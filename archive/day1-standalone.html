@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recombinatorial Drawing System - Day 1</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            background: #f5f5f5;
+            color: #333;
+        }
+        
+        .app {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .app-header {
+            background: white;
+            padding: 20px 40px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+        
+        .app-header h1 {
+            margin: 0;
+            font-size: 28px;
+            color: #333;
+            font-weight: 600;
+        }
+        
+        .app-header .subtitle {
+            margin: 8px 0 0 0;
+            font-size: 14px;
+            color: #666;
+        }
+        
+        .app-content {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 40px 20px;
+            position: relative;
+        }
+        
+        .canvas-container {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            align-items: center;
+        }
+        
+        canvas {
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            background: white;
+            cursor: crosshair;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+        
+        canvas:hover {
+            border-color: #0066ff;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 16px;
+            align-items: center;
+        }
+        
+        .clear-button {
+            padding: 10px 20px;
+            background: #ff5252;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s ease;
+        }
+        
+        .clear-button:hover {
+            background: #ff1744;
+        }
+        
+        .stroke-count {
+            font-size: 14px;
+            color: #666;
+            font-weight: 500;
+        }
+        
+        .recognition-panel {
+            position: fixed;
+            right: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            min-width: 250px;
+            max-width: 300px;
+            display: none;
+        }
+        
+        .recognition-panel.visible {
+            display: block;
+        }
+        
+        .recognition-panel h3 {
+            margin: 0 0 16px 0;
+            font-size: 16px;
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .suggestions {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        .suggestion-button {
+            padding: 12px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            background: white;
+            cursor: pointer;
+            text-align: left;
+            transition: all 0.2s ease;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        
+        .suggestion-button:hover {
+            border-color: #0066ff;
+            background: #f5f9ff;
+        }
+        
+        .suggestion-button .label {
+            font-size: 14px;
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .suggestion-button .confidence {
+            font-size: 12px;
+            color: #666;
+        }
+        
+        .suggestion-button .confidence.high {
+            color: #4CAF50;
+        }
+        
+        .suggestion-button .confidence.medium {
+            color: #ff9800;
+        }
+        
+        .something-else-button {
+            padding: 12px 16px;
+            border: 2px solid #d0d0d0;
+            border-radius: 6px;
+            background: #f5f5f5;
+            cursor: pointer;
+            text-align: center;
+            color: #666;
+            transition: all 0.2s ease;
+        }
+        
+        .something-else-button:hover {
+            background: #e8e8e8;
+            border-color: #b0b0b0;
+        }
+        
+        .app-footer {
+            background: white;
+            padding: 16px 40px;
+            text-align: center;
+            border-top: 1px solid #e0e0e0;
+        }
+        
+        .app-footer p {
+            margin: 4px 0;
+            font-size: 14px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="app">
+        <header class="app-header">
+            <h1>Recombinatorial Drawing System</h1>
+            <p class="subtitle">Day 1: Basic Drawing + Primitive Recognition</p>
+        </header>
+
+        <div class="app-content">
+            <div class="canvas-container">
+                <canvas id="canvas" width="800" height="600"></canvas>
+                
+                <div class="controls">
+                    <button id="clearBtn" class="clear-button">Clear Canvas</button>
+                    <div class="stroke-count">
+                        Strokes: <span id="strokeCount">0</span> | Accepted: <span id="acceptedCount">0</span>
+                    </div>
+                </div>
+            </div>
+
+            <div id="recognitionPanel" class="recognition-panel">
+                <h3>This looks like:</h3>
+                <div id="suggestions" class="suggestions"></div>
+            </div>
+        </div>
+
+        <footer class="app-footer">
+            <p>Draw circles, lines, or rectangles. The system will recognize them and suggest what they are.</p>
+            <p>Accepted shapes turn <span style="color: #0066ff; font-weight: bold;">blue</span>.</p>
+        </footer>
+    </div>
+
+    <script>
+        // State
+        const state = {
+            strokes: [],
+            currentStroke: [],
+            context: [],
+            isDrawing: false,
+            suggestions: [],
+            selectedStrokeIndex: null
+        };
+
+        // Elements
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const recognitionPanel = document.getElementById('recognitionPanel');
+        const suggestionsDiv = document.getElementById('suggestions');
+        const clearBtn = document.getElementById('clearBtn');
+        const strokeCountSpan = document.getElementById('strokeCount');
+        const acceptedCountSpan = document.getElementById('acceptedCount');
+
+        // Utility functions
+        function getBounds(points) {
+            if (points.length === 0) return { minX: 0, maxX: 0, minY: 0, maxY: 0 };
+            
+            let minX = Infinity, maxX = -Infinity;
+            let minY = Infinity, maxY = -Infinity;
+            
+            points.forEach(point => {
+                minX = Math.min(minX, point.x);
+                maxX = Math.max(maxX, point.x);
+                minY = Math.min(minY, point.y);
+                maxY = Math.max(maxY, point.y);
+            });
+            
+            return { minX, maxX, minY, maxY };
+        }
+
+        function isStrokeClosed(points, threshold = 20) {
+            if (points.length < 5) return false;
+            
+            const start = points[0];
+            const end = points[points.length - 1];
+            const distance = Math.sqrt(
+                Math.pow(end.x - start.x, 2) + 
+                Math.pow(end.y - start.y, 2)
+            );
+            
+            return distance < threshold;
+        }
+
+        function calculateStraightness(points) {
+            if (points.length < 2) return 0;
+            
+            const start = points[0];
+            const end = points[points.length - 1];
+            
+            const directDistance = Math.sqrt(
+                Math.pow(end.x - start.x, 2) + 
+                Math.pow(end.y - start.y, 2)
+            );
+            
+            let pathLength = 0;
+            for (let i = 1; i < points.length; i++) {
+                const dx = points[i].x - points[i-1].x;
+                const dy = points[i].y - points[i-1].y;
+                pathLength += Math.sqrt(dx * dx + dy * dy);
+            }
+            
+            if (pathLength === 0) return 0;
+            return directDistance / pathLength;
+        }
+
+        function getFingerprint(points) {
+            const bounds = getBounds(points);
+            const width = bounds.maxX - bounds.minX;
+            const height = bounds.maxY - bounds.minY;
+            
+            return {
+                aspectRatio: height === 0 ? 1 : width / height,
+                straightness: calculateStraightness(points),
+                isClosed: isStrokeClosed(points),
+                bounds: bounds,
+                size: Math.max(width, height)
+            };
+        }
+
+        function analyzeStroke(points) {
+            const fp = getFingerprint(points);
+            const results = [];
+            
+            // Circle: closed, square-ish aspect ratio, curvy
+            if (fp.isClosed && Math.abs(fp.aspectRatio - 1) < 0.3 && fp.straightness < 0.3) {
+                results.push({ type: 'circle', confidence: 0.8, label: 'Circle' });
+            }
+            
+            // Line: straight, not closed
+            if (fp.straightness > 0.85 && !fp.isClosed) {
+                results.push({ type: 'line', confidence: 0.9, label: 'Line' });
+            }
+            
+            // Rectangle: closed, straightish edges
+            if (fp.isClosed && fp.straightness > 0.6 && fp.straightness < 0.85) {
+                results.push({ type: 'rectangle', confidence: 0.7, label: 'Rectangle' });
+            }
+            
+            return results.sort((a, b) => b.confidence - a.confidence);
+        }
+
+        // Rendering
+        function render() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw completed strokes
+            state.strokes.forEach((stroke, idx) => {
+                const isAccepted = state.context[idx] && state.context[idx] !== '';
+                ctx.strokeStyle = isAccepted ? '#0066ff' : '#666666';
+                ctx.lineWidth = 2;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                
+                ctx.beginPath();
+                stroke.forEach((point, i) => {
+                    if (i === 0) ctx.moveTo(point.x, point.y);
+                    else ctx.lineTo(point.x, point.y);
+                });
+                ctx.stroke();
+            });
+            
+            // Draw current stroke
+            if (state.currentStroke.length > 0) {
+                ctx.strokeStyle = '#666666';
+                ctx.lineWidth = 2;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                
+                ctx.beginPath();
+                state.currentStroke.forEach((point, i) => {
+                    if (i === 0) ctx.moveTo(point.x, point.y);
+                    else ctx.lineTo(point.x, point.y);
+                });
+                ctx.stroke();
+            }
+            
+            // Update counters
+            strokeCountSpan.textContent = state.strokes.length;
+            acceptedCountSpan.textContent = state.context.filter(c => c && c !== '').length;
+        }
+
+        function showSuggestions(suggestions) {
+            state.suggestions = suggestions;
+            
+            if (suggestions.length === 0) {
+                recognitionPanel.classList.remove('visible');
+                return;
+            }
+            
+            suggestionsDiv.innerHTML = '';
+            
+            suggestions.forEach(sug => {
+                const btn = document.createElement('button');
+                btn.className = 'suggestion-button';
+                btn.innerHTML = `
+                    <span class="label">${sug.label}</span>
+                    <span class="confidence ${sug.confidence > 0.8 ? 'high' : 'medium'}">
+                        ${sug.confidence > 0.8 ? 'high' : 'medium'} confidence
+                    </span>
+                `;
+                btn.onclick = () => acceptSuggestion(sug);
+                suggestionsDiv.appendChild(btn);
+            });
+            
+            const elseBtn = document.createElement('button');
+            elseBtn.className = 'something-else-button';
+            elseBtn.textContent = 'Something else';
+            elseBtn.onclick = handleSomethingElse;
+            suggestionsDiv.appendChild(elseBtn);
+            
+            recognitionPanel.classList.add('visible');
+        }
+
+        function acceptSuggestion(suggestion) {
+            if (state.selectedStrokeIndex === null) return;
+            
+            state.context[state.selectedStrokeIndex] = suggestion.type;
+            recognitionPanel.classList.remove('visible');
+            state.selectedStrokeIndex = null;
+            render();
+        }
+
+        function handleSomethingElse() {
+            const customName = prompt('What should we call this?');
+            if (customName && state.selectedStrokeIndex !== null) {
+                state.context[state.selectedStrokeIndex] = customName;
+                recognitionPanel.classList.remove('visible');
+                state.selectedStrokeIndex = null;
+                render();
+            }
+        }
+
+        // Mouse events
+        canvas.addEventListener('mousedown', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const point = {
+                x: e.clientX - rect.left,
+                y: e.clientY - rect.top
+            };
+            state.isDrawing = true;
+            state.currentStroke = [point];
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            if (!state.isDrawing) return;
+            
+            const rect = canvas.getBoundingClientRect();
+            const point = {
+                x: e.clientX - rect.left,
+                y: e.clientY - rect.top
+            };
+            state.currentStroke.push(point);
+            render();
+        });
+
+        canvas.addEventListener('mouseup', () => {
+            if (state.currentStroke.length > 0) {
+                state.strokes.push([...state.currentStroke]);
+                
+                // Analyze and suggest
+                const suggestions = analyzeStroke(state.currentStroke);
+                state.selectedStrokeIndex = state.strokes.length - 1;
+                showSuggestions(suggestions);
+            }
+            state.isDrawing = false;
+            state.currentStroke = [];
+            render();
+        });
+
+        canvas.addEventListener('mouseleave', () => {
+            if (state.isDrawing) {
+                if (state.currentStroke.length > 0) {
+                    state.strokes.push([...state.currentStroke]);
+                    
+                    const suggestions = analyzeStroke(state.currentStroke);
+                    state.selectedStrokeIndex = state.strokes.length - 1;
+                    showSuggestions(suggestions);
+                }
+                state.isDrawing = false;
+                state.currentStroke = [];
+                render();
+            }
+        });
+
+        clearBtn.addEventListener('click', () => {
+            state.strokes = [];
+            state.context = [];
+            state.currentStroke = [];
+            state.suggestions = [];
+            state.selectedStrokeIndex = null;
+            recognitionPanel.classList.remove('visible');
+            render();
+        });
+
+        // Initial render
+        render();
+    </script>
+</body>
+</html>
