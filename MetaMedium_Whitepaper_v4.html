@@ -1,0 +1,2965 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MetaMedium: Beyond Chat</title>
+    <meta name="description" content="A Framework for Diagrammatic Human-AI Communication">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400;1,9..40,500&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        /* ===========================================
+           MetaMedium Design System v4
+           Warm Palette · Space Grotesk Headings
+           WCAG AA Compliant
+        =========================================== */
+        
+        :root {
+            --ink: #1a1a2e;
+            --ink-soft: #2d2d3a;
+            --paper: #f8f6f1;
+            --paper-warm: #f3f1ec;
+            --accent: #e63946;
+            --accent-hover: #c62f3b;
+            --muted: #4a4a5a;
+            --muted-light: #6b7280;
+            --highlight: #fef3c7;
+            --sketch-blue: #3b82f6;
+            --sketch-green: #22c55e;
+            --sketch-purple: #8b5cf6;
+            --border: #d1d5db;
+            --shadow: rgba(0,0,0,0.08);
+            --focus: #3b82f6;
+            
+            --text-xs: 0.8125rem;
+            --text-sm: 0.9375rem;
+            --text-base: 1.125rem;
+            --text-lg: 1.3125rem;
+            --text-xl: 1.625rem;
+            --text-2xl: 2rem;
+            --text-3xl: 2.5rem;
+            
+            --space-xs: 0.375rem;
+            --space-sm: 0.75rem;
+            --space-md: 1.25rem;
+            --space-lg: 2rem;
+            --space-xl: 3rem;
+            --space-2xl: 4.5rem;
+        }
+        
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        html { scroll-behavior: smooth; font-size: 100%; }
+        
+        @media (prefers-reduced-motion: reduce) {
+            html { scroll-behavior: auto; }
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+        
+        body {
+            font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            font-size: var(--text-base);
+            font-weight: 450;
+            line-height: 1.7;
+            color: var(--ink);
+            background: var(--paper);
+            -webkit-font-smoothing: antialiased;
+        }
+        
+        .skip-link {
+            position: absolute;
+            top: -100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--ink);
+            color: var(--paper);
+            padding: var(--space-sm) var(--space-md);
+            border-radius: 0 0 8px 8px;
+            font-weight: 600;
+            z-index: 9999;
+        }
+        .skip-link:focus { top: 0; }
+        
+        :focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
+        
+        /* Hero - Blueprint Canvas (Dark/Inverted) */
+        .hero {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: var(--space-lg) var(--space-lg) 0;
+            position: relative;
+            overflow: hidden;
+            background: #0a1628;
+        }
+        
+        /* Gradient transition to content - simple fade */
+        .hero::after {
+            content: '';
+            position: absolute;
+            bottom: 0; left: 0; right: 0;
+            height: 60px;
+            background: linear-gradient(to bottom, transparent 0%, var(--paper) 100%);
+            z-index: 3;
+            pointer-events: none;
+        }
+        
+        #heroCanvas {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            z-index: 1;
+            cursor: crosshair;
+        }
+        
+        .hero-hint {
+            position: absolute;
+            bottom: 9rem;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 2;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-family: 'DM Sans', sans-serif;
+            font-size: 0.7rem;
+            font-weight: 500;
+            color: rgba(147, 197, 253, 0.4);
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+            transition: opacity 0.3s;
+            pointer-events: none;
+        }
+        .hero-hint .hint-icon {
+            font-size: 0.9rem;
+            animation: pencil-wiggle 2s ease-in-out infinite;
+        }
+        @keyframes pencil-wiggle {
+            0%, 100% { transform: rotate(-5deg); }
+            50% { transform: rotate(5deg); }
+        }
+        .hero.drawing .hero-hint { opacity: 0; }
+        
+        .hero-content {
+            position: relative;
+            z-index: 2;
+            max-width: 800px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            pointer-events: none; /* Allow drawing through */
+        }
+        
+        .sr-only {
+            position: absolute;
+            width: 1px; height: 1px;
+            padding: 0; margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
+        }
+        
+        .hero h1 {
+            font-family: 'Space Grotesk', -apple-system, sans-serif;
+            font-size: clamp(3rem, 10vw, 5.5rem);
+            font-weight: 700;
+            letter-spacing: -0.03em;
+            line-height: 1;
+            margin-bottom: var(--space-xs);
+            color: #fff;
+        }
+        
+        .hero h1 .meta {
+            background: linear-gradient(135deg, #f97316 0%, #a855f7 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .hero .tagline {
+            font-family: 'DM Sans', sans-serif;
+            font-size: var(--text-sm);
+            font-weight: 600;
+            color: rgba(147, 197, 253, 0.7);
+            letter-spacing: 0.25em;
+            text-transform: uppercase;
+            margin-bottom: var(--space-sm);
+        }
+        
+        .hero .subtitle {
+            font-family: 'DM Serif Display', Georgia, serif;
+            font-size: clamp(1.1rem, 2.2vw, 1.4rem);
+            font-weight: 400;
+            font-style: italic;
+            color: rgba(255, 255, 255, 0.6);
+            max-width: 550px;
+            margin: 0 auto var(--space-md);
+            line-height: 1.4;
+        }
+        
+        .hero .byline { 
+            font-size: var(--text-sm); 
+            color: rgba(255, 255, 255, 0.75); 
+            font-weight: 500;
+        }
+        .hero .byline .role { 
+            color: rgba(255, 255, 255, 0.45);
+            font-weight: 400;
+            margin-left: 0.25em;
+        }
+        
+        .scroll-indicator {
+            position: absolute;
+            bottom: var(--space-xl);
+            z-index: 4;
+            animation: bounce 2s infinite;
+            cursor: pointer;
+            text-decoration: none;
+            display: block;
+        }
+        .scroll-indicator svg { 
+            width: 28px; 
+            height: 28px; 
+            stroke-width: 2;
+            animation: strokeGlow 0.8s ease-in-out infinite alternate;
+        }
+        
+        @keyframes bounce {
+            0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+            40% { transform: translateY(-8px); }
+            60% { transform: translateY(-4px); }
+        }
+        
+        @keyframes strokeGlow {
+            0% { stroke: rgba(147, 197, 253, 0.3); }
+            100% { stroke: rgba(147, 197, 253, 0.9); }
+        }
+        
+        /* Navigation - Slim with left title */
+        nav {
+            position: fixed;
+            top: 0; left: 0; right: 0;
+            background: rgba(253, 252, 250, 0.97);
+            backdrop-filter: blur(12px);
+            z-index: 1000;
+            border-bottom: 1px solid var(--border);
+            transform: translateY(-100%);
+            transition: transform 0.25s ease;
+            height: 40px;
+        }
+        nav.visible { transform: translateY(0); }
+        
+        .nav-inner {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 0 var(--space-md);
+            height: 100%;
+        }
+        
+        .nav-title {
+            font-family: 'Space Grotesk', -apple-system, sans-serif;
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--ink);
+            text-decoration: none;
+            letter-spacing: -0.02em;
+            line-height: 1;
+        }
+        .nav-title:hover { color: var(--accent); }
+        
+        /* Mobile nav toggle */
+        .nav-toggle {
+            display: none;
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 0.5rem;
+            margin-right: -0.5rem;
+        }
+        .nav-toggle span {
+            display: block;
+            width: 20px;
+            height: 2px;
+            background: var(--ink);
+            margin: 4px 0;
+            transition: transform 0.2s, opacity 0.2s;
+        }
+        .nav-toggle.active span:nth-child(1) { transform: rotate(45deg) translate(4px, 4px); }
+        .nav-toggle.active span:nth-child(2) { opacity: 0; }
+        .nav-toggle.active span:nth-child(3) { transform: rotate(-45deg) translate(4px, -4px); }
+        
+        nav ul {
+            display: flex;
+            align-items: center;
+            gap: 0;
+            list-style: none;
+            margin: 0;
+            padding: 0;
+            height: 100%;
+        }
+        
+        nav li {
+            display: flex;
+            align-items: center;
+            height: 100%;
+            margin: 0;
+        }
+        
+        nav a {
+            font-family: 'DM Sans', sans-serif;
+            font-size: 0.6875rem;
+            font-weight: 600;
+            text-decoration: none;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            padding: 0 0.625rem;
+            display: flex;
+            align-items: center;
+            height: 100%;
+            transition: color 0.2s;
+        }
+        nav ul a:hover, nav ul a:focus { color: var(--accent); }
+        
+        /* Mobile nav styles */
+        @media (max-width: 768px) {
+            .nav-toggle { display: block; }
+            
+            nav ul {
+                position: absolute;
+                top: 40px;
+                left: 0;
+                right: 0;
+                background: rgba(253, 252, 250, 0.98);
+                backdrop-filter: blur(12px);
+                flex-direction: column;
+                align-items: stretch;
+                height: auto;
+                padding: var(--space-md) 0;
+                border-bottom: 1px solid var(--border);
+                display: none;
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            }
+            
+            nav ul.open { display: flex; }
+            
+            nav li {
+                height: auto;
+            }
+            
+            nav ul a {
+                padding: 1.25rem var(--space-lg);
+                height: auto;
+                font-size: 1.125rem;
+                font-weight: 500;
+                letter-spacing: 0.02em;
+                text-transform: none;
+            }
+        }
+        
+        /* Main Content */
+        main {
+            max-width: 760px;
+            margin: 0 auto;
+            padding: var(--space-lg) var(--space-lg) var(--space-2xl);
+        }
+        
+        /* Overview/Abstract section */
+        #abstract {
+            scroll-margin-top: 0;
+        }
+        .overview-box {
+            padding: var(--space-lg);
+            background: linear-gradient(135deg, #f0f9ff 0%, #fef3c7 100%);
+            border-left: 4px solid var(--accent);
+            border-radius: 0 8px 8px 0;
+            margin-top: var(--space-sm);
+        }
+        .overview-box p {
+            font-size: var(--text-lg);
+            font-style: italic;
+            line-height: 1.65;
+            color: var(--ink-soft);
+        }
+        .overview-box p:first-child {
+            font-weight: 500;
+        }
+        .overview-box p:last-child {
+            margin-bottom: 0;
+        }
+        
+        section {
+            margin-bottom: var(--space-2xl);
+            scroll-margin-top: 4rem;
+        }
+        
+        h2 {
+            font-family: 'Space Grotesk', -apple-system, sans-serif;
+            font-size: clamp(1.875rem, 4vw, var(--text-3xl));
+            font-weight: 600;
+            margin-bottom: var(--space-md);
+            letter-spacing: -0.02em;
+            line-height: 1.2;
+            position: relative;
+            padding-left: 1.25rem;
+        }
+        
+        h2::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 5px;
+            background: var(--sketch-blue);
+            border-radius: 2px;
+        }
+        
+        h3 {
+            font-family: 'Space Grotesk', -apple-system, sans-serif;
+            font-size: var(--text-xl);
+            font-weight: 500;
+            margin: var(--space-lg) 0 var(--space-sm);
+            line-height: 1.25;
+        }
+        
+        h4 {
+            font-family: 'Space Grotesk', -apple-system, sans-serif;
+            font-size: var(--text-lg);
+            font-weight: 600;
+            margin: var(--space-md) 0 var(--space-xs);
+            letter-spacing: -0.01em;
+        }
+        
+        p {
+            margin-bottom: var(--space-md);
+            max-width: 65ch;
+        }
+        
+        strong { font-weight: 600; color: var(--ink); }
+        em { font-style: italic; }
+        
+        a {
+            color: var(--accent);
+            text-decoration: underline;
+            text-underline-offset: 2px;
+            text-decoration-thickness: 1px;
+        }
+        a:hover { color: var(--accent-hover); }
+        
+        /* Blockquotes - v1 elegant style with gradient */
+        blockquote {
+            font-family: 'DM Sans', sans-serif;
+            font-size: 1.3rem;
+            font-weight: 400;
+            font-style: italic;
+            line-height: 1.6;
+            color: var(--muted);
+            border-left: 3px solid var(--sketch-blue);
+            padding: var(--space-md) var(--space-md) var(--space-md) var(--space-lg);
+            margin: var(--space-xl) 0;
+            background: linear-gradient(to bottom, rgba(59, 130, 246, 0.08) 0%, transparent 100%);
+            border-radius: 0 8px 8px 0;
+        }
+        
+        blockquote cite {
+            display: block;
+            font-family: 'DM Sans', sans-serif;
+            font-style: normal;
+            font-size: var(--text-sm);
+            font-weight: 500;
+            color: var(--muted-light);
+            margin-top: var(--space-sm);
+        }
+        blockquote cite em { font-style: italic; }
+        
+        ul, ol {
+            margin-bottom: var(--space-md);
+            padding-left: var(--space-md);
+        }
+        
+        li {
+            margin-bottom: var(--space-xs);
+            line-height: 1.65;
+        }
+        
+        /* Figures */
+        figure { margin: var(--space-lg) 0; }
+        
+        .placeholder-figure {
+            background: linear-gradient(135deg, var(--paper-warm) 0%, #fff 100%);
+            border: 2px dashed var(--border);
+            border-radius: 10px;
+            padding: var(--space-lg) var(--space-md);
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 220px;
+        }
+        
+        .placeholder-figure .icon { font-size: 3rem; margin-bottom: var(--space-sm); opacity: 0.5; }
+        .placeholder-figure .label {
+            font-family: 'DM Sans', sans-serif;
+            font-size: var(--text-sm);
+            font-weight: 600;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-bottom: var(--space-xs);
+        }
+        .placeholder-figure .description {
+            font-size: var(--text-base);
+            color: var(--muted);
+            max-width: 400px;
+            line-height: 1.5;
+        }
+        
+        figcaption {
+            font-size: var(--text-sm);
+            color: var(--muted);
+            margin-top: var(--space-sm);
+            line-height: 1.6;
+        }
+        figcaption strong { color: var(--ink); }
+        
+        /* Video Embed */
+        .video-embed {
+            position: relative;
+            padding-bottom: 56.25%;
+            height: 0;
+            overflow: hidden;
+            margin: var(--space-md) 0;
+            border-radius: 10px;
+            box-shadow: 0 3px 20px var(--shadow);
+        }
+        .video-embed iframe {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            border: none;
+        }
+        
+        /* Demo Container */
+        .demo-container {
+            margin: var(--space-lg) 0;
+            border: 2px solid var(--sketch-blue);
+            border-radius: 12px;
+            overflow: hidden;
+            background: #fff;
+        }
+        .demo-header {
+            background: linear-gradient(135deg, var(--sketch-blue), var(--sketch-green));
+            color: white;
+            padding: var(--space-sm) var(--space-md);
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: 600;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .demo-header span {
+            font-size: var(--text-sm);
+            opacity: 0.9;
+            font-weight: 400;
+        }
+        .demo-container iframe {
+            width: 100%;
+            height: 450px;
+            border: none;
+            display: block;
+        }
+        
+        /* Callout */
+        .callout {
+            background: var(--paper-warm);
+            border-radius: 10px;
+            padding: var(--space-md);
+            margin: var(--space-md) 0;
+            border-left: 4px solid var(--sketch-blue);
+        }
+        .callout.insight { border-left-color: var(--sketch-purple); }
+        .callout.key { border-left-color: var(--accent); }
+        .callout h4 { margin-top: 0; font-size: var(--text-base); }
+        .callout p { font-size: var(--text-base); line-height: 1.65; }
+        .callout p:last-child { margin-bottom: 0; }
+        
+        /* Use Cases - v1 gradient style */
+        .use-case {
+            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+            border-radius: 8px;
+            padding: var(--space-lg);
+            margin: var(--space-md) 0;
+            border-left: 4px solid var(--sketch-green);
+        }
+        .use-case h4 {
+            margin-top: 0;
+            color: var(--sketch-green);
+            font-size: var(--text-sm);
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+        }
+        .use-case .scenario { font-style: italic; font-size: var(--text-base); line-height: 1.65; margin-bottom: var(--space-sm); }
+        .use-case .capabilities { font-size: var(--text-sm); color: var(--muted); margin-bottom: 0; }
+        
+        /* Genealogy */
+        .genealogy-item {
+            display: grid;
+            grid-template-columns: 70px 1fr;
+            gap: var(--space-md);
+            margin: var(--space-lg) 0;
+            padding: 0;
+            align-items: start;
+        }
+        .genealogy-item .year {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: var(--text-base);
+            font-weight: 600;
+            color: var(--accent);
+            line-height: 1.4;
+            padding-top: 2px;
+        }
+        .genealogy-item .content h4 { margin-top: 0; font-size: var(--text-lg); line-height: 1.25; }
+        .genealogy-item .content p { font-size: var(--text-base); line-height: 1.65; }
+        .genealogy-item .content p:last-of-type { margin-bottom: 0; }
+        
+        /* Media placeholder for timeline */
+        .media-placeholder {
+            margin-top: var(--space-sm);
+            border-radius: 8px;
+            overflow: hidden;
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.08) 0%, rgba(139, 92, 246, 0.08) 100%);
+            border: 1px dashed rgba(59, 130, 246, 0.3);
+            position: relative;
+        }
+        .media-placeholder.video {
+            aspect-ratio: 16/9;
+        }
+        .media-placeholder.image {
+            aspect-ratio: 4/3;
+        }
+        .media-placeholder-inner {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: var(--muted-light);
+            font-size: var(--text-sm);
+            gap: var(--space-xs);
+        }
+        .media-placeholder-inner .icon {
+            font-size: 1.5rem;
+            opacity: 0.6;
+        }
+        .media-placeholder-inner .label {
+            font-weight: 500;
+            opacity: 0.8;
+        }
+        .media-placeholder-inner .caption {
+            font-size: var(--text-xs);
+            opacity: 0.6;
+            text-align: center;
+            max-width: 80%;
+        }
+        
+        /* Embedded video in timeline */
+        .timeline-video {
+            margin-top: var(--space-sm);
+            border-radius: 8px;
+            overflow: hidden;
+            aspect-ratio: 16/9;
+            background: #000;
+        }
+        .timeline-video iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+        
+        /* Embedded image in timeline */
+        .timeline-image {
+            margin-top: var(--space-sm);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .timeline-image img {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+        
+        /* Gallery grid */
+        .gallery {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: var(--space-md);
+            margin: var(--space-lg) 0;
+        }
+        .gallery-item {
+            aspect-ratio: 4/3;
+        }
+        .gallery-item .media-placeholder {
+            margin-top: 0;
+            height: 100%;
+        }
+        .gallery-item .media-placeholder.video {
+            aspect-ratio: unset;
+        }
+        .gallery-item .media-placeholder.image {
+            aspect-ratio: unset;
+        }
+        .gallery-item .media-placeholder-inner .label {
+            font-size: var(--text-sm);
+        }
+        .gallery-item .media-placeholder-inner .caption {
+            font-size: var(--text-xs);
+        }
+        
+        @media (max-width: 768px) {
+            .gallery {
+                grid-template-columns: repeat(2, 1fr);
+                gap: var(--space-sm);
+            }
+        }
+        @media (max-width: 480px) {
+            .gallery {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        /* Principles - v1 watermark + v3 stripe */
+        .principles-grid { display: grid; gap: var(--space-sm); margin: var(--space-md) 0; }
+        
+        .principle {
+            background: #fff;
+            border-radius: 8px;
+            padding: var(--space-lg);
+            border: 1px solid var(--border);
+            position: relative;
+            overflow: hidden;
+        }
+        .principle::before {
+            content: attr(data-num);
+            position: absolute;
+            top: -15px;
+            right: 15px;
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 5rem;
+            font-weight: 700;
+            color: rgba(26, 26, 46, 0.04);
+            line-height: 1;
+            pointer-events: none;
+        }
+        .principle::after {
+            content: '';
+            position: absolute;
+            top: 0; left: 0;
+            width: 4px; height: 100%;
+            background: linear-gradient(180deg, var(--sketch-blue), var(--sketch-green));
+        }
+        .principle h4 {
+            margin-top: 0;
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: var(--text-lg);
+            font-weight: 600;
+        }
+        .principle p { font-size: var(--text-base); line-height: 1.65; }
+        .principle p:last-child { margin-bottom: 0; }
+        .principle-example {
+            font-size: var(--text-sm);
+            color: var(--muted);
+            border-left: 2px solid var(--border);
+            padding-left: var(--space-sm);
+            margin-top: var(--space-xs);
+        }
+        
+        /* Practice use cases - principles label */
+        .principles-used {
+            font-size: var(--text-xs);
+            color: var(--sketch-blue);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: var(--space-xs);
+        }
+        .principles-used strong {
+            color: var(--ink-muted);
+            font-weight: 500;
+        }
+        
+        /* Video fallback links */
+        .video-link {
+            font-size: var(--text-sm);
+            color: var(--ink-muted);
+            margin-top: var(--space-xs);
+        }
+        .video-link a {
+            color: var(--accent);
+        }
+        
+        /* Footer */
+        footer {
+            background: var(--ink);
+            color: #fff;
+            text-align: center;
+            padding: var(--space-xl) var(--space-md);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        .footer-title {
+            font-family: 'Space Grotesk', -apple-system, sans-serif;
+            font-size: var(--text-lg);
+            font-weight: 600;
+            margin-bottom: var(--space-xs);
+        }
+        .footer-subtitle {
+            font-size: var(--text-sm);
+            opacity: 0.65;
+            margin-bottom: var(--space-md);
+        }
+        .footer-copyright {
+            font-size: var(--text-sm);
+            opacity: 0.8;
+            margin-bottom: var(--space-xs);
+        }
+        footer a { 
+            color: #fff; 
+            opacity: 0.8;
+            text-decoration: underline;
+            text-underline-offset: 2px;
+        }
+        footer a:hover { opacity: 1; }
+        footer .version {
+            font-family: 'DM Sans', sans-serif;
+            font-size: var(--text-xs);
+            font-weight: 500;
+            opacity: 0.45;
+            margin-top: var(--space-sm);
+            letter-spacing: 0.05em;
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            :root { 
+                --text-base: 1.0625rem;
+                --space-lg: 1.5rem;
+                --space-xl: 2.25rem;
+                --space-2xl: 3rem;
+            }
+            main { padding: var(--space-md) var(--space-md) var(--space-xl); }
+            
+            nav { height: 36px; }
+            .nav-inner { padding: 0 var(--space-sm); }
+            .nav-title { font-size: 0.9375rem; }
+            nav ul a { font-size: 0.5625rem; padding: 0 0.375rem; }
+            
+            .genealogy-item { grid-template-columns: 1fr; gap: var(--space-xs); }
+            .genealogy-item .year { margin-bottom: var(--space-xs); }
+            
+            .media-placeholder.video { aspect-ratio: 16/9; }
+            .media-placeholder.image { aspect-ratio: 3/2; }
+            .timeline-video { aspect-ratio: 16/9; }
+            blockquote { padding-left: var(--space-sm); }
+            .hero { padding: var(--space-lg) var(--space-md); }
+            .hero-hint { bottom: 7rem; }
+        }
+        
+        @media (max-width: 480px) {
+            nav { height: 34px; }
+            nav ul { flex-wrap: nowrap; overflow-x: auto; }
+            nav ul a { font-size: 0.5rem; padding: 0 0.3rem; white-space: nowrap; }
+            .nav-title { font-size: 0.875rem; }
+            .hero h1 { font-size: clamp(2.5rem, 14vw, 4rem); }
+        }
+        
+        @media (min-width: 1200px) { main { max-width: 800px; } }
+        
+        @media print {
+            body { font-size: 11pt; line-height: 1.5; }
+            nav, .scroll-indicator, #heroCanvas, .hero-hint { display: none; }
+            .hero { min-height: auto; padding: 1.5rem 0; background: none; }
+            .hero::after { display: none; }
+            .hero h1, .hero .subtitle, .hero .tagline, .hero .byline { color: var(--ink); }
+            .hero h1 .meta { -webkit-text-fill-color: var(--accent); }
+        }
+    </style>
+</head>
+<body>
+    <a href="#vision" class="skip-link">Skip to main content</a>
+    
+    <nav id="nav" role="navigation" aria-label="Main navigation">
+        <div class="nav-inner">
+            <a href="#top" class="nav-title">MetaMedium</a>
+            <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+            <ul>
+                <li><a href="#abstract">Overview</a></li>
+                <li><a href="#problem">Problem</a></li>
+                <li><a href="#vision">Vision</a></li>
+                <li><a href="#lineage">Lineage</a></li>
+                <li><a href="#thesis">Thesis</a></li>
+                <li><a href="#framework">Framework</a></li>
+                <li><a href="#development">Development</a></li>
+                <li><a href="#scenarios">Scenarios</a></li>
+                <li><a href="#future">Future</a></li>
+                <li><a href="#conclusion">Conclusion</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <header class="hero" id="top">
+        <!-- Interactive Blueprint Canvas -->
+        <canvas id="heroCanvas"></canvas>
+        <div class="hero-hint">
+            <span class="hint-icon">✎</span>
+            <span class="hint-text">draw here</span>
+        </div>
+        
+        <div class="hero-content">
+            <h1><span class="meta">Meta</span>Medium</h1>
+            <p class="tagline">beyond chat</p>
+            <p class="subtitle">Principles for a Diagrammatic Understanding Interface</p>
+            <p class="byline">John Hanacek <span class="role">Product Designer</span></p>
+        </div>
+        <a href="#abstract" class="scroll-indicator" aria-label="Scroll to content">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+                <path d="M7 13l5 5 5-5M7 6l5 5 5-5"/>
+            </svg>
+        </a>
+    </header>
+
+    <main>
+        <!-- ABSTRACT -->
+        <section>
+            <h2 id="abstract">Overview</h2>
+            
+            <div class="overview-box">
+                <p>We face problems at scales our ancestors never imagined—climate systems, global economies, interconnected crises that span generations and continents. These challenges demand new ways of thinking together, yet our tools for shared understanding remain impoverished: text boxes, chat threads, turn-taking dialogues. The gap between the complexity we face and the bandwidth of our interfaces has never been wider.</p>
+                
+                <p>The MetaMedium proposes that drawing—humanity's oldest form of external thought—can become the foundation for a new kind of human-AI communication. This is not merely a new interface. It is an evolution of language itself, where AI becomes a <em>meta-word</em>—a new linguistic element that transforms marks into meaning-in-context, allowing a seven-year-old and a graduate student to collaborate on the same canvas, each working at their own level, each contributing to shared understanding.</p>
+            </div>
+        </section>
+
+        <!-- SECTION 1: THE PROBLEM -->
+        <section id="problem">
+            <h2>The Problem</h2>
+            
+            <h3>Dancing Without Music</h3>
+            
+            <blockquote>
+                "Imagine that children were forced to spend an hour a day drawing dance steps on squared paper and had to pass tests in these 'dance facts' before they were allowed to dance physically. Would we not expect the world to be full of 'dancophobes'?"
+                <cite>— Seymour Papert, <em>Mindstorms</em>, 1980</cite>
+            </blockquote>
+            
+            <p>Papert's question cuts to the heart of how we teach abstraction. We have created generations of "mathphobes"—people who carry through life the belief that they are "bad at math" even as they routinely use logical reasoning to fix computers, build furniture, navigate cities, and run businesses.</p>
+            
+            <p>The problem is not aptitude. The problem is that we ask people to dance without music—to manipulate symbols divorced from meaning, to learn the steps before they feel the rhythm. A child raised in a DIY family, with an intuitive sense for assembling materials in 3D space, may never connect the theory of school geometry with the practice of building. The analogy leap from scribbling symbols on paper to genuine internalization never happens.</p>
+            
+            <p>But give that same person a system that provides constant feedback, that lets them see the results of their actions immediately, that connects symbol to meaning through direct manipulation—and suddenly they discover they were never unable to do math. They were simply never shown the right connection to spark their understanding.</p>
+            
+            <h3>The Dead Drawing Problem</h3>
+            
+            <p>Today's drawing applications—from Adobe Illustrator to Microsoft OneNote to Apple Notes—share a fundamental limitation: they treat drawings as <em>pixels</em> or <em>vectors</em>, not as <em>meaning</em>. When you draw a circle in Illustrator, it knows geometry but not semantics. When you sketch in OneNote, your marks are captured but never interpreted. Procreate creates beautiful strokes that remain forever inert.</p>
+            
+            <p>Even sophisticated tools like Figma or Miro treat diagrams as layout, not computation. You can draw a flowchart, but the arrows don't actually <em>flow</em>. You can sketch a state machine, but it doesn't <em>run</em>. The computer faithfully records what you drew without understanding what you meant.</p>
+            
+            <figure>
+                <div class="placeholder-figure">
+                    <div class="icon">◇</div>
+                    <div class="label">Figure 1: The Dead Drawing Spectrum</div>
+                    <div class="description">From "dead" to "alive": Photoshop (pixels) → Illustrator (vectors) → OneNote (ink capture) → Figma (components) → Miro (templates) → Chalktalk (behaviors) → tldraw computer (LLM interpretation) → MetaMedium (learning + negotiation). Most tools cluster on the left.</div>
+                </div>
+            </figure>
+            
+            <p>This is the dead drawing problem: our most natural form of expression—mark-making—remains computationally inert. We have given computers eyes (computer vision), ears (speech recognition), and voice (text-to-speech), but we haven't given them the ability to <em>think with us through drawing</em>.</p>
+            
+            <h3>The Communication Bottleneck</h3>
+            
+            <p>We stand at an inflection point. Large language models have achieved remarkable capabilities in reasoning, generation, and conversation. Yet we interact with them through text boxes—the equivalent of trying to share a symphony by describing it in words.</p>
+            
+            <figure>
+                <div class="placeholder-figure">
+                    <div class="icon">▭</div>
+                    <div class="label">Figure 2: Bandwidth Comparison</div>
+                    <div class="description">Input channel dimensionality: Text box (1D: linear sequence) → Voice (1.5D: sequence + prosody) → Drawing (2D+: space, time, pressure, gesture, annotation). "We've been communicating through a straw."</div>
+                </div>
+            </figure>
+            
+            <p>The bottleneck limiting human-AI collaboration is not AI capability but <em>symbolic bandwidth</em>—the poverty of sign vehicles available for exchange. We have rich internal representations; our output channel is a text box. When a visual thinker must translate their spatial intuitions into text prompts, when a designer must describe their sketches in words, when a child must linearize their exploratory understanding into sequential queries—we lose the very richness that makes human cognition powerful.</p>
+            
+            <p>This matters for more than productivity. It matters for <em>who gets to participate</em> in the computational future. Text-based interfaces privilege certain cognitive styles, certain educational backgrounds, certain ways of being in the world. A child who thinks in pictures, a craftsperson who thinks with their hands, an elder who thinks in stories—all are excluded from full partnership with computational intelligence.</p>
+            
+            <blockquote>
+                "In a few years, men will be able to communicate more effectively through a machine than face to face."
+                <cite>— J.C.R. Licklider & Robert Taylor, "The Computer as a Communication Device," 1968</cite>
+            </blockquote>
+            
+            <p>Licklider and Taylor's prophecy has come true for text—but we have yet to fulfill it for the full range of human expression. We already have richer languages than text: we have drawing, gesture, spatial arrangement, annotation, demonstration. We need interfaces that honor these languages—that let humans bring their full cognitive richness into collaboration with AI.</p>
+        </section>
+
+        <!-- SECTION 2: THE VISION -->
+        <section id="vision">
+            <h2>The Vision: As We May Sketch</h2>
+            
+            <p>In 1945, Vannevar Bush imagined the Memex—a device for extending human memory and enabling associative thinking. He asked: <em>As we may think</em>, how might machines augment the trails of connection that constitute human understanding?</p>
+            
+            <p>We ask the parallel question: <em>As we may sketch</em>, how might machines augment the visual, spatial, gestural thinking that constitutes so much of human cognition—especially in children, who draw before they write, who think in pictures before they think in propositions?</p>
+            
+            <blockquote>
+                Anything digitized has become an abstraction, so let's embrace it. When I draw into a computer with the flourish of my hand, we can take it beyond pixels, beyond even vectors, toward universal mapping attempts, toward a truly metamedium.
+                <cite>— John Hanacek, "As We May Sketch," 2016</cite>
+            </blockquote>
+            
+            <p>A curve drawn by hand is a chance to try fitting a function to the line. A function is just waiting to become metaphorical graphics. Digital ink will move beyond "networked paper" to become a magical plane where computer vision partners with the human hand functioning as an <strong>interactive external imagination</strong>. From sketch to code, from code to sketch—no longer a pipeline but rather a constellation of possibilities, an ever-expanding network of opportunities to map expressiveness and flow to logic and math directly.</p>
+            
+            <h3>A Medium for Children</h3>
+            
+            <blockquote>
+                "The child is a 'verb' rather than a 'noun', an actor rather than an object... We would like to hook into his current modes of thought in order to influence him rather than just trying to replace his model with one of our own."
+                <cite>— Alan Kay, "A Personal Computer for Children of All Ages," 1972</cite>
+            </blockquote>
+            
+            <p>Children don't need to learn to code before they can think computationally. They already think in systems, in cause and effect, in "what happens if." They need interfaces that meet them where they already are—drawing, playing, exploring. The MetaMedium is that interface: a space where a child's sketch of a "bouncy house" contains the seeds of structural engineering, where doodled spirals become gateways to mathematical beauty, where the native language of visual thinking connects directly to computational power.</p>
+            
+            <h3>How We Think: Conceptual Blending</h3>
+            
+            <p>What is human thought anyway? Gilles Fauconnier and Mark Turner attempted to answer this with their theory of <em>conceptual blending</em>, building on Lakoff and Johnson's work on how metaphor structures understanding. Consider a riddle:</p>
+            
+            <div class="callout">
+                <p>A Buddhist monk begins at dawn walking up a mountain, reaches the top at sunset. After several days, he walks back down, starting at dawn and arriving at sunset. <strong>Is there a place on the path he occupies at the same hour on both journeys?</strong></p>
+            </div>
+            
+            <p>The answer becomes obvious the moment you <em>visualize</em> two monks walking the path simultaneously—one going up, one going down. They must meet somewhere. But this visualization requires what Fauconnier and Turner call an "integration network"—a blended mental space where separate inputs combine to reveal emergent structure.</p>
+            
+            <blockquote>
+                "Thanks to a mapping, full-fledged meaning can suddenly appear in a spot where it was entirely unsuspected."
+                <cite>— Douglas Hofstadter, <em>I Am a Strange Loop</em>, 2007</cite>
+            </blockquote>
+            
+            <p>The MetaMedium is a system for building integration networks on a canvas. When you draw a diagram, you are setting up mental spaces. When you connect elements with arrows or proximity, you are creating cross-space mappings. When the AI interprets your marks and offers possibilities, it is helping locate shared structures. Diagrammatic thinking externalizes the blending process—making it visible, manipulable, shareable. Two people looking at the same diagram can point to the same conceptual space.</p>
+        </section>
+
+        <!-- SECTION 3: THE LINEAGE -->
+        <section id="lineage">
+            <h2>The Lineage</h2>
+            
+            <p>The MetaMedium does not emerge from nothing. It stands on decades of research into human-computer interaction, sketch-based interfaces, and computational media. Understanding this lineage helps clarify what is genuinely new and what builds on proven foundations.</p>
+            
+            <div class="genealogy-item">
+                <div class="year">1960</div>
+                <div class="content">
+                    <h4>J.C.R. Licklider's "Man-Computer Symbiosis"</h4>
+                    <p>The foundational vision: "The hope is that, in not too many years, human brains and computing machines will be coupled together very tightly, and that the resulting partnership will think as no human brain has ever thought." Licklider imagined cooperative interaction, not automation.</p>
+                </div>
+            </div>
+            
+            <div class="genealogy-item">
+                <div class="year">1962</div>
+                <div class="content">
+                    <h4>Douglas Engelbart's "Augmenting Human Intellect"</h4>
+                    <p>Engelbart asked how we might "raise the level of the capability hierarchy at which human brains operate." His 1968 "Mother of All Demos" introduced the mouse, hypertext, and collaborative editing—all toward the goal of augmentation, not replacement.</p>
+                    <div class="media-placeholder video">
+                        <div class="media-placeholder-inner">
+                            <span class="icon">▶</span>
+                            <span class="label">Video: Mother of All Demos (1968)</span>
+                            <span class="caption">The first public demonstration of the mouse, hypertext, and video conferencing</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="genealogy-item">
+                <div class="year">1963</div>
+                <div class="content">
+                    <h4>Ivan Sutherland's Sketchpad</h4>
+                    <p>The deepest root. Sketchpad pioneered direct manipulation, constraint satisfaction, and master/instance architecture. Sutherland proposed that the computer could "extend the human imagination" through "conferring with our computers." His constraints become our semantic relationships; his design constraints that "communicate what he intended but didn't draw" become annotation-as-execution.</p>
+                    <div class="media-placeholder video">
+                        <div class="media-placeholder-inner">
+                            <span class="icon">▶</span>
+                            <span class="label">Video: Sketchpad Demo</span>
+                            <span class="caption">Direct manipulation and constraint-based drawing on the TX-2 computer</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="genealogy-item">
+                <div class="year">1972</div>
+                <div class="content">
+                    <h4>Alan Kay's Dynabook</h4>
+                    <p>"A Personal Computer for Children of All Ages"—a medium where users don't just consume but create. His question "what is the carrying capacity for ideas of the computer?" and his distinction between tools and medium remain foundational. The MetaMedium is, in many ways, an attempt to finally realize the Dynabook vision with modern AI.</p>
+                    <div class="media-placeholder image">
+                        <div class="media-placeholder-inner">
+                            <span class="icon">🖼</span>
+                            <span class="label">Image: Dynabook Concept</span>
+                            <span class="caption">Kay's original mockup of a portable computer for learning</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="genealogy-item">
+                <div class="year">1995</div>
+                <div class="content">
+                    <h4>James Landay's SILK</h4>
+                    <p>Pioneered sketch-based UI design where designers could literally draw interfaces that remained appropriately rough during exploration. SILK recognized that premature formalization constrains thinking—rough sketches should <em>stay</em> rough until ideas crystallize. This principle of honoring ambiguity directly informs the MetaMedium's "interpretive ambiguity as feature."</p>
+                </div>
+            </div>
+            
+            <div class="genealogy-item">
+                <div class="year">2007</div>
+                <div class="content">
+                    <h4>Microsoft Research's InkSeine</h4>
+                    <p>Demonstrated ink as a first-class data type with semantic linking between handwritten notes and digital content. InkSeine treated pen input not as a pointing device but as a medium of expression with its own logic.</p>
+                </div>
+            </div>
+            
+            <div class="genealogy-item">
+                <div class="year">2011</div>
+                <div class="content">
+                    <h4>Paper by FiftyThree</h4>
+                    <p>Showed that "feel" matters—that digital drawing can be pleasurable, not just functional. Paper's gesture vocabulary (blend, cut, mix) proved that touch interfaces deserve craft. It popularized the infinite canvas and demonstrated that constraints (limited tools, no layers) can liberate rather than restrict.</p>
+                    <div class="media-placeholder image">
+                        <div class="media-placeholder-inner">
+                            <span class="icon">🖼</span>
+                            <span class="label">Image: Paper App Interface</span>
+                            <span class="caption">Elegant gesture-based drawing with the infinite canvas</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="genealogy-item">
+                <div class="year">2012–13</div>
+                <div class="content">
+                    <h4>Bret Victor's Principles</h4>
+                    <p>"Creators need an immediate connection to what they're creating." His work—<em>Inventing on Principle</em>, <em>Stop Drawing Dead Fish</em>, <em>Drawing Dynamic Visualizations</em>—directly addresses the gap between directness and dynamics. Victor identified the core problem: "The parts of the computer that interact with the person are artificially separated from the parts that manipulate data and perform computation."</p>
+                    <div class="media-placeholder video">
+                        <div class="media-placeholder-inner">
+                            <span class="icon">▶</span>
+                            <span class="label">Video: Inventing on Principle</span>
+                            <span class="caption">Victor's manifesto on immediate feedback and creator connection</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="genealogy-item">
+                <div class="year">2015–</div>
+                <div class="content">
+                    <h4>Ken Perlin's Chalktalk</h4>
+                    <p>Demonstrates sketches triggering and connecting pre-programmed behaviors in real-time. Draw a circle, it becomes a clock. Draw a spring, it bounces. Connect them with a line, they influence each other. The MetaMedium extends Chalktalk by adding machine learning for recognition, user-specific pattern libraries, and the negotiation paradigm. Perlin's lab's <strong>DrawTalking (UIST 2024)</strong> adds speech: "building interactive worlds by sketching and speaking while telling stories."</p>
+                    <div class="media-placeholder video">
+                        <div class="media-placeholder-inner">
+                            <span class="icon">▶</span>
+                            <span class="label">Video: Chalktalk Demo</span>
+                            <span class="caption">Sketches come alive with pre-programmed behaviors</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="genealogy-item">
+                <div class="year">2018–</div>
+                <div class="content">
+                    <h4>Dynamicland</h4>
+                    <p>Victor's physical manifestation: "a nonprofit research lab creating a humane dynamic medium... a way for real people in the real world to explore ideas together, not just with words and pictures, but with computation." Dynamicland is the <em>hardware paradigm</em>; MetaMedium is the <em>software paradigm</em> that could run on such infrastructure.</p>
+                    <div class="media-placeholder image">
+                        <div class="media-placeholder-inner">
+                            <span class="icon">🖼</span>
+                            <span class="label">Image: Dynamicland Space</span>
+                            <span class="caption">Physical computing environment with projected interfaces on paper</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="genealogy-item">
+                <div class="year">2023</div>
+                <div class="content">
+                    <h4>tldraw's make-real</h4>
+                    <p>The viral moment: sketch a UI, press a button, get working code. make-real proved that the sketch-to-computation pipeline could be immediate via multimodal LLMs. It demonstrated mass appetite for this interaction paradigm—and also its limitations when recognition is one-shot rather than negotiated.</p>
+                    <div class="media-placeholder video">
+                        <div class="media-placeholder-inner">
+                            <span class="icon">▶</span>
+                            <span class="label">Video: make-real Demo</span>
+                            <span class="caption">Sketch-to-code via GPT-4 Vision</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="genealogy-item">
+                <div class="year">2024–</div>
+                <div class="content">
+                    <h4>tldraw computer</h4>
+                    <p>An experimental canvas where users connect components with arrows and natural language, powered by multimodal LLMs: "tldraw programs are transparent—you see how it works as it runs." MetaMedium differs by making marks themselves learnable and user-defined, and by emphasizing iterative negotiation over one-shot interpretation.</p>
+                    <div class="media-placeholder video">
+                        <div class="media-placeholder-inner">
+                            <span class="icon">▶</span>
+                            <span class="label">Video: tldraw computer</span>
+                            <span class="caption">Visual programming with LLM-powered components</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <h3>Stop Drawing Dead Fish</h3>
+            
+            <p>In 2013, Bret Victor posed a fundamental challenge: why do our drawing tools produce only static images? People are alive—they behave and respond. Creations within the computer can also live, behave, and respond... if they are allowed to.</p>
+            
+            <blockquote>
+                "Everything we draw should be alive by default."
+                <cite>— Bret Victor, "Stop Drawing Dead Fish," 2013</cite>
+            </blockquote>
+            
+            <p>Victor's insight: computer-based art tools should embrace both forms of life—artists behaving through real-time performance, and art behaving through real-time simulation. The artist should directly manipulate art objects on the canvas, the way visual art has always been created since the time of cave paintings. We shouldn't require artists to write code to make their creations move; we should let them <em>draw</em> behavior into existence.</p>
+            
+            <p>The MetaMedium extends this principle. When you sketch, your marks aren't dead representations—they're living proposals that the system interprets, animates, connects. Your drawing of a spring doesn't just look like a spring; it <em>behaves</em> like one. Your arrow doesn't just point; it establishes a <em>relationship</em> the system understands.</p>
+            
+            <div class="video-embed">
+                <iframe src="https://player.vimeo.com/video/64895205" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen title="Bret Victor: Stop Drawing Dead Fish"></iframe>
+                <p class="video-link"><a href="https://vimeo.com/64895205" target="_blank" rel="noopener">Watch on Vimeo: Bret Victor — Stop Drawing Dead Fish</a></p>
+            </div>
+            
+            <h3>Chalktalk in Action</h3>
+            <div class="video-embed">
+                <iframe src="https://player.vimeo.com/video/232230096" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen title="Ken Perlin: Chalktalk"></iframe>
+                <p class="video-link"><a href="https://vimeo.com/232230096" target="_blank" rel="noopener">Watch on Vimeo: Ken Perlin — Chalktalk</a></p>
+            </div>
+        </section>
+
+        <!-- SECTION 4: THE THESIS -->
+        <section id="thesis">
+            <h2>The Thesis: AI as Meta-Word</h2>
+            
+            <h3>Closing the Triadic Loop</h3>
+            
+            <p>Current human-computer interfaces connect Language and Computation, but leave Meaning external to the loop. We write code; machines execute. Machines return outputs, displays, text. But there is no continuous <strong>Language ↔ Computation ↔ Meaning</strong> feedback loop. The computer cannot participate in meaning-making—it can only execute instructions and return results.</p>
+            
+            <figure>
+                <div class="placeholder-figure">
+                    <div class="icon">△</div>
+                    <div class="label">Figure 3: The Triadic Loop</div>
+                    <div class="description">Traditional interfaces: Language → Computation → Output (linear, meaning stays in human heads). MetaMedium: Language ↔ Computation ↔ Meaning (circular, AI participates in interpretation). The loop closes when marks become probabilistic proposals that both parties negotiate.</div>
+                </div>
+            </figure>
+            
+            <p>The MetaMedium closes this triad. When every mark can mean multiple things, when the system holds probabilistic interpretations and refines them through exchange, meaning becomes part of the computational loop—not something that happens only in human minds before and after the interaction.</p>
+            
+            <h3>AI as Meta-Word</h3>
+            
+            <p>The MetaMedium proposes that AI can function as a new kind of <em>meta-word</em> within an evolution of language itself. Just as written language externalized memory, allowing us to store and retrieve thoughts across time and space, AI externalizes <em>interpretation</em>—the capacity to generate meaning from marks in context.</p>
+            
+            <div class="callout key">
+                <h4>What Is a Meta-Word?</h4>
+                <p>A meta-word is not a word about words (like "noun" or "verb"). It's a word that <em>transforms other words</em>—that takes your rough marks and interprets them into structured meaning based on context. When you write "bounce" near a spring, the meta-word doesn't just read "bounce"—it understands <em>spring + bounce = physics behavior</em> and makes it so.</p>
+            </div>
+            
+            <figure>
+                <div class="placeholder-figure">
+                    <div class="icon">◎</div>
+                    <div class="label">Figure 4: AI as Meta-Word — The Evolution of External Cognition</div>
+                    <div class="description">Three paradigms: (1) Writing: human → marks → human (marks store memory, reader reconstructs meaning). (2) Computing: human → code → machine → output (machine executes instructions literally). (3) MetaMedium: human ↔ marks ↔ AI ↔ meaning (bidirectional interpretation, iterative refinement, meaning emerges through exchange).</div>
+                </div>
+            </figure>
+            
+            <p>In traditional communication, humans exchange sign vehicles (words, gestures, marks) and each party reconstructs meaning internally. The MetaMedium introduces AI as an active participant in this meaning-making process—not merely receiving marks and returning responses, but operating as a semantic transformer that:</p>
+            
+            <ul>
+                <li>Recognizes patterns across multiple possible interpretations</li>
+                <li>Holds ambiguity productively until context resolves it</li>
+                <li>Learns user-specific vocabularies and reasoning patterns</li>
+                <li>Bridges between representational modes (sketch ↔ equation ↔ code ↔ text)</li>
+            </ul>
+            
+            <p>This is not AI as tool. This is AI as <em>grammatical element</em>—a new part of speech in the language of human-computer collaboration.</p>
+            
+            <h3>Tools vs. Medium</h3>
+            
+            <p>Alan Kay's Dynabook vision asked: "What is the carrying capacity for ideas of the computer?" His answer: the computer is a metamedium—it can simulate any existing media and also be the basis of media that can't exist without the computer. But Kay made a crucial distinction:</p>
+            
+            <blockquote>
+                "What then is a personal computer? One would hope that it would be both a medium for containing and expressing arbitrary symbolic notions, and also a collection of useful tools for manipulating these structures."
+                <cite>— Alan Kay, "A Personal Computer for Children of All Ages," 1972</cite>
+            </blockquote>
+            
+            <p>Most AI interfaces treat AI as tool—something to be invoked, queried, commanded. The MetaMedium treats AI as part of the medium itself. The sketches aren't <em>using</em> the computer; they're <em>composing within</em> the computational medium, with AI as an active interpretive layer that transforms marks into executable meaning.</p>
+        </section>
+
+        <!-- SECTION 5: THE FRAMEWORK -->
+        <section id="framework">
+            <h2>The Framework</h2>
+            
+            <h3>The Semiotic Foundation</h3>
+            
+            <p>Charles Sanders Peirce's semiotics offers a framework for understanding meaning-making that proves remarkably apt for human-AI interaction. In Peirce's model, meaning emerges from the relationship between the <em>sign</em> (the representational form), the <em>object</em> (what is represented), and the <em>interpretant</em> (the meaning generated in the interpreter's mind).</p>
+            
+            <figure>
+                <div class="placeholder-figure">
+                    <div class="icon">△</div>
+                    <div class="label">Figure 5: The Semiotic Triad Applied</div>
+                    <div class="description">Peirce's triangle in MetaMedium context: Sign (rough oval drawn on canvas) → Object (could be face, egg, zero, planet...) → Interpretant (AI holds probability distribution across possibilities; context accumulates; meaning resolves). The AI participates in the interpretant role, not as final arbiter but as collaborative sense-maker.</div>
+                </div>
+            </figure>
+            
+            <p>Critically, Peirce recognized that meaning is not transferred intact between minds but rather <em>reconstructed</em> by each interpretant. When two humans communicate, they exchange sign vehicles and create <strong>aligned but not identical</strong> internal states. Perfect transmission is impossible; coordination through iterative exchange is the reality.</p>
+            
+            <p>This insight proves crucial for AI alignment. If we accept that meaning emerges through exchange rather than transfer, then the path to human-AI alignment lies not in perfecting AI's "understanding" of human intent, but in <em>enriching the medium of exchange</em> so that iterative coordination becomes possible.</p>
+            
+            <h3>Core Principles</h3>
+            
+            <div class="principles-grid">
+                <div class="principle" data-num="1">
+                    <h4>Space Is Semantic</h4>
+                    <p>Spatial relationships carry meaning. Elements placed near each other are semantically related. Elements connected by lines have directional relationships. The entire canvas becomes a semantic field where position, proximity, and connection are first-class citizens of meaning.</p>
+                    <p class="principle-example"><em>Place two circles close together; the system infers "related." Draw one inside another; it understands "containment." Position creates meaning without words.</em></p>
+                </div>
+                
+                <div class="principle" data-num="2">
+                    <h4>Annotation Becomes Execution</h4>
+                    <p>When you write "make this bounce" near a drawn spring, that annotation becomes an instruction. When you draw an arrow from input to output, you've defined a data flow. The boundary between description and command dissolves; to describe is to instruct.</p>
+                    <p class="principle-example"><em>Write "3x" next to a line; it becomes three lines. Write "wiggle" near a shape; it animates. The annotation is the program.</em></p>
+                </div>
+                
+                <div class="principle" data-num="3">
+                    <h4>Interpretive Ambiguity Is Feature</h4>
+                    <p>A rough sketch is understood as rough—the system holds multiple interpretations probabilistically, refining its understanding as context accumulates. This mirrors how humans communicate: we tolerate ambiguity, using context to resolve meaning over time.</p>
+                    <p class="principle-example"><em>Your rough oval might be a face, an egg, or a zero. The system holds all three until you add two dots—then it commits to "face." Premature disambiguation is the enemy of exploration.</em></p>
+                </div>
+                
+                <div class="principle" data-num="4">
+                    <h4>The Canvas Learns</h4>
+                    <p>User-specific patterns accumulate into "cognitive lenses" that can be applied, shared, or composed. If you consistently use a particular mark to mean "energy flow," the system learns this convention. Your vocabulary becomes executable.</p>
+                    <p class="principle-example"><em>Draw your personal shorthand for "danger" twenty times; the twenty-first time, the system recognizes it before you finish. Your idiolect becomes shared language.</em></p>
+                </div>
+                
+                <div class="principle" data-num="5">
+                    <h4>No Mode Switching</h4>
+                    <p>Following Larry Tesler's principle that "no modes is good modes," the MetaMedium eliminates cognitive overhead. You're always just working—drawing, annotating, refining. The interpretation layer appears when needed and fades when not. There's no "design mode" vs. "execution mode," no switching between tools.</p>
+                    <p class="principle-example"><em>Draw a shape. Write near it. Adjust with gestures. Watch it execute. All the same canvas, all the same moment. The interface disappears into the work.</em></p>
+                </div>
+                
+                <div class="principle" data-num="6">
+                    <h4>Bidirectional Learning</h4>
+                    <p>The relationship between user and system is mutual adaptation, not command-and-execute. The user teaches the system their notation; the system teaches the user by surfacing patterns, completing gestures, suggesting relationships. Both intelligences grow through interaction.</p>
+                    <p class="principle-example"><em>You draw a particular squiggle to mean "recursion." The system learns this. Later, it suggests the squiggle when it detects recursive patterns in your diagram—teaching you to see what it sees.</em></p>
+                </div>
+                
+                <div class="principle" data-num="7">
+                    <h4>Observable Reasoning</h4>
+                    <p>Uncertainty becomes visible. When the AI considers multiple interpretations, the user sees them—not collapsed into a single guess. Multiple possibilities stay present until context or user choice resolves them. This transparency supports both trust and alignment.</p>
+                    <p class="principle-example"><em>Your rough mark triggers three possible interpretations shown as faint ghosts; tap one to commit, or keep drawing to refine. You see the system thinking.</em></p>
+                </div>
+            </div>
+            
+            <h3>The Negotiation Paradigm</h3>
+            
+            <p>Ribeiro and Igarashi's "Sketch-Editing Games" (UIST 2012) introduced a negotiation paradigm where user and machine take turns refining interpretation. The user sketches; the machine recognizes and offers interpretations ("bottle?"). The user refines ("no, more like a mug"). The machine updates. Understanding emerges through iterative exchange.</p>
+            
+            <p>Their key insight: sketch recognition improves dramatically when reframed as a <em>game</em> rather than a classification problem. The machine maintains a "possibility graph"—a network of possible interpretations and the transformations that would select among them. The user's next stroke navigates this graph, collapsing some possibilities and opening others.</p>
+            
+            <figure>
+                <div class="placeholder-figure">
+                    <div class="icon">⇄</div>
+                    <div class="label">Figure 6: The Negotiation Loop</div>
+                    <div class="description">User sketches rough shape → System offers: "Circle? Oval? Face?" → User adds two dots → System updates: "Face ✓" → User writes "happy" → System adds smile, adjusts interpretation confidence. Understanding emerges through exchange, not one-shot recognition. Each turn updates the possibility graph.</div>
+                </div>
+            </figure>
+            
+            <p>The MetaMedium extends this approach by making the possibility graph <em>learnable</em>—accumulating user-specific patterns over time—and by integrating natural language annotation as another form of navigation. The negotiation paradigm means that misunderstanding is not failure—it's information. Each correction teaches the system something about this user's intentions, building toward a shared vocabulary over time.</p>
+            
+            <h3>Cognitive Lenses</h3>
+            
+            <p>As patterns accumulate, they form "cognitive lenses"—personalized interpretation frameworks that shape how the system reads new marks. A physicist's lens recognizes force diagrams; an architect's lens sees load-bearing structures; a musician's lens interprets spatial arrangements as rhythm.</p>
+            
+            <figure>
+                <div class="placeholder-figure">
+                    <div class="icon">◐</div>
+                    <div class="label">Figure 7: Cognitive Lens Architecture</div>
+                    <div class="description">User's repeated gestures → Pattern extraction → Named "lens" (e.g., "Maya's physics notation"). Lenses can be: applied to new drawings, shared with collaborators, composed with other lenses, versioned and evolved. Your way of seeing becomes portable.</div>
+                </div>
+            </figure>
+            
+            <p>Lenses are not just personal—they can be shared, creating communities of interpretation. A research group might develop a shared lens for their domain notation. A classroom might inherit a lens from curriculum designers. Lenses become a new kind of intellectual property: not content, but <em>ways of seeing</em>.</p>
+        </section>
+
+        <!-- SECTION 6: CURRENT DEVELOPMENT -->
+        <section id="development">
+            <h2>Current Development</h2>
+            
+            <p>This whitepaper accompanies active development of a working prototype demonstrating the core principles. The demo—internally called "Doodle 2.0"—implements:</p>
+            
+            <ul>
+                <li><strong>Shape recognition with learning:</strong> Draw primitives (circles, rectangles, lines); teach custom shapes by naming them; the system remembers</li>
+                <li><strong>Spatial relationship detection:</strong> Intersection, containment, adjacency, and alignment are detected and visualized in real-time</li>
+                <li><strong>Composition matching:</strong> Combine learned shapes into patterns; the system recognizes compositions</li>
+                <li><strong>Refinement controls:</strong> Adjust recognition thresholds; see confidence scores; correct misrecognitions</li>
+            </ul>
+            
+            <p>The interactive canvas at the top of this page demonstrates a subset of these capabilities—you can draw shapes and see recognition, auto-completion, and relationship detection in action.</p>
+            
+            <div class="demo-container">
+                <div class="demo-header">
+                    <span>Interactive Demo: Shape Recognition</span>
+                    <span>Try it →</span>
+                </div>
+                <iframe src="https://emaradar.github.io/metamedium/" title="MetaMedium Demo" loading="lazy"></iframe>
+            </div>
+            
+            <div class="callout">
+                <h4>Full Demo & Source</h4>
+                <p>The complete prototype is available as a standalone application. Development continues in a dedicated repository.</p>
+                <p><strong>Live Demo:</strong> <a href="https://emaradar.github.io/metamedium/" target="_blank" rel="noopener">emaradar.github.io/metamedium</a><br>
+                <strong>GitHub:</strong> <a href="https://github.com/emaradar/metamedium" target="_blank" rel="noopener">github.com/emaradar/metamedium</a><br>
+                <strong>License:</strong> GPL — the MetaMedium framework is open source.</p>
+            </div>
+            
+            <h3>Development Roadmap</h3>
+            
+            <ul>
+                <li><strong>Current:</strong> Core shape recognition, spatial relationships, custom shape learning, composition detection</li>
+                <li><strong>Next:</strong> Annotation-as-execution (text near shapes triggers behaviors), improved gesture recognition, undo/redo with branching history</li>
+                <li><strong>Future:</strong> Multi-user collaboration, cognitive lens export/import, LLM integration for natural language annotation, speech input (following DrawTalking's approach)</li>
+            </ul>
+            
+            <h3>3D/4D Visualization and Latent Space Rendering</h3>
+            
+            <p>The current framework treats diagrams as 2D arrangements. But diagrams have implicit structure that could be made computationally explicit—a diagram is a projection of higher-dimensional conceptual space. Future development could explore what it means to navigate the space a diagram lives in, not just the diagram itself.</p>
+            
+            <p>Three-dimensional visualization would give canvas elements depth—z-axis as semantic distance, uncertainty, or abstraction level. Relationships become spatial structures; you could "rotate" a concept to see it from different angles. Four-dimensional (temporal) visualization would make the evolution of understanding navigable: scrub through versions, see where insight branched, experience collaborative history as visible geology.</p>
+            
+            <p>Most speculatively: latent space rendering. AI models maintain internal representations—high-dimensional embedding spaces that encode meaning. What if the canvas could project these spaces, letting users see where their current sketch sits relative to possible interpretations? The "possibility graph" becomes navigable terrain. Your marks become waypoints through semantic space.</p>
+            
+            <p>Over time, human-AI collaboration develops a character—a texture or grain that reflects the accumulated quality of exchange. This isn't metadata; it's the substance of the relationship. A physicist's canvas feels different from a musician's. Future interfaces might render this texture visibly, perhaps even haptically. The diagram becomes not just a record but a <em>formal object</em>—a first-class computational entity with transformable structure. The gap between sketch and specification collapses entirely.</p>
+            
+            <h3>Gallery</h3>
+            
+            <div class="gallery">
+                <div class="gallery-item">
+                    <div class="media-placeholder image">
+                        <div class="media-placeholder-inner">
+                            <span class="icon">🖼</span>
+                            <span class="label">Shape Recognition</span>
+                            <span class="caption">Drawing to semantic shape</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="gallery-item">
+                    <div class="media-placeholder image">
+                        <div class="media-placeholder-inner">
+                            <span class="icon">🖼</span>
+                            <span class="label">Relationship Detection</span>
+                            <span class="caption">Spatial semantics in action</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="gallery-item">
+                    <div class="media-placeholder image">
+                        <div class="media-placeholder-inner">
+                            <span class="icon">🖼</span>
+                            <span class="label">Annotation Layer</span>
+                            <span class="caption">Text becomes behavior</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="gallery-item">
+                    <div class="media-placeholder image">
+                        <div class="media-placeholder-inner">
+                            <span class="icon">🖼</span>
+                            <span class="label">Negotiation UI</span>
+                            <span class="caption">Refining interpretation</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="gallery-item">
+                    <div class="media-placeholder video">
+                        <div class="media-placeholder-inner">
+                            <span class="icon">▶</span>
+                            <span class="label">Demo Walkthrough</span>
+                            <span class="caption">Full interaction flow</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="gallery-item">
+                    <div class="media-placeholder image">
+                        <div class="media-placeholder-inner">
+                            <span class="icon">🖼</span>
+                            <span class="label">Canvas States</span>
+                            <span class="caption">Before and after recognition</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION 7: THE PRACTICE -->
+        <section id="scenarios">
+            <h2>Scenarios</h2>
+            
+            <p>The framework becomes concrete through scenarios. Each demonstrates specific principles in action.</p>
+            
+            <div class="use-case">
+                <h4>Visual Learning</h4>
+                <p class="principles-used"><strong>Principles:</strong> Space is semantic, Canvas learns, Bidirectional representation</p>
+                <p class="scenario">Jake, a visual thinker struggling with calculus, draws parabolas on the MetaMedium canvas. The system recognizes his drawings and connects them to formal equations, animating the relationship between his spatial intuition and mathematical notation. When Jake adjusts a curve, the equation updates; when he modifies the equation, the curve responds. Jake discovers he always understood calculus—he just needed the symbols connected to his drawings.</p>
+            </div>
+            
+            <div class="use-case">
+                <h4>Asymmetric Collaboration</h4>
+                <p class="principles-used"><strong>Principles:</strong> Interpretive ambiguity, Cognitive lenses, Negotiation</p>
+                <p class="scenario">Ethan (age 7) draws a "bouncy bridge" with springs on a shared MetaMedium canvas. His older sister Maya (19), studying engineering, sees his playful sketch and realizes it demonstrates seismic dampening principles. The MetaMedium lets both work at their level—Ethan's intuitive sketches become inputs to Maya's rigorous simulations. Neither needs to translate to the other's vocabulary; the canvas holds both interpretations.</p>
+            </div>
+            
+            <div class="use-case">
+                <h4>Rapid Prototyping</h4>
+                <p class="principles-used"><strong>Principles:</strong> Annotation becomes execution, Negotiation paradigm</p>
+                <p class="scenario">Sarah, a facilities manager with no programming background, sketches three circles representing water tanks. The system asks: "Storage tanks? Capacity relationship?" Sarah writes "overflow from A to B when full." The system generates a simulation. Sarah scribbles "no, B is backup"—the system updates. Continuous collaboration from rough idea to working prototype, no code required.</p>
+            </div>
+            
+            <div class="use-case">
+                <h4>Scientific Collaboration</h4>
+                <p class="principles-used"><strong>Principles:</strong> Space is semantic, Annotation becomes execution, Shared lenses</p>
+                <p class="scenario">Maya and Dev, physics researchers, sketch together at a bar, ideas flowing faster than formal notation could capture. They draw on top of each other's work, spatial relationships showing conceptual connections. The canvas understands that "defect here?" near a substrate diagram means they're proposing a location-specific hypothesis—and runs a quick simulation to test it. Their shared research lens interprets their shorthand; a colleague in another city can later read the canvas through the same lens.</p>
+            </div>
+        </section>
+
+        <!-- SECTION 8: THE FUTURE -->
+        <section id="future">
+            <h2>The Future</h2>
+            
+            <h3>Alignment Through Communication</h3>
+            
+            <p>Current approaches to AI alignment focus primarily on control: rules, guardrails, constraints, limitations. The assumption is that AI must be contained because its goals might diverge from human goals.</p>
+            
+            <p>The MetaMedium proposes an alternative: instead of constraining AI's internal state through rules, we <em>enrich the medium between us</em> so that coordination happens through genuine communication. The richer the vocabulary we share—the more kinds of sign vehicles available for exchange—the better we can align our understanding.</p>
+            
+            <figure>
+                <div class="placeholder-figure">
+                    <div class="icon">⬡</div>
+                    <div class="label">Figure 8: Alignment Through Shared Ground</div>
+                    <div class="description">Left: Traditional alignment (AI in black box, rules imposed from outside, human hopes constraints hold). Right: MetaMedium alignment (human and AI on same canvas, reasoning visible to both, shared diagram as "treaty" both parties can read and negotiate). The diagram externalizes the alignment problem.</div>
+                </div>
+            </figure>
+            
+            <p>Current AI interfaces optimize for control. The MetaMedium optimizes for communication. This is not naïve trust—it's a different theory of how coordination happens. We coordinate with other humans not because we control their thoughts but because we share a rich medium for exchange.</p>
+            
+            <h3>External Imagination</h3>
+            
+            <p>Perhaps the most apt description of the human role in MetaMedium interaction is as <em>navigator, conductor, explorer, friend to possibility</em>. The human has direction—knowing which possibilities matter. The AI has generative capability—holding multiple possibilities at once.</p>
+            
+            <p>The AI becomes an "external imagination"—not doing the thinking for the human, but <em>thinking with</em> the human. This is not automation, not replacement, but <strong>augmentation</strong>. Making human capability larger.</p>
+            
+            <h3>Reframing Intelligence</h3>
+            
+            <p>The term "Artificial Intelligence" carries unfortunate connotations: fake, simulated, lesser-than. Perhaps a more useful frame: <strong>Authentic Intelligence</strong>—real, valid, different-but-equal.</p>
+            
+            <p>Human intelligence is biological, embodied, temporal, mortal, with agency shaped by survival pressures. AI intelligence is computational, distributed, instant, ephemeral, with agency shaped by training and human direction. Both are genuine forms of intelligence. Both have distinct capabilities. The question is not which is "better" but how they can combine to create capability neither possesses alone.</p>
+            
+            <p>The MetaMedium is designed for this combination—not AI as tool to be commanded, but AI as partner with complementary cognition. The canvas becomes the site of collaboration between two authentic intelligences, each contributing what it does best.</p>
+            
+            <h3>Open Questions</h3>
+            
+            <p>The MetaMedium framework raises questions that can only be answered through building and testing:</p>
+            
+            <ul>
+                <li>How do we design for "interpretive ambiguity" without creating confusion? What's the right balance between holding possibilities open and committing to interpretation?</li>
+                <li>What are the limits of gesture vocabulary before cognitive overhead exceeds benefit? How many "words" can a visual language productively contain?</li>
+                <li>How can "cognitive lenses" be effectively shared between users? What's lost in translation when one person's way of seeing meets another's?</li>
+                <li>What patterns emerge in human-AI co-creation that neither intelligence generates alone? Can we characterize genuinely collaborative cognition?</li>
+                <li>Can visible reasoning on a shared canvas measurably improve AI alignment outcomes? This is empirically testable.</li>
+            </ul>
+            
+            <h3>Limitations and Challenges</h3>
+            
+            <p>Intellectual honesty requires acknowledging what's hard:</p>
+            
+            <ul>
+                <li><strong>Recognition accuracy:</strong> Current shape recognition, even with ML, makes mistakes. The negotiation paradigm helps—but users may lose patience with too many corrections. Finding the threshold where recognition is "good enough" is empirical work.</li>
+                <li><strong>Cognitive load:</strong> Every gestural vocabulary is a language to learn. There's a real risk that MetaMedium becomes its own expertise barrier, replacing "learn to code" with "learn our gestures." Keeping the learning curve gentle while enabling power is a design challenge.</li>
+                <li><strong>Privacy of patterns:</strong> If the canvas learns from your drawing patterns, those patterns become data. "Cognitive lenses" are intimate—they encode how you think. The system must be designed with privacy as foundational, not afterthought.</li>
+                <li><strong>Over-automation risk:</strong> "The system guessed wrong and did something I didn't want" is a real failure mode. Undo must be instant and obvious. Interpretations must be inspectable before they execute. The user must remain in control.</li>
+                <li><strong>Evaluation difficulty:</strong> How do we measure success? Traditional usability metrics may not capture "quality of thought." New evaluation frameworks are needed.</li>
+            </ul>
+            
+            <h4>Abstraction Management and Learning Dynamics</h4>
+            
+            <p>The promise of a canvas that learns creates its own challenges. Vocabulary bloat is inevitable: every learned pattern accumulates, and the system has no natural way to forget. Over time, old notations compete with new ones, recognition slows, and the interpretation space becomes cluttered. Yet aggressive pruning risks destroying hard-won understanding—how do you distinguish "stale" from "rarely-used-but-important"?</p>
+            
+            <p>More subtle is the local minima problem. A system well-fitted to your previous way of thinking may resist your attempts to evolve. When you try new notation or reframe a concept, the system "corrects" you back toward familiar patterns. The learning becomes a cage. This is especially acute for discontinuous growth—the student becoming expert, the breakthrough insight that requires abandoning old frames. Human cognition undergoes phase transitions; the canvas must accommodate leaps, not just gradual drift.</p>
+            
+            <p>Possible mitigations include explicit "unlearn" gestures, decay functions with different rates for core vs. peripheral vocabulary, "lens snapshots" that version-control ways of seeing, or detection of systematic deviation as a signal that the user is trying to break free. But the deeper question remains: is the canvas a memory of what you've done, or a partner in what you're becoming? The answer shapes the entire architecture.</p>
+            
+            <h3>The Deeper Vision</h3>
+            
+            <p>There is a version of this vision that goes beyond interface. Today's computing is an archaeological site—layer upon layer of abstraction, each solving problems created by the layer below, each adding distance from what the machine actually does. The jenga tower of modern software: every piece load-bearing, none removable, the whole structure increasingly precarious. Tools like Wolfram Alpha offer computational knowledge, but at such altitude that you consult rather than collaborate—you don't think <em>with</em> the computation, you query it.</p>
+            
+            <p>Bret Victor's "Future of Programming" reminds us that many ideas we consider new were explored in the 1960s and then abandoned. Direct manipulation. Visual programming. Goal-directed systems. The original metamedium vision—the computer as a medium that could simulate any medium—was never disproven, just buried under decades of commercial code, backward compatibility, and decisions made for reasons no one remembers.</p>
+            
+            <p>And now AI arrives, and what do we do? Add more layers. Generate code that runs on frameworks that call APIs that abstract over the same tower. We build higher, not deeper.</p>
+            
+            <p>The deeper vision asks: what if we went the other direction? The computer knowing what it can do and doing only as much as it needs to. Every operation justified. Every layer earning its existence. Endless refactoring—not just at the application level but all the way down, hardware and software co-evolving toward essential simplicity rather than capability bloat.</p>
+            
+            <p>AI could be the tool for this. Not generating more sediment on legacy systems, but reading the entire stack, understanding what it actually does, finding the essential operations buried under accretion. The MetaMedium canvas becomes a site for this rethinking: when you sketch a system, interpretation could mean "generate Python" or it could mean "this is fundamentally a constraint problem, here's how it maps closer to the metal." The diagram negotiates what level of abstraction the thought requires.</p>
+            
+            <p>The metamedium dream still lingers as ever possible. It waits beneath the APIs and the bloat, patient, ready to be excavated. The tools to dig are finally arriving.</p>
+        </section>
+
+        <!-- CONCLUSION -->
+        <section id="conclusion">
+            <h2>Conclusion</h2>
+            
+            <p>The MetaMedium represents both a technical framework and a philosophical position about the future of human-AI interaction. Its core claim is simple: we have been limited not by AI capability but by interface bandwidth. The medium between human and AI has been too impoverished to support genuine collaboration.</p>
+            
+            <p>By making every mark a potential sign vehicle, every spatial relationship a semantic statement, every annotation an execution—we create conditions for a new kind of partnership. The computer has always been a metamedium capable of simulating any other medium. AI has become capable of interpreting and generating across modalities. The missing piece is the interface that lets humans bring their full cognitive richness into the collaboration.</p>
+            
+            <div class="callout key">
+                <h4>The Promise</h4>
+                <p>We deserve to move beyond typing into text boxes. We deserve interfaces that meet us where we think. We deserve to dance and sing our intentions into being, to explore shared imagination space, to make the machinery we have built truly our partner in creation.</p>
+            </div>
+            
+            <p>The MetaMedium is that interface. The demo accompanying this paper is a first step—a proof that the principles can be made real. Development continues. Contributions welcome.</p>
+            
+            <p>It's time to bring the computer to life at the depth of mind with the speed and intuitive action of our hands.</p>
+        </section>
+    </main>
+
+    <footer>
+        <p class="footer-title">MetaMedium</p>
+        <p class="footer-subtitle">Principles for a Diagrammatic Understanding Interface</p>
+        <p class="footer-copyright">© John Hanacek · <a href="https://johnhanacek.com" target="_blank" rel="noopener">JHDesign LLC</a></p>
+        <p class="version">v4 · December 2025</p>
+    </footer>
+
+    <script>
+        // Navigation scroll visibility - show after scrolling past hero
+        const nav = document.getElementById('nav');
+        const hero = document.querySelector('.hero');
+        
+        function updateNavVisibility() {
+            const heroBottom = hero.offsetTop + hero.offsetHeight - 60;
+            nav.classList.toggle('visible', window.pageYOffset > heroBottom);
+        }
+        
+        window.addEventListener('scroll', updateNavVisibility, { passive: true });
+        window.addEventListener('resize', updateNavVisibility, { passive: true });
+        updateNavVisibility();
+
+        // Mobile navigation toggle
+        const navToggle = document.querySelector('.nav-toggle');
+        const navMenu = document.querySelector('nav ul');
+        
+        navToggle.addEventListener('click', () => {
+            const isOpen = navMenu.classList.toggle('open');
+            navToggle.classList.toggle('active', isOpen);
+            navToggle.setAttribute('aria-expanded', isOpen);
+        });
+        
+        // Close mobile nav when clicking a link
+        navMenu.querySelectorAll('a').forEach(link => {
+            link.addEventListener('click', () => {
+                navMenu.classList.remove('open');
+                navToggle.classList.remove('active');
+                navToggle.setAttribute('aria-expanded', 'false');
+            });
+        });
+
+        // ============================================
+        // Interactive Blueprint Canvas with Shape Recognition
+        // ============================================
+        const canvas = document.getElementById('heroCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        // ============================================
+        // Unified Timing Constants (in ms)
+        // ============================================
+        const TIMING = {
+            // Raw strokes
+            strokeHold: 1500,       // Time before stroke starts fading
+            strokeFade: 2000,       // Fade duration for strokes
+            
+            // Recognized shapes
+            morphDuration: 400,     // Shape morph animation
+            shapeHold: 4000,        // Time shape stays at full opacity
+            shapeFade: 1500,        // Fade duration for shapes
+            
+            // Whisper labels
+            labelFadeIn: 200,       // Label fade in
+            labelHold: 2500,        // Label at full opacity  
+            labelFade: 800,         // Label fade out
+            
+            // Relationships & intersections
+            relationshipFade: 1200, // Relationship indicator fade
+            
+            // Glyph reaction
+            glyphActive: 2500,      // How long glyphs react after shape
+        };
+        
+        // Computed totals
+        TIMING.strokeTotal = TIMING.strokeHold + TIMING.strokeFade;
+        TIMING.shapeTotal = TIMING.shapeHold + TIMING.shapeFade;
+        TIMING.labelTotal = TIMING.labelFadeIn + TIMING.labelHold + TIMING.labelFade;
+        
+        let isDrawing = false;
+        let strokes = [];           // Raw strokes (fade out)
+        let recognizedShapes = [];  // Completed shapes (persist longer)
+        let whisperLabels = [];     // Floating labels
+        let rawIntersections = [];  // Intersections between raw strokes
+        let currentStroke = null;
+        let glyphRotation = 0;      // For reactive glyphs
+        let glyphPulse = 0;
+        let lastShapeTime = 0;
+        let ripples = [];           // Tap ripple effects
+        let particles = [];         // Recognition particle bursts
+        let ambientParticles = [];  // Floating ambient particles
+        
+        // Blueprint colors
+        const colors = {
+            bg: '#0a1628',
+            grid: 'rgba(59, 130, 246, 0.08)',
+            gridAccent: 'rgba(59, 130, 246, 0.18)',
+            stroke: 'rgba(147, 197, 253, 0.85)',
+            strokeComplete: 'rgba(96, 165, 250, 0.95)',
+            ghost: 'rgba(147, 197, 253, 0.25)',
+            glyph: 'rgba(59, 130, 246, 0.25)',
+            glyphActive: 'rgba(96, 165, 250, 0.5)',
+            cursor: 'rgba(251, 146, 60, 0.9)',
+            glow: 'rgba(59, 130, 246, 0.4)',
+            label: 'rgba(147, 197, 253, 0.7)'
+        };
+        
+        // ============================================
+        // Shape Detection
+        // ============================================
+        function detectShape(points) {
+            if (points.length < 5) return null;
+            
+            const bounds = getBounds(points);
+            const center = { x: (bounds.minX + bounds.maxX) / 2, y: (bounds.minY + bounds.maxY) / 2 };
+            const width = bounds.maxX - bounds.minX;
+            const height = bounds.maxY - bounds.minY;
+            const size = Math.max(width, height);
+            
+            if (size < 20) return null; // Too small
+            
+            // Check if closed (start near end)
+            const start = points[0];
+            const end = points[points.length - 1];
+            const closedThreshold = size * 0.25;
+            const isClosed = distance(start, end) < closedThreshold;
+            
+            if (isClosed) {
+                // Analyze closed shape
+                const circleScore = getCircleScore(points, center, size / 2);
+                const rectScore = getRectScore(points, bounds);
+                const triScore = getTriangleScore(points, bounds);
+                
+                if (circleScore > 0.7 && circleScore > rectScore && circleScore > triScore) {
+                    return { type: 'circle', center, radius: size / 2, confidence: circleScore };
+                }
+                if (rectScore > 0.6 && rectScore > triScore) {
+                    return { type: 'rectangle', bounds, center, confidence: rectScore };
+                }
+                if (triScore > 0.5) {
+                    return { type: 'triangle', bounds, center, confidence: triScore };
+                }
+            } else {
+                // Open shape - line or arrow
+                const lineScore = getLineScore(points);
+                if (lineScore > 0.7) {
+                    const hasArrow = detectArrowHead(points);
+                    return { 
+                        type: hasArrow ? 'arrow' : 'line', 
+                        start, end, center,
+                        confidence: lineScore 
+                    };
+                }
+            }
+            
+            return null;
+        }
+        
+        function getBounds(points) {
+            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+            points.forEach(p => {
+                minX = Math.min(minX, p.x);
+                minY = Math.min(minY, p.y);
+                maxX = Math.max(maxX, p.x);
+                maxY = Math.max(maxY, p.y);
+            });
+            return { minX, minY, maxX, maxY };
+        }
+        
+        function distance(a, b) {
+            return Math.sqrt((a.x - b.x) ** 2 + (a.y - b.y) ** 2);
+        }
+        
+        function getCircleScore(points, center, radius) {
+            let totalError = 0;
+            points.forEach(p => {
+                const dist = distance(p, center);
+                totalError += Math.abs(dist - radius) / radius;
+            });
+            return Math.max(0, 1 - (totalError / points.length));
+        }
+        
+        function getRectScore(points, bounds) {
+            const width = bounds.maxX - bounds.minX;
+            const height = bounds.maxY - bounds.minY;
+            let cornerCount = 0;
+            const corners = [
+                { x: bounds.minX, y: bounds.minY },
+                { x: bounds.maxX, y: bounds.minY },
+                { x: bounds.maxX, y: bounds.maxY },
+                { x: bounds.minX, y: bounds.maxY }
+            ];
+            const threshold = Math.max(width, height) * 0.15;
+            corners.forEach(corner => {
+                if (points.some(p => distance(p, corner) < threshold)) cornerCount++;
+            });
+            return cornerCount / 4;
+        }
+        
+        function getTriangleScore(points, bounds) {
+            // Improved triangle detection
+            const width = bounds.maxX - bounds.minX;
+            const height = bounds.maxY - bounds.minY;
+            const cx = (bounds.minX + bounds.maxX) / 2;
+            const cy = (bounds.minY + bounds.maxY) / 2;
+            
+            // Find the 3 most extreme points (potential vertices)
+            let topPoint = points[0], bottomLeft = points[0], bottomRight = points[0];
+            
+            points.forEach(p => {
+                if (p.y < topPoint.y) topPoint = p;
+                if (p.y > bottomLeft.y || (p.y === bottomLeft.y && p.x < bottomLeft.x)) bottomLeft = p;
+                if (p.y > bottomRight.y || (p.y === bottomRight.y && p.x > bottomRight.x)) bottomRight = p;
+            });
+            
+            // Check for roughly 3 direction changes (corners)
+            let turns = 0;
+            const step = Math.max(1, Math.floor(points.length / 20));
+            for (let i = step; i < points.length - step; i += step) {
+                const prev = points[i - step];
+                const curr = points[i];
+                const next = points[Math.min(i + step, points.length - 1)];
+                const angle1 = Math.atan2(curr.y - prev.y, curr.x - prev.x);
+                const angle2 = Math.atan2(next.y - curr.y, next.x - curr.x);
+                let diff = Math.abs(angle2 - angle1);
+                if (diff > Math.PI) diff = 2 * Math.PI - diff;
+                if (diff > 0.4 && diff < 2.8) turns++;
+            }
+            
+            // Aspect ratio check - triangles shouldn't be too thin
+            const aspect = Math.min(width, height) / Math.max(width, height);
+            const aspectOk = aspect > 0.3;
+            
+            if (turns >= 2 && turns <= 6 && aspectOk) {
+                return 0.65;
+            }
+            return 0.25;
+        }
+        
+        function getLineScore(points) {
+            if (points.length < 3) return 0;
+            const start = points[0];
+            const end = points[points.length - 1];
+            const lineLen = distance(start, end);
+            if (lineLen < 30) return 0;
+            
+            let totalDev = 0;
+            points.forEach(p => {
+                const t = Math.max(0, Math.min(1, 
+                    ((p.x - start.x) * (end.x - start.x) + (p.y - start.y) * (end.y - start.y)) / (lineLen * lineLen)
+                ));
+                const proj = { x: start.x + t * (end.x - start.x), y: start.y + t * (end.y - start.y) };
+                totalDev += distance(p, proj);
+            });
+            return Math.max(0, 1 - (totalDev / points.length) / (lineLen * 0.1));
+        }
+        
+        function detectArrowHead(points) {
+            if (points.length < 10) return false;
+            const last10 = points.slice(-10);
+            const end = points[points.length - 1];
+            const beforeEnd = points[Math.max(0, points.length - 8)];
+            const mainDir = Math.atan2(end.y - beforeEnd.y, end.x - beforeEnd.x);
+            
+            // Check for splaying at end
+            let hasSplay = false;
+            for (let i = 1; i < last10.length - 1; i++) {
+                const dir = Math.atan2(last10[i].y - end.y, last10[i].x - end.x);
+                const diff = Math.abs(dir - mainDir);
+                if (diff > 0.4 && diff < 2.7) hasSplay = true;
+            }
+            return hasSplay;
+        }
+        
+        // ============================================
+        // Generate Ideal Shape Points
+        // ============================================
+        function generateIdealShape(shape, numPoints = 60) {
+            const points = [];
+            
+            if (shape.type === 'circle') {
+                for (let i = 0; i <= numPoints; i++) {
+                    const angle = (i / numPoints) * Math.PI * 2;
+                    points.push({
+                        x: shape.center.x + Math.cos(angle) * shape.radius,
+                        y: shape.center.y + Math.sin(angle) * shape.radius
+                    });
+                }
+            } else if (shape.type === 'rectangle') {
+                const b = shape.bounds;
+                const corners = [
+                    { x: b.minX, y: b.minY }, { x: b.maxX, y: b.minY },
+                    { x: b.maxX, y: b.maxY }, { x: b.minX, y: b.maxY },
+                    { x: b.minX, y: b.minY }
+                ];
+                const perSide = Math.floor(numPoints / 4);
+                for (let s = 0; s < 4; s++) {
+                    for (let i = 0; i < perSide; i++) {
+                        const t = i / perSide;
+                        points.push({
+                            x: corners[s].x + t * (corners[s + 1].x - corners[s].x),
+                            y: corners[s].y + t * (corners[s + 1].y - corners[s].y)
+                        });
+                    }
+                }
+            } else if (shape.type === 'triangle') {
+                const b = shape.bounds;
+                const cx = (b.minX + b.maxX) / 2;
+                const triPoints = [
+                    { x: cx, y: b.minY },
+                    { x: b.maxX, y: b.maxY },
+                    { x: b.minX, y: b.maxY },
+                    { x: cx, y: b.minY }
+                ];
+                const perSide = Math.floor(numPoints / 3);
+                for (let s = 0; s < 3; s++) {
+                    for (let i = 0; i < perSide; i++) {
+                        const t = i / perSide;
+                        points.push({
+                            x: triPoints[s].x + t * (triPoints[s + 1].x - triPoints[s].x),
+                            y: triPoints[s].y + t * (triPoints[s + 1].y - triPoints[s].y)
+                        });
+                    }
+                }
+            } else if (shape.type === 'line' || shape.type === 'arrow') {
+                for (let i = 0; i <= numPoints; i++) {
+                    const t = i / numPoints;
+                    points.push({
+                        x: shape.start.x + t * (shape.end.x - shape.start.x),
+                        y: shape.start.y + t * (shape.end.y - shape.start.y)
+                    });
+                }
+                if (shape.type === 'arrow') {
+                    const angle = Math.atan2(shape.end.y - shape.start.y, shape.end.x - shape.start.x);
+                    const headLen = 15;
+                    points.push({ x: shape.end.x - headLen * Math.cos(angle - 0.4), y: shape.end.y - headLen * Math.sin(angle - 0.4) });
+                    points.push(shape.end);
+                    points.push({ x: shape.end.x - headLen * Math.cos(angle + 0.4), y: shape.end.y - headLen * Math.sin(angle + 0.4) });
+                }
+            } else if (shape.type === 'dot') {
+                // Dot is just a single point
+                points.push(shape.center);
+            }
+            
+            return points;
+        }
+        
+        // ============================================
+        // Relationship Detection
+        // ============================================
+        function detectRelationships() {
+            const relationships = [];
+            const shapes = recognizedShapes.filter(s => Date.now() - s.createdAt < TIMING.shapeTotal);
+            
+            for (let i = 0; i < shapes.length; i++) {
+                for (let j = i + 1; j < shapes.length; j++) {
+                    const a = shapes[i];
+                    const b = shapes[j];
+                    
+                    const rel = analyzeRelationship(a, b);
+                    if (rel) {
+                        relationships.push({
+                            shapeA: a,
+                            shapeB: b,
+                            ...rel
+                        });
+                    }
+                }
+            }
+            return relationships;
+        }
+        
+        function analyzeRelationship(a, b) {
+            const dist = distance(a.center, b.center);
+            const aSize = getShapeSize(a);
+            const bSize = getShapeSize(b);
+            const combinedSize = (aSize + bSize) / 2;
+            
+            // Lines don't "contain" things - skip containment check for lines
+            const aIsLine = a.type === 'line' || a.type === 'arrow';
+            const bIsLine = b.type === 'line' || b.type === 'arrow';
+            
+            // Check containment (only for closed shapes)
+            if (!aIsLine && !bIsLine && dist < Math.abs(aSize - bSize) * 0.5) {
+                const container = aSize > bSize ? a : b;
+                const contained = aSize > bSize ? b : a;
+                return { type: 'contains', container, contained, dist };
+            }
+            
+            // Check intersection/overlap - always check for lines
+            if (aIsLine || bIsLine || dist < combinedSize * 0.9) {
+                const intersections = findIntersectionPoints(a, b);
+                if (intersections.length > 0) {
+                    return { type: 'intersects', intersections, dist };
+                }
+                if (!aIsLine && !bIsLine) {
+                    return { type: 'overlaps', dist };
+                }
+            }
+            
+            // Check adjacency (close but not overlapping)
+            if (dist < combinedSize * 1.5) {
+                return { type: 'adjacent', dist };
+            }
+            
+            // Check alignment
+            const dx = Math.abs(a.center.x - b.center.x);
+            const dy = Math.abs(a.center.y - b.center.y);
+            if (dx < 15) return { type: 'aligned-vertical', dist };
+            if (dy < 15) return { type: 'aligned-horizontal', dist };
+            
+            return null;
+        }
+        
+        function getShapeSize(shape) {
+            if (shape.type === 'circle') return shape.radius * 2;
+            if (shape.type === 'dot') return 12; // Small fixed size for dots
+            if (shape.bounds) {
+                return Math.max(shape.bounds.maxX - shape.bounds.minX, shape.bounds.maxY - shape.bounds.minY);
+            }
+            if (shape.start && shape.end) {
+                return distance(shape.start, shape.end);
+            }
+            return 50;
+        }
+        
+        function findIntersectionPoints(a, b) {
+            const points = [];
+            
+            // Special case: two circles - use geometric calculation
+            if (a.type === 'circle' && b.type === 'circle') {
+                const d = distance(a.center, b.center);
+                const r1 = a.radius;
+                const r2 = b.radius;
+                
+                // Check if circles actually intersect
+                if (d < r1 + r2 && d > Math.abs(r1 - r2)) {
+                    // Calculate intersection points
+                    const a2 = (r1 * r1 - r2 * r2 + d * d) / (2 * d);
+                    const h = Math.sqrt(Math.max(0, r1 * r1 - a2 * a2));
+                    
+                    const px = a.center.x + a2 * (b.center.x - a.center.x) / d;
+                    const py = a.center.y + a2 * (b.center.y - a.center.y) / d;
+                    
+                    const dx = h * (b.center.y - a.center.y) / d;
+                    const dy = h * (b.center.x - a.center.x) / d;
+                    
+                    points.push({ x: px + dx, y: py - dy });
+                    if (h > 1) { // Two distinct points
+                        points.push({ x: px - dx, y: py + dy });
+                    }
+                }
+                return points;
+            }
+            
+            // General case: check line segment intersections
+            const aPoints = a.idealPoints || [];
+            const bPoints = b.idealPoints || [];
+            
+            if (aPoints.length < 4 || bPoints.length < 4) return points;
+            
+            const stepA = Math.max(1, Math.floor(aPoints.length / 24));
+            const stepB = Math.max(1, Math.floor(bPoints.length / 24));
+            
+            for (let i = 0; i < aPoints.length - stepA; i += stepA) {
+                const a1 = aPoints[i];
+                const a2 = aPoints[i + stepA];
+                
+                for (let j = 0; j < bPoints.length - stepB; j += stepB) {
+                    const b1 = bPoints[j];
+                    const b2 = bPoints[j + stepB];
+                    
+                    const intersection = lineIntersection(a1, a2, b1, b2);
+                    if (intersection) {
+                        const tooClose = points.some(p => distance(p, intersection) < 15);
+                        if (!tooClose) points.push(intersection);
+                    }
+                }
+            }
+            return points.slice(0, 4);
+        }
+        
+        function lineIntersection(p1, p2, p3, p4) {
+            const d = (p1.x - p2.x) * (p3.y - p4.y) - (p1.y - p2.y) * (p3.x - p4.x);
+            if (Math.abs(d) < 0.001) return null;
+            
+            const t = ((p1.x - p3.x) * (p3.y - p4.y) - (p1.y - p3.y) * (p3.x - p4.x)) / d;
+            const u = -((p1.x - p2.x) * (p1.y - p3.y) - (p1.y - p2.y) * (p1.x - p3.x)) / d;
+            
+            if (t >= 0 && t <= 1 && u >= 0 && u <= 1) {
+                return {
+                    x: p1.x + t * (p2.x - p1.x),
+                    y: p1.y + t * (p2.y - p1.y)
+                };
+            }
+            return null;
+        }
+        
+        function drawRelationships() {
+            const relationships = detectRelationships();
+            const now = Date.now();
+            
+            relationships.forEach(rel => {
+                const a = rel.shapeA;
+                const b = rel.shapeB;
+                const age = Math.max(now - a.createdAt, now - b.createdAt);
+                let opacity = 1;
+                // Fade with the shapes
+                if (age > TIMING.shapeHold) {
+                    opacity = 1 - ((age - TIMING.shapeHold) / TIMING.relationshipFade);
+                }
+                if (opacity <= 0) return;
+                
+                // Ease out for smoother fade
+                const easedOpacity = opacity * opacity;
+                
+                // Draw connection line
+                ctx.strokeStyle = `rgba(251, 191, 36, ${0.4 * easedOpacity})`; // Warm yellow
+                ctx.lineWidth = 1;
+                ctx.setLineDash([4, 4]);
+                ctx.beginPath();
+                ctx.moveTo(a.center.x, a.center.y);
+                ctx.lineTo(b.center.x, b.center.y);
+                ctx.stroke();
+                ctx.setLineDash([]);
+                
+                // Draw relationship indicator at midpoint
+                const midX = (a.center.x + b.center.x) / 2;
+                const midY = (a.center.y + b.center.y) / 2;
+                
+                // Relationship-specific visuals
+                if (rel.type === 'intersects' && rel.intersections) {
+                    // Draw glowing intersection points
+                    rel.intersections.forEach(pt => {
+                        ctx.shadowColor = 'rgba(251, 191, 36, 0.8)';
+                        ctx.shadowBlur = 12 * easedOpacity;
+                        ctx.fillStyle = `rgba(251, 191, 36, ${0.9 * easedOpacity})`;
+                        ctx.beginPath();
+                        ctx.arc(pt.x, pt.y, 4, 0, Math.PI * 2);
+                        ctx.fill();
+                        
+                        // Outer ring
+                        ctx.strokeStyle = `rgba(251, 191, 36, ${0.5 * easedOpacity})`;
+                        ctx.lineWidth = 1;
+                        ctx.beginPath();
+                        ctx.arc(pt.x, pt.y, 8, 0, Math.PI * 2);
+                        ctx.stroke();
+                        ctx.shadowBlur = 0;
+                    });
+                    
+                    // Add label near first intersection
+                    if (rel.intersections.length > 0) {
+                        const pt = rel.intersections[0];
+                        ctx.font = '500 10px "DM Sans", sans-serif';
+                        ctx.textAlign = 'center';
+                        ctx.fillStyle = `rgba(251, 191, 36, ${0.9 * easedOpacity})`;
+                        ctx.fillText('intersects', pt.x, pt.y - 16);
+                    }
+                }
+                
+                if (rel.type === 'contains') {
+                    // Draw containment brackets
+                    ctx.strokeStyle = `rgba(74, 222, 128, ${0.5 * easedOpacity})`; // Green
+                    ctx.lineWidth = 2;
+                    const r = getShapeSize(rel.container) / 2 + 8;
+                    ctx.beginPath();
+                    ctx.arc(rel.container.center.x, rel.container.center.y, r, -0.3, 0.3);
+                    ctx.stroke();
+                    ctx.beginPath();
+                    ctx.arc(rel.container.center.x, rel.container.center.y, r, Math.PI - 0.3, Math.PI + 0.3);
+                    ctx.stroke();
+                    
+                    // Add label
+                    ctx.font = '500 10px "DM Sans", sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.fillStyle = `rgba(74, 222, 128, ${0.8 * easedOpacity})`;
+                    ctx.fillText('⊃ contains', rel.container.center.x, rel.container.center.y - r - 8);
+                }
+                
+                if (rel.type === 'adjacent') {
+                    // Draw proximity indicator
+                    ctx.fillStyle = `rgba(147, 197, 253, ${0.6 * easedOpacity})`;
+                    ctx.beginPath();
+                    ctx.arc(midX, midY, 3, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                
+                if (rel.type === 'aligned-vertical' || rel.type === 'aligned-horizontal') {
+                    // Draw alignment guide
+                    ctx.strokeStyle = `rgba(167, 139, 250, ${0.4 * easedOpacity})`; // Purple
+                    ctx.lineWidth = 1;
+                    ctx.setLineDash([2, 4]);
+                    ctx.beginPath();
+                    if (rel.type === 'aligned-vertical') {
+                        ctx.moveTo(a.center.x, Math.min(a.center.y, b.center.y) - 20);
+                        ctx.lineTo(a.center.x, Math.max(a.center.y, b.center.y) + 20);
+                    } else {
+                        ctx.moveTo(Math.min(a.center.x, b.center.x) - 20, a.center.y);
+                        ctx.lineTo(Math.max(a.center.x, b.center.x) + 20, a.center.y);
+                    }
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                }
+                
+                // Draw relationship label with word
+                const labelData = {
+                    'intersects': { symbol: '×', word: 'intersects' },
+                    'contains': { symbol: '⊃', word: 'contains' },
+                    'overlaps': { symbol: '∩', word: 'overlaps' },
+                    'adjacent': { symbol: '↔', word: 'near' },
+                    'aligned-vertical': { symbol: '│', word: 'aligned' },
+                    'aligned-horizontal': { symbol: '─', word: 'aligned' }
+                };
+                
+                const labelInfo = labelData[rel.type];
+                if (labelInfo && rel.type !== 'intersects') { // intersects already has point markers
+                    const displayText = `${labelInfo.symbol} ${labelInfo.word}`;
+                    ctx.font = '500 10px "DM Sans", sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    
+                    // Background pill
+                    ctx.fillStyle = `rgba(10, 22, 40, ${0.85 * easedOpacity})`;
+                    const metrics = ctx.measureText(displayText);
+                    const pw = metrics.width + 12;
+                    const ph = 18;
+                    ctx.beginPath();
+                    const rr = 9;
+                    ctx.moveTo(midX - pw/2 + rr, midY - ph/2);
+                    ctx.lineTo(midX + pw/2 - rr, midY - ph/2);
+                    ctx.quadraticCurveTo(midX + pw/2, midY - ph/2, midX + pw/2, midY - ph/2 + rr);
+                    ctx.lineTo(midX + pw/2, midY + ph/2 - rr);
+                    ctx.quadraticCurveTo(midX + pw/2, midY + ph/2, midX + pw/2 - rr, midY + ph/2);
+                    ctx.lineTo(midX - pw/2 + rr, midY + ph/2);
+                    ctx.quadraticCurveTo(midX - pw/2, midY + ph/2, midX - pw/2, midY + ph/2 - rr);
+                    ctx.lineTo(midX - pw/2, midY - ph/2 + rr);
+                    ctx.quadraticCurveTo(midX - pw/2, midY - ph/2, midX - pw/2 + rr, midY - ph/2);
+                    ctx.closePath();
+                    ctx.fill();
+                    
+                    // Label text
+                    ctx.fillStyle = `rgba(251, 191, 36, ${0.95 * easedOpacity})`;
+                    ctx.fillText(displayText, midX, midY);
+                }
+            });
+        }
+        
+        // ============================================
+        // Raw Stroke Intersection Detection
+        // ============================================
+        function detectRawIntersections() {
+            const now = Date.now();
+            const activeStrokes = strokes.filter(s => {
+                const age = now - s.startTime;
+                return age < s.fadeStart + TIMING.strokeFade && s.points.length > 3;
+            });
+            
+            const intersections = [];
+            
+            // Check strokes against each other
+            for (let i = 0; i < activeStrokes.length; i++) {
+                for (let j = i + 1; j < activeStrokes.length; j++) {
+                    const pts = findStrokeIntersections(activeStrokes[i].points, activeStrokes[j].points);
+                    pts.forEach(pt => {
+                        intersections.push({
+                            ...pt,
+                            createdAt: Math.max(activeStrokes[i].startTime, activeStrokes[j].startTime)
+                        });
+                    });
+                }
+            }
+            
+            // Check strokes against recognized shapes
+            const activeShapes = recognizedShapes.filter(s => now - s.createdAt < TIMING.shapeTotal);
+            for (const stroke of activeStrokes) {
+                for (const shape of activeShapes) {
+                    const pts = findStrokeIntersections(stroke.points, shape.idealPoints || []);
+                    pts.forEach(pt => {
+                        intersections.push({
+                            ...pt,
+                            createdAt: Math.max(stroke.startTime, shape.createdAt)
+                        });
+                    });
+                }
+            }
+            
+            return intersections;
+        }
+        
+        function findStrokeIntersections(pointsA, pointsB) {
+            const results = [];
+            if (pointsA.length < 5 || pointsB.length < 5) return results;
+            
+            // Coarser sampling to reduce noise
+            const stepA = Math.max(3, Math.floor(pointsA.length / 15));
+            const stepB = Math.max(3, Math.floor(pointsB.length / 15));
+            
+            for (let i = 0; i < pointsA.length - stepA; i += stepA) {
+                const a1 = pointsA[i];
+                const a2 = pointsA[Math.min(i + stepA, pointsA.length - 1)];
+                
+                for (let j = 0; j < pointsB.length - stepB; j += stepB) {
+                    const b1 = pointsB[j];
+                    const b2 = pointsB[Math.min(j + stepB, pointsB.length - 1)];
+                    
+                    const intersection = lineIntersection(a1, a2, b1, b2);
+                    if (intersection) {
+                        // Larger minimum distance to avoid clustering
+                        const tooClose = results.some(p => distance(p, intersection) < 40);
+                        if (!tooClose) results.push(intersection);
+                    }
+                }
+            }
+            return results.slice(0, 3); // Max 3 per pair
+        }
+        
+        function drawRawIntersections() {
+            const now = Date.now();
+            const intersections = detectRawIntersections();
+            
+            intersections.forEach(pt => {
+                const age = now - pt.createdAt;
+                let opacity = 1;
+                // Sync fade with strokes
+                if (age > TIMING.strokeHold) {
+                    opacity = 1 - ((age - TIMING.strokeHold) / TIMING.strokeFade);
+                }
+                if (opacity <= 0) return;
+                
+                // Ease out curve for smoother fade
+                const easedOpacity = opacity * opacity; // Quadratic ease out
+                
+                // Subtle cyan glow for raw intersections
+                ctx.shadowColor = 'rgba(34, 211, 238, 0.7)';
+                ctx.shadowBlur = 10 * easedOpacity;
+                ctx.fillStyle = `rgba(34, 211, 238, ${0.8 * easedOpacity})`;
+                ctx.beginPath();
+                ctx.arc(pt.x, pt.y, 3, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Outer ring
+                ctx.strokeStyle = `rgba(34, 211, 238, ${0.4 * easedOpacity})`;
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.arc(pt.x, pt.y, 7, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.shadowBlur = 0;
+            });
+        }
+        
+        // ============================================
+        // Canvas Setup
+        // ============================================
+        function resizeCanvas() {
+            const dpr = window.devicePixelRatio || 1;
+            const rect = canvas.getBoundingClientRect();
+            canvas.width = rect.width * dpr;
+            canvas.height = rect.height * dpr;
+            ctx.scale(dpr, dpr);
+            canvas.style.width = rect.width + 'px';
+            canvas.style.height = rect.height + 'px';
+        }
+        
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+        
+        // ============================================
+        // Drawing Functions
+        // ============================================
+        function drawGrid() {
+            const w = canvas.width / (window.devicePixelRatio || 1);
+            const h = canvas.height / (window.devicePixelRatio || 1);
+            
+            ctx.fillStyle = colors.bg;
+            ctx.fillRect(0, 0, w, h);
+            
+            // Small grid
+            ctx.strokeStyle = colors.grid;
+            ctx.lineWidth = 0.5;
+            ctx.beginPath();
+            for (let x = 0; x <= w; x += 40) { ctx.moveTo(x, 0); ctx.lineTo(x, h); }
+            for (let y = 0; y <= h; y += 40) { ctx.moveTo(0, y); ctx.lineTo(w, y); }
+            ctx.stroke();
+            
+            // Large grid
+            ctx.strokeStyle = colors.gridAccent;
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            for (let x = 0; x <= w; x += 200) { ctx.moveTo(x, 0); ctx.lineTo(x, h); }
+            for (let y = 0; y <= h; y += 200) { ctx.moveTo(0, y); ctx.lineTo(w, y); }
+            ctx.stroke();
+            
+            drawGlyphs(w, h);
+        }
+        
+        function drawGlyphs(w, h) {
+            const now = Date.now();
+            const timeSinceShape = now - lastShapeTime;
+            const isActive = timeSinceShape < TIMING.glyphActive;
+            
+            // Smooth transition for active state
+            let activeAmount = 0;
+            if (isActive) {
+                // Fade in quickly, fade out smoothly
+                if (timeSinceShape < 200) {
+                    activeAmount = timeSinceShape / 200;
+                } else if (timeSinceShape > TIMING.glyphActive - 500) {
+                    activeAmount = (TIMING.glyphActive - timeSinceShape) / 500;
+                } else {
+                    activeAmount = 1;
+                }
+            }
+            
+            // Pulse when idle
+            if (!isActive && !isDrawing) {
+                glyphPulse = Math.sin(now / 1000) * 0.15 + 0.85;
+            } else {
+                glyphPulse = 1;
+            }
+            
+            // Rotate when shape detected (slow down as it fades)
+            if (isActive) {
+                glyphRotation += 0.02 * activeAmount;
+            }
+            
+            const corners = [[40, 40], [w - 40, 40], [40, h - 40], [w - 40, h - 40]];
+            corners.forEach(([x, y], i) => {
+                ctx.save();
+                ctx.translate(x, y);
+                ctx.rotate(glyphRotation * (i % 2 === 0 ? 1 : -1));
+                
+                // Interpolate color based on active amount
+                const r = Math.round(59 + (96 - 59) * activeAmount);
+                const g = Math.round(130 + (165 - 130) * activeAmount);
+                const b = Math.round(246 + (250 - 246) * activeAmount);
+                const a = 0.25 + 0.25 * activeAmount;
+                ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, ${a})`;
+                ctx.globalAlpha = glyphPulse;
+                ctx.lineWidth = 1 + 0.5 * activeAmount;
+                
+                ctx.beginPath();
+                ctx.moveTo(-15, 0); ctx.lineTo(15, 0);
+                ctx.moveTo(0, -15); ctx.lineTo(0, 15);
+                ctx.stroke();
+                
+                ctx.beginPath();
+                ctx.arc(0, 0, 8, 0, Math.PI * 2);
+                ctx.stroke();
+                
+                // Outer ring fades in/out smoothly
+                if (activeAmount > 0) {
+                    ctx.globalAlpha = glyphPulse * activeAmount;
+                    ctx.beginPath();
+                    ctx.arc(0, 0, 12, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
+                
+                ctx.restore();
+            });
+            ctx.globalAlpha = 1;
+        }
+        
+        function drawRawStrokes() {
+            const now = Date.now();
+            
+            strokes = strokes.filter(stroke => {
+                const age = now - stroke.startTime;
+                if (age > stroke.fadeStart + TIMING.strokeFade) return false;
+                
+                let opacity = 1;
+                if (age > stroke.fadeStart) {
+                    opacity = 1 - ((age - stroke.fadeStart) / TIMING.strokeFade);
+                }
+                // Ease out for smoother fade
+                const easedOpacity = opacity * opacity;
+                
+                if (stroke.points.length < 2) return true;
+                
+                ctx.shadowColor = colors.glow;
+                ctx.shadowBlur = 12 * easedOpacity;
+                ctx.strokeStyle = `rgba(147, 197, 253, ${0.85 * easedOpacity})`;
+                ctx.lineWidth = 2.5;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                
+                ctx.beginPath();
+                ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
+                for (let i = 1; i < stroke.points.length; i++) {
+                    const p0 = stroke.points[i - 1];
+                    const p1 = stroke.points[i];
+                    ctx.quadraticCurveTo(p0.x, p0.y, (p0.x + p1.x) / 2, (p0.y + p1.y) / 2);
+                }
+                ctx.stroke();
+                ctx.shadowBlur = 0;
+                
+                return true;
+            });
+        }
+        
+        function drawRecognizedShapes() {
+            const now = Date.now();
+            
+            recognizedShapes = recognizedShapes.filter(shape => {
+                const age = now - shape.createdAt;
+                if (age > TIMING.shapeTotal) return false;
+                
+                let opacity = 1;
+                if (age > TIMING.shapeHold) {
+                    opacity = 1 - ((age - TIMING.shapeHold) / TIMING.shapeFade);
+                }
+                // Ease out for smoother fade
+                const easedOpacity = opacity * opacity;
+                
+                const progress = Math.min(1, age / TIMING.morphDuration);
+                const morphEase = 1 - Math.pow(1 - progress, 3); // Ease out cubic
+                
+                // Interpolate between raw and ideal points
+                const points = [];
+                const idealLen = shape.idealPoints.length;
+                const rawLen = shape.rawPoints.length;
+                
+                for (let i = 0; i < idealLen; i++) {
+                    const rawIdx = Math.floor((i / idealLen) * rawLen);
+                    const raw = shape.rawPoints[Math.min(rawIdx, rawLen - 1)];
+                    const ideal = shape.idealPoints[i];
+                    points.push({
+                        x: raw.x + (ideal.x - raw.x) * morphEase,
+                        y: raw.y + (ideal.y - raw.y) * morphEase
+                    });
+                }
+                
+                // Draw shape
+                ctx.shadowColor = 'rgba(96, 165, 250, 0.6)';
+                ctx.shadowBlur = 20 * easedOpacity;
+                ctx.strokeStyle = `rgba(96, 165, 250, ${0.9 * easedOpacity})`;
+                ctx.lineWidth = 2.5;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                
+                // Special handling for dots
+                if (shape.type === 'dot') {
+                    ctx.fillStyle = `rgba(96, 165, 250, ${0.9 * easedOpacity})`;
+                    ctx.beginPath();
+                    ctx.arc(shape.center.x, shape.center.y, 5 + 2 * morphEase, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.shadowBlur = 0;
+                    return true;
+                }
+                
+                ctx.beginPath();
+                ctx.moveTo(points[0].x, points[0].y);
+                for (let i = 1; i < points.length; i++) {
+                    ctx.lineTo(points[i].x, points[i].y);
+                }
+                if (shape.type === 'circle' || shape.type === 'rectangle' || shape.type === 'triangle') {
+                    ctx.closePath();
+                }
+                ctx.stroke();
+                ctx.shadowBlur = 0;
+                
+                return true;
+            });
+        }
+        
+        function drawGhostSuggestion() {
+            if (!isDrawing || !currentStroke || currentStroke.points.length < 10) return;
+            
+            const shape = detectShape(currentStroke.points);
+            if (!shape || shape.confidence < 0.4) return;
+            
+            const idealPoints = generateIdealShape(shape);
+            
+            ctx.strokeStyle = colors.ghost;
+            ctx.lineWidth = 2;
+            ctx.setLineDash([8, 8]);
+            ctx.lineCap = 'round';
+            
+            ctx.beginPath();
+            ctx.moveTo(idealPoints[0].x, idealPoints[0].y);
+            for (let i = 1; i < idealPoints.length; i++) {
+                ctx.lineTo(idealPoints[i].x, idealPoints[i].y);
+            }
+            if (shape.type === 'circle' || shape.type === 'rectangle' || shape.type === 'triangle') {
+                ctx.closePath();
+            }
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+        
+        function drawWhisperLabels() {
+            const now = Date.now();
+            
+            whisperLabels = whisperLabels.filter(label => {
+                const age = now - label.createdAt;
+                if (age > TIMING.labelTotal) return false;
+                
+                let opacity = 1;
+                if (age < TIMING.labelFadeIn) {
+                    opacity = age / TIMING.labelFadeIn;
+                } else if (age > TIMING.labelFadeIn + TIMING.labelHold) {
+                    opacity = 1 - ((age - TIMING.labelFadeIn - TIMING.labelHold) / TIMING.labelFade);
+                }
+                // Ease out for smoother fade
+                const easedOpacity = opacity * opacity;
+                
+                const yOffset = -20 - (age / 80); // Float upward slightly slower
+                
+                ctx.font = '500 13px "DM Sans", sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillStyle = `rgba(147, 197, 253, ${0.8 * easedOpacity})`;
+                ctx.fillText(label.text, label.x, label.y + yOffset);
+                
+                return true;
+            });
+        }
+        
+        // Cursor with glow
+        let cursorPos = { x: -100, y: -100 };
+        let cursorVisible = false;
+        
+        function drawCursor() {
+            if (!cursorVisible) return;
+            
+            const x = cursorPos.x;
+            const y = cursorPos.y;
+            const size = isDrawing ? 14 : 10;
+            
+            const gradient = ctx.createRadialGradient(x, y, 0, x, y, 60);
+            gradient.addColorStop(0, isDrawing ? 'rgba(251, 146, 60, 0.25)' : 'rgba(59, 130, 246, 0.2)');
+            gradient.addColorStop(0.5, isDrawing ? 'rgba(251, 146, 60, 0.08)' : 'rgba(59, 130, 246, 0.05)');
+            gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.arc(x, y, 60, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.strokeStyle = isDrawing ? colors.cursor : 'rgba(147, 197, 253, 0.7)';
+            ctx.lineWidth = 1.5;
+            ctx.shadowColor = isDrawing ? colors.cursor : colors.glow;
+            ctx.shadowBlur = 8;
+            
+            ctx.beginPath();
+            ctx.moveTo(x - size, y); ctx.lineTo(x - 4, y);
+            ctx.moveTo(x + 4, y); ctx.lineTo(x + size, y);
+            ctx.moveTo(x, y - size); ctx.lineTo(x, y - 4);
+            ctx.moveTo(x, y + 4); ctx.lineTo(x, y + size);
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+            
+            if (isDrawing) {
+                ctx.beginPath();
+                ctx.arc(x, y, 3, 0, Math.PI * 2);
+                ctx.fillStyle = colors.cursor;
+                ctx.fill();
+            }
+        }
+        
+        // Draw ripple effects (for tap/dot feedback)
+        function drawRipples() {
+            const now = Date.now();
+            const rippleDuration = 600;
+            
+            ripples = ripples.filter(ripple => {
+                const age = now - ripple.createdAt;
+                if (age > rippleDuration) return false;
+                
+                const progress = age / rippleDuration;
+                const eased = 1 - Math.pow(1 - progress, 3); // ease out cubic
+                const radius = ripple.maxRadius * eased;
+                const opacity = 1 - progress;
+                
+                ctx.strokeStyle = `rgba(96, 165, 250, ${0.6 * opacity})`;
+                ctx.lineWidth = 2 * (1 - progress * 0.5);
+                ctx.beginPath();
+                ctx.arc(ripple.x, ripple.y, radius, 0, Math.PI * 2);
+                ctx.stroke();
+                
+                // Second ring
+                if (progress > 0.15) {
+                    const innerProgress = (progress - 0.15) / 0.85;
+                    const innerRadius = ripple.maxRadius * 0.6 * innerProgress;
+                    ctx.strokeStyle = `rgba(147, 197, 253, ${0.4 * (1 - innerProgress)})`;
+                    ctx.lineWidth = 1.5 * (1 - innerProgress * 0.5);
+                    ctx.beginPath();
+                    ctx.arc(ripple.x, ripple.y, innerRadius, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
+                
+                return true;
+            });
+        }
+        
+        // Draw particle burst (for shape recognition feedback)
+        function drawParticles() {
+            const now = Date.now();
+            const particleDuration = 800;
+            
+            particles = particles.filter(p => {
+                const age = now - p.createdAt;
+                if (age > particleDuration) return false;
+                
+                const progress = age / particleDuration;
+                const opacity = 1 - progress;
+                
+                // Update position with slight gravity
+                p.x += p.vx;
+                p.y += p.vy + progress * 0.5;
+                p.vx *= 0.97;
+                p.vy *= 0.97;
+                
+                // Draw particle
+                const size = 3 * (1 - progress * 0.5);
+                ctx.fillStyle = `rgba(251, 191, 36, ${0.8 * opacity})`;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, size, 0, Math.PI * 2);
+                ctx.fill();
+                
+                return true;
+            });
+        }
+        
+        // Draw ambient floating particles
+        function initAmbientParticles() {
+            const w = canvas.width / (window.devicePixelRatio || 1);
+            const h = canvas.height / (window.devicePixelRatio || 1);
+            
+            for (let i = 0; i < 15; i++) {
+                ambientParticles.push({
+                    x: Math.random() * w,
+                    y: Math.random() * h,
+                    vx: (Math.random() - 0.5) * 0.3,
+                    vy: (Math.random() - 0.5) * 0.3,
+                    size: 1 + Math.random() * 2,
+                    phase: Math.random() * Math.PI * 2
+                });
+            }
+        }
+        initAmbientParticles();
+        
+        function drawAmbientParticles() {
+            const now = Date.now();
+            const w = canvas.width / (window.devicePixelRatio || 1);
+            const h = canvas.height / (window.devicePixelRatio || 1);
+            
+            ambientParticles.forEach(p => {
+                // Drift movement
+                p.x += p.vx;
+                p.y += p.vy;
+                
+                // Wrap around edges
+                if (p.x < 0) p.x = w;
+                if (p.x > w) p.x = 0;
+                if (p.y < 0) p.y = h;
+                if (p.y > h) p.y = 0;
+                
+                // Pulsing opacity
+                const pulse = 0.15 + 0.1 * Math.sin(now / 2000 + p.phase);
+                
+                ctx.fillStyle = `rgba(147, 197, 253, ${pulse})`;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                ctx.fill();
+            });
+        }
+        
+        // Animation loop
+        function animate() {
+            drawGrid();
+            drawAmbientParticles();
+            drawRawStrokes();
+            drawRawIntersections();
+            drawRecognizedShapes();
+            drawRelationships();
+            drawGhostSuggestion();
+            drawWhisperLabels();
+            drawRipples();
+            drawParticles();
+            drawCursor();
+            requestAnimationFrame(animate);
+        }
+        animate();
+        
+        // ============================================
+        // Event Handlers
+        // ============================================
+        function getPos(e) {
+            const rect = canvas.getBoundingClientRect();
+            if (e.touches) {
+                return { x: e.touches[0].clientX - rect.left, y: e.touches[0].clientY - rect.top };
+            }
+            return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+        }
+        
+        function startDraw(e) {
+            e.preventDefault();
+            isDrawing = true;
+            hero.classList.add('drawing');
+            
+            const pos = getPos(e);
+            currentStroke = {
+                points: [pos],
+                startTime: Date.now(),
+                fadeStart: TIMING.strokeHold
+            };
+            strokes.push(currentStroke);
+        }
+        
+        function draw(e) {
+            const pos = getPos(e);
+            cursorPos = pos;
+            cursorVisible = true;
+            
+            if (!isDrawing || !currentStroke) return;
+            e.preventDefault();
+            currentStroke.points.push(pos);
+        }
+        
+        function endDraw() {
+            // Detect tap/dot (few points, small area)
+            if (currentStroke && currentStroke.points.length >= 1 && currentStroke.points.length <= 8) {
+                const bounds = getBounds(currentStroke.points);
+                const size = Math.max(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY);
+                
+                if (size < 25) {
+                    // It's a tap/dot!
+                    const center = currentStroke.points.length === 1 
+                        ? currentStroke.points[0]
+                        : { x: (bounds.minX + bounds.maxX) / 2, y: (bounds.minY + bounds.maxY) / 2 };
+                    
+                    // Add dot as recognized shape
+                    recognizedShapes.push({
+                        type: 'dot',
+                        center,
+                        radius: 6,
+                        confidence: 1,
+                        rawPoints: [...currentStroke.points],
+                        idealPoints: [center],
+                        createdAt: Date.now()
+                    });
+                    
+                    // Add whisper label
+                    whisperLabels.push({
+                        text: 'Point',
+                        x: center.x,
+                        y: center.y,
+                        createdAt: Date.now()
+                    });
+                    
+                    // Add ripple effect
+                    ripples.push({
+                        x: center.x,
+                        y: center.y,
+                        createdAt: Date.now(),
+                        maxRadius: 40
+                    });
+                    
+                    lastShapeTime = Date.now();
+                    currentStroke.fadeStart = 0;
+                }
+            }
+            
+            if (currentStroke && currentStroke.points.length > 5) {
+                const shape = detectShape(currentStroke.points);
+                
+                if (shape && shape.confidence > 0.5) {
+                    // Create recognized shape with ideal points
+                    recognizedShapes.push({
+                        ...shape,
+                        rawPoints: [...currentStroke.points],
+                        idealPoints: generateIdealShape(shape),
+                        createdAt: Date.now()
+                    });
+                    
+                    // Add whisper label
+                    const labelText = shape.type.charAt(0).toUpperCase() + shape.type.slice(1);
+                    whisperLabels.push({
+                        text: labelText,
+                        x: shape.center.x,
+                        y: shape.center.y,
+                        createdAt: Date.now()
+                    });
+                    
+                    // Add particle burst for recognition feedback
+                    for (let i = 0; i < 8; i++) {
+                        const angle = (i / 8) * Math.PI * 2;
+                        particles.push({
+                            x: shape.center.x,
+                            y: shape.center.y,
+                            vx: Math.cos(angle) * (1.5 + Math.random()),
+                            vy: Math.sin(angle) * (1.5 + Math.random()),
+                            life: 1,
+                            createdAt: Date.now()
+                        });
+                    }
+                    
+                    lastShapeTime = Date.now();
+                    
+                    // Hide raw stroke quickly since we're showing recognized version
+                    currentStroke.fadeStart = 0;
+                }
+            }
+            
+            isDrawing = false;
+            currentStroke = null;
+            setTimeout(() => {
+                if (!isDrawing) hero.classList.remove('drawing');
+            }, 500);
+        }
+        
+        // Event listeners
+        canvas.addEventListener('mousedown', startDraw);
+        canvas.addEventListener('mousemove', draw);
+        canvas.addEventListener('mouseup', endDraw);
+        canvas.addEventListener('mouseleave', () => { endDraw(); cursorVisible = false; });
+        canvas.addEventListener('mouseenter', () => { cursorVisible = true; });
+        
+        canvas.addEventListener('touchstart', startDraw, { passive: false });
+        canvas.addEventListener('touchmove', draw, { passive: false });
+        canvas.addEventListener('touchend', endDraw);
+        canvas.addEventListener('touchcancel', endDraw);
+    </script>
+</body>
+</html>

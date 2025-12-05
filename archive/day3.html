@@ -1,0 +1,3825 @@
+<!DOCTYPE html>
+<!--
+MetaMedium - Recombinatorial Drawing System
+Day 3 MVP: Spatial Graphs + Full Composition Model
+
+BUILDS ON: Day 2 library + persistence (v1.0-day2)
+
+NEW FEATURES:
+- Full composition model with 'composition' type (distinct from primitives)
+- Spatial graph generation for multi-stroke compositions
+- Spatial relationship detection (overlap, touching, containment, proximity)
+- Visual debugging for spatial relationships
+- Proper separation: builtin-primitive, user-primitive, composition
+
+KEY CHANGES FROM DAY 2:
+- Multi-stroke saves now create type: 'composition' (not 'user-primitive')
+- Spatial graphs properly generated (connections, containment, proximity)
+- buildSpatialGraph() analyzes all relationships between strokes
+- Sets foundation for Day 4 multi-stroke recognition
+
+DIAGNOSTICS: All Day 1-2 metrics remain active for tuning
+
+STATUS: ✅ Complete
+TECH: Vanilla JS, single-file
+VERSION: v1.0-day3
+DATE: October 28, 2025
+
+BASED ON: day2.html (v1.0-day2)
+-->
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MetaMedium - Day 3: Spatial Graphs</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            background: #4A4A4A;
+            color: #E0E0E0;
+            overflow: hidden;
+        }
+
+        .app {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .app-header {
+            background: #3A3A3A;
+            padding: 12px 40px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            text-align: center;
+            flex-shrink: 0;
+            border-bottom: 1px solid #555;
+            position: relative;
+        }
+
+        .app-header h1 {
+            margin: 0;
+            font-size: 24px;
+            color: #FFFFFF;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+        }
+
+        .app-header .subtitle {
+            margin: 3px 0 0 0;
+            font-size: 11px;
+            color: #B0B0B0;
+        }
+
+        .app-header .copyright {
+            position: absolute;
+            right: 40px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 11px;
+            color: #999;
+        }
+
+        .app-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            padding: 6px;
+            position: relative;
+            overflow: hidden;
+            min-height: 0;
+        }
+
+        .main-workspace {
+            display: flex;
+            gap: 6px;
+            flex: 1;
+            min-height: 0;
+            overflow: hidden;
+        }
+
+        /* Library Section - Below Canvas */
+        .library-section {
+            background: #3A3A3A;
+            padding: 12px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            height: 28vh;
+            overflow-y: auto;
+            flex-shrink: 0;
+        }
+
+        .library-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #7C3AED;
+        }
+
+        .library-header h2 {
+            margin: 0;
+            font-size: 15px;
+            font-weight: 600;
+            color: #E0E0E0;
+        }
+
+        .library-actions {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .export-button {
+            padding: 6px 12px;
+            font-size: 12px;
+            font-weight: 600;
+            background: #E0E0E0;
+            color: #1F2937;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .export-button:hover {
+            background: #F5F5F5;
+        }
+
+        /* Save Primitive Inline UI */
+        .save-primitive-container {
+            display: none;
+            gap: 8px;
+            align-items: center;
+            padding: 8px 12px;
+            background: #e8f5e9;
+            border: 1px solid #4CAF50;
+            border-radius: 6px;
+        }
+
+        .save-primitive-container.active {
+            display: flex;
+        }
+
+        .save-primitive-container input {
+            flex: 1;
+            padding: 6px 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+
+        .save-primitive-container button {
+            padding: 6px 12px;
+            font-size: 12px;
+            font-weight: 600;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .save-primitive-container .confirm-save {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .save-primitive-container .confirm-save:hover {
+            background: #45a049;
+        }
+
+        .save-primitive-container .cancel-save {
+            background: #666;
+            color: white;
+        }
+
+        .save-primitive-container .cancel-save:hover {
+            background: #444;
+        }
+
+        .library-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+        }
+
+        .library-subsection h3 {
+            margin: 0 0 12px 0;
+            font-size: 13px;
+            font-weight: 600;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .library-items {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+            gap: 8px;
+        }
+
+        .library-item {
+            background: white;
+            border: 1px solid #E0E0E0;
+            border-radius: 6px;
+            padding: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            position: relative;
+        }
+
+        .library-item.builtin {
+            border-color: #D1D5DB;
+            background: #F9FAFB;
+        }
+
+        .library-item:hover {
+            border-color: #7C3AED;
+            box-shadow: 0 2px 8px rgba(124, 58, 237, 0.2);
+            transform: translateY(-1px);
+        }
+
+        .library-item-thumbnail {
+            width: 100%;
+            height: 70px;
+            background: #F5F5F5;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        .library-item-thumbnail canvas {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            display: block;
+        }
+
+        .library-item-info {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .library-item-label {
+            font-size: 13px;
+            font-weight: 700;
+            color: #1F2937;
+            line-height: 1.2;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .library-item-meta {
+            font-size: 10px;
+            color: #6B7280;
+            line-height: 1.3;
+        }
+
+        .delete-button {
+            position: absolute;
+            top: 4px;
+            right: 4px;
+            width: 20px;
+            height: 20px;
+            padding: 0;
+            font-size: 16px;
+            line-height: 18px;
+            background: rgba(239, 68, 68, 0.9);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+        }
+
+        .delete-button:hover {
+            background: rgba(220, 38, 38, 1);
+            transform: scale(1.1);
+        }
+
+        .empty-message {
+            font-size: 12px;
+            color: #999;
+            font-style: italic;
+            padding: 12px;
+        }
+
+        .library-content {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .library-category {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .library-category h3 {
+            margin: 0;
+            font-size: 12px;
+            font-weight: 600;
+            color: #999;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+        }
+
+        /* Left panel - Metrics */
+        .metrics-panel {
+            width: 240px;
+            background: #3A3A3A;
+            padding: 12px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            overflow-y: auto;
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .metrics-panel h2 {
+            margin: 0 0 12px 0;
+            font-size: 15px;
+            font-weight: 600;
+            color: #E0E0E0;
+            border-bottom: 2px solid #7C3AED;
+            padding-bottom: 6px;
+        }
+        
+        .metrics-section {
+            margin-bottom: 16px;
+        }
+
+        .metrics-section h3 {
+            margin: 0 0 8px 0;
+            font-size: 13px;
+            font-weight: 600;
+            color: #999;
+        }
+
+        .metric-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 0;
+            border-bottom: 1px solid #505050;
+            font-size: 12px;
+        }
+
+        .metric-label {
+            color: #B0B0B0;
+            font-weight: 500;
+        }
+
+        .metric-value {
+            color: #FFFFFF;
+            font-weight: 600;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .condition-check {
+            margin: 8px 0;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+        
+        .condition-check.pass {
+            background: #e8f5e9;
+            border-left: 4px solid #4caf50;
+        }
+        
+        .condition-check.fail {
+            background: #ffebee;
+            border-left: 4px solid #f44336;
+        }
+        
+        .condition-check .shape-name {
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        
+        .condition-check .reason {
+            color: #666;
+            font-size: 11px;
+            margin-top: 4px;
+        }
+        
+        /* Center - Canvas */
+        .canvas-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            min-width: 0;
+            min-height: 0;
+        }
+
+        .canvas-wrapper {
+            background: white;
+            border-radius: 8px;
+            padding: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            flex: 1;
+            width: 100%;
+            min-width: 0;
+            min-height: 0;
+        }
+
+        .canvas-input {
+            width: 100%;
+            padding: 8px 12px;
+            font-size: 13px;
+            border: 1px solid #E0E0E0;
+            border-radius: 6px;
+            outline: none;
+            font-family: inherit;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .canvas-input::placeholder {
+            color: #999;
+        }
+
+        .canvas-input:focus {
+            border-color: #7C3AED;
+            box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1);
+        }
+
+        canvas {
+            border: none;
+            border-radius: 4px;
+            background: white;
+            cursor: crosshair;
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 16px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .refinement-controls {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            padding: 8px 12px;
+            background: #2A2A2A;
+            border-radius: 6px;
+            border: 1px solid #555;
+        }
+
+        .refinement-controls.disabled {
+            opacity: 0.5;
+            pointer-events: none;
+        }
+
+        .refinement-control {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+        }
+
+        .refinement-control label {
+            font-size: 12px;
+            color: #B0B0B0;
+            white-space: nowrap;
+        }
+
+        .refinement-control input[type="range"] {
+            width: 80px;
+            height: 4px;
+            border-radius: 2px;
+            background: #555;
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        .refinement-control input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: #7C3AED;
+            cursor: pointer;
+        }
+
+        .refinement-control input[type="range"]::-moz-range-thumb {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: #7C3AED;
+            cursor: pointer;
+            border: none;
+        }
+
+        .refinement-control .value-display {
+            font-size: 11px;
+            color: #FFFFFF;
+            font-weight: 600;
+            font-family: 'Courier New', monospace;
+            min-width: 16px;
+            text-align: center;
+        }
+
+        .refinement-toggle {
+            padding: 6px 12px;
+            font-size: 12px;
+            font-weight: 600;
+            background: #555;
+            color: #E0E0E0;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .refinement-toggle.active {
+            background: #7C3AED;
+            color: white;
+        }
+        
+        .save-library-button {
+            padding: 10px 24px;
+            background: #7C3AED;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s ease, transform 0.1s ease;
+        }
+
+        .save-library-button:hover {
+            background: #6D28D9;
+            transform: translateY(-1px);
+        }
+
+        .save-library-button:disabled {
+            background: #666;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .clear-button {
+            padding: 10px 24px;
+            background: #FBBF24;
+            color: #1F2937;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s ease, transform 0.1s ease;
+        }
+
+        .clear-button:hover {
+            background: #F59E0B;
+            transform: translateY(-1px);
+        }
+
+        .stroke-count {
+            font-size: 14px;
+            color: #E0E0E0;
+            font-weight: 500;
+        }
+
+        .debug-toggle {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 13px;
+            color: #666;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .debug-toggle input[type="checkbox"] {
+            cursor: pointer;
+        }
+
+        .debug-toggle span {
+            cursor: pointer;
+        }
+
+        /* Right panel - Recognition */
+        .recognition-panel {
+            width: 240px;
+            background: #3A3A3A;
+            padding: 12px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            overflow-y: auto;
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .recognition-panel h2 {
+            margin: 0 0 12px 0;
+            font-size: 15px;
+            font-weight: 600;
+            color: #E0E0E0;
+            border-bottom: 2px solid #10B981;
+            padding-bottom: 6px;
+        }
+        
+        .recognition-status {
+            padding: 12px;
+            background: #f5f5f5;
+            border-radius: 6px;
+            margin-bottom: 12px;
+            text-align: center;
+            font-size: 13px;
+            color: #666;
+        }
+
+        .fuzzy-match-container {
+            margin-bottom: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .fuzzy-match-container label {
+            font-size: 12px;
+            font-weight: 600;
+            color: #666;
+        }
+
+        .fuzzy-match-container input {
+            padding: 8px 10px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            font-size: 13px;
+            transition: border-color 0.2s ease;
+        }
+
+        .fuzzy-match-container input:focus {
+            outline: none;
+            border-color: #0066ff;
+        }
+
+        .suggestions {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        .suggestion-button {
+            padding: 12px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            background: white;
+            cursor: pointer;
+            text-align: left;
+            transition: all 0.2s ease;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        
+        .suggestion-button:hover {
+            border-color: #0066ff;
+            background: #f5f9ff;
+        }
+        
+        .suggestion-button.disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .suggestion-button .label {
+            font-size: 14px;
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .suggestion-button .confidence {
+            font-size: 12px;
+            color: #666;
+        }
+        
+        .suggestion-button .confidence.high {
+            color: #4CAF50;
+        }
+
+        .suggestion-button .confidence.medium {
+            color: #ff9800;
+        }
+
+        .suggestion-button .confidence.low {
+            color: #999;
+        }
+
+        .something-else-button {
+            padding: 12px 16px;
+            border: 2px solid #0066ff;
+            border-radius: 6px;
+            background: #f5f9ff;
+            cursor: pointer;
+            text-align: center;
+            color: #0066ff;
+            font-weight: 600;
+            transition: all 0.2s ease;
+        }
+        
+        .something-else-button:hover {
+            background: #e3f2fd;
+            border-color: #0052cc;
+        }
+        
+        .something-else-button.disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            border-color: #d0d0d0;
+            background: #f5f5f5;
+            color: #666;
+        }
+        
+        .app-footer {
+            background: white;
+            padding: 8px 40px;
+            text-align: center;
+            border-top: 1px solid #e0e0e0;
+            flex-shrink: 0;
+        }
+
+        .app-footer p {
+            margin: 2px 0;
+            font-size: 12px;
+            color: #666;
+        }
+        
+        .no-stroke-message {
+            padding: 16px;
+            text-align: center;
+            color: #999;
+            font-style: italic;
+            font-size: 13px;
+        }
+    </style>
+</head>
+<body>
+    <div class="app">
+        <header class="app-header">
+            <h1>DynaDoodle</h1>
+            <p class="subtitle">Dynamic Recombinatorial Drawing Pad - Teach New Glyphs - Ask Questions About Content</p>
+            <div class="copyright">© JOHN HANACEK, JHDESIGN LLC</div>
+        </header>
+
+        <div class="app-content">
+            <!-- Top Row: Main Workspace -->
+            <div class="main-workspace">
+                <!-- Left: Metrics Panel -->
+            <div class="metrics-panel">
+                <h2>Recognition Metrics</h2>
+
+                <div id="metricsContent" class="no-stroke-message">
+                    Draw a stroke to see metrics...
+                </div>
+            </div>
+
+            <!-- Center: Canvas -->
+            <div class="canvas-container">
+                <div class="canvas-wrapper">
+                    <input type="text"
+                           id="canvasInput"
+                           class="canvas-input"
+                           placeholder="Type commands here (future feature)..."
+                           autocomplete="off">
+                    <canvas id="canvas"></canvas>
+                </div>
+
+                <div class="controls">
+                    <button id="saveToLibraryBtn" class="save-library-button">Save to Library</button>
+                    <button id="clearBtn" class="clear-button">Clear Canvas</button>
+                    <div class="stroke-count">
+                        Strokes: <span id="strokeCount">0</span> | Accepted: <span id="acceptedCount">0</span>
+                    </div>
+                    <label class="debug-toggle">
+                        <input type="checkbox" id="debugCheckbox" />
+                        <span>Show debug indicators</span>
+                    </label>
+                </div>
+
+                <div class="refinement-controls">
+                    <button id="refinementToggle" class="refinement-toggle">Enable Refinement</button>
+
+                    <div class="refinement-control">
+                        <label for="smoothSlider">Smooth</label>
+                        <input type="range" id="smoothSlider" min="0" max="10" value="0" step="1">
+                        <span id="smoothValue">0</span>
+                    </div>
+
+                    <div class="refinement-control">
+                        <label for="simplifySlider">Simplify</label>
+                        <input type="range" id="simplifySlider" min="0" max="10" value="0" step="1">
+                        <span id="simplifyValue">0</span>
+                    </div>
+
+                    <div class="refinement-control">
+                        <label for="normalizeToggle">Normalize</label>
+                        <input type="checkbox" id="normalizeToggle">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right: Recognition Panel -->
+            <div class="recognition-panel">
+                <h2>Suggestions</h2>
+
+                <div id="recognitionStatus" class="recognition-status">
+                    Waiting for stroke...
+                </div>
+
+                <!-- Fuzzy Match Input -->
+                <div class="fuzzy-match-container">
+                    <label for="fuzzyMatchInput">Force match:</label>
+                    <input type="text" id="fuzzyMatchInput" placeholder="Type shape name..." />
+                </div>
+
+                <div id="suggestions" class="suggestions">
+                    <button class="something-else-button disabled">Something else</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bottom: Library Section -->
+        <div class="library-section">
+            <div class="library-header">
+                <h2>Shape Library</h2>
+                <div class="library-actions">
+                    <button id="exportLibraryBtn" class="export-button">Export</button>
+                </div>
+            </div>
+
+            <!-- Inline Save Primitive UI (appears when stroke is selected) -->
+            <div id="savePrimitiveContainer" class="save-primitive-container">
+                <label>Save current stroke as:</label>
+                <input type="text" id="primitiveNameInput" placeholder="Enter shape name..." />
+                <button id="confirmSaveBtn" class="confirm-save">Save</button>
+                <button id="cancelSaveBtn" class="cancel-save">Cancel</button>
+            </div>
+
+            <div class="library-content">
+                <div id="libraryGrid" class="library-items"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        console.log('Script loading...');
+
+        // State
+        const state = {
+            strokes: [],              // Original strokes as drawn
+            refinedStrokes: [],       // Refined geometric versions (null if not refined)
+            tipDebugData: [],         // Tip points for triangle debug visualization
+            cornerDebugData: [],      // Corner positions and angles for debug visualization
+            currentStroke: [],
+            context: [],
+            isDrawing: false,
+            suggestions: [],
+            selectedStrokeIndex: null,
+            lastFingerprint: null,
+            debugMode: false,         // Toggle debug indicators
+            refinement: {             // Geometric manipulation settings
+                enabled: true,
+                smooth: 2,            // 0-10 smoothing iterations
+                simplify: 2,          // 0-10 simplification tolerance
+                normalize: false
+            },
+            library: {
+                // Built-in primitives (always present)
+                'circle': {
+                    type: 'builtin-primitive',
+                    shapeType: 'circle',
+                    label: 'Circle',
+                    usageCount: 0
+                },
+                'line': {
+                    type: 'builtin-primitive',
+                    shapeType: 'line',
+                    label: 'Line',
+                    usageCount: 0
+                },
+                'rectangle': {
+                    type: 'builtin-primitive',
+                    shapeType: 'rectangle',
+                    label: 'Rectangle',
+                    usageCount: 0
+                },
+                'triangle': {
+                    type: 'builtin-primitive',
+                    shapeType: 'triangle',
+                    label: 'Triangle',
+                    usageCount: 0
+                }
+            }
+        };
+
+        // Elements
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const canvasInput = document.getElementById('canvasInput');
+        const suggestionsDiv = document.getElementById('suggestions');
+        const metricsContent = document.getElementById('metricsContent');
+        const recognitionStatus = document.getElementById('recognitionStatus');
+        const fuzzyMatchInput = document.getElementById('fuzzyMatchInput');
+        const clearBtn = document.getElementById('clearBtn');
+        const saveToLibraryBtn = document.getElementById('saveToLibraryBtn');
+        const strokeCountSpan = document.getElementById('strokeCount');
+        const acceptedCountSpan = document.getElementById('acceptedCount');
+        const exportLibraryBtn = document.getElementById('exportLibraryBtn');
+        const libraryGrid = document.getElementById('libraryGrid');
+        const debugCheckbox = document.getElementById('debugCheckbox');
+
+        // Inline save primitive UI elements
+        const savePrimitiveContainer = document.getElementById('savePrimitiveContainer');
+        const primitiveNameInput = document.getElementById('primitiveNameInput');
+        const confirmSaveBtn = document.getElementById('confirmSaveBtn');
+        const cancelSaveBtn = document.getElementById('cancelSaveBtn');
+
+        // Utility functions
+        function countCorners(points, angleThreshold = Math.PI / 3) {
+            // Count significant direction changes (corners)
+            // Angle threshold = 60 degrees (π/3) - catches hand-drawn corners
+            if (points.length < 15) return { count: 0, angles: [] };
+
+            const cornerPositions = [];
+            const windowSize = 8; // Smaller window to catch sharper corners
+
+            // Sample every 4 points to catch corners better
+            for (let i = windowSize; i < points.length - windowSize; i += 4) {
+                // Get vectors before and after this point
+                const before = {
+                    x: points[i].x - points[i - windowSize].x,
+                    y: points[i].y - points[i - windowSize].y
+                };
+                const after = {
+                    x: points[i + windowSize].x - points[i].x,
+                    y: points[i + windowSize].y - points[i].y
+                };
+
+                // Calculate angle between vectors
+                const dotProduct = before.x * after.x + before.y * after.y;
+                const magBefore = Math.sqrt(before.x * before.x + before.y * before.y);
+                const magAfter = Math.sqrt(after.x * after.x + after.y * after.y);
+
+                if (magBefore === 0 || magAfter === 0) continue;
+
+                const cosAngle = dotProduct / (magBefore * magAfter);
+                const angle = Math.acos(Math.max(-1, Math.min(1, cosAngle)));
+
+                // If angle > threshold (90 degrees), it's a sharp corner
+                if (angle > angleThreshold) {
+                    cornerPositions.push({ index: i, angle: angle });
+                }
+            }
+
+            // Cluster corners - merge corners within 20 points of each other
+            if (cornerPositions.length === 0) return { count: 0, angles: [] };
+
+            const clusteredCorners = [cornerPositions[0]];
+            for (let i = 1; i < cornerPositions.length; i++) {
+                const lastCorner = clusteredCorners[clusteredCorners.length - 1];
+                const distance = cornerPositions[i].index - lastCorner.index;
+
+                if (distance > 20) {
+                    // Far enough away, it's a new corner
+                    clusteredCorners.push(cornerPositions[i]);
+                } else if (cornerPositions[i].angle > lastCorner.angle) {
+                    // Same cluster, but this corner is sharper - replace
+                    clusteredCorners[clusteredCorners.length - 1] = cornerPositions[i];
+                }
+            }
+
+            return {
+                count: clusteredCorners.length,
+                angles: clusteredCorners.map(c => c.angle),  // Angle values for fingerprint
+                cornerData: clusteredCorners  // Full corner objects with {index, angle} for refinement
+            };
+        }
+
+        function analyzeCornerAngles(angles) {
+            // Analyze the distribution of corner angles
+            // Returns metrics useful for distinguishing rectangles from triangles
+            // Handle undefined or empty arrays gracefully
+            if (!angles || angles.length === 0) {
+                return {
+                    avgAngle: 0,
+                    variance: 0,
+                    consistency: 0,
+                    rectangleLikeness: 0,
+                    triangleLikeness: 0
+                };
+            }
+
+            const avgAngle = angles.reduce((sum, a) => sum + a, 0) / angles.length;
+            const variance = angles.reduce((sum, a) => sum + Math.pow(a - avgAngle, 2), 0) / angles.length;
+            const stdDev = Math.sqrt(variance);
+
+            // Consistency: how similar are all the angles? (0-1, higher = more consistent)
+            const consistency = angles.length > 1 ? Math.max(0, 1 - stdDev / (Math.PI / 4)) : 1;
+
+            // Check how "rectangle-like" the angles are (close to 90° = π/2)
+            const rectangleLikeness = angles.reduce((sum, angle) => {
+                const deviationFrom90 = Math.abs(angle - Math.PI / 2);
+                // Score each corner: perfect 90° = 1, off by 45° = 0
+                return sum + Math.max(0, 1 - deviationFrom90 / (Math.PI / 4));
+            }, 0) / angles.length;
+
+            // Check how "triangle-like" the angles are (more varied, typically sharper or wider than 90°)
+            const triangleLikeness = angles.reduce((sum, angle) => {
+                // Triangles typically have angles != 90°, often 60° or 120° external
+                const deviationFrom90 = Math.abs(angle - Math.PI / 2);
+                // Score higher if NOT near 90°
+                return sum + Math.min(1, deviationFrom90 / (Math.PI / 6));
+            }, 0) / angles.length;
+
+            return {
+                avgAngle,
+                variance,
+                consistency,
+                rectangleLikeness,
+                triangleLikeness
+            };
+        }
+
+        function checkOvershoot(points, threshold = 50) {
+            // Check if stroke passes near start point at any point
+            // (not just at the end)
+            if (points.length < 10) return false;
+            
+            const start = points[0];
+            
+            // Check last 30% of stroke for proximity to start
+            const checkStart = Math.floor(points.length * 0.7);
+            
+            for (let i = checkStart; i < points.length; i++) {
+                const distance = Math.sqrt(
+                    Math.pow(points[i].x - start.x, 2) + 
+                    Math.pow(points[i].y - start.y, 2)
+                );
+                
+                if (distance < threshold) {
+                    return true;
+                }
+            }
+            
+            return false;
+        }
+
+        function getBounds(points) {
+            if (points.length === 0) return { minX: 0, maxX: 0, minY: 0, maxY: 0 };
+            
+            let minX = Infinity, maxX = -Infinity;
+            let minY = Infinity, maxY = -Infinity;
+            
+            points.forEach(point => {
+                minX = Math.min(minX, point.x);
+                maxX = Math.max(maxX, point.x);
+                minY = Math.min(minY, point.y);
+                maxY = Math.max(maxY, point.y);
+            });
+            
+            return { minX, maxX, minY, maxY };
+        }
+
+        function isStrokeClosed(points, threshold = 50) {
+            if (points.length < 5) return false;
+            
+            const start = points[0];
+            const end = points[points.length - 1];
+            const distance = Math.sqrt(
+                Math.pow(end.x - start.x, 2) + 
+                Math.pow(end.y - start.y, 2)
+            );
+            
+            // Check direct closure
+            if (distance < threshold) return true;
+            
+            // Also consider size-relative closure
+            const bounds = getBounds(points);
+            const width = bounds.maxX - bounds.minX;
+            const height = bounds.maxY - bounds.minY;
+            const size = Math.max(width, height);
+            const relativeGap = size > 0 ? distance / size : 1;
+            
+            if (relativeGap < 0.15) return true;
+            
+            // Check for overshoot (passes near start somewhere in last 30%)
+            return checkOvershoot(points, threshold);
+        }
+
+        function calculateStraightness(points) {
+            if (points.length < 2) return 0;
+            
+            const start = points[0];
+            const end = points[points.length - 1];
+            
+            const directDistance = Math.sqrt(
+                Math.pow(end.x - start.x, 2) + 
+                Math.pow(end.y - start.y, 2)
+            );
+            
+            let pathLength = 0;
+            for (let i = 1; i < points.length; i++) {
+                const dx = points[i].x - points[i-1].x;
+                const dy = points[i].y - points[i-1].y;
+                pathLength += Math.sqrt(dx * dx + dy * dy);
+            }
+            
+            if (pathLength === 0) return 0;
+            return directDistance / pathLength;
+        }
+
+        function getFingerprint(points) {
+            const bounds = getBounds(points);
+            const width = bounds.maxX - bounds.minX;
+            const height = bounds.maxY - bounds.minY;
+            const start = points[0];
+            const end = points[points.length - 1];
+            const endDistance = Math.sqrt(
+                Math.pow(end.x - start.x, 2) +
+                Math.pow(end.y - start.y, 2)
+            );
+
+            // Get corner data (count + angles + positions)
+            const cornerData = countCorners(points);
+            const angleAnalysis = analyzeCornerAngles(cornerData.angles);
+
+            return {
+                aspectRatio: height === 0 ? 1 : width / height,
+                straightness: calculateStraightness(points),
+                isClosed: isStrokeClosed(points),
+                closureDistance: endDistance,
+                corners: cornerData.count,
+                cornerAngles: cornerData.angles,
+                cornerData: cornerData.cornerData,  // Cache corner positions for refinement
+                angleAnalysis: angleAnalysis,
+                bounds: bounds,
+                size: Math.max(width, height),
+                pointCount: points.length
+            };
+        }
+
+        // ===== GEOMETRIC MANIPULATION FUNCTIONS (Phase 1) =====
+
+        function smoothStroke(points, iterations = 2) {
+            // Chaikin's corner cutting algorithm with endpoint preservation
+            // Each iteration smooths the stroke by replacing corners
+            if (!points || points.length < 3) return points;
+
+            let smoothed = [...points];
+            const firstPoint = points[0];
+            const lastPoint = points[points.length - 1];
+
+            for (let iter = 0; iter < iterations; iter++) {
+                const newPoints = [];
+
+                // Always keep the first point
+                newPoints.push({...smoothed[0]});
+
+                for (let i = 0; i < smoothed.length - 1; i++) {
+                    const p1 = smoothed[i];
+                    const p2 = smoothed[i + 1];
+
+                    // Quarter point closer to p1
+                    const q = {
+                        x: 0.75 * p1.x + 0.25 * p2.x,
+                        y: 0.75 * p1.y + 0.25 * p2.y
+                    };
+
+                    // Quarter point closer to p2
+                    const r = {
+                        x: 0.25 * p1.x + 0.75 * p2.x,
+                        y: 0.25 * p1.y + 0.75 * p2.y
+                    };
+
+                    newPoints.push(q);
+                    newPoints.push(r);
+                }
+
+                // Always keep the last point
+                newPoints.push({...smoothed[smoothed.length - 1]});
+
+                smoothed = newPoints;
+            }
+
+            // Ensure original endpoints are preserved exactly
+            smoothed[0] = firstPoint;
+            smoothed[smoothed.length - 1] = lastPoint;
+
+            return smoothed;
+        }
+
+        function simplifyStroke(points, tolerance = 2) {
+            // Douglas-Peucker algorithm for point reduction
+            // Removes points that don't significantly affect the shape
+            if (!points || points.length <= 2) return points;
+
+            function perpendicularDistance(point, lineStart, lineEnd) {
+                const dx = lineEnd.x - lineStart.x;
+                const dy = lineEnd.y - lineStart.y;
+                const mag = Math.sqrt(dx * dx + dy * dy);
+
+                if (mag === 0) return Math.sqrt(Math.pow(point.x - lineStart.x, 2) + Math.pow(point.y - lineStart.y, 2));
+
+                const u = ((point.x - lineStart.x) * dx + (point.y - lineStart.y) * dy) / (mag * mag);
+                const closestPoint = {
+                    x: lineStart.x + u * dx,
+                    y: lineStart.y + u * dy
+                };
+
+                return Math.sqrt(Math.pow(point.x - closestPoint.x, 2) + Math.pow(point.y - closestPoint.y, 2));
+            }
+
+            function simplifyDouglasPeucker(points, tolerance) {
+                if (points.length <= 2) return points;
+
+                let maxDistance = 0;
+                let maxIndex = 0;
+                const end = points.length - 1;
+
+                // Find point with maximum distance from line between first and last
+                for (let i = 1; i < end; i++) {
+                    const distance = perpendicularDistance(points[i], points[0], points[end]);
+                    if (distance > maxDistance) {
+                        maxDistance = distance;
+                        maxIndex = i;
+                    }
+                }
+
+                // If max distance is greater than tolerance, recursively simplify
+                if (maxDistance > tolerance) {
+                    const left = simplifyDouglasPeucker(points.slice(0, maxIndex + 1), tolerance);
+                    const right = simplifyDouglasPeucker(points.slice(maxIndex), tolerance);
+
+                    // Combine results (remove duplicate point at junction)
+                    return left.slice(0, -1).concat(right);
+                } else {
+                    // All points between first and last are within tolerance
+                    return [points[0], points[end]];
+                }
+            }
+
+            return simplifyDouglasPeucker(points, tolerance);
+        }
+
+        function normalizeStroke(points, targetSize = 200) {
+            // Scale stroke to standard size while maintaining canvas position
+            if (!points || points.length === 0) return points;
+
+            const bounds = getBounds(points);
+            const width = bounds.maxX - bounds.minX;
+            const height = bounds.maxY - bounds.minY;
+            const maxDim = Math.max(width, height);
+
+            if (maxDim === 0) return points;
+
+            const scale = targetSize / maxDim;
+            const originalCenterX = (bounds.minX + bounds.maxX) / 2;
+            const originalCenterY = (bounds.minY + bounds.maxY) / 2;
+
+            // Scale around the original center position to maintain location on canvas
+            return points.map(p => ({
+                x: (p.x - originalCenterX) * scale + originalCenterX,
+                y: (p.y - originalCenterY) * scale + originalCenterY
+            }));
+        }
+
+        function applyRefinement(points, options = {}) {
+            // Apply refinement operations in sequence
+            let refined = [...points];
+
+            // Simplify first (reduce points)
+            if (options.simplify > 0) {
+                refined = simplifyStroke(refined, options.simplify);
+            }
+
+            // Then smooth (multiple iterations)
+            if (options.smooth > 0) {
+                refined = smoothStroke(refined, options.smooth);
+            }
+
+            // Normalize if requested
+            if (options.normalize) {
+                refined = normalizeStroke(refined, options.normalizeSize || 200);
+            }
+
+            return refined;
+        }
+
+        // ===== END GEOMETRIC MANIPULATION =====
+
+        // ===== SPATIAL UTILITY FUNCTIONS (Day 3) =====
+        // Two-tier distance system: AABB for fast rejection, stroke distance for accuracy
+
+        function flattenStroke(stroke) {
+            // Convert segment-based strokes to flat point arrays
+            // Segment-based: [[{x,y}, ...], [{x,y}, ...]] (rectangles/triangles)
+            // Single stroke: [{x,y}, {x,y}, ...] (circles/lines)
+            if (!stroke || stroke.length === 0) return [];
+
+            // Check if this is a segment-based stroke
+            const isSegmentBased = Array.isArray(stroke[0]) &&
+                                  typeof stroke[0][0] === 'object' &&
+                                  typeof stroke[0][0].x !== 'undefined';
+
+            if (isSegmentBased) {
+                // Flatten all segments into single array
+                return stroke.reduce((acc, segment) => acc.concat(segment), []);
+            }
+
+            // Already flat
+            return stroke;
+        }
+
+        function aabbsNear(boundsA, boundsB, threshold = 50) {
+            // Fast check: Are bounding boxes within threshold distance?
+            // Used for quick rejection before expensive stroke distance calculation
+            let dx = 0;
+            let dy = 0;
+
+            // Horizontal distance
+            if (boundsA.maxX < boundsB.minX) {
+                dx = boundsB.minX - boundsA.maxX;
+            } else if (boundsB.maxX < boundsA.minX) {
+                dx = boundsA.minX - boundsB.maxX;
+            }
+
+            // Vertical distance
+            if (boundsA.maxY < boundsB.minY) {
+                dy = boundsB.minY - boundsA.maxY;
+            } else if (boundsB.maxY < boundsA.minY) {
+                dy = boundsA.minY - boundsB.maxY;
+            }
+
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            return distance <= threshold;
+        }
+
+        function calculateMinStrokeDistance(strokeA, strokeB, sampleRate = 5) {
+            // Calculate minimum distance between two strokes
+            // Uses sampling for performance with large strokes
+            if (!strokeA || !strokeB || strokeA.length === 0 || strokeB.length === 0) {
+                return Infinity;
+            }
+
+            let minDistance = Infinity;
+
+            // Sample points from strokeA
+            for (let i = 0; i < strokeA.length; i += sampleRate) {
+                const pointA = strokeA[i];
+
+                // Check against sample points from strokeB
+                for (let j = 0; j < strokeB.length; j += sampleRate) {
+                    const pointB = strokeB[j];
+                    const dx = pointB.x - pointA.x;
+                    const dy = pointB.y - pointA.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+
+                    if (distance < minDistance) {
+                        minDistance = distance;
+                    }
+
+                    // Early exit if we found overlapping points
+                    if (minDistance < 1) return minDistance;
+                }
+            }
+
+            // Always check endpoints (most important for accuracy)
+            const endpoints = [
+                [strokeA[0], strokeB[0]],
+                [strokeA[0], strokeB[strokeB.length - 1]],
+                [strokeA[strokeA.length - 1], strokeB[0]],
+                [strokeA[strokeA.length - 1], strokeB[strokeB.length - 1]]
+            ];
+
+            endpoints.forEach(([pA, pB]) => {
+                const dx = pB.x - pA.x;
+                const dy = pB.y - pA.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                if (distance < minDistance) {
+                    minDistance = distance;
+                }
+            });
+
+            return minDistance;
+        }
+
+        function checkOverlap(boundsA, boundsB) {
+            // Check if two bounding boxes overlap
+            // Returns true if they share any area
+            const noOverlap =
+                boundsA.maxX < boundsB.minX || // A is to the left of B
+                boundsA.minX > boundsB.maxX || // A is to the right of B
+                boundsA.maxY < boundsB.minY || // A is above B
+                boundsA.minY > boundsB.maxY;   // A is below B
+
+            return !noOverlap;
+        }
+
+        function checkTouching(strokeA, strokeB, boundsA, boundsB, threshold = 25) {
+            // Two-tier check: AABB first, then accurate stroke distance
+            // threshold: maximum distance to consider touching (default 25px to account for refinement gaps)
+
+            // Tier 1: Fast rejection using expanded AABB
+            if (!aabbsNear(boundsA, boundsB, threshold)) {
+                return false; // Too far apart
+            }
+
+            // Tier 2: Accurate stroke distance
+            const minDistance = calculateMinStrokeDistance(strokeA, strokeB);
+            const isTouching = minDistance <= threshold;
+
+            // Debug logging for close calls (within 60px to show proximity too)
+            if (minDistance < 60) {
+                console.log('Distance check:', {
+                    minDistance: minDistance.toFixed(2),
+                    threshold,
+                    isTouching,
+                    strokeAPoints: strokeA.length,
+                    strokeBPoints: strokeB.length,
+                    relationship: isTouching ? 'TOUCHING' : (minDistance < 50 ? 'PROXIMITY' : 'FAR')
+                });
+            }
+
+            return isTouching;
+        }
+
+        function checkContainment(boundsOuter, boundsInner) {
+            // Check if boundsInner is completely contained within boundsOuter
+            return boundsInner.minX >= boundsOuter.minX &&
+                   boundsInner.maxX <= boundsOuter.maxX &&
+                   boundsInner.minY >= boundsOuter.minY &&
+                   boundsInner.maxY <= boundsOuter.maxY;
+        }
+
+        function checkProximity(boundsA, boundsB) {
+            // Determine directional relationships between two bounding boxes
+            // Returns object with directional flags: {left, right, above, below, overlapping}
+
+            const centerA = {
+                x: (boundsA.minX + boundsA.maxX) / 2,
+                y: (boundsA.minY + boundsA.maxY) / 2
+            };
+            const centerB = {
+                x: (boundsB.minX + boundsB.maxX) / 2,
+                y: (boundsB.minY + boundsB.maxY) / 2
+            };
+
+            const dx = centerB.x - centerA.x;
+            const dy = centerB.y - centerA.y;
+
+            // Determine primary direction based on center positions
+            const proximity = {
+                overlapping: checkOverlap(boundsA, boundsB),
+                left: dx < -20,    // B is significantly left of A
+                right: dx > 20,    // B is significantly right of A
+                above: dy < -20,   // B is significantly above A
+                below: dy > 20,    // B is significantly below A
+                distance: Math.sqrt(dx * dx + dy * dy)
+            };
+
+            return proximity;
+        }
+
+        // ===== END SPATIAL UTILITIES =====
+
+        function buildSpatialGraph(components) {
+            // Build a comprehensive spatial graph from an array of components
+            // Each component should have: {bounds, recognizedAs, originalStroke, fingerprint}
+            // Returns: {connections, containment, proximity}
+
+            const graph = {
+                connections: [],   // [[i, j], ...] - strokes that touch/overlap
+                containment: [],   // [[outer, inner], ...] - stroke j is inside stroke i
+                proximity: {}      // {i: {left: [j], right: [k], ...}} - directional relationships
+            };
+
+            // Analyze all pairs of components
+            for (let i = 0; i < components.length; i++) {
+                const compA = components[i];
+                graph.proximity[i] = { left: [], right: [], above: [], below: [] };
+
+                for (let j = i + 1; j < components.length; j++) {
+                    const compB = components[j];
+
+                    // Get strokes (prefer refined if available, fall back to original)
+                    const strokeA = flattenStroke(compA.refinedStroke || compA.originalStroke);
+                    const strokeB = flattenStroke(compB.refinedStroke || compB.originalStroke);
+
+                    // Check for connections (touching or overlapping) using accurate distance
+                    // Increased threshold to 25px to account for refinement gaps
+                    if (checkTouching(strokeA, strokeB, compA.bounds, compB.bounds, 25)) {
+                        graph.connections.push([i, j]);
+                    }
+
+                    // Check for containment (still uses AABB - reasonable for this check)
+                    if (checkContainment(compA.bounds, compB.bounds)) {
+                        graph.containment.push([i, j]); // j is inside i
+                    } else if (checkContainment(compB.bounds, compA.bounds)) {
+                        graph.containment.push([j, i]); // i is inside j
+                    }
+
+                    // Check proximity/directional relationships (only if not connected)
+                    // Use distance-based check to differentiate overlap from proximity
+                    const minDistance = aabbsNear(compA.bounds, compB.bounds, 50)
+                        ? calculateMinStrokeDistance(strokeA, strokeB)
+                        : Infinity;
+
+                    const proximity = checkProximity(compA.bounds, compB.bounds);
+
+                    // Only record proximity if shapes are near but NOT touching
+                    if (minDistance > 25 && minDistance < 50) {
+                        // Add directional relationships from A's perspective
+                        if (proximity.left) graph.proximity[i].left.push(j);
+                        if (proximity.right) graph.proximity[i].right.push(j);
+                        if (proximity.above) graph.proximity[i].above.push(j);
+                        if (proximity.below) graph.proximity[i].below.push(j);
+
+                        // Add inverse relationships from B's perspective
+                        if (!graph.proximity[j]) {
+                            graph.proximity[j] = { left: [], right: [], above: [], below: [] };
+                        }
+                        if (proximity.right) graph.proximity[j].left.push(i);
+                        if (proximity.left) graph.proximity[j].right.push(i);
+                        if (proximity.below) graph.proximity[j].above.push(i);
+                        if (proximity.above) graph.proximity[j].below.push(i);
+                    }
+                }
+            }
+
+            // Debug logging
+            console.log('Spatial Graph Built:', {
+                totalComponents: components.length,
+                connections: graph.connections.length,
+                containment: graph.containment.length,
+                connections_detail: graph.connections,
+                containment_detail: graph.containment,
+                proximity_detail: graph.proximity
+            });
+
+            return graph;
+        }
+
+        function analyzeStrokeDetailed(points) {
+            const fp = getFingerprint(points);
+            const results = [];
+            const checks = [];
+
+            // STRATEGY: Contextual scoring - weight evidence, find best fit
+            // Each shape gets a score 0-100 based on how well fingerprint matches
+            // Circle: 0-1 corners, closed, roundish, VERY curved (straightness < 0.2)
+            // Triangle: 2-3 corners, closed, somewhat straight (0.3-0.7)
+            // Rectangle: 3-4 corners, closed, somewhat straight (0.3-0.7)
+            // Line: 0-2 corners, NOT closed, VERY straight (>0.65)
+            
+            // Triangle checks (add as new primitive!)
+            const triangleChecks = {
+                isClosed: fp.isClosed,
+                hasThreeCorners: fp.corners >= 2 && fp.corners <= 3,  // 2-3 corners (hand-drawn may miss one)
+                reasonableShape: fp.aspectRatio >= 0.3 && fp.aspectRatio <= 3.0
+            };
+
+            checks.push({
+                shape: 'Triangle',
+                passed: triangleChecks.isClosed && triangleChecks.hasThreeCorners && triangleChecks.reasonableShape,
+                conditions: [
+                    { test: 'Is closed?', pass: triangleChecks.isClosed, detail: `End distance: ${fp.closureDistance.toFixed(1)}px (checks overshoot too)` },
+                    { test: 'Has 3 corners?', pass: triangleChecks.hasThreeCorners, detail: `Corners: ${fp.corners} (need: 2-3)` },
+                    { test: 'Reasonable shape?', pass: triangleChecks.reasonableShape, detail: `Aspect: ${fp.aspectRatio.toFixed(2)} (need: 0.3-3.0)` }
+                ]
+            });
+
+            if (triangleChecks.isClosed && triangleChecks.hasThreeCorners && triangleChecks.reasonableShape) {
+                results.push({ type: 'triangle', confidence: 0.85, label: 'Triangle' });
+            }
+            
+            // Rectangle checks
+            const rectangleChecks = {
+                isClosed: fp.isClosed,
+                hasFourCorners: fp.corners >= 3 && fp.corners <= 4,  // 3-4 corners (hand-drawn may miss one)
+                aspectRatioOk: fp.aspectRatio > 0.3 && fp.aspectRatio < 3.0
+            };
+
+            checks.push({
+                shape: 'Rectangle',
+                passed: rectangleChecks.isClosed && rectangleChecks.hasFourCorners && rectangleChecks.aspectRatioOk,
+                conditions: [
+                    { test: 'Is closed?', pass: rectangleChecks.isClosed, detail: `End distance: ${fp.closureDistance.toFixed(1)}px` },
+                    { test: 'Has 4 corners?', pass: rectangleChecks.hasFourCorners, detail: `Corners: ${fp.corners} (need: 3-4)` },
+                    { test: 'Reasonable shape?', pass: rectangleChecks.aspectRatioOk, detail: `Aspect: ${fp.aspectRatio.toFixed(2)} (need: 0.3-3.0)` }
+                ]
+            });
+
+            if (rectangleChecks.isClosed && rectangleChecks.hasFourCorners && rectangleChecks.aspectRatioOk) {
+                results.push({ type: 'rectangle', confidence: 0.8, label: 'Rectangle' });
+            }
+            
+            // Circle checks - use overshoot for better closure detection
+            const hasOvershoot = checkOvershoot(points);
+            const circleChecks = {
+                isClosed: fp.isClosed || hasOvershoot,  // Either exact closure OR passes near start
+                fewCorners: fp.corners <= 1,  // Circles should have 0-1 corners max
+                aspectRatioOk: Math.abs(fp.aspectRatio - 1) < 0.5,
+                notStraight: fp.straightness < 0.5
+            };
+
+            checks.push({
+                shape: 'Circle',
+                passed: circleChecks.isClosed && circleChecks.fewCorners && circleChecks.aspectRatioOk && circleChecks.notStraight,
+                conditions: [
+                    { test: 'Is closed?', pass: circleChecks.isClosed, detail: `End: ${fp.closureDistance.toFixed(1)}px ${hasOvershoot ? '(overshoot ✓)' : ''}` },
+                    { test: 'Few corners?', pass: circleChecks.fewCorners, detail: `Corners: ${fp.corners} (need: ≤1)` },
+                    { test: 'Aspect ratio ~1?', pass: circleChecks.aspectRatioOk, detail: `Ratio: ${fp.aspectRatio.toFixed(2)} (need: 0.5-1.5)` },
+                    { test: 'Is curved?', pass: circleChecks.notStraight, detail: `Straightness: ${fp.straightness.toFixed(2)} (need: <0.5)` }
+                ]
+            });
+
+            if (circleChecks.isClosed && circleChecks.fewCorners && circleChecks.aspectRatioOk && circleChecks.notStraight) {
+                results.push({ type: 'circle', confidence: 0.8, label: 'Circle' });
+            }
+            
+            // Line checks
+            const lineChecks = {
+                isStraight: fp.straightness > 0.65,
+                notClosed: !fp.isClosed,
+                fewCorners: fp.corners <= 2
+            };
+            
+            checks.push({
+                shape: 'Line',
+                passed: lineChecks.isStraight && lineChecks.notClosed && lineChecks.fewCorners,
+                conditions: [
+                    { test: 'Is straight?', pass: lineChecks.isStraight, detail: `Straightness: ${fp.straightness.toFixed(2)} (need: >0.65)` },
+                    { test: 'Not closed?', pass: lineChecks.notClosed, detail: `End distance: ${fp.closureDistance.toFixed(1)}px` },
+                    { test: 'Few corners?', pass: lineChecks.fewCorners, detail: `Corners: ${fp.corners} (need: ≤2)` }
+                ]
+            });
+            
+            if (lineChecks.isStraight && lineChecks.notClosed && lineChecks.fewCorners) {
+                results.push({ type: 'line', confidence: 0.9, label: 'Line' });
+            }
+
+            // FEATURE-BASED WEIGHTED SCORING SYSTEM
+            // Each shape scored on: Corner Match (40%) + Straightness (40%) + Aspect Ratio (20%)
+            // Disqualifying features eliminate shapes entirely
+            // Note: hasOvershoot already declared above for circle checks
+            const scoredResults = [];
+            const scoringDetails = { circle: {}, triangle: {}, rectangle: {}, line: {} };
+
+            // Helper function to calculate component scores
+            // New 4-component system: Corner Count (25%) + Angle Quality (25%) + Straightness (30%) + Aspect Ratio (20%)
+            function calculateScore(cornerScore, angleScore, straightnessScore, aspectScore) {
+                return Math.round(cornerScore * 0.25 + angleScore * 0.25 + straightnessScore * 0.30 + aspectScore * 0.20);
+            }
+
+            // Continuous scoring functions - map raw values to 0-100 smoothly
+            function scoreCurviness(straightness) {
+                // For circles: lower straightness = higher score
+                // Ideal: 0 (completely curved) = 100
+                // Disqualify: 0.3+ (too straight)
+                if (straightness >= 0.3) return 0;
+                return 100 * (1 - straightness / 0.3);
+            }
+
+            function scoreStraightness(straightness) {
+                // For lines: higher straightness = higher score
+                // Ideal: 1.0 (perfectly straight) = 100
+                // Disqualify: <0.65 (too curved)
+                if (straightness < 0.65) return 0;
+                return 100 * ((straightness - 0.65) / (1.0 - 0.65));
+            }
+
+            function scoreRoundness(aspectRatio) {
+                // For circles: closer to 1.0 = higher score
+                // Ideal: 1.0 (perfect circle) = 100
+                // Maximum deviation: 0.8 (score drops to 0)
+                const deviation = Math.abs(aspectRatio - 1.0);
+                if (deviation >= 0.8) return 0;
+                return 100 * (1 - deviation / 0.8);
+            }
+
+            function scoreAspectRange(aspectRatio, minRatio, maxRatio) {
+                // For shapes with acceptable aspect ranges
+                // Penalty for being outside the comfortable range
+                if (aspectRatio < minRatio) {
+                    // Too thin
+                    const deviation = minRatio - aspectRatio;
+                    return Math.max(0, 100 - deviation * 100);
+                } else if (aspectRatio > maxRatio) {
+                    // Too wide
+                    const deviation = aspectRatio - maxRatio;
+                    return Math.max(0, 100 - deviation * 100);
+                }
+                return 100;
+            }
+
+            function scoreLineElongation(aspectRatio) {
+                // For lines: more elongated = higher score
+                // Ideal: very elongated (>5) = 100
+                // Minimum acceptable: 2.0
+                if (aspectRatio < 2.0) return 0;
+                if (aspectRatio >= 5.0) return 100;
+                // Linear scale from 2.0 to 5.0
+                return ((aspectRatio - 2.0) / (5.0 - 2.0)) * 100;
+            }
+
+            // ===== CIRCLE SCORING =====
+            let circleCornerScore = 0;
+            let circleAngleScore = 0;
+            let circleStraightnessScore = 0;
+            let circleAspectScore = 0;
+            let circleDisqualified = false;
+
+            // 1. DISQUALIFYING: Must be closed
+            scoringDetails.circle.closed = fp.isClosed || hasOvershoot;
+            if (!scoringDetails.circle.closed) {
+                circleDisqualified = true;
+                scoringDetails.circle.closedPoints = 'DISQUALIFIED (not closed)';
+            } else {
+                scoringDetails.circle.closedPoints = '✓ closed';
+            }
+
+            // 2. CORNER COUNT SCORE (25%): 0-100 based on corner count
+            if (fp.corners === 0) {
+                circleCornerScore = 100;
+                scoringDetails.circle.cornerScore = '100 (no corners)';
+            } else if (fp.corners === 1) {
+                circleCornerScore = 70;
+                scoringDetails.circle.cornerScore = '70 (1 corner)';
+            } else {
+                circleCornerScore = 0;
+                circleDisqualified = true;
+                scoringDetails.circle.cornerScore = `0 (${fp.corners} corners)`;
+            }
+
+            // 3. ANGLE QUALITY SCORE (25%): For circles, no angles should exist
+            if (fp.corners === 0) {
+                circleAngleScore = 100;
+                scoringDetails.circle.angleScore = '100 (smooth, no angles)';
+            } else if (fp.corners === 1) {
+                circleAngleScore = 50;
+                scoringDetails.circle.angleScore = '50 (one angle detected)';
+            } else {
+                circleAngleScore = 0;
+                scoringDetails.circle.angleScore = '0 (multiple angles)';
+            }
+
+            // 4. STRAIGHTNESS SCORE (30%): Must be curved (continuous scoring)
+            circleStraightnessScore = scoreCurviness(fp.straightness);
+            if (circleStraightnessScore === 0) {
+                circleDisqualified = true;
+                scoringDetails.circle.straightnessScore = `0 (too straight: ${fp.straightness.toFixed(3)})`;
+            } else {
+                scoringDetails.circle.straightnessScore = `${Math.round(circleStraightnessScore)} (straightness: ${fp.straightness.toFixed(3)})`;
+            }
+
+            // 5. ASPECT RATIO SCORE (20%): Roundness (continuous scoring)
+            circleAspectScore = scoreRoundness(fp.aspectRatio);
+            scoringDetails.circle.aspectScore = `${Math.round(circleAspectScore)} (ratio: ${fp.aspectRatio.toFixed(2)})`;
+
+            const circleFinalScore = circleDisqualified ? 0 : calculateScore(circleCornerScore, circleAngleScore, circleStraightnessScore, circleAspectScore);
+            scoringDetails.circle.total = circleFinalScore;
+            scoringDetails.circle.breakdown = `(${Math.round(circleCornerScore)}×25% + ${Math.round(circleAngleScore)}×25% + ${Math.round(circleStraightnessScore)}×30% + ${Math.round(circleAspectScore)}×20%)`;
+
+            scoredResults.push({
+                type: 'circle',
+                confidence: circleFinalScore / 100,
+                label: 'Circle',
+                score: circleFinalScore
+            });
+
+            // ===== TRIANGLE SCORING =====
+            let triangleCornerScore = 0;
+            let triangleAngleScore = 0;
+            let triangleStraightnessScore = 0;
+            let triangleAspectScore = 0;
+            let triangleDisqualified = false;
+
+            // 1. DISQUALIFYING: Must be closed
+            scoringDetails.triangle.closed = fp.isClosed;
+            if (!fp.isClosed) {
+                triangleDisqualified = true;
+                scoringDetails.triangle.closedPoints = 'DISQUALIFIED (not closed)';
+            } else {
+                scoringDetails.triangle.closedPoints = '✓ closed';
+            }
+
+            // 2. CORNER COUNT SCORE (25%): 0-100 based on corner count
+            if (fp.corners === 3) {
+                triangleCornerScore = 100;
+                scoringDetails.triangle.cornerScore = `100 (exactly 3)`;
+            } else if (fp.corners === 2) {
+                triangleCornerScore = 85;
+                scoringDetails.triangle.cornerScore = `85 (2 corners)`;
+            } else if (fp.corners === 4) {
+                triangleCornerScore = 40;
+                scoringDetails.triangle.cornerScore = `40 (4 corners)`;
+            } else {
+                triangleCornerScore = 0;
+                triangleDisqualified = true;
+                scoringDetails.triangle.cornerScore = `0 (${fp.corners} corners)`;
+            }
+
+            // 3. ANGLE QUALITY SCORE (25%): Should NOT be 90° angles (triangle-like)
+            if (!triangleDisqualified && fp.corners >= 2 && fp.corners <= 4) {
+                // Base score from triangle-likeness (0-1 → 0-100)
+                const baseLikeness = fp.angleAnalysis.triangleLikeness * 100;
+                // Penalty from rectangle-likeness
+                const rectPenalty = fp.angleAnalysis.rectangleLikeness * 30;
+                triangleAngleScore = Math.max(0, Math.min(100, baseLikeness - rectPenalty));
+
+                const avgAngleDeg = (fp.angleAnalysis.avgAngle * 180 / Math.PI).toFixed(0);
+                scoringDetails.triangle.angleScore = `${Math.round(triangleAngleScore)} (avg: ${avgAngleDeg}°, tri-like: ${fp.angleAnalysis.triangleLikeness.toFixed(2)})`;
+            } else {
+                triangleAngleScore = 0;
+                scoringDetails.triangle.angleScore = '0 (no valid angles)';
+            }
+
+            // 4. STRAIGHTNESS SCORE (30%): Corners imply straight edges
+            if (fp.corners >= 2 && fp.corners <= 3) {
+                // Has corners = has straight edges
+                triangleStraightnessScore = 100;
+                scoringDetails.triangle.straightnessScore = '100 (has corners = straight edges)';
+            } else if (fp.straightness >= 0.3 && fp.straightness <= 0.7) {
+                triangleStraightnessScore = 100;
+                scoringDetails.triangle.straightnessScore = '100 (straight enough)';
+            } else if (fp.straightness > 0.7) {
+                triangleStraightnessScore = 70;
+                scoringDetails.triangle.straightnessScore = '70 (too straight - line-like)';
+            } else {
+                triangleStraightnessScore = 0;
+                triangleDisqualified = true;
+                scoringDetails.triangle.straightnessScore = `0 (too curved: ${fp.straightness.toFixed(3)})`;
+            }
+
+            // 5. ASPECT RATIO SCORE (20%): Reasonable shape (continuous scoring)
+            triangleAspectScore = scoreAspectRange(fp.aspectRatio, 0.3, 3.0);
+            scoringDetails.triangle.aspectScore = `${Math.round(triangleAspectScore)} (ratio: ${fp.aspectRatio.toFixed(2)})`;
+
+            const triangleFinalScore = triangleDisqualified ? 0 : calculateScore(triangleCornerScore, triangleAngleScore, triangleStraightnessScore, triangleAspectScore);
+            scoringDetails.triangle.total = triangleFinalScore;
+            scoringDetails.triangle.breakdown = `(${Math.round(triangleCornerScore)}×25% + ${Math.round(triangleAngleScore)}×25% + ${Math.round(triangleStraightnessScore)}×30% + ${Math.round(triangleAspectScore)}×20%)`;
+
+            scoredResults.push({
+                type: 'triangle',
+                confidence: triangleFinalScore / 100,
+                label: 'Triangle',
+                score: triangleFinalScore
+            });
+
+            // ===== RECTANGLE SCORING =====
+            let rectangleCornerScore = 0;
+            let rectangleAngleScore = 0;
+            let rectangleStraightnessScore = 0;
+            let rectangleAspectScore = 0;
+            let rectangleDisqualified = false;
+
+            // 1. DISQUALIFYING: Must be closed
+            scoringDetails.rectangle.closed = fp.isClosed;
+            if (!fp.isClosed) {
+                rectangleDisqualified = true;
+                scoringDetails.rectangle.closedPoints = 'DISQUALIFIED (not closed)';
+            } else {
+                scoringDetails.rectangle.closedPoints = '✓ closed';
+            }
+
+            // 2. CORNER COUNT SCORE (25%): 0-100 based on corner count
+            if (fp.corners === 4) {
+                rectangleCornerScore = 100;
+                scoringDetails.rectangle.cornerScore = `100 (exactly 4)`;
+            } else if (fp.corners === 3) {
+                rectangleCornerScore = 85;
+                scoringDetails.rectangle.cornerScore = `85 (3 corners)`;
+            } else if (fp.corners === 5) {
+                rectangleCornerScore = 40;
+                scoringDetails.rectangle.cornerScore = `40 (5 corners)`;
+            } else {
+                rectangleCornerScore = 0;
+                rectangleDisqualified = true;
+                scoringDetails.rectangle.cornerScore = `0 (${fp.corners} corners)`;
+            }
+
+            // 3. ANGLE QUALITY SCORE (25%): Should be ~90° angles (rectangle-like)
+            if (!rectangleDisqualified && fp.corners >= 3 && fp.corners <= 5) {
+                // Base score from rectangle-likeness (0-1 → 0-100)
+                const baseLikeness = fp.angleAnalysis.rectangleLikeness * 100;
+                // Penalty from triangle-likeness
+                const triPenalty = fp.angleAnalysis.triangleLikeness * 30;
+                rectangleAngleScore = Math.max(0, Math.min(100, baseLikeness - triPenalty));
+
+                const avgAngleDeg = (fp.angleAnalysis.avgAngle * 180 / Math.PI).toFixed(0);
+                scoringDetails.rectangle.angleScore = `${Math.round(rectangleAngleScore)} (avg: ${avgAngleDeg}°, rect-like: ${fp.angleAnalysis.rectangleLikeness.toFixed(2)})`;
+            } else {
+                rectangleAngleScore = 0;
+                scoringDetails.rectangle.angleScore = '0 (no valid angles)';
+            }
+
+            // 4. STRAIGHTNESS SCORE (30%): Corners imply straight edges
+            if (fp.corners >= 3 && fp.corners <= 4) {
+                // Has corners = has straight edges
+                rectangleStraightnessScore = 100;
+                scoringDetails.rectangle.straightnessScore = '100 (has corners = straight edges)';
+            } else if (fp.straightness >= 0.4 && fp.straightness <= 0.8) {
+                rectangleStraightnessScore = 100;
+                scoringDetails.rectangle.straightnessScore = '100 (straight enough)';
+            } else if (fp.straightness > 0.8) {
+                rectangleStraightnessScore = 70;
+                scoringDetails.rectangle.straightnessScore = '70 (too straight - line-like)';
+            } else {
+                rectangleStraightnessScore = 0;
+                rectangleDisqualified = true;
+                scoringDetails.rectangle.straightnessScore = `0 (too curved: ${fp.straightness.toFixed(3)})`;
+            }
+
+            // 5. ASPECT RATIO SCORE (20%): Reasonable shape (continuous scoring)
+            rectangleAspectScore = scoreAspectRange(fp.aspectRatio, 0.3, 3.0);
+            scoringDetails.rectangle.aspectScore = `${Math.round(rectangleAspectScore)} (ratio: ${fp.aspectRatio.toFixed(2)})`;
+
+            const rectangleFinalScore = rectangleDisqualified ? 0 : calculateScore(rectangleCornerScore, rectangleAngleScore, rectangleStraightnessScore, rectangleAspectScore);
+            scoringDetails.rectangle.total = rectangleFinalScore;
+            scoringDetails.rectangle.breakdown = `(${Math.round(rectangleCornerScore)}×25% + ${Math.round(rectangleAngleScore)}×25% + ${Math.round(rectangleStraightnessScore)}×30% + ${Math.round(rectangleAspectScore)}×20%)`;
+
+            scoredResults.push({
+                type: 'rectangle',
+                confidence: rectangleFinalScore / 100,
+                label: 'Rectangle',
+                score: rectangleFinalScore
+            });
+
+            // ===== LINE SCORING =====
+            let lineCornerScore = 0;
+            let lineAngleScore = 0;
+            let lineStraightnessScore = 0;
+            let lineAspectScore = 0;
+            let lineDisqualified = false;
+
+            // 1. DISQUALIFYING: Must NOT be closed
+            scoringDetails.line.notClosed = !fp.isClosed;
+            if (fp.isClosed) {
+                lineDisqualified = true;
+                scoringDetails.line.closedPoints = 'DISQUALIFIED (lines must be open)';
+            } else {
+                scoringDetails.line.closedPoints = '✓ not closed';
+            }
+
+            // 2. CORNER COUNT SCORE (25%): 0-100 based on corner count
+            if (fp.corners === 0) {
+                lineCornerScore = 100;
+                scoringDetails.line.cornerScore = '100 (no corners)';
+            } else if (fp.corners <= 2) {
+                lineCornerScore = 80;
+                scoringDetails.line.cornerScore = `80 (${fp.corners} corners)`;
+            } else {
+                lineCornerScore = 0;
+                lineDisqualified = true;
+                scoringDetails.line.cornerScore = `0 (${fp.corners} corners)`;
+            }
+
+            // 3. ANGLE QUALITY SCORE (25%): Lines shouldn't have sharp angles
+            if (fp.corners === 0) {
+                lineAngleScore = 100;
+                scoringDetails.line.angleScore = '100 (perfectly smooth)';
+            } else if (fp.corners <= 2) {
+                // Slight penalty for any angles
+                lineAngleScore = 60;
+                scoringDetails.line.angleScore = '60 (minor bends)';
+            } else {
+                lineAngleScore = 0;
+                scoringDetails.line.angleScore = '0 (too many angles)';
+            }
+
+            // 4. STRAIGHTNESS SCORE (30%): MUST be very straight (continuous scoring)
+            lineStraightnessScore = scoreStraightness(fp.straightness);
+            if (lineStraightnessScore === 0) {
+                lineDisqualified = true;
+                scoringDetails.line.straightnessScore = `0 (too curved: ${fp.straightness.toFixed(3)})`;
+            } else {
+                scoringDetails.line.straightnessScore = `${Math.round(lineStraightnessScore)} (straightness: ${fp.straightness.toFixed(3)})`;
+            }
+
+            // 5. ASPECT RATIO SCORE (20%): Lines should be elongated (continuous scoring)
+            lineAspectScore = scoreLineElongation(fp.aspectRatio);
+            scoringDetails.line.aspectScore = `${Math.round(lineAspectScore)} (ratio: ${fp.aspectRatio.toFixed(2)})`;
+
+            const lineFinalScore = lineDisqualified ? 0 : calculateScore(lineCornerScore, lineAngleScore, lineStraightnessScore, lineAspectScore);
+            scoringDetails.line.total = lineFinalScore;
+            scoringDetails.line.breakdown = `(${Math.round(lineCornerScore)}×25% + ${Math.round(lineAngleScore)}×25% + ${Math.round(lineStraightnessScore)}×30% + ${Math.round(lineAspectScore)}×20%)`;
+
+            scoredResults.push({
+                type: 'line',
+                confidence: lineFinalScore / 100,
+                label: 'Line',
+                score: lineFinalScore
+            });
+
+            // ===== USER PRIMITIVE MATCHING =====
+            // Check against saved user primitives (single-stroke only)
+            Object.keys(state.library).forEach(key => {
+                const item = state.library[key];
+                if (item.type === 'user-primitive' && item.fingerprint) {
+                    const similarity = compareFingerprints(fp, item.fingerprint);
+                    const score = Math.round(similarity * 100);
+
+                    if (score >= 60) { // 60% similarity threshold
+                        scoredResults.push({
+                            type: key,
+                            confidence: similarity,
+                            label: `${item.label} (Library)`,
+                            score: score,
+                            isUserPrimitive: true
+                        });
+                    }
+                }
+            });
+
+            // Sort by score - show ALL shapes ranked, filter only scores > 20 for suggestions
+            const finalResults = scoredResults.sort((a, b) => b.score - a.score);
+
+            return {
+                results: finalResults.length > 0 ? finalResults : results,
+                fingerprint: fp,
+                checks: checks,
+                scoringDetails: scoringDetails
+            };
+        }
+
+        function updateMetrics(analysis) {
+            if (!analysis) {
+                metricsContent.innerHTML = '<div class="no-stroke-message">Draw a stroke to see metrics...</div>';
+                return;
+            }
+            
+            const fp = analysis.fingerprint;
+            
+            let html = '<div class="metrics-section">';
+            html += '<h3>Fingerprint Data</h3>';
+            html += `<div class="metric-item"><span class="metric-label">Aspect Ratio</span><span class="metric-value">${fp.aspectRatio.toFixed(3)}</span></div>`;
+            html += `<div class="metric-item"><span class="metric-label">Straightness</span><span class="metric-value">${fp.straightness.toFixed(3)}</span></div>`;
+            html += `<div class="metric-item"><span class="metric-label">Corners</span><span class="metric-value">${fp.corners}</span></div>`;
+
+            // Show corner angle details if corners exist
+            if (fp.corners > 0 && fp.cornerAngles && fp.cornerAngles.length > 0) {
+                const anglesDeg = fp.cornerAngles.map(a => (a * 180 / Math.PI).toFixed(0) + '°').join(', ');
+                html += `<div class="metric-item"><span class="metric-label">Corner Angles</span><span class="metric-value">${anglesDeg}</span></div>`;
+                html += `<div class="metric-item"><span class="metric-label">Avg Angle</span><span class="metric-value">${(fp.angleAnalysis.avgAngle * 180 / Math.PI).toFixed(0)}°</span></div>`;
+                html += `<div class="metric-item"><span class="metric-label">Rect-like</span><span class="metric-value">${fp.angleAnalysis.rectangleLikeness.toFixed(2)}</span></div>`;
+                html += `<div class="metric-item"><span class="metric-label">Tri-like</span><span class="metric-value">${fp.angleAnalysis.triangleLikeness.toFixed(2)}</span></div>`;
+            }
+
+            html += `<div class="metric-item"><span class="metric-label">Is Closed</span><span class="metric-value">${fp.isClosed ? 'Yes' : 'No'}</span></div>`;
+            html += `<div class="metric-item"><span class="metric-label">End Distance</span><span class="metric-value">${fp.closureDistance.toFixed(1)}px</span></div>`;
+            html += `<div class="metric-item"><span class="metric-label">Size</span><span class="metric-value">${fp.size.toFixed(0)}px</span></div>`;
+            html += `<div class="metric-item"><span class="metric-label">Points</span><span class="metric-value">${fp.pointCount}</span></div>`;
+            html += '</div>';
+            
+            html += '<div class="metrics-section">';
+            html += '<h3>Weighted Scoring System</h3>';
+            html += '<p style="font-size: 11px; color: #666; margin: 0 0 12px 0;">Each shape scored on: Corner Count (25%) + Angle Quality (25%) + Straightness (30%) + Aspect Ratio (20%)</p>';
+
+            // Store scoring details for display
+            if (analysis.scoringDetails) {
+                const details = analysis.scoringDetails;
+
+                // Circle details
+                html += `<div class="condition-check" style="margin-bottom: 12px; background: #f9f9f9;">`;
+                html += `<div class="shape-name" style="font-weight: bold; color: #333;">Circle: ${details.circle.total}/100</div>`;
+                html += `<div class="reason" style="font-size: 11px;">`;
+                html += `• Closed: ${details.circle.closedPoints}<br>`;
+                html += `• Corner Count (25%): ${details.circle.cornerScore}<br>`;
+                html += `• Angle Quality (25%): ${details.circle.angleScore}<br>`;
+                html += `• Straightness (30%): ${details.circle.straightnessScore}<br>`;
+                html += `• Aspect Ratio (20%): ${details.circle.aspectScore}<br>`;
+                html += `<span style="color: #666; font-size: 10px;">${details.circle.breakdown}</span>`;
+                html += `</div></div>`;
+
+                // Triangle details
+                html += `<div class="condition-check" style="margin-bottom: 12px; background: #f9f9f9;">`;
+                html += `<div class="shape-name" style="font-weight: bold; color: #333;">Triangle: ${details.triangle.total}/100</div>`;
+                html += `<div class="reason" style="font-size: 11px;">`;
+                html += `• Closed: ${details.triangle.closedPoints}<br>`;
+                html += `• Corner Count (25%): ${details.triangle.cornerScore}<br>`;
+                html += `• Angle Quality (25%): ${details.triangle.angleScore}<br>`;
+                html += `• Straightness (30%): ${details.triangle.straightnessScore}<br>`;
+                html += `• Aspect Ratio (20%): ${details.triangle.aspectScore}<br>`;
+                html += `<span style="color: #666; font-size: 10px;">${details.triangle.breakdown}</span>`;
+                html += `</div></div>`;
+
+                // Rectangle details
+                html += `<div class="condition-check" style="margin-bottom: 12px; background: #f9f9f9;">`;
+                html += `<div class="shape-name" style="font-weight: bold; color: #333;">Rectangle: ${details.rectangle.total}/100</div>`;
+                html += `<div class="reason" style="font-size: 11px;">`;
+                html += `• Closed: ${details.rectangle.closedPoints}<br>`;
+                html += `• Corner Count (25%): ${details.rectangle.cornerScore}<br>`;
+                html += `• Angle Quality (25%): ${details.rectangle.angleScore}<br>`;
+                html += `• Straightness (30%): ${details.rectangle.straightnessScore}<br>`;
+                html += `• Aspect Ratio (20%): ${details.rectangle.aspectScore}<br>`;
+                html += `<span style="color: #666; font-size: 10px;">${details.rectangle.breakdown}</span>`;
+                html += `</div></div>`;
+
+                // Line details
+                html += `<div class="condition-check" style="margin-bottom: 12px; background: #f9f9f9;">`;
+                html += `<div class="shape-name" style="font-weight: bold; color: #333;">Line: ${details.line.total}/100</div>`;
+                html += `<div class="reason" style="font-size: 11px;">`;
+                html += `• Not closed: ${details.line.closedPoints}<br>`;
+                html += `• Corner Count (25%): ${details.line.cornerScore}<br>`;
+                html += `• Angle Quality (25%): ${details.line.angleScore}<br>`;
+                html += `• Straightness (30%): ${details.line.straightnessScore}<br>`;
+                html += `• Aspect Ratio (20%): ${details.line.aspectScore}<br>`;
+                html += `<span style="color: #666; font-size: 10px;">${details.line.breakdown}</span>`;
+                html += `</div></div>`;
+            }
+
+            html += '</div>';
+            
+            metricsContent.innerHTML = html;
+        }
+
+        // ===== GEOMETRY REFINEMENT FUNCTIONS =====
+        // Convert recognized strokes into perfect geometric shapes
+
+        function refineCircle(originalStroke) {
+            const bounds = getBounds(originalStroke);
+            const centerX = (bounds.minX + bounds.maxX) / 2;
+            const centerY = (bounds.minY + bounds.maxY) / 2;
+            const radiusX = (bounds.maxX - bounds.minX) / 2;
+            const radiusY = (bounds.maxY - bounds.minY) / 2;
+            const radius = (radiusX + radiusY) / 2; // Average for perfect circle
+
+            // Generate perfect circle points
+            const points = [];
+            const numPoints = 60;
+            for (let i = 0; i <= numPoints; i++) {
+                const angle = (i / numPoints) * Math.PI * 2;
+                points.push({
+                    x: centerX + Math.cos(angle) * radius,
+                    y: centerY + Math.sin(angle) * radius
+                });
+            }
+            return points;
+        }
+
+        function refineLine(originalStroke) {
+            // Keep exact start and end, make perfectly straight
+            const start = originalStroke[0];
+            const end = originalStroke[originalStroke.length - 1];
+            return [
+                { x: start.x, y: start.y },
+                { x: end.x, y: end.y }
+            ];
+        }
+
+        function refineRectangle(originalStroke, fingerprint = null) {
+            // LINE-BASED APPROACH: Return 4 separate line segments using actual detected corners
+            // This shows composability and is more accurate than bounding-box approach
+
+            // Use cached corner data from fingerprint if available, otherwise compute
+            let cornerData;
+            if (fingerprint && fingerprint.cornerData) {
+                cornerData = {
+                    count: fingerprint.corners,
+                    angles: fingerprint.cornerAngles,
+                    cornerData: fingerprint.cornerData
+                };
+            } else {
+                cornerData = countCorners(originalStroke, Math.PI / 3);
+            }
+
+            // Get actual corner positions from the stroke
+            let corners = [];
+
+            if (cornerData.cornerData && cornerData.cornerData.length >= 3) {
+                // Use detected corners - take 4 sharpest if we have more
+                corners = cornerData.cornerData
+                    .sort((a, b) => a.angle - b.angle) // Sort by sharpness
+                    .slice(0, 4)
+                    .sort((a, b) => a.index - b.index) // Sort by order in stroke
+                    .map(c => originalStroke[c.index])
+                    .filter(p => p && typeof p.x !== 'undefined' && typeof p.y !== 'undefined');
+            }
+
+            // Fallback: if not enough corners detected, use bounding box
+            if (corners.length < 4) {
+                const bounds = getBounds(originalStroke);
+
+                // Try to detect rotation by sampling 4 points
+                const len = originalStroke.length;
+                if (len >= 4) {
+                    const p1 = originalStroke[0];
+                    const p2 = originalStroke[Math.floor(len * 0.25)];
+                    const p3 = originalStroke[Math.floor(len * 0.5)];
+                    const p4 = originalStroke[Math.floor(len * 0.75)];
+
+                    // Calculate dominant edge angle (from p1 to p2)
+                    const dx = p2.x - p1.x;
+                    const dy = p2.y - p1.y;
+                    const angle = Math.atan2(dy, dx);
+
+                    // Create rotated rectangle
+                    const width = bounds.maxX - bounds.minX;
+                    const height = bounds.maxY - bounds.minY;
+                    const centerX = bounds.minX + width / 2;
+                    const centerY = bounds.minY + height / 2;
+
+                    const halfW = width / 2;
+                    const halfH = height / 2;
+
+                    const cos = Math.cos(angle);
+                    const sin = Math.sin(angle);
+
+                    // Generate 4 corners rotated around center
+                    const unrotated = [
+                        { x: -halfW, y: -halfH },  // Top-left
+                        { x: halfW, y: -halfH },   // Top-right
+                        { x: halfW, y: halfH },    // Bottom-right
+                        { x: -halfW, y: halfH }    // Bottom-left
+                    ];
+
+                    corners = unrotated.map(corner => ({
+                        x: centerX + (corner.x * cos - corner.y * sin),
+                        y: centerY + (corner.x * sin + corner.y * cos)
+                    }));
+                } else {
+                    // Ultimate fallback: axis-aligned rectangle
+                    corners = [
+                        { x: bounds.minX, y: bounds.minY },
+                        { x: bounds.maxX, y: bounds.minY },
+                        { x: bounds.maxX, y: bounds.maxY },
+                        { x: bounds.minX, y: bounds.maxY }
+                    ];
+                }
+            }
+
+            // Final validation: ensure we have exactly 4 valid corners
+            if (corners.length !== 4) {
+                console.error('Rectangle refinement failed: invalid corners count', corners.length, corners);
+                return null;
+            }
+
+            // Validate all corners have x and y
+            for (let i = 0; i < 4; i++) {
+                if (!corners[i] || typeof corners[i].x === 'undefined' || typeof corners[i].y === 'undefined') {
+                    console.error('Rectangle refinement failed: invalid corner at index', i, corners[i]);
+                    return null;
+                }
+            }
+
+            // Get the actual corner indices in the original stroke
+            let cornerIndices = [];
+            if (cornerData.cornerData && cornerData.cornerData.length >= 3) {
+                cornerIndices = cornerData.cornerData
+                    .sort((a, b) => a.angle - b.angle)
+                    .slice(0, 4)
+                    .map(c => c.index)
+                    .sort((a, b) => a - b); // Sort by position in stroke
+            }
+
+            // Rectangles need 4 corners - add start/end point if we only detected 3
+            if (cornerIndices.length === 3) {
+                cornerIndices.push(0); // Add start point as 4th corner
+                cornerIndices.sort((a, b) => a - b); // Re-sort by position
+            } else if (cornerIndices.length < 3) {
+                // CREATE rectangle geometry from bounding box, don't try to find it in stroke
+                const bounds = getBounds(originalStroke);
+
+                // Create synthetic rectangle corners
+                const corner0 = { x: bounds.minX, y: bounds.minY };  // Top-left
+                const corner1 = { x: bounds.maxX, y: bounds.minY };  // Top-right
+                const corner2 = { x: bounds.maxX, y: bounds.maxY };  // Bottom-right
+                const corner3 = { x: bounds.minX, y: bounds.maxY };  // Bottom-left
+
+                // Return synthetic corners directly as line segments
+                const lineSegments = [
+                    [corner0, corner1],
+                    [corner1, corner2],
+                    [corner2, corner3],
+                    [corner3, corner0]
+                ];
+
+                return lineSegments;
+            }
+
+            // Extract corner points from stroke and create straight lines between them
+            const corner0 = originalStroke[cornerIndices[0]];
+            const corner1 = originalStroke[cornerIndices[1]];
+            const corner2 = originalStroke[cornerIndices[2]];
+            const corner3 = originalStroke[cornerIndices[3]];
+
+            // Create 4 straight line segments connecting the corners
+            const lineSegments = [
+                [corner0, corner1],  // Line from corner 0 to corner 1
+                [corner1, corner2],  // Line from corner 1 to corner 2
+                [corner2, corner3],  // Line from corner 2 to corner 3
+                [corner3, corner0]   // Line from corner 3 back to corner 0 (close)
+            ];
+
+            // Return 4 stroke segments (each is an array of points)
+            return lineSegments;
+        }
+
+        function detectTriangleTipDirection(originalStroke) {
+            // Strategy: Find the SHARPEST corner (smallest angle) - that's the tip
+            // Works for multiple drawing patterns:
+            // - Pattern A: Tip → Corner1 → Corner2 → Tip
+            // - Pattern B: Corner1 → Tip → Corner2 → Corner1 (best for arrows!)
+            // - Pattern C: Corner1 → Corner2 → Tip → Corner1
+            // Also works for arrow heads (1 corner) and messy triangles (2 corners)
+
+            const bounds = getBounds(originalStroke);
+            const centerX = (bounds.minX + bounds.maxX) / 2;
+            const centerY = (bounds.minY + bounds.maxY) / 2;
+
+            // Find all corners
+            const cornerData = countCorners(originalStroke, Math.PI / 3);
+
+            let tipPoint = null;
+            let tipIndex = 0;
+
+            if (cornerData.cornerData && cornerData.cornerData.length > 0) {
+                // Find the sharpest angle (smallest value) - that's the tip
+                let sharpestAngle = Math.PI;
+
+                cornerData.cornerData.forEach(angleData => {
+                    if (angleData.angle < sharpestAngle) {
+                        sharpestAngle = angleData.angle;
+                        tipIndex = angleData.index;
+                    }
+                });
+
+                // Validate tipIndex is within bounds
+                if (tipIndex >= 0 && tipIndex < originalStroke.length) {
+                    tipPoint = originalStroke[tipIndex];
+                }
+            }
+
+            // Fallback: No corners detected or invalid tipPoint, use start point
+            if (!tipPoint) {
+                tipPoint = originalStroke[0];
+                tipIndex = 0;
+            }
+
+            // Safety check - ensure tipPoint is valid
+            if (!tipPoint || typeof tipPoint.x === 'undefined' || typeof tipPoint.y === 'undefined') {
+                console.error('Invalid tipPoint:', tipPoint);
+                // Ultimate fallback
+                tipPoint = { x: centerX, y: centerY };
+            }
+
+            // Calculate direction from centroid to tip
+            const dx = tipPoint.x - centerX;
+            const dy = tipPoint.y - centerY;
+
+            const angle = Math.atan2(dy, dx);
+            const degrees = angle * 180 / Math.PI;
+
+            // Classify into 4 directions based on angle
+            let direction;
+            if (degrees >= -45 && degrees < 45) direction = 'right';
+            else if (degrees >= 45 && degrees < 135) direction = 'down';
+            else if (degrees >= 135 || degrees < -135) direction = 'left';
+            else direction = 'up';
+
+            return { direction, tipPoint, tipIndex };
+        }
+
+        function refineTriangle(originalStroke, fingerprint = null) {
+            // LINE-BASED APPROACH: Return 3 separate line segments using actual detected corners
+            // This shows composability and is more accurate than bounding-box approach
+
+            const tipData = detectTriangleTipDirection(originalStroke);
+
+            // Use cached corner data from fingerprint if available, otherwise compute
+            let cornerData;
+            if (fingerprint && fingerprint.cornerData) {
+                cornerData = {
+                    count: fingerprint.corners,
+                    angles: fingerprint.cornerAngles,
+                    cornerData: fingerprint.cornerData
+                };
+            } else {
+                cornerData = countCorners(originalStroke, Math.PI / 3);
+            }
+
+            // Get actual corner positions from the stroke
+            let corners = [];
+
+            if (cornerData.cornerData && cornerData.cornerData.length >= 2) {
+                // Use detected corners
+                corners = cornerData.cornerData
+                    .map(c => originalStroke[c.index])
+                    .filter(p => p && typeof p.x !== 'undefined' && typeof p.y !== 'undefined');
+
+                // If we have more than 3 corners, take the 3 sharpest
+                if (corners.length > 3) {
+                    corners = cornerData.cornerData
+                        .sort((a, b) => a.angle - b.angle) // Sort by sharpness (smaller angle = sharper)
+                        .slice(0, 3)
+                        .map(c => originalStroke[c.index])
+                        .filter(p => p && typeof p.x !== 'undefined' && typeof p.y !== 'undefined');
+                }
+            }
+
+            // Fallback: if not enough corners detected, use bounding box approach
+            if (corners.length < 2) {
+                const bounds = getBounds(originalStroke);
+                const width = bounds.maxX - bounds.minX;
+                const height = bounds.maxY - bounds.minY;
+                const centerX = bounds.minX + width / 2;
+                const centerY = bounds.minY + height / 2;
+
+                const direction = tipData.direction;
+
+                switch (direction) {
+                    case 'up':
+                        corners = [
+                            { x: centerX, y: bounds.minY },      // Top (tip)
+                            { x: bounds.minX, y: bounds.maxY },  // Bottom-left
+                            { x: bounds.maxX, y: bounds.maxY }   // Bottom-right
+                        ];
+                        break;
+                    case 'down':
+                        corners = [
+                            { x: centerX, y: bounds.maxY },      // Bottom (tip)
+                            { x: bounds.maxX, y: bounds.minY },  // Top-right
+                            { x: bounds.minX, y: bounds.minY }   // Top-left
+                        ];
+                        break;
+                    case 'left':
+                        corners = [
+                            { x: bounds.minX, y: centerY },      // Left (tip)
+                            { x: bounds.maxX, y: bounds.minY },  // Top-right
+                            { x: bounds.maxX, y: bounds.maxY }   // Bottom-right
+                        ];
+                        break;
+                    case 'right':
+                        corners = [
+                            { x: bounds.maxX, y: centerY },      // Right (tip)
+                            { x: bounds.minX, y: bounds.maxY },  // Bottom-left
+                            { x: bounds.minX, y: bounds.minY }   // Top-left
+                        ];
+                        break;
+                }
+            } else if (corners.length === 2) {
+                // Add tip as third corner
+                corners.push(tipData.tipPoint);
+            }
+
+            // Final validation: ensure we have exactly 3 valid corners
+            if (corners.length !== 3) {
+                console.error('Triangle refinement failed: invalid corners count', corners.length, corners);
+                return null;
+            }
+
+            // Validate all corners have x and y
+            for (let i = 0; i < 3; i++) {
+                if (!corners[i] || typeof corners[i].x === 'undefined' || typeof corners[i].y === 'undefined') {
+                    console.error('Triangle refinement failed: invalid corner at index', i, corners[i]);
+                    return null;
+                }
+            }
+
+            // Get the actual corner indices in the original stroke
+            let cornerIndices = [];
+            if (cornerData.cornerData && cornerData.cornerData.length >= 2) {
+                cornerIndices = cornerData.cornerData
+                    .sort((a, b) => a.angle - b.angle)
+                    .slice(0, 3)
+                    .map(c => c.index)
+                    .filter(idx => typeof idx !== 'undefined' && idx >= 0) // Remove undefined indices
+                    .sort((a, b) => a - b); // Sort by position in stroke
+            }
+
+            // Corner indices found from detected corners
+
+            // Triangles need 3 corners - add start/end point if we only detected 2
+            if (cornerIndices.length === 2) {
+                cornerIndices.push(0); // Add start point as 3rd corner
+                cornerIndices.sort((a, b) => a - b); // Re-sort by position
+            } else if (cornerIndices.length === 1) {
+                // Find the point farthest from the detected corner
+                const cornerPt = originalStroke[cornerIndices[0]];
+                let maxDist = 0;
+                let farthestIdx = 0;
+                originalStroke.forEach((pt, idx) => {
+                    const dist = Math.sqrt(Math.pow(pt.x - cornerPt.x, 2) + Math.pow(pt.y - cornerPt.y, 2));
+                    if (dist > maxDist) {
+                        maxDist = dist;
+                        farthestIdx = idx;
+                    }
+                });
+                cornerIndices = [0, cornerIndices[0], farthestIdx].sort((a, b) => a - b);
+            } else if (cornerIndices.length === 0) {
+                // Use stroke start and end as two corners, use detected tip as third corner
+                const startPt = originalStroke[0];
+                const endPt = originalStroke[originalStroke.length - 1];
+                const thirdCorner = tipData.tipPoint;  // Use the detected tip point!
+
+                // Return line segments using stroke endpoints + tip point
+                const lineSegments = [
+                    [startPt, endPt],
+                    [endPt, thirdCorner],
+                    [thirdCorner, startPt]
+                ];
+
+                return lineSegments;
+            }
+
+            // Extract corner points from stroke and create straight lines between them
+            const corner0 = originalStroke[cornerIndices[0]];
+            const corner1 = originalStroke[cornerIndices[1]];
+            const corner2 = originalStroke[cornerIndices[2]];
+
+            // Create 3 straight line segments connecting the corners
+            const lineSegments = [
+                [corner0, corner1],  // Line from corner 0 to corner 1
+                [corner1, corner2],  // Line from corner 1 to corner 2
+                [corner2, corner0]   // Line from corner 2 back to corner 0 (close)
+            ];
+
+            // Return 3 stroke segments (each is an array of points)
+            return lineSegments;
+        }
+
+        function refineStroke(originalStroke, recognizedAs, fingerprint = null) {
+            switch (recognizedAs) {
+                case 'circle':
+                    return refineCircle(originalStroke);
+                case 'line':
+                    return refineLine(originalStroke);
+                case 'rectangle':
+                    return refineRectangle(originalStroke, fingerprint);
+                case 'triangle':
+                    return refineTriangle(originalStroke, fingerprint);
+                default:
+                    return null; // No refinement for unrecognized shapes
+            }
+        }
+
+        // Rendering
+        function render() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Draw completed strokes (use refined if available)
+            state.strokes.forEach((stroke, idx) => {
+                const isAccepted = state.context[idx] && state.context[idx] !== '';
+                const refinedStroke = state.refinedStrokes[idx];
+
+                ctx.strokeStyle = isAccepted ? '#0066ff' : '#666666';
+                ctx.lineWidth = refinedStroke ? 3 : 2; // Thicker for refined shapes
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+
+                // Check if refined stroke is segment-based (array of stroke segments)
+                // Segment-based: [[{x,y}, {x,y}, ...], [{x,y}, {x,y}, ...], ...]
+                // Single stroke: [{x,y}, {x,y}, {x,y}, ...]
+                const isSegmentBased = refinedStroke &&
+                                      Array.isArray(refinedStroke[0]) &&
+                                      typeof refinedStroke[0][0] === 'object' &&
+                                      typeof refinedStroke[0][0].x !== 'undefined';
+
+                if (isSegmentBased) {
+                    // Draw each stroke segment separately
+                    const corners = new Set();
+
+                    refinedStroke.forEach((segment, segIdx) => {
+                        // Safety check
+                        if (segment && segment.length > 0) {
+                            ctx.beginPath();
+                            segment.forEach((point, i) => {
+                                if (i === 0) ctx.moveTo(point.x, point.y);
+                                else ctx.lineTo(point.x, point.y);
+                            });
+                            ctx.stroke();
+
+                            // Collect corner points (start and end of each segment)
+                            if (segment[0]) corners.add(JSON.stringify(segment[0]));
+                            if (segment[segment.length - 1]) corners.add(JSON.stringify(segment[segment.length - 1]));
+                        }
+                    });
+
+                    // Draw debug indicators (corners with numbers and angles)
+                    if (state.debugMode && isAccepted) {
+                        const cornerArray = Array.from(corners).map(s => JSON.parse(s));
+                        cornerArray.forEach((corner, i) => {
+                            // Dark grey dot
+                            ctx.fillStyle = '#444';
+                            ctx.beginPath();
+                            ctx.arc(corner.x, corner.y, 5, 0, Math.PI * 2);
+                            ctx.fill();
+
+                            // Corner number
+                            ctx.fillStyle = '#444';
+                            ctx.font = 'bold 14px sans-serif';
+                            ctx.fillText(`#${i}`, corner.x + 10, corner.y - 5);
+
+                            // Show angle if available from corner debug data
+                            const cornerDebug = state.cornerDebugData[idx];
+                            if (cornerDebug && cornerDebug[i]) {
+                                const angleDeg = Math.round(cornerDebug[i].angle * 180 / Math.PI);
+                                ctx.font = '12px sans-serif';
+                                ctx.fillText(`${angleDeg}°`, corner.x + 10, corner.y + 10);
+                            }
+                        });
+                    }
+                } else {
+                    // Draw as single stroke (original or refined circle/line)
+                    const displayStroke = refinedStroke || stroke;
+
+                    ctx.beginPath();
+                    displayStroke.forEach((point, i) => {
+                        if (i === 0) ctx.moveTo(point.x, point.y);
+                        else ctx.lineTo(point.x, point.y);
+                    });
+                    ctx.stroke();
+                }
+
+                // Draw tip debug indicator for triangles
+                if (state.debugMode) {
+                    const tipPoint = state.tipDebugData[idx];
+                    if (tipPoint && isAccepted) {
+                        ctx.fillStyle = '#444'; // Dark grey dot for tip
+                        ctx.beginPath();
+                        ctx.arc(tipPoint.x, tipPoint.y, 5, 0, Math.PI * 2);
+                        ctx.fill();
+
+                        // Add a small label
+                        ctx.fillStyle = '#444';
+                        ctx.font = 'bold 14px sans-serif';
+                        ctx.fillText('TIP', tipPoint.x + 10, tipPoint.y - 5);
+                    }
+                }
+            });
+
+            // Draw current stroke
+            if (state.currentStroke.length > 0) {
+                ctx.strokeStyle = '#666666';
+                ctx.lineWidth = 2;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                
+                ctx.beginPath();
+                state.currentStroke.forEach((point, i) => {
+                    if (i === 0) ctx.moveTo(point.x, point.y);
+                    else ctx.lineTo(point.x, point.y);
+                });
+                ctx.stroke();
+            }
+
+            // Draw spatial graph visualization (Day 3)
+            if (state.debugMode && state.strokes.length > 1) {
+                // Build a temporary spatial graph for current canvas strokes
+                const tempComponents = state.strokes.map((stroke, idx) => {
+                    const refinedStroke = state.refinedStrokes[idx];
+                    // Use refined stroke for bounds if available and accepted
+                    const strokeForBounds = refinedStroke ? flattenStroke(refinedStroke) : stroke;
+
+                    return {
+                        originalStroke: stroke,
+                        refinedStroke: refinedStroke,
+                        bounds: getBounds(strokeForBounds),
+                        recognizedAs: state.context[idx] || `art${idx}`,
+                        fingerprint: getFingerprint(stroke)
+                    };
+                });
+
+                const tempGraph = buildSpatialGraph(tempComponents);
+
+                // Draw connections
+                tempGraph.connections.forEach(([i, j]) => {
+                    const boundsA = tempComponents[i].bounds;
+                    const boundsB = tempComponents[j].bounds;
+                    const centerA = {
+                        x: (boundsA.minX + boundsA.maxX) / 2,
+                        y: (boundsA.minY + boundsA.maxY) / 2
+                    };
+                    const centerB = {
+                        x: (boundsB.minX + boundsB.maxX) / 2,
+                        y: (boundsB.minY + boundsB.maxY) / 2
+                    };
+
+                    // Draw connection line
+                    ctx.strokeStyle = '#4CAF50'; // Green for connections
+                    ctx.lineWidth = 2;
+                    ctx.setLineDash([5, 5]); // Dashed line
+                    ctx.beginPath();
+                    ctx.moveTo(centerA.x, centerA.y);
+                    ctx.lineTo(centerB.x, centerB.y);
+                    ctx.stroke();
+                    ctx.setLineDash([]); // Reset dash
+
+                    // Draw connection label
+                    const midX = (centerA.x + centerB.x) / 2;
+                    const midY = (centerA.y + centerB.y) / 2;
+                    ctx.fillStyle = '#4CAF50';
+                    ctx.font = 'bold 12px sans-serif';
+                    ctx.fillText('🔗', midX - 6, midY - 5);
+                });
+
+                // Draw containment relationships
+                tempGraph.containment.forEach(([outer, inner]) => {
+                    const boundsOuter = tempComponents[outer].bounds;
+                    const boundsInner = tempComponents[inner].bounds;
+
+                    // Draw containment box around outer
+                    ctx.strokeStyle = '#FF9800'; // Orange for containment
+                    ctx.lineWidth = 2;
+                    ctx.setLineDash([3, 3]);
+                    ctx.strokeRect(
+                        boundsOuter.minX - 5,
+                        boundsOuter.minY - 5,
+                        (boundsOuter.maxX - boundsOuter.minX) + 10,
+                        (boundsOuter.maxY - boundsOuter.minY) + 10
+                    );
+                    ctx.setLineDash([]);
+
+                    // Label
+                    ctx.fillStyle = '#FF9800';
+                    ctx.font = 'bold 12px sans-serif';
+                    ctx.fillText(`${outer}⊃${inner}`, boundsOuter.minX, boundsOuter.minY - 10);
+                });
+
+                // Draw bounding boxes for all strokes (use same bounds as spatial graph)
+                tempComponents.forEach((component, idx) => {
+                    const bounds = component.bounds;
+                    ctx.strokeStyle = '#999';
+                    ctx.lineWidth = 1;
+                    ctx.setLineDash([2, 2]);
+                    ctx.strokeRect(
+                        bounds.minX,
+                        bounds.minY,
+                        bounds.maxX - bounds.minX,
+                        bounds.maxY - bounds.minY
+                    );
+                    ctx.setLineDash([]);
+
+                    // Draw stroke index
+                    ctx.fillStyle = '#999';
+                    ctx.font = '10px sans-serif';
+                    ctx.fillText(`[${idx}]`, bounds.minX, bounds.minY - 2);
+                });
+            }
+
+            // Update counters
+            strokeCountSpan.textContent = state.strokes.length;
+            acceptedCountSpan.textContent = state.context.filter(c => c && c !== '').length;
+        }
+
+        function showSuggestions(analysis) {
+            // Lower threshold - show more suggestions (score > 10)
+            const allResults = analysis.results;
+            const suggestions = allResults.filter(r => r.score > 10);
+            state.suggestions = suggestions;
+
+            // Update status
+            if (suggestions.length === 0) {
+                recognitionStatus.textContent = 'No strong matches';
+                recognitionStatus.style.background = '#fff3e0';
+                recognitionStatus.style.color = '#e65100';
+            } else {
+                recognitionStatus.textContent = `Found ${suggestions.length} match${suggestions.length > 1 ? 'es' : ''}`;
+                recognitionStatus.style.background = '#e8f5e9';
+                recognitionStatus.style.color = '#2e7d32';
+            }
+
+            suggestionsDiv.innerHTML = '';
+
+            if (suggestions.length > 0) {
+                suggestions.forEach(sug => {
+                    const btn = document.createElement('button');
+                    btn.className = 'suggestion-button';
+                    const score = sug.score || Math.round(sug.confidence * 100);
+
+                    // Confidence-based styling
+                    let confidenceClass = 'low';
+                    let confidenceText = 'low';
+                    if (score >= 60) {
+                        confidenceClass = 'high';
+                        confidenceText = 'high';
+                    } else if (score >= 30) {
+                        confidenceClass = 'medium';
+                        confidenceText = 'medium';
+                    }
+
+                    btn.innerHTML = `
+                        <span class="label">${sug.label}</span>
+                        <span class="confidence ${confidenceClass}">
+                            ${score}/100 (${confidenceText} confidence)
+                        </span>
+                    `;
+                    btn.onclick = () => acceptSuggestion(sug);
+                    suggestionsDiv.appendChild(btn);
+                });
+            }
+
+            // Always show "Something else" button
+            const elseBtn = document.createElement('button');
+            elseBtn.className = 'something-else-button';
+            elseBtn.textContent = 'Something else';
+            elseBtn.onclick = handleSomethingElse;
+            suggestionsDiv.appendChild(elseBtn);
+        }
+
+        function acceptSuggestion(suggestion) {
+            if (state.selectedStrokeIndex === null) return;
+
+            const strokeIndex = state.selectedStrokeIndex;
+            const originalStroke = state.strokes[strokeIndex];
+
+            // Set context
+            state.context[strokeIndex] = suggestion.type;
+
+            // Generate refined geometry ONLY for built-in shapes
+            // User-saved shapes are NOT refined - they stay as original stroke (just turn blue)
+            if (suggestion.isUserPrimitive) {
+                // No refinement for user primitives
+                state.refinedStrokes[strokeIndex] = null;
+                state.tipDebugData[strokeIndex] = null;
+            } else {
+                // Refine built-in shapes (circle, line, rectangle, triangle)
+                const refined = refineStroke(originalStroke, suggestion.type, state.lastFingerprint);
+                state.refinedStrokes[strokeIndex] = refined;
+
+                // Store tip debug data for triangles
+                if (suggestion.type === 'triangle') {
+                    const tipData = detectTriangleTipDirection(originalStroke);
+                    state.tipDebugData[strokeIndex] = tipData.tipPoint;
+                } else {
+                    state.tipDebugData[strokeIndex] = null;
+                }
+
+                // Store corner debug data for visualization (triangles and rectangles)
+                if ((suggestion.type === 'triangle' || suggestion.type === 'rectangle') &&
+                    state.lastFingerprint && state.lastFingerprint.cornerData) {
+                    state.cornerDebugData[strokeIndex] = state.lastFingerprint.cornerData;
+                } else {
+                    state.cornerDebugData[strokeIndex] = null;
+                }
+            }
+
+            // Increment usage count in library
+            if (state.library[suggestion.type]) {
+                state.library[suggestion.type].usageCount++;
+                saveLibrary();
+                renderLibrary();
+            }
+
+            state.selectedStrokeIndex = null;
+
+            // Reset UI
+            fuzzyMatchInput.value = '';
+            recognitionStatus.textContent = 'Waiting for stroke...';
+            recognitionStatus.style.background = '#f5f5f5';
+            recognitionStatus.style.color = '#666';
+
+            suggestionsDiv.innerHTML = '<button class="something-else-button disabled">Something else</button>';
+
+            render();
+        }
+
+        function handleSomethingElse() {
+            if (state.selectedStrokeIndex === null) return;
+
+            // Check if fuzzy match input has text - use it for save
+            const fuzzyText = fuzzyMatchInput.value.trim();
+
+            if (fuzzyText) {
+                // Save directly with fuzzy match text
+                const name = fuzzyText;
+                const key = name.toLowerCase().replace(/\s+/g, '-');
+
+                // Check if name already exists
+                if (state.library[key]) {
+                    alert('A shape with that name already exists! Try a different name.');
+                    return;
+                }
+
+                // Save the stroke as new primitive
+                const strokeIndex = state.selectedStrokeIndex;
+                const stroke = state.strokes[strokeIndex];
+
+                // Use refined stroke if refinement is enabled and available
+                const refinedStroke = state.refinedStrokes[strokeIndex];
+                const strokeToSave = (state.refinement.enabled && refinedStroke) ? refinedStroke : stroke;
+
+                const fingerprint = getFingerprint(strokeToSave);
+
+                state.library[key] = {
+                    type: 'user-primitive',
+                    label: name,
+                    strokes: [strokeToSave],
+                    fingerprint: fingerprint,
+                    usageCount: 0,
+                    created: Date.now()
+                };
+
+                // Update context
+                state.context[strokeIndex] = key;
+                state.library[key].usageCount++;
+
+                saveLibrary();
+                renderLibrary();
+                render();
+
+                // Clear inputs and reset
+                fuzzyMatchInput.value = '';
+                state.selectedStrokeIndex = null;
+                recognitionStatus.textContent = 'Waiting for stroke...';
+                recognitionStatus.style.background = '#f5f5f5';
+                recognitionStatus.style.color = '#666';
+                suggestionsDiv.innerHTML = '<button class="something-else-button disabled">Something else</button>';
+            } else {
+                // No fuzzy text - show inline save UI as fallback
+                showSavePrimitiveUI();
+            }
+        }
+
+        // ===== FUZZY MATCHING =====
+
+        function getAllAvailableShapes() {
+            // Get all shapes: built-ins + user primitives
+            const shapes = [];
+
+            Object.keys(state.library).forEach(key => {
+                const item = state.library[key];
+                shapes.push({
+                    key: key,
+                    label: item.label,
+                    type: item.type
+                });
+            });
+
+            return shapes;
+        }
+
+        function fuzzyMatchScore(query, target) {
+            // Simple fuzzy matching: case-insensitive substring match with position bonus
+            query = query.toLowerCase();
+            target = target.toLowerCase();
+
+            if (target === query) return 100; // Exact match
+            if (target.startsWith(query)) return 80; // Starts with
+            if (target.includes(query)) return 60; // Contains
+
+            // Check if all characters in query appear in order in target
+            let queryIndex = 0;
+            for (let i = 0; i < target.length && queryIndex < query.length; i++) {
+                if (target[i] === query[queryIndex]) {
+                    queryIndex++;
+                }
+            }
+            if (queryIndex === query.length) return 40; // All chars present in order
+
+            return 0; // No match
+        }
+
+        function handleFuzzyMatch() {
+            const query = fuzzyMatchInput.value.trim();
+
+            if (!query) {
+                // Empty query - show normal suggestions if stroke is selected
+                if (state.selectedStrokeIndex !== null && state.lastFingerprint) {
+                    const analysis = analyzeStrokeDetailed(state.strokes[state.selectedStrokeIndex]);
+                    showSuggestions(analysis);
+                }
+                return;
+            }
+
+            // Get all available shapes
+            const allShapes = getAllAvailableShapes();
+
+            // Score and sort by match quality
+            const matches = allShapes
+                .map(shape => ({
+                    ...shape,
+                    score: fuzzyMatchScore(query, shape.label)
+                }))
+                .filter(m => m.score > 0)
+                .sort((a, b) => b.score - a.score);
+
+            // Update suggestions display
+            if (matches.length === 0) {
+                recognitionStatus.textContent = 'No matches found';
+                recognitionStatus.style.background = '#fff3e0';
+                recognitionStatus.style.color = '#e65100';
+
+                // Clear state.suggestions so Enter triggers "something else"
+                state.suggestions = [];
+
+                // Show active "Something else" button if there's a selected stroke
+                if (state.selectedStrokeIndex !== null) {
+                    const elseBtn = document.createElement('button');
+                    elseBtn.className = 'something-else-button';
+                    elseBtn.textContent = `Save as "${query}"`;
+                    elseBtn.onclick = handleSomethingElse;
+                    suggestionsDiv.innerHTML = '';
+                    suggestionsDiv.appendChild(elseBtn);
+                } else {
+                    suggestionsDiv.innerHTML = '<button class="something-else-button disabled">Something else</button>';
+                }
+            } else {
+                recognitionStatus.textContent = `Found ${matches.length} match${matches.length > 1 ? 'es' : ''}`;
+                recognitionStatus.style.background = '#e8f5e9';
+                recognitionStatus.style.color = '#2e7d32';
+
+                // Update state.suggestions so Enter key can accept first match
+                state.suggestions = matches.slice(0, 5).map(match => ({
+                    type: match.key,
+                    label: match.label,
+                    score: match.score,
+                    confidence: match.score / 100
+                }));
+
+                suggestionsDiv.innerHTML = '';
+
+                state.suggestions.forEach(match => {
+                    const btn = document.createElement('button');
+                    btn.className = 'suggestion-button';
+                    btn.innerHTML = `
+                        <span class="label">${match.label}</span>
+                        <span class="confidence ${match.score > 70 ? 'high' : 'medium'}">
+                            ${match.score}/100 (fuzzy match)
+                        </span>
+                    `;
+                    btn.onclick = () => {
+                        if (state.selectedStrokeIndex !== null) {
+                            acceptSuggestion(match);
+                        }
+                    };
+                    suggestionsDiv.appendChild(btn);
+                });
+
+                const elseBtn = document.createElement('button');
+                elseBtn.className = 'something-else-button';
+                elseBtn.textContent = 'Something else';
+                elseBtn.onclick = handleSomethingElse;
+                suggestionsDiv.appendChild(elseBtn);
+            }
+        }
+
+        // Mouse events
+        console.log('Attaching mouse events to canvas...');
+
+        canvas.addEventListener('mousedown', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const point = {
+                x: e.clientX - rect.left,
+                y: e.clientY - rect.top
+            };
+            state.isDrawing = true;
+            state.currentStroke = [point];
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            if (!state.isDrawing) return;
+            
+            const rect = canvas.getBoundingClientRect();
+            const point = {
+                x: e.clientX - rect.left,
+                y: e.clientY - rect.top
+            };
+            state.currentStroke.push(point);
+            render();
+        });
+
+        canvas.addEventListener('mouseup', () => {
+            if (state.currentStroke.length > 0) {
+                state.strokes.push([...state.currentStroke]);
+                state.context.push(''); // Keep context array in sync with strokes
+
+                try {
+                    // Analyze and show detailed results
+                    const analysis = analyzeStrokeDetailed(state.currentStroke);
+                    state.selectedStrokeIndex = state.strokes.length - 1;
+                    state.lastFingerprint = analysis.fingerprint;  // Cache for refinement
+
+                    updateMetrics(analysis);
+                    showSuggestions(analysis);
+                } catch (error) {
+                    console.error('Error in analysis:', error);
+                    alert('Error analyzing stroke: ' + error.message);
+                }
+
+                // Update refined strokes if refinement is enabled
+                if (state.refinement.enabled) {
+                    updateRefinedStrokes();
+                }
+            }
+            state.isDrawing = false;
+            state.currentStroke = [];
+            render();
+        });
+
+        canvas.addEventListener('mouseleave', () => {
+            if (state.isDrawing) {
+                if (state.currentStroke.length > 0) {
+                    state.strokes.push([...state.currentStroke]);
+                    state.context.push(''); // Keep context array in sync with strokes
+
+                    const analysis = analyzeStrokeDetailed(state.currentStroke);
+                    state.selectedStrokeIndex = state.strokes.length - 1;
+                    state.lastFingerprint = analysis.fingerprint;  // Cache for refinement
+
+                    updateMetrics(analysis);
+                    showSuggestions(analysis);
+
+                    // Update refined strokes if refinement is enabled
+                    if (state.refinement.enabled) {
+                        updateRefinedStrokes();
+                    }
+                }
+                state.isDrawing = false;
+                state.currentStroke = [];
+                render();
+            }
+        });
+
+        // Library Management Functions
+        function generateThumbnail(item, maxHeight = 70) {
+            // Generate a thumbnail canvas for a library item
+            // Maintains aspect ratio within maxHeight constraint
+
+            // Determine what to draw
+            let strokesToDraw = [];
+            let isBuiltin = false;
+
+            if (item.type === 'composition' && item.components) {
+                // Draw composition - all strokes
+                strokesToDraw = item.components.map(c => c.originalStroke || c.refinedStroke || []);
+            } else if (item.strokes && item.strokes.length > 0) {
+                // User primitive with strokes
+                strokesToDraw = item.strokes;
+            } else if (item.type === 'builtin-primitive') {
+                isBuiltin = true;
+            }
+
+            // Calculate dimensions based on content
+            let canvasWidth = maxHeight;
+            let canvasHeight = maxHeight;
+
+            if (!isBuiltin && strokesToDraw.length > 0) {
+                // Calculate bounding box for actual content
+                let allPoints = [];
+                strokesToDraw.forEach(stroke => {
+                    if (stroke && stroke.length > 0) {
+                        allPoints = allPoints.concat(stroke);
+                    }
+                });
+
+                if (allPoints.length > 0) {
+                    const bounds = getBounds(allPoints);
+                    const contentWidth = bounds.maxX - bounds.minX;
+                    const contentHeight = bounds.maxY - bounds.minY;
+                    const aspectRatio = contentWidth / contentHeight;
+
+                    // Adjust canvas size to maintain aspect ratio
+                    if (aspectRatio > 1) {
+                        // Wider than tall
+                        canvasWidth = maxHeight * aspectRatio;
+                        canvasHeight = maxHeight;
+                    } else {
+                        // Taller than wide
+                        canvasWidth = maxHeight;
+                        canvasHeight = maxHeight / aspectRatio;
+                    }
+
+                    // Cap maximum width to avoid extremely wide thumbnails
+                    const maxWidth = maxHeight * 2;
+                    if (canvasWidth > maxWidth) {
+                        canvasHeight = canvasHeight * (maxWidth / canvasWidth);
+                        canvasWidth = maxWidth;
+                    }
+                }
+            }
+
+            const thumbnailCanvas = document.createElement('canvas');
+            thumbnailCanvas.width = canvasWidth;
+            thumbnailCanvas.height = canvasHeight;
+            const thumbCtx = thumbnailCanvas.getContext('2d');
+
+            // Clear with light gray background
+            thumbCtx.fillStyle = '#F5F5F5';
+            thumbCtx.fillRect(0, 0, canvasWidth, canvasHeight);
+
+            if (isBuiltin) {
+                // Draw built-in primitives as simple shapes
+                thumbCtx.strokeStyle = '#7C3AED';
+                thumbCtx.lineWidth = 2;
+                thumbCtx.lineCap = 'round';
+
+                const center = canvasWidth / 2;
+                const centerY = canvasHeight / 2;
+                const radius = Math.min(canvasWidth, canvasHeight) * 0.3;
+
+                switch (item.shapeType) {
+                    case 'circle':
+                        thumbCtx.beginPath();
+                        thumbCtx.arc(center, centerY, radius, 0, Math.PI * 2);
+                        thumbCtx.stroke();
+                        break;
+                    case 'line':
+                        thumbCtx.beginPath();
+                        thumbCtx.moveTo(canvasWidth * 0.2, canvasHeight * 0.7);
+                        thumbCtx.lineTo(canvasWidth * 0.8, canvasHeight * 0.3);
+                        thumbCtx.stroke();
+                        break;
+                    case 'rectangle':
+                        thumbCtx.strokeRect(canvasWidth * 0.2, canvasHeight * 0.25, canvasWidth * 0.6, canvasHeight * 0.5);
+                        break;
+                    case 'triangle':
+                        thumbCtx.beginPath();
+                        thumbCtx.moveTo(center, canvasHeight * 0.2);
+                        thumbCtx.lineTo(canvasWidth * 0.2, canvasHeight * 0.7);
+                        thumbCtx.lineTo(canvasWidth * 0.8, canvasHeight * 0.7);
+                        thumbCtx.closePath();
+                        thumbCtx.stroke();
+                        break;
+                }
+                return thumbnailCanvas;
+            }
+
+            // Draw user-created strokes
+            if (strokesToDraw.length > 0) {
+                // Calculate bounding box for all strokes
+                let allPoints = [];
+                strokesToDraw.forEach(stroke => {
+                    if (stroke && stroke.length > 0) {
+                        allPoints = allPoints.concat(stroke);
+                    }
+                });
+
+                if (allPoints.length > 0) {
+                    const bounds = getBounds(allPoints);
+                    const width = bounds.maxX - bounds.minX;
+                    const height = bounds.maxY - bounds.minY;
+
+                    // Calculate scale to fit in thumbnail with padding
+                    const padding = Math.min(canvasWidth, canvasHeight) * 0.1;
+                    const scaleX = (canvasWidth - padding * 2) / width;
+                    const scaleY = (canvasHeight - padding * 2) / height;
+                    const scale = Math.min(scaleX, scaleY);
+
+                    // Center the drawing
+                    const offsetX = (canvasWidth - width * scale) / 2;
+                    const offsetY = (canvasHeight - height * scale) / 2;
+
+                    // Draw each stroke
+                    thumbCtx.strokeStyle = '#7C3AED';
+                    thumbCtx.lineWidth = 2;
+                    thumbCtx.lineCap = 'round';
+                    thumbCtx.lineJoin = 'round';
+
+                    strokesToDraw.forEach(stroke => {
+                        if (!stroke || stroke.length === 0) return;
+
+                        thumbCtx.beginPath();
+                        stroke.forEach((point, i) => {
+                            const x = (point.x - bounds.minX) * scale + offsetX;
+                            const y = (point.y - bounds.minY) * scale + offsetY;
+                            if (i === 0) thumbCtx.moveTo(x, y);
+                            else thumbCtx.lineTo(x, y);
+                        });
+                        thumbCtx.stroke();
+                    });
+                }
+            }
+
+            return thumbnailCanvas;
+        }
+
+        function renderLibrary() {
+            // Get all library items, separated by type
+            const builtins = Object.keys(state.library).filter(key =>
+                state.library[key].type === 'builtin-primitive'
+            );
+
+            const userItems = Object.keys(state.library).filter(key =>
+                state.library[key].type === 'user-primitive' || state.library[key].type === 'composition'
+            );
+
+            // Combine: built-ins first, then user items
+            const allItems = [...builtins, ...userItems];
+
+            if (allItems.length === 0) {
+                libraryGrid.innerHTML = '<div class="empty-message">No shapes yet</div>';
+                return;
+            }
+
+            // Render all items
+            libraryGrid.innerHTML = allItems.map(key => {
+                const item = state.library[key];
+                const isBuiltin = item.type === 'builtin-primitive';
+
+                // Determine type and meta info
+                let metaInfo = '';
+                let typeLabel = '';
+
+                if (isBuiltin) {
+                    metaInfo = `Used ${item.usageCount}×`;
+                } else if (item.type === 'composition') {
+                    // Multi-stroke composition
+                    typeLabel = '🔗';
+                    const connections = item.spatialGraph.connections.length;
+                    metaInfo = `${item.components.length} strokes · ${connections} conn · ${item.usageCount}×`;
+                } else if (item.components) {
+                    // Legacy compound primitive from Day 2
+                    typeLabel = '📦';
+                    metaInfo = `${item.components.length} comp · ${item.usageCount}×`;
+                } else {
+                    // Single stroke primitive
+                    typeLabel = '✏️';
+                    metaInfo = `1 stroke · ${item.usageCount}×`;
+                }
+
+                const deleteButton = !isBuiltin ? `<button class="delete-button" onclick="deleteLibraryItem('${key}')" title="Delete">×</button>` : '';
+
+                return `
+                    <div class="library-item ${isBuiltin ? 'builtin' : ''}" data-key="${key}">
+                        ${deleteButton}
+                        <div class="library-item-thumbnail" id="thumb-${key}"></div>
+                        <div class="library-item-info">
+                            <div class="library-item-label">${typeLabel}${item.label}</div>
+                            <div class="library-item-meta">${metaInfo}</div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            // Generate thumbnails for all items
+            allItems.forEach(key => {
+                const thumbnailContainer = document.getElementById(`thumb-${key}`);
+                if (thumbnailContainer) {
+                    const thumbnail = generateThumbnail(state.library[key]);
+                    thumbnailContainer.appendChild(thumbnail);
+                }
+            });
+        }
+
+        function showSavePrimitiveUI() {
+            // Show the inline save primitive container (for "Something else" - single stroke)
+            savePrimitiveContainer.classList.add('active');
+            primitiveNameInput.value = '';
+            primitiveNameInput.dataset.saveMode = 'single'; // Mark as single stroke save
+            primitiveNameInput.focus();
+        }
+
+        function hideSavePrimitiveUI() {
+            savePrimitiveContainer.classList.remove('active');
+            primitiveNameInput.value = '';
+        }
+
+        function initiateLibrarySave() {
+            // Called by "Save to Library" button
+            // Saves ALL strokes on canvas as compound primitive
+            if (state.strokes.length === 0) return;
+
+            // Show inline save UI
+            savePrimitiveContainer.classList.add('active');
+            primitiveNameInput.value = '';
+            primitiveNameInput.dataset.saveMode = 'compound'; // Mark as compound save
+            primitiveNameInput.focus();
+        }
+
+        function confirmSavePrimitive() {
+            const name = primitiveNameInput.value.trim();
+            if (!name) {
+                primitiveNameInput.focus();
+                return;
+            }
+
+            const key = name.toLowerCase().replace(/\s+/g, '-');
+
+            // Check if name already exists
+            if (state.library[key]) {
+                // Show error inline instead of alert
+                primitiveNameInput.style.borderColor = '#ff5252';
+                primitiveNameInput.placeholder = 'Name already exists! Try another...';
+                primitiveNameInput.value = '';
+                primitiveNameInput.focus();
+                return;
+            }
+
+            const saveMode = primitiveNameInput.dataset.saveMode || 'single';
+
+            if (saveMode === 'compound') {
+                // Save compound primitive (all strokes)
+                saveCompoundPrimitive(name, key);
+            } else {
+                // Save single stroke primitive (from "Something else")
+                saveSingleStrokePrimitive(name, key);
+            }
+
+            hideSavePrimitiveUI();
+            state.selectedStrokeIndex = null;
+        }
+
+        function saveSingleStrokePrimitive(name, key) {
+            const strokeIndex = state.selectedStrokeIndex;
+            if (strokeIndex === null || !state.strokes[strokeIndex]) return;
+
+            const stroke = state.strokes[strokeIndex];
+
+            // Use refined stroke if refinement is enabled and available
+            const refinedStroke = state.refinedStrokes[strokeIndex];
+            const strokeToSave = (state.refinement.enabled && refinedStroke) ? refinedStroke : stroke;
+
+            const fingerprint = getFingerprint(strokeToSave);
+
+            state.library[key] = {
+                type: 'user-primitive',
+                label: name,
+                strokes: [strokeToSave],
+                fingerprint: fingerprint,
+                usageCount: 0,
+                created: Date.now()
+            };
+
+            // Update context to reference the new primitive
+            state.context[strokeIndex] = key;
+            state.library[key].usageCount++;
+
+            saveLibrary();
+            renderLibrary();
+            render();
+        }
+
+        function saveCompoundPrimitive(name, key) {
+            // Auto-accept any pending strokes as artN
+            let artCounter = 0;
+            state.strokes.forEach((stroke, idx) => {
+                if (!state.context[idx] || state.context[idx] === '') {
+                    state.context[idx] = `art${artCounter}`;
+                    artCounter++;
+                }
+            });
+
+            // Build components array
+            const components = state.strokes.map((stroke, idx) => {
+                const originalStroke = stroke;
+                const refinedStroke = state.refinedStrokes[idx] || null;
+                const recognizedAs = state.context[idx];
+                const fingerprint = getFingerprint(originalStroke);
+                const bounds = getBounds(originalStroke);
+
+                return {
+                    originalStroke: originalStroke,
+                    refinedStroke: refinedStroke,
+                    recognizedAs: recognizedAs,
+                    fingerprint: fingerprint,
+                    bounds: bounds
+                };
+            });
+
+            // Calculate overall bounds
+            const allBounds = components.map(c => c.bounds);
+            const overallBounds = {
+                minX: Math.min(...allBounds.map(b => b.minX)),
+                maxX: Math.max(...allBounds.map(b => b.maxX)),
+                minY: Math.min(...allBounds.map(b => b.minY)),
+                maxY: Math.max(...allBounds.map(b => b.maxY))
+            };
+
+            // Build spatial graph (Day 3)
+            const spatialGraph = buildSpatialGraph(components);
+
+            state.library[key] = {
+                type: 'composition',  // Day 3: distinct from primitives
+                label: name,
+                components: components,
+                overallBounds: overallBounds,
+                spatialGraph: spatialGraph,  // Day 3: properly generated
+                usageCount: 0,
+                created: Date.now()
+            };
+
+            saveLibrary();
+            renderLibrary();
+
+            // Clear canvas after save
+            state.strokes = [];
+            state.refinedStrokes = [];
+            state.context = [];
+            state.currentStroke = [];
+            state.suggestions = [];
+
+            recognitionStatus.textContent = 'Waiting for stroke...';
+            recognitionStatus.style.background = '#f5f5f5';
+            recognitionStatus.style.color = '#666';
+            suggestionsDiv.innerHTML = '<button class="something-else-button disabled">Something else</button>';
+
+            render();
+        }
+
+        function cancelSavePrimitive() {
+            hideSavePrimitiveUI();
+            state.selectedStrokeIndex = null;
+        }
+
+        function deleteLibraryItem(key) {
+            // Direct delete without confirmation for faster workflow
+            delete state.library[key];
+            saveLibrary();
+            renderLibrary();
+        }
+
+        function saveLibrary() {
+            try {
+                localStorage.setItem('metamedium_library_v1', JSON.stringify(state.library));
+            } catch (e) {
+                console.error('Failed to save library:', e);
+            }
+        }
+
+        function loadLibrary() {
+            try {
+                const saved = localStorage.getItem('metamedium_library_v1');
+                if (saved) {
+                    const loaded = JSON.parse(saved);
+                    // Merge with built-ins (keep built-ins, add user items and compositions)
+                    Object.keys(loaded).forEach(key => {
+                        if (loaded[key].type === 'user-primitive' || loaded[key].type === 'composition') {
+                            state.library[key] = loaded[key];
+                        }
+                    });
+                }
+            } catch (e) {
+                console.error('Failed to load library:', e);
+            }
+        }
+
+        function exportLibrary() {
+            const dataStr = JSON.stringify(state.library, null, 2);
+            const dataBlob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(dataBlob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `metamedium-library-${Date.now()}.json`;
+            link.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function compareFingerprints(fp1, fp2) {
+            // Simple similarity score between two fingerprints
+            let score = 0;
+            let factors = 0;
+
+            // Aspect ratio similarity
+            const aspectDiff = Math.abs(fp1.aspectRatio - fp2.aspectRatio);
+            score += Math.max(0, 1 - aspectDiff);
+            factors++;
+
+            // Straightness similarity
+            const straightDiff = Math.abs(fp1.straightness - fp2.straightness);
+            score += Math.max(0, 1 - straightDiff);
+            factors++;
+
+            // Closure match (binary)
+            if (fp1.isClosed === fp2.isClosed) {
+                score += 1;
+            }
+            factors++;
+
+            // Size similarity (normalized)
+            if (fp1.size && fp2.size) {
+                const sizeDiff = Math.abs(fp1.size - fp2.size) / Math.max(fp1.size, fp2.size);
+                score += Math.max(0, 1 - sizeDiff);
+                factors++;
+            }
+
+            return score / factors; // 0-1 similarity
+        }
+
+        // Event Listeners for Library
+        exportLibraryBtn.addEventListener('click', exportLibrary);
+
+        // Inline save primitive UI event listeners
+        confirmSaveBtn.addEventListener('click', confirmSavePrimitive);
+        cancelSaveBtn.addEventListener('click', cancelSavePrimitive);
+
+        primitiveNameInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                confirmSavePrimitive();
+            } else if (e.key === 'Escape') {
+                cancelSavePrimitive();
+            }
+        });
+
+        // Reset input styling on typing
+        primitiveNameInput.addEventListener('input', () => {
+            primitiveNameInput.style.borderColor = '';
+            primitiveNameInput.placeholder = 'Enter shape name...';
+        });
+
+        // Fuzzy match input listeners
+        fuzzyMatchInput.addEventListener('input', handleFuzzyMatch);
+
+        fuzzyMatchInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                // Accept first suggestion if available, otherwise trigger "something else"
+                if (state.suggestions && state.suggestions.length > 0) {
+                    acceptSuggestion(state.suggestions[0]);
+                } else {
+                    handleSomethingElse();
+                }
+            } else if (e.key === 'Escape') {
+                // Clear fuzzy match input and restore normal suggestions
+                fuzzyMatchInput.value = '';
+                if (state.selectedStrokeIndex !== null && state.lastFingerprint) {
+                    const analysis = analyzeStrokeDetailed(state.strokes[state.selectedStrokeIndex]);
+                    showSuggestions(analysis);
+                }
+            }
+        });
+
+        saveToLibraryBtn.addEventListener('click', initiateLibrarySave);
+
+        // Debug checkbox toggle
+        debugCheckbox.addEventListener('change', (e) => {
+            state.debugMode = e.target.checked;
+            render(); // Re-render to show/hide debug indicators
+        });
+
+        clearBtn.addEventListener('click', () => {
+            state.strokes = [];
+            state.refinedStrokes = [];
+            state.tipDebugData = [];
+            state.cornerDebugData = [];
+            state.context = [];
+            state.currentStroke = [];
+            state.suggestions = [];
+            state.selectedStrokeIndex = null;
+
+            metricsContent.innerHTML = '<div class="no-stroke-message">Draw a stroke to see metrics...</div>';
+            recognitionStatus.textContent = 'Waiting for stroke...';
+            recognitionStatus.style.background = '#f5f5f5';
+            recognitionStatus.style.color = '#666';
+            suggestionsDiv.innerHTML = '<button class="something-else-button disabled">Something else</button>';
+            hideSavePrimitiveUI();
+            fuzzyMatchInput.value = '';
+
+            render();
+        });
+
+        // Canvas input - Reserved for future commands
+        canvasInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                const typed = canvasInput.value.trim();
+                if (!typed) return;
+
+                // TODO: Handle commands here in future
+                // For now, just clear the input
+                console.log('Command entered:', typed);
+                canvasInput.value = '';
+            } else if (e.key === 'Escape') {
+                canvasInput.value = '';
+            }
+        });
+
+        // Refinement controls event listeners
+        const refinementToggle = document.getElementById('refinementToggle');
+        const smoothSlider = document.getElementById('smoothSlider');
+        const smoothValue = document.getElementById('smoothValue');
+        const simplifySlider = document.getElementById('simplifySlider');
+        const simplifyValue = document.getElementById('simplifyValue');
+        const normalizeToggle = document.getElementById('normalizeToggle');
+
+        refinementToggle.addEventListener('click', () => {
+            state.refinement.enabled = !state.refinement.enabled;
+            refinementToggle.textContent = state.refinement.enabled ? 'Disable Refinement' : 'Enable Refinement';
+            refinementToggle.classList.toggle('active', state.refinement.enabled);
+            updateRefinedStrokes();
+            render();
+        });
+
+        smoothSlider.addEventListener('input', (e) => {
+            state.refinement.smooth = parseInt(e.target.value);
+            smoothValue.textContent = e.target.value;
+            updateRefinedStrokes();
+            render();
+        });
+
+        simplifySlider.addEventListener('input', (e) => {
+            state.refinement.simplify = parseInt(e.target.value);
+            simplifyValue.textContent = e.target.value;
+            updateRefinedStrokes();
+            render();
+        });
+
+        normalizeToggle.addEventListener('change', (e) => {
+            state.refinement.normalize = e.target.checked;
+            updateRefinedStrokes();
+            render();
+        });
+
+        // Initialize refinement UI to match state defaults
+        refinementToggle.textContent = state.refinement.enabled ? 'Disable Refinement' : 'Enable Refinement';
+        refinementToggle.classList.toggle('active', state.refinement.enabled);
+        smoothSlider.value = state.refinement.smooth;
+        smoothValue.textContent = state.refinement.smooth;
+        simplifySlider.value = state.refinement.simplify;
+        simplifyValue.textContent = state.refinement.simplify;
+        normalizeToggle.checked = state.refinement.normalize;
+
+        // Update refined strokes based on current refinement settings
+        function updateRefinedStrokes() {
+            if (!state.refinement.enabled) {
+                state.refinedStrokes = [];
+                return;
+            }
+
+            state.refinedStrokes = state.strokes.map((stroke, idx) => {
+                // Don't overwrite accepted shapes - they keep their geometric refinement
+                const isAccepted = state.context[idx] && state.context[idx] !== '';
+                if (isAccepted && state.refinedStrokes[idx]) {
+                    // Keep existing refined geometry for accepted shapes
+                    return state.refinedStrokes[idx];
+                }
+
+                // Only apply manual refinement to unaccepted strokes
+                return applyRefinement(stroke, {
+                    smooth: state.refinement.smooth,
+                    simplify: state.refinement.simplify,
+                    normalize: state.refinement.normalize,
+                    normalizeSize: 200
+                });
+            });
+        }
+
+        // Resize canvas to fill container
+        function resizeCanvas() {
+            const wrapper = canvas.parentElement;
+            const rect = wrapper.getBoundingClientRect();
+
+            // Account for input and padding
+            const inputHeight = canvasInput.offsetHeight;
+            const gap = 8; // gap between input and canvas
+            const padding = 24; // wrapper padding (12px * 2)
+
+            const availableWidth = rect.width - padding;
+            const availableHeight = rect.height - inputHeight - gap - padding;
+
+            // Set canvas display size (CSS pixels)
+            canvas.style.width = availableWidth + 'px';
+            canvas.style.height = availableHeight + 'px';
+
+            // Set canvas resolution (drawing buffer)
+            const dpr = window.devicePixelRatio || 1;
+            canvas.width = availableWidth * dpr;
+            canvas.height = availableHeight * dpr;
+
+            // Scale context to handle high DPI
+            ctx.scale(dpr, dpr);
+
+            // Re-render after resize
+            render();
+        }
+
+        // Initial setup
+        loadLibrary();
+        renderLibrary();
+
+        // Resize canvas once DOM is ready
+        setTimeout(() => {
+            resizeCanvas();
+        }, 100);
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            resizeCanvas();
+        });
+
+        console.log('Day 3 initialized: Spatial graph system ready!');
+    </script>
+</body>
+</html>
