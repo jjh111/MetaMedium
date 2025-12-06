@@ -900,7 +900,120 @@
             margin-top: var(--space-sm);
             letter-spacing: 0.05em;
         }
-        
+
+        /* Demo Canvas - Fish Animation */
+        .demo-wrapper {
+            margin: var(--space-xl) 0 var(--space-md);
+        }
+
+        .demo-prompt {
+            text-align: center;
+            margin-bottom: 1rem;
+            font-size: 1.25rem;
+            color: var(--ink);
+            font-weight: 500;
+            min-height: 2rem;
+        }
+
+        .demo-prompt .highlight {
+            color: #e63946;
+            font-weight: 600;
+        }
+
+        .demo-canvas-container {
+            position: relative;
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            overflow: hidden;
+        }
+
+        #demoCanvas {
+            display: block;
+            width: 100%;
+            aspect-ratio: 4/3;
+            cursor: crosshair;
+            touch-action: none;
+        }
+
+        #demoCanvas.grabbing {
+            cursor: grabbing;
+        }
+
+        .demo-labels {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            pointer-events: none;
+        }
+
+        .demo-label {
+            position: absolute;
+            font-size: 0.75rem;
+            font-weight: 600;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            transform: translate(-50%, -100%);
+            margin-top: -8px;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .demo-label.visible {
+            opacity: 1;
+        }
+
+        .demo-label.fish {
+            background: rgba(59, 130, 246, 0.9);
+            color: white;
+        }
+
+        .demo-label.food {
+            background: rgba(74, 222, 128, 0.9);
+            color: #1a1a2e;
+        }
+
+        .demo-controls {
+            display: flex;
+            justify-content: center;
+            margin-top: 1rem;
+            gap: 0.75rem;
+        }
+
+        .demo-reset-btn {
+            font-family: inherit;
+            font-size: 0.875rem;
+            font-weight: 500;
+            padding: 0.625rem 1.25rem;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            background: #1a1a2e;
+            color: white;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .demo-reset-btn.visible {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .demo-reset-btn:hover {
+            background: #2d2d4a;
+        }
+
+        .demo-status {
+            text-align: center;
+            margin-top: 0.75rem;
+            font-size: 0.8125rem;
+            color: #666;
+            min-height: 1.25rem;
+        }
+
         /* Responsive */
         @media (max-width: 768px) {
             :root { 
@@ -939,7 +1052,7 @@
         
         @media print {
             body { font-size: 11pt; line-height: 1.5; }
-            nav, .scroll-indicator, #heroCanvas, .hero-hint { display: none; }
+            nav, .scroll-indicator, #heroCanvas, .hero-hint, .demo-wrapper { display: none; }
             .hero { min-height: auto; padding: 1.5rem 0; background: none; }
             .hero::after { display: none; }
             .hero h1, .hero .subtitle, .hero .tagline, .hero .byline { color: var(--ink); }
@@ -1701,8 +1814,27 @@
             </div>
             
             <p>The MetaMedium is that interface. The demo accompanying this paper is a first step—a proof that the principles can be made real. Development continues. Contributions welcome.</p>
-            
+
             <p>It's time to bring the computer to life at the depth of mind with the speed and intuitive action of our hands.</p>
+
+            <!-- Interactive Demo Canvas -->
+            <div class="demo-wrapper">
+                <div class="demo-prompt" id="demoPrompt">Draw a <span class="highlight">fish</span></div>
+
+                <div class="demo-canvas-container">
+                    <canvas id="demoCanvas"></canvas>
+                    <div class="demo-labels">
+                        <div class="demo-label fish" id="fishLabel">🐟 fish</div>
+                        <div class="demo-label food" id="foodLabel">🍎 food</div>
+                    </div>
+                </div>
+
+                <div class="demo-controls">
+                    <button class="demo-reset-btn" id="demoResetBtn">Reset</button>
+                </div>
+
+                <div class="demo-status" id="demoStatus"></div>
+            </div>
 
         </section>
     </main>
@@ -1810,58 +1942,10 @@
             glow: 'rgba(59, 130, 246, 0.4)',
             label: 'rgba(147, 197, 253, 0.7)'
         };
-        
+
         // ============================================
-        // Shape Detection
+        // Helper Functions
         // ============================================
-        function detectShape(points) {
-            if (points.length < 5) return null;
-            
-            const bounds = getBounds(points);
-            const center = { x: (bounds.minX + bounds.maxX) / 2, y: (bounds.minY + bounds.maxY) / 2 };
-            const width = bounds.maxX - bounds.minX;
-            const height = bounds.maxY - bounds.minY;
-            const size = Math.max(width, height);
-            
-            if (size < 20) return null; // Too small
-            
-            // Check if closed (start near end)
-            const start = points[0];
-            const end = points[points.length - 1];
-            const closedThreshold = size * 0.25;
-            const isClosed = distance(start, end) < closedThreshold;
-            
-            if (isClosed) {
-                // Analyze closed shape
-                const circleScore = getCircleScore(points, center, size / 2);
-                const rectScore = getRectScore(points, bounds);
-                const triScore = getTriangleScore(points, bounds);
-                
-                if (circleScore > 0.7 && circleScore > rectScore && circleScore > triScore) {
-                    return { type: 'circle', center, radius: size / 2, confidence: circleScore };
-                }
-                if (rectScore > 0.6 && rectScore > triScore) {
-                    return { type: 'rectangle', bounds, center, confidence: rectScore };
-                }
-                if (triScore > 0.5) {
-                    return { type: 'triangle', bounds, center, confidence: triScore };
-                }
-            } else {
-                // Open shape - line or arrow
-                const lineScore = getLineScore(points);
-                if (lineScore > 0.7) {
-                    const hasArrow = detectArrowHead(points);
-                    return { 
-                        type: hasArrow ? 'arrow' : 'line', 
-                        start, end, center,
-                        confidence: lineScore 
-                    };
-                }
-            }
-            
-            return null;
-        }
-        
         function getBounds(points) {
             let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
             points.forEach(p => {
@@ -1872,11 +1956,11 @@
             });
             return { minX, minY, maxX, maxY };
         }
-        
+
         function distance(a, b) {
             return Math.sqrt((a.x - b.x) ** 2 + (a.y - b.y) ** 2);
         }
-        
+
         function getCircleScore(points, center, radius) {
             let totalError = 0;
             points.forEach(p => {
@@ -1885,7 +1969,7 @@
             });
             return Math.max(0, 1 - (totalError / points.length));
         }
-        
+
         function getRectScore(points, bounds) {
             const width = bounds.maxX - bounds.minX;
             const height = bounds.maxY - bounds.minY;
@@ -1902,23 +1986,23 @@
             });
             return cornerCount / 4;
         }
-        
+
         function getTriangleScore(points, bounds) {
             // Improved triangle detection
             const width = bounds.maxX - bounds.minX;
             const height = bounds.maxY - bounds.minY;
             const cx = (bounds.minX + bounds.maxX) / 2;
             const cy = (bounds.minY + bounds.maxY) / 2;
-            
+
             // Find the 3 most extreme points (potential vertices)
             let topPoint = points[0], bottomLeft = points[0], bottomRight = points[0];
-            
+
             points.forEach(p => {
                 if (p.y < topPoint.y) topPoint = p;
                 if (p.y > bottomLeft.y || (p.y === bottomLeft.y && p.x < bottomLeft.x)) bottomLeft = p;
                 if (p.y > bottomRight.y || (p.y === bottomRight.y && p.x > bottomRight.x)) bottomRight = p;
             });
-            
+
             // Check for roughly 3 direction changes (corners)
             let turns = 0;
             const step = Math.max(1, Math.floor(points.length / 20));
@@ -1932,27 +2016,27 @@
                 if (diff > Math.PI) diff = 2 * Math.PI - diff;
                 if (diff > 0.4 && diff < 2.8) turns++;
             }
-            
+
             // Aspect ratio check - triangles shouldn't be too thin
             const aspect = Math.min(width, height) / Math.max(width, height);
             const aspectOk = aspect > 0.3;
-            
+
             if (turns >= 2 && turns <= 6 && aspectOk) {
                 return 0.65;
             }
             return 0.25;
         }
-        
+
         function getLineScore(points) {
             if (points.length < 3) return 0;
             const start = points[0];
             const end = points[points.length - 1];
             const lineLen = distance(start, end);
             if (lineLen < 30) return 0;
-            
+
             let totalDev = 0;
             points.forEach(p => {
-                const t = Math.max(0, Math.min(1, 
+                const t = Math.max(0, Math.min(1,
                     ((p.x - start.x) * (end.x - start.x) + (p.y - start.y) * (end.y - start.y)) / (lineLen * lineLen)
                 ));
                 const proj = { x: start.x + t * (end.x - start.x), y: start.y + t * (end.y - start.y) };
@@ -1960,14 +2044,14 @@
             });
             return Math.max(0, 1 - (totalDev / points.length) / (lineLen * 0.1));
         }
-        
+
         function detectArrowHead(points) {
             if (points.length < 10) return false;
             const last10 = points.slice(-10);
             const end = points[points.length - 1];
             const beforeEnd = points[Math.max(0, points.length - 8)];
             const mainDir = Math.atan2(end.y - beforeEnd.y, end.x - beforeEnd.x);
-            
+
             // Check for splaying at end
             let hasSplay = false;
             for (let i = 1; i < last10.length - 1; i++) {
@@ -1976,6 +2060,57 @@
                 if (diff > 0.4 && diff < 2.7) hasSplay = true;
             }
             return hasSplay;
+        }
+
+        // ============================================
+        // Shape Detection
+        // ============================================
+        function detectShape(points) {
+            if (points.length < 5) return null;
+
+            const bounds = getBounds(points);
+            const center = { x: (bounds.minX + bounds.maxX) / 2, y: (bounds.minY + bounds.maxY) / 2 };
+            const width = bounds.maxX - bounds.minX;
+            const height = bounds.maxY - bounds.minY;
+            const size = Math.max(width, height);
+
+            if (size < 20) return null; // Too small
+
+            // Check if closed (start near end)
+            const start = points[0];
+            const end = points[points.length - 1];
+            const closedThreshold = size * 0.25;
+            const isClosed = distance(start, end) < closedThreshold;
+
+            if (isClosed) {
+                // Analyze closed shape
+                const circleScore = getCircleScore(points, center, size / 2);
+                const rectScore = getRectScore(points, bounds);
+                const triScore = getTriangleScore(points, bounds);
+
+                if (circleScore > 0.7 && circleScore > rectScore && circleScore > triScore) {
+                    return { type: 'circle', center, radius: size / 2, confidence: circleScore };
+                }
+                if (rectScore > 0.6 && rectScore > triScore) {
+                    return { type: 'rectangle', bounds, center, confidence: rectScore };
+                }
+                if (triScore > 0.5) {
+                    return { type: 'triangle', bounds, center, confidence: triScore };
+                }
+            } else {
+                // Open shape - line or arrow
+                const lineScore = getLineScore(points);
+                if (lineScore > 0.7) {
+                    const hasArrow = detectArrowHead(points);
+                    return {
+                        type: hasArrow ? 'arrow' : 'line',
+                        start, end, center,
+                        confidence: lineScore
+                    };
+                }
+            }
+
+            return null;
         }
         
         // ============================================
@@ -3024,6 +3159,358 @@
         canvas.addEventListener('touchmove', draw, { passive: false });
         canvas.addEventListener('touchend', endDraw);
         canvas.addEventListener('touchcancel', endDraw);
+
+        // ============================================
+        // Demo Canvas - Interactive Fish Animation
+        // ============================================
+        const demoCanvas = document.getElementById('demoCanvas');
+        if (demoCanvas) {
+            const demoCtx = demoCanvas.getContext('2d');
+            const demoPrompt = document.getElementById('demoPrompt');
+            const demoStatus = document.getElementById('demoStatus');
+            const demoResetBtn = document.getElementById('demoResetBtn');
+            const fishLabel = document.getElementById('fishLabel');
+            const foodLabel = document.getElementById('foodLabel');
+
+            // State
+            let demoState = 'draw-fish'; // draw-fish, draw-food, animating
+            let demoIsDrawing = false;
+            let demoIsDraggingFood = false;
+            let demoCurrentStroke = [];
+            let demoFish = null;
+            let demoFood = null;
+            let demoAnimationId = null;
+            let demoWigglePhase = 0;
+
+            // High DPI support
+            function setupDemoCanvas() {
+                const rect = demoCanvas.getBoundingClientRect();
+                const dpr = window.devicePixelRatio || 1;
+                demoCanvas.width = rect.width * dpr;
+                demoCanvas.height = rect.height * dpr;
+                demoCtx.scale(dpr, dpr);
+                demoCanvas.style.width = rect.width + 'px';
+                demoCanvas.style.height = rect.height + 'px';
+            }
+            setupDemoCanvas();
+            window.addEventListener('resize', () => {
+                setupDemoCanvas();
+                redrawDemo();
+            });
+
+            // Get canvas dimensions
+            function getDemoCanvasSize() {
+                return {
+                    width: demoCanvas.getBoundingClientRect().width,
+                    height: demoCanvas.getBoundingClientRect().height
+                };
+            }
+
+            // Get position from event
+            function getDemoPos(e) {
+                const rect = demoCanvas.getBoundingClientRect();
+                if (e.touches) {
+                    return {
+                        x: e.touches[0].clientX - rect.left,
+                        y: e.touches[0].clientY - rect.top
+                    };
+                }
+                return {
+                    x: e.clientX - rect.left,
+                    y: e.clientY - rect.top
+                };
+            }
+
+            function demoBounds(points) {
+                let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+                points.forEach(p => {
+                    minX = Math.min(minX, p.x);
+                    minY = Math.min(minY, p.y);
+                    maxX = Math.max(maxX, p.x);
+                    maxY = Math.max(maxY, p.y);
+                });
+                return { minX, minY, maxX, maxY };
+            }
+
+            function updateDemoLabel(labelEl, pos, visible) {
+                const rect = demoCanvas.getBoundingClientRect();
+                labelEl.style.left = pos.x + 'px';
+                labelEl.style.top = pos.y + 'px';
+                labelEl.classList.toggle('visible', visible);
+            }
+
+            // Drawing handlers
+            function demoStartDraw(e) {
+                e.preventDefault();
+                const pos = getDemoPos(e);
+
+                // Check if clicking on food to drag it
+                if (demoFood && demoState === 'animating') {
+                    const dx = pos.x - demoFood.center.x;
+                    const dy = pos.y - demoFood.center.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    if (dist < 40) {
+                        demoIsDraggingFood = true;
+                        demoCanvas.classList.add('grabbing');
+                        return;
+                    }
+                }
+
+                if (demoState === 'animating') return;
+                demoIsDrawing = true;
+                demoCurrentStroke = [pos];
+            }
+
+            function demoDraw(e) {
+                e.preventDefault();
+                const pos = getDemoPos(e);
+
+                // Handle dragging food
+                if (demoIsDraggingFood && demoFood) {
+                    const dx = pos.x - demoFood.center.x;
+                    const dy = pos.y - demoFood.center.y;
+                    demoFood.center.x = pos.x;
+                    demoFood.center.y = pos.y;
+                    demoFood.points = demoFood.points.map(p => ({
+                        x: p.x + dx,
+                        y: p.y + dy
+                    }));
+                    updateDemoLabel(foodLabel, demoFood.center, true);
+                    return;
+                }
+
+                if (!demoIsDrawing) return;
+                demoCurrentStroke.push(pos);
+                redrawDemo();
+
+                // Draw current stroke
+                if (demoCurrentStroke.length > 1) {
+                    demoCtx.strokeStyle = demoState === 'draw-fish' ? 'rgba(59, 130, 246, 0.8)' : 'rgba(74, 222, 128, 0.8)';
+                    demoCtx.lineWidth = 3;
+                    demoCtx.lineCap = 'round';
+                    demoCtx.lineJoin = 'round';
+                    demoCtx.beginPath();
+                    demoCtx.moveTo(demoCurrentStroke[0].x, demoCurrentStroke[0].y);
+                    for (let i = 1; i < demoCurrentStroke.length; i++) {
+                        demoCtx.lineTo(demoCurrentStroke[i].x, demoCurrentStroke[i].y);
+                    }
+                    demoCtx.stroke();
+                }
+            }
+
+            function demoEndDraw() {
+                if (demoIsDraggingFood) {
+                    demoIsDraggingFood = false;
+                    demoCanvas.classList.remove('grabbing');
+                    return;
+                }
+
+                if (!demoIsDrawing) return;
+                demoIsDrawing = false;
+
+                if (demoCurrentStroke.length < 5) {
+                    demoCurrentStroke = [];
+                    return;
+                }
+
+                // Calculate bounds and center
+                const bounds = demoBounds(demoCurrentStroke);
+                const center = {
+                    x: (bounds.minX + bounds.maxX) / 2,
+                    y: (bounds.minY + bounds.maxY) / 2
+                };
+
+                if (demoState === 'draw-fish') {
+                    demoFish = {
+                        points: [...demoCurrentStroke],
+                        originalPoints: [...demoCurrentStroke],
+                        center: { ...center },
+                        bounds: { ...bounds },
+                        velocity: { x: 0, y: 0 }
+                    };
+
+                    demoPrompt.innerHTML = 'Draw some <span class="highlight">food</span>';
+                    demoStatus.textContent = 'Your fish is waiting...';
+                    updateDemoLabel(fishLabel, demoFish.center, true);
+                    demoState = 'draw-food';
+
+                } else if (demoState === 'draw-food') {
+                    demoFood = {
+                        points: [...demoCurrentStroke],
+                        center: { ...center },
+                        bounds: { ...bounds }
+                    };
+
+                    demoPrompt.innerHTML = '🎬 <span class="highlight">Drag the food!</span>';
+                    demoStatus.textContent = 'Your fish will follow...';
+                    updateDemoLabel(foodLabel, demoFood.center, true);
+                    demoResetBtn.classList.add('visible');
+
+                    demoState = 'animating';
+                    startDemoAnimation();
+                }
+
+                demoCurrentStroke = [];
+                redrawDemo();
+            }
+
+            // Animation
+            function startDemoAnimation() {
+                function animate() {
+                    if (demoState !== 'animating') return;
+
+                    demoWigglePhase += 0.15;
+
+                    // Calculate direction to food
+                    const dx = demoFood.center.x - demoFish.center.x;
+                    const dy = demoFood.center.y - demoFish.center.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+
+                    // Move fish toward food
+                    if (dist > 5) {
+                        const speed = Math.min(2.5, dist * 0.05);
+                        const vx = (dx / dist) * speed;
+                        const vy = (dy / dist) * speed;
+
+                        demoFish.center.x += vx;
+                        demoFish.center.y += vy;
+
+                        demoFish.originalPoints = demoFish.originalPoints.map(p => ({
+                            x: p.x + vx,
+                            y: p.y + vy
+                        }));
+                    }
+
+                    // Apply wiggle
+                    const wiggleAmount = dist < 20 ? 2 : 1.5;
+                    const wiggleSpeed = dist < 20 ? 1.5 : 1;
+                    demoFish.points = demoFish.originalPoints.map((p, i) => {
+                        const offset = Math.sin(demoWigglePhase * wiggleSpeed + i * 0.3) * wiggleAmount;
+                        const perpX = -dy / (dist || 1);
+                        const perpY = dx / (dist || 1);
+                        return {
+                            x: p.x + perpX * offset,
+                            y: p.y + perpY * offset
+                        };
+                    });
+
+                    updateDemoLabel(fishLabel, demoFish.center, true);
+                    redrawDemo();
+
+                    demoAnimationId = requestAnimationFrame(animate);
+                }
+
+                demoAnimationId = requestAnimationFrame(animate);
+            }
+
+            // Redraw everything
+            function redrawDemo() {
+                const { width, height } = getDemoCanvasSize();
+                demoCtx.clearRect(0, 0, width, height);
+
+                // Draw grid
+                demoCtx.strokeStyle = 'rgba(59, 130, 246, 0.06)';
+                demoCtx.lineWidth = 1;
+                const gridSize = 20;
+                for (let x = 0; x < width; x += gridSize) {
+                    demoCtx.beginPath();
+                    demoCtx.moveTo(x, 0);
+                    demoCtx.lineTo(x, height);
+                    demoCtx.stroke();
+                }
+                for (let y = 0; y < height; y += gridSize) {
+                    demoCtx.beginPath();
+                    demoCtx.moveTo(0, y);
+                    demoCtx.lineTo(width, y);
+                    demoCtx.stroke();
+                }
+
+                // Draw food
+                if (demoFood) {
+                    demoCtx.strokeStyle = 'rgba(74, 222, 128, 0.8)';
+                    demoCtx.lineWidth = 3;
+                    demoCtx.lineCap = 'round';
+                    demoCtx.lineJoin = 'round';
+                    demoCtx.beginPath();
+                    demoCtx.moveTo(demoFood.points[0].x, demoFood.points[0].y);
+                    for (let i = 1; i < demoFood.points.length; i++) {
+                        demoCtx.lineTo(demoFood.points[i].x, demoFood.points[i].y);
+                    }
+                    demoCtx.stroke();
+
+                    // Draw drag hint circle
+                    if (demoState === 'animating') {
+                        demoCtx.strokeStyle = 'rgba(74, 222, 128, 0.3)';
+                        demoCtx.lineWidth = 2;
+                        demoCtx.setLineDash([4, 4]);
+                        demoCtx.beginPath();
+                        demoCtx.arc(demoFood.center.x, demoFood.center.y, 35, 0, Math.PI * 2);
+                        demoCtx.stroke();
+                        demoCtx.setLineDash([]);
+                    }
+                }
+
+                // Draw fish
+                if (demoFish) {
+                    demoCtx.strokeStyle = 'rgba(59, 130, 246, 0.8)';
+                    demoCtx.lineWidth = 3;
+                    demoCtx.lineCap = 'round';
+                    demoCtx.lineJoin = 'round';
+                    demoCtx.beginPath();
+                    demoCtx.moveTo(demoFish.points[0].x, demoFish.points[0].y);
+                    for (let i = 1; i < demoFish.points.length; i++) {
+                        demoCtx.lineTo(demoFish.points[i].x, demoFish.points[i].y);
+                    }
+                    demoCtx.stroke();
+                }
+            }
+
+            // Reset
+            function resetDemo() {
+                if (demoAnimationId) cancelAnimationFrame(demoAnimationId);
+
+                demoState = 'draw-fish';
+                demoFish = null;
+                demoFood = null;
+                demoCurrentStroke = [];
+                demoIsDraggingFood = false;
+                demoWigglePhase = 0;
+
+                demoPrompt.innerHTML = 'Draw a <span class="highlight">fish</span>';
+                demoStatus.textContent = '';
+                demoResetBtn.classList.remove('visible');
+                fishLabel.classList.remove('visible');
+                foodLabel.classList.remove('visible');
+
+                redrawDemo();
+            }
+
+            // Event listeners
+            demoCanvas.addEventListener('mousedown', demoStartDraw);
+            demoCanvas.addEventListener('mousemove', (e) => {
+                demoDraw(e);
+                // Update cursor when hovering over food
+                if (demoFood && demoState === 'animating' && !demoIsDraggingFood) {
+                    const pos = getDemoPos(e);
+                    const dx = pos.x - demoFood.center.x;
+                    const dy = pos.y - demoFood.center.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    demoCanvas.style.cursor = dist < 40 ? 'grab' : 'crosshair';
+                }
+            });
+            demoCanvas.addEventListener('mouseup', demoEndDraw);
+            demoCanvas.addEventListener('mouseleave', demoEndDraw);
+
+            demoCanvas.addEventListener('touchstart', demoStartDraw, { passive: false });
+            demoCanvas.addEventListener('touchmove', demoDraw, { passive: false });
+            demoCanvas.addEventListener('touchend', demoEndDraw);
+            demoCanvas.addEventListener('touchcancel', demoEndDraw);
+
+            demoResetBtn.addEventListener('click', resetDemo);
+
+            // Initial draw
+            redrawDemo();
+        }
     </script>
 </body>
 </html>
