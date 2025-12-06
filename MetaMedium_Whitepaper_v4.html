@@ -527,11 +527,11 @@
             border: 2px dashed var(--border);
             border-radius: 10px;
             padding: var(--space-lg) var(--space-md);
-            text-align: center;
+            text-align: left;
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: center;
+            justify-content: left;
             min-height: 220px;
         }
         
@@ -1144,9 +1144,9 @@
             
             <figure>
                 <div class="placeholder-figure">
-                    <div class="icon">◇</div>
-                    <div class="label">Figure 1: The Dead Drawing Spectrum</div>
-                    <div class="description">From "dead" to "alive": Photoshop (pixels) → Illustrator (vectors) → OneNote (ink capture) → Figma (components) → Miro (templates) → Chalktalk (behaviors) → tldraw computer (LLM interpretation) → MetaMedium (learning + negotiation). Most tools cluster on the left.</div>
+                    <div class="image"><img src="./Assets/fig-digidraw.svg" alt="Spectrum of Digital Representations"></div>
+                    <div class="label">Figure 1: The Digital Representation Spectrum</div>
+                    <div class="description">From "inert" to "dynamic": Photoshop (pixels) → Illustrator (vectors) → OneNote (ink capture) → Figma (components) → Miro (templates) → Chalktalk (behaviors) → tldraw computer (LLM interpretation) → MetaMedium (learning + negotiation). Most tools cluster on the left.</div>
                 </div>
             </figure>
             
@@ -1292,7 +1292,14 @@
                     <p>Demonstrated ink as a first-class data type with semantic linking between handwritten notes and digital content. InkSeine treated pen input not as a pointing device but as a medium of expression with its own logic.</p>
                 </div>
             </div>
-            
+             <div class="genealogy-item">
+                <div class="year">2011</div>
+                <div class="content">
+                    <h4>ShadowDraw</h4>
+                    <p>Balancing drawing support without limiting user input.</p>
+                    </div>
+                </div>
+            </div>
             <div class="genealogy-item">
                 <div class="year">2011</div>
                 <div class="content">
@@ -1697,25 +1704,33 @@
             <div class="use-case">
                 <h4>Visual Learning</h4>
                 <p class="principles-used"><strong>Principles:</strong> Space is semantic, Canvas learns, Bidirectional representation</p>
-                <p class="scenario">Jake, a visual thinker struggling with calculus, draws parabolas on the MetaMedium canvas. The system recognizes his drawings and connects them to formal equations, animating the relationship between his spatial intuition and mathematical notation. When Jake adjusts a curve, the equation updates; when he modifies the equation, the curve responds. Jake discovers he always understood calculus—he just needed the symbols connected to his drawings.</p>
+                <p class="scenario">Jake, a visual thinker struggling with calculus, draws parabolas on the MetaMedium canvas. The system recognizes his drawings and connects them to formal equations, animating the relationship between his spatial intuition and mathematical notation. When Jake adjusts a curve, the equation updates; when he modifies the equation, the curve responds. Jake discovers he always understood calculus—he just needed the symbols connected to his drawings.
+                    <a href="https://open.substack.com/pub/johnhanacek/p/a-day-with-metamedium-62d" target="_blank">Read Story</a></a>
+                </p>
             </div>
             
             <div class="use-case">
                 <h4>Asymmetric Collaboration</h4>
                 <p class="principles-used"><strong>Principles:</strong> Interpretive ambiguity, Cognitive lenses, Negotiation</p>
-                <p class="scenario">Ethan (age 7) draws a "bouncy bridge" with springs on a shared MetaMedium canvas. His older sister Maya (19), studying engineering, sees his playful sketch and realizes it demonstrates seismic dampening principles. The MetaMedium lets both work at their level—Ethan's intuitive sketches become inputs to Maya's rigorous simulations. Neither needs to translate to the other's vocabulary; the canvas holds both interpretations.</p>
+                <p class="scenario">Ethan (age 7) draws a "bouncy bridge" with springs on a shared MetaMedium canvas. His older sister Maya (19), studying engineering, sees his playful sketch and realizes it demonstrates seismic dampening principles. The MetaMedium lets both work at their level—Ethan's intuitive sketches become inputs to Maya's rigorous simulations. Neither needs to translate to the other's vocabulary; the canvas holds both interpretations.
+                    <a href="https://open.substack.com/pub/johnhanacek/p/a-day-with-metamedium-96c" target="_blank">Read Story</a></a>
+                </p>
             </div>
             
             <div class="use-case">
                 <h4>Rapid Prototyping</h4>
                 <p class="principles-used"><strong>Principles:</strong> Annotation becomes execution, Negotiation paradigm</p>
-                <p class="scenario">Sarah, a facilities manager with no programming background, sketches three circles representing water tanks. The system asks: "Storage tanks? Capacity relationship?" Sarah writes "overflow from A to B when full." The system generates a simulation. Sarah scribbles "no, B is backup"—the system updates. Continuous collaboration from rough idea to working prototype, no code required.</p>
+                <p class="scenario">Sarah, a facilities manager with no programming background, sketches three circles representing water tanks. The system asks: "Storage tanks? Capacity relationship?" Sarah writes "overflow from A to B when full." The system generates a simulation. Sarah scribbles "no, B is backup"—the system updates. Continuous collaboration from rough idea to working prototype, no code required. 
+                    <a href="https://open.substack.com/pub/johnhanacek/p/a-day-with-metamedium" target="_blank">Read Story</a></a>
+                </p>
             </div>
             
             <div class="use-case">
                 <h4>Scientific Collaboration</h4>
                 <p class="principles-used"><strong>Principles:</strong> Space is semantic, Annotation becomes execution, Shared lenses</p>
-                <p class="scenario">Maya and Dev, physics researchers, sketch together at a bar, ideas flowing faster than formal notation could capture. They draw on top of each other's work, spatial relationships showing conceptual connections. The canvas understands that "defect here?" near a substrate diagram means they're proposing a location-specific hypothesis—and runs a quick simulation to test it. Their shared research lens interprets their shorthand; a colleague in another city can later read the canvas through the same lens.</p>
+                <p class="scenario">Maya and Dev, physics researchers, sketch together at a bar, ideas flowing faster than formal notation could capture. They draw on top of each other's work, spatial relationships showing conceptual connections. The canvas understands that "defect here?" near a substrate diagram means they're proposing a location-specific hypothesis—and runs a quick simulation to test it. Their shared research lens interprets their shorthand; a colleague in another city can later read the canvas through the same lens.
+                    <a href="https://open.substack.com/pub/johnhanacek/p/a-day-with-metamedium-147" target="_blank">Read Story</a></a>
+                </p>
             </div>
         </section>
 
@@ -1842,8 +1857,9 @@
     <footer>
         <p class="footer-title">MetaMedium</p>
         <p class="footer-subtitle">Principles for a Diagrammatic Understanding Interface</p>
-        <p class="footer-copyright">© John Hanacek · <a href="https://johnhanacek.com" target="_blank" rel="noopener">JHDesign LLC</a></p>
-        <p class="version">v4 · December 2025</p>
+        <p class="footer-subtitle">Original Research and More Sources at the <a href="https://jhanacek.net/metamedium-resources-65" target="_blank" rel="noopener">Resources Page</a></p>
+        <p class="footer-copyright">© John Hanacek 2015· <a href="https://johnhanacek.com" target="_blank" rel="noopener">JHDesign LLC</a></p>
+        <p class="version">v4 · Updated December 2025</p>
     </footer>
 
     <script>
