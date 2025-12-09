@@ -2344,6 +2344,38 @@
             
             <p>Over time, human-AI collaboration develops a character—a texture or grain that reflects the accumulated quality of exchange. This isn't metadata; it's the substance of the relationship. A physicist's canvas feels different from a musician's. Future interfaces might render this texture visibly, perhaps even haptically. The diagram becomes not just a record but a <em>formal object</em>—a first-class computational entity with transformable structure. The gap between sketch and specification collapses entirely.</p>
             
+<h3>Open Questions</h3>
+            
+            <p>The MetaMedium framework raises questions that can only be answered through building and testing:</p>
+            
+            <ul>
+                <li>How do we design for "interpretive ambiguity" without creating confusion? What's the right balance between holding possibilities open and committing to interpretation?</li>
+                <li>What are the limits of gesture vocabulary before cognitive overhead exceeds benefit? How many "words" can a visual language productively contain?</li>
+                <li>How can "cognitive lenses" be effectively shared between users? What's lost in translation when one person's way of seeing meets another's?</li>
+                <li>What patterns emerge in human-AI co-creation that neither intelligence generates alone? Can we characterize genuinely collaborative cognition?</li>
+                <li>Can visible reasoning on a shared canvas measurably improve AI alignment outcomes? This is empirically testable.</li>
+            </ul>
+            
+            <h3>Limitations and Challenges</h3>
+            
+            <p>Intellectual honesty requires acknowledging what's hard:</p>
+            
+            <ul>
+                <li><strong>Recognition accuracy:</strong> Current shape recognition, even with ML, makes mistakes. The negotiation paradigm helps—but users may lose patience with too many corrections. Finding the threshold where recognition is "good enough" is empirical work.</li>
+                <li><strong>Cognitive load:</strong> Every gestural vocabulary is a language to learn. There's a real risk that MetaMedium becomes its own expertise barrier, replacing "learn to code" with "learn our gestures." Keeping the learning curve gentle while enabling power is a design challenge.</li>
+                <li><strong>Privacy of patterns:</strong> If the canvas learns from your drawing patterns, those patterns become data. "Cognitive lenses" are intimate—they encode how you think. The system must be designed with privacy as foundational, not afterthought.</li>
+                <li><strong>Over-automation risk:</strong> "The system guessed wrong and did something I didn't want" is a real failure mode. Undo must be instant and obvious. Interpretations must be inspectable before they execute. The user must remain in control.</li>
+                <li><strong>Evaluation difficulty:</strong> How do we measure success? Traditional usability metrics may not capture "quality of thought." New evaluation frameworks are needed.</li>
+            </ul>
+            
+            <h4>Abstraction Management and Learning Dynamics</h4>
+            
+            <p>The promise of a canvas that learns creates its own challenges. Vocabulary bloat is inevitable: every learned pattern accumulates, and the system has no natural way to forget. Over time, old notations compete with new ones, recognition slows, and the interpretation space becomes cluttered. Yet aggressive pruning risks destroying hard-won understanding—how do you distinguish "stale" from "rarely-used-but-important"?</p>
+            
+            <p>More subtle is the local minima problem. A system well-fitted to your previous way of thinking may resist your attempts to evolve. When you try new notation or reframe a concept, the system "corrects" you back toward familiar patterns. The learning becomes a cage. This is especially acute for discontinuous growth—the student becoming expert, the breakthrough insight that requires abandoning old frames. Human cognition undergoes phase transitions; the canvas must accommodate leaps, not just gradual drift.</p>
+            
+            <p>Possible mitigations include explicit "unlearn" gestures, decay functions with different rates for core vs. peripheral vocabulary, "lens snapshots" that version-control ways of seeing, or detection of systematic deviation as a signal that the user is trying to break free. But the deeper question remains: is the canvas a memory of what you've done, or a partner in what you're becoming? The answer shapes the entire architecture.</p>
+
             <h3>Gallery</h3>
             
             <div class="gallery">
@@ -2441,7 +2473,7 @@
         <section id="future">
             <h2>The Future</h2>
             
-            
+        
             
             <h3>External Imagination</h3>
             
@@ -2581,37 +2613,7 @@
             
             <p>The MetaMedium is designed for this combination—not AI as tool to be commanded, but AI as partner with complementary cognition. The canvas becomes the site of collaboration between two authentic intelligences, each contributing what it does best.</p>
             
-            <h3>Open Questions</h3>
             
-            <p>The MetaMedium framework raises questions that can only be answered through building and testing:</p>
-            
-            <ul>
-                <li>How do we design for "interpretive ambiguity" without creating confusion? What's the right balance between holding possibilities open and committing to interpretation?</li>
-                <li>What are the limits of gesture vocabulary before cognitive overhead exceeds benefit? How many "words" can a visual language productively contain?</li>
-                <li>How can "cognitive lenses" be effectively shared between users? What's lost in translation when one person's way of seeing meets another's?</li>
-                <li>What patterns emerge in human-AI co-creation that neither intelligence generates alone? Can we characterize genuinely collaborative cognition?</li>
-                <li>Can visible reasoning on a shared canvas measurably improve AI alignment outcomes? This is empirically testable.</li>
-            </ul>
-            
-            <h3>Limitations and Challenges</h3>
-            
-            <p>Intellectual honesty requires acknowledging what's hard:</p>
-            
-            <ul>
-                <li><strong>Recognition accuracy:</strong> Current shape recognition, even with ML, makes mistakes. The negotiation paradigm helps—but users may lose patience with too many corrections. Finding the threshold where recognition is "good enough" is empirical work.</li>
-                <li><strong>Cognitive load:</strong> Every gestural vocabulary is a language to learn. There's a real risk that MetaMedium becomes its own expertise barrier, replacing "learn to code" with "learn our gestures." Keeping the learning curve gentle while enabling power is a design challenge.</li>
-                <li><strong>Privacy of patterns:</strong> If the canvas learns from your drawing patterns, those patterns become data. "Cognitive lenses" are intimate—they encode how you think. The system must be designed with privacy as foundational, not afterthought.</li>
-                <li><strong>Over-automation risk:</strong> "The system guessed wrong and did something I didn't want" is a real failure mode. Undo must be instant and obvious. Interpretations must be inspectable before they execute. The user must remain in control.</li>
-                <li><strong>Evaluation difficulty:</strong> How do we measure success? Traditional usability metrics may not capture "quality of thought." New evaluation frameworks are needed.</li>
-            </ul>
-            
-            <h4>Abstraction Management and Learning Dynamics</h4>
-            
-            <p>The promise of a canvas that learns creates its own challenges. Vocabulary bloat is inevitable: every learned pattern accumulates, and the system has no natural way to forget. Over time, old notations compete with new ones, recognition slows, and the interpretation space becomes cluttered. Yet aggressive pruning risks destroying hard-won understanding—how do you distinguish "stale" from "rarely-used-but-important"?</p>
-            
-            <p>More subtle is the local minima problem. A system well-fitted to your previous way of thinking may resist your attempts to evolve. When you try new notation or reframe a concept, the system "corrects" you back toward familiar patterns. The learning becomes a cage. This is especially acute for discontinuous growth—the student becoming expert, the breakthrough insight that requires abandoning old frames. Human cognition undergoes phase transitions; the canvas must accommodate leaps, not just gradual drift.</p>
-            
-            <p>Possible mitigations include explicit "unlearn" gestures, decay functions with different rates for core vs. peripheral vocabulary, "lens snapshots" that version-control ways of seeing, or detection of systematic deviation as a signal that the user is trying to break free. But the deeper question remains: is the canvas a memory of what you've done, or a partner in what you're becoming? The answer shapes the entire architecture.</p>
             
             <h3>The Deeper Vision</h3>
             
