@@ -1179,27 +1179,27 @@
                     <div class="image">
                         <svg viewBox="0 0 800 280" xmlns="http://www.w3.org/2000/svg">
                             <!-- Title -->
-                            <text x="400" y="25" text-anchor="middle" fill="#7b8a9a" font-size="16" opacity="1">Information Capacity Across Modalities</text>
+                            <text x="400" y="25" text-anchor="middle" fill="#7b8a9a" font-size="22" opacity="1">Information Capacity Across Modalities</text>
 
                             <!-- Panel 1: TEXT (1D) -->
                             <g>
-                                <rect x="50" y="50" width="220" height="180" fill="rgba(74, 85, 104, 0.15)" stroke="#4a5568" stroke-width="2" rx="6"/>
+                                <rect x="50" y="50" width="220" height="180" fill="rgba(74, 85, 104, 0.15)" stroke="#4a5568" stroke-width="2" rx="6" opacity="0.5"/>
                                 <text x="160" y="75" text-anchor="middle" fill="#6b7280" font-size="18" font-weight="bold">TEXT</text>
 
                                 <!-- Monospace text with cursor -->
                                 <text x="75" y="125" fill="#9ca3af" font-family="Monaco, monospace" font-size="16">hello world</text>
-                                <rect x="173" y="110" width="2" height="18" fill="#9ca3af" opacity="0.6"/>
+                                <rect x="182" y="110" width="2" height="18" fill="#9ca3af" opacity="0.6"/>
 
                                 <!-- Dimension label -->
-                                <text x="160" y="165" text-anchor="middle" fill="#6b7280" font-size="15">1D: linear sequence</text>
+                                <text x="160" y="165" text-anchor="middle" fill="#6b7280" font-size="15" font-weight="bold">1D: linear sequence</text>
 
                                 <!-- Narrow pipe visualization -->
                                 <rect x="140" y="185" width="40" height="10" fill="#4a5568" opacity="0.4" rx="5"/>
-                                <text x="160" y="213" text-anchor="middle" fill="#6b7280" font-size="13" opacity="0.7">conceptual</text>
+                                <text x="160" y="213" text-anchor="middle" fill="#6b7280" font-size="18" opacity="0.7">conceptual</text>
                             </g>
 
                             <!-- Panel 2: VOICE (1.5D) -->
-                            <g transform="translate(290, 0)">
+                            <g transform="translate(260, 0)">
                                 <rect x="50" y="50" width="220" height="180" fill="rgba(90, 106, 122, 0.15)" stroke="#5a6a7a" stroke-width="2" rx="6"/>
                                 <text x="160" y="75" text-anchor="middle" fill="#7b8a9a" font-size="18" font-weight="bold">VOICE</text>
 
@@ -1211,42 +1211,38 @@
                                 <text x="200" y="110" fill="#7b8a9a" font-size="14">↑</text>
 
                                 <!-- Dimension label -->
-                                <text x="160" y="165" text-anchor="middle" fill="#7b8a9a" font-size="15">1.5D: + tone, rhythm</text>
+                                <text x="160" y="165" text-anchor="middle" fill="#7b8a9a" font-size="15" font-weight="bold">1.5D: + tone, rhythm</text>
 
                                 <!-- Medium pipe -->
                                 <rect x="130" y="185" width="60" height="12" fill="#5a6a7a" opacity="0.5" rx="6"/>
-                                <text x="160" y="213" text-anchor="middle" fill="#7b8a9a" font-size="13" opacity="0.7">temporal</text>
+                                <text x="160" y="213" text-anchor="middle" fill="#7b8a9a" font-size="18" opacity="0.8">temporal</text>
                             </g>
 
                             <!-- Panel 3: DRAWING (2D+) -->
-                            <g transform="translate(530, 0)">
-                                <rect x="50" y="50" width="220" height="180" fill="rgba(100, 181, 246, 0.08)" stroke="#64b5f6" stroke-width="2" rx="6"/>
+                            <g transform="translate(510, 0)">
+                                <rect x="50" y="50" width="220" height="180" fill="7b8a9a" stroke="#64b5f6" stroke-width="2" rx="6" opacity="0.6"/>
                                 <text x="160" y="75" text-anchor="middle" fill="#90caf9" font-size="18" font-weight="bold">DRAWING</text>
 
                                 <!-- Rich sketch elements - compact -->
                                 <circle cx="110" cy="115" r="15" stroke="#90caf9" stroke-width="2" fill="none"/>
                                 <line x1="125" y1="115" x2="160" y2="115" stroke="#90caf9" stroke-width="2" marker-end="url(#arrowblue)"/>
-
-                                
                                 <rect x="187" y="100" width="20" height="20" stroke="#90caf9" stroke-width="2" fill="none"/>
-
                                 <circle cx="185" cy="120" r="6" fill="#90caf9"/>
-                                <line x1="170" y1="115" x2="170" y2="145" stroke="#90caf9" stroke-width="2" marker-end="url(#arrowblue)"/>
-
+                                <line x1="170" y1="110" x2="170" y2="145" stroke="#90caf9" stroke-width="2" marker-end="url(#arrowblue)"/>
                                 <!-- Annotation -->
                                 <line x1="180" y1="165" x2="200" y2="165" stroke="#90caf9" stroke-width="1.5" opacity="0.6"/>
 
                                 <!-- Dimension label -->
-                                <text x="160" y="157" text-anchor="middle" fill="#90caf9" font-size="13">2D+: space, gesture,</text>
-                                <text x="160" y="171" text-anchor="middle" fill="#90caf9" font-size="13">time, relationships</text>
+                                <text x="160" y="159" text-anchor="middle" fill="#64b5f6" font-size="15" font-weight="bold">2D+: space, gesture,</text>
+                                <text x="160" y="173" text-anchor="middle" fill="#64b5f6" font-size="15" font-weight="bold">time, relationships</text>
 
                                 <!-- Wide channel -->
-                                <rect x="110" y="185" width="100" height="16" fill="#64b5f6" opacity="0.6" rx="8"/>
-                                <text x="160" y="213" text-anchor="middle" fill="#90caf9" font-size="13" opacity="0.8">expressive</text>
+                                <rect x="110" y="185" width="100" height="16" fill="#64b5f6" opacity="0.2" rx="8"/>
+                                <text x="160" y="213" text-anchor="middle" fill="#64b5f6" font-size="18" opacity="0.99">expressive</text>
                             </g>
 
                             <!-- Bottom insight -->
-                            <text x="400" y="260" text-anchor="middle" fill="#6b7280" font-size="14" font-style="italic">Drawing captures complexity that text and voice cannot express</text>
+                            <text x="400" y="260" text-anchor="middle" fill="#6b7280" font-size="18" font-style="italic">Drawing captures complexity that text and voice alone cannot express</text>
 
                             <!-- Arrow marker -->
                             <defs>
@@ -1256,8 +1252,8 @@
                             </defs>
                         </svg>
                     </div>
-                    <div class="label">Figure: Bandwidth Comparison</div>
-                    <div class="description">Input channel dimensionality: Text box (1D: linear sequence) → Voice (1.5D: sequence + prosody) → Drawing (2D+: space, time, pressure, gesture, annotation).</div>
+                    <div class="label">Figure: Input channel dimensionality</div>
+                    <div class="description">Text box (1D: linear sequence) → Voice (1.5D: sequence + prosody) → Drawing (2D+: space, time, pressure, gesture, annotation).</div>
                 </div>
             </figure>
             
