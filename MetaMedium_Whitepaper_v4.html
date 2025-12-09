@@ -5,6 +5,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MetaMedium: Beyond Chat</title>
     <meta name="description" content="A Framework for Diagrammatic Human-AI Communication">
+
+    <!-- Open Graph / Social Share -->
+    <meta property="og:title" content="MetaMedium: Beyond Chat">
+    <meta property="og:description" content="A Framework for Diagrammatic Human-AI Communication">
+    <meta property="og:image" content="./Assets/thumb-metamedium.jpg">
+    <meta property="og:type" content="article">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="MetaMedium: Beyond Chat">
+    <meta name="twitter:description" content="A Framework for Diagrammatic Human-AI Communication">
+    <meta name="twitter:image" content="./Assets/thumb-metamedium.jpg">
+
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400;1,9..40,500&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -335,12 +348,16 @@
         nav ul a:hover, nav ul a:focus { color: var(--accent); }
         
         /* Mobile nav styles */
-        @media (max-width: 768px) {
-            .nav-toggle { display: block; }
-            
+        @media (max-width: 900px) {
+            .nav-toggle {
+                display: block;
+                position: relative;
+                z-index: 1001;
+            }
+
             nav ul {
                 position: absolute;
-                top: 40px;
+                top: 10px;
                 left: 0;
                 right: 0;
                 background: rgba(253, 252, 250, 0.98);
@@ -361,9 +378,9 @@
             }
             
             nav ul a {
-                padding: 1.25rem var(--space-lg);
+                padding: 1.5rem var(--space-lg);
                 height: auto;
-                font-size: 1.125rem;
+                font-size: 1.5rem;
                 font-weight: 500;
                 letter-spacing: 0.02em;
                 text-transform: none;
@@ -772,7 +789,7 @@
             display: grid;
             grid-template-columns: repeat(2, 1fr);
             gap: var(--space-sm);
-            margin: var(--space-lg) 0;
+            margin: var(--space-sm) 0;
         }
         .gallery-item {
             background: rgba(74, 85, 104, 0.08);
@@ -802,7 +819,7 @@
         .gallery-item figcaption {
             font-size: var(--text-sm);
             color: rgba(51, 51, 51, 0.9);
-            line-height: 1.4;
+            line-height: 1.6;
             width: 100%;
             font-weight: 500;
         }
@@ -1053,12 +1070,11 @@
                 --space-2xl: 3rem;
             }
             main { padding: var(--space-md) var(--space-md) var(--space-xl); }
-            
+
             nav { height: 36px; }
             .nav-inner { padding: 0 var(--space-sm); }
             .nav-title { font-size: 0.9375rem; }
-            nav ul a { font-size: 0.5625rem; padding: 0 0.375rem; }
-            
+
             .genealogy-item { grid-template-columns: 1fr; gap: var(--space-xs); }
             .genealogy-item .year { margin-bottom: var(--space-xs); }
             
@@ -1072,8 +1088,6 @@
         
         @media (max-width: 480px) {
             nav { height: 34px; }
-            nav ul { flex-wrap: nowrap; overflow-x: auto; }
-            nav ul a { font-size: 0.5rem; padding: 0 0.3rem; white-space: nowrap; }
             .nav-title { font-size: 0.875rem; }
             .hero h1 { font-size: clamp(2.5rem, 14vw, 4rem); }
         }
