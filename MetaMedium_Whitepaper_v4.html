@@ -771,7 +771,7 @@
         .gallery {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
-            gap: var(--space-lg);
+            gap: var(--space-sm);
             margin: var(--space-lg) 0;
         }
         .gallery-item {
@@ -779,12 +779,7 @@
             border: 1px solid rgba(107, 114, 128, 0.4);
             border-radius: 4px;
             padding: var(--space-xs) var(--space-sm);
-            transition: all 0.2s ease;
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-        }
-        .gallery-item:hover {
-            border-color: rgba(100, 181, 246, 0.6);
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15);
         }
         .gallery-item .image {
             width: 100%;
