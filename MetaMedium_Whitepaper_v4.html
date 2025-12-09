@@ -374,7 +374,7 @@
         main {
             max-width: 760px;
             margin: 0 auto;
-            padding: var(--space-lg) var(--space-lg) var(--space-2xl);
+            padding: var(--space-lg) var(--space-lg) var(--space-xl);
         }
         
         /* Overview/Abstract section */
@@ -402,7 +402,7 @@
         }
         
         section {
-            margin-bottom: var(--space-2xl);
+            margin-bottom: var(--space-xl);
             scroll-margin-top: 4rem;
         }
         
@@ -432,7 +432,7 @@
             font-family: 'Space Grotesk', -apple-system, sans-serif;
             font-size: var(--text-xl);
             font-weight: 500;
-            margin: var(--space-lg) 0 var(--space-sm);
+            margin: var(--space-md) 0 var(--space-sm);
             line-height: 1.25;
         }
         
@@ -470,7 +470,7 @@
             color: var(--muted);
             border-left: 3px solid var(--sketch-blue);
             padding: var(--space-md) var(--space-md) var(--space-md) var(--space-lg);
-            margin: var(--space-xl) 0;
+            margin: var(--space-lg) 0;
             background: linear-gradient(to bottom, rgba(59, 130, 246, 0.08) 0%, transparent 100%);
             border-radius: 0 8px 8px 0;
         }
@@ -526,15 +526,15 @@
             background: linear-gradient(135deg, var(--paper-warm) 0%, #fff 100%);
             border: 2px dashed var(--border);
             border-radius: 10px;
-            padding: var(--space-lg) var(--space-md);
+            padding: var(--space-md);
             text-align: left;
             display: flex;
             flex-direction: column;
-            align-items: center;
+            align-items: stretch;
             justify-content: left;
             min-height: 220px;
         }
-        
+
         .placeholder-figure .icon { font-size: 3rem; margin-bottom: var(--space-sm); opacity: 0.5; }
         .placeholder-figure .label {
             font-family: 'DM Sans', sans-serif;
@@ -544,12 +544,13 @@
             text-transform: uppercase;
             letter-spacing: 0.1em;
             margin-bottom: var(--space-xs);
+            width: 100%;
         }
         .placeholder-figure .description {
             font-size: var(--text-base);
             color: var(--muted);
-            max-width: 400px;
             line-height: 1.5;
+            width: 100%;
         }
 
         .placeholder-figure .image {
@@ -660,7 +661,7 @@
         .use-case {
             background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
             border-radius: 8px;
-            padding: var(--space-lg);
+            padding: var(--space-md);
             margin: var(--space-md) 0;
             border-left: 4px solid var(--sketch-green);
         }
@@ -765,35 +766,46 @@
         /* Gallery grid */
         .gallery {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: var(--space-md);
+            grid-template-columns: repeat(2, 1fr);
+            gap: var(--space-lg);
             margin: var(--space-lg) 0;
         }
         .gallery-item {
-            aspect-ratio: 4/3;
-            overflow: hidden;
+            background: rgba(74, 85, 104, 0.08);
+            border: 1px solid rgba(107, 114, 128, 0.4);
+            border-radius: 4px;
+            padding: var(--space-sm);
+            transition: all 0.2s ease;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
         }
-        .gallery-item img {
+        .gallery-item:hover {
+            border-color: rgba(100, 181, 246, 0.6);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15);
+        }
+        .gallery-item .image {
+            width: 100%;
+            min-height: 300px;
+            margin-bottom: var(--space-xs);
+            background: rgba(10, 14, 26, 0.4);
+            border-radius: 2px;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .gallery-item .image img {
             width: 100%;
             height: 100%;
+            min-height: 300px;
             object-fit: cover;
             display: block;
         }
-        .gallery-item .media-placeholder {
-            margin-top: 0;
-            height: 100%;
-        }
-        .gallery-item .media-placeholder.video {
-            aspect-ratio: unset;
-        }
-        .gallery-item .media-placeholder.image {
-            aspect-ratio: unset;
-        }
-        .gallery-item .media-placeholder-inner .label {
+        .gallery-item figcaption {
             font-size: var(--text-sm);
-        }
-        .gallery-item .media-placeholder-inner .caption {
-            font-size: var(--text-xs);
+            color: rgba(51, 51, 51, 0.9);
+            line-height: 1.4;
+            width: 100%;
+            font-weight: 500;
         }
         
         @media (max-width: 768px) {
@@ -1164,7 +1176,7 @@
             <figure>
                 <div class="placeholder-figure">
                     <div class="image"><img src="./Assets/fig-digidraw.svg" alt="Spectrum of Digital Representations"></div>
-                    <div class="label">Figure 1: The Digital Representation Spectrum</div>
+                    <div class="label">Figure: The Digital Representation Spectrum</div>
                     <div class="description">From "inert" to "dynamic": Photoshop (pixels) → Illustrator (vectors) → OneNote (ink capture) → Figma (components) → Miro (templates) → Chalktalk (behaviors) → tldraw computer (LLM interpretation) → MetaMedium (learning + negotiation). Most tools cluster on the left.</div>
                 </div>
             </figure>
@@ -1259,7 +1271,7 @@
                             </defs>
                         </svg>
                     </div>
-                    <div class="label">Figure 2: Bandwidth Comparison</div>
+                    <div class="label">Figure: Bandwidth Comparison</div>
                     <div class="description">Input channel dimensionality: Text box (1D: linear sequence) → Voice (1.5D: sequence + prosody) → Drawing (2D+: space, time, pressure, gesture, annotation).</div>
                 </div>
             </figure>
@@ -1342,13 +1354,13 @@
                 <div class="content">
                     <h4>Douglas Engelbart's "Augmenting Human Intellect"</h4>
                     <p>Engelbart asked how we might "raise the level of the capability hierarchy at which human brains operate." His 1968 "Mother of All Demos" introduced the mouse, hypertext, and collaborative editing—all toward the goal of augmentation, not replacement.</p>
-                    <div class="media-placeholder video">
+                    <!-- <div class="media-placeholder video">
                         <div class="media-placeholder-inner">
                             <span class="icon">▶</span>
                             <span class="label">Video: Mother of All Demos (1968)</span>
                             <span class="caption">The first public demonstration of the mouse, hypertext, and video conferencing</span>
                         </div>
-                    </div>
+                    </div> -->
                 </div>
             </div>
             
@@ -1357,15 +1369,9 @@
                 <div class="content">
                     <h4>Ivan Sutherland's Sketchpad</h4>
                     <p>The deepest root. Sketchpad pioneered direct manipulation, constraint satisfaction, and master/instance architecture. Sutherland proposed that the computer could "extend the human imagination" through "conferring with our computers." His constraints become our semantic relationships; his design constraints that "communicate what he intended but didn't draw" become annotation-as-execution.</p>
-                    <div class="media-placeholder video">
-                        
-                        <div class="media-placeholder-inner">
-                        
-                            <span class="icon"></span>
-                            <span class="label">Video: Sketchpad Demo</span>
-                            <span class="caption">Direct manipulation and constraint-based drawing on the TX-2 computer</span>
-                        </div>
-                    </div>
+                    <!-- <div class="timeline-video">
+                        <iframe src="https://www.youtube.com/embed/5RyU50qbvzQ" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe>
+                    </div> -->
                 </div>
             </div>
             
@@ -1408,13 +1414,13 @@
                 <div class="content">
                     <h4>Paper by FiftyThree</h4>
                     <p>Showed that "feel" matters—that digital drawing can be pleasurable, not just functional. Paper's gesture vocabulary (blend, cut, mix) proved that touch interfaces deserve craft. It popularized the infinite canvas and demonstrated that constraints (limited tools, no layers) can liberate rather than restrict.</p>
-                    <div class="media-placeholder image">
+                    <!-- <div class="media-placeholder image">
                         <div class="media-placeholder-inner">
                             <span class="icon">🖼</span>
                             <span class="label">Image: Paper App Interface</span>
                             <span class="caption">Elegant gesture-based drawing with the infinite canvas</span>
                         </div>
-                    </div>
+                    </div> -->
                 </div>
             </div>
             
@@ -1423,13 +1429,13 @@
                 <div class="content">
                     <h4>Bret Victor's Principles</h4>
                     <p>"Creators need an immediate connection to what they're creating." His work—<em>Inventing on Principle</em>, <em>Stop Drawing Dead Fish</em>, <em>Drawing Dynamic Visualizations</em>—directly addresses the gap between directness and dynamics. Victor identified the core problem: "The parts of the computer that interact with the person are artificially separated from the parts that manipulate data and perform computation."</p>
-                    <div class="media-placeholder video">
+                    <!-- <div class="media-placeholder video">
                         <div class="media-placeholder-inner">
                             <span class="icon">▶</span>
                             <span class="label">Video: Inventing on Principle</span>
                             <span class="caption">Victor's manifesto on immediate feedback and creator connection</span>
                         </div>
-                    </div>
+                    </div> -->
                 </div>
             </div>
             
@@ -1438,13 +1444,13 @@
                 <div class="content">
                     <h4>Ken Perlin's Chalktalk</h4>
                     <p>Demonstrates sketches triggering and connecting pre-programmed behaviors in real-time. Draw a circle, it becomes a clock. Draw a spring, it bounces. Connect them with a line, they influence each other.  Perlin's lab's <strong>DrawTalking (UIST 2024)</strong> adds speech: "building interactive worlds by sketching and speaking while telling stories."</p>
-                    <div class="media-placeholder video">
+                    <!-- <div class="media-placeholder video">
                         <div class="media-placeholder-inner">
                             <span class="icon">▶</span>
                             <span class="label">Video: Chalktalk Demo</span>
                             <span class="caption">Sketches come alive with pre-programmed behaviors</span>
                         </div>
-                    </div>
+                    </div> -->
                 </div>
             </div>
             
@@ -1453,13 +1459,13 @@
                 <div class="content">
                     <h4>Dynamicland</h4>
                     <p>Victor's physical manifestation: "a nonprofit research lab creating a humane dynamic medium... a way for real people in the real world to explore ideas together, not just with words and pictures, but with computation." Dynamicland is the <em>hardware paradigm</em>; MetaMedium is the <em>software paradigm</em> that could run on such infrastructure.</p>
-                    <div class="media-placeholder image">
+                    <!-- <div class="media-placeholder image">
                         <div class="media-placeholder-inner">
                             <span class="icon">🖼</span>
                             <span class="label">Image: Dynamicland Space</span>
                             <span class="caption">Physical computing environment with projected interfaces on paper</span>
                         </div>
-                    </div>
+                    </div> -->
                 </div>
             </div>
             
@@ -1468,13 +1474,13 @@
                 <div class="content">
                     <h4>tldraw's make-real</h4>
                     <p>The viral moment: sketch a UI, press a button, get working code. make-real proved that the sketch-to-computation pipeline could be immediate via multimodal LLMs. It demonstrated mass appetite for this interaction paradigm—and also its limitations when recognition is one-shot rather than negotiated.</p>
-                    <div class="media-placeholder video">
+                    <!-- <div class="media-placeholder video">
                         <div class="media-placeholder-inner">
                             <span class="icon">▶</span>
                             <span class="label">Video: make-real Demo</span>
                             <span class="caption">Sketch-to-code via GPT-4 Vision</span>
                         </div>
-                    </div>
+                    </div> -->
                 </div>
             </div>
             
@@ -1483,13 +1489,13 @@
                 <div class="content">
                     <h4>tldraw computer</h4>
                     <p>An experimental canvas where users connect components with arrows and natural language, powered by multimodal LLMs: "tldraw programs are transparent—you see how it works as it runs." MetaMedium differs by making marks themselves learnable and user-defined, and by emphasizing iterative negotiation over one-shot interpretation.</p>
-                    <div class="media-placeholder video">
+                    <!-- <div class="media-placeholder video">
                         <div class="media-placeholder-inner">
                             <span class="icon">▶</span>
                             <span class="label">Video: tldraw computer</span>
                             <span class="caption">Visual programming with LLM-powered components</span>
                         </div>
-                    </div>
+                    </div> -->
                 </div>
             </div>
             
@@ -1534,7 +1540,7 @@
             <figure>
                 <div class="placeholder-figure">
                     <div class="icon">△</div>
-                    <div class="label">Figure 3: The Triadic Loop</div>
+                    <div class="label">Figure: The Triadic Loop</div>
                     <div class="description">Traditional interfaces: Language → Computation → Output (linear, meaning stays in human heads). MetaMedium: Language ↔ Computation ↔ Meaning (circular, AI participates in interpretation). The loop closes when marks become probabilistic proposals that both parties negotiate.</div>
                 </div>
             </figure>
@@ -1553,7 +1559,7 @@
             <figure>
                 <div class="placeholder-figure">
                     <div class="image"><img src="./Assets/fig-MetaMediumTriad.svg" alt="From Docs to MetaMedium</div>
-                    <div class="label">Figure 4: AI as Meta-Word — The Evolution of External Cognition</div>
+                    <div class="label">Figure: AI as Meta-Word — The Evolution of External Cognition</div>
                     <div class="description">Three paradigms: (1) Writing: human → marks → human (marks store memory, reader reconstructs meaning). (2) Computing: human → code → machine → output (machine executes instructions literally). (3) MetaMedium: human ↔ marks ↔ AI ↔ meaning (bidirectional interpretation, iterative refinement, meaning emerges through exchange).</div>
                 </div>
             </figure>
@@ -1689,7 +1695,7 @@
                             <text x="350" y="226" text-anchor="middle" fill="#90caf9" font-size="13" opacity="0.8">not as authority but as collaborator</text>
                         </svg>
                     </div>
-                    <div class="label">Figure 5: The Semiotic Triad Applied</div>
+                    <div class="label">Figure: The Semiotic Triad Applied</div>
                     <div class="description">Peirce's triangle in MetaMedium context: Sign (rough oval drawn on canvas) → Object (could be face, egg, zero, planet...) → Interpretant (AI holds probability distribution across possibilities; context accumulates; meaning resolves). The AI participates in the interpretant role, not as final arbiter but as collaborative sense-maker.</div>
                 </div>
             </figure>
@@ -1751,11 +1757,11 @@
             <div class="figure-pair">
                 <figure>
                     <img src="./Assets/fig-sketch-game-turn.png" alt="Turn-taking in the sketch-editing game">
-                    <figcaption><strong>Figure 3: Turn-Taking.</strong> The user sketches; the machine recognizes and modifies with a guess ("bottle?"). User declines and modifies. Machine recognizes again ("mug?"). User accepts. From Ribeiro & Igarashi, UIST '12.</figcaption>
+                    <figcaption><strong>Figure: Turn-Taking.</strong> The user sketches; the machine recognizes and modifies with a guess ("bottle?"). User declines and modifies. Machine recognizes again ("mug?"). User accepts. From Ribeiro & Igarashi, UIST '12.</figcaption>
                 </figure>
                 <figure>
                     <img src="./Assets/fig-sketch-game-graph.png" alt="Game graph showing transformation possibilities">
-                    <figcaption><strong>Figure 4: Possibility Graph.</strong> The machine's internal model after several games. The center shows the current sketch; each ring shows possible transformations (add neck → bottle, add base → wine glass, widen top → cup). From Ribeiro & Igarashi, UIST '12.</figcaption>
+                    <figcaption><strong>Figure: Possibility Graph.</strong> The machine's internal model after several games. The center shows the current sketch; each ring shows possible transformations (add neck → bottle, add base → wine glass, widen top → cup). From Ribeiro & Igarashi, UIST '12.</figcaption>
                 </figure>
             </div>
 
@@ -1837,7 +1843,7 @@
                             </defs>
                         </svg>
                     </div>
-                    <div class="label">Figure 6: The Negotiation Loop</div>
+                    <div class="label">Figure: The Negotiation Loop</div>
                     <div class="description">User sketches rough shape → System offers: "Circle? Oval? Face?" → User adds two dots → System updates: "Face ✓" → User writes "happy" → System adds smile, adjusts interpretation confidence. Understanding emerges through exchange, not one-shot recognition. Each turn updates the possibility graph.</div>
                 </div>
             </figure>
@@ -1974,7 +1980,7 @@
                             </defs>
                         </svg>
                     </div>
-                    <div class="label">Figure 7: Cognitive Lens Architecture</div>
+                    <div class="label">Figure: Cognitive Lens Architecture</div>
                     <div class="description">User's repeated gestures → Pattern extraction → Named "lens" (e.g., "Maya's physics notation"). Lenses can be: applied to new drawings, shared with collaborators, composed with other lenses, versioned and evolved. Your way of seeing becomes portable.</div>
                 </div>
             </figure>
@@ -2034,30 +2040,54 @@
             <h3>Gallery</h3>
             
             <div class="gallery">
-                <div class="gallery-item">
-                    <img src="./Assets/gal-notes-systemdiagram2016.jpeg" alt="System architecture diagram showing component relationships">
-                </div>
-                <div class="gallery-item">
-                    <img src="./Assets/gal-notes-activitymodel2016.png" alt="Activity theory model for human-computer interaction">
-                </div>
-                <div class="gallery-item">
-                    <img src="./Assets/gal-notes-sentance.png" alt="Conceptual framework for sentence-level annotation">
-                </div>
-                <div class="gallery-item">
-                    <img src="./Assets/gal-notes-planestocube.png" alt="Visualization of 2D to 3D transformation concept">
-                </div>
-                <div class="gallery-item">
-                    <img src="./Assets/gal-notes-memoryassociaton.png" alt="Memory association network diagram">
-                </div>
-                <div class="gallery-item">
-                    <img src="./Assets/gal-notes-conceptualframeworks Large.jpeg" alt="Conceptual frameworks for design thinking">
-                </div>
-                <div class="gallery-item">
-                    <img src="./Assets/gal-notes-artefactsofprocess.jpeg" alt="Artifacts of the design and development process">
-                </div>
-                <div class="gallery-item">
-                    <img src="./Assets/gal-notes-useractivitymodel2016.png" alt="User activity model showing interaction patterns">
-                </div>
+                <figure class="gallery-item">
+                    <div class="image">
+                        <img src="./Assets/gal-notes-systemdiagram2016.jpeg" alt="System architecture diagram">
+                    </div>
+                    <figcaption>System architecture diagram showing component relationships</figcaption>
+                </figure>
+                <figure class="gallery-item">
+                    <div class="image">
+                        <img src="./Assets/gal-notes-activitymodel2016.png" alt="Activity theory model">
+                    </div>
+                    <figcaption>Activity theory model for human-computer interaction</figcaption>
+                </figure>
+                <figure class="gallery-item">
+                    <div class="image">
+                        <img src="./Assets/gal-notes-sentance.png" alt="Sentence annotation framework">
+                    </div>
+                    <figcaption>Conceptual framework for sentence-level annotation</figcaption>
+                </figure>
+                <figure class="gallery-item">
+                    <div class="image">
+                        <img src="./Assets/gal-notes-planestocube.png" alt="2D to 3D transformation">
+                    </div>
+                    <figcaption>Visualization of 2D to 3D transformation concept</figcaption>
+                </figure>
+                <figure class="gallery-item">
+                    <div class="image">
+                        <img src="./Assets/gal-notes-memoryassociaton.png" alt="Memory association network">
+                    </div>
+                    <figcaption>Memory association network diagram</figcaption>
+                </figure>
+                <figure class="gallery-item">
+                    <div class="image">
+                        <img src="./Assets/gal-notes-conceptualframeworks Large.jpeg" alt="Design thinking frameworks">
+                    </div>
+                    <figcaption>Conceptual frameworks for design thinking</figcaption>
+                </figure>
+                <figure class="gallery-item">
+                    <div class="image">
+                        <img src="./Assets/gal-notes-artefactsofprocess.jpeg" alt="Process artifacts">
+                    </div>
+                    <figcaption>Artifacts of the design and development process</figcaption>
+                </figure>
+                <figure class="gallery-item">
+                    <div class="image">
+                        <img src="./Assets/gal-notes-useractivitymodel2016.png" alt="User activity model">
+                    </div>
+                    <figcaption>User activity model showing interaction patterns</figcaption>
+                </figure>
             </div>
         </section>
 
@@ -2221,7 +2251,7 @@
                             </defs>
                         </svg>
                     </div>
-                    <div class="label">Figure 8: Alignment Through Shared Ground</div>
+                    <div class="label">Figure: Alignment Through Shared Ground</div>
                     <div class="description">Left: Traditional alignment (AI in black box, rules imposed from outside, human hopes constraints hold). Right: MetaMedium alignment (human and AI on same canvas, reasoning visible to both, shared diagram as "treaty" both parties can read and negotiate). The diagram externalizes the alignment problem.</div>
                 </div>
             </figure>
