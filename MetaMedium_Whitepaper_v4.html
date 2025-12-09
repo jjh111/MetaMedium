@@ -552,6 +552,18 @@
             line-height: 1.5;
         }
 
+        .placeholder-figure .image {
+            width: 100%;
+            margin-bottom: var(--space-md);
+        }
+
+        .placeholder-figure .image svg,
+        .placeholder-figure .image img {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+
         figure img {
             width: 100%;
             display: block;
@@ -759,6 +771,13 @@
         }
         .gallery-item {
             aspect-ratio: 4/3;
+            overflow: hidden;
+        }
+        .gallery-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
         }
         .gallery-item .media-placeholder {
             margin-top: 0;
@@ -1158,7 +1177,88 @@
             
             <figure>
                 <div class="placeholder-figure">
-                    <div class="icon">▭</div>
+                    <div class="image">
+                        <svg viewBox="0 0 800 280" xmlns="http://www.w3.org/2000/svg">
+                            <!-- Title -->
+                            <text x="400" y="25" text-anchor="middle" fill="#b0c4de" font-size="16" opacity="0.8">Information Capacity Across Modalities</text>
+
+                            <!-- Panel 1: TEXT (1D) -->
+                            <g>
+                                <rect x="50" y="50" width="220" height="180" fill="rgba(74, 85, 104, 0.15)" stroke="#4a5568" stroke-width="2" rx="6"/>
+                                <text x="160" y="75" text-anchor="middle" fill="#6b7280" font-size="18" font-weight="bold">TEXT</text>
+
+                                <!-- Monospace text with cursor -->
+                                <text x="75" y="125" fill="#9ca3af" font-family="Monaco, monospace" font-size="16">hello world</text>
+                                <rect x="173" y="110" width="2" height="18" fill="#9ca3af" opacity="0.6"/>
+
+                                <!-- Dimension label -->
+                                <text x="160" y="165" text-anchor="middle" fill="#6b7280" font-size="15">1D: linear sequence</text>
+
+                                <!-- Narrow pipe visualization -->
+                                <rect x="140" y="185" width="40" height="10" fill="#4a5568" opacity="0.4" rx="5"/>
+                                <text x="160" y="213" text-anchor="middle" fill="#6b7280" font-size="13" opacity="0.7">narrow channel</text>
+                            </g>
+
+                            <!-- Panel 2: VOICE (1.5D) -->
+                            <g transform="translate(290, 0)">
+                                <rect x="50" y="50" width="220" height="180" fill="rgba(90, 106, 122, 0.15)" stroke="#5a6a7a" stroke-width="2" rx="6"/>
+                                <text x="160" y="75" text-anchor="middle" fill="#7b8a9a" font-size="18" font-weight="bold">VOICE</text>
+
+                                <!-- Waveform with prosody markers -->
+                                <path d="M 70 125 Q 85 110, 100 125 T 130 125 Q 145 140, 160 125 T 190 125 Q 205 118, 220 125"
+                                      stroke="#90a5ba" stroke-width="2" fill="none"/>
+                                <text x="90" y="105" fill="#90a5ba" font-size="14">↑</text>
+                                <text x="150" y="150" fill="#90a5ba" font-size="14">↓</text>
+                                <text x="200" y="110" fill="#90a5ba" font-size="14">↑</text>
+
+                                <!-- Dimension label -->
+                                <text x="160" y="165" text-anchor="middle" fill="#7b8a9a" font-size="15">1.5D: + tone, rhythm</text>
+
+                                <!-- Medium pipe -->
+                                <rect x="130" y="185" width="60" height="12" fill="#5a6a7a" opacity="0.5" rx="6"/>
+                                <text x="160" y="213" text-anchor="middle" fill="#7b8a9a" font-size="13" opacity="0.7">wider channel</text>
+                            </g>
+
+                            <!-- Panel 3: DRAWING (2D+) -->
+                            <g transform="translate(530, 0)">
+                                <rect x="50" y="50" width="220" height="180" fill="rgba(100, 181, 246, 0.08)" stroke="#64b5f6" stroke-width="2" rx="6"/>
+                                <text x="160" y="75" text-anchor="middle" fill="#90caf9" font-size="18" font-weight="bold">DRAWING</text>
+
+                                <!-- Rich sketch elements - compact -->
+                                <circle cx="110" cy="115" r="15" stroke="#90caf9" stroke-width="2" fill="none"/>
+                                <line x1="125" y1="115" x2="160" y2="115" stroke="#90caf9" stroke-width="2" marker-end="url(#arrowblue)"/>
+
+                                <line x1="110" y1="130" x2="90" y2="150" stroke="#90caf9" stroke-width="2.5"/>
+                                <line x1="110" y1="130" x2="130" y2="150" stroke="#90caf9" stroke-width="2.5"/>
+                                <rect x="87" y="150" width="20" height="20" stroke="#90caf9" stroke-width="2" fill="none"/>
+
+                                <path d="M 140,150 L 160,170 L 140,170 Z" stroke="#90caf9" stroke-width="2" fill="none"/>
+                                <circle cx="185" cy="150" r="6" fill="#90caf9"/>
+                                <line x1="170" y1="115" x2="170" y2="145" stroke="#90caf9" stroke-width="2" marker-end="url(#arrowblue)"/>
+
+                                <!-- Annotation -->
+                                <line x1="180" y1="165" x2="200" y2="165" stroke="#90caf9" stroke-width="1.5" opacity="0.6"/>
+
+                                <!-- Dimension label -->
+                                <text x="160" y="155" text-anchor="middle" fill="#90caf9" font-size="13">2D+: space, gesture,</text>
+                                <text x="160" y="169" text-anchor="middle" fill="#90caf9" font-size="13">time, relationships</text>
+
+                                <!-- Wide channel -->
+                                <rect x="110" y="185" width="100" height="16" fill="#64b5f6" opacity="0.6" rx="8"/>
+                                <text x="160" y="213" text-anchor="middle" fill="#90caf9" font-size="13" opacity="0.8">full bandwidth</text>
+                            </g>
+
+                            <!-- Bottom insight -->
+                            <text x="400" y="260" text-anchor="middle" fill="#b0c4de" font-size="14" font-style="italic">Drawing captures complexity that text and voice cannot express</text>
+
+                            <!-- Arrow marker -->
+                            <defs>
+                                <marker id="arrowblue" markerWidth="8" markerHeight="8" refX="7" refY="2.5" orient="auto" markerUnits="strokeWidth">
+                                    <path d="M0,0 L0,5 L7,2.5 z" fill="#90caf9" />
+                                </marker>
+                            </defs>
+                        </svg>
+                    </div>
                     <div class="label">Figure 2: Bandwidth Comparison</div>
                     <div class="description">Input channel dimensionality: Text box (1D: linear sequence) → Voice (1.5D: sequence + prosody) → Drawing (2D+: space, time, pressure, gesture, annotation).</div>
                 </div>
@@ -1209,7 +1309,12 @@
             </div>
             
             <p>The answer becomes obvious the moment you <em>visualize</em> two monks walking the path simultaneously—one going up, one going down. They must meet somewhere. But this visualization requires what Fauconnier and Turner call an "integration network"—a blended mental space where separate inputs combine to reveal emergent structure. I have animated their central figure illustrating the blending space as a diagram.</p>
-            
+
+            <figure>
+                <img src="./Assets/fig-Conceptual Blending slower.gif" alt="Conceptual Blending Animation - Integration network showing blend space">
+                <figcaption>Fauconnier & Turner's conceptual blending model: two input spaces merge into a blended space revealing emergent structure.</figcaption>
+            </figure>
+
             <blockquote>
                 "Thanks to a mapping, full-fledged meaning can suddenly appear in a spot where it was entirely unsuspected."
                 <cite>— Douglas Hofstadter, <em>I Am a Strange Loop</em>, 2007</cite>
@@ -1269,12 +1374,8 @@
                 <div class="content">
                     <h4>Alan Kay's Dynabook</h4>
                     <p>"A Personal Computer for Children of All Ages"—a medium where users don't just consume but create. His question "what is the carrying capacity for ideas of the computer?" and his distinction between tools and medium remain foundational. The MetaMedium is, in many ways, an attempt to finally realize the Dynabook vision with modern AI.</p>
-                    <div class="media-placeholder image">
-                        <div class="media-placeholder-inner">
-                            <span class="icon">🖼</span>
-                            <span class="label">Image: Dynabook Concept</span>
-                            <span class="caption">Kay's original mockup of a portable computer for learning</span>
-                        </div>
+                    <div class="timeline-image">
+                        <img src="./Assets/fig-dynabook.jpg" alt="Alan Kay's Dynabook Concept - A portable computer for children">
                     </div>
                 </div>
             </div>
@@ -1490,7 +1591,104 @@
             
             <figure>
                 <div class="placeholder-figure">
-                    <div class="icon">△</div>
+                    <div class="image">
+                        <svg viewBox="0 0 700 400" xmlns="http://www.w3.org/2000/svg">
+                            <!-- Title -->
+                            <text x="350" y="25" text-anchor="middle" fill="#b0c4de" font-size="15" opacity="0.8">How meaning emerges through triangulation</text>
+
+                            <!-- Triangle structure -->
+                            <line x1="350" y1="80" x2="180" y2="320" stroke="#64b5f6" stroke-width="2"/>
+                            <line x1="350" y1="80" x2="520" y2="320" stroke="#64b5f6" stroke-width="2"/>
+                            <line x1="180" y1="320" x2="520" y2="320" stroke="#64b5f6" stroke-width="2"/>
+
+                            <!-- OBJECT (top) -->
+                            <g>
+                                <circle cx="350" cy="80" r="26" fill="rgba(100, 181, 246, 0.15)" stroke="#64b5f6" stroke-width="2"/>
+                                <text x="350" y="60" text-anchor="middle" fill="#90caf9" font-size="18" font-weight="bold">OBJECT</text>
+                                <text x="350" y="47" text-anchor="middle" fill="#b0c4de" font-size="13" opacity="0.7">(referent)</text>
+
+                                <!-- Multiple possibilities -->
+                                <text x="350" y="88" text-anchor="middle" fill="#90caf9" font-size="12">?</text>
+                                <g transform="translate(350, 30)">
+                                    <circle cx="-40" cy="0" r="7" fill="none" stroke="#90caf9" stroke-width="1" opacity="0.5"/>
+                                    <text x="-40" y="15" text-anchor="middle" fill="#90caf9" font-size="11" opacity="0.6">face</text>
+
+                                    <ellipse cx="-14" cy="0" rx="7" ry="8" fill="none" stroke="#90caf9" stroke-width="1" opacity="0.5"/>
+                                    <text x="-14" y="15" text-anchor="middle" fill="#90caf9" font-size="11" opacity="0.6">egg</text>
+
+                                    <circle cx="13" cy="0" r="7" fill="none" stroke="#90caf9" stroke-width="1" opacity="0.5"/>
+                                    <text x="13" y="5" text-anchor="middle" fill="#90caf9" font-size="10" opacity="0.6">0</text>
+
+                                    <circle cx="39" cy="0" r="7" fill="rgba(100, 181, 246, 0.15)" stroke="#90caf9" stroke-width="1" opacity="0.5"/>
+                                    <text x="39" y="15" text-anchor="middle" fill="#90caf9" font-size="11" opacity="0.6">ball</text>
+                                </g>
+                            </g>
+
+                            <!-- SIGN (bottom left) -->
+                            <g>
+                                <circle cx="180" cy="320" r="26" fill="rgba(100, 181, 246, 0.15)" stroke="#64b5f6" stroke-width="2"/>
+                                <text x="180" y="358" text-anchor="middle" fill="#90caf9" font-size="18" font-weight="bold">SIGN</text>
+                                <text x="180" y="372" text-anchor="middle" fill="#b0c4de" font-size="13" opacity="0.7">(form)</text>
+
+                                <!-- Sketch progression -->
+                                <g transform="translate(50, 170)">
+                                    <!-- Step 1: rough oval -->
+                                    <rect x="0" y="0" width="80" height="70" fill="rgba(10, 14, 26, 0.5)" stroke="#4a5568" stroke-width="1" rx="3"/>
+                                    <ellipse cx="40" cy="30" rx="22" ry="25" fill="none" stroke="#90caf9" stroke-width="2" stroke-dasharray="2,1" opacity="0.8"/>
+                                    <text x="40" y="60" text-anchor="middle" fill="#b0c4de" font-size="11">1. rough oval</text>
+
+                                    <!-- Arrow -->
+                                    <text x="88" y="35" fill="#64b5f6" font-size="16">→</text>
+
+                                    <!-- Step 2: with dots -->
+                                    <rect x="100" y="0" width="80" height="70" fill="rgba(10, 14, 26, 0.5)" stroke="#4a5568" stroke-width="1" rx="3"/>
+                                    <ellipse cx="140" cy="30" rx="22" ry="25" fill="none" stroke="#90caf9" stroke-width="2" stroke-dasharray="2,1" opacity="0.8"/>
+                                    <circle cx="134" cy="27" r="2.5" fill="#90caf9"/>
+                                    <circle cx="146" cy="27" r="2.5" fill="#90caf9"/>
+                                    <text x="140" y="52" text-anchor="middle" fill="#b0c4de" font-size="11">2. + eyes</text>
+                                    <text x="140" y="64" text-anchor="middle" fill="#90caf9" font-size="11" font-weight="bold">→ face!</text>
+                                </g>
+                            </g>
+
+                            <!-- INTERPRETANT (bottom right) -->
+                            <g>
+                                <circle cx="520" cy="320" r="26" fill="rgba(100, 181, 246, 0.15)" stroke="#64b5f6" stroke-width="2"/>
+                                <text x="520" y="358" text-anchor="middle" fill="#90caf9" font-size="18" font-weight="bold">INTERPRETANT</text>
+                                <text x="520" y="372" text-anchor="middle" fill="#b0c4de" font-size="13" opacity="0.7">(meaning)</text>
+
+                                <!-- Probability distribution -->
+                                <g transform="translate(450, 168)">
+                                    <!-- Initial probabilities -->
+                                    <rect x="0" y="0" width="120" height="85" fill="rgba(10, 14, 26, 0.5)" stroke="#4a5568" stroke-width="1" rx="3"/>
+                                    <text x="60" y="15" text-anchor="middle" fill="#b0c4de" font-size="11">AI considers:</text>
+
+                                    <rect x="8" y="23" width="45" height="7" fill="#64b5f6" opacity="0.35"/>
+                                    <text x="58" y="29" fill="#90caf9" font-size="11">face 0.4</text>
+
+                                    <rect x="8" y="34" width="28" height="7" fill="#64b5f6" opacity="0.35"/>
+                                    <text x="58" y="40" fill="#90caf9" font-size="11">egg 0.25</text>
+
+                                    <rect x="8" y="45" width="22" height="7" fill="#64b5f6" opacity="0.35"/>
+                                    <text x="58" y="51" fill="#90caf9" font-size="11">zero 0.2</text>
+
+                                    <rect x="8" y="56" width="17" height="7" fill="#64b5f6" opacity="0.35"/>
+                                    <text x="58" y="62" fill="#90caf9" font-size="11">ball 0.15</text>
+
+                                    <text x="60" y="77" text-anchor="middle" fill="#64b5f6" font-size="12">↓ context</text>
+
+                                    <!-- Resolved -->
+                                    <rect x="0" y="90" width="120" height="38" fill="rgba(100, 181, 246, 0.12)" stroke="#64b5f6" stroke-width="1.5" rx="3"/>
+                                    <rect x="8" y="100" width="104" height="9" fill="#64b5f6" opacity="0.8"/>
+                                    <text x="60" y="107" text-anchor="middle" fill="#fff" font-size="12" font-weight="bold">face 0.95 ✓</text>
+                                    <text x="60" y="122" text-anchor="middle" fill="#90caf9" font-size="11">"confident match"</text>
+                                </g>
+                            </g>
+
+                            <!-- Central insight -->
+                            <text x="350" y="210" text-anchor="middle" fill="#90caf9" font-size="13" opacity="0.8">AI participates in meaning-making,</text>
+                            <text x="350" y="226" text-anchor="middle" fill="#90caf9" font-size="13" opacity="0.8">not as authority but as collaborator</text>
+                        </svg>
+                    </div>
                     <div class="label">Figure 5: The Semiotic Triad Applied</div>
                     <div class="description">Peirce's triangle in MetaMedium context: Sign (rough oval drawn on canvas) → Object (could be face, egg, zero, planet...) → Interpretant (AI holds probability distribution across possibilities; context accumulates; meaning resolves). The AI participates in the interpretant role, not as final arbiter but as collaborative sense-maker.</div>
                 </div>
@@ -1565,7 +1763,85 @@
             
             <figure>
                 <div class="placeholder-figure">
-                    <div class="icon">⇄</div>
+                    <div class="image">
+                        <svg viewBox="0 0 700 420" xmlns="http://www.w3.org/2000/svg">
+                            <!-- Title -->
+                            <text x="350" y="25" text-anchor="middle" fill="#b0c4de" font-size="15" opacity="0.8">Understanding emerges through iterative exchange</text>
+
+                            <!-- User box (left) -->
+                            <rect x="70" y="60" width="140" height="60" fill="rgba(100, 181, 246, 0.08)" stroke="#64b5f6" stroke-width="2" rx="6"/>
+                            <text x="140" y="88" text-anchor="middle" fill="#90caf9" font-size="18" font-weight="bold">USER</text>
+                            <text x="140" y="105" text-anchor="middle" fill="#b0c4de" font-size="14">sketches</text>
+
+                            <!-- System box (right) -->
+                            <rect x="490" y="60" width="140" height="60" fill="rgba(100, 181, 246, 0.08)" stroke="#64b5f6" stroke-width="2" rx="6"/>
+                            <text x="560" y="88" text-anchor="middle" fill="#90caf9" font-size="18" font-weight="bold">SYSTEM</text>
+                            <text x="560" y="105" text-anchor="middle" fill="#b0c4de" font-size="14">interprets</text>
+
+                            <!-- Exchange 1 -->
+                            <g>
+                                <line x1="210" y1="150" x2="480" y2="150" stroke="#64b5f6" stroke-width="2" marker-end="url(#arrow4)" stroke-dasharray="3,2"/>
+                                <text x="345" y="143" text-anchor="middle" fill="#90caf9" font-size="13">1. draws oval</text>
+                                <ellipse cx="315" cy="153" rx="10" ry="12" fill="none" stroke="#90caf9" stroke-width="1.5" stroke-dasharray="1.5,1"/>
+
+                                <line x1="480" y1="170" x2="210" y2="170" stroke="#90a5ba" stroke-width="2" marker-end="url(#arrow5)"/>
+                                <text x="345" y="185" text-anchor="middle" fill="#90a5ba" font-size="12" font-style="italic">"Circle? Face? Egg?"</text>
+                            </g>
+
+                            <!-- Exchange 2 -->
+                            <g transform="translate(0, 70)">
+                                <line x1="210" y1="150" x2="480" y2="150" stroke="#64b5f6" stroke-width="2" marker-end="url(#arrow4)" stroke-dasharray="3,2"/>
+                                <text x="345" y="143" text-anchor="middle" fill="#90caf9" font-size="13">2. adds two dots</text>
+                                <ellipse cx="315" cy="153" rx="10" ry="12" fill="none" stroke="#90caf9" stroke-width="1.5" stroke-dasharray="1.5,1"/>
+                                <circle cx="311" cy="151" r="1.5" fill="#90caf9"/>
+                                <circle cx="319" cy="151" r="1.5" fill="#90caf9"/>
+
+                                <line x1="480" y1="170" x2="210" y2="170" stroke="#90a5ba" stroke-width="2" marker-end="url(#arrow5)"/>
+                                <text x="345" y="185" text-anchor="middle" fill="#90a5ba" font-size="12" font-style="italic">"Face! (confidence 0.9)"</text>
+                            </g>
+
+                            <!-- Exchange 3 -->
+                            <g transform="translate(0, 140)">
+                                <line x1="210" y1="150" x2="480" y2="150" stroke="#64b5f6" stroke-width="2" marker-end="url(#arrow4)" stroke-dasharray="3,2"/>
+                                <text x="345" y="143" text-anchor="middle" fill="#90caf9" font-size="13">3. writes "happy"</text>
+                                <text x="315" y="158" text-anchor="middle" fill="#90caf9" font-size="11" font-family="Monaco">happy</text>
+
+                                <line x1="480" y1="170" x2="210" y2="170" stroke="#90a5ba" stroke-width="2" marker-end="url(#arrow5)"/>
+                                <text x="345" y="185" text-anchor="middle" fill="#90a5ba" font-size="12" font-style="italic">adds smile + learns pattern</text>
+                            </g>
+
+                            <!-- Shared Understanding result -->
+                            <g transform="translate(0, 230)">
+                                <rect x="230" y="140" width="240" height="70" fill="rgba(100, 181, 246, 0.15)" stroke="#64b5f6" stroke-width="2" rx="6"/>
+                                <text x="350" y="165" text-anchor="middle" fill="#90caf9" font-size="17" font-weight="bold">SHARED UNDERSTANDING</text>
+                                <text x="350" y="183" text-anchor="middle" fill="#b0c4de" font-size="13">"Happy face" → vocabulary</text>
+
+                                <!-- Small happy face demo -->
+                                <ellipse cx="320" cy="195" rx="9" ry="10" fill="none" stroke="#90caf9" stroke-width="1.5"/>
+                                <circle cx="317" cy="193" r="1.2" fill="#90caf9"/>
+                                <circle cx="323" cy="193" r="1.2" fill="#90caf9"/>
+                                <path d="M 315 198 Q 320 200, 325 198" stroke="#90caf9" stroke-width="1.5" fill="none"/>
+                            </g>
+
+                            <!-- Loop back arrow -->
+                            <path d="M 560 120 Q 640 240, 560 360" stroke="#64b5f6" stroke-width="2" stroke-dasharray="4,3" marker-end="url(#arrow4)" opacity="0.4"/>
+                            <text x="655" y="240" fill="#b0c4de" font-size="12" opacity="0.7">continues</text>
+                            <text x="655" y="252" fill="#b0c4de" font-size="12" opacity="0.7">learning</text>
+
+                            <!-- Bottom insight -->
+                            <text x="350" y="405" text-anchor="middle" fill="#b0c4de" font-size="13" font-style="italic">Each exchange refines shared vocabulary and understanding</text>
+
+                            <!-- Arrow markers -->
+                            <defs>
+                                <marker id="arrow4" markerWidth="8" markerHeight="8" refX="7" refY="2.5" orient="auto">
+                                    <path d="M0,0 L0,5 L7,2.5 z" fill="#64b5f6" />
+                                </marker>
+                                <marker id="arrow5" markerWidth="8" markerHeight="8" refX="7" refY="2.5" orient="auto">
+                                    <path d="M0,0 L0,5 L7,2.5 z" fill="#90a5ba" />
+                                </marker>
+                            </defs>
+                        </svg>
+                    </div>
                     <div class="label">Figure 6: The Negotiation Loop</div>
                     <div class="description">User sketches rough shape → System offers: "Circle? Oval? Face?" → User adds two dots → System updates: "Face ✓" → User writes "happy" → System adds smile, adjusts interpretation confidence. Understanding emerges through exchange, not one-shot recognition. Each turn updates the possibility graph.</div>
                 </div>
@@ -1579,7 +1855,130 @@
             
             <figure>
                 <div class="placeholder-figure">
-                    <div class="icon">◐</div>
+                    <div class="image">
+                        <svg viewBox="0 0 750 450" xmlns="http://www.w3.org/2000/svg">
+                            <!-- Title -->
+                            <text x="375" y="25" text-anchor="middle" fill="#b0c4de" font-size="15" opacity="0.8">Your patterns become portable ways of seeing</text>
+
+                            <!-- Pattern Accumulation -->
+                            <g>
+                                <text x="120" y="65" fill="#90caf9" font-size="17" font-weight="bold">PATTERN ACCUMULATION</text>
+                                <text x="120" y="83" fill="#b0c4de" font-size="13">User repeatedly draws:</text>
+
+                                <!-- Repeated marks -->
+                                <g transform="translate(80, 95)">
+                                    <!-- Force arrows -->
+                                    <path d="M 0 0 L 20 -8" stroke="#90caf9" stroke-width="2" marker-end="url(#arrow6)"/>
+                                    <path d="M 35 0 L 55 -8" stroke="#90caf9" stroke-width="2" marker-end="url(#arrow6)"/>
+                                    <path d="M 70 0 L 90 -8" stroke="#90caf9" stroke-width="2" marker-end="url(#arrow6)"/>
+                                    <path d="M 105 0 L 125 -8" stroke="#90caf9" stroke-width="2" marker-end="url(#arrow6)"/>
+                                    <text x="135" y="0" fill="#b0c4de" font-size="12" opacity="0.7">force</text>
+
+                                    <!-- Energy marks -->
+                                    <text x="0" y="25" fill="#90caf9" font-size="18">↯</text>
+                                    <text x="35" y="25" fill="#90caf9" font-size="18">↯</text>
+                                    <text x="70" y="25" fill="#90caf9" font-size="18">↯</text>
+                                    <text x="105" y="25" fill="#90caf9" font-size="18">↯</text>
+                                    <text x="135" y="25" fill="#b0c4de" font-size="12" opacity="0.7">energy</text>
+
+                                    <!-- Field lines -->
+                                    <path d="M 0 45 Q 10 38, 20 45" stroke="#90caf9" stroke-width="1.5" fill="none"/>
+                                    <path d="M 35 45 Q 45 38, 55 45" stroke="#90caf9" stroke-width="1.5" fill="none"/>
+                                    <path d="M 70 45 Q 80 38, 90 45" stroke="#90caf9" stroke-width="1.5" fill="none"/>
+                                    <path d="M 105 45 Q 115 38, 125 45" stroke="#90caf9" stroke-width="1.5" fill="none"/>
+                                    <text x="135" y="48" fill="#b0c4de" font-size="12" opacity="0.7">fields</text>
+                                </g>
+                            </g>
+
+                            <!-- Arrow to extraction -->
+                            <text x="350" y="140" text-anchor="middle" fill="#64b5f6" font-size="17">→ system extracts →</text>
+
+                            <!-- Lens (crystallized pattern) -->
+                            <g transform="translate(520, 85)">
+                                <rect x="0" y="0" width="160" height="80" fill="rgba(100, 181, 246, 0.12)" stroke="#64b5f6" stroke-width="2" rx="6"/>
+                                <text x="80" y="25" text-anchor="middle" fill="#90caf9" font-size="16" font-weight="bold">LENS</text>
+                                <text x="80" y="43" text-anchor="middle" fill="#90caf9" font-size="13">"Maya's Physics</text>
+                                <text x="80" y="56" text-anchor="middle" fill="#90caf9" font-size="13">Notation"</text>
+
+                                <!-- Prism icon -->
+                                <path d="M 80 -8 L 92 8 L 68 8 Z" fill="none" stroke="#64b5f6" stroke-width="2"/>
+                                <line x1="92" y1="8" x2="96" y2="10" stroke="#90caf9" stroke-width="1" opacity="0.5"/>
+                                <line x1="92" y1="8" x2="96" y2="6" stroke="#64b5f6" stroke-width="1" opacity="0.5"/>
+
+                                <text x="80" y="72" text-anchor="middle" fill="#b0c4de" font-size="11" opacity="0.7">portable interpretation</text>
+                            </g>
+
+                            <!-- Arrow down to operations -->
+                            <line x1="600" y1="175" x2="600" y2="200" stroke="#64b5f6" stroke-width="2" marker-end="url(#arrow6)"/>
+
+                            <!-- Lens Operations -->
+                            <g transform="translate(0, 210)">
+                                <text x="375" y="10" text-anchor="middle" fill="#90caf9" font-size="17" font-weight="bold">LENS OPERATIONS</text>
+
+                                <!-- Operation 1: Apply -->
+                                <g transform="translate(60, 30)">
+                                    <rect x="0" y="0" width="170" height="165" fill="rgba(74, 85, 104, 0.2)" stroke="#64b5f6" stroke-width="2" rx="6"/>
+                                    <text x="85" y="25" text-anchor="middle" fill="#90caf9" font-size="16" font-weight="bold">APPLY</text>
+                                    <text x="85" y="42" text-anchor="middle" fill="#b0c4de" font-size="13">Use on new drawings</text>
+
+                                    <text x="85" y="70" text-anchor="middle" fill="#64b5f6" font-size="18">↓</text>
+
+                                    <!-- Result -->
+                                    <rect x="15" y="80" width="140" height="65" fill="rgba(10, 14, 26, 0.5)" stroke="#4a5568" stroke-width="1.5" rx="3"/>
+                                    <text x="85" y="98" text-anchor="middle" fill="#b0c4de" font-size="12">New sketch auto-</text>
+                                    <text x="85" y="110" text-anchor="middle" fill="#b0c4de" font-size="12">recognized as</text>
+                                    <text x="85" y="122" text-anchor="middle" fill="#90caf9" font-size="13" font-weight="bold">force diagram</text>
+                                    <path d="M 65 130 L 95 122" stroke="#90caf9" stroke-width="2" marker-end="url(#arrow6)"/>
+                                </g>
+
+                                <!-- Operation 2: Share -->
+                                <g transform="translate(260, 30)">
+                                    <rect x="0" y="0" width="170" height="165" fill="rgba(74, 85, 104, 0.2)" stroke="#64b5f6" stroke-width="2" rx="6"/>
+                                    <text x="85" y="25" text-anchor="middle" fill="#90caf9" font-size="16" font-weight="bold">SHARE</text>
+                                    <text x="85" y="42" text-anchor="middle" fill="#b0c4de" font-size="13">Export to collaborators</text>
+
+                                    <text x="85" y="70" text-anchor="middle" fill="#64b5f6" font-size="18">↓</text>
+
+                                    <!-- Result -->
+                                    <rect x="15" y="80" width="140" height="65" fill="rgba(10, 14, 26, 0.5)" stroke="#4a5568" stroke-width="1.5" rx="3"/>
+                                    <text x="85" y="98" text-anchor="middle" fill="#b0c4de" font-size="12">Teammate's canvas</text>
+                                    <text x="85" y="110" text-anchor="middle" fill="#b0c4de" font-size="12">now reads your</text>
+                                    <text x="85" y="122" text-anchor="middle" fill="#90caf9" font-size="13" font-weight="bold">notation</text>
+                                    <text x="65" y="138" text-anchor="middle" fill="#90caf9" font-size="16">👤</text>
+                                    <text x="105" y="138" text-anchor="middle" fill="#90caf9" font-size="16">👤</text>
+                                    <line x1="73" y1="135" x2="97" y2="135" stroke="#64b5f6" stroke-width="1.5"/>
+                                </g>
+
+                                <!-- Operation 3: Compose -->
+                                <g transform="translate(460, 30)">
+                                    <rect x="0" y="0" width="170" height="165" fill="rgba(74, 85, 104, 0.2)" stroke="#64b5f6" stroke-width="2" rx="6"/>
+                                    <text x="85" y="25" text-anchor="middle" fill="#90caf9" font-size="16" font-weight="bold">COMPOSE</text>
+                                    <text x="85" y="42" text-anchor="middle" fill="#b0c4de" font-size="13">Combine with other lenses</text>
+
+                                    <text x="85" y="70" text-anchor="middle" fill="#64b5f6" font-size="18">↓</text>
+
+                                    <!-- Result -->
+                                    <rect x="15" y="80" width="140" height="65" fill="rgba(10, 14, 26, 0.5)" stroke="#4a5568" stroke-width="1.5" rx="3"/>
+                                    <text x="85" y="98" text-anchor="middle" fill="#b0c4de" font-size="12">Create hybrid:</text>
+                                    <text x="85" y="115" text-anchor="middle" fill="#90caf9" font-size="13" font-weight="bold">physics +</text>
+                                    <text x="85" y="128" text-anchor="middle" fill="#90caf9" font-size="13" font-weight="bold">chemistry lens</text>
+                                    <!-- Overlapping prisms -->
+                                    <path d="M 65 135 L 77 147 L 53 147 Z" fill="none" stroke="#90caf9" stroke-width="1.5" opacity="0.6"/>
+                                    <path d="M 85 135 L 97 147 L 73 147 Z" fill="none" stroke="#64b5f6" stroke-width="1.5" opacity="0.6"/>
+                                </g>
+                            </g>
+
+                            <!-- Bottom insight -->
+                            <text x="375" y="435" text-anchor="middle" fill="#b0c4de" font-size="13" font-style="italic">Lenses are portable IP—not the content, but the interpretation framework</text>
+
+                            <!-- Arrow marker -->
+                            <defs>
+                                <marker id="arrow6" markerWidth="8" markerHeight="8" refX="7" refY="2.5" orient="auto">
+                                    <path d="M0,0 L0,5 L7,2.5 z" fill="#64b5f6" />
+                                </marker>
+                            </defs>
+                        </svg>
+                    </div>
                     <div class="label">Figure 7: Cognitive Lens Architecture</div>
                     <div class="description">User's repeated gestures → Pattern extraction → Named "lens" (e.g., "Maya's physics notation"). Lenses can be: applied to new drawings, shared with collaborators, composed with other lenses, versioned and evolved. Your way of seeing becomes portable.</div>
                 </div>
@@ -1641,58 +2040,28 @@
             
             <div class="gallery">
                 <div class="gallery-item">
-                    <div class="media-placeholder image">
-                        <div class="media-placeholder-inner">
-                            <span class="icon">🖼</span>
-                            <span class="label">Shape Recognition</span>
-                            <span class="caption">Drawing to semantic shape</span>
-                        </div>
-                    </div>
+                    <img src="./Assets/gal-notes-systemdiagram2016.jpeg" alt="System architecture diagram showing component relationships">
                 </div>
                 <div class="gallery-item">
-                    <div class="media-placeholder image">
-                        <div class="media-placeholder-inner">
-                            <span class="icon">🖼</span>
-                            <span class="label">Relationship Detection</span>
-                            <span class="caption">Spatial semantics in action</span>
-                        </div>
-                    </div>
+                    <img src="./Assets/gal-notes-activitymodel2016.png" alt="Activity theory model for human-computer interaction">
                 </div>
                 <div class="gallery-item">
-                    <div class="media-placeholder image">
-                        <div class="media-placeholder-inner">
-                            <span class="icon">🖼</span>
-                            <span class="label">Annotation Layer</span>
-                            <span class="caption">Text becomes behavior</span>
-                        </div>
-                    </div>
+                    <img src="./Assets/gal-notes-sentance.png" alt="Conceptual framework for sentence-level annotation">
                 </div>
                 <div class="gallery-item">
-                    <div class="media-placeholder image">
-                        <div class="media-placeholder-inner">
-                            <span class="icon">🖼</span>
-                            <span class="label">Negotiation UI</span>
-                            <span class="caption">Refining interpretation</span>
-                        </div>
-                    </div>
+                    <img src="./Assets/gal-notes-planestocube.png" alt="Visualization of 2D to 3D transformation concept">
                 </div>
                 <div class="gallery-item">
-                    <div class="media-placeholder video">
-                        <div class="media-placeholder-inner">
-                            <span class="icon">▶</span>
-                            <span class="label">Demo Walkthrough</span>
-                            <span class="caption">Full interaction flow</span>
-                        </div>
-                    </div>
+                    <img src="./Assets/gal-notes-memoryassociaton.png" alt="Memory association network diagram">
                 </div>
                 <div class="gallery-item">
-                    <div class="media-placeholder image">
-                        <div class="media-placeholder-inner">
-                            <span class="icon">🖼</span>
-                            <span class="label">Canvas States</span>
-                            <span class="caption">Before and after recognition</span>
-                        </div>
-                    </div>
+                    <img src="./Assets/gal-notes-conceptualframeworks Large.jpeg" alt="Conceptual frameworks for design thinking">
+                </div>
+                <div class="gallery-item">
+                    <img src="./Assets/gal-notes-artefactsofprocess.jpeg" alt="Artifacts of the design and development process">
+                </div>
+                <div class="gallery-item">
+                    <img src="./Assets/gal-notes-useractivitymodel2016.png" alt="User activity model showing interaction patterns">
                 </div>
             </div>
         </section>
@@ -1748,7 +2117,115 @@
             
             <figure>
                 <div class="placeholder-figure">
-                    <div class="icon">⬡</div>
+                    <div class="image">
+                        <svg viewBox="0 0 750 400" xmlns="http://www.w3.org/2000/svg">
+                            <!-- Title -->
+                            <text x="375" y="25" text-anchor="middle" fill="#b0c4de" font-size="11" opacity="0.8">Two paradigms for AI alignment</text>
+
+                            <!-- Left: Traditional -->
+                            <g>
+                                <rect x="40" y="50" width="330" height="310" fill="rgba(74, 85, 104, 0.15)" stroke="#6b7280" stroke-width="2" rx="6"/>
+                                <text x="205" y="75" text-anchor="middle" fill="#8b9aaa" font-size="13" font-weight="bold">TRADITIONAL ALIGNMENT</text>
+
+                                <!-- Rules imposed from above -->
+                                <g transform="translate(205, 100)">
+                                    <rect x="-50" y="0" width="100" height="60" fill="rgba(74, 85, 104, 0.4)" stroke="#6b7280" stroke-width="1.5" rx="4"/>
+                                    <text x="0" y="20" text-anchor="middle" fill="#9ca3af" font-size="11" font-weight="bold">RULES</text>
+                                    <text x="0" y="34" text-anchor="middle" fill="#d1495b" font-size="10">STOP</text>
+                                    <text x="0" y="46" text-anchor="middle" fill="#d1495b" font-size="10">DON'T</text>
+                                    <text x="0" y="58" text-anchor="middle" fill="#d1495b" font-size="10">NEVER</text>
+                                </g>
+
+                                <!-- Arrow down -->
+                                <line x1="205" y1="175" x2="205" y2="205" stroke="#6b7280" stroke-width="1.5" marker-end="url(#arrow7)"/>
+
+                                <!-- Black box AI -->
+                                <g transform="translate(205, 220)">
+                                    <rect x="-55" y="0" width="110" height="70" fill="rgba(20, 25, 35, 0.8)" stroke="#4a5568" stroke-width="1.5" rx="4"/>
+                                    <text x="0" y="25" text-anchor="middle" fill="#6b7280" font-size="18">🧠</text>
+                                    <text x="0" y="43" text-anchor="middle" fill="#6b7280" font-size="11">AI</text>
+                                    <text x="0" y="58" text-anchor="middle" fill="#6b7280" font-size="9" opacity="0.5">?????</text>
+                                    <text x="70" y="40" fill="#9ca3af" font-size="8" opacity="0.6">opaque</text>
+                                </g>
+
+                                <!-- User watching from outside -->
+                                <text x="80" y="265" fill="#9ca3af" font-size="11">👤</text>
+                                <text x="65" y="280" fill="#9ca3af" font-size="9">watches</text>
+                                <text x="65" y="290" fill="#9ca3af" font-size="9">from outside</text>
+
+                                <!-- Problems -->
+                                <text x="60" y="330" fill="#d1495b" font-size="10">❌ Opaque process</text>
+                                <text x="60" y="345" fill="#d1495b" font-size="10">❌ Adversarial framing</text>
+                            </g>
+
+                            <!-- Right: MetaMedium -->
+                            <g transform="translate(380, 0)">
+                                <rect x="40" y="50" width="330" height="310" fill="rgba(100, 181, 246, 0.08)" stroke="#64b5f6" stroke-width="2" rx="6"/>
+                                <text x="205" y="75" text-anchor="middle" fill="#90caf9" font-size="13" font-weight="bold">METAMEDIUM ALIGNMENT</text>
+
+                                <!-- Human and AI side by side -->
+                                <g transform="translate(100, 95)">
+                                    <!-- Human -->
+                                    <circle cx="0" cy="25" r="16" fill="rgba(100, 181, 246, 0.2)" stroke="#64b5f6" stroke-width="1.5"/>
+                                    <text x="0" y="31" text-anchor="middle" fill="#fff" font-size="16">👤</text>
+                                    <text x="0" y="50" text-anchor="middle" fill="#90caf9" font-size="9">human</text>
+
+                                    <!-- Double arrow (equals) -->
+                                    <path d="M 20 25 L 185 25" stroke="#64b5f6" stroke-width="2.5"/>
+                                    <path d="M 0,0 L0,5 L7,2.5 z" transform="translate(20, 22.5)" fill="#64b5f6"/>
+                                    <path d="M0,0 L0,5 L7,2.5 z" transform="translate(178, 27.5) rotate(180)" fill="#64b5f6"/>
+                                    <text x="102" y="17" text-anchor="middle" fill="#90caf9" font-size="9">shared</text>
+                                    <text x="102" y="38" text-anchor="middle" fill="#90caf9" font-size="9">canvas</text>
+
+                                    <!-- AI -->
+                                    <circle cx="205" cy="25" r="16" fill="rgba(100, 181, 246, 0.2)" stroke="#64b5f6" stroke-width="1.5"/>
+                                    <text x="205" y="31" text-anchor="middle" fill="#fff" font-size="16">🧠</text>
+                                    <text x="205" y="50" text-anchor="middle" fill="#90caf9" font-size="9">AI</text>
+                                </g>
+
+                                <!-- Arrows to shared canvas -->
+                                <line x1="120" y1="150" x2="160" y2="180" stroke="#64b5f6" stroke-width="1.5" marker-end="url(#arrow8)"/>
+                                <line x1="290" y1="150" x2="250" y2="180" stroke="#64b5f6" stroke-width="1.5" marker-end="url(#arrow8)"/>
+
+                                <!-- Shared visible canvas -->
+                                <g transform="translate(205, 200)">
+                                    <rect x="-75" y="0" width="150" height="95" fill="rgba(10, 14, 26, 0.5)" stroke="#64b5f6" stroke-width="1.5" rx="4"/>
+
+                                    <!-- Sketch elements showing visible reasoning -->
+                                    <circle cx="-30" cy="25" r="13" fill="none" stroke="#90caf9" stroke-width="1.5"/>
+                                    <line x1="-17" y1="25" x2="10" y2="25" stroke="#90caf9" stroke-width="1.5" marker-end="url(#arrow8)"/>
+                                    <line x1="-30" y1="38" x2="-45" y2="55" stroke="#90caf9" stroke-width="2"/>
+                                    <line x1="-30" y1="38" x2="-15" y2="55" stroke="#90caf9" stroke-width="2"/>
+                                    <rect x="-50" y="55" width="18" height="18" fill="none" stroke="#90caf9" stroke-width="1.5"/>
+                                    <path d="M 5,55 L 20,68 L 5,68 Z" fill="none" stroke="#90caf9" stroke-width="1.5"/>
+                                    <circle cx="35" cy="55" r="5" fill="#90caf9"/>
+
+                                    <text x="0" y="17" text-anchor="middle" fill="#b0c4de" font-size="8" font-style="italic">"flow process"</text>
+                                    <text x="0" y="87" text-anchor="middle" fill="#b0c4de" font-size="8">both can inspect</text>
+                                </g>
+
+                                <!-- Quote -->
+                                <text x="205" y="115" text-anchor="middle" fill="#b0c4de" font-size="9" font-style="italic">"The diagram is the treaty"</text>
+
+                                <!-- Benefits -->
+                                <text x="60" y="330" fill="#64b5f6" font-size="10">✓ Transparent reasoning</text>
+                                <text x="60" y="345" fill="#64b5f6" font-size="10">✓ Collaborative process</text>
+                            </g>
+
+                            <!-- Bottom insight -->
+                            <text x="375" y="385" text-anchor="middle" fill="#b0c4de" font-size="10" font-style="italic">Control assumes conflict. Communication builds shared ground.</text>
+
+                            <!-- Arrow markers -->
+                            <defs>
+                                <marker id="arrow7" markerWidth="8" markerHeight="8" refX="7" refY="2.5" orient="auto">
+                                    <path d="M0,0 L0,5 L7,2.5 z" fill="#6b7280" />
+                                </marker>
+                                <marker id="arrow8" markerWidth="8" markerHeight="8" refX="7" refY="2.5" orient="auto">
+                                    <path d="M0,0 L0,5 L7,2.5 z" fill="#64b5f6" />
+                                </marker>
+                            </defs>
+                        </svg>
+                    </div>
                     <div class="label">Figure 8: Alignment Through Shared Ground</div>
                     <div class="description">Left: Traditional alignment (AI in black box, rules imposed from outside, human hopes constraints hold). Right: MetaMedium alignment (human and AI on same canvas, reasoning visible to both, shared diagram as "treaty" both parties can read and negotiate). The diagram externalizes the alignment problem.</div>
                 </div>
