@@ -513,7 +513,11 @@
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 2rem;
-            margin: 3rem 0;
+            margin: 1.5rem 0;
+        }
+
+        .figure-pair figure {
+            padding: var(--space-xs) 0;
         }
 
         @media (max-width: 768px) {
@@ -774,7 +778,7 @@
             background: rgba(74, 85, 104, 0.08);
             border: 1px solid rgba(107, 114, 128, 0.4);
             border-radius: 4px;
-            padding: var(--space-sm);
+            padding: var(--space-xs) var(--space-sm);
             transition: all 0.2s ease;
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
         }
@@ -1537,13 +1541,325 @@
             
             <p>Current human-computer interfaces connect Language and Computation, but leave Meaning external to the loop. We write code; machines execute. Machines return outputs, displays, text. But there is no continuous <strong>Language ↔ Computation ↔ Meaning</strong> feedback loop. The computer cannot participate in meaning-making—it can only execute instructions and return results.</p>
             
-            <figure>
-                <div class="placeholder-figure">
-                    <div class="icon">△</div>
-                    <div class="label">Figure: The Triadic Loop</div>
-                    <div class="description">Traditional interfaces: Language → Computation → Output (linear, meaning stays in human heads). MetaMedium: Language ↔ Computation ↔ Meaning (circular, AI participates in interpretation). The loop closes when marks become probabilistic proposals that both parties negotiate.</div>
-                </div>
-            </figure>
+            <!--
+              TRIADIC LOOP FIGURE
+              For MetaMedium Whitepaper
+
+              Usage: Insert this entire block where the figure should appear.
+              Dependencies: None (self-contained)
+              Styling: Uses CSS custom properties from whitepaper, with fallbacks
+            -->
+
+            <div class="triadic-loop-figure" id="triadicLoop">
+              <div class="triadic-controls">
+                <button class="triadic-toggle" data-mode="traditional" aria-pressed="true">Traditional</button>
+                <button class="triadic-toggle" data-mode="metamedium" aria-pressed="false">MetaMedium</button>
+              </div>
+
+              <svg viewBox="0 0 400 360" class="triadic-svg" aria-labelledby="triadicTitle triadicDesc">
+                <title id="triadicTitle">The Triadic Loop</title>
+                <desc id="triadicDesc">Diagram showing how MetaMedium closes the loop between Language, Computation, and Meaning</desc>
+
+                <defs>
+                  <!-- Gradient for active edges -->
+                  <linearGradient id="edgeGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" style="stop-color: var(--accent, #3b82f6); stop-opacity: 0.8" />
+                    <stop offset="100%" style="stop-color: var(--accent-secondary, #8b5cf6); stop-opacity: 0.8" />
+                  </linearGradient>
+
+                  <!-- Arrow marker -->
+                  <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                    <polygon points="0 0, 10 3.5, 0 7" fill="var(--accent, #3b82f6)" />
+                  </marker>
+                  <marker id="arrowheadDim" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                    <polygon points="0 0, 10 3.5, 0 7" fill="var(--border, #d4d4d4)" />
+                  </marker>
+                  <marker id="arrowheadReverse" markerWidth="10" markerHeight="7" refX="1" refY="3.5" orient="auto">
+                    <polygon points="10 0, 0 3.5, 10 7" fill="var(--accent, #3b82f6)" />
+                  </marker>
+
+                  <!-- Glow filter -->
+                  <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+                    <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+                    <feMerge>
+                      <feMergeNode in="coloredBlur"/>
+                      <feMergeNode in="SourceGraphic"/>
+                    </feMerge>
+                  </filter>
+                </defs>
+
+                <!-- Background subtle grid -->
+                <pattern id="triGrid" width="20" height="20" patternUnits="userSpaceOnUse">
+                  <path d="M 20 0 L 0 0 0 20" fill="none" stroke="var(--border, #e5e5e5)" stroke-width="0.5" opacity="0.3"/>
+                </pattern>
+                <rect width="400" height="360" fill="url(#triGrid)" />
+
+                <!-- Triangle vertices (positions) -->
+                <!-- Top: Language (200, 60) -->
+                <!-- Bottom-left: Computation (60, 300) -->
+                <!-- Bottom-right: Meaning (340, 300) -->
+
+                <!-- EDGES -->
+                <g class="triadic-edges">
+                  <!-- Language → Computation (left edge) -->
+                  <line class="edge edge-lang-comp"
+                        x1="175" y1="85" x2="85" y2="270"
+                        stroke="var(--accent, #3b82f6)" stroke-width="2"
+                        marker-end="url(#arrowhead)" />
+
+                  <!-- Computation → Meaning/Output (bottom edge) -->
+                  <line class="edge edge-comp-meaning"
+                        x1="95" y1="300" x2="305" y2="300"
+                        stroke="var(--accent, #3b82f6)" stroke-width="2"
+                        marker-end="url(#arrowhead)" />
+
+                  <!-- Meaning → Language (right edge) - initially hidden in traditional -->
+                  <line class="edge edge-meaning-lang"
+                        x1="315" y1="270" x2="225" y2="85"
+                        stroke="var(--accent, #3b82f6)" stroke-width="2"
+                        marker-end="url(#arrowhead)"
+                        opacity="0" />
+
+                  <!-- Reverse arrows (MetaMedium only) -->
+                  <line class="edge edge-reverse edge-comp-lang"
+                        x1="85" y1="255" x2="170" y2="90"
+                        stroke="var(--accent-secondary, #8b5cf6)" stroke-width="2"
+                        marker-end="url(#arrowhead)"
+                        opacity="0" />
+                  <line class="edge edge-reverse edge-meaning-comp"
+                        x1="290" y1="295" x2="110" y2="295"
+                        stroke="var(--accent-secondary, #8b5cf6)" stroke-width="2"
+                        marker-end="url(#arrowhead)"
+                        opacity="0" />
+                  <line class="edge edge-reverse edge-lang-meaning"
+                        x1="230" y1="90" x2="310" y2="255"
+                        stroke="var(--accent-secondary, #8b5cf6)" stroke-width="2"
+                        marker-end="url(#arrowhead)"
+                        opacity="0" />
+                </g>
+
+                <!-- Animated pulses (MetaMedium mode) -->
+                <g class="triadic-pulses" opacity="0">
+                  <circle class="pulse pulse-1" r="4" fill="var(--accent, #3b82f6)" filter="url(#glow)">
+                    <animateMotion dur="2s" repeatCount="indefinite" path="M175,85 L85,270 L305,300 L225,85 Z" />
+                  </circle>
+                  <circle class="pulse pulse-2" r="4" fill="var(--accent-secondary, #8b5cf6)" filter="url(#glow)">
+                    <animateMotion dur="2s" repeatCount="indefinite" begin="0.66s" path="M175,85 L85,270 L305,300 L225,85 Z" />
+                  </circle>
+                  <circle class="pulse pulse-3" r="4" fill="var(--accent, #3b82f6)" filter="url(#glow)">
+                    <animateMotion dur="2s" repeatCount="indefinite" begin="1.33s" path="M175,85 L85,270 L305,300 L225,85 Z" />
+                  </circle>
+                  <!-- Counter-rotating pulses -->
+                  <circle class="pulse pulse-4" r="3" fill="var(--accent-secondary, #8b5cf6)" opacity="0.7">
+                    <animateMotion dur="2.5s" repeatCount="indefinite" path="M225,85 L305,300 L85,270 L175,85 Z" />
+                  </circle>
+                </g>
+
+                <!-- NODES -->
+                <g class="triadic-nodes">
+                  <!-- Language Node (top) -->
+                  <g class="node node-language" transform="translate(200, 60)">
+                    <circle r="36" fill="var(--paper, #f8f6f1)" stroke="var(--accent, #3b82f6)" stroke-width="3" />
+                    <text y="5" text-anchor="middle" class="node-label" fill="var(--text, #1a1a2e)">Language</text>
+                  </g>
+
+                  <!-- Computation Node (bottom-left) -->
+                  <g class="node node-computation" transform="translate(60, 300)">
+                    <circle r="36" fill="var(--paper, #f8f6f1)" stroke="var(--accent, #3b82f6)" stroke-width="3" />
+                    <text y="5" text-anchor="middle" class="node-label" fill="var(--text, #1a1a2e)">Computation</text>
+                  </g>
+
+                  <!-- Meaning/Output Node (bottom-right) -->
+                  <g class="node node-meaning" transform="translate(340, 300)">
+                    <circle r="36" fill="var(--paper, #f8f6f1)" stroke="var(--border, #d4d4d4)" stroke-width="3" class="meaning-circle" />
+                    <text y="5" text-anchor="middle" class="node-label meaning-label" fill="var(--muted, #666)">Output</text>
+                  </g>
+                </g>
+
+                <!-- Annotations -->
+                <g class="triadic-annotations">
+                  <!-- Traditional annotation -->
+                  <text class="annotation annotation-traditional" x="200" y="345" text-anchor="middle" fill="var(--muted, #666)" font-size="12">
+                    Linear: meaning stays in human heads
+                  </text>
+                  <!-- MetaMedium annotation -->
+                  <text class="annotation annotation-metamedium" x="200" y="345" text-anchor="middle" fill="var(--accent, #3b82f6)" font-size="12" opacity="0">
+                    Circular: AI participates in interpretation
+                  </text>
+                </g>
+
+                <!-- Center label -->
+                <text class="center-label" x="200" y="210" text-anchor="middle" fill="var(--muted, #666)" font-size="11" opacity="0">
+                  negotiation
+                </text>
+              </svg>
+
+              <p class="triadic-caption">
+                <span class="caption-traditional">Traditional interfaces flow one way: we write, machines execute, outputs return. Meaning remains external.</span>
+                <span class="caption-metamedium" style="display: none;">The MetaMedium closes the loop. Marks become probabilistic proposals. Both parties negotiate meaning.</span>
+              </p>
+            </div>
+
+            <style>
+            .triadic-loop-figure {
+              --accent: #3b82f6;
+              --accent-secondary: #8b5cf6;
+              --paper: #f8f6f1;
+              --text: #1a1a2e;
+              --muted: #666;
+              --border: #d4d4d4;
+
+              margin: var(--space-lg, 2rem) 0;
+              padding: var(--space-md, 1rem);
+              background: linear-gradient(135deg, rgba(59, 130, 246, 0.03) 0%, rgba(139, 92, 246, 0.03) 100%);
+              border-radius: 12px;
+              font-family: 'Space Grotesk', system-ui, sans-serif;
+            }
+
+            .triadic-controls {
+              display: flex;
+              justify-content: center;
+              gap: 0.5rem;
+              margin-bottom: 1rem;
+            }
+
+            .triadic-toggle {
+              padding: 0.5rem 1rem;
+              border: 1px solid var(--border);
+              border-radius: 6px;
+              background: var(--paper);
+              color: var(--muted);
+              font-family: inherit;
+              font-size: 0.875rem;
+              cursor: pointer;
+              transition: all 0.2s ease;
+            }
+
+            .triadic-toggle[aria-pressed="true"] {
+              background: var(--accent);
+              border-color: var(--accent);
+              color: white;
+            }
+
+            .triadic-toggle:hover:not([aria-pressed="true"]) {
+              border-color: var(--accent);
+              color: var(--accent);
+            }
+
+            .triadic-svg {
+              width: 100%;
+              max-width: 400px;
+              height: auto;
+              display: block;
+              margin: 0 auto;
+            }
+
+            .node-label {
+              font-family: 'Space Grotesk', system-ui, sans-serif;
+              font-size: 11px;
+              font-weight: 500;
+            }
+
+            .triadic-caption {
+              text-align: center;
+              font-size: 0.875rem;
+              color: var(--muted);
+              margin-top: 1rem;
+              min-height: 2.5em;
+            }
+
+            /* Transitions */
+            .edge, .node circle, .node-label, .annotation, .center-label {
+              transition: all 0.5s ease;
+            }
+
+            .triadic-pulses {
+              transition: opacity 0.5s ease;
+            }
+
+            /* MetaMedium mode styles (applied via JS) */
+            .triadic-loop-figure.metamedium .meaning-circle {
+              stroke: var(--accent);
+            }
+
+            .triadic-loop-figure.metamedium .meaning-label {
+              fill: var(--text);
+            }
+
+            .triadic-loop-figure.metamedium .edge-meaning-lang,
+            .triadic-loop-figure.metamedium .edge-reverse {
+              opacity: 1;
+            }
+
+            .triadic-loop-figure.metamedium .triadic-pulses {
+              opacity: 1;
+            }
+
+            .triadic-loop-figure.metamedium .annotation-traditional {
+              opacity: 0;
+            }
+
+            .triadic-loop-figure.metamedium .annotation-metamedium {
+              opacity: 1;
+            }
+
+            .triadic-loop-figure.metamedium .center-label {
+              opacity: 0.7;
+            }
+
+            /* Responsive */
+            @media (max-width: 480px) {
+              .triadic-controls {
+                flex-direction: column;
+                align-items: center;
+              }
+              .triadic-toggle {
+                width: 100%;
+                max-width: 200px;
+              }
+            }
+            </style>
+
+            <script>
+            (function() {
+              const figure = document.getElementById('triadicLoop');
+              const toggles = figure.querySelectorAll('.triadic-toggle');
+              const captionTraditional = figure.querySelector('.caption-traditional');
+              const captionMetamedium = figure.querySelector('.caption-metamedium');
+              const meaningLabel = figure.querySelector('.meaning-label');
+
+              function setMode(mode) {
+                // Update toggle states
+                toggles.forEach(btn => {
+                  btn.setAttribute('aria-pressed', btn.dataset.mode === mode);
+                });
+
+                // Update figure class
+                if (mode === 'metamedium') {
+                  figure.classList.add('metamedium');
+                  captionTraditional.style.display = 'none';
+                  captionMetamedium.style.display = 'inline';
+                  meaningLabel.textContent = 'Meaning';
+                } else {
+                  figure.classList.remove('metamedium');
+                  captionTraditional.style.display = 'inline';
+                  captionMetamedium.style.display = 'none';
+                  meaningLabel.textContent = 'Output';
+                }
+              }
+
+              toggles.forEach(btn => {
+                btn.addEventListener('click', () => setMode(btn.dataset.mode));
+              });
+
+              // Optional: auto-cycle for demo
+              // let isMetamedium = false;
+              // setInterval(() => {
+              //   isMetamedium = !isMetamedium;
+              //   setMode(isMetamedium ? 'metamedium' : 'traditional');
+              // }, 4000);
+            })();
+            </script>
             
             <p>The MetaMedium closes this triad. When every mark can mean multiple things, when the system holds probabilistic interpretations and refines them through exchange, meaning becomes part of the computational loop—not something that happens only in human minds before and after the interaction.</p>
             
@@ -2363,6 +2679,7 @@
         <p class="footer-subtitle">Principles for a Diagrammatic Understanding Interface</p>
         <p class="footer-subtitle">Bibliography: <a href="https://jhanacek.net/metamedium-resources-65" target="_blank" rel="noopener"><b>Resources Page</b></a></p>
         <p class="footer-copyright">© John Hanacek 2015· <a href="https://johnhanacek.com" target="_blank" rel="noopener">JHDesign LLC</a></p>
+        <p class="footer-signature"><img src="./Assets/footer-JHsig.png" alt="John Hanacek signature" style="height: 2em; opacity: 0.7;"></p>
         <p class="version">v4 · Updated December 2025</p>
     </footer>
 
