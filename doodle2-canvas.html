@@ -1514,6 +1514,22 @@ JOHN HANACEK 2025, JHDESIGN LLC
                 <div class="reasoning-list" id="reasoningList"></div>
             </div>
 
+            <!-- Manual Selection / Something Else -->
+            <div class="fuzzy-match-container" style="margin-top: var(--space-sm);">
+                <label for="fuzzyMatchInput" style="display: block; margin-bottom: 4px; font-size: 0.6875rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em;">
+                    Type to search or name
+                </label>
+                <input
+                    type="text"
+                    id="fuzzyMatchInput"
+                    placeholder="Search library or name this..."
+                    style="width: 100%; padding: 6px 8px; font-size: 0.8125rem; border: 1px solid var(--border); border-radius: 4px; background: var(--panel-bg); color: var(--ink); font-family: var(--font-body);"
+                />
+                <div style="font-size: 0.625rem; color: var(--muted); margin-top: 4px;">
+                    Press Enter to accept • Esc to clear
+                </div>
+            </div>
+
             <!-- Expandable Fingerprint -->
             <div class="fingerprint-section" id="fingerprintSection" style="display: none;">
                 <button class="fingerprint-toggle" id="fingerprintToggle">
@@ -1611,7 +1627,6 @@ JOHN HANACEK 2025, JHDESIGN LLC
             <div id="metricsPanel"></div>
             <div class="library-row"></div>
             <div id="recognitionStatus"></div>
-            <input type="text" id="fuzzyMatchInput" />
             <input type="text" id="canvasInput" />
             <input type="range" id="smoothSlider" min="0" max="10" value="2" />
             <span id="smoothValue">2</span>
