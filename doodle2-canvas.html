@@ -193,16 +193,16 @@ JOHN HANACEK 2025, JHDESIGN LLC
 
         .recognition-overlay {
             position: fixed;
-            top: var(--space-xl);
+            top: var(--space-xs);
             right: var(--space-xs);
             z-index: 100;
-            width: 280px;
+            width: 260px;
             max-height: calc(100vh - var(--space-lg) * 2);
             background: var(--panel-bg);
             backdrop-filter: blur(12px);
             border: 1px solid var(--panel-border);
             border-radius: 8px;
-            padding: var(--space-lg);
+            padding: var(--space-sm);
             box-shadow: 0 2px 12px var(--shadow);
             overflow-y: auto;
             display: flex;
@@ -1461,9 +1461,11 @@ JOHN HANACEK 2025, JHDESIGN LLC
             <h1 class="header-title">MetaMedium Canvas</h1>
             <div class="header-actions">
                 <button id="clearBtn" class="header-btn">Clear</button>
-                <button id="undoBtn" class="header-btn">Undo</button>
+               <!-- 
+                   <button id="undoBtn" class="header-btn">Undo</button>
                 <button id="redoBtn" class="header-btn">Redo</button>
-                <button id="debugToggleBtn" class="header-btn">Debug</button>
+               -->
+                <button id="debugToggleBtn" class="header-btn">Semantic Show</button>
             </div>
         </div>
 
@@ -8713,7 +8715,7 @@ JOHN HANACEK 2025, JHDESIGN LLC
             debugToggleBtn.addEventListener('click', () => {
                 state.debugMode = !state.debugMode;
                 debugCheckbox.checked = state.debugMode;
-                debugToggleBtn.textContent = state.debugMode ? 'Debug On' : 'Debug Off';
+                debugToggleBtn.textContent = state.debugMode ? 'Semantic Hide' : 'Semantic Show';
                 debugToggleBtn.classList.toggle('active', state.debugMode);
                 render();
             });
