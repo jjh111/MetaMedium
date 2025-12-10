@@ -1501,6 +1501,13 @@ JOHN HANACEK 2025, JHDESIGN LLC
                     <span>▼</span>
                 </button>
                 <div class="fingerprint-details" id="fingerprintDetails">
+                    <!-- Phase 2: Stroke Visualization -->
+                    <div style="text-align: center; margin-bottom: var(--space-sm);">
+                        <canvas id="strokePreview" width="120" height="120" style="border: 1px solid var(--border); border-radius: 4px; background: #fafafa;"></canvas>
+                        <div style="font-size: 0.6875rem; color: var(--muted); margin-top: 0.25rem;">
+                            Analyzed Stroke (gray) + Corners (red)
+                        </div>
+                    </div>
                     <div class="fingerprint-grid" id="fingerprintGrid"></div>
                 </div>
             </div>
@@ -3217,63 +3224,95 @@ JOHN HANACEK 2025, JHDESIGN LLC
             const cancelSaveBtn = document.getElementById('cancelSaveBtn');
 
             // Utility functions
-            function countCorners(points, angleThreshold = Math.PI / 3) {
-                // Count significant direction changes (corners)
-                // Angle threshold = 60 degrees (π/3) - catches hand-drawn corners
-                if (points.length < 15) return { count: 0, angles: [] };
+            // PHASE 1: Convex Hull Corner Detection (Robust & Accurate)
+            function countCorners(points, maxCorners = 8, isClosed = false) {
+                // Detects ACTUAL CORNERS (angle changes), not just hull vertices
+                // Key distinctions:
+                // - Line endpoints ≠ corners (open shapes)
+                // - Circle vertices ≠ corners (smooth curves)
+                // - Only polygon angle changes = corners (rectangles, triangles)
 
-                const cornerPositions = [];
-                const windowSize = 8; // Smaller window to catch sharper corners
+                if (points.length < 4) return { count: 0, angles: [], cornerData: [] };
 
-                // Sample every 4 points to catch corners better
-                for (let i = windowSize; i < points.length - windowSize; i += 4) {
-                    // Get vectors before and after this point
-                    const before = {
-                        x: points[i].x - points[i - windowSize].x,
-                        y: points[i].y - points[i - windowSize].y
-                    };
-                    const after = {
-                        x: points[i + windowSize].x - points[i].x,
-                        y: points[i + windowSize].y - points[i].y
-                    };
+                // 1. Simplify to remove noise but preserve shape
+                const simplified = simplifyStroke(points, 2.0);
+                if (simplified.length < 3) return { count: 0, angles: [], cornerData: [] };
 
-                    // Calculate angle between vectors
-                    const dotProduct = before.x * after.x + before.y * after.y;
-                    const magBefore = Math.sqrt(before.x * before.x + before.y * before.y);
-                    const magAfter = Math.sqrt(after.x * after.x + after.y * after.y);
+                // 2. For OPEN shapes (lines, arcs), don't use convex hull
+                // Just return 0 corners - endpoints are NOT corners
+                if (!isClosed) {
+                    return { count: 0, angles: [], cornerData: [] };
+                }
 
-                    if (magBefore === 0 || magAfter === 0) continue;
+                // 3. Compute convex hull (outer boundary of closed shape)
+                const hull = convexHull(simplified);
+                if (hull.length < 3) return { count: 0, angles: [], cornerData: [] };
 
-                    const cosAngle = dotProduct / (magBefore * magAfter);
-                    const angle = Math.acos(Math.max(-1, Math.min(1, cosAngle)));
+                // Special case: If hull has very few vertices, be strict
+                // Small hulls might be circles/smooth curves, not polygons
+                if (hull.length === 2) {
+                    return { count: 0, angles: [], cornerData: [] };
+                }
 
-                    // If angle > threshold (90 degrees), it's a sharp corner
-                    if (angle > angleThreshold) {
-                        cornerPositions.push({ index: i, angle: angle });
+                // 3. Analyze angles at each hull vertex to find TRUE corners
+                const cornerCandidates = [];
+                for (let i = 0; i < hull.length; i++) {
+                    const prev = hull[(i - 1 + hull.length) % hull.length];
+                    const curr = hull[i];
+                    const next = hull[(i + 1) % hull.length];
+
+                    // Calculate interior angle at this vertex
+                    const angleData = Angle(prev, curr, next);
+                    const angleDeg = angleData.degrees;
+                    const angleRad = angleData.radians;
+
+                    // Sharpness = deviation from straight (180°)
+                    // TRUE corners have significant angle changes
+                    const sharpness = Math.abs(180 - angleDeg);
+
+                    // STRICT threshold: 40° deviation minimum for corner detection
+                    // This prevents counting smooth curve vertices as corners
+                    // 140° or sharper = corner (rectangles ~90°, triangles ~60°)
+                    if (sharpness > 40) {
+                        cornerCandidates.push({
+                            point: curr,
+                            angle: angleRad,
+                            angleDeg: angleDeg,
+                            sharpness: sharpness,
+                            index: i
+                        });
                     }
                 }
 
-                // Cluster corners - merge corners within 20 points of each other
-                if (cornerPositions.length === 0) return { count: 0, angles: [] };
-
-                const clusteredCorners = [cornerPositions[0]];
-                for (let i = 1; i < cornerPositions.length; i++) {
-                    const lastCorner = clusteredCorners[clusteredCorners.length - 1];
-                    const distance = cornerPositions[i].index - lastCorner.index;
-
-                    if (distance > 20) {
-                        // Far enough away, it's a new corner
-                        clusteredCorners.push(cornerPositions[i]);
-                    } else if (cornerPositions[i].angle > lastCorner.angle) {
-                        // Same cluster, but this corner is sharper - replace
-                        clusteredCorners[clusteredCorners.length - 1] = cornerPositions[i];
+                // 4. Additional filtering: If we only found 1-2 weak corners on a small hull,
+                // it's likely a smooth curve (circle/arc), not a polygon
+                if (cornerCandidates.length <= 2 && hull.length <= 6) {
+                    if (cornerCandidates.length === 0) {
+                        // No corners found = smooth curve
+                        return { count: 0, angles: [], cornerData: [] };
+                    }
+                    // Check if corners are actually sharp enough for polygons
+                    const avgSharpness = cornerCandidates.reduce((sum, c) => sum + c.sharpness, 0) / cornerCandidates.length;
+                    if (avgSharpness < 60) {
+                        // Weak corners on small hull = smooth curve
+                        return { count: 0, angles: [], cornerData: [] };
                     }
                 }
+
+                // 5. Sort by sharpness (sharpest corners first)
+                cornerCandidates.sort((a, b) => b.sharpness - a.sharpness);
+
+                // 6. Take top N corners (up to maxCorners)
+                const selectedCorners = cornerCandidates.slice(0, Math.min(cornerCandidates.length, maxCorners));
+
+                // 7. Sort back by position for consistent ordering
+                selectedCorners.sort((a, b) => a.index - b.index);
 
                 return {
-                    count: clusteredCorners.length,
-                    angles: clusteredCorners.map(c => c.angle),  // Angle values for fingerprint
-                    cornerData: clusteredCorners  // Full corner objects with {index, angle} for refinement
+                    count: selectedCorners.length,
+                    angles: selectedCorners.map(c => c.angle),
+                    angleDegrees: selectedCorners.map(c => c.angleDeg),
+                    cornerData: selectedCorners
                 };
             }
 
@@ -3411,6 +3450,10 @@ JOHN HANACEK 2025, JHDESIGN LLC
             }
 
             function getFingerprint(points) {
+                // RECOGNITION PIPELINE: Fingerprint raw stroke BEFORE any smoothing
+                // This function uses simplification (Douglas-Peucker) which removes noise
+                // but preserves corners, unlike smoothing (Chaikin) which rounds corners
+
                 const bounds = getBounds(points);
                 const width = bounds.maxX - bounds.minX;
                 const height = bounds.maxY - bounds.minY;
@@ -3421,18 +3464,27 @@ JOHN HANACEK 2025, JHDESIGN LLC
                     Math.pow(end.y - start.y, 2)
                 );
 
-                // Get corner data (count + angles + positions)
-                const cornerData = countCorners(points);
+                // SIMPLIFY (not smooth): removes jitter/noise, preserves corners and straight edges
+                // This is essential for accurate corner detection and straightness calculation
+                const simplified = simplifyStroke(points, 1.5);
+
+                // Check if stroke is closed BEFORE analyzing corners
+                // This info is needed by corner detector to handle open vs closed shapes
+                const isClosed = isStrokeClosed(points);
+
+                // Analyze geometry on simplified stroke (clean data, intact corners)
+                // Pass isClosed flag so corner detector knows not to count endpoints as corners
+                const cornerData = countCorners(simplified, 8, isClosed);
                 const angleAnalysis = analyzeCornerAngles(cornerData.angles);
 
                 return {
                     aspectRatio: height === 0 ? 1 : width / height,
-                    straightness: calculateStraightness(points),
-                    isClosed: isStrokeClosed(points),
+                    straightness: calculateStraightness(simplified),
+                    isClosed: isClosed,
                     closureDistance: endDistance,
                     corners: cornerData.count,
                     cornerAngles: cornerData.angles,
-                    cornerData: cornerData.cornerData,  // Cache corner positions for refinement
+                    cornerData: cornerData.cornerData,
                     angleAnalysis: angleAnalysis,
                     bounds: bounds,
                     size: Math.max(width, height),
@@ -5150,13 +5202,18 @@ JOHN HANACEK 2025, JHDESIGN LLC
                 const results = [];
                 const checks = [];
 
-                // STRATEGY: Test shapes in priority order (specific → generic)
-                // Priority Order:
-                // 1. Line (open + straight) - FITTING METHOD, not in library
+                // PHASE 1 IMPROVEMENTS: Convex Hull Corner Detection
+                // - Replaced sliding window angle analysis with convex hull approach
+                // - More robust to drawing speed, noise, and stroke length
+                // - Exact corner counts: Triangle=3, Rectangle=4, Circle≤2
+                // - Adjusted straightness thresholds for better shape separation
+                //
+                // RECOGNITION STRATEGY: Test shapes in priority order (specific → generic)
+                // 1. Line (open + very straight) - FITTING METHOD, not in library
                 // 2. Arc (open + curved) - FITTING METHOD, not in library
-                // 3. Triangle (3 corners + closed) - library primitive
-                // 4. Rectangle (4 corners + closed) - library primitive
-                // 5. Circle (closed + curved, any aspect ratio) - library primitive, catch-all for curves
+                // 3. Triangle (exactly 3 corners, closed) - library primitive
+                // 4. Rectangle (exactly 4 corners, closed, straight edges) - library primitive
+                // 5. Circle (0-2 corners, closed, very curved) - library primitive, catch-all
                 //
                 // Note: Line and Arc are curve fitting methods, not reusable shapes
                 // Circle handles both circular and elliptical (aspect ratio is a parameter)
@@ -5206,70 +5263,74 @@ JOHN HANACEK 2025, JHDESIGN LLC
                     results.push({ type: 'arc', confidence: 0.7, label: 'Arc' });
                 }
 
-                // 3. Triangle checks
+                // 3. Triangle checks (3 corners, closed)
                 const triangleChecks = {
                     isClosed: fp.isClosed,
-                    hasThreeCorners: fp.corners >= 2 && fp.corners <= 3,  // 2-3 corners (hand-drawn may miss one)
+                    hasThreeCorners: fp.corners === 3,  // EXACT 3 corners from convex hull
+                    notTooStraight: fp.straightness < 0.8,  // Some curvature allowed
                     reasonableShape: fp.aspectRatio >= 0.3 && fp.aspectRatio <= 3.0
                 };
 
                 checks.push({
                     shape: 'Triangle',
-                    passed: triangleChecks.isClosed && triangleChecks.hasThreeCorners && triangleChecks.reasonableShape,
+                    passed: triangleChecks.isClosed && triangleChecks.hasThreeCorners && triangleChecks.notTooStraight && triangleChecks.reasonableShape,
                     conditions: [
-                        { test: 'Is closed?', pass: triangleChecks.isClosed, detail: `End distance: ${fp.closureDistance.toFixed(1)}px (checks overshoot too)` },
-                        { test: 'Has 3 corners?', pass: triangleChecks.hasThreeCorners, detail: `Corners: ${fp.corners} (need: 2-3)` },
-                        { test: 'Reasonable shape?', pass: triangleChecks.reasonableShape, detail: `Aspect: ${fp.aspectRatio.toFixed(2)} (need: 0.3-3.0)` }
+                        { test: 'Is closed?', pass: triangleChecks.isClosed, detail: `Gap: ${fp.closureDistance.toFixed(1)}px` },
+                        { test: 'Has 3 corners?', pass: triangleChecks.hasThreeCorners, detail: `Corners: ${fp.corners} (need: exactly 3)` },
+                        { test: 'Not too straight?', pass: triangleChecks.notTooStraight, detail: `Straightness: ${fp.straightness.toFixed(2)} (need: <0.8)` },
+                        { test: 'Reasonable shape?', pass: triangleChecks.reasonableShape, detail: `Aspect: ${fp.aspectRatio.toFixed(2)} (0.3-3.0)` }
                     ]
                 });
 
-                if (triangleChecks.isClosed && triangleChecks.hasThreeCorners && triangleChecks.reasonableShape) {
+                if (triangleChecks.isClosed && triangleChecks.hasThreeCorners && triangleChecks.notTooStraight && triangleChecks.reasonableShape) {
                     results.push({ type: 'triangle', confidence: 0.85, label: 'Triangle' });
                 }
 
-                // Rectangle checks
+                // 4. Rectangle checks (4 corners, closed, fairly straight edges)
                 const rectangleChecks = {
                     isClosed: fp.isClosed,
-                    hasFourCorners: fp.corners >= 3 && fp.corners <= 4,  // 3-4 corners (hand-drawn may miss one)
+                    hasFourCorners: fp.corners === 4,  // EXACT 4 corners from convex hull
+                    straightEnough: fp.straightness > 0.4,  // Straighter than circles/triangles
                     aspectRatioOk: fp.aspectRatio > 0.3 && fp.aspectRatio < 3.0
                 };
 
                 checks.push({
                     shape: 'Rectangle',
-                    passed: rectangleChecks.isClosed && rectangleChecks.hasFourCorners && rectangleChecks.aspectRatioOk,
+                    passed: rectangleChecks.isClosed && rectangleChecks.hasFourCorners && rectangleChecks.straightEnough && rectangleChecks.aspectRatioOk,
                     conditions: [
-                        { test: 'Is closed?', pass: rectangleChecks.isClosed, detail: `End distance: ${fp.closureDistance.toFixed(1)}px` },
-                        { test: 'Has 4 corners?', pass: rectangleChecks.hasFourCorners, detail: `Corners: ${fp.corners} (need: 3-4)` },
-                        { test: 'Reasonable shape?', pass: rectangleChecks.aspectRatioOk, detail: `Aspect: ${fp.aspectRatio.toFixed(2)} (need: 0.3-3.0)` }
+                        { test: 'Is closed?', pass: rectangleChecks.isClosed, detail: `Gap: ${fp.closureDistance.toFixed(1)}px` },
+                        { test: 'Has 4 corners?', pass: rectangleChecks.hasFourCorners, detail: `Corners: ${fp.corners} (need: exactly 4)` },
+                        { test: 'Straight edges?', pass: rectangleChecks.straightEnough, detail: `Straightness: ${fp.straightness.toFixed(2)} (need: >0.4)` },
+                        { test: 'Reasonable shape?', pass: rectangleChecks.aspectRatioOk, detail: `Aspect: ${fp.aspectRatio.toFixed(2)} (0.3-3.0)` }
                     ]
                 });
 
-                if (rectangleChecks.isClosed && rectangleChecks.hasFourCorners && rectangleChecks.aspectRatioOk) {
+                if (rectangleChecks.isClosed && rectangleChecks.hasFourCorners && rectangleChecks.straightEnough && rectangleChecks.aspectRatioOk) {
                     results.push({ type: 'rectangle', confidence: 0.8, label: 'Rectangle' });
                 }
 
-                // 5. CIRCLE checks (closed + curved, any aspect ratio) - GENERIC CATCH-ALL for curves
+                // 5. CIRCLE checks (closed + curved, 0-2 corners, very curvy)
                 // Note: Circle can be circular (aspectRatio ~1) or elliptical (aspectRatio ≠ 1)
-                // Both are the same primitive, just with different aspectRatio parameter
+                // Convex hull might find a few corners on imperfect circles, so allow 0-2
                 const circleChecks = {
                     isClosed: fp.isClosed || hasOvershoot,
-                    fewCorners: fp.corners <= 1,
-                    notStraight: fp.straightness < 0.5,
-                    reasonableRatio: fp.aspectRatio >= 0.3 && fp.aspectRatio <= 3.0  // Accept any reasonable aspect ratio
+                    fewCorners: fp.corners <= 2,  // Allow up to 2 corners for hand-drawn circles
+                    veryCurved: fp.straightness < 0.35,  // Must be very curvy (not polygon-like)
+                    reasonableRatio: fp.aspectRatio >= 0.3 && fp.aspectRatio <= 3.0
                 };
 
                 checks.push({
                     shape: 'Circle',
-                    passed: circleChecks.isClosed && circleChecks.fewCorners && circleChecks.notStraight && circleChecks.reasonableRatio,
+                    passed: circleChecks.isClosed && circleChecks.fewCorners && circleChecks.veryCurved && circleChecks.reasonableRatio,
                     conditions: [
-                        { test: 'Is closed?', pass: circleChecks.isClosed, detail: `End: ${fp.closureDistance.toFixed(1)}px ${hasOvershoot ? '(overshoot ✓)' : ''}` },
-                        { test: 'Few corners?', pass: circleChecks.fewCorners, detail: `Corners: ${fp.corners} (need: ≤1)` },
-                        { test: 'Is curved?', pass: circleChecks.notStraight, detail: `Straightness: ${fp.straightness.toFixed(2)} (need: <0.5)` },
-                        { test: 'Reasonable ratio?', pass: circleChecks.reasonableRatio, detail: `Ratio: ${fp.aspectRatio.toFixed(2)} (0.3-3.0)${Math.abs(fp.aspectRatio - 1) > 0.4 ? ' [elliptical]' : ' [circular]'}` }
+                        { test: 'Is closed?', pass: circleChecks.isClosed, detail: `Gap: ${fp.closureDistance.toFixed(1)}px ${hasOvershoot ? '(overshoot ✓)' : ''}` },
+                        { test: 'Few corners?', pass: circleChecks.fewCorners, detail: `Corners: ${fp.corners} (need: ≤2)` },
+                        { test: 'Very curved?', pass: circleChecks.veryCurved, detail: `Straightness: ${fp.straightness.toFixed(2)} (need: <0.35)` },
+                        { test: 'Reasonable ratio?', pass: circleChecks.reasonableRatio, detail: `Aspect: ${fp.aspectRatio.toFixed(2)} (0.3-3.0)${Math.abs(fp.aspectRatio - 1) > 0.4 ? ' [elliptical]' : ' [circular]'}` }
                     ]
                 });
 
-                if (circleChecks.isClosed && circleChecks.fewCorners && circleChecks.notStraight && circleChecks.reasonableRatio) {
+                if (circleChecks.isClosed && circleChecks.fewCorners && circleChecks.veryCurved && circleChecks.reasonableRatio) {
                     results.push({ type: 'circle', confidence: 0.8, label: 'Circle' });
                 }
 
@@ -7272,6 +7333,89 @@ JOHN HANACEK 2025, JHDESIGN LLC
                 return allMatches;
             }
 
+            // PHASE 2: Stroke Visualization
+            function renderStrokePreview(points, fingerprint) {
+                const previewCanvas = document.getElementById('strokePreview');
+                if (!previewCanvas || !points || points.length < 2) return;
+
+                const ctx = previewCanvas.getContext('2d');
+                const size = 120;
+                ctx.clearRect(0, 0, size, size);
+
+                // Get bounds of original stroke
+                const bounds = getBounds(points);
+                const width = bounds.maxX - bounds.minX;
+                const height = bounds.maxY - bounds.minY;
+                const maxDim = Math.max(width, height);
+
+                // Scale factor to fit in canvas with padding
+                const padding = 15;
+                const scale = (size - padding * 2) / maxDim;
+
+                // Center offset
+                const offsetX = padding + (size - padding * 2 - width * scale) / 2 - bounds.minX * scale;
+                const offsetY = padding + (size - padding * 2 - height * scale) / 2 - bounds.minY * scale;
+
+                // Transform function
+                const transform = (p) => ({
+                    x: p.x * scale + offsetX,
+                    y: p.y * scale + offsetY
+                });
+
+                // 1. Draw simplified stroke in gray
+                const simplified = simplifyStroke(points, 2.0);
+                ctx.strokeStyle = '#999';
+                ctx.lineWidth = 2;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                ctx.beginPath();
+                simplified.forEach((p, i) => {
+                    const tp = transform(p);
+                    if (i === 0) ctx.moveTo(tp.x, tp.y);
+                    else ctx.lineTo(tp.x, tp.y);
+                });
+                ctx.stroke();
+
+                // 2. Draw convex hull in light purple (optional - helps see shape boundary)
+                const hull = convexHull(simplified);
+                if (hull.length > 2) {
+                    ctx.strokeStyle = 'rgba(124, 58, 237, 0.3)';
+                    ctx.lineWidth = 1.5;
+                    ctx.setLineDash([3, 3]);
+                    ctx.beginPath();
+                    hull.forEach((p, i) => {
+                        const tp = transform(p);
+                        if (i === 0) ctx.moveTo(tp.x, tp.y);
+                        else ctx.lineTo(tp.x, tp.y);
+                    });
+                    ctx.closePath();
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                }
+
+                // 3. Draw detected corners as red dots
+                if (fingerprint && fingerprint.cornerData && fingerprint.cornerData.length > 0) {
+                    ctx.fillStyle = '#ef4444';
+                    fingerprint.cornerData.forEach(corner => {
+                        if (corner.point) {
+                            const tp = transform(corner.point);
+                            ctx.beginPath();
+                            ctx.arc(tp.x, tp.y, 4, 0, Math.PI * 2);
+                            ctx.fill();
+                        }
+                    });
+                }
+
+                // 4. Draw corner count label
+                if (fingerprint && fingerprint.corners !== undefined) {
+                    ctx.fillStyle = '#7C3AED';
+                    ctx.font = 'bold 11px monospace';
+                    ctx.textAlign = 'right';
+                    ctx.textBaseline = 'top';
+                    ctx.fillText(`${fingerprint.corners} corners`, size - 5, 5);
+                }
+            }
+
             function showSuggestions(analysis) {
                 // Primitive suggestions from stroke analysis
                 const allResults = analysis ? analysis.results : [];
@@ -7303,12 +7447,52 @@ JOHN HANACEK 2025, JHDESIGN LLC
                 const fingerprintSection = document.getElementById('fingerprintSection');
                 const fingerprintGrid = document.getElementById('fingerprintGrid');
 
-                if (suggestions.length === 0) {
-                    // No matches
-                    topMatch.style.display = 'none';
-                    candidatesList.innerHTML = '<div style="text-align: center; color: var(--muted); font-size: 0.875rem; padding: 1rem;">Draw a shape to see recognition...</div>';
-                    reasoningSection.style.display = 'none';
+                // PHASE 2: Always show fingerprint if we have analysis (even with no matches)
+                if (analysis && analysis.fingerprint) {
+                    fingerprintSection.style.display = 'block';
+
+                    // Render stroke visualization
+                    if (state.selectedStrokeIndex !== null && state.strokes[state.selectedStrokeIndex]) {
+                        renderStrokePreview(state.strokes[state.selectedStrokeIndex], analysis.fingerprint);
+                    }
+
+                    // Show fingerprint data
+                    const fp = analysis.fingerprint;
+                    fingerprintGrid.innerHTML = `
+                        <div class="fingerprint-item">
+                            <div class="fingerprint-label">Straightness</div>
+                            <div class="fingerprint-value">${fp.straightness.toFixed(3)}</div>
+                        </div>
+                        <div class="fingerprint-item">
+                            <div class="fingerprint-label">Aspect</div>
+                            <div class="fingerprint-value">${fp.aspectRatio.toFixed(3)}</div>
+                        </div>
+                        <div class="fingerprint-item">
+                            <div class="fingerprint-label">Corners</div>
+                            <div class="fingerprint-value">${fp.corners}</div>
+                        </div>
+                        <div class="fingerprint-item">
+                            <div class="fingerprint-label">Closed</div>
+                            <div class="fingerprint-value">${fp.isClosed ? 'Yes' : 'No'}</div>
+                        </div>
+                        <div class="fingerprint-item">
+                            <div class="fingerprint-label">Gap</div>
+                            <div class="fingerprint-value">${Math.round(fp.closureDistance)}px</div>
+                        </div>
+                        <div class="fingerprint-item">
+                            <div class="fingerprint-label">Size</div>
+                            <div class="fingerprint-value">${Math.round(fp.size)}px</div>
+                        </div>
+                    `;
+                } else {
                     fingerprintSection.style.display = 'none';
+                }
+
+                if (suggestions.length === 0) {
+                    // No recognition matches, but fingerprint shown above
+                    topMatch.style.display = 'none';
+                    candidatesList.innerHTML = '<div style="text-align: center; color: var(--muted); font-size: 0.875rem; padding: 1rem;">No strong matches found</div>';
+                    reasoningSection.style.display = 'none';
                     return;
                 }
 
@@ -7394,37 +7578,9 @@ JOHN HANACEK 2025, JHDESIGN LLC
                         reasoningList.appendChild(item);
                     });
 
-                    // Show fingerprint data
-                    fingerprintSection.style.display = 'block';
-                    fingerprintGrid.innerHTML = `
-                        <div class="fingerprint-item">
-                            <div class="fingerprint-label">Straightness</div>
-                            <div class="fingerprint-value">${fp.straightness.toFixed(3)}</div>
-                        </div>
-                        <div class="fingerprint-item">
-                            <div class="fingerprint-label">Aspect</div>
-                            <div class="fingerprint-value">${fp.aspectRatio.toFixed(3)}</div>
-                        </div>
-                        <div class="fingerprint-item">
-                            <div class="fingerprint-label">Corners</div>
-                            <div class="fingerprint-value">${fp.corners}</div>
-                        </div>
-                        <div class="fingerprint-item">
-                            <div class="fingerprint-label">Closed</div>
-                            <div class="fingerprint-value">${fp.isClosed ? 'Yes' : 'No'}</div>
-                        </div>
-                        <div class="fingerprint-item">
-                            <div class="fingerprint-label">Gap</div>
-                            <div class="fingerprint-value">${Math.round(fp.closureDistance)}px</div>
-                        </div>
-                        <div class="fingerprint-item">
-                            <div class="fingerprint-label">Size</div>
-                            <div class="fingerprint-value">${Math.round(fp.size)}px</div>
-                        </div>
-                    `;
+                    // Fingerprint already shown above - no need to duplicate
                 } else {
                     reasoningSection.style.display = 'none';
-                    fingerprintSection.style.display = 'none';
                 }
 
                 // Legacy support - also update old suggestionsDiv (hidden)
@@ -7943,6 +8099,211 @@ JOHN HANACEK 2025, JHDESIGN LLC
             });
 
             canvas.addEventListener('mouseleave', () => {
+                if (state.isDrawing) {
+                    if (state.currentStroke.length > 0) {
+                        state.strokes.push([...state.currentStroke]);
+                        state.strokeIds.push(`stroke-${state.nextStrokeId++}`); // PHASE 5.5C
+                        state.context.push(''); // Unaccepted initially
+                        state.semanticData.push(null); // Will be filled when accepted
+
+                        const analysis = analyzeStrokeDetailed(state.currentStroke);
+                        state.selectedStrokeIndex = state.strokes.length - 1;
+                        state.lastFingerprint = analysis.fingerprint;  // Cache for refinement
+
+                        // UNIFIED GEOMETRY: Create geometric shape for ALL strokes
+                        let geometricType = 'curve';
+                        let geometricLabel = 'curve';
+
+                        if (analysis.results.length > 0) {
+                            const topResult = analysis.results[0];
+                            geometricType = topResult.type;
+                            geometricLabel = topResult.label;
+                        }
+
+                        const shape = extractGeometricShape(
+                            state.currentStroke,
+                            geometricType,
+                            analysis.fingerprint,
+                            geometricLabel,
+                            false  // accepted = false
+                        );
+
+                        state.shapes.push(shape);
+
+                        // PHASE 5.5A: Record stroke creation for undo
+                        const afterState = captureState();
+                        recordAction('draw-stroke', {
+                            strokes: state.strokes.slice(0, -1),
+                            strokeIds: state.strokeIds.slice(0, -1),  // PHASE 5.5C
+                            context: state.context.slice(0, -1),
+                            shapes: state.shapes.slice(0, -1),
+                            refinedStrokes: state.refinedStrokes.slice(0, -1),
+                            semanticData: state.semanticData.slice(0, -1),
+                            selectedStrokeIndex: null,
+                            suggestions: []
+                        }, afterState, {
+                            strokeIndex: state.strokes.length - 1,
+                            topSuggestion: analysis.results.length > 0 ? analysis.results[0].type : 'none'
+                        });
+
+                        updateMetrics(analysis);
+                        showSuggestions(analysis);
+
+                        // Update refined strokes if refinement is enabled
+                        if (state.refinement.enabled) {
+                            updateRefinedStrokes();
+                        }
+                    }
+                    state.isDrawing = false;
+                    state.currentStroke = [];
+                    render();
+                }
+            });
+
+            // Touch events for mobile support
+            console.log('Attaching touch events to canvas...');
+
+            canvas.addEventListener('touchstart', (e) => {
+                e.preventDefault(); // Prevent scrolling while drawing
+                const touch = e.touches[0];
+                const rect = canvas.getBoundingClientRect();
+                const point = {
+                    x: touch.clientX - rect.left,
+                    y: touch.clientY - rect.top
+                };
+                state.isDrawing = true;
+                state.currentStroke = [point];
+            });
+
+            canvas.addEventListener('touchmove', (e) => {
+                if (!state.isDrawing) return;
+                e.preventDefault(); // Prevent scrolling while drawing
+
+                const touch = e.touches[0];
+                const rect = canvas.getBoundingClientRect();
+                const point = {
+                    x: touch.clientX - rect.left,
+                    y: touch.clientY - rect.top
+                };
+                state.currentStroke.push(point);
+                render();
+            });
+
+            canvas.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                if (state.currentStroke.length > 0) {
+                    // DAY 5: Check for point detection (zero-length stroke)
+                    const isPoint = checkIfPoint(state.currentStroke);
+
+                    if (isPoint) {
+                        // Calculate average position (in case of tiny movement)
+                        const avgX = state.currentStroke.reduce((sum, p) => sum + p.x, 0) / state.currentStroke.length;
+                        const avgY = state.currentStroke.reduce((sum, p) => sum + p.y, 0) / state.currentStroke.length;
+
+                        // Add to legacy arrays
+                        state.strokes.push([...state.currentStroke]);
+                        state.strokeIds.push(`stroke-${state.nextStrokeId++}`); // PHASE 5.5C
+                        state.context.push('point');
+                        state.semanticData.push({ type: 'point', x: avgX, y: avgY });
+
+                        // DAY 5: Create Shape object
+                        const pointShape = createPointShape(avgX, avgY, 'point', true);
+                        state.shapes.push(pointShape);
+
+                        // PHASE 5.5A: Record stroke creation for undo
+                        const afterState = captureState();
+                        recordAction('draw-point', {
+                            strokes: state.strokes.slice(0, -1),
+                            strokeIds: state.strokeIds.slice(0, -1),  // PHASE 5.5C
+                            context: state.context.slice(0, -1),
+                            shapes: state.shapes.slice(0, -1),
+                            refinedStrokes: state.refinedStrokes.slice(0, -1),
+                            semanticData: state.semanticData.slice(0, -1),
+                            selectedStrokeIndex: null,
+                            suggestions: []
+                        }, afterState, {
+                            strokeIndex: state.strokes.length - 1,
+                            type: 'point'
+                        });
+
+                        // Update UI
+                        state.selectedStrokeIndex = state.strokes.length - 1;
+                        recognitionStatus.textContent = 'Point detected';
+                        recognitionStatus.style.background = '#4CAF50';
+                        recognitionStatus.style.color = '#fff';
+
+                    } else {
+                        // Normal stroke processing
+                        state.strokes.push([...state.currentStroke]);
+                        state.strokeIds.push(`stroke-${state.nextStrokeId++}`); // PHASE 5.5C
+                        state.context.push(''); // Unaccepted initially
+                        state.semanticData.push(null); // Will be filled when accepted
+
+                        try {
+                            // Analyze and show detailed results
+                            const analysis = analyzeStrokeDetailed(state.currentStroke);
+                            state.selectedStrokeIndex = state.strokes.length - 1;
+                            state.lastFingerprint = analysis.fingerprint;  // Cache for refinement
+
+                            // UNIFIED GEOMETRY: Create geometric shape for ALL strokes
+                            // Determine best-fit geometry based on analysis
+                            let geometricType = 'curve'; // Default fallback
+                            let geometricLabel = 'curve';
+
+                            if (analysis.results.length > 0) {
+                                // Use top recognition result for geometry type
+                                const topResult = analysis.results[0];
+                                geometricType = topResult.type;
+                                geometricLabel = topResult.label;
+                            }
+
+                            // Create geometric shape (unaccepted initially)
+                            const shape = extractGeometricShape(
+                                state.currentStroke,
+                                geometricType,
+                                analysis.fingerprint,
+                                geometricLabel,
+                                false  // accepted = false (unaccepted stroke)
+                            );
+
+                            state.shapes.push(shape);
+
+                            // PHASE 5.5A: Record stroke creation for undo
+                            const afterState = captureState();
+                            recordAction('draw-stroke', {
+                                strokes: state.strokes.slice(0, -1),
+                                strokeIds: state.strokeIds.slice(0, -1),  // PHASE 5.5C
+                                context: state.context.slice(0, -1),
+                                shapes: state.shapes.slice(0, -1),
+                                refinedStrokes: state.refinedStrokes.slice(0, -1),
+                                semanticData: state.semanticData.slice(0, -1),
+                                selectedStrokeIndex: null,
+                                suggestions: []
+                            }, afterState, {
+                                strokeIndex: state.strokes.length - 1,
+                                topSuggestion: analysis.results.length > 0 ? analysis.results[0].type : 'none'
+                            });
+
+                            updateMetrics(analysis);
+                            showSuggestions(analysis);
+                        } catch (error) {
+                            console.error('Error in analysis:', error);
+                            alert('Error analyzing stroke: ' + error.message);
+                        }
+
+                        // Update refined strokes if refinement is enabled
+                        if (state.refinement.enabled) {
+                            updateRefinedStrokes();
+                        }
+                    }
+                }
+                state.isDrawing = false;
+                state.currentStroke = [];
+                render();
+            });
+
+            canvas.addEventListener('touchcancel', (e) => {
+                e.preventDefault();
                 if (state.isDrawing) {
                     if (state.currentStroke.length > 0) {
                         state.strokes.push([...state.currentStroke]);
