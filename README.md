@@ -1,5 +1,8 @@
+MetaMedium interactive whitepaper:
+
 https://jjh111.github.io/MetaMedium/MetaMedium_Whitepaper_v4.html
 
+Supplimental resources page:
 https://jhanacek.net/metamedium-resources-65
 
 MetaMedium Canvas Demo - Computational Intelligence Made Visible
