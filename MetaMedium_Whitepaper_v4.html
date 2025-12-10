@@ -1119,9 +1119,9 @@
                 <li><a href="#abstract">Overview</a></li>
                 <li><a href="#problem">Problem</a></li>
                 <li><a href="#vision">Vision</a></li>
-                <li><a href="#lineage">Lineage</a></li>
                 <li><a href="#thesis">Thesis</a></li>
                 <li><a href="#framework">Framework</a></li>
+                 <li><a href="#lineage">Lineage</a></li>
                 <li><a href="#development">Development</a></li>
                 <li><a href="#scenarios">Scenarios</a></li>
                 <li><a href="#future">Future</a></li>
@@ -1344,7 +1344,778 @@
             <p>The MetaMedium is a system for building integration networks on a canvas. When you draw a diagram, you are setting up mental spaces. When you connect elements with arrows or proximity, you are creating cross-space mappings. When the AI interprets your marks and offers possibilities, it is helping locate shared structures. Diagrammatic thinking externalizes the blending process—making it visible, manipulable, shareable. Two people looking at the same diagram can point to the same conceptual space.</p>
         </section>
 
-        <!-- SECTION 3: THE LINEAGE -->
+       
+        <!-- SECTION 4: THE THESIS -->
+        <section id="thesis">
+            <h2>The Thesis: AI as Meta-Word</h2>
+            
+            <h3>Closing the Triadic Loop</h3>
+            
+            <p>Current human-computer interfaces connect Language and Computation, but leave Meaning external to the loop. We write code; machines execute. Machines return outputs, displays, text. But there is no continuous <strong>Language ↔ Computation ↔ Meaning</strong> feedback loop. The computer cannot participate in meaning-making—it can only execute instructions and return results.</p>
+            
+            <!--
+              TRIADIC LOOP FIGURE
+              For MetaMedium Whitepaper
+
+              Usage: Insert this entire block where the figure should appear.
+              Dependencies: None (self-contained)
+              Styling: Uses CSS custom properties from whitepaper, with fallbacks
+            -->
+
+            <div class="triadic-loop-figure" id="triadicLoop">
+              <div class="triadic-controls">
+                <button class="triadic-toggle" data-mode="traditional" aria-pressed="true">Traditional</button>
+                <button class="triadic-toggle" data-mode="metamedium" aria-pressed="false">MetaMedium</button>
+              </div>
+
+              <svg viewBox="0 0 400 360" class="triadic-svg" aria-labelledby="triadicTitle triadicDesc">
+                <title id="triadicTitle">The Triadic Loop</title>
+                <desc id="triadicDesc">Diagram showing how MetaMedium closes the loop between Language, Computation, and Meaning</desc>
+
+                <defs>
+                  <!-- Gradient for active edges -->
+                  <linearGradient id="edgeGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" style="stop-color: var(--accent, #3b82f6); stop-opacity: 0.8" />
+                    <stop offset="100%" style="stop-color: var(--accent-secondary, #8b5cf6); stop-opacity: 0.8" />
+                  </linearGradient>
+
+                  <!-- Arrow marker -->
+                  <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                    <polygon points="0 0, 10 3.5, 0 7" fill="var(--accent, #3b82f6)" />
+                  </marker>
+                  <marker id="arrowheadDim" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                    <polygon points="0 0, 10 3.5, 0 7" fill="var(--border, #d4d4d4)" />
+                  </marker>
+                  <marker id="arrowheadReverse" markerWidth="10" markerHeight="7" refX="1" refY="3.5" orient="auto">
+                    <polygon points="10 0, 0 3.5, 10 7" fill="var(--accent, #3b82f6)" />
+                  </marker>
+
+                  <!-- Glow filter -->
+                  <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+                    <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+                    <feMerge>
+                      <feMergeNode in="coloredBlur"/>
+                      <feMergeNode in="SourceGraphic"/>
+                    </feMerge>
+                  </filter>
+                </defs>
+
+                <!-- Background subtle grid -->
+                <pattern id="triGrid" width="20" height="20" patternUnits="userSpaceOnUse">
+                  <path d="M 20 0 L 0 0 0 20" fill="none" stroke="var(--border, #e5e5e5)" stroke-width="0.5" opacity="0.3"/>
+                </pattern>
+                <rect width="400" height="360" fill="url(#triGrid)" />
+
+                <!-- Triangle vertices (positions) -->
+                <!-- Top: Language (200, 60) -->
+                <!-- Bottom-left: Computation (60, 300) -->
+                <!-- Bottom-right: Meaning (340, 300) -->
+
+                <!-- EDGES -->
+                <g class="triadic-edges">
+                  <!-- Language → Computation (left edge) -->
+                  <line class="edge edge-lang-comp"
+                        x1="175" y1="85" x2="85" y2="270"
+                        stroke="var(--accent, #3b82f6)" stroke-width="2"
+                        marker-end="url(#arrowhead)" />
+
+                  <!-- Computation → Meaning/Output (bottom edge) -->
+                  <line class="edge edge-comp-meaning"
+                        x1="95" y1="300" x2="305" y2="300"
+                        stroke="var(--accent, #3b82f6)" stroke-width="2"
+                        marker-end="url(#arrowhead)" />
+
+                  <!-- Meaning → Language (right edge) - initially hidden in traditional -->
+                  <line class="edge edge-meaning-lang"
+                        x1="315" y1="270" x2="225" y2="85"
+                        stroke="var(--accent, #3b82f6)" stroke-width="2"
+                        marker-end="url(#arrowhead)"
+                        opacity="0" />
+
+                  <!-- Reverse arrows (MetaMedium only) -->
+                  <line class="edge edge-reverse edge-comp-lang"
+                        x1="85" y1="255" x2="170" y2="90"
+                        stroke="var(--accent-secondary, #8b5cf6)" stroke-width="2"
+                        marker-end="url(#arrowhead)"
+                        opacity="0" />
+                  <line class="edge edge-reverse edge-meaning-comp"
+                        x1="290" y1="295" x2="110" y2="295"
+                        stroke="var(--accent-secondary, #8b5cf6)" stroke-width="2"
+                        marker-end="url(#arrowhead)"
+                        opacity="0" />
+                  <line class="edge edge-reverse edge-lang-meaning"
+                        x1="230" y1="90" x2="310" y2="255"
+                        stroke="var(--accent-secondary, #8b5cf6)" stroke-width="2"
+                        marker-end="url(#arrowhead)"
+                        opacity="0" />
+                </g>
+
+                <!-- Animated pulses (MetaMedium mode) -->
+                <g class="triadic-pulses" opacity="0">
+                  <circle class="pulse pulse-1" r="4" fill="var(--accent, #3b82f6)" filter="url(#glow)">
+                    <animateMotion dur="2s" repeatCount="indefinite" path="M175,85 L85,270 L305,300 L225,85 Z" />
+                  </circle>
+                  <circle class="pulse pulse-2" r="4" fill="var(--accent-secondary, #8b5cf6)" filter="url(#glow)">
+                    <animateMotion dur="2s" repeatCount="indefinite" begin="0.66s" path="M175,85 L85,270 L305,300 L225,85 Z" />
+                  </circle>
+                  <circle class="pulse pulse-3" r="4" fill="var(--accent, #3b82f6)" filter="url(#glow)">
+                    <animateMotion dur="2s" repeatCount="indefinite" begin="1.33s" path="M175,85 L85,270 L305,300 L225,85 Z" />
+                  </circle>
+                  <!-- Counter-rotating pulses -->
+                  <circle class="pulse pulse-4" r="3" fill="var(--accent-secondary, #8b5cf6)" opacity="0.7">
+                    <animateMotion dur="2.5s" repeatCount="indefinite" path="M225,85 L305,300 L85,270 L175,85 Z" />
+                  </circle>
+                </g>
+
+                <!-- NODES -->
+                <g class="triadic-nodes">
+                  <!-- Language Node (top) -->
+                  <g class="node node-language" transform="translate(200, 60)">
+                    <circle r="36" fill="var(--paper, #f8f6f1)" stroke="var(--accent, #3b82f6)" stroke-width="3" />
+                    <text y="5" text-anchor="middle" class="node-label" fill="var(--text, #1a1a2e)">Language</text>
+                  </g>
+
+                  <!-- Computation Node (bottom-left) -->
+                  <g class="node node-computation" transform="translate(60, 300)">
+                    <circle r="36" fill="var(--paper, #f8f6f1)" stroke="var(--accent, #3b82f6)" stroke-width="3" />
+                    <text y="5" text-anchor="middle" class="node-label" fill="var(--text, #1a1a2e)">Computation</text>
+                  </g>
+
+                  <!-- Meaning/Output Node (bottom-right) -->
+                  <g class="node node-meaning" transform="translate(340, 300)">
+                    <circle r="36" fill="var(--paper, #f8f6f1)" stroke="var(--border, #d4d4d4)" stroke-width="3" class="meaning-circle" />
+                    <text y="5" text-anchor="middle" class="node-label meaning-label" fill="var(--muted, #666)">Output</text>
+                  </g>
+                </g>
+
+                <!-- Annotations -->
+                <g class="triadic-annotations">
+                  <!-- Traditional annotation -->
+                  <text class="annotation annotation-traditional" x="200" y="345" text-anchor="middle" fill="var(--muted, #666)" font-size="12">
+                    Linear: meaning stays in human heads
+                  </text>
+                  <!-- MetaMedium annotation -->
+                  <text class="annotation annotation-metamedium" x="200" y="345" text-anchor="middle" fill="var(--accent, #3b82f6)" font-size="12" opacity="0">
+                    Circular: AI participates in interpretation
+                  </text>
+                </g>
+
+                <!-- Center label -->
+                <text class="center-label" x="200" y="210" text-anchor="middle" fill="var(--muted, #666)" font-size="11" opacity="0">
+                  negotiation
+                </text>
+              </svg>
+
+              <p class="triadic-caption">
+                <span class="caption-traditional">Traditional interfaces flow one way: we write, machines execute, outputs return. Meaning remains external.</span>
+                <span class="caption-metamedium" style="display: none;">The MetaMedium closes the loop. Marks become probabilistic proposals. Both parties negotiate meaning.</span>
+              </p>
+            </div>
+
+            <style>
+            .triadic-loop-figure {
+              --accent: #3b82f6;
+              --accent-secondary: #8b5cf6;
+              --paper: #f8f6f1;
+              --text: #1a1a2e;
+              --muted: #666;
+              --border: #d4d4d4;
+
+              margin: var(--space-lg, 2rem) 0;
+              padding: var(--space-md, 1rem);
+              background: linear-gradient(135deg, rgba(59, 130, 246, 0.03) 0%, rgba(139, 92, 246, 0.03) 100%);
+              border-radius: 12px;
+              font-family: 'Space Grotesk', system-ui, sans-serif;
+            }
+
+            .triadic-controls {
+              display: flex;
+              justify-content: center;
+              gap: 0.5rem;
+              margin-bottom: 1rem;
+            }
+
+            .triadic-toggle {
+              padding: 0.5rem 1rem;
+              border: 1px solid var(--border);
+              border-radius: 6px;
+              background: var(--paper);
+              color: var(--muted);
+              font-family: inherit;
+              font-size: 0.875rem;
+              cursor: pointer;
+              transition: all 0.2s ease;
+            }
+
+            .triadic-toggle[aria-pressed="true"] {
+              background: var(--accent);
+              border-color: var(--accent);
+              color: white;
+            }
+
+            .triadic-toggle:hover:not([aria-pressed="true"]) {
+              border-color: var(--accent);
+              color: var(--accent);
+            }
+
+            .triadic-svg {
+              width: 100%;
+              max-width: 400px;
+              height: auto;
+              display: block;
+              margin: 0 auto;
+            }
+
+            .node-label {
+              font-family: 'Space Grotesk', system-ui, sans-serif;
+              font-size: 11px;
+              font-weight: 500;
+            }
+
+            .triadic-caption {
+              text-align: center;
+              font-size: 0.875rem;
+              color: var(--muted);
+              margin-top: 1rem;
+              min-height: 2.5em;
+            }
+
+            /* Transitions */
+            .edge, .node circle, .node-label, .annotation, .center-label {
+              transition: all 0.5s ease;
+            }
+
+            .triadic-pulses {
+              transition: opacity 0.5s ease;
+            }
+
+            /* MetaMedium mode styles (applied via JS) */
+            .triadic-loop-figure.metamedium .meaning-circle {
+              stroke: var(--accent);
+            }
+
+            .triadic-loop-figure.metamedium .meaning-label {
+              fill: var(--text);
+            }
+
+            .triadic-loop-figure.metamedium .edge-meaning-lang,
+            .triadic-loop-figure.metamedium .edge-reverse {
+              opacity: 1;
+            }
+
+            .triadic-loop-figure.metamedium .triadic-pulses {
+              opacity: 1;
+            }
+
+            .triadic-loop-figure.metamedium .annotation-traditional {
+              opacity: 0;
+            }
+
+            .triadic-loop-figure.metamedium .annotation-metamedium {
+              opacity: 1;
+            }
+
+            .triadic-loop-figure.metamedium .center-label {
+              opacity: 0.7;
+            }
+
+            /* Responsive */
+            @media (max-width: 480px) {
+              .triadic-controls {
+                flex-direction: column;
+                align-items: center;
+              }
+              .triadic-toggle {
+                width: 100%;
+                max-width: 200px;
+              }
+            }
+            </style>
+
+            <script>
+            (function() {
+              const figure = document.getElementById('triadicLoop');
+              const toggles = figure.querySelectorAll('.triadic-toggle');
+              const captionTraditional = figure.querySelector('.caption-traditional');
+              const captionMetamedium = figure.querySelector('.caption-metamedium');
+              const meaningLabel = figure.querySelector('.meaning-label');
+
+              function setMode(mode) {
+                // Update toggle states
+                toggles.forEach(btn => {
+                  btn.setAttribute('aria-pressed', btn.dataset.mode === mode);
+                });
+
+                // Update figure class
+                if (mode === 'metamedium') {
+                  figure.classList.add('metamedium');
+                  captionTraditional.style.display = 'none';
+                  captionMetamedium.style.display = 'inline';
+                  meaningLabel.textContent = 'Meaning';
+                } else {
+                  figure.classList.remove('metamedium');
+                  captionTraditional.style.display = 'inline';
+                  captionMetamedium.style.display = 'none';
+                  meaningLabel.textContent = 'Output';
+                }
+              }
+
+              toggles.forEach(btn => {
+                btn.addEventListener('click', () => setMode(btn.dataset.mode));
+              });
+
+              // Optional: auto-cycle for demo
+              // let isMetamedium = false;
+              // setInterval(() => {
+              //   isMetamedium = !isMetamedium;
+              //   setMode(isMetamedium ? 'metamedium' : 'traditional');
+              // }, 4000);
+            })();
+            </script>
+            
+            <p>The MetaMedium closes this triad. When every mark can mean multiple things, when the system holds probabilistic interpretations and refines them through exchange, meaning becomes part of the computational loop—not something that happens only in human minds before and after the interaction.</p>
+            
+            <h3>AI as Meta-Word</h3>
+            
+            <p>The MetaMedium proposes that AI can function as a new kind of <em>meta-word</em> within an evolution of language itself. Just as written language externalized memory, allowing us to store and retrieve thoughts across time and space, AI externalizes <em>interpretation</em>—the capacity to generate meaning from marks in context.</p>
+            
+            <div class="callout key">
+                <h4>What Is a Meta-Word?</h4>
+                <p>A meta-word is not a word about words (like "noun" or "verb"). It's a word that <em>transforms other words</em>—that takes your rough marks and interprets them into structured meaning based on context. When you write "bounce" near a spring, the meta-word doesn't just read "bounce"—it understands <em>spring + bounce = physics behavior</em> and makes it so.</p>
+            </div>
+            
+            <figure>
+                <div class="placeholder-figure">
+                    <div class="image"><img src="./Assets/fig-MetaMediumTriad.svg" alt="From Docs to MetaMedium</div>
+                    <div class="label">Figure: AI as Meta-Word — The Evolution of External Cognition</div>
+                    <div class="description">Three paradigms: (1) Writing: human → marks → human (marks store memory, reader reconstructs meaning). (2) Computing: human → code → machine → output (machine executes instructions literally). (3) MetaMedium: human ↔ marks ↔ AI ↔ meaning (bidirectional interpretation, iterative refinement, meaning emerges through exchange).</div>
+                </div>
+            </figure>
+            
+            <p>In traditional communication, humans exchange sign vehicles (words, gestures, marks) and each party reconstructs meaning internally. The MetaMedium introduces AI as an active participant in this meaning-making process—not merely receiving marks and returning responses, but operating as a semantic transformer that:</p>
+            
+            <ul>
+                <li>Recognizes patterns across multiple possible interpretations</li>
+                <li>Holds ambiguity productively until context resolves it</li>
+                <li>Learns user-specific vocabularies and reasoning patterns</li>
+                <li>Bridges between representational modes (sketch ↔ equation ↔ code ↔ text)</li>
+            </ul>
+            
+            <p>This is not AI as tool. This is AI as <em>grammatical element</em>—a new part of speech in the language of human-computer collaboration.</p>
+            
+            <h3>Tools vs. Medium</h3>
+            
+            <p>Alan Kay's Dynabook vision asked: "What is the carrying capacity for ideas of the computer?" His answer: the computer is a metamedium—it can simulate any existing media and also be the basis of media that can't exist without the computer. But Kay made a crucial distinction:</p>
+            
+            <blockquote>
+                "What then is a personal computer? One would hope that it would be both a medium for containing and expressing arbitrary symbolic notions, and also a collection of useful tools for manipulating these structures."
+                <cite>— Alan Kay, "A Personal Computer for Children of All Ages," 1972</cite>
+            </blockquote>
+            
+            <p>Most AI interfaces treat AI as tool—something to be invoked, queried, commanded. The MetaMedium treats AI as part of the medium itself. The sketches aren't <em>using</em> the computer; they're <em>composing within</em> the computational medium, with AI as an active interpretive layer that transforms marks into executable meaning.</p>
+        </section>
+
+        <!-- SECTION 5: THE FRAMEWORK -->
+        <section id="framework">
+            <h2>The Framework</h2>
+            
+            <h3>The Semiotic Foundation</h3>
+            
+            <p>Charles Sanders Peirce's semiotics offers a framework for understanding meaning-making that proves remarkably apt for human-AI interaction. In Peirce's model, meaning emerges from the relationship between the <em>sign</em> (the representational form), the <em>object</em> (what is represented), and the <em>interpretant</em> (the meaning generated in the interpreter's mind).</p>
+            
+            <figure>
+                <div class="placeholder-figure">
+                    <div class="image">
+                        <svg viewBox="0 0 700 400" xmlns="http://www.w3.org/2000/svg">
+                            <!-- Title -->
+                            <text x="350" y="10" text-anchor="middle" fill="#7b8a9a" font-size="15" opacity="1">How meaning emerges through triangulation</text>
+
+                            <!-- Triangle structure -->
+                            <line x1="350" y1="80" x2="180" y2="320" stroke="#64b5f6" stroke-width="2" opacity=".4"/>
+                            <line x1="350" y1="80" x2="520" y2="320" stroke="#64b5f6" stroke-width="2" opacity=".4"/>
+                            <line x1="180" y1="320" x2="520" y2="320" stroke="#64b5f6" stroke-width="2" opacity=".4"/>
+
+                            <!-- OBJECT (top) -->
+                            <g>
+                                <circle cx="350" cy="80" r="26" fill="rgba(100, 181, 246, 0.15)" stroke="#64b5f6" stroke-width="2"/>
+                                <text x="350" y="125" text-anchor="middle" fill="#90caf9" font-size="22" font-weight="bold">OBJECT</text>
+                                <text x="350" y="140" text-anchor="middle" fill="#7b8a9a" font-size="13" opacity="1">(referent)</text>
+
+                                <!-- Multiple possibilities -->
+                                <text x="350" y="88" text-anchor="middle" fill="#90caf9" font-size="12">?</text>
+                                <g transform="translate(350, 30)">
+                                    <circle cx="-40" cy="0" r="7" fill="none" stroke="#90caf9" stroke-width="1" opacity="0.8"/>
+                                    <text x="-40" y="15" text-anchor="middle" fill="#90caf9" font-size="11" opacity="0.6">face</text>
+
+                                    <ellipse cx="-14" cy="0" rx="7" ry="8" fill="none" stroke="#90caf9" stroke-width="1" opacity="0.8"/>
+                                    <text x="-14" y="15" text-anchor="middle" fill="#90caf9" font-size="11" opacity="0.6">egg</text>
+
+                                    <circle cx="13" cy="0" r="7" fill="none" stroke="#90caf9" stroke-width="1" opacity="0.8"/>
+                                    <text x="13" y="5" text-anchor="middle" fill="#90caf9" font-size="10" opacity="0.6">0</text>
+
+                                    <circle cx="39" cy="0" r="7" fill="rgba(100, 181, 246, 0.15)" stroke="#90caf9" stroke-width="1" opacity="0.8"/>
+                                    <text x="39" y="15" text-anchor="middle" fill="#90caf9" font-size="11" opacity="0.6">ball</text>
+                                </g>
+                            </g>
+
+                            <!-- SIGN (bottom left) -->
+                            <g>
+                                <circle cx="180" cy="320" r="26" fill="rgba(100, 181, 246, 0.15)" stroke="#64b5f6" stroke-width="2"/>
+                                <text x="180" y="361" text-anchor="middle" fill="#90caf9" font-size="22" font-weight="bold">SIGN</text>
+                                <text x="180" y="375" text-anchor="middle" fill="#7b8a9a" font-size="13" opacity="1">(form)</text>
+
+                                <!-- Sketch progression -->
+                                <g transform="translate(50, 170)">
+                                    <!-- Step 1: rough oval -->
+                                    <rect x="0" y="0" width="80" height="70" fill="rgba(10, 14, 26, 0.5)" stroke="#4a5568" stroke-width="1" rx="3"/>
+                                    <ellipse cx="40" cy="30" rx="22" ry="25" fill="none" stroke="#90caf9" stroke-width="2" stroke-dasharray="2,1" opacity="0.8"/>
+                                    <text x="40" y="60" text-anchor="middle" fill="#7b8a9a" font-size="11">1. rough oval</text>
+
+                                    <!-- Arrow -->
+                                    <text x="88" y="35" fill="#64b5f6" font-size="16">→</text>
+
+                                    <!-- Step 2: with dots -->
+                                    <rect x="100" y="0" width="80" height="70" fill="rgba(10, 14, 26, 0.5)" stroke="#4a5568" stroke-width="1" rx="3"/>
+                                    <ellipse cx="140" cy="30" rx="22" ry="25" fill="none" stroke="#90caf9" stroke-width="2" stroke-dasharray="2,1" opacity="0.8"/>
+                                    <circle cx="134" cy="27" r="2.5" fill="#90caf9"/>
+                                    <circle cx="146" cy="27" r="2.5" fill="#90caf9"/>
+                                    <text x="140" y="52" text-anchor="middle" fill="#7b8a9a" font-size="11">2. + eyes</text>
+                                    <text x="140" y="64" text-anchor="middle" fill="#90caf9" font-size="11" font-weight="bold">→ face!</text>
+                                </g>
+                            </g>
+
+                            <!-- INTERPRETANT (bottom right) -->
+                            <g>
+                                <circle cx="520" cy="320" r="26" fill="rgba(100, 181, 246, 0.15)" stroke="#64b5f6" stroke-width="2"/>
+                                <text x="520" y="361" text-anchor="middle" fill="#90caf9" font-size="22" font-weight="bold">INTERPRETANT</text>
+                                <text x="520" y="375" text-anchor="middle" fill="#7b8a9a" font-size="13" opacity="1">(meaning)</text>
+
+                                <!-- Probability distribution -->
+                                <g transform="translate(450, 168)">
+                                    <!-- Initial probabilities -->
+                                    <rect x="0" y="0" width="120" height="85" fill="rgba(10, 14, 26, 0.5)" stroke="#4a5568" stroke-width="1" rx="3"/>
+                                    <text x="60" y="15" text-anchor="middle" fill="#4a5568" font-size="12">AI considers:</text>
+
+                                    <rect x="8" y="23" width="45" height="7" fill="#64b5f6" opacity="0.8"/>
+                                    <text x="58" y="29" fill="#90caf9" font-size="11">face 0.4</text>
+
+                                    <rect x="8" y="34" width="28" height="7" fill="#64b5f6" opacity="0.8"/>
+                                    <text x="58" y="40" fill="#90caf9" font-size="11">egg 0.25</text>
+
+                                    <rect x="8" y="45" width="22" height="7" fill="#64b5f6" opacity="0.8"/>
+                                    <text x="58" y="51" fill="#90caf9" font-size="11">zero 0.2</text>
+
+                                    <rect x="8" y="56" width="17" height="7" fill="#64b5f6" opacity="0.8"/>
+                                    <text x="58" y="62" fill="#90caf9" font-size="11">ball 0.15</text>
+
+                                    <text x="60" y="77" text-anchor="middle" fill="#64b5f6" font-size="12">↓ context</text>
+
+                                    <!-- Resolved -->
+                                    <rect x="0" y="90" width="120" height="38" fill="rgba(100, 181, 246, 0.12)" stroke="#64b5f6" stroke-width="1.5" rx="3"/>
+                                    <rect x="8" y="100" width="104" height="9" fill="#64b5f6" opacity="0.8"/>
+                                    <text x="60" y="107" text-anchor="middle" fill="#fff" font-size="12" font-weight="bold">face 0.95 ✓</text>
+                                    <text x="60" y="122" text-anchor="middle" fill="#64b5f6" font-size="11">"confident match"</text>
+                                </g>
+                            </g>
+
+                            <!-- Central insight -->
+                            <text x="350" y="310" text-anchor="middle" fill="#64b5f6" font-size="14" opacity="0.9">AI participates in meaning-making,</text>
+                            <text x="350" y="335" text-anchor="middle" fill="#64b5f6" font-size="14" opacity="0.9">not as authority but as collaborator</text>
+                        </svg>
+                    </div>
+                    <div class="label">Figure: The Semiotic Triad Applied</div>
+                    <div class="description">Peirce's triangle in MetaMedium context: Sign (rough oval drawn on canvas) → Object (could be face, egg, zero, planet...) → Interpretant (AI holds probability distribution across possibilities; context accumulates; meaning resolves). The AI participates in the interpretant role, not as final arbiter but as collaborative sense-maker.</div>
+                </div>
+            </figure>
+            
+            <p>Critically, Peirce recognized that meaning is not transferred intact between minds but rather <em>reconstructed</em> by each interpretant. When two humans communicate, they exchange sign vehicles and create <strong>aligned but not identical</strong> internal states. Perfect transmission is impossible; coordination through iterative exchange is the reality.</p>
+            
+            <p>This insight proves crucial for AI alignment. If we accept that meaning emerges through exchange rather than transfer, then the path to human-AI alignment lies not in perfecting AI's "understanding" of human intent, but in <em>enriching the medium of exchange</em> so that iterative coordination becomes possible.</p>
+            
+            <h3>Core Principles</h3>
+            
+            <div class="principles-grid">
+                <div class="principle" data-num="1">
+                    <h4>Space Is Semantic</h4>
+                    <p>Spatial relationships carry meaning. Elements placed near each other are semantically related. Elements connected by lines have directional relationships. The entire canvas becomes a semantic field where position, proximity, and connection are first-class citizens of meaning.</p>
+                    <p class="principle-example"><em>Place two circles close together; the system infers "related." Draw one inside another; it understands "containment." Position creates meaning without words.</em></p>
+                </div>
+                
+                <div class="principle" data-num="2">
+                    <h4>Annotation Becomes Execution</h4>
+                    <p>When you write "make this bounce" near a drawn spring, that annotation becomes an instruction. When you draw an arrow from input to output, you've defined a data flow. The boundary between description and command dissolves; to describe is to instruct.</p>
+                    <p class="principle-example"><em>Write "3x" next to a line; it becomes three lines. Write "wiggle" near a shape; it animates. The annotation is the program.</em></p>
+                </div>
+                
+                <div class="principle" data-num="3">
+                    <h4>Interpretive Ambiguity Is Feature</h4>
+                    <p>A rough sketch is understood as rough—the system holds multiple interpretations probabilistically, refining its understanding as context accumulates. This mirrors how humans communicate: we tolerate ambiguity, using context to resolve meaning over time.</p>
+                    <p class="principle-example"><em>Your rough oval might be a face, an egg, or a zero. The system holds all three until you add two dots—then it commits to "face." Premature disambiguation is the enemy of exploration.</em></p>
+                </div>
+                
+                <div class="principle" data-num="4">
+                    <h4>The Canvas Learns</h4>
+                    <p>User-specific patterns accumulate into "cognitive lenses" that can be applied, shared, or composed. If you consistently use a particular mark to mean "energy flow," the system learns this convention. Your vocabulary becomes executable.</p>
+                    <p class="principle-example"><em>Draw your personal shorthand for "danger" twenty times; the twenty-first time, the system recognizes it before you finish. Your idiolect becomes shared language.</em></p>
+                </div>
+                
+                <div class="principle" data-num="5">
+                    <h4>No Mode Switching</h4>
+                    <p>Following Larry Tesler's principle that "no modes is good modes," the MetaMedium eliminates cognitive overhead. You're always just working—drawing, annotating, refining. The interpretation layer appears when needed and fades when not. There's no "design mode" vs. "execution mode," no switching between tools.</p>
+                    <p class="principle-example"><em>Draw a shape. Write near it. Adjust with gestures. Watch it execute. All the same canvas, all the same moment. The interface disappears into the work.</em></p>
+                </div>
+                
+                <div class="principle" data-num="6">
+                    <h4>Bidirectional Learning</h4>
+                    <p>The relationship between user and system is mutual adaptation, not command-and-execute. The user teaches the system their notation; the system teaches the user by surfacing patterns, completing gestures, suggesting relationships. Both intelligences grow through interaction.</p>
+                    <p class="principle-example"><em>You draw a particular squiggle to mean "recursion." The system learns this. Later, it suggests the squiggle when it detects recursive patterns in your diagram—teaching you to see what it sees.</em></p>
+                </div>
+                
+                <div class="principle" data-num="7">
+                    <h4>Observable Reasoning</h4>
+                    <p>Uncertainty becomes visible. When the AI considers multiple interpretations, the user sees them—not collapsed into a single guess. Multiple possibilities stay present until context or user choice resolves them. This transparency supports both trust and alignment.</p>
+                    <p class="principle-example"><em>Your rough mark triggers three possible interpretations shown as faint ghosts; tap one to commit, or keep drawing to refine. You see the system thinking.</em></p>
+                </div>
+            </div>
+            
+            <h3>The Negotiation Paradigm</h3>
+            
+            <p>Ribeiro and Igarashi's "Sketch-Editing Games" (UIST 2012) introduced a negotiation paradigm where user and machine take turns refining interpretation. The user sketches; the machine recognizes and offers interpretations ("bottle?"). The user refines ("no, more like a mug"). The machine updates. Understanding emerges through iterative exchange.</p>
+            
+            <div class="figure-pair">
+                <figure>
+                    <img src="./Assets/fig-sketch-game-turn.png" alt="Turn-taking in the sketch-editing game">
+                    <figcaption><strong>Figure: Turn-Taking.</strong> The user sketches; the machine recognizes and modifies with a guess ("bottle?"). User declines and modifies. Machine recognizes again ("mug?"). User accepts. From Ribeiro & Igarashi, UIST '12.</figcaption>
+                </figure>
+                <figure>
+                    <img src="./Assets/fig-sketch-game-graph.png" alt="Game graph showing transformation possibilities">
+                    <figcaption><strong>Figure: Possibility Graph.</strong> The machine's internal model after several games. The center shows the current sketch; each ring shows possible transformations (add neck → bottle, add base → wine glass, widen top → cup). From Ribeiro & Igarashi, UIST '12.</figcaption>
+                </figure>
+            </div>
+
+            <p>Their key insight: sketch recognition improves dramatically when reframed as a <em>game</em> rather than a classification problem. The machine maintains a "possibility graph"—a network of possible interpretations and the transformations that would select among them. The user's next stroke navigates this graph, collapsing some possibilities and opening others.</p>
+            
+            <figure>
+                <div class="placeholder-figure">
+                    <div class="image">
+                        <svg viewBox="0 0 700 400" xmlns="http://www.w3.org/2000/svg">
+                            <!-- Title -->
+                            <text x="350" y="22" text-anchor="middle" fill="#7b8a9a" font-size="15" opacity="1">Understanding emerges through iterative exchange</text>
+
+                            <!-- User box (left) -->
+                            <rect x="70" y="50" width="140" height="60" fill="rgba(100, 181, 246, 0.08)" stroke="#64b5f6" stroke-width="2" rx="6"/>
+                            <text x="140" y="78" text-anchor="middle" fill="#64b5f6" font-size="18" font-weight="bold">USER</text>
+                            <text x="140" y="95" text-anchor="middle" fill="#7b8a9a" font-size="14">sketches</text>
+
+                            <!-- System box (right) -->
+                            <rect x="490" y="50" width="140" height="60" fill="rgba(100, 181, 246, 0.08)" stroke="#64b5f6" stroke-width="2" rx="6"/>
+                            <text x="560" y="78" text-anchor="middle" fill="#64b5f6" font-size="18" font-weight="bold">SYSTEM</text>
+                            <text x="560" y="95" text-anchor="middle" fill="#7b8a9a" font-size="14">interprets</text>
+
+                            <!-- Exchange 1 -->
+                            <g>
+                                <line x1="210" y1="140" x2="480" y2="140" stroke="#64b5f6" stroke-width="2" marker-end="url(#arrow4)" stroke-dasharray="3,2"/>
+                                <text x="345" y="133" text-anchor="middle" fill="#64b5f6" font-size="14">1. draws oval</text>
+                                <ellipse cx="315" cy="143" rx="11" ry="13" fill="none" stroke="#64b5f6" stroke-width="2" stroke-dasharray="2,1"/>
+
+                                <line x1="480" y1="160" x2="210" y2="160" stroke="#7b8a9a" stroke-width="2" marker-end="url(#arrow5)"/>
+                                <text x="345" y="175" text-anchor="middle" fill="#6b7280" font-size="13" font-style="italic">"Circle? Face? Egg?"</text>
+                            </g>
+
+                            <!-- Exchange 2 -->
+                            <g transform="translate(0, 60)">
+                                <line x1="210" y1="140" x2="480" y2="140" stroke="#64b5f6" stroke-width="2" marker-end="url(#arrow4)" stroke-dasharray="3,2"/>
+                                <text x="345" y="133" text-anchor="middle" fill="#64b5f6" font-size="14">2. adds two dots</text>
+                                <ellipse cx="315" cy="143" rx="11" ry="13" fill="none" stroke="#64b5f6" stroke-width="2" stroke-dasharray="2,1"/>
+                                <circle cx="311" cy="141" r="2" fill="#64b5f6"/>
+                                <circle cx="319" cy="141" r="2" fill="#64b5f6"/>
+
+                                <line x1="480" y1="160" x2="210" y2="160" stroke="#7b8a9a" stroke-width="2" marker-end="url(#arrow5)"/>
+                                <text x="345" y="175" text-anchor="middle" fill="#6b7280" font-size="13" font-style="italic">"Face! (confidence 0.9)"</text>
+                            </g>
+
+                            <!-- Exchange 3 -->
+                            <g transform="translate(0, 120)">
+                                <line x1="210" y1="140" x2="480" y2="140" stroke="#64b5f6" stroke-width="2" marker-end="url(#arrow4)" stroke-dasharray="3,2"/>
+                                <text x="345" y="133" text-anchor="middle" fill="#64b5f6" font-size="14">3. writes "happy"</text>
+                                <text x="315" y="149" text-anchor="middle" fill="#64b5f6" font-size="13" font-family="Monaco">happy</text>
+
+                                <line x1="480" y1="160" x2="210" y2="160" stroke="#7b8a9a" stroke-width="2" marker-end="url(#arrow5)"/>
+                                <text x="345" y="175" text-anchor="middle" fill="#6b7280" font-size="13" font-style="italic">adds smile + learns pattern</text>
+                            </g>
+
+                            <!-- Shared Understanding result -->
+                            <g transform="translate(0, 200)">
+                                <rect x="230" y="140" width="240" height="58" fill="rgba(100, 181, 246, 0.15)" stroke="#64b5f6" stroke-width="2" rx="6"/>
+                                <text x="350" y="162" text-anchor="middle" fill="#64b5f6" font-size="18" font-weight="bold">SHARED UNDERSTANDING</text>
+                                <text x="350" y="180" text-anchor="middle" fill="#6b7280" font-size="14">"Happy face" → vocabulary</text>
+
+                                <!-- Small happy face demo -->
+                                <ellipse cx="320" cy="187" rx="9" ry="10" fill="none" stroke="#64b5f6" stroke-width="2"/>
+                                <circle cx="316" cy="185" r="1.3" fill="#64b5f6"/>
+                                <circle cx="324" cy="185" r="1.3" fill="#64b5f6"/>
+                                <path d="M 314 190 Q 320 192, 326 190" stroke="#64b5f6" stroke-width="1.5" fill="none"/>
+                            </g>
+
+                            <!-- Bottom insight -->
+                            <text x="350" y="330" text-anchor="middle" fill="#6b7280" font-size="14" font-style="italic">Each exchange refines shared vocabulary and understanding</text>
+
+                            <!-- Arrow markers -->
+                            <defs>
+                                <marker id="arrow4" markerWidth="8" markerHeight="8" refX="7" refY="2.5" orient="auto">
+                                    <path d="M0,0 L0,5 L7,2.5 z" fill="#64b5f6" />
+                                </marker>
+                                <marker id="arrow5" markerWidth="8" markerHeight="8" refX="7" refY="2.5" orient="auto">
+                                    <path d="M0,0 L0,5 L7,2.5 z" fill="#7b8a9a" />
+                                </marker>
+                            </defs>
+                        </svg>
+                    </div>
+                    <div class="label">Figure: The Negotiation Loop</div>
+                    <div class="description">User sketches rough shape → System offers: "Circle? Oval? Face?" → User adds two dots → System updates: "Face ✓" → User writes "happy" → System adds smile, adjusts interpretation confidence. Understanding emerges through exchange, not one-shot recognition. Each turn updates the possibility graph.</div>
+                </div>
+            </figure>
+            
+            <p>The MetaMedium extends this approach by making the possibility graph <em>learnable</em>—accumulating user-specific patterns over time—and by integrating natural language annotation as another form of navigation. The negotiation paradigm means that misunderstanding is not failure—it's information. Each correction teaches the system something about this user's intentions, building toward a shared vocabulary over time.</p>
+            
+            <h3>Cognitive Lenses</h3>
+            
+            <p>As patterns accumulate, they form "cognitive lenses"—personalized interpretation frameworks that shape how the system reads new marks. A physicist's lens recognizes force diagrams; an architect's lens sees load-bearing structures; a musician's lens interprets spatial arrangements as rhythm.</p>
+            
+            <figure>
+                <div class="placeholder-figure">
+                    <div class="image">
+                        <svg viewBox="0 0 750 450" xmlns="http://www.w3.org/2000/svg">
+                            <!-- Title -->
+                            <text x="375" y="25" text-anchor="middle" fill="#7b8a9a" font-size="15" opacity="1">Your patterns become portable ways of seeing</text>
+
+                            <!-- Pattern Accumulation -->
+                            <g>
+                                <text x="120" y="65" fill="#90caf9" font-size="17" font-weight="bold">PATTERN ACCUMULATION</text>
+                                <text x="120" y="83" fill="#7b8a9a" font-size="13">User repeatedly draws:</text>
+
+                                <!-- Repeated marks -->
+                                <g transform="translate(80, 95)">
+                                    <!-- Force arrows -->
+                                    <path d="M 0 0 L 20 -8" stroke="#90caf9" stroke-width="2" marker-end="url(#arrow6)"/>
+                                    <path d="M 35 0 L 55 -8" stroke="#90caf9" stroke-width="2" marker-end="url(#arrow6)"/>
+                                    <path d="M 70 0 L 90 -8" stroke="#90caf9" stroke-width="2" marker-end="url(#arrow6)"/>
+                                    <path d="M 105 0 L 125 -8" stroke="#90caf9" stroke-width="2" marker-end="url(#arrow6)"/>
+                                    <text x="135" y="0" fill="#7b8a9a" font-size="13" opacity="1">force</text>
+
+                                    <!-- Energy marks -->
+                                    <text x="0" y="25" fill="#90caf9" font-size="20">↯</text>
+                                    <text x="35" y="25" fill="#90caf9" font-size="20">↯</text>
+                                    <text x="70" y="25" fill="#90caf9" font-size="20">↯</text>
+                                    <text x="105" y="25" fill="#90caf9" font-size="20">↯</text>
+                                    <text x="135" y="25" fill="#7b8a9a" font-size="13" opacity="1">energy</text>
+
+                                    <!-- Field lines -->
+                                    <path d="M 0 45 Q 10 38, 20 45" stroke="#90caf9" stroke-width="2" fill="none"/>
+                                    <path d="M 35 45 Q 45 38, 55 45" stroke="#90caf9" stroke-width="2" fill="none"/>
+                                    <path d="M 70 45 Q 80 38, 90 45" stroke="#90caf9" stroke-width="2" fill="none"/>
+                                    <path d="M 105 45 Q 115 38, 125 45" stroke="#90caf9" stroke-width="2" fill="none"/>
+                                    <text x="135" y="48" fill="#7b8a9a" font-size="13" opacity="1">fields</text>
+                                </g>
+                            </g>
+
+                            <!-- Arrow to extraction -->
+                            <text x="350" y="140" text-anchor="middle" fill="#64b5f6" font-size="17">→ system extracts →</text>
+
+                            <!-- Lens (crystallized pattern) -->
+                            <g transform="translate(520, 85)">
+                                <rect x="0" y="0" width="160" height="80" fill="rgba(100, 181, 246, 0.12)" stroke="#64b5f6" stroke-width="2" rx="6"/>
+                                <text x="80" y="25" text-anchor="middle" fill="#90caf9" font-size="16" font-weight="bold">LENS</text>
+                                <text x="80" y="43" text-anchor="middle" fill="#90caf9" font-size="13">"Maya's Physics</text>
+                                <text x="80" y="56" text-anchor="middle" fill="#90caf9" font-size="13">Notation"</text>
+
+                                <!-- Prism icon -->
+                                <path d="M 80 -8 L 92 8 L 68 8 Z" fill="none" stroke="#64b5f6" stroke-width="2"/>
+                                <line x1="92" y1="8" x2="96" y2="10" stroke="#90caf9" stroke-width="1" opacity="0.5"/>
+                                <line x1="92" y1="8" x2="96" y2="6" stroke="#64b5f6" stroke-width="1" opacity="0.5"/>
+
+                                <text x="80" y="72" text-anchor="middle" fill="#7b8a9a" font-size="12" opacity="1">portable interpretation</text>
+                            </g>
+
+                            <!-- Arrow down to operations -->
+                            <line x1="600" y1="175" x2="600" y2="200" stroke="#64b5f6" stroke-width="2" marker-end="url(#arrow6)"/>
+
+                            <!-- Lens Operations -->
+                            <g transform="translate(0, 210)">
+                                <text x="375" y="10" text-anchor="middle" fill="#90caf9" font-size="18" font-weight="bold">LENS OPERATIONS</text>
+
+                                <!-- Operation 1: Apply -->
+                                <g transform="translate(60, 30)">
+                                    <rect x="0" y="0" width="170" height="165" fill="rgba(74, 85, 104, 0.2)" stroke="#64b5f6" stroke-width="2" rx="6"/>
+                                    <text x="85" y="25" text-anchor="middle" fill="#90caf9" font-size="16" font-weight="bold">APPLY</text>
+                                    <text x="85" y="43" text-anchor="middle" fill="#7b8a9a" font-size="13">Use on new drawings</text>
+
+                                    <text x="85" y="72" text-anchor="middle" fill="#64b5f6" font-size="20">↓</text>
+
+                                    <!-- Result -->
+                                    <rect x="15" y="82" width="140" height="65" fill="rgba(10, 14, 26, 0.5)" stroke="#4a5568" stroke-width="1.5" rx="3"/>
+                                    <text x="85" y="100" text-anchor="middle" fill="#7b8a9a" font-size="13">New sketch auto-</text>
+                                    <text x="85" y="113" text-anchor="middle" fill="#7b8a9a" font-size="13">recognized as</text>
+                                    <text x="85" y="126" text-anchor="middle" fill="#90caf9" font-size="14" font-weight="bold">force diagram</text>
+                                    <path d="M 65 135 L 95 127" stroke="#90caf9" stroke-width="2" marker-end="url(#arrow6)"/>
+                                </g>
+
+                                <!-- Operation 2: Share -->
+                                <g transform="translate(260, 30)">
+                                    <rect x="0" y="0" width="170" height="165" fill="rgba(74, 85, 104, 0.2)" stroke="#64b5f6" stroke-width="2" rx="6"/>
+                                    <text x="85" y="25" text-anchor="middle" fill="#90caf9" font-size="16" font-weight="bold">SHARE</text>
+                                    <text x="85" y="43" text-anchor="middle" fill="#7b8a9a" font-size="13">Export to collaborators</text>
+
+                                    <text x="85" y="72" text-anchor="middle" fill="#64b5f6" font-size="20">↓</text>
+
+                                    <!-- Result -->
+                                    <rect x="15" y="82" width="140" height="65" fill="rgba(10, 14, 26, 0.5)" stroke="#4a5568" stroke-width="1.5" rx="3"/>
+                                    <text x="85" y="100" text-anchor="middle" fill="#7b8a9a" font-size="13">Teammate's canvas</text>
+                                    <text x="85" y="113" text-anchor="middle" fill="#7b8a9a" font-size="13">now reads your</text>
+                                    <text x="85" y="126" text-anchor="middle" fill="#90caf9" font-size="14" font-weight="bold">notation</text>
+                                    <text x="65" y="142" text-anchor="middle" fill="#90caf9" font-size="18">👤</text>
+                                    <text x="105" y="142" text-anchor="middle" fill="#90caf9" font-size="18">👤</text>
+                                    <line x1="73" y1="139" x2="97" y2="139" stroke="#64b5f6" stroke-width="2"/>
+                                </g>
+
+                                <!-- Operation 3: Compose -->
+                                <g transform="translate(460, 30)">
+                                    <rect x="0" y="0" width="170" height="165" fill="rgba(74, 85, 104, 0.2)" stroke="#64b5f6" stroke-width="2" rx="6"/>
+                                    <text x="85" y="25" text-anchor="middle" fill="#90caf9" font-size="16" font-weight="bold">COMPOSE</text>
+                                    <text x="85" y="43" text-anchor="middle" fill="#7b8a9a" font-size="13">Combine with other lenses</text>
+
+                                    <text x="85" y="72" text-anchor="middle" fill="#64b5f6" font-size="20">↓</text>
+
+                                    <!-- Result -->
+                                    <rect x="15" y="82" width="140" height="65" fill="rgba(10, 14, 26, 0.5)" stroke="#4a5568" stroke-width="1.5" rx="3"/>
+                                    <text x="85" y="100" text-anchor="middle" fill="#7b8a9a" font-size="13">Create hybrid:</text>
+                                    <text x="85" y="118" text-anchor="middle" fill="#90caf9" font-size="14" font-weight="bold">physics +</text>
+                                    <text x="85" y="132" text-anchor="middle" fill="#90caf9" font-size="14" font-weight="bold">chemistry lens</text>
+                                    <!-- Overlapping prisms -->
+                                    <path d="M 65 140 L 77 152 L 53 152 Z" fill="none" stroke="#90caf9" stroke-width="2" opacity="0.6"/>
+                                    <path d="M 85 140 L 97 152 L 73 152 Z" fill="none" stroke="#64b5f6" stroke-width="2" opacity="0.6"/>
+                                </g>
+                            </g>
+
+                            <!-- Bottom insight -->
+                            <text x="375" y="435" text-anchor="middle" fill="#6b7280" font-size="14" font-style="italic">Lenses are portable interpretation frameworks</text>
+
+                            <!-- Arrow marker -->
+                            <defs>
+                                <marker id="arrow6" markerWidth="8" markerHeight="8" refX="7" refY="2.5" orient="auto">
+                                    <path d="M0,0 L0,5 L7,2.5 z" fill="#64b5f6" />
+                                </marker>
+                            </defs>
+                        </svg>
+                    </div>
+                    <div class="label">Figure: Cognitive Lens Architecture</div>
+                    <div class="description">User's repeated gestures → Pattern extraction → Named "lens" (e.g., "Maya's physics notation"). Lenses can be: applied to new drawings, shared with collaborators, composed with other lenses, versioned and evolved. Your way of seeing becomes portable.</div>
+                </div>
+            </figure>
+            
+            <p>Lenses are not just personal—they can be shared, creating communities of interpretation. A research group might develop a shared lens for their domain notation. A classroom might inherit a lens from curriculum designers. Lenses become a new kind of intellectual property: not content, but <em>ways of seeing</em>.</p>
+        </section>
+ <!-- SECTION: THE LINEAGE -->
         <section id="lineage">
             <h2>The Lineage</h2>
             
@@ -2163,777 +2934,6 @@
                 <iframe src="https://player.vimeo.com/video/232230096" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen title="Ken Perlin: Chalktalk"></iframe>
                 <p class="video-link"><a href="https://vimeo.com/232230096" target="_blank" rel="noopener">Watch on Vimeo: Ken Perlin — Chalktalk</a></p>
             </div>
-        </section>
-
-        <!-- SECTION 4: THE THESIS -->
-        <section id="thesis">
-            <h2>The Thesis: AI as Meta-Word</h2>
-            
-            <h3>Closing the Triadic Loop</h3>
-            
-            <p>Current human-computer interfaces connect Language and Computation, but leave Meaning external to the loop. We write code; machines execute. Machines return outputs, displays, text. But there is no continuous <strong>Language ↔ Computation ↔ Meaning</strong> feedback loop. The computer cannot participate in meaning-making—it can only execute instructions and return results.</p>
-            
-            <!--
-              TRIADIC LOOP FIGURE
-              For MetaMedium Whitepaper
-
-              Usage: Insert this entire block where the figure should appear.
-              Dependencies: None (self-contained)
-              Styling: Uses CSS custom properties from whitepaper, with fallbacks
-            -->
-
-            <div class="triadic-loop-figure" id="triadicLoop">
-              <div class="triadic-controls">
-                <button class="triadic-toggle" data-mode="traditional" aria-pressed="true">Traditional</button>
-                <button class="triadic-toggle" data-mode="metamedium" aria-pressed="false">MetaMedium</button>
-              </div>
-
-              <svg viewBox="0 0 400 360" class="triadic-svg" aria-labelledby="triadicTitle triadicDesc">
-                <title id="triadicTitle">The Triadic Loop</title>
-                <desc id="triadicDesc">Diagram showing how MetaMedium closes the loop between Language, Computation, and Meaning</desc>
-
-                <defs>
-                  <!-- Gradient for active edges -->
-                  <linearGradient id="edgeGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                    <stop offset="0%" style="stop-color: var(--accent, #3b82f6); stop-opacity: 0.8" />
-                    <stop offset="100%" style="stop-color: var(--accent-secondary, #8b5cf6); stop-opacity: 0.8" />
-                  </linearGradient>
-
-                  <!-- Arrow marker -->
-                  <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
-                    <polygon points="0 0, 10 3.5, 0 7" fill="var(--accent, #3b82f6)" />
-                  </marker>
-                  <marker id="arrowheadDim" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
-                    <polygon points="0 0, 10 3.5, 0 7" fill="var(--border, #d4d4d4)" />
-                  </marker>
-                  <marker id="arrowheadReverse" markerWidth="10" markerHeight="7" refX="1" refY="3.5" orient="auto">
-                    <polygon points="10 0, 0 3.5, 10 7" fill="var(--accent, #3b82f6)" />
-                  </marker>
-
-                  <!-- Glow filter -->
-                  <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
-                    <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
-                    <feMerge>
-                      <feMergeNode in="coloredBlur"/>
-                      <feMergeNode in="SourceGraphic"/>
-                    </feMerge>
-                  </filter>
-                </defs>
-
-                <!-- Background subtle grid -->
-                <pattern id="triGrid" width="20" height="20" patternUnits="userSpaceOnUse">
-                  <path d="M 20 0 L 0 0 0 20" fill="none" stroke="var(--border, #e5e5e5)" stroke-width="0.5" opacity="0.3"/>
-                </pattern>
-                <rect width="400" height="360" fill="url(#triGrid)" />
-
-                <!-- Triangle vertices (positions) -->
-                <!-- Top: Language (200, 60) -->
-                <!-- Bottom-left: Computation (60, 300) -->
-                <!-- Bottom-right: Meaning (340, 300) -->
-
-                <!-- EDGES -->
-                <g class="triadic-edges">
-                  <!-- Language → Computation (left edge) -->
-                  <line class="edge edge-lang-comp"
-                        x1="175" y1="85" x2="85" y2="270"
-                        stroke="var(--accent, #3b82f6)" stroke-width="2"
-                        marker-end="url(#arrowhead)" />
-
-                  <!-- Computation → Meaning/Output (bottom edge) -->
-                  <line class="edge edge-comp-meaning"
-                        x1="95" y1="300" x2="305" y2="300"
-                        stroke="var(--accent, #3b82f6)" stroke-width="2"
-                        marker-end="url(#arrowhead)" />
-
-                  <!-- Meaning → Language (right edge) - initially hidden in traditional -->
-                  <line class="edge edge-meaning-lang"
-                        x1="315" y1="270" x2="225" y2="85"
-                        stroke="var(--accent, #3b82f6)" stroke-width="2"
-                        marker-end="url(#arrowhead)"
-                        opacity="0" />
-
-                  <!-- Reverse arrows (MetaMedium only) -->
-                  <line class="edge edge-reverse edge-comp-lang"
-                        x1="85" y1="255" x2="170" y2="90"
-                        stroke="var(--accent-secondary, #8b5cf6)" stroke-width="2"
-                        marker-end="url(#arrowhead)"
-                        opacity="0" />
-                  <line class="edge edge-reverse edge-meaning-comp"
-                        x1="290" y1="295" x2="110" y2="295"
-                        stroke="var(--accent-secondary, #8b5cf6)" stroke-width="2"
-                        marker-end="url(#arrowhead)"
-                        opacity="0" />
-                  <line class="edge edge-reverse edge-lang-meaning"
-                        x1="230" y1="90" x2="310" y2="255"
-                        stroke="var(--accent-secondary, #8b5cf6)" stroke-width="2"
-                        marker-end="url(#arrowhead)"
-                        opacity="0" />
-                </g>
-
-                <!-- Animated pulses (MetaMedium mode) -->
-                <g class="triadic-pulses" opacity="0">
-                  <circle class="pulse pulse-1" r="4" fill="var(--accent, #3b82f6)" filter="url(#glow)">
-                    <animateMotion dur="2s" repeatCount="indefinite" path="M175,85 L85,270 L305,300 L225,85 Z" />
-                  </circle>
-                  <circle class="pulse pulse-2" r="4" fill="var(--accent-secondary, #8b5cf6)" filter="url(#glow)">
-                    <animateMotion dur="2s" repeatCount="indefinite" begin="0.66s" path="M175,85 L85,270 L305,300 L225,85 Z" />
-                  </circle>
-                  <circle class="pulse pulse-3" r="4" fill="var(--accent, #3b82f6)" filter="url(#glow)">
-                    <animateMotion dur="2s" repeatCount="indefinite" begin="1.33s" path="M175,85 L85,270 L305,300 L225,85 Z" />
-                  </circle>
-                  <!-- Counter-rotating pulses -->
-                  <circle class="pulse pulse-4" r="3" fill="var(--accent-secondary, #8b5cf6)" opacity="0.7">
-                    <animateMotion dur="2.5s" repeatCount="indefinite" path="M225,85 L305,300 L85,270 L175,85 Z" />
-                  </circle>
-                </g>
-
-                <!-- NODES -->
-                <g class="triadic-nodes">
-                  <!-- Language Node (top) -->
-                  <g class="node node-language" transform="translate(200, 60)">
-                    <circle r="36" fill="var(--paper, #f8f6f1)" stroke="var(--accent, #3b82f6)" stroke-width="3" />
-                    <text y="5" text-anchor="middle" class="node-label" fill="var(--text, #1a1a2e)">Language</text>
-                  </g>
-
-                  <!-- Computation Node (bottom-left) -->
-                  <g class="node node-computation" transform="translate(60, 300)">
-                    <circle r="36" fill="var(--paper, #f8f6f1)" stroke="var(--accent, #3b82f6)" stroke-width="3" />
-                    <text y="5" text-anchor="middle" class="node-label" fill="var(--text, #1a1a2e)">Computation</text>
-                  </g>
-
-                  <!-- Meaning/Output Node (bottom-right) -->
-                  <g class="node node-meaning" transform="translate(340, 300)">
-                    <circle r="36" fill="var(--paper, #f8f6f1)" stroke="var(--border, #d4d4d4)" stroke-width="3" class="meaning-circle" />
-                    <text y="5" text-anchor="middle" class="node-label meaning-label" fill="var(--muted, #666)">Output</text>
-                  </g>
-                </g>
-
-                <!-- Annotations -->
-                <g class="triadic-annotations">
-                  <!-- Traditional annotation -->
-                  <text class="annotation annotation-traditional" x="200" y="345" text-anchor="middle" fill="var(--muted, #666)" font-size="12">
-                    Linear: meaning stays in human heads
-                  </text>
-                  <!-- MetaMedium annotation -->
-                  <text class="annotation annotation-metamedium" x="200" y="345" text-anchor="middle" fill="var(--accent, #3b82f6)" font-size="12" opacity="0">
-                    Circular: AI participates in interpretation
-                  </text>
-                </g>
-
-                <!-- Center label -->
-                <text class="center-label" x="200" y="210" text-anchor="middle" fill="var(--muted, #666)" font-size="11" opacity="0">
-                  negotiation
-                </text>
-              </svg>
-
-              <p class="triadic-caption">
-                <span class="caption-traditional">Traditional interfaces flow one way: we write, machines execute, outputs return. Meaning remains external.</span>
-                <span class="caption-metamedium" style="display: none;">The MetaMedium closes the loop. Marks become probabilistic proposals. Both parties negotiate meaning.</span>
-              </p>
-            </div>
-
-            <style>
-            .triadic-loop-figure {
-              --accent: #3b82f6;
-              --accent-secondary: #8b5cf6;
-              --paper: #f8f6f1;
-              --text: #1a1a2e;
-              --muted: #666;
-              --border: #d4d4d4;
-
-              margin: var(--space-lg, 2rem) 0;
-              padding: var(--space-md, 1rem);
-              background: linear-gradient(135deg, rgba(59, 130, 246, 0.03) 0%, rgba(139, 92, 246, 0.03) 100%);
-              border-radius: 12px;
-              font-family: 'Space Grotesk', system-ui, sans-serif;
-            }
-
-            .triadic-controls {
-              display: flex;
-              justify-content: center;
-              gap: 0.5rem;
-              margin-bottom: 1rem;
-            }
-
-            .triadic-toggle {
-              padding: 0.5rem 1rem;
-              border: 1px solid var(--border);
-              border-radius: 6px;
-              background: var(--paper);
-              color: var(--muted);
-              font-family: inherit;
-              font-size: 0.875rem;
-              cursor: pointer;
-              transition: all 0.2s ease;
-            }
-
-            .triadic-toggle[aria-pressed="true"] {
-              background: var(--accent);
-              border-color: var(--accent);
-              color: white;
-            }
-
-            .triadic-toggle:hover:not([aria-pressed="true"]) {
-              border-color: var(--accent);
-              color: var(--accent);
-            }
-
-            .triadic-svg {
-              width: 100%;
-              max-width: 400px;
-              height: auto;
-              display: block;
-              margin: 0 auto;
-            }
-
-            .node-label {
-              font-family: 'Space Grotesk', system-ui, sans-serif;
-              font-size: 11px;
-              font-weight: 500;
-            }
-
-            .triadic-caption {
-              text-align: center;
-              font-size: 0.875rem;
-              color: var(--muted);
-              margin-top: 1rem;
-              min-height: 2.5em;
-            }
-
-            /* Transitions */
-            .edge, .node circle, .node-label, .annotation, .center-label {
-              transition: all 0.5s ease;
-            }
-
-            .triadic-pulses {
-              transition: opacity 0.5s ease;
-            }
-
-            /* MetaMedium mode styles (applied via JS) */
-            .triadic-loop-figure.metamedium .meaning-circle {
-              stroke: var(--accent);
-            }
-
-            .triadic-loop-figure.metamedium .meaning-label {
-              fill: var(--text);
-            }
-
-            .triadic-loop-figure.metamedium .edge-meaning-lang,
-            .triadic-loop-figure.metamedium .edge-reverse {
-              opacity: 1;
-            }
-
-            .triadic-loop-figure.metamedium .triadic-pulses {
-              opacity: 1;
-            }
-
-            .triadic-loop-figure.metamedium .annotation-traditional {
-              opacity: 0;
-            }
-
-            .triadic-loop-figure.metamedium .annotation-metamedium {
-              opacity: 1;
-            }
-
-            .triadic-loop-figure.metamedium .center-label {
-              opacity: 0.7;
-            }
-
-            /* Responsive */
-            @media (max-width: 480px) {
-              .triadic-controls {
-                flex-direction: column;
-                align-items: center;
-              }
-              .triadic-toggle {
-                width: 100%;
-                max-width: 200px;
-              }
-            }
-            </style>
-
-            <script>
-            (function() {
-              const figure = document.getElementById('triadicLoop');
-              const toggles = figure.querySelectorAll('.triadic-toggle');
-              const captionTraditional = figure.querySelector('.caption-traditional');
-              const captionMetamedium = figure.querySelector('.caption-metamedium');
-              const meaningLabel = figure.querySelector('.meaning-label');
-
-              function setMode(mode) {
-                // Update toggle states
-                toggles.forEach(btn => {
-                  btn.setAttribute('aria-pressed', btn.dataset.mode === mode);
-                });
-
-                // Update figure class
-                if (mode === 'metamedium') {
-                  figure.classList.add('metamedium');
-                  captionTraditional.style.display = 'none';
-                  captionMetamedium.style.display = 'inline';
-                  meaningLabel.textContent = 'Meaning';
-                } else {
-                  figure.classList.remove('metamedium');
-                  captionTraditional.style.display = 'inline';
-                  captionMetamedium.style.display = 'none';
-                  meaningLabel.textContent = 'Output';
-                }
-              }
-
-              toggles.forEach(btn => {
-                btn.addEventListener('click', () => setMode(btn.dataset.mode));
-              });
-
-              // Optional: auto-cycle for demo
-              // let isMetamedium = false;
-              // setInterval(() => {
-              //   isMetamedium = !isMetamedium;
-              //   setMode(isMetamedium ? 'metamedium' : 'traditional');
-              // }, 4000);
-            })();
-            </script>
-            
-            <p>The MetaMedium closes this triad. When every mark can mean multiple things, when the system holds probabilistic interpretations and refines them through exchange, meaning becomes part of the computational loop—not something that happens only in human minds before and after the interaction.</p>
-            
-            <h3>AI as Meta-Word</h3>
-            
-            <p>The MetaMedium proposes that AI can function as a new kind of <em>meta-word</em> within an evolution of language itself. Just as written language externalized memory, allowing us to store and retrieve thoughts across time and space, AI externalizes <em>interpretation</em>—the capacity to generate meaning from marks in context.</p>
-            
-            <div class="callout key">
-                <h4>What Is a Meta-Word?</h4>
-                <p>A meta-word is not a word about words (like "noun" or "verb"). It's a word that <em>transforms other words</em>—that takes your rough marks and interprets them into structured meaning based on context. When you write "bounce" near a spring, the meta-word doesn't just read "bounce"—it understands <em>spring + bounce = physics behavior</em> and makes it so.</p>
-            </div>
-            
-            <figure>
-                <div class="placeholder-figure">
-                    <div class="image"><img src="./Assets/fig-MetaMediumTriad.svg" alt="From Docs to MetaMedium</div>
-                    <div class="label">Figure: AI as Meta-Word — The Evolution of External Cognition</div>
-                    <div class="description">Three paradigms: (1) Writing: human → marks → human (marks store memory, reader reconstructs meaning). (2) Computing: human → code → machine → output (machine executes instructions literally). (3) MetaMedium: human ↔ marks ↔ AI ↔ meaning (bidirectional interpretation, iterative refinement, meaning emerges through exchange).</div>
-                </div>
-            </figure>
-            
-            <p>In traditional communication, humans exchange sign vehicles (words, gestures, marks) and each party reconstructs meaning internally. The MetaMedium introduces AI as an active participant in this meaning-making process—not merely receiving marks and returning responses, but operating as a semantic transformer that:</p>
-            
-            <ul>
-                <li>Recognizes patterns across multiple possible interpretations</li>
-                <li>Holds ambiguity productively until context resolves it</li>
-                <li>Learns user-specific vocabularies and reasoning patterns</li>
-                <li>Bridges between representational modes (sketch ↔ equation ↔ code ↔ text)</li>
-            </ul>
-            
-            <p>This is not AI as tool. This is AI as <em>grammatical element</em>—a new part of speech in the language of human-computer collaboration.</p>
-            
-            <h3>Tools vs. Medium</h3>
-            
-            <p>Alan Kay's Dynabook vision asked: "What is the carrying capacity for ideas of the computer?" His answer: the computer is a metamedium—it can simulate any existing media and also be the basis of media that can't exist without the computer. But Kay made a crucial distinction:</p>
-            
-            <blockquote>
-                "What then is a personal computer? One would hope that it would be both a medium for containing and expressing arbitrary symbolic notions, and also a collection of useful tools for manipulating these structures."
-                <cite>— Alan Kay, "A Personal Computer for Children of All Ages," 1972</cite>
-            </blockquote>
-            
-            <p>Most AI interfaces treat AI as tool—something to be invoked, queried, commanded. The MetaMedium treats AI as part of the medium itself. The sketches aren't <em>using</em> the computer; they're <em>composing within</em> the computational medium, with AI as an active interpretive layer that transforms marks into executable meaning.</p>
-        </section>
-
-        <!-- SECTION 5: THE FRAMEWORK -->
-        <section id="framework">
-            <h2>The Framework</h2>
-            
-            <h3>The Semiotic Foundation</h3>
-            
-            <p>Charles Sanders Peirce's semiotics offers a framework for understanding meaning-making that proves remarkably apt for human-AI interaction. In Peirce's model, meaning emerges from the relationship between the <em>sign</em> (the representational form), the <em>object</em> (what is represented), and the <em>interpretant</em> (the meaning generated in the interpreter's mind).</p>
-            
-            <figure>
-                <div class="placeholder-figure">
-                    <div class="image">
-                        <svg viewBox="0 0 700 400" xmlns="http://www.w3.org/2000/svg">
-                            <!-- Title -->
-                            <text x="350" y="10" text-anchor="middle" fill="#7b8a9a" font-size="15" opacity="1">How meaning emerges through triangulation</text>
-
-                            <!-- Triangle structure -->
-                            <line x1="350" y1="80" x2="180" y2="320" stroke="#64b5f6" stroke-width="2" opacity=".4"/>
-                            <line x1="350" y1="80" x2="520" y2="320" stroke="#64b5f6" stroke-width="2" opacity=".4"/>
-                            <line x1="180" y1="320" x2="520" y2="320" stroke="#64b5f6" stroke-width="2" opacity=".4"/>
-
-                            <!-- OBJECT (top) -->
-                            <g>
-                                <circle cx="350" cy="80" r="26" fill="rgba(100, 181, 246, 0.15)" stroke="#64b5f6" stroke-width="2"/>
-                                <text x="350" y="125" text-anchor="middle" fill="#90caf9" font-size="22" font-weight="bold">OBJECT</text>
-                                <text x="350" y="140" text-anchor="middle" fill="#7b8a9a" font-size="13" opacity="1">(referent)</text>
-
-                                <!-- Multiple possibilities -->
-                                <text x="350" y="88" text-anchor="middle" fill="#90caf9" font-size="12">?</text>
-                                <g transform="translate(350, 30)">
-                                    <circle cx="-40" cy="0" r="7" fill="none" stroke="#90caf9" stroke-width="1" opacity="0.8"/>
-                                    <text x="-40" y="15" text-anchor="middle" fill="#90caf9" font-size="11" opacity="0.6">face</text>
-
-                                    <ellipse cx="-14" cy="0" rx="7" ry="8" fill="none" stroke="#90caf9" stroke-width="1" opacity="0.8"/>
-                                    <text x="-14" y="15" text-anchor="middle" fill="#90caf9" font-size="11" opacity="0.6">egg</text>
-
-                                    <circle cx="13" cy="0" r="7" fill="none" stroke="#90caf9" stroke-width="1" opacity="0.8"/>
-                                    <text x="13" y="5" text-anchor="middle" fill="#90caf9" font-size="10" opacity="0.6">0</text>
-
-                                    <circle cx="39" cy="0" r="7" fill="rgba(100, 181, 246, 0.15)" stroke="#90caf9" stroke-width="1" opacity="0.8"/>
-                                    <text x="39" y="15" text-anchor="middle" fill="#90caf9" font-size="11" opacity="0.6">ball</text>
-                                </g>
-                            </g>
-
-                            <!-- SIGN (bottom left) -->
-                            <g>
-                                <circle cx="180" cy="320" r="26" fill="rgba(100, 181, 246, 0.15)" stroke="#64b5f6" stroke-width="2"/>
-                                <text x="180" y="361" text-anchor="middle" fill="#90caf9" font-size="22" font-weight="bold">SIGN</text>
-                                <text x="180" y="375" text-anchor="middle" fill="#7b8a9a" font-size="13" opacity="1">(form)</text>
-
-                                <!-- Sketch progression -->
-                                <g transform="translate(50, 170)">
-                                    <!-- Step 1: rough oval -->
-                                    <rect x="0" y="0" width="80" height="70" fill="rgba(10, 14, 26, 0.5)" stroke="#4a5568" stroke-width="1" rx="3"/>
-                                    <ellipse cx="40" cy="30" rx="22" ry="25" fill="none" stroke="#90caf9" stroke-width="2" stroke-dasharray="2,1" opacity="0.8"/>
-                                    <text x="40" y="60" text-anchor="middle" fill="#7b8a9a" font-size="11">1. rough oval</text>
-
-                                    <!-- Arrow -->
-                                    <text x="88" y="35" fill="#64b5f6" font-size="16">→</text>
-
-                                    <!-- Step 2: with dots -->
-                                    <rect x="100" y="0" width="80" height="70" fill="rgba(10, 14, 26, 0.5)" stroke="#4a5568" stroke-width="1" rx="3"/>
-                                    <ellipse cx="140" cy="30" rx="22" ry="25" fill="none" stroke="#90caf9" stroke-width="2" stroke-dasharray="2,1" opacity="0.8"/>
-                                    <circle cx="134" cy="27" r="2.5" fill="#90caf9"/>
-                                    <circle cx="146" cy="27" r="2.5" fill="#90caf9"/>
-                                    <text x="140" y="52" text-anchor="middle" fill="#7b8a9a" font-size="11">2. + eyes</text>
-                                    <text x="140" y="64" text-anchor="middle" fill="#90caf9" font-size="11" font-weight="bold">→ face!</text>
-                                </g>
-                            </g>
-
-                            <!-- INTERPRETANT (bottom right) -->
-                            <g>
-                                <circle cx="520" cy="320" r="26" fill="rgba(100, 181, 246, 0.15)" stroke="#64b5f6" stroke-width="2"/>
-                                <text x="520" y="361" text-anchor="middle" fill="#90caf9" font-size="22" font-weight="bold">INTERPRETANT</text>
-                                <text x="520" y="375" text-anchor="middle" fill="#7b8a9a" font-size="13" opacity="1">(meaning)</text>
-
-                                <!-- Probability distribution -->
-                                <g transform="translate(450, 168)">
-                                    <!-- Initial probabilities -->
-                                    <rect x="0" y="0" width="120" height="85" fill="rgba(10, 14, 26, 0.5)" stroke="#4a5568" stroke-width="1" rx="3"/>
-                                    <text x="60" y="15" text-anchor="middle" fill="#4a5568" font-size="12">AI considers:</text>
-
-                                    <rect x="8" y="23" width="45" height="7" fill="#64b5f6" opacity="0.8"/>
-                                    <text x="58" y="29" fill="#90caf9" font-size="11">face 0.4</text>
-
-                                    <rect x="8" y="34" width="28" height="7" fill="#64b5f6" opacity="0.8"/>
-                                    <text x="58" y="40" fill="#90caf9" font-size="11">egg 0.25</text>
-
-                                    <rect x="8" y="45" width="22" height="7" fill="#64b5f6" opacity="0.8"/>
-                                    <text x="58" y="51" fill="#90caf9" font-size="11">zero 0.2</text>
-
-                                    <rect x="8" y="56" width="17" height="7" fill="#64b5f6" opacity="0.8"/>
-                                    <text x="58" y="62" fill="#90caf9" font-size="11">ball 0.15</text>
-
-                                    <text x="60" y="77" text-anchor="middle" fill="#64b5f6" font-size="12">↓ context</text>
-
-                                    <!-- Resolved -->
-                                    <rect x="0" y="90" width="120" height="38" fill="rgba(100, 181, 246, 0.12)" stroke="#64b5f6" stroke-width="1.5" rx="3"/>
-                                    <rect x="8" y="100" width="104" height="9" fill="#64b5f6" opacity="0.8"/>
-                                    <text x="60" y="107" text-anchor="middle" fill="#fff" font-size="12" font-weight="bold">face 0.95 ✓</text>
-                                    <text x="60" y="122" text-anchor="middle" fill="#64b5f6" font-size="11">"confident match"</text>
-                                </g>
-                            </g>
-
-                            <!-- Central insight -->
-                            <text x="350" y="310" text-anchor="middle" fill="#64b5f6" font-size="14" opacity="0.9">AI participates in meaning-making,</text>
-                            <text x="350" y="335" text-anchor="middle" fill="#64b5f6" font-size="14" opacity="0.9">not as authority but as collaborator</text>
-                        </svg>
-                    </div>
-                    <div class="label">Figure: The Semiotic Triad Applied</div>
-                    <div class="description">Peirce's triangle in MetaMedium context: Sign (rough oval drawn on canvas) → Object (could be face, egg, zero, planet...) → Interpretant (AI holds probability distribution across possibilities; context accumulates; meaning resolves). The AI participates in the interpretant role, not as final arbiter but as collaborative sense-maker.</div>
-                </div>
-            </figure>
-            
-            <p>Critically, Peirce recognized that meaning is not transferred intact between minds but rather <em>reconstructed</em> by each interpretant. When two humans communicate, they exchange sign vehicles and create <strong>aligned but not identical</strong> internal states. Perfect transmission is impossible; coordination through iterative exchange is the reality.</p>
-            
-            <p>This insight proves crucial for AI alignment. If we accept that meaning emerges through exchange rather than transfer, then the path to human-AI alignment lies not in perfecting AI's "understanding" of human intent, but in <em>enriching the medium of exchange</em> so that iterative coordination becomes possible.</p>
-            
-            <h3>Core Principles</h3>
-            
-            <div class="principles-grid">
-                <div class="principle" data-num="1">
-                    <h4>Space Is Semantic</h4>
-                    <p>Spatial relationships carry meaning. Elements placed near each other are semantically related. Elements connected by lines have directional relationships. The entire canvas becomes a semantic field where position, proximity, and connection are first-class citizens of meaning.</p>
-                    <p class="principle-example"><em>Place two circles close together; the system infers "related." Draw one inside another; it understands "containment." Position creates meaning without words.</em></p>
-                </div>
-                
-                <div class="principle" data-num="2">
-                    <h4>Annotation Becomes Execution</h4>
-                    <p>When you write "make this bounce" near a drawn spring, that annotation becomes an instruction. When you draw an arrow from input to output, you've defined a data flow. The boundary between description and command dissolves; to describe is to instruct.</p>
-                    <p class="principle-example"><em>Write "3x" next to a line; it becomes three lines. Write "wiggle" near a shape; it animates. The annotation is the program.</em></p>
-                </div>
-                
-                <div class="principle" data-num="3">
-                    <h4>Interpretive Ambiguity Is Feature</h4>
-                    <p>A rough sketch is understood as rough—the system holds multiple interpretations probabilistically, refining its understanding as context accumulates. This mirrors how humans communicate: we tolerate ambiguity, using context to resolve meaning over time.</p>
-                    <p class="principle-example"><em>Your rough oval might be a face, an egg, or a zero. The system holds all three until you add two dots—then it commits to "face." Premature disambiguation is the enemy of exploration.</em></p>
-                </div>
-                
-                <div class="principle" data-num="4">
-                    <h4>The Canvas Learns</h4>
-                    <p>User-specific patterns accumulate into "cognitive lenses" that can be applied, shared, or composed. If you consistently use a particular mark to mean "energy flow," the system learns this convention. Your vocabulary becomes executable.</p>
-                    <p class="principle-example"><em>Draw your personal shorthand for "danger" twenty times; the twenty-first time, the system recognizes it before you finish. Your idiolect becomes shared language.</em></p>
-                </div>
-                
-                <div class="principle" data-num="5">
-                    <h4>No Mode Switching</h4>
-                    <p>Following Larry Tesler's principle that "no modes is good modes," the MetaMedium eliminates cognitive overhead. You're always just working—drawing, annotating, refining. The interpretation layer appears when needed and fades when not. There's no "design mode" vs. "execution mode," no switching between tools.</p>
-                    <p class="principle-example"><em>Draw a shape. Write near it. Adjust with gestures. Watch it execute. All the same canvas, all the same moment. The interface disappears into the work.</em></p>
-                </div>
-                
-                <div class="principle" data-num="6">
-                    <h4>Bidirectional Learning</h4>
-                    <p>The relationship between user and system is mutual adaptation, not command-and-execute. The user teaches the system their notation; the system teaches the user by surfacing patterns, completing gestures, suggesting relationships. Both intelligences grow through interaction.</p>
-                    <p class="principle-example"><em>You draw a particular squiggle to mean "recursion." The system learns this. Later, it suggests the squiggle when it detects recursive patterns in your diagram—teaching you to see what it sees.</em></p>
-                </div>
-                
-                <div class="principle" data-num="7">
-                    <h4>Observable Reasoning</h4>
-                    <p>Uncertainty becomes visible. When the AI considers multiple interpretations, the user sees them—not collapsed into a single guess. Multiple possibilities stay present until context or user choice resolves them. This transparency supports both trust and alignment.</p>
-                    <p class="principle-example"><em>Your rough mark triggers three possible interpretations shown as faint ghosts; tap one to commit, or keep drawing to refine. You see the system thinking.</em></p>
-                </div>
-            </div>
-            
-            <h3>The Negotiation Paradigm</h3>
-            
-            <p>Ribeiro and Igarashi's "Sketch-Editing Games" (UIST 2012) introduced a negotiation paradigm where user and machine take turns refining interpretation. The user sketches; the machine recognizes and offers interpretations ("bottle?"). The user refines ("no, more like a mug"). The machine updates. Understanding emerges through iterative exchange.</p>
-            
-            <div class="figure-pair">
-                <figure>
-                    <img src="./Assets/fig-sketch-game-turn.png" alt="Turn-taking in the sketch-editing game">
-                    <figcaption><strong>Figure: Turn-Taking.</strong> The user sketches; the machine recognizes and modifies with a guess ("bottle?"). User declines and modifies. Machine recognizes again ("mug?"). User accepts. From Ribeiro & Igarashi, UIST '12.</figcaption>
-                </figure>
-                <figure>
-                    <img src="./Assets/fig-sketch-game-graph.png" alt="Game graph showing transformation possibilities">
-                    <figcaption><strong>Figure: Possibility Graph.</strong> The machine's internal model after several games. The center shows the current sketch; each ring shows possible transformations (add neck → bottle, add base → wine glass, widen top → cup). From Ribeiro & Igarashi, UIST '12.</figcaption>
-                </figure>
-            </div>
-
-            <p>Their key insight: sketch recognition improves dramatically when reframed as a <em>game</em> rather than a classification problem. The machine maintains a "possibility graph"—a network of possible interpretations and the transformations that would select among them. The user's next stroke navigates this graph, collapsing some possibilities and opening others.</p>
-            
-            <figure>
-                <div class="placeholder-figure">
-                    <div class="image">
-                        <svg viewBox="0 0 700 400" xmlns="http://www.w3.org/2000/svg">
-                            <!-- Title -->
-                            <text x="350" y="22" text-anchor="middle" fill="#7b8a9a" font-size="15" opacity="1">Understanding emerges through iterative exchange</text>
-
-                            <!-- User box (left) -->
-                            <rect x="70" y="50" width="140" height="60" fill="rgba(100, 181, 246, 0.08)" stroke="#64b5f6" stroke-width="2" rx="6"/>
-                            <text x="140" y="78" text-anchor="middle" fill="#64b5f6" font-size="18" font-weight="bold">USER</text>
-                            <text x="140" y="95" text-anchor="middle" fill="#7b8a9a" font-size="14">sketches</text>
-
-                            <!-- System box (right) -->
-                            <rect x="490" y="50" width="140" height="60" fill="rgba(100, 181, 246, 0.08)" stroke="#64b5f6" stroke-width="2" rx="6"/>
-                            <text x="560" y="78" text-anchor="middle" fill="#64b5f6" font-size="18" font-weight="bold">SYSTEM</text>
-                            <text x="560" y="95" text-anchor="middle" fill="#7b8a9a" font-size="14">interprets</text>
-
-                            <!-- Exchange 1 -->
-                            <g>
-                                <line x1="210" y1="140" x2="480" y2="140" stroke="#64b5f6" stroke-width="2" marker-end="url(#arrow4)" stroke-dasharray="3,2"/>
-                                <text x="345" y="133" text-anchor="middle" fill="#64b5f6" font-size="14">1. draws oval</text>
-                                <ellipse cx="315" cy="143" rx="11" ry="13" fill="none" stroke="#64b5f6" stroke-width="2" stroke-dasharray="2,1"/>
-
-                                <line x1="480" y1="160" x2="210" y2="160" stroke="#7b8a9a" stroke-width="2" marker-end="url(#arrow5)"/>
-                                <text x="345" y="175" text-anchor="middle" fill="#6b7280" font-size="13" font-style="italic">"Circle? Face? Egg?"</text>
-                            </g>
-
-                            <!-- Exchange 2 -->
-                            <g transform="translate(0, 60)">
-                                <line x1="210" y1="140" x2="480" y2="140" stroke="#64b5f6" stroke-width="2" marker-end="url(#arrow4)" stroke-dasharray="3,2"/>
-                                <text x="345" y="133" text-anchor="middle" fill="#64b5f6" font-size="14">2. adds two dots</text>
-                                <ellipse cx="315" cy="143" rx="11" ry="13" fill="none" stroke="#64b5f6" stroke-width="2" stroke-dasharray="2,1"/>
-                                <circle cx="311" cy="141" r="2" fill="#64b5f6"/>
-                                <circle cx="319" cy="141" r="2" fill="#64b5f6"/>
-
-                                <line x1="480" y1="160" x2="210" y2="160" stroke="#7b8a9a" stroke-width="2" marker-end="url(#arrow5)"/>
-                                <text x="345" y="175" text-anchor="middle" fill="#6b7280" font-size="13" font-style="italic">"Face! (confidence 0.9)"</text>
-                            </g>
-
-                            <!-- Exchange 3 -->
-                            <g transform="translate(0, 120)">
-                                <line x1="210" y1="140" x2="480" y2="140" stroke="#64b5f6" stroke-width="2" marker-end="url(#arrow4)" stroke-dasharray="3,2"/>
-                                <text x="345" y="133" text-anchor="middle" fill="#64b5f6" font-size="14">3. writes "happy"</text>
-                                <text x="315" y="149" text-anchor="middle" fill="#64b5f6" font-size="13" font-family="Monaco">happy</text>
-
-                                <line x1="480" y1="160" x2="210" y2="160" stroke="#7b8a9a" stroke-width="2" marker-end="url(#arrow5)"/>
-                                <text x="345" y="175" text-anchor="middle" fill="#6b7280" font-size="13" font-style="italic">adds smile + learns pattern</text>
-                            </g>
-
-                            <!-- Shared Understanding result -->
-                            <g transform="translate(0, 200)">
-                                <rect x="230" y="140" width="240" height="58" fill="rgba(100, 181, 246, 0.15)" stroke="#64b5f6" stroke-width="2" rx="6"/>
-                                <text x="350" y="162" text-anchor="middle" fill="#64b5f6" font-size="18" font-weight="bold">SHARED UNDERSTANDING</text>
-                                <text x="350" y="180" text-anchor="middle" fill="#6b7280" font-size="14">"Happy face" → vocabulary</text>
-
-                                <!-- Small happy face demo -->
-                                <ellipse cx="320" cy="187" rx="9" ry="10" fill="none" stroke="#64b5f6" stroke-width="2"/>
-                                <circle cx="316" cy="185" r="1.3" fill="#64b5f6"/>
-                                <circle cx="324" cy="185" r="1.3" fill="#64b5f6"/>
-                                <path d="M 314 190 Q 320 192, 326 190" stroke="#64b5f6" stroke-width="1.5" fill="none"/>
-                            </g>
-
-                            <!-- Bottom insight -->
-                            <text x="350" y="330" text-anchor="middle" fill="#6b7280" font-size="14" font-style="italic">Each exchange refines shared vocabulary and understanding</text>
-
-                            <!-- Arrow markers -->
-                            <defs>
-                                <marker id="arrow4" markerWidth="8" markerHeight="8" refX="7" refY="2.5" orient="auto">
-                                    <path d="M0,0 L0,5 L7,2.5 z" fill="#64b5f6" />
-                                </marker>
-                                <marker id="arrow5" markerWidth="8" markerHeight="8" refX="7" refY="2.5" orient="auto">
-                                    <path d="M0,0 L0,5 L7,2.5 z" fill="#7b8a9a" />
-                                </marker>
-                            </defs>
-                        </svg>
-                    </div>
-                    <div class="label">Figure: The Negotiation Loop</div>
-                    <div class="description">User sketches rough shape → System offers: "Circle? Oval? Face?" → User adds two dots → System updates: "Face ✓" → User writes "happy" → System adds smile, adjusts interpretation confidence. Understanding emerges through exchange, not one-shot recognition. Each turn updates the possibility graph.</div>
-                </div>
-            </figure>
-            
-            <p>The MetaMedium extends this approach by making the possibility graph <em>learnable</em>—accumulating user-specific patterns over time—and by integrating natural language annotation as another form of navigation. The negotiation paradigm means that misunderstanding is not failure—it's information. Each correction teaches the system something about this user's intentions, building toward a shared vocabulary over time.</p>
-            
-            <h3>Cognitive Lenses</h3>
-            
-            <p>As patterns accumulate, they form "cognitive lenses"—personalized interpretation frameworks that shape how the system reads new marks. A physicist's lens recognizes force diagrams; an architect's lens sees load-bearing structures; a musician's lens interprets spatial arrangements as rhythm.</p>
-            
-            <figure>
-                <div class="placeholder-figure">
-                    <div class="image">
-                        <svg viewBox="0 0 750 450" xmlns="http://www.w3.org/2000/svg">
-                            <!-- Title -->
-                            <text x="375" y="25" text-anchor="middle" fill="#7b8a9a" font-size="15" opacity="1">Your patterns become portable ways of seeing</text>
-
-                            <!-- Pattern Accumulation -->
-                            <g>
-                                <text x="120" y="65" fill="#90caf9" font-size="17" font-weight="bold">PATTERN ACCUMULATION</text>
-                                <text x="120" y="83" fill="#7b8a9a" font-size="13">User repeatedly draws:</text>
-
-                                <!-- Repeated marks -->
-                                <g transform="translate(80, 95)">
-                                    <!-- Force arrows -->
-                                    <path d="M 0 0 L 20 -8" stroke="#90caf9" stroke-width="2" marker-end="url(#arrow6)"/>
-                                    <path d="M 35 0 L 55 -8" stroke="#90caf9" stroke-width="2" marker-end="url(#arrow6)"/>
-                                    <path d="M 70 0 L 90 -8" stroke="#90caf9" stroke-width="2" marker-end="url(#arrow6)"/>
-                                    <path d="M 105 0 L 125 -8" stroke="#90caf9" stroke-width="2" marker-end="url(#arrow6)"/>
-                                    <text x="135" y="0" fill="#7b8a9a" font-size="13" opacity="1">force</text>
-
-                                    <!-- Energy marks -->
-                                    <text x="0" y="25" fill="#90caf9" font-size="20">↯</text>
-                                    <text x="35" y="25" fill="#90caf9" font-size="20">↯</text>
-                                    <text x="70" y="25" fill="#90caf9" font-size="20">↯</text>
-                                    <text x="105" y="25" fill="#90caf9" font-size="20">↯</text>
-                                    <text x="135" y="25" fill="#7b8a9a" font-size="13" opacity="1">energy</text>
-
-                                    <!-- Field lines -->
-                                    <path d="M 0 45 Q 10 38, 20 45" stroke="#90caf9" stroke-width="2" fill="none"/>
-                                    <path d="M 35 45 Q 45 38, 55 45" stroke="#90caf9" stroke-width="2" fill="none"/>
-                                    <path d="M 70 45 Q 80 38, 90 45" stroke="#90caf9" stroke-width="2" fill="none"/>
-                                    <path d="M 105 45 Q 115 38, 125 45" stroke="#90caf9" stroke-width="2" fill="none"/>
-                                    <text x="135" y="48" fill="#7b8a9a" font-size="13" opacity="1">fields</text>
-                                </g>
-                            </g>
-
-                            <!-- Arrow to extraction -->
-                            <text x="350" y="140" text-anchor="middle" fill="#64b5f6" font-size="17">→ system extracts →</text>
-
-                            <!-- Lens (crystallized pattern) -->
-                            <g transform="translate(520, 85)">
-                                <rect x="0" y="0" width="160" height="80" fill="rgba(100, 181, 246, 0.12)" stroke="#64b5f6" stroke-width="2" rx="6"/>
-                                <text x="80" y="25" text-anchor="middle" fill="#90caf9" font-size="16" font-weight="bold">LENS</text>
-                                <text x="80" y="43" text-anchor="middle" fill="#90caf9" font-size="13">"Maya's Physics</text>
-                                <text x="80" y="56" text-anchor="middle" fill="#90caf9" font-size="13">Notation"</text>
-
-                                <!-- Prism icon -->
-                                <path d="M 80 -8 L 92 8 L 68 8 Z" fill="none" stroke="#64b5f6" stroke-width="2"/>
-                                <line x1="92" y1="8" x2="96" y2="10" stroke="#90caf9" stroke-width="1" opacity="0.5"/>
-                                <line x1="92" y1="8" x2="96" y2="6" stroke="#64b5f6" stroke-width="1" opacity="0.5"/>
-
-                                <text x="80" y="72" text-anchor="middle" fill="#7b8a9a" font-size="12" opacity="1">portable interpretation</text>
-                            </g>
-
-                            <!-- Arrow down to operations -->
-                            <line x1="600" y1="175" x2="600" y2="200" stroke="#64b5f6" stroke-width="2" marker-end="url(#arrow6)"/>
-
-                            <!-- Lens Operations -->
-                            <g transform="translate(0, 210)">
-                                <text x="375" y="10" text-anchor="middle" fill="#90caf9" font-size="18" font-weight="bold">LENS OPERATIONS</text>
-
-                                <!-- Operation 1: Apply -->
-                                <g transform="translate(60, 30)">
-                                    <rect x="0" y="0" width="170" height="165" fill="rgba(74, 85, 104, 0.2)" stroke="#64b5f6" stroke-width="2" rx="6"/>
-                                    <text x="85" y="25" text-anchor="middle" fill="#90caf9" font-size="16" font-weight="bold">APPLY</text>
-                                    <text x="85" y="43" text-anchor="middle" fill="#7b8a9a" font-size="13">Use on new drawings</text>
-
-                                    <text x="85" y="72" text-anchor="middle" fill="#64b5f6" font-size="20">↓</text>
-
-                                    <!-- Result -->
-                                    <rect x="15" y="82" width="140" height="65" fill="rgba(10, 14, 26, 0.5)" stroke="#4a5568" stroke-width="1.5" rx="3"/>
-                                    <text x="85" y="100" text-anchor="middle" fill="#7b8a9a" font-size="13">New sketch auto-</text>
-                                    <text x="85" y="113" text-anchor="middle" fill="#7b8a9a" font-size="13">recognized as</text>
-                                    <text x="85" y="126" text-anchor="middle" fill="#90caf9" font-size="14" font-weight="bold">force diagram</text>
-                                    <path d="M 65 135 L 95 127" stroke="#90caf9" stroke-width="2" marker-end="url(#arrow6)"/>
-                                </g>
-
-                                <!-- Operation 2: Share -->
-                                <g transform="translate(260, 30)">
-                                    <rect x="0" y="0" width="170" height="165" fill="rgba(74, 85, 104, 0.2)" stroke="#64b5f6" stroke-width="2" rx="6"/>
-                                    <text x="85" y="25" text-anchor="middle" fill="#90caf9" font-size="16" font-weight="bold">SHARE</text>
-                                    <text x="85" y="43" text-anchor="middle" fill="#7b8a9a" font-size="13">Export to collaborators</text>
-
-                                    <text x="85" y="72" text-anchor="middle" fill="#64b5f6" font-size="20">↓</text>
-
-                                    <!-- Result -->
-                                    <rect x="15" y="82" width="140" height="65" fill="rgba(10, 14, 26, 0.5)" stroke="#4a5568" stroke-width="1.5" rx="3"/>
-                                    <text x="85" y="100" text-anchor="middle" fill="#7b8a9a" font-size="13">Teammate's canvas</text>
-                                    <text x="85" y="113" text-anchor="middle" fill="#7b8a9a" font-size="13">now reads your</text>
-                                    <text x="85" y="126" text-anchor="middle" fill="#90caf9" font-size="14" font-weight="bold">notation</text>
-                                    <text x="65" y="142" text-anchor="middle" fill="#90caf9" font-size="18">👤</text>
-                                    <text x="105" y="142" text-anchor="middle" fill="#90caf9" font-size="18">👤</text>
-                                    <line x1="73" y1="139" x2="97" y2="139" stroke="#64b5f6" stroke-width="2"/>
-                                </g>
-
-                                <!-- Operation 3: Compose -->
-                                <g transform="translate(460, 30)">
-                                    <rect x="0" y="0" width="170" height="165" fill="rgba(74, 85, 104, 0.2)" stroke="#64b5f6" stroke-width="2" rx="6"/>
-                                    <text x="85" y="25" text-anchor="middle" fill="#90caf9" font-size="16" font-weight="bold">COMPOSE</text>
-                                    <text x="85" y="43" text-anchor="middle" fill="#7b8a9a" font-size="13">Combine with other lenses</text>
-
-                                    <text x="85" y="72" text-anchor="middle" fill="#64b5f6" font-size="20">↓</text>
-
-                                    <!-- Result -->
-                                    <rect x="15" y="82" width="140" height="65" fill="rgba(10, 14, 26, 0.5)" stroke="#4a5568" stroke-width="1.5" rx="3"/>
-                                    <text x="85" y="100" text-anchor="middle" fill="#7b8a9a" font-size="13">Create hybrid:</text>
-                                    <text x="85" y="118" text-anchor="middle" fill="#90caf9" font-size="14" font-weight="bold">physics +</text>
-                                    <text x="85" y="132" text-anchor="middle" fill="#90caf9" font-size="14" font-weight="bold">chemistry lens</text>
-                                    <!-- Overlapping prisms -->
-                                    <path d="M 65 140 L 77 152 L 53 152 Z" fill="none" stroke="#90caf9" stroke-width="2" opacity="0.6"/>
-                                    <path d="M 85 140 L 97 152 L 73 152 Z" fill="none" stroke="#64b5f6" stroke-width="2" opacity="0.6"/>
-                                </g>
-                            </g>
-
-                            <!-- Bottom insight -->
-                            <text x="375" y="435" text-anchor="middle" fill="#6b7280" font-size="14" font-style="italic">Lenses are portable interpretation frameworks</text>
-
-                            <!-- Arrow marker -->
-                            <defs>
-                                <marker id="arrow6" markerWidth="8" markerHeight="8" refX="7" refY="2.5" orient="auto">
-                                    <path d="M0,0 L0,5 L7,2.5 z" fill="#64b5f6" />
-                                </marker>
-                            </defs>
-                        </svg>
-                    </div>
-                    <div class="label">Figure: Cognitive Lens Architecture</div>
-                    <div class="description">User's repeated gestures → Pattern extraction → Named "lens" (e.g., "Maya's physics notation"). Lenses can be: applied to new drawings, shared with collaborators, composed with other lenses, versioned and evolved. Your way of seeing becomes portable.</div>
-                </div>
-            </figure>
-            
-            <p>Lenses are not just personal—they can be shared, creating communities of interpretation. A research group might develop a shared lens for their domain notation. A classroom might inherit a lens from curriculum designers. Lenses become a new kind of intellectual property: not content, but <em>ways of seeing</em>.</p>
         </section>
 
         <!-- SECTION 6: CURRENT DEVELOPMENT -->
