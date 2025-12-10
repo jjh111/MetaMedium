@@ -2,10 +2,10 @@ https://jjh111.github.io/MetaMedium/MetaMedium_Whitepaper_v4.html
 
 https://jhanacek.net/metamedium-resources-65
 
-https://jjh111.github.io/MetaMedium/doodle2-canvas.html
-
 MetaMedium Canvas Demo - Computational Intelligence Made Visible
 An interactive demonstration of recombinatorial shape recognition
+
+https://jjh111.github.io/MetaMedium/doodle2-canvas.html
 
 THIS VERSION (doodle2-canvas.html):
 - Redesigned UI matching whitepaper aesthetic
@@ -33,5 +33,6 @@ KEYBOARD SHORTCUTS:
 - Escape: Clear selection
 
 Demo Archive:
+
 https://jjh111.github.io/MetaMedium/doodle2-v1.html
 
