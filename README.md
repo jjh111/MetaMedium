@@ -6,7 +6,7 @@ Supplimental resources page:
 https://jhanacek.net/metamedium-resources-65
 
 MetaMedium Canvas Demo - Computational Intelligence Made Visible
-An interactive demonstration of recombinatorial shape recognition
+An interactive demonstration of recombinatorial shape recognition, geometric and semantic graph
 
 https://jjh111.github.io/MetaMedium/doodle2-canvas.html
 
