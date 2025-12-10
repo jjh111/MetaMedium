@@ -3194,9 +3194,14 @@ JOHN HANACEK 2025, JHDESIGN LLC
                             componentTypes: ['line', 'triangle'],
                             componentCount: 2,
                             typeHistogram: { line: 1, triangle: 1 },
-                            // For arrow, accept either touching OR intersecting (hand-drawn flexibility)
-                            relationshipHistogram: null,  // Don't check relationships strictly
-                            topologyHash: 'line+triangle',  // Just type composition, not relationships
+                            // FIXED: Require spatial connection (touching OR intersecting)
+                            relationshipHistogram: {
+                                touching: 1,      // Line should touch triangle (preferred)
+                                intersecting: 0,  // OR intersect (also valid with fuzzy)
+                                containment: 0    // No containment required
+                            },
+                            fuzzyRelationships: true,  // Accept touching OR intersecting (flexible)
+                            topologyHash: 'line+triangle-touching:1',
                             canonicalOrder: [0, 1]
                         },
                         usageCount: 0
@@ -8267,12 +8272,12 @@ JOHN HANACEK 2025, JHDESIGN LLC
                             updateMetrics(analysis);
                             showSuggestions(analysis);
 
-                            // AUTO-ACCEPT: High confidence matches (≥85%) are automatically accepted
+                            // AUTO-ACCEPT: High confidence matches (≥80%) are automatically accepted
                             if (analysis.results.length > 0) {
                                 const topResult = analysis.results[0];
                                 const confidence = topResult.score || Math.round((topResult.confidence || 0) * 100);
 
-                                if (confidence >= 85) {
+                                if (confidence >= 80) {
                                     console.log(`Auto-accepting high confidence match: ${topResult.label} (${confidence}%)`);
                                     // Auto-accept after a tiny delay so user sees the recognition flash
                                     setTimeout(() => {
@@ -8506,12 +8511,12 @@ JOHN HANACEK 2025, JHDESIGN LLC
                             updateMetrics(analysis);
                             showSuggestions(analysis);
 
-                            // AUTO-ACCEPT: High confidence matches (≥85%) are automatically accepted
+                            // AUTO-ACCEPT: High confidence matches (≥80%) are automatically accepted
                             if (analysis.results.length > 0) {
                                 const topResult = analysis.results[0];
                                 const confidence = topResult.score || Math.round((topResult.confidence || 0) * 100);
 
-                                if (confidence >= 85) {
+                                if (confidence >= 80) {
                                     console.log(`Auto-accepting high confidence match: ${topResult.label} (${confidence}%)`);
                                     // Auto-accept after a tiny delay so user sees the recognition flash
                                     setTimeout(() => {
@@ -9366,6 +9371,26 @@ JOHN HANACEK 2025, JHDESIGN LLC
                 hideSavePrimitiveUI();
                 fuzzyMatchInput.value = '';
                 fuzzyMatchInput.blur();  // DAY 5 FIX: Remove focus to prevent accidental Enter key
+
+                // Clear recognition panel (top match, candidates, fingerprint, reasoning)
+                const topMatch = document.getElementById('topMatch');
+                const candidatesList = document.getElementById('candidatesList');
+                const fingerprintSection = document.getElementById('fingerprintSection');
+                const reasoningSection = document.getElementById('reasoningSection');
+
+                if (topMatch) topMatch.style.display = 'none';
+                if (candidatesList) {
+                    candidatesList.innerHTML = '<div style="text-align: center; color: var(--muted); font-size: 0.875rem; padding: 1rem;">Draw a shape to see recognition...</div>';
+                }
+                if (fingerprintSection) fingerprintSection.style.display = 'none';
+                if (reasoningSection) reasoningSection.style.display = 'none';
+
+                // Clear stroke preview canvas
+                const strokePreview = document.getElementById('strokePreview');
+                if (strokePreview) {
+                    const ctx = strokePreview.getContext('2d');
+                    ctx.clearRect(0, 0, strokePreview.width, strokePreview.height);
+                }
 
                 // Day 4: Clear composition matches
                 updateCanvasLooksLike();
