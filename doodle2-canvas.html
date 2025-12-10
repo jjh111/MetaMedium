@@ -1448,6 +1448,26 @@ JOHN HANACEK 2025, JHDESIGN LLC
         .library-item.old {
             display: none !important;
         }
+
+        /* ===========================================
+           MOBILE BREAKPOINT
+        =========================================== */
+        @media (max-width: 768px) {
+            .header-overlay {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: var(--space-xs);
+            }
+
+            .header-title {
+                width: 100%;
+            }
+
+            .header-actions {
+                width: 100%;
+                justify-content: flex-start;
+            }
+        }
     </style>
 </head>
 
@@ -1458,7 +1478,7 @@ JOHN HANACEK 2025, JHDESIGN LLC
 
         <!-- Header Overlay - Top Left -->
         <div class="header-overlay">
-            <h1 class="header-title"><a href="https://jjh111.github.io/MetaMedium/MetaMedium_Whitepaper_v4.html" target="_blank">Meta</a>Medium/Canvas</h1>
+            <h1 class="header-title"><a href="https://jjh111.github.io/MetaMedium/MetaMedium_Whitepaper_v4.html" target="_blank">MetaMedium</a>/Canvas</h1>
             <div class="header-actions">
                 <button id="clearBtn" class="header-btn">Clear</button>
                <!-- 
@@ -6230,6 +6250,105 @@ JOHN HANACEK 2025, JHDESIGN LLC
             }
 
             // Rendering
+            // PHASE 3: Dotted Outline Preview (Whitepaper Feature)
+            // Shows refined geometric interpretation overlaid on user's stroke
+            function drawDottedOutlinePreview(ctx, stroke, shapeType, fingerprint) {
+                if (!stroke || stroke.length === 0 || !shapeType) return;
+
+                // Save context state
+                ctx.save();
+
+                // Dotted line style
+                ctx.strokeStyle = 'rgba(99, 102, 241, 0.7)'; // Indigo/purple
+                ctx.lineWidth = 2;
+                ctx.setLineDash([8, 4]); // Dotted pattern
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+
+                try {
+                    switch (shapeType.toLowerCase()) {
+                        case 'circle': {
+                            // Fit circle to stroke bounds
+                            const bounds = getBounds(stroke);
+                            const cx = (bounds.minX + bounds.maxX) / 2;
+                            const cy = (bounds.minY + bounds.maxY) / 2;
+                            const rx = (bounds.maxX - bounds.minX) / 2;
+                            const ry = (bounds.maxY - bounds.minY) / 2;
+                            const radius = (rx + ry) / 2; // Average for circular preview
+
+                            ctx.beginPath();
+                            ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+                            ctx.stroke();
+                            break;
+                        }
+
+                        case 'rectangle': {
+                            // Use bounding box as rectangle preview
+                            const bounds = getBounds(stroke);
+                            ctx.beginPath();
+                            ctx.rect(
+                                bounds.minX,
+                                bounds.minY,
+                                bounds.maxX - bounds.minX,
+                                bounds.maxY - bounds.minY
+                            );
+                            ctx.stroke();
+                            break;
+                        }
+
+                        case 'triangle': {
+                            // Fit triangle using convex hull
+                            const simplified = simplifyStroke(stroke, 2.0);
+                            const hull = convexHull(simplified);
+                            const corners = fitTriangle(hull);
+
+                            if (corners.length >= 3) {
+                                ctx.beginPath();
+                                ctx.moveTo(corners[0].x, corners[0].y);
+                                for (let i = 1; i < corners.length; i++) {
+                                    ctx.lineTo(corners[i].x, corners[i].y);
+                                }
+                                ctx.closePath();
+                                ctx.stroke();
+                            }
+                            break;
+                        }
+
+                        case 'line': {
+                            // Draw line from first to last point
+                            if (stroke.length >= 2) {
+                                const first = stroke[0];
+                                const last = stroke[stroke.length - 1];
+                                ctx.beginPath();
+                                ctx.moveTo(first.x, first.y);
+                                ctx.lineTo(last.x, last.y);
+                                ctx.stroke();
+                            }
+                            break;
+                        }
+
+                        case 'arc': {
+                            // Draw simplified curved path
+                            const simplified = simplifyStroke(stroke, 1.5);
+                            if (simplified.length >= 2) {
+                                ctx.beginPath();
+                                simplified.forEach((point, i) => {
+                                    if (i === 0) ctx.moveTo(point.x, point.y);
+                                    else ctx.lineTo(point.x, point.y);
+                                });
+                                ctx.stroke();
+                            }
+                            break;
+                        }
+                    }
+                } catch (error) {
+                    console.warn('Error drawing dotted preview:', error);
+                }
+
+                // Restore context state
+                ctx.restore();
+            }
+
             function render() {
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -6346,6 +6465,31 @@ JOHN HANACEK 2025, JHDESIGN LLC
                         else ctx.lineTo(point.x, point.y);
                     });
                     ctx.stroke();
+
+                    // PHASE 3: Show live dotted outline preview while drawing
+                    if (state.suggestions && state.suggestions.length > 0 && state.currentStroke.length >= 5) {
+                        const topSuggestion = state.suggestions[0];
+                        const shapeType = topSuggestion.type;
+                        drawDottedOutlinePreview(ctx, state.currentStroke, shapeType, state.lastFingerprint);
+                    }
+                }
+
+                // PHASE 3: Draw dotted outline preview for selected unaccepted stroke
+                // Shows "this is what I think you drew" with geometric refinement overlay
+                if (state.selectedStrokeIndex !== null &&
+                    state.suggestions && state.suggestions.length > 0 &&
+                    state.strokes[state.selectedStrokeIndex]) {
+
+                    const selectedStroke = state.strokes[state.selectedStrokeIndex];
+                    const isAccepted = state.context[state.selectedStrokeIndex] &&
+                                      state.context[state.selectedStrokeIndex] !== '';
+
+                    // Only show preview for UNACCEPTED strokes (pending recognition)
+                    if (!isAccepted) {
+                        const topSuggestion = state.suggestions[0];
+                        const shapeType = topSuggestion.type;
+                        drawDottedOutlinePreview(ctx, selectedStroke, shapeType, state.lastFingerprint);
+                    }
                 }
 
                 // Draw spatial graph visualization (Day 3)
@@ -7627,8 +7771,7 @@ JOHN HANACEK 2025, JHDESIGN LLC
                         renderLibrary();
                     }
 
-                    // Reset UI
-                    state.selectedStrokeIndex = null;
+                    // Reset UI (but keep recognition panel visible)
                     fuzzyMatchInput.value = '';
                     fuzzyMatchInput.blur();  // DAY 5 FIX: Remove focus after acceptance
                     recognitionStatus.textContent = `Composition "${suggestion.label}" accepted!`;
@@ -7646,8 +7789,12 @@ JOHN HANACEK 2025, JHDESIGN LLC
                         compositionName: compositionName
                     });
 
-                    // DAY 5 FIX: Check for remaining composition matches after acceptance
-                    showSuggestions(null);
+                    // KEEP SHOWING COMPOSITION DATA: Re-check for composition matches to keep panel visible
+                    // This preserves the recognition panel showing the accepted composition
+                    const compositionMatches = checkCanvasForCompositions();
+                    if (compositionMatches.length > 0) {
+                        showSuggestions({ results: compositionMatches, fingerprint: null });
+                    }
 
                     // Reset status after 2 seconds if no new suggestions
                     setTimeout(() => {
@@ -7752,15 +7899,19 @@ JOHN HANACEK 2025, JHDESIGN LLC
                     renderLibrary();
                 }
 
-                state.selectedStrokeIndex = null;
+                // Keep selectedStrokeIndex pointing to accepted stroke (don't clear)
+                // This keeps the recognition panel visible with the stroke data
 
                 // Reset UI
                 fuzzyMatchInput.value = '';
                 fuzzyMatchInput.blur();  // DAY 5 FIX: Remove focus after acceptance
 
-                // DAY 5 FIX: Check for composition matches after accepting primitive
-                // Use unified showSuggestions() instead of duplicate code
-                showSuggestions(null);
+                // KEEP SHOWING SUGGESTIONS: Re-analyze the accepted stroke to show its final data
+                // This preserves the recognition panel with fingerprint, scoring, and reasoning
+                if (state.strokes[strokeIndex]) {
+                    const finalAnalysis = analyzeStrokeDetailed(state.strokes[strokeIndex]);
+                    showSuggestions(finalAnalysis);
+                }
 
                 // Day 4: Update composition matching (for debug area)
                 updateCanvasLooksLike();
@@ -7769,7 +7920,7 @@ JOHN HANACEK 2025, JHDESIGN LLC
                 const afterState = captureState();
                 recordAction('accept-primitive', beforeState, afterState, {
                     suggestion: suggestion,
-                    strokeIndex: state.selectedStrokeIndex
+                    strokeIndex: strokeIndex  // Use captured strokeIndex (not null)
                 });
 
                 render();
@@ -7961,6 +8112,31 @@ JOHN HANACEK 2025, JHDESIGN LLC
                 }
             }
 
+            // Real-time recognition throttling
+            let lastRecognitionTime = 0;
+            const RECOGNITION_THROTTLE_MS = 150; // Run recognition every 150ms max
+
+            function runLiveRecognition() {
+                // Throttle recognition to avoid performance issues
+                const now = Date.now();
+                if (now - lastRecognitionTime < RECOGNITION_THROTTLE_MS) return;
+                lastRecognitionTime = now;
+
+                // Only run if we have enough points
+                if (state.currentStroke.length < 5) return;
+
+                try {
+                    // Analyze current stroke in progress
+                    const analysis = analyzeStrokeDetailed(state.currentStroke);
+                    state.lastFingerprint = analysis.fingerprint;
+
+                    // Show live suggestions
+                    showSuggestions(analysis);
+                } catch (error) {
+                    console.warn('Live recognition error:', error);
+                }
+            }
+
             // Mouse events
             console.log('Attaching mouse events to canvas...');
 
@@ -7972,6 +8148,10 @@ JOHN HANACEK 2025, JHDESIGN LLC
                 };
                 state.isDrawing = true;
                 state.currentStroke = [point];
+
+                // Clear previous suggestions when starting new stroke
+                state.suggestions = [];
+                state.lastFingerprint = null;
             });
 
             canvas.addEventListener('mousemove', (e) => {
@@ -7983,6 +8163,10 @@ JOHN HANACEK 2025, JHDESIGN LLC
                     y: e.clientY - rect.top
                 };
                 state.currentStroke.push(point);
+
+                // Run live recognition (throttled)
+                runLiveRecognition();
+
                 render();
             });
 
@@ -8082,6 +8266,20 @@ JOHN HANACEK 2025, JHDESIGN LLC
 
                             updateMetrics(analysis);
                             showSuggestions(analysis);
+
+                            // AUTO-ACCEPT: High confidence matches (≥85%) are automatically accepted
+                            if (analysis.results.length > 0) {
+                                const topResult = analysis.results[0];
+                                const confidence = topResult.score || Math.round((topResult.confidence || 0) * 100);
+
+                                if (confidence >= 85) {
+                                    console.log(`Auto-accepting high confidence match: ${topResult.label} (${confidence}%)`);
+                                    // Auto-accept after a tiny delay so user sees the recognition flash
+                                    setTimeout(() => {
+                                        acceptSuggestion(topResult);
+                                    }, 100);
+                                }
+                            }
                         } catch (error) {
                             console.error('Error in analysis:', error);
                             alert('Error analyzing stroke: ' + error.message);
@@ -8149,6 +8347,19 @@ JOHN HANACEK 2025, JHDESIGN LLC
                         updateMetrics(analysis);
                         showSuggestions(analysis);
 
+                        // AUTO-ACCEPT: High confidence matches (≥85%) are automatically accepted
+                        if (analysis.results.length > 0) {
+                            const topResult = analysis.results[0];
+                            const confidence = topResult.score || Math.round((topResult.confidence || 0) * 100);
+
+                            if (confidence >= 85) {
+                                console.log(`Auto-accepting high confidence match: ${topResult.label} (${confidence}%)`);
+                                setTimeout(() => {
+                                    acceptSuggestion(topResult);
+                                }, 100);
+                            }
+                        }
+
                         // Update refined strokes if refinement is enabled
                         if (state.refinement.enabled) {
                             updateRefinedStrokes();
@@ -8173,6 +8384,10 @@ JOHN HANACEK 2025, JHDESIGN LLC
                 };
                 state.isDrawing = true;
                 state.currentStroke = [point];
+
+                // Clear previous suggestions when starting new stroke
+                state.suggestions = [];
+                state.lastFingerprint = null;
             });
 
             canvas.addEventListener('touchmove', (e) => {
@@ -8186,6 +8401,10 @@ JOHN HANACEK 2025, JHDESIGN LLC
                     y: touch.clientY - rect.top
                 };
                 state.currentStroke.push(point);
+
+                // Run live recognition (throttled)
+                runLiveRecognition();
+
                 render();
             });
 
@@ -8286,6 +8505,20 @@ JOHN HANACEK 2025, JHDESIGN LLC
 
                             updateMetrics(analysis);
                             showSuggestions(analysis);
+
+                            // AUTO-ACCEPT: High confidence matches (≥85%) are automatically accepted
+                            if (analysis.results.length > 0) {
+                                const topResult = analysis.results[0];
+                                const confidence = topResult.score || Math.round((topResult.confidence || 0) * 100);
+
+                                if (confidence >= 85) {
+                                    console.log(`Auto-accepting high confidence match: ${topResult.label} (${confidence}%)`);
+                                    // Auto-accept after a tiny delay so user sees the recognition flash
+                                    setTimeout(() => {
+                                        acceptSuggestion(topResult);
+                                    }, 100);
+                                }
+                            }
                         } catch (error) {
                             console.error('Error in analysis:', error);
                             alert('Error analyzing stroke: ' + error.message);
@@ -8353,6 +8586,19 @@ JOHN HANACEK 2025, JHDESIGN LLC
 
                         updateMetrics(analysis);
                         showSuggestions(analysis);
+
+                        // AUTO-ACCEPT: High confidence matches (≥85%) are automatically accepted
+                        if (analysis.results.length > 0) {
+                            const topResult = analysis.results[0];
+                            const confidence = topResult.score || Math.round((topResult.confidence || 0) * 100);
+
+                            if (confidence >= 85) {
+                                console.log(`Auto-accepting high confidence match: ${topResult.label} (${confidence}%)`);
+                                setTimeout(() => {
+                                    acceptSuggestion(topResult);
+                                }, 100);
+                            }
+                        }
 
                         // Update refined strokes if refinement is enabled
                         if (state.refinement.enabled) {
