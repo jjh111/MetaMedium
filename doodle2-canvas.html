@@ -28,7 +28,7 @@ KEYBOARD SHORTCUTS:
 - Enter: Accept top suggestion
 - Escape: Clear selection
 
-© JOHN HANACEK, JHDESIGN LLC
+JOHN HANACEK 2025, JHDESIGN LLC
 -->
 <html lang="en">
 
@@ -103,14 +103,14 @@ KEYBOARD SHORTCUTS:
 
         .app {
             position: relative;
-            width: 100vw;
-            height: 100vh;
+            width: 103vw;
+            height: 152vh;
             overflow: hidden;
         }
 
         /* Fullscreen Canvas */
         canvas {
-            position: fixed;
+            position: relative;
             top: 0;
             left: 0;
             width: 100%;
@@ -128,14 +128,14 @@ KEYBOARD SHORTCUTS:
 
         .header-overlay {
             position: fixed;
-            top: var(--space-md);
+            top: var(--space-sm);
             left: var(--space-md);
             z-index: 100;
             background: var(--panel-bg);
             backdrop-filter: blur(12px);
             border: 1px solid var(--panel-border);
             border-radius: 8px;
-            padding: var(--space-sm) var(--space-md);
+            padding: var(--space-sm) var(--space-xs);
             box-shadow: 0 2px 12px var(--shadow);
             display: flex;
             align-items: center;
@@ -161,7 +161,7 @@ KEYBOARD SHORTCUTS:
         .header-btn {
             padding: 0.375rem 0.75rem;
             font-size: 0.8125rem;
-            font-weight: 500;
+            font-weight: 900;
             background: white;
             color: var(--ink);
             border: 1px solid var(--border);
@@ -192,11 +192,11 @@ KEYBOARD SHORTCUTS:
         =========================================== */
 
         .recognition-overlay {
-            position: fixed;
-            top: var(--space-md);
-            right: var(--space-md);
+            position: absolute;
+            top: var(--space-xl);
+            right: var(--space-sm);
             z-index: 100;
-            width: 320px;
+            width: 280px;
             max-height: calc(100vh - var(--space-lg) * 2);
             background: var(--panel-bg);
             backdrop-filter: blur(12px);
@@ -849,7 +849,7 @@ KEYBOARD SHORTCUTS:
         =========================================== */
 
         /* Tablet and below - 900px */
-        @media (max-width: 900px) {
+        @media (max-width: 760px) {
             .header-overlay {
                 top: var(--space-sm);
                 left: var(--space-sm);
@@ -859,11 +859,11 @@ KEYBOARD SHORTCUTS:
             }
 
             .header-title {
-                font-size: 1rem;
+                font-size: .8rem;
             }
 
             .header-actions {
-                width: 100%;
+                width: 50%;
                 margin-top: var(--space-xs);
             }
 
@@ -874,10 +874,9 @@ KEYBOARD SHORTCUTS:
             }
 
             .recognition-overlay {
-                top: 70px;
+                top: 60px;
                 right: var(--space-sm);
-                left: var(--space-sm);
-                width: auto;
+                width: 30%;
                 max-height: 40vh;
             }
 
@@ -918,7 +917,7 @@ KEYBOARD SHORTCUTS:
 
             .recognition-overlay,
             .spatial-overlay {
-                padding: var(--space-sm);
+                padding: var(--space-xl);
                 gap: var(--space-sm);
             }
 
