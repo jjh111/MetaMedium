@@ -1101,29 +1101,7 @@ JOHN HANACEK 2025, JHDESIGN LLC
             padding: 8px;
         }
 
-        /* Legacy canvas-wrapper - no longer used
-        .canvas-wrapper {
-            background: white;
-            border-radius: 4px;
-            display: flex;
-            flex-direction: column;
-            flex: 1;
-            width: 100%;
-            min-width: 0;
-            min-height: 0;
-            overflow: hidden;
-        }
-
-        canvas {
-            border: none;
-            background: white;
-            cursor: crosshair;
-            display: block;
-            flex: 1;
-            width: 100%;
-        }
-        */
-
+   
         .canvas-input {
             width: 100%;
             padding: 10px 14px;
@@ -1649,8 +1627,8 @@ JOHN HANACEK 2025, JHDESIGN LLC
         <div class="header-overlay">
             <h1 class="header-title"><a href="https://jjh111.github.io/MetaMedium/MetaMedium_Whitepaper_v4.html" target="_blank">MetaMedium</a>/Canvas</h1>
             <div class="header-actions">
-                <button id="debugToggleBtn" class="header-btn">Semantic Show</button>
                 <button id="clearBtn" class="header-btn">Clear</button>
+                <button id="debugToggleBtn" class="header-btn">Semantic On</button>
                <!-- 
                    <button id="undoBtn" class="header-btn">Undo</button>
                 <button id="redoBtn" class="header-btn">Redo</button>
@@ -9752,7 +9730,7 @@ JOHN HANACEK 2025, JHDESIGN LLC
             debugToggleBtn.addEventListener('click', () => {
                 state.debugMode = !state.debugMode;
                 debugCheckbox.checked = state.debugMode;
-                debugToggleBtn.textContent = state.debugMode ? 'Semantic Hide' : 'Semantic Show';
+                debugToggleBtn.textContent = state.debugMode ? 'Semantic Off' : 'Semantic On';
                 debugToggleBtn.classList.toggle('active', state.debugMode);
                 render();
             });
