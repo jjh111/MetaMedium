@@ -809,6 +809,12 @@
             display: flex;
             align-items: center;
             justify-content: center;
+            transition: all 0.2s ease;
+        }
+        .gallery-item .image:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            background: rgba(10, 14, 26, 1);
         }
         .gallery-item .image img {
             width: 100%;
@@ -1065,6 +1071,170 @@
             font-size: 0.8125rem;
             color: #666;
             min-height: 1.25rem;
+        }
+
+        /* Image Modal / Lightbox */
+        .image-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 10000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .image-modal.active {
+            display: flex;
+            opacity: 1;
+        }
+
+        .modal-backdrop {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(15, 15, 20, 0.92);
+            cursor: pointer;
+        }
+
+        .modal-content {
+            position: relative;
+            z-index: 10001;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-image-container {
+            width: 90vw;
+            height: 80vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-image-container img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            border-radius: 4px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+        }
+
+        .modal-close {
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            font-size: 1.5rem;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            line-height: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+        }
+
+        .modal-close:hover {
+            background: rgba(255, 255, 255, 0.2);
+            border-color: rgba(255, 255, 255, 0.5);
+            transform: scale(1.1);
+        }
+
+        .modal-prev,
+        .modal-next {
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            font-size: 1.5rem;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            line-height: 1;
+            padding: 0;
+            padding-bottom: 2px;
+            font-family: Arial, sans-serif;
+        }
+
+        .modal-prev:hover:not(:disabled),
+        .modal-next:hover:not(:disabled) {
+            background: rgba(255, 255, 255, 0.2);
+            border-color: rgba(255, 255, 255, 0.5);
+            transform: scale(1.1);
+        }
+
+        .modal-prev:disabled,
+        .modal-next:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        #modalCaption {
+            color: white;
+            text-align: center;
+            margin-top: 1rem;
+            font-size: 0.9375rem;
+            max-width: 80vw;
+            line-height: 1.5;
+        }
+
+        .modal-controls {
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            align-items: center;
+            width: 90vw;
+            margin-top: 0.75rem;
+        }
+
+        .modal-nav-group {
+            grid-column: 2;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .modal-close {
+            grid-column: 3;
+            justify-self: end;
+        }
+
+        .modal-counter {
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 0.875rem;
+            font-family: 'JetBrains Mono', monospace;
+            min-width: 60px;
+            text-align: center;
+        }
+
+        @media (max-width: 768px) {
+            .modal-image-container {
+                width: 95vw;
+                height: 70vh;
+            }
+
+            .modal-controls {
+                width: 95vw;
+            }
+
+            .modal-nav-group {
+                gap: 0.75rem;
+            }
         }
 
         /* Responsive */
@@ -4989,6 +5159,123 @@
             // Initial draw
             redrawDemo();
         }
+    </script>
+
+    <!-- Image Modal / Lightbox -->
+    <div id="imageModal" class="image-modal">
+        <div class="modal-backdrop"></div>
+        <div class="modal-content">
+            <div class="modal-image-container">
+                <img id="modalImage" src="" alt="">
+            </div>
+            <figcaption id="modalCaption"></figcaption>
+            <div class="modal-controls">
+                <div class="modal-nav-group">
+                    <button class="modal-prev" aria-label="Previous image">‹</button>
+                    <div class="modal-counter" id="modalCounter"></div>
+                    <button class="modal-next" aria-label="Next image">›</button>
+                </div>
+                <button class="modal-close" aria-label="Close">&times;</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Gallery Modal / Lightbox functionality
+        (function() {
+            const modal = document.getElementById('imageModal');
+            const modalImage = document.getElementById('modalImage');
+            const modalCaption = document.getElementById('modalCaption');
+            const modalCounter = document.getElementById('modalCounter');
+            const closeBtn = document.querySelector('.modal-close');
+            const prevBtn = document.querySelector('.modal-prev');
+            const nextBtn = document.querySelector('.modal-next');
+            const backdrop = document.querySelector('.modal-backdrop');
+
+            let galleryImages = [];
+            let currentIndex = 0;
+
+            // Collect all gallery images
+            function initGallery() {
+                const galleryItems = document.querySelectorAll('.gallery-item');
+                galleryImages = Array.from(galleryItems).map(item => ({
+                    src: item.querySelector('img').src,
+                    alt: item.querySelector('img').alt,
+                    caption: item.querySelector('figcaption').textContent
+                }));
+
+                // Add click listeners to gallery images
+                galleryItems.forEach((item, index) => {
+                    const imageContainer = item.querySelector('.image');
+                    imageContainer.style.cursor = 'pointer';
+                    imageContainer.addEventListener('click', () => openModal(index));
+                });
+            }
+
+            // Open modal at specific index
+            function openModal(index) {
+                currentIndex = index;
+                updateModalContent();
+                modal.classList.add('active');
+                document.body.style.overflow = 'hidden';
+            }
+
+            // Close modal
+            function closeModal() {
+                modal.classList.remove('active');
+                document.body.style.overflow = '';
+            }
+
+            // Update modal content
+            function updateModalContent() {
+                const current = galleryImages[currentIndex];
+                modalImage.src = current.src;
+                modalImage.alt = current.alt;
+                modalCaption.textContent = current.caption;
+                modalCounter.textContent = `${currentIndex + 1} / ${galleryImages.length}`;
+
+                // Update button states
+                prevBtn.disabled = currentIndex === 0;
+                nextBtn.disabled = currentIndex === galleryImages.length - 1;
+            }
+
+            // Navigation
+            function showPrevious() {
+                if (currentIndex > 0) {
+                    currentIndex--;
+                    updateModalContent();
+                }
+            }
+
+            function showNext() {
+                if (currentIndex < galleryImages.length - 1) {
+                    currentIndex++;
+                    updateModalContent();
+                }
+            }
+
+            // Event listeners
+            closeBtn.addEventListener('click', closeModal);
+            backdrop.addEventListener('click', closeModal);
+            prevBtn.addEventListener('click', showPrevious);
+            nextBtn.addEventListener('click', showNext);
+
+            // Keyboard navigation
+            document.addEventListener('keydown', (e) => {
+                if (!modal.classList.contains('active')) return;
+
+                if (e.key === 'Escape') closeModal();
+                else if (e.key === 'ArrowLeft') showPrevious();
+                else if (e.key === 'ArrowRight') showNext();
+            });
+
+            // Initialize when DOM is ready
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', initGallery);
+            } else {
+                initGallery();
+            }
+        })();
     </script>
 </body>
 </html>
