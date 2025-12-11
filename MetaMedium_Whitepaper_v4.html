@@ -788,21 +788,22 @@
         .gallery {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
-            gap: var(--space-sm);
-            margin: var(--space-sm) 0;
+            gap: var(--space-xs);
+            margin: var(--space-xs) 0;
         }
         .gallery-item {
             background: rgba(74, 85, 104, 0.08);
             border: 1px solid rgba(107, 114, 128, 0.4);
             border-radius: 4px;
-            padding: var(--space-xs) var(--space-sm);
+            padding: var(--space-xs) var(--space-xs);
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            margin: 0;  /* Override default figure margin */
         }
         .gallery-item .image {
             width: 100%;
-            min-height: 300px;
+            aspect-ratio: 16 / 10;
             margin-bottom: var(--space-xs);
-            background: rgba(10, 14, 26, 0.4);
+            background: rgba(10, 14, 26, 0.9);
             border-radius: 2px;
             overflow: hidden;
             display: flex;
@@ -812,27 +813,32 @@
         .gallery-item .image img {
             width: 100%;
             height: 100%;
-            min-height: 300px;
-            object-fit: cover;
+            object-fit: contain;
             display: block;
         }
         .gallery-item figcaption {
             font-size: var(--text-sm);
             color: rgba(51, 51, 51, 0.9);
-            line-height: 1.6;
+            line-height: 1.4;
             width: 100%;
             font-weight: 500;
         }
-        
+
         @media (max-width: 768px) {
             .gallery {
                 grid-template-columns: repeat(2, 1fr);
                 gap: var(--space-sm);
             }
+            .gallery-item .image {
+                aspect-ratio: 4 / 3;  /* Taller ratio for smaller screens */
+            }
         }
         @media (max-width: 480px) {
             .gallery {
                 grid-template-columns: 1fr;
+            }
+            .gallery-item .image {
+                aspect-ratio: 16 / 10;  /* Back to wider for full-width */
             }
         }
         
@@ -2570,7 +2576,7 @@
     padding-bottom: 0.75rem;
     margin-bottom: 0.75rem;
     border-bottom: 1px solid var(--border);
-    font-size: 0.85rem;
+    font-size: 0.75rem;
     color: var(--muted);
     flex-wrap: wrap;
   }
@@ -2594,15 +2600,15 @@
   .tc-mobile-list {
     display: flex;
     flex-direction: column;
-    gap: 0.125rem;
+    gap: 0.1rem;
   }
   
   .tc-m-item {
     display: flex;
     align-items: center;
     gap: 0.625rem;
-    padding: 0.5rem 0;
-    font-size: 1.8rem;
+    padding: 0.2rem 0.3;
+    font-size: 1.2rem;
     cursor: pointer;
     transition: color 0.15s ease;
   }
