@@ -3279,25 +3279,80 @@ JOHN HANACEK 2025, JHDESIGN LLC
 
             // Utility functions
             // PHASE 1: Convex Hull Corner Detection (Robust & Accurate)
-            function countCorners(points, maxCorners = 8, isClosed = false) {
+            function countCorners(points, maxCorners = 8, isClosed = false, originalPoints = null, hasOvershoot = false) {
                 // Detects ACTUAL CORNERS (angle changes), not just hull vertices
                 // Key distinctions:
                 // - Line endpoints ≠ corners (open shapes)
                 // - Circle vertices ≠ corners (smooth curves)
                 // - Only polygon angle changes = corners (rectangles, triangles)
+                // - Overshoot false corners ≠ shape corners (filter near start/end)
                 //
                 // NOTE: Expects ALREADY SIMPLIFIED points from getFingerprint()
                 // No double simplification - preserves organic shape features
 
                 if (points.length < 4) return { count: 0, angles: [], cornerData: [] };
 
-                // 1. For OPEN shapes (lines, arcs), don't use convex hull
-                // Just return 0 corners - endpoints are NOT corners
+                // 1. OPEN vs CLOSED SHAPE CORNER DETECTION
+                // Open shapes: Analyze angles along the path (exclude endpoints)
+                // Closed shapes: Use convex hull (endpoints = start point)
+
                 if (!isClosed) {
-                    return { count: 0, angles: [], cornerData: [] };
+                    // OPEN SHAPE CORNER DETECTION (polylines: V, W, zigzag, etc.)
+                    // Analyze interior angles, excluding endpoints
+                    const cornerCandidates = [];
+
+                    // Skip first and last points (endpoints are not corners)
+                    for (let i = 1; i < points.length - 1; i++) {
+                        const prev = points[i - 1];
+                        const curr = points[i];
+                        const next = points[i + 1];
+
+                        const angleData = Angle(prev, curr, next);
+                        const angleDeg = angleData.degrees;
+                        const angleRad = angleData.radians;
+
+                        // Sharpness = deviation from straight (180°)
+                        const sharpness = Math.abs(180 - angleDeg);
+
+                        // Corner threshold: 40° deviation (same as closed shapes)
+                        // V-shape: ~180° turn = 180 sharpness
+                        // Gentle curve: ~170° = 10 sharpness (not a corner)
+                        if (sharpness > 40) {
+                            cornerCandidates.push({
+                                point: curr,
+                                angle: angleRad,
+                                angleDeg: angleDeg,
+                                sharpness: sharpness,
+                                index: i
+                            });
+                        }
+                    }
+
+                    // Filter weak corners on short strokes (likely smooth curves)
+                    if (cornerCandidates.length <= 2 && points.length <= 6) {
+                        const avgSharpness = cornerCandidates.length > 0
+                            ? cornerCandidates.reduce((sum, c) => sum + c.sharpness, 0) / cornerCandidates.length
+                            : 0;
+                        if (avgSharpness < 60) {
+                            return { count: 0, angles: [], cornerData: [] };
+                        }
+                    }
+
+                    // Sort by sharpness, take top N
+                    cornerCandidates.sort((a, b) => b.sharpness - a.sharpness);
+                    const selectedCorners = cornerCandidates.slice(0, Math.min(cornerCandidates.length, maxCorners));
+                    selectedCorners.sort((a, b) => a.index - b.index);
+
+                    return {
+                        count: selectedCorners.length,
+                        angles: selectedCorners.map(c => c.angle),
+                        angleDegrees: selectedCorners.map(c => c.angleDeg),
+                        cornerData: selectedCorners
+                    };
                 }
 
-                // 2. Compute convex hull (outer boundary of closed shape)
+                // 2. CLOSED SHAPE CORNER DETECTION
+                // Compute convex hull (outer boundary of closed shape)
                 // Use points directly - they're already simplified by getFingerprint()
                 const hull = convexHull(points);
                 if (hull.length < 3) return { count: 0, angles: [], cornerData: [] };
@@ -3308,8 +3363,8 @@ JOHN HANACEK 2025, JHDESIGN LLC
                     return { count: 0, angles: [], cornerData: [] };
                 }
 
-                // 3. Analyze angles at each hull vertex to find TRUE corners
-                const cornerCandidates = [];
+                // 3. Analyze angles at each hull vertex to find TRUE corners (closed shapes)
+                let cornerCandidates = [];
                 for (let i = 0; i < hull.length; i++) {
                     const prev = hull[(i - 1 + hull.length) % hull.length];
                     const curr = hull[i];
@@ -3338,7 +3393,35 @@ JOHN HANACEK 2025, JHDESIGN LLC
                     }
                 }
 
-                // 4. Additional filtering: If we only found 1-2 weak corners on a small hull,
+                // 4. OVERSHOOT FILTERING: Remove false corners near start/end when overshoot detected
+                // When user draws past start point and comes back, the turn creates a false corner
+                // Filter out corners within threshold distance of start/end area
+                if (hasOvershoot && originalPoints && originalPoints.length > 0) {
+                    const start = originalPoints[0];
+                    const end = originalPoints[originalPoints.length - 1];
+                    const bounds = getBounds(originalPoints);
+                    const shapeSize = Math.max(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY);
+
+                    // Threshold: 15% of shape size (adaptive to drawing size)
+                    const overshootThreshold = Math.max(30, shapeSize * 0.15);
+
+                    // Filter out corners near start OR end point
+                    cornerCandidates = cornerCandidates.filter(corner => {
+                        const distToStart = Math.sqrt(
+                            Math.pow(corner.point.x - start.x, 2) +
+                            Math.pow(corner.point.y - start.y, 2)
+                        );
+                        const distToEnd = Math.sqrt(
+                            Math.pow(corner.point.x - end.x, 2) +
+                            Math.pow(corner.point.y - end.y, 2)
+                        );
+
+                        // Keep corners that are far from both start and end
+                        return distToStart > overshootThreshold && distToEnd > overshootThreshold;
+                    });
+                }
+
+                // 5. Additional filtering: If we only found 1-2 weak corners on a small hull,
                 // it's likely a smooth curve (circle/arc), not a polygon
                 if (cornerCandidates.length <= 2 && hull.length <= 6) {
                     if (cornerCandidates.length === 0) {
@@ -3353,13 +3436,13 @@ JOHN HANACEK 2025, JHDESIGN LLC
                     }
                 }
 
-                // 5. Sort by sharpness (sharpest corners first)
+                // 6. Sort by sharpness (sharpest corners first)
                 cornerCandidates.sort((a, b) => b.sharpness - a.sharpness);
 
-                // 6. Take top N corners (up to maxCorners)
+                // 7. Take top N corners (up to maxCorners)
                 const selectedCorners = cornerCandidates.slice(0, Math.min(cornerCandidates.length, maxCorners));
 
-                // 7. Sort back by position for consistent ordering
+                // 8. Sort back by position for consistent ordering
                 selectedCorners.sort((a, b) => a.index - b.index);
 
                 return {
@@ -3530,9 +3613,13 @@ JOHN HANACEK 2025, JHDESIGN LLC
                 // This info is needed by corner detector to handle open vs closed shapes
                 const isClosed = isStrokeClosed(points);
 
+                // Check for overshoot (user drew past start point)
+                const hasOvershoot = checkOvershoot(points);
+
                 // Analyze geometry on simplified stroke (clean data, intact corners)
                 // Pass isClosed flag so corner detector knows not to count endpoints as corners
-                const cornerData = countCorners(simplified, 8, isClosed);
+                // Pass original points and overshoot flag to filter false corners at overshoot point
+                const cornerData = countCorners(simplified, 8, isClosed, points, hasOvershoot);
                 const angleAnalysis = analyzeCornerAngles(cornerData.angles);
 
                 return {
