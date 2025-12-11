@@ -187,6 +187,158 @@ JOHN HANACEK 2025, JHDESIGN LLC
         }
 
         /* ===========================================
+           GRAPH STATE PANEL - Below Header
+           Shows canvas graph visualization and queries
+        =========================================== */
+
+        .graph-state-panel {
+            position: fixed;
+            top: 60px;
+            left: var(--space-xs);
+            z-index: 99;
+            width: 300px;
+            background: var(--panel-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--panel-border);
+            border-radius: 8px;
+            box-shadow: 0 2px 12px var(--shadow);
+            pointer-events: auto;
+            transition: all 0.3s ease;
+        }
+
+        .graph-state-header {
+            padding: var(--space-xs) var(--space-sm);
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border);
+            user-select: none;
+        }
+
+        .graph-state-header:hover {
+            background: var(--paper-warm);
+        }
+
+        .graph-state-title {
+            font-family: var(--font-heading);
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: var(--ink);
+        }
+
+        .graph-state-toggle {
+            font-size: 0.75rem;
+            color: var(--muted);
+            transition: transform 0.3s ease;
+        }
+
+        .graph-state-panel.collapsed .graph-state-toggle {
+            transform: rotate(-90deg);
+        }
+
+        .graph-state-panel.collapsed .graph-state-content {
+            display: none;
+        }
+
+        .graph-state-content {
+            padding: var(--space-sm);
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-sm);
+        }
+
+        .graph-viz-container {
+            background: #fafafa;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        #graphVizSvg {
+            display: block;
+            width: 100%;
+            height: auto;
+        }
+
+        .graph-filter {
+            display: flex;
+            flex-direction: column;
+        }
+
+        #shapeFilter {
+            transition: all 0.15s ease;
+        }
+
+        #shapeFilter:hover {
+            border-color: var(--ink-soft);
+        }
+
+        #shapeFilter:focus {
+            outline: none;
+            border-color: var(--sketch-blue);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+
+        .graph-queries {
+            display: flex;
+            gap: 0.375rem;
+            flex-wrap: wrap;
+        }
+
+        .query-btn {
+            flex: 1;
+            padding: 0.5rem 0.625rem;
+            font-size: 0.75rem;
+            font-weight: 500;
+            background: white;
+            color: var(--ink);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            font-family: var(--font-body);
+            white-space: nowrap;
+        }
+
+        .query-btn:hover {
+            background: var(--sketch-blue);
+            color: white;
+            border-color: var(--sketch-blue);
+        }
+
+        .query-btn.active {
+            background: var(--sketch-blue);
+            color: white;
+            border-color: var(--sketch-blue);
+        }
+
+        .query-btn-reset {
+            background: var(--paper-warm);
+            border: 1px solid var(--border);
+            font-weight: 600;
+        }
+
+        .query-btn-reset:hover {
+            background: var(--ink);
+            color: white;
+            border-color: var(--ink);
+        }
+
+        .graph-relationships {
+            padding: var(--space-xs);
+            background: var(--paper-warm);
+            border-radius: 4px;
+        }
+
+        .relationship-summary {
+            font-size: 0.75rem;
+            color: var(--muted);
+            font-family: var(--font-mono);
+            text-align: center;
+        }
+
+        /* ===========================================
            RECOGNITION OVERLAY - Top Right Floating Panel
            Shows live recognition scoring and reasoning
         =========================================== */
@@ -1467,6 +1619,23 @@ JOHN HANACEK 2025, JHDESIGN LLC
                 width: 100%;
                 justify-content: flex-start;
             }
+
+            /* Graph panel: position below wrapped header */
+            .graph-state-panel {
+                top: 80px; /* Adjust for wrapped header height */
+                width: calc(100vw - var(--space-xs) * 2);
+                max-width: 300px;
+            }
+
+            /* Make query buttons wrap nicely */
+            .graph-queries {
+                gap: 0.25rem;
+            }
+
+            .query-btn {
+                font-size: 0.6875rem;
+                padding: 0.375rem 0.5rem;
+            }
         }
     </style>
 </head>
@@ -1486,6 +1655,66 @@ JOHN HANACEK 2025, JHDESIGN LLC
                 <button id="redoBtn" class="header-btn">Redo</button>
                -->
                 <button id="debugToggleBtn" class="header-btn">Semantic Show</button>
+            </div>
+        </div>
+
+        <!-- Graph State Panel - Below Header -->
+        <div class="graph-state-panel collapsed" id="graphStatePanel">
+            <div class="graph-state-header" id="graphStateHeader">
+                <span class="graph-state-title">Canvas Graph</span>
+                <span class="graph-state-toggle">▼</span>
+            </div>
+            <div class="graph-state-content" id="graphStateContent">
+                <!-- Mini Graph Visualization -->
+                <div class="graph-viz-container">
+                    <svg id="graphVizSvg" width="280" height="140" viewBox="0 0 280 140">
+                        <!-- Graph will be rendered here dynamically -->
+                        <text x="140" y="70" text-anchor="middle" fill="var(--muted)" font-size="12" font-family="var(--font-body)">
+                            Draw shapes to see graph...
+                        </text>
+                    </svg>
+                </div>
+
+                <!-- Filter Dropdown -->
+                <div class="graph-filter">
+                    <label for="shapeFilter" style="font-size: 0.6875rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.25rem; display: block;">
+                        Filter Shapes
+                    </label>
+                    <select id="shapeFilter" onchange="window.graphState.filterByType(this.value)" style="width: 100%; padding: 0.5rem; font-size: 0.8125rem; border: 1px solid var(--border); border-radius: 4px; background: white; color: var(--ink); font-family: var(--font-body); cursor: pointer;">
+                        <option value="all">All Shapes (<span id="statAll">0</span>)</option>
+                        <option value="point">• Points (<span id="statPoint">0</span>)</option>
+                        <option value="line">─ Lines (<span id="statLine">0</span>)</option>
+                        <option value="circle">○ Circles (<span id="statCircle">0</span>)</option>
+                        <option value="triangle">△ Triangles (<span id="statTriangle">0</span>)</option>
+                        <option value="rectangle">▭ Rectangles (<span id="statRectangle">0</span>)</option>
+                    </select>
+                </div>
+
+                <!-- Quick Queries -->
+                <div class="graph-queries" id="graphQueries">
+                    <button class="query-btn" id="connectedBtn" onclick="window.graphState.filterByRelationship('connected')" title="Show connected shapes">
+                        🔗 Connected <span id="connectedCount">(0)</span>
+                    </button>
+                    <button class="query-btn" id="isolatedBtn" onclick="window.graphState.filterByRelationship('isolated')" title="Show isolated shapes">
+                        ⚪ Isolated <span id="isolatedCount">(0)</span>
+                    </button>
+                    <button class="query-btn" id="intersectingBtn" onclick="window.graphState.filterByRelationship('intersecting')" title="Show intersecting shapes">
+                        ✕ Intersecting <span id="intersectingCount">(0)</span>
+                    </button>
+                    <button class="query-btn" id="containingBtn" onclick="window.graphState.filterByRelationship('containing')" title="Show containment relationships">
+                        ⊃ Containing <span id="containingCount">(0)</span>
+                    </button>
+                    <button class="query-btn query-btn-reset" id="allBtn" onclick="window.graphState.resetFilter()" title="Clear all filters">
+                        ● All
+                    </button>
+                </div>
+
+                <!-- Relationship Summary -->
+                <div class="graph-relationships" id="graphRelationships">
+                    <div class="relationship-summary">
+                        <span id="relationshipCount">No relationships</span>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -4788,6 +5017,37 @@ JOHN HANACEK 2025, JHDESIGN LLC
                     return { contained: allInside, type: 'circle-in-polygon' };
                 }
 
+                // Point containment (check if point is inside outer shape)
+                if (typeInner === 'point') {
+                    const point = shapeInner.definition; // Point has x, y properties
+
+                    // Circle/ellipse contains point
+                    if (typeOuter === 'circle') {
+                        const center = shapeOuter.definition.center;
+                        const radius = shapeOuter.definition.radius;
+                        const contained = pointInCircle(point, center, radius);
+                        return { contained, type: 'point-in-circle' };
+                    }
+
+                    if (typeOuter === 'ellipse') {
+                        const center = shapeOuter.definition.center;
+                        const radiusX = shapeOuter.definition.radiusX;
+                        const radiusY = shapeOuter.definition.radiusY;
+                        // Use ellipse equation: (x-cx)²/rx² + (y-cy)²/ry² <= 1
+                        const dx = point.x - center.x;
+                        const dy = point.y - center.y;
+                        const contained = (dx * dx) / (radiusX * radiusX) + (dy * dy) / (radiusY * radiusY) <= 1;
+                        return { contained, type: 'point-in-ellipse' };
+                    }
+
+                    // Polygon contains point
+                    if (typeOuter === 'polygon') {
+                        const vertices = shapeOuter.definition.vertices;
+                        const contained = pointInPolygon(point, vertices);
+                        return { contained, type: 'point-in-polygon' };
+                    }
+                }
+
                 // Default: use bounding box containment as fallback
                 const outerBounds = shapeOuter.rendering?.bounds;
                 const innerBounds = shapeInner.rendering?.bounds;
@@ -5432,49 +5692,51 @@ JOHN HANACEK 2025, JHDESIGN LLC
                     results.push({ type: 'arc', confidence: 0.7, label: 'Arc' });
                 }
 
-                // 3. Triangle checks (3 corners, closed)
+                // 3. Triangle checks (exactly 2 corners, closed)
+                // 3rd corner is implicit at closure point
                 const triangleChecks = {
                     isClosed: fp.isClosed,
-                    hasThreeCorners: fp.corners === 3,  // EXACT 3 corners from convex hull
+                    hasTriangleCorners: fp.corners === 2,  // Exactly 2 corners (3rd is closure)
                     notTooStraight: fp.straightness < 0.8,  // Some curvature allowed
                     reasonableShape: fp.aspectRatio >= 0.3 && fp.aspectRatio <= 3.0
                 };
 
                 checks.push({
                     shape: 'Triangle',
-                    passed: triangleChecks.isClosed && triangleChecks.hasThreeCorners && triangleChecks.notTooStraight && triangleChecks.reasonableShape,
+                    passed: triangleChecks.isClosed && triangleChecks.hasTriangleCorners && triangleChecks.notTooStraight && triangleChecks.reasonableShape,
                     conditions: [
                         { test: 'Is closed?', pass: triangleChecks.isClosed, detail: `Gap: ${fp.closureDistance.toFixed(1)}px` },
-                        { test: 'Has 3 corners?', pass: triangleChecks.hasThreeCorners, detail: `Corners: ${fp.corners} (need: exactly 3)` },
+                        { test: 'Has 2 corners?', pass: triangleChecks.hasTriangleCorners, detail: `Corners: ${fp.corners} (need: exactly 2)` },
                         { test: 'Not too straight?', pass: triangleChecks.notTooStraight, detail: `Straightness: ${fp.straightness.toFixed(2)} (need: <0.8)` },
                         { test: 'Reasonable shape?', pass: triangleChecks.reasonableShape, detail: `Aspect: ${fp.aspectRatio.toFixed(2)} (0.3-3.0)` }
                     ]
                 });
 
-                if (triangleChecks.isClosed && triangleChecks.hasThreeCorners && triangleChecks.notTooStraight && triangleChecks.reasonableShape) {
+                if (triangleChecks.isClosed && triangleChecks.hasTriangleCorners && triangleChecks.notTooStraight && triangleChecks.reasonableShape) {
                     results.push({ type: 'triangle', confidence: 0.85, label: 'Triangle' });
                 }
 
-                // 4. Rectangle checks (4 corners, closed, fairly straight edges)
+                // 4. Rectangle checks (exactly 3 corners, closed, fairly straight edges)
+                // 4th corner is implicit at closure point
                 const rectangleChecks = {
                     isClosed: fp.isClosed,
-                    hasFourCorners: fp.corners === 4,  // EXACT 4 corners from convex hull
+                    hasRectangleCorners: fp.corners === 3,  // Exactly 3 corners (4th is closure)
                     straightEnough: fp.straightness > 0.4,  // Straighter than circles/triangles
                     aspectRatioOk: fp.aspectRatio > 0.3 && fp.aspectRatio < 3.0
                 };
 
                 checks.push({
                     shape: 'Rectangle',
-                    passed: rectangleChecks.isClosed && rectangleChecks.hasFourCorners && rectangleChecks.straightEnough && rectangleChecks.aspectRatioOk,
+                    passed: rectangleChecks.isClosed && rectangleChecks.hasRectangleCorners && rectangleChecks.straightEnough && rectangleChecks.aspectRatioOk,
                     conditions: [
                         { test: 'Is closed?', pass: rectangleChecks.isClosed, detail: `Gap: ${fp.closureDistance.toFixed(1)}px` },
-                        { test: 'Has 4 corners?', pass: rectangleChecks.hasFourCorners, detail: `Corners: ${fp.corners} (need: exactly 4)` },
+                        { test: 'Has 3 corners?', pass: rectangleChecks.hasRectangleCorners, detail: `Corners: ${fp.corners} (need: exactly 3)` },
                         { test: 'Straight edges?', pass: rectangleChecks.straightEnough, detail: `Straightness: ${fp.straightness.toFixed(2)} (need: >0.4)` },
                         { test: 'Reasonable shape?', pass: rectangleChecks.aspectRatioOk, detail: `Aspect: ${fp.aspectRatio.toFixed(2)} (0.3-3.0)` }
                     ]
                 });
 
-                if (rectangleChecks.isClosed && rectangleChecks.hasFourCorners && rectangleChecks.straightEnough && rectangleChecks.aspectRatioOk) {
+                if (rectangleChecks.isClosed && rectangleChecks.hasRectangleCorners && rectangleChecks.straightEnough && rectangleChecks.aspectRatioOk) {
                     results.push({ type: 'rectangle', confidence: 0.8, label: 'Rectangle' });
                 }
 
@@ -9973,6 +10235,468 @@ JOHN HANACEK 2025, JHDESIGN LLC
             console.log('');
             console.log('💡 Tip: Type query.help() for semantic query API');
             console.log('');
+
+            // ===== GRAPH STATE VISUALIZATION =====
+            // Interactive graph panel showing canvas state and relationships
+
+            window.graphState = {
+                currentFilter: 'all',
+                filterMode: 'type', // 'type' or 'relationship'
+                currentGraph: null, // Cache graph for filtering
+
+                // Update graph visualization after drawing changes
+                update: function() {
+                    const components = window.query.getCurrentComponents();
+
+                    // Auto-reset filter when canvas changes (new strokes drawn)
+                    const prevComponentCount = this.lastComponentCount || 0;
+                    if (components.length !== prevComponentCount) {
+                        // Just reset state, don't redraw (render() already handles that)
+                        this.currentFilter = 'all';
+                        this.filterMode = 'type';
+                        document.querySelectorAll('.query-btn').forEach(btn => btn.classList.remove('active'));
+                        const select = document.getElementById('shapeFilter');
+                        if (select) select.value = 'all';
+                        this.lastComponentCount = components.length;
+                    }
+
+                    const graph = buildSpatialGraph(components.map((c, idx) => ({
+                        bounds: c.bounds,
+                        recognizedAs: c.recognizedAs,
+                        originalStroke: state.strokes[idx],
+                        refinedStroke: state.refinedStrokes[idx],
+                        fingerprint: state.shapes[idx]?.fingerprint,
+                        geometricShape: state.shapes[idx]
+                    })));
+
+                    this.currentGraph = graph; // Cache for filtering
+                    this.renderGraph(components, graph);
+                    this.updateStats(components);
+                    this.updateRelationshipCounts(components, graph);
+                },
+
+                // Render mini graph visualization (SVG)
+                renderGraph: function(components, graph) {
+                    const svg = document.getElementById('graphVizSvg');
+                    if (!svg) return;
+
+                    // Clear existing content
+                    while (svg.firstChild) {
+                        svg.removeChild(svg.firstChild);
+                    }
+
+                    if (components.length === 0) {
+                        const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                        text.setAttribute('x', '140');
+                        text.setAttribute('y', '70');
+                        text.setAttribute('text-anchor', 'middle');
+                        text.setAttribute('fill', 'var(--muted)');
+                        text.setAttribute('font-size', '12');
+                        text.setAttribute('font-family', 'var(--font-body)');
+                        text.textContent = 'Draw shapes to see graph...';
+                        svg.appendChild(text);
+                        return;
+                    }
+
+                    // Simple force-directed layout (circular arrangement)
+                    const centerX = 140;
+                    const centerY = 70;
+                    const radius = Math.min(50, 30 + components.length * 5);
+                    const angleStep = (Math.PI * 2) / components.length;
+
+                    const nodes = components.map((comp, i) => ({
+                        x: centerX + radius * Math.cos(i * angleStep - Math.PI / 2),
+                        y: centerY + radius * Math.sin(i * angleStep - Math.PI / 2),
+                        type: comp.recognizedAs,
+                        index: i
+                    }));
+
+                    // Draw edges first (so nodes appear on top)
+                    graph.connections.forEach(conn => {
+                        const a = nodes[conn.a];
+                        const b = nodes[conn.b];
+                        if (!a || !b) return;
+
+                        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                        line.setAttribute('x1', a.x);
+                        line.setAttribute('y1', a.y);
+                        line.setAttribute('x2', b.x);
+                        line.setAttribute('y2', b.y);
+                        line.setAttribute('stroke', conn.relationship === 'intersecting' ? '#ff5252' : '#3b82f6');
+                        line.setAttribute('stroke-width', '2');
+                        line.setAttribute('stroke-opacity', '0.5');
+                        svg.appendChild(line);
+                    });
+
+                    // Draw containment edges (dotted)
+                    graph.containment.forEach(cont => {
+                        const outer = nodes[cont.outer];
+                        const inner = nodes[cont.inner];
+                        if (!outer || !inner) return;
+
+                        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                        line.setAttribute('x1', outer.x);
+                        line.setAttribute('y1', outer.y);
+                        line.setAttribute('x2', inner.x);
+                        line.setAttribute('y2', inner.y);
+                        line.setAttribute('stroke', '#22c55e');
+                        line.setAttribute('stroke-width', '2');
+                        line.setAttribute('stroke-dasharray', '3,3');
+                        line.setAttribute('stroke-opacity', '0.6');
+                        svg.appendChild(line);
+                    });
+
+                    // Draw nodes
+                    nodes.forEach((node, i) => {
+                        const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+                        g.setAttribute('data-index', i);
+                        g.style.cursor = 'pointer';
+
+                        // Node circle
+                        const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                        circle.setAttribute('cx', node.x);
+                        circle.setAttribute('cy', node.y);
+                        circle.setAttribute('r', '8');
+                        circle.setAttribute('fill', this.getColorForType(node.type));
+                        circle.setAttribute('stroke', 'white');
+                        circle.setAttribute('stroke-width', '2');
+                        g.appendChild(circle);
+
+                        // Node label
+                        const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                        text.setAttribute('x', node.x);
+                        text.setAttribute('y', node.y + 20);
+                        text.setAttribute('text-anchor', 'middle');
+                        text.setAttribute('font-size', '10');
+                        text.setAttribute('font-family', 'var(--font-mono)');
+                        text.setAttribute('fill', 'var(--muted)');
+                        text.textContent = `${node.type[0]}${i}`;
+                        g.appendChild(text);
+
+                        // Hover/click interaction
+                        g.addEventListener('mouseenter', () => {
+                            circle.setAttribute('r', '10');
+                            circle.setAttribute('stroke-width', '3');
+                        });
+                        g.addEventListener('mouseleave', () => {
+                            circle.setAttribute('r', '8');
+                            circle.setAttribute('stroke-width', '2');
+                        });
+                        g.addEventListener('click', () => {
+                            this.highlightShape(i);
+                        });
+
+                        svg.appendChild(g);
+                    });
+                },
+
+                // Get color for shape type
+                getColorForType: function(type) {
+                    const colors = {
+                        point: '#8b5cf6',
+                        line: '#3b82f6',
+                        circle: '#22c55e',
+                        triangle: '#f59e0b',
+                        rectangle: '#e63946',
+                        arc: '#6b7280'
+                    };
+                    return colors[type] || '#6b7280';
+                },
+
+                // Update stats counters
+                updateStats: function(components) {
+                    const counts = {
+                        all: components.length,
+                        point: 0,
+                        line: 0,
+                        circle: 0,
+                        triangle: 0,
+                        rectangle: 0
+                    };
+
+                    components.forEach(c => {
+                        const type = c.recognizedAs;
+                        if (counts[type] !== undefined) {
+                            counts[type]++;
+                        }
+                    });
+
+                    // Update dropdown options with counts
+                    const select = document.getElementById('shapeFilter');
+                    if (select) {
+                        select.innerHTML = `
+                            <option value="all">All Shapes (${counts.all})</option>
+                            <option value="point">• Points (${counts.point})</option>
+                            <option value="line">─ Lines (${counts.line})</option>
+                            <option value="circle">○ Circles (${counts.circle})</option>
+                            <option value="triangle">△ Triangles (${counts.triangle})</option>
+                            <option value="rectangle">▭ Rectangles (${counts.rectangle})</option>
+                        `;
+                        // Restore current filter selection
+                        select.value = this.currentFilter;
+                    }
+                },
+
+                // Update relationship counts
+                updateRelationshipCounts: function(components, graph) {
+                    // Count connected shapes (shapes that have connections)
+                    const connectedSet = new Set();
+                    graph.connections.forEach(conn => {
+                        connectedSet.add(conn.a);
+                        connectedSet.add(conn.b);
+                    });
+                    const connectedCount = connectedSet.size;
+
+                    // Count isolated shapes (shapes with no connections)
+                    const isolatedCount = components.length - connectedCount;
+
+                    // Count intersecting shapes (geometric intersections)
+                    const intersectingSet = new Set();
+                    graph.intersections?.forEach(int => {
+                        intersectingSet.add(int.a);
+                        intersectingSet.add(int.b);
+                    });
+                    const intersectingCount = intersectingSet.size;
+
+                    // Count shapes involved in containment
+                    const containingSet = new Set();
+                    graph.containment.forEach(cont => {
+                        containingSet.add(cont.outer);
+                        containingSet.add(cont.inner);
+                    });
+                    const containingCount = containingSet.size;
+
+                    // Update button counts
+                    document.getElementById('connectedCount').textContent = `(${connectedCount})`;
+                    document.getElementById('isolatedCount').textContent = `(${isolatedCount})`;
+                    document.getElementById('intersectingCount').textContent = `(${intersectingCount})`;
+                    document.getElementById('containingCount').textContent = `(${containingCount})`;
+
+                    // Update summary
+                    const connCount = graph.connections.length;
+                    const intCount = graph.intersections?.length || 0;
+                    const contCount = graph.containment.length;
+                    let summary = '';
+
+                    if (connCount === 0 && intCount === 0 && contCount === 0) {
+                        summary = 'No relationships';
+                    } else {
+                        const parts = [];
+                        if (connCount > 0) parts.push(`${connCount} connection${connCount > 1 ? 's' : ''}`);
+                        if (intCount > 0) parts.push(`${intCount} intersection${intCount > 1 ? 's' : ''}`);
+                        if (contCount > 0) parts.push(`${contCount} containment${contCount > 1 ? 's' : ''}`);
+                        summary = parts.join(', ');
+                    }
+
+                    document.getElementById('relationshipCount').textContent = summary;
+                },
+
+                // Filter by shape type
+                filterByType: function(type) {
+                    this.currentFilter = type;
+                    this.filterMode = 'type';
+
+                    // Clear relationship button states
+                    document.querySelectorAll('.query-btn').forEach(btn => btn.classList.remove('active'));
+
+                    // Highlight matching shapes on canvas
+                    const components = window.query.getCurrentComponents();
+                    const matchingIndices = new Set();
+
+                    components.forEach((comp, idx) => {
+                        if (type === 'all' || comp.recognizedAs === type) {
+                            matchingIndices.add(idx);
+                        }
+                    });
+
+                    this.applyFilter(matchingIndices, components);
+                },
+
+                // Filter by relationship (connected, isolated, containing)
+                filterByRelationship: function(relationship) {
+                    this.currentFilter = relationship;
+                    this.filterMode = 'relationship';
+
+                    // Update button states
+                    document.querySelectorAll('.query-btn').forEach(btn => btn.classList.remove('active'));
+                    document.getElementById(`${relationship}Btn`)?.classList.add('active');
+
+                    // Reset type filter dropdown
+                    const select = document.getElementById('shapeFilter');
+                    if (select) select.value = 'all';
+
+                    const components = window.query.getCurrentComponents();
+                    const graph = this.currentGraph;
+                    if (!graph) return;
+
+                    const matchingIndices = new Set();
+
+                    if (relationship === 'connected') {
+                        // Shapes with connections
+                        graph.connections.forEach(conn => {
+                            matchingIndices.add(conn.a);
+                            matchingIndices.add(conn.b);
+                        });
+                    } else if (relationship === 'isolated') {
+                        // Shapes with NO connections
+                        const connectedSet = new Set();
+                        graph.connections.forEach(conn => {
+                            connectedSet.add(conn.a);
+                            connectedSet.add(conn.b);
+                        });
+                        components.forEach((comp, idx) => {
+                            if (!connectedSet.has(idx)) {
+                                matchingIndices.add(idx);
+                            }
+                        });
+                    } else if (relationship === 'intersecting') {
+                        // Shapes with geometric intersections
+                        if (graph.intersections) {
+                            graph.intersections.forEach(int => {
+                                matchingIndices.add(int.a);
+                                matchingIndices.add(int.b);
+                            });
+                        }
+                    } else if (relationship === 'containing') {
+                        // Shapes involved in containment
+                        graph.containment.forEach(cont => {
+                            matchingIndices.add(cont.outer);
+                            matchingIndices.add(cont.inner);
+                        });
+                    }
+
+                    this.applyFilter(matchingIndices, components);
+                },
+
+                // Reset all filters (show everything)
+                resetFilter: function() {
+                    // Just reset state, don't redraw (let render() handle it)
+                    this.currentFilter = 'all';
+                    this.filterMode = 'type';
+
+                    // Clear all button states
+                    document.querySelectorAll('.query-btn').forEach(btn => btn.classList.remove('active'));
+
+                    // Reset dropdown
+                    const select = document.getElementById('shapeFilter');
+                    if (select) select.value = 'all';
+
+                    // Trigger normal render (not filtered)
+                    render();
+                },
+
+                // Apply filter visualization to graph and canvas
+                applyFilter: function(matchingIndices, components) {
+                    // Update graph visualization
+                    const svg = document.getElementById('graphVizSvg');
+                    if (svg) {
+                        svg.querySelectorAll('g[data-index]').forEach((g, idx) => {
+                            const circle = g.querySelector('circle');
+                            const text = g.querySelector('text');
+
+                            if (matchingIndices.has(idx)) {
+                                // Matching shape - full opacity
+                                circle.setAttribute('fill-opacity', '1');
+                                circle.setAttribute('stroke-opacity', '1');
+                                text.setAttribute('fill-opacity', '1');
+                            } else {
+                                // Non-matching shape - dimmed
+                                circle.setAttribute('fill-opacity', '0.2');
+                                circle.setAttribute('stroke-opacity', '0.2');
+                                text.setAttribute('fill-opacity', '0.3');
+                            }
+                        });
+                    }
+
+                    // Re-render canvas with filtered view
+                    this.renderFilteredCanvas(matchingIndices);
+                },
+
+                // Render canvas with filter applied
+                renderFilteredCanvas: function(matchingIndices) {
+                    const canvas = document.getElementById('canvas');
+                    const ctx = canvas.getContext('2d');
+
+                    // Clear and redraw
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                    // Draw all strokes
+                    state.strokes.forEach((stroke, idx) => {
+                        const isMatch = matchingIndices.has(idx);
+                        const isAccepted = state.context[idx] !== '';
+                        const shape = state.shapes[idx];
+
+                        if (isMatch) {
+                            // MATCHING SHAPES: Use drawShape for proper rendering
+                            ctx.globalAlpha = 1.0;
+
+                            if (shape && shape.accepted) {
+                                // Use the same drawShape function as normal render()
+                                drawShape(shape, ctx, false); // Don't show debug in filtered view
+                            } else {
+                                // Unaccepted or no shape object - draw original stroke
+                                const refinedStroke = state.refinedStrokes[idx];
+                                ctx.strokeStyle = isAccepted ? '#0066ff' : '#666666';
+                                ctx.lineWidth = refinedStroke ? 3 : 2;
+                                ctx.lineCap = 'round';
+                                ctx.lineJoin = 'round';
+
+                                const displayStroke = refinedStroke || stroke;
+                                ctx.beginPath();
+                                displayStroke.forEach((point, i) => {
+                                    if (i === 0) {
+                                        ctx.moveTo(point.x, point.y);
+                                    } else {
+                                        ctx.lineTo(point.x, point.y);
+                                    }
+                                });
+                                ctx.stroke();
+                            }
+                        } else {
+                            // NON-MATCHING SHAPES: Draw as ghost (original stroke, dimmed)
+                            ctx.globalAlpha = 0.15;
+                            ctx.strokeStyle = '#999999';
+                            ctx.lineWidth = 1.5;
+                            ctx.lineCap = 'round';
+                            ctx.lineJoin = 'round';
+
+                            ctx.beginPath();
+                            stroke.forEach((point, i) => {
+                                if (i === 0) {
+                                    ctx.moveTo(point.x, point.y);
+                                } else {
+                                    ctx.lineTo(point.x, point.y);
+                                }
+                            });
+                            ctx.stroke();
+                        }
+                    });
+
+                    ctx.globalAlpha = 1.0; // Reset
+                },
+
+                // Highlight a specific shape
+                highlightShape: function(index) {
+                    console.log(`Highlight shape ${index}`);
+                    // TODO: Draw highlight on canvas
+                }
+            };
+
+            // Toggle graph panel collapse/expand
+            document.getElementById('graphStateHeader').addEventListener('click', function() {
+                const panel = document.getElementById('graphStatePanel');
+                panel.classList.toggle('collapsed');
+            });
+
+            // Update graph on canvas changes
+            const originalRender = render;
+            render = function() {
+                originalRender();
+                if (typeof window.graphState !== 'undefined') {
+                    window.graphState.update();
+                }
+            };
+
         </script>
 </body>
 
