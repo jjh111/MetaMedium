@@ -3179,8 +3179,22 @@ JOHN HANACEK 2025, JHDESIGN LLC
                 },
                 library: {
                     // Built-in primitives (always present)
-                    // NOTE: Line and Arc are FITTING METHODS, not library shapes
-                    // Users draw lines/arcs, but don't save "line" as a reusable shape
+                    // NOTE: Arc is FITTING METHOD, not library shape (curve between endpoints)
+                    // Point, Line, Circle, Triangle, Rectangle ARE reusable library shapes
+                    'point': {
+                        type: 'builtin-primitive',
+                        shapeType: 'point',
+                        label: 'Point',
+                        usageCount: 0
+                        // Single location: dot, marker, node, vertex
+                    },
+                    'line': {
+                        type: 'builtin-primitive',
+                        shapeType: 'line',
+                        label: 'Line',
+                        usageCount: 0
+                        // Straight connector between two points
+                    },
                     'circle': {
                         type: 'builtin-primitive',
                         shapeType: 'circle',
@@ -3271,21 +3285,21 @@ JOHN HANACEK 2025, JHDESIGN LLC
                 // - Line endpoints ≠ corners (open shapes)
                 // - Circle vertices ≠ corners (smooth curves)
                 // - Only polygon angle changes = corners (rectangles, triangles)
+                //
+                // NOTE: Expects ALREADY SIMPLIFIED points from getFingerprint()
+                // No double simplification - preserves organic shape features
 
                 if (points.length < 4) return { count: 0, angles: [], cornerData: [] };
 
-                // 1. Simplify to remove noise but preserve shape
-                const simplified = simplifyStroke(points, 2.0);
-                if (simplified.length < 3) return { count: 0, angles: [], cornerData: [] };
-
-                // 2. For OPEN shapes (lines, arcs), don't use convex hull
+                // 1. For OPEN shapes (lines, arcs), don't use convex hull
                 // Just return 0 corners - endpoints are NOT corners
                 if (!isClosed) {
                     return { count: 0, angles: [], cornerData: [] };
                 }
 
-                // 3. Compute convex hull (outer boundary of closed shape)
-                const hull = convexHull(simplified);
+                // 2. Compute convex hull (outer boundary of closed shape)
+                // Use points directly - they're already simplified by getFingerprint()
+                const hull = convexHull(points);
                 if (hull.length < 3) return { count: 0, angles: [], cornerData: [] };
 
                 // Special case: If hull has very few vertices, be strict
@@ -3497,6 +3511,7 @@ JOHN HANACEK 2025, JHDESIGN LLC
                 const bounds = getBounds(points);
                 const width = bounds.maxX - bounds.minX;
                 const height = bounds.maxY - bounds.minY;
+                const size = Math.max(width, height);
                 const start = points[0];
                 const end = points[points.length - 1];
                 const endDistance = Math.sqrt(
@@ -3504,9 +3519,12 @@ JOHN HANACEK 2025, JHDESIGN LLC
                     Math.pow(end.y - start.y, 2)
                 );
 
-                // SIMPLIFY (not smooth): removes jitter/noise, preserves corners and straight edges
-                // This is essential for accurate corner detection and straightness calculation
-                const simplified = simplifyStroke(points, 1.5);
+                // ADAPTIVE SIMPLIFICATION: Scale tolerance to stroke size
+                // Small strokes (50px): tolerance ~0.5px (preserve detail)
+                // Large strokes (500px): tolerance ~2.5px (remove noise)
+                // This prevents over-simplification of organic shapes
+                const adaptiveTolerance = Math.max(0.5, Math.min(2.5, size * 0.01));
+                const simplified = simplifyStroke(points, adaptiveTolerance);
 
                 // Check if stroke is closed BEFORE analyzing corners
                 // This info is needed by corner detector to handle open vs closed shapes
@@ -3528,7 +3546,9 @@ JOHN HANACEK 2025, JHDESIGN LLC
                     angleAnalysis: angleAnalysis,
                     bounds: bounds,
                     size: Math.max(width, height),
-                    pointCount: points.length
+                    pointCount: points.length,
+                    simplifiedStroke: simplified,  // For visualization
+                    simplificationTolerance: adaptiveTolerance  // For debugging
                 };
             }
 
@@ -5249,19 +5269,41 @@ JOHN HANACEK 2025, JHDESIGN LLC
                 // - Adjusted straightness thresholds for better shape separation
                 //
                 // RECOGNITION STRATEGY: Test shapes in priority order (specific → generic)
-                // 1. Line (open + very straight) - FITTING METHOD, not in library
+                // 0. Point (very small or single click) - library primitive
+                // 1. Line (open + very straight) - library primitive (added to library)
                 // 2. Arc (open + curved) - FITTING METHOD, not in library
                 // 3. Triangle (exactly 3 corners, closed) - library primitive
                 // 4. Rectangle (exactly 4 corners, closed, straight edges) - library primitive
                 // 5. Circle (0-2 corners, closed, very curved) - library primitive, catch-all
                 //
-                // Note: Line and Arc are curve fitting methods, not reusable shapes
+                // Note: Arc is curve fitting method, not a reusable shape
                 // Circle handles both circular and elliptical (aspect ratio is a parameter)
 
                 // Check for overshoot once (used by circle/ellipse/arc)
                 const hasOvershoot = checkOvershoot(points);
 
-                // 1. LINE checks (test first - open + straight)
+                // 0. POINT checks (test FIRST - tiny stroke or quick tap)
+                const pointChecks = {
+                    veryShort: fp.pointCount < 5,
+                    verySmall: fp.size < 15,
+                    quickGesture: fp.pointCount < 8 && fp.size < 25
+                };
+
+                checks.push({
+                    shape: 'Point',
+                    passed: pointChecks.verySmall || pointChecks.veryShort,
+                    conditions: [
+                        { test: 'Very small?', pass: pointChecks.verySmall, detail: `Size: ${fp.size.toFixed(1)}px (need: <15px)` },
+                        { test: 'Very short?', pass: pointChecks.veryShort, detail: `Points: ${fp.pointCount} (need: <5)` },
+                        { test: 'Quick tap?', pass: pointChecks.quickGesture, detail: `${fp.pointCount} points, ${fp.size.toFixed(1)}px` }
+                    ]
+                });
+
+                if (pointChecks.verySmall || pointChecks.veryShort) {
+                    results.push({ type: 'point', confidence: 0.95, label: 'Point' });
+                }
+
+                // 1. LINE checks (test next - open + straight)
                 const lineChecks = {
                     isStraight: fp.straightness > 0.65,
                     notClosed: !fp.isClosed && !hasOvershoot,
@@ -8665,20 +8707,38 @@ JOHN HANACEK 2025, JHDESIGN LLC
                 if (item.type === 'builtin-primitive') {
                     ctx.beginPath();
                     switch (item.shapeType) {
+                        case 'point':
+                            // Draw as dot with circle outline
+                            ctx.fillStyle = '#7C3AED';
+                            ctx.arc(center, center, size * 0.08, 0, Math.PI * 2);
+                            ctx.fill();
+                            ctx.beginPath();
+                            ctx.arc(center, center, size * 0.18, 0, Math.PI * 2);
+                            ctx.stroke();
+                            break;
+                        case 'line':
+                            // Draw diagonal line
+                            ctx.moveTo(size * 0.2, size * 0.7);
+                            ctx.lineTo(size * 0.8, size * 0.3);
+                            ctx.stroke();
+                            break;
                         case 'circle':
                             ctx.arc(center, center, radius, 0, Math.PI * 2);
+                            ctx.stroke();
                             break;
                         case 'triangle':
                             ctx.moveTo(center, size * 0.25);
                             ctx.lineTo(size * 0.25, size * 0.75);
                             ctx.lineTo(size * 0.75, size * 0.75);
                             ctx.closePath();
+                            ctx.stroke();
                             break;
                         case 'rectangle':
                             ctx.rect(size * 0.25, size * 0.3, size * 0.5, size * 0.4);
+                            ctx.stroke();
                             break;
                     }
-                    ctx.stroke();
+                    // ctx.stroke() moved into cases where needed
                 } else if (item.type === 'builtin-composition' && item.label === 'Arrow') {
                     // Line
                     ctx.beginPath();
