@@ -102,12 +102,14 @@
       const canvasRef = useRef(null);
       const [canvasSize, setCanvasSize] = useState({ width: 400, height: 320 });
       const [isDrawing, setIsDrawing] = useState(false);
+      const [isDragging, setIsDragging] = useState(false);
+      const [dragNodeId, setDragNodeId] = useState(null);
       const [currentStroke, setCurrentStroke] = useState([]);
       const [editingNode, setEditingNode] = useState(null);
       const [inputPos, setInputPos] = useState({ x: 0, y: 0 });
       const inputRef = useRef(null);
       const lastTapRef = useRef(0);
-      
+
       const nodeRadius = 28;
       
       useEffect(() => {
@@ -236,49 +238,81 @@
       const startDrawing = useCallback((e) => {
         e.preventDefault();
         const point = getCanvasPoint(e);
+
+        // Smaller grab radius for dragging (center area only)
+        const grabRadius = nodeRadius * 0.5; // 14px - center half only
+        const clickedNodeForDrag = nodes.find(n => Math.hypot(n.x - point.x, n.y - point.y) < grabRadius);
+
+        // Full radius for editing detection
         const clickedNode = nodes.find(n => Math.hypot(n.x - point.x, n.y - point.y) < nodeRadius);
-        
+
         // Double-tap detection for touch
         const now = Date.now();
         const isDoubleTap = (now - lastTapRef.current) < 300;
         lastTapRef.current = now;
-        
+
         if (clickedNode && (e.detail === 2 || isDoubleTap)) {
           openEditor(clickedNode);
           return;
         }
-        
+
+        // Start dragging only if clicking center of node
+        if (clickedNodeForDrag) {
+          setIsDragging(true);
+          setDragNodeId(clickedNodeForDrag.id);
+          return;
+        }
+
+        // Otherwise start drawing (allows drawing from edge of node)
         setIsDrawing(true);
         setCurrentStroke([point]);
       }, [getCanvasPoint, nodes, nodeRadius, openEditor]);
       
       const continueDrawing = useCallback((e) => {
-        if (!isDrawing) return;
         e.preventDefault();
         const point = getCanvasPoint(e);
-        setCurrentStroke(prev => [...prev, point]);
-      }, [isDrawing, getCanvasPoint]);
+
+        if (isDragging && dragNodeId) {
+          // Update node position while dragging
+          onUpdateNode(dragNodeId, { x: point.x, y: point.y });
+          return;
+        }
+
+        if (isDrawing) {
+          setCurrentStroke(prev => [...prev, point]);
+        }
+      }, [isDrawing, isDragging, dragNodeId, getCanvasPoint, onUpdateNode]);
       
       const endDrawing = useCallback((e) => {
-        if (!isDrawing) return;
         e?.preventDefault();
-        setIsDrawing(false);
-        
-        const result = analyzeStroke(currentStroke, nodes, nodeRadius);
-        
-        if (result.type === 'circle') {
-          const newId = Date.now();
-          onAddNode({ id: newId, x: result.x, y: result.y, label: '' });
-          setTimeout(() => {
-            const newNode = { id: newId, x: result.x, y: result.y };
-            openEditor(newNode);
-          }, 50);
-        } else if (result.type === 'edge') {
-          onAddEdge(result.source, result.target);
+
+        // End dragging
+        if (isDragging) {
+          setIsDragging(false);
+          setDragNodeId(null);
+          return;
         }
-        
-        setCurrentStroke([]);
-      }, [isDrawing, currentStroke, nodes, nodeRadius, onAddNode, onAddEdge, openEditor]);
+
+        // End drawing
+        if (isDrawing) {
+          setIsDrawing(false);
+
+          const result = analyzeStroke(currentStroke, nodes, nodeRadius);
+
+          if (result.type === 'circle') {
+            const newId = Date.now();
+            onAddNode({ id: newId, x: result.x, y: result.y, label: '' });
+            setTimeout(() => {
+              const newNode = { id: newId, x: result.x, y: result.y };
+              openEditor(newNode);
+            }, 50);
+          } else if (result.type === 'edge') {
+            onAddEdge(result.source, result.target);
+          }
+
+          setCurrentStroke([]);
+        }
+      }, [isDrawing, isDragging, currentStroke, nodes, nodeRadius, onAddNode, onAddEdge, openEditor]);
       
       return (
         <div 
@@ -343,19 +377,66 @@
       );
     };
 
+    // --- HELPER: Find valid spawn position ---
+    const findValidSpawnPosition = (nodes, canvasWidth = 400, canvasHeight = 320, nodeRadius = 28) => {
+      const minDistance = nodeRadius * 3; // Minimum distance from other nodes
+      const margin = nodeRadius + 20; // Margin from edges
+      const maxAttempts = 100;
+
+      // Try random positions
+      for (let i = 0; i < maxAttempts; i++) {
+        const x = margin + Math.random() * (canvasWidth - 2 * margin);
+        const y = margin + Math.random() * (canvasHeight - 2 * margin);
+
+        // Check if this position is far enough from all existing nodes
+        const isFarEnough = nodes.every(node =>
+          Math.hypot(node.x - x, node.y - y) >= minDistance
+        );
+
+        if (isFarEnough) {
+          return { x, y };
+        }
+      }
+
+      // Fallback: use spiral pattern if random didn't work
+      const centerX = canvasWidth / 2;
+      const centerY = canvasHeight / 2;
+      for (let angle = 0; angle < Math.PI * 8; angle += 0.3) {
+        const radius = 60 + angle * 10;
+        const x = centerX + Math.cos(angle) * radius;
+        const y = centerY + Math.sin(angle) * radius;
+
+        if (x < margin || x > canvasWidth - margin || y < margin || y > canvasHeight - margin) {
+          continue;
+        }
+
+        const isFarEnough = nodes.every(node =>
+          Math.hypot(node.x - x, node.y - y) >= minDistance
+        );
+
+        if (isFarEnough) {
+          return { x, y };
+        }
+      }
+
+      // Last resort: just return center with some offset
+      return { x: centerX + Math.random() * 40 - 20, y: centerY + Math.random() * 40 - 20 };
+    };
+
     // --- TABLE COMPONENT ---
     const NetworkTable = ({ nodes, edges, onAddNode, onUpdateNode, onRemoveNode, onAddEdge, onRemoveEdge }) => {
       const [newLabel, setNewLabel] = useState('');
       const [edgeSrc, setEdgeSrc] = useState('');
       const [edgeTgt, setEdgeTgt] = useState('');
-      
+
       const getConnections = (nodeId) => edges
         .filter(e => e.source === nodeId || e.target === nodeId)
         .map(e => e.source === nodeId ? e.target : e.source);
-      
+
       const handleAddNode = () => {
         if (newLabel.trim()) {
-          onAddNode({ label: newLabel.trim(), x: 60 + Math.random() * 200, y: 60 + Math.random() * 150 });
+          const pos = findValidSpawnPosition(nodes);
+          onAddNode({ label: newLabel.trim(), ...pos });
           setNewLabel('');
         }
       };
@@ -479,7 +560,7 @@
           margin: '0 auto', boxSizing: 'border-box'
         }}>
           <div style={{ fontSize: '10px', color: '#666', fontFamily: 'ui-monospace, SFMono-Regular, monospace' }}>
-            Draw ◯ to add nodes · Draw lines between nodes to connect · Double-click/tap to edit
+            Draw ◯ to add nodes · Draw lines between nodes to connect · Drag nodes to move · Double-click/tap to edit
           </div>
           <div style={{ 
             display: 'flex', 
