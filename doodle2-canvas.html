@@ -1738,6 +1738,22 @@ JOHN HANACEK 2025, JHDESIGN LLC
                 </div>
             </div>
 
+            <!-- Equation Display -->
+            <div id="equationSection" style="display: none; padding: var(--space-sm) 0; border-top: 1px solid var(--border);">
+                <div id="equationDisplay" style="font-family: 'SF Mono', 'Monaco', 'Courier New', monospace; font-size: 0.9375rem; color: var(--ink); padding: var(--space-sm); background: rgba(100, 116, 139, 0.05); border-radius: 6px; text-align: center; margin-bottom: var(--space-xs);">
+                    <!-- Equation string goes here -->
+                </div>
+                <!-- COMMENTED OUT: Coefficient editing (needs unified geometry system to handle stroke bounds properly)
+                <details id="equationDetails" style="margin-top: var(--space-xs);">
+                    <summary style="cursor: pointer; font-size: 0.75rem; color: var(--muted); user-select: none; padding: var(--space-xs) 0;">
+                        Edit Coefficients ▼
+                    </summary>
+                    <div id="equationParams" style="padding: var(--space-sm) 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(80px, 1fr)); gap: var(--space-sm);">
+                    </div>
+                </details>
+                -->
+            </div>
+
             <!-- Expandable Fingerprint -->
             <div class="fingerprint-section" id="fingerprintSection" style="display: none;">
                 <button class="fingerprint-toggle" id="fingerprintToggle">
@@ -5042,6 +5058,276 @@ JOHN HANACEK 2025, JHDESIGN LLC
 
             // ===== END GEOMETRIC CONTAINMENT DETECTION =====
 
+            // ===== EQUATION FITTING (Day 6+) =====
+            // Fit mathematical equations to geometric shapes
+            // Converts pixel coordinates to mathematical coordinate system
+
+            // Coordinate transformation: Canvas → Math
+            // Canvas: origin top-left, y increases down
+            // Math: origin at center, y increases up
+            function canvasToMath(canvasX, canvasY, canvasWidth, canvasHeight) {
+                const scale = 20; // pixels per unit
+                const centerX = canvasWidth / 2;
+                const centerY = canvasHeight / 2;
+                return {
+                    x: (canvasX - centerX) / scale,
+                    y: (centerY - canvasY) / scale  // Flip y
+                };
+            }
+
+            function mathToCanvas(mathX, mathY, canvasWidth, canvasHeight) {
+                const scale = 20; // pixels per unit
+                const centerX = canvasWidth / 2;
+                const centerY = canvasHeight / 2;
+                return {
+                    x: mathX * scale + centerX,
+                    y: centerY - mathY * scale  // Flip y
+                };
+            }
+
+            function round(num, decimals) {
+                return Math.round(num * Math.pow(10, decimals)) / Math.pow(10, decimals);
+            }
+
+            // Fit line: y = mx + b (least squares)
+            function fitLineEquation(points, canvasWidth, canvasHeight) {
+                if (points.length < 2) return null;
+
+                // Convert to math coordinates
+                const mathPoints = points.map(p => canvasToMath(p.x, p.y, canvasWidth, canvasHeight));
+
+                const n = mathPoints.length;
+                let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
+
+                mathPoints.forEach(p => {
+                    sumX += p.x;
+                    sumY += p.y;
+                    sumXY += p.x * p.y;
+                    sumX2 += p.x * p.x;
+                });
+
+                const denom = n * sumX2 - sumX * sumX;
+                let m = 0, b = sumY / n;
+
+                if (Math.abs(denom) > 0.0001) {
+                    m = (n * sumXY - sumX * sumY) / denom;
+                    b = (sumY - m * sumX) / n;
+                }
+
+                // Calculate error
+                let error = 0;
+                mathPoints.forEach(p => {
+                    const predicted = m * p.x + b;
+                    error += Math.pow(p.y - predicted, 2);
+                });
+                error = Math.sqrt(error / n);
+
+                return {
+                    type: 'line',
+                    equation: `y = ${m >= 0 ? '' : '-'}${Math.abs(round(m, 2))}x ${b >= 0 ? '+' : '-'} ${Math.abs(round(b, 2))}`,
+                    params: { m: round(m, 2), b: round(b, 2) },
+                    error: round(error, 3)
+                };
+            }
+
+            // Fit circle: (x-h)² + (y-k)² = r²
+            function fitCircleEquation(points, canvasWidth, canvasHeight) {
+                if (points.length < 3) return null;
+
+                const mathPoints = points.map(p => canvasToMath(p.x, p.y, canvasWidth, canvasHeight));
+                const n = mathPoints.length;
+                let sumX = 0, sumY = 0, sumX2 = 0, sumY2 = 0;
+                let sumX3 = 0, sumY3 = 0, sumXY = 0, sumX2Y = 0, sumXY2 = 0;
+
+                mathPoints.forEach(p => {
+                    const x2 = p.x * p.x;
+                    const y2 = p.y * p.y;
+                    sumX += p.x;
+                    sumY += p.y;
+                    sumX2 += x2;
+                    sumY2 += y2;
+                    sumXY += p.x * p.y;
+                    sumX3 += x2 * p.x;
+                    sumY3 += y2 * p.y;
+                    sumX2Y += x2 * p.y;
+                    sumXY2 += p.x * y2;
+                });
+
+                const A = n * sumX2 - sumX * sumX;
+                const B = n * sumXY - sumX * sumY;
+                const C = n * sumY2 - sumY * sumY;
+                const D = 0.5 * (n * sumX3 + n * sumXY2 - sumX * sumX2 - sumX * sumY2);
+                const E = 0.5 * (n * sumX2Y + n * sumY3 - sumY * sumX2 - sumY * sumY2);
+
+                const denom = A * C - B * B;
+                let h = 0, k = 0;
+
+                if (Math.abs(denom) > 0.0001) {
+                    h = (D * C - B * E) / denom;
+                    k = (A * E - B * D) / denom;
+                }
+
+                // Calculate radius
+                let r = 0;
+                mathPoints.forEach(p => {
+                    r += Math.hypot(p.x - h, p.y - k);
+                });
+                r /= n;
+
+                // Calculate error
+                let error = 0;
+                mathPoints.forEach(p => {
+                    const dist = Math.hypot(p.x - h, p.y - k);
+                    error += Math.pow(dist - r, 2);
+                });
+                error = Math.sqrt(error / n);
+
+                const h_rounded = round(h, 2);
+                const k_rounded = round(k, 2);
+                const r_rounded = round(Math.abs(r), 2);
+                const r2 = round(r_rounded * r_rounded, 2);
+
+                // Format equation
+                let eq = '(x';
+                if (h_rounded !== 0) eq += ` ${h_rounded >= 0 ? '-' : '+'} ${Math.abs(h_rounded)}`;
+                eq += ')² + (y';
+                if (k_rounded !== 0) eq += ` ${k_rounded >= 0 ? '-' : '+'} ${Math.abs(k_rounded)}`;
+                eq += ')² = ';
+                eq += r2;
+
+                return {
+                    type: 'circle',
+                    equation: eq,
+                    params: { h: h_rounded, k: k_rounded, r: r_rounded },
+                    error: round(error, 3)
+                };
+            }
+
+            // Fit rectangle: parametric representation with 4 corners
+            function fitRectangleEquation(points, bounds) {
+                if (!bounds) return null;
+
+                const centerX = (bounds.minX + bounds.maxX) / 2;
+                const centerY = (bounds.minY + bounds.maxY) / 2;
+                const width = bounds.maxX - bounds.minX;
+                const height = bounds.maxY - bounds.minY;
+
+                // Simple bounding box representation
+                return {
+                    type: 'rectangle',
+                    equation: `width: ${round(width, 1)}, height: ${round(height, 1)}`,
+                    params: {
+                        centerX: round(centerX, 1),
+                        centerY: round(centerY, 1),
+                        width: round(width, 1),
+                        height: round(height, 1)
+                    },
+                    error: 0
+                };
+            }
+
+            // Main equation fitting router
+            function fitEquationForShape(shapeType, originalStroke, definition) {
+                if (!originalStroke || originalStroke.length < 2) return null;
+
+                const canvas = document.getElementById('canvas');
+                const canvasWidth = canvas.width;
+                const canvasHeight = canvas.height;
+
+                try {
+                    switch (shapeType) {
+                        case 'line':
+                            return fitLineEquation(originalStroke, canvasWidth, canvasHeight);
+
+                        case 'circle':
+                        case 'ellipse':
+                            return fitCircleEquation(originalStroke, canvasWidth, canvasHeight);
+
+                        case 'rectangle':
+                            const bounds = getBounds(originalStroke);
+                            return fitRectangleEquation(originalStroke, bounds);
+
+                        case 'triangle':
+                            // For now, use bounding box
+                            const triBounds = getBounds(originalStroke);
+                            return {
+                                type: 'triangle',
+                                equation: `3 vertices`,
+                                params: {
+                                    vertices: definition.vertices || []
+                                },
+                                error: 0
+                            };
+
+                        case 'point':
+                            const pt = originalStroke[0];
+                            return {
+                                type: 'point',
+                                equation: `(${round(pt.x, 1)}, ${round(pt.y, 1)})`,
+                                params: { x: round(pt.x, 1), y: round(pt.y, 1) },
+                                error: 0
+                            };
+
+                        default:
+                            return null;
+                    }
+                } catch (error) {
+                    console.warn('Equation fitting error:', error);
+                    return null;
+                }
+            }
+
+            // Generate geometric points from equation parameters
+            // Used for bidirectional editing (equation → geometry)
+
+            function generateLineFromEquation(m, b, canvasWidth, canvasHeight) {
+                // Generate points along y = mx + b across canvas width
+                const points = [];
+                const numPoints = 50;
+
+                // Convert canvas bounds to math coordinates
+                const leftMath = canvasToMath(0, 0, canvasWidth, canvasHeight).x;
+                const rightMath = canvasToMath(canvasWidth, 0, canvasWidth, canvasHeight).x;
+
+                for (let i = 0; i < numPoints; i++) {
+                    const mathX = leftMath + (rightMath - leftMath) * (i / (numPoints - 1));
+                    const mathY = m * mathX + b;
+
+                    const canvasPoint = mathToCanvas(mathX, mathY, canvasWidth, canvasHeight);
+
+                    // Only add if within canvas bounds
+                    if (canvasPoint.y >= 0 && canvasPoint.y <= canvasHeight) {
+                        points.push(canvasPoint);
+                    }
+                }
+
+                return points;
+            }
+
+            function generateCircleFromEquation(h, k, r, canvasWidth, canvasHeight) {
+                // Generate points around circle (x-h)² + (y-k)² = r²
+                const points = [];
+                const numPoints = 100;
+
+                for (let i = 0; i < numPoints; i++) {
+                    const angle = (2 * Math.PI * i) / numPoints;
+                    const mathX = h + r * Math.cos(angle);
+                    const mathY = k + r * Math.sin(angle);
+
+                    const canvasPoint = mathToCanvas(mathX, mathY, canvasWidth, canvasHeight);
+                    points.push(canvasPoint);
+                }
+
+                // Close the circle
+                if (points.length > 0) {
+                    points.push({ x: points[0].x, y: points[0].y });
+                }
+
+                return points;
+            }
+
+            // ===== END EQUATION FITTING =====
+
             // ===== PHASE 3B: PARALLEL/PERPENDICULAR DETECTION =====
 
             // Normalize angle to 0-180° range (lines don't have direction)
@@ -7950,6 +8236,111 @@ JOHN HANACEK 2025, JHDESIGN LLC
                 }
             }
 
+            // EQUATION DISPLAY: Show equation for accepted shape (read-only)
+            function updateEquationDisplay() {
+                const equationSection = document.getElementById('equationSection');
+                const equationDisplay = document.getElementById('equationDisplay');
+
+                if (state.selectedStrokeIndex === null || !state.shapes[state.selectedStrokeIndex]) {
+                    equationSection.style.display = 'none';
+                    return;
+                }
+
+                const shape = state.shapes[state.selectedStrokeIndex];
+                if (!shape.accepted || !shape.equation) {
+                    equationSection.style.display = 'none';
+                    return;
+                }
+
+                equationSection.style.display = 'block';
+                equationDisplay.textContent = shape.equation.equation || 'No equation';
+
+                // Note: Coefficient editing UI is commented out in HTML
+                // Needs unified geometry system to handle stroke bounds properly
+            }
+
+            // Update shape when equation parameter changes
+            // NOTE: Currently unused - coefficient editing UI is commented out
+            // TODO: Needs unified geometry system to handle stroke bounds (lines draw infinitely, not respecting original stroke length)
+            function updateShapeFromEquation(strokeIndex, paramName, newValue) {
+                if (!state.shapes[strokeIndex] || !state.shapes[strokeIndex].equation) {
+                    return;
+                }
+
+                const shape = state.shapes[strokeIndex];
+                shape.equation.params[paramName] = newValue;
+
+                const canvas = document.getElementById('canvas');
+                const canvasWidth = canvas.width;
+                const canvasHeight = canvas.height;
+
+                // Recalculate geometric shape based on new parameters
+                const eq = shape.equation;
+                let newPoints = null;
+
+                if (eq.type === 'line') {
+                    // Regenerate line from y = mx + b
+                    const { m, b } = eq.params;
+                    newPoints = generateLineFromEquation(m, b, canvasWidth, canvasHeight);
+
+                    // Update equation string
+                    eq.equation = `y = ${m >= 0 ? '' : '-'}${Math.abs(m)}x ${b >= 0 ? '+' : '-'} ${Math.abs(b)}`;
+
+                    // Update definition (lines are drawn from shape.definition.start and .end)
+                    if (newPoints.length >= 2) {
+                        shape.definition.start = newPoints[0];
+                        shape.definition.end = newPoints[newPoints.length - 1];
+
+                        // Also update midpoint and length
+                        const dx = shape.definition.end.x - shape.definition.start.x;
+                        const dy = shape.definition.end.y - shape.definition.start.y;
+                        shape.definition.length = Math.sqrt(dx * dx + dy * dy);
+                        shape.definition.midpoint = {
+                            x: (shape.definition.start.x + shape.definition.end.x) / 2,
+                            y: (shape.definition.start.y + shape.definition.end.y) / 2
+                        };
+                    }
+
+                } else if (eq.type === 'circle') {
+                    // Regenerate circle from (x-h)² + (y-k)² = r²
+                    const { h, k, r } = eq.params;
+                    newPoints = generateCircleFromEquation(h, k, r, canvasWidth, canvasHeight);
+
+                    // Update equation string
+                    const r2 = r * r;
+                    let eqStr = '(x';
+                    if (h !== 0) eqStr += ` ${h >= 0 ? '-' : '+'} ${Math.abs(h)}`;
+                    eqStr += ')² + (y';
+                    if (k !== 0) eqStr += ` ${k >= 0 ? '-' : '+'} ${Math.abs(k)}`;
+                    eqStr += ')² = ' + round(r2, 2);
+                    eq.equation = eqStr;
+
+                    // Update definition (convert back to canvas coordinates)
+                    const centerCanvas = mathToCanvas(h, k, canvasWidth, canvasHeight);
+                    const radiusPixels = r * 20; // Convert math units to pixels
+
+                    shape.definition.center = centerCanvas;
+                    shape.definition.radius = radiusPixels;
+                    shape.definition.circumference = 2 * Math.PI * radiusPixels;
+                    shape.definition.area = Math.PI * radiusPixels * radiusPixels;
+
+                    // Update rendering (circles are drawn from shape.rendering.refined)
+                    shape.rendering.refined = newPoints;
+                }
+
+                // Update the stroke points if we generated new geometry
+                if (newPoints && newPoints.length > 0) {
+                    shape.originalStroke = newPoints;
+                    state.strokes[strokeIndex] = newPoints;
+
+                    // Recalculate bounds
+                    shape.bounds = getBounds(newPoints);
+                }
+
+                updateEquationDisplay();
+                render();
+            }
+
             function showSuggestions(analysis) {
                 // Primitive suggestions from stroke analysis
                 const allResults = analysis ? analysis.results : [];
@@ -8268,6 +8659,13 @@ JOHN HANACEK 2025, JHDESIGN LLC
 
                     // Legacy compatibility
                     state.semanticData[strokeIndex] = existingShape.definition;
+
+                    // EQUATION FITTING: Add mathematical equation to shape
+                    existingShape.equation = fitEquationForShape(
+                        existingShape.type,
+                        originalStroke,
+                        existingShape.definition
+                    );
                 } else {
                     // Fallback: create shape if it doesn't exist (shouldn't happen with unified geometry)
                     console.warn(`⚠️ Shape ${strokeIndex} didn't exist, creating new one`);
@@ -8280,6 +8678,13 @@ JOHN HANACEK 2025, JHDESIGN LLC
                     );
                     state.shapes[strokeIndex] = shape;
                     state.semanticData[strokeIndex] = shape.definition;
+
+                    // EQUATION FITTING: Add mathematical equation to shape
+                    shape.equation = fitEquationForShape(
+                        shape.type,
+                        originalStroke,
+                        shape.definition
+                    );
                 }
 
                 // Increment usage count in library
@@ -8302,6 +8707,9 @@ JOHN HANACEK 2025, JHDESIGN LLC
                     const finalAnalysis = analyzeStrokeDetailed(state.strokes[strokeIndex]);
                     showSuggestions(finalAnalysis);
                 }
+
+                // Update equation display for accepted shape
+                updateEquationDisplay();
 
                 // Day 4: Update composition matching (for debug area)
                 updateCanvasLooksLike();
@@ -8656,6 +9064,7 @@ JOHN HANACEK 2025, JHDESIGN LLC
 
                             updateMetrics(analysis);
                             showSuggestions(analysis);
+                            updateEquationDisplay(); // Update equation display when showing suggestions
 
                             // AUTO-ACCEPT: High confidence matches (≥80%) are automatically accepted
                             if (analysis.results.length > 0) {
@@ -8895,6 +9304,7 @@ JOHN HANACEK 2025, JHDESIGN LLC
 
                             updateMetrics(analysis);
                             showSuggestions(analysis);
+                            updateEquationDisplay(); // Update equation display when showing suggestions
 
                             // AUTO-ACCEPT: High confidence matches (≥80%) are automatically accepted
                             if (analysis.results.length > 0) {
