@@ -659,7 +659,7 @@
         }
         .demo-container iframe {
             width: 100%;
-            height: 650px;
+            height: 640px;
             border: none;
             display: block;
         }
@@ -1518,9 +1518,18 @@
             </blockquote>
             
             <p>The MetaMedium is a system for building integration networks on a canvas. When you draw a diagram, you are setting up mental spaces. When you connect elements with arrows or proximity, you are creating cross-space mappings. When the AI interprets your marks and offers possibilities, it is helping locate shared structures. Diagrammatic thinking externalizes the blending process—making it visible, manipulable, shareable. Two people looking at the same diagram can point to the same conceptual space.</p>
+<!--
+            <div class="demo-container">
+                <div class="demo-header">
+                    <span>Interactive Figure - Network Nodes as Table</span>
+                    <span><a href="https://jjh111.github.io/MetaMedium/doodle2-canvas.html" target="_blank" rel="noopener"><strong></strong>Try it→</strong></a></span>
+                
+                </div>
+                <iframe src="https://jjh111.github.io/MetaMedium/Demos/sna-drawing-demo.html" title="MetaMedium Demo" loading="lazy"></iframe>
+            </div>
         </section>
 
-       
+       -->
         <!-- SECTION 4: THE THESIS -->
         <section id="thesis">
             <h2>The Thesis: AI as Meta-Word</h2>
@@ -2004,10 +2013,8 @@
                 </div>
             </figure>
             
-            <p>Critically, Peirce recognized that meaning is not transferred intact between minds but rather <em>reconstructed</em> by each interpretant. When two humans communicate, they exchange sign vehicles and create <strong>aligned but not identical</strong> internal states. Perfect transmission is impossible; coordination through iterative exchange is the reality.</p>
-            
-            <p>This insight proves crucial for AI alignment. If we accept that meaning emerges through exchange rather than transfer, then the path to human-AI alignment lies not in perfecting AI's "understanding" of human intent, but in <em>enriching the medium of exchange</em> so that iterative coordination becomes possible.</p>
-            
+            <p>Peirce's insight—that meaning is reconstructed, not transferred—maps directly onto the <strong>Language ↔ Computation ↔ Meaning</strong> triadic loop described earlier. The MetaMedium enables this iterative coordination by letting AI participate as interpretant, holding probabilistic meanings that refine through exchange rather than executing fixed commands.</p>
+
             <h3>Core Principles</h3>
             
             <div class="principles-grid">
@@ -2030,24 +2037,18 @@
                 </div>
                 
                 <div class="principle" data-num="4">
-                    <h4>The Canvas Learns</h4>
-                    <p>User-specific patterns accumulate into "cognitive lenses" that can be applied, shared, or composed. If you consistently use a particular mark to mean "energy flow," the system learns this convention. Your vocabulary becomes executable.</p>
-                    <p class="principle-example"><em>Draw your personal shorthand for "danger" twenty times; the twenty-first time, the system recognizes it before you finish. Your idiolect becomes shared language.</em></p>
+                    <h4>Bidirectional Learning</h4>
+                    <p>User and system engage in mutual adaptation. User-specific patterns accumulate into "cognitive lenses"—the system learns your vocabulary and conventions. Simultaneously, the system teaches you by surfacing patterns, completing gestures, suggesting relationships. Your idiolect becomes executable; the system's interpretations become visible. Both intelligences grow through exchange.</p>
+                    <p class="principle-example"><em>Draw "recursion" shorthand repeatedly; the system learns it. Later, it suggests this mark when detecting recursive patterns—teaching you to see what it sees. Your notation becomes shared language.</em></p>
                 </div>
-                
+
                 <div class="principle" data-num="5">
                     <h4>No Mode Switching</h4>
                     <p>Following Larry Tesler's principle that "no modes is good modes," the MetaMedium eliminates cognitive overhead. You're always just working—drawing, annotating, refining. The interpretation layer appears when needed and fades when not. There's no "design mode" vs. "execution mode," no switching between tools.</p>
                     <p class="principle-example"><em>Draw a shape. Write near it. Adjust with gestures. Watch it execute. All the same canvas, all the same moment. The interface disappears into the work.</em></p>
                 </div>
-                
+
                 <div class="principle" data-num="6">
-                    <h4>Bidirectional Learning</h4>
-                    <p>The relationship between user and system is mutual adaptation, not command-and-execute. The user teaches the system their notation; the system teaches the user by surfacing patterns, completing gestures, suggesting relationships. Both intelligences grow through interaction.</p>
-                    <p class="principle-example"><em>You draw a particular squiggle to mean "recursion." The system learns this. Later, it suggests the squiggle when it detects recursive patterns in your diagram—teaching you to see what it sees.</em></p>
-                </div>
-                
-                <div class="principle" data-num="7">
                     <h4>Observable Reasoning</h4>
                     <p>Uncertainty becomes visible. When the AI considers multiple interpretations, the user sees them—not collapsed into a single guess. Multiple possibilities stay present until context or user choice resolves them. This transparency supports both trust and alignment.</p>
                     <p class="principle-example"><em>Your rough mark triggers three possible interpretations shown as faint ghosts; tap one to commit, or keep drawing to refine. You see the system thinking.</em></p>
@@ -3082,34 +3083,6 @@
                 </div>
             </div>
             
-            <h3>Stop Drawing Dead Fish</h3>
-            
-            <p>In 2013, Bret Victor posed a fundamental challenge: why do our drawing tools produce only static images? People are alive—they behave and respond. Creations within the computer can also live, behave, and respond... if they are allowed to.</p>
-            
-            <blockquote>
-                "Everything we draw should be alive by default."
-                <cite>— Bret Victor, "Stop Drawing Dead Fish," 2013</cite>
-            </blockquote>
-            
-            <p>Victor's insight: computer-based art tools should embrace both forms of life—artists behaving through real-time performance, and art behaving through real-time simulation. The artist should directly manipulate art objects on the canvas, the way visual art has always been created since the time of cave paintings. We shouldn't require artists to write code to make their creations move; we should let them <em>draw</em> behavior into existence.</p>
-            
-            <p>The MetaMedium extends this principle. When you sketch, your marks aren't dead representations—they're living proposals that the system interprets, animates, connects. Your drawing of a spring doesn't just look like a spring; it <em>behaves</em> like one. Your arrow doesn't just point; it establishes a <em>relationship</em> the system understands.</p>
-            
-            <div class="video-embed">
-                <iframe src="https://player.vimeo.com/video/64895205" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen title="Bret Victor: Stop Drawing Dead Fish"></iframe>
-                <p class="video-link"><a href="https://vimeo.com/64895205" target="_blank" rel="noopener">Watch on Vimeo: Bret Victor — Stop Drawing Dead Fish</a></p>
-            </div>
-            
-            <h3>Chalktalk in Action</h3>
-
-            <p>Ken Perlin's ChalkTalk at NYU demonstrates using sketches to call complex programs. Drawing a clock makes it tick; drawing a graph makes it animate; connecting symbols creates computational relationships.</p>
-
-            <p>ChalkTalk shows what's possible when marks become executable. The MetaMedium extends this by adding machine learning for recognition, user-specific pattern libraries, and the negotiation paradigm from Sketch-Editing Games. </p>
-            
-            <div class="video-embed">
-                <iframe src="https://player.vimeo.com/video/232230096" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen title="Ken Perlin: Chalktalk"></iframe>
-                <p class="video-link"><a href="https://vimeo.com/232230096" target="_blank" rel="noopener">Watch on Vimeo: Ken Perlin — Chalktalk</a></p>
-            </div>
         </section>
 
         <!-- SECTION 6: CURRENT DEVELOPMENT -->
