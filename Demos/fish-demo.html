@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Draw a Fish</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #f8f6f1;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+        }
+        
+        .container {
+            width: 100%;
+            max-width: 500px;
+        }
+        
+        .prompt {
+            text-align: center;
+            margin-bottom: 1rem;
+            font-size: 1.25rem;
+            color: #1a1a2e;
+            font-weight: 500;
+            min-height: 2rem;
+        }
+        
+        .prompt .highlight {
+            color: #e63946;
+            font-weight: 600;
+        }
+        
+        .canvas-container {
+            position: relative;
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            overflow: hidden;
+        }
+        
+        canvas {
+            display: block;
+            width: 100%;
+            aspect-ratio: 4/3;
+            cursor: crosshair;
+            touch-action: none;
+        }
+        
+        canvas.grabbing {
+            cursor: grabbing;
+        }
+        
+        .labels {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            pointer-events: none;
+        }
+        
+        .label {
+            position: absolute;
+            font-size: 0.75rem;
+            font-weight: 600;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            transform: translate(-50%, -100%);
+            margin-top: -8px;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        
+        .label.visible {
+            opacity: 1;
+        }
+        
+        .label.fish {
+            background: rgba(59, 130, 246, 0.9);
+            color: white;
+        }
+        
+        .label.food {
+            background: rgba(74, 222, 128, 0.9);
+            color: #1a1a2e;
+        }
+        
+        .controls {
+            display: flex;
+            justify-content: center;
+            margin-top: 1rem;
+            gap: 0.75rem;
+        }
+        
+        button {
+            font-family: inherit;
+            font-size: 0.875rem;
+            font-weight: 500;
+            padding: 0.625rem 1.25rem;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .reset-btn {
+            background: #1a1a2e;
+            color: white;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+        
+        .reset-btn.visible {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        
+        .reset-btn:hover {
+            background: #2d2d4a;
+        }
+        
+        .status {
+            text-align: center;
+            margin-top: 0.75rem;
+            font-size: 0.8125rem;
+            color: #666;
+            min-height: 1.25rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="prompt">Draw a <span class="highlight">fish</span></div>
+        
+        <div class="canvas-container">
+            <canvas id="canvas"></canvas>
+            <div class="labels">
+                <div class="label fish" id="fishLabel">🐟 fish</div>
+                <div class="label food" id="foodLabel">🍎 food</div>
+            </div>
+        </div>
+        
+        <div class="controls">
+            <button class="reset-btn" id="resetBtn">Reset</button>
+        </div>
+        
+        <div class="status" id="status"></div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const prompt = document.querySelector('.prompt');
+        const status = document.getElementById('status');
+        const resetBtn = document.getElementById('resetBtn');
+        const fishLabel = document.getElementById('fishLabel');
+        const foodLabel = document.getElementById('foodLabel');
+        
+        // High DPI support
+        function setupCanvas() {
+            const rect = canvas.getBoundingClientRect();
+            const dpr = window.devicePixelRatio || 1;
+            canvas.width = rect.width * dpr;
+            canvas.height = rect.height * dpr;
+            ctx.scale(dpr, dpr);
+            canvas.style.width = rect.width + 'px';
+            canvas.style.height = rect.height + 'px';
+        }
+        setupCanvas();
+        window.addEventListener('resize', () => {
+            setupCanvas();
+            redraw();
+        });
+        
+        // State
+        let state = 'draw-fish'; // draw-fish, draw-food, animating
+        let isDrawing = false;
+        let isDraggingFood = false;
+        let currentStroke = [];
+        let fish = null;
+        let food = null;
+        let animationId = null;
+        let wigglePhase = 0;
+        
+        // Get canvas dimensions
+        function getCanvasSize() {
+            return {
+                width: canvas.getBoundingClientRect().width,
+                height: canvas.getBoundingClientRect().height
+            };
+        }
+        
+        // Get position from event
+        function getPos(e) {
+            const rect = canvas.getBoundingClientRect();
+            if (e.touches) {
+                return {
+                    x: e.touches[0].clientX - rect.left,
+                    y: e.touches[0].clientY - rect.top
+                };
+            }
+            return {
+                x: e.clientX - rect.left,
+                y: e.clientY - rect.top
+            };
+        }
+        
+        // Drawing handlers
+        function startDraw(e) {
+            e.preventDefault();
+            const pos = getPos(e);
+            
+            // Check if clicking on food to drag it
+            if (food && state === 'animating') {
+                const dx = pos.x - food.center.x;
+                const dy = pos.y - food.center.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                if (dist < 40) {
+                    isDraggingFood = true;
+                    canvas.classList.add('grabbing');
+                    return;
+                }
+            }
+            
+            if (state === 'animating') return;
+            isDrawing = true;
+            currentStroke = [pos];
+        }
+        
+        function draw(e) {
+            e.preventDefault();
+            const pos = getPos(e);
+            
+            // Handle dragging food
+            if (isDraggingFood && food) {
+                const dx = pos.x - food.center.x;
+                const dy = pos.y - food.center.y;
+                food.center.x = pos.x;
+                food.center.y = pos.y;
+                food.points = food.points.map(p => ({
+                    x: p.x + dx,
+                    y: p.y + dy
+                }));
+                updateLabel(foodLabel, food.center, true);
+                return;
+            }
+            
+            if (!isDrawing) return;
+            currentStroke.push(pos);
+            redraw();
+            
+            // Draw current stroke
+            if (currentStroke.length > 1) {
+                ctx.strokeStyle = state === 'draw-fish' ? 'rgba(59, 130, 246, 0.8)' : 'rgba(74, 222, 128, 0.8)';
+                ctx.lineWidth = 3;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                ctx.beginPath();
+                ctx.moveTo(currentStroke[0].x, currentStroke[0].y);
+                for (let i = 1; i < currentStroke.length; i++) {
+                    ctx.lineTo(currentStroke[i].x, currentStroke[i].y);
+                }
+                ctx.stroke();
+            }
+        }
+        
+        function endDraw() {
+            if (isDraggingFood) {
+                isDraggingFood = false;
+                canvas.classList.remove('grabbing');
+                return;
+            }
+            
+            if (!isDrawing) return;
+            isDrawing = false;
+            
+            if (currentStroke.length < 5) {
+                currentStroke = [];
+                return;
+            }
+            
+            // Calculate bounds and center
+            const bounds = getBounds(currentStroke);
+            const center = {
+                x: (bounds.minX + bounds.maxX) / 2,
+                y: (bounds.minY + bounds.maxY) / 2
+            };
+            
+            if (state === 'draw-fish') {
+                fish = {
+                    points: [...currentStroke],
+                    originalPoints: [...currentStroke], // Store original for wiggle
+                    center: { ...center },
+                    bounds: { ...bounds },
+                    velocity: { x: 0, y: 0 }
+                };
+                
+                // Update UI
+                prompt.innerHTML = 'Draw some <span class="highlight">food</span>';
+                status.textContent = 'Your fish is waiting...';
+                updateLabel(fishLabel, fish.center, true);
+                state = 'draw-food';
+                
+            } else if (state === 'draw-food') {
+                food = {
+                    points: [...currentStroke],
+                    center: { ...center },
+                    bounds: { ...bounds }
+                };
+                
+                // Update UI
+                prompt.innerHTML = '🎬 <span class="highlight">Drag the food!</span>';
+                status.textContent = 'Your fish will follow...';
+                updateLabel(foodLabel, food.center, true);
+                resetBtn.classList.add('visible');
+                
+                state = 'animating';
+                startAnimation();
+            }
+            
+            currentStroke = [];
+            redraw();
+        }
+        
+        function getBounds(points) {
+            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+            points.forEach(p => {
+                minX = Math.min(minX, p.x);
+                minY = Math.min(minY, p.y);
+                maxX = Math.max(maxX, p.x);
+                maxY = Math.max(maxY, p.y);
+            });
+            return { minX, minY, maxX, maxY };
+        }
+        
+        function updateLabel(labelEl, pos, visible) {
+            const rect = canvas.getBoundingClientRect();
+            labelEl.style.left = pos.x + 'px';
+            labelEl.style.top = pos.y + 'px';
+            labelEl.classList.toggle('visible', visible);
+        }
+        
+        // Animation
+        function startAnimation() {
+            function animate() {
+                if (state !== 'animating') return;
+                
+                wigglePhase += 0.15;
+                
+                // Calculate direction to food
+                const dx = food.center.x - fish.center.x;
+                const dy = food.center.y - fish.center.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                
+                // Move fish toward food (with easing when close)
+                if (dist > 5) {
+                    const speed = Math.min(2.5, dist * 0.05);
+                    const vx = (dx / dist) * speed;
+                    const vy = (dy / dist) * speed;
+                    
+                    fish.center.x += vx;
+                    fish.center.y += vy;
+                    
+                    // Update base points position
+                    fish.originalPoints = fish.originalPoints.map(p => ({
+                        x: p.x + vx,
+                        y: p.y + vy
+                    }));
+                }
+                
+                // Apply wiggle to fish points
+                const wiggleAmount = dist < 20 ? 2 : 1.5; // Wiggle more when "eating"
+                const wiggleSpeed = dist < 20 ? 1.5 : 1;
+                fish.points = fish.originalPoints.map((p, i) => {
+                    const offset = Math.sin(wigglePhase * wiggleSpeed + i * 0.3) * wiggleAmount;
+                    // Wiggle perpendicular to fish direction
+                    const perpX = -dy / (dist || 1);
+                    const perpY = dx / (dist || 1);
+                    return {
+                        x: p.x + perpX * offset,
+                        y: p.y + perpY * offset
+                    };
+                });
+                
+                updateLabel(fishLabel, fish.center, true);
+                redraw();
+                
+                animationId = requestAnimationFrame(animate);
+            }
+            
+            animationId = requestAnimationFrame(animate);
+        }
+        
+        // Redraw everything
+        function redraw() {
+            const { width, height } = getCanvasSize();
+            ctx.clearRect(0, 0, width, height);
+            
+            // Draw grid
+            ctx.strokeStyle = 'rgba(59, 130, 246, 0.06)';
+            ctx.lineWidth = 1;
+            const gridSize = 20;
+            for (let x = 0; x < width; x += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, height);
+                ctx.stroke();
+            }
+            for (let y = 0; y < height; y += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(width, y);
+                ctx.stroke();
+            }
+            
+            // Draw food
+            if (food) {
+                ctx.strokeStyle = 'rgba(74, 222, 128, 0.8)';
+                ctx.lineWidth = 3;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                ctx.beginPath();
+                ctx.moveTo(food.points[0].x, food.points[0].y);
+                for (let i = 1; i < food.points.length; i++) {
+                    ctx.lineTo(food.points[i].x, food.points[i].y);
+                }
+                ctx.stroke();
+                
+                // Draw drag hint circle when animating
+                if (state === 'animating') {
+                    ctx.strokeStyle = 'rgba(74, 222, 128, 0.3)';
+                    ctx.lineWidth = 2;
+                    ctx.setLineDash([4, 4]);
+                    ctx.beginPath();
+                    ctx.arc(food.center.x, food.center.y, 35, 0, Math.PI * 2);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                }
+            }
+            
+            // Draw fish
+            if (fish) {
+                ctx.strokeStyle = 'rgba(59, 130, 246, 0.8)';
+                ctx.lineWidth = 3;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                ctx.beginPath();
+                ctx.moveTo(fish.points[0].x, fish.points[0].y);
+                for (let i = 1; i < fish.points.length; i++) {
+                    ctx.lineTo(fish.points[i].x, fish.points[i].y);
+                }
+                ctx.stroke();
+            }
+        }
+        
+        // Reset
+        function reset() {
+            if (animationId) cancelAnimationFrame(animationId);
+            
+            state = 'draw-fish';
+            fish = null;
+            food = null;
+            currentStroke = [];
+            isDraggingFood = false;
+            wigglePhase = 0;
+            
+            prompt.innerHTML = 'Draw a <span class="highlight">fish</span>';
+            status.textContent = '';
+            resetBtn.classList.remove('visible');
+            fishLabel.classList.remove('visible');
+            foodLabel.classList.remove('visible');
+            
+            redraw();
+        }
+        
+        // Event listeners
+        canvas.addEventListener('mousedown', startDraw);
+        canvas.addEventListener('mousemove', (e) => {
+            draw(e);
+            // Update cursor when hovering over food
+            if (food && state === 'animating' && !isDraggingFood) {
+                const pos = getPos(e);
+                const dx = pos.x - food.center.x;
+                const dy = pos.y - food.center.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                canvas.style.cursor = dist < 40 ? 'grab' : 'crosshair';
+            }
+        });
+        canvas.addEventListener('mouseup', endDraw);
+        canvas.addEventListener('mouseleave', endDraw);
+        
+        canvas.addEventListener('touchstart', startDraw, { passive: false });
+        canvas.addEventListener('touchmove', draw, { passive: false });
+        canvas.addEventListener('touchend', endDraw);
+        canvas.addEventListener('touchcancel', endDraw);
+        
+        resetBtn.addEventListener('click', reset);
+        
+        // Initial draw
+        redraw();
+    </script>
+</body>
+</html>

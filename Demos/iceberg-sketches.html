@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Meeting of Blurriness - Sketches</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    
+    body {
+      font-family: 'Space Grotesk', system-ui, sans-serif;
+      background: #08080e;
+      color: #e5e5e5;
+      padding: 24px;
+    }
+    
+    h1 {
+      font-size: 1rem;
+      color: #888;
+      margin-bottom: 24px;
+      text-align: center;
+    }
+    
+    .sketches {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 24px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    
+    .sketch {
+      background: #0a0a12;
+      border: 1px solid #1a1a2a;
+      border-radius: 12px;
+      padding: 20px;
+    }
+    
+    .sketch-title {
+      font-size: 0.75rem;
+      color: #8b5cf6;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 16px;
+    }
+    
+    .sketch-canvas {
+      width: 100%;
+      height: 280px;
+      background: #08080e;
+      border-radius: 8px;
+      margin-bottom: 12px;
+    }
+    
+    .sketch-caption {
+      font-size: 0.75rem;
+      color: #666;
+      line-height: 1.5;
+    }
+    
+    .sketch-caption em {
+      color: #10b981;
+      font-style: normal;
+    }
+  </style>
+</head>
+<body>
+  <h1>Meeting of Blurriness — Visual Approaches</h1>
+  
+  <div class="sketches">
+    <!-- Sketch 1: Vertical Funnels -->
+    <div class="sketch">
+      <div class="sketch-title">A. Vertical Funnels</div>
+      <canvas class="sketch-canvas" id="sketch1"></canvas>
+      <div class="sketch-caption">
+        Human depth above, AI depth below. Both narrow toward the <em>crystallized surface</em> where they meet.
+      </div>
+    </div>
+    
+    <!-- Sketch 2: Horizontal Mirrored -->
+    <div class="sketch">
+      <div class="sketch-title">B. Horizontal Mirror</div>
+      <canvas class="sketch-canvas" id="sketch2"></canvas>
+      <div class="sketch-caption">
+        Two blurry regions reach toward center. Canvas holds <em>stable objects</em> both can point to.
+      </div>
+    </div>
+    
+    <!-- Sketch 3: Activity Layers -->
+    <div class="sketch">
+      <div class="sketch-title">C. Activity Layers (like your 2016)</div>
+      <canvas class="sketch-canvas" id="sketch3"></canvas>
+      <div class="sketch-caption">
+        Layered structure: internal motive → intention → action → <em>visible mark</em>. Mirrored for both.
+      </div>
+    </div>
+    
+    <!-- Sketch 4: Triadic Closure -->
+    <div class="sketch">
+      <div class="sketch-title">D. Triadic Closure</div>
+      <canvas class="sketch-canvas" id="sketch4"></canvas>
+      <div class="sketch-caption">
+        Three vertices, each pair <em>closed through the third</em>. Canvas mediates Human↔AI.
+      </div>
+    </div>
+    
+    <!-- Sketch 5: Wave Interference -->
+    <div class="sketch">
+      <div class="sketch-title">E. Wave Interference</div>
+      <canvas class="sketch-canvas" id="sketch5"></canvas>
+      <div class="sketch-caption">
+        Two fuzzy waves meet. Where they <em>constructively interfere</em>, stable patterns emerge.
+      </div>
+    </div>
+    
+    <!-- Sketch 6: Reconciled -->
+    <div class="sketch">
+      <div class="sketch-title">F. Reconciled: Funnel + Layers + Triad</div>
+      <canvas class="sketch-canvas" id="sketch6"></canvas>
+      <div class="sketch-caption">
+        Mirrored funnels with internal layers. Canvas as <em>third vertex</em> that closes the loop.
+      </div>
+    </div>
+  </div>
+  
+  <script>
+    const dpr = window.devicePixelRatio || 1;
+    
+    function setupCanvas(id) {
+      const canvas = document.getElementById(id);
+      const rect = canvas.getBoundingClientRect();
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
+      const ctx = canvas.getContext('2d');
+      ctx.scale(dpr, dpr);
+      return { canvas, ctx, w: rect.width, h: rect.height };
+    }
+    
+    // ===== SKETCH 1: Vertical Funnels =====
+    function drawSketch1() {
+      const { ctx, w, h } = setupCanvas('sketch1');
+      
+      // Human (top) - blue gradient funnel pointing down
+      const gradTop = ctx.createLinearGradient(0, 0, 0, h/2);
+      gradTop.addColorStop(0, '#3b82f622');
+      gradTop.addColorStop(1, '#3b82f6cc');
+      
+      ctx.fillStyle = gradTop;
+      ctx.beginPath();
+      ctx.moveTo(w/2 - 100, 0);
+      ctx.lineTo(w/2 + 100, 0);
+      ctx.lineTo(w/2 + 15, h/2 - 10);
+      ctx.lineTo(w/2 - 15, h/2 - 10);
+      ctx.closePath();
+      ctx.fill();
+      
+      // AI (bottom) - purple gradient funnel pointing up
+      const gradBot = ctx.createLinearGradient(0, h, 0, h/2);
+      gradBot.addColorStop(0, '#8b5cf622');
+      gradBot.addColorStop(1, '#8b5cf6cc');
+      
+      ctx.fillStyle = gradBot;
+      ctx.beginPath();
+      ctx.moveTo(w/2 - 100, h);
+      ctx.lineTo(w/2 + 100, h);
+      ctx.lineTo(w/2 + 15, h/2 + 10);
+      ctx.lineTo(w/2 - 15, h/2 + 10);
+      ctx.closePath();
+      ctx.fill();
+      
+      // Canvas line in middle
+      ctx.strokeStyle = '#10b981';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(w/2 - 60, h/2);
+      ctx.lineTo(w/2 + 60, h/2);
+      ctx.stroke();
+      
+      // Crystal objects on canvas
+      ctx.fillStyle = '#fff';
+      ctx.beginPath();
+      ctx.arc(w/2 - 25, h/2, 8, 0, Math.PI * 2);
+      ctx.fill();
+      
+      ctx.beginPath();
+      ctx.moveTo(w/2 + 25, h/2 - 10);
+      ctx.lineTo(w/2 + 35, h/2 + 8);
+      ctx.lineTo(w/2 + 15, h/2 + 8);
+      ctx.closePath();
+      ctx.fill();
+      
+      // Labels
+      ctx.font = '11px Space Grotesk, system-ui';
+      ctx.fillStyle = '#3b82f6';
+      ctx.textAlign = 'center';
+      ctx.fillText('HUMAN', w/2, 20);
+      ctx.fillStyle = '#666';
+      ctx.fillText('(blurry depth)', w/2, 35);
+      
+      ctx.fillStyle = '#8b5cf6';
+      ctx.fillText('LLM', w/2, h - 20);
+      ctx.fillStyle = '#666';
+      ctx.fillText('(blurry depth)', w/2, h - 35);
+      
+      ctx.fillStyle = '#10b981';
+      ctx.fillText('canvas', w/2, h/2 + 35);
+    }
+    
+    // ===== SKETCH 2: Horizontal Mirror =====
+    function drawSketch2() {
+      const { ctx, w, h } = setupCanvas('sketch2');
+      
+      // Human (left) - horizontal funnel
+      const gradLeft = ctx.createLinearGradient(0, 0, w/2, 0);
+      gradLeft.addColorStop(0, '#3b82f611');
+      gradLeft.addColorStop(1, '#3b82f6aa');
+      
+      ctx.fillStyle = gradLeft;
+      ctx.beginPath();
+      ctx.moveTo(0, h/2 - 80);
+      ctx.lineTo(0, h/2 + 80);
+      ctx.lineTo(w/2 - 50, h/2 + 20);
+      ctx.lineTo(w/2 - 50, h/2 - 20);
+      ctx.closePath();
+      ctx.fill();
+      
+      // AI (right) - horizontal funnel
+      const gradRight = ctx.createLinearGradient(w, 0, w/2, 0);
+      gradRight.addColorStop(0, '#8b5cf611');
+      gradRight.addColorStop(1, '#8b5cf6aa');
+      
+      ctx.fillStyle = gradRight;
+      ctx.beginPath();
+      ctx.moveTo(w, h/2 - 80);
+      ctx.lineTo(w, h/2 + 80);
+      ctx.lineTo(w/2 + 50, h/2 + 20);
+      ctx.lineTo(w/2 + 50, h/2 - 20);
+      ctx.closePath();
+      ctx.fill();
+      
+      // Canvas center box
+      ctx.fillStyle = '#10b98133';
+      ctx.strokeStyle = '#10b981';
+      ctx.lineWidth = 2;
+      ctx.fillRect(w/2 - 45, h/2 - 35, 90, 70);
+      ctx.strokeRect(w/2 - 45, h/2 - 35, 90, 70);
+      
+      // Objects in canvas
+      ctx.fillStyle = '#fff';
+      ctx.font = '14px serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('○', w/2 - 15, h/2);
+      ctx.fillText('△', w/2 + 15, h/2);
+      ctx.font = '10px Space Grotesk';
+      ctx.fillText('x²+y²=r²', w/2, h/2 + 20);
+      
+      // Labels
+      ctx.font = '11px Space Grotesk, system-ui';
+      ctx.fillStyle = '#3b82f6';
+      ctx.textAlign = 'left';
+      ctx.fillText('HUMAN', 10, 20);
+      
+      ctx.fillStyle = '#8b5cf6';
+      ctx.textAlign = 'right';
+      ctx.fillText('LLM', w - 10, 20);
+    }
+    
+    // ===== SKETCH 3: Activity Layers =====
+    function drawSketch3() {
+      const { ctx, w, h } = setupCanvas('sketch3');
+      
+      const layers = ['motive', 'intention', 'action', 'mark'];
+      const layerH = h / 5;
+      
+      // Human side (left of center)
+      layers.forEach((label, i) => {
+        const y = 20 + i * layerH;
+        const alpha = 0.2 + i * 0.25;
+        const width = 60 + i * 20;
+        
+        ctx.fillStyle = `rgba(59, 130, 246, ${alpha})`;
+        ctx.fillRect(w/2 - width - 10, y, width, layerH - 8);
+        
+        ctx.fillStyle = i < 3 ? '#3b82f6' : '#fff';
+        ctx.font = '9px Space Grotesk';
+        ctx.textAlign = 'right';
+        ctx.fillText(label, w/2 - 20, y + layerH/2);
+      });
+      
+      // AI side (right of center) - mirrored
+      layers.forEach((label, i) => {
+        const y = 20 + i * layerH;
+        const alpha = 0.2 + i * 0.25;
+        const width = 60 + i * 20;
+        
+        ctx.fillStyle = `rgba(139, 92, 246, ${alpha})`;
+        ctx.fillRect(w/2 + 10, y, width, layerH - 8);
+        
+        ctx.fillStyle = i < 3 ? '#8b5cf6' : '#fff';
+        ctx.font = '9px Space Grotesk';
+        ctx.textAlign = 'left';
+        ctx.fillText(i < 3 ? ['latent', 'pattern', 'output', 'mark'][i] : 'mark', w/2 + 20, y + layerH/2);
+      });
+      
+      // Canvas highlight on bottom layer
+      ctx.strokeStyle = '#10b981';
+      ctx.lineWidth = 2;
+      const bottomY = 20 + 3 * layerH;
+      ctx.strokeRect(w/2 - 140, bottomY, 280, layerH - 8);
+      
+      // Divider labels
+      ctx.fillStyle = '#666';
+      ctx.font = '8px Space Grotesk';
+      ctx.textAlign = 'center';
+      ctx.fillText('internal', w/2, 35);
+      ctx.fillText('↓', w/2, 50);
+      ctx.fillStyle = '#10b981';
+      ctx.fillText('VISIBLE', w/2, bottomY + layerH/2);
+      
+      // Labels
+      ctx.font = '10px Space Grotesk';
+      ctx.fillStyle = '#3b82f6';
+      ctx.textAlign = 'left';
+      ctx.fillText('HUMAN', 10, 16);
+      ctx.fillStyle = '#8b5cf6';
+      ctx.textAlign = 'right';
+      ctx.fillText('LLM', w - 10, 16);
+    }
+    
+    // ===== SKETCH 4: Triadic Closure =====
+    function drawSketch4() {
+      const { ctx, w, h } = setupCanvas('sketch4');
+      
+      const cx = w/2, cy = h/2;
+      const r = 90;
+      
+      // Triangle vertices
+      const human = { x: cx - r, y: cy + r * 0.6 };
+      const ai = { x: cx + r, y: cy + r * 0.6 };
+      const canvas = { x: cx, y: cy - r * 0.8 };
+      
+      // Connection lines (dashed for mediation)
+      ctx.setLineDash([4, 4]);
+      ctx.strokeStyle = '#ffffff33';
+      ctx.lineWidth = 1;
+      
+      // Human - AI (mediated by canvas)
+      ctx.beginPath();
+      ctx.moveTo(human.x, human.y);
+      ctx.lineTo(ai.x, ai.y);
+      ctx.stroke();
+      
+      // Human - Canvas
+      ctx.strokeStyle = '#3b82f666';
+      ctx.beginPath();
+      ctx.moveTo(human.x, human.y);
+      ctx.lineTo(canvas.x, canvas.y);
+      ctx.stroke();
+      
+      // AI - Canvas
+      ctx.strokeStyle = '#8b5cf666';
+      ctx.beginPath();
+      ctx.moveTo(ai.x, ai.y);
+      ctx.lineTo(canvas.x, canvas.y);
+      ctx.stroke();
+      
+      ctx.setLineDash([]);
+      
+      // Blurry regions at human/ai
+      const blurRad = 35;
+      
+      const gradH = ctx.createRadialGradient(human.x, human.y, 0, human.x, human.y, blurRad);
+      gradH.addColorStop(0, '#3b82f6aa');
+      gradH.addColorStop(1, '#3b82f600');
+      ctx.fillStyle = gradH;
+      ctx.beginPath();
+      ctx.arc(human.x, human.y, blurRad, 0, Math.PI * 2);
+      ctx.fill();
+      
+      const gradA = ctx.createRadialGradient(ai.x, ai.y, 0, ai.x, ai.y, blurRad);
+      gradA.addColorStop(0, '#8b5cf6aa');
+      gradA.addColorStop(1, '#8b5cf600');
+      ctx.fillStyle = gradA;
+      ctx.beginPath();
+      ctx.arc(ai.x, ai.y, blurRad, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // Sharp canvas node
+      ctx.fillStyle = '#10b981';
+      ctx.beginPath();
+      ctx.arc(canvas.x, canvas.y, 20, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // Canvas content
+      ctx.fillStyle = '#fff';
+      ctx.font = '12px serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('○ △', canvas.x, canvas.y + 4);
+      
+      // Labels
+      ctx.font = '10px Space Grotesk';
+      ctx.fillStyle = '#3b82f6';
+      ctx.fillText('HUMAN', human.x, human.y + 50);
+      ctx.fillStyle = '#8b5cf6';
+      ctx.fillText('LLM', ai.x, ai.y + 50);
+      ctx.fillStyle = '#10b981';
+      ctx.fillText('CANVAS', canvas.x, canvas.y - 30);
+      
+      // Mediation arrow
+      ctx.fillStyle = '#666';
+      ctx.font = '8px Space Grotesk';
+      ctx.fillText('mediates', cx, cy + 50);
+    }
+    
+    // ===== SKETCH 5: Wave Interference =====
+    function drawSketch5() {
+      const { ctx, w, h } = setupCanvas('sketch5');
+      
+      ctx.lineWidth = 2;
+      
+      // Human wave (from left)
+      ctx.strokeStyle = '#3b82f666';
+      ctx.beginPath();
+      for (let x = 0; x < w/2 + 40; x += 2) {
+        const amp = 30 * (1 - x / (w/2 + 40)) + 5;
+        const y = h/2 + Math.sin(x * 0.05) * amp;
+        if (x === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+      
+      // AI wave (from right)
+      ctx.strokeStyle = '#8b5cf666';
+      ctx.beginPath();
+      for (let x = w; x > w/2 - 40; x -= 2) {
+        const amp = 30 * (1 - (w - x) / (w/2 + 40)) + 5;
+        const y = h/2 + Math.sin(x * 0.05 + 1) * amp;
+        if (x === w) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+      
+      // Interference zone - standing wave / stable pattern
+      ctx.strokeStyle = '#10b981';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      for (let x = w/2 - 40; x < w/2 + 40; x += 2) {
+        const y = h/2 + Math.sin(x * 0.15) * 15;
+        if (x === w/2 - 40) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+      
+      // Stable points (nodes of standing wave)
+      ctx.fillStyle = '#fff';
+      [-30, 0, 30].forEach(offset => {
+        ctx.beginPath();
+        ctx.arc(w/2 + offset, h/2, 6, 0, Math.PI * 2);
+        ctx.fill();
+      });
+      
+      // Labels
+      ctx.font = '10px Space Grotesk';
+      ctx.fillStyle = '#3b82f6';
+      ctx.textAlign = 'left';
+      ctx.fillText('human', 10, h/2 - 50);
+      ctx.fillStyle = '#666';
+      ctx.fillText('(fuzzy wave)', 10, h/2 - 35);
+      
+      ctx.fillStyle = '#8b5cf6';
+      ctx.textAlign = 'right';
+      ctx.fillText('LLM', w - 10, h/2 - 50);
+      ctx.fillStyle = '#666';
+      ctx.fillText('(fuzzy wave)', w - 10, h/2 - 35);
+      
+      ctx.fillStyle = '#10b981';
+      ctx.textAlign = 'center';
+      ctx.fillText('stable patterns', w/2, h/2 + 50);
+      ctx.fillText('emerge', w/2, h/2 + 65);
+    }
+    
+    // ===== SKETCH 6: Reconciled =====
+    function drawSketch6() {
+      const { ctx, w, h } = setupCanvas('sketch6');
+      
+      const cx = w/2;
+      
+      // Human funnel (top-left)
+      const gradH = ctx.createLinearGradient(30, 30, cx - 20, h/2);
+      gradH.addColorStop(0, '#3b82f611');
+      gradH.addColorStop(1, '#3b82f6aa');
+      
+      ctx.fillStyle = gradH;
+      ctx.beginPath();
+      ctx.moveTo(30, 30);
+      ctx.lineTo(100, 30);
+      ctx.lineTo(cx - 20, h/2 - 15);
+      ctx.lineTo(cx - 20, h/2 + 15);
+      ctx.lineTo(30, 120);
+      ctx.closePath();
+      ctx.fill();
+      
+      // AI funnel (top-right)
+      const gradA = ctx.createLinearGradient(w - 30, 30, cx + 20, h/2);
+      gradA.addColorStop(0, '#8b5cf611');
+      gradA.addColorStop(1, '#8b5cf6aa');
+      
+      ctx.fillStyle = gradA;
+      ctx.beginPath();
+      ctx.moveTo(w - 30, 30);
+      ctx.lineTo(w - 100, 30);
+      ctx.lineTo(cx + 20, h/2 - 15);
+      ctx.lineTo(cx + 20, h/2 + 15);
+      ctx.lineTo(w - 30, 120);
+      ctx.closePath();
+      ctx.fill();
+      
+      // Canvas node at convergence
+      ctx.fillStyle = '#10b981';
+      ctx.beginPath();
+      ctx.arc(cx, h/2, 25, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // Sharp objects in canvas
+      ctx.fillStyle = '#fff';
+      ctx.font = '14px serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('○ △', cx, h/2 + 5);
+      
+      // Internal layers (subtle lines in funnels)
+      ctx.strokeStyle = '#ffffff22';
+      ctx.lineWidth = 1;
+      
+      // Human layers
+      [0.25, 0.5, 0.75].forEach(t => {
+        const x1 = 30 + t * (cx - 50);
+        const y1 = 30 + t * (h/2 - 45);
+        const y2 = 120 - t * (120 - h/2 - 15);
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x1, y2);
+        ctx.stroke();
+      });
+      
+      // AI layers
+      [0.25, 0.5, 0.75].forEach(t => {
+        const x1 = w - 30 - t * (cx - 50);
+        const y1 = 30 + t * (h/2 - 45);
+        const y2 = 120 - t * (120 - h/2 - 15);
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x1, y2);
+        ctx.stroke();
+      });
+      
+      // Feedback loop (closing the triad)
+      ctx.strokeStyle = '#10b98155';
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([3, 3]);
+      
+      ctx.beginPath();
+      ctx.moveTo(cx, h/2 + 25);
+      ctx.quadraticCurveTo(cx - 80, h - 30, 30, 120);
+      ctx.stroke();
+      
+      ctx.beginPath();
+      ctx.moveTo(cx, h/2 + 25);
+      ctx.quadraticCurveTo(cx + 80, h - 30, w - 30, 120);
+      ctx.stroke();
+      
+      ctx.setLineDash([]);
+      
+      // Labels
+      ctx.font = '10px Space Grotesk';
+      ctx.fillStyle = '#3b82f6';
+      ctx.textAlign = 'left';
+      ctx.fillText('HUMAN', 30, 22);
+      ctx.fillStyle = '#666';
+      ctx.font = '8px Space Grotesk';
+      ctx.fillText('motive → action', 30, 140);
+      
+      ctx.font = '10px Space Grotesk';
+      ctx.fillStyle = '#8b5cf6';
+      ctx.textAlign = 'right';
+      ctx.fillText('LLM', w - 30, 22);
+      ctx.fillStyle = '#666';
+      ctx.font = '8px Space Grotesk';
+      ctx.fillText('latent → output', w - 30, 140);
+      
+      ctx.fillStyle = '#10b981';
+      ctx.font = '10px Space Grotesk';
+      ctx.textAlign = 'center';
+      ctx.fillText('CANVAS', cx, h/2 + 45);
+      ctx.fillStyle = '#666';
+      ctx.font = '8px Space Grotesk';
+      ctx.fillText('crystallized', cx, h/2 + 58);
+      ctx.fillText('meeting point', cx, h/2 + 70);
+      
+      // Loop label
+      ctx.fillStyle = '#10b98166';
+      ctx.fillText('feedback shapes both', cx, h - 20);
+    }
+    
+    // Draw all
+    drawSketch1();
+    drawSketch2();
+    drawSketch3();
+    drawSketch4();
+    drawSketch5();
+    drawSketch6();
+  </script>
+</body>
+</html>

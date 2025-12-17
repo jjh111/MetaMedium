@@ -1,0 +1,774 @@
+<!--
+  WAVEFORM CANVAS v2 — Stroke IS the Sound
+  
+  Your drawn stroke becomes the waveform.
+  Y-values of your stroke = audio samples that loop.
+  Smooth curve = pure tone. Jagged = harsh. Scribble = noise.
+-->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Waveform Canvas</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    
+    body {
+      font-family: 'Space Grotesk', system-ui, sans-serif;
+      background: #1a1a2e;
+      color: #e5e5e5;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 1.5rem;
+    }
+    
+    h1 {
+      font-size: 1.25rem;
+      font-weight: 500;
+      margin-bottom: 0.5rem;
+      color: #fff;
+    }
+    
+    .subtitle {
+      font-size: 0.875rem;
+      color: #888;
+      margin-bottom: 1.5rem;
+      text-align: center;
+    }
+    
+    .container {
+      width: 100%;
+      max-width: 800px;
+    }
+    
+    .toolbar {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    
+    .toolbar button {
+      padding: 0.5rem 1rem;
+      border: 1px solid #444;
+      border-radius: 6px;
+      background: #2a2a3e;
+      color: #e5e5e5;
+      font-family: inherit;
+      font-size: 0.875rem;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    
+    .toolbar button:hover {
+      background: #3a3a4e;
+      border-color: #666;
+    }
+    
+    .toolbar button.active {
+      background: #8b5cf6;
+      border-color: #8b5cf6;
+      color: white;
+    }
+    
+    .toolbar button.play-btn {
+      background: #10b981;
+      border-color: #10b981;
+    }
+    
+    .toolbar button.play-btn:hover {
+      background: #059669;
+    }
+    
+    .toolbar button.play-btn.playing {
+      background: #ef4444;
+      border-color: #ef4444;
+    }
+    
+    .spacer {
+      flex: 1;
+    }
+    
+    .tempo-control {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.75rem;
+      color: #888;
+    }
+    
+    .tempo-control input {
+      width: 80px;
+    }
+    
+    .canvas-wrap {
+      position: relative;
+      background: #0d0d1a;
+      border: 1px solid #333;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    
+    canvas {
+      display: block;
+      cursor: crosshair;
+    }
+    
+    .playhead {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 2px;
+      background: #8b5cf6;
+      box-shadow: 0 0 8px #8b5cf6;
+      pointer-events: none;
+      display: none;
+    }
+    
+    .playhead.active {
+      display: block;
+    }
+    
+    .pitch-labels {
+      position: absolute;
+      left: 4px;
+      top: 0;
+      bottom: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 8px 0;
+      font-size: 0.625rem;
+      color: #555;
+      pointer-events: none;
+    }
+    
+    .waveform-preview {
+      margin-top: 1rem;
+      background: #0d0d1a;
+      border: 1px solid #333;
+      border-radius: 8px;
+      padding: 1rem;
+      display: none;
+    }
+    
+    .waveform-preview.visible {
+      display: block;
+    }
+    
+    .waveform-preview h3 {
+      font-size: 0.75rem;
+      color: #888;
+      margin-bottom: 0.5rem;
+      font-weight: 500;
+    }
+    
+    .waveform-preview canvas {
+      width: 100%;
+      height: 80px;
+      border-radius: 4px;
+      background: #1a1a2e;
+    }
+    
+    .shape-count {
+      margin-top: 0.75rem;
+      font-size: 0.75rem;
+      color: #666;
+    }
+    
+    .instructions {
+      margin-top: 1.5rem;
+      padding: 1rem;
+      background: #2a2a3e;
+      border-radius: 8px;
+      font-size: 0.8125rem;
+      color: #aaa;
+      line-height: 1.6;
+    }
+    
+    .instructions strong {
+      color: #e5e5e5;
+    }
+    
+    .color-hint {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 2px;
+      vertical-align: middle;
+      margin-right: 2px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Waveform Canvas</h1>
+    <p class="subtitle">Your stroke <em>is</em> the sound. Draw a wave, hear it loop.</p>
+    
+    <div class="toolbar">
+      <button class="play-btn" id="playBtn">▶ Play</button>
+      <button id="loopBtn">Loop</button>
+      <button id="clearBtn">Clear</button>
+      <div class="spacer"></div>
+      <div class="tempo-control">
+        <label>Speed:</label>
+        <input type="range" id="tempoSlider" min="2" max="20" value="8">
+      </div>
+    </div>
+    
+    <div class="canvas-wrap">
+      <canvas id="canvas" width="760" height="400"></canvas>
+      <div class="playhead" id="playhead"></div>
+      <div class="pitch-labels">
+        <span>high</span>
+        <span></span>
+        <span></span>
+        <span>low</span>
+      </div>
+    </div>
+    
+    <div class="waveform-preview" id="waveformPreview">
+      <h3>Selected waveform (one cycle):</h3>
+      <canvas id="waveformCanvas" width="300" height="80"></canvas>
+    </div>
+    
+    <div class="shape-count" id="shapeCount">No sounds yet — draw a waveform!</div>
+    
+    <div class="instructions">
+      <strong>How it works:</strong> Draw any stroke. The vertical movement of your stroke becomes a looping audio waveform. 
+      <span class="color-hint" style="background:#3b82f6"></span>Smooth curves → pure tones. 
+      <span class="color-hint" style="background:#f97316"></span>Jagged lines → harsh/buzzy. 
+      <span class="color-hint" style="background:#ec4899"></span>Scribbles → noise. 
+      Vertical position on canvas = pitch. Horizontal position = when it plays.
+    </div>
+  </div>
+  
+  <script>
+    // ===== AUDIO ENGINE =====
+    let audioCtx = null;
+    const activeNodes = new Map();
+    
+    function initAudio() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+    }
+    
+    // Convert stroke y-values to audio buffer (one cycle)
+    function strokeToAudioBuffer(stroke, sampleLength = 256) {
+      if (!audioCtx || stroke.length < 2) return null;
+      
+      // Resample stroke to fixed length
+      const samples = new Float32Array(sampleLength);
+      
+      for (let i = 0; i < sampleLength; i++) {
+        const t = i / (sampleLength - 1);
+        const strokeIdx = t * (stroke.length - 1);
+        const idx0 = Math.floor(strokeIdx);
+        const idx1 = Math.min(idx0 + 1, stroke.length - 1);
+        const frac = strokeIdx - idx0;
+        
+        // Interpolate y value
+        const y = stroke[idx0].y * (1 - frac) + stroke[idx1].y * frac;
+        
+        // Normalize to -1 to 1 based on stroke's own y range
+        samples[i] = y;
+      }
+      
+      // Normalize the samples to -1 to 1
+      let minY = Infinity, maxY = -Infinity;
+      samples.forEach(s => {
+        minY = Math.min(minY, s);
+        maxY = Math.max(maxY, s);
+      });
+      
+      const range = maxY - minY || 1;
+      const mid = (maxY + minY) / 2;
+      
+      for (let i = 0; i < sampleLength; i++) {
+        samples[i] = ((samples[i] - mid) / (range / 2));
+      }
+      
+      // Create audio buffer
+      const buffer = audioCtx.createBuffer(1, sampleLength, audioCtx.sampleRate);
+      buffer.getChannelData(0).set(samples);
+      
+      return { buffer, samples };
+    }
+    
+    function playShape(shape) {
+      if (!audioCtx || !shape.audioBuffer) return;
+      
+      // Create a longer buffer by repeating the waveform
+      const cycleLength = shape.audioBuffer.length;
+      const totalCycles = Math.ceil(audioCtx.sampleRate * shape.duration / cycleLength);
+      const totalLength = totalCycles * cycleLength;
+      
+      const playBuffer = audioCtx.createBuffer(1, totalLength, audioCtx.sampleRate);
+      const channelData = playBuffer.getChannelData(0);
+      const sourceData = shape.audioBuffer.getChannelData(0);
+      
+      for (let i = 0; i < totalLength; i++) {
+        channelData[i] = sourceData[i % cycleLength];
+      }
+      
+      const source = audioCtx.createBufferSource();
+      source.buffer = playBuffer;
+      
+      // Playback rate controls pitch
+      source.playbackRate.value = shape.playbackRate;
+      
+      // Envelope
+      const gain = audioCtx.createGain();
+      gain.gain.setValueAtTime(0, audioCtx.currentTime);
+      gain.gain.linearRampToValueAtTime(0.2, audioCtx.currentTime + 0.02);
+      gain.gain.setValueAtTime(0.2, audioCtx.currentTime + shape.duration - 0.05);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + shape.duration);
+      
+      source.connect(gain);
+      gain.connect(audioCtx.destination);
+      
+      source.start();
+      source.stop(audioCtx.currentTime + shape.duration);
+      
+      activeNodes.set(shape.id, { source, gain });
+      
+      setTimeout(() => {
+        activeNodes.delete(shape.id);
+      }, shape.duration * 1000);
+    }
+    
+    function stopAllSounds() {
+      activeNodes.forEach(({ source, gain }) => {
+        try {
+          gain.gain.cancelScheduledValues(audioCtx.currentTime);
+          gain.gain.setValueAtTime(gain.gain.value, audioCtx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.05);
+          source.stop(audioCtx.currentTime + 0.05);
+        } catch(e) {}
+      });
+      activeNodes.clear();
+    }
+    
+    // ===== CANVAS & STATE =====
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const waveformPreview = document.getElementById('waveformPreview');
+    const waveformCanvas = document.getElementById('waveformCanvas');
+    const waveformCtx = waveformCanvas.getContext('2d');
+    const playhead = document.getElementById('playhead');
+    const playBtn = document.getElementById('playBtn');
+    const loopBtn = document.getElementById('loopBtn');
+    const clearBtn = document.getElementById('clearBtn');
+    const tempoSlider = document.getElementById('tempoSlider');
+    const shapeCountEl = document.getElementById('shapeCount');
+    
+    let shapes = [];
+    let currentStroke = [];
+    let isDrawing = false;
+    let isPlaying = false;
+    let isLooping = false;
+    let playheadX = 0;
+    let playStartTime = 0;
+    let shapeIdCounter = 0;
+    let selectedShape = null;
+    
+    // ===== WAVEFORM ANALYSIS =====
+    function analyzeWaveform(samples) {
+      // Measure "complexity" - how jagged/smooth
+      let totalVariation = 0;
+      for (let i = 1; i < samples.length; i++) {
+        totalVariation += Math.abs(samples[i] - samples[i-1]);
+      }
+      const avgVariation = totalVariation / samples.length;
+      
+      // Map to hue: smooth (low variation) = blue, jagged = orange/pink
+      // avgVariation typically 0 to 0.5
+      const normalizedVar = Math.min(1, avgVariation * 4);
+      
+      // Blue (220) -> Purple (280) -> Pink (320) -> Orange (30)
+      let hue;
+      if (normalizedVar < 0.3) {
+        hue = 220 + normalizedVar * 200; // blue to purple
+      } else if (normalizedVar < 0.6) {
+        hue = 280 + (normalizedVar - 0.3) * 133; // purple to pink
+      } else {
+        hue = 320 + (normalizedVar - 0.6) * 175; // pink to orange (wrapping)
+        if (hue > 360) hue -= 360;
+      }
+      
+      return {
+        variation: avgVariation,
+        complexity: normalizedVar,
+        hue,
+        color: `hsl(${hue}, 70%, 55%)`
+      };
+    }
+    
+    function createShape(stroke) {
+      if (stroke.length < 5) return null;
+      
+      // Bounding box
+      let minX = Infinity, maxX = -Infinity;
+      let minY = Infinity, maxY = -Infinity;
+      stroke.forEach(p => {
+        minX = Math.min(minX, p.x);
+        maxX = Math.max(maxX, p.x);
+        minY = Math.min(minY, p.y);
+        maxY = Math.max(maxY, p.y);
+      });
+      
+      const width = maxX - minX;
+      const height = maxY - minY;
+      
+      if (width < 10 && height < 10) return null;
+      
+      const centerX = (minX + maxX) / 2;
+      const centerY = (minY + maxY) / 2;
+      
+      // Create audio buffer from stroke
+      initAudio();
+      const audioData = strokeToAudioBuffer(stroke, 256);
+      if (!audioData) return null;
+      
+      const analysis = analyzeWaveform(audioData.samples);
+      
+      // Map Y position to playback rate (pitch)
+      // Top = high pitch (2x), bottom = low pitch (0.25x)
+      const normalizedY = 1 - (centerY / canvas.height);
+      const playbackRate = 0.25 * Math.pow(8, normalizedY); // 0.25x to 2x
+      
+      // Duration based on width
+      const duration = Math.max(0.3, Math.min(2, width / 80));
+      
+      return {
+        id: shapeIdCounter++,
+        points: [...stroke],
+        audioBuffer: audioData.buffer,
+        samples: audioData.samples,
+        analysis,
+        centerX,
+        centerY,
+        width,
+        height,
+        playbackRate,
+        duration,
+        triggered: false
+      };
+    }
+    
+    // ===== DRAWING =====
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      
+      // Grid lines
+      ctx.strokeStyle = '#222';
+      ctx.lineWidth = 1;
+      for (let y = 0; y <= canvas.height; y += canvas.height / 4) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(canvas.width, y);
+        ctx.stroke();
+      }
+      
+      // Draw shapes
+      shapes.forEach(shape => {
+        const color = shape.analysis.color;
+        const isSelected = selectedShape === shape;
+        
+        // Draw stroke path
+        ctx.strokeStyle = color;
+        ctx.lineWidth = isSelected ? 4 : 2;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        
+        ctx.beginPath();
+        shape.points.forEach((p, i) => {
+          if (i === 0) ctx.moveTo(p.x, p.y);
+          else ctx.lineTo(p.x, p.y);
+        });
+        ctx.stroke();
+        
+        // Glow effect if triggered
+        if (shape.triggered && isPlaying) {
+          ctx.shadowColor = color;
+          ctx.shadowBlur = 15;
+          ctx.stroke();
+          ctx.shadowBlur = 0;
+        }
+        
+        // Draw mini waveform inside bounding box
+        const waveWidth = Math.max(40, shape.width);
+        const waveHeight = 20;
+        const waveX = shape.centerX - waveWidth / 2;
+        const waveY = shape.centerY + shape.height / 2 + 8;
+        
+        ctx.strokeStyle = color + '88';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        for (let i = 0; i < shape.samples.length; i++) {
+          const x = waveX + (i / shape.samples.length) * waveWidth;
+          const y = waveY + shape.samples[i] * (waveHeight / 2);
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+      });
+      
+      // Draw current stroke
+      if (currentStroke.length > 1) {
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 2;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.beginPath();
+        currentStroke.forEach((p, i) => {
+          if (i === 0) ctx.moveTo(p.x, p.y);
+          else ctx.lineTo(p.x, p.y);
+        });
+        ctx.stroke();
+      }
+    }
+    
+    function drawWaveformPreview(shape) {
+      if (!shape) {
+        waveformPreview.classList.remove('visible');
+        return;
+      }
+      
+      waveformPreview.classList.add('visible');
+      
+      const w = waveformCanvas.width;
+      const h = waveformCanvas.height;
+      
+      waveformCtx.clearRect(0, 0, w, h);
+      
+      // Center line
+      waveformCtx.strokeStyle = '#333';
+      waveformCtx.lineWidth = 1;
+      waveformCtx.beginPath();
+      waveformCtx.moveTo(0, h / 2);
+      waveformCtx.lineTo(w, h / 2);
+      waveformCtx.stroke();
+      
+      // Waveform
+      waveformCtx.strokeStyle = shape.analysis.color;
+      waveformCtx.lineWidth = 2;
+      waveformCtx.beginPath();
+      
+      const samples = shape.samples;
+      for (let i = 0; i < samples.length; i++) {
+        const x = (i / samples.length) * w;
+        const y = (h / 2) - samples[i] * (h / 2 - 4);
+        if (i === 0) waveformCtx.moveTo(x, y);
+        else waveformCtx.lineTo(x, y);
+      }
+      waveformCtx.stroke();
+    }
+    
+    function updateShapeCount() {
+      if (shapes.length === 0) {
+        shapeCountEl.textContent = "No sounds yet — draw a waveform!";
+      } else {
+        shapeCountEl.textContent = `${shapes.length} waveform${shapes.length > 1 ? 's' : ''} on canvas`;
+      }
+    }
+    
+    // ===== PLAYBACK =====
+    function startPlayback() {
+      initAudio();
+      isPlaying = true;
+      playBtn.textContent = '⏹ Stop';
+      playBtn.classList.add('playing');
+      playhead.classList.add('active');
+      playheadX = 0;
+      playStartTime = performance.now();
+      shapes.forEach(s => s.triggered = false);
+      requestAnimationFrame(updatePlayhead);
+    }
+    
+    function stopPlayback() {
+      isPlaying = false;
+      playBtn.textContent = '▶ Play';
+      playBtn.classList.remove('playing');
+      playhead.classList.remove('active');
+      stopAllSounds();
+      shapes.forEach(s => s.triggered = false);
+      draw();
+    }
+    
+    function updatePlayhead() {
+      if (!isPlaying) return;
+      
+      const elapsed = performance.now() - playStartTime;
+      const speed = parseFloat(tempoSlider.value);
+      const progress = (elapsed / 1000) / speed;
+      
+      playheadX = progress * canvas.width;
+      playhead.style.left = playheadX + 'px';
+      
+      // Trigger shapes
+      shapes.forEach(shape => {
+        const shapeLeft = shape.centerX - shape.width / 2;
+        
+        if (!shape.triggered && playheadX >= shapeLeft) {
+          shape.triggered = true;
+          playShape(shape);
+        }
+      });
+      
+      draw();
+      
+      if (playheadX >= canvas.width) {
+        if (isLooping) {
+          playheadX = 0;
+          playStartTime = performance.now();
+          shapes.forEach(s => s.triggered = false);
+          requestAnimationFrame(updatePlayhead);
+        } else {
+          stopPlayback();
+        }
+      } else {
+        requestAnimationFrame(updatePlayhead);
+      }
+    }
+    
+    // ===== EVENT HANDLERS =====
+    function getPointerPos(e) {
+      const rect = canvas.getBoundingClientRect();
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      return {
+        x: (clientX - rect.left) * (canvas.width / rect.width),
+        y: (clientY - rect.top) * (canvas.height / rect.height)
+      };
+    }
+    
+    function handlePointerDown(e) {
+      e.preventDefault();
+      
+      // Check for shape selection
+      const pos = getPointerPos(e);
+      let clickedShape = null;
+      
+      for (let i = shapes.length - 1; i >= 0; i--) {
+        const s = shapes[i];
+        if (pos.x >= s.centerX - s.width/2 - 10 && 
+            pos.x <= s.centerX + s.width/2 + 10 &&
+            pos.y >= s.centerY - s.height/2 - 10 && 
+            pos.y <= s.centerY + s.height/2 + 10) {
+          clickedShape = s;
+          break;
+        }
+      }
+      
+      if (clickedShape) {
+        selectedShape = clickedShape;
+        drawWaveformPreview(selectedShape);
+        draw();
+        
+        // Play it immediately as preview
+        initAudio();
+        playShape(clickedShape);
+        return;
+      }
+      
+      // Start drawing
+      selectedShape = null;
+      drawWaveformPreview(null);
+      isDrawing = true;
+      currentStroke = [pos];
+      draw();
+    }
+    
+    function handlePointerMove(e) {
+      if (!isDrawing) return;
+      e.preventDefault();
+      currentStroke.push(getPointerPos(e));
+      draw();
+    }
+    
+    function handlePointerUp(e) {
+      if (!isDrawing) return;
+      isDrawing = false;
+      
+      if (currentStroke.length > 5) {
+        const shape = createShape(currentStroke);
+        if (shape) {
+          shapes.push(shape);
+          selectedShape = shape;
+          drawWaveformPreview(shape);
+          updateShapeCount();
+          
+          // Play preview
+          initAudio();
+          playShape(shape);
+        }
+      }
+      
+      currentStroke = [];
+      draw();
+    }
+    
+    // Mouse events
+    canvas.addEventListener('mousedown', handlePointerDown);
+    canvas.addEventListener('mousemove', handlePointerMove);
+    canvas.addEventListener('mouseup', handlePointerUp);
+    canvas.addEventListener('mouseleave', handlePointerUp);
+    
+    // Touch events
+    canvas.addEventListener('touchstart', handlePointerDown, { passive: false });
+    canvas.addEventListener('touchmove', handlePointerMove, { passive: false });
+    canvas.addEventListener('touchend', handlePointerUp);
+    
+    // Keyboard for delete
+    document.addEventListener('keydown', (e) => {
+      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedShape) {
+        shapes = shapes.filter(s => s !== selectedShape);
+        selectedShape = null;
+        drawWaveformPreview(null);
+        updateShapeCount();
+        draw();
+      }
+    });
+    
+    // Buttons
+    playBtn.addEventListener('click', () => {
+      if (isPlaying) {
+        stopPlayback();
+      } else if (shapes.length > 0) {
+        startPlayback();
+      }
+    });
+    
+    loopBtn.addEventListener('click', () => {
+      isLooping = !isLooping;
+      loopBtn.classList.toggle('active', isLooping);
+    });
+    
+    clearBtn.addEventListener('click', () => {
+      shapes = [];
+      selectedShape = null;
+      stopPlayback();
+      drawWaveformPreview(null);
+      updateShapeCount();
+      draw();
+    });
+    
+    // Initial draw
+    draw();
+  </script>
+</body>
+</html>

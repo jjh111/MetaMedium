@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Compositional Interpretation</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    
+    body {
+      font-family: 'Space Grotesk', system-ui, -apple-system, sans-serif;
+      background: #08080e;
+      color: #e5e5e5;
+      min-height: 100vh;
+      min-height: 100dvh;
+      overflow-x: hidden;
+    }
+    
+    .container {
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+      min-height: 100dvh;
+    }
+    
+    /* Drawing area */
+    .draw-area {
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      background: #0a0a12;
+      border-bottom: 1px solid #1a1a2a;
+      position: relative;
+    }
+    
+    .draw-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    
+    .draw-label {
+      font-size: 0.625rem;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: #555;
+    }
+    
+    .reset-btn {
+      padding: 4px 10px;
+      background: #1a1a2a;
+      border: 1px solid #2a2a3a;
+      border-radius: 4px;
+      color: #666;
+      font-family: inherit;
+      font-size: 0.625rem;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    
+    .reset-btn:hover {
+      background: #2a2a3a;
+      color: #fff;
+      border-color: #3a3a4a;
+    }
+    
+    .drawing {
+      width: 180px;
+      height: 180px;
+      position: relative;
+    }
+    
+    .drawing svg {
+      width: 100%;
+      height: 100%;
+    }
+    
+    .stroke-el {
+      transition: opacity 0.25s, filter 0.25s;
+    }
+    
+    .stroke-el.dim {
+      opacity: 0.15;
+      filter: saturate(0.3);
+    }
+    
+    .ghost-parabola {
+      cursor: pointer;
+      transition: opacity 0.2s, stroke-dasharray 0.3s;
+    }
+    
+    .ghost-parabola:hover {
+      opacity: 0.8 !important;
+    }
+    
+    .ghost-parabola.added {
+      opacity: 1 !important;
+      stroke-dasharray: none;
+    }
+    
+    .ghost-parabola.dim {
+      opacity: 0.1 !important;
+    }
+    
+    .click-hint {
+      position: absolute;
+      bottom: 8px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 0.625rem;
+      color: #f97316;
+      opacity: 0.8;
+      pointer-events: none;
+      transition: opacity 0.3s;
+    }
+    
+    .click-hint.hidden {
+      opacity: 0;
+    }
+    
+    .interp-label {
+      margin-top: 16px;
+      padding: 10px 16px;
+      background: #12121a;
+      border-radius: 8px;
+      font-size: 0.9375rem;
+      font-weight: 500;
+      text-align: center;
+      border: 1px solid #2a2a3a;
+      min-width: 200px;
+      transition: all 0.2s;
+    }
+    
+    /* Graph area */
+    .graph-area {
+      flex: 1;
+      padding: 16px;
+      min-height: 300px;
+      position: relative;
+    }
+    
+    .graph-canvas {
+      width: 100%;
+      height: 100%;
+      position: relative;
+    }
+    
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      touch-action: none;
+    }
+    
+    /* Insight area */
+    .insight-area {
+      padding: 16px 20px;
+      background: #0a0a12;
+      border-top: 1px solid #1a1a2a;
+    }
+    
+    .insight-title {
+      font-size: 0.625rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: #555;
+      margin-bottom: 8px;
+    }
+    
+    .insight-text {
+      font-size: 0.8125rem;
+      line-height: 1.6;
+      color: #888;
+    }
+    
+    .insight-text strong {
+      color: #fff;
+    }
+    
+    .insight-text em {
+      color: #8b5cf6;
+      font-style: normal;
+    }
+    
+    .legend {
+      display: flex;
+      justify-content: center;
+      gap: 16px;
+      margin-top: 12px;
+      flex-wrap: wrap;
+    }
+    
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.625rem;
+      color: #666;
+    }
+    
+    .legend-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Drawing Area -->
+    <div class="draw-area">
+      <div class="draw-header">
+        <div class="draw-label">Drawing</div>
+        <button class="reset-btn" id="resetBtn">↺ Reset</button>
+      </div>
+      <div class="drawing">
+        <svg viewBox="0 0 180 180">
+          <!-- Circle -->
+          <ellipse id="s-circle" class="stroke-el" data-stroke="circle-stroke"
+            cx="90" cy="100" rx="50" ry="50" 
+            stroke="#8b5cf6" stroke-width="4" fill="none"/>
+          
+          <!-- Left dot (eye) -->
+          <circle id="s-dot1" class="stroke-el" data-stroke="dot1-stroke"
+            cx="70" cy="90" r="8" fill="#3b82f6"/>
+          
+          <!-- Right dot (eye) -->
+          <circle id="s-dot2" class="stroke-el" data-stroke="dot2-stroke"
+            cx="110" cy="90" r="8" fill="#3b82f6"/>
+          
+          <!-- Line up (hair/antenna) -->
+          <path id="s-line" class="stroke-el" data-stroke="line-stroke"
+            d="M90 50 L90 15" 
+            stroke="#10b981" stroke-width="4" stroke-linecap="round"/>
+          
+          <!-- Ghost parabola (smile) - clickable -->
+          <path id="s-parabola" class="ghost-parabola" data-stroke="curve-stroke"
+            d="M65 115 Q90 140 115 115" 
+            stroke="#f97316" stroke-width="4" fill="none" stroke-linecap="round"
+            stroke-dasharray="6 6" opacity="0.4"/>
+        </svg>
+        <div class="click-hint" id="clickHint">click smile to add</div>
+      </div>
+      <div class="interp-label" id="interpLabel" style="color:#10b981">face? balloon? antenna?</div>
+    </div>
+    
+    <!-- Graph Area -->
+    <div class="graph-area">
+      <div class="graph-canvas">
+        <canvas id="canvas"></canvas>
+      </div>
+    </div>
+    
+    <!-- Insight Area -->
+    <div class="insight-area">
+      <div class="insight-title">The Insight</div>
+      <div class="insight-text" id="insightText">
+        <strong>Concepts are conserved.</strong> "Point" exists once — edges show it applies to both dots.
+        "Inside" exists once — connected to everything inside the circle.
+        <em>Meanings emerge from connection patterns.</em>
+      </div>
+      <div class="legend">
+        <div class="legend-item"><div class="legend-dot" style="background:#64748b"></div> stroke</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#8b5cf6"></div> shape</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#f97316"></div> relation</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#10b981"></div> meaning</div>
+      </div>
+    </div>
+  </div>
+  
+  <script>
+    // ===== STATE =====
+    let parabolaAdded = false;
+    let hoveredNode = null;
+    let dpr = 1;
+    
+    // ===== GRAPH DATA =====
+    const baseNodes = {
+      // STROKES (level 0)
+      'circle-stroke': { level: 0, label: 'circle', color: '#64748b', strokes: ['circle-stroke'] },
+      'dot1-stroke': { level: 0, label: 'dot', color: '#64748b', strokes: ['dot1-stroke'] },
+      'dot2-stroke': { level: 0, label: 'dot', color: '#64748b', strokes: ['dot2-stroke'] },
+      'line-stroke': { level: 0, label: 'line', color: '#64748b', strokes: ['line-stroke'] },
+      
+      // SHAPES (level 1)
+      'circle': { level: 1, label: 'circle', color: '#8b5cf6', edges: ['circle-stroke'] },
+      'point': { level: 1, label: 'point', color: '#8b5cf6', edges: ['dot1-stroke', 'dot2-stroke'] },
+      'line': { level: 1, label: 'line', color: '#8b5cf6', edges: ['line-stroke'] },
+      
+      // RELATIONS (level 2)
+      'inside': { level: 2, label: 'inside', color: '#f97316', edges: ['point', 'circle'] },
+      'above': { level: 2, label: 'above', color: '#f97316', edges: ['line', 'circle'] },
+      'attached': { level: 2, label: 'attached', color: '#f97316', edges: ['line', 'circle'] },
+      'symmetric': { level: 2, label: 'symmetric', color: '#f97316', edges: ['point'] },
+      
+      // MEANINGS (level 3)
+      'face': { level: 3, label: 'face', color: '#10b981', edges: ['inside', 'symmetric'], confidence: 0.8 },
+      'balloon': { level: 3, label: 'balloon', color: '#10b981', edges: ['above', 'attached'], confidence: 0.4 },
+      'antenna': { level: 3, label: 'antenna', color: '#10b981', edges: ['above', 'symmetric'], confidence: 0.5 },
+    };
+    
+    const parabolaNodes = {
+      'curve-stroke': { level: 0, label: 'curve', color: '#64748b', strokes: ['curve-stroke'] },
+      'parabola': { level: 1, label: 'parabola', color: '#8b5cf6', edges: ['curve-stroke'] },
+      'below': { level: 2, label: 'below', color: '#f97316', edges: ['parabola', 'point'] },
+      'happy': { level: 3, label: 'happy face', color: '#10b981', edges: ['face', 'inside', 'below'], confidence: 0.95 },
+    };
+    
+    const parabolaEdgeUpdates = {
+      'inside': ['parabola'],
+    };
+    
+    function getNodes() {
+      const nodes = JSON.parse(JSON.stringify(baseNodes)); // deep copy
+      if (parabolaAdded) {
+        Object.assign(nodes, JSON.parse(JSON.stringify(parabolaNodes)));
+        for (const [nodeId, newEdges] of Object.entries(parabolaEdgeUpdates)) {
+          if (nodes[nodeId]) {
+            nodes[nodeId].edges = [...nodes[nodeId].edges, ...newEdges];
+          }
+        }
+      }
+      return nodes;
+    }
+    
+    // ===== FIND RELATED STROKES =====
+    function findRelatedStrokes(nodeId, nodes) {
+      const strokes = new Set();
+      const visited = new Set();
+      
+      function traverse(id) {
+        if (visited.has(id)) return;
+        visited.add(id);
+        
+        const node = nodes[id];
+        if (!node) return;
+        
+        // If this node has strokes directly, add them
+        if (node.strokes) {
+          node.strokes.forEach(s => strokes.add(s));
+        }
+        
+        // Traverse edges downward (to lower levels)
+        if (node.edges) {
+          node.edges.forEach(edgeId => {
+            const target = nodes[edgeId];
+            if (target && target.level < node.level) {
+              traverse(edgeId);
+            }
+          });
+        }
+      }
+      
+      traverse(nodeId);
+      return strokes;
+    }
+    
+    // ===== HIGHLIGHT STROKES =====
+    function highlightStrokes(strokeIds) {
+      const allStrokes = document.querySelectorAll('.stroke-el, .ghost-parabola');
+      
+      if (!strokeIds) {
+        // Reset all
+        allStrokes.forEach(el => el.classList.remove('dim'));
+        return;
+      }
+      
+      allStrokes.forEach(el => {
+        const strokeId = el.dataset.stroke;
+        if (strokeIds.has(strokeId)) {
+          el.classList.remove('dim');
+        } else {
+          el.classList.add('dim');
+        }
+      });
+    }
+    
+    // ===== LAYOUT =====
+    function layoutNodes(nodes) {
+      const levels = [[], [], [], []];
+      Object.entries(nodes).forEach(([id, node]) => {
+        levels[node.level].push(id);
+        node.id = id;
+      });
+      
+      levels.forEach((ids, level) => {
+        ids.forEach((id, i) => {
+          nodes[id].gx = (i + 1) / (ids.length + 1);
+          nodes[id].gy = 0.92 - level * 0.28;
+        });
+      });
+      
+      return nodes;
+    }
+    
+    // ===== EDGE COUNTS =====
+    function getEdgeCounts(nodes) {
+      const inCount = {};
+      const outCount = {};
+      
+      Object.entries(nodes).forEach(([id, node]) => {
+        outCount[id] = node.edges?.length || 0;
+        inCount[id] = inCount[id] || 0;
+        
+        (node.edges || []).forEach(targetId => {
+          inCount[targetId] = (inCount[targetId] || 0) + 1;
+        });
+      });
+      
+      return { inCount, outCount };
+    }
+    
+    // ===== CANVAS =====
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    
+    function resize() {
+      dpr = window.devicePixelRatio || 1;
+      const rect = canvas.parentElement.getBoundingClientRect();
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
+      canvas.style.width = rect.width + 'px';
+      canvas.style.height = rect.height + 'px';
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.scale(dpr, dpr);
+      render();
+    }
+    
+    const levelNames = ['STROKES', 'SHAPES', 'RELATIONS', 'MEANINGS'];
+    const levelColors = ['#64748b', '#8b5cf6', '#f97316', '#10b981'];
+    
+    function render() {
+      const w = canvas.width / dpr;
+      const h = canvas.height / dpr;
+      ctx.clearRect(0, 0, w, h);
+      
+      const nodes = layoutNodes(getNodes());
+      const { inCount, outCount } = getEdgeCounts(nodes);
+      
+      const mx = 24, my = 16;
+      const gw = w - mx * 2;
+      const gh = h - my * 2;
+      
+      // Level labels
+      ctx.textAlign = 'right';
+      ctx.font = '600 9px Space Grotesk, system-ui';
+      for (let i = 0; i < 4; i++) {
+        const y = my + gh * (0.92 - i * 0.28);
+        ctx.fillStyle = levelColors[i] + '55';
+        ctx.fillText(levelNames[i], w - 8, y + 3);
+      }
+      ctx.textAlign = 'center';
+      
+      // Find strokes for hovered node
+      const hoveredStrokes = hoveredNode ? findRelatedStrokes(hoveredNode, nodes) : null;
+      
+      // Edges
+      Object.entries(nodes).forEach(([id, node]) => {
+        if (!node.edges) return;
+        const x1 = mx + node.gx * gw;
+        const y1 = my + node.gy * gh;
+        
+        node.edges.forEach(targetId => {
+          const t = nodes[targetId];
+          if (!t) return;
+          const x2 = mx + t.gx * gw;
+          const y2 = my + t.gy * gh;
+          
+          const isHovered = hoveredNode === id || hoveredNode === targetId;
+          const isNew = parabolaAdded && (
+            parabolaNodes[id] || parabolaNodes[targetId] ||
+            (parabolaEdgeUpdates[id]?.includes(targetId))
+          );
+          
+          ctx.strokeStyle = isHovered ? '#ffffff66' : (isNew ? '#f9731666' : '#ffffff1a');
+          ctx.lineWidth = isHovered ? 2.5 : (isNew ? 2 : 1.5);
+          ctx.beginPath();
+          ctx.moveTo(x1, y1);
+          ctx.lineTo(x2, y2);
+          ctx.stroke();
+        });
+      });
+      
+      // Nodes
+      Object.entries(nodes).forEach(([id, node]) => {
+        const x = mx + node.gx * gw;
+        const y = my + node.gy * gh;
+        const r = node.level === 3 ? 22 : (node.level === 2 ? 18 : (node.level === 1 ? 16 : 13));
+        
+        const isHov = hoveredNode === id;
+        const isNew = parabolaAdded && parabolaNodes[id];
+        
+        if (isHov || isNew) {
+          ctx.shadowColor = node.color;
+          ctx.shadowBlur = isHov ? 20 : 12;
+        }
+        
+        ctx.fillStyle = isHov ? node.color : node.color + (isNew ? 'dd' : '99');
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        
+        // Label
+        ctx.fillStyle = '#fff';
+        ctx.font = `${node.level === 3 ? '600 ' : ''}${node.level >= 2 ? 10 : 9}px Space Grotesk, system-ui`;
+        ctx.textBaseline = 'middle';
+        
+        let label = node.label;
+        if (label.length > 9) label = label.slice(0, 7) + '…';
+        ctx.fillText(label, x, y);
+        
+        // Edge counts
+        const inC = inCount[id] || 0;
+        const outC = outCount[id] || 0;
+        
+        ctx.font = '8px Space Grotesk, system-ui';
+        ctx.fillStyle = '#ffffff55';
+        
+        if (inC > 0) {
+          ctx.fillText(`${inC}↓`, x, y - r - 8);
+        }
+        
+        if (outC > 0) {
+          ctx.fillText(`${outC}↑`, x, y + r + 10);
+        }
+      });
+      
+      // Update stroke highlighting
+      highlightStrokes(hoveredStrokes);
+    }
+    
+    function getNodeAt(px, py) {
+      const nodes = layoutNodes(getNodes());
+      const w = canvas.width / dpr;
+      const h = canvas.height / dpr;
+      const mx = 24, my = 16;
+      const gw = w - mx * 2;
+      const gh = h - my * 2;
+      
+      for (const [id, node] of Object.entries(nodes)) {
+        const x = mx + node.gx * gw;
+        const y = my + node.gy * gh;
+        const r = node.level === 3 ? 22 : (node.level === 2 ? 18 : 16);
+        if (Math.hypot(px - x, py - y) < r + 6) return id;
+      }
+      return null;
+    }
+    
+    // ===== INTERACTION =====
+    const parabola = document.getElementById('s-parabola');
+    const clickHint = document.getElementById('clickHint');
+    const interpLabel = document.getElementById('interpLabel');
+    const insightText = document.getElementById('insightText');
+    const resetBtn = document.getElementById('resetBtn');
+    
+    function updateInterpLabel(nodeId) {
+      const nodes = getNodes();
+      if (nodeId && nodes[nodeId]?.level === 3) {
+        const node = nodes[nodeId];
+        const conf = node.confidence ? ` (${Math.round(node.confidence * 100)}%)` : '';
+        interpLabel.textContent = node.label + conf;
+        interpLabel.style.color = node.color;
+      } else if (parabolaAdded) {
+        interpLabel.textContent = 'happy face!';
+        interpLabel.style.color = '#10b981';
+      } else {
+        interpLabel.textContent = 'face? balloon? antenna?';
+        interpLabel.style.color = '#10b981';
+      }
+    }
+    
+    parabola.addEventListener('click', () => {
+      if (parabolaAdded) return;
+      
+      parabolaAdded = true;
+      parabola.classList.add('added');
+      clickHint.classList.add('hidden');
+      
+      updateInterpLabel(null);
+      
+      insightText.innerHTML = `
+        <strong>Adding the smile</strong> cascaded through the graph:
+        new stroke → new shape → new relations → <em>new meaning emerges</em>.
+        "Happy face" connects to "face" — meanings form a network too.
+      `;
+      
+      render();
+    });
+    
+    resetBtn.addEventListener('click', () => {
+      parabolaAdded = false;
+      parabola.classList.remove('added');
+      clickHint.classList.remove('hidden');
+      hoveredNode = null;
+      
+      updateInterpLabel(null);
+      highlightStrokes(null);
+      
+      insightText.innerHTML = `
+        <strong>Concepts are conserved.</strong> "Point" exists once — edges show it applies to both dots.
+        "Inside" exists once — connected to everything inside the circle.
+        <em>Meanings emerge from connection patterns.</em>
+      `;
+      
+      render();
+    });
+    
+    function handlePointer(e) {
+      const rect = canvas.getBoundingClientRect();
+      const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+      const y = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
+      const id = getNodeAt(x, y);
+      
+      if (id !== hoveredNode) {
+        hoveredNode = id;
+        canvas.style.cursor = id ? 'pointer' : 'default';
+        updateInterpLabel(id);
+        render();
+      }
+    }
+    
+    canvas.addEventListener('mousemove', handlePointer);
+    canvas.addEventListener('touchstart', e => { e.preventDefault(); handlePointer(e); }, { passive: false });
+    canvas.addEventListener('touchmove', e => { e.preventDefault(); handlePointer(e); }, { passive: false });
+    
+    canvas.addEventListener('mouseleave', () => {
+      hoveredNode = null;
+      updateInterpLabel(null);
+      highlightStrokes(null);
+      render();
+    });
+    
+    // ===== INIT =====
+    window.addEventListener('resize', resize);
+    resize();
+  </script>
+</body>
+</html>

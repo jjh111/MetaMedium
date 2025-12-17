@@ -1,0 +1,1087 @@
+<!--
+  SHAPE ↔ EQUATION — MVP
+  Draw shapes, see equations. Edit equations, shapes update.
+  
+  Supported: Line, Circle, Parabola
+  Bidirectional: drag shape OR edit coefficients
+-->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Shape ↔ Equation</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    
+    body {
+      font-family: 'Space Grotesk', system-ui, sans-serif;
+      background: #f8f6f1;
+      color: #1a1a2e;
+      min-height: 100vh;
+      padding: 1.5rem;
+    }
+    
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+    
+    h1 {
+      font-size: 1.25rem;
+      font-weight: 600;
+      margin-bottom: 0.25rem;
+    }
+    
+    .subtitle {
+      font-size: 0.875rem;
+      color: #666;
+      margin-bottom: 1.5rem;
+    }
+    
+    .main {
+      display: grid;
+      grid-template-columns: 1fr 280px;
+      gap: 1.5rem;
+    }
+    
+    @media (max-width: 700px) {
+      .main {
+        grid-template-columns: 1fr;
+      }
+    }
+    
+    /* Canvas */
+    .canvas-wrap {
+      position: relative;
+      background: white;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    
+    canvas {
+      display: block;
+      cursor: crosshair;
+    }
+    
+    .canvas-wrap.dragging {
+      cursor: grab;
+    }
+    
+    .axis-labels {
+      position: absolute;
+      font-size: 0.625rem;
+      color: #999;
+      pointer-events: none;
+    }
+    
+    .axis-labels.x {
+      bottom: 4px;
+      right: 8px;
+    }
+    
+    .axis-labels.y {
+      top: 8px;
+      left: 4px;
+    }
+    
+    .toolbar {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      display: flex;
+      gap: 0.375rem;
+    }
+    
+    .toolbar button {
+      padding: 0.375rem 0.625rem;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      background: white;
+      font-size: 0.75rem;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    
+    .toolbar button:hover {
+      background: #f0f0f0;
+      border-color: #bbb;
+    }
+    
+    .toolbar button.active {
+      background: #8b5cf6;
+      border-color: #8b5cf6;
+      color: white;
+    }
+    
+    /* Panel */
+    .panel {
+      background: white;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      padding: 1.25rem;
+    }
+    
+    .panel h2 {
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #888;
+      margin-bottom: 1rem;
+    }
+    
+    .no-shape {
+      color: #999;
+      font-size: 0.875rem;
+      font-style: italic;
+    }
+    
+    .shape-type {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+    
+    .shape-badge {
+      padding: 0.25rem 0.625rem;
+      border-radius: 12px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+    
+    .shape-badge.line { background: #dbeafe; color: #1d4ed8; }
+    .shape-badge.circle { background: #ede9fe; color: #6d28d9; }
+    .shape-badge.parabola { background: #ffedd5; color: #c2410c; }
+    
+    .confidence {
+      font-size: 0.6875rem;
+      color: #999;
+    }
+    
+    .equation-display {
+      font-family: 'Times New Roman', Georgia, serif;
+      font-size: 1.375rem;
+      text-align: center;
+      padding: 1rem;
+      background: #fafaf8;
+      border-radius: 6px;
+      margin-bottom: 1rem;
+      min-height: 3.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .equation-display .var {
+      font-style: italic;
+    }
+    
+    .equation-display .num {
+      font-style: normal;
+    }
+    
+    .equation-display sup {
+      font-size: 0.75em;
+      vertical-align: super;
+    }
+    
+    .controls {
+      display: flex;
+      flex-direction: column;
+      gap: 0.875rem;
+    }
+    
+    .control-row {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    
+    .control-label {
+      font-size: 0.875rem;
+      font-weight: 500;
+      min-width: 20px;
+      font-family: 'Times New Roman', Georgia, serif;
+      font-style: italic;
+    }
+    
+    .control-input {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    
+    .control-input input[type="range"] {
+      flex: 1;
+      height: 4px;
+      -webkit-appearance: none;
+      background: #e5e5e5;
+      border-radius: 2px;
+      outline: none;
+    }
+    
+    .control-input input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 14px;
+      height: 14px;
+      background: #8b5cf6;
+      border-radius: 50%;
+      cursor: pointer;
+    }
+    
+    .control-input input[type="number"] {
+      width: 60px;
+      padding: 0.25rem 0.375rem;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-family: 'SF Mono', monospace;
+      font-size: 0.8125rem;
+      text-align: right;
+    }
+    
+    .control-input input[type="number"]:focus {
+      outline: none;
+      border-color: #8b5cf6;
+    }
+    
+    .shape-override {
+      margin-top: 1rem;
+      padding-top: 1rem;
+      border-top: 1px solid #eee;
+    }
+    
+    .shape-override-label {
+      font-size: 0.6875rem;
+      color: #999;
+      margin-bottom: 0.5rem;
+    }
+    
+    .shape-override-btns {
+      display: flex;
+      gap: 0.375rem;
+    }
+    
+    .shape-override-btns button {
+      flex: 1;
+      padding: 0.375rem;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      background: white;
+      font-size: 0.6875rem;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    
+    .shape-override-btns button:hover {
+      background: #f5f5f5;
+    }
+    
+    .shape-override-btns button.active {
+      background: #8b5cf6;
+      border-color: #8b5cf6;
+      color: white;
+    }
+    
+    .instructions {
+      margin-top: 1.5rem;
+      padding: 1rem;
+      background: white;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      font-size: 0.8125rem;
+      color: #666;
+      line-height: 1.6;
+    }
+    
+    .instructions strong {
+      color: #1a1a2e;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Shape ↔ Equation</h1>
+    <p class="subtitle">Draw a shape. See its equation. Edit either one.</p>
+    
+    <div class="main">
+      <div class="canvas-wrap" id="canvasWrap">
+        <canvas id="canvas" width="560" height="400"></canvas>
+        <div class="axis-labels x">x</div>
+        <div class="axis-labels y">y</div>
+        <div class="toolbar">
+          <button id="gridBtn" class="active">Grid</button>
+          <button id="clearBtn">Clear</button>
+        </div>
+      </div>
+      
+      <div class="panel">
+        <h2>Equation</h2>
+        
+        <div id="noShape" class="no-shape">
+          Draw a line, circle, or parabola...
+        </div>
+        
+        <div id="shapePanel" style="display: none;">
+          <div class="shape-type">
+            <span class="shape-badge" id="shapeBadge">Line</span>
+            <span class="confidence" id="confidenceText">94% confident</span>
+          </div>
+          
+          <div class="equation-display" id="equationDisplay">
+            <!-- Filled by JS -->
+          </div>
+          
+          <div class="controls" id="controls">
+            <!-- Filled by JS -->
+          </div>
+          
+          <div class="shape-override">
+            <div class="shape-override-label">Wrong shape? Override:</div>
+            <div class="shape-override-btns">
+              <button data-type="line">Line</button>
+              <button data-type="circle">Circle</button>
+              <button data-type="parabola">Parabola</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="instructions">
+      <strong>Draw</strong> a shape on the canvas. 
+      <strong>Drag</strong> the fitted shape to move it. 
+      <strong>Edit</strong> the sliders to change the equation. 
+      The loop is bidirectional — changes anywhere update everywhere.
+    </div>
+  </div>
+  
+  <script>
+    // ===== SETUP =====
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const canvasWrap = document.getElementById('canvasWrap');
+    const noShapeEl = document.getElementById('noShape');
+    const shapePanelEl = document.getElementById('shapePanel');
+    const shapeBadgeEl = document.getElementById('shapeBadge');
+    const confidenceEl = document.getElementById('confidenceText');
+    const equationEl = document.getElementById('equationDisplay');
+    const controlsEl = document.getElementById('controls');
+    const gridBtn = document.getElementById('gridBtn');
+    const clearBtn = document.getElementById('clearBtn');
+    const overrideBtns = document.querySelectorAll('.shape-override-btns button');
+    
+    // Canvas coordinate system: origin at center
+    const origin = { x: canvas.width / 2, y: canvas.height / 2 };
+    const scale = 20; // pixels per unit
+    
+    let showGrid = true;
+    let currentStroke = [];
+    let isDrawing = false;
+    let isDragging = false;
+    let dragStart = null;
+    let shape = null; // Current recognized shape
+    
+    // Shape colors
+    const colors = {
+      line: '#3b82f6',
+      circle: '#8b5cf6',
+      parabola: '#f97316'
+    };
+    
+    // ===== COORDINATE TRANSFORMS =====
+    function canvasToMath(cx, cy) {
+      return {
+        x: (cx - origin.x) / scale,
+        y: (origin.y - cy) / scale // flip Y
+      };
+    }
+    
+    function mathToCanvas(mx, my) {
+      return {
+        x: origin.x + mx * scale,
+        y: origin.y - my * scale // flip Y
+      };
+    }
+    
+    // ===== DRAWING =====
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      
+      // Grid
+      if (showGrid) {
+        ctx.strokeStyle = '#eee';
+        ctx.lineWidth = 1;
+        
+        // Vertical lines
+        for (let x = origin.x % scale; x < canvas.width; x += scale) {
+          ctx.beginPath();
+          ctx.moveTo(x, 0);
+          ctx.lineTo(x, canvas.height);
+          ctx.stroke();
+        }
+        
+        // Horizontal lines
+        for (let y = origin.y % scale; y < canvas.height; y += scale) {
+          ctx.beginPath();
+          ctx.moveTo(0, y);
+          ctx.lineTo(canvas.width, y);
+          ctx.stroke();
+        }
+        
+        // Axes
+        ctx.strokeStyle = '#ccc';
+        ctx.lineWidth = 2;
+        
+        // X axis
+        ctx.beginPath();
+        ctx.moveTo(0, origin.y);
+        ctx.lineTo(canvas.width, origin.y);
+        ctx.stroke();
+        
+        // Y axis
+        ctx.beginPath();
+        ctx.moveTo(origin.x, 0);
+        ctx.lineTo(origin.x, canvas.height);
+        ctx.stroke();
+      }
+      
+      // Original stroke (faded)
+      if (shape && shape.originalStroke.length > 1) {
+        ctx.strokeStyle = '#ccc';
+        ctx.lineWidth = 2;
+        ctx.lineCap = 'round';
+        ctx.setLineDash([4, 4]);
+        ctx.beginPath();
+        shape.originalStroke.forEach((p, i) => {
+          if (i === 0) ctx.moveTo(p.x, p.y);
+          else ctx.lineTo(p.x, p.y);
+        });
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+      
+      // Fitted shape
+      if (shape) {
+        const color = colors[shape.type];
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 3;
+        ctx.lineCap = 'round';
+        
+        if (shape.type === 'line') {
+          drawLine(shape.params);
+        } else if (shape.type === 'circle') {
+          drawCircle(shape.params);
+        } else if (shape.type === 'parabola') {
+          drawParabola(shape.params);
+        }
+        
+        // Draw draggable handle at center
+        const handle = getShapeCenter(shape);
+        const cp = mathToCanvas(handle.x, handle.y);
+        
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(cp.x, cp.y, 6, 0, Math.PI * 2);
+        ctx.fill();
+        
+        ctx.fillStyle = 'white';
+        ctx.beginPath();
+        ctx.arc(cp.x, cp.y, 3, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      
+      // Current stroke
+      if (currentStroke.length > 1) {
+        ctx.strokeStyle = '#1a1a2e';
+        ctx.lineWidth = 2;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.beginPath();
+        currentStroke.forEach((p, i) => {
+          if (i === 0) ctx.moveTo(p.x, p.y);
+          else ctx.lineTo(p.x, p.y);
+        });
+        ctx.stroke();
+      }
+    }
+    
+    function drawLine(params) {
+      const { m, b } = params;
+      
+      // Find line endpoints at canvas edges
+      const xMin = -origin.x / scale;
+      const xMax = (canvas.width - origin.x) / scale;
+      
+      const p1 = mathToCanvas(xMin, m * xMin + b);
+      const p2 = mathToCanvas(xMax, m * xMax + b);
+      
+      ctx.beginPath();
+      ctx.moveTo(p1.x, p1.y);
+      ctx.lineTo(p2.x, p2.y);
+      ctx.stroke();
+    }
+    
+    function drawCircle(params) {
+      const { h, k, r } = params;
+      const center = mathToCanvas(h, k);
+      
+      ctx.beginPath();
+      ctx.arc(center.x, center.y, r * scale, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    
+    function drawParabola(params) {
+      const { a, h, k } = params;
+      
+      ctx.beginPath();
+      let first = true;
+      
+      for (let cx = 0; cx < canvas.width; cx += 2) {
+        const m = canvasToMath(cx, 0);
+        const x = m.x;
+        const y = a * Math.pow(x - h, 2) + k;
+        const cp = mathToCanvas(x, y);
+        
+        if (cp.y >= 0 && cp.y <= canvas.height) {
+          if (first) {
+            ctx.moveTo(cp.x, cp.y);
+            first = false;
+          } else {
+            ctx.lineTo(cp.x, cp.y);
+          }
+        }
+      }
+      ctx.stroke();
+    }
+    
+    function getShapeCenter(shape) {
+      if (shape.type === 'line') {
+        // Return a point on the line near origin
+        return { x: 0, y: shape.params.b };
+      } else if (shape.type === 'circle') {
+        return { x: shape.params.h, y: shape.params.k };
+      } else if (shape.type === 'parabola') {
+        return { x: shape.params.h, y: shape.params.k };
+      }
+      return { x: 0, y: 0 };
+    }
+    
+    // ===== RECOGNITION =====
+    function recognizeShape(stroke) {
+      if (stroke.length < 5) return null;
+      
+      // Convert to math coordinates
+      const points = stroke.map(p => canvasToMath(p.x, p.y));
+      
+      // Bounding box
+      let minX = Infinity, maxX = -Infinity;
+      let minY = Infinity, maxY = -Infinity;
+      points.forEach(p => {
+        minX = Math.min(minX, p.x);
+        maxX = Math.max(maxX, p.x);
+        minY = Math.min(minY, p.y);
+        maxY = Math.max(maxY, p.y);
+      });
+      
+      const width = maxX - minX;
+      const height = maxY - minY;
+      const aspectRatio = width / (height + 0.001);
+      
+      // Check if closed
+      const start = points[0];
+      const end = points[points.length - 1];
+      const closeDist = Math.hypot(end.x - start.x, end.y - start.y);
+      const isClosed = closeDist < Math.max(width, height) * 0.3;
+      
+      // Fit each shape type and compare errors
+      const lineFit = fitLine(points);
+      const circleFit = fitCircle(points);
+      const parabolaFit = fitParabola(points);
+      
+      // Choose best fit based on error and shape characteristics
+      let bestType = 'line';
+      let bestParams = lineFit.params;
+      let bestError = lineFit.error;
+      let confidence = 0.5;
+      
+      // Circle: prefer if closed and low error
+      if (isClosed && circleFit.error < lineFit.error * 1.5) {
+        bestType = 'circle';
+        bestParams = circleFit.params;
+        bestError = circleFit.error;
+      }
+      
+      // Parabola: prefer if open, curved, and low error
+      if (!isClosed && parabolaFit.error < lineFit.error * 0.7 && height > width * 0.3) {
+        bestType = 'parabola';
+        bestParams = parabolaFit.params;
+        bestError = parabolaFit.error;
+      }
+      
+      // Also check if parabola beats circle for open curves
+      if (!isClosed && bestType === 'circle' && parabolaFit.error < circleFit.error) {
+        bestType = 'parabola';
+        bestParams = parabolaFit.params;
+        bestError = parabolaFit.error;
+      }
+      
+      // Confidence based on error magnitude
+      confidence = Math.max(0.5, Math.min(0.99, 1 - bestError * 0.5));
+      
+      return {
+        type: bestType,
+        params: bestParams,
+        confidence,
+        originalStroke: [...stroke]
+      };
+    }
+    
+    function fitLine(points) {
+      // Least squares: y = mx + b
+      const n = points.length;
+      let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
+      
+      points.forEach(p => {
+        sumX += p.x;
+        sumY += p.y;
+        sumXY += p.x * p.y;
+        sumX2 += p.x * p.x;
+      });
+      
+      const denom = n * sumX2 - sumX * sumX;
+      let m = 0, b = sumY / n;
+      
+      if (Math.abs(denom) > 0.0001) {
+        m = (n * sumXY - sumX * sumY) / denom;
+        b = (sumY - m * sumX) / n;
+      }
+      
+      // Calculate error
+      let error = 0;
+      points.forEach(p => {
+        const predicted = m * p.x + b;
+        error += Math.pow(p.y - predicted, 2);
+      });
+      error = Math.sqrt(error / n);
+      
+      return {
+        params: { m: round(m, 2), b: round(b, 2) },
+        error
+      };
+    }
+    
+    function fitCircle(points) {
+      // Algebraic circle fit
+      // (x-h)² + (y-k)² = r²
+      // Expanded: x² + y² = 2hx + 2ky + (r² - h² - k²)
+      // Linear in unknowns: A = 2h, B = 2k, C = r² - h² - k²
+      
+      const n = points.length;
+      let sumX = 0, sumY = 0, sumX2 = 0, sumY2 = 0;
+      let sumX3 = 0, sumY3 = 0, sumXY = 0, sumX2Y = 0, sumXY2 = 0;
+      
+      points.forEach(p => {
+        const x2 = p.x * p.x;
+        const y2 = p.y * p.y;
+        sumX += p.x;
+        sumY += p.y;
+        sumX2 += x2;
+        sumY2 += y2;
+        sumXY += p.x * p.y;
+        sumX3 += x2 * p.x;
+        sumY3 += y2 * p.y;
+        sumX2Y += x2 * p.y;
+        sumXY2 += p.x * y2;
+      });
+      
+      const A = n * sumX2 - sumX * sumX;
+      const B = n * sumXY - sumX * sumY;
+      const C = n * sumY2 - sumY * sumY;
+      const D = 0.5 * (n * sumX3 + n * sumXY2 - sumX * sumX2 - sumX * sumY2);
+      const E = 0.5 * (n * sumX2Y + n * sumY3 - sumY * sumX2 - sumY * sumY2);
+      
+      const denom = A * C - B * B;
+      let h = 0, k = 0;
+      
+      if (Math.abs(denom) > 0.0001) {
+        h = (D * C - B * E) / denom;
+        k = (A * E - B * D) / denom;
+      }
+      
+      // Calculate radius
+      let r = 0;
+      points.forEach(p => {
+        r += Math.hypot(p.x - h, p.y - k);
+      });
+      r /= n;
+      
+      // Calculate error
+      let error = 0;
+      points.forEach(p => {
+        const dist = Math.hypot(p.x - h, p.y - k);
+        error += Math.pow(dist - r, 2);
+      });
+      error = Math.sqrt(error / n);
+      
+      return {
+        params: { h: round(h, 2), k: round(k, 2), r: round(Math.abs(r), 2) },
+        error
+      };
+    }
+    
+    function fitParabola(points) {
+      // Fit y = a(x-h)² + k
+      // First find approximate vertex (min or max y)
+      let vertexIdx = 0;
+      let vertexY = points[0].y;
+      
+      points.forEach((p, i) => {
+        if (Math.abs(p.y) > Math.abs(vertexY)) {
+          // Check if it's a local extremum
+          vertexY = p.y;
+          vertexIdx = i;
+        }
+      });
+      
+      // Use bounding box center as initial vertex estimate
+      let minX = Infinity, maxX = -Infinity;
+      let minY = Infinity, maxY = -Infinity;
+      points.forEach(p => {
+        minX = Math.min(minX, p.x);
+        maxX = Math.max(maxX, p.x);
+        minY = Math.min(minY, p.y);
+        maxY = Math.max(maxY, p.y);
+      });
+      
+      // Determine if opens up or down
+      const midIdx = Math.floor(points.length / 2);
+      const midY = points[midIdx].y;
+      const avgEndY = (points[0].y + points[points.length - 1].y) / 2;
+      const opensUp = midY < avgEndY;
+      
+      let h = (minX + maxX) / 2;
+      let k = opensUp ? minY : maxY;
+      
+      // Fit 'a' using least squares
+      let sumNum = 0, sumDenom = 0;
+      points.forEach(p => {
+        const dx = p.x - h;
+        const dx2 = dx * dx;
+        sumNum += (p.y - k) * dx2;
+        sumDenom += dx2 * dx2;
+      });
+      
+      let a = sumDenom > 0.0001 ? sumNum / sumDenom : (opensUp ? 0.5 : -0.5);
+      
+      // Refine h, k with gradient descent (simple)
+      for (let iter = 0; iter < 10; iter++) {
+        let gradH = 0, gradK = 0;
+        points.forEach(p => {
+          const pred = a * Math.pow(p.x - h, 2) + k;
+          const err = pred - p.y;
+          gradH += err * (-2 * a * (p.x - h));
+          gradK += err;
+        });
+        h -= gradH * 0.001;
+        k -= gradK * 0.01;
+        
+        // Refit a
+        sumNum = 0; sumDenom = 0;
+        points.forEach(p => {
+          const dx = p.x - h;
+          const dx2 = dx * dx;
+          sumNum += (p.y - k) * dx2;
+          sumDenom += dx2 * dx2;
+        });
+        if (sumDenom > 0.0001) a = sumNum / sumDenom;
+      }
+      
+      // Calculate error
+      let error = 0;
+      points.forEach(p => {
+        const predicted = a * Math.pow(p.x - h, 2) + k;
+        error += Math.pow(p.y - predicted, 2);
+      });
+      error = Math.sqrt(error / points.length);
+      
+      return {
+        params: { a: round(a, 3), h: round(h, 2), k: round(k, 2) },
+        error
+      };
+    }
+    
+    function refitShape(type, stroke) {
+      const points = stroke.map(p => canvasToMath(p.x, p.y));
+      
+      let fit;
+      if (type === 'line') fit = fitLine(points);
+      else if (type === 'circle') fit = fitCircle(points);
+      else if (type === 'parabola') fit = fitParabola(points);
+      
+      return {
+        type,
+        params: fit.params,
+        confidence: Math.max(0.5, 1 - fit.error * 0.5),
+        originalStroke: stroke
+      };
+    }
+    
+    function round(val, decimals) {
+      const factor = Math.pow(10, decimals);
+      return Math.round(val * factor) / factor;
+    }
+    
+    // ===== UI UPDATES =====
+    function updatePanel() {
+      if (!shape) {
+        noShapeEl.style.display = 'block';
+        shapePanelEl.style.display = 'none';
+        return;
+      }
+      
+      noShapeEl.style.display = 'none';
+      shapePanelEl.style.display = 'block';
+      
+      // Badge
+      shapeBadgeEl.textContent = shape.type.charAt(0).toUpperCase() + shape.type.slice(1);
+      shapeBadgeEl.className = 'shape-badge ' + shape.type;
+      
+      // Confidence
+      confidenceEl.textContent = Math.round(shape.confidence * 100) + '% confident';
+      
+      // Equation display
+      updateEquationDisplay();
+      
+      // Controls
+      updateControls();
+      
+      // Override buttons
+      overrideBtns.forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.type === shape.type);
+      });
+    }
+    
+    function updateEquationDisplay() {
+      if (shape.type === 'line') {
+        const { m, b } = shape.params;
+        const mSign = m >= 0 ? '' : '−';
+        const mAbs = Math.abs(m);
+        const bSign = b >= 0 ? '+' : '−';
+        const bAbs = Math.abs(b);
+        equationEl.innerHTML = `<span class="var">y</span> = <span class="num">${mSign}${mAbs}</span><span class="var">x</span> ${bSign} <span class="num">${bAbs}</span>`;
+      } else if (shape.type === 'circle') {
+        const { h, k, r } = shape.params;
+        const hSign = h >= 0 ? '−' : '+';
+        const hAbs = Math.abs(h);
+        const kSign = k >= 0 ? '−' : '+';
+        const kAbs = Math.abs(k);
+        const r2 = round(r * r, 2);
+        equationEl.innerHTML = `(<span class="var">x</span>${hSign}<span class="num">${hAbs}</span>)<sup>2</sup> + (<span class="var">y</span>${kSign}<span class="num">${kAbs}</span>)<sup>2</sup> = <span class="num">${r2}</span>`;
+      } else if (shape.type === 'parabola') {
+        const { a, h, k } = shape.params;
+        const aSign = a >= 0 ? '' : '−';
+        const aAbs = Math.abs(a);
+        const hSign = h >= 0 ? '−' : '+';
+        const hAbs = Math.abs(h);
+        const kSign = k >= 0 ? '+' : '−';
+        const kAbs = Math.abs(k);
+        equationEl.innerHTML = `<span class="var">y</span> = <span class="num">${aSign}${aAbs}</span>(<span class="var">x</span>${hSign}<span class="num">${hAbs}</span>)<sup>2</sup> ${kSign} <span class="num">${kAbs}</span>`;
+      }
+    }
+    
+    function updateControls() {
+      controlsEl.innerHTML = '';
+      
+      if (shape.type === 'line') {
+        addControl('m', 'slope', -5, 5, 0.1);
+        addControl('b', 'y-intercept', -10, 10, 0.1);
+      } else if (shape.type === 'circle') {
+        addControl('h', 'center x', -10, 10, 0.1);
+        addControl('k', 'center y', -10, 10, 0.1);
+        addControl('r', 'radius', 0.5, 10, 0.1);
+      } else if (shape.type === 'parabola') {
+        addControl('a', 'curvature', -2, 2, 0.05);
+        addControl('h', 'vertex x', -10, 10, 0.1);
+        addControl('k', 'vertex y', -10, 10, 0.1);
+      }
+    }
+    
+    function addControl(param, label, min, max, step) {
+      const value = shape.params[param];
+      
+      const row = document.createElement('div');
+      row.className = 'control-row';
+      row.innerHTML = `
+        <span class="control-label">${param}</span>
+        <div class="control-input">
+          <input type="range" min="${min}" max="${max}" step="${step}" value="${value}" data-param="${param}">
+          <input type="number" min="${min}" max="${max}" step="${step}" value="${value}" data-param="${param}">
+        </div>
+      `;
+      
+      const slider = row.querySelector('input[type="range"]');
+      const number = row.querySelector('input[type="number"]');
+      
+      slider.addEventListener('input', () => {
+        const val = parseFloat(slider.value);
+        number.value = val;
+        shape.params[param] = val;
+        updateEquationDisplay();
+        draw();
+      });
+      
+      number.addEventListener('input', () => {
+        let val = parseFloat(number.value);
+        if (isNaN(val)) return;
+        val = Math.max(min, Math.min(max, val));
+        slider.value = val;
+        shape.params[param] = val;
+        updateEquationDisplay();
+        draw();
+      });
+      
+      controlsEl.appendChild(row);
+    }
+    
+    // ===== EVENT HANDLERS =====
+    function getPointerPos(e) {
+      const rect = canvas.getBoundingClientRect();
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      return {
+        x: (clientX - rect.left) * (canvas.width / rect.width),
+        y: (clientY - rect.top) * (canvas.height / rect.height)
+      };
+    }
+    
+    function isNearHandle(pos) {
+      if (!shape) return false;
+      const center = getShapeCenter(shape);
+      const cp = mathToCanvas(center.x, center.y);
+      return Math.hypot(pos.x - cp.x, pos.y - cp.y) < 15;
+    }
+    
+    function handlePointerDown(e) {
+      e.preventDefault();
+      const pos = getPointerPos(e);
+      
+      // Check if clicking on handle
+      if (shape && isNearHandle(pos)) {
+        isDragging = true;
+        dragStart = pos;
+        canvasWrap.classList.add('dragging');
+        return;
+      }
+      
+      // Start new stroke
+      isDrawing = true;
+      currentStroke = [pos];
+      draw();
+    }
+    
+    function handlePointerMove(e) {
+      if (isDragging && shape) {
+        e.preventDefault();
+        const pos = getPointerPos(e);
+        const delta = canvasToMath(pos.x, pos.y);
+        const startMath = canvasToMath(dragStart.x, dragStart.y);
+        
+        const dx = delta.x - startMath.x;
+        const dy = delta.y - startMath.y;
+        
+        // Update shape params based on type
+        if (shape.type === 'line') {
+          shape.params.b = round(shape.params.b + dy, 2);
+        } else if (shape.type === 'circle') {
+          shape.params.h = round(shape.params.h + dx, 2);
+          shape.params.k = round(shape.params.k + dy, 2);
+        } else if (shape.type === 'parabola') {
+          shape.params.h = round(shape.params.h + dx, 2);
+          shape.params.k = round(shape.params.k + dy, 2);
+        }
+        
+        dragStart = pos;
+        updatePanel();
+        draw();
+        return;
+      }
+      
+      if (!isDrawing) return;
+      e.preventDefault();
+      currentStroke.push(getPointerPos(e));
+      draw();
+    }
+    
+    function handlePointerUp(e) {
+      if (isDragging) {
+        isDragging = false;
+        canvasWrap.classList.remove('dragging');
+        return;
+      }
+      
+      if (!isDrawing) return;
+      isDrawing = false;
+      
+      if (currentStroke.length > 5) {
+        shape = recognizeShape(currentStroke);
+        updatePanel();
+      }
+      
+      currentStroke = [];
+      draw();
+    }
+    
+    // Mouse events
+    canvas.addEventListener('mousedown', handlePointerDown);
+    canvas.addEventListener('mousemove', handlePointerMove);
+    canvas.addEventListener('mouseup', handlePointerUp);
+    canvas.addEventListener('mouseleave', handlePointerUp);
+    
+    // Touch events
+    canvas.addEventListener('touchstart', handlePointerDown, { passive: false });
+    canvas.addEventListener('touchmove', handlePointerMove, { passive: false });
+    canvas.addEventListener('touchend', handlePointerUp);
+    
+    // Toolbar
+    gridBtn.addEventListener('click', () => {
+      showGrid = !showGrid;
+      gridBtn.classList.toggle('active', showGrid);
+      draw();
+    });
+    
+    clearBtn.addEventListener('click', () => {
+      shape = null;
+      currentStroke = [];
+      updatePanel();
+      draw();
+    });
+    
+    // Override buttons
+    overrideBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (!shape) return;
+        const newType = btn.dataset.type;
+        if (newType !== shape.type) {
+          shape = refitShape(newType, shape.originalStroke);
+          updatePanel();
+          draw();
+        }
+      });
+    });
+    
+    // Initial draw
+    draw();
+  </script>
+</body>
+</html>

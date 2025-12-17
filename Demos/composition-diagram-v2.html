@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Compositional Interpretation</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    
+    body {
+      font-family: 'Space Grotesk', system-ui, -apple-system, sans-serif;
+      background: #08080e;
+      color: #e5e5e5;
+      min-height: 100vh;
+      min-height: 100dvh;
+      overflow: hidden;
+    }
+    
+    .container {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      height: 100dvh;
+    }
+    
+    @media (min-width: 640px) {
+      .container {
+        flex-direction: row;
+      }
+    }
+    
+    /* Drawing panel */
+    .draw-panel {
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      border-bottom: 1px solid #1a1a2a;
+      background: #0a0a12;
+    }
+    
+    @media (min-width: 640px) {
+      .draw-panel {
+        width: 200px;
+        border-bottom: none;
+        border-right: 1px solid #1a1a2a;
+        padding: 24px 16px;
+      }
+    }
+    
+    .draw-label {
+      font-size: 0.6875rem;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: #666;
+      margin-bottom: 12px;
+    }
+    
+    .drawing {
+      width: 120px;
+      height: 140px;
+    }
+    
+    @media (min-width: 640px) {
+      .drawing {
+        width: 140px;
+        height: 160px;
+      }
+    }
+    
+    .drawing svg {
+      width: 100%;
+      height: 100%;
+    }
+    
+    .stroke-highlight {
+      opacity: 0.25;
+      transition: opacity 0.25s;
+    }
+    
+    .stroke-highlight.active {
+      opacity: 1;
+    }
+    
+    .interp-label {
+      margin-top: 12px;
+      padding: 10px 14px;
+      background: #12121a;
+      border-radius: 8px;
+      font-size: 0.875rem;
+      font-weight: 500;
+      text-align: center;
+      min-height: 42px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid #2a2a3a;
+    }
+    
+    /* Graph panel */
+    .graph-panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+    
+    .graph-canvas {
+      flex: 1;
+      position: relative;
+      min-height: 200px;
+    }
+    
+    canvas { 
+      display: block; 
+      width: 100%; 
+      height: 100%;
+      touch-action: none;
+    }
+    
+    /* Level labels on canvas */
+    .level-label {
+      position: absolute;
+      left: 12px;
+      font-size: 0.625rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: #333;
+      pointer-events: none;
+    }
+    
+    @media (min-width: 640px) {
+      .level-label {
+        font-size: 0.6875rem;
+      }
+    }
+    
+    /* Insight panel */
+    .insight-panel {
+      padding: 16px;
+      border-top: 1px solid #1a1a2a;
+      background: #0a0a12;
+    }
+    
+    @media (min-width: 640px) {
+      .insight-panel {
+        width: 220px;
+        border-top: none;
+        border-left: 1px solid #1a1a2a;
+        padding: 20px;
+        overflow-y: auto;
+      }
+    }
+    
+    .insight-title {
+      font-size: 0.6875rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: #666;
+      margin-bottom: 10px;
+    }
+    
+    .insight-text {
+      font-size: 0.8125rem;
+      line-height: 1.6;
+      color: #999;
+    }
+    
+    .insight-text strong {
+      color: #fff;
+      font-weight: 600;
+    }
+    
+    .insight-text em {
+      color: #8b5cf6;
+      font-style: normal;
+      font-weight: 500;
+    }
+    
+    .insight-list {
+      margin: 12px 0;
+      padding-left: 1em;
+    }
+    
+    .insight-list li {
+      margin: 4px 0;
+      color: #888;
+    }
+    
+    .insight-list li span {
+      color: #666;
+    }
+    
+    /* Node info (shown on selection) */
+    .node-info {
+      margin-top: 16px;
+      padding: 12px;
+      background: #12121a;
+      border-radius: 8px;
+      border: 1px solid #2a2a3a;
+      display: none;
+    }
+    
+    .node-info.visible {
+      display: block;
+    }
+    
+    .node-info-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    
+    .node-info-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+    
+    .node-info-label {
+      font-weight: 600;
+      font-size: 0.875rem;
+    }
+    
+    .node-info-type {
+      font-size: 0.6875rem;
+      color: #666;
+      margin-bottom: 8px;
+    }
+    
+    .conn-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    
+    .conn-chip {
+      padding: 4px 8px;
+      background: #1a1a2a;
+      border-radius: 4px;
+      font-size: 0.6875rem;
+      cursor: pointer;
+      border-left: 3px solid;
+      transition: background 0.15s;
+    }
+    
+    .conn-chip:hover {
+      background: #2a2a3a;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Drawing Panel -->
+    <div class="draw-panel">
+      <div class="draw-label">Drawn Marks</div>
+      <div class="drawing">
+        <svg viewBox="0 0 140 160">
+          <ellipse id="s-circle" class="stroke-highlight active" 
+            cx="70" cy="95" rx="42" ry="42" 
+            stroke="#8b5cf6" stroke-width="4" fill="none"/>
+          <circle id="s-dot1" class="stroke-highlight active"
+            cx="52" cy="88" r="7" fill="#3b82f6"/>
+          <circle id="s-dot2" class="stroke-highlight active"
+            cx="88" cy="88" r="7" fill="#3b82f6"/>
+          <path id="s-line" class="stroke-highlight active"
+            d="M70 52 L70 12" 
+            stroke="#10b981" stroke-width="4" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="interp-label" id="interpLabel" style="color:#666">hover nodes to explore</div>
+    </div>
+    
+    <!-- Graph Panel -->
+    <div class="graph-panel">
+      <div class="graph-canvas">
+        <canvas id="canvas"></canvas>
+      </div>
+    </div>
+    
+    <!-- Insight Panel -->
+    <div class="insight-panel">
+      <div class="insight-title">The Insight</div>
+      <div class="insight-text">
+        Same marks → <strong>multiple valid readings</strong>
+        <br><br>
+        The dots are <em>inside</em> the circle.<br>
+        The line is <em>above</em> and <em>attached</em>.
+        <br><br>
+        These spatial facts enable:
+        <ul class="insight-list">
+          <li><strong>face</strong> <span>(eyes in head)</span></li>
+          <li><strong>balloon</strong> <span>(string attached)</span></li>
+          <li><strong>antenna</strong> <span>(signal source)</span></li>
+        </ul>
+        <em>Relations</em> open possibilities.<br>
+        <em>Context</em> selects among them.
+      </div>
+      
+      <div class="node-info" id="nodeInfo">
+        <div class="node-info-header">
+          <div class="node-info-dot" id="nodeInfoDot"></div>
+          <div class="node-info-label" id="nodeInfoLabel"></div>
+        </div>
+        <div class="node-info-type" id="nodeInfoType"></div>
+        <div class="conn-list" id="nodeInfoConns"></div>
+      </div>
+    </div>
+  </div>
+  
+  <script>
+    const nodes = {
+      // Strokes
+      'stroke:circle': { level: 0, label: 'circle', color: '#64748b', drawing: 's-circle' },
+      'stroke:dot1': { level: 0, label: 'dot', color: '#64748b', drawing: 's-dot1' },
+      'stroke:dot2': { level: 0, label: 'dot', color: '#64748b', drawing: 's-dot2' },
+      'stroke:line': { level: 0, label: 'line', color: '#64748b', drawing: 's-line' },
+      
+      // Shapes
+      'shape:circle': { level: 1, label: 'circle', sub: 'x²+y²=r²', color: '#8b5cf6', edges: ['stroke:circle'] },
+      'shape:point1': { level: 1, label: 'point', color: '#8b5cf6', edges: ['stroke:dot1'] },
+      'shape:point2': { level: 1, label: 'point', color: '#8b5cf6', edges: ['stroke:dot2'] },
+      'shape:line': { level: 1, label: 'line', sub: 'vertical', color: '#8b5cf6', edges: ['stroke:line'] },
+      
+      // Relations
+      'rel:inside1': { level: 2, label: 'inside', color: '#f97316', edges: ['shape:point1', 'shape:circle'] },
+      'rel:inside2': { level: 2, label: 'inside', color: '#f97316', edges: ['shape:point2', 'shape:circle'] },
+      'rel:above': { level: 2, label: 'above', color: '#f97316', edges: ['shape:line', 'shape:circle'] },
+      'rel:attached': { level: 2, label: 'attached', color: '#f97316', edges: ['shape:line', 'shape:circle'] },
+      'rel:pair': { level: 2, label: 'symmetric', color: '#f97316', edges: ['shape:point1', 'shape:point2'] },
+      
+      // Meanings
+      'meaning:face': { level: 3, label: 'face', icon: '👤', color: '#10b981', edges: ['rel:inside1', 'rel:inside2', 'rel:pair'], interp: 'face with eyes' },
+      'meaning:balloon': { level: 3, label: 'balloon', icon: '🎈', color: '#10b981', edges: ['rel:above', 'rel:attached'], interp: 'balloon with string' },
+      'meaning:antenna': { level: 3, label: 'antenna', icon: '📡', color: '#10b981', edges: ['rel:above', 'rel:pair'], interp: 'signal/broadcast' },
+    };
+    
+    const levelNames = ['STROKES', 'SHAPES', 'RELATIONS', 'MEANINGS'];
+    const levelColors = ['#64748b', '#8b5cf6', '#f97316', '#10b981'];
+    
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    let selectedNode = null;
+    let hoveredNode = null;
+    let dpr = 1;
+    
+    function layout() {
+      const levels = [[], [], [], []];
+      Object.entries(nodes).forEach(([id, node]) => {
+        levels[node.level].push(id);
+      });
+      
+      levels.forEach((ids, level) => {
+        ids.forEach((id, i) => {
+          nodes[id].gx = (i + 1) / (ids.length + 1);
+          nodes[id].gy = 0.88 - level * 0.25;
+        });
+      });
+    }
+    
+    function resize() {
+      dpr = window.devicePixelRatio || 1;
+      const rect = canvas.parentElement.getBoundingClientRect();
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
+      canvas.style.width = rect.width + 'px';
+      canvas.style.height = rect.height + 'px';
+      ctx.scale(dpr, dpr);
+      render();
+    }
+    
+    function render() {
+      const w = canvas.width / dpr;
+      const h = canvas.height / dpr;
+      ctx.clearRect(0, 0, w, h);
+      
+      const mx = 50, my = 30;
+      const gw = w - mx * 2;
+      const gh = h - my * 2;
+      
+      // Level labels
+      ctx.font = '600 10px Space Grotesk, system-ui';
+      for (let i = 0; i < 4; i++) {
+        const y = my + gh * (0.88 - i * 0.25);
+        ctx.fillStyle = levelColors[i] + '66';
+        ctx.fillText(levelNames[i], 10, y + 4);
+      }
+      
+      // Edges
+      Object.entries(nodes).forEach(([id, node]) => {
+        if (!node.edges) return;
+        const x1 = mx + node.gx * gw;
+        const y1 = my + node.gy * gh;
+        
+        node.edges.forEach(tid => {
+          const t = nodes[tid];
+          if (!t) return;
+          const x2 = mx + t.gx * gw;
+          const y2 = my + t.gy * gh;
+          
+          const hl = hoveredNode === id || hoveredNode === tid || selectedNode === id || selectedNode === tid;
+          ctx.strokeStyle = hl ? '#ffffff55' : '#ffffff18';
+          ctx.lineWidth = hl ? 2.5 : 1.5;
+          ctx.beginPath();
+          ctx.moveTo(x1, y1);
+          ctx.lineTo(x2, y2);
+          ctx.stroke();
+        });
+      });
+      
+      // Nodes
+      Object.entries(nodes).forEach(([id, node]) => {
+        const x = mx + node.gx * gw;
+        const y = my + node.gy * gh;
+        const r = node.level === 3 ? 24 : (node.level === 2 ? 20 : 16);
+        
+        const isSel = selectedNode === id;
+        const isHov = hoveredNode === id;
+        
+        if (isSel || isHov) {
+          ctx.shadowColor = node.color;
+          ctx.shadowBlur = isSel ? 25 : 15;
+        }
+        
+        ctx.fillStyle = isSel ? node.color : (isHov ? node.color + 'ee' : node.color + '99');
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        
+        // Label
+        ctx.fillStyle = '#fff';
+        ctx.font = `${node.level === 3 ? '600 ' : ''}${node.level >= 2 ? 11 : 10}px Space Grotesk, system-ui`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        
+        const label = node.icon || node.label;
+        ctx.fillText(label, x, y);
+        
+        // Sub label for shapes
+        if (node.sub && node.level === 1) {
+          ctx.font = '9px Space Grotesk, system-ui';
+          ctx.fillStyle = '#ffffff77';
+          ctx.fillText(node.sub, x, y + r + 10);
+        }
+      });
+    }
+    
+    function getNodeAt(px, py) {
+      const w = canvas.width / dpr;
+      const h = canvas.height / dpr;
+      const mx = 50, my = 30;
+      const gw = w - mx * 2;
+      const gh = h - my * 2;
+      
+      for (const [id, node] of Object.entries(nodes)) {
+        const x = mx + node.gx * gw;
+        const y = my + node.gy * gh;
+        const r = node.level === 3 ? 24 : (node.level === 2 ? 20 : 16);
+        if (Math.hypot(px - x, py - y) < r + 6) return id;
+      }
+      return null;
+    }
+    
+    function highlightDrawing(nodeId) {
+      document.querySelectorAll('.stroke-highlight').forEach(el => {
+        el.classList.remove('active');
+      });
+      
+      const label = document.getElementById('interpLabel');
+      
+      if (!nodeId) {
+        document.querySelectorAll('.stroke-highlight').forEach(el => el.classList.add('active'));
+        label.textContent = 'hover nodes to explore';
+        label.style.color = '#666';
+        return;
+      }
+      
+      const node = nodes[nodeId];
+      const strokes = new Set();
+      
+      (function find(id) {
+        const n = nodes[id];
+        if (!n) return;
+        if (n.drawing) strokes.add(n.drawing);
+        if (n.edges) n.edges.forEach(find);
+      })(nodeId);
+      
+      strokes.forEach(sid => {
+        document.getElementById(sid)?.classList.add('active');
+      });
+      
+      label.style.color = node.color;
+      label.textContent = node.interp || node.sub || node.label;
+    }
+    
+    function updateNodeInfo(nodeId) {
+      const panel = document.getElementById('nodeInfo');
+      
+      if (!nodeId) {
+        panel.classList.remove('visible');
+        return;
+      }
+      
+      const node = nodes[nodeId];
+      panel.classList.add('visible');
+      
+      document.getElementById('nodeInfoDot').style.background = node.color;
+      document.getElementById('nodeInfoLabel').textContent = node.label;
+      document.getElementById('nodeInfoType').textContent = levelNames[node.level].toLowerCase();
+      
+      const conns = document.getElementById('nodeInfoConns');
+      const connected = [
+        ...(node.edges || []),
+        ...Object.entries(nodes).filter(([id, n]) => n.edges?.includes(nodeId)).map(([id]) => id)
+      ];
+      
+      conns.innerHTML = connected.map(id => {
+        const n = nodes[id];
+        return n ? `<div class="conn-chip" data-id="${id}" style="border-color:${n.color}">${n.label}</div>` : '';
+      }).join('');
+      
+      conns.querySelectorAll('.conn-chip').forEach(chip => {
+        chip.onclick = () => {
+          selectedNode = chip.dataset.id;
+          highlightDrawing(selectedNode);
+          updateNodeInfo(selectedNode);
+          render();
+        };
+      });
+    }
+    
+    // Events
+    function handlePointer(e, isDown) {
+      const rect = canvas.getBoundingClientRect();
+      const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+      const y = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
+      const id = getNodeAt(x, y);
+      
+      if (isDown) {
+        selectedNode = id;
+        updateNodeInfo(id);
+      }
+      
+      if (id !== hoveredNode) {
+        hoveredNode = id;
+        canvas.style.cursor = id ? 'pointer' : 'default';
+        highlightDrawing(id || selectedNode);
+      }
+      render();
+    }
+    
+    canvas.addEventListener('mousemove', e => handlePointer(e, false));
+    canvas.addEventListener('mousedown', e => handlePointer(e, true));
+    canvas.addEventListener('touchstart', e => { e.preventDefault(); handlePointer(e, true); }, { passive: false });
+    canvas.addEventListener('touchmove', e => { e.preventDefault(); handlePointer(e, false); }, { passive: false });
+    canvas.addEventListener('mouseleave', () => {
+      hoveredNode = null;
+      highlightDrawing(selectedNode);
+      render();
+    });
+    
+    // Init
+    layout();
+    window.addEventListener('resize', resize);
+    resize();
+  </script>
+</body>
+</html>

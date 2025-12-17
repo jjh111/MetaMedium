@@ -1,0 +1,1210 @@
+<!--
+  RELATIONAL SCENE CANVAS
+  
+  Grounded in: Scene Graphs, Construction Grammar, Image Schemas
+  
+  Draw:
+    - Closed shapes → Entities (nouns)
+    - Marks touching one entity → Attributes (adjectives)  
+    - Strokes connecting entities → Relations (verbs/prepositions)
+  
+  See:
+    - Graph emerges from structure (not assigned)
+    - Sentence generates from graph
+    - Everything stays connected
+-->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Relational Scene</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    
+    body {
+      font-family: 'Space Grotesk', system-ui, sans-serif;
+      background: #0a0a12;
+      color: #e5e5e5;
+      min-height: 100vh;
+      overflow: hidden;
+    }
+    
+    .container {
+      display: grid;
+      grid-template-columns: 1fr 320px;
+      grid-template-rows: auto 1fr auto;
+      height: 100vh;
+    }
+    
+    /* Header */
+    .header {
+      grid-column: 1 / -1;
+      padding: 0.75rem 1rem;
+      background: #12121a;
+      border-bottom: 1px solid #2a2a3a;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+    
+    .title {
+      font-size: 0.875rem;
+      font-weight: 600;
+    }
+    
+    .subtitle {
+      font-size: 0.6875rem;
+      color: #666;
+    }
+    
+    .header-spacer { flex: 1; }
+    
+    .example-btn {
+      padding: 0.375rem 0.75rem;
+      background: #1a1a2a;
+      border: 1px solid #2a2a3a;
+      border-radius: 4px;
+      color: #888;
+      font-family: inherit;
+      font-size: 0.625rem;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    
+    .example-btn:hover {
+      background: #2a2a3a;
+      color: #fff;
+    }
+    
+    /* Canvas area */
+    .canvas-area {
+      position: relative;
+      background: #0d0d14;
+    }
+    
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+    
+    .canvas-toolbar {
+      position: absolute;
+      top: 0.75rem;
+      left: 0.75rem;
+      display: flex;
+      gap: 0.25rem;
+    }
+    
+    .tool-btn {
+      padding: 0.5rem 0.75rem;
+      background: #1a1a2a;
+      border: 1px solid #2a2a3a;
+      border-radius: 4px;
+      color: #888;
+      font-family: inherit;
+      font-size: 0.6875rem;
+      cursor: pointer;
+      transition: all 0.15s;
+      display: flex;
+      align-items: center;
+      gap: 0.375rem;
+    }
+    
+    .tool-btn:hover { background: #2a2a3a; color: #fff; }
+    .tool-btn.active { background: #8b5cf6; border-color: #8b5cf6; color: #fff; }
+    
+    .canvas-hint {
+      position: absolute;
+      bottom: 0.75rem;
+      left: 0.75rem;
+      font-size: 0.625rem;
+      color: #444;
+    }
+    
+    /* Sidebar */
+    .sidebar {
+      background: #12121a;
+      border-left: 1px solid #2a2a3a;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    
+    .panel {
+      padding: 0.875rem;
+      border-bottom: 1px solid #2a2a3a;
+    }
+    
+    .panel-title {
+      font-size: 0.5625rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: #555;
+      margin-bottom: 0.625rem;
+    }
+    
+    /* Sentence display */
+    .sentence-display {
+      font-size: 1rem;
+      line-height: 1.6;
+      color: #fff;
+      min-height: 3rem;
+    }
+    
+    .sentence-display .entity {
+      color: #3b82f6;
+      border-bottom: 1px dotted #3b82f6;
+      cursor: pointer;
+    }
+    
+    .sentence-display .attribute {
+      color: #10b981;
+      cursor: pointer;
+    }
+    
+    .sentence-display .relation {
+      color: #f97316;
+      cursor: pointer;
+    }
+    
+    .sentence-placeholder {
+      color: #444;
+      font-style: italic;
+    }
+    
+    /* Graph panel */
+    .graph-panel {
+      flex: 1;
+      overflow: hidden;
+      position: relative;
+    }
+    
+    .graph-canvas {
+      width: 100%;
+      height: 100%;
+    }
+    
+    .graph-legend {
+      position: absolute;
+      bottom: 0.5rem;
+      left: 0.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+      font-size: 0.5625rem;
+      color: #555;
+    }
+    
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 0.375rem;
+    }
+    
+    .legend-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+    
+    /* Inventory */
+    .inventory {
+      max-height: 150px;
+      overflow-y: auto;
+    }
+    
+    .inv-section {
+      margin-bottom: 0.625rem;
+    }
+    
+    .inv-section-title {
+      font-size: 0.5rem;
+      color: #444;
+      text-transform: uppercase;
+      margin-bottom: 0.25rem;
+    }
+    
+    .inv-items {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.25rem;
+    }
+    
+    .inv-item {
+      padding: 0.25rem 0.5rem;
+      background: #1a1a2a;
+      border-radius: 3px;
+      font-size: 0.6875rem;
+      cursor: pointer;
+      transition: all 0.15s;
+      border: 1px solid transparent;
+    }
+    
+    .inv-item:hover {
+      background: #2a2a3a;
+    }
+    
+    .inv-item.selected {
+      border-color: #8b5cf6;
+      background: rgba(139, 92, 246, 0.2);
+    }
+    
+    .inv-item.entity { border-left: 2px solid #3b82f6; }
+    .inv-item.attribute { border-left: 2px solid #10b981; }
+    .inv-item.relation { border-left: 2px solid #f97316; }
+    
+    /* Footer */
+    .footer {
+      grid-column: 1 / -1;
+      padding: 0.5rem 1rem;
+      background: #12121a;
+      border-top: 1px solid #2a2a3a;
+      display: flex;
+      gap: 1.5rem;
+      font-size: 0.625rem;
+      color: #555;
+    }
+    
+    .stat-val { color: #fff; font-weight: 600; }
+    
+    /* Word input popup */
+    .word-input {
+      position: absolute;
+      background: #1a1a2a;
+      border: 1px solid #3a3a4a;
+      border-radius: 6px;
+      padding: 0.5rem;
+      display: none;
+      z-index: 100;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    }
+    
+    .word-input.visible { display: block; }
+    
+    .word-input input {
+      background: #0a0a12;
+      border: 1px solid #2a2a3a;
+      border-radius: 4px;
+      padding: 0.375rem 0.5rem;
+      color: #fff;
+      font-family: inherit;
+      font-size: 0.8125rem;
+      width: 150px;
+      outline: none;
+    }
+    
+    .word-input input:focus {
+      border-color: #8b5cf6;
+    }
+    
+    .word-suggestions {
+      margin-top: 0.375rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.25rem;
+    }
+    
+    .word-suggestion {
+      padding: 0.25rem 0.5rem;
+      background: #2a2a3a;
+      border-radius: 3px;
+      font-size: 0.625rem;
+      cursor: pointer;
+    }
+    
+    .word-suggestion:hover {
+      background: #3a3a4a;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div>
+        <div class="title">Relational Scene Canvas</div>
+        <div class="subtitle">Draw shapes (entities), marks (attributes), connections (relations)</div>
+      </div>
+      <div class="header-spacer"></div>
+      <button class="example-btn" id="exampleFoxBtn">Load: fox jumps over dog</button>
+      <button class="example-btn" id="exampleFishBtn">Load: hungry fish wants food</button>
+      <button class="example-btn" id="clearBtn">Clear</button>
+    </div>
+    
+    <div class="canvas-area">
+      <canvas id="drawCanvas"></canvas>
+      <div class="canvas-toolbar">
+        <button class="tool-btn active" data-tool="draw">✏️ Draw</button>
+        <button class="tool-btn" data-tool="select">👆 Select</button>
+        <button class="tool-btn" data-tool="connect">🔗 Connect</button>
+        <button class="tool-btn" data-tool="label">💬 Label</button>
+      </div>
+      <div class="canvas-hint">
+        Closed shape → entity • Open stroke near entity → attribute • Stroke between entities → relation
+      </div>
+      <div class="word-input" id="wordInput">
+        <input type="text" id="wordInputField" placeholder="Enter label...">
+        <div class="word-suggestions" id="wordSuggestions"></div>
+      </div>
+    </div>
+    
+    <div class="sidebar">
+      <div class="panel">
+        <div class="panel-title">Generated Sentence</div>
+        <div class="sentence-display" id="sentenceDisplay">
+          <span class="sentence-placeholder">Draw a scene to generate a sentence...</span>
+        </div>
+      </div>
+      
+      <div class="panel graph-panel">
+        <div class="panel-title">Scene Graph</div>
+        <canvas class="graph-canvas" id="graphCanvas"></canvas>
+        <div class="graph-legend">
+          <div class="legend-item"><div class="legend-dot" style="background:#3b82f6"></div> entity</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#10b981"></div> attribute</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#f97316"></div> relation</div>
+        </div>
+      </div>
+      
+      <div class="panel inventory">
+        <div class="panel-title">Inventory</div>
+        <div id="inventoryPanel">
+          <div class="sentence-placeholder" style="font-size:0.6875rem">No elements yet</div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="footer">
+      <span><span class="stat-val" id="strokeCount">0</span> strokes</span>
+      <span><span class="stat-val" id="entityCount">0</span> entities</span>
+      <span><span class="stat-val" id="attrCount">0</span> attributes</span>
+      <span><span class="stat-val" id="relCount">0</span> relations</span>
+    </div>
+  </div>
+  
+  <script>
+    // ===== SCHEMA =====
+    // Everything is a node. Role emerges from structure.
+    
+    let nodes = [];
+    let nextId = 1;
+    
+    function createNode(stroke, role = null) {
+      const node = {
+        id: `n${nextId++}`,
+        stroke: stroke,           // { points: [], closed: bool }
+        word: null,               // label
+        edges: [],                // connections to other nodes
+        role: role,               // 'entity' | 'attribute' | 'relation' (computed)
+        bbox: null,               // bounding box
+        center: null,             // center point
+      };
+      
+      // Compute bbox and center
+      if (stroke.points.length > 0) {
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        stroke.points.forEach(p => {
+          minX = Math.min(minX, p.x);
+          minY = Math.min(minY, p.y);
+          maxX = Math.max(maxX, p.x);
+          maxY = Math.max(maxY, p.y);
+        });
+        node.bbox = { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
+        node.center = { x: (minX + maxX) / 2, y: (minY + maxY) / 2 };
+      }
+      
+      nodes.push(node);
+      return node;
+    }
+    
+    function classifyNodes() {
+      // Determine role from structure
+      // 1. Closed shapes with area > threshold → entity
+      // 2. Open strokes that touch one entity → attribute
+      // 3. Strokes connecting 2+ entities → relation
+      
+      const entities = [];
+      const others = [];
+      
+      nodes.forEach(node => {
+        if (!node.role) {
+          if (node.stroke.closed && getArea(node.stroke.points) > 500) {
+            node.role = 'entity';
+            entities.push(node);
+          } else {
+            others.push(node);
+          }
+        } else if (node.role === 'entity') {
+          entities.push(node);
+        }
+      });
+      
+      // Classify remaining strokes
+      others.forEach(node => {
+        if (node.role) return; // already set
+        
+        const touching = findTouchingEntities(node, entities);
+        
+        if (touching.length === 0) {
+          // Floating mark - might become entity or attribute later
+          node.role = 'attribute'; // default to attribute
+        } else if (touching.length === 1) {
+          // Touches one entity → attribute
+          node.role = 'attribute';
+          if (!node.edges.includes(touching[0].id)) {
+            node.edges.push(touching[0].id);
+          }
+        } else {
+          // Touches 2+ entities → relation
+          node.role = 'relation';
+          touching.forEach(e => {
+            if (!node.edges.includes(e.id)) {
+              node.edges.push(e.id);
+            }
+          });
+        }
+      });
+    }
+    
+    function findTouchingEntities(node, entities) {
+      const touching = [];
+      const threshold = 40; // pixels
+      
+      entities.forEach(entity => {
+        // Check if any point of node is near entity
+        const near = node.stroke.points.some(p => {
+          return isPointNearShape(p, entity);
+        });
+        
+        if (near) touching.push(entity);
+      });
+      
+      return touching;
+    }
+    
+    function isPointNearShape(point, entity, threshold = 40) {
+      // Check if point is near any point of entity's stroke
+      return entity.stroke.points.some(ep => {
+        return Math.hypot(point.x - ep.x, point.y - ep.y) < threshold;
+      });
+    }
+    
+    function getArea(points) {
+      if (points.length < 3) return 0;
+      let area = 0;
+      for (let i = 0; i < points.length; i++) {
+        const j = (i + 1) % points.length;
+        area += points[i].x * points[j].y;
+        area -= points[j].x * points[i].y;
+      }
+      return Math.abs(area / 2);
+    }
+    
+    function isClosed(points) {
+      if (points.length < 3) return false;
+      const start = points[0];
+      const end = points[points.length - 1];
+      const dist = Math.hypot(end.x - start.x, end.y - start.y);
+      const pathLen = getPathLength(points);
+      return dist < pathLen * 0.15 && dist < 50;
+    }
+    
+    function getPathLength(points) {
+      let len = 0;
+      for (let i = 1; i < points.length; i++) {
+        len += Math.hypot(points[i].x - points[i-1].x, points[i].y - points[i-1].y);
+      }
+      return len;
+    }
+    
+    // ===== SENTENCE GENERATION =====
+    function generateSentence() {
+      const entities = nodes.filter(n => n.role === 'entity' && n.word);
+      const relations = nodes.filter(n => n.role === 'relation' && n.word);
+      
+      if (entities.length === 0) {
+        return { html: '<span class="sentence-placeholder">Draw and label entities...</span>', text: '' };
+      }
+      
+      // Find relations that connect entities
+      const statements = [];
+      
+      relations.forEach(rel => {
+        const connectedEntities = rel.edges
+          .map(id => nodes.find(n => n.id === id))
+          .filter(n => n && n.role === 'entity' && n.word);
+        
+        if (connectedEntities.length >= 2) {
+          // Get attributes for each entity
+          const subj = connectedEntities[0];
+          const obj = connectedEntities[1];
+          
+          const subjAttrs = getAttributes(subj);
+          const objAttrs = getAttributes(obj);
+          
+          statements.push({
+            subject: subj,
+            subjectAttrs: subjAttrs,
+            relation: rel,
+            object: obj,
+            objectAttrs: objAttrs
+          });
+        }
+      });
+      
+      if (statements.length === 0) {
+        // No complete statements, just list entities with attributes
+        const parts = entities.map(e => {
+          const attrs = getAttributes(e);
+          const attrStr = attrs.map(a => `<span class="attribute">${a.word}</span>`).join(' ');
+          return `${attrStr} <span class="entity" data-id="${e.id}">${e.word}</span>`;
+        });
+        return { 
+          html: 'The ' + parts.join(', ') + '.', 
+          text: 'The ' + entities.map(e => {
+            const attrs = getAttributes(e);
+            return attrs.map(a => a.word).join(' ') + ' ' + e.word;
+          }).join(', ') + '.'
+        };
+      }
+      
+      // Build sentence from statements
+      const sentenceParts = statements.map(s => {
+        const subjAttrs = s.subjectAttrs.map(a => `<span class="attribute">${a.word}</span>`).join(' ');
+        const objAttrs = s.objectAttrs.map(a => `<span class="attribute">${a.word}</span>`).join(' ');
+        
+        return `${subjAttrs} <span class="entity" data-id="${s.subject.id}">${s.subject.word}</span> ` +
+               `<span class="relation" data-id="${s.relation.id}">${s.relation.word}</span> ` +
+               `${objAttrs} <span class="entity" data-id="${s.object.id}">${s.object.word}</span>`;
+      });
+      
+      return {
+        html: 'The ' + sentenceParts.join(', and the ') + '.',
+        text: 'The ' + statements.map(s => {
+          const subjAttrs = s.subjectAttrs.map(a => a.word).join(' ');
+          const objAttrs = s.objectAttrs.map(a => a.word).join(' ');
+          return `${subjAttrs} ${s.subject.word} ${s.relation.word} ${objAttrs} ${s.object.word}`;
+        }).join(', and the ') + '.'
+      };
+    }
+    
+    function getAttributes(entity) {
+      return nodes.filter(n => 
+        n.role === 'attribute' && 
+        n.word && 
+        n.edges.includes(entity.id)
+      );
+    }
+    
+    // ===== DRAWING CANVAS =====
+    const drawCanvas = document.getElementById('drawCanvas');
+    const drawCtx = drawCanvas.getContext('2d');
+    
+    let currentStroke = [];
+    let isDrawing = false;
+    let currentTool = 'draw';
+    let selectedNode = null;
+    let connectingFrom = null;
+    
+    function resizeCanvases() {
+      const drawArea = drawCanvas.parentElement;
+      drawCanvas.width = drawArea.clientWidth;
+      drawCanvas.height = drawArea.clientHeight;
+      
+      const graphArea = document.getElementById('graphCanvas').parentElement;
+      graphCanvas.width = graphArea.clientWidth;
+      graphCanvas.height = graphArea.clientHeight;
+      
+      render();
+    }
+    
+    function render() {
+      renderDrawCanvas();
+      renderGraph();
+      renderSentence();
+      renderInventory();
+      updateStats();
+    }
+    
+    function renderDrawCanvas() {
+      drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+      
+      // Draw all nodes
+      nodes.forEach(node => {
+        const color = getRoleColor(node.role);
+        const isSelected = node === selectedNode;
+        
+        // Draw stroke
+        if (node.stroke.points.length > 1) {
+          drawCtx.strokeStyle = isSelected ? '#fff' : color;
+          drawCtx.lineWidth = isSelected ? 3 : 2;
+          drawCtx.lineCap = 'round';
+          drawCtx.lineJoin = 'round';
+          
+          drawCtx.beginPath();
+          node.stroke.points.forEach((p, i) => {
+            if (i === 0) drawCtx.moveTo(p.x, p.y);
+            else drawCtx.lineTo(p.x, p.y);
+          });
+          
+          if (node.stroke.closed) {
+            drawCtx.closePath();
+            drawCtx.fillStyle = color + '22';
+            drawCtx.fill();
+          }
+          drawCtx.stroke();
+        }
+        
+        // Draw label
+        if (node.word && node.center) {
+          drawCtx.font = '12px Space Grotesk, system-ui';
+          drawCtx.fillStyle = '#fff';
+          drawCtx.textAlign = 'center';
+          drawCtx.textBaseline = 'middle';
+          
+          // Background
+          const metrics = drawCtx.measureText(node.word);
+          const pad = 4;
+          drawCtx.fillStyle = color + 'cc';
+          drawCtx.fillRect(
+            node.center.x - metrics.width / 2 - pad,
+            node.center.y - 8 - pad,
+            metrics.width + pad * 2,
+            16 + pad
+          );
+          
+          drawCtx.fillStyle = '#fff';
+          drawCtx.fillText(node.word, node.center.x, node.center.y);
+        }
+      });
+      
+      // Draw current stroke
+      if (currentStroke.length > 1) {
+        drawCtx.strokeStyle = '#888';
+        drawCtx.lineWidth = 2;
+        drawCtx.lineCap = 'round';
+        drawCtx.lineJoin = 'round';
+        drawCtx.beginPath();
+        currentStroke.forEach((p, i) => {
+          if (i === 0) drawCtx.moveTo(p.x, p.y);
+          else drawCtx.lineTo(p.x, p.y);
+        });
+        drawCtx.stroke();
+      }
+      
+      // Draw connection line
+      if (connectingFrom && currentTool === 'connect') {
+        drawCtx.strokeStyle = '#f9731688';
+        drawCtx.lineWidth = 2;
+        drawCtx.setLineDash([5, 5]);
+        drawCtx.beginPath();
+        drawCtx.moveTo(connectingFrom.center.x, connectingFrom.center.y);
+        // Draw to mouse position (would need to track)
+        drawCtx.stroke();
+        drawCtx.setLineDash([]);
+      }
+    }
+    
+    function getRoleColor(role) {
+      switch (role) {
+        case 'entity': return '#3b82f6';
+        case 'attribute': return '#10b981';
+        case 'relation': return '#f97316';
+        default: return '#888';
+      }
+    }
+    
+    // ===== GRAPH CANVAS =====
+    const graphCanvas = document.getElementById('graphCanvas');
+    const graphCtx = graphCanvas.getContext('2d');
+    
+    function renderGraph() {
+      graphCtx.clearRect(0, 0, graphCanvas.width, graphCanvas.height);
+      
+      if (nodes.length === 0) return;
+      
+      // Layout: entities at bottom, attributes/relations higher
+      // y = based on role, x = spread out
+      
+      const entities = nodes.filter(n => n.role === 'entity');
+      const attributes = nodes.filter(n => n.role === 'attribute');
+      const relations = nodes.filter(n => n.role === 'relation');
+      
+      const w = graphCanvas.width;
+      const h = graphCanvas.height;
+      const margin = 30;
+      
+      // Position entities at bottom
+      entities.forEach((e, i) => {
+        e._gx = margin + (i + 0.5) * (w - margin * 2) / Math.max(entities.length, 1);
+        e._gy = h - margin - 20;
+      });
+      
+      // Position relations in middle
+      relations.forEach((r, i) => {
+        // Try to position between connected entities
+        const connected = r.edges.map(id => nodes.find(n => n.id === id)).filter(n => n && n._gx);
+        if (connected.length >= 2) {
+          r._gx = (connected[0]._gx + connected[1]._gx) / 2;
+        } else {
+          r._gx = margin + (i + 0.5) * (w - margin * 2) / Math.max(relations.length, 1);
+        }
+        r._gy = h / 2;
+      });
+      
+      // Position attributes above their entities
+      attributes.forEach((a, i) => {
+        const connected = a.edges.map(id => nodes.find(n => n.id === id)).filter(n => n && n._gx);
+        if (connected.length > 0) {
+          a._gx = connected[0]._gx + (i - attributes.filter(at => at.edges.some(e => connected[0].edges?.includes(e) || e === connected[0].id)).indexOf(a)) * 25;
+          a._gy = connected[0]._gy - 50;
+        } else {
+          a._gx = margin + (i + 0.5) * (w - margin * 2) / Math.max(attributes.length, 1);
+          a._gy = margin + 30;
+        }
+      });
+      
+      // Draw edges
+      nodes.forEach(node => {
+        if (!node._gx) return;
+        
+        node.edges.forEach(targetId => {
+          const target = nodes.find(n => n.id === targetId);
+          if (!target || !target._gx) return;
+          
+          graphCtx.strokeStyle = '#ffffff22';
+          graphCtx.lineWidth = 1;
+          graphCtx.beginPath();
+          graphCtx.moveTo(node._gx, node._gy);
+          graphCtx.lineTo(target._gx, target._gy);
+          graphCtx.stroke();
+          
+          // Arrow
+          const angle = Math.atan2(target._gy - node._gy, target._gx - node._gx);
+          const mx = (node._gx + target._gx) / 2;
+          const my = (node._gy + target._gy) / 2;
+          
+          graphCtx.fillStyle = '#ffffff33';
+          graphCtx.beginPath();
+          graphCtx.moveTo(mx + 5 * Math.cos(angle), my + 5 * Math.sin(angle));
+          graphCtx.lineTo(mx + 5 * Math.cos(angle + 2.5), my + 5 * Math.sin(angle + 2.5));
+          graphCtx.lineTo(mx + 5 * Math.cos(angle - 2.5), my + 5 * Math.sin(angle - 2.5));
+          graphCtx.fill();
+        });
+      });
+      
+      // Draw nodes
+      nodes.forEach(node => {
+        if (!node._gx) return;
+        
+        const color = getRoleColor(node.role);
+        const isSelected = node === selectedNode;
+        const r = node.role === 'entity' ? 16 : 12;
+        
+        if (isSelected) {
+          graphCtx.shadowColor = color;
+          graphCtx.shadowBlur = 15;
+        }
+        
+        graphCtx.fillStyle = isSelected ? color : color + 'aa';
+        graphCtx.beginPath();
+        graphCtx.arc(node._gx, node._gy, r, 0, Math.PI * 2);
+        graphCtx.fill();
+        graphCtx.shadowBlur = 0;
+        
+        // Label
+        if (node.word) {
+          graphCtx.font = '9px Space Grotesk, system-ui';
+          graphCtx.fillStyle = '#fff';
+          graphCtx.textAlign = 'center';
+          graphCtx.textBaseline = 'middle';
+          graphCtx.fillText(node.word.slice(0, 8), node._gx, node._gy);
+        }
+      });
+    }
+    
+    // ===== SENTENCE DISPLAY =====
+    function renderSentence() {
+      const display = document.getElementById('sentenceDisplay');
+      const { html } = generateSentence();
+      display.innerHTML = html;
+      
+      // Add click handlers
+      display.querySelectorAll('[data-id]').forEach(el => {
+        el.onclick = () => {
+          selectedNode = nodes.find(n => n.id === el.dataset.id);
+          render();
+        };
+      });
+    }
+    
+    // ===== INVENTORY =====
+    function renderInventory() {
+      const panel = document.getElementById('inventoryPanel');
+      
+      const entities = nodes.filter(n => n.role === 'entity');
+      const attributes = nodes.filter(n => n.role === 'attribute');
+      const relations = nodes.filter(n => n.role === 'relation');
+      
+      if (entities.length === 0 && attributes.length === 0 && relations.length === 0) {
+        panel.innerHTML = '<div class="sentence-placeholder" style="font-size:0.6875rem">No elements yet</div>';
+        return;
+      }
+      
+      let html = '';
+      
+      if (entities.length > 0) {
+        html += '<div class="inv-section"><div class="inv-section-title">Entities</div><div class="inv-items">';
+        html += entities.map(e => `<div class="inv-item entity ${e === selectedNode ? 'selected' : ''}" data-id="${e.id}">${e.word || '?'}</div>`).join('');
+        html += '</div></div>';
+      }
+      
+      if (attributes.length > 0) {
+        html += '<div class="inv-section"><div class="inv-section-title">Attributes</div><div class="inv-items">';
+        html += attributes.map(a => `<div class="inv-item attribute ${a === selectedNode ? 'selected' : ''}" data-id="${a.id}">${a.word || '?'}</div>`).join('');
+        html += '</div></div>';
+      }
+      
+      if (relations.length > 0) {
+        html += '<div class="inv-section"><div class="inv-section-title">Relations</div><div class="inv-items">';
+        html += relations.map(r => `<div class="inv-item relation ${r === selectedNode ? 'selected' : ''}" data-id="${r.id}">${r.word || '?'}</div>`).join('');
+        html += '</div></div>';
+      }
+      
+      panel.innerHTML = html;
+      
+      panel.querySelectorAll('.inv-item').forEach(el => {
+        el.onclick = () => {
+          selectedNode = nodes.find(n => n.id === el.dataset.id);
+          render();
+        };
+      });
+    }
+    
+    function updateStats() {
+      document.getElementById('strokeCount').textContent = nodes.length;
+      document.getElementById('entityCount').textContent = nodes.filter(n => n.role === 'entity').length;
+      document.getElementById('attrCount').textContent = nodes.filter(n => n.role === 'attribute').length;
+      document.getElementById('relCount').textContent = nodes.filter(n => n.role === 'relation').length;
+    }
+    
+    // ===== EVENT HANDLERS =====
+    function getPos(e) {
+      const rect = drawCanvas.getBoundingClientRect();
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      return {
+        x: clientX - rect.left,
+        y: clientY - rect.top
+      };
+    }
+    
+    drawCanvas.addEventListener('mousedown', e => {
+      const pos = getPos(e);
+      
+      if (currentTool === 'draw') {
+        isDrawing = true;
+        currentStroke = [pos];
+      } else if (currentTool === 'select' || currentTool === 'label') {
+        // Find node under cursor
+        selectedNode = findNodeAt(pos);
+        if (currentTool === 'label' && selectedNode) {
+          showWordInput(pos, selectedNode);
+        }
+        render();
+      } else if (currentTool === 'connect') {
+        const node = findNodeAt(pos);
+        if (node) {
+          if (!connectingFrom) {
+            connectingFrom = node;
+          } else if (node !== connectingFrom) {
+            // Create connection
+            if (!connectingFrom.edges.includes(node.id)) {
+              connectingFrom.edges.push(node.id);
+            }
+            connectingFrom = null;
+            render();
+          }
+        }
+      }
+    });
+    
+    drawCanvas.addEventListener('mousemove', e => {
+      if (!isDrawing) return;
+      const pos = getPos(e);
+      currentStroke.push(pos);
+      renderDrawCanvas();
+    });
+    
+    drawCanvas.addEventListener('mouseup', e => {
+      if (!isDrawing) return;
+      isDrawing = false;
+      
+      if (currentStroke.length > 5) {
+        const closed = isClosed(currentStroke);
+        const node = createNode({ points: [...currentStroke], closed }, null);
+        classifyNodes();
+        
+        // If it's an entity or unclassified, prompt for label
+        if (node.role === 'entity' || node.role === 'relation') {
+          selectedNode = node;
+          showWordInput(node.center, node);
+        }
+      }
+      
+      currentStroke = [];
+      render();
+    });
+    
+    drawCanvas.addEventListener('mouseleave', () => {
+      if (isDrawing) {
+        isDrawing = false;
+        currentStroke = [];
+        renderDrawCanvas();
+      }
+    });
+    
+    // Touch support
+    drawCanvas.addEventListener('touchstart', e => {
+      e.preventDefault();
+      const mouseEvent = new MouseEvent('mousedown', {
+        clientX: e.touches[0].clientX,
+        clientY: e.touches[0].clientY
+      });
+      drawCanvas.dispatchEvent(mouseEvent);
+    }, { passive: false });
+    
+    drawCanvas.addEventListener('touchmove', e => {
+      e.preventDefault();
+      const mouseEvent = new MouseEvent('mousemove', {
+        clientX: e.touches[0].clientX,
+        clientY: e.touches[0].clientY
+      });
+      drawCanvas.dispatchEvent(mouseEvent);
+    }, { passive: false });
+    
+    drawCanvas.addEventListener('touchend', e => {
+      const mouseEvent = new MouseEvent('mouseup', {});
+      drawCanvas.dispatchEvent(mouseEvent);
+    });
+    
+    function findNodeAt(pos) {
+      // Find node whose bbox contains pos, or is near stroke
+      for (let i = nodes.length - 1; i >= 0; i--) {
+        const node = nodes[i];
+        if (node.bbox) {
+          const b = node.bbox;
+          const pad = 10;
+          if (pos.x >= b.x - pad && pos.x <= b.x + b.w + pad &&
+              pos.y >= b.y - pad && pos.y <= b.y + b.h + pad) {
+            return node;
+          }
+        }
+      }
+      return null;
+    }
+    
+    // ===== WORD INPUT =====
+    const wordInput = document.getElementById('wordInput');
+    const wordInputField = document.getElementById('wordInputField');
+    const wordSuggestions = document.getElementById('wordSuggestions');
+    let labelingNode = null;
+    
+    function showWordInput(pos, node) {
+      labelingNode = node;
+      wordInput.style.left = pos.x + 'px';
+      wordInput.style.top = pos.y + 'px';
+      wordInput.classList.add('visible');
+      wordInputField.value = node.word || '';
+      wordInputField.focus();
+      
+      // Show suggestions based on role
+      const suggestions = getSuggestions(node.role);
+      wordSuggestions.innerHTML = suggestions.map(s => 
+        `<div class="word-suggestion">${s}</div>`
+      ).join('');
+      
+      wordSuggestions.querySelectorAll('.word-suggestion').forEach(el => {
+        el.onclick = () => {
+          wordInputField.value = el.textContent;
+          applyWordLabel();
+        };
+      });
+    }
+    
+    function hideWordInput() {
+      wordInput.classList.remove('visible');
+      labelingNode = null;
+    }
+    
+    function applyWordLabel() {
+      if (labelingNode && wordInputField.value.trim()) {
+        labelingNode.word = wordInputField.value.trim();
+      }
+      hideWordInput();
+      render();
+    }
+    
+    wordInputField.addEventListener('keydown', e => {
+      if (e.key === 'Enter') {
+        applyWordLabel();
+      } else if (e.key === 'Escape') {
+        hideWordInput();
+      }
+    });
+    
+    wordInputField.addEventListener('blur', () => {
+      setTimeout(applyWordLabel, 100);
+    });
+    
+    function getSuggestions(role) {
+      switch (role) {
+        case 'entity':
+          return ['fox', 'dog', 'cat', 'fish', 'bird', 'person', 'ball', 'box', 'food', 'tree'];
+        case 'attribute':
+          return ['quick', 'brown', 'lazy', 'hungry', 'big', 'small', 'red', 'happy', 'fast', 'slow'];
+        case 'relation':
+          return ['jumps over', 'chases', 'eats', 'wants', 'sees', 'loves', 'near', 'above', 'contains', 'becomes'];
+        default:
+          return [];
+      }
+    }
+    
+    // ===== TOOLBAR =====
+    document.querySelectorAll('.tool-btn').forEach(btn => {
+      btn.onclick = () => {
+        currentTool = btn.dataset.tool;
+        document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        connectingFrom = null;
+        hideWordInput();
+      };
+    });
+    
+    // ===== EXAMPLES =====
+    document.getElementById('exampleFoxBtn').onclick = loadFoxExample;
+    document.getElementById('exampleFishBtn').onclick = loadFishExample;
+    document.getElementById('clearBtn').onclick = () => {
+      nodes = [];
+      nextId = 1;
+      selectedNode = null;
+      render();
+    };
+    
+    function loadFoxExample() {
+      nodes = [];
+      nextId = 1;
+      
+      // Fox shape
+      const foxPoints = generateOval(150, 200, 60, 40);
+      const fox = createNode({ points: foxPoints, closed: true }, 'entity');
+      fox.word = 'fox';
+      
+      // Dog shape
+      const dogPoints = generateOval(400, 280, 70, 45);
+      const dog = createNode({ points: dogPoints, closed: true }, 'entity');
+      dog.word = 'dog';
+      
+      // Quick attribute (near fox)
+      const quickPoints = generateSquiggle(90, 160, 30);
+      const quick = createNode({ points: quickPoints, closed: false }, 'attribute');
+      quick.word = 'quick';
+      quick.edges = [fox.id];
+      
+      // Brown attribute (near fox)
+      const brownPoints = generateSquiggle(110, 240, 25);
+      const brown = createNode({ points: brownPoints, closed: false }, 'attribute');
+      brown.word = 'brown';
+      brown.edges = [fox.id];
+      
+      // Lazy attribute (near dog)
+      const lazyPoints = generateSquiggle(450, 240, 30);
+      const lazy = createNode({ points: lazyPoints, closed: false }, 'attribute');
+      lazy.word = 'lazy';
+      lazy.edges = [dog.id];
+      
+      // Jumps over relation (arc from fox to dog)
+      const jumpPoints = generateArc(150, 180, 400, 260);
+      const jump = createNode({ points: jumpPoints, closed: false }, 'relation');
+      jump.word = 'jumps over';
+      jump.edges = [fox.id, dog.id];
+      
+      render();
+    }
+    
+    function loadFishExample() {
+      nodes = [];
+      nextId = 1;
+      
+      // Fish shape
+      const fishPoints = generateOval(150, 220, 50, 30);
+      const fish = createNode({ points: fishPoints, closed: true }, 'entity');
+      fish.word = 'fish';
+      
+      // Food shape
+      const foodPoints = generateOval(380, 200, 25, 25);
+      const food = createNode({ points: foodPoints, closed: true }, 'entity');
+      food.word = 'food';
+      
+      // Hungry attribute
+      const hungryPoints = generateSquiggle(100, 180, 25);
+      const hungry = createNode({ points: hungryPoints, closed: false }, 'attribute');
+      hungry.word = 'hungry';
+      hungry.edges = [fish.id];
+      
+      // Wants relation
+      const wantsPoints = generateArc(180, 220, 350, 200);
+      const wants = createNode({ points: wantsPoints, closed: false }, 'relation');
+      wants.word = 'wants';
+      wants.edges = [fish.id, food.id];
+      
+      render();
+    }
+    
+    function generateOval(cx, cy, rx, ry) {
+      const points = [];
+      for (let i = 0; i <= 32; i++) {
+        const angle = (i / 32) * Math.PI * 2;
+        points.push({
+          x: cx + Math.cos(angle) * rx + (Math.random() - 0.5) * 5,
+          y: cy + Math.sin(angle) * ry + (Math.random() - 0.5) * 5
+        });
+      }
+      return points;
+    }
+    
+    function generateSquiggle(x, y, len) {
+      const points = [];
+      for (let i = 0; i < 10; i++) {
+        points.push({
+          x: x + i * len / 10 + (Math.random() - 0.5) * 8,
+          y: y + Math.sin(i * 0.8) * 8 + (Math.random() - 0.5) * 5
+        });
+      }
+      return points;
+    }
+    
+    function generateArc(x1, y1, x2, y2) {
+      const points = [];
+      const mx = (x1 + x2) / 2;
+      const my = Math.min(y1, y2) - 60;
+      
+      for (let i = 0; i <= 20; i++) {
+        const t = i / 20;
+        // Quadratic bezier
+        const x = (1-t)*(1-t)*x1 + 2*(1-t)*t*mx + t*t*x2;
+        const y = (1-t)*(1-t)*y1 + 2*(1-t)*t*my + t*t*y2;
+        points.push({ x: x + (Math.random() - 0.5) * 3, y: y + (Math.random() - 0.5) * 3 });
+      }
+      return points;
+    }
+    
+    // ===== INIT =====
+    window.addEventListener('resize', resizeCanvases);
+    resizeCanvases();
+    loadFoxExample(); // Start with example
+  </script>
+</body>
+</html>

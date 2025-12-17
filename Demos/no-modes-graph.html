@@ -1,0 +1,850 @@
+<!--
+  NO-MODES GRAPH
+  
+  Core principle: Type is not a property. Type emerges from connections.
+  
+  A drawn circle IS:
+    - a stroke (connected to its points)
+    - a shape (connected to shape:circle)
+    - a semantic (connected to word:"circle", math:"x²+y²=r²")
+    - a concept (connected to "closure", "boundary", "wholeness")
+  
+  All at once. No switching. No hierarchy. Just connections.
+  
+  Node {
+    id: string
+    reps: { modality: data }[]   // visual, textual, mathematical, sonic...
+    edges: → NodeId[]            // just connections, relations are also nodes
+  }
+-->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>No-Modes Graph</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    
+    body {
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      background: #0a0a12;
+      color: #e5e5e5;
+      min-height: 100vh;
+      overflow: hidden;
+    }
+    
+    .container {
+      display: flex;
+      height: 100vh;
+    }
+    
+    .graph-area {
+      flex: 1;
+      position: relative;
+    }
+    
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+    
+    .sidebar {
+      width: 300px;
+      background: #12121a;
+      border-left: 1px solid #2a2a3a;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    
+    .panel {
+      padding: 1rem;
+      border-bottom: 1px solid #2a2a3a;
+    }
+    
+    .panel-title {
+      font-size: 0.625rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: #666;
+      margin-bottom: 0.75rem;
+    }
+    
+    .schema {
+      font-size: 0.6875rem;
+      line-height: 1.7;
+      background: #0a0a12;
+      padding: 0.75rem;
+      border-radius: 4px;
+    }
+    
+    .k { color: #c084fc; }
+    .t { color: #22d3ee; }
+    .c { color: #555; }
+    
+    /* Representations */
+    .reps {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    
+    .rep {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem;
+      background: #0a0a12;
+      border-radius: 4px;
+      border: 1px solid transparent;
+    }
+    
+    .rep.active {
+      border-color: #8b5cf6;
+    }
+    
+    .rep-icon {
+      width: 24px;
+      height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.875rem;
+    }
+    
+    .rep-content {
+      flex: 1;
+      font-size: 0.75rem;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    
+    .rep-modality {
+      font-size: 0.5625rem;
+      color: #666;
+      text-transform: uppercase;
+    }
+    
+    /* Connections */
+    .connections {
+      flex: 1;
+      overflow-y: auto;
+      padding: 1rem;
+    }
+    
+    .conn-group {
+      margin-bottom: 1rem;
+    }
+    
+    .conn-group-title {
+      font-size: 0.5625rem;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.375rem;
+    }
+    
+    .conn-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.25rem;
+    }
+    
+    .conn-chip {
+      padding: 0.25rem 0.5rem;
+      background: #1a1a2a;
+      border-radius: 4px;
+      font-size: 0.6875rem;
+      cursor: pointer;
+      transition: all 0.15s;
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+    }
+    
+    .conn-chip:hover {
+      background: #2a2a3a;
+    }
+    
+    .conn-chip .weight {
+      font-size: 0.5rem;
+      color: #666;
+    }
+    
+    /* Stats */
+    .stats {
+      display: flex;
+      gap: 1rem;
+      font-size: 0.625rem;
+      color: #666;
+      padding: 0.75rem 1rem;
+      border-top: 1px solid #2a2a3a;
+    }
+    
+    .stat-val { color: #fff; font-weight: 600; }
+    
+    /* Toolbar */
+    .toolbar {
+      position: absolute;
+      top: 1rem;
+      left: 1rem;
+      display: flex;
+      gap: 0.375rem;
+      z-index: 10;
+    }
+    
+    .toolbar button {
+      padding: 0.5rem 0.75rem;
+      background: #1a1a2a;
+      border: 1px solid #2a2a3a;
+      border-radius: 4px;
+      color: #e5e5e5;
+      font-family: inherit;
+      font-size: 0.6875rem;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    
+    .toolbar button:hover {
+      background: #2a2a3a;
+    }
+    
+    .toolbar button.active {
+      background: #8b5cf6;
+      border-color: #8b5cf6;
+    }
+    
+    /* Legend */
+    .legend {
+      position: absolute;
+      bottom: 1rem;
+      left: 1rem;
+      display: flex;
+      gap: 1rem;
+      font-size: 0.625rem;
+      color: #555;
+    }
+    
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 0.375rem;
+    }
+    
+    .legend-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+    
+    /* Empty state */
+    .empty-state {
+      color: #444;
+      font-size: 0.75rem;
+      font-style: italic;
+    }
+    
+    /* Hint */
+    .hint {
+      position: absolute;
+      top: 1rem;
+      right: 320px;
+      font-size: 0.625rem;
+      color: #444;
+      display: flex;
+      gap: 1rem;
+    }
+    
+    .hint kbd {
+      padding: 0.125rem 0.375rem;
+      background: #1a1a2a;
+      border-radius: 3px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="graph-area">
+      <canvas id="canvas"></canvas>
+      
+      <div class="toolbar">
+        <button id="addNodeBtn">+ Node</button>
+        <button id="drawBtn">✏ Draw</button>
+        <button id="typeBtn">T Type</button>
+      </div>
+      
+      <div class="hint">
+        <span><kbd>click</kbd> select</span>
+        <span><kbd>drag</kbd> move</span>
+        <span><kbd>shift+drag</kbd> connect</span>
+        <span><kbd>del</kbd> remove</span>
+      </div>
+      
+      <div class="legend">
+        <div class="legend-item"><div class="legend-dot" style="background:#8b5cf6"></div> type node</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#3b82f6"></div> instance</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#f97316"></div> relation</div>
+      </div>
+    </div>
+    
+    <div class="sidebar">
+      <div class="panel">
+        <div class="panel-title">Schema (no modes)</div>
+        <div class="schema">
+          <span class="k">Node</span> {<br>
+          &nbsp;&nbsp;id: <span class="t">string</span><br>
+          &nbsp;&nbsp;reps: <span class="t">{ modality: data }[]</span><br>
+          &nbsp;&nbsp;edges: <span class="t">→ NodeId[]</span> <span class="c">// that's it</span><br>
+          }<br><br>
+          <span class="c">// Type = connection to type node</span><br>
+          <span class="c">// Relations = also nodes</span><br>
+          <span class="c">// Hierarchy = emergent</span>
+        </div>
+      </div>
+      
+      <div class="panel">
+        <div class="panel-title">Selected Node</div>
+        <div id="selectedInfo">
+          <div class="empty-state">Click a node to inspect</div>
+        </div>
+      </div>
+      
+      <div class="panel">
+        <div class="panel-title">Representations</div>
+        <div class="reps" id="repsPanel">
+          <div class="empty-state">No representations</div>
+        </div>
+      </div>
+      
+      <div class="connections" id="connectionsPanel">
+        <div class="panel-title">Connections</div>
+        <div class="empty-state">No connections</div>
+      </div>
+      
+      <div class="stats">
+        <span><span class="stat-val" id="nodeCount">0</span> nodes</span>
+        <span><span class="stat-val" id="edgeCount">0</span> edges</span>
+        <span><span class="stat-val" id="typeNodeCount">0</span> types</span>
+      </div>
+    </div>
+  </div>
+  
+  <script>
+    // ===== NO-MODES GRAPH =====
+    // Type is not a property. Type emerges from connections.
+    
+    let nodes = new Map();
+    let nextId = 1;
+    
+    function createNode(reps = [], edges = []) {
+      const id = `n${nextId++}`;
+      const node = { id, reps, edges, x: 0, y: 0 };
+      nodes.set(id, node);
+      return node;
+    }
+    
+    function getNode(id) { return nodes.get(id); }
+    
+    // Get all nodes this node connects to
+    function getConnections(node) {
+      return node.edges.map(eid => getNode(eid)).filter(Boolean);
+    }
+    
+    // Get all nodes that connect TO this node
+    function getIncoming(node) {
+      return [...nodes.values()].filter(n => n.edges.includes(node.id));
+    }
+    
+    // Check if a node is a "type" (has no incoming type edges, or is bootstrap)
+    function isTypeNode(node) {
+      // Bootstrap types or nodes that represent categories
+      const typeRep = node.reps.find(r => r.modality === 'meta');
+      return typeRep?.data?.isType === true;
+    }
+    
+    // Check if a node is a "relation" 
+    function isRelationNode(node) {
+      const typeRep = node.reps.find(r => r.modality === 'meta');
+      return typeRep?.data?.isRelation === true;
+    }
+    
+    // Get primary label for a node
+    function getLabel(node) {
+      const wordRep = node.reps.find(r => r.modality === 'word');
+      if (wordRep) return wordRep.data;
+      
+      const mathRep = node.reps.find(r => r.modality === 'math');
+      if (mathRep) return mathRep.data;
+      
+      const metaRep = node.reps.find(r => r.modality === 'meta');
+      if (metaRep?.data?.name) return metaRep.data.name;
+      
+      return node.id;
+    }
+    
+    // Get node color based on what it IS (via connections)
+    function getNodeColor(node) {
+      if (isTypeNode(node)) return '#8b5cf6';
+      if (isRelationNode(node)) return '#f97316';
+      return '#3b82f6';
+    }
+    
+    // ===== BOOTSTRAP =====
+    function bootstrap() {
+      // Create fundamental type nodes
+      const typeNodes = [
+        { name: 'stroke', reps: [{ modality: 'word', data: 'stroke' }, { modality: 'meta', data: { isType: true, color: '#64748b' }}]},
+        { name: 'shape', reps: [{ modality: 'word', data: 'shape' }, { modality: 'meta', data: { isType: true, color: '#8b5cf6' }}]},
+        { name: 'circle', reps: [{ modality: 'word', data: 'circle' }, { modality: 'math', data: 'x²+y²=r²' }, { modality: 'meta', data: { isType: true, color: '#a855f7' }}]},
+        { name: 'line', reps: [{ modality: 'word', data: 'line' }, { modality: 'math', data: 'y=mx+b' }, { modality: 'meta', data: { isType: true, color: '#7c3aed' }}]},
+        { name: 'word', reps: [{ modality: 'word', data: 'word' }, { modality: 'meta', data: { isType: true, color: '#06b6d4' }}]},
+        { name: 'concept', reps: [{ modality: 'word', data: 'concept' }, { modality: 'meta', data: { isType: true, color: '#10b981' }}]},
+      ];
+      
+      const typeMap = {};
+      typeNodes.forEach((t, i) => {
+        const node = createNode(t.reps, []);
+        node.x = 100 + (i % 3) * 150;
+        node.y = 80 + Math.floor(i / 3) * 100;
+        typeMap[t.name] = node;
+      });
+      
+      // Create relation nodes
+      const relations = [
+        { name: 'is-a', reps: [{ modality: 'word', data: 'is-a' }, { modality: 'meta', data: { isRelation: true }}]},
+        { name: 'contains', reps: [{ modality: 'word', data: 'contains' }, { modality: 'meta', data: { isRelation: true }}]},
+        { name: 'means', reps: [{ modality: 'word', data: 'means' }, { modality: 'meta', data: { isRelation: true }}]},
+        { name: 'adjacent', reps: [{ modality: 'word', data: 'adjacent' }, { modality: 'meta', data: { isRelation: true }}]},
+      ];
+      
+      relations.forEach((r, i) => {
+        const node = createNode(r.reps, []);
+        node.x = 500 + i * 100;
+        node.y = 80;
+        typeMap[r.name] = node;
+      });
+      
+      // Create an example: a drawn circle
+      // This single node IS multiple things simultaneously
+      const drawnCircle = createNode([
+        { modality: 'stroke', data: { points: [[100,200],[150,180],[200,200],[150,220],[100,200]], style: 'closed' }},
+        { modality: 'word', data: 'loop' },
+        { modality: 'math', data: '(x-150)²+(y-200)²=50²' },
+        { modality: 'params', data: { h: 150, k: 200, r: 50 }},
+      ], [
+        typeMap['stroke'].id,   // it IS a stroke
+        typeMap['shape'].id,    // it IS a shape
+        typeMap['circle'].id,   // it IS a circle (recognized)
+      ]);
+      drawnCircle.x = 200;
+      drawnCircle.y = 350;
+      
+      // Create a concept it connects to
+      const wholeness = createNode([
+        { modality: 'word', data: 'wholeness' },
+        { modality: 'meta', data: { description: 'completeness, unity, containment' }},
+      ], [
+        typeMap['concept'].id,
+      ]);
+      wholeness.x = 400;
+      wholeness.y = 350;
+      
+      // Connect circle to concept
+      drawnCircle.edges.push(wholeness.id);
+      
+      // Create another shape
+      const drawnLine = createNode([
+        { modality: 'stroke', data: { points: [[300,400],[500,350]], style: 'open' }},
+        { modality: 'word', data: 'path' },
+        { modality: 'math', data: 'y = -0.25x + 475' },
+      ], [
+        typeMap['stroke'].id,
+        typeMap['shape'].id,
+        typeMap['line'].id,
+      ]);
+      drawnLine.x = 350;
+      drawnLine.y = 450;
+      
+      // Direction concept
+      const direction = createNode([
+        { modality: 'word', data: 'direction' },
+      ], [
+        typeMap['concept'].id,
+      ]);
+      direction.x = 500;
+      direction.y = 450;
+      
+      drawnLine.edges.push(direction.id);
+      
+      // Connect the two shapes (adjacent)
+      drawnCircle.edges.push(drawnLine.id);
+    }
+    
+    // ===== CANVAS =====
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    
+    let selected = null;
+    let hovered = null;
+    let dragging = null;
+    let dragOffset = { x: 0, y: 0 };
+    let connecting = false;
+    let connectFrom = null;
+    let mouse = { x: 0, y: 0 };
+    
+    function resize() {
+      canvas.width = canvas.parentElement.clientWidth;
+      canvas.height = canvas.parentElement.clientHeight;
+      render();
+    }
+    
+    function render() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      
+      // Draw edges
+      nodes.forEach(node => {
+        node.edges.forEach(targetId => {
+          const target = getNode(targetId);
+          if (target) {
+            drawEdge(node, target);
+          }
+        });
+      });
+      
+      // Draw connecting line
+      if (connecting && connectFrom) {
+        ctx.strokeStyle = '#8b5cf688';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([5, 5]);
+        ctx.beginPath();
+        ctx.moveTo(connectFrom.x, connectFrom.y);
+        ctx.lineTo(mouse.x, mouse.y);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+      
+      // Draw nodes
+      nodes.forEach(node => drawNode(node));
+      
+      updateStats();
+    }
+    
+    function drawEdge(from, to) {
+      const isTypeEdge = isTypeNode(to);
+      
+      ctx.strokeStyle = isTypeEdge ? '#8b5cf633' : '#3b82f633';
+      ctx.lineWidth = isTypeEdge ? 1 : 2;
+      
+      if (isTypeEdge) {
+        ctx.setLineDash([3, 3]);
+      }
+      
+      ctx.beginPath();
+      ctx.moveTo(from.x, from.y);
+      ctx.lineTo(to.x, to.y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      
+      // Arrow
+      const angle = Math.atan2(to.y - from.y, to.x - from.x);
+      const dist = Math.hypot(to.x - from.x, to.y - from.y);
+      const arrowPos = 0.7;
+      const ax = from.x + (to.x - from.x) * arrowPos;
+      const ay = from.y + (to.y - from.y) * arrowPos;
+      const len = 6;
+      
+      ctx.fillStyle = isTypeEdge ? '#8b5cf644' : '#3b82f644';
+      ctx.beginPath();
+      ctx.moveTo(ax + len * Math.cos(angle), ay + len * Math.sin(angle));
+      ctx.lineTo(ax + len * Math.cos(angle + 2.5), ay + len * Math.sin(angle + 2.5));
+      ctx.lineTo(ax + len * Math.cos(angle - 2.5), ay + len * Math.sin(angle - 2.5));
+      ctx.fill();
+    }
+    
+    function drawNode(node) {
+      const color = getNodeColor(node);
+      const isSel = node === selected;
+      const isHov = node === hovered;
+      const isType = isTypeNode(node);
+      const isRel = isRelationNode(node);
+      
+      const r = isType ? 20 : (isRel ? 16 : 14);
+      
+      // Glow
+      if (isSel || isHov) {
+        ctx.shadowColor = color;
+        ctx.shadowBlur = isSel ? 20 : 10;
+      }
+      
+      // Fill
+      ctx.fillStyle = isSel ? color : (isHov ? color + 'dd' : color + '99');
+      ctx.beginPath();
+      ctx.arc(node.x, node.y, r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      
+      // Border for types
+      if (isType || isRel) {
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+      
+      // Multi-rep indicator (small dots)
+      const repCount = node.reps.filter(r => r.modality !== 'meta').length;
+      if (repCount > 1) {
+        for (let i = 0; i < Math.min(repCount, 4); i++) {
+          const angle = (i / 4) * Math.PI * 2 - Math.PI / 2;
+          const dx = Math.cos(angle) * (r + 6);
+          const dy = Math.sin(angle) * (r + 6);
+          ctx.fillStyle = '#fff';
+          ctx.beginPath();
+          ctx.arc(node.x + dx, node.y + dy, 2, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+      
+      // Label
+      ctx.fillStyle = '#fff';
+      ctx.font = `${isType ? 'bold ' : ''}${isType ? 9 : 8}px monospace`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      
+      let label = getLabel(node);
+      if (label.length > 10) label = label.slice(0, 8) + '…';
+      ctx.fillText(label, node.x, node.y);
+    }
+    
+    function getNodeAt(x, y) {
+      for (const node of [...nodes.values()].reverse()) {
+        const r = isTypeNode(node) ? 20 : (isRelationNode(node) ? 16 : 14);
+        if (Math.hypot(node.x - x, node.y - y) < r + 4) return node;
+      }
+      return null;
+    }
+    
+    // ===== SIDEBAR =====
+    function updateSidebar() {
+      const info = document.getElementById('selectedInfo');
+      const reps = document.getElementById('repsPanel');
+      const conns = document.getElementById('connectionsPanel');
+      
+      if (!selected) {
+        info.innerHTML = '<div class="empty-state">Click a node to inspect</div>';
+        reps.innerHTML = '<div class="empty-state">No representations</div>';
+        conns.innerHTML = '<div class="panel-title">Connections</div><div class="empty-state">No connections</div>';
+        return;
+      }
+      
+      // Info
+      info.innerHTML = `
+        <div style="font-size:0.875rem;font-weight:600;margin-bottom:0.25rem">${getLabel(selected)}</div>
+        <div style="font-size:0.625rem;color:#666">${selected.id} · ${selected.edges.length} edges</div>
+      `;
+      
+      // Representations
+      const repIcons = {
+        stroke: '✏️',
+        word: '💬',
+        math: '∑',
+        params: '⚙️',
+        meta: '◈',
+        image: '🖼',
+        sound: '🔊'
+      };
+      
+      const visibleReps = selected.reps.filter(r => r.modality !== 'meta');
+      if (visibleReps.length === 0) {
+        reps.innerHTML = '<div class="empty-state">No representations</div>';
+      } else {
+        reps.innerHTML = visibleReps.map(r => `
+          <div class="rep">
+            <div class="rep-icon">${repIcons[r.modality] || '?'}</div>
+            <div>
+              <div class="rep-modality">${r.modality}</div>
+              <div class="rep-content">${typeof r.data === 'object' ? JSON.stringify(r.data).slice(0, 30) : r.data}</div>
+            </div>
+          </div>
+        `).join('');
+      }
+      
+      // Connections - grouped by type
+      const outgoing = getConnections(selected);
+      const incoming = getIncoming(selected);
+      
+      const typeConns = outgoing.filter(n => isTypeNode(n));
+      const relConns = outgoing.filter(n => isRelationNode(n));
+      const otherConns = outgoing.filter(n => !isTypeNode(n) && !isRelationNode(n));
+      
+      let connHtml = '<div class="panel-title">Connections</div>';
+      
+      if (typeConns.length > 0) {
+        connHtml += `
+          <div class="conn-group">
+            <div class="conn-group-title">IS A (types)</div>
+            <div class="conn-list">
+              ${typeConns.map(n => `<div class="conn-chip" data-id="${n.id}" style="border-left:2px solid #8b5cf6">${getLabel(n)}</div>`).join('')}
+            </div>
+          </div>
+        `;
+      }
+      
+      if (otherConns.length > 0) {
+        connHtml += `
+          <div class="conn-group">
+            <div class="conn-group-title">CONNECTS TO</div>
+            <div class="conn-list">
+              ${otherConns.map(n => `<div class="conn-chip" data-id="${n.id}">${getLabel(n)}</div>`).join('')}
+            </div>
+          </div>
+        `;
+      }
+      
+      if (incoming.length > 0) {
+        connHtml += `
+          <div class="conn-group">
+            <div class="conn-group-title">CONNECTED FROM</div>
+            <div class="conn-list">
+              ${incoming.map(n => `<div class="conn-chip" data-id="${n.id}" style="opacity:0.7">${getLabel(n)}</div>`).join('')}
+            </div>
+          </div>
+        `;
+      }
+      
+      if (typeConns.length === 0 && otherConns.length === 0 && incoming.length === 0) {
+        connHtml += '<div class="empty-state">No connections</div>';
+      }
+      
+      conns.innerHTML = connHtml;
+      
+      // Click handlers for chips
+      conns.querySelectorAll('.conn-chip').forEach(chip => {
+        chip.onclick = () => {
+          selected = getNode(chip.dataset.id);
+          updateSidebar();
+          render();
+        };
+      });
+    }
+    
+    function updateStats() {
+      document.getElementById('nodeCount').textContent = nodes.size;
+      let edges = 0;
+      nodes.forEach(n => edges += n.edges.length);
+      document.getElementById('edgeCount').textContent = edges;
+      document.getElementById('typeNodeCount').textContent = [...nodes.values()].filter(isTypeNode).length;
+    }
+    
+    // ===== EVENTS =====
+    canvas.onmousedown = e => {
+      const rect = canvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      const node = getNodeAt(x, y);
+      
+      if (e.shiftKey && node) {
+        connecting = true;
+        connectFrom = node;
+      } else if (node) {
+        dragging = node;
+        dragOffset = { x: x - node.x, y: y - node.y };
+        selected = node;
+        updateSidebar();
+      } else {
+        selected = null;
+        updateSidebar();
+      }
+      render();
+    };
+    
+    canvas.onmousemove = e => {
+      const rect = canvas.getBoundingClientRect();
+      mouse.x = e.clientX - rect.left;
+      mouse.y = e.clientY - rect.top;
+      
+      if (dragging) {
+        dragging.x = mouse.x - dragOffset.x;
+        dragging.y = mouse.y - dragOffset.y;
+        render();
+      } else {
+        const node = getNodeAt(mouse.x, mouse.y);
+        if (node !== hovered) {
+          hovered = node;
+          canvas.style.cursor = node ? 'pointer' : 'default';
+          render();
+        }
+        if (connecting) render();
+      }
+    };
+    
+    canvas.onmouseup = e => {
+      if (connecting && connectFrom) {
+        const target = getNodeAt(mouse.x, mouse.y);
+        if (target && target !== connectFrom && !connectFrom.edges.includes(target.id)) {
+          connectFrom.edges.push(target.id);
+        }
+      }
+      dragging = null;
+      connecting = false;
+      connectFrom = null;
+      render();
+    };
+    
+    document.onkeydown = e => {
+      if ((e.key === 'Delete' || e.key === 'Backspace') && selected) {
+        // Remove all edges pointing to this node
+        nodes.forEach(n => {
+          n.edges = n.edges.filter(eid => eid !== selected.id);
+        });
+        nodes.delete(selected.id);
+        selected = null;
+        updateSidebar();
+        render();
+      }
+    };
+    
+    // Toolbar
+    document.getElementById('addNodeBtn').onclick = () => {
+      const label = prompt('Node label (word):');
+      if (!label) return;
+      
+      const node = createNode([
+        { modality: 'word', data: label }
+      ], []);
+      node.x = 100 + Math.random() * 300;
+      node.y = 200 + Math.random() * 200;
+      
+      selected = node;
+      updateSidebar();
+      render();
+    };
+    
+    document.getElementById('typeBtn').onclick = () => {
+      const name = prompt('Type name:');
+      if (!name) return;
+      
+      const node = createNode([
+        { modality: 'word', data: name },
+        { modality: 'meta', data: { isType: true }}
+      ], []);
+      node.x = 100 + Math.random() * 200;
+      node.y = 80 + Math.random() * 80;
+      
+      selected = node;
+      updateSidebar();
+      render();
+    };
+    
+    // ===== INIT =====
+    window.onresize = resize;
+    resize();
+    bootstrap();
+    updateSidebar();
+    render();
+  </script>
+</body>
+</html>

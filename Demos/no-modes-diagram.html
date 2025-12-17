@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>No-Modes Schema</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    
+    body {
+      font-family: 'Space Grotesk', system-ui, sans-serif;
+      background: #08080e;
+      color: #e5e5e5;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+    
+    .diagram {
+      position: relative;
+      width: 400px;
+      height: 320px;
+    }
+    
+    /* The drawn mark (center) */
+    .mark {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: 64px;
+      height: 64px;
+      cursor: pointer;
+      z-index: 10;
+    }
+    
+    .mark svg {
+      width: 100%;
+      height: 100%;
+      filter: drop-shadow(0 0 20px rgba(139, 92, 246, 0.5));
+      transition: filter 0.3s;
+    }
+    
+    .mark:hover svg {
+      filter: drop-shadow(0 0 30px rgba(139, 92, 246, 0.8));
+    }
+    
+    .mark-label {
+      position: absolute;
+      top: 100%;
+      left: 50%;
+      transform: translateX(-50%);
+      margin-top: 8px;
+      font-size: 0.6875rem;
+      color: #666;
+      white-space: nowrap;
+    }
+    
+    /* Connection nodes */
+    .node {
+      position: absolute;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+    
+    .node:hover {
+      transform: scale(1.1);
+    }
+    
+    .node:hover .node-dot {
+      box-shadow: 0 0 20px currentColor;
+    }
+    
+    .node-dot {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.75rem;
+      font-weight: 600;
+      transition: box-shadow 0.2s;
+      border: 2px solid currentColor;
+      background: #08080e;
+    }
+    
+    .node-label {
+      font-size: 0.625rem;
+      color: inherit;
+      opacity: 0.8;
+    }
+    
+    /* Connection lines (SVG layer) */
+    .connections {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
+    
+    .conn-line {
+      stroke-width: 1.5;
+      stroke-dasharray: 4 4;
+      opacity: 0.4;
+      transition: opacity 0.2s, stroke-width 0.2s;
+    }
+    
+    .conn-line.highlight {
+      opacity: 1;
+      stroke-width: 2;
+      stroke-dasharray: none;
+    }
+    
+    /* Insight text */
+    .insight {
+      margin-top: 24px;
+      text-align: center;
+      max-width: 320px;
+    }
+    
+    .insight-main {
+      font-size: 0.9375rem;
+      line-height: 1.5;
+      color: #aaa;
+    }
+    
+    .insight-main strong {
+      color: #fff;
+    }
+    
+    .insight-sub {
+      margin-top: 8px;
+      font-size: 0.6875rem;
+      color: #555;
+    }
+    
+    /* Hover state display */
+    .hover-display {
+      height: 20px;
+      margin-top: 16px;
+      font-size: 0.75rem;
+      color: #8b5cf6;
+      text-align: center;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+    
+    .hover-display.visible {
+      opacity: 1;
+    }
+  </style>
+</head>
+<body>
+  <div class="diagram" id="diagram">
+    <svg class="connections" id="connections"></svg>
+    
+    <!-- Central mark -->
+    <div class="mark" id="mark">
+      <svg viewBox="0 0 64 64">
+        <path d="M32 8 C 50 8, 56 24, 56 32 C 56 44, 44 56, 32 56 C 20 56, 8 44, 8 32 C 8 20, 18 8, 32 8" 
+              stroke="#8b5cf6" stroke-width="3" fill="none" stroke-linecap="round"/>
+      </svg>
+      <div class="mark-label">drawn mark</div>
+    </div>
+    
+    <!-- Type nodes (positioned around center) -->
+    <div class="node" id="n-stroke" style="color:#64748b; left:50px; top:40px;">
+      <div class="node-dot">✏</div>
+      <div class="node-label">stroke</div>
+    </div>
+    
+    <div class="node" id="n-circle" style="color:#8b5cf6; left:160px; top:20px;">
+      <div class="node-dot">○</div>
+      <div class="node-label">circle</div>
+    </div>
+    
+    <div class="node" id="n-entity" style="color:#10b981; right:50px; top:40px;">
+      <div class="node-dot">▣</div>
+      <div class="node-label">entity</div>
+    </div>
+    
+    <div class="node" id="n-loop" style="color:#3b82f6; right:30px; top:150px;">
+      <div class="node-dot">∮</div>
+      <div class="node-label">"loop"</div>
+    </div>
+    
+    <div class="node" id="n-whole" style="color:#f97316; right:80px; bottom:40px;">
+      <div class="node-dot">◉</div>
+      <div class="node-label">wholeness</div>
+    </div>
+    
+    <div class="node" id="n-math" style="color:#06b6d4; left:30px; bottom:60px;">
+      <div class="node-dot">𝑓</div>
+      <div class="node-label">x²+y²=r²</div>
+    </div>
+  </div>
+  
+  <div class="hover-display" id="hoverDisplay"></div>
+  
+  <div class="insight">
+    <div class="insight-main">
+      What something <strong>is</strong> = what it <strong>connects to</strong>
+    </div>
+    <div class="insight-sub">
+      No type assignment. Meaning emerges from structure.
+    </div>
+  </div>
+  
+  <script>
+    const diagram = document.getElementById('diagram');
+    const connSvg = document.getElementById('connections');
+    const mark = document.getElementById('mark');
+    const hoverDisplay = document.getElementById('hoverDisplay');
+    
+    const nodes = ['stroke', 'circle', 'entity', 'loop', 'whole', 'math'];
+    const labels = {
+      stroke: 'it IS a stroke',
+      circle: 'it IS a circle',
+      entity: 'it IS an entity',
+      loop: 'it MEANS "loop"',
+      whole: 'it EVOKES wholeness',
+      math: 'it HAS equation x²+y²=r²'
+    };
+    
+    // Draw connection lines
+    function drawConnections() {
+      const markRect = mark.getBoundingClientRect();
+      const diagramRect = diagram.getBoundingClientRect();
+      const cx = markRect.left + markRect.width/2 - diagramRect.left;
+      const cy = markRect.top + markRect.height/2 - diagramRect.top;
+      
+      let svg = '';
+      nodes.forEach(id => {
+        const node = document.getElementById('n-' + id);
+        const nodeRect = node.getBoundingClientRect();
+        const nx = nodeRect.left + 16 - diagramRect.left;
+        const ny = nodeRect.top + 16 - diagramRect.top;
+        
+        const color = getComputedStyle(node).color;
+        svg += `<line class="conn-line" id="line-${id}" 
+                  x1="${cx}" y1="${cy}" x2="${nx}" y2="${ny}" 
+                  stroke="${color}"/>`;
+      });
+      connSvg.innerHTML = svg;
+    }
+    
+    // Highlight on hover
+    function highlight(id) {
+      nodes.forEach(n => {
+        const line = document.getElementById('line-' + n);
+        const node = document.getElementById('n-' + n);
+        if (n === id) {
+          line?.classList.add('highlight');
+          node?.style.setProperty('transform', 'scale(1.15)');
+        } else {
+          line?.classList.remove('highlight');
+          node?.style.setProperty('transform', 'scale(1)');
+        }
+      });
+      
+      if (id && labels[id]) {
+        hoverDisplay.textContent = labels[id];
+        hoverDisplay.classList.add('visible');
+      } else {
+        hoverDisplay.classList.remove('visible');
+      }
+    }
+    
+    // Events
+    nodes.forEach(id => {
+      const node = document.getElementById('n-' + id);
+      node.addEventListener('mouseenter', () => highlight(id));
+      node.addEventListener('mouseleave', () => highlight(null));
+    });
+    
+    mark.addEventListener('mouseenter', () => {
+      nodes.forEach(id => {
+        document.getElementById('line-' + id)?.classList.add('highlight');
+      });
+      hoverDisplay.textContent = 'simultaneously ALL of these';
+      hoverDisplay.classList.add('visible');
+    });
+    
+    mark.addEventListener('mouseleave', () => {
+      nodes.forEach(id => {
+        document.getElementById('line-' + id)?.classList.remove('highlight');
+      });
+      hoverDisplay.classList.remove('visible');
+    });
+    
+    // Init
+    drawConnections();
+    window.addEventListener('resize', drawConnections);
+  </script>
+</body>
+</html>
