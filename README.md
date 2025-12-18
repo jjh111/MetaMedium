@@ -10,14 +10,6 @@ An interactive demonstration of recombinatorial shape recognition, geometric and
 
 https://jjh111.github.io/MetaMedium/doodle2-canvas.html
 
-THIS VERSION (doodle2-canvas.html):
-- Redesigned UI matching whitepaper aesthetic
-- Recognition reasoning visible in real-time
-- Spatial intelligence panel showing relationships
-- Mobile-responsive with touch support
-- All features from doodle2-v1.html preserved
-- "Computational theater" - shows the machine's thinking
-
 FEATURES:
 - Live recognition scoring with visual progress bars
 - Real-time "why" reasoning for shape detection
@@ -35,7 +27,17 @@ KEYBOARD SHORTCUTS:
 - Enter: Accept top suggestion
 - Escape: Clear selection
 
-Demo Archive:
+Micro Demos:
+
 https://jjh111.github.io/MetaMedium/Demos/sna-drawing-demo.html
+
+Main Demo Archive:
 https://jjh111.github.io/MetaMedium/doodle2-v1.html
 
+CURRENT VERSION CHANGES (doodle2-canvas.html):
+- Redesigned UI matching whitepaper aesthetic
+- Recognition reasoning visible in real-time
+- Spatial intelligence panel showing relationships
+- Mobile-responsive with touch support
+- All features from doodle2-v1.html preserved
+- "Computational theater" - shows the machine's thinking
