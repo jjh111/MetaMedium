@@ -20,7 +20,7 @@
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400;1,9..40,500&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400;1,9..40,500&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         /* ===========================================
            MetaMedium Design System v4
@@ -209,7 +209,7 @@
         }
         
         .hero .subtitle {
-            font-family: 'DM Serif Display', Georgia, serif;
+            font-family: Georgia, serif;
             font-size: clamp(1.1rem, 2.2vw, 1.4rem);
             font-weight: 400;
             font-style: italic;
@@ -1215,7 +1215,7 @@
         .modal-counter {
             color: rgba(255, 255, 255, 0.7);
             font-size: 0.875rem;
-            font-family: 'JetBrains Mono', monospace;
+            font-family: 'SF Mono', 'Monaco', 'Courier New', monospace;
             min-width: 60px;
             text-align: center;
         }
@@ -2002,389 +2002,7 @@
   }
 }
 
-/* Hide old timeline styles */
-.timeline-columns, .tc-mobile, .tc-card {
-  display: none !important;
-}
-
-/* Header */
-.tc-header {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 1.5rem;
-  margin-bottom: 0.625rem;
-}
-
-.tc-col-head {
-  font-size: 0.875rem;
-  font-weight: 600;
-  letter-spacing: 0.12em;
-  color: var(--muted);
-  padding-bottom: 0.625rem;
-  border-bottom: 1px solid var(--border);
-}
-
-.tc-col-head:nth-child(1) { color: var(--v); border-color: var(--v); }
-.tc-col-head:nth-child(2) { color: var(--r); border-color: var(--r); }
-.tc-col-head:nth-child(3) { color: var(--i); border-color: var(--i); }
-
-/* Body */
-.tc-body {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 1.5rem;
-  padding: 1rem 0;
-  border-bottom: 1px solid var(--border);
-}
-
-.tc-column {
-  display: flex;
-  flex-direction: column;
-  gap: 0.375rem;
-}
-
-/* Items */
-.tc-item {
-  padding: 0.3125rem 0;
-  cursor: pointer;
-  transition: color 0.15s ease;
-  position: relative;
-  white-space: nowrap;
-}
-
-.tc-item:hover {
-  color: white;
-}
-
-.visions .tc-item:hover { color: var(--v); }
-.recognition .tc-item:hover { color: var(--r); }
-.intelligence .tc-item:hover { color: var(--i); }
-
-.tc-year {
-  color: var(--muted);
-  margin-right: 0.625rem;
-}
-
-.tc-item:hover .tc-year {
-  color: inherit;
-}
-
-/* Spacers */
-.tc-spacer { height: 3rem; }
-.tc-spacer-top { height: 2.8rem; }
-.tc-spacer-small { height: 1rem; }
-.tc-spacer-large { height: 14.5rem; }
-
-/* Chalktalk arrow */
-.tc-item.chalktalk {
-  position: relative;
-}
-
-.tc-arrow {
-  position: absolute;
-  left: 100%;
-  top: 50%;
-  width: calc(100% + 1.5rem);
-  height: 1px;
-  background: var(--muted);
-  margin-left: 0.625rem;
-}
-
-.tc-arrow::after {
-  content: '';
-  position: absolute;
-  right: 0;
-  top: -4px;
-  border: 5px solid transparent;
-  border-left-color: var(--muted);
-}
-
-/* Footer */
-.tc-footer {
-  padding-top: 1.25rem;
-  text-align: center;
-}
-
-.tc-metamedium {
-  display: inline-block;
-  font-size: 1.25rem;
-}
-
-.tc-metamedium .tc-year {
-  background: linear-gradient(90deg, var(--v), var(--r), var(--i));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-.tc-subtitle {
-  font-size: 0.9375rem;
-  color: var(--muted);
-  margin-top: 0.25rem;
-}
-
-/* Hover Card */
-.tc-card {
-  position: absolute;
-  width: 280px;
-  background: #1a1a1e;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 1.125rem;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
-  opacity: 0;
-  visibility: hidden;
-  transition: opacity 0.15s ease, visibility 0.15s ease;
-  z-index: 100;
-  pointer-events: none;
-}
-
-.tc-card.visible {
-  opacity: 1;
-  visibility: visible;
-}
-
-.tc-card-title {
-  font-family: 'Space Grotesk', system-ui, sans-serif;
-  font-size: 1rem;
-  font-weight: 600;
-  color: white;
-  margin-bottom: 0.3125rem;
-}
-
-.tc-card-subtitle {
-  font-size: 0.875rem;
-  font-style: italic;
-  color: var(--muted);
-  margin-bottom: 0.625rem;
-}
-
-.tc-card-desc {
-  font-family: 'Space Grotesk', system-ui, sans-serif;
-  font-size: 0.9375rem;
-  color: var(--text);
-  line-height: 1.5;
-  margin-bottom: 0.625rem;
-}
-
-.tc-card-est {
-  font-size: 0.875rem;
-  font-weight: 600;
-}
-
-.tc-card.visions .tc-card-est { color: var(--v); }
-.tc-card.recognition .tc-card-est { color: var(--r); }
-.tc-card.intelligence .tc-card-est { color: var(--i); }
-
-/* Mobile list - hidden on desktop */
-.tc-mobile {
-  display: none;
-}
-
-/* Responsive */
-@media (max-width: 640px) {
-  .timeline-columns {
-    padding: 1.25rem;
-  }
-
-  /* Hide desktop layout */
-  .tc-header,
-  .tc-body,
-  .tc-footer {
-    display: none;
-  }
-
-  /* Show mobile layout */
-  .tc-mobile {
-    display: block;
-  }
-
-  .tc-mobile-legend {
-    display: flex;
-    gap: 1rem;
-    padding-bottom: 0.75rem;
-    margin-bottom: 0.75rem;
-    border-bottom: 1px solid var(--border);
-    font-size: 0.75rem;
-    color: var(--muted);
-    flex-wrap: wrap;
-  }
-
-  .tc-mobile-legend span {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.375rem;
-  }
-
-  .tc-mobile-legend .dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-  }
-
-  .tc-mobile-legend .dot.v { background: var(--v); }
-  .tc-mobile-legend .dot.r { background: var(--r); }
-  .tc-mobile-legend .dot.i { background: var(--i); }
-
-  .tc-mobile-list {
-    display: flex;
-    flex-direction: column;
-    gap: 0.1rem;
-  }
-
-  .tc-m-item {
-    display: flex;
-    align-items: center;
-    gap: 0.625rem;
-    padding: 0.2rem 0.3;
-    font-size: 1.2rem;
-    cursor: pointer;
-    transition: color 0.15s ease;
-  }
-
-  .tc-m-item:hover {
-    color: white;
-  }
-
-  .tc-m-item.v:hover { color: var(--v); }
-  .tc-m-item.r:hover { color: var(--r); }
-  .tc-m-item.i:hover { color: var(--i); }
-  .tc-m-item.c:hover,
-  .tc-m-item.m:hover { color: var(--r); }
-
-  .tc-m-dot {
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    flex-shrink: 0;
-  }
-
-  .tc-m-dot.v { background: var(--v); }
-  .tc-m-dot.r { background: var(--r); }
-  .tc-m-dot.i { background: var(--i); }
-  .tc-m-dot.c { background: linear-gradient(135deg, var(--v), var(--r)); }
-  .tc-m-dot.m {
-    background: linear-gradient(135deg, var(--v), var(--r), var(--i));
-    width: 12px;
-    height: 12px;
-  }
-
-  .tc-m-year {
-    color: var(--muted);
-    font-size: 0.875rem;
-    min-width: 3rem;
-  }
-
-  .tc-m-item:hover .tc-m-year {
-    color: inherit;
-  }
-
-  .tc-m-name {
-    flex: 1;
-  }
-
-  .tc-m-sub {
-    font-size: 0.75rem;
-    color: var(--muted);
-    margin-left: 0.25rem;
-  }
-
-  .tc-m-item.m {
-    margin-top: 0.5rem;
-    padding-top: 0.75rem;
-    border-top: 1px solid var(--border);
-  }
-
-  .tc-m-item.m .tc-m-year {
-    background: linear-gradient(90deg, var(--v), var(--r), var(--i));
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-  }
-
-  /* Card adjustments for mobile */
-  .tc-card {
-    width: 290px;
-    padding: 0.875rem;
-    left: 50% !important;
-    transform: translateX(-50%);
-  }
-
-  .tc-card-title { font-size: 0.875rem; }
-  .tc-card-subtitle { font-size: 0.75rem; }
-  .tc-card-desc { font-size: 0.8125rem; }
-  .tc-card-est { font-size: 0.75rem; }
-}
 </style>
-
-<script>
-(function() {
-  const container = document.getElementById('timelineColumns');
-  const card = document.getElementById('tcCard');
-  const items = container.querySelectorAll('.tc-item, .tc-m-item');
-
-  items.forEach(item => {
-    item.addEventListener('mouseenter', (e) => {
-      const info = item.dataset.info;
-      if (!info) return;
-
-      const [title, subtitle, desc, est] = info.split('|');
-      card.querySelector('.tc-card-title').textContent = title;
-      card.querySelector('.tc-card-subtitle').textContent = subtitle;
-      card.querySelector('.tc-card-desc').textContent = desc;
-      card.querySelector('.tc-card-est').textContent = est;
-
-      // Determine thread for coloring
-      card.classList.remove('visions', 'recognition', 'intelligence');
-      const col = item.closest('.tc-column');
-      if (col) {
-        if (col.classList.contains('visions')) card.classList.add('visions');
-        if (col.classList.contains('recognition')) card.classList.add('recognition');
-        if (col.classList.contains('intelligence')) card.classList.add('intelligence');
-      } else {
-        // Mobile item - check class
-        if (item.classList.contains('v')) card.classList.add('visions');
-        if (item.classList.contains('r')) card.classList.add('recognition');
-        if (item.classList.contains('i')) card.classList.add('intelligence');
-        if (item.classList.contains('c')) card.classList.add('recognition');
-      }
-
-      // Position card
-      const rect = item.getBoundingClientRect();
-      const containerRect = container.getBoundingClientRect();
-
-      // Check if mobile (card will be centered via CSS)
-      if (window.innerWidth <= 640) {
-        card.style.left = '';
-        card.style.top = (rect.top - containerRect.top - 120) + 'px';
-        if (rect.top - containerRect.top < 130) {
-          card.style.top = (rect.bottom - containerRect.top + 10) + 'px';
-        }
-      } else {
-        let left = rect.right - containerRect.left + 16;
-        let top = rect.top - containerRect.top - 10;
-
-        if (left + 280 > containerRect.width) {
-          left = rect.left - containerRect.left - 296;
-        }
-        if (top + 160 > containerRect.height) {
-          top = containerRect.height - 170;
-        }
-        if (top < 0) top = 10;
-
-        card.style.left = left + 'px';
-        card.style.top = top + 'px';
-      }
-
-      card.classList.add('visible');
-    });
-
-    item.addEventListener('mouseleave', () => {
-      card.classList.remove('visible');
-    });
-  });
-})();
-</script>
 
         </section>
         <!-- SECTION 4: THE THESIS -->
@@ -2440,11 +2058,6 @@
                   <path d="M 20 0 L 0 0 0 20" fill="none" stroke="var(--border, #e5e5e5)" stroke-width="0.5" opacity="0.3"/>
                 </pattern>
                 <rect width="400" height="360" fill="url(#triGrid)" />
-
-                <!-- Triangle vertices (positions) -->
-                <!-- Top: Language (200, 60) -->
-                <!-- Bottom-left: Computation (60, 300) -->
-                <!-- Bottom-right: Meaning (340, 300) -->
 
                 <!-- EDGES -->
                 <g class="triadic-edges">
@@ -2923,7 +2536,6 @@
                             <!-- Title -->
                             <text x="350" y="10" text-anchor="middle" fill="#7b8a9a" font-size="15" opacity="1">How meaning emerges through triangulation</text>
 
-                            <!-- Triangle structure -->
                             <line x1="350" y1="80" x2="180" y2="320" stroke="#64b5f6" stroke-width="2" opacity=".4"/>
                             <line x1="350" y1="80" x2="520" y2="320" stroke="#64b5f6" stroke-width="2" opacity=".4"/>
                             <line x1="180" y1="320" x2="520" y2="320" stroke="#64b5f6" stroke-width="2" opacity=".4"/>
@@ -2957,14 +2569,12 @@
                                 <text x="180" y="361" text-anchor="middle" fill="#90caf9" font-size="22" font-weight="bold">SIGN</text>
                                 <text x="180" y="375" text-anchor="middle" fill="#7b8a9a" font-size="13" opacity="1">(form)</text>
 
-                                <!-- Sketch progression -->
                                 <g transform="translate(50, 170)">
                                     <!-- Step 1: rough oval -->
                                     <rect x="0" y="0" width="80" height="70" fill="rgba(10, 14, 26, 0.5)" stroke="#4a5568" stroke-width="1" rx="3"/>
                                     <ellipse cx="40" cy="30" rx="22" ry="25" fill="none" stroke="#90caf9" stroke-width="2" stroke-dasharray="2,1" opacity="0.8"/>
                                     <text x="40" y="60" text-anchor="middle" fill="#7b8a9a" font-size="11">1. rough oval</text>
 
-                                    <!-- Arrow -->
                                     <text x="88" y="35" fill="#64b5f6" font-size="16">→</text>
 
                                     <!-- Step 2: with dots -->
@@ -3355,7 +2965,6 @@
                             <!-- Title -->
                             <text x="375" y="25" text-anchor="middle" fill="#7b8a9a" font-size="15" opacity="1">Two paradigms for AI alignment</text>
 
-                            <!-- Left: Traditional -->
                             <g>
                                 <rect x="40" y="50" width="330" height="310" fill="rgba(74, 85, 104, 0.15)" stroke="#6b7280" stroke-width="2" rx="6"/>
                                 <text x="205" y="75" text-anchor="middle" fill="#8b9aaa" font-size="16" font-weight="bold">TRADITIONAL ALIGNMENT</text>
@@ -3391,7 +3000,6 @@
                                 <text x="60" y="347" fill="#d1495b" font-size="13">❌ Adversarial framing</text>
                             </g>
 
-                            <!-- Right: MetaMedium -->
                             <g transform="translate(380, 0)">
                                 <rect x="40" y="50" width="330" height="310" fill="rgba(100, 181, 246, 0.08)" stroke="#64b5f6" stroke-width="2" rx="6"/>
                                 <text x="205" y="75" text-anchor="middle" fill="#90caf9" font-size="16" font-weight="bold">METAMEDIUM ALIGNMENT</text>
@@ -3416,7 +3024,6 @@
                                     <text x="205" y="52" text-anchor="middle" fill="#90caf9" font-size="12">AI</text>
                                 </g>
 
-                                <!-- Arrows to shared canvas -->
                                 <line x1="120" y1="150" x2="160" y2="180" stroke="#64b5f6" stroke-width="2" marker-end="url(#arrow8)"/>
                                 <line x1="290" y1="150" x2="250" y2="180" stroke="#64b5f6" stroke-width="2" marker-end="url(#arrow8)"/>
 
@@ -3424,7 +3031,6 @@
                                 <g transform="translate(205, 200)">
                                     <rect x="-75" y="0" width="150" height="95" fill="rgba(10, 14, 26, 0.5)" stroke="#64b5f6" stroke-width="2" rx="4"/>
 
-                                    <!-- Sketch elements showing visible reasoning -->
                                     <circle cx="-30" cy="25" r="13" fill="none" stroke="#90caf9" stroke-width="1.5"/>
                                     <line x1="-17" y1="25" x2="10" y2="25" stroke="#90caf9" stroke-width="1.5" marker-end="url(#arrow8)"/>
                                     <line x1="-30" y1="38" x2="-45" y2="55" stroke="#90caf9" stroke-width="2"/>
