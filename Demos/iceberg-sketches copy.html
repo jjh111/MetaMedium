@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Meeting of Blurriness - Sketches</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    
+    body {
+      font-family: 'Space Grotesk', system-ui, sans-serif;
+      background: #08080e;
+      color: #e5e5e5;
+      padding: 32px;
+    }
+    
+    h1 {
+      font-size: 1.5rem;
+      color: #888;
+      margin-bottom: 32px;
+      text-align: center;
+    }
+    
+    .sketches {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+      gap: 32px;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+    
+    .sketch {
+      background: #0a0a12;
+      border: 1px solid #1a1a2a;
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+    
+    .sketch-title {
+      font-size: 1.1rem;
+      color: #8b5cf6;
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
+      margin-bottom: 20px;
+      font-weight: 600;
+    }
+    
+    .sketch-canvas {
+      width: 100%;
+      height: 320px;
+      background: #08080e;
+      border-radius: 12px;
+      margin-bottom: 16px;
+    }
+    
+    .sketch-caption {
+      font-size: 0.9rem;
+      color: #aaa;
+      line-height: 1.6;
+      margin-bottom: 12px;
+    }
+    
+    .sketch-caption em {
+      color: #10b981;
+      font-style: normal;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+  <h1>Meeting of Blurriness — Visual Approaches</h1>
+  
+  <div class="sketches">
+    <!-- Sketch 1: Vertical Funnels -->
+    <div class="sketch">
+      <div class="sketch-title">A. Vertical Funnels</div>
+      <canvas class="sketch-canvas" id="sketch1"></canvas>
+      <div class="sketch-caption">
+        Human depth above, AI depth below. Both narrow toward the <em>crystallized surface</em> where they meet.
+      </div>
+    </div>
+    
+    <!-- Sketch 2: Horizontal Mirrored -->
+    <div class="sketch">
+      <div class="sketch-title">B. Horizontal Mirror</div>
+      <canvas class="sketch-canvas" id="sketch2"></canvas>
+      <div class="sketch-caption">
+        Two blurry regions reach toward center. Canvas holds <em>stable objects</em> both can point to.
+      </div>
+    </div>
+    
+    <!-- Sketch 3: Activity Layers -->
+    <div class="sketch">
+      <div class="sketch-title">C. Activity Layers (like your 2016)</div>
+      <canvas class="sketch-canvas" id="sketch3"></canvas>
+      <div class="sketch-caption">
+        Layered structure: internal motive → intention → action → <em>visible mark</em>. Mirrored for both.
+      </div>
+    </div>
+    
+    <!-- Sketch 4: Triadic Closure -->
+    <div class="sketch">
+      <div class="sketch-title">D. Triadic Closure</div>
+      <canvas class="sketch-canvas" id="sketch4"></canvas>
+      <div class="sketch-caption">
+        Three vertices, each pair <em>closed through the third</em>. Canvas mediates Human↔AI.
+      </div>
+    </div>
+    
+    <!-- Sketch 5: Wave Interference -->
+    <div class="sketch">
+      <div class="sketch-title">E. Wave Interference</div>
+      <canvas class="sketch-canvas" id="sketch5"></canvas>
+      <div class="sketch-caption">
+        Two fuzzy waves meet. Where they <em>constructively interfere</em>, stable patterns emerge.
+      </div>
+    </div>
+    
+    <!-- Sketch 6: Reconciled -->
+    <div class="sketch">
+      <div class="sketch-title">F. Reconciled: Funnel + Layers + Triad</div>
+      <canvas class="sketch-canvas" id="sketch6"></canvas>
+      <div class="sketch-caption">
+        Mirrored funnels with internal layers. Canvas as <em>third vertex</em> that closes the loop.
+      </div>
+    </div>
+  </div>
+  
+  <script>
+    const dpr = window.devicePixelRatio || 1;
+    
+    function setupCanvas(id) {
+      const canvas = document.getElementById(id);
+      const rect = canvas.getBoundingClientRect();
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
+      const ctx = canvas.getContext('2d');
+      ctx.scale(dpr, dpr);
+      return ctx;
+    }
+    
+    function drawSketch1() {
+      const canvas = document.getElementById('sketch1');
+      const ctx = setupCanvas('sketch1');
+      const w = canvas.width / dpr;
+      const h = canvas.height / dpr;
+      const cx = w / 2;
+      const cy = h / 2;
+      
+      // Background
+      ctx.fillStyle = '#08080e';
+      ctx.fillRect(0, 0, w, h);
+      
+      // Funnel shapes
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(cx, h/2);
+      ctx.lineTo(w, 0);
+      ctx.closePath();
+      ctx.fillStyle = '#3b82f6';
+      ctx.globalAlpha = 0.1;
+      ctx.fill();
+      
+      ctx.beginPath();
+      ctx.moveTo(0, h);
+      ctx.lineTo(cx, h/2);
+      ctx.lineTo(w, h);
+      ctx.closePath();
+      ctx.fillStyle = '#8b5cf6';
+      ctx.globalAlpha = 0.1;
+      ctx.fill();
+      
+      // Lines
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(cx, h/2);
+      ctx.lineTo(w, 0);
+      ctx.strokeStyle = '#3b82f6';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      
+      ctx.beginPath();
+      ctx.moveTo(0, h);
+      ctx.lineTo(cx, h/2);
+      ctx.lineTo(w, h);
+      ctx.strokeStyle = '#8b5cf6';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      
+      // Labels
+      ctx.font = '12px Space Grotesk';
+      ctx.fillStyle = '#3b82f6';
+      ctx.textAlign = 'left';
+      ctx.fillText('HUMAN', 30, 25);
+      ctx.fillStyle = '#666';
+      ctx.font = '10px Space Grotesk';
+      ctx.fillText('motive → action', 30, 145);
+      
+      ctx.font = '12px Space Grotesk';
+      ctx.fillStyle = '#8b5cf6';
+      ctx.textAlign = 'right';
+      ctx.fillText('LLM', w - 30, 25);
+      ctx.fillStyle = '#666';
+      ctx.font = '10px Space Grotesk';
+      ctx.fillText('latent → output', w - 30, 145);
+      
+      ctx.fillStyle = '#10b981';
+      ctx.font = '12px Space Grotesk';
+      ctx.textAlign = 'center';
+      ctx.fillText('CANVAS', cx, h/2 + 50);
+      ctx.fillStyle = '#666';
+      ctx.font = '10px Space Grotesk';
+      ctx.fillText('crystallized', cx, h/2 + 65);
+      ctx.fillText('meeting point', cx, h/2 + 80);
+      
+      // Loop label
+      ctx.fillStyle = '#10b98166';
+      ctx.fillText('feedback shapes both', cx, h - 25);
+    }
+    
+    function drawSketch2() {
+      const canvas = document.getElementById('sketch2');
+      const ctx = setupCanvas('sketch2');
+      const w = canvas.width / dpr;
+      const h = canvas.height / dpr;
+      const cx = w / 2;
+      const cy = h / 2;
+      
+      // Background
+      ctx.fillStyle = '#08080e';
+      ctx.fillRect(0, 0, w, h);
+      
+      // Horizontal lines
+      ctx.beginPath();
+      ctx.moveTo(0, h/4);
+      ctx.lineTo(w, h/4);
+      ctx.strokeStyle = '#3b82f6';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      
+      ctx.beginPath();
+      ctx.moveTo(0, 3*h/4);
+      ctx.lineTo(w, 3*h/4);
+      ctx.strokeStyle = '#8b5cf6';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      
+      // Connecting lines
+      ctx.beginPath();
+      ctx.moveTo(0, h/4);
+      ctx.lineTo(cx, h/2);
+      ctx.lineTo(w, h/4);
+      ctx.strokeStyle = '#3b82f6';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      
+      ctx.beginPath();
+      ctx.moveTo(0, 3*h/4);
+      ctx.lineTo(cx, h/2);
+      ctx.lineTo(w, 3*h/4);
+      ctx.strokeStyle = '#8b5cf6';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      
+      // Labels
+      ctx.font = '12px Space Grotesk';
+      ctx.fillStyle = '#3b82f6';
+      ctx.textAlign = 'left';
+      ctx.fillText('HUMAN', 30, h/4 - 10);
+      
+      ctx.font = '12px Space Grotesk';
+      ctx.fillStyle = '#8b5cf6';
+      ctx.textAlign = 'right';
+      ctx.fillText('LLM', w - 30, 3*h/4 + 15);
+      
+      ctx.fillStyle = '#10b981';
+      ctx.font = '12px Space Grotesk';
+      ctx.textAlign = 'center';
+      ctx.fillText('CANVAS', cx, h/2 + 5);
+      
+      // Loop label
+      ctx.fillStyle = '#10b98166';
+      ctx.fillText('stabilizing force', cx, h - 25);
+    }
+    
+    function drawSketch3() {
+      const canvas = document.getElementById('sketch3');
+      const ctx = setupCanvas('sketch3');
+      const w = canvas.width / dpr;
+      const h = canvas.height / dpr;
+      const cx = w / 2;
+      const cy = h / 2;
+      
+      // Background
+      ctx.fillStyle = '#08080e';
+      ctx.fillRect(0, 0, w, h);
+      
+      // Vertical layers
+      const layerHeight = h / 4;
+      
+      // Layer 1: HUMAN
+      ctx.fillStyle = '#3b82f6';
+      ctx.globalAlpha = 0.1;
+      ctx.fillRect(0, 0, w, layerHeight);
+      
+      // Layer 2: HUMAN
+      ctx.fillStyle = '#3b82f6';
+      ctx.globalAlpha = 0.2;
+      ctx.fillRect(0, layerHeight, w, layerHeight);
+      
+      // Layer 3: CANVAS
+      ctx.fillStyle = '#10b981';
+      ctx.globalAlpha = 0.2;
+      ctx.fillRect(0, 2 * layerHeight, w, layerHeight);
+      
+      // Layer 4: LLM
+      ctx.fillStyle = '#8b5cf6';
+      ctx.globalAlpha = 0.2;
+      ctx.fillRect(0, 3 * layerHeight, w, layerHeight);
+      
+      // Labels
+      ctx.font = '12px Space Grotesk';
+      ctx.fillStyle = '#3b82f6';
+      ctx.textAlign = 'left';
+      ctx.fillText('HUMAN', 30, layerHeight - 10);
+      
+      ctx.font = '12px Space Grotesk';
+      ctx.fillStyle = '#8b5cf6';
+      ctx.textAlign = 'right';
+      ctx.fillText('LLM', w - 30, 3 * layerHeight + layerHeight/2);
+      
+      ctx.fillStyle = '#10b981';
+      ctx.font = '12px Space Grotesk';
+      ctx.textAlign = 'center';
+      ctx.fillText('CANVAS', cx, 2 * layerHeight + layerHeight/2);
+      
+      // Loop label
+      ctx.fillStyle = '#10b98166';
+      ctx.fillText('layered process', cx, h - 25);
+    }
+    
+    function drawSketch4() {
+      const canvas = document.getElementById('sketch4');
+      const ctx = setupCanvas('sketch4');
+      const w = canvas.width / dpr;
+      const h = canvas.height / dpr;
+      const cx = w / 2;
+      const cy = h / 2;
+      
+      // Background
+      ctx.fillStyle = '#08080e';
+      ctx.fillRect(0, 0, w, h);
+      
+      // Triangle
+      ctx.beginPath();
+      ctx.moveTo(100, 100);
+      ctx.lineTo(w - 100, 100);
+      ctx.lineTo(cx, h - 100);
+      ctx.closePath();
+      ctx.fillStyle = '#3b82f6';
+      ctx.globalAlpha = 0.1;
+      ctx.fill();
+      
+      // Labels
+      ctx.font = '12px Space Grotesk';
+      ctx.fillStyle = '#3b82f6';
+      ctx.textAlign = 'left';
+      ctx.fillText('HUMAN', 100, 90);
+      
+      ctx.font = '12px Space Grotesk';
+      ctx.fillStyle = '#8b5cf6';
+      ctx.textAlign = 'right';
+      ctx.fillText('LLM', w - 100, 90);
+      
+      ctx.fillStyle = '#10b981';
+      ctx.font = '12px Space Grotesk';
+      ctx.textAlign = 'center';
+      ctx.fillText('CANVAS', cx, h - 90);
+      
+      // Loop label
+      ctx.fillStyle = '#10b98166';
+      ctx.fillText('triadic structure', cx, h - 25);
+    }
+    
+    function drawSketch5() {
+      const canvas = document.getElementById('sketch5');
+      const ctx = setupCanvas('sketch5');
+      const w = canvas.width / dpr;
+      const h = canvas.height / dpr;
+      const cx = w / 2;
+      const cy = h / 2;
+      
+      // Background
+      ctx.fillStyle = '#08080e';
+      ctx.fillRect(0, 0, w, h);
+      
+      // Wave patterns
+      ctx.beginPath();
+      ctx.moveTo(0, h/2);
+      for (let x = 0; x < w; x += 20) {
+        const y = h/2 + Math.sin(x / 30) * 50;
+        ctx.lineTo(x, y);
+      }
+      ctx.strokeStyle = '#3b82f6';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      
+      ctx.beginPath();
+      ctx.moveTo(0, h/2);
+      for (let x = 0; x < w; x += 20) {
+        const y = h/2 + Math.sin(x / 30 + Math.PI) * 50;
+        ctx.lineTo(x, y);
+      }
+      ctx.strokeStyle = '#8b5cf6';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      
+      // Labels
+      ctx.font = '12px Space Grotesk';
+      ctx.fillStyle = '#3b82f6';
+      ctx.textAlign = 'left';
+      ctx.fillText('HUMAN', 30, h/2 - 60);
+      
+      ctx.font = '12px Space Grotesk';
+      ctx.fillStyle = '#8b5cf6';
+      ctx.textAlign = 'right';
+      ctx.fillText('LLM', w - 30, h/2 + 60);
+      
+      ctx.fillStyle = '#10b981';
+      ctx.font = '12px Space Grotesk';
+      ctx.textAlign = 'center';
+      ctx.fillText('CANVAS', cx, h/2);
+      
+      // Loop label
+      ctx.fillStyle = '#10b98166';
+      ctx.fillText('interference pattern', cx, h - 25);
+    }
+    
+    function drawSketch6() {
+      const canvas = document.getElementById('sketch6');
+      const ctx = setupCanvas('sketch6');
+      const w = canvas.width / dpr;
+      const h = canvas.height / dpr;
+      const cx = w / 2;
+      const cy = h / 2;
+      
+      // Background
+      ctx.fillStyle = '#08080e';
+      ctx.fillRect(0, 0, w, h);
+      
+      // Funnel shapes
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(cx, h/2);
+      ctx.lineTo(w, 0);
+      ctx.closePath();
+      ctx.fillStyle = '#3b82f6';
+      ctx.globalAlpha = 0.1;
+      ctx.fill();
+      
+      ctx.beginPath();
+      ctx.moveTo(0, h);
+      ctx.lineTo(cx, h/2);
+      ctx.lineTo(w, h);
+      ctx.closePath();
+      ctx.fillStyle = '#8b5cf6';
+      ctx.globalAlpha = 0.1;
+      ctx.fill();
+      
+      // Vertical layers
+      const layerHeight = h / 4;
+      
+      // Layer 1: HUMAN
+      ctx.fillStyle = '#3b82f6';
+      ctx.globalAlpha = 0.1;
+      ctx.fillRect(0, 0, w, layerHeight);
+      
+      // Layer 2: HUMAN
+      ctx.fillStyle = '#3b82f6';
+      ctx.globalAlpha = 0.2;
+      ctx.fillRect(0, layerHeight, w, layerHeight);
+      
+      // Layer 3: CANVAS
+      ctx.fillStyle = '#10b981';
+      ctx.globalAlpha = 0.2;
+      ctx.fillRect(0, 2 * layerHeight, w, layerHeight);
+      
+      // Layer 4: LLM
+      ctx.fillStyle = '#8b5cf6';
+      ctx.globalAlpha = 0.2;
+      ctx.fillRect(0, 3 * layerHeight, w, layerHeight);
+      
+      // Labels
+      ctx.font = '12px Space Grotesk';
+      ctx.fillStyle = '#3b82f6';
+      ctx.textAlign = 'left';
+      ctx.fillText('HUMAN', 30, layerHeight - 10);
+      
+      ctx.font = '12px Space Grotesk';
+      ctx.fillStyle = '#8b5cf6';
+      ctx.textAlign = 'right';
+      ctx.fillText('LLM', w - 30, 3 * layerHeight + layerHeight/2);
+      
+      ctx.fillStyle = '#10b981';
+      ctx.font = '12px Space Grotesk';
+      ctx.textAlign = 'center';
+      ctx.fillText('CANVAS', cx, 2 * layerHeight + layerHeight/2);
+      
+      // Loop label
+      ctx.fillStyle = '#10b98166';
+      ctx.fillText('reconciled structure', cx, h - 25);
+    }
+    
+    // Draw all sketches when page loads
+    window.addEventListener('load', function() {
+      drawSketch1();
+      drawSketch2();
+      drawSketch3();
+      drawSketch4();
+      drawSketch5();
+      drawSketch6();
+    });
+  </script>
+</body>
+</html>

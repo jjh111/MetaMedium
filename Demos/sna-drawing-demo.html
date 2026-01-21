@@ -18,28 +18,127 @@
   <script type="text/babel">
     const { useState, useRef, useEffect, useCallback } = React;
 
+    // --- SNA METRICS ---
+    const calculateMetrics = (nodes, edges) => {
+      const metrics = {};
+
+      nodes.forEach(node => {
+        const connections = edges.filter(e => e.source === node.id || e.target === node.id);
+        const degree = connections.length;
+
+        metrics[node.id] = {
+          degree,
+          centrality: nodes.length > 1 ? degree / (nodes.length - 1) : 0
+        };
+      });
+
+      // Network-wide metrics
+      const totalEdges = edges.length;
+      const totalNodes = nodes.length;
+      const maxEdges = (totalNodes * (totalNodes - 1)) / 2;
+      const density = maxEdges > 0 ? totalEdges / maxEdges : 0;
+      const avgDegree = totalNodes > 0 ? (totalEdges * 2) / totalNodes : 0;
+
+      return {
+        nodes: metrics,
+        network: { density, avgDegree, totalNodes, totalEdges }
+      };
+    };
+
+    // --- FORCE-DIRECTED LAYOUT ---
+    const applyForceLayout = (nodes, edges, canvasWidth = 400, canvasHeight = 320, iterations = 50) => {
+      if (nodes.length === 0) return nodes;
+
+      const workingNodes = nodes.map(n => ({ ...n, vx: 0, vy: 0 }));
+      const nodeRadius = 28;
+      const repulsion = 3000;
+      const attraction = 0.01;
+      const damping = 0.8;
+
+      for (let iter = 0; iter < iterations; iter++) {
+        // Reset forces
+        workingNodes.forEach(n => {
+          n.fx = 0;
+          n.fy = 0;
+        });
+
+        // Repulsion between all nodes
+        for (let i = 0; i < workingNodes.length; i++) {
+          for (let j = i + 1; j < workingNodes.length; j++) {
+            const dx = workingNodes[j].x - workingNodes[i].x;
+            const dy = workingNodes[j].y - workingNodes[i].y;
+            const dist = Math.max(1, Math.sqrt(dx * dx + dy * dy));
+            const force = repulsion / (dist * dist);
+
+            const fx = (dx / dist) * force;
+            const fy = (dy / dist) * force;
+
+            workingNodes[i].fx -= fx;
+            workingNodes[i].fy -= fy;
+            workingNodes[j].fx += fx;
+            workingNodes[j].fy += fy;
+          }
+        }
+
+        // Attraction along edges
+        edges.forEach(edge => {
+          const source = workingNodes.find(n => n.id === edge.source);
+          const target = workingNodes.find(n => n.id === edge.target);
+          if (!source || !target) return;
+
+          const dx = target.x - source.x;
+          const dy = target.y - source.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+
+          const force = dist * attraction;
+          const fx = (dx / dist) * force;
+          const fy = (dy / dist) * force;
+
+          source.fx += fx;
+          source.fy += fy;
+          target.fx -= fx;
+          target.fy -= fy;
+        });
+
+        // Update positions
+        workingNodes.forEach(n => {
+          n.vx = (n.vx + n.fx) * damping;
+          n.vy = (n.vy + n.fy) * damping;
+          n.x += n.vx;
+          n.y += n.vy;
+
+          // Keep in bounds
+          const margin = nodeRadius + 20;
+          n.x = Math.max(margin, Math.min(canvasWidth - margin, n.x));
+          n.y = Math.max(margin, Math.min(canvasHeight - margin, n.y));
+        });
+      }
+
+      return workingNodes.map(({ vx, vy, fx, fy, ...n }) => n);
+    };
+
     // --- CORE GRAPH STATE ---
     const useGraph = () => {
       const [nodes, setNodes] = useState([]);
       const [edges, setEdges] = useState([]);
-      
+
       const addNode = useCallback((node) => {
         setNodes(prev => [...prev, { id: Date.now(), label: '', x: node.x, y: node.y, ...node }]);
       }, []);
-      
+
       const updateNode = useCallback((id, updates) => {
         setNodes(prev => prev.map(n => n.id === id ? { ...n, ...updates } : n));
       }, []);
-      
+
       const removeNode = useCallback((id) => {
         setNodes(prev => prev.filter(n => n.id !== id));
         setEdges(prev => prev.filter(e => e.source !== id && e.target !== id));
       }, []);
-      
+
       const addEdge = useCallback((source, target) => {
         if (source === target) return;
         setEdges(prev => {
-          const exists = prev.some(e => 
+          const exists = prev.some(e =>
             (e.source === source && e.target === target) ||
             (e.source === target && e.target === source)
           );
@@ -47,57 +146,96 @@
           return [...prev, { id: Date.now(), source, target }];
         });
       }, []);
-      
+
       const removeEdge = useCallback((source, target) => {
-        setEdges(prev => prev.filter(e => 
+        setEdges(prev => prev.filter(e =>
           !((e.source === source && e.target === target) ||
             (e.source === target && e.target === source))
         ));
       }, []);
-      
-      return { nodes, edges, setNodes, setEdges, addNode, updateNode, removeNode, addEdge, removeEdge };
+
+      const arrangeNodes = useCallback((canvasWidth, canvasHeight) => {
+        setNodes(prev => applyForceLayout(prev, edges, canvasWidth, canvasHeight));
+      }, [edges]);
+
+      const clearAll = useCallback(() => {
+        setNodes([]);
+        setEdges([]);
+      }, []);
+
+      return { nodes, edges, setNodes, setEdges, addNode, updateNode, removeNode, addEdge, removeEdge, arrangeNodes, clearAll };
     };
 
     // --- GESTURE RECOGNITION ---
     const analyzeStroke = (points, nodes, nodeRadius) => {
       if (points.length < 8) return { type: 'none' };
-      
+
       const first = points[0];
       const last = points[points.length - 1];
       const dist = Math.hypot(last.x - first.x, last.y - first.y);
-      
+
       const xs = points.map(p => p.x);
       const ys = points.map(p => p.y);
       const minX = Math.min(...xs), maxX = Math.max(...xs);
       const minY = Math.min(...ys), maxY = Math.max(...ys);
+      const width = maxX - minX;
+      const height = maxY - minY;
       const centerX = (minX + maxX) / 2;
       const centerY = (minY + maxY) / 2;
-      const avgRadius = ((maxX - minX) + (maxY - minY)) / 4;
-      
+      const avgRadius = (width + height) / 4;
+
       const isClosed = dist < avgRadius * 0.9;
-      
+
+      // Check for square/rectangle (closed, similar width/height, corners)
+      const aspectRatio = width / height;
+      const isSquarish = aspectRatio > 0.6 && aspectRatio < 1.4;
+
+      if (isClosed && isSquarish && avgRadius > 12) {
+        // Check for corners - calculate path angles
+        let corners = 0;
+        for (let i = 2; i < points.length - 2; i += 3) {
+          const prev = points[i - 2];
+          const curr = points[i];
+          const next = points[i + 2];
+
+          const angle1 = Math.atan2(curr.y - prev.y, curr.x - prev.x);
+          const angle2 = Math.atan2(next.y - curr.y, next.x - curr.x);
+          let angleDiff = Math.abs(angle2 - angle1);
+          if (angleDiff > Math.PI) angleDiff = 2 * Math.PI - angleDiff;
+
+          if (angleDiff > Math.PI / 3) corners++; // ~60 degrees or more = corner
+        }
+
+        if (corners >= 3) {
+          const size = Math.max(25, Math.min(40, avgRadius));
+          return { type: 'square', x: centerX, y: centerY, size };
+        }
+      }
+
+      // Check for circle
       const radii = points.map(p => Math.hypot(p.x - centerX, p.y - centerY));
       const avgR = radii.reduce((a, b) => a + b, 0) / radii.length;
       const variance = radii.reduce((a, r) => a + Math.pow(r - avgR, 2), 0) / radii.length;
       const circularity = 1 - Math.min(1, Math.sqrt(variance) / avgR);
-      
+
       if (isClosed && circularity > 0.45 && avgRadius > 12) {
         return { type: 'circle', x: centerX, y: centerY, radius: Math.max(25, Math.min(40, avgRadius)) };
       }
-      
+
+      // Check for edge
       const hitRadius = nodeRadius + 20;
       const startNode = nodes.find(n => Math.hypot(n.x - first.x, n.y - first.y) < hitRadius);
       const endNode = nodes.find(n => Math.hypot(n.x - last.x, n.y - last.y) < hitRadius);
-      
+
       if (startNode && endNode && startNode.id !== endNode.id) {
         return { type: 'edge', source: startNode.id, target: endNode.id };
       }
-      
+
       return { type: 'none' };
     };
 
     // --- CANVAS COMPONENT ---
-    const NetworkCanvas = ({ nodes, edges, onAddNode, onUpdateNode, onRemoveNode, onAddEdge }) => {
+    const NetworkCanvas = ({ nodes, edges, onAddNode, onUpdateNode, onRemoveNode, onAddEdge, onCanvasSizeChange }) => {
       const containerRef = useRef(null);
       const canvasRef = useRef(null);
       const [canvasSize, setCanvasSize] = useState({ width: 400, height: 320 });
@@ -107,22 +245,25 @@
       const [currentStroke, setCurrentStroke] = useState([]);
       const [editingNode, setEditingNode] = useState(null);
       const [inputPos, setInputPos] = useState({ x: 0, y: 0 });
+      const [nodeType, setNodeType] = useState('person'); // 'person' or 'concept'
       const inputRef = useRef(null);
       const lastTapRef = useRef(0);
 
       const nodeRadius = 28;
-      
+
       useEffect(() => {
         const updateSize = () => {
           if (containerRef.current) {
             const rect = containerRef.current.getBoundingClientRect();
-            setCanvasSize({ width: Math.floor(rect.width), height: Math.floor(rect.height) });
+            const newSize = { width: Math.floor(rect.width), height: Math.floor(rect.height) };
+            setCanvasSize(newSize);
+            onCanvasSizeChange?.(newSize);
           }
         };
         updateSize();
         window.addEventListener('resize', updateSize);
         return () => window.removeEventListener('resize', updateSize);
-      }, []);
+      }, [onCanvasSizeChange]);
       
       const getCanvasPoint = useCallback((e) => {
         const canvas = canvasRef.current;
@@ -187,21 +328,39 @@
         });
         
         nodes.forEach(node => {
-          ctx.beginPath();
-          ctx.arc(node.x + 2, node.y + 2, nodeRadius, 0, Math.PI * 2);
-          ctx.fillStyle = 'rgba(0,0,0,0.08)';
-          ctx.fill();
-          
-          ctx.beginPath();
-          ctx.arc(node.x, node.y, nodeRadius, 0, Math.PI * 2);
-          ctx.fillStyle = editingNode === node.id ? '#fff' : '#faf8f5';
-          ctx.fill();
-          ctx.strokeStyle = editingNode === node.id ? '#c97856' : '#2d3a35';
-          ctx.lineWidth = editingNode === node.id ? 2.5 : 1.5;
-          ctx.stroke();
-          
+          const isConcept = node.type === 'concept';
+
+          // Shadow
+          if (isConcept) {
+            ctx.fillStyle = 'rgba(0,0,0,0.08)';
+            ctx.fillRect(node.x - nodeRadius + 2, node.y - nodeRadius + 2, nodeRadius * 2, nodeRadius * 2);
+          } else {
+            ctx.beginPath();
+            ctx.arc(node.x + 2, node.y + 2, nodeRadius, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(0,0,0,0.08)';
+            ctx.fill();
+          }
+
+          // Node shape
+          if (isConcept) {
+            ctx.fillStyle = editingNode === node.id ? '#fff' : '#faf8f5';
+            ctx.fillRect(node.x - nodeRadius, node.y - nodeRadius, nodeRadius * 2, nodeRadius * 2);
+            ctx.strokeStyle = editingNode === node.id ? '#c97856' : '#2d3a35';
+            ctx.lineWidth = editingNode === node.id ? 2.5 : 1.5;
+            ctx.strokeRect(node.x - nodeRadius, node.y - nodeRadius, nodeRadius * 2, nodeRadius * 2);
+          } else {
+            ctx.beginPath();
+            ctx.arc(node.x, node.y, nodeRadius, 0, Math.PI * 2);
+            ctx.fillStyle = editingNode === node.id ? '#fff' : '#faf8f5';
+            ctx.fill();
+            ctx.strokeStyle = editingNode === node.id ? '#c97856' : '#2d3a35';
+            ctx.lineWidth = editingNode === node.id ? 2.5 : 1.5;
+            ctx.stroke();
+          }
+
+          // Label
           if (node.label && editingNode !== node.id) {
-            ctx.font = '11px ui-monospace, SFMono-Regular, monospace';
+            ctx.font = isConcept ? 'bold 11px ui-monospace, SFMono-Regular, monospace' : '11px ui-monospace, SFMono-Regular, monospace';
             ctx.fillStyle = '#2d3a35';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
@@ -299,9 +458,10 @@
 
           const result = analyzeStroke(currentStroke, nodes, nodeRadius);
 
-          if (result.type === 'circle') {
+          if (result.type === 'circle' || result.type === 'square') {
             const newId = Date.now();
-            onAddNode({ id: newId, x: result.x, y: result.y, label: '' });
+            const nodeTypeToUse = result.type === 'square' ? 'concept' : nodeType;
+            onAddNode({ id: newId, x: result.x, y: result.y, label: '', type: nodeTypeToUse });
             setTimeout(() => {
               const newNode = { id: newId, x: result.x, y: result.y };
               openEditor(newNode);
@@ -312,7 +472,7 @@
 
           setCurrentStroke([]);
         }
-      }, [isDrawing, isDragging, currentStroke, nodes, nodeRadius, onAddNode, onAddEdge, openEditor]);
+      }, [isDrawing, isDragging, currentStroke, nodes, nodeRadius, nodeType, onAddNode, onAddEdge, openEditor]);
       
       return (
         <div 
@@ -348,6 +508,51 @@
             onTouchEnd={endDrawing}
             onTouchCancel={endDrawing}
           />
+          <div style={{
+            position: 'absolute',
+            top: '8px',
+            right: '8px',
+            display: 'flex',
+            gap: '4px',
+            background: 'rgba(250,248,245,0.9)',
+            borderRadius: '4px',
+            padding: '4px',
+            border: '1px solid #2d3a35'
+          }}>
+            <button
+              onClick={() => setNodeType('person')}
+              style={{
+                padding: '6px 10px',
+                background: nodeType === 'person' ? '#5a7d6d' : 'transparent',
+                color: nodeType === 'person' ? '#fff' : '#2d3a35',
+                border: 'none',
+                borderRadius: '3px',
+                cursor: 'pointer',
+                fontFamily: 'ui-monospace, SFMono-Regular, monospace',
+                fontSize: '10px'
+              }}
+              title="Draw circles for people"
+            >
+              ○ Person
+            </button>
+            <button
+              onClick={() => setNodeType('concept')}
+              style={{
+                padding: '6px 10px',
+                background: nodeType === 'concept' ? '#5a7d6d' : 'transparent',
+                color: nodeType === 'concept' ? '#fff' : '#2d3a35',
+                border: 'none',
+                borderRadius: '3px',
+                cursor: 'pointer',
+                fontFamily: 'ui-monospace, SFMono-Regular, monospace',
+                fontSize: '10px',
+                fontWeight: 'bold'
+              }}
+              title="Draw squares for concepts"
+            >
+              ▢ Concept
+            </button>
+          </div>
           {editingNode && (
             <input
               ref={inputRef}
@@ -424,10 +629,12 @@
     };
 
     // --- TABLE COMPONENT ---
-    const NetworkTable = ({ nodes, edges, onAddNode, onUpdateNode, onRemoveNode, onAddEdge, onRemoveEdge }) => {
+    const NetworkTable = ({ nodes, edges, onAddNode, onUpdateNode, onRemoveNode, onAddEdge, onRemoveEdge, onArrange, onClear }) => {
       const [newLabel, setNewLabel] = useState('');
       const [edgeSrc, setEdgeSrc] = useState('');
       const [edgeTgt, setEdgeTgt] = useState('');
+
+      const metrics = calculateMetrics(nodes, edges);
 
       const getConnections = (nodeId) => edges
         .filter(e => e.source === nodeId || e.target === nodeId)
@@ -436,7 +643,7 @@
       const handleAddNode = () => {
         if (newLabel.trim()) {
           const pos = findValidSpawnPosition(nodes);
-          onAddNode({ label: newLabel.trim(), ...pos });
+          onAddNode({ label: newLabel.trim(), type: 'person', ...pos });
           setNewLabel('');
         }
       };
@@ -486,6 +693,40 @@
             </select>
             <button onClick={handleAddEdge} style={btnStyle}>Link</button>
           </div>
+
+          <div style={{ display: 'flex', gap: '6px' }}>
+            {nodes.length > 1 && (
+              <button
+                onClick={onArrange}
+                style={{
+                  ...btnStyle,
+                  flex: 1,
+                  background: '#c97856',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '4px'
+                }}
+              >
+                ⚡ Auto-Arrange
+              </button>
+            )}
+            <button
+              onClick={onClear}
+              style={{
+                ...btnStyle,
+                flex: nodes.length > 1 ? 0 : 1,
+                background: '#999',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '4px'
+              }}
+              title="Reset to default state"
+            >
+              ↺ Clear
+            </button>
+          </div>
           
           <div style={{ flex: 1, overflow: 'auto', borderTop: '1px solid #e5e2dc', paddingTop: '10px' }}>
             {nodes.length === 0 ? (
@@ -510,14 +751,19 @@
                           borderRadius: '3px', cursor: 'pointer', fontSize: '11px'
                         }}>×</button>
                       </div>
+                      <div style={{ marginTop: '4px', display: 'flex', gap: '8px', fontSize: '10px',
+                        fontFamily: 'ui-monospace, SFMono-Regular, monospace', color: '#999' }}>
+                        <span title="Degree (connections)">deg: {metrics.nodes[node.id]?.degree || 0}</span>
+                        <span title="Degree centrality">cen: {(metrics.nodes[node.id]?.centrality || 0).toFixed(2)}</span>
+                      </div>
                       {conns.length > 0 && (
-                        <div style={{ marginTop: '4px', color: '#666', 
+                        <div style={{ marginTop: '4px', color: '#666',
                           fontFamily: 'ui-monospace, SFMono-Regular, monospace', fontSize: '10px' }}>
                           → {conns.map((cId, i) => {
                             const c = nodes.find(n => n.id === cId);
                             return (
                               <span key={cId}>
-                                <span onClick={() => onRemoveEdge(node.id, cId)} 
+                                <span onClick={() => onRemoveEdge(node.id, cId)}
                                   style={{ color: '#5a7d6d', cursor: 'pointer', textDecoration: 'underline dotted' }}
                                   title="Click to disconnect">
                                   {c?.label || '○'}
@@ -534,9 +780,14 @@
             )}
           </div>
           
-          <div style={{ fontSize: '10px', color: '#999', fontFamily: 'ui-monospace, SFMono-Regular, monospace', 
-            borderTop: '1px solid #e5e2dc', paddingTop: '8px' }}>
-            {nodes.length} nodes · {edges.length} edges
+          <div style={{ fontSize: '10px', color: '#999', fontFamily: 'ui-monospace, SFMono-Regular, monospace',
+            borderTop: '1px solid #e5e2dc', paddingTop: '8px', display: 'flex', flexDirection: 'column', gap: '3px' }}>
+            <div>{nodes.length} nodes · {edges.length} edges</div>
+            {nodes.length > 1 && (
+              <div>
+                density: {metrics.network.density.toFixed(3)} · avg deg: {metrics.network.avgDegree.toFixed(1)}
+              </div>
+            )}
           </div>
         </div>
       );
@@ -546,13 +797,18 @@
     function SocialNetworkDemo() {
       const graph = useGraph();
       const [isVertical, setIsVertical] = useState(window.innerWidth < 600);
-      
+      const [canvasSize, setCanvasSize] = useState({ width: 400, height: 320 });
+
       useEffect(() => {
         const checkLayout = () => setIsVertical(window.innerWidth < 600);
         window.addEventListener('resize', checkLayout);
         return () => window.removeEventListener('resize', checkLayout);
       }, []);
-      
+
+      const handleArrange = useCallback(() => {
+        graph.arrangeNodes(canvasSize.width, canvasSize.height);
+      }, [graph, canvasSize]);
+
       return (
         <div style={{
           display: 'flex', flexDirection: 'column', gap: '8px',
@@ -560,24 +816,27 @@
           margin: '0 auto', boxSizing: 'border-box'
         }}>
           <div style={{ fontSize: '10px', color: '#666', fontFamily: 'ui-monospace, SFMono-Regular, monospace' }}>
-            Draw ◯ to add nodes · Draw lines between nodes to connect · Drag nodes to move · Double-click/tap to edit
+            Draw ◯ for people, ▢ for concepts · Draw lines to connect · Drag to move · Double-click/tap to edit
           </div>
-          <div style={{ 
-            display: 'flex', 
+          <div style={{
+            display: 'flex',
             flexDirection: isVertical ? 'column' : 'row',
-            gap: '10px', 
-            flex: 1, 
-            minHeight: 0 
+            gap: '10px',
+            flex: 1,
+            minHeight: 0
           }}>
             <NetworkCanvas
               nodes={graph.nodes} edges={graph.edges}
               onAddNode={graph.addNode} onUpdateNode={graph.updateNode}
               onRemoveNode={graph.removeNode} onAddEdge={graph.addEdge}
+              onCanvasSizeChange={setCanvasSize}
             />
             <NetworkTable
               nodes={graph.nodes} edges={graph.edges}
               onAddNode={graph.addNode} onUpdateNode={graph.updateNode}
               onRemoveNode={graph.removeNode} onAddEdge={graph.addEdge} onRemoveEdge={graph.removeEdge}
+              onArrange={handleArrange}
+              onClear={graph.clearAll}
               style={isVertical ? { width: '100%' } : {}}
             />
           </div>
