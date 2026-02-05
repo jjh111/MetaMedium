@@ -18,6 +18,8 @@
     <meta name="twitter:description" content="A Framework for Diagrammatic Human-AI Communication">
     <meta name="twitter:image" content="./Assets/thumb-metamedium.jpg">
 
+    <link rel="canonical" href="https://jjh111.github.io/MetaMedium/">
+
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400;1,9..40,500&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -1268,6 +1270,275 @@
         
         @media (min-width: 1200px) { main { max-width: 800px; } }
         
+        /* ===== SINGLE-COLUMN TIMELINE ===== */
+        .timeline-single {
+          --visions-color: #3b82f6;
+          --recognition-color: #8b5cf6;
+          --intelligence-color: #10b981;
+          --chalktalk-color: #f59e0b;
+          --convergence-color: #f59e0b;
+          --bg: #f8f6f1;
+          --text: #1a1a2e;
+          --muted: #666;
+          --border: #d4d4d4;
+          --pipe: #999;
+          font-family: 'SF Mono', 'Monaco', 'Courier New', monospace;
+          font-size: 0.9375rem;
+          background: var(--bg);
+          border-radius: 12px;
+          padding: 1.5rem;
+          margin: 1rem 0;
+          color: var(--text);
+          max-width: 900px;
+        }
+        .tl-entry {
+          display: grid;
+          grid-template-columns: 60px 20px 1fr;
+          gap: 1rem;
+          margin-bottom: 1.3rem;
+          position: relative;
+        }
+        .tl-year {
+          font-weight: 700;
+          font-size: 1.125rem;
+          color: var(--text);
+          text-align: right;
+          line-height: 1.3;
+        }
+        .tl-pipe {
+          color: var(--pipe);
+          font-size: 1.25rem;
+          line-height: 1;
+          user-select: none;
+        }
+        .tl-content { padding-bottom: 0.5rem; }
+        .tl-title {
+          font-weight: 700;
+          font-size: 1rem;
+          letter-spacing: 0.02em;
+          margin-bottom: 0.5rem;
+          color: var(--text);
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+          flex-wrap: wrap;
+        }
+        .tl-badge {
+          display: inline-block;
+          padding: 0.25rem 0.625rem;
+          border-radius: 12px;
+          font-size: 0.6875rem;
+          font-weight: 600;
+          letter-spacing: 0.05em;
+          white-space: nowrap;
+        }
+        .tl-badge.visions {
+          background: rgba(59, 130, 246, 0.15);
+          color: var(--visions-color);
+          border: 1px solid var(--visions-color);
+        }
+        .tl-badge.recognition {
+          background: rgba(139, 92, 246, 0.15);
+          color: var(--recognition-color);
+          border: 1px solid var(--recognition-color);
+        }
+        .tl-badge.intelligence {
+          background: rgba(16, 185, 129, 0.15);
+          color: var(--intelligence-color);
+          border: 1px solid var(--intelligence-color);
+        }
+        .tl-badge.chalktalk {
+          background: rgba(245, 158, 11, 0.15);
+          color: var(--chalktalk-color);
+          border: 1px solid var(--chalktalk-color);
+          font-size: 0.625rem;
+        }
+        .tl-badge.convergence {
+          background: rgba(245, 158, 11, 0.2);
+          color: var(--convergence-color);
+          border: 2px solid var(--convergence-color);
+          font-weight: 700;
+        }
+        .tl-author {
+          font-size: 0.9375rem;
+          color: var(--text);
+          margin-bottom: 0.375rem;
+          line-height: 1.5;
+        }
+        .tl-desc {
+          font-size: 0.875rem;
+          color: var(--muted);
+          line-height: 1.6;
+          margin-bottom: 0.5rem;
+        }
+        .tl-sig {
+          font-size: 0.8125rem;
+          font-style: italic;
+          color: var(--muted);
+          line-height: 1.5;
+          padding-left: 1.25rem;
+        }
+        .tl-convergence {
+          background: linear-gradient(135deg, rgba(59, 130, 246, 0.05), rgba(245, 158, 11, 0.08));
+          border: 2px solid var(--convergence-color);
+          border-radius: 12px;
+          padding: 1.5rem;
+          margin: 2rem 0;
+          grid-template-columns: 1fr;
+        }
+        .tl-convergence .tl-year {
+          text-align: left;
+          font-size: 1.25rem;
+          color: var(--convergence-color);
+          margin-bottom: 0.5rem;
+        }
+        .tl-convergence .tl-pipe { display: none; }
+        .tl-convergence .tl-title {
+          font-size: 1.375rem;
+          margin-bottom: 0.75rem;
+        }
+        .tl-synthesis {
+          margin: 1rem 0;
+          padding: 1rem;
+          background: rgba(255, 255, 255, 0.5);
+          border-radius: 8px;
+          border-left: 3px solid var(--convergence-color);
+        }
+        .tl-synthesis strong { color: var(--text); }
+        .tl-synthesis ul {
+          margin: 0.75rem 0 0 0;
+          padding-left: 1.25rem;
+          list-style: none;
+        }
+        .tl-synthesis li {
+          margin-bottom: 0.5rem;
+          line-height: 1.6;
+          position: relative;
+        }
+        .tl-synthesis li::before {
+          content: "\2192";
+          position: absolute;
+          left: -1.25rem;
+          color: var(--convergence-color);
+        }
+        /* Timeline collapsible */
+        .tl-entry.tl-hidden { display: none; }
+        .timeline-toggle {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 0.5rem;
+          margin: 1rem 0 0.5rem;
+          padding: 0.5rem 1rem;
+          background: none;
+          border: 1px solid var(--border, #d4d4d4);
+          border-radius: 6px;
+          color: var(--muted, #666);
+          font-family: 'DM Sans', sans-serif;
+          font-size: 0.875rem;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          width: 100%;
+        }
+        .timeline-toggle:hover {
+          border-color: #3b82f6;
+          color: #3b82f6;
+        }
+        .timeline-toggle .toggle-arrow {
+          transition: transform 0.2s ease;
+        }
+        .timeline-toggle.expanded .toggle-arrow {
+          transform: rotate(180deg);
+        }
+        @media (max-width: 768px) {
+          .timeline-single { padding: 1rem; font-size: 0.875rem; }
+          .tl-entry { grid-template-columns: 50px 15px 1fr; gap: 0.75rem; margin-bottom: 1.25rem; }
+          .tl-year { font-size: 1rem; }
+          .tl-title { font-size: 0.9375rem; }
+          .tl-author { font-size: 0.875rem; }
+          .tl-desc { font-size: 0.8125rem; }
+          .tl-convergence { padding: 1rem; grid-template-columns: 1fr; display: block; }
+          .tl-convergence .tl-title { font-size: 1.125rem; }
+          .tl-synthesis { margin: 0.75rem 0; padding: 0.75rem; }
+          .tl-synthesis ul { padding-left: 1rem; }
+        }
+
+        /* ===== TRIADIC LOOP FIGURE ===== */
+        .triadic-loop-figure {
+          --accent: #3b82f6;
+          --accent-secondary: #8b5cf6;
+          --paper: #f8f6f1;
+          --text: #1a1a2e;
+          --muted: #666;
+          --border: #d4d4d4;
+          margin: var(--space-lg, 2rem) 0;
+          padding: var(--space-md, 1rem);
+          background: linear-gradient(135deg, rgba(59, 130, 246, 0.03) 0%, rgba(139, 92, 246, 0.03) 100%);
+          border-radius: 12px;
+          font-family: 'Space Grotesk', system-ui, sans-serif;
+        }
+        .triadic-controls {
+          display: flex;
+          justify-content: center;
+          gap: 0.5rem;
+          margin-bottom: 1rem;
+        }
+        .triadic-toggle {
+          padding: 0.5rem 1rem;
+          border: 1px solid var(--border);
+          border-radius: 6px;
+          background: var(--paper);
+          color: var(--muted);
+          font-family: inherit;
+          font-size: 0.875rem;
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+        .triadic-toggle[aria-pressed="true"] {
+          background: var(--accent);
+          border-color: var(--accent);
+          color: white;
+        }
+        .triadic-toggle:hover:not([aria-pressed="true"]) {
+          border-color: var(--accent);
+          color: var(--accent);
+        }
+        .triadic-svg {
+          width: 100%;
+          max-width: 400px;
+          height: auto;
+          display: block;
+          margin: 0 auto;
+        }
+        .node-label {
+          font-family: 'Space Grotesk', system-ui, sans-serif;
+          font-size: 11px;
+          font-weight: 500;
+        }
+        .triadic-caption {
+          text-align: center;
+          font-size: 0.875rem;
+          color: var(--muted);
+          margin-top: 1rem;
+          min-height: 2.5em;
+        }
+        .edge, .node circle, .node-label, .annotation, .center-label {
+          transition: all 0.5s ease;
+        }
+        .triadic-pulses { transition: opacity 0.5s ease; }
+        .triadic-loop-figure.metamedium .meaning-circle { stroke: var(--accent); }
+        .triadic-loop-figure.metamedium .meaning-label { fill: var(--text); }
+        .triadic-loop-figure.metamedium .edge-meaning-lang,
+        .triadic-loop-figure.metamedium .edge-reverse { opacity: 1; }
+        .triadic-loop-figure.metamedium .triadic-pulses { opacity: 1; }
+        .triadic-loop-figure.metamedium .annotation-traditional { opacity: 0; }
+        .triadic-loop-figure.metamedium .annotation-metamedium { opacity: 1; }
+        .triadic-loop-figure.metamedium .center-label { opacity: 0.7; }
+        @media (max-width: 480px) {
+          .triadic-controls { flex-direction: column; align-items: center; }
+          .triadic-toggle { width: 100%; max-width: 200px; }
+        }
+
         @media print {
             body { font-size: 11pt; line-height: 1.5; }
             nav, .scroll-indicator, #heroCanvas, .hero-hint, .demo-wrapper { display: none; }
@@ -1330,13 +1601,12 @@
             <h2 id="abstract">Overview</h2>
             
             <div class="overview-box">
-                <p>We face problems at scales our ancestors never imagined—climate systems, global economies, interconnected crises that span generations and continents. These challenges demand new ways of thinking together, yet our tools for shared understanding remain impoverished: text boxes, chat threads, turn-taking dialogues. The gap between the complexity we face and the bandwidth of our interfaces has never been wider.</p>
+                <p>MetaMedium is a framework and working prototype for a new kind of human-AI interface: one where you draw instead of type, and the system interprets your marks as meaning — not just pixels. Draw a circle and it becomes a recognized shape. Connect shapes and the system detects relationships. Name a pattern and the system learns your vocabulary.</p>
 
-                <p>The MetaMedium proposes that drawing—humanity's oldest form of external thought—can become the foundation for a new kind of human-AI communication. This is not merely a new interface. It is an evolution of language itself, where AI becomes a <em>meta-word</em>—a new linguistic element that transforms marks into meaning-in-context, allowing a seven-year-old and a graduate student to collaborate on the same canvas, each working at their own level, each contributing to shared understanding.</p>
+                <p>The core idea: AI can function as a <em>meta-word</em> — a new linguistic element that transforms rough marks into structured meaning based on context. This turns drawing into a shared language between human and machine, where a seven-year-old's sketch and an engineer's diagram can coexist on the same canvas, each interpreted at its own level of abstraction.</p>
             </div>
 <div style="margin-top: var(--space-lg); padding: 0 var(--space-lg); max-width: 760px; margin-left: auto; margin-right: auto; color: var(--muted); line-height: 1.7;">
-            <p>This whitepaper begins by examining <a href="#problem">the problem</a> with current interfaces that treat drawings as pixels rather than meaning. It then explores <a href="#vision">the vision</a> of sketching as genuine communication and traces <a href="#lineage">its lineage</a> through six decades of pioneering research. <a href="#thesis">The thesis</a> positions AI as a "meta-word" that closes the meaning-making loop between human and machine. <a href="#framework">The framework</a> introduces semiotic foundations, core principles, and cognitive lenses that enable shared interpretation. It demonstrates <a href="#development">current development</a> through a working prototype with shape recognition and spatial reasoning. <a href="#scenarios">Fictional scenarios</a> explore the proposed visual learning, asymmetric collaboration, rapid prototyping, and scientific thinking in practice. Finally, it considers <a href="#future">the future</a>—from external imagination to alignment through communication, and the deeper vision of computing rebuilt from first principles. </p> 
-            <p><strong>Use the header navigation links to skip to any section while reading.</strong></p>
+            <p>This paper examines <a href="#problem">the problem</a> with current interfaces, <a href="#vision">the vision</a> of sketching as communication, and <a href="#lineage">the lineage</a> of six decades of research behind it. <a href="#thesis">The thesis</a> positions AI as a "meta-word" that closes the meaning-making loop. <a href="#framework">The framework</a> introduces core principles and cognitive lenses. <a href="#development">Current development</a> demonstrates a working prototype. <a href="#scenarios">Scenarios</a> and <a href="#future">future directions</a> explore where this leads.</p>
             </div>
         </section>
 
@@ -1510,7 +1780,7 @@
 
            <div class="timeline-single" id="timelineSingle">
 
-  <div class="tl-entry">
+  <div class="tl-entry tl-hidden">
     <div class="tl-year">1960</div>
     <div class="tl-pipe">┃</div>
     <div class="tl-content">
@@ -1521,7 +1791,7 @@
     </div>
   </div>
 
-  <div class="tl-entry">
+  <div class="tl-entry tl-hidden">
     <div class="tl-year">1962</div>
     <div class="tl-pipe">┃</div>
     <div class="tl-content">
@@ -1543,7 +1813,7 @@
     </div>
   </div>
 
-  <div class="tl-entry">
+  <div class="tl-entry tl-hidden">
     <div class="tl-year">1968</div>
     <div class="tl-pipe">┃</div>
     <div class="tl-content">
@@ -1565,7 +1835,7 @@
     </div>
   </div>
 
-  <div class="tl-entry">
+  <div class="tl-entry tl-hidden">
     <div class="tl-year">1993</div>
     <div class="tl-pipe">┃</div>
     <div class="tl-content">
@@ -1576,7 +1846,7 @@
     </div>
   </div>
 
-  <div class="tl-entry">
+  <div class="tl-entry tl-hidden">
     <div class="tl-year">1996</div>
     <div class="tl-pipe">┃</div>
     <div class="tl-content">
@@ -1587,7 +1857,7 @@
     </div>
   </div>
 
-  <div class="tl-entry">
+  <div class="tl-entry tl-hidden">
     <div class="tl-year">2004</div>
     <div class="tl-pipe">┃</div>
     <div class="tl-content">
@@ -1598,7 +1868,7 @@
     </div>
   </div>
 
-  <div class="tl-entry">
+  <div class="tl-entry tl-hidden">
     <div class="tl-year">2007</div>
     <div class="tl-pipe">┃</div>
     <div class="tl-content">
@@ -1609,7 +1879,7 @@
     </div>
   </div>
 
-  <div class="tl-entry">
+  <div class="tl-entry tl-hidden">
     <div class="tl-year">2011</div>
     <div class="tl-pipe">┃</div>
     <div class="tl-content">
@@ -1620,7 +1890,7 @@
     </div>
   </div>
 
-  <div class="tl-entry">
+  <div class="tl-entry tl-hidden">
     <div class="tl-year">2011</div>
     <div class="tl-pipe">┃</div>
     <div class="tl-content">
@@ -1642,7 +1912,7 @@
     </div>
   </div>
 
-  <div class="tl-entry">
+  <div class="tl-entry tl-hidden">
     <div class="tl-year">2014</div>
     <div class="tl-pipe">┃</div>
     <div class="tl-content">
@@ -1653,7 +1923,7 @@
     </div>
   </div>
 
-  <div class="tl-entry">
+  <div class="tl-entry tl-hidden">
     <div class="tl-year">2014</div>
     <div class="tl-pipe">┃</div>
     <div class="tl-content">
@@ -1675,7 +1945,7 @@
     </div>
   </div>
 
-  <div class="tl-entry">
+  <div class="tl-entry tl-hidden">
     <div class="tl-year">2018</div>
     <div class="tl-pipe">┃</div>
     <div class="tl-content">
@@ -1686,7 +1956,7 @@
     </div>
   </div>
 
-  <div class="tl-entry">
+  <div class="tl-entry tl-hidden">
     <div class="tl-year">2018</div>
     <div class="tl-pipe">┃</div>
     <div class="tl-content">
@@ -1697,7 +1967,7 @@
     </div>
   </div>
 
-  <div class="tl-entry">
+  <div class="tl-entry tl-hidden">
     <div class="tl-year">2023</div>
     <div class="tl-pipe">┃</div>
     <div class="tl-content">
@@ -1708,7 +1978,7 @@
     </div>
   </div>
 
-  <div class="tl-entry">
+  <div class="tl-entry tl-hidden">
     <div class="tl-year">2023</div>
     <div class="tl-pipe">┃</div>
     <div class="tl-content">
@@ -1730,7 +2000,12 @@
     </div>
   </div>
 
-  <div class="tl-entry">
+  <button class="timeline-toggle" id="timelineToggle" aria-expanded="false">
+    <span class="toggle-text">Show full lineage (17 more entries)</span>
+    <span class="toggle-arrow">&#x25BC;</span>
+  </button>
+
+  <div class="tl-entry tl-hidden">
     <div class="tl-year">2024</div>
     <div class="tl-pipe">┃</div>
     <div class="tl-content">
@@ -1741,7 +2016,7 @@
     </div>
   </div>
 
-  <div class="tl-entry">
+  <div class="tl-entry tl-hidden">
     <div class="tl-year">2024</div>
     <div class="tl-pipe">┃</div>
     <div class="tl-content">
@@ -1769,244 +2044,9 @@
       <div class="tl-sig">┗━━ Drawing becomes a shared language between human and AI, enabling genuine collaboration through rich symbolic exchange</div>
     </div>
   </div>
-   <figure>
-          
+
 </div>
 
-<style>
-/* ===== NEW SINGLE-COLUMN TIMELINE ===== */
-.timeline-single {
-  --visions-color: #3b82f6;
-  --recognition-color: #8b5cf6;
-  --intelligence-color: #10b981;
-  --chalktalk-color: #f59e0b;
-  --convergence-color: #f59e0b;
-  --bg: #f8f6f1;
-  --text: #1a1a2e;
-  --muted: #666;
-  --border: #d4d4d4;
-  --pipe: #999;
-
-  font-family: 'SF Mono', 'Monaco', 'Courier New', monospace;
-  font-size: 0.9375rem;
-  background: var(--bg);
-  border-radius: 12px;
-  padding: 1.5rem;
-  margin: 1rem 0;
-  color: var(--text);
-  max-width: 900px;
-}
-
-.tl-entry {
-  display: grid;
-  grid-template-columns: 60px 20px 1fr;
-  gap: 1rem;
-  margin-bottom: 1.3rem;
-  position: relative;
-}
-
-.tl-year {
-  font-weight: 700;
-  font-size: 1.125rem;
-  color: var(--text);
-  text-align: right;
-  line-height: 1.3;
-}
-
-.tl-pipe {
-  color: var(--pipe);
-  font-size: 1.25rem;
-  line-height: 1;
-  user-select: none;
-}
-
-.tl-content {
-  padding-bottom: 0.5rem;
-}
-
-.tl-title {
-  font-weight: 700;
-  font-size: 1rem;
-  letter-spacing: 0.02em;
-  margin-bottom: 0.5rem;
-  color: var(--text);
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  flex-wrap: wrap;
-}
-
-.tl-badge {
-  display: inline-block;
-  padding: 0.25rem 0.625rem;
-  border-radius: 12px;
-  font-size: 0.6875rem;
-  font-weight: 600;
-  letter-spacing: 0.05em;
-  white-space: nowrap;
-}
-
-.tl-badge.visions {
-  background: rgba(59, 130, 246, 0.15);
-  color: var(--visions-color);
-  border: 1px solid var(--visions-color);
-}
-
-.tl-badge.recognition {
-  background: rgba(139, 92, 246, 0.15);
-  color: var(--recognition-color);
-  border: 1px solid var(--recognition-color);
-}
-
-.tl-badge.intelligence {
-  background: rgba(16, 185, 129, 0.15);
-  color: var(--intelligence-color);
-  border: 1px solid var(--intelligence-color);
-}
-
-.tl-badge.chalktalk {
-  background: rgba(245, 158, 11, 0.15);
-  color: var(--chalktalk-color);
-  border: 1px solid var(--chalktalk-color);
-  font-size: 0.625rem;
-}
-
-.tl-badge.convergence {
-  background: rgba(245, 158, 11, 0.2);
-  color: var(--convergence-color);
-  border: 2px solid var(--convergence-color);
-  font-weight: 700;
-}
-
-.tl-author {
-  font-size: 0.9375rem;
-  color: var(--text);
-  margin-bottom: 0.375rem;
-  line-height: 1.5;
-}
-
-.tl-desc {
-  font-size: 0.875rem;
-  color: var(--muted);
-  line-height: 1.6;
-  margin-bottom: 0.5rem;
-}
-
-.tl-sig {
-  font-size: 0.8125rem;
-  font-style: italic;
-  color: var(--muted);
-  line-height: 1.5;
-  padding-left: 1.25rem;
-}
-
-/* MetaMedium convergence entry */
-.tl-convergence {
-  background: linear-gradient(135deg, rgba(59, 130, 246, 0.05), rgba(245, 158, 11, 0.08));
-  border: 2px solid var(--convergence-color);
-  border-radius: 12px;
-  padding: 1.5rem;
-  margin: 2rem 0;
-  grid-template-columns: 1fr;
-}
-
-.tl-convergence .tl-year {
-  text-align: left;
-  font-size: 1.25rem;
-  color: var(--convergence-color);
-  margin-bottom: 0.5rem;
-}
-
-.tl-convergence .tl-pipe {
-  display: none;
-}
-
-.tl-convergence .tl-title {
-  font-size: 1.375rem;
-  margin-bottom: 0.75rem;
-}
-
-.tl-synthesis {
-  margin: 1rem 0;
-  padding: 1rem;
-  background: rgba(255, 255, 255, 0.5);
-  border-radius: 8px;
-  border-left: 3px solid var(--convergence-color);
-}
-
-.tl-synthesis strong {
-  color: var(--text);
-}
-
-.tl-synthesis ul {
-  margin: 0.75rem 0 0 0;
-  padding-left: 1.25rem;
-  list-style: none;
-}
-
-.tl-synthesis li {
-  margin-bottom: 0.5rem;
-  line-height: 1.6;
-  position: relative;
-}
-
-.tl-synthesis li::before {
-  content: "→";
-  position: absolute;
-  left: -1.25rem;
-  color: var(--convergence-color);
-}
-
-/* Mobile */
-@media (max-width: 768px) {
-  .timeline-single {
-    padding: 1rem;
-    font-size: 0.875rem;
-  }
-
-  .tl-entry {
-    grid-template-columns: 50px 15px 1fr;
-    gap: 0.75rem;
-    margin-bottom: 1.25rem;
-  }
-
-  .tl-year {
-    font-size: 1rem;
-  }
-
-  .tl-title {
-    font-size: 0.9375rem;
-  }
-
-  .tl-author {
-    font-size: 0.875rem;
-  }
-
-  .tl-desc {
-    font-size: 0.8125rem;
-  }
-
-  .tl-convergence {
-    padding: 1rem;
-    grid-template-columns: 1fr;
-    display: block;
-  }
-
-  .tl-convergence .tl-title {
-    font-size: 1.125rem;
-  }
-
-  .tl-synthesis {
-    margin: 0.75rem 0;
-    padding: 0.75rem;
-  }
-
-  .tl-synthesis ul {
-    padding-left: 1rem;
-  }
-}
-
-</style>
 
         </section>
         <!-- SECTION 4: THE THESIS -->
@@ -2164,126 +2204,6 @@
               </p>
             </div>
 
-            <style>
-            .triadic-loop-figure {
-              --accent: #3b82f6;
-              --accent-secondary: #8b5cf6;
-              --paper: #f8f6f1;
-              --text: #1a1a2e;
-              --muted: #666;
-              --border: #d4d4d4;
-
-              margin: var(--space-lg, 2rem) 0;
-              padding: var(--space-md, 1rem);
-              background: linear-gradient(135deg, rgba(59, 130, 246, 0.03) 0%, rgba(139, 92, 246, 0.03) 100%);
-              border-radius: 12px;
-              font-family: 'Space Grotesk', system-ui, sans-serif;
-            }
-
-            .triadic-controls {
-              display: flex;
-              justify-content: center;
-              gap: 0.5rem;
-              margin-bottom: 1rem;
-            }
-
-            .triadic-toggle {
-              padding: 0.5rem 1rem;
-              border: 1px solid var(--border);
-              border-radius: 6px;
-              background: var(--paper);
-              color: var(--muted);
-              font-family: inherit;
-              font-size: 0.875rem;
-              cursor: pointer;
-              transition: all 0.2s ease;
-            }
-
-            .triadic-toggle[aria-pressed="true"] {
-              background: var(--accent);
-              border-color: var(--accent);
-              color: white;
-            }
-
-            .triadic-toggle:hover:not([aria-pressed="true"]) {
-              border-color: var(--accent);
-              color: var(--accent);
-            }
-
-            .triadic-svg {
-              width: 100%;
-              max-width: 400px;
-              height: auto;
-              display: block;
-              margin: 0 auto;
-            }
-
-            .node-label {
-              font-family: 'Space Grotesk', system-ui, sans-serif;
-              font-size: 11px;
-              font-weight: 500;
-            }
-
-            .triadic-caption {
-              text-align: center;
-              font-size: 0.875rem;
-              color: var(--muted);
-              margin-top: 1rem;
-              min-height: 2.5em;
-            }
-
-            /* Transitions */
-            .edge, .node circle, .node-label, .annotation, .center-label {
-              transition: all 0.5s ease;
-            }
-
-            .triadic-pulses {
-              transition: opacity 0.5s ease;
-            }
-
-            /* MetaMedium mode styles (applied via JS) */
-            .triadic-loop-figure.metamedium .meaning-circle {
-              stroke: var(--accent);
-            }
-
-            .triadic-loop-figure.metamedium .meaning-label {
-              fill: var(--text);
-            }
-
-            .triadic-loop-figure.metamedium .edge-meaning-lang,
-            .triadic-loop-figure.metamedium .edge-reverse {
-              opacity: 1;
-            }
-
-            .triadic-loop-figure.metamedium .triadic-pulses {
-              opacity: 1;
-            }
-
-            .triadic-loop-figure.metamedium .annotation-traditional {
-              opacity: 0;
-            }
-
-            .triadic-loop-figure.metamedium .annotation-metamedium {
-              opacity: 1;
-            }
-
-            .triadic-loop-figure.metamedium .center-label {
-              opacity: 0.7;
-            }
-
-            /* Responsive */
-            @media (max-width: 480px) {
-              .triadic-controls {
-                flex-direction: column;
-                align-items: center;
-              }
-              .triadic-toggle {
-                width: 100%;
-                max-width: 200px;
-              }
-            }
-            </style>
-
             <script>
             (function() {
               const figure = document.getElementById('triadicLoop');
@@ -2383,6 +2303,30 @@
             </blockquote>
             
             <p>Most AI interfaces treat AI as tool—something to be invoked, queried, commanded. The MetaMedium treats AI as part of the medium itself. The sketches aren't <em>using</em> the computer; they're <em>composing within</em> the computational medium, with AI as an active interpretive layer that transforms marks into executable meaning.</p>
+
+            <h3>Try It: Draw, Name, Interact</h3>
+
+            <p>This is the core loop in miniature. Draw a shape, and the system recognizes and names it. Draw another, and it gains behavior. Your marks become meaning — and meaning becomes interaction.</p>
+
+            <!-- Interactive Demo Canvas -->
+            <div class="demo-wrapper">
+                <div class="demo-prompt" id="demoPrompt">Draw a <span class="highlight">fish</span></div>
+
+                <div class="demo-canvas-container">
+                    <canvas id="demoCanvas"></canvas>
+                    <div class="demo-labels">
+                        <div class="demo-label fish" id="fishLabel">🐟 fish</div>
+                        <div class="demo-label food" id="foodLabel">🍎 food</div>
+                    </div>
+                </div>
+
+                <div class="demo-controls">
+                    <button class="demo-reset-btn" id="demoResetBtn">Reset</button>
+                </div>
+
+                <div class="demo-status" id="demoStatus"></div>
+            </div>
+
         </section>
 
         <!-- SECTION 5: THE FRAMEWORK -->
@@ -2793,7 +2737,7 @@
             <div class="demo-container">
                 <div class="demo-header">
                     <span>Interactive Demo</span>
-                    <span><a href="https://jjh111.github.io/MetaMedium/doodle2-canvas.html" target="_blank" rel="noopener"><strong></strong>Try it→</strong></a></span>
+                    <span><a href="https://jjh111.github.io/MetaMedium/doodle2-canvas.html" target="_blank" rel="noopener"><strong>Try it →</strong></a></span>
                 </div>
                 <iframe src="https://jjh111.github.io/MetaMedium/doodle2-canvas.html" title="MetaMedium Demo" loading="lazy"></iframe>
             </div>
@@ -3119,25 +3063,6 @@
 
             <p>It's time to bring the computer to life at the depth of mind with the speed and intuitive action of our hands.</p>
 
-            <!-- Interactive Demo Canvas -->
-            <div class="demo-wrapper">
-                <div class="demo-prompt" id="demoPrompt">Draw a <span class="highlight">fish</span></div>
-
-                <div class="demo-canvas-container">
-                    <canvas id="demoCanvas"></canvas>
-                    <div class="demo-labels">
-                        <div class="demo-label fish" id="fishLabel">🐟 fish</div>
-                        <div class="demo-label food" id="foodLabel">🍎 food</div>
-                    </div>
-                </div>
-
-                <div class="demo-controls">
-                    <button class="demo-reset-btn" id="demoResetBtn">Reset</button>
-                </div>
-
-                <div class="demo-status" id="demoStatus"></div>
-            </div>
-
         </section>
     </main>
 
@@ -3147,7 +3072,7 @@
         <p class="footer-subtitle">Bibliography: <a href="https://jhanacek.net/metamedium-resources-65" target="_blank" rel="noopener"><b>Resources Page</b></a></p>
         <p class="footer-copyright">© John Hanacek 2015 · <a href="https://johnhanacek.com" target="_blank" rel="noopener">JHDesign LLC</a></p>
         <p class="footer-signature"><img src="./Assets/footer-JHsig.png" alt="John Hanacek signature" style="height: 2em; opacity: 0.7;"></p>
-        <p class="version">v4 · Updated December 2025 · Made using Claude Code </p>
+        <p class="version">v5 · Updated February 2026 · Made using Claude Code</p>
     </footer>
 
     <script>
@@ -3182,6 +3107,33 @@
                 navToggle.setAttribute('aria-expanded', 'false');
             });
         });
+
+        // ============================================
+        // Timeline Toggle (collapsible lineage)
+        // ============================================
+        (function() {
+            const toggle = document.getElementById('timelineToggle');
+            const timeline = document.getElementById('timelineSingle');
+            if (!toggle || !timeline) return;
+
+            const hiddenEntries = timeline.querySelectorAll('.tl-entry.tl-hidden');
+            let expanded = false;
+
+            toggle.addEventListener('click', function() {
+                expanded = !expanded;
+                hiddenEntries.forEach(entry => {
+                    entry.style.display = expanded ? 'grid' : 'none';
+                });
+                toggle.classList.toggle('expanded', expanded);
+                toggle.setAttribute('aria-expanded', expanded);
+                toggle.querySelector('.toggle-text').textContent = expanded
+                    ? 'Show key entries only'
+                    : 'Show full lineage (' + hiddenEntries.length + ' more entries)';
+            });
+
+            // Initialize: ensure hidden entries are hidden via inline style too
+            hiddenEntries.forEach(entry => { entry.style.display = 'none'; });
+        })();
 
         // ============================================
         // Interactive Blueprint Canvas with Shape Recognition
