@@ -1,5 +1,5 @@
-// MetaMedium Day 6 - Zustand Store
-// Central state management
+// MetaMedium v4 - Zustand Store
+// Central state management with LLM integration
 
 import { create } from 'zustand';
 import type { Store, Point, RecognitionResult, RefinementSettings, Library } from '../types';
@@ -10,6 +10,7 @@ import { createCompositionFingerprint } from '../core/matching';
 import { setVerboseMode as setLoggerVerbose } from '../utils/logger';
 import { refineStroke } from '../utils/refinement';
 import { createShapeFromRecognition } from '../utils/shapeBuilder';
+import { interpret, type InterpretationContext } from '../llm';
 
 // ===== INITIAL LIBRARY =====
 
@@ -51,6 +52,7 @@ export const useStore = create<Store>((set, get) => ({
 
   // Current stroke
   currentStroke: [],
+  currentStrokeStartTime: null,
   isDrawing: false,
 
   // UI state
@@ -63,6 +65,22 @@ export const useStore = create<Store>((set, get) => ({
   verboseMode: false,
   showSaveUI: false,
   saveMode: 'single',
+  showApiSettings: false,
+
+  // Selection state
+  selection: {
+    isActive: false,
+    selectedIndices: [],
+    selectionBounds: null,
+  },
+
+  // LLM state
+  llm: {
+    isInterpreting: false,
+    lastInterpretationTier: null,
+    lastInterpretationMs: null,
+    interpretationError: null,
+  },
 
   // Settings
   refinement: {
@@ -85,6 +103,7 @@ export const useStore = create<Store>((set, get) => ({
   startStroke: (point: Point) => {
     set({
       currentStroke: [point],
+      currentStrokeStartTime: Date.now(),
       isDrawing: true,
     });
   },
@@ -493,5 +512,163 @@ export const useStore = create<Store>((set, get) => ({
 
   hideSaveDialog: () => {
     set({ showSaveUI: false });
+  },
+
+  showApiSettingsDialog: () => {
+    set({ showApiSettings: true });
+  },
+
+  hideApiSettingsDialog: () => {
+    set({ showApiSettings: false });
+  },
+
+  // LLM Interpretation
+  setLLMInterpreting: (isInterpreting: boolean) => {
+    set((state) => ({
+      llm: { ...state.llm, isInterpreting },
+    }));
+  },
+
+  interpretWithLLM: async (strokeIndex: number) => {
+    const state = get();
+    const stroke = state.strokes[strokeIndex];
+    if (!stroke) return;
+
+    // Set loading state
+    set((s) => ({
+      llm: { ...s.llm, isInterpreting: true, interpretationError: null },
+    }));
+
+    try {
+      // Calculate drawing duration
+      const drawingDurationMs = state.currentStrokeStartTime
+        ? Date.now() - state.currentStrokeStartTime
+        : 500; // Default if not tracked
+
+      // Build interpretation context
+      const context: InterpretationContext = {
+        stroke: {
+          points: stroke,
+          fingerprint: state.lastFingerprint || getFingerprint(stroke),
+          drawingDurationMs,
+        },
+        userFingerprints: null, // TODO: Load from profile
+        library: state.library,
+        canvas: {
+          strokeCount: state.strokes.length,
+          acceptedShapes: state.strokes
+            .map((s, idx) => {
+              if (!state.context[idx]) return null;
+              const bounds = getBounds(s);
+              return {
+                index: idx,
+                type: state.context[idx],
+                bounds,
+              };
+            })
+            .filter((s): s is NonNullable<typeof s> => s !== null),
+          spatialGraph: state.strokes.length > 1
+            ? buildSpatialGraph(
+                state.strokes.map((s, idx) => ({
+                  index: idx,
+                  strokeId: state.strokeIds[idx],
+                  originalStroke: s,
+                  refinedStroke: state.refinedStrokes[idx],
+                  bounds: getBounds(s),
+                  recognizedAs: state.context[idx] || '',
+                  type: state.context[idx] || 'unknown',
+                  fingerprint: getFingerprint(s),
+                  geometricShape: state.shapes[idx],
+                }))
+              )
+            : null,
+        },
+      };
+
+      // Call LLM interpreter
+      const result = await interpret(context);
+
+      // Handle selection gesture
+      if (result.isSelectionGesture && result.selectionDetails) {
+        set((s) => ({
+          llm: {
+            ...s.llm,
+            isInterpreting: false,
+            lastInterpretationTier: result.tier,
+            lastInterpretationMs: result.latencyMs,
+          },
+          selection: {
+            isActive: true,
+            selectedIndices: result.selectionDetails!.enclosedShapeIndices,
+            selectionBounds: null, // TODO: Calculate
+          },
+          // Remove the gesture stroke from canvas
+          strokes: s.strokes.slice(0, -1),
+          strokeIds: s.strokeIds.slice(0, -1),
+          context: s.context.slice(0, -1),
+          refinedStrokes: s.refinedStrokes.slice(0, -1),
+          shapes: s.shapes.slice(0, -1),
+          semanticData: s.semanticData.slice(0, -1),
+          tipDebugData: s.tipDebugData.slice(0, -1),
+          cornerDebugData: s.cornerDebugData.slice(0, -1),
+          nextStrokeId: s.nextStrokeId - 1,
+          selectedStrokeIndex: null,
+          suggestions: [],
+        }));
+        return;
+      }
+
+      // Convert LLM candidates to RecognitionResult format
+      const suggestions: RecognitionResult[] = result.candidates.map((c) => ({
+        type: c.type,
+        label: c.label,
+        score: c.confidence * 100,
+        confidence: c.confidence,
+        isUserPrimitive: c.isUserPrimitive,
+        isComposition: c.isComposition,
+        matchDetails: { reasoning: c.reasoning },
+      }));
+
+      set((s) => ({
+        llm: {
+          ...s.llm,
+          isInterpreting: false,
+          lastInterpretationTier: result.tier,
+          lastInterpretationMs: result.latencyMs,
+        },
+        suggestions,
+        selectedStrokeIndex: strokeIndex,
+      }));
+    } catch (error) {
+      console.error('[Store] LLM interpretation error:', error);
+      set((s) => ({
+        llm: {
+          ...s.llm,
+          isInterpreting: false,
+          interpretationError: String(error),
+        },
+      }));
+    }
+  },
+
+  // Selection
+  setSelection: (indices: number[]) => {
+    set({
+      selection: {
+        isActive: indices.length > 0,
+        selectedIndices: indices,
+        selectionBounds: null, // TODO: Calculate union bounds
+      },
+    });
+  },
+
+  clearSelection: () => {
+    set({
+      selection: {
+        isActive: false,
+        selectedIndices: [],
+        selectionBounds: null,
+      },
+    });
   },
 }));

@@ -179,6 +179,21 @@ export interface RefinementSettings {
   normalize: boolean;
 }
 
+// Selection state for gesture system
+export interface SelectionState {
+  isActive: boolean;
+  selectedIndices: number[];
+  selectionBounds: Bounds | null;
+}
+
+// LLM interpretation state
+export interface LLMState {
+  isInterpreting: boolean;
+  lastInterpretationTier: 0 | 1 | 2 | null;
+  lastInterpretationMs: number | null;
+  interpretationError: string | null;
+}
+
 export interface AppState {
   // Drawing data
   shapes: Shape[];
@@ -192,6 +207,7 @@ export interface AppState {
 
   // Current stroke
   currentStroke: Point[];
+  currentStrokeStartTime: number | null;
   isDrawing: boolean;
 
   // UI state
@@ -204,6 +220,13 @@ export interface AppState {
   verboseMode: boolean;
   showSaveUI: boolean;
   saveMode: 'single' | 'compound';
+  showApiSettings: boolean;
+
+  // Selection state
+  selection: SelectionState;
+
+  // LLM state
+  llm: LLMState;
 
   // Settings
   refinement: RefinementSettings;
@@ -226,6 +249,14 @@ export interface StoreActions {
   acceptSuggestion: (suggestion: RecognitionResult) => void;
   rejectSuggestion: () => void;
 
+  // LLM Interpretation
+  interpretWithLLM: (strokeIndex: number) => Promise<void>;
+  setLLMInterpreting: (isInterpreting: boolean) => void;
+
+  // Selection
+  setSelection: (indices: number[]) => void;
+  clearSelection: () => void;
+
   // Library
   saveToLibrary: (name: string, key: string) => void;
   deleteFromLibrary: (key: string) => void;
@@ -242,6 +273,8 @@ export interface StoreActions {
   // UI actions
   showSaveDialog: (mode: 'single' | 'compound') => void;
   hideSaveDialog: () => void;
+  showApiSettingsDialog: () => void;
+  hideApiSettingsDialog: () => void;
 }
 
 export type Store = AppState & StoreActions;

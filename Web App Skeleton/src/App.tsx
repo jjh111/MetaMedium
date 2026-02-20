@@ -1,5 +1,5 @@
-// MetaMedium Day 6 - Main App Component
-// Layout and keyboard shortcuts
+// MetaMedium v4 - Main App Component
+// Layout and keyboard shortcuts with LLM integration
 
 import { useEffect } from 'react';
 import { useStore } from './store/useStore';
@@ -8,11 +8,13 @@ import { CanvasControls } from './components/CanvasControls';
 import { RefinementPanel } from './components/RefinementPanel';
 import { SuggestionPanel } from './components/SuggestionPanel';
 import { LibraryPanel } from './components/LibraryPanel';
+import { ApiSettings } from './components/ApiSettings';
 import { installQueryAPI } from './api/semanticQuery';
+import { getInterpreterStatus, hasApiKey } from './llm';
 import './App.css';
 
 export function App() {
-  const { undo, redo } = useStore();
+  const { undo, redo, showApiSettings, showApiSettingsDialog, hideApiSettingsDialog } = useStore();
 
   // Install Semantic Query API on mount
   useEffect(() => {
@@ -37,22 +39,39 @@ export function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [undo, redo]);
 
+  const status = getInterpreterStatus();
+  const hasKey = hasApiKey();
+
   return (
     <div className="app">
       <header className="app-header">
         <div className="header-content">
           <div>
             <h1>MetaMedium</h1>
-            <p className="app-subtitle">Draw shapes and compositions</p>
+            <p className="app-subtitle">LLM-Grounded Drawing System</p>
           </div>
-          <a
-            href="https://johnhanacek.com"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="header-link"
-          >
-            JHDesign, LLC
-          </a>
+          <div className="header-right">
+            <button
+              className={`llm-status-btn ${hasKey ? 'has-key' : ''}`}
+              onClick={showApiSettingsDialog}
+              title="LLM Settings"
+            >
+              <span className="status-indicator">
+                {status.tier2 ? '●●●' : status.tier1 ? '●●○' : '●○○'}
+              </span>
+              <span className="status-label">
+                {status.tier2 ? 'Tier 2' : status.tier1 ? 'Tier 1' : 'Tier 0'}
+              </span>
+            </button>
+            <a
+              href="https://johnhanacek.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="header-link"
+            >
+              JHDesign, LLC
+            </a>
+          </div>
         </div>
       </header>
 
@@ -71,6 +90,8 @@ export function App() {
         <CanvasControls />
         <RefinementPanel />
       </div>
+
+      <ApiSettings isOpen={showApiSettings} onClose={hideApiSettingsDialog} />
     </div>
   );
 }

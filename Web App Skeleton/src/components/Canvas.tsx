@@ -291,7 +291,7 @@ export function Canvas() {
       const spatialGraph = buildSpatialGraph(tempComponents as any);
 
       // Draw connection lines
-      spatialGraph.connections.forEach((conn, connIdx) => {
+      spatialGraph.connections.forEach((conn) => {
         const compA = tempComponents[conn.a];
         const compB = tempComponents[conn.b];
         const centerA = {
@@ -365,9 +365,8 @@ export function Canvas() {
       if (spatialGraph.containment && spatialGraph.containment.length > 0) {
         spatialGraph.containment.forEach((cont) => {
           const outer = tempComponents[cont.outer];
-          const inner = tempComponents[cont.inner];
+          // cont.inner available for future use (e.g., drawing inner bounds)
           const boundsOuter = outer.bounds;
-          const boundsInner = inner.bounds;
 
           // Determine containment type (check if we have type info from spatial graph)
           const type = (cont as any).type || 'bounds-based';

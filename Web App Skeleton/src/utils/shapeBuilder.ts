@@ -28,9 +28,9 @@ export function createLineShape(
 }
 
 export function createCircleShape(
-  originalStroke: Point[],
+  _originalStroke: Point[],
   bounds: Bounds,
-  fingerprint: Fingerprint | null
+  _fingerprint: Fingerprint | null
 ): Shape {
   // Calculate center and radius from bounds
   const centerX = (bounds.minX + bounds.maxX) / 2;
@@ -54,7 +54,7 @@ export function createCircleShape(
 }
 
 export function createPolygonShape(
-  originalStroke: Point[],
+  _originalStroke: Point[],
   refinedStroke: Point[][] | null,
   type: string,
   bounds: Bounds,
