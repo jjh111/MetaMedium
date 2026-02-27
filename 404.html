@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Page Not Found - MetaMedium</title>
+    <meta name="description" content="The page you're looking for has moved. Visit the MetaMedium whitepaper and demos.">
+
+    <!-- Open Graph / Social Share -->
+    <meta property="og:title" content="MetaMedium - Page Not Found">
+    <meta property="og:description" content="The page you're looking for has moved. Visit the MetaMedium whitepaper and demos.">
+    <meta property="og:image" content="https://jjh111.github.io/MetaMedium/Assets/thumb-metamedium.jpg">
+    <meta property="og:type" content="website">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="MetaMedium - Page Not Found">
+    <meta name="twitter:description" content="The page you're looking for has moved. Visit the MetaMedium whitepaper and demos.">
+    <meta name="twitter:image" content="https://jjh111.github.io/MetaMedium/Assets/thumb-metamedium.jpg">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --ink: #1a1a2e;
+            --paper: #f8f6f1;
+            --muted: #6b7280;
+            --sketch-blue: #3b82f6;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #0a1628;
+            color: #fff;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Blueprint grid background matching hero */
+        body::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-image:
+                linear-gradient(rgba(59, 130, 246, 0.06) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(59, 130, 246, 0.06) 1px, transparent 1px);
+            background-size: 40px 40px;
+            pointer-events: none;
+        }
+
+        /* Subtle radial glow behind content */
+        body::after {
+            content: '';
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, rgba(59, 130, 246, 0.08) 0%, transparent 70%);
+            pointer-events: none;
+        }
+
+        .container {
+            max-width: 600px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .title {
+            font-family: 'Space Grotesk', -apple-system, sans-serif;
+            font-size: clamp(2.5rem, 8vw, 4rem);
+            font-weight: 700;
+            letter-spacing: -0.03em;
+            line-height: 1;
+            margin-bottom: 0.5rem;
+            color: #ebebeb;
+        }
+
+        .title .meta {
+            background: linear-gradient(135deg, #f97316 0%, #a855f7 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .tagline {
+            font-family: 'DM Sans', sans-serif;
+            font-size: 0.9375rem;
+            font-weight: 500;
+            color: rgba(147, 197, 253, 0.7);
+            letter-spacing: 0.45em;
+            text-transform: uppercase;
+            margin-bottom: 2.5rem;
+        }
+
+        .error-code {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 6rem;
+            font-weight: 700;
+            color: rgba(255, 255, 255, 0.06);
+            line-height: 1;
+            margin-bottom: -1rem;
+            letter-spacing: 0.1em;
+        }
+
+        h2 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            color: rgba(255, 255, 255, 0.9);
+        }
+
+        p {
+            font-size: 1rem;
+            color: rgba(255, 255, 255, 0.5);
+            margin-bottom: 2rem;
+            line-height: 1.7;
+        }
+
+        .links {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            align-items: center;
+        }
+
+        a {
+            display: inline-block;
+            padding: 0.875rem 1.75rem;
+            font-size: 1rem;
+            font-weight: 600;
+            text-decoration: none;
+            border-radius: 8px;
+            transition: all 0.2s ease;
+        }
+
+        .primary {
+            background: var(--sketch-blue);
+            color: white;
+        }
+
+        .primary:hover {
+            background: #2563eb;
+            transform: translateY(-2px);
+        }
+
+        .secondary {
+            background: rgba(255, 255, 255, 0.08);
+            color: rgba(255, 255, 255, 0.85);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+        }
+
+        .secondary:hover {
+            background: rgba(255, 255, 255, 0.14);
+            transform: translateY(-2px);
+        }
+
+        .external-links {
+            margin-top: 3rem;
+            display: flex;
+            gap: 2rem;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .external-links a {
+            padding: 0.5rem;
+            color: rgba(147, 197, 253, 0.5);
+            font-weight: 500;
+            font-size: 0.875rem;
+        }
+
+        .external-links a:hover {
+            color: rgba(147, 197, 253, 0.9);
+        }
+
+        /* Decorative sketch elements */
+        .sketch-elements {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            pointer-events: none;
+            overflow: hidden;
+        }
+
+        .sketch-elements svg {
+            position: absolute;
+            opacity: 0.07;
+            stroke: var(--sketch-blue);
+            fill: none;
+            stroke-width: 1.5;
+            stroke-linecap: round;
+        }
+
+        .sketch-circle {
+            width: 120px; height: 120px;
+            top: 15%; left: 8%;
+        }
+
+        .sketch-rect {
+            width: 80px; height: 80px;
+            bottom: 20%; right: 10%;
+        }
+
+        .sketch-line {
+            width: 100px; height: 60px;
+            top: 25%; right: 12%;
+        }
+
+        .sketch-squiggle {
+            width: 140px; height: 40px;
+            bottom: 30%; left: 5%;
+        }
+
+        @media (max-width: 640px) {
+            .sketch-elements svg { opacity: 0.04; }
+            .error-code { font-size: 4rem; }
+        }
+    </style>
+</head>
+<body>
+    <div class="sketch-elements">
+        <svg class="sketch-circle" viewBox="0 0 120 120">
+            <circle cx="60" cy="60" r="45" />
+        </svg>
+        <svg class="sketch-rect" viewBox="0 0 80 80">
+            <rect x="10" y="10" width="60" height="60" rx="2" />
+        </svg>
+        <svg class="sketch-line" viewBox="0 0 100 60">
+            <path d="M10 50 L90 10" />
+        </svg>
+        <svg class="sketch-squiggle" viewBox="0 0 140 40">
+            <path d="M10 20 Q35 5 60 20 Q85 35 110 20 Q125 12 135 20" />
+        </svg>
+    </div>
+
+    <div class="container">
+        <div class="title"><span class="meta">Meta</span>Medium</div>
+        <p class="tagline">beyond chat</p>
+
+        <div class="error-code">404</div>
+        <h2>Page Not Found</h2>
+        <p>
+            The page you're looking for has moved or no longer exists.
+            This might have been an old link to the whitepaper.
+        </p>
+
+        <div class="links">
+            <a href="https://jjh111.github.io/MetaMedium/" class="primary">
+                Read the Whitepaper
+            </a>
+            <a href="https://jjh111.github.io/MetaMedium/doodle2-canvas.html" class="secondary">
+                Try the Demo
+            </a>
+        </div>
+
+        <div class="external-links">
+            <a href="https://johnhanacek.com">johnhanacek.com</a>
+            <a href="https://github.com/jjh111/MetaMedium">GitHub Repository</a>
+        </div>
+    </div>
+</body>
+</html>
