@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LLM Search Test - John Hanacek</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background: #0a1628;
+            color: #e0e0e0;
+            padding: 2rem;
+            max-width: 700px;
+            margin: 0 auto;
+        }
+        h1 { font-size: 1.4rem; margin-bottom: 0.5rem; color: #fff; }
+        .subtitle { color: #888; margin-bottom: 1.5rem; font-size: 0.9rem; }
+        #searchInput {
+            width: 100%;
+            padding: 0.8rem 1rem;
+            font-size: 1rem;
+            background: #1a2a42;
+            color: #fff;
+            border: 1px solid #2a3a52;
+            border-radius: 8px;
+            outline: none;
+        }
+        #searchInput:focus { border-color: #4d9ef6; }
+        #searchInput::placeholder { color: #556; }
+
+        .section-label {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: #668;
+            margin: 1.2rem 0 0.5rem;
+        }
+
+        .result {
+            background: #12203a;
+            border: 1px solid #1e3050;
+            border-radius: 6px;
+            padding: 0.8rem 1rem;
+            margin-bottom: 0.5rem;
+        }
+        .result-title { font-weight: 600; color: #7db4f6; font-size: 0.95rem; }
+        .result-snippet { color: #aab; font-size: 0.85rem; margin-top: 0.3rem; }
+        .result-meta { color: #556; font-size: 0.75rem; margin-top: 0.3rem; }
+
+        #aiSection {
+            margin-top: 1.5rem;
+            border-top: 1px solid #1e3050;
+            padding-top: 1rem;
+        }
+        #enableBtn {
+            background: #2a5a9a;
+            color: #fff;
+            border: none;
+            padding: 0.6rem 1.2rem;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+        #enableBtn:hover { background: #3a6aba; }
+        #enableBtn:disabled { opacity: 0.5; cursor: default; }
+
+        #progress {
+            margin-top: 0.8rem;
+            font-size: 0.8rem;
+            color: #888;
+        }
+        #progressBar {
+            width: 100%;
+            height: 4px;
+            background: #1a2a42;
+            border-radius: 2px;
+            margin-top: 0.4rem;
+            display: none;
+        }
+        #progressFill {
+            height: 100%;
+            background: #4d9ef6;
+            border-radius: 2px;
+            width: 0%;
+            transition: width 0.3s;
+        }
+
+        #aiAnswer {
+            background: #0d1a2e;
+            border: 1px solid #2a4a6a;
+            border-radius: 6px;
+            padding: 1rem;
+            margin-top: 0.8rem;
+            font-size: 0.9rem;
+            line-height: 1.5;
+            white-space: pre-wrap;
+            display: none;
+            min-height: 3rem;
+        }
+
+        .status-dot {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 0.4rem;
+            vertical-align: middle;
+        }
+        .status-dot.off { background: #444; }
+        .status-dot.loading { background: #d4a520; animation: pulse 1s infinite; }
+        .status-dot.ready { background: #22c55e; }
+        @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+        .webgpu-badge {
+            display: inline-block;
+            font-size: 0.7rem;
+            padding: 0.15rem 0.5rem;
+            border-radius: 3px;
+            margin-left: 0.5rem;
+            vertical-align: middle;
+        }
+        .webgpu-badge.supported { background: #1a3a2a; color: #4ade80; }
+        .webgpu-badge.unsupported { background: #3a1a1a; color: #f87171; }
+    </style>
+</head>
+<body>
+    <h1>Portfolio Search Test <span id="webgpuBadge" class="webgpu-badge"></span></h1>
+    <p class="subtitle">Layer 1: instant search. Layer 2: optional local AI answers via Qwen3-0.6B.</p>
+
+    <input type="text" id="searchInput" placeholder="Try: XR design, Georgetown, AvatarMEDIC, robotics..." autofocus>
+
+    <div class="section-label">Search Results</div>
+    <div id="searchResults"><div class="result"><div class="result-snippet" style="color:#556;">Type to search portfolio content...</div></div></div>
+
+    <div id="aiSection">
+        <div class="section-label"><span id="aiDot" class="status-dot off"></span> AI Answer Engine</div>
+        <button id="enableBtn">Download Qwen3-0.6B (~400MB) to enable AI answers</button>
+        <div id="progress"></div>
+        <div id="progressBar"><div id="progressFill"></div></div>
+        <div id="aiAnswer"></div>
+    </div>
+
+    <!-- MiniSearch via CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/minisearch@7.1.1/dist/umd/index.min.js"></script>
+
+    <!-- WebLLM via CDN -->
+    <script type="module">
+        import * as webllm from "https://esm.run/@mlc-ai/web-llm";
+
+        // ============================================
+        // Content Index — portfolio chunks
+        // ============================================
+        const chunks = [
+            { id: 1, title: "About John Hanacek", tags: "innovator designer creator AI human augmentation",
+              content: "John Hanacek works at the intersection of Creativity, Curiosity, AI & Human Augmentation. Innovator, Designer, Creator.", page: "index" },
+            { id: 2, title: "Education — Georgetown CCT", tags: "education masters thesis research",
+              content: "MA in Communication, Culture & Technology from Georgetown University (2016). Awarded 'Most Meta' by peers. Thesis on AI-enabled drawing app for education. Published research on technology adoption at EduLearn 2015 Barcelona.", page: "index" },
+            { id: 3, title: "Founder Institute & AvatarMEDIC", tags: "startup CEO founder aerospace medical",
+              content: "Founder Institute SF 2020 graduate. CEO of AvatarMEDIC, a startup focused on aerospace medical technology. Received R&D Innovation Award from Aerospace Medical Association in 2022.", page: "index" },
+            { id: 4, title: "Lead Designer at Nanome", tags: "XR VR molecular product design spatial computing",
+              content: "Led design for Nanome's molecular VR platform. Product design for spatial computing and scientific visualization in virtual reality.", page: "design" },
+            { id: 5, title: "BadVR — Data Visualization in XR", tags: "XR VR AR data visualization immersive analytics",
+              content: "Design work at BadVR, building immersive data visualization tools in extended reality. XR analytics and spatial data experiences.", page: "design" },
+            { id: 6, title: "Earth Star — Speculative Design", tags: "earth star worldbuilding speculative regenerative futures AI",
+              content: "Speculative design and narrative worldbuilding exploring regenerative futures. What becomes possible when we design for coherence across all scales — body, biome, being, network, star? Systems thinking meets storytelling: designing protocols for human-AI collaboration grounded in living wisdom.", page: "design" },
+            { id: 7, title: "JHDesign LLC — Consulting", tags: "consulting UX product design services freelance",
+              content: "JHDesign LLC offers product design, UX consulting, customer journey mapping, and design workshops. Professional services for startups and enterprises.", page: "design" },
+            { id: 8, title: "Interactive Installations — Godish & God Like", tags: "art installation interactive leap motion kinect",
+              content: "Godish (2015): Using a Leap Motion controller to trigger lightning video on hand hover. God Like (2016): Follow-up using Microsoft Kinect for full body pose interaction. Collaboration with Nathan Danskey.", page: "art" },
+            { id: 9, title: "Fractal Futures — Short Stories", tags: "writing fiction science fiction stories worldbuilding",
+              content: "A series of short stories — thoughtful ruminations on bright and dark possibilities that lie ahead of us, down a turbulent river of time. Endorsed by David Brin, science fiction author.", page: "art" },
+            { id: 10, title: "Photography & Visual Art", tags: "photography landscape portrait editorial multimedia",
+              content: "Multimedia artist working in interactive installation, VR/AR, digital illustration, 3D scanning and modeling, and animation. Background in photography covering editorial, portrait and landscape subjects across California and beyond.", page: "art" },
+            { id: 11, title: "Skills & Expertise", tags: "skills tools figma unity blender prototyping user research",
+              content: "Product design, UX/UI, spatial computing, XR design, prototyping, user research, customer journey mapping, design systems, Figma, Unity, Blender, 3D modeling, animation, AI tools integration.", page: "design" },
+            { id: 12, title: "Artist Beliefs & Philosophy", tags: "beliefs philosophy art technology infinite games",
+              content: "As an artist John believes: Technology can augment human intelligence & collaboration. Infinite Games are more powerful than Finite Games. Optimism and pessimism are self-fulfilling prophecies. Imagination is within reality.", page: "art" },
+            { id: 13, title: "Robot Digital Twin Control", tags: "robotics digital twin XR control remote",
+              content: "Past project involving robot digital twin control systems. XR-based remote control and monitoring of robotic systems using digital twin technology.", page: "design" },
+            { id: 14, title: "HoloTRIAGE — Medical XR", tags: "medical XR holographic triage healthcare AR",
+              content: "HoloTRIAGE: An XR medical triage system. Holographic interface for medical assessment and decision support in healthcare settings.", page: "design" },
+            { id: 15, title: "Contact & Social", tags: "contact email linkedin bluesky twitter",
+              content: "Email: hello@jhanacek.net. Social: Bluesky @johnhanacek.bsky.social, LinkedIn linkedin.com/in/johnhanacek, X/Twitter.", page: "index" },
+        ];
+
+        // ============================================
+        // Search Layer (MiniSearch)
+        // ============================================
+        const miniSearch = new MiniSearch({
+            fields: ['title', 'content', 'tags'],
+            storeFields: ['title', 'content', 'page'],
+            searchOptions: {
+                boost: { title: 3, tags: 2 },
+                fuzzy: 0.2,
+                prefix: true,
+            }
+        });
+        miniSearch.addAll(chunks);
+
+        function search(query) {
+            if (!query.trim()) return [];
+            return miniSearch.search(query, { limit: 5 });
+        }
+
+        function renderResults(results) {
+            const el = document.getElementById('searchResults');
+            if (results.length === 0) {
+                el.innerHTML = '<div class="result"><div class="result-snippet" style="color:#556;">No results found.</div></div>';
+                return;
+            }
+            el.innerHTML = results.map(r =>
+                `<div class="result">
+                    <div class="result-title">${r.title}</div>
+                    <div class="result-snippet">${r.content.substring(0, 150)}${r.content.length > 150 ? '...' : ''}</div>
+                    <div class="result-meta">${r.page}.html · score: ${r.score.toFixed(1)}</div>
+                </div>`
+            ).join('');
+        }
+
+        // ============================================
+        // WebGPU Detection
+        // ============================================
+        const badge = document.getElementById('webgpuBadge');
+        let hasWebGPU = false;
+
+        async function checkWebGPU() {
+            if (!navigator.gpu) {
+                badge.textContent = 'No WebGPU';
+                badge.className = 'webgpu-badge unsupported';
+                return false;
+            }
+            const adapter = await navigator.gpu.requestAdapter();
+            if (!adapter) {
+                badge.textContent = 'No GPU adapter';
+                badge.className = 'webgpu-badge unsupported';
+                return false;
+            }
+            badge.textContent = 'WebGPU OK';
+            badge.className = 'webgpu-badge supported';
+            return true;
+        }
+
+        hasWebGPU = await checkWebGPU();
+
+        if (!hasWebGPU) {
+            document.getElementById('enableBtn').textContent = 'WebGPU not available in this browser';
+            document.getElementById('enableBtn').disabled = true;
+        }
+
+        // ============================================
+        // LLM Layer (WebLLM)
+        // ============================================
+        let engine = null;
+        let modelReady = false;
+
+        const MODEL_ID = "Qwen3-0.6B-q4f16_1-MLC";
+
+        document.getElementById('enableBtn').addEventListener('click', async () => {
+            if (!hasWebGPU || modelReady) return;
+
+            const btn = document.getElementById('enableBtn');
+            const progress = document.getElementById('progress');
+            const progressBar = document.getElementById('progressBar');
+            const progressFill = document.getElementById('progressFill');
+            const dot = document.getElementById('aiDot');
+
+            btn.disabled = true;
+            btn.textContent = 'Downloading model...';
+            dot.className = 'status-dot loading';
+            progressBar.style.display = 'block';
+
+            try {
+                engine = await webllm.CreateMLCEngine(MODEL_ID, {
+                    initProgressCallback: (report) => {
+                        progress.textContent = report.text;
+                        if (report.progress !== undefined) {
+                            progressFill.style.width = (report.progress * 100) + '%';
+                        }
+                    }
+                });
+
+                modelReady = true;
+                btn.textContent = 'Qwen3-0.6B loaded — AI answers enabled';
+                btn.style.background = '#1a4a2a';
+                dot.className = 'status-dot ready';
+                progress.textContent = 'Model ready. Search to get AI-powered answers.';
+                progressBar.style.display = 'none';
+
+                // If there's already a query, generate an answer
+                const query = document.getElementById('searchInput').value;
+                if (query.trim()) {
+                    const results = search(query);
+                    if (results.length > 0) generateAnswer(query, results);
+                }
+            } catch (err) {
+                btn.textContent = 'Error loading model — click to retry';
+                btn.disabled = false;
+                dot.className = 'status-dot off';
+                progress.textContent = `Error: ${err.message}`;
+                progressBar.style.display = 'none';
+                console.error('WebLLM error:', err);
+            }
+        });
+
+        async function generateAnswer(query, results) {
+            if (!engine || !modelReady) return;
+
+            const answerEl = document.getElementById('aiAnswer');
+            answerEl.style.display = 'block';
+            answerEl.textContent = 'Thinking...';
+
+            const context = results.slice(0, 4).map(r =>
+                `[${r.title}]: ${r.content}`
+            ).join('\n\n');
+
+            try {
+                const stream = await engine.chat.completions.create({
+                    messages: [
+                        {
+                            role: "system",
+                            content: `You are a helpful assistant for John Hanacek's portfolio website. Answer questions about John's work, skills, and experience based only on the provided context. Keep answers concise (2-4 sentences). If the context doesn't contain enough info, say so honestly.`
+                        },
+                        {
+                            role: "user",
+                            content: `Context:\n${context}\n\nQuestion: ${query}`
+                        }
+                    ],
+                    stream: true,
+                    max_tokens: 200,
+                    temperature: 0.3,
+                });
+
+                answerEl.textContent = '';
+                for await (const chunk of stream) {
+                    const delta = chunk.choices[0]?.delta?.content || '';
+                    answerEl.textContent += delta;
+                }
+
+                if (!answerEl.textContent.trim()) {
+                    answerEl.textContent = '(No answer generated)';
+                }
+            } catch (err) {
+                answerEl.textContent = `Error: ${err.message}`;
+                console.error('Generation error:', err);
+            }
+        }
+
+        // ============================================
+        // Wire up search input
+        // ============================================
+        let debounceTimer;
+        document.getElementById('searchInput').addEventListener('input', (e) => {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(() => {
+                const query = e.target.value;
+                const results = search(query);
+                renderResults(results);
+
+                if (modelReady && query.trim() && results.length > 0) {
+                    generateAnswer(query, results);
+                } else {
+                    document.getElementById('aiAnswer').style.display = 'none';
+                }
+            }, 250);
+        });
+
+        // Handle enter key
+        document.getElementById('searchInput').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                const query = e.target.value;
+                const results = search(query);
+                renderResults(results);
+                if (modelReady && query.trim() && results.length > 0) {
+                    generateAnswer(query, results);
+                }
+            }
+        });
+    </script>
+</body>
+</html>
