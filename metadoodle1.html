@@ -1664,6 +1664,156 @@ JOHN HANACEK 2025, JHDESIGN LLC
             50% { opacity: 0.4; }
         }
 
+        /* ===== UNIFIED INTERFACE STATUS ===== */
+        .unified-status-bar {
+            position: fixed;
+            bottom: var(--space-sm);
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 200;
+            display: flex;
+            align-items: center;
+            gap: var(--space-md);
+            padding: var(--space-xs) var(--space-md);
+            background: var(--panel-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--panel-border);
+            border-radius: 24px;
+            box-shadow: 0 4px 20px var(--shadow);
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.75rem;
+            color: var(--muted);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #9ca3af;
+            transition: all 0.3s ease;
+        }
+
+        .status-dot.ready {
+            background: #22c55e;
+            box-shadow: 0 0 6px rgba(34, 197, 94, 0.5);
+        }
+
+        .status-dot.loading {
+            background: #f59e0b;
+            animation: pulse-dot 1s ease-in-out infinite;
+        }
+
+        .status-dot.listening {
+            background: #ef4444;
+            box-shadow: 0 0 8px rgba(239, 68, 68, 0.6);
+            animation: pulse-listening 0.5s ease-in-out infinite;
+        }
+
+        .status-dot.processing {
+            background: #8b5cf6;
+            animation: pulse-dot 0.5s ease-in-out infinite;
+        }
+
+        .status-dot.error {
+            background: #ef4444;
+        }
+
+        @keyframes pulse-listening {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.3); }
+        }
+
+        /* Voice button - press and hold to speak */
+        .voice-button {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            border: none;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+        }
+
+        .voice-button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+        }
+
+        .voice-button:active, .voice-button.recording {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            box-shadow: 0 0 20px rgba(239, 68, 68, 0.5);
+        }
+
+        .voice-button svg {
+            width: 20px;
+            height: 20px;
+            fill: white;
+        }
+
+        /* Selection options floating panel */
+        .selection-options-container {
+            position: fixed;
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 199;
+            display: none;
+        }
+
+        .selection-options {
+            background: var(--panel-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--panel-border);
+            border-radius: 12px;
+            padding: var(--space-sm) var(--space-md);
+            text-align: center;
+            box-shadow: 0 4px 20px var(--shadow);
+        }
+
+        .selection-count {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: var(--ink);
+        }
+
+        .selection-hint {
+            font-size: 0.75rem;
+            color: var(--muted);
+            margin-top: 4px;
+        }
+
+        /* Voice transcript display */
+        .voice-transcript {
+            position: fixed;
+            bottom: 140px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 198;
+            max-width: 400px;
+            padding: var(--space-sm) var(--space-md);
+            background: rgba(0, 0, 0, 0.85);
+            color: white;
+            border-radius: 8px;
+            font-size: 0.875rem;
+            text-align: center;
+            display: none;
+            animation: fadeInUp 0.2s ease;
+        }
+
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateX(-50%) translateY(10px); }
+            to { opacity: 1; transform: translateX(-50%) translateY(0); }
+        }
+
         .llm-suggestion-row {
             padding: 8px 10px;
             background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%);
@@ -2161,8 +2311,47 @@ JOHN HANACEK 2025, JHDESIGN LLC
             <button id="cancelSaveBtn" class="cancel-save">Cancel</button>
         </div>
 
-        <script>
-            console.log('Doodle2.0 loading... (MetaDoodle1 - LLM Integration)');
+        <!-- Unified Status Bar (Voice + AI) -->
+        <div class="unified-status-bar" id="unifiedStatusBar">
+            <!-- WebLLM Status -->
+            <div class="status-indicator" id="webllmStatus" title="In-browser AI">
+                <span class="status-dot" id="webllmStatusDot"></span>
+                <span id="webllmStatusLabel">AI: Off</span>
+            </div>
+
+            <!-- Voice Button (Push to Talk) -->
+            <button class="voice-button" id="voiceButton" title="Hold to speak">
+                <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.91-3c-.49 0-.9.36-.98.85C16.52 14.2 14.47 16 12 16s-4.52-1.8-4.93-4.15c-.08-.49-.49-.85-.98-.85-.61 0-1.09.54-1 1.14.49 3 2.89 5.35 5.91 5.78V20c0 .55.45 1 1 1s1-.45 1-1v-2.08c3.02-.43 5.42-2.78 5.91-5.78.1-.6-.39-1.14-1-1.14z"/>
+                </svg>
+            </button>
+
+            <!-- Whisper Status -->
+            <div class="status-indicator" id="whisperStatus" title="Voice recognition">
+                <span class="status-dot" id="whisperStatusDot"></span>
+                <span id="whisperStatusLabel">Voice: Off</span>
+            </div>
+        </div>
+
+        <!-- Selection Options (appears when shapes selected) -->
+        <div class="selection-options-container" id="selectionOptionsContainer"></div>
+
+        <!-- Voice Transcript Display -->
+        <div class="voice-transcript" id="voiceTranscript"></div>
+
+        <script type="module">
+            // ===== MODULE IMPORTS =====
+            // WebLLM for in-browser inference (no server needed)
+            import * as webllm from "https://esm.run/@mlc-ai/web-llm";
+
+            // Whisper for in-browser voice transcription
+            // Using transformers.js which includes Whisper
+            import { pipeline, env } from "https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2";
+
+            // Disable local model caching to use CDN
+            env.allowLocalModels = false;
+
+            console.log('MetaMedium loading... (Unified Doodle Interface)');
 
             // ===== LM STUDIO CONNECTION MODULE =====
             // Local LLM integration via OpenAI-compatible API
@@ -2178,6 +2367,417 @@ JOHN HANACEK 2025, JHDESIGN LLC
                 _healthCheckInterval: null,
                 _pendingQuery: null  // Track in-flight Layer 1 query
             };
+
+            // ===== WEBLLM MODULE =====
+            // In-browser LLM inference via WebGPU (no server needed)
+            // Falls back gracefully if WebGPU unavailable
+
+            const WEBLLM = {
+                engine: null,
+                modelReady: false,
+                modelId: "Qwen3-0.6B-q4f16_1-MLC",
+                hasWebGPU: false,
+                loading: false,
+                progress: 0,
+                progressText: ''
+            };
+
+            // Check WebGPU availability
+            async function checkWebGPU() {
+                if (!navigator.gpu) {
+                    console.log('WebGPU not available');
+                    return false;
+                }
+                const adapter = await navigator.gpu.requestAdapter();
+                if (!adapter) {
+                    console.log('No WebGPU adapter found');
+                    return false;
+                }
+                console.log('WebGPU available');
+                WEBLLM.hasWebGPU = true;
+                return true;
+            }
+
+            // Initialize WebLLM engine (downloads model ~400MB)
+            async function initWebLLM() {
+                if (!WEBLLM.hasWebGPU || WEBLLM.loading || WEBLLM.modelReady) return;
+
+                WEBLLM.loading = true;
+                updateWebLLMStatus('loading', 'Downloading model...');
+
+                try {
+                    WEBLLM.engine = await webllm.CreateMLCEngine(WEBLLM.modelId, {
+                        initProgressCallback: (report) => {
+                            WEBLLM.progressText = report.text;
+                            WEBLLM.progress = report.progress || 0;
+                            updateWebLLMStatus('loading', report.text);
+                        }
+                    });
+
+                    WEBLLM.modelReady = true;
+                    WEBLLM.loading = false;
+                    updateWebLLMStatus('ready', 'In-browser AI ready');
+                    console.log('WebLLM ready:', WEBLLM.modelId);
+                } catch (err) {
+                    WEBLLM.loading = false;
+                    updateWebLLMStatus('error', 'Model load failed');
+                    console.error('WebLLM init error:', err);
+                }
+            }
+
+            // Query WebLLM (in-browser)
+            async function queryWebLLM(systemPrompt, userContent, options = {}) {
+                if (!WEBLLM.modelReady || !WEBLLM.engine) return null;
+
+                try {
+                    const response = await WEBLLM.engine.chat.completions.create({
+                        messages: [
+                            { role: 'system', content: systemPrompt },
+                            { role: 'user', content: typeof userContent === 'string' ? userContent : JSON.stringify(userContent) }
+                        ],
+                        max_tokens: options.maxTokens || 500,
+                        temperature: options.temperature || 0.3,
+                        stream: false
+                    });
+
+                    const content = response.choices[0]?.message?.content || '';
+                    return extractLLMAnswer(content);
+                } catch (err) {
+                    console.warn('WebLLM query error:', err);
+                    return null;
+                }
+            }
+
+            function updateWebLLMStatus(state, text) {
+                const dot = document.getElementById('webllmStatusDot');
+                const label = document.getElementById('webllmStatusLabel');
+                if (dot) {
+                    dot.className = 'status-dot ' + state;
+                }
+                if (label) {
+                    label.textContent = text;
+                }
+            }
+
+            // ===== WHISPER MODULE =====
+            // In-browser voice transcription via transformers.js
+            // Always-on listening with push-to-talk option
+
+            const WHISPER = {
+                transcriber: null,
+                ready: false,
+                loading: false,
+                listening: false,
+                mediaRecorder: null,
+                audioChunks: [],
+                stream: null,
+                lastTranscript: '',
+                onTranscript: null,  // Callback for transcription results
+                mode: 'push-to-talk',  // 'push-to-talk' or 'always-on'
+                silenceTimeout: null,
+                isRecording: false
+            };
+
+            // Initialize Whisper pipeline
+            async function initWhisper() {
+                if (WHISPER.loading || WHISPER.ready) return;
+
+                WHISPER.loading = true;
+                updateWhisperStatus('loading', 'Loading Whisper...');
+
+                try {
+                    // Use tiny model for speed
+                    WHISPER.transcriber = await pipeline(
+                        'automatic-speech-recognition',
+                        'Xenova/whisper-tiny.en',
+                        { progress_callback: (progress) => {
+                            if (progress.status === 'progress') {
+                                updateWhisperStatus('loading', `Loading: ${Math.round(progress.progress)}%`);
+                            }
+                        }}
+                    );
+
+                    WHISPER.ready = true;
+                    WHISPER.loading = false;
+                    updateWhisperStatus('ready', 'Voice ready');
+                    console.log('Whisper ready');
+
+                    // Request microphone access
+                    await requestMicrophoneAccess();
+                } catch (err) {
+                    WHISPER.loading = false;
+                    updateWhisperStatus('error', 'Whisper load failed');
+                    console.error('Whisper init error:', err);
+                }
+            }
+
+            // Request microphone access
+            async function requestMicrophoneAccess() {
+                try {
+                    WHISPER.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    console.log('Microphone access granted');
+                    return true;
+                } catch (err) {
+                    console.warn('Microphone access denied:', err);
+                    updateWhisperStatus('error', 'Mic access denied');
+                    return false;
+                }
+            }
+
+            // Start recording voice
+            function startVoiceRecording() {
+                if (!WHISPER.ready || !WHISPER.stream || WHISPER.isRecording) return;
+
+                WHISPER.audioChunks = [];
+                WHISPER.isRecording = true;
+
+                WHISPER.mediaRecorder = new MediaRecorder(WHISPER.stream);
+                WHISPER.mediaRecorder.ondataavailable = (e) => {
+                    if (e.data.size > 0) {
+                        WHISPER.audioChunks.push(e.data);
+                    }
+                };
+
+                WHISPER.mediaRecorder.onstop = async () => {
+                    WHISPER.isRecording = false;
+                    if (WHISPER.audioChunks.length === 0) return;
+
+                    const audioBlob = new Blob(WHISPER.audioChunks, { type: 'audio/webm' });
+                    await transcribeAudio(audioBlob);
+                };
+
+                WHISPER.mediaRecorder.start();
+                updateWhisperStatus('listening', 'Listening...');
+                console.log('Voice recording started');
+            }
+
+            // Stop recording and transcribe
+            function stopVoiceRecording() {
+                if (!WHISPER.mediaRecorder || !WHISPER.isRecording) return;
+
+                WHISPER.mediaRecorder.stop();
+                updateWhisperStatus('processing', 'Transcribing...');
+                console.log('Voice recording stopped');
+            }
+
+            // Transcribe audio blob
+            async function transcribeAudio(audioBlob) {
+                if (!WHISPER.transcriber) return;
+
+                try {
+                    // Convert blob to array buffer
+                    const arrayBuffer = await audioBlob.arrayBuffer();
+
+                    // Decode audio
+                    const audioContext = new AudioContext({ sampleRate: 16000 });
+                    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+
+                    // Get audio data as Float32Array
+                    const audioData = audioBuffer.getChannelData(0);
+
+                    // Transcribe
+                    const result = await WHISPER.transcriber(audioData);
+                    const transcript = result.text.trim();
+
+                    console.log('Transcript:', transcript);
+                    WHISPER.lastTranscript = transcript;
+
+                    updateWhisperStatus('ready', transcript || 'Voice ready');
+
+                    // Trigger callback if set
+                    if (WHISPER.onTranscript && transcript) {
+                        WHISPER.onTranscript(transcript);
+                    }
+
+                    return transcript;
+                } catch (err) {
+                    console.error('Transcription error:', err);
+                    updateWhisperStatus('error', 'Transcription failed');
+                    return null;
+                }
+            }
+
+            function updateWhisperStatus(state, text) {
+                const dot = document.getElementById('whisperStatusDot');
+                const label = document.getElementById('whisperStatusLabel');
+                if (dot) {
+                    dot.className = 'status-dot ' + state;
+                }
+                if (label) {
+                    label.textContent = text;
+                }
+            }
+
+            // ===== UNIFIED INTENT SYSTEM =====
+            // Combines gesture + voice + context into actionable intents
+
+            const INTENT = {
+                currentSelection: null,     // Indices of selected shapes
+                selectionBounds: null,      // Bounds of selection gesture
+                selectionStrokeIndex: null, // Index of the selection circle stroke
+                pendingVoiceCommand: null,  // Voice command waiting for context
+                lastGestureType: null       // 'selection', 'checkmark', 'x', 'shape'
+            };
+
+            // Detect if a stroke is a meta-gesture (selection, checkmark, X)
+            function detectMetaGesture(stroke, fingerprint) {
+                if (!stroke || stroke.length < 5) return null;
+
+                const fp = fingerprint || getFingerprint(stroke);
+
+                // Check for selection gesture: closed circle that contains other shapes
+                if (fp.isClosed && fp.straightness < 0.4) {
+                    const containedIndices = findEnclosedShapes(stroke);
+                    if (containedIndices.length > 0) {
+                        return {
+                            type: 'selection',
+                            containedIndices,
+                            bounds: fp.bounds
+                        };
+                    }
+                }
+
+                // Check for checkmark gesture: short, angled, open stroke
+                // Checkmark: ~45-90 degree angle change, relatively straight segments
+                if (!fp.isClosed && fp.straightness > 0.5 && fp.corners === 1) {
+                    const size = fp.size;
+                    if (size > 30 && size < 200) {
+                        // Verify it's roughly checkmark shaped (down-right then up-right)
+                        const midIdx = Math.floor(stroke.length / 2);
+                        const start = stroke[0];
+                        const mid = stroke[midIdx];
+                        const end = stroke[stroke.length - 1];
+
+                        // Check if middle is lower than both ends (V shape)
+                        if (mid.y > start.y && mid.y > end.y) {
+                            return { type: 'checkmark' };
+                        }
+                    }
+                }
+
+                // Check for X gesture: two crossed lines
+                // Actually hard to detect from single stroke - skip for now
+                // Could detect as stroke with 2 corners and specific crossing pattern
+
+                return null;
+            }
+
+            // Find shapes enclosed by a selection stroke
+            function findEnclosedShapes(selectionStroke) {
+                const selectionBounds = getBounds(selectionStroke);
+                const containedIndices = [];
+
+                for (let i = 0; i < state.strokes.length; i++) {
+                    const shape = state.shapes[i];
+                    if (!shape) continue;
+
+                    const shapeBounds = shape.bounds || getBounds(state.strokes[i]);
+                    if (shapeBounds && checkContainment(selectionBounds, shapeBounds)) {
+                        containedIndices.push(i);
+                    }
+                }
+
+                return containedIndices;
+            }
+
+            // Process intent from gesture + voice
+            function processIntent(gesture, voiceCommand) {
+                console.log('Processing intent:', { gesture, voiceCommand });
+
+                // Case 1: Selection gesture + voice command
+                if (gesture?.type === 'selection' && voiceCommand) {
+                    return executeVoiceCommand(voiceCommand, gesture.containedIndices);
+                }
+
+                // Case 2: Selection gesture alone - set context, show options
+                if (gesture?.type === 'selection') {
+                    INTENT.currentSelection = gesture.containedIndices;
+                    INTENT.selectionBounds = gesture.bounds;
+                    showSelectionOptions(gesture.containedIndices);
+                    return { action: 'selection-set', indices: gesture.containedIndices };
+                }
+
+                // Case 3: Checkmark gesture - accept current suggestion or confirm selection
+                if (gesture?.type === 'checkmark') {
+                    if (state.suggestions && state.suggestions.length > 0) {
+                        acceptSuggestion(state.suggestions[0]);
+                        return { action: 'accept-suggestion' };
+                    }
+                    if (INTENT.currentSelection) {
+                        // Confirm selection action
+                        return { action: 'confirm-selection' };
+                    }
+                }
+
+                // Case 4: Voice command without gesture - apply to current selection or canvas
+                if (voiceCommand && !gesture) {
+                    return executeVoiceCommand(voiceCommand, INTENT.currentSelection);
+                }
+
+                return null;
+            }
+
+            // Execute a voice command on selected shapes
+            function executeVoiceCommand(command, targetIndices) {
+                const cmd = command.toLowerCase().trim();
+
+                // Common commands
+                if (cmd.includes('delete') || cmd.includes('remove')) {
+                    if (targetIndices && targetIndices.length > 0) {
+                        // Delete selected shapes
+                        console.log('Delete command on:', targetIndices);
+                        return { action: 'delete', indices: targetIndices };
+                    }
+                }
+
+                if (cmd.includes('group') || cmd.includes('save') || cmd.includes('call this') || cmd.includes('name this')) {
+                    // Extract name from command
+                    const nameMatch = cmd.match(/(?:group|save|call this|name this)\s+(?:as\s+)?["']?([^"']+)["']?/i);
+                    const name = nameMatch ? nameMatch[1].trim() : null;
+
+                    if (targetIndices && targetIndices.length > 0) {
+                        console.log('Group command:', name, 'on:', targetIndices);
+                        return { action: 'group', indices: targetIndices, name };
+                    }
+                }
+
+                if (cmd.includes('what is this') || cmd.includes('what\'s this') || cmd.includes('identify')) {
+                    if (targetIndices && targetIndices.length > 0) {
+                        // Interpret selected shapes
+                        interpretSelection(INTENT.selectionBounds, targetIndices);
+                        return { action: 'interpret', indices: targetIndices };
+                    }
+                }
+
+                if (cmd.includes('undo')) {
+                    undo();
+                    return { action: 'undo' };
+                }
+
+                if (cmd.includes('clear') || cmd.includes('start over')) {
+                    clearCanvas();
+                    return { action: 'clear' };
+                }
+
+                // Fallback: treat as shape name query
+                console.log('Unknown command, treating as query:', cmd);
+                return { action: 'query', text: cmd };
+            }
+
+            // Show contextual options for selection
+            function showSelectionOptions(indices) {
+                const count = indices.length;
+                const container = document.getElementById('selectionOptionsContainer');
+                if (!container) return;
+
+                container.innerHTML = `
+                    <div class="selection-options">
+                        <span class="selection-count">${count} shape${count > 1 ? 's' : ''} selected</span>
+                        <div class="selection-hint">Speak a command or draw a checkmark to confirm</div>
+                    </div>
+                `;
+                container.style.display = 'block';
+            }
 
             // Health check: probe LM Studio for available models
             async function checkLLMConnection() {
@@ -3023,19 +3623,29 @@ After your analysis, output your final answer as a JSON object with keys: descri
 
                 if (containedIndices.length === 0) return;
 
-                // Show the interpret button
-                const container = document.getElementById('interpretBtnContainer');
+                // UNIFIED INTENT: Store selection in INTENT system (no button needed)
+                // User can now speak commands like "what is this?" or "group as X"
+                INTENT.currentSelection = containedIndices;
+                INTENT.selectionBounds = selectionBounds;
+                INTENT.selectionStrokeIndex = strokeIndex;
+
+                // Mark the selection stroke
+                if (state.shapes[strokeIndex]) {
+                    state.shapes[strokeIndex].isSelectionGesture = true;
+                }
+
+                // Show selection options (hint to user they can speak)
+                showSelectionOptions(containedIndices);
+
+                // Legacy: also store on button for backward compatibility
                 const btn = document.getElementById('interpretBtn');
-                if (!container || !btn) return;
-
-                container.style.display = 'block';
-                btn.innerHTML = `<span>Interpret ${containedIndices.length} shape${containedIndices.length > 1 ? 's' : ''}</span>`;
-                btn.disabled = false;
-
-                // Store selection data for when button is clicked
-                btn._selectionBounds = selectionBounds;
-                btn._containedIndices = containedIndices;
-                btn._selectionStrokeIndex = strokeIndex;
+                if (btn) {
+                    btn._selectionBounds = selectionBounds;
+                    btn._containedIndices = containedIndices;
+                    btn._selectionStrokeIndex = strokeIndex;
+                }
+                // Note: interpret button container is hidden by default
+                // Voice commands now handle interpretation
             }
 
             async function interpretSelection(selectionBounds, containedIndices) {
@@ -8411,9 +9021,47 @@ After your analysis, output your final answer as a JSON object with keys: descri
                 // Draw completed strokes (use refined if available)
                 state.strokes.forEach((stroke, idx) => {
                     const isAccepted = state.context[idx] && state.context[idx] !== '';
+                    const isSelected = INTENT.currentSelection && INTENT.currentSelection.includes(idx);
 
                     // DAY 5: Prefer drawing from Shape object if available
                     const shape = state.shapes[idx];
+
+                    // Check if this is a selection gesture stroke
+                    if (shape && shape.isSelectionGesture) {
+                        // Draw selection gesture as dashed blue line
+                        ctx.save();
+                        ctx.strokeStyle = '#3b82f6';
+                        ctx.lineWidth = 2;
+                        ctx.setLineDash([8, 4]);
+                        ctx.lineCap = 'round';
+                        ctx.beginPath();
+                        stroke.forEach((point, i) => {
+                            if (i === 0) ctx.moveTo(point.x, point.y);
+                            else ctx.lineTo(point.x, point.y);
+                        });
+                        ctx.stroke();
+                        ctx.setLineDash([]);
+                        ctx.restore();
+                        return;
+                    }
+
+                    // Highlight selected shapes
+                    if (isSelected && shape) {
+                        ctx.save();
+                        ctx.strokeStyle = '#22c55e';
+                        ctx.lineWidth = 4;
+                        ctx.globalAlpha = 0.5;
+                        ctx.lineCap = 'round';
+                        ctx.lineJoin = 'round';
+                        ctx.beginPath();
+                        stroke.forEach((point, i) => {
+                            if (i === 0) ctx.moveTo(point.x, point.y);
+                            else ctx.lineTo(point.x, point.y);
+                        });
+                        ctx.stroke();
+                        ctx.restore();
+                    }
+
                     if (shape && shape.accepted) {
                         drawShape(shape, ctx, state.debugMode);
                         return; // Skip legacy rendering
@@ -8422,7 +9070,7 @@ After your analysis, output your final answer as a JSON object with keys: descri
                     // Legacy rendering (for unaccepted or migrating shapes)
                     const refinedStroke = state.refinedStrokes[idx];
 
-                    ctx.strokeStyle = isAccepted ? '#0066ff' : '#666666';
+                    ctx.strokeStyle = isAccepted ? '#0066ff' : (isSelected ? '#22c55e' : '#666666');
                     ctx.lineWidth = refinedStroke ? 3 : 2; // Thicker for refined shapes
                     ctx.lineCap = 'round';
                     ctx.lineJoin = 'round';
@@ -10330,7 +10978,40 @@ After your analysis, output your final answer as a JSON object with keys: descri
                 // Clear previous suggestions when starting new stroke
                 state.suggestions = [];
                 state.lastFingerprint = null;
+
+                // Clear selection when starting a new stroke
+                // (selection will be set again if this stroke is a selection gesture)
+                if (INTENT.currentSelection) {
+                    clearSelection();
+                }
             });
+
+            // Clear current selection
+            function clearSelection() {
+                INTENT.currentSelection = null;
+                INTENT.selectionBounds = null;
+
+                // Remove selection gesture stroke if it exists
+                if (INTENT.selectionStrokeIndex !== null) {
+                    const idx = INTENT.selectionStrokeIndex;
+                    if (state.shapes[idx] && state.shapes[idx].isSelectionGesture) {
+                        // Remove the selection stroke
+                        state.strokes.splice(idx, 1);
+                        state.strokeIds.splice(idx, 1);
+                        state.context.splice(idx, 1);
+                        state.shapes.splice(idx, 1);
+                        state.semanticData.splice(idx, 1);
+                        state.refinedStrokes.splice(idx, 1);
+                    }
+                    INTENT.selectionStrokeIndex = null;
+                }
+
+                // Hide selection options
+                const container = document.getElementById('selectionOptionsContainer');
+                if (container) container.style.display = 'none';
+
+                render();
+            }
 
             canvas.addEventListener('mousemove', (e) => {
                 if (!state.isDrawing) return;
@@ -10466,6 +11147,47 @@ After your analysis, output your final answer as a JSON object with keys: descri
                             }
                             // LAYER 2: Check if this stroke is a selection circle
                             checkForInterpretGesture(_llmStrokeIdx);
+
+                            // UNIFIED INTENT: Check for meta-gestures (selection, checkmark, etc.)
+                            const metaGesture = detectMetaGesture(state.currentStroke, analysis.fingerprint);
+                            if (metaGesture) {
+                                console.log('Meta-gesture detected:', metaGesture.type);
+                                INTENT.lastGestureType = metaGesture.type;
+
+                                if (metaGesture.type === 'selection') {
+                                    // Store selection context
+                                    INTENT.currentSelection = metaGesture.containedIndices;
+                                    INTENT.selectionBounds = metaGesture.bounds;
+                                    INTENT.selectionStrokeIndex = _llmStrokeIdx;
+
+                                    // Mark selection stroke visually different
+                                    if (state.shapes[_llmStrokeIdx]) {
+                                        state.shapes[_llmStrokeIdx].isSelectionGesture = true;
+                                    }
+
+                                    // Show selection options
+                                    showSelectionOptions(metaGesture.containedIndices);
+
+                                    // Don't auto-accept selection gestures as shapes
+                                    render();
+                                    return;
+                                }
+
+                                if (metaGesture.type === 'checkmark') {
+                                    // Accept top suggestion or confirm selection
+                                    const result = processIntent(metaGesture, null);
+                                    console.log('Checkmark intent result:', result);
+
+                                    // Don't add checkmark as a shape - it's a command
+                                    state.strokes.pop();
+                                    state.strokeIds.pop();
+                                    state.context.pop();
+                                    state.shapes.pop();
+                                    state.semanticData.pop();
+                                    render();
+                                    return;
+                                }
+                            }
 
                             // AUTO-ACCEPT: High confidence matches (>=80%) are automatically accepted
                             if (analysis.results.length > 0) {
@@ -12600,6 +13322,139 @@ After your analysis, output your final answer as a JSON object with keys: descri
 
             // ===== INITIALIZE LLM UI =====
             initLLMUI();
+
+            // ===== INITIALIZE UNIFIED INTERFACE =====
+            async function initUnifiedInterface() {
+                console.log('Initializing unified doodle interface...');
+
+                // Check WebGPU and initialize WebLLM if available
+                const hasGPU = await checkWebGPU();
+                if (hasGPU) {
+                    updateWebLLMStatus('loading', 'WebGPU ready');
+                    // Don't auto-download model - let user trigger it
+                    updateWebLLMStatus('ready', 'AI: Ready');
+                } else {
+                    updateWebLLMStatus('error', 'AI: No WebGPU');
+                }
+
+                // Initialize Whisper
+                updateWhisperStatus('loading', 'Voice: Loading...');
+                // Don't auto-load - let user trigger
+                updateWhisperStatus('ready', 'Voice: Ready');
+
+                // Voice button event listeners (push-to-talk)
+                const voiceButton = document.getElementById('voiceButton');
+                if (voiceButton) {
+                    // Mouse events
+                    voiceButton.addEventListener('mousedown', (e) => {
+                        e.preventDefault();
+                        startVoiceInteraction();
+                    });
+                    voiceButton.addEventListener('mouseup', () => {
+                        stopVoiceInteraction();
+                    });
+                    voiceButton.addEventListener('mouseleave', () => {
+                        if (WHISPER.isRecording) stopVoiceInteraction();
+                    });
+
+                    // Touch events
+                    voiceButton.addEventListener('touchstart', (e) => {
+                        e.preventDefault();
+                        startVoiceInteraction();
+                    });
+                    voiceButton.addEventListener('touchend', () => {
+                        stopVoiceInteraction();
+                    });
+                }
+
+                // WebLLM status click - trigger model download
+                const webllmStatus = document.getElementById('webllmStatus');
+                if (webllmStatus) {
+                    webllmStatus.style.cursor = 'pointer';
+                    webllmStatus.addEventListener('click', async () => {
+                        if (!WEBLLM.hasWebGPU) {
+                            alert('WebGPU not available in this browser');
+                            return;
+                        }
+                        if (WEBLLM.modelReady) {
+                            console.log('WebLLM already ready');
+                            return;
+                        }
+                        if (WEBLLM.loading) {
+                            console.log('WebLLM already loading');
+                            return;
+                        }
+                        await initWebLLM();
+                    });
+                }
+
+                // Whisper status click - trigger model download
+                const whisperStatus = document.getElementById('whisperStatus');
+                if (whisperStatus) {
+                    whisperStatus.style.cursor = 'pointer';
+                    whisperStatus.addEventListener('click', async () => {
+                        if (WHISPER.ready) {
+                            console.log('Whisper already ready');
+                            return;
+                        }
+                        if (WHISPER.loading) {
+                            console.log('Whisper already loading');
+                            return;
+                        }
+                        await initWhisper();
+                    });
+                }
+
+                // Set up voice command callback
+                WHISPER.onTranscript = (transcript) => {
+                    showVoiceTranscript(transcript);
+                    // Process intent with current selection context
+                    const result = processIntent(null, transcript);
+                    console.log('Voice command result:', result);
+                };
+            }
+
+            // Start voice interaction
+            async function startVoiceInteraction() {
+                const voiceButton = document.getElementById('voiceButton');
+
+                // Initialize Whisper on first use
+                if (!WHISPER.ready && !WHISPER.loading) {
+                    await initWhisper();
+                }
+
+                if (!WHISPER.ready) {
+                    console.log('Whisper not ready');
+                    return;
+                }
+
+                if (voiceButton) voiceButton.classList.add('recording');
+                startVoiceRecording();
+            }
+
+            // Stop voice interaction
+            function stopVoiceInteraction() {
+                const voiceButton = document.getElementById('voiceButton');
+                if (voiceButton) voiceButton.classList.remove('recording');
+                stopVoiceRecording();
+            }
+
+            // Show voice transcript briefly
+            function showVoiceTranscript(text) {
+                const el = document.getElementById('voiceTranscript');
+                if (!el) return;
+
+                el.textContent = `"${text}"`;
+                el.style.display = 'block';
+
+                // Hide after 3 seconds
+                setTimeout(() => {
+                    el.style.display = 'none';
+                }, 3000);
+            }
+
+            // Initialize on load
+            initUnifiedInterface();
 
         </script>
 </body>
