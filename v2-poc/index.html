@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>MetaMedium v2 — Drawing-Responsive Text</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --bg: #0a0a0f;
+      --text: #e8e4d9;
+      --text-dim: #a09880;
+      --accent: #c9a84c;
+      --accent-dim: rgba(201, 168, 76, 0.3);
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Space Grotesk', system-ui, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      -webkit-text-size-adjust: 100%;
+      touch-action: none;
+    }
+
+    #app {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .header {
+      padding: 16px 24px 8px;
+      flex-shrink: 0;
+      z-index: 10;
+    }
+
+    .header h1 {
+      font-size: 20px;
+      font-weight: 600;
+      color: var(--accent);
+      letter-spacing: 0.02em;
+    }
+
+    .header .v2 {
+      font-weight: 300;
+      font-size: 14px;
+      color: var(--text-dim);
+    }
+
+    .header .subtitle {
+      font-size: 13px;
+      color: var(--text-dim);
+      margin-top: 2px;
+      font-weight: 300;
+    }
+
+    .canvas-container {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+      margin: 0 8px;
+    }
+
+    .text-layer {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    .text-line {
+      position: absolute;
+      font: 18px/1.6 'Space Grotesk', system-ui, sans-serif;
+      color: var(--text);
+      white-space: nowrap;
+      pointer-events: none;
+      will-change: transform;
+    }
+
+    .draw-canvas {
+      position: absolute;
+      inset: 0;
+      z-index: 2;
+      cursor: crosshair;
+      touch-action: none;
+    }
+
+    .instruction {
+      position: absolute;
+      bottom: 40px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 14px;
+      color: var(--text-dim);
+      pointer-events: none;
+      z-index: 5;
+      transition: opacity 0.4s ease;
+      text-align: center;
+      background: rgba(10, 10, 15, 0.8);
+      padding: 10px 20px;
+      border-radius: 8px;
+      border: 1px solid var(--accent-dim);
+    }
+
+    .draw-icon {
+      color: var(--accent);
+      margin-right: 6px;
+    }
+
+    .info-panel {
+      padding: 8px 24px;
+      flex-shrink: 0;
+      display: none;
+      z-index: 10;
+    }
+
+    .shape-info {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+      font-size: 12px;
+    }
+
+    .shape-type {
+      color: var(--accent);
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      background: rgba(201, 168, 76, 0.1);
+      padding: 3px 10px;
+      border-radius: 4px;
+    }
+
+    .shape-confidence {
+      color: var(--text-dim);
+    }
+
+    .shape-alts {
+      color: var(--text-dim);
+      font-size: 11px;
+      opacity: 0.7;
+    }
+
+    .shape-count {
+      color: var(--text-dim);
+      font-size: 11px;
+      margin-left: auto;
+    }
+
+    .clear-btn {
+      margin: 4px 24px 8px;
+      padding: 6px 16px;
+      background: transparent;
+      border: 1px solid var(--accent-dim);
+      color: var(--text-dim);
+      font-family: 'Space Grotesk', system-ui, sans-serif;
+      font-size: 12px;
+      border-radius: 4px;
+      cursor: pointer;
+      flex-shrink: 0;
+      align-self: flex-start;
+      transition: all 0.2s ease;
+      z-index: 10;
+    }
+
+    .clear-btn:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .footer {
+      padding: 8px 24px 12px;
+      flex-shrink: 0;
+      z-index: 10;
+    }
+
+    .footer p {
+      font-size: 11px;
+      color: var(--text-dim);
+      opacity: 0.5;
+    }
+
+    .footer a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    /* Mobile adjustments */
+    @media (max-width: 600px) {
+      .header { padding: 12px 16px 6px; }
+      .header h1 { font-size: 18px; }
+      .text-line { font-size: 16px !important; }
+      .canvas-container { margin: 0 4px; }
+      .info-panel { padding: 6px 16px; }
+      .clear-btn { margin: 4px 16px 6px; }
+      .footer { padding: 6px 16px 10px; }
+      .instruction { bottom: 24px; font-size: 13px; }
+    }
+
+    /* Subtle border around canvas area */
+    .canvas-container::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border: 1px solid rgba(201, 168, 76, 0.08);
+      border-radius: 4px;
+      pointer-events: none;
+      z-index: 0;
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script src="bundle.js"></script>
+</body>
+</html>
