@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lens Canvas — MetaMedium</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root[data-theme="dark"] {
+      --sea-deep: #020a12;
+      --sea-mid: #051018;
+      --glass: rgba(2, 10, 18, 0.72);
+      --cyan: #7dd8f7;
+      --cyan-dim: #4dc9f6;
+      --cyan-glow: rgba(77, 201, 246, 0.4);
+      --gold: #d4af37;
+      --green: #b6ffba;
+      --text-heading: #7dd8f7;
+      --text-subhead: #e8f4ff;
+      --text-primary: #8cb8cc;
+      --muted: #7a9aaa;
+      --border: rgba(77, 201, 246, 0.2);
+      --border-subtle: rgba(77, 201, 246, 0.08);
+    }
+    :root[data-theme="light"] {
+      --sea-deep: #f8f5f0;
+      --sea-mid: #f0ece4;
+      --glass: rgba(255, 255, 255, 0.85);
+      --cyan: #2a6b8a;
+      --cyan-dim: #3a7d9c;
+      --cyan-glow: rgba(42, 107, 138, 0.15);
+      --gold: #9a7b2a;
+      --green: #2d7a3a;
+      --text-heading: #2a4a5a;
+      --text-subhead: #1a2a3a;
+      --text-primary: #4a6a7a;
+      --muted: #8a9aa4;
+      --border: rgba(42, 74, 90, 0.2);
+      --border-subtle: rgba(42, 74, 90, 0.08);
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; overflow: hidden; font-family: 'JetBrains Mono', monospace; }
+    body { background: var(--sea-deep); }
+    #canvas { width: 100%; height: 100%; display: block; cursor: crosshair; }
+    #toolbar {
+      position: fixed; top: 12px; left: 12px; z-index: 10;
+      display: flex; gap: 8px; align-items: center;
+    }
+    #toolbar button {
+      background: var(--glass); border: 1px solid var(--border);
+      color: var(--text-primary); padding: 4px 10px; border-radius: 3px;
+      font: 400 11px 'JetBrains Mono', monospace; cursor: pointer;
+      letter-spacing: 0.05em;
+    }
+    #toolbar button:hover { border-color: var(--cyan); color: var(--cyan); }
+    #brand {
+      position: fixed; bottom: 12px; left: 12px; z-index: 10;
+      color: var(--muted); font: 400 10px 'JetBrains Mono', monospace;
+      letter-spacing: 0.15em; text-transform: uppercase;
+    }
+  </style>
+</head>
+<body>
+  <div id="toolbar">
+    <button id="theme-toggle">☼ Light</button>
+    <button id="clear-btn">Clear</button>
+  </div>
+  <canvas id="canvas"></canvas>
+  <div id="brand">Lens Canvas</div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

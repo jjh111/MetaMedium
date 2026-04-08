@@ -1,0 +1,822 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vision PoC — Qwen3.5 VLM</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background: #0a1628;
+            color: #e0e0e0;
+            padding: 2rem;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        h1 { font-size: 1.4rem; margin-bottom: 0.3rem; color: #fff; }
+        .subtitle { color: #888; margin-bottom: 1.5rem; font-size: 0.85rem; }
+
+        .canvas-wrap {
+            position: relative;
+            border: 1px solid #1e3050;
+            border-radius: 8px;
+            overflow: hidden;
+            margin-bottom: 1rem;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 400px;
+            background: #0d1b2a;
+        }
+        .canvas-label {
+            position: absolute;
+            top: 0.5rem;
+            left: 0.75rem;
+            font-size: 0.65rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: #446;
+            pointer-events: none;
+        }
+
+        .controls {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+        }
+        button {
+            padding: 0.6rem 1.2rem;
+            font-size: 0.85rem;
+            border: 1px solid #2a3a52;
+            border-radius: 6px;
+            background: #1a2a42;
+            color: #ccc;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        button:hover:not(:disabled) { border-color: #4d9ef6; color: #fff; }
+        button:disabled { opacity: 0.4; cursor: not-allowed; }
+        button.primary { background: #1a4a2a; border-color: #2a6a3a; color: #8f8; }
+        button.vision-btn { background: #3a2a1a; border-color: #6a4a2a; color: #f8c; font-weight: 600; }
+        button.vision-btn:hover:not(:disabled) { border-color: #f8c; }
+
+        .scene-selector { display: flex; gap: 0.4rem; margin-bottom: 1rem; }
+        .scene-btn { padding: 0.4rem 0.8rem; font-size: 0.75rem; }
+        .scene-btn.active { background: #2a3a52; border-color: #4d9ef6; color: #7db4f6; }
+
+        .status {
+            display: flex; align-items: center; gap: 0.5rem;
+            margin-bottom: 1rem;
+            font-size: 0.8rem; color: #668;
+        }
+        .status-dot {
+            width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+        }
+        .status-dot.off { background: #334; }
+        .status-dot.loading { background: #f8c; animation: pulse 1s infinite; }
+        .status-dot.ready { background: #4f8; }
+        @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+        #progress { font-size: 0.75rem; color: #668; margin-bottom: 0.5rem; }
+        .progress-bar {
+            height: 3px; background: #1a2a42; border-radius: 2px;
+            overflow: hidden; margin-bottom: 1rem; display: none;
+        }
+        .progress-fill { height: 100%; background: linear-gradient(90deg, #2a5a9a, #4d9ef6); width: 0%; transition: width 0.2s; }
+
+        .section-label {
+            font-size: 0.7rem; text-transform: uppercase;
+            letter-spacing: 0.1em; color: #446; margin: 1rem 0 0.4rem;
+        }
+
+        .answer-box {
+            background: #12203a;
+            border: 1px solid #1e3050;
+            border-radius: 6px;
+            padding: 0.8rem 1rem;
+            font-size: 0.85rem;
+            line-height: 1.5;
+            color: #bcc;
+            min-height: 2.5rem;
+            white-space: pre-wrap;
+        }
+        .answer-box.generating { border-color: #3a4a6a; }
+
+        .thinking-spinner::after {
+            content: '...';
+            animation: dots 1.5s steps(3) infinite;
+        }
+        @keyframes dots {
+            0% { content: '.'; } 33% { content: '..'; } 66% { content: '...'; }
+        }
+
+        .prompt-input {
+            width: 100%;
+            padding: 0.6rem 0.8rem;
+            font-size: 0.85rem;
+            background: #1a2a42;
+            color: #fff;
+            border: 1px solid #2a3a52;
+            border-radius: 6px;
+            outline: none;
+            margin-bottom: 0.5rem;
+        }
+        .prompt-input:focus { border-color: #4d9ef6; }
+        .prompt-input::placeholder { color: #446; }
+
+        .test-log {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.7rem;
+            color: #556;
+            margin-top: 1rem;
+            max-height: 200px;
+            overflow-y: auto;
+            padding: 0.5rem;
+            background: #0d1520;
+            border-radius: 4px;
+            border: 1px solid #1a2535;
+        }
+        .test-log .entry { margin-bottom: 0.2rem; }
+        .test-log .time { color: #446; }
+        .test-log .info { color: #4d9ef6; }
+        .test-log .ok { color: #4f8; }
+        .test-log .err { color: #f66; }
+
+        .capture-preview {
+            margin-top: 0.5rem;
+            border: 1px solid #1e3050;
+            border-radius: 4px;
+            overflow: hidden;
+            display: none;
+        }
+        .capture-preview img {
+            display: block;
+            max-width: 300px;
+            height: auto;
+        }
+        .capture-label {
+            font-size: 0.65rem;
+            color: #446;
+            padding: 0.3rem 0.5rem;
+            background: #0d1520;
+        }
+    </style>
+</head>
+<body>
+    <h1>Vision PoC — Qwen3.5 VLM <span id="webgpuBadge" style="font-size:0.65rem; padding:0.15rem 0.5rem; border-radius:3px; background:#1a4a2a; color:#4f8; vertical-align:middle;">checking...</span></h1>
+    <p class="subtitle">P0.1: Can the 0.8B VLM describe what it sees on a canvas?</p>
+
+    <div class="scene-selector">
+        <button class="scene-btn active" data-scene="fish">Fish Scene</button>
+        <button class="scene-btn" data-scene="shapes">Shapes</button>
+        <button class="scene-btn" data-scene="portfolio">Portfolio Mock</button>
+        <button class="scene-btn" data-scene="drawing">Draw</button>
+    </div>
+
+    <div class="canvas-wrap">
+        <canvas id="testCanvas" width="800" height="400"></canvas>
+        <div class="canvas-label" id="canvasLabel">Fish Scene — animated</div>
+    </div>
+
+    <div class="controls">
+        <button id="enableBtn">Download Qwen3.5-0.8B (~750MB) for vision</button>
+        <button class="vision-btn" id="captureBtn" disabled>📷 Describe what you see</button>
+    </div>
+
+    <div class="status">
+        <span class="status-dot off" id="aiDot"></span>
+        <span id="statusText">Model not loaded</span>
+    </div>
+    <div id="progress"></div>
+    <div class="progress-bar" id="progressBar"><div class="progress-fill" id="progressFill"></div></div>
+
+    <div class="section-label">Custom prompt (optional)</div>
+    <input class="prompt-input" id="promptInput" placeholder="Default: Describe what you see on this canvas..." value="">
+
+    <div class="section-label">Vision answer</div>
+    <div class="answer-box" id="answer">Load the model, then click 📷 to test vision.</div>
+
+    <div class="section-label">Captured frame (sent to model)</div>
+    <div class="capture-preview" id="capturePreview">
+        <div class="capture-label">Downscaled capture sent to VLM</div>
+        <img id="captureImg" alt="captured frame">
+    </div>
+
+    <div class="test-log" id="log"></div>
+
+    <script type="module">
+        import { AutoProcessor, Qwen3_5ForConditionalGeneration, RawImage, TextStreamer } from "https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.0.0-next.5";
+
+        // ── Logging ──
+        const logEl = document.getElementById('log');
+        function log(msg, type = 'info') {
+            const t = new Date().toLocaleTimeString('en-US', { hour12: false });
+            logEl.innerHTML += `<div class="entry"><span class="time">${t}</span> <span class="${type}">${msg}</span></div>`;
+            logEl.scrollTop = logEl.scrollHeight;
+        }
+
+        // ── Canvas scenes ──
+        const canvas = document.getElementById('testCanvas');
+        const ctx = canvas.getContext('2d');
+        let currentScene = 'fish';
+        let animId = null;
+        let drawPoints = [];
+        let isDrawing = false;
+
+        // Fish scene state
+        const fishes = [];
+        const food = [];
+        const corals = [];
+
+        function initFishScene() {
+            fishes.length = 0;
+            food.length = 0;
+            corals.length = 0;
+            // Spawn 5 fish with different sizes and colors
+            const fishColors = ['#4dc9f6', '#f67280', '#f8b500', '#6bcb77', '#c084fc'];
+            for (let i = 0; i < 5; i++) {
+                const size = 12 + Math.random() * 28;
+                fishes.push({
+                    x: 100 + Math.random() * 600,
+                    y: 80 + Math.random() * 240,
+                    vx: (Math.random() - 0.5) * 2,
+                    vy: (Math.random() - 0.5) * 1.2,
+                    size,
+                    color: fishColors[i],
+                    tailPhase: Math.random() * Math.PI * 2,
+                    heading: Math.random() * Math.PI * 2
+                });
+            }
+            // Spawn 3 corals
+            for (let i = 0; i < 3; i++) {
+                corals.push({
+                    x: 150 + i * 250 + Math.random() * 80,
+                    y: 320 + Math.random() * 60,
+                    width: 30 + Math.random() * 40,
+                    height: 40 + Math.random() * 60,
+                    color: `hsl(${340 + Math.random() * 40}, 60%, ${40 + Math.random() * 20}%)`
+                });
+            }
+            // Spawn food particles
+            for (let i = 0; i < 8; i++) {
+                food.push({
+                    x: 50 + Math.random() * 700,
+                    y: 50 + Math.random() * 300,
+                    vy: 0.2 + Math.random() * 0.3,
+                    size: 2 + Math.random() * 3,
+                    opacity: 0.5 + Math.random() * 0.5
+                });
+            }
+        }
+
+        function drawFishScene() {
+            const w = canvas.width, h = canvas.height;
+            // Ocean gradient
+            const grad = ctx.createLinearGradient(0, 0, 0, h);
+            grad.addColorStop(0, '#0a1628');
+            grad.addColorStop(0.6, '#0d1f3c');
+            grad.addColorStop(1, '#0a1222');
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, w, h);
+
+            // Water caustics (subtle light rays)
+            const t = Date.now() * 0.001;
+            ctx.save();
+            ctx.globalAlpha = 0.03;
+            for (let i = 0; i < 6; i++) {
+                const x = (i * 150 + Math.sin(t + i) * 40) % w;
+                const cg = ctx.createLinearGradient(x, 0, x + 60, h);
+                cg.addColorStop(0, '#4dc9f6');
+                cg.addColorStop(1, 'transparent');
+                ctx.fillStyle = cg;
+                ctx.fillRect(x, 0, 60, h);
+            }
+            ctx.restore();
+
+            // Bubbles
+            ctx.save();
+            ctx.globalAlpha = 0.15;
+            for (let i = 0; i < 12; i++) {
+                const bx = (i * 70 + Math.sin(t * 0.7 + i * 1.3) * 30) % w;
+                const by = (h - ((t * 30 + i * 50) % (h + 40)));
+                const br = 2 + Math.sin(t + i) * 1.5;
+                ctx.beginPath();
+                ctx.arc(bx, by, Math.abs(br), 0, Math.PI * 2);
+                ctx.strokeStyle = '#4dc9f6';
+                ctx.lineWidth = 0.8;
+                ctx.stroke();
+            }
+            ctx.restore();
+
+            // Sand/ground
+            ctx.fillStyle = '#1a2a3a';
+            ctx.fillRect(0, h - 30, w, 30);
+            ctx.fillStyle = '#1e3040';
+            for (let i = 0; i < w; i += 3) {
+                const sh = Math.sin(i * 0.05 + t * 0.3) * 4 + 4;
+                ctx.fillRect(i, h - 30 - sh, 2, sh);
+            }
+
+            // Corals
+            for (const c of corals) {
+                ctx.save();
+                ctx.translate(c.x, c.y);
+                ctx.fillStyle = c.color;
+                // Branching coral shape
+                for (let b = -1; b <= 1; b++) {
+                    ctx.beginPath();
+                    ctx.ellipse(b * c.width * 0.3, 0, c.width * 0.2, c.height * 0.5, b * 0.2, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                ctx.restore();
+            }
+
+            // Food
+            for (const f of food) {
+                f.y += f.vy;
+                if (f.y > h - 35) { f.y = -5; f.x = 50 + Math.random() * 700; }
+                ctx.beginPath();
+                ctx.arc(f.x, f.y, f.size, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(120, 230, 120, ${f.opacity})`;
+                ctx.fill();
+            }
+
+            // Fish
+            for (const f of fishes) {
+                // Simple wander + edge bounce
+                f.vx += (Math.random() - 0.5) * 0.15;
+                f.vy += (Math.random() - 0.5) * 0.1;
+                f.vx *= 0.98; f.vy *= 0.98;
+                f.x += f.vx; f.y += f.vy;
+                if (f.x < 30) f.vx += 0.3;
+                if (f.x > w - 30) f.vx -= 0.3;
+                if (f.y < 30) f.vy += 0.2;
+                if (f.y > h - 60) f.vy -= 0.2;
+                f.heading = Math.atan2(f.vy, f.vx);
+                f.tailPhase += 0.12;
+
+                ctx.save();
+                ctx.translate(f.x, f.y);
+                ctx.rotate(f.heading);
+
+                // Body
+                ctx.beginPath();
+                ctx.ellipse(0, 0, f.size, f.size * 0.45, 0, 0, Math.PI * 2);
+                ctx.fillStyle = f.color;
+                ctx.globalAlpha = 0.7;
+                ctx.fill();
+
+                // Tail
+                const tailSwing = Math.sin(f.tailPhase) * f.size * 0.3;
+                ctx.beginPath();
+                ctx.moveTo(-f.size * 0.8, 0);
+                ctx.lineTo(-f.size * 1.4, tailSwing - f.size * 0.3);
+                ctx.lineTo(-f.size * 1.4, tailSwing + f.size * 0.3);
+                ctx.closePath();
+                ctx.globalAlpha = 0.5;
+                ctx.fill();
+
+                // Eye
+                ctx.globalAlpha = 0.9;
+                ctx.beginPath();
+                ctx.arc(f.size * 0.5, -f.size * 0.12, f.size * 0.1, 0, Math.PI * 2);
+                ctx.fillStyle = '#fff';
+                ctx.fill();
+                ctx.beginPath();
+                ctx.arc(f.size * 0.53, -f.size * 0.12, f.size * 0.05, 0, Math.PI * 2);
+                ctx.fillStyle = '#111';
+                ctx.fill();
+
+                ctx.restore();
+            }
+
+            // Label
+            ctx.fillStyle = 'rgba(77, 201, 246, 0.15)';
+            ctx.font = '11px system-ui';
+            ctx.fillText('Interactive Fish Ecosystem — canvas demo', 10, h - 8);
+        }
+
+        function drawShapesScene() {
+            const w = canvas.width, h = canvas.height;
+            const t = Date.now() * 0.001;
+            ctx.fillStyle = '#0d1520';
+            ctx.fillRect(0, 0, w, h);
+
+            // Blueprint grid
+            ctx.strokeStyle = 'rgba(77, 201, 246, 0.06)';
+            ctx.lineWidth = 0.5;
+            for (let x = 0; x < w; x += 40) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke(); }
+            for (let y = 0; y < h; y += 40) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke(); }
+
+            // Recognized shapes
+            const shapes = [
+                { type: 'circle', x: 200, y: 180, r: 60, color: '#4dc9f6' },
+                { type: 'rect', x: 450, y: 120, w: 120, h: 90, color: '#f67280' },
+                { type: 'triangle', x: 650, y: 200, s: 80, color: '#6bcb77' },
+                { type: 'line', x1: 100, y1: 320, x2: 700, y2: 350, color: '#f8b500' },
+            ];
+
+            for (const s of shapes) {
+                ctx.save();
+                ctx.strokeStyle = s.color;
+                ctx.lineWidth = 2;
+                ctx.globalAlpha = 0.7 + Math.sin(t * 2) * 0.1;
+
+                if (s.type === 'circle') {
+                    ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2); ctx.stroke();
+                    ctx.fillStyle = s.color; ctx.globalAlpha = 0.08; ctx.fill();
+                } else if (s.type === 'rect') {
+                    ctx.strokeRect(s.x, s.y, s.w, s.h);
+                    ctx.fillStyle = s.color; ctx.globalAlpha = 0.08; ctx.fillRect(s.x, s.y, s.w, s.h);
+                } else if (s.type === 'triangle') {
+                    ctx.beginPath();
+                    ctx.moveTo(s.x, s.y - s.s);
+                    ctx.lineTo(s.x - s.s * 0.87, s.y + s.s * 0.5);
+                    ctx.lineTo(s.x + s.s * 0.87, s.y + s.s * 0.5);
+                    ctx.closePath(); ctx.stroke();
+                    ctx.fillStyle = s.color; ctx.globalAlpha = 0.08; ctx.fill();
+                } else if (s.type === 'line') {
+                    ctx.beginPath(); ctx.moveTo(s.x1, s.y1); ctx.lineTo(s.x2, s.y2); ctx.stroke();
+                }
+
+                // Label
+                ctx.globalAlpha = 0.4;
+                ctx.fillStyle = s.color;
+                ctx.font = '10px system-ui';
+                const lx = s.type === 'line' ? (s.x1 + s.x2) / 2 : (s.x || s.x);
+                const ly = s.type === 'circle' ? s.y + s.r + 16 : s.type === 'rect' ? s.y + s.h + 16 : s.type === 'triangle' ? s.y + s.s * 0.5 + 20 : s.y1 - 8;
+                ctx.fillText(s.type.toUpperCase(), lx - 15, ly);
+                ctx.restore();
+            }
+
+            ctx.fillStyle = 'rgba(77, 201, 246, 0.15)';
+            ctx.font = '11px system-ui';
+            ctx.fillText('Blueprint Drawing Canvas — shape recognition demo', 10, h - 8);
+        }
+
+        function drawPortfolioScene() {
+            const w = canvas.width, h = canvas.height;
+            ctx.fillStyle = '#0a1628';
+            ctx.fillRect(0, 0, w, h);
+
+            // Mock portfolio card layout
+            const cards = [
+                { title: 'Nanome — XR Molecular Design', sub: 'Primary XR designer, 2022–2024', color: '#4dc9f6' },
+                { title: 'AvatarMEDIC — CEO & Founder', sub: 'Telepresence robotics, 2019–2021', color: '#f67280' },
+                { title: 'MetaMedium — AI Beyond Chat', sub: 'Diagrammatic AI canvas', color: '#6bcb77' },
+                { title: 'JH Coaching OS', sub: 'AI coaching product', color: '#f8b500' },
+            ];
+
+            const cardW = 340, cardH = 70, gap = 20, startX = (w - cardW * 2 - gap) / 2, startY = 60;
+
+            // Title
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 16px system-ui';
+            ctx.fillText('Shipped AI Products — John Hanacek', startX, 35);
+            ctx.fillStyle = '#668';
+            ctx.font = '11px system-ui';
+            ctx.fillText('Design Engineer · 10+ years prototyping in code', startX, 52);
+
+            for (let i = 0; i < cards.length; i++) {
+                const col = i % 2, row = Math.floor(i / 2);
+                const x = startX + col * (cardW + gap);
+                const y = startY + row * (cardH + gap);
+
+                // Card bg
+                ctx.fillStyle = 'rgba(18, 32, 58, 0.8)';
+                ctx.beginPath();
+                ctx.roundRect(x, y, cardW, cardH, 6);
+                ctx.fill();
+                ctx.strokeStyle = 'rgba(77, 201, 246, 0.12)';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+
+                // Accent bar
+                ctx.fillStyle = cards[i].color;
+                ctx.fillRect(x, y, 3, cardH);
+
+                // Text
+                ctx.fillStyle = cards[i].color;
+                ctx.font = 'bold 13px system-ui';
+                ctx.fillText(cards[i].title, x + 14, y + 26);
+                ctx.fillStyle = '#8899aa';
+                ctx.font = '11px system-ui';
+                ctx.fillText(cards[i].sub, x + 14, y + 46);
+            }
+
+            // Skills section
+            const sy = startY + 2 * (cardH + gap) + 20;
+            ctx.fillStyle = '#4dc9f6';
+            ctx.font = 'bold 12px system-ui';
+            ctx.fillText('SKILLS & TOOLS', startX, sy);
+
+            const skills = ['Claude Code', 'JavaScript', 'Unity/C#', 'Figma', 'WebGPU', 'p5.js', 'Blender', 'ShapesXR'];
+            ctx.font = '11px system-ui';
+            for (let i = 0; i < skills.length; i++) {
+                const sx = startX + (i % 4) * 180;
+                const srow = Math.floor(i / 4);
+                ctx.fillStyle = '#334';
+                ctx.beginPath();
+                ctx.roundRect(sx, sy + 10 + srow * 28, 160, 22, 4);
+                ctx.fill();
+                ctx.fillStyle = '#aab';
+                ctx.fillText(skills[i], sx + 10, sy + 26 + srow * 28);
+            }
+
+            ctx.fillStyle = 'rgba(77, 201, 246, 0.15)';
+            ctx.font = '11px system-ui';
+            ctx.fillText('Portfolio Overview — mock layout', 10, h - 8);
+        }
+
+        function drawDrawingScene() {
+            const w = canvas.width, h = canvas.height;
+            ctx.fillStyle = '#0d1520';
+            ctx.fillRect(0, 0, w, h);
+
+            // Grid
+            ctx.strokeStyle = 'rgba(77, 201, 246, 0.04)';
+            ctx.lineWidth = 0.5;
+            for (let x = 0; x < w; x += 30) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke(); }
+            for (let y = 0; y < h; y += 30) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke(); }
+
+            // Draw user strokes
+            if (drawPoints.length > 1) {
+                ctx.beginPath();
+                ctx.moveTo(drawPoints[0].x, drawPoints[0].y);
+                for (let i = 1; i < drawPoints.length; i++) {
+                    ctx.lineTo(drawPoints[i].x, drawPoints[i].y);
+                }
+                ctx.strokeStyle = '#4dc9f6';
+                ctx.lineWidth = 2.5;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                ctx.stroke();
+            }
+
+            ctx.fillStyle = 'rgba(77, 201, 246, 0.3)';
+            ctx.font = '13px system-ui';
+            ctx.fillText(drawPoints.length > 0 ? `${drawPoints.length} points drawn` : 'Draw something on the canvas...', 10, h - 12);
+        }
+
+        // Drawing input
+        canvas.addEventListener('pointerdown', e => {
+            if (currentScene !== 'drawing') return;
+            isDrawing = true;
+            drawPoints = [];
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            drawPoints.push({ x: (e.clientX - rect.left) * scaleX, y: (e.clientY - rect.top) * scaleY });
+        });
+        canvas.addEventListener('pointermove', e => {
+            if (!isDrawing || currentScene !== 'drawing') return;
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            drawPoints.push({ x: (e.clientX - rect.left) * scaleX, y: (e.clientY - rect.top) * scaleY });
+        });
+        canvas.addEventListener('pointerup', () => { isDrawing = false; });
+
+        // Scene switcher
+        document.querySelectorAll('.scene-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.scene-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                currentScene = btn.dataset.scene;
+                document.getElementById('canvasLabel').textContent =
+                    currentScene === 'fish' ? 'Fish Scene — animated' :
+                    currentScene === 'shapes' ? 'Blueprint Shapes — animated' :
+                    currentScene === 'portfolio' ? 'Portfolio Mock — static' :
+                    'Drawing Canvas — draw with mouse';
+                if (currentScene === 'fish') initFishScene();
+                if (currentScene === 'drawing') drawPoints = [];
+            });
+        });
+
+        // Animation loop
+        initFishScene();
+        function animate() {
+            if (currentScene === 'fish') drawFishScene();
+            else if (currentScene === 'shapes') drawShapesScene();
+            else if (currentScene === 'portfolio') drawPortfolioScene();
+            else if (currentScene === 'drawing') drawDrawingScene();
+            animId = requestAnimationFrame(animate);
+        }
+        animate();
+
+        // ── WebGPU check ──
+        const badge = document.getElementById('webgpuBadge');
+        let hasWebGPU = false;
+        async function checkWebGPU() {
+            if (!navigator.gpu) { badge.textContent = 'No WebGPU'; badge.style.background = '#4a1a1a'; badge.style.color = '#f66'; return false; }
+            const adapter = await navigator.gpu.requestAdapter();
+            if (!adapter) { badge.textContent = 'No GPU adapter'; badge.style.background = '#4a1a1a'; badge.style.color = '#f66'; return false; }
+            badge.textContent = 'WebGPU OK';
+            return true;
+        }
+        hasWebGPU = await checkWebGPU();
+        if (!hasWebGPU) document.getElementById('enableBtn').disabled = true;
+
+        // ── Model loading ──
+        const MODEL_ID = "onnx-community/Qwen3.5-0.8B-ONNX";
+        let processor = null;
+        let model = null;
+        let modelReady = false;
+
+        document.getElementById('enableBtn').addEventListener('click', async () => {
+            if (!hasWebGPU || modelReady) return;
+            const btn = document.getElementById('enableBtn');
+            const progress = document.getElementById('progress');
+            const progressBar = document.getElementById('progressBar');
+            const progressFill = document.getElementById('progressFill');
+            const dot = document.getElementById('aiDot');
+            const statusText = document.getElementById('statusText');
+
+            btn.disabled = true;
+            btn.textContent = 'Downloading...';
+            dot.className = 'status-dot loading';
+            statusText.textContent = 'Downloading model files...';
+            progressBar.style.display = 'block';
+            log('Starting model download...');
+
+            const fileProgress = new Map();
+            function onProgress(info) {
+                if (info.status === 'progress' && info.total) {
+                    fileProgress.set(info.file, { loaded: info.loaded, total: info.total });
+                    let loaded = 0, total = 0;
+                    for (const fp of fileProgress.values()) { loaded += fp.loaded; total += fp.total; }
+                    if (total > 0) {
+                        progressFill.style.width = (loaded / total * 100) + '%';
+                        progress.textContent = `${(loaded / 1e6).toFixed(0)}/${(total / 1e6).toFixed(0)} MB`;
+                    }
+                } else if (info.status === 'initiate') {
+                    log(`Loading ${info.file || '...'}`, 'info');
+                }
+            }
+
+            try {
+                log('Loading processor (tokenizer + image processor)...');
+                processor = await AutoProcessor.from_pretrained(MODEL_ID, { progress_callback: onProgress });
+                log('Processor loaded', 'ok');
+
+                log('Loading model weights (vision_encoder: fp16 for vision quality)...');
+                model = await Qwen3_5ForConditionalGeneration.from_pretrained(MODEL_ID, {
+                    dtype: {
+                        embed_tokens: "q4",
+                        vision_encoder: "fp16",
+                        decoder_model_merged: "q4",
+                    },
+                    device: "webgpu",
+                    progress_callback: onProgress,
+                });
+                log('Model loaded', 'ok');
+
+                // Warm up
+                log('Compiling GPU shaders (warmup)...');
+                statusText.textContent = 'Compiling GPU shaders...';
+                const warmup = processor.tokenizer("hi");
+                await model.generate({ ...warmup, max_new_tokens: 1 });
+                log('GPU shaders compiled', 'ok');
+
+                modelReady = true;
+                btn.textContent = 'Qwen3.5-0.8B loaded (fp16 vision)';
+                btn.classList.add('primary');
+                dot.className = 'status-dot ready';
+                statusText.textContent = 'Model ready — click 📷 to test vision';
+                progressBar.style.display = 'none';
+                progress.textContent = '';
+                document.getElementById('captureBtn').disabled = false;
+                log('Ready for vision! Click 📷 Describe', 'ok');
+            } catch (err) {
+                log(`Error: ${err.message}`, 'err');
+                btn.textContent = 'Error — click to retry';
+                btn.disabled = false;
+                dot.className = 'status-dot off';
+                statusText.textContent = `Error: ${err.message}`;
+                progressBar.style.display = 'none';
+                console.error(err);
+            }
+        });
+
+        // ── Vision capture + generation ──
+        const CAPTURE_MAX_WIDTH = 800;
+
+        function captureCanvas() {
+            const sourceW = canvas.width;
+            const sourceH = canvas.height;
+            const scale = Math.min(1, CAPTURE_MAX_WIDTH / sourceW);
+
+            // Create offscreen canvas at capture size
+            const offscreen = document.createElement('canvas');
+            offscreen.width = Math.round(sourceW * scale);
+            offscreen.height = Math.round(sourceH * scale);
+            const octx = offscreen.getContext('2d');
+            octx.drawImage(canvas, 0, 0, offscreen.width, offscreen.height);
+
+            // Show preview
+            const preview = document.getElementById('capturePreview');
+            const img = document.getElementById('captureImg');
+            img.src = offscreen.toDataURL('image/jpeg', 0.85);
+            preview.style.display = 'block';
+
+            log(`Captured frame: ${offscreen.width}x${offscreen.height}px`);
+            return RawImage.fromCanvas(offscreen);
+        }
+
+        document.getElementById('captureBtn').addEventListener('click', async () => {
+            if (!modelReady) return;
+            const answerEl = document.getElementById('answer');
+            const captureBtn = document.getElementById('captureBtn');
+            const dot = document.getElementById('aiDot');
+            const statusText = document.getElementById('statusText');
+
+            captureBtn.disabled = true;
+            answerEl.className = 'answer-box generating';
+            answerEl.innerHTML = '<span class="thinking-spinner">Analyzing image</span>';
+            dot.className = 'status-dot loading';
+            statusText.textContent = 'Processing vision...';
+
+            const startTime = performance.now();
+            log('Capturing canvas frame...');
+
+            try {
+                // 1. Capture
+                const rawImage = captureCanvas();
+                const captureTime = performance.now() - startTime;
+                log(`Canvas captured in ${captureTime.toFixed(0)}ms`, 'ok');
+
+                // 2. Build multimodal message
+                const userPrompt = document.getElementById('promptInput').value.trim()
+                    || 'Describe what you see on this canvas in detail. What visual elements, colors, and objects are present?';
+
+                const messages = [
+                    {
+                        role: "system",
+                        content: "You describe visual content on a web portfolio canvas. Be specific about colors, shapes, objects, animations, and layout. 2-4 sentences."
+                    },
+                    {
+                        role: "user",
+                        content: [
+                            { type: "image" },
+                            { type: "text", text: userPrompt }
+                        ]
+                    }
+                ];
+
+                // 3. Apply chat template
+                log('Applying chat template...');
+                const text = processor.apply_chat_template(messages, {
+                    add_generation_prompt: true,
+                    tokenizer_kwargs: { enable_thinking: false },
+                });
+
+                // 4. Process text + image together
+                log('Processing text + image through vision encoder...');
+                const visionStart = performance.now();
+                const inputs = await processor(text, [rawImage]);
+                const visionTime = performance.now() - visionStart;
+                log(`Vision encoding: ${(visionTime / 1000).toFixed(1)}s`, 'info');
+
+                // 5. Generate with streaming
+                log('Generating response...');
+                let outputText = '';
+                const genStart = performance.now();
+
+                await model.generate({
+                    ...inputs,
+                    max_new_tokens: 256,
+                    do_sample: false,
+                    streamer: new TextStreamer(processor.tokenizer, {
+                        skip_prompt: true,
+                        skip_special_tokens: true,
+                        callback_function: (token) => {
+                            outputText += token;
+                            answerEl.textContent = outputText.trimStart();
+                        },
+                    }),
+                });
+
+                const genTime = performance.now() - genStart;
+                const totalTime = performance.now() - startTime;
+                const finalText = outputText.trim();
+                answerEl.textContent = finalText || '(No output)';
+
+                log(`Generation: ${(genTime / 1000).toFixed(1)}s, Total: ${(totalTime / 1000).toFixed(1)}s, Output: ${finalText.length} chars`, 'ok');
+
+            } catch (err) {
+                answerEl.textContent = `Error: ${err.message}`;
+                log(`Vision error: ${err.message}`, 'err');
+                console.error(err);
+            } finally {
+                captureBtn.disabled = false;
+                answerEl.classList.remove('generating');
+                dot.className = 'status-dot ready';
+                statusText.textContent = 'Ready';
+            }
+        });
+    </script>
+</body>
+</html>

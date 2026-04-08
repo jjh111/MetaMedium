@@ -1,0 +1,1364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Playground - John Hanacek</title>
+    <meta name="description" content="Interactive demos and creative experiments by John Hanacek — zoomable, explorable, alive.">
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="./Assets/favicon-jhsigfrmpaper.png">
+
+    <!-- Open Graph / Social Share -->
+    <meta property="og:title" content="Playground - John Hanacek">
+    <meta property="og:description" content="Interactive demos and creative experiments — zoomable, explorable, alive.">
+    <meta property="og:image" content="https://www.johnhanacek.com/Assets/socialgraph-jhcom.webp">
+    <meta property="og:url" content="https://www.johnhanacek.com/playground.html">
+    <meta property="og:type" content="website">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Playground - John Hanacek">
+    <meta name="twitter:description" content="Interactive demos and creative experiments — zoomable, explorable, alive.">
+    <meta name="twitter:image" content="https://www.johnhanacek.com/Assets/socialgraph-jhcom.webp">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Raleway:wght@100;200;300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="./styles/shared.css">
+
+    <style>
+        /* ============================================
+           PLAYGROUND PAGE — Full-screen board layout
+           ============================================ */
+
+        /* Override body to be full-screen, no scroll */
+        body {
+            overflow: hidden;
+            background: #122d3e;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            padding-top: 40px; /* Account for fixed nav height */
+        }
+
+        /* Caustic ripple layer — sits BELOW board-world in DOM so cards are never covered.
+           mix-blend-mode:screen brightens the teal background gaps; dark card surfaces
+           are already near-black so screen barely affects them. */
+        .caustic-layer {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            z-index: 0;
+            mix-blend-mode: screen;
+            background:
+                radial-gradient(ellipse 42% 32% at 20% 26%, rgba(0, 200, 240, 0.25) 0%, transparent 65%),
+                radial-gradient(ellipse 32% 48% at 70% 60%, rgba(0, 180, 225, 0.20) 0%, transparent 62%),
+                radial-gradient(ellipse 52% 28% at 48% 84%, rgba(10, 210, 240, 0.18) 0%, transparent 56%),
+                radial-gradient(ellipse 30% 42% at 86% 20%, rgba(0, 195, 235, 0.16) 0%, transparent 60%),
+                radial-gradient(ellipse 36% 36% at 10% 75%, rgba(5, 190, 230, 0.14) 0%, transparent 56%);
+            animation: pgCausticDrift 20s ease-in-out infinite alternate;
+        }
+
+        @keyframes pgCausticDrift {
+            0%   { transform: scale(1)    translate(0%,   0%);   }
+            20%  { transform: scale(1.06) translate(1%,   2%);   }
+            45%  { transform: scale(0.96) translate(2%,  -1.5%); }
+            70%  { transform: scale(1.03) translate(1.5%, 2.5%); }
+            100% { transform: scale(0.98) translate(0.5%,  1%);  }
+        }
+
+        /* ---- Controls Bar (top) ---- */
+        .playground-header {
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.5rem 1rem;
+            background: rgba(6, 13, 26, 0.95);
+            border-bottom: 1px solid rgba(77, 201, 246, 0.12);
+            backdrop-filter: blur(8px);
+            z-index: 100;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.7rem;
+            flex-wrap: wrap;
+            min-height: 46px;
+        }
+
+        .pg-title {
+            color: rgba(77, 201, 246, 0.9);
+            font-weight: 500;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            font-size: 0.65rem;
+            margin-right: 0.5rem;
+            white-space: nowrap;
+        }
+
+        .pg-divider {
+            width: 1px;
+            height: 18px;
+            background: rgba(77, 201, 246, 0.15);
+            flex-shrink: 0;
+        }
+
+        .zoom-display {
+            color: rgba(255, 255, 255, 0.5);
+            font-size: 0.65rem;
+            min-width: 44px;
+            text-align: center;
+        }
+
+        .pg-btn {
+            background: rgba(77, 201, 246, 0.06);
+            border: 1px solid rgba(77, 201, 246, 0.2);
+            color: rgba(77, 201, 246, 0.8);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.65rem;
+            padding: 0.25rem 0.5rem;
+            border-radius: 3px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            white-space: nowrap;
+            line-height: 1;
+        }
+        .pg-btn:hover {
+            background: rgba(77, 201, 246, 0.15);
+            border-color: rgba(77, 201, 246, 0.4);
+            color: rgba(77, 201, 246, 1);
+        }
+        .pg-btn.active {
+            background: rgba(77, 201, 246, 0.18);
+            border-color: rgba(77, 201, 246, 0.5);
+            color: #4dc9f6;
+        }
+
+        .filter-group {
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+            margin-left: auto;
+        }
+
+        .filter-label {
+            color: rgba(255, 255, 255, 0.3);
+            font-size: 0.6rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+        }
+
+        /* ---- Board Viewport ---- */
+        .board-viewport {
+            flex: 1;
+            overflow: hidden;
+            position: relative;
+            cursor: grab;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        .board-viewport.panning {
+            cursor: grabbing;
+        }
+
+        /* ---- Dot grid — fixed to viewport so it always fills the full visible area ---- */
+        /* Placed on board-viewport (the clipping container), not on board-world (the transformed layer).
+           This means the grid doesn't move/scale with the canvas, giving a subtle infinite-feeling backdrop. */
+        .board-viewport {
+            background-image: radial-gradient(circle, rgba(100, 210, 240, 0.18) 1px, transparent 1px);
+            background-size: 28px 28px;
+        }
+
+        /* ---- Board World (transformed) ---- */
+        .board-world {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 6000px;
+            height: 4000px;
+            transform-origin: 0 0;
+            z-index: 1;
+            background: transparent;
+        }
+
+        /* ---- Demo Cards ---- */
+        .demo-card {
+            position: absolute;
+            border: 1px solid rgba(77, 201, 246, 0.28);
+            border-radius: 8px;
+            background: #0b1e2e;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(77, 201, 246, 0.06) inset;
+            overflow: visible;
+            transition: box-shadow 0.2s ease, border-color 0.2s ease;
+        }
+        .demo-card:hover {
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.65), 0 0 20px rgba(77, 201, 246, 0.1), 0 0 0 1px rgba(77, 201, 246, 0.1) inset;
+            border-color: rgba(77, 201, 246, 0.45);
+        }
+        .demo-card.dragging-card {
+            box-shadow: 0 16px 48px rgba(0, 0, 0, 0.8), 0 0 30px rgba(77, 201, 246, 0.18);
+            border-color: rgba(77, 201, 246, 0.6);
+            z-index: 1000 !important;
+        }
+        .demo-card.hidden-card {
+            display: none;
+        }
+
+        /* Card header — left: drag handle + title/desc; right: size buttons + controls */
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 6px 8px;
+            background: rgba(77, 201, 246, 0.06);
+            border-bottom: 1px solid rgba(77, 201, 246, 0.14);
+            border-radius: 8px 8px 0 0;
+            cursor: grab;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .card-header:active {
+            cursor: grabbing;
+        }
+
+        .drag-handle {
+            color: rgba(77, 201, 246, 0.3);
+            font-size: 0.8rem;
+            line-height: 1;
+            flex-shrink: 0;
+            cursor: grab;
+        }
+
+        .card-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .card-title {
+            display: block;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.7rem;
+            font-weight: 500;
+            color: #4dc9f6;
+            letter-spacing: 0.08em;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .card-desc {
+            display: block;
+            font-family: 'Raleway', sans-serif;
+            font-size: 0.65rem;
+            color: rgba(255, 255, 255, 0.42);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin-top: 1px;
+            line-height: 1.3;
+        }
+
+        /* Right side controls cluster */
+        .card-controls {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            flex-shrink: 0;
+            margin-left: auto;
+        }
+
+        /* Tech badges */
+        .tech-badge {
+            flex-shrink: 0;
+            font-size: 0.55rem;
+            font-weight: 500;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .tech-threejs  { background: rgba(77, 201, 246, 0.12); color: #4dc9f6;  border: 1px solid rgba(77, 201, 246, 0.25); }
+        .tech-react    { background: rgba(97, 218, 251, 0.1);  color: #61dafb;  border: 1px solid rgba(97, 218, 251, 0.2); }
+        .tech-p5js     { background: rgba(237, 34, 93, 0.12);  color: #ed225d;  border: 1px solid rgba(237, 34, 93, 0.25); }
+        .tech-paperjs  { background: rgba(139, 92, 246, 0.12); color: #a78bfa;  border: 1px solid rgba(139, 92, 246, 0.25); }
+        .tech-css      { background: rgba(160, 160, 160, 0.1); color: #9ca3af;  border: 1px solid rgba(160, 160, 160, 0.2); }
+
+        /* Open in new tab button */
+        .card-open {
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 22px;
+            height: 22px;
+            background: rgba(77, 201, 246, 0.06);
+            border: 1px solid rgba(77, 201, 246, 0.18);
+            border-radius: 3px;
+            color: rgba(77, 201, 246, 0.6);
+            font-size: 0.7rem;
+            text-decoration: none;
+            transition: all 0.15s ease;
+            line-height: 1;
+        }
+        .card-open:hover {
+            background: rgba(77, 201, 246, 0.15);
+            border-color: rgba(77, 201, 246, 0.4);
+            color: #4dc9f6;
+        }
+
+        /* Card iframe wrap */
+        .card-iframe-wrap {
+            position: relative;
+            overflow: hidden;
+            border-radius: 0 0 7px 7px;
+        }
+
+        .card-iframe-wrap iframe {
+            display: block;
+            width: 100%;
+            height: 100%;
+            border: none;
+            background: #050c1a;
+        }
+
+        /* Iframe blocker — shown during any drag to prevent iframe stealing events */
+        .iframe-blocker {
+            position: absolute;
+            inset: 0;
+            z-index: 10;
+            display: none;
+            background: transparent;
+        }
+
+        /* Card placeholder — shown until iframe loaded */
+        .card-placeholder {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 0.6rem;
+            background: rgba(5, 12, 26, 0.96);
+            color: rgba(77, 201, 246, 0.5);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.65rem;
+            letter-spacing: 0.1em;
+            border-radius: 0 0 7px 7px;
+            transition: opacity 0.4s ease;
+            cursor: pointer;
+        }
+        .card-placeholder .ph-icon {
+            font-size: 1.8rem;
+            opacity: 0.4;
+        }
+        .card-placeholder .ph-label {
+            text-transform: uppercase;
+            opacity: 0.7;
+        }
+        .card-placeholder .ph-hint {
+            font-size: 0.55rem;
+            opacity: 0.4;
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+        }
+        .card-placeholder:hover {
+            background: rgba(10, 22, 40, 0.96);
+            color: rgba(77, 201, 246, 0.8);
+        }
+
+        .demo-card.loaded .card-placeholder {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        /* ---- Board corner controls ---- */
+        .board-controls {
+            position: fixed;
+            bottom: 1rem;
+            right: 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.35rem;
+            z-index: 200;
+        }
+
+        .board-controls .pg-btn {
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+            font-size: 1rem;
+        }
+
+        /* ---- Nav override (fixed as normal, but always visible — no scroll needed) ---- */
+        /* nav.visible class is added via JS immediately at page load */
+
+        /* Hint text at bottom of board */
+        .board-hint {
+            position: fixed;
+            bottom: 1rem;
+            left: 50%;
+            transform: translateX(-50%);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.6rem;
+            color: rgba(77, 201, 246, 0.25);
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            pointer-events: none;
+            white-space: nowrap;
+        }
+
+        /* ---- Card Size Presets (+25% from original S/M/L) ---- */
+        /* Width controlled on .demo-card; height on .card-iframe-wrap */
+        .demo-card.size-sm { width: 475px; }
+        .demo-card.size-md { width: 700px; }
+        .demo-card.size-lg { width: 950px; }
+
+        .demo-card.size-sm .card-iframe-wrap { height: 400px; }
+        .demo-card.size-md .card-iframe-wrap { height: 625px; }
+        .demo-card.size-lg .card-iframe-wrap { height: 850px; }
+
+        /* Size toggle buttons — now in .card-controls on the right */
+        .size-btn {
+            background: rgba(77, 201, 246, 0.04);
+            border: 1px solid rgba(77, 201, 246, 0.15);
+            color: rgba(77, 201, 246, 0.45);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.55rem;
+            width: 18px;
+            height: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 2px;
+            cursor: pointer;
+            transition: all 0.12s ease;
+            padding: 0;
+            line-height: 1;
+        }
+        .size-btn:hover {
+            background: rgba(77, 201, 246, 0.12);
+            border-color: rgba(77, 201, 246, 0.35);
+            color: rgba(77, 201, 246, 0.9);
+        }
+        .size-btn.active {
+            background: rgba(77, 201, 246, 0.18);
+            border-color: rgba(77, 201, 246, 0.5);
+            color: #4dc9f6;
+        }
+
+        /* Unload button */
+        .card-unload {
+            flex-shrink: 0;
+            width: 22px;
+            height: 22px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+            font-size: 0.65rem;
+            opacity: 0.5;
+        }
+        .card-unload:hover {
+            opacity: 1;
+            color: rgba(246, 120, 77, 0.9);
+            border-color: rgba(246, 120, 77, 0.4);
+            background: rgba(246, 120, 77, 0.08);
+        }
+        /* Only show unload button when card is loaded */
+        .demo-card:not(.loaded) .card-unload {
+            display: none;
+        }
+
+        @media (max-width: 768px) {
+            .pg-title { display: none; }
+            .pg-divider { display: none; }
+            .filter-label { display: none; }
+            .board-hint { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Interactive Cursor Spotlight -->
+    <div id="cursorSpotlight"></div>
+
+    <a href="#board" class="skip-link">Skip to playground board</a>
+
+    <!-- Shared Nav -->
+    <nav id="nav" role="navigation" aria-label="Main navigation">
+        <div class="nav-inner">
+            <div class="nav-left">
+                <a href="index.html" class="shape-link" aria-label="Home">
+                    <svg class="shape triangle" viewBox="0 0 40 40"><polygon points="20,8 34,32 6,32"/></svg>
+                    <img class="shape-label shape-label-img" src="./Assets/footer-JHsig.png" alt="JH">
+                </a>
+                <a href="design.html" class="shape-link" aria-label="Design">
+                    <svg class="shape rounded-square" viewBox="0 0 40 40"><rect x="6" y="6" width="28" height="28" rx="6"/></svg>
+                    <span class="shape-label">DESIGN</span>
+                </a>
+                <a href="art.html" class="shape-link" aria-label="Art">
+                    <svg class="shape circle" viewBox="0 0 40 40"><circle cx="20" cy="20" r="14"/></svg>
+                    <span class="shape-label">ART</span>
+                </a>
+                <a href="index.html" class="nav-title">John Hanacek</a>
+                <a href="about.html" class="shape-link secondary" aria-label="About">
+                    <svg class="shape diamond" viewBox="0 0 40 40"><polygon points="20,6 34,20 20,34 6,20"/></svg>
+                    <span class="shape-label">ABOUT</span>
+                </a>
+                <a href="services.html" class="shape-link secondary" aria-label="Services">
+                    <svg class="shape star" viewBox="0 0 40 40"><polygon points="20,6 23,16 34,16 25,22 28,34 20,26 12,34 15,22 6,16 17,16"/></svg>
+                    <span class="shape-label">SERVICES</span>
+                </a>
+                <a href="playground.html" class="shape-link active" aria-label="Playground" aria-current="page">
+                    <svg class="shape hexagon" viewBox="0 0 40 40"><polygon points="20,5 33,12.5 33,27.5 20,35 7,27.5 7,12.5"/></svg>
+                    <span class="shape-label">PLAY</span>
+                </a>
+            </div>
+            <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+            <ul class="nav-right">
+                <li><a href="#board">Board</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <!-- Playground Controls Bar -->
+    <div class="playground-header">
+        <span class="pg-title">⬡ Playground</span>
+        <div class="pg-divider"></div>
+        <span class="zoom-display" id="zoomDisplay">68%</span>
+        <button class="pg-btn" id="btnZoomOut" title="Zoom out">−</button>
+        <button class="pg-btn" id="btnZoomIn" title="Zoom in">+</button>
+        <button class="pg-btn" id="btnReset" title="Reset view">⌂ Reset</button>
+        <div class="pg-divider"></div>
+        <div class="filter-group">
+            <span class="filter-label">Filter:</span>
+            <button class="pg-btn active" data-filter="all">All</button>
+            <button class="pg-btn" data-filter="game">Game</button>
+            <button class="pg-btn" data-filter="tool">Tool</button>
+            <button class="pg-btn" data-filter="demo">Demo</button>
+            <button class="pg-btn" data-filter="ideas">Ideas</button>
+        </div>
+    </div>
+
+    <!-- Infinite Canvas Board -->
+    <div class="board-viewport" id="boardViewport">
+        <!-- Caustic light layer — below board-world, never covers card content -->
+        <div class="caustic-layer"></div>
+        <div class="board-world" id="boardWorld">
+
+            <!-- ═══════════════════════════════════════
+                 ROW 1 — Games & Tools (top, y=60)
+                 ═══════════════════════════════════════ -->
+
+            <!-- CARD: CYBERBIRD -->
+            <div class="demo-card size-lg" id="card-cyberbird" data-category="game"
+                 style="left: 60px; top: 60px;">
+                <div class="card-header">
+                    <span class="drag-handle">⠿</span>
+                    <div class="card-info">
+                        <span class="card-title">CYBERBIRD</span>
+                        <span class="card-desc">Radical aerial flight simulator in 3D space</span>
+                    </div>
+                    <div class="card-controls">
+                        <button class="size-btn" data-size="sm">S</button>
+                        <button class="size-btn" data-size="md">M</button>
+                        <button class="size-btn active" data-size="lg">L</button>
+                        <button class="card-unload pg-btn" title="Unload">✕</button>
+                        <span class="tech-badge tech-threejs">Three.js</span>
+                        <a class="card-open" href="./Assets/DemosPlayground/aethereal-flight/index.html" target="_blank" rel="noopener" title="Open in new tab">↗</a>
+                    </div>
+                </div>
+                <div class="card-iframe-wrap">
+                    <iframe data-src="./Assets/DemosPlayground/aethereal-flight/index.html" title="CYBERBIRD — aerial flight simulator" sandbox="allow-scripts allow-same-origin allow-forms"></iframe>
+                    <div class="iframe-blocker"></div>
+                    <div class="card-placeholder" data-card="card-cyberbird">
+                        <div class="ph-icon">✈</div>
+                        <div class="ph-label">CYBERBIRD</div>
+                        <div class="ph-hint">Click to load · Three.js</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CARD: Social Network Viz -->
+            <div class="demo-card size-lg" id="card-sna" data-category="tool"
+                 style="left: 1070px; top: 60px;">
+                <div class="card-header">
+                    <span class="drag-handle">⠿</span>
+                    <div class="card-info">
+                        <span class="card-title">SOCIAL NETWORK VIZ</span>
+                        <span class="card-desc">Draw nodes and edges, watch force-directed layout emerge</span>
+                    </div>
+                    <div class="card-controls">
+                        <button class="size-btn" data-size="sm">S</button>
+                        <button class="size-btn" data-size="md">M</button>
+                        <button class="size-btn active" data-size="lg">L</button>
+                        <button class="card-unload pg-btn" title="Unload">✕</button>
+                        <span class="tech-badge tech-react">React</span>
+                        <a class="card-open" href="./Assets/DemosPlayground/sna-drawing-demo.html" target="_blank" rel="noopener" title="Open in new tab">↗</a>
+                    </div>
+                </div>
+                <div class="card-iframe-wrap">
+                    <iframe data-src="./Assets/DemosPlayground/sna-drawing-demo.html" title="Social Network Analysis — draw nodes and edges" sandbox="allow-scripts allow-same-origin allow-forms"></iframe>
+                    <div class="iframe-blocker"></div>
+                    <div class="card-placeholder" data-card="card-sna">
+                        <div class="ph-icon">◎</div>
+                        <div class="ph-label">SOCIAL NETWORK VIZ</div>
+                        <div class="ph-hint">Click to load · React + Canvas</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CARD: 3D Sync Demo (demo-gated) -->
+            <div class="demo-card size-lg" id="card-3dsync" data-category="demo"
+                 data-no-autoload="true"
+                 style="left: 2080px; top: 60px;">
+                <div class="card-header">
+                    <span class="drag-handle">⠿</span>
+                    <div class="card-info">
+                        <span class="card-title">3D SYNC DEMO</span>
+                        <span class="card-desc">Three synchronized 3D viewports with linked camera controls</span>
+                    </div>
+                    <div class="card-controls">
+                        <button class="size-btn" data-size="sm">S</button>
+                        <button class="size-btn" data-size="md">M</button>
+                        <button class="size-btn active" data-size="lg">L</button>
+                        <button class="card-unload pg-btn" title="Unload">✕</button>
+                        <span class="tech-badge tech-threejs">Three.js</span>
+                        <a class="card-open" href="./Assets/3d-sync-demo/index.html" target="_blank" rel="noopener" title="Open in new tab">↗</a>
+                    </div>
+                </div>
+                <div class="card-iframe-wrap">
+                    <iframe data-src="./Assets/3d-sync-demo/index.html" title="3D Sync Demo — synchronized 3D viewports" sandbox="allow-scripts allow-same-origin"></iframe>
+                    <div class="iframe-blocker"></div>
+                    <div class="card-placeholder" data-card="card-3dsync">
+                        <div class="ph-icon">⬡</div>
+                        <div class="ph-label">3D SYNC DEMO</div>
+                        <div class="ph-hint">Click to load · Three.js</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ═══════════════════════════════════════
+                 ROW 2 — Style References (y=1000)
+                 ═══════════════════════════════════════ -->
+
+            <!-- CARD: Black Hole Gothic -->
+            <div class="demo-card size-md" id="card-bhg" data-category="ideas"
+                 style="left: 60px; top: 1000px;">
+                <div class="card-header">
+                    <span class="drag-handle">⠿</span>
+                    <div class="card-info">
+                        <span class="card-title">BLACK HOLE GOTHIC</span>
+                        <span class="card-desc">Dark cosmic design system with gold accents and star animations</span>
+                    </div>
+                    <div class="card-controls">
+                        <button class="size-btn" data-size="sm">S</button>
+                        <button class="size-btn active" data-size="md">M</button>
+                        <button class="size-btn" data-size="lg">L</button>
+                        <button class="card-unload pg-btn" title="Unload">✕</button>
+                        <span class="tech-badge tech-css">CSS</span>
+                        <a class="card-open" href="./Assets/DemosPlayground/StyleRefs/black-hole-gothic.html" target="_blank" rel="noopener" title="Open in new tab">↗</a>
+                    </div>
+                </div>
+                <div class="card-iframe-wrap">
+                    <iframe data-src="./Assets/DemosPlayground/StyleRefs/black-hole-gothic.html" title="Black Hole Gothic — dark cosmic design system" sandbox="allow-scripts allow-same-origin"></iframe>
+                    <div class="iframe-blocker"></div>
+                    <div class="card-placeholder" data-card="card-bhg">
+                        <div class="ph-icon">✦</div>
+                        <div class="ph-label">BLACK HOLE GOTHIC</div>
+                        <div class="ph-hint">Click to load · CSS</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CARD: Transcendence Gold -->
+            <div class="demo-card size-md" id="card-gold" data-category="ideas"
+                 style="left: 820px; top: 1000px;">
+                <div class="card-header">
+                    <span class="drag-handle">⠿</span>
+                    <div class="card-info">
+                        <span class="card-title">TRANSCENDENCE GOLD</span>
+                        <span class="card-desc">Luxury warm-toned design system, elegant typography</span>
+                    </div>
+                    <div class="card-controls">
+                        <button class="size-btn" data-size="sm">S</button>
+                        <button class="size-btn active" data-size="md">M</button>
+                        <button class="size-btn" data-size="lg">L</button>
+                        <button class="card-unload pg-btn" title="Unload">✕</button>
+                        <span class="tech-badge tech-css">CSS</span>
+                        <a class="card-open" href="./Assets/DemosPlayground/StyleRefs/transcendence-gold.html" target="_blank" rel="noopener" title="Open in new tab">↗</a>
+                    </div>
+                </div>
+                <div class="card-iframe-wrap">
+                    <iframe data-src="./Assets/DemosPlayground/StyleRefs/transcendence-gold.html" title="Transcendence Gold — luxury design system" sandbox="allow-scripts allow-same-origin"></iframe>
+                    <div class="iframe-blocker"></div>
+                    <div class="card-placeholder" data-card="card-gold">
+                        <div class="ph-icon">◈</div>
+                        <div class="ph-label">TRANSCENDENCE GOLD</div>
+                        <div class="ph-hint">Click to load · CSS</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CARD: Gothic Manuscript -->
+            <div class="demo-card size-md" id="card-goth" data-category="ideas"
+                 style="left: 1580px; top: 1000px;">
+                <div class="card-header">
+                    <span class="drag-handle">⠿</span>
+                    <div class="card-info">
+                        <span class="card-title">GOTHIC MANUSCRIPT</span>
+                        <span class="card-desc">Medieval manuscript aesthetic, parchment tones</span>
+                    </div>
+                    <div class="card-controls">
+                        <button class="size-btn" data-size="sm">S</button>
+                        <button class="size-btn active" data-size="md">M</button>
+                        <button class="size-btn" data-size="lg">L</button>
+                        <button class="card-unload pg-btn" title="Unload">✕</button>
+                        <span class="tech-badge tech-css">CSS</span>
+                        <a class="card-open" href="./Assets/DemosPlayground/StyleRefs/gothic-manuscript.html" target="_blank" rel="noopener" title="Open in new tab">↗</a>
+                    </div>
+                </div>
+                <div class="card-iframe-wrap">
+                    <iframe data-src="./Assets/DemosPlayground/StyleRefs/gothic-manuscript.html" title="Gothic Manuscript — medieval design system" sandbox="allow-scripts allow-same-origin"></iframe>
+                    <div class="iframe-blocker"></div>
+                    <div class="card-placeholder" data-card="card-goth">
+                        <div class="ph-icon">⚜</div>
+                        <div class="ph-label">GOTHIC MANUSCRIPT</div>
+                        <div class="ph-hint">Click to load · CSS</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CARD: Ancient Matrix Lab -->
+            <div class="demo-card size-md" id="card-matrix" data-category="ideas"
+                 style="left: 2340px; top: 1000px;">
+                <div class="card-header">
+                    <span class="drag-handle">⠿</span>
+                    <div class="card-info">
+                        <span class="card-title">ANCIENT MATRIX LAB</span>
+                        <span class="card-desc">Glitch-meets-antiquity design system with matrix aesthetics</span>
+                    </div>
+                    <div class="card-controls">
+                        <button class="size-btn" data-size="sm">S</button>
+                        <button class="size-btn active" data-size="md">M</button>
+                        <button class="size-btn" data-size="lg">L</button>
+                        <button class="card-unload pg-btn" title="Unload">✕</button>
+                        <span class="tech-badge tech-css">CSS</span>
+                        <a class="card-open" href="./Assets/DemosPlayground/StyleRefs/ancient-matrix-lab.html" target="_blank" rel="noopener" title="Open in new tab">↗</a>
+                    </div>
+                </div>
+                <div class="card-iframe-wrap">
+                    <iframe data-src="./Assets/DemosPlayground/StyleRefs/ancient-matrix-lab.html" title="Ancient Matrix Lab — glitch design system" sandbox="allow-scripts allow-same-origin"></iframe>
+                    <div class="iframe-blocker"></div>
+                    <div class="card-placeholder" data-card="card-matrix">
+                        <div class="ph-icon">⌘</div>
+                        <div class="ph-label">ANCIENT MATRIX LAB</div>
+                        <div class="ph-hint">Click to load · CSS</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CARD: Typography Experiments -->
+            <div class="demo-card size-md" id="card-typo" data-category="ideas"
+                 style="left: 3100px; top: 1000px;">
+                <div class="card-header">
+                    <span class="drag-handle">⠿</span>
+                    <div class="card-info">
+                        <span class="card-title">TYPOGRAPHY EXPERIMENTS</span>
+                        <span class="card-desc">Expressive type explorations and layout experiments</span>
+                    </div>
+                    <div class="card-controls">
+                        <button class="size-btn" data-size="sm">S</button>
+                        <button class="size-btn active" data-size="md">M</button>
+                        <button class="size-btn" data-size="lg">L</button>
+                        <button class="card-unload pg-btn" title="Unload">✕</button>
+                        <span class="tech-badge tech-css">CSS</span>
+                        <a class="card-open" href="./Assets/DemosPlayground/StyleRefs/altec-style.html" target="_blank" rel="noopener" title="Open in new tab">↗</a>
+                    </div>
+                </div>
+                <div class="card-iframe-wrap">
+                    <iframe data-src="./Assets/DemosPlayground/StyleRefs/altec-style.html" title="Typography Experiments" sandbox="allow-scripts allow-same-origin"></iframe>
+                    <div class="iframe-blocker"></div>
+                    <div class="card-placeholder" data-card="card-typo">
+                        <div class="ph-icon">Aa</div>
+                        <div class="ph-label">TYPOGRAPHY EXPERIMENTS</div>
+                        <div class="ph-hint">Click to load · CSS</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ═══════════════════════════════════════
+                 ROW 3 — Creative Code 2016 (y=1740)
+                 ═══════════════════════════════════════ -->
+
+            <!-- CARD: Hypercube Projection -->
+            <div class="demo-card size-sm" id="card-hypercube" data-category="demo"
+                 data-no-autoload="true"
+                 style="left: 60px; top: 1740px;">
+                <div class="card-header">
+                    <span class="drag-handle">⠿</span>
+                    <div class="card-info">
+                        <span class="card-title">HYPERCUBE PROJECTION</span>
+                        <span class="card-desc">4D tesseract projected into 3D space, rotating in real time</span>
+                    </div>
+                    <div class="card-controls">
+                        <button class="size-btn active" data-size="sm">S</button>
+                        <button class="size-btn" data-size="md">M</button>
+                        <button class="size-btn" data-size="lg">L</button>
+                        <button class="card-unload pg-btn" title="Unload">✕</button>
+                        <span class="tech-badge tech-p5js">p5.js</span>
+                        <a class="card-open" href="./Assets/DemosPlayground/CreativeCODE2016/hypercube/hypercube.html" target="_blank" rel="noopener" title="Open in new tab">↗</a>
+                    </div>
+                </div>
+                <div class="card-iframe-wrap">
+                    <iframe data-src="./Assets/DemosPlayground/CreativeCODE2016/hypercube/hypercube.html" title="Hypercube Projection" sandbox="allow-scripts allow-same-origin"></iframe>
+                    <div class="iframe-blocker"></div>
+                    <div class="card-placeholder" data-card="card-hypercube">
+                        <div class="ph-icon">⬡</div>
+                        <div class="ph-label">HYPERCUBE PROJECTION</div>
+                        <div class="ph-hint">Click to load · p5.js</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CARD: Star Trails Music Viz -->
+            <div class="demo-card size-sm" id="card-startrails" data-category="demo"
+                 data-no-autoload="true"
+                 style="left: 595px; top: 1740px;">
+                <div class="card-header">
+                    <span class="drag-handle">⠿</span>
+                    <div class="card-info">
+                        <span class="card-title">STAR TRAILS</span>
+                        <span class="card-desc">Music visualization with star trail particle effects</span>
+                    </div>
+                    <div class="card-controls">
+                        <button class="size-btn active" data-size="sm">S</button>
+                        <button class="size-btn" data-size="md">M</button>
+                        <button class="size-btn" data-size="lg">L</button>
+                        <button class="card-unload pg-btn" title="Unload">✕</button>
+                        <span class="tech-badge tech-p5js">p5.js</span>
+                        <a class="card-open" href="./Assets/DemosPlayground/CreativeCODE2016/p5 sketches/starTrails-master/index.html" target="_blank" rel="noopener" title="Open in new tab">↗</a>
+                    </div>
+                </div>
+                <div class="card-iframe-wrap">
+                    <iframe data-src="./Assets/DemosPlayground/CreativeCODE2016/p5 sketches/starTrails-master/index.html" title="Star Trails Music Visualization" sandbox="allow-scripts allow-same-origin"></iframe>
+                    <div class="iframe-blocker"></div>
+                    <div class="card-placeholder" data-card="card-startrails">
+                        <div class="ph-icon">✦</div>
+                        <div class="ph-label">STAR TRAILS</div>
+                        <div class="ph-hint">Click to load · p5.js</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CARD: Dynaboard v1 -->
+            <div class="demo-card size-sm" id="card-dynaboard" data-category="demo"
+                 data-no-autoload="true"
+                 style="left: 1130px; top: 1740px;">
+                <div class="card-header">
+                    <span class="drag-handle">⠿</span>
+                    <div class="card-info">
+                        <span class="card-title">DYNABOARD V1</span>
+                        <span class="card-desc">Dynamic 3D board experiment — early spatial interface concept</span>
+                    </div>
+                    <div class="card-controls">
+                        <button class="size-btn active" data-size="sm">S</button>
+                        <button class="size-btn" data-size="md">M</button>
+                        <button class="size-btn" data-size="lg">L</button>
+                        <button class="card-unload pg-btn" title="Unload">✕</button>
+                        <span class="tech-badge tech-threejs">Three.js</span>
+                        <a class="card-open" href="./Assets/DemosPlayground/CreativeCODE2016/DynaBoard1/Dynaboard1.html" target="_blank" rel="noopener" title="Open in new tab">↗</a>
+                    </div>
+                </div>
+                <div class="card-iframe-wrap">
+                    <iframe data-src="./Assets/DemosPlayground/CreativeCODE2016/DynaBoard1/Dynaboard1.html" title="Dynaboard v1" sandbox="allow-scripts allow-same-origin"></iframe>
+                    <div class="iframe-blocker"></div>
+                    <div class="card-placeholder" data-card="card-dynaboard">
+                        <div class="ph-icon">⬜</div>
+                        <div class="ph-label">DYNABOARD V1</div>
+                        <div class="ph-hint">Click to load · Three.js</div>
+                    </div>
+                </div>
+            </div>
+
+        </div><!-- end board-world -->
+    </div><!-- end board-viewport -->
+
+    <!-- Corner zoom controls -->
+    <div class="board-controls">
+        <button class="pg-btn" id="cornerZoomIn" title="Zoom in">+</button>
+        <button class="pg-btn" id="cornerZoomOut" title="Zoom out">−</button>
+    </div>
+
+    <!-- Hint text -->
+    <div class="board-hint">Scroll to pan · Pinch or Ctrl+scroll to zoom · Drag card header to move · S/M/L to resize</div>
+
+    <script>
+        // ============================================================
+        // PLAYGROUND BOARD — Infinite canvas with draggable iframe cards
+        // ============================================================
+
+        const boardViewport = document.getElementById('boardViewport');
+        const boardWorld    = document.getElementById('boardWorld');
+        const zoomDisplay   = document.getElementById('zoomDisplay');
+
+        // Board state — initial view fits all 5 cards (computed after DOM ready)
+        let worldX = 0, worldY = 0, worldScale = 0.78;
+        const MIN_SCALE = 0.20, MAX_SCALE = 1.50;
+
+        // Drag state
+        let isPanning = false;
+        let panStart  = { px: 0, py: 0, wx: 0, wy: 0 };
+
+        let draggingCard = null;
+        let cardDragStart = { px: 0, py: 0, cx: 0, cy: 0 };
+
+        // Pinch state
+        let pinchDist = null;
+
+        // ---- Transform ----
+        function applyTransform() {
+            boardWorld.style.transform = `translate(${worldX}px, ${worldY}px) scale(${worldScale})`;
+            zoomDisplay.textContent = Math.round(worldScale * 100) + '%';
+        }
+
+        function clampScale(s) {
+            return Math.max(MIN_SCALE, Math.min(MAX_SCALE, s));
+        }
+
+        // Zoom centered on a viewport point (vx, vy)
+        function zoomAt(vx, vy, factor) {
+            const newScale = clampScale(worldScale * factor);
+            const actualFactor = newScale / worldScale;
+            worldX = vx - (vx - worldX) * actualFactor;
+            worldY = vy - (vy - worldY) * actualFactor;
+            worldScale = newScale;
+            applyTransform();
+            scheduledVisibilityCheck();
+        }
+
+        // Zoom centered on viewport center
+        function zoomCenter(factor) {
+            const rect = boardViewport.getBoundingClientRect();
+            zoomAt(rect.width / 2, rect.height / 2, factor);
+        }
+
+        // Fit all visible cards into the viewport with padding
+        function fitAllCards() {
+            const vpRect = boardViewport.getBoundingClientRect();
+            const vpW = vpRect.width, vpH = vpRect.height;
+            const padding = 50;
+
+            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+            document.querySelectorAll('.demo-card:not(.hidden-card)').forEach(card => {
+                const l = parseInt(card.style.left) || 0;
+                const t = parseInt(card.style.top)  || 0;
+                const w = card.offsetWidth;
+                const h = card.offsetHeight;
+                minX = Math.min(minX, l);
+                minY = Math.min(minY, t);
+                maxX = Math.max(maxX, l + w);
+                maxY = Math.max(maxY, t + h);
+            });
+            if (minX === Infinity) return;
+
+            const contentW = maxX - minX;
+            const contentH = maxY - minY;
+            const scale = clampScale(Math.min(
+                (vpW - padding * 2) / contentW,
+                (vpH - padding * 2) / contentH
+            ));
+            worldScale = scale;
+            worldX = (vpW - contentW * scale) / 2 - minX * scale;
+            worldY = (vpH - contentH * scale) / 2 - minY * scale;
+            applyTransform();
+            scheduledVisibilityCheck();
+        }
+
+        // Reset — restore all cards, reset filter to All, re-fit view
+        function resetView() {
+            // Reset filter to All
+            document.querySelectorAll('[data-filter]').forEach(b => b.classList.remove('active'));
+            document.querySelector('[data-filter="all"]').classList.add('active');
+            document.querySelectorAll('.demo-card').forEach(card => card.classList.remove('hidden-card'));
+            fitAllCards();
+        }
+
+        // ---- Blocker (prevent iframes from stealing pointer events during drag) ----
+        function setBlockers(active) {
+            document.querySelectorAll('.iframe-blocker').forEach(b => {
+                b.style.display = active ? 'block' : 'none';
+            });
+        }
+
+        // ---- Pointer Events ----
+
+        // Track active pointers for pinch zoom
+        const activePointers = {};
+
+        function getPinchInfo() {
+            const ids = Object.keys(activePointers);
+            if (ids.length < 2) return null;
+            const a = activePointers[ids[0]];
+            const b = activePointers[ids[1]];
+            const dist = Math.hypot(b.x - a.x, b.y - a.y);
+            const mx   = (a.x + b.x) / 2;
+            const my   = (a.y + b.y) / 2;
+            return { dist, mx, my };
+        }
+
+        // Board pointerdown — pan or start pinch
+        boardViewport.addEventListener('pointerdown', e => {
+            // Card header is handled separately
+            if (e.target.closest('.card-header')) return;
+            // Don't pan when clicking a placeholder (allows click-to-load to fire)
+            if (e.target.closest('.card-placeholder')) return;
+            // Don't start pan if clicking inside a loaded card's content area
+            if (e.target.closest('.demo-card.loaded') &&
+                !e.target.closest('.iframe-blocker')) return;
+
+            activePointers[e.pointerId] = { x: e.clientX, y: e.clientY };
+            boardViewport.setPointerCapture(e.pointerId);
+
+            const pinch = getPinchInfo();
+            if (pinch) {
+                // Two fingers — switch to pinch mode, cancel pan
+                isPanning = false;
+                pinchDist = pinch.dist;
+                boardViewport.classList.remove('panning');
+                return;
+            }
+
+            // Single pointer — start pan
+            isPanning = true;
+            boardViewport.classList.add('panning');
+            panStart = { px: e.clientX, py: e.clientY, wx: worldX, wy: worldY };
+            setBlockers(true);
+        });
+
+        boardViewport.addEventListener('pointermove', e => {
+            if (!(e.pointerId in activePointers)) return;
+            activePointers[e.pointerId] = { x: e.clientX, y: e.clientY };
+
+            const pinch = getPinchInfo();
+            if (pinch && pinchDist !== null) {
+                // Pinch zoom
+                const factor = pinch.dist / pinchDist;
+                const rect = boardViewport.getBoundingClientRect();
+                zoomAt(pinch.mx - rect.left, pinch.my - rect.top, factor);
+                pinchDist = pinch.dist;
+                return;
+            }
+
+            if (isPanning) {
+                worldX = panStart.wx + (e.clientX - panStart.px);
+                worldY = panStart.wy + (e.clientY - panStart.py);
+                applyTransform();
+            }
+        });
+
+        boardViewport.addEventListener('pointerup', e => {
+            delete activePointers[e.pointerId];
+            const remaining = Object.keys(activePointers).length;
+            pinchDist = null;
+
+            if (remaining === 0) {
+                isPanning = false;
+                boardViewport.classList.remove('panning');
+                setBlockers(false);
+                scheduledVisibilityCheck();
+            } else if (remaining === 1) {
+                // Back to single pointer — restart pan from current position
+                const id = Object.keys(activePointers)[0];
+                const p = activePointers[id];
+                panStart = { px: p.x, py: p.y, wx: worldX, wy: worldY };
+                isPanning = true;
+            }
+        });
+
+        boardViewport.addEventListener('pointercancel', e => {
+            delete activePointers[e.pointerId];
+            isPanning = false;
+            pinchDist = null;
+            boardViewport.classList.remove('panning');
+            setBlockers(false);
+        });
+
+        // Card dragging — delegated on boardWorld, but capture on target header
+        let activeCardHeader = null;
+
+        boardWorld.addEventListener('pointerdown', e => {
+            const header = e.target.closest('.card-header');
+            if (!header) return;
+            // Don't trigger if clicking a button inside the header
+            if (e.target.closest('button') || e.target.closest('a')) return;
+            e.stopPropagation(); // Don't trigger board pan
+            const card = header.closest('.demo-card');
+            activeCardHeader = header;
+            draggingCard = card;
+            card.classList.add('dragging-card');
+            card.style.zIndex = Date.now();
+            cardDragStart = {
+                px: e.clientX,
+                py: e.clientY,
+                cx: parseInt(card.style.left) || 0,
+                cy: parseInt(card.style.top)  || 0,
+            };
+            header.setPointerCapture(e.pointerId);
+            setBlockers(true);
+        });
+
+        boardWorld.addEventListener('pointermove', e => {
+            if (!draggingCard || !activeCardHeader) return;
+            const dx = (e.clientX - cardDragStart.px) / worldScale;
+            const dy = (e.clientY - cardDragStart.py) / worldScale;
+            draggingCard.style.left = (cardDragStart.cx + dx) + 'px';
+            draggingCard.style.top  = (cardDragStart.cy + dy) + 'px';
+        });
+
+        boardWorld.addEventListener('pointerup', () => {
+            if (draggingCard) {
+                draggingCard.classList.remove('dragging-card');
+                draggingCard = null;
+                activeCardHeader = null;
+                setBlockers(false);
+                scheduledVisibilityCheck();
+            }
+        });
+
+        boardWorld.addEventListener('pointercancel', () => {
+            if (draggingCard) {
+                draggingCard.classList.remove('dragging-card');
+                draggingCard = null;
+                activeCardHeader = null;
+                setBlockers(false);
+            }
+        });
+
+        // Wheel / trackpad handler
+        // - Trackpad pinch  → ctrlKey=true  → zoom at cursor
+        // - Trackpad 2-finger scroll → ctrlKey=false, deltaX≠0 or small deltaY → pan
+        // - Mouse wheel → ctrlKey=false, deltaX=0, large deltaY → zoom at cursor
+        boardViewport.addEventListener('wheel', e => {
+            e.preventDefault();
+            const rect = boardViewport.getBoundingClientRect();
+
+            if (e.ctrlKey) {
+                // Trackpad pinch-to-zoom (or Ctrl + mouse wheel)
+                const vx = e.clientX - rect.left;
+                const vy = e.clientY - rect.top;
+                let delta = e.deltaY;
+                if (e.deltaMode === 1) delta *= 20;
+                if (e.deltaMode === 2) delta *= 300;
+                // Trackpad pinch deltas are small — use finer factor for smoothness
+                const factor = delta < 0 ? 1.06 : 0.94;
+                zoomAt(vx, vy, factor);
+            } else {
+                // Distinguish trackpad 2-finger scroll from mouse wheel:
+                // Trackpad: deltaMode===0 (pixels) with deltaX possibly non-zero, or |deltaY| is small
+                // Mouse wheel: deltaMode===0 with deltaX===0 and |deltaY| typically ≥ 100
+                const isTrackpad = Math.abs(e.deltaX) > 0 ||
+                                   (e.deltaMode === 0 && Math.abs(e.deltaY) < 60);
+                if (isTrackpad) {
+                    // Two-finger pan
+                    worldX -= e.deltaX;
+                    worldY -= e.deltaY;
+                    applyTransform();
+                    scheduledVisibilityCheck();
+                } else {
+                    // Mouse wheel → zoom at cursor
+                    const vx = e.clientX - rect.left;
+                    const vy = e.clientY - rect.top;
+                    let delta = e.deltaY;
+                    if (e.deltaMode === 1) delta *= 20;
+                    if (e.deltaMode === 2) delta *= 300;
+                    const factor = delta < 0 ? 1.1 : 0.9;
+                    zoomAt(vx, vy, factor);
+                }
+            }
+        }, { passive: false });
+
+        // ---- Zoom control buttons ----
+        document.getElementById('btnZoomIn').addEventListener('click', () => zoomCenter(1.15));
+        document.getElementById('btnZoomOut').addEventListener('click', () => zoomCenter(0.87));
+        document.getElementById('btnReset').addEventListener('click', resetView);
+        document.getElementById('cornerZoomIn').addEventListener('click', () => zoomCenter(1.15));
+        document.getElementById('cornerZoomOut').addEventListener('click', () => zoomCenter(0.87));
+
+        // ---- Filter buttons ----
+        document.querySelectorAll('[data-filter]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                // Update active state
+                document.querySelectorAll('[data-filter]').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+
+                const filter = btn.dataset.filter;
+                document.querySelectorAll('.demo-card').forEach(card => {
+                    if (filter === 'all' || card.dataset.category === filter) {
+                        card.classList.remove('hidden-card');
+                    } else {
+                        card.classList.add('hidden-card');
+                        // Unload iframe if loaded — frees GPU/memory while filtered out
+                        if (card.classList.contains('loaded')) {
+                            const iframe = card.querySelector('iframe');
+                            if (iframe) iframe.removeAttribute('src');
+                            card.classList.remove('loaded');
+                        }
+                    }
+                });
+                // Re-fit after filtering to show relevant cards
+                setTimeout(fitAllCards, 50);
+            });
+        });
+
+        // ---- Size toggle buttons (delegated on boardWorld) ----
+        boardWorld.addEventListener('click', e => {
+            const sizeBtn = e.target.closest('.size-btn');
+            if (!sizeBtn) return;
+            const card = sizeBtn.closest('.demo-card');
+            const oldW = card.offsetWidth;
+            const oldH = card.offsetHeight;
+            card.classList.remove('size-sm', 'size-md', 'size-lg');
+            card.classList.add('size-' + sizeBtn.dataset.size);
+            card.querySelectorAll('.size-btn').forEach(b => b.classList.remove('active'));
+            sizeBtn.classList.add('active');
+
+            // Responsive repositioning — push overlapping cards away from the resized card
+            requestAnimationFrame(() => {
+                const newW = card.offsetWidth;
+                const newH = card.offsetHeight;
+                const dW = newW - oldW;
+                const dH = newH - oldH;
+                if (Math.abs(dW) < 4 && Math.abs(dH) < 4) return; // no meaningful change
+
+                const cLeft  = parseInt(card.style.left) || 0;
+                const cTop   = parseInt(card.style.top)  || 0;
+                const cRight  = cLeft + newW;
+                const cBottom = cTop  + newH;
+                const GAP = 24; // minimum gap to maintain between cards
+
+                document.querySelectorAll('.demo-card:not(.hidden-card)').forEach(other => {
+                    if (other === card) return;
+                    const oLeft   = parseInt(other.style.left)  || 0;
+                    const oTop    = parseInt(other.style.top)   || 0;
+                    const oRight  = oLeft + other.offsetWidth;
+                    const oBottom = oTop  + other.offsetHeight;
+
+                    // Check overlap after resize
+                    const overlapX = cRight  + GAP > oLeft && oRight  + GAP > cLeft;
+                    const overlapY = cBottom + GAP > oTop  && oBottom + GAP > cTop;
+                    if (!overlapX || !overlapY) return;
+
+                    // Push right if card grew rightward and other is to the right
+                    if (dW > 0 && oLeft >= cLeft && oLeft < cLeft + newW + GAP) {
+                        other.style.left = (oLeft + dW) + 'px';
+                    }
+                    // Push down if card grew downward and other is below
+                    if (dH > 0 && oTop >= cTop && oTop < cTop + newH + GAP) {
+                        other.style.top = (oTop + dH) + 'px';
+                    }
+                });
+                scheduledVisibilityCheck();
+            });
+        });
+
+        // ---- Unload button (delegated on boardWorld) ----
+        boardWorld.addEventListener('click', e => {
+            const unloadBtn = e.target.closest('.card-unload');
+            if (!unloadBtn) return;
+            const card = unloadBtn.closest('.demo-card');
+            const iframe = card.querySelector('iframe');
+            iframe.removeAttribute('src');
+            card.classList.remove('loaded');
+        });
+
+        // ---- Progressive Loading ----
+        // IntersectionObserver doesn't work well with CSS transforms on the parent.
+        // Use getBoundingClientRect() check after pan/zoom.
+
+        function loadCard(card) {
+            const iframe = card.querySelector('iframe');
+            if (iframe && !iframe.src && iframe.dataset.src) {
+                iframe.src = iframe.dataset.src;
+                // Small delay before marking loaded (let iframe start rendering)
+                setTimeout(() => card.classList.add('loaded'), 800);
+            }
+        }
+
+        function checkCardVisibility() {
+            // "demo" category cards (data-no-autoload) are click-gated only.
+            // All other categories (game, tool, ideas) auto-load when in view.
+            // All loaded cards auto-unload when far outside the viewport.
+            const vpRect = boardViewport.getBoundingClientRect();
+            const loadMargin   = 400;  // auto-load when within 400px of viewport edge
+            const unloadMargin = 1200; // auto-unload when >1200px outside viewport edge
+
+            document.querySelectorAll('.demo-card:not(.hidden-card)').forEach(card => {
+                const r = card.getBoundingClientRect();
+
+                const inLoad = r.right  > vpRect.left   - loadMargin &&
+                               r.left   < vpRect.right  + loadMargin &&
+                               r.bottom > vpRect.top    - loadMargin &&
+                               r.top    < vpRect.bottom + loadMargin;
+
+                const farOut = r.right  < vpRect.left   - unloadMargin ||
+                               r.left   > vpRect.right  + unloadMargin ||
+                               r.bottom < vpRect.top    - unloadMargin ||
+                               r.top    > vpRect.bottom + unloadMargin;
+
+                // Auto-load non-demo cards when near viewport
+                if (!card.dataset.noAutoload && inLoad) {
+                    loadCard(card);
+                }
+
+                // Auto-unload all loaded cards when far off-screen
+                if (farOut && card.classList.contains('loaded')) {
+                    const iframe = card.querySelector('iframe');
+                    if (iframe) iframe.removeAttribute('src');
+                    card.classList.remove('loaded');
+                }
+            });
+        }
+
+        let visibilityTimer = null;
+        function scheduledVisibilityCheck() {
+            clearTimeout(visibilityTimer);
+            visibilityTimer = setTimeout(checkCardVisibility, 150);
+        }
+
+        // Click-to-load on placeholder
+        document.querySelectorAll('.card-placeholder').forEach(ph => {
+            ph.addEventListener('click', () => {
+                const cardId = ph.dataset.card;
+                const card = document.getElementById(cardId);
+                if (card) loadCard(card);
+            });
+        });
+
+        // ---- Nav scroll behavior (keeps nav always visible on this page) ----
+        // Nav is always shown since playground is full-screen (no hero to scroll past)
+        const nav = document.getElementById('nav');
+        nav.classList.add('visible');
+
+        // Cursor spotlight (shared pattern)
+        const spotlight = document.getElementById('cursorSpotlight');
+        document.addEventListener('mousemove', e => {
+            spotlight.style.setProperty('--x', e.clientX + 'px');
+            spotlight.style.setProperty('--y', e.clientY + 'px');
+        });
+
+        // ---- Init ----
+        // Fit all cards into view after DOM layout settles
+        setTimeout(() => {
+            fitAllCards();
+            checkCardVisibility();
+        }, 50);
+    </script>
+</body>
+</html>

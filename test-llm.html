@@ -41,12 +41,67 @@
             background: #12203a;
             border: 1px solid #1e3050;
             border-radius: 6px;
-            padding: 0.8rem 1rem;
-            margin-bottom: 0.5rem;
+            padding: 0.7rem 0.9rem;
+            margin-bottom: 0.4rem;
         }
-        .result-title { font-weight: 600; color: #7db4f6; font-size: 0.95rem; }
-        .result-snippet { color: #aab; font-size: 0.85rem; margin-top: 0.3rem; }
-        .result-meta { color: #556; font-size: 0.75rem; margin-top: 0.3rem; }
+        .result-header { display: flex; align-items: baseline; gap: 0.5rem; }
+        .result-title { font-weight: 600; color: #7db4f6; font-size: 0.9rem; flex: 1; }
+        .result-page { font-size: 0.65rem; padding: 0.1rem 0.4rem; border-radius: 3px; background: #1a2a42; color: #668; white-space: nowrap; }
+        .result-content { color: #9aa; font-size: 0.82rem; margin-top: 0.3rem; line-height: 1.45; }
+        .result-bar { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.35rem; }
+        .result-bar .score-track { flex: 1; height: 3px; background: #1a2a42; border-radius: 2px; overflow: hidden; }
+        .result-bar .score-fill { height: 100%; border-radius: 2px; background: linear-gradient(90deg, #2a5a9a, #4d9ef6); }
+        .result-bar .score-num { font-size: 0.65rem; color: #556; min-width: 2rem; text-align: right; }
+
+        .show-more-btn {
+            width: 100%;
+            background: transparent;
+            border: 1px dashed #2a3a52;
+            border-radius: 6px;
+            color: #668;
+            font-size: 0.8rem;
+            padding: 0.6rem;
+            cursor: pointer;
+            margin-top: 0.3rem;
+            transition: all 0.2s;
+        }
+        .show-more-btn:hover { border-color: #4d9ef6; color: #7db4f6; }
+
+        .query-hint {
+            font-size: 0.75rem;
+            color: #4d9ef6;
+            margin: 0.4rem 0 0;
+            font-style: italic;
+            opacity: 0.8;
+        }
+
+        .score-info {
+            display: inline-block;
+            cursor: help;
+            color: #445;
+            font-size: 0.7rem;
+            margin-left: 0.4rem;
+            position: relative;
+        }
+        .score-info:hover .score-tooltip {
+            display: block;
+        }
+        .score-tooltip {
+            display: none;
+            position: absolute;
+            bottom: 1.5em;
+            left: -6rem;
+            width: 16rem;
+            background: #1a2a42;
+            border: 1px solid #2a4a6a;
+            border-radius: 6px;
+            padding: 0.6rem 0.8rem;
+            font-size: 0.75rem;
+            color: #aab;
+            line-height: 1.4;
+            z-index: 10;
+            font-style: normal;
+        }
 
         #aiSection {
             margin-top: 1.5rem;
@@ -99,6 +154,30 @@
             min-height: 3rem;
         }
 
+        .thinking-spinner {
+            color: #6a9fca;
+            font-style: italic;
+            display: inline-block;
+        }
+        #aiAnswer.generating {
+            border-color: #2a5a8a;
+            animation: ai-pulse 2s ease-in-out infinite;
+        }
+        @keyframes ai-pulse {
+            0%, 100% { border-color: #2a4a6a; }
+            50% { border-color: #4d9ef6; }
+        }
+        .thinking-spinner::after {
+            content: '';
+            animation: dots 1.5s infinite;
+        }
+        @keyframes dots {
+            0% { content: ''; }
+            25% { content: '.'; }
+            50% { content: '..'; }
+            75% { content: '...'; }
+        }
+
         .status-dot {
             display: inline-block;
             width: 8px;
@@ -126,16 +205,16 @@
 </head>
 <body>
     <h1>Portfolio Search Test <span id="webgpuBadge" class="webgpu-badge"></span></h1>
-    <p class="subtitle">Layer 1: instant search. Layer 2: optional local AI answers via Qwen3-0.6B.</p>
+    <p class="subtitle">Layer 1: instant search. Layer 2: optional local AI answers via Qwen3.5-0.8B.</p>
 
     <input type="text" id="searchInput" placeholder="Try: XR design, Georgetown, AvatarMEDIC, robotics..." autofocus>
 
-    <div class="section-label">Search Results</div>
+    <div class="section-label">Search Results <span class="score-info">ⓘ<span class="score-tooltip">Scores use BM25 keyword relevance across title (3×), tags (2×), and content (1×) with fuzzy matching. Higher = more keyword matches in important fields.</span></span></div>
     <div id="searchResults"><div class="result"><div class="result-snippet" style="color:#556;">Type to search portfolio content...</div></div></div>
 
     <div id="aiSection">
         <div class="section-label"><span id="aiDot" class="status-dot off"></span> AI Answer Engine</div>
-        <button id="enableBtn">Download Qwen3-0.6B (~400MB) to enable AI answers</button>
+        <button id="enableBtn">Download Qwen3.5-0.8B (~700MB) to enable AI answers</button>
         <div id="progress"></div>
         <div id="progressBar"><div id="progressFill"></div></div>
         <div id="aiAnswer"></div>
@@ -144,49 +223,16 @@
     <!-- MiniSearch via CDN -->
     <script src="https://cdn.jsdelivr.net/npm/minisearch@7.1.1/dist/umd/index.min.js"></script>
 
-    <!-- WebLLM via CDN -->
+    <!-- Transformers.js v4 via CDN (Qwen3.5-0.8B ONNX, WebGPU) -->
     <script type="module">
-        import * as webllm from "https://esm.run/@mlc-ai/web-llm";
+        import { AutoProcessor, Qwen3_5ForConditionalGeneration, TextStreamer } from "https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.0.0-next.5";
 
         // ============================================
-        // Content Index — portfolio chunks
+        // Content Index — loaded from external JSON
+        // Source: Assets/search-chunks.json
         // ============================================
-        const chunks = [
-            { id: 1, title: "About John Hanacek", tags: "innovator designer creator AI human augmentation",
-              content: "John Hanacek works at the intersection of Creativity, Curiosity, AI & Human Augmentation. Innovator, Designer, Creator.", page: "index" },
-            { id: 2, title: "Education — Georgetown CCT", tags: "education masters thesis research",
-              content: "MA in Communication, Culture & Technology from Georgetown University (2016). Awarded 'Most Meta' by peers. Thesis on AI-enabled drawing app for education. Published research on technology adoption at EduLearn 2015 Barcelona.", page: "index" },
-            { id: 3, title: "Founder Institute & AvatarMEDIC", tags: "startup CEO founder aerospace medical",
-              content: "Founder Institute SF 2020 graduate. CEO of AvatarMEDIC, a startup focused on aerospace medical technology. Received R&D Innovation Award from Aerospace Medical Association in 2022.", page: "index" },
-            { id: 4, title: "Lead Designer at Nanome", tags: "XR VR molecular product design spatial computing",
-              content: "Led design for Nanome's molecular VR platform. Product design for spatial computing and scientific visualization in virtual reality.", page: "design" },
-            { id: 5, title: "BadVR — Data Visualization in XR", tags: "XR VR AR data visualization immersive analytics",
-              content: "Design work at BadVR, building immersive data visualization tools in extended reality. XR analytics and spatial data experiences.", page: "design" },
-            { id: 6, title: "Earth Star — Speculative Design", tags: "earth star worldbuilding speculative regenerative futures AI",
-              content: "Speculative design and narrative worldbuilding exploring regenerative futures. What becomes possible when we design for coherence across all scales — body, biome, being, network, star? Systems thinking meets storytelling: designing protocols for human-AI collaboration grounded in living wisdom.", page: "design" },
-            { id: 7, title: "JHDesign LLC — Consulting", tags: "consulting UX product design services freelance",
-              content: "JHDesign LLC offers product design, UX consulting, customer journey mapping, and design workshops. Professional services for startups and enterprises.", page: "design" },
-            { id: 8, title: "Interactive Installations — Godish & God Like", tags: "art installation interactive leap motion kinect",
-              content: "Godish (2015): Using a Leap Motion controller to trigger lightning video on hand hover. God Like (2016): Follow-up using Microsoft Kinect for full body pose interaction. Collaboration with Nathan Danskey.", page: "art" },
-            { id: 9, title: "Fractal Futures — Short Stories", tags: "writing fiction science fiction stories worldbuilding",
-              content: "A series of short stories — thoughtful ruminations on bright and dark possibilities that lie ahead of us, down a turbulent river of time. Endorsed by David Brin, science fiction author.", page: "art" },
-            { id: 10, title: "Photography & Visual Art", tags: "photography landscape portrait editorial multimedia",
-              content: "Multimedia artist working in interactive installation, VR/AR, digital illustration, 3D scanning and modeling, and animation. Background in photography covering editorial, portrait and landscape subjects across California and beyond.", page: "art" },
-            { id: 11, title: "Skills & Expertise", tags: "skills tools figma unity blender prototyping user research",
-              content: "Product design, UX/UI, spatial computing, XR design, prototyping, user research, customer journey mapping, design systems, Figma, Unity, Blender, 3D modeling, animation, AI tools integration.", page: "design" },
-            { id: 12, title: "Artist Beliefs & Philosophy", tags: "beliefs philosophy art technology infinite games",
-              content: "As an artist John believes: Technology can augment human intelligence & collaboration. Infinite Games are more powerful than Finite Games. Optimism and pessimism are self-fulfilling prophecies. Imagination is within reality.", page: "art" },
-            { id: 13, title: "Robot Digital Twin Control", tags: "robotics digital twin XR control remote",
-              content: "Past project involving robot digital twin control systems. XR-based remote control and monitoring of robotic systems using digital twin technology.", page: "design" },
-            { id: 14, title: "HoloTRIAGE — Medical XR", tags: "medical XR holographic triage healthcare AR",
-              content: "HoloTRIAGE: An XR medical triage system. Holographic interface for medical assessment and decision support in healthcare settings.", page: "design" },
-            { id: 15, title: "Contact & Social", tags: "contact email linkedin bluesky twitter",
-              content: "Email: hello@jhanacek.net. Social: Bluesky @johnhanacek.bsky.social, LinkedIn linkedin.com/in/johnhanacek, X/Twitter.", page: "index" },
-        ];
+        let chunks = [];
 
-        // ============================================
-        // Search Layer (MiniSearch)
-        // ============================================
         const miniSearch = new MiniSearch({
             fields: ['title', 'content', 'tags'],
             storeFields: ['title', 'content', 'page'],
@@ -196,26 +242,174 @@
                 prefix: true,
             }
         });
-        miniSearch.addAll(chunks);
+
+        async function loadSearchIndex() {
+            try {
+                const response = await fetch('Assets/search-chunks.json');
+                const data = await response.json();
+                chunks = data.chunks;
+                miniSearch.addAll(chunks);
+                console.log(`Loaded ${chunks.length} search chunks (updated: ${data._meta.lastUpdated})`);
+            } catch (err) {
+                console.error('Failed to load search index:', err);
+            }
+        }
+
+        // Load search index on startup
+        loadSearchIndex();
+
+        // ============================================
+        // Query Intent Mapping
+        // Expands abstract/conversational queries into
+        // keyword-rich search terms the index can match.
+        // ============================================
+        const QUERY_INTENTS = [
+            {
+                patterns: [/should\s+\w*\s*(hire|work\s+with|contract|engage)/i, /is\s+he\s+(good|qualified|worth|a\s+good\s+fit)/i, /why\s+\w*\s*(hire|choose|pick)\s+him/i, /what\s+makes\s+him\s+(stand\s+out|different|unique|special)/i, /why\s+should\s+\w+\s+hire/i],
+                expanded: 'unique differentiator skills expertise experience awards shipped products design AI leadership',
+                hint: 'Showing expertise, awards, and what makes him unique'
+            },
+            {
+                patterns: [/what('s|\s+is)\s+his\s+background/i, /tell\s+me\s+about\s+(him|john|this\s+(guy|person))/i, /who\s+is\s+(he|john|this)/i, /what\s+does\s+he\s+do/i, /^about$/i],
+                expanded: 'about john hanacek innovator designer creator education career work history unique',
+                hint: 'Showing background and career overview'
+            },
+            {
+                patterns: [/what\s+has\s+he\s+(built|made|created|shipped|designed|launched|delivered)/i, /his\s+(projects|portfolio|work)/i, /show\s+me\s+his\s+work/i, /what\s+are\s+his\s+projects/i, /shipped\s+(any|AI|products?)/i, /has\s+he\s+shipped/i],
+                expanded: 'shipped AI products nanome badvr avatarmedic holotriage metamedium coaching built',
+                hint: 'Showing shipped products and projects'
+            },
+            {
+                patterns: [/what\s+are\s+his\s+(skills|abilities|strengths)/i, /what\s+can\s+he\s+do/i, /his\s+(expertise|capabilities|specialties)/i, /areas\s+of\s+expertise/i],
+                expanded: 'expertise skills AI XR robotics design product LLM agent spatial computing coding engineering',
+                hint: 'Showing skills and areas of expertise'
+            },
+            {
+                patterns: [/can\s+he\s+(code|program|write\s+code|develop|build|engineer)/i, /does\s+he\s+(code|program|write\s+code|develop|build)/i, /is\s+he\s+(technical|a\s+developer|an\s+engineer)/i, /coding|programming|technical\s+skills/i, /just\s+design/i],
+                expanded: 'code coding programming engineer technical javascript html css python unity build ship prototype design engineering',
+                hint: 'Showing design engineering and coding ability'
+            },
+            {
+                patterns: [/where\s+did\s+he\s+(go\s+to\s+school|study|graduate)/i, /his\s+education/i, /degree|university|college|school/i],
+                expanded: 'education masters thesis Georgetown UCSD research publications',
+                hint: 'Showing education and research'
+            },
+            {
+                patterns: [/has\s+he\s+won\s+(any|an)\s+(award|prize)/i, /awards?|recognition|achievement|accomplishment/i, /what\s+has\s+he\s+(won|achieved|accomplished)/i, /biggest\s+(accomplishment|achievement)/i],
+                expanded: 'awards innovation aerospace nist microsoft founder institute accomplishment achievement won',
+                hint: 'Showing awards and recognition'
+            },
+            {
+                patterns: [/how\s+(do\s+i|can\s+i|to)\s+(contact|reach|email|message)\s+(him|john)/i, /contact|email|linkedin|twitter|social/i],
+                expanded: 'contact email linkedin bluesky twitter social',
+                hint: 'Showing contact information'
+            },
+            {
+                patterns: [/what\s+does\s+he\s+(charge|cost)|pricing|rates?|how\s+much/i, /services?|consulting|coaching|freelance/i, /can\s+he\s+help\s+(me|us|with)/i],
+                expanded: 'services coaching consulting design product workshops retainer sprint',
+                hint: 'Showing services and engagement options'
+            },
+            {
+                patterns: [/has\s+he\s+(led|managed|run)\s+(teams?|people|a\s+company)/i, /leadership|management|team\s+lead/i, /manage\s+(people|teams?|reports)/i],
+                expanded: 'leadership team managed led CEO founder cross-functional collaboration hire people',
+                hint: 'Showing leadership and team experience'
+            },
+            {
+                patterns: [/his\s+(design\s+)?process/i, /how\s+does\s+he\s+(work|design|approach)/i, /methodology|workflow/i],
+                expanded: 'process methodology design thinking research prototype iterate user-centered approach',
+                hint: 'Showing design process and methodology'
+            },
+            {
+                patterns: [/XR|VR|AR|spatial|immersive|mixed\s+reality|virtual\s+reality/i],
+                expanded: null,
+                hint: null
+            },
+            {
+                patterns: [/AI|machine\s+learning|LLM|agent|artificial\s+intelligence/i],
+                expanded: null,
+                hint: null
+            },
+        ];
+
+        function expandQuery(rawQuery) {
+            const trimmed = rawQuery.trim();
+            if (!trimmed) return { query: trimmed, hint: null };
+
+            for (const intent of QUERY_INTENTS) {
+                for (const pattern of intent.patterns) {
+                    if (pattern.test(trimmed)) {
+                        if (intent.expanded) {
+                            return { query: intent.expanded, hint: intent.hint, originalQuery: trimmed };
+                        }
+                        // matched but no expansion needed
+                        return { query: trimmed, hint: intent.hint };
+                    }
+                }
+            }
+
+            // Basic pronoun resolution — replace "him/he/his" with "John Hanacek"
+            let resolved = trimmed.replace(/\b(him|he|his)\b/gi, 'John Hanacek');
+            if (resolved !== trimmed) {
+                return { query: resolved, hint: null };
+            }
+
+            return { query: trimmed, hint: null };
+        }
+
+        const RESULTS_PER_PAGE = 5;
 
         function search(query) {
             if (!query.trim()) return [];
-            return miniSearch.search(query, { limit: 5 });
+            const results = miniSearch.search(query);
+            return results; // return all, pagination handled by render
         }
 
-        function renderResults(results) {
+        function renderResults(results, hint) {
             const el = document.getElementById('searchResults');
             if (results.length === 0) {
                 el.innerHTML = '<div class="result"><div class="result-snippet" style="color:#556;">No results found.</div></div>';
                 return;
             }
-            el.innerHTML = results.map(r =>
-                `<div class="result">
-                    <div class="result-title">${r.title}</div>
-                    <div class="result-snippet">${r.content.substring(0, 150)}${r.content.length > 150 ? '...' : ''}</div>
-                    <div class="result-meta">${r.page}.html · score: ${r.score.toFixed(1)}</div>
-                </div>`
-            ).join('');
+
+            // Compute max score for relative bar width
+            const maxScore = results[0]?.score || 1;
+            const topResults = results.slice(0, RESULTS_PER_PAGE);
+            const remaining = results.length - RESULTS_PER_PAGE;
+
+            let html = '';
+
+            // Show query hint if we expanded the query
+            if (hint) {
+                html += `<div class="query-hint">↳ ${hint}</div>`;
+            }
+
+            html += topResults.map(r => renderResultCard(r, maxScore)).join('');
+
+            if (remaining > 0) {
+                html += `<button class="show-more-btn" onclick="this.parentNode.querySelectorAll('.result-hidden').forEach(e=>e.style.display='block');this.remove();">Show ${remaining} more result${remaining > 1 ? 's' : ''}</button>`;
+                html += results.slice(RESULTS_PER_PAGE).map(r =>
+                    `<div class="result result-hidden" style="display:none">${renderResultCardInner(r, maxScore)}</div>`
+                ).join('');
+            }
+
+            el.innerHTML = html;
+        }
+
+        function renderResultCard(r, maxScore) {
+            return `<div class="result">${renderResultCardInner(r, maxScore)}</div>`;
+        }
+
+        function renderResultCardInner(r, maxScore) {
+            const pct = Math.min(100, (r.score / maxScore) * 100);
+            return `<div class="result-header">
+                        <span class="result-title">${r.title}</span>
+                        <span class="result-page">${r.page}</span>
+                    </div>
+                    <div class="result-content">${r.content}</div>
+                    <div class="result-bar">
+                        <span class="score-track"><span class="score-fill" style="width:${pct}%"></span></span>
+                        <span class="score-num">${r.score.toFixed(0)}</span>
+                    </div>`;
         }
 
         // ============================================
@@ -249,12 +443,16 @@
         }
 
         // ============================================
-        // LLM Layer (WebLLM)
+        // LLM Layer (Transformers.js + Qwen3.5-0.8B)
         // ============================================
-        let engine = null;
+        let processor = null;
+        let llmModel = null;
         let modelReady = false;
+        let currentGenId = 0;       // monotonic ID — only latest generation writes to DOM
+        let isGenerating = false;   // true while model.generate is active
+        let pendingGen = null;      // queued { query, results } when busy
 
-        const MODEL_ID = "Qwen3-0.6B-q4f16_1-MLC";
+        const MODEL_ID = "onnx-community/Qwen3.5-0.8B-ONNX";
 
         document.getElementById('enableBtn').addEventListener('click', async () => {
             if (!hasWebGPU || modelReady) return;
@@ -270,18 +468,44 @@
             dot.className = 'status-dot loading';
             progressBar.style.display = 'block';
 
-            try {
-                engine = await webllm.CreateMLCEngine(MODEL_ID, {
-                    initProgressCallback: (report) => {
-                        progress.textContent = report.text;
-                        if (report.progress !== undefined) {
-                            progressFill.style.width = (report.progress * 100) + '%';
-                        }
+            // Track multi-file download progress
+            const fileProgress = new Map();
+            function onProgress(info) {
+                if (info.status === 'progress' && info.total) {
+                    fileProgress.set(info.file, { loaded: info.loaded, total: info.total });
+                    let loaded = 0, total = 0;
+                    for (const fp of fileProgress.values()) { loaded += fp.loaded; total += fp.total; }
+                    if (total > 0) {
+                        progressFill.style.width = (loaded / total * 100) + '%';
+                        progress.textContent = `Downloading... ${(loaded / 1e6).toFixed(0)}/${(total / 1e6).toFixed(0)} MB`;
                     }
+                } else if (info.status === 'initiate') {
+                    progress.textContent = `Loading ${info.file || 'model'}...`;
+                }
+            }
+
+            try {
+                progress.textContent = 'Loading processor...';
+                processor = await AutoProcessor.from_pretrained(MODEL_ID, { progress_callback: onProgress });
+
+                progress.textContent = 'Loading model weights (WebGPU)...';
+                llmModel = await Qwen3_5ForConditionalGeneration.from_pretrained(MODEL_ID, {
+                    dtype: {
+                        embed_tokens: "q4",
+                        vision_encoder: "q4",
+                        decoder_model_merged: "q4",
+                    },
+                    device: "webgpu",
+                    progress_callback: onProgress,
                 });
 
+                // Warm up GPU shader compilation with a dummy pass
+                progress.textContent = 'Compiling GPU shaders...';
+                const warmup = processor.tokenizer("hi");
+                await llmModel.generate({ ...warmup, max_new_tokens: 1 });
+
                 modelReady = true;
-                btn.textContent = 'Qwen3-0.6B loaded — AI answers enabled';
+                btn.textContent = 'Qwen3.5-0.8B loaded — AI answers enabled';
                 btn.style.background = '#1a4a2a';
                 dot.className = 'status-dot ready';
                 progress.textContent = 'Model ready. Search to get AI-powered answers.';
@@ -290,8 +514,8 @@
                 // If there's already a query, generate an answer
                 const query = document.getElementById('searchInput').value;
                 if (query.trim()) {
-                    const results = search(query);
-                    if (results.length > 0) generateAnswer(query, results);
+                    doSearchOnly(query);
+                    doAIGeneration();
                 }
             } catch (err) {
                 btn.textContent = 'Error loading model — click to retry';
@@ -299,81 +523,188 @@
                 dot.className = 'status-dot off';
                 progress.textContent = `Error: ${err.message}`;
                 progressBar.style.display = 'none';
-                console.error('WebLLM error:', err);
+                console.error('Model load error:', err);
             }
         });
 
+        // ── Queue-based generation ──
+        // GPU runs one generation at a time.
+        // If a new query arrives while generating, we:
+        //   1. Mark current generation stale (genId bump) so it stops writing to DOM
+        //   2. Queue the new request — it will auto-start when the current one finishes
+        //   3. Show "Thinking" immediately so the user sees responsiveness
+
         async function generateAnswer(query, results) {
-            if (!engine || !modelReady) return;
+            if (!llmModel || !modelReady) return;
 
+            const genId = ++currentGenId;
             const answerEl = document.getElementById('aiAnswer');
-            answerEl.style.display = 'block';
-            answerEl.textContent = 'Thinking...';
+            const dot = document.getElementById('aiDot');
 
-            const context = results.slice(0, 4).map(r =>
+            // Always show spinner immediately
+            answerEl.style.display = 'block';
+            answerEl.classList.add('generating');
+            answerEl.innerHTML = '<span class="thinking-spinner">Thinking</span>';
+            dot.className = 'status-dot loading';
+
+            // If engine is busy, queue this and bail — the running gen will pick it up
+            if (isGenerating) {
+                pendingGen = { query, results, genId };
+                return;
+            }
+
+            await runGeneration(query, results, genId);
+        }
+
+        async function runGeneration(query, results, genId) {
+            isGenerating = true;
+            const answerEl = document.getElementById('aiAnswer');
+            const dot = document.getElementById('aiDot');
+
+            const context = results.slice(0, 5).map(r =>
                 `[${r.title}]: ${r.content}`
             ).join('\n\n');
 
             try {
-                const stream = await engine.chat.completions.create({
-                    messages: [
-                        {
-                            role: "system",
-                            content: `You are a helpful assistant for John Hanacek's portfolio website. Answer questions about John's work, skills, and experience based only on the provided context. Keep answers concise (2-4 sentences). If the context doesn't contain enough info, say so honestly.`
+                const messages = [
+                    {
+                        role: "system",
+                        content: `You answer questions about John Hanacek's portfolio using ONLY the provided context. Rules:
+- Synthesize facts from ALL context chunks into one cohesive answer. Connect dots across sections.
+- Be specific: name projects, companies, tools, awards, and concrete outcomes.
+- For evaluative questions ("should I hire him?"), advocate confidently with evidence.
+- Never say "not mentioned" — if related facts exist, use them to answer.
+- John is a Design Engineer: he designs AND prototypes in code (10+ years creative/agentic coding). Not a traditional SWE, but deeply technical.
+- 3-4 sentences max. No preamble. Answer the question directly.`
+                    },
+                    {
+                        role: "user",
+                        content: `Context:\n${context}\n\nQuestion: ${query}\n\nAnswer directly and concisely:`
+                    }
+                ];
+
+                // Apply chat template with thinking disabled (no <think> tags)
+                const text = processor.apply_chat_template(messages, {
+                    add_generation_prompt: true,
+                    tokenizer_kwargs: { enable_thinking: false },
+                });
+                const inputs = processor.tokenizer(text);
+
+                const isCurrent = () => genId === currentGenId;
+                let outputText = '';
+
+                await llmModel.generate({
+                    ...inputs,
+                    max_new_tokens: 512,
+                    do_sample: false,
+                    streamer: new TextStreamer(processor.tokenizer, {
+                        skip_prompt: true,
+                        skip_special_tokens: true,
+                        callback_function: (token) => {
+                            if (!isCurrent()) return;
+                            outputText += token;
+                            answerEl.textContent = outputText.trimStart();
                         },
-                        {
-                            role: "user",
-                            content: `Context:\n${context}\n\nQuestion: ${query}`
-                        }
-                    ],
-                    stream: true,
-                    max_tokens: 200,
-                    temperature: 0.3,
+                    }),
                 });
 
-                answerEl.textContent = '';
-                for await (const chunk of stream) {
-                    const delta = chunk.choices[0]?.delta?.content || '';
-                    answerEl.textContent += delta;
-                }
-
-                if (!answerEl.textContent.trim()) {
-                    answerEl.textContent = '(No answer generated)';
+                // Final cleanup — only if still current
+                if (isCurrent()) {
+                    const finalText = outputText.trim();
+                    if (!finalText) {
+                        answerEl.textContent = '(No answer generated. Try a different query.)';
+                    } else {
+                        answerEl.textContent = finalText;
+                    }
                 }
             } catch (err) {
-                answerEl.textContent = `Error: ${err.message}`;
-                console.error('Generation error:', err);
+                if (genId === currentGenId) {
+                    answerEl.textContent = `Error: ${err.message}`;
+                    console.error('Generation error:', err);
+                }
+            } finally {
+                isGenerating = false;
+
+                // If a newer query was queued while we were busy, run it now
+                if (pendingGen) {
+                    const { query: pq, results: pr, genId: pg } = pendingGen;
+                    pendingGen = null;
+                    // Only run if it's still the latest request
+                    if (pg === currentGenId) {
+                        answerEl.innerHTML = '<span class="thinking-spinner">Thinking</span>';
+                        dot.className = 'status-dot loading';
+                        await runGeneration(pq, pr, pg);
+                    }
+                }
+
+                // Clean up UI if nothing else is running
+                if (!isGenerating && genId === currentGenId) {
+                    answerEl.classList.remove('generating');
+                    dot.className = 'status-dot ready';
+                }
             }
         }
 
         // ============================================
         // Wire up search input
+        // Two-tier debounce:
+        //   - Search results: fast (200ms) — instant-feeling
+        //   - AI generation:  slow (800ms) — waits for typing to stop
+        //   - Enter key: fires both immediately
         // ============================================
-        let debounceTimer;
-        document.getElementById('searchInput').addEventListener('input', (e) => {
-            clearTimeout(debounceTimer);
-            debounceTimer = setTimeout(() => {
-                const query = e.target.value;
-                const results = search(query);
-                renderResults(results);
+        let searchDebounce;
+        let aiDebounce;
+        let lastSearchResults = [];
+        let lastLlmQuery = '';
 
-                if (modelReady && query.trim() && results.length > 0) {
-                    generateAnswer(query, results);
-                } else {
-                    document.getElementById('aiAnswer').style.display = 'none';
-                }
-            }, 250);
+        function doSearchOnly(rawQuery) {
+            const { query: expanded, hint, originalQuery } = expandQuery(rawQuery);
+            const results = search(expanded);
+            renderResults(results, hint);
+
+            // Stash for AI to pick up
+            lastSearchResults = results;
+            lastLlmQuery = originalQuery || rawQuery;
+
+            // Clear stale AI answer immediately when query changes
+            const answerEl = document.getElementById('aiAnswer');
+            if (answerEl.style.display !== 'none' && isGenerating) {
+                answerEl.innerHTML = '<span class="thinking-spinner">Thinking</span>';
+            }
+
+            // Hide AI box if no results or model not ready
+            if (!modelReady || !rawQuery.trim() || results.length === 0) {
+                answerEl.style.display = 'none';
+            }
+        }
+
+        function doAIGeneration() {
+            if (modelReady && lastLlmQuery.trim() && lastSearchResults.length > 0) {
+                generateAnswer(lastLlmQuery, lastSearchResults);
+            }
+        }
+
+        document.getElementById('searchInput').addEventListener('input', (e) => {
+            const val = e.target.value;
+
+            // Fast: update search results
+            clearTimeout(searchDebounce);
+            searchDebounce = setTimeout(() => doSearchOnly(val), 200);
+
+            // Slow: trigger AI generation after typing settles
+            clearTimeout(aiDebounce);
+            if (modelReady && val.trim()) {
+                aiDebounce = setTimeout(() => doAIGeneration(), 800);
+            }
         });
 
-        // Handle enter key
+        // Enter key: fire both immediately
         document.getElementById('searchInput').addEventListener('keydown', (e) => {
             if (e.key === 'Enter') {
-                const query = e.target.value;
-                const results = search(query);
-                renderResults(results);
-                if (modelReady && query.trim() && results.length > 0) {
-                    generateAnswer(query, results);
-                }
+                clearTimeout(searchDebounce);
+                clearTimeout(aiDebounce);
+                doSearchOnly(e.target.value);
+                doAIGeneration();
             }
         });
     </script>

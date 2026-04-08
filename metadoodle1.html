@@ -1666,20 +1666,8 @@ JOHN HANACEK 2025, JHDESIGN LLC
 
         /* ===== UNIFIED INTERFACE STATUS ===== */
         .unified-status-bar {
-            position: fixed;
-            bottom: var(--space-sm);
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 200;
-            display: flex;
-            align-items: center;
-            gap: var(--space-md);
-            padding: var(--space-xs) var(--space-md);
-            background: var(--panel-bg);
-            backdrop-filter: blur(12px);
-            border: 1px solid var(--panel-border);
-            border-radius: 24px;
-            box-shadow: 0 4px 20px var(--shadow);
+            /* Hidden — contents moved into .ai-chat-container */
+            display: none !important;
         }
 
         .status-indicator {
@@ -1721,6 +1709,18 @@ JOHN HANACEK 2025, JHDESIGN LLC
 
         .status-dot.error {
             background: #ef4444;
+            box-shadow: 0 0 6px rgba(239, 68, 68, 0.5);
+        }
+
+        .status-dot.generating {
+            background: #f59e0b;
+            animation: pulse-dot 1s ease-in-out infinite;
+            box-shadow: 0 0 6px rgba(245, 158, 11, 0.5);
+        }
+
+        .status-dot.available {
+            background: #3b82f6;
+            animation: pulse-dot 2s ease-in-out infinite;
         }
 
         @keyframes pulse-listening {
@@ -1733,39 +1733,40 @@ JOHN HANACEK 2025, JHDESIGN LLC
             display: flex;
             align-items: center;
             justify-content: center;
-            width: 44px;
-            height: 44px;
+            width: 32px;
+            height: 32px;
             border-radius: 50%;
             background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
             border: none;
             cursor: pointer;
             transition: all 0.15s ease;
-            box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+            box-shadow: 0 1px 4px rgba(59, 130, 246, 0.25);
+            flex-shrink: 0;
         }
 
         .voice-button:hover {
-            transform: scale(1.05);
-            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+            transform: scale(1.08);
+            box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4);
         }
 
         .voice-button:active, .voice-button.recording {
             background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
-            box-shadow: 0 0 20px rgba(239, 68, 68, 0.5);
+            box-shadow: 0 0 12px rgba(239, 68, 68, 0.5);
         }
 
         .voice-button svg {
-            width: 20px;
-            height: 20px;
+            width: 16px;
+            height: 16px;
             fill: white;
         }
 
         /* Selection options floating panel */
         .selection-options-container {
             position: fixed;
-            bottom: 80px;
+            bottom: 120px;
             left: 50%;
             transform: translateX(-50%);
-            z-index: 199;
+            z-index: 250;
             display: none;
         }
 
@@ -1794,10 +1795,10 @@ JOHN HANACEK 2025, JHDESIGN LLC
         /* Voice transcript display */
         .voice-transcript {
             position: fixed;
-            bottom: 140px;
+            bottom: 180px;
             left: 50%;
             transform: translateX(-50%);
-            z-index: 198;
+            z-index: 250;
             max-width: 400px;
             padding: var(--space-sm) var(--space-md);
             background: rgba(0, 0, 0, 0.85);
@@ -1812,6 +1813,212 @@ JOHN HANACEK 2025, JHDESIGN LLC
         @keyframes fadeInUp {
             from { opacity: 0; transform: translateX(-50%) translateY(10px); }
             to { opacity: 1; transform: translateX(-50%) translateY(0); }
+        }
+
+        /* ===========================================
+           UNIFIED AI COMMAND BAR
+           Combines: chat input + WebLLM status + voice
+           Sits above the Library panel header
+        =========================================== */
+        .ai-chat-container {
+            position: fixed;
+            bottom: 56px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 200;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--panel-bg);
+            border: 1px solid var(--panel-border);
+            border-radius: 24px;
+            padding: 5px 8px 5px 6px;
+            box-shadow: 0 4px 24px var(--shadow), 0 1px 4px rgba(0,0,0,0.04);
+            max-width: 640px;
+            width: 92%;
+            transition: bottom 0.3s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.2s, box-shadow 0.2s;
+        }
+        .ai-chat-container:focus-within {
+            border-color: var(--sketch-blue);
+            box-shadow: 0 4px 24px rgba(59, 130, 246, 0.12), 0 1px 4px rgba(0,0,0,0.04);
+        }
+        /* Shift chat bar + toast up when library drawer is expanded */
+        body.library-expanded .ai-chat-container {
+            bottom: 308px; /* 300px library + 8px gap */
+            transition: bottom 0.3s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.2s, box-shadow 0.2s;
+        }
+        body.library-expanded .ai-response-toast {
+            bottom: 368px; /* chat bottom (308) + chat height (~44) + gap (16) */
+        }
+        .ai-chat-container.disabled .ai-chat-input,
+        .ai-chat-container.disabled .ai-chat-send,
+        .ai-chat-container.disabled .ai-chat-vision {
+            opacity: 0.4;
+            pointer-events: none;
+        }
+        /* Status indicator inside chat bar */
+        .ai-chat-container .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 0.7rem;
+            color: var(--muted);
+            white-space: nowrap;
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 16px;
+            background: rgba(0,0,0,0.03);
+            border: 1px solid transparent;
+            transition: all 0.15s;
+            flex-shrink: 0;
+        }
+        .ai-chat-container .status-indicator:hover {
+            background: rgba(0,0,0,0.06);
+            border-color: var(--panel-border);
+        }
+        .ai-chat-container .status-indicator .status-dot {
+            width: 7px;
+            height: 7px;
+        }
+        /* Whisper indicator — hidden until recording, then shows as mini badge */
+        .ai-chat-container .whisper-mini {
+            padding: 2px 4px;
+            background: transparent;
+            border: none;
+            display: none;
+        }
+        .ai-chat-container .whisper-mini.active {
+            display: flex;
+            padding: 4px 8px;
+            background: rgba(239, 68, 68, 0.08);
+            border: 1px solid rgba(239, 68, 68, 0.2);
+        }
+        .ai-chat-container .whisper-mini.active span:last-child {
+            display: inline;
+        }
+        /* Chat input */
+        .ai-chat-input {
+            flex: 1;
+            border: none;
+            background: transparent;
+            font-family: var(--font-body);
+            font-size: 0.875rem;
+            color: var(--ink);
+            outline: none;
+            padding: 6px 4px;
+            min-width: 0;
+        }
+        .ai-chat-input::placeholder {
+            color: var(--muted-light);
+            font-size: 0.8125rem;
+        }
+        /* Send button */
+        .ai-chat-send {
+            background: var(--sketch-blue);
+            color: white;
+            border: none;
+            border-radius: 16px;
+            padding: 6px 14px;
+            font-family: var(--font-body);
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: background 0.15s;
+            flex-shrink: 0;
+        }
+        .ai-chat-send:hover { background: #2563eb; }
+        .ai-chat-send:disabled { opacity: 0.4; cursor: default; }
+        /* Vision button */
+        .ai-chat-vision {
+            background: none;
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 5px 8px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.15s;
+            color: var(--muted);
+            flex-shrink: 0;
+        }
+        .ai-chat-vision:hover { border-color: var(--sketch-purple); color: var(--sketch-purple); }
+        .ai-chat-vision:disabled { opacity: 0.4; cursor: default; }
+        /* Separator between status section and input */
+        .ai-chat-divider {
+            width: 1px;
+            height: 20px;
+            background: var(--border);
+            flex-shrink: 0;
+        }
+
+        /* ===========================================
+           AI RESPONSE TOAST
+           Dark floating card above the command bar
+        =========================================== */
+        .ai-response-toast {
+            position: fixed;
+            bottom: 116px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 300;
+            max-width: 540px;
+            width: 90%;
+            padding: 12px 16px;
+            background: var(--ink);
+            color: #e8e8ec;
+            border-radius: 12px;
+            font-family: var(--font-body);
+            font-size: 0.82rem;
+            line-height: 1.5;
+            white-space: pre-wrap;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.1);
+            display: none;
+            flex-direction: column;
+            gap: 4px;
+            max-height: 200px;
+            overflow-y: auto;
+            animation: fadeInUp 0.2s ease;
+            transition: bottom 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .ai-response-toast .ai-response-label {
+            font-family: var(--font-mono);
+            font-size: 0.625rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--sketch-purple);
+            margin-bottom: 6px;
+        }
+        .ai-response-toast .ai-response-text {
+            color: #e0e0e4;
+        }
+        .ai-response-toast .ai-response-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 10px;
+        }
+        .ai-response-toast .ai-action-btn {
+            padding: 5px 12px;
+            border-radius: 6px;
+            border: 1px solid rgba(255,255,255,0.12);
+            background: rgba(255,255,255,0.06);
+            color: #bbb;
+            font-family: var(--font-body);
+            font-size: 0.75rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .ai-response-toast .ai-action-btn:hover {
+            background: rgba(255,255,255,0.12);
+            color: #fff;
+        }
+        .ai-response-toast .ai-action-btn.confirm {
+            border-color: rgba(34, 197, 94, 0.35);
+            color: #4ade80;
+        }
+        .ai-response-toast .ai-action-btn.dismiss {
+            border-color: rgba(239, 68, 68, 0.25);
+            color: #f87171;
         }
 
         .llm-suggestion-row {
@@ -1859,11 +2066,24 @@ JOHN HANACEK 2025, JHDESIGN LLC
         .llm-suggestion-loading {
             display: flex;
             align-items: center;
-            gap: 8px;
-            padding: 6px 10px;
+            gap: 6px;
+            padding: 4px 10px;
             font-size: 0.6875rem;
             color: var(--muted);
             font-style: italic;
+        }
+
+        .llm-loading-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #7c3aed;
+            animation: llm-pulse 1s ease-in-out infinite;
+        }
+
+        @keyframes llm-pulse {
+            0%, 100% { opacity: 0.3; transform: scale(0.8); }
+            50% { opacity: 1; transform: scale(1.2); }
         }
 
         .llm-loading-dots::after {
@@ -1876,6 +2096,38 @@ JOHN HANACEK 2025, JHDESIGN LLC
             25% { content: '.'; }
             50% { content: '..'; }
             75% { content: '...'; }
+        }
+
+        .llm-disagreement-note {
+            font-size: 0.625rem;
+            color: #dc2626;
+            font-style: italic;
+            margin-top: 2px;
+        }
+
+        .llm-alt-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            margin-top: 4px;
+        }
+
+        .llm-alt-chip {
+            padding: 2px 8px;
+            font-size: 0.625rem;
+            font-weight: 500;
+            color: #7c3aed;
+            background: rgba(139, 92, 246, 0.08);
+            border: 1px solid rgba(139, 92, 246, 0.25);
+            border-radius: 12px;
+            cursor: pointer;
+            font-family: var(--font-body);
+            transition: all 0.15s ease;
+        }
+
+        .llm-alt-chip:hover {
+            background: rgba(139, 92, 246, 0.18);
+            border-color: rgba(139, 92, 246, 0.5);
         }
 
         .interpret-btn {
@@ -2127,6 +2379,9 @@ JOHN HANACEK 2025, JHDESIGN LLC
                 </div>
             </div>
 
+            <!-- LLM Suggestion Area (Layer 1) — positioned right after top match for easy comparison -->
+            <div id="llmSuggestionArea" style="display: none;"></div>
+
             <!-- Other Suggestions -->
             <div class="candidates-list" id="candidatesList">
                 <div style="text-align: center; color: var(--muted); font-size: 0.875rem; padding: 1rem;">
@@ -2138,9 +2393,6 @@ JOHN HANACEK 2025, JHDESIGN LLC
             <div class="reasoning-section" id="reasoningSection" style="display: none;">
                 <div class="reasoning-list" id="reasoningList"></div>
             </div>
-
-            <!-- LLM Suggestion Area (Layer 1) -->
-            <div id="llmSuggestionArea" style="display: none;"></div>
 
             <!-- Interpret Button (Layer 2 - appears when circle contains shapes) -->
             <div id="interpretBtnContainer" style="display: none;">
@@ -2312,26 +2564,8 @@ JOHN HANACEK 2025, JHDESIGN LLC
         </div>
 
         <!-- Unified Status Bar (Voice + AI) -->
-        <div class="unified-status-bar" id="unifiedStatusBar">
-            <!-- WebLLM Status -->
-            <div class="status-indicator" id="webllmStatus" title="In-browser AI">
-                <span class="status-dot" id="webllmStatusDot"></span>
-                <span id="webllmStatusLabel">AI: Off</span>
-            </div>
-
-            <!-- Voice Button (Push to Talk) -->
-            <button class="voice-button" id="voiceButton" title="Hold to speak">
-                <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.91-3c-.49 0-.9.36-.98.85C16.52 14.2 14.47 16 12 16s-4.52-1.8-4.93-4.15c-.08-.49-.49-.85-.98-.85-.61 0-1.09.54-1 1.14.49 3 2.89 5.35 5.91 5.78V20c0 .55.45 1 1 1s1-.45 1-1v-2.08c3.02-.43 5.42-2.78 5.91-5.78.1-.6-.39-1.14-1-1.14z"/>
-                </svg>
-            </button>
-
-            <!-- Whisper Status -->
-            <div class="status-indicator" id="whisperStatus" title="Voice recognition">
-                <span class="status-dot" id="whisperStatusDot"></span>
-                <span id="whisperStatusLabel">Voice: Off</span>
-            </div>
-        </div>
+        <!-- Old unified status bar — hidden, contents moved into chat bar -->
+        <div class="unified-status-bar" id="unifiedStatusBar"></div>
 
         <!-- Selection Options (appears when shapes selected) -->
         <div class="selection-options-container" id="selectionOptionsContainer"></div>
@@ -2339,13 +2573,58 @@ JOHN HANACEK 2025, JHDESIGN LLC
         <!-- Voice Transcript Display -->
         <div class="voice-transcript" id="voiceTranscript"></div>
 
+        <!-- Unified AI Command Bar: status + chat input + actions -->
+        <div class="ai-chat-container disabled" id="aiChatContainer">
+            <!-- WebLLM Status (click to download model) -->
+            <div class="status-indicator" id="webllmStatus" title="Click to download in-browser AI (Qwen3.5-0.8B ~750MB)">
+                <span class="status-dot" id="webllmStatusDot"></span>
+                <span id="webllmStatusLabel">AI: Off</span>
+                <div id="webllmProgressBar" style="display:none; width:50px; height:3px; background:rgba(0,0,0,0.1); border-radius:2px; overflow:hidden;">
+                    <div id="webllmProgressFill" style="height:100%; width:0%; background:linear-gradient(90deg, #3b82f6, #22c55e); border-radius:2px; transition:width 0.3s;"></div>
+                </div>
+            </div>
+
+            <div class="ai-chat-divider"></div>
+
+            <!-- Chat Input -->
+            <input type="text" class="ai-chat-input" id="aiChatInput"
+                   placeholder="Load AI to chat... (click AI status)"
+                   disabled>
+
+            <!-- Vision Button -->
+            <button class="ai-chat-vision" id="aiVisionBtn" title="Describe what's on canvas (vision mode)" disabled>👁</button>
+
+            <!-- Send Button -->
+            <button class="ai-chat-send" id="aiChatSend" disabled>Send</button>
+
+            <!-- Voice Button (compact) -->
+            <button class="voice-button" id="voiceButton" title="Hold to speak">
+                <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.91-3c-.49 0-.9.36-.98.85C16.52 14.2 14.47 16 12 16s-4.52-1.8-4.93-4.15c-.08-.49-.49-.85-.98-.85-.61 0-1.09.54-1 1.14.49 3 2.89 5.35 5.91 5.78V20c0 .55.45 1 1 1s1-.45 1-1v-2.08c3.02-.43 5.42-2.78 5.91-5.78.1-.6-.39-1.14-1-1.14z"/>
+                </svg>
+            </button>
+
+            <!-- Whisper Status (compact) -->
+            <div class="status-indicator whisper-mini" id="whisperStatus" title="Voice recognition">
+                <span class="status-dot" id="whisperStatusDot"></span>
+                <span id="whisperStatusLabel">Voice</span>
+            </div>
+        </div>
+
+        <!-- AI Response Toast (shows LLM responses above command bar) -->
+        <div class="ai-response-toast" id="aiResponseToast">
+            <div class="ai-response-label">AI</div>
+            <div class="ai-response-text" id="aiResponseText"></div>
+            <div class="ai-response-actions" id="aiResponseActions"></div>
+        </div>
+
         <script type="module">
             // ===== MODULE IMPORTS =====
-            // WebLLM for in-browser inference (no server needed)
-            import * as webllm from "https://esm.run/@mlc-ai/web-llm";
+            // Transformers.js v4 — in-browser inference via WebGPU (text + vision)
+            import { AutoProcessor, Qwen3_5ForConditionalGeneration, RawImage, TextStreamer } from "https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.0.0-next.5";
 
             // Whisper for in-browser voice transcription
-            // Using transformers.js which includes Whisper
+            // Using transformers.js v2 which includes Whisper (separate import)
             import { pipeline, env } from "https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2";
 
             // Disable local model caching to use CDN
@@ -2369,18 +2648,28 @@ JOHN HANACEK 2025, JHDESIGN LLC
             };
 
             // ===== WEBLLM MODULE =====
-            // In-browser LLM inference via WebGPU (no server needed)
+            // In-browser LLM inference via Transformers.js v4 + WebGPU
+            // Qwen3.5-0.8B with vision support (text + image understanding)
             // Falls back gracefully if WebGPU unavailable
 
             const WEBLLM = {
-                engine: null,
+                modelId: "onnx-community/Qwen3.5-0.8B-ONNX",
+                processor: null,
+                model: null,
                 modelReady: false,
-                modelId: "Qwen3-0.6B-q4f16_1-MLC",
                 hasWebGPU: false,
                 loading: false,
                 progress: 0,
-                progressText: ''
+                progressText: '',
+                error: null,
+                // Queue system — GPU runs one generation at a time
+                currentGenId: 0,
+                isGenerating: false,
+                pendingGen: null
             };
+
+            // Expose for debugging/testing
+            window.WEBLLM = WEBLLM;
 
             // Check WebGPU availability
             async function checkWebGPU() {
@@ -2398,65 +2687,385 @@ JOHN HANACEK 2025, JHDESIGN LLC
                 return true;
             }
 
-            // Initialize WebLLM engine (downloads model ~400MB)
+            // Initialize WebLLM — downloads Qwen3.5-0.8B (~750MB, fp16 vision)
             async function initWebLLM() {
                 if (!WEBLLM.hasWebGPU || WEBLLM.loading || WEBLLM.modelReady) return;
 
                 WEBLLM.loading = true;
+                WEBLLM.error = null;
                 updateWebLLMStatus('loading', 'Downloading model...');
 
-                try {
-                    WEBLLM.engine = await webllm.CreateMLCEngine(WEBLLM.modelId, {
-                        initProgressCallback: (report) => {
-                            WEBLLM.progressText = report.text;
-                            WEBLLM.progress = report.progress || 0;
-                            updateWebLLMStatus('loading', report.text);
+                // Track multi-file download progress
+                const fileProgress = new Map();
+                function onProgress(info) {
+                    if (info.status === 'progress' && info.total) {
+                        fileProgress.set(info.file, { loaded: info.loaded, total: info.total });
+                        let loaded = 0, total = 0;
+                        for (const fp of fileProgress.values()) { loaded += fp.loaded; total += fp.total; }
+                        if (total > 0) {
+                            WEBLLM.progress = loaded / total;
+                            const pct = Math.round(WEBLLM.progress * 100);
+                            const mb = (loaded / 1e6).toFixed(0);
+                            const totalMb = (total / 1e6).toFixed(0);
+                            updateWebLLMStatus('loading', `AI: ${mb}/${totalMb} MB (${pct}%)`);
                         }
+                    } else if (info.status === 'initiate') {
+                        updateWebLLMStatus('loading', `Loading ${info.file || 'model'}...`);
+                    }
+                }
+
+                try {
+                    updateWebLLMStatus('loading', 'Loading processor...');
+                    WEBLLM.processor = await AutoProcessor.from_pretrained(WEBLLM.modelId, {
+                        progress_callback: onProgress
                     });
+
+                    updateWebLLMStatus('loading', 'Loading model weights (WebGPU)...');
+                    WEBLLM.model = await Qwen3_5ForConditionalGeneration.from_pretrained(WEBLLM.modelId, {
+                        dtype: {
+                            embed_tokens: "q4",
+                            vision_encoder: "fp16",    // fp16 for vision quality
+                            decoder_model_merged: "q4", // q4 for text speed
+                        },
+                        device: "webgpu",
+                        progress_callback: onProgress,
+                    });
+
+                    // Warm up GPU shader compilation
+                    updateWebLLMStatus('loading', 'Compiling GPU shaders...');
+                    const warmup = WEBLLM.processor.tokenizer("hi");
+                    await WEBLLM.model.generate({ ...warmup, max_new_tokens: 1 });
 
                     WEBLLM.modelReady = true;
                     WEBLLM.loading = false;
-                    updateWebLLMStatus('ready', 'In-browser AI ready');
-                    console.log('WebLLM ready:', WEBLLM.modelId);
+                    updateWebLLMStatus('ready', 'AI: Ready (Qwen3.5-0.8B)');
+                    console.log('WebLLM ready:', WEBLLM.modelId, '(fp16 vision + q4 text)');
+
+                    // Enable AI chat interface now that model is loaded
+                    enableAIChatInterface();
                 } catch (err) {
                     WEBLLM.loading = false;
-                    updateWebLLMStatus('error', 'Model load failed');
+                    WEBLLM.error = err.message;
+                    updateWebLLMStatus('error', 'AI: Load failed');
                     console.error('WebLLM init error:', err);
                 }
             }
 
-            // Query WebLLM (in-browser)
-            async function queryWebLLM(systemPrompt, userContent, options = {}) {
-                if (!WEBLLM.modelReady || !WEBLLM.engine) return null;
+            // ===== CANVAS CAPTURE FOR VISION MODE =====
+            // Captures the drawing canvas as a RawImage for VLM input
+
+            function captureCanvasForVLM() {
+                const sourceCanvas = document.getElementById('drawingCanvas');
+                if (!sourceCanvas) return null;
+
+                const sourceW = sourceCanvas.width;
+                const sourceH = sourceCanvas.height;
+                const maxDim = 512; // Balance quality vs token cost
+                const scale = Math.min(1, maxDim / Math.max(sourceW, sourceH));
+
+                const offscreen = document.createElement('canvas');
+                offscreen.width = Math.round(sourceW * scale);
+                offscreen.height = Math.round(sourceH * scale);
+                const octx = offscreen.getContext('2d');
+
+                // White background (canvas bg is CSS-only, need explicit fill)
+                octx.fillStyle = '#f8f6f1';
+                octx.fillRect(0, 0, offscreen.width, offscreen.height);
+                octx.drawImage(sourceCanvas, 0, 0, offscreen.width, offscreen.height);
+
+                console.log(`VLM capture: ${offscreen.width}x${offscreen.height}px`);
+                return RawImage.fromCanvas(offscreen);
+            }
+
+            // ===== UNIFIED GENERATION ENGINE =====
+            // Queue-based: only one generation runs at a time on GPU
+            // Supports text mode (fast, structured) and vision mode (canvas understanding)
+
+            async function generateWebLLM(systemPrompt, userContent, options = {}) {
+                if (!WEBLLM.modelReady || !WEBLLM.model) return null;
+
+                const { mode = 'text', image = null, maxTokens = 512, onToken = null } = options;
+                const genId = ++WEBLLM.currentGenId;
+
+                // If engine is busy, queue this and WAIT for it (not return null)
+                if (WEBLLM.isGenerating) {
+                    return new Promise((resolve) => {
+                        WEBLLM.pendingGen = { systemPrompt, userContent, options, genId, resolve };
+                    });
+                }
+
+                return await runWebLLMGeneration(systemPrompt, userContent, options, genId);
+            }
+
+            async function runWebLLMGeneration(systemPrompt, userContent, options, genId) {
+                WEBLLM.isGenerating = true;
+                updateWebLLMStatus('generating', 'AI: Thinking...');
+                const { mode = 'text', image = null, maxTokens = 512, onToken = null } = options;
 
                 try {
-                    const response = await WEBLLM.engine.chat.completions.create({
-                        messages: [
-                            { role: 'system', content: systemPrompt },
-                            { role: 'user', content: typeof userContent === 'string' ? userContent : JSON.stringify(userContent) }
-                        ],
-                        max_tokens: options.maxTokens || 500,
-                        temperature: options.temperature || 0.3,
-                        stream: false
+                    // Build messages
+                    const messages = [
+                        { role: 'system', content: systemPrompt }
+                    ];
+
+                    if (mode === 'vision' && image) {
+                        messages.push({
+                            role: 'user',
+                            content: [
+                                { type: 'image' },
+                                { type: 'text', text: typeof userContent === 'string' ? userContent : JSON.stringify(userContent) }
+                            ]
+                        });
+                    } else {
+                        messages.push({
+                            role: 'user',
+                            content: typeof userContent === 'string' ? userContent : JSON.stringify(userContent)
+                        });
+                    }
+
+                    // Apply chat template with thinking disabled
+                    const text = WEBLLM.processor.apply_chat_template(messages, {
+                        add_generation_prompt: true,
+                        tokenizer_kwargs: { enable_thinking: false },
                     });
 
-                    const content = response.choices[0]?.message?.content || '';
-                    return extractLLMAnswer(content);
+                    // Process inputs — vision mode includes image
+                    let inputs;
+                    if (mode === 'vision' && image) {
+                        inputs = await WEBLLM.processor(text, [image]);
+                    } else {
+                        inputs = WEBLLM.processor.tokenizer(text);
+                    }
+
+                    // Generate with optional streaming
+                    const isCurrent = () => genId === WEBLLM.currentGenId;
+                    let outputText = '';
+
+                    const streamerConfig = {
+                        skip_prompt: true,
+                        skip_special_tokens: true,
+                        callback_function: (token) => {
+                            if (!isCurrent()) return;
+                            outputText += token;
+                            if (onToken) onToken(token, outputText);
+                        }
+                    };
+
+                    // Race generation against a timeout to prevent infinite hangs
+                    const timeoutMs = options.timeout || 60000; // 60s to accommodate WebGPU cold-start shader compilation
+                    const timeoutPromise = new Promise((_, reject) =>
+                        setTimeout(() => reject(new Error('WebLLM generation timed out after ' + (timeoutMs/1000) + 's')), timeoutMs)
+                    );
+
+                    await Promise.race([
+                        WEBLLM.model.generate({
+                            ...inputs,
+                            max_new_tokens: maxTokens,
+                            do_sample: false,
+                            streamer: new TextStreamer(WEBLLM.processor.tokenizer, streamerConfig),
+                        }),
+                        timeoutPromise
+                    ]);
+
+                    if (!isCurrent()) return null;
+
+                    const finalText = outputText.trim();
+                    console.log(`WebLLM generated ${finalText.length} chars (mode: ${mode})`);
+                    return finalText;
+
                 } catch (err) {
-                    console.warn('WebLLM query error:', err);
+                    const isTimeout = err.message && err.message.includes('timed out');
+                    if (genId === WEBLLM.currentGenId) {
+                        console.warn('WebLLM generation error:', err);
+                        // Flash the status indicator to show error
+                        updateWebLLMStatus('error', 'AI: Error — ' + (err.message || 'generation failed').substring(0, 40));
+                        // Auto-recover status after 5s
+                        setTimeout(() => {
+                            if (WEBLLM.modelReady && !WEBLLM.isGenerating) updateWebLLMStatus('ready', 'AI: Ready');
+                        }, 5000);
+                    }
+                    // After a timeout, model.generate() may still be running in background.
+                    // Resolve any pending request with null so callers can fall back to LM Studio.
+                    if (isTimeout && WEBLLM.pendingGen) {
+                        const { resolve } = WEBLLM.pendingGen;
+                        WEBLLM.pendingGen = null;
+                        if (resolve) resolve(null);
+                    }
                     return null;
+                } finally {
+                    WEBLLM.isGenerating = false;
+
+                    // If a newer query was queued, run it now and resolve the caller's Promise
+                    // (Skip if pendingGen was already cleared by timeout handler above)
+                    if (WEBLLM.pendingGen) {
+                        const { systemPrompt: sp, userContent: uc, options: opts, genId: pg, resolve } = WEBLLM.pendingGen;
+                        WEBLLM.pendingGen = null;
+                        if (pg === WEBLLM.currentGenId) {
+                            const result = await runWebLLMGeneration(sp, uc, opts, pg);
+                            if (resolve) resolve(result);
+                        } else if (resolve) {
+                            resolve(null); // Superseded by newer request
+                        }
+                    }
+
+                    // Restore status if nothing else is pending
+                    if (WEBLLM.modelReady && !WEBLLM.isGenerating) {
+                        updateWebLLMStatus('ready', 'AI: Ready');
+                    }
                 }
             }
 
-            function updateWebLLMStatus(state, text) {
+            // Query WebLLM with structured output (matches queryLLM interface)
+            // Uses multiple fallback strategies to extract useful results from small-model output
+            async function queryWebLLM(systemPrompt, structuredData, options = {}) {
+                if (!WEBLLM.modelReady) return null;
+
+                const rawText = await generateWebLLM(systemPrompt, structuredData, {
+                    mode: options.mode || 'text',
+                    image: options.image || null,
+                    maxTokens: options.maxTokens || 512
+                });
+
+                if (!rawText) return null;
+
+                console.log('WebLLM raw output:', rawText.substring(0, 200));
+
+                // Strategy 1: Standard JSON extraction (strict schema match)
+                const parsed = extractLLMAnswer(rawText);
+                if (parsed) {
+                    return normalizeLLMResponse(parsed);
+                }
+
+                // Strategy 2: Find ANY JSON object with relaxed key requirements
+                const anyJson = extractAnyJSON(rawText);
+                if (anyJson) {
+                    return normalizeLLMResponse(anyJson);
+                }
+
+                // Strategy 3: Extract label from natural language response
+                const naturalLabel = extractNaturalLabel(rawText);
+                if (naturalLabel) {
+                    return normalizeLLMResponse({
+                        label: naturalLabel,
+                        alternatives: [],
+                        reasoning: rawText.substring(0, 100)
+                    });
+                }
+
+                // Strategy 4 (last resort): extract from last non-empty line
+                const lines = rawText.split('\n').filter(l => l.trim());
+                const lastLine = lines[lines.length - 1] || '';
+                const cleanLabel = lastLine.replace(/[{}"*`#\[\]]/g, '').trim().slice(0, 50);
+                if (cleanLabel && cleanLabel.length > 1) {
+                    return normalizeLLMResponse({ label: cleanLabel, alternatives: [], reasoning: '' });
+                }
+
+                return null;
+            }
+
+            // Helper: extract any JSON object from text (relaxed key matching)
+            function extractAnyJSON(text) {
+                const matches = text.match(/\{[^{}]*\}/g);
+                if (!matches) return null;
+                for (let i = matches.length - 1; i >= 0; i--) {
+                    try {
+                        const obj = JSON.parse(matches[i]);
+                        // Accept if it has any useful key
+                        if (obj.label || obj.name || obj.shape || obj.type || obj.description) {
+                            return { label: obj.label || obj.name || obj.shape || obj.type, ...obj };
+                        }
+                    } catch (e) { continue; }
+                }
+                return null;
+            }
+
+            // Helper: extract a label from natural language model output
+            function extractNaturalLabel(text) {
+                // Strip thinking blocks and markdown
+                let clean = text.replace(/<think>[\s\S]*?<\/think>/gi, '')
+                                 .replace(/```[\s\S]*?```/g, '')
+                                 .replace(/[*#`]/g, '')
+                                 .trim();
+
+                // Common patterns: "This is a circle", "I see a star", "The shape is a line"
+                const patterns = [
+                    /(?:this|it)\s+(?:is|looks like)\s+(?:a|an)\s+["']?(\w[\w\s]{0,30}?)["']?(?:\.|,|$)/i,
+                    /(?:shape|stroke|drawing)\s+(?:is|appears to be)\s+(?:a|an)\s+["']?(\w[\w\s]{0,30}?)["']?/i,
+                    /(?:I (?:see|think|recognize))\s+(?:a|an)\s+["']?(\w[\w\s]{0,30}?)["']?/i,
+                    /^["']?(\w[\w\s]{0,30}?)["']?$/m  // Just a word on its own line
+                ];
+
+                for (const pat of patterns) {
+                    const m = clean.match(pat);
+                    if (m && m[1] && m[1].trim().length > 1) {
+                        return m[1].trim().substring(0, 50);
+                    }
+                }
+                return null;
+            }
+
+            function updateWebLLMStatus(statusState, text) {
                 const dot = document.getElementById('webllmStatusDot');
                 const label = document.getElementById('webllmStatusLabel');
                 if (dot) {
-                    dot.className = 'status-dot ' + state;
+                    dot.className = 'status-dot ' + statusState;
                 }
                 if (label) {
                     label.textContent = text;
                 }
+                // Also update progress bar if present
+                const progressBar = document.getElementById('webllmProgressBar');
+                const progressFill = document.getElementById('webllmProgressFill');
+                if (progressBar && progressFill) {
+                    if (statusState === 'loading') {
+                        progressBar.style.display = 'block';
+                        progressFill.style.width = Math.round(WEBLLM.progress * 100) + '%';
+                    } else {
+                        progressBar.style.display = 'none';
+                    }
+                }
+            }
+
+            // ===== UNIFIED LLM ROUTER =====
+            // Tries WebLLM first (in-browser), falls back to LM Studio (localhost)
+            // Supports text mode (structured JSON) and vision mode (canvas capture)
+
+            async function routeLLMQuery(systemPrompt, structuredData, options = {}) {
+                const { mode = 'text', image = null, timeout = 15000 } = options;
+
+                // Try WebLLM first if loaded
+                if (WEBLLM.modelReady) {
+                    const result = await queryWebLLM(systemPrompt, structuredData, {
+                        mode,
+                        image,
+                        maxTokens: options.maxTokens || 512
+                    });
+                    if (result) return result;
+                }
+
+                // Fall back to LM Studio if available (text mode only)
+                if (LM_STUDIO.available && LM_STUDIO.enabled) {
+                    return await queryLLM(systemPrompt, structuredData, { timeout });
+                }
+
+                // Neither available
+                return null;
+            }
+
+            // Vision query — captures canvas and sends to VLM
+            async function queryVisionLLM(prompt, options = {}) {
+                if (!WEBLLM.modelReady) return null;
+
+                const image = captureCanvasForVLM();
+                if (!image) return null;
+
+                const rawText = await generateWebLLM(
+                    'You analyze drawings on a canvas. Describe what you see — shapes, objects, patterns, spatial relationships. Be specific and concise. If asked to take action, respond with a JSON action object.',
+                    prompt,
+                    { mode: 'vision', image, maxTokens: options.maxTokens || 256, onToken: options.onToken }
+                );
+
+                return rawText;
             }
 
             // ===== WHISPER MODULE =====
@@ -2850,6 +3459,11 @@ JOHN HANACEK 2025, JHDESIGN LLC
                             }
 
                             console.log(`LLM connected: ${LM_STUDIO.model} (${LM_STUDIO.models.length} models available)`);
+
+                            // Enable AI chat interface if WebLLM hasn't already done so
+                            if (!WEBLLM.modelReady) {
+                                enableAIChatInterface();
+                            }
                             return;
                         }
                     }
@@ -2899,6 +3513,23 @@ JOHN HANACEK 2025, JHDESIGN LLC
                 const analysis = analyzeStrokeDetailed(stroke);
                 const topResult = analysis.results.length > 0 ? analysis.results[0] : null;
 
+                // Compute enriched geometric features for LLM semantic recognition
+                const curvature = computeCurvatureProfile(stroke);
+                const symmetry = computeSymmetry(stroke);
+                const selfIntersections = countSelfIntersections(stroke);
+
+                // Encode simplified points as directional chain code (translation/scale invariant)
+                const dirLabels = ['R', 'DR', 'D', 'DL', 'L', 'UL', 'U', 'UR'];
+                const directions = [];
+                for (let i = 1; i < simplified.length; i++) {
+                    const dx = simplified[i][0] - simplified[i - 1][0];
+                    const dy = simplified[i][1] - simplified[i - 1][1];
+                    if (Math.abs(dx) < 1 && Math.abs(dy) < 1) continue; // skip zero-length segments
+                    const angle = Math.atan2(dy, dx);
+                    const dir = ((Math.round(angle / (Math.PI / 4)) % 8) + 8) % 8;
+                    directions.push(dirLabels[dir]);
+                }
+
                 return {
                     fingerprint: {
                         straightness: parseFloat(fp.straightness.toFixed(3)),
@@ -2906,8 +3537,21 @@ JOHN HANACEK 2025, JHDESIGN LLC
                         corners: fp.corners,
                         isClosed: fp.isClosed,
                         closureGap: Math.round(fp.closureDistance),
-                        size: Math.round(fp.size)
+                        size: Math.round(fp.size),
+                        // Existing features that were computed but not sent:
+                        pointCount: fp.pointCount,
+                        cornerAngles: fp.cornerAngles ? fp.cornerAngles.map(a => +(a * 180 / Math.PI).toFixed(1)) : [],
+                        angleAnalysis: fp.angleAnalysis ? {
+                            rectangleLikeness: +fp.angleAnalysis.rectangleLikeness.toFixed(2),
+                            triangleLikeness: +fp.angleAnalysis.triangleLikeness.toFixed(2),
+                            consistency: +fp.angleAnalysis.consistency.toFixed(2)
+                        } : null
                     },
+                    // Enriched features for organic/semantic shape recognition
+                    curvature: curvature,
+                    symmetry: symmetry,
+                    selfIntersections: selfIntersections,
+                    directionChain: directions.join(''),
                     bounds: {
                         minX: Math.round(bounds.minX),
                         minY: Math.round(bounds.minY),
@@ -3028,32 +3672,80 @@ JOHN HANACEK 2025, JHDESIGN LLC
             // Non-blocking requests to LM Studio's OpenAI-compatible endpoint
 
             const LLM_PROMPTS = {
-                stroke: `You analyze hand-drawn strokes on a canvas. You receive:
-- fingerprint: geometric data (straightness, aspect ratio, corners, closure)
-- library: the user's saved shape concepts (may be empty)
-- nearestLibraryMatch: closest existing concept with similarity score (may be null)
-- canvasContext: other shapes already drawn
-- spatialContext: spatial relationships to nearby shapes
+                stroke: `You analyze hand-drawn strokes on a canvas. You receive structured geometric data — NOT an image.
 
-Your TWO jobs:
-1. If the stroke matches an EXISTING library concept (check nearestLibraryMatch), return action "match_existing" with that concept's key
-2. If it's genuinely NEW, return action "suggest_new" with a semantic label and recognition criteria
+INPUT DATA:
+- fingerprint: straightness (0=curvy, 1=straight), aspectRatio (width/height), corners (count), isClosed (bool), closureGap (px), size (px), pointCount, cornerAngles (degrees), angleAnalysis (rectangleLikeness, triangleLikeness, consistency 0-1)
+- curvature: avgCurvature, maxCurvature, curvatureVariance (high variance=organic/irregular shape)
+- symmetry: vertical (0-1), horizontal (0-1)
+- selfIntersections: count of self-crossings
+- directionChain: stroke direction sequence (R/DR/D/DL/L/UL/U/UR)
+- library: user's saved concepts (may be empty)
+- nearestLibraryMatch: best existing match with similarity %
+- canvasContext: other shapes on canvas with labels and bounds
+- spatialContext: spatial relationships to nearby shapes (overlapping, containment, proximity, direction)
 
-Think semantically — not just shape names. Consider: sun, wheel, cloud, arrow, star, wave, checkmark, eye, flower, house, tree, heart, lightning, etc.
+ROLE: Heuristics already handle basic geometry (circle, line, rectangle, triangle). Your value is SEMANTIC interpretation — what does the shape MEAN? Think about real-world objects, not just geometry.
 
-Output a JSON object with these keys:
+INTERPRETING FEATURES for organic/semantic shapes:
+- Closed + curved + no corners + high vertical symmetry → heart, leaf, raindrop, shield
+- Closed + curved + no corners + high curvatureVariance → cloud, blob, jellyfish body, puddle
+- Open + low straightness + wavy directionChain → wave, snake, river, tentacle, hair
+- Closed + 5+ corners + high symmetry → star, flower, sun, snowflake
+- Self-intersections > 0 → figure-eight, infinity symbol, knot, pretzel
+- Open + slight curve + tapering → arrow, feather, branch, tail
+- Closed + vertically symmetric + 2 curvature peaks at top → heart
+- Low aspectRatio (tall) + closed → bottle, vase, person silhouette
+- High aspectRatio (wide) + open → horizon line, ground, shelf
+
+COMPOSITIONAL REASONING — shapes mean more TOGETHER:
+Use canvasContext and spatialContext to reason about what this shape adds to the scene:
+- Circle above wavy lines = sun over water, moon over sea
+- Small circles inside large circle = face (eyes in head), bubbles in water
+- Lines radiating from circle = sun, flower, explosion
+- Triangle above rectangle = house, tent on base
+- Curved lines below rounded shape = jellyfish (dome + tentacles), octopus
+- Multiple similar shapes in a row = fence, teeth, waves, grass
+
+TASK:
+1. If nearestLibraryMatch >= 70% similar, return action "match_existing" with that concept's key
+2. Otherwise, return action "suggest_new" with a semantic label
+
+Output JSON:
 - action: "match_existing" or "suggest_new"
-- label: human-readable name (e.g. "Cloud", "Star")
-- conceptKey: lowercase key (e.g. "cloud", "star") — for match_existing, use the existing key
-- alternatives: array of 1-3 alternative labels
-- reasoning: brief explanation
+- label: human-readable name (e.g. "Cloud", "Heart", "Jellyfish")
+- conceptKey: lowercase key (e.g. "cloud", "heart")
+- alternatives: 1-3 alternative labels
+- reasoning: brief explanation referencing feature values
 - recognitionCriteria (suggest_new only): { closedShape: bool, straightnessRange: [min,max], cornerRange: [min,max], aspectRange: [min,max], basedOn: nearest-primitive-or-null }`,
 
                 scene: `You analyze a selected region of a drawing canvas. You receive shapes with their types, labels, bounding boxes, and spatial relationships (overlapping, containment, proximity).
 
 Interpret what the user is drawing as a whole scene. Consider how shapes relate to each other spatially. Suggest a descriptive composition name.
 
-After your analysis, output your final answer as a JSON object with keys: description, compositionName, details.`
+After your analysis, output your final answer as a JSON object with keys: description, compositionName, details.`,
+
+                command: `You are an AI assistant that can manipulate shapes on a drawing canvas. The user gives you a command and you respond with a JSON action.
+
+Available actions:
+- { "action": "label", "strokeIndex": 0, "label": "circle", "confidence": 0.9, "reasoning": "..." }
+- { "action": "group", "strokeIndices": [0,1,2], "label": "face", "reasoning": "..." }
+- { "action": "add_stroke", "points": [{"x":100,"y":100},{"x":200,"y":100},...], "label": "arrow", "reasoning": "..." }
+- { "action": "delete", "strokeIndices": [3], "reasoning": "..." }
+- { "action": "modify", "strokeIndex": 0, "properties": { "label": "eye" }, "reasoning": "..." }
+- { "action": "rearrange", "moves": [{"strokeIndex":0, "dx":50, "dy":0}], "reasoning": "..." }
+- { "action": "suggest", "text": "Try adding eyes to the face", "reasoning": "..." }
+
+Rules:
+- Use "label" to rename or identify a shape
+- Use "group" to combine related shapes into a named composition
+- Use "add_stroke" to create new shapes (provide points as x,y coordinates)
+- Use "delete" to remove shapes (this is destructive, use sparingly)
+- Use "rearrange" to move shapes (provide dx,dy offsets in pixels)
+- Use "suggest" when you want to recommend something without changing the canvas
+- Always include "reasoning" explaining why you chose this action
+
+Output ONLY a JSON object with the action. No other text.`
             };
 
             // Tool definitions for LLM tool-use (Layer 2 future-ready)
@@ -3371,7 +4063,7 @@ After your analysis, output your final answer as a JSON object with keys: descri
                     } : null
                 };
 
-                return queryLLM(LLM_PROMPTS.stroke, payload, { timeout: 15000 });
+                return routeLLMQuery(LLM_PROMPTS.stroke, payload, { timeout: 15000 });
             }
 
             function showLLMLoading() {
@@ -3380,8 +4072,8 @@ After your analysis, output your final answer as a JSON object with keys: descri
                 area.style.display = 'block';
                 area.innerHTML = `
                     <div class="llm-suggestion-loading">
-                        <span class="llm-suggestion-badge">AI</span>
-                        <span class="llm-loading-dots">Thinking</span>
+                        <span class="llm-loading-dot"></span>
+                        <span style="color: #7c3aed; font-size: 0.625rem;">AI analyzing<span class="llm-loading-dots"></span></span>
                     </div>
                 `;
             }
@@ -3494,12 +4186,19 @@ After your analysis, output your final answer as a JSON object with keys: descri
                 }
 
                 const label = llmResult.label || 'Unknown';
-                const alternatives = (llmResult.alternatives || []).slice(0, 3);
+                const alternatives = (llmResult.alternatives || []).slice(0, 4);
                 const reasoning = llmResult.reasoning || '';
                 const isMatch = llmResult.action === 'match_existing';
 
                 // Capture strokeIndex at render time so button closures use correct value
                 const capturedStrokeIndex = state.selectedStrokeIndex;
+
+                // Detect disagreement with heuristic top match
+                const heuristicLabelEl = document.getElementById('topMatchLabel');
+                const heuristicLabel = heuristicLabelEl ? heuristicLabelEl.textContent.trim() : '';
+                const llmLabelNorm = label.toLowerCase().replace(/[^a-z0-9]/g, '');
+                const heurLabelNorm = heuristicLabel.toLowerCase().replace(/[^a-z0-9]/g, '');
+                const isDisagreement = heuristicLabel && heuristicLabel !== '—' && llmLabelNorm !== heurLabelNorm;
 
                 area.style.display = 'block';
                 area.innerHTML = '';
@@ -3508,8 +4207,12 @@ After your analysis, output your final answer as a JSON object with keys: descri
                 const row = document.createElement('div');
                 row.className = 'llm-suggestion-row';
 
-                // Style based on match vs new
-                if (isMatch) {
+                // Style based on match vs new, with disagreement accent
+                if (isDisagreement) {
+                    row.style.borderWidth = '2px';
+                    row.style.borderColor = 'rgba(220, 38, 38, 0.4)';
+                    row.style.borderLeft = '3px solid #dc2626';
+                } else if (isMatch) {
                     row.style.borderWidth = '2px';
                     row.style.borderColor = 'rgba(34, 197, 94, 0.4)';
                 } else {
@@ -3522,10 +4225,13 @@ After your analysis, output your final answer as a JSON object with keys: descri
                 const btnText = isMatch ? 'Accept Match' : 'Accept &amp; Save';
                 const btnColor = isMatch ? '#16a34a' : '#7c3aed';
 
-                let altText = '';
-                if (alternatives.length > 0) {
-                    altText = `<div class="llm-suggestion-context">Also: ${alternatives.join(', ')}</div>`;
+                // Disagreement note
+                let disagreementHtml = '';
+                if (isDisagreement) {
+                    disagreementHtml = `<div class="llm-disagreement-note">Heuristic says "${heuristicLabel}" — AI sees something different</div>`;
                 }
+
+                // Reasoning (compact)
                 let reasonText = '';
                 if (reasoning) {
                     reasonText = `<div class="llm-suggestion-context" style="margin-top: 2px; font-style: italic;">${reasoning}</div>`;
@@ -3535,12 +4241,10 @@ After your analysis, output your final answer as a JSON object with keys: descri
                     <div class="llm-suggestion-header">
                         <span class="llm-suggestion-badge" style="background: ${badgeColor};">${badgeText}</span>
                         <span class="llm-suggestion-label">${label}</span>
+                        <button class="llm-accept-btn" style="margin-left: auto; padding: 2px 8px; font-size: 0.625rem; font-weight: 600; color: white; background: ${btnColor}; border: none; border-radius: 4px; cursor: pointer; font-family: var(--font-body);">${btnText}</button>
                     </div>
-                    ${altText}
+                    ${disagreementHtml}
                     ${reasonText}
-                    <div style="margin-top: 6px; display: flex; gap: 4px;">
-                        <button class="llm-accept-btn" style="flex: 1; padding: 4px 8px; font-size: 0.6875rem; font-weight: 600; color: white; background: ${btnColor}; border: none; border-radius: 4px; cursor: pointer; font-family: var(--font-body);">${btnText}</button>
-                    </div>
                 `;
 
                 // Wire up the accept button — passes full llmResult and captured strokeIndex
@@ -3554,36 +4258,33 @@ After your analysis, output your final answer as a JSON object with keys: descri
 
                 area.appendChild(row);
 
-                // Add alternative suggestions (always as suggest_new with that alt label)
-                alternatives.forEach(alt => {
-                    const altResult = {
-                        action: 'suggest_new',
-                        label: alt,
-                        conceptKey: alt.toLowerCase().trim().replace(/\s+/g, '_'),
-                        alternatives: [],
-                        reasoning: '',
-                        recognitionCriteria: null
-                    };
+                // Add alternative suggestions as compact inline chips
+                if (alternatives.length > 0) {
+                    const chipContainer = document.createElement('div');
+                    chipContainer.className = 'llm-alt-chips';
 
-                    const altRow = document.createElement('div');
-                    altRow.className = 'llm-suggestion-row';
-                    altRow.style.marginTop = '4px';
-                    altRow.style.opacity = '0.85';
-                    altRow.innerHTML = `
-                        <div class="llm-suggestion-header">
-                            <span class="llm-suggestion-badge" style="opacity: 0.6; background: #7c3aed;">New</span>
-                            <span class="llm-suggestion-label">${alt}</span>
-                            <button class="llm-alt-accept" style="margin-left: auto; padding: 2px 8px; font-size: 0.625rem; color: #7c3aed; background: rgba(139,92,246,0.1); border: 1px solid rgba(139,92,246,0.3); border-radius: 3px; cursor: pointer; font-family: var(--font-body);">Save</button>
-                        </div>
-                    `;
-                    const altAcceptBtn = altRow.querySelector('.llm-alt-accept');
-                    altAcceptBtn.onclick = (e) => {
-                        e.stopPropagation();
-                        acceptLLMSuggestion(altResult, capturedStrokeIndex);
-                    };
-                    altRow.onclick = () => acceptLLMSuggestion(altResult, capturedStrokeIndex);
-                    area.appendChild(altRow);
-                });
+                    alternatives.forEach(alt => {
+                        const altResult = {
+                            action: 'suggest_new',
+                            label: alt,
+                            conceptKey: alt.toLowerCase().trim().replace(/\s+/g, '_'),
+                            alternatives: [],
+                            reasoning: '',
+                            recognitionCriteria: null
+                        };
+
+                        const chip = document.createElement('button');
+                        chip.className = 'llm-alt-chip';
+                        chip.textContent = alt;
+                        chip.onclick = (e) => {
+                            e.stopPropagation();
+                            acceptLLMSuggestion(altResult, capturedStrokeIndex);
+                        };
+                        chipContainer.appendChild(chip);
+                    });
+
+                    area.appendChild(chipContainer);
+                }
             }
 
             function clearLLMSuggestion() {
@@ -3591,6 +4292,473 @@ After your analysis, output your final answer as a JSON object with keys: descri
                 if (area) {
                     area.style.display = 'none';
                     area.innerHTML = '';
+                }
+            }
+
+            // ===== AI CHAT INTERFACE =====
+            // Enables the chat input bar after model loads, wires event handlers
+
+            function enableAIChatInterface() {
+                const container = document.getElementById('aiChatContainer');
+                const input = document.getElementById('aiChatInput');
+                const sendBtn = document.getElementById('aiChatSend');
+                const visionBtn = document.getElementById('aiVisionBtn');
+                if (!container || !input) return;
+
+                // Idempotent — safe to call multiple times
+                if (container._chatEnabled) {
+                    // Update placeholder/vision based on current state
+                    if (WEBLLM.modelReady) {
+                        input.placeholder = 'Ask AI about your drawing... (/ to focus)';
+                        if (visionBtn) visionBtn.disabled = false;
+                    }
+                    return;
+                }
+                container._chatEnabled = true;
+
+                container.classList.remove('disabled');
+                input.disabled = false;
+                const hasVision = WEBLLM.modelReady;
+                input.placeholder = hasVision ? 'Ask AI about your drawing... (/ to focus)' : 'Ask AI (text only, load WebLLM for vision)';
+                if (sendBtn) sendBtn.disabled = false;
+                // Vision button only works with WebLLM (needs canvas capture)
+                if (visionBtn) visionBtn.disabled = !hasVision;
+
+                // Send on button click
+                if (sendBtn) {
+                    sendBtn.addEventListener('click', () => {
+                        const text = input.value.trim();
+                        if (text) {
+                            input.value = '';
+                            handleAIChatMessage(text, false);
+                        }
+                    });
+                }
+
+                // Send on Enter key
+                input.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        const text = input.value.trim();
+                        if (text) {
+                            input.value = '';
+                            handleAIChatMessage(text, false);
+                        }
+                    }
+                });
+
+                // Vision button — sends with canvas screenshot
+                if (visionBtn) {
+                    visionBtn.addEventListener('click', () => {
+                        const text = input.value.trim() || 'What do you see on the canvas?';
+                        input.value = '';
+                        handleAIChatMessage(text, true);
+                    });
+                }
+
+                // Global keyboard shortcut: / to focus chat input
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === '/' && document.activeElement !== input && !e.ctrlKey && !e.metaKey && !e.altKey) {
+                        // Don't capture / when typing in other inputs
+                        if (document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA')) return;
+                        e.preventDefault();
+                        input.focus();
+                    }
+                });
+
+                console.log('AI chat interface enabled');
+            }
+
+            // Handle a chat message from the user
+            async function handleAIChatMessage(text, useVision) {
+                if (!WEBLLM.modelReady && !(LM_STUDIO.available && LM_STUDIO.enabled)) {
+                    showAIResponse('AI model not loaded. Click "Load AI ⬇" to download, or start LM Studio.', []);
+                    return;
+                }
+
+                showAIResponse('Thinking...', []);
+
+                try {
+                    // Determine if this is a vision query or a command
+                    const isVisionQuery = useVision || /what (do you |is|are|can you) see/i.test(text) || /describe|look at|analyze this/i.test(text);
+                    const isCommand = /^(group|delete|remove|add|move|rearrange|label|rename|connect)/i.test(text);
+
+                    let response = null;
+
+                    if (isVisionQuery && WEBLLM.modelReady) {
+                        // Vision mode — send canvas screenshot
+                        response = await queryVisionLLM(text);
+                        if (response) {
+                            showAIResponse(response, []);
+                            return;
+                        }
+                    }
+
+                    if (isCommand) {
+                        // Command mode — send scene data + action protocol
+                        const scene = serializeScene();
+                        const selectedInfo = state.selectedStrokeIndex !== null ?
+                            `Selected shape: index ${state.selectedStrokeIndex}, label "${state.context[state.selectedStrokeIndex] || 'unnamed'}"` : 'No shape selected';
+
+                        const prompt = LLM_PROMPTS.command;
+                        const payload = {
+                            userCommand: text,
+                            selectedInfo: selectedInfo,
+                            scene: scene
+                        };
+
+                        const result = await routeLLMQuery(prompt, payload, { timeout: 20000 });
+                        if (result && result.action) {
+                            const executed = executeLLMAction(result);
+                            if (executed) {
+                                showAIResponse(result.reasoning || `Done: ${result.action}`, []);
+                            } else {
+                                showAIResponse(result.reasoning || 'Could not execute that action.', []);
+                            }
+                        } else if (result && result.text) {
+                            showAIResponse(result.text, []);
+                        } else {
+                            showAIResponse('I wasn\'t sure how to do that. Try being more specific.', []);
+                        }
+                        return;
+                    }
+
+                    // General chat — ask about the drawing
+                    const scene = serializeScene();
+                    const selectedInfo = state.selectedStrokeIndex !== null ?
+                        `Selected shape: index ${state.selectedStrokeIndex}, label "${state.context[state.selectedStrokeIndex] || 'unnamed'}"` : 'No shape selected';
+
+                    const chatSystemPrompt = `You are an AI assistant helping with a drawing canvas app. The user has drawn shapes on the canvas. Answer their question helpfully and concisely. If they seem to want you to do something to the canvas, explain what you'd suggest.
+
+Current scene:
+${JSON.stringify(scene, null, 1)}
+${selectedInfo}`;
+
+                    // Use WebLLM if available, otherwise fall back to LM Studio
+                    let rawResponse = null;
+                    if (WEBLLM.modelReady) {
+                        rawResponse = await generateWebLLM(chatSystemPrompt, text, { mode: 'text', maxTokens: 256 });
+                    } else if (LM_STUDIO.available && LM_STUDIO.enabled) {
+                        // Direct LM Studio call for free-text chat (bypass JSON-parsing queryLLM)
+                        try {
+                            const controller = new AbortController();
+                            const timer = setTimeout(() => controller.abort(), 15000);
+                            const resp = await fetch(`${LM_STUDIO.endpoint}/chat/completions`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    model: LM_STUDIO.model,
+                                    messages: [
+                                        { role: 'system', content: chatSystemPrompt },
+                                        { role: 'user', content: text }
+                                    ],
+                                    temperature: 0.6,
+                                    max_tokens: 512
+                                }),
+                                signal: controller.signal
+                            });
+                            clearTimeout(timer);
+                            if (resp.ok) {
+                                const data = await resp.json();
+                                const content = data.choices?.[0]?.message?.content || '';
+                                // Strip thinking tags from reasoning models
+                                rawResponse = content
+                                    .replace(/<think>[\s\S]*?<\/think>/g, '')
+                                    .replace(/<\|think\|>[\s\S]*?<\|\/think\|>/g, '')
+                                    .trim();
+                            }
+                        } catch (chatErr) {
+                            console.warn('LM Studio chat error:', chatErr.message);
+                        }
+                    }
+                    showAIResponse(rawResponse || 'AI is processing. Try again in a moment.', []);
+
+                } catch (err) {
+                    console.error('AI chat error:', err);
+                    showAIResponse('Error: ' + err.message, []);
+                }
+            }
+
+            // Show AI response in the toast
+            window._aiToastTimer = null;
+            function showAIResponse(text, actions) {
+                const toast = document.getElementById('aiResponseToast');
+                const textEl = document.getElementById('aiResponseText');
+                const actionsEl = document.getElementById('aiResponseActions');
+                if (!toast || !textEl) return;
+
+                // Always clear any pending hide timer first
+                if (window._aiToastTimer) {
+                    clearTimeout(window._aiToastTimer);
+                    window._aiToastTimer = null;
+                }
+
+                textEl.textContent = text;
+                toast.style.display = 'flex';
+
+                // Clear previous actions
+                if (actionsEl) actionsEl.innerHTML = '';
+
+                // Add action buttons if provided
+                if (actions && actions.length > 0 && actionsEl) {
+                    actions.forEach(action => {
+                        const btn = document.createElement('button');
+                        btn.textContent = action.label;
+                        btn.className = 'ai-action-btn';
+                        btn.addEventListener('click', () => {
+                            if (window._aiToastTimer) { clearTimeout(window._aiToastTimer); window._aiToastTimer = null; }
+                            toast.style.display = 'none';
+                        });
+                        actionsEl.appendChild(btn);
+                    });
+                }
+
+                // Auto-hide after 15 seconds if no actions
+                if (!actions || actions.length === 0) {
+                    window._aiToastTimer = setTimeout(() => {
+                        toast.style.display = 'none';
+                        window._aiToastTimer = null;
+                    }, 15000);
+                }
+            }
+
+            // Allow dismissing toast by clicking it
+            document.getElementById('aiResponseToast')?.addEventListener('click', function(e) {
+                if (e.target.classList.contains('ai-action-btn')) return;
+                if (window._aiToastTimer) { clearTimeout(window._aiToastTimer); window._aiToastTimer = null; }
+                this.style.display = 'none';
+            });
+
+            // ===== CANVAS MANIPULATION API =====
+            // Allows the LLM to mutate canvas state: add, delete, modify, rearrange, label, group shapes
+            // All mutations go through recordAction() for undo/redo support
+
+            function executeLLMAction(action) {
+                if (!action || !action.action) return false;
+
+                const beforeState = captureState();
+
+                try {
+                    switch (action.action) {
+                        case 'label': {
+                            // Label a stroke with a new name
+                            const idx = action.strokeIndex;
+                            if (idx === undefined || idx < 0 || idx >= state.strokes.length) return false;
+                            const label = action.label || 'Unknown';
+                            const conceptKey = label.toLowerCase().trim().replace(/\s+/g, '_');
+
+                            // Update context
+                            state.context[idx] = conceptKey;
+
+                            // Update semantic data
+                            if (!state.semanticData[idx]) state.semanticData[idx] = {};
+                            state.semanticData[idx].llmLabel = label;
+                            state.semanticData[idx].llmConfidence = action.confidence || 0.8;
+
+                            recordAction('llm_label', beforeState, captureState(), { label, strokeIndex: idx });
+                            render();
+                            saveLibrary();
+                            console.log(`LLM labeled stroke ${idx} as "${label}"`);
+                            return true;
+                        }
+
+                        case 'group': {
+                            // Group multiple strokes into a composition
+                            const indices = action.strokeIndices;
+                            if (!indices || !Array.isArray(indices) || indices.length < 2) return false;
+                            const groupLabel = action.label || 'group';
+                            const conceptKey = groupLabel.toLowerCase().trim().replace(/\s+/g, '_');
+
+                            // Validate indices
+                            for (const idx of indices) {
+                                if (idx < 0 || idx >= state.strokes.length) return false;
+                            }
+
+                            // Create composition in library
+                            const componentStrokes = indices.map(i => state.strokes[i]);
+                            const componentFps = componentStrokes.map(s => getFingerprint(s));
+
+                            // Compute bounding box of group
+                            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+                            componentFps.forEach(fp => {
+                                if (fp.bounds.minX < minX) minX = fp.bounds.minX;
+                                if (fp.bounds.minY < minY) minY = fp.bounds.minY;
+                                if (fp.bounds.maxX > maxX) maxX = fp.bounds.maxX;
+                                if (fp.bounds.maxY > maxY) maxY = fp.bounds.maxY;
+                            });
+
+                            state.library[conceptKey] = {
+                                type: 'composition',
+                                label: groupLabel,
+                                source: 'llm-grouped',
+                                components: indices.map(i => ({
+                                    strokeIndex: i,
+                                    label: state.context[i] || 'unknown',
+                                    fingerprint: componentFps[indices.indexOf(i)]
+                                })),
+                                bounds: { minX, minY, maxX, maxY },
+                                usageCount: 1,
+                                created: Date.now()
+                            };
+
+                            // Update context for grouped strokes
+                            indices.forEach(i => {
+                                state.context[i] = conceptKey;
+                                if (!state.semanticData[i]) state.semanticData[i] = {};
+                                state.semanticData[i].groupedAs = conceptKey;
+                            });
+
+                            recordAction('llm_group', beforeState, captureState(), { label: groupLabel, indices });
+                            render();
+                            saveLibrary();
+                            renderLibrary();
+                            console.log(`LLM grouped strokes [${indices.join(',')}] as "${groupLabel}"`);
+                            return true;
+                        }
+
+                        case 'add_stroke': {
+                            // Add a synthetic stroke to the canvas
+                            const points = action.points;
+                            if (!points || !Array.isArray(points) || points.length < 2) return false;
+                            const label = action.label || 'ai-added';
+                            const conceptKey = label.toLowerCase().trim().replace(/\s+/g, '_');
+
+                            // Add to state
+                            state.strokes.push(points);
+                            state.context.push(conceptKey);
+                            state.shapes.push({});
+                            state.refinedStrokes.push(null);
+                            state.semanticData.push({ source: 'llm', llmLabel: label });
+                            if (state.strokeIds) {
+                                state.strokeIds.push('llm_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6));
+                            }
+
+                            recordAction('llm_add', beforeState, captureState(), { label });
+                            render();
+                            console.log(`LLM added stroke: "${label}" with ${points.length} points`);
+                            return true;
+                        }
+
+                        case 'delete': {
+                            // Delete strokes — requires confirmation for safety
+                            const indices = action.strokeIndices;
+                            if (!indices || !Array.isArray(indices) || indices.length === 0) return false;
+
+                            // Validate all indices
+                            for (const idx of indices) {
+                                if (idx < 0 || idx >= state.strokes.length) return false;
+                            }
+
+                            // Show confirmation before destructive action
+                            const labels = indices.map(i => state.context[i] || `stroke ${i}`).join(', ');
+                            showAIResponse(`Delete ${labels}?`, [{
+                                label: '✓ Confirm Delete',
+                                handler: () => {
+                                    const before = captureState();
+                                    // Delete in reverse order to maintain indices
+                                    const sorted = [...indices].sort((a, b) => b - a);
+                                    sorted.forEach(idx => {
+                                        state.strokes.splice(idx, 1);
+                                        state.context.splice(idx, 1);
+                                        state.shapes.splice(idx, 1);
+                                        state.refinedStrokes.splice(idx, 1);
+                                        state.semanticData.splice(idx, 1);
+                                        if (state.strokeIds) state.strokeIds.splice(idx, 1);
+                                    });
+                                    if (state.selectedStrokeIndex !== null) {
+                                        if (indices.includes(state.selectedStrokeIndex)) {
+                                            state.selectedStrokeIndex = null;
+                                        }
+                                    }
+                                    recordAction('llm_delete', before, captureState(), { deletedIndices: indices });
+                                    render();
+                                    saveLibrary();
+                                    console.log(`LLM deleted strokes [${indices.join(',')}]`);
+                                }
+                            }, {
+                                label: '✗ Cancel',
+                                handler: () => {}
+                            }]);
+                            return true;  // Action was initiated (pending confirmation)
+                        }
+
+                        case 'modify': {
+                            // Modify properties of a stroke
+                            const idx = action.strokeIndex;
+                            if (idx === undefined || idx < 0 || idx >= state.strokes.length) return false;
+                            const props = action.properties || {};
+
+                            if (props.label) {
+                                const newKey = props.label.toLowerCase().trim().replace(/\s+/g, '_');
+                                state.context[idx] = newKey;
+                                if (!state.semanticData[idx]) state.semanticData[idx] = {};
+                                state.semanticData[idx].llmLabel = props.label;
+                            }
+
+                            recordAction('llm_modify', beforeState, captureState(), { strokeIndex: idx, properties: props });
+                            render();
+                            console.log(`LLM modified stroke ${idx}:`, props);
+                            return true;
+                        }
+
+                        case 'rearrange': {
+                            // Move strokes by dx/dy offsets — requires confirmation
+                            const moves = action.moves;
+                            if (!moves || !Array.isArray(moves) || moves.length === 0) return false;
+
+                            showAIResponse(`Rearrange ${moves.length} shape(s)?`, [{
+                                label: '✓ Confirm Move',
+                                handler: () => {
+                                    const before = captureState();
+                                    moves.forEach(move => {
+                                        const idx = move.strokeIndex;
+                                        const dx = move.dx || 0;
+                                        const dy = move.dy || 0;
+                                        if (idx >= 0 && idx < state.strokes.length) {
+                                            state.strokes[idx] = state.strokes[idx].map(p => ({
+                                                x: p.x + dx,
+                                                y: p.y + dy
+                                            }));
+                                            // Also move refined strokes if they exist
+                                            if (state.refinedStrokes[idx]) {
+                                                if (Array.isArray(state.refinedStrokes[idx][0])) {
+                                                    // Multi-segment
+                                                    state.refinedStrokes[idx] = state.refinedStrokes[idx].map(seg =>
+                                                        seg.map(p => ({ x: p.x + dx, y: p.y + dy }))
+                                                    );
+                                                } else {
+                                                    state.refinedStrokes[idx] = state.refinedStrokes[idx].map(p => ({
+                                                        x: p.x + dx, y: p.y + dy
+                                                    }));
+                                                }
+                                            }
+                                        }
+                                    });
+                                    recordAction('llm_rearrange', before, captureState(), { moves });
+                                    render();
+                                    console.log(`LLM rearranged ${moves.length} shapes`);
+                                }
+                            }, {
+                                label: '✗ Cancel',
+                                handler: () => {}
+                            }]);
+                            return true;
+                        }
+
+                        case 'suggest': {
+                            // Non-destructive suggestion displayed to user
+                            const text = action.text || action.reasoning || 'No suggestion';
+                            showAIResponse(text, []);
+                            return true;
+                        }
+
+                        default:
+                            console.warn('Unknown LLM action:', action.action);
+                            return false;
+                    }
+                } catch (err) {
+                    console.error('Error executing LLM action:', err);
+                    return false;
                 }
             }
 
@@ -5283,6 +6451,7 @@ After your analysis, output your final answer as a JSON object with keys: descri
                 context: [],
                 nextStrokeId: 1,          // PHASE 5.5C: Counter for generating unique stroke IDs
                 isDrawing: false,
+                _canvasMouseUpHandled: false,  // Flag to prevent double-processing in document mouseup
                 suggestions: [],
                 selectedStrokeIndex: null,
                 lastFingerprint: null,
@@ -5709,6 +6878,126 @@ After your analysis, output your final answer as a JSON object with keys: descri
                 if (pathLength === 0) return 0;
                 return directDistance / pathLength;
             }
+
+            // ===== ENRICHED GEOMETRIC FEATURES (for LLM semantic recognition) =====
+
+            function computeCurvatureProfile(points, numSamples) {
+                // Sample Menger curvature at evenly-spaced points along the stroke.
+                // Returns: { avgCurvature, maxCurvature, curvatureVariance }
+                // High curvatureVariance = organic/irregular shape (jellyfish, heart)
+                // Low curvatureVariance = geometric shape (circle = uniform curvature)
+                if (!points || points.length < 5) return null;
+                numSamples = numSamples || 8;
+
+                const step = Math.max(1, Math.floor(points.length / numSamples));
+                const curvatures = [];
+
+                for (let i = step; i < points.length - step; i += step) {
+                    const prev = points[Math.max(0, i - step)];
+                    const curr = points[i];
+                    const next = points[Math.min(i + step, points.length - 1)];
+
+                    // Menger curvature: 2 * |cross product| / (|a| * |b| * |c|)
+                    const ax = curr.x - prev.x, ay = curr.y - prev.y;
+                    const bx = next.x - curr.x, by = next.y - curr.y;
+                    const cross = Math.abs(ax * by - ay * bx);
+                    const da = Math.sqrt(ax * ax + ay * ay);
+                    const db = Math.sqrt(bx * bx + by * by);
+                    const dc = Math.sqrt((next.x - prev.x) ** 2 + (next.y - prev.y) ** 2);
+                    const denom = da * db * dc;
+                    curvatures.push(denom > 0 ? (2 * cross / denom) : 0);
+                }
+
+                if (curvatures.length === 0) return null;
+
+                const avg = curvatures.reduce((s, v) => s + v, 0) / curvatures.length;
+                const max = Math.max(...curvatures);
+                const variance = curvatures.reduce((s, v) => s + (v - avg) ** 2, 0) / curvatures.length;
+
+                return {
+                    avgCurvature: +avg.toFixed(4),
+                    maxCurvature: +max.toFixed(4),
+                    curvatureVariance: +variance.toFixed(6)
+                };
+            }
+
+            function computeSymmetry(points) {
+                // Measure vertical and horizontal symmetry by comparing point density
+                // in mirrored bins. Returns { vertical: 0-1, horizontal: 0-1 }.
+                // Heart = high vertical symmetry. Fish = high horizontal. Arrow = low both.
+                if (!points || points.length < 5) return { vertical: 0, horizontal: 0 };
+
+                const bounds = getBounds(points);
+                const cx = (bounds.minX + bounds.maxX) / 2;
+                const cy = (bounds.minY + bounds.maxY) / 2;
+                const size = Math.max(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY);
+                if (size === 0) return { vertical: 0, horizontal: 0 };
+
+                const bins = 8;
+                const leftCounts = new Array(bins).fill(0);
+                const rightCounts = new Array(bins).fill(0);
+                const topCounts = new Array(bins).fill(0);
+                const bottomCounts = new Array(bins).fill(0);
+
+                points.forEach(p => {
+                    const nx = (p.x - cx) / size + 0.5; // normalize to 0-1
+                    const ny = (p.y - cy) / size + 0.5;
+                    const yBin = Math.min(bins - 1, Math.max(0, Math.floor(ny * bins)));
+                    const xBin = Math.min(bins - 1, Math.max(0, Math.floor(nx * bins)));
+
+                    if (p.x < cx) leftCounts[yBin]++;
+                    else rightCounts[yBin]++;
+
+                    if (p.y < cy) topCounts[xBin]++;
+                    else bottomCounts[xBin]++;
+                });
+
+                let vDiff = 0, hDiff = 0, vTotal = 0, hTotal = 0;
+                for (let i = 0; i < bins; i++) {
+                    const vSum = leftCounts[i] + rightCounts[i];
+                    const hSum = topCounts[i] + bottomCounts[i];
+                    if (vSum > 0) { vDiff += Math.abs(leftCounts[i] - rightCounts[i]); vTotal += vSum; }
+                    if (hSum > 0) { hDiff += Math.abs(topCounts[i] - bottomCounts[i]); hTotal += hSum; }
+                }
+
+                return {
+                    vertical: vTotal > 0 ? +(1 - vDiff / vTotal).toFixed(2) : 0,
+                    horizontal: hTotal > 0 ? +(1 - hDiff / hTotal).toFixed(2) : 0
+                };
+            }
+
+            function segmentsIntersect(a1, a2, b1, b2) {
+                // Check if line segment a1-a2 intersects b1-b2
+                const d1x = a2.x - a1.x, d1y = a2.y - a1.y;
+                const d2x = b2.x - b1.x, d2y = b2.y - b1.y;
+                const cross = d1x * d2y - d1y * d2x;
+                if (Math.abs(cross) < 1e-10) return false;
+                const t = ((b1.x - a1.x) * d2y - (b1.y - a1.y) * d2x) / cross;
+                const u = ((b1.x - a1.x) * d1y - (b1.y - a1.y) * d1x) / cross;
+                return t > 0.01 && t < 0.99 && u > 0.01 && u < 0.99;
+            }
+
+            function countSelfIntersections(points, sampleStep) {
+                // Count how many times the stroke crosses itself.
+                // figure-eight=1, star=~5, simple circle=0
+                if (!points || points.length < 10) return 0;
+                sampleStep = sampleStep || 3;
+
+                let crossings = 0;
+                const n = points.length;
+
+                for (let i = 0; i < n - sampleStep; i += sampleStep) {
+                    const a1 = points[i], a2 = points[Math.min(i + sampleStep, n - 1)];
+                    // Skip adjacent segments (they always share endpoints)
+                    for (let j = i + sampleStep * 2; j < n - sampleStep; j += sampleStep) {
+                        const b1 = points[j], b2 = points[Math.min(j + sampleStep, n - 1)];
+                        if (segmentsIntersect(a1, a2, b1, b2)) crossings++;
+                    }
+                }
+                return crossings;
+            }
+
+            // ===== END ENRICHED GEOMETRIC FEATURES =====
 
             function getFingerprint(points) {
                 // RECOGNITION PIPELINE: Fingerprint raw stroke BEFORE any smoothing
@@ -11030,6 +12319,8 @@ After your analysis, output your final answer as a JSON object with keys: descri
             });
 
             canvas.addEventListener('mouseup', () => {
+                if (!state.isDrawing) return;
+                state._canvasMouseUpHandled = true;  // Prevent document mouseup from double-processing
                 if (state.currentStroke.length > 0) {
                     // DAY 5: Check for point detection (zero-length stroke)
                     const isPoint = checkIfPoint(state.currentStroke);
@@ -11128,22 +12419,32 @@ After your analysis, output your final answer as a JSON object with keys: descri
                             updateEquationDisplay(); // Update equation display when showing suggestions
 
                             // LAYER 1: Fire async LLM query (non-blocking, mouse handler)
+                            // Only fire when heuristics are uncertain — that's where AI adds real value.
+                            // High-confidence matches (≥80%) are auto-accepted below, so LLM would arrive too late.
                             const _llmStrokeIdx = state.strokes.length - 1;
-                            if (LM_STUDIO.available && LM_STUDIO.enabled && LM_STUDIO.autoQuery) {
+                            const _llmAvailable = WEBLLM.modelReady || (LM_STUDIO.available && LM_STUDIO.enabled && LM_STUDIO.autoQuery);
+                            const _topConfidence = analysis.results.length > 0
+                                ? (analysis.results[0].score || Math.round((analysis.results[0].confidence || 0) * 100))
+                                : 0;
+                            if (_llmAvailable && _topConfidence < 80) {
                                 clearLLMSuggestion();
                                 showLLMLoading();
                                 if (LM_STUDIO._pendingQuery) LM_STUDIO._pendingQuery = null;
                                 const queryId = Symbol('llm-query');
                                 LM_STUDIO._pendingQuery = queryId;
-                                queryStrokeLLM(_llmStrokeIdx, analysis)
-                                    .then(llmResult => {
-                                        if (LM_STUDIO._pendingQuery === queryId && state.selectedStrokeIndex === _llmStrokeIdx) {
-                                            appendLLMSuggestion(llmResult);
-                                        } else {
-                                            clearLLMSuggestion();
-                                        }
-                                    })
-                                    .catch(() => clearLLMSuggestion());
+                                // Tier 1 LLM: 800ms debounce (heuristics already showed at 200ms above)
+                                clearTimeout(state._llmDebounceTimer);
+                                state._llmDebounceTimer = setTimeout(() => {
+                                    queryStrokeLLM(_llmStrokeIdx, analysis)
+                                        .then(llmResult => {
+                                            if (LM_STUDIO._pendingQuery === queryId && state.selectedStrokeIndex === _llmStrokeIdx) {
+                                                appendLLMSuggestion(llmResult);
+                                            } else {
+                                                clearLLMSuggestion();
+                                            }
+                                        })
+                                        .catch(() => clearLLMSuggestion());
+                                }, WEBLLM.modelReady ? 400 : 0);  // 400ms debounce for WebLLM (was 800), immediate for LM Studio
                             }
                             // LAYER 2: Check if this stroke is a selection circle
                             checkForInterpretGesture(_llmStrokeIdx);
@@ -11218,79 +12519,112 @@ After your analysis, output your final answer as a JSON object with keys: descri
                 render();
             });
 
+            // BUGFIX: Mouseleave no longer finalizes strokes — user might come back.
+            // Document-level mouseup (below) handles finalization wherever user releases.
+            // This prevents strokes from being split when accidentally brushing the canvas edge.
             canvas.addEventListener('mouseleave', () => {
-                if (state.isDrawing) {
-                    if (state.currentStroke.length > 0) {
+                // isDrawing stays true — document mouseup will finalize.
+                // Just stop the live recognition while outside canvas.
+            });
+
+            // BUGFIX: Catch mouseup events outside canvas.
+            // Without this, releasing the mouse outside the canvas leaves state.isDrawing=true
+            // and strokes continue when the cursor re-enters.
+            document.addEventListener('mouseup', () => {
+                if (state._canvasMouseUpHandled) {
+                    state._canvasMouseUpHandled = false;
+                    return; // Canvas handler already processed this mouseup
+                }
+                if (!state.isDrawing) return;
+
+                // Finalize stroke with same logic as canvas mouseup
+                if (state.currentStroke.length > 0) {
+                    const isPoint = checkIfPoint(state.currentStroke);
+
+                    if (isPoint) {
+                        const avgX = state.currentStroke.reduce((sum, p) => sum + p.x, 0) / state.currentStroke.length;
+                        const avgY = state.currentStroke.reduce((sum, p) => sum + p.y, 0) / state.currentStroke.length;
+
                         state.strokes.push([...state.currentStroke]);
-                        state.strokeIds.push(`stroke-${state.nextStrokeId++}`); // PHASE 5.5C
-                        state.context.push(''); // Unaccepted initially
-                        state.semanticData.push(null); // Will be filled when accepted
+                        state.strokeIds.push(`stroke-${state.nextStrokeId++}`);
+                        state.context.push('point');
+                        state.semanticData.push({ type: 'point', x: avgX, y: avgY });
 
-                        const analysis = analyzeStrokeDetailed(state.currentStroke);
+                        const pointShape = createPointShape(avgX, avgY, 'point', true);
+                        state.shapes.push(pointShape);
+
                         state.selectedStrokeIndex = state.strokes.length - 1;
-                        state.lastFingerprint = analysis.fingerprint;  // Cache for refinement
+                    } else {
+                        state.strokes.push([...state.currentStroke]);
+                        state.strokeIds.push(`stroke-${state.nextStrokeId++}`);
+                        state.context.push('');
+                        state.semanticData.push(null);
 
-                        // UNIFIED GEOMETRY: Create geometric shape for ALL strokes
-                        let geometricType = 'curve';
-                        let geometricLabel = 'curve';
+                        try {
+                            const analysis = analyzeStrokeDetailed(state.currentStroke);
+                            state.selectedStrokeIndex = state.strokes.length - 1;
+                            state.lastFingerprint = analysis.fingerprint;
 
-                        if (analysis.results.length > 0) {
-                            const topResult = analysis.results[0];
-                            geometricType = topResult.type;
-                            geometricLabel = topResult.label;
-                        }
-
-                        const shape = extractGeometricShape(
-                            state.currentStroke,
-                            geometricType,
-                            analysis.fingerprint,
-                            geometricLabel,
-                            false  // accepted = false
-                        );
-
-                        state.shapes.push(shape);
-
-                        // PHASE 5.5A: Record stroke creation for undo
-                        const afterState = captureState();
-                        recordAction('draw-stroke', {
-                            strokes: state.strokes.slice(0, -1),
-                            strokeIds: state.strokeIds.slice(0, -1),  // PHASE 5.5C
-                            context: state.context.slice(0, -1),
-                            shapes: state.shapes.slice(0, -1),
-                            refinedStrokes: state.refinedStrokes.slice(0, -1),
-                            semanticData: state.semanticData.slice(0, -1),
-                            selectedStrokeIndex: null,
-                            suggestions: []
-                        }, afterState, {
-                            strokeIndex: state.strokes.length - 1,
-                            topSuggestion: analysis.results.length > 0 ? analysis.results[0].type : 'none'
-                        });
-
-                        updateMetrics(analysis);
-                        showSuggestions(analysis);
-
-                        // AUTO-ACCEPT: High confidence matches (≥85%) are automatically accepted
-                        if (analysis.results.length > 0) {
-                            const topResult = analysis.results[0];
-                            const confidence = topResult.score || Math.round((topResult.confidence || 0) * 100);
-
-                            if (confidence >= 85) {
-                                console.log(`Auto-accepting high confidence match: ${topResult.label} (${confidence}%)`);
-                                setTimeout(() => {
-                                    acceptSuggestion(topResult);
-                                }, 100);
+                            let geometricType = 'curve';
+                            let geometricLabel = 'curve';
+                            if (analysis.results.length > 0) {
+                                geometricType = analysis.results[0].type;
+                                geometricLabel = analysis.results[0].label;
                             }
+
+                            const shape = extractGeometricShape(
+                                state.currentStroke, geometricType,
+                                analysis.fingerprint, geometricLabel, false
+                            );
+                            state.shapes.push(shape);
+
+                            updateMetrics(analysis);
+                            showSuggestions(analysis);
+
+                            // Fire LLM if available and heuristics are uncertain
+                            const _si = state.strokes.length - 1;
+                            const _avail = WEBLLM.modelReady || (LM_STUDIO.available && LM_STUDIO.enabled && LM_STUDIO.autoQuery);
+                            const topConf = analysis.results.length > 0
+                                ? (analysis.results[0].score || Math.round((analysis.results[0].confidence || 0) * 100))
+                                : 0;
+                            if (_avail && topConf < 80) {
+                                clearLLMSuggestion();
+                                showLLMLoading();
+                                if (LM_STUDIO._pendingQuery) LM_STUDIO._pendingQuery = null;
+                                const qid = Symbol('llm-query');
+                                LM_STUDIO._pendingQuery = qid;
+                                clearTimeout(state._llmDebounceTimer);
+                                state._llmDebounceTimer = setTimeout(() => {
+                                    queryStrokeLLM(_si, analysis)
+                                        .then(r => {
+                                            if (LM_STUDIO._pendingQuery === qid && state.selectedStrokeIndex === _si) {
+                                                appendLLMSuggestion(r);
+                                            } else { clearLLMSuggestion(); }
+                                        })
+                                        .catch(() => clearLLMSuggestion());
+                                }, WEBLLM.modelReady ? 400 : 0);
+                            }
+
+                            // Auto-accept high confidence
+                            if (analysis.results.length > 0) {
+                                const topResult = analysis.results[0];
+                                const confidence = topResult.score || Math.round((topResult.confidence || 0) * 100);
+                                if (confidence >= 80) {
+                                    setTimeout(() => acceptSuggestion(topResult), 100);
+                                }
+                            }
+                        } catch (err) {
+                            console.error('Error in document mouseup stroke analysis:', err);
                         }
 
-                        // Update refined strokes if refinement is enabled
                         if (state.refinement.enabled) {
                             updateRefinedStrokes();
                         }
                     }
-                    state.isDrawing = false;
-                    state.currentStroke = [];
-                    render();
                 }
+                state.isDrawing = false;
+                state.currentStroke = [];
+                render();
             });
 
             // Touch events for mobile support
@@ -11430,22 +12764,27 @@ After your analysis, output your final answer as a JSON object with keys: descri
                             updateEquationDisplay(); // Update equation display when showing suggestions
 
                             // LAYER 1: Fire async LLM query (non-blocking, touch handler)
+                            // Two-tier: fires if WebLLM loaded OR LM Studio available
                             const _llmTouchStrokeIdx = state.strokes.length - 1;
-                            if (LM_STUDIO.available && LM_STUDIO.enabled && LM_STUDIO.autoQuery) {
+                            const _llmTouchAvailable = WEBLLM.modelReady || (LM_STUDIO.available && LM_STUDIO.enabled && LM_STUDIO.autoQuery);
+                            if (_llmTouchAvailable) {
                                 clearLLMSuggestion();
                                 showLLMLoading();
                                 if (LM_STUDIO._pendingQuery) LM_STUDIO._pendingQuery = null;
                                 const queryId = Symbol('llm-query-touch');
                                 LM_STUDIO._pendingQuery = queryId;
-                                queryStrokeLLM(_llmTouchStrokeIdx, analysis)
-                                    .then(llmResult => {
-                                        if (LM_STUDIO._pendingQuery === queryId && state.selectedStrokeIndex === _llmTouchStrokeIdx) {
-                                            appendLLMSuggestion(llmResult);
-                                        } else {
-                                            clearLLMSuggestion();
-                                        }
-                                    })
-                                    .catch(() => clearLLMSuggestion());
+                                clearTimeout(state._llmDebounceTimer);
+                                state._llmDebounceTimer = setTimeout(() => {
+                                    queryStrokeLLM(_llmTouchStrokeIdx, analysis)
+                                        .then(llmResult => {
+                                            if (LM_STUDIO._pendingQuery === queryId && state.selectedStrokeIndex === _llmTouchStrokeIdx) {
+                                                appendLLMSuggestion(llmResult);
+                                            } else {
+                                                clearLLMSuggestion();
+                                            }
+                                        })
+                                        .catch(() => clearLLMSuggestion());
+                                }, WEBLLM.modelReady ? 800 : 0);
                             }
                             // LAYER 2: Check if this stroke is a selection circle
                             checkForInterpretGesture(_llmTouchStrokeIdx);
@@ -12352,6 +13691,9 @@ After your analysis, output your final answer as a JSON object with keys: descri
                 libraryHeader.addEventListener('click', (e) => {
                     e.stopPropagation(); // Prevent event bubbling
                     libraryOverlay.classList.toggle('expanded');
+                    // Move chat bar + toast up/down when library opens/closes
+                    const isExpanded = libraryOverlay.classList.contains('expanded');
+                    document.body.classList.toggle('library-expanded', isExpanded);
                 });
             } else {
                 console.error('LIBRARY ELEMENTS NOT FOUND!', { libraryHeader, libraryOverlay });
@@ -13327,14 +14669,16 @@ After your analysis, output your final answer as a JSON object with keys: descri
             async function initUnifiedInterface() {
                 console.log('Initializing unified doodle interface...');
 
-                // Check WebGPU and initialize WebLLM if available
+                // Check WebGPU and set up WebLLM
                 const hasGPU = await checkWebGPU();
                 if (hasGPU) {
-                    updateWebLLMStatus('loading', 'WebGPU ready');
-                    // Don't auto-download model - let user trigger it
-                    updateWebLLMStatus('ready', 'AI: Ready');
+                    // Don't auto-download — let user trigger via click
+                    updateWebLLMStatus('available', 'Load AI ⬇');
                 } else {
                     updateWebLLMStatus('error', 'AI: No WebGPU');
+                    // Disable chat input completely
+                    const chatInput = document.getElementById('aiChatInput');
+                    if (chatInput) chatInput.placeholder = 'WebGPU required for AI (use Chrome)';
                 }
 
                 // Initialize Whisper
