@@ -151,8 +151,56 @@ Phase execution order: 1 → 2 → 4 → 3 → 5 → 8
 
 ---
 
+### Phase 3: Resize Handles + Auto-Height ✅
+**Completed:** 2026-04-08 04:10 PDT
+**Commit:** 4cf853e
+
+**Changes:**
+
+1. **Resize Handles (`src/canvas/renderer.ts`)** — 8-handle resize system:
+   - `getHandlePositions()` returns [HandleName, x, y] for NW, N, NE, E, SE, S, SW, W
+   - `drawResizeHandles()` draws cyan filled circles (r=4) with dark stroke at each handle position
+   - Handles drawn after lens content so they appear on top
+   - Selected node check: only draws handles when `node.id === selectedNodeId`
+   - New `HandleName` type exported for interactions use
+
+2. **Resize Interaction (`src/canvas/interactions.ts`)** — Full resize drag:
+   - `hitTestHandle()` checks handle proximity with zoom-aware radius (`HANDLE_RADIUS / zoom`)
+   - `onPointerDown()` checks handles BEFORE node drag — handle hits take priority
+   - `onPointerMove()` computes new position based on which handle is dragged:
+     - East handles grow width; West handles move x + grow width; same for N/S with height
+     - Minimum size enforced: 160px width, 100px height
+   - `onPointerUp()` clears both `resizing` and `dragging` state
+   - Cursor hints: `nw-resize`, `se-resize`, etc. when hovering handles; `grab` when hovering nodes
+
+3. **Auto-Height Estimation** — `estimateNodeHeight()` for paste-to-create:
+   - JSON: `60 + keys.length * 16`, capped at 500px
+   - Code: `40 + lines * 15`, capped at 500px
+   - Text: rough chars-per-line estimate, capped at 400px
+   - Default: 140px for unknown types
+   - Both `onPaste()` and `showCreateModal()` now use auto-height
+
+4. **UX Fixes (from review backlog):**
+   - Separator line opacity: `0.12` → `0.25`/`0.20` (dark/light) in card.ts and tree.ts — now visible
+   - CodeLens light mode badge alpha: `0.4` → `0.65` — WCAG contrast fix
+   - TreeLens descriptor now wraps via `wrapText(ctx, descriptor, contentWidth, 2)` — no overflow
+
+**Tests:** 19/19 passing
+**TypeScript:** No new errors
+
+**Visual Verification:**
+- Screenshot confirmed 8 resize handle dots visible on selected "Claude Opus 4" card
+- Handles appear at all 4 corners and 4 edge midpoints as cyan circles
+- Separator lines clearly visible between header and content zones
+- TreeLens descriptors wrap properly across multiple lines
+- Cursor changes to resize arrows when hovering handles
+- Cards respect minimum size during resize
+
+**Issues:** None — clean implementation.
+
+---
+
 ## Known Issues (remaining)
-- No resize handles (Phase 3)
 - No edge drawing UI (Phase 5)
 
 ---
