@@ -2,9 +2,10 @@
 // Pure function of graph state + viewport
 
 import { getAllNodes, getAllEdges, generateDescriptor } from '../core/graph';
-import { matchLens } from '../core/lens-registry';
+import { matchLens, getLensById } from '../core/lens-registry';
 import { getState } from './viewport';
 import { drawGrid } from './grid';
+import { BackLens } from '../lenses/back';
 import type { LensNode, Edge } from '../core/types';
 
 let canvas: HTMLCanvasElement;
@@ -13,6 +14,25 @@ let animId: number;
 let selectedNodeId: string | null = null;
 let isDark = true;
 let dpr = 1;
+
+// ── Flip state ──
+const flippedNodes = new Set<string>();
+const flipAnimations = new Map<string, { progress: number; startTime: number }>();
+const FLIP_DURATION = 300; // ms total
+
+export function toggleFlip(id: string) {
+  if (flippedNodes.has(id)) {
+    flippedNodes.delete(id);
+  } else {
+    flippedNodes.add(id);
+  }
+  // Start animation
+  flipAnimations.set(id, { progress: 0, startTime: performance.now() });
+}
+
+export function isFlipped(id: string): boolean {
+  return flippedNodes.has(id);
+}
 
 export function initRenderer(c: HTMLCanvasElement) {
   canvas = c;
@@ -84,19 +104,60 @@ function render() {
   }
   
   // Nodes
+  const now = performance.now();
   for (const node of nodes) {
-    drawNode(ctx, node, isDark);
+    drawNode(ctx, node, isDark, now);
   }
   
   // Reset to identity for any post-render UI
   ctx.setTransform(1, 0, 0, 1, 0, 0);
 }
 
-function drawNode(ctx: CanvasRenderingContext2D, node: LensNode, isDark: boolean) {
-  const lens = matchLens(node.dataType, node.data);
-  const descriptor = node.descriptor ?? generateDescriptor(node.data, node.dataType);
+function drawNode(ctx: CanvasRenderingContext2D, node: LensNode, isDark: boolean, now: number) {
+  const anim = flipAnimations.get(node.id);
   
-  lens.render(ctx, node.data, node.position, {
+  if (anim) {
+    // Time-based animation (not frame-rate dependent)
+    const elapsed = now - anim.startTime;
+    anim.progress = Math.min(elapsed / FLIP_DURATION, 1);
+    
+    if (anim.progress >= 1) {
+      flipAnimations.delete(node.id);
+      renderNodeContent(ctx, node, isDark);
+      return;
+    }
+    
+    const { x, y, width, height } = node.position;
+    const cx = x + width / 2;
+    const cy = y + height / 2;
+    const t = anim.progress;
+    
+    // Ease in-out: scale Y collapses to 0 at t=0.5, then expands
+    let scaleY: number;
+    if (t < 0.5) {
+      scaleY = 1 - (t * 2); // 1 → 0
+    } else {
+      scaleY = (t - 0.5) * 2; // 0 → 1
+    }
+    
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.scale(1, Math.max(0.01, scaleY));
+    ctx.translate(-cx, -cy);
+    
+    renderNodeContent(ctx, node, isDark);
+    
+    ctx.restore();
+  } else {
+    renderNodeContent(ctx, node, isDark);
+  }
+}
+
+function renderNodeContent(ctx: CanvasRenderingContext2D, node: LensNode, isDark: boolean) {
+  const descriptor = node.descriptor ?? generateDescriptor(node.data, node.dataType);
+  const showing = isFlipped(node.id) ? 'back' : 'front';
+  
+  const options = {
     isDark,
     selected: node.id === selectedNodeId,
     source: node.source,
@@ -104,7 +165,21 @@ function drawNode(ctx: CanvasRenderingContext2D, node: LensNode, isDark: boolean
     meaning: node.meaning,
     abstractionLevel: node.abstractionLevel,
     dataType: node.dataType,
-  });
+  };
+  
+  if (showing === 'back') {
+    BackLens.render(ctx, node.data, node.position, options);
+  } else {
+    // Check node.lens override first, then MoE match
+    let lens = null;
+    if (node.lens && node.lens !== 'raw') {
+      lens = getLensById(node.lens);
+    }
+    if (!lens) {
+      lens = matchLens(node.dataType, node.data);
+    }
+    lens.render(ctx, node.data, node.position, options);
+  }
 }
 
 function drawEdge(ctx: CanvasRenderingContext2D, edge: Edge, nodeMap: Map<string, LensNode>, isDark: boolean) {

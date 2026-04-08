@@ -1,7 +1,7 @@
 // Canvas interactions — node selection, drag, double-click create
 import { screenToWorld } from './viewport';
 import { getAllNodes, addNode, updateNode, removeNode, generateDescriptor, inferDataType } from '../core/graph';
-import { setSelectedNode, getSelectedNode } from './renderer';
+import { setSelectedNode, getSelectedNode, toggleFlip } from './renderer';
 import type { LensNode } from '../core/types';
 
 let canvas: HTMLCanvasElement;
@@ -81,13 +81,10 @@ function onDoubleClick(e: MouseEvent) {
   const sy = e.clientY - rect.top;
   const { x: wx, y: wy } = screenToWorld(sx, sy);
   
-  // Check if we hit an existing node
+  // Check if we hit an existing node — flip it
   const hit = hitTest(wx, wy);
   if (hit) {
-    // Toggle abstraction level
-    const levels: Array<'type' | 'descriptor' | 'meaning'> = ['type', 'descriptor', 'meaning'];
-    const idx = levels.indexOf(hit.abstractionLevel);
-    updateNode(hit.id, { abstractionLevel: levels[(idx + 1) % levels.length] });
+    toggleFlip(hit.id);
     return;
   }
   
@@ -103,6 +100,15 @@ function onKeyDown(e: KeyboardEvent) {
     if (document.activeElement?.tagName === 'TEXTAREA' || document.activeElement?.tagName === 'INPUT') return;
     removeNode(sel);
     setSelectedNode(null);
+  }
+  
+  // F to flip selected node (front/back)
+  if (e.key === 'f' || e.key === 'F') {
+    if (!e.ctrlKey && !e.metaKey) {
+      if (document.activeElement?.tagName === 'TEXTAREA' || document.activeElement?.tagName === 'INPUT') return;
+      e.preventDefault();
+      toggleFlip(sel);
+    }
   }
 }
 

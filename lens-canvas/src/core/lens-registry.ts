@@ -26,6 +26,10 @@ export function registerLens(lens: Lens) {
   registry.push(lens);
 }
 
+export function getLensById(id: string): Lens | null {
+  return registry.find(l => l.id === id) ?? null;
+}
+
 export function matchLens(dataType: string, data: unknown): Lens {
   let best: Lens | null = null;
   let bestScore = -1;
