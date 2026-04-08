@@ -1,8 +1,10 @@
 // CodeLens — syntax-highlighted code block
 // Best for: code strings, function definitions, config snippets
+// Phase 1: replaced charW=6.6 estimate with pretext-measured truncation
 
 import type { Rect } from '../core/types';
 import type { LensRenderOptions } from '../core/lens-registry';
+import { wrapText } from '../core/text-wrap';
 
 // Simple keyword-based syntax highlighting (no parser needed for PoC)
 const KEYWORDS = new Set([
@@ -12,6 +14,23 @@ const KEYWORDS = new Set([
   'undefined', 'this', 'interface', 'type', 'enum', 'extends', 'implements',
   'def', 'print', 'lambda', 'with', 'as', 'in', 'not', 'and', 'or', 'self',
 ]);
+
+/**
+ * Get the displayable portion of a line using pretext measurement.
+ * Replaces the old charW = 6.6 pixel estimate.
+ */
+function getDisplayLine(
+  ctx: CanvasRenderingContext2D,
+  line: string,
+  maxWidth: number,
+): string {
+  ctx.font = '400 11px "JetBrains Mono", monospace';
+  if (ctx.measureText(line).width <= maxWidth) return line;
+  // Use wrapText to get just what fits on one line
+  const wrapped = wrapText(ctx, line, maxWidth, 1);
+  const first = wrapped[0];
+  return first ? first.text.trimEnd() + '…' : '';
+}
 
 export const CodeLens = {
   id: 'code',
@@ -74,6 +93,7 @@ export const CodeLens = {
     // Line numbers + code
     const gutterW = String(Math.min(lines.length, maxLines)).length * 7 + 8;
     const codeX = textX + gutterW;
+    const codeMaxW = width - pad * 2 - gutterW - 8;
 
     ctx.textBaseline = 'top';
 
@@ -85,8 +105,9 @@ export const CodeLens = {
       ctx.fillText(String(i + 1), textX + gutterW - 4, textY);
       ctx.textAlign = 'left';
 
-      // Highlighted code
-      renderHighlightedLine(ctx, lines[i], codeX, textY, width - pad * 2 - gutterW - 8, isDark);
+      // Get displayable portion via pretext, then syntax highlight
+      const displayLine = getDisplayLine(ctx, lines[i], codeMaxW);
+      renderHighlightedLine(ctx, displayLine, codeX, textY, isDark);
       textY += lineH;
     }
 
@@ -110,16 +131,12 @@ function renderHighlightedLine(
   line: string,
   x: number,
   y: number,
-  maxWidth: number,
   isDark: boolean,
 ) {
   ctx.font = '400 11px "JetBrains Mono", monospace';
-  const charW = 6.6;
-  const maxChars = Math.floor(maxWidth / charW);
-  const truncated = line.length > maxChars ? line.slice(0, maxChars - 1) + '…' : line;
 
   // Simple token-based highlighting
-  const tokens = tokenize(truncated);
+  const tokens = tokenize(line);
   let cx = x;
 
   for (const token of tokens) {

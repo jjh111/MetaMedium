@@ -1,5 +1,6 @@
 // CardLens — summary card with title, descriptor, type badge, palette accent
 // Best for: any data type at a glance. The default "overview" lens.
+// Phase 1 redesign: clear visual zones (header / separator / content / footer)
 
 import type { Rect } from '../core/types';
 import type { LensRenderOptions } from '../core/lens-registry';
@@ -21,6 +22,13 @@ function getPalette(dataType: string, isDark: boolean) {
   return { color: isDark ? p.dark : p.light, bg: isDark ? p.darkBg : p.lightBg };
 }
 
+// Layout constants — clear visual zones
+const HEADER_PAD = 12;
+const LINE_TITLE = 18;    // title line height
+const LINE_DESC = 15;     // descriptor line height
+const LINE_BODY = 14;     // body/content line height
+const FOOTER_H = 20;      // lens badge zone
+
 export const CardLens = {
   id: 'card',
   name: 'Card',
@@ -41,7 +49,8 @@ export const CardLens = {
   ) {
     const { x, y, width, height } = bounds;
     const { isDark, selected, source, descriptor, abstractionLevel } = options;
-    const pal = getPalette((options as any).dataType ?? 'default', isDark);
+    const dataType = options.dataType ?? 'default';
+    const pal = getPalette(dataType, isDark);
 
     // ── Card background ──
     ctx.fillStyle = isDark ? '#051018' : '#f0ece4';
@@ -75,34 +84,23 @@ export const CardLens = {
       ctx.stroke();
     }
 
-    const pad = 14;
-    const textX = x + pad + 4;
-    let textY = y + pad;
-    const contentWidth = width - pad * 2 - 8;
+    const textX = x + HEADER_PAD + 4; // after accent bar
+    let textY = y + HEADER_PAD;
+    const contentWidth = width - HEADER_PAD * 2 - 8;
 
-    // ── Type badge (top-right) ──
-    const dataType = (options as any).dataType ?? 'unknown';
-    const badgeText = abstractionLevel === 'type' ? dataType.toUpperCase() : abstractionLevel.toUpperCase().slice(0, 4);
-    ctx.font = '500 9px "JetBrains Mono", monospace';
-    const badgeW = ctx.measureText(badgeText).width + 10;
-    const badgeX = x + width - badgeW - 8;
-    const badgeY = y + 8;
-    ctx.fillStyle = pal.bg;
-    roundRect(ctx, badgeX, badgeY, badgeW, 16, 2);
-    ctx.fill();
-    ctx.fillStyle = pal.color;
-    ctx.textBaseline = 'top';
-    ctx.textAlign = 'left';
-    ctx.fillText(badgeText, badgeX + 5, badgeY + 3);
+    // ── Title (full width, bold 600, word-wrapped to 2 lines) ──
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(x + 6, y, width - 6, height);
+    ctx.clip();
 
-    // ── Title line (word-wrapped) ──
-    ctx.font = '500 13px "JetBrains Mono", monospace';
+    ctx.font = '600 13px "JetBrains Mono", monospace';
     ctx.fillStyle = isDark ? '#e8f4ff' : '#1a2a3a';
     ctx.textBaseline = 'top';
 
     let title = '';
-    if (abstractionLevel === 'meaning' && (options as any).meaning) {
-      title = (options as any).meaning;
+    if (abstractionLevel === 'meaning' && options.meaning) {
+      title = String(options.meaning);
     } else if (typeof data === 'object' && data !== null) {
       const d = data as Record<string, unknown>;
       if (d.name) title = String(d.name);
@@ -116,37 +114,54 @@ export const CardLens = {
       title = String(data).slice(0, 80);
     }
 
-    const titleMaxW = contentWidth - badgeW - 4;
-    const titleLines = wrapText(ctx, title, titleMaxW, 2);
+    // Title gets full width — no badge competition
+    const titleLines = wrapText(ctx, title, contentWidth, 2);
     for (const line of titleLines) {
       ctx.fillText(line.text, textX, textY);
-      textY += 16;
+      textY += LINE_TITLE;
     }
-    textY += 2;
 
-    // ── Descriptor (word-wrapped) ──
+    // ── Descriptor (muted, smaller, below title) ──
     if (descriptor && abstractionLevel !== 'type') {
-      ctx.font = '400 11px "JetBrains Mono", monospace';
+      ctx.font = '400 10px "JetBrains Mono", monospace';
       ctx.fillStyle = isDark ? '#8cb8cc' : '#4a6a7a';
-      const descLines = wrapText(ctx, descriptor, contentWidth, 2);
+      const descLines = wrapText(ctx, descriptor, contentWidth, 3);
       for (const line of descLines) {
         ctx.fillText(line.text, textX, textY);
-        textY += 14;
+        textY += LINE_DESC;
       }
-      textY += 2;
     }
+    textY += 4;
 
-    // ── Preview content (word-wrapped values) ──
+    ctx.restore();
+
+    // ── Separator line between header and content ──
+    ctx.strokeStyle = isDark ? 'rgba(77,201,246,0.12)' : 'rgba(42,74,90,0.12)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(x + 8, textY);
+    ctx.lineTo(x + width - 8, textY);
+    ctx.stroke();
+    textY += 8;
+
+    // ── Content zone (clipped) ──
+    const contentBottom = y + height - FOOTER_H;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(x + 6, textY, width - 10, contentBottom - textY);
+    ctx.clip();
+
     ctx.font = '400 11px "JetBrains Mono", monospace';
     ctx.fillStyle = isDark ? '#7a9aaa' : '#8a9aa4';
-    const maxPreviewY = y + height - pad - 16;
+    ctx.textBaseline = 'top';
 
     if (typeof data === 'object' && data !== null) {
       const entries = Object.entries(data as Record<string, unknown>);
-      for (const [k, v] of entries) {
-        if (textY > maxPreviewY) {
+      for (let idx = 0; idx < entries.length; idx++) {
+        const [k, v] = entries[idx];
+        if (textY > contentBottom - LINE_BODY) {
           ctx.fillStyle = isDark ? 'rgba(77,201,246,0.4)' : 'rgba(42,107,138,0.4)';
-          ctx.fillText(`+${entries.length - entries.indexOf(entries.find(e => e[0] === k)!)} more`, textX, textY);
+          ctx.fillText(`+${entries.length - idx} more`, textX, textY);
           break;
         }
 
@@ -170,35 +185,53 @@ export const CardLens = {
         if (ctx.measureText(valStr).width > remainingW && valStr.length > 20) {
           // Multi-line wrap for long values
           ctx.fillText(': ', textX + ctx.measureText(k).width, textY);
-          textY += 14;
+          textY += LINE_BODY;
           const valLines = wrapText(ctx, valStr, contentWidth - 12, 2);
           for (const vl of valLines) {
-            if (textY > maxPreviewY) break;
+            if (textY > contentBottom - LINE_BODY) break;
             ctx.fillText(vl.text, textX + 12, textY);
-            textY += 14;
+            textY += LINE_BODY;
           }
         } else {
           const fitted = fitValue(ctx, ': ' + valStr, contentWidth - ctx.measureText(k).width);
           ctx.fillText(fitted, textX + ctx.measureText(k).width, textY);
-          textY += 14;
+          textY += LINE_BODY;
         }
       }
     } else {
       // Text content — proper word wrap
       const text = String(data);
-      const maxLines = Math.floor((maxPreviewY - textY) / 14);
+      const maxLines = Math.floor((contentBottom - textY) / LINE_BODY);
       const lines = wrapText(ctx, text, contentWidth, maxLines);
       for (const line of lines) {
         ctx.fillText(line.text, textX, textY);
-        textY += 14;
+        textY += LINE_BODY;
       }
     }
 
-    // ── Lens badge (bottom-right) ──
+    ctx.restore();
+
+    // ── Footer: Type badge (bottom-right) + Lens badge ──
+    const badgeText = abstractionLevel === 'type'
+      ? dataType.toUpperCase()
+      : abstractionLevel.toUpperCase().slice(0, 4);
+    ctx.font = '500 9px "JetBrains Mono", monospace';
+    const badgeW = ctx.measureText(badgeText).width + 10;
+    const badgeX = x + width - badgeW - 8;
+    const badgeY = y + height - FOOTER_H + 2;
+    ctx.fillStyle = pal.bg;
+    roundRect(ctx, badgeX, badgeY, badgeW, 16, 2);
+    ctx.fill();
+    ctx.fillStyle = pal.color;
+    ctx.textBaseline = 'top';
+    ctx.textAlign = 'left';
+    ctx.fillText(badgeText, badgeX + 5, badgeY + 3);
+
+    // Lens badge
     ctx.font = '400 9px "JetBrains Mono", monospace';
     ctx.fillStyle = isDark ? 'rgba(77, 201, 246, 0.4)' : 'rgba(42, 107, 138, 0.4)';
-    ctx.textAlign = 'right';
-    ctx.fillText('CARD ~', x + width - 8, y + height - 8);
+    ctx.textAlign = 'left';
+    ctx.fillText('CARD ∿', x + HEADER_PAD + 4, y + height - FOOTER_H + 5);
     ctx.textAlign = 'left';
 
     // ── Source badge for LLM ──
@@ -206,7 +239,7 @@ export const CardLens = {
       ctx.font = '400 9px "JetBrains Mono", monospace';
       ctx.fillStyle = '#8B5CF6';
       ctx.textAlign = 'left';
-      ctx.fillText('* AI', x + pad + 4, y + height - 8);
+      ctx.fillText('✦ AI', x + HEADER_PAD + 4 + ctx.measureText('CARD ∿  ').width, y + height - FOOTER_H + 5);
     }
   },
 };

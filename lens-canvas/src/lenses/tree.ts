@@ -1,9 +1,10 @@
 // TreeLens — expandable JSON/object tree view
 // Best for: JSON objects, nested structures, config data
+// Phase 1: long string values now wrap via wrapText instead of truncating
 
 import type { Rect } from '../core/types';
 import type { LensRenderOptions } from '../core/lens-registry';
-import { fitValue } from '../core/text-wrap';
+import { fitValue, wrapText } from '../core/text-wrap';
 
 export const TreeLens = {
   id: 'tree',
@@ -36,7 +37,8 @@ export const TreeLens = {
     options: LensRenderOptions,
   ) {
     const { x, y, width, height } = bounds;
-    const { isDark, selected, source, descriptor, abstractionLevel, dataType } = options;
+    const { isDark, selected, source, descriptor, abstractionLevel } = options;
+    const dataType = options.dataType;
 
     // Parse if string
     let obj = data;
@@ -109,7 +111,7 @@ function renderTree(
     if (y > maxY) {
       ctx.font = '400 10px "JetBrains Mono", monospace';
       ctx.fillStyle = isDark ? 'rgba(77,201,246,0.4)' : 'rgba(42,107,138,0.4)';
-      ctx.fillText(`… ${entries.length - entries.indexOf([key, val] as any)} more`, x, y);
+      ctx.fillText(`… ${entries.length - entries.indexOf([key, val] as [string, unknown])} more`, x, y);
       break;
     }
 
@@ -136,12 +138,26 @@ function renderTree(
         y = renderTree(ctx, val, startX, y, maxWidth, maxY, depth + 1, isDark);
       }
     } else if (typeof val === 'string') {
-      ctx.fillStyle = strColor;
+      // Phase 1: wrap long string values instead of just truncating
       const raw = `"${val}"`;
       const remainW = maxWidth - (x - startX) - keyW - 16;
-      const display = fitValue(ctx, ': ' + raw, remainW);
-      ctx.fillText(display, x + keyW, y);
-      y += LINE_H;
+      if (ctx.measureText(': ' + raw).width > remainW && raw.length > 30) {
+        // Display key with colon, value wrapped below
+        ctx.fillStyle = strColor;
+        ctx.fillText(':', x + keyW, y);
+        y += LINE_H;
+        const valLines = wrapText(ctx, raw, maxWidth - depth * INDENT - INDENT, 2);
+        for (const vl of valLines) {
+          if (y > maxY) break;
+          ctx.fillText(vl.text, x + INDENT, y);
+          y += LINE_H;
+        }
+      } else {
+        ctx.fillStyle = strColor;
+        const display = fitValue(ctx, ': ' + raw, remainW);
+        ctx.fillText(display, x + keyW, y);
+        y += LINE_H;
+      }
     } else if (typeof val === 'number') {
       ctx.fillStyle = numColor;
       ctx.fillText(': ' + String(val), x + keyW, y);
@@ -163,7 +179,7 @@ function renderTree(
 function drawCardChrome(
   ctx: CanvasRenderingContext2D,
   x: number, y: number, w: number, h: number,
-  isDark: boolean, selected: boolean, source: string, dataType: string,
+  isDark: boolean, selected: boolean, source: string, _dataType: string,
 ) {
   // Background
   ctx.fillStyle = isDark ? '#051018' : '#f0ece4';
