@@ -119,7 +119,7 @@ export const CodeLens = {
 
     // Lens badge
     ctx.font = '400 9px "JetBrains Mono", monospace';
-    ctx.fillStyle = isDark ? 'rgba(77, 201, 246, 0.4)' : 'rgba(42, 107, 138, 0.4)';
+    ctx.fillStyle = isDark ? 'rgba(77, 201, 246, 0.4)' : 'rgba(42, 107, 138, 0.65)';
     ctx.textAlign = 'right';
     ctx.fillText('CODE ▾', x + width - 8, y + height - 14);
     ctx.textAlign = 'left';

@@ -82,16 +82,19 @@ export const TreeLens = {
       ctx.restore();
     }
 
-    // Descriptor (muted, below title)
+    // Descriptor (muted, below title — wrapped to fit)
     if (abstractionLevel !== 'type' && descriptor) {
       ctx.font = '400 10px "JetBrains Mono", monospace';
       ctx.fillStyle = isDark ? '#8cb8cc' : '#4a6a7a';
-      ctx.fillText(descriptor, textX, textY);
-      textY += 15;
+      const descLines = wrapText(ctx, descriptor, contentWidth, 2);
+      for (const line of descLines) {
+        ctx.fillText(line.text, textX, textY);
+        textY += 15;
+      }
     }
 
     // ── Separator line ──
-    ctx.strokeStyle = isDark ? 'rgba(77,201,246,0.12)' : 'rgba(42,74,90,0.12)';
+    ctx.strokeStyle = isDark ? 'rgba(77,201,246,0.25)' : 'rgba(42,74,90,0.20)';
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(x + 8, textY);

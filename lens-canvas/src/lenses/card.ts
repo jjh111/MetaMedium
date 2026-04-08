@@ -136,7 +136,7 @@ export const CardLens = {
     ctx.restore();
 
     // ── Separator line between header and content ──
-    ctx.strokeStyle = isDark ? 'rgba(77,201,246,0.12)' : 'rgba(42,74,90,0.12)';
+    ctx.strokeStyle = isDark ? 'rgba(77,201,246,0.25)' : 'rgba(42,74,90,0.20)';
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(x + 8, textY);

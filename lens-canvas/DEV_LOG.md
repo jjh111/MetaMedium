@@ -312,3 +312,118 @@ When CardLens renders, pretext produces clean line breaks at word boundaries. Th
 The code card renders with line numbers in a gutter, keyword highlighting (JS/TS/Python), string and number coloring, and comment detection. The `getDisplayLine()` helper using `wrapText(ctx, line, maxWidth, 1)` is clean and avoids the old `charW=6.6` hack.
 
 ---
+
+## Review Notes — Phase 4 UX Critique (2026-04-08 03:10 PDT)
+
+### 🔴 CRITICAL: Separator line is nearly invisible in both modes
+
+**Problem:** The header/content separator uses `rgba(77,201,246,0.12)` in dark mode and `rgba(42,74,90,0.12)` in light mode. At 12% opacity, this line is functionally invisible — vision analysis confirmed it's "barely perceptible" and "requires close inspection." The separator is the single most important visual zone boundary in the card redesign (Phase 1's core contribution), and users can't see it.
+
+**Fix in `card.ts` line 139 and `tree.ts` line 94:**
+```typescript
+// BEFORE (invisible):
+ctx.strokeStyle = isDark ? 'rgba(77,201,246,0.12)' : 'rgba(42,74,90,0.12)';
+// AFTER (subtle but visible):
+ctx.strokeStyle = isDark ? 'rgba(77,201,246,0.25)' : 'rgba(42,74,90,0.20)';
+```
+
+### 🔴 CRITICAL: CodeLens badge uses 0.4 alpha — too faint in light mode
+
+**Problem:** `code.ts` line 122 still uses `rgba(42, 107, 138, 0.4)` for the light mode badge. Phase 4's fix raised TreeLens and CardLens to 0.65, but CodeLens was missed. In light mode on cream background, the CODE ▾ badge is "noticeably fainter" and "requires more visual effort" (vision analysis confirmed).
+
+**Fix in `code.ts` line 122:**
+```typescript
+// BEFORE:
+ctx.fillStyle = isDark ? 'rgba(77, 201, 246, 0.4)' : 'rgba(42, 107, 138, 0.4)';
+// AFTER:
+ctx.fillStyle = isDark ? 'rgba(77, 201, 246, 0.4)' : 'rgba(42, 107, 138, 0.65)';
+```
+
+### 🟡 MODERATE: TreeLens descriptor doesn't wrap — can overflow
+
+**Problem:** `tree.ts` line 89 uses `ctx.fillText(descriptor, textX, textY)` — a single `fillText` call with no wrapping. If the descriptor is longer than `contentWidth` (e.g., "Object with 8 keys: name, architecture, entities, tiers, relations, decisions, harvester, next..."), it will silently overflow the card boundary to the right. CardLens properly uses `wrapText()` for its descriptor (line 128), but TreeLens doesn't.
+
+**Fix in `tree.ts` lines 86-91:**
+```typescript
+// BEFORE:
+if (abstractionLevel !== 'type' && descriptor) {
+  ctx.font = '400 10px "JetBrains Mono", monospace';
+  ctx.fillStyle = isDark ? '#8cb8cc' : '#4a6a7a';
+  ctx.fillText(descriptor, textX, textY);
+  textY += 15;
+}
+// AFTER:
+if (abstractionLevel !== 'type' && descriptor) {
+  ctx.font = '400 10px "JetBrains Mono", monospace';
+  ctx.fillStyle = isDark ? '#8cb8cc' : '#4a6a7a';
+  const descLines = wrapText(ctx, descriptor, contentWidth, 2);
+  for (const line of descLines) {
+    ctx.fillText(line.text, textX, textY);
+    textY += 15;
+  }
+}
+```
+
+### 🟡 MODERATE: BackLens still uses fitValue() — long JSON values truncate instead of wrapping
+
+**Problem:** Previous review flagged this (Phase 2 review, item 3). BackLens `renderJsonLine()` at `back.ts` line 146 calls `fitValue()` which truncates to a single line with `…`. For the "raw data inspector" use case, truncating `delegate_task(model="claude-opus-4-6")` to `delegate_task(model="claude…` defeats the purpose. The back side should show complete data.
+
+**Fix:** Import `wrapText` from `text-wrap.ts` and use it in `renderJsonLine()` for long lines, similar to how TreeLens wraps long string values (lines 180-190). A single JSON key-value pair might take 2-3 lines, but the data is complete.
+
+### 🟡 MODERATE: Edge connection points use card centers — edges visually pass through card bodies
+
+**Problem:** Previous review flagged this (Phase 2 review, item 5). `renderer.ts` lines 190-193 compute edge endpoints as the center of each card. Edges start deep inside one card and end deep inside another, making connections hard to trace. This is especially bad for the dependency chain (Opus → Sonnet → GLM → Qwen) where cards are close together.
+
+**Fix:** Compute intersection of the edge direction vector with the source/target card boundary rectangle. A simpler approach: connect to the nearest edge midpoint (top/bottom/left/right) based on the direction to the target card.
+
+### 🟡 MODERATE: Descriptor text blends into content in dark mode
+
+**Problem:** The descriptor ("Object with 7 keys: name, provider, model...") uses `#8cb8cc` in dark mode — the same cyan-ish muted color as the key names below the separator. Without a clearly visible separator line (see critical issue #1), the descriptor is visually indistinguishable from content. Vision analysis confirmed "too similar in brightness to the key-value content below it."
+
+**Fix:** Either:
+1. Fix the separator line visibility (critical issue #1) — this alone would solve it, OR
+2. Make descriptor text slightly brighter: `#9ec8d8` instead of `#8cb8cc` in dark mode.
+
+Option 1 is preferred — the separator is what should create the visual boundary.
+
+### 🟢 MINOR: RawLens still uses `charWidth = 6.6` hardcoded estimate
+
+**Problem:** `raw.ts` line 97. Flagged in two previous reviews. Not fixed. RawLens is the fallback lens — it should use the same pretext-based measurement as all other lenses for consistency.
+
+**Fix:** Import `fitValue` from `text-wrap.ts` and replace the `truncate()` function. Also import and use `wrapText` for multi-line content.
+
+### 🟢 MINOR: roundRect() duplicated across 5 files
+
+**Problem:** Flagged in two previous reviews. Now 5 copies (card, tree, code, raw, back). Not fixed.
+
+**Fix:** Extract to `src/core/canvas-utils.ts` and import in each lens.
+
+### 🟢 MINOR: BackLens roundRect uses `arcTo` while all others use `quadraticCurveTo`
+
+**Problem:** `back.ts` lines 17-27 use `ctx.arcTo()` while `card.ts`, `tree.ts`, `code.ts`, `raw.ts` all use `ctx.quadraticCurveTo()`. These produce slightly different corner curves. Flagged in previous review. Not fixed.
+
+**Fix:** Extract to shared `canvas-utils.ts` (same fix as above — one stone, two birds).
+
+### 🟢 MINOR: CodeLens has no footer zone — badge can overlap last code line
+
+**Problem:** `code.ts` places the "CODE ▾" badge at `(x + width - 8, y + height - 14)` with `textAlign: 'right'`. Unlike CardLens (which reserves a 20px `FOOTER_H` zone), CodeLens computes `maxLines` as `Math.floor((height - pad * 2 - 14) / lineH)`. The `-14` accounts for badge space, but the badge overlaps the content area visually. If a code card has exactly `maxLines` of content, the last code line and the badge share the same vertical space.
+
+**Fix:** Reserve an explicit footer zone (like CardLens's 20px `FOOTER_H`) and place the badge there, separated from code content by the same vertical padding.
+
+### ✅ GOOD: MoE rebalancing works correctly
+
+8 of 10 seed nodes now render as CARD ∿ (flat JSON objects), 1 as TREE ▾ (Memory Cortex with depth 2), and 1 as CODE ▾. The Phase 4 depth-based confidence scaling is the correct MoE answer — TreeLens earns its higher confidence by detecting structural depth, not just `dataType === 'json'`.
+
+### ✅ GOOD: Lens Switcher HUD is polished
+
+The floating HUD shows all matching lenses with confidence %, mini bar charts, and the ★ MoE winner indicator. Click-outside dismisses properly. Viewport clamping works. The "Auto (MoE decides)" option correctly clears the override. The `updateNode(nodeId, { lens: undefined as unknown as string })` type hack is ugly but functional.
+
+### ✅ GOOD: Front/back flip is meaningful and distinct
+
+The gold right accent bar vs cyan left accent bar creates immediate visual distinction. Back side is warmer (#060c10 vs #051018 in dark mode). Syntax-colored JSON (cyan keys, green strings, gold numbers, purple booleans, red null) is useful. The "↩ F to flip" hint is a nice touch. The Y-scale animation (300ms) is smooth and correctly swaps sides at t=0.5.
+
+### ✅ GOOD: Text wrapping via pretext works correctly
+
+When CardLens renders, pretext produces clean line breaks at word boundaries. The caching layer (WeakMap with 200-entry eviction) handles performance. The `naiveWrap` fallback is a sensible safety net. Multi-line value wrapping (CardLens lines 186-194) works for long string values.
+
+---

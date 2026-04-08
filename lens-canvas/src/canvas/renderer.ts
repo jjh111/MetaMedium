@@ -6,7 +6,7 @@ import { matchLens, getLensById } from '../core/lens-registry';
 import { getState } from './viewport';
 import { drawGrid } from './grid';
 import { BackLens } from '../lenses/back';
-import type { LensNode, Edge } from '../core/types';
+import type { LensNode, Edge, Rect } from '../core/types';
 
 let canvas: HTMLCanvasElement;
 let ctx: CanvasRenderingContext2D;
@@ -180,6 +180,11 @@ function renderNodeContent(ctx: CanvasRenderingContext2D, node: LensNode, isDark
     }
     lens.render(ctx, node.data, node.position, options);
   }
+
+  // Draw resize handles on selected node
+  if (node.id === selectedNodeId) {
+    drawResizeHandles(ctx, node.position, isDark);
+  }
 }
 
 function drawEdge(ctx: CanvasRenderingContext2D, edge: Edge, nodeMap: Map<string, LensNode>, isDark: boolean) {
@@ -234,6 +239,39 @@ function drawEdge(ctx: CanvasRenderingContext2D, edge: Edge, nodeMap: Map<string
   }
   
   ctx.restore();
+}
+
+// ── Resize handles ──
+
+export type HandleName = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w';
+
+export function getHandlePositions(pos: Rect): [HandleName, number, number][] {
+  const { x, y, width: w, height: h } = pos;
+  return [
+    ['nw', x, y],
+    ['n', x + w / 2, y],
+    ['ne', x + w, y],
+    ['e', x + w, y + h / 2],
+    ['se', x + w, y + h],
+    ['s', x + w / 2, y + h],
+    ['sw', x, y + h],
+    ['w', x, y + h / 2],
+  ];
+}
+
+function drawResizeHandles(ctx: CanvasRenderingContext2D, pos: Rect, isDark: boolean) {
+  const handles = getHandlePositions(pos);
+
+  for (const [, hx, hy] of handles) {
+    ctx.fillStyle = isDark ? '#7dd8f7' : '#2a6b8a';
+    ctx.strokeStyle = isDark ? '#020a12' : '#f8f5f0';
+    ctx.lineWidth = 1;
+
+    ctx.beginPath();
+    ctx.arc(hx, hy, 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+  }
 }
 
 export function stopRenderer() {

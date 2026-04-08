@@ -1,12 +1,24 @@
-// Canvas interactions — node selection, drag, double-click create, lens switcher
-import { screenToWorld, worldToScreen } from './viewport';
+// Canvas interactions — node selection, drag, resize, double-click create, lens switcher
+import { screenToWorld, worldToScreen, getState } from './viewport';
 import { getAllNodes, addNode, updateNode, removeNode, generateDescriptor, inferDataType } from '../core/graph';
-import { setSelectedNode, getSelectedNode, toggleFlip } from './renderer';
+import { setSelectedNode, getSelectedNode, toggleFlip, getHandlePositions } from './renderer';
+import type { HandleName } from './renderer';
 import { showLensHud, closeLensHud } from '../ui/lens-hud';
-import type { LensNode } from '../core/types';
+import type { LensNode, Rect } from '../core/types';
 
 let canvas: HTMLCanvasElement;
 let dragging: { nodeId: string; offsetX: number; offsetY: number } | null = null;
+let resizing: { nodeId: string; handle: HandleName; startPos: Rect; startX: number; startY: number } | null = null;
+
+const MIN_WIDTH = 160;
+const MIN_HEIGHT = 100;
+const HANDLE_RADIUS = 6; // px in world space
+
+const CURSOR_MAP: Record<string, string> = {
+  nw: 'nw-resize', n: 'n-resize', ne: 'ne-resize',
+  e: 'e-resize', se: 'se-resize', s: 's-resize',
+  sw: 'sw-resize', w: 'w-resize',
+};
 
 export function initInteractions(c: HTMLCanvasElement) {
   canvas = c;
@@ -33,6 +45,19 @@ function hitTest(wx: number, wy: number): LensNode | null {
   return null;
 }
 
+function hitTestHandle(wx: number, wy: number, node: LensNode): HandleName | null {
+  const handles = getHandlePositions(node.position);
+  // Scale handle radius by inverse zoom so handles stay usable at any zoom level
+  const zoom = getState().zoom;
+  const radius = HANDLE_RADIUS / zoom;
+  for (const [name, hx, hy] of handles) {
+    const dx = wx - hx;
+    const dy = wy - hy;
+    if (Math.sqrt(dx * dx + dy * dy) <= radius) return name;
+  }
+  return null;
+}
+
 function onPointerDown(e: PointerEvent) {
   if (e.button !== 0 || e.altKey) return; // alt = pan (handled by viewport)
   
@@ -41,6 +66,28 @@ function onPointerDown(e: PointerEvent) {
   const sy = e.clientY - rect.top;
   const { x: wx, y: wy } = screenToWorld(sx, sy);
   
+  // 1. Check resize handles on selected node first
+  const sel = getSelectedNode();
+  if (sel) {
+    const selNode = getAllNodes().find(n => n.id === sel);
+    if (selNode) {
+      const handle = hitTestHandle(wx, wy, selNode);
+      if (handle) {
+        resizing = {
+          nodeId: sel,
+          handle,
+          startPos: { ...selNode.position },
+          startX: wx,
+          startY: wy,
+        };
+        canvas.setPointerCapture(e.pointerId);
+        e.stopPropagation();
+        return;
+      }
+    }
+  }
+  
+  // 2. Then check node drag
   const hit = hitTest(wx, wy);
   if (hit) {
     setSelectedNode(hit.id);
@@ -57,24 +104,79 @@ function onPointerDown(e: PointerEvent) {
 }
 
 function onPointerMove(e: PointerEvent) {
-  if (!dragging) return;
-  
   const rect = canvas.getBoundingClientRect();
   const sx = e.clientX - rect.left;
   const sy = e.clientY - rect.top;
   const { x: wx, y: wy } = screenToWorld(sx, sy);
+
+  if (resizing) {
+    const { nodeId, handle, startPos, startX, startY } = resizing;
+    const dx = wx - startX;
+    const dy = wy - startY;
+    
+    let { x, y, width, height } = startPos;
+    
+    // East handles: grow width rightward
+    if (handle.includes('e')) {
+      width = Math.max(MIN_WIDTH, startPos.width + dx);
+    }
+    // South handles: grow height downward
+    if (handle.includes('s')) {
+      height = Math.max(MIN_HEIGHT, startPos.height + dy);
+    }
+    // West handles: move left edge, grow width leftward
+    if (handle.includes('w')) {
+      const newWidth = Math.max(MIN_WIDTH, startPos.width - dx);
+      x = startPos.x + (startPos.width - newWidth);
+      width = newWidth;
+    }
+    // North handles: move top edge, grow height upward
+    if (handle.includes('n')) {
+      const newHeight = Math.max(MIN_HEIGHT, startPos.height - dy);
+      y = startPos.y + (startPos.height - newHeight);
+      height = newHeight;
+    }
+    
+    updateNode(nodeId, { position: { x, y, width, height } });
+    return;
+  }
+
+  if (dragging) {
+    updateNode(dragging.nodeId, {
+      position: {
+        ...getAllNodes().find(n => n.id === dragging!.nodeId)!.position,
+        x: wx - dragging.offsetX,
+        y: wy - dragging.offsetY,
+      },
+    });
+    return;
+  }
   
-  updateNode(dragging.nodeId, {
-    position: {
-      ...getAllNodes().find(n => n.id === dragging!.nodeId)!.position,
-      x: wx - dragging.offsetX,
-      y: wy - dragging.offsetY,
-    },
-  });
+  // Cursor hints when hovering handles on selected node
+  const sel = getSelectedNode();
+  if (sel) {
+    const node = getAllNodes().find(n => n.id === sel);
+    if (node) {
+      const handle = hitTestHandle(wx, wy, node);
+      if (handle) {
+        canvas.style.cursor = CURSOR_MAP[handle] ?? 'default';
+        return;
+      }
+    }
+  }
+  
+  // Default cursor: grab on hover over nodes, default otherwise
+  const hover = hitTest(wx, wy);
+  canvas.style.cursor = hover ? 'grab' : 'default';
 }
 
 function onPointerUp() {
-  dragging = null;
+  if (resizing) {
+    resizing = null;
+  }
+  if (dragging) {
+    dragging = null;
+  }
 }
 
 function onDoubleClick(e: MouseEvent) {
@@ -144,6 +246,30 @@ function onKeyDown(e: KeyboardEvent) {
   }
 }
 
+// ── Auto-height estimation ──
+
+function estimateNodeHeight(data: unknown, dataType: string, width: number): number {
+  const baseH = 80;
+  
+  if (dataType === 'json' && typeof data === 'object' && data !== null) {
+    const keys = Object.keys(data as Record<string, unknown>);
+    return Math.min(500, Math.max(baseH, 60 + keys.length * 16));
+  }
+  if (dataType === 'code') {
+    const lines = String(data).split('\n').length;
+    return Math.min(500, Math.max(baseH, 40 + lines * 15));
+  }
+  if (dataType === 'text') {
+    const str = String(data);
+    // Rough estimate: ~8px per character in 11px monospace, wrap at (width-32)
+    const contentW = width - 32;
+    const charsPerLine = Math.max(1, Math.floor(contentW / 7));
+    const lineCount = Math.ceil(str.length / charsPerLine);
+    return Math.min(400, Math.max(baseH, 60 + lineCount * 16));
+  }
+  return 140; // default
+}
+
 function onPaste(e: ClipboardEvent) {
   // Don't intercept if user is typing in an input
   if (document.activeElement?.tagName === 'TEXTAREA' || document.activeElement?.tagName === 'INPUT') return;
@@ -164,11 +290,14 @@ function onPaste(e: ClipboardEvent) {
   // Offset slightly random so multiple pastes don't stack
   const jitter = () => (Math.random() - 0.5) * 60;
   
+  const nodeWidth = 280;
+  const nodeHeight = estimateNodeHeight(data, dataType, nodeWidth);
+  
   addNode({
     data,
     dataType,
     descriptor,
-    position: { x: center.x - 140 + jitter(), y: center.y - 80 + jitter(), width: 280, height: 160 },
+    position: { x: center.x - nodeWidth / 2 + jitter(), y: center.y - nodeHeight / 2 + jitter(), width: nodeWidth, height: nodeHeight },
   });
 }
 
@@ -208,11 +337,14 @@ function showCreateModal(wx: number, wy: number) {
     const dataType = inferDataType(data);
     const descriptor = generateDescriptor(data, dataType);
     
+    const nodeWidth = 240;
+    const nodeHeight = estimateNodeHeight(data, dataType, nodeWidth);
+    
     addNode({
       data,
       dataType,
       descriptor,
-      position: { x: wx - 120, y: wy - 60, width: 240, height: 120 },
+      position: { x: wx - nodeWidth / 2, y: wy - nodeHeight / 2, width: nodeWidth, height: nodeHeight },
     });
     close();
   }
