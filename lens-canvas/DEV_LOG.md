@@ -54,12 +54,65 @@ Phase execution order: 1 → 2 → 4 → 3 → 5 → 8
 - Card layout has clear visual zones (header/separator/content/footer)
 - 19 tests passing
 
+### Phase 2: Front/Back Node Flip ✅
+**Completed:** 2026-04-08 00:15 PDT
+**Commit:** 128639f
+
+**Changes:**
+
+1. **BackLens (`src/lenses/back.ts`)** — New back-side data inspector:
+   - Gold-themed visual identity: right accent bar (vs left on front), warm background tint
+   - "RAW · JSON" header in gold, separator line, content zone
+   - Syntax-colored JSON: keys in cyan, strings in green, numbers in gold, booleans purple, null red
+   - Content clipped to bounds, "… N more lines" overflow indicator
+   - "↩ F to flip" hint at bottom-left
+   - Uses `fitValue()` from text-wrap.ts for pretext-measured line truncation
+
+2. **Renderer (`src/canvas/renderer.ts`)** — Flip state and animation:
+   - `flippedNodes` Set tracks which nodes show their back side
+   - `flipAnimations` Map drives time-based Y-scale animation (300ms)
+   - Animation: scaleY 1→0 (first half), swap visible side, scaleY 0→1 (second half)
+   - `renderNodeContent()` routes to BackLens vs MoE-matched front lens
+   - `node.lens` override now respected via `getLensById()` before MoE fallback
+   - Exported `toggleFlip()` and `isFlipped()` for use by interactions
+
+3. **Interactions (`src/canvas/interactions.ts`)** — Flip triggers:
+   - F key toggles flip on selected node (guards: no ctrl/meta, not in input)
+   - Double-click on existing node now flips instead of cycling abstractionLevel
+   - Double-click on empty canvas still opens create modal
+
+4. **Lens Registry (`src/core/lens-registry.ts`)** — `getLensById()` for direct lookup
+
+**Tests:** 19/19 passing
+**TypeScript:** No new errors (pre-existing errors in main.ts, api-handler.ts, viewport.ts unchanged)
+
+**Visual Verification:**
+- Screenshot confirmed flipped card shows gold right accent bar, "RAW · JSON" header
+- JSON content is syntax-colored (cyan keys, green strings)
+- F key toggles between front and back cleanly
+- Double-click on node triggers flip
+- "↩ F to flip" hint renders at bottom of back side
+- Animation compresses card vertically then expands (Y-scale)
+- Multiple nodes can be flipped independently
+
+**Issues:** None — clean implementation.
+
+---
+
+## Current State
+- 10 nodes with real Hermes system data as seed
+- pretext installed as core text layout dependency
+- text-wrap.ts wraps pretext with caching layer
+- 4 lenses (Raw, Card, Tree, Code) + BackLens — all using pretext for text layout
+- Card layout has clear visual zones (header/separator/content/footer)
+- Front/back flip working via F key and double-click, with Y-scale animation
+- node.lens override now respected by renderer
+- 19 tests passing
+
 ## Known Issues (remaining)
-- No front/back flip capability (Phase 2)
 - No resize handles (Phase 3)
 - No lens switcher UI (Phase 4)
 - No edge drawing UI
-- node.lens field exists but renderer ignores it
 
 ---
 
