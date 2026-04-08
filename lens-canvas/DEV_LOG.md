@@ -109,10 +109,51 @@ Phase execution order: 1 → 2 → 4 → 3 → 5 → 8
 - node.lens override now respected by renderer
 - 19 tests passing
 
+### Phase 4: Lens Switcher HUD + Critical UX Fixes ✅
+**Completed:** 2026-04-08 02:15 PDT
+**Commit:** 9d6551d
+
+**Changes:**
+
+1. **Critical UX Fix: MoE confidence rebalancing** — TreeLens confidence for flat objects (depth ≤ 1) reduced from 0.75 to 0.6, so CardLens (0.7) now wins for flat JSON objects. Memory Cortex (depth 2) still renders as TreeLens (0.85). This means 8 of 10 seed nodes now render as CARD ∿ instead of TREE ▾, making the Phase 1 card redesign finally visible.
+
+2. **Critical UX Fix: Default lens = undefined** — Changed `graph.ts` default from `lens: 'raw'` to `lens: undefined`. This means "let MoE decide" by default, with explicit `lens: 'card'` meaning "I chose this lens." Renderer simplified: `if (node.lens)` instead of `if (node.lens && node.lens !== 'raw')`. Updated `LensNode.lens` type from `string` to `string | undefined`.
+
+3. **Critical UX Fix: TreeLens title extraction + separator** — TreeLens now extracts `data.name` / `data.model` / `data.title` as a **bold 600-weight 13px title** (matching CardLens). Added horizontal separator line between header and tree content. Descriptor renders in muted text below title. This gives TreeLens the same visual hierarchy as CardLens.
+
+4. **Light mode badge contrast** — Increased badge alpha from 0.4 to 0.65 for TreeLens and CardLens badges in light mode. Fixes WCAG contrast issue where badges were nearly invisible.
+
+5. **Lens Switcher HUD (`src/ui/lens-hud.ts`)** — New floating DOM overlay for per-node lens switching:
+   - Shows all matching lenses with name, confidence %, and mini bar chart
+   - Current lens highlighted with ● indicator, MoE winner with ★
+   - "Auto (MoE decides)" option at bottom to clear override
+   - Theme-aware (reads `getTheme()` from renderer for dark/light styles)
+   - Viewport-clamped (repositions if near screen edges)
+   - Dismisses on Escape, click-outside, or selecting a lens
+
+6. **Interactions (`src/canvas/interactions.ts`)** — Two new triggers:
+   - Right-click on node → opens Lens Switcher HUD at cursor position
+   - L key on selected node → opens HUD centered above the node
+   - Refactored `onKeyDown()` to check `activeElement` once at top
+
+**Tests:** 19/19 passing (updated test for `lens: undefined` default)
+**TypeScript:** No new errors
+
+**Visual Verification:**
+- Screenshot confirmed 8 of 10 nodes now render as CARD ∿ (flat JSON), 1 as TREE ▾ (nested JSON), 1 as CODE
+- Right-click on node shows floating HUD with Card 70%, Tree 60%, Raw 1% and confidence bars
+- Clicking "Tree" in HUD immediately re-renders node as TreeLens with TREE ▾ badge
+- TreeLens shows bold title + descriptor + separator line (matching CardLens visual zones)
+- Resetting to "Auto" returns node to MoE-selected CardLens
+- HUD dismisses on Escape and click-outside
+
+**Issues:** None — clean implementation.
+
+---
+
 ## Known Issues (remaining)
 - No resize handles (Phase 3)
-- No lens switcher UI (Phase 4)
-- No edge drawing UI
+- No edge drawing UI (Phase 5)
 
 ---
 
@@ -182,5 +223,92 @@ Bezier curves with type-appropriate dash patterns, arrowheads for relationship/d
 ### ✅ GOOD: DPR-aware rendering
 
 Canvas correctly handles device pixel ratio for crisp text on Retina displays.
+
+---
+
+## Review Notes — Phase 2 UX Critique (2026-04-08 01:10 PDT)
+
+### 🔴 CRITICAL (UNCHANGED): CardLens still never renders — TreeLens dominates all JSON nodes
+
+**Problem:** Previous review flagged this. Phase 2 didn't address it. TreeLens scores 0.75–0.85 for `json` vs CardLens 0.7. Nine of ten seed nodes are `dataType: 'json'`, so TreeLens wins every MoE match. The entire CardLens Phase 1 redesign (separator lines, footer badges, bold titles, descriptor zones) is **invisible in the default canvas**.
+
+**Fix (preferred — MoE-correct):** TreeLens confidence should scale with depth:
+```typescript
+// tree.ts matches()
+if (dataType === 'json') {
+  if (typeof data === 'object' && data !== null) {
+    const depth = getDepth(data);
+    return depth > 1 ? 0.85 : 0.6;  // flat objects → CardLens wins
+  }
+  return 0.5;
+}
+```
+This means "Claude Opus 4" (depth=1) renders as a CardLens card with bold title + separator, while "Memory Cortex" (depth=2 because of nested `entities` object) renders as TreeLens. Both make visual sense for their data shape.
+
+### 🔴 CRITICAL (NEW): TreeLens descriptor is useless as a card header
+
+**Problem:** The descriptor "Object with 7 keys: name, provider, model, context, pricing..." is the first thing you see on every card. It's rendered at `400 11px` in muted color (`#8cb8cc` dark / `#4a6a7a` light) — identical in weight and style to the tree key-value content below. There is NO separator line between the descriptor and the tree content. The result: the descriptor reads as the first line of data, not a card title. Visual hierarchy rating: **4/10** — it's a flat data dump.
+
+**Fix:** Two changes in `tree.ts`:
+1. Extract `data.name` / `data.model` / `data.title` as a **bold title** (same logic as CardLens lines 101-115). Render it at `600 13px` in bright text. This turns "Object with 7 keys: name, provider..." into **"Claude Opus 4"** as the card header.
+2. Add a **separator line** between the header zone and the tree content (copy the CardLens separator at lines 138-144).
+
+### 🟡 MODERATE (NEW): All seed nodes default to `lens: 'raw'` — override is dead
+
+**Problem:** `graph.ts` line 59: `lens: partial.lens ?? 'raw'`. Every seed node in `main.ts` omits `lens`, so they all get `lens: 'raw'`. The renderer (line 175) then checks `if (node.lens && node.lens !== 'raw')` — since it's always `'raw'`, the override is never triggered. The previous review said "node.lens field is ignored by the renderer" — but actually the renderer WAS fixed in Phase 2 (line 173-180 now checks `node.lens` first). The real problem is the **seed data never uses the override**.
+
+**Fix:** Either:
+1. Change default in `graph.ts` to `lens: undefined` (so the renderer always falls through to MoE), OR
+2. Set explicit `lens: 'card'` on seed nodes that should show as cards (e.g., the model nodes with `name` fields).
+
+Option 1 is simpler and more correct — `undefined` means "let MoE decide" while a specific value means "I know what lens I want."
+
+### 🟡 MODERATE (NEW): BackLens doesn't use `wrapText` — long lines just truncate
+
+**Problem:** `back.ts` line 146 uses `fitValue()` (single-line truncation with `…`) for JSON lines. If a JSON value is wider than the card (e.g., `"routing": "delegate_task(model=\"claude-opus-4-6\")"`), it just gets cut off. The back side is supposed to be the "raw data inspector" — truncating data defeats the purpose.
+
+**Fix:** Import `wrapText` from `text-wrap.ts` and use it for long JSON lines, similar to how CardLens and TreeLens wrap long values. This means a single JSON key-value pair might take 2-3 lines on the back side, but at least the data is complete.
+
+### 🟡 MODERATE (NEW): Light mode — TREE ▾ badge is nearly invisible
+
+**Problem:** In light mode, the badge "TREE ▾" uses `rgba(42, 107, 138, 0.4)` which renders as a very pale teal on the cream background (`#f0ece4`). Contrast ratio is approximately 2.5:1 — well below the 4.5:1 WCAG AA minimum. The badge is functionally invisible.
+
+**Fix:** In `tree.ts` line 77, change the light mode badge color from `rgba(42, 107, 138, 0.4)` to `rgba(42, 107, 138, 0.65)`. Same for CodeLens (line 122) and RawLens (line 88) — they all use the same `0.4` alpha for light mode badges.
+
+### 🟡 MODERATE (NEW): Edge connection points always use card center
+
+**Problem:** `renderer.ts` lines 190-193 compute edge endpoints as the center of each card (`x + width/2, y + height/2`). This means edges visually pass through the card body rather than connecting at the card boundary. For cards that are close together, the edge starts deep inside one card and ends deep inside another, making the connection hard to trace.
+
+**Fix:** Compute intersection of the edge line with the card boundary rectangle. A simpler approach: connect to the nearest edge midpoint (top/bottom/left/right) based on the direction to the target card.
+
+### 🟢 MINOR (NEW): BackLens roundRect uses `arcTo` while all other lenses use `quadraticCurveTo`
+
+**Problem:** `back.ts` lines 9-28 implement `roundRect()` using `ctx.arcTo()`, while `card.ts`, `tree.ts`, `code.ts`, and `raw.ts` all use `ctx.quadraticCurveTo()`. These produce slightly different curves. The back lens is a special case (right accent bar vs left), but the corner rendering should be consistent.
+
+**Fix:** Standardize all `roundRect()` implementations. Better yet — extract to shared `core/canvas-utils.ts` (this was flagged in the previous review too).
+
+### 🟢 MINOR (UNCHANGED): RawLens still uses `charWidth = 6.6`
+
+**Problem:** `raw.ts` line 97 still has the hardcoded character width estimate. Previous review flagged this; not fixed.
+
+### 🟢 MINOR (UNCHANGED): roundRect() duplicated across 5 files
+
+**Problem:** Now 5 files (card, tree, code, raw, back). Previous review flagged 4. Not fixed.
+
+### ✅ GOOD: Front/back flip animation works correctly
+
+The Y-scale animation (300ms) is smooth and correctly swaps visible sides at the halfway point. The gold-themed back side is visually distinct with: right accent bar, "RAW · JSON" header, gold separator line, syntax-colored JSON (cyan keys, green strings, gold numbers, purple booleans, red null), and "↩ F to flip" hint. Double-click also triggers flip.
+
+### ✅ GOOD: BackLens visual identity is strong
+
+The right-side gold accent bar vs left-side cyan creates an immediate visual distinction between front and back. The warmer background tint (`#060c10` vs `#051018`) reinforces the "other side" metaphor. Selected state uses gold glow instead of cyan. All cohesive.
+
+### ✅ GOOD: Text wrapping via pretext works correctly
+
+When CardLens renders, pretext produces clean line breaks at word boundaries. The caching layer in `text-wrap.ts` (WeakMap with 200-entry eviction) handles performance well. The `naiveWrap` fallback is a sensible safety net.
+
+### ✅ GOOD: CodeLens syntax highlighting and line numbers
+
+The code card renders with line numbers in a gutter, keyword highlighting (JS/TS/Python), string and number coloring, and comment detection. The `getDisplayLine()` helper using `wrapText(ctx, line, maxWidth, 1)` is clean and avoids the old `charW=6.6` hack.
 
 ---

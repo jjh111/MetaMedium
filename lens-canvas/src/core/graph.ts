@@ -56,7 +56,7 @@ export function addNode(partial: Partial<LensNode> & { data: unknown }): LensNod
     position: partial.position ?? { x: 0, y: 0, width: 240, height: 120 },
     data: partial.data,
     dataType: partial.dataType ?? inferDataType(partial.data),
-    lens: partial.lens ?? 'raw',
+    lens: partial.lens,  // undefined = let MoE decide; explicit value = user override
     abstractionLevel: partial.abstractionLevel ?? 'descriptor',
     descriptor: partial.descriptor,
     meaning: partial.meaning,

@@ -17,7 +17,7 @@ export interface LensNode {
   position: Rect;
   data: unknown;
   dataType: string;    // 'json', 'text', 'code', 'number', 'array', ...
-  lens: string;        // 'raw', 'card', 'tree', 'code', 'sparkline', ...
+  lens?: string;            // undefined = MoE decides; 'card', 'tree', 'code' = explicit override
   abstractionLevel: 'type' | 'descriptor' | 'meaning';
   descriptor?: string;
   meaning?: string;

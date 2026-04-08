@@ -1,7 +1,8 @@
-// Canvas interactions — node selection, drag, double-click create
-import { screenToWorld } from './viewport';
+// Canvas interactions — node selection, drag, double-click create, lens switcher
+import { screenToWorld, worldToScreen } from './viewport';
 import { getAllNodes, addNode, updateNode, removeNode, generateDescriptor, inferDataType } from '../core/graph';
 import { setSelectedNode, getSelectedNode, toggleFlip } from './renderer';
+import { showLensHud, closeLensHud } from '../ui/lens-hud';
 import type { LensNode } from '../core/types';
 
 let canvas: HTMLCanvasElement;
@@ -14,6 +15,7 @@ export function initInteractions(c: HTMLCanvasElement) {
   window.addEventListener('pointermove', onPointerMove);
   window.addEventListener('pointerup', onPointerUp);
   c.addEventListener('dblclick', onDoubleClick);
+  c.addEventListener('contextmenu', onContextMenu);
   window.addEventListener('keydown', onKeyDown);
   window.addEventListener('paste', onPaste);
 }
@@ -92,12 +94,27 @@ function onDoubleClick(e: MouseEvent) {
   showCreateModal(wx, wy);
 }
 
+function onContextMenu(e: MouseEvent) {
+  e.preventDefault();
+  const rect = canvas.getBoundingClientRect();
+  const sx = e.clientX - rect.left;
+  const sy = e.clientY - rect.top;
+  const { x: wx, y: wy } = screenToWorld(sx, sy);
+  const hit = hitTest(wx, wy);
+  if (hit) {
+    setSelectedNode(hit.id);
+    showLensHud(hit.id, e.clientX, e.clientY);
+  }
+}
+
 function onKeyDown(e: KeyboardEvent) {
   const sel = getSelectedNode();
   if (!sel) return;
   
+  // Skip if user is typing in an input
+  if (document.activeElement?.tagName === 'TEXTAREA' || document.activeElement?.tagName === 'INPUT') return;
+
   if (e.key === 'Delete' || e.key === 'Backspace') {
-    if (document.activeElement?.tagName === 'TEXTAREA' || document.activeElement?.tagName === 'INPUT') return;
     removeNode(sel);
     setSelectedNode(null);
   }
@@ -105,9 +122,24 @@ function onKeyDown(e: KeyboardEvent) {
   // F to flip selected node (front/back)
   if (e.key === 'f' || e.key === 'F') {
     if (!e.ctrlKey && !e.metaKey) {
-      if (document.activeElement?.tagName === 'TEXTAREA' || document.activeElement?.tagName === 'INPUT') return;
       e.preventDefault();
       toggleFlip(sel);
+    }
+  }
+
+  // L to open lens switcher HUD
+  if (e.key === 'l' || e.key === 'L') {
+    if (!e.ctrlKey && !e.metaKey) {
+      e.preventDefault();
+      const node = getAllNodes().find(n => n.id === sel);
+      if (node) {
+        // Position HUD near the top-center of the node
+        const { x: sx, y: sy } = worldToScreen(
+          node.position.x + node.position.width / 2,
+          node.position.y
+        );
+        showLensHud(sel, sx, sy);
+      }
     }
   }
 }

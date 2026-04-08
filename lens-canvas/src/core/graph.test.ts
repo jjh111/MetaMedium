@@ -11,7 +11,7 @@ describe('graph store', () => {
       const node = addNode({ data: { hello: 'world' } });
       expect(node.id).toBeTruthy();
       expect(node.dataType).toBe('json');
-      expect(node.lens).toBe('raw');
+      expect(node.lens).toBeUndefined(); // undefined = MoE decides
       expect(node.source).toBe('human');
       expect(node.abstractionLevel).toBe('descriptor');
       expect(node.position.width).toBe(240);

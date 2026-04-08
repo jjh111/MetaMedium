@@ -172,7 +172,7 @@ function renderNodeContent(ctx: CanvasRenderingContext2D, node: LensNode, isDark
   } else {
     // Check node.lens override first, then MoE match
     let lens = null;
-    if (node.lens && node.lens !== 'raw') {
+    if (node.lens) {
       lens = getLensById(node.lens);
     }
     if (!lens) {

@@ -229,7 +229,7 @@ export const CardLens = {
 
     // Lens badge
     ctx.font = '400 9px "JetBrains Mono", monospace';
-    ctx.fillStyle = isDark ? 'rgba(77, 201, 246, 0.4)' : 'rgba(42, 107, 138, 0.4)';
+    ctx.fillStyle = isDark ? 'rgba(77, 201, 246, 0.4)' : 'rgba(42, 107, 138, 0.65)';
     ctx.textAlign = 'left';
     ctx.fillText('CARD ∿', x + HEADER_PAD + 4, y + height - FOOTER_H + 5);
     ctx.textAlign = 'left';

@@ -15,7 +15,7 @@ export const TreeLens = {
       // Higher confidence for deeper objects
       if (typeof data === 'object' && data !== null) {
         const depth = getDepth(data);
-        return depth > 1 ? 0.85 : 0.75;
+        return depth > 1 ? 0.85 : 0.6;  // flat objects → CardLens wins at 0.7
       }
       // JSON string — try to parse
       if (typeof data === 'string') {
@@ -53,15 +53,51 @@ export const TreeLens = {
     const textX = x + pad + 6; // +6 for accent bar
     let textY = y + pad;
     const maxY = y + height - pad - 14; // leave room for lens badge
+    const contentWidth = width - pad * 2 - 8;
 
-    // ── Header ──
-    if (abstractionLevel !== 'type') {
-      ctx.font = '400 11px "JetBrains Mono", monospace';
-      ctx.fillStyle = isDark ? '#8cb8cc' : '#4a6a7a';
-      ctx.textBaseline = 'top';
-      ctx.fillText(descriptor ?? '', textX, textY);
-      textY += 16;
+    // ── Header: extract title from data (like CardLens) ──
+    ctx.textBaseline = 'top';
+
+    // Bold title — extract name/model/title from data
+    let title = '';
+    if (typeof obj === 'object' && obj !== null) {
+      const d = obj as Record<string, unknown>;
+      if (d.name) title = String(d.name);
+      else if (d.model) title = String(d.model);
+      else if (d.title) title = String(d.title);
     }
+
+    if (title) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(x + 6, y, width - 6, height);
+      ctx.clip();
+      ctx.font = '600 13px "JetBrains Mono", monospace';
+      ctx.fillStyle = isDark ? '#e8f4ff' : '#1a2a3a';
+      const titleLines = wrapText(ctx, title, contentWidth, 2);
+      for (const line of titleLines) {
+        ctx.fillText(line.text, textX, textY);
+        textY += 18;
+      }
+      ctx.restore();
+    }
+
+    // Descriptor (muted, below title)
+    if (abstractionLevel !== 'type' && descriptor) {
+      ctx.font = '400 10px "JetBrains Mono", monospace';
+      ctx.fillStyle = isDark ? '#8cb8cc' : '#4a6a7a';
+      ctx.fillText(descriptor, textX, textY);
+      textY += 15;
+    }
+
+    // ── Separator line ──
+    ctx.strokeStyle = isDark ? 'rgba(77,201,246,0.12)' : 'rgba(42,74,90,0.12)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(x + 8, textY);
+    ctx.lineTo(x + width - 8, textY);
+    ctx.stroke();
+    textY += 8;
 
     // ── Tree content ──
     if (typeof obj === 'object' && obj !== null) {
@@ -74,7 +110,7 @@ export const TreeLens = {
 
     // ── Lens badge ──
     ctx.font = '400 9px "JetBrains Mono", monospace';
-    ctx.fillStyle = isDark ? 'rgba(77, 201, 246, 0.4)' : 'rgba(42, 107, 138, 0.4)';
+    ctx.fillStyle = isDark ? 'rgba(77, 201, 246, 0.4)' : 'rgba(42, 107, 138, 0.65)';
     ctx.textAlign = 'right';
     ctx.textBaseline = 'top';
     ctx.fillText('TREE ▾', x + width - 8, y + height - 14);
