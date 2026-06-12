@@ -21,15 +21,17 @@ automatically → ask "why?" and get grounded reasoning.
 v5.1 (embed demos in the document), then Demo v3 (extract a shared
 `metamedium-core` library and converge the forked demos onto it).
 
-Architecture documents (planning, in chronological order):
+Architecture documents (chronological; **read v6 first — it's the active one**):
+- `ARCHITECTURE-v6-SESSION-ENGINE.md` — **active design**: the no-modes session engine (deferred commitment, summoning, promotion ladder, capability tiers), implemented in `metamedium-core/`
 - `PRD-v4-LLM-Grounded.md` — LLM-grounded architecture, tiered escalation (Tier 0 heuristics / Tier 1 light LLM / Tier 2 Claude), MCP server spec
-- `ARCHITECTURE-v5-UNIFIED-ENGINE.md` — unified engine: shape experts, MoE routing, three state planes, `metamedium-core` extraction plan
-- `metamedium-core-schema.md` — graph data model ("everything is a node; type emerges from connections")
+- `ARCHITECTURE-v5-UNIFIED-ENGINE.md` — unified engine: shape experts, MoE routing, three state planes (amended by v6)
+- `metamedium-core-schema.md` — graph data model ("everything is a node; type emerges from connections") — now load-bearing via v6
 
 ## Repository Map
 
 | Path | What it is |
 |---|---|
+| `metamedium-core/` | **The canonical engine** (TypeScript, zero deps, tested): geometry, recognition, spatial graph, and the no-modes session engine. New recognition/engine work lands HERE |
 | `index.html` | **Interactive whitepaper v5** "MetaMedium: AI Beyond Chat" (live on GitHub Pages) |
 | `doodle2-canvas.html` | **Flagship demo**: heuristic recognition, spatial graph, library, undo/redo, touch. No LLM. Single-file (~500KB) |
 | `metadoodle1.html` | Fork of flagship + tiered LLM recognition (WebLLM in-browser, LM Studio local API) + voice. Single-file (~600KB) |
@@ -42,12 +44,12 @@ Architecture documents (planning, in chronological order):
 | `archive/` | Retired versions, incl. whitepaper v4 (root `MetaMedium_Whitepaper_v4.html` is a redirect stub — keep it) |
 | `.github/workflows/ci.yml` | CI: lint + test + build of Web App Skeleton on every push/PR |
 
-**Known duplication:** recognition logic exists independently in
+**Known duplication:** recognition logic still exists independently in
 `doodle2-canvas.html`, `metadoodle1.html`, `Web App Skeleton/src/core/`, and
-`v2-poc/bundle.js`. Until `metamedium-core` is extracted (see ROADMAP.md), a
-recognition change usually needs to be evaluated against all of them — prefer
-landing improvements in `Web App Skeleton/src/core/` (the future core source)
-and the flagship demo.
+`v2-poc/bundle.js`. As of June 2026, **`metamedium-core/` is the canonical
+source** (geometry/recognition ported from the Web App Skeleton with
+behavior-identical tests). Land improvements in core; the legacy copies
+converge onto it per ROADMAP.md and should not receive new logic.
 
 ## Architecture
 
@@ -107,6 +109,20 @@ context) — not screenshots. LLM calls must never block drawing; degrade
 gracefully to Tier 0.
 
 ## Working with the Codebase
+
+### metamedium-core (the engine — start here for recognition/engine work)
+
+```bash
+cd metamedium-core
+npm install
+npm test         # 63 tests incl. the canonical-loop scenario (keep green)
+npm run typecheck
+npm run build    # ESM + d.ts → dist/
+```
+
+`src/session/session.scenario.test.ts` is the executable spec for the
+no-modes flow (lasso → check → summon → bless → artifact). Change it knowingly
+or not at all. Design rationale: `ARCHITECTURE-v6-SESSION-ENGINE.md`.
 
 ### Standalone HTML demos
 

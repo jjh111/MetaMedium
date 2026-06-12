@@ -22,7 +22,8 @@ Flagship demo keyboard shortcuts: `Ctrl+Z` undo, `Ctrl+Shift+Z` redo,
 
 ## Plan & Architecture
 
-- **[ROADMAP.md](ROADMAP.md)** — active plan: Whitepaper v5.1, then Demo v3 on a shared `metamedium-core`
+- **[ROADMAP.md](ROADMAP.md)** — active plan: Whitepaper v5.1, then Demo v3 on `metamedium-core`
+- **[ARCHITECTURE-v6-SESSION-ENGINE.md](ARCHITECTURE-v6-SESSION-ENGINE.md)** — active design: the no-modes session engine
 - [PRD-v4-LLM-Grounded.md](PRD-v4-LLM-Grounded.md) — LLM-grounded architecture, tiered escalation, MCP server spec
 - [ARCHITECTURE-v5-UNIFIED-ENGINE.md](ARCHITECTURE-v5-UNIFIED-ENGINE.md) — unified engine: shape experts, routing, state planes
 - [metamedium-core-schema.md](metamedium-core-schema.md) — graph data model: everything is a node
@@ -30,8 +31,18 @@ Flagship demo keyboard shortcuts: `Ctrl+Z` undo, `Ctrl+Shift+Z` redo,
 
 ## Development
 
-The React/TypeScript app (future home of `metamedium-core`) lives in
-`Web App Skeleton/`:
+**The engine** — geometry, recognition, spatial graph, and the no-modes
+session engine — lives in [`metamedium-core/`](metamedium-core/) (TypeScript,
+zero runtime deps):
+
+```bash
+cd metamedium-core
+npm install
+npm test         # 63 tests incl. the canonical-loop executable spec
+npm run build
+```
+
+The React/TypeScript app lives in `Web App Skeleton/`:
 
 ```bash
 cd "Web App Skeleton"

@@ -84,6 +84,14 @@ Goal: converge the forks into a single flagship demo built on an extracted,
 tested core library. This is ARCHITECTURE-v5 Phases 1–3, scoped down to what
 the demo needs — no MoE router, no embedding space yet.
 
+> **Update (June 2026):** Step 1 happened — driven by the no-modes user story
+> rather than as an abstract refactor. `metamedium-core/` now exists with
+> geometry/recognition/spatial ported (behavior-identical, tested) **plus the
+> session engine** implementing lasso → check → summon → bless → artifact.
+> See `ARCHITECTURE-v6-SESSION-ENGINE.md` (the active design) and the
+> executable spec at `metamedium-core/src/session/session.scenario.test.ts`.
+> Remaining from the original Step 1: UMD bundle for standalone demos.
+
 **Step 1 — Extract `metamedium-core` (week 1–2).**
 - New `metamedium-core/` package: geometry, fingerprinting, recognition
   heuristics, spatial graph, library/matching — pure TypeScript, zero

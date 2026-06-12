@@ -1,8 +1,9 @@
 # macOS junk
 .DS_Store
 
-# Dependencies
+# Dependencies & build output
 node_modules/
+metamedium-core/dist/
 
 # NOTE: v2-poc/src/ was previously ignored, so the v2-poc source was never
 # committed — only the built bundle.js. Commit the source from the machine
