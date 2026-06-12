@@ -25,6 +25,8 @@ var MetaMediumCore = (() => {
     BUILTIN_TYPES: () => BUILTIN_TYPES,
     DEFAULT_GESTURE_CONFIG: () => DEFAULT_GESTURE_CONFIG,
     DEFAULT_SESSION_CONFIG: () => DEFAULT_SESSION_CONFIG,
+    LOCAL_PARTICIPANT: () => LOCAL_PARTICIPANT,
+    TIER0_PARTICIPANT: () => TIER0_PARTICIPANT,
     analyzeCornerAngles: () => analyzeCornerAngles,
     analyzeStroke: () => analyzeStroke,
     boundingBoxDistance: () => boundingBoxDistance,
@@ -38,6 +40,7 @@ var MetaMediumCore = (() => {
     convexHull: () => convexHull,
     countCorners: () => countCorners,
     createBootstrapNodes: () => createBootstrapNodes,
+    createParticipantNode: () => createParticipantNode,
     createSession: () => createSession,
     enclosedBy: () => enclosedBy,
     findCorners: () => findCorners,
@@ -50,6 +53,7 @@ var MetaMediumCore = (() => {
     isCheckLike: () => isCheckLike,
     isGesture: () => isGesture,
     isLassoLike: () => isLassoLike,
+    isParticipant: () => isParticipant,
     isStrokeClosed: () => isStrokeClosed,
     matchPrimitiveFromLibrary: () => matchPrimitiveFromLibrary,
     normalizeStroke: () => normalizeStroke,
@@ -675,14 +679,35 @@ var MetaMediumCore = (() => {
   function typeNodeId(type) {
     return `type:${type}`;
   }
-  function createBootstrapNodes(at) {
-    return BUILTIN_TYPES.map((t) => ({
-      id: typeNodeId(t),
-      reps: [{ modality: "word", data: t, source: "bootstrap" }],
+  var LOCAL_PARTICIPANT = "participant:local";
+  var TIER0_PARTICIPANT = "participant:tier0";
+  function createParticipantNode(id, kind, name, at) {
+    return {
+      id,
+      reps: [
+        { modality: "participant", data: { kind } },
+        { modality: "word", data: name }
+      ],
       edges: [],
       capability: 0,
       createdAt: at
-    }));
+    };
+  }
+  function isParticipant(node) {
+    return getRep(node, "participant") !== void 0;
+  }
+  function createBootstrapNodes(at) {
+    return [
+      ...BUILTIN_TYPES.map((t) => ({
+        id: typeNodeId(t),
+        reps: [{ modality: "word", data: t, source: "bootstrap" }],
+        edges: [],
+        capability: 0,
+        createdAt: at
+      })),
+      createParticipantNode(LOCAL_PARTICIPANT, "human", "local", at),
+      createParticipantNode(TIER0_PARTICIPANT, "engine", "tier0-heuristics", at)
+    ];
   }
   function getRep(node, modality) {
     return node.reps.find((r) => r.modality === modality);
@@ -754,6 +779,7 @@ var MetaMediumCore = (() => {
     let pendingLasso = null;
     let summon = null;
     let clusterCandidates = [];
+    let participants = [];
     let counter = 0;
     const listeners = /* @__PURE__ */ new Set();
     function reset() {
@@ -763,6 +789,7 @@ var MetaMediumCore = (() => {
       pendingLasso = null;
       summon = null;
       clusterCandidates = [];
+      participants = [LOCAL_PARTICIPANT, TIER0_PARTICIPANT];
       counter = 0;
       for (const n of createBootstrapNodes(0)) nodes.set(n.id, n);
     }
@@ -880,14 +907,15 @@ var MetaMediumCore = (() => {
     }
     function applyStroke(ev) {
       const { points, at } = ev;
+      const pid = ev.participantId ?? LOCAL_PARTICIPANT;
       const fp = getFingerprint(points);
       const node = {
         id: nextId("stroke"),
         reps: [
-          { modality: "stroke", data: { points, at }, source: "user" },
-          { modality: "fingerprint", data: fp, source: "heuristic" }
+          { modality: "stroke", data: { points, at }, source: pid },
+          { modality: "fingerprint", data: fp, source: TIER0_PARTICIPANT }
         ],
-        edges: [],
+        edges: [{ to: pid, rel: "made-by" }],
         capability: 0,
         createdAt: at
       };
@@ -919,7 +947,9 @@ var MetaMediumCore = (() => {
         node.edges.push({
           to: typeNodeId(r.type),
           rel: "resembles",
-          weight: r.confidence
+          weight: r.confidence,
+          via: TIER0_PARTICIPANT
+          // even the heuristics are a participant
         });
       }
       addSpatialEdges(node);
@@ -955,9 +985,9 @@ var MetaMediumCore = (() => {
       const artifact = {
         id: nextId("artifact"),
         reps: [
-          { modality: "word", data: name, source: "user" },
+          { modality: "word", data: name, source: ev.participantId ?? LOCAL_PARTICIPANT },
           { modality: "bounds", data: unionBounds },
-          { modality: "signature", data: signatureOf(memberIds), source: "heuristic" }
+          { modality: "signature", data: signatureOf(memberIds), source: TIER0_PARTICIPANT }
         ],
         edges: [
           ...memberIds.map((id) => ({ to: id, rel: "has-part", blessed: true })),
@@ -1012,12 +1042,31 @@ var MetaMediumCore = (() => {
       }
       recomputeClusterCandidates();
     }
+    function applyJoin(ev) {
+      const node = createParticipantNode(nextId("participant"), ev.kind, ev.name, ev.at);
+      nodes.set(node.id, node);
+      participants.push(node.id);
+      return node.id;
+    }
+    function applyPropose(ev) {
+      const node = nodes.get(ev.nodeId);
+      if (!node || !participants.includes(ev.participantId)) return;
+      for (const e of ev.edges) {
+        node.edges.push({ to: e.to, rel: e.rel, weight: e.weight, via: ev.participantId });
+      }
+      recomputeClusterCandidates();
+    }
     function applyEvent(ev) {
       switch (ev.type) {
         case "stroke":
           return applyStroke(ev);
         case "bless":
           return applyBless(ev);
+        case "join":
+          return applyJoin(ev);
+        case "propose":
+          applyPropose(ev);
+          return null;
         case "dismiss":
           if (summon?.id === ev.summonId) summon = null;
           return null;
@@ -1055,7 +1104,8 @@ var MetaMediumCore = (() => {
         pendingLassoId: pendingLasso?.id ?? null,
         summon: summon ? { ...summon, enclosedIds: [...summon.enclosedIds] } : null,
         clusterCandidates: clusterCandidates.map((c) => ({ ...c })),
-        artifacts: [...artifacts]
+        artifacts: [...artifacts],
+        participants: [...participants]
       };
     }
     function subscribe(listener) {
@@ -1065,7 +1115,9 @@ var MetaMediumCore = (() => {
       };
     }
     return {
-      addStroke: (points, at) => dispatch({ type: "stroke", points, at }),
+      addStroke: (points, at, participantId) => dispatch({ type: "stroke", points, at, participantId }),
+      join: (kind, name, at) => dispatch({ type: "join", kind, name, at }),
+      propose: (args) => void dispatch({ type: "propose", ...args }),
       tick: (at) => void dispatch({ type: "tick", at }),
       bless: (args) => dispatch({ type: "bless", ...args }),
       dismiss: (summonId, at) => void dispatch({ type: "dismiss", summonId, at }),

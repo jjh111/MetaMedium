@@ -19,7 +19,9 @@ import { buildSpatialGraph, spatialCluster } from '../spatial';
 import {
   type MMNode,
   type Edge,
+  type ParticipantKind,
   createBootstrapNodes,
+  createParticipantNode,
   typeNodeId,
   fingerprintOf,
   getRep,
@@ -27,6 +29,8 @@ import {
   topInterpretation,
   boundsOf,
   resemblances,
+  LOCAL_PARTICIPANT,
+  TIER0_PARTICIPANT,
 } from './nodes';
 import {
   type GestureConfig,
@@ -69,14 +73,28 @@ export interface SessionState {
   summon: Summon | null;
   clusterCandidates: ClusterCandidate[];
   artifacts: string[];
+  /** Participant node ids (humans, agents, and the engine's own recognizers). */
+  participants: string[];
 }
 
+// Every event is attributed: participantId defaults to the local human.
+// Humans and AI agents contribute through the SAME events — there is no
+// separate "AI input" channel (one class of citizen).
 export type SessionEvent =
-  | { type: 'stroke'; points: Point[]; at: number }
+  | { type: 'stroke'; points: Point[]; at: number; participantId?: string }
   | { type: 'tick'; at: number }
-  | { type: 'bless'; summonId: string; name?: string; suggestionId?: string; at: number }
-  | { type: 'dismiss'; summonId: string; at: number }
-  | { type: 'erase'; nodeId: string; at: number };
+  | { type: 'bless'; summonId: string; name?: string; suggestionId?: string; at: number; participantId?: string }
+  | { type: 'dismiss'; summonId: string; at: number; participantId?: string }
+  | { type: 'erase'; nodeId: string; at: number; participantId?: string }
+  | { type: 'join'; kind: ParticipantKind; name: string; at: number }
+  | { type: 'propose'; participantId: string; nodeId: string; edges: ProposedEdge[]; at: number };
+
+/** An attributed, inferred edge offered by a participant (e.g. an LLM tier). */
+export interface ProposedEdge {
+  to: string;
+  rel: string;
+  weight?: number;
+}
 
 export interface SessionConfig {
   gesture: GestureConfig;
@@ -94,9 +112,19 @@ export const DEFAULT_SESSION_CONFIG: SessionConfig = {
 type Signature = Record<string, number>; // type histogram, e.g. { circle: 3, line: 2 }
 
 export interface Session {
-  addStroke(points: Point[], at: number): string;
+  addStroke(points: Point[], at: number, participantId?: string): string;
+  /** Register a participant (human or AI agent). Returns its node id. */
+  join(kind: ParticipantKind, name: string, at: number): string;
+  /** Offer attributed, inferred edges on a node — the channel LLM tiers use. */
+  propose(args: { participantId: string; nodeId: string; edges: ProposedEdge[]; at: number }): void;
   tick(at: number): void;
-  bless(args: { summonId: string; name?: string; suggestionId?: string; at: number }): string | null;
+  bless(args: {
+    summonId: string;
+    name?: string;
+    suggestionId?: string;
+    at: number;
+    participantId?: string;
+  }): string | null;
   dismiss(summonId: string, at: number): void;
   /** Remove a node from the content plane. Members degrade their artifact. Ink is kept. */
   erase(nodeId: string, at: number): void;
@@ -116,6 +144,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
   let pendingLasso: { id: string; at: number } | null = null;
   let summon: Summon | null = null;
   let clusterCandidates: ClusterCandidate[] = [];
+  let participants: string[] = [];
   let counter = 0;
   const listeners = new Set<(state: SessionState) => void>();
 
@@ -126,6 +155,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     pendingLasso = null;
     summon = null;
     clusterCandidates = [];
+    participants = [LOCAL_PARTICIPANT, TIER0_PARTICIPANT];
     counter = 0;
     for (const n of createBootstrapNodes(0)) nodes.set(n.id, n);
   }
@@ -281,14 +311,15 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
 
   function applyStroke(ev: Extract<SessionEvent, { type: 'stroke' }>): string {
     const { points, at } = ev;
+    const pid = ev.participantId ?? LOCAL_PARTICIPANT;
     const fp = getFingerprint(points);
     const node: MMNode = {
       id: nextId('stroke'),
       reps: [
-        { modality: 'stroke', data: { points, at }, source: 'user' },
-        { modality: 'fingerprint', data: fp, source: 'heuristic' },
+        { modality: 'stroke', data: { points, at }, source: pid },
+        { modality: 'fingerprint', data: fp, source: TIER0_PARTICIPANT },
       ],
-      edges: [],
+      edges: [{ to: pid, rel: 'made-by' }],
       capability: 0,
       createdAt: at,
     };
@@ -331,6 +362,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
         to: typeNodeId(r.type),
         rel: 'resembles',
         weight: r.confidence,
+        via: TIER0_PARTICIPANT, // even the heuristics are a participant
       } satisfies Edge);
     }
 
@@ -380,9 +412,9 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     const artifact: MMNode = {
       id: nextId('artifact'),
       reps: [
-        { modality: 'word', data: name, source: 'user' },
+        { modality: 'word', data: name, source: ev.participantId ?? LOCAL_PARTICIPANT },
         { modality: 'bounds', data: unionBounds },
-        { modality: 'signature', data: signatureOf(memberIds), source: 'heuristic' },
+        { modality: 'signature', data: signatureOf(memberIds), source: TIER0_PARTICIPANT },
       ],
       edges: [
         ...memberIds.map((id) => ({ to: id, rel: 'has-part', blessed: true })),
@@ -458,12 +490,35 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     recomputeClusterCandidates();
   }
 
+  function applyJoin(ev: Extract<SessionEvent, { type: 'join' }>): string {
+    const node = createParticipantNode(nextId('participant'), ev.kind, ev.name, ev.at);
+    nodes.set(node.id, node);
+    participants.push(node.id);
+    return node.id;
+  }
+
+  function applyPropose(ev: Extract<SessionEvent, { type: 'propose' }>) {
+    const node = nodes.get(ev.nodeId);
+    if (!node || !participants.includes(ev.participantId)) return;
+    // Proposals are held like every other interpretation: attributed,
+    // inferred, never blessed by the act of proposing.
+    for (const e of ev.edges) {
+      node.edges.push({ to: e.to, rel: e.rel, weight: e.weight, via: ev.participantId });
+    }
+    recomputeClusterCandidates();
+  }
+
   function applyEvent(ev: SessionEvent): string | null {
     switch (ev.type) {
       case 'stroke':
         return applyStroke(ev);
       case 'bless':
         return applyBless(ev);
+      case 'join':
+        return applyJoin(ev);
+      case 'propose':
+        applyPropose(ev);
+        return null;
       case 'dismiss':
         if (summon?.id === ev.summonId) summon = null;
         return null;
@@ -512,6 +567,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       summon: summon ? { ...summon, enclosedIds: [...summon.enclosedIds] } : null,
       clusterCandidates: clusterCandidates.map((c) => ({ ...c })),
       artifacts: [...artifacts],
+      participants: [...participants],
     };
   }
 
@@ -523,7 +579,10 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
   }
 
   return {
-    addStroke: (points, at) => dispatch({ type: 'stroke', points, at }) as string,
+    addStroke: (points, at, participantId) =>
+      dispatch({ type: 'stroke', points, at, participantId }) as string,
+    join: (kind, name, at) => dispatch({ type: 'join', kind, name, at }) as string,
+    propose: (args) => void dispatch({ type: 'propose', ...args }),
     tick: (at) => void dispatch({ type: 'tick', at }),
     bless: (args) => dispatch({ type: 'bless', ...args }),
     dismiss: (summonId, at) => void dispatch({ type: 'dismiss', summonId, at }),

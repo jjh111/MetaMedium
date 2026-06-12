@@ -70,11 +70,29 @@ session.subscribe((state) => {
 | `spatial` | `buildSpatialGraph` (touching/intersecting/contains), `spatialCluster` |
 | `session/nodes` | the node model: open `reps` list + `edges` + `capability` tier — everything is a node |
 | `session/gesture` | lasso/check predicates; temporal **+** contextual resolution |
+| `session/nodes` (participants) | participants are nodes: local human + tier-0 heuristics bootstrap; `join` adds humans/agents |
 | `session/session` | the engine: events in, `SessionState` out; event-sourced — `undo()` = drop last input + replay; `erase()` with artifact degradation; wire (`connects`) inference |
+
+### Plugging in an LLM tier (or any agent)
+
+```typescript
+const me = session.join('agent', 'claude-haiku', Date.now());
+// Agents draw, lasso, check, and bless through the SAME calls as humans:
+session.addStroke(points, Date.now(), me);
+// Interpretations are attributed proposals — held, never auto-committed:
+session.propose({
+  participantId: me,
+  nodeId: strokeId,
+  edges: [{ to: 'type:circle', rel: 'resembles', weight: 0.92 }],
+  at: Date.now(),
+});
+```
 
 ## Invariants (enforced by tests — keep them)
 
 - Input is never refused; there is no mode.
+- One class of citizen: humans, agents, and the engine's own recognizers are
+  participants; every act is attributed; there is no separate AI channel.
 - Interpretations are held (multi-parse), never auto-committed.
 - A lasso is simultaneously content and gesture-candidate until the next event resolves it.
 - A check **summons**; blessing is a separate act. Drawing past a summon dismisses it.

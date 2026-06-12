@@ -40,14 +40,54 @@ export function typeNodeId(type: string): string {
   return `type:${type}`;
 }
 
-export function createBootstrapNodes(at: number): MMNode[] {
-  return BUILTIN_TYPES.map((t) => ({
-    id: typeNodeId(t),
-    reps: [{ modality: 'word', data: t, source: 'bootstrap' }],
+// ===== Participants =====
+// One class of citizen: humans, AI agents, and the engine's own recognizers
+// are all participants — nodes that contribute attributed acts to the shared
+// canvas. What differs is the nuance of their marks (humans enter through
+// stroke dynamics; agents may enter through words, refined geometry, or
+// payloads), not their standing.
+
+export type ParticipantKind = 'human' | 'agent' | 'engine';
+
+/** The default local human, present in every session. */
+export const LOCAL_PARTICIPANT = 'participant:local';
+/** The engine's Tier-0 heuristics — the medium is itself a participant. */
+export const TIER0_PARTICIPANT = 'participant:tier0';
+
+export function createParticipantNode(
+  id: string,
+  kind: ParticipantKind,
+  name: string,
+  at: number
+): MMNode {
+  return {
+    id,
+    reps: [
+      { modality: 'participant', data: { kind } },
+      { modality: 'word', data: name },
+    ],
     edges: [],
     capability: 0,
     createdAt: at,
-  }));
+  };
+}
+
+export function isParticipant(node: MMNode): boolean {
+  return getRep(node, 'participant') !== undefined;
+}
+
+export function createBootstrapNodes(at: number): MMNode[] {
+  return [
+    ...BUILTIN_TYPES.map((t) => ({
+      id: typeNodeId(t),
+      reps: [{ modality: 'word', data: t, source: 'bootstrap' }],
+      edges: [],
+      capability: 0 as const,
+      createdAt: at,
+    })),
+    createParticipantNode(LOCAL_PARTICIPANT, 'human', 'local', at),
+    createParticipantNode(TIER0_PARTICIPANT, 'engine', 'tier0-heuristics', at),
+  ];
 }
 
 // ===== Accessors =====

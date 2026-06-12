@@ -34,18 +34,22 @@ export type { IntersectionDetector } from './spatial';
 // Node model
 export {
   createBootstrapNodes,
+  createParticipantNode,
   typeNodeId,
   getRep,
   fingerprintOf,
   strokePointsOf,
   wordOf,
   isGesture,
+  isParticipant,
   resemblances,
   topInterpretation,
   boundsOf,
   BUILTIN_TYPES,
+  LOCAL_PARTICIPANT,
+  TIER0_PARTICIPANT,
 } from './session/nodes';
-export type { MMNode, Rep, Edge, Capability } from './session/nodes';
+export type { MMNode, Rep, Edge, Capability, ParticipantKind } from './session/nodes';
 
 // Gesture grammar
 export {
@@ -67,6 +71,7 @@ export type {
   Summon,
   Suggestion,
   ClusterCandidate,
+  ProposedEdge,
 } from './session/session';
 
 // Types

@@ -214,13 +214,45 @@ with** the spatial condition — neither alone suffices (principle 4). A
 pending lasso that never gets its check simply remains content; nothing
 expires it into an error.
 
+### Participants: one class of citizen
+
+The canvas is multiplayer between humans and AIs — multiple of each — and the
+engine refuses to give them separate input channels. **A participant is the
+one class of citizen, and participants are nodes** (`participant` rep, name,
+kind: human | agent | engine).
+
+- **Every event is attributed.** `stroke`, `bless`, `erase`, `propose` all
+  carry a `participantId` (defaulting to the local human). Strokes get a
+  `made-by` edge to their author. "Show me everything Claude drew" is a graph
+  query, not a feature.
+- **The medium is itself a participant.** The engine's Tier-0 heuristics are
+  registered as `participant:tier0`; every recognition edge they add carries
+  `via: participant:tier0`. So ALL interpretation — heuristic, WebLLM,
+  Claude, human assertion — flows through one attributed channel: the
+  `propose` event (held, unblessed edges that re-rank the multi-parse but
+  never commit). AI as medium *and* messenger, literally.
+- **Same acts, same standing.** An agent can draw (its strokes are
+  recognized, lassoable, blessable like anyone's), can lasso + check (the
+  summon is the messenger's speech act), and can bless. What differs is the
+  *nuance of entry*: humans enter through stroke dynamics (ink → meaning,
+  bottom-up); agents may enter through words, refined geometry, or payload
+  reps (intent → form, top-down). The open `reps` list absorbs both
+  directions on the same node.
+- **Trust is per-participant** and rides the same capability concept as
+  containers. Open question (decide when it bites): whether agent blessings
+  in some sessions are held as proposals until a human co-signs.
+- **Multiplayer sync = merged event logs.** The event-sourced design is the
+  sync substrate; a shared session is an ordered merge of attributed events.
+  (Conflict policy and per-participant pending-lasso tracking are future
+  work — today the engine keeps one shared pending lasso.)
+
 ### What the engine deliberately does not know
 
-Rendering, sanitization, sandboxing, HTML, voice, LLMs. LLM tiers attach
-later as **async candidate sources**: they receive the same grounded substrate
-(fingerprints, spatial edges, library context) and return additional
-`resembles`/`connects` edges with `source: 'llm:…'` — feeding the same
-multi-parse state, never gating input (CLAUDE.md pitfall #2).
+Rendering, sanitization, sandboxing, HTML, voice, LLM transport. LLM tiers
+attach as **agent participants**: `join` once, then `propose` attributed
+edges computed from the same grounded substrate (fingerprints, spatial
+edges, library context) — feeding the same multi-parse state, never gating
+input (CLAUDE.md pitfall #2).
 
 ---
 
@@ -310,7 +342,12 @@ connection — blessing flow for wires still pending); size-relative
 browser bundle (IIFE, `window.MetaMediumCore`); **reference surface** at
 `Demos/session-engine.html` — the first visible artifact of the engine,
 verified end-to-end in headless Chromium.
-**v0.3 (next):** wire blessing via summon; richer composition matching (port
+**v0.3 — participants landed:** one-class citizenship — participants as
+nodes (`join`), attributed events (`made-by`), tier-0 heuristics registered
+as a participant, and the `propose` channel for LLM tiers (attributed, held,
+unblessed edges). Mixed human/agent artifacts and agent-performed gestures
+are covered by tests.
+**Still v0.3:** wire blessing via summon; richer composition matching (port
 `CompositionFingerprint`); first Tier-1 container escalation ("make this a
 surface" → markdown/HTML payload rendered in bounds); playground surface
 wiring; Web App Skeleton converges onto the package; single-stroke
