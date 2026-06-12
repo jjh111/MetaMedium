@@ -174,6 +174,16 @@ demo, offline-first, with LLM tiers as progressive enhancement.
   committed — only `bundle.js` is in the repo. Commit `v2-poc/src/` from the
   machine that has it (the ignore rule is now removed).
 
+## Done: June 2026 Session-Engine Push (v0.1 + v0.2)
+
+Following the cleanup pass, the no-modes user story was crystallized in
+`ARCHITECTURE-v6-SESSION-ENGINE.md` and implemented in `metamedium-core/`:
+node model, gesture grammar, session engine (summon/bless/artifact),
+event-sourced undo, erase with artifact degradation, wire inference, and a
+size-relative overshoot fix. 76 tests including the canonical-loop executable
+spec. A browser bundle + reference surface (`Demos/session-engine.html`) make
+the engine visible and were verified end-to-end in headless Chromium.
+
 ## Success Criteria
 
 - [ ] Whitepaper v5.1 live: embedded reflow figure, demo gallery, roadmap section

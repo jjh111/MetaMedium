@@ -413,10 +413,18 @@ export function analyzeCornerAngles(angles: number[]): {
 
 export function checkOvershoot(points: Point[], threshold = 50): boolean {
   // Check if stroke passes near start point at any point (not just at the end)
-  // This detects circles/ellipses where user overshoots the starting point
+  // This detects circles/ellipses where user overshoots the starting point.
+  //
+  // The proximity threshold is size-relative (like closure detection): a fixed
+  // 50px threshold made every stroke shorter than ~70px read as "overshooting",
+  // which made short strokes unrecognizable as lines.
   if (points.length < 10) return false;
 
   const start = points[0];
+
+  const bounds = getBounds(points);
+  const size = Math.max(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY);
+  const effectiveThreshold = Math.min(threshold, size * 0.2);
 
   // Check last 30% of stroke for proximity to start
   const checkStart = Math.floor(points.length * 0.7);
@@ -426,7 +434,7 @@ export function checkOvershoot(points: Point[], threshold = 50): boolean {
       Math.pow(points[i].x - start.x, 2) + Math.pow(points[i].y - start.y, 2)
     );
 
-    if (distance < threshold) {
+    if (distance < effectiveThreshold) {
       return true;
     }
   }
@@ -604,6 +612,12 @@ export function normalizeStroke(points: Point[], targetSize = 200): Point[] {
 }
 
 // ===== BOUNDING BOX OPERATIONS =====
+
+export function distancePointToBounds(p: Point, b: Bounds): number {
+  const dx = Math.max(0, b.minX - p.x, p.x - b.maxX);
+  const dy = Math.max(0, b.minY - p.y, p.y - b.maxY);
+  return Math.sqrt(dx * dx + dy * dy);
+}
 
 export function boundingBoxDistance(b1: Bounds, b2: Bounds): number {
   const horizDist = Math.max(

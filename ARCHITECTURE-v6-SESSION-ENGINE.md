@@ -299,14 +299,22 @@ detection. CI runs all of it on every push/PR.
 
 ## 10. Build Sequencing & Anti-Goals
 
-**v0.1 (now):** package scaffold; geometry/recognition/spatial ported from
+**v0.1 — done:** package scaffold; geometry/recognition/spatial ported from
 Web App Skeleton with tests; node store; session engine with lasso+check →
 summon → bless; histogram artifact matching; scenario test; CI.
-**v0.2:** replay-based undo + artifact degradation; wire (`connects`)
-inference + blessing; richer composition matching (port
-`CompositionFingerprint`); UMD bundle for standalone demos.
-**v0.3:** first Tier-1 container escalation; playground surface wiring;
-Web App Skeleton converges onto the package.
+**v0.2 — done:** event-sourced undo (drop last input + replay) + erase with
+artifact degradation (visibly broken, survivors return as ink); wire
+(`connects`) inference (a line landing on two nodes is a held candidate
+connection — blessing flow for wires still pending); size-relative
+`checkOvershoot` (knowing fix: short strokes were unrecognizable as lines);
+browser bundle (IIFE, `window.MetaMediumCore`); **reference surface** at
+`Demos/session-engine.html` — the first visible artifact of the engine,
+verified end-to-end in headless Chromium.
+**v0.3 (next):** wire blessing via summon; richer composition matching (port
+`CompositionFingerprint`); first Tier-1 container escalation ("make this a
+surface" → markdown/HTML payload rendered in bounds); playground surface
+wiring; Web App Skeleton converges onto the package; single-stroke
+circle-with-tail gesture variant.
 
 **Anti-goals for now:** no UI in the core, no LLM calls in the core, no
 embedding space, no MoE, no general plugin system, no sanitizer/sandbox in

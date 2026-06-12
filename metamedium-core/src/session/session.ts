@@ -8,10 +8,12 @@
 //     the NEXT event resolves it (deferred commitment with retroactivity).
 //   - A check summons; it does not confirm. Blessing is a separate act.
 //   - Drawing past an active summon dissolves it (ignoring is a valid answer).
-//   - Ink is never destroyed: gesture/member strokes keep their nodes & reps.
+//   - Ink is never destroyed: gesture/member/erased strokes keep their nodes.
+//   - The engine is event-sourced: every input is logged, state is a pure
+//     function of the log, and undo = drop the last input and replay.
 
 import type { Bounds, Component, Point } from '../types';
-import { getFingerprint, getBounds } from '../geometry';
+import { getFingerprint, getBounds, distancePointToBounds } from '../geometry';
 import { analyzeStroke } from '../recognition';
 import { buildSpatialGraph, spatialCluster } from '../spatial';
 import {
@@ -20,9 +22,11 @@ import {
   createBootstrapNodes,
   typeNodeId,
   fingerprintOf,
+  getRep,
   wordOf,
   topInterpretation,
   boundsOf,
+  resemblances,
 } from './nodes';
 import {
   type GestureConfig,
@@ -56,6 +60,7 @@ export interface ClusterCandidate {
 }
 
 export interface SessionState {
+  /** Live view of the node graph (not a snapshot) — read, don't mutate. */
   nodes: ReadonlyMap<string, MMNode>;
   /** Nodes on the content plane (strokes not yet in artifacts, plus artifacts). */
   contentIds: string[];
@@ -70,16 +75,20 @@ export type SessionEvent =
   | { type: 'stroke'; points: Point[]; at: number }
   | { type: 'tick'; at: number }
   | { type: 'bless'; summonId: string; name?: string; suggestionId?: string; at: number }
-  | { type: 'dismiss'; summonId: string; at: number };
+  | { type: 'dismiss'; summonId: string; at: number }
+  | { type: 'erase'; nodeId: string; at: number };
 
 export interface SessionConfig {
   gesture: GestureConfig;
   clusterThresholdPx: number;
+  /** How close a line endpoint must be to a node to infer a 'connects' wire. */
+  wireEndpointPx: number;
 }
 
 export const DEFAULT_SESSION_CONFIG: SessionConfig = {
   gesture: DEFAULT_GESTURE_CONFIG,
   clusterThresholdPx: 60,
+  wireEndpointPx: 30,
 };
 
 type Signature = Record<string, number>; // type histogram, e.g. { circle: 3, line: 2 }
@@ -89,24 +98,38 @@ export interface Session {
   tick(at: number): void;
   bless(args: { summonId: string; name?: string; suggestionId?: string; at: number }): string | null;
   dismiss(summonId: string, at: number): void;
+  /** Remove a node from the content plane. Members degrade their artifact. Ink is kept. */
+  erase(nodeId: string, at: number): void;
+  /** Drop the last input event and replay the log. */
+  undo(): void;
   getState(): SessionState;
   subscribe(listener: (state: SessionState) => void): () => void;
-  /** Full input log — the session is replayable (undo = drop + replay, v0.2). */
+  /** Full input log — state is a pure function of this. */
   getEvents(): readonly SessionEvent[];
 }
 
 export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): Session {
-  const events: SessionEvent[] = [];
-  const nodes = new Map<string, MMNode>();
-  const contentIds: string[] = [];
-  const artifacts: string[] = [];
+  let events: SessionEvent[] = [];
+  let nodes = new Map<string, MMNode>();
+  let contentIds: string[] = [];
+  let artifacts: string[] = [];
   let pendingLasso: { id: string; at: number } | null = null;
   let summon: Summon | null = null;
   let clusterCandidates: ClusterCandidate[] = [];
   let counter = 0;
   const listeners = new Set<(state: SessionState) => void>();
 
-  for (const n of createBootstrapNodes(0)) nodes.set(n.id, n);
+  function reset() {
+    nodes = new Map();
+    contentIds = [];
+    artifacts = [];
+    pendingLasso = null;
+    summon = null;
+    clusterCandidates = [];
+    counter = 0;
+    for (const n of createBootstrapNodes(0)) nodes.set(n.id, n);
+  }
+  reset();
 
   const nextId = (prefix: string) => `${prefix}:${++counter}`;
 
@@ -114,6 +137,8 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     const state = getState();
     listeners.forEach((l) => l(state));
   }
+
+  // ===== Derived helpers =====
 
   function contentBoundsList(excludeId?: string): { id: string; bounds: Bounds }[] {
     return contentIds
@@ -130,7 +155,6 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       index,
       recognizedAs: type,
       type,
-      // Artifacts carry a synthetic fingerprint-less bounds; fall back gracefully.
       fingerprint: fp ?? ({ bounds: boundsOf(node)! } as Component['fingerprint']),
       bounds: boundsOf(node)!,
     };
@@ -168,7 +192,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       const matches = artifacts
         .map((aid) => {
           const a = nodes.get(aid)!;
-          const aSig = a.reps.find((r) => r.modality === 'signature')?.data as Signature | undefined;
+          const aSig = getRep(a, 'signature')?.data as Signature | undefined;
           if (!aSig || !signaturesEqual(sig, aSig)) return null;
           return { artifactId: aid, name: wordOf(a) ?? aid, score: 1 };
         })
@@ -183,7 +207,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     const suggestions: Suggestion[] = [];
     for (const aid of artifacts) {
       const a = nodes.get(aid)!;
-      const aSig = a.reps.find((r) => r.modality === 'signature')?.data as Signature | undefined;
+      const aSig = getRep(a, 'signature')?.data as Signature | undefined;
       if (aSig && signaturesEqual(sig, aSig)) {
         suggestions.push({
           id: nextId('sug'),
@@ -219,9 +243,44 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     for (const c of graph.containment) addPair(c.outer, c.inner, 'contains');
   }
 
-  function addStroke(points: Point[], at: number): string {
-    events.push({ type: 'stroke', points, at });
+  /**
+   * Wire inference (inferred-then-blessed): a line-like stroke whose endpoints
+   * land near two different content nodes is held as a candidate connection.
+   * The line IS the relation node (relations are nodes — core schema).
+   */
+  function inferWire(node: MMNode, points: Point[]) {
+    const top = resemblances(node)[0];
+    if (!top || top.to !== typeNodeId('line')) return;
 
+    const nearest = (p: Point) => {
+      let best: { id: string; d: number } | null = null;
+      for (const c of contentBoundsList(node.id)) {
+        const d = distancePointToBounds(p, c.bounds);
+        if (d < config.wireEndpointPx && (!best || d < best.d)) best = { id: c.id, d };
+      }
+      return best;
+    };
+
+    const a = nearest(points[0]);
+    const b = nearest(points[points.length - 1]);
+    if (!a || !b || a.id === b.id) return;
+
+    const weight = top.weight;
+    node.edges.push({ to: a.id, rel: 'connects', weight } satisfies Edge);
+    node.edges.push({ to: b.id, rel: 'connects', weight } satisfies Edge);
+    nodes.get(a.id)!.edges.push({ to: node.id, rel: 'connected-by', weight });
+    nodes.get(b.id)!.edges.push({ to: node.id, rel: 'connected-by', weight });
+  }
+
+  function removeFromContent(id: string) {
+    const idx = contentIds.indexOf(id);
+    if (idx >= 0) contentIds.splice(idx, 1);
+  }
+
+  // ===== Event application (the reducer — all mutation lives here) =====
+
+  function applyStroke(ev: Extract<SessionEvent, { type: 'stroke' }>): string {
+    const { points, at } = ev;
     const fp = getFingerprint(points);
     const node: MMNode = {
       id: nextId('stroke'),
@@ -257,7 +316,6 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
         };
         pendingLasso = null;
         recomputeClusterCandidates();
-        notify();
         return node.id;
       }
     }
@@ -277,6 +335,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     }
 
     addSpatialEdges(node);
+    inferWire(node, points);
 
     // Held ambiguity: a closed stroke enclosing content is BOTH a content
     // candidate (edges above) and the new pending lasso. The next event decides.
@@ -284,21 +343,14 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     pendingLasso = isLassoLike(fp, enclosed.length) ? { id: node.id, at } : null;
 
     recomputeClusterCandidates();
-    notify();
     return node.id;
   }
 
-  function removeFromContent(id: string) {
-    const idx = contentIds.indexOf(id);
-    if (idx >= 0) contentIds.splice(idx, 1);
-  }
+  function applyBless(ev: Extract<SessionEvent, { type: 'bless' }>): string | null {
+    if (!summon || summon.id !== ev.summonId) return null;
 
-  function bless(args: { summonId: string; name?: string; suggestionId?: string; at: number }): string | null {
-    events.push({ type: 'bless', ...args });
-    if (!summon || summon.id !== args.summonId) return null;
-
-    const chosen = args.suggestionId
-      ? summon.suggestions.find((s) => s.id === args.suggestionId)
+    const chosen = ev.suggestionId
+      ? summon.suggestions.find((s) => s.id === ev.suggestionId)
       : undefined;
 
     if (chosen?.kind === 'keep-as-drawing') {
@@ -310,11 +362,10 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       }
       summon = null;
       recomputeClusterCandidates();
-      notify();
       return null;
     }
 
-    const name = args.name ?? chosen?.label;
+    const name = ev.name ?? chosen?.label;
     if (!name) return null;
 
     const memberIds = summon.enclosedIds;
@@ -341,7 +392,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
           : []),
       ],
       capability: 0,
-      createdAt: args.at,
+      createdAt: ev.at,
     };
     nodes.set(artifact.id, artifact);
 
@@ -356,22 +407,101 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     artifacts.push(artifact.id);
     summon = null;
     recomputeClusterCandidates();
-    notify();
     return artifact.id;
   }
 
-  function dismiss(summonId: string, at: number) {
-    events.push({ type: 'dismiss', summonId, at });
-    if (summon?.id === summonId) {
+  function applyErase(ev: Extract<SessionEvent, { type: 'erase' }>) {
+    const node = nodes.get(ev.nodeId);
+    if (!node || node.id.startsWith('type:')) return;
+    if (getRep(node, 'erased')) return;
+
+    // Ink is never destroyed: the node stays in the graph, marked erased.
+    node.reps.push({ modality: 'erased', data: { at: ev.at }, source: 'user' });
+    removeFromContent(node.id);
+
+    if (pendingLasso?.id === node.id) pendingLasso = null;
+    if (
+      summon &&
+      (summon.enclosedIds.includes(node.id) || summon.gestureIds.includes(node.id))
+    ) {
       summon = null;
-      notify();
+    }
+
+    const degrade = (artifactId: string) => {
+      const artifact = nodes.get(artifactId);
+      if (!artifact || getRep(artifact, 'status')) return;
+      // Never a silent phantom: the artifact is demoted, visibly broken, and
+      // its surviving members return to the content plane as loose ink.
+      artifact.reps.push({ modality: 'status', data: 'broken', source: 'engine' });
+      removeFromContent(artifactId);
+      const ai = artifacts.indexOf(artifactId);
+      if (ai >= 0) artifacts.splice(ai, 1);
+      for (const e of artifact.edges) {
+        if (e.rel !== 'has-part') continue;
+        const member = nodes.get(e.to);
+        if (member && !getRep(member, 'erased') && !contentIds.includes(e.to)) {
+          contentIds.push(e.to);
+        }
+      }
+    };
+
+    if (artifacts.includes(node.id)) {
+      // Erasing an artifact demotes it; its members survive as ink.
+      degrade(node.id);
+    } else {
+      // Erasing a member degrades the artifact it belonged to.
+      for (const e of node.edges) {
+        if (e.rel === 'part-of' && e.blessed) degrade(e.to);
+      }
+    }
+
+    recomputeClusterCandidates();
+  }
+
+  function applyEvent(ev: SessionEvent): string | null {
+    switch (ev.type) {
+      case 'stroke':
+        return applyStroke(ev);
+      case 'bless':
+        return applyBless(ev);
+      case 'dismiss':
+        if (summon?.id === ev.summonId) summon = null;
+        return null;
+      case 'erase':
+        applyErase(ev);
+        return null;
+      case 'tick':
+        // Reserved: quiescence is an input the host provides; v0.x resolution
+        // is event-driven (the next stroke decides), so a tick only logs time.
+        return null;
     }
   }
 
-  function tick(at: number) {
-    // Reserved: quiescence is an input the host provides; v0.1 resolution is
-    // event-driven (next stroke decides), so a tick only records time.
-    events.push({ type: 'tick', at });
+  function replay() {
+    reset();
+    for (const ev of events) applyEvent(ev);
+  }
+
+  // ===== Public API =====
+
+  function dispatch(ev: SessionEvent): string | null {
+    events.push(ev);
+    const result = applyEvent(ev);
+    notify();
+    return result;
+  }
+
+  function undo() {
+    // Drop the most recent meaningful input and rebuild. Ticks are not
+    // user actions, so they're skipped over (but kept in the log).
+    for (let i = events.length - 1; i >= 0; i--) {
+      if (events[i].type !== 'tick') {
+        events = [...events.slice(0, i), ...events.slice(i + 1)];
+        replay();
+        notify();
+        return;
+      }
+    }
   }
 
   function getState(): SessionState {
@@ -392,5 +522,15 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     };
   }
 
-  return { addStroke, tick, bless, dismiss, getState, subscribe, getEvents: () => events };
+  return {
+    addStroke: (points, at) => dispatch({ type: 'stroke', points, at }) as string,
+    tick: (at) => void dispatch({ type: 'tick', at }),
+    bless: (args) => dispatch({ type: 'bless', ...args }),
+    dismiss: (summonId, at) => void dispatch({ type: 'dismiss', summonId, at }),
+    erase: (nodeId, at) => void dispatch({ type: 'erase', nodeId, at }),
+    undo,
+    getState,
+    subscribe,
+    getEvents: () => events,
+  };
 }

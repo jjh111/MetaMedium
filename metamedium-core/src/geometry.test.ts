@@ -14,6 +14,7 @@ import {
   boundingBoxDistance,
   boundsOverlap,
   boundsContain,
+  distancePointToBounds,
 } from './geometry';
 import { lineStroke, circleStroke, rectStroke } from './test/strokes';
 
@@ -112,7 +113,28 @@ describe('countCorners', () => {
   });
 });
 
+describe('distancePointToBounds', () => {
+  const b = { minX: 100, maxX: 200, minY: 100, maxY: 200 };
+
+  it('is 0 for points inside the bounds', () => {
+    expect(distancePointToBounds({ x: 150, y: 150 }, b)).toBe(0);
+  });
+
+  it('measures the gap to the nearest edge or corner', () => {
+    expect(distancePointToBounds({ x: 250, y: 150 }, b)).toBe(50); // right edge
+    expect(distancePointToBounds({ x: 150, y: 80 }, b)).toBe(20); // top edge
+    expect(distancePointToBounds({ x: 230, y: 60 }, b)).toBe(50); // corner: 3-4-5
+  });
+});
+
 describe('checkOvershoot', () => {
+  it('is size-relative: short strokes do not "overshoot" their own length', () => {
+    // A 50px line ends 50px from its start — under the old fixed 50px
+    // threshold every short stroke read as overshooting, making short lines
+    // unrecognizable. Size-relative thresholding fixes that.
+    expect(checkOvershoot(lineStroke({ x: 0, y: 0 }, { x: 50, y: 0 }))).toBe(false);
+  });
+
   it('detects a circle that overshoots its starting point', () => {
     // 1.2 revolutions: the tail passes the start again.
     const points = [];

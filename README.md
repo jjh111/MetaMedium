@@ -15,6 +15,7 @@ vocabulary, recognize compositional patterns as you draw, and use AI as a
 | [Canvas demo (flagship)](https://jjh111.github.io/MetaMedium/doodle2-canvas.html) | Heuristic recognition, spatial graph, visual vocabulary library, live "why" reasoning. Works offline, touch + mouse. |
 | [MetaDoodle (LLM tiers)](https://jjh111.github.io/MetaMedium/metadoodle1.html) | Tiered AI interpretation: heuristics → in-browser WebLLM (WebGPU) → LM Studio local API. Plus voice input. |
 | [v2 PoC: drawing-responsive text](https://jjh111.github.io/MetaMedium/v2-poc/) | Whitepaper text reflows in real time around shapes you draw — the medium-blending thesis, live. |
+| [No-modes session engine](https://jjh111.github.io/MetaMedium/Demos/session-engine.html) | The new engine's reference surface: doodle → circle it → check ✓ → name it → it's recognized when drawn again. No tools, no modes. |
 | [Micro demos](https://github.com/jjh111/MetaMedium/tree/master/Demos) | Fish vocabulary, composition diagrams, no-modes graph, and other small experiments. |
 
 Flagship demo keyboard shortcuts: `Ctrl+Z` undo, `Ctrl+Shift+Z` redo,

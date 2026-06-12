@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>MetaMedium — No-Modes Session Engine</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0a0a0f; --text: #e8e4d9; --text-dim: #a09880;
+      --accent: #c9a84c; --accent-dim: rgba(201, 168, 76, 0.35);
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      width: 100%; height: 100%; overflow: hidden;
+      background: var(--bg); color: var(--text);
+      font-family: 'Space Grotesk', system-ui, sans-serif;
+      touch-action: none; -webkit-font-smoothing: antialiased;
+    }
+    #canvas { position: absolute; inset: 0; cursor: crosshair; touch-action: none; }
+    .header { position: absolute; top: 14px; left: 20px; z-index: 5; pointer-events: none; }
+    .header h1 { font-size: 17px; font-weight: 600; color: var(--accent); }
+    .header p { font-size: 12px; color: var(--text-dim); margin-top: 2px; font-weight: 300; max-width: 480px; }
+    .toolbar { position: absolute; top: 14px; right: 16px; z-index: 6; display: flex; gap: 8px; }
+    .toolbar button {
+      background: transparent; border: 1px solid var(--accent-dim); color: var(--text-dim);
+      font: 12px 'Space Grotesk', sans-serif; padding: 6px 14px; border-radius: 4px; cursor: pointer;
+    }
+    .toolbar button:hover { border-color: var(--accent); color: var(--accent); }
+    .status { position: absolute; bottom: 12px; left: 20px; z-index: 5; font-size: 11px; color: var(--text-dim); opacity: 0.7; pointer-events: none; }
+    #summon {
+      position: absolute; z-index: 10; display: none; gap: 6px; align-items: center;
+      background: rgba(10, 10, 15, 0.92); border: 1px solid var(--accent-dim);
+      border-radius: 8px; padding: 8px;
+    }
+    #summon button {
+      background: rgba(201, 168, 76, 0.12); border: 1px solid var(--accent-dim); color: var(--text);
+      font: 12px 'Space Grotesk', sans-serif; padding: 6px 12px; border-radius: 5px; cursor: pointer; white-space: nowrap;
+    }
+    #summon button:hover { border-color: var(--accent); color: var(--accent); }
+    #summon button.match { color: var(--accent); font-weight: 500; }
+    #summon input {
+      background: transparent; border: 1px solid var(--accent); color: var(--text);
+      font: 13px 'Space Grotesk', sans-serif; padding: 6px 10px; border-radius: 5px; width: 130px; outline: none;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="canvas"></canvas>
+  <div class="header">
+    <h1>No-Modes Session Engine <span style="font-weight:300; color:var(--text-dim)">v0.2</span></h1>
+    <p>Just doodle. Circle a group of strokes, then draw a quick check ✓ beside the circle to summon. Name it — then draw the same arrangement again. (No tools, no modes; ignoring any offer is a valid answer.)</p>
+  </div>
+  <div class="toolbar">
+    <button id="undoBtn" title="Ctrl+Z">⌫ Undo</button>
+  </div>
+  <div class="status" id="status"></div>
+  <div id="summon"></div>
+
+  <script src="metamedium-core.browser.js"></script>
+  <script>
+  (function () {
+    const MM = window.MetaMediumCore;
+    const session = MM.createSession();
+
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const summonEl = document.getElementById('summon');
+    const statusEl = document.getElementById('status');
+
+    function resize() {
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = innerWidth * dpr;
+      canvas.height = innerHeight * dpr;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      render(session.getState());
+    }
+    addEventListener('resize', resize);
+
+    // ===== Input: strokes in, nothing gated =====
+    let current = null;
+    canvas.addEventListener('pointerdown', (e) => {
+      canvas.setPointerCapture(e.pointerId);
+      current = [{ x: e.clientX, y: e.clientY }];
+    });
+    canvas.addEventListener('pointermove', (e) => {
+      if (!current) return;
+      current.push({ x: e.clientX, y: e.clientY });
+      render(session.getState()); // live ink while drawing
+    });
+    canvas.addEventListener('pointerup', () => {
+      if (current && current.length > 2) session.addStroke(current, Date.now());
+      current = null;
+    });
+
+    document.getElementById('undoBtn').onclick = () => session.undo();
+    addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); session.undo(); }
+    });
+
+    // ===== Rendering: ink is ground truth; the refined is surfaced, not swapped =====
+    function drawInk(node, style) {
+      const stroke = MM.strokePointsOf(node);
+      if (stroke) {
+        ctx.beginPath();
+        stroke.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
+        Object.assign(ctx, style);
+        ctx.stroke();
+        return;
+      }
+      // Artifact: render members' ink (transparent within).
+      for (const e of node.edges) {
+        if (e.rel === 'has-part') {
+          const m = state.nodes.get(e.to);
+          if (m && !m.reps.some((r) => r.modality === 'erased')) drawInk(m, style);
+        }
+      }
+    }
+
+    let state = session.getState();
+    function render(s) {
+      state = s;
+      ctx.clearRect(0, 0, innerWidth, innerHeight);
+      ctx.lineWidth = 2; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+
+      // Cluster candidates: held recognition, hinted not committed.
+      for (const c of s.clusterCandidates) {
+        const bounds = unionBounds(c.nodeIds.map((id) => MM.boundsOf(s.nodes.get(id))));
+        ctx.setLineDash([4, 6]);
+        ctx.strokeStyle = 'rgba(201,168,76,0.4)'; ctx.lineWidth = 1;
+        ctx.strokeRect(bounds.minX - 12, bounds.minY - 12, bounds.maxX - bounds.minX + 24, bounds.maxY - bounds.minY + 24);
+        ctx.setLineDash([]);
+        label(`${c.matches[0].name}? (circle + ✓ to confirm)`, bounds.minX - 10, bounds.minY - 18, 'rgba(201,168,76,0.7)');
+        ctx.lineWidth = 2;
+      }
+
+      for (const id of s.contentIds) {
+        const node = s.nodes.get(id);
+        const isArtifact = s.artifacts.includes(id);
+        const isPendingLasso = s.pendingLassoId === id;
+
+        drawInk(node, {
+          strokeStyle: isPendingLasso ? 'rgba(201,168,76,0.9)' : '#e8e4d9',
+          lineWidth: 2,
+        });
+
+        const b = MM.boundsOf(node);
+        if (isArtifact && b) {
+          corners(b, '#c9a84c');
+          label(MM.wordOf(node), b.minX, b.minY - 8, '#c9a84c');
+        } else if (b && !isPendingLasso) {
+          const top = MM.topInterpretation(node);
+          if (top) label(top, b.minX, b.maxY + 14, 'rgba(160,152,128,0.55)');
+        }
+      }
+
+      // Active summon: its gesture ink glows gold while the offer stands.
+      if (s.summon) {
+        for (const gid of s.summon.gestureIds) {
+          drawInk(s.nodes.get(gid), { strokeStyle: 'rgba(201,168,76,0.55)', lineWidth: 3 });
+        }
+      }
+
+      // Live ink under the pointer.
+      if (current) {
+        ctx.beginPath();
+        current.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
+        ctx.strokeStyle = '#e8e4d9'; ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+
+      renderSummon(s);
+      statusEl.textContent =
+        `${s.contentIds.length - s.artifacts.length} strokes · ${s.artifacts.length} artifact${s.artifacts.length === 1 ? '' : 's'}` +
+        (s.pendingLassoId ? ' · circle held — ✓ to summon' : '');
+    }
+
+    function label(text, x, y, color) {
+      ctx.font = "11px 'Space Grotesk', sans-serif";
+      ctx.fillStyle = color;
+      ctx.fillText(text, x, y);
+    }
+
+    function corners(b, color) {
+      const L = 12, p = 8;
+      ctx.strokeStyle = color; ctx.lineWidth = 1.5;
+      const c = [
+        [b.minX - p, b.minY - p, L, 0, 0, L], [b.maxX + p, b.minY - p, -L, 0, 0, L],
+        [b.minX - p, b.maxY + p, L, 0, 0, -L], [b.maxX + p, b.maxY + p, -L, 0, 0, -L],
+      ];
+      for (const [x, y, dx1, dy1, dx2, dy2] of c) {
+        ctx.beginPath();
+        ctx.moveTo(x + dx1, y + dy1); ctx.lineTo(x, y); ctx.lineTo(x + dx2, y + dy2);
+        ctx.stroke();
+      }
+      ctx.lineWidth = 2;
+    }
+
+    function unionBounds(list) {
+      return list.reduce((a, b) => ({
+        minX: Math.min(a.minX, b.minX), maxX: Math.max(a.maxX, b.maxX),
+        minY: Math.min(a.minY, b.minY), maxY: Math.max(a.maxY, b.maxY),
+      }));
+    }
+
+    // ===== Summon chips: non-modal — drawing anything else dissolves them =====
+    let renderedSummonId = null;
+    function renderSummon(s) {
+      if (!s.summon) { summonEl.style.display = 'none'; renderedSummonId = null; return; }
+      if (renderedSummonId === s.summon.id) return;
+      renderedSummonId = s.summon.id;
+
+      summonEl.innerHTML = '';
+      summonEl.style.display = 'flex';
+      for (const sug of s.summon.suggestions) {
+        const btn = document.createElement('button');
+        btn.textContent = sug.kind === 'match' ? `✓ ${sug.label}` : sug.label;
+        if (sug.kind === 'match') btn.className = 'match';
+        btn.onclick = () => {
+          if (sug.kind === 'name-as-new') return swapToInput(s.summon.id, btn);
+          session.bless({ summonId: s.summon.id, suggestionId: sug.id, at: Date.now() });
+        };
+        summonEl.appendChild(btn);
+      }
+      const checkNode = s.nodes.get(s.summon.gestureIds[1]);
+      const b = MM.boundsOf(checkNode);
+      summonEl.style.left = Math.min(b.minX, innerWidth - 330) + 'px';
+      summonEl.style.top = Math.min(b.maxY + 14, innerHeight - 60) + 'px';
+    }
+
+    function swapToInput(summonId, btn) {
+      const input = document.createElement('input');
+      input.placeholder = 'name it…';
+      input.onkeydown = (e) => {
+        e.stopPropagation();
+        if (e.key === 'Enter' && input.value.trim()) {
+          session.bless({ summonId, name: input.value.trim(), at: Date.now() });
+        }
+      };
+      btn.replaceWith(input);
+      input.focus();
+    }
+
+    session.subscribe(render);
+    resize();
+  })();
+  </script>
+</body>
+</html>

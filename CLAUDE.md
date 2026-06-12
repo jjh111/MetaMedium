@@ -37,7 +37,7 @@ Architecture documents (chronological; **read v6 first — it's the active one**
 | `metadoodle1.html` | Fork of flagship + tiered LLM recognition (WebLLM in-browser, LM Studio local API) + voice. Single-file (~600KB) |
 | `v2-poc/` | Drawing-responsive text reflow PoC (chenglou/pretext). `index.html` + esbuild `bundle.js` |
 | `Web App Skeleton/` | React + Vite + TypeScript + Zustand rebuild; Claude API interpreter skeleton in `src/llm/`; recognition/spatial/matching in `src/core/` |
-| `Demos/` | Micro demos (fish, composition diagrams, no-modes graph, etc.) |
+| `Demos/` | Micro demos. **`session-engine.html`** is the live reference surface for metamedium-core (uses the committed `metamedium-core.browser.js` bundle); plus fish, composition diagrams, no-modes graph, etc. |
 | `test-llm.html` | Standalone LLM test harness |
 | `skills/` | Claude Code skills: `metamedium-code` (code patterns), `metamedium-design` (design principles) |
 | `Assets/` | Figures, design notes, recognition strategy docs |
@@ -115,10 +115,15 @@ gracefully to Tier 0.
 ```bash
 cd metamedium-core
 npm install
-npm test         # 63 tests incl. the canonical-loop scenario (keep green)
+npm test         # full suite incl. the canonical-loop scenario (keep green)
 npm run typecheck
 npm run build    # ESM + d.ts → dist/
+npm run build:browser  # IIFE bundle; a copy is committed at Demos/metamedium-core.browser.js
 ```
+
+After engine changes, rebuild the browser bundle and re-copy it to `Demos/`
+(`Demos/session-engine.html` is the live reference surface) — CI fails if the
+committed copy drifts from source.
 
 `src/session/session.scenario.test.ts` is the executable spec for the
 no-modes flow (lasso → check → summon → bless → artifact). Change it knowingly

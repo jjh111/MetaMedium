@@ -16,6 +16,11 @@ describe('analyzeStroke — primitive recognition', () => {
     expect(results[0].confidence).toBeGreaterThanOrEqual(0.9);
   });
 
+  it('recognizes a short line (size-relative overshoot fix)', () => {
+    const { results } = analyzeStroke(lineStroke({ x: 0, y: 0 }, { x: 50, y: 0 }));
+    expect(results[0]?.type).toBe('line');
+  });
+
   it('recognizes an open arc', () => {
     const { results } = analyzeStroke(arcStroke(200, 200, 100));
     expect(results[0]?.type).toBe('arc');

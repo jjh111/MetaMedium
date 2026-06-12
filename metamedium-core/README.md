@@ -10,10 +10,15 @@ behavioral contract is `src/session/session.scenario.test.ts` — read both
 before changing engine semantics.**
 
 ```bash
-npm install     # dev deps only (typescript, vitest)
-npm test        # 63 tests incl. the canonical-loop scenario
-npm run build   # ESM + .d.ts → dist/
+npm install           # dev deps only (typescript, vitest, esbuild)
+npm test              # full suite incl. the canonical-loop scenario
+npm run build         # ESM + .d.ts → dist/
+npm run build:browser # IIFE bundle (window.MetaMediumCore) → dist/
 ```
+
+A copy of the browser bundle is committed at `Demos/metamedium-core.browser.js`
+for the GitHub Pages demo (`Demos/session-engine.html`). After engine changes,
+rebuild and re-copy it — CI fails if it drifts from source.
 
 ## Wiring a surface (canvas, playground iframe, React app)
 
@@ -65,7 +70,7 @@ session.subscribe((state) => {
 | `spatial` | `buildSpatialGraph` (touching/intersecting/contains), `spatialCluster` |
 | `session/nodes` | the node model: open `reps` list + `edges` + `capability` tier — everything is a node |
 | `session/gesture` | lasso/check predicates; temporal **+** contextual resolution |
-| `session/session` | the engine: events in, `SessionState` out, event log kept for replay |
+| `session/session` | the engine: events in, `SessionState` out; event-sourced — `undo()` = drop last input + replay; `erase()` with artifact degradation; wire (`connects`) inference |
 
 ## Invariants (enforced by tests — keep them)
 
@@ -76,8 +81,8 @@ session.subscribe((state) => {
 - Ink is never destroyed — members and gestures keep their nodes and reps.
 - Everything starts at capability 0 (inert); escalation is a blessed act (v0.2+).
 
-## Known quirks (ported faithfully, fix knowingly)
+## Departures from the legacy heuristics (made knowingly)
 
-- `checkOvershoot` uses a fixed 50px threshold, so strokes shorter than ~70px
-  cannot be recognized as lines. Candidate fix: make it size-relative, like
-  closure already is. Update the recognition tests in the same change.
+- `checkOvershoot` is now size-relative (`min(50px, 20% of stroke size)`).
+  The legacy fixed 50px threshold made strokes shorter than ~70px
+  unrecognizable as lines. Covered by tests in geometry/recognition suites.

@@ -17,9 +17,6 @@ import { circleStroke, lineStroke, checkStroke } from '../test/strokes';
 import type { Point } from '../types';
 
 // 3 circles + 2 connecting lines, translated by (dx, dy).
-// NOTE: connectors must be >~70px — checkOvershoot()'s fixed 50px threshold
-// makes shorter strokes unrecognizable as lines (ported behavior; candidate
-// for a knowing fix: make overshoot size-relative like closure already is).
 function moleculeStrokes(dx = 0, dy = 0): Point[][] {
   const t = (points: Point[]) => points.map((p) => ({ x: p.x + dx, y: p.y + dy }));
   return [

@@ -157,3 +157,142 @@ describe('event log', () => {
     expect(s.getEvents().map((e) => e.type)).toEqual(['stroke', 'tick', 'stroke']);
   });
 });
+
+describe('wire inference (inferred, then blessed)', () => {
+  it('a line landing on two nodes is held as a candidate connection', () => {
+    const s = createSession();
+    const a = s.addStroke(circleStroke(200, 200, 40), 0);
+    const b = s.addStroke(circleStroke(500, 200, 40), 1000);
+    const wire = s.addStroke(lineStroke({ x: 245, y: 200 }, { x: 455, y: 200 }), 2000);
+
+    const state = s.getState();
+    const wireNode = state.nodes.get(wire)!;
+    const connects = wireNode.edges.filter((e) => e.rel === 'connects');
+    expect(connects.map((e) => e.to).sort()).toEqual([a, b].sort());
+    // Inferred, not blessed — held like every other interpretation.
+    expect(connects.every((e) => !e.blessed)).toBe(true);
+    expect(
+      state.nodes.get(a)!.edges.some((e) => e.rel === 'connected-by' && e.to === wire)
+    ).toBe(true);
+  });
+
+  it('a line touching only one node is not a wire', () => {
+    const s = createSession();
+    s.addStroke(circleStroke(200, 200, 40), 0);
+    const wire = s.addStroke(lineStroke({ x: 245, y: 200 }, { x: 455, y: 200 }), 1000);
+    const wireNode = s.getState().nodes.get(wire)!;
+    expect(wireNode.edges.filter((e) => e.rel === 'connects')).toHaveLength(0);
+  });
+});
+
+describe('undo (event replay)', () => {
+  it('undoing a stroke removes it and rebuilds identical prior state', () => {
+    const s = createSession();
+    s.addStroke(circleStroke(200, 200, 40), 0);
+    // Snapshot now — state.nodes is a live view of the graph, not a copy.
+    const beforeContent = s.getState().contentIds;
+    const beforeKeys = [...s.getState().nodes.keys()].sort();
+    s.addStroke(circleStroke(500, 200, 40), 1000);
+    s.undo();
+
+    const after = s.getState();
+    expect(after.contentIds).toEqual(beforeContent);
+    expect(after.artifacts).toEqual([]);
+    expect([...after.nodes.keys()].sort()).toEqual(beforeKeys);
+  });
+
+  it('undoing a bless restores the summon — the offer comes back', () => {
+    const s = createSession();
+    s.addStroke(circleStroke(300, 300, 40), 0);
+    s.addStroke(circleStroke(300, 300, 150), 1000);
+    s.addStroke(checkStroke(460, 300), 2000);
+    const summonId = s.getState().summon!.id;
+    s.bless({ summonId, name: 'bubble', at: 3000 });
+    expect(s.getState().artifacts).toHaveLength(1);
+
+    s.undo();
+    const state = s.getState();
+    expect(state.artifacts).toHaveLength(0);
+    expect(state.summon).not.toBeNull();
+    expect(state.summon!.id).toBe(summonId); // deterministic replay
+  });
+
+  it('skips ticks: undo targets the last meaningful input', () => {
+    const s = createSession();
+    s.addStroke(circleStroke(200, 200, 40), 0);
+    s.addStroke(circleStroke(500, 200, 40), 1000);
+    s.tick(1500);
+    s.tick(1600);
+    s.undo();
+    expect(s.getState().contentIds).toHaveLength(1);
+  });
+});
+
+describe('erase & artifact degradation', () => {
+  it('erasing a loose stroke removes it from content but keeps its node (ink preserved)', () => {
+    const s = createSession();
+    const id = s.addStroke(circleStroke(200, 200, 40), 0);
+    s.erase(id, 1000);
+
+    const state = s.getState();
+    expect(state.contentIds).not.toContain(id);
+    const node = state.nodes.get(id)!;
+    expect(node).toBeDefined();
+    expect(strokePointsOf(node)).toBeDefined();
+    expect(node.reps.some((r) => r.modality === 'erased')).toBe(true);
+  });
+
+  it('erasing a member degrades the artifact: visibly broken, survivors return as ink', () => {
+    const s = createSession();
+    const m1 = s.addStroke(circleStroke(250, 300, 40), 0);
+    const m2 = s.addStroke(circleStroke(350, 300, 40), 1000);
+    s.addStroke(circleStroke(300, 300, 160), 2000); // lasso
+    s.addStroke(checkStroke(470, 300), 3000); // check
+    const artifactId = s.bless({ summonId: s.getState().summon!.id, name: 'pair', at: 4000 })!;
+    expect(s.getState().contentIds).toEqual([artifactId]);
+
+    s.erase(m1, 5000);
+    const state = s.getState();
+    // Never a silent phantom:
+    const artifact = state.nodes.get(artifactId)!;
+    expect(artifact.reps.some((r) => r.modality === 'status' && r.data === 'broken')).toBe(true);
+    expect(state.artifacts).not.toContain(artifactId);
+    expect(state.contentIds).not.toContain(artifactId);
+    // Survivors come back as loose ink; the erased member does not.
+    expect(state.contentIds).toContain(m2);
+    expect(state.contentIds).not.toContain(m1);
+  });
+
+  it('erasing an artifact demotes it and frees all its members', () => {
+    const s = createSession();
+    const m1 = s.addStroke(circleStroke(250, 300, 40), 0);
+    const m2 = s.addStroke(circleStroke(350, 300, 40), 1000);
+    s.addStroke(circleStroke(300, 300, 160), 2000);
+    s.addStroke(checkStroke(470, 300), 3000);
+    const artifactId = s.bless({ summonId: s.getState().summon!.id, name: 'pair', at: 4000 })!;
+
+    s.erase(artifactId, 5000);
+    const state = s.getState();
+    expect(state.artifacts).toHaveLength(0);
+    expect(state.contentIds).toContain(m1);
+    expect(state.contentIds).toContain(m2);
+    // Membership history is retained — nothing is destroyed, only demoted.
+    expect(state.nodes.get(m1)!.edges.some((e) => e.rel === 'part-of')).toBe(true);
+  });
+
+  it('erase + undo round-trips: the artifact is whole again', () => {
+    const s = createSession();
+    const m1 = s.addStroke(circleStroke(250, 300, 40), 0);
+    s.addStroke(circleStroke(350, 300, 40), 1000);
+    s.addStroke(circleStroke(300, 300, 160), 2000);
+    s.addStroke(checkStroke(470, 300), 3000);
+    const artifactId = s.bless({ summonId: s.getState().summon!.id, name: 'pair', at: 4000 })!;
+
+    s.erase(m1, 5000);
+    s.undo();
+    const state = s.getState();
+    expect(state.artifacts).toEqual([artifactId]);
+    expect(state.contentIds).toEqual([artifactId]);
+    expect(state.nodes.get(artifactId)!.reps.some((r) => r.modality === 'status')).toBe(false);
+  });
+});
