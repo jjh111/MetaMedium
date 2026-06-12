@@ -122,7 +122,7 @@ export const useStore = create<Store>((set, get) => ({
     if (state.currentStroke.length === 0) return;
 
     // Add stroke to arrays
-    let processedStroke = [...state.currentStroke];
+    const processedStroke = [...state.currentStroke];
     const newStrokeId = `stroke-${state.nextStrokeId}`;
 
     // Apply refinement if enabled

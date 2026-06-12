@@ -38,8 +38,8 @@ export function Canvas() {
       const maxHeight = container.clientHeight - padding;
 
       // Use full width, adjust height to maintain reasonable aspect ratio
-      let width = maxWidth;
-      let height = Math.min(width * 0.6, maxHeight); // 5:3 aspect ratio, max out at container height
+      const width = maxWidth;
+      const height = Math.min(width * 0.6, maxHeight); // 5:3 aspect ratio, max out at container height
 
       setCanvasSize({
         width: Math.floor(width),

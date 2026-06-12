@@ -71,9 +71,8 @@ work, no engine changes required — this is the near-term value delivery.
   micro-demos.
 - **Add a short, public roadmap section** (condensed from this file) so the
   document sets expectations for what's next.
-- **Hygiene:** move `MetaMedium_Whitepaper_v4.html.bak` to `archive/`; make
-  README.md a real front door (canonical links: whitepaper, flagship demo,
-  roadmap).
+- ~~**Hygiene:** move `MetaMedium_Whitepaper_v4.html.bak` to `archive/`; make
+  README.md a real front door~~ ✅ done (June 2026 cleanup pass — see below).
 
 Ship criterion: a first-time visitor can experience draw→recognize→name and
 drawing-responsive text without leaving the whitepaper, and can find the
@@ -146,6 +145,26 @@ demo, offline-first, with LLM tiers as progressive enhancement.
 - **Graph schema migration** (metamedium-core-schema.md): adopt incrementally
   — the spatial graph in core can grow toward "everything is a node" without
   a big-bang rewrite.
+
+## Done: June 2026 Cleanup Pass (soil prep)
+
+- Repo hygiene: `.DS_Store` files untracked and gitignored; duplicate
+  `Assets/metamedium-core-schema.md` removed; `iceberg-sketches copy.html`
+  moved to `archive/`; whitepaper v4 (the fuller `.bak` version) restored at
+  `archive/MetaMedium_Whitepaper_v4.html` with a redirect stub at its old
+  published URL.
+- README rewritten as the front door (whitepaper, demo gallery, plan, dev
+  instructions); CLAUDE.md normalized to the actual repo.
+- Web App Skeleton validated: `npm run build` (typecheck + bundle) green;
+  lint reduced from 59 errors to 0 (remaining `any`s demoted to warnings
+  until core extraction types them properly).
+- **Vitest suite added** (41 tests: geometry, recognition, spatial) with
+  synthetic stroke generators in `src/test/strokes.ts` — the seed of the
+  `metamedium-core` regression suite. CI workflow runs lint + test + build
+  on every push/PR.
+- ⚠️ **Action needed (John):** v2-poc source was gitignored and never
+  committed — only `bundle.js` is in the repo. Commit `v2-poc/src/` from the
+  machine that has it (the ignore rule is now removed).
 
 ## Success Criteria
 

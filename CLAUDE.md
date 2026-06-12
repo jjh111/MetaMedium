@@ -39,8 +39,8 @@ Architecture documents (planning, in chronological order):
 | `test-llm.html` | Standalone LLM test harness |
 | `skills/` | Claude Code skills: `metamedium-code` (code patterns), `metamedium-design` (design principles) |
 | `Assets/` | Figures, design notes, recognition strategy docs |
-| `archive/` | Retired versions |
-| `MetaMedium_Whitepaper_v4.html.bak` | Previous whitepaper (to be archived) |
+| `archive/` | Retired versions, incl. whitepaper v4 (root `MetaMedium_Whitepaper_v4.html` is a redirect stub — keep it) |
+| `.github/workflows/ci.yml` | CI: lint + test + build of Web App Skeleton on every push/PR |
 
 **Known duplication:** recognition logic exists independently in
 `doodle2-canvas.html`, `metadoodle1.html`, `Web App Skeleton/src/core/`, and
@@ -120,20 +120,23 @@ function names / UI strings) rather than loading whole files.
 cd "Web App Skeleton"
 npm install
 npm run dev      # development server
-npm run build    # production build
+npm test         # vitest (geometry, recognition, spatial — keep green)
+npm run lint     # 0 errors required; `any` warnings allowed until core extraction
+npm run build    # typecheck + production build
 ```
 
 Structure: `src/components/` (Canvas, SuggestionPanel, LibraryPanel, …),
 `src/core/` (recognition, spatial, matching), `src/llm/` (heuristic + Claude
-interpreters), `src/types/`.
+interpreters), `src/types/`, `src/test/` (synthetic stroke generators for
+tests). Recognition changes must keep the vitest suite green — it encodes the
+documented thresholds below.
 
 ### v2-poc
 
-```bash
-cd v2-poc
-npm install
-npm run build    # esbuild → bundle.js
-```
+⚠️ The v2-poc **source was never committed** (an old `.gitignore` excluded
+`v2-poc/src/`) — only the built `bundle.js` exists in the repo. Don't attempt
+to rebuild it; treat `bundle.js` as the artifact until the source is recovered
+and committed from the original machine.
 
 ## Technical Specifications
 
