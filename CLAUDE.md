@@ -4,298 +4,171 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**MetaMedium** is a recombinatorial drawing system that demonstrates how interfaces can learn user vocabularies, recognize compositional patterns in real-time, and evolve through use. This is the practical implementation of concepts from the "Beyond Chat: Designing the Next Generation of AI Interaction" whitepaper.
+**MetaMedium** is a recombinatorial drawing system: interfaces that learn user
+vocabularies, recognize compositional patterns in real-time, and evolve through
+use. Strokes are grounded geometrically (fingerprints, spatial graphs), users
+name what they draw, names compose recursively, and LLMs interpret over that
+grounded substrate ("AI as meta-word" — see the interactive whitepaper at
+`index.html`, published at https://jjh111.github.io/MetaMedium/).
 
-The core innovation: recursive composition with preserved semantics, multi-scale recognition (single-stroke to multi-stroke), and an extensible learning system that adapts to user drawing style.
+The canonical loop that proves the thesis: draw circle → save as "bubble" →
+draw 3 bubbles + 2 lines → save as "molecule" → system recognizes "molecule"
+automatically → ask "why?" and get grounded reasoning.
 
-## Current Status
+## Current Status & Plan
 
-**Day 1 Complete** - Basic drawing with primitive shape recognition is fully functional.
+**See `ROADMAP.md`** — the active plan (June 2026). Headline: ship Whitepaper
+v5.1 (embed demos in the document), then Demo v3 (extract a shared
+`metamedium-core` library and converge the forked demos onto it).
 
-Available versions:
-- `day1-standalone.html` - Single-file vanilla JS implementation (works anywhere, ~14KB)
-- `day1-standalone-improved.html` - Enhanced recognition with size-relative thresholds
-- `day1-debug-version.html` - Debug version with detailed metrics display
+Architecture documents (planning, in chronological order):
+- `PRD-v4-LLM-Grounded.md` — LLM-grounded architecture, tiered escalation (Tier 0 heuristics / Tier 1 light LLM / Tier 2 Claude), MCP server spec
+- `ARCHITECTURE-v5-UNIFIED-ENGINE.md` — unified engine: shape experts, MoE routing, three state planes, `metamedium-core` extraction plan
+- `metamedium-core-schema.md` — graph data model ("everything is a node; type emerges from connections")
 
-The React/TypeScript development version is located at `/home/claude/recombinatorial-demo/` (referenced in docs but may be in different environment).
+## Repository Map
+
+| Path | What it is |
+|---|---|
+| `index.html` | **Interactive whitepaper v5** "MetaMedium: AI Beyond Chat" (live on GitHub Pages) |
+| `doodle2-canvas.html` | **Flagship demo**: heuristic recognition, spatial graph, library, undo/redo, touch. No LLM. Single-file (~500KB) |
+| `metadoodle1.html` | Fork of flagship + tiered LLM recognition (WebLLM in-browser, LM Studio local API) + voice. Single-file (~600KB) |
+| `v2-poc/` | Drawing-responsive text reflow PoC (chenglou/pretext). `index.html` + esbuild `bundle.js` |
+| `Web App Skeleton/` | React + Vite + TypeScript + Zustand rebuild; Claude API interpreter skeleton in `src/llm/`; recognition/spatial/matching in `src/core/` |
+| `Demos/` | Micro demos (fish, composition diagrams, no-modes graph, etc.) |
+| `test-llm.html` | Standalone LLM test harness |
+| `skills/` | Claude Code skills: `metamedium-code` (code patterns), `metamedium-design` (design principles) |
+| `Assets/` | Figures, design notes, recognition strategy docs |
+| `archive/` | Retired versions |
+| `MetaMedium_Whitepaper_v4.html.bak` | Previous whitepaper (to be archived) |
+
+**Known duplication:** recognition logic exists independently in
+`doodle2-canvas.html`, `metadoodle1.html`, `Web App Skeleton/src/core/`, and
+`v2-poc/bundle.js`. Until `metamedium-core` is extracted (see ROADMAP.md), a
+recognition change usually needs to be evaluated against all of them — prefer
+landing improvements in `Web App Skeleton/src/core/` (the future core source)
+and the flagship demo.
 
 ## Architecture
 
 ### Core Data Model
 
-**Strokes and Context (Day 1)**
-```javascript
-strokes = [
-  [{x: 10, y: 20}, {x: 15, y: 25}, ...],  // stroke 0
-  [{x: 50, y: 60}, {x: 55, y: 65}, ...]   // stroke 1
-]
+Strokes are arrays of points; a parallel `context` array records what each
+stroke is recognized as. Unnamed strokes use placeholder `'art[n]'`.
 
-context = [
-  'circle',    // stroke 0 is a circle
-  'line'       // stroke 1 is a line
-]
+```javascript
+strokes = [[{x, y}, ...], ...]   // raw input (some demos add t, pressure)
+context = ['circle', 'line']     // 1:1 with strokes
 ```
 
-Context array maps 1:1 with strokes array. Unnamed strokes use placeholder `'art[n]'`.
+The library stores named items: user primitives (with fingerprints), and
+compositions (with components + spatial graph). `basedOn` references make the
+library hierarchical.
 
-**Recognition Engine**
+### Recognition Engine
 
-The system uses geometric fingerprinting with heuristic-based detection:
+Geometric fingerprinting with heuristic detection:
 
 ```javascript
 fingerprint = {
   aspectRatio: width / height,
-  straightness: directDistance / pathLength,  // 0-1, 1 = perfectly straight
+  straightness: directDistance / pathLength,  // 1 = perfectly straight
   isClosed: startEndDistance < threshold,
+  corners,                                     // corner count (later versions)
   bounds: { minX, maxX, minY, maxY },
   size: max(width, height)
 }
 ```
 
-### Recognition Thresholds (v1.1 - Improved)
+**Straightness separates the primitives:**
+- 0.0–0.4: circles (curved) — confidence 0.8
+- 0.5–0.75: rectangles — confidence 0.7
+- 0.75–1.0: lines — confidence 0.9
 
-**Circle Detection:**
-- Aspect ratio: 0.6 to 1.4 (±0.4 from 1.0)
-- Straightness: < 0.4 (curvy)
-- Closure: < 50px OR < 15% of shape size
-- Confidence: 0.8
+**Size-relative closure** (key innovation):
+`isClosed = distance < 50px OR distance/size < 0.15` — small shapes need tight
+closure, large shapes tolerate bigger gaps.
 
-**Line Detection:**
-- Straightness: > 0.75
-- Not closed: > 50px gap OR > 15% of size
-- Confidence: 0.9
+### Spatial Graph
 
-**Rectangle Detection:**
-- Straightness: 0.5 to 0.75 (between circles and lines)
-- Closure: < 50px OR < 15% of shape size
-- Confidence: 0.7
+Relationships between strokes drive composition recognition: intersection,
+touching (proximity threshold), containment (bounds inside closed shape),
+directional proximity. See `Web App Skeleton/src/core/spatial.ts` and the
+spatial intelligence panel in `doodle2-canvas.html`.
 
-**Key Innovation:** Size-relative closure detection (`distance < 50 || distance/size < 0.15`) allows the system to scale naturally with drawing size - small shapes need tighter closure, large shapes can have bigger gaps.
+### Tiered LLM Interpretation
 
-### Core Utilities
+- **Tier 0:** heuristics (always available, offline baseline)
+- **Tier 1:** light/local LLM — WebLLM (WebGPU) or LM Studio in `metadoodle1.html`; Claude Haiku in `Web App Skeleton/src/llm/claudeInterpreter.ts`
+- **Tier 2:** Claude Sonnet/Opus for compositions, ambiguity, and "explain why"
 
-**Geometric Functions** (found in standalone HTML files):
-- `getBounds(points)` - Calculate bounding box
-- `isStrokeClosed(points, threshold)` - Check if start/end points are close
-- `calculateStraightness(points)` - Ratio of direct distance to path length
-- `getFingerprint(points)` - Extract all geometric features
-- `analyzeStroke(points)` - Return array of shape matches with confidence
-
-**Spatial Utilities** (for Day 3+):
-- `checkOverlap(boundsA, boundsB)` - Bounding box intersection
-- `checkTouching(boundsA, boundsB, threshold)` - Close proximity
-- `checkContainment(boundsOuter, boundsInner)` - One shape inside another
-- `checkProximity(boundsA, boundsB)` - Directional relationships
-
-## Development Roadmap
-
-### Day 1: ✅ Complete
-- Basic drawing with mouse events
-- Primitive recognition (circle, line, rectangle)
-- Accept/reject suggestions
-- Custom naming
-- Visual feedback (accepted shapes turn blue)
-
-### Day 2: Library + Persistence (Next)
-- Library data structure for storing shapes
-- Save primitives with fingerprints
-- localStorage persistence
-- Example-based matching for user shapes
-- Export/import library
-
-### Day 3: Simple Compositions + Spatial Graph
-- Save multi-stroke drawings as compositions
-- Build spatial graph (connections between strokes)
-- Visualize relationships
-
-### Day 4: Multi-Stroke Recognition
-- Recognize saved compositions while drawing
-- Three-tier spatial graph (connections, containment, proximity)
-- Composition fingerprints
-
-### Day 5: Built-in Compositions + Smart Recognition
-- Add triangle, arrow, cross, star, grid
-- Multi-scale recognition (same shape drawn different ways)
-- Auto-accept high confidence
-
-### Day 6: Reference System + Semantic Queries
-- Add `basedOn` field to primitives
-- Add `components` array to compositions
-- Hierarchical dependency resolution
-- Semantic queries ("count all lines in view")
-
-### Day 7: Extensible Recognition + Learning
-- Recognition methods as data
-- Learning from corrections
-- Export/import recognition profiles
-- User style adaptation
-
-## Technical Specifications
-
-**Performance Targets:**
-- Drawing latency: <16ms (60fps)
-- Recognition time: <50ms (Day 1-2), <100ms (Day 5-7)
-- Canvas size: 800x600 default
-- Max points per stroke: 500
-
-**Data Limits:**
-- Max strokes per composition: 50
-- Max composition depth: 5 levels
-- Max library size: 100 items
-
-**Browser Support:**
-- Chrome 100+, Safari 15+, Firefox 100+
-- Mouse/trackpad input only for v1.0
-
-## Design System
-
-**Colors:**
-- Primary/Accepted: `#0066ff` (blue)
-- Pending: `#666666` (gray)
-- Success: `#4CAF50` (green)
-- Warning: `#ff9800` (orange)
-- Error: `#ff5252` (red)
-- Background: `#f5f5f5`
-- Text: `#333333`
-
-**Visual Feedback:**
-- Unaccepted strokes: gray (#666666)
-- Accepted strokes: blue (#0066ff)
-- High confidence suggestions: green text
-- Medium confidence suggestions: orange text
+LLMs receive structured geometric data (fingerprints, spatial graph, library
+context) — not screenshots. LLM calls must never block drawing; degrade
+gracefully to Tier 0.
 
 ## Working with the Codebase
 
-### Standalone HTML Files
+### Standalone HTML demos
 
-All functionality is self-contained in single HTML files with inline CSS and JavaScript. To modify:
+Self-contained single files (inline CSS + JS). Edit directly; test with
+`python -m http.server 8000`. They are large — read selectively (search for
+function names / UI strings) rather than loading whole files.
 
-1. Open the HTML file directly
-2. Edit the `<style>` section for CSS changes
-3. Edit the `<script>` section for JavaScript logic
-4. Test by opening in browser or using `python -m http.server 8000`
-
-### React/TypeScript Version (Day 2+)
-
-When the React version becomes active:
+### Web App Skeleton (React/TypeScript)
 
 ```bash
-cd /home/claude/recombinatorial-demo
-
-# Development server
-npm run dev
-
-# Production build
-npm run build
-
-# Preview build
-npm run preview
+cd "Web App Skeleton"
+npm install
+npm run dev      # development server
+npm run build    # production build
 ```
 
-**Project Structure:**
-```
-src/
-  components/
-    Canvas.tsx              # Drawing surface
-    RecognitionPanel.tsx    # Suggestions UI
-    LibraryPanel.tsx        # Saved shapes (Day 2+)
-  lib/
-    recognition.ts          # Shape detection
-    spatial.ts              # Spatial relationships (Day 3+)
-    library.ts              # Library management (Day 2+)
-  utils/
-    geometry.ts             # Geometric calculations
-  types/
-    index.ts                # TypeScript types
+Structure: `src/components/` (Canvas, SuggestionPanel, LibraryPanel, …),
+`src/core/` (recognition, spatial, matching), `src/llm/` (heuristic + Claude
+interpreters), `src/types/`.
+
+### v2-poc
+
+```bash
+cd v2-poc
+npm install
+npm run build    # esbuild → bundle.js
 ```
 
-## Key Algorithms
+## Technical Specifications
 
-**Straightness Calculation:**
-```
-straightness = directDistance / pathLength
-- 1.0 = perfectly straight line
-- <0.4 = curved (circle territory)
-- 0.5-0.75 = somewhat straight (rectangle)
-- >0.75 = very straight (line)
-```
+**Performance targets:** drawing latency <16ms (60fps); heuristic recognition
+<50ms per stroke; LLM tiers asynchronous and non-blocking.
 
-**Size-Relative Closure:**
-```
-isClosed = (distance < 50px) OR (distance / shapeSize < 0.15)
-```
-This allows 30px shape to accept 4.5px gap, 300px shape to accept 45px gap.
+**Data limits:** max 500 points/stroke, 50 strokes/composition, composition
+depth 5, library 100 items.
 
-**Shape Separation Strategy:**
-Straightness ranges create clear boundaries:
-- 0.0-0.4: Circles (curved)
-- 0.4-0.5: Gap (no matches)
-- 0.5-0.75: Rectangles
-- 0.75-1.0: Lines
+**Browser support:** Chrome 100+, Safari 15+, Firefox 100+. Touch + mouse.
+WebLLM features require WebGPU.
+
+## Design System
+
+- Whitepaper/demos (current): dark theme, `#0a0a0f` background, `#e8e4d9` text, `#c9a84c` gold accent, Space Grotesk
+- Recognition feedback: accepted `#0066ff`, pending `#666666`, high confidence green, medium confidence orange
 
 ## Development Philosophy
 
-**Daily Shipping:**
-- Each day must ship a working, testable feature
-- No infrastructure-only days
-- Demo at end of day
-- Fix critical bugs before new features
+- **Ship something visible weekly** — no infrastructure-only weeks
+- **Simple first** — build the simplest thing that works; refactor when patterns emerge
+- **One core, many surfaces** — recognition logic belongs in shared code (post-extraction), demos consume builds
+- **Progressive enhancement** — heuristics always work offline; LLM tiers enhance, never gate
+- **Keep CLAUDE.md current** — update it in the same PR as any structural change
 
-**Simple First:**
-- Build simplest thing that works
-- Add complexity only when needed
-- Refactor when patterns emerge
-- Function over form early on
+## What to Preserve When Evolving
 
-**Progressive Enhancement:**
-- Day 1: Hardcoded heuristics
-- Day 2-5: Example-based matching
-- Day 6: Hierarchical references
-- Day 7: Data-driven learning
+- Fingerprinting system and geometric utilities (expanded, not replaced)
+- The `context` array (kept for compatibility as `components`/`basedOn` grow)
+- Published URLs — retire old demos to `archive/` with redirects, never break links
+- The whitepaper's claim-to-demo honesty: only link demos that actually show what the text claims
 
-## Testing Scenarios
+## Common Pitfalls
 
-**Day 1 Success Criteria:**
-- Draw circle → suggests "Circle" → accept → turns blue ✓
-- Draw line → suggests "Line" → accept → turns blue ✓
-- Draw rectangle → suggests "Rectangle" → accept → works ✓
-- Draw blob → "Something else" → custom name → works ✓
-- Clear canvas → everything resets ✓
-- Recognition < 50ms per stroke ✓
-- No drawing lag ✓
-
-## Future Context
-
-**What to preserve when evolving:**
-- Current recognition logic (will be enhanced, not replaced)
-- Fingerprinting system (will be reused)
-- Geometric utilities (will be expanded)
-- Simple data structures (will grow, not rebuild)
-
-**What will change:**
-- Day 2: Add library data structure
-- Day 3: Extend with spatial graphs
-- Day 6: Add reference resolution
-- Day 7: Move recognition logic to data
-
-**Backward Compatibility:**
-When migrating to later days, keep `context` array for compatibility while adding new structures (`components`, `basedOn`).
-
-## Common Pitfalls to Avoid
-
-1. Don't over-engineer early days
-2. Don't optimize prematurely
-3. Don't build infrastructure without user value
-4. Don't hardcode more than necessary
-5. Each day must be independently shippable
-
-## Vision
-
-This system demonstrates that interfaces can:
-- Learn user-specific visual vocabularies
-- Recognize compositional patterns recursively
-- Answer semantic queries about drawings
-- Adapt recognition based on corrections
-- Enable drawing as a form of programming
-
-The end result: **draw circle → save as "bubble" → draw 3 bubbles + lines → save as "molecule" → system recognizes "molecule" pattern automatically**.
+1. Don't fork the monolithic demos again — converge on the core (ROADMAP.md)
+2. Don't let LLM calls block the drawing loop
+3. Don't over-engineer ahead of a shippable demo (MoE/embeddings are deferred — see ROADMAP.md)
+4. Don't trust this file's thresholds blindly — the demos have diverged; verify in the file you're editing
