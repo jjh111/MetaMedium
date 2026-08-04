@@ -74,5 +74,29 @@ export type {
   ProposedEdge,
 } from './session/session';
 
+// Interpretations — the NON-COLLAPSING read path (ARCHITECTURE-v7 §4.1).
+// `topInterpretation` above returns one reading for surfaces that need a
+// headline; these keep every reading from every source and tier.
+export {
+  interpretationsOf,
+  byTier,
+  bySource,
+  disagreement,
+  sourcesOf,
+  hasMultipleSources,
+} from './session/interpretations';
+export type { Interpretation, InterpretationGroup, Disagreement } from './session/interpretations';
+
+// LLM transport (Tier 1–2). One client covers Ollama / LM Studio / OpenRouter;
+// Anthropic has its own. Failures are returned, never thrown.
+export { complete, listModels, providerLabel, providerTier, PRESETS, DEFAULT_TIMEOUT_MS } from './llm/provider';
+export type { ProviderConfig, ProviderKind, ChatMessage, CompletionResult } from './llm/provider';
+
+// Agent participants — a model joins through the same channel a human uses.
+export { createAgentParticipant, parseReadings, readingsToEdges, MAX_READINGS } from './participants/agent';
+export type { AgentParticipant, AgentReading, InterpretResult } from './participants/agent';
+export { describeSession, describeSignature } from './participants/serialize';
+export type { SerializeOptions } from './participants/serialize';
+
 // Types
 export type * from './types';

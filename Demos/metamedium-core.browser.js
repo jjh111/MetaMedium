@@ -25,7 +25,10 @@ var MetaMediumCore = (() => {
     BUILTIN_TYPES: () => BUILTIN_TYPES,
     DEFAULT_GESTURE_CONFIG: () => DEFAULT_GESTURE_CONFIG,
     DEFAULT_SESSION_CONFIG: () => DEFAULT_SESSION_CONFIG,
+    DEFAULT_TIMEOUT_MS: () => DEFAULT_TIMEOUT_MS,
     LOCAL_PARTICIPANT: () => LOCAL_PARTICIPANT,
+    MAX_READINGS: () => MAX_READINGS,
+    PRESETS: () => PRESETS,
     TIER0_PARTICIPANT: () => TIER0_PARTICIPANT,
     analyzeCornerAngles: () => analyzeCornerAngles,
     analyzeStroke: () => analyzeStroke,
@@ -34,14 +37,21 @@ var MetaMediumCore = (() => {
     boundsOf: () => boundsOf,
     boundsOverlap: () => boundsOverlap,
     buildSpatialGraph: () => buildSpatialGraph,
+    bySource: () => bySource,
+    byTier: () => byTier,
     calculateDistance: () => calculateDistance,
     calculateStraightness: () => calculateStraightness,
     checkOvershoot: () => checkOvershoot,
+    complete: () => complete,
     convexHull: () => convexHull,
     countCorners: () => countCorners,
+    createAgentParticipant: () => createAgentParticipant,
     createBootstrapNodes: () => createBootstrapNodes,
     createParticipantNode: () => createParticipantNode,
     createSession: () => createSession,
+    describeSession: () => describeSession,
+    describeSignature: () => describeSignature,
+    disagreement: () => disagreement,
     enclosedBy: () => enclosedBy,
     findCorners: () => findCorners,
     findCornersWithSeparation: () => findCornersWithSeparation,
@@ -50,17 +60,25 @@ var MetaMediumCore = (() => {
     getBoundsFromStroke: () => getBoundsFromStroke,
     getFingerprint: () => getFingerprint,
     getRep: () => getRep,
+    hasMultipleSources: () => hasMultipleSources,
+    interpretationsOf: () => interpretationsOf,
     isCheckLike: () => isCheckLike,
     isGesture: () => isGesture,
     isLassoLike: () => isLassoLike,
     isParticipant: () => isParticipant,
     isStrokeClosed: () => isStrokeClosed,
+    listModels: () => listModels,
     matchPrimitiveFromLibrary: () => matchPrimitiveFromLibrary,
     normalizeStroke: () => normalizeStroke,
+    parseReadings: () => parseReadings,
+    providerLabel: () => providerLabel,
+    providerTier: () => providerTier,
+    readingsToEdges: () => readingsToEdges,
     resemblances: () => resemblances,
     resolvesLasso: () => resolvesLasso,
     simplifyStroke: () => simplifyStroke,
     smoothStroke: () => smoothStroke,
+    sourcesOf: () => sourcesOf,
     spatialCluster: () => spatialCluster,
     strokePointsOf: () => strokePointsOf,
     topInterpretation: () => topInterpretation,
@@ -681,7 +699,7 @@ var MetaMediumCore = (() => {
   }
   var LOCAL_PARTICIPANT = "participant:local";
   var TIER0_PARTICIPANT = "participant:tier0";
-  function createParticipantNode(id, kind, name, at) {
+  function createParticipantNode(id, kind, name, at, capability = 0) {
     return {
       id,
       reps: [
@@ -689,7 +707,7 @@ var MetaMediumCore = (() => {
         { modality: "word", data: name }
       ],
       edges: [],
-      capability: 0,
+      capability,
       createdAt: at
     };
   }
@@ -791,7 +809,7 @@ var MetaMediumCore = (() => {
       clusterCandidates = [];
       participants = [LOCAL_PARTICIPANT, TIER0_PARTICIPANT];
       counter = 0;
-      for (const n of createBootstrapNodes(0)) nodes.set(n.id, n);
+      for (const n2 of createBootstrapNodes(0)) nodes.set(n2.id, n2);
     }
     reset();
     const nextId = (prefix) => `${prefix}:${++counter}`;
@@ -1045,7 +1063,7 @@ var MetaMediumCore = (() => {
       recomputeClusterCandidates();
     }
     function applyJoin(ev) {
-      const node = createParticipantNode(nextId("participant"), ev.kind, ev.name, ev.at);
+      const node = createParticipantNode(nextId("participant"), ev.kind, ev.name, ev.at, ev.capability ?? 0);
       nodes.set(node.id, node);
       participants.push(node.id);
       return node.id;
@@ -1124,7 +1142,7 @@ var MetaMediumCore = (() => {
     }
     return {
       addStroke: (points, at, participantId) => dispatch({ type: "stroke", points, at, participantId }),
-      join: (kind, name, at) => dispatch({ type: "join", kind, name, at }),
+      join: (kind, name, at, capability) => dispatch({ type: "join", kind, name, at, capability }),
       propose: (args) => void dispatch({ type: "propose", ...args }),
       tick: (at) => void dispatch({ type: "tick", at }),
       bless: (args) => dispatch({ type: "bless", ...args }),
@@ -1135,6 +1153,379 @@ var MetaMediumCore = (() => {
       subscribe,
       getEvents: () => events
     };
+  }
+
+  // src/session/interpretations.ts
+  function participantName(id, nodes) {
+    const p = nodes.get(id);
+    if (!p || !isParticipant(p)) return id;
+    return wordOf(p) ?? id;
+  }
+  function participantTier(id, nodes) {
+    const p = nodes.get(id);
+    return p?.capability ?? 0;
+  }
+  function interpretationsOf(node, nodes) {
+    const out = [];
+    const name = wordOf(node);
+    if (name) {
+      const blessedBy = node.edges.find((e) => e.rel === "blessed-by" && e.blessed)?.to;
+      out.push({
+        label: name,
+        to: node.id,
+        source: blessedBy ?? LOCAL_PARTICIPANT,
+        sourceName: participantName(blessedBy ?? LOCAL_PARTICIPANT, nodes),
+        tier: participantTier(blessedBy ?? LOCAL_PARTICIPANT, nodes),
+        weight: 1,
+        reasoning: "blessed by a participant",
+        blessed: true
+      });
+    }
+    for (const e of resemblances(node)) {
+      const source = e.via;
+      out.push({
+        label: e.to.replace(/^type:/, ""),
+        to: e.to,
+        source,
+        // An un-attributed resemblance is the engine's own Tier 0 reading:
+        // recognition ran inline at stroke time, before any participant spoke.
+        sourceName: source ? participantName(source, nodes) : participantName(TIER0_PARTICIPANT, nodes),
+        tier: source ? participantTier(source, nodes) : 0,
+        weight: e.weight ?? 0,
+        reasoning: e.reasoning,
+        blessed: e.blessed === true
+      });
+    }
+    return out.sort((a, b) => {
+      if (a.blessed !== b.blessed) return a.blessed ? -1 : 1;
+      return b.weight - a.weight;
+    });
+  }
+  function byTier(interpretations) {
+    const groups = /* @__PURE__ */ new Map();
+    for (const i of interpretations) {
+      const g = groups.get(i.tier);
+      if (g) g.push(i);
+      else groups.set(i.tier, [i]);
+    }
+    return [...groups.entries()].sort((a, b) => a[0] - b[0]).map(([key, list]) => ({ key, label: `tier ${key}`, interpretations: list }));
+  }
+  function bySource(interpretations) {
+    const groups = /* @__PURE__ */ new Map();
+    for (const i of interpretations) {
+      const key = i.source ?? TIER0_PARTICIPANT;
+      const g = groups.get(key);
+      if (g) g.push(i);
+      else groups.set(key, [i]);
+    }
+    return [...groups.entries()].map(([key, list]) => ({
+      key,
+      label: list[0].sourceName,
+      interpretations: list
+    }));
+  }
+  function disagreement(interpretations) {
+    if (interpretations.length < 2) return null;
+    const byLabel = /* @__PURE__ */ new Map();
+    for (const i of interpretations) {
+      const entry = byLabel.get(i.label);
+      const src = i.sourceName;
+      if (entry) {
+        entry.bestWeight = Math.max(entry.bestWeight, i.weight);
+        entry.sources.add(src);
+      } else {
+        byLabel.set(i.label, { bestWeight: i.weight, sources: /* @__PURE__ */ new Set([src]) });
+      }
+    }
+    if (byLabel.size < 2) return null;
+    const labels = [...byLabel.entries()].map(([label, v]) => ({ label, bestWeight: v.bestWeight, sources: [...v.sources] })).sort((a, b) => b.bestWeight - a.bestWeight);
+    const allSources = new Set(labels.flatMap((l) => l.sources));
+    const crossSource = allSources.size > 1 && labels.some((l) => !l.sources.every((s) => labels[0].sources.includes(s)));
+    return { labels, crossSource };
+  }
+  function sourcesOf(interpretations) {
+    return [...new Set(interpretations.map((i) => i.sourceName))];
+  }
+  function hasMultipleSources(interpretations) {
+    return sourcesOf(interpretations).length > 1;
+  }
+
+  // src/llm/provider.ts
+  var PRESETS = {
+    ollama: { kind: "openai-compatible", baseUrl: "http://localhost:11434/v1" },
+    lmStudio: { kind: "openai-compatible", baseUrl: "http://localhost:1234/v1" },
+    openRouter: { kind: "openai-compatible", baseUrl: "https://openrouter.ai/api/v1" },
+    anthropic: { kind: "anthropic", baseUrl: "https://api.anthropic.com/v1" }
+  };
+  var DEFAULT_TIMEOUT_MS = 3e4;
+  function providerLabel(config) {
+    return config.label ?? `llm:${config.model}`;
+  }
+  function providerTier(config) {
+    return /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:|\/|$)/i.test(config.baseUrl) ? 1 : 2;
+  }
+  function withTimeout(ms) {
+    const ctl = new AbortController();
+    const t = setTimeout(() => ctl.abort(), ms);
+    return { signal: ctl.signal, done: () => clearTimeout(t) };
+  }
+  async function post(url, headers, body, timeoutMs) {
+    const { signal, done } = withTimeout(timeoutMs);
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "content-type": "application/json", ...headers },
+        body: JSON.stringify(body),
+        signal
+      });
+      if (!res.ok) {
+        const detail = await res.text().catch(() => "");
+        return { ok: false, error: `HTTP ${res.status}${detail ? `: ${detail.slice(0, 200)}` : ""}` };
+      }
+      return { ok: true, json: await res.json() };
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return { ok: false, error: signal.aborted ? `timed out after ${timeoutMs}ms` : msg };
+    } finally {
+      done();
+    }
+  }
+  function firstString(...candidates) {
+    for (const c of candidates) if (typeof c === "string" && c.length > 0) return c;
+    return void 0;
+  }
+  async function completeOpenAICompatible(config, messages, timeoutMs) {
+    const headers = {};
+    if (config.apiKey) headers.authorization = `Bearer ${config.apiKey}`;
+    const res = await post(
+      `${config.baseUrl.replace(/\/$/, "")}/chat/completions`,
+      headers,
+      { model: config.model, messages, stream: false },
+      timeoutMs
+    );
+    if (!res.ok) return res;
+    const body = res.json;
+    const text = firstString(body?.choices?.[0]?.message?.content);
+    if (text === void 0) return { ok: false, error: "no completion text in response" };
+    return { ok: true, text, model: firstString(body.model) ?? config.model };
+  }
+  async function completeAnthropic(config, messages, timeoutMs) {
+    if (!config.apiKey) return { ok: false, error: "anthropic requires an API key" };
+    const system = messages.filter((m) => m.role === "system").map((m) => m.content).join("\n\n");
+    const user = messages.filter((m) => m.role === "user");
+    if (user.length === 0) return { ok: false, error: "no user message" };
+    const res = await post(
+      `${config.baseUrl.replace(/\/$/, "")}/messages`,
+      {
+        "x-api-key": config.apiKey,
+        "anthropic-version": "2023-06-01",
+        // The canvas is a browser surface; without this the API rejects the
+        // request rather than the browser blocking it at CORS.
+        "anthropic-dangerous-direct-browser-access": "true"
+      },
+      {
+        model: config.model,
+        max_tokens: 4096,
+        ...system ? { system } : {},
+        messages: user.map((m) => ({ role: "user", content: m.content }))
+      },
+      timeoutMs
+    );
+    if (!res.ok) return res;
+    const body = res.json;
+    if (body?.stop_reason === "refusal") {
+      return { ok: false, error: "model declined the request" };
+    }
+    const text = body?.content?.find((b) => b?.type === "text")?.text;
+    if (typeof text !== "string") return { ok: false, error: "no text block in response" };
+    return { ok: true, text, model: firstString(body.model) ?? config.model };
+  }
+  async function complete(config, messages) {
+    const timeoutMs = config.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+    try {
+      return config.kind === "anthropic" ? await completeAnthropic(config, messages, timeoutMs) : await completeOpenAICompatible(config, messages, timeoutMs);
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : String(err) };
+    }
+  }
+  async function listModels(config) {
+    const headers = {};
+    if (config.apiKey) headers.authorization = `Bearer ${config.apiKey}`;
+    try {
+      const { signal, done } = withTimeout(5e3);
+      const res = await fetch(`${config.baseUrl.replace(/\/$/, "")}/models`, { headers, signal });
+      done();
+      if (!res.ok) return [];
+      const body = await res.json();
+      return (body?.data ?? []).map((m) => m?.id).filter((id) => typeof id === "string");
+    } catch {
+      return [];
+    }
+  }
+
+  // src/participants/serialize.ts
+  function n(v, round) {
+    return round ? String(Math.round(v)) : v.toFixed(2);
+  }
+  function describeNode(node, state, opts) {
+    const lines = [];
+    const name = wordOf(node);
+    lines.push(`${node.id}${name ? ` (named "${name}")` : ""}`);
+    const fp = fingerprintOf(node);
+    if (fp) {
+      lines.push(
+        `  geometry: straightness ${fp.straightness.toFixed(2)}, ${fp.corners} corner(s), ${fp.isClosed ? "closed" : "open"}, aspect ${fp.aspectRatio.toFixed(2)}, size ${n(fp.size, opts.round)}px`
+      );
+    }
+    const b = boundsOf(node);
+    if (b) {
+      lines.push(
+        `  at: (${n(b.minX, opts.round)},${n(b.minY, opts.round)})\u2013(${n(b.maxX, opts.round)},${n(b.maxY, opts.round)})`
+      );
+    }
+    if (opts.includeInterpretations) {
+      const reads = interpretationsOf(node, state.nodes);
+      if (reads.length > 0) {
+        lines.push("  read as:");
+        for (const r of reads) {
+          lines.push(
+            `    - "${r.label}" ${r.weight.toFixed(2)} by ${r.sourceName}${r.blessed ? " [blessed]" : ""}${r.reasoning ? ` \u2014 ${r.reasoning}` : ""}`
+          );
+        }
+      }
+    }
+    const rels = node.edges.filter(
+      (e) => e.rel !== "resembles" && e.rel !== "blessed-by" && e.rel !== "made-by"
+    );
+    if (rels.length > 0) {
+      const shown = rels.map((e) => `${e.rel} ${e.to}`).join(", ");
+      lines.push(`  relations: ${shown}`);
+    }
+    return lines.join("\n");
+  }
+  function describeSession(state, options = {}) {
+    const includeInterpretations = options.includeInterpretations ?? true;
+    const round = options.round ?? true;
+    const ids = options.nodeIds ?? state.contentIds;
+    const nodes = ids.map((id) => state.nodes.get(id)).filter((x) => !!x && !isParticipant(x) && !isGesture(x));
+    if (nodes.length === 0) return "(nothing on the canvas)";
+    const parts = [];
+    const named = state.artifacts.map((id) => state.nodes.get(id)).filter((x) => !!x).map((a) => wordOf(a)).filter((w) => !!w);
+    if (named.length > 0) {
+      parts.push(`Known names in this session: ${named.join(", ")}`);
+    }
+    const others = state.participants.map((id) => state.nodes.get(id)).filter((x) => !!x).map((p) => wordOf(p)).filter((w) => !!w);
+    if (others.length > 0) parts.push(`Participants: ${others.join(", ")}`);
+    parts.push(`Marks (${nodes.length}):`);
+    for (const node of nodes) {
+      parts.push(describeNode(node, state, { includeInterpretations, round }));
+    }
+    return parts.join("\n");
+  }
+  function describeSignature(state, nodeIds) {
+    const counts = /* @__PURE__ */ new Map();
+    for (const id of nodeIds) {
+      const node = state.nodes.get(id);
+      if (!node) continue;
+      const reads = interpretationsOf(node, state.nodes);
+      const top = reads[0]?.label;
+      if (!top) continue;
+      counts.set(top, (counts.get(top) ?? 0) + 1);
+    }
+    return [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([label, count]) => `${count}\xD7${label}`).join(" + ");
+  }
+
+  // src/participants/agent.ts
+  var MAX_READINGS = 4;
+  var SYSTEM_PROMPT = `You are a participant on a shared drawing canvas, alongside a human and the canvas's own geometric recognizer.
+
+You are given GROUNDED FACTS about marks that were drawn: measured geometry, spatial relations, and how other participants already read them. You are not given an image. Trust the measurements \u2014 they are exact.
+
+Your job is to offer INTERPRETATIONS, not answers.
+
+Rules:
+- Offer between 1 and ${MAX_READINGS} genuinely different readings, ranked by confidence. A drawing can be several things at once; that ambiguity is useful information, not a problem to resolve.
+- Do NOT simply restate a reading that is already listed unless you actively agree with it \u2014 and if you do agree, say why it holds up.
+- If you disagree with another participant's reading, offer yours anyway. Disagreement is a signal the human wants to see.
+- Ground every reading in the facts you were given. Cite the specific geometry or relation that supports it.
+- Confidence is 0.0\u20131.0 and should be honest. Low confidence on a real possibility beats false certainty.
+
+Reply with ONLY a JSON array, no prose, no code fences:
+[{"label":"short-name","confidence":0.0-1.0,"reasoning":"one sentence citing the evidence"}]`;
+  function clamp01(v) {
+    const n2 = typeof v === "number" ? v : Number(v);
+    if (!Number.isFinite(n2)) return 0.5;
+    return Math.max(0, Math.min(1, n2));
+  }
+  function parseReadings(text) {
+    if (!text) return [];
+    const unfenced = text.replace(/```(?:json)?/gi, "").trim();
+    const start = unfenced.indexOf("[");
+    const end = unfenced.lastIndexOf("]");
+    if (start === -1 || end === -1 || end < start) return [];
+    let parsed;
+    try {
+      parsed = JSON.parse(unfenced.slice(start, end + 1));
+    } catch {
+      return [];
+    }
+    if (!Array.isArray(parsed)) return [];
+    const readings = [];
+    for (const item of parsed) {
+      if (!item || typeof item !== "object") continue;
+      const rec = item;
+      const label = typeof rec.label === "string" ? rec.label.trim() : "";
+      if (!label) continue;
+      readings.push({
+        label,
+        confidence: clamp01(rec.confidence),
+        reasoning: typeof rec.reasoning === "string" ? rec.reasoning.trim() : ""
+      });
+    }
+    return readings.sort((a, b) => b.confidence - a.confidence);
+  }
+  function readingsToEdges(readings, targetIsCluster) {
+    return readings.map((r) => ({
+      // A cluster reading names a possible composition; a stroke reading names a
+      // type. Both live in the same `type:` namespace the engine already uses.
+      to: `type:${r.label.toLowerCase().replace(/\s+/g, "-")}`,
+      rel: "resembles",
+      weight: r.confidence,
+      reasoning: r.reasoning || (targetIsCluster ? "proposed for this group" : "proposed for this mark")
+    }));
+  }
+  function createAgentParticipant(session, config, at = 0) {
+    const name = providerLabel(config);
+    const id = session.join("agent", name, at, providerTier(config));
+    async function interpret(nodeIds, now) {
+      const state = session.getState();
+      const targets = nodeIds.filter((n2) => state.nodes.has(n2));
+      if (targets.length === 0) return { ok: false, readings: [], error: "no such nodes" };
+      const isCluster = targets.length > 1;
+      const context = describeSession(state, { nodeIds: targets });
+      const signature = isCluster ? describeSignature(state, targets) : "";
+      const question = isCluster ? `These ${targets.length} marks were grouped together (${signature}). What could this group be? Offer several readings.` : `What could this mark be? Offer several readings.`;
+      const result = await complete(config, [
+        { role: "system", content: SYSTEM_PROMPT },
+        { role: "user", content: `${context}
+
+${question}` }
+      ]);
+      if (!result.ok) return { ok: false, readings: [], error: result.error };
+      const readings = parseReadings(result.text);
+      if (readings.length === 0) {
+        return { ok: false, readings: [], error: "no parseable readings", raw: result.text };
+      }
+      const target = targets[0];
+      session.propose({
+        participantId: id,
+        nodeId: target,
+        edges: readingsToEdges(readings, isCluster),
+        at: now
+      });
+      return { ok: true, readings, raw: result.text };
+    }
+    return { id, name, config, interpret };
   }
   return __toCommonJS(index_exports);
 })();

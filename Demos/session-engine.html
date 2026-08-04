@@ -106,6 +106,50 @@ html, body {
 }
 #inspector .sep { height: 1px; background: var(--rule); margin: 9px 0; }
 #inspector .empty { color: var(--dim); font-family: var(--ui); font-size: 12px; }
+#modelPanel {
+  position: fixed; left: 18px; bottom: 56px; width: 292px; z-index: 20;
+  background: rgba(12,12,18,0.96); border: 1px solid rgba(255,255,255,0.10);
+  border-radius: 8px; padding: 12px 13px; font-size: 11.5px;
+  box-shadow: 0 12px 34px rgba(0,0,0,0.5);
+}
+#modelPanel[hidden] { display: none; }
+#modelPanel .eyebrow {
+  font-size: 10px; letter-spacing: 0.09em; text-transform: uppercase;
+  color: var(--dim); margin-bottom: 6px;
+}
+#modelPanel .hint { color: var(--dim); font-size: 10.5px; line-height: 1.45; margin: 0 0 9px; }
+#modelPanel label { display: block; color: var(--dim); font-size: 10px; margin: 8px 0 3px; }
+#modelPanel select, #modelPanel input {
+  width: 100%; box-sizing: border-box; padding: 6px 7px; font: inherit;
+  font-size: 11px; color: var(--ink); background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.12); border-radius: 4px;
+}
+#modelPanel .mpRow { display: flex; gap: 7px; margin-top: 11px; }
+#modelPanel button { flex: 1; }
+#modelPanel button.ghost { flex: 0 0 auto; padding-left: 11px; padding-right: 11px; }
+#modelPanel #mpStatus { margin: 9px 0 0; }
+#modelPanel #mpList:not(:empty) {
+  margin-top: 9px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.08);
+}
+#modelPanel .mpItem {
+  display: flex; justify-content: space-between; gap: 8px;
+  color: var(--agent); font-size: 10.5px; padding: 2px 0;
+}
+#modelPanel .mpItem .t { color: var(--dim); }
+#inspector .srccount { color: var(--dim); font-weight: 400; letter-spacing: 0; }
+#inspector .gap {
+  margin: 6px 0 4px; padding: 5px 7px; font-size: 10.5px; line-height: 1.4;
+  color: var(--gold); border-left: 2px solid var(--gold);
+  background: rgba(201,168,76,0.07);
+}
+#inspector .srchead {
+  display: flex; justify-content: space-between; align-items: baseline;
+  margin: 8px 0 2px; padding-bottom: 2px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+#inspector .srchead .by { color: var(--agent); font-size: 10.5px; }
+#inspector .srchead .tier { color: var(--dim); font-size: 10px; }
+#inspector .read.blessed .type { color: var(--gold); }
 #inspector .by-agent { color: var(--agent); }
 #inspector .by-human { color: var(--ink); }
 
@@ -162,10 +206,34 @@ html, body {
        drawing to ignore it. <kbd>Ctrl</kbd>+<kbd>Z</kbd> undoes.</p>
   </div>
   <div class="controls">
-    <button id="agentBtn" aria-pressed="false" title="A second participant that echoes your strokes — scripted, not an LLM">Second participant</button>
+    <button id="modelBtn" aria-pressed="false" title="Add a model as a participant (Tier 1–2)">Add a model…</button>
+    <button id="agentBtn" aria-pressed="false" title="A second participant that echoes your strokes — scripted, not an LLM">Echo participant</button>
     <button id="undoBtn" title="Ctrl+Z">Undo</button>
     <button id="resetBtn">Reset</button>
   </div>
+</div>
+
+<div id="modelPanel" hidden>
+  <div class="eyebrow">add a model participant</div>
+  <p class="hint">Every model joins as a peer and <b>proposes</b> — it never commits.
+     Readings from all sources are held side by side.</p>
+  <label>Provider</label>
+  <select id="mpProvider">
+    <option value="ollama">Ollama (local, no key)</option>
+    <option value="lmStudio">LM Studio (local, no key)</option>
+    <option value="openRouter">OpenRouter (key)</option>
+    <option value="anthropic">Anthropic (key)</option>
+  </select>
+  <label>Model</label>
+  <input id="mpModel" placeholder="qwen3" autocomplete="off" />
+  <label id="mpKeyLabel" hidden>API key <span class="hint">— kept in this tab only</span></label>
+  <input id="mpKey" type="password" placeholder="sk-…" autocomplete="off" hidden />
+  <div class="mpRow">
+    <button id="mpAdd">Add participant</button>
+    <button id="mpClose" class="ghost">Close</button>
+  </div>
+  <div id="mpStatus" class="hint"></div>
+  <div id="mpList"></div>
 </div>
 
 <aside id="inspector" aria-live="polite"></aside>
@@ -202,6 +270,98 @@ html, body {
     render(session.getState());
   }
   addEventListener('resize', resize);
+
+  // ===== Model participants (Tier 1–2) =====
+  // A model joins through the SAME channel a human uses — session.join() then
+  // session.propose(). Every reading it offers is held as an attributed,
+  // unblessed edge beside Tier 0's, never instead of it.
+  const modelBtn = document.getElementById('modelBtn');
+  const panel = document.getElementById('modelPanel');
+  const mpProvider = document.getElementById('mpProvider');
+  const mpModel = document.getElementById('mpModel');
+  const mpKey = document.getElementById('mpKey');
+  const mpKeyLabel = document.getElementById('mpKeyLabel');
+  const mpStatus = document.getElementById('mpStatus');
+  const mpList = document.getElementById('mpList');
+
+  const DEFAULT_MODEL = {
+    ollama: 'qwen3', lmStudio: 'local-model',
+    openRouter: 'anthropic/claude-opus-4.5', anthropic: 'claude-opus-5',
+  };
+  const NEEDS_KEY = { openRouter: true, anthropic: true };
+  const agents = [];   // AgentParticipant[] — several models can coexist
+
+  function syncProviderFields() {
+    const p = mpProvider.value;
+    mpModel.placeholder = DEFAULT_MODEL[p] || '';
+    const needsKey = !!NEEDS_KEY[p];
+    mpKey.hidden = !needsKey;
+    mpKeyLabel.hidden = !needsKey;
+  }
+  mpProvider.onchange = syncProviderFields;
+  syncProviderFields();
+
+  modelBtn.onclick = () => {
+    const open = panel.hasAttribute('hidden');
+    if (open) panel.removeAttribute('hidden'); else panel.setAttribute('hidden', '');
+    modelBtn.setAttribute('aria-pressed', String(open));
+    if (open) mpModel.focus();
+  };
+  document.getElementById('mpClose').onclick = () => {
+    panel.setAttribute('hidden', ''); modelBtn.setAttribute('aria-pressed', 'false');
+  };
+
+  function renderAgents() {
+    mpList.innerHTML = agents.map((a) =>
+      '<div class="mpItem"><span>' + esc(a.name) + '</span>' +
+      '<span class="t">tier ' + MM.providerTier(a.config) + '</span></div>'
+    ).join('');
+  }
+
+  document.getElementById('mpAdd').onclick = () => {
+    const p = mpProvider.value;
+    const model = (mpModel.value || DEFAULT_MODEL[p] || '').trim();
+    if (!model) { mpStatus.textContent = 'Pick a model first.'; return; }
+    const key = mpKey.value.trim();
+    if (NEEDS_KEY[p] && !key) { mpStatus.textContent = 'This provider needs a key.'; return; }
+
+    const config = Object.assign({}, MM.PRESETS[p], { model: model });
+    if (key) config.apiKey = key;
+
+    // Several models may run in the same tier — that is the point.
+    const agent = MM.createAgentParticipant(session, config, Date.now());
+    agents.push(agent);
+    mpKey.value = '';
+    mpStatus.textContent = agent.name + ' joined. It will read each group you summon.';
+    renderAgents();
+    render(session.getState());
+  };
+
+  // When a group is summoned, ask EVERY model at once. They answer in
+  // parallel and each proposal lands independently — no escalation, no
+  // waiting for a cheaper tier to fail first.
+  let lastAskedSummon = null;
+  function askModels(s) {
+    if (!s.summon || agents.length === 0) return;
+    if (s.summon.id === lastAskedSummon) return;
+    lastAskedSummon = s.summon.id;
+
+    const ids = s.summon.enclosedIds.slice();
+    mpStatus.textContent = 'asking ' + agents.length + ' model(s)…';
+
+    agents.forEach((agent) => {
+      agent.interpret(ids, Date.now()).then((res) => {
+        if (res.ok) {
+          mpStatus.textContent = agent.name + ': ' +
+            res.readings.map((r) => r.label).join(', ');
+        } else {
+          // Degrade to Tier 0 — the canvas never stops working.
+          mpStatus.textContent = agent.name + ' unavailable (' + res.error + ') — tier 0 still holds.';
+        }
+        render(session.getState());
+      });
+    });
+  }
 
   // ===== A second participant: scripted, honest, useful =====
   // It echoes your last mark as its own mark — enough to prove that agent ink
@@ -304,6 +464,9 @@ html, body {
 
   function render(s) {
     state = s;
+    // A summon is the moment a group becomes a question — ask every model.
+    // Fire-and-forget: proposals arrive later and re-render on their own.
+    askModels(s);
     ctx.clearRect(0, 0, innerWidth, innerHeight);
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
@@ -434,16 +597,35 @@ html, body {
       if (inst) html += '<div class="row"><span class="k">same as</span><span class="v">' + esc(inst.to) + '</span></div>';
     }
 
-    // Held interpretations — all of them, ranked, attributed, justified.
-    const reads = MM.resemblances(node);
+    // Held interpretations — EVERY reading, from EVERY source, grouped by who
+    // said it. Tiers are simultaneous, not an escalation ladder: a confident
+    // model reading never evicts the engine's own (ARCHITECTURE-v7 §4.1).
+    const reads = MM.interpretationsOf(node, s.nodes);
     if (reads.length) {
-      html += '<div class="sep"></div><div class="eyebrow">reads as</div><div class="reads">';
-      reads.forEach((e, i) => {
-        html += '<div class="read' + (i === 0 ? ' top' : '') + '">' +
-          '<span class="type">' + esc(e.to.replace(/^type:/, '')) + '</span>' +
-          '<span class="w">' + (e.weight != null ? e.weight.toFixed(2) : '—') + '</span>' +
-          '<span class="by">' + esc(e.via ? nameOfParticipant(e.via) : '') + '</span></div>';
-        if (e.reasoning) html += '<div class="why">' + esc(e.reasoning) + '</div>';
+      const groups = MM.bySource(reads);
+      const gap = MM.disagreement(reads);
+
+      html += '<div class="sep"></div><div class="eyebrow">reads as' +
+        (groups.length > 1 ? ' <span class="srccount">' + groups.length + ' sources</span>' : '') +
+        '</div>';
+
+      // Disagreement is a signal, not noise — surface it above the readings.
+      if (gap && gap.crossSource) {
+        html += '<div class="gap">sources differ: ' +
+          gap.labels.slice(0, 3).map((l) => esc(l.label)).join(' vs ') + '</div>';
+      }
+
+      html += '<div class="reads">';
+      groups.forEach((g) => {
+        const tier = g.interpretations[0].tier;
+        html += '<div class="srchead"><span class="by">' + esc(g.label) + '</span>' +
+          '<span class="tier">tier ' + tier + '</span></div>';
+        g.interpretations.forEach((r, i) => {
+          html += '<div class="read' + (i === 0 ? ' top' : '') + (r.blessed ? ' blessed' : '') + '">' +
+            '<span class="type">' + esc(r.label) + '</span>' +
+            '<span class="w">' + r.weight.toFixed(2) + '</span></div>';
+          if (r.reasoning) html += '<div class="why">' + esc(r.reasoning) + '</div>';
+        });
       });
       html += '</div>';
     }
@@ -544,6 +726,11 @@ html, body {
     btn.replaceWith(input);
     input.focus();
   }
+
+  // Debug handle. This is a reference surface for the engine, so being able to
+  // read the graph from the console is a feature, not a leak — it is read-only
+  // by convention and nothing in the demo depends on it.
+  window.__mm = { session: session, agents: agents, MM: MM };
 
   session.subscribe(render);
   document.fonts.ready.then(() => render(session.getState()));

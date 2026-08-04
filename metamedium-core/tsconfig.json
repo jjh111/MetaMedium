@@ -4,7 +4,10 @@
     "module": "ESNext",
     "moduleResolution": "bundler",
     "lib": [
-      "ES2021"
+      "ES2021",
+      // WebWorker (not DOM) gives fetch/AbortController/timers for the LLM
+      // transport while keeping the engine headless — no document, no window.
+      "WebWorker"
     ],
     "strict": true,
     "noUnusedLocals": true,

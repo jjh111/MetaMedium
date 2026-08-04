@@ -137,14 +137,25 @@ intelligence panel in `doodle2-canvas.html`.
 
 ### Tiered LLM Interpretation
 
-> **Status: only Tier 0 is live in the engine.** The `Capability = 0|1|2|3`
-> ladder and the `propose()` channel exist in core and are tested, but nothing
-> has ever plugged a model into them. Design: `ARCHITECTURE-v7-PARTICIPANTS-AND-TIERS.md`.
+> **Status (Aug 2026): Tiers 1–2 are live in the engine.** A model joins via
+> `createAgentParticipant()` and proposes through the same channel a human uses.
+> Design: `ARCHITECTURE-v7-PARTICIPANTS-AND-TIERS.md`.
+>
+> **Multi-interpretation is a hard rule, not a nicety.** Models are asked for
+> *several* readings, several models can answer in the same tier, and **all
+> tiers show at once** — a confident Tier 2 reading never evicts Tier 0's. The
+> old "escalate only on low confidence" policy is withdrawn: escalation means
+> suppression, and disagreement between sources is exactly what the human wants
+> to see. Read with `interpretationsOf()` / `byTier()` / `bySource()` /
+> `disagreement()`; `topInterpretation()` is a headline helper, not the truth.
 
-- **Tier 0:** heuristics (always available, offline baseline) — **built**
-- **Tier 1:** local model via Ollama (`localhost:11434/v1`) or LM Studio (`localhost:1234/v1`) — LM Studio wired in `metadoodle1.html`, not on the engine
-- **Tier 2:** hosted model via OpenRouter or Anthropic, bring-your-own-key — not built
+- **Tier 0:** engine heuristics (always available, offline) — **built**
+- **Tier 1:** local model via Ollama (`localhost:11434/v1`) or LM Studio (`localhost:1234/v1`) — **built**
+- **Tier 2:** hosted model via OpenRouter or Anthropic, bring-your-own-key — **built**
 - **Tier 3:** structural proposals (growing what the board can know) — reserved
+
+Tier is derived from the provider by `providerTier()` (localhost → 1, hosted →
+2) and carried on the participant node via `join(kind, name, at, capability)`.
 
 **One transport covers Tier 1 and most of Tier 2:** Ollama, LM Studio, and
 OpenRouter all speak the OpenAI-compatible `/v1/chat/completions` shape and

@@ -20,6 +20,7 @@ import {
   type MMNode,
   type Edge,
   type ParticipantKind,
+  type Capability,
   createBootstrapNodes,
   createParticipantNode,
   typeNodeId,
@@ -86,7 +87,7 @@ export type SessionEvent =
   | { type: 'bless'; summonId: string; name?: string; suggestionId?: string; at: number; participantId?: string }
   | { type: 'dismiss'; summonId: string; at: number; participantId?: string }
   | { type: 'erase'; nodeId: string; at: number; participantId?: string }
-  | { type: 'join'; kind: ParticipantKind; name: string; at: number }
+  | { type: 'join'; kind: ParticipantKind; name: string; at: number; capability?: Capability }
   | { type: 'propose'; participantId: string; nodeId: string; edges: ProposedEdge[]; at: number };
 
 /** An attributed, inferred edge offered by a participant (e.g. an LLM tier). */
@@ -116,7 +117,7 @@ type Signature = Record<string, number>; // type histogram, e.g. { circle: 3, li
 export interface Session {
   addStroke(points: Point[], at: number, participantId?: string): string;
   /** Register a participant (human or AI agent). Returns its node id. */
-  join(kind: ParticipantKind, name: string, at: number): string;
+  join(kind: ParticipantKind, name: string, at: number, capability?: Capability): string;
   /** Offer attributed, inferred edges on a node — the channel LLM tiers use. */
   propose(args: { participantId: string; nodeId: string; edges: ProposedEdge[]; at: number }): void;
   tick(at: number): void;
@@ -494,7 +495,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
   }
 
   function applyJoin(ev: Extract<SessionEvent, { type: 'join' }>): string {
-    const node = createParticipantNode(nextId('participant'), ev.kind, ev.name, ev.at);
+    const node = createParticipantNode(nextId('participant'), ev.kind, ev.name, ev.at, ev.capability ?? 0);
     nodes.set(node.id, node);
     participants.push(node.id);
     return node.id;
@@ -590,7 +591,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
   return {
     addStroke: (points, at, participantId) =>
       dispatch({ type: 'stroke', points, at, participantId }) as string,
-    join: (kind, name, at) => dispatch({ type: 'join', kind, name, at }) as string,
+    join: (kind, name, at, capability) => dispatch({ type: 'join', kind, name, at, capability }) as string,
     propose: (args) => void dispatch({ type: 'propose', ...args }),
     tick: (at) => void dispatch({ type: 'tick', at }),
     bless: (args) => dispatch({ type: 'bless', ...args }),

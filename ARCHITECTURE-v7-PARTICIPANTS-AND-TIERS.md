@@ -114,7 +114,7 @@ meaning rather than inventing a parallel scheme:
 | **2** | Hosted model via OpenRouter or Anthropic | Explanations, diagram→code, composition interpretation, "why" in prose | When the user supplies a key |
 | **3** | Reserved | Structural proposals (new types, schema growth) — the "extensible in what it can know" tier | Not yet built |
 
-**The rules that make tiers safe** — all three already hold in the engine, and
+**The rules that make tiers safe** — all four already hold in the engine, and
 v7 must not weaken any of them:
 
 1. **Every tier proposes; no tier commits.** A model's output is an unblessed,
@@ -123,6 +123,53 @@ v7 must not weaken any of them:
    `llm:<model>` is visible in the inspector next to `tier0-heuristics`.
 3. **Degrade to Tier 0, never gate on a tier.** No LLM call blocks drawing. The
    canvas is fully usable with the network off.
+4. **Tiers are simultaneous, not an escalation ladder.** See below.
+
+### 4.1 Multi-interpretation — the rule that shapes everything
+
+**ARCHITECTURE-v6 principle 2 — *nothing wins by silencing the others* — applies
+to models exactly as it applies to heuristics.** Tier 0 is already multi-parse:
+every qualifying detector contributes a ranked candidate and none suppresses the
+rest. The LLM tiers inherit that, in three directions at once:
+
+- **Multiple readings *within* one model.** A model is asked for **N candidate
+  interpretations with confidences and reasons**, never for "the answer". One
+  arrangement can legitimately be *molecule*, *network*, and *three bubbles on
+  strings* — the canvas holds all three.
+- **Multiple models *within* a tier.** Two local models, or a text model and a
+  VLM, can each answer and each be held. Same tier, different voices.
+- **All tiers at once.** Tier 0's heuristic reading, Tier 1's local reading, and
+  Tier 2's hosted reading coexist on the same node, side by side and
+  distinguishable by source. **This is not an escalation ladder** — the older
+  "escalate only on low confidence" policy from PRD-v4 is explicitly withdrawn,
+  because escalation means suppression: it throws away a cheap reading the
+  moment an expensive one arrives, and the disagreement between them is
+  information the human should see.
+
+The point isn't redundancy — **it's that disagreement is a first-class signal.**
+When Tier 0 says *circle* and Tier 2 says *the letter O*, the interesting thing
+is the gap. Collapsing to one answer destroys exactly what makes a grounded
+substrate worth having.
+
+**Data model: already supports this, no schema change.** `propose()` takes
+`edges: ProposedEdge[]` — an array — and every edge carries its own `weight`,
+`reasoning`, and `via`. Several participants can each add their own edges to the
+same node. Multi-interpretation is already expressible; nothing needed writing.
+
+**The gap is on the read side.** `topInterpretation()` returns exactly one
+reading — the winner-take-all helper. It stays (surfaces need a headline), but
+v7 adds a non-collapsing read path beside it:
+
+```
+interpretationsOf(node, state)  →  ranked readings, each annotated with
+                                   { source, participantName, tier, weight,
+                                     reasoning, blessed }
+byTier(...) / bySource(...)     →  grouped views for rendering
+disagreement(...)               →  where sources diverge — the signal to surface
+```
+
+Surfaces render **all** of it. A node with four readings from three sources
+shows four readings from three sources.
 
 ---
 
@@ -148,18 +195,42 @@ Items 1–4 are the platform. 5–7 are what makes the benchmark demonstrable.
 
 Each stage ends with something visible. No infrastructure-only weeks.
 
-### Stage A — The agent speaks (the smallest honest slice)
+### Stage A — The agent speaks ✅ **shipped (Aug 2026)**
 
-Replace the scripted echo behind "Second participant" with a real model over
-the OpenAI-compatible adapter, pointed at Ollama by default.
+A model joins through `join()`/`propose()` and offers **several** readings; the
+canvas holds them beside Tier 0's rather than instead of them.
 
-- Serialize the session; ask for one thing only: *what is this cluster, and
-  why?*
-- Return proposals through `propose()`, attributed `llm:<model>`.
-- Render them as held candidates, visually distinct from Tier 0's.
+What landed:
 
-**Ship criterion:** you draw three circles and two lines, the agent proposes
-"molecule" with a reason, and you bless it. Two participants, one artifact.
+| | |
+|---|---|
+| `src/llm/provider.ts` | One OpenAI-compatible client (Ollama / LM Studio / OpenRouter) + an Anthropic client. Failures are **returned, never thrown** — nothing can break drawing |
+| `src/participants/serialize.ts` | The graph as grounded text: geometry, relations, existing readings *and who made them*. No pixels — this is the hypothesis's test surface |
+| `src/participants/agent.ts` | The adapter. Prompts for **1–N genuinely different readings**, parses tolerantly (local models fence their JSON), proposes every one |
+| `src/session/interpretations.ts` | The non-collapsing read path: `interpretationsOf` / `byTier` / `bySource` / `disagreement` |
+| `Demos/session-engine.html` | Provider picker, multiple models at once, readings grouped by source with a disagreement banner |
+
+**Verified live in the browser**, two models plus the engine on one mark:
+
+```
+READS AS  3 SOURCES
+  sources differ: molecule vs circle vs flowchart
+  llm:qwen3                                    tier 1
+    molecule 0.82   three closed shapes joined by two straight connectors
+    network 0.61    nodes linked by edges
+    triangle-of-bubbles 0.34
+  tier0-heuristics                             tier 0
+    circle 0.80     closed (overshoot), curved, smooth, aspect 1.01
+  llm:hosted-model                             tier 2
+    flowchart 0.75  discrete nodes with directed connectors
+```
+
+Five readings, three sources, three tiers — **nothing collapsed, nothing
+committed.** 117 tests green.
+
+**Fixed along the way:** `join()` gave every participant `capability: 0`, so
+tier grouping was meaningless. It now carries a tier, derived from whether the
+model runs on this machine (`providerTier`).
 
 ### Stage B — Tiers and keys
 

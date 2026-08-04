@@ -60,7 +60,14 @@ export function createParticipantNode(
   id: string,
   kind: ParticipantKind,
   name: string,
-  at: number
+  at: number,
+  /**
+   * Which tier this participant speaks at. Humans and the engine's own
+   * heuristics are 0; a local model is 1, a hosted one 2 (ARCHITECTURE-v7 §4).
+   * Tiers are simultaneous, so this labels a voice — it never ranks one above
+   * another or gates what a participant may propose.
+   */
+  capability: Capability = 0
 ): MMNode {
   return {
     id,
@@ -69,7 +76,7 @@ export function createParticipantNode(
       { modality: 'word', data: name },
     ],
     edges: [],
-    capability: 0,
+    capability,
     createdAt: at,
   };
 }
