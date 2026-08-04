@@ -23,7 +23,8 @@ Flagship demo keyboard shortcuts: `Ctrl+Z` undo, `Ctrl+Shift+Z` redo,
 
 ## Plan & Architecture
 
-- **[ROADMAP.md](ROADMAP.md)** — active plan: Whitepaper v5.1, then Demo v3 on `metamedium-core`
+- **[ROADMAP.md](ROADMAP.md)** — status, the August 2026 accounting, and what's next
+- **[ARCHITECTURE-v7-PARTICIPANTS-AND-TIERS.md](ARCHITECTURE-v7-PARTICIPANTS-AND-TIERS.md)** — active plan: a model in the loop, and the conversation benchmark
 - **[ARCHITECTURE-v6-SESSION-ENGINE.md](ARCHITECTURE-v6-SESSION-ENGINE.md)** — active design: the no-modes session engine
 - [metamedium-core-schema.md](metamedium-core-schema.md) — graph data model: everything is a node
 - [ARCHITECTURE-v5-UNIFIED-ENGINE.md](ARCHITECTURE-v5-UNIFIED-ENGINE.md) — partly superseded; reference for the deferred MoE/embedding work

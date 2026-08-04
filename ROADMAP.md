@@ -51,21 +51,41 @@ tracks only **status**. Experiments are tracked in
    there is now one place for new logic. The diverged copies in
    doodle2-canvas, metadoodle1, Web App Skeleton and v2-poc are still there —
    fragmentation ends when Demo v3 converges them, not before.
-2. **The whitepaper doesn't show the thesis.** It argues "AI beyond chat" but
-   links to a demo with no AI in it. The LLM-grounded work (metadoodle1) and
-   the medium-blending work (v2-poc) exist but aren't surfaced.
+2. **The whitepaper doesn't show the thesis.** Still true — it argues "AI
+   beyond chat" and links a demo with no AI in it. **Deliberately not the next
+   move:** the honest fix is to make the thesis true in the engine first (v7),
+   then show it. Parked, not forgotten.
 3. **Plans have outpaced shipping.** ~~Three architecture documents, zero
    shared code.~~ **Addressed (June 2026)** — v6 was written *and* built in the
    same pass, and the cure holds: the next document should be a demo.
 
 ---
 
-## The Two Next Versions
+## What's Next
 
-### Whitepaper v5.1 — "Show, don't tell" (fast, ~1–2 weeks)
+### → **v7: Participants and Tiers** — the active plan
+
+**[ARCHITECTURE-v7-PARTICIPANTS-AND-TIERS.md](ARCHITECTURE-v7-PARTICIPANTS-AND-TIERS.md)**
+is where the work goes now. The substrate is real and the loop is closed; there
+has never been a model in it. v7 puts one there, through the `propose` channel
+the engine already has.
+
+The target is **the conversation benchmark**: a human and an AI holding a
+conversation *on the canvas* — both contributing marks, both building library
+entries, questions answered into the space, diagrams parsed into code. MVP
+transport is one OpenAI-compatible adapter (Ollama, LM Studio, and OpenRouter
+are the same client with a different base URL), plus the Anthropic client for
+Tier 2.
+
+### Whitepaper v5.1 — "Show, don't tell" — **deferred by decision**
+
+> 📌 **Parked (Aug 2026, John's call):** *"leave whitepaper alone until we know
+> this works."* The document should demonstrate a thesis that is proven, not a
+> promising one. Revisit after v7 Stage C. Everything below stays valid as the
+> plan for when it resumes.
 
 Goal: the live document demonstrates its own argument. Pure content/curation
-work, no engine changes required — this is the near-term value delivery.
+work, no engine changes required.
 
 - **Embed v2-poc as an interactive figure.** Text reflowing around the
   reader's own drawn shapes, inside the whitepaper, is the thesis made
@@ -83,50 +103,37 @@ Ship criterion: a first-time visitor can experience draw→recognize→name and
 drawing-responsive text without leaving the whitepaper, and can find the
 LLM-tier demo in one click.
 
-### Demo v3 — "One demo on one core" (~4–6 weeks, the dev-cycle setup)
+### ~~Demo v3 — "One demo on one core"~~ → **superseded, mostly done**
 
-Goal: converge the forks into a single flagship demo built on an extracted,
-tested core library. This is ARCHITECTURE-v5 Phases 1–3, scoped down to what
-the demo needs — no MoE router, no embedding space yet.
+> **Status (Aug 2026): Steps 1 and 3 shipped; Step 2 is withdrawn as written.**
+> The successor plan is **[ARCHITECTURE-v7-PARTICIPANTS-AND-TIERS.md](ARCHITECTURE-v7-PARTICIPANTS-AND-TIERS.md)**.
 
-> **Update (June 2026):** Step 1 happened — driven by the no-modes user story
-> rather than as an abstract refactor. `metamedium-core/` now exists with
-> geometry/recognition/spatial ported (behavior-identical, tested) **plus the
-> session engine** implementing lasso → check → summon → bless → artifact.
-> See `ARCHITECTURE-v6-SESSION-ENGINE.md` (the active design) and the
-> executable spec at `metamedium-core/src/session/session.scenario.test.ts`.
-> Step 1 is now complete: the browser (IIFE) bundle ships at
-> `Demos/metamedium-core.browser.js`, CI-checked against source.
+**Step 1 — Extract `metamedium-core`. ✅ Done (June 2026).** Driven by the
+no-modes user story rather than as an abstract refactor. Geometry, recognition,
+and spatial ported behavior-identically with tests, **plus the session engine**
+(lasso → check → summon → bless → artifact). The browser bundle ships at
+`Demos/metamedium-core.browser.js`, CI-checked against source. Design:
+`ARCHITECTURE-v6-SESSION-ENGINE.md`.
 
-**Step 1 — Extract `metamedium-core` (week 1–2).**
-- New `metamedium-core/` package: geometry, fingerprinting, recognition
-  heuristics, spatial graph, library/matching — pure TypeScript, zero
-  framework dependencies. Source of truth: Web App Skeleton's `src/core` +
-  the best of doodle2-canvas's heuristics (they have diverged; reconcile by
-  test, not by guess).
-- Vitest unit tests on every pure function. Recorded-stroke fixtures (capture
-  real strokes from doodle2-canvas as JSON) become the regression suite.
-- Two build outputs: ESM for the React app, UMD bundle for the standalone
-  HTML demos. This is what lets the monoliths shrink instead of fork.
+**Step 2 — Converge the two monoliths into `canvas.html`. ❌ Withdrawn.**
+Written in June, before v6 existed. `doodle2-canvas.html` and `metadoodle1.html`
+both implement a **mode-and-tool interaction model that v6 deliberately
+abandoned** — merging them would port the old model forward and leave the
+no-modes engine as the side project. The real successor is
+`Demos/session-engine.html` grown up: 554 lines against their ~500KB each, and
+the only surface actually built on the engine. The monoliths get archived with
+redirects once it reaches parity on polish, touch, and undo/redo. See v7 §7.
 
-**Step 2 — Converge the flagship (week 2–4).**
-- One demo (working name: `canvas.html`, successor to both doodle2-canvas and
-  metadoodle1) consuming the UMD core. Keep doodle2-canvas's polished UI;
-  port metadoodle1's tiered LLM layer onto it.
-- Tier policy (simplified from PRD-v4): **Tier 0** core heuristics (always,
-  offline); **Tier 1** in-browser WebLLM (optional download); **Tier 2**
-  Claude API, bring-your-own-key (Haiku for interpretation, Sonnet for
-  "explain why"). Escalate only on low confidence or explicit user ask.
-- Old files move to `archive/` with redirects; published URLs keep working.
+**Step 3 — Close the canonical loop. ✅ Done in the engine (June–Aug 2026).**
+Composition save, re-recognition, and grounded "why" all work end-to-end, and
+were verified in a browser: draw 3 circles + 2 lines → lasso → check → summon
+(*"holds 5 marks · sig 3×circle + 2×line"*) → name it → **0 loose · 1 artifact**
+→ draw the same arrangement elsewhere → the canvas offers *"molecule? circle + ✓
+to confirm"* as a held candidate. The inspector shows the grounding throughout.
+The executable spec is `metamedium-core/src/session/session.scenario.test.ts`.
 
-**Step 3 — Close the canonical loop (week 4–6).**
-- Composition save + recognition in core (spatial-graph fingerprints — Day
-  3–5 of the old roadmap, finally done once, in one place).
-- "Explain why" surfaced in the flagship via Tier 2.
-- Record a 60-second video of the bubble→molecule loop for the whitepaper.
-
-Ship criterion: the canonical loop works end-to-end in the published flagship
-demo, offline-first, with LLM tiers as progressive enhancement.
+**What Step 3 did *not* deliver:** "explain why" is Tier 0 grounded reasoning,
+not an LLM. There is still no model in the loop anywhere. That is v7's job.
 
 ---
 
@@ -225,11 +232,58 @@ The docs were then consolidated on a **one definition, one home** rule:
 - **Design systems documented as a deliberate split** (MetaMedium vs.
   personal-site language), with the MetaMedium style pinned as to-be-defined.
 
+## The Accounting (August 2026)
+
+An honest ledger before the next plan. **Done** = works and is verified.
+**Partial** = exists but doesn't do what the name implies. **Not started** =
+say so plainly.
+
+### Done
+
+| | Evidence |
+|---|---|
+| Geometry, fingerprinting, recognition | `metamedium-core/src/{geometry,recognition}.ts`, 86 tests, CI-enforced |
+| Spatial graph + clustering | `src/spatial.ts` |
+| **The node model** — type emerges from connections | `src/session/nodes.ts`; the schema doc is implemented, not aspirational |
+| **The session engine** — no modes, deferred commitment | `src/session/session.ts`; gesture grammar in `gesture.ts` |
+| **The canonical loop, end to end** | Executable spec + verified live in `Demos/session-engine.html` |
+| Multi-parse recognition (nothing wins by silencing) | `analyzeStroke` returns ranked candidates with `reasoning` |
+| Event-sourced undo; erase with artifact degradation | `session.undo()`, `session.erase()` |
+| **Participants as first-class citizens** | `join`, `propose`, attribution, `Capability 0–3` — v0.3a |
+| Browser bundle + reference surface | `metamedium-core.browser.js`, CI drift check |
+| CI on core and the React app | `.github/workflows/ci.yml` |
+| Repo unified; docs consolidated | Aug 2026 (below) |
+
+### Partial
+
+| | What's actually true |
+|---|---|
+| "Explain why" | **Tier 0 only.** Grounded heuristic reasoning — honest and offline, but no model is involved |
+| Tiered LLM interpretation | Wired in `metadoodle1.html` (LM Studio + WebLLM), **not** on the engine. The core has the socket and nothing plugged into it |
+| Claude / Tier 2 | `Web App Skeleton/src/llm/claudeInterpreter.ts` exists but pins **two retired model IDs** — it would 404 today |
+| The flagship demo | `session-engine.html` proves the loop but is framed as a dev reference surface; the polished monoliths are on the old interaction model |
+| Whitepaper | v5 is live and polished, but still links only the heuristic demo — it does not show its own thesis |
+| Web App Skeleton | Builds, lints, tests green; not wired to anything shipped |
+
+### Not started
+
+- **Any model in the engine loop** — the propose channel has never carried an LLM proposal
+- **Diagram → code**, handwriting recognition, explanation reps on canvas
+- MCP server (PRD-v4 Phase 1)
+- Point primitive (`Assets/point-primitive-design.md`)
+- Onboarding / calibration / user fingerprints
+- Embedding space (MoE routing is prototyped in `lens-canvas/`, not in core)
+
+**The one-line summary:** the substrate is real and the loop is closed; there
+has never been a model in it. v7 is about that, and only that.
+
 ## Success Criteria
 
-- [ ] Whitepaper v5.1 live: embedded reflow figure, demo gallery, roadmap section
-- [ ] `metamedium-core` package: zero framework deps, tested, ESM + UMD builds
+- [x] `metamedium-core` package: zero framework deps, tested, ESM + browser builds
+- [x] Canonical bubble→molecule loop works in a published demo (`Demos/session-engine.html`)
+- [x] CI green on core; recognition changes land via small, tested PRs
+- [ ] **A model participates** — an LLM proposal, attributed and blessed, on the canvas (v7 Stage A)
+- [ ] **The conversation benchmark** — human and AI build library entries together, ask/explain, diagram→code (v7)
+- [ ] Tier 2 "explain why" from a real model with a user-supplied key (v7 Stage B–C)
 - [ ] One flagship demo on core; doodle2-canvas/metadoodle1 archived with redirects
-- [ ] Canonical bubble→molecule loop works in the published demo
-- [ ] Tier 2 "explain why" works with a user-supplied Anthropic key
-- [ ] CI green on core; recognition changes land via small, tested PRs
+- [ ] Whitepaper v5.1 live — **deliberately deferred until the above works** (John, Aug 2026: "leave whitepaper alone until we know this works")

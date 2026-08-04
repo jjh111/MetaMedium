@@ -17,11 +17,14 @@ automatically → ask "why?" and get grounded reasoning.
 
 ## Current Status & Plan
 
-**See `ROADMAP.md`** — the active plan (June 2026). Headline: ship Whitepaper
-v5.1 (embed demos in the document), then Demo v3 (extract a shared
-`metamedium-core` library and converge the forked demos onto it).
+**See `ROADMAP.md`** for status and the August 2026 accounting. Headline: the
+substrate is real and the canonical loop is closed end-to-end — but **there has
+never been a model in the loop**. `ARCHITECTURE-v7-PARTICIPANTS-AND-TIERS.md`
+is the active plan for putting one there. Whitepaper v5.1 is deliberately
+parked until that works.
 
-Architecture documents (chronological; **read v6 first — it's the active one**):
+Architecture documents (chronological; **read v7 then v6 — they're the active pair**):
+- `ARCHITECTURE-v7-PARTICIPANTS-AND-TIERS.md` — **active plan**: putting a model in the loop through the `propose` channel; the conversation benchmark; one OpenAI-compatible transport for Ollama/LM Studio/OpenRouter
 - `ARCHITECTURE-v6-SESSION-ENGINE.md` — **active design**: the no-modes session engine (deferred commitment, summoning, promotion ladder, capability tiers), implemented in `metamedium-core/`
 - `metamedium-core-schema.md` — graph data model ("everything is a node; type emerges from connections") — load-bearing via v6
 - `ARCHITECTURE-v5-UNIFIED-ENGINE.md` — partly superseded by v6; still the reference for the deferred MoE-routing and embedding-space work
@@ -134,13 +137,29 @@ intelligence panel in `doodle2-canvas.html`.
 
 ### Tiered LLM Interpretation
 
-- **Tier 0:** heuristics (always available, offline baseline)
-- **Tier 1:** light/local LLM — WebLLM (WebGPU) or LM Studio in `metadoodle1.html`; Claude Haiku in `Web App Skeleton/src/llm/claudeInterpreter.ts`
-- **Tier 2:** Claude Sonnet/Opus for compositions, ambiguity, and "explain why"
+> **Status: only Tier 0 is live in the engine.** The `Capability = 0|1|2|3`
+> ladder and the `propose()` channel exist in core and are tested, but nothing
+> has ever plugged a model into them. Design: `ARCHITECTURE-v7-PARTICIPANTS-AND-TIERS.md`.
 
-LLMs receive structured geometric data (fingerprints, spatial graph, library
-context) — not screenshots. LLM calls must never block drawing; degrade
-gracefully to Tier 0.
+- **Tier 0:** heuristics (always available, offline baseline) — **built**
+- **Tier 1:** local model via Ollama (`localhost:11434/v1`) or LM Studio (`localhost:1234/v1`) — LM Studio wired in `metadoodle1.html`, not on the engine
+- **Tier 2:** hosted model via OpenRouter or Anthropic, bring-your-own-key — not built
+- **Tier 3:** structural proposals (growing what the board can know) — reserved
+
+**One transport covers Tier 1 and most of Tier 2:** Ollama, LM Studio, and
+OpenRouter all speak the OpenAI-compatible `/v1/chat/completions` shape and
+differ only by base URL and key. Anthropic needs its own client.
+
+⚠️ `Web App Skeleton/src/llm/claudeInterpreter.ts` pins `claude-3-haiku-20240307`
+and `claude-sonnet-4-20250514` — **both are past retirement and return 404**.
+Retarget to `claude-opus-5` before trusting that file (thinking is on by
+default there, so leave `max_tokens` headroom).
+
+**The rules that make tiers safe:** LLMs receive structured geometric data
+(fingerprints, spatial graph, library context) — **not screenshots**. Every
+tier *proposes*; no tier commits — a model's output is an unblessed, attributed
+edge that the human blesses or ignores. LLM calls must never block drawing;
+degrade to Tier 0, never gate on a tier.
 
 ## Working with the Codebase
 
