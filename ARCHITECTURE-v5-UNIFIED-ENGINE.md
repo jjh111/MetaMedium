@@ -1,5 +1,15 @@
 # MetaMedium v5: Unified Engine Architecture
 
+> **Status: partly superseded (kept for the parts still in play).**
+> `ARCHITECTURE-v6-SESSION-ENGINE.md` is the active design and amends this
+> document's engine/state model. What remains live here: the **expert routing
+> (MoE)** and **embedding-space** ideas, which ROADMAP.md keeps deferred —
+> `lens-canvas/` is a running prototype of the routing half (see
+> EXPERIMENTS.md). What is settled: Phase 1's `metamedium-core` extraction,
+> which happened in June 2026. Recognition thresholds quoted below are
+> historical — the engine is the source of truth
+> (`metamedium-core/src/recognition.ts`).
+
 **Version:** 5.0 DRAFT
 **Author:** Claude (Opus) + John Hanacek
 **Date:** March 2026
@@ -612,7 +622,7 @@ server.addTool('interpret_stroke', async (params) => {
 
 ## References
 
-- PRD-v4-LLM-Grounded.md — Previous architecture document
+- `archive/PRD-v4-LLM-Grounded.md` — Previous architecture document (archived)
 - CLAUDE.md — Project development guide
 - metamedium-core-schema.md — Graph-based data model
 - Web App Skeleton/src/llm/ — Existing tiered interpreter

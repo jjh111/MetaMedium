@@ -2,6 +2,11 @@
 
 A collection of reusable code patterns extracted from MetaMedium development sessions. These patterns are useful for building recognition systems, gesture-based interfaces, and composable drawing applications.
 
+> Code shown here is **illustrative and abridged** (e.g. `detectCircle` omits
+> the overshoot and aspect-ratio checks the engine actually runs). For patterns
+> as-shipped read `skill.md`; for exact behaviour read
+> `metamedium-core/src/recognition.ts`, which wins any disagreement.
+
 ## Overview
 
 The MetaMedium codebase implements a **stroke fingerprinting and recognition system** that:

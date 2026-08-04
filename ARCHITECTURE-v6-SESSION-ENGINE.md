@@ -4,7 +4,7 @@
 **Date:** June 2026
 **Lineage:** Adopts the node model from `metamedium-core-schema.md`; adopts and amends
 `ARCHITECTURE-v5-UNIFIED-ENGINE.md`; supersedes the selection-gesture section of
-`PRD-v4-LLM-Grounded.md`. Read those for background; read **this** to build.
+`archive/PRD-v4-LLM-Grounded.md`. Read those for background; read **this** to build.
 
 This document crystallizes the design conversation of June 2026. It is written
 to be sufficient on its own: a future contributor (human or AI, any model)

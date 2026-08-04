@@ -1,5 +1,10 @@
 # MetaMedium Recognition System Strategy
 
+> **Design rationale — historical.** Written before `metamedium-core/` existed.
+> The rules described here were ported faithfully into
+> `metamedium-core/src/recognition.ts` and are covered by tests; **read the code
+> for current values**, read this for the reasoning behind them.
+
 ## Current State Analysis
 
 ### Recognition Pipeline

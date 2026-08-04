@@ -23,11 +23,20 @@ v5.1 (embed demos in the document), then Demo v3 (extract a shared
 
 Architecture documents (chronological; **read v6 first — it's the active one**):
 - `ARCHITECTURE-v6-SESSION-ENGINE.md` — **active design**: the no-modes session engine (deferred commitment, summoning, promotion ladder, capability tiers), implemented in `metamedium-core/`
-- `PRD-v4-LLM-Grounded.md` — LLM-grounded architecture, tiered escalation (Tier 0 heuristics / Tier 1 light LLM / Tier 2 Claude), MCP server spec
-- `ARCHITECTURE-v5-UNIFIED-ENGINE.md` — unified engine: shape experts, MoE routing, three state planes (amended by v6)
-- `metamedium-core-schema.md` — graph data model ("everything is a node; type emerges from connections") — now load-bearing via v6
+- `metamedium-core-schema.md` — graph data model ("everything is a node; type emerges from connections") — load-bearing via v6
+- `ARCHITECTURE-v5-UNIFIED-ENGINE.md` — partly superseded by v6; still the reference for the deferred MoE-routing and embedding-space work
+- `archive/PRD-v4-LLM-Grounded.md` — **archived**; still the spec for the tiered escalation (Tier 0 heuristics / Tier 1 light LLM / Tier 2 Claude) and the unbuilt MCP server
+
+`EXPERIMENTS.md` covers the side tier (lens-canvas, v2-poc, vision/LLM PoCs,
+the explainer video) and what each one feeds back into the platform.
 
 ## Repository Map
+
+This table is the **single inventory of the repo** — README.md and ROADMAP.md
+link here rather than keeping their own lists. Update it in the same commit as
+any structural change.
+
+### Platform (the project proper)
 
 | Path | What it is |
 |---|---|
@@ -35,14 +44,27 @@ Architecture documents (chronological; **read v6 first — it's the active one**
 | `index.html` | **Interactive whitepaper v5** "MetaMedium: AI Beyond Chat" (live on GitHub Pages) |
 | `doodle2-canvas.html` | **Flagship demo**: heuristic recognition, spatial graph, library, undo/redo, touch. No LLM. Single-file (~500KB) |
 | `metadoodle1.html` | Fork of flagship + tiered LLM recognition (WebLLM in-browser, LM Studio local API) + voice. Single-file (~600KB) |
-| `v2-poc/` | Drawing-responsive text reflow PoC (chenglou/pretext). `index.html` + esbuild `bundle.js` |
 | `Web App Skeleton/` | React + Vite + TypeScript + Zustand rebuild; Claude API interpreter skeleton in `src/llm/`; recognition/spatial/matching in `src/core/` |
 | `Demos/` | Micro demos. **`session-engine.html`** is the live reference surface for metamedium-core (canvas + "why" inspector + second participant; uses the committed `metamedium-core.browser.js` bundle). `build-standalone.mjs` inlines the bundle into a single shareable file. Plus fish, composition diagrams, no-modes graph, etc. |
-| `test-llm.html` | Standalone LLM test harness |
 | `skills/` | Claude Code skills: `metamedium-code` (code patterns), `metamedium-design` (design principles) |
-| `Assets/` | Figures, design notes, recognition strategy docs |
-| `archive/` | Retired versions, incl. whitepaper v4 (root `MetaMedium_Whitepaper_v4.html` is a redirect stub — keep it) |
-| `.github/workflows/ci.yml` | CI: lint + test + build of Web App Skeleton on every push/PR |
+| `Assets/` | Figures and design rationale (recognition strategy, point-primitive proposal) |
+| `archive/` | Retired versions and superseded plans, incl. whitepaper v4 (root `MetaMedium_Whitepaper_v4.html` is a redirect stub — keep it) and PRDs v3.2/v4 |
+| `.github/workflows/ci.yml` | CI: typecheck + test + build for `metamedium-core` (incl. a bundle-drift check) and `Web App Skeleton`, on every push/PR |
+
+### Experiments (subordinate tier — see `EXPERIMENTS.md`)
+
+Cheap, forked, allowed to re-implement. They de-risk platform bets; they are
+not the product. Each entry's rationale and what it feeds back lives in
+`EXPERIMENTS.md`.
+
+| Path | What it probes |
+|---|---|
+| `lens-canvas/` | Infinite canvas, `LensNode` graph, confidence-scored lens routing — a running prototype of the deferred MoE router and the "type emerges from connections" model. Vite + vitest (19 tests). **Not in CI** |
+| `v2-poc/` | Drawing-responsive text reflow (chenglou/pretext) — the figure Whitepaper v5.1 is built around. `src/main.ts` + committed `bundle.js` |
+| `test-vision.html` | VLM path (Qwen3.5): image-in instead of structured-geometry-in. The control case for the grounded-not-pixels commitment |
+| `test-llm.html` | Standalone LLM harness |
+| `manim-explainer/` | ~50s explainer video. Source + stills tracked; renders and `media/` cache gitignored (regenerate from the scripts) |
+| `playground.html` | Personal sandbox on the personal-site design language |
 
 **Known duplication:** recognition logic still exists independently in
 `doodle2-canvas.html`, `metadoodle1.html`, `Web App Skeleton/src/core/`, and
@@ -69,34 +91,46 @@ library hierarchical.
 
 ### Recognition Engine
 
-Geometric fingerprinting with heuristic detection:
+> **Source of truth: `metamedium-core/src/recognition.ts` and
+> `src/geometry.ts`, with `*.test.ts` beside them.** Exact thresholds are
+> deliberately *not* restated here — they used to be, in ten documents, and
+> they drifted. Read the code for values; read this for shape. The reasoning
+> behind the rules is in `Assets/recognition-strategy.md`.
 
-```javascript
-fingerprint = {
-  aspectRatio: width / height,
-  straightness: directDistance / pathLength,  // 1 = perfectly straight
-  isClosed: startEndDistance < threshold,
-  corners,                                     // corner count (later versions)
-  bounds: { minX, maxX, minY, maxY },
-  size: max(width, height)
-}
-```
+A stroke is reduced to a **fingerprint** — aspect ratio, straightness
+(`directDistance / pathLength`, 1 = perfectly straight), closure, corner count
+and angles, bounds, size — and detectors read that fingerprint.
 
-**Straightness separates the primitives:**
-- 0.0–0.4: circles (curved) — confidence 0.8
-- 0.5–0.75: rectangles — confidence 0.7
-- 0.75–1.0: lines — confidence 0.9
+Two properties matter more than any individual number:
 
-**Size-relative closure** (key innovation):
-`isClosed = distance < 50px OR distance/size < 0.15` — small shapes need tight
-closure, large shapes tolerate bigger gaps.
+**Multi-parse, not winner-take-all.** Every detector that qualifies contributes
+a candidate; results are returned sorted by score, and nothing wins by
+silencing the others (ARCHITECTURE-v6 principle 2). A closed, low-corner stroke
+can be a circle *and* something else at once — the caller decides. Detectors
+today: line, arc, triangle, rectangle, circle. Each result carries a grounded
+`reasoning` string, which is what the "why" inspector surfaces.
+
+**Detection keys on closure + corners + straightness together**, not on
+straightness alone. Closure and corner count do most of the discriminating;
+straightness mainly separates line from arc and vetoes circles.
+
+**Size-relative closure** (key innovation): a stroke closes if the start–end
+gap is under a fixed pixel threshold **or** under a fraction of the stroke's
+size — small shapes need tight closure, large shapes tolerate bigger gaps. The
+same size-relative logic guards overshoot detection, so short strokes don't all
+read as circles. Both live in `isStrokeClosed` / `checkOvershoot`.
+
+**Library matching** is a weighted fingerprint comparison (straightness,
+aspect, corners, closure, size) with a straightness veto — see
+`matchPrimitiveFromLibrary`.
 
 ### Spatial Graph
 
 Relationships between strokes drive composition recognition: intersection,
 touching (proximity threshold), containment (bounds inside closed shape),
-directional proximity. See `Web App Skeleton/src/core/spatial.ts` and the
-spatial intelligence panel in `doodle2-canvas.html`.
+directional proximity. Canonical: `metamedium-core/src/spatial.ts`. Legacy
+copies for reference: `Web App Skeleton/src/core/spatial.ts` and the spatial
+intelligence panel in `doodle2-canvas.html`.
 
 ### Tiered LLM Interpretation
 
@@ -150,14 +184,20 @@ Structure: `src/components/` (Canvas, SuggestionPanel, LibraryPanel, …),
 `src/core/` (recognition, spatial, matching), `src/llm/` (heuristic + Claude
 interpreters), `src/types/`, `src/test/` (synthetic stroke generators for
 tests). Recognition changes must keep the vitest suite green — it encodes the
-documented thresholds below.
+thresholds, which is why no document restates them.
 
-### v2-poc
+### Experiments
 
-⚠️ The v2-poc **source was never committed** (an old `.gitignore` excluded
-`v2-poc/src/`) — only the built `bundle.js` exists in the repo. Don't attempt
-to rebuild it; treat `bundle.js` as the artifact until the source is recovered
-and committed from the original machine.
+See `EXPERIMENTS.md` for what each one is for. Two have real toolchains:
+
+```bash
+cd lens-canvas && npm run dev   # Vite on :5173; npm test → 19 vitest tests
+cd v2-poc                       # esbuild; src/main.ts → bundle.js (committed)
+```
+
+`v2-poc/src/main.ts` was recovered and committed in August 2026 — an old
+`.gitignore` rule had hidden it, leaving only the built `bundle.js`. Both are
+in the repo now.
 
 ## Technical Specifications
 
@@ -172,15 +212,31 @@ WebLLM features require WebGPU.
 
 ## Design System
 
-- Whitepaper/demos (current): dark theme, `#0a0a0f` background, `#e8e4d9` text, `#c9a84c` gold accent, Space Grotesk
-- Recognition feedback: accepted `#0066ff`, pending `#666666`, high confidence green, medium confidence orange
+Two palettes coexist **by intent** — the split is by brand, not drift. Don't
+"fix" one to match the other.
+
+| Surface | Palette | Type |
+|---|---|---|
+| Whitepaper, `Demos/`, flagship demos | `#0a0a0f` bg · `#e8e4d9` text · `#c9a84c` gold | Space Grotesk |
+| `lens-canvas/`, `manim-explainer/`, `playground.html` | `#020a12` sea-deep · `#7dd8f7` cyan · `#d4af37` gold | JetBrains Mono |
+
+The second is the personal-site (johnhanacek.com) language.
+
+Recognition feedback (whitepaper/demos): accepted `#0066ff`, pending `#666666`,
+high confidence green, medium confidence orange.
+
+> 📌 **Pinned:** a deliberate MetaMedium style is still to be defined (John has
+> one in mind). Until then treat the whitepaper palette as *current*, not
+> *decided* — and keep the two systems separate.
 
 ## Development Philosophy
 
 - **Ship something visible weekly** — no infrastructure-only weeks
 - **Simple first** — build the simplest thing that works; refactor when patterns emerge
-- **One core, many surfaces** — recognition logic belongs in shared code (post-extraction), demos consume builds
+- **One core, many surfaces** — recognition logic belongs in `metamedium-core`; demos consume builds
 - **Progressive enhancement** — heuristics always work offline; LLM tiers enhance, never gate
+- **Experiments feed the platform** — they may fork and re-implement to move fast, but a proven idea lands in core with tests, and experiments never become the focus (`EXPERIMENTS.md`)
+- **One definition, one home** — a threshold, a palette, or an inventory lives in exactly one place; everything else links to it
 - **Keep CLAUDE.md current** — update it in the same PR as any structural change
 
 ## What to Preserve When Evolving
@@ -195,4 +251,11 @@ WebLLM features require WebGPU.
 1. Don't fork the monolithic demos again — converge on the core (ROADMAP.md)
 2. Don't let LLM calls block the drawing loop
 3. Don't over-engineer ahead of a shippable demo (MoE/embeddings are deferred — see ROADMAP.md)
-4. Don't trust this file's thresholds blindly — the demos have diverged; verify in the file you're editing
+4. **Don't restate thresholds in prose.** They lived in ten documents and
+   drifted; this file's own copy went stale twice. Cite
+   `metamedium-core/src/*.ts` instead. The one intentional mirror is
+   `skills/metamedium-code/skill.md`, which Claude Code loads standalone —
+   re-verify it against the engine when recognition changes
+5. The legacy monoliths (`doodle2-canvas.html`, `metadoodle1.html`,
+   `Web App Skeleton/src/core/`) still carry their own diverged recognition
+   copies. Read the file you're editing; land new logic in core

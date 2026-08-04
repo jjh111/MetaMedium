@@ -25,10 +25,17 @@ Flagship demo keyboard shortcuts: `Ctrl+Z` undo, `Ctrl+Shift+Z` redo,
 
 - **[ROADMAP.md](ROADMAP.md)** — active plan: Whitepaper v5.1, then Demo v3 on `metamedium-core`
 - **[ARCHITECTURE-v6-SESSION-ENGINE.md](ARCHITECTURE-v6-SESSION-ENGINE.md)** — active design: the no-modes session engine
-- [PRD-v4-LLM-Grounded.md](PRD-v4-LLM-Grounded.md) — LLM-grounded architecture, tiered escalation, MCP server spec
-- [ARCHITECTURE-v5-UNIFIED-ENGINE.md](ARCHITECTURE-v5-UNIFIED-ENGINE.md) — unified engine: shape experts, routing, state planes
 - [metamedium-core-schema.md](metamedium-core-schema.md) — graph data model: everything is a node
-- [CLAUDE.md](CLAUDE.md) — codebase guide (structure, thresholds, conventions)
+- [ARCHITECTURE-v5-UNIFIED-ENGINE.md](ARCHITECTURE-v5-UNIFIED-ENGINE.md) — partly superseded; reference for the deferred MoE/embedding work
+- [archive/PRD-v4-LLM-Grounded.md](archive/PRD-v4-LLM-Grounded.md) — archived; still the spec for tiered escalation and the unbuilt MCP server
+- [CLAUDE.md](CLAUDE.md) — codebase guide and the repo's single inventory (structure, conventions)
+
+## Experiments
+
+**[EXPERIMENTS.md](EXPERIMENTS.md)** — the side tier: lens-canvas (infinite
+canvas + confidence-routed lenses), the drawing-responsive text PoC, vision/LLM
+probes, and the explainer video. Experiments de-risk platform bets and feed
+proven ideas back into `metamedium-core`; they aren't the product.
 
 ## Development
 
@@ -39,7 +46,7 @@ zero runtime deps):
 ```bash
 cd metamedium-core
 npm install
-npm test         # 63 tests incl. the canonical-loop executable spec
+npm test         # 86 tests incl. the canonical-loop executable spec
 npm run build
 ```
 
@@ -54,7 +61,8 @@ npm run lint     # eslint
 npm run build    # typecheck + production build
 ```
 
-CI runs lint, tests, and build on every push and PR.
+CI runs typecheck, lint, tests, and build for both packages on every push and
+PR, and fails if the committed browser bundle drifts from core.
 
 The standalone HTML demos are self-contained single files — serve the repo
 root with `python -m http.server 8000` and open them directly.

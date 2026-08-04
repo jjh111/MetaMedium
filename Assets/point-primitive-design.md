@@ -1,5 +1,10 @@
 # Point Primitive Integration Design
 
+> **Open proposal — not implemented.** The point primitive still does not exist
+> in `metamedium-core/`; stroke-endpoint-vs-corner confusion is still a real
+> failure mode. Kept as a live design idea, tracked under "Deliberately
+> Deferred" in ROADMAP.md.
+
 ## Current State
 
 **Existing Shape Types:**

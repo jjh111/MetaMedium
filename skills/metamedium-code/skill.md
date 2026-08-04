@@ -4,6 +4,16 @@
 
 This skill documents reusable code patterns extracted from MetaMedium development sessions. Use these patterns when building recognition systems, gesture-based interfaces, or composable drawing applications.
 
+> **Provenance — the one intentional mirror.** Every other document in this
+> repo cites `metamedium-core/src/*.ts` instead of restating thresholds,
+> because ten copies drifted. This skill keeps real code inline on purpose:
+> Claude Code loads it standalone, without the repo. That makes it the one file
+> that can silently go stale.
+>
+> **Verified against the engine: August 2026.** Re-verify when recognition
+> changes — `metamedium-core/src/recognition.ts` and `src/geometry.ts` win any
+> disagreement.
+
 ---
 
 ## Core Type Patterns

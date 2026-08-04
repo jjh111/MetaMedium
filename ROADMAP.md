@@ -1,8 +1,8 @@
 # MetaMedium Roadmap — Mid-2026 Refresh
 
-**Date:** June 2026
+**Date:** June 2026 · last revised August 2026
 **Status:** Active plan
-**Supersedes:** the day-by-day roadmap in the old CLAUDE.md; sequences (does not replace) PRD-v4-LLM-Grounded.md and ARCHITECTURE-v5-UNIFIED-ENGINE.md
+**Supersedes:** the day-by-day roadmap in the old CLAUDE.md; sequences (does not replace) `archive/PRD-v4-LLM-Grounded.md` and `ARCHITECTURE-v5-UNIFIED-ENGINE.md`
 
 ---
 
@@ -27,31 +27,36 @@ Everything below is sequenced to get that loop **into one shippable demo** and
 
 ## Where Things Actually Stand
 
-| Artifact | Role | Status |
-|---|---|---|
-| `index.html` | Whitepaper v5 "AI Beyond Chat" (live on GitHub Pages) | Polished; "Current Development" section links only to the heuristic demo |
-| `doodle2-canvas.html` | Flagship canvas demo | Polished; heuristics + spatial graph + library; **no LLM** |
-| `metadoodle1.html` | Fork of flagship + tiered LLM (WebLLM, LM Studio) + voice | Working prototype; diverging copy of the flagship |
-| `v2-poc/` | Drawing-responsive text reflow (pretext) | Newest work; the most direct demo of "drawing and text are one medium" |
-| `Web App Skeleton/` | React/TS/Zustand rebuild + Claude API interpreter skeleton | Builds and runs; no compositions; not wired to anything shipped |
-| `PRD-v4-LLM-Grounded.md` | LLM-grounded architecture + tiered escalation + MCP spec | Plan only |
-| `ARCHITECTURE-v5-UNIFIED-ENGINE.md` | Unified engine: experts/MoE, three state planes, `metamedium-core` extraction | Plan only |
-| `metamedium-core-schema.md` | Graph data model (everything is a node) | Plan only |
-| `Demos/`, `test-llm.html`, `skills/` | Micro demos, LLM test harness, Claude Code skills | Supporting material |
+*What each thing **is** lives in the repo map in
+[CLAUDE.md](CLAUDE.md#repository-map) — the single inventory. This table
+tracks only **status**. Experiments are tracked in
+[EXPERIMENTS.md](EXPERIMENTS.md).*
+
+| Artifact | Status (Aug 2026) |
+|---|---|
+| `metamedium-core/` | **Shipped and canonical.** Geometry, recognition, spatial, session engine. 86 tests, CI-enforced, browser bundle committed |
+| `index.html` (Whitepaper v5) | Polished; "Current Development" still links only the heuristic demo — **v5.1 is the open work** |
+| `doodle2-canvas.html` | Polished; heuristics + spatial graph + library; **no LLM**. Not yet on core |
+| `metadoodle1.html` | Working prototype; diverging copy of the flagship. Not yet on core |
+| `Demos/session-engine.html` | Live reference surface for core: canvas + "why" inspector + second participant |
+| `Web App Skeleton/` | Builds, lints, tests green; no compositions; not wired to anything shipped |
+| `metamedium-core-schema.md` | **Load-bearing** — the node model is implemented via v6 (was "plan only") |
+| `ARCHITECTURE-v5-UNIFIED-ENGINE.md` | Partly superseded; MoE/embedding half still deferred (and now prototyped in `lens-canvas/`) |
+| `archive/PRD-v4-LLM-Grounded.md` | Archived; tiered escalation partly built, MCP server unbuilt |
 
 ### Three tensions blocking progress
 
-1. **Fragmentation.** Recognition logic now lives in at least four places
-   (doodle2-canvas, metadoodle1, Web App Skeleton, v2-poc), each a monolithic
-   copy. Every improvement costs 3–4×. This is the single biggest blocker to
-   dev cycles, and it is exactly what ARCHITECTURE-v5 Phase 1 (extract
-   `metamedium-core`) fixes.
+1. **Fragmentation.** ~~Recognition logic now lives in at least four places~~
+   **Half-fixed (June 2026).** `metamedium-core` exists and is canonical, so
+   there is now one place for new logic. The diverged copies in
+   doodle2-canvas, metadoodle1, Web App Skeleton and v2-poc are still there —
+   fragmentation ends when Demo v3 converges them, not before.
 2. **The whitepaper doesn't show the thesis.** It argues "AI beyond chat" but
    links to a demo with no AI in it. The LLM-grounded work (metadoodle1) and
    the medium-blending work (v2-poc) exist but aren't surfaced.
-3. **Plans have outpaced shipping.** Three architecture documents, zero shared
-   code. The cure is not another architecture doc — it's picking the smallest
-   slice of v5 that unblocks everything else and shipping it.
+3. **Plans have outpaced shipping.** ~~Three architecture documents, zero
+   shared code.~~ **Addressed (June 2026)** — v6 was written *and* built in the
+   same pass, and the cure holds: the next document should be a demo.
 
 ---
 
@@ -90,7 +95,8 @@ the demo needs — no MoE router, no embedding space yet.
 > session engine** implementing lasso → check → summon → bless → artifact.
 > See `ARCHITECTURE-v6-SESSION-ENGINE.md` (the active design) and the
 > executable spec at `metamedium-core/src/session/session.scenario.test.ts`.
-> Remaining from the original Step 1: UMD bundle for standalone demos.
+> Step 1 is now complete: the browser (IIFE) bundle ships at
+> `Demos/metamedium-core.browser.js`, CI-checked against source.
 
 **Step 1 — Extract `metamedium-core` (week 1–2).**
 - New `metamedium-core/` package: geometry, fingerprinting, recognition
@@ -127,8 +133,10 @@ demo, offline-first, with LLM tiers as progressive enhancement.
 ## Dev-Cycle Operating Model (what this sets up)
 
 - **One core, many surfaces.** All recognition changes land in
-  `metamedium-core` with tests; demos and the React app consume builds. New
-  experiments (like v2-poc) import the core instead of re-implementing it.
+  `metamedium-core` with tests; demos and the React app consume builds.
+  Experiments may fork and re-implement to move fast — that is what makes them
+  cheap — but a proven idea comes back into core with tests rather than living
+  on in a fork (see EXPERIMENTS.md).
 - **CI on the core.** GitHub Action: typecheck + vitest on every PR. The
   stroke-fixture suite makes recognition changes reviewable ("this PR changes
   12 of 200 fixture interpretations") instead of vibes-based.
@@ -149,10 +157,19 @@ demo, offline-first, with LLM tiers as progressive enhancement.
   converged flagship as its host. After Demo v3.
 - **Embedding space, MoE router, expert feedback loops** (ARCH-v5 Phases
   4+): keep as the magnum-opus target; revisit once corrections data from a
-  real demo exists to justify them.
+  real demo exists to justify them. **Partly de-risked already** —
+  `lens-canvas/` runs confidence-scored expert routing at small scale and it
+  works (see EXPERIMENTS.md), so the router is less speculative than when this
+  was written.
 - **Graph schema migration** (metamedium-core-schema.md): adopt incrementally
   — the spatial graph in core can grow toward "everything is a node" without
-  a big-bang rewrite.
+  a big-bang rewrite. `lens-canvas/` is the working precedent.
+- **Point primitive** (`Assets/point-primitive-design.md`): dots/markers as
+  first-class shapes, plus a fix for stroke-endpoint-vs-corner confusion.
+  Designed, never implemented; still a real failure mode in core.
+- **CI for `lens-canvas/`**: it has 19 vitest tests that nothing runs
+  automatically. Cheap to add whenever the experiment goes from parked to
+  load-bearing.
 
 ## Done: June 2026 Cleanup Pass (soil prep)
 
@@ -170,9 +187,9 @@ demo, offline-first, with LLM tiers as progressive enhancement.
   synthetic stroke generators in `src/test/strokes.ts` — the seed of the
   `metamedium-core` regression suite. CI workflow runs lint + test + build
   on every push/PR.
-- ⚠️ **Action needed (John):** v2-poc source was gitignored and never
-  committed — only `bundle.js` is in the repo. Commit `v2-poc/src/` from the
-  machine that has it (the ignore rule is now removed).
+- ~~⚠️ **Action needed (John):** v2-poc source was gitignored and never
+  committed~~ ✅ **done (Aug 2026)** — `v2-poc/src/main.ts` recovered and
+  committed from the original machine.
 
 ## Done: June 2026 Session-Engine Push (v0.1 + v0.2)
 
@@ -183,6 +200,30 @@ event-sourced undo, erase with artifact degradation, wire inference, and a
 size-relative overshoot fix. 76 tests including the canonical-loop executable
 spec. A browser bundle + reference surface (`Demos/session-engine.html`) make
 the engine visible and were verified end-to-end in headless Chromium.
+
+## Done: August 2026 Unification + Docs Pass
+
+Two lines of work had diverged — a remote session branch (metamedium-core, v6,
+reference surface) and local work (lens-canvas Phases 1–4, the explainer video,
+vision PoC). Both are merged into `master`; the stale `claude/*` branches are
+deleted and CI is green.
+
+The docs were then consolidated on a **one definition, one home** rule:
+
+- **Thresholds left prose.** Recognition numbers had been restated in ten
+  documents and had drifted — CLAUDE.md's own copy described an older engine
+  (straightness-banded detection, a 0.15 closure gap) while the shipped engine
+  is multi-parse with a 0.20 gap. The engine and its tests are now the only
+  spec; docs describe shape and cite code. `Assets/recognition-strategy.md`
+  keeps the *reasoning*.
+- **One inventory.** CLAUDE.md's repo map is it; README and ROADMAP link to it.
+- **Experiments got a tier.** `EXPERIMENTS.md` names what each probes and what
+  it feeds back, without letting any of them read as the main project.
+- **Superseded plans archived, not deleted** — PRD v3.2 and the Web App
+  Skeleton migration guide moved to `archive/`; ARCHITECTURE-v5 and the
+  `Assets/` design notes bannered with what's still live in them.
+- **Design systems documented as a deliberate split** (MetaMedium vs.
+  personal-site language), with the MetaMedium style pinned as to-be-defined.
 
 ## Success Criteria
 
