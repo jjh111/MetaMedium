@@ -948,8 +948,10 @@ var MetaMediumCore = (() => {
           to: typeNodeId(r.type),
           rel: "resembles",
           weight: r.confidence,
-          via: TIER0_PARTICIPANT
+          via: TIER0_PARTICIPANT,
           // even the heuristics are a participant
+          reasoning: r.reasoning
+          // grounded "why", carried with the claim
         });
       }
       addSpatialEdges(node);
@@ -1052,7 +1054,13 @@ var MetaMediumCore = (() => {
       const node = nodes.get(ev.nodeId);
       if (!node || !participants.includes(ev.participantId)) return;
       for (const e of ev.edges) {
-        node.edges.push({ to: e.to, rel: e.rel, weight: e.weight, via: ev.participantId });
+        node.edges.push({
+          to: e.to,
+          rel: e.rel,
+          weight: e.weight,
+          via: ev.participantId,
+          reasoning: e.reasoning
+        });
       }
       recomputeClusterCandidates();
     }

@@ -94,6 +94,8 @@ export interface ProposedEdge {
   to: string;
   rel: string;
   weight?: number;
+  /** Why this participant makes this claim — surfaced by "why?" in any surface. */
+  reasoning?: string;
 }
 
 export interface SessionConfig {
@@ -363,6 +365,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
         rel: 'resembles',
         weight: r.confidence,
         via: TIER0_PARTICIPANT, // even the heuristics are a participant
+        reasoning: r.reasoning, // grounded "why", carried with the claim
       } satisfies Edge);
     }
 
@@ -503,7 +506,13 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     // Proposals are held like every other interpretation: attributed,
     // inferred, never blessed by the act of proposing.
     for (const e of ev.edges) {
-      node.edges.push({ to: e.to, rel: e.rel, weight: e.weight, via: ev.participantId });
+      node.edges.push({
+        to: e.to,
+        rel: e.rel,
+        weight: e.weight,
+        via: ev.participantId,
+        reasoning: e.reasoning,
+      });
     }
     recomputeClusterCandidates();
   }

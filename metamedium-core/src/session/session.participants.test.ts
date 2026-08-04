@@ -55,6 +55,33 @@ describe('attribution', () => {
     const top = resemblances(s.getState().nodes.get(id)!)[0];
     expect(top.via).toBe(TIER0_PARTICIPANT);
   });
+
+  it('claims carry their grounded reasoning, whoever makes them', () => {
+    const s = createSession();
+    const agent = s.join('agent', 'claude', 0);
+    const id = s.addStroke(circleStroke(200, 200, 40), 1000);
+
+    // The engine's own claim explains itself...
+    expect(resemblances(s.getState().nodes.get(id)!)[0].reasoning).toContain('closed');
+
+    // ...and so does an agent's.
+    s.propose({
+      participantId: agent,
+      nodeId: id,
+      edges: [
+        {
+          to: 'type:rectangle',
+          rel: 'resembles',
+          weight: 0.95,
+          reasoning: 'four corner-ish turns at near-right angles',
+        },
+      ],
+      at: 2000,
+    });
+    const top = resemblances(s.getState().nodes.get(id)!)[0];
+    expect(top.via).toBe(agent);
+    expect(top.reasoning).toBe('four corner-ish turns at near-right angles');
+  });
 });
 
 describe('same-class citizenship', () => {

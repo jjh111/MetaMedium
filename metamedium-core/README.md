@@ -97,6 +97,8 @@ session.propose({
 - A lasso is simultaneously content and gesture-candidate until the next event resolves it.
 - A check **summons**; blessing is a separate act. Drawing past a summon dismisses it.
 - Ink is never destroyed — members and gestures keep their nodes and reps.
+- Every claim carries its author (`via`) and its justification (`reasoning`),
+  so "why did you think that?" is answerable with no LLM in the loop.
 - Everything starts at capability 0 (inert); escalation is a blessed act (v0.2+).
 
 ## Departures from the legacy heuristics (made knowingly)

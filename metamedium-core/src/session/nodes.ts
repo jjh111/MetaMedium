@@ -21,6 +21,8 @@ export interface Edge {
   weight?: number;
   blessed?: boolean; // inferred (absent/false) vs blessed (true)
   via?: string;
+  /** Grounded justification for this claim — the substance behind "why?". */
+  reasoning?: string;
 }
 
 export interface MMNode {

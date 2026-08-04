@@ -347,6 +347,10 @@ nodes (`join`), attributed events (`made-by`), tier-0 heuristics registered
 as a participant, and the `propose` channel for LLM tiers (attributed, held,
 unblessed edges). Mixed human/agent artifacts and agent-performed gestures
 are covered by tests.
+**Also landed:** every claim carries `reasoning` (grounded justification) as
+well as `via` (its author), so "why did you think that?" is answerable from
+the graph with no LLM in the loop — surfaced by the reference surface's
+inspector.
 **Still v0.3:** wire blessing via summon; richer composition matching (port
 `CompositionFingerprint`); first Tier-1 container escalation ("make this a
 surface" → markdown/HTML payload rendered in bounds); playground surface

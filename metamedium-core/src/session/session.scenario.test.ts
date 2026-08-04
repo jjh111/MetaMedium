@@ -133,5 +133,9 @@ describe('the canonical loop', () => {
     const top = resemblances(firstCircle)[0];
     expect(top.to).toBe('type:circle');
     expect(top.weight).toBeGreaterThanOrEqual(0.8);
+    // Every claim carries its justification and its author — the substance
+    // behind "why did you think that?", available without an LLM.
+    expect(top.reasoning).toMatch(/closed/);
+    expect(top.via).toBeDefined();
   });
 });

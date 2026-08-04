@@ -37,7 +37,7 @@ Architecture documents (chronological; **read v6 first — it's the active one**
 | `metadoodle1.html` | Fork of flagship + tiered LLM recognition (WebLLM in-browser, LM Studio local API) + voice. Single-file (~600KB) |
 | `v2-poc/` | Drawing-responsive text reflow PoC (chenglou/pretext). `index.html` + esbuild `bundle.js` |
 | `Web App Skeleton/` | React + Vite + TypeScript + Zustand rebuild; Claude API interpreter skeleton in `src/llm/`; recognition/spatial/matching in `src/core/` |
-| `Demos/` | Micro demos. **`session-engine.html`** is the live reference surface for metamedium-core (uses the committed `metamedium-core.browser.js` bundle); plus fish, composition diagrams, no-modes graph, etc. |
+| `Demos/` | Micro demos. **`session-engine.html`** is the live reference surface for metamedium-core (canvas + "why" inspector + second participant; uses the committed `metamedium-core.browser.js` bundle). `build-standalone.mjs` inlines the bundle into a single shareable file. Plus fish, composition diagrams, no-modes graph, etc. |
 | `test-llm.html` | Standalone LLM test harness |
 | `skills/` | Claude Code skills: `metamedium-code` (code patterns), `metamedium-design` (design principles) |
 | `Assets/` | Figures, design notes, recognition strategy docs |
