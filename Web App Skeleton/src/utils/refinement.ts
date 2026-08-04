@@ -197,8 +197,8 @@ export function refineTriangle(
     // This works even with very few points in the stroke
 
     // Start with first point
-    let p1Idx = 0;
-    let p1 = originalStroke[0];
+    const p1Idx = 0;
+    const p1 = originalStroke[0];
 
     // Find point farthest from p1
     let maxDist1 = 0;

@@ -1,0 +1,1140 @@
+/* metamedium-core browser bundle — built from metamedium-core/src via: npm run build:browser. Do not edit directly. */
+"use strict";
+var MetaMediumCore = (() => {
+  var __defProp = Object.defineProperty;
+  var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+  var __getOwnPropNames = Object.getOwnPropertyNames;
+  var __hasOwnProp = Object.prototype.hasOwnProperty;
+  var __export = (target, all) => {
+    for (var name in all)
+      __defProp(target, name, { get: all[name], enumerable: true });
+  };
+  var __copyProps = (to, from, except, desc) => {
+    if (from && typeof from === "object" || typeof from === "function") {
+      for (let key of __getOwnPropNames(from))
+        if (!__hasOwnProp.call(to, key) && key !== except)
+          __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+    }
+    return to;
+  };
+  var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
+
+  // src/index.ts
+  var index_exports = {};
+  __export(index_exports, {
+    BUILTIN_TYPES: () => BUILTIN_TYPES,
+    DEFAULT_GESTURE_CONFIG: () => DEFAULT_GESTURE_CONFIG,
+    DEFAULT_SESSION_CONFIG: () => DEFAULT_SESSION_CONFIG,
+    LOCAL_PARTICIPANT: () => LOCAL_PARTICIPANT,
+    TIER0_PARTICIPANT: () => TIER0_PARTICIPANT,
+    analyzeCornerAngles: () => analyzeCornerAngles,
+    analyzeStroke: () => analyzeStroke,
+    boundingBoxDistance: () => boundingBoxDistance,
+    boundsContain: () => boundsContain,
+    boundsOf: () => boundsOf,
+    boundsOverlap: () => boundsOverlap,
+    buildSpatialGraph: () => buildSpatialGraph,
+    calculateDistance: () => calculateDistance,
+    calculateStraightness: () => calculateStraightness,
+    checkOvershoot: () => checkOvershoot,
+    convexHull: () => convexHull,
+    countCorners: () => countCorners,
+    createBootstrapNodes: () => createBootstrapNodes,
+    createParticipantNode: () => createParticipantNode,
+    createSession: () => createSession,
+    enclosedBy: () => enclosedBy,
+    findCorners: () => findCorners,
+    findCornersWithSeparation: () => findCornersWithSeparation,
+    fingerprintOf: () => fingerprintOf,
+    getBounds: () => getBounds,
+    getBoundsFromStroke: () => getBoundsFromStroke,
+    getFingerprint: () => getFingerprint,
+    getRep: () => getRep,
+    isCheckLike: () => isCheckLike,
+    isGesture: () => isGesture,
+    isLassoLike: () => isLassoLike,
+    isParticipant: () => isParticipant,
+    isStrokeClosed: () => isStrokeClosed,
+    matchPrimitiveFromLibrary: () => matchPrimitiveFromLibrary,
+    normalizeStroke: () => normalizeStroke,
+    resemblances: () => resemblances,
+    resolvesLasso: () => resolvesLasso,
+    simplifyStroke: () => simplifyStroke,
+    smoothStroke: () => smoothStroke,
+    spatialCluster: () => spatialCluster,
+    strokePointsOf: () => strokePointsOf,
+    topInterpretation: () => topInterpretation,
+    typeNodeId: () => typeNodeId,
+    wordOf: () => wordOf
+  });
+
+  // src/geometry.ts
+  function getBounds(points) {
+    if (points.length === 0) return { minX: 0, maxX: 0, minY: 0, maxY: 0 };
+    let minX = Infinity, maxX = -Infinity;
+    let minY = Infinity, maxY = -Infinity;
+    points.forEach((point) => {
+      minX = Math.min(minX, point.x);
+      maxX = Math.max(maxX, point.x);
+      minY = Math.min(minY, point.y);
+      maxY = Math.max(maxY, point.y);
+    });
+    return { minX, maxX, minY, maxY };
+  }
+  function getBoundsFromStroke(stroke) {
+    if (Array.isArray(stroke[0]) && typeof stroke[0][0] === "object") {
+      const allPoints = [];
+      stroke.forEach((segment) => {
+        allPoints.push(...segment);
+      });
+      return getBounds(allPoints);
+    }
+    return getBounds(stroke);
+  }
+  function calculateDistance(p1, p2) {
+    return Math.sqrt(Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2));
+  }
+  function calculateStraightness(points) {
+    if (points.length < 2) return 0;
+    const start = points[0];
+    const end = points[points.length - 1];
+    const directDistance = calculateDistance(start, end);
+    let pathLength = 0;
+    for (let i = 1; i < points.length; i++) {
+      const dx = points[i].x - points[i - 1].x;
+      const dy = points[i].y - points[i - 1].y;
+      pathLength += Math.sqrt(dx * dx + dy * dy);
+    }
+    if (pathLength === 0) return 0;
+    return directDistance / pathLength;
+  }
+  function isStrokeClosed(points, threshold = 50) {
+    if (points.length < 5) return false;
+    const start = points[0];
+    const end = points[points.length - 1];
+    const distance = calculateDistance(start, end);
+    if (distance < threshold) return true;
+    const bounds = getBounds(points);
+    const width = bounds.maxX - bounds.minX;
+    const height = bounds.maxY - bounds.minY;
+    const size = Math.max(width, height);
+    const relativeGap = size > 0 ? distance / size : 1;
+    return relativeGap < 0.2;
+  }
+  function ccw(p1, p2, p3) {
+    return (p2.x - p1.x) * (p3.y - p1.y) - (p2.y - p1.y) * (p3.x - p1.x);
+  }
+  function convexHull(points) {
+    if (!points || points.length < 3) return points;
+    let start = points[0];
+    for (let i = 1; i < points.length; i++) {
+      if (points[i].y < start.y || points[i].y === start.y && points[i].x < start.x) {
+        start = points[i];
+      }
+    }
+    const sorted = points.filter((p) => p !== start).sort((a, b) => {
+      const angleA = Math.atan2(a.y - start.y, a.x - start.x);
+      const angleB = Math.atan2(b.y - start.y, b.x - start.x);
+      if (angleA !== angleB) return angleA - angleB;
+      const distA = calculateDistance(start, a);
+      const distB = calculateDistance(start, b);
+      return distA - distB;
+    });
+    const hull = [start, sorted[0]];
+    for (let i = 1; i < sorted.length; i++) {
+      let top = hull[hull.length - 1];
+      let middle = hull[hull.length - 2];
+      while (hull.length > 1 && ccw(middle, top, sorted[i]) <= 0) {
+        hull.pop();
+        top = hull[hull.length - 1];
+        middle = hull[hull.length - 2];
+      }
+      hull.push(sorted[i]);
+    }
+    return hull;
+  }
+  function calculateAngleBetweenPoints(arm1, vertex, arm2) {
+    const v1x = arm1.x - vertex.x;
+    const v1y = arm1.y - vertex.y;
+    const v2x = arm2.x - vertex.x;
+    const v2y = arm2.y - vertex.y;
+    const angle1 = Math.atan2(v1y, v1x);
+    const angle2 = Math.atan2(v2y, v2x);
+    let radians = angle2 - angle1;
+    if (radians < 0) radians += Math.PI * 2;
+    if (radians > Math.PI * 2) radians -= Math.PI * 2;
+    return radians;
+  }
+  function findCorners(points, targetCount) {
+    if (!points || points.length < targetCount) return points;
+    const hull = convexHull(points);
+    if (hull.length <= targetCount) return hull;
+    const corners = [];
+    for (let i = 0; i < hull.length; i++) {
+      const prev = hull[(i - 1 + hull.length) % hull.length];
+      const curr = hull[i];
+      const next = hull[(i + 1) % hull.length];
+      const angle = calculateAngleBetweenPoints(prev, curr, next);
+      corners.push({
+        point: curr,
+        angle,
+        sharpness: Math.PI - angle,
+        // How far from straight (π)
+        index: i
+      });
+    }
+    corners.sort((a, b) => b.sharpness - a.sharpness);
+    const selected = corners.slice(0, targetCount);
+    selected.sort((a, b) => a.index - b.index);
+    return selected.map((c) => c.point);
+  }
+  function findCornersWithSeparation(hullPoints, targetCount) {
+    if (!hullPoints || hullPoints.length <= targetCount) return hullPoints;
+    let perimeter = 0;
+    for (let i = 0; i < hullPoints.length; i++) {
+      const next = (i + 1) % hullPoints.length;
+      perimeter += calculateDistance(hullPoints[i], hullPoints[next]);
+    }
+    const minSeparation = perimeter / (targetCount * 1.5);
+    const corners = [];
+    for (let i = 0; i < hullPoints.length; i++) {
+      const prev = hullPoints[(i - 1 + hullPoints.length) % hullPoints.length];
+      const curr = hullPoints[i];
+      const next = hullPoints[(i + 1) % hullPoints.length];
+      const angle = calculateAngleBetweenPoints(prev, curr, next);
+      corners.push({
+        point: curr,
+        angle,
+        sharpness: Math.PI - angle,
+        index: i
+      });
+    }
+    corners.sort((a, b) => b.sharpness - a.sharpness);
+    const selected = [];
+    for (let i = 0; i < corners.length && selected.length < targetCount; i++) {
+      const candidate = corners[i];
+      let tooClose = false;
+      for (const existing of selected) {
+        const indexDiff = Math.abs(candidate.index - existing.index);
+        const wrapDiff = hullPoints.length - indexDiff;
+        const minIndexDiff = Math.min(indexDiff, wrapDiff);
+        const approxDist = minIndexDiff / hullPoints.length * perimeter;
+        if (approxDist < minSeparation) {
+          tooClose = true;
+          break;
+        }
+      }
+      if (!tooClose) {
+        selected.push(candidate);
+      }
+    }
+    if (selected.length < targetCount) {
+      for (let i = 0; i < corners.length && selected.length < targetCount; i++) {
+        if (!selected.includes(corners[i])) {
+          selected.push(corners[i]);
+        }
+      }
+    }
+    selected.sort((a, b) => a.index - b.index);
+    return selected.map((c) => c.point);
+  }
+  function countCorners(points, angleThreshold = Math.PI / 3) {
+    if (points.length < 15) {
+      return { count: 0, angles: [], cornerData: [] };
+    }
+    const cornerPositions = [];
+    const windowSize = 8;
+    for (let i = windowSize; i < points.length - windowSize; i += 4) {
+      const before = {
+        x: points[i].x - points[i - windowSize].x,
+        y: points[i].y - points[i - windowSize].y
+      };
+      const after = {
+        x: points[i + windowSize].x - points[i].x,
+        y: points[i + windowSize].y - points[i].y
+      };
+      const dotProduct = before.x * after.x + before.y * after.y;
+      const magBefore = Math.sqrt(before.x * before.x + before.y * before.y);
+      const magAfter = Math.sqrt(after.x * after.x + after.y * after.y);
+      if (magBefore === 0 || magAfter === 0) continue;
+      const cosAngle = dotProduct / (magBefore * magAfter);
+      const angle = Math.acos(Math.max(-1, Math.min(1, cosAngle)));
+      if (angle > angleThreshold) {
+        cornerPositions.push({ index: i, angle });
+      }
+    }
+    if (cornerPositions.length === 0) return { count: 0, angles: [], cornerData: [] };
+    const clusteredCorners = [cornerPositions[0]];
+    for (let i = 1; i < cornerPositions.length; i++) {
+      const lastCorner = clusteredCorners[clusteredCorners.length - 1];
+      const distance = cornerPositions[i].index - lastCorner.index;
+      if (distance > 20) {
+        clusteredCorners.push(cornerPositions[i]);
+      } else if (cornerPositions[i].angle > lastCorner.angle) {
+        clusteredCorners[clusteredCorners.length - 1] = cornerPositions[i];
+      }
+    }
+    const cornersWithCoords = clusteredCorners.map((c) => ({
+      index: c.index,
+      angle: c.angle,
+      x: points[c.index].x,
+      y: points[c.index].y
+    }));
+    return {
+      count: clusteredCorners.length,
+      angles: clusteredCorners.map((c) => c.angle),
+      cornerData: cornersWithCoords
+    };
+  }
+  function analyzeCornerAngles(angles) {
+    if (!angles || angles.length === 0) {
+      return {
+        avgAngle: 0,
+        variance: 0,
+        consistency: 0,
+        rectangleLikeness: 0,
+        triangleLikeness: 0
+      };
+    }
+    const avgAngle = angles.reduce((sum, a) => sum + a, 0) / angles.length;
+    const variance = angles.reduce((sum, a) => sum + Math.pow(a - avgAngle, 2), 0) / angles.length;
+    const stdDev = Math.sqrt(variance);
+    const consistency = angles.length > 1 ? Math.max(0, 1 - stdDev / (Math.PI / 4)) : 1;
+    const rectangleLikeness = angles.reduce((sum, angle) => {
+      const deviationFrom90 = Math.abs(angle - Math.PI / 2);
+      return sum + Math.max(0, 1 - deviationFrom90 / (Math.PI / 4));
+    }, 0) / angles.length;
+    const triangleLikeness = angles.reduce((sum, angle) => {
+      const deviationFrom90 = Math.abs(angle - Math.PI / 2);
+      return sum + Math.min(1, deviationFrom90 / (Math.PI / 6));
+    }, 0) / angles.length;
+    return {
+      avgAngle,
+      variance,
+      consistency,
+      rectangleLikeness,
+      triangleLikeness
+    };
+  }
+  function checkOvershoot(points, threshold = 50) {
+    if (points.length < 10) return false;
+    const start = points[0];
+    const bounds = getBounds(points);
+    const size = Math.max(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY);
+    const effectiveThreshold = Math.min(threshold, size * 0.2);
+    const checkStart = Math.floor(points.length * 0.7);
+    for (let i = checkStart; i < points.length; i++) {
+      const distance = Math.sqrt(
+        Math.pow(points[i].x - start.x, 2) + Math.pow(points[i].y - start.y, 2)
+      );
+      if (distance < effectiveThreshold) {
+        return true;
+      }
+    }
+    return false;
+  }
+  function getFingerprint(points) {
+    const bounds = getBounds(points);
+    const width = bounds.maxX - bounds.minX;
+    const height = bounds.maxY - bounds.minY;
+    const cornerData = countCorners(points);
+    const start = points[0];
+    const end = points[points.length - 1];
+    const closureDistance = Math.sqrt(
+      Math.pow(end.x - start.x, 2) + Math.pow(end.y - start.y, 2)
+    );
+    const angleAnalysis = analyzeCornerAngles(cornerData.angles);
+    let tipPoint;
+    if (cornerData.cornerData && cornerData.cornerData.length > 0) {
+      let sharpestAngle = Math.PI;
+      let sharpestCorner = cornerData.cornerData[0];
+      cornerData.cornerData.forEach((corner) => {
+        if (corner.angle < sharpestAngle) {
+          sharpestAngle = corner.angle;
+          sharpestCorner = corner;
+        }
+      });
+      tipPoint = { x: sharpestCorner.x, y: sharpestCorner.y };
+    }
+    return {
+      aspectRatio: height === 0 ? 1 : width / height,
+      straightness: calculateStraightness(points),
+      isClosed: isStrokeClosed(points),
+      closureDistance,
+      bounds,
+      size: Math.max(width, height),
+      corners: cornerData.count,
+      cornerAngles: cornerData.angles,
+      cornerData: cornerData.cornerData,
+      tipPoint,
+      angleAnalysis,
+      pointCount: points.length
+    };
+  }
+  function smoothStroke(points, iterations = 2) {
+    if (!points || points.length < 3) return points;
+    let smoothed = [...points];
+    const firstPoint = points[0];
+    const lastPoint = points[points.length - 1];
+    for (let iter = 0; iter < iterations; iter++) {
+      const newPoints = [];
+      newPoints.push({ ...smoothed[0] });
+      for (let i = 0; i < smoothed.length - 1; i++) {
+        const p1 = smoothed[i];
+        const p2 = smoothed[i + 1];
+        const q = {
+          x: 0.75 * p1.x + 0.25 * p2.x,
+          y: 0.75 * p1.y + 0.25 * p2.y
+        };
+        const r = {
+          x: 0.25 * p1.x + 0.75 * p2.x,
+          y: 0.25 * p1.y + 0.75 * p2.y
+        };
+        newPoints.push(q);
+        newPoints.push(r);
+      }
+      newPoints.push({ ...smoothed[smoothed.length - 1] });
+      smoothed = newPoints;
+    }
+    smoothed[0] = firstPoint;
+    smoothed[smoothed.length - 1] = lastPoint;
+    return smoothed;
+  }
+  function simplifyStroke(points, tolerance = 2) {
+    if (!points || points.length <= 2) return points;
+    function perpendicularDistance(point, lineStart, lineEnd) {
+      const dx = lineEnd.x - lineStart.x;
+      const dy = lineEnd.y - lineStart.y;
+      if (dx === 0 && dy === 0) {
+        return calculateDistance(point, lineStart);
+      }
+      const t = ((point.x - lineStart.x) * dx + (point.y - lineStart.y) * dy) / (dx * dx + dy * dy);
+      const clampedT = Math.max(0, Math.min(1, t));
+      const projection = {
+        x: lineStart.x + clampedT * dx,
+        y: lineStart.y + clampedT * dy
+      };
+      return calculateDistance(point, projection);
+    }
+    function douglasPeucker(pts, tol) {
+      if (pts.length < 3) return pts;
+      let maxDist = 0;
+      let maxIndex = 0;
+      const start = pts[0];
+      const end = pts[pts.length - 1];
+      for (let i = 1; i < pts.length - 1; i++) {
+        const dist = perpendicularDistance(pts[i], start, end);
+        if (dist > maxDist) {
+          maxDist = dist;
+          maxIndex = i;
+        }
+      }
+      if (maxDist > tol) {
+        const left = douglasPeucker(pts.slice(0, maxIndex + 1), tol);
+        const right = douglasPeucker(pts.slice(maxIndex), tol);
+        return [...left.slice(0, -1), ...right];
+      }
+      return [start, end];
+    }
+    return douglasPeucker(points, tolerance);
+  }
+  function normalizeStroke(points, targetSize = 200) {
+    if (!points || points.length === 0) return points;
+    const bounds = getBounds(points);
+    const width = bounds.maxX - bounds.minX;
+    const height = bounds.maxY - bounds.minY;
+    const maxDim = Math.max(width, height);
+    if (maxDim === 0) return points;
+    const scale = targetSize / maxDim;
+    const originalCenterX = (bounds.minX + bounds.maxX) / 2;
+    const originalCenterY = (bounds.minY + bounds.maxY) / 2;
+    return points.map((p) => ({
+      x: (p.x - originalCenterX) * scale + originalCenterX,
+      y: (p.y - originalCenterY) * scale + originalCenterY
+    }));
+  }
+  function distancePointToBounds(p, b) {
+    const dx = Math.max(0, b.minX - p.x, p.x - b.maxX);
+    const dy = Math.max(0, b.minY - p.y, p.y - b.maxY);
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+  function boundingBoxDistance(b1, b2) {
+    const horizDist = Math.max(
+      0,
+      b2.minX > b1.maxX ? b2.minX - b1.maxX : b1.minX - b2.maxX
+    );
+    const vertDist = Math.max(
+      0,
+      b2.minY > b1.maxY ? b2.minY - b1.maxY : b1.minY - b2.maxY
+    );
+    return Math.sqrt(horizDist * horizDist + vertDist * vertDist);
+  }
+  function boundsOverlap(b1, b2) {
+    return !(b1.maxX < b2.minX || b2.maxX < b1.minX || b1.maxY < b2.minY || b2.maxY < b1.minY);
+  }
+  function boundsContain(outer, inner) {
+    return inner.minX >= outer.minX && inner.maxX <= outer.maxX && inner.minY >= outer.minY && inner.maxY <= outer.maxY;
+  }
+
+  // src/recognition.ts
+  function detectLine(fp, points) {
+    const hasOvershoot = checkOvershoot(points);
+    const isStraight = fp.straightness > 0.65;
+    const notClosed = !fp.isClosed && !hasOvershoot;
+    const fewCorners = fp.corners <= 2;
+    if (isStraight && notClosed && fewCorners) {
+      return {
+        type: "line",
+        label: "Line",
+        score: 90,
+        confidence: 0.9,
+        reasoning: `straightness ${fp.straightness.toFixed(2)} > 0.65, open, ${fp.corners} corner(s)`
+      };
+    }
+    return null;
+  }
+  function detectArc(fp, points) {
+    const hasOvershoot = checkOvershoot(points);
+    const notClosed = !fp.isClosed && !hasOvershoot;
+    const fewCorners = fp.corners <= 1;
+    const isCurved = fp.straightness < 0.6;
+    if (notClosed && fewCorners && isCurved) {
+      return {
+        type: "arc",
+        label: "Arc",
+        score: 70,
+        confidence: 0.7,
+        reasoning: `open, curved (straightness ${fp.straightness.toFixed(2)} < 0.6), smooth`
+      };
+    }
+    return null;
+  }
+  function detectTriangle(fp) {
+    const isClosed = fp.isClosed;
+    const hasThreeCorners = fp.corners >= 2 && fp.corners <= 3;
+    const reasonableShape = fp.aspectRatio >= 0.3 && fp.aspectRatio <= 3;
+    if (isClosed && hasThreeCorners && reasonableShape) {
+      return {
+        type: "triangle",
+        label: "Triangle",
+        score: 85,
+        confidence: 0.85,
+        reasoning: `closed with ${fp.corners} corner(s) in the triangle range (2\u20133)`
+      };
+    }
+    return null;
+  }
+  function detectRectangle(fp) {
+    const isClosed = fp.isClosed;
+    const hasFourCorners = fp.corners >= 3 && fp.corners <= 4;
+    const aspectRatioOk = fp.aspectRatio > 0.3 && fp.aspectRatio < 3;
+    if (isClosed && hasFourCorners && aspectRatioOk) {
+      return {
+        type: "rectangle",
+        label: "Rectangle",
+        score: 80,
+        confidence: 0.8,
+        reasoning: `closed with ${fp.corners} corner(s) in the rectangle range (3\u20134)`
+      };
+    }
+    return null;
+  }
+  function detectCircle(fp, points) {
+    const hasOvershoot = checkOvershoot(points);
+    const isClosed = fp.isClosed || hasOvershoot;
+    const fewCorners = fp.corners <= 1;
+    const notStraight = fp.straightness < 0.5;
+    const reasonableRatio = fp.aspectRatio >= 0.3 && fp.aspectRatio <= 3;
+    if (isClosed && fewCorners && notStraight && reasonableRatio) {
+      return {
+        type: "circle",
+        label: "Circle",
+        score: 80,
+        confidence: 0.8,
+        reasoning: `closed${hasOvershoot ? " (overshoot)" : ""}, curved, smooth, aspect ${fp.aspectRatio.toFixed(2)}`
+      };
+    }
+    return null;
+  }
+  function analyzeStroke(points) {
+    const fingerprint = getFingerprint(points);
+    const results = [
+      detectLine(fingerprint, points),
+      detectArc(fingerprint, points),
+      detectTriangle(fingerprint),
+      detectRectangle(fingerprint),
+      detectCircle(fingerprint, points)
+    ].filter((r) => r !== null);
+    results.sort((a, b) => b.score - a.score);
+    return { fingerprint, results };
+  }
+  function matchPrimitiveFromLibrary(fingerprint, libraryFingerprint) {
+    let totalScore = 0;
+    let weights = 0;
+    const straightnessDiff = Math.abs(
+      fingerprint.straightness - libraryFingerprint.straightness
+    );
+    if (straightnessDiff > 0.5) return 0;
+    const straightnessScore = Math.max(0, 1 - straightnessDiff);
+    totalScore += straightnessScore * 0.3;
+    weights += 0.3;
+    const aspectRatio1 = Math.min(fingerprint.aspectRatio, 1 / fingerprint.aspectRatio);
+    const aspectRatio2 = Math.min(
+      libraryFingerprint.aspectRatio,
+      1 / libraryFingerprint.aspectRatio
+    );
+    const aspectDiff = Math.abs(aspectRatio1 - aspectRatio2);
+    const aspectScore = Math.max(0, 1 - aspectDiff * 2);
+    totalScore += aspectScore * 0.25;
+    weights += 0.25;
+    const cornerDiff = Math.abs(fingerprint.corners - libraryFingerprint.corners);
+    const cornerScore = Math.max(0, 1 - cornerDiff / 4);
+    totalScore += cornerScore * 0.2;
+    weights += 0.2;
+    const closureMatch = fingerprint.isClosed === libraryFingerprint.isClosed ? 1 : 0;
+    totalScore += closureMatch * 0.15;
+    weights += 0.15;
+    const sizeDiff = Math.abs(fingerprint.size - libraryFingerprint.size) / Math.max(fingerprint.size, libraryFingerprint.size);
+    const sizeScore = Math.max(0, 1 - sizeDiff);
+    totalScore += sizeScore * 0.1;
+    weights += 0.1;
+    return totalScore / weights;
+  }
+
+  // src/spatial.ts
+  function buildSpatialGraph(components, detectIntersections) {
+    const connections = [];
+    const containment = [];
+    for (let i = 0; i < components.length; i++) {
+      for (let j = i + 1; j < components.length; j++) {
+        const compA = components[i];
+        const compB = components[j];
+        const isLineA = compA.type === "line" || compA.recognizedAs === "line";
+        const isLineB = compB.type === "line" || compB.recognizedAs === "line";
+        if (!isLineA && !isLineB) {
+          if (boundsContain(compA.bounds, compB.bounds)) {
+            containment.push({ outer: i, inner: j });
+            continue;
+          }
+          if (boundsContain(compB.bounds, compA.bounds)) {
+            containment.push({ outer: j, inner: i });
+            continue;
+          }
+        }
+        if (boundsOverlap(compA.bounds, compB.bounds)) {
+          let intersectionPoints;
+          if (detectIntersections && compA.geometricShape && compB.geometricShape) {
+            const found = detectIntersections(compA.geometricShape, compB.geometricShape);
+            if (found.length > 0) intersectionPoints = found;
+          }
+          connections.push({
+            a: i,
+            b: j,
+            relationship: "intersecting",
+            distance: 0,
+            intersectionPoints
+          });
+          continue;
+        }
+        const distance = boundingBoxDistance(compA.bounds, compB.bounds);
+        if (distance < 50) {
+          connections.push({ a: i, b: j, relationship: "touching", distance });
+        }
+      }
+    }
+    return { connections, containment };
+  }
+  function spatialCluster(components, proximityThreshold) {
+    if (components.length === 0) return [];
+    if (components.length === 1) return [components];
+    const clusters = [];
+    const assigned = /* @__PURE__ */ new Set();
+    components.forEach((comp, idx) => {
+      if (assigned.has(idx)) return;
+      const cluster = [comp];
+      assigned.add(idx);
+      let changed = true;
+      while (changed) {
+        changed = false;
+        components.forEach((other, otherIdx) => {
+          if (assigned.has(otherIdx)) return;
+          for (const member of cluster) {
+            const dist = boundingBoxDistance(member.bounds, other.bounds);
+            if (dist < proximityThreshold) {
+              cluster.push(other);
+              assigned.add(otherIdx);
+              changed = true;
+              break;
+            }
+          }
+        });
+      }
+      clusters.push(cluster);
+    });
+    return clusters;
+  }
+
+  // src/session/nodes.ts
+  var BUILTIN_TYPES = ["circle", "line", "rectangle", "triangle", "arc"];
+  function typeNodeId(type) {
+    return `type:${type}`;
+  }
+  var LOCAL_PARTICIPANT = "participant:local";
+  var TIER0_PARTICIPANT = "participant:tier0";
+  function createParticipantNode(id, kind, name, at) {
+    return {
+      id,
+      reps: [
+        { modality: "participant", data: { kind } },
+        { modality: "word", data: name }
+      ],
+      edges: [],
+      capability: 0,
+      createdAt: at
+    };
+  }
+  function isParticipant(node) {
+    return getRep(node, "participant") !== void 0;
+  }
+  function createBootstrapNodes(at) {
+    return [
+      ...BUILTIN_TYPES.map((t) => ({
+        id: typeNodeId(t),
+        reps: [{ modality: "word", data: t, source: "bootstrap" }],
+        edges: [],
+        capability: 0,
+        createdAt: at
+      })),
+      createParticipantNode(LOCAL_PARTICIPANT, "human", "local", at),
+      createParticipantNode(TIER0_PARTICIPANT, "engine", "tier0-heuristics", at)
+    ];
+  }
+  function getRep(node, modality) {
+    return node.reps.find((r) => r.modality === modality);
+  }
+  function fingerprintOf(node) {
+    return getRep(node, "fingerprint")?.data;
+  }
+  function strokePointsOf(node) {
+    const rep = getRep(node, "stroke");
+    return rep ? rep.data.points : void 0;
+  }
+  function wordOf(node) {
+    return getRep(node, "word")?.data;
+  }
+  function isGesture(node) {
+    return getRep(node, "gesture") !== void 0;
+  }
+  function resemblances(node) {
+    return node.edges.filter((e) => e.rel === "resembles").sort((a, b) => (b.weight ?? 0) - (a.weight ?? 0));
+  }
+  function topInterpretation(node) {
+    const name = wordOf(node);
+    if (name) return name;
+    const top = resemblances(node)[0];
+    return top ? top.to.replace(/^type:/, "") : void 0;
+  }
+  function boundsOf(node) {
+    const fp = fingerprintOf(node);
+    if (fp) return fp.bounds;
+    return getRep(node, "bounds")?.data;
+  }
+
+  // src/session/gesture.ts
+  var DEFAULT_GESTURE_CONFIG = {
+    checkWindowMs: 4e3,
+    checkProximityPx: 80,
+    checkMaxSizeRatio: 0.6
+  };
+  function isLassoLike(fp, enclosedContentCount) {
+    return fp.isClosed && enclosedContentCount >= 1;
+  }
+  function enclosedBy(lassoBounds, candidates) {
+    return candidates.filter((c) => boundsContain(lassoBounds, c.bounds)).map((c) => c.id);
+  }
+  function isCheckLike(fp, lassoFp, config = DEFAULT_GESTURE_CONFIG) {
+    if (fp.isClosed) return false;
+    if (fp.corners < 1 || fp.corners > 2) return false;
+    if (fp.size > lassoFp.size * config.checkMaxSizeRatio) return false;
+    return true;
+  }
+  function resolvesLasso(checkFp, checkAt, lassoFp, lassoAt, config = DEFAULT_GESTURE_CONFIG) {
+    if (checkAt - lassoAt > config.checkWindowMs) return false;
+    if (!isCheckLike(checkFp, lassoFp, config)) return false;
+    const near = boundsOverlap(checkFp.bounds, lassoFp.bounds) || boundingBoxDistance(checkFp.bounds, lassoFp.bounds) < config.checkProximityPx;
+    return near;
+  }
+
+  // src/session/session.ts
+  var DEFAULT_SESSION_CONFIG = {
+    gesture: DEFAULT_GESTURE_CONFIG,
+    clusterThresholdPx: 60,
+    wireEndpointPx: 30
+  };
+  function createSession(config = DEFAULT_SESSION_CONFIG) {
+    let events = [];
+    let nodes = /* @__PURE__ */ new Map();
+    let contentIds = [];
+    let artifacts = [];
+    let pendingLasso = null;
+    let summon = null;
+    let clusterCandidates = [];
+    let participants = [];
+    let counter = 0;
+    const listeners = /* @__PURE__ */ new Set();
+    function reset() {
+      nodes = /* @__PURE__ */ new Map();
+      contentIds = [];
+      artifacts = [];
+      pendingLasso = null;
+      summon = null;
+      clusterCandidates = [];
+      participants = [LOCAL_PARTICIPANT, TIER0_PARTICIPANT];
+      counter = 0;
+      for (const n of createBootstrapNodes(0)) nodes.set(n.id, n);
+    }
+    reset();
+    const nextId = (prefix) => `${prefix}:${++counter}`;
+    function notify() {
+      const state = getState();
+      listeners.forEach((l) => l(state));
+    }
+    function contentBoundsList(excludeId) {
+      return contentIds.filter((id) => id !== excludeId).map((id) => ({ id, bounds: boundsOf(nodes.get(id)) })).filter((c) => c.bounds !== void 0);
+    }
+    function asComponent(id, index) {
+      const node = nodes.get(id);
+      const fp = fingerprintOf(node);
+      const type = topInterpretation(node) ?? "art";
+      return {
+        index,
+        recognizedAs: type,
+        type,
+        fingerprint: fp ?? { bounds: boundsOf(node) },
+        bounds: boundsOf(node)
+      };
+    }
+    function signatureOf(ids) {
+      const sig = {};
+      for (const id of ids) {
+        const t = topInterpretation(nodes.get(id)) ?? "art";
+        sig[t] = (sig[t] ?? 0) + 1;
+      }
+      return sig;
+    }
+    function signaturesEqual(a, b) {
+      const keys = /* @__PURE__ */ new Set([...Object.keys(a), ...Object.keys(b)]);
+      for (const k of keys) if ((a[k] ?? 0) !== (b[k] ?? 0)) return false;
+      return true;
+    }
+    function recomputeClusterCandidates() {
+      clusterCandidates = [];
+      if (artifacts.length === 0 || contentIds.length === 0) return;
+      const comps = contentIds.map((id, i) => asComponent(id, i));
+      const clusters = spatialCluster(comps, config.clusterThresholdPx);
+      for (const cluster of clusters) {
+        const ids = cluster.map((c) => contentIds[c.index]);
+        const strokeIds = ids.filter((id) => !artifacts.includes(id));
+        if (strokeIds.length < 2) continue;
+        const sig = signatureOf(strokeIds);
+        const matches = artifacts.map((aid) => {
+          const a = nodes.get(aid);
+          const aSig = getRep(a, "signature")?.data;
+          if (!aSig || !signaturesEqual(sig, aSig)) return null;
+          return { artifactId: aid, name: wordOf(a) ?? aid, score: 1 };
+        }).filter((m) => m !== null);
+        if (matches.length > 0) clusterCandidates.push({ nodeIds: strokeIds, matches });
+      }
+    }
+    function makeSuggestions(enclosedIds) {
+      const sig = signatureOf(enclosedIds);
+      const suggestions = [];
+      for (const aid of artifacts) {
+        const a = nodes.get(aid);
+        const aSig = getRep(a, "signature")?.data;
+        if (aSig && signaturesEqual(sig, aSig)) {
+          suggestions.push({
+            id: nextId("sug"),
+            kind: "match",
+            label: wordOf(a) ?? aid,
+            artifactId: aid,
+            score: 1
+          });
+        }
+      }
+      suggestions.push({ id: nextId("sug"), kind: "name-as-new", label: "Name this\u2026" });
+      suggestions.push({ id: nextId("sug"), kind: "keep-as-drawing", label: "Keep as drawing" });
+      return suggestions;
+    }
+    function addSpatialEdges(node) {
+      const ids = [...contentIds.filter((id) => id !== node.id), node.id];
+      const comps = ids.map((id, i) => asComponent(id, i));
+      const graph = buildSpatialGraph(comps);
+      const newIdx = ids.length - 1;
+      const addPair = (i, j, rel, weight) => {
+        if (i !== newIdx && j !== newIdx) return;
+        const a = nodes.get(ids[i]);
+        const b = nodes.get(ids[j]);
+        a.edges.push({ to: b.id, rel, weight });
+        b.edges.push({ to: a.id, rel, weight });
+      };
+      for (const c of graph.connections) addPair(c.a, c.b, c.relationship);
+      for (const c of graph.containment) addPair(c.outer, c.inner, "contains");
+    }
+    function inferWire(node, points) {
+      const top = resemblances(node)[0];
+      if (!top || top.to !== typeNodeId("line")) return;
+      const nearest = (p) => {
+        let best = null;
+        for (const c of contentBoundsList(node.id)) {
+          const d = distancePointToBounds(p, c.bounds);
+          if (d < config.wireEndpointPx && (!best || d < best.d)) best = { id: c.id, d };
+        }
+        return best;
+      };
+      const a = nearest(points[0]);
+      const b = nearest(points[points.length - 1]);
+      if (!a || !b || a.id === b.id) return;
+      const weight = top.weight;
+      node.edges.push({ to: a.id, rel: "connects", weight });
+      node.edges.push({ to: b.id, rel: "connects", weight });
+      nodes.get(a.id).edges.push({ to: node.id, rel: "connected-by", weight });
+      nodes.get(b.id).edges.push({ to: node.id, rel: "connected-by", weight });
+    }
+    function removeFromContent(id) {
+      const idx = contentIds.indexOf(id);
+      if (idx >= 0) contentIds.splice(idx, 1);
+    }
+    function applyStroke(ev) {
+      const { points, at } = ev;
+      const pid = ev.participantId ?? LOCAL_PARTICIPANT;
+      const fp = getFingerprint(points);
+      const node = {
+        id: nextId("stroke"),
+        reps: [
+          { modality: "stroke", data: { points, at }, source: pid },
+          { modality: "fingerprint", data: fp, source: TIER0_PARTICIPANT }
+        ],
+        edges: [{ to: pid, rel: "made-by" }],
+        capability: 0,
+        createdAt: at
+      };
+      nodes.set(node.id, node);
+      if (pendingLasso) {
+        const lassoNode = nodes.get(pendingLasso.id);
+        const lassoFp = fingerprintOf(lassoNode);
+        if (resolvesLasso(fp, at, lassoFp, pendingLasso.at, config.gesture)) {
+          node.reps.push({ modality: "gesture", data: { role: "check" }, source: "heuristic" });
+          lassoNode.reps.push({ modality: "gesture", data: { role: "lasso" }, source: "heuristic" });
+          removeFromContent(lassoNode.id);
+          const enclosedIds = enclosedBy(lassoFp.bounds, contentBoundsList());
+          summon = {
+            id: nextId("summon"),
+            enclosedIds,
+            suggestions: makeSuggestions(enclosedIds),
+            gestureIds: [lassoNode.id, node.id],
+            at
+          };
+          pendingLasso = null;
+          recomputeClusterCandidates();
+          return node.id;
+        }
+      }
+      summon = null;
+      contentIds.push(node.id);
+      const analysis = analyzeStroke(points);
+      for (const r of analysis.results) {
+        node.edges.push({
+          to: typeNodeId(r.type),
+          rel: "resembles",
+          weight: r.confidence,
+          via: TIER0_PARTICIPANT,
+          // even the heuristics are a participant
+          reasoning: r.reasoning
+          // grounded "why", carried with the claim
+        });
+      }
+      addSpatialEdges(node);
+      inferWire(node, points);
+      const enclosed = enclosedBy(fp.bounds, contentBoundsList(node.id));
+      pendingLasso = isLassoLike(fp, enclosed.length) ? { id: node.id, at } : null;
+      recomputeClusterCandidates();
+      return node.id;
+    }
+    function applyBless(ev) {
+      if (!summon || summon.id !== ev.summonId) return null;
+      const chosen = ev.suggestionId ? summon.suggestions.find((s) => s.id === ev.suggestionId) : void 0;
+      if (chosen?.kind === "keep-as-drawing") {
+        for (const gid of summon.gestureIds) {
+          const g = nodes.get(gid);
+          g.reps = g.reps.filter((r) => r.modality !== "gesture");
+          contentIds.push(gid);
+        }
+        summon = null;
+        recomputeClusterCandidates();
+        return null;
+      }
+      const name = ev.name ?? chosen?.label;
+      if (!name) return null;
+      const memberIds = summon.enclosedIds;
+      const memberBounds = memberIds.map((id) => boundsOf(nodes.get(id)));
+      const unionBounds = getBounds(
+        memberBounds.flatMap((b) => [
+          { x: b.minX, y: b.minY },
+          { x: b.maxX, y: b.maxY }
+        ])
+      );
+      const artifact = {
+        id: nextId("artifact"),
+        reps: [
+          { modality: "word", data: name, source: ev.participantId ?? LOCAL_PARTICIPANT },
+          { modality: "bounds", data: unionBounds },
+          { modality: "signature", data: signatureOf(memberIds), source: TIER0_PARTICIPANT }
+        ],
+        edges: [
+          ...memberIds.map((id) => ({ to: id, rel: "has-part", blessed: true })),
+          ...summon.gestureIds.map((id) => ({ to: id, rel: "blessed-by" })),
+          ...chosen?.artifactId ? [{ to: chosen.artifactId, rel: "instance-of", blessed: true }] : []
+        ],
+        capability: 0,
+        createdAt: ev.at
+      };
+      nodes.set(artifact.id, artifact);
+      for (const id of memberIds) {
+        nodes.get(id).edges.push({ to: artifact.id, rel: "part-of", blessed: true });
+        removeFromContent(id);
+      }
+      contentIds.push(artifact.id);
+      artifacts.push(artifact.id);
+      summon = null;
+      recomputeClusterCandidates();
+      return artifact.id;
+    }
+    function applyErase(ev) {
+      const node = nodes.get(ev.nodeId);
+      if (!node || node.id.startsWith("type:")) return;
+      if (getRep(node, "erased")) return;
+      node.reps.push({ modality: "erased", data: { at: ev.at }, source: "user" });
+      removeFromContent(node.id);
+      if (pendingLasso?.id === node.id) pendingLasso = null;
+      if (summon && (summon.enclosedIds.includes(node.id) || summon.gestureIds.includes(node.id))) {
+        summon = null;
+      }
+      const degrade = (artifactId) => {
+        const artifact = nodes.get(artifactId);
+        if (!artifact || getRep(artifact, "status")) return;
+        artifact.reps.push({ modality: "status", data: "broken", source: "engine" });
+        removeFromContent(artifactId);
+        const ai = artifacts.indexOf(artifactId);
+        if (ai >= 0) artifacts.splice(ai, 1);
+        for (const e of artifact.edges) {
+          if (e.rel !== "has-part") continue;
+          const member = nodes.get(e.to);
+          if (member && !getRep(member, "erased") && !contentIds.includes(e.to)) {
+            contentIds.push(e.to);
+          }
+        }
+      };
+      if (artifacts.includes(node.id)) {
+        degrade(node.id);
+      } else {
+        for (const e of node.edges) {
+          if (e.rel === "part-of" && e.blessed) degrade(e.to);
+        }
+      }
+      recomputeClusterCandidates();
+    }
+    function applyJoin(ev) {
+      const node = createParticipantNode(nextId("participant"), ev.kind, ev.name, ev.at);
+      nodes.set(node.id, node);
+      participants.push(node.id);
+      return node.id;
+    }
+    function applyPropose(ev) {
+      const node = nodes.get(ev.nodeId);
+      if (!node || !participants.includes(ev.participantId)) return;
+      for (const e of ev.edges) {
+        node.edges.push({
+          to: e.to,
+          rel: e.rel,
+          weight: e.weight,
+          via: ev.participantId,
+          reasoning: e.reasoning
+        });
+      }
+      recomputeClusterCandidates();
+    }
+    function applyEvent(ev) {
+      switch (ev.type) {
+        case "stroke":
+          return applyStroke(ev);
+        case "bless":
+          return applyBless(ev);
+        case "join":
+          return applyJoin(ev);
+        case "propose":
+          applyPropose(ev);
+          return null;
+        case "dismiss":
+          if (summon?.id === ev.summonId) summon = null;
+          return null;
+        case "erase":
+          applyErase(ev);
+          return null;
+        case "tick":
+          return null;
+      }
+    }
+    function replay() {
+      reset();
+      for (const ev of events) applyEvent(ev);
+    }
+    function dispatch(ev) {
+      events.push(ev);
+      const result = applyEvent(ev);
+      notify();
+      return result;
+    }
+    function undo() {
+      for (let i = events.length - 1; i >= 0; i--) {
+        if (events[i].type !== "tick") {
+          events = [...events.slice(0, i), ...events.slice(i + 1)];
+          replay();
+          notify();
+          return;
+        }
+      }
+    }
+    function getState() {
+      return {
+        nodes,
+        contentIds: [...contentIds],
+        pendingLassoId: pendingLasso?.id ?? null,
+        summon: summon ? { ...summon, enclosedIds: [...summon.enclosedIds] } : null,
+        clusterCandidates: clusterCandidates.map((c) => ({ ...c })),
+        artifacts: [...artifacts],
+        participants: [...participants]
+      };
+    }
+    function subscribe(listener) {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    }
+    return {
+      addStroke: (points, at, participantId) => dispatch({ type: "stroke", points, at, participantId }),
+      join: (kind, name, at) => dispatch({ type: "join", kind, name, at }),
+      propose: (args) => void dispatch({ type: "propose", ...args }),
+      tick: (at) => void dispatch({ type: "tick", at }),
+      bless: (args) => dispatch({ type: "bless", ...args }),
+      dismiss: (summonId, at) => void dispatch({ type: "dismiss", summonId, at }),
+      erase: (nodeId, at) => void dispatch({ type: "erase", nodeId, at }),
+      undo,
+      getState,
+      subscribe,
+      getEvents: () => events
+    };
+  }
+  return __toCommonJS(index_exports);
+})();

@@ -11,7 +11,7 @@ import type {
 import type { Fingerprint, Library } from '../types';
 
 export class HeuristicInterpreter implements LLMInterpreter {
-  public tier: 0 = 0;
+  public tier = 0 as const;
 
   isAvailable(): boolean {
     return true; // Always available as fallback

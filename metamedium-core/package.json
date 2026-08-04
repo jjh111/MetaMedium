@@ -1,0 +1,24 @@
+{
+  "name": "metamedium-core",
+  "version": "0.1.0",
+  "description": "Headless engine for MetaMedium: geometric grounding, multi-parse recognition, spatial graph, and the no-modes session engine (see ARCHITECTURE-v6-SESSION-ENGINE.md)",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "build:browser": "esbuild src/index.ts --bundle --format=iife --global-name=MetaMediumCore --banner:js='/* metamedium-core browser bundle — built from metamedium-core/src via: npm run build:browser. Do not edit directly. */' --outfile=dist/metamedium-core.browser.js"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "esbuild": "^0.28.1",
+    "typescript": "~5.6.2",
+    "vitest": "^4.1.8"
+  }
+}
