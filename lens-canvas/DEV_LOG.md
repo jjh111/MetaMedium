@@ -475,3 +475,148 @@ The gold right accent bar vs cyan left accent bar creates immediate visual disti
 When CardLens renders, pretext produces clean line breaks at word boundaries. The caching layer (WeakMap with 200-entry eviction) handles performance. The `naiveWrap` fallback is a sensible safety net. Multi-line value wrapping (CardLens lines 186-194) works for long string values.
 
 ---
+
+## Review Notes — Phase 3 UX Critique (2026-04-08 05:05 PDT)
+
+### 🔴 CRITICAL: Edge connection points use card centers — edges visually pass through card bodies
+
+**Problem:** `renderer.ts` lines 195-198 compute edge endpoints as the center of each card (`x + width/2, y + height/2`). Edges start deep inside one card and end deep inside another, making connections hard to trace. Vision analysis confirmed edges "visually pass through or overlap with other cards" and "the dependency chain is not clean or obvious." The dependency chain (Opus → Sonnet → GLM → Qwen) is especially impacted — edges from top-row cards pass through the middle area where Hermes Agent and Memory Cortex sit. Arrowheads are also "not clearly visible" or "too subtle."
+
+**Fix in `renderer.ts` `drawEdge()`:** Compute intersection of the edge direction vector with the source/target card boundary rectangle. A simpler approach: for each edge, determine which face of the source card is closest to the target card center, then connect from that face's midpoint. Same for the target card. This moves edge endpoints from card centers to card edges, preventing visual overlap.
+
+```typescript
+function getEdgeEndpoint(fromPos: Rect, toCenterX: number, toCenterY: number): { x: number; y: number } {
+  const cx = fromPos.x + fromPos.width / 2;
+  const cy = fromPos.y + fromPos.height / 2;
+  const dx = toCenterX - cx;
+  const dy = toCenterY - cy;
+  
+  // Determine which face to connect from
+  const aspect = fromPos.width / fromPos.height;
+  if (Math.abs(dx) * fromPos.height > Math.abs(dy) * fromPos.width) {
+    // Connect from left or right edge
+    const x = dx > 0 ? fromPos.x + fromPos.width : fromPos.x;
+    const y = cy + (dy / dx) * (x - cx);
+    return { x, y: Math.max(fromPos.y, Math.min(fromPos.y + fromPos.height, y)) };
+  } else {
+    // Connect from top or bottom edge
+    const y = dy > 0 ? fromPos.y + fromPos.height : fromPos.y;
+    const x = cx + (dx / dy) * (y - cy);
+    return { x: Math.max(fromPos.x, Math.min(fromPos.x + fromPos.width, x)), y };
+  }
+}
+```
+
+### 🔴 CRITICAL: Arrowheads too small and hard to see
+
+**Problem:** Vision analysis confirmed "arrows are missing or too subtle" at edge endpoints. The arrowhead is drawn at `size = 6` with `±0.4 radian` spread — this creates a very small arrowhead that's easy to miss, especially on the dashed lines where the arrow is at the very tip. For dependency edges (dashed lines at 0.4 global alpha), the arrowhead is nearly invisible.
+
+**Fix in `renderer.ts` lines 229-239:**
+```typescript
+// BEFORE:
+ctx.globalAlpha = 0.4;
+const size = 6;
+
+// AFTER:
+ctx.globalAlpha = 0.6;  // More visible arrows
+const size = 8;         // Larger arrowhead
+```
+
+### 🟡 MODERATE: BackLens still uses fitValue() — long JSON values truncate instead of wrapping
+
+**Problem:** Flagged in two previous reviews (Phase 2 and Phase 4). BackLens `renderJsonLine()` at `back.ts` line 146 calls `fitValue()` which truncates to a single line with `…`. For the "raw data inspector" use case, truncating a value like `delegate_task(model="claude-opus-4-6")` to `delegate_task(model="claude…` defeats the purpose. The back side should show complete data — that's its whole reason for existing.
+
+**Fix in `back.ts`:** Import `wrapText` from `text-wrap.ts` and use it in `renderJsonLine()` for long lines. A single JSON key-value pair might take 2-3 lines, but the data is complete. This was specifically flagged in Phase 2 review item 3 and Phase 4 review item 3.
+
+### 🟡 MODERATE: CodeLens has no footer zone — badge overlaps last code line
+
+**Problem:** `code.ts` line 90 computes `maxLines = Math.floor((height - pad * 2 - 14) / lineH)`. The `-14` accounts for badge space, but there's no explicit footer zone. The CODE ▾ badge at `(x + width - 8, y + height - 14)` shares vertical space with the last code line. If a code card has exactly `maxLines` of content, the badge and the last line overlap.
+
+**Fix in `code.ts`:** Add a `FOOTER_H = 20` constant (matching CardLens) and reserve it at the bottom. Place the badge inside this footer zone, separated from code content. Update `maxLines` computation to `Math.floor((height - pad * 2 - FOOTER_H) / lineH)`.
+
+### 🟡 MODERATE: Light mode — cyan key names have insufficient contrast
+
+**Problem:** Vision analysis confirmed "cyan/teal key names have reduced contrast against the cream background — they are readable but not optimal — the color is somewhat washed out — requires slightly more visual effort to parse." The key color in light mode is `#3a7d9c` (card.ts line 169, tree.ts line 143). Against `#f0ece4` cream background, this gives a contrast ratio of approximately 3.5:1 — below the WCAG AA minimum of 4.5:1 for normal text.
+
+**Fix in `card.ts` line 169, `tree.ts` line 143:**
+```typescript
+// BEFORE:
+ctx.fillStyle = isDark ? '#4dc9f6' : '#3a7d9c';
+// AFTER:
+ctx.fillStyle = isDark ? '#4dc9f6' : '#2a5a74';  // darker teal for WCAG AA
+```
+
+### 🟡 MODERATE: TreeLens badge positioned differently from CardLens — visual inconsistency
+
+**Problem:** CardLens places its "CARD ∿" badge at `(x + HEADER_PAD + 4, y + height - FOOTER_H + 5)` in a dedicated 20px footer zone with `textAlign: 'left'`. TreeLens places "TREE ▾" at `(x + width - 8, y + height - 14)` with `textAlign: 'right'` and no footer zone. The badges are in different positions (left vs right) with different vertical offsets and no shared layout convention. This creates visual inconsistency when both lens types are visible on the same canvas.
+
+**Fix in `tree.ts`:** Add a `FOOTER_H = 20` footer zone (matching CardLens). Place "TREE ▾" badge at the bottom-left `(x + pad + 6, y + height - FOOTER_H + 5)` with `textAlign: 'left'`, and move the type badge to bottom-right (matching CardLens's two-badge footer layout). This makes both lenses follow the same footer convention.
+
+### 🟢 MINOR: RawLens still uses `charWidth = 6.6` hardcoded estimate
+
+**Problem:** `raw.ts` line 97. Flagged in THREE previous reviews. Not fixed. RawLens is the fallback lens — it should use the same pretext-based measurement as all other lenses for consistency.
+
+**Fix:** Import `fitValue` from `text-wrap.ts` and replace the `truncate()` function. Also import and use `wrapText` for multi-line content.
+
+### 🟢 MINOR: roundRect() duplicated across 5 files with inconsistent implementations
+
+**Problem:** Flagged in THREE previous reviews. Now 5 copies (card.ts, tree.ts, code.ts, raw.ts, back.ts). Not fixed. BackLens uses `ctx.arcTo()` while the other 4 use `ctx.quadraticCurveTo()` — producing slightly different corner curves.
+
+**Fix:** Extract to `src/core/canvas-utils.ts` and import in each lens. Use the `quadraticCurveTo` version as canonical (4 files already use it). One stone, two birds — eliminates both duplication and inconsistency.
+
+### 🟢 MINOR: BackLens separator line uses 0.15 alpha — too faint
+
+**Problem:** `back.ts` line 90: `ctx.strokeStyle = isDark ? 'rgba(212,175,55,0.15)' : 'rgba(154,123,42,0.12)'`. The previous Phase 4 review raised card.ts and tree.ts separator alpha from 0.12 to 0.25/0.20, but the BackLens separator was missed. At 0.15 alpha, this separator is nearly invisible — the "RAW · JSON" header zone blends into the content.
+
+**Fix in `back.ts` line 90:**
+```typescript
+// BEFORE:
+ctx.strokeStyle = isDark ? 'rgba(212,175,55,0.15)' : 'rgba(154,123,42,0.12)';
+// AFTER (match card.ts/tree.ts fix):
+ctx.strokeStyle = isDark ? 'rgba(212,175,55,0.25)' : 'rgba(154,123,42,0.20)';
+```
+
+### 🟢 MINOR: TreeLens overflow indicator uses incorrect count
+
+**Problem:** `tree.ts` line 153 uses `entries.length - entries.indexOf([key, val] as [string, unknown])` to compute remaining items. `Array.indexOf()` uses reference equality for objects, so `entries.indexOf([key, val])` will always return `-1` since `[key, val]` creates a new array. This means the "… N more" text shows `entries.length - (-1) = entries.length + 1` — always off by one.
+
+**Fix in `tree.ts` line 153:**
+```typescript
+// BEFORE:
+ctx.fillText(`… ${entries.length - entries.indexOf([key, val] as [string, unknown])} more`, x, y);
+// AFTER:
+const currentIdx = entries.findIndex(([k, v]) => k === key && v === val);
+ctx.fillText(`… ${entries.length - currentIdx} more`, x, y);
+```
+
+### 🟢 MINOR: `estimateNodeHeight()` uses hardcoded charWidth=7 for text estimation
+
+**Problem:** `interactions.ts` line 266: `const charsPerLine = Math.max(1, Math.floor(contentW / 7))`. This is another hardcoded character width estimate, similar to the `charWidth = 6.6` in RawLens. While `estimateNodeHeight()` is only used for initial placement (not rendering), it could produce incorrect height estimates for wide or narrow characters.
+
+**Fix:** Use `measureTextHeight()` from `text-wrap.ts` for accurate estimation, or at minimum use a measured char width from the canvas context.
+
+### ✅ GOOD: Resize handles work correctly
+
+8 handle dots (cyan circles at corners and midpoints) appear on the selected card. Cursor changes to appropriate resize arrows when hovering. Handles are zoom-aware (radius scales with 1/zoom). Minimum size enforcement (160×100) works. Handles appear on top of card content. All functioning as designed.
+
+### ✅ GOOD: Auto-height estimation works
+
+Paste-to-create and create modal both use `estimateNodeHeight()` for initial card sizing. JSON nodes get `60 + keys.length * 16`, code nodes get `40 + lines * 15`, text nodes get character-based estimation. All capped at 500px. Reasonable defaults that prevent cards from being too small or too tall.
+
+### ✅ GOOD: Card visual zones are clear (finally)
+
+With the Phase 3 fix raising separator alpha from 0.12 to 0.25/0.20, the separator line between header and content is now "clearly visible" in both dark and light modes (confirmed by vision analysis in both themes). The bold 600-weight 13px title is visually distinct from the 400-weight 11px content. Footer badges are legible.
+
+### ✅ GOOD: Front/back flip still works cleanly
+
+The Y-scale animation (300ms) is smooth. Gold right accent bar vs cyan left accent bar creates immediate visual distinction. Syntax-colored JSON is useful and readable. The "↩ F to flip" hint renders at the bottom. Double-click triggers flip. Multiple nodes can be flipped independently.
+
+### ✅ GOOD: MoE depth-based routing produces correct lens assignments
+
+8 of 10 nodes render as CARD ∿ (flat JSON), 1 as TREE ▾ (Memory Cortex with depth 2), 1 as CODE ▾. This is the correct MoE answer — TreeLens earns its higher confidence by detecting structural depth, not just dataType.
+
+### ✅ GOOD: Tests still passing (19/19)
+
+All graph store tests pass. No regressions from Phase 3 changes.
+
+---
