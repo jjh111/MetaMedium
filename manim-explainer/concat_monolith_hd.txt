@@ -1,0 +1,8 @@
+file 'media/videos/monolith/1080p60/Scene1_Void.mp4'
+file 'media/videos/monolith/1080p60/Scene2_TheMonolith.mp4'
+file 'media/videos/monolith/1080p60/Scene3_ModelChain.mp4'
+file 'media/videos/monolith/1080p60/Scene4_MemoryCortex.mp4'
+file 'media/videos/monolith/1080p60/Scene5_Autonomy.mp4'
+file 'media/videos/monolith/1080p60/Scene6_Vault.mp4'
+file 'media/videos/monolith/1080p60/Scene7_Coherence.mp4'
+file 'media/videos/monolith/1080p60/Scene8_Closing.mp4'

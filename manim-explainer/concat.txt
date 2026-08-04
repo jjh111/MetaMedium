@@ -1,0 +1,8 @@
+file 'media/videos/script/480p15/Scene1_TheMark.mp4'
+file 'media/videos/script/480p15/Scene2_Recognition.mp4'
+file 'media/videos/script/480p15/Scene3_Composition.mp4'
+file 'media/videos/script/480p15/Scene4_Doodling.mp4'
+file 'media/videos/script/480p15/Scene5_MathModulation.mp4'
+file 'media/videos/script/480p15/Scene6_CodeGen.mp4'
+file 'media/videos/script/480p15/Scene7_TheGraph.mp4'
+file 'media/videos/script/480p15/Scene8_TheLoop.mp4'
