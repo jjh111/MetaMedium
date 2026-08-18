@@ -42,6 +42,10 @@ export {
   wordOf,
   isGesture,
   isParticipant,
+  isExplanation,
+  explanationOf,
+  aboutIdsOf,
+  createExplanationNode,
   resemblances,
   topInterpretation,
   boundsOf,
@@ -49,7 +53,7 @@ export {
   LOCAL_PARTICIPANT,
   TIER0_PARTICIPANT,
 } from './session/nodes';
-export type { MMNode, Rep, Edge, Capability, ParticipantKind } from './session/nodes';
+export type { MMNode, Rep, Edge, Capability, ParticipantKind, ExplanationData } from './session/nodes';
 
 // Gesture grammar
 export {
@@ -94,7 +98,7 @@ export type { ProviderConfig, ProviderKind, ChatMessage, CompletionResult } from
 
 // Agent participants — a model joins through the same channel a human uses.
 export { createAgentParticipant, parseReadings, readingsToEdges, MAX_READINGS } from './participants/agent';
-export type { AgentParticipant, AgentReading, InterpretResult } from './participants/agent';
+export type { AgentParticipant, AgentReading, InterpretResult, AskResult } from './participants/agent';
 export { describeSession, describeSignature } from './participants/serialize';
 export type { SerializeOptions } from './participants/serialize';
 

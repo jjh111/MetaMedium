@@ -50,6 +50,19 @@ Rules:
 Reply with ONLY a JSON array, no prose, no code fences:
 [{"label":"short-name","confidence":0.0-1.0,"reasoning":"one sentence citing the evidence"}]`;
 
+const ASK_PROMPT = `You are a participant on a shared drawing canvas, answering a question about specific marks the human has selected.
+
+You are given GROUNDED FACTS: measured geometry, spatial relations between marks, and how each participant (including the canvas's own recognizer) currently reads them. You are not given an image.
+
+Answer the question directly, in 1–3 short sentences of plain prose.
+
+Rules:
+- CITE THE EVIDENCE. Refer to the actual measurements and relations you were given — "these three closed shapes are joined by two strokes that touch both" — not to a general impression of what the drawing looks like.
+- Do not restate the drawing back to the human. They can see it. Say the thing they cannot see.
+- If the readings disagree, say so and explain what separates them. The disagreement is usually the answer.
+- If the facts do not support an answer, say what is missing rather than guessing.
+- No preamble, no markdown, no bullet points. Just the answer.`;
+
 function clamp01(v: unknown): number {
   const n = typeof v === 'number' ? v : Number(v);
   if (!Number.isFinite(n)) return 0.5;
@@ -122,6 +135,22 @@ export interface AgentParticipant {
    * working from Tier 0.
    */
   interpret(nodeIds: string[], at: number): Promise<InterpretResult>;
+  /**
+   * Answer a question about some marks, placing the answer IN the canvas.
+   *
+   * Never throws. Several agents may answer the same question; each answer is
+   * its own held, attributed node and none replaces another.
+   */
+  ask(question: string, nodeIds: string[], at: number): Promise<AskResult>;
+}
+
+export interface AskResult {
+  ok: boolean;
+  /** The prose answer, when the call succeeded. */
+  text?: string;
+  /** Id of the explanation node placed in the canvas. */
+  explanationId?: string;
+  error?: string;
 }
 
 /**
@@ -177,5 +206,34 @@ export function createAgentParticipant(
     return { ok: true, readings, raw: result.text };
   }
 
-  return { id, name, config, interpret };
+  async function ask(question: string, nodeIds: string[], now: number): Promise<AskResult> {
+    const q = question.trim();
+    if (!q) return { ok: false, error: 'no question' };
+
+    const state = session.getState();
+    const targets = nodeIds.filter((n) => state.nodes.has(n));
+    if (targets.length === 0) return { ok: false, error: 'no such nodes' };
+
+    const context = describeSession(state, { nodeIds: targets });
+    const result = await complete(config, [
+      { role: 'system', content: ASK_PROMPT },
+      { role: 'user', content: `${context}\n\nQuestion: ${q}` },
+    ]);
+    if (!result.ok) return { ok: false, error: result.error };
+
+    const text = result.text.trim();
+    if (!text) return { ok: false, error: 'empty answer' };
+
+    const explanationId = session.answer({
+      participantId: id,
+      question: q,
+      text,
+      aboutIds: targets,
+      at: now,
+    });
+
+    return { ok: true, text, explanationId: explanationId ?? undefined };
+  }
+
+  return { id, name, config, interpret, ask };
 }

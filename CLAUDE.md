@@ -17,11 +17,14 @@ automatically → ask "why?" and get grounded reasoning.
 
 ## Current Status & Plan
 
-**See `ROADMAP.md`** for status and the August 2026 accounting. Headline: the
-substrate is real and the canonical loop is closed end-to-end — but **there has
-never been a model in the loop**. `ARCHITECTURE-v7-PARTICIPANTS-AND-TIERS.md`
-is the active plan for putting one there. Whitepaper v5.1 is deliberately
-parked until that works.
+**See `ROADMAP.md`** for status and the August 2026 accounting.
+`ARCHITECTURE-v7-PARTICIPANTS-AND-TIERS.md` is the active plan.
+
+Headline: the substrate is real, the canonical loop is closed, and **models are
+now in the loop** — v7 Stages A and C have shipped. A model joins as a peer,
+offers *several* readings held beside Tier 0's, and answers questions *into* the
+canvas. Still open: diagram→code (Stage D) and handwriting (Stage E). Whitepaper
+v5.1 stays parked until the conversation benchmark passes end to end.
 
 Architecture documents (chronological; **read v7 then v6 — they're the active pair**):
 - `ARCHITECTURE-v7-PARTICIPANTS-AND-TIERS.md` — **active plan**: putting a model in the loop through the `propose` channel; the conversation benchmark; one OpenAI-compatible transport for Ollama/LM Studio/OpenRouter
@@ -48,7 +51,7 @@ any structural change.
 | `doodle2-canvas.html` | **Flagship demo**: heuristic recognition, spatial graph, library, undo/redo, touch. No LLM. Single-file (~500KB) |
 | `metadoodle1.html` | Fork of flagship + tiered LLM recognition (WebLLM in-browser, LM Studio local API) + voice. Single-file (~600KB) |
 | `Web App Skeleton/` | React + Vite + TypeScript + Zustand rebuild; Claude API interpreter skeleton in `src/llm/`; recognition/spatial/matching in `src/core/` |
-| `Demos/` | Micro demos. **`session-engine.html`** is the live reference surface for metamedium-core (canvas + "why" inspector + second participant; uses the committed `metamedium-core.browser.js` bundle). `build-standalone.mjs` inlines the bundle into a single shareable file. Plus fish, composition diagrams, no-modes graph, etc. |
+| `Demos/` | Micro demos. **`session-engine.html`** is the live reference surface for metamedium-core (canvas + "why" inspector + model participants + canvas answers; uses the committed `metamedium-core.browser.js` bundle). `build-standalone.mjs` inlines the bundle into a single shareable file. Plus fish, composition diagrams, no-modes graph, etc. |
 | `skills/` | Claude Code skills: `metamedium-code` (code patterns), `metamedium-design` (design principles) |
 | `Assets/` | Figures and design rationale (recognition strategy, point-primitive proposal) |
 | `archive/` | Retired versions and superseded plans, incl. whitepaper v4 (root `MetaMedium_Whitepaper_v4.html` is a redirect stub — keep it) and PRDs v3.2/v4 |
@@ -156,6 +159,13 @@ intelligence panel in `doodle2-canvas.html`.
 
 Tier is derived from the provider by `providerTier()` (localhost → 1, hosted →
 2) and carried on the participant node via `join(kind, name, at, capability)`.
+
+**Answers are nodes, not chat.** `session.answer()` places an explanation in the
+canvas, anchored to the marks it is about and attributed to whoever said it.
+Explanations are a **third plane** (`SessionState.explanations`) beside content
+and gesture: visible and erasable, but not ink — they never join a lasso, a
+cluster, or a signature. Several participants may answer the same question and
+every answer is held.
 
 **One transport covers Tier 1 and most of Tier 2:** Ollama, LM Studio, and
 OpenRouter all speak the OpenAI-compatible `/v1/chat/completions` shape and

@@ -30,6 +30,7 @@ var MetaMediumCore = (() => {
     MAX_READINGS: () => MAX_READINGS,
     PRESETS: () => PRESETS,
     TIER0_PARTICIPANT: () => TIER0_PARTICIPANT,
+    aboutIdsOf: () => aboutIdsOf,
     analyzeCornerAngles: () => analyzeCornerAngles,
     analyzeStroke: () => analyzeStroke,
     boundingBoxDistance: () => boundingBoxDistance,
@@ -47,12 +48,14 @@ var MetaMediumCore = (() => {
     countCorners: () => countCorners,
     createAgentParticipant: () => createAgentParticipant,
     createBootstrapNodes: () => createBootstrapNodes,
+    createExplanationNode: () => createExplanationNode,
     createParticipantNode: () => createParticipantNode,
     createSession: () => createSession,
     describeSession: () => describeSession,
     describeSignature: () => describeSignature,
     disagreement: () => disagreement,
     enclosedBy: () => enclosedBy,
+    explanationOf: () => explanationOf,
     findCorners: () => findCorners,
     findCornersWithSeparation: () => findCornersWithSeparation,
     fingerprintOf: () => fingerprintOf,
@@ -63,6 +66,7 @@ var MetaMediumCore = (() => {
     hasMultipleSources: () => hasMultipleSources,
     interpretationsOf: () => interpretationsOf,
     isCheckLike: () => isCheckLike,
+    isExplanation: () => isExplanation,
     isGesture: () => isGesture,
     isLassoLike: () => isLassoLike,
     isParticipant: () => isParticipant,
@@ -711,6 +715,32 @@ var MetaMediumCore = (() => {
       createdAt: at
     };
   }
+  function createExplanationNode(id, data, aboutIds, bounds, participantId, capability, at) {
+    return {
+      id,
+      reps: [
+        { modality: "explanation", data, source: participantId },
+        { modality: "bounds", data: bounds }
+      ],
+      edges: [
+        // `about` is inferred, not blessed: the human may disagree that this
+        // answer is about these marks, and ignoring it is a valid response.
+        ...aboutIds.map((to) => ({ to, rel: "about" })),
+        { to: participantId, rel: "made-by", blessed: true }
+      ],
+      capability,
+      createdAt: at
+    };
+  }
+  function isExplanation(node) {
+    return node.reps.some((r) => r.modality === "explanation");
+  }
+  function explanationOf(node) {
+    return getRep(node, "explanation")?.data;
+  }
+  function aboutIdsOf(node) {
+    return node.edges.filter((e) => e.rel === "about").map((e) => e.to);
+  }
   function isParticipant(node) {
     return getRep(node, "participant") !== void 0;
   }
@@ -798,6 +828,7 @@ var MetaMediumCore = (() => {
     let summon = null;
     let clusterCandidates = [];
     let participants = [];
+    let explanations = [];
     let counter = 0;
     const listeners = /* @__PURE__ */ new Set();
     function reset() {
@@ -808,6 +839,7 @@ var MetaMediumCore = (() => {
       summon = null;
       clusterCandidates = [];
       participants = [LOCAL_PARTICIPANT, TIER0_PARTICIPANT];
+      explanations = [];
       counter = 0;
       for (const n2 of createBootstrapNodes(0)) nodes.set(n2.id, n2);
     }
@@ -1082,6 +1114,39 @@ var MetaMediumCore = (() => {
       }
       recomputeClusterCandidates();
     }
+    function applyAnswer(ev) {
+      if (!participants.includes(ev.participantId)) return null;
+      const about = ev.aboutIds.filter((id) => nodes.has(id));
+      if (about.length === 0) return null;
+      const subject = about.map((id) => boundsOf(nodes.get(id))).filter((b) => !!b);
+      const union = subject.length ? getBounds(
+        subject.flatMap((b) => [
+          { x: b.minX, y: b.minY },
+          { x: b.maxX, y: b.maxY }
+        ])
+      ) : { minX: 0, minY: 0, maxX: 0, maxY: 0 };
+      const gap = 28;
+      const width = 260;
+      const bounds = {
+        minX: union.maxX + gap,
+        minY: union.minY,
+        maxX: union.maxX + gap + width,
+        maxY: union.minY + 120
+      };
+      const participant = nodes.get(ev.participantId);
+      const node = createExplanationNode(
+        nextId("explanation"),
+        { question: ev.question, text: ev.text },
+        about,
+        bounds,
+        ev.participantId,
+        participant?.capability ?? 0,
+        ev.at
+      );
+      nodes.set(node.id, node);
+      explanations.push(node.id);
+      return node.id;
+    }
     function applyEvent(ev) {
       switch (ev.type) {
         case "stroke":
@@ -1093,6 +1158,8 @@ var MetaMediumCore = (() => {
         case "propose":
           applyPropose(ev);
           return null;
+        case "answer":
+          return applyAnswer(ev);
         case "dismiss":
           if (summon?.id === ev.summonId) summon = null;
           return null;
@@ -1131,7 +1198,8 @@ var MetaMediumCore = (() => {
         summon: summon ? { ...summon, enclosedIds: [...summon.enclosedIds] } : null,
         clusterCandidates: clusterCandidates.map((c) => ({ ...c })),
         artifacts: [...artifacts],
-        participants: [...participants]
+        participants: [...participants],
+        explanations: [...explanations]
       };
     }
     function subscribe(listener) {
@@ -1144,6 +1212,7 @@ var MetaMediumCore = (() => {
       addStroke: (points, at, participantId) => dispatch({ type: "stroke", points, at, participantId }),
       join: (kind, name, at, capability) => dispatch({ type: "join", kind, name, at, capability }),
       propose: (args) => void dispatch({ type: "propose", ...args }),
+      answer: (args) => dispatch({ type: "answer", ...args }),
       tick: (at) => void dispatch({ type: "tick", at }),
       bless: (args) => dispatch({ type: "bless", ...args }),
       dismiss: (summonId, at) => void dispatch({ type: "dismiss", summonId, at }),
@@ -1452,6 +1521,18 @@ Rules:
 
 Reply with ONLY a JSON array, no prose, no code fences:
 [{"label":"short-name","confidence":0.0-1.0,"reasoning":"one sentence citing the evidence"}]`;
+  var ASK_PROMPT = `You are a participant on a shared drawing canvas, answering a question about specific marks the human has selected.
+
+You are given GROUNDED FACTS: measured geometry, spatial relations between marks, and how each participant (including the canvas's own recognizer) currently reads them. You are not given an image.
+
+Answer the question directly, in 1\u20133 short sentences of plain prose.
+
+Rules:
+- CITE THE EVIDENCE. Refer to the actual measurements and relations you were given \u2014 "these three closed shapes are joined by two strokes that touch both" \u2014 not to a general impression of what the drawing looks like.
+- Do not restate the drawing back to the human. They can see it. Say the thing they cannot see.
+- If the readings disagree, say so and explain what separates them. The disagreement is usually the answer.
+- If the facts do not support an answer, say what is missing rather than guessing.
+- No preamble, no markdown, no bullet points. Just the answer.`;
   function clamp01(v) {
     const n2 = typeof v === "number" ? v : Number(v);
     if (!Number.isFinite(n2)) return 0.5;
@@ -1525,7 +1606,32 @@ ${question}` }
       });
       return { ok: true, readings, raw: result.text };
     }
-    return { id, name, config, interpret };
+    async function ask(question, nodeIds, now) {
+      const q = question.trim();
+      if (!q) return { ok: false, error: "no question" };
+      const state = session.getState();
+      const targets = nodeIds.filter((n2) => state.nodes.has(n2));
+      if (targets.length === 0) return { ok: false, error: "no such nodes" };
+      const context = describeSession(state, { nodeIds: targets });
+      const result = await complete(config, [
+        { role: "system", content: ASK_PROMPT },
+        { role: "user", content: `${context}
+
+Question: ${q}` }
+      ]);
+      if (!result.ok) return { ok: false, error: result.error };
+      const text = result.text.trim();
+      if (!text) return { ok: false, error: "empty answer" };
+      const explanationId = session.answer({
+        participantId: id,
+        question: q,
+        text,
+        aboutIds: targets,
+        at: now
+      });
+      return { ok: true, text, explanationId: explanationId ?? void 0 };
+    }
+    return { id, name, config, interpret, ask };
   }
   return __toCommonJS(index_exports);
 })();

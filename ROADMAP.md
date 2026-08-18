@@ -38,7 +38,7 @@ tracks only **status**. Experiments are tracked in
 | `index.html` (Whitepaper v5) | Polished; "Current Development" still links only the heuristic demo — **v5.1 is the open work** |
 | `doodle2-canvas.html` | Polished; heuristics + spatial graph + library; **no LLM**. Not yet on core |
 | `metadoodle1.html` | Working prototype; diverging copy of the flagship. Not yet on core |
-| `Demos/session-engine.html` | Live reference surface for core: canvas + "why" inspector + second participant |
+| `Demos/session-engine.html` | Live reference surface for core: canvas + "why" inspector + **model participants** + **answers placed in the canvas** |
 | `Web App Skeleton/` | Builds, lints, tests green; no compositions; not wired to anything shipped |
 | `metamedium-core-schema.md` | **Load-bearing** — the node model is implemented via v6 (was "plan only") |
 | `ARCHITECTURE-v5-UNIFIED-ENGINE.md` | Partly superseded; MoE/embedding half still deferred (and now prototyped in `lens-canvas/`) |
@@ -66,9 +66,10 @@ tracks only **status**. Experiments are tracked in
 ### → **v7: Participants and Tiers** — the active plan
 
 **[ARCHITECTURE-v7-PARTICIPANTS-AND-TIERS.md](ARCHITECTURE-v7-PARTICIPANTS-AND-TIERS.md)**
-is where the work goes now. The substrate is real and the loop is closed; there
-has never been a model in it. v7 puts one there, through the `propose` channel
-the engine already has.
+is where the work goes now. **Stages A and C have shipped:** a model joins as a
+peer through the `propose` channel the engine already had, offers *several*
+readings held beside Tier 0's, and answers questions *into* the canvas.
+Remaining: diagram→code (D) and handwriting (E).
 
 The target is **the conversation benchmark**: a human and an AI holding a
 conversation *on the canvas* — both contributing marks, both building library
@@ -132,8 +133,9 @@ were verified in a browser: draw 3 circles + 2 lines → lasso → check → sum
 to confirm"* as a held candidate. The inspector shows the grounding throughout.
 The executable spec is `metamedium-core/src/session/session.scenario.test.ts`.
 
-**What Step 3 did *not* deliver:** "explain why" is Tier 0 grounded reasoning,
-not an LLM. There is still no model in the loop anywhere. That is v7's job.
+**What Step 3 did *not* deliver:** "explain why" was Tier 0 grounded reasoning,
+not an LLM. ✅ **Now delivered by v7 Stage C** — models answer questions into the
+canvas, and Tier 0's reasoning still stands beside theirs.
 
 ---
 
@@ -274,8 +276,14 @@ say so plainly.
 - Onboarding / calibration / user fingerprints
 - Embedding space (MoE routing is prototyped in `lens-canvas/`, not in core)
 
-**The one-line summary:** the substrate is real and the loop is closed; there
-has never been a model in it. v7 is about that, and only that.
+**The one-line summary (as of the accounting):** the substrate is real and the
+loop is closed; there has never been a model in it. v7 is about that, and only
+that.
+
+> **Update — v7 Stages A and C shipped (Aug 2026).** There is now a model in the
+> loop: it joins as a peer, offers several readings held beside Tier 0's, and
+> answers questions into the canvas. The "Not started" list above shrinks by its
+> first two lines. Diagram→code and handwriting remain.
 
 ## Success Criteria
 

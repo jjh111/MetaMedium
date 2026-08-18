@@ -240,13 +240,42 @@ local-first defaults and bring-your-own-key.
 **Ship criterion:** the same flow works offline on a local model and online on
 a hosted one, and the inspector shows which model made each claim.
 
-### Stage C — Ask and explain
+### Stage C — Ask and explain ✅ **shipped (Aug 2026)**
 
-The human poses a question *on the canvas*; the agent answers *into* it — an
-explanation rep placed in the space, anchored to the nodes it's about.
+Circle a region, hit **Ask…**, type a question. Every model answers at once and
+each answer lands **in the canvas** — a card tethered by a dashed line to the
+marks it is about, labelled with who said it.
 
-**Ship criterion:** circle a region, ask "why these?", get a grounded answer
-that cites the actual relations rather than restating the drawing.
+**An answer is a node**, not a chat message: attributed, positioned, erasable,
+and **unblessed**. Its `about` edges are inference, so ignoring an answer is a
+valid response, exactly like ignoring a summon.
+
+New in the engine:
+
+| | |
+|---|---|
+| `session.answer({participantId, question, text, aboutIds, at})` | Places an explanation node; returns its id, or `null` if the participant never joined |
+| `createExplanationNode` / `isExplanation` / `explanationOf` / `aboutIdsOf` | The node shape and its readers |
+| `SessionState.explanations` | **A third plane**, beside content and gesture. An answer is visible and erasable but is *not ink* — so it never joins a lasso, a cluster, or a signature |
+| `agent.ask(question, nodeIds, at)` | Grounded question in, prose answer placed in the canvas |
+
+**Verified live**, one question to two models:
+
+> **llm:qwen3** (tier 1) — *"The two straight strokes each touch two of the
+> closed shapes, which is what makes this a group rather than three separate
+> marks."*
+>
+> **llm:hosted-model** (tier 2) — *"Every line terminates on a circle. Remove
+> either line and the remaining shapes share no relation at all."*
+
+Both cite the **relations**, not the picture — which is the ship criterion, and
+the first real evidence for §1's hypothesis: neither answer would be reachable
+from a screenshot without re-deriving what the canvas already knows.
+
+**And with the model switched off**, the same flow gives
+`llm:qwen3 could not answer (HTTP 503)`, places nothing, and the canonical loop
+still closes to `0 loose · 1 artifact` on Tier 0 alone. Rule 3 holds under real
+failure, not just in principle.
 
 ### Stage D — Diagram → code
 

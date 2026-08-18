@@ -136,6 +136,7 @@ html, body {
   color: var(--agent); font-size: 10.5px; padding: 2px 0;
 }
 #modelPanel .mpItem .t { color: var(--dim); }
+#summon input.ask { min-width: 210px; }
 #inspector .srccount { color: var(--dim); font-weight: 400; letter-spacing: 0; }
 #inspector .gap {
   margin: 6px 0 4px; padding: 5px 7px; font-size: 10.5px; line-height: 1.4;
@@ -517,6 +518,7 @@ html, body {
       ctx.stroke();
     }
 
+    renderExplanations(s);
     renderSummon(s);
     renderInspector(s, inspectedId);
 
@@ -691,6 +693,101 @@ html, body {
 
   // ===== Summon chips: non-modal — drawing anything else dissolves them =====
   let shownSummonId = null;
+  // Answers live IN the canvas, tethered to the marks they are about — so the
+  // reader never has to hold "which marks was this for?" in their head. Several
+  // answers to one question stack, each labelled with who said it.
+  function renderExplanations(s) {
+    if (!s.explanations.length) return;
+
+    const stacked = new Map(); // subject key -> how many answers already drawn
+    for (const id of s.explanations) {
+      const node = s.nodes.get(id);
+      if (!node || MM.getRep(node, 'erased')) continue;
+      const data = MM.explanationOf(node);
+      const b = MM.boundsOf(node);
+      if (!data || !b) continue;
+
+      const about = MM.aboutIdsOf(node);
+      const key = about.join(',');
+      const slot = stacked.get(key) || 0;
+
+      const pad = 9, w = b.maxX - b.minX;
+      ctx.font = '11px ui-monospace, SFMono-Regular, Menlo, monospace';
+      const lines = wrapText(data.text, w - pad * 2);
+      const who = MM.wordOf(s.nodes.get(node.edges.find((e) => e.rel === 'made-by').to)) || 'agent';
+      const headH = 15, lineH = 15;
+      const h = pad * 2 + headH + lines.length * lineH;
+
+      // Core anchors the answer beside its subject; only the surface knows the
+      // viewport, so fitting it on screen is the surface's job. Stack later
+      // answers below earlier ones rather than overlapping them.
+      let x = b.minX, y = b.minY + slot * (h + 10);
+      if (x + w > innerWidth - 8) {
+        // No room to the right — tuck it under the subject instead.
+        const sb = about.map((a) => (s.nodes.get(a) ? MM.boundsOf(s.nodes.get(a)) : null)).filter(Boolean);
+        const under = sb.length ? union(sb) : null;
+        x = under ? Math.max(8, Math.min(under.minX, innerWidth - 8 - w)) : Math.max(8, innerWidth - 8 - w);
+        y = (under ? under.maxY + 16 : y) + slot * (h + 10);
+      }
+      y = Math.max(8, Math.min(y, innerHeight - 46 - h)); // leave the status bar clear
+      stacked.set(key, slot + 1);
+
+      // Tether to the subject, drawn first so the card sits on top of it.
+      const subjectBounds = about
+        .map((a) => (s.nodes.get(a) ? MM.boundsOf(s.nodes.get(a)) : null))
+        .filter(Boolean);
+      const subject = subjectBounds.length ? union(subjectBounds) : null;
+      if (subject) {
+        ctx.beginPath();
+        ctx.moveTo(subject.maxX, (subject.minY + subject.maxY) / 2);
+        ctx.lineTo(x, y + h / 2);
+        ctx.strokeStyle = 'rgba(138,180,200,0.32)';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([3, 4]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+
+      ctx.fillStyle = 'rgba(138,180,200,0.07)';
+      ctx.strokeStyle = 'rgba(138,180,200,0.38)';
+      ctx.lineWidth = 1;
+      roundRect(x, y, w, h, 6);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = 'rgba(138,180,200,0.85)';
+      ctx.font = '10px ui-monospace, SFMono-Regular, Menlo, monospace';
+      ctx.fillText(who, x + pad, y + pad + 8);
+
+      ctx.fillStyle = '#e8e4d9';
+      ctx.font = '11px ui-monospace, SFMono-Regular, Menlo, monospace';
+      lines.forEach((ln, i) => ctx.fillText(ln, x + pad, y + pad + headH + 8 + i * lineH));
+    }
+  }
+
+  function wrapText(text, maxWidth) {
+    const words = String(text).split(/\s+/);
+    const lines = [];
+    let line = '';
+    for (const word of words) {
+      const next = line ? line + ' ' + word : word;
+      if (ctx.measureText(next).width > maxWidth && line) { lines.push(line); line = word; }
+      else line = next;
+    }
+    if (line) lines.push(line);
+    return lines.slice(0, 6);
+  }
+
+  function roundRect(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
   function renderSummon(s) {
     if (!s.summon) { summonEl.style.display = 'none'; shownSummonId = null; return; }
     if (shownSummonId === s.summon.id) return;
@@ -709,6 +806,15 @@ html, body {
       summonEl.appendChild(btn);
     }
 
+    // Asking is only offered when someone can answer. The question goes to
+    // EVERY model at once — several answers to one question is the point.
+    if (agents.length > 0) {
+      const askBtn = document.createElement('button');
+      askBtn.textContent = 'Ask…';
+      askBtn.onclick = () => swapToQuestion(s.summon.enclosedIds.slice(), askBtn);
+      summonEl.appendChild(askBtn);
+    }
+
     const b = MM.boundsOf(s.nodes.get(s.summon.gestureIds[1]));
     summonEl.style.left = Math.max(8, Math.min(b.minX, innerWidth - 340)) + 'px';
     summonEl.style.top = Math.max(8, Math.min(b.maxY + 14, innerHeight - 70)) + 'px';
@@ -722,6 +828,33 @@ html, body {
       if (e.key === 'Enter' && input.value.trim()) {
         session.bless({ summonId: summonId, name: input.value.trim(), at: Date.now() });
       }
+    };
+    btn.replaceWith(input);
+    input.focus();
+  }
+
+  function swapToQuestion(nodeIds, btn) {
+    const input = document.createElement('input');
+    input.placeholder = 'ask about these…';
+    input.className = 'ask';
+    input.onkeydown = (e) => {
+      e.stopPropagation();
+      if (e.key !== 'Enter') return;
+      const q = input.value.trim();
+      if (!q) return;
+      input.disabled = true;
+      input.placeholder = 'asking ' + agents.length + ' model(s)…';
+
+      // Fan out. Each answer lands as its own node the moment it arrives;
+      // a slow model never holds up a fast one.
+      agents.forEach((agent) => {
+        agent.ask(q, nodeIds, Date.now()).then((res) => {
+          if (!res.ok) {
+            mpStatus.textContent = agent.name + ' could not answer (' + res.error + ').';
+          }
+          render(session.getState());
+        });
+      });
     };
     btn.replaceWith(input);
     input.focus();

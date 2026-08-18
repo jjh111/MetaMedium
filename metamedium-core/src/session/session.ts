@@ -23,6 +23,7 @@ import {
   type Capability,
   createBootstrapNodes,
   createParticipantNode,
+  createExplanationNode,
   typeNodeId,
   fingerprintOf,
   getRep,
@@ -76,6 +77,12 @@ export interface SessionState {
   artifacts: string[];
   /** Participant node ids (humans, agents, and the engine's own recognizers). */
   participants: string[];
+  /**
+   * Answers placed in the canvas. A third plane beside content and gesture:
+   * an explanation is visible and erasable but is not ink, so it never joins a
+   * lasso, a cluster, or a signature.
+   */
+  explanations: string[];
 }
 
 // Every event is attributed: participantId defaults to the local human.
@@ -88,7 +95,15 @@ export type SessionEvent =
   | { type: 'dismiss'; summonId: string; at: number; participantId?: string }
   | { type: 'erase'; nodeId: string; at: number; participantId?: string }
   | { type: 'join'; kind: ParticipantKind; name: string; at: number; capability?: Capability }
-  | { type: 'propose'; participantId: string; nodeId: string; edges: ProposedEdge[]; at: number };
+  | { type: 'propose'; participantId: string; nodeId: string; edges: ProposedEdge[]; at: number }
+  | {
+      type: 'answer';
+      participantId: string;
+      question: string;
+      text: string;
+      aboutIds: string[];
+      at: number;
+    };
 
 /** An attributed, inferred edge offered by a participant (e.g. an LLM tier). */
 export interface ProposedEdge {
@@ -120,6 +135,19 @@ export interface Session {
   join(kind: ParticipantKind, name: string, at: number, capability?: Capability): string;
   /** Offer attributed, inferred edges on a node — the channel LLM tiers use. */
   propose(args: { participantId: string; nodeId: string; edges: ProposedEdge[]; at: number }): void;
+  /**
+   * Place an answer in the canvas, anchored to the marks it is about.
+   *
+   * Returns the explanation node's id. Several participants may answer the
+   * same question — every answer is held, none replaces another.
+   */
+  answer(args: {
+    participantId: string;
+    question: string;
+    text: string;
+    aboutIds: string[];
+    at: number;
+  }): string | null;
   tick(at: number): void;
   bless(args: {
     summonId: string;
@@ -148,6 +176,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
   let summon: Summon | null = null;
   let clusterCandidates: ClusterCandidate[] = [];
   let participants: string[] = [];
+  let explanations: string[] = [];
   let counter = 0;
   const listeners = new Set<(state: SessionState) => void>();
 
@@ -159,6 +188,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     summon = null;
     clusterCandidates = [];
     participants = [LOCAL_PARTICIPANT, TIER0_PARTICIPANT];
+    explanations = [];
     counter = 0;
     for (const n of createBootstrapNodes(0)) nodes.set(n.id, n);
   }
@@ -518,6 +548,49 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     recomputeClusterCandidates();
   }
 
+  function applyAnswer(ev: Extract<SessionEvent, { type: 'answer' }>): string | null {
+    if (!participants.includes(ev.participantId)) return null;
+    const about = ev.aboutIds.filter((id) => nodes.has(id));
+    if (about.length === 0) return null;
+
+    // Anchor the answer beside what it is about, so the reader never has to
+    // hold "which marks was this for?" in their head — the placement says it.
+    const subject = about
+      .map((id) => boundsOf(nodes.get(id)!))
+      .filter((b): b is Bounds => !!b);
+    const union = subject.length
+      ? getBounds(
+          subject.flatMap((b) => [
+            { x: b.minX, y: b.minY },
+            { x: b.maxX, y: b.maxY },
+          ])
+        )
+      : { minX: 0, minY: 0, maxX: 0, maxY: 0 };
+
+    const gap = 28;
+    const width = 260;
+    const bounds: Bounds = {
+      minX: union.maxX + gap,
+      minY: union.minY,
+      maxX: union.maxX + gap + width,
+      maxY: union.minY + 120,
+    };
+
+    const participant = nodes.get(ev.participantId);
+    const node = createExplanationNode(
+      nextId('explanation'),
+      { question: ev.question, text: ev.text },
+      about,
+      bounds,
+      ev.participantId,
+      (participant?.capability ?? 0) as Capability,
+      ev.at
+    );
+    nodes.set(node.id, node);
+    explanations.push(node.id);
+    return node.id;
+  }
+
   function applyEvent(ev: SessionEvent): string | null {
     switch (ev.type) {
       case 'stroke':
@@ -529,6 +602,8 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       case 'propose':
         applyPropose(ev);
         return null;
+      case 'answer':
+        return applyAnswer(ev);
       case 'dismiss':
         if (summon?.id === ev.summonId) summon = null;
         return null;
@@ -578,6 +653,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       clusterCandidates: clusterCandidates.map((c) => ({ ...c })),
       artifacts: [...artifacts],
       participants: [...participants],
+      explanations: [...explanations],
     };
   }
 
@@ -593,6 +669,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       dispatch({ type: 'stroke', points, at, participantId }) as string,
     join: (kind, name, at, capability) => dispatch({ type: 'join', kind, name, at, capability }) as string,
     propose: (args) => void dispatch({ type: 'propose', ...args }),
+    answer: (args) => dispatch({ type: 'answer', ...args }),
     tick: (at) => void dispatch({ type: 'tick', at }),
     bless: (args) => dispatch({ type: 'bless', ...args }),
     dismiss: (summonId, at) => void dispatch({ type: 'dismiss', summonId, at }),

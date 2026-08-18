@@ -81,6 +81,58 @@ export function createParticipantNode(
   };
 }
 
+/**
+ * An answer placed IN the canvas rather than in a chat log.
+ *
+ * An explanation is a node like everything else: attributed, positioned,
+ * erasable, and — crucially — **unblessed**. It is a participant's proposal
+ * about some marks, not a verdict, so several participants can answer the same
+ * question and every answer is held (ARCHITECTURE-v7 §4.1).
+ */
+export interface ExplanationData {
+  question: string;
+  text: string;
+}
+
+export function createExplanationNode(
+  id: string,
+  data: ExplanationData,
+  aboutIds: string[],
+  bounds: Bounds,
+  participantId: string,
+  capability: Capability,
+  at: number
+): MMNode {
+  return {
+    id,
+    reps: [
+      { modality: 'explanation', data, source: participantId },
+      { modality: 'bounds', data: bounds },
+    ],
+    edges: [
+      // `about` is inferred, not blessed: the human may disagree that this
+      // answer is about these marks, and ignoring it is a valid response.
+      ...aboutIds.map((to) => ({ to, rel: 'about' })),
+      { to: participantId, rel: 'made-by', blessed: true },
+    ],
+    capability,
+    createdAt: at,
+  };
+}
+
+export function isExplanation(node: MMNode): boolean {
+  return node.reps.some((r) => r.modality === 'explanation');
+}
+
+export function explanationOf(node: MMNode): ExplanationData | undefined {
+  return getRep(node, 'explanation')?.data as ExplanationData | undefined;
+}
+
+/** Which marks an explanation claims to be about. */
+export function aboutIdsOf(node: MMNode): string[] {
+  return node.edges.filter((e) => e.rel === 'about').map((e) => e.to);
+}
+
 export function isParticipant(node: MMNode): boolean {
   return getRep(node, 'participant') !== undefined;
 }
