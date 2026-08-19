@@ -1053,8 +1053,20 @@ html, body {
   }
 
   // ===== Explanations: answers live IN the canvas ==========================
+  /**
+   * The world rectangle a canvas object can occupy and still be READ — the
+   * viewport minus the chrome that floats over it. Fitting to the raw viewport
+   * is not enough: an answer card placed at the right edge lands underneath the
+   * inspector, which is the one place it is guaranteed to be unreadable.
+   */
   function viewportWorld() {
-    const a = screenToWorld(0, 0), b = screenToWorld(innerWidth, innerHeight);
+    const rail = document.querySelector('.rail');
+    const insp = document.getElementById('inspector');
+    const railH = rail ? rail.getBoundingClientRect().height : 0;
+    const inspRect = insp && insp.offsetParent !== null ? insp.getBoundingClientRect() : null;
+    const right = inspRect ? Math.min(innerWidth, inspRect.left) - 16 : innerWidth - 8;
+    const a = screenToWorld(8, railH + 8);
+    const b = screenToWorld(Math.max(120, right), innerHeight - 46);
     return { minX: a.x, minY: a.y, maxX: b.x, maxY: b.y };
   }
 
@@ -1090,10 +1102,13 @@ html, body {
         .map((a) => (s.nodes.get(a) ? MM.boundsOf(s.nodes.get(a)) : null))
         .filter(Boolean);
       const subject = subjectBounds.length ? union(subjectBounds) : null;
-      if (x + w > vw.maxX - wpx(8) && subject) {
-        x = Math.max(vw.minX + wpx(8), Math.min(subject.minX, vw.maxX - wpx(8) - w));
+      // No room to the right of the subject — tuck the card under it instead.
+      if (x + w > vw.maxX && subject) {
+        x = Math.min(subject.minX, vw.maxX - w);
         y = subject.maxY + wpx(16) + slot * (h + 10);
       }
+      x = Math.max(vw.minX, Math.min(x, vw.maxX - w));
+      y = Math.max(vw.minY, Math.min(y, vw.maxY - h));
       stacked.set(key, slot + 1);
 
       if (subject) {
