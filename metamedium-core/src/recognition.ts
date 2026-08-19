@@ -7,93 +7,149 @@
 import type { Point, Fingerprint, RecognitionResult, StrokeAnalysis } from './types';
 import { getFingerprint, checkOvershoot } from './geometry';
 
-function detectLine(fp: Fingerprint, points: Point[], scale = 1): RecognitionResult | null {
-  const hasOvershoot = checkOvershoot(points, 50 * scale);
-  const isStraight = fp.straightness > 0.65;
-  const notClosed = !fp.isClosed && !hasOvershoot;
-  const fewCorners = fp.corners <= 2;
+// ===== Evidence =====
+//
+// Every detector below scores CONTINUOUSLY from measurements, and the results
+// are ranked by that score. The previous version gave each detector a fixed
+// confidence (triangle 0.85, rectangle 0.80) and let their corner-count bands
+// overlap, so a shape with three detected corners matched both and the triangle
+// won — not because it looked like one, but because 85 > 80. A tie between two
+// readings has to be broken by evidence, or the ranking means nothing.
 
-  if (isStraight && notClosed && fewCorners) {
-    return {
-      type: 'line',
-      label: 'Line',
-      score: 90,
-      confidence: 0.9,
-      reasoning: `straightness ${fp.straightness.toFixed(2)} > 0.65, open, ${fp.corners} corner(s)`,
-    };
-  }
-  return null;
+/** 1 when `value` sits on `ideal`, falling to 0 at `tolerance` away. */
+function fit(value: number, ideal: number, tolerance: number): number {
+  return Math.max(0, 1 - Math.abs(value - ideal) / tolerance);
+}
+
+/** 0 below `lo`, 1 above `hi`, linear between. */
+function ramp(value: number, lo: number, hi: number): number {
+  return Math.max(0, Math.min(1, (value - lo) / (hi - lo)));
+}
+
+const DEG = Math.PI / 180;
+
+/** Mean turn angle at the detected corners, in radians. */
+function meanTurn(fp: Fingerprint): number {
+  const a = fp.cornerAngles;
+  if (!a || a.length === 0) return 0;
+  return a.reduce((x, y) => x + y, 0) / a.length;
+}
+
+/**
+ * Below this a reading is not worth offering. Deliberately low: multi-parse
+ * means several candidates coexist and the human decides (ARCHITECTURE-v6
+ * principle 2), so this only filters out noise, it does not pick a winner.
+ */
+export const MIN_CONFIDENCE = 0.35;
+
+/**
+ * The ceiling on a Tier 0 reading. A perfect template fit is still only
+ * evidence, and heuristics that report certainty are lying about what they
+ * know — a flawless circle is exactly what a hand-drawn letter O looks like.
+ * The cap also leaves headroom above the engine, so a participant with more
+ * context can outrank it without having to claim 0.99.
+ */
+export const MAX_TIER0_CONFIDENCE = 0.92;
+
+function result(
+  type: string,
+  label: string,
+  fitScore: number,
+  reasoning: string
+): RecognitionResult | null {
+  const confidence = fitScore * MAX_TIER0_CONFIDENCE;
+  if (confidence < MIN_CONFIDENCE) return null;
+  return { type, label, score: Math.round(confidence * 100), confidence, reasoning };
+}
+
+function detectLine(fp: Fingerprint, points: Point[], scale = 1): RecognitionResult | null {
+  if (fp.isClosed || checkOvershoot(points, 50 * scale)) return null;
+
+  const straight = ramp(fp.straightness, 0.55, 0.95);
+  const corners = fit(fp.corners, 0, 3);
+  const confidence = straight * 0.7 + corners * 0.3;
+
+  return result(
+    'line',
+    'Line',
+    confidence,
+    `open, straightness ${fp.straightness.toFixed(2)}, ${fp.corners} corner(s)`
+  );
 }
 
 function detectArc(fp: Fingerprint, points: Point[], scale = 1): RecognitionResult | null {
-  const hasOvershoot = checkOvershoot(points, 50 * scale);
-  const notClosed = !fp.isClosed && !hasOvershoot;
-  const fewCorners = fp.corners <= 1;
-  const isCurved = fp.straightness < 0.6;
+  if (fp.isClosed || checkOvershoot(points, 50 * scale)) return null;
 
-  if (notClosed && fewCorners && isCurved) {
-    return {
-      type: 'arc',
-      label: 'Arc',
-      score: 70,
-      confidence: 0.7,
-      reasoning: `open, curved (straightness ${fp.straightness.toFixed(2)} < 0.6), smooth`,
-    };
-  }
-  return null;
+  const curved = 1 - ramp(fp.straightness, 0.25, 0.8);
+  const smooth = fit(fp.corners, 0, 2.5);
+  const confidence = curved * 0.6 + smooth * 0.4;
+
+  return result(
+    'arc',
+    'Arc',
+    confidence,
+    `open, curved (straightness ${fp.straightness.toFixed(2)}), ${fp.corners} corner(s)`
+  );
 }
 
 function detectTriangle(fp: Fingerprint): RecognitionResult | null {
-  const isClosed = fp.isClosed;
-  const hasThreeCorners = fp.corners >= 2 && fp.corners <= 3;
-  const reasonableShape = fp.aspectRatio >= 0.3 && fp.aspectRatio <= 3.0;
+  if (!fp.isClosed) return null;
+  if (fp.aspectRatio < 0.25 || fp.aspectRatio > 4) return null;
 
-  if (isClosed && hasThreeCorners && reasonableShape) {
-    return {
-      type: 'triangle',
-      label: 'Triangle',
-      score: 85,
-      confidence: 0.85,
-      reasoning: `closed with ${fp.corners} corner(s) in the triangle range (2–3)`,
-    };
-  }
-  return null;
+  // A triangle fills about half its bounding box. That holds however the
+  // corners were counted, which is exactly why it carries the most weight.
+  const area = fit(fp.extent, 0.5, 0.3);
+  const corners = fit(fp.corners, 3, 2);
+  // Interior angles average 60 degrees, so the path TURNS about 120 at each.
+  const turn = fp.cornerAngles?.length ? fit(meanTurn(fp), 120 * DEG, 70 * DEG) : 0.5;
+  const confidence = area * 0.5 + corners * 0.35 + turn * 0.15;
+
+  return result(
+    'triangle',
+    'Triangle',
+    confidence,
+    `closed, ${fp.corners} corner(s), fills ${(fp.extent * 100).toFixed(0)}% of its box (a triangle fills ~50%)`
+  );
 }
 
 function detectRectangle(fp: Fingerprint): RecognitionResult | null {
-  const isClosed = fp.isClosed;
-  const hasFourCorners = fp.corners >= 3 && fp.corners <= 4;
-  const aspectRatioOk = fp.aspectRatio > 0.3 && fp.aspectRatio < 3.0;
+  if (!fp.isClosed) return null;
+  if (fp.aspectRatio < 0.2 || fp.aspectRatio > 5) return null;
 
-  if (isClosed && hasFourCorners && aspectRatioOk) {
-    return {
-      type: 'rectangle',
-      label: 'Rectangle',
-      score: 80,
-      confidence: 0.8,
-      reasoning: `closed with ${fp.corners} corner(s) in the rectangle range (3–4)`,
-    };
-  }
-  return null;
+  // A rectangle fills its bounding box almost completely — the one measurement
+  // that a missed corner cannot take away.
+  const area = fit(fp.extent, 1, 0.45);
+  const corners = fit(fp.corners, 4, 2.5);
+  const turn = fp.cornerAngles?.length ? fit(meanTurn(fp), 90 * DEG, 55 * DEG) : 0.5;
+  const confidence = area * 0.45 + corners * 0.35 + turn * 0.2;
+
+  return result(
+    'rectangle',
+    'Rectangle',
+    confidence,
+    `closed, ${fp.corners} corner(s) near ${Math.round(meanTurn(fp) / DEG)}°, ` +
+      `fills ${(fp.extent * 100).toFixed(0)}% of its box (a rectangle fills ~100%)`
+  );
 }
 
 function detectCircle(fp: Fingerprint, points: Point[], scale = 1): RecognitionResult | null {
   const hasOvershoot = checkOvershoot(points, 50 * scale);
-  const isClosed = fp.isClosed || hasOvershoot;
-  const fewCorners = fp.corners <= 1;
-  const notStraight = fp.straightness < 0.5;
-  const reasonableRatio = fp.aspectRatio >= 0.3 && fp.aspectRatio <= 3.0;
+  if (!fp.isClosed && !hasOvershoot) return null;
+  if (fp.aspectRatio < 0.3 || fp.aspectRatio > 3.3) return null;
 
-  if (isClosed && fewCorners && notStraight && reasonableRatio) {
-    return {
-      type: 'circle',
-      label: 'Circle',
-      score: 80,
-      confidence: 0.8,
-      reasoning: `closed${hasOvershoot ? ' (overshoot)' : ''}, curved, smooth, aspect ${fp.aspectRatio.toFixed(2)}`,
-    };
-  }
-  return null;
+  const smooth = fit(fp.corners, 0, 3);
+  // pi/4: a circle covers 78.5% of the square that bounds it.
+  const area = fit(fp.extent, Math.PI / 4, 0.28);
+  const curved = 1 - ramp(fp.straightness, 0.2, 0.6);
+  const confidence = smooth * 0.45 + area * 0.4 + curved * 0.15;
+
+  return result(
+    'circle',
+    'Circle',
+    confidence,
+    `closed${hasOvershoot ? ' (overshoot)' : ''}, ${fp.corners} corner(s), ` +
+      `fills ${(fp.extent * 100).toFixed(0)}% of its box (a circle fills ~79%), aspect ${fp.aspectRatio.toFixed(2)}`
+  );
 }
 
 export function analyzeStroke(points: Point[], scale = 1): StrokeAnalysis {
@@ -107,7 +163,8 @@ export function analyzeStroke(points: Point[], scale = 1): StrokeAnalysis {
     detectCircle(fingerprint, points, scale),
   ].filter((r): r is RecognitionResult => r !== null);
 
-  results.sort((a, b) => b.score - a.score);
+  // Ranked by measured confidence — no detector outranks another by fiat.
+  results.sort((a, b) => b.confidence - a.confidence);
 
   return { fingerprint, results };
 }

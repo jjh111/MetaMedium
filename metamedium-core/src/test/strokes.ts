@@ -99,3 +99,222 @@ export function caretStroke(x: number, y: number, w = 60, h = 40, jitter = 0): P
     ...lineStroke({ x: x + w / 2 + j(1), y: y + j(2) }, { x: x + w, y: y + h + j(3) }, 30).slice(1),
   ];
 }
+
+// ===== Hand-drawn stroke generators =====
+//
+// The synthetic generators above are geometrically perfect, which is exactly
+// what let a broken corner detector look healthy for months: a perfect rect
+// drawn from the middle of an edge happened to hit the one sampling density
+// the thresholds were tuned against. These generators vary the things a real
+// hand varies — where the stroke starts, how much it wobbles, how rounded the
+// corners are, how densely it samples, and whether it quite closes — so a
+// detector has to survive all of them rather than one lucky case.
+//
+// Deterministic: same seed, same stroke. Tests must not be flaky.
+
+/** Tiny deterministic PRNG (mulberry32) — reproducible "hand wobble". */
+export function rng(seed: number): () => number {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+export interface HandOptions {
+  /** Wobble amplitude in px. 0 = a ruler; 3–5 = a normal hand. */
+  jitter?: number;
+  /** Points per unit length. Low = drawn fast, high = drawn slowly. */
+  density?: number;
+  /** Corner rounding as a fraction of the shorter adjoining edge (0–0.4). */
+  round?: number;
+  /** Where along the outline the stroke starts, 0–1. 0 = at a vertex. */
+  startAt?: number;
+  /** How far short of (or past) the start the stroke ends, in px. */
+  closureGap?: number;
+  /**
+   * High-frequency digitizer noise in px, applied per SAMPLE. Distinct from
+   * `jitter`, which is low-frequency tremor applied per position: a real device
+   * has both, and only this one gets worse the faster the device reports.
+   * ±0.5–1.5px is typical for a pen, more for a finger.
+   */
+  sensorNoise?: number;
+  seed?: number;
+}
+
+const DEFAULTS: Required<HandOptions> = {
+  jitter: 2.5,
+  density: 0.35,
+  round: 0.12,
+  startAt: 0,
+  closureGap: 0,
+  sensorNoise: 0,
+  seed: 1,
+};
+
+function lerp(a: Point, b: Point, t: number): Point {
+  return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
+}
+
+/**
+ * Hand tremor as a function of position along the stroke, NOT per sample.
+ *
+ * This distinction is the whole point. Independent per-point noise is white
+ * noise: at high sampling density it adds enormous path length and collapses
+ * straightness, so a "line" drawn slowly would score 0.37 and read as an arc —
+ * an artefact of the generator, not of any hand. Real tremor is low-frequency
+ * and depends on where you are in the stroke, so drawing the same line slowly
+ * gives you more points along the same wobble, not more wobble.
+ */
+function tremor(seed: number, amplitude: number): (t: number) => Point {
+  const r = rng(seed);
+  const waves = [1.7, 3.3, 6.1].map((freq) => ({
+    freq,
+    phaseX: r() * Math.PI * 2,
+    phaseY: r() * Math.PI * 2,
+    weight: 1 / freq,
+  }));
+  const norm = waves.reduce((a, w) => a + w.weight, 0);
+  return (t: number) => {
+    let dx = 0, dy = 0;
+    for (const w of waves) {
+      dx += Math.sin(t * Math.PI * 2 * w.freq + w.phaseX) * w.weight;
+      dy += Math.cos(t * Math.PI * 2 * w.freq + w.phaseY) * w.weight;
+    }
+    return { x: (dx / norm) * amplitude, y: (dy / norm) * amplitude };
+  };
+}
+
+function quadratic(a: Point, c: Point, b: Point, t: number): Point {
+  const u = 1 - t;
+  return {
+    x: u * u * a.x + 2 * u * t * c.x + t * t * b.x,
+    y: u * u * a.y + 2 * u * t * c.y + t * t * b.y,
+  };
+}
+
+/**
+ * Walk a closed polygon the way a hand does: rounded corners, wobble, and a
+ * start point anywhere along the outline (not necessarily a vertex).
+ */
+export function handPolygon(vertices: Point[], options: HandOptions = {}): Point[] {
+  const o = { ...DEFAULTS, ...options };
+  const n = vertices.length;
+
+  // Build the ideal path: straight runs joined by rounded corners.
+  const path: Point[] = [];
+  for (let i = 0; i < n; i++) {
+    const prev = vertices[(i - 1 + n) % n];
+    const cur = vertices[i];
+    const next = vertices[(i + 1) % n];
+    const inLen = Math.hypot(cur.x - prev.x, cur.y - prev.y);
+    const outLen = Math.hypot(next.x - cur.x, next.y - cur.y);
+    const r = Math.min(0.45, o.round);
+    const a = lerp(cur, prev, (r * Math.min(inLen, outLen)) / (inLen || 1));
+    const b = lerp(cur, next, (r * Math.min(inLen, outLen)) / (outLen || 1));
+
+    const from = path.length ? path[path.length - 1] : a;
+    const straight = Math.hypot(a.x - from.x, a.y - from.y);
+    const steps = Math.max(1, Math.round(straight * o.density));
+    for (let k = 1; k <= steps; k++) path.push(lerp(from, a, k / steps));
+
+    if (r > 0.001) {
+      const arcLen = Math.hypot(b.x - a.x, b.y - a.y) * 1.3;
+      const arcSteps = Math.max(2, Math.round(arcLen * o.density));
+      for (let k = 1; k <= arcSteps; k++) path.push(quadratic(a, cur, b, k / arcSteps));
+    } else {
+      path.push(b);
+    }
+  }
+  // Close the loop back to the first point.
+  const first = path[0];
+  const last = path[path.length - 1];
+  const tail = Math.max(1, Math.round(Math.hypot(first.x - last.x, first.y - last.y) * o.density));
+  for (let k = 1; k <= tail; k++) path.push(lerp(last, first, k / tail));
+
+  // Rotate so the stroke starts where the hand started.
+  const offset = Math.round(o.startAt * path.length) % path.length;
+  const rotated = path.slice(offset).concat(path.slice(0, offset));
+
+  // Trim (or extend) the tail so the ends don't meet exactly.
+  let out = rotated;
+  if (o.closureGap > 0) {
+    let acc = 0;
+    let cut = out.length - 1;
+    for (let i = out.length - 1; i > 1; i--) {
+      acc += Math.hypot(out[i].x - out[i - 1].x, out[i].y - out[i - 1].y);
+      cut = i;
+      if (acc >= o.closureGap) break;
+    }
+    out = out.slice(0, cut);
+  }
+
+  const wobble = tremor(o.seed, o.jitter);
+  const noise = rng(o.seed * 977 + 13);
+  return out.map((p, i) => {
+    const d = wobble(i / Math.max(1, out.length - 1));
+    return {
+      x: p.x + d.x + (noise() - 0.5) * 2 * o.sensorNoise,
+      y: p.y + d.y + (noise() - 0.5) * 2 * o.sensorNoise,
+    };
+  });
+}
+
+export function handRect(x: number, y: number, w: number, h: number, options: HandOptions = {}): Point[] {
+  return handPolygon(
+    [
+      { x, y },
+      { x: x + w, y },
+      { x: x + w, y: y + h },
+      { x, y: y + h },
+    ],
+    options
+  );
+}
+
+export function handTriangle(a: Point, b: Point, c: Point, options: HandOptions = {}): Point[] {
+  return handPolygon([a, b, c], options);
+}
+
+export function handCircle(cx: number, cy: number, r: number, options: HandOptions = {}): Point[] {
+  const o = { ...DEFAULTS, ...options };
+  const wobble = tremor(o.seed, o.jitter);
+  const noise = rng(o.seed * 977 + 13);
+  const steps = Math.max(24, Math.round(2 * Math.PI * r * o.density));
+  const sweep = Math.PI * 2 - (o.closureGap > 0 ? o.closureGap / r : 0);
+  const points: Point[] = [];
+  for (let i = 0; i <= steps; i++) {
+    const t = (i / steps) * sweep + o.startAt * Math.PI * 2;
+    // A hand-drawn circle is never a perfect one — let the radius breathe.
+    const rr = r * (1 + Math.sin(t * 3 + o.seed) * 0.03);
+    const d = wobble(i / steps);
+    points.push({
+      x: cx + rr * Math.cos(t) + d.x + (noise() - 0.5) * 2 * o.sensorNoise,
+      y: cy + rr * Math.sin(t) + d.y + (noise() - 0.5) * 2 * o.sensorNoise,
+    });
+  }
+  return points;
+}
+
+export function handLine(from: Point, to: Point, options: HandOptions = {}): Point[] {
+  const o = { ...DEFAULTS, ...options };
+  const wobble = tremor(o.seed, o.jitter);
+  const noise = rng(o.seed * 977 + 13);
+  const len = Math.hypot(to.x - from.x, to.y - from.y);
+  const steps = Math.max(12, Math.round(len * o.density));
+  const points: Point[] = [];
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    // Hands bow slightly; a "straight" line is a very shallow arc.
+    const bow = Math.sin(t * Math.PI) * o.jitter * 1.5;
+    const nx = -(to.y - from.y) / (len || 1), ny = (to.x - from.x) / (len || 1);
+    const d = wobble(t);
+    points.push({
+      x: from.x + (to.x - from.x) * t + nx * bow + d.x * 0.5 + (noise() - 0.5) * 2 * o.sensorNoise,
+      y: from.y + (to.y - from.y) * t + ny * bow + d.y * 0.5 + (noise() - 0.5) * 2 * o.sensorNoise,
+    });
+  }
+  return points;
+}

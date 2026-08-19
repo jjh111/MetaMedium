@@ -43,6 +43,66 @@ export function calculateDistance(p1: Point, p2: Point): number {
   return Math.sqrt(Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2));
 }
 
+/**
+ * How straight a stroke is: direct distance over path length. 1 = a ruler.
+ *
+ * Path length is measured on a SIMPLIFIED copy of the stroke, and that detail is
+ * load-bearing. Raw path length counts every digitizer wobble, so it grows with
+ * the device's report rate rather than with the shape: a genuinely straight line
+ * drawn with realistic ±1px sensor noise scores 0.99 on a slow device and 0.30
+ * on a fast one, and reads as an arc. Simplifying first — with a tolerance
+ * relative to the stroke's own size, so it stays scale-free — measures the shape
+ * the hand drew instead of the noise the hardware added. Real curvature is far
+ * larger than the tolerance and survives untouched.
+ */
+/**
+ * Mean filter over a window measured in SAMPLES, preserving point count.
+ *
+ * `smoothStroke` (Chaikin) is the wrong tool here: it doubles the point count
+ * per pass, so the passes needed to tame a dense noisy stroke would turn 600
+ * points into 40,000. This averages in place, and the caller sizes the window in
+ * arc length so it means the same thing at any report rate.
+ */
+function meanFilter(points: Point[], halfWindow: number): Point[] {
+  if (halfWindow < 1 || points.length < 3) return points;
+  const out: Point[] = [];
+  for (let i = 0; i < points.length; i++) {
+    let sx = 0, sy = 0, n = 0;
+    const lo = Math.max(0, i - halfWindow);
+    const hi = Math.min(points.length - 1, i + halfWindow);
+    for (let j = lo; j <= hi; j++) { sx += points[j].x; sy += points[j].y; n++; }
+    out.push({ x: sx / n, y: sy / n });
+  }
+  // Endpoints define direct distance and closure; never move them.
+  out[0] = points[0];
+  out[out.length - 1] = points[points.length - 1];
+  return out;
+}
+
+/**
+ * Remove digitizer noise while leaving the drawn shape alone.
+ *
+ * The filter window is sized in ARC LENGTH (a fraction of the stroke's own
+ * size), then converted to samples using the stroke's actual sample spacing. So
+ * it removes the same physical wobble whether the device reported 60 or 240
+ * times a second, and on a sparsely sampled stroke it does almost nothing —
+ * there is nothing there to remove. Everything downstream that measures SHAPE
+ * rather than position should start here.
+ */
+export function denoise(points: Point[], windowFraction = 0.015): Point[] {
+  if (points.length < 5) return points;
+  const bounds = getBounds(points);
+  const size = Math.max(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY);
+  if (size <= 0) return points;
+
+  let raw = 0;
+  for (let i = 1; i < points.length; i++) raw += calculateDistance(points[i - 1], points[i]);
+  const spacing = raw / Math.max(1, points.length - 1);
+  if (spacing <= 0) return points;
+
+  return meanFilter(points, Math.min(24, Math.round((size * windowFraction) / spacing)));
+}
+
 export function calculateStraightness(points: Point[]): number {
   if (points.length < 2) return 0;
 
@@ -50,15 +110,17 @@ export function calculateStraightness(points: Point[]): number {
   const end = points[points.length - 1];
   const directDistance = calculateDistance(start, end);
 
+  const bounds = getBounds(points);
+  const size = Math.max(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY);
+  const path = simplifyStroke(denoise(points), Math.max(1.2, size * 0.012));
+
   let pathLength = 0;
-  for (let i = 1; i < points.length; i++) {
-    const dx = points[i].x - points[i - 1].x;
-    const dy = points[i].y - points[i - 1].y;
-    pathLength += Math.sqrt(dx * dx + dy * dy);
+  for (let i = 1; i < path.length; i++) {
+    pathLength += calculateDistance(path[i - 1], path[i]);
   }
 
   if (pathLength === 0) return 0;
-  return directDistance / pathLength;
+  return Math.min(1, directDistance / pathLength);
 }
 
 export function isStrokeClosed(points: Point[], threshold = 50): boolean {
@@ -284,81 +346,179 @@ export function findCornersWithSeparation(hullPoints: Point[], targetCount: numb
   return selected.map(c => c.point);
 }
 
-export function countCorners(points: Point[], angleThreshold = Math.PI / 3): {
+export interface CornerOptions {
+  /** Turn angle in radians above which a sample counts as a corner. */
+  threshold?: number;
+  /** Length of each measuring arm, as a fraction of the whole path. */
+  window?: number;
+  /** Suppression radius around an accepted corner, as a fraction of the path. */
+  separation?: number;
+  /** How many uniform samples to reduce the stroke to before measuring. */
+  samples?: number;
+}
+
+export const DEFAULT_CORNER_OPTIONS: Required<CornerOptions> = {
+  // A circle turns 2 x window x 360 degrees across the measuring span — at a
+  // 0.055 window that is ~40 degrees, so 50 degrees clears a smooth curve while
+  // still catching a rounded rectangle corner.
+  threshold: (50 * Math.PI) / 180,
+  window: 0.055,
+  separation: 0.11,
+  samples: 180,
+};
+
+/**
+ * Resample a stroke to `n` points spaced evenly along its length.
+ *
+ * This is the fix for the whole family of density bugs. Input points arrive at
+ * whatever rate the pointer fired, so a slowly-drawn stroke is dense and a fast
+ * one is sparse — and any rule expressed in POINT INDICES therefore means a
+ * different physical distance every time. After resampling, index distance IS
+ * arc length, and the rules mean what they say.
+ */
+export function resampleByArcLength(points: Point[], n: number, closed = false): Point[] {
+  const path = closed && points.length > 1 ? points.concat([points[0]]) : points;
+  if (path.length < 2 || n < 2) return path.slice();
+
+  const cum: number[] = [0];
+  for (let i = 1; i < path.length; i++) {
+    cum.push(cum[i - 1] + calculateDistance(path[i - 1], path[i]));
+  }
+  const total = cum[cum.length - 1];
+  if (total === 0) return path.slice(0, n);
+
+  const out: Point[] = [];
+  const count = closed ? n : n - 1;
+  let j = 0;
+  for (let i = 0; i < (closed ? n : n); i++) {
+    const target = (i / count) * total;
+    while (j < cum.length - 2 && cum[j + 1] < target) j++;
+    const span = cum[j + 1] - cum[j];
+    const t = span > 0 ? (target - cum[j]) / span : 0;
+    out.push({
+      x: path[j].x + (path[j + 1].x - path[j].x) * t,
+      y: path[j].y + (path[j + 1].y - path[j].y) * t,
+    });
+  }
+  return out;
+}
+
+/**
+ * Corners, measured along the path rather than along the point array.
+ *
+ * Two properties the previous implementation lacked, both of which showed up as
+ * "a rectangle is a triangle":
+ *
+ *   1. **Scale and density independence.** The measuring arms and the
+ *      suppression radius are fractions of the stroke's own length, so the same
+ *      rectangle counts four corners whether it was drawn fast or slowly. The
+ *      old version used a fixed 8-point arm and a fixed 20-index merge radius,
+ *      and returned 1, 2 or 3 corners for one rectangle depending only on
+ *      drawing speed — adjacent corners were merged whenever the points were
+ *      sparse.
+ *   2. **The seam is scanned.** A closed stroke wraps, so a corner at the point
+ *      where the stroke starts and ends is found. Drawing a box starting at a
+ *      corner — the natural way — used to lose that corner every single time,
+ *      which is why a rectangle could never score 4.
+ */
+export function countCorners(
+  points: Point[],
+  optionsOrThreshold: CornerOptions | number = {},
+  closed?: boolean
+): {
   count: number;
   angles: number[];
   cornerData: { index: number; angle: number; x: number; y: number }[];
 } {
-  // Day 5a exact logic: Fixed parameters for consistent corner detection
-  // Angle threshold = 60 degrees (π/3) - catches hand-drawn corners
-  if (points.length < 15) {
-    return { count: 0, angles: [], cornerData: [] };
+  const opts: Required<CornerOptions> = {
+    ...DEFAULT_CORNER_OPTIONS,
+    ...(typeof optionsOrThreshold === 'number'
+      ? { threshold: optionsOrThreshold }
+      : optionsOrThreshold),
+  };
+  const empty = { count: 0, angles: [], cornerData: [] };
+  if (points.length < 8) return empty;
+
+  const isClosed = closed ?? isStrokeClosed(points);
+  const n = opts.samples;
+  // Denoise first: on a dense noisy stroke the sensor alone can swing a chord
+  // angle by ~15 degrees, which is enough to invent corners on a smooth curve.
+  const path = resampleByArcLength(denoise(points), n, isClosed);
+  if (path.length < 8) return empty;
+
+  const arm = Math.max(2, Math.round(opts.window * path.length));
+  const sep = Math.max(2, Math.round(opts.separation * path.length));
+  const at = (i: number) => path[((i % path.length) + path.length) % path.length];
+
+  // Turn angle at every sample: the angle between the chord arriving and the
+  // chord leaving, each one `arm` of the path long.
+  const turn: number[] = new Array(path.length).fill(0);
+  for (let i = 0; i < path.length; i++) {
+    if (!isClosed && (i < arm || i >= path.length - arm)) continue;
+    const a = at(i - arm), b = at(i), c = at(i + arm);
+    const bx = b.x - a.x, by = b.y - a.y;
+    const cx = c.x - b.x, cy = c.y - b.y;
+    const magB = Math.hypot(bx, by), magC = Math.hypot(cx, cy);
+    if (magB === 0 || magC === 0) continue;
+    const cos = (bx * cx + by * cy) / (magB * magC);
+    turn[i] = Math.acos(Math.max(-1, Math.min(1, cos)));
   }
 
-  const cornerPositions: { index: number; angle: number }[] = [];
-  const windowSize = 8; // Fixed window to catch sharper corners
-
-  // Sample every 4 points to catch corners better
-  for (let i = windowSize; i < points.length - windowSize; i += 4) {
-    // Get vectors before and after this point
-    const before = {
-      x: points[i].x - points[i - windowSize].x,
-      y: points[i].y - points[i - windowSize].y
-    };
-    const after = {
-      x: points[i + windowSize].x - points[i].x,
-      y: points[i + windowSize].y - points[i].y
-    };
-
-    // Calculate angle between vectors
-    const dotProduct = before.x * after.x + before.y * after.y;
-    const magBefore = Math.sqrt(before.x * before.x + before.y * before.y);
-    const magAfter = Math.sqrt(after.x * after.x + after.y * after.y);
-
-    if (magBefore === 0 || magAfter === 0) continue;
-
-    const cosAngle = dotProduct / (magBefore * magAfter);
-    const angle = Math.acos(Math.max(-1, Math.min(1, cosAngle)));
-
-    // If angle > threshold (60 degrees), it's a sharp corner
-    if (angle > angleThreshold) {
-      cornerPositions.push({ index: i, angle: angle });
+  // Greedy non-maximum suppression: take the sharpest turn, silence everything
+  // within `sep` of it along the path, repeat. Wrapping, so a corner sitting on
+  // the seam suppresses its neighbours on both sides like any other.
+  const taken: { index: number; angle: number }[] = [];
+  const used = new Array(path.length).fill(false);
+  for (;;) {
+    let best = -1, bestAngle = opts.threshold;
+    for (let i = 0; i < path.length; i++) {
+      if (!used[i] && turn[i] > bestAngle) { bestAngle = turn[i]; best = i; }
+    }
+    if (best < 0) break;
+    taken.push({ index: best, angle: turn[best] });
+    for (let d = -sep; d <= sep; d++) {
+      const k = ((best + d) % path.length + path.length) % path.length;
+      if (!isClosed && (best + d < 0 || best + d >= path.length)) continue;
+      used[k] = true;
     }
   }
 
-  // Cluster corners - merge corners within 20 points of each other
-  if (cornerPositions.length === 0) return { count: 0, angles: [], cornerData: [] };
-
-  const clusteredCorners = [cornerPositions[0]];
-  for (let i = 1; i < cornerPositions.length; i++) {
-    const lastCorner = clusteredCorners[clusteredCorners.length - 1];
-    const distance = cornerPositions[i].index - lastCorner.index;
-
-    if (distance > 20) {
-      // Far enough away, it's a new corner
-      clusteredCorners.push(cornerPositions[i]);
-    } else if (cornerPositions[i].angle > lastCorner.angle) {
-      // Same cluster, but this corner is sharper - replace
-      clusteredCorners[clusteredCorners.length - 1] = cornerPositions[i];
-    }
-  }
-
-  // Add x,y coordinates to corner data
-  const cornersWithCoords = clusteredCorners.map(c => ({
-    index: c.index,
-    angle: c.angle,
-    x: points[c.index].x,
-    y: points[c.index].y
-  }));
-
+  taken.sort((a, b) => a.index - b.index);
   return {
-    count: clusteredCorners.length,
-    angles: clusteredCorners.map(c => c.angle),
-    cornerData: cornersWithCoords
+    count: taken.length,
+    angles: taken.map((c) => c.angle),
+    cornerData: taken.map((c) => ({
+      index: c.index,
+      angle: c.angle,
+      x: path[c.index].x,
+      y: path[c.index].y,
+    })),
   };
 }
 
-// ===== CORNER ANGLE ANALYSIS =====
+/**
+ * How much of its own bounding box the stroke's outline encloses, 0–1.
+ *
+ * The single most discriminating feature the engine was missing, and the reason
+ * a rectangle and a triangle were indistinguishable: corner COUNT is fragile
+ * (one missed corner and a box becomes a triangle), but a rectangle fills ~1.0
+ * of its box, a triangle ~0.5, and a circle ~0.79 — and those hold no matter
+ * how the corners were counted, how fast it was drawn, or where it started.
+ */
+export function shapeExtent(points: Point[]): number {
+  if (points.length < 3) return 0;
+  const b = getBounds(points);
+  const boxArea = (b.maxX - b.minX) * (b.maxY - b.minY);
+  if (boxArea <= 0) return 0;
+
+  // Shoelace over the outline, closed back to the start.
+  let area = 0;
+  for (let i = 0; i < points.length; i++) {
+    const p = points[i], q = points[(i + 1) % points.length];
+    area += p.x * q.y - q.x * p.y;
+  }
+  return Math.min(1, Math.abs(area) / 2 / boxArea);
+}
 
 export function analyzeCornerAngles(angles: number[]): {
   avgAngle: number;
@@ -469,7 +629,10 @@ export function getFingerprint(points: Point[], scale = 1): Fingerprint {
   const bounds = getBounds(points);
   const width = bounds.maxX - bounds.minX;
   const height = bounds.maxY - bounds.minY;
-  const cornerData = countCorners(points);
+  // Closure is decided first, because corner detection needs to know whether to
+  // wrap: a corner on the seam of a closed stroke is a real corner.
+  const closed = isStrokeClosed(points, 50 * scale);
+  const cornerData = countCorners(points, {}, closed);
 
   // Calculate closure distance (end-to-start distance)
   const start = points[0];
@@ -500,7 +663,8 @@ export function getFingerprint(points: Point[], scale = 1): Fingerprint {
   return {
     aspectRatio: height === 0 ? 1 : width / height,
     straightness: calculateStraightness(points),
-    isClosed: isStrokeClosed(points, 50 * scale),
+    isClosed: closed,
+    extent: shapeExtent(points),
     closureDistance,
     bounds: bounds,
     size: Math.max(width, height),

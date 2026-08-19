@@ -13,6 +13,10 @@ export {
   findCorners,
   findCornersWithSeparation,
   countCorners,
+  resampleByArcLength,
+  shapeExtent,
+  denoise,
+  DEFAULT_CORNER_OPTIONS,
   analyzeCornerAngles,
   checkOvershoot,
   getFingerprint,
@@ -25,7 +29,8 @@ export {
 } from './geometry';
 
 // Recognition (Tier 0 heuristics)
-export { analyzeStroke, matchPrimitiveFromLibrary } from './recognition';
+export { analyzeStroke, matchPrimitiveFromLibrary, MIN_CONFIDENCE, MAX_TIER0_CONFIDENCE } from './recognition';
+export type { CornerOptions } from './geometry';
 
 // Spatial graph & clustering
 export { buildSpatialGraph, spatialCluster } from './spatial';

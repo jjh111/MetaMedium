@@ -26,6 +26,12 @@ export interface Fingerprint {
   aspectRatio: number;
   straightness: number;
   isClosed: boolean;
+  /**
+   * Fraction of its own bounding box the outline encloses, 0–1.
+   * Rectangle ~1.0, circle ~0.79, triangle ~0.5. Robust where corner count is
+   * fragile, which is what keeps a box from reading as a triangle.
+   */
+  extent: number;
   closureDistance: number;
   bounds: Bounds;
   size: number;

@@ -24,12 +24,15 @@ var MetaMediumCore = (() => {
   __export(index_exports, {
     BUILTIN_TYPES: () => BUILTIN_TYPES,
     COMMAND_MARK_SAMPLES: () => COMMAND_MARK_SAMPLES,
+    DEFAULT_CORNER_OPTIONS: () => DEFAULT_CORNER_OPTIONS,
     DEFAULT_ERASE_CROSSINGS: () => DEFAULT_ERASE_CROSSINGS,
     DEFAULT_GESTURE_CONFIG: () => DEFAULT_GESTURE_CONFIG,
     DEFAULT_SESSION_CONFIG: () => DEFAULT_SESSION_CONFIG,
     DEFAULT_TIMEOUT_MS: () => DEFAULT_TIMEOUT_MS,
     LOCAL_PARTICIPANT: () => LOCAL_PARTICIPANT,
     MAX_READINGS: () => MAX_READINGS,
+    MAX_TIER0_CONFIDENCE: () => MAX_TIER0_CONFIDENCE,
+    MIN_CONFIDENCE: () => MIN_CONFIDENCE,
     PRESETS: () => PRESETS,
     TIER0_PARTICIPANT: () => TIER0_PARTICIPANT,
     aboutIdsOf: () => aboutIdsOf,
@@ -55,6 +58,7 @@ var MetaMediumCore = (() => {
     createExplanationNode: () => createExplanationNode,
     createParticipantNode: () => createParticipantNode,
     createSession: () => createSession,
+    denoise: () => denoise,
     describeAddressed: () => describeAddressed,
     describeRegions: () => describeRegions,
     describeSession: () => describeSession,
@@ -92,10 +96,12 @@ var MetaMediumCore = (() => {
     regionAt: () => regionAt,
     regionsOf: () => regionsOf,
     regionsOverlapping: () => regionsOverlapping,
+    resampleByArcLength: () => resampleByArcLength,
     resemblances: () => resemblances,
     resolvesLasso: () => resolvesLasso,
     scratchedOut: () => scratchedOut,
     segmentsIntersect: () => segmentsIntersect,
+    shapeExtent: () => shapeExtent,
     simplifyStroke: () => simplifyStroke,
     smoothStroke: () => smoothStroke,
     sourcesOf: () => sourcesOf,
@@ -133,19 +139,49 @@ var MetaMediumCore = (() => {
   function calculateDistance(p1, p2) {
     return Math.sqrt(Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2));
   }
+  function meanFilter(points, halfWindow) {
+    if (halfWindow < 1 || points.length < 3) return points;
+    const out = [];
+    for (let i = 0; i < points.length; i++) {
+      let sx = 0, sy = 0, n2 = 0;
+      const lo = Math.max(0, i - halfWindow);
+      const hi = Math.min(points.length - 1, i + halfWindow);
+      for (let j = lo; j <= hi; j++) {
+        sx += points[j].x;
+        sy += points[j].y;
+        n2++;
+      }
+      out.push({ x: sx / n2, y: sy / n2 });
+    }
+    out[0] = points[0];
+    out[out.length - 1] = points[points.length - 1];
+    return out;
+  }
+  function denoise(points, windowFraction = 0.015) {
+    if (points.length < 5) return points;
+    const bounds = getBounds(points);
+    const size = Math.max(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY);
+    if (size <= 0) return points;
+    let raw = 0;
+    for (let i = 1; i < points.length; i++) raw += calculateDistance(points[i - 1], points[i]);
+    const spacing = raw / Math.max(1, points.length - 1);
+    if (spacing <= 0) return points;
+    return meanFilter(points, Math.min(24, Math.round(size * windowFraction / spacing)));
+  }
   function calculateStraightness(points) {
     if (points.length < 2) return 0;
     const start = points[0];
     const end = points[points.length - 1];
     const directDistance = calculateDistance(start, end);
+    const bounds = getBounds(points);
+    const size = Math.max(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY);
+    const path = simplifyStroke(denoise(points), Math.max(1.2, size * 0.012));
     let pathLength = 0;
-    for (let i = 1; i < points.length; i++) {
-      const dx = points[i].x - points[i - 1].x;
-      const dy = points[i].y - points[i - 1].y;
-      pathLength += Math.sqrt(dx * dx + dy * dy);
+    for (let i = 1; i < path.length; i++) {
+      pathLength += calculateDistance(path[i - 1], path[i]);
     }
     if (pathLength === 0) return 0;
-    return directDistance / pathLength;
+    return Math.min(1, directDistance / pathLength);
   }
   function isStrokeClosed(points, threshold = 50) {
     if (points.length < 5) return false;
@@ -277,53 +313,105 @@ var MetaMediumCore = (() => {
     selected.sort((a, b) => a.index - b.index);
     return selected.map((c) => c.point);
   }
-  function countCorners(points, angleThreshold = Math.PI / 3) {
-    if (points.length < 15) {
-      return { count: 0, angles: [], cornerData: [] };
+  var DEFAULT_CORNER_OPTIONS = {
+    // A circle turns 2 x window x 360 degrees across the measuring span — at a
+    // 0.055 window that is ~40 degrees, so 50 degrees clears a smooth curve while
+    // still catching a rounded rectangle corner.
+    threshold: 50 * Math.PI / 180,
+    window: 0.055,
+    separation: 0.11,
+    samples: 180
+  };
+  function resampleByArcLength(points, n2, closed = false) {
+    const path = closed && points.length > 1 ? points.concat([points[0]]) : points;
+    if (path.length < 2 || n2 < 2) return path.slice();
+    const cum = [0];
+    for (let i = 1; i < path.length; i++) {
+      cum.push(cum[i - 1] + calculateDistance(path[i - 1], path[i]));
     }
-    const cornerPositions = [];
-    const windowSize = 8;
-    for (let i = windowSize; i < points.length - windowSize; i += 4) {
-      const before = {
-        x: points[i].x - points[i - windowSize].x,
-        y: points[i].y - points[i - windowSize].y
-      };
-      const after = {
-        x: points[i + windowSize].x - points[i].x,
-        y: points[i + windowSize].y - points[i].y
-      };
-      const dotProduct = before.x * after.x + before.y * after.y;
-      const magBefore = Math.sqrt(before.x * before.x + before.y * before.y);
-      const magAfter = Math.sqrt(after.x * after.x + after.y * after.y);
-      if (magBefore === 0 || magAfter === 0) continue;
-      const cosAngle = dotProduct / (magBefore * magAfter);
-      const angle = Math.acos(Math.max(-1, Math.min(1, cosAngle)));
-      if (angle > angleThreshold) {
-        cornerPositions.push({ index: i, angle });
-      }
+    const total = cum[cum.length - 1];
+    if (total === 0) return path.slice(0, n2);
+    const out = [];
+    const count = closed ? n2 : n2 - 1;
+    let j = 0;
+    for (let i = 0; i < (closed ? n2 : n2); i++) {
+      const target = i / count * total;
+      while (j < cum.length - 2 && cum[j + 1] < target) j++;
+      const span = cum[j + 1] - cum[j];
+      const t = span > 0 ? (target - cum[j]) / span : 0;
+      out.push({
+        x: path[j].x + (path[j + 1].x - path[j].x) * t,
+        y: path[j].y + (path[j + 1].y - path[j].y) * t
+      });
     }
-    if (cornerPositions.length === 0) return { count: 0, angles: [], cornerData: [] };
-    const clusteredCorners = [cornerPositions[0]];
-    for (let i = 1; i < cornerPositions.length; i++) {
-      const lastCorner = clusteredCorners[clusteredCorners.length - 1];
-      const distance = cornerPositions[i].index - lastCorner.index;
-      if (distance > 20) {
-        clusteredCorners.push(cornerPositions[i]);
-      } else if (cornerPositions[i].angle > lastCorner.angle) {
-        clusteredCorners[clusteredCorners.length - 1] = cornerPositions[i];
-      }
-    }
-    const cornersWithCoords = clusteredCorners.map((c) => ({
-      index: c.index,
-      angle: c.angle,
-      x: points[c.index].x,
-      y: points[c.index].y
-    }));
-    return {
-      count: clusteredCorners.length,
-      angles: clusteredCorners.map((c) => c.angle),
-      cornerData: cornersWithCoords
+    return out;
+  }
+  function countCorners(points, optionsOrThreshold = {}, closed) {
+    const opts = {
+      ...DEFAULT_CORNER_OPTIONS,
+      ...typeof optionsOrThreshold === "number" ? { threshold: optionsOrThreshold } : optionsOrThreshold
     };
+    const empty = { count: 0, angles: [], cornerData: [] };
+    if (points.length < 8) return empty;
+    const isClosed = closed ?? isStrokeClosed(points);
+    const n2 = opts.samples;
+    const path = resampleByArcLength(denoise(points), n2, isClosed);
+    if (path.length < 8) return empty;
+    const arm = Math.max(2, Math.round(opts.window * path.length));
+    const sep = Math.max(2, Math.round(opts.separation * path.length));
+    const at = (i) => path[(i % path.length + path.length) % path.length];
+    const turn = new Array(path.length).fill(0);
+    for (let i = 0; i < path.length; i++) {
+      if (!isClosed && (i < arm || i >= path.length - arm)) continue;
+      const a = at(i - arm), b = at(i), c = at(i + arm);
+      const bx = b.x - a.x, by = b.y - a.y;
+      const cx = c.x - b.x, cy = c.y - b.y;
+      const magB = Math.hypot(bx, by), magC = Math.hypot(cx, cy);
+      if (magB === 0 || magC === 0) continue;
+      const cos = (bx * cx + by * cy) / (magB * magC);
+      turn[i] = Math.acos(Math.max(-1, Math.min(1, cos)));
+    }
+    const taken = [];
+    const used = new Array(path.length).fill(false);
+    for (; ; ) {
+      let best = -1, bestAngle = opts.threshold;
+      for (let i = 0; i < path.length; i++) {
+        if (!used[i] && turn[i] > bestAngle) {
+          bestAngle = turn[i];
+          best = i;
+        }
+      }
+      if (best < 0) break;
+      taken.push({ index: best, angle: turn[best] });
+      for (let d = -sep; d <= sep; d++) {
+        const k = ((best + d) % path.length + path.length) % path.length;
+        if (!isClosed && (best + d < 0 || best + d >= path.length)) continue;
+        used[k] = true;
+      }
+    }
+    taken.sort((a, b) => a.index - b.index);
+    return {
+      count: taken.length,
+      angles: taken.map((c) => c.angle),
+      cornerData: taken.map((c) => ({
+        index: c.index,
+        angle: c.angle,
+        x: path[c.index].x,
+        y: path[c.index].y
+      }))
+    };
+  }
+  function shapeExtent(points) {
+    if (points.length < 3) return 0;
+    const b = getBounds(points);
+    const boxArea = (b.maxX - b.minX) * (b.maxY - b.minY);
+    if (boxArea <= 0) return 0;
+    let area = 0;
+    for (let i = 0; i < points.length; i++) {
+      const p = points[i], q = points[(i + 1) % points.length];
+      area += p.x * q.y - q.x * p.y;
+    }
+    return Math.min(1, Math.abs(area) / 2 / boxArea);
   }
   function analyzeCornerAngles(angles) {
     if (!angles || angles.length === 0) {
@@ -376,7 +464,8 @@ var MetaMediumCore = (() => {
     const bounds = getBounds(points);
     const width = bounds.maxX - bounds.minX;
     const height = bounds.maxY - bounds.minY;
-    const cornerData = countCorners(points);
+    const closed = isStrokeClosed(points, 50 * scale);
+    const cornerData = countCorners(points, {}, closed);
     const start = points[0];
     const end = points[points.length - 1];
     const closureDistance = Math.sqrt(
@@ -398,7 +487,8 @@ var MetaMediumCore = (() => {
     return {
       aspectRatio: height === 0 ? 1 : width / height,
       straightness: calculateStraightness(points),
-      isClosed: isStrokeClosed(points, 50 * scale),
+      isClosed: closed,
+      extent: shapeExtent(points),
       closureDistance,
       bounds,
       size: Math.max(width, height),
@@ -516,84 +606,91 @@ var MetaMediumCore = (() => {
   }
 
   // src/recognition.ts
+  function fit(value, ideal, tolerance) {
+    return Math.max(0, 1 - Math.abs(value - ideal) / tolerance);
+  }
+  function ramp(value, lo, hi) {
+    return Math.max(0, Math.min(1, (value - lo) / (hi - lo)));
+  }
+  var DEG = Math.PI / 180;
+  function meanTurn(fp) {
+    const a = fp.cornerAngles;
+    if (!a || a.length === 0) return 0;
+    return a.reduce((x, y) => x + y, 0) / a.length;
+  }
+  var MIN_CONFIDENCE = 0.35;
+  var MAX_TIER0_CONFIDENCE = 0.92;
+  function result(type, label, fitScore, reasoning) {
+    const confidence = fitScore * MAX_TIER0_CONFIDENCE;
+    if (confidence < MIN_CONFIDENCE) return null;
+    return { type, label, score: Math.round(confidence * 100), confidence, reasoning };
+  }
   function detectLine(fp, points, scale = 1) {
-    const hasOvershoot = checkOvershoot(points, 50 * scale);
-    const isStraight = fp.straightness > 0.65;
-    const notClosed = !fp.isClosed && !hasOvershoot;
-    const fewCorners = fp.corners <= 2;
-    if (isStraight && notClosed && fewCorners) {
-      return {
-        type: "line",
-        label: "Line",
-        score: 90,
-        confidence: 0.9,
-        reasoning: `straightness ${fp.straightness.toFixed(2)} > 0.65, open, ${fp.corners} corner(s)`
-      };
-    }
-    return null;
+    if (fp.isClosed || checkOvershoot(points, 50 * scale)) return null;
+    const straight = ramp(fp.straightness, 0.55, 0.95);
+    const corners = fit(fp.corners, 0, 3);
+    const confidence = straight * 0.7 + corners * 0.3;
+    return result(
+      "line",
+      "Line",
+      confidence,
+      `open, straightness ${fp.straightness.toFixed(2)}, ${fp.corners} corner(s)`
+    );
   }
   function detectArc(fp, points, scale = 1) {
-    const hasOvershoot = checkOvershoot(points, 50 * scale);
-    const notClosed = !fp.isClosed && !hasOvershoot;
-    const fewCorners = fp.corners <= 1;
-    const isCurved = fp.straightness < 0.6;
-    if (notClosed && fewCorners && isCurved) {
-      return {
-        type: "arc",
-        label: "Arc",
-        score: 70,
-        confidence: 0.7,
-        reasoning: `open, curved (straightness ${fp.straightness.toFixed(2)} < 0.6), smooth`
-      };
-    }
-    return null;
+    if (fp.isClosed || checkOvershoot(points, 50 * scale)) return null;
+    const curved = 1 - ramp(fp.straightness, 0.25, 0.8);
+    const smooth = fit(fp.corners, 0, 2.5);
+    const confidence = curved * 0.6 + smooth * 0.4;
+    return result(
+      "arc",
+      "Arc",
+      confidence,
+      `open, curved (straightness ${fp.straightness.toFixed(2)}), ${fp.corners} corner(s)`
+    );
   }
   function detectTriangle(fp) {
-    const isClosed = fp.isClosed;
-    const hasThreeCorners = fp.corners >= 2 && fp.corners <= 3;
-    const reasonableShape = fp.aspectRatio >= 0.3 && fp.aspectRatio <= 3;
-    if (isClosed && hasThreeCorners && reasonableShape) {
-      return {
-        type: "triangle",
-        label: "Triangle",
-        score: 85,
-        confidence: 0.85,
-        reasoning: `closed with ${fp.corners} corner(s) in the triangle range (2\u20133)`
-      };
-    }
-    return null;
+    if (!fp.isClosed) return null;
+    if (fp.aspectRatio < 0.25 || fp.aspectRatio > 4) return null;
+    const area = fit(fp.extent, 0.5, 0.3);
+    const corners = fit(fp.corners, 3, 2);
+    const turn = fp.cornerAngles?.length ? fit(meanTurn(fp), 120 * DEG, 70 * DEG) : 0.5;
+    const confidence = area * 0.5 + corners * 0.35 + turn * 0.15;
+    return result(
+      "triangle",
+      "Triangle",
+      confidence,
+      `closed, ${fp.corners} corner(s), fills ${(fp.extent * 100).toFixed(0)}% of its box (a triangle fills ~50%)`
+    );
   }
   function detectRectangle(fp) {
-    const isClosed = fp.isClosed;
-    const hasFourCorners = fp.corners >= 3 && fp.corners <= 4;
-    const aspectRatioOk = fp.aspectRatio > 0.3 && fp.aspectRatio < 3;
-    if (isClosed && hasFourCorners && aspectRatioOk) {
-      return {
-        type: "rectangle",
-        label: "Rectangle",
-        score: 80,
-        confidence: 0.8,
-        reasoning: `closed with ${fp.corners} corner(s) in the rectangle range (3\u20134)`
-      };
-    }
-    return null;
+    if (!fp.isClosed) return null;
+    if (fp.aspectRatio < 0.2 || fp.aspectRatio > 5) return null;
+    const area = fit(fp.extent, 1, 0.45);
+    const corners = fit(fp.corners, 4, 2.5);
+    const turn = fp.cornerAngles?.length ? fit(meanTurn(fp), 90 * DEG, 55 * DEG) : 0.5;
+    const confidence = area * 0.45 + corners * 0.35 + turn * 0.2;
+    return result(
+      "rectangle",
+      "Rectangle",
+      confidence,
+      `closed, ${fp.corners} corner(s) near ${Math.round(meanTurn(fp) / DEG)}\xB0, fills ${(fp.extent * 100).toFixed(0)}% of its box (a rectangle fills ~100%)`
+    );
   }
   function detectCircle(fp, points, scale = 1) {
     const hasOvershoot = checkOvershoot(points, 50 * scale);
-    const isClosed = fp.isClosed || hasOvershoot;
-    const fewCorners = fp.corners <= 1;
-    const notStraight = fp.straightness < 0.5;
-    const reasonableRatio = fp.aspectRatio >= 0.3 && fp.aspectRatio <= 3;
-    if (isClosed && fewCorners && notStraight && reasonableRatio) {
-      return {
-        type: "circle",
-        label: "Circle",
-        score: 80,
-        confidence: 0.8,
-        reasoning: `closed${hasOvershoot ? " (overshoot)" : ""}, curved, smooth, aspect ${fp.aspectRatio.toFixed(2)}`
-      };
-    }
-    return null;
+    if (!fp.isClosed && !hasOvershoot) return null;
+    if (fp.aspectRatio < 0.3 || fp.aspectRatio > 3.3) return null;
+    const smooth = fit(fp.corners, 0, 3);
+    const area = fit(fp.extent, Math.PI / 4, 0.28);
+    const curved = 1 - ramp(fp.straightness, 0.2, 0.6);
+    const confidence = smooth * 0.45 + area * 0.4 + curved * 0.15;
+    return result(
+      "circle",
+      "Circle",
+      confidence,
+      `closed${hasOvershoot ? " (overshoot)" : ""}, ${fp.corners} corner(s), fills ${(fp.extent * 100).toFixed(0)}% of its box (a circle fills ~79%), aspect ${fp.aspectRatio.toFixed(2)}`
+    );
   }
   function analyzeStroke(points, scale = 1) {
     const fingerprint = getFingerprint(points, scale);
@@ -604,7 +701,7 @@ var MetaMediumCore = (() => {
       detectRectangle(fingerprint),
       detectCircle(fingerprint, points, scale)
     ].filter((r) => r !== null);
-    results.sort((a, b) => b.score - a.score);
+    results.sort((a, b) => b.confidence - a.confidence);
     return { fingerprint, results };
   }
   function matchPrimitiveFromLibrary(fingerprint, libraryFingerprint) {
@@ -1482,9 +1579,9 @@ var MetaMediumCore = (() => {
     }
     function dispatch(ev) {
       events.push(ev);
-      const result = applyEvent(ev);
+      const result2 = applyEvent(ev);
       notify();
-      return result;
+      return result2;
     }
     function undo() {
       for (let i = events.length - 1; i >= 0; i--) {
@@ -1960,16 +2057,16 @@ Reply with ONLY the HTML. No prose, no code fences, no explanation.`;
       const context = describeSession(state, { nodeIds: targets });
       const signature = isCluster ? describeSignature(state, targets) : "";
       const question = isCluster ? `These ${targets.length} marks were grouped together (${signature}). What could this group be? Offer several readings.` : `What could this mark be? Offer several readings.`;
-      const result = await complete(config, [
+      const result2 = await complete(config, [
         { role: "system", content: SYSTEM_PROMPT },
         { role: "user", content: `${context}
 
 ${question}` }
       ]);
-      if (!result.ok) return { ok: false, readings: [], error: result.error };
-      const readings = parseReadings(result.text);
+      if (!result2.ok) return { ok: false, readings: [], error: result2.error };
+      const readings = parseReadings(result2.text);
       if (readings.length === 0) {
-        return { ok: false, readings: [], error: "no parseable readings", raw: result.text };
+        return { ok: false, readings: [], error: "no parseable readings", raw: result2.text };
       }
       const target = targets[0];
       session.propose({
@@ -1978,7 +2075,7 @@ ${question}` }
         edges: readingsToEdges(readings, isCluster),
         at: now
       });
-      return { ok: true, readings, raw: result.text };
+      return { ok: true, readings, raw: result2.text };
     }
     async function ask(question, nodeIds, now) {
       const q = question.trim();
@@ -1987,14 +2084,14 @@ ${question}` }
       const targets = nodeIds.filter((n2) => state.nodes.has(n2));
       if (targets.length === 0) return { ok: false, error: "no such nodes" };
       const context = describeSession(state, { nodeIds: targets });
-      const result = await complete(config, [
+      const result2 = await complete(config, [
         { role: "system", content: ASK_PROMPT },
         { role: "user", content: `${context}
 
 Question: ${q}` }
       ]);
-      if (!result.ok) return { ok: false, error: result.error };
-      const text = result.text.trim();
+      if (!result2.ok) return { ok: false, error: result2.error };
+      const text = result2.text.trim();
       if (!text) return { ok: false, error: "empty answer" };
       const explanationId = session.answer({
         participantId: id,
@@ -2029,13 +2126,13 @@ Question: ${q}` }
         "",
         `The human asks: ${prompt}`
       ].join("\n") : [context, "", describeRegions(regions, frame), "", `The human asks: ${prompt}`].join("\n");
-      const result = await complete(config, [
+      const result2 = await complete(config, [
         { role: "system", content: revising ? REVISE_PROMPT : MAKE_PROMPT },
         { role: "user", content: user }
       ]);
-      if (!result.ok) return { ok: false, error: result.error };
-      const code = parseCode(result.text);
-      if (!code) return { ok: false, error: "no usable code in reply", raw: result.text };
+      if (!result2.ok) return { ok: false, error: result2.error };
+      const code = parseCode(result2.text);
+      if (!code) return { ok: false, error: "no usable code in reply", raw: result2.text };
       session.attachCode({
         participantId: id,
         nodeId: args.artifactId,
@@ -2044,7 +2141,7 @@ Question: ${q}` }
         prompt,
         at: args.at
       });
-      return { ok: true, code, revised: revising, raw: result.text };
+      return { ok: true, code, revised: revising, raw: result2.text };
     }
     return { id, name, config, interpret, ask, generate };
   }
