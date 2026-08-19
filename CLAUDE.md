@@ -17,8 +17,10 @@ automatically → ask "why?" and get grounded reasoning.
 
 ## Current Status & Plan
 
+**See `MVP.md`** for the product being built — *ink over living artifacts*.
 **See `ROADMAP.md`** for status and the August 2026 accounting.
-`ARCHITECTURE-v7-PARTICIPANTS-AND-TIERS.md` is the active plan.
+`ARCHITECTURE-v7-PARTICIPANTS-AND-TIERS.md` is the active engine plan; MVP.md
+absorbs and raises its Stage D.
 
 Headline: the substrate is real, the canonical loop is closed, and **models are
 now in the loop** — v7 Stages A and C have shipped. A model joins as a peer,
@@ -26,7 +28,9 @@ offers *several* readings held beside Tier 0's, and answers questions *into* the
 canvas. Still open: diagram→code (Stage D) and handwriting (Stage E). Whitepaper
 v5.1 stays parked until the conversation benchmark passes end to end.
 
-Architecture documents (chronological; **read v7 then v6 — they're the active pair**):
+Architecture documents (chronological; **read MVP.md, then v7, then v6**):
+- `MVP.md` — **the product definition**: infinite canvas, a learned command mark,
+  drawings prompted into living code, and ink that addresses what's under it
 - `ARCHITECTURE-v7-PARTICIPANTS-AND-TIERS.md` — **active plan**: putting a model in the loop through the `propose` channel; the conversation benchmark; one OpenAI-compatible transport for Ollama/LM Studio/OpenRouter
 - `ARCHITECTURE-v6-SESSION-ENGINE.md` — **active design**: the no-modes session engine (deferred commitment, summoning, promotion ladder, capability tiers), implemented in `metamedium-core/`
 - `metamedium-core-schema.md` — graph data model ("everything is a node; type emerges from connections") — load-bearing via v6

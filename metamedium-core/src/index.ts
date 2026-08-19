@@ -61,9 +61,34 @@ export {
   isCheckLike,
   resolvesLasso,
   enclosedBy,
+  strokesIntersect,
   DEFAULT_GESTURE_CONFIG,
 } from './session/gesture';
 export type { GestureConfig } from './session/gesture';
+
+// The command mark — a gesture the user teaches the system (MVP.md §5.2).
+export {
+  learnCommandMark,
+  matchesCommandMark,
+  collidesWith,
+  COMMAND_MARK_SAMPLES,
+} from './session/commandmark';
+export type { CommandMark, CommandMatch } from './session/commandmark';
+
+// Scratch-out erase — relational, not gestural (MVP.md, erase.ts).
+export {
+  segmentsIntersect,
+  countCrossings,
+  outlineOf,
+  scratchedOut,
+  DEFAULT_ERASE_CROSSINGS,
+} from './session/erase';
+export type { ScratchTarget } from './session/erase';
+
+// Regions — the drawn boxes as a layout frame, and the address space for ink
+// drawn over a live artifact (MVP.md §5.4, §6.2).
+export { regionsOf, frameOf, regionAt, regionsOverlapping } from './session/regions';
+export type { Region, Rect } from './session/regions';
 
 // Session engine
 export { createSession, DEFAULT_SESSION_CONFIG } from './session/session';
@@ -97,9 +122,9 @@ export { complete, listModels, providerLabel, providerTier, PRESETS, DEFAULT_TIM
 export type { ProviderConfig, ProviderKind, ChatMessage, CompletionResult } from './llm/provider';
 
 // Agent participants — a model joins through the same channel a human uses.
-export { createAgentParticipant, parseReadings, readingsToEdges, MAX_READINGS } from './participants/agent';
-export type { AgentParticipant, AgentReading, InterpretResult, AskResult } from './participants/agent';
-export { describeSession, describeSignature } from './participants/serialize';
+export { createAgentParticipant, parseReadings, parseCode, readingsToEdges, MAX_READINGS } from './participants/agent';
+export type { AgentParticipant, AgentReading, InterpretResult, AskResult, GenerateResult } from './participants/agent';
+export { describeSession, describeSignature, describeRegions, describeAddressed } from './participants/serialize';
 export type { SerializeOptions } from './participants/serialize';
 
 // Types

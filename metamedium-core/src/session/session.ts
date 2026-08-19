@@ -30,6 +30,7 @@ import {
   wordOf,
   topInterpretation,
   boundsOf,
+  strokePointsOf,
   resemblances,
   LOCAL_PARTICIPANT,
   TIER0_PARTICIPANT,
@@ -41,12 +42,15 @@ import {
   enclosedBy,
   resolvesLasso,
 } from './gesture';
+import { type CommandMark } from './commandmark';
+import { DEFAULT_ERASE_CROSSINGS, scratchedOut } from './erase';
+import { type Region, regionsOf } from './regions';
 
 // ===== Public state shape =====
 
 export interface Suggestion {
   id: string;
-  kind: 'match' | 'name-as-new' | 'keep-as-drawing';
+  kind: 'match' | 'name-as-new' | 'keep-as-drawing' | 'prompt';
   label: string;
   artifactId?: string; // for 'match'
   score?: number;
@@ -83,6 +87,10 @@ export interface SessionState {
    * lasso, a cluster, or a signature.
    */
   explanations: string[];
+  /** The mark the user taught this session, or null while the built-in check stands. */
+  commandMark: CommandMark | null;
+  /** Artifacts carrying a 'code' rep — the ones that render and run. */
+  live: string[];
 }
 
 // Every event is attributed: participantId defaults to the local human.
@@ -96,6 +104,16 @@ export type SessionEvent =
   | { type: 'erase'; nodeId: string; at: number; participantId?: string }
   | { type: 'join'; kind: ParticipantKind; name: string; at: number; capability?: Capability }
   | { type: 'propose'; participantId: string; nodeId: string; edges: ProposedEdge[]; at: number }
+  | { type: 'teach'; mark: CommandMark | null; at: number }
+  | {
+      type: 'code';
+      participantId: string;
+      nodeId: string;
+      code: string;
+      language?: string;
+      prompt?: string;
+      at: number;
+    }
   | {
       type: 'answer';
       participantId: string;
@@ -119,12 +137,15 @@ export interface SessionConfig {
   clusterThresholdPx: number;
   /** How close a line endpoint must be to a node to infer a 'connects' wire. */
   wireEndpointPx: number;
+  /** Crossings before a stroke is read as scratching a mark out. See erase.ts. */
+  eraseCrossings: number;
 }
 
 export const DEFAULT_SESSION_CONFIG: SessionConfig = {
   gesture: DEFAULT_GESTURE_CONFIG,
   clusterThresholdPx: 60,
   wireEndpointPx: 30,
+  eraseCrossings: DEFAULT_ERASE_CROSSINGS,
 };
 
 type Signature = Record<string, number>; // type histogram, e.g. { circle: 3, line: 2 }
@@ -148,6 +169,26 @@ export interface Session {
     aboutIds: string[];
     at: number;
   }): string | null;
+  /**
+   * Install (or clear) the mark that resolves a lasso. An event, not a setting:
+   * teaching is part of the session's history and replays with it.
+   */
+  teachCommandMark(mark: CommandMark | null, at: number): void;
+  /**
+   * Attach generated code to an artifact — the 'code' rep that makes it live.
+   * Several participants may each attach code to the same artifact; every
+   * attempt is held and attributed, and the surface renders the chosen one.
+   */
+  attachCode(args: {
+    participantId: string;
+    nodeId: string;
+    code: string;
+    language?: string;
+    prompt?: string;
+    at: number;
+  }): string | null;
+  /** The artifact's member marks as a layout frame (MVP.md §6.2). */
+  regions(artifactId: string): Region[];
   tick(at: number): void;
   bless(args: {
     summonId: string;
@@ -177,6 +218,8 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
   let clusterCandidates: ClusterCandidate[] = [];
   let participants: string[] = [];
   let explanations: string[] = [];
+  let live: string[] = [];
+  let commandMark: CommandMark | null = config.gesture.commandMark ?? null;
   let counter = 0;
   const listeners = new Set<(state: SessionState) => void>();
 
@@ -189,6 +232,8 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     clusterCandidates = [];
     participants = [LOCAL_PARTICIPANT, TIER0_PARTICIPANT];
     explanations = [];
+    live = [];
+    commandMark = config.gesture.commandMark ?? null;
     counter = 0;
     for (const n of createBootstrapNodes(0)) nodes.set(n.id, n);
   }
@@ -281,6 +326,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
         });
       }
     }
+    suggestions.push({ id: nextId('sug'), kind: 'prompt', label: 'Make…' });
     suggestions.push({ id: nextId('sug'), kind: 'name-as-new', label: 'Name this…' });
     suggestions.push({ id: nextId('sug'), kind: 'keep-as-drawing', label: 'Keep as drawing' });
     return suggestions;
@@ -362,11 +408,22 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     if (pendingLasso) {
       const lassoNode = nodes.get(pendingLasso.id)!;
       const lassoFp = fingerprintOf(lassoNode)!;
-      if (resolvesLasso(fp, at, lassoFp, pendingLasso.at, config.gesture)) {
+      const lassoPoints = strokePointsOf(lassoNode) ?? [];
+      const gestureConfig = { ...config.gesture, commandMark };
+      if (
+        resolvesLasso(fp, at, lassoFp, pendingLasso.at, gestureConfig, {
+          check: points,
+          lasso: lassoPoints,
+        })
+      ) {
         // Retroactivity: the lasso was a gesture all along. Both strokes get
         // gesture reps and leave the content plane; their ink and prior
         // candidate edges remain (provenance, principle 9).
-        node.reps.push({ modality: 'gesture', data: { role: 'check' }, source: 'heuristic' });
+        node.reps.push({
+          modality: 'gesture',
+          data: { role: commandMark ? 'command' : 'check' },
+          source: commandMark ? `command-mark:${commandMark.name}` : 'heuristic',
+        });
         lassoNode.reps.push({ modality: 'gesture', data: { role: 'lasso' }, source: 'heuristic' });
         removeFromContent(lassoNode.id);
 
@@ -382,6 +439,37 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
         recomputeClusterCandidates();
         return node.id;
       }
+    }
+
+    // --- Scratch-out: did this stroke cross something enough times to rub it
+    //     out? Relational, not gestural — see erase.ts. Runs on every stroke
+    //     because ordinary ink crosses nothing and costs nothing to test. ---
+    const scratched = scratchedOut(
+      points,
+      contentIds
+        .filter((id) => id !== node.id)
+        .map((id) => {
+          const n = nodes.get(id)!;
+          const nfp = fingerprintOf(n);
+          return {
+            id,
+            points: strokePointsOf(n) ?? undefined,
+            bounds: boundsOf(n) ?? undefined,
+            closed: nfp?.isClosed ?? false,
+          };
+        }),
+      config.eraseCrossings
+    );
+    if (scratched.length > 0) {
+      node.reps.push({
+        modality: 'gesture',
+        data: { role: 'scratch', erased: scratched },
+        source: 'heuristic',
+      });
+      pendingLasso = null;
+      summon = null;
+      for (const id of scratched) eraseNode(id, at);
+      return node.id;
     }
 
     // --- Not a gesture: this is content. Drawing past a summon dissolves it. ---
@@ -477,13 +565,20 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
   }
 
   function applyErase(ev: Extract<SessionEvent, { type: 'erase' }>) {
-    const node = nodes.get(ev.nodeId);
+    eraseNode(ev.nodeId, ev.at);
+  }
+
+  function eraseNode(nodeId: string, at: number) {
+    const node = nodes.get(nodeId);
     if (!node || node.id.startsWith('type:')) return;
     if (getRep(node, 'erased')) return;
 
     // Ink is never destroyed: the node stays in the graph, marked erased.
-    node.reps.push({ modality: 'erased', data: { at: ev.at }, source: 'user' });
+    node.reps.push({ modality: 'erased', data: { at }, source: 'user' });
     removeFromContent(node.id);
+
+    const li = live.indexOf(node.id);
+    if (li >= 0) live.splice(li, 1);
 
     if (pendingLasso?.id === node.id) pendingLasso = null;
     if (
@@ -591,6 +686,32 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     return node.id;
   }
 
+  function applyTeach(ev: Extract<SessionEvent, { type: 'teach' }>) {
+    commandMark = ev.mark;
+  }
+
+  function applyCode(ev: Extract<SessionEvent, { type: 'code' }>): string | null {
+    const node = nodes.get(ev.nodeId);
+    if (!node || !participants.includes(ev.participantId)) return null;
+
+    // Held, attributed, and NOT blessed — generated code is a proposal like any
+    // other reading. Several participants may each attach code to the same
+    // artifact; the newest is what the surface renders, all of them are kept.
+    node.reps.push({
+      modality: 'code',
+      data: {
+        code: ev.code,
+        language: ev.language ?? 'html',
+        prompt: ev.prompt,
+        regions: regionsOf(node, nodes),
+        at: ev.at,
+      },
+      source: ev.participantId,
+    });
+    if (!live.includes(node.id)) live.push(node.id);
+    return node.id;
+  }
+
   function applyEvent(ev: SessionEvent): string | null {
     switch (ev.type) {
       case 'stroke':
@@ -604,6 +725,11 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
         return null;
       case 'answer':
         return applyAnswer(ev);
+      case 'teach':
+        applyTeach(ev);
+        return null;
+      case 'code':
+        return applyCode(ev);
       case 'dismiss':
         if (summon?.id === ev.summonId) summon = null;
         return null;
@@ -654,6 +780,8 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       artifacts: [...artifacts],
       participants: [...participants],
       explanations: [...explanations],
+      commandMark,
+      live: [...live],
     };
   }
 
@@ -670,6 +798,12 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     join: (kind, name, at, capability) => dispatch({ type: 'join', kind, name, at, capability }) as string,
     propose: (args) => void dispatch({ type: 'propose', ...args }),
     answer: (args) => dispatch({ type: 'answer', ...args }),
+    teachCommandMark: (mark, at) => void dispatch({ type: 'teach', mark, at }),
+    attachCode: (args) => dispatch({ type: 'code', ...args }),
+    regions: (artifactId) => {
+      const node = nodes.get(artifactId);
+      return node ? regionsOf(node, nodes) : [];
+    },
     tick: (at) => void dispatch({ type: 'tick', at }),
     bless: (args) => dispatch({ type: 'bless', ...args }),
     dismiss: (summonId, at) => void dispatch({ type: 'dismiss', summonId, at }),

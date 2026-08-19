@@ -14,6 +14,7 @@ import type { MMNode } from '../session/nodes';
 import type { SessionState } from '../session/session';
 import { fingerprintOf, wordOf, boundsOf, isParticipant, isGesture } from '../session/nodes';
 import { interpretationsOf } from '../session/interpretations';
+import type { Rect, Region } from '../session/regions';
 
 export interface SerializeOptions {
   /** Restrict to these nodes (e.g. a lasso's contents). Default: all content. */
@@ -138,4 +139,46 @@ export function describeSignature(state: SessionState, nodeIds: string[]): strin
     .sort((a, b) => b[1] - a[1])
     .map(([label, count]) => `${count}×${label}`)
     .join(' + ');
+}
+
+// ===== The region frame =====
+//
+// MVP.md §6.2: generated code is written INTO a frame the human drew. The
+// rects below are not a suggestion the model may improve on — they are the
+// layout, and the ink on the canvas is the record of them. A model that moves
+// a region breaks the visible promise that the doodle outlines the div.
+
+
+function rect(r: Rect, round = true): string {
+  const v = (x: number) => (round ? Math.round(x) : Number(x.toFixed(2)));
+  return `x=${v(r.x)} y=${v(r.y)} w=${v(r.w)} h=${v(r.h)}`;
+}
+
+/**
+ * The drawn geometry as a layout contract. Local pixels, because that is the
+ * coordinate space the generated code positions itself in.
+ */
+export function describeRegions(regions: Region[], frame: Rect): string {
+  const lines = [`FRAME: ${Math.round(frame.w)}×${Math.round(frame.h)} px (origin 0,0 is the artifact's top-left).`];
+  if (regions.length === 0) {
+    lines.push('No regions were drawn — you may lay the frame out freely.');
+    return lines.join('\n');
+  }
+  lines.push('', 'REGIONS the human drew, in artifact-local pixels:');
+  for (const r of regions) {
+    const nested = r.contains.length ? `, contains ${r.contains.join(', ')}` : '';
+    lines.push(`  ${r.id}: ${rect(r.rect)} — drawn as a ${r.shape}${nested}`);
+  }
+  return lines.join('\n');
+}
+
+/** Which regions a mark drawn over a live artifact addresses. */
+export function describeAddressed(regions: Region[], addressedIds: string[]): string {
+  const hit = regions.filter((r) => addressedIds.includes(r.id));
+  if (hit.length === 0) return 'The mark did not land on any region — treat it as addressing the whole artifact.';
+  return [
+    'The human drew over this artifact. The mark lands on:',
+    ...hit.map((r) => `  ${r.id} (${rect(r.rect)}, drawn as a ${r.shape})`),
+    'Change only what those regions cover. Leave the rest of the code as it is.',
+  ].join('\n');
 }

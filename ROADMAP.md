@@ -63,7 +63,19 @@ tracks only **status**. Experiments are tracked in
 
 ## What's Next
 
-### → **v7: Participants and Tiers** — the active plan
+### → **MVP: Ink Over Living Artifacts** — the product target
+
+**[MVP.md](MVP.md)** (Aug 2026) defines the product the engine work serves: an
+infinite canvas, a command mark the user *teaches* the system, a freeform prompt
+on the summon that turns enclosed drawings into **living code rendered in place**,
+and ink drawn over that running artifact that addresses what is underneath it.
+
+The reckoning is favourable: it is the existing state machine with three
+substitutions — `command` is a learned `check`, `prompt` is a third suggestion
+kind, `generate` is a `bless` that attaches a `'code'` rep. Core changes are
+small and additive; the work is in the surface. ~2 weeks to the loop standing.
+
+### → **v7: Participants and Tiers** — the active engine plan
 
 **[ARCHITECTURE-v7-PARTICIPANTS-AND-TIERS.md](ARCHITECTURE-v7-PARTICIPANTS-AND-TIERS.md)**
 is where the work goes now. **Stages A and C have shipped:** a model joins as a

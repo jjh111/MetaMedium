@@ -23,6 +23,8 @@ var MetaMediumCore = (() => {
   var index_exports = {};
   __export(index_exports, {
     BUILTIN_TYPES: () => BUILTIN_TYPES,
+    COMMAND_MARK_SAMPLES: () => COMMAND_MARK_SAMPLES,
+    DEFAULT_ERASE_CROSSINGS: () => DEFAULT_ERASE_CROSSINGS,
     DEFAULT_GESTURE_CONFIG: () => DEFAULT_GESTURE_CONFIG,
     DEFAULT_SESSION_CONFIG: () => DEFAULT_SESSION_CONFIG,
     DEFAULT_TIMEOUT_MS: () => DEFAULT_TIMEOUT_MS,
@@ -43,14 +45,18 @@ var MetaMediumCore = (() => {
     calculateDistance: () => calculateDistance,
     calculateStraightness: () => calculateStraightness,
     checkOvershoot: () => checkOvershoot,
+    collidesWith: () => collidesWith,
     complete: () => complete,
     convexHull: () => convexHull,
     countCorners: () => countCorners,
+    countCrossings: () => countCrossings,
     createAgentParticipant: () => createAgentParticipant,
     createBootstrapNodes: () => createBootstrapNodes,
     createExplanationNode: () => createExplanationNode,
     createParticipantNode: () => createParticipantNode,
     createSession: () => createSession,
+    describeAddressed: () => describeAddressed,
+    describeRegions: () => describeRegions,
     describeSession: () => describeSession,
     describeSignature: () => describeSignature,
     disagreement: () => disagreement,
@@ -59,6 +65,7 @@ var MetaMediumCore = (() => {
     findCorners: () => findCorners,
     findCornersWithSeparation: () => findCornersWithSeparation,
     fingerprintOf: () => fingerprintOf,
+    frameOf: () => frameOf,
     getBounds: () => getBounds,
     getBoundsFromStroke: () => getBoundsFromStroke,
     getFingerprint: () => getFingerprint,
@@ -71,20 +78,30 @@ var MetaMediumCore = (() => {
     isLassoLike: () => isLassoLike,
     isParticipant: () => isParticipant,
     isStrokeClosed: () => isStrokeClosed,
+    learnCommandMark: () => learnCommandMark,
     listModels: () => listModels,
     matchPrimitiveFromLibrary: () => matchPrimitiveFromLibrary,
+    matchesCommandMark: () => matchesCommandMark,
     normalizeStroke: () => normalizeStroke,
+    outlineOf: () => outlineOf,
+    parseCode: () => parseCode,
     parseReadings: () => parseReadings,
     providerLabel: () => providerLabel,
     providerTier: () => providerTier,
     readingsToEdges: () => readingsToEdges,
+    regionAt: () => regionAt,
+    regionsOf: () => regionsOf,
+    regionsOverlapping: () => regionsOverlapping,
     resemblances: () => resemblances,
     resolvesLasso: () => resolvesLasso,
+    scratchedOut: () => scratchedOut,
+    segmentsIntersect: () => segmentsIntersect,
     simplifyStroke: () => simplifyStroke,
     smoothStroke: () => smoothStroke,
     sourcesOf: () => sourcesOf,
     spatialCluster: () => spatialCluster,
     strokePointsOf: () => strokePointsOf,
+    strokesIntersect: () => strokesIntersect,
     topInterpretation: () => topInterpretation,
     typeNodeId: () => typeNodeId,
     wordOf: () => wordOf
@@ -788,11 +805,138 @@ var MetaMediumCore = (() => {
     return getRep(node, "bounds")?.data;
   }
 
+  // src/session/erase.ts
+  var DEFAULT_ERASE_CROSSINGS = 3;
+  function segmentsIntersect(p1, p2, p3, p4) {
+    const d = (p2.x - p1.x) * (p4.y - p3.y) - (p2.y - p1.y) * (p4.x - p3.x);
+    if (Math.abs(d) < 1e-10) return false;
+    const t = ((p3.x - p1.x) * (p4.y - p3.y) - (p3.y - p1.y) * (p4.x - p3.x)) / d;
+    const u = ((p3.x - p1.x) * (p2.y - p1.y) - (p3.y - p1.y) * (p2.x - p1.x)) / d;
+    return t >= 0 && t <= 1 && u >= 0 && u <= 1;
+  }
+  function outlineOf(target) {
+    if (target.points && target.points.length >= 2) {
+      const pts = target.points;
+      if (target.closed) return pts.concat([pts[0]]);
+      return pts;
+    }
+    const b = target.bounds;
+    if (!b) return null;
+    return [
+      { x: b.minX, y: b.minY },
+      { x: b.maxX, y: b.minY },
+      { x: b.maxX, y: b.maxY },
+      { x: b.minX, y: b.maxY },
+      { x: b.minX, y: b.minY }
+    ];
+  }
+  function countCrossings(stroke, outline, max = DEFAULT_ERASE_CROSSINGS) {
+    let n2 = 0;
+    for (let i = 1; i < stroke.length; i++) {
+      for (let j = 1; j < outline.length; j++) {
+        if (segmentsIntersect(stroke[i - 1], stroke[i], outline[j - 1], outline[j])) {
+          n2++;
+          if (n2 >= max) return n2;
+        }
+      }
+    }
+    return n2;
+  }
+  function scratchedOut(points, targets, minCrossings = DEFAULT_ERASE_CROSSINGS) {
+    if (points.length < 3) return [];
+    const hit = [];
+    for (const t of targets) {
+      const outline = outlineOf(t);
+      if (!outline) continue;
+      if (countCrossings(points, outline, minCrossings) >= minCrossings) hit.push(t.id);
+    }
+    return hit;
+  }
+
+  // src/session/commandmark.ts
+  var COMMAND_MARK_SAMPLES = 5;
+  var FEATURES = ["straightness", "corners", "aspect", "closureRatio", "consistency"];
+  var TOLERANCE_FLOOR = {
+    straightness: 0.12,
+    corners: 0.9,
+    aspect: 0.25,
+    closureRatio: 0.18,
+    consistency: 0.3
+  };
+  var SPREAD_MULTIPLIER = 2.5;
+  function featuresOf(fp) {
+    const w = Math.max(1, fp.bounds.maxX - fp.bounds.minX);
+    const h = Math.max(1, fp.bounds.maxY - fp.bounds.minY);
+    const size = Math.max(1, fp.size);
+    return {
+      straightness: fp.straightness,
+      corners: fp.corners,
+      // Orientation-free: a tall mark and a wide mark of the same proportion read alike.
+      aspect: Math.min(w, h) / Math.max(w, h),
+      closureRatio: Math.min(1, fp.closureDistance / size),
+      consistency: fp.angleAnalysis?.consistency ?? 0
+    };
+  }
+  function mean(xs) {
+    return xs.reduce((a, b) => a + b, 0) / xs.length;
+  }
+  function stddev(xs) {
+    if (xs.length < 2) return 0;
+    const m = mean(xs);
+    return Math.sqrt(mean(xs.map((x) => (x - m) ** 2)));
+  }
+  function learnCommandMark(samples, name = "command") {
+    if (samples.length < 2) throw new Error("a command mark needs at least 2 samples");
+    const fps = samples.map((s) => getFingerprint(s));
+    const perFeature = fps.map(featuresOf);
+    const features = {};
+    const tolerance = {};
+    const spreadRatios = [];
+    for (const f of FEATURES) {
+      const values = perFeature.map((p) => p[f]);
+      features[f] = mean(values);
+      const sd = stddev(values);
+      tolerance[f] = Math.max(sd * SPREAD_MULTIPLIER, TOLERANCE_FLOOR[f]);
+      spreadRatios.push(Math.min(1, sd * SPREAD_MULTIPLIER / tolerance[f]));
+    }
+    const closedCount = fps.filter((f) => f.isClosed).length;
+    return {
+      name,
+      features,
+      tolerance,
+      isClosed: closedCount > samples.length / 2,
+      sampleCount: samples.length,
+      consistency: 1 - mean(spreadRatios)
+    };
+  }
+  function matchesCommandMark(fp, mark) {
+    if (fp.isClosed !== mark.isClosed) {
+      return { match: false, score: 0, failedOn: "closureRatio" };
+    }
+    const f = featuresOf(fp);
+    let worst = 0;
+    let worstFeature = FEATURES[0];
+    for (const key of FEATURES) {
+      const normalized = Math.abs(f[key] - mark.features[key]) / mark.tolerance[key];
+      if (normalized > worst) {
+        worst = normalized;
+        worstFeature = key;
+      }
+    }
+    if (worst > 1) return { match: false, score: 0, failedOn: worstFeature };
+    return { match: true, score: 1 - worst };
+  }
+  function collidesWith(mark, existing) {
+    return existing.some((fp) => matchesCommandMark(fp, mark).match);
+  }
+
   // src/session/gesture.ts
   var DEFAULT_GESTURE_CONFIG = {
     checkWindowMs: 4e3,
     checkProximityPx: 80,
-    checkMaxSizeRatio: 0.6
+    checkMaxSizeRatio: 0.6,
+    commandMark: null,
+    requireIntersection: true
   };
   function isLassoLike(fp, enclosedContentCount) {
     return fp.isClosed && enclosedContentCount >= 1;
@@ -806,18 +950,82 @@ var MetaMediumCore = (() => {
     if (fp.size > lassoFp.size * config.checkMaxSizeRatio) return false;
     return true;
   }
-  function resolvesLasso(checkFp, checkAt, lassoFp, lassoAt, config = DEFAULT_GESTURE_CONFIG) {
+  function strokesIntersect(a, b) {
+    for (let i = 1; i < a.length; i++) {
+      for (let j = 1; j < b.length; j++) {
+        if (segmentsIntersect(a[i - 1], a[i], b[j - 1], b[j])) return true;
+      }
+    }
+    return false;
+  }
+  function resolvesLasso(checkFp, checkAt, lassoFp, lassoAt, config = DEFAULT_GESTURE_CONFIG, strokes) {
     if (checkAt - lassoAt > config.checkWindowMs) return false;
-    if (!isCheckLike(checkFp, lassoFp, config)) return false;
-    const near = boundsOverlap(checkFp.bounds, lassoFp.bounds) || boundingBoxDistance(checkFp.bounds, lassoFp.bounds) < config.checkProximityPx;
-    return near;
+    if (config.commandMark) {
+      if (!matchesCommandMark(checkFp, config.commandMark).match) return false;
+      if (checkFp.size > lassoFp.size) return false;
+      if (config.requireIntersection && strokes) return strokesIntersect(strokes.check, strokes.lasso);
+    } else {
+      if (!isCheckLike(checkFp, lassoFp, config)) return false;
+    }
+    return boundsOverlap(checkFp.bounds, lassoFp.bounds) || boundingBoxDistance(checkFp.bounds, lassoFp.bounds) < config.checkProximityPx;
+  }
+
+  // src/session/regions.ts
+  var rectOf = (b) => ({
+    x: b.minX,
+    y: b.minY,
+    w: b.maxX - b.minX,
+    h: b.maxY - b.minY
+  });
+  var insideOf = (outer, inner) => inner.x >= outer.x && inner.y >= outer.y && inner.x + inner.w <= outer.x + outer.w && inner.y + inner.h <= outer.y + outer.h && !(inner.x === outer.x && inner.y === outer.y && inner.w === outer.w && inner.h === outer.h);
+  function frameOf(artifact) {
+    const b = getRep(artifact, "bounds")?.data ?? boundsOf(artifact);
+    return b ? rectOf(b) : null;
+  }
+  function regionsOf(artifact, nodes) {
+    const frame = frameOf(artifact);
+    if (!frame) return [];
+    const members = artifact.edges.filter((e) => e.rel === "has-part").map((e) => nodes.get(e.to)).filter((n2) => !!n2 && !getRep(n2, "erased"));
+    const sized = members.map((n2) => {
+      const b = boundsOf(n2);
+      return b ? { node: n2, world: rectOf(b) } : null;
+    }).filter((m) => !!m).sort((a, b) => b.world.w * b.world.h - a.world.w * a.world.h);
+    const regions = sized.map(({ node, world }, i) => ({
+      id: `r${i + 1}`,
+      nodeId: node.id,
+      shape: wordOf(node) ?? topInterpretation(node) ?? "art",
+      rect: { x: world.x - frame.x, y: world.y - frame.y, w: world.w, h: world.h },
+      world,
+      contains: []
+    }));
+    for (const outer of regions) {
+      for (const inner of regions) {
+        if (outer.id !== inner.id && insideOf(outer.world, inner.world)) outer.contains.push(inner.id);
+      }
+    }
+    return regions;
+  }
+  function regionAt(regions, x, y) {
+    let best = null;
+    for (const r of regions) {
+      const { world: w } = r;
+      if (x < w.x || y < w.y || x > w.x + w.w || y > w.y + w.h) continue;
+      if (!best || w.w * w.h < best.world.w * best.world.h) best = r;
+    }
+    return best;
+  }
+  function regionsOverlapping(regions, b) {
+    return regions.filter(
+      (r) => !(b.maxX < r.world.x || b.minX > r.world.x + r.world.w || b.maxY < r.world.y || b.minY > r.world.y + r.world.h)
+    );
   }
 
   // src/session/session.ts
   var DEFAULT_SESSION_CONFIG = {
     gesture: DEFAULT_GESTURE_CONFIG,
     clusterThresholdPx: 60,
-    wireEndpointPx: 30
+    wireEndpointPx: 30,
+    eraseCrossings: DEFAULT_ERASE_CROSSINGS
   };
   function createSession(config = DEFAULT_SESSION_CONFIG) {
     let events = [];
@@ -829,6 +1037,8 @@ var MetaMediumCore = (() => {
     let clusterCandidates = [];
     let participants = [];
     let explanations = [];
+    let live = [];
+    let commandMark = config.gesture.commandMark ?? null;
     let counter = 0;
     const listeners = /* @__PURE__ */ new Set();
     function reset() {
@@ -840,6 +1050,8 @@ var MetaMediumCore = (() => {
       clusterCandidates = [];
       participants = [LOCAL_PARTICIPANT, TIER0_PARTICIPANT];
       explanations = [];
+      live = [];
+      commandMark = config.gesture.commandMark ?? null;
       counter = 0;
       for (const n2 of createBootstrapNodes(0)) nodes.set(n2.id, n2);
     }
@@ -912,6 +1124,7 @@ var MetaMediumCore = (() => {
           });
         }
       }
+      suggestions.push({ id: nextId("sug"), kind: "prompt", label: "Make\u2026" });
       suggestions.push({ id: nextId("sug"), kind: "name-as-new", label: "Name this\u2026" });
       suggestions.push({ id: nextId("sug"), kind: "keep-as-drawing", label: "Keep as drawing" });
       return suggestions;
@@ -973,8 +1186,17 @@ var MetaMediumCore = (() => {
       if (pendingLasso) {
         const lassoNode = nodes.get(pendingLasso.id);
         const lassoFp = fingerprintOf(lassoNode);
-        if (resolvesLasso(fp, at, lassoFp, pendingLasso.at, config.gesture)) {
-          node.reps.push({ modality: "gesture", data: { role: "check" }, source: "heuristic" });
+        const lassoPoints = strokePointsOf(lassoNode) ?? [];
+        const gestureConfig = { ...config.gesture, commandMark };
+        if (resolvesLasso(fp, at, lassoFp, pendingLasso.at, gestureConfig, {
+          check: points,
+          lasso: lassoPoints
+        })) {
+          node.reps.push({
+            modality: "gesture",
+            data: { role: commandMark ? "command" : "check" },
+            source: commandMark ? `command-mark:${commandMark.name}` : "heuristic"
+          });
           lassoNode.reps.push({ modality: "gesture", data: { role: "lasso" }, source: "heuristic" });
           removeFromContent(lassoNode.id);
           const enclosedIds = enclosedBy(lassoFp.bounds, contentBoundsList());
@@ -989,6 +1211,31 @@ var MetaMediumCore = (() => {
           recomputeClusterCandidates();
           return node.id;
         }
+      }
+      const scratched = scratchedOut(
+        points,
+        contentIds.filter((id) => id !== node.id).map((id) => {
+          const n2 = nodes.get(id);
+          const nfp = fingerprintOf(n2);
+          return {
+            id,
+            points: strokePointsOf(n2) ?? void 0,
+            bounds: boundsOf(n2) ?? void 0,
+            closed: nfp?.isClosed ?? false
+          };
+        }),
+        config.eraseCrossings
+      );
+      if (scratched.length > 0) {
+        node.reps.push({
+          modality: "gesture",
+          data: { role: "scratch", erased: scratched },
+          source: "heuristic"
+        });
+        pendingLasso = null;
+        summon = null;
+        for (const id of scratched) eraseNode(id, at);
+        return node.id;
       }
       summon = null;
       contentIds.push(node.id);
@@ -1061,11 +1308,16 @@ var MetaMediumCore = (() => {
       return artifact.id;
     }
     function applyErase(ev) {
-      const node = nodes.get(ev.nodeId);
+      eraseNode(ev.nodeId, ev.at);
+    }
+    function eraseNode(nodeId, at) {
+      const node = nodes.get(nodeId);
       if (!node || node.id.startsWith("type:")) return;
       if (getRep(node, "erased")) return;
-      node.reps.push({ modality: "erased", data: { at: ev.at }, source: "user" });
+      node.reps.push({ modality: "erased", data: { at }, source: "user" });
       removeFromContent(node.id);
+      const li = live.indexOf(node.id);
+      if (li >= 0) live.splice(li, 1);
       if (pendingLasso?.id === node.id) pendingLasso = null;
       if (summon && (summon.enclosedIds.includes(node.id) || summon.gestureIds.includes(node.id))) {
         summon = null;
@@ -1147,6 +1399,26 @@ var MetaMediumCore = (() => {
       explanations.push(node.id);
       return node.id;
     }
+    function applyTeach(ev) {
+      commandMark = ev.mark;
+    }
+    function applyCode(ev) {
+      const node = nodes.get(ev.nodeId);
+      if (!node || !participants.includes(ev.participantId)) return null;
+      node.reps.push({
+        modality: "code",
+        data: {
+          code: ev.code,
+          language: ev.language ?? "html",
+          prompt: ev.prompt,
+          regions: regionsOf(node, nodes),
+          at: ev.at
+        },
+        source: ev.participantId
+      });
+      if (!live.includes(node.id)) live.push(node.id);
+      return node.id;
+    }
     function applyEvent(ev) {
       switch (ev.type) {
         case "stroke":
@@ -1160,6 +1432,11 @@ var MetaMediumCore = (() => {
           return null;
         case "answer":
           return applyAnswer(ev);
+        case "teach":
+          applyTeach(ev);
+          return null;
+        case "code":
+          return applyCode(ev);
         case "dismiss":
           if (summon?.id === ev.summonId) summon = null;
           return null;
@@ -1199,7 +1476,9 @@ var MetaMediumCore = (() => {
         clusterCandidates: clusterCandidates.map((c) => ({ ...c })),
         artifacts: [...artifacts],
         participants: [...participants],
-        explanations: [...explanations]
+        explanations: [...explanations],
+        commandMark,
+        live: [...live]
       };
     }
     function subscribe(listener) {
@@ -1213,6 +1492,12 @@ var MetaMediumCore = (() => {
       join: (kind, name, at, capability) => dispatch({ type: "join", kind, name, at, capability }),
       propose: (args) => void dispatch({ type: "propose", ...args }),
       answer: (args) => dispatch({ type: "answer", ...args }),
+      teachCommandMark: (mark, at) => void dispatch({ type: "teach", mark, at }),
+      attachCode: (args) => dispatch({ type: "code", ...args }),
+      regions: (artifactId) => {
+        const node = nodes.get(artifactId);
+        return node ? regionsOf(node, nodes) : [];
+      },
       tick: (at) => void dispatch({ type: "tick", at }),
       bless: (args) => dispatch({ type: "bless", ...args }),
       dismiss: (summonId, at) => void dispatch({ type: "dismiss", summonId, at }),
@@ -1503,6 +1788,32 @@ var MetaMediumCore = (() => {
     }
     return [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([label, count]) => `${count}\xD7${label}`).join(" + ");
   }
+  function rect(r, round = true) {
+    const v = (x) => round ? Math.round(x) : Number(x.toFixed(2));
+    return `x=${v(r.x)} y=${v(r.y)} w=${v(r.w)} h=${v(r.h)}`;
+  }
+  function describeRegions(regions, frame) {
+    const lines = [`FRAME: ${Math.round(frame.w)}\xD7${Math.round(frame.h)} px (origin 0,0 is the artifact's top-left).`];
+    if (regions.length === 0) {
+      lines.push("No regions were drawn \u2014 you may lay the frame out freely.");
+      return lines.join("\n");
+    }
+    lines.push("", "REGIONS the human drew, in artifact-local pixels:");
+    for (const r of regions) {
+      const nested = r.contains.length ? `, contains ${r.contains.join(", ")}` : "";
+      lines.push(`  ${r.id}: ${rect(r.rect)} \u2014 drawn as a ${r.shape}${nested}`);
+    }
+    return lines.join("\n");
+  }
+  function describeAddressed(regions, addressedIds) {
+    const hit = regions.filter((r) => addressedIds.includes(r.id));
+    if (hit.length === 0) return "The mark did not land on any region \u2014 treat it as addressing the whole artifact.";
+    return [
+      "The human drew over this artifact. The mark lands on:",
+      ...hit.map((r) => `  ${r.id} (${rect(r.rect)}, drawn as a ${r.shape})`),
+      "Change only what those regions cover. Leave the rest of the code as it is."
+    ].join("\n");
+  }
 
   // src/participants/agent.ts
   var MAX_READINGS = 4;
@@ -1533,6 +1844,31 @@ Rules:
 - If the readings disagree, say so and explain what separates them. The disagreement is usually the answer.
 - If the facts do not support an answer, say what is missing rather than guessing.
 - No preamble, no markdown, no bullet points. Just the answer.`;
+  var MAKE_PROMPT = `You are a participant on a shared drawing canvas. The human has drawn a layout and asked you to build it.
+
+You are given the FRAME and the REGIONS the human drew, measured in pixels, plus grounded facts about each mark. You are not given an image.
+
+THE REGIONS ARE NOT SUGGESTIONS. The human drew them and their ink stays visible on the canvas outlining what you build. If you move, resize, or ignore a region, the ink will no longer line up with the result and the drawing will be visibly wrong. You choose what goes in a region and how it looks. You do not choose where the regions are.
+
+Rules:
+- Output a single self-contained HTML fragment: markup plus one <style> block. No <html>, <head>, or <body> tags, no external requests, no <script> unless the human asked for behaviour.
+- Position each region with \`position:absolute\` at exactly the left/top/width/height you were given, on a \`position:relative\` root sized to the frame.
+- Give every region-backed element \`data-region="rN"\` matching its region id. This is how the canvas knows which of your elements the human's ink is pointing at \u2014 omitting it breaks the link between the drawing and the code.
+- A region that contains others is their container; nest accordingly and position children relative to it.
+- Design it well within those constraints: real copy, considered type, sensible colour. Do not emit placeholder lorem ipsum.
+
+Reply with ONLY the HTML. No prose, no code fences, no explanation.`;
+  var REVISE_PROMPT = `You are a participant on a shared drawing canvas, revising code you or another participant already generated.
+
+You are given the existing HTML, the region frame it was built against, and which regions the human's new mark lands on.
+
+Rules:
+- Return the COMPLETE revised HTML fragment, not a diff and not a fragment of a fragment.
+- Change only what the addressed regions cover. Everything else must come back byte-identical.
+- Keep every \`data-region\` attribute and every absolute position exactly as they were. The human's ink is registered against those coordinates.
+- If the request cannot be satisfied without moving a region, do the closest thing that keeps the geometry, and do not move it.
+
+Reply with ONLY the HTML. No prose, no code fences, no explanation.`;
   function clamp01(v) {
     const n2 = typeof v === "number" ? v : Number(v);
     if (!Number.isFinite(n2)) return 0.5;
@@ -1564,6 +1900,15 @@ Rules:
       });
     }
     return readings.sort((a, b) => b.confidence - a.confidence);
+  }
+  function parseCode(text) {
+    if (!text) return "";
+    const fenced = text.match(/```(?:html|xml)?\s*\n([\s\S]*?)```/i);
+    const body = (fenced ? fenced[1] : text).trim();
+    const first = body.indexOf("<");
+    if (first === -1) return "";
+    const last = body.lastIndexOf(">");
+    return body.slice(first, last + 1).trim();
   }
   function readingsToEdges(readings, targetIsCluster) {
     return readings.map((r) => ({
@@ -1631,7 +1976,48 @@ Question: ${q}` }
       });
       return { ok: true, text, explanationId: explanationId ?? void 0 };
     }
-    return { id, name, config, interpret, ask };
+    async function generate(args) {
+      const prompt = args.prompt.trim();
+      if (!prompt) return { ok: false, error: "no prompt" };
+      const state = session.getState();
+      const artifact = state.nodes.get(args.artifactId);
+      if (!artifact) return { ok: false, error: "no such artifact" };
+      const frame = frameOf(artifact);
+      if (!frame) return { ok: false, error: "artifact has no frame" };
+      const regions = regionsOf(artifact, state.nodes);
+      const existing = [...artifact.reps].reverse().find((r) => r.modality === "code");
+      const revising = !!existing;
+      const context = describeSession(state, {
+        nodeIds: regions.map((r) => r.nodeId)
+      });
+      const user = revising ? [
+        describeRegions(regions, frame),
+        "",
+        "EXISTING CODE:",
+        String(existing.data.code),
+        "",
+        describeAddressed(regions, args.addressed ?? []),
+        "",
+        `The human asks: ${prompt}`
+      ].join("\n") : [context, "", describeRegions(regions, frame), "", `The human asks: ${prompt}`].join("\n");
+      const result = await complete(config, [
+        { role: "system", content: revising ? REVISE_PROMPT : MAKE_PROMPT },
+        { role: "user", content: user }
+      ]);
+      if (!result.ok) return { ok: false, error: result.error };
+      const code = parseCode(result.text);
+      if (!code) return { ok: false, error: "no usable code in reply", raw: result.text };
+      session.attachCode({
+        participantId: id,
+        nodeId: args.artifactId,
+        code,
+        language: "html",
+        prompt,
+        at: args.at
+      });
+      return { ok: true, code, revised: revising, raw: result.text };
+    }
+    return { id, name, config, interpret, ask, generate };
   }
   return __toCommonJS(index_exports);
 })();
