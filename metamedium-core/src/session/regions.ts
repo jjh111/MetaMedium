@@ -66,8 +66,14 @@ export function frameOf(artifact: MMNode): Rect | null {
 }
 
 /**
- * The artifact's member marks as a layout frame, largest first so a container
- * drawn around others is declared before what it holds.
+ * The artifact's member marks as a layout frame, in READING ORDER: top to
+ * bottom, left to right, with a container always ahead of what it contains.
+ *
+ * Ordering is not cosmetic. Region ids are how the human, the model and the
+ * generated DOM refer to the same thing, so `r1` must mean the mark a person
+ * would call first. Sorting by area — which is all the containment pass needs —
+ * made `r1` the right-hand column of a four-box page, and the model then wrote
+ * its markup in that order too.
  */
 export function regionsOf(artifact: MMNode, nodes: ReadonlyMap<string, MMNode>): Region[] {
   const frame = frameOf(artifact);
@@ -86,22 +92,55 @@ export function regionsOf(artifact: MMNode, nodes: ReadonlyMap<string, MMNode>):
     .filter((m): m is { node: MMNode; world: Rect } => !!m)
     .sort((a, b) => b.world.w * b.world.h - a.world.w * a.world.h);
 
-  const regions: Region[] = sized.map(({ node, world }, i) => ({
-    id: `r${i + 1}`,
-    nodeId: node.id,
-    shape: wordOf(node) ?? topInterpretation(node) ?? 'art',
-    rect: { x: world.x - frame.x, y: world.y - frame.y, w: world.w, h: world.h },
+  // Containment is computed on area order (an outer box is always larger), then
+  // the tree is walked in reading order to assign the ids.
+  const draft = sized.map(({ node, world }, i) => ({
+    key: i,
+    node,
     world,
-    contains: [],
+    contains: [] as number[],
+    parent: -1,
   }));
-
-  for (const outer of regions) {
-    for (const inner of regions) {
-      if (outer.id !== inner.id && insideOf(outer.world, inner.world)) outer.contains.push(inner.id);
+  for (const outer of draft) {
+    for (const inner of draft) {
+      if (outer.key !== inner.key && insideOf(outer.world, inner.world)) {
+        outer.contains.push(inner.key);
+        // Area order means the LAST container to claim it is the smallest.
+        inner.parent = outer.key;
+      }
     }
   }
 
-  return regions;
+  const readingOrder = (a: typeof draft[number], b: typeof draft[number]) => {
+    // Same band vertically? Then left to right. Otherwise top to bottom.
+    const overlap =
+      Math.min(a.world.y + a.world.h, b.world.y + b.world.h) - Math.max(a.world.y, b.world.y);
+    const shorter = Math.min(a.world.h, b.world.h);
+    if (overlap > shorter * 0.5) return a.world.x - b.world.x;
+    return a.world.y - b.world.y;
+  };
+
+  const ordered: typeof draft = [];
+  const visit = (parentKey: number) => {
+    draft
+      .filter((d) => d.parent === parentKey)
+      .sort(readingOrder)
+      .forEach((d) => {
+        ordered.push(d);
+        visit(d.key);
+      });
+  };
+  visit(-1);
+
+  const idByKey = new Map(ordered.map((d, i) => [d.key, `r${i + 1}`]));
+  return ordered.map((d) => ({
+    id: idByKey.get(d.key)!,
+    nodeId: d.node.id,
+    shape: wordOf(d.node) ?? topInterpretation(d.node) ?? 'art',
+    rect: { x: d.world.x - frame.x, y: d.world.y - frame.y, w: d.world.w, h: d.world.h },
+    world: d.world,
+    contains: d.contains.map((k) => idByKey.get(k)!).filter(Boolean),
+  }));
 }
 
 /** Which region a world point falls in — innermost wins, so nesting resolves correctly. */

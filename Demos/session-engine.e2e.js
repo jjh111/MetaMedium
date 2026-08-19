@@ -17,7 +17,7 @@
 // iframes, pointer events), which the headless core suite deliberately does
 // not model. The engine's own guarantees are tested in metamedium-core.
 
-window.__setup = function(){
+window.__helpers = function(){
   const c = document.getElementById('canvas');
   function ev(el,type,x,y){ el.dispatchEvent(new PointerEvent(type,{pointerId:1,isPrimary:true,bubbles:true,clientX:x,clientY:y,button:0,buttons:type==='pointerup'?0:1})); }
   function strokeOn(el,pts){ ev(el,'pointerdown',pts[0].x,pts[0].y); for(let i=1;i<pts.length;i++) ev(el,'pointermove',pts[i].x,pts[i].y); ev(el,'pointerup',pts[pts.length-1].x,pts[pts.length-1].y); }
@@ -31,34 +31,6 @@ window.__setup = function(){
   function summary(){ const st=window.__mm.session.getState(); return {loose:st.contentIds.length-st.artifacts.length, artifacts:st.artifacts.length, live:st.live.length, pending:st.pendingLassoId, summon: st.summon?{enclosed:st.summon.enclosedIds.length,onArtifact:st.summon.onArtifact||null}:null, mark: st.commandMark?st.commandMark.name:null, status: document.getElementById('status').textContent}; }
   function chips(){ return [...document.querySelectorAll('#summon button, #summon .scope')].map(b=>b.textContent); }
   window.__t = {stroke,strokeOn,line,rect,circle,caret,check,scratch,summary,chips};
-
-  window.__calls=[];
-  window.fetch = async function(url, init){
-    const body=JSON.parse(init.body);
-    const sys=body.messages.find(m=>m.role==='system').content;
-    const usr=body.messages.find(m=>m.role==='user').content;
-    window.__calls.push({system:sys.slice(0,50), user:usr});
-    if(/revising code/.test(sys)){
-      const prev=(usr.match(/EXISTING CODE:\n([\s\S]*?)\n\nThe human drew|EXISTING CODE:\n([\s\S]*?)\n\nThe mark/)||[])[1]||(usr.match(/EXISTING CODE:\n([\s\S]*?)\n\n/)||[])[1]||'';
-      const hit=[...usr.matchAll(/^\s{2}(r\d+) \(/gm)].map(m=>m[1]);
-      let out=prev;
-      hit.forEach(id=>{ out=out.replace(new RegExp('(data-region="'+id+'"[^>]*background:)#[0-9a-f]{6}','i'),'$1#7d2b8c'); });
-      window.__lastRevise={hit:hit, prevLen:prev.length, outLen:out.length};
-      return new Response(JSON.stringify({choices:[{message:{content:out}}]}),{status:200,headers:{'content-type':'application/json'}});
-    }
-    if(/REGIONS ARE NOT SUGGESTIONS/.test(sys)){
-      const rows=[...usr.matchAll(/(r\d+): x=(-?\d+) y=(-?\d+) w=(\d+) h=(\d+) — drawn as a (\S+)/g)];
-      const pal=['#1b3a4b','#c9a84c','#8a3324','#2f5d50'];
-      const html=rows.map(([,id,x,y,w,h],i)=>'<div data-region="'+id+'" style="position:absolute;left:'+x+'px;top:'+y+'px;width:'+w+'px;height:'+h+'px;background:'+pal[i%pal.length]+';color:#fff;display:flex;align-items:center;justify-content:center;font:600 '+(i?18:26)+'px/1.2 system-ui;">'+(i===0?'Recombinatorial drawing':'Section '+id)+'</div>').join('\n');
-      return new Response(JSON.stringify({choices:[{message:{content:'```html\n'+html+'\n```'}}]}),{status:200,headers:{'content-type':'application/json'}});
-    }
-    if(/answering a question/.test(sys)){
-      return new Response(JSON.stringify({choices:[{message:{content:'The three rectangles share edges only through the region frame you drew; nothing else relates them.'}}]}),{status:200,headers:{'content-type':'application/json'}});
-    }
-    return new Response(JSON.stringify({choices:[{message:{content:'[{"label":"page-layout","confidence":0.78,"reasoning":"three rectangles in a header/two-column arrangement"}]'}}]}),{status:200,headers:{'content-type':'application/json'}});
-  };
-  const a=window.__mm.MM.createAgentParticipant(window.__mm.session, Object.assign({},window.__mm.MM.PRESETS.ollama,{model:'stub-qwen'}), Date.now());
-  window.__mm.agents.push(a);
 
   // Teach the caret as the command mark, through the real pad UI.
   window.__teach = function(){
@@ -77,6 +49,50 @@ window.__setup = function(){
             chip:!document.getElementById('markChip').hidden,
             statusAfter:document.getElementById('teachStatus').textContent};
   };
+  return 'helpers ready';
+};
+
+/** Helpers plus a stubbed model, for a deterministic run. */
+window.__setup = function(){
+  window.__helpers();
+  const strokeOn = window.__t.strokeOn, line = window.__t.line;
+
+  window.__calls=[];
+  // The stub answers the FILL contract: per-region content, no layout. It
+  // derives the region ids from the prompt it was handed rather than hardcoding
+  // them, so a broken layout description fails the run instead of passing.
+  window.fetch = async function(url, init){
+    const body=JSON.parse(init.body);
+    const sys=body.messages.find(m=>m.role==='system').content;
+    const usr=body.messages.find(m=>m.role==='user').content;
+    window.__calls.push({system:sys.slice(0,60), user:usr});
+    const reply = (o) => new Response(JSON.stringify({choices:[{message:{content:JSON.stringify(o)}}]}),
+      {status:200, headers:{'content-type':'application/json'}});
+
+    if(/changing part of a page/.test(sys)){
+      const hit=(usr.match(/THE MARK LANDS ON: ([^.]+)\./)||[])[1]||'';
+      const ids=hit.split(',').map(x=>x.trim()).filter(Boolean);
+      window.__lastRevise={hit:ids};
+      const regions={};
+      ids.forEach(id=>{ regions[id]={tag:'section', style:'background:#7d2b8c;color:#fff', html:'<h2>revised '+id+'</h2>'}; });
+      return reply({regions});
+    }
+    if(/THE LAYOUT IS ALREADY DECIDED/.test(sys)){
+      const list=(usr.match(/REGIONS TO FILL: (.+)/)||[])[1]||'';
+      const ids=list.split(',').map(x=>x.trim()).filter(Boolean);
+      const pal=['#1b3a4b','#c9a84c','#8a3324','#2f5d50'];
+      const regions={};
+      ids.forEach((id,i)=>{ regions[id]={tag:i===0?'header':'section', style:'background:'+pal[i%pal.length]+';color:#fff;display:flex;align-items:center;justify-content:center', html:'<h2>Section '+id+'</h2>'}; });
+      return reply({theme:{background:'#fbfaf7', color:'#16161a'}, regions});
+    }
+    if(/answering a question/.test(sys)){
+      return new Response(JSON.stringify({choices:[{message:{content:'The three rectangles share edges only through the region frame you drew; nothing else relates them.'}}]}),{status:200,headers:{'content-type':'application/json'}});
+    }
+    return new Response(JSON.stringify({choices:[{message:{content:'[{"label":"page-layout","confidence":0.78,"reasoning":"three rectangles in a header/two-column arrangement"}]'}}]}),{status:200,headers:{'content-type':'application/json'}});
+  };
+  const a=window.__mm.MM.createAgentParticipant(window.__mm.session, Object.assign({},window.__mm.MM.PRESETS.ollama,{model:'stub-qwen'}), Date.now());
+  window.__mm.agents.push(a);
+
   return 'ready · ' + a.name;
 };
 
@@ -160,24 +176,43 @@ window.__scenario = async function(){
   step('6. the artifact is live', st1.live.length === 1 && st1.live[0] === artId,
     {live: st1.live, status: document.getElementById('mpStatus').textContent});
 
-  // ---- 7. The generated code honours the drawn geometry EXACTLY ----
+  // ---- 7. The rendered page matches the drawing ----
+  // Not "did the model position things correctly" — it is not asked to. The
+  // check is that what renders lines up with the ink, which is measured off the
+  // live DOM rather than off the markup.
   const wrap = document.querySelector('.artifactFrame');
   const doc = wrap && wrap.querySelector('iframe').contentDocument;
   const regions = artId ? mm.session.regions(artId) : [];
   if (!doc) {
-    step('7. every drawn box matches its generated div, to the pixel', false,
+    step('7. the rendered page lines up with the ink', false,
       { reason: 'no artifact frame rendered', live: st1.live, artifacts: st1.artifacts });
     return R;
   }
-  const mismatches = regions.filter(r=>{
-    const el = doc && doc.querySelector('[data-region="'+r.id+'"]');
-    if (!el) return true;
-    return parseInt(el.style.left)!==Math.round(r.rect.x) || parseInt(el.style.top)!==Math.round(r.rect.y)
-        || parseInt(el.style.width)!==Math.round(r.rect.w) || parseInt(el.style.height)!==Math.round(r.rect.h);
+  await wait(150); // let the iframe lay out
+  // An element's rect INSIDE the iframe is already in the artifact's own
+  // coordinate space — the iframe element is what the canvas transform scales,
+  // not its contents. So this compares like with like, with no zoom to divide
+  // out and no frame offset to subtract.
+  const drift = regions.map((r) => {
+    const el = doc.querySelector('[data-region="' + r.id + '"]');
+    if (!el) return { id: r.id, missing: true, dx: Infinity, dy: Infinity, dw: Infinity, dh: Infinity };
+    const b = el.getBoundingClientRect();
+    return {
+      id: r.id,
+      dx: Math.abs(b.left - r.rect.x),
+      dy: Math.abs(b.top - r.rect.y),
+      dw: Math.abs(b.width - r.rect.w),
+      dh: Math.abs(b.height - r.rect.h),
+    };
   });
-  step('7. every drawn box matches its generated div, to the pixel',
-    regions.length === 3 && mismatches.length === 0,
-    {regions: regions.map(r=>r.id+' '+r.rect.w+'x'+r.rect.h), mismatches: mismatches.map(m=>m.id)});
+  const worst = Math.max(...drift.map((d) => Math.max(d.dx, d.dy, d.dw || 0, d.dh || 0)));
+  step('7. every drawn box lines up with its rendered element (within 2px)',
+    regions.length === 3 && worst < 2,
+    { worstDriftPx: Math.round(worst * 100) / 100, drift: drift.map(d => d.id + ':' + Math.round(Math.max(d.dx,d.dy)*10)/10) });
+
+  const codeNow = String(mm.session.getState().nodes.get(artId).reps.filter(r=>r.modality==='code').pop().data.code);
+  step('7b. the page is laid out with flex, not pinned to pixels',
+    /display:flex/.test(codeNow) && !/position:absolute/.test(codeNow));
 
   // ---- 8. Ink ON the running page addresses what is under it ----
   mm.fitAll();
@@ -198,20 +233,25 @@ window.__scenario = async function(){
     t.chips().some(x=>x==='Change…') && !t.chips().some(x=>x==='Name this…'), t.chips());
 
   // ---- 10. Revise only what the ink covers ----
-  const before = doc.querySelector('[data-region="r2"]').style.background;
-  const otherBefore = doc.querySelector('[data-region="r1"]').style.background;
+  // Ask the summon which region the ink actually landed on rather than assuming
+  // an id: region ids follow reading order, so hardcoding one bakes in a layout.
+  const hitId = sum2.onArtifact.regionIds[0];
+  const otherId = regions.map((r) => r.id).find((x) => x !== hitId);
+  const beforeAddressed = doc.querySelector('[data-region="' + hitId + '"]').textContent;
+  const beforeOther = doc.querySelector('[data-region="' + otherId + '"]').textContent;
   const chg = [...document.querySelectorAll('#summon button')].find(b=>b.textContent.trim()==='Change…');
   chg.click();
   const inp2 = document.querySelector('#summon input.make');
   inp2.value = 'make this one purple';
   inp2.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}));
-  await wait(400);
+  await wait(500);
 
   const doc2 = document.querySelector('.artifactFrame iframe').contentDocument;
-  const after = doc2.querySelector('[data-region="r2"]') && doc2.querySelector('[data-region="r2"]').style.background;
-  const otherAfter = doc2.querySelector('[data-region="r1"]') && doc2.querySelector('[data-region="r1"]').style.background;
-  step('10. the addressed region changed', before !== after, {before, after});
-  step('10b. the region the ink did NOT cover is untouched', otherBefore === otherAfter, {otherBefore, otherAfter});
+  const q = (id) => { const e = doc2.querySelector('[data-region="' + id + '"]'); return e && e.textContent; };
+  step('10. the addressed region changed', beforeAddressed !== q(hitId),
+    {region: hitId, before: beforeAddressed, after: q(hitId)});
+  step('10b. the region the ink did NOT cover is untouched', beforeOther === q(otherId),
+    {region: otherId, before: beforeOther, after: q(otherId)});
 
   const codes = mm.session.getState().nodes.get(artId).reps.filter(r=>r.modality==='code');
   step('10c. both versions are held — generation is a proposal', codes.length === 2, {versions: codes.length});

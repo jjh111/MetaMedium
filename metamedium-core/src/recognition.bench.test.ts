@@ -55,6 +55,16 @@ describe('recognition benchmark — hand-drawn strokes', () => {
     }
   });
 
+  it('reads the bars an interface is made of, not just tidy squares', () => {
+    // A header, a nav, a footer, an input field. The aspect guard used to
+    // reject anything past 5:1, so the most common shape in any UI arrived at
+    // the layout parser as unrecognised 'art'.
+    for (const [w, h] of [[600, 90], [800, 60], [900, 44], [1200, 70]]) {
+      const top = analyzeStroke(handRect(0, 0, w, h, { seed: 5 })).results[0];
+      expect(top?.type, `${w}x${h} read as ${top?.type}`).toBe('rectangle');
+    }
+  });
+
   it('counts a rectangle as 4 corners regardless of how fast it was drawn', () => {
     for (const density of [0.12, 0.2, 0.35, 0.6, 1.0, 1.6]) {
       const fp = getFingerprint(handRect(0, 0, 200, 140, { startAt: 0, density, jitter: 2, seed: 3 }));

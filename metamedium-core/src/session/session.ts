@@ -43,6 +43,7 @@ import {
   resolvesLasso,
 } from './gesture';
 import { type CommandMark } from './commandmark';
+import { type MarkMiss, whyNotResolved } from './gesture';
 import { DEFAULT_ERASE_CROSSINGS, scratchedOut } from './erase';
 import { type Region, regionsOf, regionsOverlapping } from './regions';
 
@@ -95,6 +96,11 @@ export interface SessionState {
   explanations: string[];
   /** The mark the user taught this session, or null while the built-in check stands. */
   commandMark: CommandMark | null;
+  /**
+   * Why the last stroke drawn against a waiting lasso did not summon. Cleared
+   * by the next stroke. A gesture that fails silently cannot be learned.
+   */
+  markMiss: MarkMiss | null;
   /** Artifacts carrying a 'code' rep — the ones that render and run. */
   live: string[];
 }
@@ -130,6 +136,12 @@ export type SessionEvent =
       code: string;
       language?: string;
       prompt?: string;
+      /**
+       * The per-region content the code was built from. Kept so a revision can
+       * start from what is already there instead of re-deriving it from markup:
+       * the page is generated, but the CONTENT is the thing being edited.
+       */
+      fill?: unknown;
       at: number;
     }
   | {
@@ -203,6 +215,7 @@ export interface Session {
     code: string;
     language?: string;
     prompt?: string;
+    fill?: unknown;
     at: number;
   }): string | null;
   /** The artifact's member marks as a layout frame (MVP.md §6.2). */
@@ -238,6 +251,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
   let explanations: string[] = [];
   let live: string[] = [];
   let commandMark: CommandMark | null = config.gesture.commandMark ?? null;
+  let markMiss: MarkMiss | null = null;
   let counter = 0;
   const listeners = new Set<(state: SessionState) => void>();
 
@@ -252,6 +266,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     explanations = [];
     live = [];
     commandMark = config.gesture.commandMark ?? null;
+    markMiss = null;
     counter = 0;
     for (const n of createBootstrapNodes(0)) nodes.set(n.id, n);
   }
@@ -467,12 +482,8 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       // rule is a ratio of the lasso's own size, so it is zoom-free by
       // construction rather than by compensation.
       const gestureConfig = { ...config.gesture, commandMark };
-      if (
-        resolvesLasso(fp, at, lassoFp, pendingLasso.at, gestureConfig, {
-          check: points,
-          lasso: lassoPoints,
-        })
-      ) {
+      const strokePair = { check: points, lasso: lassoPoints };
+      if (resolvesLasso(fp, at, lassoFp, pendingLasso.at, gestureConfig, strokePair)) {
         // Retroactivity: the lasso was a gesture all along. Both strokes get
         // gesture reps and leave the content plane; their ink and prior
         // candidate edges remain (provenance, principle 9).
@@ -504,9 +515,14 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
           ...(onArtifact ? { onArtifact } : {}),
         };
         pendingLasso = null;
+        markMiss = null;
         recomputeClusterCandidates();
         return node.id;
       }
+      // It did not resolve. Record why, so the surface can say so.
+      markMiss = whyNotResolved(fp, at, lassoFp, pendingLasso.at, gestureConfig, strokePair);
+    } else {
+      markMiss = null;
     }
 
     // --- Scratch-out: did this stroke cross something enough times to rub it
@@ -782,6 +798,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
         code: ev.code,
         language: ev.language ?? 'html',
         prompt: ev.prompt,
+        fill: ev.fill,
         regions: regionsOf(node, nodes),
         at: ev.at,
       },
@@ -860,6 +877,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       participants: [...participants],
       explanations: [...explanations],
       commandMark,
+      markMiss,
       live: [...live],
     };
   }

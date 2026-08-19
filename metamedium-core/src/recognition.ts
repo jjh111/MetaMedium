@@ -94,7 +94,7 @@ function detectArc(fp: Fingerprint, points: Point[], scale = 1): RecognitionResu
 
 function detectTriangle(fp: Fingerprint): RecognitionResult | null {
   if (!fp.isClosed) return null;
-  if (fp.aspectRatio < 0.25 || fp.aspectRatio > 4) return null;
+  if (fp.aspectRatio < 0.14 || fp.aspectRatio > 7) return null;
 
   // A triangle fills about half its bounding box. That holds however the
   // corners were counted, which is exactly why it carries the most weight.
@@ -114,7 +114,12 @@ function detectTriangle(fp: Fingerprint): RecognitionResult | null {
 
 function detectRectangle(fp: Fingerprint): RecognitionResult | null {
   if (!fp.isClosed) return null;
-  if (fp.aspectRatio < 0.2 || fp.aspectRatio > 5) return null;
+  // Deliberately generous. The aspect guard is only here to keep a LINE from
+  // reading as a rectangle, and closure plus extent already do that far better:
+  // a line is open and encloses nothing. A tight 5:1 limit meanwhile rejected
+  // the single most common shape in any interface — a header bar — which then
+  // reached the layout parser as unrecognised 'art'.
+  if (fp.aspectRatio < 0.05 || fp.aspectRatio > 20) return null;
 
   // A rectangle fills its bounding box almost completely — the one measurement
   // that a missed corner cannot take away.

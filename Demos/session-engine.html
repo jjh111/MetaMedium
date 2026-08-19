@@ -343,7 +343,8 @@ html, body {
     <option value="anthropic">Anthropic (key)</option>
   </select>
   <label>Model</label>
-  <input id="mpModel" placeholder="qwen3" autocomplete="off" />
+  <input id="mpModel" placeholder="qwen3" autocomplete="off" list="mpModels" />
+  <datalist id="mpModels"></datalist>
   <label id="mpKeyLabel" hidden>API key <span class="hint">— kept in this tab only</span></label>
   <input id="mpKey" type="password" placeholder="sk-…" autocomplete="off" hidden />
   <div class="mpRow">
@@ -755,8 +756,34 @@ html, body {
     mpKey.hidden = !needsKey;
     mpKeyLabel.hidden = !needsKey;
   }
-  mpProvider.onchange = syncProviderFields;
+  mpProvider.onchange = () => { syncProviderFields(); listLocalModels(); };
   syncProviderFields();
+
+  // Ask a local server what it is holding. Typing a model name from memory is
+  // the kind of friction that makes a local-first tool feel worse than a hosted
+  // one, and the endpoint that answers this is the same one we generate with —
+  // so a populated list is also proof the transport can reach it.
+  const mpModelList = document.getElementById('mpModels');
+  async function listLocalModels() {
+    const p = mpProvider.value;
+    mpModelList.innerHTML = '';
+    if (NEEDS_KEY[p]) return;
+    const found = await MM.listModels(Object.assign({}, MM.PRESETS[p], { model: '' }));
+    if (!found.ok || !found.models.length) {
+      mpStatus.textContent = found.ok
+        ? 'No models on that server yet.'
+        : 'No local server on ' + MM.PRESETS[p].baseUrl + ' (' + found.error + ').';
+      return;
+    }
+    mpStatus.textContent = found.models.length + ' model(s) available.';
+    for (const m of found.models) {
+      const opt = document.createElement('option');
+      opt.value = m;
+      mpModelList.appendChild(opt);
+    }
+    if (!mpModel.value) mpModel.value = found.models[0];
+  }
+  listLocalModels();
 
   modelBtn.onclick = () => {
     togglePanel(panel, modelBtn);
@@ -793,17 +820,38 @@ html, body {
   // When a group is summoned, ask EVERY model at once. They answer in parallel
   // and each proposal lands independently — no escalation, no waiting for a
   // cheaper tier to fail first.
+  //
+  // A reading is worth having, but it is NOT worth making the human wait for.
+  // A local server answers one request at a time, so an unasked-for
+  // interpretation sits in front of whatever they type next — 35 seconds of a
+  // model describing a drawing they were about to replace. So it is cancellable,
+  // and committing to a prompt cancels it.
   let lastAskedSummon = null;
+  let reading = null; // AbortController for interpretations in flight
+
+  function cancelReading(why) {
+    if (!reading) return;
+    reading.abort();
+    reading = null;
+    if (why) mpStatus.textContent = why;
+  }
+
   function askModels(s) {
     if (!s.summon || agents.length === 0) return;
     if (s.summon.id === lastAskedSummon) return;
     lastAskedSummon = s.summon.id;
     if (s.summon.enclosedIds.length === 0) return; // nothing to read (ink on a page)
 
+    cancelReading();
+    const ctl = new AbortController();
+    reading = ctl;
     const ids = s.summon.enclosedIds.slice();
-    mpStatus.textContent = 'asking ' + agents.length + ' model(s)…';
+    mpStatus.textContent = 'reading with ' + agents.length + ' model(s)…';
+    let left = agents.length;
     agents.forEach((agent) => {
-      agent.interpret(ids, Date.now()).then((res) => {
+      agent.interpret(ids, Date.now(), ctl.signal).then((res) => {
+        if (ctl.signal.aborted) return;
+        if (--left === 0 && reading === ctl) reading = null;
         mpStatus.textContent = res.ok
           ? agent.name + ': ' + res.readings.map((r) => r.label).join(', ')
           : agent.name + ' unavailable (' + res.error + ') — tier 0 still holds.';
@@ -873,11 +921,18 @@ html, body {
     // NOT from a drop in the content count: a lasso resolved by a command mark
     // also leaves the content plane, and reporting that as "erased" would be a
     // lie about the one operation the user most needs to trust.
-    const made = session.getState().nodes.get(id);
+    const after = session.getState();
+    const made = after.nodes.get(id);
     const g = made && MM.getRep(made, 'gesture');
     if (g && g.data && g.data.role === 'scratch') {
       const n = (g.data.erased || []).length;
       flash('erased ' + n + ' mark' + (n === 1 ? '' : 's'));
+    } else if (after.markMiss && after.markMiss.nearMiss) {
+      // Only when the stroke was recognisably an ATTEMPT. A gesture that fails
+      // silently cannot be learned — the user cannot tell whether they drew it
+      // wrong, waited too long, or made it too big. Saying nothing about marks
+      // that were plainly just drawing keeps this from becoming nagging.
+      flash('no summon — ' + after.markMiss.detail);
     }
   });
 
@@ -1313,13 +1368,23 @@ html, body {
       if (!artifactId) { mpStatus.textContent = 'Could not hold that group.'; return; }
     }
 
+    // What the human typed outranks a reading nobody asked for.
+    cancelReading();
     mpStatus.textContent = (revising ? 'revising' : 'building') + ' with ' + agents.length + ' model(s)…';
     agents.forEach((agent) => {
       agent.generate({ prompt: prompt, artifactId: artifactId, at: Date.now(), addressed: addressed })
         .then((res) => {
-          mpStatus.textContent = res.ok
-            ? agent.name + ' ' + (res.revised ? 'revised' : 'built') + ' it (' + res.code.length + ' chars).'
-            : agent.name + ' could not build (' + res.error + ') — the drawing is untouched.';
+          if (res.ok) {
+            const short = res.unfilled && res.unfilled.length
+              ? ' — left ' + res.unfilled.join(', ') + ' empty'
+              : '';
+            mpStatus.textContent =
+              agent.name + ' ' + (res.revised ? 'revised' : 'built') + ' ' + res.filled.join(', ') + short;
+          } else {
+            mpStatus.textContent = agent.name + ' could not build (' + res.error + ') — the drawing is untouched.';
+            // A model that answered unusably is a thing you need to SEE to fix.
+            if (res.raw) window.__mm.lastRaw = res.raw;
+          }
           render(session.getState());
         });
     });
@@ -1336,6 +1401,7 @@ html, body {
       if (!q) return;
       input.disabled = true;
       input.placeholder = 'asking ' + agents.length + ' model(s)…';
+      cancelReading();
       agents.forEach((agent) => {
         agent.ask(q, nodeIds, Date.now()).then((res) => {
           if (!res.ok) mpStatus.textContent = agent.name + ' could not answer (' + res.error + ').';

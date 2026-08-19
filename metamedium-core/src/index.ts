@@ -67,9 +67,10 @@ export {
   resolvesLasso,
   enclosedBy,
   strokesIntersect,
+  whyNotResolved,
   DEFAULT_GESTURE_CONFIG,
 } from './session/gesture';
-export type { GestureConfig } from './session/gesture';
+export type { GestureConfig, MarkMiss, MissReason } from './session/gesture';
 
 // The command mark — a gesture the user teaches the system (MVP.md §5.2).
 export {
@@ -97,6 +98,13 @@ export type { ScratchTarget } from './session/erase';
 // drawn over a live artifact (MVP.md §5.4, §6.2).
 export { regionsOf, frameOf, regionAt, regionsOverlapping } from './session/regions';
 export type { Region, Rect } from './session/regions';
+
+// Parsing — the drawing read as a LAYOUT, and the page built from that reading.
+// The engine owns structure because it measured it; the model owns content.
+export { parseLayout, describeLayout } from './parse/layout';
+export type { Layout, LayoutNode, Flow, Connection } from './parse/layout';
+export { buildScaffold, validateRegions, prepare } from './parse/scaffold';
+export type { RegionContent, Theme } from './parse/scaffold';
 
 // Session engine
 export { createSession, DEFAULT_SESSION_CONFIG } from './session/session';
@@ -126,12 +134,12 @@ export type { Interpretation, InterpretationGroup, Disagreement } from './sessio
 
 // LLM transport (Tier 1–2). One client covers Ollama / LM Studio / OpenRouter;
 // Anthropic has its own. Failures are returned, never thrown.
-export { complete, listModels, providerLabel, providerTier, PRESETS, DEFAULT_TIMEOUT_MS } from './llm/provider';
-export type { ProviderConfig, ProviderKind, ChatMessage, CompletionResult } from './llm/provider';
+export { complete, listModels, providerLabel, providerTier, PRESETS, DEFAULT_TIMEOUT_MS, LOCAL_TIMEOUT_MS } from './llm/provider';
+export type { ProviderConfig, ProviderKind, ChatMessage, CompletionResult, ModelList } from './llm/provider';
 
 // Agent participants — a model joins through the same channel a human uses.
-export { createAgentParticipant, parseReadings, parseCode, readingsToEdges, MAX_READINGS } from './participants/agent';
-export type { AgentParticipant, AgentReading, InterpretResult, AskResult, GenerateResult } from './participants/agent';
+export { createAgentParticipant, parseReadings, parseCode, parseFill, readingsToEdges, MAX_READINGS } from './participants/agent';
+export type { AgentParticipant, AgentReading, InterpretResult, AskResult, GenerateResult, RegionFill } from './participants/agent';
 export { describeSession, describeSignature, describeRegions, describeAddressed } from './participants/serialize';
 export type { SerializeOptions } from './participants/serialize';
 

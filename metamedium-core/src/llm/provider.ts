@@ -41,7 +41,17 @@ export type CompletionResult =
   | { ok: true; text: string; model: string }
   | { ok: false; error: string };
 
-export const DEFAULT_TIMEOUT_MS = 30_000;
+export const DEFAULT_TIMEOUT_MS = 60_000;
+
+/**
+ * A local model gets far longer, because the two failure modes are not alike.
+ * A hosted call that hangs for a minute is a network problem worth giving up
+ * on; a local call that takes three is usually a 14GB model being paged into
+ * memory on its first request, and abandoning it wastes the load and reports a
+ * failure to a user whose machine is working perfectly. Measured: a cold
+ * devstral:24b took past 30s to answer at all, and 35s warm.
+ */
+export const LOCAL_TIMEOUT_MS = 300_000;
 
 export function providerLabel(config: ProviderConfig): string {
   return config.label ?? `llm:${config.model}`;
@@ -59,19 +69,39 @@ export function providerTier(config: ProviderConfig): 1 | 2 {
   return /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:|\/|$)/i.test(config.baseUrl) ? 1 : 2;
 }
 
-function withTimeout(ms: number): { signal: AbortSignal; done: () => void } {
+/**
+ * A signal that trips on timeout, or when the caller gives up first.
+ *
+ * The caller's signal matters as much as the clock. A local server answers one
+ * request at a time, so a reading nobody asked for can sit in front of the thing
+ * the human actually typed — and the only honest fix is to be able to take it
+ * back.
+ */
+function withTimeout(ms: number, external?: AbortSignal): { signal: AbortSignal; done: () => void } {
   const ctl = new AbortController();
   const t = setTimeout(() => ctl.abort(), ms);
-  return { signal: ctl.signal, done: () => clearTimeout(t) };
+  const relay = () => ctl.abort();
+  if (external) {
+    if (external.aborted) ctl.abort();
+    else external.addEventListener('abort', relay, { once: true });
+  }
+  return {
+    signal: ctl.signal,
+    done: () => {
+      clearTimeout(t);
+      external?.removeEventListener('abort', relay);
+    },
+  };
 }
 
 async function post(
   url: string,
   headers: Record<string, string>,
   body: unknown,
-  timeoutMs: number
+  timeoutMs: number,
+  external?: AbortSignal
 ): Promise<{ ok: true; json: unknown } | { ok: false; error: string }> {
-  const { signal, done } = withTimeout(timeoutMs);
+  const { signal, done } = withTimeout(timeoutMs, external);
   try {
     const res = await fetch(url, {
       method: 'POST',
@@ -86,7 +116,9 @@ async function post(
     return { ok: true, json: await res.json() };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    // An aborted request is a timeout, not a crash — say so plainly.
+    // Distinguish the two ways a request can be cut short: the caller gave up,
+    // or the clock ran out. Only one of them is worth reporting as a failure.
+    if (external?.aborted) return { ok: false, error: 'cancelled' };
     return { ok: false, error: signal.aborted ? `timed out after ${timeoutMs}ms` : msg };
   } finally {
     done();
@@ -102,7 +134,8 @@ function firstString(...candidates: unknown[]): string | undefined {
 async function completeOpenAICompatible(
   config: ProviderConfig,
   messages: ChatMessage[],
-  timeoutMs: number
+  timeoutMs: number,
+  external?: AbortSignal
 ): Promise<CompletionResult> {
   const headers: Record<string, string> = {};
   if (config.apiKey) headers.authorization = `Bearer ${config.apiKey}`;
@@ -111,7 +144,8 @@ async function completeOpenAICompatible(
     `${config.baseUrl.replace(/\/$/, '')}/chat/completions`,
     headers,
     { model: config.model, messages, stream: false },
-    timeoutMs
+    timeoutMs,
+    external
   );
   if (!res.ok) return res;
 
@@ -134,7 +168,8 @@ async function completeOpenAICompatible(
 async function completeAnthropic(
   config: ProviderConfig,
   messages: ChatMessage[],
-  timeoutMs: number
+  timeoutMs: number,
+  external?: AbortSignal
 ): Promise<CompletionResult> {
   if (!config.apiKey) return { ok: false, error: 'anthropic requires an API key' };
 
@@ -157,7 +192,8 @@ async function completeAnthropic(
       ...(system ? { system } : {}),
       messages: user.map((m) => ({ role: 'user', content: m.content })),
     },
-    timeoutMs
+    timeoutMs,
+    external
   );
   if (!res.ok) return res;
 
@@ -185,32 +221,48 @@ async function completeAnthropic(
  */
 export async function complete(
   config: ProviderConfig,
-  messages: ChatMessage[]
+  messages: ChatMessage[],
+  opts: { signal?: AbortSignal } = {}
 ): Promise<CompletionResult> {
-  const timeoutMs = config.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  const timeoutMs =
+    config.timeoutMs ?? (providerTier(config) === 1 ? LOCAL_TIMEOUT_MS : DEFAULT_TIMEOUT_MS);
   try {
     return config.kind === 'anthropic'
-      ? await completeAnthropic(config, messages, timeoutMs)
-      : await completeOpenAICompatible(config, messages, timeoutMs);
+      ? await completeAnthropic(config, messages, timeoutMs, opts.signal)
+      : await completeOpenAICompatible(config, messages, timeoutMs, opts.signal);
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) };
   }
 }
 
-/** List models a local OpenAI-compatible server is serving. `[]` if unreachable. */
-export async function listModels(config: Pick<ProviderConfig, 'baseUrl' | 'apiKey'>): Promise<string[]> {
+export interface ModelList {
+  ok: boolean;
+  models: string[];
+  error?: string;
+}
+
+/**
+ * What an OpenAI-compatible server is currently serving.
+ *
+ * Reports whether it could ask, separately from what came back. Returning a
+ * bare `[]` made "this server has no models" and "there is no server" the same
+ * answer, and only one of those is worth telling the user about.
+ */
+export async function listModels(config: Pick<ProviderConfig, 'baseUrl' | 'apiKey'>): Promise<ModelList> {
   const headers: Record<string, string> = {};
   if (config.apiKey) headers.authorization = `Bearer ${config.apiKey}`;
   try {
     const { signal, done } = withTimeout(5_000);
     const res = await fetch(`${config.baseUrl.replace(/\/$/, '')}/models`, { headers, signal });
     done();
-    if (!res.ok) return [];
+    if (!res.ok) return { ok: false, models: [], error: `HTTP ${res.status}` };
     const body = (await res.json()) as { data?: { id?: unknown }[] };
-    return (body?.data ?? [])
+    const models = (body?.data ?? [])
       .map((m) => m?.id)
-      .filter((id): id is string => typeof id === 'string');
-  } catch {
-    return [];
+      .filter((id): id is string => typeof id === 'string')
+      .sort();
+    return { ok: true, models };
+  } catch (err) {
+    return { ok: false, models: [], error: err instanceof Error ? err.message : String(err) };
   }
 }

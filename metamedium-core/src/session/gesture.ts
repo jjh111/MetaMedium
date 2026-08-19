@@ -113,3 +113,89 @@ export function resolvesLasso(
     lassoFp.size * config.checkProximityRatio
   );
 }
+
+// ===== Diagnosis =====
+
+export type MissReason = 'too-late' | 'too-big' | 'not-the-mark' | 'not-engaged';
+
+export interface MarkMiss {
+  reason: MissReason;
+  /** What to tell the human, in their terms. */
+  detail: string;
+  /**
+   * True when the stroke was recognisably an ATTEMPT at the mark and something
+   * else stopped it. Worth saying out loud; a stroke that was nothing like the
+   * mark is just drawing, and reporting on it would be nagging.
+   */
+  nearMiss: boolean;
+}
+
+/**
+ * Why a stroke did not resolve the pending lasso.
+ *
+ * A gesture that fails silently is indistinguishable from a gesture that does
+ * not exist — the user cannot tell whether they drew it wrong, waited too long,
+ * or made it too big, so they cannot get better at it. The engine knows exactly
+ * which test failed, and it costs nothing to say.
+ */
+export function whyNotResolved(
+  checkFp: Fingerprint,
+  checkAt: number,
+  lassoFp: Fingerprint,
+  lassoAt: number,
+  config: GestureConfig = DEFAULT_GESTURE_CONFIG,
+  strokes?: { check: Point[]; lasso: Point[] }
+): MarkMiss | null {
+  const mark = config.commandMark ?? BUILTIN_COMMAND_MARK;
+  const match = matchesCommandMark(checkFp, mark);
+  const shapeOk = match.match;
+
+  if (checkAt - lassoAt > config.checkWindowMs) {
+    return {
+      reason: 'too-late',
+      detail: `the circle had been waiting more than ${Math.round(config.checkWindowMs / 1000)}s`,
+      nearMiss: shapeOk,
+    };
+  }
+  if (checkFp.size > lassoFp.size * config.checkMaxSizeRatio) {
+    return {
+      reason: 'too-big',
+      detail: 'the mark was too large for what it was marking',
+      nearMiss: shapeOk,
+    };
+  }
+  if (!shapeOk) {
+    // Only volunteer this when the stroke was in the neighbourhood of the mark;
+    // otherwise the user was drawing, not gesturing.
+    const engaged =
+      (strokes && strokesIntersect(strokes.check, strokes.lasso)) ||
+      boundsOverlap(checkFp.bounds, lassoFp.bounds);
+    return {
+      reason: 'not-the-mark',
+      detail: match.failedOn
+        ? `that is not the ${mark.name} — ${readable(match.failedOn)}`
+        : `that is not the ${mark.name}`,
+      nearMiss: !!engaged && !checkFp.isClosed,
+    };
+  }
+  return {
+    reason: 'not-engaged',
+    detail: 'the mark has to cross or touch the circle',
+    nearMiss: true,
+  };
+}
+
+/** The feature that failed, said the way a person would say it. */
+function readable(feature: string): string {
+  switch (feature) {
+    case 'armRatio': return 'its two halves are the wrong lengths';
+    case 'turnSharpness': return 'its corner is the wrong sharpness';
+    case 'vertexDepth': return 'its corner is in the wrong place';
+    case 'endRise': return 'it ends at the wrong height';
+    case 'closureRatio': return 'its ends join up';
+    case 'corners': return 'it has the wrong number of corners';
+    case 'aspect': return 'its proportions are wrong';
+    case 'straightness': return 'it is too curved';
+    default: return `its ${feature} is off`;
+  }
+}

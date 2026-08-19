@@ -13,8 +13,10 @@
 import type { Session, ProposedEdge } from '../session/session';
 import type { ProviderConfig } from '../llm/provider';
 import { complete, providerLabel, providerTier } from '../llm/provider';
-import { describeSession, describeSignature, describeRegions, describeAddressed } from './serialize';
+import { describeSession, describeSignature } from './serialize';
 import { frameOf, regionsOf } from '../session/regions';
+import { parseLayout, describeLayout } from '../parse/layout';
+import { buildScaffold, validateRegions, type RegionContent, type Theme } from '../parse/scaffold';
 
 /** One candidate reading, as the model reports it. */
 export interface AgentReading {
@@ -64,32 +66,40 @@ Rules:
 - If the facts do not support an answer, say what is missing rather than guessing.
 - No preamble, no markdown, no bullet points. Just the answer.`;
 
-const MAKE_PROMPT = `You are a participant on a shared drawing canvas. The human has drawn a layout and asked you to build it.
+const MAKE_PROMPT = `You are a participant on a shared drawing canvas. The human drew a layout and asked you to build it.
 
-You are given the FRAME and the REGIONS the human drew, measured in pixels, plus grounded facts about each mark. You are not given an image.
+THE LAYOUT IS ALREADY DECIDED. It was measured from their drawing and the canvas will assemble it. You are not writing the page structure and you must not try to: no wrappers, no positioning, no widths or heights, no flexbox. If you emit layout it will be discarded, and if you omit a region it will render empty.
 
-THE REGIONS ARE NOT SUGGESTIONS. The human drew them and their ink stays visible on the canvas outlining what you build. If you move, resize, or ignore a region, the ink will no longer line up with the result and the drawing will be visibly wrong. You choose what goes in a region and how it looks. You do not choose where the regions are.
+Your job is the CONTENT of each region: the words, the semantics, and the look.
 
-Rules:
-- Output a single self-contained HTML fragment: markup plus one <style> block. No <html>, <head>, or <body> tags, no external requests, no <script> unless the human asked for behaviour.
-- Position each region with \`position:absolute\` at exactly the left/top/width/height you were given, on a \`position:relative\` root sized to the frame.
-- Give every region-backed element \`data-region="rN"\` matching its region id. This is how the canvas knows which of your elements the human's ink is pointing at — omitting it breaks the link between the drawing and the code.
-- A region that contains others is their container; nest accordingly and position children relative to it.
-- Design it well within those constraints: real copy, considered type, sensible colour. Do not emit placeholder lorem ipsum.
+For each region id you are given, return:
+  - "html"  — the inner HTML of that region. Real copy, never lorem ipsum. Headings, paragraphs, links, lists, buttons. Inline styles are fine for type and colour.
+  - "tag"   — one of div, section, header, footer, main, aside, nav, article, figure, form. Choose the one that fits what the region is.
+  - "style" — optional inline style for the region box itself: background, padding, border, alignment.
 
-Reply with ONLY the HTML. No prose, no code fences, no explanation.`;
-
-const REVISE_PROMPT = `You are a participant on a shared drawing canvas, revising code you or another participant already generated.
-
-You are given the existing HTML, the region frame it was built against, and which regions the human's new mark lands on.
+Also return a "theme": background, color, accent, fontFamily for the page as a whole.
 
 Rules:
-- Return the COMPLETE revised HTML fragment, not a diff and not a fragment of a fragment.
-- Change only what the addressed regions cover. Everything else must come back byte-identical.
-- Keep every \`data-region\` attribute and every absolute position exactly as they were. The human's ink is registered against those coordinates.
-- If the request cannot be satisfied without moving a region, do the closest thing that keeps the geometry, and do not move it.
+- Fill EVERY region you are given, using its exact id.
+- A wide region across the top is almost always a header; across the bottom, a footer. Side-by-side regions of similar size are columns of equal standing.
+- Write as if this were shipping. Specific copy, considered colour, real link text.
+- No <script>. No external images, fonts, or stylesheets — nothing that loads from the network.
 
-Reply with ONLY the HTML. No prose, no code fences, no explanation.`;
+Reply with ONLY a JSON object, no prose, no code fences:
+{"theme":{"background":"#…","color":"#…","accent":"#…","fontFamily":"…"},"regions":{"r1":{"tag":"header","style":"…","html":"…"}}}`;
+
+const REVISE_PROMPT = `You are a participant on a shared drawing canvas, changing part of a page you or another participant already filled in.
+
+You are given the layout, the content each region currently holds, and which regions the human's new mark lands on.
+
+Rules:
+- Return ONLY the regions you are changing. Regions you leave out keep exactly what they have.
+- Change only the regions the mark addresses. If the request cannot be satisfied within them, do the closest thing that can be, and say nothing about the rest.
+- The layout is not yours to change. No positioning, no sizes, no wrappers.
+- Return "theme" only if the request is about the whole page's look.
+
+Reply with ONLY a JSON object, no prose, no code fences:
+{"regions":{"r2":{"tag":"aside","style":"…","html":"…"}}}`;
 
 function clamp01(v: unknown): number {
   const n = typeof v === 'number' ? v : Number(v);
@@ -149,14 +159,161 @@ export function parseCode(text: string): string {
   if (!text) return '';
   const fenced = text.match(/```(?:html|xml)?\s*\n([\s\S]*?)```/i);
   const body = (fenced ? fenced[1] : text).trim();
-  // Drop any preamble before the first tag; models narrate despite instructions.
   const first = body.indexOf('<');
   if (first === -1) return '';
   const last = body.lastIndexOf('>');
   return body.slice(first, last + 1).trim();
 }
 
-/** Readings → the edges `propose()` expects. */
+export interface RegionFill {
+  theme?: Theme;
+  regions: Record<string, RegionContent>;
+}
+
+/**
+ * Parse JSON that a model wrote by hand.
+ *
+ * Strict JSON first, always. The repairs below only run on text that already
+ * failed, and each one exists because a real local model produced it:
+ *
+ *   - **Backtick strings.** Asked for JSON whose values are HTML full of double
+ *     quotes, devstral reaches for a JavaScript template literal rather than
+ *     escaping — `` "html":`<p class="x">hi</p>` ``. It is the single most
+ *     common way these replies are invalid, and it is unambiguous to fix.
+ *   - **Trailing commas.** Written by everything, meant by nothing.
+ *
+ * Nothing here guesses at intent. A reply we still cannot read is reported as
+ * unusable rather than half-understood.
+ */
+function parseLoose(text: string): unknown | null {
+  try {
+    return JSON.parse(text);
+  } catch {
+    /* fall through and repair */
+  }
+
+  // Backtick-delimited values → properly escaped JSON strings. Scanning rather
+  // than replacing, so a backtick INSIDE a normal JSON string is left alone.
+  let out = '';
+  let inString = false;
+  let escaped = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inString) {
+      out += c;
+      if (escaped) escaped = false;
+      else if (c === '\\') escaped = true;
+      else if (c === '"') inString = false;
+      continue;
+    }
+    if (c === '"') {
+      inString = true;
+      out += c;
+      continue;
+    }
+    if (c === '`') {
+      let body = '';
+      i++;
+      while (i < text.length && text[i] !== '`') {
+        body += text[i];
+        i++;
+      }
+      out += JSON.stringify(body);
+      continue;
+    }
+    out += c;
+  }
+
+  // Trailing commas before a closing brace or bracket.
+  out = out.replace(/,(\s*[}\]])/g, '$1');
+
+  try {
+    return JSON.parse(out);
+  } catch {
+    return null;
+  }
+}
+
+/** Find the outermost balanced JSON object in a reply that may be wrapped in prose. */
+function outermostObject(text: string): string | null {
+  const start = text.indexOf('{');
+  if (start === -1) return null;
+  let depth = 0;
+  let inString = false;
+  let inTemplate = false;
+  let escaped = false;
+  for (let i = start; i < text.length; i++) {
+    const c = text[i];
+    if (inTemplate) {
+      // A brace inside a template literal is content, not structure.
+      if (c === '`') inTemplate = false;
+      continue;
+    }
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (c === '\\') escaped = true;
+      else if (c === '"') inString = false;
+      continue;
+    }
+    if (c === '"') inString = true;
+    else if (c === '`') inTemplate = true;
+    else if (c === '{') depth++;
+    else if (c === '}' && --depth === 0) return text.slice(start, i + 1);
+  }
+  return null;
+}
+
+/**
+ * Parse a fill reply: per-region content plus an optional theme.
+ *
+ * Tolerant in the same way and for the same reasons as `parseReadings`, with
+ * one addition — a model that answers with a bare map of ids to HTML strings,
+ * rather than the documented object, is understood too. That shape is what
+ * smaller models reach for, and rejecting it would be pedantry rather than
+ * safety.
+ */
+export function parseFill(text: string): RegionFill | null {
+  if (!text) return null;
+  const json = outermostObject(text.replace(/```(?:json)?/gi, ''));
+  if (!json) return null;
+
+  const parsed = parseLoose(json);
+  if (!parsed || typeof parsed !== 'object') return null;
+  const obj = parsed as Record<string, unknown>;
+
+  const rawRegions =
+    obj.regions && typeof obj.regions === 'object'
+      ? (obj.regions as Record<string, unknown>)
+      : obj;
+
+  const regions: Record<string, RegionContent> = {};
+  for (const [id, value] of Object.entries(rawRegions)) {
+    if (!/^r\d+$/.test(id)) continue;
+    if (typeof value === 'string') {
+      regions[id] = { html: value };
+      continue;
+    }
+    if (!value || typeof value !== 'object') continue;
+    const v = value as Record<string, unknown>;
+    const html = typeof v.html === 'string' ? v.html : typeof v.content === 'string' ? v.content : '';
+    if (!html) continue;
+    regions[id] = {
+      html,
+      tag: typeof v.tag === 'string' ? v.tag.toLowerCase() : undefined,
+      style: typeof v.style === 'string' ? v.style : undefined,
+    };
+  }
+  if (Object.keys(regions).length === 0) return null;
+
+  const t = obj.theme && typeof obj.theme === 'object' ? (obj.theme as Record<string, unknown>) : {};
+  const str = (k: string) => (typeof t[k] === 'string' ? (t[k] as string) : undefined);
+  return {
+    theme: { background: str('background'), color: str('color'), accent: str('accent'), fontFamily: str('fontFamily') },
+    regions,
+  };
+}
+
+/** Readings → the edges `propose()` expects. *//** Readings → the edges `propose()` expects. */
 export function readingsToEdges(readings: AgentReading[], targetIsCluster: boolean): ProposedEdge[] {
   return readings.map((r) => ({
     // A cluster reading names a possible composition; a stroke reading names a
@@ -180,14 +337,14 @@ export interface AgentParticipant {
    * Never throws. On failure the session is untouched and the canvas keeps
    * working from Tier 0.
    */
-  interpret(nodeIds: string[], at: number): Promise<InterpretResult>;
+  interpret(nodeIds: string[], at: number, signal?: AbortSignal): Promise<InterpretResult>;
   /**
    * Answer a question about some marks, placing the answer IN the canvas.
    *
    * Never throws. Several agents may answer the same question; each answer is
    * its own held, attributed node and none replaces another.
    */
-  ask(question: string, nodeIds: string[], at: number): Promise<AskResult>;
+  ask(question: string, nodeIds: string[], at: number, signal?: AbortSignal): Promise<AskResult>;
   /**
    * Build (or revise) the code for an artifact and attach it to the canvas.
    *
@@ -203,14 +360,20 @@ export interface AgentParticipant {
     at: number;
     /** Region ids the human's ink landed on. Present only when revising. */
     addressed?: string[];
+    /** Abort this call — a local server answers one request at a time. */
+    signal?: AbortSignal;
   }): Promise<GenerateResult>;
 }
 
 export interface GenerateResult {
   ok: boolean;
   code?: string;
-  /** True when this revised existing code rather than building from scratch. */
+  /** True when this revised existing content rather than building from scratch. */
   revised?: boolean;
+  /** Region ids that now hold content. */
+  filled?: string[];
+  /** Region ids the model left empty — reported, never hidden. */
+  unfilled?: string[];
   error?: string;
   raw?: string;
 }
@@ -239,7 +402,7 @@ export function createAgentParticipant(
   // Join at the provider's tier so surfaces can group readings by voice.
   const id = session.join('agent', name, at, providerTier(config));
 
-  async function interpret(nodeIds: string[], now: number): Promise<InterpretResult> {
+  async function interpret(nodeIds: string[], now: number, signal?: AbortSignal): Promise<InterpretResult> {
     const state = session.getState();
     const targets = nodeIds.filter((n) => state.nodes.has(n));
     if (targets.length === 0) return { ok: false, readings: [], error: 'no such nodes' };
@@ -252,10 +415,14 @@ export function createAgentParticipant(
       ? `These ${targets.length} marks were grouped together (${signature}). What could this group be? Offer several readings.`
       : `What could this mark be? Offer several readings.`;
 
-    const result = await complete(config, [
-      { role: 'system', content: SYSTEM_PROMPT },
-      { role: 'user', content: `${context}\n\n${question}` },
-    ]);
+    const result = await complete(
+      config,
+      [
+        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'user', content: `${context}\n\n${question}` },
+      ],
+      { signal }
+    );
 
     if (!result.ok) return { ok: false, readings: [], error: result.error };
 
@@ -277,7 +444,7 @@ export function createAgentParticipant(
     return { ok: true, readings, raw: result.text };
   }
 
-  async function ask(question: string, nodeIds: string[], now: number): Promise<AskResult> {
+  async function ask(question: string, nodeIds: string[], now: number, signal?: AbortSignal): Promise<AskResult> {
     const q = question.trim();
     if (!q) return { ok: false, error: 'no question' };
 
@@ -286,10 +453,14 @@ export function createAgentParticipant(
     if (targets.length === 0) return { ok: false, error: 'no such nodes' };
 
     const context = describeSession(state, { nodeIds: targets });
-    const result = await complete(config, [
-      { role: 'system', content: ASK_PROMPT },
-      { role: 'user', content: `${context}\n\nQuestion: ${q}` },
-    ]);
+    const result = await complete(
+      config,
+      [
+        { role: 'system', content: ASK_PROMPT },
+        { role: 'user', content: `${context}\n\nQuestion: ${q}` },
+      ],
+      { signal }
+    );
     if (!result.ok) return { ok: false, error: result.error };
 
     const text = result.text.trim();
@@ -307,11 +478,30 @@ export function createAgentParticipant(
     return { ok: true, text, explanationId };
   }
 
+  /** Wires the engine already inferred between member marks, as region pairs. */
+  function connectionsOf(
+    artifact: { edges: { to: string; rel: string }[] },
+    state: ReturnType<Session['getState']>,
+    regions: { id: string; nodeId: string }[]
+  ) {
+    const byNode = new Map(regions.map((r) => [r.nodeId, r.id]));
+    const out: { from: string; to: string; via?: string }[] = [];
+    for (const e of artifact.edges) {
+      if (e.rel !== 'has-part') continue;
+      const node = state.nodes.get(e.to);
+      if (!node) continue;
+      const ends = node.edges.filter((x) => x.rel === 'connects').map((x) => byNode.get(x.to)).filter(Boolean) as string[];
+      if (ends.length === 2) out.push({ from: ends[0], to: ends[1], via: byNode.get(node.id) });
+    }
+    return out;
+  }
+
   async function generate(args: {
     prompt: string;
     artifactId: string;
     at: number;
     addressed?: string[];
+    signal?: AbortSignal;
   }): Promise<GenerateResult> {
     const prompt = args.prompt.trim();
     if (!prompt) return { ok: false, error: 'no prompt' };
@@ -323,54 +513,97 @@ export function createAgentParticipant(
     const frame = frameOf(artifact);
     if (!frame) return { ok: false, error: 'artifact has no frame' };
     const regions = regionsOf(artifact, state.nodes);
+    if (regions.length === 0) return { ok: false, error: 'nothing was drawn inside the artifact' };
+    const layout = parseLayout(regions, frame, connectionsOf(artifact, state, regions));
 
-    // The newest code rep is what the surface renders, so it is what we revise.
+    // The newest fill is what the surface renders, so it is what we revise.
     const existing = [...artifact.reps].reverse().find((r) => r.modality === 'code');
-    const revising = !!existing;
+    const previous = (existing?.data as { fill?: RegionFill } | undefined)?.fill;
+    const revising = !!previous;
 
-    const context = describeSession(state, {
-      nodeIds: regions.map((r) => r.nodeId),
-    });
+    const ids = regions.map((r) => r.id);
+    const addressed = args.addressed?.length ? args.addressed : ids;
 
-    const user = revising
-      ? [
-          describeRegions(regions, frame),
-          '',
-          'EXISTING CODE:',
-          String((existing!.data as { code: string }).code),
-          '',
-          describeAddressed(regions, args.addressed ?? []),
-          '',
-          `The human asks: ${prompt}`,
-        ].join('\n')
-      : [context, '', describeRegions(regions, frame), '', `The human asks: ${prompt}`].join('\n');
+    const lines = [describeLayout(layout), ''];
+    if (revising) {
+      lines.push('WHAT EACH REGION HOLDS NOW:');
+      for (const id of ids) {
+        const c = previous!.regions[id];
+        lines.push(`  ${id}: ${c ? `<${c.tag ?? 'div'}> ${c.html.replace(/\s+/g, ' ').slice(0, 160)}` : '(empty)'}`);
+      }
+      lines.push('', `THE MARK LANDS ON: ${addressed.join(', ')}. Change only those.`);
+    } else {
+      lines.push(`REGIONS TO FILL: ${ids.join(', ')}`);
+    }
+    lines.push('', `The human asks: ${prompt}`);
 
-    const result = await complete(config, [
-      { role: 'system', content: revising ? REVISE_PROMPT : MAKE_PROMPT },
-      { role: 'user', content: user },
-    ]);
+    const result = await complete(
+      config,
+      [
+        { role: 'system', content: revising ? REVISE_PROMPT : MAKE_PROMPT },
+        { role: 'user', content: lines.join('\n') },
+      ],
+      { signal: args.signal }
+    );
     if (!result.ok) return { ok: false, error: result.error };
 
-    const code = parseCode(result.text);
-    if (!code) return { ok: false, error: 'no usable code in reply', raw: result.text };
+    const fill = parseFill(result.text);
+    if (!fill) return { ok: false, error: 'no usable content in reply', raw: result.text };
 
-    // The session can refuse — an unregistered participant, a vanished node —
-    // and an agent that reports success the canvas rejected is worse than one
-    // that fails, because the failure is then invisible. Undo can un-join a
-    // participant, so this is reachable in normal use, not just in theory.
+    // A revision keeps everything it did not mention; a build starts empty. The
+    // model is told this, but the engine is what guarantees it.
+    const merged: RegionFill = {
+      theme: { ...(previous?.theme ?? {}), ...(fill.theme ?? {}) },
+      regions: { ...(previous?.regions ?? {}) },
+    };
+    for (const [id, content] of Object.entries(fill.regions)) {
+      if (!ids.includes(id)) continue; // a region the drawing does not have
+      if (revising && !addressed.includes(id)) continue; // outside what the ink addressed
+      merged.regions[id] = content;
+    }
+
+    const filled = ids.filter((id) => merged.regions[id]);
+    if (filled.length === 0) {
+      return { ok: false, error: 'the model filled none of the regions', raw: result.text };
+    }
+
+    const code = buildScaffold(layout, merged.regions, merged.theme);
+
+    // The scaffold is built from the parse, so this cannot normally fail — but
+    // it is the promise the whole design rests on, and a promise nobody checks
+    // is a promise you find out about from a screenshot.
+    const check = validateRegions(code, ids);
+    if (!check.ok) {
+      return {
+        ok: false,
+        error: `the page does not match the drawing (missing ${check.missing.join(', ') || 'none'}` +
+          `${check.duplicated.length ? `, duplicated ${check.duplicated.join(', ')}` : ''})`,
+        code,
+        raw: result.text,
+      };
+    }
+
     const accepted = session.attachCode({
       participantId: id,
       nodeId: args.artifactId,
       code,
       language: 'html',
       prompt,
+      fill: merged,
       at: args.at,
     });
     if (!accepted) {
       return { ok: false, error: 'the canvas did not accept the code', code, raw: result.text };
     }
 
-    return { ok: true, code, revised: revising, raw: result.text };
+    return {
+      ok: true,
+      code,
+      revised: revising,
+      filled,
+      unfilled: ids.filter((x) => !merged.regions[x]),
+      raw: result.text,
+    };
   }
 
   return { id, name, config, interpret, ask, generate };

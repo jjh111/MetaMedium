@@ -384,3 +384,78 @@ describe('the same hand gesture reads the same at any zoom', () => {
   });
 });
 
+
+describe('a mark that does not take says why', () => {
+  // A gesture that fails silently is indistinguishable from a gesture that does
+  // not exist: the user cannot tell whether they drew it wrong, waited too long,
+  // or made it too big, so they cannot get better at it.
+  function lassoWaiting() {
+    const s = createSession();
+    s.addStroke(rectStroke(100, 100, 120, 90), 1000);
+    s.addStroke(circleStroke(160, 145, 150), 2000);
+    expect(s.getState().pendingLassoId).not.toBeNull();
+    return s;
+  }
+
+  it('says nothing when there is no lasso waiting', () => {
+    const s = createSession();
+    s.addStroke(rectStroke(0, 0, 100, 80), 1000);
+    expect(s.getState().markMiss).toBeNull();
+  });
+
+  it('reports a mark drawn too long after the circle', () => {
+    const s = lassoWaiting();
+    s.addStroke(checkStroke(300, 120), 2000 + 9000);
+    const miss = s.getState().markMiss!;
+    expect(miss.reason).toBe('too-late');
+    expect(miss.nearMiss).toBe(true);
+    expect(miss.detail).toMatch(/waiting/);
+  });
+
+  it('reports a mark too large for what it marks', () => {
+    const s = lassoWaiting();
+    s.addStroke(checkStroke(120, 120).map((p) => ({ x: p.x * 4, y: p.y * 4 })), 2200);
+    expect(s.getState().markMiss!.reason).toBe('too-big');
+  });
+
+  it('reports the mark being wrong, and names the feature', () => {
+    const s = lassoWaiting();
+    // An upside-down caret, drawn right on the circle: clearly an attempt.
+    s.addStroke(
+      lineStroke({ x: 150, y: 190 }, { x: 185, y: 140 }, 30).concat(
+        lineStroke({ x: 185, y: 140 }, { x: 220, y: 190 }, 30).slice(1)
+      ),
+      2200
+    );
+    const miss = s.getState().markMiss!;
+    expect(miss.reason).toBe('not-the-mark');
+    expect(miss.nearMiss).toBe(true);
+    expect(miss.detail).toMatch(/not the check/);
+  });
+
+  it('does not nag about a stroke that was plainly just drawing', () => {
+    const s = lassoWaiting();
+    s.addStroke(rectStroke(600, 600, 90, 70), 2200);
+    const miss = s.getState().markMiss;
+    expect(miss?.nearMiss).toBe(false);
+  });
+
+  it('reports a correct mark that never touched the circle', () => {
+    const s = lassoWaiting();
+    s.addStroke(checkStroke(900, 900), 2200);
+    const miss = s.getState().markMiss!;
+    expect(miss.reason).toBe('not-engaged');
+    expect(miss.detail).toMatch(/cross or touch/);
+  });
+
+  it('clears once a mark lands', () => {
+    const s = lassoWaiting();
+    s.addStroke(checkStroke(900, 900), 2200); // miss recorded
+    expect(s.getState().markMiss).not.toBeNull();
+    s.addStroke(rectStroke(100, 100, 120, 90), 3000);
+    s.addStroke(circleStroke(160, 145, 150), 3200);
+    s.addStroke(checkStroke(300, 130), 3400);
+    expect(s.getState().summon).not.toBeNull();
+    expect(s.getState().markMiss).toBeNull();
+  });
+});

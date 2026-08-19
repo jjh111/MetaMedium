@@ -21,10 +21,29 @@ describe('regionsOf', () => {
     expect(s.regions(id)).toHaveLength(3);
   });
 
-  it('orders largest first, so a container is declared before what it holds', () => {
+  it('orders by reading order — top to bottom, left to right', () => {
+    // Region ids are how the human, the model and the generated DOM refer to
+    // the same thing, so r1 must be the mark a person would name first.
     const { s, id } = boardWithBoxes();
-    const areas = s.regions(id).map((r) => r.rect.w * r.rect.h);
-    expect([...areas].sort((a, b) => b - a)).toEqual(areas);
+    const r = s.regions(id);
+    expect(r.map((x) => [x.world.x, x.world.y])).toEqual([
+      [100, 100], // top-left
+      [340, 100], // top-right, same band
+      [100, 260], // the bar underneath
+    ]);
+  });
+
+  it('puts a container ahead of what it contains', () => {
+    const s = createSession();
+    s.addStroke(rectStroke(100, 100, 400, 300), 1000); // outer
+    s.addStroke(rectStroke(150, 150, 120, 80), 1100); // inner
+    s.addStroke(circleStroke(300, 250, 400), 2000);
+    s.addStroke(checkStroke(740, 250), 2500);
+    const id = s.bless({ summonId: s.getState().summon!.id, name: 'card', at: 3000 })!;
+
+    const r = s.regions(id);
+    expect(r[0].contains).toContain(r[1].id);
+    expect(r[1].contains).toHaveLength(0);
   });
 
   it('gives artifact-local coordinates — the space generated code is written in', () => {
