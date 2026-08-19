@@ -75,7 +75,10 @@ export type { GestureConfig } from './session/gesture';
 export {
   learnCommandMark,
   matchesCommandMark,
+  commandMarkFeatures,
   collidesWith,
+  canonicalCheckSamples,
+  BUILTIN_COMMAND_MARK,
   COMMAND_MARK_SAMPLES,
 } from './session/commandmark';
 export type { CommandMark, CommandMatch } from './session/commandmark';

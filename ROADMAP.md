@@ -89,6 +89,19 @@ in MVP.md §7: fixed pixel thresholds are about the *hand*, not the world;
 `isStrokeClosed` contradicted its own documented intent at the small end; and a
 closed stroke must never be read as a scratch.
 
+**Recognition and gesture refresh (19 Aug 2026).** A hand-drawn rectangle read
+as a triangle. Benchmarked over 1080 hand-drawn strokes, top-reading accuracy
+went **40.4% → 99.9%** (rectangles 10% → 100%). Same pass: the command gesture,
+which had never actually been *defined* — the rule was "open, 1–2 corners,
+smaller than the lasso", which fires on an L, a V and an upside-down caret. It
+is now a check with eight scale-free measurements including orientation, and
+`BUILTIN_COMMAND_MARK` is a signature learned the same way a taught mark is
+rather than a special case in the code. 271 core tests.
+
+Both mistakes had the same shape: **a threshold stated in the wrong space**
+(point indices instead of arc length, pixels instead of ratios) and **a decision
+made by a constant instead of a measurement**. Details in MVP.md §7.
+
 **Still open:** handwriting (v7 Stage E), so "the copy in the squares" can be
 literal rather than typed.
 

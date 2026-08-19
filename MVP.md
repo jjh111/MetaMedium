@@ -141,25 +141,43 @@ size-relative overshoot. In world space those are zoom-invariant and the grammar
 holds at any zoom. In screen space, §2 step 3 breaks the moment you zoom out to
 lasso, which is precisely the flow the MVP is built on.
 
-### 5.2 The learned command gesture
+### 5.2 The command mark
 
-A gesture library on the gesture plane, parallel to the primitive library:
+Eight scale-free measurements, five of them shape and three of them
+**orientation** — the axis the first attempt lacked entirely, and the reason it
+could not tell a check from an upside-down caret:
 
-- `learnGesture(samples: Point[][]) → GestureSignature` — fingerprint centroid
-  across five samples, plus per-feature spread, which gives the tolerance band
-  for free. A user with a consistent mark gets a tight band; a sloppy one gets a
-  loose band and is told so.
-- `matchesCommand(fp, signature)` — weighted fingerprint comparison, the same
-  shape as `matchPrimitiveFromLibrary`.
-- `resolvesLasso` swaps `isCheckLike` for `matchesCommand`, and tightens
-  proximity from "overlaps or within 80px" to **intersects**, per §2 step 4.
-- The built-in check stays as the default signature, so the system works before
-  it is taught anything.
+| | |
+|---|---|
+| `straightness`, `corners`, `aspect`, `closureRatio` | shape |
+| `armRatio` | shorter arm over longer, split at the sharpest corner. A V is 1.0; a check ~0.62 |
+| `turnSharpness` | how hard that corner turns |
+| `vertexDepth` | where the elbow sits vertically in the stroke's box. 0 = a caret, 1 = a check |
+| `endRise` | how much higher the stroke ends than it began |
 
-**Rejection matters more than recognition.** A command mark that also fires
-while you are drawing is worse than no gesture at all. The five samples must
-produce a band that ordinary drawing falls outside of, and the engine should
-refuse to accept a signature that collides with the user's existing primitives.
+- `learnCommandMark(samples)` — feature centroid across the samples plus
+  per-feature spread, which gives the accept band for free. A steady hand gets a
+  tight band; a sloppy one gets a loose band and is told so.
+- **Tolerance floors are the designed generosity**; a learned spread only ever
+  widens them. The straightness floor is the widest of the set and was measured,
+  not guessed: across 60 hand-drawn checks straightness ranges 0.46–0.74,
+  because a deep dip lengthens the path without moving the endpoints.
+- `BUILTIN_COMMAND_MARK` is that same signature, learned from canonical check
+  samples at module load. The default is vocabulary we ship, not a code path.
+
+**Rejection matters more than recognition.** A mark that fires while you draw is
+worse than no gesture at all. `commandmark.bench.test.ts` pins **100% acceptance**
+of hand-drawn checks across size, proportion, slant and wobble, and **zero false
+fires** across the whole drawing corpus — rectangles, triangles, circles, lines,
+arcs, scratch-outs, diamonds, and the near-misses (L, backwards L, V, caret,
+check-drawn-backwards) that the old rule accepted. `collidesWith` additionally
+refuses a taught signature that matches the user's existing primitives.
+
+**One engagement rule for every mark:** cross the selection, overlap it, or come
+close *relative to the selection's own size*. Previously a taught mark required
+strict intersection while the built-in check needed only to land within 80px —
+two behaviours to learn, and a fixed pixel term that meant something different at
+every zoom. No fixed pixel term remains in the gesture grammar.
 
 ### 5.3 Two layers, one transform
 
@@ -230,17 +248,43 @@ the regions are.** The human drew that, and the ink is the record of it.
 
 ## 7. Staging — shipped
 
-All six stages landed. **215 core tests** (+87), plus a 17-step end-to-end check
+All six stages landed. **271 core tests**, plus a 19-step end-to-end check
 that drives the real UI in a browser (`Demos/session-engine.e2e.js`).
 
 | # | Stage | Ship criterion | Status |
 |---|---|---|---|
 | **1** | **Infinite canvas** | Zoom out, lasso a group too wide for one screen, loop still closes | ✅ verified at 0.41× |
-| **2** | **Your command mark** | Your mark summons; ordinary drawing never fires it | ✅ 5 samples → 82% consistency; check correctly ignored after teaching |
+| **2** | **The command mark** | Your mark summons; ordinary drawing never fires it | ✅ built-in check works untaught; 5 samples replace it; 100% accept / 0 false fires |
 | **3** | **Prompt → living code** | Boxes + *"website with the copy in the squares"* → a real page in place | ✅ renders in a sandboxed iframe at world position |
 | **4** | **Ink lands on the artifact** | Circle a region of the live page, command, prompt — that region changes | ✅ resolves to `r2`; the untouched region comes back byte-identical |
 | **5** | **The decomposition persists** | The drawn boxes stay as the region outlines | ✅ every rect matches its generated div **to the pixel** |
 | **6** | **Scratch erase** | Scribble over a mark, it goes; undo restores | ✅ relational crossing-count, ported from the sibling `johnhanacek` repo |
+
+### The recognition and gesture refresh (19 Aug 2026)
+
+Two things the first pass got wrong badly enough to be worth recording.
+
+**A hand-drawn rectangle read as a triangle.** Benchmarked over 1080 hand-drawn
+strokes, top-reading accuracy was **40.4%** — rectangles **10%**. Three causes:
+corner counting measured in point-index space (so the same rectangle returned 1,
+2 or 3 corners depending only on drawing speed, and never 4, because the corner
+on the stroke's seam was structurally unscannable); no measurement separated a
+box from a triangle at all; and the detectors carried fixed confidences with
+overlapping corner bands, so triangle beat rectangle because 0.85 > 0.80. Now
+**99.9%**, with corners measured along the path, `extent` as the discriminator,
+and confidence scored from evidence. Two further findings fell out of the
+benchmark: straightness was dominated by digitizer noise at high report rates,
+and Tier 0 could claim certainty. See CLAUDE.md.
+
+**The command gesture was never defined.** *Open, one or two corners, smaller
+than the lasso* fired on an L, a backwards L, a V, an upside-down caret, and a
+check drawn backwards. §5.2 replaces it with an actual definition — including
+the orientation features the first attempt lacked — and a benchmark that tests
+silence harder than it tests recognition.
+
+The shape of both mistakes was the same: **a threshold stated in the wrong
+space** (point indices instead of arc length; pixels instead of ratios), and
+**a decision made by a constant instead of by a measurement**.
 
 ### What the build actually taught
 

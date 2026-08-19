@@ -92,6 +92,22 @@ window.__scenario = async function(){
   const step = (name, ok, detail) => { R.steps.push({name, ok: !!ok, detail}); if(!ok) R.pass=false; return ok; };
   const wait = (ms) => new Promise(r=>setTimeout(r, ms||250));
 
+  // ---- 0. The built-in mark works before anything is taught ----
+  // A default gesture that only works after you configure it is not a default.
+  {
+    t.stroke(t.rect(200, 180, 200, 140));
+    t.stroke(t.circle(300, 250, 190));
+    t.stroke(t.check(470, 210, 1));
+    const summoned = window.__mm.session.getState().summon !== null;
+    // Exactly as many undos as strokes. One more would drop the model's `join`
+    // event and quietly un-register it for the rest of the run.
+    for (let i = 0; i < 3; i++) window.__mm.session.undo();
+    step('0. the built-in check summons with nothing taught', summoned,
+      { mark: window.__mm.session.getState().commandMark });
+    step('0b. the model is still a registered participant after undo',
+      window.__mm.session.getState().participants.includes(window.__mm.agents[0].id));
+  }
+
   // ---- 1. Teach the command mark ----
   const taught = window.__teach();
   step('1. five samples become a command mark',
@@ -144,7 +160,12 @@ window.__scenario = async function(){
   // ---- 7. The generated code honours the drawn geometry EXACTLY ----
   const wrap = document.querySelector('.artifactFrame');
   const doc = wrap && wrap.querySelector('iframe').contentDocument;
-  const regions = mm.session.regions(artId);
+  const regions = artId ? mm.session.regions(artId) : [];
+  if (!doc) {
+    step('7. every drawn box matches its generated div, to the pixel', false,
+      { reason: 'no artifact frame rendered', live: st1.live, artifacts: st1.artifacts });
+    return R;
+  }
   const mismatches = regions.filter(r=>{
     const el = doc && doc.querySelector('[data-region="'+r.id+'"]');
     if (!el) return true;

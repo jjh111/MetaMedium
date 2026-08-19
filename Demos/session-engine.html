@@ -292,14 +292,15 @@ html, body {
 <div class="rail">
   <div class="title">
     <h1>MetaMedium <span>MVP</span></h1>
-    <p>Draw. Circle a group and cross it with your command mark to summon an
-       offer — name it, or <b>prompt it into a living page</b>. Draw on the page
-       and your ink addresses what's under it. Scratch anything out to erase.
+    <p>Draw. Circle a group, then draw the <b>command mark</b> across it — a
+       check ✓, or your own once you teach one — to summon an offer. Name it, or
+       <b>prompt it into a living page</b>. Draw on the page and your ink
+       addresses what's under it. Scratch anything out to erase.
        <kbd>Ctrl</kbd>+<kbd>Z</kbd> undoes.</p>
   </div>
   <div class="controls">
-    <div class="markChip" id="markChip" hidden>
-      <canvas id="markGlyph" width="34" height="22"></canvas><span id="markName">mark</span>
+    <div class="markChip" id="markChip" title="The mark that turns a circled group into an offer. Click to teach your own.">
+      <canvas id="markGlyph" width="34" height="22"></canvas><span id="markName">check</span>
     </div>
     <div class="zoomRow">
       <button id="zoomOut" title="Zoom out">−</button>
@@ -316,9 +317,10 @@ html, body {
 
 <div id="teachPanel" hidden>
   <div class="eyebrow">teach your command mark</div>
-  <p class="hint">Draw the same mark <b>five times</b> in the pad. The canvas learns
-     your hand's spread, so the sixth one it has never seen still counts —
-     the same way it learns any shape you name.</p>
+  <p class="hint">The canvas watches for a <b>check ✓</b> until you replace it.
+     Draw your own mark <b>five times</b> below: it learns your hand's spread, so
+     the sixth one it has never seen still counts — the same way it learns any
+     shape you name. It will refuse a mark that looks like something you draw.</p>
   <canvas id="teachPad"></canvas>
   <div id="teachDots"><i></i><i></i><i></i><i></i><i></i></div>
   <div class="tpRow">
@@ -667,7 +669,7 @@ html, body {
     if (samples.length < MM.COMMAND_MARK_SAMPLES) return;
     const mark = MM.learnCommandMark(samples, 'your mark');
     session.teachCommandMark(mark, Date.now());
-    drawMarkChip(samples[samples.length - 1]);
+    drawMarkChip(samples[samples.length - 1], 'your mark');
     teachStatus.className = '';
     teachStatus.textContent = 'Learned. The check ✓ no longer summons — your mark does.';
   };
@@ -679,9 +681,17 @@ html, body {
     togglePanel(teachPanel, teachBtn);
     if (!teachPanel.hasAttribute('hidden')) { sizePad(); evaluateSamples(); }
   };
+  document.getElementById('markChip').onclick = () => teachBtn.click();
 
-  // The taught mark, echoed in the rail: you can see what the canvas watches for.
-  function drawMarkChip(pts) {
+  // The ACTIVE mark, echoed in the rail. Shown from the start, not only once
+  // you have taught one — a gesture you cannot see is a gesture you have to be
+  // told about, and the built-in check deserves the same visibility as yours.
+  function showBuiltInMark() {
+    const samples = MM.canonicalCheckSamples();
+    drawMarkChip(samples[0], 'check');
+  }
+
+  function drawMarkChip(pts, name) {
     const chip = document.getElementById('markChip');
     const g = document.getElementById('markGlyph');
     const gc = g.getContext('2d');
@@ -695,7 +705,7 @@ html, body {
       i ? gc.lineTo(x, y) : gc.moveTo(x, y);
     });
     gc.strokeStyle = '#c9a84c'; gc.lineWidth = 1.6; gc.lineCap = 'round'; gc.stroke();
-    document.getElementById('markName').textContent = 'your mark';
+    document.getElementById('markName').textContent = name || 'your mark';
     chip.hidden = false;
   }
 
@@ -1023,7 +1033,7 @@ html, body {
       strokes + ' loose · ' + s.artifacts.length + ' artifact' + (s.artifacts.length === 1 ? '' : 's') +
       (s.live.length ? ' (' + s.live.length + ' live)' : '') +
       ' · ' + s.participants.length + ' participants' +
-      (s.commandMark ? ' · your mark' : ' · check ✓') +
+      ' · ' + (s.commandMark ? 'your mark' : 'check ✓') +
       (s.pendingLassoId ? '  ·  circle held — cross it to summon' : '') +
       (fresh ? '  ·  ' + flashText : '');
   }
@@ -1494,6 +1504,7 @@ html, body {
   };
 
   session.subscribe(render);
+  showBuiltInMark();
   document.fonts.ready.then(() => { sizePad(); render(session.getState()); });
   resize();
   afterViewChange();

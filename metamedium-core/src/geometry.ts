@@ -428,7 +428,8 @@ export function countCorners(
 ): {
   count: number;
   angles: number[];
-  cornerData: { index: number; angle: number; x: number; y: number }[];
+  /** `t` is the corner's position along the path, 0–1 — arc length, not index. */
+  cornerData: { index: number; angle: number; x: number; y: number; t: number }[];
 } {
   const opts: Required<CornerOptions> = {
     ...DEFAULT_CORNER_OPTIONS,
@@ -492,6 +493,7 @@ export function countCorners(
       angle: c.angle,
       x: path[c.index].x,
       y: path[c.index].y,
+      t: c.index / path.length,
     })),
   };
 }
@@ -674,6 +676,8 @@ export function getFingerprint(points: Point[], scale = 1): Fingerprint {
     tipPoint: tipPoint,
     angleAnalysis: angleAnalysis,
     pointCount: points.length,
+    start: points[0],
+    end: points[points.length - 1],
   };
 }
 

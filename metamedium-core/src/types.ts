@@ -37,7 +37,10 @@ export interface Fingerprint {
   size: number;
   corners: number;
   cornerAngles?: number[]; // radians
-  cornerData?: { index: number; angle: number; x: number; y: number }[];
+  cornerData?: { index: number; angle: number; x: number; y: number; t: number }[];
+  /** First and last point — where the stroke began and ended, direction included. */
+  start: Point;
+  end: Point;
   tipPoint?: Point; // sharpest corner (triangles)
   angleAnalysis: AngleAnalysis;
   pointCount: number;

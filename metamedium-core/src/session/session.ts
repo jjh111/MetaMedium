@@ -463,13 +463,10 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       const lassoNode = nodes.get(pendingLasso.id)!;
       const lassoFp = fingerprintOf(lassoNode)!;
       const lassoPoints = strokePointsOf(lassoNode) ?? [];
-      // Proximity is a hand-sized rule too: 80px means 80px as the human sees
-      // it, so it travels with the zoom the command stroke was drawn at.
-      const gestureConfig = {
-        ...config.gesture,
-        commandMark,
-        checkProximityPx: config.gesture.checkProximityPx * scale,
-      };
+      // No scale correction is needed here any more: every term in the gesture
+      // rule is a ratio of the lasso's own size, so it is zoom-free by
+      // construction rather than by compensation.
+      const gestureConfig = { ...config.gesture, commandMark };
       if (
         resolvesLasso(fp, at, lassoFp, pendingLasso.at, gestureConfig, {
           check: points,

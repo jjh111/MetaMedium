@@ -302,8 +302,9 @@ export function createAgentParticipant(
       aboutIds: targets,
       at: now,
     });
+    if (!explanationId) return { ok: false, error: 'the canvas did not accept the answer', text };
 
-    return { ok: true, text, explanationId: explanationId ?? undefined };
+    return { ok: true, text, explanationId };
   }
 
   async function generate(args: {
@@ -353,7 +354,11 @@ export function createAgentParticipant(
     const code = parseCode(result.text);
     if (!code) return { ok: false, error: 'no usable code in reply', raw: result.text };
 
-    session.attachCode({
+    // The session can refuse — an unregistered participant, a vanished node —
+    // and an agent that reports success the canvas rejected is worse than one
+    // that fails, because the failure is then invisible. Undo can un-join a
+    // participant, so this is reachable in normal use, not just in theory.
+    const accepted = session.attachCode({
       participantId: id,
       nodeId: args.artifactId,
       code,
@@ -361,6 +366,9 @@ export function createAgentParticipant(
       prompt,
       at: args.at,
     });
+    if (!accepted) {
+      return { ok: false, error: 'the canvas did not accept the code', code, raw: result.text };
+    }
 
     return { ok: true, code, revised: revising, raw: result.text };
   }

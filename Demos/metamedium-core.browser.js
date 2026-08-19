@@ -22,6 +22,7 @@ var MetaMediumCore = (() => {
   // src/index.ts
   var index_exports = {};
   __export(index_exports, {
+    BUILTIN_COMMAND_MARK: () => BUILTIN_COMMAND_MARK,
     BUILTIN_TYPES: () => BUILTIN_TYPES,
     COMMAND_MARK_SAMPLES: () => COMMAND_MARK_SAMPLES,
     DEFAULT_CORNER_OPTIONS: () => DEFAULT_CORNER_OPTIONS,
@@ -47,8 +48,10 @@ var MetaMediumCore = (() => {
     byTier: () => byTier,
     calculateDistance: () => calculateDistance,
     calculateStraightness: () => calculateStraightness,
+    canonicalCheckSamples: () => canonicalCheckSamples,
     checkOvershoot: () => checkOvershoot,
     collidesWith: () => collidesWith,
+    commandMarkFeatures: () => commandMarkFeatures,
     complete: () => complete,
     convexHull: () => convexHull,
     countCorners: () => countCorners,
@@ -397,7 +400,8 @@ var MetaMediumCore = (() => {
         index: c.index,
         angle: c.angle,
         x: path[c.index].x,
-        y: path[c.index].y
+        y: path[c.index].y,
+        t: c.index / path.length
       }))
     };
   }
@@ -497,7 +501,9 @@ var MetaMediumCore = (() => {
       cornerData: cornerData.cornerData,
       tipPoint,
       angleAnalysis,
-      pointCount: points.length
+      pointCount: points.length,
+      start: points[0],
+      end: points[points.length - 1]
     };
   }
   function smoothStroke(points, iterations = 2) {
@@ -952,26 +958,58 @@ var MetaMediumCore = (() => {
 
   // src/session/commandmark.ts
   var COMMAND_MARK_SAMPLES = 5;
-  var FEATURES = ["straightness", "corners", "aspect", "closureRatio", "consistency"];
+  var FEATURES = [
+    "straightness",
+    "corners",
+    "aspect",
+    "closureRatio",
+    /** Shorter arm over longer arm, split at the sharpest corner. A V is 1.0; a check ~0.6. */
+    "armRatio",
+    /** How sharp that corner turns, 0–1 of a half turn. */
+    "turnSharpness",
+    /** Where the corner sits vertically in the stroke's box. 0 = top (caret), 1 = bottom (check). */
+    "vertexDepth",
+    /** How much higher the stroke ends than it began, as a fraction of its height. */
+    "endRise"
+  ];
   var TOLERANCE_FLOOR = {
-    straightness: 0.12,
+    // Widest floor of the set, and measured rather than guessed: across 60
+    // hand-drawn checks the straightness of a check ranges 0.46–0.74, because a
+    // deep dip lengthens the path without moving the endpoints. It still earns
+    // its place — it separates a bend from a curve — but it cannot be the tight
+    // feature, and it was rejecting one real check in six when it was.
+    straightness: 0.22,
     corners: 0.9,
-    aspect: 0.25,
-    closureRatio: 0.18,
-    consistency: 0.3
+    aspect: 0.34,
+    closureRatio: 0.2,
+    armRatio: 0.26,
+    turnSharpness: 0.26,
+    vertexDepth: 0.34,
+    endRise: 0.42
   };
   var SPREAD_MULTIPLIER = 2.5;
-  function featuresOf(fp) {
+  function dominantCorner(fp) {
+    const corners = fp.cornerData;
+    if (!corners || corners.length === 0) return null;
+    return corners.reduce((best, c) => c.angle > best.angle ? c : best, corners[0]);
+  }
+  function commandMarkFeatures(fp) {
     const w = Math.max(1, fp.bounds.maxX - fp.bounds.minX);
     const h = Math.max(1, fp.bounds.maxY - fp.bounds.minY);
     const size = Math.max(1, fp.size);
+    const corner = dominantCorner(fp);
+    const t = corner ? corner.t : 0.5;
+    const armRatio = Math.min(t, 1 - t) / Math.max(t, 1 - t, 1e-6);
     return {
       straightness: fp.straightness,
       corners: fp.corners,
-      // Orientation-free: a tall mark and a wide mark of the same proportion read alike.
+      // Orientation-free proportion: a tall mark and a wide one read alike.
       aspect: Math.min(w, h) / Math.max(w, h),
       closureRatio: Math.min(1, fp.closureDistance / size),
-      consistency: fp.angleAnalysis?.consistency ?? 0
+      armRatio: corner ? armRatio : 1,
+      turnSharpness: corner ? corner.angle / Math.PI : 0,
+      vertexDepth: corner ? (corner.y - fp.bounds.minY) / h : 0.5,
+      endRise: (fp.start.y - fp.end.y) / h
     };
   }
   function mean(xs) {
@@ -985,7 +1023,7 @@ var MetaMediumCore = (() => {
   function learnCommandMark(samples, name = "command") {
     if (samples.length < 2) throw new Error("a command mark needs at least 2 samples");
     const fps = samples.map((s) => getFingerprint(s));
-    const perFeature = fps.map(featuresOf);
+    const perFeature = fps.map(commandMarkFeatures);
     const features = {};
     const tolerance = {};
     const spreadRatios = [];
@@ -1010,7 +1048,7 @@ var MetaMediumCore = (() => {
     if (fp.isClosed !== mark.isClosed) {
       return { match: false, score: 0, failedOn: "closureRatio" };
     }
-    const f = featuresOf(fp);
+    const f = commandMarkFeatures(fp);
     let worst = 0;
     let worstFeature = FEATURES[0];
     for (const key of FEATURES) {
@@ -1026,14 +1064,36 @@ var MetaMediumCore = (() => {
   function collidesWith(mark, existing) {
     return existing.some((fp) => matchesCommandMark(fp, mark).match);
   }
+  function canonicalCheckSamples() {
+    const check = (w, h, dip, rise, slant = 0) => {
+      const start = { x: 0, y: 0 };
+      const vertex = { x: w * dip, y: h };
+      const end = { x: w, y: -h * rise + w * slant };
+      const seg = (a, b, n2) => Array.from({ length: n2 }, (_, i) => ({
+        x: a.x + (b.x - a.x) * (i / (n2 - 1)),
+        y: a.y + (b.y - a.y) * (i / (n2 - 1))
+      }));
+      return seg(start, vertex, 34).concat(seg(vertex, end, 44).slice(1));
+    };
+    return [
+      check(70, 35, 0.36, 0.45),
+      check(64, 40, 0.33, 0.52),
+      check(78, 32, 0.38, 0.4),
+      check(60, 36, 0.34, 0.58, 0.06),
+      check(74, 38, 0.35, 0.47, -0.05)
+    ];
+  }
+  var BUILTIN_COMMAND_MARK = learnCommandMark(
+    canonicalCheckSamples(),
+    "check"
+  );
 
   // src/session/gesture.ts
   var DEFAULT_GESTURE_CONFIG = {
     checkWindowMs: 4e3,
-    checkProximityPx: 80,
+    checkProximityRatio: 0.15,
     checkMaxSizeRatio: 0.6,
-    commandMark: null,
-    requireIntersection: true
+    commandMark: null
   };
   function isLassoLike(fp, enclosedContentCount) {
     return fp.isClosed && enclosedContentCount >= 1;
@@ -1042,10 +1102,8 @@ var MetaMediumCore = (() => {
     return candidates.filter((c) => boundsContain(lassoBounds, c.bounds)).map((c) => c.id);
   }
   function isCheckLike(fp, lassoFp, config = DEFAULT_GESTURE_CONFIG) {
-    if (fp.isClosed) return false;
-    if (fp.corners < 1 || fp.corners > 2) return false;
     if (fp.size > lassoFp.size * config.checkMaxSizeRatio) return false;
-    return true;
+    return matchesCommandMark(fp, BUILTIN_COMMAND_MARK).match;
   }
   function strokesIntersect(a, b) {
     for (let i = 1; i < a.length; i++) {
@@ -1057,14 +1115,12 @@ var MetaMediumCore = (() => {
   }
   function resolvesLasso(checkFp, checkAt, lassoFp, lassoAt, config = DEFAULT_GESTURE_CONFIG, strokes) {
     if (checkAt - lassoAt > config.checkWindowMs) return false;
-    if (config.commandMark) {
-      if (!matchesCommandMark(checkFp, config.commandMark).match) return false;
-      if (checkFp.size > lassoFp.size) return false;
-      if (config.requireIntersection && strokes) return strokesIntersect(strokes.check, strokes.lasso);
-    } else {
-      if (!isCheckLike(checkFp, lassoFp, config)) return false;
-    }
-    return boundsOverlap(checkFp.bounds, lassoFp.bounds) || boundingBoxDistance(checkFp.bounds, lassoFp.bounds) < config.checkProximityPx;
+    const mark = config.commandMark ?? BUILTIN_COMMAND_MARK;
+    if (checkFp.size > lassoFp.size * config.checkMaxSizeRatio) return false;
+    if (!matchesCommandMark(checkFp, mark).match) return false;
+    if (strokes && strokesIntersect(strokes.check, strokes.lasso)) return true;
+    if (boundsOverlap(checkFp.bounds, lassoFp.bounds)) return true;
+    return boundingBoxDistance(checkFp.bounds, lassoFp.bounds) < lassoFp.size * config.checkProximityRatio;
   }
 
   // src/session/regions.ts
@@ -1310,11 +1366,7 @@ var MetaMediumCore = (() => {
         const lassoNode = nodes.get(pendingLasso.id);
         const lassoFp = fingerprintOf(lassoNode);
         const lassoPoints = strokePointsOf(lassoNode) ?? [];
-        const gestureConfig = {
-          ...config.gesture,
-          commandMark,
-          checkProximityPx: config.gesture.checkProximityPx * scale
-        };
+        const gestureConfig = { ...config.gesture, commandMark };
         if (resolvesLasso(fp, at, lassoFp, pendingLasso.at, gestureConfig, {
           check: points,
           lasso: lassoPoints
@@ -2100,7 +2152,8 @@ Question: ${q}` }
         aboutIds: targets,
         at: now
       });
-      return { ok: true, text, explanationId: explanationId ?? void 0 };
+      if (!explanationId) return { ok: false, error: "the canvas did not accept the answer", text };
+      return { ok: true, text, explanationId };
     }
     async function generate(args) {
       const prompt = args.prompt.trim();
@@ -2133,7 +2186,7 @@ Question: ${q}` }
       if (!result2.ok) return { ok: false, error: result2.error };
       const code = parseCode(result2.text);
       if (!code) return { ok: false, error: "no usable code in reply", raw: result2.text };
-      session.attachCode({
+      const accepted = session.attachCode({
         participantId: id,
         nodeId: args.artifactId,
         code,
@@ -2141,6 +2194,9 @@ Question: ${q}` }
         prompt,
         at: args.at
       });
+      if (!accepted) {
+        return { ok: false, error: "the canvas did not accept the code", code, raw: result2.text };
+      }
       return { ok: true, code, revised: revising, raw: result2.text };
     }
     return { id, name, config, interpret, ask, generate };

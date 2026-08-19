@@ -27,7 +27,7 @@ circle them, cross with a command mark *you taught the system*, prompt them into
 a living page that renders in the canvas with your ink still outlining its
 divs — then draw on that page and the ink addresses the regions underneath it.
 Scratch anything out to erase. `Demos/session-engine.html` is the surface;
-`Demos/session-engine.e2e.js` drives all 17 steps through the real UI.
+`Demos/session-engine.e2e.js` drives all 19 steps through the real UI.
 Still open: handwriting (v7 Stage E). Whitepaper v5.1 stays parked until the
 conversation benchmark passes end to end.
 
@@ -110,22 +110,32 @@ library hierarchical.
 > they drifted. Read the code for values; read this for shape. The reasoning
 > behind the rules is in `Assets/recognition-strategy.md`.
 
-A stroke is reduced to a **fingerprint** — aspect ratio, straightness
-(`directDistance / pathLength`, 1 = perfectly straight), closure, corner count
-and angles, bounds, size — and detectors read that fingerprint.
+A stroke is reduced to a **fingerprint** — aspect ratio, straightness, closure,
+corner count and angles, **extent**, bounds, size — and detectors read that
+fingerprint.
 
 Two properties matter more than any individual number:
 
 **Multi-parse, not winner-take-all.** Every detector that qualifies contributes
-a candidate; results are returned sorted by score, and nothing wins by
-silencing the others (ARCHITECTURE-v6 principle 2). A closed, low-corner stroke
-can be a circle *and* something else at once — the caller decides. Detectors
-today: line, arc, triangle, rectangle, circle. Each result carries a grounded
-`reasoning` string, which is what the "why" inspector surfaces.
+a candidate; results are returned ranked by confidence, and nothing wins by
+silencing the others (ARCHITECTURE-v6 principle 2). A diamond is legitimately
+*triangle* and *rectangle* at once — the caller decides. Detectors today: line,
+arc, triangle, rectangle, circle. Each result carries a grounded `reasoning`
+string, which is what the "why" inspector surfaces.
 
-**Detection keys on closure + corners + straightness together**, not on
-straightness alone. Closure and corner count do most of the discriminating;
-straightness mainly separates line from arc and vetoes circles.
+**Confidence is measured, never assigned.** Each detector scores continuously
+from the evidence, and results rank by that score. The detectors used to carry
+fixed confidences with overlapping corner bands, so a 3-corner shape matched
+both triangle (0.85) and rectangle (0.80) and the triangle won because 85 > 80.
+A tie broken by a constant is not a ranking. **Tier 0 is also capped below
+certainty** (`MAX_TIER0_CONFIDENCE`): a flawless circle is exactly what a
+letter O looks like, and the cap leaves headroom for a participant with more
+context to outrank the engine.
+
+**`extent` — the fraction of its own bounding box a stroke's outline encloses —
+is the strongest single discriminator.** Rectangle ~1.0, circle ~0.79, triangle
+~0.5. Corner count is fragile (miss one corner and a box becomes a triangle);
+extent holds regardless. This is what fixed "rectangles read as triangles".
 
 **Size-relative closure** (key innovation): a stroke closes if the start–end
 gap is under a fixed pixel threshold **or** under a fraction of the stroke's
@@ -136,6 +146,18 @@ read as circles. Both live in `isStrokeClosed` / `checkOvershoot`.
 **The fixed term is bounded by the stroke's own size**, or it inverts the rule
 above at the small end: an unbounded `gap < 50px` called a 45px-wide caret with
 45px between its ends *closed*, which is what broke the learned command mark.
+
+**Everything is measured along the PATH, not along the point array.** Corner
+detection resamples to uniform arc length, wraps closed strokes so the seam is
+scanned, and suppresses neighbours in arc-length space. In index space the same
+rectangle returned 1, 2 or 3 corners purely as a function of drawing speed, and
+never 4 — a corner where the stroke starts and ends was structurally invisible,
+which is exactly what you get drawing a box from a corner. Same principle in
+`calculateStraightness`, which measures on a **denoised, simplified** path:
+raw path length grows with the device's report rate, so a straight line with
+realistic ±1px sensor noise scored 0.99 slowly and 0.30 quickly, and read as an
+arc. `denoise()` sizes its filter in arc length, so it removes the same physical
+wobble at any sample rate.
 
 **Fixed pixel thresholds are about the HAND, not the world.** On an infinite
 canvas the surface feeds world coordinates (so the grammar survives zoom), and
@@ -151,20 +173,29 @@ aspect, corners, closure, size) with a straightness veto — see
 
 ### Gestures: taught, and relational
 
-The gesture grammar is **user vocabulary**, learned the same way any named shape
-is. `learnCommandMark(samples)` turns five drawings into a signature (a
-fingerprint centroid plus per-feature spread, which gives the accept band for
-free); `session.teachCommandMark(mark, at)` installs it as an event, so it
-replays with the session. Until taught, the built-in check ✓ stands.
+**The command mark is a check ✓** — down to a sharp elbow, then a longer flick
+up — drawn across a circled group. It is *defined*, by eight scale-free
+measurements, and `BUILTIN_COMMAND_MARK` is **not a special case in the code**:
+it is a signature learned from canonical samples by `learnCommandMark`, exactly
+the way your own mark is learned when you draw it five times. One mechanism,
+shipped pre-taught. `session.teachCommandMark(mark, at)` replaces it as an
+event, so it replays with the session.
 
-- Every feature is **scale-free** (ratios and counts, never size), so a taught
-  mark works at any zoom.
-- **Rejection is tested harder than recognition** — a mark that fires while you
-  draw reads as broken, not eager. `collidesWith` refuses a signature that
-  matches the user's existing vocabulary.
-- A **taught** mark must *cross* the lasso; the built-in check need only land
-  near it. A confirming tick belongs beside a selection; a command mark is drawn
-  deliberately across one.
+Why a check: it already means "yes, do this"; its elbow is sharp and its arms
+are asymmetric (~1:1.6), unlike anything in the canvas's vocabulary; and it is
+**oriented** — the elbow sits low and the stroke ends high.
+
+- Features are **scale-free** (ratios, counts, and positions within the stroke's
+  own box), so a mark works at any size and any zoom. Three are oriented.
+- **Rejection is tested harder than recognition.** The earlier rule (open, 1–2
+  corners, smaller than the lasso) fired on an L, a backwards L, a V, a caret,
+  and a check drawn backwards. `commandmark.bench.test.ts` pins 100% acceptance
+  of hand-drawn checks and **zero** false fires across the drawing corpus.
+- Tolerance floors are the *designed* generosity; a learned spread only widens
+  them. The straightness floor is the widest and was measured, not guessed.
+- One engagement rule for every mark: it must **cross the selection, overlap it,
+  or come close relative to the selection's own size** (`checkProximityRatio`).
+  No fixed pixel term remains in the gesture grammar.
 
 **Erasing is relational, not gestural** (`src/session/erase.ts`): count
 crossings between the stroke and the target's own outline; three erases it. No

@@ -217,3 +217,31 @@ describe('describeAddressed', () => {
     expect(describeAddressed(regions, [regions[0].id])).toContain(regions[0].id);
   });
 });
+
+describe('an agent never claims what the canvas refused', () => {
+  it('reports failure when the session rejects the code', async () => {
+    const { s, id } = board();
+    stubOpenAI('<div data-region="r1">x</div>');
+    const agent = createAgentParticipant(s, config, 3100);
+    // Undo drops the join event, so the agent is no longer a registered
+    // participant — reachable in normal use, not just in theory.
+    s.undo();
+
+    const r = await agent.generate({ prompt: 'a page', artifactId: id, at: 3200 });
+    expect(r.ok).toBe(false);
+    expect(r.error).toMatch(/did not accept/);
+    expect(s.getState().live).toEqual([]);
+  });
+
+  it('reports failure when the session rejects the answer', async () => {
+    const { s, id } = board();
+    stubOpenAI('Because the three boxes share a frame.');
+    const agent = createAgentParticipant(s, config, 3100);
+    s.undo();
+
+    const r = await agent.ask('why?', [id], 3200);
+    expect(r.ok).toBe(false);
+    expect(r.error).toMatch(/did not accept/);
+    expect(s.getState().explanations).toEqual([]);
+  });
+});

@@ -48,17 +48,45 @@ describe('teaching a command mark', () => {
     return s;
   }
 
-  it('a taught mark BESIDE the lasso does not summon', () => {
-    const s = lassoed();
-    // Close enough for the old proximity rule, but it crosses nothing.
-    s.addStroke(caretStroke(300, 120, 60, 40), 2500);
-    expect(s.getState().summon).toBeNull();
-  });
-
   it('a taught mark ACROSS the lasso summons — crossing is the deliberate act', () => {
     const s = lassoed();
     s.addStroke(caretStroke(250, 120, 80, 50), 3000);
     expect(s.getState().summon).not.toBeNull();
+  });
+
+  it('a taught mark just OUTSIDE the lasso still summons — engaging it is enough', () => {
+    // One rule for every mark: cross the selection, overlap it, or come close
+    // relative to its size. A tick at the edge of a circled group is the same
+    // intent as one drawn through it, and the grammar should not make the user
+    // guess which of the two the canvas wanted.
+    const s = lassoed();
+    s.addStroke(caretStroke(300, 120, 60, 40), 2500);
+    expect(s.getState().summon).not.toBeNull();
+  });
+
+  it('a taught mark drawn FAR from the lasso does not summon', () => {
+    const s = lassoed();
+    s.addStroke(caretStroke(900, 900, 60, 40), 2500);
+    expect(s.getState().summon).toBeNull();
+  });
+
+  it('proximity scales with the selection, not with pixels', () => {
+    // The same gap that engages a small group must NOT engage a huge one drawn
+    // ten times larger — otherwise "near" means something different at every
+    // zoom level and on every size of drawing.
+    const near = createSession();
+    near.teachCommandMark(learnCommandMark(CARETS, 'caret'), 500);
+    near.addStroke(rectStroke(100, 100, 100, 80), 1000);
+    near.addStroke(circleStroke(150, 140, 140), 2000); // size 280, so 15% = 42px
+    near.addStroke(caretStroke(300, 120, 60, 40), 2500); // ~10px away
+    expect(near.getState().summon).not.toBeNull();
+
+    const far = createSession();
+    far.teachCommandMark(learnCommandMark(CARETS, 'caret'), 500);
+    far.addStroke(rectStroke(100, 100, 20, 16), 1000);
+    far.addStroke(circleStroke(110, 108, 28), 2000); // size 56, so 15% = 8.4px
+    far.addStroke(caretStroke(160, 96, 12, 8), 2500); // ~22px away — too far now
+    expect(far.getState().summon).toBeNull();
   });
 
   it('records who resolved the lasso — the mark, by name', () => {

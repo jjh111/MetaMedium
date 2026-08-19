@@ -1,16 +1,27 @@
-// The command mark: a gesture the user TEACHES the system.
+// The command mark: the gesture that turns a selection into an offer.
 //
-// The engine already learns user vocabulary — draw a shape, name it, and a
-// fingerprint plus weighted comparison recognizes it forever. A gesture is that
-// same object on a different plane. So the command mark is learned exactly the
-// way "bubble" is learned: draw it a few times, and the samples become a
-// signature.
+// WHAT IT IS. A check — down-left to a sharp elbow, then a longer flick up to
+// the right — drawn across a circled group. It is defined by six scale-free
+// measurements, not by "a small stroke with a bend in it", and the difference
+// matters: the earlier rule (open, 1–2 corners, smaller than the lasso) fired on
+// an L, a backwards L, and an upside-down caret. A gesture that fires on any
+// bent stroke is not a gesture, it is an accident waiting for the user's hand.
 //
-// This is the thesis pointed at its own interface. It is also the onboarding:
-// teaching the system your mark IS the tutorial.
+// WHY A CHECK.
+//   - It already means "yes, do this" to everyone, so nothing has to be taught.
+//   - Its elbow is sharp and its arms are ASYMMETRIC (roughly 1:1.6), which is
+//     measurable and unlike the shapes the canvas already knows — a triangle, a
+//     box and an arc are all either closed or smooth.
+//   - It is oriented: the elbow sits low and the stroke ends high. That single
+//     constraint separates it from an L, a V and a caret, which is most of what
+//     an unoriented rule confuses it with.
+//   - It is one stroke and about half a second.
 //
-// Size is deliberately NOT a feature. The mark must work at any scale and any
-// zoom level, and every feature here is a ratio or a count for that reason.
+// AND IT IS REPLACEABLE. The built-in check is not a special case in the code:
+// it is a signature learned from canonical samples, exactly the way YOUR mark is
+// learned when you draw it five times. One mechanism, shipped pre-taught. That
+// is the thesis pointed at its own interface — the gesture grammar is user
+// vocabulary, and the default is just the vocabulary we ship with.
 
 import type { Fingerprint, Point } from '../types';
 import { getFingerprint } from '../geometry';
@@ -18,21 +29,49 @@ import { getFingerprint } from '../geometry';
 /** How many samples the teach flow collects. Enough for a spread, few enough to draw. */
 export const COMMAND_MARK_SAMPLES = 5;
 
-/** Scale-free features. Add one here and both learn and match pick it up. */
-const FEATURES = ['straightness', 'corners', 'aspect', 'closureRatio', 'consistency'] as const;
+/**
+ * Every feature is scale-free — a ratio, a count, or a position within the
+ * stroke's own bounding box — so a mark works at any size and any zoom.
+ * Three of them are ORIENTED, which is what a check needs and what the old
+ * rule lacked entirely.
+ */
+const FEATURES = [
+  'straightness',
+  'corners',
+  'aspect',
+  'closureRatio',
+  /** Shorter arm over longer arm, split at the sharpest corner. A V is 1.0; a check ~0.6. */
+  'armRatio',
+  /** How sharp that corner turns, 0–1 of a half turn. */
+  'turnSharpness',
+  /** Where the corner sits vertically in the stroke's box. 0 = top (caret), 1 = bottom (check). */
+  'vertexDepth',
+  /** How much higher the stroke ends than it began, as a fraction of its height. */
+  'endRise',
+] as const;
 type Feature = (typeof FEATURES)[number];
 
 /**
  * Minimum tolerance per feature, in that feature's own units. A user with a very
- * consistent hand would otherwise learn a band so tight that their sixth attempt
+ * steady hand would otherwise learn a band so tight that their sixth attempt
  * fails — a signature must be at least as loose as ordinary hand variation.
+ * These are the designed generosity of the gesture; the learned spread only ever
+ * widens them.
  */
 const TOLERANCE_FLOOR: Record<Feature, number> = {
-  straightness: 0.12,
+  // Widest floor of the set, and measured rather than guessed: across 60
+  // hand-drawn checks the straightness of a check ranges 0.46–0.74, because a
+  // deep dip lengthens the path without moving the endpoints. It still earns
+  // its place — it separates a bend from a curve — but it cannot be the tight
+  // feature, and it was rejecting one real check in six when it was.
+  straightness: 0.22,
   corners: 0.9,
-  aspect: 0.25,
-  closureRatio: 0.18,
-  consistency: 0.3,
+  aspect: 0.34,
+  closureRatio: 0.2,
+  armRatio: 0.26,
+  turnSharpness: 0.26,
+  vertexDepth: 0.34,
+  endRise: 0.42,
 };
 
 /** Observed spread is widened by this much before it becomes the accept band. */
@@ -62,17 +101,34 @@ export interface CommandMatch {
   failedOn?: Feature;
 }
 
-function featuresOf(fp: Fingerprint): Record<Feature, number> {
+/** The sharpest corner, which is the one the mark is built around. */
+function dominantCorner(fp: Fingerprint) {
+  const corners = fp.cornerData;
+  if (!corners || corners.length === 0) return null;
+  return corners.reduce((best, c) => (c.angle > best.angle ? c : best), corners[0]);
+}
+
+export function commandMarkFeatures(fp: Fingerprint): Record<Feature, number> {
   const w = Math.max(1, fp.bounds.maxX - fp.bounds.minX);
   const h = Math.max(1, fp.bounds.maxY - fp.bounds.minY);
   const size = Math.max(1, fp.size);
+  const corner = dominantCorner(fp);
+
+  // The corner's position along the path splits the stroke into two arms. The
+  // path is resampled to uniform arc length, so this is a length ratio.
+  const t = corner ? corner.t : 0.5;
+  const armRatio = Math.min(t, 1 - t) / Math.max(t, 1 - t, 1e-6);
+
   return {
     straightness: fp.straightness,
     corners: fp.corners,
-    // Orientation-free: a tall mark and a wide mark of the same proportion read alike.
+    // Orientation-free proportion: a tall mark and a wide one read alike.
     aspect: Math.min(w, h) / Math.max(w, h),
     closureRatio: Math.min(1, fp.closureDistance / size),
-    consistency: fp.angleAnalysis?.consistency ?? 0,
+    armRatio: corner ? armRatio : 1,
+    turnSharpness: corner ? corner.angle / Math.PI : 0,
+    vertexDepth: corner ? (corner.y - fp.bounds.minY) / h : 0.5,
+    endRise: (fp.start.y - fp.end.y) / h,
   };
 }
 
@@ -95,7 +151,7 @@ function stddev(xs: number[]): number {
 export function learnCommandMark(samples: Point[][], name = 'command'): CommandMark {
   if (samples.length < 2) throw new Error('a command mark needs at least 2 samples');
   const fps = samples.map((s) => getFingerprint(s));
-  const perFeature = fps.map(featuresOf);
+  const perFeature = fps.map(commandMarkFeatures);
 
   const features = {} as Record<Feature, number>;
   const tolerance = {} as Record<Feature, number>;
@@ -133,7 +189,7 @@ export function matchesCommandMark(fp: Fingerprint, mark: CommandMark): CommandM
   if (fp.isClosed !== mark.isClosed) {
     return { match: false, score: 0, failedOn: 'closureRatio' };
   }
-  const f = featuresOf(fp);
+  const f = commandMarkFeatures(fp);
   let worst = 0;
   let worstFeature: Feature = FEATURES[0];
   for (const key of FEATURES) {
@@ -155,3 +211,40 @@ export function matchesCommandMark(fp: Fingerprint, mark: CommandMark): CommandM
 export function collidesWith(mark: CommandMark, existing: Fingerprint[]): boolean {
   return existing.some((fp) => matchesCommandMark(fp, mark).match);
 }
+
+// ===== The built-in mark =====
+
+/**
+ * Canonical checks: the same gesture at different proportions and slants, the
+ * way five deliberate attempts by one person would vary. These ARE the teaching
+ * samples — the built-in mark goes through `learnCommandMark` like any other.
+ */
+export function canonicalCheckSamples(): Point[][] {
+  const check = (w: number, h: number, dip: number, rise: number, slant = 0) => {
+    const start = { x: 0, y: 0 };
+    const vertex = { x: w * dip, y: h };
+    const end = { x: w, y: -h * rise + w * slant };
+    const seg = (a: Point, b: Point, n: number) =>
+      Array.from({ length: n }, (_, i) => ({
+        x: a.x + (b.x - a.x) * (i / (n - 1)),
+        y: a.y + (b.y - a.y) * (i / (n - 1)),
+      }));
+    return seg(start, vertex, 34).concat(seg(vertex, end, 44).slice(1));
+  };
+  return [
+    check(70, 35, 0.36, 0.45),
+    check(64, 40, 0.33, 0.52),
+    check(78, 32, 0.38, 0.40),
+    check(60, 36, 0.34, 0.58, 0.06),
+    check(74, 38, 0.35, 0.47, -0.05),
+  ];
+}
+
+/**
+ * The mark the canvas watches for until the user teaches it another one.
+ * Not a special case: a signature, pre-taught.
+ */
+export const BUILTIN_COMMAND_MARK: CommandMark = learnCommandMark(
+  canonicalCheckSamples(),
+  'check'
+);
