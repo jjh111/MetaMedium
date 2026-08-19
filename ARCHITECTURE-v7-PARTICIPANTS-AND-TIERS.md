@@ -285,10 +285,11 @@ the code is anchored to the diagram and updates when the diagram does.
 **Ship criterion:** draw a flow, get runnable code, change the flow, see the
 code follow.
 
-### Stage E — Handwriting
+### Stage E — Handwriting — **the last one open**
 
 Prove the read path on `test-vision.html` first (that's what experiments are
-for), then land the winner in core.
+for), then land the winner in core. It is what makes *"website with the copy in
+the squares"* literal instead of typed.
 
 **Ship criterion:** write a word next to a shape; it becomes that shape's name.
 

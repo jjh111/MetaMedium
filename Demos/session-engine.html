@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>MetaMedium — No-Modes Session Engine</title>
+<title>MetaMedium — Ink Over Living Artifacts</title>
 <style>
 /* Space Grotesk (latin, variable) inlined so the surface never falls back silently. */
 @font-face {
@@ -194,24 +194,139 @@ html, body {
   .status { bottom: 10px; font-size: 10px; }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
+/* ===== MVP additions (MVP.md): infinite canvas, live artifacts, the taught mark ===== */
+
+/* The stage carries live artifacts as real DOM, transformed by the SAME matrix
+   as the ink canvas. Two layers, one transform — if they ever disagree, the ink
+   drifts off the divs it is supposed to outline. It sits BELOW the canvas so
+   ink always draws on top, and it never takes a pointer event: you are always
+   drawing (MVP.md §5.3). */
+#stage {
+  position: absolute; inset: 0; z-index: 1;
+  transform-origin: 0 0; pointer-events: none; overflow: visible;
+}
+#canvas { z-index: 2; }
+.artifactFrame { position: absolute; }
+.artifactFrame iframe {
+  width: 100%; height: 100%; border: 0; display: block;
+  background: #fbfaf7; border-radius: 2px;
+  box-shadow: 0 0 0 1px rgba(201,168,76,0.35), 0 18px 50px rgba(0,0,0,0.55);
+}
+
+/* ===== Zoom readout ===== */
+.zoomRow { display: flex; gap: 6px; align-items: center; pointer-events: auto; }
+.zoomRow .z {
+  font-family: var(--mono); font-size: 11px; color: var(--dim);
+  min-width: 42px; text-align: center; font-variant-numeric: tabular-nums;
+}
+
+/* ===== Teach panel: five samples become your command mark ===== */
+#teachPanel {
+  position: fixed; left: 18px; bottom: 56px; width: 292px; z-index: 21;
+  background: rgba(12,12,18,0.96); border: 1px solid rgba(255,255,255,0.10);
+  border-radius: 8px; padding: 12px 13px; font-size: 11.5px;
+  box-shadow: 0 12px 34px rgba(0,0,0,0.5);
+}
+#teachPanel[hidden] { display: none; }
+#teachPanel .eyebrow {
+  font-size: 10px; letter-spacing: 0.09em; text-transform: uppercase;
+  color: var(--dim); margin-bottom: 6px;
+}
+#teachPanel .hint { color: var(--dim); font-size: 10.5px; line-height: 1.45; margin: 0 0 9px; }
+#teachPad {
+  width: 100%; height: 132px; display: block; cursor: crosshair;
+  background: rgba(255,255,255,0.035); border: 1px dashed var(--rule);
+  border-radius: 5px; touch-action: none;
+}
+#teachDots { display: flex; gap: 5px; margin: 9px 0 0; }
+#teachDots i {
+  flex: 1; height: 3px; border-radius: 2px; background: rgba(255,255,255,0.12);
+}
+#teachDots i.on { background: var(--gold); }
+#teachPanel .tpRow { display: flex; gap: 7px; margin-top: 11px; }
+#teachPanel button {
+  flex: 1; background: transparent; border: 1px solid var(--rule); color: var(--dim);
+  font: 12px var(--ui); padding: 7px 11px; border-radius: 5px; cursor: pointer;
+}
+#teachPanel button:hover:not(:disabled) { border-color: var(--gold); color: var(--gold); }
+#teachPanel button:disabled { opacity: 0.4; cursor: default; }
+#teachStatus { margin-top: 9px; color: var(--dim); font-size: 10.5px; line-height: 1.45; }
+#teachStatus.warn { color: var(--gold); }
+
+/* The taught mark, echoed in the rail so you can see what the canvas is watching for. */
+.markChip {
+  display: flex; align-items: center; gap: 6px; pointer-events: auto;
+  border: 1px solid var(--rule); border-radius: 5px; padding: 4px 9px 4px 6px;
+  color: var(--gold); font-size: 11px;
+}
+.markChip[hidden] { display: none; }
+.markChip canvas { display: block; }
+
+/* Chrome sits over an infinite canvas, so it needs its own ground — without
+   this the help text collides with whatever the user drew up there. */
+.rail::before, .scrimBottom {
+  content: ''; position: absolute; left: 0; right: 0; pointer-events: none; z-index: -1;
+}
+.rail::before {
+  top: 0; height: 118px;
+  background: linear-gradient(to bottom, rgba(10,10,15,0.94) 40%, rgba(10,10,15,0));
+}
+.scrimBottom {
+  bottom: 0; height: 54px; z-index: 4;
+  background: linear-gradient(to top, rgba(10,10,15,0.94) 40%, rgba(10,10,15,0));
+}
+
+#summon input.make { min-width: 250px; }
+#summon .scope {
+  font-family: var(--mono); font-size: 10px; color: var(--gold);
+  padding: 0 4px 0 2px; white-space: nowrap;
+}
+#summon button.make { color: var(--gold); border-color: rgba(201,168,76,0.45); font-weight: 500; }
 </style>
 </head>
 <body>
+<div id="stage"></div>
 <canvas id="canvas"></canvas>
 
 <div class="rail">
   <div class="title">
-    <h1>No-Modes Session Engine <span>v0.3</span></h1>
-    <p>Doodle anything. To hold a group as a thing: circle it, then draw a quick
-       check <b>✓</b> beside the circle — that summons an offer. Name it, or keep
-       drawing to ignore it. <kbd>Ctrl</kbd>+<kbd>Z</kbd> undoes.</p>
+    <h1>MetaMedium <span>MVP</span></h1>
+    <p>Draw. Circle a group and cross it with your command mark to summon an
+       offer — name it, or <b>prompt it into a living page</b>. Draw on the page
+       and your ink addresses what's under it. Scratch anything out to erase.
+       <kbd>Ctrl</kbd>+<kbd>Z</kbd> undoes.</p>
   </div>
   <div class="controls">
+    <div class="markChip" id="markChip" hidden>
+      <canvas id="markGlyph" width="34" height="22"></canvas><span id="markName">mark</span>
+    </div>
+    <div class="zoomRow">
+      <button id="zoomOut" title="Zoom out">−</button>
+      <span class="z" id="zoomPct">100%</span>
+      <button id="zoomIn" title="Zoom in">+</button>
+      <button id="fitBtn" title="Fit everything on screen">Fit</button>
+    </div>
+    <button id="teachBtn" aria-pressed="false" title="Teach the canvas your command mark">Teach a mark…</button>
     <button id="modelBtn" aria-pressed="false" title="Add a model as a participant (Tier 1–2)">Add a model…</button>
-    <button id="agentBtn" aria-pressed="false" title="A second participant that echoes your strokes — scripted, not an LLM">Echo participant</button>
     <button id="undoBtn" title="Ctrl+Z">Undo</button>
     <button id="resetBtn">Reset</button>
   </div>
+</div>
+
+<div id="teachPanel" hidden>
+  <div class="eyebrow">teach your command mark</div>
+  <p class="hint">Draw the same mark <b>five times</b> in the pad. The canvas learns
+     your hand's spread, so the sixth one it has never seen still counts —
+     the same way it learns any shape you name.</p>
+  <canvas id="teachPad"></canvas>
+  <div id="teachDots"><i></i><i></i><i></i><i></i><i></i></div>
+  <div class="tpRow">
+    <button id="teachUse" disabled>Use this mark</button>
+    <button id="teachClear">Clear</button>
+    <button id="teachClose">Close</button>
+  </div>
+  <div id="teachStatus"></div>
 </div>
 
 <div id="modelPanel" hidden>
@@ -239,10 +354,11 @@ html, body {
 
 <aside id="inspector" aria-live="polite"></aside>
 <div id="summon"></div>
+<div class="scrimBottom"></div>
 <div class="status" id="status"></div>
 <div class="legend">
   <span><i style="background:#e8e4d9"></i>you</span>
-  <span><i style="background:#8ab4c8"></i>participant 2</span>
+  <span><i style="background:#8ab4c8"></i>model</span>
   <span><i style="background:#c9a84c"></i>gesture / artifact</span>
 </div>
 
@@ -254,28 +370,345 @@ html, body {
 
   const canvas = document.getElementById('canvas');
   const ctx = canvas.getContext('2d');
+  const stage = document.getElementById('stage');
   const summonEl = document.getElementById('summon');
   const statusEl = document.getElementById('status');
   const inspectorEl = document.getElementById('inspector');
 
   let state = session.getState();
-  let live = null;      // stroke under the pointer
+  let live = null;      // stroke under the pointer, in WORLD coordinates
   let hoverId = null;   // inspected node (hover), else most recent
+
+  const esc = (t) => String(t).replace(/[&<>"]/g, (c) =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+  // ===== Viewport =========================================================
+  // The engine is renderer-agnostic and stores whatever space it is fed, so it
+  // is fed WORLD coordinates — never screen. Every threshold in the engine is
+  // in pixels (proximity, closure, size-relative overshoot); in world space
+  // those are zoom-invariant and the grammar holds at any zoom. In screen space
+  // the whole MVP flow breaks the moment you zoom out to lasso a wide group,
+  // which is exactly the move the product is built on (MVP.md §5.1).
+  const view = { panX: 0, panY: 0, zoom: 1 };
+  const MIN_ZOOM = 0.08, MAX_ZOOM = 5;
+  const clampZoom = (z) => Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, z));
+
+  const screenToWorld = (sx, sy) => ({
+    x: (sx - view.panX) / view.zoom,
+    y: (sy - view.panY) / view.zoom,
+  });
+  const worldToScreen = (wx, wy) => ({
+    x: wx * view.zoom + view.panX,
+    y: wy * view.zoom + view.panY,
+  });
+  /** World length that renders as `n` screen pixels — for chrome that must not shrink. */
+  const wpx = (n) => n / view.zoom;
+
+  function zoomAround(sx, sy, factor) {
+    const before = clampZoom(view.zoom);
+    const after = clampZoom(before * factor);
+    if (after === before) return;
+    view.zoom = after;
+    const ratio = after / before;
+    view.panX = sx - (sx - view.panX) * ratio;
+    view.panY = sy - (sy - view.panY) * ratio;
+    afterViewChange();
+  }
+
+  function fitAll() {
+    const ids = state.contentIds.concat(state.explanations);
+    const boxes = ids.map((id) => MM.boundsOf(state.nodes.get(id))).filter(Boolean);
+    if (!boxes.length) { view.panX = 0; view.panY = 0; view.zoom = 1; afterViewChange(); return; }
+    const b = union(boxes);
+    // Guard the viewport: a window smaller than the padding (or one not laid
+    // out yet) would compute a negative scale and slam into MIN_ZOOM.
+    const pad = Math.max(0, Math.min(90, innerWidth / 6, innerHeight / 6));
+    const availW = Math.max(1, innerWidth - pad * 2);
+    const availH = Math.max(1, innerHeight - pad * 2);
+    const w = Math.max(1, b.maxX - b.minX), h = Math.max(1, b.maxY - b.minY);
+    view.zoom = clampZoom(Math.min(availW / w, availH / h, 2));
+    view.panX = (innerWidth - w * view.zoom) / 2 - b.minX * view.zoom;
+    view.panY = (innerHeight - h * view.zoom) / 2 - b.minY * view.zoom;
+    afterViewChange();
+  }
+
+  function afterViewChange() {
+    document.getElementById('zoomPct').textContent = Math.round(view.zoom * 100) + '%';
+    // ONE transform for both layers. If the ink canvas and the artifact stage
+    // ever disagree, ink drifts off the divs it is supposed to outline.
+    stage.style.transform =
+      'translate(' + view.panX + 'px,' + view.panY + 'px) scale(' + view.zoom + ')';
+    render(state);
+  }
+
+  document.getElementById('zoomIn').onclick = () => zoomAround(innerWidth / 2, innerHeight / 2, 1.25);
+  document.getElementById('zoomOut').onclick = () => zoomAround(innerWidth / 2, innerHeight / 2, 0.8);
+  document.getElementById('fitBtn').onclick = fitAll;
+
+  canvas.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    if (e.ctrlKey || e.metaKey) {
+      zoomAround(e.clientX, e.clientY, e.deltaY > 0 ? 0.92 : 1.08);
+    } else {
+      view.panX -= e.deltaX;
+      view.panY -= e.deltaY;
+      afterViewChange();
+    }
+  }, { passive: false });
 
   // ===== Canvas sizing =====
   function resize() {
     const dpr = window.devicePixelRatio || 1;
     canvas.width = innerWidth * dpr;
     canvas.height = innerHeight * dpr;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     render(session.getState());
   }
   addEventListener('resize', resize);
 
-  // ===== Model participants (Tier 1–2) =====
-  // A model joins through the SAME channel a human uses — session.join() then
-  // session.propose(). Every reading it offers is held as an attributed,
-  // unblessed edge beside Tier 0's, never instead of it.
+  // ===== The live plane: artifacts that render and run ====================
+  // Generated code becomes real DOM in an iframe, positioned in world space
+  // inside the shared transform. The ink canvas sits ON TOP of it, so the boxes
+  // you drew stay visible as the outlines of what they produced (MVP.md §3.3).
+  //
+  // SANDBOX POSTURE, deliberate (MVP.md risk #5): `allow-same-origin` WITHOUT
+  // `allow-scripts`. Same-origin is what lets ink hit-test into the artifact's
+  // own DOM, which is the novel capability here. Granting both together is the
+  // known sandbox escape, and running arbitrary generated JS is not needed to
+  // prove the loop — so scripts stay off, and this is a choice to revisit
+  // explicitly rather than a default that drifted.
+  const frames = new Map(); // artifactId -> { wrap, iframe, codeAt }
+
+  function codeRepOf(node) {
+    for (let i = node.reps.length - 1; i >= 0; i--) {
+      if (node.reps[i].modality === 'code') return node.reps[i];
+    }
+    return null;
+  }
+
+  function documentFor(code, w, h) {
+    return '<!doctype html><html><head><meta charset="utf-8">' +
+      '<style>' +
+      'html,body{margin:0;padding:0;background:#fbfaf7;color:#14140f;' +
+      "font-family:'Space Grotesk',system-ui,-apple-system,sans-serif;}" +
+      '#mmroot{position:relative;width:' + Math.round(w) + 'px;height:' + Math.round(h) + 'px;overflow:hidden;}' +
+      '*{box-sizing:border-box;}' +
+      '</style></head><body><div id="mmroot">' + code + '</div></body></html>';
+  }
+
+  function syncStage(s) {
+    // Drop frames for artifacts that are gone or erased.
+    for (const [id, f] of frames) {
+      if (!s.live.includes(id)) { f.wrap.remove(); frames.delete(id); }
+    }
+    for (const id of s.live) {
+      const node = s.nodes.get(id);
+      const rep = node && codeRepOf(node);
+      const fr = node && MM.frameOf(node);
+      if (!rep || !fr) continue;
+
+      let f = frames.get(id);
+      if (!f) {
+        const wrap = document.createElement('div');
+        wrap.className = 'artifactFrame';
+        const iframe = document.createElement('iframe');
+        iframe.setAttribute('sandbox', 'allow-same-origin');
+        iframe.setAttribute('scrolling', 'no');
+        iframe.title = MM.wordOf(node) || id;
+        wrap.appendChild(iframe);
+        stage.appendChild(wrap);
+        f = { wrap: wrap, iframe: iframe, codeAt: null };
+        frames.set(id, f);
+      }
+      f.wrap.style.left = fr.x + 'px';
+      f.wrap.style.top = fr.y + 'px';
+      f.wrap.style.width = fr.w + 'px';
+      f.wrap.style.height = fr.h + 'px';
+
+      const stamp = rep.data.at + ':' + Math.round(fr.w) + 'x' + Math.round(fr.h);
+      if (f.codeAt !== stamp) {
+        f.codeAt = stamp;
+        f.iframe.srcdoc = documentFor(rep.data.code, fr.w, fr.h);
+      }
+    }
+  }
+
+  /**
+   * Which regions the ink actually lands on, read from the artifact's own DOM.
+   *
+   * This is "formal coordinate intersections with code aspects": the mark's
+   * world bounds become artifact-local pixels, `elementFromPoint` resolves them
+   * to real elements, and each element carries the `data-region` the generator
+   * was required to emit. The engine's geometric answer is the fallback, so
+   * addressing still works if the document is unreadable for any reason.
+   */
+  function regionsUnderInk(artifactId, bounds) {
+    const f = frames.get(artifactId);
+    const node = state.nodes.get(artifactId);
+    const fr = node && MM.frameOf(node);
+    const found = new Set();
+    if (!f || !fr) return [];
+    let doc = null;
+    try { doc = f.iframe.contentDocument; } catch (err) { doc = null; }
+    if (!doc || !doc.elementFromPoint) return [];
+
+    const N = 4;
+    for (let i = 0; i <= N; i++) {
+      for (let j = 0; j <= N; j++) {
+        const x = bounds.minX + ((bounds.maxX - bounds.minX) * i) / N - fr.x;
+        const y = bounds.minY + ((bounds.maxY - bounds.minY) * j) / N - fr.y;
+        let el = null;
+        try { el = doc.elementFromPoint(x, y); } catch (err) { el = null; }
+        while (el && !(el.dataset && el.dataset.region)) el = el.parentElement;
+        if (el && el.dataset.region) found.add(el.dataset.region);
+      }
+    }
+    return [...found];
+  }
+
+  // ===== Teaching the command mark ========================================
+  // Five samples become a signature, through the same fingerprint machinery
+  // that learns any shape you name. Taught in a dedicated pad rather than on
+  // the canvas, so the canvas itself never enters a mode (MVP.md §5.2).
+  const teachPanel = document.getElementById('teachPanel');
+  const teachBtn = document.getElementById('teachBtn');
+  const pad = document.getElementById('teachPad');
+  const padCtx = pad.getContext('2d');
+  const teachStatus = document.getElementById('teachStatus');
+  const teachUse = document.getElementById('teachUse');
+  const teachDots = [...document.querySelectorAll('#teachDots i')];
+  let samples = [];
+  let padStroke = null;
+
+  function sizePad() {
+    const dpr = window.devicePixelRatio || 1;
+    const r = pad.getBoundingClientRect();
+    if (!r.width) return;
+    pad.width = r.width * dpr; pad.height = r.height * dpr;
+    padCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    drawPad();
+  }
+
+  function drawPad() {
+    const r = pad.getBoundingClientRect();
+    padCtx.clearRect(0, 0, r.width || pad.width, r.height || pad.height);
+    padCtx.lineCap = 'round'; padCtx.lineJoin = 'round';
+    // Earlier samples ghost behind, so you can see whether your hand is steady.
+    samples.forEach((pts, i) => {
+      padCtx.beginPath();
+      pts.forEach((p, k) => (k ? padCtx.lineTo(p.x, p.y) : padCtx.moveTo(p.x, p.y)));
+      padCtx.strokeStyle = 'rgba(201,168,76,' + (0.16 + 0.1 * i) + ')';
+      padCtx.lineWidth = 2; padCtx.stroke();
+    });
+    if (padStroke) {
+      padCtx.beginPath();
+      padStroke.forEach((p, k) => (k ? padCtx.lineTo(p.x, p.y) : padCtx.moveTo(p.x, p.y)));
+      padCtx.strokeStyle = '#e8e4d9'; padCtx.lineWidth = 2; padCtx.stroke();
+    }
+    teachDots.forEach((d, i) => d.classList.toggle('on', i < samples.length));
+  }
+
+  pad.addEventListener('pointerdown', (e) => {
+    capture(pad, e);
+    const r = pad.getBoundingClientRect();
+    padStroke = [{ x: e.clientX - r.left, y: e.clientY - r.top }];
+  });
+  pad.addEventListener('pointermove', (e) => {
+    if (!padStroke) return;
+    const r = pad.getBoundingClientRect();
+    padStroke.push({ x: e.clientX - r.left, y: e.clientY - r.top });
+    drawPad();
+  });
+  pad.addEventListener('pointerup', () => {
+    const pts = padStroke; padStroke = null;
+    if (!pts || pts.length < 8) { drawPad(); return; }
+    if (samples.length < MM.COMMAND_MARK_SAMPLES) samples.push(pts);
+    drawPad();
+    evaluateSamples();
+  });
+
+  function evaluateSamples() {
+    const need = MM.COMMAND_MARK_SAMPLES - samples.length;
+    if (need > 0) {
+      teachUse.disabled = true;
+      teachStatus.className = '';
+      teachStatus.textContent = need + ' more to go.';
+      return;
+    }
+    let mark;
+    try { mark = MM.learnCommandMark(samples, 'your mark'); }
+    catch (err) { teachStatus.textContent = String(err.message || err); return; }
+
+    // Rejection matters more than recognition: a mark that also fires while you
+    // draw reads as broken, not eager. So the signature is tested against the
+    // vocabulary the canvas already knows before it is offered.
+    const drawn = state.contentIds
+      .map((id) => MM.fingerprintOf(state.nodes.get(id)))
+      .filter(Boolean);
+    const collides = MM.collidesWith(mark, drawn);
+
+    teachUse.disabled = false;
+    if (collides) {
+      teachStatus.className = 'warn';
+      teachStatus.textContent =
+        'Careful — this mark also matches something already on the canvas. It would fire while you draw.';
+    } else if (mark.consistency < 0.35) {
+      teachStatus.className = 'warn';
+      teachStatus.textContent =
+        'Those five were quite different from each other, so the band is wide and it may over-trigger. Clear and try again for a tighter mark.';
+    } else {
+      teachStatus.className = '';
+      teachStatus.textContent =
+        'Consistent (' + Math.round(mark.consistency * 100) + '%). Cross a circled group with this to summon.';
+    }
+    teachUse.dataset.ready = '1';
+  }
+
+  teachUse.onclick = () => {
+    if (samples.length < MM.COMMAND_MARK_SAMPLES) return;
+    const mark = MM.learnCommandMark(samples, 'your mark');
+    session.teachCommandMark(mark, Date.now());
+    drawMarkChip(samples[samples.length - 1]);
+    teachStatus.className = '';
+    teachStatus.textContent = 'Learned. The check ✓ no longer summons — your mark does.';
+  };
+  document.getElementById('teachClear').onclick = () => {
+    samples = []; teachUse.disabled = true; teachStatus.textContent = ''; drawPad();
+  };
+  document.getElementById('teachClose').onclick = () => closePanel(teachPanel, teachBtn);
+  teachBtn.onclick = () => {
+    togglePanel(teachPanel, teachBtn);
+    if (!teachPanel.hasAttribute('hidden')) { sizePad(); evaluateSamples(); }
+  };
+
+  // The taught mark, echoed in the rail: you can see what the canvas watches for.
+  function drawMarkChip(pts) {
+    const chip = document.getElementById('markChip');
+    const g = document.getElementById('markGlyph');
+    const gc = g.getContext('2d');
+    const b = MM.getBounds(pts);
+    const w = Math.max(1, b.maxX - b.minX), h = Math.max(1, b.maxY - b.minY);
+    const k = Math.min((g.width - 6) / w, (g.height - 6) / h);
+    gc.clearRect(0, 0, g.width, g.height);
+    gc.beginPath();
+    pts.forEach((p, i) => {
+      const x = (p.x - b.minX) * k + 3, y = (p.y - b.minY) * k + 3;
+      i ? gc.lineTo(x, y) : gc.moveTo(x, y);
+    });
+    gc.strokeStyle = '#c9a84c'; gc.lineWidth = 1.6; gc.lineCap = 'round'; gc.stroke();
+    document.getElementById('markName').textContent = 'your mark';
+    chip.hidden = false;
+  }
+
+  function togglePanel(el, btn) {
+    const open = el.hasAttribute('hidden');
+    if (open) el.removeAttribute('hidden'); else el.setAttribute('hidden', '');
+    btn.setAttribute('aria-pressed', String(open));
+  }
+  function closePanel(el, btn) {
+    el.setAttribute('hidden', ''); btn.setAttribute('aria-pressed', 'false');
+  }
+
+  // ===== Model participants (Tier 1–2) ====================================
   const modelBtn = document.getElementById('modelBtn');
   const panel = document.getElementById('modelPanel');
   const mpProvider = document.getElementById('mpProvider');
@@ -303,14 +736,10 @@ html, body {
   syncProviderFields();
 
   modelBtn.onclick = () => {
-    const open = panel.hasAttribute('hidden');
-    if (open) panel.removeAttribute('hidden'); else panel.setAttribute('hidden', '');
-    modelBtn.setAttribute('aria-pressed', String(open));
-    if (open) mpModel.focus();
+    togglePanel(panel, modelBtn);
+    if (!panel.hasAttribute('hidden')) mpModel.focus();
   };
-  document.getElementById('mpClose').onclick = () => {
-    panel.setAttribute('hidden', ''); modelBtn.setAttribute('aria-pressed', 'false');
-  };
+  document.getElementById('mpClose').onclick = () => closePanel(panel, modelBtn);
 
   function renderAgents() {
     mpList.innerHTML = agents.map((a) =>
@@ -333,74 +762,77 @@ html, body {
     const agent = MM.createAgentParticipant(session, config, Date.now());
     agents.push(agent);
     mpKey.value = '';
-    mpStatus.textContent = agent.name + ' joined. It will read each group you summon.';
+    mpStatus.textContent = agent.name + ' joined. It reads each group you summon, and builds what you prompt for.';
     renderAgents();
     render(session.getState());
   };
 
-  // When a group is summoned, ask EVERY model at once. They answer in
-  // parallel and each proposal lands independently — no escalation, no
-  // waiting for a cheaper tier to fail first.
+  // When a group is summoned, ask EVERY model at once. They answer in parallel
+  // and each proposal lands independently — no escalation, no waiting for a
+  // cheaper tier to fail first.
   let lastAskedSummon = null;
   function askModels(s) {
     if (!s.summon || agents.length === 0) return;
     if (s.summon.id === lastAskedSummon) return;
     lastAskedSummon = s.summon.id;
+    if (s.summon.enclosedIds.length === 0) return; // nothing to read (ink on a page)
 
     const ids = s.summon.enclosedIds.slice();
     mpStatus.textContent = 'asking ' + agents.length + ' model(s)…';
-
     agents.forEach((agent) => {
       agent.interpret(ids, Date.now()).then((res) => {
-        if (res.ok) {
-          mpStatus.textContent = agent.name + ': ' +
-            res.readings.map((r) => r.label).join(', ');
-        } else {
-          // Degrade to Tier 0 — the canvas never stops working.
-          mpStatus.textContent = agent.name + ' unavailable (' + res.error + ') — tier 0 still holds.';
-        }
+        mpStatus.textContent = res.ok
+          ? agent.name + ': ' + res.readings.map((r) => r.label).join(', ')
+          : agent.name + ' unavailable (' + res.error + ') — tier 0 still holds.';
         render(session.getState());
       });
     });
   }
 
-  // ===== A second participant: scripted, honest, useful =====
-  // It echoes your last mark as its own mark — enough to prove that agent ink
-  // is a full citizen (recognized, lassoable, blessable), without pretending
-  // to be an LLM. A real tier joins the same way and calls session.propose().
-  const agentBtn = document.getElementById('agentBtn');
-  let agentId = null;
-  let agentOn = false;
-  agentBtn.onclick = () => {
-    agentOn = !agentOn;
-    agentBtn.setAttribute('aria-pressed', String(agentOn));
-    if (agentOn && !agentId) agentId = session.join('agent', 'participant 2', Date.now());
-    render(session.getState());
-  };
+  // ===== Input: strokes in, nothing gated, no modes ========================
+  // Pointer events belong to the ink layer. You are ALWAYS drawing; panning is
+  // the deliberate act (space, middle button, or alt), never the default. That
+  // is what makes "doodle on top of the running page" work at all.
+  let panning = null;
+  let spaceHeld = false;
 
-  function echo(points) {
-    const xs = points.map((p) => p.x);
-    const dx = Math.max(...xs) - Math.min(...xs) + 56;
-    const shifted = points.map((p) => ({ x: p.x + dx, y: p.y }));
-    if (Math.max(...shifted.map((p) => p.x)) > innerWidth - 8) return; // stay on canvas
-    session.addStroke(shifted, Date.now(), agentId);
+  // Pointer capture is a nicety — it keeps a stroke alive when the pointer
+  // leaves the element. It is NOT allowed to be the reason a stroke fails to
+  // start, so its failure is swallowed rather than thrown into the draw loop.
+  function capture(el, e) {
+    try { el.setPointerCapture(e.pointerId); } catch (err) { /* not capturable */ }
   }
 
-  // ===== Input: strokes in, nothing gated, no modes =====
   canvas.addEventListener('pointerdown', (e) => {
-    canvas.setPointerCapture(e.pointerId);
-    live = [{ x: e.clientX, y: e.clientY }];
+    capture(canvas, e);
+    if (e.button === 1 || e.altKey || spaceHeld) {
+      panning = { x: e.clientX, y: e.clientY };
+      canvas.style.cursor = 'grabbing';
+      return;
+    }
+    live = [screenToWorld(e.clientX, e.clientY)];
   });
+
   canvas.addEventListener('pointermove', (e) => {
+    if (panning) {
+      view.panX += e.clientX - panning.x;
+      view.panY += e.clientY - panning.y;
+      panning = { x: e.clientX, y: e.clientY };
+      afterViewChange();
+      return;
+    }
     if (!live) {
-      const over = nodeAt(e.clientX, e.clientY);
+      const w = screenToWorld(e.clientX, e.clientY);
+      const over = nodeAt(w.x, w.y);
       if (over !== hoverId) { hoverId = over; render(state); }
       return;
     }
-    live.push({ x: e.clientX, y: e.clientY });
+    live.push(screenToWorld(e.clientX, e.clientY));
     render(state); // live ink
   });
+
   canvas.addEventListener('pointerup', () => {
+    if (panning) { panning = null; canvas.style.cursor = 'crosshair'; return; }
     const points = live;
     live = null;
     if (!points || points.length < 3) { render(state); return; }
@@ -408,25 +840,55 @@ html, body {
     // Clear hover *before* the engine notifies: the render it triggers must
     // report the mark just made, not whatever the cursor was resting on.
     hoverId = null;
-    const before = session.getState().summon;
-    const id = session.addStroke(points, Date.now());
-    const after = session.getState();
+    // Points are world coordinates; the scale says how big the hand's pixel was
+    // when they were drawn. Position belongs in world space, the hand does not —
+    // without this, the same check reads as a closed loop at 1.7x zoom.
+    const id = session.addStroke(points, Date.now(), undefined, 1 / view.zoom);
 
-    // Don't echo gestures — only content. (A lasso the agent copied would
-    // leave a stray circle behind.)
-    const wasGesture = after.summon && after.summon !== before;
-    const isPendingLasso = after.pendingLassoId === id;
-    if (agentOn && agentId && !wasGesture && !isPendingLasso) echo(points);
+    // Say what happened when a stroke rubbed something out — a silent erase is
+    // indistinguishable from a bug. Read it from the stroke's own gesture rep,
+    // NOT from a drop in the content count: a lasso resolved by a command mark
+    // also leaves the content plane, and reporting that as "erased" would be a
+    // lie about the one operation the user most needs to trust.
+    const made = session.getState().nodes.get(id);
+    const g = made && MM.getRep(made, 'gesture');
+    if (g && g.data && g.data.role === 'scratch') {
+      const n = (g.data.erased || []).length;
+      flash('erased ' + n + ' mark' + (n === 1 ? '' : 's'));
+    }
   });
+
   canvas.addEventListener('pointerleave', () => { hoverId = null; render(state); });
+
+  addEventListener('keydown', (e) => {
+    if (e.code === 'Space' && !spaceHeld && e.target === document.body) {
+      spaceHeld = true; canvas.style.cursor = 'grab'; e.preventDefault();
+    }
+    if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); session.undo(); }
+    if (e.key === '0' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); fitAll(); }
+  });
+  addEventListener('keyup', (e) => {
+    if (e.code === 'Space') { spaceHeld = false; canvas.style.cursor = 'crosshair'; }
+  });
 
   document.getElementById('undoBtn').onclick = () => session.undo();
   document.getElementById('resetBtn').onclick = () => location.reload();
-  addEventListener('keydown', (e) => {
-    if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); session.undo(); }
-  });
 
-  // ===== Queries over engine state =====
+  // A transient line in the status bar. It must re-render IMMEDIATELY: the
+  // render triggered by the stroke itself has already happened by the time we
+  // know what the stroke did, so without this the message is set and never
+  // shown, and an erase looks silent.
+  let flashText = null, flashAt = 0, flashTimer = null;
+  const FLASH_MS = 1600;
+  function flash(msg) {
+    flashText = msg;
+    flashAt = Date.now();
+    render(session.getState());
+    clearTimeout(flashTimer);
+    flashTimer = setTimeout(() => { flashText = null; render(session.getState()); }, FLASH_MS);
+  }
+
+  // ===== Queries over engine state ========================================
   const authorOf = (node) => {
     const e = node.edges.find((x) => x.rel === 'made-by');
     return e ? e.to : MM.LOCAL_PARTICIPANT;
@@ -436,21 +898,39 @@ html, body {
     pid === MM.LOCAL_PARTICIPANT ? 'you' : (MM.wordOf(state.nodes.get(pid)) || pid);
 
   function nodeAt(x, y) {
+    const slack = wpx(8);
     for (let i = state.contentIds.length - 1; i >= 0; i--) {
       const b = MM.boundsOf(state.nodes.get(state.contentIds[i]));
-      if (b && x >= b.minX - 8 && x <= b.maxX + 8 && y >= b.minY - 8 && y <= b.maxY + 8) {
+      if (b && x >= b.minX - slack && x <= b.maxX + slack &&
+               y >= b.minY - slack && y <= b.maxY + slack) {
         return state.contentIds[i];
       }
     }
     return null;
   }
 
-  // ===== Rendering: ink is ground truth, the reading is surfaced beside it =====
+  const union = (list) => list.reduce((a, b) => ({
+    minX: Math.min(a.minX, b.minX), maxX: Math.max(a.maxX, b.maxX),
+    minY: Math.min(a.minY, b.minY), maxY: Math.max(a.maxY, b.maxY),
+  }));
+
+  function lastContentId(s) {
+    return s.contentIds.length ? s.contentIds[s.contentIds.length - 1] : null;
+  }
+
+  // ===== Rendering: ink is ground truth ===================================
   function inkOf(node, style) {
     const points = MM.strokePointsOf(node);
     if (points) {
       ctx.beginPath();
       points.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
+      // A dark halo under every mark. On the ground it is invisible; over a
+      // live artifact it is the difference between ink you can see and ink that
+      // disappears into whatever colour the model happened to choose. One rule,
+      // no special case for "is this stroke over a page".
+      ctx.strokeStyle = 'rgba(10,10,15,0.55)';
+      ctx.lineWidth = style.width + wpx(2.5);
+      ctx.stroke();
       ctx.strokeStyle = style.color;
       ctx.lineWidth = style.width;
       ctx.stroke();
@@ -465,22 +945,30 @@ html, body {
 
   function render(s) {
     state = s;
-    // A summon is the moment a group becomes a question — ask every model.
-    // Fire-and-forget: proposals arrive later and re-render on their own.
     askModels(s);
+    syncStage(s);
+
+    const dpr = window.devicePixelRatio || 1;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, innerWidth, innerHeight);
+    // World space from here down. Ink scales with the drawing; chrome that must
+    // stay legible uses wpx() to hold a constant size on screen.
+    ctx.setTransform(dpr * view.zoom, 0, 0, dpr * view.zoom, dpr * view.panX, dpr * view.panY);
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
 
-    // Held recognition of known artifacts — hinted, never committed.
+    // Ink thins as you zoom out; hold a visible floor so a wide board still reads.
+    const inkW = Math.max(2, wpx(1.3));
+
     for (const c of s.clusterCandidates) {
       const b = union(c.nodeIds.map((id) => MM.boundsOf(s.nodes.get(id))));
-      ctx.setLineDash([4, 6]);
+      const pad = wpx(14);
+      ctx.setLineDash([wpx(4), wpx(6)]);
       ctx.strokeStyle = 'rgba(201,168,76,0.38)';
-      ctx.lineWidth = 1;
-      ctx.strokeRect(b.minX - 14, b.minY - 14, b.maxX - b.minX + 28, b.maxY - b.minY + 28);
+      ctx.lineWidth = wpx(1);
+      ctx.strokeRect(b.minX - pad, b.minY - pad, b.maxX - b.minX + pad * 2, b.maxY - b.minY + pad * 2);
       ctx.setLineDash([]);
-      text(c.matches[0].name + '?  circle + ✓ to confirm', b.minX - 12, b.minY - 20, 'rgba(201,168,76,0.72)');
+      text(c.matches[0].name + '?  circle + mark to confirm', b.minX - wpx(12), b.minY - wpx(20), 'rgba(201,168,76,0.72)');
     }
 
     const inspectedId = hoverId || lastContentId(s);
@@ -488,25 +976,31 @@ html, body {
     for (const id of s.contentIds) {
       const node = s.nodes.get(id);
       const isArtifact = s.artifacts.includes(id);
+      const isLive = s.live.includes(id);
       const pending = s.pendingLassoId === id;
       const color = pending ? 'rgba(201,168,76,0.9)' : (isAgentNode(node) ? '#8ab4c8' : '#e8e4d9');
 
-      inkOf(node, { color, width: id === inspectedId ? 2.6 : 2 });
+      // A live artifact keeps its ink: the boxes you drew ARE the outlines of
+      // what got built, and that promise is only kept by drawing them on top.
+      inkOf(node, {
+        color: isLive ? 'rgba(201,168,76,0.85)' : color,
+        width: id === inspectedId ? inkW * 1.3 : inkW,
+      });
 
       const b = MM.boundsOf(node);
       if (isArtifact && b) {
-        brackets(b, '#c9a84c');
-        text(MM.wordOf(node), b.minX, b.minY - 10, '#c9a84c');
+        brackets(b, isLive ? '#c9a84c' : 'rgba(201,168,76,0.7)');
+        text((MM.wordOf(node) || '') + (isLive ? '  ·  live' : ''), b.minX, b.minY - wpx(10), '#c9a84c');
       } else if (b && !pending) {
         const top = MM.topInterpretation(node);
-        if (top) text(top, b.minX, b.maxY + 15, id === inspectedId ? 'rgba(160,152,128,0.95)' : 'rgba(160,152,128,0.5)');
+        if (top) text(top, b.minX, b.maxY + wpx(15),
+          id === inspectedId ? 'rgba(160,152,128,0.95)' : 'rgba(160,152,128,0.5)');
       }
     }
 
-    // The gesture that summoned: shown, so a misread is instantly visible.
     if (s.summon) {
       for (const gid of s.summon.gestureIds) {
-        inkOf(s.nodes.get(gid), { color: 'rgba(201,168,76,0.55)', width: 3 });
+        inkOf(s.nodes.get(gid), { color: 'rgba(201,168,76,0.55)', width: inkW * 1.5 });
       }
     }
 
@@ -514,31 +1008,39 @@ html, body {
       ctx.beginPath();
       live.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
       ctx.strokeStyle = '#e8e4d9';
-      ctx.lineWidth = 2;
+      ctx.lineWidth = inkW;
       ctx.stroke();
     }
 
     renderExplanations(s);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0); // back to screen space for the chrome
     renderSummon(s);
     renderInspector(s, inspectedId);
 
     const strokes = s.contentIds.length - s.artifacts.length;
+    const fresh = flashText && Date.now() - flashAt < FLASH_MS;
     statusEl.textContent =
       strokes + ' loose · ' + s.artifacts.length + ' artifact' + (s.artifacts.length === 1 ? '' : 's') +
+      (s.live.length ? ' (' + s.live.length + ' live)' : '') +
       ' · ' + s.participants.length + ' participants' +
-      (s.pendingLassoId ? '  ·  circle held — ✓ to summon' : '');
+      (s.commandMark ? ' · your mark' : ' · check ✓') +
+      (s.pendingLassoId ? '  ·  circle held — cross it to summon' : '') +
+      (fresh ? '  ·  ' + flashText : '');
   }
 
   function text(str, x, y, color) {
-    ctx.font = "11px 'Space Grotesk', system-ui, sans-serif";
+    ctx.font = wpx(11).toFixed(2) + "px 'Space Grotesk', system-ui, sans-serif";
+    ctx.lineWidth = wpx(3);
+    ctx.strokeStyle = 'rgba(10,10,15,0.7)';
+    ctx.strokeText(str, x, y);
     ctx.fillStyle = color;
     ctx.fillText(str, x, y);
   }
 
   function brackets(b, color) {
-    const L = 12, p = 9;
+    const L = wpx(12), p = wpx(9);
     ctx.strokeStyle = color;
-    ctx.lineWidth = 1.5;
+    ctx.lineWidth = wpx(1.5);
     const corners = [
       [b.minX - p, b.minY - p, L, 0, 0, L], [b.maxX + p, b.minY - p, -L, 0, 0, L],
       [b.minX - p, b.maxY + p, L, 0, 0, -L], [b.maxX + p, b.maxY + p, -L, 0, 0, -L],
@@ -550,156 +1052,17 @@ html, body {
     }
   }
 
-  const union = (list) => list.reduce((a, b) => ({
-    minX: Math.min(a.minX, b.minX), maxX: Math.max(a.maxX, b.maxX),
-    minY: Math.min(a.minY, b.minY), maxY: Math.max(a.maxY, b.maxY),
-  }));
-
-  function lastContentId(s) {
-    return s.contentIds.length ? s.contentIds[s.contentIds.length - 1] : null;
+  // ===== Explanations: answers live IN the canvas ==========================
+  function viewportWorld() {
+    const a = screenToWorld(0, 0), b = screenToWorld(innerWidth, innerHeight);
+    return { minX: a.x, minY: a.y, maxX: b.x, maxY: b.y };
   }
 
-  // ===== Inspector: what the machine currently holds, and why =====
-  const esc = (t) => String(t).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
-
-  function renderInspector(s, id) {
-    // While an offer stands, report on the offer — that's when it matters most.
-    if (s.summon) return renderSummonScope(s);
-
-    const node = id && s.nodes.get(id);
-    if (!node) {
-      inspectorEl.innerHTML = '<div class="eyebrow">what the engine holds</div>' +
-        '<div class="empty">Draw something. Every mark keeps all its readings — ' +
-        'nothing is committed until you bless it.</div>';
-      return;
-    }
-
-    const isArtifact = s.artifacts.includes(id);
-    // Strokes are attributed by made-by; artifacts by whoever named them.
-    const author = MM.strokePointsOf(node)
-      ? authorOf(node)
-      : ((node.reps.find((r) => r.modality === 'word') || {}).source || MM.LOCAL_PARTICIPANT);
-    const authorName = nameOfParticipant(author);
-    let html = '<div class="eyebrow">' + (isArtifact ? 'artifact' : 'what the engine holds') + '</div>';
-
-    html += '<div class="row"><span class="k">node</span><span class="v">' + esc(id) + '</span></div>';
-    html += '<div class="row"><span class="k">by</span><span class="v ' +
-      (author !== MM.LOCAL_PARTICIPANT ? 'by-agent' : 'by-human') + '">' + esc(authorName) + '</span></div>';
-
-    if (isArtifact) {
-      const members = node.edges.filter((e) => e.rel === 'has-part');
-      html += '<div class="row"><span class="k">name</span><span class="v">' + esc(MM.wordOf(node)) + '</span></div>';
-      html += '<div class="row"><span class="k">holds</span><span class="v">' + members.length + ' marks</span></div>';
-      const sig = (node.reps.find((r) => r.modality === 'signature') || {}).data;
-      if (sig) {
-        html += '<div class="row"><span class="k">sig</span><span class="v">' +
-          esc(Object.entries(sig).map(([k, v]) => v + '×' + k).join(' + ')) + '</span></div>';
-      }
-      const inst = node.edges.find((e) => e.rel === 'instance-of');
-      if (inst) html += '<div class="row"><span class="k">same as</span><span class="v">' + esc(inst.to) + '</span></div>';
-    }
-
-    // Held interpretations — EVERY reading, from EVERY source, grouped by who
-    // said it. Tiers are simultaneous, not an escalation ladder: a confident
-    // model reading never evicts the engine's own (ARCHITECTURE-v7 §4.1).
-    const reads = MM.interpretationsOf(node, s.nodes);
-    if (reads.length) {
-      const groups = MM.bySource(reads);
-      const gap = MM.disagreement(reads);
-
-      html += '<div class="sep"></div><div class="eyebrow">reads as' +
-        (groups.length > 1 ? ' <span class="srccount">' + groups.length + ' sources</span>' : '') +
-        '</div>';
-
-      // Disagreement is a signal, not noise — surface it above the readings.
-      if (gap && gap.crossSource) {
-        html += '<div class="gap">sources differ: ' +
-          gap.labels.slice(0, 3).map((l) => esc(l.label)).join(' vs ') + '</div>';
-      }
-
-      html += '<div class="reads">';
-      groups.forEach((g) => {
-        const tier = g.interpretations[0].tier;
-        html += '<div class="srchead"><span class="by">' + esc(g.label) + '</span>' +
-          '<span class="tier">tier ' + tier + '</span></div>';
-        g.interpretations.forEach((r, i) => {
-          html += '<div class="read' + (i === 0 ? ' top' : '') + (r.blessed ? ' blessed' : '') + '">' +
-            '<span class="type">' + esc(r.label) + '</span>' +
-            '<span class="w">' + r.weight.toFixed(2) + '</span></div>';
-          if (r.reasoning) html += '<div class="why">' + esc(r.reasoning) + '</div>';
-        });
-      });
-      html += '</div>';
-    }
-
-    // Relationships the engine inferred (never blessed by inference alone).
-    const rels = node.edges.filter((e) =>
-      ['touching', 'intersecting', 'contains', 'connects', 'connected-by', 'part-of'].includes(e.rel));
-    if (rels.length) {
-      html += '<div class="sep"></div><div class="eyebrow">relations</div>';
-      const seen = new Set();
-      rels.forEach((e) => {
-        const key = e.rel + e.to;
-        if (seen.has(key)) return;
-        seen.add(key);
-        const label = e.rel === 'part-of' ? 'part of ' + (MM.wordOf(s.nodes.get(e.to)) || e.to) : e.rel + ' ' + e.to;
-        html += '<div class="row"><span class="k">' + (e.blessed ? 'blessed' : 'held') + '</span>' +
-          '<span class="v">' + esc(label) + '</span></div>';
-      });
-    }
-
-    const fp = MM.fingerprintOf(node);
-    if (fp) {
-      html += '<div class="sep"></div><div class="eyebrow">ground truth</div>' +
-        '<div class="row"><span class="k">straight</span><span class="v">' + fp.straightness.toFixed(3) + '</span></div>' +
-        '<div class="row"><span class="k">corners</span><span class="v">' + fp.corners + '</span></div>' +
-        '<div class="row"><span class="k">closed</span><span class="v">' + (fp.isClosed ? 'yes' : 'no') + '</span></div>' +
-        '<div class="row"><span class="k">size</span><span class="v">' + Math.round(fp.size) + 'px</span></div>';
-    }
-
-    inspectorEl.innerHTML = html;
-  }
-
-  // What the pending offer covers: the scope the lasso defined, and who made
-  // each mark in it. Nothing here is committed — walking away is an answer.
-  function renderSummonScope(s) {
-    const ids = s.summon.enclosedIds;
-    let html = '<div class="eyebrow">offer standing</div>' +
-      '<div class="row"><span class="k">holds</span><span class="v">' + ids.length + ' marks</span></div>';
-
-    const sig = {};
-    ids.forEach((id) => {
-      const t = MM.topInterpretation(s.nodes.get(id)) || 'mark';
-      sig[t] = (sig[t] || 0) + 1;
-    });
-    html += '<div class="row"><span class="k">sig</span><span class="v">' +
-      esc(Object.entries(sig).map(([k, v]) => v + '×' + k).join(' + ')) + '</span></div>';
-
-    const authors = [...new Set(ids.map((id) => authorOf(s.nodes.get(id))))];
-    html += '<div class="row"><span class="k">by</span><span class="v">' +
-      authors.map((a) => '<span class="' + (a === MM.LOCAL_PARTICIPANT ? 'by-human' : 'by-agent') + '">' +
-        esc(nameOfParticipant(a)) + '</span>').join(', ') + '</span></div>';
-
-    html += '<div class="sep"></div><div class="eyebrow">offered</div>';
-    s.summon.suggestions.forEach((sug) => {
-      html += '<div class="row"><span class="k">' + (sug.kind === 'match' ? 'match' : '—') + '</span>' +
-        '<span class="v">' + esc(sug.label) + '</span></div>';
-    });
-    html += '<div class="why" style="margin-top:7px">Ignoring this is a valid answer: ' +
-      'keep drawing and the offer dissolves, leaving the marks as they were.</div>';
-
-    inspectorEl.innerHTML = html;
-  }
-
-  // ===== Summon chips: non-modal — drawing anything else dissolves them =====
-  let shownSummonId = null;
-  // Answers live IN the canvas, tethered to the marks they are about — so the
-  // reader never has to hold "which marks was this for?" in their head. Several
-  // answers to one question stack, each labelled with who said it.
   function renderExplanations(s) {
     if (!s.explanations.length) return;
-
+    const vw = viewportWorld();
     const stacked = new Map(); // subject key -> how many answers already drawn
+
     for (const id of s.explanations) {
       const node = s.nodes.get(id);
       if (!node || MM.getRep(node, 'erased')) continue;
@@ -714,7 +1077,8 @@ html, body {
       const pad = 9, w = b.maxX - b.minX;
       ctx.font = '11px ui-monospace, SFMono-Regular, Menlo, monospace';
       const lines = wrapText(data.text, w - pad * 2);
-      const who = MM.wordOf(s.nodes.get(node.edges.find((e) => e.rel === 'made-by').to)) || 'agent';
+      const madeBy = node.edges.find((e) => e.rel === 'made-by');
+      const who = (madeBy && MM.wordOf(s.nodes.get(madeBy.to))) || 'agent';
       const headH = 15, lineH = 15;
       const h = pad * 2 + headH + lines.length * lineH;
 
@@ -722,35 +1086,30 @@ html, body {
       // viewport, so fitting it on screen is the surface's job. Stack later
       // answers below earlier ones rather than overlapping them.
       let x = b.minX, y = b.minY + slot * (h + 10);
-      if (x + w > innerWidth - 8) {
-        // No room to the right — tuck it under the subject instead.
-        const sb = about.map((a) => (s.nodes.get(a) ? MM.boundsOf(s.nodes.get(a)) : null)).filter(Boolean);
-        const under = sb.length ? union(sb) : null;
-        x = under ? Math.max(8, Math.min(under.minX, innerWidth - 8 - w)) : Math.max(8, innerWidth - 8 - w);
-        y = (under ? under.maxY + 16 : y) + slot * (h + 10);
-      }
-      y = Math.max(8, Math.min(y, innerHeight - 46 - h)); // leave the status bar clear
-      stacked.set(key, slot + 1);
-
-      // Tether to the subject, drawn first so the card sits on top of it.
       const subjectBounds = about
         .map((a) => (s.nodes.get(a) ? MM.boundsOf(s.nodes.get(a)) : null))
         .filter(Boolean);
       const subject = subjectBounds.length ? union(subjectBounds) : null;
+      if (x + w > vw.maxX - wpx(8) && subject) {
+        x = Math.max(vw.minX + wpx(8), Math.min(subject.minX, vw.maxX - wpx(8) - w));
+        y = subject.maxY + wpx(16) + slot * (h + 10);
+      }
+      stacked.set(key, slot + 1);
+
       if (subject) {
         ctx.beginPath();
         ctx.moveTo(subject.maxX, (subject.minY + subject.maxY) / 2);
         ctx.lineTo(x, y + h / 2);
         ctx.strokeStyle = 'rgba(138,180,200,0.32)';
-        ctx.lineWidth = 1;
-        ctx.setLineDash([3, 4]);
+        ctx.lineWidth = wpx(1);
+        ctx.setLineDash([wpx(3), wpx(4)]);
         ctx.stroke();
         ctx.setLineDash([]);
       }
 
-      ctx.fillStyle = 'rgba(138,180,200,0.07)';
+      ctx.fillStyle = 'rgba(10,10,15,0.86)';
       ctx.strokeStyle = 'rgba(138,180,200,0.38)';
-      ctx.lineWidth = 1;
+      ctx.lineWidth = wpx(1);
       roundRect(x, y, w, h, 6);
       ctx.fill();
       ctx.stroke();
@@ -788,36 +1147,72 @@ html, body {
     ctx.closePath();
   }
 
+  // ===== Summon chips: non-modal — drawing anything else dissolves them =====
+  let shownSummonId = null;
+
   function renderSummon(s) {
     if (!s.summon) { summonEl.style.display = 'none'; shownSummonId = null; return; }
-    if (shownSummonId === s.summon.id) return;
-    shownSummonId = s.summon.id;
+    const sum = s.summon;
+    if (shownSummonId !== sum.id) {
+      shownSummonId = sum.id;
+      summonEl.innerHTML = '';
+      summonEl.style.display = 'flex';
 
-    summonEl.innerHTML = '';
-    summonEl.style.display = 'flex';
-    for (const sug of s.summon.suggestions) {
-      const btn = document.createElement('button');
-      btn.textContent = sug.kind === 'match' ? '✓ ' + sug.label : sug.label;
-      if (sug.kind === 'match') btn.className = 'match';
-      btn.onclick = () => {
-        if (sug.kind === 'name-as-new') return swapToInput(s.summon.id, btn);
-        session.bless({ summonId: s.summon.id, suggestionId: sug.id, at: Date.now() });
-      };
-      summonEl.appendChild(btn);
+      // Ink over a live artifact says what it landed on, before you say anything.
+      if (sum.onArtifact) {
+        const art = s.nodes.get(sum.onArtifact.artifactId);
+        const scope = document.createElement('span');
+        scope.className = 'scope';
+        const regions = addressedRegions(sum);
+        scope.textContent = 'on ' + (MM.wordOf(art) || 'artifact') +
+          (regions.length ? ' · ' + regions.join(' ') : ' · whole page');
+        summonEl.appendChild(scope);
+      }
+
+      for (const sug of sum.suggestions) {
+        // On a live artifact only the prompt makes sense — you are changing the
+        // page, not naming a new thing.
+        if (sum.onArtifact && sug.kind !== 'prompt' && sug.kind !== 'keep-as-drawing') continue;
+        const btn = document.createElement('button');
+        btn.textContent = sug.kind === 'match' ? '✓ ' + sug.label
+          : sug.kind === 'prompt' ? (sum.onArtifact ? 'Change…' : 'Make…')
+          : sug.label;
+        if (sug.kind === 'match') btn.className = 'match';
+        if (sug.kind === 'prompt') btn.className = 'make';
+        btn.onclick = () => {
+          if (sug.kind === 'prompt') return swapToPrompt(sum, btn);
+          if (sug.kind === 'name-as-new') return swapToInput(sum.id, btn);
+          session.bless({ summonId: sum.id, suggestionId: sug.id, at: Date.now() });
+        };
+        summonEl.appendChild(btn);
+      }
+
+      if (agents.length > 0 && sum.enclosedIds.length > 0) {
+        const askBtn = document.createElement('button');
+        askBtn.textContent = 'Ask…';
+        askBtn.onclick = () => swapToQuestion(sum.enclosedIds.slice(), askBtn);
+        summonEl.appendChild(askBtn);
+      }
     }
 
-    // Asking is only offered when someone can answer. The question goes to
-    // EVERY model at once — several answers to one question is the point.
-    if (agents.length > 0) {
-      const askBtn = document.createElement('button');
-      askBtn.textContent = 'Ask…';
-      askBtn.onclick = () => swapToQuestion(s.summon.enclosedIds.slice(), askBtn);
-      summonEl.appendChild(askBtn);
-    }
+    // Follow the gesture through pan and zoom — the offer belongs to the marks.
+    const b = MM.boundsOf(s.nodes.get(sum.gestureIds[1]));
+    const p = worldToScreen(b.minX, b.maxY);
+    summonEl.style.left = Math.max(8, Math.min(p.x, innerWidth - summonEl.offsetWidth - 8)) + 'px';
+    summonEl.style.top = Math.max(8, Math.min(p.y + 14, innerHeight - 70)) + 'px';
+  }
 
-    const b = MM.boundsOf(s.nodes.get(s.summon.gestureIds[1]));
-    summonEl.style.left = Math.max(8, Math.min(b.minX, innerWidth - 340)) + 'px';
-    summonEl.style.top = Math.max(8, Math.min(b.maxY + 14, innerHeight - 70)) + 'px';
+  /**
+   * Which regions this summon addresses. The engine's geometric answer, merged
+   * with what the artifact's own DOM reports under the ink — two independent
+   * reads of the same question, and the union is what the model is told.
+   */
+  function addressedRegions(sum) {
+    if (!sum.onArtifact) return [];
+    const lasso = state.nodes.get(sum.gestureIds[0]);
+    const b = lasso && MM.boundsOf(lasso);
+    const fromDom = b ? regionsUnderInk(sum.onArtifact.artifactId, b) : [];
+    return [...new Set((sum.onArtifact.regionIds || []).concat(fromDom))];
   }
 
   function swapToInput(summonId, btn) {
@@ -833,6 +1228,64 @@ html, body {
     input.focus();
   }
 
+  // The freeform prompt — MVP.md §2 step 6. One box for building and for
+  // changing, because it is one gesture; whether the artifact already carries
+  // code is what decides, not a mode the human has to pick.
+  function swapToPrompt(sum, btn) {
+    const revising = !!sum.onArtifact;
+    const input = document.createElement('input');
+    input.className = 'make';
+    input.placeholder = revising
+      ? 'change what this covers…'
+      : 'website with the copy in the squares…';
+    input.onkeydown = (e) => {
+      e.stopPropagation();
+      if (e.key !== 'Enter') return;
+      const prompt = input.value.trim();
+      if (!prompt) return;
+      if (agents.length === 0) {
+        input.value = '';
+        input.placeholder = 'add a model first — generation needs one';
+        return;
+      }
+      input.disabled = true;
+      input.placeholder = 'building with ' + agents.length + ' model(s)…';
+      runPrompt(sum, prompt, revising);
+    };
+    btn.replaceWith(input);
+    input.focus();
+  }
+
+  function runPrompt(sum, prompt, revising) {
+    const at = Date.now();
+    let artifactId, addressed;
+
+    if (revising) {
+      artifactId = sum.onArtifact.artifactId;
+      addressed = addressedRegions(sum);
+      session.dismiss(sum.id, at); // the addressing mark has done its work
+    } else {
+      // Blessing first gives the code somewhere to live, and gives the region
+      // frame its origin. The name is the prompt, so the artifact says what it
+      // was asked to be.
+      const name = prompt.length > 30 ? prompt.slice(0, 30) + '…' : prompt;
+      artifactId = session.bless({ summonId: sum.id, name: name, at: at });
+      addressed = undefined;
+      if (!artifactId) { mpStatus.textContent = 'Could not hold that group.'; return; }
+    }
+
+    mpStatus.textContent = (revising ? 'revising' : 'building') + ' with ' + agents.length + ' model(s)…';
+    agents.forEach((agent) => {
+      agent.generate({ prompt: prompt, artifactId: artifactId, at: Date.now(), addressed: addressed })
+        .then((res) => {
+          mpStatus.textContent = res.ok
+            ? agent.name + ' ' + (res.revised ? 'revised' : 'built') + ' it (' + res.code.length + ' chars).'
+            : agent.name + ' could not build (' + res.error + ') — the drawing is untouched.';
+          render(session.getState());
+        });
+    });
+  }
+
   function swapToQuestion(nodeIds, btn) {
     const input = document.createElement('input');
     input.placeholder = 'ask about these…';
@@ -844,14 +1297,9 @@ html, body {
       if (!q) return;
       input.disabled = true;
       input.placeholder = 'asking ' + agents.length + ' model(s)…';
-
-      // Fan out. Each answer lands as its own node the moment it arrives;
-      // a slow model never holds up a fast one.
       agents.forEach((agent) => {
         agent.ask(q, nodeIds, Date.now()).then((res) => {
-          if (!res.ok) {
-            mpStatus.textContent = agent.name + ' could not answer (' + res.error + ').';
-          }
+          if (!res.ok) mpStatus.textContent = agent.name + ' could not answer (' + res.error + ').';
           render(session.getState());
         });
       });
@@ -860,14 +1308,180 @@ html, body {
     input.focus();
   }
 
-  // Debug handle. This is a reference surface for the engine, so being able to
-  // read the graph from the console is a feature, not a leak — it is read-only
-  // by convention and nothing in the demo depends on it.
-  window.__mm = { session: session, agents: agents, MM: MM };
+  // ===== Inspector: what the machine currently holds, and why ==============
+  function renderInspector(s, id) {
+    if (s.summon) return renderSummonScope(s);
+
+    const node = id && s.nodes.get(id);
+    if (!node) {
+      inspectorEl.innerHTML = '<div class="eyebrow">what the engine holds</div>' +
+        '<div class="empty">Draw something. Every mark keeps all its readings — ' +
+        'nothing is committed until you bless it.</div>';
+      return;
+    }
+
+    const isArtifact = s.artifacts.includes(id);
+    const isLive = s.live.includes(id);
+    const author = MM.strokePointsOf(node)
+      ? authorOf(node)
+      : ((node.reps.find((r) => r.modality === 'word') || {}).source || MM.LOCAL_PARTICIPANT);
+    const authorName = nameOfParticipant(author);
+    let html = '<div class="eyebrow">' +
+      (isLive ? 'living artifact' : isArtifact ? 'artifact' : 'what the engine holds') + '</div>';
+
+    html += '<div class="row"><span class="k">node</span><span class="v">' + esc(id) + '</span></div>';
+    html += '<div class="row"><span class="k">by</span><span class="v ' +
+      (author !== MM.LOCAL_PARTICIPANT ? 'by-agent' : 'by-human') + '">' + esc(authorName) + '</span></div>';
+
+    if (isArtifact) {
+      const members = node.edges.filter((e) => e.rel === 'has-part');
+      html += '<div class="row"><span class="k">name</span><span class="v">' + esc(MM.wordOf(node)) + '</span></div>';
+      html += '<div class="row"><span class="k">holds</span><span class="v">' + members.length + ' marks</span></div>';
+      const sig = (node.reps.find((r) => r.modality === 'signature') || {}).data;
+      if (sig) {
+        html += '<div class="row"><span class="k">sig</span><span class="v">' +
+          esc(Object.entries(sig).map(([k, v]) => v + '×' + k).join(' + ')) + '</span></div>';
+      }
+      const inst = node.edges.find((e) => e.rel === 'instance-of');
+      if (inst) html += '<div class="row"><span class="k">same as</span><span class="v">' + esc(inst.to) + '</span></div>';
+    }
+
+    // The code plane. Every attempt is kept and attributed; the newest is what
+    // renders. Generation is a proposal like any other reading (MVP.md §7).
+    const codes = node.reps.filter((r) => r.modality === 'code');
+    if (codes.length) {
+      const newest = codes[codes.length - 1];
+      html += '<div class="sep"></div><div class="eyebrow">code' +
+        (codes.length > 1 ? ' <span class="srccount">' + codes.length + ' versions</span>' : '') + '</div>';
+      html += '<div class="row"><span class="k">built by</span><span class="v by-agent">' +
+        esc(nameOfParticipant(newest.source)) + '</span></div>';
+      html += '<div class="row"><span class="k">size</span><span class="v">' +
+        newest.data.code.length + ' chars</span></div>';
+      if (newest.data.prompt) html += '<div class="why">“' + esc(newest.data.prompt) + '”</div>';
+
+      const regions = MM.regionsOf(node, s.nodes);
+      html += '<div class="row"><span class="k">regions</span><span class="v">' +
+        regions.map((r) => r.id).join(' ') + '</span></div>';
+      if (codes.length > 1) {
+        html += '<div class="why">Earlier versions are still held — rendering the newest is a ' +
+          'display choice, not a commitment.</div>';
+      }
+    }
+
+    // Held interpretations — EVERY reading, from EVERY source, grouped by who
+    // said it. Tiers are simultaneous, not an escalation ladder.
+    const reads = MM.interpretationsOf(node, s.nodes);
+    if (reads.length) {
+      const groups = MM.bySource(reads);
+      const gap = MM.disagreement(reads);
+
+      html += '<div class="sep"></div><div class="eyebrow">reads as' +
+        (groups.length > 1 ? ' <span class="srccount">' + groups.length + ' sources</span>' : '') + '</div>';
+
+      if (gap && gap.crossSource) {
+        html += '<div class="gap">sources differ: ' +
+          gap.labels.slice(0, 3).map((l) => esc(l.label)).join(' vs ') + '</div>';
+      }
+
+      html += '<div class="reads">';
+      groups.forEach((g) => {
+        const tier = g.interpretations[0].tier;
+        html += '<div class="srchead"><span class="by">' + esc(g.label) + '</span>' +
+          '<span class="tier">tier ' + tier + '</span></div>';
+        g.interpretations.forEach((r, i) => {
+          html += '<div class="read' + (i === 0 ? ' top' : '') + (r.blessed ? ' blessed' : '') + '">' +
+            '<span class="type">' + esc(r.label) + '</span>' +
+            '<span class="w">' + r.weight.toFixed(2) + '</span></div>';
+          if (r.reasoning) html += '<div class="why">' + esc(r.reasoning) + '</div>';
+        });
+      });
+      html += '</div>';
+    }
+
+    const rels = node.edges.filter((e) =>
+      ['touching', 'intersecting', 'contains', 'connects', 'connected-by', 'part-of'].includes(e.rel));
+    if (rels.length) {
+      html += '<div class="sep"></div><div class="eyebrow">relations</div>';
+      const seen = new Set();
+      rels.forEach((e) => {
+        const key = e.rel + e.to;
+        if (seen.has(key)) return;
+        seen.add(key);
+        const label = e.rel === 'part-of' ? 'part of ' + (MM.wordOf(s.nodes.get(e.to)) || e.to) : e.rel + ' ' + e.to;
+        html += '<div class="row"><span class="k">' + (e.blessed ? 'blessed' : 'held') + '</span>' +
+          '<span class="v">' + esc(label) + '</span></div>';
+      });
+    }
+
+    const fp = MM.fingerprintOf(node);
+    if (fp) {
+      html += '<div class="sep"></div><div class="eyebrow">ground truth</div>' +
+        '<div class="row"><span class="k">straight</span><span class="v">' + fp.straightness.toFixed(3) + '</span></div>' +
+        '<div class="row"><span class="k">corners</span><span class="v">' + fp.corners + '</span></div>' +
+        '<div class="row"><span class="k">closed</span><span class="v">' + (fp.isClosed ? 'yes' : 'no') + '</span></div>' +
+        '<div class="row"><span class="k">size</span><span class="v">' + Math.round(fp.size) + 'px</span></div>';
+    }
+
+    inspectorEl.innerHTML = html;
+  }
+
+  function renderSummonScope(s) {
+    const sum = s.summon;
+    const ids = sum.enclosedIds;
+    let html = '<div class="eyebrow">offer standing</div>';
+
+    if (sum.onArtifact) {
+      const art = s.nodes.get(sum.onArtifact.artifactId);
+      const regions = addressedRegions(sum);
+      html += '<div class="row"><span class="k">on</span><span class="v">' +
+        esc(MM.wordOf(art) || sum.onArtifact.artifactId) + '</span></div>';
+      html += '<div class="row"><span class="k">covers</span><span class="v">' +
+        (regions.length ? esc(regions.join(', ')) : 'the whole page') + '</span></div>';
+      html += '<div class="why" style="margin-top:7px">Your mark is over a living artifact, so the ' +
+        'canvas resolved it to real elements in that page — not to an impression of one. ' +
+        'A prompt now changes only what those regions cover.</div>';
+      inspectorEl.innerHTML = html;
+      return;
+    }
+
+    html += '<div class="row"><span class="k">holds</span><span class="v">' + ids.length + ' marks</span></div>';
+    const sig = {};
+    ids.forEach((id) => {
+      const t = MM.topInterpretation(s.nodes.get(id)) || 'mark';
+      sig[t] = (sig[t] || 0) + 1;
+    });
+    html += '<div class="row"><span class="k">sig</span><span class="v">' +
+      esc(Object.entries(sig).map(([k, v]) => v + '×' + k).join(' + ')) + '</span></div>';
+
+    const authors = [...new Set(ids.map((id) => authorOf(s.nodes.get(id))))];
+    html += '<div class="row"><span class="k">by</span><span class="v">' +
+      authors.map((a) => '<span class="' + (a === MM.LOCAL_PARTICIPANT ? 'by-human' : 'by-agent') + '">' +
+        esc(nameOfParticipant(a)) + '</span>').join(', ') + '</span></div>';
+
+    html += '<div class="sep"></div><div class="eyebrow">offered</div>';
+    sum.suggestions.forEach((sug) => {
+      html += '<div class="row"><span class="k">' +
+        (sug.kind === 'match' ? 'match' : sug.kind === 'prompt' ? 'build' : '—') + '</span>' +
+        '<span class="v">' + esc(sug.label) + '</span></div>';
+    });
+    html += '<div class="why" style="margin-top:7px">Ignoring this is a valid answer: ' +
+      'keep drawing and the offer dissolves, leaving the marks as they were.</div>';
+
+    inspectorEl.innerHTML = html;
+  }
+
+  // Debug handle. This is a reference surface for the engine, so reading the
+  // graph from the console is a feature, not a leak.
+  window.__mm = {
+    session: session, agents: agents, MM: MM, view: view, frames: frames,
+    screenToWorld: screenToWorld, worldToScreen: worldToScreen,
+    fitAll: fitAll, regionsUnderInk: regionsUnderInk,
+  };
 
   session.subscribe(render);
-  document.fonts.ready.then(() => render(session.getState()));
+  document.fonts.ready.then(() => { sizePad(); render(session.getState()); });
   resize();
+  afterViewChange();
 })();
 </script>
 </body>

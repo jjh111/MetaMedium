@@ -7,8 +7,8 @@
 import type { Point, Fingerprint, RecognitionResult, StrokeAnalysis } from './types';
 import { getFingerprint, checkOvershoot } from './geometry';
 
-function detectLine(fp: Fingerprint, points: Point[]): RecognitionResult | null {
-  const hasOvershoot = checkOvershoot(points);
+function detectLine(fp: Fingerprint, points: Point[], scale = 1): RecognitionResult | null {
+  const hasOvershoot = checkOvershoot(points, 50 * scale);
   const isStraight = fp.straightness > 0.65;
   const notClosed = !fp.isClosed && !hasOvershoot;
   const fewCorners = fp.corners <= 2;
@@ -25,8 +25,8 @@ function detectLine(fp: Fingerprint, points: Point[]): RecognitionResult | null 
   return null;
 }
 
-function detectArc(fp: Fingerprint, points: Point[]): RecognitionResult | null {
-  const hasOvershoot = checkOvershoot(points);
+function detectArc(fp: Fingerprint, points: Point[], scale = 1): RecognitionResult | null {
+  const hasOvershoot = checkOvershoot(points, 50 * scale);
   const notClosed = !fp.isClosed && !hasOvershoot;
   const fewCorners = fp.corners <= 1;
   const isCurved = fp.straightness < 0.6;
@@ -77,8 +77,8 @@ function detectRectangle(fp: Fingerprint): RecognitionResult | null {
   return null;
 }
 
-function detectCircle(fp: Fingerprint, points: Point[]): RecognitionResult | null {
-  const hasOvershoot = checkOvershoot(points);
+function detectCircle(fp: Fingerprint, points: Point[], scale = 1): RecognitionResult | null {
+  const hasOvershoot = checkOvershoot(points, 50 * scale);
   const isClosed = fp.isClosed || hasOvershoot;
   const fewCorners = fp.corners <= 1;
   const notStraight = fp.straightness < 0.5;
@@ -96,15 +96,15 @@ function detectCircle(fp: Fingerprint, points: Point[]): RecognitionResult | nul
   return null;
 }
 
-export function analyzeStroke(points: Point[]): StrokeAnalysis {
-  const fingerprint = getFingerprint(points);
+export function analyzeStroke(points: Point[], scale = 1): StrokeAnalysis {
+  const fingerprint = getFingerprint(points, scale);
 
   const results = [
-    detectLine(fingerprint, points),
-    detectArc(fingerprint, points),
+    detectLine(fingerprint, points, scale),
+    detectArc(fingerprint, points, scale),
     detectTriangle(fingerprint),
     detectRectangle(fingerprint),
-    detectCircle(fingerprint, points),
+    detectCircle(fingerprint, points, scale),
   ].filter((r): r is RecognitionResult => r !== null);
 
   results.sort((a, b) => b.score - a.score);

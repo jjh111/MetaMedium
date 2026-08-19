@@ -63,25 +63,43 @@ tracks only **status**. Experiments are tracked in
 
 ## What's Next
 
-### → **MVP: Ink Over Living Artifacts** — the product target
+### → **MVP: Ink Over Living Artifacts** — ✅ **built (19 Aug 2026)**
 
-**[MVP.md](MVP.md)** (Aug 2026) defines the product the engine work serves: an
-infinite canvas, a command mark the user *teaches* the system, a freeform prompt
-on the summon that turns enclosed drawings into **living code rendered in place**,
-and ink drawn over that running artifact that addresses what is underneath it.
+**[MVP.md](MVP.md)** defines the product, and the loop it defines now runs end
+to end in `Demos/session-engine.html`:
 
-The reckoning is favourable: it is the existing state machine with three
-substitutions — `command` is a learned `check`, `prompt` is a third suggestion
-kind, `generate` is a `bless` that attaches a `'code'` rep. Core changes are
-small and additive; the work is in the surface. ~2 weeks to the loop standing.
+> Draw boxes on an infinite canvas → zoom out and circle the set → cross it with
+> a command mark **you taught the system by drawing it five times** → a freeform
+> prompt appears → *"website with the copy in the squares"* → a real page renders
+> in the canvas, with your ink still outlining its divs to the pixel → draw on
+> that page and the ink resolves to the regions underneath it → prompt again and
+> only those regions change. Scratch anything out to erase.
+
+The reckoning held: it was the existing state machine with three substitutions —
+`command` is a learned `check`, `prompt` is a third suggestion kind, `generate`
+is a `bless` that attaches a `'code'` rep. Core grew five small modules
+(`commandmark`, `erase`, `regions`, plus `teach`/`code` events and
+`agent.generate`); the work was in the surface, as predicted.
+
+**215 core tests** (+87), plus `Demos/session-engine.e2e.js` — a 17-step check
+that drives the whole loop through the real UI in a browser.
+
+Three engine bugs surfaced only because zoom exists, and all three are recorded
+in MVP.md §7: fixed pixel thresholds are about the *hand*, not the world;
+`isStrokeClosed` contradicted its own documented intent at the small end; and a
+closed stroke must never be read as a scratch.
+
+**Still open:** handwriting (v7 Stage E), so "the copy in the squares" can be
+literal rather than typed.
 
 ### → **v7: Participants and Tiers** — the active engine plan
 
 **[ARCHITECTURE-v7-PARTICIPANTS-AND-TIERS.md](ARCHITECTURE-v7-PARTICIPANTS-AND-TIERS.md)**
-is where the work goes now. **Stages A and C have shipped:** a model joins as a
+holds the engine design. **Stages A, C and D have shipped:** a model joins as a
 peer through the `propose` channel the engine already had, offers *several*
-readings held beside Tier 0's, and answers questions *into* the canvas.
-Remaining: diagram→code (D) and handwriting (E).
+readings held beside Tier 0's, answers questions *into* the canvas, and now
+builds living code from a drawing (D, absorbed and raised by MVP.md).
+Remaining: handwriting (E).
 
 The target is **the conversation benchmark**: a human and an AI holding a
 conversation *on the canvas* — both contributing marks, both building library

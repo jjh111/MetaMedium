@@ -22,11 +22,14 @@ automatically → ask "why?" and get grounded reasoning.
 `ARCHITECTURE-v7-PARTICIPANTS-AND-TIERS.md` is the active engine plan; MVP.md
 absorbs and raises its Stage D.
 
-Headline: the substrate is real, the canonical loop is closed, and **models are
-now in the loop** — v7 Stages A and C have shipped. A model joins as a peer,
-offers *several* readings held beside Tier 0's, and answers questions *into* the
-canvas. Still open: diagram→code (Stage D) and handwriting (Stage E). Whitepaper
-v5.1 stays parked until the conversation benchmark passes end to end.
+Headline: **the MVP loop runs end to end.** Draw boxes on an infinite canvas,
+circle them, cross with a command mark *you taught the system*, prompt them into
+a living page that renders in the canvas with your ink still outlining its
+divs — then draw on that page and the ink addresses the regions underneath it.
+Scratch anything out to erase. `Demos/session-engine.html` is the surface;
+`Demos/session-engine.e2e.js` drives all 17 steps through the real UI.
+Still open: handwriting (v7 Stage E). Whitepaper v5.1 stays parked until the
+conversation benchmark passes end to end.
 
 Architecture documents (chronological; **read MVP.md, then v7, then v6**):
 - `MVP.md` — **the product definition**: infinite canvas, a learned command mark,
@@ -55,7 +58,7 @@ any structural change.
 | `doodle2-canvas.html` | **Flagship demo**: heuristic recognition, spatial graph, library, undo/redo, touch. No LLM. Single-file (~500KB) |
 | `metadoodle1.html` | Fork of flagship + tiered LLM recognition (WebLLM in-browser, LM Studio local API) + voice. Single-file (~600KB) |
 | `Web App Skeleton/` | React + Vite + TypeScript + Zustand rebuild; Claude API interpreter skeleton in `src/llm/`; recognition/spatial/matching in `src/core/` |
-| `Demos/` | Micro demos. **`session-engine.html`** is the live reference surface for metamedium-core (canvas + "why" inspector + model participants + canvas answers; uses the committed `metamedium-core.browser.js` bundle). `build-standalone.mjs` inlines the bundle into a single shareable file. Plus fish, composition diagrams, no-modes graph, etc. |
+| `Demos/` | **`session-engine.html` is the MVP surface** — infinite canvas, the taught command mark, living artifacts in a DOM overlay, ink-over-artifact addressing, "why" inspector, model participants, canvas answers. Uses the committed `metamedium-core.browser.js` bundle. **`session-engine.e2e.js`** drives the whole loop through the real UI with a stubbed model (browser console; not part of `npm test`). `build-standalone.mjs` inlines the bundle into a single shareable file. Plus fish, composition diagrams, no-modes graph, etc. |
 | `skills/` | Claude Code skills: `metamedium-code` (code patterns), `metamedium-design` (design principles) |
 | `Assets/` | Figures and design rationale (recognition strategy, point-primitive proposal) |
 | `archive/` | Retired versions and superseded plans, incl. whitepaper v4 (root `MetaMedium_Whitepaper_v4.html` is a redirect stub — keep it) and PRDs v3.2/v4 |
@@ -130,9 +133,65 @@ size — small shapes need tight closure, large shapes tolerate bigger gaps. The
 same size-relative logic guards overshoot detection, so short strokes don't all
 read as circles. Both live in `isStrokeClosed` / `checkOvershoot`.
 
+**The fixed term is bounded by the stroke's own size**, or it inverts the rule
+above at the small end: an unbounded `gap < 50px` called a 45px-wide caret with
+45px between its ends *closed*, which is what broke the learned command mark.
+
+**Fixed pixel thresholds are about the HAND, not the world.** On an infinite
+canvas the surface feeds world coordinates (so the grammar survives zoom), and
+that silently makes every fixed-pixel rule zoom-dependent — the same check reads
+open at 1× and closed at 1.7×. `getFingerprint(points, scale)` and
+`analyzeStroke(points, scale)` take world-units-per-screen-pixel (1/zoom), and
+the scale is logged with each stroke so replay is deterministic. **Surfaces with
+a viewport must pass it.** See MVP.md §7.
+
 **Library matching** is a weighted fingerprint comparison (straightness,
 aspect, corners, closure, size) with a straightness veto — see
 `matchPrimitiveFromLibrary`.
+
+### Gestures: taught, and relational
+
+The gesture grammar is **user vocabulary**, learned the same way any named shape
+is. `learnCommandMark(samples)` turns five drawings into a signature (a
+fingerprint centroid plus per-feature spread, which gives the accept band for
+free); `session.teachCommandMark(mark, at)` installs it as an event, so it
+replays with the session. Until taught, the built-in check ✓ stands.
+
+- Every feature is **scale-free** (ratios and counts, never size), so a taught
+  mark works at any zoom.
+- **Rejection is tested harder than recognition** — a mark that fires while you
+  draw reads as broken, not eager. `collidesWith` refuses a signature that
+  matches the user's existing vocabulary.
+- A **taught** mark must *cross* the lasso; the built-in check need only land
+  near it. A confirming tick belongs beside a selection; a command mark is drawn
+  deliberately across one.
+
+**Erasing is relational, not gestural** (`src/session/erase.ts`): count
+crossings between the stroke and the target's own outline; three erases it. No
+speed, density, or size constant to tune, zoom-invariant, and it degrades
+honestly — a line drawn *through* a shape crosses twice and is safe. Two rules
+keep it safe: a **closed** stroke is never a scratch (it is a lasso), and
+scratch targets are **ink**, never artifacts.
+
+### Living artifacts
+
+An artifact may carry a `'code'` rep, which puts it on `SessionState.live` and
+makes it render as real DOM in the canvas. The rules:
+
+- `regionsOf(artifact, nodes)` turns member marks into a layout frame in
+  artifact-local pixels. **Generation is constrained by that frame, not merely
+  prompted by it** — a moved region breaks the visible promise that the doodle
+  outlines the div (MVP.md §6.2). Generated elements must carry `data-region`.
+- A closed stroke drawn **on** a live artifact is lasso-like even enclosing no
+  mark — it encloses a *region*. `Summon.onArtifact` reports which artifact and
+  which regions, so ink over a running page addresses real elements.
+- `agent.generate()` is **one method for build and revise**, because it is one
+  gesture; whether the artifact already carries code decides which.
+- Every version is held and attributed. Rendering the newest is a display
+  choice, not a commitment.
+- A **broken** artifact leaves the live plane: code is a contract with the marks
+  that framed it, and a page rendering over erased ink is the silent phantom
+  degradation exists to prevent.
 
 ### Spatial Graph
 
@@ -250,6 +309,11 @@ in the repo now.
 
 **Data limits:** max 500 points/stroke, 50 strokes/composition, composition
 depth 5, library 100 items.
+
+**Artifact sandbox:** live artifacts render with `sandbox="allow-same-origin"`
+and deliberately **not** `allow-scripts` — same-origin is what lets ink
+hit-test into the artifact's DOM, and granting both is the known escape. See
+MVP.md risk #5.
 
 **Browser support:** Chrome 100+, Safari 15+, Firefox 100+. Touch + mouse.
 WebLLM features require WebGPU.

@@ -160,7 +160,7 @@ describe('generate — revise', () => {
   }
 
   it('a second prompt on a live artifact revises rather than rebuilds', async () => {
-    const { s, id, agent } = await built();
+    const { id, agent } = await built();
     stubOpenAI('<section data-region="r1">second</section>');
 
     const r = await agent.generate({ prompt: 'make it blue', artifactId: id, at: 3300, addressed: ['r1'] });

@@ -13,7 +13,7 @@
 //     function of the log, and undo = drop the last input and replay.
 
 import type { Bounds, Component, Point } from '../types';
-import { getFingerprint, getBounds, distancePointToBounds } from '../geometry';
+import { getFingerprint, getBounds, distancePointToBounds, boundsOverlap } from '../geometry';
 import { analyzeStroke } from '../recognition';
 import { buildSpatialGraph, spatialCluster } from '../spatial';
 import {
@@ -44,7 +44,7 @@ import {
 } from './gesture';
 import { type CommandMark } from './commandmark';
 import { DEFAULT_ERASE_CROSSINGS, scratchedOut } from './erase';
-import { type Region, regionsOf } from './regions';
+import { type Region, regionsOf, regionsOverlapping } from './regions';
 
 // ===== Public state shape =====
 
@@ -62,6 +62,12 @@ export interface Summon {
   suggestions: Suggestion[];
   gestureIds: string[]; // lasso + check (provenance)
   at: number;
+  /**
+   * Set when the lasso was drawn ON a live artifact. Ink over a running
+   * artifact addresses the regions beneath it, so this is how "circle a bit of
+   * the generated page and prompt again" reaches the right code (MVP.md §5.4).
+   */
+  onArtifact?: { artifactId: string; regionIds: string[] };
 }
 
 export interface ClusterCandidate {
@@ -97,7 +103,19 @@ export interface SessionState {
 // Humans and AI agents contribute through the SAME events — there is no
 // separate "AI input" channel (one class of citizen).
 export type SessionEvent =
-  | { type: 'stroke'; points: Point[]; at: number; participantId?: string }
+  | {
+      type: 'stroke';
+      points: Point[];
+      at: number;
+      participantId?: string;
+      /**
+       * World units per screen pixel when this stroke was drawn (1/zoom).
+       * Fixed-pixel thresholds are about the HAND, so they are interpreted in
+       * the space the hand worked in — see getFingerprint. Logged with the
+       * stroke so replay is deterministic across later zoom changes.
+       */
+      scale?: number;
+    }
   | { type: 'tick'; at: number }
   | { type: 'bless'; summonId: string; name?: string; suggestionId?: string; at: number; participantId?: string }
   | { type: 'dismiss'; summonId: string; at: number; participantId?: string }
@@ -151,7 +169,7 @@ export const DEFAULT_SESSION_CONFIG: SessionConfig = {
 type Signature = Record<string, number>; // type histogram, e.g. { circle: 3, line: 2 }
 
 export interface Session {
-  addStroke(points: Point[], at: number, participantId?: string): string;
+  addStroke(points: Point[], at: number, participantId?: string, scale?: number): string;
   /** Register a participant (human or AI agent). Returns its node id. */
   join(kind: ParticipantKind, name: string, at: number, capability?: Capability): string;
   /** Offer attributed, inferred edges on a node — the channel LLM tiers use. */
@@ -357,7 +375,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
    * land near two different content nodes is held as a candidate connection.
    * The line IS the relation node (relations are nodes — core schema).
    */
-  function inferWire(node: MMNode, points: Point[]) {
+  function inferWire(node: MMNode, points: Point[], scale: number) {
     const top = resemblances(node)[0];
     if (!top || top.to !== typeNodeId('line')) return;
 
@@ -365,7 +383,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       let best: { id: string; d: number } | null = null;
       for (const c of contentBoundsList(node.id)) {
         const d = distancePointToBounds(p, c.bounds);
-        if (d < config.wireEndpointPx && (!best || d < best.d)) best = { id: c.id, d };
+        if (d < config.wireEndpointPx * scale && (!best || d < best.d)) best = { id: c.id, d };
       }
       return best;
     };
@@ -381,6 +399,41 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     nodes.get(b.id)!.edges.push({ to: node.id, rel: 'connected-by', weight });
   }
 
+  /**
+   * Every mark a scratch could rub out: loose strokes, plus the member marks
+   * inside artifacts (which have left the content plane but are still ink).
+   */
+  function scratchTargets(excludeId: string) {
+    const ids = new Set<string>();
+    for (const id of contentIds) {
+      if (id === excludeId) continue;
+      const n = nodes.get(id)!;
+      if (strokePointsOf(n)) {
+        ids.add(id);
+        continue;
+      }
+      for (const e of n.edges) if (e.rel === 'has-part') ids.add(e.to);
+    }
+    return [...ids]
+      .map((id) => nodes.get(id))
+      .filter((n): n is MMNode => !!n && !getRep(n, 'erased') && !!strokePointsOf(n))
+      .map((n) => ({
+        id: n.id,
+        points: strokePointsOf(n)!,
+        closed: fingerprintOf(n)?.isClosed ?? false,
+      }));
+  }
+
+  /** The live artifact a closed stroke was drawn over, if any. */
+  function liveArtifactUnder(b: Bounds, excludeId?: string): string | null {
+    for (const aid of live) {
+      if (aid === excludeId) continue;
+      const ab = boundsOf(nodes.get(aid)!);
+      if (ab && boundsOverlap(ab, b)) return aid;
+    }
+    return null;
+  }
+
   function removeFromContent(id: string) {
     const idx = contentIds.indexOf(id);
     if (idx >= 0) contentIds.splice(idx, 1);
@@ -391,11 +444,12 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
   function applyStroke(ev: Extract<SessionEvent, { type: 'stroke' }>): string {
     const { points, at } = ev;
     const pid = ev.participantId ?? LOCAL_PARTICIPANT;
-    const fp = getFingerprint(points);
+    const scale = ev.scale && ev.scale > 0 ? ev.scale : 1;
+    const fp = getFingerprint(points, scale);
     const node: MMNode = {
       id: nextId('stroke'),
       reps: [
-        { modality: 'stroke', data: { points, at }, source: pid },
+        { modality: 'stroke', data: { points, at, scale }, source: pid },
         { modality: 'fingerprint', data: fp, source: TIER0_PARTICIPANT },
       ],
       edges: [{ to: pid, rel: 'made-by' }],
@@ -409,7 +463,13 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       const lassoNode = nodes.get(pendingLasso.id)!;
       const lassoFp = fingerprintOf(lassoNode)!;
       const lassoPoints = strokePointsOf(lassoNode) ?? [];
-      const gestureConfig = { ...config.gesture, commandMark };
+      // Proximity is a hand-sized rule too: 80px means 80px as the human sees
+      // it, so it travels with the zoom the command stroke was drawn at.
+      const gestureConfig = {
+        ...config.gesture,
+        commandMark,
+        checkProximityPx: config.gesture.checkProximityPx * scale,
+      };
       if (
         resolvesLasso(fp, at, lassoFp, pendingLasso.at, gestureConfig, {
           check: points,
@@ -428,12 +488,23 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
         removeFromContent(lassoNode.id);
 
         const enclosedIds = enclosedBy(lassoFp.bounds, contentBoundsList());
+        const artifactId = liveArtifactUnder(lassoFp.bounds, lassoNode.id);
+        const onArtifact = artifactId
+          ? {
+              artifactId,
+              regionIds: regionsOverlapping(
+                regionsOf(nodes.get(artifactId)!, nodes),
+                lassoFp.bounds
+              ).map((r) => r.id),
+            }
+          : undefined;
         summon = {
           id: nextId('summon'),
           enclosedIds,
           suggestions: makeSuggestions(enclosedIds),
           gestureIds: [lassoNode.id, node.id],
           at,
+          ...(onArtifact ? { onArtifact } : {}),
         };
         pendingLasso = null;
         recomputeClusterCandidates();
@@ -444,22 +515,20 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     // --- Scratch-out: did this stroke cross something enough times to rub it
     //     out? Relational, not gestural — see erase.ts. Runs on every stroke
     //     because ordinary ink crosses nothing and costs nothing to test. ---
-    const scratched = scratchedOut(
-      points,
-      contentIds
-        .filter((id) => id !== node.id)
-        .map((id) => {
-          const n = nodes.get(id)!;
-          const nfp = fingerprintOf(n);
-          return {
-            id,
-            points: strokePointsOf(n) ?? undefined,
-            bounds: boundsOf(n) ?? undefined,
-            closed: nfp?.isClosed ?? false,
-          };
-        }),
-      config.eraseCrossings
-    );
+    //
+    //     Targets are INK, not artifacts. An artifact has no stroke of its own,
+    //     so scratching one would have to test its bounding box — and a mark
+    //     merely tangent to that box would rub out a whole page. Scratching
+    //     across a member erases the member and degrades its artifact, which is
+    //     both safer and truer: the doodles are what decompose the artifact.
+    //
+    //     A CLOSED stroke is never a scratch — it is a lasso. Closure already
+    //     does most of the discriminating everywhere else in the engine, and
+    //     without this rule a loop that grazes a shape's edge tangentially can
+    //     count six crossings and rub out what the user meant to select.
+    const scratched = fp.isClosed
+      ? []
+      : scratchedOut(points, scratchTargets(node.id), config.eraseCrossings);
     if (scratched.length > 0) {
       node.reps.push({
         modality: 'gesture',
@@ -477,7 +546,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     contentIds.push(node.id);
 
     // Multi-parse: every qualifying recognition becomes a held 'resembles' edge.
-    const analysis = analyzeStroke(points);
+    const analysis = analyzeStroke(points, scale);
     for (const r of analysis.results) {
       node.edges.push({
         to: typeNodeId(r.type),
@@ -489,12 +558,18 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     }
 
     addSpatialEdges(node);
-    inferWire(node, points);
+    inferWire(node, points, scale);
 
     // Held ambiguity: a closed stroke enclosing content is BOTH a content
     // candidate (edges above) and the new pending lasso. The next event decides.
+    //
+    // A closed stroke drawn ON a live artifact is also lasso-like even when it
+    // encloses no whole mark — it encloses a REGION of the running thing, which
+    // is the whole point of being able to draw on top of it.
     const enclosed = enclosedBy(fp.bounds, contentBoundsList(node.id));
-    pendingLasso = isLassoLike(fp, enclosed.length) ? { id: node.id, at } : null;
+    const onLive = liveArtifactUnder(fp.bounds, node.id);
+    pendingLasso =
+      isLassoLike(fp, enclosed.length) || (fp.isClosed && onLive) ? { id: node.id, at } : null;
 
     recomputeClusterCandidates();
     return node.id;
@@ -597,6 +672,13 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       removeFromContent(artifactId);
       const ai = artifacts.indexOf(artifactId);
       if (ai >= 0) artifacts.splice(ai, 1);
+      // It leaves the live plane too. Generated code is a contract with the
+      // marks that framed it; once those marks are gone the contract is void,
+      // and a page still rendering over ink that no longer exists is exactly
+      // the silent phantom this degradation exists to prevent. The 'code' rep
+      // stays on the node, so undo restores the whole thing.
+      const li2 = live.indexOf(artifactId);
+      if (li2 >= 0) live.splice(li2, 1);
       for (const e of artifact.edges) {
         if (e.rel !== 'has-part') continue;
         const member = nodes.get(e.to);
@@ -793,8 +875,8 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
   }
 
   return {
-    addStroke: (points, at, participantId) =>
-      dispatch({ type: 'stroke', points, at, participantId }) as string,
+    addStroke: (points, at, participantId, scale) =>
+      dispatch({ type: 'stroke', points, at, participantId, scale }) as string,
     join: (kind, name, at, capability) => dispatch({ type: 'join', kind, name, at, capability }) as string,
     propose: (args) => void dispatch({ type: 'propose', ...args }),
     answer: (args) => dispatch({ type: 'answer', ...args }),

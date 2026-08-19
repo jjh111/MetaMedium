@@ -152,12 +152,12 @@ var MetaMediumCore = (() => {
     const start = points[0];
     const end = points[points.length - 1];
     const distance = calculateDistance(start, end);
-    if (distance < threshold) return true;
     const bounds = getBounds(points);
     const width = bounds.maxX - bounds.minX;
     const height = bounds.maxY - bounds.minY;
     const size = Math.max(width, height);
     const relativeGap = size > 0 ? distance / size : 1;
+    if (distance < threshold && distance < size * 0.5) return true;
     return relativeGap < 0.2;
   }
   function ccw(p1, p2, p3) {
@@ -372,7 +372,7 @@ var MetaMediumCore = (() => {
     }
     return false;
   }
-  function getFingerprint(points) {
+  function getFingerprint(points, scale = 1) {
     const bounds = getBounds(points);
     const width = bounds.maxX - bounds.minX;
     const height = bounds.maxY - bounds.minY;
@@ -398,7 +398,7 @@ var MetaMediumCore = (() => {
     return {
       aspectRatio: height === 0 ? 1 : width / height,
       straightness: calculateStraightness(points),
-      isClosed: isStrokeClosed(points),
+      isClosed: isStrokeClosed(points, 50 * scale),
       closureDistance,
       bounds,
       size: Math.max(width, height),
@@ -516,8 +516,8 @@ var MetaMediumCore = (() => {
   }
 
   // src/recognition.ts
-  function detectLine(fp, points) {
-    const hasOvershoot = checkOvershoot(points);
+  function detectLine(fp, points, scale = 1) {
+    const hasOvershoot = checkOvershoot(points, 50 * scale);
     const isStraight = fp.straightness > 0.65;
     const notClosed = !fp.isClosed && !hasOvershoot;
     const fewCorners = fp.corners <= 2;
@@ -532,8 +532,8 @@ var MetaMediumCore = (() => {
     }
     return null;
   }
-  function detectArc(fp, points) {
-    const hasOvershoot = checkOvershoot(points);
+  function detectArc(fp, points, scale = 1) {
+    const hasOvershoot = checkOvershoot(points, 50 * scale);
     const notClosed = !fp.isClosed && !hasOvershoot;
     const fewCorners = fp.corners <= 1;
     const isCurved = fp.straightness < 0.6;
@@ -578,8 +578,8 @@ var MetaMediumCore = (() => {
     }
     return null;
   }
-  function detectCircle(fp, points) {
-    const hasOvershoot = checkOvershoot(points);
+  function detectCircle(fp, points, scale = 1) {
+    const hasOvershoot = checkOvershoot(points, 50 * scale);
     const isClosed = fp.isClosed || hasOvershoot;
     const fewCorners = fp.corners <= 1;
     const notStraight = fp.straightness < 0.5;
@@ -595,14 +595,14 @@ var MetaMediumCore = (() => {
     }
     return null;
   }
-  function analyzeStroke(points) {
-    const fingerprint = getFingerprint(points);
+  function analyzeStroke(points, scale = 1) {
+    const fingerprint = getFingerprint(points, scale);
     const results = [
-      detectLine(fingerprint, points),
-      detectArc(fingerprint, points),
+      detectLine(fingerprint, points, scale),
+      detectArc(fingerprint, points, scale),
       detectTriangle(fingerprint),
       detectRectangle(fingerprint),
-      detectCircle(fingerprint, points)
+      detectCircle(fingerprint, points, scale)
     ].filter((r) => r !== null);
     results.sort((a, b) => b.score - a.score);
     return { fingerprint, results };
@@ -1144,14 +1144,14 @@ var MetaMediumCore = (() => {
       for (const c of graph.connections) addPair(c.a, c.b, c.relationship);
       for (const c of graph.containment) addPair(c.outer, c.inner, "contains");
     }
-    function inferWire(node, points) {
+    function inferWire(node, points, scale) {
       const top = resemblances(node)[0];
       if (!top || top.to !== typeNodeId("line")) return;
       const nearest = (p) => {
         let best = null;
         for (const c of contentBoundsList(node.id)) {
           const d = distancePointToBounds(p, c.bounds);
-          if (d < config.wireEndpointPx && (!best || d < best.d)) best = { id: c.id, d };
+          if (d < config.wireEndpointPx * scale && (!best || d < best.d)) best = { id: c.id, d };
         }
         return best;
       };
@@ -1164,6 +1164,31 @@ var MetaMediumCore = (() => {
       nodes.get(a.id).edges.push({ to: node.id, rel: "connected-by", weight });
       nodes.get(b.id).edges.push({ to: node.id, rel: "connected-by", weight });
     }
+    function scratchTargets(excludeId) {
+      const ids = /* @__PURE__ */ new Set();
+      for (const id of contentIds) {
+        if (id === excludeId) continue;
+        const n2 = nodes.get(id);
+        if (strokePointsOf(n2)) {
+          ids.add(id);
+          continue;
+        }
+        for (const e of n2.edges) if (e.rel === "has-part") ids.add(e.to);
+      }
+      return [...ids].map((id) => nodes.get(id)).filter((n2) => !!n2 && !getRep(n2, "erased") && !!strokePointsOf(n2)).map((n2) => ({
+        id: n2.id,
+        points: strokePointsOf(n2),
+        closed: fingerprintOf(n2)?.isClosed ?? false
+      }));
+    }
+    function liveArtifactUnder(b, excludeId) {
+      for (const aid of live) {
+        if (aid === excludeId) continue;
+        const ab = boundsOf(nodes.get(aid));
+        if (ab && boundsOverlap(ab, b)) return aid;
+      }
+      return null;
+    }
     function removeFromContent(id) {
       const idx = contentIds.indexOf(id);
       if (idx >= 0) contentIds.splice(idx, 1);
@@ -1171,11 +1196,12 @@ var MetaMediumCore = (() => {
     function applyStroke(ev) {
       const { points, at } = ev;
       const pid = ev.participantId ?? LOCAL_PARTICIPANT;
-      const fp = getFingerprint(points);
+      const scale = ev.scale && ev.scale > 0 ? ev.scale : 1;
+      const fp = getFingerprint(points, scale);
       const node = {
         id: nextId("stroke"),
         reps: [
-          { modality: "stroke", data: { points, at }, source: pid },
+          { modality: "stroke", data: { points, at, scale }, source: pid },
           { modality: "fingerprint", data: fp, source: TIER0_PARTICIPANT }
         ],
         edges: [{ to: pid, rel: "made-by" }],
@@ -1187,7 +1213,11 @@ var MetaMediumCore = (() => {
         const lassoNode = nodes.get(pendingLasso.id);
         const lassoFp = fingerprintOf(lassoNode);
         const lassoPoints = strokePointsOf(lassoNode) ?? [];
-        const gestureConfig = { ...config.gesture, commandMark };
+        const gestureConfig = {
+          ...config.gesture,
+          commandMark,
+          checkProximityPx: config.gesture.checkProximityPx * scale
+        };
         if (resolvesLasso(fp, at, lassoFp, pendingLasso.at, gestureConfig, {
           check: points,
           lasso: lassoPoints
@@ -1200,32 +1230,28 @@ var MetaMediumCore = (() => {
           lassoNode.reps.push({ modality: "gesture", data: { role: "lasso" }, source: "heuristic" });
           removeFromContent(lassoNode.id);
           const enclosedIds = enclosedBy(lassoFp.bounds, contentBoundsList());
+          const artifactId = liveArtifactUnder(lassoFp.bounds, lassoNode.id);
+          const onArtifact = artifactId ? {
+            artifactId,
+            regionIds: regionsOverlapping(
+              regionsOf(nodes.get(artifactId), nodes),
+              lassoFp.bounds
+            ).map((r) => r.id)
+          } : void 0;
           summon = {
             id: nextId("summon"),
             enclosedIds,
             suggestions: makeSuggestions(enclosedIds),
             gestureIds: [lassoNode.id, node.id],
-            at
+            at,
+            ...onArtifact ? { onArtifact } : {}
           };
           pendingLasso = null;
           recomputeClusterCandidates();
           return node.id;
         }
       }
-      const scratched = scratchedOut(
-        points,
-        contentIds.filter((id) => id !== node.id).map((id) => {
-          const n2 = nodes.get(id);
-          const nfp = fingerprintOf(n2);
-          return {
-            id,
-            points: strokePointsOf(n2) ?? void 0,
-            bounds: boundsOf(n2) ?? void 0,
-            closed: nfp?.isClosed ?? false
-          };
-        }),
-        config.eraseCrossings
-      );
+      const scratched = fp.isClosed ? [] : scratchedOut(points, scratchTargets(node.id), config.eraseCrossings);
       if (scratched.length > 0) {
         node.reps.push({
           modality: "gesture",
@@ -1239,7 +1265,7 @@ var MetaMediumCore = (() => {
       }
       summon = null;
       contentIds.push(node.id);
-      const analysis = analyzeStroke(points);
+      const analysis = analyzeStroke(points, scale);
       for (const r of analysis.results) {
         node.edges.push({
           to: typeNodeId(r.type),
@@ -1252,9 +1278,10 @@ var MetaMediumCore = (() => {
         });
       }
       addSpatialEdges(node);
-      inferWire(node, points);
+      inferWire(node, points, scale);
       const enclosed = enclosedBy(fp.bounds, contentBoundsList(node.id));
-      pendingLasso = isLassoLike(fp, enclosed.length) ? { id: node.id, at } : null;
+      const onLive = liveArtifactUnder(fp.bounds, node.id);
+      pendingLasso = isLassoLike(fp, enclosed.length) || fp.isClosed && onLive ? { id: node.id, at } : null;
       recomputeClusterCandidates();
       return node.id;
     }
@@ -1329,6 +1356,8 @@ var MetaMediumCore = (() => {
         removeFromContent(artifactId);
         const ai = artifacts.indexOf(artifactId);
         if (ai >= 0) artifacts.splice(ai, 1);
+        const li2 = live.indexOf(artifactId);
+        if (li2 >= 0) live.splice(li2, 1);
         for (const e of artifact.edges) {
           if (e.rel !== "has-part") continue;
           const member = nodes.get(e.to);
@@ -1488,7 +1517,7 @@ var MetaMediumCore = (() => {
       };
     }
     return {
-      addStroke: (points, at, participantId) => dispatch({ type: "stroke", points, at, participantId }),
+      addStroke: (points, at, participantId, scale) => dispatch({ type: "stroke", points, at, participantId, scale }),
       join: (kind, name, at, capability) => dispatch({ type: "join", kind, name, at, capability }),
       propose: (args) => void dispatch({ type: "propose", ...args }),
       answer: (args) => dispatch({ type: "answer", ...args }),

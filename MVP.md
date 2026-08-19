@@ -1,7 +1,9 @@
 # MetaMedium MVP: Ink Over Living Artifacts
 
 **Date:** August 2026
-**Status:** Active product definition — the target v7's stages now serve
+**Status:** **Built and verified** (19 Aug 2026). The loop in §2 runs end to end
+in `Demos/session-engine.html`; §7 records what each stage actually cost and
+what it taught. This stays the product definition — it is no longer a plan.
 **Relationship to other docs:** `ARCHITECTURE-v6` is the engine, `ARCHITECTURE-v7`
 is the model-in-the-loop plan. This is the **product** those two are for. Where
 v7 Stage D said "diagram → code," this says what that actually looks like and
@@ -226,38 +228,71 @@ the regions are.** The human drew that, and the ink is the record of it.
 
 ---
 
-## 7. Staging
+## 7. Staging — shipped
 
-Each stage ends in something demonstrable. Estimates assume focused days.
+All six stages landed. **215 core tests** (+87), plus a 17-step end-to-end check
+that drives the real UI in a browser (`Demos/session-engine.e2e.js`).
 
-| # | Stage | Ship criterion | Est. |
+| # | Stage | Ship criterion | Status |
 |---|---|---|---|
-| **1** | **Infinite canvas.** Port `viewport.ts`; feed world coords to the engine; pinch/wheel zoom, pan. | Zoom out, lasso a group too wide for one screen, and the canonical loop still closes to `0 loose · 1 artifact`. | ~1d |
-| **2** | **Your command mark.** Five-sample fingerprint, gesture library, intersection test, first-run teach flow. | Your own mark summons the context tools; ordinary drawing never fires it. | ~2d |
-| **3** | **Prompt box → living code.** Third suggestion kind; `'code'` rep; DOM overlay; sandboxed render at world bounds. | Boxes + *"website with the copy in the squares"* → a real page rendered in place. | ~4d |
-| **4** | **Ink lands on the artifact.** Hit-test ink into artifact DOM; addressed regions into the prompt. | Circle a region of the live page, command, *"make this the header"* — and that region changes. | ~3d |
-| **5** | **The decomposition persists.** Boxes stay as region outlines; editing a box moves its region. | Drag a drawn box; the layout follows. Erase one; the region goes. | ~2d |
-| **6** | **Scribble erase.** The gesture over the existing `erase()`. | Scribble over a mark, it goes; undo restores. | ~1d |
+| **1** | **Infinite canvas** | Zoom out, lasso a group too wide for one screen, loop still closes | ✅ verified at 0.41× |
+| **2** | **Your command mark** | Your mark summons; ordinary drawing never fires it | ✅ 5 samples → 82% consistency; check correctly ignored after teaching |
+| **3** | **Prompt → living code** | Boxes + *"website with the copy in the squares"* → a real page in place | ✅ renders in a sandboxed iframe at world position |
+| **4** | **Ink lands on the artifact** | Circle a region of the live page, command, prompt — that region changes | ✅ resolves to `r2`; the untouched region comes back byte-identical |
+| **5** | **The decomposition persists** | The drawn boxes stay as the region outlines | ✅ every rect matches its generated div **to the pixel** |
+| **6** | **Scratch erase** | Scribble over a mark, it goes; undo restores | ✅ relational crossing-count, ported from the sibling `johnhanacek` repo |
 
-**~2 weeks to the loop standing end to end.** Stage 3 is the risky one and the
-one to prototype first if a single day is available for de-risking.
+### What the build actually taught
+
+Four things were not in the plan, and three of them were bugs in the engine that
+only the MVP's zoom could expose.
+
+**1. World coordinates cost more than they look.** Every fixed-pixel threshold in
+the engine — closure, overshoot, gesture proximity, wire endpoints — silently
+became zoom-dependent the moment the surface fed world coordinates. The same
+hand-drawn check reads as an open tick at 1× and a closed loop at 1.7×.
+
+The fix is a one-line idea: **position belongs in world space, the hand does
+not.** `getFingerprint(points, scale)` takes world-units-per-screen-pixel, and
+the fixed thresholds are interpreted in the space the hand actually worked in.
+The scale is logged with each stroke, so replay is deterministic. The
+size-relative half of each rule needed no change — it was already scale-free,
+which is why it was the right idea to begin with.
+
+**2. `isStrokeClosed` contradicted its own documentation.** The stated intent is
+*"small shapes need tight closure, large shapes tolerate bigger gaps."* The
+implementation did the opposite at the small end: an unbounded `gap < 50px`
+declared a 45px-wide caret with 45px between its ends to be *closed*. That is
+what was breaking the command mark, which is small by nature. Capping the
+absolute allowance at half the stroke's own size restores the documented
+behaviour, and 215 tests agree.
+
+**3. A closed stroke must never be a scratch.** A loop merely tangent to a
+shape's edge can count six crossings and rub out what you meant to select.
+Closure already does most of the discriminating everywhere else in the engine;
+letting it decide here too removes the ambiguity entirely. Related: scratch
+targets are **ink**, never artifacts — testing an artifact's bounding box would
+mean a mark grazing the edge of a page could delete the page.
+
+**4. Two surface bugs worth recording, because both were lies to the user.** The
+"erased" flash fired whenever a lasso was consumed by a command mark (the lasso
+leaves the content plane, so the content count drops) — feedback that would have
+made the one operation users most need to trust look destructive. And the flash
+was set *after* the render that would have shown it, so a real erase was silent.
+Erase feedback now reads the stroke's own `scratch` gesture rep.
 
 ### What this does to v7
 
-- **Stage D (diagram → code) is absorbed and raised.** Its ship criterion —
-  "draw a flow, get runnable code, change the flow, see the code follow" — is
-  Stages 3 and 5 here, with the addition that the code *renders in the canvas*.
-- **Stage E (handwriting) is deferred, not cancelled.** "Copy in the squares"
-  needs handwriting to be literal. For the MVP, typed text into a region is an
-  acceptable stand-in; handwriting makes it whole. It follows Stage 4.
-- **Stages A and C stand unchanged** and are load-bearing: the transport,
-  serializer, agent adapter, and multi-interpretation read path are exactly what
-  Stage 3 calls.
+- **Stage D (diagram → code) is absorbed and raised** — and shipped, as Stages
+  3 and 5 here, with the code rendering *in* the canvas rather than beside it.
+- **Stage E (handwriting) is deferred, not cancelled.** Typed text into a region
+  stands in for now; handwriting makes "the copy in the squares" literal.
+- **Stages A and C stand unchanged** and are load-bearing: transport,
+  serializer, agent adapter, and the multi-interpretation read path are exactly
+  what generation calls.
 - **Multi-interpretation carries through.** Several models may each propose code
-  for the same drawing. Nothing here collapses that: candidate artifacts are
-  held side by side and the human blesses one. Generation is a proposal.
-
----
+  for the same drawing; every version is held and attributed, and rendering the
+  newest is a display choice, not a commitment.
 
 ## 8. Risks worth naming
 
@@ -272,6 +307,10 @@ one to prototype first if a single day is available for de-risking.
    live artifact plus ink plus code regions is far more context than three
    circles and two lines. The spatial graph gives the answer — send the
    neighborhood, not the world — but the cutoff needs measuring.
-5. **Sandbox posture.** Same-origin access to artifact DOM is required for hit
-   testing. The content is generated for the user and runs locally, but this
-   should be a deliberate, documented decision rather than a default.
+5. **Sandbox posture — decided.** Artifacts render with
+   `sandbox="allow-same-origin"` and **not** `allow-scripts`. Same-origin is
+   what lets ink hit-test into the artifact's own DOM, which is the novel
+   capability; granting both together is the known sandbox escape, and running
+   arbitrary generated JS is not needed to prove the loop. Revisit explicitly if
+   interactive artifacts are wanted — the fallback is region-level addressing,
+   which already works without reading the document at all.

@@ -68,17 +68,23 @@ export function isStrokeClosed(points: Point[], threshold = 50): boolean {
   const end = points[points.length - 1];
   const distance = calculateDistance(start, end);
 
-  // Check direct closure
-  if (distance < threshold) return true;
-
-  // Size-relative closure (more forgiving for quick sketches)
   const bounds = getBounds(points);
   const width = bounds.maxX - bounds.minX;
   const height = bounds.maxY - bounds.minY;
   const size = Math.max(width, height);
   const relativeGap = size > 0 ? distance / size : 1;
 
-  // Allow up to 20% gap for hand-drawn shapes (was 15%)
+  // Absolute closure, bounded by the stroke's own size. The intent has always
+  // been "small shapes need tight closure, large shapes tolerate bigger gaps",
+  // but an unbounded `distance < threshold` does the opposite at the small end:
+  // a 45px-wide caret whose ends are 45px apart is plainly open, and yet 45 < 50
+  // declared it closed. Capping the absolute allowance at half the stroke's size
+  // restores the documented behaviour and, with it, the command mark — which is
+  // small by nature and was being read as a loop.
+  if (distance < threshold && distance < size * 0.5) return true;
+
+  // Size-relative closure (more forgiving for quick sketches).
+  // Allow up to 20% gap for hand-drawn shapes.
   return relativeGap < 0.20;
 }
 
@@ -444,7 +450,22 @@ export function checkOvershoot(points: Point[], threshold = 50): boolean {
 
 // ===== FINGERPRINTING =====
 
-export function getFingerprint(points: Point[]): Fingerprint {
+/**
+ * Reduce a stroke to the features detectors read.
+ *
+ * `scale` is world units per screen pixel at the moment the stroke was drawn —
+ * i.e. 1/zoom. It exists because two of the rules here are FIXED pixel
+ * thresholds (closure, overshoot), and a fixed threshold in world units makes
+ * the same physical gesture read differently at different zoom levels: a check
+ * drawn at 1.7× is only ~40 world px end-to-end and reads as CLOSED, while the
+ * identical hand movement at 1× reads as open.
+ *
+ * Position belongs in world space; the hand does not. Passing the scale puts
+ * the fixed thresholds back in the space the hand actually worked in. The
+ * size-relative half of each rule needs no adjustment — it was already
+ * scale-free, which is why it was the right idea to begin with.
+ */
+export function getFingerprint(points: Point[], scale = 1): Fingerprint {
   const bounds = getBounds(points);
   const width = bounds.maxX - bounds.minX;
   const height = bounds.maxY - bounds.minY;
@@ -479,7 +500,7 @@ export function getFingerprint(points: Point[]): Fingerprint {
   return {
     aspectRatio: height === 0 ? 1 : width / height,
     straightness: calculateStraightness(points),
-    isClosed: isStrokeClosed(points),
+    isClosed: isStrokeClosed(points, 50 * scale),
     closureDistance,
     bounds: bounds,
     size: Math.max(width, height),
