@@ -248,7 +248,7 @@ the regions are.** The human drew that, and the ink is the record of it.
 
 ## 7. Staging — shipped
 
-All six stages landed. **271 core tests**, plus a 19-step end-to-end check
+All six stages landed. **271 core tests**, plus a 21-step end-to-end check
 that drives the real UI in a browser (`Demos/session-engine.e2e.js`).
 
 | # | Stage | Ship criterion | Status |

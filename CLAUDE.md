@@ -27,7 +27,7 @@ circle them, cross with a command mark *you taught the system*, prompt them into
 a living page that renders in the canvas with your ink still outlining its
 divs — then draw on that page and the ink addresses the regions underneath it.
 Scratch anything out to erase. `Demos/session-engine.html` is the surface;
-`Demos/session-engine.e2e.js` drives all 19 steps through the real UI.
+`Demos/session-engine.e2e.js` drives all 21 steps through the real UI.
 Still open: handwriting (v7 Stage E). Whitepaper v5.1 stays parked until the
 conversation benchmark passes end to end.
 

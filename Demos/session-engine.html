@@ -665,13 +665,16 @@ html, body {
     teachUse.dataset.ready = '1';
   }
 
+  let taughtGlyph = null; // the sample we show in the rail once a mark is taught
+
   teachUse.onclick = () => {
     if (samples.length < MM.COMMAND_MARK_SAMPLES) return;
     const mark = MM.learnCommandMark(samples, 'your mark');
     session.teachCommandMark(mark, Date.now());
-    drawMarkChip(samples[samples.length - 1], 'your mark');
+    taughtGlyph = samples[samples.length - 1];
     teachStatus.className = '';
     teachStatus.textContent = 'Learned. The check ✓ no longer summons — your mark does.';
+    render(session.getState());
   };
   document.getElementById('teachClear').onclick = () => {
     samples = []; teachUse.disabled = true; teachStatus.textContent = ''; drawPad();
@@ -683,12 +686,22 @@ html, body {
   };
   document.getElementById('markChip').onclick = () => teachBtn.click();
 
-  // The ACTIVE mark, echoed in the rail. Shown from the start, not only once
-  // you have taught one — a gesture you cannot see is a gesture you have to be
-  // told about, and the built-in check deserves the same visibility as yours.
-  function showBuiltInMark() {
-    const samples = MM.canonicalCheckSamples();
-    drawMarkChip(samples[0], 'check');
+  // The ACTIVE mark, echoed in the rail. Shown from the start, not only once you
+  // have taught one — a gesture you cannot see is a gesture you have to be told
+  // about, and the built-in check deserves the same visibility as yours.
+  //
+  // Driven from session state rather than from the teach button, so undoing the
+  // teach event puts the check back in the rail. A chip that disagrees with the
+  // grammar is worse than no chip.
+  let shownMark = undefined;
+  function syncMarkChip(s) {
+    const name = s.commandMark ? s.commandMark.name : 'check';
+    if (shownMark === name) return;
+    shownMark = name;
+    drawMarkChip(
+      s.commandMark && taughtGlyph ? taughtGlyph : MM.canonicalCheckSamples()[0],
+      name
+    );
   }
 
   function drawMarkChip(pts, name) {
@@ -1024,6 +1037,7 @@ html, body {
 
     renderExplanations(s);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0); // back to screen space for the chrome
+    syncMarkChip(s);
     renderSummon(s);
     renderInspector(s, inspectedId);
 
@@ -1504,7 +1518,6 @@ html, body {
   };
 
   session.subscribe(render);
-  showBuiltInMark();
   document.fonts.ready.then(() => { sizePad(); render(session.getState()); });
   resize();
   afterViewChange();

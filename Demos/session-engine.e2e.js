@@ -113,6 +113,9 @@ window.__scenario = async function(){
   step('1. five samples become a command mark',
     taught.mark && taught.mark.samples === 5 && taught.mark.closed === false,
     taught.mark);
+  step('1b. the rail shows the mark that is actually active',
+    document.getElementById('markName').textContent === 'your mark',
+    { chip: document.getElementById('markName').textContent });
 
   // ---- 2. Doodle three boxes, zoom out ----
   t.stroke(t.rect(200,180,260,150));
@@ -229,6 +232,13 @@ window.__scenario = async function(){
   mm.session.undo();
   step('11b. and undo brings them back', mm.session.getState().artifacts.length === 1,
     {artifacts: mm.session.getState().artifacts.length});
+
+  // ---- 12. Undoing the teach puts the built-in mark back in the rail ----
+  while (mm.session.getEvents().length) mm.session.undo();
+  step('12. the rail follows the grammar — undoing the teach restores the check',
+    mm.session.getState().commandMark === null &&
+    document.getElementById('markName').textContent === 'check',
+    { mark: mm.session.getState().commandMark, chip: document.getElementById('markName').textContent });
 
   return R;
 };
