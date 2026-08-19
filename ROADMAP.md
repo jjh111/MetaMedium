@@ -102,6 +102,19 @@ Both mistakes had the same shape: **a threshold stated in the wrong space**
 (point indices instead of arc length, pixels instead of ratios) and **a decision
 made by a constant instead of a measurement**. Details in MVP.md §7.
 
+**Real models, and the parse (19 Aug 2026).** Pointed at real Ollama, generation
+failed in the way MVP.md §6.2 predicted: asked for a positioned page,
+`devstral:24b` returned good copy and no positioning at all. The fix was to stop
+asking. `metamedium-core/src/parse/` reads the drawing as a **layout** —
+recursive XY-cut into `column(header, row(left,right), footer)` with the drawn
+proportions — and emits it as flexbox itself; the model is asked only for each
+region's content. Geometry became an invariant instead of a request, verified at
+**zero pixels of drift** off the live DOM.
+
+It also made small models viable: `qwen3:8b` now produces a correct, semantic
+page in 44s, where the unconstrained contract needed a 24B code model to get
+close and still drifted. 310 core tests.
+
 **Still open:** handwriting (v7 Stage E), so "the copy in the squares" can be
 literal rather than typed.
 

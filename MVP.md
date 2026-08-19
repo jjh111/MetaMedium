@@ -260,6 +260,50 @@ that drives the real UI in a browser (`Demos/session-engine.e2e.js`).
 | **5** | **The decomposition persists** | The drawn boxes stay as the region outlines | ✅ every rect matches its generated div **to the pixel** |
 | **6** | **Scratch erase** | Scribble over a mark, it goes; undo restores | ✅ relational crossing-count, ported from the sibling `johnhanacek` repo |
 
+### Real models, and what they broke (19 Aug 2026)
+
+The MVP ran end to end against stubs. Pointed at real Ollama — `devstral:24b`
+for code, `qwen3.5` for reading — it did not.
+
+**The generator ignored the geometry, exactly as §6.2 predicted.** Asked for a
+complete fragment with every region absolutely positioned, devstral returned
+four correctly-labelled divs with **no positioning at all**: good copy, right
+regions, and ink that lined up with none of it. That is not a prompt problem.
+Pixel-accurate layout is what models are worst at and what the engine already
+knows for certain.
+
+So the split changed to follow the strength of each party. **The engine owns
+structure** — `parse/layout.ts` reads the drawing as a flow tree and
+`parse/scaffold.ts` emits it as flexbox with the drawn proportions. **The model
+owns content** — per-region html, tag, style, and a theme. Whether it obeys is
+no longer load-bearing: the geometry is an invariant instead of a request. See
+CLAUDE.md for the algorithm; §6.2's fallback is now the main path, and it also
+turns out to make much smaller models viable.
+
+Three bugs only real content could surface:
+
+1. **`flex-basis: 0` with `box-sizing: border-box` cannot go below the item's own
+   padding and border.** A region the model padded by 20px started 42px ahead of
+   its siblings, so the column shifted: 42 + 76 = 118 where the drawing said 90.
+   The element carrying `data-region` is now pure geometry, and everything the
+   model styles sits one level inside it.
+2. **Flex items default to `min-height: auto`.** One region holding a long list
+   refuses to shrink and pushes the rest out of place.
+3. **Models write JavaScript, not JSON.** Asked for JSON whose values are HTML
+   full of quotes, devstral reaches for a backtick template literal. `parseFill`
+   repairs that and trailing commas *after* strict parsing fails.
+
+And four in the transport, all the same shape — **a failure that looked like a
+success, or a cost nobody chose**: a 30s timeout that abandoned a cold local
+model mid-load; an automatic reading that queued in front of what the human
+actually typed (calls are cancellable now, and a prompt cancels them);
+`listModels` returning `[]` for both "no models" and "no server"; and a picker
+that made you type a model name from memory.
+
+The gesture also stopped failing silently: `whyNotResolved` names which test
+failed — too late, too big, not the mark (and which feature of it), or never
+touched the circle — reported only when the stroke was recognisably an attempt.
+
 ### The recognition and gesture refresh (19 Aug 2026)
 
 Two things the first pass got wrong badly enough to be worth recording.

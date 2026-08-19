@@ -53,7 +53,7 @@ any structural change.
 
 | Path | What it is |
 |---|---|
-| `metamedium-core/` | **The canonical engine** (TypeScript, zero deps, tested): geometry, recognition, spatial graph, and the no-modes session engine. New recognition/engine work lands HERE |
+| `metamedium-core/` | **The canonical engine** (TypeScript, zero deps, tested): geometry, recognition, spatial graph, the no-modes session engine, the layout parser, and the LLM transport. New recognition/engine work lands HERE |
 | `index.html` | **Interactive whitepaper v5** "MetaMedium: AI Beyond Chat" (live on GitHub Pages) |
 | `doodle2-canvas.html` | **Flagship demo**: heuristic recognition, spatial graph, library, undo/redo, touch. No LLM. Single-file (~500KB) |
 | `metadoodle1.html` | Fork of flagship + tiered LLM recognition (WebLLM in-browser, LM Studio local API) + voice. Single-file (~600KB) |
@@ -204,15 +204,47 @@ honestly — a line drawn *through* a shape crosses twice and is safe. Two rules
 keep it safe: a **closed** stroke is never a scratch (it is a lasso), and
 scratch targets are **ink**, never artifacts.
 
+### Parsing: the drawing as a layout
+
+> `metamedium-core/src/parse/` — `layout.ts` reads it, `scaffold.ts` builds from it.
+
+Regions alone are a bag of rects, and a model handed pixel rects writes
+absolutely-positioned divs: a faithful tracing of the ink that is not real code.
+`parseLayout` runs a **recursive XY-cut** (the document-layout algorithm) over
+the regions — find a gap that runs clean across the group, split there, recurse
+with the axis flipped — turning four boxes into
+`column(header, row(left, right), footer)` with the proportions that were drawn.
+Containment the human drew is honoured first; marks that overlap in both
+directions fall back to `stack`.
+
+`buildScaffold` renders that tree as **flexbox with proportional growth**: exact
+at the size it was drawn, and still code that reflows. Two rules earned the hard
+way, both by running a real model:
+
+- **The element carrying `data-region` is pure geometry.** Everything the model
+  styles lives one level inside it. With `box-sizing: border-box` a
+  `flex-basis: 0` item cannot be smaller than its own padding and border, so a
+  padded region starts ahead of its siblings and the whole column shifts.
+- **`min-width`/`min-height` are zeroed on every flex ITEM**, not just
+  containers — their default is `auto`, so a region with a long list in it
+  refuses to shrink and pushes everything else out of place.
+
+`validateRegions` checks the result still matches the drawing. A promise nobody
+checks is one you find out about from a screenshot.
+
 ### Living artifacts
 
 An artifact may carry a `'code'` rep, which puts it on `SessionState.live` and
 makes it render as real DOM in the canvas. The rules:
 
-- `regionsOf(artifact, nodes)` turns member marks into a layout frame in
-  artifact-local pixels. **Generation is constrained by that frame, not merely
-  prompted by it** — a moved region breaks the visible promise that the doodle
-  outlines the div (MVP.md §6.2). Generated elements must carry `data-region`.
+- **The engine owns structure; the model owns content.** Generation asks for
+  per-region `html`/`tag`/`style` plus a theme, and says the layout is already
+  decided. Asked instead for a positioned page, a real local model returned good
+  copy and *no positioning at all* — so the geometry is an invariant now, not a
+  request (MVP.md §6.2).
+- `regionsOf(artifact, nodes)` returns member marks in **reading order**
+  (top-to-bottom, left-to-right, containers before contents), because region ids
+  are how the human, the model and the DOM refer to the same thing.
 - A closed stroke drawn **on** a live artifact is lasso-like even enclosing no
   mark — it encloses a *region*. `Summon.onArtifact` reports which artifact and
   which regions, so ink over a running page addresses real elements.
@@ -264,6 +296,20 @@ every answer is held.
 **One transport covers Tier 1 and most of Tier 2:** Ollama, LM Studio, and
 OpenRouter all speak the OpenAI-compatible `/v1/chat/completions` shape and
 differ only by base URL and key. Anthropic needs its own client.
+
+**Running against a real local model taught four things** (all in the transport):
+
+- **Local gets a 300s timeout, hosted 60s.** A cold 14GB model takes past 30s to
+  answer at all; abandoning it wastes the load and reports failure to a user
+  whose machine is fine.
+- **Calls are cancellable, and the human's request outranks a speculative one.**
+  A local server answers one at a time, so an automatic reading sat in front of
+  whatever the user typed next.
+- **Model replies need repair before parsing.** Strict JSON first, always — but
+  devstral writes JavaScript template literals when the values are HTML full of
+  quotes. `parseFill`/`parseReadings` repair, never guess.
+- **`listModels` reports whether it could ask**, separately from what came back.
+  Ollama serves the browser directly; no CORS configuration is needed.
 
 ⚠️ `Web App Skeleton/src/llm/claudeInterpreter.ts` pins `claude-3-haiku-20240307`
 and `claude-sonnet-4-20250514` — **both are past retirement and return 404**.
