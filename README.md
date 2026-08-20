@@ -24,6 +24,7 @@ Flagship demo keyboard shortcuts: `Ctrl+Z` undo, `Ctrl+Shift+Z` redo,
 ## Plan & Architecture
 
 - **[MVP.md](MVP.md)** — the product: ink over living artifacts, and the one loop that proves it
+- **[KEYFRAMES.md](KEYFRAMES.md)** — next sprint: shape → diagram-shape → code, each a closed vocabulary
 - **[ROADMAP.md](ROADMAP.md)** — status, the August 2026 accounting, and what's next
 - **[ARCHITECTURE-v7-PARTICIPANTS-AND-TIERS.md](ARCHITECTURE-v7-PARTICIPANTS-AND-TIERS.md)** — active plan: a model in the loop, and the conversation benchmark
 - **[ARCHITECTURE-v6-SESSION-ENGINE.md](ARCHITECTURE-v6-SESSION-ENGINE.md)** — active design: the no-modes session engine

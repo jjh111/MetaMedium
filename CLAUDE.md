@@ -18,6 +18,8 @@ automatically → ask "why?" and get grounded reasoning.
 ## Current Status & Plan
 
 **See `MVP.md`** for the product being built — *ink over living artifacts*.
+**See `KEYFRAMES.md`** for the sprint under review: three fixed rungs
+(shape → diagram-shape → code), each with a closed vocabulary.
 **See `ROADMAP.md`** for status and the August 2026 accounting.
 `ARCHITECTURE-v7-PARTICIPANTS-AND-TIERS.md` is the active engine plan; MVP.md
 absorbs and raises its Stage D.
@@ -34,6 +36,8 @@ conversation benchmark passes end to end.
 Architecture documents (chronological; **read MVP.md, then v7, then v6**):
 - `MVP.md` — **the product definition**: infinite canvas, a learned command mark,
   drawings prompted into living code, and ink that addresses what's under it
+- `KEYFRAMES.md` — **next sprint, under review**: narrowing the open-ended
+  concept library to three keyframes with closed vocabularies
 - `ARCHITECTURE-v7-PARTICIPANTS-AND-TIERS.md` — **active plan**: putting a model in the loop through the `propose` channel; the conversation benchmark; one OpenAI-compatible transport for Ollama/LM Studio/OpenRouter
 - `ARCHITECTURE-v6-SESSION-ENGINE.md` — **active design**: the no-modes session engine (deferred commitment, summoning, promotion ladder, capability tiers), implemented in `metamedium-core/`
 - `metamedium-core-schema.md` — graph data model ("everything is a node; type emerges from connections") — load-bearing via v6
