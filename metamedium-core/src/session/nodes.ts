@@ -5,6 +5,7 @@
 // today and renderable/executable payloads later (capability tiers, §7).
 
 import type { Bounds, Fingerprint, Point } from '../types';
+import { getBounds } from '../geometry';
 
 export type Capability = 0 | 1 | 2 | 3;
 
@@ -161,9 +162,32 @@ export function fingerprintOf(node: MMNode): Fingerprint | undefined {
   return getRep(node, 'fingerprint')?.data as Fingerprint | undefined;
 }
 
+/**
+ * A mark's points, as they stand now.
+ *
+ * Tidying a drawing has to move ink, and "ink is never destroyed" has to keep
+ * meaning something. So a moved mark keeps its original stroke untouched and
+ * gains a `'transform'` rep saying where it now sits; the two are composed
+ * here. Undo drops the transform event and the mark springs back, because the
+ * original was never overwritten in the first place.
+ */
 export function strokePointsOf(node: MMNode): Point[] | undefined {
   const rep = getRep(node, 'stroke');
-  return rep ? (rep.data as { points: Point[] }).points : undefined;
+  if (!rep) return undefined;
+  const points = (rep.data as { points: Point[] }).points;
+  const to = getRep(node, 'transform')?.data as Bounds | undefined;
+  if (!to) return points;
+
+  const from = getBounds(points);
+  const fw = Math.max(1e-6, from.maxX - from.minX);
+  const fh = Math.max(1e-6, from.maxY - from.minY);
+  const sx = (to.maxX - to.minX) / fw;
+  const sy = (to.maxY - to.minY) / fh;
+  return points.map((p) => ({
+    ...p,
+    x: to.minX + (p.x - from.minX) * sx,
+    y: to.minY + (p.y - from.minY) * sy,
+  }));
 }
 
 export function wordOf(node: MMNode): string | undefined {
@@ -190,6 +214,10 @@ export function topInterpretation(node: MMNode): string | undefined {
 }
 
 export function boundsOf(node: MMNode): Bounds | undefined {
+  // A transform is where the mark IS; the fingerprint records where it was
+  // drawn. Anything asking for bounds wants the former.
+  const moved = getRep(node, 'transform')?.data as Bounds | undefined;
+  if (moved) return moved;
   const fp = fingerprintOf(node);
   if (fp) return fp.bounds;
   return getRep(node, 'bounds')?.data as Bounds | undefined;

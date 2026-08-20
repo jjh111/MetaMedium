@@ -13,7 +13,14 @@
 //     function of the log, and undo = drop the last input and replay.
 
 import type { Bounds, Component, Point } from '../types';
-import { getFingerprint, getBounds, distancePointToBounds, boundsOverlap } from '../geometry';
+import type { Fingerprint } from '../types';
+import {
+  getFingerprint,
+  getBounds,
+  distancePointToBounds,
+  boundsOverlap,
+  boundingBoxDistance,
+} from '../geometry';
 import { analyzeStroke } from '../recognition';
 import { buildSpatialGraph, spatialCluster } from '../spatial';
 import {
@@ -37,6 +44,7 @@ import {
 } from './nodes';
 import {
   type GestureConfig,
+  strokesIntersect,
   DEFAULT_GESTURE_CONFIG,
   isLassoLike,
   enclosedBy,
@@ -46,6 +54,9 @@ import { type CommandMark } from './commandmark';
 import { type MarkMiss, whyNotResolved } from './gesture';
 import { DEFAULT_ERASE_CROSSINGS, scratchedOut } from './erase';
 import { type Region, regionsOf, regionsOverlapping } from './regions';
+import { type Mark, type Relation, clusters, relate } from '../relate/relations';
+import { type ConceptMatch, type ConceptScope, matchConcepts } from '../concepts/concept';
+import { BUILTIN_COMMAND_MARK, matchesCommandMark } from './commandmark';
 
 // ===== Public state shape =====
 
@@ -57,9 +68,21 @@ export interface Suggestion {
   score?: number;
 }
 
+/** How the command mark decided what it was about. */
+export type ScopeSource =
+  /** You circled it first — an explicit selection. */
+  | 'lasso'
+  /** The mark crossed it. */
+  | 'crossed'
+  /** It came along with something the mark crossed, because you had just drawn them together. */
+  | 'recent';
+
 export interface Summon {
   id: string;
   enclosedIds: string[];
+  /** Where the scope came from, and why — shown, so a wrong guess is visible. */
+  scopeSource: ScopeSource;
+  scopeReasoning: string;
   suggestions: Suggestion[];
   gestureIds: string[]; // lasso + check (provenance)
   at: number;
@@ -103,6 +126,11 @@ export interface SessionState {
   markMiss: MarkMiss | null;
   /** Artifacts carrying a 'code' rep — the ones that render and run. */
   live: string[];
+  /**
+   * Content drawn inside the recent window, oldest first — "what you were just
+   * doing". The command mark reads back over this.
+   */
+  recentIds: string[];
 }
 
 // Every event is attributed: participantId defaults to the local human.
@@ -129,6 +157,14 @@ export type SessionEvent =
   | { type: 'join'; kind: ParticipantKind; name: string; at: number; capability?: Capability }
   | { type: 'propose'; participantId: string; nodeId: string; edges: ProposedEdge[]; at: number }
   | { type: 'teach'; mark: CommandMark | null; at: number }
+  | {
+      type: 'tidy';
+      ids: string[];
+      /** 'align' spaces them evenly along an axis; 'equalize' matches their sizes. */
+      mode: 'align' | 'equalize';
+      axis?: 'row' | 'column';
+      at: number;
+    }
   | {
       type: 'code';
       participantId: string;
@@ -169,6 +205,15 @@ export interface SessionConfig {
   wireEndpointPx: number;
   /** Crossings before a stroke is read as scratching a mark out. See erase.ts. */
   eraseCrossings: number;
+  /**
+   * How far back "what you were just doing" reaches, in ms.
+   *
+   * The command mark understands RETROACTIVELY: it looks at the marks you made
+   * in this window and decides which of them you meant. Without it the mark can
+   * only act on something you explicitly circled first, which is a mode wearing
+   * a different hat.
+   */
+  recentWindowMs: number;
 }
 
 export const DEFAULT_SESSION_CONFIG: SessionConfig = {
@@ -176,6 +221,7 @@ export const DEFAULT_SESSION_CONFIG: SessionConfig = {
   clusterThresholdPx: 60,
   wireEndpointPx: 30,
   eraseCrossings: DEFAULT_ERASE_CROSSINGS,
+  recentWindowMs: 20_000,
 };
 
 type Signature = Record<string, number>; // type histogram, e.g. { circle: 3, line: 2 }
@@ -218,8 +264,20 @@ export interface Session {
     fill?: unknown;
     at: number;
   }): string | null;
+  /**
+   * Straighten a set of marks — a Tier 0 conversion, needing no model at all.
+   * The originals are untouched; each mark gains a transform saying where it
+   * now sits, so undo springs them back exactly.
+   */
+  tidy(args: { ids: string[]; mode: 'align' | 'equalize'; axis?: 'row' | 'column'; at: number }): void;
   /** The artifact's member marks as a layout frame (MVP.md §6.2). */
   regions(artifactId: string): Region[];
+  /**
+   * Everything Tier 0 can see about a set of marks: the relations between them,
+   * and the concepts those relations read as. This is the substrate a palette
+   * offers from and a model is handed — nobody downstream re-derives it.
+   */
+  read(ids: string[]): { scope: ConceptScope; relations: Relation[]; concepts: ConceptMatch[] };
   tick(at: number): void;
   bless(args: {
     summonId: string;
@@ -252,6 +310,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
   let live: string[] = [];
   let commandMark: CommandMark | null = config.gesture.commandMark ?? null;
   let markMiss: MarkMiss | null = null;
+  let lastAt = 0;
   let counter = 0;
   const listeners = new Set<(state: SessionState) => void>();
 
@@ -267,6 +326,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     live = [];
     commandMark = config.gesture.commandMark ?? null;
     markMiss = null;
+    lastAt = 0;
     counter = 0;
     for (const n of createBootstrapNodes(0)) nodes.set(n.id, n);
   }
@@ -439,6 +499,115 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       }));
   }
 
+  function buildSummon(
+    ids: string[],
+    source: ScopeSource,
+    reasoning: string,
+    gestureIds: string[],
+    scopeBounds: Bounds,
+    excludeId: string,
+    at: number
+  ): Summon {
+    const artifactId = liveArtifactUnder(scopeBounds, excludeId);
+    const onArtifact = artifactId
+      ? {
+          artifactId,
+          regionIds: regionsOverlapping(regionsOf(nodes.get(artifactId)!, nodes), scopeBounds).map((r) => r.id),
+        }
+      : undefined;
+    return {
+      id: nextId('summon'),
+      enclosedIds: ids,
+      scopeSource: source,
+      scopeReasoning: reasoning,
+      suggestions: makeSuggestions(ids),
+      gestureIds,
+      at,
+      ...(onArtifact ? { onArtifact } : {}),
+    };
+  }
+
+  /** Content drawn inside the recent window — what the human was just doing. */
+  function recentWithin(at: number): string[] {
+    return contentIds.filter((id) => {
+      const n = nodes.get(id);
+      if (!n || getRep(n, 'erased')) return false;
+      return at - n.createdAt <= config.recentWindowMs;
+    });
+  }
+
+  function markOf(id: string): Mark | null {
+    const n = nodes.get(id);
+    const b = n && boundsOf(n);
+    if (!n || !b) return null;
+    return { id, bounds: b, points: strokePointsOf(n) ?? undefined, closed: fingerprintOf(n)?.isClosed };
+  }
+
+  /** Does this stroke engage that mark — cross it, overlap it, or sit close to it? */
+  function engages(points: Point[], fp: Fingerprint, target: Mark): boolean {
+    if (target.points && strokesIntersect(points, target.points)) return true;
+    if (boundsOverlap(fp.bounds, target.bounds)) return true;
+    const size = Math.max(
+      1,
+      Math.max(target.bounds.maxX - target.bounds.minX, target.bounds.maxY - target.bounds.minY)
+    );
+    return boundingBoxDistance(fp.bounds, target.bounds) < size * config.gesture.checkProximityRatio;
+  }
+
+  /**
+   * What the command mark is about, when nothing was circled first.
+   *
+   * Reads backwards. The marks the stroke actually crossed are what you pointed
+   * at; anything you drew alongside them inside the recent window comes with
+   * them, because a group you just made is a group you still mean. Drawing four
+   * boxes and striking through one is how you say "these four" — without having
+   * to say it twice.
+   */
+  function scopeFromMark(
+    points: Point[],
+    fp: Fingerprint,
+    at: number
+  ): { ids: string[]; source: ScopeSource; reasoning: string } | null {
+    const candidates = contentIds
+      .map(markOf)
+      .filter((m): m is Mark => !!m && !getRep(nodes.get(m.id)!, 'erased'));
+
+    const engaged = candidates.filter((m) => engages(points, fp, m));
+    if (engaged.length === 0) return null;
+
+    // A mark that dwarfs everything it touched is a drawing, not a gesture.
+    const union = engaged.reduce(
+      (acc, m) => ({
+        minX: Math.min(acc.minX, m.bounds.minX),
+        minY: Math.min(acc.minY, m.bounds.minY),
+        maxX: Math.max(acc.maxX, m.bounds.maxX),
+        maxY: Math.max(acc.maxY, m.bounds.maxY),
+      }),
+      engaged[0].bounds
+    );
+    const scopeSize = Math.max(union.maxX - union.minX, union.maxY - union.minY);
+    if (fp.size > scopeSize) return null;
+
+    // Grow the selection through things drawn in the same breath.
+    const recent = new Set(recentWithin(at));
+    const pool = candidates.filter((m) => recent.has(m.id) || engaged.some((e) => e.id === m.id));
+    const groups = clusters(pool, relate(pool));
+    const ids = new Set(engaged.map((m) => m.id));
+    for (const g of groups) {
+      if (g.some((id) => ids.has(id))) g.forEach((id) => ids.add(id));
+    }
+
+    const grown = ids.size - engaged.length;
+    return {
+      ids: [...ids],
+      source: grown > 0 ? 'recent' : 'crossed',
+      reasoning:
+        grown > 0
+          ? `the mark crossed ${engaged.length}, and ${grown} more you drew alongside just now came with it`
+          : `the mark crossed ${engaged.length} mark${engaged.length === 1 ? '' : 's'}`,
+    };
+  }
+
   /** The live artifact a closed stroke was drawn over, if any. */
   function liveArtifactUnder(b: Bounds, excludeId?: string): string | null {
     for (const aid of live) {
@@ -496,33 +665,52 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
         removeFromContent(lassoNode.id);
 
         const enclosedIds = enclosedBy(lassoFp.bounds, contentBoundsList());
-        const artifactId = liveArtifactUnder(lassoFp.bounds, lassoNode.id);
-        const onArtifact = artifactId
-          ? {
-              artifactId,
-              regionIds: regionsOverlapping(
-                regionsOf(nodes.get(artifactId)!, nodes),
-                lassoFp.bounds
-              ).map((r) => r.id),
-            }
-          : undefined;
-        summon = {
-          id: nextId('summon'),
+        summon = buildSummon(
           enclosedIds,
-          suggestions: makeSuggestions(enclosedIds),
-          gestureIds: [lassoNode.id, node.id],
-          at,
-          ...(onArtifact ? { onArtifact } : {}),
-        };
+          'lasso',
+          `you circled ${enclosedIds.length} mark${enclosedIds.length === 1 ? '' : 's'}`,
+          [lassoNode.id, node.id],
+          lassoFp.bounds,
+          lassoNode.id,
+          at
+        );
         pendingLasso = null;
         markMiss = null;
         recomputeClusterCandidates();
         return node.id;
       }
-      // It did not resolve. Record why, so the surface can say so.
+      // It did not resolve the lasso. Fall through — it may still be the mark,
+      // acting on what was drawn just now — and remember why, if it is not.
       markMiss = whyNotResolved(fp, at, lassoFp, pendingLasso.at, gestureConfig, strokePair);
     } else {
       markMiss = null;
+    }
+
+    // --- The mark, with nothing circled first. It reads BACKWARDS: what did
+    //     this stroke cross, and what did you draw alongside it just now? ---
+    if (matchesCommandMark(fp, commandMark ?? BUILTIN_COMMAND_MARK).match) {
+      const scope = scopeFromMark(points, fp, at);
+      if (scope) {
+        node.reps.push({
+          modality: 'gesture',
+          data: { role: commandMark ? 'command' : 'check', scope: scope.source },
+          source: commandMark ? `command-mark:${commandMark.name}` : 'heuristic',
+        });
+        const union = getBounds(
+          scope.ids.flatMap((id) => {
+            const b = boundsOf(nodes.get(id)!)!;
+            return [
+              { x: b.minX, y: b.minY },
+              { x: b.maxX, y: b.maxY },
+            ];
+          })
+        );
+        summon = buildSummon(scope.ids, scope.source, scope.reasoning, [node.id], union, node.id, at);
+        pendingLasso = null;
+        markMiss = null;
+        recomputeClusterCandidates();
+        return node.id;
+      }
     }
 
     // --- Scratch-out: did this stroke cross something enough times to rub it
@@ -781,6 +969,74 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     return node.id;
   }
 
+  /**
+   * Line marks up, or match their sizes.
+   *
+   * The axis is inferred from how they already sit when it is not given: marks
+   * spread wider than they are tall are a row. Spacing is made even across the
+   * span the human already used, so tidying feels like straightening what is
+   * there rather than relaying it out somewhere else.
+   */
+  function applyTidy(ev: Extract<SessionEvent, { type: 'tidy' }>) {
+    const targets = ev.ids
+      .map((id) => ({ id, node: nodes.get(id), bounds: nodes.get(id) ? boundsOf(nodes.get(id)!) : undefined }))
+      .filter((t): t is { id: string; node: MMNode; bounds: Bounds } => !!t.node && !!t.bounds && !getRep(t.node, 'erased'));
+    if (targets.length < 2) return;
+
+    const w = (b: Bounds) => b.maxX - b.minX;
+    const h = (b: Bounds) => b.maxY - b.minY;
+    const span = getBounds(targets.flatMap((t) => [
+      { x: t.bounds.minX, y: t.bounds.minY },
+      { x: t.bounds.maxX, y: t.bounds.maxY },
+    ]));
+    const axis = ev.axis ?? (w(span) >= h(span) ? 'row' : 'column');
+
+    let placed: { id: string; to: Bounds }[];
+
+    if (ev.mode === 'equalize') {
+      // The largest wins: shrinking to the smallest loses whatever detail the
+      // human put in the big one.
+      const tw = Math.max(...targets.map((t) => w(t.bounds)));
+      const th = Math.max(...targets.map((t) => h(t.bounds)));
+      placed = targets.map((t) => {
+        const cx = (t.bounds.minX + t.bounds.maxX) / 2;
+        const cy = (t.bounds.minY + t.bounds.maxY) / 2;
+        return { id: t.id, to: { minX: cx - tw / 2, maxX: cx + tw / 2, minY: cy - th / 2, maxY: cy + th / 2 } };
+      });
+    } else {
+      const along = (b: Bounds) => (axis === 'row' ? (b.minX + b.maxX) / 2 : (b.minY + b.maxY) / 2);
+      const ordered = [...targets].sort((a, b) => along(a.bounds) - along(b.bounds));
+      const sizes = ordered.map((t) => (axis === 'row' ? w(t.bounds) : h(t.bounds)));
+      const total = sizes.reduce((a, b) => a + b, 0);
+      const start = axis === 'row' ? span.minX : span.minY;
+      const end = axis === 'row' ? span.maxX : span.maxY;
+      const gap = ordered.length > 1 ? (end - start - total) / (ordered.length - 1) : 0;
+      // The shared line is the mean of the centres they already had.
+      const cross =
+        ordered.reduce((acc, t) => acc + (axis === 'row' ? (t.bounds.minY + t.bounds.maxY) / 2 : (t.bounds.minX + t.bounds.maxX) / 2), 0) /
+        ordered.length;
+
+      let cursor = start;
+      placed = ordered.map((t, i) => {
+        const size = sizes[i];
+        const half = (axis === 'row' ? h(t.bounds) : w(t.bounds)) / 2;
+        const to: Bounds =
+          axis === 'row'
+            ? { minX: cursor, maxX: cursor + size, minY: cross - half, maxY: cross + half }
+            : { minX: cross - half, maxX: cross + half, minY: cursor, maxY: cursor + size };
+        cursor += size + gap;
+        return { id: t.id, to };
+      });
+    }
+
+    for (const p of placed) {
+      const node = nodes.get(p.id)!;
+      node.reps = node.reps.filter((r) => r.modality !== 'transform');
+      node.reps.push({ modality: 'transform', data: p.to, source: 'engine' });
+    }
+    recomputeClusterCandidates();
+  }
+
   function applyTeach(ev: Extract<SessionEvent, { type: 'teach' }>) {
     commandMark = ev.mark;
   }
@@ -809,6 +1065,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
   }
 
   function applyEvent(ev: SessionEvent): string | null {
+    if ('at' in ev && typeof ev.at === 'number') lastAt = Math.max(lastAt, ev.at);
     switch (ev.type) {
       case 'stroke':
         return applyStroke(ev);
@@ -823,6 +1080,9 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
         return applyAnswer(ev);
       case 'teach':
         applyTeach(ev);
+        return null;
+      case 'tidy':
+        applyTidy(ev);
         return null;
       case 'code':
         return applyCode(ev);
@@ -878,6 +1138,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       explanations: [...explanations],
       commandMark,
       markMiss,
+      recentIds: recentWithin(lastAt),
       live: [...live],
     };
   }
@@ -896,10 +1157,25 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     propose: (args) => void dispatch({ type: 'propose', ...args }),
     answer: (args) => dispatch({ type: 'answer', ...args }),
     teachCommandMark: (mark, at) => void dispatch({ type: 'teach', mark, at }),
+    tidy: (args) => void dispatch({ type: 'tidy', ...args }),
     attachCode: (args) => dispatch({ type: 'code', ...args }),
     regions: (artifactId) => {
       const node = nodes.get(artifactId);
       return node ? regionsOf(node, nodes) : [];
+    },
+    read: (ids) => {
+      const marks = ids.map(markOf).filter((m): m is Mark => !!m);
+      const relations = relate(marks);
+      const shapes: Record<string, string> = {};
+      const names: Record<string, string> = {};
+      for (const m of marks) {
+        const n = nodes.get(m.id)!;
+        shapes[m.id] = topInterpretation(n) ?? 'art';
+        const word = wordOf(n);
+        if (word) names[m.id] = word;
+      }
+      const scope: ConceptScope = { ids: marks.map((m) => m.id), marks, relations, shapes, names };
+      return { scope, relations, concepts: matchConcepts(scope) };
     },
     tick: (at) => void dispatch({ type: 'tick', at }),
     bless: (args) => dispatch({ type: 'bless', ...args }),

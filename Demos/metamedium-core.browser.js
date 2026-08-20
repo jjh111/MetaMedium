@@ -23,11 +23,13 @@ var MetaMediumCore = (() => {
   var index_exports = {};
   __export(index_exports, {
     BUILTIN_COMMAND_MARK: () => BUILTIN_COMMAND_MARK,
+    BUILTIN_CONCEPTS: () => BUILTIN_CONCEPTS,
     BUILTIN_TYPES: () => BUILTIN_TYPES,
     COMMAND_MARK_SAMPLES: () => COMMAND_MARK_SAMPLES,
     DEFAULT_CORNER_OPTIONS: () => DEFAULT_CORNER_OPTIONS,
     DEFAULT_ERASE_CROSSINGS: () => DEFAULT_ERASE_CROSSINGS,
     DEFAULT_GESTURE_CONFIG: () => DEFAULT_GESTURE_CONFIG,
+    DEFAULT_RELATE_CONFIG: () => DEFAULT_RELATE_CONFIG,
     DEFAULT_SESSION_CONFIG: () => DEFAULT_SESSION_CONFIG,
     DEFAULT_TIMEOUT_MS: () => DEFAULT_TIMEOUT_MS,
     LOCAL_PARTICIPANT: () => LOCAL_PARTICIPANT,
@@ -40,6 +42,7 @@ var MetaMediumCore = (() => {
     aboutIdsOf: () => aboutIdsOf,
     analyzeCornerAngles: () => analyzeCornerAngles,
     analyzeStroke: () => analyzeStroke,
+    between: () => between,
     boundingBoxDistance: () => boundingBoxDistance,
     boundsContain: () => boundsContain,
     boundsOf: () => boundsOf,
@@ -52,6 +55,7 @@ var MetaMediumCore = (() => {
     calculateStraightness: () => calculateStraightness,
     canonicalCheckSamples: () => canonicalCheckSamples,
     checkOvershoot: () => checkOvershoot,
+    clusters: () => clusters,
     collidesWith: () => collidesWith,
     commandMarkFeatures: () => commandMarkFeatures,
     complete: () => complete,
@@ -67,6 +71,7 @@ var MetaMediumCore = (() => {
     describeAddressed: () => describeAddressed,
     describeLayout: () => describeLayout,
     describeRegions: () => describeRegions,
+    describeRelations: () => describeRelations,
     describeSession: () => describeSession,
     describeSignature: () => describeSignature,
     disagreement: () => disagreement,
@@ -80,6 +85,7 @@ var MetaMediumCore = (() => {
     getBoundsFromStroke: () => getBoundsFromStroke,
     getFingerprint: () => getFingerprint,
     getRep: () => getRep,
+    has: () => has,
     hasMultipleSources: () => hasMultipleSources,
     interpretationsOf: () => interpretationsOf,
     isCheckLike: () => isCheckLike,
@@ -90,6 +96,7 @@ var MetaMediumCore = (() => {
     isStrokeClosed: () => isStrokeClosed,
     learnCommandMark: () => learnCommandMark,
     listModels: () => listModels,
+    matchConcepts: () => matchConcepts,
     matchPrimitiveFromLibrary: () => matchPrimitiveFromLibrary,
     matchesCommandMark: () => matchesCommandMark,
     normalizeStroke: () => normalizeStroke,
@@ -105,6 +112,8 @@ var MetaMediumCore = (() => {
     regionAt: () => regionAt,
     regionsOf: () => regionsOf,
     regionsOverlapping: () => regionsOverlapping,
+    relate: () => relate,
+    relationsOf: () => relationsOf,
     resampleByArcLength: () => resampleByArcLength,
     resemblances: () => resemblances,
     resolvesLasso: () => resolvesLasso,
@@ -364,22 +373,22 @@ var MetaMediumCore = (() => {
     };
     const empty = { count: 0, angles: [], cornerData: [] };
     if (points.length < 8) return empty;
-    const isClosed = closed ?? isStrokeClosed(points);
+    const isClosed2 = closed ?? isStrokeClosed(points);
     const n2 = opts.samples;
-    const path = resampleByArcLength(denoise(points), n2, isClosed);
+    const path = resampleByArcLength(denoise(points), n2, isClosed2);
     if (path.length < 8) return empty;
     const arm = Math.max(2, Math.round(opts.window * path.length));
     const sep = Math.max(2, Math.round(opts.separation * path.length));
     const at = (i) => path[(i % path.length + path.length) % path.length];
     const turn = new Array(path.length).fill(0);
     for (let i = 0; i < path.length; i++) {
-      if (!isClosed && (i < arm || i >= path.length - arm)) continue;
+      if (!isClosed2 && (i < arm || i >= path.length - arm)) continue;
       const a = at(i - arm), b = at(i), c = at(i + arm);
       const bx = b.x - a.x, by = b.y - a.y;
-      const cx = c.x - b.x, cy = c.y - b.y;
-      const magB = Math.hypot(bx, by), magC = Math.hypot(cx, cy);
+      const cx2 = c.x - b.x, cy2 = c.y - b.y;
+      const magB = Math.hypot(bx, by), magC = Math.hypot(cx2, cy2);
       if (magB === 0 || magC === 0) continue;
-      const cos = (bx * cx + by * cy) / (magB * magC);
+      const cos = (bx * cx2 + by * cy2) / (magB * magC);
       turn[i] = Math.acos(Math.max(-1, Math.min(1, cos)));
     }
     const taken = [];
@@ -396,7 +405,7 @@ var MetaMediumCore = (() => {
       taken.push({ index: best, angle: turn[best] });
       for (let d = -sep; d <= sep; d++) {
         const k = ((best + d) % path.length + path.length) % path.length;
-        if (!isClosed && (best + d < 0 || best + d >= path.length)) continue;
+        if (!isClosed2 && (best + d < 0 || best + d >= path.length)) continue;
         used[k] = true;
       }
     }
@@ -797,7 +806,7 @@ var MetaMediumCore = (() => {
   function spatialCluster(components, proximityThreshold) {
     if (components.length === 0) return [];
     if (components.length === 1) return [components];
-    const clusters = [];
+    const clusters2 = [];
     const assigned = /* @__PURE__ */ new Set();
     components.forEach((comp, idx) => {
       if (assigned.has(idx)) return;
@@ -819,9 +828,9 @@ var MetaMediumCore = (() => {
           }
         });
       }
-      clusters.push(cluster);
+      clusters2.push(cluster);
     });
-    return clusters;
+    return clusters2;
   }
 
   // src/session/nodes.ts
@@ -893,7 +902,20 @@ var MetaMediumCore = (() => {
   }
   function strokePointsOf(node) {
     const rep = getRep(node, "stroke");
-    return rep ? rep.data.points : void 0;
+    if (!rep) return void 0;
+    const points = rep.data.points;
+    const to = getRep(node, "transform")?.data;
+    if (!to) return points;
+    const from = getBounds(points);
+    const fw = Math.max(1e-6, from.maxX - from.minX);
+    const fh = Math.max(1e-6, from.maxY - from.minY);
+    const sx = (to.maxX - to.minX) / fw;
+    const sy = (to.maxY - to.minY) / fh;
+    return points.map((p) => ({
+      ...p,
+      x: to.minX + (p.x - from.minX) * sx,
+      y: to.minY + (p.y - from.minY) * sy
+    }));
   }
   function wordOf(node) {
     return getRep(node, "word")?.data;
@@ -911,6 +933,8 @@ var MetaMediumCore = (() => {
     return top ? top.to.replace(/^type:/, "") : void 0;
   }
   function boundsOf(node) {
+    const moved = getRep(node, "transform")?.data;
+    if (moved) return moved;
     const fp = fingerprintOf(node);
     if (fp) return fp.bounds;
     return getRep(node, "bounds")?.data;
@@ -1002,8 +1026,8 @@ var MetaMediumCore = (() => {
     return corners.reduce((best, c) => c.angle > best.angle ? c : best, corners[0]);
   }
   function commandMarkFeatures(fp) {
-    const w = Math.max(1, fp.bounds.maxX - fp.bounds.minX);
-    const h = Math.max(1, fp.bounds.maxY - fp.bounds.minY);
+    const w2 = Math.max(1, fp.bounds.maxX - fp.bounds.minX);
+    const h2 = Math.max(1, fp.bounds.maxY - fp.bounds.minY);
     const size = Math.max(1, fp.size);
     const corner = dominantCorner(fp);
     const t = corner ? corner.t : 0.5;
@@ -1012,12 +1036,12 @@ var MetaMediumCore = (() => {
       straightness: fp.straightness,
       corners: fp.corners,
       // Orientation-free proportion: a tall mark and a wide one read alike.
-      aspect: Math.min(w, h) / Math.max(w, h),
+      aspect: Math.min(w2, h2) / Math.max(w2, h2),
       closureRatio: Math.min(1, fp.closureDistance / size),
       armRatio: corner ? armRatio : 1,
       turnSharpness: corner ? corner.angle / Math.PI : 0,
-      vertexDepth: corner ? (corner.y - fp.bounds.minY) / h : 0.5,
-      endRise: (fp.start.y - fp.end.y) / h
+      vertexDepth: corner ? (corner.y - fp.bounds.minY) / h2 : 0.5,
+      endRise: (fp.start.y - fp.end.y) / h2
     };
   }
   function mean(xs) {
@@ -1073,10 +1097,10 @@ var MetaMediumCore = (() => {
     return existing.some((fp) => matchesCommandMark(fp, mark).match);
   }
   function canonicalCheckSamples() {
-    const check = (w, h, dip, rise, slant = 0) => {
+    const check = (w2, h2, dip, rise, slant = 0) => {
       const start = { x: 0, y: 0 };
-      const vertex = { x: w * dip, y: h };
-      const end = { x: w, y: -h * rise + w * slant };
+      const vertex = { x: w2 * dip, y: h2 };
+      const end = { x: w2, y: -h2 * rise + w2 * slant };
       const seg = (a, b, n2) => Array.from({ length: n2 }, (_, i) => ({
         x: a.x + (b.x - a.x) * (i / (n2 - 1)),
         y: a.y + (b.y - a.y) * (i / (n2 - 1))
@@ -1226,16 +1250,16 @@ var MetaMediumCore = (() => {
       if (overlap > shorter * 0.5) return a.world.x - b.world.x;
       return a.world.y - b.world.y;
     };
-    const ordered = [];
+    const ordered2 = [];
     const visit = (parentKey) => {
       draft.filter((d) => d.parent === parentKey).sort(readingOrder).forEach((d) => {
-        ordered.push(d);
+        ordered2.push(d);
         visit(d.key);
       });
     };
     visit(-1);
-    const idByKey = new Map(ordered.map((d, i) => [d.key, `r${i + 1}`]));
-    return ordered.map((d) => ({
+    const idByKey = new Map(ordered2.map((d, i) => [d.key, `r${i + 1}`]));
+    return ordered2.map((d) => ({
       id: idByKey.get(d.key),
       nodeId: d.node.id,
       shape: wordOf(d.node) ?? topInterpretation(d.node) ?? "art",
@@ -1247,9 +1271,9 @@ var MetaMediumCore = (() => {
   function regionAt(regions, x, y) {
     let best = null;
     for (const r of regions) {
-      const { world: w } = r;
-      if (x < w.x || y < w.y || x > w.x + w.w || y > w.y + w.h) continue;
-      if (!best || w.w * w.h < best.world.w * best.world.h) best = r;
+      const { world: w2 } = r;
+      if (x < w2.x || y < w2.y || x > w2.x + w2.w || y > w2.y + w2.h) continue;
+      if (!best || w2.w * w2.h < best.world.w * best.world.h) best = r;
     }
     return best;
   }
@@ -1257,6 +1281,388 @@ var MetaMediumCore = (() => {
     return regions.filter(
       (r) => !(b.maxX < r.world.x || b.minX > r.world.x + r.world.w || b.maxY < r.world.y || b.minY > r.world.y + r.world.h)
     );
+  }
+
+  // src/relate/relations.ts
+  var DEFAULT_RELATE_CONFIG = {
+    nearRatio: 0.6,
+    alignRatio: 0.22,
+    directionOverlap: 0.3,
+    peerRatio: 0.62
+  };
+  var w = (b) => b.maxX - b.minX;
+  var h = (b) => b.maxY - b.minY;
+  var cx = (b) => (b.minX + b.maxX) / 2;
+  var cy = (b) => (b.minY + b.maxY) / 2;
+  var sizeOf = (b) => Math.max(w(b), h(b));
+  function overlapFraction(aMin, aMax, bMin, bMax) {
+    const shorter = Math.min(aMax - aMin, bMax - bMin);
+    if (shorter <= 0) return 0;
+    return Math.max(0, Math.min(aMax, bMax) - Math.max(aMin, bMin)) / shorter;
+  }
+  function crossings(a, b, max = 4) {
+    let n2 = 0;
+    for (let i = 1; i < a.length; i++) {
+      for (let j = 1; j < b.length; j++) {
+        if (segmentsIntersect(a[i - 1], a[i], b[j - 1], b[j])) {
+          if (++n2 >= max) return n2;
+        }
+      }
+    }
+    return n2;
+  }
+  function relate(marks, config = DEFAULT_RELATE_CONFIG) {
+    const out = [];
+    const add = (kind, from, to, strength, reasoning) => {
+      if (strength > 0) out.push({ kind, from, to, strength: Math.min(1, strength), reasoning });
+    };
+    for (let i = 0; i < marks.length; i++) {
+      for (let j = i + 1; j < marks.length; j++) {
+        const a = marks[i];
+        const b = marks[j];
+        const ab = a.bounds;
+        const bb = b.bounds;
+        const ref = Math.max(1, Math.min(sizeOf(ab), sizeOf(bb)));
+        if (boundsContain(ab, bb)) {
+          const margin = Math.min(bb.minX - ab.minX, bb.minY - ab.minY, ab.maxX - bb.maxX, ab.maxY - bb.maxY);
+          const strength = Math.min(1, 0.5 + margin / Math.max(1, sizeOf(ab)));
+          add("contains", a.id, b.id, strength, `${b.id} sits wholly inside ${a.id}`);
+          add("inside", b.id, a.id, strength, `${b.id} sits wholly inside ${a.id}`);
+          continue;
+        }
+        if (boundsContain(bb, ab)) {
+          const margin = Math.min(ab.minX - bb.minX, ab.minY - bb.minY, bb.maxX - ab.maxX, bb.maxY - ab.maxY);
+          const strength = Math.min(1, 0.5 + margin / Math.max(1, sizeOf(bb)));
+          add("contains", b.id, a.id, strength, `${a.id} sits wholly inside ${b.id}`);
+          add("inside", a.id, b.id, strength, `${a.id} sits wholly inside ${b.id}`);
+          continue;
+        }
+        const gap = boundingBoxDistance(ab, bb);
+        if (a.points && b.points) {
+          const n2 = crossings(a.points, b.points);
+          if (n2 > 0) {
+            add("crossing", a.id, b.id, Math.min(1, 0.5 + n2 * 0.15), `their strokes cross ${n2 === 4 ? "4 or more" : n2} time(s)`);
+            add("crossing", b.id, a.id, Math.min(1, 0.5 + n2 * 0.15), `their strokes cross ${n2 === 4 ? "4 or more" : n2} time(s)`);
+          }
+        }
+        if (boundsOverlap(ab, bb)) {
+          const depth = overlapFraction(ab.minX, ab.maxX, bb.minX, bb.maxX) * overlapFraction(ab.minY, ab.maxY, bb.minY, bb.maxY);
+          add("touching", a.id, b.id, 0.5 + depth * 0.5, "their areas overlap");
+          add("touching", b.id, a.id, 0.5 + depth * 0.5, "their areas overlap");
+        }
+        const nearLimit = config.nearRatio * ref;
+        if (gap < nearLimit) {
+          const strength = 1 - gap / nearLimit;
+          const pct = Math.round(gap / ref * 100);
+          add("near", a.id, b.id, strength, `${Math.round(gap)}px apart \u2014 ${pct}% of the smaller mark`);
+          add("near", b.id, a.id, strength, `${Math.round(gap)}px apart \u2014 ${pct}% of the smaller mark`);
+        }
+        const vOverlap = overlapFraction(ab.minY, ab.maxY, bb.minY, bb.maxY);
+        const hOverlap = overlapFraction(ab.minX, ab.maxX, bb.minX, bb.maxX);
+        if (vOverlap >= config.directionOverlap) {
+          const [left, right2] = cx(ab) <= cx(bb) ? [a, b] : [b, a];
+          add("left-of", left.id, right2.id, vOverlap, `they share a horizontal band (${Math.round(vOverlap * 100)}%)`);
+          add("right-of", right2.id, left.id, vOverlap, `they share a horizontal band (${Math.round(vOverlap * 100)}%)`);
+        }
+        if (hOverlap >= config.directionOverlap) {
+          const [top, bottom2] = cy(ab) <= cy(bb) ? [a, b] : [b, a];
+          add("above", top.id, bottom2.id, hOverlap, `they share a vertical band (${Math.round(hOverlap * 100)}%)`);
+          add("below", bottom2.id, top.id, hOverlap, `they share a vertical band (${Math.round(hOverlap * 100)}%)`);
+        }
+        const dy = Math.abs(cy(ab) - cy(bb));
+        const dx = Math.abs(cx(ab) - cx(bb));
+        const rowTol = config.alignRatio * Math.max(1, Math.min(h(ab), h(bb)));
+        const colTol = config.alignRatio * Math.max(1, Math.min(w(ab), w(bb)));
+        if (dy < rowTol) {
+          add("same-row", a.id, b.id, 1 - dy / rowTol, `centres within ${Math.round(dy)}px vertically`);
+          add("same-row", b.id, a.id, 1 - dy / rowTol, `centres within ${Math.round(dy)}px vertically`);
+        }
+        if (dx < colTol) {
+          add("same-column", a.id, b.id, 1 - dx / colTol, `centres within ${Math.round(dx)}px horizontally`);
+          add("same-column", b.id, a.id, 1 - dx / colTol, `centres within ${Math.round(dx)}px horizontally`);
+        }
+        const ratio = Math.min(sizeOf(ab), sizeOf(bb)) / Math.max(1, Math.max(sizeOf(ab), sizeOf(bb)));
+        if (ratio > config.peerRatio) {
+          add("same-size", a.id, b.id, ratio, `within ${Math.round((1 - ratio) * 100)}% of each other in size`);
+          add("same-size", b.id, a.id, ratio, `within ${Math.round((1 - ratio) * 100)}% of each other in size`);
+        }
+      }
+    }
+    return out;
+  }
+  function relationsOf(relations, id) {
+    return relations.filter((r) => r.from === id);
+  }
+  function between(relations, from, to) {
+    return relations.filter((r) => r.from === from && r.to === to);
+  }
+  function has(relations, kind, from, to) {
+    return relations.find((r) => r.kind === kind && r.from === from && r.to === to);
+  }
+  function clusters(marks, relations) {
+    const linked = /* @__PURE__ */ new Map();
+    for (const m of marks) linked.set(m.id, /* @__PURE__ */ new Set());
+    for (const r of relations) {
+      if (r.kind !== "near" && r.kind !== "touching" && r.kind !== "crossing" && r.kind !== "contains") continue;
+      linked.get(r.from)?.add(r.to);
+      linked.get(r.to)?.add(r.from);
+    }
+    const seen = /* @__PURE__ */ new Set();
+    const out = [];
+    for (const m of marks) {
+      if (seen.has(m.id)) continue;
+      const group2 = [];
+      const stack = [m.id];
+      while (stack.length) {
+        const id = stack.pop();
+        if (seen.has(id)) continue;
+        seen.add(id);
+        group2.push(id);
+        for (const other of linked.get(id) ?? []) if (!seen.has(other)) stack.push(other);
+      }
+      out.push(group2);
+    }
+    return out;
+  }
+  function describeRelations(relations, ids) {
+    const scope = ids ? relations.filter((r) => ids.includes(r.from) && ids.includes(r.to)) : relations;
+    if (scope.length === 0) return "No relations between these marks.";
+    const byPair = /* @__PURE__ */ new Map();
+    for (const r of scope) {
+      const key = `${r.from}\u2192${r.to}`;
+      (byPair.get(key) ?? byPair.set(key, []).get(key)).push(r);
+    }
+    const lines = [];
+    for (const [pair, rels] of byPair) {
+      const kinds = rels.sort((a, b) => b.strength - a.strength).map((r) => `${r.kind} (${r.strength.toFixed(2)})`).join(", ");
+      lines.push(`  ${pair}: ${kinds}`);
+    }
+    return lines.join("\n");
+  }
+
+  // src/concepts/concept.ts
+  var NAME = {
+    id: "name",
+    label: "Name this\u2026",
+    tier: 0,
+    effect: { kind: "name" },
+    hint: "hold it as a thing you can use again"
+  };
+  var prompt = (id, label, seed, hint) => ({
+    id,
+    label,
+    tier: 2,
+    effect: { kind: "prompt", seed },
+    hint
+  });
+  var tidy = (axis) => ({
+    id: `tidy-${axis}`,
+    label: axis === "row" ? "Line up across" : "Line up down",
+    tier: 0,
+    effect: { kind: "tidy", axis },
+    hint: "align and space them evenly"
+  });
+  var EQUALIZE = {
+    id: "equalize",
+    label: "Match sizes",
+    tier: 0,
+    effect: { kind: "equalize" },
+    hint: "make them the same size as the largest"
+  };
+  var strongest = (rels, kind, from, to) => has(rels, kind, from, to)?.strength ?? 0;
+  function pairwise(scope, kind) {
+    const { ids, relations } = scope;
+    if (ids.length < 2) return 0;
+    let total = 0;
+    let pairs = 0;
+    for (let i = 0; i < ids.length; i++) {
+      for (let j = i + 1; j < ids.length; j++) {
+        total += strongest(relations, kind, ids[i], ids[j]);
+        pairs++;
+      }
+    }
+    return pairs ? total / pairs : 0;
+  }
+  function ordered(scope, axis) {
+    const centre = (id) => {
+      const b = scope.marks.find((m) => m.id === id).bounds;
+      return axis === "x" ? (b.minX + b.maxX) / 2 : (b.minY + b.maxY) / 2;
+    };
+    return [...scope.ids].sort((a, b) => centre(a) - centre(b));
+  }
+  function chainStrength(scope, kind, axis) {
+    if (scope.ids.length < 2) return 0;
+    const seq = ordered(scope, axis);
+    let total = 0;
+    for (let i = 1; i < seq.length; i++) total += strongest(scope.relations, kind, seq[i - 1], seq[i]);
+    return total / (seq.length - 1);
+  }
+  function nested(scope) {
+    return scope.relations.some(
+      (r) => r.kind === "contains" && scope.ids.includes(r.from) && scope.ids.includes(r.to)
+    );
+  }
+  function runOfPeers(scope, axis) {
+    const beside = axis === "x" ? "left-of" : "above";
+    const shares = axis === "x" ? "same-row" : "same-column";
+    if (scope.ids.length < 2) return null;
+    if (scope.ids.some((id) => !isClosed(scope, id))) return null;
+    if (nested(scope)) return null;
+    const seq = ordered(scope, axis);
+    const bands2 = [];
+    for (let i = 1; i < seq.length; i++) {
+      const strength = strongest(scope.relations, beside, seq[i - 1], seq[i]);
+      if (strength === 0) return null;
+      const adjacent = strongest(scope.relations, "near", seq[i - 1], seq[i]) || strongest(scope.relations, "touching", seq[i - 1], seq[i]);
+      if (adjacent === 0) return null;
+      bands2.push(strength);
+    }
+    const band = bands2.reduce((a, b) => a + b, 0) / bands2.length;
+    const peers = pairwise(scope, "same-size");
+    const close = chainStrength(scope, "near", axis);
+    const aligned = chainStrength(scope, shares, axis);
+    if (peers < 0.3) return null;
+    return {
+      confidence: band * 0.3 + peers * 0.3 + close * 0.2 + aligned * 0.2,
+      reasoning: `${scope.ids.length} comparable marks sitting ${axis === "x" ? "side by side" : "one under another"} (overlap ${band.toFixed(2)}, similarity ${peers.toFixed(2)}) \u2014 ` + (aligned > 0.6 ? "already well lined up" : aligned > 0.25 ? "roughly lined up" : "not lined up yet")
+    };
+  }
+  var closedShapes = /* @__PURE__ */ new Set(["rectangle", "circle", "triangle"]);
+  var isClosed = (scope, id) => closedShapes.has(scope.shapes[id] ?? "");
+  var isLine = (scope, id) => (scope.shapes[id] ?? "") === "line";
+  var BUILTIN_CONCEPTS = [
+    {
+      name: "row",
+      describes: "peers side by side",
+      conversions: [
+        tidy("row"),
+        EQUALIZE,
+        NAME,
+        prompt("nav", "Make a nav bar", "a navigation bar", "links across the top"),
+        prompt("cols", "Make columns", "a page laid out in columns", "equal columns of content")
+      ],
+      match(scope) {
+        return runOfPeers(scope, "x");
+      }
+    },
+    {
+      name: "column",
+      describes: "peers stacked",
+      conversions: [
+        tidy("column"),
+        EQUALIZE,
+        NAME,
+        prompt("list", "Make a list", "a vertical list of items", "one item per row"),
+        prompt("form", "Make a form", "a form with labelled fields", "fields stacked down the page")
+      ],
+      match(scope) {
+        return runOfPeers(scope, "y");
+      }
+    },
+    {
+      name: "frame",
+      describes: "a mark holding others",
+      conversions: [
+        NAME,
+        prompt("card", "Make a card", "a card with a heading and body", "contents inside a bordered box"),
+        prompt("page", "Make a page", "a page", "the outer mark becomes the page")
+      ],
+      match(scope) {
+        const outer = scope.ids.filter(
+          (id) => scope.relations.some((r) => r.kind === "contains" && r.from === id && scope.ids.includes(r.to))
+        );
+        if (outer.length === 0) return null;
+        const held = scope.relations.filter(
+          (r) => r.kind === "contains" && outer.includes(r.from) && scope.ids.includes(r.to)
+        );
+        const strength = held.reduce((a, r) => a + r.strength, 0) / held.length;
+        return {
+          confidence: Math.min(0.95, 0.45 + strength * 0.5),
+          reasoning: `${outer.length} mark(s) wholly enclose ${new Set(held.map((r) => r.to)).size} other(s)`,
+          roles: { container: outer, contents: [...new Set(held.map((r) => r.to))] }
+        };
+      }
+    },
+    {
+      name: "flow",
+      describes: "marks joined by lines",
+      conversions: [
+        NAME,
+        prompt("flowchart", "Make a flowchart", "a flowchart with labelled steps", "boxes and arrows as steps"),
+        prompt("pipeline", "Make a pipeline", "a processing pipeline", "each box a stage")
+      ],
+      match(scope) {
+        const lines = scope.ids.filter((id) => isLine(scope, id));
+        const nodes = scope.ids.filter((id) => isClosed(scope, id));
+        if (lines.length === 0 || nodes.length < 2) return null;
+        const links = lines.filter((l) => {
+          const ends = nodes.filter(
+            (n2) => strongest(scope.relations, "crossing", l, n2) > 0 || strongest(scope.relations, "touching", l, n2) > 0 || strongest(scope.relations, "near", l, n2) > 0.55
+          );
+          return ends.length >= 2;
+        });
+        if (links.length === 0) return null;
+        return {
+          confidence: Math.min(0.9, 0.45 + links.length / Math.max(1, nodes.length - 1) * 0.45),
+          reasoning: `${nodes.length} closed marks joined by ${links.length} connector(s)`,
+          roles: { nodes, links }
+        };
+      }
+    },
+    {
+      name: "grid",
+      describes: "rows and columns of peers",
+      conversions: [
+        EQUALIZE,
+        NAME,
+        prompt("table", "Make a table", "a table with a header row", "cells in rows and columns"),
+        prompt("gallery", "Make a gallery", "a gallery of cards", "a card per cell")
+      ],
+      match(scope) {
+        if (scope.ids.length < 4) return null;
+        if (scope.ids.some((id) => !isClosed(scope, id))) return null;
+        const rows = chainStrength(scope, "same-row", "x");
+        const cols = chainStrength(scope, "same-column", "y");
+        const peers = pairwise(scope, "same-size");
+        if (pairwise(scope, "same-row") < 0.2 || pairwise(scope, "same-column") < 0.2) return null;
+        if (peers < 0.4) return null;
+        return {
+          confidence: Math.min(0.9, (rows + cols) * 0.3 + peers * 0.4),
+          reasoning: `${scope.ids.length} peers aligned on both axes`
+        };
+      }
+    },
+    {
+      name: "labelled",
+      describes: "a mark with something written in it",
+      conversions: [
+        NAME,
+        prompt("button", "Make a button", "a button with that label", "the inner mark is the label"),
+        prompt("field", "Make an input", "a labelled input field", "the inner mark is the placeholder")
+      ],
+      match(scope) {
+        const contains = scope.relations.filter(
+          (r) => r.kind === "contains" && scope.ids.includes(r.from) && scope.ids.includes(r.to)
+        );
+        if (contains.length === 0) return null;
+        const writing = contains.filter((r) => !isClosed(scope, r.to));
+        if (writing.length === 0) return null;
+        return {
+          confidence: Math.min(0.85, 0.4 + writing.length * 0.15),
+          reasoning: `a closed mark holding ${writing.length} open mark(s) \u2014 writing, not structure`,
+          roles: { box: [...new Set(writing.map((r) => r.from))], label: writing.map((r) => r.to) }
+        };
+      }
+    }
+  ];
+  function matchConcepts(scope, library = BUILTIN_CONCEPTS) {
+    const out = [];
+    for (const concept of library) {
+      const m = concept.match(scope);
+      if (!m || m.confidence <= 0) continue;
+      out.push({ concept: concept.name, conversions: concept.conversions, ...m });
+    }
+    return out.sort((a, b) => b.confidence - a.confidence);
   }
 
   // src/parse/layout.ts
@@ -1510,7 +1916,8 @@ ${pad}</${tag}>`;
     gesture: DEFAULT_GESTURE_CONFIG,
     clusterThresholdPx: 60,
     wireEndpointPx: 30,
-    eraseCrossings: DEFAULT_ERASE_CROSSINGS
+    eraseCrossings: DEFAULT_ERASE_CROSSINGS,
+    recentWindowMs: 2e4
   };
   function createSession(config = DEFAULT_SESSION_CONFIG) {
     let events = [];
@@ -1525,6 +1932,7 @@ ${pad}</${tag}>`;
     let live = [];
     let commandMark = config.gesture.commandMark ?? null;
     let markMiss = null;
+    let lastAt = 0;
     let counter2 = 0;
     const listeners = /* @__PURE__ */ new Set();
     function reset() {
@@ -1539,6 +1947,7 @@ ${pad}</${tag}>`;
       live = [];
       commandMark = config.gesture.commandMark ?? null;
       markMiss = null;
+      lastAt = 0;
       counter2 = 0;
       for (const n2 of createBootstrapNodes(0)) nodes.set(n2.id, n2);
     }
@@ -1580,8 +1989,8 @@ ${pad}</${tag}>`;
       clusterCandidates = [];
       if (artifacts.length === 0 || contentIds.length === 0) return;
       const comps = contentIds.map((id, i) => asComponent(id, i));
-      const clusters = spatialCluster(comps, config.clusterThresholdPx);
-      for (const cluster of clusters) {
+      const clusters2 = spatialCluster(comps, config.clusterThresholdPx);
+      for (const cluster of clusters2) {
         const ids = cluster.map((c) => contentIds[c.index]);
         const strokeIds = ids.filter((id) => !artifacts.includes(id));
         if (strokeIds.length < 2) continue;
@@ -1668,6 +2077,74 @@ ${pad}</${tag}>`;
         closed: fingerprintOf(n2)?.isClosed ?? false
       }));
     }
+    function buildSummon(ids, source, reasoning, gestureIds, scopeBounds, excludeId, at) {
+      const artifactId = liveArtifactUnder(scopeBounds, excludeId);
+      const onArtifact = artifactId ? {
+        artifactId,
+        regionIds: regionsOverlapping(regionsOf(nodes.get(artifactId), nodes), scopeBounds).map((r) => r.id)
+      } : void 0;
+      return {
+        id: nextId("summon"),
+        enclosedIds: ids,
+        scopeSource: source,
+        scopeReasoning: reasoning,
+        suggestions: makeSuggestions(ids),
+        gestureIds,
+        at,
+        ...onArtifact ? { onArtifact } : {}
+      };
+    }
+    function recentWithin(at) {
+      return contentIds.filter((id) => {
+        const n2 = nodes.get(id);
+        if (!n2 || getRep(n2, "erased")) return false;
+        return at - n2.createdAt <= config.recentWindowMs;
+      });
+    }
+    function markOf(id) {
+      const n2 = nodes.get(id);
+      const b = n2 && boundsOf(n2);
+      if (!n2 || !b) return null;
+      return { id, bounds: b, points: strokePointsOf(n2) ?? void 0, closed: fingerprintOf(n2)?.isClosed };
+    }
+    function engages(points, fp, target) {
+      if (target.points && strokesIntersect(points, target.points)) return true;
+      if (boundsOverlap(fp.bounds, target.bounds)) return true;
+      const size = Math.max(
+        1,
+        Math.max(target.bounds.maxX - target.bounds.minX, target.bounds.maxY - target.bounds.minY)
+      );
+      return boundingBoxDistance(fp.bounds, target.bounds) < size * config.gesture.checkProximityRatio;
+    }
+    function scopeFromMark(points, fp, at) {
+      const candidates = contentIds.map(markOf).filter((m) => !!m && !getRep(nodes.get(m.id), "erased"));
+      const engaged = candidates.filter((m) => engages(points, fp, m));
+      if (engaged.length === 0) return null;
+      const union = engaged.reduce(
+        (acc, m) => ({
+          minX: Math.min(acc.minX, m.bounds.minX),
+          minY: Math.min(acc.minY, m.bounds.minY),
+          maxX: Math.max(acc.maxX, m.bounds.maxX),
+          maxY: Math.max(acc.maxY, m.bounds.maxY)
+        }),
+        engaged[0].bounds
+      );
+      const scopeSize = Math.max(union.maxX - union.minX, union.maxY - union.minY);
+      if (fp.size > scopeSize) return null;
+      const recent = new Set(recentWithin(at));
+      const pool = candidates.filter((m) => recent.has(m.id) || engaged.some((e) => e.id === m.id));
+      const groups = clusters(pool, relate(pool));
+      const ids = new Set(engaged.map((m) => m.id));
+      for (const g of groups) {
+        if (g.some((id) => ids.has(id))) g.forEach((id) => ids.add(id));
+      }
+      const grown = ids.size - engaged.length;
+      return {
+        ids: [...ids],
+        source: grown > 0 ? "recent" : "crossed",
+        reasoning: grown > 0 ? `the mark crossed ${engaged.length}, and ${grown} more you drew alongside just now came with it` : `the mark crossed ${engaged.length} mark${engaged.length === 1 ? "" : "s"}`
+      };
+    }
     function liveArtifactUnder(b, excludeId) {
       for (const aid of live) {
         if (aid === excludeId) continue;
@@ -1711,22 +2188,15 @@ ${pad}</${tag}>`;
           lassoNode.reps.push({ modality: "gesture", data: { role: "lasso" }, source: "heuristic" });
           removeFromContent(lassoNode.id);
           const enclosedIds = enclosedBy(lassoFp.bounds, contentBoundsList());
-          const artifactId = liveArtifactUnder(lassoFp.bounds, lassoNode.id);
-          const onArtifact = artifactId ? {
-            artifactId,
-            regionIds: regionsOverlapping(
-              regionsOf(nodes.get(artifactId), nodes),
-              lassoFp.bounds
-            ).map((r) => r.id)
-          } : void 0;
-          summon = {
-            id: nextId("summon"),
+          summon = buildSummon(
             enclosedIds,
-            suggestions: makeSuggestions(enclosedIds),
-            gestureIds: [lassoNode.id, node.id],
-            at,
-            ...onArtifact ? { onArtifact } : {}
-          };
+            "lasso",
+            `you circled ${enclosedIds.length} mark${enclosedIds.length === 1 ? "" : "s"}`,
+            [lassoNode.id, node.id],
+            lassoFp.bounds,
+            lassoNode.id,
+            at
+          );
           pendingLasso = null;
           markMiss = null;
           recomputeClusterCandidates();
@@ -1735,6 +2205,30 @@ ${pad}</${tag}>`;
         markMiss = whyNotResolved(fp, at, lassoFp, pendingLasso.at, gestureConfig, strokePair);
       } else {
         markMiss = null;
+      }
+      if (matchesCommandMark(fp, commandMark ?? BUILTIN_COMMAND_MARK).match) {
+        const scope = scopeFromMark(points, fp, at);
+        if (scope) {
+          node.reps.push({
+            modality: "gesture",
+            data: { role: commandMark ? "command" : "check", scope: scope.source },
+            source: commandMark ? `command-mark:${commandMark.name}` : "heuristic"
+          });
+          const union = getBounds(
+            scope.ids.flatMap((id) => {
+              const b = boundsOf(nodes.get(id));
+              return [
+                { x: b.minX, y: b.minY },
+                { x: b.maxX, y: b.maxY }
+              ];
+            })
+          );
+          summon = buildSummon(scope.ids, scope.source, scope.reasoning, [node.id], union, node.id, at);
+          pendingLasso = null;
+          markMiss = null;
+          recomputeClusterCandidates();
+          return node.id;
+        }
       }
       const scratched = fp.isClosed ? [] : scratchedOut(points, scratchTargets(node.id), config.eraseCrossings);
       if (scratched.length > 0) {
@@ -1913,6 +2407,50 @@ ${pad}</${tag}>`;
       explanations.push(node.id);
       return node.id;
     }
+    function applyTidy(ev) {
+      const targets = ev.ids.map((id) => ({ id, node: nodes.get(id), bounds: nodes.get(id) ? boundsOf(nodes.get(id)) : void 0 })).filter((t) => !!t.node && !!t.bounds && !getRep(t.node, "erased"));
+      if (targets.length < 2) return;
+      const w2 = (b) => b.maxX - b.minX;
+      const h2 = (b) => b.maxY - b.minY;
+      const span = getBounds(targets.flatMap((t) => [
+        { x: t.bounds.minX, y: t.bounds.minY },
+        { x: t.bounds.maxX, y: t.bounds.maxY }
+      ]));
+      const axis = ev.axis ?? (w2(span) >= h2(span) ? "row" : "column");
+      let placed;
+      if (ev.mode === "equalize") {
+        const tw = Math.max(...targets.map((t) => w2(t.bounds)));
+        const th = Math.max(...targets.map((t) => h2(t.bounds)));
+        placed = targets.map((t) => {
+          const cx2 = (t.bounds.minX + t.bounds.maxX) / 2;
+          const cy2 = (t.bounds.minY + t.bounds.maxY) / 2;
+          return { id: t.id, to: { minX: cx2 - tw / 2, maxX: cx2 + tw / 2, minY: cy2 - th / 2, maxY: cy2 + th / 2 } };
+        });
+      } else {
+        const along = (b) => axis === "row" ? (b.minX + b.maxX) / 2 : (b.minY + b.maxY) / 2;
+        const ordered2 = [...targets].sort((a, b) => along(a.bounds) - along(b.bounds));
+        const sizes = ordered2.map((t) => axis === "row" ? w2(t.bounds) : h2(t.bounds));
+        const total = sizes.reduce((a, b) => a + b, 0);
+        const start = axis === "row" ? span.minX : span.minY;
+        const end = axis === "row" ? span.maxX : span.maxY;
+        const gap = ordered2.length > 1 ? (end - start - total) / (ordered2.length - 1) : 0;
+        const cross = ordered2.reduce((acc, t) => acc + (axis === "row" ? (t.bounds.minY + t.bounds.maxY) / 2 : (t.bounds.minX + t.bounds.maxX) / 2), 0) / ordered2.length;
+        let cursor = start;
+        placed = ordered2.map((t, i) => {
+          const size = sizes[i];
+          const half = (axis === "row" ? h2(t.bounds) : w2(t.bounds)) / 2;
+          const to = axis === "row" ? { minX: cursor, maxX: cursor + size, minY: cross - half, maxY: cross + half } : { minX: cross - half, maxX: cross + half, minY: cursor, maxY: cursor + size };
+          cursor += size + gap;
+          return { id: t.id, to };
+        });
+      }
+      for (const p of placed) {
+        const node = nodes.get(p.id);
+        node.reps = node.reps.filter((r) => r.modality !== "transform");
+        node.reps.push({ modality: "transform", data: p.to, source: "engine" });
+      }
+      recomputeClusterCandidates();
+    }
     function applyTeach(ev) {
       commandMark = ev.mark;
     }
@@ -1935,6 +2473,7 @@ ${pad}</${tag}>`;
       return node.id;
     }
     function applyEvent(ev) {
+      if ("at" in ev && typeof ev.at === "number") lastAt = Math.max(lastAt, ev.at);
       switch (ev.type) {
         case "stroke":
           return applyStroke(ev);
@@ -1949,6 +2488,9 @@ ${pad}</${tag}>`;
           return applyAnswer(ev);
         case "teach":
           applyTeach(ev);
+          return null;
+        case "tidy":
+          applyTidy(ev);
           return null;
         case "code":
           return applyCode(ev);
@@ -1994,6 +2536,7 @@ ${pad}</${tag}>`;
         explanations: [...explanations],
         commandMark,
         markMiss,
+        recentIds: recentWithin(lastAt),
         live: [...live]
       };
     }
@@ -2009,10 +2552,25 @@ ${pad}</${tag}>`;
       propose: (args) => void dispatch({ type: "propose", ...args }),
       answer: (args) => dispatch({ type: "answer", ...args }),
       teachCommandMark: (mark, at) => void dispatch({ type: "teach", mark, at }),
+      tidy: (args) => void dispatch({ type: "tidy", ...args }),
       attachCode: (args) => dispatch({ type: "code", ...args }),
       regions: (artifactId) => {
         const node = nodes.get(artifactId);
         return node ? regionsOf(node, nodes) : [];
+      },
+      read: (ids) => {
+        const marks = ids.map(markOf).filter((m) => !!m);
+        const relations = relate(marks);
+        const shapes = {};
+        const names = {};
+        for (const m of marks) {
+          const n2 = nodes.get(m.id);
+          shapes[m.id] = topInterpretation(n2) ?? "art";
+          const word = wordOf(n2);
+          if (word) names[m.id] = word;
+        }
+        const scope = { ids: marks.map((m) => m.id), marks, relations, shapes, names };
+        return { scope, relations, concepts: matchConcepts(scope) };
       },
       tick: (at) => void dispatch({ type: "tick", at }),
       bless: (args) => dispatch({ type: "bless", ...args }),
@@ -2296,11 +2854,11 @@ ${pad}</${tag}>`;
     const nodes = ids.map((id) => state.nodes.get(id)).filter((x) => !!x && !isParticipant(x) && !isGesture(x));
     if (nodes.length === 0) return "(nothing on the canvas)";
     const parts = [];
-    const named = state.artifacts.map((id) => state.nodes.get(id)).filter((x) => !!x).map((a) => wordOf(a)).filter((w) => !!w);
+    const named = state.artifacts.map((id) => state.nodes.get(id)).filter((x) => !!x).map((a) => wordOf(a)).filter((w2) => !!w2);
     if (named.length > 0) {
       parts.push(`Known names in this session: ${named.join(", ")}`);
     }
-    const others = state.participants.map((id) => state.nodes.get(id)).filter((x) => !!x).map((p) => wordOf(p)).filter((w) => !!w);
+    const others = state.participants.map((id) => state.nodes.get(id)).filter((x) => !!x).map((p) => wordOf(p)).filter((w2) => !!w2);
     if (others.length > 0) parts.push(`Participants: ${others.join(", ")}`);
     parts.push(`Marks (${nodes.length}):`);
     for (const node of nodes) {
@@ -2332,8 +2890,8 @@ ${pad}</${tag}>`;
     }
     lines.push("", "REGIONS the human drew, in artifact-local pixels:");
     for (const r of regions) {
-      const nested = r.contains.length ? `, contains ${r.contains.join(", ")}` : "";
-      lines.push(`  ${r.id}: ${rect(r.rect)} \u2014 drawn as a ${r.shape}${nested}`);
+      const nested2 = r.contains.length ? `, contains ${r.contains.join(", ")}` : "";
+      lines.push(`  ${r.id}: ${rect(r.rect)} \u2014 drawn as a ${r.shape}${nested2}`);
     }
     return lines.join("\n");
   }
@@ -2638,8 +3196,8 @@ Question: ${q}` }
       return out;
     }
     async function generate(args) {
-      const prompt = args.prompt.trim();
-      if (!prompt) return { ok: false, error: "no prompt" };
+      const prompt2 = args.prompt.trim();
+      if (!prompt2) return { ok: false, error: "no prompt" };
       const state = session.getState();
       const artifact = state.nodes.get(args.artifactId);
       if (!artifact) return { ok: false, error: "no such artifact" };
@@ -2664,7 +3222,7 @@ Question: ${q}` }
       } else {
         lines.push(`REGIONS TO FILL: ${ids.join(", ")}`);
       }
-      lines.push("", `The human asks: ${prompt}`);
+      lines.push("", `The human asks: ${prompt2}`);
       const result2 = await complete(
         config,
         [
@@ -2704,7 +3262,7 @@ Question: ${q}` }
         nodeId: args.artifactId,
         code,
         language: "html",
-        prompt,
+        prompt: prompt2,
         fill: merged,
         at: args.at
       });

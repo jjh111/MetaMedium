@@ -277,6 +277,43 @@ html, body {
   background: linear-gradient(to top, rgba(10,10,15,0.94) 40%, rgba(10,10,15,0));
 }
 
+/* ===== Command palette: what these marks could become ===== */
+#summon.palette {
+  display: block; padding: 0; width: 340px; overflow: hidden;
+  box-shadow: 0 18px 48px rgba(0,0,0,0.55);
+}
+#summon .scope {
+  display: block; padding: 9px 12px 8px; border-bottom: 1px solid var(--rule);
+  font-family: var(--mono); font-size: 10.5px; line-height: 1.45; color: var(--dim);
+  white-space: normal;
+}
+#summon .scope b { color: var(--gold); font-weight: 500; }
+#summon input.filter {
+  display: block; width: 100%; border: 0; border-bottom: 1px solid var(--rule);
+  border-radius: 0; background: transparent; color: var(--ink);
+  font: 13px var(--ui); padding: 9px 12px; outline: none;
+}
+#summon input.filter::placeholder { color: var(--dim); }
+#summon .items { max-height: 262px; overflow-y: auto; padding: 4px 0; }
+#summon .group {
+  font-family: var(--ui); font-size: 9.5px; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--dim);
+  padding: 7px 12px 3px; display: flex; justify-content: space-between; gap: 8px;
+}
+#summon .group .conf { font-family: var(--mono); letter-spacing: 0; text-transform: none; }
+#summon .item {
+  display: flex; width: 100%; align-items: baseline; gap: 8px; text-align: left;
+  background: transparent; border: 0; border-radius: 0; color: var(--ink);
+  font: 12.5px var(--ui); padding: 6px 12px; cursor: pointer; white-space: nowrap;
+}
+#summon .item:hover, #summon .item[aria-selected="true"] { background: rgba(201,168,76,0.14); }
+#summon .item[aria-selected="true"] { box-shadow: inset 2px 0 0 var(--gold); }
+#summon .item .why {
+  color: var(--dim); font-size: 10.5px; margin-left: auto; padding-left: 10px;
+  overflow: hidden; text-overflow: ellipsis;
+}
+#summon .item .tier0 { color: var(--gold); font-family: var(--mono); font-size: 9.5px; }
+#summon .empty2 { padding: 10px 12px; color: var(--dim); font-size: 11.5px; }
 #summon input.make { min-width: 250px; }
 #summon .scope {
   font-family: var(--mono); font-size: 10px; color: var(--gold);
@@ -292,10 +329,10 @@ html, body {
 <div class="rail">
   <div class="title">
     <h1>MetaMedium <span>MVP</span></h1>
-    <p>Draw. Circle a group, then draw the <b>command mark</b> across it — a
-       check ✓, or your own once you teach one — to summon an offer. Name it, or
-       <b>prompt it into a living page</b>. Draw on the page and your ink
-       addresses what's under it. Scratch anything out to erase.
+    <p>Draw. Then draw the <b>command mark</b> across what you mean — a check ✓,
+       or your own once you teach one. It reads back over what you just drew and
+       opens a palette of what those marks could become. Circle first if you want
+       to be exact. Scratch anything out to erase.
        <kbd>Ctrl</kbd>+<kbd>Z</kbd> undoes.</p>
   </div>
   <div class="controls">
@@ -1241,59 +1278,221 @@ html, body {
     ctx.closePath();
   }
 
-  // ===== Summon chips: non-modal — drawing anything else dissolves them =====
+  // ===== The command palette ==============================================
+  //
+  // What the marks could BECOME, offered as one list. The order is the argument:
+  // conversions the engine can do by itself come first, because they are instant
+  // and work with nothing attached, and the ones that need a model come after,
+  // marked. A canvas whose every offer is "ask a model" is a chat box with a
+  // drawing area; a canvas that can tidy your boxes before anything is
+  // configured is a tool.
+  //
+  // Concepts come from `session.read()` — Tier 0 relations (insideness,
+  // nearness, alignment, peerhood) matched against the concept library. The
+  // palette never decides what the marks mean; it renders what the engine read.
   let shownSummonId = null;
+  let paletteItems = [];
+  let paletteIndex = 0;
 
-  function renderSummon(s) {
-    if (!s.summon) { summonEl.style.display = 'none'; shownSummonId = null; return; }
+  function conversionsFor(s) {
     const sum = s.summon;
-    if (shownSummonId !== sum.id) {
-      shownSummonId = sum.id;
-      summonEl.innerHTML = '';
-      summonEl.style.display = 'flex';
+    const reading = session.read(sum.enclosedIds);
+    const items = [];
 
-      // Ink over a live artifact says what it landed on, before you say anything.
-      if (sum.onArtifact) {
-        const art = s.nodes.get(sum.onArtifact.artifactId);
-        const scope = document.createElement('span');
-        scope.className = 'scope';
-        const regions = addressedRegions(sum);
-        scope.textContent = 'on ' + (MM.wordOf(art) || 'artifact') +
-          (regions.length ? ' · ' + regions.join(' ') : ' · whole page');
-        summonEl.appendChild(scope);
-      }
-
-      for (const sug of sum.suggestions) {
-        // On a live artifact only the prompt makes sense — you are changing the
-        // page, not naming a new thing.
-        if (sum.onArtifact && sug.kind !== 'prompt' && sug.kind !== 'keep-as-drawing') continue;
-        const btn = document.createElement('button');
-        btn.textContent = sug.kind === 'match' ? '✓ ' + sug.label
-          : sug.kind === 'prompt' ? (sum.onArtifact ? 'Change…' : 'Make…')
-          : sug.label;
-        if (sug.kind === 'match') btn.className = 'match';
-        if (sug.kind === 'prompt') btn.className = 'make';
-        btn.onclick = () => {
-          if (sug.kind === 'prompt') return swapToPrompt(sum, btn);
-          if (sug.kind === 'name-as-new') return swapToInput(sum.id, btn);
-          session.bless({ summonId: sum.id, suggestionId: sug.id, at: Date.now() });
-        };
-        summonEl.appendChild(btn);
-      }
-
-      if (agents.length > 0 && sum.enclosedIds.length > 0) {
-        const askBtn = document.createElement('button');
-        askBtn.textContent = 'Ask…';
-        askBtn.onclick = () => swapToQuestion(sum.enclosedIds.slice(), askBtn);
-        summonEl.appendChild(askBtn);
+    for (const concept of reading.concepts) {
+      for (const conv of concept.conversions) {
+        // The same conversion can be offered by two concepts; keep the stronger.
+        const seen = items.find((i) => i.key === concept.concept + ':' + conv.id);
+        if (seen) continue;
+        items.push({
+          key: concept.concept + ':' + conv.id,
+          group: concept.concept,
+          groupConf: concept.confidence,
+          groupWhy: concept.reasoning,
+          label: conv.label,
+          why: conv.hint || '',
+          tier: conv.tier,
+          run: () => runConversion(sum, conv, concept),
+        });
       }
     }
 
-    // Follow the gesture through pan and zoom — the offer belongs to the marks.
-    const b = MM.boundsOf(s.nodes.get(sum.gestureIds[1]));
+    // The engine's own offers: an artifact this matches, and the plain ways out.
+    for (const sug of sum.suggestions) {
+      if (sug.kind === 'match') {
+        items.unshift({
+          key: 'sug:' + sug.id, group: 'known', groupConf: sug.score || 1,
+          groupWhy: 'you have named this shape before',
+          label: 'It’s a ' + sug.label, why: 'hold it as another one', tier: 0,
+          run: () => session.bless({ summonId: sum.id, suggestionId: sug.id, at: Date.now() }),
+        });
+      }
+    }
+    if (!items.some((i) => i.label === 'Name this…')) {
+      items.push({
+        key: 'name', group: 'always', groupConf: 0, groupWhy: '',
+        label: 'Name this…', why: 'hold it as a thing you can use again', tier: 0,
+        run: (btn) => swapToInput(sum.id, btn),
+      });
+    }
+    items.push({
+      key: 'make', group: 'always', groupConf: 0, groupWhy: '',
+      // One gesture, one box; whether it builds or changes is context, not a mode.
+      label: sum.onArtifact ? 'Change it…' : 'Describe it…',
+      why: sum.onArtifact ? 'change what this ink covers' : 'say what it should become',
+      tier: 2,
+      run: (btn) => swapToPrompt(sum, btn),
+    });
+    if (agents.length > 0 && sum.enclosedIds.length > 0) {
+      items.push({
+        key: 'ask', group: 'always', groupConf: 0, groupWhy: '',
+        label: 'Ask about it…', why: 'answered into the canvas', tier: 2,
+        run: (btn) => swapToQuestion(sum.enclosedIds.slice(), btn),
+      });
+    }
+    items.push({
+      key: 'keep', group: 'always', groupConf: 0, groupWhy: '',
+      label: 'Keep as drawing', why: 'leave the marks as they are', tier: 0,
+      run: () => {
+        const keep = sum.suggestions.find((x) => x.kind === 'keep-as-drawing');
+        if (keep) session.bless({ summonId: sum.id, suggestionId: keep.id, at: Date.now() });
+        else session.dismiss(sum.id, Date.now());
+      },
+    });
+
+    // Groups stay whole — a reading split across the list reads as two readings.
+    // Within a group, what the engine can do alone comes first: instant,
+    // offline, and true regardless of what is plugged in. Between groups, the
+    // strongest reading leads and the always-available actions sit at the end.
+    const order = new Map();
+    for (const i of items) {
+      const best = order.get(i.group);
+      const rank = i.group === 'always' ? -1 : i.groupConf;
+      if (best === undefined || rank > best) order.set(i.group, rank);
+    }
+    return items.sort((a, b) => {
+      if (a.group !== b.group) return order.get(b.group) - order.get(a.group);
+      return a.tier - b.tier;
+    });
+  }
+
+  function runConversion(sum, conv, concept) {
+    const at = Date.now();
+    const ids = sum.enclosedIds.slice();
+    if (conv.effect.kind === 'tidy') {
+      session.dismiss(sum.id, at);
+      session.tidy({ ids: ids, mode: 'align', axis: conv.effect.axis, at: at });
+      flash('lined up ' + ids.length + ' marks');
+    } else if (conv.effect.kind === 'equalize') {
+      session.dismiss(sum.id, at);
+      session.tidy({ ids: ids, mode: 'equalize', at: at });
+      flash('matched ' + ids.length + ' sizes');
+    } else if (conv.effect.kind === 'name') {
+      session.bless({ summonId: sum.id, name: concept.concept, at: at });
+    } else if (conv.effect.kind === 'prompt') {
+      const input = document.querySelector('#summon input.filter');
+      if (input) { input.value = conv.effect.seed; }
+      swapToPrompt(sum, input, conv.effect.seed);
+    }
+  }
+
+  function renderSummon(s) {
+    if (!s.summon) { summonEl.style.display = 'none'; summonEl.className = ''; shownSummonId = null; return; }
+    const sum = s.summon;
+    if (shownSummonId !== sum.id) {
+      shownSummonId = sum.id;
+      paletteItems = conversionsFor(s);
+      paletteIndex = 0;
+      summonEl.className = 'palette';
+      summonEl.style.display = 'block';
+      summonEl.innerHTML = '';
+
+      // Say what it is acting on, and how it decided — a wrong guess should be
+      // visible before you act on it, not after.
+      const scope = document.createElement('div');
+      scope.className = 'scope';
+      const onArt = sum.onArtifact
+        ? ' on <b>' + esc(MM.wordOf(s.nodes.get(sum.onArtifact.artifactId)) || 'artifact') + '</b>' +
+          (sum.onArtifact.regionIds.length ? ' · ' + esc(sum.onArtifact.regionIds.join(' ')) : '')
+        : '';
+      scope.innerHTML = '<b>' + sum.enclosedIds.length + ' mark' +
+        (sum.enclosedIds.length === 1 ? '' : 's') + '</b>' + onArt + ' — ' + esc(sum.scopeReasoning);
+      summonEl.appendChild(scope);
+
+      const filter = document.createElement('input');
+      filter.className = 'filter';
+      filter.placeholder = 'what should this become?';
+      filter.onkeydown = onPaletteKey;
+      filter.oninput = () => paintPalette(filter.value);
+      summonEl.appendChild(filter);
+
+      const list = document.createElement('div');
+      list.className = 'items';
+      summonEl.appendChild(list);
+      paintPalette('');
+      setTimeout(() => filter.focus(), 0);
+    }
+
+    const b = MM.boundsOf(s.nodes.get(sum.gestureIds[sum.gestureIds.length - 1]));
     const p = worldToScreen(b.minX, b.maxY);
     summonEl.style.left = Math.max(8, Math.min(p.x, innerWidth - summonEl.offsetWidth - 8)) + 'px';
-    summonEl.style.top = Math.max(8, Math.min(p.y + 14, innerHeight - 70)) + 'px';
+    summonEl.style.top = Math.max(8, Math.min(p.y + 14, innerHeight - summonEl.offsetHeight - 52)) + 'px';
+  }
+
+  function visibleItems(query) {
+    const q = query.trim().toLowerCase();
+    if (!q) return paletteItems;
+    return paletteItems.filter((i) =>
+      (i.label + ' ' + i.group + ' ' + i.why).toLowerCase().includes(q));
+  }
+
+  function paintPalette(query) {
+    const list = summonEl.querySelector('.items');
+    if (!list) return;
+    const shown = visibleItems(query);
+    if (paletteIndex >= shown.length) paletteIndex = Math.max(0, shown.length - 1);
+    list.innerHTML = '';
+    if (shown.length === 0) {
+      list.innerHTML = '<div class="empty2">Nothing matches. Keep drawing to dismiss.</div>';
+      return;
+    }
+    let lastGroup = null;
+    shown.forEach((item, i) => {
+      if (item.group !== lastGroup) {
+        lastGroup = item.group;
+        const g = document.createElement('div');
+        g.className = 'group';
+        g.innerHTML = '<span>' + esc(item.group) + '</span>' +
+          (item.groupConf ? '<span class="conf" title="' + esc(item.groupWhy) + '">' +
+            item.groupConf.toFixed(2) + '</span>' : '');
+        list.appendChild(g);
+      }
+      const btn = document.createElement('button');
+      btn.className = 'item';
+      btn.setAttribute('aria-selected', String(i === paletteIndex));
+      btn.innerHTML = '<span>' + esc(item.label) + '</span>' +
+        (item.tier === 0 ? '<span class="tier0">·now</span>' : '') +
+        '<span class="why">' + esc(item.why) + '</span>';
+      btn.onclick = () => item.run(btn);
+      list.appendChild(btn);
+    });
+    const sel = list.querySelector('[aria-selected="true"]');
+    if (sel && sel.scrollIntoView) sel.scrollIntoView({ block: 'nearest' });
+  }
+
+  function onPaletteKey(e) {
+    e.stopPropagation();
+    const shown = visibleItems(e.target.value);
+    if (e.key === 'ArrowDown') { e.preventDefault(); paletteIndex = Math.min(shown.length - 1, paletteIndex + 1); paintPalette(e.target.value); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); paletteIndex = Math.max(0, paletteIndex - 1); paintPalette(e.target.value); }
+    else if (e.key === 'Enter') {
+      e.preventDefault();
+      const item = shown[paletteIndex];
+      if (item) item.run(summonEl.querySelectorAll('.item')[paletteIndex]);
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      session.dismiss(shownSummonId, Date.now());
+    }
   }
 
   /**
@@ -1318,17 +1517,17 @@ html, body {
         session.bless({ summonId: summonId, name: input.value.trim(), at: Date.now() });
       }
     };
-    btn.replaceWith(input);
-    input.focus();
+    replaceWithField(btn, input);
   }
 
   // The freeform prompt — MVP.md §2 step 6. One box for building and for
   // changing, because it is one gesture; whether the artifact already carries
   // code is what decides, not a mode the human has to pick.
-  function swapToPrompt(sum, btn) {
+  function swapToPrompt(sum, btn, seed) {
     const revising = !!sum.onArtifact;
     const input = document.createElement('input');
-    input.className = 'make';
+    input.className = 'make filter';
+    input.value = seed || '';
     input.placeholder = revising
       ? 'change what this covers…'
       : 'website with the copy in the squares…';
@@ -1346,8 +1545,22 @@ html, body {
       input.placeholder = 'building with ' + agents.length + ' model(s)…';
       runPrompt(sum, prompt, revising);
     };
-    btn.replaceWith(input);
+    replaceWithField(btn, input);
+  }
+
+  /**
+   * Swap the palette for a single field. The list is removed rather than left
+   * behind: once you are typing, the options are stale.
+   */
+  function replaceWithField(btn, input) {
+    const list = summonEl.querySelector('.items');
+    if (list) list.remove();
+    const filter = summonEl.querySelector('input.filter');
+    if (filter && filter !== input) filter.replaceWith(input);
+    else if (btn && btn.replaceWith) btn.replaceWith(input);
+    else summonEl.appendChild(input);
     input.focus();
+    input.setSelectionRange(input.value.length, input.value.length);
   }
 
   function runPrompt(sum, prompt, revising) {
@@ -1409,8 +1622,7 @@ html, body {
         });
       });
     };
-    btn.replaceWith(input);
-    input.focus();
+    replaceWithField(btn, input);
   }
 
   // ===== Inspector: what the machine currently holds, and why ==============
@@ -1532,43 +1744,62 @@ html, body {
 
   function renderSummonScope(s) {
     const sum = s.summon;
-    const ids = sum.enclosedIds;
-    let html = '<div class="eyebrow">offer standing</div>';
+    const reading = session.read(sum.enclosedIds);
+    let html = '<div class="eyebrow">what these marks are</div>';
+
+    html += '<div class="row"><span class="k">holds</span><span class="v">' +
+      sum.enclosedIds.length + ' mark' + (sum.enclosedIds.length === 1 ? '' : 's') + '</span></div>';
+    html += '<div class="row"><span class="k">scope</span><span class="v">' + esc(sum.scopeSource) + '</span></div>';
+    html += '<div class="why">' + esc(sum.scopeReasoning) + '</div>';
 
     if (sum.onArtifact) {
       const art = s.nodes.get(sum.onArtifact.artifactId);
-      const regions = addressedRegions(sum);
       html += '<div class="row"><span class="k">on</span><span class="v">' +
         esc(MM.wordOf(art) || sum.onArtifact.artifactId) + '</span></div>';
       html += '<div class="row"><span class="k">covers</span><span class="v">' +
-        (regions.length ? esc(regions.join(', ')) : 'the whole page') + '</span></div>';
-      html += '<div class="why" style="margin-top:7px">Your mark is over a living artifact, so the ' +
-        'canvas resolved it to real elements in that page — not to an impression of one. ' +
-        'A prompt now changes only what those regions cover.</div>';
-      inspectorEl.innerHTML = html;
-      return;
+        (sum.onArtifact.regionIds.length ? esc(sum.onArtifact.regionIds.join(', ')) : 'the whole page') + '</span></div>';
     }
 
-    html += '<div class="row"><span class="k">holds</span><span class="v">' + ids.length + ' marks</span></div>';
-    const sig = {};
-    ids.forEach((id) => {
-      const t = MM.topInterpretation(s.nodes.get(id)) || 'mark';
-      sig[t] = (sig[t] || 0) + 1;
-    });
-    html += '<div class="row"><span class="k">sig</span><span class="v">' +
-      esc(Object.entries(sig).map(([k, v]) => v + '×' + k).join(' + ')) + '</span></div>';
+    // The concepts these marks read as. Tier 0, from measured relations — this
+    // is what the palette is offering from, so it is what the inspector must
+    // explain. Several at once, ranked, like every other reading in the engine.
+    if (reading.concepts.length) {
+      html += '<div class="sep"></div><div class="eyebrow">reads as' +
+        (reading.concepts.length > 1 ? ' <span class="srccount">' + reading.concepts.length + ' concepts</span>' : '') +
+        '</div><div class="reads">';
+      reading.concepts.forEach((c, i) => {
+        html += '<div class="read' + (i === 0 ? ' top' : '') + '">' +
+          '<span class="type">' + esc(c.concept) + '</span>' +
+          '<span class="w">' + c.confidence.toFixed(2) + '</span></div>';
+        html += '<div class="why">' + esc(c.reasoning) + '</div>';
+        if (c.roles) {
+          for (const role of Object.keys(c.roles)) {
+            html += '<div class="row"><span class="k">' + esc(role) + '</span>' +
+              '<span class="v">' + esc(c.roles[role].join(', ')) + '</span></div>';
+          }
+        }
+      });
+      html += '</div>';
+    } else {
+      html += '<div class="sep"></div><div class="why">No structural reading — these marks ' +
+        'relate to each other, but not in a way the concept library has a name for yet.</div>';
+    }
 
-    const authors = [...new Set(ids.map((id) => authorOf(s.nodes.get(id))))];
-    html += '<div class="row"><span class="k">by</span><span class="v">' +
-      authors.map((a) => '<span class="' + (a === MM.LOCAL_PARTICIPANT ? 'by-human' : 'by-agent') + '">' +
-        esc(nameOfParticipant(a)) + '</span>').join(', ') + '</span></div>';
+    // The relations underneath, which is where those readings came from.
+    const rels = reading.relations.filter((r, i, all) =>
+      all.findIndex((x) => x.kind === r.kind && x.from === r.from && x.to === r.to) === i);
+    if (rels.length) {
+      const byKind = {};
+      rels.forEach((r) => { byKind[r.kind] = (byKind[r.kind] || 0) + 1; });
+      html += '<div class="sep"></div><div class="eyebrow">relations seen</div>';
+      Object.keys(byKind).sort().forEach((kind) => {
+        html += '<div class="row"><span class="k">' + esc(kind) + '</span>' +
+          '<span class="v">' + byKind[kind] + '</span></div>';
+      });
+      const strongest = rels.slice().sort((a, b) => b.strength - a.strength)[0];
+      if (strongest) html += '<div class="why">' + esc(strongest.kind + ': ' + strongest.reasoning) + '</div>';
+    }
 
-    html += '<div class="sep"></div><div class="eyebrow">offered</div>';
-    sum.suggestions.forEach((sug) => {
-      html += '<div class="row"><span class="k">' +
-        (sug.kind === 'match' ? 'match' : sug.kind === 'prompt' ? 'build' : '—') + '</span>' +
-        '<span class="v">' + esc(sug.label) + '</span></div>';
-    });
     html += '<div class="why" style="margin-top:7px">Ignoring this is a valid answer: ' +
       'keep drawing and the offer dissolves, leaving the marks as they were.</div>';
 

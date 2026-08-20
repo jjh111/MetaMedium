@@ -403,9 +403,10 @@ describe('a mark that does not take says why', () => {
     expect(s.getState().markMiss).toBeNull();
   });
 
-  it('reports a mark drawn too long after the circle', () => {
+  it('reports a mark drawn too long after the circle, when it rescues nothing', () => {
+    // Late AND touching nothing: there is no reading left to fall back on.
     const s = lassoWaiting();
-    s.addStroke(checkStroke(300, 120), 2000 + 9000);
+    s.addStroke(checkStroke(1400, 1400), 2000 + 9000);
     const miss = s.getState().markMiss!;
     expect(miss.reason).toBe('too-late');
     expect(miss.nearMiss).toBe(true);

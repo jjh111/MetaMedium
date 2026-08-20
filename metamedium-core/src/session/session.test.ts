@@ -39,13 +39,20 @@ describe('held ambiguity', () => {
     expect(isGesture(state.nodes.get(lassoId)!)).toBe(false);
   });
 
-  it('a check too late does NOT resolve the lasso (temporal half)', () => {
+  it('a check too late does not LIFT the lasso, though it can still act on it', () => {
+    // Deferred commitment has a deadline: past the window the circle has
+    // settled as ink and is not retroactively turned into a gesture. The mark
+    // is not thereby useless — it still crossed something, and acting on what
+    // you strike through is the whole point — but the scope is now "this
+    // circle", not "what the circle enclosed", and it says so.
     const s = createSession();
     s.addStroke(circleStroke(300, 300, 40), 0);
-    s.addStroke(circleStroke(300, 300, 150), 1000);
+    const lasso = s.addStroke(circleStroke(300, 300, 150), 1000);
     s.addStroke(checkStroke(460, 300), 60000); // way past the window
 
-    expect(s.getState().summon).toBeNull();
+    const state = s.getState();
+    expect(state.contentIds).toContain(lasso); // never lifted
+    expect(state.summon?.scopeSource).toBe('crossed');
   });
 
   it('a check too far away does NOT resolve the lasso (contextual half)', () => {

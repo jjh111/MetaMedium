@@ -99,6 +99,24 @@ export type { ScratchTarget } from './session/erase';
 export { regionsOf, frameOf, regionAt, regionsOverlapping } from './session/regions';
 export type { Region, Rect } from './session/regions';
 
+// Relations — what Tier 0 can SEE between marks: insideness, nearness,
+// alignment, direction, peerhood. Measured, scale-free, and the substrate that
+// concepts match against.
+export {
+  relate,
+  relationsOf,
+  between,
+  has,
+  clusters,
+  describeRelations,
+  DEFAULT_RELATE_CONFIG,
+} from './relate/relations';
+export type { Relation, RelationKind, Mark, RelateConfig } from './relate/relations';
+
+// Concepts — the meaning-mappings, as a library rather than as code paths.
+export { matchConcepts, BUILTIN_CONCEPTS } from './concepts/concept';
+export type { Concept, ConceptMatch, ConceptScope, Conversion } from './concepts/concept';
+
 // Parsing — the drawing read as a LAYOUT, and the page built from that reading.
 // The engine owns structure because it measured it; the model owns content.
 export { parseLayout, describeLayout } from './parse/layout';

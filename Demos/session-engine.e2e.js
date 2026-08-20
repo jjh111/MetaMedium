@@ -29,7 +29,7 @@ window.__helpers = function(){
   function check(x,y,k){ k=k||1; return line({x,y},{x:x+25*k,y:y+35*k},30).concat(line({x:x+25*k,y:y+35*k},{x:x+70*k,y:y-15*k},30).slice(1)); }
   function scratch(x,y,w,h,passes){ passes=passes||3; let p=[]; for(let i=0;i<passes;i++){const yi=y+(passes===1?0:h*i/(passes-1)); const a={x:i%2?x+w:x,y:yi},b={x:i%2?x:x+w,y:yi}; if(i)p.push({x:a.x,y:p[p.length-1].y}); p=p.concat(line(a,b,10).slice(i?1:0));} return p; }
   function summary(){ const st=window.__mm.session.getState(); return {loose:st.contentIds.length-st.artifacts.length, artifacts:st.artifacts.length, live:st.live.length, pending:st.pendingLassoId, summon: st.summon?{enclosed:st.summon.enclosedIds.length,onArtifact:st.summon.onArtifact||null}:null, mark: st.commandMark?st.commandMark.name:null, status: document.getElementById('status').textContent}; }
-  function chips(){ return [...document.querySelectorAll('#summon button, #summon .scope')].map(b=>b.textContent); }
+  function chips(){ return [...document.querySelectorAll('#summon .item')].map(b=>b.querySelector('span').textContent.trim()); }
   window.__t = {stroke,strokeOn,line,rect,circle,caret,check,scratch,summary,chips};
 
   // Teach the caret as the command mark, through the real pad UI.
@@ -161,10 +161,10 @@ window.__scenario = async function(){
   const sum = t.summary().summon;
   step('5. crossing with the taught mark summons', sum && sum.enclosed === 3,
     {enclosed: sum && sum.enclosed, chips: t.chips()});
-  step('5b. the offer includes a freeform prompt', t.chips().includes('Make…'), t.chips());
+  step('5b. the offer includes a freeform prompt', t.chips().some(x=>x.startsWith('Describe it')), t.chips());
 
   // ---- 6. Prompt it into living code ----
-  const make = [...document.querySelectorAll('#summon button')].find(b=>b.textContent.trim()==='Make…');
+  const make = [...document.querySelectorAll('#summon .item')].find(b=>b.textContent.trim().startsWith('Describe it'));
   make.click();
   const input = document.querySelector('#summon input.make');
   input.value = 'website with the copy in the squares';
@@ -229,8 +229,8 @@ window.__scenario = async function(){
   step('9. the summon resolves the ink to a REGION of the running artifact',
     !!addressed && addressed.artifactId === artId && addressed.regionIds.length >= 1,
     addressed);
-  step('9b. the offer on a live page is a change, not a naming',
-    t.chips().some(x=>x==='Change…') && !t.chips().some(x=>x==='Name this…'), t.chips());
+  step('9b. the offer on a live page is a change, not a build',
+    t.chips().some(x=>x.startsWith('Change it')), t.chips());
 
   // ---- 10. Revise only what the ink covers ----
   // Ask the summon which region the ink actually landed on rather than assuming
@@ -239,7 +239,7 @@ window.__scenario = async function(){
   const otherId = regions.map((r) => r.id).find((x) => x !== hitId);
   const beforeAddressed = doc.querySelector('[data-region="' + hitId + '"]').textContent;
   const beforeOther = doc.querySelector('[data-region="' + otherId + '"]').textContent;
-  const chg = [...document.querySelectorAll('#summon button')].find(b=>b.textContent.trim()==='Change…');
+  const chg = [...document.querySelectorAll('#summon .item')].find(b=>b.textContent.trim().startsWith('Change it'));
   chg.click();
   const inp2 = document.querySelector('#summon input.make');
   inp2.value = 'make this one purple';
@@ -273,7 +273,54 @@ window.__scenario = async function(){
   step('11b. and undo brings them back', mm.session.getState().artifacts.length === 1,
     {artifacts: mm.session.getState().artifacts.length});
 
+  // ---- 12b. The canvas on its own: no lasso, no model ----
+  // The mark reads BACK over what was just drawn, the palette offers what the
+  // marks could become, and the Tier 0 conversions need nothing attached.
+  while (mm.session.getEvents().length) mm.session.undo();
+  mm.fitAll(); await wait(60);
+  {
+    t.stroke(t.rect(200, 220, 180, 140));
+    t.stroke(t.rect(430, 250, 210, 110));
+    t.stroke(t.rect(700, 200, 150, 170));
+    t.stroke(t.check(470, 270, 1));                  // no circle first
+    const sum = mm.session.getState().summon;
+    step('12b. the mark reads back over what was just drawn',
+      !!sum && sum.enclosedIds.length === 3 && sum.scopeSource === 'recent',
+      sum && { n: sum.enclosedIds.length, source: sum.scopeSource, why: sum.scopeReasoning });
+
+    const concepts = mm.session.read(sum.enclosedIds).concepts;
+    step('12c. Tier 0 reads three wonky peers as a row',
+      concepts.some(c => c.concept === 'row'),
+      concepts.map(c => c.concept + ' ' + c.confidence.toFixed(2)));
+
+    const items = [...document.querySelectorAll('#summon .item')].map(b => b.textContent);
+    step('12d. the palette leads with what needs no model',
+      /·now/.test(items[0] || ''), { first: (items[0] || '').trim() });
+
+    const ids = sum.enclosedIds.slice();
+    const cy = () => ids.map(id => {
+      const b = mm.MM.boundsOf(mm.session.getState().nodes.get(id));
+      return (b.minY + b.maxY) / 2;
+    });
+    const before = cy();
+    const filter = document.querySelector('#summon input.filter');
+    filter.value = 'line up';
+    filter.dispatchEvent(new Event('input', { bubbles: true }));
+    filter.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    const after = cy();
+    const spread = xs => Math.max(...xs) - Math.min(...xs);
+    step('12e. tidy lines them up, with no model attached',
+      spread(before) > 10 && spread(after) < 1,
+      { spreadBefore: Math.round(spread(before)), spreadAfter: Math.round(spread(after)) });
+
+    mm.session.undo();
+    step('12f. and undo springs them back — the ink was never overwritten',
+      Math.abs(spread(cy()) - spread(before)) < 1,
+      { spreadNow: Math.round(spread(cy())) });
+  }
+
   // ---- 12. Undoing the teach puts the built-in mark back in the rail ----
+  window.__teach();
   while (mm.session.getEvents().length) mm.session.undo();
   step('12. the rail follows the grammar — undoing the teach restores the check',
     mm.session.getState().commandMark === null &&
