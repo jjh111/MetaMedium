@@ -115,3 +115,34 @@ describe('parseLayout', () => {
     expect(describeLayout(empty)).toContain('LAYOUT');
   });
 });
+
+describe('connectors are edges, not boxes', () => {
+  it('reads two boxes joined by a line as a row, not a stack', () => {
+    const s = createSession();
+    const a = s.addStroke(handRect(220, 240, 200, 140, { seed: 1 }), 1000);
+    const b = s.addStroke(handRect(560, 240, 200, 140, { seed: 2 }), 1100);
+    s.addStroke(
+      Array.from({ length: 40 }, (_, i) => ({ x: 420 + (140 * i) / 39, y: 310 })),
+      1200
+    );
+    s.addStroke(handCircle(490, 310, 400, { seed: 3 }), 2000);
+    s.addStroke(checkStroke(900, 310), 2200);
+    const id = s.bless({ summonId: s.getState().summon!.id, name: 'flow', at: 3000 })!;
+    const node = s.getState().nodes.get(id)!;
+    const regions = regionsOf(node, s.getState().nodes);
+    const connector = regions.find((r) => r.shape === 'line')!;
+
+    // Without the connection, the line straddles both boxes and defeats the cut.
+    const naive = parseLayout(regions, frameOf(node)!);
+    expect(naive.root.flow).toBe('stack');
+
+    // Told which mark is the connector, the boxes read as what they are.
+    const informed = parseLayout(regions, frameOf(node)!, [
+      { from: 'r1', to: 'r2', via: connector.id },
+    ]);
+    expect(informed.root.flow).toBe('row');
+    expect(informed.root.children).toHaveLength(2);
+    expect(informed.connections).toHaveLength(1);
+    expect([a, b]).toHaveLength(2);
+  });
+});

@@ -11,11 +11,12 @@
 // beside, which are already multi-parse.
 
 import type { Session, ProposedEdge } from '../session/session';
-import type { ProviderConfig } from '../llm/provider';
+import type { Capability } from '../session/nodes';
+import type { ChatMessage, CompletionResult, ProviderConfig } from '../llm/provider';
 import { complete, providerLabel, providerTier } from '../llm/provider';
 import { describeSession, describeSignature } from './serialize';
 import { frameOf, regionsOf } from '../session/regions';
-import { parseLayout, describeLayout } from '../parse/layout';
+import { parseLayout, describeLayout, regionIdsIn } from '../parse/layout';
 import { buildScaffold, validateRegions, type RegionContent, type Theme } from '../parse/scaffold';
 
 /** One candidate reading, as the model reports it. */
@@ -393,14 +394,40 @@ export interface AskResult {
  * The agent joins as a first-class citizen — same `join`/`propose` channel a
  * human uses, same attribution, same "nothing commits without a blessing".
  */
+/**
+ * How a participant is actually reached.
+ *
+ * Injectable so that "who answers" and "what is asked" stay separate concerns.
+ * A model behind HTTP and a human answering by hand are the same participant
+ * from the canvas's point of view — same prompts, same parsing, same propose
+ * channel — and differ only here. That is what lets an assistant with no API,
+ * or a model on a machine the browser cannot reach, take part as a peer rather
+ * than as a special case bolted on beside one.
+ */
+export type Transport = (
+  config: ProviderConfig,
+  messages: ChatMessage[],
+  opts: { signal?: AbortSignal }
+) => Promise<CompletionResult>;
+
+export interface AgentOptions {
+  /** Defaults to the HTTP transport. */
+  transport?: Transport;
+  /** Overrides the display name and the tier derived from the provider. */
+  name?: string;
+  tier?: Capability;
+}
+
 export function createAgentParticipant(
   session: Session,
   config: ProviderConfig,
-  at: number = 0
+  at: number = 0,
+  options: AgentOptions = {}
 ): AgentParticipant {
-  const name = providerLabel(config);
+  const send: Transport = options.transport ?? ((c, m, o) => complete(c, m, o));
+  const name = options.name ?? providerLabel(config);
   // Join at the provider's tier so surfaces can group readings by voice.
-  const id = session.join('agent', name, at, providerTier(config));
+  const id = session.join('agent', name, at, options.tier ?? providerTier(config));
 
   async function interpret(nodeIds: string[], now: number, signal?: AbortSignal): Promise<InterpretResult> {
     const state = session.getState();
@@ -415,7 +442,7 @@ export function createAgentParticipant(
       ? `These ${targets.length} marks were grouped together (${signature}). What could this group be? Offer several readings.`
       : `What could this mark be? Offer several readings.`;
 
-    const result = await complete(
+    const result = await send(
       config,
       [
         { role: 'system', content: SYSTEM_PROMPT },
@@ -453,7 +480,7 @@ export function createAgentParticipant(
     if (targets.length === 0) return { ok: false, error: 'no such nodes' };
 
     const context = describeSession(state, { nodeIds: targets });
-    const result = await complete(
+    const result = await send(
       config,
       [
         { role: 'system', content: ASK_PROMPT },
@@ -521,8 +548,12 @@ export function createAgentParticipant(
     const previous = (existing?.data as { fill?: RegionFill } | undefined)?.fill;
     const revising = !!previous;
 
-    const ids = regions.map((r) => r.id);
-    const addressed = args.addressed?.length ? args.addressed : ids;
+    // What the layout PLACES, not every mark that was drawn: a connector is an
+    // edge, and asking a model to write content for a line it will never see
+    // rendered is asking for something to be thrown away.
+    const ids = regionIdsIn(layout);
+    if (ids.length === 0) return { ok: false, error: 'nothing in this artifact can hold content' };
+    const addressed = args.addressed?.length ? args.addressed.filter((a) => ids.includes(a)) : ids;
 
     const lines = [describeLayout(layout), ''];
     if (revising) {
@@ -537,7 +568,7 @@ export function createAgentParticipant(
     }
     lines.push('', `The human asks: ${prompt}`);
 
-    const result = await complete(
+    const result = await send(
       config,
       [
         { role: 'system', content: revising ? REVISE_PROMPT : MAKE_PROMPT },

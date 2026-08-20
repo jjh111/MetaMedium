@@ -38,6 +38,7 @@ var MetaMediumCore = (() => {
     MAX_TIER0_CONFIDENCE: () => MAX_TIER0_CONFIDENCE,
     MIN_CONFIDENCE: () => MIN_CONFIDENCE,
     PRESETS: () => PRESETS,
+    SETTLED_CONFIDENCE: () => SETTLED_CONFIDENCE,
     TIER0_PARTICIPANT: () => TIER0_PARTICIPANT,
     aboutIdsOf: () => aboutIdsOf,
     analyzeCornerAngles: () => analyzeCornerAngles,
@@ -64,6 +65,7 @@ var MetaMediumCore = (() => {
     countCrossings: () => countCrossings,
     createAgentParticipant: () => createAgentParticipant,
     createBootstrapNodes: () => createBootstrapNodes,
+    createBridgeParticipant: () => createBridgeParticipant,
     createExplanationNode: () => createExplanationNode,
     createParticipantNode: () => createParticipantNode,
     createSession: () => createSession,
@@ -72,6 +74,7 @@ var MetaMediumCore = (() => {
     describeLayout: () => describeLayout,
     describeRegions: () => describeRegions,
     describeRelations: () => describeRelations,
+    describeRoute: () => describeRoute,
     describeSession: () => describeSession,
     describeSignature: () => describeSignature,
     disagreement: () => disagreement,
@@ -110,6 +113,7 @@ var MetaMediumCore = (() => {
     providerTier: () => providerTier,
     readingsToEdges: () => readingsToEdges,
     regionAt: () => regionAt,
+    regionIdsIn: () => regionIdsIn,
     regionsOf: () => regionsOf,
     regionsOverlapping: () => regionsOverlapping,
     relate: () => relate,
@@ -117,6 +121,7 @@ var MetaMediumCore = (() => {
     resampleByArcLength: () => resampleByArcLength,
     resemblances: () => resemblances,
     resolvesLasso: () => resolvesLasso,
+    route: () => route,
     scratchedOut: () => scratchedOut,
     segmentsIntersect: () => segmentsIntersect,
     shapeExtent: () => shapeExtent,
@@ -1749,6 +1754,10 @@ var MetaMediumCore = (() => {
   }
   function parseLayout(regions, frame, connections = []) {
     counter = 0;
+    const connectors = new Set(connections.map((c) => c.via).filter((v) => !!v));
+    if (connectors.size) {
+      regions = regions.filter((r) => !connectors.has(r.id));
+    }
     if (regions.length === 0) {
       return {
         root: {
@@ -1815,6 +1824,15 @@ var MetaMediumCore = (() => {
     }
     return lines.join("\n");
   }
+  function regionIdsIn(layout) {
+    const out = [];
+    const walk = (n2) => {
+      if (n2.region) out.push(n2.id);
+      n2.children.forEach(walk);
+    };
+    walk(layout.root);
+    return out;
+  }
 
   // src/parse/scaffold.ts
   var SAFE_TAGS = /* @__PURE__ */ new Set([
@@ -1836,7 +1854,7 @@ var MetaMediumCore = (() => {
     const own = node.region ? content[node.id] : void 0;
     const tag = own?.tag && SAFE_TAGS.has(own.tag) ? own.tag : "div";
     const box = [];
-    if (depth === 1) box.push("flex:1 1 auto");
+    if (depth === 1) box.push("flex:1 1 0", "min-width:0", "min-height:0");
     else if (depth > 1) {
       box.push(`flex:${node.grow ?? 1} 1 0`, "min-width:0", "min-height:0");
     }
@@ -3118,9 +3136,10 @@ Reply with ONLY a JSON object, no prose, no code fences:
       reasoning: r.reasoning || (targetIsCluster ? "proposed for this group" : "proposed for this mark")
     }));
   }
-  function createAgentParticipant(session, config, at = 0) {
-    const name = providerLabel(config);
-    const id = session.join("agent", name, at, providerTier(config));
+  function createAgentParticipant(session, config, at = 0, options = {}) {
+    const send = options.transport ?? ((c, m, o) => complete(c, m, o));
+    const name = options.name ?? providerLabel(config);
+    const id = session.join("agent", name, at, options.tier ?? providerTier(config));
     async function interpret(nodeIds, now, signal) {
       const state = session.getState();
       const targets = nodeIds.filter((n2) => state.nodes.has(n2));
@@ -3129,7 +3148,7 @@ Reply with ONLY a JSON object, no prose, no code fences:
       const context = describeSession(state, { nodeIds: targets });
       const signature = isCluster ? describeSignature(state, targets) : "";
       const question = isCluster ? `These ${targets.length} marks were grouped together (${signature}). What could this group be? Offer several readings.` : `What could this mark be? Offer several readings.`;
-      const result2 = await complete(
+      const result2 = await send(
         config,
         [
           { role: "system", content: SYSTEM_PROMPT },
@@ -3160,7 +3179,7 @@ ${question}` }
       const targets = nodeIds.filter((n2) => state.nodes.has(n2));
       if (targets.length === 0) return { ok: false, error: "no such nodes" };
       const context = describeSession(state, { nodeIds: targets });
-      const result2 = await complete(
+      const result2 = await send(
         config,
         [
           { role: "system", content: ASK_PROMPT },
@@ -3209,8 +3228,9 @@ Question: ${q}` }
       const existing = [...artifact.reps].reverse().find((r) => r.modality === "code");
       const previous = existing?.data?.fill;
       const revising = !!previous;
-      const ids = regions.map((r) => r.id);
-      const addressed = args.addressed?.length ? args.addressed : ids;
+      const ids = regionIdsIn(layout);
+      if (ids.length === 0) return { ok: false, error: "nothing in this artifact can hold content" };
+      const addressed = args.addressed?.length ? args.addressed.filter((a) => ids.includes(a)) : ids;
       const lines = [describeLayout(layout), ""];
       if (revising) {
         lines.push("WHAT EACH REGION HOLDS NOW:");
@@ -3223,7 +3243,7 @@ Question: ${q}` }
         lines.push(`REGIONS TO FILL: ${ids.join(", ")}`);
       }
       lines.push("", `The human asks: ${prompt2}`);
-      const result2 = await complete(
+      const result2 = await send(
         config,
         [
           { role: "system", content: revising ? REVISE_PROMPT : MAKE_PROMPT },
@@ -3279,6 +3299,112 @@ Question: ${q}` }
       };
     }
     return { id, name, config, interpret, ask, generate };
+  }
+
+  // src/participants/bridge.ts
+  function createBridgeParticipant(session, at = 0, options = {}) {
+    const name = options.name ?? "bridge";
+    const timeoutMs = options.timeoutMs ?? 6e5;
+    let waiting = null;
+    let counter2 = 0;
+    const listeners = /* @__PURE__ */ new Set();
+    const notify = () => listeners.forEach((l) => l(waiting?.request ?? null));
+    function settle(result2) {
+      if (!waiting) return;
+      clearTimeout(waiting.timer);
+      const { resolve } = waiting;
+      waiting = null;
+      resolve(result2);
+      notify();
+    }
+    const transport = (_config, messages, opts) => {
+      if (waiting) {
+        return Promise.resolve({ ok: false, error: "already waiting on an answer" });
+      }
+      const request = {
+        id: `bridge:${++counter2}`,
+        system: messages.find((m) => m.role === "system")?.content ?? "",
+        user: messages.find((m) => m.role === "user")?.content ?? "",
+        at: Date.now()
+      };
+      return new Promise((resolve) => {
+        const timer = setTimeout(() => settle({ ok: false, error: `no answer within ${timeoutMs}ms` }), timeoutMs);
+        waiting = { request, resolve, timer };
+        if (opts.signal) {
+          if (opts.signal.aborted) settle({ ok: false, error: "cancelled" });
+          else opts.signal.addEventListener("abort", () => settle({ ok: false, error: "cancelled" }), { once: true });
+        }
+        notify();
+      });
+    };
+    const config = { kind: "openai-compatible", baseUrl: "bridge://local", model: name };
+    const agent = createAgentParticipant(session, config, at, {
+      transport,
+      name,
+      tier: options.tier ?? 2
+    });
+    return {
+      ...agent,
+      pending: () => waiting?.request ?? null,
+      deliver(requestId, text) {
+        if (!waiting || waiting.request.id !== requestId) return false;
+        settle({ ok: true, text, model: name });
+        return true;
+      },
+      cancel(requestId, reason) {
+        if (!waiting || waiting.request.id !== requestId) return false;
+        settle({ ok: false, error: reason ?? "cancelled" });
+        return true;
+      },
+      subscribe(listener) {
+        listeners.add(listener);
+        return () => listeners.delete(listener);
+      }
+    };
+  }
+
+  // src/participants/router.ts
+  var TIER0_ABILITIES = {
+    read: true,
+    arrange: true,
+    answer: false,
+    build: false,
+    name: false
+  };
+  var SETTLED_CONFIDENCE = 0.6;
+  function route(ability, state, options = {}) {
+    const top = options.concepts?.[0];
+    const settledLocally = TIER0_ABILITIES[ability] && !!top && top.confidence >= SETTLED_CONFIDENCE;
+    const ids = options.participantIds ?? state.participants;
+    const candidates = [];
+    for (const pid of ids) {
+      const node = state.nodes.get(pid);
+      if (!node) continue;
+      const kind = node.reps.find((r) => r.modality === "participant")?.data?.kind;
+      if (kind !== "agent") continue;
+      const tier = node.capability ?? 0;
+      candidates.push({
+        participantId: pid,
+        name: wordOf(node) ?? pid,
+        tier,
+        // Local before hosted: on a machine you own, latency is the only price,
+        // and it is one you have already paid for.
+        cost: tier,
+        why: tier === 1 ? "runs on this machine" : "hosted"
+      });
+    }
+    candidates.sort((a, b) => a.cost - b.cost || a.name.localeCompare(b.name));
+    return {
+      ability,
+      settledLocally,
+      localAnswer: settledLocally ? `${top.concept} (${top.confidence.toFixed(2)}) \u2014 ${top.reasoning}` : void 0,
+      candidates
+    };
+  }
+  function describeRoute(r) {
+    if (r.settledLocally) return `Tier 0 has this: ${r.localAnswer}`;
+    if (r.candidates.length === 0) return `Nothing here can ${r.ability} \u2014 add a model, or bridge one in.`;
+    return `${r.ability}: ${r.candidates.map((c) => `${c.name} (tier ${c.tier})`).join(", ")}`;
   }
   return __toCommonJS(index_exports);
 })();

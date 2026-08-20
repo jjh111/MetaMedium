@@ -119,7 +119,7 @@ export type { Concept, ConceptMatch, ConceptScope, Conversion } from './concepts
 
 // Parsing — the drawing read as a LAYOUT, and the page built from that reading.
 // The engine owns structure because it measured it; the model owns content.
-export { parseLayout, describeLayout } from './parse/layout';
+export { parseLayout, describeLayout, regionIdsIn } from './parse/layout';
 export type { Layout, LayoutNode, Flow, Connection } from './parse/layout';
 export { buildScaffold, validateRegions, prepare } from './parse/scaffold';
 export type { RegionContent, Theme } from './parse/scaffold';
@@ -159,6 +159,16 @@ export type { ProviderConfig, ProviderKind, ChatMessage, CompletionResult, Model
 export { createAgentParticipant, parseReadings, parseCode, parseFill, readingsToEdges, MAX_READINGS } from './participants/agent';
 export type { AgentParticipant, AgentReading, InterpretResult, AskResult, GenerateResult, RegionFill } from './participants/agent';
 export { describeSession, describeSignature, describeRegions, describeAddressed } from './participants/serialize';
+export type { Transport, AgentOptions } from './participants/agent';
+
+// A participant answered by hand — any model, including one with no HTTP API,
+// takes part through the same channel as one behind a URL.
+export { createBridgeParticipant } from './participants/bridge';
+export type { BridgeParticipant, BridgeRequest, BridgeOptions } from './participants/bridge';
+
+// Routing — Tier 0 answers first, and a model is asked only for what it cannot.
+export { route, describeRoute, SETTLED_CONFIDENCE } from './participants/router';
+export type { Ability, Route, Candidate, RouteOptions } from './participants/router';
 export type { SerializeOptions } from './participants/serialize';
 
 // Types

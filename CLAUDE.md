@@ -197,6 +197,13 @@ are asymmetric (~1:1.6), unlike anything in the canvas's vocabulary; and it is
   or come close relative to the selection's own size** (`checkProximityRatio`).
   No fixed pixel term remains in the gesture grammar.
 
+**The mark reads BACKWARDS.** Requiring a lasso before the mark can act is a
+mode wearing a different hat. The command mark looks back over
+`recentWindowMs`: the marks it crossed are what you pointed at, and anything
+drawn alongside them just now comes with it. An explicit circle still wins, and
+`Summon.scopeSource` (`lasso` / `crossed` / `recent`) plus `scopeReasoning` say
+which way it decided, so a wrong guess is visible before you act on it.
+
 **Erasing is relational, not gestural** (`src/session/erase.ts`): count
 crossings between the stroke and the target's own outline; three erases it. No
 speed, density, or size constant to tune, zoom-invariant, and it degrades
@@ -256,6 +263,37 @@ makes it render as real DOM in the canvas. The rules:
   that framed it, and a page rendering over erased ink is the silent phantom
   degradation exists to prevent.
 
+### Relations and concepts (Tier 0)
+
+> `metamedium-core/src/relate/relations.ts` and `src/concepts/concept.ts`.
+
+**Relations** are what the canvas can SEE between marks: `contains`/`inside`,
+`crossing`, `touching`, `near`, `above`/`below`/`left-of`/`right-of`,
+`same-row`, `same-column`, `same-size`. Two rules:
+
+- **Every threshold is a ratio of the marks' own size**, never a pixel count.
+  Nearness is judged against the *smaller* mark, so a dot two hundred pixels
+  from a large box is not near it.
+- **Relations carry strength**, so a crisp row can be told from a rough one.
+
+**Concepts** are the meaning-mappings, kept as a library rather than as code
+paths: `row`, `column`, `frame`, `flow`, `grid`, `labelled`. Each is a name, a
+predicate over relations, and a list of `conversions` it affords. They match
+plurally and rank by confidence, like every other reading in the engine.
+
+**Alignment is a concept's confidence, not its gate.** A `row` that required
+marks to already sit on a clean line would only fire on drawings that need no
+tidying — exactly backwards, since offering to line them up is the most useful
+thing it can do. What makes a row is peers sitting beside each other sharing a
+band; how straight they are is how sure the reading is, and it says so
+("roughly lined up", "not lined up yet"). Adjacency must hold between
+*neighbours*, not on average.
+
+**Tier 0 conversions need no model**: `session.tidy()` lines marks up and spaces
+them evenly across the span already used, or matches sizes to the largest. Ink
+is never destroyed — the original stroke is untouched and the mark gains a
+`'transform'` rep, so undo springs it back exactly.
+
 ### Spatial Graph
 
 Relationships between strokes drive composition recognition: intersection,
@@ -292,6 +330,20 @@ Explanations are a **third plane** (`SessionState.explanations`) beside content
 and gesture: visible and erasable, but not ink — they never join a lasso, a
 cluster, or a signature. Several participants may answer the same question and
 every answer is held.
+
+**Routing** (`src/participants/router.ts`): Tier 0 answers first, and a model is
+asked only for what it cannot do. `route(ability, state, {concepts})` reports
+`settledLocally` when the engine already has the answer — "the engine knows
+this" beats a spinner, and "nobody here can do that" beats silence. It is not a
+fallback chain: every candidate is returned, ranked cheapest-first, because
+several participants answering at once is the point.
+
+**A participant can be answered by hand** (`src/participants/bridge.ts`). The
+transport is injectable, so a bridge is not a new kind of participant — same
+prompts, same parsing, same `propose()` channel, with the question parked
+instead of posted. Any model can take part, including one with no HTTP API. It
+is also the honest test of the serializer: if a capable reader cannot make sense
+of `describeSession`, that is worth knowing before blaming a small local model.
 
 **One transport covers Tier 1 and most of Tier 2:** Ollama, LM Studio, and
 OpenRouter all speak the OpenAI-compatible `/v1/chat/completions` shape and

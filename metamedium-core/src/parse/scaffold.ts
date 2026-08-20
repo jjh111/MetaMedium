@@ -54,7 +54,12 @@ function renderNode(node: LayoutNode, content: Record<string, RegionContent>, de
   // free space splits by these ratios, which reproduces the drawing exactly at
   // its drawn size and keeps reflowing above and below it.
   const box: string[] = [];
-  if (depth === 1) box.push('flex:1 1 auto');
+  // The root must have a DEFINITE size, not an automatic one. With
+  // `flex:1 1 auto` its main size comes from its content, so a row of regions
+  // whose content is taller than the frame stretches the whole thing and every
+  // height drifts — 157px where the drawing said 140. Basis 0 with grow 1
+  // resolves against the frame instead, which is the size the human drew.
+  if (depth === 1) box.push('flex:1 1 0', 'min-width:0', 'min-height:0');
   else if (depth > 1) {
     // `min-width`/`min-height` must be zeroed on every flex ITEM, not only on
     // containers. Their default is `auto`, which means an item refuses to

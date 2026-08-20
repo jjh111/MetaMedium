@@ -157,7 +157,8 @@ describe('buildScaffold — the engine owns structure', () => {
     const id = s.bless({ summonId: s.getState().summon!.id, name: 'p', at: 3000 })!;
     const { layout } = layoutFor(s, id);
     const code = buildScaffold(layout, { r1: { html: 'A' }, r2: { html: 'B' } });
-    const grows = [...code.matchAll(/flex:(\d+) 1 0/g)].map((m) => Number(m[1]));
+    // The root is flex:1 1 0 too, so read the children specifically.
+    const grows = [...code.matchAll(/data-region="r\d+" style="flex:(\d+) 1 0/g)].map((m) => Number(m[1]));
     expect(grows).toHaveLength(2);
     expect(grows[1] / grows[0]).toBeGreaterThan(2.5);
   });
@@ -473,5 +474,29 @@ describe('the region box is pure geometry', () => {
     const openR1 = code.indexOf('data-region="r1"');
     const r2at = code.indexOf('data-region="r2"');
     expect(r2at).toBeGreaterThan(openR1);
+  });
+});
+
+describe('connectors are edges all the way through', () => {
+  it('does not ask a model to write content for a line', async () => {
+    const s = createSession();
+    s.addStroke(rectStroke(220, 240, 200, 140), 1000);
+    s.addStroke(rectStroke(560, 240, 200, 140), 1100);
+    s.addStroke(
+      Array.from({ length: 40 }, (_, i) => ({ x: 420 + (140 * i) / 39, y: 310 })),
+      1200
+    );
+    s.addStroke(circleStroke(490, 310, 400), 2000);
+    s.addStroke(checkStroke(900, 310), 2200);
+    const id = s.bless({ summonId: s.getState().summon!.id, name: 'flow', at: 3000 })!;
+
+    stubOpenAI(fillReply({ r1: { html: 'A' }, r2: { html: 'B' } }));
+    const agent = createAgentParticipant(s, config, 3100);
+    const r = await agent.generate({ prompt: 'a signup flow', artifactId: id, at: 3200 });
+
+    expect(userPrompt()).toContain('read as a row');
+    expect(userPrompt()).toMatch(/REGIONS TO FILL: r1, r2$/m);
+    expect(r.ok).toBe(true);
+    expect(r.unfilled).toEqual([]);
   });
 });

@@ -115,6 +115,24 @@ It also made small models viable: `qwen3:8b` now produces a correct, semantic
 page in 44s, where the unconstrained contract needed a 24B code model to get
 close and still drifted. 310 core tests.
 
+**The canvas on its own (20 Aug 2026).** The differentiator is not the model, it
+is a no-modes contextual surface that intelligence plugs into. So: a relation
+vocabulary (insideness, nearness, alignment, direction, peerhood — measured,
+scale-free, carrying strength), a **library of concepts** matched against it
+(row, column, frame, flow, grid, labelled), and a **command palette** offering
+what those marks could become. The command mark now reads *backwards* over a
+temporal window, so striking through one of four boxes you just drew acts on all
+four — no lasso, no mode.
+
+Crucially the palette leads with conversions that need **no model at all**: tidy
+a wonky row onto one line, match sizes. Ink is never destroyed — a moved mark
+keeps its original stroke and gains a transform, so undo springs it back.
+
+Routing is now explicit (Tier 0 first; models only for what it cannot do), and
+the transport is injectable, so a participant can be answered by hand — any
+model takes part through the same channel, including one with no API.
+361 core tests, 27-step browser e2e.
+
 **Still open:** handwriting (v7 Stage E), so "the copy in the squares" can be
 literal rather than typed.
 

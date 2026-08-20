@@ -172,6 +172,17 @@ function leafOf(region: Region): LayoutNode {
  */
 export function parseLayout(regions: Region[], frame: Rect, connections: Connection[] = []): Layout {
   counter = 0;
+
+  // A connector is an EDGE, not a box. A line joining two marks necessarily
+  // straddles both of them, so leaving it in the cut makes every flow diagram
+  // read as "these overlap in both directions" and collapse to absolute
+  // placement. Taking it out lets the boxes read as the row they are, and the
+  // connection it carries is already recorded separately.
+  const connectors = new Set(connections.map((c) => c.via).filter((v): v is string => !!v));
+  if (connectors.size) {
+    regions = regions.filter((r) => !connectors.has(r.id));
+  }
+
   if (regions.length === 0) {
     return {
       root: {
@@ -245,4 +256,15 @@ export function describeLayout(layout: Layout): string {
     for (const c of layout.connections) lines.push(`  ${c.from} → ${c.to}`);
   }
   return lines.join('\n');
+}
+
+/** Every region id the layout actually places — connectors excluded. */
+export function regionIdsIn(layout: Layout): string[] {
+  const out: string[] = [];
+  const walk = (n: LayoutNode) => {
+    if (n.region) out.push(n.id);
+    n.children.forEach(walk);
+  };
+  walk(layout.root);
+  return out;
 }
