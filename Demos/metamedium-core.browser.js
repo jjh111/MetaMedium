@@ -399,11 +399,16 @@ var MetaMediumCore = (() => {
     const n2 = opts.samples;
     const path = resampleByArcLength(denoise(points), n2, isClosed2);
     if (path.length < 8) return empty;
-    const arm = Math.max(2, Math.round(opts.window * path.length));
-    const bb = getBounds(points);
-    const bw = bb.maxX - bb.minX, bh = bb.maxY - bb.minY;
-    const shortFrac = Math.min(bw, bh) / Math.max(1e-6, 2 * (bw + bh));
-    const sepFrac = Math.min(opts.separation, Math.max(0.03, shortFrac * 0.7));
+    let windowFrac = opts.window;
+    let sepFrac = opts.separation;
+    if (isClosed2) {
+      const bb = getBounds(points);
+      const bw = bb.maxX - bb.minX, bh = bb.maxY - bb.minY;
+      const shortFrac = Math.min(bw, bh) / Math.max(1e-6, 2 * (bw + bh));
+      windowFrac = Math.min(opts.window, Math.max(0.02, shortFrac * 0.6));
+      sepFrac = Math.min(opts.separation, Math.max(0.03, shortFrac * 0.7));
+    }
+    const arm = Math.max(2, Math.round(windowFrac * path.length));
     const sep = Math.max(2, Math.round(sepFrac * path.length));
     const at = (i) => path[(i % path.length + path.length) % path.length];
     const turn = new Array(path.length).fill(0);

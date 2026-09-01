@@ -48,6 +48,14 @@ describe('snapReading on the shapes people actually draw', () => {
     expect(r.ok).toBe(true);
   });
 
+  it('offers a thin 9:1 strip — a footer — drawn by hand', () => {
+    const s = createSession();
+    const id = s.addStroke(handRect(180, 530, 560, 60, { seed: 22 }), at());
+    const r = snapReading(s.getState().nodes.get(id)!, s.getState().nodes);
+    expect(r.shape).toBe('rectangle');
+    expect(r.ok).toBe(true);
+  });
+
   it('offers a hand-drawn banner too', () => {
     const s = createSession();
     const id = s.addStroke(handRect(100, 100, 600, 110, { seed: 21 }), at());

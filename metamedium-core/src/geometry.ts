@@ -447,17 +447,26 @@ export function countCorners(
   const path = resampleByArcLength(denoise(points), n, isClosed);
   if (path.length < 8) return empty;
 
-  const arm = Math.max(2, Math.round(opts.window * path.length));
-  // Suppression is a fraction of the path, and on an elongated box the short
-  // sides are a small fraction of it: at 5:1 each is 8% of the perimeter, so a
-  // window wider than that silently ate one corner at each end, and the most
-  // common box in any interface — a header bar — came back with two corners
-  // and a rectangle score in the 0.6s. Bound the window by the short side so
-  // it can never straddle a whole one. Square-ish strokes are unaffected.
-  const bb = getBounds(points);
-  const bw = bb.maxX - bb.minX, bh = bb.maxY - bb.minY;
-  const shortFrac = Math.min(bw, bh) / Math.max(1e-6, 2 * (bw + bh));
-  const sepFrac = Math.min(opts.separation, Math.max(0.03, shortFrac * 0.7));
+  // Both windows are fractions of the path, and on an elongated box the short
+  // sides are a small fraction of it: at 5:1 each is 8% of the perimeter, at
+  // 9:1 under 5%. A suppression window wider than a short side ate one corner
+  // at each end, and a measuring arm longer than one turned the MIDDLE of the
+  // side into the sharpest turn on the stroke — so a header bar, the most
+  // common box in any interface, came back with two corners or six and a
+  // rectangle score in the 0.5s. For a closed stroke, bound both by the short
+  // side so neither can straddle a whole one. Square-ish strokes (every circle,
+  // every ordinary box) are unaffected; open strokes keep the defaults, since a
+  // line's short side is its own noise.
+  let windowFrac = opts.window;
+  let sepFrac = opts.separation;
+  if (isClosed) {
+    const bb = getBounds(points);
+    const bw = bb.maxX - bb.minX, bh = bb.maxY - bb.minY;
+    const shortFrac = Math.min(bw, bh) / Math.max(1e-6, 2 * (bw + bh));
+    windowFrac = Math.min(opts.window, Math.max(0.02, shortFrac * 0.6));
+    sepFrac = Math.min(opts.separation, Math.max(0.03, shortFrac * 0.7));
+  }
+  const arm = Math.max(2, Math.round(windowFrac * path.length));
   const sep = Math.max(2, Math.round(sepFrac * path.length));
   const at = (i: number) => path[((i % path.length) + path.length) % path.length];
 
