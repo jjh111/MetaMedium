@@ -29,7 +29,7 @@ circle them, cross with a command mark *you taught the system*, prompt them into
 a living page that renders in the canvas with your ink still outlining its
 divs — then draw on that page and the ink addresses the regions underneath it.
 Scratch anything out to erase. `Demos/session-engine.html` is the surface;
-`Demos/session-engine.e2e.js` drives all 30 steps through the real UI, page and flowchart both.
+`Demos/session-engine.e2e.js` drives all 32 steps through the real UI, page and flowchart both.
 Still open: handwriting (v7 Stage E). Whitepaper v5.1 stays parked until the
 conversation benchmark passes end to end.
 
@@ -199,6 +199,11 @@ event, so it replays with the session.
 Why a check: it already means "yes, do this"; its elbow is sharp and its arms
 are asymmetric (~1:1.6), unlike anything in the canvas's vocabulary; and it is
 **oriented** — the elbow sits low and the stroke ends high.
+
+**A taught mark is held on the device** (`localStorage`, with the five samples
+it learned from) and re-taught into the session at boot as a `teach` event, so
+it replays like any other. Opening the pane with a mark held shows those five
+samples and offers *Forget*; teaching a new one means *Clear* first.
 
 - Features are **scale-free** (ratios, counts, and positions within the stroke's
   own box), so a mark works at any size and any zoom. Three are oriented.
@@ -404,6 +409,22 @@ differ only by base URL and key. Anthropic needs its own client.
   quotes. `parseFill`/`parseReadings` repair, never guess.
 - **`listModels` reports whether it could ask**, separately from what came back.
   Ollama serves the browser directly; no CORS configuration is needed.
+- **Reasoning is stripped in the transport** (`stripThink`): qwen3 and its
+  relatives think inside `<think>…</think>`, and a brace in there is exactly what
+  the tolerant JSON readers downstream would latch onto.
+
+**The model pane** (`Demos/session-engine.html`) follows what the personal
+site's search bar learned (`johnhanacek/scripts/search-core.js`): it probes
+**both** local servers in parallel (returning on the first that answered hid a
+running Ollama behind LM Studio), lists models per server, **hides
+embedding-only models and says so** (an Ollama holding only `nomic-embed-text`
+used to show nothing and explain nothing), and **remembers the pick as a
+preference** — honoured when that server still offers that model, quietly
+ignored otherwise. Hosted providers and a custom OpenAI-compatible endpoint
+join by key; the key is remembered only when asked. The palette's "Describe
+it…" opens this pane when no model is present: the escalation, made visible.
+Model participants are surface-side (`agents[]`); the session keeps every
+`join` in its history, so leaving only stops a model being asked.
 
 ⚠️ `Web App Skeleton/src/llm/claudeInterpreter.ts` pins `claude-3-haiku-20240307`
 and `claude-sonnet-4-20250514` — **both are past retirement and return 404**.

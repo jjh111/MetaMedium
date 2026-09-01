@@ -125,6 +125,21 @@ async function post(
   }
 }
 
+/**
+ * Drop a model's reasoning so only its answer remains.
+ *
+ * qwen3 and its relatives think out loud inside `<think>…</think>` before the
+ * reply, and some servers stream the reasoning as content rather than in a
+ * separate field. A `{` inside that block is exactly what the tolerant JSON
+ * readers downstream would latch onto, so it goes before they ever see it.
+ * An unclosed block is treated as all reasoning: nothing usable followed.
+ */
+export function stripThink(text: string): string {
+  const stripped = text.replace(/<think>[\s\S]*?<\/think>/gi, '');
+  const open = stripped.search(/<think>/i);
+  return (open === -1 ? stripped : stripped.slice(0, open)).trim();
+}
+
 function firstString(...candidates: unknown[]): string | undefined {
   for (const c of candidates) if (typeof c === 'string' && c.length > 0) return c;
   return undefined;
@@ -153,8 +168,11 @@ async function completeOpenAICompatible(
     choices?: { message?: { content?: unknown } }[];
     model?: string;
   };
-  const text = firstString(body?.choices?.[0]?.message?.content);
-  if (text === undefined) return { ok: false, error: 'no completion text in response' };
+  const raw = firstString(body?.choices?.[0]?.message?.content);
+  if (raw === undefined) return { ok: false, error: 'no completion text in response' };
+  // Reasoning is not an answer. Stripped here, before any reader downstream
+  // can mistake a brace inside the model's thinking for the start of its reply.
+  const text = stripThink(raw);
   return { ok: true, text, model: firstString(body.model) ?? config.model };
 }
 

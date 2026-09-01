@@ -35,6 +35,7 @@ window.__helpers = function(){
   // Teach the caret as the command mark, through the real pad UI.
   window.__teach = function(){
     document.getElementById('teachBtn').click();
+    document.getElementById('teachClear').click(); // a held mark pre-fills the pad
     const pad=document.getElementById('teachPad'); const r=pad.getBoundingClientRect();
     [[60,40],[66,44],[54,38],[62,46],[58,36]].forEach(([w,h],i)=>{
       const x=r.left+40+i*3, y=r.top+35;
@@ -90,6 +91,7 @@ window.__setup = function(){
     }
     return new Response(JSON.stringify({choices:[{message:{content:'[{"label":"page-layout","confidence":0.78,"reasoning":"three rectangles in a header/two-column arrangement"}]'}}]}),{status:200,headers:{'content-type':'application/json'}});
   };
+  window.__mm.agents.splice(0); // a remembered model may have rejoined at boot
   const a=window.__mm.MM.createAgentParticipant(window.__mm.session, Object.assign({},window.__mm.MM.PRESETS.ollama,{model:'stub-qwen'}), Date.now());
   window.__mm.agents.push(a);
 
@@ -132,6 +134,10 @@ window.__scenario = async function(){
   step('1b. the rail shows the mark that is actually active',
     document.getElementById('markName').textContent === 'your mark',
     { chip: document.getElementById('markName').textContent });
+  const held = mm.savedMark();
+  step('1c. the taught mark is held on this device, with the five it learned from',
+    !!held && !!held.mark && Array.isArray(held.samples) && held.samples.length === 5,
+    { held: !!held, samples: held && held.samples && held.samples.length });
 
   // ---- 2. Doodle three boxes, zoom out ----
   t.stroke(t.rect(200,180,260,150));
@@ -380,6 +386,13 @@ window.__scenario = async function(){
       Math.abs(spread(cy()) - spread(before)) < 1,
       { spreadNow: Math.round(spread(cy())) });
   }
+
+  // ---- 11c. Forgetting the mark goes back to the check, on the device too ----
+  mm.forgetMark();
+  step('11c. Forget clears the held mark and the check is back',
+    mm.session.getState().commandMark === null && mm.savedMark() === null &&
+    document.getElementById('markName').textContent === 'check',
+    { mark: mm.session.getState().commandMark, saved: mm.savedMark(), chip: document.getElementById('markName').textContent });
 
   // ---- 12. Undoing the teach puts the built-in mark back in the rail ----
   window.__teach();

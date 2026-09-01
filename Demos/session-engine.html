@@ -138,6 +138,33 @@ html, body {
   color: var(--agent); font-size: 10.5px; padding: 2px 0;
 }
 #modelPanel .mpItem .t { color: var(--dim); }
+#modelPanel .mpItem button { flex: 0 0 auto; padding: 1px 7px; font-size: 10px; }
+#modelPanel .mpSection { margin-top: 10px; padding-top: 9px; border-top: 1px solid rgba(255,255,255,0.08); }
+#modelPanel .mpHead {
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 10px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--dim); margin-bottom: 6px;
+}
+#modelPanel .mpHead button { flex: 0 0 auto; padding: 3px 9px; font-size: 10.5px; }
+#modelPanel .mpLocal .server {
+  display: flex; gap: 7px; align-items: baseline; margin: 6px 0 3px;
+  font-family: var(--mono); font-size: 10px; color: var(--dim);
+}
+#modelPanel .mpLocal .server b { color: var(--agent); font-weight: 500; }
+#modelPanel .mpLocal .model {
+  display: flex; width: 100%; align-items: baseline; gap: 8px; text-align: left;
+  background: transparent; border: 1px solid transparent; color: var(--ink);
+  font: 11.5px var(--ui); padding: 4px 8px; border-radius: 4px; cursor: pointer;
+}
+#modelPanel .mpLocal .model:hover { border-color: var(--rule); }
+#modelPanel .mpLocal .model.on { border-color: var(--agent); color: var(--agent); }
+#modelPanel .mpLocal .model .why { color: var(--dim); font-size: 10px; margin-left: auto; }
+#modelPanel .mpLocal .note { color: var(--dim); font-size: 10px; padding: 3px 8px; }
+#modelPanel .mpRemember {
+  display: flex; align-items: center; gap: 6px; margin-top: 7px;
+  font-size: 10.5px; color: var(--dim); cursor: pointer;
+}
+#modelPanel .mpRemember input { width: auto; margin: 0; accent-color: var(--gold); }
+#modelPanel .tier0 { color: var(--gold); font-family: var(--mono); font-size: 9.5px; }
 #summon input.ask { min-width: 210px; }
 #inspector .srccount { color: var(--dim); font-weight: 400; letter-spacing: 0; }
 #inspector .gap {
@@ -350,40 +377,42 @@ html, body {
 </div>
 
 <div id="teachPanel" hidden>
-  <div class="eyebrow">teach your command mark</div>
-  <p class="hint">The canvas watches for a <b>check ✓</b> until you replace it.
-     Draw your own mark <b>five times</b> below: it learns your hand's spread, so
-     the sixth one it has never seen still counts — the same way it learns any
-     shape you name. It will refuse a mark that looks like something you draw.</p>
+  <div class="eyebrow">your command mark</div>
+  <p class="hint" id="teachHint"></p>
   <canvas id="teachPad"></canvas>
   <div id="teachDots"><i></i><i></i><i></i><i></i><i></i></div>
   <div class="tpRow">
     <button id="teachUse" disabled>Use this mark</button>
     <button id="teachClear">Clear</button>
+    <button id="teachForget" hidden>Forget</button>
     <button id="teachClose">Close</button>
   </div>
   <div id="teachStatus"></div>
 </div>
 
 <div id="modelPanel" hidden>
-  <div class="eyebrow">add a model participant</div>
-  <p class="hint">Every model joins as a peer and <b>proposes</b> — it never commits.
-     Readings from all sources are held side by side.</p>
-  <label>Provider</label>
-  <select id="mpProvider">
-    <option value="ollama">Ollama (local, no key)</option>
-    <option value="lmStudio">LM Studio (local, no key)</option>
-    <option value="openRouter">OpenRouter (key)</option>
-    <option value="anthropic">Anthropic (key)</option>
-  </select>
-  <label>Model</label>
-  <input id="mpModel" placeholder="qwen3" autocomplete="off" list="mpModels" />
-  <datalist id="mpModels"></datalist>
-  <label id="mpKeyLabel" hidden>API key <span class="hint">— kept in this tab only</span></label>
-  <input id="mpKey" type="password" placeholder="sk-…" autocomplete="off" hidden />
-  <div class="mpRow">
-    <button id="mpAdd">Add participant</button>
-    <button id="mpClose" class="ghost">Close</button>
+  <div class="eyebrow">models</div>
+  <p class="hint">A model joins as a peer and <b>proposes</b> — it never commits. Everything
+     marked <span class="tier0">·now</span> in the palette works with none attached.</p>
+  <div class="mpSection">
+    <div class="mpHead"><span>on this machine</span><button id="mpDetect" class="ghost">Detect</button></div>
+    <div id="mpLocal" class="mpLocal"><div class="hint">Ollama and LM Studio are looked for when this opens.</div></div>
+  </div>
+  <div class="mpSection">
+    <div class="mpHead"><span>by key</span></div>
+    <select id="mpProvider">
+      <option value="openRouter">OpenRouter</option>
+      <option value="anthropic">Anthropic</option>
+      <option value="custom">Custom OpenAI-compatible endpoint</option>
+    </select>
+    <input id="mpEndpoint" placeholder="http://host:port/v1" autocomplete="off" spellcheck="false" hidden />
+    <input id="mpModel" placeholder="model id" autocomplete="off" spellcheck="false" />
+    <input id="mpKey" type="password" placeholder="API key" autocomplete="off" />
+    <label class="mpRemember"><input type="checkbox" id="mpRememberKey" /> remember the key on this device</label>
+    <div class="mpRow">
+      <button id="mpAdd">Join</button>
+      <button id="mpClose" class="ghost">Close</button>
+    </div>
   </div>
   <div id="mpStatus" class="hint"></div>
   <div id="mpList"></div>
@@ -725,22 +754,78 @@ html, body {
 
   let taughtGlyph = null; // the sample we show in the rail once a mark is taught
 
+  // The taught mark is HELD: on this device, across reloads. Teaching is a
+  // session event (it replays with the log), and the device remembers it too,
+  // so opening the canvas tomorrow finds your mark waiting rather than the
+  // check. The five samples are kept with it, so the pad can show you what
+  // it learned when you come back to it.
+  const MARK_KEY = 'mm-command-mark';
+  const teachHint = document.getElementById('teachHint');
+  const teachForget = document.getElementById('teachForget');
+  function savedMark() {
+    try { return JSON.parse(localStorage.getItem(MARK_KEY) || 'null'); } catch (err) { return null; }
+  }
+  function rememberMark(mark, pts) {
+    try { localStorage.setItem(MARK_KEY, JSON.stringify({ mark: mark, samples: pts, at: Date.now() })); } catch (err) { /* private mode */ }
+  }
+  function forgetMark() {
+    try { localStorage.removeItem(MARK_KEY); } catch (err) { /* nothing to forget */ }
+    session.teachCommandMark(null, Date.now());
+    samples = []; taughtGlyph = null;
+    teachUse.disabled = true;
+    drawPad();
+    showPadState();
+    render(session.getState());
+  }
+  function restoreMark() {
+    const saved = savedMark();
+    if (!saved || !saved.mark) return false;
+    session.teachCommandMark(saved.mark, Date.now());
+    samples = Array.isArray(saved.samples) ? saved.samples : [];
+    taughtGlyph = samples.length ? samples[samples.length - 1] : null;
+    return true;
+  }
+
+  // What the pane says depends on whether a mark is already held.
+  function showPadState() {
+    const held = !!session.getState().commandMark;
+    teachForget.hidden = !held;
+    if (held) {
+      teachHint.innerHTML = 'This is <b>your mark</b> — the canvas watches for it instead of the check. ' +
+        'To replace it, <b>Clear</b> and draw a new one five times. <b>Forget</b> goes back to ✓.';
+      teachStatus.className = '';
+      teachStatus.textContent = samples.length
+        ? 'Held on this device. These are the five it learned from.'
+        : 'Held on this device.';
+    } else {
+      teachHint.innerHTML = 'The canvas watches for a <b>check ✓</b> until you replace it. Draw your own mark ' +
+        '<b>five times</b>: it learns your hand\'s spread, so the sixth one it has never seen still counts. ' +
+        'It will refuse a mark that looks like something you draw.';
+      evaluateSamples();
+    }
+  }
+
   teachUse.onclick = () => {
     if (samples.length < MM.COMMAND_MARK_SAMPLES) return;
     const mark = MM.learnCommandMark(samples, 'your mark');
     session.teachCommandMark(mark, Date.now());
     taughtGlyph = samples[samples.length - 1];
-    teachStatus.className = '';
-    teachStatus.textContent = 'Learned. The check ✓ no longer summons — your mark does.';
+    rememberMark(mark, samples);
+    showPadState();
+    teachStatus.textContent = 'Learned, and held on this device. The check ✓ no longer summons — your mark does.';
     render(session.getState());
   };
   document.getElementById('teachClear').onclick = () => {
     samples = []; teachUse.disabled = true; teachStatus.textContent = ''; drawPad();
+    if (session.getState().commandMark) {
+      teachStatus.textContent = 'Draw the new mark five times. Your held mark stays until you use the new one.';
+    }
   };
+  teachForget.onclick = forgetMark;
   document.getElementById('teachClose').onclick = () => closePanel(teachPanel, teachBtn);
   teachBtn.onclick = () => {
     togglePanel(teachPanel, teachBtn);
-    if (!teachPanel.hasAttribute('hidden')) { sizePad(); evaluateSamples(); }
+    if (!teachPanel.hasAttribute('hidden')) { sizePad(); showPadState(); }
   };
   document.getElementById('markChip').onclick = () => teachBtn.click();
 
@@ -790,89 +875,204 @@ html, body {
   }
 
   // ===== Model participants (Tier 1–2) ====================================
+  // A model joins through the SAME channel a human uses — session.join() then
+  // session.propose(). Every reading it offers is held as an attributed,
+  // unblessed edge beside Tier 0's, never instead of it.
+  //
+  // The picker, following what the site's search bar learned the hard way:
+  //   - BOTH local servers are probed, in parallel. Returning on the first one
+  //     that answered meant a running LM Studio hid Ollama entirely.
+  //   - Embedding-only models are hidden AND explained. An Ollama holding only
+  //     nomic-embed-text used to show nothing and say nothing.
+  //   - The pick is remembered as a PREFERENCE: honoured when that server still
+  //     offers that model, quietly ignored otherwise. A remembered pointer at
+  //     something no longer running is worse than no memory at all.
   const modelBtn = document.getElementById('modelBtn');
   const panel = document.getElementById('modelPanel');
   const mpProvider = document.getElementById('mpProvider');
+  const mpEndpoint = document.getElementById('mpEndpoint');
   const mpModel = document.getElementById('mpModel');
   const mpKey = document.getElementById('mpKey');
-  const mpKeyLabel = document.getElementById('mpKeyLabel');
+  const mpRememberKey = document.getElementById('mpRememberKey');
   const mpStatus = document.getElementById('mpStatus');
   const mpList = document.getElementById('mpList');
+  const mpLocal = document.getElementById('mpLocal');
 
-  const DEFAULT_MODEL = {
-    ollama: 'qwen3', lmStudio: 'local-model',
-    openRouter: 'anthropic/claude-opus-4.5', anthropic: 'claude-opus-5',
+  const PICK_KEY = 'mm-model-pick';
+  const KEY_KEY = 'mm-model-key';
+  const DEFAULT_MODEL = { openRouter: 'anthropic/claude-opus-5', anthropic: 'claude-opus-5', custom: '' };
+  const agents = [];       // AgentParticipant[] — several models can coexist
+  let localServers = [];   // [{ source, host, baseUrl, models, skipped }]
+
+  const store = {
+    get(k) { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (err) { return null; } },
+    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (err) { /* private mode */ } },
+    del(k) { try { localStorage.removeItem(k); } catch (err) { /* nothing */ } },
   };
-  const NEEDS_KEY = { openRouter: true, anthropic: true };
-  const agents = [];   // AgentParticipant[] — several models can coexist
 
   function syncProviderFields() {
     const p = mpProvider.value;
-    mpModel.placeholder = DEFAULT_MODEL[p] || '';
-    const needsKey = !!NEEDS_KEY[p];
-    mpKey.hidden = !needsKey;
-    mpKeyLabel.hidden = !needsKey;
+    mpEndpoint.hidden = p !== 'custom';
+    mpModel.placeholder = DEFAULT_MODEL[p] || 'model id';
+    mpKey.placeholder = p === 'custom' ? 'API key (if the endpoint needs one)' : 'API key';
   }
-  mpProvider.onchange = () => { syncProviderFields(); listLocalModels(); };
+  mpProvider.onchange = syncProviderFields;
   syncProviderFields();
 
-  // Ask a local server what it is holding. Typing a model name from memory is
-  // the kind of friction that makes a local-first tool feel worse than a hosted
-  // one, and the endpoint that answers this is the same one we generate with —
-  // so a populated list is also proof the transport can reach it.
-  const mpModelList = document.getElementById('mpModels');
-  async function listLocalModels() {
-    const p = mpProvider.value;
-    mpModelList.innerHTML = '';
-    if (NEEDS_KEY[p]) return;
-    const found = await MM.listModels(Object.assign({}, MM.PRESETS[p], { model: '' }));
-    if (!found.ok || !found.models.length) {
-      mpStatus.textContent = found.ok
-        ? 'No models on that server yet.'
-        : 'No local server on ' + MM.PRESETS[p].baseUrl + ' (' + found.error + ').';
+  // --- Local servers, both at once ---
+  async function probeLocal() {
+    const probes = [
+      { source: 'Ollama', preset: 'ollama', list: 'http://localhost:11434/api/tags',
+        pick: (d) => (d.models || []).map((m) => ({ name: m.name,
+          chat: !(m.capabilities && m.capabilities.length && !m.capabilities.includes('completion')) && !/embed/i.test(m.name) })) },
+      { source: 'LM Studio', preset: 'lmStudio', list: 'http://localhost:1234/v1/models',
+        pick: (d) => (d.data || []).map((m) => ({ name: m.id, chat: !/embed/i.test(m.id) })) },
+    ];
+    const settled = await Promise.allSettled(probes.map(async (pr) => {
+      const res = await fetch(pr.list, { signal: AbortSignal.timeout(2500) });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const all = pr.pick(await res.json());
+      return {
+        source: pr.source, preset: pr.preset, baseUrl: MM.PRESETS[pr.preset].baseUrl,
+        host: MM.PRESETS[pr.preset].baseUrl.replace(/^https?:\/\//, '').replace(/\/v1$/, ''),
+        models: all.filter((m) => m.chat).map((m) => m.name).sort(),
+        skipped: all.filter((m) => !m.chat).map((m) => m.name),
+      };
+    }));
+    localServers = settled.filter((r) => r.status === 'fulfilled').map((r) => r.value);
+    renderLocal();
+    return localServers;
+  }
+
+  const isJoined = (baseUrl, model) => agents.some((a) => a.config.baseUrl === baseUrl && a.config.model === model);
+
+  function renderLocal() {
+    if (!localServers.length) {
+      mpLocal.innerHTML = '<div class="note">No local server answered on :11434 or :1234. ' +
+        'Start Ollama or LM Studio, then Detect.</div>';
       return;
     }
-    mpStatus.textContent = found.models.length + ' model(s) available.';
-    for (const m of found.models) {
-      const opt = document.createElement('option');
-      opt.value = m;
-      mpModelList.appendChild(opt);
+    let html = '';
+    for (const sv of localServers) {
+      html += '<div class="server"><b>' + esc(sv.source) + '</b><span>' + esc(sv.host) + '</span></div>';
+      for (const m of sv.models) {
+        const on = isJoined(sv.baseUrl, m);
+        html += '<button class="model' + (on ? ' on' : '') + '" data-base="' + esc(sv.baseUrl) + '" data-model="' + esc(m) + '">' +
+          '<span>' + esc(m) + '</span><span class="why">' + (on ? 'joined' : 'tier 1 · tap to join') + '</span></button>';
+      }
+      if (!sv.models.length && sv.skipped.length) {
+        html += '<div class="note">only embedding models here — they cannot chat</div>';
+      } else if (sv.skipped.length) {
+        html += '<div class="note">' + sv.skipped.length + ' embedding model' + (sv.skipped.length === 1 ? '' : 's') + ' hidden</div>';
+      }
     }
-    if (!mpModel.value) mpModel.value = found.models[0];
+    mpLocal.innerHTML = html;
+    mpLocal.querySelectorAll('.model').forEach((btn) => {
+      btn.onclick = () => {
+        const sv = localServers.find((x) => x.baseUrl === btn.dataset.base);
+        join(Object.assign({}, MM.PRESETS[sv.preset], { model: btn.dataset.model }), { provider: sv.preset });
+      };
+    });
   }
-  listLocalModels();
 
-  modelBtn.onclick = () => {
-    togglePanel(panel, modelBtn);
-    if (!panel.hasAttribute('hidden')) mpModel.focus();
-  };
-  document.getElementById('mpClose').onclick = () => closePanel(panel, modelBtn);
+  // --- Joining, and remembering ---
+  function join(config, pick) {
+    if (isJoined(config.baseUrl, config.model)) {
+      mpStatus.textContent = config.model + ' is already here.';
+      return null;
+    }
+    // Several models may run in the same tier — that is the point.
+    const agent = MM.createAgentParticipant(session, config, Date.now());
+    agents.push(agent);
+    if (pick) store.set(PICK_KEY, Object.assign({ baseUrl: config.baseUrl, model: config.model, kind: config.kind }, pick));
+    mpStatus.textContent = agent.name + ' joined (tier ' + MM.providerTier(config) + '). It reads what you summon and builds what you describe.';
+    renderAgents();
+    renderLocal();
+    render(session.getState());
+    return agent;
+  }
+
+  function leave(agent) {
+    const i = agents.indexOf(agent);
+    if (i >= 0) agents.splice(i, 1);
+    // The session keeps the join in its history; it simply stops being asked.
+    const pick = store.get(PICK_KEY);
+    if (pick && pick.baseUrl === agent.config.baseUrl && pick.model === agent.config.model) { store.del(PICK_KEY); store.del(KEY_KEY); }
+    mpStatus.textContent = agent.name + ' left.';
+    renderAgents();
+    renderLocal();
+    render(session.getState());
+  }
 
   function renderAgents() {
-    mpList.innerHTML = agents.map((a) =>
+    mpList.innerHTML = agents.map((a, i) =>
       '<div class="mpItem"><span>' + esc(a.name) + '</span>' +
-      '<span class="t">tier ' + MM.providerTier(a.config) + '</span></div>'
+      '<span class="t">tier ' + MM.providerTier(a.config) + '</span>' +
+      '<button class="ghost" data-leave="' + i + '">leave</button></div>'
     ).join('');
+    mpList.querySelectorAll('[data-leave]').forEach((b) => { b.onclick = () => leave(agents[Number(b.dataset.leave)]); });
   }
 
   document.getElementById('mpAdd').onclick = () => {
     const p = mpProvider.value;
     const model = (mpModel.value || DEFAULT_MODEL[p] || '').trim();
-    if (!model) { mpStatus.textContent = 'Pick a model first.'; return; }
     const key = mpKey.value.trim();
-    if (NEEDS_KEY[p] && !key) { mpStatus.textContent = 'This provider needs a key.'; return; }
-
-    const config = Object.assign({}, MM.PRESETS[p], { model: model });
+    if (!model) { mpStatus.textContent = 'Which model? Type its id.'; return; }
+    let config;
+    if (p === 'custom') {
+      const base = mpEndpoint.value.trim().replace(/\/+$/, '');
+      if (!base) { mpStatus.textContent = 'Where is it? Enter the endpoint, e.g. http://localhost:8080/v1'; return; }
+      config = { kind: 'openai-compatible', baseUrl: /\/v1$/.test(base) ? base : base + '/v1', model: model };
+    } else {
+      if (!key) { mpStatus.textContent = p + ' needs a key.'; return; }
+      config = Object.assign({}, MM.PRESETS[p], { model: model });
+    }
     if (key) config.apiKey = key;
-
-    // Several models may run in the same tier — that is the point.
-    const agent = MM.createAgentParticipant(session, config, Date.now());
-    agents.push(agent);
+    const agent = join(config, { provider: p, endpoint: p === 'custom' ? config.baseUrl : undefined });
+    if (!agent) return;
+    // The key is remembered only when asked, and only on this device.
+    if (key && mpRememberKey.checked) store.set(KEY_KEY, key); else store.del(KEY_KEY);
     mpKey.value = '';
-    mpStatus.textContent = agent.name + ' joined. It reads each group you summon, and builds what you prompt for.';
-    renderAgents();
-    render(session.getState());
   };
+
+  // --- Coming back: the remembered pick rejoins if it can ---
+  async function rejoinRemembered() {
+    const pick = store.get(PICK_KEY);
+    if (!pick) return;
+    if (MM.providerTier({ baseUrl: pick.baseUrl }) === 1) {
+      const servers = await probeLocal();
+      const sv = servers.find((x) => x.baseUrl === pick.baseUrl);
+      if (sv && sv.models.includes(pick.model)) join(Object.assign({}, MM.PRESETS[sv.preset], { model: pick.model }), null);
+      else mpStatus.textContent = 'Remembered ' + pick.model + ', but ' + pick.baseUrl + ' is not offering it right now.';
+      return;
+    }
+    const key = store.get(KEY_KEY);
+    const config = pick.provider === 'custom'
+      ? { kind: 'openai-compatible', baseUrl: pick.baseUrl, model: pick.model }
+      : Object.assign({}, MM.PRESETS[pick.provider] || { kind: pick.kind, baseUrl: pick.baseUrl }, { model: pick.model });
+    if (key) { config.apiKey = key; join(config, null); return; }
+    if (pick.provider !== 'custom') {
+      mpProvider.value = pick.provider; syncProviderFields(); mpModel.value = pick.model;
+      mpStatus.textContent = 'Remembered ' + pick.model + ' — enter its key to rejoin.';
+    } else {
+      mpProvider.value = 'custom'; syncProviderFields(); mpEndpoint.value = pick.baseUrl; mpModel.value = pick.model;
+      join(config, null);
+    }
+  }
+
+  document.getElementById('mpDetect').onclick = () => { mpStatus.textContent = 'looking…'; probeLocal().then((s) => { mpStatus.textContent = s.length ? '' : 'Nothing answered.'; }); };
+  modelBtn.onclick = () => {
+    togglePanel(panel, modelBtn);
+    if (!panel.hasAttribute('hidden')) probeLocal();
+  };
+  document.getElementById('mpClose').onclick = () => closePanel(panel, modelBtn);
+
+  /** Open the models pane because something needed one — says why. */
+  function offerModel(why) {
+    if (panel.hasAttribute('hidden')) togglePanel(panel, modelBtn);
+    probeLocal();
+    mpStatus.textContent = why || 'That needs a model. Tap one to join it.';
+  }
 
   // When a group is summoned, ask EVERY model at once. They answer in parallel
   // and each proposal lands independently — no escalation, no waiting for a
@@ -1222,7 +1422,7 @@ html, body {
     const fresh = flashText && Date.now() - flashAt < FLASH_MS;
     const parts = [strokes + ' loose'];
     if (s.artifacts.length) parts.push(s.artifacts.length + ' artifact' + (s.artifacts.length === 1 ? '' : 's') + (s.live.length ? ' (' + s.live.length + ' live)' : ''));
-    if (agents.length) parts.push(agents.length + ' model' + (agents.length === 1 ? '' : 's'));
+    if (agents.length) parts.push(agents.map((a) => a.config.model).join(', '));
     if (s.pendingLassoId) parts.push('circle held — cross it with ' + (s.commandMark ? 'your mark' : '✓'));
     if (fresh) parts.push(flashText);
     statusEl.textContent = parts.join('  ·  ');
@@ -1423,7 +1623,8 @@ html, body {
       key: 'make', group: 'always', groupConf: 0, groupWhy: '',
       // One gesture, one box; whether it builds or changes is context, not a mode.
       label: sum.onArtifact ? 'Change it…' : 'Describe it…',
-      why: sum.onArtifact ? 'change what this ink covers'
+      why: agents.length === 0 ? 'needs a model — tap to add one'
+        : sum.onArtifact ? 'change what this ink covers'
         : (reading.genre && reading.genre.genre === 'graph' ? 'build it as a running diagram'
           : reading.genre && reading.genre.genre === 'mixed' ? 'build it — a diagram inside a page'
           : 'say what it should become'),
@@ -1626,8 +1827,9 @@ html, body {
       const prompt = input.value.trim();
       if (!prompt) return;
       if (agents.length === 0) {
-        input.value = '';
-        input.placeholder = 'add a model first — generation needs one';
+        // The escalation, made visible: the engine did all it could, and this
+        // is the step that needs a model. Open the pane instead of a dead box.
+        offerModel('“' + prompt.slice(0, 40) + '” needs a model to build. Tap one to join it, then describe it again.');
         return;
       }
       input.disabled = true;
@@ -1955,11 +2157,14 @@ html, body {
   // graph from the console is a feature, not a leak.
   window.__mm = {
     session: session, agents: agents, MM: MM, view: view, frames: frames,
+    savedMark: savedMark, forgetMark: forgetMark, join: join, probeLocal: probeLocal,
     screenToWorld: screenToWorld, worldToScreen: worldToScreen,
     fitAll: fitAll, regionsUnderInk: regionsUnderInk,
   };
 
   session.subscribe(render);
+  restoreMark();
+  rejoinRemembered();
   document.fonts.ready.then(() => { sizePad(); render(session.getState()); });
   resize();
   afterViewChange();

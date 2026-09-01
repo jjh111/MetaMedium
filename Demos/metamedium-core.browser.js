@@ -136,6 +136,7 @@ var MetaMediumCore = (() => {
     simplifyStroke: () => simplifyStroke,
     smoothStroke: () => smoothStroke,
     sourcesOf: () => sourcesOf,
+    stripThink: () => stripThink,
     strokePointsOf: () => strokePointsOf,
     strokesIntersect: () => strokesIntersect,
     topInterpretation: () => topInterpretation,
@@ -3072,6 +3073,11 @@ ${pad}</${tag}>`;
       done();
     }
   }
+  function stripThink(text) {
+    const stripped = text.replace(/<think>[\s\S]*?<\/think>/gi, "");
+    const open = stripped.search(/<think>/i);
+    return (open === -1 ? stripped : stripped.slice(0, open)).trim();
+  }
   function firstString(...candidates) {
     for (const c of candidates) if (typeof c === "string" && c.length > 0) return c;
     return void 0;
@@ -3088,8 +3094,9 @@ ${pad}</${tag}>`;
     );
     if (!res.ok) return res;
     const body = res.json;
-    const text = firstString(body?.choices?.[0]?.message?.content);
-    if (text === void 0) return { ok: false, error: "no completion text in response" };
+    const raw = firstString(body?.choices?.[0]?.message?.content);
+    if (raw === void 0) return { ok: false, error: "no completion text in response" };
+    const text = stripThink(raw);
     return { ok: true, text, model: firstString(body.model) ?? config.model };
   }
   async function completeAnthropic(config, messages, timeoutMs, external) {

@@ -159,7 +159,7 @@ export type { Interpretation, InterpretationGroup, Disagreement } from './sessio
 
 // LLM transport (Tier 1–2). One client covers Ollama / LM Studio / OpenRouter;
 // Anthropic has its own. Failures are returned, never thrown.
-export { complete, listModels, providerLabel, providerTier, PRESETS, DEFAULT_TIMEOUT_MS, LOCAL_TIMEOUT_MS } from './llm/provider';
+export { complete, listModels, providerLabel, providerTier, stripThink, PRESETS, DEFAULT_TIMEOUT_MS, LOCAL_TIMEOUT_MS } from './llm/provider';
 export type { ProviderConfig, ProviderKind, ChatMessage, CompletionResult, ModelList } from './llm/provider';
 
 // Agent participants — a model joins through the same channel a human uses.
