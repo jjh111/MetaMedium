@@ -107,6 +107,14 @@ html, body {
 #inspector .sep { height: 1px; background: var(--rule); margin: 9px 0; }
 #inspector .ladder .k { color: var(--gold); }
 #inspector .ladder .row + .row { margin-top: 2px; }
+#inspector button.mini {
+  pointer-events: auto; cursor: pointer; font: inherit; font-size: 10.5px;
+  color: var(--gold); background: none; border: 1px solid rgba(201,168,76,0.35);
+  border-radius: 4px; padding: 1px 8px; margin: 1px 0 5px 52px;
+}
+#inspector button.mini:hover { border-color: var(--gold); }
+#snapBtn { color: var(--gold); border-color: rgba(201,168,76,0.45); }
+#snapBtn[hidden] { display: none; }
 #inspector .empty { color: var(--dim); font-family: var(--ui); font-size: 12px; }
 #modelPanel {
   position: fixed; left: 18px; bottom: 56px; width: 292px; z-index: 20;
@@ -371,6 +379,8 @@ html, body {
     </div>
     <button id="teachBtn" aria-pressed="false" title="Teach the canvas your command mark">Teach a mark…</button>
     <button id="modelBtn" aria-pressed="false" title="Add a model as a participant (Tier 1–2)">Add a model…</button>
+    <button id="snapBtn" hidden title="Redraw every confidently read shape clean. The ink stays underneath; undo puts it back in front.">Snap</button>
+    <button id="snapMode" title="offer: ghost the clean form and wait · auto: snap as you draw · off">snap · offer</button>
     <button id="undoBtn" title="Ctrl+Z">Undo</button>
     <button id="resetBtn">Reset</button>
   </div>
@@ -910,6 +920,51 @@ html, body {
     del(k) { try { localStorage.removeItem(k); } catch (err) { /* nothing */ } },
   };
 
+  // ===== Snapping: a confident reading, redrawn ============================
+  //
+  // The engine says "rectangle 0.86"; the canvas can draw that rectangle. Three
+  // ways in, one mechanism: the ghost under each confident mark is the OFFER,
+  // the rail button and the palette take it up for many at once, and the
+  // inspector for one. `auto` takes it up as you draw. The ink is never
+  // replaced — it stays faint under the clean form, and undo drops the form.
+  const SNAP_KEY = 'mm-snap';
+  const SNAP_MODES = ['offer', 'auto', 'off'];
+  let snapMode = SNAP_MODES.includes(store.get(SNAP_KEY)) ? store.get(SNAP_KEY) : 'offer';
+  let snapOffers = new Map(); // id → candidate, recomputed each render
+  const idealCache = new WeakMap(); // node → clean form (nodes are rebuilt on replay)
+  const snapBtn = document.getElementById('snapBtn');
+  const snapModeBtn = document.getElementById('snapMode');
+
+  function idealOf(node, shape) {
+    let c = idealCache.get(node);
+    if (c === undefined || (c && c.shape !== shape)) { c = MM.idealize(node, shape); idealCache.set(node, c); }
+    return c;
+  }
+  function refreshOffers() {
+    snapOffers = snapMode === 'off' ? new Map() : new Map(session.snapCandidates().map((c) => [c.id, c]));
+    const n = snapOffers.size;
+    snapBtn.hidden = n === 0;
+    snapBtn.textContent = 'Snap ' + n;
+    snapModeBtn.textContent = 'snap · ' + snapMode;
+  }
+  function shapesSummary(cands) {
+    const counts = {};
+    cands.forEach((c) => { counts[c.shape] = (counts[c.shape] || 0) + 1; });
+    return Object.entries(counts).map(([k, v]) => v + ' ' + k + (v === 1 ? '' : 's')).join(', ');
+  }
+  function snapAll(ids, why) {
+    if (!ids.length) return;
+    session.snap({ ids: ids, at: Date.now() });
+    flash('drew ' + ids.length + ' clean' + (why ? ' — ' + why : ''));
+  }
+  function setSnapMode(mode) {
+    snapMode = SNAP_MODES.includes(mode) ? mode : 'offer';
+    store.set(SNAP_KEY, snapMode);
+    render(session.getState());
+  }
+  snapBtn.onclick = () => snapAll([...snapOffers.keys()], shapesSummary([...snapOffers.values()]));
+  snapModeBtn.onclick = () => setSnapMode(SNAP_MODES[(SNAP_MODES.indexOf(snapMode) + 1) % SNAP_MODES.length]);
+
   function syncProviderFields() {
     const p = mpProvider.value;
     mpEndpoint.hidden = p !== 'custom';
@@ -1219,6 +1274,11 @@ html, body {
     const after = session.getState();
     const made = after.nodes.get(id);
     const g = made && MM.getRep(made, 'gesture');
+    // Auto: take the offer up the moment it is made. Never for a stroke the
+    // grammar is still deciding about — a held lasso is a gesture in waiting.
+    if (snapMode === 'auto' && !g && after.pendingLassoId !== id && session.snapCandidates([id]).length) {
+      session.snap({ ids: [id], at: Date.now() });
+    }
     if (g && g.data && g.data.role === 'scratch') {
       const n = (g.data.erased || []).length;
       flash('erased ' + n + ' mark' + (n === 1 ? '' : 's'));
@@ -1247,6 +1307,13 @@ html, body {
   });
 
   document.getElementById('undoBtn').onclick = () => session.undo();
+  inspectorEl.addEventListener('click', (e) => {
+    const b = e.target.closest && e.target.closest('button[data-act]');
+    if (!b) return;
+    const id = b.getAttribute('data-id');
+    if (b.getAttribute('data-act') === 'snap') snapAll([id]);
+    else session.snap({ ids: [id], mode: 'raw', at: Date.now() });
+  });
   document.getElementById('resetBtn').onclick = () => location.reload();
 
   // A transient line in the status bar. It must re-render IMMEDIATELY: the
@@ -1316,21 +1383,54 @@ html, body {
   }
 
   // ===== Rendering: ink is ground truth ===================================
+  function path(points, closed) {
+    ctx.beginPath();
+    points.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
+    if (closed) ctx.closePath();
+  }
+  function inkStroke(points, closed, style) {
+    path(points, closed);
+    // A dark halo under every mark. On the ground it is invisible; over a
+    // live artifact it is the difference between ink you can see and ink that
+    // disappears into whatever colour the model happened to choose. One rule,
+    // no special case for "is this stroke over a page".
+    ctx.strokeStyle = 'rgba(10,10,15,0.55)';
+    ctx.lineWidth = style.width + wpx(2.5);
+    ctx.stroke();
+    ctx.strokeStyle = style.color;
+    ctx.lineWidth = style.width;
+    ctx.stroke();
+  }
+
   function inkOf(node, style) {
     const points = MM.strokePointsOf(node);
     if (points) {
-      ctx.beginPath();
-      points.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
-      // A dark halo under every mark. On the ground it is invisible; over a
-      // live artifact it is the difference between ink you can see and ink that
-      // disappears into whatever colour the model happened to choose. One rule,
-      // no special case for "is this stroke over a page".
-      ctx.strokeStyle = 'rgba(10,10,15,0.55)';
-      ctx.lineWidth = style.width + wpx(2.5);
-      ctx.stroke();
-      ctx.strokeStyle = style.color;
-      ctx.lineWidth = style.width;
-      ctx.stroke();
+      const clean = MM.cleanPointsOf(node);
+      if (clean) {
+        // Snapped: the clean form in front, the hand's ink faint beneath it.
+        // What was drawn is still there — that is the whole promise.
+        path(points, false);
+        ctx.strokeStyle = 'rgba(232,228,217,0.14)';
+        ctx.lineWidth = Math.max(1, style.width * 0.7);
+        ctx.stroke();
+        inkStroke(clean, MM.cleanOf(node).closed, style);
+        return;
+      }
+      inkStroke(points, false, style);
+      // The offer: a ghost of what this mark would be, drawn clean. Dashed and
+      // faint so it reads as a question, not a change already made.
+      const offer = snapOffers.get(node.id);
+      if (offer && !style.gesture) {
+        const ideal = idealOf(node, offer.shape);
+        if (ideal) {
+          path(ideal.points, ideal.closed);
+          ctx.setLineDash([wpx(3), wpx(4)]);
+          ctx.strokeStyle = 'rgba(201,168,76,0.7)';
+          ctx.lineWidth = wpx(1.2);
+          ctx.stroke();
+          ctx.setLineDash([]);
+        }
+      }
       return;
     }
     for (const e of node.edges) { // artifact: draw its members (transparent within)
@@ -1344,6 +1444,7 @@ html, body {
     state = s;
     askModels(s);
     syncStage(s);
+    refreshOffers();
 
     const dpr = window.devicePixelRatio || 1;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -1400,7 +1501,7 @@ html, body {
 
     if (s.summon) {
       for (const gid of s.summon.gestureIds) {
-        inkOf(s.nodes.get(gid), { color: 'rgba(201,168,76,0.55)', width: inkW * 1.5 });
+        inkOf(s.nodes.get(gid), { color: 'rgba(201,168,76,0.55)', width: inkW * 1.5, gesture: true });
       }
     }
 
@@ -1423,6 +1524,7 @@ html, body {
     const parts = [strokes + ' loose'];
     if (s.artifacts.length) parts.push(s.artifacts.length + ' artifact' + (s.artifacts.length === 1 ? '' : 's') + (s.live.length ? ' (' + s.live.length + ' live)' : ''));
     if (agents.length) parts.push(agents.map((a) => a.config.model).join(', '));
+    if (snapOffers.size) parts.push(snapOffers.size + ' read clean');
     if (s.pendingLassoId) parts.push('circle held — cross it with ' + (s.commandMark ? 'your mark' : '✓'));
     if (fresh) parts.push(flashText);
     statusEl.textContent = parts.join('  ·  ');
@@ -1611,6 +1713,20 @@ html, body {
           run: () => session.bless({ summonId: sum.id, suggestionId: sug.id, at: Date.now() }),
         });
       }
+    }
+    // Drawing them clean: instant, offline, and the summon stays open so the
+    // next offer is taken from the cleaned-up marks.
+    const offers = snapMode === 'off' ? [] : session.snapCandidates(sum.enclosedIds);
+    if (offers.length) {
+      const all = offers.length === sum.enclosedIds.length;
+      items.unshift({
+        key: 'snap', group: 'clean',
+        groupConf: offers.reduce((a, o) => a + o.weight, 0) / offers.length,
+        groupWhy: 'each reads confidently as one shape',
+        label: all ? 'Draw them clean' : 'Draw ' + offers.length + ' of ' + sum.enclosedIds.length + ' clean',
+        why: shapesSummary(offers) + ' · ink kept', tier: 0,
+        run: () => { shownSummonId = null; snapAll(offers.map((o) => o.id), shapesSummary(offers)); },
+      });
     }
     if (!items.some((i) => i.label === 'Name this…')) {
       items.push({
@@ -1992,6 +2108,16 @@ html, body {
         rows.push(['ink', node.edges.filter((e) => e.rel === 'has-part').length + ' marks held', '']);
       }
       if (shapeRead) rows.push(['shape', shapeRead.label + ' ' + shapeRead.weight.toFixed(2), shapeRead.reasoning || '']);
+      // Clean form: held, offered, or neither — and the one-mark way to take it up.
+      const clean = MM.cleanOf(node);
+      const offer = snapOffers.get(id);
+      if (clean) {
+        rows.push(['clean', 'drawn as a ' + clean.shape, clean.reasoning,
+          '<button class="mini" data-act="raw" data-id="' + esc(id) + '">show the ink</button>']);
+      } else if (offer) {
+        rows.push(['clean?', 'could be a ' + offer.shape, offer.reasoning,
+          '<button class="mini" data-act="snap" data-id="' + esc(id) + '">draw it clean</button>']);
+      }
       if (role) {
         const dir = role.direction ? ' ' + role.direction.from + ' → ' + role.direction.to : '';
         rows.push(['plays', role.role + dir, role.reasoning]);
@@ -2010,9 +2136,10 @@ html, body {
       }
       if (rows.length) {
         html += '<div class="sep"></div><div class="eyebrow">the ladder</div><div class="ladder">';
-        rows.forEach(([k, v, why]) => {
+        rows.forEach(([k, v, why, action]) => {
           html += '<div class="row"><span class="k">' + esc(k) + '</span><span class="v">' + esc(v) + '</span></div>';
           if (why) html += '<div class="why">' + esc(why) + '</div>';
+          if (action) html += action;
         });
         html += '</div>';
       }
@@ -2160,6 +2287,7 @@ html, body {
     savedMark: savedMark, forgetMark: forgetMark, join: join, probeLocal: probeLocal,
     screenToWorld: screenToWorld, worldToScreen: worldToScreen,
     fitAll: fitAll, regionsUnderInk: regionsUnderInk,
+    snapMode: () => snapMode, setSnapMode: setSnapMode, snapOffers: () => snapOffers,
   };
 
   session.subscribe(render);

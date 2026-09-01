@@ -448,7 +448,17 @@ export function countCorners(
   if (path.length < 8) return empty;
 
   const arm = Math.max(2, Math.round(opts.window * path.length));
-  const sep = Math.max(2, Math.round(opts.separation * path.length));
+  // Suppression is a fraction of the path, and on an elongated box the short
+  // sides are a small fraction of it: at 5:1 each is 8% of the perimeter, so a
+  // window wider than that silently ate one corner at each end, and the most
+  // common box in any interface — a header bar — came back with two corners
+  // and a rectangle score in the 0.6s. Bound the window by the short side so
+  // it can never straddle a whole one. Square-ish strokes are unaffected.
+  const bb = getBounds(points);
+  const bw = bb.maxX - bb.minX, bh = bb.maxY - bb.minY;
+  const shortFrac = Math.min(bw, bh) / Math.max(1e-6, 2 * (bw + bh));
+  const sepFrac = Math.min(opts.separation, Math.max(0.03, shortFrac * 0.7));
+  const sep = Math.max(2, Math.round(sepFrac * path.length));
   const at = (i: number) => path[((i % path.length) + path.length) % path.length];
 
   // Turn angle at every sample: the angle between the chord arriving and the

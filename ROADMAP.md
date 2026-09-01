@@ -151,6 +151,13 @@ gained `arrow`, `text` and `dot` to make that possible (99.8% over 1674 strokes)
 concepts were rebuilt on roles, and the old fixed-pixel spatial graph is gone in
 favour of the one measured relation system.
 
+**Taken up (1 Sep 2026):** the readings now *do* something on their own. A
+confident, unambiguous shape reading is offered as its clean form and, taken
+up, redraws the mark with the ink kept beneath (`session.snap`; zero wrong
+snaps over the corpus, pinned). And the model building a page is handed the
+engine's whole reading — roles, relations, concepts, names, per container — in
+region ids, so "a page" is a brief rather than a request for placeholders.
+
 **Still open after that:** handwriting (v7 Stage E), so "the copy in the squares"
 can be literal rather than typed. Deliberately not a blocker: the sprint's `text`
 shape gives a mark the `label` role without needing to read it.
@@ -343,6 +350,8 @@ say so plainly.
 | **The session engine** — no modes, deferred commitment | `src/session/session.ts`; gesture grammar in `gesture.ts` |
 | **The canonical loop, end to end** | Executable spec + verified live in `Demos/session-engine.html` |
 | Multi-parse recognition (nothing wins by silencing) | `analyzeStroke` returns ranked candidates with `reasoning` |
+| **Clean forms** — a confident reading redrawn, ink kept | `src/session/clean.ts`; `clean.bench.test.ts` pins zero wrong snaps |
+| **The drawing as the brief** for generation | `describeReading` in `participants/serialize.ts`; tested in `generate.test.ts` |
 | Event-sourced undo; erase with artifact degradation | `session.undo()`, `session.erase()` |
 | **Participants as first-class citizens** | `join`, `propose`, attribution, `Capability 0–3` — v0.3a |
 | Browser bundle + reference surface | `metamedium-core.browser.js`, CI drift check |

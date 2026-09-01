@@ -205,6 +205,27 @@ Concepts rebuilt on roles passed every existing concept test unchanged, and
 every predicate got shorter. 390 core tests; the browser e2e compiles a page and
 a flowchart in the same run.
 
+### Stage 7 — Take the reading up  ·  ✅ built
+The rungs were legible but inert: a mark read as *rectangle 0.86* still looked
+like a wobble, and the model building a page was told the boxes' rects and
+nothing of what the engine had read about them.
+
+**Clean forms** (`src/session/clean.ts`). A confident, unambiguous Tier 0
+reading is offered as a dashed ghost of its clean form; taking the offer adds a
+`'clean'` rep beside the ink, like tidy's `'transform'`. The ink stays faint
+underneath, undo drops the form. The gate is a floor *and* a margin over the
+next reading, so a diamond is never quietly settled; writing is never redrawn.
+Over the 1674-stroke corpus: ≥95% of every drawable shape offered, zero wrong,
+zero for text — pinned. The one detector fix it forced: a 5:1 banner lost a
+corner at each end to path-fraction suppression, so the window is now bounded
+by the short side.
+
+**The drawing is the brief** (`describeReading`). Generation now hands the
+model genre, roles, engaging relations, concepts and names in *region ids*, plus
+a reading of each container's contents on their own — the row inside a frame
+does not exist at the scope of the frame. "A page" is told to infer a subject
+from that structure rather than write placeholders.
+
 ---
 
 ## 5. What this changes about what exists

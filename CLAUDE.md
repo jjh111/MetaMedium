@@ -29,7 +29,7 @@ circle them, cross with a command mark *you taught the system*, prompt them into
 a living page that renders in the canvas with your ink still outlining its
 divs — then draw on that page and the ink addresses the regions underneath it.
 Scratch anything out to erase. `Demos/session-engine.html` is the surface;
-`Demos/session-engine.e2e.js` drives all 32 steps through the real UI, page and flowchart both.
+`Demos/session-engine.e2e.js` drives all 38 steps through the real UI, page and flowchart both.
 Still open: handwriting (v7 Stage E). Whitepaper v5.1 stays parked until the
 conversation benchmark passes end to end.
 
@@ -182,9 +182,46 @@ open at 1× and closed at 1.7×. `getFingerprint(points, scale)` and
 the scale is logged with each stroke so replay is deterministic. **Surfaces with
 a viewport must pass it.** See MVP.md §7.
 
+**Corner suppression is bounded by the stroke's short side.** Non-maximum
+suppression along the path uses a fixed fraction of its length, and on a 5:1
+banner each short side is 8% of the perimeter — a wider window ate one corner
+at each end, and the most common box in any interface came back with two
+corners and a rectangle score in the 0.6s. `countCorners` caps the window at a
+fraction of the short side, so it can never straddle a whole one.
+
 **Library matching** is a weighted fingerprint comparison (straightness,
 aspect, corners, closure, size) with a straightness veto — see
 `matchPrimitiveFromLibrary`.
+
+### Clean forms: a confident reading, redrawn
+
+> `metamedium-core/src/session/clean.ts` — `snapReading`, `idealize`,
+> `session.snap()`, `session.snapCandidates()`.
+
+The shape rung says "rectangle 0.86"; the canvas can draw that rectangle. A
+snapped mark gains a `'clean'` rep beside its ink — the same shape as tidy's
+`'transform'` — and the surface draws the clean form in front with the hand's
+ink faint beneath it. **Ink is never replaced**; undo drops the rep. Three rules:
+
+- **Confident AND unambiguous.** `SNAP_CONFIDENCE` floors the top Tier 0
+  reading and `SNAP_MARGIN` requires it to lead the next; a diamond that is
+  triangle 0.61 / rectangle 0.58 is never redrawn as either, because that would
+  silently settle an argument the engine deliberately holds open. Only the
+  engine's own reading counts — a model calling a box "a card" is a claim about
+  meaning, not geometry.
+- **Built from the ink's own measurements**, never a template: bounds, the
+  three sharpest corners, the arrow's tip and tail, the arc's bulge. A slight
+  oval stays an oval. `text` has no clean form — handwriting redrawn as a box
+  is a lie about what was written.
+- **Zero wrong snaps over the whole corpus** is pinned in `clean.bench.test.ts`,
+  alongside ≥95% offered for every drawable shape and 0% for writing.
+
+In the surface the offer is a dashed ghost under each qualifying mark; the rail's
+*Snap N* button, the palette's *Draw them clean* (Tier 0, and the summon stays
+open so the next offer is taken from the cleaned marks) and the inspector's
+*draw it clean* take it up. `snap · offer / auto / off` is a device preference;
+*auto* takes the offer as you draw, never for a stroke the grammar is still
+deciding about. A held lasso is never offered.
 
 ### Gestures: taught, and relational
 
@@ -269,6 +306,16 @@ makes it render as real DOM in the canvas. The rules:
   decided. Asked instead for a positioned page, a real local model returned good
   copy and *no positioning at all* — so the geometry is an invariant now, not a
   request (MVP.md §6.2).
+- **The drawing is the brief.** Beside the layout tree the model gets
+  `describeReading()` (`participants/serialize.ts`) — genre, what each region
+  *plays*, the engaging relations between regions, the concepts they read as,
+  and any names the human gave — **in region ids**, the same names the layout,
+  the reply and the DOM use. Concepts are matched per scope and a container is
+  not a peer of its contents, so each container's contents are read on their
+  own too (`WITHIN CONTAINERS:`), or the row inside a frame is invisible. A
+  label is handed over as handwriting the model cannot read and must title;
+  "a page" is told to infer a subject from the structure rather than write
+  placeholders. `ask` and `interpret` get the same brief for a group.
 - `regionsOf(artifact, nodes)` returns member marks in **reading order**
   (top-to-bottom, left-to-right, containers before contents), because region ids
   are how the human, the model and the DOM refer to the same thing.

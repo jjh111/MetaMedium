@@ -57,6 +57,7 @@ import { type Mark, type Relation, clusters, relate } from '../relate/relations'
 import { type ConceptMatch, type ConceptScope, matchConcepts } from '../concepts/concept';
 import { type GenreReading, type RoleReading, type Wire, assignRoles, genreOf } from '../diagram/roles';
 import { BUILTIN_COMMAND_MARK, matchesCommandMark } from './commandmark';
+import { type SnapReading, idealize, snapReading, cleanOf } from './clean';
 
 // ===== Public state shape =====
 
@@ -166,6 +167,17 @@ export type SessionEvent =
       at: number;
     }
   | {
+      /**
+       * Redraw confident marks as their clean form — or drop that form again.
+       * The ink stays; a `'clean'` rep is added beside it (clean.ts).
+       */
+      type: 'snap';
+      ids: string[];
+      mode?: 'clean' | 'raw';
+      at: number;
+      participantId?: string;
+    }
+  | {
       type: 'code';
       participantId: string;
       nodeId: string;
@@ -273,6 +285,19 @@ export interface Session {
    * now sits, so undo springs them back exactly.
    */
   tidy(args: { ids: string[]; mode: 'align' | 'equalize'; axis?: 'row' | 'column'; at: number }): void;
+  /**
+   * Redraw marks as the clean form of what they confidently read as
+   * (`mode: 'clean'`, the default), or put the ink back in front (`'raw'`).
+   * Only marks `snapCandidates` would offer are changed; the rest are left as
+   * they are and the call says nothing, because a snap is an offer taken up,
+   * not a command that can fail.
+   */
+  snap(args: { ids: string[]; mode?: 'clean' | 'raw'; at: number }): void;
+  /**
+   * Which marks read cleanly enough to be redrawn, and as what. Defaults to
+   * every loose mark on the board. Marks already snapped are not offered again.
+   */
+  snapCandidates(ids?: string[]): (SnapReading & { id: string })[];
   /** The artifact's member marks as a layout frame (MVP.md §6.2). */
   regions(artifactId: string): Region[];
   /**
@@ -1055,6 +1080,50 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     recomputeClusterCandidates();
   }
 
+  /** Every mark on the board: loose ones, and the members of artifacts. A box
+   *  inside a live page is still a box, and drawn clean it IS the div's outline. */
+  function snappableIds(): string[] {
+    // A held lasso is a circle until the next mark says otherwise; offering to
+    // draw it clean would be offering to redraw a gesture.
+    const out = contentIds.filter((id) => !artifacts.includes(id) && id !== pendingLasso?.id);
+    for (const aid of artifacts) {
+      const a = nodes.get(aid);
+      if (a) for (const e of a.edges) if (e.rel === 'has-part') out.push(e.to);
+    }
+    return out;
+  }
+
+  function candidatesAmong(ids: string[]): (SnapReading & { id: string })[] {
+    const out: (SnapReading & { id: string })[] = [];
+    for (const id of ids) {
+      const node = nodes.get(id);
+      if (!node || getRep(node, 'erased') || !getRep(node, 'stroke') || cleanOf(node)) continue;
+      const r = snapReading(node, nodes);
+      if (r.ok) out.push({ id, ...r });
+    }
+    return out;
+  }
+
+  /**
+   * The doodle, drawn clean. Same shape as `applyTidy`: the ink is untouched,
+   * the mark gains a rep saying what it now shows, and undo drops the rep.
+   */
+  function applySnap(ev: Extract<SessionEvent, { type: 'snap' }>) {
+    if (ev.mode === 'raw') {
+      for (const id of ev.ids) {
+        const node = nodes.get(id);
+        if (node) node.reps = node.reps.filter((r) => r.modality !== 'clean');
+      }
+      return;
+    }
+    for (const c of candidatesAmong(ev.ids)) {
+      const node = nodes.get(c.id)!;
+      const clean = idealize(node, c.shape);
+      if (!clean) continue;
+      node.reps.push({ modality: 'clean', data: clean, confidence: c.weight, source: ev.participantId ?? 'engine' });
+    }
+  }
+
   function applyTeach(ev: Extract<SessionEvent, { type: 'teach' }>) {
     commandMark = ev.mark;
   }
@@ -1101,6 +1170,9 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
         return null;
       case 'tidy':
         applyTidy(ev);
+        return null;
+      case 'snap':
+        applySnap(ev);
         return null;
       case 'code':
         return applyCode(ev);
@@ -1176,6 +1248,8 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     answer: (args) => dispatch({ type: 'answer', ...args }),
     teachCommandMark: (mark, at) => void dispatch({ type: 'teach', mark, at }),
     tidy: (args) => void dispatch({ type: 'tidy', ...args }),
+    snap: (args) => void dispatch({ type: 'snap', ...args }),
+    snapCandidates: (ids) => candidatesAmong(ids ?? snappableIds()),
     attachCode: (args) => dispatch({ type: 'code', ...args }),
     regions: (artifactId) => {
       const node = nodes.get(artifactId);

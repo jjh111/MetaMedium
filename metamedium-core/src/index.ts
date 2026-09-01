@@ -57,6 +57,20 @@ export {
 } from './session/nodes';
 export type { MMNode, Rep, Edge, Capability, ParticipantKind, ExplanationData } from './session/nodes';
 
+// Clean forms — a confident reading, redrawn. Held beside the ink as a
+// `'clean'` rep, like tidy's `'transform'`; never a replacement of the stroke.
+export {
+  idealize,
+  snapReading,
+  cleanOf,
+  cleanPointsOf,
+  describeSnap,
+  SNAP_CONFIDENCE,
+  SNAP_MARGIN,
+  SNAPPABLE,
+} from './session/clean';
+export type { CleanShape, SnapReading } from './session/clean';
+
 // Gesture grammar
 export {
   isLassoLike,
@@ -165,7 +179,8 @@ export type { ProviderConfig, ProviderKind, ChatMessage, CompletionResult, Model
 // Agent participants — a model joins through the same channel a human uses.
 export { createAgentParticipant, parseReadings, parseCode, parseFill, readingsToEdges, MAX_READINGS } from './participants/agent';
 export type { AgentParticipant, AgentReading, InterpretResult, AskResult, GenerateResult, RegionFill } from './participants/agent';
-export { describeSession, describeSignature, describeRegions, describeAddressed } from './participants/serialize';
+export { describeSession, describeSignature, describeRegions, describeAddressed, describeReading } from './participants/serialize';
+export type { ReadingLike, DescribeReadingOptions } from './participants/serialize';
 export type { Transport, AgentOptions } from './participants/agent';
 
 // A participant answered by hand — any model, including one with no HTTP API,

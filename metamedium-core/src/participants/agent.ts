@@ -14,11 +14,10 @@ import type { Session, ProposedEdge } from '../session/session';
 import type { Capability } from '../session/nodes';
 import type { ChatMessage, CompletionResult, ProviderConfig } from '../llm/provider';
 import { complete, providerLabel, providerTier } from '../llm/provider';
-import { describeSession, describeSignature } from './serialize';
+import { describeSession, describeSignature, describeReading } from './serialize';
 import { frameOf, regionsOf } from '../session/regions';
 import { parseLayout, describeLayout, regionIdsIn } from '../parse/layout';
 import { parseGraph, describeGraph, nodeIdsIn, buildGraphScaffold } from '../parse/graph';
-import { describeRoles } from '../diagram/roles';
 import { getRep, strokePointsOf } from '../session/nodes';
 import type { Point } from '../types';
 import { buildScaffold, validateRegions, type RegionContent, type Theme } from '../parse/scaffold';
@@ -83,6 +82,11 @@ For each region id you are given, return:
   - "style" — optional inline style for the region box itself: background, padding, border, alignment.
 
 Also return a "theme": background, color, accent, fontFamily for the page as a whole.
+
+THE DRAWING IS THE BRIEF. Below the layout you are told what each region PLAYS, how the regions sit, and any names the human gave. Read it before writing a word:
+- A label is handwriting the human put inside a region. You cannot read it, so write the title or caption that belongs in exactly that place, and make the region it labels read as titled by it.
+- Regions in a row are peers of equal standing. A column is a sequence, top to bottom. A container's contents are its sections, and the container itself frames them.
+- A short request ("a page", "a card") is not a request for placeholders. Infer a specific subject from the structure — a header over two columns over a footer is a product page, a box with a label inside it is a titled panel — and commit to it throughout.
 
 Rules:
 - Fill EVERY region you are given, using its exact id.
@@ -441,7 +445,8 @@ export function createAgentParticipant(
     if (targets.length === 0) return { ok: false, readings: [], error: 'no such nodes' };
 
     const isCluster = targets.length > 1;
-    const context = describeSession(state, { nodeIds: targets });
+    const context = describeSession(state, { nodeIds: targets }) +
+      (isCluster ? `\n\n${describeReading(session.read(targets), { noun: 'mark' })}` : '');
     const signature = isCluster ? describeSignature(state, targets) : '';
 
     const question = isCluster
@@ -485,7 +490,8 @@ export function createAgentParticipant(
     const targets = nodeIds.filter((n) => state.nodes.has(n));
     if (targets.length === 0) return { ok: false, error: 'no such nodes' };
 
-    const context = describeSession(state, { nodeIds: targets });
+    const context = describeSession(state, { nodeIds: targets }) +
+      (targets.length > 1 ? `\n\n${describeReading(session.read(targets), { noun: 'mark' })}` : '');
     const result = await send(
       config,
       [
@@ -552,6 +558,25 @@ export function createAgentParticipant(
     // flowchart keeps its positions and its arrows (KEYFRAMES.md Stage 3–4).
     const reading = session.read(regions.map((r) => r.nodeId));
     const genre = reading.genre.genre;
+    // The brief speaks in region ids — the same names the layout, the model's
+    // reply and the DOM use — so a role placed on a mark lands on its region.
+    const regionIdOf = new Map(regions.map((r) => [r.nodeId, r.id]));
+    const idOf = (id: string) => regionIdOf.get(id);
+    // Concepts are matched over a scope, and a container is not a peer of what
+    // it holds — so the row INSIDE a frame is only visible when the frame's
+    // contents are read on their own. Each container's contents get a reading.
+    const inside: string[] = [];
+    for (const r of reading.roles) {
+      if (r.role !== 'container' || r.targets.length < 2) continue;
+      const me = idOf(r.id);
+      if (!me) continue;
+      for (const c of session.read(r.targets).concepts) {
+        const members = [...new Set(Object.values(c.roles ?? {}).flat())].map(idOf).filter((x): x is string => !!x);
+        const who = members.length ? members.join(', ') : r.targets.map(idOf).filter(Boolean).join(', ');
+        inside.push(`  within ${me}: ${who} read as a ${c.concept} (${c.confidence.toFixed(2)}) — ${c.reasoning}`);
+      }
+    }
+    const brief = describeReading(reading, { idOf }) + (inside.length ? `\n\nWITHIN CONTAINERS:\n${inside.join('\n')}` : '');
     let plan: { describe: string; ids: string[]; build: (c: Record<string, RegionContent>, t: Theme) => string };
     if (genre === 'graph' || genre === 'mixed') {
       const strokes: Record<string, Point[]> = {};
@@ -566,14 +591,14 @@ export function createAgentParticipant(
       }
       const graph = parseGraph(regions, frame, reading.roles, { strokes, arrows });
       plan = {
-        describe: `${describeRoles(reading.roles, reading.genre)}\n\n${describeGraph(graph)}`,
+        describe: `${describeGraph(graph)}\n\n${brief}`,
         ids: nodeIdsIn(graph),
         build: (c, t) => buildGraphScaffold(graph, c, t),
       };
     } else {
       const layout = parseLayout(regions, frame, connectionsOf(artifact, state, regions));
       plan = {
-        describe: describeLayout(layout),
+        describe: `${describeLayout(layout)}\n\n${brief}`,
         // What the layout PLACES, not every mark that was drawn: a connector
         // is an edge, and content written for a line is content thrown away.
         ids: regionIdsIn(layout),

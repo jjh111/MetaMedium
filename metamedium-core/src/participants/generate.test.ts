@@ -548,3 +548,32 @@ describe('generate — a graph compiles as a graph', () => {
     expect(r.code).not.toContain('<svg');
   });
 });
+
+describe('the drawing is the brief', () => {
+  it('tells the model what each region plays and how they sit, in region ids', async () => {
+    const s = createSession();
+    // A container holding a label and two boxes side by side.
+    const frame = s.addStroke(rectStroke(50, 50, 600, 400), 1000);
+    s.addStroke(handRect(80, 160, 250, 200, { seed: 1 }), 1100);
+    s.addStroke(handRect(370, 160, 250, 200, { seed: 2 }), 1200);
+    s.addStroke(circleStroke(350, 250, 420), 2000);
+    s.addStroke(checkStroke(820, 250), 2500);
+    const id = s.bless({ summonId: s.getState().summon!.id, name: 'page', at: 3000 })!;
+    expect(frame).toBeTruthy();
+
+    stubOpenAI(fillReply({ r1: { html: '<h1>Hi</h1>' }, r2: { html: '<p>a</p>' }, r3: { html: '<p>b</p>' } }));
+    const agent = createAgentParticipant(s, config, 3500);
+    const res = await agent.generate({ prompt: 'a page', artifactId: id, at: 4000 });
+    expect(res.ok).toBe(true);
+
+    const u = userPrompt();
+    expect(u).toContain('WHAT EACH REGION PLAYS:');
+    expect(u).toMatch(/r1: container, holding r2, r3/);
+    expect(u).toContain('HOW THEY SIT:');
+    expect(u).toMatch(/within r1: r2, r3 read as a row/);
+    expect(u).toMatch(/r1 contains r2/);
+    // Session node ids never leak into a brief written in region ids.
+    expect(u).not.toMatch(/\bn\d+\b/);
+    expect(systemPrompt()).toContain('THE DRAWING IS THE BRIEF');
+  });
+});

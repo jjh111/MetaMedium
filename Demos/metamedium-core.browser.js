@@ -41,6 +41,9 @@ var MetaMediumCore = (() => {
     PRESETS: () => PRESETS,
     ROLES: () => ROLES,
     SETTLED_CONFIDENCE: () => SETTLED_CONFIDENCE,
+    SNAPPABLE: () => SNAPPABLE,
+    SNAP_CONFIDENCE: () => SNAP_CONFIDENCE,
+    SNAP_MARGIN: () => SNAP_MARGIN,
     TIER0_PARTICIPANT: () => TIER0_PARTICIPANT,
     aboutIdsOf: () => aboutIdsOf,
     analyzeCornerAngles: () => analyzeCornerAngles,
@@ -59,6 +62,8 @@ var MetaMediumCore = (() => {
     calculateStraightness: () => calculateStraightness,
     canonicalCheckSamples: () => canonicalCheckSamples,
     checkOvershoot: () => checkOvershoot,
+    cleanOf: () => cleanOf,
+    cleanPointsOf: () => cleanPointsOf,
     clusters: () => clusters,
     collidesWith: () => collidesWith,
     commandMarkFeatures: () => commandMarkFeatures,
@@ -76,12 +81,14 @@ var MetaMediumCore = (() => {
     describeAddressed: () => describeAddressed,
     describeGraph: () => describeGraph,
     describeLayout: () => describeLayout,
+    describeReading: () => describeReading,
     describeRegions: () => describeRegions,
     describeRelations: () => describeRelations,
     describeRoles: () => describeRoles,
     describeRoute: () => describeRoute,
     describeSession: () => describeSession,
     describeSignature: () => describeSignature,
+    describeSnap: () => describeSnap,
     disagreement: () => disagreement,
     enclosedBy: () => enclosedBy,
     explanationOf: () => explanationOf,
@@ -96,6 +103,7 @@ var MetaMediumCore = (() => {
     getRep: () => getRep,
     has: () => has,
     hasMultipleSources: () => hasMultipleSources,
+    idealize: () => idealize,
     interpretationsOf: () => interpretationsOf,
     isCheckLike: () => isCheckLike,
     isExplanation: () => isExplanation,
@@ -135,6 +143,7 @@ var MetaMediumCore = (() => {
     shapeExtent: () => shapeExtent,
     simplifyStroke: () => simplifyStroke,
     smoothStroke: () => smoothStroke,
+    snapReading: () => snapReading,
     sourcesOf: () => sourcesOf,
     stripThink: () => stripThink,
     strokePointsOf: () => strokePointsOf,
@@ -391,7 +400,11 @@ var MetaMediumCore = (() => {
     const path = resampleByArcLength(denoise(points), n2, isClosed2);
     if (path.length < 8) return empty;
     const arm = Math.max(2, Math.round(opts.window * path.length));
-    const sep = Math.max(2, Math.round(opts.separation * path.length));
+    const bb = getBounds(points);
+    const bw = bb.maxX - bb.minX, bh = bb.maxY - bb.minY;
+    const shortFrac = Math.min(bw, bh) / Math.max(1e-6, 2 * (bw + bh));
+    const sepFrac = Math.min(opts.separation, Math.max(0.03, shortFrac * 0.7));
+    const sep = Math.max(2, Math.round(sepFrac * path.length));
     const at = (i) => path[(i % path.length + path.length) % path.length];
     const turn = new Array(path.length).fill(0);
     for (let i = 0; i < path.length; i++) {
@@ -946,6 +959,296 @@ var MetaMediumCore = (() => {
     const fp = fingerprintOf(node);
     if (fp) return fp.bounds;
     return getRep(node, "bounds")?.data;
+  }
+
+  // src/session/interpretations.ts
+  function participantName(id, nodes) {
+    const p = nodes.get(id);
+    if (!p || !isParticipant(p)) return id;
+    return wordOf(p) ?? id;
+  }
+  function participantTier(id, nodes) {
+    const p = nodes.get(id);
+    return p?.capability ?? 0;
+  }
+  function interpretationsOf(node, nodes) {
+    const out = [];
+    const name = wordOf(node);
+    if (name) {
+      const blessedBy = node.edges.find((e) => e.rel === "blessed-by" && e.blessed)?.to;
+      out.push({
+        label: name,
+        to: node.id,
+        source: blessedBy ?? LOCAL_PARTICIPANT,
+        sourceName: participantName(blessedBy ?? LOCAL_PARTICIPANT, nodes),
+        tier: participantTier(blessedBy ?? LOCAL_PARTICIPANT, nodes),
+        weight: 1,
+        reasoning: "blessed by a participant",
+        blessed: true
+      });
+    }
+    for (const e of resemblances(node)) {
+      const source = e.via;
+      out.push({
+        label: e.to.replace(/^type:/, ""),
+        to: e.to,
+        source,
+        // An un-attributed resemblance is the engine's own Tier 0 reading:
+        // recognition ran inline at stroke time, before any participant spoke.
+        sourceName: source ? participantName(source, nodes) : participantName(TIER0_PARTICIPANT, nodes),
+        tier: source ? participantTier(source, nodes) : 0,
+        weight: e.weight ?? 0,
+        reasoning: e.reasoning,
+        blessed: e.blessed === true
+      });
+    }
+    return out.sort((a, b) => {
+      if (a.blessed !== b.blessed) return a.blessed ? -1 : 1;
+      return b.weight - a.weight;
+    });
+  }
+  function byTier(interpretations) {
+    const groups = /* @__PURE__ */ new Map();
+    for (const i of interpretations) {
+      const g = groups.get(i.tier);
+      if (g) g.push(i);
+      else groups.set(i.tier, [i]);
+    }
+    return [...groups.entries()].sort((a, b) => a[0] - b[0]).map(([key, list]) => ({ key, label: `tier ${key}`, interpretations: list }));
+  }
+  function bySource(interpretations) {
+    const groups = /* @__PURE__ */ new Map();
+    for (const i of interpretations) {
+      const key = i.source ?? TIER0_PARTICIPANT;
+      const g = groups.get(key);
+      if (g) g.push(i);
+      else groups.set(key, [i]);
+    }
+    return [...groups.entries()].map(([key, list]) => ({
+      key,
+      label: list[0].sourceName,
+      interpretations: list
+    }));
+  }
+  function disagreement(interpretations) {
+    if (interpretations.length < 2) return null;
+    const byLabel = /* @__PURE__ */ new Map();
+    for (const i of interpretations) {
+      const entry = byLabel.get(i.label);
+      const src = i.sourceName;
+      if (entry) {
+        entry.bestWeight = Math.max(entry.bestWeight, i.weight);
+        entry.sources.add(src);
+      } else {
+        byLabel.set(i.label, { bestWeight: i.weight, sources: /* @__PURE__ */ new Set([src]) });
+      }
+    }
+    if (byLabel.size < 2) return null;
+    const labels = [...byLabel.entries()].map(([label, v]) => ({ label, bestWeight: v.bestWeight, sources: [...v.sources] })).sort((a, b) => b.bestWeight - a.bestWeight);
+    const allSources = new Set(labels.flatMap((l) => l.sources));
+    const crossSource = allSources.size > 1 && labels.some((l) => !l.sources.every((s) => labels[0].sources.includes(s)));
+    return { labels, crossSource };
+  }
+  function sourcesOf(interpretations) {
+    return [...new Set(interpretations.map((i) => i.sourceName))];
+  }
+  function hasMultipleSources(interpretations) {
+    return sourcesOf(interpretations).length > 1;
+  }
+
+  // src/session/clean.ts
+  var SNAP_CONFIDENCE = 0.7;
+  var SNAP_MARGIN = 0.12;
+  var SNAPPABLE = /* @__PURE__ */ new Set(["rectangle", "circle", "triangle", "line", "arrow", "arc", "dot"]);
+  function snapReading(node, nodes) {
+    const tier0 = interpretationsOf(node, nodes).filter((r) => r.tier === 0 && r.to.startsWith("type:"));
+    const top = tier0[0];
+    if (!top) return { shape: "art", weight: 0, ok: false, reasoning: "no shape reading" };
+    const second = tier0[1];
+    const shape = top.label;
+    if (!SNAPPABLE.has(shape)) {
+      return { shape, weight: top.weight, ok: false, reasoning: `${shape} has no clean form` };
+    }
+    if (top.weight < SNAP_CONFIDENCE) {
+      return { shape, weight: top.weight, ok: false, reasoning: `${shape} ${top.weight.toFixed(2)} is below ${SNAP_CONFIDENCE}` };
+    }
+    if (second && top.weight - second.weight < SNAP_MARGIN) {
+      return {
+        shape,
+        weight: top.weight,
+        ok: false,
+        reasoning: `${shape} ${top.weight.toFixed(2)} and ${second.label} ${second.weight.toFixed(2)} are too close to call`
+      };
+    }
+    return {
+      shape,
+      weight: top.weight,
+      ok: true,
+      reasoning: second ? `${shape} ${top.weight.toFixed(2)}, well ahead of ${second.label} ${second.weight.toFixed(2)}` : `${shape} ${top.weight.toFixed(2)}, unopposed`
+    };
+  }
+  var TAU = Math.PI * 2;
+  function ellipse(b, n2 = 64) {
+    const cx2 = (b.minX + b.maxX) / 2, cy2 = (b.minY + b.maxY) / 2;
+    const rx = (b.maxX - b.minX) / 2, ry = (b.maxY - b.minY) / 2;
+    const out = [];
+    for (let i = 0; i < n2; i++) {
+      const a = i / n2 * TAU;
+      out.push({ x: cx2 + rx * Math.cos(a), y: cy2 + ry * Math.sin(a) });
+    }
+    return out;
+  }
+  function sideOf(a, b, p) {
+    return (b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x);
+  }
+  function circumcircle(a, b, c) {
+    const d = 2 * (a.x * (b.y - c.y) + b.x * (c.y - a.y) + c.x * (a.y - b.y));
+    if (Math.abs(d) < 1e-9) return null;
+    const a2 = a.x * a.x + a.y * a.y, b2 = b.x * b.x + b.y * b.y, c2 = c.x * c.x + c.y * c.y;
+    const cx2 = (a2 * (b.y - c.y) + b2 * (c.y - a.y) + c2 * (a.y - b.y)) / d;
+    const cy2 = (a2 * (c.x - b.x) + b2 * (a.x - c.x) + c2 * (b.x - a.x)) / d;
+    return { cx: cx2, cy: cy2, r: Math.hypot(a.x - cx2, a.y - cy2) };
+  }
+  function idealize(node, shape) {
+    const fp = fingerprintOf(node);
+    const raw = getRep(node, "stroke")?.data?.points;
+    if (!fp || !raw || raw.length < 2) return null;
+    const b = fp.bounds;
+    const w2 = b.maxX - b.minX, h2 = b.maxY - b.minY;
+    switch (shape) {
+      case "rectangle": {
+        return {
+          shape,
+          closed: true,
+          points: [
+            { x: b.minX, y: b.minY },
+            { x: b.maxX, y: b.minY },
+            { x: b.maxX, y: b.maxY },
+            { x: b.minX, y: b.maxY }
+          ],
+          reasoning: `the box the ink fills, ${Math.round(w2)}\xD7${Math.round(h2)}, squared up`
+        };
+      }
+      case "circle": {
+        const aspect = Math.min(w2, h2) / Math.max(1e-6, w2, h2);
+        if (aspect > 0.85) {
+          const r = (w2 + h2) / 4;
+          const cx2 = (b.minX + b.maxX) / 2, cy2 = (b.minY + b.maxY) / 2;
+          return {
+            shape,
+            closed: true,
+            points: ellipse({ minX: cx2 - r, maxX: cx2 + r, minY: cy2 - r, maxY: cy2 + r }),
+            reasoning: `a circle of radius ${Math.round(r)} on the ink's centre`
+          };
+        }
+        return { shape, closed: true, points: ellipse(b), reasoning: `an oval ${Math.round(w2)}\xD7${Math.round(h2)}, as drawn` };
+      }
+      case "triangle": {
+        const corners = (fp.cornerData ?? []).slice().sort((p, q) => q.angle - p.angle).slice(0, 3);
+        if (corners.length === 3) {
+          corners.sort((p, q) => p.t - q.t);
+          return {
+            shape,
+            closed: true,
+            points: corners.map((c) => ({ x: c.x, y: c.y })),
+            reasoning: "its three sharpest corners, joined straight"
+          };
+        }
+        return {
+          shape,
+          closed: true,
+          points: [{ x: (b.minX + b.maxX) / 2, y: b.minY }, { x: b.maxX, y: b.maxY }, { x: b.minX, y: b.maxY }],
+          reasoning: "an upright triangle in the box the ink fills"
+        };
+      }
+      case "line": {
+        return { shape, closed: false, points: [fp.start, fp.end], reasoning: "its two ends, joined straight" };
+      }
+      case "arrow": {
+        const meta = getRep(node, "reading:arrow")?.data;
+        const tail = meta?.tail ?? fp.start, tip = meta?.tip ?? fp.end;
+        const len = Math.hypot(tip.x - tail.x, tip.y - tail.y);
+        if (len < 1e-6) return null;
+        const ux = (tip.x - tail.x) / len, uy = (tip.y - tail.y) / len;
+        const barb = Math.max(6, Math.min(len * 0.28, 40));
+        const wing = (s) => ({
+          x: tip.x - barb * (ux * Math.cos(0.5) - s * uy * Math.sin(0.5)),
+          y: tip.y - barb * (uy * Math.cos(0.5) + s * ux * Math.sin(0.5))
+        });
+        return {
+          shape,
+          closed: false,
+          points: [tail, tip, wing(1), tip, wing(-1)],
+          reasoning: "a straight shaft from tail to tip, with an even barb"
+        };
+      }
+      case "arc": {
+        const a = fp.start, c = fp.end;
+        let mid = raw[Math.floor(raw.length / 2)], best = -1;
+        for (const p of raw) {
+          const d = Math.abs(sideOf(a, c, p));
+          if (d > best) {
+            best = d;
+            mid = p;
+          }
+        }
+        const cc = circumcircle(a, mid, c);
+        if (!cc) return { shape: "line", closed: false, points: [a, c], reasoning: "too flat to bow; drawn straight" };
+        const a0 = Math.atan2(a.y - cc.cy, a.x - cc.cx);
+        const a1 = Math.atan2(c.y - cc.cy, c.x - cc.cx);
+        const am = Math.atan2(mid.y - cc.cy, mid.x - cc.cx);
+        let sweep = a1 - a0;
+        const norm = (x) => (x % TAU + TAU) % TAU;
+        const viaCcw = norm(am - a0) < norm(a1 - a0);
+        sweep = viaCcw ? norm(a1 - a0) : -norm(a0 - a1);
+        const n2 = 40;
+        const points = [];
+        for (let i = 0; i <= n2; i++) {
+          const t = a0 + sweep * i / n2;
+          points.push({ x: cc.cx + cc.r * Math.cos(t), y: cc.cy + cc.r * Math.sin(t) });
+        }
+        return { shape, closed: false, points, reasoning: `a circular arc of radius ${Math.round(cc.r)} through its ends and its bulge` };
+      }
+      case "dot": {
+        const cx2 = (b.minX + b.maxX) / 2, cy2 = (b.minY + b.maxY) / 2;
+        const r = Math.max(1.5, Math.max(w2, h2) / 2);
+        return {
+          shape,
+          closed: true,
+          points: ellipse({ minX: cx2 - r, maxX: cx2 + r, minY: cy2 - r, maxY: cy2 + r }, 24),
+          reasoning: "a round dot where the ink landed"
+        };
+      }
+      default:
+        return null;
+    }
+  }
+  function cleanOf(node) {
+    return getRep(node, "clean")?.data;
+  }
+  function cleanPointsOf(node) {
+    const clean = cleanOf(node);
+    if (!clean) return void 0;
+    const to = getRep(node, "transform")?.data;
+    if (!to) return clean.points;
+    const raw = getRep(node, "stroke")?.data?.points;
+    if (!raw) return clean.points;
+    const from = getBounds(raw);
+    const fw = Math.max(1e-6, from.maxX - from.minX);
+    const fh = Math.max(1e-6, from.maxY - from.minY);
+    const sx = (to.maxX - to.minX) / fw;
+    const sy = (to.maxY - to.minY) / fh;
+    return clean.points.map((p) => ({
+      x: to.minX + (p.x - from.minX) * sx,
+      y: to.minY + (p.y - from.minY) * sy
+    }));
+  }
+  function describeSnap(node, nodes) {
+    const clean = cleanOf(node);
+    if (clean) return `drawn clean as a ${clean.shape} \u2014 ${clean.reasoning}`;
+    const r = snapReading(node, nodes);
+    const name = wordOf(node);
+    return (r.ok ? `could be drawn clean as a ${r.shape}` : `kept as ink`) + (name ? ` (${name})` : "") + ` \u2014 ${r.reasoning}`;
   }
 
   // src/session/erase.ts
@@ -2778,6 +3081,41 @@ ${pad}</${tag}>`;
       }
       recomputeClusterCandidates();
     }
+    function snappableIds() {
+      const out = contentIds.filter((id) => !artifacts.includes(id) && id !== pendingLasso?.id);
+      for (const aid of artifacts) {
+        const a = nodes.get(aid);
+        if (a) {
+          for (const e of a.edges) if (e.rel === "has-part") out.push(e.to);
+        }
+      }
+      return out;
+    }
+    function candidatesAmong(ids) {
+      const out = [];
+      for (const id of ids) {
+        const node = nodes.get(id);
+        if (!node || getRep(node, "erased") || !getRep(node, "stroke") || cleanOf(node)) continue;
+        const r = snapReading(node, nodes);
+        if (r.ok) out.push({ id, ...r });
+      }
+      return out;
+    }
+    function applySnap(ev) {
+      if (ev.mode === "raw") {
+        for (const id of ev.ids) {
+          const node = nodes.get(id);
+          if (node) node.reps = node.reps.filter((r) => r.modality !== "clean");
+        }
+        return;
+      }
+      for (const c of candidatesAmong(ev.ids)) {
+        const node = nodes.get(c.id);
+        const clean = idealize(node, c.shape);
+        if (!clean) continue;
+        node.reps.push({ modality: "clean", data: clean, confidence: c.weight, source: ev.participantId ?? "engine" });
+      }
+    }
     function applyTeach(ev) {
       commandMark = ev.mark;
     }
@@ -2818,6 +3156,9 @@ ${pad}</${tag}>`;
           return null;
         case "tidy":
           applyTidy(ev);
+          return null;
+        case "snap":
+          applySnap(ev);
           return null;
         case "code":
           return applyCode(ev);
@@ -2880,6 +3221,8 @@ ${pad}</${tag}>`;
       answer: (args) => dispatch({ type: "answer", ...args }),
       teachCommandMark: (mark, at) => void dispatch({ type: "teach", mark, at }),
       tidy: (args) => void dispatch({ type: "tidy", ...args }),
+      snap: (args) => void dispatch({ type: "snap", ...args }),
+      snapCandidates: (ids) => candidatesAmong(ids ?? snappableIds()),
       attachCode: (args) => dispatch({ type: "code", ...args }),
       regions: (artifactId) => {
         const node = nodes.get(artifactId);
@@ -2923,101 +3266,6 @@ ${pad}</${tag}>`;
       subscribe,
       getEvents: () => events
     };
-  }
-
-  // src/session/interpretations.ts
-  function participantName(id, nodes) {
-    const p = nodes.get(id);
-    if (!p || !isParticipant(p)) return id;
-    return wordOf(p) ?? id;
-  }
-  function participantTier(id, nodes) {
-    const p = nodes.get(id);
-    return p?.capability ?? 0;
-  }
-  function interpretationsOf(node, nodes) {
-    const out = [];
-    const name = wordOf(node);
-    if (name) {
-      const blessedBy = node.edges.find((e) => e.rel === "blessed-by" && e.blessed)?.to;
-      out.push({
-        label: name,
-        to: node.id,
-        source: blessedBy ?? LOCAL_PARTICIPANT,
-        sourceName: participantName(blessedBy ?? LOCAL_PARTICIPANT, nodes),
-        tier: participantTier(blessedBy ?? LOCAL_PARTICIPANT, nodes),
-        weight: 1,
-        reasoning: "blessed by a participant",
-        blessed: true
-      });
-    }
-    for (const e of resemblances(node)) {
-      const source = e.via;
-      out.push({
-        label: e.to.replace(/^type:/, ""),
-        to: e.to,
-        source,
-        // An un-attributed resemblance is the engine's own Tier 0 reading:
-        // recognition ran inline at stroke time, before any participant spoke.
-        sourceName: source ? participantName(source, nodes) : participantName(TIER0_PARTICIPANT, nodes),
-        tier: source ? participantTier(source, nodes) : 0,
-        weight: e.weight ?? 0,
-        reasoning: e.reasoning,
-        blessed: e.blessed === true
-      });
-    }
-    return out.sort((a, b) => {
-      if (a.blessed !== b.blessed) return a.blessed ? -1 : 1;
-      return b.weight - a.weight;
-    });
-  }
-  function byTier(interpretations) {
-    const groups = /* @__PURE__ */ new Map();
-    for (const i of interpretations) {
-      const g = groups.get(i.tier);
-      if (g) g.push(i);
-      else groups.set(i.tier, [i]);
-    }
-    return [...groups.entries()].sort((a, b) => a[0] - b[0]).map(([key, list]) => ({ key, label: `tier ${key}`, interpretations: list }));
-  }
-  function bySource(interpretations) {
-    const groups = /* @__PURE__ */ new Map();
-    for (const i of interpretations) {
-      const key = i.source ?? TIER0_PARTICIPANT;
-      const g = groups.get(key);
-      if (g) g.push(i);
-      else groups.set(key, [i]);
-    }
-    return [...groups.entries()].map(([key, list]) => ({
-      key,
-      label: list[0].sourceName,
-      interpretations: list
-    }));
-  }
-  function disagreement(interpretations) {
-    if (interpretations.length < 2) return null;
-    const byLabel = /* @__PURE__ */ new Map();
-    for (const i of interpretations) {
-      const entry = byLabel.get(i.label);
-      const src = i.sourceName;
-      if (entry) {
-        entry.bestWeight = Math.max(entry.bestWeight, i.weight);
-        entry.sources.add(src);
-      } else {
-        byLabel.set(i.label, { bestWeight: i.weight, sources: /* @__PURE__ */ new Set([src]) });
-      }
-    }
-    if (byLabel.size < 2) return null;
-    const labels = [...byLabel.entries()].map(([label, v]) => ({ label, bestWeight: v.bestWeight, sources: [...v.sources] })).sort((a, b) => b.bestWeight - a.bestWeight);
-    const allSources = new Set(labels.flatMap((l) => l.sources));
-    const crossSource = allSources.size > 1 && labels.some((l) => !l.sources.every((s) => labels[0].sources.includes(s)));
-    return { labels, crossSource };
-  }
-  function sourcesOf(interpretations) {
-    return [...new Set(interpretations.map((i) => i.sourceName))];
-  }
-  function hasMultipleSources(interpretations) {
-    return sourcesOf(interpretations).length > 1;
   }
 
   // src/llm/provider.ts
@@ -3252,6 +3500,69 @@ ${pad}</${tag}>`;
       "Change only what those regions cover. Leave the rest of the code as it is."
     ].join("\n");
   }
+  var ENGAGING_RELATIONS = ["contains", "near", "touching", "crossing"];
+  function roleLine(r, name, noun) {
+    const me = name(r.id);
+    if (!me) return void 0;
+    const others = r.targets.map(name).filter((x) => !!x);
+    switch (r.role) {
+      case "container":
+        return `${me}: container${others.length ? `, holding ${others.join(", ")}` : ""} \u2014 its contents are its sections`;
+      case "label":
+        return others.length ? `${me}: label for ${others[0]} \u2014 handwriting the human put there. You cannot read it; write the title or caption that belongs in that place, and treat ${others[0]} as titled by it` : `${me}: label \u2014 handwriting; write what belongs there`;
+      case "edge": {
+        if (r.direction) {
+          const from = name(r.direction.from), to = name(r.direction.to);
+          if (from && to) return `${me}: edge ${from} \u2192 ${to} \u2014 a connection with a direction`;
+        }
+        return others.length ? `${me}: edge joining ${others.join(" and ")}` : `${me}: edge`;
+      }
+      case "annotation":
+        return `${me}: annotation${others.length ? ` near ${others[0]}` : ""} \u2014 a note in the margin, not part of the ${noun}s' content`;
+      case "node":
+        return `${me}: node \u2014 a ${noun} that holds content of its own`;
+      default:
+        return `${me}: unclassified \u2014 ${r.reasoning}`;
+    }
+  }
+  function describeReading(reading, options = {}) {
+    const name = options.idOf ?? ((id) => id);
+    const noun = options.noun ?? "region";
+    const lines = [];
+    lines.push(`GENRE: ${reading.genre.genre} \u2014 ${reading.genre.reasoning}`);
+    const roleLines = reading.roles.map((r) => roleLine(r, name, noun)).filter((x) => !!x);
+    if (roleLines.length) {
+      lines.push("", `WHAT EACH ${noun.toUpperCase()} PLAYS:`);
+      for (const l of roleLines) lines.push(`  ${l}`);
+    }
+    const seen = /* @__PURE__ */ new Set();
+    const sits = [];
+    for (const c of reading.concepts) {
+      const members = [...new Set(Object.values(c.roles ?? {}).flat())].map(name).filter((x) => !!x);
+      const who = members.length ? members.join(", ") : "these marks";
+      sits.push(`${who} read as a ${c.concept} (${c.confidence.toFixed(2)}) \u2014 ${c.reasoning}`);
+    }
+    for (const r of reading.relations) {
+      if (!ENGAGING_RELATIONS.includes(r.kind)) continue;
+      const a = name(r.from), b = name(r.to);
+      if (!a || !b) continue;
+      const key = r.kind === "contains" ? `${r.kind}:${a}:${b}` : `${r.kind}:${[a, b].sort().join(":")}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const verb = r.kind === "contains" ? "contains" : r.kind === "near" ? "is near" : r.kind === "touching" ? "touches" : "crosses";
+      sits.push(`${a} ${verb} ${b} (${r.strength.toFixed(2)})`);
+    }
+    if (sits.length) {
+      lines.push("", "HOW THEY SIT:");
+      for (const l of sits) lines.push(`  ${l}`);
+    }
+    const names = Object.entries(reading.scope?.names ?? {}).map(([id, w2]) => [name(id), w2]).filter((x) => !!x[0]);
+    if (names.length) {
+      lines.push("", "NAMES the human gave:");
+      for (const [id, w2] of names) lines.push(`  ${id}: "${w2}"`);
+    }
+    return lines.join("\n");
+  }
 
   // src/participants/agent.ts
   var MAX_READINGS = 4;
@@ -3294,6 +3605,11 @@ For each region id you are given, return:
   - "style" \u2014 optional inline style for the region box itself: background, padding, border, alignment.
 
 Also return a "theme": background, color, accent, fontFamily for the page as a whole.
+
+THE DRAWING IS THE BRIEF. Below the layout you are told what each region PLAYS, how the regions sit, and any names the human gave. Read it before writing a word:
+- A label is handwriting the human put inside a region. You cannot read it, so write the title or caption that belongs in exactly that place, and make the region it labels read as titled by it.
+- Regions in a row are peers of equal standing. A column is a sequence, top to bottom. A container's contents are its sections, and the container itself frames them.
+- A short request ("a page", "a card") is not a request for placeholders. Infer a specific subject from the structure \u2014 a header over two columns over a footer is a product page, a box with a label inside it is a titled panel \u2014 and commit to it throughout.
 
 Rules:
 - Fill EVERY region you are given, using its exact id.
@@ -3475,7 +3791,9 @@ Reply with ONLY a JSON object, no prose, no code fences:
       const targets = nodeIds.filter((n2) => state.nodes.has(n2));
       if (targets.length === 0) return { ok: false, readings: [], error: "no such nodes" };
       const isCluster = targets.length > 1;
-      const context = describeSession(state, { nodeIds: targets });
+      const context = describeSession(state, { nodeIds: targets }) + (isCluster ? `
+
+${describeReading(session.read(targets), { noun: "mark" })}` : "");
       const signature = isCluster ? describeSignature(state, targets) : "";
       const question = isCluster ? `These ${targets.length} marks were grouped together (${signature}). What could this group be? Offer several readings.` : `What could this mark be? Offer several readings.`;
       const result2 = await send(
@@ -3508,7 +3826,9 @@ ${question}` }
       const state = session.getState();
       const targets = nodeIds.filter((n2) => state.nodes.has(n2));
       if (targets.length === 0) return { ok: false, error: "no such nodes" };
-      const context = describeSession(state, { nodeIds: targets });
+      const context = describeSession(state, { nodeIds: targets }) + (targets.length > 1 ? `
+
+${describeReading(session.read(targets), { noun: "mark" })}` : "");
       const result2 = await send(
         config,
         [
@@ -3556,6 +3876,23 @@ Question: ${q}` }
       if (regions.length === 0) return { ok: false, error: "nothing was drawn inside the artifact" };
       const reading = session.read(regions.map((r) => r.nodeId));
       const genre = reading.genre.genre;
+      const regionIdOf = new Map(regions.map((r) => [r.nodeId, r.id]));
+      const idOf = (id2) => regionIdOf.get(id2);
+      const inside = [];
+      for (const r of reading.roles) {
+        if (r.role !== "container" || r.targets.length < 2) continue;
+        const me = idOf(r.id);
+        if (!me) continue;
+        for (const c of session.read(r.targets).concepts) {
+          const members = [...new Set(Object.values(c.roles ?? {}).flat())].map(idOf).filter((x) => !!x);
+          const who = members.length ? members.join(", ") : r.targets.map(idOf).filter(Boolean).join(", ");
+          inside.push(`  within ${me}: ${who} read as a ${c.concept} (${c.confidence.toFixed(2)}) \u2014 ${c.reasoning}`);
+        }
+      }
+      const brief = describeReading(reading, { idOf }) + (inside.length ? `
+
+WITHIN CONTAINERS:
+${inside.join("\n")}` : "");
       let plan;
       if (genre === "graph" || genre === "mixed") {
         const strokes = {};
@@ -3570,16 +3907,18 @@ Question: ${q}` }
         }
         const graph = parseGraph(regions, frame, reading.roles, { strokes, arrows });
         plan = {
-          describe: `${describeRoles(reading.roles, reading.genre)}
+          describe: `${describeGraph(graph)}
 
-${describeGraph(graph)}`,
+${brief}`,
           ids: nodeIdsIn(graph),
           build: (c, t) => buildGraphScaffold(graph, c, t)
         };
       } else {
         const layout = parseLayout(regions, frame, connectionsOf(artifact, state, regions));
         plan = {
-          describe: describeLayout(layout),
+          describe: `${describeLayout(layout)}
+
+${brief}`,
           // What the layout PLACES, not every mark that was drawn: a connector
           // is an edge, and content written for a line is content thrown away.
           ids: regionIdsIn(layout),

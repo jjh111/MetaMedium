@@ -15,6 +15,9 @@ import type { SessionState } from '../session/session';
 import { fingerprintOf, wordOf, boundsOf, isParticipant, isGesture } from '../session/nodes';
 import { interpretationsOf } from '../session/interpretations';
 import type { Rect, Region } from '../session/regions';
+import type { Relation } from '../relate/relations';
+import type { GenreReading, RoleReading } from '../diagram/roles';
+import type { ConceptMatch, ConceptScope } from '../concepts/concept';
 
 export interface SerializeOptions {
   /** Restrict to these nodes (e.g. a lasso's contents). Default: all content. */
@@ -181,4 +184,115 @@ export function describeAddressed(regions: Region[], addressedIds: string[]): st
     ...hit.map((r) => `  ${r.id} (${rect(r.rect)}, drawn as a ${r.shape})`),
     'Change only what those regions cover. Leave the rest of the code as it is.',
   ].join('\n');
+}
+
+// ===== The reading, as a brief =====
+//
+// What `session.read()` returns is the engine's whole understanding of a set
+// of marks: what each plays, how they sit, what the arrangement reads as. A
+// model handed the layout tree alone writes a page that FITS the boxes; handed
+// this as well, it can write the page the boxes were drawn FOR. "A page" is a
+// two-word prompt; the drawing is the brief, and this is the drawing read out.
+
+export interface ReadingLike {
+  relations: Relation[];
+  roles: RoleReading[];
+  genre: GenreReading;
+  concepts: ConceptMatch[];
+  scope?: Pick<ConceptScope, 'names'>;
+}
+
+export interface DescribeReadingOptions {
+  /**
+   * Rename marks for the reader — node ids to region ids, when the reader will
+   * fill regions. A mark this returns undefined for is left out, because the
+   * reader has no way to act on it.
+   */
+  idOf?: (nodeId: string) => string | undefined;
+  /** Say what the region ids mean for the reader. Default: "region". */
+  noun?: string;
+}
+
+const ENGAGING_RELATIONS: Relation['kind'][] = ['contains', 'near', 'touching', 'crossing'];
+
+function roleLine(r: RoleReading, name: (id: string) => string | undefined, noun: string): string | undefined {
+  const me = name(r.id);
+  if (!me) return undefined;
+  const others = r.targets.map(name).filter((x): x is string => !!x);
+  switch (r.role) {
+    case 'container':
+      return `${me}: container${others.length ? `, holding ${others.join(', ')}` : ''} — its contents are its sections`;
+    case 'label':
+      return others.length
+        ? `${me}: label for ${others[0]} — handwriting the human put there. You cannot read it; write the title or caption that belongs in that place, and treat ${others[0]} as titled by it`
+        : `${me}: label — handwriting; write what belongs there`;
+    case 'edge': {
+      if (r.direction) {
+        const from = name(r.direction.from), to = name(r.direction.to);
+        if (from && to) return `${me}: edge ${from} → ${to} — a connection with a direction`;
+      }
+      return others.length ? `${me}: edge joining ${others.join(' and ')}` : `${me}: edge`;
+    }
+    case 'annotation':
+      return `${me}: annotation${others.length ? ` near ${others[0]}` : ''} — a note in the margin, not part of the ${noun}s' content`;
+    case 'node':
+      return `${me}: node — a ${noun} that holds content of its own`;
+    default:
+      return `${me}: unclassified — ${r.reasoning}`;
+  }
+}
+
+/**
+ * The engine's reading of some marks, as text a model can act on.
+ *
+ * Says only what was measured: roles from the table, concepts with their
+ * confidence, the relations that bind marks together, names the human gave.
+ * Alignment and peerhood relations are folded into the concepts that use them
+ * rather than listed pairwise — a row is one fact, not six.
+ */
+export function describeReading(reading: ReadingLike, options: DescribeReadingOptions = {}): string {
+  const name = options.idOf ?? ((id: string) => id);
+  const noun = options.noun ?? 'region';
+  const lines: string[] = [];
+
+  lines.push(`GENRE: ${reading.genre.genre} — ${reading.genre.reasoning}`);
+
+  const roleLines = reading.roles.map((r) => roleLine(r, name, noun)).filter((x): x is string => !!x);
+  if (roleLines.length) {
+    lines.push('', `WHAT EACH ${noun.toUpperCase()} PLAYS:`);
+    for (const l of roleLines) lines.push(`  ${l}`);
+  }
+
+  const seen = new Set<string>();
+  const sits: string[] = [];
+  for (const c of reading.concepts) {
+    const members = [...new Set(Object.values(c.roles ?? {}).flat())].map(name).filter((x): x is string => !!x);
+    const who = members.length ? members.join(', ') : 'these marks';
+    sits.push(`${who} read as a ${c.concept} (${c.confidence.toFixed(2)}) — ${c.reasoning}`);
+  }
+  for (const r of reading.relations) {
+    if (!ENGAGING_RELATIONS.includes(r.kind)) continue;
+    const a = name(r.from), b = name(r.to);
+    if (!a || !b) continue;
+    // Symmetric kinds once per pair; contains is directional and already unique.
+    const key = r.kind === 'contains' ? `${r.kind}:${a}:${b}` : `${r.kind}:${[a, b].sort().join(':')}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const verb = r.kind === 'contains' ? 'contains' : r.kind === 'near' ? 'is near' : r.kind === 'touching' ? 'touches' : 'crosses';
+    sits.push(`${a} ${verb} ${b} (${r.strength.toFixed(2)})`);
+  }
+  if (sits.length) {
+    lines.push('', 'HOW THEY SIT:');
+    for (const l of sits) lines.push(`  ${l}`);
+  }
+
+  const names = Object.entries(reading.scope?.names ?? {})
+    .map(([id, w]) => [name(id), w] as const)
+    .filter((x): x is readonly [string, string] => !!x[0]);
+  if (names.length) {
+    lines.push('', 'NAMES the human gave:');
+    for (const [id, w] of names) lines.push(`  ${id}: "${w}"`);
+  }
+
+  return lines.join('\n');
 }

@@ -56,6 +56,9 @@ window.__helpers = function(){
 /** Helpers plus a stubbed model, for a deterministic run. */
 window.__setup = function(){
   window.__helpers();
+  // A mark held on this device from an earlier run would make step 0 — "the
+  // built-in check summons with nothing taught" — untrue before we begin.
+  if (window.__mm.savedMark()) window.__mm.forgetMark();
   const strokeOn = window.__t.strokeOn, line = window.__t.line;
 
   window.__calls=[];
@@ -147,6 +150,13 @@ window.__scenario = async function(){
   step('2. three boxes drawn, zoomed out to see them all',
     t.summary().loose === 3 && mm.view.zoom < 0.5,
     {loose: t.summary().loose, zoom:+mm.view.zoom.toFixed(2)});
+  {
+    // The snap offer: confident shapes are offered clean, never writing, and
+    // never the held lasso. Nothing is redrawn until the offer is taken up.
+    const offers = mm.snapOffers();
+    step('2b. the three boxes read clean and are offered as rectangles', offers.size === 3 && [...offers.values()].every(o => o.shape === 'rectangle'),
+      {offers: [...offers.values()].map(o => o.shape + ' ' + o.weight.toFixed(2)), rail: document.getElementById('snapBtn').textContent, hidden: document.getElementById('snapBtn').hidden});
+  }
 
   // ---- 3. Lasso the whole set at low zoom ----
   const c = mm.worldToScreen(490, 340);
@@ -168,6 +178,21 @@ window.__scenario = async function(){
   step('5. crossing with the taught mark summons', sum && sum.enclosed === 3,
     {enclosed: sum && sum.enclosed, chips: t.chips()});
   step('5b. the offer includes a freeform prompt', t.chips().some(x=>x.startsWith('Describe it')), t.chips());
+  {
+    const st0 = mm.session.getState();
+    step('5c. a held lasso is never offered for snapping — it is a gesture in waiting', ![...mm.snapOffers().keys()].some(id => st0.summon && st0.summon.gestureIds.includes(id)));
+    // Drawing them clean is a Tier 0 offer in the palette, and the summon survives it.
+    const chip = [...document.querySelectorAll('#summon .item')].find(b => /Draw them clean/.test(b.textContent));
+    step('5d. the palette offers to draw them clean, needing no model', !!chip && /·now/.test(chip.textContent), t.chips());
+    if (chip) chip.click();
+    await wait(150);
+    const st = mm.session.getState();
+    const cleaned = st.summon ? st.summon.enclosedIds.filter(id => MM.cleanOf(st.nodes.get(id))).length : -1;
+    step('5e. they are drawn clean, the ink is kept, and the summon stays open', cleaned === 3 && !!st.summon &&
+      st.summon.enclosedIds.every(id => MM.strokePointsOf(st.nodes.get(id)).length > 4),
+      {cleaned, summonOpen: !!st.summon, offersNow: mm.snapOffers().size});
+    step('5f. the offer is not made twice', !t.chips().some(x => /clean/.test(x)), t.chips());
+  }
 
   // ---- 6. Prompt it into living code ----
   const make = [...document.querySelectorAll('#summon .item')].find(b=>b.textContent.trim().startsWith('Describe it'));
@@ -181,6 +206,12 @@ window.__scenario = async function(){
   const artId = st1.artifacts[0];
   step('6. the artifact is live', st1.live.length === 1 && st1.live[0] === artId,
     {live: st1.live, status: document.getElementById('mpStatus').textContent});
+  {
+    const build = window.__calls.find(c => /REGIONS TO FILL/.test(c.user));
+    step('6b. the model was briefed on what each region plays and how they sit, in region ids',
+      !!build && /WHAT EACH REGION PLAYS:/.test(build.user) && /HOW THEY SIT:/.test(build.user) && /r1: node/.test(build.user) && !/\bn\d+\b/.test(build.user),
+      build ? build.user.split('\n').filter(l => /PLAYS|SIT|r1/.test(l)).slice(0, 6) : 'no build call');
+  }
 
   // ---- 7. The rendered page matches the drawing ----
   // Not "did the model position things correctly" — it is not asked to. The
