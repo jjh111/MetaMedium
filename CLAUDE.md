@@ -18,8 +18,8 @@ automatically → ask "why?" and get grounded reasoning.
 ## Current Status & Plan
 
 **See `MVP.md`** for the product being built — *ink over living artifacts*.
-**See `KEYFRAMES.md`** for the sprint under review: three fixed rungs
-(shape → diagram-shape → code), each with a closed vocabulary.
+**See `KEYFRAMES.md`** for the three rungs every mark climbs
+(shape → diagram-shape → code), each with a closed vocabulary — **built**.
 **See `ROADMAP.md`** for status and the August 2026 accounting.
 `ARCHITECTURE-v7-PARTICIPANTS-AND-TIERS.md` is the active engine plan; MVP.md
 absorbs and raises its Stage D.
@@ -29,15 +29,15 @@ circle them, cross with a command mark *you taught the system*, prompt them into
 a living page that renders in the canvas with your ink still outlining its
 divs — then draw on that page and the ink addresses the regions underneath it.
 Scratch anything out to erase. `Demos/session-engine.html` is the surface;
-`Demos/session-engine.e2e.js` drives all 21 steps through the real UI.
+`Demos/session-engine.e2e.js` drives all 24 steps through the real UI, page and flowchart both.
 Still open: handwriting (v7 Stage E). Whitepaper v5.1 stays parked until the
 conversation benchmark passes end to end.
 
 Architecture documents (chronological; **read MVP.md, then v7, then v6**):
 - `MVP.md` — **the product definition**: infinite canvas, a learned command mark,
   drawings prompted into living code, and ink that addresses what's under it
-- `KEYFRAMES.md` — **next sprint, under review**: narrowing the open-ended
-  concept library to three keyframes with closed vocabularies
+- `KEYFRAMES.md` — **the three keyframes, built**: shape → diagram-shape →
+  code, each a closed vocabulary; the mappings between them are tables
 - `ARCHITECTURE-v7-PARTICIPANTS-AND-TIERS.md` — **active plan**: putting a model in the loop through the `propose` channel; the conversation benchmark; one OpenAI-compatible transport for Ollama/LM Studio/OpenRouter
 - `ARCHITECTURE-v6-SESSION-ENGINE.md` — **active design**: the no-modes session engine (deferred commitment, summoning, promotion ladder, capability tiers), implemented in `metamedium-core/`
 - `metamedium-core-schema.md` — graph data model ("everything is a node; type emerges from connections") — load-bearing via v6
@@ -57,7 +57,7 @@ any structural change.
 
 | Path | What it is |
 |---|---|
-| `metamedium-core/` | **The canonical engine** (TypeScript, zero deps, tested): geometry, recognition, spatial graph, the no-modes session engine, the layout parser, and the LLM transport. New recognition/engine work lands HERE |
+| `metamedium-core/` | **The canonical engine** (TypeScript, zero deps, tested): geometry, recognition (the shape rung), relations, the diagram rung (`src/diagram/`), concepts, the no-modes session engine, the layout and graph parsers, and the LLM transport. New recognition/engine work lands HERE |
 | `index.html` | **Interactive whitepaper v5** "MetaMedium: AI Beyond Chat" (live on GitHub Pages) |
 | `doodle2-canvas.html` | **Flagship demo**: heuristic recognition, spatial graph, library, undo/redo, touch. No LLM. Single-file (~500KB) |
 | `metadoodle1.html` | Fork of flagship + tiered LLM recognition (WebLLM in-browser, LM Studio local API) + voice. Single-file (~600KB) |
@@ -140,6 +140,17 @@ context to outrank the engine.
 is the strongest single discriminator.** Rectangle ~1.0, circle ~0.79, triangle
 ~0.5. Corner count is fragile (miss one corner and a box becomes a triangle);
 extent holds regardless. This is what fixed "rectangles read as triangles".
+
+**The shape rung is closed: eight entries.** `line`, `arc`, `triangle`,
+`rectangle`, `circle`, and — because the rung above cannot do without them —
+`arrow` (a straight shaft with a barb: an edge with no arrow has no direction),
+`text` (writing, *without reading it*: open, turns many times, low and wide,
+mostly-empty box — enough to make a mark a `label`), and `dot`. **Below the
+hand's resolution (`HAND_RESOLUTION_PX`) only `dot` is offered**: a 5px blob has
+no measurable geometry, and reporting "circle 0.85" for it would be sensor noise
+dressed as evidence. A detector may return `meta` beyond its label — an arrow's
+tip and tail — which the session keeps as a `reading:<type>` rep so the rungs
+above can read direction as a fact.
 
 **Size-relative closure** (key innovation): a stroke closes if the start–end
 gap is under a fixed pixel threshold **or** under a fraction of the stroke's
@@ -298,13 +309,40 @@ them evenly across the span already used, or matches sizes to the largest. Ink
 is never destroyed — the original stroke is untouched and the mark gains a
 `'transform'` rep, so undo springs it back exactly.
 
-### Spatial Graph
+### The diagram rung: what a mark PLAYS
 
-Relationships between strokes drive composition recognition: intersection,
-touching (proximity threshold), containment (bounds inside closed shape),
-directional proximity. Canonical: `metamedium-core/src/spatial.ts`. Legacy
-copies for reference: `Web App Skeleton/src/core/spatial.ts` and the spatial
-intelligence panel in `doodle2-canvas.html`.
+> `metamedium-core/src/diagram/roles.ts` — KEYFRAMES.md §2–3.
+
+Shape says *rectangle*; this rung says *container*. It is the link between
+seeing a shape and writing a div, and it is a **closed vocabulary of six**:
+`container`, `node`, `edge`, `label`, `annotation`, `unclassified`. Roles are
+placed by a nine-row **table** over shape + relations + wires, read top to
+bottom, first match wins — and a mark no row places is `unclassified`, *said out
+loud*. Two decisions the table forced: a lone closed box is a `node`, not a note
+(you draw boxes before you connect them); and "relates to nothing" means no
+*engaging* relation (`near`/`touching`/`crossing`/`contains`) — a note in the
+margin can be the same size as a box on the page and still be in the margin.
+
+**A drawing has a genre** (`genreOf`): boxes tiling a space are a `layout`,
+nodes joined by edges are a `graph`, a graph inside a container is `mixed`.
+The genre picks the code target: `parse/layout.ts` (flexbox that reflows) or
+`parse/graph.ts` (nodes at their drawn positions, edges as SVG paths following
+the drawn ink, cut at the tip so the head sits where the arrow pointed).
+
+**Concepts are built on roles**, not shapes: a `row` is a run of `node`s, a
+`frame` is a `container` and what it holds, a `flow` is `node`s joined by
+`edge`s — and gets its direction for free. `session.read(ids)` returns the
+relations, roles, genre and concepts together; the inspector's **ladder**
+(ink → shape → plays → code) is that reading, per mark.
+
+### Spatial Graph — retired
+
+The old spatial graph (`spatial.ts`, with its fixed 50px "touching") is gone.
+`src/relate/relations.ts` is the one relation system: the session records its
+measured, scale-free relations on the node graph, clusters over them, and infers
+wires (`connects`, plus `points-from`/`points-to` for arrows) with a tolerance
+relative to the target's own size. Legacy copies still exist for reference in
+`Web App Skeleton/src/core/spatial.ts` and `doodle2-canvas.html`.
 
 ### Tiered LLM Interpretation
 

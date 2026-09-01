@@ -1,7 +1,7 @@
 # The Three Keyframes
 
 **Date:** August 2026
-**Status:** Sprint plan — for review
+**Status:** **Built** (all six stages). What each stage found is recorded under it.
 **Relationship to other docs:** `MVP.md` is the product; this is the next sprint
 inside it. It absorbs and narrows the open-ended concept library added on 20 Aug.
 
@@ -51,9 +51,9 @@ rung above it:
 | shape | status | why it matters |
 |---|---|---|
 | `rectangle` `circle` `triangle` `line` `arc` | ✅ built | the current vocabulary |
-| **`arrow`** | ✗ missing | **without it an edge has no direction**, and a flow is just a graph |
-| **`text`** | ✗ missing | **without it a label is indistinguishable from a box**, so every scribble in a box reads as structure |
-| **`dot`** | ✗ missing | a point, a bullet, a terminus — currently reads as a tiny circle or nothing |
+| **`arrow`** | ✅ 100% | **without it an edge has no direction**, and a flow is just a graph |
+| **`text`** | ✅ 99% | **without it a label is indistinguishable from a box**, so every scribble in a box reads as structure |
+| **`dot`** | ✅ 100% | a point, a bullet, a terminus — below the hand's resolution only `dot` is offered |
 
 **`text` does not mean readable.** Knowing *"there is writing here"* is enough to
 assign the `label` role, and it is a far cheaper thing to detect than what the
@@ -86,7 +86,7 @@ and the genre chooses the code target:
 | genre | when | target |
 |---|---|---|
 | `layout` | containers and nodes tiling a space, no edges | flexbox scaffold ✅ built |
-| `graph` | ≥2 nodes joined by ≥1 edge | nodes + connectors — **to build** |
+| `graph` | ≥2 nodes joined by ≥1 edge | nodes + SVG connectors following the ink ✅ built |
 | `mixed` | both | layout outer, graph within a container |
 
 ---
@@ -105,7 +105,7 @@ the first row that matches wins.
 | 5 | `line` | both ends engage marks | `edge`, undirected |
 | 6 | `arrow`/`line` | one end engages a mark | `annotation` (a pointer) |
 | 7 | closed | anything else | `node` |
-| 8 | anything | relates to nothing | `annotation` |
+| 8 | anything open | engages nothing (`near`/`touching`/`crossing`/`contains`) | `annotation` |
 | 9 | — | no rule matched | `unclassified` |
 
 And the second mapping, role → code, chosen by genre:
@@ -134,7 +134,7 @@ Two properties worth stating because they are easy to lose:
 
 Six stages. Each ends with something you can look at.
 
-### Stage 1 — Finish the shape rung  ·  ~2 days
+### Stage 1 — Finish the shape rung  ·  ✅ built
 Add `arrow`, `text`, `dot` to `src/recognition.ts`, and extend the hand-drawn
 corpus in `src/test/cases.ts` to cover them.
 
@@ -149,20 +149,20 @@ corpus in `src/test/cases.ts` to cover them.
 **Ship:** the benchmark covers 8 shapes and still reads ≥99%, and a hand-drawn
 arrow is told from a line, and writing in a box from a box in a box.
 
-### Stage 2 — The diagram rung  ·  ~2 days
+### Stage 2 — The diagram rung  ·  ✅ built
 New `src/diagram/roles.ts`: the §3 table, applied over shapes + relations.
 
 **Ship:** draw a flowchart and every mark reports its role; draw a page and
 every mark reports its role; anything the table cannot place says
 `unclassified` rather than guessing.
 
-### Stage 3 — Genre  ·  ~0.5 day
+### Stage 3 — Genre  ·  ✅ built
 `genreOf(roles)` → `layout` | `graph` | `mixed`, from role counts.
 
 **Ship:** four boxes in a grid say `layout`; three boxes and two arrows say
 `graph`; the inspector shows which and why.
 
-### Stage 4 — The graph code target  ·  ~3 days
+### Stage 4 — The graph code target  ·  ✅ built
 `src/parse/graph.ts` beside `parse/layout.ts`. Nodes positioned where they were
 drawn; edges as SVG paths following the drawn line; labels as content. Same
 contract as the layout target: **the engine owns structure, the model owns
@@ -171,7 +171,7 @@ content**, and `data-region` still ties ink to element.
 **Ship:** draw two boxes and an arrow, get a running diagram whose connector
 follows your ink, change a box's copy without the arrow moving.
 
-### Stage 5 — Concepts rebuilt on roles  ·  ~1 day
+### Stage 5 — Concepts rebuilt on roles  ·  ✅ built
 The existing six concepts currently match raw relations. Rebuild them over
 roles: `row` is peers that are all `node`s; `frame` is a `container` with
 contents; `flow` is `node`s joined by `edge`s. Same names, one rung up, far
@@ -180,7 +180,7 @@ less to say.
 **Ship:** the palette offers by role and genre, and the concept predicates get
 shorter rather than longer.
 
-### Stage 6 — Show the ladder  ·  ~1 day
+### Stage 6 — Show the ladder  ·  ✅ built
 The inspector walks it for any mark:
 
 ```
@@ -194,7 +194,16 @@ stroke:7
 **Ship:** every mark on the canvas can be walked from ink to code, and each rung
 says why. This is also the demo that makes the idea legible to someone else.
 
-**Total: ~9–10 days.**
+**What the build found.** The benchmark over 1674 hand-drawn strokes reads
+99.8%, arrows 100%; the one thing that took tuning was a two-wing arrowhead,
+three corners and legitimately a third of the stroke, which a tight head window
+read as a bent line every time. The role table forced two decisions worth
+recording: a lone closed box is a `node`, not a note — you draw boxes before you
+connect them — and "relates to nothing" has to mean no *engaging* relation, or a
+note in the margin the same size as a box on the page stops being in the margin.
+Concepts rebuilt on roles passed every existing concept test unchanged, and
+every predicate got shorter. 390 core tests; the browser e2e compiles a page and
+a flowchart in the same run.
 
 ---
 

@@ -133,7 +133,7 @@ the transport is injectable, so a participant can be answered by hand — any
 model takes part through the same channel, including one with no API.
 361 core tests, 27-step browser e2e.
 
-### → **Next: the three keyframes** — [KEYFRAMES.md](KEYFRAMES.md), under review
+### ✅ **The three keyframes** — [KEYFRAMES.md](KEYFRAMES.md), built (20 Aug 2026)
 
 The concept library was built open-ended, which is the right end state and the
 wrong starting point: nothing constrains it, so there is no way to tell whether
@@ -142,10 +142,14 @@ vocabularies** — shape → diagram-shape → code — and makes the mappings b
 them a table you can read rather than predicates you have to trust. Open-endedness
 returns later as additions to a vocabulary, not as a different mechanism.
 
-The missing rung is the middle one: what a mark *plays* (container, node, edge,
-label, annotation) as against what it *is*. It is the link between "I see a
-rectangle" and "I can write a div", and it is also what lets a drawing have a
-**genre** — a page and a flowchart should not compile the same way.
+The middle rung — what a mark *plays* (container, node, edge, label,
+annotation, unclassified) as against what it *is* — now exists, placed by a
+nine-row table. It is what lets a drawing have a **genre**: boxes tiling a space
+compile as a page (flexbox that reflows), nodes joined by edges compile as a
+graph (positions kept, edges as SVG following the drawn ink). The shape rung
+gained `arrow`, `text` and `dot` to make that possible (99.8% over 1674 strokes),
+concepts were rebuilt on roles, and the old fixed-pixel spatial graph is gone in
+favour of the one measured relation system.
 
 **Still open after that:** handwriting (v7 Stage E), so "the copy in the squares"
 can be literal rather than typed. Deliberately not a blocker: the sprint's `text`
