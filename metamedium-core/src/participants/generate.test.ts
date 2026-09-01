@@ -10,7 +10,7 @@ import { parseLayout } from '../parse/layout';
 import { buildScaffold, validateRegions } from '../parse/scaffold';
 
 import { PRESETS } from '../llm/provider';
-import { rectStroke, circleStroke, checkStroke } from '../test/strokes';
+import { rectStroke, circleStroke, checkStroke, handRect, handArrow } from '../test/strokes';
 
 const realFetch = globalThis.fetch;
 afterEach(() => {
@@ -490,13 +490,61 @@ describe('connectors are edges all the way through', () => {
     s.addStroke(checkStroke(900, 310), 2200);
     const id = s.bless({ summonId: s.getState().summon!.id, name: 'flow', at: 3000 })!;
 
-    stubOpenAI(fillReply({ r1: { html: 'A' }, r2: { html: 'B' } }));
+    // Two boxes joined by a line is a GRAPH now, not a row — but the property
+    // this test exists for holds either way: the line is structure, and the
+    // model is never asked to write words for it.
+    const regions = s.regions(id);
+    const lineRegion = regions.find((x) => x.shape === 'line')!.id;
+    const boxes = regions.filter((x) => x.shape !== 'line').map((x) => x.id);
+    stubOpenAI(fillReply(Object.fromEntries(boxes.map((b) => [b, { html: b }]))));
     const agent = createAgentParticipant(s, config, 3100);
     const r = await agent.generate({ prompt: 'a signup flow', artifactId: id, at: 3200 });
 
-    expect(userPrompt()).toContain('read as a row');
-    expect(userPrompt()).toMatch(/REGIONS TO FILL: r1, r2$/m);
+    const asked = (userPrompt().match(/REGIONS TO FILL: (.+)$/m) || [])[1] || '';
+    expect(asked.split(', ').sort()).toEqual(boxes.sort());
+    expect(asked).not.toContain(lineRegion);
     expect(r.ok).toBe(true);
+    expect(r.genre).toBe('graph');
     expect(r.unfilled).toEqual([]);
+  });
+});
+
+describe('generate — a graph compiles as a graph', () => {
+  it('two boxes and an arrow become positioned nodes and an SVG edge, not flex columns', async () => {
+    const s = createSession();
+    const a = s.addStroke(handRect(100, 100, 140, 80, { seed: 1 }), 1000);
+    const b = s.addStroke(handRect(420, 100, 140, 80, { seed: 2 }), 1100);
+    s.addStroke(handArrow({ x: 245, y: 140 }, { x: 415, y: 140 }, { seed: 3 }), 1200);
+    s.addStroke(circleStroke(330, 140, 300), 2000);
+    s.addStroke(checkStroke(650, 140), 2500);
+    const id = s.bless({ summonId: s.getState().summon!.id, name: 'flow', at: 3000 })!;
+    const regions = s.regions(id);
+    const [ra, rb] = [a, b].map((n) => regions.find((r) => r.nodeId === n)!.id);
+
+    stubOpenAI(fillReply({ [ra]: { tag: 'section', html: '<b>Start</b>' }, [rb]: { tag: 'section', html: '<b>End</b>' } }));
+    const agent = createAgentParticipant(s, config, 3100);
+    const r = await agent.generate({ prompt: 'a two-step flow', artifactId: id, at: 3200 });
+
+    expect(r.ok).toBe(true);
+    expect(r.genre).toBe('graph');
+    expect(r.filled?.sort()).toEqual([ra, rb].sort());
+    expect(r.code).toContain('<svg class="mm-edges"');
+    expect(r.code).toContain('marker-end="url(#mm-head)"');
+    expect(r.code).toContain('position:absolute');
+    expect(r.code).not.toContain('display:flex');
+    // The model was told it was a graph, with direction.
+    expect(userPrompt()).toContain('GENRE: graph');
+    expect(userPrompt()).toContain('→');
+    expect(userPrompt()).toContain(`REGIONS TO FILL: ${ra}, ${rb}`);
+  });
+
+  it('a page still compiles as a page', async () => {
+    const { s, id } = board();
+    stubOpenAI(fillReply({ r1: { html: 'A' }, r2: { html: 'B' } }));
+    const agent = createAgentParticipant(s, config, 3100);
+    const r = await agent.generate({ prompt: 'a page', artifactId: id, at: 3200 });
+    expect(r.genre).toBe('layout');
+    expect(r.code).toContain('display:flex');
+    expect(r.code).not.toContain('<svg');
   });
 });

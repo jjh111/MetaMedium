@@ -105,6 +105,8 @@ html, body {
   line-height: 1.45;
 }
 #inspector .sep { height: 1px; background: var(--rule); margin: 9px 0; }
+#inspector .ladder .k { color: var(--gold); }
+#inspector .ladder .row + .row { margin-top: 2px; }
 #inspector .empty { color: var(--dim); font-family: var(--ui); font-size: 12px; }
 #modelPanel {
   position: fixed; left: 18px; bottom: 56px; width: 292px; z-index: 20;
@@ -329,10 +331,11 @@ html, body {
 <div class="rail">
   <div class="title">
     <h1>MetaMedium <span>MVP</span></h1>
-    <p>Draw. Then draw the <b>command mark</b> across what you mean — a check ✓,
-       or your own once you teach one. It reads back over what you just drew and
-       opens a palette of what those marks could become. Circle first if you want
-       to be exact. Scratch anything out to erase.
+    <p>Draw. Every mark climbs a ladder — <b>shape</b>, what it <b>plays</b>
+       (node, edge, container, label), what it <b>becomes</b>. Draw the
+       <b>command mark</b> across what you mean — a check ✓ — to open a palette of
+       what those marks could turn into. Boxes and arrows compile as a diagram;
+       boxes tiling a space compile as a page. Scratch anything out to erase.
        <kbd>Ctrl</kbd>+<kbd>Z</kbd> undoes.</p>
   </div>
   <div class="controls">
@@ -1033,6 +1036,28 @@ html, body {
     return s.contentIds.length ? s.contentIds[s.contentIds.length - 1] : null;
   }
 
+  // ===== The rungs, read once per frame ====================================
+  // Shape → role → genre for everything on the board, from session.read().
+  // Labels under marks, the inspector's ladder and the palette all read from
+  // the same reading, so they cannot disagree with each other. Cached on the
+  // set of ids, because hover re-renders and relate() is O(n²).
+  let rungs = { key: null, roles: new Map(), genre: null, reading: null };
+  function readRungs(s) {
+    const ids = s.contentIds.filter((id) => !s.artifacts.includes(id));
+    // Members of artifacts keep their roles — a box inside a live page is
+    // still a node, and the ladder should say so.
+    for (const aid of s.artifacts) {
+      for (const e of s.nodes.get(aid).edges) if (e.rel === 'has-part') ids.push(e.to);
+    }
+    const key = ids.join('|');
+    if (rungs.key === key) return rungs;
+    const reading = ids.length
+      ? session.read(ids)
+      : { roles: [], genre: { genre: 'empty', reasoning: 'nothing drawn yet' }, concepts: [], relations: [] };
+    rungs = { key, roles: new Map(reading.roles.map((r) => [r.id, r])), genre: reading.genre, reading };
+    return rungs;
+  }
+
   // ===== Rendering: ink is ground truth ===================================
   function inkOf(node, style) {
     const points = MM.strokePointsOf(node);
@@ -1107,8 +1132,11 @@ html, body {
         brackets(b, isLive ? '#c9a84c' : 'rgba(201,168,76,0.7)');
         text((MM.wordOf(node) || '') + (isLive ? '  ·  live' : ''), b.minX, b.minY - wpx(10), '#c9a84c');
       } else if (b && !pending) {
+        // Two rungs at a glance: what it is, and what it plays.
         const top = MM.topInterpretation(node);
-        if (top) text(top, b.minX, b.maxY + wpx(15),
+        const role = readRungs(s).roles.get(id);
+        const played = role && role.role !== 'unclassified' && role.role !== top ? ' · ' + role.role : '';
+        if (top) text(top + played, b.minX, b.maxY + wpx(15),
           id === inspectedId ? 'rgba(160,152,128,0.95)' : 'rgba(160,152,128,0.5)');
       }
     }
@@ -1339,7 +1367,10 @@ html, body {
       key: 'make', group: 'always', groupConf: 0, groupWhy: '',
       // One gesture, one box; whether it builds or changes is context, not a mode.
       label: sum.onArtifact ? 'Change it…' : 'Describe it…',
-      why: sum.onArtifact ? 'change what this ink covers' : 'say what it should become',
+      why: sum.onArtifact ? 'change what this ink covers'
+        : (reading.genre && reading.genre.genre === 'graph' ? 'build it as a running diagram'
+          : reading.genre && reading.genre.genre === 'mixed' ? 'build it — a diagram inside a page'
+          : 'say what it should become'),
       tier: 2,
       run: (btn) => swapToPrompt(sum, btn),
     });
@@ -1415,8 +1446,10 @@ html, body {
         ? ' on <b>' + esc(MM.wordOf(s.nodes.get(sum.onArtifact.artifactId)) || 'artifact') + '</b>' +
           (sum.onArtifact.regionIds.length ? ' · ' + esc(sum.onArtifact.regionIds.join(' ')) : '')
         : '';
+      const genre = session.read(sum.enclosedIds).genre;
       scope.innerHTML = '<b>' + sum.enclosedIds.length + ' mark' +
-        (sum.enclosedIds.length === 1 ? '' : 's') + '</b>' + onArt + ' — ' + esc(sum.scopeReasoning);
+        (sum.enclosedIds.length === 1 ? '' : 's') + '</b>' + onArt + ' — ' + esc(sum.scopeReasoning) +
+        (genre && genre.genre !== 'empty' ? ' · <b>' + esc(genre.genre) + '</b>' : '');
       summonEl.appendChild(scope);
 
       const filter = document.createElement('input');
@@ -1685,6 +1718,48 @@ html, body {
       }
     }
 
+    // THE LADDER. Every rung a mark has climbed, with why at each one — ink,
+    // shape, what it plays, what it became. Each rung keeps the one below it,
+    // so a wrong reading at the top never destroys the bottom (KEYFRAMES.md §3).
+    {
+      const rung = readRungs(s);
+      const role = rung.roles.get(id);
+      const shapeRead = MM.interpretationsOf(node, s.nodes).filter((r) => r.tier === 0)[0];
+      const rows = [];
+      const fpx = MM.fingerprintOf(node);
+      if (fpx) {
+        const scaleRep = (node.reps.find((r) => r.modality === 'stroke') || {}).data || {};
+        rows.push(['ink', fpx.pointCount + ' points' + (scaleRep.scale ? ' at ' + (1 / scaleRep.scale).toFixed(1) + '×' : ''), '']);
+      } else if (isArtifact) {
+        rows.push(['ink', node.edges.filter((e) => e.rel === 'has-part').length + ' marks held', '']);
+      }
+      if (shapeRead) rows.push(['shape', shapeRead.label + ' ' + shapeRead.weight.toFixed(2), shapeRead.reasoning || '']);
+      if (role) {
+        const dir = role.direction ? ' ' + role.direction.from + ' → ' + role.direction.to : '';
+        rows.push(['plays', role.role + dir, role.reasoning]);
+      }
+      // The code rung: the element this mark became, if it is inside a live artifact.
+      const owner = s.live.map((aid) => s.nodes.get(aid)).find((a) => a && a.edges.some((e) => e.rel === 'has-part' && e.to === id));
+      const ownCode = isLive ? codes[codes.length - 1] : (owner ? owner.reps.filter((r) => r.modality === 'code').pop() : null);
+      if (ownCode) {
+        const regs = (ownCode.data.regions || []);
+        const mine = isLive ? null : regs.find((r) => r.nodeId === id);
+        const m = mine && String(ownCode.data.code).match(new RegExp('<([a-z]+)[^>]*data-region="' + mine.id + '"'));
+        rows.push(['code', isLive
+          ? (rung.genre && rung.genre.genre === 'graph' ? 'a running diagram' : 'a running page')
+          : (m ? '<' + m[1] + ' data-region="' + mine.id + '">' : 'part of ' + (MM.wordOf(owner) || 'an artifact')),
+          isLive && rung.genre ? rung.genre.reasoning : '']);
+      }
+      if (rows.length) {
+        html += '<div class="sep"></div><div class="eyebrow">the ladder</div><div class="ladder">';
+        rows.forEach(([k, v, why]) => {
+          html += '<div class="row"><span class="k">' + esc(k) + '</span><span class="v">' + esc(v) + '</span></div>';
+          if (why) html += '<div class="why">' + esc(why) + '</div>';
+        });
+        html += '</div>';
+      }
+    }
+
     // Held interpretations — EVERY reading, from EVERY source, grouped by who
     // said it. Tiers are simultaneous, not an escalation ladder.
     const reads = MM.interpretationsOf(node, s.nodes);
@@ -1715,8 +1790,10 @@ html, body {
       html += '</div>';
     }
 
+    // The engaging relations and the wires — not the peer/alignment ones,
+    // which are true of nearly everything and would drown the list.
     const rels = node.edges.filter((e) =>
-      ['touching', 'intersecting', 'contains', 'connects', 'connected-by', 'part-of'].includes(e.rel));
+      ['near', 'touching', 'crossing', 'contains', 'inside', 'connects', 'connected-by', 'points-to', 'points-from', 'part-of'].includes(e.rel));
     if (rels.length) {
       html += '<div class="sep"></div><div class="eyebrow">relations</div>';
       const seen = new Set();
@@ -1751,6 +1828,18 @@ html, body {
       sum.enclosedIds.length + ' mark' + (sum.enclosedIds.length === 1 ? '' : 's') + '</span></div>';
     html += '<div class="row"><span class="k">scope</span><span class="v">' + esc(sum.scopeSource) + '</span></div>';
     html += '<div class="why">' + esc(sum.scopeReasoning) + '</div>';
+    // Which way this will compile — a page or a diagram — and what each mark plays.
+    if (reading.genre) {
+      html += '<div class="row"><span class="k">genre</span><span class="v">' + esc(reading.genre.genre) + '</span></div>';
+      html += '<div class="why">' + esc(reading.genre.reasoning) + '</div>';
+    }
+    if (reading.roles && reading.roles.length) {
+      html += '<div class="sep"></div><div class="eyebrow">plays</div>';
+      reading.roles.forEach((r) => {
+        const dir = r.direction ? ' ' + r.direction.from + ' → ' + r.direction.to : '';
+        html += '<div class="row"><span class="k">' + esc(r.role) + '</span><span class="v">' + esc(r.id + dir) + '</span></div>';
+      });
+    }
 
     if (sum.onArtifact) {
       const art = s.nodes.get(sum.onArtifact.artifactId);

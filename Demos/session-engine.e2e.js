@@ -256,6 +256,42 @@ window.__scenario = async function(){
   const codes = mm.session.getState().nodes.get(artId).reps.filter(r=>r.modality==='code');
   step('10c. both versions are held — generation is a proposal', codes.length === 2, {versions: codes.length});
 
+  // ---- 10d. A flowchart compiles as a diagram, not a page ----
+  // Boxes joined by an arrow have the genre `graph`: nodes keep their drawn
+  // positions and the arrow becomes an SVG edge that follows the ink.
+  mm.fitAll(); await wait(60);
+  const fx = 1400, fy = 900; // world coords well clear of the page above
+  const gA = t.stroke, W = (x, y) => mm.worldToScreen(x, y);
+  const pA = W(fx, fy), pB = W(fx + 360, fy);
+  const z = mm.view.zoom;
+  gA(t.rect(pA.x, pA.y, 150 * z, 90 * z));
+  gA(t.rect(pB.x, pB.y, 150 * z, 90 * z));
+  // An arrow: shaft, then one wing back at the tip.
+  const tail = W(fx + 158, fy + 45), tip = W(fx + 352, fy + 45), wing = W(fx + 326, fy + 28);
+  gA(t.line(tail, tip, 40).concat(t.line(tip, wing, 20).slice(1)));
+  const gc = W(fx + 255, fy + 45);
+  gA(t.circle(gc.x, gc.y, 320 * z));
+  const ge = W(fx + 255 + 320, fy + 45);
+  gA(t.check(ge.x - 30, ge.y - 20, 1));
+  const sum3 = mm.session.getState().summon;
+  const reading3 = sum3 ? mm.session.read(sum3.enclosedIds) : null;
+  step('10d. two boxes and an arrow read as node, node, edge — genre graph',
+    !!reading3 && reading3.genre.genre === 'graph' &&
+    reading3.roles.filter((r) => r.role === 'edge' && r.direction).length === 1,
+    reading3 && { genre: reading3.genre.genre, roles: reading3.roles.map((r) => r.role) });
+
+  [...document.querySelectorAll('#summon button')].find((b) => /Describe it/.test(b.textContent)).click();
+  const inp3 = document.querySelector('#summon input.make');
+  inp3.value = 'a two-step process';
+  inp3.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+  await wait(500);
+  const flowId = mm.session.getState().artifacts.find((a) => mm.session.getState().live.includes(a) && a !== artId);
+  const flowCode = flowId && String(mm.session.getState().nodes.get(flowId).reps.filter((r) => r.modality === 'code').pop().data.code);
+  step('10e. it compiled as a diagram: positioned nodes and an SVG edge following the ink',
+    !!flowCode && /<svg class="mm-edges"/.test(flowCode) && /marker-end/.test(flowCode) &&
+    /position:absolute/.test(flowCode) && !/display:flex/.test(flowCode),
+    { live: mm.session.getState().live.length, hasSvg: !!flowCode && /<svg/.test(flowCode) });
+
   // ---- 11. Scratch-out erase ----
   mm.fitAll(); await wait(60);
   const stBefore = mm.session.getState().contentIds.length;

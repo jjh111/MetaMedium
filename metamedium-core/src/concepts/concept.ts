@@ -18,8 +18,15 @@
 //
 // The user's own named artifacts are concepts too. This file holds the ones
 // that are structural rather than personal — the grammar, not the vocabulary.
+//
+// Concepts are built ON THE DIAGRAM RUNG (KEYFRAMES.md Stage 5), not on raw
+// shapes. A row is a run of `node`s; a frame is a `container` and what it
+// holds; a flow is `node`s joined by `edge`s. Asking the roles instead of the
+// shapes made every predicate shorter, and gave the flow its direction for free.
 
 import type { Mark, Relation } from '../relate/relations';
+import type { Role, RoleReading } from '../diagram/roles';
+import { assignRoles } from '../diagram/roles';
 import { has } from '../relate/relations';
 
 export interface ConceptScope {
@@ -30,6 +37,8 @@ export interface ConceptScope {
   shapes: Record<string, string>;
   /** Names the human has already given these marks, where they have. */
   names: Record<string, string>;
+  /** The diagram rung — what each mark plays. Concepts are built on these. */
+  roles?: RoleReading[];
 }
 
 /** What a concept can be turned into. */
@@ -141,12 +150,24 @@ function chainStrength(scope: ConceptScope, kind: Relation['kind'], axis: 'x' | 
   return total / (seq.length - 1);
 }
 
-/** Does any mark in the scope contain another? Then it is a frame, not a run. */
-function nested(scope: ConceptScope): boolean {
-  return scope.relations.some(
-    (r) => r.kind === 'contains' && scope.ids.includes(r.from) && scope.ids.includes(r.to)
-  );
+// ===== The diagram rung, as concepts see it =====
+
+/**
+ * Roles for the scope. `session.read()` supplies them; a caller that built a
+ * scope by hand gets them derived from the shapes, with no wires.
+ */
+function rolesOf(scope: ConceptScope): RoleReading[] {
+  if (scope.roles) return scope.roles;
+  const shapeConfidence: Record<string, number> = {};
+  for (const id of scope.ids) shapeConfidence[id] = 0.8;
+  return assignRoles({ ids: scope.ids, shapes: scope.shapes, shapeConfidence, relations: scope.relations, wires: {} });
 }
+
+const withRole = (scope: ConceptScope, role: Role): RoleReading[] =>
+  rolesOf(scope).filter((r) => r.role === role);
+
+const allPlay = (scope: ConceptScope, role: Role): boolean =>
+  scope.ids.length > 0 && rolesOf(scope).every((r) => r.role === role);
 
 /**
  * A run of peers along one axis.
@@ -163,8 +184,9 @@ function runOfPeers(scope: ConceptScope, axis: 'x' | 'y') {
   const beside: Relation['kind'] = axis === 'x' ? 'left-of' : 'above';
   const shares: Relation['kind'] = axis === 'x' ? 'same-row' : 'same-column';
   if (scope.ids.length < 2) return null;
-  if (scope.ids.some((id) => !isClosed(scope, id))) return null;
-  if (nested(scope)) return null;
+  // Peers are NODES. A container is not a peer of what it holds, and an edge is
+  // not a peer of anything — the role table already settled both.
+  if (!allPlay(scope, 'node')) return null;
 
   const seq = ordered(scope, axis);
   const bands: number[] = [];
@@ -195,9 +217,6 @@ function runOfPeers(scope: ConceptScope, axis: 'x' | 'y') {
   };
 }
 
-const closedShapes = new Set(['rectangle', 'circle', 'triangle']);
-const isClosed = (scope: ConceptScope, id: string) => closedShapes.has(scope.shapes[id] ?? '');
-const isLine = (scope: ConceptScope, id: string) => (scope.shapes[id] ?? '') === 'line';
 
 // ===== The library =====
 
@@ -229,18 +248,14 @@ export const BUILTIN_CONCEPTS: Concept[] = [
       prompt('card', 'Make a card', 'a card with a heading and body', 'contents inside a bordered box'),
       prompt('page', 'Make a page', 'a page', 'the outer mark becomes the page')],
     match(scope) {
-      const outer = scope.ids.filter((id) =>
-        scope.relations.some((r) => r.kind === 'contains' && r.from === id && scope.ids.includes(r.to))
-      );
-      if (outer.length === 0) return null;
-      const held = scope.relations.filter(
-        (r) => r.kind === 'contains' && outer.includes(r.from) && scope.ids.includes(r.to)
-      );
-      const strength = held.reduce((a, r) => a + r.strength, 0) / held.length;
+      const containers = withRole(scope, 'container');
+      if (containers.length === 0) return null;
+      const contents = [...new Set(containers.flatMap((c) => c.targets))];
+      const confidence = containers.reduce((a, c) => a + c.confidence, 0) / containers.length;
       return {
-        confidence: Math.min(0.95, 0.45 + strength * 0.5),
-        reasoning: `${outer.length} mark(s) wholly enclose ${new Set(held.map((r) => r.to)).size} other(s)`,
-        roles: { container: outer, contents: [...new Set(held.map((r) => r.to))] },
+        confidence,
+        reasoning: `${containers.length} container${containers.length === 1 ? '' : 's'} holding ${contents.length} mark${contents.length === 1 ? '' : 's'}`,
+        roles: { container: containers.map((c) => c.id), contents },
       };
     },
   },
@@ -251,24 +266,16 @@ export const BUILTIN_CONCEPTS: Concept[] = [
       prompt('flowchart', 'Make a flowchart', 'a flowchart with labelled steps', 'boxes and arrows as steps'),
       prompt('pipeline', 'Make a pipeline', 'a processing pipeline', 'each box a stage')],
     match(scope) {
-      const lines = scope.ids.filter((id) => isLine(scope, id));
-      const nodes = scope.ids.filter((id) => isClosed(scope, id));
-      if (lines.length === 0 || nodes.length < 2) return null;
-      // A connector is a line touching two different closed marks.
-      const links = lines.filter((l) => {
-        const ends = nodes.filter(
-          (n) =>
-            strongest(scope.relations, 'crossing', l, n) > 0 ||
-            strongest(scope.relations, 'touching', l, n) > 0 ||
-            strongest(scope.relations, 'near', l, n) > 0.55
-        );
-        return ends.length >= 2;
-      });
-      if (links.length === 0) return null;
+      const nodes = withRole(scope, 'node').map((r) => r.id);
+      const edges = withRole(scope, 'edge');
+      if (edges.length === 0 || nodes.length < 2) return null;
+      const directed = edges.filter((e) => e.direction).length;
       return {
-        confidence: Math.min(0.9, 0.45 + (links.length / Math.max(1, nodes.length - 1)) * 0.45),
-        reasoning: `${nodes.length} closed marks joined by ${links.length} connector(s)`,
-        roles: { nodes, links },
+        confidence: Math.min(0.9, 0.45 + (edges.length / Math.max(1, nodes.length - 1)) * 0.45),
+        reasoning:
+          `${nodes.length} nodes joined by ${edges.length} edge${edges.length === 1 ? '' : 's'}` +
+          (directed ? `, ${directed} of them pointing somewhere` : ''),
+        roles: { nodes, links: edges.map((e) => e.id) },
       };
     },
   },
@@ -280,7 +287,7 @@ export const BUILTIN_CONCEPTS: Concept[] = [
       prompt('gallery', 'Make a gallery', 'a gallery of cards', 'a card per cell')],
     match(scope) {
       if (scope.ids.length < 4) return null;
-      if (scope.ids.some((id) => !isClosed(scope, id))) return null;
+      if (!allPlay(scope, 'node')) return null;
       const rows = chainStrength(scope, 'same-row', 'x');
       const cols = chainStrength(scope, 'same-column', 'y');
       const peers = pairwise(scope, 'same-size');
@@ -300,17 +307,13 @@ export const BUILTIN_CONCEPTS: Concept[] = [
       prompt('button', 'Make a button', 'a button with that label', 'the inner mark is the label'),
       prompt('field', 'Make an input', 'a labelled input field', 'the inner mark is the placeholder')],
     match(scope) {
-      const contains = scope.relations.filter(
-        (r) => r.kind === 'contains' && scope.ids.includes(r.from) && scope.ids.includes(r.to)
-      );
-      if (contains.length === 0) return null;
-      // Small, non-closed contents read as writing rather than as structure.
-      const writing = contains.filter((r) => !isClosed(scope, r.to));
-      if (writing.length === 0) return null;
+      // A label placed by the table's row 2: writing sitting inside a closed mark.
+      const labels = withRole(scope, 'label').filter((l) => l.rule === 2);
+      if (labels.length === 0) return null;
       return {
-        confidence: Math.min(0.85, 0.4 + writing.length * 0.15),
-        reasoning: `a closed mark holding ${writing.length} open mark(s) — writing, not structure`,
-        roles: { box: [...new Set(writing.map((r) => r.from))], label: writing.map((r) => r.to) },
+        confidence: labels.reduce((a, l) => a + l.confidence, 0) / labels.length,
+        reasoning: `${labels.length} mark${labels.length === 1 ? '' : 's'} of writing inside a box`,
+        roles: { box: [...new Set(labels.flatMap((l) => l.targets))], label: labels.map((l) => l.id) },
       };
     },
   },

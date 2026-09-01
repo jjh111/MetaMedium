@@ -17,6 +17,10 @@ import { complete, providerLabel, providerTier } from '../llm/provider';
 import { describeSession, describeSignature } from './serialize';
 import { frameOf, regionsOf } from '../session/regions';
 import { parseLayout, describeLayout, regionIdsIn } from '../parse/layout';
+import { parseGraph, describeGraph, nodeIdsIn, buildGraphScaffold } from '../parse/graph';
+import { describeRoles } from '../diagram/roles';
+import { getRep, strokePointsOf } from '../session/nodes';
+import type { Point } from '../types';
 import { buildScaffold, validateRegions, type RegionContent, type Theme } from '../parse/scaffold';
 
 /** One candidate reading, as the model reports it. */
@@ -371,6 +375,8 @@ export interface GenerateResult {
   code?: string;
   /** True when this revised existing content rather than building from scratch. */
   revised?: boolean;
+  /** How the drawing compiled: a page that reflows, or a graph that keeps its positions. */
+  genre?: 'layout' | 'graph' | 'mixed' | 'empty';
   /** Region ids that now hold content. */
   filled?: string[];
   /** Region ids the model left empty — reported, never hidden. */
@@ -541,21 +547,50 @@ export function createAgentParticipant(
     if (!frame) return { ok: false, error: 'artifact has no frame' };
     const regions = regionsOf(artifact, state.nodes);
     if (regions.length === 0) return { ok: false, error: 'nothing was drawn inside the artifact' };
-    const layout = parseLayout(regions, frame, connectionsOf(artifact, state, regions));
+
+    // The diagram rung decides how this drawing compiles. A page reflows; a
+    // flowchart keeps its positions and its arrows (KEYFRAMES.md Stage 3–4).
+    const reading = session.read(regions.map((r) => r.nodeId));
+    const genre = reading.genre.genre;
+    let plan: { describe: string; ids: string[]; build: (c: Record<string, RegionContent>, t: Theme) => string };
+    if (genre === 'graph' || genre === 'mixed') {
+      const strokes: Record<string, Point[]> = {};
+      const arrows: Record<string, { tip: Point; tail: Point }> = {};
+      for (const r of regions) {
+        const n = state.nodes.get(r.nodeId);
+        if (!n) continue;
+        const pts = strokePointsOf(n);
+        if (pts) strokes[r.nodeId] = pts;
+        const a = getRep(n, 'reading:arrow')?.data as { tip: Point; tail: Point } | undefined;
+        if (a) arrows[r.nodeId] = a;
+      }
+      const graph = parseGraph(regions, frame, reading.roles, { strokes, arrows });
+      plan = {
+        describe: `${describeRoles(reading.roles, reading.genre)}\n\n${describeGraph(graph)}`,
+        ids: nodeIdsIn(graph),
+        build: (c, t) => buildGraphScaffold(graph, c, t),
+      };
+    } else {
+      const layout = parseLayout(regions, frame, connectionsOf(artifact, state, regions));
+      plan = {
+        describe: describeLayout(layout),
+        // What the layout PLACES, not every mark that was drawn: a connector
+        // is an edge, and content written for a line is content thrown away.
+        ids: regionIdsIn(layout),
+        build: (c, t) => buildScaffold(layout, c, t),
+      };
+    }
 
     // The newest fill is what the surface renders, so it is what we revise.
     const existing = [...artifact.reps].reverse().find((r) => r.modality === 'code');
     const previous = (existing?.data as { fill?: RegionFill } | undefined)?.fill;
     const revising = !!previous;
 
-    // What the layout PLACES, not every mark that was drawn: a connector is an
-    // edge, and asking a model to write content for a line it will never see
-    // rendered is asking for something to be thrown away.
-    const ids = regionIdsIn(layout);
+    const ids = plan.ids;
     if (ids.length === 0) return { ok: false, error: 'nothing in this artifact can hold content' };
     const addressed = args.addressed?.length ? args.addressed.filter((a) => ids.includes(a)) : ids;
 
-    const lines = [describeLayout(layout), ''];
+    const lines = [plan.describe, ''];
     if (revising) {
       lines.push('WHAT EACH REGION HOLDS NOW:');
       for (const id of ids) {
@@ -598,7 +633,7 @@ export function createAgentParticipant(
       return { ok: false, error: 'the model filled none of the regions', raw: result.text };
     }
 
-    const code = buildScaffold(layout, merged.regions, merged.theme);
+    const code = plan.build(merged.regions, merged.theme ?? {});
 
     // The scaffold is built from the parse, so this cannot normally fail — but
     // it is the promise the whole design rests on, and a promise nobody checks
@@ -631,6 +666,7 @@ export function createAgentParticipant(
       ok: true,
       code,
       revised: revising,
+      genre,
       filled,
       unfilled: ids.filter((x) => !merged.regions[x]),
       raw: result.text,

@@ -37,7 +37,7 @@ export interface MMNode {
 // ===== Bootstrap type nodes =====
 // Not privileged — just nodes many others connect to ("popular, not sacred").
 
-export const BUILTIN_TYPES = ['circle', 'line', 'rectangle', 'triangle', 'arc'] as const;
+export const BUILTIN_TYPES = ['circle', 'line', 'rectangle', 'triangle', 'arc', 'arrow', 'text', 'dot'] as const;
 
 export function typeNodeId(type: string): string {
   return `type:${type}`;

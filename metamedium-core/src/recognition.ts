@@ -5,7 +5,7 @@
 // by silencing the others (ARCHITECTURE-v6 principle 2).
 
 import type { Point, Fingerprint, RecognitionResult, StrokeAnalysis } from './types';
-import { getFingerprint, checkOvershoot } from './geometry';
+import { getFingerprint, checkOvershoot, calculateStraightness, resampleByArcLength } from './geometry';
 
 // ===== Evidence =====
 //
@@ -55,12 +55,21 @@ function result(
   type: string,
   label: string,
   fitScore: number,
-  reasoning: string
+  reasoning: string,
+  meta?: Record<string, unknown>
 ): RecognitionResult | null {
   const confidence = fitScore * MAX_TIER0_CONFIDENCE;
   if (confidence < MIN_CONFIDENCE) return null;
-  return { type, label, score: Math.round(confidence * 100), confidence, reasoning };
+  return { type, label, score: Math.round(confidence * 100), confidence, reasoning, ...(meta ? { meta } : {}) };
 }
+
+/**
+ * Below this many SCREEN pixels a mark has no measurable geometry. Corners,
+ * extent and straightness on a 5px blob are sensor noise dressed as evidence,
+ * so nothing but `dot` is offered for it — reporting "circle 0.85" there would
+ * be a lie about what the engine can see.
+ */
+export const HAND_RESOLUTION_PX = 8;
 
 function detectLine(fp: Fingerprint, points: Point[], scale = 1): RecognitionResult | null {
   if (fp.isClosed || checkOvershoot(points, 50 * scale)) return null;
@@ -157,8 +166,109 @@ function detectCircle(fp: Fingerprint, points: Point[], scale = 1): RecognitionR
   );
 }
 
+// ===== The rest of the shape rung: dot, text, arrow (KEYFRAMES.md Stage 1) =====
+
+function detectDot(fp: Fingerprint, scale: number): RecognitionResult | null {
+  // Judged at the hand's scale, not the world's: a dot is a dot at any zoom.
+  const screen = fp.size / scale;
+  const tiny = 1 - ramp(screen, 6, 18);
+  return result('dot', 'Dot', tiny, `${Math.round(screen)}px on screen — a point, not a shape`);
+}
+
+/**
+ * Writing, without reading it.
+ *
+ * A word is an open stroke that turns many times while staying low and wide
+ * and leaving most of its box empty. That is enough to give a mark the `label`
+ * role; what the word SAYS is a different capability (handwriting, v7 Stage E)
+ * and deliberately not a prerequisite for this one.
+ */
+function detectText(fp: Fingerprint, points: Point[], scale = 1): RecognitionResult | null {
+  if (fp.isClosed || checkOvershoot(points, 50 * scale)) return null;
+  const wiggle = ramp(fp.corners, 2, 6);
+  const sparse = 1 - ramp(fp.extent, 0.3, 0.7);
+  const curvy = 1 - ramp(fp.straightness, 0.25, 0.65);
+  const wide = ramp(fp.aspectRatio, 0.6, 2.0);
+  if (fp.corners < 3) return null; // one bend is a check or a caret, not a word
+  const confidence = wiggle * 0.4 + sparse * 0.25 + curvy * 0.2 + wide * 0.15;
+  return result(
+    'text',
+    'Text',
+    confidence,
+    `open, turns ${fp.corners} times, fills ${(fp.extent * 100).toFixed(0)}% of a ${fp.aspectRatio.toFixed(1)}:1 box — writing, not a shape`
+  );
+}
+
+/**
+ * A line with a barb: mostly straight, then a sharp turn back near one end.
+ *
+ * The one shape the diagram rung cannot do without — an edge with no arrow has
+ * no direction, and a flow is then just a graph. Detected from the corner
+ * positions along the path: a corner that turns hard inside the last (or
+ * first) fifth of the stroke, with a straight shaft before it.
+ */
+function detectArrow(fp: Fingerprint, points: Point[], scale = 1): RecognitionResult | null {
+  if (fp.isClosed || checkOvershoot(points, 50 * scale)) return null;
+  const corners = fp.cornerData ?? [];
+  if (corners.length === 0 || corners.length > 4) return null;
+
+  // The head lives inside this fraction of the path. Generous, because a
+  // two-wing head — out one wing, back to the tip, out the other — is three
+  // corners and legitimately a third of the stroke; a tighter window read every
+  // one of those as a bent line. What keeps a bent line out is the rule below:
+  // a corner in the MIDDLE of the stroke is not a head at either end.
+  const HEAD = 0.42;
+  const atEnd = corners.filter((c) => c.t >= 1 - HEAD);
+  const atStart = corners.filter((c) => c.t <= HEAD);
+  if (corners.some((c) => c.t > HEAD && c.t < 1 - HEAD)) return null;
+  // Both ends bent means a double-headed arrow or a zigzag; either way, not this.
+  if (atEnd.length > 0 && atStart.length > 0) return null;
+
+  const path = resampleByArcLength(points, 100);
+  const tryHead = (head: 'end' | 'start', cs: typeof corners) => {
+    if (cs.length === 0) return null;
+    const first = cs.reduce((a, c) => (head === 'end' ? Math.min(a, c.t) : Math.max(a, c.t)), head === 'end' ? 1 : 0);
+    const shaft = head === 'end' ? path.slice(0, Math.max(3, Math.round(first * 100))) : path.slice(Math.min(97, Math.round(first * 100)));
+    const straight = calculateStraightness(shaft);
+    const sharpest = Math.max(...cs.map((c) => c.angle));
+    const shaftOk = ramp(straight, 0.72, 0.95);
+    const barbOk = ramp(sharpest, (55 * Math.PI) / 180, (110 * Math.PI) / 180);
+    // The head is short next to the shaft: a long tail after the corner is a
+    // bent line, not a barb. One wing is ~15% of the path, two wings ~35%.
+    const headLen = head === 'end' ? 1 - first : first;
+    const shortHead = 1 - ramp(headLen, 0.3, 0.45);
+    const tipIdx = Math.round(first * 99);
+    return {
+      fit: shaftOk * 0.5 + barbOk * 0.35 + shortHead * 0.15,
+      head,
+      tip: path[tipIdx],
+      tail: head === 'end' ? path[0] : path[99],
+      straight,
+      sharpest,
+    };
+  };
+  const best = [tryHead('end', atEnd), tryHead('start', atStart)]
+    .filter((x): x is NonNullable<typeof x> => !!x)
+    .sort((a, b) => b.fit - a.fit)[0];
+  if (!best) return null;
+
+  return result(
+    'arrow',
+    'Arrow',
+    best.fit,
+    `a straight shaft (${best.straight.toFixed(2)}) with a ${Math.round((best.sharpest * 180) / Math.PI)}° barb at the ${best.head}`,
+    { head: best.head, tip: best.tip, tail: best.tail }
+  );
+}
+
 export function analyzeStroke(points: Point[], scale = 1): StrokeAnalysis {
   const fingerprint = getFingerprint(points, scale);
+
+  // Below the hand's resolution there is no geometry to read — only a dot.
+  if (fingerprint.size / scale < HAND_RESOLUTION_PX) {
+    const dot = detectDot(fingerprint, scale);
+    return { fingerprint, results: dot ? [dot] : [] };
+  }
 
   const results = [
     detectLine(fingerprint, points, scale),
@@ -166,6 +276,9 @@ export function analyzeStroke(points: Point[], scale = 1): StrokeAnalysis {
     detectTriangle(fingerprint),
     detectRectangle(fingerprint),
     detectCircle(fingerprint, points, scale),
+    detectDot(fingerprint, scale),
+    detectText(fingerprint, points, scale),
+    detectArrow(fingerprint, points, scale),
   ].filter((r): r is RecognitionResult => r !== null);
 
   // Ranked by measured confidence — no detector outranks another by fiat.

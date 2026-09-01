@@ -5,7 +5,7 @@
 // you cannot debug against.
 
 import { analyzeStroke } from '../recognition';
-import { handRect, handTriangle, handCircle, handLine, type HandOptions } from './strokes';
+import { handRect, handTriangle, handCircle, handLine, handArrow, handText, handDot, type HandOptions } from './strokes';
 import type { Point } from '../types';
 
 export interface Case { label: string; expect: string; points: Point[]; }
@@ -53,6 +53,23 @@ export function buildCases(): Case[] {
     cases.push({ label: `circle r45 ${v.name}`, expect: 'circle', points: handCircle(0, 0, 45, v.opts) });
     cases.push({ label: `line ${v.name}`, expect: 'line',
       points: handLine({ x: 0, y: 0 }, { x: 240, y: 40 }, v.opts) });
+
+    // The rest of the shape rung (KEYFRAMES.md Stage 1).
+    cases.push({ label: `arrow right ${v.name}`, expect: 'arrow',
+      points: handArrow({ x: 0, y: 0 }, { x: 220, y: 20 }, v.opts) });
+    cases.push({ label: `arrow down 2-wing ${v.name}`, expect: 'arrow',
+      points: handArrow({ x: 0, y: 0 }, { x: 30, y: 200 }, { ...v.opts, wings: 2, headLen: 32 }) });
+    cases.push({ label: `arrow head-first ${v.name}`, expect: 'arrow',
+      points: handArrow({ x: 200, y: 100 }, { x: 0, y: 0 }, { ...v.opts, headAt: 'start' }) });
+    // A word cannot be written in a dozen samples: at the sparsest density a
+    // 150px scribble is 18 points, which is not what any hand produces.
+    if (v.opts.density! >= 0.35) {
+      cases.push({ label: `text word ${v.name}`, expect: 'text',
+        points: handText(0, 0, 150, 28, { ...v.opts, humps: 5 }) });
+      cases.push({ label: `text long ${v.name}`, expect: 'text',
+        points: handText(0, 0, 230, 34, { ...v.opts, humps: 8 }) });
+    }
+    cases.push({ label: `dot ${v.name}`, expect: 'dot', points: handDot(0, 0, 3, v.opts) });
   }
   return cases;
 }

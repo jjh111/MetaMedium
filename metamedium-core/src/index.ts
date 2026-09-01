@@ -29,12 +29,9 @@ export {
 } from './geometry';
 
 // Recognition (Tier 0 heuristics)
-export { analyzeStroke, matchPrimitiveFromLibrary, MIN_CONFIDENCE, MAX_TIER0_CONFIDENCE } from './recognition';
+export { analyzeStroke, matchPrimitiveFromLibrary, MIN_CONFIDENCE, MAX_TIER0_CONFIDENCE, HAND_RESOLUTION_PX } from './recognition';
 export type { CornerOptions } from './geometry';
 
-// Spatial graph & clustering
-export { buildSpatialGraph, spatialCluster } from './spatial';
-export type { IntersectionDetector } from './spatial';
 
 // Node model
 export {
@@ -113,6 +110,12 @@ export {
 } from './relate/relations';
 export type { Relation, RelationKind, Mark, RelateConfig } from './relate/relations';
 
+// The diagram rung — what a mark PLAYS: container, node, edge, label,
+// annotation, unclassified. A closed vocabulary, placed by a table
+// (KEYFRAMES.md §3), and the genre that decides how a drawing compiles.
+export { assignRoles, genreOf, describeRoles, ROLES } from './diagram/roles';
+export type { Role, RoleReading, RoleScope, Wire, Genre, GenreReading } from './diagram/roles';
+
 // Concepts — the meaning-mappings, as a library rather than as code paths.
 export { matchConcepts, BUILTIN_CONCEPTS } from './concepts/concept';
 export type { Concept, ConceptMatch, ConceptScope, Conversion } from './concepts/concept';
@@ -123,6 +126,10 @@ export { parseLayout, describeLayout, regionIdsIn } from './parse/layout';
 export type { Layout, LayoutNode, Flow, Connection } from './parse/layout';
 export { buildScaffold, validateRegions, prepare } from './parse/scaffold';
 export type { RegionContent, Theme } from './parse/scaffold';
+// …and read as a GRAPH when its genre says so: nodes keep their drawn
+// positions, edges follow the drawn ink.
+export { parseGraph, buildGraphScaffold, describeGraph, nodeIdsIn } from './parse/graph';
+export type { Graph, GraphNode, GraphEdge, ParseGraphOptions } from './parse/graph';
 
 // Session engine
 export { createSession, DEFAULT_SESSION_CONFIG } from './session/session';

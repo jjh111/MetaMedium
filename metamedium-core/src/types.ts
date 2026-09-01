@@ -52,38 +52,15 @@ export interface RecognitionResult {
   score: number;
   confidence: number;
   reasoning: string; // grounded "why" — part of the thesis, not decoration
+  /**
+   * What the detector measured beyond a label, when there is something. An
+   * arrow carries its tip and tail: direction is a fact about the stroke, and
+   * the diagram rung needs it as one.
+   */
+  meta?: Record<string, unknown>;
 }
 
 export interface StrokeAnalysis {
   fingerprint: Fingerprint;
   results: RecognitionResult[];
-}
-
-// A recognized element participating in spatial analysis.
-export interface Component {
-  index: number;
-  recognizedAs: string;
-  type: string;
-  fingerprint: Fingerprint;
-  bounds: Bounds;
-  /** Opaque refined-geometry handle; only used by an injected intersection detector. */
-  geometricShape?: unknown;
-}
-
-export interface SpatialConnection {
-  a: number;
-  b: number;
-  relationship: 'touching' | 'intersecting';
-  distance: number;
-  intersectionPoints?: Point[];
-}
-
-export interface SpatialContainment {
-  outer: number;
-  inner: number;
-}
-
-export interface SpatialGraph {
-  connections: SpatialConnection[];
-  containment: SpatialContainment[];
 }

@@ -12,7 +12,7 @@
 //   - The engine is event-sourced: every input is logged, state is a pure
 //     function of the log, and undo = drop the last input and replay.
 
-import type { Bounds, Component, Point } from '../types';
+import type { Bounds, Point } from '../types';
 import type { Fingerprint } from '../types';
 import {
   getFingerprint,
@@ -22,7 +22,6 @@ import {
   boundingBoxDistance,
 } from '../geometry';
 import { analyzeStroke } from '../recognition';
-import { buildSpatialGraph, spatialCluster } from '../spatial';
 import {
   type MMNode,
   type Edge,
@@ -56,6 +55,7 @@ import { DEFAULT_ERASE_CROSSINGS, scratchedOut } from './erase';
 import { type Region, regionsOf, regionsOverlapping } from './regions';
 import { type Mark, type Relation, clusters, relate } from '../relate/relations';
 import { type ConceptMatch, type ConceptScope, matchConcepts } from '../concepts/concept';
+import { type GenreReading, type RoleReading, type Wire, assignRoles, genreOf } from '../diagram/roles';
 import { BUILTIN_COMMAND_MARK, matchesCommandMark } from './commandmark';
 
 // ===== Public state shape =====
@@ -200,9 +200,13 @@ export interface ProposedEdge {
 
 export interface SessionConfig {
   gesture: GestureConfig;
-  clusterThresholdPx: number;
-  /** How close a line endpoint must be to a node to infer a 'connects' wire. */
-  wireEndpointPx: number;
+  /**
+   * How close a connector's end must land to a mark to be read as joining it,
+   * as a fraction of that mark's own size. A hand floor of a few screen pixels
+   * is applied underneath, because a pen can miss a small target by more than
+   * 15% of it and still plainly mean it.
+   */
+  wireEndpointRatio: number;
   /** Crossings before a stroke is read as scratching a mark out. See erase.ts. */
   eraseCrossings: number;
   /**
@@ -218,8 +222,7 @@ export interface SessionConfig {
 
 export const DEFAULT_SESSION_CONFIG: SessionConfig = {
   gesture: DEFAULT_GESTURE_CONFIG,
-  clusterThresholdPx: 60,
-  wireEndpointPx: 30,
+  wireEndpointRatio: 0.15,
   eraseCrossings: DEFAULT_ERASE_CROSSINGS,
   recentWindowMs: 20_000,
 };
@@ -277,7 +280,15 @@ export interface Session {
    * and the concepts those relations read as. This is the substrate a palette
    * offers from and a model is handed — nobody downstream re-derives it.
    */
-  read(ids: string[]): { scope: ConceptScope; relations: Relation[]; concepts: ConceptMatch[] };
+  read(ids: string[]): {
+    scope: ConceptScope;
+    relations: Relation[];
+    /** The diagram rung: what each mark plays (KEYFRAMES.md §2). */
+    roles: RoleReading[];
+    /** Which way this drawing compiles: a page, a graph, or both. */
+    genre: GenreReading;
+    concepts: ConceptMatch[];
+  };
   tick(at: number): void;
   bless(args: {
     summonId: string;
@@ -348,19 +359,6 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       .filter((c) => c.bounds !== undefined);
   }
 
-  function asComponent(id: string, index: number): Component {
-    const node = nodes.get(id)!;
-    const fp = fingerprintOf(node);
-    const type = topInterpretation(node) ?? 'art';
-    return {
-      index,
-      recognizedAs: type,
-      type,
-      fingerprint: fp ?? ({ bounds: boundsOf(node)! } as Component['fingerprint']),
-      bounds: boundsOf(node)!,
-    };
-  }
-
   function signatureOf(ids: string[]): Signature {
     const sig: Signature = {};
     for (const id of ids) {
@@ -380,11 +378,10 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     clusterCandidates = [];
     if (artifacts.length === 0 || contentIds.length === 0) return;
 
-    const comps = contentIds.map((id, i) => asComponent(id, i));
-    const clusters = spatialCluster(comps, config.clusterThresholdPx);
+    const marks = contentIds.map(markOf).filter((m): m is Mark => !!m);
+    const groups = clusters(marks, relate(marks));
 
-    for (const cluster of clusters) {
-      const ids = cluster.map((c) => contentIds[c.index]);
+    for (const ids of groups) {
       // Don't offer an artifact as a match for itself.
       const strokeIds = ids.filter((id) => !artifacts.includes(id));
       if (strokeIds.length < 2) continue;
@@ -425,24 +422,24 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     return suggestions;
   }
 
+  /**
+   * Record what Tier 0 can see between the new mark and everything else, as
+   * held (unblessed) edges on both ends. This is the SAME relate() the palette
+   * and the diagram rung read from — one relation system, one set of
+   * thresholds, all of them ratios of the marks' own sizes.
+   */
   function addSpatialEdges(node: MMNode) {
-    // Pairwise relationships between the new node and existing content,
-    // recorded as inferred (unblessed) edges on both nodes.
-    const ids = [...contentIds.filter((id) => id !== node.id), node.id];
-    const comps = ids.map((id, i) => asComponent(id, i));
-    const graph = buildSpatialGraph(comps);
-    const newIdx = ids.length - 1;
-
-    const addPair = (i: number, j: number, rel: string, weight?: number) => {
-      if (i !== newIdx && j !== newIdx) return; // only edges involving the new node
-      const a = nodes.get(ids[i])!;
-      const b = nodes.get(ids[j])!;
-      a.edges.push({ to: b.id, rel, weight });
-      b.edges.push({ to: a.id, rel, weight });
-    };
-
-    for (const c of graph.connections) addPair(c.a, c.b, c.relationship);
-    for (const c of graph.containment) addPair(c.outer, c.inner, 'contains');
+    const marks = contentIds.map(markOf).filter((m): m is Mark => !!m);
+    for (const r of relate(marks)) {
+      if (r.from !== node.id && r.to !== node.id) continue;
+      nodes.get(r.from)?.edges.push({
+        to: r.to,
+        rel: r.kind,
+        weight: r.strength,
+        via: TIER0_PARTICIPANT,
+        reasoning: r.reasoning,
+      });
+    }
   }
 
   /**
@@ -452,26 +449,41 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
    */
   function inferWire(node: MMNode, points: Point[], scale: number) {
     const top = resemblances(node)[0];
-    if (!top || top.to !== typeNodeId('line')) return;
+    if (!top) return;
+    const kind = top.to.replace(/^type:/, '');
+    if (kind !== 'line' && kind !== 'arrow') return;
+
+    // An arrow's ends are its tip and tail, not the stroke's first and last
+    // points — the last point is the end of a wing.
+    const arrow = getRep(node, 'reading:arrow')?.data as { tip: Point; tail: Point } | undefined;
+    const ends = kind === 'arrow' && arrow ? [arrow.tail, arrow.tip] : [points[0], points[points.length - 1]];
 
     const nearest = (p: Point) => {
       let best: { id: string; d: number } | null = null;
       for (const c of contentBoundsList(node.id)) {
+        const size = Math.max(c.bounds.maxX - c.bounds.minX, c.bounds.maxY - c.bounds.minY);
+        const reach = Math.max(10 * scale, size * config.wireEndpointRatio);
         const d = distancePointToBounds(p, c.bounds);
-        if (d < config.wireEndpointPx * scale && (!best || d < best.d)) best = { id: c.id, d };
+        if (d < reach && (!best || d < best.d)) best = { id: c.id, d };
       }
       return best;
     };
 
-    const a = nearest(points[0]);
-    const b = nearest(points[points.length - 1]);
+    const a = nearest(ends[0]);
+    const b = nearest(ends[1]);
     if (!a || !b || a.id === b.id) return;
 
     const weight = top.weight;
-    node.edges.push({ to: a.id, rel: 'connects', weight } satisfies Edge);
-    node.edges.push({ to: b.id, rel: 'connects', weight } satisfies Edge);
+    const why = `its ${kind === 'arrow' ? 'tail' : 'start'} lands on ${a.id} and its ${kind === 'arrow' ? 'tip' : 'end'} on ${b.id}`;
+    node.edges.push({ to: a.id, rel: 'connects', weight, reasoning: why } satisfies Edge);
+    node.edges.push({ to: b.id, rel: 'connects', weight, reasoning: why } satisfies Edge);
     nodes.get(a.id)!.edges.push({ to: node.id, rel: 'connected-by', weight });
     nodes.get(b.id)!.edges.push({ to: node.id, rel: 'connected-by', weight });
+    if (kind === 'arrow') {
+      // Direction is a fact about the stroke, so it is recorded as one.
+      node.edges.push({ to: a.id, rel: 'points-from', weight, reasoning: why });
+      node.edges.push({ to: b.id, rel: 'points-to', weight, reasoning: why });
+    }
   }
 
   /**
@@ -756,6 +768,12 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
         via: TIER0_PARTICIPANT, // even the heuristics are a participant
         reasoning: r.reasoning, // grounded "why", carried with the claim
       } satisfies Edge);
+    }
+
+    // What a detector measured beyond its label — an arrow's tip and tail —
+    // is kept on the node so the rungs above can read it as fact.
+    for (const r of analysis.results) {
+      if (r.meta) node.reps.push({ modality: `reading:${r.type}`, data: r.meta, source: TIER0_PARTICIPANT });
     }
 
     addSpatialEdges(node);
@@ -1167,15 +1185,32 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       const marks = ids.map(markOf).filter((m): m is Mark => !!m);
       const relations = relate(marks);
       const shapes: Record<string, string> = {};
+      const shapeConfidence: Record<string, number> = {};
       const names: Record<string, string> = {};
+      const wires: Record<string, Wire> = {};
       for (const m of marks) {
         const n = nodes.get(m.id)!;
-        shapes[m.id] = topInterpretation(n) ?? 'art';
+        // The shape rung, as the engine reads it — a blessed name outranks a guess.
+        const top = resemblances(n)[0];
+        shapes[m.id] = top ? top.to.replace(/^type:/, '') : 'art';
+        shapeConfidence[m.id] = top?.weight ?? 0;
         const word = wordOf(n);
         if (word) names[m.id] = word;
+        // Wires the session inferred when the mark was drawn, direction included.
+        const ends = n.edges.filter((e) => e.rel === 'connects').map((e) => e.to);
+        if (ends.length) {
+          wires[m.id] = {
+            ends,
+            from: n.edges.find((e) => e.rel === 'points-from')?.to,
+            to: n.edges.find((e) => e.rel === 'points-to')?.to,
+          };
+        }
       }
-      const scope: ConceptScope = { ids: marks.map((m) => m.id), marks, relations, shapes, names };
-      return { scope, relations, concepts: matchConcepts(scope) };
+      const scopeIds = marks.map((m) => m.id);
+      const roles = assignRoles({ ids: scopeIds, shapes, shapeConfidence, relations, wires });
+      const genre = genreOf(roles);
+      const scope: ConceptScope = { ids: scopeIds, marks, relations, shapes, names, roles };
+      return { scope, relations, roles, genre, concepts: matchConcepts(scope) };
     },
     tick: (at) => void dispatch({ type: 'tick', at }),
     bless: (args) => dispatch({ type: 'bless', ...args }),
