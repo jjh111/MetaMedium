@@ -298,25 +298,28 @@ window.__scenario = async function(){
   const flowId = mm.session.getState().artifacts.find((a) => mm.session.getState().live.includes(a) && a !== artId);
   const flowCode = flowId && String(mm.session.getState().nodes.get(flowId).reps.filter((r) => r.modality === 'code').pop().data.code);
   step('10e. it compiled as a diagram: positioned nodes and an SVG edge following the ink',
+    // No flex-direction: that is the LAYOUT scaffold's signature. (The model's
+    // own inner styles may well use flex — that is content, not structure.)
     !!flowCode && /<svg class="mm-edges"/.test(flowCode) && /marker-end/.test(flowCode) &&
-    /position:absolute/.test(flowCode) && !/display:flex/.test(flowCode),
+    /position:absolute/.test(flowCode) && !/flex-direction/.test(flowCode),
     { live: mm.session.getState().live.length, hasSvg: !!flowCode && /<svg/.test(flowCode) });
 
   // ---- 11. Scratch-out erase ----
   mm.fitAll(); await wait(60);
   const stBefore = mm.session.getState().contentIds.length;
+  const artsBefore = mm.session.getState().artifacts.length; // the page and the flowchart
   const a = mm.worldToScreen(150, 250), b = mm.worldToScreen(500, 300);
   t.stroke(t.scratch(a.x, a.y, b.x-a.x, b.y-a.y, 3));
   const stAfter = mm.session.getState();
   const said = document.getElementById('status').textContent;
   step('11. scratching across the page rubs out the marks it crossed',
-    stAfter.artifacts.length === 0,
+    stAfter.artifacts.length === artsBefore - 1,
     {before: stBefore, after: stAfter.contentIds.length, artifacts: stAfter.artifacts.length, status: said});
   step('11a. and says so — a silent erase is indistinguishable from a bug',
     /erased \d+ mark/.test(said), {status: said});
 
   mm.session.undo();
-  step('11b. and undo brings them back', mm.session.getState().artifacts.length === 1,
+  step('11b. and undo brings them back', mm.session.getState().artifacts.length === artsBefore,
     {artifacts: mm.session.getState().artifacts.length});
 
   // ---- 12b. The canvas on its own: no lasso, no model ----
