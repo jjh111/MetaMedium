@@ -2004,7 +2004,7 @@ html, body {
         const mine = isLive ? null : regs.find((r) => r.nodeId === id);
         const m = mine && String(ownCode.data.code).match(new RegExp('<([a-z]+)[^>]*data-region="' + mine.id + '"'));
         rows.push(['code', isLive
-          ? (rung.genre && rung.genre.genre === 'graph' ? 'a running diagram' : 'a running page')
+          ? (rung.genre && (rung.genre.genre === 'graph' || rung.genre.genre === 'mixed') ? 'a running diagram' : 'a running page')
           : (m ? '<' + m[1] + ' data-region="' + mine.id + '">' : 'part of ' + (MM.wordOf(owner) || 'an artifact')),
           isLive && rung.genre ? rung.genre.reasoning : '']);
       }
