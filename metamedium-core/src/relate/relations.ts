@@ -144,7 +144,10 @@ export function relate(marks: Mark[], config: RelateConfig = DEFAULT_RELATE_CONF
 
       // --- Contact ---
       const gap = boundingBoxDistance(ab, bb);
-      if (a.points && b.points) {
+      // Strokes whose boxes do not overlap cannot cross, and the segment test
+      // is O(points²) per pair — on a board of fifty strokes this guard is the
+      // difference between relate() being free and being the frame budget.
+      if (a.points && b.points && boundsOverlap(ab, bb)) {
         const n = crossings(a.points, b.points);
         if (n > 0) {
           add('crossing', a.id, b.id, Math.min(1, 0.5 + n * 0.15), `their strokes cross ${n === 4 ? '4 or more' : n} time(s)`);

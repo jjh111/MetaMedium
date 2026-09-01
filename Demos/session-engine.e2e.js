@@ -222,8 +222,12 @@ window.__scenario = async function(){
   const overLive = t.summary().pending !== null;
   step('8. a loop on the live page is a lasso, though it encloses no mark', overLive);
 
+  // Sized in WORLD units like the lasso (55 world radius): a mark wider than
+  // 60% of what it marks is refused, and that must not depend on the zoom
+  // fitAll happened to pick for this viewport.
   const e2 = mm.worldToScreen(385, 250);
-  t.stroke(t.caret(e2.x - 55, e2.y - 40, 118, 76));
+  const zz = mm.view.zoom;
+  t.stroke(t.caret(e2.x - 28 * zz, e2.y - 20 * zz, 58 * zz, 38 * zz));
   const sum2 = mm.session.getState().summon;
   const addressed = sum2 && sum2.onArtifact;
   step('9. the summon resolves the ink to a REGION of the running artifact',
@@ -235,10 +239,19 @@ window.__scenario = async function(){
   // ---- 10. Revise only what the ink covers ----
   // Ask the summon which region the ink actually landed on rather than assuming
   // an id: region ids follow reading order, so hardcoding one bakes in a layout.
+  // Everything that fed the addressing, so a wrong pick is explainable.
+  const lassoB = mm.MM.boundsOf(mm.session.getState().nodes.get(sum2.gestureIds[0]));
+  const domHits = mm.regionsUnderInk(artId, lassoB);
+  const addressedAll = [...new Set(sum2.onArtifact.regionIds.concat(domHits))];
   const hitId = sum2.onArtifact.regionIds[0];
-  const otherId = regions.map((r) => r.id).find((x) => x !== hitId);
-  const beforeAddressed = doc.querySelector('[data-region="' + hitId + '"]').textContent;
-  const beforeOther = doc.querySelector('[data-region="' + otherId + '"]').textContent;
+  const otherId = regions.map((r) => r.id).find((x) => !addressedAll.includes(x));
+  step('9c. the ink addresses exactly one region, by geometry and by DOM alike',
+    addressedAll.length === 1,
+    { geometric: sum2.onArtifact.regionIds, dom: domHits, lasso: [lassoB.minX, lassoB.minY, lassoB.maxX, lassoB.maxY].map(Math.round),
+      regions: regions.map((r) => r.id + ':' + [r.world.x, r.world.y, r.world.w, r.world.h].map(Math.round).join(',')), zoom: +mm.view.zoom.toFixed(2) });
+  const textOf = (d, id) => { const el = id && d && d.querySelector('[data-region="' + id + '"]'); return el ? el.textContent : null; };
+  const beforeAddressed = textOf(doc, hitId);
+  const beforeOther = textOf(doc, otherId);
   const chg = [...document.querySelectorAll('#summon .item')].find(b=>b.textContent.trim().startsWith('Change it'));
   chg.click();
   const inp2 = document.querySelector('#summon input.make');

@@ -39,7 +39,7 @@ html, body {
   -webkit-tap-highlight-color: transparent;
 }
 
-#canvas { position: absolute; inset: 0; cursor: crosshair; touch-action: none; }
+#canvas { position: absolute; left: 0; top: 0; cursor: crosshair; touch-action: none; }
 
 /* ===== Chrome: recedes, never competes with the ink ===== */
 .rail {
@@ -271,7 +271,7 @@ html, body {
   content: ''; position: absolute; left: 0; right: 0; pointer-events: none; z-index: -1;
 }
 .rail::before {
-  top: 0; height: 118px;
+  top: 0; height: 64px;
   background: linear-gradient(to bottom, rgba(10,10,15,0.94) 40%, rgba(10,10,15,0));
 }
 .scrimBottom {
@@ -331,12 +331,6 @@ html, body {
 <div class="rail">
   <div class="title">
     <h1>MetaMedium <span>MVP</span></h1>
-    <p>Draw. Every mark climbs a ladder — <b>shape</b>, what it <b>plays</b>
-       (node, edge, container, label), what it <b>becomes</b>. Draw the
-       <b>command mark</b> across what you mean — a check ✓ — to open a palette of
-       what those marks could turn into. Boxes and arrows compile as a diagram;
-       boxes tiling a space compile as a page. Scratch anything out to erase.
-       <kbd>Ctrl</kbd>+<kbd>Z</kbd> undoes.</p>
   </div>
   <div class="controls">
     <div class="markChip" id="markChip" title="The mark that turns a circled group into an offer. Click to teach your own.">
@@ -488,22 +482,45 @@ html, body {
   document.getElementById('zoomOut').onclick = () => zoomAround(innerWidth / 2, innerHeight / 2, 0.8);
   document.getElementById('fitBtn').onclick = fitAll;
 
+  // The wheel ZOOMS, toward the cursor. A trackpad pinch arrives as a wheel
+  // with ctrlKey in Chrome and as gesture events in Safari; both zoom. Holding
+  // shift turns the wheel into a pan, and space/middle/alt-drag pans — panning
+  // is the deliberate act, zooming is what a wheel over a canvas means.
   canvas.addEventListener('wheel', (e) => {
     e.preventDefault();
-    if (e.ctrlKey || e.metaKey) {
-      zoomAround(e.clientX, e.clientY, e.deltaY > 0 ? 0.92 : 1.08);
-    } else {
-      view.panX -= e.deltaX;
-      view.panY -= e.deltaY;
+    if (e.shiftKey) {
+      view.panX -= e.deltaX || e.deltaY;
+      view.panY -= e.deltaX ? e.deltaY : 0;
       afterViewChange();
+      return;
     }
+    // Pinch deltas are small and continuous; wheel clicks are large and
+    // stepped. Scale the factor by the delta so both feel proportionate.
+    const k = e.ctrlKey || e.metaKey ? 0.01 : 0.0022;
+    zoomAround(e.clientX, e.clientY, Math.exp(-e.deltaY * k));
   }, { passive: false });
+
+  // Safari: pinch is a gesture event, not a wheel.
+  let gestureStartZoom = 1;
+  canvas.addEventListener('gesturestart', (e) => { e.preventDefault(); gestureStartZoom = view.zoom; });
+  canvas.addEventListener('gesturechange', (e) => {
+    e.preventDefault();
+    const target = clampZoom(gestureStartZoom * e.scale);
+    zoomAround(e.clientX, e.clientY, target / view.zoom);
+  });
+  canvas.addEventListener('gestureend', (e) => e.preventDefault());
 
   // ===== Canvas sizing =====
   function resize() {
     const dpr = window.devicePixelRatio || 1;
     canvas.width = innerWidth * dpr;
     canvas.height = innerHeight * dpr;
+    // A <canvas> is a REPLACED element: `inset: 0` does not stretch it, its
+    // CSS box defaults to its bitmap size. On a retina screen that made the
+    // canvas twice the viewport, so every stroke landed at twice the pointer's
+    // distance from the origin. The CSS size must be set explicitly.
+    canvas.style.width = innerWidth + 'px';
+    canvas.style.height = innerHeight + 'px';
     render(session.getState());
   }
   addEventListener('resize', resize);
@@ -914,8 +931,22 @@ html, body {
     try { el.setPointerCapture(e.pointerId); } catch (err) { /* not capturable */ }
   }
 
+  const touches = new Map(); // pointerId → {x, y}, for two-finger pinch
+  let pinch = null;          // { dist, mid, zoom } at the moment the second finger landed
+
   canvas.addEventListener('pointerdown', (e) => {
     capture(canvas, e);
+    if (e.pointerType === 'touch') {
+      touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (touches.size === 2) {
+        // Two fingers: this is a pinch, not a stroke. Drop the live ink — it
+        // was the first finger landing, not a mark.
+        live = null;
+        const [a, b] = [...touches.values()];
+        pinch = { dist: Math.hypot(a.x - b.x, a.y - b.y), mid: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, zoom: view.zoom };
+        return;
+      }
+    }
     if (e.button === 1 || e.altKey || spaceHeld) {
       panning = { x: e.clientX, y: e.clientY };
       canvas.style.cursor = 'grabbing';
@@ -925,6 +956,21 @@ html, body {
   });
 
   canvas.addEventListener('pointermove', (e) => {
+    if (e.pointerType === 'touch' && touches.has(e.pointerId)) {
+      touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pinch && touches.size === 2) {
+        const [a, b] = [...touches.values()];
+        const dist = Math.hypot(a.x - b.x, a.y - b.y);
+        const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+        const target = clampZoom(pinch.zoom * (dist / Math.max(1, pinch.dist)));
+        zoomAround(pinch.mid.x, pinch.mid.y, target / view.zoom);
+        view.panX += mid.x - pinch.mid.x;
+        view.panY += mid.y - pinch.mid.y;
+        pinch.mid = mid;
+        afterViewChange();
+        return;
+      }
+    }
     if (panning) {
       view.panX += e.clientX - panning.x;
       view.panY += e.clientY - panning.y;
@@ -942,7 +988,16 @@ html, body {
     render(state); // live ink
   });
 
-  canvas.addEventListener('pointerup', () => {
+  const endTouch = (e) => {
+    if (e.pointerType !== 'touch') return false;
+    touches.delete(e.pointerId);
+    if (touches.size < 2) pinch = null;
+    return touches.size > 0; // a finger is still down: nothing to commit yet
+  };
+  canvas.addEventListener('pointercancel', (e) => { endTouch(e); live = null; });
+
+  canvas.addEventListener('pointerup', (e) => {
+    if (endTouch(e)) { live = null; return; }
     if (panning) { panning = null; canvas.style.cursor = 'crosshair'; return; }
     const points = live;
     live = null;
@@ -984,6 +1039,8 @@ html, body {
     }
     if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); session.undo(); }
     if (e.key === '0' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); fitAll(); }
+    if (e.target === document.body && (e.key === '=' || e.key === '+')) zoomAround(innerWidth / 2, innerHeight / 2, 1.2);
+    if (e.target === document.body && (e.key === '-' || e.key === '_')) zoomAround(innerWidth / 2, innerHeight / 2, 1 / 1.2);
   });
   addEventListener('keyup', (e) => {
     if (e.code === 'Space') { spaceHeld = false; canvas.style.cursor = 'crosshair'; }
@@ -1163,13 +1220,12 @@ html, body {
 
     const strokes = s.contentIds.length - s.artifacts.length;
     const fresh = flashText && Date.now() - flashAt < FLASH_MS;
-    statusEl.textContent =
-      strokes + ' loose · ' + s.artifacts.length + ' artifact' + (s.artifacts.length === 1 ? '' : 's') +
-      (s.live.length ? ' (' + s.live.length + ' live)' : '') +
-      ' · ' + s.participants.length + ' participants' +
-      ' · ' + (s.commandMark ? 'your mark' : 'check ✓') +
-      (s.pendingLassoId ? '  ·  circle held — cross it to summon' : '') +
-      (fresh ? '  ·  ' + flashText : '');
+    const parts = [strokes + ' loose'];
+    if (s.artifacts.length) parts.push(s.artifacts.length + ' artifact' + (s.artifacts.length === 1 ? '' : 's') + (s.live.length ? ' (' + s.live.length + ' live)' : ''));
+    if (agents.length) parts.push(agents.length + ' model' + (agents.length === 1 ? '' : 's'));
+    if (s.pendingLassoId) parts.push('circle held — cross it with ' + (s.commandMark ? 'your mark' : '✓'));
+    if (fresh) parts.push(flashText);
+    statusEl.textContent = parts.join('  ·  ');
   }
 
   function text(str, x, y, color) {

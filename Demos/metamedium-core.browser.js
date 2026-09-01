@@ -1348,7 +1348,7 @@ var MetaMediumCore = (() => {
           continue;
         }
         const gap = boundingBoxDistance(ab, bb);
-        if (a.points && b.points) {
+        if (a.points && b.points && boundsOverlap(ab, bb)) {
           const n2 = crossings(a.points, b.points);
           if (n2 > 0) {
             add("crossing", a.id, b.id, Math.min(1, 0.5 + n2 * 0.15), `their strokes cross ${n2 === 4 ? "4 or more" : n2} time(s)`);
