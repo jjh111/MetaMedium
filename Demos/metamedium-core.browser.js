@@ -1183,7 +1183,7 @@ var MetaMediumCore = (() => {
       const engaged = strokes && strokesIntersect(strokes.check, strokes.lasso) || boundsOverlap(checkFp.bounds, lassoFp.bounds);
       return {
         reason: "not-the-mark",
-        detail: match.failedOn ? `that is not the ${mark.name} \u2014 ${readable(match.failedOn)}` : `that is not the ${mark.name}`,
+        detail: match.failedOn ? `that is not ${named(mark.name)} \u2014 ${readable(match.failedOn)}` : `that is not ${named(mark.name)}`,
         nearMiss: !!engaged && !checkFp.isClosed
       };
     }
@@ -1192,6 +1192,9 @@ var MetaMediumCore = (() => {
       detail: "the mark has to cross or touch the circle",
       nearMiss: true
     };
+  }
+  function named(name) {
+    return /^(your|my|the)\b/i.test(name) ? name : `a ${name}`;
   }
   function readable(feature) {
     switch (feature) {
@@ -3192,9 +3195,9 @@ ${pad}</${tag}>`;
     const nodes = ids.map((id) => state.nodes.get(id)).filter((x) => !!x && !isParticipant(x) && !isGesture(x));
     if (nodes.length === 0) return "(nothing on the canvas)";
     const parts = [];
-    const named = state.artifacts.map((id) => state.nodes.get(id)).filter((x) => !!x).map((a) => wordOf(a)).filter((w2) => !!w2);
-    if (named.length > 0) {
-      parts.push(`Known names in this session: ${named.join(", ")}`);
+    const named2 = state.artifacts.map((id) => state.nodes.get(id)).filter((x) => !!x).map((a) => wordOf(a)).filter((w2) => !!w2);
+    if (named2.length > 0) {
+      parts.push(`Known names in this session: ${named2.join(", ")}`);
     }
     const others = state.participants.map((id) => state.nodes.get(id)).filter((x) => !!x).map((p) => wordOf(p)).filter((w2) => !!w2);
     if (others.length > 0) parts.push(`Participants: ${others.join(", ")}`);

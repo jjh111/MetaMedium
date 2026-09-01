@@ -173,8 +173,8 @@ export function whyNotResolved(
     return {
       reason: 'not-the-mark',
       detail: match.failedOn
-        ? `that is not the ${mark.name} — ${readable(match.failedOn)}`
-        : `that is not the ${mark.name}`,
+        ? `that is not ${named(mark.name)} — ${readable(match.failedOn)}`
+        : `that is not ${named(mark.name)}`,
       nearMiss: !!engaged && !checkFp.isClosed,
     };
   }
@@ -183,6 +183,11 @@ export function whyNotResolved(
     detail: 'the mark has to cross or touch the circle',
     nearMiss: true,
   };
+}
+
+/** "a check", but "your mark" — a possessive already names the thing. */
+function named(name: string): string {
+  return /^(your|my|the)\b/i.test(name) ? name : `a ${name}`;
 }
 
 /** The feature that failed, said the way a person would say it. */

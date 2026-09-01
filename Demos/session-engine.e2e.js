@@ -271,8 +271,10 @@ window.__scenario = async function(){
   gA(t.line(tail, tip, 40).concat(t.line(tip, wing, 20).slice(1)));
   const gc = W(fx + 255, fy + 45);
   gA(t.circle(gc.x, gc.y, 320 * z));
+  // The mark that is ACTIVE by now is the caret taught in step 1 — a check
+  // would be (correctly) refused. Drawn across the lasso's right edge.
   const ge = W(fx + 255 + 320, fy + 45);
-  gA(t.check(ge.x - 30, ge.y - 20, 1));
+  gA(t.caret(ge.x - 60, ge.y - 40, 120, 78));
   const sum3 = mm.session.getState().summon;
   const reading3 = sum3 ? mm.session.read(sum3.enclosedIds) : null;
   step('10d. two boxes and an arrow read as node, node, edge — genre graph',
@@ -280,7 +282,15 @@ window.__scenario = async function(){
     reading3.roles.filter((r) => r.role === 'edge' && r.direction).length === 1,
     reading3 && { genre: reading3.genre.genre, roles: reading3.roles.map((r) => r.role) });
 
-  [...document.querySelectorAll('#summon button')].find((b) => /Describe it/.test(b.textContent)).click();
+  const describeBtn = [...document.querySelectorAll('#summon button')].find((b) => /Describe it/.test(b.textContent));
+  if (!describeBtn) {
+    step('10e. it compiled as a diagram', false, {
+      reason: 'no palette to build from', summon: !!sum3, miss: mm.session.getState().markMiss,
+      buttons: [...document.querySelectorAll('#summon button')].map((b) => b.textContent.trim()),
+    });
+    return R;
+  }
+  describeBtn.click();
   const inp3 = document.querySelector('#summon input.make');
   inp3.value = 'a two-step process';
   inp3.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));

@@ -431,7 +431,7 @@ describe('a mark that does not take says why', () => {
     const miss = s.getState().markMiss!;
     expect(miss.reason).toBe('not-the-mark');
     expect(miss.nearMiss).toBe(true);
-    expect(miss.detail).toMatch(/not the check/);
+    expect(miss.detail).toMatch(/not a check/);
   });
 
   it('does not nag about a stroke that was plainly just drawing', () => {
@@ -458,5 +458,23 @@ describe('a mark that does not take says why', () => {
     s.addStroke(checkStroke(300, 130), 3400);
     expect(s.getState().summon).not.toBeNull();
     expect(s.getState().markMiss).toBeNull();
+  });
+});
+
+describe('the miss names the mark the way a person would', () => {
+  it('says "a check" for the built-in and "your mark" for a taught one, never "the your mark"', () => {
+    const s = createSession();
+    s.addStroke(rectStroke(100, 100, 120, 90), 1000);
+    s.addStroke(circleStroke(160, 145, 150), 2000);
+    s.addStroke(caretStroke(150, 150, 60, 40), 2200); // a caret, not a check
+    expect(s.getState().markMiss!.detail).toMatch(/^that is not a check/);
+
+    const t = createSession();
+    t.teachCommandMark(learnCommandMark(CARETS, 'your mark'), 500);
+    t.addStroke(rectStroke(100, 100, 120, 90), 1000);
+    t.addStroke(circleStroke(160, 145, 150), 2000);
+    t.addStroke(checkStroke(150, 150), 2200); // a check, not the caret
+    expect(t.getState().markMiss!.detail).toMatch(/^that is not your mark/);
+    expect(t.getState().markMiss!.detail).not.toContain('the your');
   });
 });
