@@ -3138,6 +3138,7 @@
         <p class="version">v5 · February 2026 · development section September 2026 · written by John Hanacek, drafted and built with Claude Code</p>
     </footer>
 
+    <script src="Demos/metamedium-core.browser.js"></script>
     <script>
         // Navigation scroll visibility - show after scrolling past hero
         const nav = document.getElementById('nav');
@@ -3280,297 +3281,126 @@
             return Math.sqrt((a.x - b.x) ** 2 + (a.y - b.y) ** 2);
         }
 
-        function getCircleScore(points, center, radius) {
-            let totalError = 0;
-            points.forEach(p => {
-                const dist = distance(p, center);
-                totalError += Math.abs(dist - radius) / radius;
-            });
-            return Math.max(0, 1 - (totalError / points.length));
-        }
 
-        function getRectScore(points, bounds) {
-            const width = bounds.maxX - bounds.minX;
-            const height = bounds.maxY - bounds.minY;
-            let cornerCount = 0;
-            const corners = [
-                { x: bounds.minX, y: bounds.minY },
-                { x: bounds.maxX, y: bounds.minY },
-                { x: bounds.maxX, y: bounds.maxY },
-                { x: bounds.minX, y: bounds.maxY }
-            ];
-            const threshold = Math.max(width, height) * 0.15;
-            corners.forEach(corner => {
-                if (points.some(p => distance(p, corner) < threshold)) cornerCount++;
-            });
-            return cornerCount / 4;
-        }
 
-        function getTriangleScore(points, bounds) {
-            // Improved triangle detection
-            const width = bounds.maxX - bounds.minX;
-            const height = bounds.maxY - bounds.minY;
-            const cx = (bounds.minX + bounds.maxX) / 2;
-            const cy = (bounds.minY + bounds.maxY) / 2;
 
-            // Find the 3 most extreme points (potential vertices)
-            let topPoint = points[0], bottomLeft = points[0], bottomRight = points[0];
 
-            points.forEach(p => {
-                if (p.y < topPoint.y) topPoint = p;
-                if (p.y > bottomLeft.y || (p.y === bottomLeft.y && p.x < bottomLeft.x)) bottomLeft = p;
-                if (p.y > bottomRight.y || (p.y === bottomRight.y && p.x > bottomRight.x)) bottomRight = p;
-            });
-
-            // Check for roughly 3 direction changes (corners)
-            let turns = 0;
-            const step = Math.max(1, Math.floor(points.length / 20));
-            for (let i = step; i < points.length - step; i += step) {
-                const prev = points[i - step];
-                const curr = points[i];
-                const next = points[Math.min(i + step, points.length - 1)];
-                const angle1 = Math.atan2(curr.y - prev.y, curr.x - prev.x);
-                const angle2 = Math.atan2(next.y - curr.y, next.x - curr.x);
-                let diff = Math.abs(angle2 - angle1);
-                if (diff > Math.PI) diff = 2 * Math.PI - diff;
-                if (diff > 0.4 && diff < 2.8) turns++;
-            }
-
-            // Aspect ratio check - triangles shouldn't be too thin
-            const aspect = Math.min(width, height) / Math.max(width, height);
-            const aspectOk = aspect > 0.3;
-
-            if (turns >= 2 && turns <= 6 && aspectOk) {
-                return 0.65;
-            }
-            return 0.25;
-        }
-
-        function getLineScore(points) {
-            if (points.length < 3) return 0;
-            const start = points[0];
-            const end = points[points.length - 1];
-            const lineLen = distance(start, end);
-            if (lineLen < 30) return 0;
-
-            let totalDev = 0;
-            points.forEach(p => {
-                const t = Math.max(0, Math.min(1,
-                    ((p.x - start.x) * (end.x - start.x) + (p.y - start.y) * (end.y - start.y)) / (lineLen * lineLen)
-                ));
-                const proj = { x: start.x + t * (end.x - start.x), y: start.y + t * (end.y - start.y) };
-                totalDev += distance(p, proj);
-            });
-            return Math.max(0, 1 - (totalDev / points.length) / (lineLen * 0.1));
-        }
-
-        function detectArrowHead(points) {
-            if (points.length < 10) return false;
-            const last10 = points.slice(-10);
-            const end = points[points.length - 1];
-            const beforeEnd = points[Math.max(0, points.length - 8)];
-            const mainDir = Math.atan2(end.y - beforeEnd.y, end.x - beforeEnd.x);
-
-            // Check for splaying at end
-            let hasSplay = false;
-            for (let i = 1; i < last10.length - 1; i++) {
-                const dir = Math.atan2(last10[i].y - end.y, last10[i].x - end.x);
-                const diff = Math.abs(dir - mainDir);
-                if (diff > 0.4 && diff < 2.7) hasSplay = true;
-            }
-            return hasSplay;
-        }
 
         // ============================================
         // Shape Detection
         // ============================================
+        // ============================================
+        // Shape Recognition — the engine, not a third copy of it
+        // ============================================
+        // The same core that runs the reference surface reads the hero. One
+        // core, many surfaces: what this canvas says a stroke is, the demo
+        // further down says too, for the same reasons.
+        const MMC = window.MetaMediumCore;
+        const CLOSED_SHAPES = new Set(['circle', 'rectangle', 'triangle']);
+
+        /** A stroke as the engine reads it: a throwaway node with its fingerprint and every reading. */
+        function readStroke(points) {
+            if (!MMC || points.length < 5) return null;
+            const fp = MMC.getFingerprint(points, 1);
+            const analysis = MMC.analyzeStroke(points, 1);
+            const top = analysis.results[0];
+            if (!top) return null;
+            const node = {
+                id: 'hero', capability: 0, createdAt: 0,
+                reps: [{ modality: 'stroke', data: { points } }, { modality: 'fingerprint', data: fp }],
+                edges: analysis.results.map(r => ({ to: 'type:' + r.type, rel: 'resembles', weight: r.confidence, via: 'participant:tier0', reasoning: r.reasoning })),
+            };
+            analysis.results.forEach(r => { if (r.meta) node.reps.push({ modality: 'reading:' + r.type, data: r.meta }); });
+            return { node, fp, results: analysis.results, top };
+        }
+
         function detectShape(points) {
-            if (points.length < 5) return null;
+            const read = readStroke(points);
+            if (!read) return null;
+            const { fp, top, node } = read;
+            const b = fp.bounds;
+            const w = b.maxX - b.minX, h = b.maxY - b.minY;
+            if (Math.max(w, h) < 20) return null;
+            const arrow = node.reps.find(r => r.modality === 'reading:arrow');
+            return {
+                type: top.type,
+                confidence: top.confidence,
+                reasoning: top.reasoning,
+                readings: read.results,
+                node,
+                bounds: b,
+                center: { x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2 },
+                size: Math.max(w, h),
+                radius: (w + h) / 4,
+                start: arrow ? arrow.data.tail : fp.start,
+                end: arrow ? arrow.data.tip : fp.end,
+            };
+        }
 
-            const bounds = getBounds(points);
-            const center = { x: (bounds.minX + bounds.maxX) / 2, y: (bounds.minY + bounds.maxY) / 2 };
-            const width = bounds.maxX - bounds.minX;
-            const height = bounds.maxY - bounds.minY;
-            const size = Math.max(width, height);
+        /** The clean form the engine would offer, as a polyline (closed forms return to their start). */
+        function generateIdealShape(shape) {
+            if (shape.type === 'dot') return [shape.center];
+            const clean = MMC.idealize(shape.node, shape.type);
+            if (!clean) return shape.node.reps[0].data.points;
+            return clean.closed ? clean.points.concat([clean.points[0]]) : clean.points;
+        }
 
-            if (size < 20) return null; // Too small
-
-            // Check if closed (start near end)
-            const start = points[0];
-            const end = points[points.length - 1];
-            const closedThreshold = size * 0.25;
-            const isClosed = distance(start, end) < closedThreshold;
-
-            if (isClosed) {
-                // Analyze closed shape
-                const circleScore = getCircleScore(points, center, size / 2);
-                const rectScore = getRectScore(points, bounds);
-                const triScore = getTriangleScore(points, bounds);
-
-                if (circleScore > 0.7 && circleScore > rectScore && circleScore > triScore) {
-                    return { type: 'circle', center, radius: size / 2, confidence: circleScore };
-                }
-                if (rectScore > 0.6 && rectScore > triScore) {
-                    return { type: 'rectangle', bounds, center, confidence: rectScore };
-                }
-                if (triScore > 0.5) {
-                    return { type: 'triangle', bounds, center, confidence: triScore };
-                }
-            } else {
-                // Open shape - line or arrow
-                const lineScore = getLineScore(points);
-                if (lineScore > 0.7) {
-                    const hasArrow = detectArrowHead(points);
-                    return {
-                        type: hasArrow ? 'arrow' : 'line',
-                        start, end, center,
-                        confidence: lineScore
-                    };
-                }
+        /** The maths of the reading, short enough to whisper. */
+        function shortMaths(shape) {
+            const m = MMC.measure(shape.node, new Map());
+            if (!m) return '';
+            const v = (k) => { const x = m.measures.find(q => q.key === k); return x ? x.value : null; };
+            switch (m.shape) {
+                case 'circle': return v('radius') !== null ? 'r ' + v('radius') : 'rx ' + v('rx') + ' · ry ' + v('ry');
+                case 'rectangle': return v('width') + ' × ' + v('height');
+                case 'triangle': return ['angle0', 'angle1', 'angle2'].map(k => v(k) + '°').join(' ');
+                case 'line': return v('length') + 'px · ' + v('heading') + '°';
+                case 'arrow': return v('length') + 'px → ' + v('heading') + '°';
+                case 'arc': return v('radius') !== null ? 'r ' + v('radius') + ' · ' + v('sweep') + '°' : v('arcLength') + 'px';
+                default: return '';
             }
+        }
 
-            return null;
+        // ============================================
+        // Relationship Detection — measured by the engine
+        // ============================================
+        // Insideness, crossing, nearness and alignment come from the same
+        // relation system the palette offers from. Every threshold is a ratio
+        // of the marks' own size, and every relation carries a strength.
+        function detectRelationships() {
+            const now = Date.now();
+            const shapes = recognizedShapes.filter(s => now - s.createdAt < TIMING.shapeTotal && s.type !== 'dot');
+            if (!MMC || shapes.length < 2) return [];
+            const marks = shapes.map((sh, i) => ({ id: String(i), bounds: sh.bounds, points: sh.idealPoints, closed: CLOSED_SHAPES.has(sh.type) }));
+            const order = ['contains', 'crossing', 'touching', 'near', 'same-row', 'same-column'];
+            const rels = MMC.relate(marks).filter(r => order.includes(r.kind))
+                .sort((p, q) => order.indexOf(p.kind) - order.indexOf(q.kind) || q.strength - p.strength);
+            const seen = new Set();
+            const out = [];
+            for (const r of rels) {
+                const i = Number(r.from), j = Number(r.to);
+                const key = Math.min(i, j) + ':' + Math.max(i, j);
+                if (seen.has(key)) continue;
+                const a = shapes[i], b = shapes[j];
+                const base = { shapeA: a, shapeB: b, strength: r.strength, reasoning: r.reasoning };
+                if (r.kind === 'contains') out.push({ ...base, type: 'contains', container: a, contained: b });
+                else if (r.kind === 'crossing') out.push({ ...base, type: 'intersects', intersections: findIntersectionPoints(a, b) });
+                else if (r.kind === 'touching' || r.kind === 'near') out.push({ ...base, type: 'adjacent' });
+                else if (r.kind === 'same-row') out.push({ ...base, type: 'aligned-horizontal' });
+                else out.push({ ...base, type: 'aligned-vertical' });
+                seen.add(key);
+            }
+            return out;
         }
         
         // ============================================
         // Generate Ideal Shape Points
         // ============================================
-        function generateIdealShape(shape, numPoints = 60) {
-            const points = [];
-            
-            if (shape.type === 'circle') {
-                for (let i = 0; i <= numPoints; i++) {
-                    const angle = (i / numPoints) * Math.PI * 2;
-                    points.push({
-                        x: shape.center.x + Math.cos(angle) * shape.radius,
-                        y: shape.center.y + Math.sin(angle) * shape.radius
-                    });
-                }
-            } else if (shape.type === 'rectangle') {
-                const b = shape.bounds;
-                const corners = [
-                    { x: b.minX, y: b.minY }, { x: b.maxX, y: b.minY },
-                    { x: b.maxX, y: b.maxY }, { x: b.minX, y: b.maxY },
-                    { x: b.minX, y: b.minY }
-                ];
-                const perSide = Math.floor(numPoints / 4);
-                for (let s = 0; s < 4; s++) {
-                    for (let i = 0; i < perSide; i++) {
-                        const t = i / perSide;
-                        points.push({
-                            x: corners[s].x + t * (corners[s + 1].x - corners[s].x),
-                            y: corners[s].y + t * (corners[s + 1].y - corners[s].y)
-                        });
-                    }
-                }
-            } else if (shape.type === 'triangle') {
-                const b = shape.bounds;
-                const cx = (b.minX + b.maxX) / 2;
-                const triPoints = [
-                    { x: cx, y: b.minY },
-                    { x: b.maxX, y: b.maxY },
-                    { x: b.minX, y: b.maxY },
-                    { x: cx, y: b.minY }
-                ];
-                const perSide = Math.floor(numPoints / 3);
-                for (let s = 0; s < 3; s++) {
-                    for (let i = 0; i < perSide; i++) {
-                        const t = i / perSide;
-                        points.push({
-                            x: triPoints[s].x + t * (triPoints[s + 1].x - triPoints[s].x),
-                            y: triPoints[s].y + t * (triPoints[s + 1].y - triPoints[s].y)
-                        });
-                    }
-                }
-            } else if (shape.type === 'line' || shape.type === 'arrow') {
-                for (let i = 0; i <= numPoints; i++) {
-                    const t = i / numPoints;
-                    points.push({
-                        x: shape.start.x + t * (shape.end.x - shape.start.x),
-                        y: shape.start.y + t * (shape.end.y - shape.start.y)
-                    });
-                }
-                if (shape.type === 'arrow') {
-                    const angle = Math.atan2(shape.end.y - shape.start.y, shape.end.x - shape.start.x);
-                    const headLen = 15;
-                    points.push({ x: shape.end.x - headLen * Math.cos(angle - 0.4), y: shape.end.y - headLen * Math.sin(angle - 0.4) });
-                    points.push(shape.end);
-                    points.push({ x: shape.end.x - headLen * Math.cos(angle + 0.4), y: shape.end.y - headLen * Math.sin(angle + 0.4) });
-                }
-            } else if (shape.type === 'dot') {
-                // Dot is just a single point
-                points.push(shape.center);
-            }
-            
-            return points;
-        }
         
         // ============================================
         // Relationship Detection
         // ============================================
-        function detectRelationships() {
-            const relationships = [];
-            const shapes = recognizedShapes.filter(s => Date.now() - s.createdAt < TIMING.shapeTotal);
-            
-            for (let i = 0; i < shapes.length; i++) {
-                for (let j = i + 1; j < shapes.length; j++) {
-                    const a = shapes[i];
-                    const b = shapes[j];
-                    
-                    const rel = analyzeRelationship(a, b);
-                    if (rel) {
-                        relationships.push({
-                            shapeA: a,
-                            shapeB: b,
-                            ...rel
-                        });
-                    }
-                }
-            }
-            return relationships;
-        }
         
-        function analyzeRelationship(a, b) {
-            const dist = distance(a.center, b.center);
-            const aSize = getShapeSize(a);
-            const bSize = getShapeSize(b);
-            const combinedSize = (aSize + bSize) / 2;
-            
-            // Lines don't "contain" things - skip containment check for lines
-            const aIsLine = a.type === 'line' || a.type === 'arrow';
-            const bIsLine = b.type === 'line' || b.type === 'arrow';
-            
-            // Check containment (only for closed shapes)
-            if (!aIsLine && !bIsLine && dist < Math.abs(aSize - bSize) * 0.5) {
-                const container = aSize > bSize ? a : b;
-                const contained = aSize > bSize ? b : a;
-                return { type: 'contains', container, contained, dist };
-            }
-            
-            // Check intersection/overlap - always check for lines
-            if (aIsLine || bIsLine || dist < combinedSize * 0.9) {
-                const intersections = findIntersectionPoints(a, b);
-                if (intersections.length > 0) {
-                    return { type: 'intersects', intersections, dist };
-                }
-                if (!aIsLine && !bIsLine) {
-                    return { type: 'overlaps', dist };
-                }
-            }
-            
-            // Check adjacency (close but not overlapping)
-            if (dist < combinedSize * 1.5) {
-                return { type: 'adjacent', dist };
-            }
-            
-            // Check alignment
-            const dx = Math.abs(a.center.x - b.center.x);
-            const dy = Math.abs(a.center.y - b.center.y);
-            if (dx < 15) return { type: 'aligned-vertical', dist };
-            if (dy < 15) return { type: 'aligned-horizontal', dist };
-            
-            return null;
-        }
         
         function getShapeSize(shape) {
             if (shape.type === 'circle') return shape.radius * 2;
@@ -4169,6 +3999,11 @@
                 ctx.textAlign = 'center';
                 ctx.fillStyle = `rgba(147, 197, 253, ${0.8 * easedOpacity})`;
                 ctx.fillText(label.text, label.x, label.y + yOffset);
+                if (label.sub) {
+                    ctx.font = '400 10px "JetBrains Mono", ui-monospace, monospace';
+                    ctx.fillStyle = `rgba(147, 197, 253, ${0.55 * easedOpacity})`;
+                    ctx.fillText(label.sub, label.x, label.y + yOffset + 15);
+                }
                 
                 return true;
             });
@@ -4431,10 +4266,13 @@
                         createdAt: Date.now()
                     });
                     
-                    // Add whisper label
-                    const labelText = shape.type.charAt(0).toUpperCase() + shape.type.slice(1);
+                    // Whisper what it is, the maths that follows, and why it read that way.
+                    const name = shape.type === 'text' ? 'Writing' : shape.type.charAt(0).toUpperCase() + shape.type.slice(1);
+                    const maths = shortMaths(shape);
                     whisperLabels.push({
-                        text: labelText,
+                        text: name + (maths ? '  ·  ' + maths : ''),
+                        // The first two clauses of the measurement: enough to see why, short enough to whisper.
+                        sub: (shape.reasoning || '').split(/,\s+/).slice(0, 2).join(', '),
                         x: shape.center.x,
                         y: shape.center.y,
                         createdAt: Date.now()
