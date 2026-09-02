@@ -82,6 +82,7 @@ var MetaMediumCore = (() => {
     describeAddressed: () => describeAddressed,
     describeGraph: () => describeGraph,
     describeLayout: () => describeLayout,
+    describeMaths: () => describeMaths,
     describeReading: () => describeReading,
     describeRegions: () => describeRegions,
     describeRelations: () => describeRelations,
@@ -117,6 +118,7 @@ var MetaMediumCore = (() => {
     matchConcepts: () => matchConcepts,
     matchPrimitiveFromLibrary: () => matchPrimitiveFromLibrary,
     matchesCommandMark: () => matchesCommandMark,
+    measure: () => measure,
     nodeIdsIn: () => nodeIdsIn,
     normalizeStroke: () => normalizeStroke,
     outlineOf: () => outlineOf,
@@ -1363,6 +1365,118 @@ var MetaMediumCore = (() => {
       }
     }
     return out;
+  }
+
+  // src/session/measure.ts
+  var deg = (rad) => rad * 180 / Math.PI;
+  var r0 = (v) => Math.round(v);
+  var r1 = (v) => Math.round(v * 10) / 10;
+  function angleAt(prev, v, next) {
+    const a = Math.atan2(prev.y - v.y, prev.x - v.x);
+    const b = Math.atan2(next.y - v.y, next.x - v.x);
+    let d = Math.abs(a - b);
+    if (d > Math.PI) d = 2 * Math.PI - d;
+    return deg(d);
+  }
+  function classify(degrees) {
+    if (Math.abs(degrees - 90) < 4) return "right";
+    return degrees < 90 ? "acute" : "obtuse";
+  }
+  function measure(node, nodes) {
+    const fp = fingerprintOf(node);
+    if (!fp) return null;
+    const reading = snapReading(node, nodes);
+    const shape = reading.shape;
+    const held = getRep(node, "clean") ? cleanPointsOf(node) : void 0;
+    const ideal = held ?? idealize(node, shape)?.points ?? strokePointsOf(node);
+    if (!ideal || ideal.length < 2) return null;
+    const b = held ? getBounds(held) : boundsOf(node) ?? getBounds(ideal);
+    const w2 = b.maxX - b.minX, h2 = b.maxY - b.minY;
+    const centre = { x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2 };
+    const m = [];
+    switch (shape) {
+      case "circle": {
+        const round = Math.min(w2, h2) / Math.max(1e-6, w2, h2) > 0.85;
+        const r = (w2 + h2) / 4;
+        m.push({ key: "centre", label: "centre", value: r0(centre.x), unit: "", at: centre });
+        m.push({ key: "centreY", label: "centre y", value: r0(centre.y), unit: "" });
+        if (round) {
+          m.push({ key: "radius", label: "radius", value: r0(r), unit: "px" });
+          m.push({ key: "circumference", label: "circumference", value: r0(2 * Math.PI * r), unit: "px" });
+          m.push({ key: "area", label: "area", value: r0(Math.PI * r * r), unit: "px\xB2" });
+        } else {
+          m.push({ key: "rx", label: "radius x", value: r0(w2 / 2), unit: "px" });
+          m.push({ key: "ry", label: "radius y", value: r0(h2 / 2), unit: "px" });
+          m.push({ key: "area", label: "area", value: r0(Math.PI * (w2 / 2) * (h2 / 2)), unit: "px\xB2" });
+        }
+        return { shape, measures: m };
+      }
+      case "rectangle": {
+        m.push({ key: "width", label: "width", value: r0(w2), unit: "px" });
+        m.push({ key: "height", label: "height", value: r0(h2), unit: "px" });
+        m.push({ key: "perimeter", label: "perimeter", value: r0(2 * (w2 + h2)), unit: "px" });
+        m.push({ key: "area", label: "area", value: r0(w2 * h2), unit: "px\xB2" });
+        m.push({ key: "aspect", label: "aspect", value: r1(w2 / Math.max(1e-6, h2)), unit: "" });
+        return { shape, measures: m };
+      }
+      case "triangle": {
+        const v = ideal.slice(0, 3);
+        if (v.length < 3) return null;
+        const sides = [0, 1, 2].map((i) => Math.hypot(v[(i + 1) % 3].x - v[i].x, v[(i + 1) % 3].y - v[i].y));
+        const angles = [0, 1, 2].map((i) => angleAt(v[(i + 2) % 3], v[i], v[(i + 1) % 3]));
+        angles.forEach((a, i) => m.push({ key: `angle${i}`, label: `angle ${"ABC"[i]} (${classify(a)})`, value: r0(a), unit: "\xB0", at: v[i] }));
+        sides.forEach((s2, i) => m.push({ key: `side${i}`, label: `side ${"ABC"[i]}${"ABC"[(i + 1) % 3]}`, value: r0(s2), unit: "px" }));
+        const s = sides.reduce((a, c) => a + c, 0) / 2;
+        m.push({ key: "area", label: "area", value: r0(Math.sqrt(Math.max(0, s * (s - sides[0]) * (s - sides[1]) * (s - sides[2])))), unit: "px\xB2" });
+        return { shape, measures: m };
+      }
+      case "line":
+      case "arrow": {
+        const arrow = getRep(node, "reading:arrow")?.data;
+        const from = shape === "arrow" && arrow?.tail ? arrow.tail : fp.start;
+        const to = shape === "arrow" && arrow?.tip ? arrow.tip : fp.end;
+        const len = Math.hypot(to.x - from.x, to.y - from.y);
+        const heading = (deg(Math.atan2(-(to.y - from.y), to.x - from.x)) % 360 + 360) % 360;
+        m.push({ key: "length", label: "length", value: r0(len), unit: "px" });
+        m.push({ key: "heading", label: shape === "arrow" ? "points" : "heading", value: r0(heading), unit: "\xB0" });
+        m.push({ key: "slope", label: "slope", value: Math.abs(to.x - from.x) < 1e-6 ? Infinity : r1((to.y - from.y) / (to.x - from.x)), unit: "" });
+        return { shape, measures: m };
+      }
+      case "arc": {
+        const pts = ideal;
+        const a = pts[0], c = pts[pts.length - 1];
+        const chord = Math.hypot(c.x - a.x, c.y - a.y);
+        let arcLen = 0;
+        for (let i = 1; i < pts.length; i++) arcLen += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
+        m.push({ key: "arcLength", label: "arc length", value: r0(arcLen), unit: "px" });
+        m.push({ key: "chord", label: "chord", value: r0(chord), unit: "px" });
+        let sag = 0;
+        for (const p of pts) {
+          const d = Math.abs((c.x - a.x) * (p.y - a.y) - (c.y - a.y) * (p.x - a.x)) / Math.max(1e-6, chord);
+          if (d > sag) sag = d;
+        }
+        if (sag > 1e-6) {
+          const r = chord * chord / (8 * sag) + sag / 2;
+          m.push({ key: "radius", label: "radius", value: r0(r), unit: "px" });
+          m.push({ key: "sweep", label: "sweep", value: r0(deg(2 * Math.asin(Math.min(1, chord / (2 * r))))), unit: "\xB0" });
+        }
+        return { shape, measures: m };
+      }
+      case "dot": {
+        m.push({ key: "centre", label: "at", value: r0(centre.x), unit: "", at: centre });
+        m.push({ key: "centreY", label: "at y", value: r0(centre.y), unit: "" });
+        return { shape, measures: m };
+      }
+      default:
+        return null;
+    }
+  }
+  function describeMaths(maths) {
+    return maths.measures.filter((x) => x.key !== "centreY").map((x) => {
+      if (x.key === "centre" && x.at) return `${x.label} (${r0(x.at.x)}, ${r0(x.at.y)})`;
+      const v = Number.isFinite(x.value) ? x.value.toLocaleString("en-US") : "\u221E";
+      return `${x.label} ${v}${x.unit}`;
+    }).join(" \xB7 ");
   }
 
   // src/session/erase.ts

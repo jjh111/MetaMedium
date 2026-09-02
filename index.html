@@ -2811,40 +2811,39 @@
         <section id="development">
             <h2>Current Development</h2>
 
-            <p>This whitepaper accompanies active development of a working prototype demonstrating the core principles. The demo—internally called "Doodle 2.0"—implements:</p>
+            <p>This whitepaper accompanies a working engine and a reference surface built on it. As of September 2026 the loop the thesis describes runs end to end: you draw on an infinite canvas, the canvas reads what you drew, and a model joins the reading as a participant rather than an oracle. Every mark climbs three rungs, each a closed vocabulary you can inspect:</p>
 
             <ul>
-                <li><strong>Shape recognition with learning:</strong> Draw primitives (circles, rectangles, lines); teach custom shapes by naming them; the system remembers</li>
-                <li><strong>Spatial relationship detection:</strong> Intersection, containment, adjacency, and alignment are detected and visualized in real-time</li>
-                <li><strong>Composition matching:</strong> Combine learned shapes into patterns; the system recognizes compositions</li>
-                <li><strong>Refinement controls:</strong> Adjust recognition thresholds; see confidence scores; correct misrecognitions</li>
+                <li><strong>Shape — what the stroke is.</strong> Line, arc, triangle, rectangle, circle, arrow, writing, dot. Every reading is measured from the ink and carries its reasoning; several readings are held at once and nothing wins by silencing the others. A confident, unambiguous reading is offered back as its clean form, drawn over the ink, never in place of it.</li>
+                <li><strong>Diagram — what the mark plays.</strong> Container, node, edge, label, annotation. Placed by a nine-row table over measured relations (insideness, nearness, alignment, direction), so a drawing has a genre: boxes tiling a space are a page, nodes joined by edges are a graph.</li>
+                <li><strong>Code — what it becomes.</strong> A page compiles to flexbox that reflows, with your ink still outlining its elements to the pixel; a graph keeps its positions and its arrows. The engine owns the structure it measured; a model writes only the content, briefed by the drawing itself.</li>
             </ul>
 
-            <p>The interactive canvas at the top of this page demonstrates a subset of these capabilities—you can draw shapes and see recognition, auto-completion, and relationship detection in action.</p>
+            <p>Selection and command are marks too. Circle a group, cross it with a command mark you taught the system by drawing it five times, and a palette offers what those marks could become — starting with what needs no model at all. Handwriting beside a shape is read by a model that can see and offered as the shape's name. And the model can draw back: asked to add a footer, it says so in the shapes the canvas can read, and its marks are held in its name beside yours, with its reasons placed next to them.</p>
 
             <div class="demo-container">
                 <div class="demo-header">
-                    <span>Interactive Demo</span>
-                    <span><a href="https://jjh111.github.io/MetaMedium/doodle2-canvas.html" target="_blank" rel="noopener"><strong>Try it →</strong></a></span>
+                    <span>The reference surface</span>
+                    <span><a href="https://jjh111.github.io/MetaMedium/Demos/session-engine.html" target="_blank" rel="noopener"><strong>Open it →</strong></a></span>
                 </div>
-                <iframe src="https://jjh111.github.io/MetaMedium/doodle2-canvas.html" title="MetaMedium Demo" loading="lazy"></iframe>
+                <iframe src="https://jjh111.github.io/MetaMedium/Demos/session-engine.html" title="MetaMedium — the session engine" loading="lazy"></iframe>
             </div>
-            
+
             <div class="callout">
-                <h4>Full Demo & Source</h4>
-                <p>The complete prototype is available as a standalone web page. Development continues in the repository.</p>
-                <p><strong>Development Demo:</strong> <a href="https://jjh111.github.io/MetaMedium/doodle2-canvas.html" target="_blank" rel="noopener">jjh111.github.io/doodle2-Canvas</a>
-                    <br>
+                <h4>Demo &amp; Source</h4>
+                <p>Everything above works offline; joining a local model (Ollama or LM Studio) or a hosted one by key adds the reading, building, handwriting and drawing that need one. Development continues in the repository.</p>
+                <p><strong>Reference surface:</strong> <a href="https://jjh111.github.io/MetaMedium/Demos/session-engine.html" target="_blank" rel="noopener">jjh111.github.io/MetaMedium/Demos/session-engine.html</a><br>
+                <strong>Earlier prototype (2025):</strong> <a href="https://jjh111.github.io/MetaMedium/doodle2-canvas.html" target="_blank" rel="noopener">doodle2-canvas.html</a> — heuristic recognition, a learned library, and the geometry of what you drew read out as maths<br>
                 <strong>GitHub:</strong> <a href="https://github.com/jjh111/MetaMedium/tree/master" target="_blank" rel="noopener">github.com/jjh111/MetaMedium</a><br>
                 <strong>License:</strong> GPL — the MetaMedium framework is open source.</p>
             </div>
-            
+
             <h3>Development Roadmap</h3>
-            
+
             <ul>
-                <li><strong>Current:</strong> Core shape recognition, spatial relationships, custom shape learning, composition detection</li>
-                <li><strong>Next:</strong> Annotation-as-execution (text near shapes triggers behaviors), improved gesture recognition, undo/redo with branching history</li>
-                <li><strong>Future:</strong> Multi-user collaboration, cognitive lens export/import, LLM integration for natural language annotation, speech input (following DrawTalking's approach), 3D/4D canvas navigation (z-axis as semantic distance, temporal versioning)</li>
+                <li><strong>Built:</strong> the engine (<code>metamedium-core</code>, zero dependencies, benchmarked over 1,674 hand-drawn strokes); the three rungs; the no-modes session — selection, command and erase as marks; living artifacts with ink addressing their regions; local and hosted models as participants; handwriting; the model drawing back.</li>
+                <li><strong>Next:</strong> words from printed letters, not only cursive; the model proposing library entries the human blesses — the last clause of the conversation benchmark; recall by meaning through a local embedder; this surface as the flagship, with the earlier prototypes archived.</li>
+                <li><strong>Then:</strong> whitepaper v5.1 written around what the demo shows; an MCP server so a model outside the browser takes part through the same channel; multi-user canvases; cognitive lens export and import.</li>
             </ul>
             
             <h3>Open Questions</h3>
@@ -3160,7 +3159,7 @@
         <p class="footer-subtitle">Bibliography: <a href="https://jhanacek.net/metamedium-resources-65" target="_blank" rel="noopener"><b>Resources Page</b></a></p>
         <p class="footer-copyright">© John Hanacek 2015 · <a href="https://johnhanacek.com" target="_blank" rel="noopener">JHDesign LLC</a></p>
         <p class="footer-signature"><img src="./Assets/footer-JHsig.png" alt="John Hanacek signature" style="height: 2em; opacity: 0.7;"></p>
-        <p class="version">v5 · Updated February 2026 · Made using Claude Code</p>
+        <p class="version">v5 · February 2026 · development section updated September 2026 · Made using Claude Code</p>
     </footer>
 
     <script>

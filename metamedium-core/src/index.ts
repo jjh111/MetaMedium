@@ -78,6 +78,10 @@ export type { CleanShape, SnapReading } from './session/clean';
 export { strokeFor, parseShapes, MAX_DRAWN } from './session/synthesize';
 export type { DrawnShape } from './session/synthesize';
 
+// The maths of a mark — what follows from a reading, measured from the ink.
+export { measure, describeMaths } from './session/measure';
+export type { Maths, Measure } from './session/measure';
+
 // Gesture grammar
 export {
   isLassoLike,

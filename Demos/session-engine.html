@@ -88,7 +88,7 @@ html, body {
   margin-bottom: 8px;
 }
 #inspector .row { display: flex; gap: 8px; }
-#inspector .k { color: var(--dim); min-width: 44px; flex-shrink: 0; }
+#inspector .k { color: var(--dim); min-width: 44px; flex-shrink: 0; white-space: nowrap; }
 #inspector .v { color: var(--ink); font-variant-numeric: tabular-nums; }
 #inspector .reads { margin: 7px 0 4px; }
 #inspector .read {
@@ -2359,6 +2359,20 @@ html, body {
         const label = e.rel === 'part-of' ? 'part of ' + (MM.wordOf(s.nodes.get(e.to)) || e.to) : e.rel + ' ' + e.to;
         html += '<div class="row"><span class="k">' + (e.blessed ? 'blessed' : 'held') + '</span>' +
           '<span class="v">' + esc(label) + '</span></div>';
+      });
+    }
+
+    // The maths: what follows from the reading, measured from the ink. A
+    // circle has a radius; a triangle's angles add to 180°. Arithmetic on a
+    // reading, not a reading — no confidence, nothing to argue with.
+    const maths = !isArtifact && MM.strokePointsOf(node) ? MM.measure(node, s.nodes) : null;
+    if (maths && maths.measures.length) {
+      html += '<div class="sep"></div><div class="eyebrow">the maths <span class="srccount">' + esc(maths.shape) + '</span></div>';
+      const shown = maths.measures.filter((x) => x.key !== 'centreY');
+      shown.forEach((x) => {
+        const v = x.key === 'centre' && x.at ? '(' + Math.round(x.at.x) + ', ' + Math.round(x.at.y) + ')'
+          : (Number.isFinite(x.value) ? x.value.toLocaleString('en-US') : '∞') + esc(x.unit);
+        html += '<div class="row"><span class="k">' + esc(x.label) + '</span><span class="v">' + v + '</span></div>';
       });
     }
 

@@ -40,6 +40,7 @@ Architecture documents (chronological; **read MVP.md, then v7, then v6**):
 - `KEYFRAMES.md` — **the three keyframes, built**: shape → diagram-shape →
   code, each a closed vocabulary; the mappings between them are tables
 - `ARCHITECTURE-v7-PARTICIPANTS-AND-TIERS.md` — **active plan**: putting a model in the loop through the `propose` channel; the conversation benchmark; one OpenAI-compatible transport for Ollama/LM Studio/OpenRouter
+- `WHITEPAPER-v5.1-PLAN.md` — **the package**: what the whitepaper shows vs. what the engine does, replays-as-figures, the demos as the paper's spine, the prose pass, and the palette decision John owns
 - `ARCHITECTURE-v6-SESSION-ENGINE.md` — **active design**: the no-modes session engine (deferred commitment, summoning, promotion ladder, capability tiers), implemented in `metamedium-core/`
 - `metamedium-core-schema.md` — graph data model ("everything is a node; type emerges from connections") — load-bearing via v6
 - `ARCHITECTURE-v5-UNIFIED-ENGINE.md` — partly superseded by v6; still the reference for the deferred MoE-routing and embedding-space work
@@ -193,6 +194,19 @@ fraction of the short side, so it can never straddle a whole one.
 **Library matching** is a weighted fingerprint comparison (straightness,
 aspect, corners, closure, size) with a straightness veto — see
 `matchPrimitiveFromLibrary`.
+
+### The maths of a mark
+
+> `metamedium-core/src/session/measure.ts` — `measure(node, nodes)`, `describeMaths`.
+
+What follows from a reading, as numbers: a circle's centre, radius,
+circumference and area; a rectangle's sides, perimeter and area; a line's
+length and heading; an arrow's direction; a triangle's angles (acute / right /
+obtuse) and sides; an arc's radius and sweep. Measured from the clean form the
+mark carries or would be offered, so it is the maths of the *shape*, not of the
+wobble. It is arithmetic on a reading, not a reading — no confidence and no
+candidates — and writing has none. The inspector shows it as *the maths*; it is
+the one thing the 2025 prototype did that the engine had dropped.
 
 ### Clean forms: a confident reading, redrawn
 
@@ -617,10 +631,13 @@ Two palettes coexist **by intent** — the split is by brand, not drift. Don't
 
 | Surface | Palette | Type |
 |---|---|---|
-| Whitepaper, `Demos/`, flagship demos | `#0a0a0f` bg · `#e8e4d9` text · `#c9a84c` gold | Space Grotesk |
+| Whitepaper (`index.html`) | **light paper**: `#f8f6f1` paper · `#1a1a2e` ink · `#e63946` accent · sketch blue/green/purple | DM Sans |
+| `Demos/`, flagship demos | `#0a0a0f` bg · `#e8e4d9` text · `#c9a84c` gold | Space Grotesk |
 | `lens-canvas/`, `manim-explainer/`, `playground.html` | `#020a12` sea-deep · `#7dd8f7` cyan · `#d4af37` gold | JetBrains Mono |
 
-The second is the personal-site (johnhanacek.com) language.
+The third is the personal-site (johnhanacek.com) language. The whitepaper is
+the one light surface; the demos it embeds are dark, and that contrast is a
+known seam (see `WHITEPAPER-v5.1-PLAN.md`).
 
 Recognition feedback (whitepaper/demos): accepted `#0066ff`, pending `#666666`,
 high confidence green, medium confidence orange.

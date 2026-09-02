@@ -227,7 +227,14 @@ transport is one OpenAI-compatible adapter (Ollama, LM Studio, and OpenRouter
 are the same client with a different base URL), plus the Anthropic client for
 Tier 2.
 
-### Whitepaper v5.1 — "Show, don't tell" — **deferred by decision**
+### Whitepaper v5.1 — "Show, don't tell" — **planned: [WHITEPAPER-v5.1-PLAN.md](WHITEPAPER-v5.1-PLAN.md)**
+
+> **2 Sep 2026.** The paper's *Current Development* section was rewritten
+> around what exists (it had described the 2025 prototype and listed "LLM
+> integration" under *Future*), and the plan for v5.1 is written: replays as
+> figures, one demo per claim, a prose pass, and the palette decision. The
+> engine got back *the maths* of a shape (`measure.ts`), which the 2025
+> prototype had and the engine had dropped.
 
 > 📌 **Parked (Aug 2026, John's call):** *"leave whitepaper alone until we know
 > this works."* The document should demonstrate a thesis that is proven, not a
