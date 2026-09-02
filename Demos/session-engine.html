@@ -1745,8 +1745,13 @@ body.embed.summoning #inspector { display: none; } /* the palette is the point; 
         text((MM.wordOf(node) || '') + (isLive ? '  ·  live' : ''), b.minX, b.minY - wpx(10), C.gold);
       } else if (b && !pending) {
         // Two rungs at a glance: what it is, and what it plays.
+        // What it IS: the blessed name, the words it says, or the shape rung's
+        // reading. A model's reading of the GROUP this mark is in lands on the
+        // mark too, and it belongs in the panel and the palette, not under a
+        // circle as if the circle were "network-node-connections".
         const said = MM.transcriptOf(node);
-        const top = said ? '“' + said + '”' : MM.topInterpretation(node);
+        const shape = MM.interpretationsOf(node, s.nodes).filter((r) => r.tier === 0)[0];
+        const top = MM.wordOf(node) || (said ? '“' + said + '”' : shape ? shape.label : MM.topInterpretation(node));
         const role = readRungs(s).roles.get(id);
         const played = role && role.role !== 'unclassified' && role.role !== top ? ' · ' + role.role : '';
         if (top) text(top + played, b.minX, b.maxY + wpx(15),
@@ -2159,8 +2164,16 @@ body.embed.summoning #inspector { display: none; } /* the palette is the point; 
 
     const b = MM.boundsOf(s.nodes.get(sum.gestureIds[sum.gestureIds.length - 1]));
     const p = worldToScreen(b.minX, b.maxY);
-    summonEl.style.left = Math.max(8, Math.min(p.x, innerWidth - summonEl.offsetWidth - 8)) + 'px';
-    summonEl.style.top = Math.max(8, Math.min(p.y + 14, innerHeight - summonEl.offsetHeight - 52)) + 'px';
+    let left = Math.max(8, Math.min(p.x, innerWidth - summonEl.offsetWidth - 8));
+    const top = Math.max(8, Math.min(p.y + 14, innerHeight - summonEl.offsetHeight - 52));
+    // Keep clear of the panel: two things to read should not sit on each other.
+    const panel = inspectorEl.getBoundingClientRect();
+    if (!document.body.classList.contains('panelHidden') && panel.width && left < panel.right + 10 &&
+        top < panel.bottom && top + summonEl.offsetHeight > panel.top) {
+      left = Math.min(panel.right + 10, innerWidth - summonEl.offsetWidth - 8);
+    }
+    summonEl.style.left = left + 'px';
+    summonEl.style.top = top + 'px';
   }
 
   /** Recompute the offers for the open summon and repaint, keeping what was typed. */
