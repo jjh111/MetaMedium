@@ -199,7 +199,12 @@ shippable on its own and each with a criterion:
    without reading anything.
 5. **Whitepaper v5.1.** Unparked once 2 lands — the benchmark passes end to
    end — and written around what the demo shows rather than what it promises.
-6. **An MCP server over the engine** (PRD-v4 Phase 1, still deferred until 4):
+6. **The canvas as code** — [ARCHITECTURE-v8-CANVAS-AS-CODE.md](ARCHITECTURE-v8-CANVAS-AS-CODE.md):
+   time, behaviours as a closed vocabulary of steering verbs, definitions and
+   instances, nested artifacts carrying `js` and `json`, export as a folder.
+   The fish canvas rebuilt from primitives is its proof and the whitepaper's
+   demo 6. Stages A–C are the paradigm; decisions listed in its §10.
+7. **An MCP server over the engine** (PRD-v4 Phase 1, still deferred until 4):
    the session as tools — read, snap, draw, name — so a model outside the
    browser can take part as a participant through the same channel.
 
