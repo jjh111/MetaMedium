@@ -490,6 +490,16 @@ differ only by base URL and key. Anthropic needs its own client.
   relatives think inside `<think>…</think>`, and a brace in there is exactly what
   the tolerant JSON readers downstream would latch onto.
 
+**The surface's chrome** (`Demos/session-engine.html`): the panel that reports
+on the last or hovered mark tucks under the title, scrolls, and collapses as
+a whole (*details ▾*, remembered per device; closed by default on narrow
+screens). Its labels are plain — *mark*, *reading*, *read as*, *maths*,
+*measured*, *selection*, *roles*, *relations*. Scrolling **pans**; a pinch or
+ctrl/cmd + wheel **zooms** — the trackpad convention every infinite canvas
+uses — and the rail and keyboard still zoom for a mouse. Touch: one finger
+draws, two fingers pinch and pan; on a phone the rail wraps, the zoom row is
+hidden (pinch does it), and the held-loop chip wraps to fit.
+
 **The model pane** (`Demos/session-engine.html`) follows what the personal
 site's search bar learned (`johnhanacek/scripts/search-core.js`): it probes
 **both** local servers in parallel (returning on the first that answered hid a

@@ -47,7 +47,6 @@ html, body {
   display: flex; align-items: flex-start; justify-content: space-between;
   gap: 16px; padding: 14px 18px; z-index: 5; pointer-events: none;
 }
-.title { pointer-events: none; }
 .title h1 {
   font-size: 15px; font-weight: 600; letter-spacing: 0.01em; color: var(--gold);
 }
@@ -61,7 +60,7 @@ html, body {
   border: 1px solid var(--rule); border-radius: 3px; padding: 0 4px;
 }
 
-.controls { display: flex; gap: 8px; pointer-events: auto; flex-shrink: 0; }
+.controls { display: flex; gap: 8px; pointer-events: auto; flex-shrink: 1; min-width: 0; flex-wrap: wrap; justify-content: flex-end; }
 .controls button {
   background: transparent; border: 1px solid var(--rule); color: var(--dim);
   font: 12px var(--ui); padding: 7px 13px; border-radius: 5px; cursor: pointer;
@@ -74,14 +73,24 @@ html, body {
   background: rgba(138, 180, 200, 0.1);
 }
 
-/* ===== Inspector: reports on the last (or hovered) mark. No selection mode. ===== */
+/* ===== The panel: what the engine holds about the last (or hovered) mark.
+   Tucked under the title, scrollable, and collapsible as a whole. No
+   selection mode: it follows the hand. ===== */
 #inspector {
-  position: absolute; top: 92px; right: 18px; width: 310px; z-index: 4;
+  position: absolute; top: 58px; left: 18px; width: 300px; z-index: 4;
   background: var(--panel); border: 1px solid var(--rule); border-radius: 8px;
   padding: 12px 14px; font-family: var(--mono); font-size: 11.5px; line-height: 1.5;
-  pointer-events: none; backdrop-filter: blur(8px);
-  max-height: calc(100vh - 140px); overflow-y: auto;
+  pointer-events: auto; backdrop-filter: blur(8px);
+  max-height: calc(100vh - 190px); overflow-y: auto; overscroll-behavior: contain;
+  scrollbar-width: thin; scrollbar-color: var(--rule) transparent;
 }
+body.panelHidden #inspector { display: none; }
+#panelToggle {
+  pointer-events: auto; cursor: pointer; background: none; border: 0; padding: 0 2px;
+  font: 11px var(--ui); color: var(--dim); margin-top: 2px; letter-spacing: 0.04em;
+}
+#panelToggle:hover { color: var(--gold); }
+.title { pointer-events: auto; }
 #inspector .eyebrow {
   font-family: var(--ui); font-size: 10px; font-weight: 500;
   letter-spacing: 0.11em; text-transform: uppercase; color: var(--dim);
@@ -227,6 +236,10 @@ html, body {
     top: auto; bottom: 34px; right: 10px; left: 10px; width: auto;
     max-height: 34vh; font-size: 11px;
   }
+  .controls button { padding: 9px 12px; } /* a finger, not a pointer */
+  .controls .zoomRow, #resetBtn, #snapMode { display: none; } /* pinch zooms; the rest is noise on a phone */
+  #held { flex-wrap: wrap; white-space: normal; max-width: calc(100vw - 16px); gap: 6px 8px; }
+  #held .heldText { flex-basis: 100%; }
   .legend { display: none; }
   .status { bottom: 10px; font-size: 10px; }
 }
@@ -420,6 +433,7 @@ body.embed.summoning #inspector { display: none; } /* the palette is the point; 
 <div class="rail">
   <div class="title">
     <h1>MetaMedium <span>MVP</span></h1>
+    <button id="panelToggle" aria-expanded="true" title="Show or hide the panel">details ▾</button>
   </div>
   <div class="controls">
     <div class="markChip" id="markChip" title="The mark that turns a circled group into an offer. Click to teach your own.">
@@ -531,6 +545,16 @@ body.embed.summoning #inspector { display: none; } /* the palette is the point; 
   const summonEl = document.getElementById('summon');
   const statusEl = document.getElementById('status');
   const inspectorEl = document.getElementById('inspector');
+  const PANEL_KEY = 'mm-panel';
+  const panelToggle = document.getElementById('panelToggle');
+  let panelOpen = (() => { try { const v = localStorage.getItem(PANEL_KEY); return v === null ? innerWidth > 820 : v === 'open'; } catch (err) { return true; } })();
+  function syncPanel() {
+    document.body.classList.toggle('panelHidden', !panelOpen);
+    panelToggle.textContent = panelOpen ? 'details ▾' : 'details ▸';
+    panelToggle.setAttribute('aria-expanded', String(panelOpen));
+  }
+  panelToggle.onclick = () => { panelOpen = !panelOpen; try { localStorage.setItem(PANEL_KEY, panelOpen ? 'open' : 'closed'); } catch (err) { /* private mode */ } syncPanel(); };
+  syncPanel();
 
   let state = session.getState();
   let live = null;      // stroke under the pointer, in WORLD coordinates
@@ -606,18 +630,26 @@ body.embed.summoning #inspector { display: none; } /* the palette is the point; 
   // with ctrlKey in Chrome and as gesture events in Safari; both zoom. Holding
   // shift turns the wheel into a pan, and space/middle/alt-drag pans — panning
   // is the deliberate act, zooming is what a wheel over a canvas means.
+  // Scrolling pans; a pinch (which the browser reports as a wheel with
+  // ctrlKey) or ctrl/cmd + wheel zooms. That is the convention of every
+  // infinite canvas a trackpad user already knows, and the one thing a mouse
+  // wheel loses — zoom on a bare wheel — is on the rail and the keyboard.
   canvas.addEventListener('wheel', (e) => {
     e.preventDefault();
-    if (e.shiftKey) {
-      view.panX -= e.deltaX || e.deltaY;
-      view.panY -= e.deltaX ? e.deltaY : 0;
-      afterViewChange();
+    if (e.ctrlKey || e.metaKey) {
+      // Pinch deltas are small and continuous; wheel clicks are large and
+      // stepped. Scale the factor by the delta so both feel proportionate.
+      const k = e.deltaMode === 0 && Math.abs(e.deltaY) < 50 ? 0.01 : 0.0022;
+      zoomAround(e.clientX, e.clientY, Math.exp(-e.deltaY * k));
       return;
     }
-    // Pinch deltas are small and continuous; wheel clicks are large and
-    // stepped. Scale the factor by the delta so both feel proportionate.
-    const k = e.ctrlKey || e.metaKey ? 0.01 : 0.0022;
-    zoomAround(e.clientX, e.clientY, Math.exp(-e.deltaY * k));
+    // A line-mode wheel (a mouse) moves in bigger steps than a pixel-mode one.
+    const step = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? innerHeight : 1;
+    let dx = e.deltaX * step, dy = e.deltaY * step;
+    if (e.shiftKey && !e.deltaX) { dx = dy; dy = 0; } // shift + a plain wheel scrolls sideways
+    view.panX -= dx;
+    view.panY -= dy;
+    afterViewChange();
   }, { passive: false });
 
   // Safari: pinch is a gesture event, not a wheel.
@@ -2317,8 +2349,8 @@ body.embed.summoning #inspector { display: none; } /* the palette is the point; 
 
     const node = id && s.nodes.get(id);
     if (!node) {
-      inspectorEl.innerHTML = '<div class="eyebrow">what the engine holds</div>' +
-        '<div class="empty">Draw something. Every mark keeps all its readings — ' +
+      inspectorEl.innerHTML = '<div class="eyebrow">mark</div>' +
+        '<div class="empty">Draw something. Each mark keeps every reading it has; ' +
         'nothing is committed until you bless it.</div>';
       return;
     }
@@ -2330,9 +2362,9 @@ body.embed.summoning #inspector { display: none; } /* the palette is the point; 
       : ((node.reps.find((r) => r.modality === 'word') || {}).source || MM.LOCAL_PARTICIPANT);
     const authorName = nameOfParticipant(author);
     let html = '<div class="eyebrow">' +
-      (isLive ? 'living artifact' : isArtifact ? 'artifact' : 'what the engine holds') + '</div>';
+      (isLive ? 'living page' : isArtifact ? 'artifact' : 'mark') + '</div>';
 
-    html += '<div class="row"><span class="k">node</span><span class="v">' + esc(id) + '</span></div>';
+    html += '<div class="row"><span class="k">id</span><span class="v">' + esc(id) + '</span></div>';
     html += '<div class="row"><span class="k">by</span><span class="v ' +
       (author !== MM.LOCAL_PARTICIPANT ? 'by-agent' : 'by-human') + '">' + esc(authorName) + '</span></div>';
 
@@ -2365,10 +2397,7 @@ body.embed.summoning #inspector { display: none; } /* the palette is the point; 
       const regions = MM.regionsOf(node, s.nodes);
       html += '<div class="row"><span class="k">regions</span><span class="v">' +
         regions.map((r) => r.id).join(' ') + '</span></div>';
-      if (codes.length > 1) {
-        html += '<div class="why">Earlier versions are still held — rendering the newest is a ' +
-          'display choice, not a commitment.</div>';
-      }
+      if (codes.length > 1) html += '<div class="why">Earlier versions are kept.</div>';
     }
 
     // THE LADDER. Every rung a mark has climbed, with why at each one — ink,
@@ -2419,7 +2448,7 @@ body.embed.summoning #inspector { display: none; } /* the palette is the point; 
           isLive && rung.genre ? rung.genre.reasoning : '']);
       }
       if (rows.length) {
-        html += '<div class="sep"></div><div class="eyebrow">the ladder</div><div class="ladder">';
+        html += '<div class="sep"></div><div class="eyebrow">reading</div><div class="ladder">';
         rows.forEach(([k, v, why, action]) => {
           html += '<div class="row"><span class="k">' + esc(k) + '</span><span class="v">' + esc(v) + '</span></div>';
           if (why) html += '<div class="why">' + esc(why) + '</div>';
@@ -2436,7 +2465,7 @@ body.embed.summoning #inspector { display: none; } /* the palette is the point; 
       const groups = MM.bySource(reads);
       const gap = MM.disagreement(reads);
 
-      html += '<div class="sep"></div><div class="eyebrow">reads as' +
+      html += '<div class="sep"></div><div class="eyebrow">read as' +
         (groups.length > 1 ? ' <span class="srccount">' + groups.length + ' sources</span>' : '') + '</div>';
 
       if (gap && gap.crossSource) {
@@ -2463,7 +2492,7 @@ body.embed.summoning #inspector { display: none; } /* the palette is the point; 
     // that came in as pixels, and the model that gave it is named.
     if (MM.strokePointsOf(node) && !isArtifact && isWriting(node)) {
       const said = MM.transcriptsOf(node);
-      html += '<div class="sep"></div><div class="eyebrow">writing reads</div>';
+      html += '<div class="sep"></div><div class="eyebrow">handwriting</div>';
       if (said.length) {
         html += '<div class="reads">';
         said.forEach((t, i) => {
@@ -2502,7 +2531,7 @@ body.embed.summoning #inspector { display: none; } /* the palette is the point; 
     // reading, not a reading — no confidence, nothing to argue with.
     const maths = !isArtifact && MM.strokePointsOf(node) ? MM.measure(node, s.nodes) : null;
     if (maths && maths.measures.length) {
-      html += '<div class="sep"></div><div class="eyebrow">the maths <span class="srccount">' + esc(maths.shape) + '</span></div>';
+      html += '<div class="sep"></div><div class="eyebrow">maths <span class="srccount">' + esc(maths.shape) + '</span></div>';
       const shown = maths.measures.filter((x) => x.key !== 'centreY');
       shown.forEach((x) => {
         const v = x.key === 'centre' && x.at ? '(' + Math.round(x.at.x) + ', ' + Math.round(x.at.y) + ')'
@@ -2513,7 +2542,7 @@ body.embed.summoning #inspector { display: none; } /* the palette is the point; 
 
     const fp = MM.fingerprintOf(node);
     if (fp) {
-      html += '<div class="sep"></div><div class="eyebrow">ground truth</div>' +
+      html += '<div class="sep"></div><div class="eyebrow">measured</div>' +
         '<div class="row"><span class="k">straight</span><span class="v">' + fp.straightness.toFixed(3) + '</span></div>' +
         '<div class="row"><span class="k">corners</span><span class="v">' + fp.corners + '</span></div>' +
         '<div class="row"><span class="k">closed</span><span class="v">' + (fp.isClosed ? 'yes' : 'no') + '</span></div>' +
@@ -2526,7 +2555,7 @@ body.embed.summoning #inspector { display: none; } /* the palette is the point; 
   function renderSummonScope(s) {
     const sum = s.summon;
     const reading = session.read(sum.enclosedIds);
-    let html = '<div class="eyebrow">what these marks are</div>';
+    let html = '<div class="eyebrow">selection</div>';
 
     html += '<div class="row"><span class="k">holds</span><span class="v">' +
       sum.enclosedIds.length + ' mark' + (sum.enclosedIds.length === 1 ? '' : 's') + '</span></div>';
@@ -2538,7 +2567,7 @@ body.embed.summoning #inspector { display: none; } /* the palette is the point; 
       html += '<div class="why">' + esc(reading.genre.reasoning) + '</div>';
     }
     if (reading.roles && reading.roles.length) {
-      html += '<div class="sep"></div><div class="eyebrow">plays</div>';
+      html += '<div class="sep"></div><div class="eyebrow">roles</div>';
       reading.roles.forEach((r) => {
         const dir = r.direction ? ' ' + r.direction.from + ' → ' + r.direction.to : '';
         html += '<div class="row"><span class="k">' + esc(r.role) + '</span><span class="v">' + esc(r.id + dir) + '</span></div>';
@@ -2557,7 +2586,7 @@ body.embed.summoning #inspector { display: none; } /* the palette is the point; 
     // is what the palette is offering from, so it is what the inspector must
     // explain. Several at once, ranked, like every other reading in the engine.
     if (reading.concepts.length) {
-      html += '<div class="sep"></div><div class="eyebrow">reads as' +
+      html += '<div class="sep"></div><div class="eyebrow">read as' +
         (reading.concepts.length > 1 ? ' <span class="srccount">' + reading.concepts.length + ' concepts</span>' : '') +
         '</div><div class="reads">';
       reading.concepts.forEach((c, i) => {
@@ -2574,8 +2603,7 @@ body.embed.summoning #inspector { display: none; } /* the palette is the point; 
       });
       html += '</div>';
     } else {
-      html += '<div class="sep"></div><div class="why">No structural reading — these marks ' +
-        'relate to each other, but not in a way the concept library has a name for yet.</div>';
+      html += '<div class="sep"></div><div class="why">No concept matched yet.</div>';
     }
 
     // The relations underneath, which is where those readings came from.
@@ -2584,7 +2612,7 @@ body.embed.summoning #inspector { display: none; } /* the palette is the point; 
     if (rels.length) {
       const byKind = {};
       rels.forEach((r) => { byKind[r.kind] = (byKind[r.kind] || 0) + 1; });
-      html += '<div class="sep"></div><div class="eyebrow">relations seen</div>';
+      html += '<div class="sep"></div><div class="eyebrow">relations</div>';
       Object.keys(byKind).sort().forEach((kind) => {
         html += '<div class="row"><span class="k">' + esc(kind) + '</span>' +
           '<span class="v">' + byKind[kind] + '</span></div>';
@@ -2592,9 +2620,6 @@ body.embed.summoning #inspector { display: none; } /* the palette is the point; 
       const strongest = rels.slice().sort((a, b) => b.strength - a.strength)[0];
       if (strongest) html += '<div class="why">' + esc(strongest.kind + ': ' + strongest.reasoning) + '</div>';
     }
-
-    html += '<div class="why" style="margin-top:7px">Ignoring this is a valid answer: ' +
-      'keep drawing and the offer dissolves, leaving the marks as they were.</div>';
 
     inspectorEl.innerHTML = html;
   }
