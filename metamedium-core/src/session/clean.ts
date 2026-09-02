@@ -8,7 +8,7 @@
 //   1. **Ink is never destroyed.** The clean form is a rep added to the mark;
 //      the stroke underneath is untouched, and dropping the rep is the undo.
 //   2. **Only a reading that is both confident AND unambiguous qualifies.**
-//      A diamond is triangle 0.61 and rectangle 0.58; redrawing it as either
+//      A pentagon is rectangle 0.44 and circle 0.43; redrawing it as either
 //      would silently settle an argument the engine deliberately holds open.
 //      So `snapReading` asks for a floor on the top reading and a margin over
 //      the next (ARCHITECTURE-v6 principle 2, applied to geometry).

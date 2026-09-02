@@ -159,6 +159,16 @@ export type SessionEvent =
        */
       content?: boolean;
     }
+  | {
+      /**
+       * Resolve the held lasso as a selection WITHOUT the command mark — a
+       * button beside the loop, a tap, a key. The mark is the fluent way; this
+       * is the discoverable one, and it reaches exactly the same summon.
+       */
+      type: 'summon';
+      at: number;
+      participantId?: string;
+    }
   | { type: 'tick'; at: number }
   | { type: 'bless'; summonId: string; name?: string; suggestionId?: string; at: number; participantId?: string }
   | { type: 'dismiss'; summonId: string; at: number; participantId?: string }
@@ -336,6 +346,11 @@ export interface Session {
     concepts: ConceptMatch[];
   };
   tick(at: number): void;
+  /**
+   * Summon the held lasso's contents explicitly, as the command mark would.
+   * Returns the summon id, or null when nothing is held.
+   */
+  summonHeld(at: number): string | null;
   bless(args: {
     summonId: string;
     name?: string;
@@ -1175,6 +1190,30 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     }
   }
 
+  function applySummon(ev: Extract<SessionEvent, { type: 'summon' }>): string | null {
+    if (!pendingLasso) return null;
+    const lassoNode = nodes.get(pendingLasso.id);
+    const lassoFp = lassoNode && fingerprintOf(lassoNode);
+    if (!lassoNode || !lassoFp) return null;
+    // Same retroactivity as the mark: the loop was a gesture all along.
+    lassoNode.reps.push({ modality: 'gesture', data: { role: 'lasso' }, source: 'heuristic' });
+    removeFromContent(lassoNode.id);
+    const enclosedIds = enclosedBy(lassoFp.bounds, contentBoundsList());
+    summon = buildSummon(
+      enclosedIds,
+      'lasso',
+      `you circled ${enclosedIds.length} mark${enclosedIds.length === 1 ? '' : 's'} and asked`,
+      [lassoNode.id],
+      lassoFp.bounds,
+      lassoNode.id,
+      ev.at
+    );
+    pendingLasso = null;
+    markMiss = null;
+    recomputeClusterCandidates();
+    return summon.id;
+  }
+
   function applyTeach(ev: Extract<SessionEvent, { type: 'teach' }>) {
     commandMark = ev.mark;
   }
@@ -1219,6 +1258,8 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       case 'teach':
         applyTeach(ev);
         return null;
+      case 'summon':
+        return applySummon(ev);
       case 'tidy':
         applyTidy(ev);
         return null;
@@ -1341,6 +1382,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       return { scope, relations, roles, genre, concepts: matchConcepts(scope) };
     },
     tick: (at) => void dispatch({ type: 'tick', at }),
+    summonHeld: (at) => dispatch({ type: 'summon', at }),
     bless: (args) => dispatch({ type: 'bless', ...args }),
     dismiss: (summonId, at) => void dispatch({ type: 'dismiss', summonId, at }),
     erase: (nodeId, at) => void dispatch({ type: 'erase', nodeId, at }),

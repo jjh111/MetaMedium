@@ -126,13 +126,18 @@ describe('confidence is measured, not assigned', () => {
 
 describe('multi-parse survives — ambiguity is reported, not resolved', () => {
   it('offers competing readings for a genuinely ambiguous shape', () => {
-    // A diamond has four corners like a rectangle and fills half its box like a
-    // triangle. Both readings are true; collapsing to one would be the lie.
-    const results = analyzeStroke(
-      handPolygon([{ x: 100, y: 0 }, { x: 200, y: 100 }, { x: 100, y: 200 }, { x: 0, y: 100 }], { jitter: 2, seed: 3 })
-    ).results;
+    // A pentagon has a corner more than a rectangle and five more than a
+    // circle, and fills its box like neither. Both readings are true;
+    // collapsing to one would be the lie. (A diamond used to be the example
+    // here — but a diamond is a rotated square, and now that extent is
+    // measured against the tightest box at any angle the engine says so.)
+    const reg = (n: number, r = 100) => Array.from({ length: n }, (_, i) => ({
+      x: 150 + r * Math.cos((i / n) * Math.PI * 2 - Math.PI / 2),
+      y: 150 + r * Math.sin((i / n) * Math.PI * 2 - Math.PI / 2),
+    }));
+    const results = analyzeStroke(handPolygon(reg(5), { jitter: 2, seed: 3 })).results;
     expect(results.length).toBeGreaterThanOrEqual(2);
-    expect(results.map((r) => r.type)).toEqual(expect.arrayContaining(['triangle', 'rectangle']));
+    expect(results.map((r) => r.type)).toEqual(expect.arrayContaining(['rectangle', 'circle']));
   });
 
   it('does not spam readings for an unambiguous one', () => {

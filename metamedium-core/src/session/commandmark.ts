@@ -237,6 +237,11 @@ export function canonicalCheckSamples(): Point[][] {
     check(78, 32, 0.38, 0.40),
     check(60, 36, 0.34, 0.58, 0.06),
     check(74, 38, 0.35, 0.47, -0.05),
+    // A hand often draws the tail long — a short dip, then a long flick. The
+    // first five put the arms near 1:1.6; these reach 1:2.5, which a real
+    // check at 1:3 was refused for ("its two halves are the wrong lengths").
+    check(88, 30, 0.24, 0.55),
+    check(96, 28, 0.21, 0.50, 0.03),
   ];
 }
 

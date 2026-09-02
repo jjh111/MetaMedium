@@ -214,7 +214,7 @@ nothing of what the engine had read about them.
 reading is offered as a dashed ghost of its clean form; taking the offer adds a
 `'clean'` rep beside the ink, like tidy's `'transform'`. The ink stays faint
 underneath, undo drops the form. The gate is a floor *and* a margin over the
-next reading, so a diamond is never quietly settled; writing is never redrawn.
+next reading, so a pentagon is never quietly settled; writing is never redrawn.
 Over the 1674-stroke corpus: ≥95% of every drawable shape offered, zero wrong,
 zero for text — pinned. The one detector fix it forced: a 5:1 banner lost a
 corner at each end to path-fraction suppression, so the window is now bounded

@@ -464,15 +464,34 @@ var MetaMediumCore = (() => {
   }
   function shapeExtent(points) {
     if (points.length < 3) return 0;
-    const b = getBounds(points);
-    const boxArea = (b.maxX - b.minX) * (b.maxY - b.minY);
-    if (boxArea <= 0) return 0;
     let area2 = 0;
     for (let i = 0; i < points.length; i++) {
       const p = points[i], q = points[(i + 1) % points.length];
       area2 += p.x * q.y - q.x * p.y;
     }
-    return Math.min(1, Math.abs(area2) / 2 / boxArea);
+    area2 = Math.abs(area2) / 2;
+    if (area2 <= 0) return 0;
+    const hull2 = convexHull(points);
+    if (hull2.length < 3) return 0;
+    let best = Infinity;
+    for (let i = 0; i < hull2.length; i++) {
+      const a = hull2[i], b = hull2[(i + 1) % hull2.length];
+      const len = Math.hypot(b.x - a.x, b.y - a.y);
+      if (len < 1e-9) continue;
+      const ux = (b.x - a.x) / len, uy = (b.y - a.y) / len;
+      let minU = Infinity, maxU = -Infinity, minV = Infinity, maxV = -Infinity;
+      for (const p of hull2) {
+        const u = p.x * ux + p.y * uy, v = -p.x * uy + p.y * ux;
+        if (u < minU) minU = u;
+        if (u > maxU) maxU = u;
+        if (v < minV) minV = v;
+        if (v > maxV) maxV = v;
+      }
+      const boxArea = (maxU - minU) * (maxV - minV);
+      if (boxArea > 0 && boxArea < best) best = boxArea;
+    }
+    if (!Number.isFinite(best) || best <= 0) return 0;
+    return Math.min(1, area2 / best);
   }
   function analyzeCornerAngles(angles) {
     if (!angles || angles.length === 0) {
@@ -1651,7 +1670,12 @@ var MetaMediumCore = (() => {
       check(64, 40, 0.33, 0.52),
       check(78, 32, 0.38, 0.4),
       check(60, 36, 0.34, 0.58, 0.06),
-      check(74, 38, 0.35, 0.47, -0.05)
+      check(74, 38, 0.35, 0.47, -0.05),
+      // A hand often draws the tail long — a short dip, then a long flick. The
+      // first five put the arms near 1:1.6; these reach 1:2.5, which a real
+      // check at 1:3 was refused for ("its two halves are the wrong lengths").
+      check(88, 30, 0.24, 0.55),
+      check(96, 28, 0.21, 0.5, 0.03)
     ];
   }
   var BUILTIN_COMMAND_MARK = learnCommandMark(
@@ -3353,6 +3377,28 @@ ${pad}</${tag}>`;
         node.reps.push({ modality: "clean", data: clean, confidence: c.weight, source: ev.participantId ?? "engine" });
       }
     }
+    function applySummon(ev) {
+      if (!pendingLasso) return null;
+      const lassoNode = nodes.get(pendingLasso.id);
+      const lassoFp = lassoNode && fingerprintOf(lassoNode);
+      if (!lassoNode || !lassoFp) return null;
+      lassoNode.reps.push({ modality: "gesture", data: { role: "lasso" }, source: "heuristic" });
+      removeFromContent(lassoNode.id);
+      const enclosedIds = enclosedBy(lassoFp.bounds, contentBoundsList());
+      summon = buildSummon(
+        enclosedIds,
+        "lasso",
+        `you circled ${enclosedIds.length} mark${enclosedIds.length === 1 ? "" : "s"} and asked`,
+        [lassoNode.id],
+        lassoFp.bounds,
+        lassoNode.id,
+        ev.at
+      );
+      pendingLasso = null;
+      markMiss = null;
+      recomputeClusterCandidates();
+      return summon.id;
+    }
     function applyTeach(ev) {
       commandMark = ev.mark;
     }
@@ -3391,6 +3437,8 @@ ${pad}</${tag}>`;
         case "teach":
           applyTeach(ev);
           return null;
+        case "summon":
+          return applySummon(ev);
         case "tidy":
           applyTidy(ev);
           return null;
@@ -3498,6 +3546,7 @@ ${pad}</${tag}>`;
         return { scope, relations, roles, genre, concepts: matchConcepts(scope) };
       },
       tick: (at) => void dispatch({ type: "tick", at }),
+      summonHeld: (at) => dispatch({ type: "summon", at }),
       bless: (args) => dispatch({ type: "bless", ...args }),
       dismiss: (summonId, at) => void dispatch({ type: "dismiss", summonId, at }),
       erase: (nodeId, at) => void dispatch({ type: "erase", nodeId, at }),

@@ -124,8 +124,8 @@ Two properties matter more than any individual number:
 
 **Multi-parse, not winner-take-all.** Every detector that qualifies contributes
 a candidate; results are returned ranked by confidence, and nothing wins by
-silencing the others (ARCHITECTURE-v6 principle 2). A diamond is legitimately
-*triangle* and *rectangle* at once — the caller decides. Detectors today: line,
+silencing the others (ARCHITECTURE-v6 principle 2). A pentagon is legitimately
+*rectangle* and *circle* at once — the caller decides. Detectors today: line,
 arc, triangle, rectangle, circle. Each result carries a grounded `reasoning`
 string, which is what the "why" inspector surfaces.
 
@@ -142,6 +142,10 @@ context to outrank the engine.
 is the strongest single discriminator.** Rectangle ~1.0, circle ~0.79, triangle
 ~0.5. Corner count is fragile (miss one corner and a box becomes a triangle);
 extent holds regardless. This is what fixed "rectangles read as triangles".
+**The box is the tightest one at any angle** (rotating calipers over the
+hull), not the axis-aligned bounds: against those, a box tilted ten degrees
+filled ~80% and lost its snap offer, and at fifteen read half as a triangle.
+A hand rarely draws square to the screen.
 
 **The shape rung is closed: eight entries.** `line`, `arc`, `triangle`,
 `rectangle`, `circle`, and — because the rung above cannot do without them —
@@ -219,8 +223,8 @@ snapped mark gains a `'clean'` rep beside its ink — the same shape as tidy's
 ink faint beneath it. **Ink is never replaced**; undo drops the rep. Three rules:
 
 - **Confident AND unambiguous.** `SNAP_CONFIDENCE` floors the top Tier 0
-  reading and `SNAP_MARGIN` requires it to lead the next; a diamond that is
-  triangle 0.61 / rectangle 0.58 is never redrawn as either, because that would
+  reading and `SNAP_MARGIN` requires it to lead the next; a pentagon that is
+  rectangle 0.44 / circle 0.43 is never redrawn as either, because that would
   silently settle an argument the engine deliberately holds open. Only the
   engine's own reading counts — a model calling a box "a card" is a claim about
   meaning, not geometry.

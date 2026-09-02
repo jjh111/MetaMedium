@@ -528,9 +528,6 @@ export function countCorners(
  */
 export function shapeExtent(points: Point[]): number {
   if (points.length < 3) return 0;
-  const b = getBounds(points);
-  const boxArea = (b.maxX - b.minX) * (b.maxY - b.minY);
-  if (boxArea <= 0) return 0;
 
   // Shoelace over the outline, closed back to the start.
   let area = 0;
@@ -538,7 +535,35 @@ export function shapeExtent(points: Point[]): number {
     const p = points[i], q = points[(i + 1) % points.length];
     area += p.x * q.y - q.x * p.y;
   }
-  return Math.min(1, Math.abs(area) / 2 / boxArea);
+  area = Math.abs(area) / 2;
+  if (area <= 0) return 0;
+
+  // Against the TIGHTEST box at any angle, not the axis-aligned one. A box
+  // drawn by hand is rarely square to the screen, and against its axis-aligned
+  // bounds a rectangle tilted ten degrees fills only ~80% — enough to drop it
+  // below the snap floor and, at fifteen, to read half as a triangle. The
+  // minimum-area enclosing box has an edge collinear with a hull edge
+  // (rotating calipers), so trying each hull edge's direction is exact. A
+  // rectangle scores ~1 at any tilt; a circle stays at π/4; a triangle at ½.
+  const hull = convexHull(points);
+  if (hull.length < 3) return 0;
+  let best = Infinity;
+  for (let i = 0; i < hull.length; i++) {
+    const a = hull[i], b = hull[(i + 1) % hull.length];
+    const len = Math.hypot(b.x - a.x, b.y - a.y);
+    if (len < 1e-9) continue;
+    const ux = (b.x - a.x) / len, uy = (b.y - a.y) / len;
+    let minU = Infinity, maxU = -Infinity, minV = Infinity, maxV = -Infinity;
+    for (const p of hull) {
+      const u = p.x * ux + p.y * uy, v = -p.x * uy + p.y * ux;
+      if (u < minU) minU = u; if (u > maxU) maxU = u;
+      if (v < minV) minV = v; if (v > maxV) maxV = v;
+    }
+    const boxArea = (maxU - minU) * (maxV - minV);
+    if (boxArea > 0 && boxArea < best) best = boxArea;
+  }
+  if (!Number.isFinite(best) || best <= 0) return 0;
+  return Math.min(1, area / best);
 }
 
 export function analyzeCornerAngles(angles: number[]): {

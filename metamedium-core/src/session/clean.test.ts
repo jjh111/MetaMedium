@@ -28,7 +28,7 @@ describe('snapReading', () => {
   });
 
   it('holds back when two readings are too close to call', () => {
-    // A diamond reads as triangle and rectangle at once; neither should win by snapping.
+    // A hand-drawn triangle can carry a second reading; neither should win by snapping.
     const s = createSession();
     const id = s.addStroke(handTriangle({ x: 200, y: 100 }, { x: 300, y: 250 }, { x: 100, y: 250 }, { seed: 2 }), at());
     const node = s.getState().nodes.get(id)!;
