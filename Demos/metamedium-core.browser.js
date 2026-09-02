@@ -4321,6 +4321,7 @@ ${brief}`,
         merged.regions[id2] = content;
       }
       const filled = ids.filter((id2) => merged.regions[id2]);
+      const changed = ids.filter((id2) => fill.regions[id2] && (!revising || addressed.includes(id2)));
       if (filled.length === 0) {
         return { ok: false, error: "the model filled none of the regions", raw: result2.text };
       }
@@ -4352,6 +4353,7 @@ ${brief}`,
         revised: revising,
         genre,
         filled,
+        changed,
         unfilled: ids.filter((x) => !merged.regions[x]),
         raw: result2.text
       };

@@ -535,6 +535,8 @@ export interface GenerateResult {
   genre?: 'layout' | 'graph' | 'mixed' | 'empty';
   /** Region ids that now hold content. */
   filled?: string[];
+  /** Region ids this call actually wrote — on a revision, only the addressed ones the model answered for. */
+  changed?: string[];
   /** Region ids the model left empty — reported, never hidden. */
   unfilled?: string[];
   error?: string;
@@ -806,6 +808,7 @@ export function createAgentParticipant(
     }
 
     const filled = ids.filter((id) => merged.regions[id]);
+    const changed = ids.filter((id) => fill.regions[id] && (!revising || addressed.includes(id)));
     if (filled.length === 0) {
       return { ok: false, error: 'the model filled none of the regions', raw: result.text };
     }
@@ -845,6 +848,7 @@ export function createAgentParticipant(
       revised: revising,
       genre,
       filled,
+      changed,
       unfilled: ids.filter((x) => !merged.regions[x]),
       raw: result.text,
     };
