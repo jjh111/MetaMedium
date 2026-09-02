@@ -645,7 +645,7 @@
         /* Demo Container */
         .demo-container {
             margin: var(--space-lg) 0;
-            border: 2px solid var(--sketch-blue);
+            border: 1px solid var(--border);
             border-radius: 12px;
             overflow: hidden;
             background: #fff;
@@ -657,8 +657,9 @@
             position: relative;
         }
         .demo-header {
-            background: linear-gradient(135deg, var(--sketch-blue), var(--sketch-green));
-            color: white;
+            background: var(--paper-warm);
+            color: var(--ink);
+            border-bottom: 1px solid var(--border);
             padding: var(--space-sm) var(--space-md);
             font-family: 'Space Grotesk', sans-serif;
             font-weight: 600;
@@ -679,6 +680,23 @@
         }
         
         /* Callout */
+        .principle-now {
+            margin-top: var(--space-sm);
+            padding-top: var(--space-xs);
+            border-top: 1px dashed var(--border);
+            font-size: var(--text-sm);
+            color: var(--muted);
+            line-height: 1.55;
+        }
+        .principle-now strong { color: var(--ink); font-weight: 600; }
+        code {
+            font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+            font-size: 0.9em;
+            background: var(--paper-warm);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 0.05em 0.35em;
+        }
         .callout {
             background: var(--paper-warm);
             border-radius: 10px;
@@ -1689,12 +1707,12 @@
             <h2 id="abstract">Overview</h2>
             
             <div class="overview-box">
-                <p>MetaMedium is a framework and working prototype for a new kind of human-AI interface: one where you draw instead of type, and the system interprets your marks as meaning — not just pixels. Draw a circle and it becomes a recognized shape. Connect shapes and the system detects relationships. Name a pattern and the system learns your vocabulary.</p>
+                <p>MetaMedium is a framework, a working engine and a reference surface for a new kind of human-AI interface: one where you draw instead of type, and the canvas reads your marks as meaning, not pixels. Draw a circle and it is recognized, measured, and offered back clean. Put shapes near each other and the relations between them are read. Name a pattern and the canvas learns your vocabulary. A model joins the reading as a participant that proposes and never commits.</p>
 
                 <p>The core idea: AI can function as a <em>meta-word</em> — a new linguistic element that transforms rough marks into structured meaning based on context. This turns drawing into a shared language between human and machine, where a seven-year-old's sketch and an engineer's diagram can coexist on the same canvas, each interpreted at its own level of abstraction.</p>
             </div>
 <div style="margin-top: var(--space-lg); padding: 0 var(--space-lg); max-width: 760px; margin-left: auto; margin-right: auto; color: var(--muted); line-height: 1.7;">
-            <p>This paper examines <a href="#problem">the problem</a> with current interfaces, <a href="#vision">the vision</a> of sketching as communication, and <a href="#lineage">the lineage</a> of six decades of research behind it. <a href="#thesis">The thesis</a> positions AI as a "meta-word" that closes the meaning-making loop. <a href="#framework">The framework</a> introduces core principles and cognitive lenses. <a href="#development">Current development</a> demonstrates a working prototype. <a href="#scenarios">Scenarios</a> and <a href="#future">future directions</a> explore where this leads.</p>
+            <p>This paper examines <a href="#problem">the problem</a> with current interfaces, <a href="#vision">the vision</a> of sketching as communication, and <a href="#lineage">the lineage</a> of six decades of research behind it. <a href="#thesis">The thesis</a> positions AI as a "meta-word" that closes the meaning-making loop. <a href="#framework">The framework</a> introduces core principles and cognitive lenses. <a href="#development">Current development</a> shows the engine in use and what building it found. <a href="#scenarios">Scenarios</a> and <a href="#future">future directions</a> explore where this leads.</p>
             </div>
         </section>
 
@@ -2428,36 +2446,42 @@
                     <h4>Space Is Semantic</h4>
                     <p>Spatial relationships carry meaning. Elements placed near each other are semantically related. Elements connected by lines have directional relationships. The entire canvas becomes a semantic field where position, proximity, and connection are first-class citizens of meaning.</p>
                     <p class="principle-example"><em>Place two circles close together; the system infers "related." Draw one inside another; it understands "containment." Position creates meaning without words.</em></p>
+                    <p class="principle-now"><strong>Built.</strong> Nearness, insideness, alignment and direction are measured as ratios of the marks' own size, carry a strength, and are what the palette offers from and the model is briefed with.</p>
                 </div>
                 
                 <div class="principle" data-num="2">
                     <h4>Annotation Becomes Execution</h4>
                     <p>When you write "make this bounce" near a drawn spring, that annotation becomes an instruction. When you draw an arrow from input to output, you've defined a data flow. The boundary between description and command dissolves; to describe is to instruct.</p>
                     <p class="principle-example"><em>Write "3x" next to a line; it becomes three lines. Write "wiggle" near a shape; it animates. The annotation is the program.</em></p>
+                    <p class="principle-now"><strong>Partly.</strong> A word written beside a shape is read and offered as its name; a prompt on a circled group builds a page in place, and ink on that page addresses the region under it. “3x” and “wiggle” are still vision.</p>
                 </div>
                 
                 <div class="principle" data-num="3">
                     <h4>Interpretive Ambiguity Is Feature</h4>
                     <p>A rough sketch is understood as rough—the system holds multiple interpretations probabilistically, refining its understanding as context accumulates. This mirrors how humans communicate: we tolerate ambiguity, using context to resolve meaning over time.</p>
                     <p class="principle-example"><em>Your rough oval might be a face, an egg, or a zero. The system holds all three until you add two dots—then it commits to "face." Premature disambiguation is the enemy of exploration.</em></p>
+                    <p class="principle-now"><strong>Built.</strong> A mark holds every reading that qualifies, ranked by measured confidence. A diamond is triangle and rectangle at once, and is redrawn clean as neither.</p>
                 </div>
                 
                 <div class="principle" data-num="4">
                     <h4>Bidirectional Learning</h4>
                     <p>User and system engage in mutual adaptation. User-specific patterns accumulate into "cognitive lenses"—the system learns your vocabulary and conventions. Simultaneously, the system teaches you by surfacing patterns, completing gestures, suggesting relationships. Your idiolect becomes executable; the system's interpretations become visible. Both intelligences grow through exchange.</p>
                     <p class="principle-example"><em>Draw "recursion" shorthand repeatedly; the system learns it. Later, it suggests this mark when detecting recursive patterns—teaching you to see what it sees. Your notation becomes shared language.</em></p>
+                    <p class="principle-now"><strong>Partly.</strong> Draw your command mark five times and it becomes yours; name a group and the next one like it is recognized. Lenses beyond that are not built.</p>
                 </div>
 
                 <div class="principle" data-num="5">
                     <h4>No Mode Switching</h4>
                     <p>Following Larry Tesler's principle that "no modes is good modes," the MetaMedium eliminates cognitive overhead. You're always just working—drawing, annotating, refining. The interpretation layer appears when needed and fades when not. There's no "design mode" vs. "execution mode," no switching between tools.</p>
                     <p class="principle-example"><em>Draw a shape. Write near it. Adjust with gestures. Watch it execute. All the same canvas, all the same moment. The interface disappears into the work.</em></p>
+                    <p class="principle-now"><strong>Built.</strong> Selection, command and erase are marks: a loop is a lasso, your mark across it summons, a scratch erases what it crosses. There is no mode to be in.</p>
                 </div>
 
                 <div class="principle" data-num="6">
                     <h4>Observable Reasoning</h4>
                     <p>Uncertainty becomes visible. When the AI considers multiple interpretations, the user sees them—not collapsed into a single guess. Multiple possibilities stay present until context or user choice resolves them. This transparency supports both trust and alignment.</p>
                     <p class="principle-example"><em>Your rough mark triggers three possible interpretations shown as faint ghosts; tap one to commit, or keep drawing to refine. You see the system thinking.</em></p>
+                    <p class="principle-now"><strong>Built.</strong> Every reading names the measurement it rests on; a confident one ghosts its clean form under the ink; an inspector walks any mark from ink to shape to role to code.</p>
                 </div>
             </div>
             
@@ -2846,6 +2870,18 @@
                 <li><strong>Then:</strong> whitepaper v5.1 written around what the demo shows; an MCP server so a model outside the browser takes part through the same channel; multi-user canvases; cognitive lens export and import.</li>
             </ul>
             
+            <h3>What Building It Found</h3>
+
+            <p>The engine is small and has no dependencies, and most of what it knows was learned by being wrong in a specific way. Five of those, because they are the part of the work a paper is for:</p>
+
+            <ul>
+                <li><strong>Fixed thresholds are about the hand, not the world.</strong> On an infinite canvas the same "closed if the gap is under 50 pixels" rule reads open at one zoom and closed at another. Every fixed-pixel rule in the engine is now stated in the hand's space and scaled by the zoom the stroke was drawn at, and every relation is a ratio of the marks' own size. There is no pixel constant left in the gesture grammar.</li>
+                <li><strong>Corner count is fragile; the fraction of its box a stroke encloses is not.</strong> Miss one corner and a rectangle becomes a triangle. A rectangle fills its bounding box; a circle fills 79% of it; a triangle about half. That one measurement took rectangles from 10% to 100% over the corpus, and it is why the engine trusts extent before it trusts corners.</li>
+                <li><strong>A tie broken by a constant is not a ranking.</strong> The first detectors carried fixed confidences, so a three-corner shape was triangle 0.85 and rectangle 0.80 and the triangle won because 85 is more than 80. Confidence is now measured from the evidence, and the engine's own certainty is capped so a participant with more context can outrank it.</li>
+                <li><strong>A model handed rectangles writes absolutely positioned divs.</strong> Asked for a positioned page, a 24-billion-parameter local model returned good copy and no positioning at all. So the engine stopped asking: it reads the drawing as a layout with a recursive cut, emits the flexbox itself, and asks the model only for each region's content. Geometry became an invariant rather than a request, and an 8-billion-parameter model became enough.</li>
+                <li><strong>The drawing is the brief.</strong> Given only rectangles, a model writes a page that fits the boxes. Given what each box plays, how they sit, what was written in them and what the human named, it writes the page the boxes were drawn for. "A page" is two words; the drawing is the specification, and the engine reads it out.</li>
+            </ul>
+
             <h3>Open Questions</h3>
             
             <p>The MetaMedium framework raises questions that can only be answered through building and testing:</p>
@@ -2861,7 +2897,7 @@
             <h3>Limitations and Challenges</h3>
             
             <ul>
-                <li><strong>Recognition accuracy:</strong> Current shape recognition, even with ML, makes mistakes. The negotiation paradigm helps—but users may lose patience with too many corrections. Finding the threshold where recognition is "good enough" is empirical work.</li>
+                <li><strong>Recognition is bounded, not solved:</strong> the shape rung reads 99.8% of a 1,674-stroke hand-drawn corpus, but it reads eight shapes and one cursive stroke per word; printed letters, symbols and everything past that vocabulary are held as "art" until a model or the human says otherwise. What a page <em>says</em> is still only as good as the model asked, and a small local model writes generic copy. The negotiation paradigm turns each miss into a correction rather than a failure, but too many corrections and people stop drawing.</li>
                 <li><strong>Cognitive load:</strong> Every gestural vocabulary is a language to learn. There's a real risk that MetaMedium becomes its own expertise barrier, replacing "learn to code" with "learn our gestures." Keeping the learning curve gentle while enabling power is a design challenge.</li>
                 <li><strong>Privacy of patterns:</strong> If the canvas learns from your drawing patterns, those patterns become data. "Cognitive lenses" are intimate—they encode how you think. The system must be designed with privacy as foundational, not afterthought.</li>
                 <li><strong>Over-automation risk:</strong> "The system guessed wrong and did something I didn't want" is a real failure mode. Undo must be instant and obvious. Interpretations must be inspectable before they execute. The user must remain in control.</li>
@@ -2940,7 +2976,7 @@
                 <h4>Visual Learning</h4>
                 <p class="principles-used"><strong>Principles:</strong> Space is semantic, Canvas learns, Bidirectional representation</p>
                 <p class="scenario">Visual thinker draws parabolas; system connects spatial intuition to formal equations bidirectionally. Discovers he understood calculus all along—just needed symbols connected to drawings.
-                    <a href="https://open.substack.com/pub/johnhanacek/p/a-day-with-metamedium-62d" target="_blank">Read Story</a></a>
+                    <a href="https://open.substack.com/pub/johnhanacek/p/a-day-with-metamedium-62d" target="_blank">Read Story</a>
                 </p>
             </div>
             
@@ -2948,7 +2984,7 @@
                 <h4>Asymmetric Collaboration</h4>
                 <p class="principles-used"><strong>Principles:</strong> Interpretive ambiguity, Cognitive lenses, Negotiation</p>
                 <p class="scenario">Seven-year-old's playful "bouncy bridge" sketch becomes engineering student's seismic dampening simulation. Canvas holds both interpretations—intuitive play and rigorous analysis—without translation.
-                    <a href="https://open.substack.com/pub/johnhanacek/p/a-day-with-metamedium-96c" target="_blank">Read Story</a></a>
+                    <a href="https://open.substack.com/pub/johnhanacek/p/a-day-with-metamedium-96c" target="_blank">Read Story</a>
                 </p>
             </div>
             
@@ -2956,7 +2992,7 @@
                 <h4>Rapid Prototyping</h4>
                 <p class="principles-used"><strong>Principles:</strong> Annotation becomes execution, Negotiation paradigm</p>
                 <p class="scenario">Non-programmer sketches water tanks, annotates flow logic. System generates simulation, asks clarifying questions, updates as she refines. Continuous negotiation from rough idea to working prototype—no code.
-                    <a href="https://open.substack.com/pub/johnhanacek/p/a-day-with-metamedium" target="_blank">Read Story</a></a>
+                    <a href="https://open.substack.com/pub/johnhanacek/p/a-day-with-metamedium" target="_blank">Read Story</a>
                 </p>
             </div>
             
@@ -2964,7 +3000,7 @@
                 <h4>Scientific Collaboration</h4>
                 <p class="principles-used"><strong>Principles:</strong> Space is semantic, Annotation becomes execution, Shared lenses</p>
                 <p class="scenario">Researchers sketch faster than formal notation allows. Spatial annotations like "defect here?" trigger simulations. Shared research lens interprets their shorthand.
-                    <a href="https://open.substack.com/pub/johnhanacek/p/a-day-with-metamedium-147" target="_blank">Read Story</a></a>
+                    <a href="https://open.substack.com/pub/johnhanacek/p/a-day-with-metamedium-147" target="_blank">Read Story</a>
                 </p>
             </div>
         </section>
@@ -3137,7 +3173,7 @@
             <p>The MetaMedium represents both a technical framework and a philosophical position about the future of human-AI interaction. Its core claim is simple: we have been limited not by AI capability but by interface bandwidth. The medium between human and AI has been too impoverished to support genuine collaboration.</p>
             
             <p>By making every mark a potential sign vehicle, every spatial relationship a semantic statement, every annotation an execution—we create conditions for a new kind of partnership. The computer has always been a metamedium capable of simulating any other medium. AI has become capable of interpreting and generating across modalities. The missing piece is the interface that lets humans bring their full cognitive richness into the collaboration.</p>
-            <p>We deserve to move beyond typing into text boxes. We deserve interfaces that meet us where we think. We deserve to dance and sing our intentions into being, to explore shared imagination space, to make the machinery we have built truly our partner in creation.</p>
+            <p>We should not have to type our thinking into a box. An interface can meet us where we think: on a surface where a mark is a proposal, where the machine's reading is visible and arguable, and where the two of us are building the same drawing.</p>
             <!--
                   <div class="callout key">
                 <h4>The Promise</h4>
@@ -3146,7 +3182,7 @@
             
             -->
       
-            <p>The MetaMedium is that interface. The demo accompanying this paper is a first step of grounded semantics, geometry and drawing: a canvas state ready for meta-mappings. Development continues. Contributions welcome.</p>
+            <p>The MetaMedium is that interface. The engine accompanying this paper reads a drawing, redraws it clean, measures it, compiles it, reads the writing on it, and lets a model draw back in marks the human can read on the same terms as their own. What it does not yet do is listed above as plainly as what it does. Development continues. Contributions welcome.</p>
 
             <p>It's time to bring the computer to life at the depth of mind with the speed and intuitive action of our hands.</p>
 
@@ -3159,7 +3195,7 @@
         <p class="footer-subtitle">Bibliography: <a href="https://jhanacek.net/metamedium-resources-65" target="_blank" rel="noopener"><b>Resources Page</b></a></p>
         <p class="footer-copyright">© John Hanacek 2015 · <a href="https://johnhanacek.com" target="_blank" rel="noopener">JHDesign LLC</a></p>
         <p class="footer-signature"><img src="./Assets/footer-JHsig.png" alt="John Hanacek signature" style="height: 2em; opacity: 0.7;"></p>
-        <p class="version">v5 · February 2026 · development section updated September 2026 · Made using Claude Code</p>
+        <p class="version">v5 · February 2026 · development section September 2026 · written by John Hanacek, drafted and built with Claude Code</p>
     </footer>
 
     <script>
