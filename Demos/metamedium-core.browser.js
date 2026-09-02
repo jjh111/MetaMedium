@@ -33,6 +33,7 @@ var MetaMediumCore = (() => {
     DEFAULT_SESSION_CONFIG: () => DEFAULT_SESSION_CONFIG,
     DEFAULT_TIMEOUT_MS: () => DEFAULT_TIMEOUT_MS,
     HAND_RESOLUTION_PX: () => HAND_RESOLUTION_PX,
+    LETTER_MAX_HEIGHT_PX: () => LETTER_MAX_HEIGHT_PX,
     LOCAL_PARTICIPANT: () => LOCAL_PARTICIPANT,
     LOCAL_TIMEOUT_MS: () => LOCAL_TIMEOUT_MS,
     MAX_DRAWN: () => MAX_DRAWN,
@@ -46,6 +47,8 @@ var MetaMediumCore = (() => {
     SNAP_CONFIDENCE: () => SNAP_CONFIDENCE,
     SNAP_MARGIN: () => SNAP_MARGIN,
     TIER0_PARTICIPANT: () => TIER0_PARTICIPANT,
+    WORD_GAP_RATIO: () => WORD_GAP_RATIO,
+    WORD_WINDOW_MS: () => WORD_WINDOW_MS,
     aboutIdsOf: () => aboutIdsOf,
     analyzeCornerAngles: () => analyzeCornerAngles,
     analyzeStroke: () => analyzeStroke,
@@ -111,9 +114,13 @@ var MetaMediumCore = (() => {
     isExplanation: () => isExplanation,
     isGesture: () => isGesture,
     isLassoLike: () => isLassoLike,
+    isLetterLike: () => isLetterLike,
     isParticipant: () => isParticipant,
     isStrokeClosed: () => isStrokeClosed,
+    isWord: () => isWord,
+    joinsRun: () => joinsRun,
     learnCommandMark: () => learnCommandMark,
+    lettersOf: () => lettersOf,
     listModels: () => listModels,
     matchConcepts: () => matchConcepts,
     matchPrimitiveFromLibrary: () => matchPrimitiveFromLibrary,
@@ -161,6 +168,7 @@ var MetaMediumCore = (() => {
     typeNodeId: () => typeNodeId,
     validateRegions: () => validateRegions,
     whyNotResolved: () => whyNotResolved,
+    wordConfidence: () => wordConfidence,
     wordOf: () => wordOf
   });
 
@@ -988,6 +996,12 @@ var MetaMediumCore = (() => {
   function transcriptOf(node) {
     return transcriptsOf(node)[0]?.text;
   }
+  function isWord(node) {
+    return getRep(node, "word-run") !== void 0;
+  }
+  function lettersOf(node) {
+    return (getRep(node, "word-run")?.data?.letters ?? []).slice();
+  }
   function isGesture(node) {
     return getRep(node, "gesture") !== void 0;
   }
@@ -1496,6 +1510,38 @@ var MetaMediumCore = (() => {
       const v = Number.isFinite(x.value) ? x.value.toLocaleString("en-US") : "\u221E";
       return `${x.label} ${v}${x.unit}`;
     }).join(" \xB7 ");
+  }
+
+  // src/session/words.ts
+  var LETTER_MAX_HEIGHT_PX = 44;
+  var LETTER_MAX_WIDTH_PX = 60;
+  var WORD_GAP_RATIO = 0.7;
+  var WORD_BAND_OVERLAP = 0.35;
+  var WORD_WINDOW_MS = 3e3;
+  function isLetterLike(b, scale) {
+    const h2 = (b.maxY - b.minY) / scale, w2 = (b.maxX - b.minX) / scale;
+    return h2 <= LETTER_MAX_HEIGHT_PX && w2 <= LETTER_MAX_WIDTH_PX;
+  }
+  function joinsRun(run, letter, scale) {
+    if (letter.at - run.lastAt > WORD_WINDOW_MS) return { ok: false, reasoning: "drawn too long after the last letter" };
+    const rb = run.bounds, lb = letter.bounds;
+    const runH = Math.max(1, rb.maxY - rb.minY), letH = Math.max(1, lb.maxY - lb.minY);
+    const band = Math.min(rb.maxY, lb.maxY) - Math.max(rb.minY, lb.minY);
+    const withinX = lb.minX >= rb.minX - runH * 0.3 && lb.maxX <= rb.maxX + runH * 0.3;
+    const closeAbove = lb.maxY <= rb.minY && rb.minY - lb.maxY <= runH * 0.6 && letH <= runH * 0.5;
+    if (withinX && closeAbove) return { ok: true, reasoning: "a small mark just above the word" };
+    const letMid = (lb.minY + lb.maxY) / 2;
+    const onLine = band >= Math.min(runH, letH) * WORD_BAND_OVERLAP || letMid >= rb.minY && letMid <= rb.maxY || (rb.minY + rb.maxY) / 2 >= lb.minY && (rb.minY + rb.maxY) / 2 <= lb.maxY;
+    if (!onLine) return { ok: false, reasoning: "not on the same line" };
+    const gap = Math.max(lb.minX - rb.maxX, rb.minX - lb.maxX, 0);
+    const ref = Math.max(runH, letH) / scale;
+    if (gap / scale > ref * WORD_GAP_RATIO) return { ok: false, reasoning: "too far from the last letter to be the same word" };
+    const tiny = Math.min(runH, letH) / scale < 10;
+    if (!tiny && (letH / runH > 2.2 || runH / letH > 2.2)) return { ok: false, reasoning: "a different size from the letters beside it" };
+    return { ok: true, reasoning: `beside the last letter, on its line, ${Math.round(gap / scale)}px away` };
+  }
+  function wordConfidence(letters) {
+    return Math.min(0.88, 0.55 + 0.08 * (letters - 2));
   }
 
   // src/session/erase.ts
@@ -3139,6 +3185,10 @@ ${pad}</${tag}>`;
       for (const r of analysis.results) {
         if (r.meta) node.reps.push({ modality: `reading:${r.type}`, data: r.meta, source: TIER0_PARTICIPANT });
       }
+      if (absorbIntoWord(node, fp, at, scale)) {
+        recomputeClusterCandidates();
+        return node.id;
+      }
       addSpatialEdges(node);
       inferWire(node, points, scale);
       const enclosed = enclosedBy(fp.bounds, contentBoundsList(node.id));
@@ -3228,6 +3278,12 @@ ${pad}</${tag}>`;
           }
         }
       };
+      if (isWord(node)) {
+        for (const id of lettersOf(node)) eraseNode(id, at);
+      }
+      for (const e of node.edges) {
+        if (e.rel === "part-of" && !e.blessed && nodes.get(e.to) && isWord(nodes.get(e.to))) shrinkWord(e.to, node.id);
+      }
       if (artifacts.includes(node.id)) {
         degrade(node.id);
       } else {
@@ -3377,6 +3433,82 @@ ${pad}</${tag}>`;
         node.reps.push({ modality: "clean", data: clean, confidence: c.weight, source: ev.participantId ?? "engine" });
       }
     }
+    function wordBounds(letterIds) {
+      return getBounds(letterIds.flatMap((id) => {
+        const b = boundsOf(nodes.get(id));
+        return [{ x: b.minX, y: b.minY }, { x: b.maxX, y: b.maxY }];
+      }));
+    }
+    function setWordReps(word, letterIds) {
+      word.reps = word.reps.filter((r) => r.modality !== "word-run" && r.modality !== "bounds");
+      word.reps.push({ modality: "word-run", data: { letters: letterIds }, source: TIER0_PARTICIPANT });
+      word.reps.push({ modality: "bounds", data: wordBounds(letterIds), source: TIER0_PARTICIPANT });
+      word.edges = word.edges.filter((e) => e.rel !== "has-part" && e.rel !== "resembles");
+      for (const id of letterIds) word.edges.push({ to: id, rel: "has-part" });
+      word.edges.push({
+        to: typeNodeId("text"),
+        rel: "resembles",
+        weight: wordConfidence(letterIds.length),
+        via: TIER0_PARTICIPANT,
+        reasoning: `${letterIds.length} small strokes in a row on one line \u2014 printed letters`
+      });
+    }
+    function absorbIntoWord(node, fp, at, scale) {
+      if (!isLetterLike(fp.bounds, scale)) return false;
+      const prevId = contentIds.filter((id) => id !== node.id).pop();
+      if (!prevId) return false;
+      const prev = nodes.get(prevId);
+      const letter = { bounds: fp.bounds, at };
+      if (isWord(prev)) {
+        const letters = lettersOf(prev);
+        const lastAt2 = (getRep(nodes.get(letters[letters.length - 1]), "stroke")?.data).at;
+        const j2 = joinsRun({ bounds: boundsOf(prev), lastAt: lastAt2 }, letter, scale);
+        if (!j2.ok) return false;
+        letters.push(node.id);
+        setWordReps(prev, letters);
+        node.edges.push({ to: prev.id, rel: "part-of", reasoning: j2.reasoning });
+        removeFromContent(node.id);
+        return true;
+      }
+      const prevFp = fingerprintOf(prev);
+      const prevStroke = getRep(prev, "stroke")?.data;
+      if (!prevFp || !prevStroke || getRep(prev, "gesture")) return false;
+      if (pendingLasso?.id === prev.id) return false;
+      if (!isLetterLike(prevFp.bounds, prevStroke.scale ?? scale)) return false;
+      const j = joinsRun({ bounds: prevFp.bounds, lastAt: prevStroke.at }, letter, scale);
+      if (!j.ok) return false;
+      const word = { id: nextId("word"), reps: [], edges: [{ to: LOCAL_PARTICIPANT, rel: "made-by" }], capability: 0, createdAt: at };
+      nodes.set(word.id, word);
+      setWordReps(word, [prev.id, node.id]);
+      for (const id of [prev.id, node.id]) {
+        nodes.get(id).edges.push({ to: word.id, rel: "part-of", reasoning: j.reasoning });
+      }
+      const idx = contentIds.indexOf(prev.id);
+      contentIds.splice(idx, 1, word.id);
+      removeFromContent(node.id);
+      if (pendingLasso?.id === node.id) pendingLasso = null;
+      return true;
+    }
+    function shrinkWord(wordId, without) {
+      const word = nodes.get(wordId);
+      if (!word || !isWord(word)) return;
+      const letters = lettersOf(word).filter((id) => id !== without && !getRep(nodes.get(id), "erased"));
+      if (letters.length >= 2 && without !== null) {
+        setWordReps(word, letters);
+        return;
+      }
+      const idx = contentIds.indexOf(wordId);
+      if (idx >= 0) contentIds.splice(idx, 1, ...letters);
+      for (const id of letters) {
+        const n2 = nodes.get(id);
+        n2.edges = n2.edges.filter((e) => !(e.rel === "part-of" && e.to === wordId));
+      }
+      word.reps.push({ modality: "status", data: "dissolved", source: "engine" });
+      word.edges = word.edges.filter((e) => e.rel !== "has-part");
+    }
+    function applySplit(ev) {
+      shrinkWord(ev.nodeId, null);
+    }
     function applySummon(ev) {
       if (!pendingLasso) return null;
       const lassoNode = nodes.get(pendingLasso.id);
@@ -3439,6 +3571,9 @@ ${pad}</${tag}>`;
           return null;
         case "summon":
           return applySummon(ev);
+        case "split":
+          applySplit(ev);
+          return null;
         case "tidy":
           applyTidy(ev);
           return null;
@@ -3547,6 +3682,7 @@ ${pad}</${tag}>`;
       },
       tick: (at) => void dispatch({ type: "tick", at }),
       summonHeld: (at) => dispatch({ type: "summon", at }),
+      splitWord: (nodeId, at) => void dispatch({ type: "split", nodeId, at }),
       bless: (args) => dispatch({ type: "bless", ...args }),
       dismiss: (summonId, at) => void dispatch({ type: "dismiss", summonId, at }),
       erase: (nodeId, at) => void dispatch({ type: "erase", nodeId, at }),

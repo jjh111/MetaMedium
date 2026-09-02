@@ -542,8 +542,14 @@ fingerprint carries it, so the model is asked to *read*, not to interpret.
   which was Stage E's ship criterion.
 - **The words reach the brief.** `describeReading` says *the human wrote
   "Pricing" there — use those words* instead of *handwriting you cannot read*.
-- **One stroke per word, for now.** The `text` detector reads a single cursive
-  stroke; grouping printed letters into a word is not built.
+- **Printed letters gather into a word** (`session/words.ts`). Small strokes
+  drawn in quick succession, side by side on a shared band, become a held
+  `word` node — the letters are its parts, it stands in the content plane in
+  their place, and it reads as `text`, so it can be a label, be read as one
+  image, and become a name. Every rule is in the hand's space (a letter is
+  small *on screen*), a crossbar or a dot counts by its centre, and the
+  grouping is inferred: erasing a letter shrinks the word, one letter left
+  dissolves it, and the inspector's *not a word — split it* undoes it.
 - `propose()` carries `reps` as well as edges, so a transcript is held through
   the same channel as every other reading and undo drops it.
 

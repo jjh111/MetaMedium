@@ -227,6 +227,16 @@ export function transcriptOf(node: MMNode): string | undefined {
   return transcriptsOf(node)[0]?.text;
 }
 
+/** A held run of printed letters, standing in the content plane as one mark. */
+export function isWord(node: MMNode): boolean {
+  return getRep(node, 'word-run') !== undefined;
+}
+
+/** The letter strokes a word is made of, in the order they were written. */
+export function lettersOf(node: MMNode): string[] {
+  return ((getRep(node, 'word-run')?.data as { letters?: string[] } | undefined)?.letters ?? []).slice();
+}
+
 export function isGesture(node: MMNode): boolean {
   return getRep(node, 'gesture') !== undefined;
 }

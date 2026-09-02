@@ -170,13 +170,11 @@ it, and let a model draw back. The conversation benchmark has one clause left
 and the surface is still framed as a reference. The phases from here, each
 shippable on its own and each with a criterion:
 
-1. **Words from letters.** Handwriting reads one cursive stroke; printed
-   letters are several strokes and the shape rung sees each alone. Cluster
-   small, near, same-band strokes into one `text` mark before recognition
-   (relations already carry `near`/`same-row`; the cluster is a node whose
-   parts are the letters), read the cluster, and let scratching any letter
-   erase the word. *Criterion:* print a word in block capitals beside a box and
-   it becomes the box's name.
+1. ~~**Words from letters.**~~ ✅ **built (2 Sep 2026).** Small strokes drawn in
+   quick succession on a shared band gather into a held `word` node
+   (`session/words.ts`) that reads as `text`; erasing a letter shrinks it, the
+   inspector can split it. *Criterion met:* print NAV in block capitals beside
+   a box and the palette leads with *Name it "…"* — e2e step 16.
 2. **The model builds the library.** The benchmark's last clause. A model that
    reads a group as "a molecule" should be able to *propose it as an entry* —
    a signature plus a name — held unblessed until the human takes it, after

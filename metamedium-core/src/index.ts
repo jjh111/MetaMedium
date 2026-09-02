@@ -51,6 +51,8 @@ export {
   resemblances,
   transcriptsOf,
   transcriptOf,
+  isWord,
+  lettersOf,
   topInterpretation,
   boundsOf,
   BUILTIN_TYPES,
@@ -81,6 +83,9 @@ export type { DrawnShape } from './session/synthesize';
 // The maths of a mark — what follows from a reading, measured from the ink.
 export { measure, describeMaths } from './session/measure';
 export type { Maths, Measure } from './session/measure';
+
+// Words from letters — printed letters gathered into one held mark (words.ts).
+export { isLetterLike, joinsRun, wordConfidence, LETTER_MAX_HEIGHT_PX, WORD_GAP_RATIO, WORD_WINDOW_MS } from './session/words';
 
 // Gesture grammar
 export {

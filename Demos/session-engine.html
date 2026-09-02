@@ -1360,8 +1360,12 @@ body.embed.summoning #inspector { display: none; } /* the palette is the point; 
   const askedToRead = new Set(); // node ids handed out already (per model join, see below)
 
   function inkImage(node, size) {
-    const pts = MM.strokePointsOf(node);
-    if (!pts || pts.length < 2) return null;
+    // A word is several strokes; a cursive word is one. Same image either way.
+    const runs = MM.isWord(node)
+      ? MM.lettersOf(node).map((id) => state.nodes.get(id)).filter(Boolean).map((n) => MM.strokePointsOf(n)).filter((p) => p && p.length > 1)
+      : [MM.strokePointsOf(node)].filter((p) => p && p.length > 1);
+    if (!runs.length) return null;
+    const pts = runs.flat();
     const b = MM.getBounds(pts);
     const w = Math.max(1, b.maxX - b.minX), h = Math.max(1, b.maxY - b.minY);
     const S = size || 320, pad = 16;
@@ -1372,9 +1376,11 @@ body.embed.summoning #inspector { display: none; } /* the palette is the point; 
     const c = off.getContext('2d');
     c.fillStyle = '#fff'; c.fillRect(0, 0, cw, ch);
     c.strokeStyle = '#111'; c.lineWidth = Math.max(2, 3 * k); c.lineCap = 'round'; c.lineJoin = 'round';
-    c.beginPath();
-    pts.forEach((p, i) => { const x = pad + (p.x - b.minX) * k, y = pad + (p.y - b.minY) * k; i ? c.lineTo(x, y) : c.moveTo(x, y); });
-    c.stroke();
+    for (const run of runs) {
+      c.beginPath();
+      run.forEach((p, i) => { const x = pad + (p.x - b.minX) * k, y = pad + (p.y - b.minY) * k; i ? c.lineTo(x, y) : c.moveTo(x, y); });
+      c.stroke();
+    }
     return off.toDataURL('image/png');
   }
 
@@ -1410,7 +1416,7 @@ body.embed.summoning #inspector { display: none; } /* the palette is the point; 
     for (const aid of s.artifacts) for (const e of s.nodes.get(aid).edges) if (e.rel === 'has-part') ids.push(e.to);
     for (const id of ids) {
       const node = s.nodes.get(id);
-      if (!node || s.pendingLassoId === id || MM.transcriptOf(node) || !MM.strokePointsOf(node)) continue;
+      if (!node || s.pendingLassoId === id || MM.transcriptOf(node) || !(MM.strokePointsOf(node) || MM.isWord(node))) continue;
       if (isWriting(node)) readOne(node, false);
     }
   }
@@ -1557,6 +1563,7 @@ body.embed.summoning #inspector { display: none; } /* the palette is the point; 
     const act = b.getAttribute('data-act');
     if (act === 'snap') snapAll([id]);
     else if (act === 'read') { const n = state.nodes.get(id); if (n && !readOne(n, true)) offerModel('Reading writing needs a model that can see.'); }
+    else if (act === 'split') session.splitWord(id, Date.now());
     else session.snap({ ids: [id], mode: 'raw', at: Date.now() });
   });
   document.getElementById('resetBtn').onclick = () => location.reload();
@@ -2357,17 +2364,23 @@ body.embed.summoning #inspector { display: none; } /* the palette is the point; 
 
     const isArtifact = s.artifacts.includes(id);
     const isLive = s.live.includes(id);
+    const isWordNode = MM.isWord(node);
     const author = MM.strokePointsOf(node)
       ? authorOf(node)
       : ((node.reps.find((r) => r.modality === 'word') || {}).source || MM.LOCAL_PARTICIPANT);
     const authorName = nameOfParticipant(author);
     let html = '<div class="eyebrow">' +
-      (isLive ? 'living page' : isArtifact ? 'artifact' : 'mark') + '</div>';
+      (isLive ? 'living page' : isArtifact ? 'artifact' : isWordNode ? 'word' : 'mark') + '</div>';
 
     html += '<div class="row"><span class="k">id</span><span class="v">' + esc(id) + '</span></div>';
     html += '<div class="row"><span class="k">by</span><span class="v ' +
       (author !== MM.LOCAL_PARTICIPANT ? 'by-agent' : 'by-human') + '">' + esc(authorName) + '</span></div>';
 
+    if (isWordNode) {
+      const letters = MM.lettersOf(node);
+      html += '<div class="row"><span class="k">letters</span><span class="v">' + letters.length + ' strokes, gathered as one word</span></div>' +
+        '<button class="mini" data-act="split" data-id="' + esc(id) + '">not a word — split it</button>';
+    }
     if (isArtifact) {
       const members = node.edges.filter((e) => e.rel === 'has-part');
       html += '<div class="row"><span class="k">name</span><span class="v">' + esc(MM.wordOf(node)) + '</span></div>';
@@ -2490,7 +2503,7 @@ body.embed.summoning #inspector { display: none; } /* the palette is the point; 
 
     // What the writing says — every transcript, attributed. The one reading
     // that came in as pixels, and the model that gave it is named.
-    if (MM.strokePointsOf(node) && !isArtifact && isWriting(node)) {
+    if ((MM.strokePointsOf(node) || MM.isWord(node)) && !isArtifact && isWriting(node)) {
       const said = MM.transcriptsOf(node);
       html += '<div class="sep"></div><div class="eyebrow">handwriting</div>';
       if (said.length) {

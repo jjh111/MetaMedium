@@ -39,6 +39,8 @@ import {
   strokePointsOf,
   resemblances,
   transcriptOf,
+  isWord,
+  lettersOf,
   LOCAL_PARTICIPANT,
   TIER0_PARTICIPANT,
 } from './nodes';
@@ -59,6 +61,7 @@ import { type ConceptMatch, type ConceptScope, matchConcepts } from '../concepts
 import { type GenreReading, type RoleReading, type Wire, assignRoles, genreOf } from '../diagram/roles';
 import { BUILTIN_COMMAND_MARK, matchesCommandMark } from './commandmark';
 import { type SnapReading, idealize, snapReading, cleanOf } from './clean';
+import { isLetterLike, joinsRun, wordConfidence } from './words';
 
 // ===== Public state shape =====
 
@@ -168,6 +171,12 @@ export type SessionEvent =
       type: 'summon';
       at: number;
       participantId?: string;
+    }
+  | {
+      /** Split a held word back into its letters — the grouping was inferred, and this is the human saying no. */
+      type: 'split';
+      nodeId: string;
+      at: number;
     }
   | { type: 'tick'; at: number }
   | { type: 'bless'; summonId: string; name?: string; suggestionId?: string; at: number; participantId?: string }
@@ -351,6 +360,8 @@ export interface Session {
    * Returns the summon id, or null when nothing is held.
    */
   summonHeld(at: number): string | null;
+  /** Split a held word back into its letter strokes. */
+  splitWord(nodeId: string, at: number): void;
   bless(args: {
     summonId: string;
     name?: string;
@@ -859,6 +870,14 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       if (r.meta) node.reps.push({ modality: `reading:${r.type}`, data: r.meta, source: TIER0_PARTICIPANT });
     }
 
+    // Printed letters gather into a word. If this stroke joined one, the WORD
+    // now stands in the content plane and this stroke is one of its parts;
+    // relations belong to the word and are read live, so none are stored here.
+    if (absorbIntoWord(node, fp, at, scale)) {
+      recomputeClusterCandidates();
+      return node.id;
+    }
+
     addSpatialEdges(node);
     inferWire(node, points, scale);
 
@@ -989,6 +1008,14 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
         }
       }
     };
+
+    if (isWord(node)) {
+      // Erasing a word erases what it is made of — that is what was scratched.
+      for (const id of lettersOf(node)) eraseNode(id, at);
+    }
+    for (const e of node.edges) {
+      if (e.rel === 'part-of' && !e.blessed && nodes.get(e.to) && isWord(nodes.get(e.to)!)) shrinkWord(e.to, node.id);
+    }
 
     if (artifacts.includes(node.id)) {
       // Erasing an artifact demotes it; its members survive as ink.
@@ -1190,6 +1217,98 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     }
   }
 
+  // ===== Words from letters (words.ts) =====
+
+  function wordBounds(letterIds: string[]): Bounds {
+    return getBounds(letterIds.flatMap((id) => {
+      const b = boundsOf(nodes.get(id)!)!;
+      return [{ x: b.minX, y: b.minY }, { x: b.maxX, y: b.maxY }];
+    }));
+  }
+
+  function setWordReps(word: MMNode, letterIds: string[]) {
+    word.reps = word.reps.filter((r) => r.modality !== 'word-run' && r.modality !== 'bounds');
+    word.reps.push({ modality: 'word-run', data: { letters: letterIds }, source: TIER0_PARTICIPANT });
+    word.reps.push({ modality: 'bounds', data: wordBounds(letterIds), source: TIER0_PARTICIPANT });
+    word.edges = word.edges.filter((e) => e.rel !== 'has-part' && e.rel !== 'resembles');
+    for (const id of letterIds) word.edges.push({ to: id, rel: 'has-part' });
+    word.edges.push({
+      to: typeNodeId('text'),
+      rel: 'resembles',
+      weight: wordConfidence(letterIds.length),
+      via: TIER0_PARTICIPANT,
+      reasoning: `${letterIds.length} small strokes in a row on one line — printed letters`,
+    });
+  }
+
+  /** The stroke just made: does it continue a word, or start one with the stroke before it? */
+  function absorbIntoWord(node: MMNode, fp: Fingerprint, at: number, scale: number): boolean {
+    if (!isLetterLike(fp.bounds, scale)) return false;
+    // The previous content node: a word being written, or a lone letter-like stroke.
+    const prevId = contentIds.filter((id) => id !== node.id).pop();
+    if (!prevId) return false;
+    const prev = nodes.get(prevId)!;
+    const letter = { bounds: fp.bounds, at };
+
+    if (isWord(prev)) {
+      const letters = lettersOf(prev);
+      const lastAt = (getRep(nodes.get(letters[letters.length - 1])!, 'stroke')?.data as { at: number }).at;
+      const j = joinsRun({ bounds: boundsOf(prev)!, lastAt }, letter, scale);
+      if (!j.ok) return false;
+      letters.push(node.id);
+      setWordReps(prev, letters);
+      node.edges.push({ to: prev.id, rel: 'part-of', reasoning: j.reasoning });
+      removeFromContent(node.id);
+      return true;
+    }
+
+    const prevFp = fingerprintOf(prev);
+    const prevStroke = getRep(prev, 'stroke')?.data as { at: number; scale?: number } | undefined;
+    if (!prevFp || !prevStroke || getRep(prev, 'gesture')) return false;
+    if (pendingLasso?.id === prev.id) return false;
+    if (!isLetterLike(prevFp.bounds, prevStroke.scale ?? scale)) return false;
+    const j = joinsRun({ bounds: prevFp.bounds, lastAt: prevStroke.at }, letter, scale);
+    if (!j.ok) return false;
+
+    // Two letters make a word. It takes their place in the content plane, where
+    // the first letter stood, so reading order is where the writing began.
+    const word: MMNode = { id: nextId('word'), reps: [], edges: [{ to: LOCAL_PARTICIPANT, rel: 'made-by' }], capability: 0, createdAt: at };
+    nodes.set(word.id, word);
+    setWordReps(word, [prev.id, node.id]);
+    for (const id of [prev.id, node.id]) {
+      nodes.get(id)!.edges.push({ to: word.id, rel: 'part-of', reasoning: j.reasoning });
+    }
+    const idx = contentIds.indexOf(prev.id);
+    contentIds.splice(idx, 1, word.id);
+    removeFromContent(node.id);
+    if (pendingLasso?.id === node.id) pendingLasso = null;
+    return true;
+  }
+
+  /** A letter left (erased, or the word split): shrink the word, or dissolve it. */
+  function shrinkWord(wordId: string, without: string | null) {
+    const word = nodes.get(wordId);
+    if (!word || !isWord(word)) return;
+    const letters = lettersOf(word).filter((id) => id !== without && !getRep(nodes.get(id)!, 'erased'));
+    if (letters.length >= 2 && without !== null) {
+      setWordReps(word, letters);
+      return;
+    }
+    // Dissolve: the surviving letters go back where the word stood.
+    const idx = contentIds.indexOf(wordId);
+    if (idx >= 0) contentIds.splice(idx, 1, ...letters);
+    for (const id of letters) {
+      const n = nodes.get(id)!;
+      n.edges = n.edges.filter((e) => !(e.rel === 'part-of' && e.to === wordId));
+    }
+    word.reps.push({ modality: 'status', data: 'dissolved', source: 'engine' });
+    word.edges = word.edges.filter((e) => e.rel !== 'has-part');
+  }
+
+  function applySplit(ev: Extract<SessionEvent, { type: 'split' }>) {
+    shrinkWord(ev.nodeId, null);
+  }
+
   function applySummon(ev: Extract<SessionEvent, { type: 'summon' }>): string | null {
     if (!pendingLasso) return null;
     const lassoNode = nodes.get(pendingLasso.id);
@@ -1260,6 +1379,9 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
         return null;
       case 'summon':
         return applySummon(ev);
+      case 'split':
+        applySplit(ev);
+        return null;
       case 'tidy':
         applyTidy(ev);
         return null;
@@ -1383,6 +1505,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     },
     tick: (at) => void dispatch({ type: 'tick', at }),
     summonHeld: (at) => dispatch({ type: 'summon', at }),
+    splitWord: (nodeId, at) => void dispatch({ type: 'split', nodeId, at }),
     bless: (args) => dispatch({ type: 'bless', ...args }),
     dismiss: (summonId, at) => void dispatch({ type: 'dismiss', summonId, at }),
     erase: (nodeId, at) => void dispatch({ type: 'erase', nodeId, at }),

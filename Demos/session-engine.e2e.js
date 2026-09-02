@@ -487,6 +487,43 @@ window.__scenario = async function(){
     mm.setSnapMode('offer');
   }
 
+  // ---- 16. Words from letters: print a word in block capitals beside a box; it becomes the box's name ----
+  {
+    mm.fitAll(); await wait(60);
+    const z = mm.view.zoom;
+    const W = (x, y) => mm.worldToScreen(x, y);
+    const seg = (a, b) => t.line(W(a.x, a.y), W(b.x, b.y), 14);
+    const bx = { x: 3300, y: 2100 };
+    t.stroke(t.rect(W(bx.x, bx.y).x, W(bx.x, bx.y).y, 220 * z, 140 * z));
+    // N A V, each as the strokes a hand makes, 30 world-px tall beside the box — at this zoom, well under a letter's screen height.
+    const h = 30 / z > 40 ? 40 * z : 30, x0 = bx.x + 240, y0 = bx.y + 50;
+    const strokes = [
+      seg({ x: x0, y: y0 + h }, { x: x0, y: y0 }).concat(seg({ x: x0, y: y0 }, { x: x0 + 18, y: y0 + h }).slice(1), seg({ x: x0 + 18, y: y0 + h }, { x: x0 + 18, y: y0 }).slice(1)),
+      seg({ x: x0 + 26, y: y0 + h }, { x: x0 + 36, y: y0 }).concat(seg({ x: x0 + 36, y: y0 }, { x: x0 + 46, y: y0 + h }).slice(1)),
+      seg({ x: x0 + 30, y: y0 + h * 0.6 }, { x: x0 + 42, y: y0 + h * 0.6 }),
+      seg({ x: x0 + 54, y: y0 }, { x: x0 + 64, y: y0 + h }).concat(seg({ x: x0 + 64, y: y0 + h }, { x: x0 + 74, y: y0 }).slice(1)),
+    ];
+    for (const pts of strokes) t.stroke(pts);
+    await wait(300); // the read is asynchronous
+    const stW = mm.session.getState();
+    const wordId = stW.contentIds.find(id => MM.isWord(stW.nodes.get(id)));
+    const word = wordId && stW.nodes.get(wordId);
+    step('16. four printed strokes beside a box gather into one word', !!word && MM.lettersOf(word).length === 4 && MM.topInterpretation(word) === 'text', { content: stW.contentIds.length, letters: word && MM.lettersOf(word).length });
+    step('16a. the word is read as a whole by the model that can see', !!word && MM.transcriptOf(word) === 'Pricing', word && MM.transcriptsOf(word).map(x => x.text));
+    const cW = W(bx.x + 150, bx.y + 70);
+    t.stroke(t.circle(cW.x, cW.y, 260 * z));
+    document.getElementById('heldOffer').click();
+    await wait(80);
+    const chipsW = t.chips();
+    // Step 13 already named a box-plus-word "Pricing"; this group has the same
+    // signature, so the match may lead — either way the word is the offer.
+    step('16b. the palette leads with the word as the box\'s name', chipsW.slice(0, 2).includes('Name it “Pricing”') || chipsW[0] === 'It’s a Pricing', chipsW);
+    const nameChip = [...document.querySelectorAll('#summon .item')].find(b => /Name it/.test(b.textContent));
+    if (nameChip) nameChip.click();
+    const stN = mm.session.getState();
+    step('16c. the printed word is now the box\'s name — the ship criterion for printed letters', stN.artifacts.map(id => MM.wordOf(stN.nodes.get(id))).filter(n => n === 'Pricing').length >= 1);
+  }
+
   // ---- 11. Scratch-out erase ----
   mm.fitAll(); await wait(60);
   const stBefore = mm.session.getState().contentIds.length;
