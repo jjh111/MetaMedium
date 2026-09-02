@@ -352,6 +352,18 @@ export interface Session {
   subscribe(listener: (state: SessionState) => void): () => void;
   /** Full input log — state is a pure function of this. */
   getEvents(): readonly SessionEvent[];
+  /**
+   * Replace the log and replay it.
+   *
+   * State is a pure function of the log, so a recorded session — the canonical
+   * loop run once against a real model, every proposal and every answer
+   * captured as the events they were — replays deterministically anywhere,
+   * with no model attached. That is what makes a recording a FIGURE rather
+   * than a screenshot: the actual engine, the actual events, in the reader's
+   * browser, inspectable at every step. Load a prefix to stand at that step;
+   * draw afterwards to continue the recorded session with your own marks.
+   */
+  load(events: readonly SessionEvent[]): void;
 }
 
 export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): Session {
@@ -1333,6 +1345,11 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     dismiss: (summonId, at) => void dispatch({ type: 'dismiss', summonId, at }),
     erase: (nodeId, at) => void dispatch({ type: 'erase', nodeId, at }),
     undo,
+    load: (log) => {
+      events = log.map((ev) => ({ ...ev }));
+      replay();
+      notify();
+    },
     getState,
     subscribe,
     getEvents: () => events,

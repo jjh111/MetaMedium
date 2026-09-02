@@ -3502,6 +3502,11 @@ ${pad}</${tag}>`;
       dismiss: (summonId, at) => void dispatch({ type: "dismiss", summonId, at }),
       erase: (nodeId, at) => void dispatch({ type: "erase", nodeId, at }),
       undo,
+      load: (log) => {
+        events = log.map((ev) => ({ ...ev }));
+        replay();
+        notify();
+      },
       getState,
       subscribe,
       getEvents: () => events
