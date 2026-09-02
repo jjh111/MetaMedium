@@ -351,6 +351,23 @@ body.embed.summoning #inspector { display: none; } /* the palette is the point; 
 #replay .rpCaption { grid-column: 1 / -1; line-height: 1.45; color: var(--ink); }
 #replay .rpCaption b { color: var(--gold); font-weight: 500; }
 
+/* ===== The held loop: what you can do with what you circled ===== */
+#held {
+  position: absolute; z-index: 6; display: flex; align-items: center; gap: 8px;
+  background: var(--panel); border: 1px solid var(--rule); border-radius: 8px;
+  padding: 6px 8px 6px 11px; font-family: var(--ui); font-size: 12px; color: var(--ink);
+  backdrop-filter: blur(8px); white-space: nowrap;
+}
+#held[hidden] { display: none; }
+#held .heldText { color: var(--dim); }
+#held .heldText b { color: var(--gold); font-weight: 500; }
+#held button {
+  font: inherit; font-size: 12px; color: var(--gold); background: none;
+  border: 1px solid var(--rule); border-radius: 6px; padding: 3px 9px; cursor: pointer;
+}
+#held button:hover { border-color: var(--gold); }
+#held button[hidden] { display: none; }
+
 /* ===== Command palette: what these marks could become ===== */
 #summon.palette {
   display: block; padding: 0; width: 340px; overflow: hidden;
@@ -465,6 +482,11 @@ body.embed.summoning #inspector { display: none; } /* the palette is the point; 
   <div id="mpList"></div>
 </div>
 
+<div id="held" hidden>
+  <span class="heldText" id="heldText"></span>
+  <button id="heldSnap" title="Redraw the circled marks clean; the loop stays held">Draw clean</button>
+  <button id="heldOffer" title="See what these could become — the same offer the mark gives">What could these be?</button>
+</div>
 <aside id="inspector" aria-live="polite"></aside>
 <div id="summon"></div>
 <div class="scrimBottom"></div>
@@ -999,11 +1021,25 @@ body.embed.summoning #inspector { display: none; } /* the palette is the point; 
     if (c === undefined || (c && c.shape !== shape)) { c = MM.idealize(node, shape); idealCache.set(node, c); }
     return c;
   }
+  /** The marks a held loop encloses — the same test the engine will make when it resolves. */
+  function heldEnclosed(s) {
+    if (!s.pendingLassoId) return [];
+    const lasso = s.nodes.get(s.pendingLassoId);
+    const b = lasso && MM.boundsOf(lasso);
+    if (!b) return [];
+    return MM.enclosedBy(b, s.contentIds.filter((id) => id !== s.pendingLassoId)
+      .map((id) => ({ id, bounds: MM.boundsOf(s.nodes.get(id)) })).filter((c) => c.bounds));
+  }
+  let heldCandidates = []; // offers among what the held loop encloses
+
   function refreshOffers() {
+    const s = session.getState();
     snapOffers = snapMode === 'off' ? new Map() : new Map(session.snapCandidates().map((c) => [c.id, c]));
-    const n = snapOffers.size;
+    heldCandidates = heldEnclosed(s).filter((id) => snapOffers.has(id));
+    // A held loop scopes the button: what you circled, not everything.
+    const n = heldCandidates.length || snapOffers.size;
     snapBtn.hidden = n === 0;
-    snapBtn.textContent = 'Snap ' + n;
+    snapBtn.textContent = (heldCandidates.length ? 'Snap circled ' : 'Snap ') + n;
     snapModeBtn.textContent = 'snap · ' + snapMode;
   }
   function shapesSummary(cands) {
@@ -1019,9 +1055,42 @@ body.embed.summoning #inspector { display: none; } /* the palette is the point; 
   function setSnapMode(mode) {
     snapMode = SNAP_MODES.includes(mode) ? mode : 'offer';
     store.set(SNAP_KEY, snapMode);
+    // Auto means everything that reads clean IS clean — including what was
+    // drawn before the switch.
+    if (snapMode === 'auto') autoSweep();
     render(session.getState());
   }
-  snapBtn.onclick = () => snapAll([...snapOffers.keys()], shapesSummary([...snapOffers.values()]));
+  /** Auto: take every open offer except the held loop, which is a gesture in waiting. */
+  function autoSweep() {
+    if (snapMode !== 'auto') return;
+    const ids = session.snapCandidates().map((c) => c.id);
+    if (ids.length) session.snap({ ids: ids, at: Date.now() });
+  }
+
+  // ===== The held loop: a chip that says what you circled and what you can do =
+  const heldEl = document.getElementById('held');
+  const heldText = document.getElementById('heldText');
+  const heldSnap = document.getElementById('heldSnap');
+  document.getElementById('heldOffer').onclick = () => session.summonHeld(Date.now());
+  heldSnap.onclick = () => snapAll(heldCandidates.slice(), shapesSummary(heldCandidates.map((id) => snapOffers.get(id))));
+
+  function renderHeld(s) {
+    const enclosed = heldEnclosed(s);
+    if (!s.pendingLassoId || !enclosed.length) { heldEl.hidden = true; return; }
+    const lasso = s.nodes.get(s.pendingLassoId);
+    const b = MM.boundsOf(lasso);
+    heldText.innerHTML = '<b>' + enclosed.length + '</b> circled · cross with ' + (s.commandMark ? 'your mark' : '✓') + ', or';
+    heldSnap.hidden = heldCandidates.length === 0;
+    heldSnap.textContent = 'Draw ' + (heldCandidates.length === enclosed.length ? 'them' : heldCandidates.length) + ' clean';
+    heldEl.hidden = false;
+    const p = worldToScreen(b.minX, b.maxY);
+    heldEl.style.left = Math.max(8, Math.min(p.x, innerWidth - heldEl.offsetWidth - 8)) + 'px';
+    heldEl.style.top = Math.max(8, Math.min(p.y + 12, innerHeight - heldEl.offsetHeight - 52)) + 'px';
+  }
+  snapBtn.onclick = () => {
+    const ids = heldCandidates.length ? heldCandidates : [...snapOffers.keys()];
+    snapAll(ids, shapesSummary(ids.map((id) => snapOffers.get(id))));
+  };
   snapModeBtn.onclick = () => setSnapMode(SNAP_MODES[(SNAP_MODES.indexOf(snapMode) + 1) % SNAP_MODES.length]);
 
   function syncProviderFields() {
@@ -1416,11 +1485,11 @@ body.embed.summoning #inspector { display: none; } /* the palette is the point; 
     const after = session.getState();
     const made = after.nodes.get(id);
     const g = made && MM.getRep(made, 'gesture');
-    // Auto: take the offer up the moment it is made. Never for a stroke the
-    // grammar is still deciding about — a held lasso is a gesture in waiting.
-    if (snapMode === 'auto' && !g && after.pendingLassoId !== id && session.snapCandidates([id]).length) {
-      session.snap({ ids: [id], at: Date.now() });
-    }
+    // Auto: take every open offer the moment it is made — this stroke, and any
+    // earlier closed stroke that was a loop-in-waiting until this one settled
+    // it. Never the held loop itself; that is a gesture until the next mark
+    // says otherwise.
+    if (!g) autoSweep();
     if (g && g.data && g.data.role === 'scratch') {
       const n = (g.data.erased || []).length;
       flash('erased ' + n + ' mark' + (n === 1 ? '' : 's'));
@@ -1663,6 +1732,7 @@ body.embed.summoning #inspector { display: none; } /* the palette is the point; 
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0); // back to screen space for the chrome
     syncMarkChip(s);
     renderSummon(s);
+    renderHeld(s);
     renderInspector(s, inspectedId);
 
     const strokes = s.contentIds.length - s.artifacts.length;
@@ -1671,7 +1741,7 @@ body.embed.summoning #inspector { display: none; } /* the palette is the point; 
     if (s.artifacts.length) parts.push(s.artifacts.length + ' artifact' + (s.artifacts.length === 1 ? '' : 's') + (s.live.length ? ' (' + s.live.length + ' live)' : ''));
     if (agents.length) parts.push(agents.map((a) => a.config.model).join(', '));
     if (snapOffers.size) parts.push(snapOffers.size + ' read clean');
-    if (s.pendingLassoId) parts.push('circle held — cross it with ' + (s.commandMark ? 'your mark' : '✓'));
+    if (s.pendingLassoId) parts.push('loop held — cross it with ' + (s.commandMark ? 'your mark' : '✓') + ', or use the buttons beside it');
     if (fresh) parts.push(flashText);
     statusEl.textContent = parts.join('  ·  ');
   }
@@ -2326,6 +2396,11 @@ body.embed.summoning #inspector { display: none; } /* the palette is the point; 
       } else if (offer) {
         rows.push(['clean?', 'could be a ' + offer.shape, offer.reasoning,
           '<button class="mini" data-act="snap" data-id="' + esc(id) + '">draw it clean</button>']);
+      } else if (shapeRead && !isArtifact && snapMode !== 'off' && s.pendingLassoId !== id) {
+        // Not offered — and the reason is the useful part: a reading that is
+        // too weak or too close to another is exactly what a redraw would hide.
+        const why = MM.snapReading(node, s.nodes);
+        if (why.shape !== 'text') rows.push(['clean?', 'not offered', why.reasoning]);
       }
       if (role) {
         const dir = role.direction ? ' ' + role.direction.from + ' → ' + role.direction.to : '';

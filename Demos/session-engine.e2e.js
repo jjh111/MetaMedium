@@ -61,6 +61,8 @@ window.__setup = function(){
   // A mark held on this device from an earlier run would make step 0 — "the
   // built-in check summons with nothing taught" — untrue before we begin.
   if (window.__mm.savedMark()) window.__mm.forgetMark();
+  window.__snapModeBefore = window.__mm.snapMode();
+  window.__mm.setSnapMode('offer');
   const strokeOn = window.__t.strokeOn, line = window.__t.line;
 
   window.__calls=[];
@@ -444,6 +446,47 @@ window.__scenario = async function(){
     }
   }
 
+  // ---- 15. From the user's side: circle things and draw them clean, without knowing the mark ----
+  {
+    mm.fitAll(); await wait(60);
+    const z = mm.view.zoom;
+    const rot = (pts, deg, cx, cy) => { const a = deg * Math.PI / 180; return pts.map(p => ({ x: cx + (p.x - cx) * Math.cos(a) - (p.y - cy) * Math.sin(a), y: cy + (p.x - cx) * Math.sin(a) + (p.y - cy) * Math.cos(a) })); };
+    const p1 = mm.worldToScreen(2300, 2100), p2 = mm.worldToScreen(2560, 2100);
+    t.stroke(t.rect(p1.x, p1.y, 200*z, 120*z));
+    t.stroke(rot(t.rect(p2.x, p2.y, 200*z, 120*z), 12, p2.x + 100*z, p2.y + 60*z)); // a box drawn a little tilted, as hands do
+    const st15 = mm.session.getState();
+    const tilted = st15.nodes.get(st15.contentIds[st15.contentIds.length - 1]);
+    const tr = MM.snapReading(tilted, st15.nodes);
+    step('15. a box drawn twelve degrees off square is still read and offered as a rectangle', tr.shape === 'rectangle' && tr.ok, tr);
+    const cL = mm.worldToScreen(2530, 2160);
+    t.stroke(t.circle(cL.x, cL.y, 300*z));
+    const held = document.getElementById('held');
+    step('15a. circling them shows what you circled and what you can do, before any mark', !held.hidden && /2/.test(held.textContent) && !document.getElementById('heldSnap').hidden, held.textContent);
+    document.getElementById('heldSnap').click();
+    await wait(80);
+    const stS = mm.session.getState();
+    const cleaned = stS.contentIds.filter(id => MM.cleanOf(stS.nodes.get(id))).length;
+    step('15b. "Draw them clean" redraws the circled marks and keeps the loop held', cleaned >= 2 && stS.pendingLassoId !== null, { cleaned, held: stS.pendingLassoId });
+    document.getElementById('heldOffer').click();
+    await wait(80);
+    const stO = mm.session.getState();
+    step('15c. "What could these be?" reaches the same offer the mark gives', !!stO.summon && stO.summon.enclosedIds.length === 2 && stO.summon.scopeSource === 'lasso', stO.summon && stO.summon.scopeReasoning);
+    if (stO.summon) mm.session.dismiss(stO.summon.id, Date.now());
+    // Auto: a box that enclosed something when drawn is a loop-in-waiting, and is still made clean once the next stroke settles it.
+    mm.setSnapMode('auto');
+    const d = mm.worldToScreen(2900, 2160);
+    t.stroke(t.line({x: d.x, y: d.y}, {x: d.x + 4, y: d.y + 3}, 4));
+    const bx = mm.worldToScreen(2820, 2100);
+    t.stroke(t.rect(bx.x, bx.y, 200*z, 120*z));
+    const stA = mm.session.getState();
+    const boxId = stA.contentIds[stA.contentIds.length - 1];
+    const heldAtDraw = stA.pendingLassoId === boxId;
+    t.stroke(t.line({x: bx.x + 260*z, y: bx.y}, {x: bx.x + 460*z, y: bx.y + 20*z}, 40));
+    const stB = mm.session.getState();
+    step('15d. auto: a box that was a loop-in-waiting is drawn clean once the next stroke settles it', heldAtDraw && !!MM.cleanOf(stB.nodes.get(boxId)), { heldAtDraw, clean: !!MM.cleanOf(stB.nodes.get(boxId)) });
+    mm.setSnapMode('offer');
+  }
+
   // ---- 11. Scratch-out erase ----
   mm.fitAll(); await wait(60);
   const stBefore = mm.session.getState().contentIds.length;
@@ -518,6 +561,7 @@ window.__scenario = async function(){
   // ---- 12. Undoing the teach puts the built-in mark back in the rail ----
   window.__teach();
   while (mm.session.getEvents().length) mm.session.undo();
+  if (window.__snapModeBefore) mm.setSnapMode(window.__snapModeBefore);
   step('12. the rail follows the grammar — undoing the teach restores the check',
     mm.session.getState().commandMark === null &&
     document.getElementById('markName').textContent === 'check',

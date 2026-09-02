@@ -29,7 +29,7 @@ circle them, cross with a command mark *you taught the system*, prompt them into
 a living page that renders in the canvas with your ink still outlining its
 divs — then draw on that page and the ink addresses the regions underneath it.
 Scratch anything out to erase. `Demos/session-engine.html` is the surface;
-`Demos/session-engine.e2e.js` drives all 48 steps through the real UI: page, flowchart, handwriting, and the model drawing.
+`Demos/session-engine.e2e.js` drives all 53 steps through the real UI: page, flowchart, handwriting, the model drawing, and the user-side loop.
 v7 Stage E (handwriting) shipped 1 Sep 2026: a word written beside a shape is read by a
 model that can see and offered as that shape's name. Whitepaper v5.1 stays parked until the
 conversation benchmark passes end to end.
@@ -272,6 +272,17 @@ samples and offers *Forget*; teaching a new one means *Clear* first.
 - One engagement rule for every mark: it must **cross the selection, overlap it,
   or come close relative to the selection's own size** (`checkProximityRatio`).
   No fixed pixel term remains in the gesture grammar.
+
+**A held loop says what you can do with it.** Circle some marks and a chip
+appears beside the loop: *N circled · cross with ✓, or* **Draw them clean** /
+**What could these be?**. The second reaches the same summon the mark does
+(`session.summonHeld`, a `summon` event); the first snaps the circled
+candidates and keeps the loop held. The mark stays the fluent path; the chip
+is the discoverable one, because a grammar nobody can find is a mode with
+extra steps. The rail's *Snap* button scopes to the circled marks while a
+loop is held, and in `auto` every open offer is taken after each stroke —
+including a closed stroke that was a loop-in-waiting until the next stroke
+settled it, which the per-stroke version silently skipped.
 
 **The mark reads BACKWARDS.** Requiring a lasso before the mark can act is a
 mode wearing a different hat. The command mark looks back over
