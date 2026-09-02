@@ -314,6 +314,43 @@ html, body {
   background: linear-gradient(to top, rgba(10,10,15,0.94) 40%, rgba(10,10,15,0));
 }
 
+/* ===== Paper: the whitepaper's ground, for an embedded surface =====
+   Ink over living artifacts, on paper — the metaphor, literally. The
+   instrument look stays the default for working in. */
+body.paper {
+  --ground: #f8f6f1; --panel: rgba(255,255,255,0.94); --rule: rgba(138,109,31,0.28);
+  --ink: #1a1a2e; --agent: #2f6f8f; --gold: #8a6d1f; --dim: #6b6b7b;
+}
+body.paper .rail::before { background: linear-gradient(to bottom, rgba(248,246,241,0.96) 40%, rgba(248,246,241,0)); }
+body.paper .scrimBottom { background: linear-gradient(to top, rgba(248,246,241,0.96) 40%, rgba(248,246,241,0)); }
+body.paper .legend i[style*="e8e4d9"] { background: #1a1a2e !important; }
+
+/* ===== Embed: the surface as a figure inside a page ===== */
+body.embed #teachBtn, body.embed #modelBtn, body.embed #resetBtn, body.embed #snapMode,
+body.embed .markChip, body.embed .legend { display: none; }
+body.embed .title h1 span { display: none; }
+body.embed #inspector { width: 250px; font-size: 10.5px; }
+body.embed.summoning #inspector { display: none; } /* the palette is the point; the why is one click away */
+
+/* ===== Replay: a recorded session, stepped through ===== */
+#replay {
+  position: absolute; left: 50%; bottom: 40px; transform: translateX(-50%); z-index: 6;
+  width: min(640px, calc(100vw - 36px)); background: var(--panel); border: 1px solid var(--rule);
+  border-radius: 10px; padding: 10px 12px; backdrop-filter: blur(8px);
+  font-family: var(--ui); font-size: 13px; color: var(--ink);
+  display: grid; grid-template-columns: auto auto auto 1fr auto; gap: 8px 10px; align-items: center;
+}
+#replay[hidden] { display: none; }
+#replay button {
+  font: inherit; font-size: 12px; color: var(--gold); background: none;
+  border: 1px solid var(--rule); border-radius: 6px; padding: 3px 9px; cursor: pointer;
+}
+#replay button:hover { border-color: var(--gold); }
+#replay input[type=range] { width: 100%; accent-color: var(--gold); }
+#replay .rpStep { font-family: var(--mono); font-size: 11px; color: var(--dim); font-variant-numeric: tabular-nums; }
+#replay .rpCaption { grid-column: 1 / -1; line-height: 1.45; color: var(--ink); }
+#replay .rpCaption b { color: var(--gold); font-weight: 500; }
+
 /* ===== Command palette: what these marks could become ===== */
 #summon.palette {
   display: block; padding: 0; width: 340px; overflow: hidden;
@@ -432,6 +469,14 @@ html, body {
 <div id="summon"></div>
 <div class="scrimBottom"></div>
 <div class="status" id="status"></div>
+<div id="replay" hidden>
+  <button id="rpPrev" title="Previous step (←)">◀</button>
+  <button id="rpPlay" title="Play / pause (space)">▶</button>
+  <button id="rpNext" title="Next step (→)">▶|</button>
+  <input id="rpScrub" type="range" min="0" max="0" value="0" />
+  <span class="rpStep" id="rpStep"></span>
+  <div class="rpCaption" id="rpCaption"></div>
+</div>
 <div class="legend">
   <span><i style="background:#e8e4d9"></i>you</span>
   <span><i style="background:#8ab4c8"></i>model</span>
@@ -442,6 +487,20 @@ html, body {
 <script>
 (function () {
   const MM = window.MetaMediumCore;
+
+  // The page decides the look: ?theme=paper puts ink on the whitepaper's
+  // ground, ?embed hides what a figure does not need, ?replay=<url> steps a
+  // recorded session. The default is the instrument, for working in.
+  const params = new URLSearchParams(location.search);
+  const THEME = params.get('theme') === 'paper' ? 'paper' : 'instrument';
+  const EMBED = params.has('embed');
+  if (THEME === 'paper') document.body.classList.add('paper');
+  if (EMBED) document.body.classList.add('embed');
+  const C = THEME === 'paper'
+    ? { ink: '#1a1a2e', inkFaint: 'rgba(26,26,46,0.16)', halo: 'rgba(248,246,241,0.75)', haloText: 'rgba(248,246,241,0.9)',
+        agent: '#2f6f8f', gold: '#8a6d1f', goldRGB: '138,109,31', labelRGB: '90,90,110' }
+    : { ink: '#e8e4d9', inkFaint: 'rgba(232,228,217,0.14)', halo: 'rgba(10,10,15,0.55)', haloText: 'rgba(10,10,15,0.7)',
+        agent: '#8ab4c8', gold: '#c9a84c', goldRGB: '201,168,76', labelRGB: '160,152,128' };
   const session = MM.createSession();
 
   const canvas = document.getElementById('canvas');
@@ -701,7 +760,7 @@ html, body {
     if (padStroke) {
       padCtx.beginPath();
       padStroke.forEach((p, k) => (k ? padCtx.lineTo(p.x, p.y) : padCtx.moveTo(p.x, p.y)));
-      padCtx.strokeStyle = '#e8e4d9'; padCtx.lineWidth = 2; padCtx.stroke();
+      padCtx.strokeStyle = C.ink; padCtx.lineWidth = 2; padCtx.stroke();
     }
     teachDots.forEach((d, i) => d.classList.toggle('on', i < samples.length));
   }
@@ -870,7 +929,7 @@ html, body {
       const x = (p.x - b.minX) * k + 3, y = (p.y - b.minY) * k + 3;
       i ? gc.lineTo(x, y) : gc.moveTo(x, y);
     });
-    gc.strokeStyle = '#c9a84c'; gc.lineWidth = 1.6; gc.lineCap = 'round'; gc.stroke();
+    gc.strokeStyle = C.gold; gc.lineWidth = 1.6; gc.lineCap = 'round'; gc.stroke();
     document.getElementById('markName').textContent = name || 'your mark';
     chip.hidden = false;
   }
@@ -1479,7 +1538,7 @@ html, body {
     // live artifact it is the difference between ink you can see and ink that
     // disappears into whatever colour the model happened to choose. One rule,
     // no special case for "is this stroke over a page".
-    ctx.strokeStyle = 'rgba(10,10,15,0.55)';
+    ctx.strokeStyle = C.halo;
     ctx.lineWidth = style.width + wpx(2.5);
     ctx.stroke();
     ctx.strokeStyle = style.color;
@@ -1495,7 +1554,7 @@ html, body {
         // Snapped: the clean form in front, the hand's ink faint beneath it.
         // What was drawn is still there — that is the whole promise.
         path(points, false);
-        ctx.strokeStyle = 'rgba(232,228,217,0.14)';
+        ctx.strokeStyle = C.inkFaint;
         ctx.lineWidth = Math.max(1, style.width * 0.7);
         ctx.stroke();
         inkStroke(clean, MM.cleanOf(node).closed, style);
@@ -1510,7 +1569,7 @@ html, body {
         if (ideal) {
           path(ideal.points, ideal.closed);
           ctx.setLineDash([wpx(3), wpx(4)]);
-          ctx.strokeStyle = 'rgba(201,168,76,0.7)';
+          ctx.strokeStyle = `rgba(${C.goldRGB},0.7)`;
           ctx.lineWidth = wpx(1.2);
           ctx.stroke();
           ctx.setLineDash([]);
@@ -1548,11 +1607,11 @@ html, body {
       const b = union(c.nodeIds.map((id) => MM.boundsOf(s.nodes.get(id))));
       const pad = wpx(14);
       ctx.setLineDash([wpx(4), wpx(6)]);
-      ctx.strokeStyle = 'rgba(201,168,76,0.38)';
+      ctx.strokeStyle = `rgba(${C.goldRGB},0.38)`;
       ctx.lineWidth = wpx(1);
       ctx.strokeRect(b.minX - pad, b.minY - pad, b.maxX - b.minX + pad * 2, b.maxY - b.minY + pad * 2);
       ctx.setLineDash([]);
-      text(c.matches[0].name + '?  circle + mark to confirm', b.minX - wpx(12), b.minY - wpx(20), 'rgba(201,168,76,0.72)');
+      text(c.matches[0].name + '?  circle + mark to confirm', b.minX - wpx(12), b.minY - wpx(20), `rgba(${C.goldRGB},0.72)`);
     }
 
     const inspectedId = hoverId || lastContentId(s);
@@ -1562,19 +1621,19 @@ html, body {
       const isArtifact = s.artifacts.includes(id);
       const isLive = s.live.includes(id);
       const pending = s.pendingLassoId === id;
-      const color = pending ? 'rgba(201,168,76,0.9)' : (isAgentNode(node) ? '#8ab4c8' : '#e8e4d9');
+      const color = pending ? `rgba(${C.goldRGB},0.9)` : (isAgentNode(node) ? C.agent : C.ink);
 
       // A live artifact keeps its ink: the boxes you drew ARE the outlines of
       // what got built, and that promise is only kept by drawing them on top.
       inkOf(node, {
-        color: isLive ? 'rgba(201,168,76,0.85)' : color,
+        color: isLive ? `rgba(${C.goldRGB},0.85)` : color,
         width: id === inspectedId ? inkW * 1.3 : inkW,
       });
 
       const b = MM.boundsOf(node);
       if (isArtifact && b) {
-        brackets(b, isLive ? '#c9a84c' : 'rgba(201,168,76,0.7)');
-        text((MM.wordOf(node) || '') + (isLive ? '  ·  live' : ''), b.minX, b.minY - wpx(10), '#c9a84c');
+        brackets(b, isLive ? C.gold : `rgba(${C.goldRGB},0.7)`);
+        text((MM.wordOf(node) || '') + (isLive ? '  ·  live' : ''), b.minX, b.minY - wpx(10), C.gold);
       } else if (b && !pending) {
         // Two rungs at a glance: what it is, and what it plays.
         const said = MM.transcriptOf(node);
@@ -1582,20 +1641,20 @@ html, body {
         const role = readRungs(s).roles.get(id);
         const played = role && role.role !== 'unclassified' && role.role !== top ? ' · ' + role.role : '';
         if (top) text(top + played, b.minX, b.maxY + wpx(15),
-          id === inspectedId ? 'rgba(160,152,128,0.95)' : 'rgba(160,152,128,0.5)');
+          id === inspectedId ? `rgba(${C.labelRGB},0.95)` : `rgba(${C.labelRGB},0.5)`);
       }
     }
 
     if (s.summon) {
       for (const gid of s.summon.gestureIds) {
-        inkOf(s.nodes.get(gid), { color: 'rgba(201,168,76,0.55)', width: inkW * 1.5, gesture: true });
+        inkOf(s.nodes.get(gid), { color: `rgba(${C.goldRGB},0.55)`, width: inkW * 1.5, gesture: true });
       }
     }
 
     if (live) {
       ctx.beginPath();
       live.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
-      ctx.strokeStyle = '#e8e4d9';
+      ctx.strokeStyle = C.ink;
       ctx.lineWidth = inkW;
       ctx.stroke();
     }
@@ -1620,7 +1679,7 @@ html, body {
   function text(str, x, y, color) {
     ctx.font = wpx(11).toFixed(2) + "px 'Space Grotesk', system-ui, sans-serif";
     ctx.lineWidth = wpx(3);
-    ctx.strokeStyle = 'rgba(10,10,15,0.7)';
+    ctx.strokeStyle = C.haloText;
     ctx.strokeText(str, x, y);
     ctx.fillStyle = color;
     ctx.fillText(str, x, y);
@@ -1722,7 +1781,7 @@ html, body {
       ctx.font = '10px ui-monospace, SFMono-Regular, Menlo, monospace';
       ctx.fillText(who, x + pad, y + pad + 8);
 
-      ctx.fillStyle = '#e8e4d9';
+      ctx.fillStyle = C.ink;
       ctx.font = '11px ui-monospace, SFMono-Regular, Menlo, monospace';
       lines.forEach((ln, i) => ctx.fillText(ln, x + pad, y + pad + headH + 8 + i * lineH));
     }
@@ -1920,6 +1979,7 @@ html, body {
   }
 
   function renderSummon(s) {
+    document.body.classList.toggle('summoning', !!s.summon);
     if (!s.summon) { summonEl.style.display = 'none'; summonEl.className = ''; shownSummonId = null; return; }
     const sum = s.summon;
     if (shownSummonId !== sum.id) {
@@ -2473,11 +2533,77 @@ html, body {
     fitAll: fitAll, regionsUnderInk: regionsUnderInk,
     snapMode: () => snapMode, setSnapMode: setSnapMode, snapOffers: () => snapOffers,
     inkImage: inkImage, readOne: readOne, readWriting: readWriting,
+    replay: () => rp, rpGoTo: (i) => rpGoTo(i), theme: THEME,
   };
 
+  // ===== Replay: a recorded session as a figure =============================
+  //
+  // State is a pure function of the log, so a session recorded once — every
+  // model reply captured as the event it was — replays here with no model
+  // attached, at any step, inspectable. Load a prefix to stand at a step;
+  // draw afterwards and the recording continues with your marks.
+  const rp = { rec: null, step: -1, timer: null };
+  const rpEl = document.getElementById('replay');
+  const rpCaption = document.getElementById('rpCaption'), rpStep = document.getElementById('rpStep');
+  const rpScrub = document.getElementById('rpScrub'), rpPlay = document.getElementById('rpPlay');
+
+  function rpGoTo(i) {
+    if (!rp.rec) return;
+    const steps = rp.rec.steps;
+    i = Math.max(0, Math.min(steps.length - 1, i));
+    rp.step = i;
+    session.load(rp.rec.events.slice(0, steps[i].after));
+    rpScrub.value = String(i);
+    rpStep.textContent = (i + 1) + ' / ' + steps.length;
+    rpCaption.innerHTML = '<b>' + (i + 1) + '.</b> ' + esc(steps[i].caption);
+    if (i === steps.length - 1) rpStop();
+  }
+  function rpStop() { if (rp.timer) { clearInterval(rp.timer); rp.timer = null; } rpPlay.textContent = '▶'; }
+  function rpStart() {
+    if (!rp.rec) return;
+    if (rp.step >= rp.rec.steps.length - 1) rpGoTo(0);
+    rpStop();
+    rp.timer = setInterval(() => rpGoTo(rp.step + 1), Number(params.get('every') || 3200));
+    rpPlay.textContent = '❚❚';
+  }
+  async function startReplay(url) {
+    try {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      rp.rec = await res.json();
+    } catch (err) {
+      flash('could not load the recording (' + err.message + ')');
+      return;
+    }
+    rpScrub.max = String(rp.rec.steps.length - 1);
+    rpEl.hidden = false;
+    // Fit the whole recording once, so stepping never moves the view.
+    session.load(rp.rec.events);
+    fitAll();
+    rpGoTo(0);
+    if (params.has('autoplay')) rpStart();
+  }
+  rpScrub.oninput = () => { rpStop(); rpGoTo(Number(rpScrub.value)); };
+  document.getElementById('rpPrev').onclick = () => { rpStop(); rpGoTo(rp.step - 1); };
+  document.getElementById('rpNext').onclick = () => { rpStop(); rpGoTo(rp.step + 1); };
+  rpPlay.onclick = () => (rp.timer ? rpStop() : rpStart());
+  addEventListener('keydown', (e) => {
+    if (!rp.rec || e.target !== document.body) return;
+    if (e.key === 'ArrowRight') { rpStop(); rpGoTo(rp.step + 1); }
+    else if (e.key === 'ArrowLeft') { rpStop(); rpGoTo(rp.step - 1); }
+    else if (e.key === ' ') { e.preventDefault(); rpPlay.onclick(); }
+  });
+  // A stroke of the reader's own continues the recording from where it stands.
+  canvas.addEventListener('pointerdown', () => { if (rp.rec && rp.timer) { rpStop(); rpCaption.innerHTML = '<b>' + (rp.step + 1) + '.</b> ' + esc(rp.rec.steps[rp.step].caption) + ' <span style="color:var(--dim)">— continuing from here with your marks</span>'; } });
+
   session.subscribe(render);
-  restoreMark();
-  rejoinRemembered();
+  const replayUrl = params.get('replay');
+  if (!replayUrl) {
+    restoreMark();
+    rejoinRemembered();
+  } else {
+    startReplay(replayUrl);
+  }
   document.fonts.ready.then(() => { sizePad(); render(session.getState()); });
   resize();
   afterViewChange();

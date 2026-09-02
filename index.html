@@ -2382,6 +2382,18 @@
             
             <p>Most AI interfaces treat AI as tool—something to be invoked, queried, commanded. The MetaMedium treats AI as part of the medium itself. The sketches aren't <em>using</em> the computer; they're <em>composing within</em> the computational medium, with AI as an active interpretive layer that transforms marks into executable meaning.</p>
 
+            <h3>The Loop, Recorded</h3>
+
+            <p>This is the canonical loop, run once through the engine and recorded as the events it produced. What you step through below is not a video: it is the engine replaying its own log in your browser, and the inspector on the right holds every reading at every step. Draw on it at any point and the recorded session continues with your marks.</p>
+
+            <div class="demo-container">
+                <div class="demo-header">
+                    <span>Draw a circle, name it, compose it, and the canvas reads with your word</span>
+                    <span><a href="Demos/session-engine.html?replay=recordings/canonical-loop.json" target="_blank" rel="noopener"><strong>Open it →</strong></a></span>
+                </div>
+                <iframe src="Demos/session-engine.html?replay=recordings/canonical-loop.json&amp;embed=1&amp;theme=paper" title="The canonical loop, replayed by the engine" loading="lazy"></iframe>
+            </div>
+
             <h3>Try It: Draw, Name, Interact</h3>
 
             <p>This is the core loop in miniature. Draw a shape, and the system recognizes and names it. Draw another, and it gains behavior. Your marks become meaning — and meaning becomes interaction.</p>
@@ -2817,12 +2829,24 @@
 
             <p>Selection and command are marks too. Circle a group, cross it with a command mark you taught by drawing it five times, and a palette offers what those marks could become, starting with what needs no model. Handwriting beside a shape is read by a model that can see and offered as the shape's name. The model can draw back, in the shapes the canvas can read, its marks held in its name beside yours.</p>
 
+            <p>The loop the product is built around, recorded once against a local eight-billion-parameter model and replayed here by the engine: four boxes become a page inside the ink, and a mark drawn on the running page changes only the region it lands on.</p>
+
+            <div class="demo-container">
+                <div class="demo-header">
+                    <span>Ink over a living artifact — recorded, with qwen3:8b</span>
+                    <span><a href="Demos/session-engine.html?replay=recordings/mvp-page.json" target="_blank" rel="noopener"><strong>Open it →</strong></a></span>
+                </div>
+                <iframe src="Demos/session-engine.html?replay=recordings/mvp-page.json&amp;embed=1&amp;theme=paper" title="Ink over a living artifact, replayed by the engine" loading="lazy"></iframe>
+            </div>
+
+            <p>And the surface itself, live. Everything here works offline; join a local model in the full page to build, read handwriting, or have it draw.</p>
+
             <div class="demo-container">
                 <div class="demo-header">
                     <span>The reference surface</span>
                     <span><a href="https://jjh111.github.io/MetaMedium/Demos/session-engine.html" target="_blank" rel="noopener"><strong>Open it →</strong></a></span>
                 </div>
-                <iframe src="https://jjh111.github.io/MetaMedium/Demos/session-engine.html" title="MetaMedium — the session engine" loading="lazy"></iframe>
+                <iframe src="Demos/session-engine.html?embed=1&theme=paper" title="MetaMedium — the session engine" loading="lazy"></iframe>
             </div>
 
             <div class="callout">
