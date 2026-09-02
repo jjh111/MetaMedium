@@ -2178,7 +2178,7 @@ body.embed.summoning #inspector { display: none; } /* the palette is the point; 
               ? ' — left ' + res.unfilled.join(', ') + ' empty'
               : '';
             mpStatus.textContent =
-              agent.name + ' ' + (res.revised ? 'revised' : 'built') + ' ' + res.filled.join(', ') + short;
+              agent.name + ' ' + (res.revised ? 'revised' : 'built') + ' ' + (res.revised ? (res.changed || res.filled) : res.filled).join(', ') + short;
           } else {
             mpStatus.textContent = agent.name + ' could not build (' + res.error + ') — the drawing is untouched.';
             // A model that answered unusably is a thing you need to SEE to fix.

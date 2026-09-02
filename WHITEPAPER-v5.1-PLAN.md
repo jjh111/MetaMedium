@@ -181,6 +181,17 @@ engine, not the look.
 
 ## 6. Sequence
 
+> **Progress, 2 Sep 2026.** Steps 1–3 are drafted on the local branch
+> `whitepaper-v5.1`, for John to test before they merge: the hero reads
+> through the engine (clean-form ghost, the maths, measured relations); the
+> reference surface has `?replay=`, `?embed` and `?theme=paper`; two
+> recordings exist — the canonical loop (`Demos/record-canonical.mjs`, no
+> model) and the MVP loop (recorded against qwen3:8b: four boxes → a page →
+> ink on the page rewrites one region) — and both are embedded in the paper.
+> On master already: `session.load`, the parser salvage for cut-off
+> replies, the non-interactive prose and style pass. Step 4 (the prose pass
+> proper) is half done; the findings paragraphs are in.
+
 Each step shippable on its own; each ends with something a visitor can see.
 
 1. **Hero on core (H).** Replace the inline recognizer with the bundle;
