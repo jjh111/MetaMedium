@@ -285,13 +285,40 @@ the code is anchored to the diagram and updates when the diagram does.
 **Ship criterion:** draw a flow, get runnable code, change the flow, see the
 code follow.
 
-### Stage E — Handwriting — **the last one open**
+### Stage E — Handwriting ✅ **shipped (1 Sep 2026)**
 
-Prove the read path on `test-vision.html` first (that's what experiments are
-for), then land the winner in core. It is what makes *"website with the copy in
-the squares"* literal instead of typed.
+The read path landed in core without the experiment: `agent.read()` renders a
+`text` mark's ink on its own and hands it to any joined model that can see
+(`ProviderConfig.vision`, relayed from what Ollama and LM Studio report per
+model). What comes back is held as `transcript` reps — several when ambiguous,
+attributed, never blessed — through `propose()`, which now carries reps as well
+as edges. The brief for generation says *the human wrote "Pricing" there* where
+it used to say *handwriting you cannot read*. Verified against `qwen3.5:9b` on
+Ollama; the transport's image content works on the OpenAI-compatible and
+Anthropic clients alike.
 
-**Ship criterion:** write a word next to a shape; it becomes that shape's name.
+**Ship criterion met:** write a word next to a shape; the palette leads with
+*Name it "…"* and taking it makes the word that shape's name. Pinned in the
+browser e2e (steps 13–13d). Open: one cursive stroke per word — grouping
+printed letters into a word is a later step.
+
+### Stage F — The model holds a pen ✅ **shipped (1 Sep 2026)**
+
+The benchmark says *both contributing marks*. `agent.draw()` asks the model
+what it would add, in the shape rung's vocabulary with coordinates, and draws
+each shape through `addStroke` attributed to the model; its reason for each
+mark is placed beside it as an answer. The vocabulary is closed on purpose —
+what the model draws is exactly what the canvas can read — and `parseShapes`
+drops the rest. Palette: *Ask it to draw…*. Pinned in the e2e (steps 14–14d);
+verified against `qwen3:8b`.
+
+**Where the benchmark stands.** Of its five clauses — both contributing marks,
+both building library entries, questions answered in the space, a diagram
+parsed into code, handwriting read — four run end to end. *Both building
+library entries* is the one still open: a model can name what it reads
+(`Name it "…"` comes from its transcript), but it does not yet propose a
+composition as a reusable entry. That, and grouping printed letters into a
+word, are the next two steps.
 
 ---
 

@@ -12,7 +12,7 @@
 
 import type { MMNode } from '../session/nodes';
 import type { SessionState } from '../session/session';
-import { fingerprintOf, wordOf, boundsOf, isParticipant, isGesture } from '../session/nodes';
+import { fingerprintOf, wordOf, boundsOf, isParticipant, isGesture, transcriptsOf } from '../session/nodes';
 import { interpretationsOf } from '../session/interpretations';
 import type { Rect, Region } from '../session/regions';
 import type { Relation } from '../relate/relations';
@@ -69,6 +69,13 @@ function describeNode(
         );
       }
     }
+  }
+
+  // What the writing says, as read — the one fact that came in as pixels.
+  const said = transcriptsOf(node);
+  if (said.length > 0) {
+    lines.push('  writing reads:');
+    for (const t of said) lines.push(`    - "${t.text}" ${t.confidence.toFixed(2)} by ${t.source ?? 'unknown'}`);
   }
 
   // Spatial relations are the part a screenshot cannot hand a model directly.
@@ -199,7 +206,7 @@ export interface ReadingLike {
   roles: RoleReading[];
   genre: GenreReading;
   concepts: ConceptMatch[];
-  scope?: Pick<ConceptScope, 'names'>;
+  scope?: Partial<Pick<ConceptScope, 'names' | 'transcripts'>>;
 }
 
 export interface DescribeReadingOptions {
@@ -215,7 +222,12 @@ export interface DescribeReadingOptions {
 
 const ENGAGING_RELATIONS: Relation['kind'][] = ['contains', 'near', 'touching', 'crossing'];
 
-function roleLine(r: RoleReading, name: (id: string) => string | undefined, noun: string): string | undefined {
+function roleLine(
+  r: RoleReading,
+  name: (id: string) => string | undefined,
+  noun: string,
+  said?: string
+): string | undefined {
   const me = name(r.id);
   if (!me) return undefined;
   const others = r.targets.map(name).filter((x): x is string => !!x);
@@ -223,6 +235,11 @@ function roleLine(r: RoleReading, name: (id: string) => string | undefined, noun
     case 'container':
       return `${me}: container${others.length ? `, holding ${others.join(', ')}` : ''} — its contents are its sections`;
     case 'label':
+      if (said) {
+        return others.length
+          ? `${me}: label for ${others[0]} — the human wrote "${said}" there. Use those words: they are ${others[0]}'s title, and ${me} shows them`
+          : `${me}: label — the human wrote "${said}". Use those words`;
+      }
       return others.length
         ? `${me}: label for ${others[0]} — handwriting the human put there. You cannot read it; write the title or caption that belongs in that place, and treat ${others[0]} as titled by it`
         : `${me}: label — handwriting; write what belongs there`;
@@ -257,7 +274,9 @@ export function describeReading(reading: ReadingLike, options: DescribeReadingOp
 
   lines.push(`GENRE: ${reading.genre.genre} — ${reading.genre.reasoning}`);
 
-  const roleLines = reading.roles.map((r) => roleLine(r, name, noun)).filter((x): x is string => !!x);
+  const roleLines = reading.roles
+    .map((r) => roleLine(r, name, noun, reading.scope?.transcripts?.[r.id]))
+    .filter((x): x is string => !!x);
   if (roleLines.length) {
     lines.push('', `WHAT EACH ${noun.toUpperCase()} PLAYS:`);
     for (const l of roleLines) lines.push(`  ${l}`);

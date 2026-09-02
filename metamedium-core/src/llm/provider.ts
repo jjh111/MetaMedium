@@ -21,6 +21,13 @@ export interface ProviderConfig {
   label?: string;
   /** Abort the request after this many ms. Never blocks drawing regardless. */
   timeoutMs?: number;
+  /**
+   * Whether this model can look at an image. The one thing the canvas sends as
+   * pixels is handwriting — the ink IS the ground truth there, and reading it
+   * is a capability a model either has or lacks. Set by the surface from what
+   * the server reports; a model without it is simply never asked to read.
+   */
+  vision?: boolean;
 }
 
 /** Ready-made configs for the providers v7 targets. `model` still required. */
@@ -31,9 +38,44 @@ export const PRESETS = {
   anthropic: { kind: 'anthropic', baseUrl: 'https://api.anthropic.com/v1' },
 } as const satisfies Record<string, Pick<ProviderConfig, 'kind' | 'baseUrl'>>;
 
+/** A piece of a message: text, or an image as a data URL. */
+export type ContentPart = { type: 'text'; text: string } | { type: 'image'; dataUrl: string };
+
 export interface ChatMessage {
   role: 'system' | 'user';
-  content: string;
+  content: string | ContentPart[];
+}
+
+/** The text of a message, images left out — for system prompts and logs. */
+export function textOf(content: string | ContentPart[]): string {
+  return typeof content === 'string'
+    ? content
+    : content.filter((p): p is { type: 'text'; text: string } => p.type === 'text').map((p) => p.text).join('\n');
+}
+
+function dataUrlParts(dataUrl: string): { mediaType: string; data: string } | null {
+  const m = /^data:([^;,]+);base64,(.+)$/s.exec(dataUrl);
+  return m ? { mediaType: m[1], data: m[2] } : null;
+}
+
+/** OpenAI-compatible content: a string, or parts with `image_url` entries. */
+function openAIContent(content: string | ContentPart[]): unknown {
+  if (typeof content === 'string') return content;
+  return content.map((p) =>
+    p.type === 'text' ? { type: 'text', text: p.text } : { type: 'image_url', image_url: { url: p.dataUrl } }
+  );
+}
+
+/** Anthropic content blocks: images as base64 sources. */
+function anthropicContent(content: string | ContentPart[]): unknown {
+  if (typeof content === 'string') return content;
+  return content.map((p) => {
+    if (p.type === 'text') return { type: 'text', text: p.text };
+    const parts = dataUrlParts(p.dataUrl);
+    return parts
+      ? { type: 'image', source: { type: 'base64', media_type: parts.mediaType, data: parts.data } }
+      : { type: 'text', text: '(an image the transport could not encode)' };
+  });
 }
 
 /** Success or failure, never a throw — the caller is inside a drawing app. */
@@ -158,7 +200,7 @@ async function completeOpenAICompatible(
   const res = await post(
     `${config.baseUrl.replace(/\/$/, '')}/chat/completions`,
     headers,
-    { model: config.model, messages, stream: false },
+    { model: config.model, messages: messages.map((m) => ({ role: m.role, content: openAIContent(m.content) })), stream: false },
     timeoutMs,
     external
   );
@@ -191,7 +233,7 @@ async function completeAnthropic(
 ): Promise<CompletionResult> {
   if (!config.apiKey) return { ok: false, error: 'anthropic requires an API key' };
 
-  const system = messages.filter((m) => m.role === 'system').map((m) => m.content).join('\n\n');
+  const system = messages.filter((m) => m.role === 'system').map((m) => textOf(m.content)).join('\n\n');
   const user = messages.filter((m) => m.role === 'user');
   if (user.length === 0) return { ok: false, error: 'no user message' };
 
@@ -208,7 +250,7 @@ async function completeAnthropic(
       model: config.model,
       max_tokens: 4096,
       ...(system ? { system } : {}),
-      messages: user.map((m) => ({ role: 'user', content: m.content })),
+      messages: user.map((m) => ({ role: 'user', content: anthropicContent(m.content) })),
     },
     timeoutMs,
     external

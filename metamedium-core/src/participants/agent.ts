@@ -21,6 +21,8 @@ import { parseGraph, describeGraph, nodeIdsIn, buildGraphScaffold } from '../par
 import { getRep, strokePointsOf } from '../session/nodes';
 import type { Point } from '../types';
 import { buildScaffold, validateRegions, type RegionContent, type Theme } from '../parse/scaffold';
+import { type DrawnShape, parseShapes, strokeFor, MAX_DRAWN } from '../session/synthesize';
+import { boundsOf } from '../session/nodes';
 
 /** One candidate reading, as the model reports it. */
 export interface AgentReading {
@@ -109,6 +111,86 @@ Rules:
 
 Reply with ONLY a JSON object, no prose, no code fences:
 {"regions":{"r2":{"tag":"aside","style":"…","html":"…"}}}`;
+
+// The one place the canvas hands a model pixels. Handwriting is the exception
+// the whole "grounded, not screenshots" commitment allows for, because the ink
+// IS the ground truth of what was written and no fingerprint carries it. The
+// model is asked to read, not to interpret: what the words say, ranked, with
+// the same multi-reading rule as everything else (v7 Stage E).
+const READ_PROMPT = `You are reading handwriting from a shared drawing canvas. The image shows one handwritten mark, dark ink on a light ground, exactly as the human drew it.
+
+Transcribe what it says. Offer up to 3 readings ranked by confidence when the writing is ambiguous; one when it is clear. Keep the human's casing and punctuation. Do not describe the image, do not guess at meaning, do not add words that are not there.
+
+Reply with ONLY a JSON array, no prose, no code fences:
+[{"text":"what it says","confidence":0.0-1.0}]`;
+
+// A model contributing MARKS. It says what it would draw in the shape rung's
+// vocabulary and the engine draws it, attributed — the conversation benchmark's
+// other half (ARCHITECTURE-v7 §1). The vocabulary is closed on purpose: a
+// model that can only draw what the canvas can read makes marks the human can
+// argue with on the same terms as their own.
+const DRAW_PROMPT = `You are a participant on a shared drawing canvas, alongside a human. You have been asked to ADD MARKS to the drawing.
+
+You are given the marks already on the canvas as measured facts — positions, sizes, what each reads as and plays — in canvas units (y grows downward). You are not given an image.
+
+Say what you would draw. You may use only these shapes:
+  - {"shape":"rectangle","x":..,"y":..,"w":..,"h":..,"why":"..."}
+  - {"shape":"circle","x":..,"y":..,"w":..,"h":..,"why":"..."}   (x,y,w,h is the box the circle fills)
+  - {"shape":"triangle","x":..,"y":..,"w":..,"h":..,"why":"..."}
+  - {"shape":"line","from":{"x":..,"y":..},"to":{"x":..,"y":..},"why":"..."}
+  - {"shape":"arrow","from":{"x":..,"y":..},"to":{"x":..,"y":..},"why":"..."}   (points from tail to tip)
+
+Rules:
+- At most ${MAX_DRAWN} shapes. Fewer is better; draw what was asked and nothing decorative.
+- Place new marks relative to what is there: match the sizes and spacing you were given, sit beside or below the marks you were pointed at, and do not overlap them unless asked to.
+- An arrow's ends should land on the marks it joins — near an edge, not at the centre.
+- "why" is one short clause the human will see beside the mark.
+
+Reply with ONLY a JSON array, no prose, no code fences.`;
+
+export interface DrawResult {
+  ok: boolean;
+  /** Ids of the marks made, attributed to this participant. */
+  ids: string[];
+  shapes: DrawnShape[];
+  error?: string;
+  raw?: string;
+}
+
+export interface TranscriptReading {
+  text: string;
+  confidence: number;
+}
+
+/** Parse a read reply. Accepts `text` or `label`, and a bare string. */
+export function parseTranscripts(text: string): TranscriptReading[] {
+  if (!text) return [];
+  const unfenced = text.replace(/```(?:json)?/gi, '').trim();
+  const start = unfenced.indexOf('[');
+  const end = unfenced.lastIndexOf(']');
+  if (start === -1 || end === -1 || end < start) {
+    // A model that just wrote the word is still answering the question.
+    const bare = unfenced.replace(/^["'\s]+|["'\s]+$/g, '');
+    return bare && bare.length <= 80 && !/\n/.test(bare) ? [{ text: bare, confidence: 0.5 }] : [];
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(unfenced.slice(start, end + 1));
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(parsed)) return [];
+  const out: TranscriptReading[] = [];
+  for (const item of parsed) {
+    if (typeof item === 'string' && item.trim()) { out.push({ text: item.trim(), confidence: 0.5 }); continue; }
+    if (!item || typeof item !== 'object') continue;
+    const rec = item as Record<string, unknown>;
+    const t = typeof rec.text === 'string' ? rec.text : typeof rec.label === 'string' ? rec.label : '';
+    if (!t.trim()) continue;
+    out.push({ text: t.trim(), confidence: clamp01(rec.confidence) });
+  }
+  return out.sort((a, b) => b.confidence - a.confidence);
+}
 
 function clamp01(v: unknown): number {
   const n = typeof v === 'number' ? v : Number(v);
@@ -372,6 +454,43 @@ export interface AgentParticipant {
     /** Abort this call — a local server answers one request at a time. */
     signal?: AbortSignal;
   }): Promise<GenerateResult>;
+  /**
+   * Read a mark's handwriting from an image of its ink, and hold what it says
+   * as attributed transcript reps on that mark — several when the writing is
+   * ambiguous, none committed. Needs a model that can see
+   * (`config.vision`); one that cannot returns an error without asking.
+   *
+   * Never throws.
+   */
+  read(args: {
+    nodeId: string;
+    /** The mark's ink as a data URL (PNG), rendered by the surface. */
+    image: string;
+    at: number;
+    signal?: AbortSignal;
+  }): Promise<ReadResult>;
+  /**
+   * Ask the model to add marks to the drawing. What it says it would draw, in
+   * the shape rung's vocabulary, is drawn through `addStroke` attributed to
+   * this participant — read, offered and erasable like any human mark.
+   *
+   * Never throws. A reply the canvas cannot read adds nothing.
+   */
+  draw(args: {
+    prompt: string;
+    /** The marks the human pointed at, as context; the whole board when empty. */
+    nodeIds?: string[];
+    at: number;
+    signal?: AbortSignal;
+  }): Promise<DrawResult>;
+}
+
+export interface ReadResult {
+  ok: boolean;
+  /** Every transcript offered, best first. */
+  transcripts: TranscriptReading[];
+  error?: string;
+  raw?: string;
 }
 
 export interface GenerateResult {
@@ -698,5 +817,88 @@ export function createAgentParticipant(
     };
   }
 
-  return { id, name, config, interpret, ask, generate };
+  async function read(args: { nodeId: string; image: string; at: number; signal?: AbortSignal }): Promise<ReadResult> {
+    if (!config.vision) return { ok: false, transcripts: [], error: `${name} cannot see images` };
+    const state = session.getState();
+    const node = state.nodes.get(args.nodeId);
+    if (!node) return { ok: false, transcripts: [], error: 'no such node' };
+    if (!/^data:image\//.test(args.image)) return { ok: false, transcripts: [], error: 'image must be a data URL' };
+
+    const result = await send(
+      config,
+      [
+        { role: 'system', content: READ_PROMPT },
+        { role: 'user', content: [{ type: 'image', dataUrl: args.image }, { type: 'text', text: 'What does this say?' }] },
+      ],
+      { signal: args.signal }
+    );
+    if (!result.ok) return { ok: false, transcripts: [], error: result.error };
+
+    const transcripts = parseTranscripts(result.text);
+    if (transcripts.length === 0) return { ok: false, transcripts: [], error: 'no readable transcript in reply', raw: result.text };
+
+    // Every reading is its own held rep. The human sees them all, ranked by
+    // confidence like every other reading on the canvas.
+    session.propose({
+      participantId: id,
+      nodeId: args.nodeId,
+      edges: [],
+      reps: transcripts.map((t) => ({ modality: 'transcript', data: { text: t.text }, confidence: t.confidence })),
+      at: args.at,
+    });
+    return { ok: true, transcripts, raw: result.text };
+  }
+
+  async function draw(args: { prompt: string; nodeIds?: string[]; at: number; signal?: AbortSignal }): Promise<DrawResult> {
+    const prompt = args.prompt.trim();
+    if (!prompt) return { ok: false, ids: [], shapes: [], error: 'no prompt' };
+    const state = session.getState();
+    const pointed = (args.nodeIds ?? []).filter((n) => state.nodes.has(n));
+    const all = state.contentIds.filter((n) => !state.artifacts.includes(n));
+    const context = describeSession(state, { nodeIds: all.length ? all : undefined });
+    const reading = all.length > 1 ? `\n\n${describeReading(session.read(all), { noun: 'mark' })}` : '';
+    const focus = pointed.length
+      ? `\n\nTHE HUMAN POINTED AT: ${pointed.join(', ')}${(() => {
+          const bs = pointed.map((p) => boundsOf(state.nodes.get(p)!)).filter((b): b is NonNullable<typeof b> => !!b);
+          if (!bs.length) return '';
+          const minX = Math.min(...bs.map((b) => b.minX)), minY = Math.min(...bs.map((b) => b.minY));
+          const maxX = Math.max(...bs.map((b) => b.maxX)), maxY = Math.max(...bs.map((b) => b.maxY));
+          return ` — together they span x ${Math.round(minX)}–${Math.round(maxX)}, y ${Math.round(minY)}–${Math.round(maxY)}`;
+        })()}`
+      : '';
+
+    const result = await send(
+      config,
+      [
+        { role: 'system', content: DRAW_PROMPT },
+        { role: 'user', content: `${context}${reading}${focus}\n\nThe human asks: ${prompt}` },
+      ],
+      { signal: args.signal }
+    );
+    if (!result.ok) return { ok: false, ids: [], shapes: [], error: result.error };
+
+    const shapes = parseShapes(result.text);
+    if (shapes.length === 0) return { ok: false, ids: [], shapes: [], error: 'nothing drawable in reply', raw: result.text };
+
+    const ids: string[] = [];
+    let at = args.at;
+    for (const s of shapes) {
+      const points = strokeFor(s);
+      if (!points) continue;
+      // Spaced in time so the retroactive command mark can still tell "just
+      // drawn" apart, and attributed so the surface can say who drew it.
+      // Declared content: a drawn shape never lassoes, commands or erases.
+      const made = session.addStroke(points, at, id, 1, { content: true });
+      ids.push(made);
+      at += 1;
+      // Its reason sits beside the mark, as an answer does: attributed,
+      // erasable, and never mistaken for ink.
+      if (s.why) session.answer({ participantId: id, question: prompt, text: s.why, aboutIds: [made], at });
+      at += 1;
+    }
+    if (ids.length === 0) return { ok: false, ids: [], shapes, error: 'every shape had no size', raw: result.text };
+    return { ok: true, ids, shapes, raw: result.text };
+  }
+
+  return { id, name, config, interpret, ask, generate, read, draw };
 }

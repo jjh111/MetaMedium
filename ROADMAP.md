@@ -158,18 +158,67 @@ snaps over the corpus, pinned). And the model building a page is handed the
 engine's whole reading — roles, relations, concepts, names, per container — in
 region ids, so "a page" is a brief rather than a request for placeholders.
 
-**Still open after that:** handwriting (v7 Stage E), so "the copy in the squares"
-can be literal rather than typed. Deliberately not a blocker: the sprint's `text`
-shape gives a mark the `label` role without needing to read it.
+**Handwriting (v7 Stage E) shipped 1 Sep 2026:** a `text` mark is rendered on
+its own and read by any joined model that can see; what it says is held as
+attributed transcripts, offered as a name for the shape beside it, and handed to
+generation as the words to use. One cursive stroke per word for now.
+
+### → **What comes next (from 1 Sep 2026)** — the phases, in order
+
+The engine can read a drawing, redraw it clean, build it, read the writing on
+it, and let a model draw back. The conversation benchmark has one clause left
+and the surface is still framed as a reference. The phases from here, each
+shippable on its own and each with a criterion:
+
+1. **Words from letters.** Handwriting reads one cursive stroke; printed
+   letters are several strokes and the shape rung sees each alone. Cluster
+   small, near, same-band strokes into one `text` mark before recognition
+   (relations already carry `near`/`same-row`; the cluster is a node whose
+   parts are the letters), read the cluster, and let scratching any letter
+   erase the word. *Criterion:* print a word in block capitals beside a box and
+   it becomes the box's name.
+2. **The model builds the library.** The benchmark's last clause. A model that
+   reads a group as "a molecule" should be able to *propose it as an entry* —
+   a signature plus a name — held unblessed until the human takes it, after
+   which the engine recognises the next one the way it recognises the human's
+   own. This is `propose()` carrying a composition, not a new channel.
+   *Criterion:* the canonical loop, with the model naming "molecule" and the
+   human only blessing.
+3. **Recall by meaning.** Library matching is a fingerprint comparison, so a
+   thing named "bubble" is found by shape only. Embed names and readings with
+   the local embedder both servers already serve (`nomic-embed-text`, per the
+   personal site's search tier) and let the palette offer entries that are
+   *near in meaning* as well as in geometry. The deferred v5 embedding-space
+   work, started at its smallest useful size. *Criterion:* draw a circle after
+   naming one "bubble", and "cell" — named earlier and shaped alike — is offered
+   too, saying why.
+4. **The surface becomes the flagship.** `session-engine.html` is the only
+   surface on the engine and it now does everything the monoliths did that
+   mattered, plus the loop. Build it standalone (`build-standalone.mjs`), link
+   it from the whitepaper as *the* demo, retire `doodle2-canvas.html` and
+   `metadoodle1.html` to `archive/` with redirects, and record the conversation
+   benchmark as a walkthrough on the page. *Criterion:* a visitor from the
+   whitepaper draws the canonical loop with a local model in under two minutes
+   without reading anything.
+5. **Whitepaper v5.1.** Unparked once 2 lands — the benchmark passes end to
+   end — and written around what the demo shows rather than what it promises.
+6. **An MCP server over the engine** (PRD-v4 Phase 1, still deferred until 4):
+   the session as tools — read, snap, draw, name — so a model outside the
+   browser can take part as a participant through the same channel.
+
+Not on the list, on purpose: MoE routing and expert feedback loops (v5 Phases
+4+) stay deferred until corrections data from a real demo exists.
 
 ### → **v7: Participants and Tiers** — the active engine plan
 
 **[ARCHITECTURE-v7-PARTICIPANTS-AND-TIERS.md](ARCHITECTURE-v7-PARTICIPANTS-AND-TIERS.md)**
-holds the engine design. **Stages A, C and D have shipped:** a model joins as a
+holds the engine design. **Stages A, C, D and E have shipped:** a model joins as a
 peer through the `propose` channel the engine already had, offers *several*
-readings held beside Tier 0's, answers questions *into* the canvas, and now
-builds living code from a drawing (D, absorbed and raised by MVP.md).
-Remaining: handwriting (E).
+readings held beside Tier 0's, answers questions *into* the canvas, builds
+living code from a drawing (D, absorbed and raised by MVP.md), reads
+handwriting (E), and draws back in the shape rung's vocabulary (F). Stage B
+(hosted keys) shipped with the model pane. The conversation benchmark has one
+clause open — the model proposing library entries — which is phase 2 above.
 
 The target is **the conversation benchmark**: a human and an AI holding a
 conversation *on the canvas* — both contributing marks, both building library
@@ -352,6 +401,8 @@ say so plainly.
 | Multi-parse recognition (nothing wins by silencing) | `analyzeStroke` returns ranked candidates with `reasoning` |
 | **Clean forms** — a confident reading redrawn, ink kept | `src/session/clean.ts`; `clean.bench.test.ts` pins zero wrong snaps |
 | **The drawing as the brief** for generation | `describeReading` in `participants/serialize.ts`; tested in `generate.test.ts` |
+| **Handwriting read** (v7 Stage E) | `agent.read()`, transcript reps; `read.test.ts`; e2e steps 13–13d |
+| **The model draws** (v7 Stage F) | `agent.draw()`, `session/synthesize.ts`; `draw.test.ts`; e2e steps 14–14d |
 | Event-sourced undo; erase with artifact degradation | `session.undo()`, `session.erase()` |
 | **Participants as first-class citizens** | `join`, `propose`, attribution, `Capability 0–3` — v0.3a |
 | Browser bundle + reference surface | `metamedium-core.browser.js`, CI drift check |
@@ -372,7 +423,7 @@ say so plainly.
 ### Not started
 
 - **Any model in the engine loop** — the propose channel has never carried an LLM proposal
-- **Diagram → code**, handwriting recognition, explanation reps on canvas
+- ~~**Diagram → code**, handwriting recognition, explanation reps on canvas~~ — all three shipped (Aug–Sep 2026)
 - MCP server (PRD-v4 Phase 1)
 - Point primitive (`Assets/point-primitive-design.md`)
 - Onboarding / calibration / user fingerprints

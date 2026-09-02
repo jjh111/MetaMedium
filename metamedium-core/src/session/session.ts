@@ -38,6 +38,7 @@ import {
   boundsOf,
   strokePointsOf,
   resemblances,
+  transcriptOf,
   LOCAL_PARTICIPANT,
   TIER0_PARTICIPANT,
 } from './nodes';
@@ -150,13 +151,20 @@ export type SessionEvent =
        * stroke so replay is deterministic across later zoom changes.
        */
       scale?: number;
+      /**
+       * Declared content: this stroke is never read as a gesture. A model that
+       * says "I would draw a rectangle here" is drawing, not selecting,
+       * commanding or erasing — those are commitments, and no tier commits.
+       * Any participant may declare it; `agent.draw()` always does.
+       */
+      content?: boolean;
     }
   | { type: 'tick'; at: number }
   | { type: 'bless'; summonId: string; name?: string; suggestionId?: string; at: number; participantId?: string }
   | { type: 'dismiss'; summonId: string; at: number; participantId?: string }
   | { type: 'erase'; nodeId: string; at: number; participantId?: string }
   | { type: 'join'; kind: ParticipantKind; name: string; at: number; capability?: Capability }
-  | { type: 'propose'; participantId: string; nodeId: string; edges: ProposedEdge[]; at: number }
+  | { type: 'propose'; participantId: string; nodeId: string; edges: ProposedEdge[]; reps?: ProposedRep[]; at: number }
   | { type: 'teach'; mark: CommandMark | null; at: number }
   | {
       type: 'tidy';
@@ -201,6 +209,19 @@ export type SessionEvent =
       at: number;
     };
 
+/**
+ * An attributed, inferred REP offered by a participant — what a model read
+ * where the reading is not a type but a value: the text of some handwriting.
+ * Held on the node with its source, ranked by confidence, never blessed by the
+ * act of proposing, exactly like an edge.
+ */
+export interface ProposedRep {
+  modality: string;
+  data: unknown;
+  confidence?: number;
+  reasoning?: string;
+}
+
 /** An attributed, inferred edge offered by a participant (e.g. an LLM tier). */
 export interface ProposedEdge {
   to: string;
@@ -242,11 +263,11 @@ export const DEFAULT_SESSION_CONFIG: SessionConfig = {
 type Signature = Record<string, number>; // type histogram, e.g. { circle: 3, line: 2 }
 
 export interface Session {
-  addStroke(points: Point[], at: number, participantId?: string, scale?: number): string;
+  addStroke(points: Point[], at: number, participantId?: string, scale?: number, options?: { content?: boolean }): string;
   /** Register a participant (human or AI agent). Returns its node id. */
   join(kind: ParticipantKind, name: string, at: number, capability?: Capability): string;
   /** Offer attributed, inferred edges on a node — the channel LLM tiers use. */
-  propose(args: { participantId: string; nodeId: string; edges: ProposedEdge[]; at: number }): void;
+  propose(args: { participantId: string; nodeId: string; edges: ProposedEdge[]; reps?: ProposedRep[]; at: number }): void;
   /**
    * Place an answer in the canvas, anchored to the marks it is about.
    *
@@ -679,8 +700,16 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     };
     nodes.set(node.id, node);
 
+    // Declared content is never a gesture. Lassoing, commanding and scratching
+    // out are commitments, and a stroke whose author said "this is a drawing"
+    // — a model's arrow that happens to cross a box three times, a model's loop
+    // around some marks — must not erase, select or summon. Who drew it does
+    // not decide this (participants are one class, v6 §3); what they declared
+    // does. `agent.draw()` always declares it.
+    const byHand = !ev.content;
+
     // --- Gesture resolution first: does this stroke complete a pending lasso? ---
-    if (pendingLasso) {
+    if (pendingLasso && byHand) {
       const lassoNode = nodes.get(pendingLasso.id)!;
       const lassoFp = fingerprintOf(lassoNode)!;
       const lassoPoints = strokePointsOf(lassoNode) ?? [];
@@ -725,7 +754,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
 
     // --- The mark, with nothing circled first. It reads BACKWARDS: what did
     //     this stroke cross, and what did you draw alongside it just now? ---
-    if (matchesCommandMark(fp, commandMark ?? BUILTIN_COMMAND_MARK).match) {
+    if (byHand && matchesCommandMark(fp, commandMark ?? BUILTIN_COMMAND_MARK).match) {
       const scope = scopeFromMark(points, fp, at);
       if (scope) {
         node.reps.push({
@@ -764,7 +793,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     //     does most of the discriminating everywhere else in the engine, and
     //     without this rule a loop that grazes a shape's edge tangentially can
     //     count six crossings and rub out what the user meant to select.
-    const scratched = fp.isClosed
+    const scratched = fp.isClosed || !byHand
       ? []
       : scratchedOut(points, scratchTargets(node.id), config.eraseCrossings);
     if (scratched.length > 0) {
@@ -779,8 +808,10 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       return node.id;
     }
 
-    // --- Not a gesture: this is content. Drawing past a summon dissolves it. ---
-    summon = null;
+    // --- Not a gesture: this is content. Drawing past a summon dissolves it —
+    //     when it is the human drawing; a model adding a mark while the human
+    //     is still choosing takes nothing away from them. ---
+    if (byHand) summon = null;
     contentIds.push(node.id);
 
     // Multi-parse: every qualifying recognition becomes a held 'resembles' edge.
@@ -813,7 +844,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     const enclosed = enclosedBy(fp.bounds, contentBoundsList(node.id));
     const onLive = liveArtifactUnder(fp.bounds, node.id);
     pendingLasso =
-      isLassoLike(fp, enclosed.length) || (fp.isClosed && onLive) ? { id: node.id, at } : null;
+      byHand && (isLassoLike(fp, enclosed.length) || (fp.isClosed && onLive)) ? { id: node.id, at } : null;
 
     recomputeClusterCandidates();
     return node.id;
@@ -964,6 +995,14 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
         weight: e.weight,
         via: ev.participantId,
         reasoning: e.reasoning,
+      });
+    }
+    for (const r of ev.reps ?? []) {
+      node.reps.push({
+        modality: r.modality,
+        data: r.reasoning === undefined ? r.data : { ...(r.data as object), reasoning: r.reasoning },
+        confidence: r.confidence,
+        source: ev.participantId,
       });
     }
     recomputeClusterCandidates();
@@ -1241,8 +1280,8 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
   }
 
   return {
-    addStroke: (points, at, participantId, scale) =>
-      dispatch({ type: 'stroke', points, at, participantId, scale }) as string,
+    addStroke: (points, at, participantId, scale, options) =>
+      dispatch({ type: 'stroke', points, at, participantId, scale, content: options?.content }) as string,
     join: (kind, name, at, capability) => dispatch({ type: 'join', kind, name, at, capability }) as string,
     propose: (args) => void dispatch({ type: 'propose', ...args }),
     answer: (args) => dispatch({ type: 'answer', ...args }),
@@ -1261,6 +1300,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       const shapes: Record<string, string> = {};
       const shapeConfidence: Record<string, number> = {};
       const names: Record<string, string> = {};
+      const transcripts: Record<string, string> = {};
       const wires: Record<string, Wire> = {};
       for (const m of marks) {
         const n = nodes.get(m.id)!;
@@ -1270,6 +1310,8 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
         shapeConfidence[m.id] = top?.weight ?? 0;
         const word = wordOf(n);
         if (word) names[m.id] = word;
+        const said = transcriptOf(n);
+        if (said) transcripts[m.id] = said;
         // Wires the session inferred when the mark was drawn, direction included.
         const ends = n.edges.filter((e) => e.rel === 'connects').map((e) => e.to);
         if (ends.length) {
@@ -1283,7 +1325,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       const scopeIds = marks.map((m) => m.id);
       const roles = assignRoles({ ids: scopeIds, shapes, shapeConfidence, relations, wires });
       const genre = genreOf(roles);
-      const scope: ConceptScope = { ids: scopeIds, marks, relations, shapes, names, roles };
+      const scope: ConceptScope = { ids: scopeIds, marks, relations, shapes, names, transcripts, roles };
       return { scope, relations, roles, genre, concepts: matchConcepts(scope) };
     },
     tick: (at) => void dispatch({ type: 'tick', at }),

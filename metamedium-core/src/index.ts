@@ -49,13 +49,15 @@ export {
   aboutIdsOf,
   createExplanationNode,
   resemblances,
+  transcriptsOf,
+  transcriptOf,
   topInterpretation,
   boundsOf,
   BUILTIN_TYPES,
   LOCAL_PARTICIPANT,
   TIER0_PARTICIPANT,
 } from './session/nodes';
-export type { MMNode, Rep, Edge, Capability, ParticipantKind, ExplanationData } from './session/nodes';
+export type { MMNode, Rep, Edge, Capability, ParticipantKind, ExplanationData, Transcript } from './session/nodes';
 
 // Clean forms — a confident reading, redrawn. Held beside the ink as a
 // `'clean'` rep, like tidy's `'transform'`; never a replacement of the stroke.
@@ -70,6 +72,11 @@ export {
   SNAPPABLE,
 } from './session/clean';
 export type { CleanShape, SnapReading } from './session/clean';
+
+// A participant's marks made without a hand — the shape rung as a drawing
+// vocabulary for models (the conversation benchmark's other half).
+export { strokeFor, parseShapes, MAX_DRAWN } from './session/synthesize';
+export type { DrawnShape } from './session/synthesize';
 
 // Gesture grammar
 export {
@@ -156,6 +163,7 @@ export type {
   Suggestion,
   ClusterCandidate,
   ProposedEdge,
+  ProposedRep,
 } from './session/session';
 
 // Interpretations — the NON-COLLAPSING read path (ARCHITECTURE-v7 §4.1).
@@ -173,12 +181,12 @@ export type { Interpretation, InterpretationGroup, Disagreement } from './sessio
 
 // LLM transport (Tier 1–2). One client covers Ollama / LM Studio / OpenRouter;
 // Anthropic has its own. Failures are returned, never thrown.
-export { complete, listModels, providerLabel, providerTier, stripThink, PRESETS, DEFAULT_TIMEOUT_MS, LOCAL_TIMEOUT_MS } from './llm/provider';
-export type { ProviderConfig, ProviderKind, ChatMessage, CompletionResult, ModelList } from './llm/provider';
+export { complete, listModels, providerLabel, providerTier, stripThink, textOf, PRESETS, DEFAULT_TIMEOUT_MS, LOCAL_TIMEOUT_MS } from './llm/provider';
+export type { ProviderConfig, ProviderKind, ChatMessage, ContentPart, CompletionResult, ModelList } from './llm/provider';
 
 // Agent participants — a model joins through the same channel a human uses.
-export { createAgentParticipant, parseReadings, parseCode, parseFill, readingsToEdges, MAX_READINGS } from './participants/agent';
-export type { AgentParticipant, AgentReading, InterpretResult, AskResult, GenerateResult, RegionFill } from './participants/agent';
+export { createAgentParticipant, parseReadings, parseCode, parseFill, parseTranscripts, readingsToEdges, MAX_READINGS } from './participants/agent';
+export type { AgentParticipant, AgentReading, InterpretResult, AskResult, GenerateResult, ReadResult, TranscriptReading, DrawResult, RegionFill } from './participants/agent';
 export { describeSession, describeSignature, describeRegions, describeAddressed, describeReading } from './participants/serialize';
 export type { ReadingLike, DescribeReadingOptions } from './participants/serialize';
 export type { Transport, AgentOptions } from './participants/agent';

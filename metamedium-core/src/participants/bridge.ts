@@ -20,6 +20,7 @@
 //     the routing system is still being decided.
 
 import type { ProviderConfig, CompletionResult, ChatMessage } from '../llm/provider';
+import { textOf } from '../llm/provider';
 import type { Session } from '../session/session';
 import type { Capability } from '../session/nodes';
 import { type AgentParticipant, createAgentParticipant } from './agent';
@@ -83,6 +84,11 @@ export function createBridgeParticipant(
     notify();
   }
 
+  const describeForHand = (content: ChatMessage['content']): string =>
+    typeof content === 'string'
+      ? content
+      : content.map((p) => (p.type === 'text' ? p.text : '[an image of the ink is attached]')).join('\n');
+
   const transport = (
     _config: ProviderConfig,
     messages: ChatMessage[],
@@ -95,8 +101,10 @@ export function createBridgeParticipant(
     }
     const request: BridgeRequest = {
       id: `bridge:${++counter}`,
-      system: messages.find((m) => m.role === 'system')?.content ?? '',
-      user: messages.find((m) => m.role === 'user')?.content ?? '',
+      // A person answering by hand gets the words; an image the bridge cannot
+      // show is said to be there rather than silently dropped.
+      system: textOf(messages.find((m) => m.role === 'system')?.content ?? ''),
+      user: describeForHand(messages.find((m) => m.role === 'user')?.content ?? ''),
       at: Date.now(),
     };
 

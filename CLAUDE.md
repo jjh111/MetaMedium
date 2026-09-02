@@ -29,8 +29,9 @@ circle them, cross with a command mark *you taught the system*, prompt them into
 a living page that renders in the canvas with your ink still outlining its
 divs — then draw on that page and the ink addresses the regions underneath it.
 Scratch anything out to erase. `Demos/session-engine.html` is the surface;
-`Demos/session-engine.e2e.js` drives all 38 steps through the real UI, page and flowchart both.
-Still open: handwriting (v7 Stage E). Whitepaper v5.1 stays parked until the
+`Demos/session-engine.e2e.js` drives all 48 steps through the real UI: page, flowchart, handwriting, and the model drawing.
+v7 Stage E (handwriting) shipped 1 Sep 2026: a word written beside a shape is read by a
+model that can see and offered as that shape's name. Whitepaper v5.1 stays parked until the
 conversation benchmark passes end to end.
 
 Architecture documents (chronological; **read MVP.md, then v7, then v6**):
@@ -477,6 +478,58 @@ Model participants are surface-side (`agents[]`); the session keeps every
 and `claude-sonnet-4-20250514` — **both are past retirement and return 404**.
 Retarget to `claude-opus-5` before trusting that file (thinking is on by
 default there, so leave `max_tokens` headroom).
+
+### Handwriting: the one thing sent as pixels (v7 Stage E)
+
+> `agent.read()` in `participants/agent.ts`; `transcriptsOf` / `transcriptOf` in
+> `session/nodes.ts`; `inkImage` / `readWriting` in `Demos/session-engine.html`.
+
+A mark the shape rung reads as `text` is rendered **on its own** — its ink,
+dark on a light ground, nothing else on the board — and handed to every joined
+model that can **see** (`ProviderConfig.vision`). The reply is held on the mark
+as `transcript` reps: several when the writing is ambiguous, each attributed
+and ranked, none blessed. This is the deliberate exception to "grounded, not
+screenshots": the ink *is* the ground truth of what was written and no
+fingerprint carries it, so the model is asked to *read*, not to interpret.
+
+- **A model that cannot see is never asked.** The pane relays what each server
+  says: Ollama lists `vision` among a model's capabilities, LM Studio types the
+  model `vlm` on `/api/v0/models`. Joined models marked *sees* read
+  automatically; with none present, writing stays `text` and the inspector says
+  what it would take.
+- **The word becomes the offer to name with.** A label with a transcript puts
+  *Name it "Pricing"* at the top of the palette (Tier 0, since the reading is
+  already held) — write a word beside a shape and it becomes that shape's name,
+  which was Stage E's ship criterion.
+- **The words reach the brief.** `describeReading` says *the human wrote
+  "Pricing" there — use those words* instead of *handwriting you cannot read*.
+- **One stroke per word, for now.** The `text` detector reads a single cursive
+  stroke; grouping printed letters into a word is not built.
+- `propose()` carries `reps` as well as edges, so a transcript is held through
+  the same channel as every other reading and undo drops it.
+
+### The model holds a pen (the conversation benchmark's other half)
+
+> `agent.draw()` in `participants/agent.ts`; `strokeFor` / `parseShapes` in
+> `session/synthesize.ts`; *Ask it to draw…* in the palette.
+
+A model contributes **marks**, not only words. It says what it would add in
+the shape rung's closed vocabulary — rectangle, circle, triangle, line, arrow,
+with coordinates in canvas units — and the engine draws each one through
+`addStroke` **attributed to the model**, so the mark gets the same fingerprint,
+readings, snap offer and eraser as a human's, and the surface colours it as the
+model's. Its `why` for each mark is placed beside it with `session.answer()`,
+so the reason is visible and erasable too. **A drawn shape is declared
+content** (`addStroke(…, { content: true })`): it is never read as a lasso, a
+command mark or a scratch, because those are commitments and no tier commits —
+the first real run had a model's arrow cross a box three times and erase it.
+The rule is about what was declared, not who drew it; an agent driving
+`addStroke` without the flag can still gesture (v6 same-class citizenship).
+The vocabulary is closed on purpose:
+a model that can only draw what the canvas can read makes marks the human can
+argue with on the same terms as their own. `parseShapes` drops anything outside
+it and caps the count (`MAX_DRAWN`). The brief it draws from is the same one
+generation gets, plus the measured span of what the human pointed at.
 
 **The rules that make tiers safe:** LLMs receive structured geometric data
 (fingerprints, spatial graph, library context) — **not screenshots**. Every

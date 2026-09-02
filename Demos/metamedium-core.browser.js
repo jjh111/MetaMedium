@@ -35,6 +35,7 @@ var MetaMediumCore = (() => {
     HAND_RESOLUTION_PX: () => HAND_RESOLUTION_PX,
     LOCAL_PARTICIPANT: () => LOCAL_PARTICIPANT,
     LOCAL_TIMEOUT_MS: () => LOCAL_TIMEOUT_MS,
+    MAX_DRAWN: () => MAX_DRAWN,
     MAX_READINGS: () => MAX_READINGS,
     MAX_TIER0_CONFIDENCE: () => MAX_TIER0_CONFIDENCE,
     MIN_CONFIDENCE: () => MIN_CONFIDENCE,
@@ -124,6 +125,8 @@ var MetaMediumCore = (() => {
     parseGraph: () => parseGraph,
     parseLayout: () => parseLayout,
     parseReadings: () => parseReadings,
+    parseShapes: () => parseShapes,
+    parseTranscripts: () => parseTranscripts,
     prepare: () => prepare,
     providerLabel: () => providerLabel,
     providerTier: () => providerTier,
@@ -146,9 +149,13 @@ var MetaMediumCore = (() => {
     snapReading: () => snapReading,
     sourcesOf: () => sourcesOf,
     stripThink: () => stripThink,
+    strokeFor: () => strokeFor,
     strokePointsOf: () => strokePointsOf,
     strokesIntersect: () => strokesIntersect,
+    textOf: () => textOf,
     topInterpretation: () => topInterpretation,
+    transcriptOf: () => transcriptOf,
+    transcriptsOf: () => transcriptsOf,
     typeNodeId: () => typeNodeId,
     validateRegions: () => validateRegions,
     whyNotResolved: () => whyNotResolved,
@@ -946,6 +953,20 @@ var MetaMediumCore = (() => {
   function wordOf(node) {
     return getRep(node, "word")?.data;
   }
+  function transcriptsOf(node) {
+    return node.reps.filter((r) => r.modality === "transcript").map((r) => {
+      const d = r.data;
+      return {
+        text: typeof d?.text === "string" ? d.text : "",
+        confidence: r.confidence ?? 0,
+        source: r.source,
+        reasoning: typeof d?.reasoning === "string" ? d.reasoning : void 0
+      };
+    }).filter((t) => t.text.length > 0).sort((a, b) => b.confidence - a.confidence);
+  }
+  function transcriptOf(node) {
+    return transcriptsOf(node)[0]?.text;
+  }
   function isGesture(node) {
     return getRep(node, "gesture") !== void 0;
   }
@@ -1256,6 +1277,94 @@ var MetaMediumCore = (() => {
     return (r.ok ? `could be drawn clean as a ${r.shape}` : `kept as ink`) + (name ? ` (${name})` : "") + ` \u2014 ${r.reasoning}`;
   }
 
+  // src/session/synthesize.ts
+  var MAX_DRAWN = 8;
+  function seg(a, b, n2, out, skipFirst) {
+    for (let i = skipFirst ? 1 : 0; i < n2; i++) {
+      const t = i / (n2 - 1);
+      out.push({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t });
+    }
+  }
+  function strokeFor(s) {
+    if (s.shape === "line" || s.shape === "arrow") {
+      const len = Math.hypot(s.to.x - s.from.x, s.to.y - s.from.y);
+      if (!(len > 1)) return null;
+      const out2 = [];
+      seg(s.from, s.to, Math.max(12, Math.round(len / 6)), out2, false);
+      if (s.shape === "arrow") {
+        const ux = (s.to.x - s.from.x) / len, uy = (s.to.y - s.from.y) / len;
+        const barb = Math.max(8, Math.min(len * 0.2, 40));
+        const wing = (side) => ({
+          x: s.to.x - barb * (ux * Math.cos(0.5) - side * uy * Math.sin(0.5)),
+          y: s.to.y - barb * (uy * Math.cos(0.5) + side * ux * Math.sin(0.5))
+        });
+        seg(s.to, wing(1), 8, out2, true);
+        seg(wing(1), s.to, 8, out2, true);
+        seg(s.to, wing(-1), 8, out2, true);
+      }
+      return out2;
+    }
+    const r = s;
+    const { x, y, w: w2, h: h2 } = r;
+    if (!(w2 > 1) || !(h2 > 1)) return null;
+    if (r.shape === "circle") {
+      const out2 = [];
+      const n2 = 96;
+      for (let i = 0; i <= n2; i++) {
+        const a = i / n2 * Math.PI * 2;
+        out2.push({ x: x + w2 / 2 + w2 / 2 * Math.cos(a), y: y + h2 / 2 + h2 / 2 * Math.sin(a) });
+      }
+      return out2;
+    }
+    const verts = r.shape === "triangle" ? [{ x: x + w2 / 2, y }, { x: x + w2, y: y + h2 }, { x, y: y + h2 }] : [{ x, y }, { x: x + w2, y }, { x: x + w2, y: y + h2 }, { x, y: y + h2 }];
+    const out = [];
+    const per = Math.max(10, Math.round(Math.max(w2, h2) / 8));
+    for (let i = 0; i < verts.length; i++) seg(verts[i], verts[(i + 1) % verts.length], per, out, i > 0);
+    return out;
+  }
+  function parseShapes(text) {
+    if (!text) return [];
+    const unfenced = text.replace(/```(?:json)?/gi, "").trim();
+    const start = unfenced.indexOf("[");
+    const end = unfenced.lastIndexOf("]");
+    if (start === -1 || end === -1 || end < start) return [];
+    let parsed;
+    try {
+      parsed = JSON.parse(unfenced.slice(start, end + 1));
+    } catch {
+      return [];
+    }
+    if (!Array.isArray(parsed)) return [];
+    const num = (v) => typeof v === "number" && Number.isFinite(v) ? v : typeof v === "string" && v.trim() && Number.isFinite(Number(v)) ? Number(v) : null;
+    const pt = (v) => {
+      if (!v || typeof v !== "object") return null;
+      const r = v;
+      const x = num(r.x), y = num(r.y);
+      return x === null || y === null ? null : { x, y };
+    };
+    const out = [];
+    for (const item of parsed) {
+      if (out.length >= MAX_DRAWN) break;
+      if (!item || typeof item !== "object") continue;
+      const r = item;
+      const kind = String(r.shape ?? r.type ?? r.kind ?? "").toLowerCase().trim();
+      const why = typeof r.why === "string" ? r.why : typeof r.reasoning === "string" ? r.reasoning : void 0;
+      if (kind === "line" || kind === "arrow") {
+        const from = pt(r.from) ?? (num(r.x1) !== null && num(r.y1) !== null ? { x: num(r.x1), y: num(r.y1) } : null);
+        const to = pt(r.to) ?? (num(r.x2) !== null && num(r.y2) !== null ? { x: num(r.x2), y: num(r.y2) } : null);
+        if (from && to) out.push({ shape: kind, from, to, why });
+        continue;
+      }
+      if (kind === "rectangle" || kind === "rect" || kind === "box" || kind === "circle" || kind === "ellipse" || kind === "triangle") {
+        const x = num(r.x), y = num(r.y), w2 = num(r.w ?? r.width), h2 = num(r.h ?? r.height);
+        if (x === null || y === null || w2 === null || h2 === null) continue;
+        const shape = kind === "rect" || kind === "box" ? "rectangle" : kind === "ellipse" ? "circle" : kind;
+        out.push({ shape, x, y, w: w2, h: h2, why });
+      }
+    }
+    return out;
+  }
+
   // src/session/erase.ts
   var DEFAULT_ERASE_CROSSINGS = 3;
   function segmentsIntersect(p1, p2, p3, p4) {
@@ -1417,11 +1526,11 @@ var MetaMediumCore = (() => {
       const start = { x: 0, y: 0 };
       const vertex = { x: w2 * dip, y: h2 };
       const end = { x: w2, y: -h2 * rise + w2 * slant };
-      const seg = (a, b, n2) => Array.from({ length: n2 }, (_, i) => ({
+      const seg2 = (a, b, n2) => Array.from({ length: n2 }, (_, i) => ({
         x: a.x + (b.x - a.x) * (i / (n2 - 1)),
         y: a.y + (b.y - a.y) * (i / (n2 - 1))
       }));
-      return seg(start, vertex, 34).concat(seg(vertex, end, 44).slice(1));
+      return seg2(start, vertex, 34).concat(seg2(vertex, end, 44).slice(1));
     };
     return [
       check(70, 35, 0.36, 0.45),
@@ -2805,7 +2914,8 @@ ${pad}</${tag}>`;
         createdAt: at
       };
       nodes.set(node.id, node);
-      if (pendingLasso) {
+      const byHand = !ev.content;
+      if (pendingLasso && byHand) {
         const lassoNode = nodes.get(pendingLasso.id);
         const lassoFp = fingerprintOf(lassoNode);
         const lassoPoints = strokePointsOf(lassoNode) ?? [];
@@ -2838,7 +2948,7 @@ ${pad}</${tag}>`;
       } else {
         markMiss = null;
       }
-      if (matchesCommandMark(fp, commandMark ?? BUILTIN_COMMAND_MARK).match) {
+      if (byHand && matchesCommandMark(fp, commandMark ?? BUILTIN_COMMAND_MARK).match) {
         const scope = scopeFromMark(points, fp, at);
         if (scope) {
           node.reps.push({
@@ -2862,7 +2972,7 @@ ${pad}</${tag}>`;
           return node.id;
         }
       }
-      const scratched = fp.isClosed ? [] : scratchedOut(points, scratchTargets(node.id), config.eraseCrossings);
+      const scratched = fp.isClosed || !byHand ? [] : scratchedOut(points, scratchTargets(node.id), config.eraseCrossings);
       if (scratched.length > 0) {
         node.reps.push({
           modality: "gesture",
@@ -2874,7 +2984,7 @@ ${pad}</${tag}>`;
         for (const id of scratched) eraseNode(id, at);
         return node.id;
       }
-      summon = null;
+      if (byHand) summon = null;
       contentIds.push(node.id);
       const analysis = analyzeStroke(points, scale);
       for (const r of analysis.results) {
@@ -2895,7 +3005,7 @@ ${pad}</${tag}>`;
       inferWire(node, points, scale);
       const enclosed = enclosedBy(fp.bounds, contentBoundsList(node.id));
       const onLive = liveArtifactUnder(fp.bounds, node.id);
-      pendingLasso = isLassoLike(fp, enclosed.length) || fp.isClosed && onLive ? { id: node.id, at } : null;
+      pendingLasso = byHand && (isLassoLike(fp, enclosed.length) || fp.isClosed && onLive) ? { id: node.id, at } : null;
       recomputeClusterCandidates();
       return node.id;
     }
@@ -3005,6 +3115,14 @@ ${pad}</${tag}>`;
           weight: e.weight,
           via: ev.participantId,
           reasoning: e.reasoning
+        });
+      }
+      for (const r of ev.reps ?? []) {
+        node.reps.push({
+          modality: r.modality,
+          data: r.reasoning === void 0 ? r.data : { ...r.data, reasoning: r.reasoning },
+          confidence: r.confidence,
+          source: ev.participantId
         });
       }
       recomputeClusterCandidates();
@@ -3220,7 +3338,7 @@ ${pad}</${tag}>`;
       };
     }
     return {
-      addStroke: (points, at, participantId, scale) => dispatch({ type: "stroke", points, at, participantId, scale }),
+      addStroke: (points, at, participantId, scale, options) => dispatch({ type: "stroke", points, at, participantId, scale, content: options?.content }),
       join: (kind, name, at, capability) => dispatch({ type: "join", kind, name, at, capability }),
       propose: (args) => void dispatch({ type: "propose", ...args }),
       answer: (args) => dispatch({ type: "answer", ...args }),
@@ -3239,6 +3357,7 @@ ${pad}</${tag}>`;
         const shapes = {};
         const shapeConfidence = {};
         const names = {};
+        const transcripts = {};
         const wires = {};
         for (const m of marks) {
           const n2 = nodes.get(m.id);
@@ -3247,6 +3366,8 @@ ${pad}</${tag}>`;
           shapeConfidence[m.id] = top?.weight ?? 0;
           const word = wordOf(n2);
           if (word) names[m.id] = word;
+          const said = transcriptOf(n2);
+          if (said) transcripts[m.id] = said;
           const ends = n2.edges.filter((e) => e.rel === "connects").map((e) => e.to);
           if (ends.length) {
             wires[m.id] = {
@@ -3259,7 +3380,7 @@ ${pad}</${tag}>`;
         const scopeIds = marks.map((m) => m.id);
         const roles = assignRoles({ ids: scopeIds, shapes, shapeConfidence, relations, wires });
         const genre = genreOf(roles);
-        const scope = { ids: scopeIds, marks, relations, shapes, names, roles };
+        const scope = { ids: scopeIds, marks, relations, shapes, names, transcripts, roles };
         return { scope, relations, roles, genre, concepts: matchConcepts(scope) };
       },
       tick: (at) => void dispatch({ type: "tick", at }),
@@ -3280,6 +3401,27 @@ ${pad}</${tag}>`;
     openRouter: { kind: "openai-compatible", baseUrl: "https://openrouter.ai/api/v1" },
     anthropic: { kind: "anthropic", baseUrl: "https://api.anthropic.com/v1" }
   };
+  function textOf(content) {
+    return typeof content === "string" ? content : content.filter((p) => p.type === "text").map((p) => p.text).join("\n");
+  }
+  function dataUrlParts(dataUrl) {
+    const m = /^data:([^;,]+);base64,(.+)$/s.exec(dataUrl);
+    return m ? { mediaType: m[1], data: m[2] } : null;
+  }
+  function openAIContent(content) {
+    if (typeof content === "string") return content;
+    return content.map(
+      (p) => p.type === "text" ? { type: "text", text: p.text } : { type: "image_url", image_url: { url: p.dataUrl } }
+    );
+  }
+  function anthropicContent(content) {
+    if (typeof content === "string") return content;
+    return content.map((p) => {
+      if (p.type === "text") return { type: "text", text: p.text };
+      const parts = dataUrlParts(p.dataUrl);
+      return parts ? { type: "image", source: { type: "base64", media_type: parts.mediaType, data: parts.data } } : { type: "text", text: "(an image the transport could not encode)" };
+    });
+  }
   var DEFAULT_TIMEOUT_MS = 6e4;
   var LOCAL_TIMEOUT_MS = 3e5;
   function providerLabel(config) {
@@ -3341,7 +3483,7 @@ ${pad}</${tag}>`;
     const res = await post(
       `${config.baseUrl.replace(/\/$/, "")}/chat/completions`,
       headers,
-      { model: config.model, messages, stream: false },
+      { model: config.model, messages: messages.map((m) => ({ role: m.role, content: openAIContent(m.content) })), stream: false },
       timeoutMs,
       external
     );
@@ -3354,7 +3496,7 @@ ${pad}</${tag}>`;
   }
   async function completeAnthropic(config, messages, timeoutMs, external) {
     if (!config.apiKey) return { ok: false, error: "anthropic requires an API key" };
-    const system = messages.filter((m) => m.role === "system").map((m) => m.content).join("\n\n");
+    const system = messages.filter((m) => m.role === "system").map((m) => textOf(m.content)).join("\n\n");
     const user = messages.filter((m) => m.role === "user");
     if (user.length === 0) return { ok: false, error: "no user message" };
     const res = await post(
@@ -3370,7 +3512,7 @@ ${pad}</${tag}>`;
         model: config.model,
         max_tokens: 4096,
         ...system ? { system } : {},
-        messages: user.map((m) => ({ role: "user", content: m.content }))
+        messages: user.map((m) => ({ role: "user", content: anthropicContent(m.content) }))
       },
       timeoutMs,
       external
@@ -3439,6 +3581,11 @@ ${pad}</${tag}>`;
         }
       }
     }
+    const said = transcriptsOf(node);
+    if (said.length > 0) {
+      lines.push("  writing reads:");
+      for (const t of said) lines.push(`    - "${t.text}" ${t.confidence.toFixed(2)} by ${t.source ?? "unknown"}`);
+    }
     const rels = node.edges.filter(
       (e) => e.rel !== "resembles" && e.rel !== "blessed-by" && e.rel !== "made-by"
     );
@@ -3506,7 +3653,7 @@ ${pad}</${tag}>`;
     ].join("\n");
   }
   var ENGAGING_RELATIONS = ["contains", "near", "touching", "crossing"];
-  function roleLine(r, name, noun) {
+  function roleLine(r, name, noun, said) {
     const me = name(r.id);
     if (!me) return void 0;
     const others = r.targets.map(name).filter((x) => !!x);
@@ -3514,6 +3661,9 @@ ${pad}</${tag}>`;
       case "container":
         return `${me}: container${others.length ? `, holding ${others.join(", ")}` : ""} \u2014 its contents are its sections`;
       case "label":
+        if (said) {
+          return others.length ? `${me}: label for ${others[0]} \u2014 the human wrote "${said}" there. Use those words: they are ${others[0]}'s title, and ${me} shows them` : `${me}: label \u2014 the human wrote "${said}". Use those words`;
+        }
         return others.length ? `${me}: label for ${others[0]} \u2014 handwriting the human put there. You cannot read it; write the title or caption that belongs in that place, and treat ${others[0]} as titled by it` : `${me}: label \u2014 handwriting; write what belongs there`;
       case "edge": {
         if (r.direction) {
@@ -3535,7 +3685,7 @@ ${pad}</${tag}>`;
     const noun = options.noun ?? "region";
     const lines = [];
     lines.push(`GENRE: ${reading.genre.genre} \u2014 ${reading.genre.reasoning}`);
-    const roleLines = reading.roles.map((r) => roleLine(r, name, noun)).filter((x) => !!x);
+    const roleLines = reading.roles.map((r) => roleLine(r, name, noun, reading.scope?.transcripts?.[r.id])).filter((x) => !!x);
     if (roleLines.length) {
       lines.push("", `WHAT EACH ${noun.toUpperCase()} PLAYS:`);
       for (const l of roleLines) lines.push(`  ${l}`);
@@ -3636,6 +3786,60 @@ Rules:
 
 Reply with ONLY a JSON object, no prose, no code fences:
 {"regions":{"r2":{"tag":"aside","style":"\u2026","html":"\u2026"}}}`;
+  var READ_PROMPT = `You are reading handwriting from a shared drawing canvas. The image shows one handwritten mark, dark ink on a light ground, exactly as the human drew it.
+
+Transcribe what it says. Offer up to 3 readings ranked by confidence when the writing is ambiguous; one when it is clear. Keep the human's casing and punctuation. Do not describe the image, do not guess at meaning, do not add words that are not there.
+
+Reply with ONLY a JSON array, no prose, no code fences:
+[{"text":"what it says","confidence":0.0-1.0}]`;
+  var DRAW_PROMPT = `You are a participant on a shared drawing canvas, alongside a human. You have been asked to ADD MARKS to the drawing.
+
+You are given the marks already on the canvas as measured facts \u2014 positions, sizes, what each reads as and plays \u2014 in canvas units (y grows downward). You are not given an image.
+
+Say what you would draw. You may use only these shapes:
+  - {"shape":"rectangle","x":..,"y":..,"w":..,"h":..,"why":"..."}
+  - {"shape":"circle","x":..,"y":..,"w":..,"h":..,"why":"..."}   (x,y,w,h is the box the circle fills)
+  - {"shape":"triangle","x":..,"y":..,"w":..,"h":..,"why":"..."}
+  - {"shape":"line","from":{"x":..,"y":..},"to":{"x":..,"y":..},"why":"..."}
+  - {"shape":"arrow","from":{"x":..,"y":..},"to":{"x":..,"y":..},"why":"..."}   (points from tail to tip)
+
+Rules:
+- At most ${MAX_DRAWN} shapes. Fewer is better; draw what was asked and nothing decorative.
+- Place new marks relative to what is there: match the sizes and spacing you were given, sit beside or below the marks you were pointed at, and do not overlap them unless asked to.
+- An arrow's ends should land on the marks it joins \u2014 near an edge, not at the centre.
+- "why" is one short clause the human will see beside the mark.
+
+Reply with ONLY a JSON array, no prose, no code fences.`;
+  function parseTranscripts(text) {
+    if (!text) return [];
+    const unfenced = text.replace(/```(?:json)?/gi, "").trim();
+    const start = unfenced.indexOf("[");
+    const end = unfenced.lastIndexOf("]");
+    if (start === -1 || end === -1 || end < start) {
+      const bare = unfenced.replace(/^["'\s]+|["'\s]+$/g, "");
+      return bare && bare.length <= 80 && !/\n/.test(bare) ? [{ text: bare, confidence: 0.5 }] : [];
+    }
+    let parsed;
+    try {
+      parsed = JSON.parse(unfenced.slice(start, end + 1));
+    } catch {
+      return [];
+    }
+    if (!Array.isArray(parsed)) return [];
+    const out = [];
+    for (const item of parsed) {
+      if (typeof item === "string" && item.trim()) {
+        out.push({ text: item.trim(), confidence: 0.5 });
+        continue;
+      }
+      if (!item || typeof item !== "object") continue;
+      const rec = item;
+      const t = typeof rec.text === "string" ? rec.text : typeof rec.label === "string" ? rec.label : "";
+      if (!t.trim()) continue;
+      out.push({ text: t.trim(), confidence: clamp01(rec.confidence) });
+    }
+    return out.sort((a, b) => b.confidence - a.confidence);
+  }
   function clamp01(v) {
     const n2 = typeof v === "number" ? v : Number(v);
     if (!Number.isFinite(n2)) return 0.5;
@@ -4004,7 +4208,79 @@ ${brief}`,
         raw: result2.text
       };
     }
-    return { id, name, config, interpret, ask, generate };
+    async function read(args) {
+      if (!config.vision) return { ok: false, transcripts: [], error: `${name} cannot see images` };
+      const state = session.getState();
+      const node = state.nodes.get(args.nodeId);
+      if (!node) return { ok: false, transcripts: [], error: "no such node" };
+      if (!/^data:image\//.test(args.image)) return { ok: false, transcripts: [], error: "image must be a data URL" };
+      const result2 = await send(
+        config,
+        [
+          { role: "system", content: READ_PROMPT },
+          { role: "user", content: [{ type: "image", dataUrl: args.image }, { type: "text", text: "What does this say?" }] }
+        ],
+        { signal: args.signal }
+      );
+      if (!result2.ok) return { ok: false, transcripts: [], error: result2.error };
+      const transcripts = parseTranscripts(result2.text);
+      if (transcripts.length === 0) return { ok: false, transcripts: [], error: "no readable transcript in reply", raw: result2.text };
+      session.propose({
+        participantId: id,
+        nodeId: args.nodeId,
+        edges: [],
+        reps: transcripts.map((t) => ({ modality: "transcript", data: { text: t.text }, confidence: t.confidence })),
+        at: args.at
+      });
+      return { ok: true, transcripts, raw: result2.text };
+    }
+    async function draw(args) {
+      const prompt2 = args.prompt.trim();
+      if (!prompt2) return { ok: false, ids: [], shapes: [], error: "no prompt" };
+      const state = session.getState();
+      const pointed = (args.nodeIds ?? []).filter((n2) => state.nodes.has(n2));
+      const all = state.contentIds.filter((n2) => !state.artifacts.includes(n2));
+      const context = describeSession(state, { nodeIds: all.length ? all : void 0 });
+      const reading = all.length > 1 ? `
+
+${describeReading(session.read(all), { noun: "mark" })}` : "";
+      const focus = pointed.length ? `
+
+THE HUMAN POINTED AT: ${pointed.join(", ")}${(() => {
+        const bs = pointed.map((p) => boundsOf(state.nodes.get(p))).filter((b) => !!b);
+        if (!bs.length) return "";
+        const minX = Math.min(...bs.map((b) => b.minX)), minY = Math.min(...bs.map((b) => b.minY));
+        const maxX = Math.max(...bs.map((b) => b.maxX)), maxY = Math.max(...bs.map((b) => b.maxY));
+        return ` \u2014 together they span x ${Math.round(minX)}\u2013${Math.round(maxX)}, y ${Math.round(minY)}\u2013${Math.round(maxY)}`;
+      })()}` : "";
+      const result2 = await send(
+        config,
+        [
+          { role: "system", content: DRAW_PROMPT },
+          { role: "user", content: `${context}${reading}${focus}
+
+The human asks: ${prompt2}` }
+        ],
+        { signal: args.signal }
+      );
+      if (!result2.ok) return { ok: false, ids: [], shapes: [], error: result2.error };
+      const shapes = parseShapes(result2.text);
+      if (shapes.length === 0) return { ok: false, ids: [], shapes: [], error: "nothing drawable in reply", raw: result2.text };
+      const ids = [];
+      let at2 = args.at;
+      for (const s of shapes) {
+        const points = strokeFor(s);
+        if (!points) continue;
+        const made = session.addStroke(points, at2, id, 1, { content: true });
+        ids.push(made);
+        at2 += 1;
+        if (s.why) session.answer({ participantId: id, question: prompt2, text: s.why, aboutIds: [made], at: at2 });
+        at2 += 1;
+      }
+      if (ids.length === 0) return { ok: false, ids: [], shapes, error: "every shape had no size", raw: result2.text };
+      return { ok: true, ids, shapes, raw: result2.text };
+    }
+    return { id, name, config, interpret, ask, generate, read, draw };
   }
 
   // src/participants/bridge.ts
@@ -4023,14 +4299,17 @@ ${brief}`,
       resolve(result2);
       notify();
     }
+    const describeForHand = (content) => typeof content === "string" ? content : content.map((p) => p.type === "text" ? p.text : "[an image of the ink is attached]").join("\n");
     const transport = (_config, messages, opts) => {
       if (waiting) {
         return Promise.resolve({ ok: false, error: "already waiting on an answer" });
       }
       const request = {
         id: `bridge:${++counter2}`,
-        system: messages.find((m) => m.role === "system")?.content ?? "",
-        user: messages.find((m) => m.role === "user")?.content ?? "",
+        // A person answering by hand gets the words; an image the bridge cannot
+        // show is said to be there rather than silently dropped.
+        system: textOf(messages.find((m) => m.role === "system")?.content ?? ""),
+        user: describeForHand(messages.find((m) => m.role === "user")?.content ?? ""),
         at: Date.now()
       };
       return new Promise((resolve) => {

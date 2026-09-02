@@ -37,6 +37,8 @@ export interface ConceptScope {
   shapes: Record<string, string>;
   /** Names the human has already given these marks, where they have. */
   names: Record<string, string>;
+  /** What the writing says, where a participant has read it (top transcript). */
+  transcripts?: Record<string, string>;
   /** The diagram rung — what each mark plays. Concepts are built on these. */
   roles?: RoleReading[];
 }

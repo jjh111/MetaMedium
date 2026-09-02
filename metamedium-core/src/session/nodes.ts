@@ -194,6 +194,39 @@ export function wordOf(node: MMNode): string | undefined {
   return getRep(node, 'word')?.data as string | undefined;
 }
 
+/**
+ * What a mark's writing SAYS, as participants have read it — ranked, every
+ * reading kept. A transcript is a proposal like any other: attributed to the
+ * model that read it and never blessed by being proposed (v7 Stage E).
+ */
+export interface Transcript {
+  text: string;
+  confidence: number;
+  source?: string;
+  reasoning?: string;
+}
+
+export function transcriptsOf(node: MMNode): Transcript[] {
+  return node.reps
+    .filter((r) => r.modality === 'transcript')
+    .map((r) => {
+      const d = r.data as { text?: unknown; reasoning?: unknown };
+      return {
+        text: typeof d?.text === 'string' ? d.text : '',
+        confidence: r.confidence ?? 0,
+        source: r.source,
+        reasoning: typeof d?.reasoning === 'string' ? d.reasoning : undefined,
+      };
+    })
+    .filter((t) => t.text.length > 0)
+    .sort((a, b) => b.confidence - a.confidence);
+}
+
+/** The top transcript's text, if any participant has read this mark. */
+export function transcriptOf(node: MMNode): string | undefined {
+  return transcriptsOf(node)[0]?.text;
+}
+
 export function isGesture(node: MMNode): boolean {
   return getRep(node, 'gesture') !== undefined;
 }

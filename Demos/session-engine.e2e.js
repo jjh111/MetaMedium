@@ -27,10 +27,12 @@ window.__helpers = function(){
   function circle(cx,cy,r,n){ n=n||110; const p=[]; for(let i=0;i<=n;i++){const a=i/n*Math.PI*2; p.push({x:cx+r*Math.cos(a),y:cy+r*Math.sin(a)});} return p; }
   function caret(x,y,w,h){ w=w||60;h=h||40; return line({x,y:y+h},{x:x+w/2,y},30).concat(line({x:x+w/2,y},{x:x+w,y:y+h},30).slice(1)); }
   function check(x,y,k){ k=k||1; return line({x,y},{x:x+25*k,y:y+35*k},30).concat(line({x:x+25*k,y:y+35*k},{x:x+70*k,y:y-15*k},30).slice(1)); }
+  // A word, as one cursive stroke: low, wide, open, turning many times — what the shape rung reads as `text`.
+  function word(x,y,w,h,humps){ humps=humps||7; const p=[]; const n=humps*14; for(let i=0;i<=n;i++){ const t=i/n; const a=t*humps*Math.PI; p.push({x:x+w*t, y:y+h/2-(h/2)*Math.abs(Math.sin(a))*(0.7+0.3*Math.cos(a*0.37))}); } return p; }
   function scratch(x,y,w,h,passes){ passes=passes||3; let p=[]; for(let i=0;i<passes;i++){const yi=y+(passes===1?0:h*i/(passes-1)); const a={x:i%2?x+w:x,y:yi},b={x:i%2?x:x+w,y:yi}; if(i)p.push({x:a.x,y:p[p.length-1].y}); p=p.concat(line(a,b,10).slice(i?1:0));} return p; }
   function summary(){ const st=window.__mm.session.getState(); return {loose:st.contentIds.length-st.artifacts.length, artifacts:st.artifacts.length, live:st.live.length, pending:st.pendingLassoId, summon: st.summon?{enclosed:st.summon.enclosedIds.length,onArtifact:st.summon.onArtifact||null}:null, mark: st.commandMark?st.commandMark.name:null, status: document.getElementById('status').textContent}; }
   function chips(){ return [...document.querySelectorAll('#summon .item')].map(b=>b.querySelector('span').textContent.trim()); }
-  window.__t = {stroke,strokeOn,line,rect,circle,caret,check,scratch,summary,chips};
+  window.__t = {stroke,strokeOn,line,rect,circle,caret,check,scratch,word,summary,chips};
 
   // Teach the caret as the command mark, through the real pad UI.
   window.__teach = function(){
@@ -89,13 +91,28 @@ window.__setup = function(){
       ids.forEach((id,i)=>{ regions[id]={tag:i===0?'header':'section', style:'background:'+pal[i%pal.length]+';color:#fff;display:flex;align-items:center;justify-content:center', html:'<h2>Section '+id+'</h2>'}; });
       return reply({theme:{background:'#fbfaf7', color:'#16161a'}, regions});
     }
+    if(/asked to ADD MARKS/.test(sys)){
+      // Place a footer under the span the human pointed at — derived from the
+      // prompt, so a broken brief fails the run.
+      const m = usr.match(/span x (-?\d+)–(-?\d+), y (-?\d+)–(-?\d+)/);
+      window.__lastDraw = { span: m && m.slice(1).map(Number) };
+      if(!m) return reply([]);
+      const [x0,x1,y0,y1] = m.slice(1).map(Number);
+      return reply([{shape:'rectangle', x:x0, y:y1+30, w:x1-x0, h:60, why:'a footer under both'}]);
+    }
+    if(/reading handwriting/.test(sys)){
+      const parts = body.messages.find(m=>m.role==='user').content;
+      const img = Array.isArray(parts) && parts.find(p=>p.type==='image_url');
+      window.__lastRead = { hasImage: !!img && /^data:image\/png;base64,/.test(img.image_url.url) };
+      return reply([{text:'Pricing',confidence:0.92},{text:'Prizing',confidence:0.31}]);
+    }
     if(/answering a question/.test(sys)){
       return new Response(JSON.stringify({choices:[{message:{content:'The three rectangles share edges only through the region frame you drew; nothing else relates them.'}}]}),{status:200,headers:{'content-type':'application/json'}});
     }
     return new Response(JSON.stringify({choices:[{message:{content:'[{"label":"page-layout","confidence":0.78,"reasoning":"three rectangles in a header/two-column arrangement"}]'}}]}),{status:200,headers:{'content-type':'application/json'}});
   };
   window.__mm.agents.splice(0); // a remembered model may have rejoined at boot
-  const a=window.__mm.MM.createAgentParticipant(window.__mm.session, Object.assign({},window.__mm.MM.PRESETS.ollama,{model:'stub-qwen'}), Date.now());
+  const a=window.__mm.MM.createAgentParticipant(window.__mm.session, Object.assign({},window.__mm.MM.PRESETS.ollama,{model:'stub-qwen', vision:true}), Date.now());
   window.__mm.agents.push(a);
 
   return 'ready · ' + a.name;
@@ -172,8 +189,11 @@ window.__scenario = async function(){
   step('4. the built-in check is ignored once a mark is taught', checkIgnored);
 
   // ---- 5. The taught mark, drawn ACROSS the lasso ----
+  // The mark must be sized for what it marks: drawn relative to the lasso's
+  // radius on screen, so the run does not depend on the pane's width.
   const edge = mm.worldToScreen(490+330, 340);
-  t.stroke(t.caret(edge.x - 60, edge.y - 40, 120, 78));
+  const k5 = (330 * mm.view.zoom) / 132;
+  t.stroke(t.caret(edge.x - 60*k5, edge.y - 40*k5, 120*k5, 78*k5));
   const sum = t.summary().summon;
   step('5. crossing with the taught mark summons', sum && sum.enclosed === 3,
     {enclosed: sum && sum.enclosed, chips: t.chips()});
@@ -324,7 +344,8 @@ window.__scenario = async function(){
   // The mark that is ACTIVE by now is the caret taught in step 1 — a check
   // would be (correctly) refused. Drawn across the lasso's right edge.
   const ge = W(fx + 255 + 320, fy + 45);
-  gA(t.caret(ge.x - 60, ge.y - 40, 120, 78));
+  const kg = (320 * z) / 132;
+  gA(t.caret(ge.x - 60*kg, ge.y - 40*kg, 120*kg, 78*kg));
   const sum3 = mm.session.getState().summon;
   const reading3 = sum3 ? mm.session.read(sum3.enclosedIds) : null;
   step('10d. two boxes and an arrow read as node, node, edge — genre graph',
@@ -353,6 +374,75 @@ window.__scenario = async function(){
     !!flowCode && /<svg class="mm-edges"/.test(flowCode) && /marker-end/.test(flowCode) &&
     /position:absolute/.test(flowCode) && !/flex-direction/.test(flowCode),
     { live: mm.session.getState().live.length, hasSvg: !!flowCode && /<svg/.test(flowCode) });
+
+  // ---- 13. Handwriting (v7 Stage E): write a word next to a shape; it becomes that shape's name ----
+  {
+    mm.fitAll(); await wait(60);
+    const z = mm.view.zoom;
+    const base = mm.worldToScreen(1300, 1500); // clear of the flowchart and the page
+    t.stroke(t.rect(base.x, base.y, 300*z, 180*z));                       // a box
+    t.stroke(t.word(base.x + 40*z, base.y + 60*z, 200*z, 40*z, 7));        // a word inside it
+    await wait(300);                                                        // the read is asynchronous
+    const stW = mm.session.getState();
+    const wordId = stW.contentIds[stW.contentIds.length - 1];
+    const wordNode = stW.nodes.get(wordId);
+    const shape = MM.interpretationsOf(wordNode, stW.nodes).filter(r=>r.tier===0)[0];
+    step('13. one cursive stroke reads as writing', !!shape && shape.label === 'text', shape && (shape.label + ' ' + shape.weight.toFixed(2)));
+    step('13a. it was handed to the model that can see, as an image', !!window.__lastRead && window.__lastRead.hasImage, window.__lastRead);
+    const said = MM.transcriptsOf(wordNode);
+    step('13b. every transcript is held on the mark, attributed and ranked', said.length === 2 && said[0].text === 'Pricing' && said[0].source === mm.agents[0].id,
+      said.map(x => x.text + ' ' + x.confidence));
+    // Lasso both, cross with the mark: the word becomes the offer to name with.
+    const c2 = mm.worldToScreen(1450, 1590);
+    t.stroke(t.circle(c2.x, c2.y, 230*z));
+    const e2 = mm.worldToScreen(1450+230, 1590);
+    const k2 = (230 * z) / 132;
+    t.stroke(t.caret(e2.x - 60*k2, e2.y - 40*k2, 120*k2, 78*k2));
+    const chipsW = t.chips();
+    step('13c. the palette leads with the word, as a name, needing no model', chipsW[0] === 'Name it “Pricing”', chipsW);
+    const nameChip = [...document.querySelectorAll('#summon .item')].find(b => /Name it/.test(b.textContent));
+    if (nameChip) nameChip.click();
+    const stN = mm.session.getState();
+    const named = stN.artifacts.map(id => MM.wordOf(stN.nodes.get(id)));
+    step('13d. the word next to the shape is now the shape\'s name — the ship criterion', named.includes('Pricing'), named);
+  }
+
+  // ---- 14. The model holds a pen: it adds marks in the shape rung's vocabulary, in its own name ----
+  {
+    mm.fitAll(); await wait(60);
+    const z = mm.view.zoom;
+    const p1 = mm.worldToScreen(1300, 2100), p2 = mm.worldToScreen(1560, 2100);
+    t.stroke(t.rect(p1.x, p1.y, 200*z, 120*z));
+    t.stroke(t.rect(p2.x, p2.y, 200*z, 120*z));
+    const cD = mm.worldToScreen(1530, 2160);
+    t.stroke(t.circle(cD.x, cD.y, 300*z));
+    const eD = mm.worldToScreen(1530+300, 2160);
+    const kD = (300 * z) / 132;
+    t.stroke(t.caret(eD.x - 60*kD, eD.y - 40*kD, 120*kD, 78*kD));
+    const drawChip = [...document.querySelectorAll('#summon .item')].find(b => /Ask it to draw/.test(b.textContent));
+    step('14. the palette offers to let the model draw', !!drawChip, t.chips());
+    const before = mm.session.getState().contentIds.length;
+    if (drawChip) {
+      drawChip.click();
+      const inp = document.querySelector('#summon input.ask');
+      inp.value = 'add a footer under these';
+      inp.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}));
+      await wait(300);
+    }
+    const stD = mm.session.getState();
+    const newIds = stD.contentIds.slice(before - 0).filter(id => !stD.artifacts.includes(id));
+    const drawn = newIds.map(id => stD.nodes.get(id)).filter(n => n && (n.reps.find(r => r.modality === 'stroke') || {}).source === mm.agents[0].id);
+    step('14a. the model was told what the human pointed at, as a measured span', !!window.__lastDraw && !!window.__lastDraw.span, window.__lastDraw);
+    step('14b. a mark appeared, authored by the model, through the same channel as a hand', drawn.length === 1, {newIds, by: drawn.map(n => (n.reps.find(r => r.modality === 'stroke') || {}).source)});
+    if (drawn.length) {
+      const n = drawn[0];
+      const read = MM.interpretationsOf(n, stD.nodes)[0];
+      const b = MM.boundsOf(n);
+      step('14c. it is read by the shape rung like any mark, and sits where it was asked to', read && read.label === 'rectangle' && b.minY > 2100 + 120, { read: read && read.label + ' ' + read.weight.toFixed(2), top: b && Math.round(b.minY) });
+      const why = stD.explanations.map(id => MM.explanationOf(stD.nodes.get(id))).filter(e => e && /footer/.test(e.text));
+      step('14d. its reason sits beside it as an answer, attributed', why.length === 1, why.map(e => e.text));
+    }
+  }
 
   // ---- 11. Scratch-out erase ----
   mm.fitAll(); await wait(60);

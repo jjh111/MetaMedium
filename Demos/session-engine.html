@@ -976,21 +976,34 @@ html, body {
 
   // --- Local servers, both at once ---
   async function probeLocal() {
+    // Each server says what its models can do; the pane only relays it. A
+    // model that can SEE is the one that gets asked to read handwriting —
+    // Ollama lists `vision` among capabilities, LM Studio types the model `vlm`.
     const probes = [
-      { source: 'Ollama', preset: 'ollama', list: 'http://localhost:11434/api/tags',
+      { source: 'Ollama', preset: 'ollama', list: ['http://localhost:11434/api/tags'],
         pick: (d) => (d.models || []).map((m) => ({ name: m.name,
-          chat: !(m.capabilities && m.capabilities.length && !m.capabilities.includes('completion')) && !/embed/i.test(m.name) })) },
-      { source: 'LM Studio', preset: 'lmStudio', list: 'http://localhost:1234/v1/models',
-        pick: (d) => (d.data || []).map((m) => ({ name: m.id, chat: !/embed/i.test(m.id) })) },
+          chat: !(m.capabilities && m.capabilities.length && !m.capabilities.includes('completion')) && !/embed/i.test(m.name),
+          vision: !!(m.capabilities && m.capabilities.includes('vision')) })) },
+      { source: 'LM Studio', preset: 'lmStudio', list: ['http://localhost:1234/api/v0/models', 'http://localhost:1234/v1/models'],
+        pick: (d) => (d.data || []).map((m) => ({ name: m.id, chat: !/embed/i.test(m.id) && m.type !== 'embeddings',
+          vision: m.type === 'vlm' })) },
     ];
     const settled = await Promise.allSettled(probes.map(async (pr) => {
-      const res = await fetch(pr.list, { signal: AbortSignal.timeout(2500) });
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      const all = pr.pick(await res.json());
+      let all = null, err = null;
+      for (const url of pr.list) {
+        try {
+          const res = await fetch(url, { signal: AbortSignal.timeout(2500) });
+          if (!res.ok) { err = new Error('HTTP ' + res.status); continue; }
+          all = pr.pick(await res.json());
+          break;
+        } catch (e) { err = e; }
+      }
+      if (!all) throw err || new Error('no answer');
       return {
         source: pr.source, preset: pr.preset, baseUrl: MM.PRESETS[pr.preset].baseUrl,
         host: MM.PRESETS[pr.preset].baseUrl.replace(/^https?:\/\//, '').replace(/\/v1$/, ''),
         models: all.filter((m) => m.chat).map((m) => m.name).sort(),
+        vision: all.filter((m) => m.chat && m.vision).map((m) => m.name),
         skipped: all.filter((m) => !m.chat).map((m) => m.name),
       };
     }));
@@ -1013,7 +1026,7 @@ html, body {
       for (const m of sv.models) {
         const on = isJoined(sv.baseUrl, m);
         html += '<button class="model' + (on ? ' on' : '') + '" data-base="' + esc(sv.baseUrl) + '" data-model="' + esc(m) + '">' +
-          '<span>' + esc(m) + '</span><span class="why">' + (on ? 'joined' : 'tier 1 · tap to join') + '</span></button>';
+          '<span>' + esc(m) + '</span><span class="why">' + (on ? 'joined' : 'tier 1' + (sv.vision.includes(m) ? ' · sees' : '') + ' · tap to join') + '</span></button>';
       }
       if (!sv.models.length && sv.skipped.length) {
         html += '<div class="note">only embedding models here — they cannot chat</div>';
@@ -1025,7 +1038,7 @@ html, body {
     mpLocal.querySelectorAll('.model').forEach((btn) => {
       btn.onclick = () => {
         const sv = localServers.find((x) => x.baseUrl === btn.dataset.base);
-        join(Object.assign({}, MM.PRESETS[sv.preset], { model: btn.dataset.model }), { provider: sv.preset });
+        join(Object.assign({}, MM.PRESETS[sv.preset], { model: btn.dataset.model, vision: sv.vision.includes(btn.dataset.model) }), { provider: sv.preset });
       };
     });
   }
@@ -1040,7 +1053,9 @@ html, body {
     const agent = MM.createAgentParticipant(session, config, Date.now());
     agents.push(agent);
     if (pick) store.set(PICK_KEY, Object.assign({ baseUrl: config.baseUrl, model: config.model, kind: config.kind }, pick));
-    mpStatus.textContent = agent.name + ' joined (tier ' + MM.providerTier(config) + '). It reads what you summon and builds what you describe.';
+    mpStatus.textContent = agent.name + ' joined (tier ' + MM.providerTier(config) + '). It reads what you summon' +
+      (config.vision ? ', reads your writing,' : '') + ' and builds what you describe.';
+    readWriting(session.getState());
     renderAgents();
     renderLocal();
     render(session.getState());
@@ -1062,7 +1077,7 @@ html, body {
   function renderAgents() {
     mpList.innerHTML = agents.map((a, i) =>
       '<div class="mpItem"><span>' + esc(a.name) + '</span>' +
-      '<span class="t">tier ' + MM.providerTier(a.config) + '</span>' +
+      '<span class="t">tier ' + MM.providerTier(a.config) + (a.config.vision ? ' · sees' : '') + '</span>' +
       '<button class="ghost" data-leave="' + i + '">leave</button></div>'
     ).join('');
     mpList.querySelectorAll('[data-leave]').forEach((b) => { b.onclick = () => leave(agents[Number(b.dataset.leave)]); });
@@ -1073,6 +1088,8 @@ html, body {
     const model = (mpModel.value || DEFAULT_MODEL[p] || '').trim();
     const key = mpKey.value.trim();
     if (!model) { mpStatus.textContent = 'Which model? Type its id.'; return; }
+    // Hosted servers do not say what a model can do; the id is the only clue.
+    const vision = /claude|gpt-4o|gpt-5|gemini|qwen3\.5|qwen.*vl|vision|pixtral|llava/i.test(model);
     let config;
     if (p === 'custom') {
       const base = mpEndpoint.value.trim().replace(/\/+$/, '');
@@ -1097,7 +1114,7 @@ html, body {
     if (MM.providerTier({ baseUrl: pick.baseUrl }) === 1) {
       const servers = await probeLocal();
       const sv = servers.find((x) => x.baseUrl === pick.baseUrl);
-      if (sv && sv.models.includes(pick.model)) join(Object.assign({}, MM.PRESETS[sv.preset], { model: pick.model }), null);
+      if (sv && sv.models.includes(pick.model)) join(Object.assign({}, MM.PRESETS[sv.preset], { model: pick.model, vision: sv.vision.includes(pick.model) }), null);
       else mpStatus.textContent = 'Remembered ' + pick.model + ', but ' + pick.baseUrl + ' is not offering it right now.';
       return;
     }
@@ -1170,6 +1187,72 @@ html, body {
         render(session.getState());
       });
     });
+  }
+
+  // ===== Handwriting: the one thing sent as pixels =========================
+  //
+  // A mark that reads as writing is rendered on its own — dark ink on a light
+  // ground, nothing else on the board — and handed to every model that can
+  // SEE, once. What comes back is held on the mark as transcripts, attributed
+  // and ranked, never blessed (v7 Stage E). A model that cannot see is never
+  // asked; with none present the mark simply stays "text".
+  const seeing = () => agents.filter((a) => a.config.vision);
+  const askedToRead = new Set(); // node ids handed out already (per model join, see below)
+
+  function inkImage(node, size) {
+    const pts = MM.strokePointsOf(node);
+    if (!pts || pts.length < 2) return null;
+    const b = MM.getBounds(pts);
+    const w = Math.max(1, b.maxX - b.minX), h = Math.max(1, b.maxY - b.minY);
+    const S = size || 320, pad = 16;
+    const k = Math.min((S - pad * 2) / w, (S / 2 - pad * 2) / h);
+    const cw = Math.round(w * k + pad * 2), ch = Math.round(h * k + pad * 2);
+    const off = document.createElement('canvas');
+    off.width = cw; off.height = ch;
+    const c = off.getContext('2d');
+    c.fillStyle = '#fff'; c.fillRect(0, 0, cw, ch);
+    c.strokeStyle = '#111'; c.lineWidth = Math.max(2, 3 * k); c.lineCap = 'round'; c.lineJoin = 'round';
+    c.beginPath();
+    pts.forEach((p, i) => { const x = pad + (p.x - b.minX) * k, y = pad + (p.y - b.minY) * k; i ? c.lineTo(x, y) : c.moveTo(x, y); });
+    c.stroke();
+    return off.toDataURL('image/png');
+  }
+
+  function isWriting(node) {
+    const shape = MM.interpretationsOf(node, state.nodes).filter((r) => r.tier === 0)[0];
+    return !!shape && shape.label === 'text';
+  }
+
+  function readOne(node, force) {
+    const readers = seeing();
+    if (!readers.length) return false;
+    const key = node.id;
+    if (!force && askedToRead.has(key)) return false;
+    askedToRead.add(key);
+    const image = inkImage(node);
+    if (!image) return false;
+    mpStatus.textContent = 'reading the writing with ' + readers.map((a) => a.name).join(', ') + '…';
+    readers.forEach((agent) => {
+      agent.read({ nodeId: node.id, image: image, at: Date.now() }).then((res) => {
+        mpStatus.textContent = res.ok
+          ? agent.name + ' read “' + res.transcripts[0].text + '”' + (res.transcripts.length > 1 ? ' (or ' + res.transcripts.slice(1).map((t) => '“' + t.text + '”').join(', ') + ')' : '')
+          : agent.name + ' could not read it (' + res.error + ').';
+        if (!res.ok && res.raw) window.__mm.lastRaw = res.raw;
+        render(session.getState());
+      });
+    });
+    return true;
+  }
+
+  function readWriting(s) {
+    if (!seeing().length) return;
+    const ids = s.contentIds.filter((id) => !s.artifacts.includes(id));
+    for (const aid of s.artifacts) for (const e of s.nodes.get(aid).edges) if (e.rel === 'has-part') ids.push(e.to);
+    for (const id of ids) {
+      const node = s.nodes.get(id);
+      if (!node || s.pendingLassoId === id || MM.transcriptOf(node) || !MM.strokePointsOf(node)) continue;
+      if (isWriting(node)) readOne(node, false);
+    }
   }
 
   // ===== Input: strokes in, nothing gated, no modes ========================
@@ -1311,7 +1394,9 @@ html, body {
     const b = e.target.closest && e.target.closest('button[data-act]');
     if (!b) return;
     const id = b.getAttribute('data-id');
-    if (b.getAttribute('data-act') === 'snap') snapAll([id]);
+    const act = b.getAttribute('data-act');
+    if (act === 'snap') snapAll([id]);
+    else if (act === 'read') { const n = state.nodes.get(id); if (n && !readOne(n, true)) offerModel('Reading writing needs a model that can see.'); }
     else session.snap({ ids: [id], mode: 'raw', at: Date.now() });
   });
   document.getElementById('resetBtn').onclick = () => location.reload();
@@ -1443,6 +1528,7 @@ html, body {
   function render(s) {
     state = s;
     askModels(s);
+    readWriting(s);
     syncStage(s);
     refreshOffers();
 
@@ -1491,7 +1577,8 @@ html, body {
         text((MM.wordOf(node) || '') + (isLive ? '  ·  live' : ''), b.minX, b.minY - wpx(10), '#c9a84c');
       } else if (b && !pending) {
         // Two rungs at a glance: what it is, and what it plays.
-        const top = MM.topInterpretation(node);
+        const said = MM.transcriptOf(node);
+        const top = said ? '“' + said + '”' : MM.topInterpretation(node);
         const role = readRungs(s).roles.get(id);
         const played = role && role.role !== 'unclassified' && role.role !== top ? ' · ' + role.role : '';
         if (top) text(top + played, b.minX, b.maxY + wpx(15),
@@ -1714,6 +1801,29 @@ html, body {
         });
       }
     }
+    // What the writing says becomes the offer to NAME with — the ship criterion
+    // for handwriting: write a word next to a shape and it becomes its name.
+    {
+      const labels = reading.roles.filter((r) => r.role === 'label' && sum.enclosedIds.includes(r.id));
+      const said = labels.map((r) => ({ r, t: MM.transcriptsOf(s.nodes.get(r.id))[0] })).filter((x) => x.t);
+      for (const { r, t } of said) {
+        items.unshift({
+          key: 'said:' + r.id, group: 'written', groupConf: t.confidence,
+          groupWhy: 'read from your handwriting by ' + nameOfParticipant(t.source),
+          label: 'Name it “' + t.text + '”', why: r.targets.length ? 'the word beside it, as its name' : 'the word you wrote, as its name', tier: 0,
+          run: () => session.bless({ summonId: sum.id, name: t.text, at: Date.now() }),
+        });
+      }
+      const unread = sum.enclosedIds.filter((id) => { const n = s.nodes.get(id); return n && isWriting(n) && !MM.transcriptOf(n); });
+      if (unread.length && agents.length) {
+        items.push({
+          key: 'read', group: 'always', groupConf: 0, groupWhy: '',
+          label: 'Read the writing', why: seeing().length ? unread.length + ' mark' + (unread.length === 1 ? '' : 's') + ' of writing, unread' : 'needs a model that can see', tier: 2,
+          run: () => { let any = false; unread.forEach((id) => { any = readOne(s.nodes.get(id), true) || any; }); if (!any) offerModel('Reading writing needs a model that can see — one marked “sees”.'); },
+        });
+      }
+    }
+
     // Drawing them clean: instant, offline, and the summon stays open so the
     // next offer is taken from the cleaned-up marks.
     const offers = snapMode === 'off' ? [] : session.snapCandidates(sum.enclosedIds);
@@ -1752,6 +1862,15 @@ html, body {
         key: 'ask', group: 'always', groupConf: 0, groupWhy: '',
         label: 'Ask about it…', why: 'answered into the canvas', tier: 2,
         run: (btn) => swapToQuestion(sum.enclosedIds.slice(), btn),
+      });
+    }
+    if (agents.length > 0 && !sum.onArtifact) {
+      // The model holds a pen too: it says what it would add, in the shapes
+      // the canvas can read, and the engine draws it in its name.
+      items.push({
+        key: 'draw', group: 'always', groupConf: 0, groupWhy: '',
+        label: 'Ask it to draw…', why: 'marks added in the model’s name, beside these', tier: 2,
+        run: (btn) => swapToDraw(sum, btn),
       });
     }
     items.push({
@@ -2010,6 +2129,36 @@ html, body {
     });
   }
 
+  function swapToDraw(sum, btn) {
+    const input = document.createElement('input');
+    input.placeholder = 'add a footer under these…';
+    input.className = 'ask';
+    input.onkeydown = (e) => {
+      e.stopPropagation();
+      if (e.key !== 'Enter') return;
+      const q = input.value.trim();
+      if (!q) return;
+      const ids = sum.enclosedIds.slice();
+      session.dismiss(sum.id, Date.now());
+      cancelReading();
+      mpStatus.textContent = 'drawing with ' + agents.length + ' model(s)…';
+      agents.forEach((agent) => {
+        agent.draw({ prompt: q, nodeIds: ids, at: Date.now() }).then((res) => {
+          if (res.ok) {
+            mpStatus.textContent = agent.name + ' drew ' + res.ids.length + ' mark' + (res.ids.length === 1 ? '' : 's') +
+              ': ' + res.shapes.map((s) => s.shape).join(', ');
+            flash(agent.name + ' drew ' + res.ids.length);
+          } else {
+            mpStatus.textContent = agent.name + ' drew nothing (' + res.error + ').';
+            if (res.raw) window.__mm.lastRaw = res.raw;
+          }
+          render(session.getState());
+        });
+      });
+    };
+    replaceWithField(btn, input);
+  }
+
   function swapToQuestion(nodeIds, btn) {
     const input = document.createElement('input');
     input.placeholder = 'ask about these…';
@@ -2175,6 +2324,27 @@ html, body {
       html += '</div>';
     }
 
+    // What the writing says — every transcript, attributed. The one reading
+    // that came in as pixels, and the model that gave it is named.
+    if (MM.strokePointsOf(node) && !isArtifact && isWriting(node)) {
+      const said = MM.transcriptsOf(node);
+      html += '<div class="sep"></div><div class="eyebrow">writing reads</div>';
+      if (said.length) {
+        html += '<div class="reads">';
+        said.forEach((t, i) => {
+          html += '<div class="read' + (i === 0 ? ' top' : '') + '"><span class="type">“' + esc(t.text) + '”</span>' +
+            '<span class="w">' + t.confidence.toFixed(2) + '</span></div>' +
+            '<div class="why">by ' + esc(nameOfParticipant(t.source)) + '</div>';
+        });
+        html += '</div>';
+        if (seeing().length) html += '<button class="mini" data-act="read" data-id="' + esc(id) + '">read it again</button>';
+      } else if (seeing().length) {
+        html += '<div class="why">not read yet</div><button class="mini" data-act="read" data-id="' + esc(id) + '">read it</button>';
+      } else {
+        html += '<div class="why">writing, unread — needs a model that can see (add one that says “sees”)</div>';
+      }
+    }
+
     // The engaging relations and the wires — not the peer/alignment ones,
     // which are true of nearly everything and would drown the list.
     const rels = node.edges.filter((e) =>
@@ -2288,6 +2458,7 @@ html, body {
     screenToWorld: screenToWorld, worldToScreen: worldToScreen,
     fitAll: fitAll, regionsUnderInk: regionsUnderInk,
     snapMode: () => snapMode, setSnapMode: setSnapMode, snapOffers: () => snapOffers,
+    inkImage: inkImage, readOne: readOne, readWriting: readWriting,
   };
 
   session.subscribe(render);
