@@ -448,6 +448,14 @@ relative to the target's own size. Legacy copies still exist for reference in
 Tier is derived from the provider by `providerTier()` (localhost → 1, hosted →
 2) and carried on the participant node via `join(kind, name, at, capability)`.
 
+**A model's reading of a group is an offer to name it.** When a circled group
+is summoned, every joined model is asked for readings (`interpret`); each
+lands as a held `resembles` edge, and the palette lists the top ones as *Name
+it "…"*, attributed, repainting when they arrive. Blessing one holds an
+artifact with the group's signature, so the next group like it is matched —
+the model proposed, the human decided, the engine remembers. This closed the
+conversation benchmark's last clause.
+
 **Answers are nodes, not chat.** `session.answer()` places an explanation in the
 canvas, anchored to the marks it is about and attributed to whoever said it.
 Explanations are a **third plane** (`SessionState.explanations`) beside content

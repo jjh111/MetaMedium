@@ -524,6 +524,29 @@ window.__scenario = async function(){
     step('16c. the printed word is now the box\'s name — the ship criterion for printed letters', stN.artifacts.map(id => MM.wordOf(stN.nodes.get(id))).filter(n => n === 'Pricing').length >= 1);
   }
 
+  // ---- 17. The model builds the library: it names a group, the human blesses, the next one is recognised ----
+  {
+    mm.fitAll(); await wait(60);
+    const z = mm.view.zoom;
+    const W = (x, y) => mm.worldToScreen(x, y);
+    const trio = (x, y) => { const a = W(x, y), b = W(x + 160, y); t.stroke(t.circle(a.x, a.y, 40 * z)); t.stroke(t.circle(b.x, b.y, 40 * z)); t.stroke(t.line(W(x + 44, y), W(x + 116, y), 30)); };
+    trio(4200, 2100);
+    const cT = W(4280, 2100);
+    t.stroke(t.circle(cT.x, cT.y, 170 * z));
+    document.getElementById('heldOffer').click();
+    await wait(400); // the stubbed model answers the reading
+    const chips = t.chips();
+    const proposed = chips.find(c => /Name it “page-layout”/.test(c));
+    step('17. what the model read the group as is offered as a name, attributed', !!proposed, chips);
+    const btn = [...document.querySelectorAll('#summon .item')].find(b => /Name it “page-layout”/.test(b.textContent));
+    if (btn) btn.click();
+    const named = mm.session.getState().artifacts.map(id => MM.wordOf(mm.session.getState().nodes.get(id)));
+    step('17a. blessing it holds the entry — the model proposed, the human decided', named.includes('page-layout'), named);
+    trio(4200, 2400);
+    const cands = mm.session.getState().clusterCandidates;
+    step('17b. the next group like it is recognised by its signature: the model\'s word, in the library', cands.some(c => c.matches.some(m => m.name === 'page-layout')), cands.map(c => c.matches.map(m => m.name)));
+  }
+
   // ---- 11. Scratch-out erase ----
   mm.fitAll(); await wait(60);
   const stBefore = mm.session.getState().contentIds.length;

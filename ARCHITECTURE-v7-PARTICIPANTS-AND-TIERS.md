@@ -312,13 +312,16 @@ what the model draws is exactly what the canvas can read — and `parseShapes`
 drops the rest. Palette: *Ask it to draw…*. Pinned in the e2e (steps 14–14d);
 verified against `qwen3:8b`.
 
-**Where the benchmark stands.** Of its five clauses — both contributing marks,
-both building library entries, questions answered in the space, a diagram
-parsed into code, handwriting read — four run end to end. *Both building
-library entries* is the one still open: a model can name what it reads
-(`Name it "…"` comes from its transcript), but it does not yet propose a
-composition as a reusable entry. That, and grouping printed letters into a
-word, are the next two steps.
+**Where the benchmark stands (2 Sep 2026): all five clauses run end to end.**
+Both contribute marks (`agent.draw`); both build library entries — a model's
+reading of a circled group is offered as a name in the palette, attributed,
+and blessing it holds an entry the engine matches by signature thereafter;
+questions are answered in the space; a diagram compiles to code; handwriting
+is read, cursive as one stroke and printed letters gathered into a word
+(`session/words.ts`). The benchmark passes with a stubbed model in the
+browser e2e (60 steps) and each clause has been run against a real local
+model. What remains is quality, not capability: a small local model's names
+and copy are generic, and the whitepaper is parked on that.
 
 ---
 

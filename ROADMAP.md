@@ -175,13 +175,12 @@ shippable on its own and each with a criterion:
    (`session/words.ts`) that reads as `text`; erasing a letter shrinks it, the
    inspector can split it. *Criterion met:* print NAV in block capitals beside
    a box and the palette leads with *Name it "…"* — e2e step 16.
-2. **The model builds the library.** The benchmark's last clause. A model that
-   reads a group as "a molecule" should be able to *propose it as an entry* —
-   a signature plus a name — held unblessed until the human takes it, after
-   which the engine recognises the next one the way it recognises the human's
-   own. This is `propose()` carrying a composition, not a new channel.
-   *Criterion:* the canonical loop, with the model naming "molecule" and the
-   human only blessing.
+2. ~~**The model builds the library.**~~ ✅ **built (2 Sep 2026).** A model's
+   readings of a circled group are offered in the palette as names, attributed
+   (*Name it "molecule" — llm:qwen3:8b*); blessing one holds the entry with the
+   group's signature, and the next group like it is matched. No new channel:
+   `propose()` already carried the reading; the palette now offers it, and
+   repaints when a reading lands. *Criterion met:* e2e steps 17–17b.
 3. **Recall by meaning.** Library matching is a fingerprint comparison, so a
    thing named "bubble" is found by shape only. Embed names and readings with
    the local embedder both servers already serve (`nomic-embed-text`, per the
