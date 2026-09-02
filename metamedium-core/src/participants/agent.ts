@@ -363,14 +363,47 @@ function outermostObject(text: string): string | null {
  * smaller models reach for, and rejecting it would be pedantry rather than
  * safety.
  */
+/**
+ * A reply cut off mid-object — a local model that ran out of tokens while
+ * writing the third region — still holds whole regions before the cut. Take
+ * the `"rN": {...}` entries that close properly and drop the one that did not.
+ * The engine reports what it left empty, so nothing is hidden; the alternative
+ * was throwing away two finished regions because a third was unfinished.
+ */
+function salvageRegions(text: string): Record<string, unknown> | null {
+  const out: Record<string, unknown> = {};
+  const re = /"(r\d+)"\s*:\s*\{/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text))) {
+    const start = m.index + m[0].length - 1;
+    let depth = 0, inString = false, escaped = false, end = -1;
+    for (let i = start; i < text.length; i++) {
+      const c = text[i];
+      if (inString) {
+        if (escaped) escaped = false;
+        else if (c === '\\') escaped = true;
+        else if (c === '"') inString = false;
+        continue;
+      }
+      if (c === '"') inString = true;
+      else if (c === '{') depth++;
+      else if (c === '}' && --depth === 0) { end = i; break; }
+    }
+    if (end === -1) break; // the cut-off one, and nothing whole after it
+    const entry = parseLoose(text.slice(start, end + 1));
+    if (entry && typeof entry === 'object') out[m[1]] = entry;
+  }
+  return Object.keys(out).length ? out : null;
+}
+
 export function parseFill(text: string): RegionFill | null {
   if (!text) return null;
-  const json = outermostObject(text.replace(/```(?:json)?/gi, ''));
-  if (!json) return null;
-
-  const parsed = parseLoose(json);
-  if (!parsed || typeof parsed !== 'object') return null;
-  const obj = parsed as Record<string, unknown>;
+  const unfenced = text.replace(/```(?:json)?/gi, '');
+  const json = outermostObject(unfenced);
+  const parsed = json ? parseLoose(json) : null;
+  const salvaged = parsed && typeof parsed === 'object' ? null : salvageRegions(unfenced);
+  if (!salvaged && (!parsed || typeof parsed !== 'object')) return null;
+  const obj = (salvaged ? { regions: salvaged } : parsed) as Record<string, unknown>;
 
   const rawRegions =
     obj.regions && typeof obj.regions === 'object'

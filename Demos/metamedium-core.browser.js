@@ -4067,13 +4067,42 @@ Reply with ONLY a JSON array, no prose, no code fences.`;
     }
     return null;
   }
+  function salvageRegions(text) {
+    const out = {};
+    const re = /"(r\d+)"\s*:\s*\{/g;
+    let m;
+    while (m = re.exec(text)) {
+      const start = m.index + m[0].length - 1;
+      let depth = 0, inString = false, escaped = false, end = -1;
+      for (let i = start; i < text.length; i++) {
+        const c = text[i];
+        if (inString) {
+          if (escaped) escaped = false;
+          else if (c === "\\") escaped = true;
+          else if (c === '"') inString = false;
+          continue;
+        }
+        if (c === '"') inString = true;
+        else if (c === "{") depth++;
+        else if (c === "}" && --depth === 0) {
+          end = i;
+          break;
+        }
+      }
+      if (end === -1) break;
+      const entry = parseLoose(text.slice(start, end + 1));
+      if (entry && typeof entry === "object") out[m[1]] = entry;
+    }
+    return Object.keys(out).length ? out : null;
+  }
   function parseFill(text) {
     if (!text) return null;
-    const json = outermostObject(text.replace(/```(?:json)?/gi, ""));
-    if (!json) return null;
-    const parsed = parseLoose(json);
-    if (!parsed || typeof parsed !== "object") return null;
-    const obj = parsed;
+    const unfenced = text.replace(/```(?:json)?/gi, "");
+    const json = outermostObject(unfenced);
+    const parsed = json ? parseLoose(json) : null;
+    const salvaged = parsed && typeof parsed === "object" ? null : salvageRegions(unfenced);
+    if (!salvaged && (!parsed || typeof parsed !== "object")) return null;
+    const obj = salvaged ? { regions: salvaged } : parsed;
     const rawRegions = obj.regions && typeof obj.regions === "object" ? obj.regions : obj;
     const regions = {};
     for (const [id, value] of Object.entries(rawRegions)) {

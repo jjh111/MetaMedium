@@ -577,3 +577,25 @@ describe('the drawing is the brief', () => {
     expect(systemPrompt()).toContain('THE DRAWING IS THE BRIEF');
   });
 });
+
+describe('parseFill — a reply cut off mid-object', () => {
+  it('keeps the regions that closed and drops the one that did not', () => {
+    const cut = '{"regions":{"r1":{"tag":"header","html":"<h1>Pricing</h1>"},"r3":{"tag":"section","html":"<p>$49 a month</p>"},"r4":{"tag":"footer","html":"<p>never fin';
+    const fill = parseFill(cut)!;
+    expect(fill).not.toBeNull();
+    expect(Object.keys(fill.regions).sort()).toEqual(['r1', 'r3']);
+    expect(fill.regions.r1.tag).toBe('header');
+    expect(fill.regions.r3.html).toContain('$49');
+  });
+
+  it('is not fooled by braces inside the HTML', () => {
+    const cut = '{"regions":{"r2":{"html":"<div style=\'x\'>{not json}</div>"},"r3":{"html":"<p>cut';
+    const fill = parseFill(cut)!;
+    expect(Object.keys(fill.regions)).toEqual(['r2']);
+    expect(fill.regions.r2.html).toContain('{not json}');
+  });
+
+  it('still returns null for a reply with nothing whole in it', () => {
+    expect(parseFill('{"regions":{"r1":{"html":"<p>cut')).toBeNull();
+  });
+});
