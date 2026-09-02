@@ -402,9 +402,8 @@
         }
         .overview-box {
             padding: var(--space-lg);
-            background: linear-gradient(135deg, #f0f9ff 0%, #fef3c7 100%);
-            border-left: 4px solid var(--accent);
-            border-radius: 0 8px 8px 0;
+            background: var(--paper-warm);
+            border-radius: 8px;
             margin-top: var(--space-sm);
         }
         .overview-box p {
@@ -432,20 +431,8 @@
             margin-bottom: var(--space-md);
             letter-spacing: -0.02em;
             line-height: 1.2;
-            position: relative;
-            padding-left: 1.25rem;
         }
         
-        h2::before {
-            content: '';
-            position: absolute;
-            left: 0;
-            top: 0;
-            bottom: 0;
-            width: 5px;
-            background: var(--sketch-blue);
-            border-radius: 2px;
-        }
         
         h3 {
             font-family: 'Space Grotesk', -apple-system, sans-serif;
@@ -487,7 +474,6 @@
             font-style: italic;
             line-height: 1.55;
             color: var(--muted);
-            border-left: 3px solid var(--sketch-blue);
             padding: var(--space-sm) var(--space-md) var(--space-sm) var(--space-lg);
             margin: var(--space-md) 0;
             background: linear-gradient(to bottom, rgba(59, 130, 246, 0.08) 0%, transparent 100%);
@@ -702,21 +688,17 @@
             border-radius: 10px;
             padding: var(--space-md);
             margin: var(--space-md) 0;
-            border-left: 4px solid var(--sketch-blue);
         }
-        .callout.insight { border-left-color: var(--sketch-purple); }
-        .callout.key { border-left-color: var(--accent); }
         .callout h4 { margin-top: 0; font-size: var(--text-base); }
         .callout p { font-size: var(--text-base); line-height: 1.65; }
         .callout p:last-child { margin-bottom: 0; }
         
         /* Use Cases - v1 gradient style */
         .use-case {
-            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+            background: var(--paper-warm);
             border-radius: 8px;
             padding: var(--space-md);
             margin: var(--space-md) 0;
-            border-left: 4px solid var(--sketch-green);
         }
         .use-case h4 {
             margin-top: 0;
@@ -925,13 +907,6 @@
             color: rgba(26, 26, 46, 0.04);
             line-height: 1;
             pointer-events: none;
-        }
-        .principle::after {
-            content: '';
-            position: absolute;
-            top: 0; left: 0;
-            width: 4px; height: 100%;
-            background: linear-gradient(180deg, var(--sketch-blue), var(--sketch-green));
         }
         .principle h4 {
             margin-top: 0;
@@ -1502,7 +1477,7 @@
           padding: 1rem;
           background: rgba(255, 255, 255, 0.5);
           border-radius: 8px;
-          border-left: 3px solid var(--convergence-color);
+          border-left: 3px solid var(--border);
         }
         .tl-synthesis strong { color: var(--text); }
         .tl-synthesis ul {
@@ -1711,9 +1686,7 @@
 
                 <p>The core idea: AI can function as a <em>meta-word</em> — a new linguistic element that transforms rough marks into structured meaning based on context. This turns drawing into a shared language between human and machine, where a seven-year-old's sketch and an engineer's diagram can coexist on the same canvas, each interpreted at its own level of abstraction.</p>
             </div>
-<div style="margin-top: var(--space-lg); padding: 0 var(--space-lg); max-width: 760px; margin-left: auto; margin-right: auto; color: var(--muted); line-height: 1.7;">
-            <p>This paper examines <a href="#problem">the problem</a> with current interfaces, <a href="#vision">the vision</a> of sketching as communication, and <a href="#lineage">the lineage</a> of six decades of research behind it. <a href="#thesis">The thesis</a> positions AI as a "meta-word" that closes the meaning-making loop. <a href="#framework">The framework</a> introduces core principles and cognitive lenses. <a href="#development">Current development</a> shows the engine in use and what building it found. <a href="#scenarios">Scenarios</a> and <a href="#future">future directions</a> explore where this leads.</p>
-            </div>
+
         </section>
 
         <!-- SECTION 1: THE PROBLEM -->
@@ -1723,9 +1696,9 @@
             
             <h3>Simulating Inert Drawing On The Dynamic Medium</h3>
             
-            <p>Today's drawing applications—from Adobe Illustrator to Microsoft OneNote to Apple Notes—share a fundamental limitation: they treat drawings as <em>pixels</em> or <em>vectors</em>, not as <em>meaning</em>. When you draw a circle in Illustrator, it knows geometry but not semantics. When you sketch in OneNote, your marks are captured but never interpreted. Procreate creates beautiful strokes that remain forever inert.</p>
+            <p>Today's drawing tools, from Illustrator to OneNote, treat drawings as pixels or vectors, not as meaning. Illustrator knows a circle's geometry but not what it stands for. OneNote captures your marks and never interprets them. Procreate's strokes stay forever inert.</p>
             
-            <p>Even sophisticated tools like Figma or Miro treat diagrams as layout, not computation. You can draw a flowchart, but the arrows don't actually <em>flow</em>. You can sketch a state machine, but it doesn't <em>run</em>. The computer faithfully records what you drew without understanding what you meant.</p>
+            <p>Even Figma and Miro treat diagrams as layout, not computation. You can draw a flowchart, but the arrows do not flow. You can sketch a state machine, but it does not run. The computer records what you drew without understanding what you meant.</p>
             
             <figure>
                 <div class="placeholder-figure">
@@ -1735,7 +1708,7 @@
                 </div>
             </figure>
             
-            <p>This is the dead drawing problem: our most natural form of expression—mark-making—remains computationally inert. We have given computers eyes (computer vision), ears (speech recognition), and voice (text-to-speech), but we haven't given them the ability to <em>think with us through drawing</em>.</p>
+            <p>This is the dead drawing problem: our most natural form of expression remains computationally inert. We have given computers eyes, ears and a voice, but not the ability to think with us through drawing.</p>
             
             <h3>The Communication Bottleneck</h3>
             
@@ -1824,33 +1797,19 @@
                 </div>
             </figure>
             
-            <p>The bottleneck limiting human-AI collaboration is not AI capability but <em>symbolic bandwidth</em>—the poverty of sign vehicles available for exchange. We have rich internal representations; our output channel is a text box. When a visual thinker must translate their spatial intuitions into text prompts, when a designer must describe their sketches in words, when a child must linearize their exploratory understanding into sequential queries—we lose the very richness that makes human cognition powerful.</p>
+            <p>The bottleneck is not AI capability but symbolic bandwidth: the poverty of sign vehicles available for exchange. We have rich internal representations and a text box for an output channel. A visual thinker translating spatial intuition into prompts, a designer describing a sketch in words, a child linearizing exploratory understanding into queries: each loses the richness that makes human cognition powerful.</p>
             
-            <p>This matters for more than productivity. It matters for <em>who gets to participate</em> in the computational future. Text-based interfaces privilege certain cognitive styles, certain educational backgrounds, certain ways of being in the world. A child who thinks in pictures, a craftsperson who thinks with their hands, an elder who thinks in stories—all are excluded from full partnership with computational intelligence.</p>
+            <p>This matters for more than productivity. Text-based interfaces privilege certain cognitive styles and educational backgrounds. A child who thinks in pictures, a craftsperson who thinks with their hands, an elder who thinks in stories: all are excluded from full partnership with computational intelligence.</p>
             
             <blockquote>
                 "In a few years, men will be able to communicate more effectively through a machine than face to face."
                 <cite>— J.C.R. Licklider & Robert Taylor, "The Computer as a Communication Device," 1968</cite>
             </blockquote>
             
-            <p>Licklider and Taylor's prophecy has come true for text—but we have yet to fulfill it for the full range of human expression. We already have richer languages than text: we have drawing, gesture, spatial arrangement, annotation, demonstration. We need interfaces that honor these languages—that let humans bring their full cognitive richness into collaboration with AI.</p>
+            <p>Their prophecy has come true for text. We already have richer languages: drawing, gesture, spatial arrangement, annotation, demonstration. We need interfaces that honor them.</p>
 
               
-            <h3>Dancing Without Music</h3>
-            
-            <blockquote>
-                "Imagine that children were forced to spend an hour a day drawing dance steps on squared paper and had to pass tests in these 'dance facts' before they were allowed to dance physically. Would we not expect the world to be full of 'dancophobes'?"
-                <cite>— Seymour Papert, <em>Mindstorms</em>, 1980</cite>
-            </blockquote>
-            
-            <p>Papert's question cuts to the heart of how we teach abstraction. We have created generations of "mathphobes"—people who carry through life the belief that they are "bad at math" even as they routinely use logical reasoning to fix computers, build furniture, navigate cities, and run businesses.</p>
-            
-            <p>The problem is not aptitude. The problem is that we ask people to dance without music—to manipulate symbols divorced from meaning, to learn the steps before they feel the rhythm. A child raised in a DIY family, with an intuitive sense for assembling materials in 3D space, may never connect the theory of school geometry with the practice of building. The analogy leap from scribbling symbols on paper to genuine internalization never happens.</p>
-            
-            <p>But give that same person a system that provides constant feedback, that lets them see the results of their actions immediately, that connects symbol to meaning through direct manipulation—and suddenly they discover they were never unable to do math. They were simply never shown the right connection to spark their understanding.</p>
-
-                
-        </section>
+            </section>
 
         <!-- SECTION 2: THE VISION -->
         <section id="vision">
@@ -1867,6 +1826,19 @@
             
             <p>A curve drawn by hand is a chance to try fitting a function to the line. A function is just waiting to become metaphorical graphics. Digital ink will move beyond "networked paper" to become a magical plane where computer vision partners with the human hand functioning as an <strong>interactive external imagination</strong>. From sketch to code, from code to sketch—no longer a pipeline but rather a constellation of possibilities, an ever-expanding network of opportunities to map expressiveness and flow to logic and math directly.</p>
             
+<h3>Dancing Without Music</h3>
+            
+            <blockquote>
+                "Imagine that children were forced to spend an hour a day drawing dance steps on squared paper and had to pass tests in these 'dance facts' before they were allowed to dance physically. Would we not expect the world to be full of 'dancophobes'?"
+                <cite>— Seymour Papert, <em>Mindstorms</em>, 1980</cite>
+            </blockquote>
+            
+            <p>Papert's question cuts to the heart of how we teach abstraction. We have raised generations of "mathphobes": people who believe they are bad at math while routinely using logical reasoning to fix computers, build furniture and run businesses.</p>
+            
+            <p>The problem is not aptitude. We ask people to dance without music: to manipulate symbols divorced from meaning, to learn the steps before they feel the rhythm. A child with an intuitive sense for assembling things in space may never connect school geometry with building.</p>
+            
+            <p>Give that same person constant feedback, immediate results, symbol connected to meaning through direct manipulation, and they discover they were never unable to do math. They were never shown the connection.</p>
+
             <h3>A Medium for Children</h3>
             
             <blockquote>
@@ -2444,42 +2416,42 @@
             <div class="principles-grid">
                 <div class="principle" data-num="1">
                     <h4>Space Is Semantic</h4>
-                    <p>Spatial relationships carry meaning. Elements placed near each other are semantically related. Elements connected by lines have directional relationships. The entire canvas becomes a semantic field where position, proximity, and connection are first-class citizens of meaning.</p>
+                    <p>Spatial relationships carry meaning. Near means related; a line means a directed relation. Position, proximity and connection are first-class citizens of meaning.</p>
                     <p class="principle-example"><em>Place two circles close together; the system infers "related." Draw one inside another; it understands "containment." Position creates meaning without words.</em></p>
                     <p class="principle-now"><strong>Built.</strong> Nearness, insideness, alignment and direction are measured as ratios of the marks' own size, carry a strength, and are what the palette offers from and the model is briefed with.</p>
                 </div>
                 
                 <div class="principle" data-num="2">
                     <h4>Annotation Becomes Execution</h4>
-                    <p>When you write "make this bounce" near a drawn spring, that annotation becomes an instruction. When you draw an arrow from input to output, you've defined a data flow. The boundary between description and command dissolves; to describe is to instruct.</p>
+                    <p>Write "make this bounce" beside a spring and the note is an instruction. Draw an arrow from input to output and you have defined a flow. To describe is to instruct.</p>
                     <p class="principle-example"><em>Write "3x" next to a line; it becomes three lines. Write "wiggle" near a shape; it animates. The annotation is the program.</em></p>
                     <p class="principle-now"><strong>Partly.</strong> A word written beside a shape is read and offered as its name; a prompt on a circled group builds a page in place, and ink on that page addresses the region under it. “3x” and “wiggle” are still vision.</p>
                 </div>
                 
                 <div class="principle" data-num="3">
                     <h4>Interpretive Ambiguity Is Feature</h4>
-                    <p>A rough sketch is understood as rough—the system holds multiple interpretations probabilistically, refining its understanding as context accumulates. This mirrors how humans communicate: we tolerate ambiguity, using context to resolve meaning over time.</p>
+                    <p>A rough sketch is understood as rough. The system holds several interpretations and refines them as context accumulates, the way people tolerate ambiguity and resolve it over time.</p>
                     <p class="principle-example"><em>Your rough oval might be a face, an egg, or a zero. The system holds all three until you add two dots—then it commits to "face." Premature disambiguation is the enemy of exploration.</em></p>
                     <p class="principle-now"><strong>Built.</strong> A mark holds every reading that qualifies, ranked by measured confidence. A diamond is triangle and rectangle at once, and is redrawn clean as neither.</p>
                 </div>
                 
                 <div class="principle" data-num="4">
                     <h4>Bidirectional Learning</h4>
-                    <p>User and system engage in mutual adaptation. User-specific patterns accumulate into "cognitive lenses"—the system learns your vocabulary and conventions. Simultaneously, the system teaches you by surfacing patterns, completing gestures, suggesting relationships. Your idiolect becomes executable; the system's interpretations become visible. Both intelligences grow through exchange.</p>
+                    <p>The system learns your vocabulary and conventions into a cognitive lens, and teaches you back by surfacing patterns and suggesting relationships. Your idiolect becomes executable; its interpretations become visible.</p>
                     <p class="principle-example"><em>Draw "recursion" shorthand repeatedly; the system learns it. Later, it suggests this mark when detecting recursive patterns—teaching you to see what it sees. Your notation becomes shared language.</em></p>
                     <p class="principle-now"><strong>Partly.</strong> Draw your command mark five times and it becomes yours; name a group and the next one like it is recognized. Lenses beyond that are not built.</p>
                 </div>
 
                 <div class="principle" data-num="5">
                     <h4>No Mode Switching</h4>
-                    <p>Following Larry Tesler's principle that "no modes is good modes," the MetaMedium eliminates cognitive overhead. You're always just working—drawing, annotating, refining. The interpretation layer appears when needed and fades when not. There's no "design mode" vs. "execution mode," no switching between tools.</p>
+                    <p>Following Larry Tesler's "no modes is good modes": you are always just working, drawing, annotating, refining. Interpretation appears when needed and fades when not.</p>
                     <p class="principle-example"><em>Draw a shape. Write near it. Adjust with gestures. Watch it execute. All the same canvas, all the same moment. The interface disappears into the work.</em></p>
                     <p class="principle-now"><strong>Built.</strong> Selection, command and erase are marks: a loop is a lasso, your mark across it summons, a scratch erases what it crosses. There is no mode to be in.</p>
                 </div>
 
                 <div class="principle" data-num="6">
                     <h4>Observable Reasoning</h4>
-                    <p>Uncertainty becomes visible. When the AI considers multiple interpretations, the user sees them—not collapsed into a single guess. Multiple possibilities stay present until context or user choice resolves them. This transparency supports both trust and alignment.</p>
+                    <p>Uncertainty is visible. When several interpretations are held you see them, not a single guess, and they stay present until context or your choice resolves them.</p>
                     <p class="principle-example"><em>Your rough mark triggers three possible interpretations shown as faint ghosts; tap one to commit, or keep drawing to refine. You see the system thinking.</em></p>
                     <p class="principle-now"><strong>Built.</strong> Every reading names the measurement it rests on; a confident one ghosts its clean form under the ink; an inspector walks any mark from ink to shape to role to code.</p>
                 </div>
@@ -2583,7 +2555,7 @@
                 </div>
             </figure>
             
-            <p>The MetaMedium extends this approach by making the possibility graph <em>learnable</em>—accumulating user-specific patterns over time—and by integrating natural language annotation as another form of navigation. The negotiation paradigm means that misunderstanding is not failure—it's information. Each correction teaches the system something about this user's intentions, building toward a shared vocabulary over time.</p>
+            <p>The MetaMedium makes the possibility graph learnable, accumulating your patterns over time, and adds annotation as another way to navigate it. Misunderstanding is not failure; it is information. Each correction builds toward a shared vocabulary.</p>
 
             <h3>The Semiotic Foundation</h3>
 
@@ -2835,15 +2807,15 @@
         <section id="development">
             <h2>Current Development</h2>
 
-            <p>This whitepaper accompanies a working engine and a reference surface built on it. As of September 2026 the loop the thesis describes runs end to end: you draw on an infinite canvas, the canvas reads what you drew, and a model joins the reading as a participant rather than an oracle. Every mark climbs three rungs, each a closed vocabulary you can inspect:</p>
+            <p>A working engine and a reference surface accompany this paper. You draw on an infinite canvas; the canvas reads what you drew; a model joins the reading as a participant rather than an oracle. Every mark climbs three rungs, each a closed vocabulary you can inspect:</p>
 
             <ul>
-                <li><strong>Shape — what the stroke is.</strong> Line, arc, triangle, rectangle, circle, arrow, writing, dot. Every reading is measured from the ink and carries its reasoning; several readings are held at once and nothing wins by silencing the others. A confident, unambiguous reading is offered back as its clean form, drawn over the ink, never in place of it.</li>
-                <li><strong>Diagram — what the mark plays.</strong> Container, node, edge, label, annotation. Placed by a nine-row table over measured relations (insideness, nearness, alignment, direction), so a drawing has a genre: boxes tiling a space are a page, nodes joined by edges are a graph.</li>
-                <li><strong>Code — what it becomes.</strong> A page compiles to flexbox that reflows, with your ink still outlining its elements to the pixel; a graph keeps its positions and its arrows. The engine owns the structure it measured; a model writes only the content, briefed by the drawing itself.</li>
+                <li><strong>Shape: what the stroke is.</strong> Line, arc, triangle, rectangle, circle, arrow, writing, dot. Every reading is measured from the ink and carries its reason; several are held at once. A confident one is offered back as its clean form, drawn over the ink, never in place of it.</li>
+                <li><strong>Diagram: what the mark plays.</strong> Container, node, edge, label, annotation, placed from measured relations, so a drawing has a genre: boxes tiling a space are a page, nodes joined by edges are a graph.</li>
+                <li><strong>Code: what it becomes.</strong> A page compiles to flexbox that reflows, your ink still outlining its elements; a graph keeps its positions and arrows. The engine owns the structure it measured; a model writes only the content, briefed by the drawing.</li>
             </ul>
 
-            <p>Selection and command are marks too. Circle a group, cross it with a command mark you taught the system by drawing it five times, and a palette offers what those marks could become — starting with what needs no model at all. Handwriting beside a shape is read by a model that can see and offered as the shape's name. And the model can draw back: asked to add a footer, it says so in the shapes the canvas can read, and its marks are held in its name beside yours, with its reasons placed next to them.</p>
+            <p>Selection and command are marks too. Circle a group, cross it with a command mark you taught by drawing it five times, and a palette offers what those marks could become, starting with what needs no model. Handwriting beside a shape is read by a model that can see and offered as the shape's name. The model can draw back, in the shapes the canvas can read, its marks held in its name beside yours.</p>
 
             <div class="demo-container">
                 <div class="demo-header">
@@ -2865,23 +2837,11 @@
             <h3>Development Roadmap</h3>
 
             <ul>
-                <li><strong>Built:</strong> the engine (<code>metamedium-core</code>, zero dependencies, benchmarked over 1,674 hand-drawn strokes); the three rungs; the no-modes session — selection, command and erase as marks; living artifacts with ink addressing their regions; local and hosted models as participants; handwriting; the model drawing back.</li>
-                <li><strong>Next:</strong> words from printed letters, not only cursive; the model proposing library entries the human blesses — the last clause of the conversation benchmark; recall by meaning through a local embedder; this surface as the flagship, with the earlier prototypes archived.</li>
-                <li><strong>Then:</strong> whitepaper v5.1 written around what the demo shows; an MCP server so a model outside the browser takes part through the same channel; multi-user canvases; cognitive lens export and import.</li>
+                <li><strong>Built:</strong> the engine and the three rungs; selection, command and erase as marks; living artifacts that ink can address; local and hosted models as participants; handwriting; the model drawing back.</li>
+                <li><strong>Next:</strong> words from printed letters; the model proposing library entries for the human to bless; recall by meaning; this surface as the flagship.</li>
+                <li><strong>Then:</strong> multi-user canvases; cognitive lens export and import; a model outside the browser taking part through the same channel.</li>
             </ul>
             
-            <h3>What Building It Found</h3>
-
-            <p>The engine is small and has no dependencies, and most of what it knows was learned by being wrong in a specific way. Five of those, because they are the part of the work a paper is for:</p>
-
-            <ul>
-                <li><strong>Fixed thresholds are about the hand, not the world.</strong> On an infinite canvas the same "closed if the gap is under 50 pixels" rule reads open at one zoom and closed at another. Every fixed-pixel rule in the engine is now stated in the hand's space and scaled by the zoom the stroke was drawn at, and every relation is a ratio of the marks' own size. There is no pixel constant left in the gesture grammar.</li>
-                <li><strong>Corner count is fragile; the fraction of its box a stroke encloses is not.</strong> Miss one corner and a rectangle becomes a triangle. A rectangle fills its bounding box; a circle fills 79% of it; a triangle about half. That one measurement took rectangles from 10% to 100% over the corpus, and it is why the engine trusts extent before it trusts corners.</li>
-                <li><strong>A tie broken by a constant is not a ranking.</strong> The first detectors carried fixed confidences, so a three-corner shape was triangle 0.85 and rectangle 0.80 and the triangle won because 85 is more than 80. Confidence is now measured from the evidence, and the engine's own certainty is capped so a participant with more context can outrank it.</li>
-                <li><strong>A model handed rectangles writes absolutely positioned divs.</strong> Asked for a positioned page, a 24-billion-parameter local model returned good copy and no positioning at all. So the engine stopped asking: it reads the drawing as a layout with a recursive cut, emits the flexbox itself, and asks the model only for each region's content. Geometry became an invariant rather than a request, and an 8-billion-parameter model became enough.</li>
-                <li><strong>The drawing is the brief.</strong> Given only rectangles, a model writes a page that fits the boxes. Given what each box plays, how they sit, what was written in them and what the human named, it writes the page the boxes were drawn for. "A page" is two words; the drawing is the specification, and the engine reads it out.</li>
-            </ul>
-
             <h3>Open Questions</h3>
             
             <p>The MetaMedium framework raises questions that can only be answered through building and testing:</p>
@@ -2897,7 +2857,7 @@
             <h3>Limitations and Challenges</h3>
             
             <ul>
-                <li><strong>Recognition is bounded, not solved:</strong> the shape rung reads 99.8% of a 1,674-stroke hand-drawn corpus, but it reads eight shapes and one cursive stroke per word; printed letters, symbols and everything past that vocabulary are held as "art" until a model or the human says otherwise. What a page <em>says</em> is still only as good as the model asked, and a small local model writes generic copy. The negotiation paradigm turns each miss into a correction rather than a failure, but too many corrections and people stop drawing.</li>
+                <li><strong>Recognition is bounded, not solved:</strong> the engine reads eight shapes and one cursive stroke per word; everything past that vocabulary is held as "art" until a model or the human says otherwise. The negotiation paradigm turns each miss into a correction, but too many corrections and people stop drawing.</li>
                 <li><strong>Cognitive load:</strong> Every gestural vocabulary is a language to learn. There's a real risk that MetaMedium becomes its own expertise barrier, replacing "learn to code" with "learn our gestures." Keeping the learning curve gentle while enabling power is a design challenge.</li>
                 <li><strong>Privacy of patterns:</strong> If the canvas learns from your drawing patterns, those patterns become data. "Cognitive lenses" are intimate—they encode how you think. The system must be designed with privacy as foundational, not afterthought.</li>
                 <li><strong>Over-automation risk:</strong> "The system guessed wrong and did something I didn't want" is a real failure mode. Undo must be instant and obvious. Interpretations must be inspectable before they execute. The user must remain in control.</li>
@@ -2905,12 +2865,8 @@
             </ul>
             
             <h4>Abstraction Management and Learning Dynamics</h4>
-            
-            <p>The promise of a canvas that learns creates its own challenges. Vocabulary bloat is inevitable: every learned pattern accumulates, and the system has no natural way to forget. Over time, old notations compete with new ones, recognition slows, and the interpretation space becomes cluttered. Yet aggressive pruning risks destroying hard-won understanding—how do you distinguish "stale" from "rarely-used-but-important"?</p>
-            
-            <p>More subtle is the local minima problem. A system well-fitted to your previous way of thinking may resist your attempts to evolve. When you try new notation or reframe a concept, the system "corrects" you back toward familiar patterns. The learning becomes a cage. This is especially acute for discontinuous growth—the student becoming expert, the breakthrough insight that requires abandoning old frames. Human cognition undergoes phase transitions; the canvas must accommodate leaps, not just gradual drift.</p>
-            
-            <p>Possible mitigations include explicit "unlearn" gestures, decay functions with different rates for core vs. peripheral vocabulary, "lens snapshots" that version-control ways of seeing, or detection of systematic deviation as a signal that the user is trying to break free. But the deeper question remains: is the canvas a memory of what you've done, or a partner in what you're becoming? The answer shapes the entire architecture.</p>
+            <p>A canvas that learns creates its own problems. Vocabulary accumulates and nothing forgets, so old notations compete with new ones. Worse, a system well fitted to your previous way of thinking may resist your attempts to evolve, correcting you back toward familiar patterns just when you are trying to break a frame. Possible mitigations include explicit unlearn gestures, decay with different rates for core and peripheral vocabulary, versioned lens snapshots, and treating systematic deviation as a signal. The deeper question remains: is the canvas a memory of what you have done, or a partner in what you are becoming?</p>
+
 
             <h3>Gallery</h3>
             
@@ -3013,21 +2969,13 @@
             
             <h3>External Imagination</h3>
             
-            <p>Perhaps the most apt description of the human role in MetaMedium interaction is as <em>navigator, conductor, explorer, friend to possibility</em>. The human has direction—knowing which possibilities matter. The AI has generative capability—holding multiple possibilities at once.</p>
+            <p>The human's role is navigator, conductor, explorer, friend to possibility: knowing which possibilities matter. The AI holds many possibilities at once. It becomes an external imagination, thinking <em>with</em> the human rather than for them. Not automation, not replacement: augmentation.</p>
             
-            <p>The AI becomes an "external imagination"—not doing the thinking for the human, but <em>thinking with</em> the human. This is not automation, not replacement, but <strong>augmentation</strong>. Making human capability larger.</p>
-            
-            <h3>Reframing Intelligence</h3>
-            
-            <p>The term "Artificial Intelligence" carries unfortunate connotations: fake, simulated, lesser-than. Perhaps a more useful frame: <strong>Authentic Intelligence</strong>—real, valid, different-but-equal.</p>
-            
-            <p>Human intelligence is biological, embodied, temporal, mortal, with agency shaped by survival pressures. AI intelligence is computational, distributed, instant, ephemeral, with agency shaped by training and human direction. Both are genuine forms of intelligence. Both have distinct capabilities. The question is not which is "better" but how they can combine to create capability neither possesses alone.</p>
+            <p>"Artificial" carries the wrong connotations: fake, simulated, lesser. Human intelligence is embodied, temporal, mortal, shaped by survival. Machine intelligence is computational, distributed, instant, shaped by training and direction. Both are real. The question is not which is better but how they combine into a capability neither has alone.</p>
 
             <h3>Alignment Through Communication</h3>
             
-            <p>Current approaches to AI alignment focus primarily on control: rules, guardrails, constraints, limitations. The assumption is that AI must be contained because its goals might diverge from human goals.</p>
-            
-            <p>The MetaMedium proposes an alternative: instead of constraining AI's internal state through rules, we <em>enrich the medium between us</em> so that coordination happens through genuine communication. The richer the vocabulary we share—the more kinds of sign vehicles available for exchange—the better we can align our understanding.</p>
+            <p>Most approaches to alignment focus on control: rules, guardrails, constraints, on the assumption that the machine's goals might diverge from ours. The MetaMedium proposes an alternative: enrich the medium between us so that coordination happens through communication. The richer the shared vocabulary, the better we can align our understanding.</p>
             
             <figure>
                 <div class="placeholder-figure">
@@ -3141,9 +3089,7 @@
                 </div>
             </figure>
             
-            <p>Current AI interfaces optimize for control. The MetaMedium optimizes for communication. This is not naïve trust—it's a different theory of how coordination happens. We coordinate with other humans not because we control their thoughts but because we share a rich medium for exchange.</p>
-            
-            <p>The MetaMedium is designed for this combination—not AI as tool to be commanded, but AI as partner with complementary cognition. The canvas becomes the site of collaboration between two authentic intelligences, each contributing what it does best.</p>
+            <p>This is not naive trust; it is a different theory of coordination. We coordinate with other people not by controlling their thoughts but by sharing a rich medium for exchange. The canvas becomes that medium: two intelligences, each contributing what it does best, with their reasoning visible to both.</p>
 
             <h3>Beyond 2D: Navigating Conceptual Space</h3>
 
@@ -3153,17 +3099,11 @@
 
             <h3>The Deeper Vision</h3>
             
-            <p>There is a version of this vision that goes beyond interface. Today's computing is an archaeological site—layer upon layer of abstraction, each solving problems created by the layer below, each adding distance from what the machine actually does. The jenga tower of modern software: every piece load-bearing, none removable, the whole structure increasingly precarious. Tools like Wolfram Alpha offer computational knowledge, but at such altitude that you consult rather than collaborate—you don't think <em>with</em> the computation, you query it.</p>
+            <p>There is a version of this vision that goes beyond interface. Today's computing is an archaeological site: layer upon layer of abstraction, each solving problems created by the layer below, each adding distance from what the machine does. Bret Victor's "Future of Programming" reminds us that direct manipulation, visual programming and goal-directed systems were explored in the 1960s and then buried under commercial code and decisions no one remembers. Now AI arrives, and we add more layers.</p>
             
-            <p>Bret Victor's "Future of Programming" reminds us that many ideas we consider new were explored in the 1960s and then abandoned. Direct manipulation. Visual programming. Goal-directed systems. The original metamedium vision—the computer as a medium that could simulate any medium—was never disproven, just buried under decades of commercial code, backward compatibility, and decisions made for reasons no one remembers.</p>
+            <p>The deeper vision goes the other way: the computer knowing what it can do and doing only as much as it needs to, every operation justified, every layer earning its existence. AI could be the tool for this, reading the whole stack and finding the essential operations under the accretion. On the canvas, interpreting a sketch could mean "generate Python", or it could mean "this is a constraint problem; here is how it maps closer to the metal." The diagram negotiates the level of abstraction the thought requires.</p>
             
-            <p>And now AI arrives, and what do we do? Add more layers. Generate code that runs on frameworks that call APIs that abstract over the same tower. We build higher, not deeper.</p>
-            
-            <p>The deeper vision asks: what if we went the other direction? The computer knowing what it can do and doing only as much as it needs to. Every operation justified. Every layer earning its existence. Endless refactoring—not just at the application level but all the way down, hardware and software co-evolving toward essential simplicity rather than capability bloat.</p>
-            
-            <p>AI could be the tool for this. Not generating more sediment on legacy systems, but reading the entire stack, understanding what it actually does, finding the essential operations buried under accretion. The MetaMedium canvas becomes a site for this rethinking: when you sketch a system, interpretation could mean "generate Python" or it could mean "this is fundamentally a constraint problem, here's how it maps closer to the metal." The diagram negotiates what level of abstraction the thought requires.</p>
-            
-            <p>The metamedium dream still lingers as ever possible. It waits beneath the APIs and the bloat, patient, ready to be excavated. The tools to dig are finally arriving.</p>
+            <p>The metamedium dream waits beneath the APIs and the bloat, patient, ready to be excavated. The tools to dig are finally arriving.</p>
         </section>
 
         <!-- CONCLUSION -->
