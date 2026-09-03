@@ -1363,7 +1363,8 @@
       if (offer && !style.gesture) {
         const ideal = idealOf(node, offer.shape);
         if (ideal) {
-          path(ideal.points, ideal.closed);
+          // The ghost follows the ink: same placement (transform, rotation).
+          path(MM.placed(node, ideal.points), ideal.closed);
           ctx.setLineDash([wpx(3), wpx(4)]);
           ctx.strokeStyle = `rgba(${C.goldRGB},0.7)`;
           ctx.lineWidth = wpx(1.2);
