@@ -75,7 +75,7 @@
   const heldEl = document.getElementById('held');
   const heldText = document.getElementById('heldText');
   const heldSnap = document.getElementById('heldSnap');
-  document.getElementById('heldOffer').onclick = () => session.summonHeld(Date.now());
+  document.getElementById('heldOffer').onclick = (e) => { lastPen = { x: e.clientX, y: e.clientY }; session.summonHeld(Date.now()); };
   heldSnap.onclick = () => snapAll(heldCandidates.slice(), shapesSummary(heldCandidates.map((id) => snapOffers.get(id))));
 
   function renderHeld(s) {

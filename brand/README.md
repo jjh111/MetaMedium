@@ -8,7 +8,7 @@ and use the switch at the bottom right to put it on the dark canvas ground.
 | File | What it is |
 |---|---|
 | `tokens.css` | **The system.** Light tokens on `:root`, dark tokens on `:root[data-theme="dark"]`. Link it, or inline it verbatim into a single-file surface |
-| `styleguide.html` | The living specimen: foundations, palette, type, the mark, ink states, readings, UI, both grounds, an editorial page, voice |
+| `styleguide.html` | The living specimen: foundations, palette, type, the mark, ink states, readings, UI, both grounds, an editorial page, voice, figures &amp; diagrams, long-form furniture (callout, pull quote, embed, gallery, **the timeline**) |
 
 Status: **v1 draft, 3 Sept 2026.** The whitepaper's **figures and diagrams**
 are migrated; the page around them is not — see *Convergence* below. Two decisions are still John's: whether the wordmark keeps
@@ -17,9 +17,14 @@ the gold is retired.
 
 ## The four laws
 
-1. **Paper first.** The light surface *is* the design; dark is the same design
-   inverted for a canvas you stare at for an hour. Dark mode changes tokens
-   only — **no rule below the token layer may branch on theme.**
+1. **Paper first, and the paper is warm.** The light surface *is* the design:
+   a warm ground (`#f8f5ef`, the whitepaper's own tone) under cool sea ink,
+   because the contrast between a warm page and a cool mark is what makes ink
+   look like ink. Dark is the same design inverted for a canvas you stare at
+   for an hour, and it is deliberately the **less** colourful of the two — a
+   neutral grey room with every claim colour pulled back, so saturation belongs
+   to the user's own marks. Dark mode changes tokens only: **no rule below the
+   token layer may branch on theme.**
 2. **One face carries everything.** IBM Plex Mono sets display, prose, UI and
    code. A project whose claim is that *a drawing is code* cannot change voice
    between the drawing and the code. Register is made with size, weight,
@@ -27,7 +32,8 @@ the gold is retired.
 3. **Colour is signal, not decoration.** Teal is the keyword. Blue means read
    and accepted, grey means held and unblessed, amber and red are confidence
    and damage, purple means a model contributed it. **No colour is ever applied
-   as an accent bar.**
+   as an accent bar.** There is exactly one *categorical* scale — `--thread-*`,
+   four pigments for the timeline's lineages — and it is used nowhere else.
 4. **Ink is never destroyed, so ink is never covered.** A derived form draws in
    front at full strength with the hand's ink faint beneath it. Anything the
    system inferred must be visibly reversible.
@@ -57,7 +63,7 @@ project had one of its own. In migration order:
 | Surface | Carries now | Move to |
 |---|---|---|
 | `index.html` — **figures and diagrams** | **done.** One plate, one padding, one caption structure; six diagrams on the diagram roles, IBM Plex Mono labels, one type scale | — |
-| `index.html` — the page around them | warm paper `#f8f6f1`, red `#e63946`, DM Sans + Space Grotesk, sketch blue/green/purple | the paper ground; the sketch colours become `--sig-*` |
+| `index.html` — the page around them | red `#e63946`, DM Sans + Space Grotesk, sketch blue/green/purple, five saturated timeline badges | teal keyword; sketch colours become `--sig-*`; badges become `--thread-*`. *The warm paper stays — the system adopted it* |
 | `Demos/session-engine.html` | `#0a0a0f`, gold `#c9a84c`, Space Grotesk | the canvas ground; gold retires |
 | `Demos/` others, `doodle2-canvas.html`, `metadoodle1.html` | as above | canvas ground, last |
 | `lens-canvas/`, `playground.html`, `manim-explainer/` | the personal-site language (sea-deep, cyan, gold, JetBrains Mono) | **left alone** — these are johnhanacek.com's language, not MetaMedium's |
@@ -109,3 +115,28 @@ published page, and that is John's call, not a refactor.
 One pre-existing bug found while testing and left alone: **the nav overflows by
 about 18px at 375px wide.** It is untouched by this work (the CSS is byte-identical
 to `HEAD`), and it is not a figure problem.
+
+
+## The timeline
+
+The richest component in the system, taken from the whitepaper rather than
+replaced by it. Six parts per entry, all load-bearing:
+
+| Part | Why it is there |
+|---|---|
+| `.tl-year` | Tabular figures, right-aligned, so the column reads as a spine |
+| `.tl-pipe` | The connector is a **character** (`┃`), not a border — it lands on the mono grid and survives being copied as plain text |
+| `.tl-title` + `.tl-badge` | What it was, and which lineage it belongs to |
+| `.tl-author` | Who made it, in full ink |
+| `.tl-desc` | What it said, usually in its own words |
+| `.tl-sig` | The `┗━━` line: why this entry is in *this* list at all |
+
+Earlier entries collapse behind `.tl-toggle`. The convergence entry
+(`.tl-entry.tl-conv`) is the one place the timeline stops listing and makes a
+claim, so it is the only entry that takes a container and a synthesis list.
+
+The badges use `--thread-vision / --thread-recog / --thread-intel /
+--thread-conv`. The whitepaper ran five saturated pills — blue, purple, green
+and two ambers — which put more colour in the lineage list than in the whole
+recognition engine. Four, drawn from the system's own pigments, carry the same
+information.

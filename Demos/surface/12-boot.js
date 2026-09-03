@@ -15,6 +15,7 @@
     replay: () => rp, rpGoTo: (i) => rpGoTo(i), theme: THEME,
     // For tests: pin the view so world coordinates map to known screen ones.
     setView: (zoom, panX, panY) => { view.zoom = zoom; view.panX = panX; view.panY = panY; afterViewChange(); },
+    resetUses: () => { for (const k of Object.keys(uses)) delete uses[k]; store.del(USES_KEY); },
   };
 
 

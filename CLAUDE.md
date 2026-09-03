@@ -277,6 +277,18 @@ samples and offers *Forget*; teaching a new one means *Clear* first.
   or come close relative to the selection's own size** (`checkProximityRatio`).
   No fixed pixel term remains in the gesture grammar.
 
+**The palette is packing, not a list.** Taking a loop up dissolves it into a
+selection — a dashed outline with corner handles and a knob; drag inside
+moves, a corner scales, the knob turns, one event per drag, the ink untouched
+— and the verbs bloom in rings from where the pen let go: the two most likely
+above and below the text field, four on the diagonals, then eight, then
+twelve. Likelihood comes from the reading (a known match, the word just
+written, a model's reading of the group sit above every generic verb), times
+learned use for the generic ones, capped. Pills are measured and relaxed
+apart, so none overlap and wide ones make room. A tap while a palette or a
+selection is up dismisses it and is never a dot. `Demos/surface/05-selection.js`,
+`09-palette.js`.
+
 **A held loop says what you can do with it.** Circle some marks and a chip
 appears beside the loop: *N circled · cross with ✓, or* **Draw them clean** /
 **What could these be?**. The second reaches the same summon the mark does
@@ -677,11 +689,13 @@ WebLLM features require WebGPU.
 > adopt them on a surface. Don't restate a hex here — that is how three
 > palettes happened.
 
-The four laws, in short: **paper first** (light is the design, dark is the same
-tokens inverted, and no rule below the token layer may branch on theme); **one
-face** (IBM Plex Mono carries display, prose, UI and code); **colour is
-signal, not decoration** (and never an accent bar); **ink is never covered**
-(a derived form draws in front with the hand's ink visible beneath).
+The four laws, in short: **paper first** (light is the design — a *warm* ground
+under cool sea ink; dark is the same tokens inverted and deliberately the less
+colourful of the two, a neutral grey room; no rule below the token layer may
+branch on theme); **one face** (IBM Plex Mono carries display, prose, UI and
+code); **colour is signal, not decoration** (never an accent bar, and exactly
+one categorical scale — `--thread-*`, for the timeline's lineages); **ink is
+never covered** (a derived form draws in front with the hand's ink beneath).
 
 **Status: v1 draft, 3 Sept 2026.** The whitepaper's figures and diagrams have
 migrated; everything else still carries what it always did:
@@ -689,7 +703,7 @@ migrated; everything else still carries what it always did:
 | Surface | Carries today | Moves to |
 |---|---|---|
 | `index.html` — figures/diagrams | **migrated.** One plate, one padding, one caption structure; diagrams drawn in the engine's own roles, authored 1000 units wide so a unit is a pixel, labels in IBM Plex Mono on one type scale | — |
-| `index.html` — the page around them | warm paper `#f8f6f1` · ink `#1a1a2e` · red `#e63946` · sketch blue/green/purple · DM Sans + Space Grotesk | the paper ground; sketch colours become `--sig-*` |
+| `index.html` — the page around them | ink `#1a1a2e` · red `#e63946` · sketch blue/green/purple · five saturated timeline badges · DM Sans + Space Grotesk | teal keyword; sketch colours become `--sig-*`; badges become `--thread-*`. **The warm paper stays** — the system adopted the whitepaper's tone |
 | `Demos/`, flagship demos | `#0a0a0f` · `#e8e4d9` · gold `#c9a84c` · Space Grotesk | the canvas ground; the gold retires |
 | `lens-canvas/`, `manim-explainer/`, `playground.html` | `#020a12` sea-deep · cyan `#7dd8f7` · gold `#d4af37` · JetBrains Mono | **left alone** — this is johnhanacek.com's language, not MetaMedium's |
 

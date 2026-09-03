@@ -93,6 +93,7 @@
     if (endTouch(e)) { live = null; return; }
     if (panning) { panning = null; canvas.style.cursor = 'crosshair'; return; }
     if (drag) { endDrag(); return; }
+    lastPen = { x: e.clientX, y: e.clientY };
     const points = live;
     live = null;
     // The dead state: a tap while something is dismissable is the dismissal,

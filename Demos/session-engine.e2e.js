@@ -63,6 +63,9 @@ window.__setup = function(){
   if (window.__mm.savedMark()) window.__mm.forgetMark();
   window.__snapModeBefore = window.__mm.snapMode();
   window.__mm.setSnapMode('offer');
+  // Learned palette use is device state; a run starts from none and puts it back.
+  try { window.__usesBefore = localStorage.getItem('mm-palette-uses'); } catch (e) {}
+  window.__mm.resetUses();
   const strokeOn = window.__t.strokeOn, line = window.__t.line;
 
   window.__calls=[];
@@ -661,6 +664,7 @@ window.__scenario = async function(){
   window.__teach();
   while (mm.session.getEvents().length) mm.session.undo();
   if (window.__snapModeBefore) mm.setSnapMode(window.__snapModeBefore);
+  try { if (window.__usesBefore) localStorage.setItem('mm-palette-uses', window.__usesBefore); } catch (e) {}
   step('12. the rail follows the grammar — undoing the teach restores the check',
     mm.session.getState().commandMark === null &&
     document.getElementById('markName').textContent === 'check',

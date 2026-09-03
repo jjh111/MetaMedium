@@ -514,16 +514,16 @@
             --mm-face: 'IBM Plex Mono', 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
             --mm-teal: #0b6f7d;
             --mm-ink: #0c1a24;
-            --mm-ink-3: #5b7080;
-            --mm-ink-4: #8ea3ad;
+            --mm-ink-3: #66737c;
+            --mm-ink-4: #9aa3a7;
             --sig-read: #1c5fb8;
             --sig-held: #7b8a94;
             --sig-model: #6b4fa8;
 
-            --fig-plate: #fbfcfd;
-            --fig-well: #e7eef0;
-            --fig-edge: #dde7ea;
-            --fig-rule: #e3ecee;
+            --fig-plate: #fdfbf6;
+            --fig-well: #efeae0;
+            --fig-edge: #e5ded1;
+            --fig-rule: #ebe5da;
             --fig-pad: 1.15rem;
             --fig-wide: 1040px;
             --fig-band: 860px;
@@ -537,7 +537,7 @@
             --dia-hold: var(--sig-held);
             --dia-tint: rgba(11,111,125,0.07);
             --dia-tint-live: rgba(28,95,184,0.07);
-            --dia-tint-flat: rgba(12,26,36,0.04);
+            --dia-tint-flat: rgba(60,48,32,0.045);
         }
 
         /* ONE figure component: a plate holding the drawing, a caption behind
@@ -549,9 +549,9 @@
             margin: var(--space-xl) 0;
             background: var(--fig-plate);
             border: 1px solid var(--fig-edge);
-            border-radius: 3px;
+            border-radius: 5px;
             overflow: hidden;
-            box-shadow: 0 1px 2px rgba(12,26,36,0.05);
+            box-shadow: 0 1px 2px rgba(60,48,32,0.06);
             /* Step out of the prose measure at a FIXED width, never 90vw: a
                viewport-relative figure changes its relationship to the text
                column at every window size, so the same diagram reads
@@ -576,7 +576,7 @@
             padding: var(--fig-pad);
             border-top: 1px solid var(--fig-rule);
             font-family: 'DM Sans', sans-serif;
-            font-size: 0.925rem;
+            font-size: 0.95rem;
             line-height: 1.55;
             color: var(--mm-ink-3);
             font-style: normal;
@@ -587,7 +587,7 @@
         figcaption > b {
             display: block;
             font-family: var(--mm-face);
-            font-size: 0.7rem;
+            font-size: 0.74rem;
             font-weight: 600;
             letter-spacing: 0.14em;
             text-transform: uppercase;
@@ -872,8 +872,8 @@
         .gallery-item {
             background: var(--fig-plate);
             border: 1px solid var(--fig-edge);
-            border-radius: 3px;
-            box-shadow: 0 1px 2px rgba(12,26,36,0.05);
+            border-radius: 5px;
+            box-shadow: 0 1px 2px rgba(60,48,32,0.06);
             overflow: hidden;
             width: auto; max-width: none;
             margin: 0; margin-left: 0;
@@ -885,14 +885,14 @@
             margin: 0.6rem 0.6rem 0.6rem;
             width: calc(100% - 1.2rem);
             background: var(--fig-well);
-            border-radius: 2px;
+            border-radius: 3px;
             overflow: hidden;
             display: flex;
             align-items: center;
             justify-content: center;
             transition: background 0.2s ease;
         }
-        .gallery-item .image:hover { background: #dae5e9; }
+        .gallery-item .image:hover { background: #e6ded0; }
         .gallery-item .image img {
             width: 100%;
             height: 100%;
@@ -902,7 +902,7 @@
         .gallery-item figcaption {
             padding: 0.6rem 0.75rem 0.75rem;
             border-top: 1px solid var(--fig-rule);
-            font-size: 0.8125rem;
+            font-size: 0.85rem;
             line-height: 1.45;
             color: var(--mm-ink-3);
         }
@@ -1599,8 +1599,8 @@
           padding: var(--fig-pad);
           background: var(--fig-plate);
           border: 1px solid var(--fig-edge);
-          border-radius: 3px;
-          box-shadow: 0 1px 2px rgba(12,26,36,0.05);
+          border-radius: 5px;
+          box-shadow: 0 1px 2px rgba(60,48,32,0.06);
           font-family: var(--mm-face);
           width: min(var(--fig-band), calc(100vw - 3rem));
           max-width: var(--fig-band);
@@ -1617,7 +1617,7 @@
         .triadic-toggle {
           padding: 0.45rem 0.95rem;
           border: 1px solid var(--border);
-          border-radius: 2px;
+          border-radius: 3px;
           background: var(--paper);
           color: var(--muted);
           font-family: inherit;
@@ -1653,7 +1653,7 @@
         /* The caption is part of the plate, on the plate's own padding,
            behind one hairline — the same rule every other figure follows. */
         .triadic-caption {
-          font-size: 0.925rem;
+          font-size: 0.95rem;
           font-family: 'DM Sans', sans-serif;
           line-height: 1.55;
           color: var(--muted);
@@ -2210,7 +2210,7 @@
 
                 <!-- Background subtle grid -->
                 <pattern id="triGrid" width="20" height="20" patternUnits="userSpaceOnUse">
-                  <path d="M 20 0 L 0 0 0 20" fill="none" stroke="rgba(12,26,36,0.055)" stroke-width="0.5"/>
+                  <path d="M 20 0 L 0 0 0 20" fill="none" stroke="rgba(90,72,44,0.06)" stroke-width="0.5"/>
                 </pattern>
                 <rect width="400" height="384" fill="url(#triGrid)" />
 

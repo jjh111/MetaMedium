@@ -41,7 +41,8 @@
 
   let state = session.getState();
   let live = null;      // stroke under the pointer, in WORLD coordinates
-  let hoverId = null;   // inspected node (hover), else most recent
+  let hoverId = null;
+  let lastPen = null;      // where the hand last let go, on screen — the palette blooms there   // inspected node (hover), else most recent
 
   const esc = (t) => String(t).replace(/[&<>"]/g, (c) =>
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));

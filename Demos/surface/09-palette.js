@@ -202,20 +202,90 @@
     }
   }
 
+  // ===== The blob: verbs packed in rings from the pen tip ====================
+  //
+  // A palette is a list for artists. This is packing: the two most likely
+  // verbs nearest where the hand let go, then four around them, then eight,
+  // then twelve — each ring further out — with the text filter at the
+  // centre. Likelihood comes from the same reading the engine made (a known
+  // name, a written word, a clean form, a concept, always-there verbs), times
+  // learned use, so the rings settle toward the hand that uses them. No
+  // drill-down: everything is in the rings, and typing filters all of it.
+  const USES_KEY = 'mm-palette-uses';
+  const uses = store.get(USES_KEY) || {};
+  const RINGS = [2, 4, 8, 12];
+  const RADII = [56, 122, 196, 268];
+  let paletteOrigin = null;
+
+  function baseLikelihood(item) {
+    const g = item.group, c = item.groupConf || 0;
+    let l;
+    // Offers specific to THESE marks sit above every generic verb, whatever
+    // the hand has learned to reach for: a match to something you named, the
+    // word you just wrote, a model's reading of this group.
+    if (g === 'known') l = 1.4;
+    else if (g === 'written') l = 1.35;
+    else if (g === 'proposed') l = 1.2 + 0.1 * c;
+    else if (g === 'clean') l = 0.6 + 0.35 * c;
+    else if (g === 'always') l = { name: 0.58, keep: 0.5, make: 0.56, ask: 0.42, draw: 0.38, read: 0.52 }[item.key] || 0.4;
+    else l = 0.5 + 0.45 * c; // a concept's conversions
+    if (item.tier === 2) l *= 0.85;
+    // Learned use lifts the GENERIC verbs toward the hand that uses them. An
+    // offer specific to these marks — a known match, the word just written, a
+    // model's reading of this group — is not generic, and nothing learned
+    // outranks it.
+    const specific = g === 'known' || g === 'written' || g === 'proposed';
+    return specific ? l : l * Math.min(1.25, 1 + 0.2 * Math.log1p(uses[item.key] || 0));
+  }
+  function rankItems(items) {
+    return items.map((i) => Object.assign(i, { likelihood: baseLikelihood(i) })).sort((a, b) => b.likelihood - a.likelihood);
+  }
+  function noteUse(item) {
+    uses[item.key] = (uses[item.key] || 0) + 1;
+    store.set(USES_KEY, uses);
+  }
+
+  /** Where the rings sit: at the pen, pulled in so the outer ring stays on screen and off the panel. */
+  function placeOrigin() {
+    // On a small screen the rings shrink, but never so far that pills collide;
+    // the outer rings may run off the edge, and typing still finds them.
+    const scale = Math.max(0.72, Math.min(1, (Math.min(innerWidth, innerHeight) - 24) / (2 * RADII[RADII.length - 1] + 120)));
+    const rMax = RADII[RADII.length - 1] * scale + 70;
+    let x = lastPen ? lastPen.x : innerWidth / 2, y = lastPen ? lastPen.y : innerHeight / 2;
+    x = Math.max(rMax, Math.min(innerWidth - rMax, x));
+    y = Math.max(rMax, Math.min(innerHeight - rMax - 30, y));
+    const panel = inspectorEl.getBoundingClientRect();
+    if (!document.body.classList.contains('panelHidden') && panel.width && x - rMax < panel.right && y < panel.bottom + rMax && y > panel.top - rMax) {
+      x = Math.min(innerWidth - rMax, panel.right + rMax);
+    }
+    return { x, y, scale };
+  }
+
   function renderSummon(s) {
     document.body.classList.toggle('summoning', !!s.summon);
-    if (!s.summon) { summonEl.style.display = 'none'; summonEl.className = ''; shownSummonId = null; return; }
+    if (!s.summon) { summonEl.style.display = 'none'; summonEl.className = ''; shownSummonId = null; paletteOrigin = null; return; }
     const sum = s.summon;
     if (shownSummonId !== sum.id) {
       shownSummonId = sum.id;
-      paletteItems = conversionsFor(s);
+      paletteItems = rankItems(conversionsFor(s));
       paletteIndex = 0;
-      summonEl.className = 'palette';
+      paletteOrigin = placeOrigin();
+      summonEl.className = 'blob';
       summonEl.style.display = 'block';
       summonEl.innerHTML = '';
+      summonEl.style.left = paletteOrigin.x + 'px';
+      summonEl.style.top = paletteOrigin.y + 'px';
 
-      // Say what it is acting on, and how it decided — a wrong guess should be
-      // visible before you act on it, not after.
+      // The centre: the filter, and under it what this acts on and how it
+      // decided — a wrong guess should be visible before you act on it.
+      const centre = document.createElement('div');
+      centre.className = 'centre';
+      const filter = document.createElement('input');
+      filter.className = 'filter';
+      filter.placeholder = 'type to find, or to ask…';
+      filter.onkeydown = onPaletteKey;
+      filter.oninput = () => paintPalette(filter.value);
+      centre.appendChild(filter);
       const scope = document.createElement('div');
       scope.className = 'scope';
       const onArt = sum.onArtifact
@@ -223,17 +293,10 @@
           (sum.onArtifact.regionIds.length ? ' · ' + esc(sum.onArtifact.regionIds.join(' ')) : '')
         : '';
       const genre = session.read(sum.enclosedIds).genre;
-      scope.innerHTML = '<b>' + sum.enclosedIds.length + ' mark' +
-        (sum.enclosedIds.length === 1 ? '' : 's') + '</b>' + onArt + ' — ' + esc(sum.scopeReasoning) +
-        (genre && genre.genre !== 'empty' ? ' · <b>' + esc(genre.genre) + '</b>' : '');
-      summonEl.appendChild(scope);
-
-      const filter = document.createElement('input');
-      filter.className = 'filter';
-      filter.placeholder = 'what should this become?';
-      filter.onkeydown = onPaletteKey;
-      filter.oninput = () => paintPalette(filter.value);
-      summonEl.appendChild(filter);
+      scope.innerHTML = '<b>' + sum.enclosedIds.length + ' mark' + (sum.enclosedIds.length === 1 ? '' : 's') + '</b>' + onArt +
+        (genre && genre.genre !== 'empty' ? ' · ' + esc(genre.genre) : '') + '<span class="how">' + esc(sum.scopeReasoning) + '</span>';
+      centre.appendChild(scope);
+      summonEl.appendChild(centre);
 
       const list = document.createElement('div');
       list.className = 'items';
@@ -241,20 +304,6 @@
       paintPalette('');
       setTimeout(() => filter.focus(), 0);
     }
-
-    // Beside what is selected — which is what the loop became — else beside the mark.
-    const b = selectionBounds(s) || MM.boundsOf(s.nodes.get(sum.gestureIds[sum.gestureIds.length - 1]));
-    const p = worldToScreen(b.minX - wpx(10), b.maxY + wpx(10));
-    let left = Math.max(8, Math.min(p.x, innerWidth - summonEl.offsetWidth - 8));
-    const top = Math.max(8, Math.min(p.y + 14, innerHeight - summonEl.offsetHeight - 52));
-    // Keep clear of the panel: two things to read should not sit on each other.
-    const panel = inspectorEl.getBoundingClientRect();
-    if (!document.body.classList.contains('panelHidden') && panel.width && left < panel.right + 10 &&
-        top < panel.bottom && top + summonEl.offsetHeight > panel.top) {
-      left = Math.min(panel.right + 10, innerWidth - summonEl.offsetWidth - 8);
-    }
-    summonEl.style.left = left + 'px';
-    summonEl.style.top = top + 'px';
   }
 
   /** Recompute the offers for the open summon and repaint, keeping what was typed. */
@@ -274,6 +323,32 @@
       (i.label + ' ' + i.group + ' ' + i.why).toLowerCase().includes(q));
   }
 
+  /**
+   * Slots on a ring. Pills are wide and low, so the first ring sits above and
+   * below the field and the second on the diagonals — no pill over another —
+   * and only the outer rings spread evenly, turned so the most stay on screen.
+   */
+  function ringSlots(ring, n, r, o) {
+    const fixed = ring === 0 ? [-90, 90] : ring === 1 ? [-45, 45, 135, -135] : null;
+    if (fixed) {
+      return fixed.slice(0, n).map((deg) => ({ x: o.x + r * Math.cos(deg * Math.PI / 180), y: o.y + r * Math.sin(deg * Math.PI / 180) }));
+    }
+    let best = null;
+    for (let k = 0; k < 24; k++) {
+      const a0 = (ring === 2 ? 0 : Math.PI / 12) + (k / 24) * Math.PI * 2;
+      const pts = [];
+      let score = 0;
+      for (let i = 0; i < n; i++) {
+        const a = a0 + (i / n) * Math.PI * 2;
+        const x = o.x + r * Math.cos(a), y = o.y + r * Math.sin(a);
+        pts.push({ x, y });
+        score += Math.min(x - 70, innerWidth - 70 - x, y - 30, innerHeight - 60 - y);
+      }
+      if (!best || score > best.score) best = { score, pts };
+    }
+    return best.pts;
+  }
+
   function paintPalette(query) {
     const list = summonEl.querySelector('.items');
     if (!list) return;
@@ -281,31 +356,81 @@
     if (paletteIndex >= shown.length) paletteIndex = Math.max(0, shown.length - 1);
     list.innerHTML = '';
     if (shown.length === 0) {
-      list.innerHTML = '<div class="empty2">Nothing matches. Keep drawing to dismiss.</div>';
+      const empty = document.createElement('div');
+      empty.className = 'empty2';
+      empty.textContent = query.trim() && agents.length ? 'nothing matches — Enter asks the model' : 'nothing matches';
+      empty.style.left = '0px'; empty.style.top = (RADII[0] * (paletteOrigin ? paletteOrigin.scale : 1)) + 'px';
+      list.appendChild(empty);
       return;
     }
-    let lastGroup = null;
-    shown.forEach((item, i) => {
-      if (item.group !== lastGroup) {
-        lastGroup = item.group;
-        const g = document.createElement('div');
-        g.className = 'group';
-        g.innerHTML = '<span>' + esc(item.group) + '</span>' +
-          (item.groupConf ? '<span class="conf" title="' + esc(item.groupWhy) + '">' +
-            item.groupConf.toFixed(2) + '</span>' : '');
-        list.appendChild(g);
+    const o = { x: 0, y: 0 }, scale = paletteOrigin ? paletteOrigin.scale : 1;
+    const origin = paletteOrigin || { x: innerWidth / 2, y: innerHeight / 2 };
+    let i = 0;
+    // A phone has room for the two inner rings; the rest is a keystroke away.
+    const maxRings = Math.min(innerWidth, innerHeight) < 600 ? 2 : RINGS.length;
+    for (let ring = 0; ring < maxRings && i < shown.length; ring++) {
+      const n = Math.min(RINGS[ring], shown.length - i);
+      const slots = ringSlots(ring, n, RADII[ring] * scale, origin);
+      for (let k = 0; k < n; k++, i++) {
+        const item = shown[i];
+        const btn = document.createElement('button');
+        btn.className = 'item ring' + ring;
+        btn.setAttribute('aria-selected', String(i === paletteIndex));
+        btn.title = item.why + (item.groupWhy ? ' — ' + item.groupWhy : '');
+        btn.innerHTML = '<span>' + esc(item.label) + '</span>' +
+          (item.tier === 0 ? '<span class="tier0">·now</span>' : '') +
+          (ring === 0 ? '<span class="why">' + esc(item.why) + '</span>' : '');
+        btn.style.left = (slots[k].x - origin.x) + 'px';
+        btn.style.top = (slots[k].y - origin.y) + 'px';
+        btn.onclick = () => { noteUse(item); item.run(btn); };
+        list.appendChild(btn);
       }
-      const btn = document.createElement('button');
-      btn.className = 'item';
-      btn.setAttribute('aria-selected', String(i === paletteIndex));
-      btn.innerHTML = '<span>' + esc(item.label) + '</span>' +
-        (item.tier === 0 ? '<span class="tier0">·now</span>' : '') +
-        '<span class="why">' + esc(item.why) + '</span>';
-      btn.onclick = () => item.run(btn);
-      list.appendChild(btn);
+    }
+    if (i < shown.length) {
+      const more = document.createElement('div');
+      more.className = 'empty2';
+      more.textContent = '+' + (shown.length - i) + ' more — type to find';
+      more.style.left = '0px'; more.style.top = (RADII[maxRings - 1] * scale + 34) + 'px';
+      list.appendChild(more);
+    }
+    relax(list, origin);
+  }
+
+  /**
+   * Packing, not placing. Slots put pills roughly where they belong; this
+   * lets them settle: each pill is pulled toward its slot by a spring and
+   * pushed off any pill (or the centre field) it overlaps, a few dozen times,
+   * until nothing overlaps. Wide pills make room for themselves; the rings
+   * bulge where the labels are long. Cheap — a dozen pills, forty steps.
+   */
+  function relax(list, origin) {
+    const pills = [...list.querySelectorAll('.item')].map((el) => {
+      const r = el.getBoundingClientRect();
+      return { el, w: r.width + 10, h: r.height + 8, x: parseFloat(el.style.left), y: parseFloat(el.style.top), tx: parseFloat(el.style.left), ty: parseFloat(el.style.top) };
     });
-    const sel = list.querySelector('[aria-selected="true"]');
-    if (sel && sel.scrollIntoView) sel.scrollIntoView({ block: 'nearest' });
+    const centre = summonEl.querySelector('.centre');
+    const cr = centre ? centre.getBoundingClientRect() : null;
+    const field = cr ? { w: cr.width + 16, h: cr.height + 12, x: cr.left + cr.width / 2 - origin.x, y: cr.top + cr.height / 2 - origin.y } : null;
+    const bodies = field ? [Object.assign({ fixed: true }, field)] : [];
+    const all = bodies.concat(pills);
+    for (let step = 0; step < 48; step++) {
+      for (const p of pills) { p.x += (p.tx - p.x) * 0.08; p.y += (p.ty - p.y) * 0.08; }
+      for (let i = 0; i < all.length; i++) {
+        for (let j = i + 1; j < all.length; j++) {
+          const a = all[i], b = all[j];
+          const ox = (a.w + b.w) / 2 - Math.abs(a.x - b.x);
+          const oy = (a.h + b.h) / 2 - Math.abs(a.y - b.y);
+          if (ox <= 0 || oy <= 0) continue;
+          // Push apart along the shorter escape; a fixed body (the field) does not move.
+          const sx = a.x < b.x ? -1 : 1, sy = a.y < b.y ? -1 : 1;
+          const along = ox < oy ? { x: ox, y: 0 } : { x: 0, y: oy };
+          const share = a.fixed || b.fixed ? 1 : 0.5;
+          if (!a.fixed) { a.x += sx * along.x * share; a.y += sy * along.y * share; }
+          if (!b.fixed) { b.x -= sx * along.x * share; b.y -= sy * along.y * share; }
+        }
+      }
+    }
+    for (const p of pills) { p.el.style.left = p.x + 'px'; p.el.style.top = p.y + 'px'; }
   }
 
   function onPaletteKey(e) {
@@ -382,12 +507,16 @@
    * behind: once you are typing, the options are stale.
    */
   function replaceWithField(btn, input) {
+    // The rings fold away; the field takes the centre, where the filter was.
     const list = summonEl.querySelector('.items');
     if (list) list.remove();
+    const scope = summonEl.querySelector('.scope');
+    if (scope) scope.remove();
     const filter = summonEl.querySelector('input.filter');
     if (filter && filter !== input) filter.replaceWith(input);
     else if (btn && btn.replaceWith) btn.replaceWith(input);
-    else summonEl.appendChild(input);
+    else (summonEl.querySelector('.centre') || summonEl).appendChild(input);
+    input.classList.add('field');
     input.focus();
     input.setSelectionRange(input.value.length, input.value.length);
   }
