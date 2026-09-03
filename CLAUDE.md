@@ -41,6 +41,7 @@ Architecture documents (chronological; **read MVP.md, then v7, then v6**):
   code, each a closed vocabulary; the mappings between them are tables
 - `ARCHITECTURE-v7-PARTICIPANTS-AND-TIERS.md` — **active plan**: putting a model in the loop through the `propose` channel; the conversation benchmark; one OpenAI-compatible transport for Ollama/LM Studio/OpenRouter
 - `ARCHITECTURE-v8-CANVAS-AS-CODE.md` — **the next paradigm, proposed**: the canvas as a program (the log is its source, simulation state is derived), a fourth rung of closed steering verbs, definitions and instances, time as events, nested artifacts with `js`/`json` code that ink can address, export as a folder. Worked example: the fish canvas rebuilt from primitives. Part II: the folder as the canvas (per-participant logs merged, the review canvas's storage seam and loading budget absorbed as ideas), three views, selection as the lasso that finished, frames literal and virtual, the blob palette, images and pastiche, deployment
+- `BUILD-PLAN-v8.md` — **the executable plan for v8**: invariants no package may break, fixed contracts (events, reps, kinds, the verb basis, the storage seam, the palette item), fourteen work packages with owned files and done-criteria, the parallel threads and the surface weave, and self-contained briefs for sub-contracting models
 - `WHITEPAPER-v5.1-PLAN.md` — **the package**: what the whitepaper shows vs. what the engine does, replays-as-figures, the demos as the paper's spine, the prose pass, and the palette decision John owns
 - `ARCHITECTURE-v6-SESSION-ENGINE.md` — **active design**: the no-modes session engine (deferred commitment, summoning, promotion ladder, capability tiers), implemented in `metamedium-core/`
 - `metamedium-core-schema.md` — graph data model ("everything is a node; type emerges from connections") — load-bearing via v6
@@ -62,6 +63,7 @@ any structural change.
 |---|---|
 | `metamedium-core/` | **The canonical engine** (TypeScript, zero deps, tested): geometry, recognition (the shape rung), relations, the diagram rung (`src/diagram/`), concepts, the no-modes session engine, the layout and graph parsers, and the LLM transport. New recognition/engine work lands HERE |
 | `index.html` | **Interactive whitepaper v5** "MetaMedium: AI Beyond Chat" (live on GitHub Pages) |
+| `brand/` | **The visual system, one home**: `tokens.css` holds every MetaMedium colour, face and size; `styleguide.html` is the living specimen (light paper first, IBM Plex Mono throughout, teal keyword, colour as signal). v1 draft — no surface has migrated yet; `brand/README.md` carries the four laws and the convergence order |
 | `doodle2-canvas.html` | **Flagship demo**: heuristic recognition, spatial graph, library, undo/redo, touch. No LLM. Single-file (~500KB) |
 | `metadoodle1.html` | Fork of flagship + tiered LLM recognition (WebLLM in-browser, LM Studio local API) + voice. Single-file (~600KB) |
 | `Web App Skeleton/` | React + Vite + TypeScript + Zustand rebuild; Claude API interpreter skeleton in `src/llm/`; recognition/spatial/matching in `src/core/` |
@@ -666,25 +668,36 @@ WebLLM features require WebGPU.
 
 ## Design System
 
-Two palettes coexist **by intent** — the split is by brand, not drift. Don't
-"fix" one to match the other.
+> **Source of truth: `brand/tokens.css`.** Every MetaMedium colour, face, size
+> and spacing value is defined there and nowhere else; `brand/styleguide.html`
+> is the living specimen, and `brand/README.md` has the four laws and how to
+> adopt them on a surface. Don't restate a hex here — that is how three
+> palettes happened.
 
-| Surface | Palette | Type |
+The four laws, in short: **paper first** (light is the design, dark is the same
+tokens inverted, and no rule below the token layer may branch on theme); **one
+face** (IBM Plex Mono carries display, prose, UI and code); **colour is
+signal, not decoration** (and never an accent bar); **ink is never covered**
+(a derived form draws in front with the hand's ink visible beneath).
+
+**Status: v1 draft, 3 Sept 2026 — nothing has migrated yet.** Until a surface
+is converted it still carries what it always did:
+
+| Surface | Carries today | Moves to |
 |---|---|---|
-| Whitepaper (`index.html`) | **light paper**: `#f8f6f1` paper · `#1a1a2e` ink · `#e63946` accent · sketch blue/green/purple | DM Sans |
-| `Demos/`, flagship demos | `#0a0a0f` bg · `#e8e4d9` text · `#c9a84c` gold | Space Grotesk |
-| `lens-canvas/`, `manim-explainer/`, `playground.html` | `#020a12` sea-deep · `#7dd8f7` cyan · `#d4af37` gold | JetBrains Mono |
+| `index.html` (whitepaper v5) | warm paper `#f8f6f1` · ink `#1a1a2e` · red `#e63946` · sketch blue/green/purple · DM Sans + Space Grotesk | the paper ground; sketch colours become `--sig-*` |
+| `Demos/`, flagship demos | `#0a0a0f` · `#e8e4d9` · gold `#c9a84c` · Space Grotesk | the canvas ground; the gold retires |
+| `lens-canvas/`, `manim-explainer/`, `playground.html` | `#020a12` sea-deep · cyan `#7dd8f7` · gold `#d4af37` · JetBrains Mono | **left alone** — this is johnhanacek.com's language, not MetaMedium's |
 
-The third is the personal-site (johnhanacek.com) language. The whitepaper is
-the one light surface; the demos it embeds are dark, and that contrast is a
-known seam (see `WHITEPAPER-v5.1-PLAN.md`).
+Recognition feedback in the unmigrated surfaces (accepted `#0066ff`, pending
+`#666666`, green/orange confidence) maps onto `--sig-read`, `--sig-held`,
+`--sig-high` and `--sig-mid`. Green becomes teal deliberately: green reads as
+*pass*, and a confident reading is still only a reading.
 
-Recognition feedback (whitepaper/demos): accepted `#0066ff`, pending `#666666`,
-high confidence green, medium confidence orange.
-
-> 📌 **Pinned:** a deliberate MetaMedium style is still to be defined (John has
-> one in mind). Until then treat the whitepaper palette as *current*, not
-> *decided* — and keep the two systems separate.
+> 📌 **Pinned, still John's:** whether the wordmark keeps its two-tone split,
+> and how far the canvas ground travels into `Demos/` before the gold goes. The
+> whitepaper stays on paper even when it embeds a dark demo — that seam is
+> deliberate (see `WHITEPAPER-v5.1-PLAN.md`).
 
 ## Development Philosophy
 
