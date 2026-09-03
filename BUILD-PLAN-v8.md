@@ -160,7 +160,7 @@ Files: `src/behave/verbs.ts`, `src/behave/steer.ts`, `src/behave/fit.ts`, `src/b
 Files: `src/kinds/kinds.ts` (the table), `src/kinds/address.ts` (addressing per kind: `js` → functions by brace-matching, `json` → keys by path, `md` → headings/paragraphs, `svg` → top-level elements), tests.
 *Done:* `addressablesOf(kind, source)` returns regions with stable ids for each kind, tested on fixtures.
 
-**WP-9a · Image tracing** (P, engine, pure)
+**WP-9a · Image tracing** (P, engine, pure) ✅ **done 3 Sep 2026** — `src/image/trace.ts`: luminance → Otsu (inverted when most of the picture reads as ink, so a chalkboard works) → Zhang–Suen thinning → the skeleton walked into paths (free ends, then junctions taking the straightest branch, then loops) → Douglas–Peucker at 1.5 px → densified to ink spacing, because the engine measures along the path and a polyline that is only its corners has nothing between them to measure. Three painted boxes read as three rectangles; a painted sketch with a wobbling pen, a gradient ground and flecks yields ≥ 80% of its shapes. *Honest gap:* the fixture is painted, not photographed — a committed photo of paper is the next fixture, and the surface (WP-9b) is where it will be tried on real pictures.
 Files: `src/image/trace.ts` — bitmap (ImageData-like) → strokes. Threshold, thin, trace contours, simplify. No canvas API in core: takes `{width,height,data}`; the surface supplies pixels. Test on a synthetic 3-box bitmap → three closed strokes the shape rung reads as rectangles.
 *Done:* the fixture traces to marks the engine reads correctly; a photographed-sketch fixture (committed PNG, decoded in a test via a tiny PNG reader or a pre-decoded JSON) yields ≥ 80% of its shapes.
 

@@ -111,6 +111,10 @@ export type { Sample, FitResult } from './behave/fit';
 export { KINDS, kindOf, rowOf } from './kinds/kinds';
 export type { Kind, KindRow, Renderer, Addressing } from './kinds/kinds';
 export { addressablesOf, functionsOf, keysOf, headingsOf, elementsOf, runsOf, matchBrace } from './kinds/address';
+
+// Image tracing: a bitmap of a sketch becomes strokes the rungs can read (WP-9a).
+export { trace, binarize, thin, otsu, luminance, tracePaths, DEFAULT_SIMPLIFY_PX, DEFAULT_MIN_LENGTH_PX } from './image/trace';
+export type { Bitmap, TraceOptions, TraceResult, TracedStroke } from './image/trace';
 export type { Addressable } from './kinds/address';
 
 // Gesture grammar

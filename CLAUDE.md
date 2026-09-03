@@ -595,6 +595,24 @@ fingerprint carries it, so the model is asked to *read*, not to interpret.
 - `propose()` carries `reps` as well as edges, so a transcript is held through
   the same channel as every other reading and undo drops it.
 
+### Pictures become ink (v8, WP-9a)
+
+> `metamedium-core/src/image/trace.ts` — `trace(bitmap)`.
+
+A photographed sketch is pixels, not marks. `trace` takes an RGBA bitmap
+(the shape of `ImageData`; no canvas API in core) and returns strokes in
+pixel coordinates: Otsu's threshold on luminance (inverted when most of the
+picture reads as ink, so a chalkboard photo works), Zhang–Suen thinning to the
+one-pixel centreline, the skeleton walked into paths — free ends first, then
+junctions taking the straightest branch so a shaft continues through a barb,
+then loops — Douglas–Peucker at a pixel and a half, and **densified back to
+ink spacing**: the engine measures along the path, and a polyline that is
+only its corners has nothing between them to measure, so a perfect traced box
+read as a circle until it was given the density a hand leaves. Every result
+carries its reasoning (the threshold, the ink fraction, how many flecks were
+dropped). The surface side — import, placement, the raster as an artifact —
+is WP-9b.
+
 ### The model holds a pen (the conversation benchmark's other half)
 
 > `agent.draw()` in `participants/agent.ts`; `strokeFor` / `parseShapes` in

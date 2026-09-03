@@ -30,8 +30,10 @@ var MetaMediumCore = (() => {
     DEFAULT_ERASE_CROSSINGS: () => DEFAULT_ERASE_CROSSINGS,
     DEFAULT_GESTURE_CONFIG: () => DEFAULT_GESTURE_CONFIG,
     DEFAULT_MAX_FORCE: () => DEFAULT_MAX_FORCE,
+    DEFAULT_MIN_LENGTH_PX: () => DEFAULT_MIN_LENGTH_PX,
     DEFAULT_RELATE_CONFIG: () => DEFAULT_RELATE_CONFIG,
     DEFAULT_SESSION_CONFIG: () => DEFAULT_SESSION_CONFIG,
+    DEFAULT_SIMPLIFY_PX: () => DEFAULT_SIMPLIFY_PX,
     DEFAULT_SPEED: () => DEFAULT_SPEED,
     DEFAULT_TIMEOUT_MS: () => DEFAULT_TIMEOUT_MS,
     DIRECTED_LINKS: () => DIRECTED_LINKS,
@@ -65,6 +67,7 @@ var MetaMediumCore = (() => {
     applyWalls: () => applyWalls,
     assignRoles: () => assignRoles,
     between: () => between,
+    binarize: () => binarize,
     boundingBoxDistance: () => boundingBoxDistance,
     boundsContain: () => boundsContain,
     boundsOf: () => boundsOf,
@@ -143,6 +146,7 @@ var MetaMediumCore = (() => {
     learnCommandMark: () => learnCommandMark,
     lettersOf: () => lettersOf,
     listModels: () => listModels,
+    luminance: () => luminance,
     matchBrace: () => matchBrace,
     matchConcepts: () => matchConcepts,
     matchDefinition: () => matchDefinition,
@@ -152,6 +156,7 @@ var MetaMediumCore = (() => {
     mergeLogs: () => mergeLogs,
     nodeIdsIn: () => nodeIdsIn,
     normalizeStroke: () => normalizeStroke,
+    otsu: () => otsu,
     outlineOf: () => outlineOf,
     parseCode: () => parseCode,
     parseFill: () => parseFill,
@@ -194,7 +199,10 @@ var MetaMediumCore = (() => {
     strokesIntersect: () => strokesIntersect,
     structuralSignature: () => structuralSignature,
     textOf: () => textOf,
+    thin: () => thin,
     topInterpretation: () => topInterpretation,
+    trace: () => trace,
+    tracePaths: () => tracePaths,
     transcriptOf: () => transcriptOf,
     transcriptsOf: () => transcriptsOf,
     typeNodeId: () => typeNodeId,
@@ -269,12 +277,12 @@ var MetaMediumCore = (() => {
     const bounds = getBounds(points);
     const size = Math.max(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY);
     const path = simplifyStroke(denoise(points), Math.max(1.2, size * 0.012));
-    let pathLength = 0;
+    let pathLength2 = 0;
     for (let i = 1; i < path.length; i++) {
-      pathLength += calculateDistance(path[i - 1], path[i]);
+      pathLength2 += calculateDistance(path[i - 1], path[i]);
     }
-    if (pathLength === 0) return 0;
-    return Math.min(1, directDistance / pathLength);
+    if (pathLength2 === 0) return 0;
+    return Math.min(1, directDistance / pathLength2);
   }
   function isStrokeClosed(points, threshold = 50) {
     if (points.length < 5) return false;
@@ -2364,6 +2372,203 @@ var MetaMediumCore = (() => {
       if (m.index === re.lastIndex) re.lastIndex++;
     }
     return out;
+  }
+
+  // src/image/trace.ts
+  var DEFAULT_SIMPLIFY_PX = 1.5;
+  var DEFAULT_MIN_LENGTH_PX = 8;
+  function luminance(bitmap) {
+    const n2 = bitmap.width * bitmap.height;
+    const out = new Float32Array(n2);
+    const d = bitmap.data;
+    for (let i = 0; i < n2; i++) {
+      const r = d[i * 4], g = d[i * 4 + 1], b = d[i * 4 + 2];
+      out[i] = 0.299 * r + 0.587 * g + 0.114 * b;
+    }
+    return out;
+  }
+  function otsu(lum) {
+    const hist = new Float64Array(256);
+    for (let i = 0; i < lum.length; i++) hist[Math.max(0, Math.min(255, Math.round(lum[i])))]++;
+    const total = lum.length;
+    let sum = 0;
+    for (let t = 0; t < 256; t++) sum += t * hist[t];
+    let sumB = 0, wB = 0, best = 0, threshold = 127;
+    for (let t = 0; t < 256; t++) {
+      wB += hist[t];
+      if (wB === 0) continue;
+      const wF = total - wB;
+      if (wF === 0) break;
+      sumB += t * hist[t];
+      const mB = sumB / wB, mF = (sum - sumB) / wF;
+      const between2 = wB * wF * (mB - mF) * (mB - mF);
+      if (between2 > best) {
+        best = between2;
+        threshold = t;
+      }
+    }
+    return threshold;
+  }
+  function binarize(bitmap, opts = {}) {
+    const lum = luminance(bitmap);
+    const threshold = opts.threshold ?? otsu(lum);
+    const n2 = lum.length;
+    const mask = new Uint8Array(n2);
+    let dark = 0;
+    for (let i = 0; i < n2; i++) if (lum[i] <= threshold) dark++;
+    const inverted = opts.invert ?? dark > n2 / 2;
+    let ink = 0;
+    for (let i = 0; i < n2; i++) {
+      const isInk = inverted ? lum[i] > threshold : lum[i] <= threshold;
+      if (isInk) {
+        mask[i] = 1;
+        ink++;
+      }
+    }
+    return { mask, threshold, inverted, inkFraction: n2 ? ink / n2 : 0 };
+  }
+  function thin(mask, width, height) {
+    const img = new Uint8Array(mask);
+    const at = (x, y) => x < 0 || y < 0 || x >= width || y >= height ? 0 : img[y * width + x];
+    const toDelete = [];
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (let pass = 0; pass < 2; pass++) {
+        toDelete.length = 0;
+        for (let y = 0; y < height; y++) {
+          for (let x = 0; x < width; x++) {
+            if (!img[y * width + x]) continue;
+            const p2 = at(x, y - 1), p3 = at(x + 1, y - 1), p4 = at(x + 1, y), p5 = at(x + 1, y + 1);
+            const p6 = at(x, y + 1), p7 = at(x - 1, y + 1), p8 = at(x - 1, y), p9 = at(x - 1, y - 1);
+            const b = p2 + p3 + p4 + p5 + p6 + p7 + p8 + p9;
+            if (b < 2 || b > 6) continue;
+            const seq = [p2, p3, p4, p5, p6, p7, p8, p9, p2];
+            let a = 0;
+            for (let i = 0; i < 8; i++) if (seq[i] === 0 && seq[i + 1] === 1) a++;
+            if (a !== 1) continue;
+            const c1 = pass === 0 ? p2 * p4 * p6 : p2 * p4 * p8;
+            const c2 = pass === 0 ? p4 * p6 * p8 : p2 * p6 * p8;
+            if (c1 === 0 && c2 === 0) toDelete.push(y * width + x);
+          }
+        }
+        if (toDelete.length) {
+          changed = true;
+          for (const i of toDelete) img[i] = 0;
+        }
+      }
+    }
+    return img;
+  }
+  var N8 = [[1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1], [0, -1], [1, -1]];
+  function tracePaths(skeleton, width, height) {
+    const on = (x, y) => x >= 0 && y >= 0 && x < width && y < height && skeleton[y * width + x] === 1;
+    const visited = new Uint8Array(skeleton.length);
+    const free = (x, y) => on(x, y) && !visited[y * width + x];
+    const freeNeighbours = (x, y) => {
+      const out = [];
+      for (const [dx, dy] of N8) if (free(x + dx, y + dy)) out.push({ x: x + dx, y: y + dy });
+      return out;
+    };
+    const degree = (x, y) => {
+      let d = 0;
+      for (const [dx, dy] of N8) if (on(x + dx, y + dy)) d++;
+      return d;
+    };
+    const paths = [];
+    function walk(sx, sy) {
+      const points = [{ x: sx, y: sy }];
+      visited[sy * width + sx] = 1;
+      let x = sx, y = sy, lx = 0, ly = 0;
+      for (; ; ) {
+        const next = freeNeighbours(x, y);
+        if (next.length === 0) break;
+        let pick = next[0];
+        if (next.length > 1 && (lx || ly)) {
+          let best = -Infinity;
+          for (const n2 of next) {
+            const dx = n2.x - x, dy = n2.y - y;
+            const cos = (dx * lx + dy * ly) / Math.hypot(dx, dy);
+            if (cos > best) {
+              best = cos;
+              pick = n2;
+            }
+          }
+        } else if (next.length > 1) {
+          pick = next.find((n2) => n2.x === x || n2.y === y) ?? next[0];
+        }
+        lx = pick.x - x;
+        ly = pick.y - y;
+        x = pick.x;
+        y = pick.y;
+        visited[y * width + x] = 1;
+        points.push({ x, y });
+      }
+      const first = points[0], last = points[points.length - 1];
+      const closed = points.length > 8 && Math.abs(first.x - last.x) <= 1 && Math.abs(first.y - last.y) <= 1;
+      return { points, closed };
+    }
+    for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+      if (free(x, y) && degree(x, y) === 1) paths.push(walk(x, y));
+    }
+    for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+      if (free(x, y) && degree(x, y) > 2) {
+        while (freeNeighbours(x, y).length > 0) {
+          const p = walk(x, y);
+          paths.push(p);
+          visited[y * width + x] = 0;
+        }
+        visited[y * width + x] = 1;
+      }
+    }
+    for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+      if (free(x, y)) paths.push(walk(x, y));
+    }
+    return paths;
+  }
+  function densify(points, step2 = 2) {
+    if (points.length < 2) return points;
+    const out = [points[0]];
+    for (let i = 1; i < points.length; i++) {
+      const a = points[i - 1], b = points[i];
+      const len = Math.hypot(b.x - a.x, b.y - a.y);
+      const n2 = Math.max(1, Math.round(len / step2));
+      for (let k = 1; k <= n2; k++) out.push({ x: a.x + (b.x - a.x) * k / n2, y: a.y + (b.y - a.y) * k / n2 });
+    }
+    return out;
+  }
+  function pathLength(points) {
+    let len = 0;
+    for (let i = 1; i < points.length; i++) len += Math.hypot(points[i].x - points[i - 1].x, points[i].y - points[i - 1].y);
+    return len;
+  }
+  function trace(bitmap, opts = {}) {
+    const { mask, threshold, inverted, inkFraction } = binarize(bitmap, opts);
+    const skeleton = thin(mask, bitmap.width, bitmap.height);
+    const raw = tracePaths(skeleton, bitmap.width, bitmap.height);
+    const tol = opts.simplifyPx ?? DEFAULT_SIMPLIFY_PX;
+    const minLen = opts.minLengthPx ?? DEFAULT_MIN_LENGTH_PX;
+    const strokes = [];
+    let dropped = 0;
+    for (const p of raw) {
+      const length = pathLength(p.points);
+      if (length < minLen || p.points.length < 2) {
+        dropped++;
+        continue;
+      }
+      let points = simplifyStroke(p.points.map((q) => ({ x: q.x + 0.5, y: q.y + 0.5 })), tol);
+      if (p.closed) points = points.concat([{ ...points[0] }]);
+      strokes.push({ points: densify(points), closed: p.closed, length });
+    }
+    strokes.sort((a, b) => b.length - a.length);
+    const closed = strokes.filter((s) => s.closed).length;
+    return {
+      strokes,
+      threshold,
+      inverted,
+      inkFraction,
+      reasoning: `ink is ${inverted ? "lighter" : "darker"} than ${threshold} (${(inkFraction * 100).toFixed(1)}% of the picture); thinned and walked into ${strokes.length} stroke${strokes.length === 1 ? "" : "s"} (${closed} closed), ${dropped} fleck${dropped === 1 ? "" : "s"} dropped`
+    };
   }
 
   // src/session/erase.ts
