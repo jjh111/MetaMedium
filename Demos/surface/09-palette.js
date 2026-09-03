@@ -47,10 +47,20 @@
     // The engine's own offers: an artifact this matches, and the plain ways out.
     for (const sug of sum.suggestions) {
       if (sug.kind === 'match') {
+        // The refusal sits beside the offer: a match the engine will not stop
+        // making is a mode, and the correction is what teaches it (WP-12).
+        items.push({
+          key: 'not:' + sug.id, group: 'always', groupConf: 0, groupWhy: '',
+          label: 'Not a ' + sug.label, why: 'remembered — a group like this is not offered as one again', tier: 0,
+          run: () => {
+            session.correct({ ids: sum.enclosedIds.slice(), definitionId: sug.artifactId, verdict: 'is-not', at: Date.now() });
+            refreshPalette(); // the summon stays open; the refused offer is gone from it
+          },
+        });
         items.unshift({
           key: 'sug:' + sug.id, group: 'known', groupConf: sug.score || 1,
           groupWhy: 'you have named this shape before',
-          label: 'It’s a ' + sug.label, why: 'hold it as another one', tier: 0,
+          label: 'It’s a ' + sug.label, why: sug.reasoning || 'hold it as another one', tier: 0,
           run: () => session.bless({ summonId: sum.id, suggestionId: sug.id, at: Date.now() }),
         });
       }

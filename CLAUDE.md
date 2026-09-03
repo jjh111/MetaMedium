@@ -62,7 +62,7 @@ any structural change.
 | Path | What it is |
 |---|---|
 | `metamedium-core/` | **The canonical engine** (TypeScript, zero deps, tested): geometry, recognition (the shape rung), relations, the diagram rung (`src/diagram/`), concepts, the no-modes session engine, the layout and graph parsers, and the LLM transport. New recognition/engine work lands HERE |
-| `index.html` | **Interactive whitepaper v5** "MetaMedium: AI Beyond Chat" (live on GitHub Pages) |
+| `index.html` | **Interactive whitepaper v5** "MetaMedium: AI Beyond Chat" (live on GitHub Pages). Fully on the `brand/` system as of 3 Sept 2026 — its `:root` is `brand/tokens.css` under the names this page already used, so change a value THERE first |
 | `brand/` | **The visual system, one home**: `tokens.css` holds every MetaMedium colour, face, size and figure/diagram token; `styleguide.html` is the living specimen (light paper first, IBM Plex Mono throughout, teal keyword, colour as signal, §11 figures and diagrams, §12 long-form furniture). v1 draft — the whitepaper's **figures** have migrated, the page around them has not; `brand/README.md` carries the four laws, the convergence order, and what applying it to the whitepaper taught the system |
 | `doodle2-canvas.html` | **Flagship demo**: heuristic recognition, spatial graph, library, undo/redo, touch. No LLM. Single-file (~500KB) |
 | `metadoodle1.html` | Fork of flagship + tiered LLM recognition (WebLLM in-browser, LM Studio local API) + voice. Single-file (~600KB) |
@@ -202,6 +202,16 @@ fraction of the short side, so it can never straddle a whole one.
 **Library matching** is a weighted fingerprint comparison (straightness,
 aspect, corners, closure, size) with a straightness veto — see
 `matchPrimitiveFromLibrary`.
+
+**A named group's signature is structural** (`session/signature.ts`): the
+bag of shapes *and* the bag of links between them — every engaging relation
+the canvas can see, keyed by the shapes at each end — so a circle with two
+lines inside it and a circle with two lines crossing it are different things
+to name, which a histogram could not tell apart. Matches rank plurally above
+a floor with their reasoning; the `correct` event (*Not a …* in the palette)
+adds a group's signature to the definition's rejected or accepted examples, so
+a wrong match is corrected once and stays corrected. The engine never learns
+what a definition is called.
 
 ### The maths of a mark
 
@@ -705,13 +715,12 @@ code); **colour is signal, not decoration** (never an accent bar, and exactly
 one categorical scale — `--thread-*`, for the timeline's lineages); **ink is
 never covered** (a derived form draws in front with the hand's ink beneath).
 
-**Status: v1 draft, 3 Sept 2026.** The whitepaper's figures and diagrams have
-migrated; everything else still carries what it always did:
+**Status: v1 draft, 3 Sept 2026. `index.html` is fully migrated** — tokens,
+typeface, figures, diagrams, timeline, hero and footer. The demos have not moved:
 
 | Surface | Carries today | Moves to |
 |---|---|---|
-| `index.html` — figures/diagrams | **migrated.** One plate, one padding, one caption structure; diagrams drawn in the engine's own roles, authored 1000 units wide so a unit is a pixel, labels in IBM Plex Mono on one type scale | — |
-| `index.html` — the page around them | ink `#1a1a2e` · red `#e63946` · sketch blue/green/purple · five saturated timeline badges · DM Sans + Space Grotesk | teal keyword; sketch colours become `--sig-*`; badges become `--thread-*`. **The warm paper stays** — the system adopted the whitepaper's tone |
+| `index.html` (whitepaper v5) | **migrated.** Warm paper · sea ink · teal keyword · IBM Plex Mono throughout · signal colours · `--thread-*` badges · one plate/padding/caption per figure · the hero and footer on the canvas ground | — |
 | `Demos/`, flagship demos | `#0a0a0f` · `#e8e4d9` · gold `#c9a84c` · Space Grotesk | the canvas ground; the gold retires |
 | `lens-canvas/`, `manim-explainer/`, `playground.html` | `#020a12` sea-deep · cyan `#7dd8f7` · gold `#d4af37` · JetBrains Mono | **left alone** — this is johnhanacek.com's language, not MetaMedium's |
 

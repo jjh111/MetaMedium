@@ -10,8 +10,9 @@ and use the switch at the bottom right to put it on the dark canvas ground.
 | `tokens.css` | **The system.** Light tokens on `:root`, dark tokens on `:root[data-theme="dark"]`. Link it, or inline it verbatim into a single-file surface |
 | `styleguide.html` | The living specimen: foundations, palette, type, the mark, ink states, readings, UI, both grounds, an editorial page, voice, figures &amp; diagrams, long-form furniture (callout, pull quote, embed, gallery, **the timeline**) |
 
-Status: **v1 draft, 3 Sept 2026.** The whitepaper's **figures and diagrams**
-are migrated; the page around them is not — see *Convergence* below. Two decisions are still John's: whether the wordmark keeps
+Status: **v1 draft, 3 Sept 2026. The whitepaper is fully migrated** — tokens,
+typeface, figures, diagrams, timeline, hero and footer. `Demos/` has not moved
+yet; see *Convergence* below. Two decisions are still John's: whether the wordmark keeps
 its two-tone split, and how far the canvas ground travels into `Demos/` before
 the gold is retired.
 
@@ -62,8 +63,7 @@ project had one of its own. In migration order:
 
 | Surface | Carries now | Move to |
 |---|---|---|
-| `index.html` — **figures and diagrams** | **done.** One plate, one padding, one caption structure; six diagrams on the diagram roles, IBM Plex Mono labels, one type scale | — |
-| `index.html` — the page around them | red `#e63946`, DM Sans + Space Grotesk, sketch blue/green/purple, five saturated timeline badges | teal keyword; sketch colours become `--sig-*`; badges become `--thread-*`. *The warm paper stays — the system adopted it* |
+| `index.html` (whitepaper v5) | **done.** Warm paper, sea ink, teal keyword, IBM Plex Mono throughout, signal colours, `--thread-*` badges, one plate/one padding/one caption for every figure, six diagrams on the diagram roles, the hero and footer on the canvas ground | — |
 | `Demos/session-engine.html` | `#0a0a0f`, gold `#c9a84c`, Space Grotesk | the canvas ground; gold retires |
 | `Demos/` others, `doodle2-canvas.html`, `metadoodle1.html` | as above | canvas ground, last |
 | `lens-canvas/`, `playground.html`, `manim-explainer/` | the personal-site language (sea-deep, cyan, gold, JetBrains Mono) | **left alone** — these are johnhanacek.com's language, not MetaMedium's |
@@ -103,18 +103,21 @@ Figures also gained a rule the canvas has no need for: **a drawing sits on the
 plate's padding, a scan bleeds to its edge.** A photograph brought its own
 margins; padding one makes a frame inside a frame.
 
-### Not done, and deliberately so
+### What the migration itself taught
 
-The whitepaper's **prose, nav, callouts, principles, timeline, scenarios and
-footer still carry the old warm-paper palette and DM Sans.** The figure tokens
-were added under new names (`--mm-*`, `--fig-*`, `--dia-*`) precisely so the
-page could keep its own look until that migration is a decision rather than a
-side effect — mono at whitepaper length changes the reading experience of a
-published page, and that is John's call, not a refactor.
-
-One pre-existing bug found while testing and left alone: **the nav overflows by
-about 18px at 375px wide.** It is untouched by this work (the CSS is byte-identical
-to `HEAD`), and it is not a figure problem.
+- **The wordmark accents `Meta`, not `Medium`.** The styleguide had it the other
+  way round; the site has accented *Meta* since it was written, and *Meta* is the
+  argument the project makes — AI as meta-word. The guide changed, not the site.
+- **Mono needs the italic taken away from it.** The overview lede, the pull
+  quotes and the use-case scenarios were all set italic for a sans face. A whole
+  block of mono italic is a paragraph nobody finishes; the plate and the size do
+  that work now.
+- **Mono has one usable weight above 400.** Every 600/700/800 in the page is now
+  500. At 700 IBM Plex Mono stops looking like the same face.
+- **A bare URL is one unbreakable word**, and in a mono face a wide one. It was
+  pushing the whole page 116px sideways on a phone — the nav overflow noted in
+  the previous pass was a symptom, not the cause. Long tokens now break
+  (`overflow-wrap`), and the page is exactly viewport-width at 375.
 
 
 ## The timeline

@@ -62,6 +62,7 @@ import { type GenreReading, type RoleReading, type Wire, assignRoles, genreOf } 
 import { BUILTIN_COMMAND_MARK, matchesCommandMark } from './commandmark';
 import { type SnapReading, idealize, snapReading, cleanOf } from './clean';
 import { isLetterLike, joinsRun, wordConfidence } from './words';
+import { type StructuralSignature, type Examples, structuralSignature, matchDefinition, addExample, MATCH_FLOOR } from './signature';
 
 // ===== Public state shape =====
 
@@ -71,6 +72,8 @@ export interface Suggestion {
   label: string;
   artifactId?: string; // for 'match'
   score?: number;
+  /** Why it matched, in the terms the signature was measured in. */
+  reasoning?: string;
 }
 
 /** How the command mark decided what it was about. */
@@ -101,7 +104,8 @@ export interface Summon {
 
 export interface ClusterCandidate {
   nodeIds: string[];
-  matches: { artifactId: string; name: string; score: number }[];
+  /** Every definition above the floor, best first — plural, like every reading. */
+  matches: { artifactId: string; name: string; score: number; reasoning?: string }[];
 }
 
 export interface SessionState {
@@ -199,6 +203,13 @@ export type SessionEvent =
   | { type: 'join'; kind: ParticipantKind; name: string; at: number; capability?: Capability }
   | { type: 'propose'; participantId: string; nodeId: string; edges: ProposedEdge[]; reps?: ProposedRep[]; at: number }
   | { type: 'teach'; mark: CommandMark | null; at: number }
+  /**
+   * The human correcting a match: this group IS (or is NOT) that definition.
+   * The group's structural signature joins the definition's accepted or
+   * rejected examples, so the next group like it is matched — or not — and
+   * the correction holds. What the definition is called is never consulted.
+   */
+  | { type: 'correct'; ids: string[]; definitionId: string; verdict: 'is' | 'is-not'; at: number; participantId?: string }
   | {
       type: 'tidy';
       ids: string[];
@@ -293,7 +304,6 @@ export const DEFAULT_SESSION_CONFIG: SessionConfig = {
   recentWindowMs: 20_000,
 };
 
-type Signature = Record<string, number>; // type histogram, e.g. { circle: 3, line: 2 }
 
 export interface Session {
   addStroke(points: Point[], at: number, participantId?: string, scale?: number, options?: { content?: boolean }): string;
@@ -319,6 +329,10 @@ export interface Session {
    * teaching is part of the session's history and replays with it.
    */
   teachCommandMark(mark: CommandMark | null, at: number): void;
+  /** Say that a group is, or is not, a definition; the correction is remembered on the definition. */
+  correct(args: { ids: string[]; definitionId: string; verdict: 'is' | 'is-not'; at: number; participantId?: string }): void;
+  /** Which definitions a group matches now, best first, with reasoning. Pure; no event. */
+  matchesOf(ids: string[]): { artifactId: string; name: string; score: number; reasoning: string }[];
   /**
    * Attach generated code to an artifact — the 'code' rep that makes it live.
    * Several participants may each attach code to the same artifact; every
@@ -501,19 +515,29 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       .filter((c) => c.bounds !== undefined);
   }
 
-  function signatureOf(ids: string[]): Signature {
-    const sig: Signature = {};
-    for (const id of ids) {
-      const t = topInterpretation(nodes.get(id)!) ?? 'art';
-      sig[t] = (sig[t] ?? 0) + 1;
-    }
-    return sig;
+  function signatureOf(ids: readonly string[]): StructuralSignature {
+    return structuralSignature(ids, nodes, (id) => topInterpretation(nodes.get(id)!) ?? 'art');
   }
 
-  function signaturesEqual(a: Signature, b: Signature): boolean {
-    const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
-    for (const k of keys) if ((a[k] ?? 0) !== (b[k] ?? 0)) return false;
-    return true;
+  /**
+   * Every definition a group matches, best first: its signature against each
+   * artifact's own, and against what corrections have taught that artifact.
+   * Plural on purpose — two definitions with the same shapes are both offered,
+   * with the reasoning that ranks them, and the human decides.
+   */
+  function matchesFor(ids: readonly string[]) {
+    const sig = signatureOf(ids);
+    const out: { artifactId: string; name: string; score: number; reasoning: string }[] = [];
+    for (const aid of artifacts) {
+      const a = nodes.get(aid)!;
+      const aSig = getRep(a, 'signature')?.data as StructuralSignature | undefined;
+      if (!aSig) continue;
+      const examples = getRep(a, 'examples')?.data as Examples | undefined;
+      const m = matchDefinition(sig, aSig, examples);
+      if (m.vetoed || m.score < MATCH_FLOOR) continue;
+      out.push({ artifactId: aid, name: wordOf(a) ?? aid, score: m.score, reasoning: m.reasoning });
+    }
+    return out.sort((p, q) => q.score - p.score);
   }
 
   function recomputeClusterCandidates() {
@@ -527,36 +551,22 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       // Don't offer an artifact as a match for itself.
       const strokeIds = ids.filter((id) => !artifacts.includes(id));
       if (strokeIds.length < 2) continue;
-      const sig = signatureOf(strokeIds);
-
-      const matches = artifacts
-        .map((aid) => {
-          const a = nodes.get(aid)!;
-          const aSig = getRep(a, 'signature')?.data as Signature | undefined;
-          if (!aSig || !signaturesEqual(sig, aSig)) return null;
-          return { artifactId: aid, name: wordOf(a) ?? aid, score: 1 };
-        })
-        .filter((m): m is NonNullable<typeof m> => m !== null);
-
+      const matches = matchesFor(strokeIds);
       if (matches.length > 0) clusterCandidates.push({ nodeIds: strokeIds, matches });
     }
   }
 
   function makeSuggestions(enclosedIds: string[]): Suggestion[] {
-    const sig = signatureOf(enclosedIds);
     const suggestions: Suggestion[] = [];
-    for (const aid of artifacts) {
-      const a = nodes.get(aid)!;
-      const aSig = getRep(a, 'signature')?.data as Signature | undefined;
-      if (aSig && signaturesEqual(sig, aSig)) {
-        suggestions.push({
-          id: nextId('sug'),
-          kind: 'match',
-          label: wordOf(a) ?? aid,
-          artifactId: aid,
-          score: 1,
-        });
-      }
+    for (const m of matchesFor(enclosedIds)) {
+      suggestions.push({
+        id: nextId('sug'),
+        kind: 'match',
+        label: m.name,
+        artifactId: m.artifactId,
+        score: m.score,
+        reasoning: m.reasoning,
+      });
     }
     suggestions.push({ id: nextId('sug'), kind: 'prompt', label: 'Make…' });
     suggestions.push({ id: nextId('sug'), kind: 'name-as-new', label: 'Name this…' });
@@ -1528,6 +1538,36 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     shrinkWord(ev.nodeId, null);
   }
 
+  /** A correction lands on the definition as examples, and the candidates are read again. */
+  function applyCorrect(ev: Extract<SessionEvent, { type: 'correct' }>) {
+    const def = nodes.get(ev.definitionId);
+    if (!def || !artifacts.includes(ev.definitionId)) return;
+    const ids = ev.ids.filter((id) => nodes.has(id));
+    if (ids.length === 0) return;
+    const sig = signatureOf(ids);
+    const prev = getRep(def, 'examples')?.data as Examples | undefined;
+    def.reps = def.reps.filter((r) => r.modality !== 'examples');
+    def.reps.push({
+      modality: 'examples',
+      data: addExample(prev, sig, ev.verdict),
+      source: ev.participantId ?? LOCAL_PARTICIPANT,
+    });
+    recomputeClusterCandidates();
+    // A summon open on these very marks reads its matches again, so the offer
+    // the human just refused is gone from the palette rather than waiting for
+    // the next mark.
+    if (summon && sameSet(summon.enclosedIds, ids)) {
+      summon.suggestions = summon.suggestions.filter((g) => g.kind !== 'match');
+      summon.suggestions.unshift(...makeSuggestions(ids).filter((g) => g.kind === 'match'));
+    }
+  }
+
+  function sameSet(a: readonly string[], b: readonly string[]): boolean {
+    if (a.length !== b.length) return false;
+    const set = new Set(a);
+    return b.every((x) => set.has(x));
+  }
+
   function applySummon(ev: Extract<SessionEvent, { type: 'summon' }>): string | null {
     if (!pendingLasso) return null;
     const lassoNode = nodes.get(pendingLasso.id);
@@ -1595,6 +1635,9 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
         return applyAnswer(ev);
       case 'teach':
         applyTeach(ev);
+        return null;
+      case 'correct':
+        applyCorrect(ev);
         return null;
       case 'summon':
         return applySummon(ev);
@@ -1705,6 +1748,8 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     propose: (args) => void dispatch({ type: 'propose', ...args }),
     answer: (args) => dispatch({ type: 'answer', ...args }),
     teachCommandMark: (mark, at) => void dispatch({ type: 'teach', mark, at }),
+    correct: (args) => void dispatch({ type: 'correct', ...args }),
+    matchesOf: (ids) => matchesFor(ids),
     tidy: (args) => void dispatch({ type: 'tidy', ...args }),
     snap: (args) => void dispatch({ type: 'snap', ...args }),
     snapCandidates: (ids) => candidatesAmong(ids ?? snappableIds()),

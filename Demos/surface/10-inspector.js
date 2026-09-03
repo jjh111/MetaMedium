@@ -43,7 +43,12 @@
       const sig = (node.reps.find((r) => r.modality === 'signature') || {}).data;
       if (sig) {
         html += '<div class="row"><span class="k">sig</span><span class="v">' +
-          esc(Object.entries(sig).map(([k, v]) => v + '×' + k).join(' + ')) + '</span></div>';
+          esc(sig.shapes ? MM.describeStructure(sig) : Object.entries(sig).map(([k, v]) => v + '×' + k).join(' + ')) + '</span></div>';
+      }
+      const ex = (node.reps.find((r) => r.modality === 'examples') || {}).data;
+      if (ex && (ex.accepted.length || ex.rejected.length)) {
+        html += '<div class="row"><span class="k">corrected</span><span class="v">' +
+          ex.accepted.length + ' is, ' + ex.rejected.length + ' is not</span></div>';
       }
       const inst = node.edges.find((e) => e.rel === 'instance-of');
       if (inst) html += '<div class="row"><span class="k">same as</span><span class="v">' + esc(inst.to) + '</span></div>';

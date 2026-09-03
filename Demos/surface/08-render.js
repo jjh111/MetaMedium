@@ -143,7 +143,8 @@
       ctx.lineWidth = wpx(1);
       ctx.strokeRect(b.minX - pad, b.minY - pad, b.maxX - b.minX + pad * 2, b.maxY - b.minY + pad * 2);
       ctx.setLineDash([]);
-      text(c.matches[0].name + '?  circle + mark to confirm', b.minX - wpx(12), b.minY - wpx(20), `rgba(${C.goldRGB},0.72)`);
+      // Plural, like every reading: two definitions with the same shapes are both named.
+      text(c.matches.map((m) => m.name).join(' or ') + '?  circle + mark to confirm', b.minX - wpx(12), b.minY - wpx(20), `rgba(${C.goldRGB},0.72)`);
     }
 
     const inspectedId = hoverId || lastContentId(s);

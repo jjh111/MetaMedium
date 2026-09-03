@@ -91,6 +91,11 @@ export { isLetterLike, joinsRun, wordConfidence, LETTER_MAX_HEIGHT_PX, WORD_GAP_
 // One log per participant; the canvas is the merge (BUILD-PLAN-v8 §1.5).
 export { mergeLogs } from './store/merge';
 
+// Structural signatures: what a group IS as shapes and the links between them,
+// compared with reasoning, corrected by example (WP-12).
+export { structuralSignature, compareSignatures, matchDefinition, addExample, describeStructure, MATCH_FLOOR, DIRECTED_LINKS, SYMMETRIC_LINKS } from './session/signature';
+export type { StructuralSignature, Examples, SignatureMatch } from './session/signature';
+
 // The fourth rung — what a mark DOES: steering verbs, walls, and the fit that
 // turns an acted-out path into a behaviour (ARCHITECTURE-v8 §3, §21).
 export { force, intents, VERBS, TARGETED, sizeOf, DEFAULT_SPEED, DEFAULT_MAX_FORCE } from './behave/verbs';

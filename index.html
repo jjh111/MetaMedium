@@ -109,8 +109,8 @@
         body {
             font-family: var(--face);
             font-size: var(--text-base);
-            font-weight: 450;
-            line-height: 1.7;
+            font-weight: 400;
+            line-height: 1.68;
             color: var(--ink);
             background: var(--paper);
             -webkit-font-smoothing: antialiased;
@@ -320,7 +320,9 @@
             letter-spacing: -0.02em;
             line-height: 1;
         }
+        .nav-title .meta { color: var(--accent); }
         .nav-title:hover { color: var(--accent); }
+        .nav-title:hover .meta { color: var(--accent-hover); }
         
         /* Mobile nav toggle */
         .nav-toggle {
@@ -429,14 +431,16 @@
         }
         .overview-box {
             padding: var(--space-lg);
-            background: var(--paper-warm);
-            border-radius: 8px;
+            background: var(--paper-lt);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
             margin-top: var(--space-sm);
         }
+        /* Not italic: a whole lede set in mono italic is a paragraph nobody
+           finishes. The size and the plate do the setting-apart. */
         .overview-box p {
             font-size: var(--text-lg);
-            font-style: italic;
-            line-height: 1.65;
+            line-height: 1.6;
             color: var(--ink-soft);
         }
         .overview-box p:first-child {
@@ -453,10 +457,10 @@
         
         h2 {
             font-family: var(--face);
-            font-size: clamp(1.875rem, 4vw, var(--text-3xl));
-            font-weight: 600;
+            font-size: clamp(1.7rem, 3.6vw, var(--text-3xl));
+            font-weight: 500;
             margin-bottom: var(--space-md);
-            letter-spacing: -0.02em;
+            letter-spacing: -0.025em;
             line-height: 1.2;
         }
         
@@ -472,17 +476,26 @@
         h4 {
             font-family: var(--face);
             font-size: var(--text-lg);
-            font-weight: 600;
+            font-weight: 500;
             margin: var(--space-md) 0 var(--space-xs);
             letter-spacing: -0.01em;
         }
         
+        /* Mono at length gets fewer characters, not more, and the extra air
+           to go with them (brand/styleguide.html §03). */
         p {
-            margin-bottom: var(--space-sm);
-            max-width: 65ch;
+            margin-bottom: var(--space-md);
+            max-width: 68ch;
         }
+
+        /* A bare URL is one unbreakable word. In a mono face it is a wide one,
+           and it was pushing the whole page sideways on a phone — the nav
+           overflow that predates this restyle. Long tokens break instead. */
+        p, li, figcaption, blockquote, .callout, .tl-desc, .tl-author,
+        .overview-box p, .use-case, .principle p { overflow-wrap: break-word; }
+        a, code { overflow-wrap: anywhere; }
         
-        strong { font-weight: 600; color: var(--ink); }
+        strong { font-weight: 500; color: var(--ink); }
         em { font-style: italic; }
         
         a {
@@ -493,18 +506,19 @@
         }
         a:hover { color: var(--accent-hover); }
         
-        /* Blockquotes - v1 elegant style with gradient */
+        /* Pull quote: bounded by two teal hairlines, never a left bar and
+           never a wash (brand/styleguide.html §09). */
         blockquote {
             font-family: var(--face);
-            font-size: 1.2rem;
+            font-size: 1.12rem;
             font-weight: 400;
-            font-style: italic;
-            line-height: 1.55;
-            color: var(--muted);
-            padding: var(--space-sm) var(--space-md) var(--space-sm) var(--space-lg);
-            margin: var(--space-md) 0;
-            background: linear-gradient(to bottom, rgba(59, 130, 246, 0.08) 0%, transparent 100%);
-            border-radius: 0 8px 8px 0;
+            font-style: normal;
+            line-height: 1.5;
+            color: var(--ink);
+            padding: var(--space-md) 0;
+            margin: var(--space-lg) 0;
+            border-top: 1px solid var(--accent);
+            border-bottom: 1px solid var(--accent);
         }
         
         blockquote cite {
@@ -702,7 +716,7 @@
             height: 0;
             overflow: hidden;
             margin: var(--space-md) 0;
-            border-radius: 10px;
+            border-radius: var(--radius);
             box-shadow: 0 3px 20px var(--shadow);
         }
         .video-embed iframe {
@@ -716,23 +730,27 @@
         .demo-container {
             margin: var(--space-lg) 0;
             border: 1px solid var(--border);
-            border-radius: 12px;
+            border-radius: var(--radius);
             overflow: hidden;
-            background: #fff;
+            background: var(--paper-lt);
+            box-shadow: 0 1px 2px var(--shadow);
             /* Break out of text column */
-            width: 90vw;
+            width: min(1100px, calc(100vw - 3rem));
             max-width: 1100px;
             margin-left: 50%;
             transform: translateX(-50%);
             position: relative;
         }
         .demo-header {
-            background: var(--paper-warm);
-            color: var(--ink);
+            background: var(--paper-lt);
+            color: var(--muted-light);
             border-bottom: 1px solid var(--border);
             padding: var(--space-sm) var(--space-md);
             font-family: var(--face);
+            font-size: var(--text-xs);
             font-weight: 600;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -764,34 +782,37 @@
             font-size: 0.9em;
             background: var(--paper-warm);
             border: 1px solid var(--border);
-            border-radius: 4px;
+            border-radius: var(--radius-sm);
             padding: 0.05em 0.35em;
         }
         .callout {
-            background: var(--paper-warm);
-            border-radius: 10px;
+            background: var(--paper-lt);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
             padding: var(--space-md);
-            margin: var(--space-md) 0;
+            margin: var(--space-lg) 0;
         }
+        .callout.key { background: rgba(11,111,125,0.06); border-color: var(--accent); }
         .callout h4 { margin-top: 0; font-size: var(--text-base); }
         .callout p { font-size: var(--text-base); line-height: 1.65; }
         .callout p:last-child { margin-bottom: 0; }
         
         /* Use Cases - v1 gradient style */
         .use-case {
-            background: var(--paper-warm);
-            border-radius: 8px;
+            background: var(--paper-lt);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
             padding: var(--space-md);
-            margin: var(--space-md) 0;
+            margin: var(--space-lg) 0;
         }
         .use-case h4 {
             margin-top: 0;
-            color: var(--sketch-green);
+            color: var(--accent);
             font-size: var(--text-sm);
             text-transform: uppercase;
             letter-spacing: 0.06em;
         }
-        .use-case .scenario { font-style: italic; font-size: var(--text-base); line-height: 1.65; margin-bottom: var(--space-sm); }
+        .use-case .scenario { font-style: normal; font-size: var(--text-base); line-height: 1.65; margin-bottom: var(--space-sm); }
         .use-case .capabilities { font-size: var(--text-sm); color: var(--muted); margin-bottom: 0; }
         
         /* Genealogy */
@@ -818,10 +839,10 @@
         /* Media placeholder for timeline */
         .media-placeholder {
             margin-top: var(--space-sm);
-            border-radius: 8px;
+            border-radius: var(--radius);
             overflow: hidden;
-            background: linear-gradient(135deg, rgba(59, 130, 246, 0.08) 0%, rgba(139, 92, 246, 0.08) 100%);
-            border: 1px dashed rgba(59, 130, 246, 0.3);
+            background: var(--paper-warm);
+            border: 1px dashed var(--border);
             position: relative;
         }
         .media-placeholder.video {
@@ -859,7 +880,7 @@
         /* Embedded video in timeline */
         .timeline-video {
             margin-top: var(--space-sm);
-            border-radius: 8px;
+            border-radius: var(--radius);
             overflow: hidden;
             aspect-ratio: 16/9;
             background: #000;
@@ -873,7 +894,7 @@
         /* Embedded image in timeline */
         .timeline-image {
             margin-top: var(--space-sm);
-            border-radius: 8px;
+            border-radius: var(--radius);
             overflow: hidden;
         }
         .timeline-image img {
@@ -955,12 +976,12 @@
             position: relative;
         }
         @media (max-width: 768px) {
-            .principles-grid { grid-template-columns: 1fr; width: calc(100vw - 1rem); }
+            .principles-grid { grid-template-columns: 1fr; width: calc(100vw - 3rem); }
         }
         
         .principle {
-            background: #fff;
-            border-radius: 8px;
+            background: var(--paper-lt);
+            border-radius: var(--radius);
             padding: var(--space-lg);
             border: 1px solid var(--border);
             position: relative;
@@ -972,9 +993,9 @@
             top: -15px;
             right: 15px;
             font-family: var(--face);
-            font-size: 5rem;
-            font-weight: 700;
-            color: rgba(26, 26, 46, 0.04);
+            font-size: 4.5rem;
+            font-weight: 500;
+            color: rgba(12, 26, 36, 0.055);
             line-height: 1;
             pointer-events: none;
         }
@@ -982,22 +1003,24 @@
             margin-top: 0;
             font-family: var(--face);
             font-size: var(--text-lg);
-            font-weight: 600;
+            font-weight: 500;
         }
         .principle p { font-size: var(--text-base); line-height: 1.65; }
         .principle p:last-child { margin-bottom: 0; }
+        /* No left-edge accent bar (brand law III): a hairline above sets
+           the example apart without inventing an edge. */
         .principle-example {
             font-size: var(--text-sm);
             color: var(--muted);
-            border-left: 2px solid var(--border);
-            padding-left: var(--space-sm);
-            margin-top: var(--space-xs);
+            border-top: 1px solid var(--rule-soft);
+            padding-top: var(--space-sm);
+            margin-top: var(--space-sm);
         }
         
         /* Practice use cases - principles label */
         .principles-used {
             font-size: var(--text-xs);
-            color: var(--sketch-blue);
+            color: var(--accent);
             text-transform: uppercase;
             letter-spacing: 0.05em;
             margin-bottom: var(--space-xs);
@@ -1019,8 +1042,8 @@
         
         /* Footer */
         footer {
-            background: var(--ink);
-            color: #fff;
+            background: #131315;
+            color: #e7e5e0;
             text-align: center;
             padding: var(--space-xl) var(--space-md);
             display: flex;
@@ -1028,10 +1051,12 @@
             align-items: center;
             justify-content: center;
         }
+        .footer-title .meta { color: #6fb3b8; }
         .footer-title {
             font-family: var(--face);
             font-size: var(--text-lg);
-            font-weight: 600;
+            font-weight: 500;
+            letter-spacing: -0.02em;
             margin-bottom: var(--space-xs);
         }
         .footer-subtitle {
@@ -1045,12 +1070,12 @@
             margin-bottom: var(--space-xs);
         }
         footer a { 
-            color: #fff; 
+            color: #6fb3b8; 
             opacity: 0.8;
             text-decoration: underline;
             text-underline-offset: 2px;
         }
-        footer a:hover { opacity: 1; }
+        footer a:hover { opacity: 1; color: #93cbcf; }
         footer .version {
             font-family: var(--face);
             font-size: var(--text-xs);
@@ -1087,9 +1112,10 @@
 
         .demo-canvas-container {
             position: relative;
-            background: #fff;
-            border-radius: 12px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            background: var(--paper-lt);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            box-shadow: 0 1px 2px var(--shadow);
             overflow: hidden;
         }
 
@@ -1119,7 +1145,7 @@
             font-size: 0.75rem;
             font-weight: 600;
             padding: 0.25rem 0.5rem;
-            border-radius: 4px;
+            border-radius: var(--radius-sm);
             transform: translate(-50%, -100%);
             margin-top: -8px;
             opacity: 0;
@@ -1230,7 +1256,7 @@
             max-width: 100%;
             max-height: 100%;
             object-fit: contain;
-            border-radius: 4px;
+            border-radius: var(--radius-sm);
             box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
         }
 
@@ -1360,7 +1386,7 @@
             /* Figures: near full-bleed on mobile */
             figure {
                 width: calc(100vw - 1rem);
-                border-radius: 4px;
+                border-radius: var(--radius-sm);
             }
             .figure-pair {
                 width: calc(100vw - 1rem);
@@ -1372,7 +1398,7 @@
             }
             .demo-container {
                 width: calc(100vw - 1rem);
-                border-radius: 8px;
+                border-radius: var(--radius);
             }
             .demo-container iframe {
                 height: 500px;
@@ -1566,7 +1592,7 @@
           padding: 0.5rem 1rem;
           background: none;
           border: 1px solid var(--border, #d4d4d4);
-          border-radius: 6px;
+          border-radius: var(--radius);
           color: var(--muted, #666);
           font-family: var(--face);
           font-size: 0.875rem;
@@ -1710,7 +1736,7 @@
     
     <nav id="nav" role="navigation" aria-label="Main navigation">
         <div class="nav-inner">
-            <a href="#top" class="nav-title">MetaMedium</a>
+            <a href="#top" class="nav-title"><span class="meta">Meta</span>Medium</a>
             <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">
                 <span></span>
                 <span></span>
@@ -3192,7 +3218,7 @@
     </main>
 
     <footer>
-        <p class="footer-title">MetaMedium</p>
+        <p class="footer-title"><span class="meta">Meta</span>Medium</p>
         <p class="footer-subtitle">Principles for a Diagrammatic Understanding Interface</p>
         <p class="footer-subtitle">Bibliography: <a href="https://jhanacek.net/metamedium-resources-65" target="_blank" rel="noopener"><b>Resources Page</b></a></p>
         <p class="footer-copyright">© John Hanacek 2015 · <a href="https://johnhanacek.com" target="_blank" rel="noopener">JHDesign LLC</a></p>
@@ -4086,8 +4112,8 @@
             const size = isDrawing ? 14 : 10;
             
             const gradient = ctx.createRadialGradient(x, y, 0, x, y, 60);
-            gradient.addColorStop(0, isDrawing ? 'rgba(251, 146, 60, 0.25)' : 'rgba(59, 130, 246, 0.2)');
-            gradient.addColorStop(0.5, isDrawing ? 'rgba(251, 146, 60, 0.08)' : 'rgba(59, 130, 246, 0.05)');
+            gradient.addColorStop(0, isDrawing ? 'rgba(111, 179, 184, 0.25)' : 'rgba(138, 167, 201, 0.2)');
+            gradient.addColorStop(0.5, isDrawing ? 'rgba(111, 179, 184, 0.08)' : 'rgba(138, 167, 201, 0.05)');
             gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
             ctx.fillStyle = gradient;
             ctx.beginPath();
@@ -4507,7 +4533,7 @@
 
                 // Draw current stroke
                 if (demoCurrentStroke.length > 1) {
-                    demoCtx.strokeStyle = demoState === 'draw-fish' ? 'rgba(59, 130, 246, 0.8)' : 'rgba(111, 179, 184, 0.8)';
+                    demoCtx.strokeStyle = demoState === 'draw-fish' ? 'rgba(28, 95, 184, 0.85)' : 'rgba(11, 111, 125, 0.85)';
                     demoCtx.lineWidth = 3;
                     demoCtx.lineCap = 'round';
                     demoCtx.lineJoin = 'round';
@@ -4631,7 +4657,7 @@
                 demoCtx.clearRect(0, 0, width, height);
 
                 // Draw grid
-                demoCtx.strokeStyle = 'rgba(59, 130, 246, 0.06)';
+                demoCtx.strokeStyle = 'rgba(90, 72, 44, 0.07)';
                 demoCtx.lineWidth = 1;
                 const gridSize = 20;
                 for (let x = 0; x < width; x += gridSize) {
@@ -4674,7 +4700,7 @@
 
                 // Draw fish
                 if (demoFish) {
-                    demoCtx.strokeStyle = 'rgba(59, 130, 246, 0.8)';
+                    demoCtx.strokeStyle = 'rgba(28, 95, 184, 0.85)';
                     demoCtx.lineWidth = 3;
                     demoCtx.lineCap = 'round';
                     demoCtx.lineJoin = 'round';

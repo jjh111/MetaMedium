@@ -34,11 +34,13 @@ var MetaMediumCore = (() => {
     DEFAULT_SESSION_CONFIG: () => DEFAULT_SESSION_CONFIG,
     DEFAULT_SPEED: () => DEFAULT_SPEED,
     DEFAULT_TIMEOUT_MS: () => DEFAULT_TIMEOUT_MS,
+    DIRECTED_LINKS: () => DIRECTED_LINKS,
     HAND_RESOLUTION_PX: () => HAND_RESOLUTION_PX,
     KINDS: () => KINDS,
     LETTER_MAX_HEIGHT_PX: () => LETTER_MAX_HEIGHT_PX,
     LOCAL_PARTICIPANT: () => LOCAL_PARTICIPANT,
     LOCAL_TIMEOUT_MS: () => LOCAL_TIMEOUT_MS,
+    MATCH_FLOOR: () => MATCH_FLOOR,
     MAX_DRAWN: () => MAX_DRAWN,
     MAX_READINGS: () => MAX_READINGS,
     MAX_TIER0_CONFIDENCE: () => MAX_TIER0_CONFIDENCE,
@@ -49,12 +51,14 @@ var MetaMediumCore = (() => {
     SNAPPABLE: () => SNAPPABLE,
     SNAP_CONFIDENCE: () => SNAP_CONFIDENCE,
     SNAP_MARGIN: () => SNAP_MARGIN,
+    SYMMETRIC_LINKS: () => SYMMETRIC_LINKS,
     TARGETED: () => TARGETED,
     TIER0_PARTICIPANT: () => TIER0_PARTICIPANT,
     VERBS: () => VERBS,
     WORD_GAP_RATIO: () => WORD_GAP_RATIO,
     WORD_WINDOW_MS: () => WORD_WINDOW_MS,
     aboutIdsOf: () => aboutIdsOf,
+    addExample: () => addExample,
     addressablesOf: () => addressablesOf,
     analyzeCornerAngles: () => analyzeCornerAngles,
     analyzeStroke: () => analyzeStroke,
@@ -78,6 +82,7 @@ var MetaMediumCore = (() => {
     clusters: () => clusters,
     collidesWith: () => collidesWith,
     commandMarkFeatures: () => commandMarkFeatures,
+    compareSignatures: () => compareSignatures,
     complete: () => complete,
     convexHull: () => convexHull,
     countCorners: () => countCorners,
@@ -101,6 +106,7 @@ var MetaMediumCore = (() => {
     describeSession: () => describeSession,
     describeSignature: () => describeSignature,
     describeSnap: () => describeSnap,
+    describeStructure: () => describeStructure,
     disagreement: () => disagreement,
     elementsOf: () => elementsOf,
     enclosedBy: () => enclosedBy,
@@ -139,6 +145,7 @@ var MetaMediumCore = (() => {
     listModels: () => listModels,
     matchBrace: () => matchBrace,
     matchConcepts: () => matchConcepts,
+    matchDefinition: () => matchDefinition,
     matchPrimitiveFromLibrary: () => matchPrimitiveFromLibrary,
     matchesCommandMark: () => matchesCommandMark,
     measure: () => measure,
@@ -185,6 +192,7 @@ var MetaMediumCore = (() => {
     strokeFor: () => strokeFor,
     strokePointsOf: () => strokePointsOf,
     strokesIntersect: () => strokesIntersect,
+    structuralSignature: () => structuralSignature,
     textOf: () => textOf,
     topInterpretation: () => topInterpretation,
     transcriptOf: () => transcriptOf,
@@ -1585,6 +1593,105 @@ var MetaMediumCore = (() => {
   }
   function atOf(ev) {
     return "at" in ev && typeof ev.at === "number" ? ev.at : 0;
+  }
+
+  // src/session/signature.ts
+  var DIRECTED_LINKS = /* @__PURE__ */ new Set(["contains", "points-to"]);
+  var SYMMETRIC_LINKS = /* @__PURE__ */ new Set(["crossing", "touching", "near", "connects"]);
+  var MATCH_FLOOR = 0.75;
+  var SAME = 0.999;
+  var SHAPE_WEIGHT = 0.6;
+  var LINK_WEIGHT = 0.4;
+  function structuralSignature(ids, nodes, typeOf) {
+    const members = new Set(ids);
+    const shapes = {};
+    const links = {};
+    const types = /* @__PURE__ */ new Map();
+    for (const id of ids) {
+      const t = typeOf(id);
+      types.set(id, t);
+      shapes[t] = (shapes[t] ?? 0) + 1;
+    }
+    const seen = /* @__PURE__ */ new Set();
+    for (const id of ids) {
+      const node = nodes.get(id);
+      if (!node) continue;
+      for (const e of node.edges) {
+        if (!members.has(e.to) || e.to === id) continue;
+        const a = types.get(id), b = types.get(e.to);
+        let key2;
+        if (DIRECTED_LINKS.has(e.rel)) {
+          key2 = `${a}>${e.rel}>${b}`;
+        } else if (SYMMETRIC_LINKS.has(e.rel)) {
+          const [x, y] = [a, b].sort();
+          key2 = `${x}-${e.rel}-${y}`;
+        } else continue;
+        const pair = [id, e.to].sort().join("|") + "|" + e.rel;
+        if (seen.has(pair)) continue;
+        seen.add(pair);
+        links[key2] = (links[key2] ?? 0) + 1;
+      }
+    }
+    return { shapes, links, size: ids.length };
+  }
+  function bagDistance(a, b) {
+    let shared = 0, total = 0;
+    const keys = /* @__PURE__ */ new Set([...Object.keys(a), ...Object.keys(b)]);
+    for (const k of keys) {
+      const x = a[k] ?? 0, y = b[k] ?? 0;
+      shared += Math.min(x, y);
+      total += Math.max(x, y);
+    }
+    return { shared, total };
+  }
+  function printBag(bag) {
+    return Object.entries(bag).sort((p, q) => q[1] - p[1] || p[0].localeCompare(q[0])).map(([k, v]) => v > 1 ? `${v}\xD7${k}` : k).join(" + ");
+  }
+  function describeStructure(sig) {
+    const shapes = printBag(sig.shapes) || "nothing";
+    const links = Object.entries(sig.links).sort((p, q) => q[1] - p[1] || p[0].localeCompare(q[0])).map(([k, v]) => v > 1 ? `${k} \xD7${v}` : k).join(", ");
+    return links ? `${shapes}; ${links}` : `${shapes}; no links`;
+  }
+  function compareSignatures(a, b) {
+    const s = bagDistance(a.shapes, b.shapes);
+    const l = bagDistance(a.links, b.links);
+    const shapeScore = s.total === 0 ? 1 : s.shared / s.total;
+    const linkScore = l.total === 0 ? 1 : l.shared / l.total;
+    const score = SHAPE_WEIGHT * shapeScore + LINK_WEIGHT * linkScore;
+    const parts = [];
+    parts.push(shapeScore >= SAME ? `same shapes (${printBag(a.shapes)})` : `shapes ${s.shared}/${s.total} in common`);
+    if (l.total === 0) parts.push("no links either side");
+    else parts.push(linkScore >= SAME ? `same links (${Object.keys(a.links).length} kind${Object.keys(a.links).length === 1 ? "" : "s"})` : `links ${l.shared}/${l.total} in common`);
+    return { score, reasoning: parts.join("; ") };
+  }
+  function matchDefinition(group2, definition, examples) {
+    for (const r of examples?.rejected ?? []) {
+      if (compareSignatures(group2, r).score >= SAME) {
+        return { score: 0, vetoed: true, reasoning: "a group like this was corrected: not this" };
+      }
+    }
+    let best = compareSignatures(group2, definition);
+    let via = "the definition";
+    for (const a of examples?.accepted ?? []) {
+      const m = compareSignatures(group2, a);
+      if (m.score > best.score) {
+        best = m;
+        via = "an accepted example";
+      }
+    }
+    return { score: best.score, vetoed: false, reasoning: `${best.reasoning} \u2014 against ${via}` };
+  }
+  function addExample(examples, sig, verdict) {
+    const ex = { accepted: [...examples?.accepted ?? []], rejected: [...examples?.rejected ?? []] };
+    const same = (s) => compareSignatures(s, sig).score >= SAME;
+    if (verdict === "is") {
+      ex.rejected = ex.rejected.filter((s) => !same(s));
+      if (!ex.accepted.some(same)) ex.accepted.push(sig);
+    } else {
+      ex.accepted = ex.accepted.filter((s) => !same(s));
+      if (!ex.rejected.some(same)) ex.rejected.push(sig);
+    }
+    return ex;
   }
 
   // src/behave/verbs.ts
@@ -3649,17 +3756,21 @@ ${pad}</${tag}>`;
       return contentIds.filter((id) => id !== excludeId).map((id) => ({ id, bounds: boundsOf(nodes.get(id)) })).filter((c) => c.bounds !== void 0);
     }
     function signatureOf(ids) {
-      const sig = {};
-      for (const id of ids) {
-        const t = topInterpretation(nodes.get(id)) ?? "art";
-        sig[t] = (sig[t] ?? 0) + 1;
-      }
-      return sig;
+      return structuralSignature(ids, nodes, (id) => topInterpretation(nodes.get(id)) ?? "art");
     }
-    function signaturesEqual(a, b) {
-      const keys = /* @__PURE__ */ new Set([...Object.keys(a), ...Object.keys(b)]);
-      for (const k of keys) if ((a[k] ?? 0) !== (b[k] ?? 0)) return false;
-      return true;
+    function matchesFor(ids) {
+      const sig = signatureOf(ids);
+      const out = [];
+      for (const aid of artifacts) {
+        const a = nodes.get(aid);
+        const aSig = getRep(a, "signature")?.data;
+        if (!aSig) continue;
+        const examples = getRep(a, "examples")?.data;
+        const m = matchDefinition(sig, aSig, examples);
+        if (m.vetoed || m.score < MATCH_FLOOR) continue;
+        out.push({ artifactId: aid, name: wordOf(a) ?? aid, score: m.score, reasoning: m.reasoning });
+      }
+      return out.sort((p, q) => q.score - p.score);
     }
     function recomputeClusterCandidates() {
       clusterCandidates = [];
@@ -3669,31 +3780,21 @@ ${pad}</${tag}>`;
       for (const ids of groups) {
         const strokeIds = ids.filter((id) => !artifacts.includes(id));
         if (strokeIds.length < 2) continue;
-        const sig = signatureOf(strokeIds);
-        const matches = artifacts.map((aid) => {
-          const a = nodes.get(aid);
-          const aSig = getRep(a, "signature")?.data;
-          if (!aSig || !signaturesEqual(sig, aSig)) return null;
-          return { artifactId: aid, name: wordOf(a) ?? aid, score: 1 };
-        }).filter((m) => m !== null);
+        const matches = matchesFor(strokeIds);
         if (matches.length > 0) clusterCandidates.push({ nodeIds: strokeIds, matches });
       }
     }
     function makeSuggestions(enclosedIds) {
-      const sig = signatureOf(enclosedIds);
       const suggestions = [];
-      for (const aid of artifacts) {
-        const a = nodes.get(aid);
-        const aSig = getRep(a, "signature")?.data;
-        if (aSig && signaturesEqual(sig, aSig)) {
-          suggestions.push({
-            id: nextId("sug"),
-            kind: "match",
-            label: wordOf(a) ?? aid,
-            artifactId: aid,
-            score: 1
-          });
-        }
+      for (const m of matchesFor(enclosedIds)) {
+        suggestions.push({
+          id: nextId("sug"),
+          kind: "match",
+          label: m.name,
+          artifactId: m.artifactId,
+          score: m.score,
+          reasoning: m.reasoning
+        });
       }
       suggestions.push({ id: nextId("sug"), kind: "prompt", label: "Make\u2026" });
       suggestions.push({ id: nextId("sug"), kind: "name-as-new", label: "Name this\u2026" });
@@ -4389,6 +4490,30 @@ ${pad}</${tag}>`;
     function applySplit(ev) {
       shrinkWord(ev.nodeId, null);
     }
+    function applyCorrect(ev) {
+      const def = nodes.get(ev.definitionId);
+      if (!def || !artifacts.includes(ev.definitionId)) return;
+      const ids = ev.ids.filter((id) => nodes.has(id));
+      if (ids.length === 0) return;
+      const sig = signatureOf(ids);
+      const prev = getRep(def, "examples")?.data;
+      def.reps = def.reps.filter((r) => r.modality !== "examples");
+      def.reps.push({
+        modality: "examples",
+        data: addExample(prev, sig, ev.verdict),
+        source: ev.participantId ?? LOCAL_PARTICIPANT
+      });
+      recomputeClusterCandidates();
+      if (summon && sameSet(summon.enclosedIds, ids)) {
+        summon.suggestions = summon.suggestions.filter((g) => g.kind !== "match");
+        summon.suggestions.unshift(...makeSuggestions(ids).filter((g) => g.kind === "match"));
+      }
+    }
+    function sameSet(a, b) {
+      if (a.length !== b.length) return false;
+      const set = new Set(a);
+      return b.every((x) => set.has(x));
+    }
     function applySummon(ev) {
       if (!pendingLasso) return null;
       const lassoNode = nodes.get(pendingLasso.id);
@@ -4448,6 +4573,9 @@ ${pad}</${tag}>`;
           return applyAnswer(ev);
         case "teach":
           applyTeach(ev);
+          return null;
+        case "correct":
+          applyCorrect(ev);
           return null;
         case "summon":
           return applySummon(ev);
@@ -4546,6 +4674,8 @@ ${pad}</${tag}>`;
       propose: (args) => void dispatch({ type: "propose", ...args }),
       answer: (args) => dispatch({ type: "answer", ...args }),
       teachCommandMark: (mark, at) => void dispatch({ type: "teach", mark, at }),
+      correct: (args) => void dispatch({ type: "correct", ...args }),
+      matchesOf: (ids) => matchesFor(ids),
       tidy: (args) => void dispatch({ type: "tidy", ...args }),
       snap: (args) => void dispatch({ type: "snap", ...args }),
       snapCandidates: (ids) => candidatesAmong(ids ?? snappableIds()),

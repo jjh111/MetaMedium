@@ -1420,7 +1420,8 @@
       ctx.lineWidth = wpx(1);
       ctx.strokeRect(b.minX - pad, b.minY - pad, b.maxX - b.minX + pad * 2, b.maxY - b.minY + pad * 2);
       ctx.setLineDash([]);
-      text(c.matches[0].name + '?  circle + mark to confirm', b.minX - wpx(12), b.minY - wpx(20), `rgba(${C.goldRGB},0.72)`);
+      // Plural, like every reading: two definitions with the same shapes are both named.
+      text(c.matches.map((m) => m.name).join(' or ') + '?  circle + mark to confirm', b.minX - wpx(12), b.minY - wpx(20), `rgba(${C.goldRGB},0.72)`);
     }
 
     const inspectedId = hoverId || lastContentId(s);
@@ -1685,10 +1686,20 @@
     // The engine's own offers: an artifact this matches, and the plain ways out.
     for (const sug of sum.suggestions) {
       if (sug.kind === 'match') {
+        // The refusal sits beside the offer: a match the engine will not stop
+        // making is a mode, and the correction is what teaches it (WP-12).
+        items.push({
+          key: 'not:' + sug.id, group: 'always', groupConf: 0, groupWhy: '',
+          label: 'Not a ' + sug.label, why: 'remembered — a group like this is not offered as one again', tier: 0,
+          run: () => {
+            session.correct({ ids: sum.enclosedIds.slice(), definitionId: sug.artifactId, verdict: 'is-not', at: Date.now() });
+            refreshPalette(); // the summon stays open; the refused offer is gone from it
+          },
+        });
         items.unshift({
           key: 'sug:' + sug.id, group: 'known', groupConf: sug.score || 1,
           groupWhy: 'you have named this shape before',
-          label: 'It’s a ' + sug.label, why: 'hold it as another one', tier: 0,
+          label: 'It’s a ' + sug.label, why: sug.reasoning || 'hold it as another one', tier: 0,
           run: () => session.bless({ summonId: sum.id, suggestionId: sug.id, at: Date.now() }),
         });
       }
@@ -2297,7 +2308,12 @@
       const sig = (node.reps.find((r) => r.modality === 'signature') || {}).data;
       if (sig) {
         html += '<div class="row"><span class="k">sig</span><span class="v">' +
-          esc(Object.entries(sig).map(([k, v]) => v + '×' + k).join(' + ')) + '</span></div>';
+          esc(sig.shapes ? MM.describeStructure(sig) : Object.entries(sig).map(([k, v]) => v + '×' + k).join(' + ')) + '</span></div>';
+      }
+      const ex = (node.reps.find((r) => r.modality === 'examples') || {}).data;
+      if (ex && (ex.accepted.length || ex.rejected.length)) {
+        html += '<div class="row"><span class="k">corrected</span><span class="v">' +
+          ex.accepted.length + ' is, ' + ex.rejected.length + ' is not</span></div>';
       }
       const inst = node.edges.find((e) => e.rel === 'instance-of');
       if (inst) html += '<div class="row"><span class="k">same as</span><span class="v">' + esc(inst.to) + '</span></div>';

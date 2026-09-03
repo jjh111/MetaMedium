@@ -554,6 +554,21 @@ window.__scenario = async function(){
     trio(4200, 2400);
     const cands = mm.session.getState().clusterCandidates;
     step('17b. the next group like it is recognised by its signature: the model\'s word, in the library', cands.some(c => c.matches.some(m => m.name === 'page-layout')), cands.map(c => c.matches.map(m => m.name)));
+    // The correction: circle the look-alike, refuse the match, and it stays refused.
+    const cU = W(4280, 2400);
+    t.stroke(t.circle(cU.x, cU.y, 170 * z));
+    document.getElementById('heldOffer').click(); await wait(60);
+    const chipsC = t.chips();
+    step('17c. the palette offers the match and, beside it, the refusal', chipsC.includes('It’s a page-layout') && chipsC.includes('Not a page-layout'), chipsC);
+    const notBtn = [...document.querySelectorAll('#summon .item')].find(b => /Not a page-layout/.test(b.textContent));
+    if (notBtn) notBtn.click(); await wait(60);
+    const chipsD = t.chips();
+    const stC = mm.session.getState();
+    step('17d. refusing it is a correct event; the offer leaves the open palette and the candidate goes', mm.session.getEvents().slice(-1)[0].type === 'correct' && !chipsD.includes('It’s a page-layout') && !stC.clusterCandidates.some(c => c.matches.some(m => m.name === 'page-layout')), { last: mm.session.getEvents().slice(-1)[0].type, chips: chipsD });
+    if (stC.summon) mm.session.dismiss(stC.summon.id, Date.now());
+    trio(4200, 2700);
+    const candsE = mm.session.getState().clusterCandidates;
+    step('17e. the next group like it is not offered as one either — the correction holds', !candsE.some(c => c.matches.some(m => m.name === 'page-layout')), candsE.map(c => c.matches.map(m => m.name)));
   }
 
   // ---- 18. Selection: the loop that finished. Drag it, tap off, undo the tap-off ----
