@@ -1,0 +1,1128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MetaMedium — Style</title>
+<meta name="description" content="The MetaMedium visual system: light paper, one face, colour as signal.">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='11' fill='none' stroke='%230b6f7d' stroke-width='2.5'/%3E%3Cpath d='M9 20 L14 25 L24 9' fill='none' stroke='%231c5fb8' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="tokens.css">
+<style>
+/* ==========================================================================
+   MetaMedium — styleguide page.
+   Every value comes from tokens.css. If a number appears here that should be
+   shared, it belongs in tokens.css instead. Nothing below branches on theme.
+   ========================================================================== */
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { font-size: 17px; scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
+}
+
+body {
+  background-color: var(--paper);
+  /* The faint canvas grid. MetaMedium's ground is a surface you draw on;
+     the grid says so without asking for attention. */
+  background-image:
+    linear-gradient(to right, var(--grid) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--grid) 1px, transparent 1px);
+  background-size: var(--grid-size) var(--grid-size);
+  color: var(--ink);
+  font-family: var(--face);
+  font-size: var(--t-body);
+  font-weight: 400;
+  line-height: var(--lead-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection { background: var(--hl); }
+code, .code, .smp-num, .val { font-variant-ligatures: none; }
+:focus-visible { outline: 2px solid var(--teal); outline-offset: 3px; }
+
+/* ---- shared furniture ---------------------------------------------------- */
+.wrap { max-width: var(--wide); margin: 0 auto; padding: 0 var(--s4); }
+
+section.band { padding: var(--s6) 0; }
+section.band + section.band { border-top: 1px solid var(--rule-soft); }
+
+.kicker {
+  display: flex; align-items: center; gap: var(--s3);
+  font-size: var(--t-meta); font-weight: 500;
+  letter-spacing: 0.2em; text-transform: uppercase;
+  color: var(--teal);
+  margin-bottom: var(--s3);
+}
+.kicker .num { color: var(--ink-4); font-weight: 400; }
+.kicker::after { content: ''; flex: 1; height: 1px; background: var(--rule); }
+
+h2.head {
+  font-size: var(--t-h2); font-weight: 500;
+  line-height: var(--lead-tight); letter-spacing: -0.015em;
+  margin-bottom: var(--s2);
+}
+h2.head em { font-style: normal; color: var(--teal); }
+
+h3.sub {
+  font-size: var(--t-meta); font-weight: 500;
+  letter-spacing: 0.16em; text-transform: uppercase;
+  color: var(--ink-3);
+  margin: var(--s5) 0 var(--s3);
+  padding-bottom: var(--s1);
+  border-bottom: 1px solid var(--rule-soft);
+}
+
+p.lede {
+  max-width: var(--measure); color: var(--ink-2);
+  margin-bottom: var(--s4);
+}
+p.lede strong { color: var(--ink); font-weight: 500; }
+p.lede em { font-style: italic; color: var(--ink); }
+
+.note {
+  max-width: var(--measure);
+  font-size: var(--t-small); color: var(--ink-3);
+  margin-top: var(--s3);
+}
+.note b { color: var(--ink-2); font-weight: 500; }
+
+.hl     { background: var(--hl);     padding: 0.05em 0.24em; border-radius: var(--radius); }
+.hl-hot { background: var(--hl-hot); padding: 0.05em 0.24em; border-radius: var(--radius); color: var(--sig-low); }
+
+.card {
+  background: var(--paper-lt);
+  border: 1px solid var(--paper-edge);
+  border-radius: var(--radius);
+  padding: var(--s4);
+  box-shadow: var(--lift);
+}
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s3); }
+.grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s3); }
+.grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--s3); }
+/* A grid item's min-width defaults to auto, so one wide code block inside a
+   card refuses to shrink and pushes the whole page sideways. Same rule the
+   scaffold builder learned the hard way. */
+.grid-2 > *, .grid-3 > *, .grid-4 > * { min-width: 0; }
+
+/* ---- masthead ----------------------------------------------------------- */
+.masthead { padding: var(--s6) 0 var(--s5); }
+.masthead .eyebrow {
+  font-size: var(--t-meta); font-weight: 500;
+  letter-spacing: 0.22em; text-transform: uppercase;
+  color: var(--teal); margin-bottom: var(--s4);
+}
+.wordmark {
+  font-size: var(--t-display); font-weight: 500;
+  line-height: 0.98; letter-spacing: -0.035em;
+  color: var(--ink);
+}
+.wordmark em { font-style: normal; color: var(--teal); }
+.masthead .tagline {
+  margin-top: var(--s3); max-width: var(--measure);
+  font-size: 1.05rem; color: var(--ink-2);
+}
+.masthead .meta {
+  margin-top: var(--s4); padding-top: var(--s3);
+  border-top: 1px solid var(--rule);
+  display: flex; flex-wrap: wrap; gap: var(--s3) var(--s4);
+  font-size: var(--t-meta); letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--ink-3);
+}
+
+/* Theme switch — proves the dark surface is this system, not another one.
+   Bottom right, like a device preference on the canvas surface: a control
+   pinned over a heading is chrome getting in the way of the page. */
+.theme-switch {
+  position: fixed; bottom: var(--s3); right: var(--s3); z-index: 50;
+  display: flex; gap: 0; border: 1px solid var(--rule);
+  border-radius: var(--radius); overflow: hidden;
+  background: var(--paper-lt); box-shadow: var(--lift);
+}
+.theme-switch button {
+  font-family: var(--face); font-size: var(--t-micro); font-weight: 500;
+  letter-spacing: 0.14em; text-transform: uppercase;
+  padding: 0.45rem 0.7rem; border: 0; cursor: pointer;
+  background: transparent; color: var(--ink-3);
+}
+.theme-switch button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+
+/* ---- 01 foundations ----------------------------------------------------- */
+.law { display: grid; grid-template-columns: 2.2rem 1fr; gap: var(--s3); align-items: start; }
+.law + .law { margin-top: var(--s4); padding-top: var(--s4); border-top: 1px solid var(--rule-soft); }
+.law .n {
+  font-size: var(--t-h3); font-weight: 500; color: var(--teal);
+  line-height: 1.2;
+}
+.law h4 { font-size: var(--t-body); font-weight: 500; margin-bottom: var(--s1); }
+.law p { color: var(--ink-2); font-size: var(--t-small); max-width: 62ch; }
+.law p b { color: var(--ink); font-weight: 500; }
+
+/* ---- 02 palette --------------------------------------------------------- */
+.swatch {
+  border: 1px solid var(--paper-edge); border-radius: var(--radius);
+  background: var(--paper-lt); overflow: hidden;
+}
+.swatch .chip {
+  height: 74px; border-bottom: 1px solid var(--paper-edge);
+  display: block;
+}
+.swatch .body { padding: var(--s2) var(--s3) var(--s3); }
+.swatch .name {
+  font-size: var(--t-micro); font-weight: 600;
+  letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink);
+}
+.swatch .hex { font-size: var(--t-small); color: var(--ink-3); }
+.swatch .role { font-size: var(--t-micro); color: var(--ink-3); margin-top: var(--s1); line-height: 1.5; }
+
+.signal-row {
+  display: grid; grid-template-columns: 1.6rem 8.5rem 1fr;
+  gap: var(--s3); align-items: center;
+  padding: var(--s2) 0; border-bottom: 1px dotted var(--rule);
+}
+.signal-row:last-child { border-bottom: 0; }
+.signal-row .dot { width: 12px; height: 12px; border-radius: 50%; justify-self: center; }
+.signal-row .tok { font-size: var(--t-small); font-weight: 500; }
+.signal-row .say { font-size: var(--t-small); color: var(--ink-3); }
+
+/* ---- 03 type ------------------------------------------------------------ */
+.type-row {
+  display: grid; grid-template-columns: 9rem 1fr 11rem;
+  gap: var(--s3); align-items: baseline;
+  padding: var(--s3) 0; border-bottom: 1px dotted var(--rule);
+}
+.type-row:last-child { border-bottom: 0; }
+.type-row .label {
+  font-size: var(--t-micro); font-weight: 600;
+  letter-spacing: 0.16em; text-transform: uppercase; color: var(--teal);
+}
+.type-row .spec { font-size: var(--t-micro); color: var(--ink-4); letter-spacing: 0.04em; text-align: right; line-height: 1.7; }
+.smp-display { font-size: var(--t-h1); font-weight: 500; letter-spacing: -0.03em; line-height: 1.02; }
+.smp-display em { font-style: normal; color: var(--teal); }
+.smp-h2 { font-size: var(--t-h2); font-weight: 500; letter-spacing: -0.015em; line-height: 1.1; }
+.smp-h3 { font-size: var(--t-h3); font-weight: 500; letter-spacing: -0.01em; }
+.smp-body { font-size: var(--t-body); color: var(--ink-2); line-height: var(--lead-body); }
+.smp-small { font-size: var(--t-small); color: var(--ink-2); }
+.smp-meta { font-size: var(--t-meta); letter-spacing: 0.18em; text-transform: uppercase; color: var(--ink-3); }
+.smp-num { font-size: var(--t-body); color: var(--ink); font-variant-numeric: tabular-nums; }
+
+/* ---- 04 the mark -------------------------------------------------------- */
+.mark-tile {
+  border: 1px solid var(--paper-edge); border-radius: var(--radius);
+  min-height: 210px; padding: var(--s4);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--s3);
+  text-align: center;
+}
+.mark-tile.on-paper { background: var(--paper-lt); }
+.mark-tile.on-wash  { background: var(--paper-dk); }
+.mark-tile.on-ink   { background: var(--ink); }
+.mark-tile .wm { font-size: 1.5rem; font-weight: 500; letter-spacing: -0.03em; color: var(--ink); }
+.mark-tile .wm em { font-style: normal; color: var(--teal); }
+.mark-tile.on-ink .wm { color: var(--paper); }
+.mark-tile.on-ink .wm em { color: var(--teal-soft); }
+.mark-tile .tag {
+  font-size: var(--t-micro); font-weight: 500;
+  letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-3);
+}
+.mark-tile.on-ink .tag { color: var(--ink-4); }
+.signet { width: 76px; height: 76px; display: block; }
+
+/* ---- 05 ink ------------------------------------------------------------- */
+.ink-tile {
+  background: var(--paper-lt);
+  border: 1px solid var(--paper-edge); border-radius: var(--radius);
+  padding: var(--s3);
+}
+.ink-tile svg { display: block; width: 100%; height: auto; }
+.ink-tile .cap {
+  margin-top: var(--s2); padding-top: var(--s2);
+  border-top: 1px solid var(--rule-soft);
+}
+.ink-tile .cap b {
+  display: block; font-size: var(--t-micro); font-weight: 600;
+  letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink);
+  margin-bottom: 0.15rem;
+}
+.ink-tile .cap span { font-size: var(--t-micro); color: var(--ink-3); line-height: 1.6; }
+
+/* ---- 06 readings -------------------------------------------------------- */
+.reading {
+  background: var(--paper-lt); border: 1px solid var(--paper-edge);
+  border-radius: var(--radius); padding: var(--s3) var(--s4);
+}
+.reading .r-head {
+  display: flex; align-items: baseline; justify-content: space-between; gap: var(--s3);
+  padding-bottom: var(--s2); border-bottom: 1px solid var(--rule);
+  font-size: var(--t-micro); letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-3);
+}
+.cand {
+  display: grid; grid-template-columns: 1fr auto auto;
+  gap: var(--s3); align-items: center;
+  padding: var(--s2) 0; border-bottom: 1px dotted var(--rule);
+}
+.cand:last-child { border-bottom: 0; }
+.cand .what { font-size: var(--t-small); font-weight: 500; }
+.cand .what small { display: block; font-weight: 400; font-size: var(--t-micro); color: var(--ink-3); letter-spacing: 0; }
+/* Confidence is a meter of ticks, not a filled bar: a measurement reads as
+   discrete evidence, and a bar reads as a progress promise. */
+.meter { display: flex; gap: 2px; align-items: flex-end; height: 14px; }
+.meter i { width: 3px; height: 100%; background: var(--rule); border-radius: 1px; display: block; }
+.meter i.on { background: var(--sig-high); }
+.meter.mid i.on { background: var(--sig-mid); }
+.meter.low i.on { background: var(--sig-low); }
+.cand .val { font-size: var(--t-small); color: var(--ink-3); font-variant-numeric: tabular-nums; min-width: 3.2rem; text-align: right; }
+
+.who {
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  font-size: var(--t-micro); font-weight: 500;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  padding: 0.18rem 0.45rem;
+  border: 1px solid var(--rule); border-radius: var(--radius);
+  color: var(--ink-3); background: var(--paper);
+}
+.who::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--ink-4); }
+.who.t0::before      { background: var(--sig-high); }
+.who.t0              { color: var(--teal); border-color: var(--teal); }
+.who.local::before   { background: var(--sig-model); }
+.who.local           { color: var(--sig-model); border-color: var(--sig-model); }
+.who.hosted::before  { background: var(--sig-read); }
+.who.hosted          { color: var(--sig-read); border-color: var(--sig-read); }
+.who.human::before   { background: var(--ink); }
+.who.human           { color: var(--ink-2); border-color: var(--ink-3); }
+
+.ladder { display: grid; gap: 0; }
+.rung {
+  display: grid; grid-template-columns: 6.2rem 1fr;
+  gap: var(--s3); align-items: baseline;
+  padding: var(--s2) 0; border-bottom: 1px dotted var(--rule);
+}
+.rung:last-child { border-bottom: 0; }
+.rung .lv { font-size: var(--t-micro); font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--teal); }
+.rung .vv { font-size: var(--t-small); color: var(--ink-2); }
+.rung .vv b { color: var(--ink); font-weight: 500; }
+
+/* ---- 07 UI -------------------------------------------------------------- */
+.btn {
+  font-family: var(--face); font-size: var(--t-small); font-weight: 500;
+  letter-spacing: 0.02em;
+  padding: 0.55rem 1.05rem;
+  border: 1px solid var(--ink); border-radius: var(--radius);
+  background: var(--ink); color: var(--paper);
+  cursor: pointer; transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.btn:hover { background: var(--teal); border-color: var(--teal); }
+.btn.accent { background: var(--teal); border-color: var(--teal); color: var(--paper-lt); }
+.btn.accent:hover { background: var(--teal-deep); border-color: var(--teal-deep); }
+.btn.quiet { background: transparent; color: var(--ink); border-color: var(--rule); }
+.btn.quiet:hover { border-color: var(--teal); color: var(--teal); background: var(--wash); }
+.btn.bare { background: transparent; border-color: transparent; color: var(--teal); padding-inline: 0.3rem; }
+.btn.bare:hover { background: var(--wash); border-color: transparent; color: var(--teal-deep); }
+.btn-row { display: flex; flex-wrap: wrap; gap: var(--s2); align-items: center; }
+
+.badge {
+  font-size: var(--t-micro); font-weight: 500;
+  letter-spacing: 0.12em; text-transform: uppercase;
+  padding: 0.2rem 0.5rem;
+  border: 1px solid var(--rule); border-radius: var(--radius);
+  color: var(--ink-3); background: var(--paper);
+}
+.badge.read { color: var(--sig-read); border-color: var(--sig-read); background: var(--tint-read); }
+.badge.held { color: var(--sig-held); border-color: var(--sig-held); }
+.badge.gone { color: var(--sig-low); border-color: var(--sig-low); background: var(--tint-low); }
+
+.field { display: flex; flex-direction: column; gap: var(--s1); max-width: 22rem; }
+.field label { font-size: var(--t-micro); font-weight: 500; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-3); }
+.input {
+  font-family: var(--face); font-size: var(--t-small);
+  padding: 0.55rem 0.7rem;
+  background: var(--paper); color: var(--ink);
+  border: 1px solid var(--rule); border-radius: var(--radius);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.input:focus { outline: none; border-color: var(--teal); box-shadow: 0 0 0 3px var(--wash); }
+
+.code {
+  background: var(--paper-dk); color: var(--ink);
+  border: 1px solid var(--paper-edge); border-radius: var(--radius);
+  padding: var(--s3); font-size: var(--t-small); line-height: 1.85;
+  white-space: pre;          /* measured data keeps the shape it was written in */
+  font-variant-ligatures: none;  /* -- and -> are data, not one glyph */
+  overflow-x: auto;
+}
+.code .k { color: var(--teal); }
+.code .n { color: var(--sig-read); font-variant-numeric: tabular-nums; }
+.code .c { color: var(--ink-4); }
+
+/* the held-loop chip, straight off the canvas surface */
+.chip {
+  display: inline-flex; align-items: center; gap: var(--s2); flex-wrap: wrap;
+  background: var(--paper-lt); border: 1px solid var(--teal);
+  border-radius: var(--radius); padding: var(--s2) var(--s3);
+  font-size: var(--t-small); color: var(--ink-2);
+  box-shadow: var(--lift);
+}
+.chip .count { color: var(--teal); font-weight: 500; }
+
+/* the summon palette */
+.palette-menu {
+  background: var(--paper-lt); border: 1px solid var(--paper-edge);
+  border-radius: var(--radius); box-shadow: var(--lift);
+  max-width: 24rem; overflow: hidden;
+}
+.palette-menu .pm-head {
+  padding: var(--s2) var(--s3);
+  border-bottom: 1px solid var(--rule);
+  font-size: var(--t-micro); letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-3);
+}
+.palette-menu .pm-item {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--s3);
+  padding: var(--s2) var(--s3);
+  font-size: var(--t-small); color: var(--ink);
+  border-bottom: 1px solid var(--rule-soft); cursor: pointer;
+}
+.palette-menu .pm-item:last-child { border-bottom: 0; }
+.palette-menu .pm-item:hover { background: var(--wash); }
+.palette-menu .pm-item em { font-style: normal; color: var(--teal); }
+
+/* the inspector panel */
+.panel {
+  background: var(--paper-lt); border: 1px solid var(--paper-edge);
+  border-radius: var(--radius); box-shadow: var(--lift);
+  max-width: 24rem;
+}
+.panel .p-head {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: var(--s2) var(--s3); border-bottom: 1px solid var(--rule);
+  font-size: var(--t-micro); letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-3);
+}
+.panel .p-row {
+  display: grid; grid-template-columns: 5.4rem 1fr; gap: var(--s2);
+  padding: var(--s1) var(--s3); font-size: var(--t-small);
+}
+.panel .p-row:first-of-type { padding-top: var(--s2); }
+.panel .p-row:last-child { padding-bottom: var(--s3); }
+.panel .p-row dt { font-size: var(--t-micro); letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-3); padding-top: 0.24rem; }
+.panel .p-row dd { color: var(--ink); }
+.panel .p-row dd small { color: var(--ink-3); }
+
+/* ---- 08 surfaces --------------------------------------------------------
+   The only place in this page that hardcodes colour: both grounds have to be
+   on screen at once, so neither can read from the live token set. These values
+   are copies of tokens.css and must be updated with it. */
+.surface {
+  border: 1px solid var(--paper-edge); border-radius: var(--radius);
+  overflow: hidden;
+}
+.surface .s-head {
+  padding: var(--s2) var(--s3); border-bottom: 1px solid var(--rule);
+  font-size: var(--t-micro); font-weight: 500;
+  letter-spacing: 0.16em; text-transform: uppercase;
+}
+.surface .s-body { padding: var(--s4); display: flex; flex-direction: column; gap: var(--s3); }
+.surface.light { background: #f3f7f8; color: #0c1a24; }
+.surface.light .s-head { background: #fbfcfd; color: #5b7080; border-color: #cfdde1; }
+.surface.dark { background: #08131a; color: #e3edf1; border-color: #1c2f39; }
+.surface.dark .s-head { background: #0e1e27; color: #7d939e; border-color: #1c2f39; }
+.surface .demo-wm { font-size: 1.3rem; font-weight: 500; letter-spacing: -0.03em; }
+.surface.light .demo-wm em { font-style: normal; color: #0b6f7d; }
+.surface.dark .demo-wm em  { font-style: normal; color: #4fb3bf; }
+.surface .demo-line { font-size: var(--t-small); }
+.surface.light .demo-line { color: #2a3d49; }
+.surface.dark .demo-line  { color: #b6c8d0; }
+.surface .demo-btns { display: flex; gap: var(--s2); }
+.surface .demo-btn {
+  font-family: var(--face); font-size: var(--t-micro); font-weight: 500;
+  padding: 0.4rem 0.75rem; border-radius: var(--radius); border: 1px solid;
+}
+.surface.light .demo-btn.a { background: #0b6f7d; color: #fbfcfd; border-color: #0b6f7d; }
+.surface.light .demo-btn.b { background: transparent; color: #0c1a24; border-color: #cfdde1; }
+.surface.dark  .demo-btn.a { background: #4fb3bf; color: #08131a; border-color: #4fb3bf; }
+.surface.dark  .demo-btn.b { background: transparent; color: #e3edf1; border-color: #1c2f39; }
+
+/* ---- 09 specimen -------------------------------------------------------- */
+.specimen {
+  max-width: 760px; margin: 0 auto;
+  background: var(--paper-lt);
+  border: 1px solid var(--paper-edge); border-radius: var(--radius);
+  padding: var(--s6) clamp(var(--s4), 6vw, 3.5rem);
+  box-shadow: var(--lift);
+}
+.specimen .sp-eyebrow {
+  font-size: var(--t-meta); font-weight: 500;
+  letter-spacing: 0.2em; text-transform: uppercase; color: var(--teal);
+  margin-bottom: var(--s2);
+}
+.specimen h3 {
+  font-size: var(--t-h2); font-weight: 500;
+  line-height: var(--lead-tight); letter-spacing: -0.02em;
+  margin-bottom: var(--s3);
+}
+.specimen h3 em { font-style: normal; color: var(--teal); }
+.specimen .sp-byline {
+  font-size: var(--t-meta); letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--ink-3);
+  padding-bottom: var(--s3); margin-bottom: var(--s4);
+  border-bottom: 1px solid var(--rule);
+}
+.specimen p { max-width: var(--measure); color: var(--ink-2); margin-bottom: var(--s3); }
+.specimen p strong { color: var(--ink); font-weight: 500; }
+.specimen p em { font-style: italic; color: var(--ink); }
+/* No drop cap, no small caps: mono has neither, and faking them is a costume. */
+.specimen .pull {
+  margin: var(--s4) 0; padding: var(--s3) 0;
+  border-top: 1px solid var(--teal); border-bottom: 1px solid var(--teal);
+  font-size: 1.14rem; line-height: 1.45; color: var(--ink);
+  max-width: var(--measure);
+}
+.specimen figure { margin: var(--s4) 0; }
+.specimen figcaption {
+  margin-top: var(--s2); padding-top: var(--s2);
+  border-top: 1px solid var(--rule-soft);
+  font-size: var(--t-small); color: var(--ink-3);
+}
+.specimen figcaption b { color: var(--teal); font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; font-size: var(--t-micro); }
+.fig-well {
+  background: var(--paper-dk); border: 1px solid var(--paper-edge);
+  border-radius: var(--radius); padding: var(--s3);
+}
+.fig-well svg { display: block; width: 100%; height: auto; }
+
+/* ---- 10 voice ----------------------------------------------------------- */
+.voice { display: flex; flex-direction: column; gap: var(--s3); }
+.voice .v-tag { font-size: var(--t-micro); font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: var(--teal); }
+.voice blockquote { font-size: 1.05rem; line-height: 1.45; color: var(--ink); }
+.voice blockquote em { font-style: normal; color: var(--teal); }
+.voice .v-note { font-size: var(--t-small); color: var(--ink-3); }
+
+.doNot { display: grid; grid-template-columns: 1fr 1fr; gap: 0; border: 1px solid var(--paper-edge); border-radius: var(--radius); overflow: hidden; }
+.doNot > div { padding: var(--s3); background: var(--paper-lt); }
+.doNot > div + div { border-left: 1px solid var(--rule-soft); }
+.doNot h5 { font-size: var(--t-micro); font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; margin-bottom: var(--s2); }
+.doNot .yes h5 { color: var(--teal); }
+.doNot .no h5  { color: var(--sig-low); }
+.doNot li { list-style: none; font-size: var(--t-small); color: var(--ink-2); padding: 0.25rem 0 0.25rem 1.1rem; position: relative; }
+.doNot li::before { position: absolute; left: 0; top: 0.25rem; }
+.doNot .yes li::before { content: '+'; color: var(--teal); }
+.doNot .no  li::before { content: '\2013'; color: var(--sig-low); }
+
+/* ---- colophon ----------------------------------------------------------- */
+.colophon {
+  border-top: 1px solid var(--rule);
+  padding: var(--s5) 0 var(--s6);
+  font-size: var(--t-small); color: var(--ink-3);
+}
+.colophon .rule { width: 44px; height: 1px; background: var(--teal); margin-bottom: var(--s3); }
+.colophon p { max-width: var(--measure); margin-bottom: var(--s2); }
+.colophon code { color: var(--teal); }
+.colophon .stamp { margin-top: var(--s3); font-size: var(--t-micro); letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-4); }
+
+/* ---- responsive --------------------------------------------------------- */
+@media (max-width: 900px) {
+  html { font-size: 16px; }
+  .grid-4 { grid-template-columns: repeat(2, 1fr); }
+  .grid-3, .grid-2 { grid-template-columns: 1fr; }
+  .type-row { grid-template-columns: 1fr; gap: var(--s1); }
+  .type-row .spec { text-align: left; }
+  .signal-row { grid-template-columns: 1.2rem 1fr; }
+  .signal-row .say { grid-column: 2; }
+  .doNot { grid-template-columns: 1fr; }
+  .doNot > div + div { border-left: 0; border-top: 1px solid var(--rule-soft); }
+  .theme-switch { position: static; margin: var(--s3) auto 0; width: max-content; box-shadow: none; }
+}
+</style>
+</head>
+<body>
+
+<div class="theme-switch" role="group" aria-label="Surface">
+  <button type="button" data-theme-set="light" aria-pressed="true">Paper</button>
+  <button type="button" data-theme-set="dark" aria-pressed="false">Canvas</button>
+</div>
+
+<header class="masthead">
+  <div class="wrap">
+    <div class="eyebrow">MetaMedium &middot; Visual System &middot; v1 draft</div>
+    <h1 class="wordmark">Meta<em>Medium</em></h1>
+    <p class="tagline">A drawing is code. So the drawing and the code are set in the same face, on the same paper, and every colour on the surface is the engine saying what it knows.</p>
+    <div class="meta">
+      <span>IBM Plex Mono</span>
+      <span>Teal #0b6f7d</span>
+      <span>Paper first</span>
+      <span>Colour = signal</span>
+      <span>3 Sept 2026</span>
+    </div>
+  </div>
+</header>
+
+<!-- ======================= 01 · FOUNDATIONS ======================= -->
+<section class="band" id="foundations">
+  <div class="wrap">
+    <div class="kicker"><span class="num">01</span> Foundations</div>
+    <h2 class="head">Four laws. <em>Everything else is a consequence.</em></h2>
+    <p class="lede">The system is small on purpose. A rule that has to be remembered is a rule that will drift, and this project already has three palettes in three surfaces because nobody wrote the rule down.</p>
+
+    <div class="card">
+      <div class="law">
+        <div class="n">I</div>
+        <div>
+          <h4>Paper first.</h4>
+          <p>MetaMedium is a surface you draw on, so the light surface <b>is</b> the design and the dark surface is that same design inverted for a canvas you stare at for an hour. Dark mode changes tokens only. <b>No rule below the token layer may branch on theme</b> — if a component needs to know which surface it is on, the token set is wrong.</p>
+        </div>
+      </div>
+      <div class="law">
+        <div class="n">II</div>
+        <div>
+          <h4>One face carries everything.</h4>
+          <p>IBM Plex Mono sets display, prose, UI and code. A project whose whole claim is that <b>a drawing is code</b> cannot change voice between the drawing and the code. Register is made with size, weight, spacing and rules — never with a second typeface.</p>
+        </div>
+      </div>
+      <div class="law">
+        <div class="n">III</div>
+        <div>
+          <h4>Colour is signal, not decoration.</h4>
+          <p>Teal is the keyword. Blue means <b>read and accepted</b>. Grey means <b>held, unblessed</b>. Amber and red are confidence and damage. Purple is <b>a model contributed this</b>. Nothing on the surface is coloured because it looked flat, and <b>no colour is ever applied as an accent bar</b> — a filled chip that names a value is fine; a stripe down the side of a card that means nothing is not.</p>
+        </div>
+      </div>
+      <div class="law">
+        <div class="n">IV</div>
+        <div>
+          <h4>Ink is never destroyed, so ink is never covered.</h4>
+          <p>The engine keeps the hand's stroke under every clean form, transform and reading. The visual system honours that: a derived form draws <b>in front at full strength with the hand's ink faint beneath it</b>, and the ink stays visible. Anything the system inferred must be visibly reversible.</p>
+        </div>
+      </div>
+    </div>
+
+    <p class="note"><b>One definition, one home.</b> Every value on this page comes from <code>brand/tokens.css</code>. A surface links that file or inlines it verbatim; nothing redefines a token it could import.</p>
+  </div>
+</section>
+
+<!-- ======================= 02 · PALETTE ======================= -->
+<section class="band" id="palette">
+  <div class="wrap">
+    <div class="kicker"><span class="num">02</span> Palette</div>
+    <h2 class="head">Cool paper, sea ink, <em>one teal</em>.</h2>
+    <p class="lede">The whitepaper's warm paper is retired: warm cream says <em>book</em>, and this is a screen you draw on. The ground is cool and faintly blue, the ink is the deep sea-blue the whitepaper hero already used, and there is exactly one accent.</p>
+
+    <h3 class="sub">Ground and ink</h3>
+    <div class="grid-4">
+      <div class="swatch"><span class="chip" style="background:var(--paper)"></span><div class="body"><div class="name">Paper</div><div class="hex">#f3f7f8</div><div class="role">The ground. Carries the faint canvas grid.</div></div></div>
+      <div class="swatch"><span class="chip" style="background:var(--paper-lt)"></span><div class="body"><div class="name">Paper raised</div><div class="hex">#fbfcfd</div><div class="role">Cards, specimens, panels, inputs.</div></div></div>
+      <div class="swatch"><span class="chip" style="background:var(--paper-dk)"></span><div class="body"><div class="name">Paper well</div><div class="hex">#e7eef0</div><div class="role">Code grounds and figure wells.</div></div></div>
+      <div class="swatch"><span class="chip" style="background:var(--paper-edge)"></span><div class="body"><div class="name">Edge</div><div class="hex">#dde7ea</div><div class="role">The border of a raised thing.</div></div></div>
+
+      <div class="swatch"><span class="chip" style="background:var(--ink)"></span><div class="body"><div class="name">Ink</div><div class="hex">#0c1a24</div><div class="role">Body, headings, the hand's own stroke.</div></div></div>
+      <div class="swatch"><span class="chip" style="background:var(--ink-2)"></span><div class="body"><div class="name">Ink 2</div><div class="hex">#2a3d49</div><div class="role">Prose at length, secondary copy.</div></div></div>
+      <div class="swatch"><span class="chip" style="background:var(--ink-3)"></span><div class="body"><div class="name">Ink 3</div><div class="hex">#5b7080</div><div class="role">Meta, captions, measured values.</div></div></div>
+      <div class="swatch"><span class="chip" style="background:var(--ink-4)"></span><div class="body"><div class="name">Ink 4</div><div class="hex">#8ea3ad</div><div class="role">Faintest legible ink. Never body text.</div></div></div>
+    </div>
+
+    <h3 class="sub">The accent, and the mark of the reader</h3>
+    <div class="grid-4">
+      <div class="swatch"><span class="chip" style="background:var(--teal)"></span><div class="body"><div class="name">Teal</div><div class="hex">#0b6f7d</div><div class="role">The keyword. Kickers, <em>em</em>, focus, one-pixel rules. 5.4:1 on paper.</div></div></div>
+      <div class="swatch"><span class="chip" style="background:var(--teal-deep)"></span><div class="body"><div class="name">Teal deep</div><div class="hex">#084e58</div><div class="role">Pressed and hovered states of a filled teal.</div></div></div>
+      <div class="swatch"><span class="chip" style="background:var(--teal-soft)"></span><div class="body"><div class="name">Teal soft</div><div class="hex">#3fa3ae</div><div class="role">Teal that has to sit on ink. The dark surface's keyword.</div></div></div>
+      <div class="swatch"><span class="chip" style="background:var(--hl)"></span><div class="body"><div class="name">Marker</div><div class="hex">teal @ 15%</div><div class="role">The reader's <span class="hl">highlight</span>. Replaces the old yellow.</div></div></div>
+    </div>
+    <p class="note">The gold of <code>Demos/</code> and the cyan-plus-gold of the personal site are <b>not</b> MetaMedium colours. They were adopted before the project had a palette of its own; this teal is the one that ships, on both surfaces.</p>
+
+    <h3 class="sub">Signal — the load-bearing half</h3>
+    <p class="lede">These are not palette choices. Each one is a claim the engine is making, and a surface that borrows one for decoration is lying about what it knows.</p>
+    <div class="card">
+      <div class="signal-row"><span class="dot" style="background:var(--sig-read)"></span><span class="tok">--sig-read</span><span class="say">Recognised, accepted, blessed. A reading the human took up. Also the clean form drawn in front of the ink.</span></div>
+      <div class="signal-row"><span class="dot" style="background:var(--sig-held)"></span><span class="tok">--sig-held</span><span class="say">Held and unblessed. Deliberately grey: a proposal nobody has agreed to must not look like a decision.</span></div>
+      <div class="signal-row"><span class="dot" style="background:var(--sig-high)"></span><span class="tok">--sig-high</span><span class="say">High confidence. Teal, not green — green reads as <em>pass</em>, and a confident reading is still only a reading.</span></div>
+      <div class="signal-row"><span class="dot" style="background:var(--sig-mid)"></span><span class="tok">--sig-mid</span><span class="say">Medium confidence. Amber. The engine is offering candidates, not an answer.</span></div>
+      <div class="signal-row"><span class="dot" style="background:var(--sig-low)"></span><span class="tok">--sig-low</span><span class="say">Low confidence, scratched out, or a broken artifact that has left the live plane.</span></div>
+      <div class="signal-row"><span class="dot" style="background:var(--sig-model)"></span><span class="tok">--sig-model</span><span class="say">A model contributed this — a mark it drew, a name it proposed, an answer it placed. Attribution is visible or it is not attribution.</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= 03 · TYPE ======================= -->
+<section class="band" id="type">
+  <div class="wrap">
+    <div class="kicker"><span class="num">03</span> Type</div>
+    <h2 class="head">One face. <em>IBM Plex Mono.</em> Seven roles.</h2>
+    <p class="lede">Mono at whitepaper length needs two concessions and gets exactly two: a <strong>generous line height</strong> (1.68) and a <strong>shorter measure</strong> (68 characters, not 80). In exchange, a fingerprint, a heading, a caption and a line of code all sit on the same grid.</p>
+
+    <div class="card">
+      <div class="type-row">
+        <div class="label">Display</div>
+        <div class="smp-display">Meta<em>Medium</em></div>
+        <div class="spec">500 &middot; clamp 2.6&ndash;4.6rem<br>tracking &minus;0.035em &middot; lh 0.98</div>
+      </div>
+      <div class="type-row">
+        <div class="label">Head</div>
+        <div class="smp-h2">A mark is labelled <em style="font-style:normal;color:var(--teal)">by its shape</em></div>
+        <div class="spec">500 &middot; clamp 1.5&ndash;2rem<br>tracking &minus;0.015em &middot; lh 1.14</div>
+      </div>
+      <div class="type-row">
+        <div class="label">Subhead</div>
+        <div class="smp-h3">Confidence is measured, never assigned</div>
+        <div class="spec">500 &middot; 1.22rem<br>tracking &minus;0.01em</div>
+      </div>
+      <div class="type-row">
+        <div class="label">Prose</div>
+        <div class="smp-body">A stroke is reduced to a fingerprint &mdash; aspect ratio, straightness, closure, corner count, extent &mdash; and detectors read that fingerprint. Every detector that qualifies contributes a candidate.</div>
+        <div class="spec">400 &middot; 0.97rem<br>lh 1.68 &middot; measure 68ch</div>
+      </div>
+      <div class="type-row">
+        <div class="label">Small</div>
+        <div class="smp-small">Extent is the fraction of its own bounding box a stroke's outline encloses.</div>
+        <div class="spec">400 &middot; 0.86rem<br>captions, notes, UI copy</div>
+      </div>
+      <div class="type-row">
+        <div class="label">Meta</div>
+        <div class="smp-meta">Reading &middot; Roles &middot; Relations</div>
+        <div class="spec">500 &middot; 0.72rem<br>tracking 0.18em &middot; uppercase</div>
+      </div>
+      <div class="type-row">
+        <div class="label">Measured</div>
+        <div class="smp-num">extent 0.79 &middot; corners 0 &middot; closure 0.94 &middot; r 41.2</div>
+        <div class="spec">400 &middot; 0.97rem<br>tabular-nums &middot; ink-3</div>
+      </div>
+    </div>
+
+    <div class="grid-2" style="margin-top:var(--s3)">
+      <div class="card">
+        <h3 class="sub" style="margin-top:0">Emphasis</h3>
+        <p class="smp-small" style="color:var(--ink-2)">Mono has no elegant italic at display size and no small caps, so the system does not pretend. <strong>Strong</strong> is weight 500 in full ink. <em>Emphasis</em> in prose is the real italic, at prose size only. A <span class="hl">marker highlight</span> is the reader's mark; <span class="hl-hot">hot</span> is editorial urgency and is rationed to roughly once a page.</p>
+        <p class="note">In headings, <b>em is teal and upright</b> — never slanted. A slanted display mono looks like a mistake.</p>
+      </div>
+      <div class="card">
+        <h3 class="sub" style="margin-top:0">Numbers are evidence</h3>
+        <p class="smp-small" style="color:var(--ink-2)">Every measured value is set <span style="font-variant-numeric:tabular-nums">tabular</span> so a column of confidences can be compared down the page. Thresholds are <b>never</b> written into prose — they live in the engine and drift the moment a document restates them.</p>
+        <div class="code" style="margin-top:var(--s2)"><span class="c">// cite the source, not the number</span><br><span class="k">metamedium-core/src/</span>recognition.ts<br><span class="k">SNAP_CONFIDENCE</span> &middot; <span class="k">SNAP_MARGIN</span><br><span class="k">MAX_TIER0_CONFIDENCE</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= 04 · THE MARK ======================= -->
+<section class="band" id="mark">
+  <div class="wrap">
+    <div class="kicker"><span class="num">04</span> The mark</div>
+    <h2 class="head">A loop and a check. <em>The gesture is the logo.</em></h2>
+    <p class="lede">The signet is the canonical loop with the command mark drawn across it &mdash; circle some marks, cross them with a check. It is the one gesture the whole engine is built around, so it is the one shape the brand needs. The loop is teal because it is <strong>held</strong>; the check is blue because it is the <strong>act of accepting</strong>.</p>
+
+    <div class="grid-3">
+      <div class="mark-tile on-paper">
+        <svg class="signet" viewBox="0 0 100 100" aria-label="MetaMedium signet">
+          <path d="M50 12 C74 12 89 30 89 49 C89 70 71 87 49 87 C27 87 11 69 11 49 C11 29 28 12 50 12 Z"
+                fill="none" stroke="var(--teal)" stroke-width="4" stroke-linecap="round"/>
+          <path d="M27 55 L44 74 L79 22" fill="none" stroke="var(--sig-read)" stroke-width="5"
+                stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <div class="tag">Signet &middot; primary</div>
+      </div>
+      <div class="mark-tile on-wash">
+        <div class="wm">Meta<em>Medium</em></div>
+        <div class="tag">Wordmark &middot; on paper</div>
+      </div>
+      <div class="mark-tile on-ink">
+        <div class="wm">Meta<em>Medium</em></div>
+        <div class="tag">Wordmark &middot; on ink</div>
+      </div>
+    </div>
+
+    <div class="grid-2" style="margin-top:var(--s3)">
+      <div class="card">
+        <h3 class="sub" style="margin-top:0">Rules for the mark</h3>
+        <ul style="list-style:none">
+          <li class="smp-small" style="color:var(--ink-2);padding:0.2rem 0">&mdash; <b style="color:var(--ink)">Medium is the teal half.</b> Never colour Meta, never colour both.</li>
+          <li class="smp-small" style="color:var(--ink-2);padding:0.2rem 0">&mdash; One word, no space, no hyphen: <b style="color:var(--ink)">MetaMedium</b>.</li>
+          <li class="smp-small" style="color:var(--ink-2);padding:0.2rem 0">&mdash; Tracking is &minus;0.035em at display size and eases to &minus;0.02em below 1.5rem.</li>
+          <li class="smp-small" style="color:var(--ink-2);padding:0.2rem 0">&mdash; The signet's clear space is the height of its own loop. It never sits inside a coloured plate.</li>
+          <li class="smp-small" style="color:var(--ink-2);padding:0.2rem 0">&mdash; On ink, the loop takes <b style="color:var(--ink)">teal soft</b> and the check keeps blue. The gesture must stay legible on both surfaces.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3 class="sub" style="margin-top:0">Favicon and small sizes</h3>
+        <div class="btn-row" style="align-items:flex-end;gap:var(--s4)">
+          <svg viewBox="0 0 100 100" width="48" height="48" aria-hidden="true">
+            <path d="M50 12 C74 12 89 30 89 49 C89 70 71 87 49 87 C27 87 11 69 11 49 C11 29 28 12 50 12 Z" fill="none" stroke="var(--teal)" stroke-width="6"/>
+            <path d="M27 55 L44 74 L79 22" fill="none" stroke="var(--sig-read)" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <svg viewBox="0 0 100 100" width="28" height="28" aria-hidden="true">
+            <path d="M50 12 C74 12 89 30 89 49 C89 70 71 87 49 87 C27 87 11 69 11 49 C11 29 28 12 50 12 Z" fill="none" stroke="var(--teal)" stroke-width="8"/>
+            <path d="M27 55 L44 74 L79 22" fill="none" stroke="var(--sig-read)" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <svg viewBox="0 0 100 100" width="16" height="16" aria-hidden="true">
+            <path d="M27 55 L44 74 L79 22" fill="none" stroke="var(--sig-read)" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <p class="note">Stroke weight grows as the mark shrinks. <b>At 16px the loop is dropped and the check stands alone</b> &mdash; a hairline circle at favicon size is mud, and the check is the half that carries meaning.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= 05 · INK ======================= -->
+<section class="band" id="ink">
+  <div class="wrap">
+    <div class="kicker"><span class="num">05</span> Ink on the canvas</div>
+    <h2 class="head">Six ways a mark can look. <em>Each one is a fact.</em></h2>
+    <p class="lede">This is the part of the system no other styleguide has, and the part that must not drift: how a stroke renders <em>is</em> how the engine reports what it knows about that stroke. The hand's ink is always the darkest thing on the canvas. Anything derived draws in front of it &mdash; and the ink stays visible underneath, because undo has to be believable before it is pressed.</p>
+
+    <div class="grid-3">
+      <div class="ink-tile">
+        <svg viewBox="0 0 240 140" aria-label="The hand's ink">
+          <path d="M30 34 C74 30 138 32 200 35 C204 62 203 92 201 108 C148 112 78 111 32 109 C27 82 28 55 30 34 Z"
+                fill="none" stroke="var(--stroke-hand)" stroke-width="2.6" stroke-linecap="round"/>
+        </svg>
+        <div class="cap"><b>Hand ink</b><span>Weight 2.6, full ink, round caps. The darkest mark on the surface, always.</span></div>
+      </div>
+
+      <div class="ink-tile">
+        <svg viewBox="0 0 240 140" aria-label="A snap offer">
+          <path d="M30 34 C74 30 138 32 200 35 C204 62 203 92 201 108 C148 112 78 111 32 109 C27 82 28 55 30 34 Z"
+                fill="none" stroke="var(--stroke-hand)" stroke-width="2.6" stroke-linecap="round"/>
+          <path d="M27 28 L204 28 L204 112 L27 112 Z" fill="none" stroke="var(--stroke-offer)"
+                stroke-width="1.8" stroke-dasharray="6 4"/>
+        </svg>
+        <div class="cap"><b>Offer, untaken</b><span>A dashed teal ghost over live ink. Dashes mean <em>nobody has agreed to this</em>.</span></div>
+      </div>
+
+      <div class="ink-tile">
+        <svg viewBox="0 0 240 140" aria-label="A clean form taken">
+          <path d="M30 34 C74 30 138 32 200 35 C204 62 203 92 201 108 C148 112 78 111 32 109 C27 82 28 55 30 34 Z"
+                fill="none" stroke="var(--stroke-ghost)" stroke-width="2.2" stroke-linecap="round"/>
+          <path d="M38 40 L193 40 L193 102 L38 102 Z" fill="none" stroke="var(--stroke-clean)" stroke-width="2.6"/>
+        </svg>
+        <div class="cap"><b>Clean form, taken</b><span>Solid blue in front, the hand faint beneath. Never replaces the ink &mdash; undo drops the rep.</span></div>
+      </div>
+
+      <div class="ink-tile">
+        <svg viewBox="0 0 240 140" aria-label="A mark the model drew">
+          <path d="M30 34 C74 30 138 32 200 35 C204 62 203 92 201 108 C148 112 78 111 32 109 C27 82 28 55 30 34 Z"
+                fill="none" stroke="var(--stroke-model)" stroke-width="2.6" stroke-linecap="round"/>
+          <path d="M96 122 L134 122" stroke="var(--stroke-model)" stroke-width="1.2" opacity="0.6"/>
+        </svg>
+        <div class="cap"><b>The model's pen</b><span>Purple ink, same fingerprint and same eraser. Attribution is on the mark, not in a log.</span></div>
+      </div>
+
+      <div class="ink-tile">
+        <svg viewBox="0 0 240 140" aria-label="Scratched out">
+          <path d="M30 34 C74 30 138 32 200 35 C204 62 203 92 201 108 C148 112 78 111 32 109 C27 82 28 55 30 34 Z"
+                fill="none" stroke="var(--stroke-hand)" stroke-width="2.4" stroke-linecap="round" opacity="0.28"/>
+          <path d="M24 94 L58 44 L92 100 L126 42 L160 98 L194 46 L214 84"
+                fill="none" stroke="var(--stroke-gone)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <div class="cap"><b>Scratched out</b><span>Three crossings of the target's own outline erases it. The scratch is red; the ink fades, it does not vanish mid-gesture.</span></div>
+      </div>
+
+      <div class="ink-tile">
+        <svg viewBox="0 0 240 140" aria-label="A held loop crossed by the command mark">
+          <rect x="42" y="46" width="52" height="42" fill="none" stroke="var(--stroke-hand)" stroke-width="2.4"/>
+          <rect x="118" y="46" width="52" height="42" fill="none" stroke="var(--stroke-hand)" stroke-width="2.4"/>
+          <path d="M108 16 C170 14 214 40 214 68 C214 98 166 122 106 122 C46 122 16 96 16 68 C16 40 50 16 108 16 Z"
+                fill="var(--wash)" stroke="var(--teal)" stroke-width="2" stroke-dasharray="7 5"/>
+          <path d="M62 84 L86 110 L172 30" fill="none" stroke="var(--sig-read)" stroke-width="3.4"
+                stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <div class="cap"><b>Held, then crossed</b><span>The loop is dashed teal over a faint teal wash; the check that acts on it is blue. Held is never solid.</span></div>
+      </div>
+    </div>
+
+    <p class="note"><b>The one prohibition.</b> No inferred form may be drawn in a way the hand's ink cannot be seen through. If a clean form, a tidy transform or a rendered artifact hides the marks that framed it, the surface has broken the engine's own contract &mdash; and a page rendering over erased ink is exactly the silent phantom the engine degrades to prevent.</p>
+  </div>
+</section>
+
+<!-- ======================= 06 · READINGS ======================= -->
+<section class="band" id="readings">
+  <div class="wrap">
+    <div class="kicker"><span class="num">06</span> Readings</div>
+    <h2 class="head">Show the argument, <em>not the verdict</em>.</h2>
+    <p class="lede">The engine multi-parses on principle: nothing wins by silencing the others, all tiers show at once, and disagreement between sources is the thing the human most wants to see. A UI that renders one confident label has thrown away the product. So candidates are a <strong>ranked list</strong>, confidence is a <strong>tick meter</strong> rather than a filled bar &mdash; a bar promises progress, ticks report evidence &mdash; and every row carries who said it.</p>
+
+    <div class="grid-2">
+      <div class="reading">
+        <div class="r-head"><span>Reading &middot; mark 14</span><span>4 candidates</span></div>
+        <div class="cand">
+          <div class="what">rectangle <small>extent near 1.0 &middot; 4 corners on the path</small></div>
+          <div class="meter" aria-hidden="true"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i></div>
+          <div class="val">0.86</div>
+        </div>
+        <div class="cand">
+          <div class="what">card <small>a model's reading, unblessed</small></div>
+          <div class="meter mid" aria-hidden="true"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i></i></div>
+          <div class="val">0.62</div>
+        </div>
+        <div class="cand">
+          <div class="what">circle <small>closure held; extent argues against</small></div>
+          <div class="meter low" aria-hidden="true"><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+          <div class="val">0.31</div>
+        </div>
+        <div class="cand">
+          <div class="what">triangle <small>one corner missed</small></div>
+          <div class="meter low" aria-hidden="true"><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+          <div class="val">0.19</div>
+        </div>
+        <div class="btn-row" style="margin-top:var(--s3)">
+          <span class="who t0">Tier 0 &middot; engine</span>
+          <span class="who local">Tier 1 &middot; local</span>
+          <span class="who hosted">Tier 2 &middot; hosted</span>
+          <span class="who human">You</span>
+        </div>
+        <p class="note" style="margin-top:var(--s2)"><b>Never</b> hide a lower candidate behind a disclosure. A pentagon is legitimately rectangle and circle at once, and settling that quietly is the failure mode the whole engine is designed against.</p>
+      </div>
+
+      <div class="reading">
+        <div class="r-head"><span>The ladder &middot; mark 14</span><span>ink &rarr; code</span></div>
+        <div class="ladder">
+          <div class="rung"><div class="lv">Ink</div><div class="vv">168 points &middot; closed &middot; drawn at scale <b>0.59</b></div></div>
+          <div class="rung"><div class="lv">Shape</div><div class="vv"><b>rectangle</b> 0.86 &mdash; extent near 1.0, four corners along the path</div></div>
+          <div class="rung"><div class="lv">Maths</div><div class="vv">sides <b>148 &times; 76</b> &middot; perimeter 448 &middot; area 11 248</div></div>
+          <div class="rung"><div class="lv">Plays</div><div class="vv"><b>container</b> &mdash; closed, holds two nodes, engages both</div></div>
+          <div class="rung"><div class="lv">Reads as</div><div class="vv"><b>frame</b> 0.78 &middot; <b>row</b> 0.64 <span style="color:var(--ink-3)">(roughly lined up)</span></div></div>
+          <div class="rung"><div class="lv">Code</div><div class="vv">genre <b>layout</b> &rarr; <code style="color:var(--teal)">column(header, row(left, right))</code></div></div>
+        </div>
+        <div class="btn-row" style="margin-top:var(--s3)">
+          <button type="button" class="btn quiet">why?</button>
+          <button type="button" class="btn quiet">draw it clean</button>
+          <button type="button" class="btn bare">not a word &mdash; split it</button>
+        </div>
+        <p class="note" style="margin-top:var(--s2)">Every rung is <b>said out loud</b>, including the ones that failed. A mark no role table places is shown as <span class="badge held">unclassified</span>, never left blank.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= 07 · UI ======================= -->
+<section class="band" id="ui">
+  <div class="wrap">
+    <div class="kicker"><span class="num">07</span> UI</div>
+    <h2 class="head">Hairlines, one radius, <em>no shadows to speak of</em>.</h2>
+    <p class="lede">Chrome sits beside a canvas, so it stays quiet: a 1px border, a 2px radius, and a shadow so soft it only says <em>this floats above the ink</em>. Nothing is rounded like a pill, nothing has a gradient, and no control wears a colour it has not earned.</p>
+
+    <div class="grid-2">
+      <div class="card">
+        <h3 class="sub" style="margin-top:0">Actions</h3>
+        <div class="btn-row">
+          <button type="button" class="btn">Prompt it</button>
+          <button type="button" class="btn accent">Draw them clean</button>
+          <button type="button" class="btn quiet">What could these be?</button>
+          <button type="button" class="btn bare">Describe it&hellip;</button>
+        </div>
+        <p class="note"><b>Ink is the default action</b> and teal is the one the engine can do without asking a model. A quiet button is a real option, not a lesser one &mdash; the palette lists what is possible, so the shouting is done by ordering, not by fill.</p>
+
+        <h3 class="sub">State</h3>
+        <div class="btn-row">
+          <span class="badge read">read</span>
+          <span class="badge held">held</span>
+          <span class="badge">unclassified</span>
+          <span class="badge gone">broken</span>
+        </div>
+        <p class="note">Four states, and <b>held is grey on purpose</b>. A proposal that looks accepted has already made the decision for the human.</p>
+
+        <h3 class="sub">Input</h3>
+        <div class="field">
+          <label for="nm">name this</label>
+          <input class="input" id="nm" type="text" value="molecule" spellcheck="false">
+        </div>
+      </div>
+
+      <div class="card">
+        <h3 class="sub" style="margin-top:0">The held-loop chip</h3>
+        <div class="chip">
+          <span><span class="count">3 circled</span> &middot; cross with &#10003;, or</span>
+          <button type="button" class="btn quiet" style="padding:0.35rem 0.7rem">Draw them clean</button>
+          <button type="button" class="btn quiet" style="padding:0.35rem 0.7rem">What could these be?</button>
+        </div>
+        <p class="note">The mark stays the fluent path; the chip is the discoverable one, <b>because a grammar nobody can find is a mode with extra steps</b>.</p>
+
+        <h3 class="sub">The summon palette</h3>
+        <div class="palette-menu">
+          <div class="pm-head">3 marks &middot; scope: lasso</div>
+          <div class="pm-item"><span>Name it <em>&ldquo;Pricing&rdquo;</em></span><span class="who t0">Tier 0</span></div>
+          <div class="pm-item"><span>Line them up</span><span class="who t0">Tier 0</span></div>
+          <div class="pm-item"><span>Name it <em>&ldquo;pricing card&rdquo;</em></span><span class="who local">qwen3</span></div>
+          <div class="pm-item"><span>Prompt them into a page&hellip;</span><span class="who hosted">Tier 2</span></div>
+          <div class="pm-item"><span>Ask it to draw&hellip;</span><span class="who local">qwen3</span></div>
+        </div>
+        <p class="note">Cheapest first, <b>every</b> candidate listed, each attributed. Not a fallback chain &mdash; several participants answering at once is the point.</p>
+
+        <h3 class="sub">The inspector panel</h3>
+        <dl class="panel">
+          <div class="p-head"><span>details</span><span>&#9662;</span></div>
+          <div class="p-row"><dt>mark</dt><dd>14 <small>&middot; 168 pts &middot; scale 0.59</small></dd></div>
+          <div class="p-row"><dt>reading</dt><dd>rectangle <small>0.86</small></dd></div>
+          <div class="p-row"><dt>plays</dt><dd>container</dd></div>
+          <div class="p-row"><dt>maths</dt><dd>148 &times; 76 <small>&middot; area 11 248</small></dd></div>
+          <div class="p-row"><dt>relations</dt><dd>contains 2 <small>&middot; same-row 0.71</small></dd></div>
+        </dl>
+      </div>
+    </div>
+
+    <h3 class="sub">Code and measured data</h3>
+    <div class="code">
+<span class="c">// the drawing, as the model receives it &mdash; region ids, never pixels</span>
+<span class="k">genre</span>   layout
+<span class="k">tree</span>    column( header, row( left, right ), footer )
+<span class="k">plays</span>   header:container  left:node  right:node  footer:label
+<span class="k">wrote</span>   left &rarr; <span class="n">"Pricing"</span>  <span class="c">// transcript, 0.81, qwen3-vl</span>
+    </div>
+    <p class="note">Code grounds are the <b>paper well</b>, not ink &mdash; a black terminal block on a paper page is a hole in the sheet. Keywords take teal, measured values take blue, comments take the faintest ink.</p>
+  </div>
+</section>
+
+<!-- ======================= 08 · SURFACES ======================= -->
+<section class="band" id="surfaces">
+  <div class="wrap">
+    <div class="kicker"><span class="num">08</span> Surfaces</div>
+    <h2 class="head">Two grounds, <em>one system</em>.</h2>
+    <p class="lede">The repository has carried three palettes across four surfaces &mdash; warm paper with red in the whitepaper, near-black with gold in the demos, sea-deep with cyan and gold in the personal-site work. Two of those were borrowed. From here there is <strong>one</strong> system with two grounds, and the same component built once renders on both because only tokens change.</p>
+
+    <div class="grid-2">
+      <div class="surface light">
+        <div class="s-head">Paper &middot; whitepaper, docs, figures</div>
+        <div class="s-body">
+          <div class="demo-wm">Meta<em>Medium</em></div>
+          <div class="demo-line">A stroke is reduced to a fingerprint, and detectors read that fingerprint.</div>
+          <div class="demo-btns"><span class="demo-btn a">Draw them clean</span><span class="demo-btn b">What could these be?</span></div>
+        </div>
+      </div>
+      <div class="surface dark">
+        <div class="s-head">Canvas &middot; Demos/, the session surface</div>
+        <div class="s-body">
+          <div class="demo-wm">Meta<em>Medium</em></div>
+          <div class="demo-line">A stroke is reduced to a fingerprint, and detectors read that fingerprint.</div>
+          <div class="demo-btns"><span class="demo-btn a">Draw them clean</span><span class="demo-btn b">What could these be?</span></div>
+        </div>
+      </div>
+    </div>
+    <p class="note"><b>Use the switch at the top of this page</b> to put the whole styleguide on the canvas ground. Nothing in the page's own CSS branches on theme &mdash; if a component only looks right on one ground, it is the token set that needs fixing, not the component. And <b>the whitepaper stays on paper even when it embeds a dark demo</b>: the seam is deliberate, and the demo is shown as a canvas, framed like a figure.</p>
+  </div>
+</section>
+
+<!-- ======================= 09 · SPECIMEN ======================= -->
+<section class="band" id="specimen">
+  <div class="wrap">
+    <div class="kicker"><span class="num">09</span> Specimen</div>
+    <h2 class="head">The whitepaper page, <em>set in the system</em>.</h2>
+    <p class="lede">A page of real prose with a real figure, because a styleguide that only shows swatches has not been tested.</p>
+
+    <div class="specimen">
+      <div class="sp-eyebrow">Recognition &middot; &sect;3</div>
+      <h3>Extent is the strongest single <em>discriminator</em></h3>
+      <div class="sp-byline">MetaMedium &middot; Whitepaper v5.1 &middot; draft</div>
+
+      <p>A stroke arrives as a few hundred points and nothing else. Before anything can be said about what it <em>means</em>, something has to be measurable about what it <strong>is</strong>: how straight it runs, whether it closed, how many times it turned sharply, and what fraction of its own bounding box its outline manages to enclose.</p>
+
+      <p>That last figure is the one that matters. A rectangle encloses nearly all of its box, a circle about four fifths, a triangle about half &mdash; and unlike a corner count, <span class="hl">extent holds when the hand misses a corner</span>. Counting corners is fragile in exactly the way hands are unreliable: miss one and a box becomes a triangle, which is precisely the bug this measurement was introduced to kill.</p>
+
+      <div class="pull">The box is the tightest one at any angle, not the axis-aligned bounds. A hand rarely draws square to the screen &mdash; and against axis-aligned bounds, a box tilted ten degrees filled about eighty per cent of its box and lost its offer to be redrawn clean.</div>
+
+      <figure>
+        <div class="fig-well">
+          <svg viewBox="0 0 560 150" aria-label="Extent for three shapes">
+            <g fill="none" stroke-width="2.4">
+              <rect x="30" y="30" width="110" height="90" stroke="var(--stroke-hand)"/>
+              <rect x="25" y="25" width="120" height="100" stroke="var(--teal)" stroke-dasharray="4 4" stroke-width="1.2"/>
+              <ellipse cx="280" cy="75" rx="55" ry="45" stroke="var(--stroke-hand)"/>
+              <rect x="225" y="30" width="110" height="90" stroke="var(--teal)" stroke-dasharray="4 4" stroke-width="1.2"/>
+              <path d="M420 120 L530 120 L475 30 Z" stroke="var(--stroke-hand)"/>
+              <rect x="420" y="30" width="110" height="90" stroke="var(--teal)" stroke-dasharray="4 4" stroke-width="1.2"/>
+            </g>
+            <g font-family="var(--face)" font-size="12" fill="var(--ink-3)" text-anchor="middle">
+              <text x="85" y="142">rectangle &middot; ~1.00</text>
+              <text x="280" y="142">circle &middot; ~0.79</text>
+              <text x="475" y="142">triangle &middot; ~0.50</text>
+            </g>
+          </svg>
+        </div>
+        <figcaption><b>Figure 3</b> &mdash; The dashed teal box is the tightest bounding box at any angle, found by rotating calipers over the hull. Extent is the fraction of it the ink encloses. Values are indicative; the measured thresholds live in <code>metamedium-core/src/recognition.ts</code> and are deliberately not restated here.</figcaption>
+      </figure>
+
+      <p>Two properties matter more than any individual number. Every detector that qualifies contributes a candidate, and results come back ranked &mdash; <strong>nothing wins by silencing the others</strong>. And each detector scores continuously from the evidence it found, so confidence is measured rather than assigned. Fixed confidences with overlapping bands are how a three-corner shape used to match both triangle and rectangle and win on a constant, which is not a ranking.</p>
+    </div>
+    <p class="note" style="margin:var(--s3) auto 0"><b>Specimen rules.</b> Prose is <code>--measure</code> wide and no wider. A pull quote is bounded by two teal hairlines, never by a left bar. Figures sit in a paper well with a caption that names the figure in teal and the source in ink. There is no drop cap and no small-caps opener &mdash; mono has neither, and faking them is a costume.</p>
+  </div>
+</section>
+
+<!-- ======================= 10 · VOICE ======================= -->
+<section class="band" id="voice">
+  <div class="wrap">
+    <div class="kicker"><span class="num">10</span> Voice</div>
+    <h2 class="head">Say what was measured. <em>Then say what it cost.</em></h2>
+    <p class="lede">The visual system and the writing make the same promise, so the voice belongs in the same document. MetaMedium writes in the past tense about things it actually ran: a claim arrives with the evidence, and a rule arrives with the failure that produced it.</p>
+
+    <div class="grid-3">
+      <div class="card voice">
+        <div class="v-tag">The engine, reporting</div>
+        <blockquote>&ldquo;<em>rectangle</em>, 0.86 &mdash; extent near 1.0, four corners along the path.&rdquo;</blockquote>
+        <div class="v-note">Grounded and hedged. It says what it saw, not what the thing is.</div>
+      </div>
+      <div class="card voice">
+        <div class="v-tag">The document, explaining</div>
+        <blockquote>&ldquo;Corner count is fragile. <em>Extent holds regardless.</em> This is what fixed rectangles reading as triangles.&rdquo;</blockquote>
+        <div class="v-note">Rule, then the bug it fixed. A rule with no failure behind it is decoration.</div>
+      </div>
+      <div class="card voice">
+        <div class="v-tag">The surface, offering</div>
+        <blockquote>&ldquo;3 circled &mdash; cross with &#10003;, or <em>draw them clean</em>.&rdquo;</blockquote>
+        <div class="v-note">Lowercase, plain, no exclamation. The canvas offers; it never congratulates.</div>
+      </div>
+    </div>
+
+    <h3 class="sub">The two lists</h3>
+    <div class="doNot">
+      <div class="yes">
+        <h5>Do</h5>
+        <ul>
+          <li>Name the file that holds the number, not the number.</li>
+          <li>Attribute every reading to whoever made it.</li>
+          <li>Write &ldquo;the engine cannot see that yet&rdquo; rather than staying silent.</li>
+          <li>Keep the lowercase register of the canvas in the canvas.</li>
+          <li>Let two sources disagree in the open.</li>
+        </ul>
+      </div>
+      <div class="no">
+        <h5>Don't</h5>
+        <ul>
+          <li>Restate a threshold in prose. It drifted in ten documents already.</li>
+          <li>Say &ldquo;AI-powered&rdquo;, &ldquo;seamless&rdquo;, &ldquo;magic&rdquo;, or &ldquo;just works&rdquo;.</li>
+          <li>Render one confident label where the engine returned four candidates.</li>
+          <li>Colour something to fill space, or add a bar to give a card an edge.</li>
+          <li>Claim a demo shows a thing the demo does not show.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer class="colophon">
+  <div class="wrap">
+    <div class="rule"></div>
+    <p><strong>MetaMedium visual system, v1 draft.</strong> Tokens live in <code>brand/tokens.css</code> &mdash; the single home. This page consumes them and adds nothing but layout; if a value here should be shared, it belongs in the token file instead.</p>
+    <p>Still open, and John's to decide: whether the wordmark keeps its two-tone split, and how far the dark canvas ground should travel into <code>Demos/</code> before the gold is retired for good.</p>
+    <div class="stamp">IBM Plex Mono &middot; Paper #f3f7f8 &middot; Ink #0c1a24 &middot; Teal #0b6f7d &middot; 3 Sept 2026</div>
+  </div>
+</footer>
+
+<script>
+(function () {
+  var root = document.documentElement;
+  var btns = document.querySelectorAll('[data-theme-set]');
+  var KEY = 'metamedium-brand-theme';
+
+  function apply(theme) {
+    if (theme === 'dark') root.setAttribute('data-theme', 'dark');
+    else root.removeAttribute('data-theme');
+    btns.forEach(function (b) {
+      b.setAttribute('aria-pressed', String(b.dataset.themeSet === theme));
+    });
+    try { localStorage.setItem(KEY, theme); } catch (e) {}
+  }
+
+  var saved = null;
+  try { saved = localStorage.getItem(KEY); } catch (e) {}
+  apply(saved === 'dark' ? 'dark' : 'light');   // paper is the default, always
+
+  btns.forEach(function (b) {
+    b.addEventListener('click', function () { apply(b.dataset.themeSet); });
+  });
+})();
+</script>
+</body>
+</html>

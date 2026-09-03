@@ -627,8 +627,72 @@ code maps a selection to an artifact, literal and virtual; selection is
 transient, with undo that brings it back in place, and taps that dismiss are
 never dots.
 
-Still open: the verb table's starting point (§10); determinism versus a live
-tank (§10); whether behaviour source is rendered for ink by default or only
-when the verbs run out (§10); and the prime-object question — whether a
-member shared by two virtual frames is one thing or two once either frame
-becomes a folder.
+The four that were open — the verb table's starting point, determinism
+versus a live tank, whether behaviour source is rendered for ink, and the
+prime-object question — are taken in §21.
+
+## 21. Decisions taken, 3 September 2026
+
+**1. Behaviours are a general basis with tunables, never hard-coded per
+thing.** A "fish" is not a class; it is a remix of essential affordances —
+verbs with weights and parameters — that anything can use. Parsing maps what
+the human wrote onto the verbs that exist; where the words outrun the verbs,
+the gap is named and filled in turns. And new behaviours are **teachable by
+acting them out**: select the fish, drag it the way it should move among the
+named things on the board, and the engine fits the demonstration.
+
+This is the mechanism the decision hands us. The verb table is a *basis*.
+A demonstrated path, sampled against the world at each moment (where the
+food was, where the bigger fish was, where the coral was), gives an
+acceleration at each step; the weights that best reproduce those
+accelerations from the basis are a least-squares fit. The fit *is* the
+behaviour, with each weight's contribution as its reasoning ("flee bigger
+fish explains 61% of what you showed me"). The residual — the part of the
+demonstration no verb explains — is exactly "what's missing", and it is
+what the palette asks about next: name it, describe it, or let a model
+propose a verb for it in the `js` escape hatch. Voice enters the same door
+as handwriting: a transcript is words, and words go to the verbs.
+
+**2. The canvas is always live; time belongs to items.** MetaMedium is its
+state, not a movie. It can *contain* movies. So there is no global clock to
+scrub; the board is always on. Temporal artifacts — a tank, an animation, a
+simulation — each own a clock with play, pause and reset, and each is
+seeded so that reset is exact and replay from the log reproduces it. The
+log is the source and git's concern; the live state is the image and the
+human's concern; both are real, and the second is a pure function of the
+first plus the clocks. The cursor is an instance for any item that wants
+it. Part I's `seek` is per item, not per canvas.
+
+**3. You see the code, at every level of abstraction, on inspection.** The
+essence of the medium. Inspecting anything walks a ladder of
+representations: for a mark, ink → shape → what it plays → what it became
+(built); for a behaviour, the words → the verbs as **sliders for the
+tunables** → a **control-flow diagram** → the **source** as ground. Any rung
+can be edited, and edits flow both ways: move a slider and the source
+changes; circle a line of source and the slider moves. Inspect a frame and
+you see its members' code combined as one program; inspect a selection and
+you see the same for what is selected; inspect the view and you see the
+program of what is on screen. Rendering source for ink to address is not
+the fallback, it is the last rung, always there.
+
+**4. Link, as far as linking goes; two libraries, not one.** Virtual frames
+link — that is the whole idea. What resolves the "does a slider need a
+folder" puzzle is that there are two kinds of thing in the library:
+
+- **Concepts** are vocabulary: shapes, roles, verbs, controls (a slider, a
+  toggle, a dial), the taught mark, named compositions. They are code in the
+  engine or entries in `library/` as JSON. A slider is a concept. Using one
+  in a frame is a reference by name plus a parameter — no folder, ever.
+- **Artifacts** are specific things: this page, this script, this image, this
+  tank. They live in folders and are linked by path.
+
+A virtual frame references concepts by name and artifacts by path.
+Escalating a frame to a folder copies the artifacts in and keeps the
+concepts as references, since concepts travel with the engine and the
+`library/`. Export bundles both.
+
+**The root is naive on purpose.** MetaMedium sits at the root of one folder;
+subfolders are generated only when something asks for one — an escalation,
+an export, a `library/` entry too big for JSON. Nesting is unbounded in the
+model and one level deep in the view: a folder is a card, a card opens into
+its canvas. Depth grows as the work does, never ahead of it.

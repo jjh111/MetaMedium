@@ -1,0 +1,139 @@
+/* ==========================================================================
+   MetaMedium — design tokens
+   THE single home for the MetaMedium visual system. Every surface links or
+   inlines THIS file; nothing redefines a value it can import.
+
+   Three commitments, in order:
+
+   1. LIGHT FIRST. MetaMedium is paper you can draw on. The light surface is
+      the design; the dark surface is that same system inverted for a canvas
+      you stare at for an hour. It is not a second brand.
+   2. ONE FACE. IBM Plex Mono carries display, prose, UI and code. A system
+      whose thesis is that a drawing IS code should not switch voice between
+      the drawing and the code.
+   3. COLOUR IS SIGNAL. Teal is the keyword; blue means read and accepted;
+      amber and red are confidence and damage. Nothing is coloured for
+      decoration, and no colour is ever applied as an accent bar.
+   ========================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400;1,500&display=swap');
+
+:root {
+  /* ---- paper (cool, not warm — this is a screen you draw on) ------------ */
+  --paper:      #f3f7f8;   /* the ground                                  */
+  --paper-lt:   #fbfcfd;   /* raised: cards, specimens, inputs            */
+  --paper-dk:   #e7eef0;   /* recessed: wells, code grounds               */
+  --paper-edge: #dde7ea;   /* the edge of a raised thing against paper    */
+
+  /* ---- ink (deep sea, carried over from the whitepaper hero) ----------- */
+  --ink:    #0c1a24;       /* body and headings                           */
+  --ink-2:  #2a3d49;       /* secondary prose                             */
+  --ink-3:  #5b7080;       /* meta, captions, measured values             */
+  --ink-4:  #8ea3ad;       /* the faintest legible ink                    */
+
+  /* ---- teal: the keyword ----------------------------------------------- */
+  --teal:      #0b6f7d;    /* em, kickers, focus, the accent of record    */
+  --teal-deep: #084e58;    /* pressed / hover on a filled teal            */
+  --teal-soft: #3fa3ae;    /* teal that has to sit on dark ink            */
+  --wash:      rgba(11,111,125,0.06);  /* tint, where a surface needs one */
+  --hl:        rgba(11,111,125,0.15);  /* the reader's marker             */
+  --hl-hot:    rgba(176,71,58,0.14);   /* editorial emphasis              */
+  --tint-read: rgba(28,95,184,0.07);   /* the faintest fill a badge takes */
+  --tint-low:  rgba(168,73,60,0.07);
+
+  /* ---- signal: what the engine is telling you -------------------------- */
+  /* These are load-bearing, not palette. A mark's colour is a claim about
+     what the engine knows, so each one has exactly one meaning. */
+  --sig-read:    #1c5fb8;  /* recognised / accepted / blessed             */
+  --sig-held:    #7b8a94;  /* held, unblessed, pending — deliberately grey */
+  --sig-high:    #0b6f7d;  /* high confidence   (teal, not green)         */
+  --sig-mid:     #a3761c;  /* medium confidence (amber)                   */
+  --sig-low:     #a8493c;  /* low confidence / broken / erased            */
+  --sig-model:   #6b4fa8;  /* a mark or reading a MODEL contributed       */
+
+  /* ---- ink on the canvas ------------------------------------------------ */
+  --stroke-hand:  #0c1a24; /* the hand's own ink — always the darkest     */
+  --stroke-ghost: #8ea3ad; /* the hand's ink under a clean form           */
+  --stroke-clean: #1c5fb8; /* the clean form, drawn in front              */
+  --stroke-offer: #0b6f7d; /* a dashed offer nobody has taken yet         */
+  --stroke-model: #6b4fa8; /* the model holding a pen                     */
+  --stroke-gone:  #a8493c; /* scratched out                               */
+
+  /* ---- rules and grid --------------------------------------------------- */
+  --rule:      #cfdde1;    /* a hairline that reads                       */
+  --rule-soft: #e3ecee;    /* a hairline that only separates              */
+  --grid:      rgba(11,111,125,0.045); /* the faint canvas grid           */
+  --grid-size: 26px;
+
+  /* ---- one face --------------------------------------------------------- */
+  --mono: 'IBM Plex Mono', 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
+  --face: var(--mono);     /* display, prose, UI — all of it              */
+
+  /* ---- scale ------------------------------------------------------------ */
+  --t-display: clamp(2.6rem, 7vw, 4.6rem);
+  --t-h1:      clamp(2rem, 4.4vw, 2.9rem);
+  --t-h2:      clamp(1.5rem, 2.9vw, 2rem);
+  --t-h3:      1.22rem;
+  --t-body:    0.97rem;
+  --t-small:   0.86rem;
+  --t-meta:    0.72rem;
+  --t-micro:   0.63rem;
+
+  --lead-tight: 1.14;
+  --lead-body:  1.68;      /* mono at length needs the air               */
+
+  /* ---- measure and rhythm ---------------------------------------------- */
+  --wide:    1160px;
+  --measure: 68ch;         /* mono prose gets fewer characters, not more  */
+  --s1: 0.35rem;  --s2: 0.7rem;  --s3: 1.1rem;
+  --s4: 1.75rem;  --s5: 2.75rem; --s6: 4.25rem;
+
+  /* ---- the one radius, the one shadow ---------------------------------- */
+  --radius: 2px;
+  --lift: 0 1px 2px rgba(12,26,36,0.04);
+}
+
+/* ==========================================================================
+   DARK — the same system, inverted. Only tokens change; no rule below the
+   token layer may branch on theme. Demos/ live here; the whitepaper does not.
+   ========================================================================== */
+:root[data-theme="dark"] {
+  --paper:      #08131a;
+  --paper-lt:   #0e1e27;
+  --paper-dk:   #050d12;
+  --paper-edge: #1a2c35;
+
+  --ink:    #e3edf1;
+  --ink-2:  #b6c8d0;
+  --ink-3:  #7d939e;
+  --ink-4:  #55686f;
+
+  --teal:      #4fb3bf;
+  --teal-deep: #7fcfd8;
+  --teal-soft: #0b6f7d;
+  --wash:      rgba(79,179,191,0.08);
+  --hl:        rgba(79,179,191,0.18);
+  --hl-hot:    rgba(214,124,110,0.18);
+  --tint-read: rgba(91,155,234,0.12);
+  --tint-low:  rgba(214,124,110,0.12);
+
+  --sig-read:    #5b9bea;
+  --sig-held:    #7d939e;
+  --sig-high:    #4fb3bf;
+  --sig-mid:     #d6ab55;
+  --sig-low:     #d67c6e;
+  --sig-model:   #a58ce0;
+
+  --stroke-hand:  #e3edf1;
+  --stroke-ghost: #55686f;
+  --stroke-clean: #5b9bea;
+  --stroke-offer: #4fb3bf;
+  --stroke-model: #a58ce0;
+  --stroke-gone:  #d67c6e;
+
+  --rule:      #1c2f39;
+  --rule-soft: #132330;
+  --grid:      rgba(79,179,191,0.05);
+
+  --lift: 0 1px 2px rgba(0,0,0,0.3);
+}
