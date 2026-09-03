@@ -242,8 +242,9 @@
       setTimeout(() => filter.focus(), 0);
     }
 
-    const b = MM.boundsOf(s.nodes.get(sum.gestureIds[sum.gestureIds.length - 1]));
-    const p = worldToScreen(b.minX, b.maxY);
+    // Beside what is selected — which is what the loop became — else beside the mark.
+    const b = selectionBounds(s) || MM.boundsOf(s.nodes.get(sum.gestureIds[sum.gestureIds.length - 1]));
+    const p = worldToScreen(b.minX - wpx(10), b.maxY + wpx(10));
     let left = Math.max(8, Math.min(p.x, innerWidth - summonEl.offsetWidth - 8));
     const top = Math.max(8, Math.min(p.y + 14, innerHeight - summonEl.offsetHeight - 52));
     // Keep clear of the panel: two things to read should not sit on each other.

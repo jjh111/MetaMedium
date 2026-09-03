@@ -156,10 +156,16 @@
 
       // A live artifact keeps its ink: the boxes you drew ARE the outlines of
       // what got built, and that promise is only kept by drawing them on top.
+      // While a hand holds the selection, the held marks follow it before the
+      // log has the move — one event lands when the hand lets go.
+      const pv = dragPreview();
+      const held = pv && pv.ids.includes(id);
+      if (held) { ctx.save(); applyPreview(pv); }
       inkOf(node, {
         color: isLive ? `rgba(${C.goldRGB},0.85)` : color,
         width: id === inspectedId ? inkW * 1.3 : inkW,
       });
+      if (held) ctx.restore();
 
       const b = MM.boundsOf(node);
       if (isArtifact && b) {
@@ -183,7 +189,11 @@
 
     if (s.summon) {
       for (const gid of s.summon.gestureIds) {
-        inkOf(s.nodes.get(gid), { color: `rgba(${C.goldRGB},0.55)`, width: inkW * 1.5, gesture: true });
+        const g = s.nodes.get(gid);
+        const role = (MM.getRep(g, 'gesture') || {}).data;
+        // The loop dissolved into the selection outline; the mark that took it up still shows.
+        if (s.selection.length && role && role.role === 'lasso') continue;
+        inkOf(g, { color: `rgba(${C.goldRGB},0.55)`, width: inkW * 1.5, gesture: true });
       }
     }
 
@@ -196,6 +206,7 @@
     }
 
     renderExplanations(s);
+    renderSelection(s);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0); // back to screen space for the chrome
     syncMarkChip(s);
     renderSummon(s);

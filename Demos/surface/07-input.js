@@ -40,7 +40,11 @@
       canvas.style.cursor = 'grabbing';
       return;
     }
-    live = [screenToWorld(e.clientX, e.clientY)];
+    // A hand landing on the selection takes hold of it rather than drawing.
+    const w0 = screenToWorld(e.clientX, e.clientY);
+    const hit = state.selection.length ? handleAt(w0) : null;
+    if (hit) { beginDrag(hit, w0); return; }
+    live = [w0];
   });
 
   canvas.addEventListener('pointermove', (e) => {
@@ -59,6 +63,7 @@
         return;
       }
     }
+    if (drag) { updateDrag(screenToWorld(e.clientX, e.clientY)); return; }
     if (panning) {
       view.panX += e.clientX - panning.x;
       view.panY += e.clientY - panning.y;
@@ -87,9 +92,20 @@
   canvas.addEventListener('pointerup', (e) => {
     if (endTouch(e)) { live = null; return; }
     if (panning) { panning = null; canvas.style.cursor = 'crosshair'; return; }
+    if (drag) { endDrag(); return; }
     const points = live;
     live = null;
-    if (!points || points.length < 3) { render(state); return; }
+    // The dead state: a tap while something is dismissable is the dismissal,
+    // and never a dot. Only a tap on empty ground with nothing to dismiss
+    // could be a dot — and a bare tap is not one either; a dot is drawn.
+    const tiny = points && points.length < 3;
+    if (tiny) {
+      const s0 = session.getState();
+      if (s0.summon) session.dismiss(s0.summon.id, Date.now());
+      else if (s0.selection.length) session.deselect(Date.now());
+      render(session.getState());
+      return;
+    }
 
     // Clear hover *before* the engine notifies: the render it triggers must
     // report the mark just made, not whatever the cursor was resting on.
@@ -131,6 +147,13 @@
       spaceHeld = true; canvas.style.cursor = 'grab'; e.preventDefault();
     }
     if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); session.undo(); }
+    if (e.target === document.body && e.key === 'Escape' && state.selection.length && !state.summon) session.deselect(Date.now());
+    if (e.target === document.body && (e.key === 'Backspace' || e.key === 'Delete') && state.selection.length) {
+      e.preventDefault();
+      const ids = state.selection.slice();
+      ids.forEach((id) => session.erase(id, Date.now()));
+      flash('erased ' + ids.length + ' mark' + (ids.length === 1 ? '' : 's'));
+    }
     if (e.key === '0' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); fitAll(); }
     if (e.target === document.body && (e.key === '=' || e.key === '+')) zoomAround(innerWidth / 2, innerHeight / 2, 1.2);
     if (e.target === document.body && (e.key === '-' || e.key === '_')) zoomAround(innerWidth / 2, innerHeight / 2, 1 / 1.2);

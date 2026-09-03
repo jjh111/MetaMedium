@@ -981,7 +981,10 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
 
     contentIds.push(artifact.id);
     artifacts.push(artifact.id);
-    selection = [artifact.id];
+    // Blessing ends the selection rather than moving it onto the artifact: the
+    // hand's next act on a page is usually ink over it, and a selected page
+    // would catch that pointer as a drag. A page is selected by circling it.
+    selection = [];
     summon = null;
     recomputeClusterCandidates();
     return artifact.id;

@@ -3249,7 +3249,7 @@ ${pad}</${tag}>`;
       }
       contentIds.push(artifact.id);
       artifacts.push(artifact.id);
-      selection = [artifact.id];
+      selection = [];
       summon = null;
       recomputeClusterCandidates();
       return artifact.id;

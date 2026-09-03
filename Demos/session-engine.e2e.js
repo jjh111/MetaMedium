@@ -379,7 +379,7 @@ window.__scenario = async function(){
 
   // ---- 13. Handwriting (v7 Stage E): write a word next to a shape; it becomes that shape's name ----
   {
-    mm.fitAll(); await wait(60);
+    mm.setView(1, 260 - 1300, 200 - 1500); await wait(30); // world (1300,1500) at screen (260,200), zoom 1
     const z = mm.view.zoom;
     const base = mm.worldToScreen(1300, 1500); // clear of the flowchart and the page
     t.stroke(t.rect(base.x, base.y, 300*z, 180*z));                       // a box
@@ -551,6 +551,39 @@ window.__scenario = async function(){
     trio(4200, 2400);
     const cands = mm.session.getState().clusterCandidates;
     step('17b. the next group like it is recognised by its signature: the model\'s word, in the library', cands.some(c => c.matches.some(m => m.name === 'page-layout')), cands.map(c => c.matches.map(m => m.name)));
+  }
+
+  // ---- 18. Selection: the loop that finished. Drag it, tap off, undo the tap-off ----
+  {
+    mm.setView(1, 260 - 5200, 200 - 2100); await wait(30);
+    const W = (x, y) => mm.worldToScreen(x, y);
+    const ids0 = mm.session.getState().contentIds.length;
+    const p1 = W(5200, 2100), p2 = W(5440, 2100), p3 = W(5200, 2270);
+    t.stroke(t.rect(p1.x, p1.y, 200, 120)); t.stroke(t.rect(p2.x, p2.y, 200, 120)); t.stroke(t.rect(p3.x, p3.y, 200, 120));
+    const boxes = mm.session.getState().contentIds.slice(-3);
+    const c = W(5420, 2240);
+    t.stroke(t.circle(c.x, c.y, 330));
+    document.getElementById('heldOffer').click(); await wait(60);
+    const stS = mm.session.getState();
+    step('18. taking the loop up selects what it held, and the loop is no longer ink', stS.selection.length === 3 && boxes.every(id => stS.selection.includes(id)) && !stS.contentIds.includes(stS.summon.gestureIds[0]), { selection: stS.selection.length });
+    mm.session.dismiss(stS.summon.id, Date.now()); // close the palette; the selection stays
+    step('18a. dismissing the palette keeps the selection', mm.session.getState().selection.length === 3);
+    // Drag from inside the selection by (80, 40) screen px at zoom 1.
+    const before = MM.boundsOf(mm.session.getState().nodes.get(boxes[0]));
+    const inside = W(5300, 2160);
+    t.stroke([{x: inside.x, y: inside.y}, {x: inside.x + 20, y: inside.y + 10}, {x: inside.x + 50, y: inside.y + 25}, {x: inside.x + 80, y: inside.y + 40}]);
+    const after = MM.boundsOf(mm.session.getState().nodes.get(boxes[0]));
+    const moved = Math.abs(after.minX - before.minX - 80) < 1 && Math.abs(after.minY - before.minY - 40) < 1;
+    step('18b. a hand on the selection drags it: one move event, the ink untouched', moved && mm.session.getEvents().slice(-1)[0].type === 'move' && mm.session.getState().contentIds.length === ids0 + 3, { dx: after.minX - before.minX, dy: after.minY - before.minY, last: mm.session.getEvents().slice(-1)[0].type });
+    // A tap off is the dismissal, never a dot.
+    const off = W(5900, 2600);
+    t.stroke([{x: off.x, y: off.y}, {x: off.x, y: off.y}]);
+    const stT = mm.session.getState();
+    step('18c. a tap off dismisses the selection and leaves no dot', stT.selection.length === 0 && stT.contentIds.length === ids0 + 3);
+    mm.session.undo();
+    const stU = mm.session.getState();
+    step('18d. undo brings the selection back, in place', stU.selection.length === 3 && Math.abs(MM.boundsOf(stU.nodes.get(boxes[0])).minX - after.minX) < 1e-6);
+    mm.session.deselect(Date.now());
   }
 
   // ---- 11. Scratch-out erase ----

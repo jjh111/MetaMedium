@@ -170,7 +170,7 @@ Files: `src/session/signature.ts` — from histogram to a small graph (shapes + 
 
 ### Level 2 — the surface, as a weave (W, after WP-0; one at a time)
 
-**WP-3 · Selection and the blob palette on the surface** (W)
+**WP-3 · Selection and the blob palette on the surface** (W) — *selection half done 3 Sep 2026* (`05-selection.js`; e2e step 18); the blob palette remains
 Files: `Demos/surface/held.js` → `selection.js`, `palette.js`. The loop becomes an outline with handles; drag/scale/rotate emit WP-2 events; the dead state (a tap dismisses, never dots). Ring packing from the pen tip: 2, then 4, then 8, by likelihood × learned use; fuzzy text; free text to the model. E2E steps for S1 and S2 criteria in v8 §19.
 *Done:* the S1 and S2 criteria pass in the e2e; every existing palette verb is reachable within two rings.
 

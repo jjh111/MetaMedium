@@ -420,25 +420,25 @@ p.lede em { font-style: italic; color: var(--ink); }
   letter-spacing: 0.16em; text-transform: uppercase;
 }
 .surface .s-body { padding: var(--s4); display: flex; flex-direction: column; gap: var(--s3); }
-.surface.light { background: #f3f7f8; color: #0c1a24; }
-.surface.light .s-head { background: #fbfcfd; color: #5b7080; border-color: #cfdde1; }
-.surface.dark { background: #08131a; color: #e3edf1; border-color: #1c2f39; }
-.surface.dark .s-head { background: #0e1e27; color: #7d939e; border-color: #1c2f39; }
+.surface.light { background: #f8f5ef; color: #0c1a24; }
+.surface.light .s-head { background: #fdfbf6; color: #66737c; border-color: #ded6c8; }
+.surface.dark { background: #131315; color: #e7e5e0; border-color: #2b2b2f; }
+.surface.dark .s-head { background: #1a1a1d; color: #86847e; border-color: #2b2b2f; }
 .surface .demo-wm { font-size: 1.3rem; font-weight: 500; letter-spacing: -0.03em; }
 .surface.light .demo-wm em { font-style: normal; color: #0b6f7d; }
-.surface.dark .demo-wm em  { font-style: normal; color: #4fb3bf; }
+.surface.dark .demo-wm em  { font-style: normal; color: #6fb3b8; }
 .surface .demo-line { font-size: var(--t-small); }
-.surface.light .demo-line { color: #2a3d49; }
-.surface.dark .demo-line  { color: #b6c8d0; }
+.surface.light .demo-line { color: #33424b; }
+.surface.dark .demo-line  { color: #b5b3ad; }
 .surface .demo-btns { display: flex; gap: var(--s2); }
 .surface .demo-btn {
   font-family: var(--face); font-size: var(--t-micro); font-weight: 500;
   padding: 0.4rem 0.75rem; border-radius: var(--radius); border: 1px solid;
 }
-.surface.light .demo-btn.a { background: #0b6f7d; color: #fbfcfd; border-color: #0b6f7d; }
-.surface.light .demo-btn.b { background: transparent; color: #0c1a24; border-color: #cfdde1; }
-.surface.dark  .demo-btn.a { background: #4fb3bf; color: #08131a; border-color: #4fb3bf; }
-.surface.dark  .demo-btn.b { background: transparent; color: #e3edf1; border-color: #1c2f39; }
+.surface.light .demo-btn.a { background: #0b6f7d; color: #fdfbf6; border-color: #0b6f7d; }
+.surface.light .demo-btn.b { background: transparent; color: #0c1a24; border-color: #ded6c8; }
+.surface.dark  .demo-btn.a { background: #6fb3b8; color: #131315; border-color: #6fb3b8; }
+.surface.dark  .demo-btn.b { background: transparent; color: #e7e5e0; border-color: #2b2b2f; }
 
 /* ---- 09 specimen -------------------------------------------------------- */
 .specimen {
@@ -610,15 +610,98 @@ figure.fig.band { max-width: var(--fig-band); }
 }
 .pquote cite { display: block; margin-top: var(--s2); font-style: normal; font-size: var(--t-micro); letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-3); }
 
-.entry {
-  display: grid; grid-template-columns: 5.2rem 1fr;
-  gap: var(--s3);
-  padding: var(--s3) 0; border-bottom: 1px solid var(--rule-soft);
+/* ---- the timeline ------------------------------------------------------- */
+/* Five parts per entry and they all earn their place: the year, a drawn spine,
+   a title carrying its thread, who made it, what it said, and the line that
+   says why it matters here. The spine is box-drawing glyphs rather than a
+   border, because in a mono system the connector is a character — it lands on
+   the same grid as the text and survives being copied as plain text. */
+.timeline {
+  background: var(--paper-lt);
+  border: 1px solid var(--paper-edge);
+  border-radius: var(--radius);
+  box-shadow: var(--lift);
+  padding: var(--s4);
 }
-.entry .yr { font-size: var(--t-small); color: var(--teal); font-variant-numeric: tabular-nums; }
-.entry h5 { font-size: var(--t-body); font-weight: 500; }
-.entry .by { font-size: var(--t-micro); letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-3); margin-top: 0.1rem; }
-.entry p { font-size: var(--t-small); color: var(--ink-2); margin-top: var(--s1); max-width: 60ch; }
+.tl-entry {
+  display: grid; grid-template-columns: 3.6rem 1.1rem 1fr;
+  gap: var(--s3);
+  margin-bottom: var(--s4);
+}
+.tl-entry:last-child { margin-bottom: 0; }
+.tl-year {
+  font-size: var(--t-body); font-weight: 500;
+  text-align: right; line-height: 1.35;
+  color: var(--ink); font-variant-numeric: tabular-nums;
+}
+.tl-pipe { color: var(--ink-4); line-height: 1.2; user-select: none; }
+.tl-title {
+  display: flex; align-items: baseline; gap: var(--s2); flex-wrap: wrap;
+  font-size: var(--t-body); font-weight: 500;
+  letter-spacing: 0.01em; margin-bottom: var(--s1);
+}
+.tl-author { font-size: var(--t-small); color: var(--ink); }
+.tl-desc { font-size: var(--t-small); color: var(--ink-2); margin-top: var(--s1); max-width: 62ch; }
+.tl-sig {
+  font-size: var(--t-small); color: var(--ink-3);
+  margin-top: var(--s2);
+}
+.tl-sig::before { content: '\2517\2501\2501 '; color: var(--ink-4); }
+
+/* The badge names a thread, not a status: this is the one categorical scale in
+   the system, and it exists nowhere but here. */
+.tl-badge {
+  font-size: var(--t-micro); font-weight: 600;
+  letter-spacing: 0.12em; text-transform: uppercase;
+  padding: 0.16rem 0.5rem;
+  border: 1px solid currentColor; border-radius: var(--radius-sm);
+  white-space: nowrap;
+}
+.tl-badge.vision { color: var(--thread-vision); }
+.tl-badge.recog  { color: var(--thread-recog); }
+.tl-badge.intel  { color: var(--thread-intel); }
+.tl-badge.conv   { color: var(--thread-conv); }
+
+/* The convergence entry is the one place the timeline stops being a list and
+   makes a claim, so it is the one entry that takes a container. */
+.tl-entry.tl-conv {
+  grid-template-columns: 1fr;
+  background: var(--wash);
+  border: 1px solid var(--teal);
+  border-radius: var(--radius);
+  padding: var(--s4);
+  margin-top: var(--s5);
+}
+.tl-entry.tl-conv .tl-pipe { display: none; }
+.tl-entry.tl-conv .tl-year { text-align: left; color: var(--teal); margin-bottom: var(--s1); }
+.tl-entry.tl-conv .tl-title { font-size: var(--t-h3); }
+.tl-synthesis {
+  margin-top: var(--s3);
+  padding: var(--s3);
+  background: var(--paper-lt);
+  border: 1px solid var(--rule-soft);
+  border-radius: var(--radius-sm);
+  font-size: var(--t-small);
+}
+.tl-synthesis > b { color: var(--ink); font-weight: 500; }
+.tl-synthesis ul { list-style: none; margin-top: var(--s2); }
+.tl-synthesis li { position: relative; padding-left: 1.4rem; margin-bottom: var(--s1); color: var(--ink-2); }
+.tl-synthesis li::before { content: '\2192'; position: absolute; left: 0; color: var(--teal); }
+.tl-synthesis li b { color: var(--ink); font-weight: 500; }
+
+.tl-entry.tl-hidden { display: none; }
+.timeline.open .tl-entry.tl-hidden { display: grid; }
+.tl-toggle {
+  display: flex; align-items: center; gap: var(--s2);
+  margin-top: var(--s3); padding-top: var(--s3);
+  border-top: 1px solid var(--rule-soft);
+  width: 100%;
+  font-family: var(--face); font-size: var(--t-small);
+  color: var(--teal); background: none; border-left: 0; border-right: 0; border-bottom: 0;
+  cursor: pointer;
+}
+.tl-toggle .arrow { transition: transform 0.2s; }
+.timeline.open .tl-toggle .arrow { transform: rotate(90deg); }
 
 .embed {
   border: 1px solid var(--fig-edge); border-radius: var(--radius);
@@ -748,20 +831,20 @@ figure.fig.band { max-width: var(--fig-band); }
 <section class="band" id="palette">
   <div class="wrap">
     <div class="kicker"><span class="num">02</span> Palette</div>
-    <h2 class="head">Cool paper, sea ink, <em>one teal</em>.</h2>
-    <p class="lede">The whitepaper's warm paper is retired: warm cream says <em>book</em>, and this is a screen you draw on. The ground is cool and faintly blue, the ink is the deep sea-blue the whitepaper hero already used, and there is exactly one accent.</p>
+    <h2 class="head">Warm paper, sea ink, <em>one teal</em>.</h2>
+    <p class="lede">The ground keeps the whitepaper's warmth &mdash; paper that has been left in the light, not a screen pretending to be one &mdash; and the ink stays the deep sea-blue the whitepaper hero already used. <strong>The paper does the warming and the ink stays cool</strong>: a warm grey beside a teal keyword goes muddy, and the contrast between a warm ground and a cool mark is what makes ink look like ink.</p>
 
     <h3 class="sub">Ground and ink</h3>
     <div class="grid-4">
-      <div class="swatch"><span class="chip" style="background:var(--paper)"></span><div class="body"><div class="name">Paper</div><div class="hex">#f3f7f8</div><div class="role">The ground. Carries the faint canvas grid.</div></div></div>
-      <div class="swatch"><span class="chip" style="background:var(--paper-lt)"></span><div class="body"><div class="name">Paper raised</div><div class="hex">#fbfcfd</div><div class="role">Cards, specimens, panels, inputs.</div></div></div>
-      <div class="swatch"><span class="chip" style="background:var(--paper-dk)"></span><div class="body"><div class="name">Paper well</div><div class="hex">#e7eef0</div><div class="role">Code grounds and figure wells.</div></div></div>
-      <div class="swatch"><span class="chip" style="background:var(--paper-edge)"></span><div class="body"><div class="name">Edge</div><div class="hex">#dde7ea</div><div class="role">The border of a raised thing.</div></div></div>
+      <div class="swatch"><span class="chip" style="background:var(--paper)"></span><div class="body"><div class="name">Paper</div><div class="hex">#f8f5ef</div><div class="role">The ground, warm. Carries the faint canvas grid.</div></div></div>
+      <div class="swatch"><span class="chip" style="background:var(--paper-lt)"></span><div class="body"><div class="name">Paper raised</div><div class="hex">#fdfbf6</div><div class="role">Cards, specimens, panels, inputs.</div></div></div>
+      <div class="swatch"><span class="chip" style="background:var(--paper-dk)"></span><div class="body"><div class="name">Paper well</div><div class="hex">#efeae0</div><div class="role">Code grounds and figure wells.</div></div></div>
+      <div class="swatch"><span class="chip" style="background:var(--paper-edge)"></span><div class="body"><div class="name">Edge</div><div class="hex">#e5ded1</div><div class="role">The border of a raised thing.</div></div></div>
 
       <div class="swatch"><span class="chip" style="background:var(--ink)"></span><div class="body"><div class="name">Ink</div><div class="hex">#0c1a24</div><div class="role">Body, headings, the hand's own stroke.</div></div></div>
-      <div class="swatch"><span class="chip" style="background:var(--ink-2)"></span><div class="body"><div class="name">Ink 2</div><div class="hex">#2a3d49</div><div class="role">Prose at length, secondary copy.</div></div></div>
-      <div class="swatch"><span class="chip" style="background:var(--ink-3)"></span><div class="body"><div class="name">Ink 3</div><div class="hex">#5b7080</div><div class="role">Meta, captions, measured values.</div></div></div>
-      <div class="swatch"><span class="chip" style="background:var(--ink-4)"></span><div class="body"><div class="name">Ink 4</div><div class="hex">#8ea3ad</div><div class="role">Faintest legible ink. Never body text.</div></div></div>
+      <div class="swatch"><span class="chip" style="background:var(--ink-2)"></span><div class="body"><div class="name">Ink 2</div><div class="hex">#33424b</div><div class="role">Prose at length, secondary copy.</div></div></div>
+      <div class="swatch"><span class="chip" style="background:var(--ink-3)"></span><div class="body"><div class="name">Ink 3</div><div class="hex">#66737c</div><div class="role">Meta, captions, measured values.</div></div></div>
+      <div class="swatch"><span class="chip" style="background:var(--ink-4)"></span><div class="body"><div class="name">Ink 4</div><div class="hex">#9aa3a7</div><div class="role">Faintest legible ink. Never body text.</div></div></div>
     </div>
 
     <h3 class="sub">The accent, and the mark of the reader</h3>
@@ -1118,12 +1201,12 @@ figure.fig.band { max-width: var(--fig-band); }
 <section class="band" id="surfaces">
   <div class="wrap">
     <div class="kicker"><span class="num">08</span> Surfaces</div>
-    <h2 class="head">Two grounds, <em>one system</em>.</h2>
-    <p class="lede">The repository has carried three palettes across four surfaces &mdash; warm paper with red in the whitepaper, near-black with gold in the demos, sea-deep with cyan and gold in the personal-site work. Two of those were borrowed. From here there is <strong>one</strong> system with two grounds, and the same component built once renders on both because only tokens change.</p>
+    <h2 class="head">Warm paper, <em>a grey room</em>.</h2>
+    <p class="lede">The repository has carried three palettes across four surfaces &mdash; warm paper with red in the whitepaper, near-black with gold in the demos, sea-deep with cyan and gold in the personal-site work. Two of those were borrowed. From here there is <strong>one</strong> system with two grounds, and the same component built once renders on both because only tokens change. The dark surface is deliberately the <strong>less colourful</strong> of the two: on a canvas you stare at for an hour, saturation belongs to the user's own marks, so the ground goes neutral grey and every claim colour is pulled well back.</p>
 
     <div class="grid-2">
       <div class="surface light">
-        <div class="s-head">Paper &middot; whitepaper, docs, figures</div>
+        <div class="s-head">Paper &middot; warm &middot; whitepaper, docs, figures</div>
         <div class="s-body">
           <div class="demo-wm">Meta<em>Medium</em></div>
           <div class="demo-line">A stroke is reduced to a fingerprint, and detectors read that fingerprint.</div>
@@ -1131,7 +1214,7 @@ figure.fig.band { max-width: var(--fig-band); }
         </div>
       </div>
       <div class="surface dark">
-        <div class="s-head">Canvas &middot; Demos/, the session surface</div>
+        <div class="s-head">Canvas &middot; grey &middot; Demos/, the session surface</div>
         <div class="s-body">
           <div class="demo-wm">Meta<em>Medium</em></div>
           <div class="demo-line">A stroke is reduced to a fingerprint, and detectors read that fingerprint.</div>
@@ -1350,22 +1433,7 @@ figure.fig.band { max-width: var(--fig-band); }
       </div>
 
       <div>
-        <h3 class="sub" style="margin-top:0">Lineage entry</h3>
-        <div class="card" style="padding:var(--s3) var(--s4)">
-          <div class="entry">
-            <span class="yr">1945</span>
-            <div><h5>As We May Think</h5><div class="by">Vannevar Bush</div><p>The memex: associative trails through a personal corpus, indexed by the reader rather than the publisher.</p></div>
-          </div>
-          <div class="entry">
-            <span class="yr">1968</span>
-            <div><h5>Sketchpad</h5><div class="by">Ivan Sutherland</div><p>Constraints as first-class content: the drawing holds relationships, not just marks.</p></div>
-          </div>
-          <div class="entry" style="border-bottom:0">
-            <span class="yr">2016</span>
-            <div><h5>Chalktalk</h5><div class="by">Ken Perlin</div><p>Sketches that run. A drawn mark becomes a live, parameterised behaviour.</p></div>
-          </div>
-        </div>
-        <p class="note">The year is teal and tabular so the column reads as a spine. Badges by category are <b>dropped</b> &mdash; five colours of pill was the old page's one real palette violation.</p>
+
 
         <h3 class="sub">Gallery</h3>
         <div class="tiles">
@@ -1377,6 +1445,76 @@ figure.fig.band { max-width: var(--fig-band); }
         <p class="note">Gallery tiles are the figure component at small size &mdash; same plate, same hairline, same caption rule, tighter padding.</p>
       </div>
     </div>
+
+    <h3 class="sub">The timeline</h3>
+    <div class="timeline" id="tl">
+      <div class="tl-entry tl-hidden">
+        <div class="tl-year">1960</div>
+        <div class="tl-pipe">&#9475;</div>
+        <div>
+          <div class="tl-title">Man-Computer Symbiosis <span class="tl-badge vision">Visions</span></div>
+          <div class="tl-author">J.C.R. Licklider &mdash; the foundational vision</div>
+          <div class="tl-desc">&ldquo;Human brains and computing machines coupled together very tightly &hellip; the resulting partnership will think as no human brain has ever thought.&rdquo;</div>
+          <div class="tl-sig">Cooperative interaction, not automation</div>
+        </div>
+      </div>
+
+      <div class="tl-entry">
+        <div class="tl-year">1963</div>
+        <div class="tl-pipe">&#9475;</div>
+        <div>
+          <div class="tl-title">Sketchpad <span class="tl-badge vision">Visions</span></div>
+          <div class="tl-author">Ivan Sutherland &mdash; a man-machine graphical communication system</div>
+          <div class="tl-desc">First direct manipulation of graphical objects. Constraints, copying, instances &mdash; the drawing holds relationships, not just marks.</div>
+          <div class="tl-sig">Drawing as computational dialogue</div>
+        </div>
+      </div>
+
+      <div class="tl-entry">
+        <div class="tl-year">2012</div>
+        <div class="tl-pipe">&#9475;</div>
+        <div>
+          <div class="tl-title">Sketch-Editing Games <span class="tl-badge recog">Recognition</span></div>
+          <div class="tl-author">Ribeiro &amp; Igarashi &mdash; UIST</div>
+          <div class="tl-desc">The machine guesses, the human declines and modifies, the machine guesses again. Misunderstanding treated as information rather than failure.</div>
+          <div class="tl-sig">Negotiation, not one-shot recognition</div>
+        </div>
+      </div>
+
+      <div class="tl-entry">
+        <div class="tl-year">2016</div>
+        <div class="tl-pipe">&#9475;</div>
+        <div>
+          <div class="tl-title">Chalktalk <span class="tl-badge intel">Intelligence</span></div>
+          <div class="tl-author">Ken Perlin &mdash; NYU Future Reality Lab</div>
+          <div class="tl-desc">Sketches that run. A drawn mark becomes a live, parameterised behaviour you can wire to another one.</div>
+          <div class="tl-sig">A drawing that is also a program</div>
+        </div>
+      </div>
+
+      <button type="button" class="tl-toggle" aria-expanded="false" aria-controls="tl">
+        <span class="arrow">&#9656;</span><span class="lbl">Show 1 earlier entry</span>
+      </button>
+
+      <div class="tl-entry tl-conv">
+        <div class="tl-year">2026</div>
+        <div>
+          <div class="tl-title">MetaMedium <span class="tl-badge conv">Convergence</span></div>
+          <div class="tl-author">All threads merge</div>
+          <div class="tl-synthesis">
+            <b>Synthesises:</b>
+            <ul>
+              <li><b>From Visions:</b> the Dynabook's metamedium, and Victor's directness</li>
+              <li><b>From Recognition:</b> the sketch-editing game's negotiation paradigm</li>
+              <li><b>From Intelligence:</b> model interpretation over a grounded substrate</li>
+            </ul>
+          </div>
+          <div class="tl-sig">Drawing becomes a shared language, and the argument stays visible</div>
+        </div>
+      </div>
+    </div>
+    <p class="note">Six parts per entry, all load-bearing: the <b>year</b> tabular so the column reads as a spine, a <b>spine glyph</b> that is a character rather than a border (it lands on the mono grid and survives being copied as text), the <b>title</b> carrying its thread, <b>who</b> made it, <b>what it said</b>, and the <b>&#9495;&#9473;&#9473; line</b> saying why it is in this list at all. Earlier entries collapse; the convergence entry is the one place the timeline stops listing and makes a claim, so it is the only entry that takes a container.</p>
+    <p class="note"><b>Threads are the one categorical scale in the system.</b> Four colours drawn from the same pigments as everything else, used nowhere but here. The old page ran five saturated pills including a green and two ambers, which put more colour in the lineage list than in the whole recognition engine.</p>
   </div>
 </section>
 
@@ -1385,7 +1523,7 @@ figure.fig.band { max-width: var(--fig-band); }
     <div class="rule"></div>
     <p><strong>MetaMedium visual system, v1 draft.</strong> Tokens live in <code>brand/tokens.css</code> &mdash; the single home. This page consumes them and adds nothing but layout; if a value here should be shared, it belongs in the token file instead.</p>
     <p>Still open, and John's to decide: whether the wordmark keeps its two-tone split, and how far the dark canvas ground should travel into <code>Demos/</code> before the gold is retired for good.</p>
-    <div class="stamp">IBM Plex Mono &middot; Paper #f3f7f8 &middot; Ink #0c1a24 &middot; Teal #0b6f7d &middot; 3 Sept 2026</div>
+    <div class="stamp">IBM Plex Mono &middot; Paper #f8f5ef &middot; Ink #0c1a24 &middot; Teal #0b6f7d &middot; 3 Sept 2026</div>
   </div>
 </footer>
 
@@ -1411,6 +1549,16 @@ figure.fig.band { max-width: var(--fig-band); }
   btns.forEach(function (b) {
     b.addEventListener('click', function () { apply(b.dataset.themeSet); });
   });
+
+  var tl = document.getElementById('tl');
+  var tlBtn = tl && tl.querySelector('.tl-toggle');
+  if (tlBtn) {
+    tlBtn.addEventListener('click', function () {
+      var open = tl.classList.toggle('open');
+      tlBtn.setAttribute('aria-expanded', String(open));
+      tlBtn.querySelector('.lbl').textContent = open ? 'Hide earlier entries' : 'Show 1 earlier entry';
+    });
+  }
 })();
 </script>
 </body>

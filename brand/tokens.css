@@ -20,16 +20,16 @@
 
 :root {
   /* ---- paper (cool, not warm — this is a screen you draw on) ------------ */
-  --paper:      #f3f7f8;   /* the ground                                  */
-  --paper-lt:   #fbfcfd;   /* raised: cards, specimens, inputs            */
-  --paper-dk:   #e7eef0;   /* recessed: wells, code grounds               */
-  --paper-edge: #dde7ea;   /* the edge of a raised thing against paper    */
+  --paper:      #f8f5ef;   /* the ground                                  */
+  --paper-lt:   #fdfbf6;   /* raised: cards, specimens, inputs            */
+  --paper-dk:   #efeae0;   /* recessed: wells, code grounds               */
+  --paper-edge: #e5ded1;   /* the edge of a raised thing against paper    */
 
   /* ---- ink (deep sea, carried over from the whitepaper hero) ----------- */
   --ink:    #0c1a24;       /* body and headings                           */
-  --ink-2:  #2a3d49;       /* secondary prose                             */
-  --ink-3:  #5b7080;       /* meta, captions, measured values             */
-  --ink-4:  #8ea3ad;       /* the faintest legible ink                    */
+  --ink-2:  #33424b;       /* secondary prose                             */
+  --ink-3:  #66737c;       /* meta, captions, measured values             */
+  --ink-4:  #9aa3a7;       /* the faintest legible ink                    */
 
   /* ---- teal: the keyword ----------------------------------------------- */
   --teal:      #0b6f7d;    /* em, kickers, focus, the accent of record    */
@@ -40,6 +40,15 @@
   --hl-hot:    rgba(176,71,58,0.14);   /* editorial emphasis              */
   --tint-read: rgba(28,95,184,0.07);   /* the faintest fill a badge takes */
   --tint-low:  rgba(168,73,60,0.07);
+
+  /* ---- threads: the ONE categorical scale ------------------------------- */
+  /* Signal colours say what the engine knows; these say which lineage an item
+     belongs to. Four, drawn from the same pigments, and used nowhere but the
+     timeline — a second categorical scale would just be a rainbow. */
+  --thread-vision:  #0b6f7d;
+  --thread-recog:   #6b4fa8;
+  --thread-intel:   #1c5fb8;
+  --thread-conv:    #a3761c;
 
   /* ---- signal: what the engine is telling you -------------------------- */
   /* These are load-bearing, not palette. A mark's colour is a claim about
@@ -83,13 +92,13 @@
   --dia-hold:   var(--sig-held);   /* proposed, not agreed                  */
   --dia-tint:      rgba(11,111,125,0.07);  /* a container under the keyword */
   --dia-tint-live: rgba(28,95,184,0.07);
-  --dia-tint-flat: rgba(12,26,36,0.04);    /* a container making no claim   */
-  --dia-grid:      rgba(12,26,36,0.055);
+  --dia-tint-flat: rgba(60,48,32,0.045);   /* a container making no claim   */
+  --dia-grid:      rgba(90,72,44,0.055);
 
   /* ---- rules and grid --------------------------------------------------- */
-  --rule:      #cfdde1;    /* a hairline that reads                       */
-  --rule-soft: #e3ecee;    /* a hairline that only separates              */
-  --grid:      rgba(11,111,125,0.045); /* the faint canvas grid           */
+  --rule:      #ded6c8;    /* a hairline that reads                       */
+  --rule-soft: #ebe5da;    /* a hairline that only separates              */
+  --grid:      rgba(90,72,44,0.05); /* the faint canvas grid           */
   --grid-size: 26px;
 
   /* ---- one face --------------------------------------------------------- */
@@ -100,11 +109,11 @@
   --t-display: clamp(2.6rem, 7vw, 4.6rem);
   --t-h1:      clamp(2rem, 4.4vw, 2.9rem);
   --t-h2:      clamp(1.5rem, 2.9vw, 2rem);
-  --t-h3:      1.22rem;
-  --t-body:    0.97rem;
-  --t-small:   0.86rem;
-  --t-meta:    0.72rem;
-  --t-micro:   0.63rem;
+  --t-h3:      1.32rem;
+  --t-body:    1.06rem;
+  --t-small:   0.94rem;
+  --t-meta:    0.78rem;
+  --t-micro:   0.71rem;
 
   --lead-tight: 1.14;
   --lead-body:  1.68;      /* mono at length needs the air               */
@@ -124,8 +133,12 @@
   --s1: 0.35rem;  --s2: 0.7rem;  --s3: 1.1rem;
   --s4: 1.75rem;  --s5: 2.75rem; --s6: 4.25rem;
 
-  /* ---- the one radius, the one shadow ---------------------------------- */
-  --radius: 2px;
+  /* ---- corners and the one shadow --------------------------------------- */
+  /* Softened from 2px: at 1px hairlines a near-square corner reads as a
+     rendering artefact rather than a decision. Small parts take the smaller
+     radius so a badge does not turn into a pill. */
+  --radius: 5px;
+  --radius-sm: 3px;
   --lift: 0 1px 2px rgba(12,26,36,0.04);
 }
 
@@ -134,31 +147,39 @@
    token layer may branch on theme. Demos/ live here; the whitepaper does not.
    ========================================================================== */
 :root[data-theme="dark"] {
-  --paper:      #08131a;
-  --paper-lt:   #0e1e27;
-  --paper-dk:   #050d12;
-  --paper-edge: #1a2c35;
+  /* The dark surface is a GREY room, not a blue one. Ink is nearly neutral and
+     every claim colour is pulled well back: on a canvas you stare at for an
+     hour, saturation is what the user's own marks are for. */
+  --paper:      #131315;
+  --paper-lt:   #1a1a1d;
+  --paper-dk:   #0d0d0f;
+  --paper-edge: #2b2b2f;
 
-  --ink:    #e3edf1;
-  --ink-2:  #b6c8d0;
-  --ink-3:  #7d939e;
-  --ink-4:  #55686f;
+  --ink:    #e7e5e0;
+  --ink-2:  #b5b3ad;
+  --ink-3:  #86847e;
+  --ink-4:  #5d5b56;
 
-  --teal:      #4fb3bf;
-  --teal-deep: #7fcfd8;
-  --teal-soft: #0b6f7d;
-  --wash:      rgba(79,179,191,0.08);
-  --hl:        rgba(79,179,191,0.18);
-  --hl-hot:    rgba(214,124,110,0.18);
-  --tint-read: rgba(91,155,234,0.12);
-  --tint-low:  rgba(214,124,110,0.12);
+  --teal:      #6fb3b8;
+  --teal-deep: #93cbcf;
+  --teal-soft: #2c6e75;
+  --wash:      rgba(111,179,184,0.07);
+  --hl:        rgba(111,179,184,0.16);
+  --hl-hot:    rgba(197,138,128,0.16);
+  --tint-read: rgba(138,167,201,0.10);
+  --tint-low:  rgba(197,138,128,0.10);
 
-  --sig-read:    #5b9bea;
-  --sig-held:    #7d939e;
-  --sig-high:    #4fb3bf;
-  --sig-mid:     #d6ab55;
-  --sig-low:     #d67c6e;
-  --sig-model:   #a58ce0;
+  --sig-read:    #8aa7c9;
+  --sig-held:    #86847e;
+  --sig-high:    #6fb3b8;
+  --sig-mid:     #c2a86a;
+  --sig-low:     #c58a80;
+  --sig-model:   #a99bc4;
+
+  --thread-vision: #6fb3b8;
+  --thread-recog:  #a99bc4;
+  --thread-intel:  #8aa7c9;
+  --thread-conv:   #c2a86a;
 
   --stroke-hand:  #e3edf1;
   --stroke-ghost: #55686f;
@@ -178,13 +199,13 @@
   --dia-live:   var(--sig-read);
   --dia-model:  var(--sig-model);
   --dia-hold:   var(--sig-held);
-  --dia-tint:      rgba(79,179,191,0.10);
-  --dia-tint-live: rgba(91,155,234,0.10);
-  --dia-tint-flat: rgba(227,237,241,0.05);
-  --dia-grid:      rgba(227,237,241,0.06);
+  --dia-tint:      rgba(111,179,184,0.10);
+  --dia-tint-live: rgba(138,167,201,0.10);
+  --dia-tint-flat: rgba(231,229,224,0.05);
+  --dia-grid:      rgba(231,229,224,0.06);
 
-  --rule:      #1c2f39;
-  --rule-soft: #132330;
+  --rule:      #2b2b2f;
+  --rule-soft: #202023;
   --grid:      rgba(79,179,191,0.05);
 
   --lift: 0 1px 2px rgba(0,0,0,0.3);

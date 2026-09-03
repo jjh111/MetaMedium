@@ -45,12 +45,13 @@ describe('selection', () => {
     expect(s.getState().selection).toEqual([a]);
   });
 
-  it('blessing a selection selects the artifact it became', () => {
+  it('blessing ends the selection — the hand\'s next act on a page is ink over it, not a drag', () => {
     const { s } = two();
     s.addStroke(circleStroke(320, 160, 300), 2000);
     s.addStroke(checkStroke(650, 160), 2500);
     const art = s.bless({ summonId: s.getState().summon!.id, name: 'pair', at: 3000 })!;
-    expect(s.getState().selection).toEqual([art]);
+    expect(art).toBeTruthy();
+    expect(s.getState().selection).toEqual([]);
   });
 });
 
