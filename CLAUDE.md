@@ -67,7 +67,7 @@ any structural change.
 | `doodle2-canvas.html` | **Flagship demo**: heuristic recognition, spatial graph, library, undo/redo, touch. No LLM. Single-file (~500KB) |
 | `metadoodle1.html` | Fork of flagship + tiered LLM recognition (WebLLM in-browser, LM Studio local API) + voice. Single-file (~600KB) |
 | `Web App Skeleton/` | React + Vite + TypeScript + Zustand rebuild; Claude API interpreter skeleton in `src/llm/`; recognition/spatial/matching in `src/core/` |
-| `Demos/surface/` | **The reference surface's source**: `surface.css` and nineteen script fragments (`00-core` … `18-images`, then `90-boot`, which must stay last), one concern each, concatenated in name order into one closure by `Demos/build-surface.mjs` → the committed `Demos/session-engine.js` (CI checks it has not drifted). Fragments share the closure's variables — no imports; each fragment's header says what it provides and uses. Edit a fragment, run the build, commit both |
+| `Demos/surface/` | **The reference surface's source**: `surface.css` and twenty script fragments (`00-core` … `19-text`, then `90-boot`, which must stay last), one concern each, concatenated in name order into one closure by `Demos/build-surface.mjs` → the committed `Demos/session-engine.js` (CI checks it has not drifted). Fragments share the closure's variables — no imports; each fragment's header says what it provides and uses. Edit a fragment, run the build, commit both |
 | `Demos/` | **`session-engine.html` is the MVP surface** (it links `surface/surface.css` and loads `session-engine.js`) — infinite canvas, the taught command mark, living artifacts in a DOM overlay, ink-over-artifact addressing, "why" inspector, model participants, canvas answers. Uses the committed `metamedium-core.browser.js` bundle. **`session-engine.e2e.js`** drives the whole loop through the real UI with a stubbed model (browser console; not part of `npm test`). `build-standalone.mjs` inlines the bundle into a single shareable file. Plus fish, composition diagrams, no-modes graph, etc. |
 | `skills/` | Claude Code skills: `metamedium-code` (code patterns), `metamedium-design` (design principles) |
 | `Assets/` | Figures and design rationale (recognition strategy, point-primitive proposal) |
@@ -654,6 +654,18 @@ focus are lenses over the same log. **Loops do not depend on paint**: a tab
 the browser stops painting gets no animation frames, so the tank and the
 worker take a timer's tick when no frame comes (`nextFrame` in
 `01-view.js`) — time is state, not a movie.
+
+### Text as an element (v8, WP-13)
+
+> `Demos/surface/19-text.js`.
+
+A `text` artifact is a file of words: rendered as prose ink can address, its
+words offered to any slot a frame wires it to. Double-click on empty ground
+opens an editor on the canvas where the text will stand; Enter keeps it,
+Shift+Enter is a new line, Esc drops it; editing an existing text is a new
+version of its code with every version held. Handwriting stays handwriting
+until asked: *Make it text “…”* turns a read word into a text artifact where
+the writing is, the ink staying.
 
 ### Frames: artifacts wired by reference, and the drawn slider (v8, WP-10)
 

@@ -200,6 +200,7 @@
       const rep = n && MM.behavioursOf(n)[Number(b.getAttribute('data-index'))];
       if (rep) session.behave({ nodeId: id, behaviour: { terms: rep.data.terms, source: rep.data.source, speed: rep.data.speed }, participantId: MM.LOCAL_PARTICIPANT, at: Date.now() });
     }
+    else if (act === 'edit-text') beginTextEdit(id);
     else if (act === 'export-code') {
       const n = state.nodes.get(id);
       const rep = n && codeRepOf(n);

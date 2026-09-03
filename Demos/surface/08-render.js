@@ -218,6 +218,7 @@
     }
 
     renderFrames(s);
+    if (editing) placeEditor(editing.bounds);
     renderExplanations(s);
     renderSelection(s);
     syncTank(s);

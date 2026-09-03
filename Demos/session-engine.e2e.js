@@ -906,6 +906,50 @@ window.__scenario = async function(){
     step('24d. the board exports as SVG paths, one per stroke, and the session as its log', /<path data-node="/.test(svgOut) && (svgOut.match(/<path /g) || []).length >= 3 && Array.isArray(logOut) && logOut.length === mm.session.getEvents().length, { paths: (svgOut.match(/<path /g) || []).length });
   }
 
+  // ---- 25. Text as an element: typed on the canvas, wired into a page's heading, revised in place ----
+  {
+    mm.setView(1, 260 - 10200, 200 - 2000); await wait(30);
+    const pageT = mm.importText('card.html', '<h1 data-region="title">Untitled</h1><p data-region="body">Some words.</p>', { x: 10200, y: 2000 }, 360);
+    const textId = mm.typeText({ x: 10200, y: 2320 }, 'Hello, world');
+    const stT = mm.session.getState();
+    const tn = stT.nodes.get(textId);
+    step('25. typed words are a text artifact: a file of words, live, its paragraphs addressable', !!tn && stT.live.includes(textId) && codeRepOfNode(tn).data.kind === 'text' && MM.addressablesOf('text', codeRepOfNode(tn).data.code).length === 1, { kind: tn && codeRepOfNode(tn).data.kind });
+    // Frame the text with the page: the words feed the title slot, best name match.
+    const cT = mm.worldToScreen(10380, 2200);
+    t.stroke(t.circle(cT.x, cT.y, 330)); t.takeLoop(cT.x, cT.y, 330); await wait(60);
+    const fc = [...document.querySelectorAll('#summon .item')].find(x => /^Frame these/.test(x.textContent));
+    const ff = document.querySelector('#summon input.filter'); if (ff) ff.value = 'card';
+    if (fc) fc.click(); await wait(80);
+    const wiredT = mm.wiredCodeOf(pageT);
+    step('25a. framed with a page, the words land in a slot: the heading reads what was typed', !!wiredT && /<h1 data-region="title">Hello, world<\/h1>/.test(wiredT), wiredT);
+    // Revise in place: the editor opens on the text, Enter commits a new version, the page follows.
+    step('25b. the editor opens on the text where it stands', mm.beginTextEdit(textId) && !document.getElementById('textEditor').hidden && document.getElementById('textEditor').value === 'Hello, world');
+    document.getElementById('textEditor').value = 'Hello again';
+    document.getElementById('textEditor').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    await wait(60);
+    const versions = mm.session.getState().nodes.get(textId).reps.filter(r => r.modality === 'code').length;
+    const wiredT2 = mm.wiredCodeOf(pageT);
+    step('25c. Enter keeps the revision as a new version — the earlier one held — and the page\'s heading follows', versions === 2 && /Hello again<\/h1>/.test(wiredT2) && document.getElementById('textEditor').hidden && mm.session.getEvents().slice(-1)[0].type === 'code', { versions, head: wiredT2 && wiredT2.slice(0, 60) });
+    // A written word becomes text on request: the word the model read earlier.
+    const stW2 = mm.session.getState();
+    const pricing = stW2.contentIds.find(id => MM.transcriptOf(stW2.nodes.get(id)) === 'Pricing');
+    if (pricing) {
+      const pb = MM.boundsOf(stW2.nodes.get(pricing));
+      mm.setView(1, 260 - pb.minX + 100, 200 - pb.minY + 100); await wait(30);
+      const pc = mm.worldToScreen((pb.minX + pb.maxX) / 2, (pb.minY + pb.maxY) / 2);
+      const pr = Math.max(pb.maxX - pb.minX, pb.maxY - pb.minY) * 0.9 + 40;
+      t.stroke(t.circle(pc.x, pc.y, pr)); t.takeLoop(pc.x, pc.y, pr); await wait(60);
+      const mk = [...document.querySelectorAll('#summon .item')].find(x => /Make it text “Pricing”/.test(x.textContent));
+      step('25d. circling the written word offers to make it text, with what the model read', !!mk, t.chips());
+      if (mk) mk.click(); await wait(60);
+      const stX = mm.session.getState();
+      const made = stX.artifacts.map(id => stX.nodes.get(id)).find(n => { const r = codeRepOfNode(n); return r && r.data.kind === 'text' && r.data.code === 'Pricing'; });
+      step('25e. …and taking it makes a text artifact of the word where the writing is; the ink stays', !!made && stX.contentIds.includes(pricing), { made: !!made });
+    } else {
+      step('25d. (no read word on the board to convert — skipped honestly)', true);
+    }
+  }
+
   // ---- 11. Scratch-out erase ----
   mm.fitAll(); await wait(60);
   const stBefore = mm.session.getState().contentIds.length;

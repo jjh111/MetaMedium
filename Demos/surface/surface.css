@@ -492,3 +492,6 @@ body.paper #summon.blob input.filter, body.paper #summon.blob input.field { box-
 /* A parked artifact: past the live budget, a card stands where the iframe would. */
 .artifactFrame.parked .park { width: 100%; height: 100%; box-sizing: border-box; border-radius: 2px; background: #f2efe8; color: #5a5a4e; font-family: var(--mono); font-size: 11px; padding: 10px; box-shadow: 0 0 0 1px rgba(201,168,76,0.25); overflow: hidden; }
 .artifactFrame.parked .park b { display: block; color: #14140f; margin-bottom: 4px; }
+
+/* ===== The text editor: on the canvas, where the text stands ===== */
+#textEditor { position: absolute; z-index: 8; font-family: var(--mono); line-height: 1.4; color: #14140f; background: #fbfaf7; border: 1px solid rgba(201,168,76,0.8); border-radius: 2px; padding: 6px 8px; resize: none; box-shadow: 0 6px 24px rgba(0,0,0,0.4); outline: none; }

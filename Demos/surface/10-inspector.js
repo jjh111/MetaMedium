@@ -136,7 +136,8 @@
       }
       if (codes.length > 1) html += '<div class="why">Earlier versions are kept.</div>';
       if (kind !== 'png' && kind !== 'jpg' && kind !== 'control') {
-        html += '<div class="acts"><button class="mini" data-act="export-code" data-id="' + esc(id) + '">save as .' + esc(kind === 'text' ? 'txt' : kind) + '</button></div>';
+        html += '<div class="acts">' + (kind === 'text' ? '<button class="mini" data-act="edit-text" data-id="' + esc(id) + '">edit the words</button>' : '') +
+          '<button class="mini" data-act="export-code" data-id="' + esc(id) + '">save as .' + esc(kind === 'text' ? 'txt' : kind) + '</button></div>';
       }
       // The clock: nothing runs until a hand plays it, and a stop says why.
       if (kind === 'js') {

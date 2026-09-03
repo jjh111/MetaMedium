@@ -198,7 +198,7 @@ The seam, `StaticStore` and `FolderStore`, discovery, per-participant logs, auto
 Import (file, drag, paste, camera on a phone); decode → trace → `import` event with strokes; the raster as an `image` artifact; SVG import; export kinds. SAM on request later, behind a flag.
 *Done:* v8 §19 S6 criterion.
 
-**WP-13 · Text as an element** (W)
+**WP-13 · Text as an element** (W) ✅ **done 3 Sep 2026** — `Demos/surface/19-text.js`: a `text` artifact is a file of words (rendered as prose ink can address, its words offered to any slot a frame wires it to); double-click on empty ground opens the editor on the canvas where the text will stand, Enter keeps it (Shift+Enter a new line, Esc drops it), and editing an existing text is a new version of its code with every version held. A written word the model has read becomes text only on request (*Make it text “…”*), the ink staying. e2e 25–25e: a heading typed on the canvas, framed with a page, lands in its title slot and follows a revision.
 The `text` kind with an editor; convert a written word to it on request; a page heading typed on the canvas.
 *Done:* v8 §19 S3 criterion.
 

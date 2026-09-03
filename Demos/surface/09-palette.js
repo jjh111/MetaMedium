@@ -78,6 +78,19 @@
           run: () => session.bless({ summonId: sum.id, name: t.text, at: Date.now() }),
         });
       }
+      // Writing in the loop that a model has read can become text — a file of
+      // words that a frame wires into a slot. Only on request: handwriting
+      // stays handwriting until it is asked to be a heading.
+      for (const lid of sum.enclosedIds) {
+        const ln = s.nodes.get(lid);
+        const said = ln && !s.artifacts.includes(lid) && MM.transcriptOf(ln);
+        if (!said) continue;
+        items.push({
+          key: 'word-text:' + lid, group: 'always', groupConf: 0, groupWhy: '',
+          label: 'Make it text “' + said + '”', why: 'a file of words where the writing is; the ink stays', tier: 0,
+          run: () => { session.dismiss(sum.id, Date.now()); wordToText(lid); },
+        });
+      }
       // Artifacts in the loop can be wired into a frame — and a frame built
       // once is offered again, by the name written beside them or by resemblance.
       {
