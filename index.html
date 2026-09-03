@@ -23,6 +23,16 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,300;0,400;0,500;0,600;1,400;1,500&display=swap" rel="stylesheet">
+    <script>
+        /* Apply the saved surface BEFORE first paint, so a reader who chose
+           the canvas ground never sees a flash of paper. Same key as
+           brand/styleguide.html — one choice covers both surfaces. */
+        (function () {
+            var theme = null;
+            try { theme = new URLSearchParams(location.search).get('theme') || localStorage.getItem('metamedium-brand-theme'); } catch (e) {}
+            if (theme === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+        })();
+    </script>
     <style>
         /* ===========================================
            MetaMedium Design System v5
@@ -69,6 +79,9 @@
             --rule-soft: #ebe5da;
             --shadow: rgba(60,48,32,0.06);
             --focus: #0b6f7d;
+            --wash: rgba(11,111,125,0.06);       /* the one tint a key surface takes */
+            --nav-bg: rgba(253,251,246,0.96);    /* paper-lt at 96%, blurred      */
+            --watermark: rgba(12,26,36,0.055);   /* the principle card's number   */
 
             /* one face carries display, prose, UI and code */
             --face: 'IBM Plex Mono', 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
@@ -291,7 +304,7 @@
         nav {
             position: fixed;
             top: 0; left: 0; right: 0;
-            background: rgba(253, 251, 246, 0.96);
+            background: var(--nav-bg);
             backdrop-filter: blur(12px);
             z-index: 1000;
             border-bottom: 1px solid var(--border);
@@ -391,7 +404,7 @@
                 top: 10px;
                 left: 0;
                 right: 0;
-                background: rgba(253, 252, 250, 0.98);
+                background: var(--nav-bg);
                 backdrop-filter: blur(12px);
                 flex-direction: column;
                 align-items: stretch;
@@ -418,6 +431,36 @@
             }
         }
         
+        /* Theme switch — the styleguide's own component (brand/styleguide.html),
+           bottom right like a device preference on the canvas surface. Proves
+           the dark surface is this system, not another one. */
+        .theme-switch {
+            position: fixed;
+            bottom: var(--space-md);
+            right: var(--space-md);
+            z-index: 50;
+            display: flex;
+            gap: 0;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            overflow: hidden;
+            background: var(--paper-lt);
+            box-shadow: 0 1px 2px var(--shadow);
+        }
+        .theme-switch button {
+            font-family: var(--face);
+            font-size: var(--text-xs);
+            font-weight: 500;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            padding: 0.45rem 0.7rem;
+            border: 0;
+            cursor: pointer;
+            background: transparent;
+            color: var(--muted-light);
+        }
+        .theme-switch button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+
         /* Main Content */
         main {
             max-width: 760px;
@@ -579,6 +622,69 @@
             --dia-tint: rgba(11,111,125,0.07);
             --dia-tint-live: rgba(28,95,184,0.07);
             --dia-tint-flat: rgba(60,48,32,0.045);
+            --dia-grid: rgba(90,72,44,0.055);
+
+            /* An external artwork whose ink was authored for paper keeps its
+               paper in BOTH themes — like a page photographed onto the desk.
+               Deliberately constant: it is the artwork's own ground, not the
+               surface's. */
+            --fig-artwork: #fdfbf6;
+        }
+
+        /* ==========================================================
+           CANVAS (dark) — the same system inverted, values verbatim
+           from brand/tokens.css :root[data-theme="dark"] under this
+           page's names. Only tokens change: no rule below branches
+           on theme. The hero and footer carry their own ground and
+           stay dark on paper too — that seam is deliberate
+           (WHITEPAPER-v5.1-PLAN.md).
+           ========================================================== */
+        :root[data-theme="dark"] {
+            --ink: #e7e5e0;
+            --ink-soft: #b5b3ad;
+            --paper: #131315;
+            --paper-warm: #0d0d0f;
+            --paper-lt: #1a1a1d;
+            --accent: #6fb3b8;
+            --accent-hover: #93cbcf;
+            --muted: #b5b3ad;
+            --muted-light: #86847e;
+            --highlight: rgba(111,179,184,0.16);
+
+            --sketch-blue: #8aa7c9;
+            --sketch-green: #6fb3b8;
+            --sketch-purple: #a99bc4;
+            --sig-mid: #c2a86a;
+            --sig-low: #c58a80;
+            --sig-held: #86847e;
+
+            --thread-vision: #6fb3b8;
+            --thread-recog: #a99bc4;
+            --thread-intel: #8aa7c9;
+            --thread-conv: #c2a86a;
+
+            --border: #2b2b2f;
+            --rule-soft: #202023;
+            --shadow: rgba(0,0,0,0.3);
+            --focus: #6fb3b8;
+            --wash: rgba(111,179,184,0.07);
+            --nav-bg: rgba(26,26,29,0.94);
+            --watermark: rgba(231,229,224,0.05);
+
+            --mm-ink-4: #5d5b56;
+            --sig-read: #8aa7c9;
+            --sig-held: #86847e;
+            --sig-model: #a99bc4;
+
+            --fig-plate: #1a1a1d;
+            --fig-well: #0d0d0f;
+            --fig-edge: #2b2b2f;
+            --fig-rule: #202023;
+
+            --dia-tint: rgba(111,179,184,0.10);
+            --dia-tint-live: rgba(138,167,201,0.10);
+            --dia-tint-flat: rgba(231,229,224,0.05);
+            --dia-grid: rgba(231,229,224,0.06);
         }
 
         /* ONE figure component: a plate holding the drawing, a caption behind
@@ -592,7 +698,7 @@
             border: 1px solid var(--fig-edge);
             border-radius: 5px;
             overflow: hidden;
-            box-shadow: 0 1px 2px rgba(60,48,32,0.06);
+            box-shadow: 0 1px 2px var(--shadow);
             /* Step out of the prose measure at a FIXED width, never 90vw: a
                viewport-relative figure changes its relationship to the text
                column at every window size, so the same diagram reads
@@ -612,6 +718,9 @@
         figure > .plate > svg,
         figure > .plate > img { display: block; width: 100%; height: auto; }
         figure > img { display: block; width: 100%; }
+        /* Artwork authored dark-on-transparent keeps its own paper in both
+           themes (see --fig-artwork); otherwise its ink vanishes on canvas. */
+        figure .image img.art-paper { background: var(--fig-artwork); border-radius: var(--radius-sm); }
 
         figcaption {
             padding: var(--fig-pad);
@@ -660,6 +769,46 @@
         }
 
         figure.sketch-figure { border-style: dashed; }
+
+        /* ---- sets break out like figures ----------------------------------
+           Prose stays on the measure; a SET of things — scenarios, rungs,
+           questions — takes the figure width and columns on desktop, one
+           column on a phone. Two bodies: .cards (a plate per item, the
+           use-case/principle treatment) and .ticks (a plain list tightened
+           into columns, with the timeline's own arrow as its marker). */
+        .grid-band {
+            display: grid;
+            gap: var(--space-sm);
+            margin: var(--space-lg) 0;
+            width: min(var(--fig-wide), calc(100vw - 3rem));
+            max-width: var(--fig-wide);
+            margin-left: 50%;
+            transform: translateX(-50%);
+            position: relative;
+        }
+        @media (max-width: 768px) {
+            .grid-band { width: 100%; max-width: none; margin-left: 0; transform: none; }
+        }
+        @media (min-width: 900px)  { .cols-2 { grid-template-columns: 1fr 1fr; } }
+        @media (min-width: 1100px) { .cols-3 { grid-template-columns: repeat(3, 1fr); } }
+
+        .cards { list-style: none; padding-left: 0; margin-bottom: 0; }
+        .cards > li {
+            background: var(--paper-lt);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: var(--space-md);
+            margin-bottom: 0;
+            min-width: 0;   /* a long token in one card must not push the grid */
+        }
+        .cards > li strong { display: block; margin-bottom: var(--space-xs); }
+
+        .ticks { list-style: none; padding-left: 0; margin-bottom: 0; }
+        .ticks > li { padding-left: 1.3em; position: relative; margin-bottom: 0; }
+        .ticks > li::before { content: "\2192"; position: absolute; left: 0; color: var(--accent); }
+
+        /* A grid of use-cases keeps the card; the grid owns the spacing. */
+        .use-case-grid .use-case { margin: 0; min-width: 0; }
 
         /* ---- diagrams ------------------------------------------------------
            A diagram is drawn in the six roles the engine itself reads
@@ -792,7 +941,7 @@
             padding: var(--space-md);
             margin: var(--space-lg) 0;
         }
-        .callout.key { background: rgba(11,111,125,0.06); border-color: var(--accent); }
+        .callout.key { background: var(--wash); border-color: var(--accent); }
         .callout h4 { margin-top: 0; font-size: var(--text-base); }
         .callout p { font-size: var(--text-base); line-height: 1.65; }
         .callout p:last-child { margin-bottom: 0; }
@@ -903,63 +1052,93 @@
             display: block;
         }
         
-        /* Gallery grid */
-        .gallery {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: var(--space-sm);
-            margin: var(--space-lg) 0;
-            width: min(var(--fig-wide), calc(100vw - 3rem));
-            max-width: var(--fig-wide);
-            margin-left: 50%;
-            transform: translateX(-50%);
+        /* ---- gallery: one plate, one stage, a strip of the rest -------------
+           The old gallery was a wall of small plates; on a phone each one was
+           too small to read. One figure holds a large stage on the recessed
+           well (a viewer, not the scan itself), and the rest wait in a strip
+           that scrolls. Clicking the stage opens the same lightbox as before. */
+        .gallery-stage {
             position: relative;
-        }
-        /* A gallery tile is the figure component at small size: same plate,
-           same hairline, same caption rule, tighter padding. */
-        .gallery-item {
-            background: var(--fig-plate);
-            border: 1px solid var(--fig-edge);
-            border-radius: 5px;
-            box-shadow: 0 1px 2px rgba(60,48,32,0.06);
-            overflow: hidden;
-            width: auto; max-width: none;
-            margin: 0; margin-left: 0;
-            transform: none; position: static;
-        }
-        .gallery-item .image {
-            width: 100%;
-            aspect-ratio: 16 / 10;
-            margin: 0.6rem 0.6rem 0.6rem;
-            width: calc(100% - 1.2rem);
             background: var(--fig-well);
-            border-radius: 3px;
+            border: 1px solid var(--fig-edge);
+            border-radius: var(--radius-sm);
             overflow: hidden;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: background 0.2s ease;
+            aspect-ratio: 16 / 10;
         }
-        .gallery-item .image:hover { background: #e6ded0; }
-        .gallery-item .image img {
+        .gallery-stage > img {
             width: 100%;
             height: 100%;
             object-fit: contain;
             display: block;
+            cursor: zoom-in;
         }
-        .gallery-item figcaption {
-            padding: 0.6rem 0.75rem 0.75rem;
-            border-top: 1px solid var(--fig-rule);
-            font-size: 0.85rem;
-            line-height: 1.45;
+        .gallery-arrow {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 2.2rem;
+            height: 2.2rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid var(--fig-edge);
+            border-radius: var(--radius-sm);
+            background: var(--fig-plate);
             color: var(--mm-ink-3);
+            font-family: var(--face);
+            font-size: 1.2rem;
+            line-height: 1;
+            cursor: pointer;
+            opacity: 0.6;
+            transition: opacity 0.2s;
+            padding: 0;
         }
+        .gallery-stage:hover .gallery-arrow,
+        .gallery-arrow:hover,
+        .gallery-arrow:focus-visible { opacity: 1; }
+        .gallery-arrow.prev { left: var(--space-sm); }
+        .gallery-arrow.next { right: var(--space-sm); }
 
-        @media (max-width: 1024px) {
-            .gallery { grid-template-columns: repeat(2, 1fr); }
+        .gallery-thumbs {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: var(--space-sm);
+            overflow-x: auto;
+            padding-bottom: 0.25rem;   /* room for the focus ring and scrollbar */
         }
-        @media (max-width: 480px) {
-            .gallery { grid-template-columns: 1fr; }
+        .gallery-thumb {
+            flex: 0 0 auto;
+            width: 5.5rem;
+            aspect-ratio: 16 / 10;
+            padding: 0;
+            border: 1px solid var(--fig-edge);
+            border-radius: var(--radius-sm);
+            background: var(--fig-well);
+            overflow: hidden;
+            cursor: pointer;
+            opacity: 0.55;
+            transition: opacity 0.2s, border-color 0.2s;
+        }
+        .gallery-thumb img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            display: block;
+            pointer-events: none;   /* the button carries the click */
+        }
+        .gallery-thumb:hover { opacity: 0.85; }
+        .gallery-thumb[aria-current="true"] {
+            opacity: 1;
+            border-color: var(--accent);
+            outline: 1px solid var(--accent);
+        }
+        .gallery-count {
+            float: right;
+            margin-left: var(--space-sm);
+            color: var(--mm-ink-4);
+        }
+        @media (max-width: 768px) {
+            .gallery-thumb { width: 4.5rem; }
         }
         
         /* Principles - v1 watermark + v3 stripe */
@@ -995,7 +1174,7 @@
             font-family: var(--face);
             font-size: 4.5rem;
             font-weight: 500;
-            color: rgba(12, 26, 36, 0.055);
+            color: var(--watermark);
             line-height: 1;
             pointer-events: none;
         }
@@ -1452,7 +1631,7 @@
           --text: var(--ink);
           --muted: var(--muted-light);
           --border: var(--border);
-          --pipe: #9aa3a7;
+          --pipe: var(--mm-ink-4);
           font-family: var(--face);
           font-size: var(--text-sm);
           background: var(--bg);
@@ -1538,7 +1717,7 @@
           padding-left: 1.25rem;
         }
         .tl-convergence {
-          background: rgba(11,111,125,0.06);
+          background: var(--wash);
           border: 1px solid var(--convergence-color);
           border-radius: var(--radius);
           padding: 1.5rem;
@@ -1601,8 +1780,8 @@
           width: 100%;
         }
         .timeline-toggle:hover {
-          border-color: #3b82f6;
-          color: #3b82f6;
+          border-color: var(--accent);
+          color: var(--accent);
         }
         .timeline-toggle .toggle-arrow {
           transition: transform 0.2s ease;
@@ -1642,7 +1821,7 @@
           background: var(--fig-plate);
           border: 1px solid var(--fig-edge);
           border-radius: 5px;
-          box-shadow: 0 1px 2px rgba(60,48,32,0.06);
+          box-shadow: 0 1px 2px var(--shadow);
           font-family: var(--mm-face);
           width: min(var(--fig-band), calc(100vw - 3rem));
           max-width: var(--fig-band);
@@ -1671,7 +1850,7 @@
         .triadic-toggle[aria-pressed="true"] {
           background: var(--accent);
           border-color: var(--accent);
-          color: white;
+          color: var(--paper);
         }
         .triadic-toggle:hover:not([aria-pressed="true"]) {
           border-color: var(--accent);
@@ -1723,7 +1902,8 @@
 
         @media print {
             body { font-size: 11pt; line-height: 1.5; }
-            nav, .scroll-indicator, #heroCanvas, .hero-hint, .demo-wrapper { display: none; }
+            nav, .scroll-indicator, #heroCanvas, .hero-hint, .demo-wrapper,
+            .theme-switch, .gallery-thumbs, .gallery-arrow { display: none; }
             .hero { min-height: auto; padding: 1.5rem 0; background: none; }
             .hero::after { display: none; }
             .hero h1, .hero .subtitle, .hero .tagline, .hero .byline { color: var(--ink); }
@@ -1755,6 +1935,11 @@
             </ul>
         </div>
     </nav>
+
+    <div class="theme-switch" role="group" aria-label="Surface">
+        <button type="button" data-theme-set="light" aria-pressed="true">Paper</button>
+        <button type="button" data-theme-set="dark" aria-pressed="false">Canvas</button>
+    </div>
 
     <header class="hero" id="top">
         <!-- Interactive Blueprint Canvas -->
@@ -1803,7 +1988,7 @@
             
             <figure>
                 <div class="plate">
-                    <div class="image"><img src="./Assets/fig-digidraw.svg" alt="Spectrum of Digital Representations"></div>
+                    <div class="image"><img src="./Assets/fig-digidraw.svg" alt="Spectrum of Digital Representations" class="art-paper"></div>
                 </div>
                 <figcaption><b>Figure &middot; The Digital Representation Spectrum</b>From "inert" to "dynamic": Photoshop (pixels) → Illustrator (vectors) → OneNote (ink capture) → Figma (components) → Miro (templates) → Chalktalk (behaviors) → tldraw computer (LLM interpretation) → MetaMedium (learning + negotiation). Most tools cluster on the left.</figcaption>
             </figure>
@@ -2252,7 +2437,7 @@
 
                 <!-- Background subtle grid -->
                 <pattern id="triGrid" width="20" height="20" patternUnits="userSpaceOnUse">
-                  <path d="M 20 0 L 0 0 0 20" fill="none" stroke="rgba(90,72,44,0.06)" stroke-width="0.5"/>
+                  <path d="M 20 0 L 0 0 0 20" fill="none" stroke="var(--dia-grid)" stroke-width="0.5"/>
                 </pattern>
                 <rect width="400" height="384" fill="url(#triGrid)" />
 
@@ -2414,7 +2599,7 @@
             
             <p>In traditional communication, humans exchange sign vehicles (words, gestures, marks) and each party reconstructs meaning internally. The MetaMedium introduces AI as an active participant in this meaning-making process—not merely receiving marks and returning responses, but operating as a semantic transformer that:</p>
             
-            <ul>
+            <ul class="grid-band cols-2 ticks">
                 <li>Recognizes patterns across multiple possible interpretations</li>
                 <li>Holds ambiguity productively until context resolves it</li>
                 <li>Learns user-specific vocabularies and reasoning patterns</li>
@@ -2887,7 +3072,7 @@
 
             <p>A working engine and a reference surface accompany this paper. You draw on an infinite canvas; the canvas reads what you drew; a model joins the reading as a participant rather than an oracle. Every mark climbs three rungs, each a closed vocabulary you can inspect:</p>
 
-            <ul>
+            <ul class="grid-band cols-3 cards">
                 <li><strong>Shape: what the stroke is.</strong> Line, arc, triangle, rectangle, circle, arrow, writing, dot. Every reading is measured from the ink and carries its reason; several are held at once. A confident one is offered back as its clean form, drawn over the ink, never in place of it.</li>
                 <li><strong>Diagram: what the mark plays.</strong> Container, node, edge, label, annotation, placed from measured relations, so a drawing has a genre: boxes tiling a space are a page, nodes joined by edges are a graph.</li>
                 <li><strong>Code: what it becomes.</strong> A page compiles to flexbox that reflows, your ink still outlining its elements; a graph keeps its positions and arrows. The engine owns the structure it measured; a model writes only the content, briefed by the drawing.</li>
@@ -2926,7 +3111,7 @@
 
             <h3>Development Roadmap</h3>
 
-            <ul>
+            <ul class="grid-band cols-3 cards">
                 <li><strong>Built:</strong> the engine and the three rungs; selection, command and erase as marks; living artifacts that ink can address; local and hosted models as participants; handwriting; the model drawing back.</li>
                 <li><strong>Next:</strong> words from printed letters; the model proposing library entries for the human to bless; recall by meaning; this surface as the flagship.</li>
                 <li><strong>Then:</strong> multi-user canvases; cognitive lens export and import; a model outside the browser taking part through the same channel.</li>
@@ -2936,7 +3121,7 @@
             
             <p>The MetaMedium framework raises questions that can only be answered through building and testing:</p>
             
-            <ul>
+            <ul class="grid-band cols-2 ticks">
                 <li>How do we design for "interpretive ambiguity" without creating confusion? What's the right balance between holding possibilities open and committing to interpretation?</li>
                 <li>What are the limits of gesture vocabulary before cognitive overhead exceeds benefit? How many "words" can a visual language productively contain?</li>
                 <li>How can "cognitive lenses" be effectively shared between users? What's lost in translation when one person's way of seeing meets another's?</li>
@@ -2946,7 +3131,7 @@
             
             <h3>Limitations and Challenges</h3>
             
-            <ul>
+            <ul class="grid-band cols-2 ticks">
                 <li><strong>Recognition is bounded, not solved:</strong> the engine reads eight shapes and one cursive stroke per word; everything past that vocabulary is held as "art" until a model or the human says otherwise. The negotiation paradigm turns each miss into a correction, but too many corrections and people stop drawing.</li>
                 <li><strong>Cognitive load:</strong> Every gestural vocabulary is a language to learn. There's a real risk that MetaMedium becomes its own expertise barrier, replacing "learn to code" with "learn our gestures." Keeping the learning curve gentle while enabling power is a design challenge.</li>
                 <li><strong>Privacy of patterns:</strong> If the canvas learns from your drawing patterns, those patterns become data. "Cognitive lenses" are intimate—they encode how you think. The system must be designed with privacy as foundational, not afterthought.</li>
@@ -2959,57 +3144,27 @@
 
 
             <h3>Gallery</h3>
-            
-            <div class="gallery">
-                <figure class="gallery-item">
-                    <div class="image">
-                        <img src="./Assets/gal-notes-systemdiagram2016.jpeg" alt="System architecture diagram">
+
+            <figure class="gallery-view" id="notesGallery">
+                <div class="plate">
+                    <div class="gallery-stage" id="galleryStage" tabindex="0" role="group" aria-label="Current image — arrow keys browse, click opens full size">
+                        <img id="galleryStageImg" src="./Assets/gal-notes-systemdiagram2016.jpeg" alt="System architecture diagram">
+                        <button class="gallery-arrow prev" aria-label="Previous image">&#8249;</button>
+                        <button class="gallery-arrow next" aria-label="Next image">&#8250;</button>
                     </div>
-                    <figcaption>System architecture diagram showing component relationships</figcaption>
-                </figure>
-                <figure class="gallery-item">
-                    <div class="image">
-                        <img src="./Assets/gal-notes-activitymodel2016.png" alt="Activity theory model">
+                    <div class="gallery-thumbs" role="group" aria-label="Choose an image">
+                        <button class="gallery-thumb" aria-current="true" data-caption="System architecture diagram showing component relationships"><img src="./Assets/gal-notes-systemdiagram2016.jpeg" alt="System architecture diagram" loading="lazy"></button>
+                        <button class="gallery-thumb" aria-current="false" data-caption="Activity theory model for human-computer interaction"><img src="./Assets/gal-notes-activitymodel2016.png" alt="Activity theory model" loading="lazy"></button>
+                        <button class="gallery-thumb" aria-current="false" data-caption="Conceptual framework for sentence-level annotation"><img src="./Assets/gal-notes-sentance.png" alt="Sentence annotation framework" loading="lazy"></button>
+                        <button class="gallery-thumb" aria-current="false" data-caption="Visualization of 2D to 3D transformation concept"><img src="./Assets/gal-notes-planestocube.png" alt="2D to 3D transformation" loading="lazy"></button>
+                        <button class="gallery-thumb" aria-current="false" data-caption="Memory association network diagram"><img src="./Assets/gal-notes-memoryassociaton.png" alt="Memory association network" loading="lazy"></button>
+                        <button class="gallery-thumb" aria-current="false" data-caption="Conceptual frameworks for design thinking"><img src="./Assets/gal-notes-conceptualframeworks Large.jpeg" alt="Design thinking frameworks" loading="lazy"></button>
+                        <button class="gallery-thumb" aria-current="false" data-caption="Artifacts of the design and development process"><img src="./Assets/gal-notes-artefactsofprocess.jpeg" alt="Process artifacts" loading="lazy"></button>
+                        <button class="gallery-thumb" aria-current="false" data-caption="User activity model showing interaction patterns"><img src="./Assets/gal-notes-useractivitymodel2016.png" alt="User activity model" loading="lazy"></button>
                     </div>
-                    <figcaption>Activity theory model for human-computer interaction</figcaption>
-                </figure>
-                <figure class="gallery-item">
-                    <div class="image">
-                        <img src="./Assets/gal-notes-sentance.png" alt="Sentence annotation framework">
-                    </div>
-                    <figcaption>Conceptual framework for sentence-level annotation</figcaption>
-                </figure>
-                <figure class="gallery-item">
-                    <div class="image">
-                        <img src="./Assets/gal-notes-planestocube.png" alt="2D to 3D transformation">
-                    </div>
-                    <figcaption>Visualization of 2D to 3D transformation concept</figcaption>
-                </figure>
-                <figure class="gallery-item">
-                    <div class="image">
-                        <img src="./Assets/gal-notes-memoryassociaton.png" alt="Memory association network">
-                    </div>
-                    <figcaption>Memory association network diagram</figcaption>
-                </figure>
-                <figure class="gallery-item">
-                    <div class="image">
-                        <img src="./Assets/gal-notes-conceptualframeworks Large.jpeg" alt="Design thinking frameworks">
-                    </div>
-                    <figcaption>Conceptual frameworks for design thinking</figcaption>
-                </figure>
-                <figure class="gallery-item">
-                    <div class="image">
-                        <img src="./Assets/gal-notes-artefactsofprocess.jpeg" alt="Process artifacts">
-                    </div>
-                    <figcaption>Artifacts of the design and development process</figcaption>
-                </figure>
-                <figure class="gallery-item">
-                    <div class="image">
-                        <img src="./Assets/gal-notes-useractivitymodel2016.png" alt="User activity model">
-                    </div>
-                    <figcaption>User activity model showing interaction patterns</figcaption>
-                </figure>
-            </div>
+                </div>
+                <figcaption><b>Figure &middot; The sketchbook, 2016</b><span class="gallery-count" id="galleryCount">1 / 8</span><span id="galleryCaption">System architecture diagram showing component relationships</span></figcaption>
+            </figure>
         </section>
 
         <!-- SECTION 7: THE PRACTICE -->
@@ -3017,7 +3172,8 @@
             <h2>Scenarios</h2>
             
             <p>The framework becomes concrete through scenarios. Each demonstrates specific principles in action.</p>
-            
+
+            <div class="grid-band cols-2 use-case-grid">
             <div class="use-case">
                 <h4>Visual Learning</h4>
                 <p class="principles-used"><strong>Principles:</strong> Space is semantic, Canvas learns, Bidirectional representation</p>
@@ -3048,6 +3204,7 @@
                 <p class="scenario">Researchers sketch faster than formal notation allows. Spatial annotations like "defect here?" trigger simulations. Shared research lens interprets their shorthand.
                     <a href="https://open.substack.com/pub/johnhanacek/p/a-day-with-metamedium-147" target="_blank">Read Story</a>
                 </p>
+            </div>
             </div>
         </section>
 
@@ -3228,6 +3385,34 @@
 
     <script src="Demos/metamedium-core.browser.js"></script>
     <script>
+        // Paper / Canvas switch — the styleguide's component, ported as-is.
+        // Same storage key as brand/styleguide.html, so one choice covers
+        // both surfaces. The attribute itself was applied before first paint
+        // by the head script; this wires the buttons to it. A ?theme= link
+        // shares a surface without overwriting the reader's own choice.
+        (function () {
+            const root = document.documentElement;
+            const btns = document.querySelectorAll('[data-theme-set]');
+            const KEY = 'metamedium-brand-theme';
+
+            function apply(theme, persist) {
+                if (theme === 'dark') root.setAttribute('data-theme', 'dark');
+                else root.removeAttribute('data-theme');
+                btns.forEach(function (b) {
+                    b.setAttribute('aria-pressed', String(b.dataset.themeSet === theme));
+                });
+                if (persist !== false) { try { localStorage.setItem(KEY, theme); } catch (e) {} }
+            }
+
+            let saved = null;
+            try { saved = new URLSearchParams(location.search).get('theme') || localStorage.getItem(KEY); } catch (e) {}
+            apply(saved === 'dark' ? 'dark' : 'light', false);   // paper is the default, always
+
+            btns.forEach(function (b) {
+                b.addEventListener('click', function () { apply(b.dataset.themeSet); });
+            });
+        })();
+
         // Navigation scroll visibility - show after scrolling past hero
         const nav = document.getElementById('nav');
         const hero = document.querySelector('.hero');
@@ -4781,100 +4966,108 @@
     </div>
 
     <script>
-        // Gallery Modal / Lightbox functionality
+        // Gallery: one stage, a strip of thumbnails, and the lightbox — all
+        // three fed by the thumbnail strip, so the HTML stays the single
+        // source of truth and the two viewers can never disagree.
         (function() {
+            const figure = document.getElementById('notesGallery');
+            if (!figure) return;
+            const stage = document.getElementById('galleryStage');
+            const stageImg = document.getElementById('galleryStageImg');
+            const captionEl = document.getElementById('galleryCaption');
+            const countEl = document.getElementById('galleryCount');
+            const thumbs = Array.from(figure.querySelectorAll('.gallery-thumb'));
+            const prevArrow = figure.querySelector('.gallery-arrow.prev');
+            const nextArrow = figure.querySelector('.gallery-arrow.next');
+
             const modal = document.getElementById('imageModal');
             const modalImage = document.getElementById('modalImage');
             const modalCaption = document.getElementById('modalCaption');
             const modalCounter = document.getElementById('modalCounter');
-            const closeBtn = document.querySelector('.modal-close');
-            const prevBtn = document.querySelector('.modal-prev');
-            const nextBtn = document.querySelector('.modal-next');
-            const backdrop = document.querySelector('.modal-backdrop');
+            const closeBtn = modal.querySelector('.modal-close');
+            const prevBtn = modal.querySelector('.modal-prev');
+            const nextBtn = modal.querySelector('.modal-next');
+            const backdrop = modal.querySelector('.modal-backdrop');
 
-            let galleryImages = [];
+            const items = thumbs.map(btn => ({
+                src: btn.querySelector('img').src,
+                alt: btn.querySelector('img').alt,
+                caption: btn.dataset.caption || ''
+            }));
+
             let currentIndex = 0;
 
-            // Collect all gallery images
-            function initGallery() {
-                const galleryItems = document.querySelectorAll('.gallery-item');
-                galleryImages = Array.from(galleryItems).map(item => ({
-                    src: item.querySelector('img').src,
-                    alt: item.querySelector('img').alt,
-                    caption: item.querySelector('figcaption').textContent
-                }));
-
-                // Add click listeners to gallery images
-                galleryItems.forEach((item, index) => {
-                    const imageContainer = item.querySelector('.image');
-                    imageContainer.style.cursor = 'pointer';
-                    imageContainer.addEventListener('click', () => openModal(index));
-                });
+            // One selection drives stage, strip and counter at once.
+            function select(index, keepThumbVisible) {
+                currentIndex = (index + items.length) % items.length;
+                const item = items[currentIndex];
+                stageImg.src = item.src;
+                stageImg.alt = item.alt;
+                captionEl.textContent = item.caption;
+                countEl.textContent = (currentIndex + 1) + ' / ' + items.length;
+                thumbs.forEach((b, i) => b.setAttribute('aria-current', String(i === currentIndex)));
+                if (keepThumbVisible !== false) {
+                    thumbs[currentIndex].scrollIntoView({ block: 'nearest', inline: 'nearest' });
+                }
             }
 
-            // Open modal at specific index
+            thumbs.forEach((btn, i) => btn.addEventListener('click', () => select(i)));
+            prevArrow.addEventListener('click', () => select(currentIndex - 1));
+            nextArrow.addEventListener('click', () => select(currentIndex + 1));
+
+            figure.addEventListener('keydown', (e) => {
+                if (e.key === 'ArrowLeft') { e.preventDefault(); select(currentIndex - 1); }
+                else if (e.key === 'ArrowRight') { e.preventDefault(); select(currentIndex + 1); }
+            });
+
+            // A swipe across the stage turns the page on a phone.
+            let swipeX = null;
+            stage.addEventListener('pointerdown', (e) => { swipeX = e.clientX; });
+            stage.addEventListener('pointerup', (e) => {
+                if (swipeX === null) return;
+                const dx = e.clientX - swipeX;
+                swipeX = null;
+                if (Math.abs(dx) > 40) select(currentIndex + (dx < 0 ? 1 : -1));
+            });
+
+            // The lightbox browses the same list and hands its position back,
+            // so a trip through the lightbox leaves the inline gallery on the
+            // image you stopped at.
             function openModal(index) {
-                currentIndex = index;
+                select(index, false);
                 updateModalContent();
                 modal.classList.add('active');
                 document.body.style.overflow = 'hidden';
             }
 
-            // Close modal
             function closeModal() {
                 modal.classList.remove('active');
                 document.body.style.overflow = '';
             }
 
-            // Update modal content
             function updateModalContent() {
-                const current = galleryImages[currentIndex];
+                const current = items[currentIndex];
                 modalImage.src = current.src;
                 modalImage.alt = current.alt;
                 modalCaption.textContent = current.caption;
-                modalCounter.textContent = `${currentIndex + 1} / ${galleryImages.length}`;
-
-                // Update button states
-                prevBtn.disabled = currentIndex === 0;
-                nextBtn.disabled = currentIndex === galleryImages.length - 1;
+                modalCounter.textContent = (currentIndex + 1) + ' / ' + items.length;
             }
 
-            // Navigation
-            function showPrevious() {
-                if (currentIndex > 0) {
-                    currentIndex--;
-                    updateModalContent();
-                }
-            }
+            function showPrevious() { select(currentIndex - 1, false); updateModalContent(); }
+            function showNext() { select(currentIndex + 1, false); updateModalContent(); }
 
-            function showNext() {
-                if (currentIndex < galleryImages.length - 1) {
-                    currentIndex++;
-                    updateModalContent();
-                }
-            }
-
-            // Event listeners
+            stageImg.addEventListener('click', () => openModal(currentIndex));
             closeBtn.addEventListener('click', closeModal);
             backdrop.addEventListener('click', closeModal);
             prevBtn.addEventListener('click', showPrevious);
             nextBtn.addEventListener('click', showNext);
 
-            // Keyboard navigation
             document.addEventListener('keydown', (e) => {
                 if (!modal.classList.contains('active')) return;
-
                 if (e.key === 'Escape') closeModal();
                 else if (e.key === 'ArrowLeft') showPrevious();
                 else if (e.key === 'ArrowRight') showNext();
             });
-
-            // Initialize when DOM is ready
-            if (document.readyState === 'loading') {
-                document.addEventListener('DOMContentLoaded', initGallery);
-            } else {
-                initGallery();
-            }
         })();
     </script>
 </body>

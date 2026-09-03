@@ -307,6 +307,37 @@ of `deselect` restores the selection with positions untouched. Tests in
 `selection.test.ts`. Do not touch gesture resolution beyond the one
 `select` emission; do not touch `Demos/`.
 
+**Brief Q (QA, hand-sized — report only, no edits).** You are testing, not
+building. Serve the repository root (`python3 -m http.server 8000`) and
+open `http://localhost:8000/Demos/session-engine.html` in the branch
+`next-phases`. Do NOT edit any file; your deliverable is a written report.
+The 3 Sep 2026 regression (three small bubbles and two lines folding into
+one "word") was missed because the e2e draws shapes far larger than a hand
+does, so this pass is about the sizes and speeds a hand actually uses.
+Drive the page through real pointer events at the canvas (the helpers in
+`Demos/session-engine.e2e.js` — `__helpers()` gives `__t.stroke`,
+`__t.circle`, `__t.rect`, `__t.check`, `__t.word` — dispatch to the canvas;
+prefer the browser's own drag tools where you have them). Run each scenario
+below at three sizes (marks ~35 px, ~80 px, ~200 px on screen), at three
+zooms (fit, 0.5×, 2× via the rail's − and +), with a mouse, and at the phone
+preset (375×812). Scenarios: (1) the canonical loop — draw three circles
+and two lines, circle them, cross with the check, name it "A", draw the
+same again and confirm it is recognised; (2) teach a mark — open *Teach a
+mark…*, draw a caret five times, *Use this mark*, close, then use it in
+place of the check; reload and confirm the rail chip shows the caret and
+the mark still works; (3) write a word (a cursive squiggle, then printed
+capitals stroke by stroke) beside a box, circle both, and read the palette;
+(4) circle a group, take *Draw them clean*, then drag the selection, scale
+a corner, tap off, undo; (5) scratch out a mark with three passes; (6)
+snap `auto`, then draw at each size. For every step record: what you did
+(coordinates and sizes), what the status bar said, what the panel said,
+what the palette offered, and a screenshot when something looked wrong.
+Report as a table: scenario · size · zoom · device · pass/fail · what
+happened · what you expected. Also list anything that looked like a
+"claude-ism" in the panel's wording, any console error, and any place the
+UI covered another UI (the panel over the teach pane, a pill off screen).
+Do not fix anything, and do not lower a bar to make a row pass.
+
 ---
 
 ## 5. Risks, and what we do about each
