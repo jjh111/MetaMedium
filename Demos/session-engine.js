@@ -94,15 +94,26 @@
     const boxes = ids.map((id) => MM.boundsOf(state.nodes.get(id))).filter(Boolean);
     if (!boxes.length) { view.panX = 0; view.panY = 0; view.zoom = 1; afterViewChange(); return; }
     const b = union(boxes);
+    // Fit into the area the chrome leaves FREE, not the whole window: the
+    // inspector stands on the left and the replay bar along the bottom, and a
+    // drawing centred on the window sat half under them in the whitepaper's
+    // embeds. Each panel is measured only while it is shown.
+    const free = { left: 0, top: 0, right: innerWidth, bottom: innerHeight };
+    const shown = (el) => el && !el.hidden && getComputedStyle(el).display !== 'none' && el.getBoundingClientRect().width > 0;
+    const insp = document.getElementById('inspector');
+    if (shown(insp)) free.left = Math.max(free.left, insp.getBoundingClientRect().right);
+    const rpBar = document.getElementById('replay');
+    if (shown(rpBar)) free.bottom = Math.min(free.bottom, rpBar.getBoundingClientRect().top);
+    const freeW = Math.max(1, free.right - free.left), freeH = Math.max(1, free.bottom - free.top);
     // Guard the viewport: a window smaller than the padding (or one not laid
     // out yet) would compute a negative scale and slam into MIN_ZOOM.
-    const pad = Math.max(0, Math.min(90, innerWidth / 6, innerHeight / 6));
-    const availW = Math.max(1, innerWidth - pad * 2);
-    const availH = Math.max(1, innerHeight - pad * 2);
+    const pad = Math.max(0, Math.min(90, freeW / 6, freeH / 6));
+    const availW = Math.max(1, freeW - pad * 2);
+    const availH = Math.max(1, freeH - pad * 2);
     const w = Math.max(1, b.maxX - b.minX), h = Math.max(1, b.maxY - b.minY);
     view.zoom = clampZoom(Math.min(availW / w, availH / h, 2));
-    view.panX = (innerWidth - w * view.zoom) / 2 - b.minX * view.zoom;
-    view.panY = (innerHeight - h * view.zoom) / 2 - b.minY * view.zoom;
+    view.panX = free.left + (freeW - w * view.zoom) / 2 - b.minX * view.zoom;
+    view.panY = free.top + (freeH - h * view.zoom) / 2 - b.minY * view.zoom;
     afterViewChange();
   }
 
@@ -128,6 +139,10 @@
   // infinite canvas a trackpad user already knows, and the one thing a mouse
   // wheel loses — zoom on a bare wheel — is on the rail and the keyboard.
   canvas.addEventListener('wheel', (e) => {
+    // Embedded in a page, the wheel belongs to the PAGE: a reader scrolling
+    // the whitepaper over a figure was dragging the recording out of its
+    // frame. Panning is still there by drag; the wheel passes through.
+    if (EMBED) return;
     e.preventDefault();
     if (e.ctrlKey || e.metaKey) {
       // Pinch deltas are small and continuous; wheel clicks are large and
@@ -168,7 +183,12 @@
     canvas.style.height = innerHeight + 'px';
     render(session.getState());
   }
-  addEventListener('resize', resize);
+  addEventListener('resize', () => {
+    resize();
+    // A replayed figure is fitted once so stepping never moves the view; a
+    // lazily loaded iframe can be sized after that fit, so refit on resize.
+    if (typeof rp !== 'undefined' && rp.rec) fitAll();
+  });
 
   // A frame that comes even when the page is not painting. Time is state
   // here, not a movie: a tank in a tab the browser has stopped painting
