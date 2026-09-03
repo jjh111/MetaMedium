@@ -29,7 +29,7 @@ circle them, cross with a command mark *you taught the system*, prompt them into
 a living page that renders in the canvas with your ink still outlining its
 divs — then draw on that page and the ink addresses the regions underneath it.
 Scratch anything out to erase. `Demos/session-engine.html` is the surface;
-`Demos/session-engine.e2e.js` drives all 53 steps through the real UI: page, flowchart, handwriting, the model drawing, and the user-side loop.
+`Demos/session-engine.e2e.js` drives 105 steps through the real UI: page, flowchart, handwriting, the model drawing, the user-side loop, selection and the blob palette, corrections, the worker, the tank, words into verbs and acting out, frames and the drawn slider, and the folder. A run takes about 75 s; start it with `__scenario().then(r => window.__R = r)` and read `__R` when it lands.
 v7 Stage E (handwriting) shipped 1 Sep 2026: a word written beside a shape is read by a
 model that can see and offered as that shape's name. Whitepaper v5.1 stays parked until the
 conversation benchmark passes end to end.
@@ -67,7 +67,7 @@ any structural change.
 | `doodle2-canvas.html` | **Flagship demo**: heuristic recognition, spatial graph, library, undo/redo, touch. No LLM. Single-file (~500KB) |
 | `metadoodle1.html` | Fork of flagship + tiered LLM recognition (WebLLM in-browser, LM Studio local API) + voice. Single-file (~600KB) |
 | `Web App Skeleton/` | React + Vite + TypeScript + Zustand rebuild; Claude API interpreter skeleton in `src/llm/`; recognition/spatial/matching in `src/core/` |
-| `Demos/surface/` | **The reference surface's source**: `surface.css` and seventeen script fragments (`00-core` … `16-frames`, then `90-boot`, which must stay last), one concern each, concatenated in name order into one closure by `Demos/build-surface.mjs` → the committed `Demos/session-engine.js` (CI checks it has not drifted). Fragments share the closure's variables — no imports; each fragment's header says what it provides and uses. Edit a fragment, run the build, commit both |
+| `Demos/surface/` | **The reference surface's source**: `surface.css` and eighteen script fragments (`00-core` … `17-folder`, then `90-boot`, which must stay last), one concern each, concatenated in name order into one closure by `Demos/build-surface.mjs` → the committed `Demos/session-engine.js` (CI checks it has not drifted). Fragments share the closure's variables — no imports; each fragment's header says what it provides and uses. Edit a fragment, run the build, commit both |
 | `Demos/` | **`session-engine.html` is the MVP surface** (it links `surface/surface.css` and loads `session-engine.js`) — infinite canvas, the taught command mark, living artifacts in a DOM overlay, ink-over-artifact addressing, "why" inspector, model participants, canvas answers. Uses the committed `metamedium-core.browser.js` bundle. **`session-engine.e2e.js`** drives the whole loop through the real UI with a stubbed model (browser console; not part of `npm test`). `build-standalone.mjs` inlines the bundle into a single shareable file. Plus fish, composition diagrams, no-modes graph, etc. |
 | `skills/` | Claude Code skills: `metamedium-code` (code patterns), `metamedium-design` (design principles) |
 | `Assets/` | Figures and design rationale (recognition strategy, point-primitive proposal) |
@@ -631,6 +631,29 @@ the basis at the pace it was shown, with the residual named. The fit takes
 the body's own size — modelled at thumbnail size, every range-relative verb
 saw nothing in reach. The panel's ladder is words → sliders → what each
 verb is doing now → source.
+
+### The folder is the canvas (v8, WP-11)
+
+> `metamedium-core/src/store/` (the seam and three backends);
+> `Demos/surface/17-folder.js`.
+
+Nothing is invented: a canvas is a folder. *Open a folder…* walks it for
+every file of a known kind (skipping `node_modules` and its kin, stopping
+at 400 files and saying so) and each becomes an artifact of its kind
+through an `import` event **in this participant's log**, laid out as
+cards; a second machine that pulls sees the same board and discovers
+nothing twice. Logs are one file per participant under
+`.metamedium/logs/`, one event per line, and the canvas is `mergeLogs` of
+them; **autosave** rewrites only this participant's file, or holds the
+whole log in browser storage when there is no folder — a reload brings the
+board back and *Reset* forgets it. A static site is opened read-only through
+`.metamedium/manifest.json` (`?folder=<base>`), so a published canvas can be
+drawn on and the ink stays the reader's. **The live budget**: the nearest
+twelve live artifacts render; the rest stand as parked cards. Grid and
+focus are lenses over the same log. **Loops do not depend on paint**: a tab
+the browser stops painting gets no animation frames, so the tank and the
+worker take a timer's tick when no frame comes (`nextFrame` in
+`01-view.js`) — time is state, not a movie.
 
 ### Frames: artifacts wired by reference, and the drawn slider (v8, WP-10)
 

@@ -234,6 +234,13 @@ export type SessionEvent =
    * their ids and the connections between their ports.
    */
   | { type: 'frame'; ids: string[]; name: string; connections: Connection[]; at: number; participantId?: string }
+  /**
+   * A file of a known kind, or a traced picture, brought onto the canvas
+   * (ARCHITECTURE-v8 §11, §17). With `code` it is an artifact of that kind
+   * at `bounds`, its path kept so a folder can write it back; with `strokes`
+   * it is ink, drawn as declared content attributed to the importer.
+   */
+  | { type: 'import'; kind: Kind; path: string; name?: string; bounds: Bounds; code?: string; strokes?: Point[][]; at: number; participantId?: string }
   /** An artifact's clock: play (the bless to run), pause, reset, or reseed. */
   | { type: 'clock'; nodeId: string; op: 'play' | 'pause' | 'reset' | 'seed'; seed?: number; reason?: string; at: number; participantId?: string }
   /**
@@ -364,6 +371,8 @@ export interface Session {
    * teaching is part of the session's history and replays with it.
    */
   teachCommandMark(mark: CommandMark | null, at: number): void;
+  /** Bring a file, or a traced picture, onto the canvas. Returns the artifact's id, or the first stroke's. */
+  import(args: { kind: Kind; path: string; name?: string; bounds: Bounds; code?: string; strokes?: Point[][]; at: number; participantId?: string }): string | null;
   /** Wire artifacts into a frame, by reference. Returns the frame's id. */
   frame(args: { ids: string[]; name: string; connections: Connection[]; at: number; participantId?: string }): string | null;
   /** Give a definition a behaviour. A human's is blessed by the act; a model's or the fit's is held until a human gives it. */
@@ -1655,6 +1664,49 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     return frame.id;
   }
 
+  /**
+   * A file becomes an artifact with no members: its bounds are where it was
+   * placed, its code rep carries the kind, the content and the path. Textual
+   * kinds render, so they join the live plane; a picture's kind is kept so
+   * the surface can show the file itself. Strokes (a traced picture) are ink,
+   * declared content, attributed to whoever imported them.
+   */
+  function applyImport(ev: Extract<SessionEvent, { type: 'import' }>): string | null {
+    const pid = ev.participantId ?? LOCAL_PARTICIPANT;
+    if (!participants.includes(pid)) return null;
+    if (ev.strokes && ev.strokes.length) {
+      let first: string | null = null;
+      let at = ev.at;
+      for (const pts of ev.strokes) {
+        if (!pts || pts.length < 2) continue;
+        const id = applyStroke({ type: 'stroke', points: pts, at, participantId: pid, scale: 1, content: true });
+        if (id && !first) first = id;
+        at += 1;
+      }
+      return first;
+    }
+    if (ev.code === undefined) return null;
+    const name = ev.name?.trim() || ev.path.split('/').pop() || ev.path;
+    const node: MMNode = {
+      id: nextId('artifact'),
+      reps: [
+        { modality: 'word', data: name, source: pid },
+        { modality: 'bounds', data: { ...ev.bounds }, source: pid },
+        { modality: 'code', data: { code: ev.code, language: ev.kind, kind: ev.kind, path: ev.path, regions: [], at: ev.at }, source: pid },
+        { modality: 'signature', data: { shapes: { [ev.kind]: 1 }, links: {}, size: 1 }, source: TIER0_PARTICIPANT },
+      ],
+      edges: [{ to: pid, rel: 'made-by' }],
+      capability: 0,
+      createdAt: ev.at,
+    };
+    nodes.set(node.id, node);
+    artifacts.push(node.id);
+    contentIds.push(node.id);
+    if (ev.kind !== 'png' && ev.kind !== 'jpg') live.push(node.id);
+    recomputeClusterCandidates();
+    return node.id;
+  }
+
   function isHuman(participantId: string): boolean {
     if (participantId === LOCAL_PARTICIPANT) return true;
     const p = nodes.get(participantId);
@@ -1763,6 +1815,8 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
         return null;
       case 'frame':
         return applyFrame(ev);
+      case 'import':
+        return applyImport(ev);
       case 'summon':
         return applySummon(ev);
       case 'split':
@@ -1877,6 +1931,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     clock: (args) => void dispatch({ type: 'clock', ...args }),
     behave: (args) => void dispatch({ type: 'behave', ...args }),
     frame: (args) => dispatch({ type: 'frame', ...args }),
+    import: (args) => dispatch({ type: 'import', ...args }),
     matchesOf: (ids) => matchesFor(ids),
     tidy: (args) => void dispatch({ type: 'tidy', ...args }),
     snap: (args) => void dispatch({ type: 'snap', ...args }),

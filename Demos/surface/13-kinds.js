@@ -61,6 +61,12 @@
     const kind = rep.data.kind || 'html';
     const code = rep.data.code;
     if (kind === 'html') return documentFor(code, w, h);
+    if (kind === 'png' || kind === 'jpg') {
+      const url = rep.data.path ? imageUrlFor(rep.data.path) : null;
+      return '<!doctype html><html><head><meta charset="utf-8"><style>' + SOURCE_CSS +
+        '#mmroot{width:' + Math.round(w) + 'px;height:' + Math.round(h) + 'px;display:flex;align-items:center;justify-content:center;}img{max-width:100%;max-height:100%;}</style></head>' +
+        '<body><div id="mmroot" data-region="picture">' + (url ? '<img src="' + esc(url) + '" alt="">' : '<span class="gap">' + esc(rep.data.path || 'a picture') + '</span>') + '</div></body></html>';
+    }
     const regions = MM.addressablesOf(kind, code);
     if (kind === 'svg') return svgDocument(code, regions, w, h);
     return regionsDocument(code, regions, w, h);
@@ -110,7 +116,18 @@
     seenClockAt: new Map(),
     raf: 0,
     tick: 0,
+    log: [],             // the last messages in and out, for the panel and for tests
+    waiters: new Map(),  // artifactId -> resolvers waiting for the step in flight to answer
   };
+  function settle(id) {
+    const ws = runtime.waiters.get(id) || [];
+    runtime.waiters.delete(id);
+    for (const w of ws) w();
+  }
+  function runtimeNote(dir, m) {
+    runtime.log.push({ dir: dir, type: m.type, id: m.id, tick: m.tick, error: m.error, at: Math.round(performance.now()) });
+    if (runtime.log.length > 40) runtime.log.shift();
+  }
 
   function ensureWorker() {
     if (runtime.worker) return runtime.worker;
@@ -136,6 +153,7 @@
     runtime.broken.set(id, error);
     const t = runtime.pending.get(id);
     if (t) { clearTimeout(t); runtime.pending.delete(id); }
+    settle(id);
     const s = session.getState();
     if (s.clocks[id] && s.clocks[id].playing) {
       session.clock({ nodeId: id, op: 'pause', reason: error, at: Date.now() });
@@ -145,11 +163,13 @@
   }
 
   function onWorkerMessage(m) {
+    runtimeNote('in', m);
     if (m.type === 'loaded') { runtime.loaded.set(m.id, m.at); return; }
     if (m.type === 'broken') { markBroken(m.id, 'threw: ' + m.error); return; }
     if (m.type !== 'force') return;
     const t = runtime.pending.get(m.id);
     if (t) { clearTimeout(t); runtime.pending.delete(m.id); }
+    settle(m.id);
     const b = runtime.bodies.get(m.id);
     if (!b || b.tick !== m.tick) return; // a stale answer, from before a reset
     // Integrate: force to velocity, capped; velocity to position.
@@ -229,7 +249,7 @@
     for (const id of runtime.bodies.keys()) if (!s.live.includes(id)) runtime.bodies.delete(id);
     const want = runnable(s);
     if (want.length === 0) {
-      if (runtime.raf) { cancelAnimationFrame(runtime.raf); runtime.raf = 0; }
+      if (runtime.raf) { runtime.raf.cancel(); runtime.raf = 0; }
       return;
     }
     const w = ensureWorker();
@@ -239,7 +259,36 @@
         w.postMessage({ type: 'load', id: r.id, code: r.code, at: r.key });
       }
     }
-    if (!runtime.raf) runtime.raf = requestAnimationFrame(runLoop);
+    if (!runtime.raf) runtime.raf = nextFrame(runLoop);
+  }
+
+  /** One step for one artifact: the world posted, the watchdog armed. Returns false when a step is already in flight. */
+  function sendStep(s, r, bodies) {
+    if (runtime.pending.has(r.id)) return false; // one step in flight per artifact
+    const w = ensureWorker();
+    if (runtime.loaded.get(r.id) !== r.key) {
+      runtime.loaded.set(r.id, r.key);
+      w.postMessage({ type: 'load', id: r.id, code: r.code, at: r.key });
+    }
+    if (!runtime.bodies.has(r.id)) runtime.bodies.set(r.id, { x: 0, y: 0, vx: 0, vy: 0, heading: 0, age: 0, tick: 0 });
+    const me = bodies.get(r.id);
+    if (!me) return false;
+    const others = [...bodies.values()].filter((b) => b.id !== r.id);
+    const body = runtime.bodies.get(r.id);
+    runtime.tick++;
+    body.tick = runtime.tick;
+    const clock = s.clocks[r.id];
+    runtimeNote('out', { type: 'step', id: r.id, tick: runtime.tick });
+    w.postMessage({
+      type: 'step', id: r.id, tick: runtime.tick, seed: clock ? clock.seed : 1,
+      world: { t: body.age, dt: RUN_DT, me: me, others: others, walls: [] },
+    });
+    runtime.pending.set(r.id, setTimeout(() => {
+      // Past its budget: the worker is gone, and so is everything it held.
+      dropWorker();
+      markBroken(r.id, 'took longer than its ' + RUN_BUDGET_MS + 'ms budget for one step');
+    }, RUN_BUDGET_MS));
+    return true;
   }
 
   function runLoop() {
@@ -247,28 +296,33 @@
     const s = session.getState();
     const want = runnable(s);
     if (want.length === 0) return;
-    const w = ensureWorker();
-    runtime.tick++;
     const bodies = new Map();
     for (const id of s.live) { const b = bodyOf(id, s); if (b) bodies.set(id, b); }
-    for (const r of want) {
-      if (runtime.pending.has(r.id)) continue; // one step in flight per artifact
-      if (!runtime.bodies.has(r.id)) runtime.bodies.set(r.id, { x: 0, y: 0, vx: 0, vy: 0, heading: 0, age: 0, tick: 0 });
-      const me = bodies.get(r.id);
-      if (!me) continue;
-      const others = [...bodies.values()].filter((b) => b.id !== r.id);
-      const body = runtime.bodies.get(r.id);
-      body.tick = runtime.tick;
-      const clock = s.clocks[r.id];
-      w.postMessage({
-        type: 'step', id: r.id, tick: runtime.tick, seed: clock ? clock.seed : 1,
-        world: { t: body.age, dt: RUN_DT, me: me, others: others, walls: [] },
-      });
-      runtime.pending.set(r.id, setTimeout(() => {
-        // Past its budget: the worker is gone, and so is everything it held.
-        dropWorker();
-        markBroken(r.id, 'took longer than its ' + RUN_BUDGET_MS + 'ms budget for one step');
-      }, RUN_BUDGET_MS));
-    }
-    runtime.raf = requestAnimationFrame(runLoop);
+    for (const r of want) sendStep(s, r, bodies);
+    runtime.raf = nextFrame(runLoop);
+  }
+
+  function settled(id) {
+    return new Promise((resolve) => {
+      if (!runtime.waiters.has(id)) runtime.waiters.set(id, []);
+      runtime.waiters.get(id).push(resolve);
+    });
+  }
+
+  /**
+   * For tests: one step of one artifact, with the CURRENT code, resolved when
+   * its answer lands or its budget runs out. A step already in flight is
+   * waited out first, so the answer is this step's and not an earlier one's.
+   */
+  async function stepOnce(id) {
+    if (runtime.pending.has(id)) await settled(id);
+    const s = session.getState();
+    const r = runnable(s).find((x) => x.id === id);
+    if (!r) return false;
+    const bodies = new Map();
+    for (const lid of s.live) { const b = bodyOf(lid, s); if (b) bodies.set(lid, b); }
+    const answered = settled(id);
+    if (!sendStep(s, r, bodies)) { runtime.waiters.delete(id); return false; }
+    await answered;
+    return true;
   }

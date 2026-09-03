@@ -203,7 +203,8 @@
     else if (act === 'behave-drop') session.behave({ nodeId: id, behaviour: { terms: [{ verb: 'wander', weight: 1 }, { verb: 'hold', weight: 0.35 }], source: 'hand' }, participantId: MM.LOCAL_PARTICIPANT, at: Date.now() });
     else session.snap({ ids: [id], mode: 'raw', at: Date.now() });
   });
-  document.getElementById('resetBtn').onclick = () => location.reload();
+  // Reset is a fresh board: what browser storage held goes too, or the reload would bring it back.
+  document.getElementById('resetBtn').onclick = () => { forgetLocalLog(); location.reload(); };
 
   // A transient line in the status bar. It must re-render IMMEDIATELY: the
   // render triggered by the stroke itself has already happened by the time we

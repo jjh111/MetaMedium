@@ -38,8 +38,16 @@ export interface DirHandleLike {
   getDirectoryHandle(name: string, opts?: { create?: boolean }): Promise<DirHandleLike>;
 }
 
+/** Directories a folder walk never enters: not the canvas's, and never small. */
+export const SKIP_DIRS: readonly string[] = ['node_modules', 'dist', 'build', 'out', 'coverage', 'target', 'vendor'];
+/** How many files a walk lists before it stops and says so. */
+export const DEFAULT_FILE_LIMIT = 400;
+
 export class FolderStore implements Store {
-  constructor(private root: DirHandleLike, private opts: { readOnly?: boolean } = {}) {}
+  /** Set when the last `list()` hit the limit: the folder holds more than was shown. */
+  truncated = false;
+
+  constructor(private root: DirHandleLike, private opts: { readOnly?: boolean; skip?: readonly string[]; limit?: number } = {}) {}
 
   capabilities(): Capabilities {
     return { write: !this.opts.readOnly, watch: false };
@@ -48,9 +56,12 @@ export class FolderStore implements Store {
   private async walk(dir: DirHandleLike, prefix: string, out: Entry[], logs: string[]): Promise<void> {
     for await (const [name, handle] of dir.entries()) {
       const path = prefix ? `${prefix}/${name}` : name;
+      if (out.length >= (this.opts.limit ?? DEFAULT_FILE_LIMIT)) { this.truncated = true; return; }
       if (handle.kind === 'directory') {
-        // Hidden directories are skipped, except the canvas's own.
+        // Hidden directories are skipped, except the canvas's own; so are the
+        // directories every toolchain fills and nobody draws on.
         if (name.startsWith('.') && path !== '.metamedium' && !path.startsWith('.metamedium/')) continue;
+        if ((this.opts.skip ?? SKIP_DIRS).includes(name)) continue;
         await this.walk(handle, path, out, logs);
         continue;
       }
@@ -64,6 +75,7 @@ export class FolderStore implements Store {
 
   async list(): Promise<Entry[]> {
     const out: Entry[] = [];
+    this.truncated = false;
     await this.walk(this.root, '', out, []);
     return out.sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
   }

@@ -170,6 +170,19 @@
   }
   addEventListener('resize', resize);
 
+  // A frame that comes even when the page is not painting. Time is state
+  // here, not a movie: a tank in a tab the browser has stopped painting
+  // still owes its steps, so the loops ask for a frame and take a timer's
+  // tick when no frame arrives in time.
+  const FRAME_FALLBACK_MS = 40;
+  function nextFrame(cb) {
+    let done = false;
+    const go = (now) => { if (done) return; done = true; cb(typeof now === 'number' ? now : performance.now()); };
+    const id = requestAnimationFrame(go);
+    const timer = setTimeout(() => { if (!done) { cancelAnimationFrame(id); go(performance.now()); } }, FRAME_FALLBACK_MS);
+    return { cancel: () => { done = true; cancelAnimationFrame(id); clearTimeout(timer); } };
+  }
+
 // ===== artifacts =====
 // Provides: the live plane: frames of iframes for artifacts with code, syncStage, regionsUnderInk.
 // Uses: core, view.
@@ -219,6 +232,8 @@
     for (const [id, f] of frames) {
       if (!s.live.includes(id)) { f.wrap.remove(); frames.delete(id); }
     }
+    // The live budget: the nearest N render; the rest stand as parked cards.
+    const budget = liveSet(s);
     for (const id of s.live) {
       const node = s.nodes.get(id);
       const rep = node && codeRepOf(node);
@@ -226,6 +241,19 @@
       if (!rep || !fr) continue;
 
       let f = frames.get(id);
+      const parked = !budget.has(id);
+      if (f && f.parked !== parked) { f.wrap.remove(); frames.delete(id); f = null; }
+      if (!f && parked) {
+        const wrap = document.createElement('div');
+        wrap.className = 'artifactFrame parked';
+        const card = document.createElement('div');
+        card.className = 'park';
+        card.innerHTML = '<b>' + esc(MM.wordOf(node) || id) + '</b>' + esc((rep.data.kind || 'html') + (rep.data.path ? ' · ' + rep.data.path : '')) + '<br>parked — past the live budget; pan closer to run it';
+        wrap.appendChild(card);
+        stage.appendChild(wrap);
+        f = { wrap: wrap, iframe: null, codeAt: 'parked', parked: true };
+        frames.set(id, f);
+      }
       if (!f) {
         const wrap = document.createElement('div');
         wrap.className = 'artifactFrame';
@@ -235,7 +263,7 @@
         iframe.title = MM.wordOf(node) || id;
         wrap.appendChild(iframe);
         stage.appendChild(wrap);
-        f = { wrap: wrap, iframe: iframe, codeAt: null };
+        f = { wrap: wrap, iframe: iframe, codeAt: null, parked: false };
         frames.set(id, f);
       }
       // Where the drawing put it, plus where its own behaviour has taken it
@@ -252,7 +280,7 @@
       const wired = wiredCodeOf(s, id);
       const code = wired !== null ? wired : rep.data.code;
       const stamp = rep.data.at + ':' + Math.round(fr.w) + 'x' + Math.round(fr.h) + ':' + hashOf(code);
-      if (f.codeAt !== stamp) {
+      if (!f.parked && f.codeAt !== stamp) {
         f.codeAt = stamp;
         f.iframe.srcdoc = documentForKind({ data: { ...rep.data, code: code } }, fr.w, fr.h);
       }
@@ -276,7 +304,7 @@
     const found = new Set();
     if (!f || !fr) return [];
     let doc = null;
-    try { doc = f.iframe.contentDocument; } catch (err) { doc = null; }
+    try { doc = f.iframe ? f.iframe.contentDocument : null; } catch (err) { doc = null; }
     if (!doc || !doc.elementFromPoint) return [];
 
     const N = 4;
@@ -1291,7 +1319,8 @@
     else if (act === 'behave-drop') session.behave({ nodeId: id, behaviour: { terms: [{ verb: 'wander', weight: 1 }, { verb: 'hold', weight: 0.35 }], source: 'hand' }, participantId: MM.LOCAL_PARTICIPANT, at: Date.now() });
     else session.snap({ ids: [id], mode: 'raw', at: Date.now() });
   });
-  document.getElementById('resetBtn').onclick = () => location.reload();
+  // Reset is a fresh board: what browser storage held goes too, or the reload would bring it back.
+  document.getElementById('resetBtn').onclick = () => { forgetLocalLog(); location.reload(); };
 
   // A transient line in the status bar. It must re-render IMMEDIATELY: the
   // render triggered by the stroke itself has already happened by the time we
@@ -1539,7 +1568,12 @@
     const strokes = s.contentIds.length - s.artifacts.length;
     const fresh = flashText && Date.now() - flashAt < FLASH_MS;
     const parts = [strokes + ' loose'];
-    if (s.artifacts.length) parts.push(s.artifacts.length + ' artifact' + (s.artifacts.length === 1 ? '' : 's') + (s.live.length ? ' (' + s.live.length + ' live)' : ''));
+    if (s.artifacts.length) {
+      const running = liveSet(s).size;
+      parts.push(s.artifacts.length + ' artifact' + (s.artifacts.length === 1 ? '' : 's') + (s.live.length ? ' (' + (running < s.live.length ? running + ' of ' + s.live.length + ' live, the rest parked' : s.live.length + ' live') + ')' : ''));
+    }
+    const fs = folderStatus();
+    if (fs) parts.push(fs);
     if (agents.length) parts.push(agents.map((a) => a.config.model).join(', '));
     if (snapOffers.size) parts.push(snapOffers.size + ' read clean');
     if (s.pendingLassoId) parts.push('cross the loop with ' + (s.commandMark ? 'your mark' : '✓') + ' to select what it holds');
@@ -2933,6 +2967,12 @@
     const kind = rep.data.kind || 'html';
     const code = rep.data.code;
     if (kind === 'html') return documentFor(code, w, h);
+    if (kind === 'png' || kind === 'jpg') {
+      const url = rep.data.path ? imageUrlFor(rep.data.path) : null;
+      return '<!doctype html><html><head><meta charset="utf-8"><style>' + SOURCE_CSS +
+        '#mmroot{width:' + Math.round(w) + 'px;height:' + Math.round(h) + 'px;display:flex;align-items:center;justify-content:center;}img{max-width:100%;max-height:100%;}</style></head>' +
+        '<body><div id="mmroot" data-region="picture">' + (url ? '<img src="' + esc(url) + '" alt="">' : '<span class="gap">' + esc(rep.data.path || 'a picture') + '</span>') + '</div></body></html>';
+    }
     const regions = MM.addressablesOf(kind, code);
     if (kind === 'svg') return svgDocument(code, regions, w, h);
     return regionsDocument(code, regions, w, h);
@@ -2982,7 +3022,18 @@
     seenClockAt: new Map(),
     raf: 0,
     tick: 0,
+    log: [],             // the last messages in and out, for the panel and for tests
+    waiters: new Map(),  // artifactId -> resolvers waiting for the step in flight to answer
   };
+  function settle(id) {
+    const ws = runtime.waiters.get(id) || [];
+    runtime.waiters.delete(id);
+    for (const w of ws) w();
+  }
+  function runtimeNote(dir, m) {
+    runtime.log.push({ dir: dir, type: m.type, id: m.id, tick: m.tick, error: m.error, at: Math.round(performance.now()) });
+    if (runtime.log.length > 40) runtime.log.shift();
+  }
 
   function ensureWorker() {
     if (runtime.worker) return runtime.worker;
@@ -3008,6 +3059,7 @@
     runtime.broken.set(id, error);
     const t = runtime.pending.get(id);
     if (t) { clearTimeout(t); runtime.pending.delete(id); }
+    settle(id);
     const s = session.getState();
     if (s.clocks[id] && s.clocks[id].playing) {
       session.clock({ nodeId: id, op: 'pause', reason: error, at: Date.now() });
@@ -3017,11 +3069,13 @@
   }
 
   function onWorkerMessage(m) {
+    runtimeNote('in', m);
     if (m.type === 'loaded') { runtime.loaded.set(m.id, m.at); return; }
     if (m.type === 'broken') { markBroken(m.id, 'threw: ' + m.error); return; }
     if (m.type !== 'force') return;
     const t = runtime.pending.get(m.id);
     if (t) { clearTimeout(t); runtime.pending.delete(m.id); }
+    settle(m.id);
     const b = runtime.bodies.get(m.id);
     if (!b || b.tick !== m.tick) return; // a stale answer, from before a reset
     // Integrate: force to velocity, capped; velocity to position.
@@ -3101,7 +3155,7 @@
     for (const id of runtime.bodies.keys()) if (!s.live.includes(id)) runtime.bodies.delete(id);
     const want = runnable(s);
     if (want.length === 0) {
-      if (runtime.raf) { cancelAnimationFrame(runtime.raf); runtime.raf = 0; }
+      if (runtime.raf) { runtime.raf.cancel(); runtime.raf = 0; }
       return;
     }
     const w = ensureWorker();
@@ -3111,7 +3165,36 @@
         w.postMessage({ type: 'load', id: r.id, code: r.code, at: r.key });
       }
     }
-    if (!runtime.raf) runtime.raf = requestAnimationFrame(runLoop);
+    if (!runtime.raf) runtime.raf = nextFrame(runLoop);
+  }
+
+  /** One step for one artifact: the world posted, the watchdog armed. Returns false when a step is already in flight. */
+  function sendStep(s, r, bodies) {
+    if (runtime.pending.has(r.id)) return false; // one step in flight per artifact
+    const w = ensureWorker();
+    if (runtime.loaded.get(r.id) !== r.key) {
+      runtime.loaded.set(r.id, r.key);
+      w.postMessage({ type: 'load', id: r.id, code: r.code, at: r.key });
+    }
+    if (!runtime.bodies.has(r.id)) runtime.bodies.set(r.id, { x: 0, y: 0, vx: 0, vy: 0, heading: 0, age: 0, tick: 0 });
+    const me = bodies.get(r.id);
+    if (!me) return false;
+    const others = [...bodies.values()].filter((b) => b.id !== r.id);
+    const body = runtime.bodies.get(r.id);
+    runtime.tick++;
+    body.tick = runtime.tick;
+    const clock = s.clocks[r.id];
+    runtimeNote('out', { type: 'step', id: r.id, tick: runtime.tick });
+    w.postMessage({
+      type: 'step', id: r.id, tick: runtime.tick, seed: clock ? clock.seed : 1,
+      world: { t: body.age, dt: RUN_DT, me: me, others: others, walls: [] },
+    });
+    runtime.pending.set(r.id, setTimeout(() => {
+      // Past its budget: the worker is gone, and so is everything it held.
+      dropWorker();
+      markBroken(r.id, 'took longer than its ' + RUN_BUDGET_MS + 'ms budget for one step');
+    }, RUN_BUDGET_MS));
+    return true;
   }
 
   function runLoop() {
@@ -3119,30 +3202,35 @@
     const s = session.getState();
     const want = runnable(s);
     if (want.length === 0) return;
-    const w = ensureWorker();
-    runtime.tick++;
     const bodies = new Map();
     for (const id of s.live) { const b = bodyOf(id, s); if (b) bodies.set(id, b); }
-    for (const r of want) {
-      if (runtime.pending.has(r.id)) continue; // one step in flight per artifact
-      if (!runtime.bodies.has(r.id)) runtime.bodies.set(r.id, { x: 0, y: 0, vx: 0, vy: 0, heading: 0, age: 0, tick: 0 });
-      const me = bodies.get(r.id);
-      if (!me) continue;
-      const others = [...bodies.values()].filter((b) => b.id !== r.id);
-      const body = runtime.bodies.get(r.id);
-      body.tick = runtime.tick;
-      const clock = s.clocks[r.id];
-      w.postMessage({
-        type: 'step', id: r.id, tick: runtime.tick, seed: clock ? clock.seed : 1,
-        world: { t: body.age, dt: RUN_DT, me: me, others: others, walls: [] },
-      });
-      runtime.pending.set(r.id, setTimeout(() => {
-        // Past its budget: the worker is gone, and so is everything it held.
-        dropWorker();
-        markBroken(r.id, 'took longer than its ' + RUN_BUDGET_MS + 'ms budget for one step');
-      }, RUN_BUDGET_MS));
-    }
-    runtime.raf = requestAnimationFrame(runLoop);
+    for (const r of want) sendStep(s, r, bodies);
+    runtime.raf = nextFrame(runLoop);
+  }
+
+  function settled(id) {
+    return new Promise((resolve) => {
+      if (!runtime.waiters.has(id)) runtime.waiters.set(id, []);
+      runtime.waiters.get(id).push(resolve);
+    });
+  }
+
+  /**
+   * For tests: one step of one artifact, with the CURRENT code, resolved when
+   * its answer lands or its budget runs out. A step already in flight is
+   * waited out first, so the answer is this step's and not an earlier one's.
+   */
+  async function stepOnce(id) {
+    if (runtime.pending.has(id)) await settled(id);
+    const s = session.getState();
+    const r = runnable(s).find((x) => x.id === id);
+    if (!r) return false;
+    const bodies = new Map();
+    for (const lid of s.live) { const b = bodyOf(lid, s); if (b) bodies.set(lid, b); }
+    const answered = settled(id);
+    if (!sendStep(s, r, bodies)) { runtime.waiters.delete(id); return false; }
+    await answered;
+    return true;
   }
 
 // ===== clocks =====
@@ -3438,8 +3526,8 @@
     for (const defId of tank.defs.keys()) if (!wanted.has(defId)) tank.defs.delete(defId);
     refreshPlacements();
     const playing = [...wanted].some((id) => s.clocks[id].playing);
-    if (playing && !tank.raf) { tank.last = performance.now(); tank.acc = 0; tank.raf = requestAnimationFrame(tankLoop); }
-    if (!playing && tank.raf) { cancelAnimationFrame(tank.raf); tank.raf = 0; }
+    if (playing && !tank.raf) { tank.last = performance.now(); tank.acc = 0; tank.raf = nextFrame(tankLoop); }
+    if (!playing && tank.raf) { tank.raf.cancel(); tank.raf = 0; }
   }
 
   function tankLoop(now) {
@@ -3458,7 +3546,7 @@
       steps++;
     }
     if (steps) render(s);
-    tank.raf = requestAnimationFrame(tankLoop);
+    tank.raf = nextFrame(tankLoop);
   }
 
 // ===== frames =====
@@ -3695,6 +3783,287 @@
     }
   }
 
+// ===== folder =====
+// Provides: the folder as the canvas — openFolder/openStatic/openStore (discovery into artifacts,
+//   per-participant logs merged), autosave (to the folder, else browser storage), the live budget
+//   (liveSet), the grid and focus views (setViewMode, focusOn), imageUrlFor, folderStatus.
+// Uses: core, view (fitAll, afterViewChange), artifacts, render.
+// A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
+// in name order inside `(function () { ... })();`. Shared state is the
+// closure's; no imports, no exports, no build step beyond the concatenation.
+
+  // ===== The folder ==========================================================
+  // Nothing is invented: a canvas is a folder. Every file of a known kind is
+  // an artifact; each participant appends to its own log under .metamedium/;
+  // the canvas is the merge (ARCHITECTURE-v8 §11). Opening a folder loads the
+  // merged logs, then brings in any file not yet on the board as an import —
+  // an event in THIS participant's log, so the next machine to pull sees the
+  // same board without discovering twice.
+  const PARTICIPANT_KEY = 'mm-participant';
+  const LOCAL_LOG_KEY = 'mm-log';
+  const CARD = { w: 360, h: 240, gap: 40, cols: 4 };
+  const LIVE_BUDGET = 12;
+
+  const folder = {
+    store: null, how: 'none', name: '',
+    me: (() => { try { return localStorage.getItem(PARTICIPANT_KEY) || 'local'; } catch (err) { return 'local'; } })(),
+    myPrevious: [], loadedCount: 0, entries: [], truncated: false,
+    urls: new Map(), saveTimer: 0, lastSave: '', saving: false, error: '',
+  };
+
+  function setParticipant(name) {
+    folder.me = String(name || 'local').trim() || 'local';
+    try { localStorage.setItem(PARTICIPANT_KEY, folder.me); } catch (err) { /* private mode */ }
+  }
+
+  /** The artifact that already stands for a path, if any. */
+  function artifactForPath(s, path) {
+    for (const id of s.artifacts) {
+      const n = s.nodes.get(id);
+      const r = n && codeRepOf(n);
+      if (r && r.data.path === path && !n.reps.some((x) => x.modality === 'erased')) return id;
+    }
+    return null;
+  }
+
+  /** A blob URL for a picture in the folder, made once. */
+  function imageUrlFor(path) {
+    return folder.urls.get(path) || null;
+  }
+
+  async function openFolder() {
+    if (!window.showDirectoryPicker) { flash('this browser cannot open a folder — Chrome and Edge can'); return null; }
+    let handle;
+    try { handle = await window.showDirectoryPicker({ mode: 'readwrite' }); } catch (err) { return null; }
+    const store = new MM.FolderStore(handle);
+    return openStore(store, 'folder', handle.name);
+  }
+
+  async function openStatic(base) {
+    const store = new MM.StaticStore(base, (url) => fetch(url));
+    return openStore(store, 'static', base);
+  }
+
+  /**
+   * Open any store: load the merged logs, discover the files, place what is
+   * new. Opening the same store again is what a second machine does after a
+   * pull — the board comes back and nothing is discovered twice.
+   */
+  async function openStore(store, how, name) {
+    folder.store = store; folder.how = how || 'store'; folder.name = name || ''; folder.error = '';
+    let logs = {};
+    try { logs = await store.readLogs(); } catch (err) { folder.error = 'could not read the logs: ' + (err.message || err); }
+    const merged = MM.mergeLogs(logs);
+    const meKey = MM.participantOfLog(MM.logPathFor(folder.me));
+    folder.myPrevious = (logs[meKey] || []).slice();
+    session.load(merged);
+    // What was loaded is everyone's; from here on, every event is this
+    // participant's — including the mark this device re-teaches at open.
+    folder.loadedCount = session.getEvents().length;
+    folder.lastSave = '';
+    // The device's mark is re-taught only when no log already teaches one.
+    if (!merged.some((ev) => ev.type === 'teach')) restoreMark();
+    let entries = [];
+    try { entries = await store.list(); } catch (err) { folder.error = 'could not list the folder: ' + (err.message || err); }
+    folder.entries = entries; folder.truncated = !!store.truncated;
+    await discover(entries);
+    render(session.getState());
+    fitAll();
+    flash('opened ' + (folder.name || 'a folder') + ': ' + entries.length + ' file' + (entries.length === 1 ? '' : 's') + (folder.truncated ? ' shown — the folder holds more' : ''));
+    return folder;
+  }
+
+  /** Every file not yet on the board becomes an artifact, laid out in a grid below what is there. */
+  async function discover(entries) {
+    const s0 = session.getState();
+    const boxes = s0.contentIds.map((id) => MM.boundsOf(s0.nodes.get(id))).filter(Boolean);
+    const below = boxes.length ? union(boxes).maxY + CARD.gap * 2 : 0;
+    let placed = 0;
+    for (const e of entries) {
+      const s = session.getState();
+      if (artifactForPath(s, e.path)) continue;
+      let content;
+      try { content = await folder.store.read(e.path); } catch (err) { continue; }
+      const col = placed % CARD.cols, row = Math.floor(placed / CARD.cols);
+      const bounds = { minX: col * (CARD.w + CARD.gap), minY: below + row * (CARD.h + CARD.gap), maxX: col * (CARD.w + CARD.gap) + CARD.w, maxY: below + row * (CARD.h + CARD.gap) + CARD.h };
+      placed++;
+      if (e.kind === 'png' || e.kind === 'jpg') {
+        try { folder.urls.set(e.path, URL.createObjectURL(new Blob([content], { type: e.kind === 'png' ? 'image/png' : 'image/jpeg' }))); } catch (err) { /* no url */ }
+        session.import({ kind: e.kind, path: e.path, bounds: bounds, code: '', at: Date.now() });
+      } else {
+        session.import({ kind: e.kind, path: e.path, bounds: bounds, code: String(content), at: Date.now() });
+      }
+    }
+    return placed;
+  }
+
+  // ===== Autosave: the log is saved as it grows ==============================
+  // To the folder when there is one — this participant's own file, rewritten
+  // whole (nobody else writes it) — else to browser storage, so a reload
+  // replays and a crash loses nothing.
+  function myLogNow() {
+    const evs = session.getEvents();
+    folder.loadedCount = Math.min(folder.loadedCount, evs.length);
+    const present = new Set(evs.slice(0, folder.loadedCount).map((e) => JSON.stringify(e)));
+    const kept = folder.myPrevious.filter((e) => present.has(JSON.stringify(e)));
+    return kept.concat(evs.slice(folder.loadedCount));
+  }
+
+  function scheduleSave() {
+    clearTimeout(folder.saveTimer);
+    folder.saveTimer = setTimeout(saveNow, folder.store ? 300 : 900);
+  }
+
+  /** A cheap key for "has the log changed": its length and its last event's time. */
+  function logKey(evs) {
+    const last = evs[evs.length - 1];
+    return evs.length + ':' + (last ? (last.at || 0) + ':' + last.type : '');
+  }
+
+  async function saveNow() {
+    const evs = session.getEvents();
+    if (folder.store && folder.store.capabilities().write) {
+      const mine = myLogNow();
+      const text = MM.encodeLog(mine);
+      if (text === folder.lastSave) return;
+      folder.saving = true;
+      try { await folder.store.write(MM.logPathFor(folder.me), text); folder.lastSave = text; folder.error = ''; }
+      catch (err) { folder.error = 'could not save: ' + (err.message || err); }
+      folder.saving = false;
+    } else if (!folder.store) {
+      // Browser storage holds the whole log; writing it is the one cost here,
+      // so it is written only when the log actually changed.
+      const key = logKey(evs);
+      if (key === folder.lastSave) return;
+      folder.lastSave = key;
+      try { localStorage.setItem(LOCAL_LOG_KEY, JSON.stringify(evs)); } catch (err) { /* storage full or private */ }
+    }
+  }
+
+  /** What browser storage held from last time, when there is no folder. */
+  function restoreLocalLog() {
+    if (params.has('replay') || params.has('fresh')) return false;
+    try {
+      const raw = localStorage.getItem(LOCAL_LOG_KEY);
+      if (!raw) return false;
+      const evs = JSON.parse(raw);
+      if (!Array.isArray(evs) || !evs.length) return false;
+      session.load(evs);
+      return true;
+    } catch (err) { return false; }
+  }
+  function forgetLocalLog() {
+    try { localStorage.removeItem(LOCAL_LOG_KEY); } catch (err) { /* nothing */ }
+  }
+
+  function folderStatus() {
+    if (!folder.store) return '';
+    const n = folder.entries.length;
+    return (folder.how === 'static' ? 'site' : 'folder') + (folder.name ? ' ' + folder.name : '') + ' · ' + n + ' file' + (n === 1 ? '' : 's') +
+      (folder.truncated ? '+' : '') + (folder.error ? ' · ' + folder.error : folder.store.capabilities().write ? (folder.saving ? ' · saving' : ' · saved') : ' · read-only');
+  }
+
+  // ===== The live budget =======================================================
+  // Only the nearest N live artifacts render as iframes; the rest are parked
+  // cards. Panning swaps them. The status line says how many are live.
+  function liveSet(s) {
+    const live = s.live.filter((id) => !s.nodes.get(id).reps.some((r) => r.modality === 'erased'));
+    if (live.length <= LIVE_BUDGET) return new Set(live);
+    const c = screenToWorld(innerWidth / 2, innerHeight / 2);
+    const scored = live.map((id) => {
+      const b = MM.boundsOf(s.nodes.get(id));
+      const d = b ? Math.hypot((b.minX + b.maxX) / 2 - c.x, (b.minY + b.maxY) / 2 - c.y) : Infinity;
+      return { id, d };
+    }).sort((p, q) => p.d - q.d);
+    return new Set(scored.slice(0, LIVE_BUDGET).map((x) => x.id));
+  }
+
+  // ===== Three views, one log ==================================================
+  // Canvas is the pure form; grid surfaces every artifact as a card, sortable;
+  // focus is one artifact filling the screen, prev and next through the
+  // grid's order. Lenses over the same log — a card is the artifact.
+  const gridEl = document.getElementById('grid');
+  let viewMode = 'canvas';
+  let gridSort = 'name';
+  let focusIndex = -1;
+
+  function gridOrder(s) {
+    const ids = s.artifacts.filter((id) => !s.nodes.get(id).reps.some((r) => r.modality === 'erased'));
+    const key = (id) => {
+      const n = s.nodes.get(id);
+      const r = codeRepOf(n);
+      if (gridSort === 'kind') return (r ? r.data.kind : MM.isFrame(n) ? 'frame' : 'drawing') + ' ' + (MM.wordOf(n) || '');
+      if (gridSort === 'recency') return String(1e15 - (n.createdAt || 0)).padStart(16, '0');
+      if (gridSort === 'folder') return (r && r.data.path ? r.data.path : '~' + (MM.wordOf(n) || ''));
+      return (MM.wordOf(n) || id).toLowerCase();
+    };
+    return ids.sort((a, b) => (key(a) < key(b) ? -1 : key(a) > key(b) ? 1 : 0));
+  }
+
+  function setViewMode(mode) {
+    viewMode = mode;
+    if (mode === 'grid') { renderGrid(session.getState()); gridEl.hidden = false; }
+    else gridEl.hidden = true;
+    document.getElementById('gridBtn').setAttribute('aria-pressed', String(mode === 'grid'));
+    if (mode === 'canvas') focusIndex = -1;
+  }
+
+  function renderGrid(s) {
+    const order = gridOrder(s);
+    let html = '<div class="gridBar"><b>' + order.length + '</b> artifact' + (order.length === 1 ? '' : 's') +
+      ' · sort <button data-sort="name">name</button><button data-sort="kind">kind</button><button data-sort="recency">recency</button><button data-sort="folder">folder</button>' +
+      '<span class="how">click a card to focus it; Esc back to the canvas</span></div><div class="cards">';
+    for (const id of order) {
+      const n = s.nodes.get(id);
+      const r = codeRepOf(n);
+      const kind = r ? r.data.kind : MM.isFrame(n) ? 'frame' : 'drawing';
+      const path = r && r.data.path ? r.data.path : '';
+      const preview = r && kind !== 'png' && kind !== 'jpg' ? esc(String(r.data.code).slice(0, 160)) : '';
+      const img = (kind === 'png' || kind === 'jpg') && r && imageUrlFor(r.data.path) ? '<img src="' + imageUrlFor(r.data.path) + '" alt="">' : '';
+      html += '<button class="card" data-id="' + esc(id) + '"><span class="name">' + esc(MM.wordOf(n) || id) + '</span><span class="kind">' + esc(kind) + (path ? ' · ' + esc(path) : '') + '</span>' + (img || '<pre>' + preview + '</pre>') + '</button>';
+    }
+    gridEl.innerHTML = html + '</div>';
+  }
+
+  gridEl.addEventListener('click', (e) => {
+    const sortBtn = e.target.closest && e.target.closest('button[data-sort]');
+    if (sortBtn) { gridSort = sortBtn.getAttribute('data-sort'); renderGrid(session.getState()); return; }
+    const card = e.target.closest && e.target.closest('button.card');
+    if (card) focusOn(card.getAttribute('data-id'));
+  });
+
+  /** Fit one artifact to the screen; prev and next walk the grid's order. */
+  function focusOn(id) {
+    const s = session.getState();
+    const order = gridOrder(s);
+    focusIndex = order.indexOf(id);
+    const b = MM.boundsOf(s.nodes.get(id));
+    if (!b) return;
+    setViewMode('focus');
+    const pad = Math.max(40, Math.min(innerWidth, innerHeight) / 8);
+    const w = Math.max(1, b.maxX - b.minX), h = Math.max(1, b.maxY - b.minY);
+    view.zoom = clampZoom(Math.min((innerWidth - pad * 2) / w, (innerHeight - pad * 2) / h, 4));
+    view.panX = (innerWidth - w * view.zoom) / 2 - b.minX * view.zoom;
+    view.panY = (innerHeight - h * view.zoom) / 2 - b.minY * view.zoom;
+    afterViewChange();
+    flash('focus: ' + (MM.wordOf(s.nodes.get(id)) || id) + ' · ← → for the next, Esc for the canvas');
+  }
+  function focusStep(delta) {
+    const order = gridOrder(session.getState());
+    if (!order.length) return;
+    const i = ((focusIndex < 0 ? 0 : focusIndex + delta) + order.length) % order.length;
+    focusOn(order[i]);
+  }
+
+  document.getElementById('gridBtn').onclick = () => setViewMode(viewMode === 'grid' ? 'canvas' : 'grid');
+  document.getElementById('folderBtn').onclick = () => { openFolder(); };
+  addEventListener('keydown', (e) => {
+    if (e.target !== document.body && e.target !== document && e.target !== window) return;
+    if (e.key === 'Escape' && viewMode !== 'canvas') { setViewMode('canvas'); e.preventDefault(); }
+    if (viewMode === 'focus' && e.key === 'ArrowRight') { focusStep(1); e.preventDefault(); }
+    if (viewMode === 'focus' && e.key === 'ArrowLeft') { focusStep(-1); e.preventDefault(); }
+  });
+
 // ===== boot =====
 // Provides: the debug handle (window.__mm, what the e2e drives), subscription, restore, first render.
 // Uses: everything.
@@ -3714,7 +4083,14 @@
     setView: (zoom, panX, panY) => { view.zoom = zoom; view.panX = panX; view.panY = panY; afterViewChange(); },
     resetUses: () => { for (const k of Object.keys(uses)) delete uses[k]; store.del(USES_KEY); },
     // The worker runtime, for tests: what is loaded, where each body is, what broke.
-    runtime: () => ({ bodies: runtime.bodies, broken: runtime.broken, loaded: runtime.loaded, budgetMs: RUN_BUDGET_MS }),
+    runtime: () => ({ bodies: runtime.bodies, broken: runtime.broken, loaded: runtime.loaded, budgetMs: RUN_BUDGET_MS, log: runtime.log, pending: runtime.pending, stepOnce: stepOnce }),
+    // The folder, for tests: open any store (a MemoryStore stands in for a folder), and read the board's home.
+    openStore: (store, how, name) => openStore(store, how, name),
+    folder: () => folder,
+    setParticipant: setParticipant,
+    forgetLocalLog: forgetLocalLog,
+    saveNow: saveNow,
+    setViewMode: setViewMode, viewMode: () => viewMode, focusOn: focusOn,
     // Frames, for tests: the wired code a member renders with, and a frame as files.
     wiredCodeOf: (id) => wiredCodeOf(session.getState(), id),
     exportFrame: (id) => exportFrameFiles(id),
@@ -3733,11 +4109,17 @@
   session.subscribe(render);
   const replayUrl = params.get('replay');
   if (!replayUrl) {
+    // Last time's board comes back from browser storage; a folder or a site
+    // named in the URL is opened as the canvas instead.
+    const restored = restoreLocalLog();
     restoreMark();
     rejoinRemembered();
+    if (restored) flash('your last board is back — Reset starts a fresh one');
+    if (params.get('folder')) openStatic(params.get('folder'));
   } else {
     startReplay(replayUrl);
   }
+  session.subscribe(scheduleSave);
   document.fonts.ready.then(() => { sizePad(); render(session.getState()); });
   resize();
   afterViewChange();

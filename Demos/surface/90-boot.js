@@ -17,7 +17,14 @@
     setView: (zoom, panX, panY) => { view.zoom = zoom; view.panX = panX; view.panY = panY; afterViewChange(); },
     resetUses: () => { for (const k of Object.keys(uses)) delete uses[k]; store.del(USES_KEY); },
     // The worker runtime, for tests: what is loaded, where each body is, what broke.
-    runtime: () => ({ bodies: runtime.bodies, broken: runtime.broken, loaded: runtime.loaded, budgetMs: RUN_BUDGET_MS }),
+    runtime: () => ({ bodies: runtime.bodies, broken: runtime.broken, loaded: runtime.loaded, budgetMs: RUN_BUDGET_MS, log: runtime.log, pending: runtime.pending, stepOnce: stepOnce }),
+    // The folder, for tests: open any store (a MemoryStore stands in for a folder), and read the board's home.
+    openStore: (store, how, name) => openStore(store, how, name),
+    folder: () => folder,
+    setParticipant: setParticipant,
+    forgetLocalLog: forgetLocalLog,
+    saveNow: saveNow,
+    setViewMode: setViewMode, viewMode: () => viewMode, focusOn: focusOn,
     // Frames, for tests: the wired code a member renders with, and a frame as files.
     wiredCodeOf: (id) => wiredCodeOf(session.getState(), id),
     exportFrame: (id) => exportFrameFiles(id),
@@ -36,11 +43,17 @@
   session.subscribe(render);
   const replayUrl = params.get('replay');
   if (!replayUrl) {
+    // Last time's board comes back from browser storage; a folder or a site
+    // named in the URL is opened as the canvas instead.
+    const restored = restoreLocalLog();
     restoreMark();
     rejoinRemembered();
+    if (restored) flash('your last board is back — Reset starts a fresh one');
+    if (params.get('folder')) openStatic(params.get('folder'));
   } else {
     startReplay(replayUrl);
   }
+  session.subscribe(scheduleSave);
   document.fonts.ready.then(() => { sizePad(); render(session.getState()); });
   resize();
   afterViewChange();

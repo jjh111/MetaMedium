@@ -28,6 +28,7 @@ var MetaMediumCore = (() => {
     COMMAND_MARK_SAMPLES: () => COMMAND_MARK_SAMPLES,
     DEFAULT_CORNER_OPTIONS: () => DEFAULT_CORNER_OPTIONS,
     DEFAULT_ERASE_CROSSINGS: () => DEFAULT_ERASE_CROSSINGS,
+    DEFAULT_FILE_LIMIT: () => DEFAULT_FILE_LIMIT,
     DEFAULT_GESTURE_CONFIG: () => DEFAULT_GESTURE_CONFIG,
     DEFAULT_MAX_FORCE: () => DEFAULT_MAX_FORCE,
     DEFAULT_MIN_LENGTH_PX: () => DEFAULT_MIN_LENGTH_PX,
@@ -58,6 +59,7 @@ var MetaMediumCore = (() => {
     ROLES: () => ROLES,
     ReadOnlyError: () => ReadOnlyError,
     SETTLED_CONFIDENCE: () => SETTLED_CONFIDENCE,
+    SKIP_DIRS: () => SKIP_DIRS,
     SNAPPABLE: () => SNAPPABLE,
     SNAP_CONFIDENCE: () => SNAP_CONFIDENCE,
     SNAP_MARGIN: () => SNAP_MARGIN,
@@ -1847,10 +1849,14 @@ var MetaMediumCore = (() => {
   };
 
   // src/store/folder.ts
+  var SKIP_DIRS = ["node_modules", "dist", "build", "out", "coverage", "target", "vendor"];
+  var DEFAULT_FILE_LIMIT = 400;
   var FolderStore = class {
     constructor(root, opts = {}) {
       this.root = root;
       this.opts = opts;
+      /** Set when the last `list()` hit the limit: the folder holds more than was shown. */
+      this.truncated = false;
     }
     capabilities() {
       return { write: !this.opts.readOnly, watch: false };
@@ -1858,8 +1864,13 @@ var MetaMediumCore = (() => {
     async walk(dir, prefix, out, logs) {
       for await (const [name, handle] of dir.entries()) {
         const path = prefix ? `${prefix}/${name}` : name;
+        if (out.length >= (this.opts.limit ?? DEFAULT_FILE_LIMIT)) {
+          this.truncated = true;
+          return;
+        }
         if (handle.kind === "directory") {
           if (name.startsWith(".") && path !== ".metamedium" && !path.startsWith(".metamedium/")) continue;
+          if ((this.opts.skip ?? SKIP_DIRS).includes(name)) continue;
           await this.walk(handle, path, out, logs);
           continue;
         }
@@ -1875,6 +1886,7 @@ var MetaMediumCore = (() => {
     }
     async list() {
       const out = [];
+      this.truncated = false;
       await this.walk(this.root, "", out, []);
       return out.sort((a, b) => a.path < b.path ? -1 : a.path > b.path ? 1 : 0);
     }
@@ -5443,6 +5455,41 @@ ${pad}</${tag}>`;
       artifacts.push(frame.id);
       return frame.id;
     }
+    function applyImport(ev) {
+      const pid = ev.participantId ?? LOCAL_PARTICIPANT;
+      if (!participants.includes(pid)) return null;
+      if (ev.strokes && ev.strokes.length) {
+        let first = null;
+        let at = ev.at;
+        for (const pts of ev.strokes) {
+          if (!pts || pts.length < 2) continue;
+          const id = applyStroke({ type: "stroke", points: pts, at, participantId: pid, scale: 1, content: true });
+          if (id && !first) first = id;
+          at += 1;
+        }
+        return first;
+      }
+      if (ev.code === void 0) return null;
+      const name = ev.name?.trim() || ev.path.split("/").pop() || ev.path;
+      const node = {
+        id: nextId("artifact"),
+        reps: [
+          { modality: "word", data: name, source: pid },
+          { modality: "bounds", data: { ...ev.bounds }, source: pid },
+          { modality: "code", data: { code: ev.code, language: ev.kind, kind: ev.kind, path: ev.path, regions: [], at: ev.at }, source: pid },
+          { modality: "signature", data: { shapes: { [ev.kind]: 1 }, links: {}, size: 1 }, source: TIER0_PARTICIPANT }
+        ],
+        edges: [{ to: pid, rel: "made-by" }],
+        capability: 0,
+        createdAt: ev.at
+      };
+      nodes.set(node.id, node);
+      artifacts.push(node.id);
+      contentIds.push(node.id);
+      if (ev.kind !== "png" && ev.kind !== "jpg") live.push(node.id);
+      recomputeClusterCandidates();
+      return node.id;
+    }
     function isHuman(participantId) {
       if (participantId === LOCAL_PARTICIPANT) return true;
       const p = nodes.get(participantId);
@@ -5539,6 +5586,8 @@ ${pad}</${tag}>`;
           return null;
         case "frame":
           return applyFrame(ev);
+        case "import":
+          return applyImport(ev);
         case "summon":
           return applySummon(ev);
         case "split":
@@ -5641,6 +5690,7 @@ ${pad}</${tag}>`;
       clock: (args) => void dispatch({ type: "clock", ...args }),
       behave: (args) => void dispatch({ type: "behave", ...args }),
       frame: (args) => dispatch({ type: "frame", ...args }),
+      import: (args) => dispatch({ type: "import", ...args }),
       matchesOf: (ids) => matchesFor(ids),
       tidy: (args) => void dispatch({ type: "tidy", ...args }),
       snap: (args) => void dispatch({ type: "snap", ...args }),

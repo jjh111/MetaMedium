@@ -7,7 +7,9 @@
 //     const s = document.createElement('script');
 //     s.src = '/Demos/session-engine.e2e.js';
 //     document.head.appendChild(s);
-//     s.onload = async () => { __setup(); console.table((await __scenario()).steps); };
+//     s.onload = () => { __setup(); __scenario().then((r) => { window.__R = r; console.table(r.steps); }); };
+//
+// A run takes about 75 s (105 steps); `window.__Rlive.steps` shows progress.
 //
 // The model is STUBBED here so a run is deterministic — but the stub builds
 // from the region rects it is handed rather than inventing a layout, so a
@@ -63,6 +65,9 @@ window.__setup = function(){
   // A mark held on this device from an earlier run would make step 0 — "the
   // built-in check summons with nothing taught" — untrue before we begin.
   if (window.__mm.savedMark()) window.__mm.forgetMark();
+  // The board autosaves to browser storage now; a run starts from an empty one.
+  window.__mm.forgetLocalLog();
+  window.__mm.session.load([]);
   window.__snapModeBefore = window.__mm.snapMode();
   window.__mm.setSnapMode('offer');
   // Learned palette use is device state; a run starts from none and puts it back.
@@ -133,7 +138,7 @@ window.__setup = function(){
 // ===========================================================================
 window.__scenario = async function(){
   const t = window.__t, mm = window.__mm, MM = mm.MM;
-  const R = { steps: [], pass: true };
+  const R = { steps: [], pass: true }; window.__Rlive = R;
   const step = (name, ok, detail) => { R.steps.push({name, ok: !!ok, detail}); if(!ok) R.pass=false; return ok; };
   const wait = (ms) => new Promise(r=>setTimeout(r, ms||250));
 
@@ -629,7 +634,9 @@ window.__scenario = async function(){
     const b0 = mm.runtime().bodies.get(jsId);
     step('19a. nothing runs unblessed: no step before a hand plays it', !b0 && !mm.session.getState().clocks[jsId], { body: b0 || null });
     mm.session.clock({ nodeId: jsId, op: 'play', at: Date.now() });
-    await wait(500);
+    // Stepped by hand, so the check does not depend on how often this tab is
+    // allowed a frame; the frame loop runs beside it when it can.
+    for (let i = 0; i < 30; i++) await mm.runtime().stepOnce(jsId);
     const b1 = mm.runtime().bodies.get(jsId);
     const fr1 = MM.frameOf(mm.session.getState().nodes.get(jsId));
     const left1 = parseFloat(fj.wrap.style.left);
@@ -638,7 +645,8 @@ window.__scenario = async function(){
     // Still playing, so a step may already have nudged it by a fraction of a pixel.
     step('19c. reset puts the frame back where it was drawn, and keeps playing', Math.abs(parseFloat(fj.wrap.style.left) - fr1.x) < 1 && mm.session.getState().clocks[jsId].playing, { left: fj.wrap.style.left, frameX: fr1.x });
     mm.session.attachCode({ participantId: MM.LOCAL_PARTICIPANT, nodeId: jsId, kind: 'js', code: 'throw new Error("boom");', at: Date.now() });
-    await wait(400);
+    await mm.runtime().stepOnce(jsId);
+    await wait(60);
     const stJ = mm.session.getState();
     step('19d. a throwing behaviour pauses its clock with the reason and marks the frame broken', !stJ.clocks[jsId].playing && /boom/.test(stJ.clocks[jsId].reason || '') && fj.wrap.classList.contains('broken'), stJ.clocks[jsId]);
     const n0 = stJ.contentIds.length;
@@ -647,7 +655,10 @@ window.__scenario = async function(){
     step('19e. the board survives: drawing still works after a behaviour broke', mm.session.getState().contentIds.length === n0 + 1);
     mm.session.attachCode({ participantId: MM.LOCAL_PARTICIPANT, nodeId: jsId, kind: 'js', code: 'while (true) {}', at: Date.now() });
     mm.session.clock({ nodeId: jsId, op: 'play', at: Date.now() });
-    await wait(mm.runtime().budgetMs + 400);
+    // The budget is a timer; a throttled tab fires it late, so wait for it rather than assume its pace.
+    const stepping = mm.runtime().stepOnce(jsId);
+    for (let i = 0; i < 40 && mm.session.getState().clocks[jsId].playing; i++) await wait(100);
+    await stepping;
     const stK = mm.session.getState();
     step('19f. a behaviour past its budget is stopped, and the reason names the budget', !stK.clocks[jsId].playing && /budget/.test(stK.clocks[jsId].reason || ''), stK.clocks[jsId]);
     t.stroke(t.rect(q.x, q.y + 120, 120, 80));
@@ -930,6 +941,47 @@ window.__scenario = async function(){
     mm.session.getState().commandMark === null &&
     document.getElementById('markName').textContent === 'check',
     { mark: mm.session.getState().commandMark, chip: document.getElementById('markName').textContent });
+
+  // ---- 23. The folder as the canvas: files are artifacts, ink is a log in the folder, a second machine sees it ----
+  {
+    const store = new MM.MemoryStore({
+      'index.html': '<div data-region="r1">hello</div>',
+      'notes/a.md': '# A note',
+      'scripts/x.js': 'const N = 1;\nreturn N;',
+      'Makefile': 'all:',
+    });
+    await mm.openStore(store, 'store', 'fake');
+    const st = mm.session.getState();
+    const paths = st.artifacts.map(id => { const r = st.nodes.get(id).reps.find(x => x.modality === 'code'); return r && r.data.path; }).filter(Boolean).sort();
+    step('23. opening a folder: every file of a known kind is an artifact of its kind, at its path; the Makefile is not', paths.join(',') === 'index.html,notes/a.md,scripts/x.js' && st.live.length === 3 && /folder fake · 3 files/.test(document.getElementById('status').textContent), { paths, status: document.getElementById('status').textContent });
+    const before = mm.session.getEvents().length;
+    const bx = mm.worldToScreen(100, -300);
+    t.stroke(t.rect(bx.x, bx.y, 120, 80));
+    await mm.saveNow();
+    const logPath = MM.logPathFor(mm.folder().me);
+    const saved = store.paths().includes(logPath) ? MM.decodeLog(await store.read(logPath)).events : [];
+    step('23a. ink drawn on it is this participant\'s log in the folder, imports and all', saved.length === before + 1 && saved.filter(ev => ev.type === 'import').length === 3 && saved[saved.length - 1].type === 'stroke', { saved: saved.length, before, logPath });
+    // The second machine: the same folder, opened again.
+    await mm.openStore(store, 'store', 'fake');
+    const st2 = mm.session.getState();
+    step('23b. opened again — the second machine after a pull — the board is back and nothing is discovered twice', st2.artifacts.length === 3 && mm.session.getEvents().length === before + 1 && st2.contentIds.length === 4, { artifacts: st2.artifacts.length, events: mm.session.getEvents().length, content: st2.contentIds.length });
+    // The live budget: sixteen pages, twelve live, the rest parked.
+    const many = {};
+    for (let i = 0; i < 16; i++) many['p' + i + '.html'] = '<p data-region="r1">' + i + '</p>';
+    await mm.openStore(new MM.MemoryStore(many), 'store', 'many');
+    await wait(60);
+    const iframes = document.querySelectorAll('#stage .artifactFrame iframe').length;
+    const parked = document.querySelectorAll('#stage .artifactFrame.parked').length;
+    step('23c. past the live budget, artifacts are parked cards, and the status says so', iframes === 12 && parked === 4 && /12 of 16 live/.test(document.getElementById('status').textContent), { iframes, parked });
+    // Views: the grid lists every artifact; a card focuses it; Esc is the canvas again.
+    mm.setViewMode('grid');
+    const cards = document.querySelectorAll('#grid .card').length;
+    document.querySelector('#grid .card').click();
+    const focused = mm.viewMode() === 'focus';
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    step('23d. grid: every artifact as a card; a card focuses it; Escape is the canvas', cards === 16 && focused && mm.viewMode() === 'canvas', { cards, focused, mode: mm.viewMode() });
+    mm.session.load([]);
+  }
 
   return R;
 };

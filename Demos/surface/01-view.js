@@ -118,3 +118,16 @@
     render(session.getState());
   }
   addEventListener('resize', resize);
+
+  // A frame that comes even when the page is not painting. Time is state
+  // here, not a movie: a tank in a tab the browser has stopped painting
+  // still owes its steps, so the loops ask for a frame and take a timer's
+  // tick when no frame arrives in time.
+  const FRAME_FALLBACK_MS = 40;
+  function nextFrame(cb) {
+    let done = false;
+    const go = (now) => { if (done) return; done = true; cb(typeof now === 'number' ? now : performance.now()); };
+    const id = requestAnimationFrame(go);
+    const timer = setTimeout(() => { if (!done) { cancelAnimationFrame(id); go(performance.now()); } }, FRAME_FALLBACK_MS);
+    return { cancel: () => { done = true; cancelAnimationFrame(id); clearTimeout(timer); } };
+  }

@@ -47,6 +47,8 @@
     for (const [id, f] of frames) {
       if (!s.live.includes(id)) { f.wrap.remove(); frames.delete(id); }
     }
+    // The live budget: the nearest N render; the rest stand as parked cards.
+    const budget = liveSet(s);
     for (const id of s.live) {
       const node = s.nodes.get(id);
       const rep = node && codeRepOf(node);
@@ -54,6 +56,19 @@
       if (!rep || !fr) continue;
 
       let f = frames.get(id);
+      const parked = !budget.has(id);
+      if (f && f.parked !== parked) { f.wrap.remove(); frames.delete(id); f = null; }
+      if (!f && parked) {
+        const wrap = document.createElement('div');
+        wrap.className = 'artifactFrame parked';
+        const card = document.createElement('div');
+        card.className = 'park';
+        card.innerHTML = '<b>' + esc(MM.wordOf(node) || id) + '</b>' + esc((rep.data.kind || 'html') + (rep.data.path ? ' · ' + rep.data.path : '')) + '<br>parked — past the live budget; pan closer to run it';
+        wrap.appendChild(card);
+        stage.appendChild(wrap);
+        f = { wrap: wrap, iframe: null, codeAt: 'parked', parked: true };
+        frames.set(id, f);
+      }
       if (!f) {
         const wrap = document.createElement('div');
         wrap.className = 'artifactFrame';
@@ -63,7 +78,7 @@
         iframe.title = MM.wordOf(node) || id;
         wrap.appendChild(iframe);
         stage.appendChild(wrap);
-        f = { wrap: wrap, iframe: iframe, codeAt: null };
+        f = { wrap: wrap, iframe: iframe, codeAt: null, parked: false };
         frames.set(id, f);
       }
       // Where the drawing put it, plus where its own behaviour has taken it
@@ -80,7 +95,7 @@
       const wired = wiredCodeOf(s, id);
       const code = wired !== null ? wired : rep.data.code;
       const stamp = rep.data.at + ':' + Math.round(fr.w) + 'x' + Math.round(fr.h) + ':' + hashOf(code);
-      if (f.codeAt !== stamp) {
+      if (!f.parked && f.codeAt !== stamp) {
         f.codeAt = stamp;
         f.iframe.srcdoc = documentForKind({ data: { ...rep.data, code: code } }, fr.w, fr.h);
       }
@@ -104,7 +119,7 @@
     const found = new Set();
     if (!f || !fr) return [];
     let doc = null;
-    try { doc = f.iframe.contentDocument; } catch (err) { doc = null; }
+    try { doc = f.iframe ? f.iframe.contentDocument : null; } catch (err) { doc = null; }
     if (!doc || !doc.elementFromPoint) return [];
 
     const N = 4;

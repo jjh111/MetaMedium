@@ -291,8 +291,8 @@
     for (const defId of tank.defs.keys()) if (!wanted.has(defId)) tank.defs.delete(defId);
     refreshPlacements();
     const playing = [...wanted].some((id) => s.clocks[id].playing);
-    if (playing && !tank.raf) { tank.last = performance.now(); tank.acc = 0; tank.raf = requestAnimationFrame(tankLoop); }
-    if (!playing && tank.raf) { cancelAnimationFrame(tank.raf); tank.raf = 0; }
+    if (playing && !tank.raf) { tank.last = performance.now(); tank.acc = 0; tank.raf = nextFrame(tankLoop); }
+    if (!playing && tank.raf) { tank.raf.cancel(); tank.raf = 0; }
   }
 
   function tankLoop(now) {
@@ -311,5 +311,5 @@
       steps++;
     }
     if (steps) render(s);
-    tank.raf = requestAnimationFrame(tankLoop);
+    tank.raf = nextFrame(tankLoop);
   }

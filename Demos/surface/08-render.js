@@ -230,7 +230,12 @@
     const strokes = s.contentIds.length - s.artifacts.length;
     const fresh = flashText && Date.now() - flashAt < FLASH_MS;
     const parts = [strokes + ' loose'];
-    if (s.artifacts.length) parts.push(s.artifacts.length + ' artifact' + (s.artifacts.length === 1 ? '' : 's') + (s.live.length ? ' (' + s.live.length + ' live)' : ''));
+    if (s.artifacts.length) {
+      const running = liveSet(s).size;
+      parts.push(s.artifacts.length + ' artifact' + (s.artifacts.length === 1 ? '' : 's') + (s.live.length ? ' (' + (running < s.live.length ? running + ' of ' + s.live.length + ' live, the rest parked' : s.live.length + ' live') + ')' : ''));
+    }
+    const fs = folderStatus();
+    if (fs) parts.push(fs);
     if (agents.length) parts.push(agents.map((a) => a.config.model).join(', '));
     if (snapOffers.size) parts.push(snapOffers.size + ' read clean');
     if (s.pendingLassoId) parts.push('cross the loop with ' + (s.commandMark ? 'your mark' : '✓') + ' to select what it holds');
