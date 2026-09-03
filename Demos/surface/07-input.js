@@ -172,6 +172,9 @@
     if (act === 'snap') snapAll([id]);
     else if (act === 'read') { const n = state.nodes.get(id); if (n && !readOne(n, true)) offerModel('Reading writing needs a model that can see.'); }
     else if (act === 'split') session.splitWord(id, Date.now());
+    else if (act === 'clock-play') session.clock({ nodeId: id, op: 'play', at: Date.now() });
+    else if (act === 'clock-pause') session.clock({ nodeId: id, op: 'pause', at: Date.now() });
+    else if (act === 'clock-reset') session.clock({ nodeId: id, op: 'reset', at: Date.now() });
     else session.snap({ ids: [id], mode: 'raw', at: Date.now() });
   });
   document.getElementById('resetBtn').onclick = () => location.reload();

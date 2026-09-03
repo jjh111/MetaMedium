@@ -3886,6 +3886,7 @@ ${pad}</${tag}>`;
     let participants = [];
     let explanations = [];
     let live = [];
+    let clocks = {};
     let selection = [];
     let commandMark = config.gesture.commandMark ?? null;
     let markMiss = null;
@@ -3909,7 +3910,8 @@ ${pad}</${tag}>`;
         commandMark,
         markMiss,
         lastAt,
-        counter: counter2
+        counter: counter2,
+        clocks
       });
     }
     function restore(snap) {
@@ -3928,6 +3930,7 @@ ${pad}</${tag}>`;
       markMiss = s.markMiss;
       lastAt = s.lastAt;
       counter2 = s.counter;
+      clocks = s.clocks ?? {};
     }
     function maybeCheckpoint(length) {
       if (length > 0 && length % CHECKPOINT_EVERY === 0 && !checkpoints.some((c) => c.length === length)) {
@@ -3944,6 +3947,7 @@ ${pad}</${tag}>`;
       participants = [LOCAL_PARTICIPANT, TIER0_PARTICIPANT];
       explanations = [];
       live = [];
+      clocks = {};
       selection = [];
       commandMark = config.gesture.commandMark ?? null;
       markMiss = null;
@@ -4714,6 +4718,24 @@ ${pad}</${tag}>`;
         summon.suggestions.unshift(...makeSuggestions(ids).filter((g) => g.kind === "match"));
       }
     }
+    function applyClock(ev) {
+      if (!live.includes(ev.nodeId)) return;
+      const prev = clocks[ev.nodeId] ?? { playing: false, seed: 1, at: ev.at };
+      switch (ev.op) {
+        case "play":
+          clocks[ev.nodeId] = { playing: true, seed: prev.seed, at: ev.at };
+          break;
+        case "pause":
+          clocks[ev.nodeId] = { playing: false, seed: prev.seed, at: ev.at, ...ev.reason ? { reason: ev.reason } : {} };
+          break;
+        case "reset":
+          clocks[ev.nodeId] = { playing: prev.playing, seed: prev.seed, at: ev.at };
+          break;
+        case "seed":
+          clocks[ev.nodeId] = { playing: prev.playing, seed: ev.seed ?? prev.seed, at: ev.at };
+          break;
+      }
+    }
     function sameSet(a, b) {
       if (a.length !== b.length) return false;
       const set = new Set(a);
@@ -4751,7 +4773,8 @@ ${pad}</${tag}>`;
         modality: "code",
         data: {
           code: ev.code,
-          language: ev.language ?? "html",
+          language: ev.language ?? ev.kind ?? "html",
+          kind: ev.kind ?? "html",
           prompt: ev.prompt,
           fill: ev.fill,
           regions: regionsOf(node, nodes),
@@ -4781,6 +4804,9 @@ ${pad}</${tag}>`;
           return null;
         case "correct":
           applyCorrect(ev);
+          return null;
+        case "clock":
+          applyClock(ev);
           return null;
         case "summon":
           return applySummon(ev);
@@ -4864,6 +4890,7 @@ ${pad}</${tag}>`;
         markMiss,
         recentIds: recentWithin(lastAt),
         live: [...live],
+        clocks: { ...clocks },
         selection: [...selection]
       };
     }
@@ -4880,6 +4907,7 @@ ${pad}</${tag}>`;
       answer: (args) => dispatch({ type: "answer", ...args }),
       teachCommandMark: (mark, at) => void dispatch({ type: "teach", mark, at }),
       correct: (args) => void dispatch({ type: "correct", ...args }),
+      clock: (args) => void dispatch({ type: "clock", ...args }),
       matchesOf: (ids) => matchesFor(ids),
       tidy: (args) => void dispatch({ type: "tidy", ...args }),
       snap: (args) => void dispatch({ type: "snap", ...args }),

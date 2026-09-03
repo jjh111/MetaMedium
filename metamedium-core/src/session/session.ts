@@ -63,6 +63,7 @@ import { BUILTIN_COMMAND_MARK, matchesCommandMark } from './commandmark';
 import { type SnapReading, idealize, snapReading, cleanOf } from './clean';
 import { isLetterLike, joinsRun, wordConfidence } from './words';
 import { type StructuralSignature, type Examples, structuralSignature, matchDefinition, addExample, MATCH_FLOOR } from './signature';
+import type { Kind } from '../kinds/kinds';
 
 // ===== Public state shape =====
 
@@ -102,6 +103,15 @@ export interface Summon {
   onArtifact?: { artifactId: string; regionIds: string[] };
 }
 
+export interface Clock {
+  playing: boolean;
+  seed: number;
+  /** When the last clock event landed. */
+  at: number;
+  /** Why it stopped, when it was stopped by something other than a hand — a throw, a budget. */
+  reason?: string;
+}
+
 export interface ClusterCandidate {
   nodeIds: string[];
   /** Every definition above the floor, best first — plural, like every reading. */
@@ -135,6 +145,13 @@ export interface SessionState {
   markMiss: MarkMiss | null;
   /** Artifacts carrying a 'code' rep — the ones that render and run. */
   live: string[];
+  /**
+   * Per-artifact clocks (v8). Nothing runs unblessed: an artifact's code
+   * runs only while its clock is `playing`, and `play` is the human's bless.
+   * Time itself is runtime state the surface derives; what the log holds is
+   * whether it runs, its seed, and why it last stopped.
+   */
+  clocks: Record<string, Clock>;
   /**
    * The marks a held loop became once it was taken up (by the mark or the
    * chip), or that were selected outright. Transient: a hand's next content
@@ -203,6 +220,8 @@ export type SessionEvent =
   | { type: 'join'; kind: ParticipantKind; name: string; at: number; capability?: Capability }
   | { type: 'propose'; participantId: string; nodeId: string; edges: ProposedEdge[]; reps?: ProposedRep[]; at: number }
   | { type: 'teach'; mark: CommandMark | null; at: number }
+  /** An artifact's clock: play (the bless to run), pause, reset, or reseed. */
+  | { type: 'clock'; nodeId: string; op: 'play' | 'pause' | 'reset' | 'seed'; seed?: number; reason?: string; at: number; participantId?: string }
   /**
    * The human correcting a match: this group IS (or is NOT) that definition.
    * The group's structural signature joins the definition's accepted or
@@ -235,6 +254,8 @@ export type SessionEvent =
       nodeId: string;
       code: string;
       language?: string;
+      /** Which kind of artifact this code makes (the closed table). Default: html. */
+      kind?: Kind;
       prompt?: string;
       /**
        * The per-region content the code was built from. Kept so a revision can
@@ -329,6 +350,8 @@ export interface Session {
    * teaching is part of the session's history and replays with it.
    */
   teachCommandMark(mark: CommandMark | null, at: number): void;
+  /** Play, pause, reset or reseed an artifact's clock. Play is the bless that lets its code run (I9). */
+  clock(args: { nodeId: string; op: 'play' | 'pause' | 'reset' | 'seed'; seed?: number; reason?: string; at: number; participantId?: string }): void;
   /** Say that a group is, or is not, a definition; the correction is remembered on the definition. */
   correct(args: { ids: string[]; definitionId: string; verdict: 'is' | 'is-not'; at: number; participantId?: string }): void;
   /** Which definitions a group matches now, best first, with reasoning. Pure; no event. */
@@ -343,6 +366,7 @@ export interface Session {
     nodeId: string;
     code: string;
     language?: string;
+    kind?: Kind;
     prompt?: string;
     fill?: unknown;
     at: number;
@@ -438,6 +462,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
   let participants: string[] = [];
   let explanations: string[] = [];
   let live: string[] = [];
+  let clocks: Record<string, Clock> = {};
   let selection: string[] = [];
   let commandMark: CommandMark | null = config.gesture.commandMark ?? null;
   let markMiss: MarkMiss | null = null;
@@ -458,7 +483,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
   function snapshot(): unknown {
     return structuredClone({
       nodes, contentIds, artifacts, pendingLasso, summon, clusterCandidates,
-      participants, explanations, live, selection, commandMark, markMiss, lastAt, counter,
+      participants, explanations, live, selection, commandMark, markMiss, lastAt, counter, clocks,
     });
   }
   function restore(snap: unknown) {
@@ -467,12 +492,12 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       pendingLasso: { id: string; at: number } | null; summon: Summon | null;
       clusterCandidates: ClusterCandidate[]; participants: string[]; explanations: string[];
       live: string[]; selection: string[]; commandMark: CommandMark | null; markMiss: MarkMiss | null;
-      lastAt: number; counter: number;
+      lastAt: number; counter: number; clocks: Record<string, Clock>;
     };
     nodes = s.nodes; contentIds = s.contentIds; artifacts = s.artifacts; pendingLasso = s.pendingLasso;
     summon = s.summon; clusterCandidates = s.clusterCandidates; participants = s.participants;
     explanations = s.explanations; live = s.live; selection = s.selection; commandMark = s.commandMark;
-    markMiss = s.markMiss; lastAt = s.lastAt; counter = s.counter;
+    markMiss = s.markMiss; lastAt = s.lastAt; counter = s.counter; clocks = s.clocks ?? {};
   }
   function maybeCheckpoint(length: number) {
     if (length > 0 && length % CHECKPOINT_EVERY === 0 && !checkpoints.some((c) => c.length === length)) {
@@ -490,6 +515,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     participants = [LOCAL_PARTICIPANT, TIER0_PARTICIPANT];
     explanations = [];
     live = [];
+    clocks = {};
     selection = [];
     commandMark = config.gesture.commandMark ?? null;
     markMiss = null;
@@ -1562,6 +1588,23 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     }
   }
 
+  /**
+   * A clock lives on a live artifact. Play is the bless: until a hand has
+   * played it, an artifact's code never runs (I9). A pause carries the reason
+   * when something other than a hand stopped it — a throw, a budget — so the
+   * board says why a thing went still.
+   */
+  function applyClock(ev: Extract<SessionEvent, { type: 'clock' }>) {
+    if (!live.includes(ev.nodeId)) return;
+    const prev = clocks[ev.nodeId] ?? { playing: false, seed: 1, at: ev.at };
+    switch (ev.op) {
+      case 'play': clocks[ev.nodeId] = { playing: true, seed: prev.seed, at: ev.at }; break;
+      case 'pause': clocks[ev.nodeId] = { playing: false, seed: prev.seed, at: ev.at, ...(ev.reason ? { reason: ev.reason } : {}) }; break;
+      case 'reset': clocks[ev.nodeId] = { playing: prev.playing, seed: prev.seed, at: ev.at }; break;
+      case 'seed': clocks[ev.nodeId] = { playing: prev.playing, seed: ev.seed ?? prev.seed, at: ev.at }; break;
+    }
+  }
+
   function sameSet(a: readonly string[], b: readonly string[]): boolean {
     if (a.length !== b.length) return false;
     const set = new Set(a);
@@ -1607,7 +1650,8 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       modality: 'code',
       data: {
         code: ev.code,
-        language: ev.language ?? 'html',
+        language: ev.language ?? ev.kind ?? 'html',
+        kind: ev.kind ?? 'html',
         prompt: ev.prompt,
         fill: ev.fill,
         regions: regionsOf(node, nodes),
@@ -1638,6 +1682,9 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
         return null;
       case 'correct':
         applyCorrect(ev);
+        return null;
+      case 'clock':
+        applyClock(ev);
         return null;
       case 'summon':
         return applySummon(ev);
@@ -1730,6 +1777,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       markMiss,
       recentIds: recentWithin(lastAt),
       live: [...live],
+      clocks: { ...clocks },
       selection: [...selection],
     };
   }
@@ -1749,6 +1797,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     answer: (args) => dispatch({ type: 'answer', ...args }),
     teachCommandMark: (mark, at) => void dispatch({ type: 'teach', mark, at }),
     correct: (args) => void dispatch({ type: 'correct', ...args }),
+    clock: (args) => void dispatch({ type: 'clock', ...args }),
     matchesOf: (ids) => matchesFor(ids),
     tidy: (args) => void dispatch({ type: 'tidy', ...args }),
     snap: (args) => void dispatch({ type: 'snap', ...args }),

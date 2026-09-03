@@ -59,17 +59,23 @@
         f = { wrap: wrap, iframe: iframe, codeAt: null };
         frames.set(id, f);
       }
-      f.wrap.style.left = fr.x + 'px';
-      f.wrap.style.top = fr.y + 'px';
+      // Where the drawing put it, plus where its own behaviour has taken it
+      // (runtime only — never in the log).
+      const o = runtimeOffset(id);
+      f.wrap.style.left = (fr.x + o.dx) + 'px';
+      f.wrap.style.top = (fr.y + o.dy) + 'px';
       f.wrap.style.width = fr.w + 'px';
       f.wrap.style.height = fr.h + 'px';
+      f.wrap.classList.toggle('broken', !!runtimeBroken(id));
+      f.wrap.classList.toggle('playing', !!(s.clocks[id] && s.clocks[id].playing));
 
       const stamp = rep.data.at + ':' + Math.round(fr.w) + 'x' + Math.round(fr.h);
       if (f.codeAt !== stamp) {
         f.codeAt = stamp;
-        f.iframe.srcdoc = documentFor(rep.data.code, fr.w, fr.h);
+        f.iframe.srcdoc = documentForKind(rep, fr.w, fr.h);
       }
     }
+    syncRuntime(s);
   }
 
   /**

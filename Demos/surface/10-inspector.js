@@ -6,6 +6,9 @@
 // closure's; no imports, no exports, no build step beyond the concatenation.
 
   // ===== Inspector: what the machine currently holds, and why ==============
+  /** The kind of an artifact's newest code rep, html by default. */
+  function codeKindOf(node) { const r = node && codeRepOf(node); return (r && r.data.kind) || 'html'; }
+
   function renderInspector(s, id) {
     if (s.summon) return renderSummonScope(s);
 
@@ -25,7 +28,7 @@
       : ((node.reps.find((r) => r.modality === 'word') || {}).source || MM.LOCAL_PARTICIPANT);
     const authorName = nameOfParticipant(author);
     let html = '<div class="eyebrow">' +
-      (isLive ? 'living page' : isArtifact ? 'artifact' : isWordNode ? 'word' : 'mark') + '</div>';
+      (isLive ? (codeKindOf(node) === 'html' ? 'living page' : 'living ' + codeKindOf(node)) : isArtifact ? 'artifact' : isWordNode ? 'word' : 'mark') + '</div>';
 
     html += '<div class="row"><span class="k">id</span><span class="v">' + esc(id) + '</span></div>';
     html += '<div class="row"><span class="k">by</span><span class="v ' +
@@ -67,10 +70,31 @@
         newest.data.code.length + ' chars</span></div>';
       if (newest.data.prompt) html += '<div class="why">“' + esc(newest.data.prompt) + '”</div>';
 
-      const regions = MM.regionsOf(node, s.nodes);
-      html += '<div class="row"><span class="k">regions</span><span class="v">' +
-        regions.map((r) => r.id).join(' ') + '</span></div>';
+      const kind = newest.data.kind || 'html';
+      html += '<div class="row"><span class="k">kind</span><span class="v">' + esc(kind) + '</span></div>';
+      if (kind === 'html') {
+        const regions = MM.regionsOf(node, s.nodes);
+        html += '<div class="row"><span class="k">regions</span><span class="v">' +
+          regions.map((r) => r.id).join(' ') + '</span></div>';
+      } else {
+        const parts = MM.addressablesOf(kind, newest.data.code).filter((r) => r.depth === 0);
+        html += '<div class="row"><span class="k">addresses</span><span class="v">' +
+          esc(parts.map((r) => r.id).join(' ') || 'nothing yet') + '</span></div>';
+      }
       if (codes.length > 1) html += '<div class="why">Earlier versions are kept.</div>';
+      // The clock: nothing runs until a hand plays it, and a stop says why.
+      if (kind === 'js') {
+        const c = s.clocks[id];
+        const err = runtimeBroken(id);
+        const stateText = !c ? 'not played — its code has never run'
+          : c.playing ? 'playing' : 'paused' + (c.reason ? ' — ' + c.reason : '');
+        html += '<div class="row"><span class="k">clock</span><span class="v' + (err ? ' warn' : '') + '">' + esc(stateText) + '</span></div>';
+        html += '<div class="acts">' +
+          (c && c.playing
+            ? '<button class="mini" data-act="clock-pause" data-id="' + esc(id) + '">pause</button>'
+            : '<button class="mini" data-act="clock-play" data-id="' + esc(id) + '">' + (c ? 'play' : 'play — let it run') + '</button>') +
+          '<button class="mini" data-act="clock-reset" data-id="' + esc(id) + '">reset</button></div>';
+      }
     }
 
     // THE LADDER. Every rung a mark has climbed, with why at each one — ink,
@@ -116,7 +140,7 @@
         const mine = isLive ? null : regs.find((r) => r.nodeId === id);
         const m = mine && String(ownCode.data.code).match(new RegExp('<([a-z]+)[^>]*data-region="' + mine.id + '"'));
         rows.push(['code', isLive
-          ? (rung.genre && (rung.genre.genre === 'graph' || rung.genre.genre === 'mixed') ? 'a running diagram' : 'a running page')
+          ? (codeKindOf(node) !== 'html' ? 'a running ' + codeKindOf(node) + (codeKindOf(node) === 'js' ? ' — code that runs when played' : '') : rung.genre && (rung.genre.genre === 'graph' || rung.genre.genre === 'mixed') ? 'a running diagram' : 'a running page')
           : (m ? '<' + m[1] + ' data-region="' + mine.id + '">' : 'part of ' + (MM.wordOf(owner) || 'an artifact')),
           isLive && rung.genre ? rung.genre.reasoning : '']);
       }

@@ -95,6 +95,7 @@ export { mergeLogs } from './store/merge';
 // compared with reasoning, corrected by example (WP-12).
 export { structuralSignature, compareSignatures, matchDefinition, addExample, describeStructure, MATCH_FLOOR, DIRECTED_LINKS, SYMMETRIC_LINKS } from './session/signature';
 export type { StructuralSignature, Examples, SignatureMatch } from './session/signature';
+export type { Clock } from './session/session';
 
 // The fourth rung — what a mark DOES: steering verbs, walls, and the fit that
 // turns an acted-out path into a behaviour (ARCHITECTURE-v8 §3, §21).

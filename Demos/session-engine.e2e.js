@@ -604,6 +604,53 @@ window.__scenario = async function(){
     mm.session.deselect(Date.now());
   }
 
+  // ---- 19. A js artifact: rendered addressable, run in the worker after a play, broken when it throws ----
+  {
+    mm.setView(1, 260 - 6200, 200 - 2100); await wait(30);
+    const W = (x, y) => mm.worldToScreen(x, y);
+    const p = W(6200, 2100);
+    t.stroke(t.rect(p.x, p.y, 220, 130));
+    const c = W(6310, 2165);
+    t.stroke(t.circle(c.x, c.y, 190));
+    document.getElementById('heldOffer').click(); await wait(60);
+    const sumJ = mm.session.getState().summon;
+    const jsId = mm.session.bless({ summonId: sumJ.id, name: 'mover', at: Date.now() });
+    mm.session.attachCode({ participantId: MM.LOCAL_PARTICIPANT, nodeId: jsId, kind: 'js',
+      code: 'function steer(world) {\n  return { fx: 60, fy: 0 };\n}\nreturn steer(world);', at: Date.now() });
+    await wait(150);
+    const fj = mm.frames.get(jsId);
+    let region = null;
+    try { region = fj && fj.iframe.contentDocument && fj.iframe.contentDocument.querySelector('[data-region="fn:steer"]'); } catch (err) { region = null; }
+    step('19. a js artifact renders as source, its functions addressable by ink', !!region, { hasFrame: !!fj });
+    await wait(250);
+    const b0 = mm.runtime().bodies.get(jsId);
+    step('19a. nothing runs unblessed: no step before a hand plays it', !b0 && !mm.session.getState().clocks[jsId], { body: b0 || null });
+    mm.session.clock({ nodeId: jsId, op: 'play', at: Date.now() });
+    await wait(500);
+    const b1 = mm.runtime().bodies.get(jsId);
+    const fr1 = MM.frameOf(mm.session.getState().nodes.get(jsId));
+    const left1 = parseFloat(fj.wrap.style.left);
+    step('19b. played, the behaviour steps in the worker and moves its frame', !!b1 && b1.x > 2 && left1 > fr1.x + 2, { x: b1 && b1.x, left: left1, frameX: fr1.x });
+    mm.session.clock({ nodeId: jsId, op: 'reset', at: Date.now() }); await wait(50);
+    // Still playing, so a step may already have nudged it by a fraction of a pixel.
+    step('19c. reset puts the frame back where it was drawn, and keeps playing', Math.abs(parseFloat(fj.wrap.style.left) - fr1.x) < 1 && mm.session.getState().clocks[jsId].playing, { left: fj.wrap.style.left, frameX: fr1.x });
+    mm.session.attachCode({ participantId: MM.LOCAL_PARTICIPANT, nodeId: jsId, kind: 'js', code: 'throw new Error("boom");', at: Date.now() });
+    await wait(400);
+    const stJ = mm.session.getState();
+    step('19d. a throwing behaviour pauses its clock with the reason and marks the frame broken', !stJ.clocks[jsId].playing && /boom/.test(stJ.clocks[jsId].reason || '') && fj.wrap.classList.contains('broken'), stJ.clocks[jsId]);
+    const n0 = stJ.contentIds.length;
+    const q = W(6700, 2100);
+    t.stroke(t.rect(q.x, q.y, 120, 80));
+    step('19e. the board survives: drawing still works after a behaviour broke', mm.session.getState().contentIds.length === n0 + 1);
+    mm.session.attachCode({ participantId: MM.LOCAL_PARTICIPANT, nodeId: jsId, kind: 'js', code: 'while (true) {}', at: Date.now() });
+    mm.session.clock({ nodeId: jsId, op: 'play', at: Date.now() });
+    await wait(mm.runtime().budgetMs + 400);
+    const stK = mm.session.getState();
+    step('19f. a behaviour past its budget is stopped, and the reason names the budget', !stK.clocks[jsId].playing && /budget/.test(stK.clocks[jsId].reason || ''), stK.clocks[jsId]);
+    t.stroke(t.rect(q.x, q.y + 120, 120, 80));
+    step('19g. …and the board survives that too', mm.session.getState().contentIds.length === n0 + 2);
+  }
+
   // ---- 11. Scratch-out erase ----
   mm.fitAll(); await wait(60);
   const stBefore = mm.session.getState().contentIds.length;

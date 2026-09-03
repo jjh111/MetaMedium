@@ -16,6 +16,8 @@
     // For tests: pin the view so world coordinates map to known screen ones.
     setView: (zoom, panX, panY) => { view.zoom = zoom; view.panX = panX; view.panY = panY; afterViewChange(); },
     resetUses: () => { for (const k of Object.keys(uses)) delete uses[k]; store.del(USES_KEY); },
+    // The worker runtime, for tests: what is loaded, where each body is, what broke.
+    runtime: () => ({ bodies: runtime.bodies, broken: runtime.broken, loaded: runtime.loaded, budgetMs: RUN_BUDGET_MS }),
   };
 
 

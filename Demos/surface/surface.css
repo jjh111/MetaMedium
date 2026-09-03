@@ -260,6 +260,11 @@ body.panelHidden #inspector { display: none; }
   background: #fbfaf7; border-radius: 2px;
   box-shadow: 0 0 0 1px rgba(201,168,76,0.35), 0 18px 50px rgba(0,0,0,0.55);
 }
+/* A running artifact carries a live edge; a broken one says so and stops. */
+.artifactFrame.playing iframe { box-shadow: 0 0 0 1px rgba(201,168,76,0.8), 0 18px 50px rgba(0,0,0,0.55); }
+.artifactFrame.broken iframe { box-shadow: 0 0 0 2px rgba(230,57,70,0.75), 0 18px 50px rgba(0,0,0,0.55); opacity: 0.8; }
+.inspector .v.warn { color: #e69a9a; }
+.inspector .acts { display: flex; gap: 6px; flex-wrap: wrap; margin: 4px 0 2px; }
 
 /* ===== Zoom readout ===== */
 .zoomRow { display: flex; gap: 6px; align-items: center; pointer-events: auto; }
