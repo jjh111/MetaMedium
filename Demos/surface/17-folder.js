@@ -54,6 +54,22 @@
     return openStore(store, 'folder', handle.name);
   }
 
+  /**
+   * A repository as the folder (ARCHITECTURE-v8 §18): `owner/repo`,
+   * `owner/repo@branch`, `owner/repo/some/dir`. Reads need no token; writes
+   * need one the user has pasted, held on this device only when asked.
+   */
+  const GIT_TOKEN_KEY = 'mm-git-token';
+  async function openGit(spec, token, remember) {
+    const parsed = MM.parseGitSpec(spec);
+    if (!parsed) { flash('a repository is owner/repo, owner/repo@branch or owner/repo/dir'); return null; }
+    let tok = token;
+    if (!tok) { try { tok = localStorage.getItem(GIT_TOKEN_KEY) || undefined; } catch (err) { tok = undefined; } }
+    if (token && remember) { try { localStorage.setItem(GIT_TOKEN_KEY, token); } catch (err) { /* private mode */ } }
+    const store = new MM.GitStore(parsed, (url, init) => fetch(url, init), tok);
+    return openStore(store, 'git', spec);
+  }
+
   async function openStatic(base) {
     const store = new MM.StaticStore(base, (url) => fetch(url));
     return openStore(store, 'static', base);
@@ -174,7 +190,7 @@
   function folderStatus() {
     if (!folder.store) return '';
     const n = folder.entries.length;
-    return (folder.how === 'static' ? 'site' : 'folder') + (folder.name ? ' ' + folder.name : '') + ' · ' + n + ' file' + (n === 1 ? '' : 's') +
+    return (folder.how === 'static' ? 'site' : folder.how === 'git' ? 'repo' : 'folder') + (folder.name ? ' ' + folder.name : '') + ' · ' + n + ' file' + (n === 1 ? '' : 's') +
       (folder.truncated ? '+' : '') + (folder.error ? ' · ' + folder.error : folder.store.capabilities().write ? (folder.saving ? ' · saving' : ' · saved') : ' · read-only');
   }
 

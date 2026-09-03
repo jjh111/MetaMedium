@@ -202,7 +202,7 @@ Import (file, drag, paste, camera on a phone); decode → trace → `import` eve
 The `text` kind with an editor; convert a written word to it on request; a page heading typed on the canvas.
 *Done:* v8 §19 S3 criterion.
 
-**WP-14 · Deploy** (W, last)
+**WP-14 · Deploy** (W, last) ✅ **done 3 Sep 2026** — `Demos/manifest.webmanifest` and `Demos/sw.js` (the shell cached on install; every request network-first with the cache as the fallback, so a fresh build shows on the next reload and nothing is served stale while the network is there); registered only when served, never from a file. `src/store/git.ts`: the repository backend over the GitHub contents API — the tree listed in one request, files read by path, this participant's log committed as one file, a subfolder of a repository as the canvas, reads without a token and writes with one the user pasted (structural fetch; tests drive it with a fake API). `?git=owner/repo[@branch][/dir]` opens it; `__mm.openGit(spec, token, remember)` holds a token on the device only when asked. README: *Open a folder as a canvas*. *Honest gap:* the S7 criterion (draw on a phone, see it on the desktop after a pull) is exercised by the store's tests against a fake API, not yet against GitHub itself — that needs a token John holds.
 PWA manifest and service worker (offline, installable); the `GitStore` adapter behind a flag; README section "open a folder as a canvas".
 *Done:* v8 §19 S7 criterion.
 

@@ -40,6 +40,28 @@ canvas + confidence-routed lenses), the drawing-responsive text PoC, vision/LLM
 probes, and the explainer video. Experiments de-risk platform bets and feed
 proven ideas back into `metamedium-core`; they aren't the product.
 
+## Open a folder as a canvas
+
+The reference surface (`Demos/session-engine.html`) treats a folder as the
+canvas: every file of a known kind (`html`, `js`, `json`, `svg`, `md`, `txt`,
+`png`, `jpg`) becomes an artifact you can draw on, and your ink is saved
+beside them as your own log under `.metamedium/logs/`. Three ways in:
+
+- **A folder on disk** — *Open a folder…* in the rail (Chrome or Edge).
+  Autosave rewrites only your log file; git carries it between machines.
+- **A repository** — `session-engine.html?git=owner/repo` (or
+  `owner/repo@branch`, `owner/repo/some/dir`). Reading a public repository
+  needs no token; writing needs a fine-grained token you paste in, and the
+  canvas holds it on your device only if you say so. Every save is a commit
+  of your log file. This is what lets a phone draw on a repository.
+- **A published site** — `session-engine.html?folder=https://…/` opens a
+  static deploy read-only through its `.metamedium/manifest.json`, so anyone
+  can draw on it and the ink stays theirs.
+
+The page is installable (a web manifest and a service worker cache the
+shell), so it opens with no network; a folder's files and a model's API are
+always fetched live.
+
 ## Development
 
 **The engine** — geometry, recognition, spatial graph, and the no-modes

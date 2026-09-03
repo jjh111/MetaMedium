@@ -39,6 +39,8 @@ var MetaMediumCore = (() => {
     DEFAULT_TIMEOUT_MS: () => DEFAULT_TIMEOUT_MS,
     DIRECTED_LINKS: () => DIRECTED_LINKS,
     FolderStore: () => FolderStore,
+    GITHUB_API: () => GITHUB_API,
+    GitStore: () => GitStore,
     HAND_RESOLUTION_PX: () => HAND_RESOLUTION_PX,
     KINDS: () => KINDS,
     LETTER_MAX_HEIGHT_PX: () => LETTER_MAX_HEIGHT_PX,
@@ -192,6 +194,7 @@ var MetaMediumCore = (() => {
     parseClause: () => parseClause,
     parseCode: () => parseCode,
     parseFill: () => parseFill,
+    parseGitSpec: () => parseGitSpec,
     parseGraph: () => parseGraph,
     parseLayout: () => parseLayout,
     parseReadings: () => parseReadings,
@@ -1936,6 +1939,128 @@ var MetaMediumCore = (() => {
         const who = participantOfLog(`${LOG_DIR}/${name}`);
         if (!who) continue;
         out[who] = decodeLog(toText(await (await handle.getFile()).text())).events;
+      }
+      return out;
+    }
+  };
+
+  // src/store/git.ts
+  function parseGitSpec(spec) {
+    const m = /^([^/@\s]+)\/([^/@\s]+)(?:@([^/\s]+))?(?:\/(.+))?$/.exec(spec.trim());
+    if (!m) return null;
+    return { owner: m[1], repo: m[2], branch: m[3] || void 0, dir: m[4] ? m[4].replace(/\/+$/, "") : void 0 };
+  }
+  function b64encode(bytes) {
+    let s = "";
+    for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
+    return btoa(s);
+  }
+  function b64decode(text) {
+    const s = atob(text.replace(/\s+/g, ""));
+    const out = new Uint8Array(s.length);
+    for (let i = 0; i < s.length; i++) out[i] = s.charCodeAt(i);
+    return out;
+  }
+  var GITHUB_API = "https://api.github.com";
+  var GitStore = class {
+    constructor(spec, fetcher, token, api = GITHUB_API) {
+      this.spec = spec;
+      this.fetcher = fetcher;
+      this.token = token;
+      this.api = api;
+      this.shas = /* @__PURE__ */ new Map();
+      this.branch = spec.branch ?? null;
+    }
+    capabilities() {
+      return { write: !!this.token, watch: false };
+    }
+    headers() {
+      const h2 = { Accept: "application/vnd.github+json" };
+      if (this.token) h2.Authorization = `Bearer ${this.token}`;
+      return h2;
+    }
+    full(path) {
+      return this.spec.dir ? `${this.spec.dir}/${path}` : path;
+    }
+    relative(full) {
+      if (!this.spec.dir) return full;
+      return full.startsWith(this.spec.dir + "/") ? full.slice(this.spec.dir.length + 1) : null;
+    }
+    async branchName() {
+      if (this.branch) return this.branch;
+      const r = await this.fetcher(`${this.api}/repos/${this.spec.owner}/${this.spec.repo}`, { headers: this.headers() });
+      if (!r.ok) throw new Error(`${this.spec.owner}/${this.spec.repo}: ${r.status}`);
+      const info = JSON.parse(await r.text());
+      this.branch = info.default_branch || "main";
+      return this.branch;
+    }
+    /** The whole tree in one request; only files of known kinds, under the canvas's directory. */
+    async list() {
+      const branch = await this.branchName();
+      const r = await this.fetcher(`${this.api}/repos/${this.spec.owner}/${this.spec.repo}/git/trees/${encodeURIComponent(branch)}?recursive=1`, { headers: this.headers() });
+      if (!r.ok) throw new Error(`tree of ${this.spec.owner}/${this.spec.repo}@${branch}: ${r.status}`);
+      const tree = JSON.parse(await r.text());
+      const out = [];
+      for (const t of tree.tree ?? []) {
+        if (t.type !== "blob") continue;
+        const rel = this.relative(t.path);
+        if (rel === null) continue;
+        this.shas.set(rel, t.sha);
+        if (participantOfLog(rel)) continue;
+        const e = isCanvasFile(rel);
+        if (e) out.push({ ...e, size: t.size });
+      }
+      return out.sort((a, b) => a.path < b.path ? -1 : a.path > b.path ? 1 : 0);
+    }
+    async contents(path) {
+      const branch = await this.branchName();
+      const r = await this.fetcher(`${this.api}/repos/${this.spec.owner}/${this.spec.repo}/contents/${this.full(path).split("/").map(encodeURIComponent).join("/")}?ref=${encodeURIComponent(branch)}`, { headers: this.headers() });
+      if (r.status === 404) return null;
+      if (!r.ok) throw new Error(`${path}: ${r.status}`);
+      const body = JSON.parse(await r.text());
+      this.shas.set(path, body.sha);
+      return { content: body.content ? b64decode(body.content) : new Uint8Array(), sha: body.sha };
+    }
+    async read(path) {
+      const c = await this.contents(path);
+      if (!c) throw new Error(`${path}: not in the repository`);
+      const row = kindOf(path);
+      return row && !row.textual ? c.content : toText(c.content);
+    }
+    /** A write is a commit of one file. The blob's sha is needed to update; a missing one means a new file. */
+    async write(path, data, message) {
+      if (!this.token) throw new ReadOnlyError(`write ${path}`);
+      const branch = await this.branchName();
+      let sha = this.shas.get(path);
+      if (!sha) {
+        const c = await this.contents(path);
+        sha = c?.sha;
+      }
+      const r = await this.fetcher(`${this.api}/repos/${this.spec.owner}/${this.spec.repo}/contents/${this.full(path).split("/").map(encodeURIComponent).join("/")}`, {
+        method: "PUT",
+        headers: { ...this.headers(), "Content-Type": "application/json" },
+        body: JSON.stringify({ message: message ?? `metamedium: ${path}`, content: b64encode(toBytes(data)), branch, ...sha ? { sha } : {} })
+      });
+      if (!r.ok) throw new Error(`write ${path}: ${r.status}`);
+      const body = JSON.parse(await r.text());
+      if (body.content?.sha) this.shas.set(path, body.content.sha);
+    }
+    async appendLog(participant, events) {
+      if (!this.token) throw new ReadOnlyError(`append to ${participant}'s log`);
+      if (events.length === 0) return;
+      const path = logPathFor(participant);
+      const existing = await this.contents(path);
+      const text = (existing ? toText(existing.content) : "") + encodeLog(events);
+      await this.write(path, text, `metamedium: ${participant}, ${events.length} event${events.length === 1 ? "" : "s"}`);
+    }
+    async readLogs() {
+      if (this.shas.size === 0) await this.list();
+      const out = {};
+      for (const path of this.shas.keys()) {
+        const who = participantOfLog(path);
+        if (!who) continue;
+        const c = await this.contents(path);
+        if (c) out[who] = decodeLog(toText(c.content)).events;
       }
       return out;
     }

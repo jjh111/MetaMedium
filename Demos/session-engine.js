@@ -3868,6 +3868,22 @@
     return openStore(store, 'folder', handle.name);
   }
 
+  /**
+   * A repository as the folder (ARCHITECTURE-v8 §18): `owner/repo`,
+   * `owner/repo@branch`, `owner/repo/some/dir`. Reads need no token; writes
+   * need one the user has pasted, held on this device only when asked.
+   */
+  const GIT_TOKEN_KEY = 'mm-git-token';
+  async function openGit(spec, token, remember) {
+    const parsed = MM.parseGitSpec(spec);
+    if (!parsed) { flash('a repository is owner/repo, owner/repo@branch or owner/repo/dir'); return null; }
+    let tok = token;
+    if (!tok) { try { tok = localStorage.getItem(GIT_TOKEN_KEY) || undefined; } catch (err) { tok = undefined; } }
+    if (token && remember) { try { localStorage.setItem(GIT_TOKEN_KEY, token); } catch (err) { /* private mode */ } }
+    const store = new MM.GitStore(parsed, (url, init) => fetch(url, init), tok);
+    return openStore(store, 'git', spec);
+  }
+
   async function openStatic(base) {
     const store = new MM.StaticStore(base, (url) => fetch(url));
     return openStore(store, 'static', base);
@@ -3988,7 +4004,7 @@
   function folderStatus() {
     if (!folder.store) return '';
     const n = folder.entries.length;
-    return (folder.how === 'static' ? 'site' : 'folder') + (folder.name ? ' ' + folder.name : '') + ' · ' + n + ' file' + (n === 1 ? '' : 's') +
+    return (folder.how === 'static' ? 'site' : folder.how === 'git' ? 'repo' : 'folder') + (folder.name ? ' ' + folder.name : '') + ' · ' + n + ' file' + (n === 1 ? '' : 's') +
       (folder.truncated ? '+' : '') + (folder.error ? ' · ' + folder.error : folder.store.capabilities().write ? (folder.saving ? ' · saving' : ' · saved') : ' · read-only');
   }
 
@@ -4410,6 +4426,7 @@
     importBitmap: importBitmap, importText: importText, exportBoardSVG: exportBoardSVG, exportLog: exportLog,
     // The folder, for tests: open any store (a MemoryStore stands in for a folder), and read the board's home.
     openStore: (store, how, name) => openStore(store, how, name),
+    openGit: (spec, token, remember) => openGit(spec, token, remember),
     folder: () => folder,
     setParticipant: setParticipant,
     forgetLocalLog: forgetLocalLog,
@@ -4440,11 +4457,17 @@
     rejoinRemembered();
     if (restored) flash('your last board is back — Reset starts a fresh one');
     if (params.get('folder')) openStatic(params.get('folder'));
+    else if (params.get('git')) openGit(params.get('git'));
   } else {
     startReplay(replayUrl);
   }
   session.subscribe(scheduleSave);
   document.fonts.ready.then(() => { sizePad(); render(session.getState()); });
+  // Installable, and open with no network: the shell is cached by a service
+  // worker when the page is served, never from a file on disk.
+  if ('serviceWorker' in navigator && /^https?:/.test(location.protocol) && !params.has('nosw')) {
+    navigator.serviceWorker.register('sw.js').catch(() => { /* not available here; the page works the same */ });
+  }
   resize();
   afterViewChange();
 })();

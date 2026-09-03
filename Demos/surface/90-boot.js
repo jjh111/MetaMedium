@@ -24,6 +24,7 @@
     importBitmap: importBitmap, importText: importText, exportBoardSVG: exportBoardSVG, exportLog: exportLog,
     // The folder, for tests: open any store (a MemoryStore stands in for a folder), and read the board's home.
     openStore: (store, how, name) => openStore(store, how, name),
+    openGit: (spec, token, remember) => openGit(spec, token, remember),
     folder: () => folder,
     setParticipant: setParticipant,
     forgetLocalLog: forgetLocalLog,
@@ -54,10 +55,16 @@
     rejoinRemembered();
     if (restored) flash('your last board is back — Reset starts a fresh one');
     if (params.get('folder')) openStatic(params.get('folder'));
+    else if (params.get('git')) openGit(params.get('git'));
   } else {
     startReplay(replayUrl);
   }
   session.subscribe(scheduleSave);
   document.fonts.ready.then(() => { sizePad(); render(session.getState()); });
+  // Installable, and open with no network: the shell is cached by a service
+  // worker when the page is served, never from a file on disk.
+  if ('serviceWorker' in navigator && /^https?:/.test(location.protocol) && !params.has('nosw')) {
+    navigator.serviceWorker.register('sw.js').catch(() => { /* not available here; the page works the same */ });
+  }
   resize();
   afterViewChange();

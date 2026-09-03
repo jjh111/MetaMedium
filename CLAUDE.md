@@ -650,7 +650,12 @@ board back and *Reset* forgets it. A static site is opened read-only through
 `.metamedium/manifest.json` (`?folder=<base>`), so a published canvas can be
 drawn on and the ink stays the reader's. **The live budget**: the nearest
 twelve live artifacts render; the rest stand as parked cards. Grid and
-focus are lenses over the same log. **Loops do not depend on paint**: a tab
+focus are lenses over the same log. **A repository is a folder too**
+(`store/git.ts`, `?git=owner/repo`): the tree in one request, files by
+path, this participant's log committed as one file; reads need no token,
+writes need one the user pasted. **The page is installable**: a manifest
+and a service worker cache the shell for offline; every request is
+network-first with the cache as the fallback. **Loops do not depend on paint**: a tab
 the browser stops painting gets no animation frames, so the tank and the
 worker take a timer's tick when no frame comes (`nextFrame` in
 `01-view.js`) — time is state, not a movie.

@@ -97,6 +97,8 @@ export type { Store, Entry, Capabilities } from './store/seam';
 export { StaticStore, MANIFEST_PATH } from './store/static';
 export type { Fetcher, Manifest } from './store/static';
 export { FolderStore, SKIP_DIRS, DEFAULT_FILE_LIMIT } from './store/folder';
+export { GitStore, parseGitSpec, GITHUB_API } from './store/git';
+export type { GitFetcher, GitSpec } from './store/git';
 export type { DirHandleLike, FileHandleLike, FileLike, WritableLike } from './store/folder';
 
 // Structural signatures: what a group IS as shapes and the links between them,

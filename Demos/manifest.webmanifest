@@ -1,0 +1,19 @@
+{
+  "name": "MetaMedium",
+  "short_name": "MetaMedium",
+  "description": "Ink over living artifacts: an infinite canvas where drawings become code you can pause and argue with.",
+  "start_url": "./session-engine.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0a0a0f",
+  "theme_color": "#0a0a0f",
+  "icons": [
+    {
+      "src": "data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect width='192' height='192' rx='36' fill='%230a0a0f'/%3E%3Cpath d='M40 132 L68 60 L96 132 L124 60 L152 132' fill='none' stroke='%23c9a84c' stroke-width='12' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
