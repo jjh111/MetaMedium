@@ -139,6 +139,7 @@ window.__setup = function(){
 window.__scenario = async function(){
   const t = window.__t, mm = window.__mm, MM = mm.MM;
   const R = { steps: [], pass: true }; window.__Rlive = R;
+  const codeRepOfNode = (n) => { for (let i = n.reps.length - 1; i >= 0; i--) if (n.reps[i].modality === 'code') return n.reps[i]; return null; };
   const step = (name, ok, detail) => { R.steps.push({name, ok: !!ok, detail}); if(!ok) R.pass=false; return ok; };
   const wait = (ms) => new Promise(r=>setTimeout(r, ms||250));
 
@@ -859,6 +860,50 @@ window.__scenario = async function(){
     const frames = stL.artifacts.filter(id => MM.isFrame(stL.nodes.get(id)));
     const f2 = frames.length === 2 && MM.frameOfNode(stL.nodes.get(frames[1]));
     step('22i. applying it wires the new pair the same way', !!f2 && f2.connections.length === 1 && f2.connections[0].to.port === 'param:SPEED' && /as in rig/.test(f2.connections[0].reasoning), f2);
+  }
+
+  // ---- 24. A picture becomes ink, and the ink becomes a page inside itself ----
+  {
+    mm.setView(1, 260 - 9200, 200 - 2000); await wait(30);
+    // A "photo" of three boxes: painted here, uneven ground and a wobbling line.
+    const W0 = 300, H0 = 200;
+    const off = document.createElement('canvas'); off.width = W0; off.height = H0;
+    const g = off.getContext('2d');
+    const grad = g.createLinearGradient(0, 0, W0, 0); grad.addColorStop(0, '#e9e6de'); grad.addColorStop(1, '#cfcabd');
+    g.fillStyle = grad; g.fillRect(0, 0, W0, H0);
+    g.strokeStyle = '#2a2620'; g.lineWidth = 3; g.lineJoin = 'round';
+    const wob = (x, y) => [x + Math.sin(y * 0.3) * 0.8, y + Math.cos(x * 0.2) * 0.8];
+    const box = (x, y, w, h) => { g.beginPath(); g.moveTo(...wob(x, y)); g.lineTo(...wob(x + w, y)); g.lineTo(...wob(x + w, y + h)); g.lineTo(...wob(x, y + h)); g.closePath(); g.stroke(); };
+    box(20, 20, 260, 40); box(20, 80, 120, 100); box(160, 80, 120, 100);
+    const bitmap = g.getImageData(0, 0, W0, H0);
+    const before = mm.session.getState().contentIds.length;
+    const res = mm.importBitmap(bitmap, 'sketch.png', { x: 9200, y: 2000 }, { size: 600, url: off.toDataURL('image/png') });
+    const stP = mm.session.getState();
+    const traced = stP.contentIds.slice(before).filter(id => MM.strokePointsOf(stP.nodes.get(id)));
+    const reads = traced.map(id => MM.topInterpretation(stP.nodes.get(id)));
+    step('24. a picture of three boxes is traced into three rectangles of ink, and the picture is kept beside them', res.strokes === 3 && reads.filter(r => r === 'rectangle').length === 3 && !!res.imageId && stP.artifacts.includes(res.imageId), { reads, reasoning: res.reasoning });
+    // Declared content: the traced boxes never read as a loop or a mark.
+    step('24a. traced ink is declared content — nothing waits as a loop', stP.pendingLassoId === null && !stP.summon);
+    // Circle the traced ink and prompt it into a page: the page renders inside its own ink.
+    const cP = mm.worldToScreen(9500, 2200);
+    t.stroke(t.circle(cP.x, cP.y, 340));
+    t.takeLoop(cP.x, cP.y, 340); await wait(60);
+    const makeP = [...document.querySelectorAll('#summon .item')].find(b => b.textContent.trim().startsWith('Describe it'));
+    if (makeP) makeP.click();
+    const inputP = document.querySelector('#summon input.make');
+    if (inputP) { inputP.value = 'a page with a banner and two columns'; inputP.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); }
+    await wait(400);
+    const stQ = mm.session.getState();
+    const pageId = stQ.live.find(id => { const r = codeRepOfNode(stQ.nodes.get(id)); return r && r.data.kind === 'html' && stQ.nodes.get(id).edges.some(e => e.rel === 'has-part' && traced.includes(e.to)); });
+    const regions = pageId ? MM.regionsOf(stQ.nodes.get(pageId), stQ.nodes) : [];
+    step('24b. the traced ink prompts into a living page inside its own ink: three regions, one per box', !!pageId && regions.length === 3, { pageId, regions: regions.length, live: stQ.live.length, mp: document.getElementById('mpStatus').textContent, summon: !!stQ.summon, enclosed: stQ.summon && stQ.summon.enclosedIds.length, hadMake: !!makeP, hadInput: !!inputP, lastSys: (window.__calls.slice(-1)[0] || {}).system, traced: traced.length, participants: stQ.participants, agentId: mm.agents.map(a => a.id), artifacts: stQ.artifacts.slice(-2) });
+    // SVG in, and the board out.
+    const svgId = mm.importText('figure.svg', '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 60"><rect x="5" y="5" width="40" height="50"/><circle cx="75" cy="30" r="20"/></svg>', { x: 9200, y: 2700 });
+    const svgNode = svgId && mm.session.getState().nodes.get(svgId);
+    step('24c. an SVG file is an artifact of its kind, its elements addressable', !!svgNode && codeRepOfNode(svgNode).data.kind === 'svg' && MM.addressablesOf('svg', codeRepOfNode(svgNode).data.code).length === 2);
+    const svgOut = mm.exportBoardSVG();
+    const logOut = JSON.parse(mm.exportLog());
+    step('24d. the board exports as SVG paths, one per stroke, and the session as its log', /<path data-node="/.test(svgOut) && (svgOut.match(/<path /g) || []).length >= 3 && Array.isArray(logOut) && logOut.length === mm.session.getEvents().length, { paths: (svgOut.match(/<path /g) || []).length });
   }
 
   // ---- 11. Scratch-out erase ----

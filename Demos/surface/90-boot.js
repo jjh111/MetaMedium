@@ -18,6 +18,8 @@
     resetUses: () => { for (const k of Object.keys(uses)) delete uses[k]; store.del(USES_KEY); },
     // The worker runtime, for tests: what is loaded, where each body is, what broke.
     runtime: () => ({ bodies: runtime.bodies, broken: runtime.broken, loaded: runtime.loaded, budgetMs: RUN_BUDGET_MS, log: runtime.log, pending: runtime.pending, stepOnce: stepOnce }),
+    // Pictures in and the board out, for tests.
+    importBitmap: importBitmap, importText: importText, exportBoardSVG: exportBoardSVG, exportLog: exportLog,
     // The folder, for tests: open any store (a MemoryStore stands in for a folder), and read the board's home.
     openStore: (store, how, name) => openStore(store, how, name),
     folder: () => folder,

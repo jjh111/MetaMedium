@@ -67,7 +67,7 @@ any structural change.
 | `doodle2-canvas.html` | **Flagship demo**: heuristic recognition, spatial graph, library, undo/redo, touch. No LLM. Single-file (~500KB) |
 | `metadoodle1.html` | Fork of flagship + tiered LLM recognition (WebLLM in-browser, LM Studio local API) + voice. Single-file (~600KB) |
 | `Web App Skeleton/` | React + Vite + TypeScript + Zustand rebuild; Claude API interpreter skeleton in `src/llm/`; recognition/spatial/matching in `src/core/` |
-| `Demos/surface/` | **The reference surface's source**: `surface.css` and eighteen script fragments (`00-core` … `17-folder`, then `90-boot`, which must stay last), one concern each, concatenated in name order into one closure by `Demos/build-surface.mjs` → the committed `Demos/session-engine.js` (CI checks it has not drifted). Fragments share the closure's variables — no imports; each fragment's header says what it provides and uses. Edit a fragment, run the build, commit both |
+| `Demos/surface/` | **The reference surface's source**: `surface.css` and nineteen script fragments (`00-core` … `18-images`, then `90-boot`, which must stay last), one concern each, concatenated in name order into one closure by `Demos/build-surface.mjs` → the committed `Demos/session-engine.js` (CI checks it has not drifted). Fragments share the closure's variables — no imports; each fragment's header says what it provides and uses. Edit a fragment, run the build, commit both |
 | `Demos/` | **`session-engine.html` is the MVP surface** (it links `surface/surface.css` and loads `session-engine.js`) — infinite canvas, the taught command mark, living artifacts in a DOM overlay, ink-over-artifact addressing, "why" inspector, model participants, canvas answers. Uses the committed `metamedium-core.browser.js` bundle. **`session-engine.e2e.js`** drives the whole loop through the real UI with a stubbed model (browser console; not part of `npm test`). `build-standalone.mjs` inlines the bundle into a single shareable file. Plus fish, composition diagrams, no-modes graph, etc. |
 | `skills/` | Claude Code skills: `metamedium-code` (code patterns), `metamedium-design` (design principles) |
 | `Assets/` | Figures and design rationale (recognition strategy, point-primitive proposal) |
@@ -688,8 +688,12 @@ ink spacing**: the engine measures along the path, and a polyline that is
 only its corners has nothing between them to measure, so a perfect traced box
 read as a circle until it was given the density a hand leaves. Every result
 carries its reasoning (the threshold, the ink fraction, how many flecks were
-dropped). The surface side — import, placement, the raster as an artifact —
-is WP-9b.
+dropped). On the surface (`18-images.js`) a picture arrives by drop, paste,
+*Import…* or a phone's camera, lands as declared ink at the drop point with
+the raster kept beside it as an image artifact, and can then be circled and
+prompted into a page inside its own ink; an SVG or any file of a known kind
+becomes an artifact of its kind. *Export…* writes the board as SVG or PNG
+or the session as its log, and the panel saves any artifact's code.
 
 ### The model holds a pen (the conversation benchmark's other half)
 

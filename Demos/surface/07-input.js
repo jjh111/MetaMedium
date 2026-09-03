@@ -200,6 +200,16 @@
       const rep = n && MM.behavioursOf(n)[Number(b.getAttribute('data-index'))];
       if (rep) session.behave({ nodeId: id, behaviour: { terms: rep.data.terms, source: rep.data.source, speed: rep.data.speed }, participantId: MM.LOCAL_PARTICIPANT, at: Date.now() });
     }
+    else if (act === 'export-code') {
+      const n = state.nodes.get(id);
+      const rep = n && codeRepOf(n);
+      if (rep) {
+        const kind = rep.data.kind || 'html';
+        const wired = wiredCodeOf(state, id);
+        const ext = kind === 'text' ? 'txt' : kind;
+        downloadText((MM.wordOf(n) || id).replace(/[^A-Za-z0-9._-]+/g, '-') + '.' + ext, wired !== null ? wired : rep.data.code, MM.rowOf(kind).mime);
+      }
+    }
     else if (act === 'behave-drop') session.behave({ nodeId: id, behaviour: { terms: [{ verb: 'wander', weight: 1 }, { verb: 'hold', weight: 0.35 }], source: 'hand' }, participantId: MM.LOCAL_PARTICIPANT, at: Date.now() });
     else session.snap({ ids: [id], mode: 'raw', at: Date.now() });
   });
