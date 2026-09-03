@@ -574,6 +574,14 @@ fingerprint carries it, so the model is asked to *read*, not to interpret.
   small *on screen*), a crossbar or a dot counts by its centre, and the
   grouping is inferred: erasing a letter shrinks the word, one letter left
   dissolves it, and the inspector's *not a word — split it* undoes it.
+  **A word starts from a stroke the shape rung could not place.** Two
+  confident shapes side by side never start one (a confident rectangle or
+  triangle never joins one at all); an O or an l may *join* a word being
+  written, and the word gathers back the letter-like strokes written just
+  before it. Found the hard way: at hand size, three bubbles and two lines
+  drawn quickly are exactly a run of small strokes on one line, and the
+  earlier rule folded the whole canonical loop into one word — after which
+  the lasso and the mark had nothing to act on.
 - `propose()` carries `reps` as well as edges, so a transcript is held through
   the same channel as every other reading and undo drops it.
 

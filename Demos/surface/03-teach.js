@@ -18,6 +18,10 @@
   const teachDots = [...document.querySelectorAll('#teachDots i')];
   let samples = [];
   let padStroke = null;
+  // True while the pad shows the five a HELD mark learned from. Drawing on a
+  // full pad then starts a fresh set rather than being ignored: a pad that
+  // swallows strokes until you find Clear is a mode with extra steps.
+  let samplesHeld = false;
 
   function sizePad() {
     const dpr = window.devicePixelRatio || 1;
@@ -49,6 +53,10 @@
 
   pad.addEventListener('pointerdown', (e) => {
     capture(pad, e);
+    if (samplesHeld || samples.length >= MM.COMMAND_MARK_SAMPLES) {
+      samples = []; samplesHeld = false; teachUse.disabled = true;
+      teachStatus.className = ''; teachStatus.textContent = '';
+    }
     const r = pad.getBoundingClientRect();
     padStroke = [{ x: e.clientX - r.left, y: e.clientY - r.top }];
   });
@@ -122,7 +130,7 @@
   function forgetMark() {
     try { localStorage.removeItem(MARK_KEY); } catch (err) { /* nothing to forget */ }
     session.teachCommandMark(null, Date.now());
-    samples = []; taughtGlyph = null;
+    samples = []; samplesHeld = false; taughtGlyph = null;
     teachUse.disabled = true;
     drawPad();
     showPadState();
@@ -131,9 +139,12 @@
   function restoreMark() {
     const saved = savedMark();
     if (!saved || !saved.mark) return false;
-    session.teachCommandMark(saved.mark, Date.now());
+    // The glyph before the event: teaching re-renders at once, and the rail
+    // chip is drawn in that render — from whatever glyph is held at the time.
     samples = Array.isArray(saved.samples) ? saved.samples : [];
+    samplesHeld = samples.length > 0;
     taughtGlyph = samples.length ? samples[samples.length - 1] : null;
+    session.teachCommandMark(saved.mark, Date.now());
     return true;
   }
 
@@ -146,7 +157,7 @@
         'To replace it, <b>Clear</b> and draw a new one five times. <b>Forget</b> goes back to ✓.';
       teachStatus.className = '';
       teachStatus.textContent = samples.length
-        ? 'Held on this device. These are the five it learned from.'
+        ? 'Held on this device. These are the five it learned from — draw here to start a new one.'
         : 'Held on this device.';
     } else {
       teachHint.innerHTML = 'The canvas watches for a <b>check ✓</b> until you replace it. Draw your own mark ' +
@@ -159,15 +170,16 @@
   teachUse.onclick = () => {
     if (samples.length < MM.COMMAND_MARK_SAMPLES) return;
     const mark = MM.learnCommandMark(samples, 'your mark');
-    session.teachCommandMark(mark, Date.now());
     taughtGlyph = samples[samples.length - 1];
+    samplesHeld = true;
+    session.teachCommandMark(mark, Date.now());
     rememberMark(mark, samples);
     showPadState();
     teachStatus.textContent = 'Learned, and held on this device. The check ✓ no longer summons — your mark does.';
     render(session.getState());
   };
   document.getElementById('teachClear').onclick = () => {
-    samples = []; teachUse.disabled = true; teachStatus.textContent = ''; drawPad();
+    samples = []; samplesHeld = false; teachUse.disabled = true; teachStatus.textContent = ''; drawPad();
     if (session.getState().commandMark) {
       teachStatus.textContent = 'Draw the new mark five times. Your held mark stays until you use the new one.';
     }
@@ -187,15 +199,13 @@
   // Driven from session state rather than from the teach button, so undoing the
   // teach event puts the check back in the rail. A chip that disagrees with the
   // grammar is worse than no chip.
-  let shownMark = undefined;
+  let shownMark = undefined, shownGlyph = undefined;
   function syncMarkChip(s) {
     const name = s.commandMark ? s.commandMark.name : 'check';
-    if (shownMark === name) return;
-    shownMark = name;
-    drawMarkChip(
-      s.commandMark && taughtGlyph ? taughtGlyph : MM.canonicalCheckSamples()[0],
-      name
-    );
+    const glyph = s.commandMark && taughtGlyph ? taughtGlyph : MM.canonicalCheckSamples()[0];
+    if (shownMark === name && shownGlyph === glyph) return;
+    shownMark = name; shownGlyph = glyph;
+    drawMarkChip(glyph, name);
   }
 
   function drawMarkChip(pts, name) {

@@ -4223,14 +4223,32 @@ ${pad}</${tag}>`;
         reasoning: `${letterIds.length} small strokes in a row on one line \u2014 printed letters`
       });
     }
-    function looksLikeShape(n2) {
+    const SHAPE_NOT_LETTER = 0.72;
+    function topShape(n2) {
       const top = resemblances(n2)[0];
-      if (!top) return false;
-      const t = top.to.replace(/^type:/, "");
-      return (t === "rectangle" || t === "triangle") && (top.weight ?? 0) >= 0.72;
+      if (!top) return null;
+      return { type: top.to.replace(/^type:/, ""), weight: top.weight ?? 0 };
+    }
+    function neverLetter(n2) {
+      const t = topShape(n2);
+      return !!t && (t.type === "rectangle" || t.type === "triangle") && t.weight >= SHAPE_NOT_LETTER;
+    }
+    function shapeAlone(n2) {
+      const t = topShape(n2);
+      return !!t && t.type !== "text" && t.type !== "art" && t.weight >= SHAPE_NOT_LETTER;
+    }
+    function letterCandidate(id, scale) {
+      const n2 = nodes.get(id);
+      if (!n2 || isWord(n2) || getRep(n2, "gesture") || pendingLasso?.id === id) return null;
+      const fp = fingerprintOf(n2);
+      const st = getRep(n2, "stroke")?.data;
+      if (!fp || !st) return null;
+      const sc = st.scale ?? scale;
+      if (!isLetterLike(fp.bounds, sc) || neverLetter(n2)) return null;
+      return { node: n2, bounds: fp.bounds, at: st.at, scale: sc };
     }
     function absorbIntoWord(node, fp, at, scale) {
-      if (!isLetterLike(fp.bounds, scale) || looksLikeShape(node)) return false;
+      if (!isLetterLike(fp.bounds, scale) || neverLetter(node)) return false;
       const prevId = contentIds.filter((id) => id !== node.id).pop();
       if (!prevId) return false;
       const prev = nodes.get(prevId);
@@ -4246,22 +4264,32 @@ ${pad}</${tag}>`;
         removeFromContent(node.id);
         return true;
       }
-      const prevFp = fingerprintOf(prev);
-      const prevStroke = getRep(prev, "stroke")?.data;
-      if (!prevFp || !prevStroke || getRep(prev, "gesture")) return false;
-      if (pendingLasso?.id === prev.id) return false;
-      if (!isLetterLike(prevFp.bounds, prevStroke.scale ?? scale) || looksLikeShape(prev)) return false;
-      const j = joinsRun({ bounds: prevFp.bounds, lastAt: prevStroke.at }, letter, scale);
+      const first = letterCandidate(prevId, scale);
+      if (!first) return false;
+      if (shapeAlone(node) && shapeAlone(prev)) return false;
+      const j = joinsRun({ bounds: first.bounds, lastAt: first.at }, letter, scale);
       if (!j.ok) return false;
+      const run = [first];
+      let bounds = first.bounds;
+      const ordered2 = contentIds.filter((id) => id !== node.id);
+      for (let i = ordered2.indexOf(prevId) - 1; i >= 0; i--) {
+        const cand = letterCandidate(ordered2[i], scale);
+        if (!cand) break;
+        const back = joinsRun({ bounds, lastAt: cand.at }, { bounds: cand.bounds, at: run[0].at }, cand.scale);
+        if (!back.ok) break;
+        run.unshift(cand);
+        bounds = { minX: Math.min(bounds.minX, cand.bounds.minX), minY: Math.min(bounds.minY, cand.bounds.minY), maxX: Math.max(bounds.maxX, cand.bounds.maxX), maxY: Math.max(bounds.maxY, cand.bounds.maxY) };
+      }
+      const letterIds = run.map((r) => r.node.id).concat(node.id);
       const word = { id: nextId("word"), reps: [], edges: [{ to: LOCAL_PARTICIPANT, rel: "made-by" }], capability: 0, createdAt: at };
       nodes.set(word.id, word);
-      setWordReps(word, [prev.id, node.id]);
-      for (const id of [prev.id, node.id]) {
+      setWordReps(word, letterIds);
+      for (const id of letterIds) {
         nodes.get(id).edges.push({ to: word.id, rel: "part-of", reasoning: j.reasoning });
       }
-      const idx = contentIds.indexOf(prev.id);
+      const idx = contentIds.indexOf(letterIds[0]);
       contentIds.splice(idx, 1, word.id);
-      removeFromContent(node.id);
+      for (const id of letterIds.slice(1)) removeFromContent(id);
       if (pendingLasso?.id === node.id) pendingLasso = null;
       return true;
     }

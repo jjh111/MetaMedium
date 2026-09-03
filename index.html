@@ -22,38 +22,67 @@
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400;1,9..40,500&family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,300;0,400;0,500;0,600;1,400;1,500&display=swap" rel="stylesheet">
     <style>
         /* ===========================================
-           MetaMedium Design System v4
-           Warm Palette · Space Grotesk Headings
-           WCAG AA Compliant
+           MetaMedium Design System v5
+           brand/tokens.css is the single home. Warm paper, cool sea
+           ink, one teal keyword, IBM Plex Mono throughout, colour
+           only where the engine is making a claim.
+           WCAG AA
         =========================================== */
         
+        /* ==========================================================
+           The MetaMedium visual system — brand/tokens.css is the
+           single home; these are that file's values under the
+           names this page already uses, so every component below
+           inherits the system without being rewritten.
+           Change a value in brand/tokens.css FIRST.
+           ========================================================== */
         :root {
-            --ink: #1a1a2e;
-            --ink-soft: #2d2d3a;
-            --paper: #f8f6f1;
-            --paper-warm: #f3f1ec;
-            --accent: #e63946;
-            --accent-hover: #c62f3b;
-            --muted: #4a4a5a;
-            --muted-light: #6b7280;
-            --highlight: #fef3c7;
-            --sketch-blue: #3b82f6;
-            --sketch-green: #22c55e;
-            --sketch-purple: #8b5cf6;
-            --border: #d1d5db;
-            --shadow: rgba(0,0,0,0.08);
-            --focus: #3b82f6;
-            
-            --text-xs: 0.8125rem;
-            --text-sm: 0.9375rem;
-            --text-base: 1.125rem;
-            --text-lg: 1.3125rem;
-            --text-xl: 1.625rem;
-            --text-2xl: 2rem;
-            --text-3xl: 2.5rem;
+            --ink: #0c1a24;
+            --ink-soft: #33424b;
+            --paper: #f8f5ef;
+            --paper-warm: #efeae0;
+            --paper-lt: #fdfbf6;
+            --accent: #0b6f7d;
+            --accent-hover: #084e58;
+            --muted: #33424b;
+            --muted-light: #66737c;
+            --highlight: rgba(11,111,125,0.15);
+
+            /* what the engine knows — signal, never decoration */
+            --sketch-blue: #1c5fb8;      /* read / accepted   */
+            --sketch-green: #0b6f7d;     /* high confidence — teal, not green */
+            --sketch-purple: #6b4fa8;    /* a model said it   */
+            --sig-mid: #a3761c;
+            --sig-low: #a8493c;
+            --sig-held: #7b8a94;
+
+            /* the one categorical scale: timeline threads */
+            --thread-vision: #0b6f7d;
+            --thread-recog: #6b4fa8;
+            --thread-intel: #1c5fb8;
+            --thread-conv: #a3761c;
+
+            --border: #ded6c8;
+            --rule-soft: #ebe5da;
+            --shadow: rgba(60,48,32,0.06);
+            --focus: #0b6f7d;
+
+            /* one face carries display, prose, UI and code */
+            --face: 'IBM Plex Mono', 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
+
+            --radius: 5px;
+            --radius-sm: 3px;
+
+            --text-xs: 0.78rem;
+            --text-sm: 0.91rem;
+            --text-base: 1.06rem;
+            --text-lg: 1.22rem;
+            --text-xl: 1.5rem;
+            --text-2xl: 1.85rem;
+            --text-3xl: 2.3rem;
             
             --space-xs: 0.375rem;
             --space-sm: 0.75rem;
@@ -65,7 +94,8 @@
         
         *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
         
-        html { scroll-behavior: smooth; font-size: 100%; overflow-x: hidden; }
+        /* 17px base: mono needs the extra step, and it matches the styleguide. */
+        html { scroll-behavior: smooth; font-size: 17px; overflow-x: hidden; }
         
         @media (prefers-reduced-motion: reduce) {
             html { scroll-behavior: auto; }
@@ -77,7 +107,7 @@
         }
         
         body {
-            font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            font-family: var(--face);
             font-size: var(--text-base);
             font-weight: 450;
             line-height: 1.7;
@@ -113,7 +143,7 @@
             padding: var(--space-lg) var(--space-sm) 0;
             position: relative;
             overflow: hidden;
-            background: #0a1628;
+            background: #131315;
         }
         
         /* Gradient transition to content - simple fade */
@@ -121,7 +151,7 @@
             content: '';
             position: absolute;
             bottom: 0; left: 0; right: 0;
-            height: 40px;
+            height: 48px;
             background: linear-gradient(to bottom, transparent 0%, var(--paper) 100%);
             z-index: 3;
             pointer-events: none;
@@ -144,10 +174,10 @@
             display: flex;
             align-items: center;
             gap: 0.5rem;
-            font-family: 'DM Sans', sans-serif;
+            font-family: var(--face);
             font-size: 0.9rem;
             font-weight: 500;
-            color: rgba(147, 197, 253, 0.4);
+            color: rgba(134, 132, 126, 0.95);
             text-transform: uppercase;
             letter-spacing: 0.15em;
             transition: opacity 0.3s;
@@ -184,50 +214,47 @@
         }
         
         .hero h1 {
-            font-family: 'Space Grotesk', -apple-system, sans-serif;
+            font-family: var(--face);
             font-size: clamp(3rem, 10vw, 5.5rem);
-            font-weight: 700;
-            letter-spacing: -0.03em;
+            font-weight: 500;
+            letter-spacing: -0.035em;
             line-height: 1;
             margin-bottom: var(--space-sm);
-            color: #ebebeb;
+            color: #e7e5e0;
         }
         
-        .hero h1 .meta {
-            background: linear-gradient(135deg, #f97316 0%, #a855f7 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
+        /* One teal half, no gradient: the wordmark's rule is that Medium is
+           the accent and Meta is the ink (brand/styleguide.html §04). */
+        .hero h1 .meta { color: #6fb3b8; }
         
         .hero .tagline {
-            font-family: 'DM Sans', sans-serif;
+            font-family: var(--face);
             font-size: var(--text-base);
             font-weight: 500;
-            color: rgba(147, 197, 253, 0.7);
-            letter-spacing: 0.45em;
+            color: rgba(111, 179, 184, 0.85);
+            letter-spacing: 0.4em;
             text-transform: uppercase;
             margin-bottom: var(--space-sm);
         }
         
         .hero .subtitle {
-            font-family: Georgia, serif;
+            font-family: var(--face);
             font-size: clamp(1.1rem, 2.2vw, 1.4rem);
             font-weight: 400;
             font-style: italic;
-            color: rgba(255, 255, 255, 0.651);
-            max-width: 550px;
+            color: rgba(181, 179, 173, 0.95);
+            max-width: 560px;
             margin: 0 auto var(--space-sm);
             line-height: 1.4;
         }
         
         .hero .byline { 
             font-size: var(--text-sm); 
-            color: rgba(255, 255, 255, 0.75); 
+            color: rgba(181, 179, 173, 0.9); 
             font-weight: 500;
         }
         .hero .byline .role { 
-            color: rgba(255, 255, 255, 0.45);
+            color: rgba(134, 132, 126, 0.9);
             font-weight: 400;
             margin-left: 0.25em;
         }
@@ -256,15 +283,15 @@
         }
         
         @keyframes strokeGlow {
-            0% { stroke: rgba(147, 197, 253, 0.3); }
-            100% { stroke: rgba(147, 197, 253, 0.9); }
+            0% { stroke: rgba(111, 179, 184, 0.3); }
+            100% { stroke: rgba(111, 179, 184, 0.9); }
         }
         
         /* Navigation - Slim with left title */
         nav {
             position: fixed;
             top: 0; left: 0; right: 0;
-            background: rgba(253, 252, 250, 0.97);
+            background: rgba(253, 251, 246, 0.96);
             backdrop-filter: blur(12px);
             z-index: 1000;
             border-bottom: 1px solid var(--border);
@@ -285,7 +312,7 @@
         }
         
         .nav-title {
-            font-family: 'Space Grotesk', -apple-system, sans-serif;
+            font-family: var(--face);
             font-size: 1rem;
             font-weight: 600;
             color: var(--ink);
@@ -334,7 +361,7 @@
         }
         
         nav a {
-            font-family: 'DM Sans', sans-serif;
+            font-family: var(--face);
             font-size: 0.6875rem;
             font-weight: 600;
             text-decoration: none;
@@ -425,7 +452,7 @@
         }
         
         h2 {
-            font-family: 'Space Grotesk', -apple-system, sans-serif;
+            font-family: var(--face);
             font-size: clamp(1.875rem, 4vw, var(--text-3xl));
             font-weight: 600;
             margin-bottom: var(--space-md);
@@ -435,7 +462,7 @@
         
         
         h3 {
-            font-family: 'Space Grotesk', -apple-system, sans-serif;
+            font-family: var(--face);
             font-size: var(--text-xl);
             font-weight: 500;
             margin: var(--space-lg) 0 var(--space-sm);
@@ -443,7 +470,7 @@
         }
         
         h4 {
-            font-family: 'Space Grotesk', -apple-system, sans-serif;
+            font-family: var(--face);
             font-size: var(--text-lg);
             font-weight: 600;
             margin: var(--space-md) 0 var(--space-xs);
@@ -468,7 +495,7 @@
         
         /* Blockquotes - v1 elegant style with gradient */
         blockquote {
-            font-family: 'DM Sans', sans-serif;
+            font-family: var(--face);
             font-size: 1.2rem;
             font-weight: 400;
             font-style: italic;
@@ -482,7 +509,7 @@
         
         blockquote cite {
             display: block;
-            font-family: 'DM Sans', sans-serif;
+            font-family: var(--face);
             font-style: normal;
             font-size: var(--text-sm);
             font-weight: 500;
@@ -511,10 +538,10 @@
        them in brand/tokens.css first.
        ========================================================== */
         :root {
-            --mm-face: 'IBM Plex Mono', 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
-            --mm-teal: #0b6f7d;
-            --mm-ink: #0c1a24;
-            --mm-ink-3: #66737c;
+            --mm-face: var(--face);
+            --mm-teal: var(--accent);
+            --mm-ink: var(--ink);
+            --mm-ink-3: var(--muted-light);
             --mm-ink-4: #9aa3a7;
             --sig-read: #1c5fb8;
             --sig-held: #7b8a94;
@@ -575,7 +602,7 @@
         figcaption {
             padding: var(--fig-pad);
             border-top: 1px solid var(--fig-rule);
-            font-family: 'DM Sans', sans-serif;
+            font-family: var(--face);
             font-size: 0.95rem;
             line-height: 1.55;
             color: var(--mm-ink-3);
@@ -704,7 +731,7 @@
             color: var(--ink);
             border-bottom: 1px solid var(--border);
             padding: var(--space-sm) var(--space-md);
-            font-family: 'Space Grotesk', sans-serif;
+            font-family: var(--face);
             font-weight: 600;
             display: flex;
             justify-content: space-between;
@@ -733,7 +760,7 @@
         }
         .principle-now strong { color: var(--ink); font-weight: 600; }
         code {
-            font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+            font-family: var(--face);
             font-size: 0.9em;
             background: var(--paper-warm);
             border: 1px solid var(--border);
@@ -777,7 +804,7 @@
             align-items: start;
         }
         .genealogy-item .year {
-            font-family: 'Space Grotesk', sans-serif;
+            font-family: var(--face);
             font-size: var(--text-base);
             font-weight: 600;
             color: var(--accent);
@@ -944,7 +971,7 @@
             position: absolute;
             top: -15px;
             right: 15px;
-            font-family: 'Space Grotesk', sans-serif;
+            font-family: var(--face);
             font-size: 5rem;
             font-weight: 700;
             color: rgba(26, 26, 46, 0.04);
@@ -953,7 +980,7 @@
         }
         .principle h4 {
             margin-top: 0;
-            font-family: 'Space Grotesk', sans-serif;
+            font-family: var(--face);
             font-size: var(--text-lg);
             font-weight: 600;
         }
@@ -1002,7 +1029,7 @@
             justify-content: center;
         }
         .footer-title {
-            font-family: 'Space Grotesk', -apple-system, sans-serif;
+            font-family: var(--face);
             font-size: var(--text-lg);
             font-weight: 600;
             margin-bottom: var(--space-xs);
@@ -1025,7 +1052,7 @@
         }
         footer a:hover { opacity: 1; }
         footer .version {
-            font-family: 'DM Sans', sans-serif;
+            font-family: var(--face);
             font-size: var(--text-xs);
             font-weight: 500;
             opacity: 0.45;
@@ -1054,7 +1081,7 @@
         }
 
         .demo-prompt .highlight {
-            color: #e63946;
+            color: var(--accent);
             font-weight: 600;
         }
 
@@ -1104,13 +1131,13 @@
         }
 
         .demo-label.fish {
-            background: rgba(59, 130, 246, 0.9);
-            color: white;
+            background: var(--sketch-blue);
+            color: var(--paper-lt);
         }
 
         .demo-label.food {
-            background: rgba(74, 222, 128, 0.9);
-            color: #1a1a2e;
+            background: var(--accent);
+            color: var(--paper-lt);
         }
 
         .demo-controls {
@@ -1126,11 +1153,11 @@
             font-weight: 500;
             padding: 0.625rem 1.25rem;
             border: none;
-            border-radius: 6px;
+            border-radius: var(--radius);
             cursor: pointer;
             transition: all 0.2s ease;
-            background: #1a1a2e;
-            color: white;
+            background: var(--ink);
+            color: var(--paper);
             opacity: 0;
             pointer-events: none;
         }
@@ -1141,14 +1168,14 @@
         }
 
         .demo-reset-btn:hover {
-            background: #2d2d4a;
+            background: var(--accent);
         }
 
         .demo-status {
             text-align: center;
             margin-top: 0.75rem;
-            font-size: 0.8125rem;
-            color: #666;
+            font-size: var(--text-xs);
+            color: var(--muted-light);
             min-height: 1.25rem;
         }
 
@@ -1296,7 +1323,7 @@
         .modal-counter {
             color: rgba(255, 255, 255, 0.7);
             font-size: 0.875rem;
-            font-family: 'SF Mono', 'Monaco', 'Courier New', monospace;
+            font-family: var(--face);
             min-width: 60px;
             text-align: center;
         }
@@ -1385,25 +1412,32 @@
         
         /* ===== SINGLE-COLUMN TIMELINE ===== */
         .timeline-single {
-          --visions-color: #3b82f6;
-          --recognition-color: #8b5cf6;
-          --intelligence-color: #10b981;
-          --chalktalk-color: #f59e0b;
-          --convergence-color: #f59e0b;
-          --bg: #f8f6f1;
-          --text: #1a1a2e;
-          --muted: #666;
-          --border: #d4d4d4;
-          --pipe: #999;
-          font-family: 'SF Mono', 'Monaco', 'Courier New', monospace;
-          font-size: 0.9375rem;
+          /* Threads are the one categorical scale in the system
+             (brand/styleguide.html §12). Four pigments drawn from the same
+             palette as everything else; the five saturated pills that used to
+             live here put more colour in the lineage list than in the whole
+             recognition engine. */
+          --visions-color: var(--thread-vision);
+          --recognition-color: var(--thread-recog);
+          --intelligence-color: var(--thread-intel);
+          --chalktalk-color: var(--thread-conv);
+          --convergence-color: var(--accent);
+          --bg: var(--paper-lt);
+          --text: var(--ink);
+          --muted: var(--muted-light);
+          --border: var(--border);
+          --pipe: #9aa3a7;
+          font-family: var(--face);
+          font-size: var(--text-sm);
           background: var(--bg);
-          border-radius: 12px;
+          border: 1px solid var(--border);
+          border-radius: var(--radius);
+          box-shadow: 0 1px 2px var(--shadow);
           padding: 1.5rem;
           margin: 1rem 0;
           color: var(--text);
           /* Break out of text column */
-          width: 90vw;
+          width: min(950px, calc(100vw - 3rem));
           max-width: 950px;
           margin-left: 50%;
           transform: translateX(-50%);
@@ -1417,8 +1451,9 @@
           position: relative;
         }
         .tl-year {
-          font-weight: 700;
-          font-size: 1.125rem;
+          font-weight: 500;
+          font-size: var(--text-base);
+          font-variant-numeric: tabular-nums;
           color: var(--text);
           text-align: right;
           line-height: 1.3;
@@ -1431,8 +1466,8 @@
         }
         .tl-content { padding-bottom: 0.5rem; }
         .tl-title {
-          font-weight: 700;
-          font-size: 1rem;
+          font-weight: 500;
+          font-size: var(--text-base);
           letter-spacing: 0.02em;
           margin-bottom: 0.5rem;
           color: var(--text);
@@ -1443,40 +1478,21 @@
         }
         .tl-badge {
           display: inline-block;
-          padding: 0.25rem 0.625rem;
-          border-radius: 12px;
-          font-size: 0.6875rem;
+          padding: 0.2rem 0.55rem;
+          border-radius: var(--radius-sm);
+          font-size: 0.72rem;
           font-weight: 600;
-          letter-spacing: 0.05em;
+          letter-spacing: 0.12em;
+          text-transform: uppercase;
           white-space: nowrap;
+          border: 1px solid currentColor;
+          background: none;
         }
-        .tl-badge.visions {
-          background: rgba(59, 130, 246, 0.15);
-          color: var(--visions-color);
-          border: 1px solid var(--visions-color);
-        }
-        .tl-badge.recognition {
-          background: rgba(139, 92, 246, 0.15);
-          color: var(--recognition-color);
-          border: 1px solid var(--recognition-color);
-        }
-        .tl-badge.intelligence {
-          background: rgba(16, 185, 129, 0.15);
-          color: var(--intelligence-color);
-          border: 1px solid var(--intelligence-color);
-        }
-        .tl-badge.chalktalk {
-          background: rgba(245, 158, 11, 0.15);
-          color: var(--chalktalk-color);
-          border: 1px solid var(--chalktalk-color);
-          font-size: 0.625rem;
-        }
-        .tl-badge.convergence {
-          background: rgba(245, 158, 11, 0.2);
-          color: var(--convergence-color);
-          border: 2px solid var(--convergence-color);
-          font-weight: 700;
-        }
+        .tl-badge.visions { color: var(--visions-color); }
+        .tl-badge.recognition { color: var(--recognition-color); }
+        .tl-badge.intelligence { color: var(--intelligence-color); }
+        .tl-badge.chalktalk { color: var(--chalktalk-color); }
+        .tl-badge.convergence { color: var(--convergence-color); }
         .tl-author {
           font-size: 0.9375rem;
           color: var(--text);
@@ -1490,16 +1506,15 @@
           margin-bottom: 0.5rem;
         }
         .tl-sig {
-          font-size: 0.8125rem;
-          font-style: italic;
+          font-size: var(--text-sm);
           color: var(--muted);
           line-height: 1.5;
           padding-left: 1.25rem;
         }
         .tl-convergence {
-          background: linear-gradient(135deg, rgba(59, 130, 246, 0.05), rgba(245, 158, 11, 0.08));
-          border: 2px solid var(--convergence-color);
-          border-radius: 12px;
+          background: rgba(11,111,125,0.06);
+          border: 1px solid var(--convergence-color);
+          border-radius: var(--radius);
           padding: 1.5rem;
           margin: 2rem 0;
           grid-template-columns: 1fr;
@@ -1515,12 +1530,13 @@
           font-size: 1.375rem;
           margin-bottom: 0.75rem;
         }
+        /* No left-edge accent bar: the label carries the weight the bar used to. */
         .tl-synthesis {
           margin: 1rem 0;
           padding: 1rem;
-          background: rgba(255, 255, 255, 0.5);
-          border-radius: 8px;
-          border-left: 3px solid var(--border);
+          background: var(--paper-lt);
+          border: 1px solid var(--rule-soft);
+          border-radius: var(--radius-sm);
         }
         .tl-synthesis strong { color: var(--text); }
         .tl-synthesis ul {
@@ -1552,7 +1568,7 @@
           border: 1px solid var(--border, #d4d4d4);
           border-radius: 6px;
           color: var(--muted, #666);
-          font-family: 'DM Sans', sans-serif;
+          font-family: var(--face);
           font-size: 0.875rem;
           cursor: pointer;
           transition: all 0.2s ease;
@@ -1654,7 +1670,7 @@
            behind one hairline — the same rule every other figure follows. */
         .triadic-caption {
           font-size: 0.95rem;
-          font-family: 'DM Sans', sans-serif;
+          font-family: var(--face);
           line-height: 1.55;
           color: var(--muted);
           margin: var(--fig-pad) calc(-1 * var(--fig-pad)) calc(-1 * var(--fig-pad));
@@ -3295,18 +3311,21 @@
         let ambientParticles = [];  // Floating ambient particles
         
         // Blueprint colors
+        /* The hero is the canvas surface: the system's dark ground, which is
+           a neutral grey room, with the hand's ink light and the engine's
+           readings in teal. See brand/tokens.css :root[data-theme="dark"]. */
         const colors = {
-            bg: '#0a1628',
-            grid: 'rgba(59, 130, 246, 0.08)',
-            gridAccent: 'rgba(59, 130, 246, 0.18)',
-            stroke: 'rgba(147, 197, 253, 0.85)',
-            strokeComplete: 'rgba(96, 165, 250, 0.95)',
-            ghost: 'rgba(147, 197, 253, 0.25)',
-            glyph: 'rgba(59, 130, 246, 0.25)',
-            glyphActive: 'rgba(96, 165, 250, 0.5)',
-            cursor: 'rgba(251, 146, 60, 0.9)',
-            glow: 'rgba(59, 130, 246, 0.4)',
-            label: 'rgba(147, 197, 253, 0.7)'
+            bg: '#131315',
+            grid: 'rgba(231, 229, 224, 0.045)',
+            gridAccent: 'rgba(111, 179, 184, 0.14)',
+            stroke: 'rgba(231, 229, 224, 0.88)',
+            strokeComplete: 'rgba(138, 167, 201, 0.95)',
+            ghost: 'rgba(231, 229, 224, 0.22)',
+            glyph: 'rgba(111, 179, 184, 0.22)',
+            glyphActive: 'rgba(111, 179, 184, 0.5)',
+            cursor: 'rgba(111, 179, 184, 0.9)',
+            glow: 'rgba(111, 179, 184, 0.35)',
+            label: 'rgba(134, 132, 126, 0.9)'
         };
 
         // ============================================
@@ -3551,7 +3570,7 @@
                 const easedOpacity = opacity * opacity;
                 
                 // Draw connection line
-                ctx.strokeStyle = `rgba(251, 191, 36, ${0.4 * easedOpacity})`; // Warm yellow
+                ctx.strokeStyle = `rgba(194, 168, 106, ${0.4 * easedOpacity})`; // Warm yellow
                 ctx.lineWidth = 1;
                 ctx.setLineDash([4, 4]);
                 ctx.beginPath();
@@ -3568,15 +3587,15 @@
                 if (rel.type === 'intersects' && rel.intersections) {
                     // Draw glowing intersection points
                     rel.intersections.forEach(pt => {
-                        ctx.shadowColor = 'rgba(251, 191, 36, 0.8)';
+                        ctx.shadowColor = 'rgba(194, 168, 106, 0.8)';
                         ctx.shadowBlur = 12 * easedOpacity;
-                        ctx.fillStyle = `rgba(251, 191, 36, ${0.9 * easedOpacity})`;
+                        ctx.fillStyle = `rgba(194, 168, 106, ${0.9 * easedOpacity})`;
                         ctx.beginPath();
                         ctx.arc(pt.x, pt.y, 4, 0, Math.PI * 2);
                         ctx.fill();
                         
                         // Outer ring
-                        ctx.strokeStyle = `rgba(251, 191, 36, ${0.5 * easedOpacity})`;
+                        ctx.strokeStyle = `rgba(194, 168, 106, ${0.5 * easedOpacity})`;
                         ctx.lineWidth = 1;
                         ctx.beginPath();
                         ctx.arc(pt.x, pt.y, 8, 0, Math.PI * 2);
@@ -3587,16 +3606,16 @@
                     // Add label near first intersection
                     if (rel.intersections.length > 0) {
                         const pt = rel.intersections[0];
-                        ctx.font = '500 10px "DM Sans", sans-serif';
+                        ctx.font = '500 10px "IBM Plex Mono", monospace';
                         ctx.textAlign = 'center';
-                        ctx.fillStyle = `rgba(251, 191, 36, ${0.9 * easedOpacity})`;
+                        ctx.fillStyle = `rgba(194, 168, 106, ${0.9 * easedOpacity})`;
                         ctx.fillText('intersects', pt.x, pt.y - 16);
                     }
                 }
                 
                 if (rel.type === 'contains') {
                     // Draw containment brackets
-                    ctx.strokeStyle = `rgba(74, 222, 128, ${0.5 * easedOpacity})`; // Green
+                    ctx.strokeStyle = `rgba(111, 179, 184, ${0.5 * easedOpacity})`; // Green
                     ctx.lineWidth = 2;
                     const r = getShapeSize(rel.container) / 2 + 8;
                     ctx.beginPath();
@@ -3607,15 +3626,15 @@
                     ctx.stroke();
                     
                     // Add label
-                    ctx.font = '500 10px "DM Sans", sans-serif';
+                    ctx.font = '500 10px "IBM Plex Mono", monospace';
                     ctx.textAlign = 'center';
-                    ctx.fillStyle = `rgba(74, 222, 128, ${0.8 * easedOpacity})`;
+                    ctx.fillStyle = `rgba(111, 179, 184, ${0.8 * easedOpacity})`;
                     ctx.fillText('⊃ contains', rel.container.center.x, rel.container.center.y - r - 8);
                 }
                 
                 if (rel.type === 'adjacent') {
                     // Draw proximity indicator
-                    ctx.fillStyle = `rgba(147, 197, 253, ${0.6 * easedOpacity})`;
+                    ctx.fillStyle = `rgba(231, 229, 224, ${0.6 * easedOpacity})`;
                     ctx.beginPath();
                     ctx.arc(midX, midY, 3, 0, Math.PI * 2);
                     ctx.fill();
@@ -3623,7 +3642,7 @@
                 
                 if (rel.type === 'aligned-vertical' || rel.type === 'aligned-horizontal') {
                     // Draw alignment guide
-                    ctx.strokeStyle = `rgba(167, 139, 250, ${0.4 * easedOpacity})`; // Purple
+                    ctx.strokeStyle = `rgba(169, 155, 196, ${0.4 * easedOpacity})`; // Purple
                     ctx.lineWidth = 1;
                     ctx.setLineDash([2, 4]);
                     ctx.beginPath();
@@ -3651,12 +3670,12 @@
                 const labelInfo = labelData[rel.type];
                 if (labelInfo && rel.type !== 'intersects') { // intersects already has point markers
                     const displayText = `${labelInfo.symbol} ${labelInfo.word}`;
-                    ctx.font = '500 10px "DM Sans", sans-serif';
+                    ctx.font = '500 10px "IBM Plex Mono", monospace';
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
                     
                     // Background pill
-                    ctx.fillStyle = `rgba(10, 22, 40, ${0.85 * easedOpacity})`;
+                    ctx.fillStyle = `rgba(19, 19, 21, ${0.85 * easedOpacity})`;
                     const metrics = ctx.measureText(displayText);
                     const pw = metrics.width + 12;
                     const ph = 18;
@@ -3675,7 +3694,7 @@
                     ctx.fill();
                     
                     // Label text
-                    ctx.fillStyle = `rgba(251, 191, 36, ${0.95 * easedOpacity})`;
+                    ctx.fillStyle = `rgba(194, 168, 106, ${0.95 * easedOpacity})`;
                     ctx.fillText(displayText, midX, midY);
                 }
             });
@@ -3767,15 +3786,15 @@
                 const easedOpacity = opacity * opacity; // Quadratic ease out
                 
                 // Subtle cyan glow for raw intersections
-                ctx.shadowColor = 'rgba(34, 211, 238, 0.7)';
+                ctx.shadowColor = 'rgba(111, 179, 184, 0.7)';
                 ctx.shadowBlur = 10 * easedOpacity;
-                ctx.fillStyle = `rgba(34, 211, 238, ${0.8 * easedOpacity})`;
+                ctx.fillStyle = `rgba(111, 179, 184, ${0.8 * easedOpacity})`;
                 ctx.beginPath();
                 ctx.arc(pt.x, pt.y, 3, 0, Math.PI * 2);
                 ctx.fill();
                 
                 // Outer ring
-                ctx.strokeStyle = `rgba(34, 211, 238, ${0.4 * easedOpacity})`;
+                ctx.strokeStyle = `rgba(111, 179, 184, ${0.4 * easedOpacity})`;
                 ctx.lineWidth = 1;
                 ctx.beginPath();
                 ctx.arc(pt.x, pt.y, 7, 0, Math.PI * 2);
@@ -3914,7 +3933,7 @@
                 
                 ctx.shadowColor = colors.glow;
                 ctx.shadowBlur = 12 * easedOpacity;
-                ctx.strokeStyle = `rgba(147, 197, 253, ${0.85 * easedOpacity})`;
+                ctx.strokeStyle = `rgba(231, 229, 224, ${0.85 * easedOpacity})`;
                 ctx.lineWidth = 2.5;
                 ctx.lineCap = 'round';
                 ctx.lineJoin = 'round';
@@ -3966,16 +3985,16 @@
                 }
                 
                 // Draw shape
-                ctx.shadowColor = 'rgba(96, 165, 250, 0.6)';
+                ctx.shadowColor = 'rgba(138, 167, 201, 0.6)';
                 ctx.shadowBlur = 20 * easedOpacity;
-                ctx.strokeStyle = `rgba(96, 165, 250, ${0.9 * easedOpacity})`;
+                ctx.strokeStyle = `rgba(138, 167, 201, ${0.9 * easedOpacity})`;
                 ctx.lineWidth = 2.5;
                 ctx.lineCap = 'round';
                 ctx.lineJoin = 'round';
                 
                 // Special handling for dots
                 if (shape.type === 'dot') {
-                    ctx.fillStyle = `rgba(96, 165, 250, ${0.9 * easedOpacity})`;
+                    ctx.fillStyle = `rgba(138, 167, 201, ${0.9 * easedOpacity})`;
                     ctx.beginPath();
                     ctx.arc(shape.center.x, shape.center.y, 5 + 2 * morphEase, 0, Math.PI * 2);
                     ctx.fill();
@@ -4041,13 +4060,13 @@
                 
                 const yOffset = -20 - (age / 80); // Float upward slightly slower
                 
-                ctx.font = '500 13px "DM Sans", sans-serif';
+                ctx.font = '500 13px "IBM Plex Mono", monospace';
                 ctx.textAlign = 'center';
-                ctx.fillStyle = `rgba(147, 197, 253, ${0.8 * easedOpacity})`;
+                ctx.fillStyle = `rgba(231, 229, 224, ${0.8 * easedOpacity})`;
                 ctx.fillText(label.text, label.x, label.y + yOffset);
                 if (label.sub) {
                     ctx.font = '400 10px "JetBrains Mono", ui-monospace, monospace';
-                    ctx.fillStyle = `rgba(147, 197, 253, ${0.55 * easedOpacity})`;
+                    ctx.fillStyle = `rgba(231, 229, 224, ${0.55 * easedOpacity})`;
                     ctx.fillText(label.sub, label.x, label.y + yOffset + 15);
                 }
                 
@@ -4075,7 +4094,7 @@
             ctx.arc(x, y, 60, 0, Math.PI * 2);
             ctx.fill();
             
-            ctx.strokeStyle = isDrawing ? colors.cursor : 'rgba(147, 197, 253, 0.7)';
+            ctx.strokeStyle = isDrawing ? colors.cursor : 'rgba(231, 229, 224, 0.7)';
             ctx.lineWidth = 1.5;
             ctx.shadowColor = isDrawing ? colors.cursor : colors.glow;
             ctx.shadowBlur = 8;
@@ -4110,7 +4129,7 @@
                 const radius = ripple.maxRadius * eased;
                 const opacity = 1 - progress;
                 
-                ctx.strokeStyle = `rgba(96, 165, 250, ${0.6 * opacity})`;
+                ctx.strokeStyle = `rgba(138, 167, 201, ${0.6 * opacity})`;
                 ctx.lineWidth = 2 * (1 - progress * 0.5);
                 ctx.beginPath();
                 ctx.arc(ripple.x, ripple.y, radius, 0, Math.PI * 2);
@@ -4120,7 +4139,7 @@
                 if (progress > 0.15) {
                     const innerProgress = (progress - 0.15) / 0.85;
                     const innerRadius = ripple.maxRadius * 0.6 * innerProgress;
-                    ctx.strokeStyle = `rgba(147, 197, 253, ${0.4 * (1 - innerProgress)})`;
+                    ctx.strokeStyle = `rgba(231, 229, 224, ${0.4 * (1 - innerProgress)})`;
                     ctx.lineWidth = 1.5 * (1 - innerProgress * 0.5);
                     ctx.beginPath();
                     ctx.arc(ripple.x, ripple.y, innerRadius, 0, Math.PI * 2);
@@ -4151,7 +4170,7 @@
                 
                 // Draw particle
                 const size = 3 * (1 - progress * 0.5);
-                ctx.fillStyle = `rgba(251, 191, 36, ${0.8 * opacity})`;
+                ctx.fillStyle = `rgba(194, 168, 106, ${0.8 * opacity})`;
                 ctx.beginPath();
                 ctx.arc(p.x, p.y, size, 0, Math.PI * 2);
                 ctx.fill();
@@ -4197,7 +4216,7 @@
                 // Pulsing opacity
                 const pulse = 0.15 + 0.1 * Math.sin(now / 2000 + p.phase);
                 
-                ctx.fillStyle = `rgba(147, 197, 253, ${pulse})`;
+                ctx.fillStyle = `rgba(231, 229, 224, ${pulse})`;
                 ctx.beginPath();
                 ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
                 ctx.fill();
@@ -4488,7 +4507,7 @@
 
                 // Draw current stroke
                 if (demoCurrentStroke.length > 1) {
-                    demoCtx.strokeStyle = demoState === 'draw-fish' ? 'rgba(59, 130, 246, 0.8)' : 'rgba(74, 222, 128, 0.8)';
+                    demoCtx.strokeStyle = demoState === 'draw-fish' ? 'rgba(59, 130, 246, 0.8)' : 'rgba(111, 179, 184, 0.8)';
                     demoCtx.lineWidth = 3;
                     demoCtx.lineCap = 'round';
                     demoCtx.lineJoin = 'round';
@@ -4630,7 +4649,7 @@
 
                 // Draw food
                 if (demoFood) {
-                    demoCtx.strokeStyle = 'rgba(74, 222, 128, 0.8)';
+                    demoCtx.strokeStyle = 'rgba(111, 179, 184, 0.8)';
                     demoCtx.lineWidth = 3;
                     demoCtx.lineCap = 'round';
                     demoCtx.lineJoin = 'round';
@@ -4643,7 +4662,7 @@
 
                     // Draw drag hint circle
                     if (demoState === 'animating') {
-                        demoCtx.strokeStyle = 'rgba(74, 222, 128, 0.3)';
+                        demoCtx.strokeStyle = 'rgba(111, 179, 184, 0.3)';
                         demoCtx.lineWidth = 2;
                         demoCtx.setLineDash([4, 4]);
                         demoCtx.beginPath();

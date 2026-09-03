@@ -96,6 +96,30 @@ describe('words from letters', () => {
     expect(s.getState().contentIds).toEqual([word]);
   });
 
+  it('three small bubbles and two short lines drawn quickly are a molecule, not a word', () => {
+    // Hand-sized: 36px circles, 24px lines, 400ms apart — the canonical loop as
+    // a hand actually draws it. Every one is a confident shape; none is a letter.
+    const s = createSession();
+    write(s, [
+      circleStroke(500, 300, 36), circleStroke(560, 300, 36), circleStroke(620, 300, 36),
+      lineStroke({ x: 518, y: 300 }, { x: 542, y: 300 }), lineStroke({ x: 578, y: 300 }, { x: 602, y: 300 }),
+    ], 1000);
+    expect(s.getState().contentIds).toHaveLength(5);
+    expect([...s.getState().nodes.values()].some(isWord)).toBe(false);
+  });
+
+  it('a word gathers back the letters written before it: I, O, then N', () => {
+    // I is a line and O a circle — shapes, alone. The N the rung cannot place
+    // makes them a word, and the word reaches back to where the writing began.
+    const s = createSession();
+    const { ids } = write(s, [...I(100, 100), circleStroke(122, 115, 14), ...N(146, 100)], 1000);
+    const st = s.getState();
+    expect(st.contentIds).toHaveLength(1);
+    const word = st.nodes.get(st.contentIds[0])!;
+    expect(isWord(word)).toBe(true);
+    expect(lettersOf(word)).toEqual(ids);
+  });
+
   it('a check that acts is never a letter, and a word never swallows a held loop', () => {
     const s = createSession();
     s.addStroke(rectStroke(100, 100, 200, 120), 1000);

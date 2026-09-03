@@ -1319,21 +1319,51 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
 
   /**
    * A letter is small on screen — but so is a box drawn zoomed out. What
-   * tells them apart is the reading: a stroke the shape rung confidently
-   * calls a rectangle or a triangle is a shape, whatever its size. (An O may
-   * be a circle and a letter at once; a run decides.)
+   * tells them apart is the reading. Two grades:
+   *
+   *   - `neverLetter`: a stroke the shape rung confidently calls a rectangle
+   *     or a triangle is a shape whatever its size, and joins no word.
+   *   - `shapeAlone`: any confident shape reading — a circle, a line, an
+   *     arc. An O is a circle and a letter at once, so such a stroke may JOIN
+   *     a word being written; but two of them never START one. Three small
+   *     bubbles and two lines drawn quickly in a row are a molecule, not a
+   *     word, and the first hand-sized run of the canonical loop found that
+   *     the earlier rule gathered the whole thing into one word — after which
+   *     the lasso and the mark had nothing to act on.
+   *
+   * A word starts, then, from a stroke the rung could NOT place — an N, an
+   * A, a V — and gathers the letter-like strokes written just before it.
    */
-  function looksLikeShape(n: MMNode): boolean {
+  const SHAPE_NOT_LETTER = 0.72;
+  function topShape(n: MMNode): { type: string; weight: number } | null {
     const top = resemblances(n)[0];
-    if (!top) return false;
-    const t = top.to.replace(/^type:/, '');
-    return (t === 'rectangle' || t === 'triangle') && (top.weight ?? 0) >= 0.72;
+    if (!top) return null;
+    return { type: top.to.replace(/^type:/, ''), weight: top.weight ?? 0 };
+  }
+  function neverLetter(n: MMNode): boolean {
+    const t = topShape(n);
+    return !!t && (t.type === 'rectangle' || t.type === 'triangle') && t.weight >= SHAPE_NOT_LETTER;
+  }
+  function shapeAlone(n: MMNode): boolean {
+    const t = topShape(n);
+    return !!t && t.type !== 'text' && t.type !== 'art' && t.weight >= SHAPE_NOT_LETTER;
   }
 
-  /** The stroke just made: does it continue a word, or start one with the stroke before it? */
+  /** A content stroke that could be a letter of a word being written: small, not a gesture, not a held loop, not a shape. */
+  function letterCandidate(id: string, scale: number): { node: MMNode; bounds: Bounds; at: number; scale: number } | null {
+    const n = nodes.get(id);
+    if (!n || isWord(n) || getRep(n, 'gesture') || pendingLasso?.id === id) return null;
+    const fp = fingerprintOf(n);
+    const st = getRep(n, 'stroke')?.data as { at: number; scale?: number } | undefined;
+    if (!fp || !st) return null;
+    const sc = st.scale ?? scale;
+    if (!isLetterLike(fp.bounds, sc) || neverLetter(n)) return null;
+    return { node: n, bounds: fp.bounds, at: st.at, scale: sc };
+  }
+
+  /** The stroke just made: does it continue a word, or start one with the strokes before it? */
   function absorbIntoWord(node: MMNode, fp: Fingerprint, at: number, scale: number): boolean {
-    if (!isLetterLike(fp.bounds, scale) || looksLikeShape(node)) return false;
-    // The previous content node: a word being written, or a lone letter-like stroke.
+    if (!isLetterLike(fp.bounds, scale) || neverLetter(node)) return false;
     const prevId = contentIds.filter((id) => id !== node.id).pop();
     if (!prevId) return false;
     const prev = nodes.get(prevId)!;
@@ -1351,25 +1381,40 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       return true;
     }
 
-    const prevFp = fingerprintOf(prev);
-    const prevStroke = getRep(prev, 'stroke')?.data as { at: number; scale?: number } | undefined;
-    if (!prevFp || !prevStroke || getRep(prev, 'gesture')) return false;
-    if (pendingLasso?.id === prev.id) return false;
-    if (!isLetterLike(prevFp.bounds, prevStroke.scale ?? scale) || looksLikeShape(prev)) return false;
-    const j = joinsRun({ bounds: prevFp.bounds, lastAt: prevStroke.at }, letter, scale);
+    const first = letterCandidate(prevId, scale);
+    if (!first) return false;
+    // Two confident shapes side by side are a drawing. A word needs a letter
+    // the rung could not read as a shape — in this stroke or the one before.
+    if (shapeAlone(node) && shapeAlone(prev)) return false;
+    const j = joinsRun({ bounds: first.bounds, lastAt: first.at }, letter, scale);
     if (!j.ok) return false;
 
-    // Two letters make a word. It takes their place in the content plane, where
-    // the first letter stood, so reading order is where the writing began.
+    // Gather back: the letters written just before these two, while each
+    // still sits on the run's line and came within the window of the next.
+    const run = [first];
+    let bounds = first.bounds;
+    const ordered = contentIds.filter((id) => id !== node.id);
+    for (let i = ordered.indexOf(prevId) - 1; i >= 0; i--) {
+      const cand = letterCandidate(ordered[i], scale);
+      if (!cand) break;
+      const back = joinsRun({ bounds, lastAt: cand.at }, { bounds: cand.bounds, at: run[0].at }, cand.scale);
+      if (!back.ok) break;
+      run.unshift(cand);
+      bounds = { minX: Math.min(bounds.minX, cand.bounds.minX), minY: Math.min(bounds.minY, cand.bounds.minY), maxX: Math.max(bounds.maxX, cand.bounds.maxX), maxY: Math.max(bounds.maxY, cand.bounds.maxY) };
+    }
+    const letterIds = run.map((r) => r.node.id).concat(node.id);
+
+    // The word takes their place in the content plane, where the first
+    // letter stood, so reading order is where the writing began.
     const word: MMNode = { id: nextId('word'), reps: [], edges: [{ to: LOCAL_PARTICIPANT, rel: 'made-by' }], capability: 0, createdAt: at };
     nodes.set(word.id, word);
-    setWordReps(word, [prev.id, node.id]);
-    for (const id of [prev.id, node.id]) {
+    setWordReps(word, letterIds);
+    for (const id of letterIds) {
       nodes.get(id)!.edges.push({ to: word.id, rel: 'part-of', reasoning: j.reasoning });
     }
-    const idx = contentIds.indexOf(prev.id);
+    const idx = contentIds.indexOf(letterIds[0]);
     contentIds.splice(idx, 1, word.id);
-    removeFromContent(node.id);
+    for (const id of letterIds.slice(1)) removeFromContent(id);
     if (pendingLasso?.id === node.id) pendingLasso = null;
     return true;
   }
