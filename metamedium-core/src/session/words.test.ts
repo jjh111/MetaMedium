@@ -40,6 +40,16 @@ describe('words from letters', () => {
     expect(s.getState().contentIds.some((id) => isWord(s.getState().nodes.get(id)!))).toBe(false);
   });
 
+  it('two small boxes drawn quickly while zoomed out are boxes, not letters', () => {
+    // Zoomed out to 0.3×, a 120-world-px box is 36px on screen — letter-sized.
+    // It still reads as a rectangle, and a confident rectangle is never a letter.
+    const s = createSession();
+    s.addStroke(rectStroke(100, 100, 200, 120), 1000, undefined, 1 / 0.3);
+    s.addStroke(rectStroke(340, 100, 200, 120), 1400, undefined, 1 / 0.3);
+    expect(s.getState().contentIds).toHaveLength(2);
+    expect([...s.getState().nodes.values()].some(isWord)).toBe(false);
+  });
+
   it('a letter drawn far away, or long after, starts nothing', () => {
     const s = createSession();
     write(s, [...N(100, 100), ...I(400, 100)], 1000);

@@ -1,0 +1,2349 @@
+/* Built from Demos/surface/*.js by Demos/build-surface.mjs — do not edit; edit the fragments. */
+(function () {
+// ===== core =====
+// Provides: the engine handle, URL params, the palette (instrument or paper), the session, DOM handles, the panel toggle, shared state (state, live, hoverId), esc().
+// Uses: nothing — every other fragment reads from here.
+// A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
+// in name order inside `(function () Ellipsis)();`. Shared state is the
+// closure's; no imports, no exports, no build step beyond the concatenation.
+
+  const MM = window.MetaMediumCore;
+
+  // The page decides the look: ?theme=paper puts ink on the whitepaper's
+  // ground, ?embed hides what a figure does not need, ?replay=<url> steps a
+  // recorded session. The default is the instrument, for working in.
+  const params = new URLSearchParams(location.search);
+  const THEME = params.get('theme') === 'paper' ? 'paper' : 'instrument';
+  const EMBED = params.has('embed');
+  if (THEME === 'paper') document.body.classList.add('paper');
+  if (EMBED) document.body.classList.add('embed');
+  const C = THEME === 'paper'
+    ? { ink: '#1a1a2e', inkFaint: 'rgba(26,26,46,0.16)', halo: 'rgba(248,246,241,0.75)', haloText: 'rgba(248,246,241,0.9)',
+        agent: '#2f6f8f', gold: '#8a6d1f', goldRGB: '138,109,31', labelRGB: '90,90,110' }
+    : { ink: '#e8e4d9', inkFaint: 'rgba(232,228,217,0.14)', halo: 'rgba(10,10,15,0.55)', haloText: 'rgba(10,10,15,0.7)',
+        agent: '#8ab4c8', gold: '#c9a84c', goldRGB: '201,168,76', labelRGB: '160,152,128' };
+  const session = MM.createSession();
+
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  const stage = document.getElementById('stage');
+  const summonEl = document.getElementById('summon');
+  const statusEl = document.getElementById('status');
+  const inspectorEl = document.getElementById('inspector');
+  const PANEL_KEY = 'mm-panel';
+  const panelToggle = document.getElementById('panelToggle');
+  let panelOpen = (() => { try { const v = localStorage.getItem(PANEL_KEY); return v === null ? innerWidth > 820 : v === 'open'; } catch (err) { return true; } })();
+  function syncPanel() {
+    document.body.classList.toggle('panelHidden', !panelOpen);
+    panelToggle.textContent = panelOpen ? 'details ▾' : 'details ▸';
+    panelToggle.setAttribute('aria-expanded', String(panelOpen));
+  }
+  panelToggle.onclick = () => { panelOpen = !panelOpen; try { localStorage.setItem(PANEL_KEY, panelOpen ? 'open' : 'closed'); } catch (err) { /* private mode */ } syncPanel(); };
+  syncPanel();
+
+  let state = session.getState();
+  let live = null;      // stroke under the pointer, in WORLD coordinates
+  let hoverId = null;   // inspected node (hover), else most recent
+
+  const esc = (t) => String(t).replace(/[&<>"]/g, (c) =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+// ===== view =====
+// Provides: view {zoom, panX, panY}, screenToWorld/worldToScreen/wpx, zoomAround, fitAll, afterViewChange, the wheel/pinch/keyboard zoom, resize.
+// Uses: core; input (panning/pinch state).
+// A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
+// in name order inside `(function () Ellipsis)();`. Shared state is the
+// closure's; no imports, no exports, no build step beyond the concatenation.
+
+  // ===== Viewport =========================================================
+  // The engine is renderer-agnostic and stores whatever space it is fed, so it
+  // is fed WORLD coordinates — never screen. Every threshold in the engine is
+  // in pixels (proximity, closure, size-relative overshoot); in world space
+  // those are zoom-invariant and the grammar holds at any zoom. In screen space
+  // the whole MVP flow breaks the moment you zoom out to lasso a wide group,
+  // which is exactly the move the product is built on (MVP.md §5.1).
+  const view = { panX: 0, panY: 0, zoom: 1 };
+  const MIN_ZOOM = 0.08, MAX_ZOOM = 5;
+  const clampZoom = (z) => Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, z));
+
+  const screenToWorld = (sx, sy) => ({
+    x: (sx - view.panX) / view.zoom,
+    y: (sy - view.panY) / view.zoom,
+  });
+  const worldToScreen = (wx, wy) => ({
+    x: wx * view.zoom + view.panX,
+    y: wy * view.zoom + view.panY,
+  });
+  /** World length that renders as `n` screen pixels — for chrome that must not shrink. */
+  const wpx = (n) => n / view.zoom;
+
+  function zoomAround(sx, sy, factor) {
+    const before = clampZoom(view.zoom);
+    const after = clampZoom(before * factor);
+    if (after === before) return;
+    view.zoom = after;
+    const ratio = after / before;
+    view.panX = sx - (sx - view.panX) * ratio;
+    view.panY = sy - (sy - view.panY) * ratio;
+    afterViewChange();
+  }
+
+  function fitAll() {
+    const ids = state.contentIds.concat(state.explanations);
+    const boxes = ids.map((id) => MM.boundsOf(state.nodes.get(id))).filter(Boolean);
+    if (!boxes.length) { view.panX = 0; view.panY = 0; view.zoom = 1; afterViewChange(); return; }
+    const b = union(boxes);
+    // Guard the viewport: a window smaller than the padding (or one not laid
+    // out yet) would compute a negative scale and slam into MIN_ZOOM.
+    const pad = Math.max(0, Math.min(90, innerWidth / 6, innerHeight / 6));
+    const availW = Math.max(1, innerWidth - pad * 2);
+    const availH = Math.max(1, innerHeight - pad * 2);
+    const w = Math.max(1, b.maxX - b.minX), h = Math.max(1, b.maxY - b.minY);
+    view.zoom = clampZoom(Math.min(availW / w, availH / h, 2));
+    view.panX = (innerWidth - w * view.zoom) / 2 - b.minX * view.zoom;
+    view.panY = (innerHeight - h * view.zoom) / 2 - b.minY * view.zoom;
+    afterViewChange();
+  }
+
+  function afterViewChange() {
+    document.getElementById('zoomPct').textContent = Math.round(view.zoom * 100) + '%';
+    // ONE transform for both layers. If the ink canvas and the artifact stage
+    // ever disagree, ink drifts off the divs it is supposed to outline.
+    stage.style.transform =
+      'translate(' + view.panX + 'px,' + view.panY + 'px) scale(' + view.zoom + ')';
+    render(state);
+  }
+
+  document.getElementById('zoomIn').onclick = () => zoomAround(innerWidth / 2, innerHeight / 2, 1.25);
+  document.getElementById('zoomOut').onclick = () => zoomAround(innerWidth / 2, innerHeight / 2, 0.8);
+  document.getElementById('fitBtn').onclick = fitAll;
+
+  // The wheel ZOOMS, toward the cursor. A trackpad pinch arrives as a wheel
+  // with ctrlKey in Chrome and as gesture events in Safari; both zoom. Holding
+  // shift turns the wheel into a pan, and space/middle/alt-drag pans — panning
+  // is the deliberate act, zooming is what a wheel over a canvas means.
+  // Scrolling pans; a pinch (which the browser reports as a wheel with
+  // ctrlKey) or ctrl/cmd + wheel zooms. That is the convention of every
+  // infinite canvas a trackpad user already knows, and the one thing a mouse
+  // wheel loses — zoom on a bare wheel — is on the rail and the keyboard.
+  canvas.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    if (e.ctrlKey || e.metaKey) {
+      // Pinch deltas are small and continuous; wheel clicks are large and
+      // stepped. Scale the factor by the delta so both feel proportionate.
+      const k = e.deltaMode === 0 && Math.abs(e.deltaY) < 50 ? 0.01 : 0.0022;
+      zoomAround(e.clientX, e.clientY, Math.exp(-e.deltaY * k));
+      return;
+    }
+    // A line-mode wheel (a mouse) moves in bigger steps than a pixel-mode one.
+    const step = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? innerHeight : 1;
+    let dx = e.deltaX * step, dy = e.deltaY * step;
+    if (e.shiftKey && !e.deltaX) { dx = dy; dy = 0; } // shift + a plain wheel scrolls sideways
+    view.panX -= dx;
+    view.panY -= dy;
+    afterViewChange();
+  }, { passive: false });
+
+  // Safari: pinch is a gesture event, not a wheel.
+  let gestureStartZoom = 1;
+  canvas.addEventListener('gesturestart', (e) => { e.preventDefault(); gestureStartZoom = view.zoom; });
+  canvas.addEventListener('gesturechange', (e) => {
+    e.preventDefault();
+    const target = clampZoom(gestureStartZoom * e.scale);
+    zoomAround(e.clientX, e.clientY, target / view.zoom);
+  });
+  canvas.addEventListener('gestureend', (e) => e.preventDefault());
+
+  // ===== Canvas sizing =====
+  function resize() {
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = innerWidth * dpr;
+    canvas.height = innerHeight * dpr;
+    // A <canvas> is a REPLACED element: `inset: 0` does not stretch it, its
+    // CSS box defaults to its bitmap size. On a retina screen that made the
+    // canvas twice the viewport, so every stroke landed at twice the pointer's
+    // distance from the origin. The CSS size must be set explicitly.
+    canvas.style.width = innerWidth + 'px';
+    canvas.style.height = innerHeight + 'px';
+    render(session.getState());
+  }
+  addEventListener('resize', resize);
+
+// ===== artifacts =====
+// Provides: the live plane: frames of iframes for artifacts with code, syncStage, regionsUnderInk.
+// Uses: core, view.
+// A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
+// in name order inside `(function () Ellipsis)();`. Shared state is the
+// closure's; no imports, no exports, no build step beyond the concatenation.
+
+  // ===== The live plane: artifacts that render and run ====================
+  // Generated code becomes real DOM in an iframe, positioned in world space
+  // inside the shared transform. The ink canvas sits ON TOP of it, so the boxes
+  // you drew stay visible as the outlines of what they produced (MVP.md §3.3).
+  //
+  // SANDBOX POSTURE, deliberate (MVP.md risk #5): `allow-same-origin` WITHOUT
+  // `allow-scripts`. Same-origin is what lets ink hit-test into the artifact's
+  // own DOM, which is the novel capability here. Granting both together is the
+  // known sandbox escape, and running arbitrary generated JS is not needed to
+  // prove the loop — so scripts stay off, and this is a choice to revisit
+  // explicitly rather than a default that drifted.
+  const frames = new Map(); // artifactId -> { wrap, iframe, codeAt }
+
+  function codeRepOf(node) {
+    for (let i = node.reps.length - 1; i >= 0; i--) {
+      if (node.reps[i].modality === 'code') return node.reps[i];
+    }
+    return null;
+  }
+
+  function documentFor(code, w, h) {
+    return '<!doctype html><html><head><meta charset="utf-8">' +
+      '<style>' +
+      'html,body{margin:0;padding:0;background:#fbfaf7;color:#14140f;' +
+      "font-family:'Space Grotesk',system-ui,-apple-system,sans-serif;}" +
+      '#mmroot{position:relative;width:' + Math.round(w) + 'px;height:' + Math.round(h) + 'px;overflow:hidden;}' +
+      '*{box-sizing:border-box;}' +
+      '</style></head><body><div id="mmroot">' + code + '</div></body></html>';
+  }
+
+  function syncStage(s) {
+    // Drop frames for artifacts that are gone or erased.
+    for (const [id, f] of frames) {
+      if (!s.live.includes(id)) { f.wrap.remove(); frames.delete(id); }
+    }
+    for (const id of s.live) {
+      const node = s.nodes.get(id);
+      const rep = node && codeRepOf(node);
+      const fr = node && MM.frameOf(node);
+      if (!rep || !fr) continue;
+
+      let f = frames.get(id);
+      if (!f) {
+        const wrap = document.createElement('div');
+        wrap.className = 'artifactFrame';
+        const iframe = document.createElement('iframe');
+        iframe.setAttribute('sandbox', 'allow-same-origin');
+        iframe.setAttribute('scrolling', 'no');
+        iframe.title = MM.wordOf(node) || id;
+        wrap.appendChild(iframe);
+        stage.appendChild(wrap);
+        f = { wrap: wrap, iframe: iframe, codeAt: null };
+        frames.set(id, f);
+      }
+      f.wrap.style.left = fr.x + 'px';
+      f.wrap.style.top = fr.y + 'px';
+      f.wrap.style.width = fr.w + 'px';
+      f.wrap.style.height = fr.h + 'px';
+
+      const stamp = rep.data.at + ':' + Math.round(fr.w) + 'x' + Math.round(fr.h);
+      if (f.codeAt !== stamp) {
+        f.codeAt = stamp;
+        f.iframe.srcdoc = documentFor(rep.data.code, fr.w, fr.h);
+      }
+    }
+  }
+
+  /**
+   * Which regions the ink actually lands on, read from the artifact's own DOM.
+   *
+   * This is "formal coordinate intersections with code aspects": the mark's
+   * world bounds become artifact-local pixels, `elementFromPoint` resolves them
+   * to real elements, and each element carries the `data-region` the generator
+   * was required to emit. The engine's geometric answer is the fallback, so
+   * addressing still works if the document is unreadable for any reason.
+   */
+  function regionsUnderInk(artifactId, bounds) {
+    const f = frames.get(artifactId);
+    const node = state.nodes.get(artifactId);
+    const fr = node && MM.frameOf(node);
+    const found = new Set();
+    if (!f || !fr) return [];
+    let doc = null;
+    try { doc = f.iframe.contentDocument; } catch (err) { doc = null; }
+    if (!doc || !doc.elementFromPoint) return [];
+
+    const N = 4;
+    for (let i = 0; i <= N; i++) {
+      for (let j = 0; j <= N; j++) {
+        const x = bounds.minX + ((bounds.maxX - bounds.minX) * i) / N - fr.x;
+        const y = bounds.minY + ((bounds.maxY - bounds.minY) * j) / N - fr.y;
+        let el = null;
+        try { el = doc.elementFromPoint(x, y); } catch (err) { el = null; }
+        while (el && !(el.dataset && el.dataset.region)) el = el.parentElement;
+        if (el && el.dataset.region) found.add(el.dataset.region);
+      }
+    }
+    return [...found];
+  }
+
+// ===== teach =====
+// Provides: teaching the command mark: the pad, samples, the held mark on this device, the rail chip; togglePanel/closePanel.
+// Uses: core, view (render).
+// A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
+// in name order inside `(function () Ellipsis)();`. Shared state is the
+// closure's; no imports, no exports, no build step beyond the concatenation.
+
+  // ===== Teaching the command mark ========================================
+  // Five samples become a signature, through the same fingerprint machinery
+  // that learns any shape you name. Taught in a dedicated pad rather than on
+  // the canvas, so the canvas itself never enters a mode (MVP.md §5.2).
+  const teachPanel = document.getElementById('teachPanel');
+  const teachBtn = document.getElementById('teachBtn');
+  const pad = document.getElementById('teachPad');
+  const padCtx = pad.getContext('2d');
+  const teachStatus = document.getElementById('teachStatus');
+  const teachUse = document.getElementById('teachUse');
+  const teachDots = [...document.querySelectorAll('#teachDots i')];
+  let samples = [];
+  let padStroke = null;
+
+  function sizePad() {
+    const dpr = window.devicePixelRatio || 1;
+    const r = pad.getBoundingClientRect();
+    if (!r.width) return;
+    pad.width = r.width * dpr; pad.height = r.height * dpr;
+    padCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    drawPad();
+  }
+
+  function drawPad() {
+    const r = pad.getBoundingClientRect();
+    padCtx.clearRect(0, 0, r.width || pad.width, r.height || pad.height);
+    padCtx.lineCap = 'round'; padCtx.lineJoin = 'round';
+    // Earlier samples ghost behind, so you can see whether your hand is steady.
+    samples.forEach((pts, i) => {
+      padCtx.beginPath();
+      pts.forEach((p, k) => (k ? padCtx.lineTo(p.x, p.y) : padCtx.moveTo(p.x, p.y)));
+      padCtx.strokeStyle = 'rgba(201,168,76,' + (0.16 + 0.1 * i) + ')';
+      padCtx.lineWidth = 2; padCtx.stroke();
+    });
+    if (padStroke) {
+      padCtx.beginPath();
+      padStroke.forEach((p, k) => (k ? padCtx.lineTo(p.x, p.y) : padCtx.moveTo(p.x, p.y)));
+      padCtx.strokeStyle = C.ink; padCtx.lineWidth = 2; padCtx.stroke();
+    }
+    teachDots.forEach((d, i) => d.classList.toggle('on', i < samples.length));
+  }
+
+  pad.addEventListener('pointerdown', (e) => {
+    capture(pad, e);
+    const r = pad.getBoundingClientRect();
+    padStroke = [{ x: e.clientX - r.left, y: e.clientY - r.top }];
+  });
+  pad.addEventListener('pointermove', (e) => {
+    if (!padStroke) return;
+    const r = pad.getBoundingClientRect();
+    padStroke.push({ x: e.clientX - r.left, y: e.clientY - r.top });
+    drawPad();
+  });
+  pad.addEventListener('pointerup', () => {
+    const pts = padStroke; padStroke = null;
+    if (!pts || pts.length < 8) { drawPad(); return; }
+    if (samples.length < MM.COMMAND_MARK_SAMPLES) samples.push(pts);
+    drawPad();
+    evaluateSamples();
+  });
+
+  function evaluateSamples() {
+    const need = MM.COMMAND_MARK_SAMPLES - samples.length;
+    if (need > 0) {
+      teachUse.disabled = true;
+      teachStatus.className = '';
+      teachStatus.textContent = need + ' more to go.';
+      return;
+    }
+    let mark;
+    try { mark = MM.learnCommandMark(samples, 'your mark'); }
+    catch (err) { teachStatus.textContent = String(err.message || err); return; }
+
+    // Rejection matters more than recognition: a mark that also fires while you
+    // draw reads as broken, not eager. So the signature is tested against the
+    // vocabulary the canvas already knows before it is offered.
+    const drawn = state.contentIds
+      .map((id) => MM.fingerprintOf(state.nodes.get(id)))
+      .filter(Boolean);
+    const collides = MM.collidesWith(mark, drawn);
+
+    teachUse.disabled = false;
+    if (collides) {
+      teachStatus.className = 'warn';
+      teachStatus.textContent =
+        'Careful — this mark also matches something already on the canvas. It would fire while you draw.';
+    } else if (mark.consistency < 0.35) {
+      teachStatus.className = 'warn';
+      teachStatus.textContent =
+        'Those five were quite different from each other, so the band is wide and it may over-trigger. Clear and try again for a tighter mark.';
+    } else {
+      teachStatus.className = '';
+      teachStatus.textContent =
+        'Consistent (' + Math.round(mark.consistency * 100) + '%). Cross a circled group with this to summon.';
+    }
+    teachUse.dataset.ready = '1';
+  }
+
+  let taughtGlyph = null; // the sample we show in the rail once a mark is taught
+
+  // The taught mark is HELD: on this device, across reloads. Teaching is a
+  // session event (it replays with the log), and the device remembers it too,
+  // so opening the canvas tomorrow finds your mark waiting rather than the
+  // check. The five samples are kept with it, so the pad can show you what
+  // it learned when you come back to it.
+  const MARK_KEY = 'mm-command-mark';
+  const teachHint = document.getElementById('teachHint');
+  const teachForget = document.getElementById('teachForget');
+  function savedMark() {
+    try { return JSON.parse(localStorage.getItem(MARK_KEY) || 'null'); } catch (err) { return null; }
+  }
+  function rememberMark(mark, pts) {
+    try { localStorage.setItem(MARK_KEY, JSON.stringify({ mark: mark, samples: pts, at: Date.now() })); } catch (err) { /* private mode */ }
+  }
+  function forgetMark() {
+    try { localStorage.removeItem(MARK_KEY); } catch (err) { /* nothing to forget */ }
+    session.teachCommandMark(null, Date.now());
+    samples = []; taughtGlyph = null;
+    teachUse.disabled = true;
+    drawPad();
+    showPadState();
+    render(session.getState());
+  }
+  function restoreMark() {
+    const saved = savedMark();
+    if (!saved || !saved.mark) return false;
+    session.teachCommandMark(saved.mark, Date.now());
+    samples = Array.isArray(saved.samples) ? saved.samples : [];
+    taughtGlyph = samples.length ? samples[samples.length - 1] : null;
+    return true;
+  }
+
+  // What the pane says depends on whether a mark is already held.
+  function showPadState() {
+    const held = !!session.getState().commandMark;
+    teachForget.hidden = !held;
+    if (held) {
+      teachHint.innerHTML = 'This is <b>your mark</b> — the canvas watches for it instead of the check. ' +
+        'To replace it, <b>Clear</b> and draw a new one five times. <b>Forget</b> goes back to ✓.';
+      teachStatus.className = '';
+      teachStatus.textContent = samples.length
+        ? 'Held on this device. These are the five it learned from.'
+        : 'Held on this device.';
+    } else {
+      teachHint.innerHTML = 'The canvas watches for a <b>check ✓</b> until you replace it. Draw your own mark ' +
+        '<b>five times</b>: it learns your hand\'s spread, so the sixth one it has never seen still counts. ' +
+        'It will refuse a mark that looks like something you draw.';
+      evaluateSamples();
+    }
+  }
+
+  teachUse.onclick = () => {
+    if (samples.length < MM.COMMAND_MARK_SAMPLES) return;
+    const mark = MM.learnCommandMark(samples, 'your mark');
+    session.teachCommandMark(mark, Date.now());
+    taughtGlyph = samples[samples.length - 1];
+    rememberMark(mark, samples);
+    showPadState();
+    teachStatus.textContent = 'Learned, and held on this device. The check ✓ no longer summons — your mark does.';
+    render(session.getState());
+  };
+  document.getElementById('teachClear').onclick = () => {
+    samples = []; teachUse.disabled = true; teachStatus.textContent = ''; drawPad();
+    if (session.getState().commandMark) {
+      teachStatus.textContent = 'Draw the new mark five times. Your held mark stays until you use the new one.';
+    }
+  };
+  teachForget.onclick = forgetMark;
+  document.getElementById('teachClose').onclick = () => closePanel(teachPanel, teachBtn);
+  teachBtn.onclick = () => {
+    togglePanel(teachPanel, teachBtn);
+    if (!teachPanel.hasAttribute('hidden')) { sizePad(); showPadState(); }
+  };
+  document.getElementById('markChip').onclick = () => teachBtn.click();
+
+  // The ACTIVE mark, echoed in the rail. Shown from the start, not only once you
+  // have taught one — a gesture you cannot see is a gesture you have to be told
+  // about, and the built-in check deserves the same visibility as yours.
+  //
+  // Driven from session state rather than from the teach button, so undoing the
+  // teach event puts the check back in the rail. A chip that disagrees with the
+  // grammar is worse than no chip.
+  let shownMark = undefined;
+  function syncMarkChip(s) {
+    const name = s.commandMark ? s.commandMark.name : 'check';
+    if (shownMark === name) return;
+    shownMark = name;
+    drawMarkChip(
+      s.commandMark && taughtGlyph ? taughtGlyph : MM.canonicalCheckSamples()[0],
+      name
+    );
+  }
+
+  function drawMarkChip(pts, name) {
+    const chip = document.getElementById('markChip');
+    const g = document.getElementById('markGlyph');
+    const gc = g.getContext('2d');
+    const b = MM.getBounds(pts);
+    const w = Math.max(1, b.maxX - b.minX), h = Math.max(1, b.maxY - b.minY);
+    const k = Math.min((g.width - 6) / w, (g.height - 6) / h);
+    gc.clearRect(0, 0, g.width, g.height);
+    gc.beginPath();
+    pts.forEach((p, i) => {
+      const x = (p.x - b.minX) * k + 3, y = (p.y - b.minY) * k + 3;
+      i ? gc.lineTo(x, y) : gc.moveTo(x, y);
+    });
+    gc.strokeStyle = C.gold; gc.lineWidth = 1.6; gc.lineCap = 'round'; gc.stroke();
+    document.getElementById('markName').textContent = name || 'your mark';
+    chip.hidden = false;
+  }
+
+  function togglePanel(el, btn) {
+    const open = el.hasAttribute('hidden');
+    if (open) el.removeAttribute('hidden'); else el.setAttribute('hidden', '');
+    btn.setAttribute('aria-pressed', String(open));
+  }
+  function closePanel(el, btn) {
+    el.setAttribute('hidden', ''); btn.setAttribute('aria-pressed', 'false');
+  }
+
+// ===== models =====
+// Provides: the model pane: probing local servers, joining by key, remembering the pick, offerModel, askModels/cancelReading.
+// Uses: core, teach (togglePanel), render, palette (refreshPalette).
+// A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
+// in name order inside `(function () Ellipsis)();`. Shared state is the
+// closure's; no imports, no exports, no build step beyond the concatenation.
+
+  // ===== Model participants (Tier 1–2) ====================================
+  // A model joins through the SAME channel a human uses — session.join() then
+  // session.propose(). Every reading it offers is held as an attributed,
+  // unblessed edge beside Tier 0's, never instead of it.
+  //
+  // The picker, following what the site's search bar learned the hard way:
+  //   - BOTH local servers are probed, in parallel. Returning on the first one
+  //     that answered meant a running LM Studio hid Ollama entirely.
+  //   - Embedding-only models are hidden AND explained. An Ollama holding only
+  //     nomic-embed-text used to show nothing and say nothing.
+  //   - The pick is remembered as a PREFERENCE: honoured when that server still
+  //     offers that model, quietly ignored otherwise. A remembered pointer at
+  //     something no longer running is worse than no memory at all.
+  const modelBtn = document.getElementById('modelBtn');
+  const panel = document.getElementById('modelPanel');
+  const mpProvider = document.getElementById('mpProvider');
+  const mpEndpoint = document.getElementById('mpEndpoint');
+  const mpModel = document.getElementById('mpModel');
+  const mpKey = document.getElementById('mpKey');
+  const mpRememberKey = document.getElementById('mpRememberKey');
+  const mpStatus = document.getElementById('mpStatus');
+  const mpList = document.getElementById('mpList');
+  const mpLocal = document.getElementById('mpLocal');
+
+  const PICK_KEY = 'mm-model-pick';
+  const KEY_KEY = 'mm-model-key';
+  const DEFAULT_MODEL = { openRouter: 'anthropic/claude-opus-5', anthropic: 'claude-opus-5', custom: '' };
+  const agents = [];       // AgentParticipant[] — several models can coexist
+  let localServers = [];   // [{ source, host, baseUrl, models, skipped }]
+
+  const store = {
+    get(k) { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (err) { return null; } },
+    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (err) { /* private mode */ } },
+    del(k) { try { localStorage.removeItem(k); } catch (err) { /* nothing */ } },
+  };
+
+  function syncProviderFields() {
+    const p = mpProvider.value;
+    mpEndpoint.hidden = p !== 'custom';
+    mpModel.placeholder = DEFAULT_MODEL[p] || 'model id';
+    mpKey.placeholder = p === 'custom' ? 'API key (if the endpoint needs one)' : 'API key';
+  }
+  mpProvider.onchange = syncProviderFields;
+  syncProviderFields();
+
+  // --- Local servers, both at once ---
+  async function probeLocal() {
+    // Each server says what its models can do; the pane only relays it. A
+    // model that can SEE is the one that gets asked to read handwriting —
+    // Ollama lists `vision` among capabilities, LM Studio types the model `vlm`.
+    const probes = [
+      { source: 'Ollama', preset: 'ollama', list: ['http://localhost:11434/api/tags'],
+        pick: (d) => (d.models || []).map((m) => ({ name: m.name,
+          chat: !(m.capabilities && m.capabilities.length && !m.capabilities.includes('completion')) && !/embed/i.test(m.name),
+          vision: !!(m.capabilities && m.capabilities.includes('vision')) })) },
+      { source: 'LM Studio', preset: 'lmStudio', list: ['http://localhost:1234/api/v0/models', 'http://localhost:1234/v1/models'],
+        pick: (d) => (d.data || []).map((m) => ({ name: m.id, chat: !/embed/i.test(m.id) && m.type !== 'embeddings',
+          vision: m.type === 'vlm' })) },
+    ];
+    const settled = await Promise.allSettled(probes.map(async (pr) => {
+      let all = null, err = null;
+      for (const url of pr.list) {
+        try {
+          const res = await fetch(url, { signal: AbortSignal.timeout(2500) });
+          if (!res.ok) { err = new Error('HTTP ' + res.status); continue; }
+          all = pr.pick(await res.json());
+          break;
+        } catch (e) { err = e; }
+      }
+      if (!all) throw err || new Error('no answer');
+      return {
+        source: pr.source, preset: pr.preset, baseUrl: MM.PRESETS[pr.preset].baseUrl,
+        host: MM.PRESETS[pr.preset].baseUrl.replace(/^https?:\/\//, '').replace(/\/v1$/, ''),
+        models: all.filter((m) => m.chat).map((m) => m.name).sort(),
+        vision: all.filter((m) => m.chat && m.vision).map((m) => m.name),
+        skipped: all.filter((m) => !m.chat).map((m) => m.name),
+      };
+    }));
+    localServers = settled.filter((r) => r.status === 'fulfilled').map((r) => r.value);
+    renderLocal();
+    return localServers;
+  }
+
+  const isJoined = (baseUrl, model) => agents.some((a) => a.config.baseUrl === baseUrl && a.config.model === model);
+
+  function renderLocal() {
+    if (!localServers.length) {
+      mpLocal.innerHTML = '<div class="note">No local server answered on :11434 or :1234. ' +
+        'Start Ollama or LM Studio, then Detect.</div>';
+      return;
+    }
+    let html = '';
+    for (const sv of localServers) {
+      html += '<div class="server"><b>' + esc(sv.source) + '</b><span>' + esc(sv.host) + '</span></div>';
+      for (const m of sv.models) {
+        const on = isJoined(sv.baseUrl, m);
+        html += '<button class="model' + (on ? ' on' : '') + '" data-base="' + esc(sv.baseUrl) + '" data-model="' + esc(m) + '">' +
+          '<span>' + esc(m) + '</span><span class="why">' + (on ? 'joined' : 'tier 1' + (sv.vision.includes(m) ? ' · sees' : '') + ' · tap to join') + '</span></button>';
+      }
+      if (!sv.models.length && sv.skipped.length) {
+        html += '<div class="note">only embedding models here — they cannot chat</div>';
+      } else if (sv.skipped.length) {
+        html += '<div class="note">' + sv.skipped.length + ' embedding model' + (sv.skipped.length === 1 ? '' : 's') + ' hidden</div>';
+      }
+    }
+    mpLocal.innerHTML = html;
+    mpLocal.querySelectorAll('.model').forEach((btn) => {
+      btn.onclick = () => {
+        const sv = localServers.find((x) => x.baseUrl === btn.dataset.base);
+        join(Object.assign({}, MM.PRESETS[sv.preset], { model: btn.dataset.model, vision: sv.vision.includes(btn.dataset.model) }), { provider: sv.preset });
+      };
+    });
+  }
+
+  // --- Joining, and remembering ---
+  function join(config, pick) {
+    if (isJoined(config.baseUrl, config.model)) {
+      mpStatus.textContent = config.model + ' is already here.';
+      return null;
+    }
+    // Several models may run in the same tier — that is the point.
+    const agent = MM.createAgentParticipant(session, config, Date.now());
+    agents.push(agent);
+    if (pick) store.set(PICK_KEY, Object.assign({ baseUrl: config.baseUrl, model: config.model, kind: config.kind }, pick));
+    mpStatus.textContent = agent.name + ' joined (tier ' + MM.providerTier(config) + '). It reads what you summon' +
+      (config.vision ? ', reads your writing,' : '') + ' and builds what you describe.';
+    readWriting(session.getState());
+    renderAgents();
+    renderLocal();
+    render(session.getState());
+    return agent;
+  }
+
+  function leave(agent) {
+    const i = agents.indexOf(agent);
+    if (i >= 0) agents.splice(i, 1);
+    // The session keeps the join in its history; it simply stops being asked.
+    const pick = store.get(PICK_KEY);
+    if (pick && pick.baseUrl === agent.config.baseUrl && pick.model === agent.config.model) { store.del(PICK_KEY); store.del(KEY_KEY); }
+    mpStatus.textContent = agent.name + ' left.';
+    renderAgents();
+    renderLocal();
+    render(session.getState());
+  }
+
+  function renderAgents() {
+    mpList.innerHTML = agents.map((a, i) =>
+      '<div class="mpItem"><span>' + esc(a.name) + '</span>' +
+      '<span class="t">tier ' + MM.providerTier(a.config) + (a.config.vision ? ' · sees' : '') + '</span>' +
+      '<button class="ghost" data-leave="' + i + '">leave</button></div>'
+    ).join('');
+    mpList.querySelectorAll('[data-leave]').forEach((b) => { b.onclick = () => leave(agents[Number(b.dataset.leave)]); });
+  }
+
+  document.getElementById('mpAdd').onclick = () => {
+    const p = mpProvider.value;
+    const model = (mpModel.value || DEFAULT_MODEL[p] || '').trim();
+    const key = mpKey.value.trim();
+    if (!model) { mpStatus.textContent = 'Which model? Type its id.'; return; }
+    // Hosted servers do not say what a model can do; the id is the only clue.
+    const vision = /claude|gpt-4o|gpt-5|gemini|qwen3\.5|qwen.*vl|vision|pixtral|llava/i.test(model);
+    let config;
+    if (p === 'custom') {
+      const base = mpEndpoint.value.trim().replace(/\/+$/, '');
+      if (!base) { mpStatus.textContent = 'Where is it? Enter the endpoint, e.g. http://localhost:8080/v1'; return; }
+      config = { kind: 'openai-compatible', baseUrl: /\/v1$/.test(base) ? base : base + '/v1', model: model };
+    } else {
+      if (!key) { mpStatus.textContent = p + ' needs a key.'; return; }
+      config = Object.assign({}, MM.PRESETS[p], { model: model });
+    }
+    if (key) config.apiKey = key;
+    const agent = join(config, { provider: p, endpoint: p === 'custom' ? config.baseUrl : undefined });
+    if (!agent) return;
+    // The key is remembered only when asked, and only on this device.
+    if (key && mpRememberKey.checked) store.set(KEY_KEY, key); else store.del(KEY_KEY);
+    mpKey.value = '';
+  };
+
+  // --- Coming back: the remembered pick rejoins if it can ---
+  async function rejoinRemembered() {
+    const pick = store.get(PICK_KEY);
+    if (!pick) return;
+    if (MM.providerTier({ baseUrl: pick.baseUrl }) === 1) {
+      const servers = await probeLocal();
+      const sv = servers.find((x) => x.baseUrl === pick.baseUrl);
+      if (sv && sv.models.includes(pick.model)) join(Object.assign({}, MM.PRESETS[sv.preset], { model: pick.model, vision: sv.vision.includes(pick.model) }), null);
+      else mpStatus.textContent = 'Remembered ' + pick.model + ', but ' + pick.baseUrl + ' is not offering it right now.';
+      return;
+    }
+    const key = store.get(KEY_KEY);
+    const config = pick.provider === 'custom'
+      ? { kind: 'openai-compatible', baseUrl: pick.baseUrl, model: pick.model }
+      : Object.assign({}, MM.PRESETS[pick.provider] || { kind: pick.kind, baseUrl: pick.baseUrl }, { model: pick.model });
+    if (key) { config.apiKey = key; join(config, null); return; }
+    if (pick.provider !== 'custom') {
+      mpProvider.value = pick.provider; syncProviderFields(); mpModel.value = pick.model;
+      mpStatus.textContent = 'Remembered ' + pick.model + ' — enter its key to rejoin.';
+    } else {
+      mpProvider.value = 'custom'; syncProviderFields(); mpEndpoint.value = pick.baseUrl; mpModel.value = pick.model;
+      join(config, null);
+    }
+  }
+
+  document.getElementById('mpDetect').onclick = () => { mpStatus.textContent = 'looking…'; probeLocal().then((s) => { mpStatus.textContent = s.length ? '' : 'Nothing answered.'; }); };
+  modelBtn.onclick = () => {
+    togglePanel(panel, modelBtn);
+    if (!panel.hasAttribute('hidden')) probeLocal();
+  };
+  document.getElementById('mpClose').onclick = () => closePanel(panel, modelBtn);
+
+  /** Open the models pane because something needed one — says why. */
+  function offerModel(why) {
+    if (panel.hasAttribute('hidden')) togglePanel(panel, modelBtn);
+    probeLocal();
+    mpStatus.textContent = why || 'That needs a model. Tap one to join it.';
+  }
+
+  // When a group is summoned, ask EVERY model at once. They answer in parallel
+  // and each proposal lands independently — no escalation, no waiting for a
+  // cheaper tier to fail first.
+  //
+  // A reading is worth having, but it is NOT worth making the human wait for.
+  // A local server answers one request at a time, so an unasked-for
+  // interpretation sits in front of whatever they type next — 35 seconds of a
+  // model describing a drawing they were about to replace. So it is cancellable,
+  // and committing to a prompt cancels it.
+  let lastAskedSummon = null;
+  let reading = null; // AbortController for interpretations in flight
+
+  function cancelReading(why) {
+    if (!reading) return;
+    reading.abort();
+    reading = null;
+    if (why) mpStatus.textContent = why;
+  }
+
+  function askModels(s) {
+    if (!s.summon || agents.length === 0) return;
+    if (s.summon.id === lastAskedSummon) return;
+    lastAskedSummon = s.summon.id;
+    if (s.summon.enclosedIds.length === 0) return; // nothing to read (ink on a page)
+
+    cancelReading();
+    const ctl = new AbortController();
+    reading = ctl;
+    const ids = s.summon.enclosedIds.slice();
+    mpStatus.textContent = 'reading with ' + agents.length + ' model(s)…';
+    let left = agents.length;
+    agents.forEach((agent) => {
+      agent.interpret(ids, Date.now(), ctl.signal).then((res) => {
+        if (ctl.signal.aborted) return;
+        if (--left === 0 && reading === ctl) reading = null;
+        mpStatus.textContent = res.ok
+          ? agent.name + ': ' + res.readings.map((r) => r.label).join(', ')
+          : agent.name + ' unavailable (' + res.error + ') — tier 0 still holds.';
+        render(session.getState());
+        refreshPalette();
+      });
+    });
+  }
+
+// ===== snap =====
+// Provides: snapping: offers, auto sweep, the rail button, and the held-loop chip.
+// Uses: core, view, render, input (flash).
+// A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
+// in name order inside `(function () Ellipsis)();`. Shared state is the
+// closure's; no imports, no exports, no build step beyond the concatenation.
+
+  // ===== Snapping: a confident reading, redrawn ============================
+  //
+  // The engine says "rectangle 0.86"; the canvas can draw that rectangle. Three
+  // ways in, one mechanism: the ghost under each confident mark is the OFFER,
+  // the rail button and the palette take it up for many at once, and the
+  // inspector for one. `auto` takes it up as you draw. The ink is never
+  // replaced — it stays faint under the clean form, and undo drops the form.
+  const SNAP_KEY = 'mm-snap';
+  const SNAP_MODES = ['offer', 'auto', 'off'];
+  let snapMode = SNAP_MODES.includes(store.get(SNAP_KEY)) ? store.get(SNAP_KEY) : 'offer';
+  let snapOffers = new Map(); // id → candidate, recomputed each render
+  const idealCache = new WeakMap(); // node → clean form (nodes are rebuilt on replay)
+  const snapBtn = document.getElementById('snapBtn');
+  const snapModeBtn = document.getElementById('snapMode');
+
+  function idealOf(node, shape) {
+    let c = idealCache.get(node);
+    if (c === undefined || (c && c.shape !== shape)) { c = MM.idealize(node, shape); idealCache.set(node, c); }
+    return c;
+  }
+  /** The marks a held loop encloses — the same test the engine will make when it resolves. */
+  function heldEnclosed(s) {
+    if (!s.pendingLassoId) return [];
+    const lasso = s.nodes.get(s.pendingLassoId);
+    const b = lasso && MM.boundsOf(lasso);
+    if (!b) return [];
+    return MM.enclosedBy(b, s.contentIds.filter((id) => id !== s.pendingLassoId)
+      .map((id) => ({ id, bounds: MM.boundsOf(s.nodes.get(id)) })).filter((c) => c.bounds));
+  }
+  let heldCandidates = []; // offers among what the held loop encloses
+
+  function refreshOffers() {
+    const s = session.getState();
+    snapOffers = snapMode === 'off' ? new Map() : new Map(session.snapCandidates().map((c) => [c.id, c]));
+    heldCandidates = heldEnclosed(s).filter((id) => snapOffers.has(id));
+    // A held loop scopes the button: what you circled, not everything.
+    const n = heldCandidates.length || snapOffers.size;
+    snapBtn.hidden = n === 0;
+    snapBtn.textContent = (heldCandidates.length ? 'Snap circled ' : 'Snap ') + n;
+    snapModeBtn.textContent = 'snap · ' + snapMode;
+  }
+  function shapesSummary(cands) {
+    const counts = {};
+    cands.forEach((c) => { counts[c.shape] = (counts[c.shape] || 0) + 1; });
+    return Object.entries(counts).map(([k, v]) => v + ' ' + k + (v === 1 ? '' : 's')).join(', ');
+  }
+  function snapAll(ids, why) {
+    if (!ids.length) return;
+    session.snap({ ids: ids, at: Date.now() });
+    flash('drew ' + ids.length + ' clean' + (why ? ' — ' + why : ''));
+  }
+  function setSnapMode(mode) {
+    snapMode = SNAP_MODES.includes(mode) ? mode : 'offer';
+    store.set(SNAP_KEY, snapMode);
+    // Auto means everything that reads clean IS clean — including what was
+    // drawn before the switch.
+    if (snapMode === 'auto') autoSweep();
+    render(session.getState());
+  }
+  /** Auto: take every open offer except the held loop, which is a gesture in waiting. */
+  function autoSweep() {
+    if (snapMode !== 'auto') return;
+    const ids = session.snapCandidates().map((c) => c.id);
+    if (ids.length) session.snap({ ids: ids, at: Date.now() });
+  }
+
+  // ===== The held loop: a chip that says what you circled and what you can do =
+  const heldEl = document.getElementById('held');
+  const heldText = document.getElementById('heldText');
+  const heldSnap = document.getElementById('heldSnap');
+  document.getElementById('heldOffer').onclick = () => session.summonHeld(Date.now());
+  heldSnap.onclick = () => snapAll(heldCandidates.slice(), shapesSummary(heldCandidates.map((id) => snapOffers.get(id))));
+
+  function renderHeld(s) {
+    const enclosed = heldEnclosed(s);
+    if (!s.pendingLassoId || !enclosed.length) { heldEl.hidden = true; return; }
+    const lasso = s.nodes.get(s.pendingLassoId);
+    const b = MM.boundsOf(lasso);
+    heldText.innerHTML = '<b>' + enclosed.length + '</b> circled · cross with ' + (s.commandMark ? 'your mark' : '✓') + ', or';
+    heldSnap.hidden = heldCandidates.length === 0;
+    heldSnap.textContent = 'Draw ' + (heldCandidates.length === enclosed.length ? 'them' : heldCandidates.length) + ' clean';
+    heldEl.hidden = false;
+    const p = worldToScreen(b.minX, b.maxY);
+    heldEl.style.left = Math.max(8, Math.min(p.x, innerWidth - heldEl.offsetWidth - 8)) + 'px';
+    heldEl.style.top = Math.max(8, Math.min(p.y + 12, innerHeight - heldEl.offsetHeight - 52)) + 'px';
+  }
+  snapBtn.onclick = () => {
+    const ids = heldCandidates.length ? heldCandidates : [...snapOffers.keys()];
+    snapAll(ids, shapesSummary(ids.map((id) => snapOffers.get(id))));
+  };
+  snapModeBtn.onclick = () => setSnapMode(SNAP_MODES[(SNAP_MODES.indexOf(snapMode) + 1) % SNAP_MODES.length]);
+
+// ===== handwriting =====
+// Provides: handwriting: inkImage, isWriting, readOne, readWriting.
+// Uses: core, models (agents), render.
+// A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
+// in name order inside `(function () Ellipsis)();`. Shared state is the
+// closure's; no imports, no exports, no build step beyond the concatenation.
+
+  // ===== Handwriting: the one thing sent as pixels =========================
+  //
+  // A mark that reads as writing is rendered on its own — dark ink on a light
+  // ground, nothing else on the board — and handed to every model that can
+  // SEE, once. What comes back is held on the mark as transcripts, attributed
+  // and ranked, never blessed (v7 Stage E). A model that cannot see is never
+  // asked; with none present the mark simply stays "text".
+  const seeing = () => agents.filter((a) => a.config.vision);
+  const askedToRead = new Set(); // node ids handed out already (per model join, see below)
+
+  function inkImage(node, size) {
+    // A word is several strokes; a cursive word is one. Same image either way.
+    const runs = MM.isWord(node)
+      ? MM.lettersOf(node).map((id) => state.nodes.get(id)).filter(Boolean).map((n) => MM.strokePointsOf(n)).filter((p) => p && p.length > 1)
+      : [MM.strokePointsOf(node)].filter((p) => p && p.length > 1);
+    if (!runs.length) return null;
+    const pts = runs.flat();
+    const b = MM.getBounds(pts);
+    const w = Math.max(1, b.maxX - b.minX), h = Math.max(1, b.maxY - b.minY);
+    const S = size || 320, pad = 16;
+    const k = Math.min((S - pad * 2) / w, (S / 2 - pad * 2) / h);
+    const cw = Math.round(w * k + pad * 2), ch = Math.round(h * k + pad * 2);
+    const off = document.createElement('canvas');
+    off.width = cw; off.height = ch;
+    const c = off.getContext('2d');
+    c.fillStyle = '#fff'; c.fillRect(0, 0, cw, ch);
+    c.strokeStyle = '#111'; c.lineWidth = Math.max(2, 3 * k); c.lineCap = 'round'; c.lineJoin = 'round';
+    for (const run of runs) {
+      c.beginPath();
+      run.forEach((p, i) => { const x = pad + (p.x - b.minX) * k, y = pad + (p.y - b.minY) * k; i ? c.lineTo(x, y) : c.moveTo(x, y); });
+      c.stroke();
+    }
+    return off.toDataURL('image/png');
+  }
+
+  function isWriting(node) {
+    const shape = MM.interpretationsOf(node, state.nodes).filter((r) => r.tier === 0)[0];
+    return !!shape && shape.label === 'text';
+  }
+
+  function readOne(node, force) {
+    const readers = seeing();
+    if (!readers.length) return false;
+    const key = node.id;
+    if (!force && askedToRead.has(key)) return false;
+    askedToRead.add(key);
+    const image = inkImage(node);
+    if (!image) return false;
+    mpStatus.textContent = 'reading the writing with ' + readers.map((a) => a.name).join(', ') + '…';
+    readers.forEach((agent) => {
+      agent.read({ nodeId: node.id, image: image, at: Date.now() }).then((res) => {
+        mpStatus.textContent = res.ok
+          ? agent.name + ' read “' + res.transcripts[0].text + '”' + (res.transcripts.length > 1 ? ' (or ' + res.transcripts.slice(1).map((t) => '“' + t.text + '”').join(', ') + ')' : '')
+          : agent.name + ' could not read it (' + res.error + ').';
+        if (!res.ok && res.raw) window.__mm.lastRaw = res.raw;
+        render(session.getState());
+      });
+    });
+    return true;
+  }
+
+  function readWriting(s) {
+    if (!seeing().length) return;
+    const ids = s.contentIds.filter((id) => !s.artifacts.includes(id));
+    for (const aid of s.artifacts) for (const e of s.nodes.get(aid).edges) if (e.rel === 'has-part') ids.push(e.to);
+    for (const id of ids) {
+      const node = s.nodes.get(id);
+      if (!node || s.pendingLassoId === id || MM.transcriptOf(node) || !(MM.strokePointsOf(node) || MM.isWord(node))) continue;
+      if (isWriting(node)) readOne(node, false);
+    }
+  }
+
+// ===== input =====
+// Provides: pointer input (draw, pan, pinch), keys, flash().
+// Uses: core, view, snap (autoSweep), render.
+// A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
+// in name order inside `(function () Ellipsis)();`. Shared state is the
+// closure's; no imports, no exports, no build step beyond the concatenation.
+
+  // ===== Input: strokes in, nothing gated, no modes ========================
+  // Pointer events belong to the ink layer. You are ALWAYS drawing; panning is
+  // the deliberate act (space, middle button, or alt), never the default. That
+  // is what makes "doodle on top of the running page" work at all.
+  let panning = null;
+  let spaceHeld = false;
+
+  // Pointer capture is a nicety — it keeps a stroke alive when the pointer
+  // leaves the element. It is NOT allowed to be the reason a stroke fails to
+  // start, so its failure is swallowed rather than thrown into the draw loop.
+  function capture(el, e) {
+    try { el.setPointerCapture(e.pointerId); } catch (err) { /* not capturable */ }
+  }
+
+  const touches = new Map(); // pointerId → {x, y}, for two-finger pinch
+  let pinch = null;          // { dist, mid, zoom } at the moment the second finger landed
+
+  canvas.addEventListener('pointerdown', (e) => {
+    capture(canvas, e);
+    if (e.pointerType === 'touch') {
+      touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (touches.size === 2) {
+        // Two fingers: this is a pinch, not a stroke. Drop the live ink — it
+        // was the first finger landing, not a mark.
+        live = null;
+        const [a, b] = [...touches.values()];
+        pinch = { dist: Math.hypot(a.x - b.x, a.y - b.y), mid: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, zoom: view.zoom };
+        return;
+      }
+    }
+    if (e.button === 1 || e.altKey || spaceHeld) {
+      panning = { x: e.clientX, y: e.clientY };
+      canvas.style.cursor = 'grabbing';
+      return;
+    }
+    live = [screenToWorld(e.clientX, e.clientY)];
+  });
+
+  canvas.addEventListener('pointermove', (e) => {
+    if (e.pointerType === 'touch' && touches.has(e.pointerId)) {
+      touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pinch && touches.size === 2) {
+        const [a, b] = [...touches.values()];
+        const dist = Math.hypot(a.x - b.x, a.y - b.y);
+        const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+        const target = clampZoom(pinch.zoom * (dist / Math.max(1, pinch.dist)));
+        zoomAround(pinch.mid.x, pinch.mid.y, target / view.zoom);
+        view.panX += mid.x - pinch.mid.x;
+        view.panY += mid.y - pinch.mid.y;
+        pinch.mid = mid;
+        afterViewChange();
+        return;
+      }
+    }
+    if (panning) {
+      view.panX += e.clientX - panning.x;
+      view.panY += e.clientY - panning.y;
+      panning = { x: e.clientX, y: e.clientY };
+      afterViewChange();
+      return;
+    }
+    if (!live) {
+      const w = screenToWorld(e.clientX, e.clientY);
+      const over = nodeAt(w.x, w.y);
+      if (over !== hoverId) { hoverId = over; render(state); }
+      return;
+    }
+    live.push(screenToWorld(e.clientX, e.clientY));
+    render(state); // live ink
+  });
+
+  const endTouch = (e) => {
+    if (e.pointerType !== 'touch') return false;
+    touches.delete(e.pointerId);
+    if (touches.size < 2) pinch = null;
+    return touches.size > 0; // a finger is still down: nothing to commit yet
+  };
+  canvas.addEventListener('pointercancel', (e) => { endTouch(e); live = null; });
+
+  canvas.addEventListener('pointerup', (e) => {
+    if (endTouch(e)) { live = null; return; }
+    if (panning) { panning = null; canvas.style.cursor = 'crosshair'; return; }
+    const points = live;
+    live = null;
+    if (!points || points.length < 3) { render(state); return; }
+
+    // Clear hover *before* the engine notifies: the render it triggers must
+    // report the mark just made, not whatever the cursor was resting on.
+    hoverId = null;
+    // Points are world coordinates; the scale says how big the hand's pixel was
+    // when they were drawn. Position belongs in world space, the hand does not —
+    // without this, the same check reads as a closed loop at 1.7x zoom.
+    const id = session.addStroke(points, Date.now(), undefined, 1 / view.zoom);
+
+    // Say what happened when a stroke rubbed something out — a silent erase is
+    // indistinguishable from a bug. Read it from the stroke's own gesture rep,
+    // NOT from a drop in the content count: a lasso resolved by a command mark
+    // also leaves the content plane, and reporting that as "erased" would be a
+    // lie about the one operation the user most needs to trust.
+    const after = session.getState();
+    const made = after.nodes.get(id);
+    const g = made && MM.getRep(made, 'gesture');
+    // Auto: take every open offer the moment it is made — this stroke, and any
+    // earlier closed stroke that was a loop-in-waiting until this one settled
+    // it. Never the held loop itself; that is a gesture until the next mark
+    // says otherwise.
+    if (!g) autoSweep();
+    if (g && g.data && g.data.role === 'scratch') {
+      const n = (g.data.erased || []).length;
+      flash('erased ' + n + ' mark' + (n === 1 ? '' : 's'));
+    } else if (after.markMiss && after.markMiss.nearMiss) {
+      // Only when the stroke was recognisably an ATTEMPT. A gesture that fails
+      // silently cannot be learned — the user cannot tell whether they drew it
+      // wrong, waited too long, or made it too big. Saying nothing about marks
+      // that were plainly just drawing keeps this from becoming nagging.
+      flash('no summon — ' + after.markMiss.detail);
+    }
+  });
+
+  canvas.addEventListener('pointerleave', () => { hoverId = null; render(state); });
+
+  addEventListener('keydown', (e) => {
+    if (e.code === 'Space' && !spaceHeld && e.target === document.body) {
+      spaceHeld = true; canvas.style.cursor = 'grab'; e.preventDefault();
+    }
+    if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); session.undo(); }
+    if (e.key === '0' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); fitAll(); }
+    if (e.target === document.body && (e.key === '=' || e.key === '+')) zoomAround(innerWidth / 2, innerHeight / 2, 1.2);
+    if (e.target === document.body && (e.key === '-' || e.key === '_')) zoomAround(innerWidth / 2, innerHeight / 2, 1 / 1.2);
+  });
+  addEventListener('keyup', (e) => {
+    if (e.code === 'Space') { spaceHeld = false; canvas.style.cursor = 'crosshair'; }
+  });
+
+  document.getElementById('undoBtn').onclick = () => session.undo();
+  inspectorEl.addEventListener('click', (e) => {
+    const b = e.target.closest && e.target.closest('button[data-act]');
+    if (!b) return;
+    const id = b.getAttribute('data-id');
+    const act = b.getAttribute('data-act');
+    if (act === 'snap') snapAll([id]);
+    else if (act === 'read') { const n = state.nodes.get(id); if (n && !readOne(n, true)) offerModel('Reading writing needs a model that can see.'); }
+    else if (act === 'split') session.splitWord(id, Date.now());
+    else session.snap({ ids: [id], mode: 'raw', at: Date.now() });
+  });
+  document.getElementById('resetBtn').onclick = () => location.reload();
+
+  // A transient line in the status bar. It must re-render IMMEDIATELY: the
+  // render triggered by the stroke itself has already happened by the time we
+  // know what the stroke did, so without this the message is set and never
+  // shown, and an erase looks silent.
+  let flashText = null, flashAt = 0, flashTimer = null;
+  const FLASH_MS = 1600;
+  function flash(msg) {
+    flashText = msg;
+    flashAt = Date.now();
+    render(session.getState());
+    clearTimeout(flashTimer);
+    flashTimer = setTimeout(() => { flashText = null; render(session.getState()); }, FLASH_MS);
+  }
+
+// ===== render =====
+// Provides: queries over state, the rungs cache, render(), ink, labels, explanations.
+// Uses: core, view, artifacts, snap, models, handwriting, palette, inspector, teach (syncMarkChip).
+// A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
+// in name order inside `(function () Ellipsis)();`. Shared state is the
+// closure's; no imports, no exports, no build step beyond the concatenation.
+
+  // ===== Queries over engine state ========================================
+  const authorOf = (node) => {
+    const e = node.edges.find((x) => x.rel === 'made-by');
+    return e ? e.to : MM.LOCAL_PARTICIPANT;
+  };
+  const isAgentNode = (node) => authorOf(node) !== MM.LOCAL_PARTICIPANT;
+  const nameOfParticipant = (pid) =>
+    pid === MM.LOCAL_PARTICIPANT ? 'you' : (MM.wordOf(state.nodes.get(pid)) || pid);
+
+  function nodeAt(x, y) {
+    const slack = wpx(8);
+    for (let i = state.contentIds.length - 1; i >= 0; i--) {
+      const b = MM.boundsOf(state.nodes.get(state.contentIds[i]));
+      if (b && x >= b.minX - slack && x <= b.maxX + slack &&
+               y >= b.minY - slack && y <= b.maxY + slack) {
+        return state.contentIds[i];
+      }
+    }
+    return null;
+  }
+
+  const union = (list) => list.reduce((a, b) => ({
+    minX: Math.min(a.minX, b.minX), maxX: Math.max(a.maxX, b.maxX),
+    minY: Math.min(a.minY, b.minY), maxY: Math.max(a.maxY, b.maxY),
+  }));
+
+  function lastContentId(s) {
+    return s.contentIds.length ? s.contentIds[s.contentIds.length - 1] : null;
+  }
+
+  // ===== The rungs, read once per frame ====================================
+  // Shape → role → genre for everything on the board, from session.read().
+  // Labels under marks, the inspector's ladder and the palette all read from
+  // the same reading, so they cannot disagree with each other. Cached on the
+  // set of ids, because hover re-renders and relate() is O(n²).
+  let rungs = { key: null, roles: new Map(), genre: null, reading: null };
+  function readRungs(s) {
+    const ids = s.contentIds.filter((id) => !s.artifacts.includes(id));
+    // Members of artifacts keep their roles — a box inside a live page is
+    // still a node, and the ladder should say so.
+    for (const aid of s.artifacts) {
+      for (const e of s.nodes.get(aid).edges) if (e.rel === 'has-part') ids.push(e.to);
+    }
+    const key = ids.join('|');
+    if (rungs.key === key) return rungs;
+    const reading = ids.length
+      ? session.read(ids)
+      : { roles: [], genre: { genre: 'empty', reasoning: 'nothing drawn yet' }, concepts: [], relations: [] };
+    rungs = { key, roles: new Map(reading.roles.map((r) => [r.id, r])), genre: reading.genre, reading };
+    return rungs;
+  }
+
+  // ===== Rendering: ink is ground truth ===================================
+  function path(points, closed) {
+    ctx.beginPath();
+    points.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
+    if (closed) ctx.closePath();
+  }
+  function inkStroke(points, closed, style) {
+    path(points, closed);
+    // A dark halo under every mark. On the ground it is invisible; over a
+    // live artifact it is the difference between ink you can see and ink that
+    // disappears into whatever colour the model happened to choose. One rule,
+    // no special case for "is this stroke over a page".
+    ctx.strokeStyle = C.halo;
+    ctx.lineWidth = style.width + wpx(2.5);
+    ctx.stroke();
+    ctx.strokeStyle = style.color;
+    ctx.lineWidth = style.width;
+    ctx.stroke();
+  }
+
+  function inkOf(node, style) {
+    const points = MM.strokePointsOf(node);
+    if (points) {
+      const clean = MM.cleanPointsOf(node);
+      if (clean) {
+        // Snapped: the clean form in front, the hand's ink faint beneath it.
+        // What was drawn is still there — that is the whole promise.
+        path(points, false);
+        ctx.strokeStyle = C.inkFaint;
+        ctx.lineWidth = Math.max(1, style.width * 0.7);
+        ctx.stroke();
+        inkStroke(clean, MM.cleanOf(node).closed, style);
+        return;
+      }
+      inkStroke(points, false, style);
+      // The offer: a ghost of what this mark would be, drawn clean. Dashed and
+      // faint so it reads as a question, not a change already made.
+      const offer = snapOffers.get(node.id);
+      if (offer && !style.gesture) {
+        const ideal = idealOf(node, offer.shape);
+        if (ideal) {
+          path(ideal.points, ideal.closed);
+          ctx.setLineDash([wpx(3), wpx(4)]);
+          ctx.strokeStyle = `rgba(${C.goldRGB},0.7)`;
+          ctx.lineWidth = wpx(1.2);
+          ctx.stroke();
+          ctx.setLineDash([]);
+        }
+      }
+      return;
+    }
+    for (const e of node.edges) { // artifact: draw its members (transparent within)
+      if (e.rel !== 'has-part') continue;
+      const m = state.nodes.get(e.to);
+      if (m && !m.reps.some((r) => r.modality === 'erased')) inkOf(m, style);
+    }
+  }
+
+  function render(s) {
+    state = s;
+    askModels(s);
+    readWriting(s);
+    syncStage(s);
+    refreshOffers();
+
+    const dpr = window.devicePixelRatio || 1;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, innerWidth, innerHeight);
+    // World space from here down. Ink scales with the drawing; chrome that must
+    // stay legible uses wpx() to hold a constant size on screen.
+    ctx.setTransform(dpr * view.zoom, 0, 0, dpr * view.zoom, dpr * view.panX, dpr * view.panY);
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    // Ink thins as you zoom out; hold a visible floor so a wide board still reads.
+    const inkW = Math.max(2, wpx(1.3));
+
+    for (const c of s.clusterCandidates) {
+      const b = union(c.nodeIds.map((id) => MM.boundsOf(s.nodes.get(id))));
+      const pad = wpx(14);
+      ctx.setLineDash([wpx(4), wpx(6)]);
+      ctx.strokeStyle = `rgba(${C.goldRGB},0.38)`;
+      ctx.lineWidth = wpx(1);
+      ctx.strokeRect(b.minX - pad, b.minY - pad, b.maxX - b.minX + pad * 2, b.maxY - b.minY + pad * 2);
+      ctx.setLineDash([]);
+      text(c.matches[0].name + '?  circle + mark to confirm', b.minX - wpx(12), b.minY - wpx(20), `rgba(${C.goldRGB},0.72)`);
+    }
+
+    const inspectedId = hoverId || lastContentId(s);
+
+    for (const id of s.contentIds) {
+      const node = s.nodes.get(id);
+      const isArtifact = s.artifacts.includes(id);
+      const isLive = s.live.includes(id);
+      const pending = s.pendingLassoId === id;
+      const color = pending ? `rgba(${C.goldRGB},0.9)` : (isAgentNode(node) ? C.agent : C.ink);
+
+      // A live artifact keeps its ink: the boxes you drew ARE the outlines of
+      // what got built, and that promise is only kept by drawing them on top.
+      inkOf(node, {
+        color: isLive ? `rgba(${C.goldRGB},0.85)` : color,
+        width: id === inspectedId ? inkW * 1.3 : inkW,
+      });
+
+      const b = MM.boundsOf(node);
+      if (isArtifact && b) {
+        brackets(b, isLive ? C.gold : `rgba(${C.goldRGB},0.7)`);
+        text((MM.wordOf(node) || '') + (isLive ? '  ·  live' : ''), b.minX, b.minY - wpx(10), C.gold);
+      } else if (b && !pending) {
+        // Two rungs at a glance: what it is, and what it plays.
+        // What it IS: the blessed name, the words it says, or the shape rung's
+        // reading. A model's reading of the GROUP this mark is in lands on the
+        // mark too, and it belongs in the panel and the palette, not under a
+        // circle as if the circle were "network-node-connections".
+        const said = MM.transcriptOf(node);
+        const shape = MM.interpretationsOf(node, s.nodes).filter((r) => r.tier === 0)[0];
+        const top = MM.wordOf(node) || (said ? '“' + said + '”' : shape ? shape.label : MM.topInterpretation(node));
+        const role = readRungs(s).roles.get(id);
+        const played = role && role.role !== 'unclassified' && role.role !== top ? ' · ' + role.role : '';
+        if (top) text(top + played, b.minX, b.maxY + wpx(15),
+          id === inspectedId ? `rgba(${C.labelRGB},0.95)` : `rgba(${C.labelRGB},0.5)`);
+      }
+    }
+
+    if (s.summon) {
+      for (const gid of s.summon.gestureIds) {
+        inkOf(s.nodes.get(gid), { color: `rgba(${C.goldRGB},0.55)`, width: inkW * 1.5, gesture: true });
+      }
+    }
+
+    if (live) {
+      ctx.beginPath();
+      live.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
+      ctx.strokeStyle = C.ink;
+      ctx.lineWidth = inkW;
+      ctx.stroke();
+    }
+
+    renderExplanations(s);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0); // back to screen space for the chrome
+    syncMarkChip(s);
+    renderSummon(s);
+    renderHeld(s);
+    renderInspector(s, inspectedId);
+
+    const strokes = s.contentIds.length - s.artifacts.length;
+    const fresh = flashText && Date.now() - flashAt < FLASH_MS;
+    const parts = [strokes + ' loose'];
+    if (s.artifacts.length) parts.push(s.artifacts.length + ' artifact' + (s.artifacts.length === 1 ? '' : 's') + (s.live.length ? ' (' + s.live.length + ' live)' : ''));
+    if (agents.length) parts.push(agents.map((a) => a.config.model).join(', '));
+    if (snapOffers.size) parts.push(snapOffers.size + ' read clean');
+    if (s.pendingLassoId) parts.push('loop held — cross it with ' + (s.commandMark ? 'your mark' : '✓') + ', or use the buttons beside it');
+    if (fresh) parts.push(flashText);
+    statusEl.textContent = parts.join('  ·  ');
+  }
+
+  function text(str, x, y, color) {
+    ctx.font = wpx(11).toFixed(2) + "px 'Space Grotesk', system-ui, sans-serif";
+    ctx.lineWidth = wpx(3);
+    ctx.strokeStyle = C.haloText;
+    ctx.strokeText(str, x, y);
+    ctx.fillStyle = color;
+    ctx.fillText(str, x, y);
+  }
+
+  function brackets(b, color) {
+    const L = wpx(12), p = wpx(9);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = wpx(1.5);
+    const corners = [
+      [b.minX - p, b.minY - p, L, 0, 0, L], [b.maxX + p, b.minY - p, -L, 0, 0, L],
+      [b.minX - p, b.maxY + p, L, 0, 0, -L], [b.maxX + p, b.maxY + p, -L, 0, 0, -L],
+    ];
+    for (const [x, y, dx1, dy1, dx2, dy2] of corners) {
+      ctx.beginPath();
+      ctx.moveTo(x + dx1, y + dy1); ctx.lineTo(x, y); ctx.lineTo(x + dx2, y + dy2);
+      ctx.stroke();
+    }
+  }
+
+  // ===== Explanations: answers live IN the canvas ==========================
+  /**
+   * The world rectangle a canvas object can occupy and still be READ — the
+   * viewport minus the chrome that floats over it. Fitting to the raw viewport
+   * is not enough: an answer card placed at the right edge lands underneath the
+   * inspector, which is the one place it is guaranteed to be unreadable.
+   */
+  function viewportWorld() {
+    const rail = document.querySelector('.rail');
+    const insp = document.getElementById('inspector');
+    const railH = rail ? rail.getBoundingClientRect().height : 0;
+    const inspRect = insp && insp.offsetParent !== null ? insp.getBoundingClientRect() : null;
+    const right = inspRect ? Math.min(innerWidth, inspRect.left) - 16 : innerWidth - 8;
+    const a = screenToWorld(8, railH + 8);
+    const b = screenToWorld(Math.max(120, right), innerHeight - 46);
+    return { minX: a.x, minY: a.y, maxX: b.x, maxY: b.y };
+  }
+
+  function renderExplanations(s) {
+    if (!s.explanations.length) return;
+    const vw = viewportWorld();
+    const stacked = new Map(); // subject key -> how many answers already drawn
+
+    for (const id of s.explanations) {
+      const node = s.nodes.get(id);
+      if (!node || MM.getRep(node, 'erased')) continue;
+      const data = MM.explanationOf(node);
+      const b = MM.boundsOf(node);
+      if (!data || !b) continue;
+
+      const about = MM.aboutIdsOf(node);
+      const key = about.join(',');
+      const slot = stacked.get(key) || 0;
+
+      const pad = 9, w = b.maxX - b.minX;
+      ctx.font = '11px ui-monospace, SFMono-Regular, Menlo, monospace';
+      const lines = wrapText(data.text, w - pad * 2);
+      const madeBy = node.edges.find((e) => e.rel === 'made-by');
+      const who = (madeBy && MM.wordOf(s.nodes.get(madeBy.to))) || 'agent';
+      const headH = 15, lineH = 15;
+      const h = pad * 2 + headH + lines.length * lineH;
+
+      // Core anchors the answer beside its subject; only the surface knows the
+      // viewport, so fitting it on screen is the surface's job. Stack later
+      // answers below earlier ones rather than overlapping them.
+      let x = b.minX, y = b.minY + slot * (h + 10);
+      const subjectBounds = about
+        .map((a) => (s.nodes.get(a) ? MM.boundsOf(s.nodes.get(a)) : null))
+        .filter(Boolean);
+      const subject = subjectBounds.length ? union(subjectBounds) : null;
+      // No room to the right of the subject — tuck the card under it instead.
+      if (x + w > vw.maxX && subject) {
+        x = Math.min(subject.minX, vw.maxX - w);
+        y = subject.maxY + wpx(16) + slot * (h + 10);
+      }
+      x = Math.max(vw.minX, Math.min(x, vw.maxX - w));
+      y = Math.max(vw.minY, Math.min(y, vw.maxY - h));
+      stacked.set(key, slot + 1);
+
+      if (subject) {
+        ctx.beginPath();
+        ctx.moveTo(subject.maxX, (subject.minY + subject.maxY) / 2);
+        ctx.lineTo(x, y + h / 2);
+        ctx.strokeStyle = 'rgba(138,180,200,0.32)';
+        ctx.lineWidth = wpx(1);
+        ctx.setLineDash([wpx(3), wpx(4)]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+
+      ctx.fillStyle = 'rgba(10,10,15,0.86)';
+      ctx.strokeStyle = 'rgba(138,180,200,0.38)';
+      ctx.lineWidth = wpx(1);
+      roundRect(x, y, w, h, 6);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = 'rgba(138,180,200,0.85)';
+      ctx.font = '10px ui-monospace, SFMono-Regular, Menlo, monospace';
+      ctx.fillText(who, x + pad, y + pad + 8);
+
+      ctx.fillStyle = C.ink;
+      ctx.font = '11px ui-monospace, SFMono-Regular, Menlo, monospace';
+      lines.forEach((ln, i) => ctx.fillText(ln, x + pad, y + pad + headH + 8 + i * lineH));
+    }
+  }
+
+  function wrapText(text, maxWidth) {
+    const words = String(text).split(/\s+/);
+    const lines = [];
+    let line = '';
+    for (const word of words) {
+      const next = line ? line + ' ' + word : word;
+      if (ctx.measureText(next).width > maxWidth && line) { lines.push(line); line = word; }
+      else line = next;
+    }
+    if (line) lines.push(line);
+    return lines.slice(0, 6);
+  }
+
+  function roundRect(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+// ===== palette =====
+// Provides: the command palette: conversions, painting, prompts (build/revise/ask/draw).
+// Uses: core, models, snap, render, artifacts.
+// A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
+// in name order inside `(function () Ellipsis)();`. Shared state is the
+// closure's; no imports, no exports, no build step beyond the concatenation.
+
+  // ===== The command palette ==============================================
+  //
+  // What the marks could BECOME, offered as one list. The order is the argument:
+  // conversions the engine can do by itself come first, because they are instant
+  // and work with nothing attached, and the ones that need a model come after,
+  // marked. A canvas whose every offer is "ask a model" is a chat box with a
+  // drawing area; a canvas that can tidy your boxes before anything is
+  // configured is a tool.
+  //
+  // Concepts come from `session.read()` — Tier 0 relations (insideness,
+  // nearness, alignment, peerhood) matched against the concept library. The
+  // palette never decides what the marks mean; it renders what the engine read.
+  let shownSummonId = null;
+  let paletteItems = [];
+  let paletteIndex = 0;
+
+  function conversionsFor(s) {
+    const sum = s.summon;
+    const reading = session.read(sum.enclosedIds);
+    const items = [];
+
+    for (const concept of reading.concepts) {
+      for (const conv of concept.conversions) {
+        // The same conversion can be offered by two concepts; keep the stronger.
+        const seen = items.find((i) => i.key === concept.concept + ':' + conv.id);
+        if (seen) continue;
+        items.push({
+          key: concept.concept + ':' + conv.id,
+          group: concept.concept,
+          groupConf: concept.confidence,
+          groupWhy: concept.reasoning,
+          label: conv.label,
+          why: conv.hint || '',
+          tier: conv.tier,
+          run: () => runConversion(sum, conv, concept),
+        });
+      }
+    }
+
+    // The engine's own offers: an artifact this matches, and the plain ways out.
+    for (const sug of sum.suggestions) {
+      if (sug.kind === 'match') {
+        items.unshift({
+          key: 'sug:' + sug.id, group: 'known', groupConf: sug.score || 1,
+          groupWhy: 'you have named this shape before',
+          label: 'It’s a ' + sug.label, why: 'hold it as another one', tier: 0,
+          run: () => session.bless({ summonId: sum.id, suggestionId: sug.id, at: Date.now() }),
+        });
+      }
+    }
+    // What the writing says becomes the offer to NAME with — the ship criterion
+    // for handwriting: write a word next to a shape and it becomes its name.
+    {
+      const labels = reading.roles.filter((r) => r.role === 'label' && sum.enclosedIds.includes(r.id));
+      const said = labels.map((r) => ({ r, t: MM.transcriptsOf(s.nodes.get(r.id))[0] })).filter((x) => x.t);
+      for (const { r, t } of said) {
+        items.unshift({
+          key: 'said:' + r.id, group: 'written', groupConf: t.confidence,
+          groupWhy: 'read from your handwriting by ' + nameOfParticipant(t.source),
+          label: 'Name it “' + t.text + '”', why: r.targets.length ? 'the word beside it, as its name' : 'the word you wrote, as its name', tier: 0,
+          run: () => session.bless({ summonId: sum.id, name: t.text, at: Date.now() }),
+        });
+      }
+      const unread = sum.enclosedIds.filter((id) => { const n = s.nodes.get(id); return n && isWriting(n) && !MM.transcriptOf(n); });
+      if (unread.length && agents.length) {
+        items.push({
+          key: 'read', group: 'always', groupConf: 0, groupWhy: '',
+          label: 'Read the writing', why: seeing().length ? unread.length + ' mark' + (unread.length === 1 ? '' : 's') + ' of writing, unread' : 'needs a model that can see', tier: 2,
+          run: () => { let any = false; unread.forEach((id) => { any = readOne(s.nodes.get(id), true) || any; }); if (!any) offerModel('Reading writing needs a model that can see — one marked “sees”.'); },
+        });
+      }
+    }
+
+    // What a model read this group as becomes an offer to NAME it — the
+    // benchmark's last clause. The model proposed; the human blesses; the
+    // engine then recognises the next one by its signature like any entry
+    // the human named. Readings arrive after the palette opens, so the list
+    // is repainted when they do (see askModels).
+    {
+      const seen = new Set();
+      const proposed = [];
+      for (const id of sum.enclosedIds) {
+        const n = s.nodes.get(id);
+        if (!n) continue;
+        for (const r of MM.interpretationsOf(n, s.nodes)) {
+          if (r.tier === 0 || r.blessed) continue;
+          const key = r.label.toLowerCase();
+          if (seen.has(key)) continue;
+          seen.add(key);
+          proposed.push(r);
+        }
+      }
+      proposed.sort((a, b) => b.weight - a.weight).slice(0, 3).forEach((r) => {
+        items.push({
+          key: 'proposed:' + r.label, group: 'proposed', groupConf: r.weight,
+          groupWhy: 'read this way by ' + r.sourceName,
+          label: 'Name it “' + r.label + '”', why: r.sourceName + (r.reasoning ? ' — ' + r.reasoning.slice(0, 60) : ''), tier: 0,
+          run: () => session.bless({ summonId: sum.id, name: r.label, at: Date.now() }),
+        });
+      });
+    }
+
+    // Drawing them clean: instant, offline, and the summon stays open so the
+    // next offer is taken from the cleaned-up marks.
+    const offers = snapMode === 'off' ? [] : session.snapCandidates(sum.enclosedIds);
+    if (offers.length) {
+      const all = offers.length === sum.enclosedIds.length;
+      items.unshift({
+        key: 'snap', group: 'clean',
+        groupConf: offers.reduce((a, o) => a + o.weight, 0) / offers.length,
+        groupWhy: 'each reads confidently as one shape',
+        label: all ? 'Draw them clean' : 'Draw ' + offers.length + ' of ' + sum.enclosedIds.length + ' clean',
+        why: shapesSummary(offers) + ' · ink kept', tier: 0,
+        run: () => { shownSummonId = null; snapAll(offers.map((o) => o.id), shapesSummary(offers)); },
+      });
+    }
+    if (!items.some((i) => i.label === 'Name this…')) {
+      items.push({
+        key: 'name', group: 'always', groupConf: 0, groupWhy: '',
+        label: 'Name this…', why: 'hold it as a thing you can use again', tier: 0,
+        run: (btn) => swapToInput(sum.id, btn),
+      });
+    }
+    items.push({
+      key: 'make', group: 'always', groupConf: 0, groupWhy: '',
+      // One gesture, one box; whether it builds or changes is context, not a mode.
+      label: sum.onArtifact ? 'Change it…' : 'Describe it…',
+      why: agents.length === 0 ? 'needs a model — tap to add one'
+        : sum.onArtifact ? 'change what this ink covers'
+        : (reading.genre && reading.genre.genre === 'graph' ? 'build it as a running diagram'
+          : reading.genre && reading.genre.genre === 'mixed' ? 'build it — a diagram inside a page'
+          : 'say what it should become'),
+      tier: 2,
+      run: (btn) => swapToPrompt(sum, btn),
+    });
+    if (agents.length > 0 && sum.enclosedIds.length > 0) {
+      items.push({
+        key: 'ask', group: 'always', groupConf: 0, groupWhy: '',
+        label: 'Ask about it…', why: 'answered into the canvas', tier: 2,
+        run: (btn) => swapToQuestion(sum.enclosedIds.slice(), btn),
+      });
+    }
+    if (agents.length > 0 && !sum.onArtifact) {
+      // The model holds a pen too: it says what it would add, in the shapes
+      // the canvas can read, and the engine draws it in its name.
+      items.push({
+        key: 'draw', group: 'always', groupConf: 0, groupWhy: '',
+        label: 'Ask it to draw…', why: 'marks added in the model’s name, beside these', tier: 2,
+        run: (btn) => swapToDraw(sum, btn),
+      });
+    }
+    items.push({
+      key: 'keep', group: 'always', groupConf: 0, groupWhy: '',
+      label: 'Keep as drawing', why: 'leave the marks as they are', tier: 0,
+      run: () => {
+        const keep = sum.suggestions.find((x) => x.kind === 'keep-as-drawing');
+        if (keep) session.bless({ summonId: sum.id, suggestionId: keep.id, at: Date.now() });
+        else session.dismiss(sum.id, Date.now());
+      },
+    });
+
+    // Groups stay whole — a reading split across the list reads as two readings.
+    // Within a group, what the engine can do alone comes first: instant,
+    // offline, and true regardless of what is plugged in. Between groups, the
+    // strongest reading leads and the always-available actions sit at the end.
+    const order = new Map();
+    for (const i of items) {
+      const best = order.get(i.group);
+      const rank = i.group === 'always' ? -1 : i.groupConf;
+      if (best === undefined || rank > best) order.set(i.group, rank);
+    }
+    return items.sort((a, b) => {
+      if (a.group !== b.group) return order.get(b.group) - order.get(a.group);
+      return a.tier - b.tier;
+    });
+  }
+
+  function runConversion(sum, conv, concept) {
+    const at = Date.now();
+    const ids = sum.enclosedIds.slice();
+    if (conv.effect.kind === 'tidy') {
+      session.dismiss(sum.id, at);
+      session.tidy({ ids: ids, mode: 'align', axis: conv.effect.axis, at: at });
+      flash('lined up ' + ids.length + ' marks');
+    } else if (conv.effect.kind === 'equalize') {
+      session.dismiss(sum.id, at);
+      session.tidy({ ids: ids, mode: 'equalize', at: at });
+      flash('matched ' + ids.length + ' sizes');
+    } else if (conv.effect.kind === 'name') {
+      session.bless({ summonId: sum.id, name: concept.concept, at: at });
+    } else if (conv.effect.kind === 'prompt') {
+      const input = document.querySelector('#summon input.filter');
+      if (input) { input.value = conv.effect.seed; }
+      swapToPrompt(sum, input, conv.effect.seed);
+    }
+  }
+
+  function renderSummon(s) {
+    document.body.classList.toggle('summoning', !!s.summon);
+    if (!s.summon) { summonEl.style.display = 'none'; summonEl.className = ''; shownSummonId = null; return; }
+    const sum = s.summon;
+    if (shownSummonId !== sum.id) {
+      shownSummonId = sum.id;
+      paletteItems = conversionsFor(s);
+      paletteIndex = 0;
+      summonEl.className = 'palette';
+      summonEl.style.display = 'block';
+      summonEl.innerHTML = '';
+
+      // Say what it is acting on, and how it decided — a wrong guess should be
+      // visible before you act on it, not after.
+      const scope = document.createElement('div');
+      scope.className = 'scope';
+      const onArt = sum.onArtifact
+        ? ' on <b>' + esc(MM.wordOf(s.nodes.get(sum.onArtifact.artifactId)) || 'artifact') + '</b>' +
+          (sum.onArtifact.regionIds.length ? ' · ' + esc(sum.onArtifact.regionIds.join(' ')) : '')
+        : '';
+      const genre = session.read(sum.enclosedIds).genre;
+      scope.innerHTML = '<b>' + sum.enclosedIds.length + ' mark' +
+        (sum.enclosedIds.length === 1 ? '' : 's') + '</b>' + onArt + ' — ' + esc(sum.scopeReasoning) +
+        (genre && genre.genre !== 'empty' ? ' · <b>' + esc(genre.genre) + '</b>' : '');
+      summonEl.appendChild(scope);
+
+      const filter = document.createElement('input');
+      filter.className = 'filter';
+      filter.placeholder = 'what should this become?';
+      filter.onkeydown = onPaletteKey;
+      filter.oninput = () => paintPalette(filter.value);
+      summonEl.appendChild(filter);
+
+      const list = document.createElement('div');
+      list.className = 'items';
+      summonEl.appendChild(list);
+      paintPalette('');
+      setTimeout(() => filter.focus(), 0);
+    }
+
+    const b = MM.boundsOf(s.nodes.get(sum.gestureIds[sum.gestureIds.length - 1]));
+    const p = worldToScreen(b.minX, b.maxY);
+    let left = Math.max(8, Math.min(p.x, innerWidth - summonEl.offsetWidth - 8));
+    const top = Math.max(8, Math.min(p.y + 14, innerHeight - summonEl.offsetHeight - 52));
+    // Keep clear of the panel: two things to read should not sit on each other.
+    const panel = inspectorEl.getBoundingClientRect();
+    if (!document.body.classList.contains('panelHidden') && panel.width && left < panel.right + 10 &&
+        top < panel.bottom && top + summonEl.offsetHeight > panel.top) {
+      left = Math.min(panel.right + 10, innerWidth - summonEl.offsetWidth - 8);
+    }
+    summonEl.style.left = left + 'px';
+    summonEl.style.top = top + 'px';
+  }
+
+  /** Recompute the offers for the open summon and repaint, keeping what was typed. */
+  function refreshPalette() {
+    const s = session.getState();
+    if (!s.summon || shownSummonId !== s.summon.id) return;
+    const filter = summonEl.querySelector('input.filter');
+    if (!filter || !summonEl.querySelector('.items')) return; // a prompt or name field has replaced the list
+    paletteItems = conversionsFor(s);
+    paintPalette(filter.value);
+  }
+
+  function visibleItems(query) {
+    const q = query.trim().toLowerCase();
+    if (!q) return paletteItems;
+    return paletteItems.filter((i) =>
+      (i.label + ' ' + i.group + ' ' + i.why).toLowerCase().includes(q));
+  }
+
+  function paintPalette(query) {
+    const list = summonEl.querySelector('.items');
+    if (!list) return;
+    const shown = visibleItems(query);
+    if (paletteIndex >= shown.length) paletteIndex = Math.max(0, shown.length - 1);
+    list.innerHTML = '';
+    if (shown.length === 0) {
+      list.innerHTML = '<div class="empty2">Nothing matches. Keep drawing to dismiss.</div>';
+      return;
+    }
+    let lastGroup = null;
+    shown.forEach((item, i) => {
+      if (item.group !== lastGroup) {
+        lastGroup = item.group;
+        const g = document.createElement('div');
+        g.className = 'group';
+        g.innerHTML = '<span>' + esc(item.group) + '</span>' +
+          (item.groupConf ? '<span class="conf" title="' + esc(item.groupWhy) + '">' +
+            item.groupConf.toFixed(2) + '</span>' : '');
+        list.appendChild(g);
+      }
+      const btn = document.createElement('button');
+      btn.className = 'item';
+      btn.setAttribute('aria-selected', String(i === paletteIndex));
+      btn.innerHTML = '<span>' + esc(item.label) + '</span>' +
+        (item.tier === 0 ? '<span class="tier0">·now</span>' : '') +
+        '<span class="why">' + esc(item.why) + '</span>';
+      btn.onclick = () => item.run(btn);
+      list.appendChild(btn);
+    });
+    const sel = list.querySelector('[aria-selected="true"]');
+    if (sel && sel.scrollIntoView) sel.scrollIntoView({ block: 'nearest' });
+  }
+
+  function onPaletteKey(e) {
+    e.stopPropagation();
+    const shown = visibleItems(e.target.value);
+    if (e.key === 'ArrowDown') { e.preventDefault(); paletteIndex = Math.min(shown.length - 1, paletteIndex + 1); paintPalette(e.target.value); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); paletteIndex = Math.max(0, paletteIndex - 1); paintPalette(e.target.value); }
+    else if (e.key === 'Enter') {
+      e.preventDefault();
+      const item = shown[paletteIndex];
+      if (item) item.run(summonEl.querySelectorAll('.item')[paletteIndex]);
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      session.dismiss(shownSummonId, Date.now());
+    }
+  }
+
+  /**
+   * Which regions this summon addresses. The engine's geometric answer, merged
+   * with what the artifact's own DOM reports under the ink — two independent
+   * reads of the same question, and the union is what the model is told.
+   */
+  function addressedRegions(sum) {
+    if (!sum.onArtifact) return [];
+    const lasso = state.nodes.get(sum.gestureIds[0]);
+    const b = lasso && MM.boundsOf(lasso);
+    const fromDom = b ? regionsUnderInk(sum.onArtifact.artifactId, b) : [];
+    return [...new Set((sum.onArtifact.regionIds || []).concat(fromDom))];
+  }
+
+  function swapToInput(summonId, btn) {
+    const input = document.createElement('input');
+    input.placeholder = 'name it…';
+    input.onkeydown = (e) => {
+      e.stopPropagation();
+      if (e.key === 'Enter' && input.value.trim()) {
+        session.bless({ summonId: summonId, name: input.value.trim(), at: Date.now() });
+      }
+    };
+    replaceWithField(btn, input);
+  }
+
+  // The freeform prompt — MVP.md §2 step 6. One box for building and for
+  // changing, because it is one gesture; whether the artifact already carries
+  // code is what decides, not a mode the human has to pick.
+  function swapToPrompt(sum, btn, seed) {
+    const revising = !!sum.onArtifact;
+    const input = document.createElement('input');
+    input.className = 'make filter';
+    input.value = seed || '';
+    input.placeholder = revising
+      ? 'change what this covers…'
+      : 'website with the copy in the squares…';
+    input.onkeydown = (e) => {
+      e.stopPropagation();
+      if (e.key !== 'Enter') return;
+      const prompt = input.value.trim();
+      if (!prompt) return;
+      if (agents.length === 0) {
+        // The escalation, made visible: the engine did all it could, and this
+        // is the step that needs a model. Open the pane instead of a dead box.
+        offerModel('“' + prompt.slice(0, 40) + '” needs a model to build. Tap one to join it, then describe it again.');
+        return;
+      }
+      input.disabled = true;
+      input.placeholder = 'building with ' + agents.length + ' model(s)…';
+      runPrompt(sum, prompt, revising);
+    };
+    replaceWithField(btn, input);
+  }
+
+  /**
+   * Swap the palette for a single field. The list is removed rather than left
+   * behind: once you are typing, the options are stale.
+   */
+  function replaceWithField(btn, input) {
+    const list = summonEl.querySelector('.items');
+    if (list) list.remove();
+    const filter = summonEl.querySelector('input.filter');
+    if (filter && filter !== input) filter.replaceWith(input);
+    else if (btn && btn.replaceWith) btn.replaceWith(input);
+    else summonEl.appendChild(input);
+    input.focus();
+    input.setSelectionRange(input.value.length, input.value.length);
+  }
+
+  function runPrompt(sum, prompt, revising) {
+    const at = Date.now();
+    let artifactId, addressed;
+
+    if (revising) {
+      artifactId = sum.onArtifact.artifactId;
+      addressed = addressedRegions(sum);
+      session.dismiss(sum.id, at); // the addressing mark has done its work
+    } else {
+      // Blessing first gives the code somewhere to live, and gives the region
+      // frame its origin. The name is the prompt, so the artifact says what it
+      // was asked to be.
+      const name = prompt.length > 30 ? prompt.slice(0, 30) + '…' : prompt;
+      artifactId = session.bless({ summonId: sum.id, name: name, at: at });
+      addressed = undefined;
+      if (!artifactId) { mpStatus.textContent = 'Could not hold that group.'; return; }
+    }
+
+    // What the human typed outranks a reading nobody asked for.
+    cancelReading();
+    mpStatus.textContent = (revising ? 'revising' : 'building') + ' with ' + agents.length + ' model(s)…';
+    agents.forEach((agent) => {
+      agent.generate({ prompt: prompt, artifactId: artifactId, at: Date.now(), addressed: addressed })
+        .then((res) => {
+          if (res.ok) {
+            const short = res.unfilled && res.unfilled.length
+              ? ' — left ' + res.unfilled.join(', ') + ' empty'
+              : '';
+            mpStatus.textContent =
+              agent.name + ' ' + (res.revised ? 'revised' : 'built') + ' ' + (res.revised ? (res.changed || res.filled) : res.filled).join(', ') + short;
+          } else {
+            mpStatus.textContent = agent.name + ' could not build (' + res.error + ') — the drawing is untouched.';
+            // A model that answered unusably is a thing you need to SEE to fix.
+            if (res.raw) window.__mm.lastRaw = res.raw;
+          }
+          render(session.getState());
+        });
+    });
+  }
+
+  function swapToDraw(sum, btn) {
+    const input = document.createElement('input');
+    input.placeholder = 'add a footer under these…';
+    input.className = 'ask';
+    input.onkeydown = (e) => {
+      e.stopPropagation();
+      if (e.key !== 'Enter') return;
+      const q = input.value.trim();
+      if (!q) return;
+      const ids = sum.enclosedIds.slice();
+      session.dismiss(sum.id, Date.now());
+      cancelReading();
+      mpStatus.textContent = 'drawing with ' + agents.length + ' model(s)…';
+      agents.forEach((agent) => {
+        agent.draw({ prompt: q, nodeIds: ids, at: Date.now() }).then((res) => {
+          if (res.ok) {
+            mpStatus.textContent = agent.name + ' drew ' + res.ids.length + ' mark' + (res.ids.length === 1 ? '' : 's') +
+              ': ' + res.shapes.map((s) => s.shape).join(', ');
+            flash(agent.name + ' drew ' + res.ids.length);
+          } else {
+            mpStatus.textContent = agent.name + ' drew nothing (' + res.error + ').';
+            if (res.raw) window.__mm.lastRaw = res.raw;
+          }
+          render(session.getState());
+        });
+      });
+    };
+    replaceWithField(btn, input);
+  }
+
+  function swapToQuestion(nodeIds, btn) {
+    const input = document.createElement('input');
+    input.placeholder = 'ask about these…';
+    input.className = 'ask';
+    input.onkeydown = (e) => {
+      e.stopPropagation();
+      if (e.key !== 'Enter') return;
+      const q = input.value.trim();
+      if (!q) return;
+      input.disabled = true;
+      input.placeholder = 'asking ' + agents.length + ' model(s)…';
+      cancelReading();
+      agents.forEach((agent) => {
+        agent.ask(q, nodeIds, Date.now()).then((res) => {
+          if (!res.ok) mpStatus.textContent = agent.name + ' could not answer (' + res.error + ').';
+          render(session.getState());
+        });
+      });
+    };
+    replaceWithField(btn, input);
+  }
+
+// ===== inspector =====
+// Provides: the panel: a mark, an artifact, a word, the selection.
+// Uses: core, render (readRungs), snap, handwriting, models.
+// A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
+// in name order inside `(function () { ... })();`. Shared state is the
+// closure's; no imports, no exports, no build step beyond the concatenation.
+
+  // ===== Inspector: what the machine currently holds, and why ==============
+  function renderInspector(s, id) {
+    if (s.summon) return renderSummonScope(s);
+
+    const node = id && s.nodes.get(id);
+    if (!node) {
+      inspectorEl.innerHTML = '<div class="eyebrow">mark</div>' +
+        '<div class="empty">Draw something. Each mark keeps every reading it has; ' +
+        'nothing is committed until you bless it.</div>';
+      return;
+    }
+
+    const isArtifact = s.artifacts.includes(id);
+    const isLive = s.live.includes(id);
+    const isWordNode = MM.isWord(node);
+    const author = MM.strokePointsOf(node)
+      ? authorOf(node)
+      : ((node.reps.find((r) => r.modality === 'word') || {}).source || MM.LOCAL_PARTICIPANT);
+    const authorName = nameOfParticipant(author);
+    let html = '<div class="eyebrow">' +
+      (isLive ? 'living page' : isArtifact ? 'artifact' : isWordNode ? 'word' : 'mark') + '</div>';
+
+    html += '<div class="row"><span class="k">id</span><span class="v">' + esc(id) + '</span></div>';
+    html += '<div class="row"><span class="k">by</span><span class="v ' +
+      (author !== MM.LOCAL_PARTICIPANT ? 'by-agent' : 'by-human') + '">' + esc(authorName) + '</span></div>';
+
+    if (isWordNode) {
+      const letters = MM.lettersOf(node);
+      html += '<div class="row"><span class="k">letters</span><span class="v">' + letters.length + ' strokes, gathered as one word</span></div>' +
+        '<button class="mini" data-act="split" data-id="' + esc(id) + '">not a word — split it</button>';
+    }
+    if (isArtifact) {
+      const members = node.edges.filter((e) => e.rel === 'has-part');
+      html += '<div class="row"><span class="k">name</span><span class="v">' + esc(MM.wordOf(node)) + '</span></div>';
+      html += '<div class="row"><span class="k">holds</span><span class="v">' + members.length + ' marks</span></div>';
+      const sig = (node.reps.find((r) => r.modality === 'signature') || {}).data;
+      if (sig) {
+        html += '<div class="row"><span class="k">sig</span><span class="v">' +
+          esc(Object.entries(sig).map(([k, v]) => v + '×' + k).join(' + ')) + '</span></div>';
+      }
+      const inst = node.edges.find((e) => e.rel === 'instance-of');
+      if (inst) html += '<div class="row"><span class="k">same as</span><span class="v">' + esc(inst.to) + '</span></div>';
+    }
+
+    // The code plane. Every attempt is kept and attributed; the newest is what
+    // renders. Generation is a proposal like any other reading (MVP.md §7).
+    const codes = node.reps.filter((r) => r.modality === 'code');
+    if (codes.length) {
+      const newest = codes[codes.length - 1];
+      html += '<div class="sep"></div><div class="eyebrow">code' +
+        (codes.length > 1 ? ' <span class="srccount">' + codes.length + ' versions</span>' : '') + '</div>';
+      html += '<div class="row"><span class="k">built by</span><span class="v by-agent">' +
+        esc(nameOfParticipant(newest.source)) + '</span></div>';
+      html += '<div class="row"><span class="k">size</span><span class="v">' +
+        newest.data.code.length + ' chars</span></div>';
+      if (newest.data.prompt) html += '<div class="why">“' + esc(newest.data.prompt) + '”</div>';
+
+      const regions = MM.regionsOf(node, s.nodes);
+      html += '<div class="row"><span class="k">regions</span><span class="v">' +
+        regions.map((r) => r.id).join(' ') + '</span></div>';
+      if (codes.length > 1) html += '<div class="why">Earlier versions are kept.</div>';
+    }
+
+    // THE LADDER. Every rung a mark has climbed, with why at each one — ink,
+    // shape, what it plays, what it became. Each rung keeps the one below it,
+    // so a wrong reading at the top never destroys the bottom (KEYFRAMES.md §3).
+    {
+      const rung = readRungs(s);
+      const role = rung.roles.get(id);
+      const shapeRead = MM.interpretationsOf(node, s.nodes).filter((r) => r.tier === 0)[0];
+      const rows = [];
+      const fpx = MM.fingerprintOf(node);
+      if (fpx) {
+        const scaleRep = (node.reps.find((r) => r.modality === 'stroke') || {}).data || {};
+        rows.push(['ink', fpx.pointCount + ' points' + (scaleRep.scale ? ' at ' + (1 / scaleRep.scale).toFixed(1) + '×' : ''), '']);
+      } else if (isArtifact) {
+        rows.push(['ink', node.edges.filter((e) => e.rel === 'has-part').length + ' marks held', '']);
+      }
+      if (shapeRead) rows.push(['shape', shapeRead.label + ' ' + shapeRead.weight.toFixed(2), shapeRead.reasoning || '']);
+      // Clean form: held, offered, or neither — and the one-mark way to take it up.
+      const clean = MM.cleanOf(node);
+      const offer = snapOffers.get(id);
+      if (clean) {
+        rows.push(['clean', 'drawn as a ' + clean.shape, clean.reasoning,
+          '<button class="mini" data-act="raw" data-id="' + esc(id) + '">show the ink</button>']);
+      } else if (offer) {
+        rows.push(['clean?', 'could be a ' + offer.shape, offer.reasoning,
+          '<button class="mini" data-act="snap" data-id="' + esc(id) + '">draw it clean</button>']);
+      } else if (shapeRead && !isArtifact && snapMode !== 'off' && s.pendingLassoId !== id) {
+        // Not offered — and the reason is the useful part: a reading that is
+        // too weak or too close to another is exactly what a redraw would hide.
+        const why = MM.snapReading(node, s.nodes);
+        if (why.shape !== 'text') rows.push(['clean?', 'not offered', why.reasoning]);
+      }
+      if (role) {
+        const dir = role.direction ? ' ' + role.direction.from + ' → ' + role.direction.to : '';
+        rows.push(['plays', role.role + dir, role.reasoning]);
+      }
+      // The code rung: the element this mark became, if it is inside a live artifact.
+      const owner = s.live.map((aid) => s.nodes.get(aid)).find((a) => a && a.edges.some((e) => e.rel === 'has-part' && e.to === id));
+      const ownCode = isLive ? codes[codes.length - 1] : (owner ? owner.reps.filter((r) => r.modality === 'code').pop() : null);
+      if (ownCode) {
+        const regs = (ownCode.data.regions || []);
+        const mine = isLive ? null : regs.find((r) => r.nodeId === id);
+        const m = mine && String(ownCode.data.code).match(new RegExp('<([a-z]+)[^>]*data-region="' + mine.id + '"'));
+        rows.push(['code', isLive
+          ? (rung.genre && (rung.genre.genre === 'graph' || rung.genre.genre === 'mixed') ? 'a running diagram' : 'a running page')
+          : (m ? '<' + m[1] + ' data-region="' + mine.id + '">' : 'part of ' + (MM.wordOf(owner) || 'an artifact')),
+          isLive && rung.genre ? rung.genre.reasoning : '']);
+      }
+      if (rows.length) {
+        html += '<div class="sep"></div><div class="eyebrow">reading</div><div class="ladder">';
+        rows.forEach(([k, v, why, action]) => {
+          html += '<div class="row"><span class="k">' + esc(k) + '</span><span class="v">' + esc(v) + '</span></div>';
+          if (why) html += '<div class="why">' + esc(why) + '</div>';
+          if (action) html += action;
+        });
+        html += '</div>';
+      }
+    }
+
+    // Held interpretations — EVERY reading, from EVERY source, grouped by who
+    // said it. Tiers are simultaneous, not an escalation ladder.
+    const reads = MM.interpretationsOf(node, s.nodes);
+    if (reads.length) {
+      const groups = MM.bySource(reads);
+      const gap = MM.disagreement(reads);
+
+      html += '<div class="sep"></div><div class="eyebrow">read as' +
+        (groups.length > 1 ? ' <span class="srccount">' + groups.length + ' sources</span>' : '') + '</div>';
+
+      if (gap && gap.crossSource) {
+        html += '<div class="gap">sources differ: ' +
+          gap.labels.slice(0, 3).map((l) => esc(l.label)).join(' vs ') + '</div>';
+      }
+
+      html += '<div class="reads">';
+      groups.forEach((g) => {
+        const tier = g.interpretations[0].tier;
+        html += '<div class="srchead"><span class="by">' + esc(g.label) + '</span>' +
+          '<span class="tier">tier ' + tier + '</span></div>';
+        g.interpretations.forEach((r, i) => {
+          html += '<div class="read' + (i === 0 ? ' top' : '') + (r.blessed ? ' blessed' : '') + '">' +
+            '<span class="type">' + esc(r.label) + '</span>' +
+            '<span class="w">' + r.weight.toFixed(2) + '</span></div>';
+          if (r.reasoning) html += '<div class="why">' + esc(r.reasoning) + '</div>';
+        });
+      });
+      html += '</div>';
+    }
+
+    // What the writing says — every transcript, attributed. The one reading
+    // that came in as pixels, and the model that gave it is named.
+    if ((MM.strokePointsOf(node) || MM.isWord(node)) && !isArtifact && isWriting(node)) {
+      const said = MM.transcriptsOf(node);
+      html += '<div class="sep"></div><div class="eyebrow">handwriting</div>';
+      if (said.length) {
+        html += '<div class="reads">';
+        said.forEach((t, i) => {
+          html += '<div class="read' + (i === 0 ? ' top' : '') + '"><span class="type">“' + esc(t.text) + '”</span>' +
+            '<span class="w">' + t.confidence.toFixed(2) + '</span></div>' +
+            '<div class="why">by ' + esc(nameOfParticipant(t.source)) + '</div>';
+        });
+        html += '</div>';
+        if (seeing().length) html += '<button class="mini" data-act="read" data-id="' + esc(id) + '">read it again</button>';
+      } else if (seeing().length) {
+        html += '<div class="why">not read yet</div><button class="mini" data-act="read" data-id="' + esc(id) + '">read it</button>';
+      } else {
+        html += '<div class="why">writing, unread — needs a model that can see (add one that says “sees”)</div>';
+      }
+    }
+
+    // The engaging relations and the wires — not the peer/alignment ones,
+    // which are true of nearly everything and would drown the list.
+    const rels = node.edges.filter((e) =>
+      ['near', 'touching', 'crossing', 'contains', 'inside', 'connects', 'connected-by', 'points-to', 'points-from', 'part-of'].includes(e.rel));
+    if (rels.length) {
+      html += '<div class="sep"></div><div class="eyebrow">relations</div>';
+      const seen = new Set();
+      rels.forEach((e) => {
+        const key = e.rel + e.to;
+        if (seen.has(key)) return;
+        seen.add(key);
+        const label = e.rel === 'part-of' ? 'part of ' + (MM.wordOf(s.nodes.get(e.to)) || e.to) : e.rel + ' ' + e.to;
+        html += '<div class="row"><span class="k">' + (e.blessed ? 'blessed' : 'held') + '</span>' +
+          '<span class="v">' + esc(label) + '</span></div>';
+      });
+    }
+
+    // The maths: what follows from the reading, measured from the ink. A
+    // circle has a radius; a triangle's angles add to 180°. Arithmetic on a
+    // reading, not a reading — no confidence, nothing to argue with.
+    const maths = !isArtifact && MM.strokePointsOf(node) ? MM.measure(node, s.nodes) : null;
+    if (maths && maths.measures.length) {
+      html += '<div class="sep"></div><div class="eyebrow">maths <span class="srccount">' + esc(maths.shape) + '</span></div>';
+      const shown = maths.measures.filter((x) => x.key !== 'centreY');
+      shown.forEach((x) => {
+        const v = x.key === 'centre' && x.at ? '(' + Math.round(x.at.x) + ', ' + Math.round(x.at.y) + ')'
+          : (Number.isFinite(x.value) ? x.value.toLocaleString('en-US') : '∞') + esc(x.unit);
+        html += '<div class="row"><span class="k">' + esc(x.label) + '</span><span class="v">' + v + '</span></div>';
+      });
+    }
+
+    const fp = MM.fingerprintOf(node);
+    if (fp) {
+      html += '<div class="sep"></div><div class="eyebrow">measured</div>' +
+        '<div class="row"><span class="k">straight</span><span class="v">' + fp.straightness.toFixed(3) + '</span></div>' +
+        '<div class="row"><span class="k">corners</span><span class="v">' + fp.corners + '</span></div>' +
+        '<div class="row"><span class="k">closed</span><span class="v">' + (fp.isClosed ? 'yes' : 'no') + '</span></div>' +
+        '<div class="row"><span class="k">size</span><span class="v">' + Math.round(fp.size) + 'px</span></div>';
+    }
+
+    inspectorEl.innerHTML = html;
+  }
+
+  function renderSummonScope(s) {
+    const sum = s.summon;
+    const reading = session.read(sum.enclosedIds);
+    let html = '<div class="eyebrow">selection</div>';
+
+    html += '<div class="row"><span class="k">holds</span><span class="v">' +
+      sum.enclosedIds.length + ' mark' + (sum.enclosedIds.length === 1 ? '' : 's') + '</span></div>';
+    html += '<div class="row"><span class="k">scope</span><span class="v">' + esc(sum.scopeSource) + '</span></div>';
+    html += '<div class="why">' + esc(sum.scopeReasoning) + '</div>';
+    // Which way this will compile — a page or a diagram — and what each mark plays.
+    if (reading.genre) {
+      html += '<div class="row"><span class="k">genre</span><span class="v">' + esc(reading.genre.genre) + '</span></div>';
+      html += '<div class="why">' + esc(reading.genre.reasoning) + '</div>';
+    }
+    if (reading.roles && reading.roles.length) {
+      html += '<div class="sep"></div><div class="eyebrow">roles</div>';
+      reading.roles.forEach((r) => {
+        const dir = r.direction ? ' ' + r.direction.from + ' → ' + r.direction.to : '';
+        html += '<div class="row"><span class="k">' + esc(r.role) + '</span><span class="v">' + esc(r.id + dir) + '</span></div>';
+      });
+    }
+
+    if (sum.onArtifact) {
+      const art = s.nodes.get(sum.onArtifact.artifactId);
+      html += '<div class="row"><span class="k">on</span><span class="v">' +
+        esc(MM.wordOf(art) || sum.onArtifact.artifactId) + '</span></div>';
+      html += '<div class="row"><span class="k">covers</span><span class="v">' +
+        (sum.onArtifact.regionIds.length ? esc(sum.onArtifact.regionIds.join(', ')) : 'the whole page') + '</span></div>';
+    }
+
+    // The concepts these marks read as. Tier 0, from measured relations — this
+    // is what the palette is offering from, so it is what the inspector must
+    // explain. Several at once, ranked, like every other reading in the engine.
+    if (reading.concepts.length) {
+      html += '<div class="sep"></div><div class="eyebrow">read as' +
+        (reading.concepts.length > 1 ? ' <span class="srccount">' + reading.concepts.length + ' concepts</span>' : '') +
+        '</div><div class="reads">';
+      reading.concepts.forEach((c, i) => {
+        html += '<div class="read' + (i === 0 ? ' top' : '') + '">' +
+          '<span class="type">' + esc(c.concept) + '</span>' +
+          '<span class="w">' + c.confidence.toFixed(2) + '</span></div>';
+        html += '<div class="why">' + esc(c.reasoning) + '</div>';
+        if (c.roles) {
+          for (const role of Object.keys(c.roles)) {
+            html += '<div class="row"><span class="k">' + esc(role) + '</span>' +
+              '<span class="v">' + esc(c.roles[role].join(', ')) + '</span></div>';
+          }
+        }
+      });
+      html += '</div>';
+    } else {
+      html += '<div class="sep"></div><div class="why">No concept matched yet.</div>';
+    }
+
+    // The relations underneath, which is where those readings came from.
+    const rels = reading.relations.filter((r, i, all) =>
+      all.findIndex((x) => x.kind === r.kind && x.from === r.from && x.to === r.to) === i);
+    if (rels.length) {
+      const byKind = {};
+      rels.forEach((r) => { byKind[r.kind] = (byKind[r.kind] || 0) + 1; });
+      html += '<div class="sep"></div><div class="eyebrow">relations</div>';
+      Object.keys(byKind).sort().forEach((kind) => {
+        html += '<div class="row"><span class="k">' + esc(kind) + '</span>' +
+          '<span class="v">' + byKind[kind] + '</span></div>';
+      });
+      const strongest = rels.slice().sort((a, b) => b.strength - a.strength)[0];
+      if (strongest) html += '<div class="why">' + esc(strongest.kind + ': ' + strongest.reasoning) + '</div>';
+    }
+
+    inspectorEl.innerHTML = html;
+  }
+
+  // Debug handle. This is a reference surface for the engine, so reading the
+  // graph from the console is a feature, not a leak.
+
+// ===== replay =====
+// Provides: replay: a recorded session stepped through (rpGoTo, rpStart, startReplay).
+// Uses: core, view, render, input.
+// A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
+// in name order inside `(function () { ... })();`. Shared state is the
+// closure's; no imports, no exports, no build step beyond the concatenation.
+
+  // ===== Replay: a recorded session as a figure =============================
+  //
+  // State is a pure function of the log, so a session recorded once — every
+  // model reply captured as the event it was — replays here with no model
+  // attached, at any step, inspectable. Load a prefix to stand at a step;
+  // draw afterwards and the recording continues with your marks.
+  const rp = { rec: null, step: -1, timer: null };
+  const rpEl = document.getElementById('replay');
+  const rpCaption = document.getElementById('rpCaption'), rpStep = document.getElementById('rpStep');
+  const rpScrub = document.getElementById('rpScrub'), rpPlay = document.getElementById('rpPlay');
+
+  function rpGoTo(i) {
+    if (!rp.rec) return;
+    const steps = rp.rec.steps;
+    i = Math.max(0, Math.min(steps.length - 1, i));
+    rp.step = i;
+    session.load(rp.rec.events.slice(0, steps[i].after));
+    rpScrub.value = String(i);
+    rpStep.textContent = (i + 1) + ' / ' + steps.length;
+    rpCaption.innerHTML = '<b>' + (i + 1) + '.</b> ' + esc(steps[i].caption);
+    if (i === steps.length - 1) rpStop();
+  }
+  function rpStop() { if (rp.timer) { clearInterval(rp.timer); rp.timer = null; } rpPlay.textContent = '▶'; }
+  function rpStart() {
+    if (!rp.rec) return;
+    if (rp.step >= rp.rec.steps.length - 1) rpGoTo(0);
+    rpStop();
+    rp.timer = setInterval(() => rpGoTo(rp.step + 1), Number(params.get('every') || 3200));
+    rpPlay.textContent = '❚❚';
+  }
+  async function startReplay(url) {
+    try {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      rp.rec = await res.json();
+    } catch (err) {
+      flash('could not load the recording (' + err.message + ')');
+      return;
+    }
+    rpScrub.max = String(rp.rec.steps.length - 1);
+    rpEl.hidden = false;
+    // Fit the whole recording once, so stepping never moves the view.
+    session.load(rp.rec.events);
+    fitAll();
+    rpGoTo(0);
+    if (params.has('autoplay')) rpStart();
+  }
+  rpScrub.oninput = () => { rpStop(); rpGoTo(Number(rpScrub.value)); };
+  document.getElementById('rpPrev').onclick = () => { rpStop(); rpGoTo(rp.step - 1); };
+  document.getElementById('rpNext').onclick = () => { rpStop(); rpGoTo(rp.step + 1); };
+  rpPlay.onclick = () => (rp.timer ? rpStop() : rpStart());
+  addEventListener('keydown', (e) => {
+    if (!rp.rec || e.target !== document.body) return;
+    if (e.key === 'ArrowRight') { rpStop(); rpGoTo(rp.step + 1); }
+    else if (e.key === 'ArrowLeft') { rpStop(); rpGoTo(rp.step - 1); }
+    else if (e.key === ' ') { e.preventDefault(); rpPlay.onclick(); }
+  });
+  // A stroke of the reader's own continues the recording from where it stands.
+  canvas.addEventListener('pointerdown', () => { if (rp.rec && rp.timer) { rpStop(); rpCaption.innerHTML = '<b>' + (rp.step + 1) + '.</b> ' + esc(rp.rec.steps[rp.step].caption) + ' <span style="color:var(--dim)">— continuing from here with your marks</span>'; } });
+
+// ===== boot =====
+// Provides: the debug handle (window.__mm, what the e2e drives), subscription, restore, first render.
+// Uses: everything.
+// A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
+// in name order inside `(function () { ... })();`. Shared state is the
+// closure's; no imports, no exports, no build step beyond the concatenation.
+
+  window.__mm = {
+    session: session, agents: agents, MM: MM, view: view, frames: frames,
+    savedMark: savedMark, forgetMark: forgetMark, join: join, probeLocal: probeLocal,
+    screenToWorld: screenToWorld, worldToScreen: worldToScreen,
+    fitAll: fitAll, regionsUnderInk: regionsUnderInk,
+    snapMode: () => snapMode, setSnapMode: setSnapMode, snapOffers: () => snapOffers,
+    inkImage: inkImage, readOne: readOne, readWriting: readWriting,
+    replay: () => rp, rpGoTo: (i) => rpGoTo(i), theme: THEME,
+    // For tests: pin the view so world coordinates map to known screen ones.
+    setView: (zoom, panX, panY) => { view.zoom = zoom; view.panX = panX; view.panY = panY; afterViewChange(); },
+  };
+
+
+  session.subscribe(render);
+  const replayUrl = params.get('replay');
+  if (!replayUrl) {
+    restoreMark();
+    rejoinRemembered();
+  } else {
+    startReplay(replayUrl);
+  }
+  document.fonts.ready.then(() => { sizePad(); render(session.getState()); });
+  resize();
+  afterViewChange();
+})();

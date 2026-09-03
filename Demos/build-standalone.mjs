@@ -21,12 +21,20 @@ if (!out) {
 
 let html = readFileSync(resolve(here, 'session-engine.html'), 'utf8');
 const bundle = readFileSync(resolve(here, 'metamedium-core.browser.js'), 'utf8');
+const surface = readFileSync(resolve(here, 'session-engine.js'), 'utf8');
+const css = readFileSync(resolve(here, 'surface/surface.css'), 'utf8');
 
-const tag = '<script src="metamedium-core.browser.js"></script>';
-if (!html.includes(tag)) throw new Error('bundle script tag not found — did the demo change?');
-// Guard: a literal </script> inside the bundle would close the tag early.
-if (bundle.includes('</script>')) throw new Error('bundle contains a literal </script>');
-html = html.replace(tag, '<script>\n' + bundle + '\n</script>');
+const inline = (tag, code, what) => {
+  if (!html.includes(tag)) throw new Error(`${what} tag not found — did the demo change?`);
+  // Guard: a literal </script> inside the code would close the tag early.
+  if (code.includes('</script>')) throw new Error(`${what} contains a literal </script>`);
+  html = html.replace(tag, '<script>\n' + code + '\n</script>');
+};
+inline('<script src="metamedium-core.browser.js"></script>', bundle, 'bundle');
+inline('<script src="session-engine.js"></script>', surface, 'surface');
+const link = '<link rel="stylesheet" href="surface/surface.css">';
+if (!html.includes(link)) throw new Error('stylesheet link not found — did the demo change?');
+html = html.replace(link, '<style>\n' + css + '</style>');
 
 if (asFragment) {
   const style = html.match(/<style>[\s\S]*?<\/style>/)[0];

@@ -22,7 +22,7 @@
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400;1,9..40,500&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400;1,9..40,500&family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
         /* ===========================================
            MetaMedium Design System v4
@@ -502,114 +502,168 @@
         }
         
         
-    figure {
-            margin: var(--space-lg) 0;
-            background: #fff;
-            border: 1px solid var(--border);
-            border-radius: 8px;
+    /* ==========================================================
+       FIGURES AND DIAGRAMS
+       From brand/tokens.css and brand/styleguide.html §11 — the
+       single home. Additive on purpose: every name here is new,
+       so the page's own palette is untouched until the whitepaper
+       itself is migrated. Do not diverge these values; change
+       them in brand/tokens.css first.
+       ========================================================== */
+        :root {
+            --mm-face: 'IBM Plex Mono', 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
+            --mm-teal: #0b6f7d;
+            --mm-ink: #0c1a24;
+            --mm-ink-3: #5b7080;
+            --mm-ink-4: #8ea3ad;
+            --sig-read: #1c5fb8;
+            --sig-held: #7b8a94;
+            --sig-model: #6b4fa8;
+
+            --fig-plate: #fbfcfd;
+            --fig-well: #e7eef0;
+            --fig-edge: #dde7ea;
+            --fig-rule: #e3ecee;
+            --fig-pad: 1.15rem;
+            --fig-wide: 1040px;
+            --fig-band: 860px;
+
+            --dia-ink: var(--mm-ink);
+            --dia-quiet: var(--mm-ink-3);
+            --dia-faint: var(--mm-ink-4);
+            --dia-key: var(--mm-teal);
+            --dia-live: var(--sig-read);
+            --dia-model: var(--sig-model);
+            --dia-hold: var(--sig-held);
+            --dia-tint: rgba(11,111,125,0.07);
+            --dia-tint-live: rgba(28,95,184,0.07);
+            --dia-tint-flat: rgba(12,26,36,0.04);
+        }
+
+        /* ONE figure component: a plate holding the drawing, a caption behind
+           one hairline, and BOTH ON THE SAME PADDING. The old figures padded
+           the drawing 0.75rem inside a tinted gradient and the caption
+           1rem/1.5rem against a border it did not share, which is what made
+           every caption read as bolted on. */
+        figure {
+            margin: var(--space-xl) 0;
+            background: var(--fig-plate);
+            border: 1px solid var(--fig-edge);
+            border-radius: 3px;
             overflow: hidden;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.05);
-            /* Break out of text column */
-            width: 90vw;
-            max-width: 1100px;
+            box-shadow: 0 1px 2px rgba(12,26,36,0.05);
+            /* Step out of the prose measure at a FIXED width, never 90vw: a
+               viewport-relative figure changes its relationship to the text
+               column at every window size, so the same diagram reads
+               differently on every screen. */
+            width: min(var(--fig-wide), calc(100vw - 3rem));
+            max-width: var(--fig-wide);
             margin-left: 50%;
             transform: translateX(-50%);
             position: relative;
         }
-        
-        /* Two-column figures */
+        figure.band { width: min(var(--fig-band), calc(100vw - 3rem)); max-width: var(--fig-band); }
+
+        figure > .plate { padding: var(--fig-pad); }
+        figure > .plate > .image { width: 100%; }
+        figure > .plate > .image > svg,
+        figure > .plate > .image > img,
+        figure > .plate > svg,
+        figure > .plate > img { display: block; width: 100%; height: auto; }
+        figure > img { display: block; width: 100%; }
+
+        figcaption {
+            padding: var(--fig-pad);
+            border-top: 1px solid var(--fig-rule);
+            font-family: 'DM Sans', sans-serif;
+            font-size: 0.925rem;
+            line-height: 1.55;
+            color: var(--mm-ink-3);
+            font-style: normal;
+        }
+        /* The figure's own name: a block label in the accent, at micro size.
+           It replaces the old .label div, which lived INSIDE the plate and so
+           was not a caption at all as far as a screen reader was concerned. */
+        figcaption > b {
+            display: block;
+            font-family: var(--mm-face);
+            font-size: 0.7rem;
+            font-weight: 600;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            color: var(--mm-teal);
+            margin-bottom: 0.35rem;
+        }
+        figcaption strong { color: var(--ink); font-style: normal; font-weight: 600; }
+        figcaption code, figcaption .mono { font-family: var(--mm-face); font-size: 0.86em; color: var(--mm-teal); }
+
+        /* Two-up figures: the pair breaks out, each figure inside it does not. */
         .figure-pair {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 1.5rem;
-            margin: var(--space-lg) 0;
-            /* Break out like figures */
-            width: 90vw;
-            max-width: 1100px;
+            gap: var(--space-md);
+            margin: var(--space-xl) 0;
+            width: min(var(--fig-wide), calc(100vw - 3rem));
+            max-width: var(--fig-wide);
             margin-left: 50%;
             transform: translateX(-50%);
             position: relative;
         }
-
-        .figure-pair figure {
-            width: auto;
-            max-width: none;
-            margin-left: 0;
-            transform: none;
-            position: static;
-            padding: var(--space-xs) 0;
+        .figure-pair > figure {
+            width: auto; max-width: none;
+            margin: 0; margin-left: 0;
+            transform: none; position: static;
         }
-
         @media (max-width: 768px) {
-            .figure-pair {
-                grid-template-columns: 1fr;
-            }
+            .figure-pair { grid-template-columns: 1fr; }
         }
 
-        .placeholder-figure {
-            background: linear-gradient(135deg, var(--paper-warm) 0%, #fff 100%);
-            border: none;
-            border-radius: 0;
-            padding: var(--space-sm) var(--space-sm) 0;
-            text-align: left;
-            display: flex;
-            flex-direction: column;
-            align-items: stretch;
-            justify-content: left;
-        }
+        figure.sketch-figure { border-style: dashed; }
 
-        .placeholder-figure .icon { font-size: 3rem; margin-bottom: var(--space-sm); opacity: 0.5; }
-        .placeholder-figure .label {
-            font-family: 'DM Sans', sans-serif;
-            font-size: var(--text-xs);
-            font-weight: 600;
-            color: var(--muted);
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
-            margin-bottom: 0.25rem;
-            width: 100%;
-        }
-        .placeholder-figure .description {
-            font-size: var(--text-sm);
-            color: var(--muted);
-            line-height: 1.45;
-            width: 100%;
-        }
+        /* ---- diagrams ------------------------------------------------------
+           A diagram is drawn in the six roles the engine itself reads
+           (KEYFRAMES §2): container, node, edge, label, annotation — plus the
+           two claims a figure can make, keyword and machine. The CSS is the
+           ONLY place those colours live; presentation attributes lose to
+           these rules, which is how diagrams inherited from the old dark-board
+           palette are re-pointed by adding classes rather than by rewriting
+           every attribute.
 
-        .placeholder-figure .image {
-            width: 100%;
-            margin-bottom: var(--space-xs);
+           Every diagram is authored 1000 units wide, so at --fig-wide ONE UNIT
+           IS ONE PIXEL and one type scale holds across every figure. A diagram
+           at another viewBox width sets --u to width ÷ 1000 and its labels
+           land on the same pixels. */
+        .dia { font-family: var(--mm-face); --u: 1; }
+        .dia text { fill: var(--dia-quiet); font-size: calc(17px * var(--u)); font-weight: 400; font-style: normal; }
+        .dia .t-title { fill: var(--dia-quiet); font-size: calc(26px * var(--u)); }
+        .dia .t-node  { fill: var(--dia-ink);   font-size: calc(20px * var(--u)); font-weight: 500; }
+        .dia .t-label { fill: var(--dia-quiet); font-size: calc(17px * var(--u)); }
+        .dia .t-micro { fill: var(--dia-quiet); font-size: calc(14px * var(--u)); }
+        .dia .t-tiny  { fill: var(--dia-faint); font-size: calc(12px * var(--u)); }
+        .dia .t-key   { fill: var(--dia-key); }
+        .dia .t-live  { fill: var(--dia-live); }
+        .dia .t-model { fill: var(--dia-model); }
+        .dia .t-onkey { fill: var(--fig-plate); }
+        .dia .r-container { fill: var(--dia-tint-flat); stroke: var(--dia-quiet); }
+        .dia .r-keyed     { fill: var(--dia-tint);      stroke: var(--dia-key); }
+        .dia .r-live      { fill: var(--dia-tint-live); stroke: var(--dia-live); }
+        .dia .r-well      { fill: var(--fig-well);      stroke: var(--fig-edge); }
+        .dia .r-plate     { fill: var(--fig-plate);     stroke: var(--dia-key); }
+        .dia .r-edge      { stroke: var(--dia-key);      fill: none; }
+        .dia .r-edge-back { stroke: var(--dia-model);    fill: none; }
+        .dia .r-ink       { stroke: var(--dia-ink);      fill: none; }
+        .dia .r-hold      { stroke: var(--dia-hold);     fill: none; }
+        .dia .f-key       { fill: var(--dia-key);   stroke: none; }
+        .dia .f-live      { fill: var(--dia-live);  stroke: none; }
+        .dia .f-quiet     { fill: var(--dia-quiet); stroke: none; }
+        .dia .r-container, .dia .r-keyed, .dia .r-live, .dia .r-plate,
+        .dia .r-edge, .dia .r-edge-back, .dia .r-ink, .dia .r-hold {
+            stroke-width: calc(2.4px * var(--u));
         }
-
-        .placeholder-figure .image svg,
-        .placeholder-figure .image img {
-            width: 100%;
-            height: auto;
-            display: block;
-        }
-
-        figure img {
-            width: 100%;
-            display: block;
-        }
-        
-        figure.sketch-figure {
-            background: #fafafa;
-            border: 2px dashed var(--border);
-        }
-        
-        figcaption {
-            padding: 1rem 1.5rem;
-            font-size: 0.95rem;
-            color: var(--muted);
-            border-top: 1px solid var(--border);
-            font-style: italic;
-        }
-        
-        figcaption strong {
-            color: var(--ink);
-            font-style: normal;
-        }
+        .dia .r-well { stroke-width: calc(1px * var(--u)); }
+        .dia .w-2 { stroke-width: calc(1.6px * var(--u)); }
+        .dia .w-1 { stroke-width: calc(1px * var(--u)); }
+        .dia .dash { stroke-dasharray: calc(5px * var(--u)) calc(4px * var(--u)); }
 
         /* Video Embed */
         .video-embed {
@@ -802,46 +856,40 @@
         .gallery {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
-            gap: var(--space-xs);
-            margin: var(--space-sm) 0;
-            /* Break out of text column */
-            width: 90vw;
-            max-width: 1100px;
+            gap: var(--space-sm);
+            margin: var(--space-lg) 0;
+            width: min(var(--fig-wide), calc(100vw - 3rem));
+            max-width: var(--fig-wide);
             margin-left: 50%;
             transform: translateX(-50%);
             position: relative;
         }
+        /* A gallery tile is the figure component at small size: same plate,
+           same hairline, same caption rule, tighter padding. */
         .gallery-item {
-            background: rgba(74, 85, 104, 0.08);
-            border: 1px solid rgba(107, 114, 128, 0.4);
-            border-radius: 4px;
-            padding: var(--space-xs) var(--space-xs);
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-            /* Reset breakout for gallery items */
-            width: auto;
-            max-width: none;
-            margin: 0;
-            margin-left: 0;
-            transform: none;
-            position: static;
+            background: var(--fig-plate);
+            border: 1px solid var(--fig-edge);
+            border-radius: 3px;
+            box-shadow: 0 1px 2px rgba(12,26,36,0.05);
+            overflow: hidden;
+            width: auto; max-width: none;
+            margin: 0; margin-left: 0;
+            transform: none; position: static;
         }
         .gallery-item .image {
             width: 100%;
             aspect-ratio: 16 / 10;
-            margin-bottom: var(--space-xs);
-            background: rgba(10, 14, 26, 0.9);
+            margin: 0.6rem 0.6rem 0.6rem;
+            width: calc(100% - 1.2rem);
+            background: var(--fig-well);
             border-radius: 2px;
             overflow: hidden;
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: all 0.2s ease;
+            transition: background 0.2s ease;
         }
-        .gallery-item .image:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-            background: rgba(10, 14, 26, 1);
-        }
+        .gallery-item .image:hover { background: #dae5e9; }
         .gallery-item .image img {
             width: 100%;
             height: 100%;
@@ -849,26 +897,18 @@
             display: block;
         }
         .gallery-item figcaption {
-            font-size: var(--text-sm);
-            color: rgba(51, 51, 51, 0.9);
-            line-height: 1.4;
-            width: 100%;
-            font-weight: 500;
+            padding: 0.6rem 0.75rem 0.75rem;
+            border-top: 1px solid var(--fig-rule);
+            font-size: 0.8125rem;
+            line-height: 1.45;
+            color: var(--mm-ink-3);
         }
 
         @media (max-width: 1024px) {
-            .gallery {
-                grid-template-columns: repeat(2, 1fr);
-            }
+            .gallery { grid-template-columns: repeat(2, 1fr); }
         }
         @media (max-width: 480px) {
-            .gallery {
-                grid-template-columns: 1fr;
-                width: calc(100vw - 1rem);
-            }
-            .gallery-item .image {
-                aspect-ratio: 16 / 10;
-            }
+            .gallery { grid-template-columns: 1fr; }
         }
         
         /* Principles - v1 watermark + v3 stripe */
@@ -1701,11 +1741,10 @@
             <p>Even Figma and Miro treat diagrams as layout, not computation. You can draw a flowchart, but the arrows do not flow. You can sketch a state machine, but it does not run. The computer records what you drew without understanding what you meant.</p>
             
             <figure>
-                <div class="placeholder-figure">
+                <div class="plate">
                     <div class="image"><img src="./Assets/fig-digidraw.svg" alt="Spectrum of Digital Representations"></div>
-                    <div class="label">Figure: The Digital Representation Spectrum</div>
-                    <div class="description">From "inert" to "dynamic": Photoshop (pixels) → Illustrator (vectors) → OneNote (ink capture) → Figma (components) → Miro (templates) → Chalktalk (behaviors) → tldraw computer (LLM interpretation) → MetaMedium (learning + negotiation). Most tools cluster on the left.</div>
                 </div>
+                <figcaption><b>Figure &middot; The Digital Representation Spectrum</b>From "inert" to "dynamic": Photoshop (pixels) → Illustrator (vectors) → OneNote (ink capture) → Figma (components) → Miro (templates) → Chalktalk (behaviors) → tldraw computer (LLM interpretation) → MetaMedium (learning + negotiation). Most tools cluster on the left.</figcaption>
             </figure>
             
             <p>This is the dead drawing problem: our most natural form of expression remains computationally inert. We have given computers eyes, ears and a voice, but not the ability to think with us through drawing.</p>
@@ -1715,86 +1754,61 @@
             <p>We stand at an inflection point. Large language models have achieved remarkable capabilities in reasoning, generation, and conversation. Yet we interact with them through text boxes—the equivalent of trying to share a symphony by describing it in words.</p>
             
             <figure>
-                <div class="placeholder-figure">
+                <div class="plate">
                     <div class="image">
-                        <svg viewBox="0 0 800 280" xmlns="http://www.w3.org/2000/svg">
-                            <!-- Title -->
-                            <text x="400" y="25" text-anchor="middle" fill="#7b8a9a" font-size="22" opacity="1">Information Capacity Across Modalities</text>
+                        <svg class="dia" viewBox="0 0 1000 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Information capacity across three input modalities">
+                            <text class="t-title" x="500" y="34" text-anchor="middle">Information capacity across modalities</text>
 
-                            <!-- Panel 1: TEXT (1D) -->
+                            <!-- TEXT (1D) -->
                             <g>
-                                <rect x="50" y="50" width="220" height="180" fill="rgba(74, 85, 104, 0.15)" stroke="#4a5568" stroke-width="2" rx="6" opacity="0.5"/>
-                                <text x="160" y="75" text-anchor="middle" fill="#6b7280" font-size="18" font-weight="bold">TEXT</text>
-
-                                <!-- Monospace text with cursor -->
-                                <text x="75" y="125" fill="#9ca3af" font-family="Monaco, monospace" font-size="16">hello world</text>
-                                <rect x="182" y="110" width="2" height="18" fill="#9ca3af" opacity="0.6"/>
-
-                                <!-- Dimension label -->
-                                <text x="160" y="165" text-anchor="middle" fill="#6b7280" font-size="15" font-weight="bold">1D: linear sequence</text>
-
-                                <!-- Narrow pipe visualization -->
-                                <rect x="140" y="185" width="40" height="10" fill="#4a5568" opacity="0.4" rx="5"/>
-                                <text x="160" y="213" text-anchor="middle" fill="#6b7280" font-size="18" opacity="0.7">conceptual</text>
+                                <rect class="r-container" x="20" y="62" width="290" height="190" rx="4"/>
+                                <text class="t-node" x="165" y="100" text-anchor="middle">TEXT</text>
+                                <text class="t-micro" x="72" y="150">hello world</text>
+                                <rect class="f-quiet" x="180" y="136" width="2" height="18"/>
+                                <text class="t-label" x="165" y="196" text-anchor="middle">1D &middot; linear sequence</text>
+                                <rect class="f-quiet" x="145" y="214" width="40" height="9" rx="4.5" opacity="0.45"/>
+                                <text class="t-micro" x="165" y="242" text-anchor="middle">conceptual</text>
                             </g>
 
-                            <!-- Panel 2: VOICE (1.5D) -->
-                            <g transform="translate(260, 0)">
-                                <rect x="50" y="50" width="220" height="180" fill="rgba(90, 106, 122, 0.15)" stroke="#5a6a7a" stroke-width="2" rx="6"/>
-                                <text x="160" y="75" text-anchor="middle" fill="#7b8a9a" font-size="18" font-weight="bold">VOICE</text>
-
-                                <!-- Waveform with prosody markers -->
-                                <path d="M 70 125 Q 85 110, 100 125 T 130 125 Q 145 140, 160 125 T 190 125 Q 205 118, 220 125"
-                                      stroke="#7b8a9a" stroke-width="2" fill="none"/>
-                                <text x="90" y="105" fill="#7b8a9a" font-size="14">↑</text>
-                                <text x="150" y="150" fill="#7b8a9a" font-size="14">↓</text>
-                                <text x="200" y="110" fill="#7b8a9a" font-size="14">↑</text>
-
-                                <!-- Dimension label -->
-                                <text x="160" y="165" text-anchor="middle" fill="#7b8a9a" font-size="15" font-weight="bold">1.5D: + tone, rhythm</text>
-
-                                <!-- Medium pipe -->
-                                <rect x="130" y="185" width="60" height="12" fill="#5a6a7a" opacity="0.5" rx="6"/>
-                                <text x="160" y="213" text-anchor="middle" fill="#7b8a9a" font-size="18" opacity="0.8">expressive and temporal</text>
+                            <!-- VOICE (1.5D) -->
+                            <g>
+                                <rect class="r-container" x="355" y="62" width="290" height="190" rx="4"/>
+                                <text class="t-node" x="500" y="100" text-anchor="middle">VOICE</text>
+                                <path class="r-ink w-2" d="M405 148 Q425 130, 445 148 T485 148 Q505 168, 525 148 T565 148 Q585 138, 600 148"/>
+                                <text class="t-micro" x="428" y="126" text-anchor="middle">&#8593;</text>
+                                <text class="t-micro" x="512" y="176" text-anchor="middle">&#8595;</text>
+                                <text class="t-micro" x="580" y="130" text-anchor="middle">&#8593;</text>
+                                <text class="t-label" x="500" y="196" text-anchor="middle">1.5D &middot; + tone, rhythm</text>
+                                <rect class="f-quiet" x="465" y="212" width="70" height="12" rx="6" opacity="0.55"/>
+                                <text class="t-micro" x="500" y="242" text-anchor="middle">expressive, temporal</text>
                             </g>
 
-                            <!-- Panel 3: DRAWING (2D+) -->
-                            <g transform="translate(510, 0)">
-                                <rect x="50" y="50" width="220" height="180" fill="7b8a9a" stroke="#64b5f6" stroke-width="2" rx="6" opacity="0.6"/>
-                                <text x="160" y="75" text-anchor="middle" fill="#90caf9" font-size="18" font-weight="bold">DRAWING</text>
-
-                                <!-- Rich sketch elements - compact -->
-                                <circle cx="110" cy="115" r="15" stroke="#90caf9" stroke-width="2" fill="none"/>
-                                <line x1="125" y1="115" x2="160" y2="115" stroke="#90caf9" stroke-width="2" marker-end="url(#arrowblue)"/>
-                                <rect x="187" y="100" width="20" height="20" stroke="#90caf9" stroke-width="2" fill="none"/>
-                                <circle cx="185" cy="120" r="6" fill="#90caf9"/>
-                                <line x1="170" y1="110" x2="170" y2="145" stroke="#90caf9" stroke-width="2" marker-end="url(#arrowblue)"/>
-                                <!-- Annotation -->
-                                <line x1="180" y1="165" x2="200" y2="165" stroke="#90caf9" stroke-width="1.5" opacity="0.6"/>
-
-                                <!-- Dimension label -->
-                                <text x="160" y="159" text-anchor="middle" fill="#64b5f6" font-size="15" font-weight="bold">2D+: space, gesture,</text>
-                                <text x="160" y="173" text-anchor="middle" fill="#64b5f6" font-size="15" font-weight="bold">time, relationships</text>
-
-                                <!-- Wide channel -->
-                                <rect x="110" y="185" width="100" height="16" fill="#64b5f6" opacity="0.2" rx="8"/>
-                                <text x="160" y="213" text-anchor="middle" fill="#64b5f6" font-size="18" opacity="0.99">expressive and relational</text>
+                            <!-- DRAWING (2D+) — the claim, so it takes the keyed container -->
+                            <g>
+                                <rect class="r-keyed" x="690" y="62" width="290" height="190" rx="4"/>
+                                <text class="t-node t-key" x="835" y="100" text-anchor="middle">DRAWING</text>
+                                <circle class="r-edge w-2" cx="755" cy="145" r="17"/>
+                                <line class="r-edge w-2" x1="775" y1="145" x2="820" y2="145" marker-end="url(#arrowKey)"/>
+                                <rect class="r-edge w-2" x="845" y="128" width="34" height="34" rx="2"/>
+                                <circle class="f-key" cx="843" cy="162" r="6"/>
+                                <line class="r-edge w-2" x1="825" y1="132" x2="825" y2="172" marker-end="url(#arrowKey)"/>
+                                <line class="r-edge w-1" x1="850" y1="176" x2="890" y2="176" opacity="0.55"/>
+                                <text class="t-label t-key" x="835" y="196" text-anchor="middle">2D+ &middot; space, gesture, time</text>
+                                <rect class="f-key" x="775" y="210" width="120" height="16" rx="8" opacity="0.25"/>
+                                <text class="t-micro t-key" x="835" y="242" text-anchor="middle">expressive, relational</text>
                             </g>
 
-                            <!-- Bottom insight -->
-                            <text x="400" y="260" text-anchor="middle" fill="#6b7280" font-size="18" font-style="italic">Drawing captures complexity that text and voice alone cannot express</text>
+                            <text class="t-label" x="500" y="288" text-anchor="middle">Drawing carries complexity that text and voice alone cannot express</text>
 
-                            <!-- Arrow marker -->
                             <defs>
-                                <marker id="arrowblue" markerWidth="8" markerHeight="8" refX="7" refY="2.5" orient="auto" markerUnits="strokeWidth">
-                                    <path d="M0,0 L0,5 L7,2.5 z" fill="#90caf9" />
+                                <marker id="arrowKey" markerWidth="7" markerHeight="7" refX="6" refY="2.5" orient="auto" markerUnits="strokeWidth">
+                                    <path d="M0,0 L0,5 L6,2.5 z" fill="var(--dia-key)"/>
                                 </marker>
                             </defs>
                         </svg>
                     </div>
-                    <div class="label">Figure: Input channel dimensionality</div>
-                    <div class="description">Text box (1D: linear sequence) → Voice (1.5D: sequence + prosody) → Drawing (2D+: space, time, pressure, gesture, annotation).</div>
                 </div>
+                <figcaption><b>Figure &middot; Input channel dimensionality</b>Text box (1D: linear sequence) → Voice (1.5D: sequence + prosody) → Drawing (2D+: space, time, pressure, gesture, annotation).</figcaption>
             </figure>
             
             <p>The bottleneck is not AI capability but symbolic bandwidth: the poverty of sign vehicles available for exchange. We have rich internal representations and a text box for an output channel. A visual thinker translating spatial intuition into prompts, a designer describing a sketch in words, a child linearizing exploratory understanding into queries: each loses the richness that makes human cognition powerful.</p>
@@ -2271,7 +2285,7 @@
                 </g>
 
                 <!-- Center label -->
-                <text class="center-label" x="200" y="210" text-anchor="middle" fill="var(--muted, #666)" font-size="11" opacity="0">
+                <text class="t-title" x="200" y="210" text-anchor="middle" fill="var(--muted, #666)" font-size="11" opacity="0">
                   negotiation
                 </text>
               </svg>
@@ -2362,7 +2376,7 @@
             <p>The answer becomes obvious the moment you <em>visualize</em> two monks walking the path simultaneously—one going up, one going down. They must meet somewhere. But this visualization requires what Fauconnier and Turner call an "integration network"—a blended mental space where separate inputs combine to reveal emergent structure. I have animated their central figure illustrating the blending space as a diagram.</p>
             <figure>
                 <img src="./Assets/fig-Conceptual Blending slower.gif" alt="Conceptual Blending Animation - Integration network showing blend space">
-                <figcaption>Fauconnier & Turner's conceptual blending model: two input spaces merge into a blended space revealing emergent structure.</figcaption>
+                <figcaption><b>Figure &middot; Conceptual Blending</b>Fauconnier &amp; Turner's model: two input spaces merge into a blended space revealing emergent structure.</figcaption>
             </figure>
 
     
@@ -2476,95 +2490,94 @@
             <div class="figure-pair">
                 <figure>
                     <img src="./Assets/fig-sketch-game-turn.png" alt="Turn-taking in the sketch-editing game">
-                    <figcaption><strong>Figure: Turn-Taking.</strong> The user sketches; the machine recognizes and modifies with a guess ("bottle?"). User declines and modifies. Machine recognizes again ("mug?"). User accepts. From Ribeiro & Igarashi, UIST '12.</figcaption>
+                    <figcaption><b>Figure &middot; Turn-Taking</b>The user sketches; the machine recognizes and modifies with a guess ("bottle?"). User declines and modifies. Machine recognizes again ("mug?"). User accepts. From Ribeiro & Igarashi, UIST '12.</figcaption>
                 </figure>
                 <figure>
                     <img src="./Assets/fig-sketch-game-graph.png" alt="Game graph showing transformation possibilities">
-                    <figcaption><strong>Figure: Possibility Graph.</strong> The machine's internal model after several games. The center shows the current sketch; each ring shows possible transformations (add neck → bottle, add base → wine glass, widen top → cup). From Ribeiro & Igarashi, UIST '12.</figcaption>
+                    <figcaption><b>Figure &middot; Possibility Graph</b>The machine's internal model after several games. The center shows the current sketch; each ring shows possible transformations (add neck → bottle, add base → wine glass, widen top → cup). From Ribeiro & Igarashi, UIST '12.</figcaption>
                 </figure>
             </div>
 
             <p>Their key insight: sketch recognition improves dramatically when reframed as a <em>game</em> rather than a classification problem. The machine maintains a "possibility graph"—a network of possible interpretations and the transformations that would select among them. The user's next stroke navigates this graph, collapsing some possibilities and opening others.</p>
             
             <figure>
-                <div class="placeholder-figure">
+                <div class="plate">
                     <div class="image">
-                        <svg viewBox="0 0 700 400" xmlns="http://www.w3.org/2000/svg">
+                        <svg class="dia" style="--u:0.7" viewBox="0 0 700 400" xmlns="http://www.w3.org/2000/svg">
                             <!-- Title -->
-                            <text x="350" y="22" text-anchor="middle" fill="#7b8a9a" font-size="15" opacity="1">Understanding emerges through iterative exchange</text>
+                            <text class="t-label" x="350" y="22" text-anchor="middle">Understanding emerges through iterative exchange</text>
 
                             <!-- User box (left) -->
-                            <rect x="70" y="50" width="140" height="60" fill="rgba(100, 181, 246, 0.08)" stroke="#64b5f6" stroke-width="2" rx="6"/>
-                            <text x="140" y="78" text-anchor="middle" fill="#64b5f6" font-size="18" font-weight="bold">USER</text>
-                            <text x="140" y="95" text-anchor="middle" fill="#7b8a9a" font-size="14">sketches</text>
+                            <rect class="r-keyed" x="70" y="50" width="140" height="60" rx="6"/>
+                            <text class="t-node t-key" x="140" y="78" text-anchor="middle">USER</text>
+                            <text class="t-micro" x="140" y="95" text-anchor="middle">sketches</text>
 
                             <!-- System box (right) -->
-                            <rect x="490" y="50" width="140" height="60" fill="rgba(100, 181, 246, 0.08)" stroke="#64b5f6" stroke-width="2" rx="6"/>
-                            <text x="560" y="78" text-anchor="middle" fill="#64b5f6" font-size="18" font-weight="bold">SYSTEM</text>
-                            <text x="560" y="95" text-anchor="middle" fill="#7b8a9a" font-size="14">interprets</text>
+                            <rect class="r-keyed" x="490" y="50" width="140" height="60" rx="6"/>
+                            <text class="t-node t-key" x="560" y="78" text-anchor="middle">SYSTEM</text>
+                            <text class="t-micro" x="560" y="95" text-anchor="middle">interprets</text>
 
                             <!-- Exchange 1 -->
                             <g>
-                                <line x1="210" y1="140" x2="480" y2="140" stroke="#64b5f6" stroke-width="2" marker-end="url(#arrow4)" stroke-dasharray="3,2"/>
-                                <text x="345" y="133" text-anchor="middle" fill="#64b5f6" font-size="14">1. draws oval</text>
-                                <ellipse cx="315" cy="143" rx="11" ry="13" fill="none" stroke="#64b5f6" stroke-width="2" stroke-dasharray="2,1"/>
+                                <line class="r-edge" x1="210" y1="140" x2="480" y2="140" marker-end="url(#arrow4)" stroke-dasharray="3,2"/>
+                                <text class="t-micro t-key" x="345" y="133" text-anchor="middle">1. draws oval</text>
+                                <ellipse class="r-edge" cx="315" cy="143" rx="11" ry="13" fill="none" stroke-dasharray="2,1"/>
 
-                                <line x1="480" y1="160" x2="210" y2="160" stroke="#7b8a9a" stroke-width="2" marker-end="url(#arrow5)"/>
-                                <text x="345" y="175" text-anchor="middle" fill="#6b7280" font-size="13" font-style="italic">"Circle? Face? Egg?"</text>
+                                <line class="r-hold" x1="480" y1="160" x2="210" y2="160" marker-end="url(#arrow5)"/>
+                                <text class="t-micro" x="345" y="175" text-anchor="middle">"Circle? Face? Egg?"</text>
                             </g>
 
                             <!-- Exchange 2 -->
                             <g transform="translate(0, 60)">
-                                <line x1="210" y1="140" x2="480" y2="140" stroke="#64b5f6" stroke-width="2" marker-end="url(#arrow4)" stroke-dasharray="3,2"/>
-                                <text x="345" y="133" text-anchor="middle" fill="#64b5f6" font-size="14">2. adds two dots</text>
-                                <ellipse cx="315" cy="143" rx="11" ry="13" fill="none" stroke="#64b5f6" stroke-width="2" stroke-dasharray="2,1"/>
-                                <circle cx="311" cy="141" r="2" fill="#64b5f6"/>
-                                <circle cx="319" cy="141" r="2" fill="#64b5f6"/>
+                                <line class="r-edge" x1="210" y1="140" x2="480" y2="140" marker-end="url(#arrow4)" stroke-dasharray="3,2"/>
+                                <text class="t-micro t-key" x="345" y="133" text-anchor="middle">2. adds two dots</text>
+                                <ellipse class="r-edge" cx="315" cy="143" rx="11" ry="13" fill="none" stroke-dasharray="2,1"/>
+                                <circle class="f-key" cx="311" cy="141" r="2"/>
+                                <circle class="f-key" cx="319" cy="141" r="2"/>
 
-                                <line x1="480" y1="160" x2="210" y2="160" stroke="#7b8a9a" stroke-width="2" marker-end="url(#arrow5)"/>
-                                <text x="345" y="175" text-anchor="middle" fill="#6b7280" font-size="13" font-style="italic">"Face! (confidence 0.9)"</text>
+                                <line class="r-hold" x1="480" y1="160" x2="210" y2="160" marker-end="url(#arrow5)"/>
+                                <text class="t-micro" x="345" y="175" text-anchor="middle">"Face! (confidence 0.9)"</text>
                             </g>
 
                             <!-- Exchange 3 -->
                             <g transform="translate(0, 120)">
-                                <line x1="210" y1="140" x2="480" y2="140" stroke="#64b5f6" stroke-width="2" marker-end="url(#arrow4)" stroke-dasharray="3,2"/>
-                                <text x="345" y="133" text-anchor="middle" fill="#64b5f6" font-size="14">3. writes "happy"</text>
-                                <text x="315" y="149" text-anchor="middle" fill="#64b5f6" font-size="13" font-family="Monaco">happy</text>
+                                <line class="r-edge" x1="210" y1="140" x2="480" y2="140" marker-end="url(#arrow4)" stroke-dasharray="3,2"/>
+                                <text class="t-micro t-key" x="345" y="133" text-anchor="middle">3. writes "happy"</text>
+                                <text class="t-micro t-key" x="315" y="149" text-anchor="middle">happy</text>
 
-                                <line x1="480" y1="160" x2="210" y2="160" stroke="#7b8a9a" stroke-width="2" marker-end="url(#arrow5)"/>
-                                <text x="345" y="175" text-anchor="middle" fill="#6b7280" font-size="13" font-style="italic">adds smile + learns pattern</text>
+                                <line class="r-hold" x1="480" y1="160" x2="210" y2="160" marker-end="url(#arrow5)"/>
+                                <text class="t-micro" x="345" y="175" text-anchor="middle">adds smile + learns pattern</text>
                             </g>
 
                             <!-- Shared Understanding result -->
                             <g transform="translate(0, 200)">
-                                <rect x="230" y="140" width="240" height="58" fill="rgba(100, 181, 246, 0.15)" stroke="#64b5f6" stroke-width="2" rx="6"/>
-                                <text x="350" y="162" text-anchor="middle" fill="#64b5f6" font-size="18" font-weight="bold">SHARED UNDERSTANDING</text>
-                                <text x="350" y="180" text-anchor="middle" fill="#6b7280" font-size="14">"Happy face" → vocabulary</text>
+                                <rect class="r-keyed" x="230" y="140" width="240" height="58" rx="6"/>
+                                <text class="t-node t-key" x="350" y="162" text-anchor="middle">SHARED UNDERSTANDING</text>
+                                <text class="t-micro" x="350" y="180" text-anchor="middle">"Happy face" → vocabulary</text>
 
                                 <!-- Small happy face demo -->
-                                <ellipse cx="320" cy="187" rx="9" ry="10" fill="none" stroke="#64b5f6" stroke-width="2"/>
-                                <circle cx="316" cy="185" r="1.3" fill="#64b5f6"/>
-                                <circle cx="324" cy="185" r="1.3" fill="#64b5f6"/>
-                                <path d="M 314 190 Q 320 192, 326 190" stroke="#64b5f6" stroke-width="1.5" fill="none"/>
+                                <ellipse class="r-edge" cx="320" cy="187" rx="9" ry="10" fill="none"/>
+                                <circle class="f-key" cx="316" cy="185" r="1.3"/>
+                                <circle class="f-key" cx="324" cy="185" r="1.3"/>
+                                <path class="r-edge w-2" d="M 314 190 Q 320 192, 326 190" fill="none"/>
                             </g>
 
                             <!-- Bottom insight -->
-                            <text x="350" y="330" text-anchor="middle" fill="#6b7280" font-size="14" font-style="italic">Each exchange refines shared vocabulary and understanding</text>
+                            <text class="t-micro" x="350" y="330" text-anchor="middle">Each exchange refines shared vocabulary and understanding</text>
 
                             <!-- Arrow markers -->
                             <defs>
                                 <marker id="arrow4" markerWidth="8" markerHeight="8" refX="7" refY="2.5" orient="auto">
-                                    <path d="M0,0 L0,5 L7,2.5 z" fill="#64b5f6" />
+                                    <path class="f-key" d="M0,0 L0,5 L7,2.5 z" />
                                 </marker>
                                 <marker id="arrow5" markerWidth="8" markerHeight="8" refX="7" refY="2.5" orient="auto">
-                                    <path d="M0,0 L0,5 L7,2.5 z" fill="#7b8a9a" />
+                                    <path d="M0,0 L0,5 L7,2.5 z" fill="var(--dia-quiet)" />
                                 </marker>
                             </defs>
                         </svg>
                     </div>
-                    <div class="label">Figure: The Negotiation Loop</div>
-                    <div class="description">User sketches rough shape → System offers: "Circle? Oval? Face?" → User adds two dots → System updates: "Face ✓" → User writes "happy" → System adds smile, adjusts interpretation confidence. Understanding emerges through exchange, not one-shot recognition. Each turn updates the possibility graph.</div>
                 </div>
+                <figcaption><b>Figure &middot; The Negotiation Loop</b>User sketches rough shape → System offers: "Circle? Oval? Face?" → User adds two dots → System updates: "Face ✓" → User writes "happy" → System adds smile, adjusts interpretation confidence. Understanding emerges through exchange, not one-shot recognition. Each turn updates the possibility graph.</figcaption>
             </figure>
             
             <p>The MetaMedium makes the possibility graph learnable, accumulating your patterns over time, and adds annotation as another way to navigate it. Misunderstanding is not failure; it is information. Each correction builds toward a shared vocabulary.</p>
@@ -2574,105 +2587,104 @@
             <p>Charles Sanders Peirce's semiotics offers a framework for understanding meaning-making that proves remarkably apt for human-AI interaction. In Peirce's model, meaning emerges from the relationship between the <em>sign</em> (the representational form), the <em>object</em> (what is represented), and the <em>interpretant</em> (the meaning generated in the interpreter's mind).</p>
 
             <figure>
-                <div class="placeholder-figure">
+                <div class="plate">
                     <div class="image">
-                        <svg viewBox="0 0 700 400" xmlns="http://www.w3.org/2000/svg">
+                        <svg class="dia" style="--u:0.7" viewBox="0 0 700 400" xmlns="http://www.w3.org/2000/svg">
                             <!-- Title -->
-                            <text x="350" y="10" text-anchor="middle" fill="#7b8a9a" font-size="15" opacity="1">How meaning emerges through triangulation</text>
+                            <text class="t-title" x="350" y="10" text-anchor="middle">How meaning emerges through triangulation</text>
 
-                            <line x1="350" y1="80" x2="180" y2="320" stroke="#64b5f6" stroke-width="2" opacity=".4"/>
-                            <line x1="350" y1="80" x2="520" y2="320" stroke="#64b5f6" stroke-width="2" opacity=".4"/>
-                            <line x1="180" y1="320" x2="520" y2="320" stroke="#64b5f6" stroke-width="2" opacity=".4"/>
+                            <line class="r-edge" x1="350" y1="80" x2="180" y2="320"/>
+                            <line class="r-edge" x1="350" y1="80" x2="520" y2="320"/>
+                            <line class="r-edge" x1="180" y1="320" x2="520" y2="320"/>
 
                             <!-- OBJECT (top) -->
                             <g>
-                                <circle cx="350" cy="80" r="26" fill="rgba(100, 181, 246, 0.15)" stroke="#64b5f6" stroke-width="2"/>
-                                <text x="350" y="125" text-anchor="middle" fill="#90caf9" font-size="22" font-weight="bold">OBJECT</text>
-                                <text x="350" y="140" text-anchor="middle" fill="#7b8a9a" font-size="13" opacity="1">(referent)</text>
+                                <circle class="r-keyed" cx="350" cy="80" r="26"/>
+                                <text class="t-node t-key" x="350" y="125" text-anchor="middle">OBJECT</text>
+                                <text class="t-micro" x="350" y="140" text-anchor="middle">(referent)</text>
 
                                 <!-- Multiple possibilities -->
-                                <text x="350" y="88" text-anchor="middle" fill="#90caf9" font-size="12">?</text>
+                                <text class="t-tiny t-key" x="350" y="88" text-anchor="middle">?</text>
                                 <g transform="translate(350, 30)">
-                                    <circle cx="-40" cy="0" r="7" fill="none" stroke="#90caf9" stroke-width="1" opacity="0.8"/>
-                                    <text x="-40" y="15" text-anchor="middle" fill="#90caf9" font-size="11" opacity="0.6">face</text>
+                                    <circle class="r-edge w-2" cx="-40" cy="0" r="7" fill="none"/>
+                                    <text class="t-tiny t-key" x="-40" y="15" text-anchor="middle">face</text>
 
-                                    <ellipse cx="-14" cy="0" rx="7" ry="8" fill="none" stroke="#90caf9" stroke-width="1" opacity="0.8"/>
-                                    <text x="-14" y="15" text-anchor="middle" fill="#90caf9" font-size="11" opacity="0.6">egg</text>
+                                    <ellipse class="r-edge w-2" cx="-14" cy="0" rx="7" ry="8" fill="none"/>
+                                    <text class="t-tiny t-key" x="-14" y="15" text-anchor="middle">egg</text>
 
-                                    <circle cx="13" cy="0" r="7" fill="none" stroke="#90caf9" stroke-width="1" opacity="0.8"/>
-                                    <text x="13" y="5" text-anchor="middle" fill="#90caf9" font-size="10" opacity="0.6">0</text>
+                                    <circle class="r-edge w-2" cx="13" cy="0" r="7" fill="none"/>
+                                    <text class="t-tiny t-key" x="13" y="5" text-anchor="middle">0</text>
 
-                                    <circle cx="39" cy="0" r="7" fill="rgba(100, 181, 246, 0.15)" stroke="#90caf9" stroke-width="1" opacity="0.8"/>
-                                    <text x="39" y="15" text-anchor="middle" fill="#90caf9" font-size="11" opacity="0.6">ball</text>
+                                    <circle class="r-keyed w-2" cx="39" cy="0" r="7"/>
+                                    <text class="t-tiny t-key" x="39" y="15" text-anchor="middle">ball</text>
                                 </g>
                             </g>
 
                             <!-- SIGN (bottom left) -->
                             <g>
-                                <circle cx="180" cy="320" r="26" fill="rgba(100, 181, 246, 0.15)" stroke="#64b5f6" stroke-width="2"/>
-                                <text x="180" y="361" text-anchor="middle" fill="#90caf9" font-size="22" font-weight="bold">SIGN</text>
-                                <text x="180" y="375" text-anchor="middle" fill="#7b8a9a" font-size="13" opacity="1">(form)</text>
+                                <circle class="r-keyed" cx="180" cy="320" r="26"/>
+                                <text class="t-node t-key" x="180" y="361" text-anchor="middle">SIGN</text>
+                                <text class="t-micro" x="180" y="375" text-anchor="middle">(form)</text>
 
                                 <g transform="translate(50, 170)">
                                     <!-- Step 1: rough oval -->
-                                    <rect x="0" y="0" width="80" height="70" fill="rgba(10, 14, 26, 0.5)" stroke="#4a5568" stroke-width="1" rx="3"/>
-                                    <ellipse cx="40" cy="30" rx="22" ry="25" fill="none" stroke="#90caf9" stroke-width="2" stroke-dasharray="2,1" opacity="0.8"/>
-                                    <text x="40" y="60" text-anchor="middle" fill="#7b8a9a" font-size="11">1. rough oval</text>
+                                    <rect class="r-well" x="0" y="0" width="80" height="70" rx="3"/>
+                                    <ellipse class="r-edge" cx="40" cy="30" rx="22" ry="25" fill="none" stroke-dasharray="2,1"/>
+                                    <text class="t-tiny" x="40" y="60" text-anchor="middle">1. rough oval</text>
 
-                                    <text x="88" y="35" fill="#64b5f6" font-size="16">→</text>
+                                    <text class="t-label t-key" x="88" y="35">→</text>
 
                                     <!-- Step 2: with dots -->
-                                    <rect x="100" y="0" width="80" height="70" fill="rgba(10, 14, 26, 0.5)" stroke="#4a5568" stroke-width="1" rx="3"/>
-                                    <ellipse cx="140" cy="30" rx="22" ry="25" fill="none" stroke="#90caf9" stroke-width="2" stroke-dasharray="2,1" opacity="0.8"/>
-                                    <circle cx="134" cy="27" r="2.5" fill="#90caf9"/>
-                                    <circle cx="146" cy="27" r="2.5" fill="#90caf9"/>
-                                    <text x="140" y="52" text-anchor="middle" fill="#7b8a9a" font-size="11">2. + eyes</text>
-                                    <text x="140" y="64" text-anchor="middle" fill="#90caf9" font-size="11" font-weight="bold">→ face?</text>
+                                    <rect class="r-well" x="100" y="0" width="80" height="70" rx="3"/>
+                                    <ellipse class="r-edge" cx="140" cy="30" rx="22" ry="25" fill="none" stroke-dasharray="2,1"/>
+                                    <circle class="f-key" cx="134" cy="27" r="2.5"/>
+                                    <circle class="f-key" cx="146" cy="27" r="2.5"/>
+                                    <text class="t-tiny" x="140" y="52" text-anchor="middle">2. + eyes</text>
+                                    <text class="t-tiny t-key" x="140" y="64" text-anchor="middle">→ face?</text>
                                 </g>
                             </g>
 
                             <!-- INTERPRETANT (bottom right) -->
                             <g>
-                                <circle cx="520" cy="320" r="26" fill="rgba(100, 181, 246, 0.15)" stroke="#64b5f6" stroke-width="2"/>
-                                <text x="520" y="361" text-anchor="middle" fill="#90caf9" font-size="22" font-weight="bold">INTERPRETANT</text>
-                                <text x="520" y="375" text-anchor="middle" fill="#7b8a9a" font-size="13" opacity="1">(meaning)</text>
+                                <circle class="r-keyed" cx="520" cy="320" r="26"/>
+                                <text class="t-node t-key" x="520" y="361" text-anchor="middle">INTERPRETANT</text>
+                                <text class="t-micro" x="520" y="375" text-anchor="middle">(meaning)</text>
 
                                 <!-- Probability distribution -->
                                 <g transform="translate(450, 168)">
                                     <!-- Initial probabilities -->
-                                    <rect x="0" y="0" width="120" height="85" fill="rgba(10, 14, 26, 0.5)" stroke="#4a5568" stroke-width="1" rx="3"/>
-                                    <text x="60" y="15" text-anchor="middle" fill="#4a5568" font-size="12">AI considers:</text>
+                                    <rect class="r-well" x="0" y="0" width="120" height="85" rx="3"/>
+                                    <text class="t-tiny" x="60" y="15" text-anchor="middle">AI considers:</text>
 
-                                    <rect x="8" y="23" width="45" height="7" fill="#64b5f6" opacity="0.8"/>
-                                    <text x="58" y="29" fill="#90caf9" font-size="11">face 0.4</text>
+                                    <rect class="f-key" x="8" y="23" width="45" height="7"/>
+                                    <text class="t-tiny t-key" x="58" y="29">face 0.4</text>
 
-                                    <rect x="8" y="34" width="28" height="7" fill="#64b5f6" opacity="0.8"/>
-                                    <text x="58" y="40" fill="#90caf9" font-size="11">egg 0.25</text>
+                                    <rect class="f-key" x="8" y="34" width="28" height="7"/>
+                                    <text class="t-tiny t-key" x="58" y="40">egg 0.25</text>
 
-                                    <rect x="8" y="45" width="22" height="7" fill="#64b5f6" opacity="0.8"/>
-                                    <text x="58" y="51" fill="#90caf9" font-size="11">zero 0.2</text>
+                                    <rect class="f-key" x="8" y="45" width="22" height="7"/>
+                                    <text class="t-tiny t-key" x="58" y="51">zero 0.2</text>
 
-                                    <rect x="8" y="56" width="17" height="7" fill="#64b5f6" opacity="0.8"/>
-                                    <text x="58" y="62" fill="#90caf9" font-size="11">ball 0.15</text>
+                                    <rect class="f-key" x="8" y="56" width="17" height="7"/>
+                                    <text class="t-tiny t-key" x="58" y="62">ball 0.15</text>
 
-                                    <text x="60" y="77" text-anchor="middle" fill="#64b5f6" font-size="12">↓ context</text>
+                                    <text class="t-tiny t-key" x="60" y="77" text-anchor="middle">↓ context</text>
 
                                     <!-- Resolved -->
-                                    <rect x="0" y="90" width="120" height="38" fill="rgba(100, 181, 246, 0.12)" stroke="#64b5f6" stroke-width="1.5" rx="3"/>
-                                    <rect x="8" y="100" width="104" height="9" fill="#64b5f6" opacity="0.8"/>
-                                    <text x="60" y="107" text-anchor="middle" fill="#fff" font-size="12" font-weight="bold">face 0.95 ✓</text>
-                                    <text x="60" y="122" text-anchor="middle" fill="#64b5f6" font-size="11">"confident match"</text>
+                                    <rect class="r-keyed" x="0" y="90" width="120" height="38" rx="3"/>
+                                    <rect class="f-key" x="8" y="100" width="104" height="9"/>
+                                    <text class="t-tiny t-onkey" x="60" y="107" text-anchor="middle">face 0.95 ✓</text>
+                                    <text class="t-tiny t-key" x="60" y="122" text-anchor="middle">"confident match"</text>
                                 </g>
                             </g>
 
                             <!-- Central insight -->
-                            <text x="350" y="310" text-anchor="middle" fill="#64b5f6" font-size="14" opacity="0.9">AI participates in meaning-making,</text>
-                            <text x="350" y="335" text-anchor="middle" fill="#64b5f6" font-size="14" opacity="0.9">not as authority but as collaborator</text>
+                            <text class="t-micro t-key" x="350" y="310" text-anchor="middle">AI participates in meaning-making,</text>
+                            <text class="t-micro t-key" x="350" y="335" text-anchor="middle">not as authority but as collaborator</text>
                         </svg>
                     </div>
-                    <div class="label">Figure: The Semiotic Triad Applied</div>
-                    <div class="description">Peirce's triangle in MetaMedium context: Sign (rough oval drawn on canvas) → Object (could be face, egg, zero, planet...) → Interpretant (AI holds probability distribution across possibilities; context accumulates; meaning resolves). The AI participates in the interpretant role, not as final arbiter but as collaborative sense-maker.</div>
                 </div>
+                <figcaption><b>Figure &middot; The Semiotic Triad Applied</b>Peirce's triangle in MetaMedium context: Sign (rough oval drawn on canvas) → Object (could be face, egg, zero, planet...) → Interpretant (AI holds probability distribution across possibilities; context accumulates; meaning resolves). The AI participates in the interpretant role, not as final arbiter but as collaborative sense-maker.</figcaption>
             </figure>
 
             <p>Peirce's insight—that meaning is reconstructed, not transferred—maps directly onto the <strong>Language ↔ Computation ↔ Meaning</strong> triadic loop described earlier. The MetaMedium enables this iterative coordination by letting AI participate as interpretant, holding probabilistic meanings that refine through exchange rather than executing fixed commands.</p>
@@ -2682,134 +2694,133 @@
             <p>As patterns accumulate, they form "cognitive lenses"—personalized interpretation frameworks that shape how the system reads new marks. A physicist's lens recognizes force diagrams; an architect's lens sees load-bearing structures; a musician's lens interprets spatial arrangements as rhythm.</p>
             
             <figure>
-                <div class="placeholder-figure">
+                <div class="plate">
                     <div class="image">
-                        <svg viewBox="0 0 750 450" xmlns="http://www.w3.org/2000/svg">
+                        <svg class="dia" style="--u:0.75" viewBox="0 0 750 450" xmlns="http://www.w3.org/2000/svg">
                             <!-- Title -->
-                            <text x="375" y="25" text-anchor="middle" fill="#7b8a9a" font-size="15" opacity="1">Your patterns become portable ways of seeing</text>
+                            <text class="t-title" x="375" y="25" text-anchor="middle">Your patterns become portable ways of seeing</text>
 
                             <!-- Pattern Accumulation -->
                             <g>
-                                <text x="120" y="65" fill="#90caf9" font-size="17" font-weight="bold">PATTERN ACCUMULATION</text>
-                                <text x="120" y="83" fill="#7b8a9a" font-size="13">User repeatedly draws:</text>
+                                <text class="t-node t-key" x="120" y="65">PATTERN ACCUMULATION</text>
+                                <text class="t-micro" x="120" y="83">User repeatedly draws:</text>
 
                                 <!-- Repeated marks -->
                                 <g transform="translate(80, 95)">
                                     <!-- Force arrows -->
-                                    <path d="M 0 0 L 20 -8" stroke="#90caf9" stroke-width="2" marker-end="url(#arrow6)"/>
-                                    <path d="M 35 0 L 55 -8" stroke="#90caf9" stroke-width="2" marker-end="url(#arrow6)"/>
-                                    <path d="M 70 0 L 90 -8" stroke="#90caf9" stroke-width="2" marker-end="url(#arrow6)"/>
-                                    <path d="M 105 0 L 125 -8" stroke="#90caf9" stroke-width="2" marker-end="url(#arrow6)"/>
-                                    <text x="135" y="0" fill="#7b8a9a" font-size="13" opacity="1">force</text>
+                                    <path class="r-edge" d="M 0 0 L 20 -8" marker-end="url(#arrow6)"/>
+                                    <path class="r-edge" d="M 35 0 L 55 -8" marker-end="url(#arrow6)"/>
+                                    <path class="r-edge" d="M 70 0 L 90 -8" marker-end="url(#arrow6)"/>
+                                    <path class="r-edge" d="M 105 0 L 125 -8" marker-end="url(#arrow6)"/>
+                                    <text class="t-micro" x="135" y="0">force</text>
 
                                     <!-- Energy marks -->
-                                    <text x="0" y="25" fill="#90caf9" font-size="20">↯</text>
-                                    <text x="35" y="25" fill="#90caf9" font-size="20">↯</text>
-                                    <text x="70" y="25" fill="#90caf9" font-size="20">↯</text>
-                                    <text x="105" y="25" fill="#90caf9" font-size="20">↯</text>
-                                    <text x="135" y="25" fill="#7b8a9a" font-size="13" opacity="1">energy</text>
+                                    <text class="t-node t-key" x="0" y="25">↯</text>
+                                    <text class="t-node t-key" x="35" y="25">↯</text>
+                                    <text class="t-node t-key" x="70" y="25">↯</text>
+                                    <text class="t-node t-key" x="105" y="25">↯</text>
+                                    <text class="t-micro" x="135" y="25">energy</text>
 
                                     <!-- Field lines -->
-                                    <path d="M 0 45 Q 10 38, 20 45" stroke="#90caf9" stroke-width="2" fill="none"/>
-                                    <path d="M 35 45 Q 45 38, 55 45" stroke="#90caf9" stroke-width="2" fill="none"/>
-                                    <path d="M 70 45 Q 80 38, 90 45" stroke="#90caf9" stroke-width="2" fill="none"/>
-                                    <path d="M 105 45 Q 115 38, 125 45" stroke="#90caf9" stroke-width="2" fill="none"/>
-                                    <text x="135" y="48" fill="#7b8a9a" font-size="13" opacity="1">fields</text>
+                                    <path class="r-edge" d="M 0 45 Q 10 38, 20 45" fill="none"/>
+                                    <path class="r-edge" d="M 35 45 Q 45 38, 55 45" fill="none"/>
+                                    <path class="r-edge" d="M 70 45 Q 80 38, 90 45" fill="none"/>
+                                    <path class="r-edge" d="M 105 45 Q 115 38, 125 45" fill="none"/>
+                                    <text class="t-micro" x="135" y="48">fields</text>
                                 </g>
                             </g>
 
                             <!-- Arrow to extraction -->
-                            <text x="350" y="140" text-anchor="middle" fill="#64b5f6" font-size="17">→ system extracts →</text>
+                            <text class="t-node t-key" x="350" y="140" text-anchor="middle">→ system extracts →</text>
 
                             <!-- Lens (crystallized pattern) -->
                             <g transform="translate(520, 85)">
-                                <rect x="0" y="0" width="160" height="80" fill="rgba(100, 181, 246, 0.12)" stroke="#64b5f6" stroke-width="2" rx="6"/>
-                                <text x="80" y="25" text-anchor="middle" fill="#90caf9" font-size="16" font-weight="bold">LENS</text>
-                                <text x="80" y="43" text-anchor="middle" fill="#90caf9" font-size="13">"Maya's Physics</text>
-                                <text x="80" y="56" text-anchor="middle" fill="#90caf9" font-size="13">Notation"</text>
+                                <rect class="r-keyed" x="0" y="0" width="160" height="80" rx="6"/>
+                                <text class="t-label t-key" x="80" y="25" text-anchor="middle">LENS</text>
+                                <text class="t-micro t-key" x="80" y="43" text-anchor="middle">"Maya's Physics</text>
+                                <text class="t-micro t-key" x="80" y="56" text-anchor="middle">Notation"</text>
 
                                 <!-- Prism icon -->
-                                <path d="M 80 -8 L 92 8 L 68 8 Z" fill="none" stroke="#64b5f6" stroke-width="2"/>
-                                <line x1="92" y1="8" x2="96" y2="10" stroke="#90caf9" stroke-width="1" opacity="0.5"/>
-                                <line x1="92" y1="8" x2="96" y2="6" stroke="#64b5f6" stroke-width="1" opacity="0.5"/>
+                                <path class="r-edge" d="M 80 -8 L 92 8 L 68 8 Z" fill="none"/>
+                                <line class="r-edge w-2" x1="92" y1="8" x2="96" y2="10"/>
+                                <line class="r-edge w-2" x1="92" y1="8" x2="96" y2="6"/>
 
-                                <text x="80" y="72" text-anchor="middle" fill="#7b8a9a" font-size="12" opacity="1">portable interpretation</text>
+                                <text class="t-tiny" x="80" y="72" text-anchor="middle">portable interpretation</text>
                             </g>
 
                             <!-- Arrow down to operations -->
-                            <line x1="600" y1="175" x2="600" y2="200" stroke="#64b5f6" stroke-width="2" marker-end="url(#arrow6)"/>
+                            <line class="r-edge" x1="600" y1="175" x2="600" y2="200" marker-end="url(#arrow6)"/>
 
                             <!-- Lens Operations -->
                             <g transform="translate(0, 210)">
-                                <text x="375" y="10" text-anchor="middle" fill="#90caf9" font-size="18" font-weight="bold">LENS OPERATIONS</text>
+                                <text class="t-node t-key" x="375" y="10" text-anchor="middle">LENS OPERATIONS</text>
 
                                 <!-- Operation 1: Apply -->
                                 <g transform="translate(60, 30)">
-                                    <rect x="0" y="0" width="170" height="165" fill="rgba(74, 85, 104, 0.2)" stroke="#64b5f6" stroke-width="2" rx="6"/>
-                                    <text x="85" y="25" text-anchor="middle" fill="#90caf9" font-size="16" font-weight="bold">APPLY</text>
-                                    <text x="85" y="43" text-anchor="middle" fill="#7b8a9a" font-size="13">Use on new drawings</text>
+                                    <rect class="r-well" x="0" y="0" width="170" height="165" rx="6"/>
+                                    <text class="t-label t-key" x="85" y="25" text-anchor="middle">APPLY</text>
+                                    <text class="t-micro" x="85" y="43" text-anchor="middle">Use on new drawings</text>
 
-                                    <text x="85" y="72" text-anchor="middle" fill="#64b5f6" font-size="20">↓</text>
+                                    <text class="t-node t-key" x="85" y="72" text-anchor="middle">↓</text>
 
                                     <!-- Result -->
-                                    <rect x="15" y="82" width="140" height="65" fill="rgba(10, 14, 26, 0.5)" stroke="#4a5568" stroke-width="1.5" rx="3"/>
-                                    <text x="85" y="100" text-anchor="middle" fill="#7b8a9a" font-size="13">New sketch auto-</text>
-                                    <text x="85" y="113" text-anchor="middle" fill="#7b8a9a" font-size="13">recognized as</text>
-                                    <text x="85" y="126" text-anchor="middle" fill="#90caf9" font-size="14" font-weight="bold">force diagram</text>
-                                    <path d="M 65 135 L 95 127" stroke="#90caf9" stroke-width="2" marker-end="url(#arrow6)"/>
+                                    <rect class="r-well" x="15" y="82" width="140" height="65" rx="3"/>
+                                    <text class="t-micro" x="85" y="100" text-anchor="middle">New sketch auto-</text>
+                                    <text class="t-micro" x="85" y="113" text-anchor="middle">recognized as</text>
+                                    <text class="t-micro t-key" x="85" y="126" text-anchor="middle">force diagram</text>
+                                    <path class="r-edge" d="M 65 135 L 95 127" marker-end="url(#arrow6)"/>
                                 </g>
 
                                 <!-- Operation 2: Share -->
                                 <g transform="translate(260, 30)">
-                                    <rect x="0" y="0" width="170" height="165" fill="rgba(74, 85, 104, 0.2)" stroke="#64b5f6" stroke-width="2" rx="6"/>
-                                    <text x="85" y="25" text-anchor="middle" fill="#90caf9" font-size="16" font-weight="bold">SHARE</text>
-                                    <text x="85" y="43" text-anchor="middle" fill="#7b8a9a" font-size="13">Export to collaborators</text>
+                                    <rect class="r-well" x="0" y="0" width="170" height="165" rx="6"/>
+                                    <text class="t-label t-key" x="85" y="25" text-anchor="middle">SHARE</text>
+                                    <text class="t-micro" x="85" y="43" text-anchor="middle">Export to collaborators</text>
 
-                                    <text x="85" y="72" text-anchor="middle" fill="#64b5f6" font-size="20">↓</text>
+                                    <text class="t-node t-key" x="85" y="72" text-anchor="middle">↓</text>
 
                                     <!-- Result -->
-                                    <rect x="15" y="82" width="140" height="65" fill="rgba(10, 14, 26, 0.5)" stroke="#4a5568" stroke-width="1.5" rx="3"/>
-                                    <text x="85" y="100" text-anchor="middle" fill="#7b8a9a" font-size="13">Teammate's canvas</text>
-                                    <text x="85" y="113" text-anchor="middle" fill="#7b8a9a" font-size="13">now reads your</text>
-                                    <text x="85" y="126" text-anchor="middle" fill="#90caf9" font-size="14" font-weight="bold">notation</text>
-                                    <text x="65" y="142" text-anchor="middle" fill="#90caf9" font-size="18">👤</text>
-                                    <text x="105" y="142" text-anchor="middle" fill="#90caf9" font-size="18">👤</text>
-                                    <line x1="73" y1="139" x2="97" y2="139" stroke="#64b5f6" stroke-width="2"/>
+                                    <rect class="r-well" x="15" y="82" width="140" height="65" rx="3"/>
+                                    <text class="t-micro" x="85" y="100" text-anchor="middle">Teammate's canvas</text>
+                                    <text class="t-micro" x="85" y="113" text-anchor="middle">now reads your</text>
+                                    <text class="t-micro t-key" x="85" y="126" text-anchor="middle">notation</text>
+                                    <text class="t-node t-key" x="65" y="142" text-anchor="middle">👤</text>
+                                    <text class="t-node t-key" x="105" y="142" text-anchor="middle">👤</text>
+                                    <line class="r-edge" x1="73" y1="139" x2="97" y2="139"/>
                                 </g>
 
                                 <!-- Operation 3: Compose -->
                                 <g transform="translate(460, 30)">
-                                    <rect x="0" y="0" width="170" height="165" fill="rgba(74, 85, 104, 0.2)" stroke="#64b5f6" stroke-width="2" rx="6"/>
-                                    <text x="85" y="25" text-anchor="middle" fill="#90caf9" font-size="16" font-weight="bold">COMPOSE</text>
-                                    <text x="85" y="43" text-anchor="middle" fill="#7b8a9a" font-size="13">Combine with other lenses</text>
+                                    <rect class="r-well" x="0" y="0" width="170" height="165" rx="6"/>
+                                    <text class="t-label t-key" x="85" y="25" text-anchor="middle">COMPOSE</text>
+                                    <text class="t-micro" x="85" y="43" text-anchor="middle">Combine with other lenses</text>
 
-                                    <text x="85" y="72" text-anchor="middle" fill="#64b5f6" font-size="20">↓</text>
+                                    <text class="t-node t-key" x="85" y="72" text-anchor="middle">↓</text>
 
                                     <!-- Result -->
-                                    <rect x="15" y="82" width="140" height="65" fill="rgba(10, 14, 26, 0.5)" stroke="#4a5568" stroke-width="1.5" rx="3"/>
-                                    <text x="85" y="100" text-anchor="middle" fill="#7b8a9a" font-size="13">Create hybrid:</text>
-                                    <text x="85" y="118" text-anchor="middle" fill="#90caf9" font-size="14" font-weight="bold">physics +</text>
-                                    <text x="85" y="132" text-anchor="middle" fill="#90caf9" font-size="14" font-weight="bold">chemistry lens</text>
+                                    <rect class="r-well" x="15" y="82" width="140" height="65" rx="3"/>
+                                    <text class="t-micro" x="85" y="100" text-anchor="middle">Create hybrid:</text>
+                                    <text class="t-micro t-key" x="85" y="118" text-anchor="middle">physics +</text>
+                                    <text class="t-micro t-key" x="85" y="132" text-anchor="middle">chemistry lens</text>
                                     <!-- Overlapping prisms -->
-                                    <path d="M 65 140 L 77 152 L 53 152 Z" fill="none" stroke="#90caf9" stroke-width="2" opacity="0.6"/>
-                                    <path d="M 85 140 L 97 152 L 73 152 Z" fill="none" stroke="#64b5f6" stroke-width="2" opacity="0.6"/>
+                                    <path class="r-edge" d="M 65 140 L 77 152 L 53 152 Z" fill="none"/>
+                                    <path class="r-edge" d="M 85 140 L 97 152 L 73 152 Z" fill="none"/>
                                 </g>
                             </g>
 
                             <!-- Bottom insight -->
-                            <text x="375" y="435" text-anchor="middle" fill="#6b7280" font-size="14" font-style="italic">Lenses are portable interpretation frameworks</text>
+                            <text class="t-micro" x="375" y="435" text-anchor="middle">Lenses are portable interpretation frameworks</text>
 
                             <!-- Arrow marker -->
                             <defs>
                                 <marker id="arrow6" markerWidth="8" markerHeight="8" refX="7" refY="2.5" orient="auto">
-                                    <path d="M0,0 L0,5 L7,2.5 z" fill="#64b5f6" />
+                                    <path class="f-key" d="M0,0 L0,5 L7,2.5 z" />
                                 </marker>
                             </defs>
                         </svg>
                     </div>
-                    <div class="label">Figure: Cognitive Lens Architecture</div>
-                    <div class="description">User's repeated gestures → Pattern extraction → Named "lens" (e.g., "Maya's physics notation"). Lenses can be: applied to new drawings, shared with collaborators, composed with other lenses, versioned and evolved. Your way of seeing becomes portable.</div>
                 </div>
+                <figcaption><b>Figure &middot; Cognitive Lens Architecture</b>User's repeated gestures → Pattern extraction → Named "lens" (e.g., "Maya's physics notation"). Lenses can be: applied to new drawings, shared with collaborators, composed with other lenses, versioned and evolved. Your way of seeing becomes portable.</figcaption>
             </figure>
             
             <p>Lenses are not just personal—they can be shared, creating communities of interpretation. A research group might develop a shared lens for their domain notation. A classroom might inherit a lens from curriculum designers. Lenses become a new kind of intellectual property: not content, but <em>ways of seeing</em>.</p>
@@ -3002,115 +3013,114 @@
             <p>Most approaches to alignment focus on control: rules, guardrails, constraints, on the assumption that the machine's goals might diverge from ours. The MetaMedium proposes an alternative: enrich the medium between us so that coordination happens through communication. The richer the shared vocabulary, the better we can align our understanding.</p>
             
             <figure>
-                <div class="placeholder-figure">
+                <div class="plate">
                     <div class="image">
-                        <svg viewBox="0 0 750 400" xmlns="http://www.w3.org/2000/svg">
+                        <svg class="dia" style="--u:0.75" viewBox="0 0 750 400" xmlns="http://www.w3.org/2000/svg">
                             <!-- Title -->
-                            <text x="375" y="25" text-anchor="middle" fill="#7b8a9a" font-size="15" opacity="1">Two paradigms for AI alignment</text>
+                            <text class="t-title" x="375" y="25" text-anchor="middle">Two paradigms for AI alignment</text>
 
                             <g>
-                                <rect x="40" y="50" width="330" height="310" fill="rgba(74, 85, 104, 0.15)" stroke="#6b7280" stroke-width="2" rx="6"/>
-                                <text x="205" y="75" text-anchor="middle" fill="#8b9aaa" font-size="16" font-weight="bold">TRADITIONAL ALIGNMENT</text>
+                                <rect class="r-well" x="40" y="50" width="330" height="310" rx="6"/>
+                                <text class="t-label" x="205" y="75" text-anchor="middle">TRADITIONAL ALIGNMENT</text>
 
                                 <!-- Rules imposed from above -->
                                 <g transform="translate(205, 100)">
-                                    <rect x="-50" y="0" width="100" height="60" fill="rgba(74, 85, 104, 0.4)" stroke="#6b7280" stroke-width="2" rx="4"/>
-                                    <text x="0" y="15" text-anchor="middle" fill="rgba(20, 25, 35, 0.8)" font-size="14" font-weight="bold">RULES</text>
-                                    <text x="0" y="31" text-anchor="middle" fill="#d1495b" font-size="13">STOP</text>
-                                    <text x="0" y="44" text-anchor="middle" fill="#d1495b" font-size="13">DON'T</text>
-                                    <text x="0" y="57" text-anchor="middle" fill="#d1495b" font-size="13">NEVER</text>
+                                    <rect class="r-well" x="-50" y="0" width="100" height="60" rx="4"/>
+                                    <text class="t-micro" x="0" y="15" text-anchor="middle">RULES</text>
+                                    <text class="t-micro" x="0" y="31" text-anchor="middle">STOP</text>
+                                    <text class="t-micro" x="0" y="44" text-anchor="middle">DON'T</text>
+                                    <text class="t-micro" x="0" y="57" text-anchor="middle">NEVER</text>
                                 </g>
 
                                 <!-- Arrow down -->
-                                <line x1="205" y1="175" x2="205" y2="205" stroke="#6b7280" stroke-width="2" marker-end="url(#arrow7)"/>
+                                <line class="r-hold" x1="205" y1="175" x2="205" y2="205" marker-end="url(#arrow7)"/>
 
                                 <!-- Black box AI -->
                                 <g transform="translate(205, 220)">
-                                    <rect x="-55" y="0" width="110" height="70" fill="rgba(20, 25, 35, 0.8)" stroke="#4a5568" stroke-width="2" rx="4"/>
-                                    <text x="0" y="25" text-anchor="middle" fill="#6b7280" font-size="20">🧠</text>
-                                    <text x="0" y="44" text-anchor="middle" fill="#6b7280" font-size="14">AI</text>
-                                    <text x="0" y="60" text-anchor="middle" fill="#6b7280" font-size="12" opacity="0.9">?????</text>
-                                    <text x="70" y="40" fill="#rgba(20, 25, 35, 0.8)" font-size="14" opacity="0.6">Black Box</text>
+                                    <rect class="f-quiet" x="-55" y="0" width="110" height="70" rx="4"/>
+                                    <text class="t-node" x="0" y="25" text-anchor="middle">🧠</text>
+                                    <text class="t-micro" x="0" y="44" text-anchor="middle">AI</text>
+                                    <text class="t-tiny" x="0" y="60" text-anchor="middle">?????</text>
+                                    <text class="t-micro" x="70" y="40">Black Box</text>
                                 </g>
 
                                 <!-- User watching from outside -->
-                                <text x="80" y="268" fill="#9ca3af" font-size="14">👤</text>
-                                <text x="65" y="285" fill="#9ca3af" font-size="14">Watches</text>
-                                <text x="65" y="300" fill="#9ca3af" font-size="14">from "outside"</text>
+                                <text class="t-micro" x="80" y="268">👤</text>
+                                <text class="t-micro" x="65" y="285">Watches</text>
+                                <text class="t-micro" x="65" y="300">from "outside"</text>
 
                                 <!-- Problems -->
-                                <text x="60" y="330" fill="#d1495b" font-size="13">❌ Opaque process</text>
-                                <text x="60" y="347" fill="#d1495b" font-size="13">❌ Adversarial framing</text>
+                                <text class="t-micro" x="60" y="330">❌ Opaque process</text>
+                                <text class="t-micro" x="60" y="347">❌ Adversarial framing</text>
                             </g>
 
                             <g transform="translate(380, 0)">
-                                <rect x="40" y="50" width="330" height="310" fill="rgba(100, 181, 246, 0.08)" stroke="#64b5f6" stroke-width="2" rx="6"/>
-                                <text x="205" y="75" text-anchor="middle" fill="#90caf9" font-size="16" font-weight="bold">METAMEDIUM ALIGNMENT</text>
+                                <rect class="r-keyed" x="40" y="50" width="330" height="310" rx="6"/>
+                                <text class="t-label t-key" x="205" y="75" text-anchor="middle">METAMEDIUM ALIGNMENT</text>
 
                                 <!-- Human and AI side by side -->
                                 <g transform="translate(100, 95)">
                                     <!-- Human -->
-                                    <circle cx="0" cy="25" r="18" fill="rgba(100, 181, 246, 0.2)" stroke="#64b5f6" stroke-width="2"/>
-                                    <text x="0" y="32" text-anchor="middle" fill="#fff" font-size="18">👤</text>
-                                    <text x="0" y="52" text-anchor="middle" fill="#90caf9" font-size="12">human</text>
+                                    <circle class="r-keyed" cx="0" cy="25" r="18"/>
+                                    <text class="t-node t-onkey" x="0" y="32" text-anchor="middle">👤</text>
+                                    <text class="t-tiny t-key" x="0" y="52" text-anchor="middle">human</text>
 
                                     <!-- Double arrow (equals) -->
-                                    <path d="M 22 25 L 183 25" stroke="#64b5f6" stroke-width="3"/>
-                                    <path d="M 0,0 L0,5 L7,2.5 z" transform="translate(22, 22.5)" fill="#64b5f6"/>
-                                    <path d="M0,0 L0,5 L7,2.5 z" transform="translate(176, 27.5) rotate(180)" fill="#64b5f6"/>
-                                    <text x="102" y="16" text-anchor="middle" fill="#90caf9" font-size="12">shared</text>
-                                    <text x="102" y="40" text-anchor="middle" fill="#90caf9" font-size="12">canvas</text>
+                                    <path class="r-edge" d="M 22 25 L 183 25"/>
+                                    <path class="f-key" d="M 0,0 L0,5 L7,2.5 z" transform="translate(22, 22.5)"/>
+                                    <path class="f-key" d="M0,0 L0,5 L7,2.5 z" transform="translate(176, 27.5) rotate(180)"/>
+                                    <text class="t-tiny t-key" x="102" y="16" text-anchor="middle">shared</text>
+                                    <text class="t-tiny t-key" x="102" y="40" text-anchor="middle">canvas</text>
 
                                     <!-- AI -->
-                                    <circle cx="205" cy="25" r="18" fill="rgba(100, 181, 246, 0.2)" stroke="#64b5f6" stroke-width="2"/>
-                                    <text x="205" y="32" text-anchor="middle" fill="#fff" font-size="22">≙</text>
-                                    <text x="205" y="52" text-anchor="middle" fill="#90caf9" font-size="12">AI</text>
+                                    <circle class="r-keyed" cx="205" cy="25" r="18"/>
+                                    <text class="t-node t-onkey" x="205" y="32" text-anchor="middle">≙</text>
+                                    <text class="t-tiny t-key" x="205" y="52" text-anchor="middle">AI</text>
                                 </g>
 
-                                <line x1="120" y1="150" x2="160" y2="180" stroke="#64b5f6" stroke-width="2" marker-end="url(#arrow8)"/>
-                                <line x1="290" y1="150" x2="250" y2="180" stroke="#64b5f6" stroke-width="2" marker-end="url(#arrow8)"/>
+                                <line class="r-edge" x1="120" y1="150" x2="160" y2="180" marker-end="url(#arrow8)"/>
+                                <line class="r-edge" x1="290" y1="150" x2="250" y2="180" marker-end="url(#arrow8)"/>
 
                                 <!-- Shared visible canvas -->
                                 <g transform="translate(205, 200)">
-                                    <rect x="-75" y="0" width="150" height="95" fill="rgba(10, 14, 26, 0.5)" stroke="#64b5f6" stroke-width="2" rx="4"/>
+                                    <rect class="r-well" x="-75" y="0" width="150" height="95" rx="4"/>
 
-                                    <circle cx="-30" cy="25" r="13" fill="none" stroke="#90caf9" stroke-width="1.5"/>
-                                    <line x1="-17" y1="25" x2="10" y2="25" stroke="#90caf9" stroke-width="1.5" marker-end="url(#arrow8)"/>
-                                    <line x1="-30" y1="38" x2="-45" y2="55" stroke="#90caf9" stroke-width="2"/>
-                                    <line x1="-30" y1="38" x2="-15" y2="55" stroke="#90caf9" stroke-width="2"/>
-                                    <rect x="-50" y="55" width="18" height="18" fill="none" stroke="#90caf9" stroke-width="1.5"/>
-                                    <path d="M 5,55 L 20,68 L 5,68 Z" fill="none" stroke="#90caf9" stroke-width="1.5"/>
-                                    <circle cx="35" cy="55" r="5" fill="#90caf9"/>
+                                    <circle class="r-edge w-2" cx="-30" cy="25" r="13" fill="none"/>
+                                    <line class="r-edge w-2" x1="-17" y1="25" x2="10" y2="25" marker-end="url(#arrow8)"/>
+                                    <line class="r-edge" x1="-30" y1="38" x2="-45" y2="55"/>
+                                    <line class="r-edge" x1="-30" y1="38" x2="-15" y2="55"/>
+                                    <rect class="r-edge" x="-50" y="55" width="18" height="18"/>
+                                    <path class="r-edge w-2" d="M 5,55 L 20,68 L 5,68 Z" fill="none"/>
+                                    <circle class="f-key" cx="35" cy="55" r="5"/>
 
-                                    <text x="0" y="17" text-anchor="middle" fill="#7b8a9a" font-size="11" font-style="italic">"flow process"</text>
-                                    <text x="0" y="87" text-anchor="middle" fill="#7b8a9a" font-size="11">both can inspect</text>
+                                    <text class="t-tiny" x="0" y="17" text-anchor="middle">"flow process"</text>
+                                    <text class="t-tiny" x="0" y="87" text-anchor="middle">both can inspect</text>
                                 </g>
 
                                 <!-- Quote -->
-                                <text x="205" y="194" text-anchor="middle" fill="#7b8a9a" font-size="14" font-style="italic">"The diagram is the treaty"</text>
+                                <text class="t-micro" x="205" y="194" text-anchor="middle">"The diagram is the treaty"</text>
 
                                 <!-- Benefits -->
-                                <text x="60" y="330" fill="#64b5f6" font-size="13">✓ Transparent reasoning</text>
-                                <text x="60" y="347" fill="#64b5f6" font-size="13">✓ Collaborative process</text>
+                                <text class="t-micro t-key" x="60" y="330">✓ Transparent reasoning</text>
+                                <text class="t-micro t-key" x="60" y="347">✓ Collaborative process</text>
                             </g>
 
                             <!-- Bottom insight -->
-                            <text x="375" y="385" text-anchor="middle" fill="#6b7280" font-size="14" font-style="italic">Control assumes conflict. Communication builds shared ground.</text>
+                            <text class="t-micro" x="375" y="385" text-anchor="middle">Control assumes conflict. Communication builds shared ground.</text>
 
                             <!-- Arrow markers -->
                             <defs>
                                 <marker id="arrow7" markerWidth="8" markerHeight="8" refX="7" refY="2.5" orient="auto">
-                                    <path d="M0,0 L0,5 L7,2.5 z" fill="#6b7280" />
+                                    <path d="M0,0 L0,5 L7,2.5 z" fill="var(--dia-quiet)" />
                                 </marker>
                                 <marker id="arrow8" markerWidth="8" markerHeight="8" refX="7" refY="2.5" orient="auto">
-                                    <path d="M0,0 L0,5 L7,2.5 z" fill="#64b5f6" />
+                                    <path class="f-key" d="M0,0 L0,5 L7,2.5 z" />
                                 </marker>
                             </defs>
                         </svg>
                     </div>
-                    <div class="label">Figure: Alignment Through Shared Ground</div>
-                    <div class="description">Left: Traditional alignment (AI in black box, rules imposed from outside, human hopes constraints hold). Right: MetaMedium alignment (human and AI on same canvas, reasoning visible to both, shared diagram as "treaty" both parties can read and negotiate). The diagram externalizes the alignment problem.</div>
                 </div>
+                <figcaption><b>Figure &middot; Alignment Through Shared Ground</b>Left: Traditional alignment (AI in black box, rules imposed from outside, human hopes constraints hold). Right: MetaMedium alignment (human and AI on same canvas, reasoning visible to both, shared diagram as "treaty" both parties can read and negotiate). The diagram externalizes the alignment problem.</figcaption>
             </figure>
             
             <p>This is not naive trust; it is a different theory of coordination. We coordinate with other people not by controlling their thoughts but by sharing a rich medium for exchange. The canvas becomes that medium: two intelligences, each contributing what it does best, with their reasoning visible to both.</p>

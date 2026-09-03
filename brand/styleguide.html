@@ -506,6 +506,154 @@ p.lede em { font-style: italic; color: var(--ink); }
 .doNot .yes li::before { content: '+'; color: var(--teal); }
 .doNot .no  li::before { content: '\2013'; color: var(--sig-low); }
 
+/* ---- 11 · figures and diagrams ------------------------------------------ */
+/* ONE figure component. The plate holds the drawing, the caption sits under it
+   behind one hairline, and both share --fig-pad. The whitepaper's figures had
+   the drawing on a gradient at one padding and the caption at another against
+   a border it did not share, which is what made the captions read as bolted
+   on rather than part of the plate. */
+figure.fig {
+  margin: var(--s5) 0;
+  background: var(--fig-plate);
+  border: 1px solid var(--fig-edge);
+  border-radius: var(--radius);
+  box-shadow: var(--lift);
+  overflow: hidden;
+}
+figure.fig > .plate { padding: var(--fig-pad); }
+figure.fig > .plate > svg,
+figure.fig > .plate > img { display: block; width: 100%; height: auto; }
+figure.fig > figcaption {
+  padding: var(--fig-pad);
+  border-top: 1px solid var(--rule-soft);
+  font-size: var(--t-small);
+  color: var(--ink-3);
+  line-height: 1.55;
+}
+figure.fig > figcaption > b {
+  display: block;
+  font-size: var(--t-micro); font-weight: 600;
+  letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--teal);
+  margin-bottom: 0.3rem;
+}
+figure.fig > figcaption code { color: var(--teal); }
+/* Wide figures step out of the prose measure in fixed widths, never 90vw:
+   a viewport-relative figure changes its relationship to the text column at
+   every window size, so the same diagram reads differently on every screen. */
+figure.fig.wide { max-width: var(--fig-wide); }
+figure.fig.band { max-width: var(--fig-band); }
+
+/* A diagram is drawn in the engine's own roles, and the CSS is the only place
+   its colours live. Presentation attributes lose to these rules, so a diagram
+   inherited from an older palette is re-pointed by adding classes, not by
+   rewriting every attribute. */
+.dia { font-family: var(--face); --u: 1; }
+.dia text { fill: var(--dia-quiet); font-size: calc(17px * var(--u)); }
+.dia .t-title { fill: var(--dia-quiet); font-size: calc(26px * var(--u)); }
+.dia .t-node  { fill: var(--dia-ink);   font-size: calc(20px * var(--u)); font-weight: 500; }
+.dia .t-label { fill: var(--dia-quiet); font-size: calc(17px * var(--u)); }
+.dia .t-micro { fill: var(--dia-quiet); font-size: calc(14px * var(--u)); }
+.dia .t-tiny  { fill: var(--dia-faint); font-size: calc(12px * var(--u)); }
+.dia .t-key   { fill: var(--dia-key); }
+.dia .t-live  { fill: var(--dia-live); }
+.dia .t-model { fill: var(--dia-model); }
+.dia .r-container { fill: var(--dia-tint-flat); stroke: var(--dia-quiet); }
+.dia .r-keyed     { fill: var(--dia-tint);      stroke: var(--dia-key); }
+.dia .r-live      { fill: var(--dia-tint-live); stroke: var(--dia-live); }
+.dia .r-well      { fill: var(--fig-well);      stroke: var(--fig-edge); }
+.dia .r-edge      { stroke: var(--dia-key); fill: none; }
+.dia .r-edge-back { stroke: var(--dia-model); fill: none; }
+.dia .r-ink       { stroke: var(--dia-ink); fill: none; }
+.dia .r-hold      { stroke: var(--dia-hold); fill: none; }
+/* Explicit, not a substring match: a selector that guesses at class names is
+   a selector that will one day style something it was never shown. */
+.dia .r-container, .dia .r-keyed, .dia .r-live,
+.dia .r-edge, .dia .r-edge-back, .dia .r-ink, .dia .r-hold {
+  stroke-width: calc(2.4px * var(--u));
+}
+.dia .r-well { stroke-width: calc(1px * var(--u)); }
+.dia .w-2  { stroke-width: calc(1.6px * var(--u)); }
+.dia .w-1  { stroke-width: calc(1px * var(--u)); }
+
+.scale-row {
+  display: grid; grid-template-columns: 7rem 1fr 6rem;
+  gap: var(--s3); align-items: center;
+  padding: var(--s2) 0; border-bottom: 1px dotted var(--rule);
+}
+.scale-row:last-child { border-bottom: 0; }
+.scale-row .n { font-size: var(--t-micro); font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--teal); }
+.scale-row .v { font-size: var(--t-micro); color: var(--ink-3); text-align: right; font-variant-numeric: tabular-nums; }
+
+/* ---- 12 · long-form furniture ------------------------------------------- */
+.callout {
+  border: 1px solid var(--fig-edge); border-left: 1px solid var(--fig-edge);
+  border-radius: var(--radius);
+  background: var(--paper-lt);
+  padding: var(--s3) var(--s4);
+  margin: var(--s4) 0;
+}
+.callout > b {
+  display: block;
+  font-size: var(--t-micro); font-weight: 600;
+  letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--teal); margin-bottom: var(--s1);
+}
+.callout p { font-size: var(--t-small); color: var(--ink-2); max-width: var(--measure); }
+.callout.key { background: var(--wash); border-color: var(--teal); }
+
+.pquote {
+  margin: var(--s4) 0; padding: var(--s3) 0;
+  border-top: 1px solid var(--teal); border-bottom: 1px solid var(--teal);
+  font-size: 1.1rem; line-height: 1.45; color: var(--ink);
+  max-width: var(--measure);
+}
+.pquote cite { display: block; margin-top: var(--s2); font-style: normal; font-size: var(--t-micro); letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-3); }
+
+.entry {
+  display: grid; grid-template-columns: 5.2rem 1fr;
+  gap: var(--s3);
+  padding: var(--s3) 0; border-bottom: 1px solid var(--rule-soft);
+}
+.entry .yr { font-size: var(--t-small); color: var(--teal); font-variant-numeric: tabular-nums; }
+.entry h5 { font-size: var(--t-body); font-weight: 500; }
+.entry .by { font-size: var(--t-micro); letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-3); margin-top: 0.1rem; }
+.entry p { font-size: var(--t-small); color: var(--ink-2); margin-top: var(--s1); max-width: 60ch; }
+
+.embed {
+  border: 1px solid var(--fig-edge); border-radius: var(--radius);
+  background: var(--paper-dk); overflow: hidden; margin: var(--s4) 0;
+}
+.embed .e-head {
+  display: flex; justify-content: space-between; align-items: center; gap: var(--s3);
+  padding: var(--s2) var(--fig-pad);
+  border-bottom: 1px solid var(--rule);
+  background: var(--paper-lt);
+  font-size: var(--t-micro); letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-3);
+}
+.embed .e-head b { color: var(--teal); font-weight: 600; letter-spacing: 0.14em; }
+.embed .e-body {
+  aspect-ratio: 16 / 10; display: flex; align-items: center; justify-content: center;
+  color: var(--ink-4); font-size: var(--t-small);
+}
+
+.tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--s2); }
+.tiles > figure {
+  margin: 0; border: 1px solid var(--fig-edge); border-radius: var(--radius);
+  background: var(--paper-lt); overflow: hidden;
+}
+.tiles > figure > .plate { padding: var(--s2); }
+.tiles > figure > .plate > .ph {
+  aspect-ratio: 4 / 3; background: var(--fig-well);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--ink-4); font-size: var(--t-micro);
+}
+.tiles > figure > figcaption {
+  padding: var(--s2); border-top: 1px solid var(--rule-soft);
+  font-size: var(--t-micro); color: var(--ink-3); line-height: 1.5;
+}
+@media (max-width: 900px) { .tiles { grid-template-columns: repeat(2, 1fr); } }
+
 /* ---- colophon ----------------------------------------------------------- */
 .colophon {
   border-top: 1px solid var(--rule);
@@ -1086,6 +1234,146 @@ p.lede em { font-style: italic; color: var(--ink); }
           <li>Colour something to fill space, or add a bar to give a card an edge.</li>
           <li>Claim a demo shows a thing the demo does not show.</li>
         </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= 11 · FIGURES ======================= -->
+<section class="band" id="figures">
+  <div class="wrap">
+    <div class="kicker"><span class="num">11</span> Figures &amp; diagrams</div>
+    <h2 class="head">A diagram is drawn in <em>the engine's own roles</em>.</h2>
+    <p class="lede">This is the section the whitepaper most needed and the system did not have. Its figures were authored for a dark board and then dropped onto light paper, so each one carries its own palette, its own type sizes and its own idea of what a caption is. The fix is not per-figure taste: a figure has <strong>one plate, one padding, one caption structure</strong>, and a diagram is drawn in the <strong>same six roles</strong> the diagram rung reads &mdash; container, node, edge, label, annotation &mdash; plus the two claims a figure can make.</p>
+
+    <h3 class="sub">One unit is one pixel</h3>
+    <p class="lede">Every diagram is authored <strong>1000 units wide</strong>. At <code>--fig-wide</code> (1040px) a unit is a pixel, so one type scale holds across every figure in the document. A diagram inherited at another viewBox width sets <code>--u</code> to <em>width &divide; 1000</em> and lands on the same pixels &mdash; which is how six diagrams drawn at 400, 700, 750 and 800 units stop disagreeing about how big a label is.</p>
+    <div class="card">
+      <div class="scale-row"><span class="n">Title</span><span class="v" style="text-align:left;color:var(--ink-2)">what the figure is saying, once, at the top</span><span class="v">26u &middot; ink-3</span></div>
+      <div class="scale-row"><span class="n">Node</span><span class="v" style="text-align:left;color:var(--ink-2)">the name of a thing in the diagram</span><span class="v">20u &middot; 500</span></div>
+      <div class="scale-row"><span class="n">Label</span><span class="v" style="text-align:left;color:var(--ink-2)">what a node or edge is doing</span><span class="v">17u</span></div>
+      <div class="scale-row"><span class="n">Micro</span><span class="v" style="text-align:left;color:var(--ink-2)">dimensions, values, asides</span><span class="v">14u</span></div>
+      <div class="scale-row"><span class="n">Tiny</span><span class="v" style="text-align:left;color:var(--ink-2)">the barely-there: guides, tick labels</span><span class="v">12u &middot; ink-4</span></div>
+      <div class="scale-row"><span class="n">Strokes</span><span class="v" style="text-align:left;color:var(--ink-2)">structure &middot; secondary &middot; hairline</span><span class="v">2.4 / 1.6 / 1</span></div>
+    </div>
+    <p class="note"><b>No italic and no bold in a diagram.</b> Mono has one usable weight above 400 and no display italic; emphasis in a figure is made with colour and position, the same way the canvas makes it.</p>
+
+    <h3 class="sub">The roles, and the two claims</h3>
+    <figure class="fig wide">
+      <div class="plate">
+        <svg class="dia" viewBox="0 0 1000 250" aria-label="The diagram roles">
+          <rect class="r-container" x="30" y="40" width="290" height="150" rx="3"/>
+          <text class="t-micro" x="42" y="62">r-container</text>
+          <rect class="r-live" x="60" y="90" width="100" height="62" rx="3"/>
+          <text class="t-node t-live" x="110" y="126" text-anchor="middle">node</text>
+          <rect class="r-live" x="190" y="90" width="100" height="62" rx="3"/>
+          <text class="t-node t-live" x="240" y="126" text-anchor="middle">node</text>
+
+          <line class="r-edge" x1="330" y1="115" x2="440" y2="115" marker-end="url(#sgArrow)"/>
+          <text class="t-label t-key" x="385" y="100" text-anchor="middle">edge</text>
+
+          <rect class="r-keyed" x="450" y="40" width="270" height="150" rx="3"/>
+          <text class="t-micro t-key" x="462" y="62">r-keyed</text>
+          <text class="t-node t-key" x="585" y="112" text-anchor="middle">the claim</text>
+          <text class="t-label" x="585" y="140" text-anchor="middle">what this figure says</text>
+
+          <rect class="r-well" x="750" y="40" width="220" height="150" rx="3"/>
+          <text class="t-micro" x="762" y="62">r-well</text>
+          <path class="r-edge-back w-2" d="M775 120 L840 120" marker-end="url(#sgArrowM)"/>
+          <text class="t-label t-model" x="860" y="126">model</text>
+          <text class="t-tiny" x="762" y="172">a recessed panel</text>
+
+          <text class="t-micro" x="30" y="225">annotation sits in ink-3 and never competes with a node</text>
+          <defs>
+            <marker id="sgArrow" markerWidth="7" markerHeight="7" refX="6" refY="2.5" orient="auto" markerUnits="strokeWidth">
+              <path d="M0,0 L0,5 L6,2.5 z" fill="var(--dia-key)"/>
+            </marker>
+            <marker id="sgArrowM" markerWidth="7" markerHeight="7" refX="6" refY="2.5" orient="auto" markerUnits="strokeWidth">
+              <path d="M0,0 L0,5 L6,2.5 z" fill="var(--dia-model)"/>
+            </marker>
+          </defs>
+        </svg>
+      </div>
+      <figcaption><b>Figure &middot; the diagram vocabulary</b> A container makes no claim and takes the flat tint; a keyed container is the one thing the figure is arguing. Nodes are blue because a named thing in a diagram is a <em>read</em> thing. Edges take teal, and an edge the machine contributes takes purple &mdash; the same attribution the canvas uses. Arrowheads are filled from the edge's own colour and sized in <code>strokeWidth</code> units so they scale with the line.</figcaption>
+    </figure>
+
+    <h3 class="sub">The caption rule</h3>
+    <p class="lede">A caption is <strong>part of the plate</strong>: same padding as the drawing, one hairline between them, a teal micro-label naming the figure and the explanation in prose under it. Two paddings and a heavier border is what made the old captions look bolted on.</p>
+    <div class="grid-2">
+      <div class="card">
+        <h3 class="sub" style="margin-top:0">Do</h3>
+        <div class="code">figure.fig
+  &gt; .plate      padding: --fig-pad
+  &gt; figcaption   padding: --fig-pad
+                 border-top: 1px --rule-soft
+    &gt; b          the label, teal, micro, caps
+      then       the explanation, --t-small</div>
+        <p class="note">One padding token, so the caption's left edge lines up with the drawing's.</p>
+      </div>
+      <div class="card">
+        <h3 class="sub" style="margin-top:0">Don't</h3>
+        <ul style="list-style:none">
+          <li class="smp-small" style="color:var(--ink-2);padding:0.2rem 0">&mdash; Put the label and description <b style="color:var(--ink)">inside</b> the plate as plain divs. They are the caption; a screen reader should be told so.</li>
+          <li class="smp-small" style="color:var(--ink-2);padding:0.2rem 0">&mdash; Size a figure in <code>vw</code>. Its relationship to the text column then changes at every window width.</li>
+          <li class="smp-small" style="color:var(--ink-2);padding:0.2rem 0">&mdash; Tint the plate with a gradient. A drawing needs a flat ground or its own greys start lying.</li>
+          <li class="smp-small" style="color:var(--ink-2);padding:0.2rem 0">&mdash; Set the caption in italic. At this size mono italic costs more than it says.</li>
+        </ul>
+      </div>
+    </div>
+    <p class="note"><b>Two widths, no more:</b> <code>.wide</code> (1040px) for a diagram that needs the room, <code>.band</code> (860px) for one that reads beside the prose. Everything else stays in the measure.</p>
+  </div>
+</section>
+
+<!-- ======================= 12 · LONG-FORM ======================= -->
+<section class="band" id="longform">
+  <div class="wrap">
+    <div class="kicker"><span class="num">12</span> Long-form furniture</div>
+    <h2 class="head">What a document needs <em>that a canvas does not</em>.</h2>
+    <p class="lede">The whitepaper carries seven components the canvas has no use for. They are here so the document does not invent them a second time.</p>
+
+    <div class="grid-2">
+      <div>
+        <h3 class="sub" style="margin-top:0">Callout</h3>
+        <div class="callout"><b>Note</b><p>A hairline box on raised paper. <strong>No left-edge bar</strong> &mdash; the label carries the weight the bar used to.</p></div>
+        <div class="callout key"><b>The key claim</b><p>The one callout that takes the teal wash and a teal border. At most one per section, or it is not key.</p></div>
+
+        <h3 class="sub">Pull quote</h3>
+        <blockquote class="pquote">Meaning is reconstructed, not transferred.<cite>Peirce, paraphrased</cite></blockquote>
+
+        <h3 class="sub">Embedded demo</h3>
+        <div class="embed">
+          <div class="e-head"><span><b>Live</b> &middot; session-engine</span><span>canvas ground</span></div>
+          <div class="e-body">an embedded canvas keeps its own dark ground</div>
+        </div>
+        <p class="note">A demo is framed like a figure and <b>keeps the canvas ground</b>. The seam between paper and canvas is the honest one: that is a different surface, and pretending otherwise would misreport what the reader is looking at.</p>
+      </div>
+
+      <div>
+        <h3 class="sub" style="margin-top:0">Lineage entry</h3>
+        <div class="card" style="padding:var(--s3) var(--s4)">
+          <div class="entry">
+            <span class="yr">1945</span>
+            <div><h5>As We May Think</h5><div class="by">Vannevar Bush</div><p>The memex: associative trails through a personal corpus, indexed by the reader rather than the publisher.</p></div>
+          </div>
+          <div class="entry">
+            <span class="yr">1968</span>
+            <div><h5>Sketchpad</h5><div class="by">Ivan Sutherland</div><p>Constraints as first-class content: the drawing holds relationships, not just marks.</p></div>
+          </div>
+          <div class="entry" style="border-bottom:0">
+            <span class="yr">2016</span>
+            <div><h5>Chalktalk</h5><div class="by">Ken Perlin</div><p>Sketches that run. A drawn mark becomes a live, parameterised behaviour.</p></div>
+          </div>
+        </div>
+        <p class="note">The year is teal and tabular so the column reads as a spine. Badges by category are <b>dropped</b> &mdash; five colours of pill was the old page's one real palette violation.</p>
+
+        <h3 class="sub">Gallery</h3>
+        <div class="tiles">
+          <figure><div class="plate"><div class="ph">notes</div></div><figcaption>System diagram, 2016</figcaption></figure>
+          <figure><div class="plate"><div class="ph">notes</div></div><figcaption>Activity model</figcaption></figure>
+          <figure><div class="plate"><div class="ph">notes</div></div><figcaption>Planes to cube</figcaption></figure>
+          <figure><div class="plate"><div class="ph">notes</div></div><figcaption>Memory association</figcaption></figure>
+        </div>
+        <p class="note">Gallery tiles are the figure component at small size &mdash; same plate, same hairline, same caption rule, tighter padding.</p>
       </div>
     </div>
   </div>

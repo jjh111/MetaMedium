@@ -28,6 +28,8 @@ jobs:
           npm run build:browser
           cp dist/metamedium-core.browser.js ../Demos/metamedium-core.browser.js
           git diff --exit-code -- ../Demos/metamedium-core.browser.js
+      - name: Surface fragments must match the built script
+        run: node ../Demos/build-surface.mjs --check
 
   web-app:
     name: Web App Skeleton — typecheck, lint, test, build

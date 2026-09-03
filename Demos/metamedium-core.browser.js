@@ -3453,8 +3453,14 @@ ${pad}</${tag}>`;
         reasoning: `${letterIds.length} small strokes in a row on one line \u2014 printed letters`
       });
     }
+    function looksLikeShape(n2) {
+      const top = resemblances(n2)[0];
+      if (!top) return false;
+      const t = top.to.replace(/^type:/, "");
+      return (t === "rectangle" || t === "triangle") && (top.weight ?? 0) >= 0.72;
+    }
     function absorbIntoWord(node, fp, at, scale) {
-      if (!isLetterLike(fp.bounds, scale)) return false;
+      if (!isLetterLike(fp.bounds, scale) || looksLikeShape(node)) return false;
       const prevId = contentIds.filter((id) => id !== node.id).pop();
       if (!prevId) return false;
       const prev = nodes.get(prevId);
@@ -3474,7 +3480,7 @@ ${pad}</${tag}>`;
       const prevStroke = getRep(prev, "stroke")?.data;
       if (!prevFp || !prevStroke || getRep(prev, "gesture")) return false;
       if (pendingLasso?.id === prev.id) return false;
-      if (!isLetterLike(prevFp.bounds, prevStroke.scale ?? scale)) return false;
+      if (!isLetterLike(prevFp.bounds, prevStroke.scale ?? scale) || looksLikeShape(prev)) return false;
       const j = joinsRun({ bounds: prevFp.bounds, lastAt: prevStroke.at }, letter, scale);
       if (!j.ok) return false;
       const word = { id: nextId("word"), reps: [], edges: [{ to: LOCAL_PARTICIPANT, rel: "made-by" }], capability: 0, createdAt: at };

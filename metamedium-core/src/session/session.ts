@@ -1241,9 +1241,22 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     });
   }
 
+  /**
+   * A letter is small on screen — but so is a box drawn zoomed out. What
+   * tells them apart is the reading: a stroke the shape rung confidently
+   * calls a rectangle or a triangle is a shape, whatever its size. (An O may
+   * be a circle and a letter at once; a run decides.)
+   */
+  function looksLikeShape(n: MMNode): boolean {
+    const top = resemblances(n)[0];
+    if (!top) return false;
+    const t = top.to.replace(/^type:/, '');
+    return (t === 'rectangle' || t === 'triangle') && (top.weight ?? 0) >= 0.72;
+  }
+
   /** The stroke just made: does it continue a word, or start one with the stroke before it? */
   function absorbIntoWord(node: MMNode, fp: Fingerprint, at: number, scale: number): boolean {
-    if (!isLetterLike(fp.bounds, scale)) return false;
+    if (!isLetterLike(fp.bounds, scale) || looksLikeShape(node)) return false;
     // The previous content node: a word being written, or a lone letter-like stroke.
     const prevId = contentIds.filter((id) => id !== node.id).pop();
     if (!prevId) return false;
@@ -1266,7 +1279,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     const prevStroke = getRep(prev, 'stroke')?.data as { at: number; scale?: number } | undefined;
     if (!prevFp || !prevStroke || getRep(prev, 'gesture')) return false;
     if (pendingLasso?.id === prev.id) return false;
-    if (!isLetterLike(prevFp.bounds, prevStroke.scale ?? scale)) return false;
+    if (!isLetterLike(prevFp.bounds, prevStroke.scale ?? scale) || looksLikeShape(prev)) return false;
     const j = joinsRun({ bounds: prevFp.bounds, lastAt: prevStroke.at }, letter, scale);
     if (!j.ok) return false;
 

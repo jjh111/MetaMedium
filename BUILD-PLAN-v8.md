@@ -107,7 +107,7 @@ Access), later `GitStore`. The merge of logs is `mergeLogs(logs) →
 SessionEvent[]` ordered by `at`, ties by participant id, and is a pure
 function with a test.
 
-### 1.6 The palette item (surface, `Demos/surface/palette.js`, WP-3)
+### 1.6 The palette item (surface, `Demos/surface/09-palette.js`, WP-3)
 
 ```js
 { key, label, why, tier: 0|2, scope: 'mark'|'these'|'board'|'artifact', likelihood: 0..1, run(btn) }
@@ -126,10 +126,18 @@ the surface. Each has an owner slot; JH assigns.
 
 ### Level 0 — enable parallel work
 
-**WP-0 · Split the surface into modules** (W, ~1 day, me)
-`Demos/session-engine.html` is 2,800 lines in one file. Split into
-`Demos/surface/{boot,view,ink,render,inspector,palette,held,model-pane,teach,replay,artifacts,handwriting}.js` as ES modules, loaded by the page; behaviour identical; e2e 60/60 before and after. Until this lands, only one package may touch the surface at a time.
-*Done:* e2e passes; no module over 400 lines; `Demos/build-standalone.mjs` inlines them.
+**WP-0 · Split the surface into fragments** (W, me) ✅ **done 3 Sep 2026**
+`Demos/session-engine.html` was 2,800 lines in one file. It is now
+`Demos/surface/surface.css` plus thirteen script fragments (`00-core` …
+`12-boot`), one concern each, concatenated in name order into one closure by
+`Demos/build-surface.mjs` → the committed `Demos/session-engine.js`, with a
+CI drift check like the engine bundle's. Not ES modules: the closure's shared
+state is used by every concern and there is no JS parser in the toolchain to
+rename bindings safely, so fragments reached the goal — several people on
+the surface at once, in disjoint files — with zero behaviour risk. Each
+fragment's header names what it provides and uses, so extraction into real
+modules later is mechanical. Behaviour identical; e2e 60/60 after.
+*Surface packages own fragments:* WP-3 → `05-snap` (to become `05-selection`) and `09-palette`; WP-8 → `02-artifacts` plus a new `13-kinds`; WP-5/6 → new `14-clocks`, `15-behave`; WP-10 → new `16-frames`; WP-11 → new `17-folder`; WP-9b → new `18-images`; WP-13 → new `19-text`.
 
 ### Level 1 — the foundations (all P once WP-0 lands; engine packages are P now)
 

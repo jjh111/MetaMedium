@@ -67,7 +67,8 @@ any structural change.
 | `doodle2-canvas.html` | **Flagship demo**: heuristic recognition, spatial graph, library, undo/redo, touch. No LLM. Single-file (~500KB) |
 | `metadoodle1.html` | Fork of flagship + tiered LLM recognition (WebLLM in-browser, LM Studio local API) + voice. Single-file (~600KB) |
 | `Web App Skeleton/` | React + Vite + TypeScript + Zustand rebuild; Claude API interpreter skeleton in `src/llm/`; recognition/spatial/matching in `src/core/` |
-| `Demos/` | **`session-engine.html` is the MVP surface** — infinite canvas, the taught command mark, living artifacts in a DOM overlay, ink-over-artifact addressing, "why" inspector, model participants, canvas answers. Uses the committed `metamedium-core.browser.js` bundle. **`session-engine.e2e.js`** drives the whole loop through the real UI with a stubbed model (browser console; not part of `npm test`). `build-standalone.mjs` inlines the bundle into a single shareable file. Plus fish, composition diagrams, no-modes graph, etc. |
+| `Demos/surface/` | **The reference surface's source**: `surface.css` and thirteen script fragments (`00-core` … `12-boot`), one concern each, concatenated in name order into one closure by `Demos/build-surface.mjs` → the committed `Demos/session-engine.js` (CI checks it has not drifted). Fragments share the closure's variables — no imports; each fragment's header says what it provides and uses. Edit a fragment, run the build, commit both |
+| `Demos/` | **`session-engine.html` is the MVP surface** (it links `surface/surface.css` and loads `session-engine.js`) — infinite canvas, the taught command mark, living artifacts in a DOM overlay, ink-over-artifact addressing, "why" inspector, model participants, canvas answers. Uses the committed `metamedium-core.browser.js` bundle. **`session-engine.e2e.js`** drives the whole loop through the real UI with a stubbed model (browser console; not part of `npm test`). `build-standalone.mjs` inlines the bundle into a single shareable file. Plus fish, composition diagrams, no-modes graph, etc. |
 | `skills/` | Claude Code skills: `metamedium-code` (code patterns), `metamedium-design` (design principles) |
 | `Assets/` | Figures and design rationale (recognition strategy, point-primitive proposal) |
 | `archive/` | Retired versions and superseded plans, incl. whitepaper v4 (root `MetaMedium_Whitepaper_v4.html` is a redirect stub — keep it) and PRDs v3.2/v4 |
@@ -608,7 +609,9 @@ npm run build:browser  # IIFE bundle; a copy is committed at Demos/metamedium-co
 
 After engine changes, rebuild the browser bundle and re-copy it to `Demos/`
 (`Demos/session-engine.html` is the live reference surface) — CI fails if the
-committed copy drifts from source.
+committed copy drifts from source. After surface changes, run
+`node Demos/build-surface.mjs` and commit `Demos/session-engine.js` with the
+fragments — CI checks that too.
 
 `src/session/session.scenario.test.ts` is the executable spec for the
 no-modes flow (lasso → check → summon → bless → artifact). Change it knowingly

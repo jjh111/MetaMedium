@@ -59,6 +59,33 @@
   --stroke-model: #6b4fa8; /* the model holding a pen                     */
   --stroke-gone:  #a8493c; /* scratched out                               */
 
+
+  /* ---- figures and diagrams --------------------------------------------- */
+  /* A figure is a plate (the drawing) and a caption, and they share one
+     padding. The whitepaper's figures had the drawing padded 0.75rem inside a
+     tinted gradient and the caption padded 1rem/1.5rem against a border it did
+     not share — which is why the captions read as bolted on. */
+  --fig-plate: var(--paper-lt);   /* the ground a figure is drawn on         */
+  --fig-well:  var(--paper-dk);   /* a recessed panel inside a figure        */
+  --fig-edge:  var(--paper-edge);
+  --fig-pad:   var(--s3);         /* ONE padding: plate and caption both     */
+
+  /* A diagram is drawn in the same six roles the engine reads (KEYFRAMES §2):
+     container, node, edge, label, annotation — plus the two claims a figure
+     can make, keyword and machine. Nothing in a diagram is coloured outside
+     this list. */
+  --dia-ink:    var(--ink);        /* a drawn line, the default             */
+  --dia-quiet:  var(--ink-3);      /* annotation, dimension, aside          */
+  --dia-faint:  var(--ink-4);      /* grid, guide, the barely-there         */
+  --dia-key:    var(--teal);       /* the thing the figure is saying        */
+  --dia-live:   var(--sig-read);   /* recognised, accepted, the active edge */
+  --dia-model:  var(--sig-model);  /* the machine's own contribution        */
+  --dia-hold:   var(--sig-held);   /* proposed, not agreed                  */
+  --dia-tint:      rgba(11,111,125,0.07);  /* a container under the keyword */
+  --dia-tint-live: rgba(28,95,184,0.07);
+  --dia-tint-flat: rgba(12,26,36,0.04);    /* a container making no claim   */
+  --dia-grid:      rgba(12,26,36,0.055);
+
   /* ---- rules and grid --------------------------------------------------- */
   --rule:      #cfdde1;    /* a hairline that reads                       */
   --rule-soft: #e3ecee;    /* a hairline that only separates              */
@@ -83,6 +110,15 @@
   --lead-body:  1.68;      /* mono at length needs the air               */
 
   /* ---- measure and rhythm ---------------------------------------------- */
+  /* Figures step out of the prose measure in three fixed widths, never an
+     arbitrary vw. A diagram is authored 1000 units wide so that ONE UNIT IS
+     ONE PIXEL at --fig-wide, and its type scale is the same in every figure:
+     title 26u, node 20u, label 17u, micro 14u, tiny 12u; strokes 2.4 / 1.6 / 1.
+     A figure drawn at another viewBox width sets --u to width/1000 and the
+     scale still lands on the same pixels. */
+  --fig-wide:  1040px;
+  --fig-band:  860px;
+
   --wide:    1160px;
   --measure: 68ch;         /* mono prose gets fewer characters, not more  */
   --s1: 0.35rem;  --s2: 0.7rem;  --s3: 1.1rem;
@@ -130,6 +166,22 @@
   --stroke-offer: #4fb3bf;
   --stroke-model: #a58ce0;
   --stroke-gone:  #d67c6e;
+
+  --fig-plate: var(--paper-lt);
+  --fig-well:  var(--paper-dk);
+  --fig-edge:  var(--paper-edge);
+
+  --dia-ink:    var(--ink);
+  --dia-quiet:  var(--ink-3);
+  --dia-faint:  var(--ink-4);
+  --dia-key:    var(--teal);
+  --dia-live:   var(--sig-read);
+  --dia-model:  var(--sig-model);
+  --dia-hold:   var(--sig-held);
+  --dia-tint:      rgba(79,179,191,0.10);
+  --dia-tint-live: rgba(91,155,234,0.10);
+  --dia-tint-flat: rgba(227,237,241,0.05);
+  --dia-grid:      rgba(227,237,241,0.06);
 
   --rule:      #1c2f39;
   --rule-soft: #132330;
