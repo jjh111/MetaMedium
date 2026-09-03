@@ -1894,23 +1894,37 @@ var MetaMediumCore = (() => {
       }
       return Math.sqrt(s) / norm;
     };
-    const solve = (lambda) => {
-      const w2 = new Array(candidates.length).fill(0);
-      let scale = 0;
-      for (const row of F) for (const f of row) scale += f[0] * f[0] + f[1] * f[1];
-      const lr = 1 / (scale / rows.length + 1e-9) / 2;
-      for (let it = 0; it < 600; it++) {
-        const g = new Array(w2.length).fill(0);
-        for (let i = 0; i < rows.length; i++) {
-          let px = 0, py = 0;
-          for (let j = 0; j < w2.length; j++) {
-            px += F[i][j][0] * w2[j];
-            py += F[i][j][1] * w2[j];
-          }
-          const ex = px - target[i][0], ey = py - target[i][1];
-          for (let j = 0; j < w2.length; j++) g[j] += (ex * F[i][j][0] + ey * F[i][j][1]) / rows.length;
+    const k = candidates.length;
+    const G = Array.from({ length: k }, () => new Array(k).fill(0));
+    const bvec = new Array(k).fill(0);
+    for (let i = 0; i < rows.length; i++) {
+      for (let p = 0; p < k; p++) {
+        bvec[p] += F[i][p][0] * target[i][0] + F[i][p][1] * target[i][1];
+        for (let q = p; q < k; q++) {
+          const v2 = F[i][p][0] * F[i][q][0] + F[i][p][1] * F[i][q][1];
+          G[p][q] += v2;
+          if (q !== p) G[q][p] += v2;
         }
-        for (let j = 0; j < w2.length; j++) w2[j] = Math.max(0, w2[j] - lr * (g[j] + lambda * norm * norm / rows.length));
+      }
+    }
+    const solve = (lambda, mask2) => {
+      const w2 = new Array(k).fill(0);
+      const shrink = lambda * norm * norm;
+      for (let sweep2 = 0; sweep2 < 400; sweep2++) {
+        let moved = 0;
+        for (let j = 0; j < k; j++) {
+          if (mask2 && !mask2[j]) {
+            w2[j] = 0;
+            continue;
+          }
+          if (G[j][j] <= 1e-12) continue;
+          let r = bvec[j];
+          for (let i = 0; i < k; i++) if (i !== j) r -= G[j][i] * w2[i];
+          const next = Math.max(0, (r - shrink) / G[j][j]);
+          moved = Math.max(moved, Math.abs(next - w2[j]));
+          w2[j] = next;
+        }
+        if (moved < 1e-9) break;
       }
       return w2;
     };
@@ -1924,7 +1938,10 @@ var MetaMediumCore = (() => {
       return { w: w2, residual: residualOf(w2), count: significant(w2) };
     });
     const best = Math.min(...fits.map((f) => f.residual));
-    const chosen = fits.filter((f) => f.residual <= best * 1.1 + 1e-9).sort((a, b) => a.count - b.count || a.residual - b.residual)[0];
+    const sparse = fits.filter((f) => f.residual <= best * 1.1 + 1e-9).sort((a, b) => a.count - b.count || a.residual - b.residual)[0];
+    const mask = sparse.w.map((x) => x > 0.05 && x > Math.max(...sparse.w, 1e-9) * 0.1);
+    const refit = solve(0, mask);
+    const chosen = { w: refit, residual: residualOf(refit), count: significant(refit) };
     const terms = [];
     const explained = {};
     let totalForce = 0;

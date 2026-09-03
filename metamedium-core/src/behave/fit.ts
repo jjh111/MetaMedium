@@ -82,22 +82,38 @@ export function fit(demo: Sample[], basis: Verb[], worldAt: (t: number, me: Body
     return Math.sqrt(s) / norm;
   };
 
-  // Non-negative least squares by projected gradient, with an L1 penalty.
-  const solve = (lambda: number) => {
-    const w = new Array(candidates.length).fill(0);
-    // Step size from the design's scale.
-    let scale = 0;
-    for (const row of F) for (const f of row) scale += f[0] * f[0] + f[1] * f[1];
-    const lr = 1 / (scale / rows.length + 1e-9) / 2;
-    for (let it = 0; it < 600; it++) {
-      const g = new Array(w.length).fill(0);
-      for (let i = 0; i < rows.length; i++) {
-        let px = 0, py = 0;
-        for (let j = 0; j < w.length; j++) { px += F[i][j][0] * w[j]; py += F[i][j][1] * w[j]; }
-        const ex = px - target[i][0], ey = py - target[i][1];
-        for (let j = 0; j < w.length; j++) g[j] += (ex * F[i][j][0] + ey * F[i][j][1]) / rows.length;
+  // Non-negative least squares with an L1 penalty, by coordinate descent on
+  // the Gram matrix: each weight is minimised exactly in turn (soft-
+  // thresholded, clamped at zero), which converges fast even when two
+  // columns are correlated — as seek and flee are, both carrying the body's
+  // own velocity. `mask` restricts the fit to a support (the relaxed refit).
+  const k = candidates.length;
+  const G: number[][] = Array.from({ length: k }, () => new Array(k).fill(0));
+  const bvec = new Array(k).fill(0);
+  for (let i = 0; i < rows.length; i++) {
+    for (let p = 0; p < k; p++) {
+      bvec[p] += F[i][p][0] * target[i][0] + F[i][p][1] * target[i][1];
+      for (let q = p; q < k; q++) {
+        const v = F[i][p][0] * F[i][q][0] + F[i][p][1] * F[i][q][1];
+        G[p][q] += v; if (q !== p) G[q][p] += v;
       }
-      for (let j = 0; j < w.length; j++) w[j] = Math.max(0, w[j] - lr * (g[j] + lambda * norm * norm / rows.length));
+    }
+  }
+  const solve = (lambda: number, mask?: boolean[]) => {
+    const w = new Array(k).fill(0);
+    const shrink = lambda * norm * norm;
+    for (let sweep = 0; sweep < 400; sweep++) {
+      let moved = 0;
+      for (let j = 0; j < k; j++) {
+        if (mask && !mask[j]) { w[j] = 0; continue; }
+        if (G[j][j] <= 1e-12) continue;
+        let r = bvec[j];
+        for (let i = 0; i < k; i++) if (i !== j) r -= G[j][i] * w[i];
+        const next = Math.max(0, (r - shrink) / G[j][j]);
+        moved = Math.max(moved, Math.abs(next - w[j]));
+        w[j] = next;
+      }
+      if (moved < 1e-9) break;
     }
     return w;
   };
@@ -106,7 +122,13 @@ export function fit(demo: Sample[], basis: Verb[], worldAt: (t: number, me: Body
   const significant = (w: number[]) => { const m = Math.max(...w, 1e-9); return w.filter((x) => x > 0.05 && x > m * 0.1).length; };
   const fits = sweep.map((l) => { const w = solve(l); return { w, residual: residualOf(w), count: significant(w) }; });
   const best = Math.min(...fits.map((f) => f.residual));
-  const chosen = fits.filter((f) => f.residual <= best * 1.1 + 1e-9).sort((a, b) => a.count - b.count || a.residual - b.residual)[0];
+  const sparse = fits.filter((f) => f.residual <= best * 1.1 + 1e-9).sort((a, b) => a.count - b.count || a.residual - b.residual)[0];
+  // The penalty picks WHICH verbs; it also shrinks their weights, hardest on
+  // a verb that acted for only part of the path. So refit the chosen support
+  // with no penalty: the verbs the sweep chose, at the weights the path says.
+  const mask = sparse.w.map((x) => x > 0.05 && x > Math.max(...sparse.w, 1e-9) * 0.1);
+  const refit = solve(0, mask);
+  const chosen = { w: refit, residual: residualOf(refit), count: significant(refit) };
 
   const terms: Term[] = [];
   const explained: Record<string, number> = {};
