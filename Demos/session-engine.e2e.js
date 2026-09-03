@@ -977,6 +977,27 @@ window.__scenario = async function(){
     }
   }
 
+  // ---- 26. Free text at a loop is a brief: four boxes, "website about dolphins", Enter ----
+  {
+    mm.setView(1, 260 - 11200, 200 - 2000); await wait(30);
+    const W = (x, y) => mm.worldToScreen(x, y);
+    [[11200, 2000], [11440, 2000], [11200, 2160], [11440, 2160]].forEach(([x, y]) => { const p = W(x, y); t.stroke(t.rect(p.x, p.y, 200, 120)); });
+    const cB = W(11420, 2140);
+    t.stroke(t.circle(cB.x, cB.y, 330)); t.takeLoop(cB.x, cB.y, 330); await wait(60);
+    const before26 = mm.session.getState().live.length;
+    const field = document.querySelector('#summon input.filter');
+    field.value = 'website about dolphins';
+    field.dispatchEvent(new Event('input'));
+    const shownNow = [...document.querySelectorAll('#summon .item')].map(b => b.querySelector('span').textContent.trim());
+    field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    const thinking = /is building/.test(document.getElementById('status').textContent);
+    await wait(400);
+    const st26 = mm.session.getState();
+    const built = st26.live.length === before26 + 1;
+    const newest = built && st26.nodes.get(st26.live[st26.live.length - 1]);
+    step('26. free text that names no verb goes to the model as the brief, with the thinking shown while it works', built && thinking && MM.wordOf(newest) === 'website about dolphins' && !/is building/.test(document.getElementById('status').textContent), { built, thinking, shownWhileTyping: shownNow, status: document.getElementById('status').textContent.slice(0, 120) });
+  }
+
   // ---- 11. Scratch-out erase ----
   mm.fitAll(); await wait(60);
   const stBefore = mm.session.getState().contentIds.length;

@@ -399,7 +399,7 @@
       filter.className = 'filter';
       filter.placeholder = 'type to find, or to ask…';
       filter.onkeydown = onPaletteKey;
-      filter.oninput = () => paintPalette(filter.value);
+      filter.oninput = () => { paletteNavigated = false; paintPalette(filter.value); };
       centre.appendChild(filter);
       const scope = document.createElement('div');
       scope.className = 'scope';
@@ -456,7 +456,7 @@
           matching.push({
             key: 'behave-model:' + defId, group: 'always', groupConf: 0, groupWhy: '',
             label: 'Read it with the model', why: 'for what the table could not: ' + parsed.unparsed.join(', '), tier: 2,
-            run: () => { agents.forEach((a) => a.behave({ nodeId: defId, words: query, at: Date.now() }).then(() => render(session.getState()))); },
+            run: () => { agents.forEach((a) => withWork('behave:' + a.id + ':' + defId, [defId], a.name + ' is reading the words…', a.behave({ nodeId: defId, words: query, at: Date.now() })).then(() => render(session.getState()))); },
           });
         }
       }
@@ -574,15 +574,31 @@
     for (const p of pills) { p.el.style.left = p.x + 'px'; p.el.style.top = p.y + 'px'; }
   }
 
+  let paletteNavigated = false; // the arrows chose a pill; Enter takes it
   function onPaletteKey(e) {
     e.stopPropagation();
     const shown = visibleItems(e.target.value);
-    if (e.key === 'ArrowDown') { e.preventDefault(); paletteIndex = Math.min(shown.length - 1, paletteIndex + 1); paintPalette(e.target.value); }
-    else if (e.key === 'ArrowUp') { e.preventDefault(); paletteIndex = Math.max(0, paletteIndex - 1); paintPalette(e.target.value); }
+    if (e.key === 'ArrowDown') { e.preventDefault(); paletteNavigated = true; paletteIndex = Math.min(shown.length - 1, paletteIndex + 1); paintPalette(e.target.value); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); paletteNavigated = true; paletteIndex = Math.max(0, paletteIndex - 1); paintPalette(e.target.value); }
     else if (e.key === 'Enter') {
       e.preventDefault();
-      const item = shown[paletteIndex];
-      if (item) item.run(summonEl.querySelectorAll('.item')[paletteIndex]);
+      const q = e.target.value.trim();
+      const ql = q.toLowerCase();
+      // What was typed is a verb when a pill was chosen with the arrows, or a
+      // pill's name begins with it. Anything else — "website about dolphins" —
+      // is a brief, and goes to the model as one. A word inside a pill's hint
+      // ("about" in "Ask about it…") is not a command.
+      const chosen = paletteNavigated ? shown[paletteIndex] : null;
+      const named = !chosen && ql ? shown.find((i) => i.label.toLowerCase().startsWith(ql) || i.key.startsWith('behave:') || i.key.startsWith('frame')) : null;
+      const item = chosen || named || (!ql ? shown[paletteIndex] : null);
+      if (item) { item.run(summonEl.querySelectorAll('.item')[shown.indexOf(item)]); return; }
+      if (!ql) return;
+      const sum = session.getState().summon;
+      if (!sum) return;
+      if (agents.length === 0) { offerModel('“' + q.slice(0, 40) + '” needs a model to build. Tap one to join it, then press Enter again.'); return; }
+      e.target.disabled = true;
+      e.target.placeholder = 'building with ' + agents.length + ' model(s)…';
+      runPrompt(sum, q, !!sum.onArtifact);
     } else if (e.key === 'Escape') {
       e.preventDefault();
       session.dismiss(shownSummonId, Date.now());
@@ -683,8 +699,10 @@
     // What the human typed outranks a reading nobody asked for.
     cancelReading();
     mpStatus.textContent = (revising ? 'revising' : 'building') + ' with ' + agents.length + ' model(s)…';
+    const aboutIds = session.getState().nodes.get(artifactId) ? [artifactId] : sum.enclosedIds;
     agents.forEach((agent) => {
-      agent.generate({ prompt: prompt, artifactId: artifactId, at: Date.now(), addressed: addressed })
+      withWork('build:' + agent.id + ':' + artifactId, aboutIds, agent.name + (revising ? ' is revising “' : ' is building “') + prompt.slice(0, 32) + (prompt.length > 32 ? '…' : '') + '”…',
+        agent.generate({ prompt: prompt, artifactId: artifactId, at: Date.now(), addressed: addressed }))
         .then((res) => {
           if (res.ok) {
             const short = res.unfilled && res.unfilled.length
@@ -742,7 +760,7 @@
       cancelReading();
       mpStatus.textContent = 'drawing with ' + agents.length + ' model(s)…';
       agents.forEach((agent) => {
-        agent.draw({ prompt: q, nodeIds: ids, at: Date.now() }).then((res) => {
+        withWork('draw:' + agent.id, ids, agent.name + ' is drawing…', agent.draw({ prompt: q, nodeIds: ids, at: Date.now() })).then((res) => {
           if (res.ok) {
             mpStatus.textContent = agent.name + ' drew ' + res.ids.length + ' mark' + (res.ids.length === 1 ? '' : 's') +
               ': ' + res.shapes.map((s) => s.shape).join(', ');
@@ -771,7 +789,7 @@
       input.placeholder = 'asking ' + agents.length + ' model(s)…';
       cancelReading();
       agents.forEach((agent) => {
-        agent.ask(q, nodeIds, Date.now()).then((res) => {
+        withWork('ask:' + agent.id, nodeIds, agent.name + ' is answering…', agent.ask(q, nodeIds, Date.now())).then((res) => {
           if (!res.ok) mpStatus.textContent = agent.name + ' could not answer (' + res.error + ').';
           render(session.getState());
         });

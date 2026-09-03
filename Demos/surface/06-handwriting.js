@@ -55,7 +55,7 @@
     if (!image) return false;
     mpStatus.textContent = 'reading the writing with ' + readers.map((a) => a.name).join(', ') + '…';
     readers.forEach((agent) => {
-      agent.read({ nodeId: node.id, image: image, at: Date.now() }).then((res) => {
+      withWork('write:' + agent.id + ':' + node.id, [node.id], agent.name + ' is reading the writing…', agent.read({ nodeId: node.id, image: image, at: Date.now() })).then((res) => {
         mpStatus.textContent = res.ok
           ? agent.name + ' read “' + res.transcripts[0].text + '”' + (res.transcripts.length > 1 ? ' (or ' + res.transcripts.slice(1).map((t) => '“' + t.text + '”').join(', ') + ')' : '')
           : agent.name + ' could not read it (' + res.error + ').';

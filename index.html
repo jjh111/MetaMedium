@@ -335,6 +335,8 @@
         }
         .nav-title .meta { color: var(--accent); }
         .nav-title:hover { color: var(--accent); }
+        nav ul { margin-left: auto; }
+        nav ul + .theme-toggle { margin-left: var(--space-sm); }
         .nav-title:hover .meta { color: var(--accent-hover); }
         
         /* Mobile nav toggle */
@@ -399,6 +401,14 @@
                 z-index: 1001;
             }
 
+            /* Title left; the surface control and the menu button cluster at
+               the right, in that order — the menu stays where a thumb expects
+               it, on the edge. */
+            .nav-title { order: 1; }
+            .theme-toggle { order: 2; margin-left: auto; }
+            .nav-toggle { order: 3; margin-left: var(--space-xs); }
+            nav ul { order: 4; margin-left: 0; }
+
             nav ul {
                 position: absolute;
                 top: 10px;
@@ -431,35 +441,34 @@
             }
         }
         
-        /* Theme switch — the styleguide's own component (brand/styleguide.html),
-           bottom right like a device preference on the canvas surface. Proves
-           the dark surface is this system, not another one. */
-        .theme-switch {
-            position: fixed;
-            bottom: var(--space-md);
-            right: var(--space-md);
-            z-index: 50;
+        /* Paper / canvas — one icon in the header rather than a floating pair
+           of labelled buttons. The glyph is a half-filled circle: it says
+           "two grounds, one system" without borrowing a sun and a moon, and
+           it turns 180 degrees on the way over, so the state change is the
+           same gesture as the thing it changes. */
+        .theme-toggle {
             display: flex;
-            gap: 0;
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            overflow: hidden;
-            background: var(--paper-lt);
-            box-shadow: 0 1px 2px var(--shadow);
-        }
-        .theme-switch button {
-            font-family: var(--face);
-            font-size: var(--text-xs);
-            font-weight: 500;
-            letter-spacing: 0.14em;
-            text-transform: uppercase;
-            padding: 0.45rem 0.7rem;
-            border: 0;
-            cursor: pointer;
-            background: transparent;
+            align-items: center;
+            justify-content: center;
+            width: 26px;
+            height: 26px;
+            padding: 0;
+            border: 1px solid transparent;
+            border-radius: var(--radius-sm);
+            background: none;
             color: var(--muted-light);
+            cursor: pointer;
+            flex-shrink: 0;
+            transition: color 0.2s, border-color 0.2s;
         }
-        .theme-switch button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+        .theme-toggle:hover { color: var(--accent); border-color: var(--border); }
+        .theme-toggle svg {
+            width: 15px;
+            height: 15px;
+            display: block;
+            transition: transform 0.3s ease;
+        }
+        :root[data-theme="dark"] .theme-toggle svg { transform: rotate(180deg); }
 
         /* Main Content */
         main {
@@ -1550,6 +1559,10 @@
 
         /* Responsive */
         @media (max-width: 768px) {
+            /* Mono is about 1.6x wider per character than the sans this page
+               used to be set in, which left prose at ~24 characters a line on
+               a phone. The root steps down; every token follows it. */
+            html { font-size: 15px; }
             :root {
                 --text-base: 1.0625rem;
                 --space-lg: 1.5rem;
@@ -1608,6 +1621,7 @@
         }
         
         @media (max-width: 480px) {
+            html { font-size: 14px; }
             nav { height: 34px; }
             .nav-title { font-size: 0.875rem; }
             .hero h1 { font-size: clamp(2.5rem, 14vw, 4rem); }
@@ -1903,7 +1917,7 @@
         @media print {
             body { font-size: 11pt; line-height: 1.5; }
             nav, .scroll-indicator, #heroCanvas, .hero-hint, .demo-wrapper,
-            .theme-switch, .gallery-thumbs, .gallery-arrow { display: none; }
+            .gallery-thumbs, .gallery-arrow { display: none; }
             .hero { min-height: auto; padding: 1.5rem 0; background: none; }
             .hero::after { display: none; }
             .hero h1, .hero .subtitle, .hero .tagline, .hero .byline { color: var(--ink); }
@@ -1933,13 +1947,15 @@
                 <li><a href="#future">Future</a></li>
                 <li><a href="#conclusion">Conclusion</a></li>
             </ul>
+            <button type="button" id="themeToggle" class="theme-toggle" aria-pressed="false"
+                    title="Switch to the canvas surface" aria-label="Switch to the canvas surface">
+                <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                    <circle cx="8" cy="8" r="6.25" fill="none" stroke="currentColor" stroke-width="1.5"/>
+                    <path d="M8 1.75 A6.25 6.25 0 0 1 8 14.25 Z" fill="currentColor"/>
+                </svg>
+            </button>
         </div>
     </nav>
-
-    <div class="theme-switch" role="group" aria-label="Surface">
-        <button type="button" data-theme-set="light" aria-pressed="true">Paper</button>
-        <button type="button" data-theme-set="dark" aria-pressed="false">Canvas</button>
-    </div>
 
     <header class="hero" id="top">
         <!-- Interactive Blueprint Canvas -->
@@ -3385,22 +3401,26 @@
 
     <script src="Demos/metamedium-core.browser.js"></script>
     <script>
-        // Paper / Canvas switch — the styleguide's component, ported as-is.
-        // Same storage key as brand/styleguide.html, so one choice covers
-        // both surfaces. The attribute itself was applied before first paint
-        // by the head script; this wires the buttons to it. A ?theme= link
-        // shares a surface without overwriting the reader's own choice.
+        // Paper / canvas. Same storage key as brand/styleguide.html, so one
+        // choice covers both surfaces. The attribute itself was applied before
+        // first paint by the head script; this wires the control to it. A
+        // ?theme= link shares a surface without overwriting the reader's own
+        // choice.
         (function () {
             const root = document.documentElement;
-            const btns = document.querySelectorAll('[data-theme-set]');
+            const btn = document.getElementById('themeToggle');
             const KEY = 'metamedium-brand-theme';
 
             function apply(theme, persist) {
-                if (theme === 'dark') root.setAttribute('data-theme', 'dark');
+                const dark = theme === 'dark';
+                if (dark) root.setAttribute('data-theme', 'dark');
                 else root.removeAttribute('data-theme');
-                btns.forEach(function (b) {
-                    b.setAttribute('aria-pressed', String(b.dataset.themeSet === theme));
-                });
+                if (btn) {
+                    btn.setAttribute('aria-pressed', String(dark));
+                    const next = dark ? 'Switch to the paper surface' : 'Switch to the canvas surface';
+                    btn.setAttribute('aria-label', next);
+                    btn.setAttribute('title', next);
+                }
                 if (persist !== false) { try { localStorage.setItem(KEY, theme); } catch (e) {} }
             }
 
@@ -3408,8 +3428,8 @@
             try { saved = new URLSearchParams(location.search).get('theme') || localStorage.getItem(KEY); } catch (e) {}
             apply(saved === 'dark' ? 'dark' : 'light', false);   // paper is the default, always
 
-            btns.forEach(function (b) {
-                b.addEventListener('click', function () { apply(b.dataset.themeSet); });
+            if (btn) btn.addEventListener('click', function () {
+                apply(root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
             });
         })();
 

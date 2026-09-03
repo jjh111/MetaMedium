@@ -541,6 +541,23 @@ uses — and the rail and keyboard still zoom for a mouse. Touch: one finger
 draws, two fingers pinch and pan; on a phone the rail wraps, the zoom row is
 hidden (pinch does it), and the held-loop chip wraps to fit.
 
+**A model at work is shown where it works.** Every call to a model —
+building, revising, reading a group or the writing, drawing, answering,
+reading words into verbs — is registered while it runs (`withWork` in
+`04-models.js`) and drawn as a breathing gold dot with the model's name and
+its task **above the marks it is about**, and in the status line; it leaves
+when the call ends, however it ends. **Typed text at a loop is a brief
+unless it names a verb**: Enter runs a pill only when the arrows chose one
+or a pill's name begins with what was typed; "website about dolphins" goes
+to the model as the prompt (a word inside a pill's hint, like *about* in
+*Ask about it…*, is not a command — that is what made four boxes and a
+brief do nothing). With no model joined, the pane opens and says so.
+
+**Keys never leave the device.** A hosted provider's key lives in
+`agents[].config` in memory and, only when *remember* is ticked, in
+`localStorage`; the `join` event in the log carries a kind and a name and
+nothing else, so the log, the folder, autosave and export are clean of it.
+
 **The model pane** (`Demos/session-engine.html`) follows what the personal
 site's search bar learned (`johnhanacek/scripts/search-core.js`): it probes
 **both** local servers in parallel (returning on the first that answered hid a

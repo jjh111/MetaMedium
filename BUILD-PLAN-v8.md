@@ -121,6 +121,9 @@ Ranking = `likelihood × (1 + log(1 + uses))` where `uses` comes from
 
 ## 2. Work packages
 
+> **Hand QA:** `QA-v8.md` is the demo-by-hand plan that verifies every
+> package below, step by step, with what to expect.
+>
 > **Status, 3 September 2026:** all fourteen packages done on `next-phases`
 > (WP-0 through WP-14, in the order the weave asked for). Each entry below
 > says what landed, what was found on the way, and what it does not yet do.

@@ -220,6 +220,7 @@
     }
 
     renderFrames(s);
+    renderWorking(s);
     if (editing) placeEditor(editing.bounds);
     renderExplanations(s);
     renderSelection(s);
@@ -239,11 +240,30 @@
     }
     const fs = folderStatus();
     if (fs) parts.push(fs);
+    const ws = workingSummary();
+    if (ws) parts.push('⋯ ' + ws);
     if (agents.length) parts.push(agents.map((a) => a.config.model).join(', '));
     if (snapOffers.size) parts.push(snapOffers.size + ' read clean');
     if (s.pendingLassoId) parts.push('cross the loop with ' + (s.commandMark ? 'your mark' : '✓') + ' to select what it holds');
     if (fresh) parts.push(flashText);
     statusEl.textContent = parts.join('  ·  ');
+  }
+
+  /** A model at work: a breathing dot and its words, above the marks it is working on. */
+  function renderWorking(s) {
+    if (!working.size) return;
+    const t = performance.now() / 1000;
+    for (const w of working.values()) {
+      // The marks may have been undone while the model was still thinking.
+      const boxes = w.ids.map((id) => s.nodes.get(id)).filter(Boolean).map((n) => MM.boundsOf(n)).filter(Boolean);
+      let x, y;
+      if (boxes.length) { const b = union(boxes); x = b.minX; y = b.minY - wpx(28); }
+      else { const c = screenToWorld(innerWidth / 2, 70); x = c.x; y = c.y; }
+      const r = wpx(4 + 2 * Math.sin(t * 4));
+      ctx.beginPath(); ctx.arc(x + wpx(5), y - wpx(4), r, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(${C.goldRGB},0.85)`; ctx.fill();
+      text(w.label, x + wpx(16), y, C.gold);
+    }
   }
 
   function text(str, x, y, color) {

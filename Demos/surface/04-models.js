@@ -216,6 +216,32 @@
   document.getElementById('mpClose').onclick = () => closePanel(panel, modelBtn);
 
   /** Open the models pane because something needed one — says why. */
+  // ===== Work in progress: a model is thinking, and the board says so =====
+  // Every call to a model is registered here while it runs, with the marks it
+  // is about, so the canvas can show the thinking NEAR what it is thinking
+  // about — not only in a pane the hand may have closed. A call that ends,
+  // succeeds or fails, leaves the list.
+  const working = new Map(); // key -> { ids, label, since }
+  let workingPulse = 0;
+  function beginWork(key, ids, label) {
+    working.set(key, { ids: (ids || []).slice(), label: label, since: performance.now() });
+    if (!workingPulse) workingPulse = setInterval(() => { if (working.size) render(session.getState()); else { clearInterval(workingPulse); workingPulse = 0; } }, 400);
+    render(session.getState());
+    return key;
+  }
+  function endWork(key) {
+    working.delete(key);
+    render(session.getState());
+  }
+  /** Run a model call with the thinking shown; the promise is passed through untouched. */
+  function withWork(key, ids, label, promise) {
+    beginWork(key, ids, label);
+    return promise.finally(() => endWork(key));
+  }
+  function workingSummary() {
+    return [...working.values()].map((w) => w.label).join(' · ');
+  }
+
   function offerModel(why) {
     if (panel.hasAttribute('hidden')) togglePanel(panel, modelBtn);
     probeLocal();
@@ -254,7 +280,7 @@
     mpStatus.textContent = 'reading with ' + agents.length + ' model(s)…';
     let left = agents.length;
     agents.forEach((agent) => {
-      agent.interpret(ids, Date.now(), ctl.signal).then((res) => {
+      withWork('read:' + agent.id + ':' + ids.join('+'), ids, agent.name + ' is reading the group…', agent.interpret(ids, Date.now(), ctl.signal)).then((res) => {
         if (ctl.signal.aborted) return;
         if (--left === 0 && reading === ctl) reading = null;
         mpStatus.textContent = res.ok
