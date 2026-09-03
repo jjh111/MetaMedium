@@ -156,7 +156,7 @@ Files: `src/session/selection.ts`, events per 1.1, `session.ts` reducer cases, t
 Files: `src/behave/verbs.ts`, `src/behave/steer.ts`, `src/behave/fit.ts`, `src/behave/walls.ts` (the wall rules are ported from the personal site's `fish-engine.js` `applyWallPhysics` — the *physics* is what is borrowed, not the fish; the port must not carry any size class, species or name), tests per verb, a fit test that recovers a known mix from a synthetic demonstration with under 10% error, and a sparsity test (a demo explainable by two verbs fits two, not five). Every verb takes its target as a *name supplied at run time*; there are no built-in names.
 *Done:* every verb has a force test with reasoning; `fit` recovers synthetic mixes; walls redirect rather than zero velocity; no DOM, no session imports.
 
-**WP-7 · Kinds and renderers, headless part** (P, engine)
+**WP-7 · Kinds and renderers, headless part** (P, engine) ✅ **done 3 Sep 2026** — `src/kinds/kinds.ts` (the closed table: nine kinds, each with a renderer and an addressing scheme) and `src/kinds/address.ts` (`js` by top-level declarations, brace-matched and string-aware; `json` by keys with dotted paths; `md` by heading sections; `svg` by the root's direct elements; `text` by paragraphs); ids stable across edits that do not reorder.
 Files: `src/kinds/kinds.ts` (the table), `src/kinds/address.ts` (addressing per kind: `js` → functions by brace-matching, `json` → keys by path, `md` → headings/paragraphs, `svg` → top-level elements), tests.
 *Done:* `addressablesOf(kind, source)` returns regions with stable ids for each kind, tested on fixtures.
 

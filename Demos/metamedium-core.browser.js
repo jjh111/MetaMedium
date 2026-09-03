@@ -35,6 +35,7 @@ var MetaMediumCore = (() => {
     DEFAULT_SPEED: () => DEFAULT_SPEED,
     DEFAULT_TIMEOUT_MS: () => DEFAULT_TIMEOUT_MS,
     HAND_RESOLUTION_PX: () => HAND_RESOLUTION_PX,
+    KINDS: () => KINDS,
     LETTER_MAX_HEIGHT_PX: () => LETTER_MAX_HEIGHT_PX,
     LOCAL_PARTICIPANT: () => LOCAL_PARTICIPANT,
     LOCAL_TIMEOUT_MS: () => LOCAL_TIMEOUT_MS,
@@ -54,6 +55,7 @@ var MetaMediumCore = (() => {
     WORD_GAP_RATIO: () => WORD_GAP_RATIO,
     WORD_WINDOW_MS: () => WORD_WINDOW_MS,
     aboutIdsOf: () => aboutIdsOf,
+    addressablesOf: () => addressablesOf,
     analyzeCornerAngles: () => analyzeCornerAngles,
     analyzeStroke: () => analyzeStroke,
     applyWalls: () => applyWalls,
@@ -100,6 +102,7 @@ var MetaMediumCore = (() => {
     describeSignature: () => describeSignature,
     describeSnap: () => describeSnap,
     disagreement: () => disagreement,
+    elementsOf: () => elementsOf,
     enclosedBy: () => enclosedBy,
     explanationOf: () => explanationOf,
     findCorners: () => findCorners,
@@ -108,6 +111,7 @@ var MetaMediumCore = (() => {
     fit: () => fit2,
     force: () => force,
     frameOf: () => frameOf,
+    functionsOf: () => functionsOf,
     genreOf: () => genreOf,
     getBounds: () => getBounds,
     getBoundsFromStroke: () => getBoundsFromStroke,
@@ -115,6 +119,7 @@ var MetaMediumCore = (() => {
     getRep: () => getRep,
     has: () => has,
     hasMultipleSources: () => hasMultipleSources,
+    headingsOf: () => headingsOf,
     idealize: () => idealize,
     intents: () => intents,
     interpretationsOf: () => interpretationsOf,
@@ -127,9 +132,12 @@ var MetaMediumCore = (() => {
     isStrokeClosed: () => isStrokeClosed,
     isWord: () => isWord,
     joinsRun: () => joinsRun,
+    keysOf: () => keysOf,
+    kindOf: () => kindOf,
     learnCommandMark: () => learnCommandMark,
     lettersOf: () => lettersOf,
     listModels: () => listModels,
+    matchBrace: () => matchBrace,
     matchConcepts: () => matchConcepts,
     matchPrimitiveFromLibrary: () => matchPrimitiveFromLibrary,
     matchesCommandMark: () => matchesCommandMark,
@@ -160,6 +168,8 @@ var MetaMediumCore = (() => {
     resemblances: () => resemblances,
     resolvesLasso: () => resolvesLasso,
     route: () => route,
+    rowOf: () => rowOf,
+    runsOf: () => runsOf,
     scratchedOut: () => scratchedOut,
     seeded: () => seeded,
     segmentsIntersect: () => segmentsIntersect,
@@ -1963,6 +1973,290 @@ var MetaMediumCore = (() => {
       explained,
       reasoning: terms.length ? `${terms.map((t) => `${t.verb}${t.target ? " " + t.target : ""} ${t.weight}`).join(", ")}; ${missing}% of the motion is unexplained${missing > 35 ? " \u2014 something is missing" : ""}` : "no verb explains this motion"
     };
+  }
+
+  // src/kinds/kinds.ts
+  var KINDS = [
+    { kind: "html", extensions: ["html", "htm"], mime: "text/html", renderer: "page", addressing: "regions", textual: true },
+    { kind: "js", extensions: ["js", "mjs", "ts"], mime: "text/javascript", renderer: "source", addressing: "functions", textual: true },
+    { kind: "json", extensions: ["json"], mime: "application/json", renderer: "tree", addressing: "keys", textual: true },
+    { kind: "svg", extensions: ["svg"], mime: "image/svg+xml", renderer: "vector", addressing: "elements", textual: true },
+    { kind: "md", extensions: ["md", "markdown"], mime: "text/markdown", renderer: "prose", addressing: "headings", textual: true },
+    { kind: "png", extensions: ["png"], mime: "image/png", renderer: "image", addressing: "pixels", textual: false },
+    { kind: "jpg", extensions: ["jpg", "jpeg"], mime: "image/jpeg", renderer: "image", addressing: "pixels", textual: false },
+    { kind: "text", extensions: ["txt"], mime: "text/plain", renderer: "text", addressing: "runs", textual: true },
+    { kind: "control", extensions: [], mime: "application/json", renderer: "control", addressing: "value", textual: true }
+  ];
+  function kindOf(path) {
+    const ext = (path.split(".").pop() ?? "").toLowerCase();
+    if (!ext || ext === path.toLowerCase()) return void 0;
+    return KINDS.find((k) => k.extensions.includes(ext));
+  }
+  function rowOf(kind) {
+    return KINDS.find((k) => k.kind === kind);
+  }
+
+  // src/kinds/address.ts
+  function addressablesOf(kind, source) {
+    switch (kind) {
+      case "js":
+        return functionsOf(source);
+      case "json":
+        return keysOf(source);
+      case "md":
+        return headingsOf(source);
+      case "svg":
+        return elementsOf(source);
+      case "text":
+        return runsOf(source);
+      default:
+        return [];
+    }
+  }
+  function matchBrace(src, open) {
+    let depth = 0, i = open;
+    while (i < src.length) {
+      const c = src[i];
+      if (c === '"' || c === "'" || c === "`") {
+        const q = c;
+        i++;
+        while (i < src.length && src[i] !== q) {
+          if (src[i] === "\\") i++;
+          if (q === "`" && src[i] === "$" && src[i + 1] === "{") {
+            const e = matchBrace(src, i + 1);
+            if (e === -1) return -1;
+            i = e;
+            continue;
+          }
+          i++;
+        }
+        i++;
+        continue;
+      }
+      if (c === "/" && src[i + 1] === "/") {
+        i = src.indexOf("\n", i);
+        if (i === -1) return -1;
+        continue;
+      }
+      if (c === "/" && src[i + 1] === "*") {
+        i = src.indexOf("*/", i);
+        if (i === -1) return -1;
+        i += 2;
+        continue;
+      }
+      if (c === "{") depth++;
+      else if (c === "}") {
+        depth--;
+        if (depth === 0) return i + 1;
+      }
+      i++;
+    }
+    return -1;
+  }
+  var DECL = /^(?:export\s+)?(?:default\s+)?(?:async\s+)?(?:(function\*?)\s+([A-Za-z_$][\w$]*)|(class)\s+([A-Za-z_$][\w$]*)|(const|let|var)\s+([A-Za-z_$][\w$]*)\s*=)/;
+  function functionsOf(src) {
+    const out = [];
+    const seen = /* @__PURE__ */ new Map();
+    let i = 0;
+    while (i < src.length) {
+      const lineEnd = src.indexOf("\n", i);
+      const line = src.slice(i, lineEnd === -1 ? src.length : lineEnd);
+      const m = DECL.exec(line);
+      if (m) {
+        const name = m[2] ?? m[4] ?? m[6];
+        const isBlock = !!(m[1] || m[3]);
+        let end;
+        if (isBlock) {
+          const open = src.indexOf("{", i);
+          end = open === -1 ? -1 : matchBrace(src, open);
+        } else {
+          end = statementEnd(src, i);
+        }
+        if (end !== -1) {
+          const n2 = (seen.get(name) ?? 0) + 1;
+          seen.set(name, n2);
+          out.push({ id: `fn:${name}${n2 > 1 ? "#" + n2 : ""}`, label: name, start: i, end, depth: 0 });
+          i = end;
+          continue;
+        }
+      }
+      if (lineEnd === -1) break;
+      i = lineEnd + 1;
+    }
+    return out;
+  }
+  function statementEnd(src, from) {
+    let depth = 0, i = from;
+    while (i < src.length) {
+      const c = src[i];
+      if (c === '"' || c === "'" || c === "`") {
+        const q = c;
+        i++;
+        while (i < src.length && src[i] !== q) {
+          if (src[i] === "\\") i++;
+          i++;
+        }
+        i++;
+        continue;
+      }
+      if (c === "/" && src[i + 1] === "/") {
+        i = src.indexOf("\n", i);
+        if (i === -1) return src.length;
+        continue;
+      }
+      if (c === "/" && src[i + 1] === "*") {
+        i = src.indexOf("*/", i);
+        if (i === -1) return src.length;
+        i += 2;
+        continue;
+      }
+      if (c === "{" || c === "(" || c === "[") depth++;
+      else if (c === "}" || c === ")" || c === "]") depth--;
+      else if (c === ";" && depth === 0) return i + 1;
+      else if (c === "\n" && depth === 0 && /^\s*\n/.test(src.slice(i + 1, i + 3))) return i + 1;
+      i++;
+    }
+    return src.length;
+  }
+  function keysOf(src, maxDepth = 3) {
+    const out = [];
+    let parsed;
+    try {
+      parsed = JSON.parse(src);
+    } catch {
+      return out;
+    }
+    const walk = (obj, path, from, depth) => {
+      if (!obj || typeof obj !== "object" || Array.isArray(obj) || depth > maxDepth) return from;
+      let cursor = from;
+      for (const key2 of Object.keys(obj)) {
+        const needle = JSON.stringify(key2);
+        const at = src.indexOf(needle + ":", cursor) !== -1 ? src.indexOf(needle + ":", cursor) : src.indexOf(needle, cursor);
+        if (at === -1) continue;
+        const valueStart = src.indexOf(":", at) + 1;
+        const end = valueEnd(src, valueStart);
+        const id = ["key", ...path, key2].join(path.length ? "." : ":").replace(/^key\./, "key:");
+        out.push({ id: path.length ? `key:${[...path, key2].join(".")}` : `key:${key2}`, label: [...path, key2].join("."), start: at, end, depth });
+        void id;
+        walk(obj[key2], [...path, key2], valueStart, depth + 1);
+        cursor = end;
+      }
+      return cursor;
+    };
+    walk(parsed, [], 0, 0);
+    return out;
+  }
+  function valueEnd(src, from) {
+    let i = from;
+    while (i < src.length && /\s/.test(src[i])) i++;
+    const c = src[i];
+    if (c === "{" || c === "[") {
+      const close = c === "{" ? "}" : "]";
+      let depth = 0;
+      for (; i < src.length; i++) {
+        const ch = src[i];
+        if (ch === '"') {
+          i++;
+          while (i < src.length && src[i] !== '"') {
+            if (src[i] === "\\") i++;
+            i++;
+          }
+          continue;
+        }
+        if (ch === c) depth++;
+        else if (ch === close) {
+          depth--;
+          if (depth === 0) return i + 1;
+        }
+      }
+      return src.length;
+    }
+    if (c === '"') {
+      i++;
+      while (i < src.length && src[i] !== '"') {
+        if (src[i] === "\\") i++;
+        i++;
+      }
+      return i + 1;
+    }
+    while (i < src.length && !/[,}\]\n]/.test(src[i])) i++;
+    return i;
+  }
+  function headingsOf(src) {
+    const out = [];
+    const re = /^(#{1,6})[ \t]+(.+?)[ \t]*#*[ \t]*$/gm;
+    const heads = [];
+    let m;
+    while (m = re.exec(src)) heads.push({ level: m[1].length, text: m[2], start: m.index });
+    const seen = /* @__PURE__ */ new Map();
+    heads.forEach((h2, i) => {
+      let end = src.length;
+      for (let j = i + 1; j < heads.length; j++) if (heads[j].level <= h2.level) {
+        end = heads[j].start;
+        break;
+      }
+      const slug = h2.text.toLowerCase().replace(/[^\w]+/g, "-").replace(/^-|-$/g, "") || "section";
+      const n2 = (seen.get(slug) ?? 0) + 1;
+      seen.set(slug, n2);
+      out.push({ id: `h:${slug}${n2 > 1 ? "#" + n2 : ""}`, label: h2.text, start: h2.start, end, depth: h2.level - 1 });
+    });
+    return out;
+  }
+  function elementsOf(source) {
+    const out = [];
+    const src = source.replace(/<!--[\s\S]*?-->/g, (c) => " ".repeat(c.length));
+    const root = src.search(/<svg[\s>]/i);
+    if (root === -1) return out;
+    const rootOpenEnd = src.indexOf(">", root);
+    if (rootOpenEnd === -1) return out;
+    const counts = /* @__PURE__ */ new Map();
+    let i = rootOpenEnd + 1, depth = 0;
+    const tag = /<\/?([A-Za-z][\w:-]*)([^>]*?)(\/?)>/g;
+    tag.lastIndex = i;
+    let m;
+    let openAt = -1, openName = "", openAttrs = "";
+    while (m = tag.exec(src)) {
+      const closing = src[m.index + 1] === "/";
+      const name = m[1], selfClosing = m[3] === "/";
+      if (closing) {
+        if (name.toLowerCase() === "svg" && depth === 0) break;
+        depth--;
+        if (depth === 0 && openAt !== -1) {
+          push(openName, openAttrs, openAt, m.index + m[0].length);
+          openAt = -1;
+        }
+        continue;
+      }
+      if (depth === 0) {
+        if (selfClosing) {
+          push(name, m[2], m.index, m.index + m[0].length);
+          continue;
+        }
+        openAt = m.index;
+        openName = name;
+        openAttrs = m[2];
+      }
+      if (!selfClosing) depth++;
+    }
+    function push(name, attrs, start, end) {
+      const idAttr = /\bid\s*=\s*"([^"]+)"/.exec(attrs)?.[1];
+      const n2 = (counts.get(name) ?? 0) + 1;
+      counts.set(name, n2);
+      out.push({ id: idAttr ? `el:${idAttr}` : `el:${name}#${n2}`, label: idAttr ?? `${name} ${n2}`, start, end, depth: 0 });
+    }
+    return out;
+  }
+  function runsOf(src) {
+    const out = [];
+    const re = /[^\n][\s\S]*?(?=\n\s*\n|$)/g;
+    let m, n2 = 0;
+    while (m = re.exec(src)) {
+      if (!m[0].trim()) continue;
+      n2++;
+      out.push({ id: `p:${n2}`, label: m[0].trim().slice(0, 40), start: m.index, end: m.index + m[0].length, depth: 0 });
+      if (m.index === re.lastIndex) re.lastIndex++;
+    }
+    return out;
   }
 
   // src/session/erase.ts

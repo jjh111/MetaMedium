@@ -102,6 +102,12 @@ export type { WallBox, WallState } from './behave/walls';
 export { fit } from './behave/fit';
 export type { Sample, FitResult } from './behave/fit';
 
+// Kinds of code — the closed table — and what ink lands on, per kind.
+export { KINDS, kindOf, rowOf } from './kinds/kinds';
+export type { Kind, KindRow, Renderer, Addressing } from './kinds/kinds';
+export { addressablesOf, functionsOf, keysOf, headingsOf, elementsOf, runsOf, matchBrace } from './kinds/address';
+export type { Addressable } from './kinds/address';
+
 // Gesture grammar
 export {
   isLassoLike,
