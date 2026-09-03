@@ -651,6 +651,63 @@ window.__scenario = async function(){
     step('19g. …and the board survives that too', mm.session.getState().contentIds.length === n0 + 2);
   }
 
+  // ---- 20. The tank: a definition's clock moves its instances, deterministically ----
+  {
+    mm.setView(1, 260 - 7200, 200 - 2100); await wait(30);
+    const W = (x, y) => mm.worldToScreen(x, y);
+    // A definition: a circle with a triangle touching it — generic; the engine never learns the word.
+    const pair = (x, y) => { const a = W(x, y); t.stroke(t.circle(a.x, a.y, 30)); const b = W(x + 30, y); t.stroke(t.line(b, W(x + 80, y - 30), 20).concat(t.line(W(x + 80, y - 30), W(x + 80, y + 30), 20).slice(1), t.line(W(x + 80, y + 30), b, 20).slice(1))); };
+    pair(7200, 2100);
+    const cA = W(7240, 2100);
+    t.stroke(t.circle(cA.x, cA.y, 110));
+    document.getElementById('heldOffer').click(); await wait(60);
+    const defId = mm.session.bless({ summonId: mm.session.getState().summon.id, name: 'A', at: Date.now() });
+    // Play, then pause at once: the tank exists, and no frame has stepped it —
+    // from here the test steps the clock by hand, so every position is exact.
+    mm.session.clock({ nodeId: defId, op: 'play', at: Date.now() });
+    mm.session.clock({ nodeId: defId, op: 'pause', at: Date.now() });
+    pair(7500, 2100); pair(7200, 2400);
+    const st0 = mm.session.getState();
+    const heldA = st0.clusterCandidates.filter(c => c.matches[0] && c.matches[0].artifactId === defId).length;
+    step('20. two more like it are held as instances, unblessed', heldA === 2, { held: heldA });
+    const tk = mm.tank();
+    const p0 = tk.positions(defId);
+    step('20a. the tank has three bodies, the definition\'s own ink first, at their drawn spots, t = 0', p0.length === 3 && p0[0].id === defId && tk.time(defId) === 0, p0);
+    tk.step(defId, 120);
+    const p1 = tk.positions(defId);
+    const moved = p1.every((p, i) => Math.hypot(p.x - p0[i].x, p.y - p0[i].y) > 1);
+    step('20b. two seconds of steps move every body', moved && Math.abs(tk.time(defId) - 2) < 1e-6, { t: tk.time(defId), p1 });
+    mm.session.clock({ nodeId: defId, op: 'play', at: Date.now() }); await wait(150);
+    mm.session.clock({ nodeId: defId, op: 'pause', at: Date.now() });
+    const pA = tk.positions(defId); await wait(250);
+    const pB = tk.positions(defId);
+    step('20c. playing moves them by the frame loop; pause holds them where they are', JSON.stringify(pA) !== JSON.stringify(p1) && JSON.stringify(pA) === JSON.stringify(pB));
+    mm.session.clock({ nodeId: defId, op: 'reset', at: Date.now() });
+    const pr = tk.positions(defId);
+    step('20d. reset puts them back where they were drawn', JSON.stringify(pr) === JSON.stringify(p0) && tk.time(defId) === 0, pr);
+    tk.step(defId, 120);
+    const q1 = tk.positions(defId);
+    mm.session.clock({ nodeId: defId, op: 'reset', at: Date.now() });
+    tk.step(defId, 120);
+    const q2 = tk.positions(defId);
+    step('20e. determinism: the same steps from the same seed put every body in the same place', JSON.stringify(q1) === JSON.stringify(q2) && JSON.stringify(q1) === JSON.stringify(p1), { q1, q2 });
+    mm.session.clock({ nodeId: defId, op: 'seed', seed: 7, at: Date.now() });
+    tk.step(defId, 120);
+    step('20f. a new seed is a different run', JSON.stringify(tk.positions(defId)) !== JSON.stringify(q1));
+    // A fourth body drawn, one second run, then undone: the tank is re-derived for the shorter program.
+    mm.session.clock({ nodeId: defId, op: 'seed', seed: 1, at: Date.now() });
+    mm.session.clock({ nodeId: defId, op: 'reset', at: Date.now() });
+    pair(7500, 2400);
+    step('20g. a body drawn while the clock stands joins the tank at once', tk.positions(defId).length === 4);
+    tk.step(defId, 60);
+    mm.session.undo(); mm.session.undo();
+    const after = tk.positions(defId);
+    mm.session.clock({ nodeId: defId, op: 'reset', at: Date.now() });
+    tk.step(defId, 60);
+    const fresh = tk.positions(defId);
+    step('20h. undoing a body re-derives the tank: three bodies, exactly where a fresh run of the shorter program puts them', after.length === 3 && Math.abs(tk.time(defId) - 1) < 1e-6 && JSON.stringify(after) === JSON.stringify(fresh), { after, fresh });
+  }
+
   // ---- 11. Scratch-out erase ----
   mm.fitAll(); await wait(60);
   const stBefore = mm.session.getState().contentIds.length;

@@ -595,6 +595,30 @@ fingerprint carries it, so the model is asked to *read*, not to interpret.
 - `propose()` carries `reps` as well as edges, so a transcript is held through
   the same channel as every other reading and undo drops it.
 
+### Time: clocks, tanks, and code that runs (v8)
+
+> `session.clock()`, `state.clocks`; `Demos/surface/13-kinds.js` (the worker),
+> `14-clocks.js` (the tank).
+
+**Nothing runs unblessed.** An artifact's clock is log state — playing, seed,
+why it last stopped — and *play* is the human's event; time itself is
+runtime, derived by the surface and never in the log. Two things run:
+
+- **A `js` artifact's code**, in a worker built from a string, loaded and
+  stepped only while its clock plays. A throw pauses the clock with the
+  reason; a step past its budget terminates the worker and pauses with the
+  budget named; the frame is marked broken and the board goes on drawing.
+  Every textual kind renders into the same script-less iframe carrying
+  `data-region` — a script's functions, data's keys, prose's headings — so
+  ink over a script lands on a function the way it lands on a div.
+- **A definition's tank.** A blessed artifact's own ink is its first body;
+  blessed matches and the held candidates the engine recognises are the
+  rest. Bodies step by the verb basis (`behave/`) — `wander` plus a little
+  `hold` until words or a hand say otherwise — at a fixed step, one seeded
+  stream per definition, in creation order, and are **re-derived from
+  t = 0 whenever the log changes**, so undo re-derives the tank. The
+  drawing is what moves; render translates and turns the ink.
+
 ### Pictures become ink (v8, WP-9a)
 
 > `metamedium-core/src/image/trace.ts` — `trace(bitmap)`.

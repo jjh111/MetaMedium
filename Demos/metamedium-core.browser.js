@@ -4985,7 +4985,7 @@ ${pad}</${tag}>`;
       }
     }
     function applyClock(ev) {
-      if (!live.includes(ev.nodeId)) return;
+      if (!artifacts.includes(ev.nodeId) && !live.includes(ev.nodeId)) return;
       const prev = clocks[ev.nodeId] ?? { playing: false, seed: 1, at: ev.at };
       switch (ev.op) {
         case "play":

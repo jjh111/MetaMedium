@@ -1422,7 +1422,9 @@
     const inkW = Math.max(2, wpx(1.3));
 
     for (const c of s.clusterCandidates) {
-      const b = union(c.nodeIds.map((id) => MM.boundsOf(s.nodes.get(id))));
+      const b0 = union(c.nodeIds.map((id) => MM.boundsOf(s.nodes.get(id))));
+      const cp = bodyPlacement(c.nodeIds[0]);
+      const b = cp ? { minX: b0.minX + cp.dx, maxX: b0.maxX + cp.dx, minY: b0.minY + cp.dy, maxY: b0.maxY + cp.dy } : b0;
       const pad = wpx(14);
       ctx.setLineDash([wpx(4), wpx(6)]);
       ctx.strokeStyle = `rgba(${C.goldRGB},0.38)`;
@@ -1449,13 +1451,19 @@
       const pv = dragPreview();
       const held = pv && pv.ids.includes(id);
       if (held) { ctx.save(); applyPreview(pv); }
+      // A body in a running tank is drawn where its behaviour has taken it:
+      // the DRAWING moves, translated and turned, never a sprite in its place.
+      const pl = bodyPlacement(id);
+      if (pl) { ctx.save(); ctx.translate(pl.cx + pl.dx, pl.cy + pl.dy); ctx.rotate(pl.angle); ctx.translate(-pl.cx, -pl.cy); }
       inkOf(node, {
         color: isLive ? `rgba(${C.goldRGB},0.85)` : color,
         width: id === inspectedId ? inkW * 1.3 : inkW,
       });
+      if (pl) ctx.restore();
       if (held) ctx.restore();
 
-      const b = MM.boundsOf(node);
+      const b0 = MM.boundsOf(node);
+      const b = b0 && pl ? { minX: b0.minX + pl.dx, maxX: b0.maxX + pl.dx, minY: b0.minY + pl.dy, maxY: b0.maxY + pl.dy } : b0;
       if (isArtifact && b) {
         brackets(b, isLive ? C.gold : `rgba(${C.goldRGB},0.7)`);
         text((MM.wordOf(node) || '') + (isLive ? '  ·  live' : ''), b.minX, b.minY - wpx(10), C.gold);
@@ -1495,6 +1503,7 @@
 
     renderExplanations(s);
     renderSelection(s);
+    syncTank(s);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0); // back to screen space for the chrome
     syncMarkChip(s);
     renderSummon(s);
@@ -1724,6 +1733,23 @@
           groupWhy: 'read from your handwriting by ' + nameOfParticipant(t.source),
           label: 'Name it “' + t.text + '”', why: r.targets.length ? 'the word beside it, as its name' : 'the word you wrote, as its name', tier: 0,
           run: () => session.bless({ summonId: sum.id, name: t.text, at: Date.now() }),
+        });
+      }
+      // A definition in the loop: its clock. Play is the bless that lets it run (I9).
+      const defs = [...new Set(sum.enclosedIds.filter((id) => s.artifacts.includes(id)).map((id) => definitionOf(s, id)))];
+      for (const defId of defs) {
+        const c = s.clocks[defId];
+        const name = MM.wordOf(s.nodes.get(defId)) || defId;
+        items.push({
+          key: 'clock:' + defId, group: 'always', groupConf: 0, groupWhy: '',
+          label: (c && c.playing ? 'Pause ' : 'Play ') + name,
+          why: c && c.playing ? 'hold every ' + name + ' where it is' : 'let every ' + name + ' move — nothing runs until you play it', tier: 0,
+          run: () => session.clock({ nodeId: defId, op: c && c.playing ? 'pause' : 'play', at: Date.now() }),
+        });
+        if (c) items.push({
+          key: 'reset:' + defId, group: 'always', groupConf: 0, groupWhy: '',
+          label: 'Reset ' + name, why: 'back to t = 0, where they were drawn', tier: 0,
+          run: () => session.clock({ nodeId: defId, op: 'reset', at: Date.now() }),
         });
       }
       const unread = sum.enclosedIds.filter((id) => { const n = s.nodes.get(id); return n && isWriting(n) && !MM.transcriptOf(n); });
@@ -2280,6 +2306,20 @@
 // closure's; no imports, no exports, no build step beyond the concatenation.
 
   // ===== Inspector: what the machine currently holds, and why ==============
+  /** The clock's state and its buttons, for any artifact that can run. */
+  function clockRows(s, id) {
+    const c = s.clocks[id];
+    const err = runtimeBroken(id);
+    const stateText = !c ? 'not played — nothing of it runs until you play it'
+      : c.playing ? 'playing · t = ' + tankTime(id).toFixed(1) + 's' : 'paused' + (c.reason ? ' — ' + c.reason : '') + ' · t = ' + tankTime(id).toFixed(1) + 's';
+    return '<div class="row"><span class="k">clock</span><span class="v' + (err ? ' warn' : '') + '">' + esc(stateText) + '</span></div>' +
+      '<div class="acts">' +
+      (c && c.playing
+        ? '<button class="mini" data-act="clock-pause" data-id="' + esc(id) + '">pause</button>'
+        : '<button class="mini" data-act="clock-play" data-id="' + esc(id) + '">' + (c ? 'play' : 'play — let it run') + '</button>') +
+      '<button class="mini" data-act="clock-reset" data-id="' + esc(id) + '">reset</button></div>';
+  }
+
   /** The kind of an artifact's newest code rep, html by default. */
   function codeKindOf(node) { const r = node && codeRepOf(node); return (r && r.data.kind) || 'html'; }
 
@@ -2358,17 +2398,16 @@
       if (codes.length > 1) html += '<div class="why">Earlier versions are kept.</div>';
       // The clock: nothing runs until a hand plays it, and a stop says why.
       if (kind === 'js') {
-        const c = s.clocks[id];
-        const err = runtimeBroken(id);
-        const stateText = !c ? 'not played — its code has never run'
-          : c.playing ? 'playing' : 'paused' + (c.reason ? ' — ' + c.reason : '');
-        html += '<div class="row"><span class="k">clock</span><span class="v' + (err ? ' warn' : '') + '">' + esc(stateText) + '</span></div>';
-        html += '<div class="acts">' +
-          (c && c.playing
-            ? '<button class="mini" data-act="clock-pause" data-id="' + esc(id) + '">pause</button>'
-            : '<button class="mini" data-act="clock-play" data-id="' + esc(id) + '">' + (c ? 'play' : 'play — let it run') + '</button>') +
-          '<button class="mini" data-act="clock-reset" data-id="' + esc(id) + '">reset</button></div>';
+        html += clockRows(s, id);
       }
+    }
+    // A definition without code has a clock too: play, and its instances move
+    // by the built-in behaviour until words or a hand give it another.
+    if (isArtifact && !codes.length) {
+      html += '<div class="sep"></div><div class="eyebrow">tank</div>';
+      const inst = tankCount(s, id);
+      html += '<div class="row"><span class="k">bodies</span><span class="v">' + inst.total + (inst.held ? ' (' + inst.held + ' held, unblessed)' : '') + '</span></div>';
+      html += clockRows(s, id);
     }
 
     // THE LADDER. Every rung a mark has climbed, with why at each one — ink,
@@ -2938,6 +2977,219 @@
     runtime.raf = requestAnimationFrame(runLoop);
   }
 
+// ===== clocks =====
+// Provides: the tank — definitions and their instances as bodies, the fixed-step loop, determinism
+//   (positions are a function of the log and the clock's time), bodyPlacement(id) for render,
+//   tankTime/tankCount for the panel, stepTank for tests.
+// Uses: core (session, state, MM), render (render), kinds (runtimeBroken).
+// A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
+// in name order inside `(function () { ... })();`. Shared state is the
+// closure's; no imports, no exports, no build step beyond the concatenation.
+
+  // ===== Time: a definition's clock moves its instances ====================
+  // A definition is a blessed artifact; its own ink is its first instance, a
+  // blessed match is another, and a held candidate the engine recognises as it
+  // is one too — unblessed, so a "Not a …" takes it out of the tank. Play is
+  // the human's event (I9). Positions are RUNTIME state: never in the log,
+  // re-derived from t = 0 whenever the log changes, so undoing a body puts
+  // every other body exactly where the shorter program leaves it.
+  const FIXED_DT = 1 / 60;
+  const MAX_STEPS_PER_FRAME = 8;
+  const MAX_REDERIVE_STEPS = 6000;
+  const MAX_FRAME_MS = 250;
+  /** What a definition does until words or a hand give it a behaviour: wander, and keep to its spot. */
+  const BUILTIN_BEHAVIOUR = { terms: [{ verb: 'wander', weight: 1 }, { verb: 'hold', weight: 0.35 }], source: 'hand' };
+
+  const tank = {
+    defs: new Map(),   // defId -> { t, seed, rng, bodies: Map<bodyId, entry>, order: bodyId[] }
+    place: new Map(),  // nodeId -> entry (for render)
+    logStamp: '',
+    acc: 0, last: 0, raf: 0,
+  };
+
+  function logStamp() {
+    const evs = session.getEvents();
+    const last = evs[evs.length - 1];
+    return evs.length + ':' + (last ? last.type + ':' + (last.at || 0) : '');
+  }
+
+  /** The definition an artifact belongs to: what it is an instance of, else itself. */
+  function definitionOf(s, artifactId) {
+    const n = s.nodes.get(artifactId);
+    const inst = n && n.edges.find((e) => e.rel === 'instance-of');
+    return inst ? inst.to : artifactId;
+  }
+
+  function behaviourOf(s, defId) {
+    const n = s.nodes.get(defId);
+    const rep = n && n.reps.filter((r) => r.modality === 'behaviour').pop();
+    return (rep && rep.data && rep.data.terms) ? rep.data : BUILTIN_BEHAVIOUR;
+  }
+
+  /** The bodies of a definition, in creation order: itself, blessed instances, then held candidates. */
+  function bodyEntriesOf(s, defId) {
+    const out = [];
+    for (const aid of s.artifacts) {
+      if (definitionOf(s, aid) !== defId) continue;
+      const n = s.nodes.get(aid);
+      if (n.reps.some((r) => r.modality === 'status' && r.data === 'broken')) continue;
+      out.push({ id: aid, artifactId: aid, memberIds: [aid], held: false });
+    }
+    for (const c of s.clusterCandidates) {
+      if (!c.matches.length || c.matches[0].artifactId !== defId) continue;
+      out.push({ id: 'cand:' + c.nodeIds.slice().sort().join('+'), artifactId: null, memberIds: c.nodeIds.slice(), held: true });
+    }
+    return out;
+  }
+
+  function boundsOfEntry(s, e) {
+    const bs = e.memberIds.map((id) => MM.boundsOf(s.nodes.get(id))).filter(Boolean);
+    return bs.length ? union(bs) : null;
+  }
+
+  function freshBody(s, defId, e) {
+    const b = boundsOfEntry(s, e);
+    if (!b) return null;
+    const cx = (b.minX + b.maxX) / 2, cy = (b.minY + b.maxY) / 2;
+    return {
+      id: e.id, name: MM.wordOf(s.nodes.get(defId)) || defId,
+      x: cx, y: cy, vx: 0, vy: 0, w: b.maxX - b.minX, h: b.maxY - b.minY,
+      heading: 0, age: 0, origin: { x: cx, y: cy },
+    };
+  }
+
+  /** A definition's tank at t = 0: fresh bodies, a fresh seeded stream. */
+  function rebuildDef(s, defId) {
+    const clock = s.clocks[defId] || { seed: 1 };
+    const d = { t: 0, seed: clock.seed, rng: MM.seeded(clock.seed), bodies: new Map(), order: [] };
+    for (const e of bodyEntriesOf(s, defId)) {
+      const body = freshBody(s, defId, e);
+      if (!body) continue;
+      d.bodies.set(e.id, { entry: e, body: body, origin: body.origin, wallState: { contactSteps: 0 }, angle: 0 });
+      d.order.push(e.id);
+    }
+    tank.defs.set(defId, d);
+    return d;
+  }
+
+  /** Every body in every tank, as the plain bodies a behaviour may see. */
+  function allBodies() {
+    const out = [];
+    for (const d of tank.defs.values()) for (const id of d.order) out.push(d.bodies.get(id).body);
+    return out;
+  }
+
+  /** n fixed steps of one definition's tank. Bodies step in creation order; the stream is one per definition. */
+  function stepTank(s, defId, n) {
+    const d = tank.defs.get(defId) || rebuildDef(s, defId);
+    const behaviour = behaviourOf(s, defId);
+    for (let k = 0; k < n; k++) {
+      const everyone = allBodies();
+      for (const id of d.order) {
+        const e = d.bodies.get(id);
+        const others = everyone.filter((b) => b.id !== id);
+        const world = MM.worldOf(e.body, others, [], d.t, FIXED_DT, d.rng);
+        const r = MM.step(behaviour, world, e.wallState);
+        e.body = r.body; e.wallState = r.wallState;
+        const sp = Math.hypot(r.body.vx, r.body.vy);
+        if (sp > (behaviour.speed || MM.DEFAULT_SPEED) * 0.2) e.angle = r.body.heading;
+      }
+      d.t += FIXED_DT;
+    }
+    refreshPlacements();
+  }
+
+  function refreshPlacements() {
+    tank.place.clear();
+    for (const d of tank.defs.values()) {
+      for (const id of d.order) {
+        const e = d.bodies.get(id);
+        for (const nid of e.entry.memberIds) tank.place.set(nid, e);
+      }
+    }
+  }
+
+  /** Where render should draw a node: the offset its body has moved and the angle it has turned. */
+  function bodyPlacement(nodeId) {
+    const e = tank.place.get(nodeId);
+    if (!e) return null;
+    return { dx: e.body.x - e.origin.x, dy: e.body.y - e.origin.y, angle: e.angle, cx: e.origin.x, cy: e.origin.y };
+  }
+
+  function tankTime(defId) {
+    const d = tank.defs.get(defId);
+    return d ? d.t : 0;
+  }
+  function tankCount(s, defId) {
+    const es = bodyEntriesOf(s, defId);
+    return { total: es.length, held: es.filter((e) => e.held).length };
+  }
+
+  /** The last clock event for a definition, so a reset can be told from a pause. */
+  function lastClockOp(defId) {
+    const evs = session.getEvents();
+    for (let i = evs.length - 1; i >= 0; i--) {
+      const ev = evs[i];
+      if (ev.type === 'clock' && ev.nodeId === defId) return ev.op;
+    }
+    return null;
+  }
+
+  /** Called from every render: keep the tanks true to the log, and run the loop while anything plays. */
+  function syncTank(s) {
+    const stamp = logStamp();
+    const changed = stamp !== tank.logStamp;
+    tank.logStamp = stamp;
+    const wanted = new Set();
+    for (const defId of Object.keys(s.clocks)) {
+      if (!s.artifacts.includes(defId)) continue;
+      // A live js artifact runs in the worker (13-kinds), not in a tank.
+      const node = s.nodes.get(defId);
+      if (node && codeRepOf(node)) continue;
+      wanted.add(defId);
+      const c = s.clocks[defId];
+      const d = tank.defs.get(defId);
+      if (!d) { rebuildDef(s, defId); continue; }
+      if (d.seenAt !== c.at) {
+        d.seenAt = c.at;
+        const op = lastClockOp(defId);
+        if (op === 'reset' || (op === 'seed' && d.seed !== c.seed)) { rebuildDef(s, defId).seenAt = c.at; continue; }
+      }
+      if (changed) {
+        // The program changed under a running tank: re-derive it from t = 0
+        // to the same t, so positions stay a function of the log.
+        const t0 = d.t;
+        const fresh = rebuildDef(s, defId);
+        fresh.seenAt = c.at;
+        stepTank(s, defId, Math.min(MAX_REDERIVE_STEPS, Math.round(t0 / FIXED_DT)));
+      }
+    }
+    for (const defId of tank.defs.keys()) if (!wanted.has(defId)) tank.defs.delete(defId);
+    refreshPlacements();
+    const playing = [...wanted].some((id) => s.clocks[id].playing);
+    if (playing && !tank.raf) { tank.last = performance.now(); tank.acc = 0; tank.raf = requestAnimationFrame(tankLoop); }
+    if (!playing && tank.raf) { cancelAnimationFrame(tank.raf); tank.raf = 0; }
+  }
+
+  function tankLoop(now) {
+    // `tank.raf` stays set through the body: the render below re-enters
+    // syncTank, and a loop that looked stopped from there started a second
+    // one and zeroed the accumulator — the tank ran at half speed.
+    const s = session.getState();
+    const playing = Object.keys(s.clocks).filter((id) => s.clocks[id].playing && tank.defs.has(id));
+    if (!playing.length) { tank.raf = 0; return; }
+    tank.acc += Math.min(MAX_FRAME_MS, now - tank.last);
+    tank.last = now;
+    let steps = 0;
+    while (tank.acc >= FIXED_DT * 1000 && steps < MAX_STEPS_PER_FRAME) {
+      for (const id of playing) stepTank(s, id, 1);
+      tank.acc -= FIXED_DT * 1000;
+      steps++;
+    }
+    if (steps) render(s);
+    tank.raf = requestAnimationFrame(tankLoop);
+  }
+
 // ===== boot =====
 // Provides: the debug handle (window.__mm, what the e2e drives), subscription, restore, first render.
 // Uses: everything.
@@ -2958,6 +3210,13 @@
     resetUses: () => { for (const k of Object.keys(uses)) delete uses[k]; store.del(USES_KEY); },
     // The worker runtime, for tests: what is loaded, where each body is, what broke.
     runtime: () => ({ bodies: runtime.bodies, broken: runtime.broken, loaded: runtime.loaded, budgetMs: RUN_BUDGET_MS }),
+    // The tank, for tests: step a definition's clock by hand and read where its bodies are.
+    tank: () => ({
+      defs: tank.defs,
+      step: (defId, n) => stepTank(session.getState(), defId, n),
+      time: (defId) => tankTime(defId),
+      positions: (defId) => { const d = tank.defs.get(defId); return d ? d.order.map((id) => { const b = d.bodies.get(id).body; return { id: id, x: +b.x.toFixed(4), y: +b.y.toFixed(4) }; }) : []; },
+    }),
   };
 
 

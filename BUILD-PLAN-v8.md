@@ -178,7 +178,7 @@ Files: `Demos/surface/held.js` → `selection.js`, `palette.js`. The loop become
 Renderers for `js` (source, function by function), `json` (keys), `md`, `svg`; the worker runtime for `js` under the `steer` contract; I9 enforced (a bless before run).
 *Done:* a `js` artifact renders addressable; a behaviour runs in the worker; a throwing behaviour marks its artifact broken and the board survives (e2e step).
 
-**WP-5 · Clocks and instances** (W, needs WP-2, WP-4, WP-8)
+**WP-5 · Clocks and instances** (W, needs WP-2, WP-4, WP-8) ✅ **done 3 Sep 2026** — `Demos/surface/14-clocks.js`: a definition's clock moves its bodies — its own ink first, blessed instances, and the held candidates the engine recognises (unblessed, so *Not a …* takes one out of the tank). The built-in behaviour is `wander` with a little `hold`, until words or a hand give it another. Fixed-step loop with an accumulator; one seeded stream per definition, bodies stepped in creation order; positions are runtime, never in the log, and are **re-derived from t = 0 whenever the log changes**, so undoing a body puts every other body where the shorter program leaves it (e2e 20–20h, including determinism: same seed, same steps, same places). The drawing is what moves: render translates and turns the ink. Clocks may sit on any artifact, not only live ones. *Found:* a loop whose render re-enters the sync must keep its frame handle set, or the sync starts a second loop. *Known gaps:* hit-testing a moving body still uses its drawn bounds; walls are not yet in the tank (WP-10 frames will supply them).
 `clock` events; `state.clocks`; instances with runtime state; fixed-step loop in the surface; wander as the built-in; determinism e2e (reset twice, same positions).
 *Done:* Part I stage A criterion.
 

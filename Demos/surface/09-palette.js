@@ -78,6 +78,23 @@
           run: () => session.bless({ summonId: sum.id, name: t.text, at: Date.now() }),
         });
       }
+      // A definition in the loop: its clock. Play is the bless that lets it run (I9).
+      const defs = [...new Set(sum.enclosedIds.filter((id) => s.artifacts.includes(id)).map((id) => definitionOf(s, id)))];
+      for (const defId of defs) {
+        const c = s.clocks[defId];
+        const name = MM.wordOf(s.nodes.get(defId)) || defId;
+        items.push({
+          key: 'clock:' + defId, group: 'always', groupConf: 0, groupWhy: '',
+          label: (c && c.playing ? 'Pause ' : 'Play ') + name,
+          why: c && c.playing ? 'hold every ' + name + ' where it is' : 'let every ' + name + ' move — nothing runs until you play it', tier: 0,
+          run: () => session.clock({ nodeId: defId, op: c && c.playing ? 'pause' : 'play', at: Date.now() }),
+        });
+        if (c) items.push({
+          key: 'reset:' + defId, group: 'always', groupConf: 0, groupWhy: '',
+          label: 'Reset ' + name, why: 'back to t = 0, where they were drawn', tier: 0,
+          run: () => session.clock({ nodeId: defId, op: 'reset', at: Date.now() }),
+        });
+      }
       const unread = sum.enclosedIds.filter((id) => { const n = s.nodes.get(id); return n && isWriting(n) && !MM.transcriptOf(n); });
       if (unread.length && agents.length) {
         items.push({

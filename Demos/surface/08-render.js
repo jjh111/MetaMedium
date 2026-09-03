@@ -136,7 +136,9 @@
     const inkW = Math.max(2, wpx(1.3));
 
     for (const c of s.clusterCandidates) {
-      const b = union(c.nodeIds.map((id) => MM.boundsOf(s.nodes.get(id))));
+      const b0 = union(c.nodeIds.map((id) => MM.boundsOf(s.nodes.get(id))));
+      const cp = bodyPlacement(c.nodeIds[0]);
+      const b = cp ? { minX: b0.minX + cp.dx, maxX: b0.maxX + cp.dx, minY: b0.minY + cp.dy, maxY: b0.maxY + cp.dy } : b0;
       const pad = wpx(14);
       ctx.setLineDash([wpx(4), wpx(6)]);
       ctx.strokeStyle = `rgba(${C.goldRGB},0.38)`;
@@ -163,13 +165,19 @@
       const pv = dragPreview();
       const held = pv && pv.ids.includes(id);
       if (held) { ctx.save(); applyPreview(pv); }
+      // A body in a running tank is drawn where its behaviour has taken it:
+      // the DRAWING moves, translated and turned, never a sprite in its place.
+      const pl = bodyPlacement(id);
+      if (pl) { ctx.save(); ctx.translate(pl.cx + pl.dx, pl.cy + pl.dy); ctx.rotate(pl.angle); ctx.translate(-pl.cx, -pl.cy); }
       inkOf(node, {
         color: isLive ? `rgba(${C.goldRGB},0.85)` : color,
         width: id === inspectedId ? inkW * 1.3 : inkW,
       });
+      if (pl) ctx.restore();
       if (held) ctx.restore();
 
-      const b = MM.boundsOf(node);
+      const b0 = MM.boundsOf(node);
+      const b = b0 && pl ? { minX: b0.minX + pl.dx, maxX: b0.maxX + pl.dx, minY: b0.minY + pl.dy, maxY: b0.maxY + pl.dy } : b0;
       if (isArtifact && b) {
         brackets(b, isLive ? C.gold : `rgba(${C.goldRGB},0.7)`);
         text((MM.wordOf(node) || '') + (isLive ? '  ·  live' : ''), b.minX, b.minY - wpx(10), C.gold);
@@ -209,6 +217,7 @@
 
     renderExplanations(s);
     renderSelection(s);
+    syncTank(s);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0); // back to screen space for the chrome
     syncMarkChip(s);
     renderSummon(s);

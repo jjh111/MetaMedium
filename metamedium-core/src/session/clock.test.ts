@@ -42,7 +42,7 @@ describe('clocks', () => {
     expect(s.getState().clocks[id]).toEqual({ playing: false, seed: 42, at: 6300 });
   });
 
-  it('a clock on something that is not live is ignored, and clocks replay and undo', () => {
+  it('a clock on a stroke is ignored — clocks belong to artifacts — and clocks replay and undo', () => {
     const s = createSession();
     const id = liveArtifact(s);
     s.clock({ nodeId: 'stroke:1', op: 'play', at: 6000 });

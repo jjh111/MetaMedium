@@ -1589,13 +1589,14 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
   }
 
   /**
-   * A clock lives on a live artifact. Play is the bless: until a hand has
-   * played it, an artifact's code never runs (I9). A pause carries the reason
+   * A clock lives on an artifact: a definition whose instances move, or a
+   * live artifact whose code runs. Play is the bless: until a hand has played
+   * it, nothing of it moves or runs (I9). A pause carries the reason
    * when something other than a hand stopped it — a throw, a budget — so the
    * board says why a thing went still.
    */
   function applyClock(ev: Extract<SessionEvent, { type: 'clock' }>) {
-    if (!live.includes(ev.nodeId)) return;
+    if (!artifacts.includes(ev.nodeId) && !live.includes(ev.nodeId)) return;
     const prev = clocks[ev.nodeId] ?? { playing: false, seed: 1, at: ev.at };
     switch (ev.op) {
       case 'play': clocks[ev.nodeId] = { playing: true, seed: prev.seed, at: ev.at }; break;

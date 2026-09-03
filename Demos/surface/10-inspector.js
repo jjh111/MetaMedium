@@ -6,6 +6,20 @@
 // closure's; no imports, no exports, no build step beyond the concatenation.
 
   // ===== Inspector: what the machine currently holds, and why ==============
+  /** The clock's state and its buttons, for any artifact that can run. */
+  function clockRows(s, id) {
+    const c = s.clocks[id];
+    const err = runtimeBroken(id);
+    const stateText = !c ? 'not played — nothing of it runs until you play it'
+      : c.playing ? 'playing · t = ' + tankTime(id).toFixed(1) + 's' : 'paused' + (c.reason ? ' — ' + c.reason : '') + ' · t = ' + tankTime(id).toFixed(1) + 's';
+    return '<div class="row"><span class="k">clock</span><span class="v' + (err ? ' warn' : '') + '">' + esc(stateText) + '</span></div>' +
+      '<div class="acts">' +
+      (c && c.playing
+        ? '<button class="mini" data-act="clock-pause" data-id="' + esc(id) + '">pause</button>'
+        : '<button class="mini" data-act="clock-play" data-id="' + esc(id) + '">' + (c ? 'play' : 'play — let it run') + '</button>') +
+      '<button class="mini" data-act="clock-reset" data-id="' + esc(id) + '">reset</button></div>';
+  }
+
   /** The kind of an artifact's newest code rep, html by default. */
   function codeKindOf(node) { const r = node && codeRepOf(node); return (r && r.data.kind) || 'html'; }
 
@@ -84,17 +98,16 @@
       if (codes.length > 1) html += '<div class="why">Earlier versions are kept.</div>';
       // The clock: nothing runs until a hand plays it, and a stop says why.
       if (kind === 'js') {
-        const c = s.clocks[id];
-        const err = runtimeBroken(id);
-        const stateText = !c ? 'not played — its code has never run'
-          : c.playing ? 'playing' : 'paused' + (c.reason ? ' — ' + c.reason : '');
-        html += '<div class="row"><span class="k">clock</span><span class="v' + (err ? ' warn' : '') + '">' + esc(stateText) + '</span></div>';
-        html += '<div class="acts">' +
-          (c && c.playing
-            ? '<button class="mini" data-act="clock-pause" data-id="' + esc(id) + '">pause</button>'
-            : '<button class="mini" data-act="clock-play" data-id="' + esc(id) + '">' + (c ? 'play' : 'play — let it run') + '</button>') +
-          '<button class="mini" data-act="clock-reset" data-id="' + esc(id) + '">reset</button></div>';
+        html += clockRows(s, id);
       }
+    }
+    // A definition without code has a clock too: play, and its instances move
+    // by the built-in behaviour until words or a hand give it another.
+    if (isArtifact && !codes.length) {
+      html += '<div class="sep"></div><div class="eyebrow">tank</div>';
+      const inst = tankCount(s, id);
+      html += '<div class="row"><span class="k">bodies</span><span class="v">' + inst.total + (inst.held ? ' (' + inst.held + ' held, unblessed)' : '') + '</span></div>';
+      html += clockRows(s, id);
     }
 
     // THE LADDER. Every rung a mark has climbed, with why at each one — ink,
