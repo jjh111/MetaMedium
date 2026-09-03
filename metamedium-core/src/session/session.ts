@@ -65,6 +65,7 @@ import { isLetterLike, joinsRun, wordConfidence } from './words';
 import { type StructuralSignature, type Examples, structuralSignature, matchDefinition, addExample, MATCH_FLOOR } from './signature';
 import type { Kind } from '../kinds/kinds';
 import type { Behaviour } from '../behave/verbs';
+import type { Connection } from '../frames/frame';
 
 // ===== Public state shape =====
 
@@ -227,6 +228,12 @@ export type SessionEvent =
    * and drives nothing until a human gives it again in their own name.
    */
   | { type: 'behave'; nodeId: string; behaviour: Behaviour; participantId?: string; at: number }
+  /**
+   * A frame: artifacts wired together by reference (ARCHITECTURE-v8 §15).
+   * The members stay where they are; the frame is a new artifact holding
+   * their ids and the connections between their ports.
+   */
+  | { type: 'frame'; ids: string[]; name: string; connections: Connection[]; at: number; participantId?: string }
   /** An artifact's clock: play (the bless to run), pause, reset, or reseed. */
   | { type: 'clock'; nodeId: string; op: 'play' | 'pause' | 'reset' | 'seed'; seed?: number; reason?: string; at: number; participantId?: string }
   /**
@@ -357,6 +364,8 @@ export interface Session {
    * teaching is part of the session's history and replays with it.
    */
   teachCommandMark(mark: CommandMark | null, at: number): void;
+  /** Wire artifacts into a frame, by reference. Returns the frame's id. */
+  frame(args: { ids: string[]; name: string; connections: Connection[]; at: number; participantId?: string }): string | null;
   /** Give a definition a behaviour. A human's is blessed by the act; a model's or the fit's is held until a human gives it. */
   behave(args: { nodeId: string; behaviour: Behaviour; participantId?: string; at: number }): void;
   /** Play, pause, reset or reseed an artifact's clock. Play is the bless that lets its code run (I9). */
@@ -1615,6 +1624,37 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     }
   }
 
+  /**
+   * A frame is an artifact that REFERENCES its members: they keep their own
+   * place on the board, and the frame carries their ids, the wiring, and a
+   * signature over what they are, so a frame built once can be offered again.
+   */
+  function applyFrame(ev: Extract<SessionEvent, { type: 'frame' }>): string | null {
+    const members = ev.ids.filter((id) => artifacts.includes(id) && !getRep(nodes.get(id)!, 'erased'));
+    if (members.length < 1 || !ev.name.trim()) return null;
+    const pid = ev.participantId ?? LOCAL_PARTICIPANT;
+    const bs = members.map((id) => boundsOf(nodes.get(id)!)).filter((b): b is NonNullable<typeof b> => !!b);
+    const union = bs.length ? getBounds(bs.flatMap((b) => [{ x: b.minX, y: b.minY }, { x: b.maxX, y: b.maxY }])) : null;
+    const frame: MMNode = {
+      id: nextId('frame'),
+      reps: [
+        { modality: 'word', data: ev.name.trim(), source: pid },
+        { modality: 'frame', data: { members, connections: ev.connections.filter((c) => members.includes(c.from.id) && members.includes(c.to.id)) }, source: pid },
+        { modality: 'signature', data: signatureOf(members), source: TIER0_PARTICIPANT },
+        ...(union ? [{ modality: 'bounds', data: union, source: TIER0_PARTICIPANT }] : []),
+      ],
+      edges: [
+        { to: pid, rel: 'made-by' },
+        ...members.map((id) => ({ to: id, rel: 'refers-to', blessed: true })),
+      ],
+      capability: 0,
+      createdAt: ev.at,
+    };
+    nodes.set(frame.id, frame);
+    artifacts.push(frame.id);
+    return frame.id;
+  }
+
   function isHuman(participantId: string): boolean {
     if (participantId === LOCAL_PARTICIPANT) return true;
     const p = nodes.get(participantId);
@@ -1721,6 +1761,8 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       case 'behave':
         applyBehave(ev);
         return null;
+      case 'frame':
+        return applyFrame(ev);
       case 'summon':
         return applySummon(ev);
       case 'split':
@@ -1834,6 +1876,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     correct: (args) => void dispatch({ type: 'correct', ...args }),
     clock: (args) => void dispatch({ type: 'clock', ...args }),
     behave: (args) => void dispatch({ type: 'behave', ...args }),
+    frame: (args) => dispatch({ type: 'frame', ...args }),
     matchesOf: (ids) => matchesFor(ids),
     tidy: (args) => void dispatch({ type: 'tidy', ...args }),
     snap: (args) => void dispatch({ type: 'snap', ...args }),

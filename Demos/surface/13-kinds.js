@@ -202,7 +202,9 @@
       const node = s.nodes.get(id);
       const rep = node && codeRepOf(node);
       if (!rep || (rep.data.kind || 'html') !== 'js') continue;
-      out.push({ id: id, rep: rep });
+      const wired = wiredCodeOf(s, id);
+      const code = wired !== null ? wired : rep.data.code;
+      out.push({ id: id, rep: rep, code: code, key: rep.data.at + ':' + hashOf(code) });
     }
     return out;
   }
@@ -232,9 +234,9 @@
     }
     const w = ensureWorker();
     for (const r of want) {
-      if (runtime.loaded.get(r.id) !== r.rep.data.at && !runtime.pending.has(r.id)) {
-        runtime.loaded.set(r.id, r.rep.data.at); // in flight; a 'loaded' reply confirms
-        w.postMessage({ type: 'load', id: r.id, code: r.rep.data.code, at: r.rep.data.at });
+      if (runtime.loaded.get(r.id) !== r.key && !runtime.pending.has(r.id)) {
+        runtime.loaded.set(r.id, r.key); // in flight; a 'loaded' reply confirms
+        w.postMessage({ type: 'load', id: r.id, code: r.code, at: r.key });
       }
     }
     if (!runtime.raf) runtime.raf = requestAnimationFrame(runLoop);

@@ -57,7 +57,9 @@ export interface Conversion {
     | { kind: 'name' }
     | { kind: 'tidy'; axis: 'row' | 'column' }
     | { kind: 'equalize' }
-    | { kind: 'prompt'; seed: string };
+    | { kind: 'prompt'; seed: string }
+    /** The marks become a drawn control: a slider whose value is where its knob sits. */
+    | { kind: 'control' };
   /** One line saying what will happen. */
   hint?: string;
 }
@@ -223,6 +225,37 @@ function runOfPeers(scope: ConceptScope, axis: 'x' | 'y') {
 // ===== The library =====
 
 export const BUILTIN_CONCEPTS: Concept[] = [
+  {
+    // The first drawn control (ARCHITECTURE-v8 §15): a line with a dot on it
+    // is a slider, and the dot's place along the line is its value.
+    name: 'slider',
+    describes: 'a knob on a track',
+    conversions: [
+      { id: 'control', label: 'Make it a slider', tier: 0, effect: { kind: 'control' }, hint: 'its value is where the knob sits; drag the knob to set it' },
+      NAME,
+    ],
+    match(scope) {
+      const tracks = scope.ids.filter((id) => scope.shapes[id] === 'line' || scope.shapes[id] === 'arrow');
+      const knobs = scope.ids.filter((id) => scope.shapes[id] === 'dot' || scope.shapes[id] === 'circle');
+      if (scope.ids.length !== 2 || tracks.length !== 1 || knobs.length !== 1) return null;
+      const track = scope.marks.find((m) => m.id === tracks[0]), knob = scope.marks.find((m) => m.id === knobs[0]);
+      if (!track || !knob) return null;
+      const tb = track.bounds, kb = knob.bounds;
+      const knobSize = Math.max(kb.maxX - kb.minX, kb.maxY - kb.minY);
+      const trackLen = Math.max(tb.maxX - tb.minX, tb.maxY - tb.minY);
+      if (knobSize > trackLen * 0.5) return null; // a knob is small beside its track
+      const engaged = scope.relations.some((r) =>
+        (r.kind === 'touching' || r.kind === 'crossing' || r.kind === 'near' || r.kind === 'contains' || r.kind === 'inside') &&
+        ((r.from === track.id && r.to === knob.id) || (r.from === knob.id && r.to === track.id)));
+      if (!engaged) return null;
+      const confidence = Math.min(0.9, 0.55 + 0.35 * (1 - knobSize / trackLen));
+      return {
+        confidence,
+        reasoning: `a ${scope.shapes[knob.id]} ${Math.round(knobSize)}px across on a ${Math.round(trackLen)}px ${scope.shapes[track.id]}`,
+        roles: { track: [track.id], knob: [knob.id] },
+      };
+    },
+  },
   {
     name: 'row',
     describes: 'peers side by side',

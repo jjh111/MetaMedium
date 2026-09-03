@@ -67,7 +67,7 @@ any structural change.
 | `doodle2-canvas.html` | **Flagship demo**: heuristic recognition, spatial graph, library, undo/redo, touch. No LLM. Single-file (~500KB) |
 | `metadoodle1.html` | Fork of flagship + tiered LLM recognition (WebLLM in-browser, LM Studio local API) + voice. Single-file (~600KB) |
 | `Web App Skeleton/` | React + Vite + TypeScript + Zustand rebuild; Claude API interpreter skeleton in `src/llm/`; recognition/spatial/matching in `src/core/` |
-| `Demos/surface/` | **The reference surface's source**: `surface.css` and fifteen script fragments (`00-core` … `13-kinds`, then `90-boot`, which must stay last), one concern each, concatenated in name order into one closure by `Demos/build-surface.mjs` → the committed `Demos/session-engine.js` (CI checks it has not drifted). Fragments share the closure's variables — no imports; each fragment's header says what it provides and uses. Edit a fragment, run the build, commit both |
+| `Demos/surface/` | **The reference surface's source**: `surface.css` and seventeen script fragments (`00-core` … `16-frames`, then `90-boot`, which must stay last), one concern each, concatenated in name order into one closure by `Demos/build-surface.mjs` → the committed `Demos/session-engine.js` (CI checks it has not drifted). Fragments share the closure's variables — no imports; each fragment's header says what it provides and uses. Edit a fragment, run the build, commit both |
 | `Demos/` | **`session-engine.html` is the MVP surface** (it links `surface/surface.css` and loads `session-engine.js`) — infinite canvas, the taught command mark, living artifacts in a DOM overlay, ink-over-artifact addressing, "why" inspector, model participants, canvas answers. Uses the committed `metamedium-core.browser.js` bundle. **`session-engine.e2e.js`** drives the whole loop through the real UI with a stubbed model (browser console; not part of `npm test`). `build-standalone.mjs` inlines the bundle into a single shareable file. Plus fish, composition diagrams, no-modes graph, etc. |
 | `skills/` | Claude Code skills: `metamedium-code` (code patterns), `metamedium-design` (design principles) |
 | `Assets/` | Figures and design rationale (recognition strategy, point-primitive proposal) |
@@ -631,6 +631,24 @@ the basis at the pace it was shown, with the residual named. The fit takes
 the body's own size — modelled at thumbnail size, every range-relative verb
 saw nothing in reach. The panel's ladder is words → sliders → what each
 verb is doing now → source.
+
+### Frames: artifacts wired by reference, and the drawn slider (v8, WP-10)
+
+> `metamedium-core/src/frames/frame.ts`; `Demos/surface/16-frames.js`.
+
+A **frame** is an artifact that *refers* to other artifacts and carries the
+**connections** between their ports; nothing is copied or moved. Interfaces
+are read, not declared: a script's tunables are its top-level numeric
+constants, a page's slots its regions, a control's port its value, a word's
+its text, a behaviour's its speed and weights. Connections are offered by
+type and ranked by name, each with its reasoning; resolving a frame
+substitutes the wired values wherever a member renders, runs or steps. The
+**drawn slider** is the first drawn control: a line with a dot on it reads
+as the `slider` concept, and the control's value is where the knob sits
+along the track, read from the ink where it stands — dragging the knob is
+setting the value, and the `move` that records the drag is the only event.
+A frame built once is offered again by the name written beside a loop or by
+resemblance, and export writes it as a folder of wired files.
 
 ### Pictures become ink (v8, WP-9a)
 

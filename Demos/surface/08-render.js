@@ -217,6 +217,7 @@
       ctx.stroke();
     }
 
+    renderFrames(s);
     renderExplanations(s);
     renderSelection(s);
     syncTank(s);

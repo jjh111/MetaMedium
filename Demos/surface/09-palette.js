@@ -78,6 +78,29 @@
           run: () => session.bless({ summonId: sum.id, name: t.text, at: Date.now() }),
         });
       }
+      // Artifacts in the loop can be wired into a frame — and a frame built
+      // once is offered again, by the name written beside them or by resemblance.
+      {
+        const arts = artifactsIn(s, sum.enclosedIds);
+        if (arts.length) {
+          const wiring = bestWiring(arts, s.nodes);
+          if (arts.length >= 2 || wiring.length) {
+            items.push({
+              key: 'frame', group: 'always', groupConf: 0, groupWhy: '',
+              label: 'Frame these', why: wiring.length ? wiring.length + ' connection' + (wiring.length === 1 ? '' : 's') + ': ' + wiring.map((c) => c.from.port + ' → ' + c.to.port).join(', ') : arts.length + ' artifacts, nothing to wire yet', tier: 0,
+              run: () => { const f = document.querySelector('#summon input.filter'); makeFrame(sum, f && f.value.trim() ? f.value.trim() : ''); },
+            });
+          }
+          for (const tpl of frameTemplatesFor(s, sum.enclosedIds)) {
+            const name = MM.wordOf(tpl.frame) || tpl.frame.id;
+            items.unshift({
+              key: 'frame-like:' + tpl.frame.id, group: tpl.how === 'name' ? 'written' : 'known', groupConf: tpl.how === 'name' ? 0.95 : 0.8,
+              groupWhy: tpl.why, label: 'Frame these like “' + name + '”', why: 'the same wiring, on these', tier: 0,
+              run: () => frameLike(sum, tpl.frame),
+            });
+          }
+        }
+      }
       // A definition in the loop: what it has been offered to do, and what
       // the words beside it say it does.
       for (const defId of [...new Set(sum.enclosedIds.filter((id) => s.artifacts.includes(id)).map((id) => definitionOf(s, id)))]) {
@@ -254,6 +277,8 @@
       const input = document.querySelector('#summon input.filter');
       if (input) { input.value = conv.effect.seed; }
       swapToPrompt(sum, input, conv.effect.seed);
+    } else if (conv.effect.kind === 'control') {
+      makeControl(sum);
     }
   }
 

@@ -18,6 +18,9 @@
     resetUses: () => { for (const k of Object.keys(uses)) delete uses[k]; store.del(USES_KEY); },
     // The worker runtime, for tests: what is loaded, where each body is, what broke.
     runtime: () => ({ bodies: runtime.bodies, broken: runtime.broken, loaded: runtime.loaded, budgetMs: RUN_BUDGET_MS }),
+    // Frames, for tests: the wired code a member renders with, and a frame as files.
+    wiredCodeOf: (id) => wiredCodeOf(session.getState(), id),
+    exportFrame: (id) => exportFrameFiles(id),
     // The tank, for tests: step a definition's clock by hand and read where its bodies are.
     tank: () => ({
       defs: tank.defs,

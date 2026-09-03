@@ -42,6 +42,8 @@
     }
     // A hand landing on the selection takes hold of it rather than drawing.
     const w0 = screenToWorld(e.clientX, e.clientY);
+    // A hand on a control's knob slides it: no selection needed, one move when it lets go.
+    if (knobBegin(w0)) return;
     const hit = state.selection.length ? handleAt(w0) : null;
     // A hand on a body in a running tank is acting it out, not moving ink.
     if (hit && hit.kind === 'move' && demoBegin(state.selection, w0)) return;
@@ -65,6 +67,7 @@
         return;
       }
     }
+    if (knobMove(screenToWorld(e.clientX, e.clientY))) return;
     if (demoMove(screenToWorld(e.clientX, e.clientY))) return;
     if (drag) { updateDrag(screenToWorld(e.clientX, e.clientY)); return; }
     if (panning) {
@@ -95,6 +98,7 @@
   canvas.addEventListener('pointerup', (e) => {
     if (endTouch(e)) { live = null; return; }
     if (panning) { panning = null; canvas.style.cursor = 'crosshair'; return; }
+    if (knobEnd()) return;
     if (demoEnd()) return;
     if (drag) { endDrag(); return; }
     lastPen = { x: e.clientX, y: e.clientY };

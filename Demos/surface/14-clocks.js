@@ -45,7 +45,7 @@
   function behaviourOf(s, defId) {
     const n = s.nodes.get(defId);
     const b = n && MM.blessedBehaviourOf(n);
-    return (b && b.terms && b.terms.length) ? b : BUILTIN_BEHAVIOUR;
+    return wiredBehaviourOf(s, defId, (b && b.terms && b.terms.length) ? b : BUILTIN_BEHAVIOUR);
   }
 
   /** The bodies of a definition, in creation order: itself, blessed instances, then held candidates. */

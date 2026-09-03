@@ -190,6 +190,13 @@
   // explicitly rather than a default that drifted.
   const frames = new Map(); // artifactId -> { wrap, iframe, codeAt }
 
+  /** A cheap content hash, so a re-render happens exactly when the code changes. */
+  function hashOf(str) {
+    let h = 2166136261;
+    for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
+    return (h >>> 0).toString(36) + ':' + str.length;
+  }
+
   function codeRepOf(node) {
     for (let i = node.reps.length - 1; i >= 0; i--) {
       if (node.reps[i].modality === 'code') return node.reps[i];
@@ -241,10 +248,13 @@
       f.wrap.classList.toggle('broken', !!runtimeBroken(id));
       f.wrap.classList.toggle('playing', !!(s.clocks[id] && s.clocks[id].playing));
 
-      const stamp = rep.data.at + ':' + Math.round(fr.w) + 'x' + Math.round(fr.h);
+      // What renders is the WIRED code when a frame feeds this member.
+      const wired = wiredCodeOf(s, id);
+      const code = wired !== null ? wired : rep.data.code;
+      const stamp = rep.data.at + ':' + Math.round(fr.w) + 'x' + Math.round(fr.h) + ':' + hashOf(code);
       if (f.codeAt !== stamp) {
         f.codeAt = stamp;
-        f.iframe.srcdoc = documentForKind(rep, fr.w, fr.h);
+        f.iframe.srcdoc = documentForKind({ data: { ...rep.data, code: code } }, fr.w, fr.h);
       }
     }
     syncRuntime(s);
@@ -1120,6 +1130,8 @@
     }
     // A hand landing on the selection takes hold of it rather than drawing.
     const w0 = screenToWorld(e.clientX, e.clientY);
+    // A hand on a control's knob slides it: no selection needed, one move when it lets go.
+    if (knobBegin(w0)) return;
     const hit = state.selection.length ? handleAt(w0) : null;
     // A hand on a body in a running tank is acting it out, not moving ink.
     if (hit && hit.kind === 'move' && demoBegin(state.selection, w0)) return;
@@ -1143,6 +1155,7 @@
         return;
       }
     }
+    if (knobMove(screenToWorld(e.clientX, e.clientY))) return;
     if (demoMove(screenToWorld(e.clientX, e.clientY))) return;
     if (drag) { updateDrag(screenToWorld(e.clientX, e.clientY)); return; }
     if (panning) {
@@ -1173,6 +1186,7 @@
   canvas.addEventListener('pointerup', (e) => {
     if (endTouch(e)) { live = null; return; }
     if (panning) { panning = null; canvas.style.cursor = 'crosshair'; return; }
+    if (knobEnd()) return;
     if (demoEnd()) return;
     if (drag) { endDrag(); return; }
     lastPen = { x: e.clientX, y: e.clientY };
@@ -1512,6 +1526,7 @@
       ctx.stroke();
     }
 
+    renderFrames(s);
     renderExplanations(s);
     renderSelection(s);
     syncTank(s);
@@ -1746,6 +1761,29 @@
           run: () => session.bless({ summonId: sum.id, name: t.text, at: Date.now() }),
         });
       }
+      // Artifacts in the loop can be wired into a frame — and a frame built
+      // once is offered again, by the name written beside them or by resemblance.
+      {
+        const arts = artifactsIn(s, sum.enclosedIds);
+        if (arts.length) {
+          const wiring = bestWiring(arts, s.nodes);
+          if (arts.length >= 2 || wiring.length) {
+            items.push({
+              key: 'frame', group: 'always', groupConf: 0, groupWhy: '',
+              label: 'Frame these', why: wiring.length ? wiring.length + ' connection' + (wiring.length === 1 ? '' : 's') + ': ' + wiring.map((c) => c.from.port + ' → ' + c.to.port).join(', ') : arts.length + ' artifacts, nothing to wire yet', tier: 0,
+              run: () => { const f = document.querySelector('#summon input.filter'); makeFrame(sum, f && f.value.trim() ? f.value.trim() : ''); },
+            });
+          }
+          for (const tpl of frameTemplatesFor(s, sum.enclosedIds)) {
+            const name = MM.wordOf(tpl.frame) || tpl.frame.id;
+            items.unshift({
+              key: 'frame-like:' + tpl.frame.id, group: tpl.how === 'name' ? 'written' : 'known', groupConf: tpl.how === 'name' ? 0.95 : 0.8,
+              groupWhy: tpl.why, label: 'Frame these like “' + name + '”', why: 'the same wiring, on these', tier: 0,
+              run: () => frameLike(sum, tpl.frame),
+            });
+          }
+        }
+      }
       // A definition in the loop: what it has been offered to do, and what
       // the words beside it say it does.
       for (const defId of [...new Set(sum.enclosedIds.filter((id) => s.artifacts.includes(id)).map((id) => definitionOf(s, id)))]) {
@@ -1922,6 +1960,8 @@
       const input = document.querySelector('#summon input.filter');
       if (input) { input.value = conv.effect.seed; }
       swapToPrompt(sum, input, conv.effect.seed);
+    } else if (conv.effect.kind === 'control') {
+      makeControl(sum);
     }
   }
 
@@ -2505,9 +2545,30 @@
         html += clockRows(s, id);
       }
     }
+    // A frame: what it holds and how it is wired, each connection with its reason and what it carries now.
+    if (isArtifact && MM.isFrame(node)) {
+      const f = MM.frameOfNode(node);
+      const r = MM.resolveFrame(f, s.nodes);
+      html += '<div class="sep"></div><div class="eyebrow">frame</div>';
+      html += '<div class="row"><span class="k">members</span><span class="v">' + esc(f.members.map((m) => MM.wordOf(s.nodes.get(m)) || m).join(', ')) + '</span></div>';
+      if (!f.connections.length) html += '<div class="why">no connections — nothing among them offers a value another accepts</div>';
+      r.carried.forEach((c) => {
+        html += '<div class="row"><span class="k">wire</span><span class="v">' + esc((MM.wordOf(s.nodes.get(c.connection.from.id)) || c.connection.from.id) + '.' + c.connection.from.port + ' → ' + (MM.wordOf(s.nodes.get(c.connection.to.id)) || c.connection.to.id) + '.' + c.connection.to.port) +
+          (c.value !== undefined ? ' = ' + esc(typeof c.value === 'number' ? (+c.value.toFixed(3)).toString() : String(c.value)) : '') + '</span></div>';
+        if (c.connection.reasoning) html += '<div class="why">' + esc(c.connection.reasoning) + '</div>';
+      });
+      const files = exportFrameFiles(id);
+      if (files) html += '<div class="row"><span class="k">exports as</span><span class="v">' + esc(Object.keys(files).join(', ')) + '</span></div>';
+    }
+    // A control: its value is where the knob sits.
+    if (isArtifact && codes.length && (codes[codes.length - 1].data.kind === 'control')) {
+      const c = MM.controlOf(node, s.nodes);
+      html += '<div class="row"><span class="k">value</span><span class="v">' + (c ? esc((+c.value.toFixed(3)).toString() + ' of ' + c.min + '–' + c.max) : 'no knob on the track') + '</span></div>';
+      if (c) html += '<div class="why">' + esc(c.reasoning) + ' — drag the knob to set it</div>';
+    }
     // A definition without code has a clock too: play, and its instances move
     // by the built-in behaviour until words or a hand give it another.
-    if (isArtifact && !codes.length) {
+    if (isArtifact && !codes.length && !MM.isFrame(node)) {
       html += '<div class="sep"></div><div class="eyebrow">tank</div>';
       const inst = tankCount(s, id);
       html += '<div class="row"><span class="k">bodies</span><span class="v">' + inst.total + (inst.held ? ' (' + inst.held + ' held, unblessed)' : '') + '</span></div>';
@@ -3013,7 +3074,9 @@
       const node = s.nodes.get(id);
       const rep = node && codeRepOf(node);
       if (!rep || (rep.data.kind || 'html') !== 'js') continue;
-      out.push({ id: id, rep: rep });
+      const wired = wiredCodeOf(s, id);
+      const code = wired !== null ? wired : rep.data.code;
+      out.push({ id: id, rep: rep, code: code, key: rep.data.at + ':' + hashOf(code) });
     }
     return out;
   }
@@ -3043,9 +3106,9 @@
     }
     const w = ensureWorker();
     for (const r of want) {
-      if (runtime.loaded.get(r.id) !== r.rep.data.at && !runtime.pending.has(r.id)) {
-        runtime.loaded.set(r.id, r.rep.data.at); // in flight; a 'loaded' reply confirms
-        w.postMessage({ type: 'load', id: r.id, code: r.rep.data.code, at: r.rep.data.at });
+      if (runtime.loaded.get(r.id) !== r.key && !runtime.pending.has(r.id)) {
+        runtime.loaded.set(r.id, r.key); // in flight; a 'loaded' reply confirms
+        w.postMessage({ type: 'load', id: r.id, code: r.code, at: r.key });
       }
     }
     if (!runtime.raf) runtime.raf = requestAnimationFrame(runLoop);
@@ -3129,7 +3192,7 @@
   function behaviourOf(s, defId) {
     const n = s.nodes.get(defId);
     const b = n && MM.blessedBehaviourOf(n);
-    return (b && b.terms && b.terms.length) ? b : BUILTIN_BEHAVIOUR;
+    return wiredBehaviourOf(s, defId, (b && b.terms && b.terms.length) ? b : BUILTIN_BEHAVIOUR);
   }
 
   /** The bodies of a definition, in creation order: itself, blessed instances, then held candidates. */
@@ -3398,6 +3461,240 @@
     tank.raf = requestAnimationFrame(tankLoop);
   }
 
+// ===== frames =====
+// Provides: frames on the surface — wiredCodeOf/wiredBehaviourOf (the harness applied where members render
+//   and run), frame and control rendering, the knob drag, makeControl/makeFrame/frameLike for the palette,
+//   frameTemplatesFor (conjure by resemblance and by name), exportFrameFiles.
+// Uses: core, artifacts (frames map), render, kinds, clocks.
+// A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
+// in name order inside `(function () { ... })();`. Shared state is the
+// closure's; no imports, no exports, no build step beyond the concatenation.
+
+  // ===== The harness, applied ==============================================
+  // A frame references its members and wires their ports. Nothing is written
+  // back: where a member renders or runs, it is asked for its WIRED code —
+  // the newest frame that holds it, resolved from the current values.
+  function framesHolding(s, id) {
+    return s.artifacts
+      .map((aid) => s.nodes.get(aid))
+      .filter((n) => n && MM.isFrame(n) && !n.reps.some((r) => r.modality === 'erased') && MM.frameOfNode(n).members.includes(id));
+  }
+
+  /** The member's code with its connections applied, or null when nothing feeds it. */
+  function wiredCodeOf(s, id) {
+    const holders = framesHolding(s, id);
+    for (let i = holders.length - 1; i >= 0; i--) {
+      const r = MM.resolveFrame(MM.frameOfNode(holders[i]), s.nodes);
+      if (r.code[id] !== undefined) return r.code[id];
+    }
+    return null;
+  }
+
+  /** A definition's behaviour with its wired speed and weights, or the behaviour itself. */
+  function wiredBehaviourOf(s, id, behaviour) {
+    const holders = framesHolding(s, id);
+    for (let i = holders.length - 1; i >= 0; i--) {
+      const r = MM.resolveFrame(MM.frameOfNode(holders[i]), s.nodes);
+      const w = r.behaviour[id];
+      if (!w) continue;
+      const terms = behaviour.terms.map((t, k) => (w.weights[k] !== undefined ? { ...t, weight: w.weights[k] } : t));
+      return { ...behaviour, terms: terms, speed: w.speed !== undefined ? w.speed : behaviour.speed };
+    }
+    return behaviour;
+  }
+
+  // ===== Making them ==========================================================
+  /** The circled line and dot become a control: the drawing IS the slider. */
+  function makeControl(sum) {
+    const at = Date.now();
+    const id = session.bless({ summonId: sum.id, name: 'slider', at: at });
+    if (!id) return null;
+    session.attachCode({ participantId: MM.LOCAL_PARTICIPANT, nodeId: id, kind: 'control', code: JSON.stringify({ min: 0, max: 1 }), at: at + 1 });
+    flash('a slider — drag the knob to set it');
+    return id;
+  }
+
+  /** One connection per input port, best first, so a value feeds each place it fits without fighting. */
+  function bestWiring(ids, nodes) {
+    const taken = new Set();
+    const out = [];
+    for (const c of MM.connectionsFor(ids, nodes)) {
+      const key = c.to.id + '|' + c.to.port;
+      if (taken.has(key)) continue;
+      taken.add(key);
+      out.push({ from: c.from, to: c.to, reasoning: c.reasoning });
+    }
+    return out;
+  }
+
+  /** The artifacts among some ids, each taken to its definition once. */
+  function artifactsIn(s, ids) {
+    return [...new Set(ids.filter((id) => s.artifacts.includes(id)))];
+  }
+
+  function makeFrame(sum, name) {
+    const s = session.getState();
+    const members = artifactsIn(s, sum.enclosedIds);
+    if (!members.length) return null;
+    const connections = bestWiring(members, s.nodes);
+    const at = Date.now();
+    session.dismiss(sum.id, at);
+    const id = session.frame({ ids: members, name: name || 'frame', connections: connections, at: at + 1 });
+    if (id) flash('framed ' + members.length + ' — ' + MM.describeFrame(MM.frameOfNode(s.nodes.get(id) || session.getState().nodes.get(id)), session.getState().nodes));
+    return id;
+  }
+
+  /** A frame built once, offered again: the template's connections mapped onto members with the same ports. */
+  function frameLike(sum, template) {
+    const s = session.getState();
+    const members = artifactsIn(s, sum.enclosedIds);
+    const tf = MM.frameOfNode(template);
+    const ifaces = new Map(members.map((id) => [id, MM.interfacesOf(s.nodes.get(id), s.nodes)]));
+    const connections = [];
+    for (const c of tf.connections) {
+      const src = members.find((id) => ifaces.get(id).offers.some((o) => o.id === c.from.port));
+      const dst = members.find((id) => id !== src && ifaces.get(id).accepts.some((a) => a.id === c.to.port));
+      if (src && dst) connections.push({ from: { id: src, port: c.from.port }, to: { id: dst, port: c.to.port }, reasoning: 'as in ' + (MM.wordOf(template) || template.id) });
+    }
+    const at = Date.now();
+    session.dismiss(sum.id, at);
+    return session.frame({ ids: members, name: MM.wordOf(template) || 'frame', connections: connections, at: at + 1 });
+  }
+
+  /**
+   * Frames this loop could be: by name, when writing in the loop says a
+   * frame's name; by resemblance, when a frame's members are the same kinds.
+   */
+  function frameTemplatesFor(s, ids) {
+    const members = artifactsIn(s, ids);
+    if (!members.length) return [];
+    const kindsOf = (list) => list.map((id) => { const n = s.nodes.get(id); const r = n && codeRepOf(n); return (r && r.data.kind) || (n && MM.blessedBehaviourOf(n) ? 'behaviour' : 'ink'); }).sort().join(',');
+    const mine = kindsOf(members);
+    const said = ids.map((id) => { const n = s.nodes.get(id); return n && MM.transcriptOf(n); }).filter(Boolean).map((w) => w.toLowerCase().trim());
+    const out = [];
+    for (const aid of s.artifacts) {
+      const n = s.nodes.get(aid);
+      if (!n || !MM.isFrame(n) || members.includes(aid)) continue;
+      const name = (MM.wordOf(n) || '').toLowerCase();
+      if (name && said.includes(name)) { out.push({ frame: n, how: 'name', why: 'you wrote “' + name + '” beside them' }); continue; }
+      if (kindsOf(MM.frameOfNode(n).members) === mine) out.push({ frame: n, how: 'resemblance', why: 'the same kinds of thing, wired the same way' });
+    }
+    return out;
+  }
+
+  function exportFrameFiles(id) {
+    const s = session.getState();
+    const n = s.nodes.get(id);
+    if (!n || !MM.isFrame(n)) return null;
+    return MM.exportFrame(MM.wordOf(n) || 'frame', MM.frameOfNode(n), s.nodes);
+  }
+
+  // ===== The knob: dragging it sets the value ================================
+  // A control's knob may be taken without selecting anything: the hand lands
+  // on it and slides it along the track. One `move` event when it lets go;
+  // the value is read from where the ink now stands.
+  let knobDrag = null; // { controlId, knob, track: {a, b}, start, last }
+
+  function knobAt(s, w) {
+    for (const aid of s.artifacts) {
+      const n = s.nodes.get(aid);
+      const rep = n && codeRepOf(n);
+      if (!rep || rep.data.kind !== 'control') continue;
+      const members = n.edges.filter((e) => e.rel === 'has-part').map((e) => e.to);
+      const sl = MM.sliderOf(members, s.nodes, 1 / view.zoom);
+      if (!sl) continue;
+      const kb = MM.boundsOf(s.nodes.get(sl.knob));
+      const c = { x: (kb.minX + kb.maxX) / 2, y: (kb.minY + kb.maxY) / 2 };
+      const r = Math.max(kb.maxX - kb.minX, kb.maxY - kb.minY) / 2 + wpx(10);
+      if (Math.hypot(w.x - c.x, w.y - c.y) <= r) {
+        const pts = MM.strokePointsOf(s.nodes.get(sl.track));
+        return { controlId: aid, knob: sl.knob, track: { a: pts[0], b: pts[pts.length - 1] }, centre: c };
+      }
+    }
+    return null;
+  }
+
+  function knobBegin(w) {
+    const hit = knobAt(state, w);
+    if (!hit) return false;
+    knobDrag = { ...hit, start: w, last: w };
+    canvas.style.cursor = 'ew-resize';
+    return true;
+  }
+  function knobMove(w) {
+    if (!knobDrag) return false;
+    knobDrag.last = w;
+    render(state);
+    return true;
+  }
+  /** Where the knob would land: the hand's point projected onto the track. */
+  function knobPreview() {
+    if (!knobDrag) return null;
+    const { a, b } = knobDrag.track;
+    const p = MM.alongSegment(a, b, knobDrag.last);
+    const q = { x: a.x + (b.x - a.x) * p.t, y: a.y + (b.y - a.y) * p.t };
+    return { knob: knobDrag.knob, dx: q.x - knobDrag.centre.x, dy: q.y - knobDrag.centre.y, controlId: knobDrag.controlId };
+  }
+  function knobEnd() {
+    if (!knobDrag) return false;
+    const pv = knobPreview();
+    knobDrag = null;
+    canvas.style.cursor = 'crosshair';
+    if (pv && Math.hypot(pv.dx, pv.dy) > 0.5) session.move({ ids: [pv.knob], dx: pv.dx, dy: pv.dy, at: Date.now() });
+    else render(state);
+    return true;
+  }
+
+  // ===== Rendering ==============================================================
+  /** Frames: a dashed bracket around the members, the name, and each connection as a thin wire. */
+  function renderFrames(s) {
+    for (const aid of s.artifacts) {
+      const n = s.nodes.get(aid);
+      if (!n || !MM.isFrame(n)) continue;
+      const f = MM.frameOfNode(n);
+      const bs = f.members.map((id) => MM.boundsOf(s.nodes.get(id))).filter(Boolean);
+      if (!bs.length) continue;
+      const b = union(bs);
+      const pad = wpx(22);
+      ctx.setLineDash([wpx(6), wpx(5)]);
+      ctx.strokeStyle = `rgba(${C.goldRGB},0.5)`;
+      ctx.lineWidth = wpx(1);
+      ctx.strokeRect(b.minX - pad, b.minY - pad, b.maxX - b.minX + pad * 2, b.maxY - b.minY + pad * 2);
+      ctx.setLineDash([]);
+      text((MM.wordOf(n) || 'frame') + '  ·  frame', b.minX - pad, b.minY - pad - wpx(8), C.gold);
+      const centre = (id) => { const bb = MM.boundsOf(s.nodes.get(id)); return bb ? { x: (bb.minX + bb.maxX) / 2, y: (bb.minY + bb.maxY) / 2 } : null; };
+      for (const c of f.connections) {
+        const p = centre(c.from.id), q = centre(c.to.id);
+        if (!p || !q) continue;
+        ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(q.x, q.y);
+        ctx.strokeStyle = `rgba(${C.goldRGB},0.35)`; ctx.lineWidth = wpx(1); ctx.stroke();
+        const mx = (p.x + q.x) / 2, my = (p.y + q.y) / 2;
+        text(c.from.port + ' → ' + c.to.port, mx, my - wpx(4), `rgba(${C.labelRGB},0.7)`);
+      }
+    }
+    // Controls: the value beside the knob, and the knob under a hand while it slides.
+    const pv = knobPreview();
+    for (const aid of s.artifacts) {
+      const n = s.nodes.get(aid);
+      const rep = n && codeRepOf(n);
+      if (!rep || rep.data.kind !== 'control') continue;
+      const c = MM.controlOf(n, s.nodes);
+      if (!c) continue;
+      const members = n.edges.filter((e) => e.rel === 'has-part').map((e) => e.to);
+      const sl = MM.sliderOf(members, s.nodes, 1 / view.zoom);
+      if (!sl) continue;
+      const kb = MM.boundsOf(s.nodes.get(sl.knob));
+      let kx = (kb.minX + kb.maxX) / 2, ky = (kb.minY + kb.maxY) / 2;
+      if (pv && pv.controlId === aid) {
+        kx += pv.dx; ky += pv.dy;
+        ctx.beginPath(); ctx.arc(kx, ky, Math.max(wpx(5), (kb.maxX - kb.minX) / 2), 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(${C.goldRGB},0.6)`; ctx.fill();
+      }
+      const shown = pv && pv.controlId === aid ? (() => { const p = MM.alongSegment(knobDrag.track.a, knobDrag.track.b, { x: kx, y: ky }); return c.min + (c.max - c.min) * p.t; })() : c.value;
+      text((+shown.toFixed(2)).toString(), kx + wpx(10), ky - wpx(10), C.gold);
+    }
+  }
+
 // ===== boot =====
 // Provides: the debug handle (window.__mm, what the e2e drives), subscription, restore, first render.
 // Uses: everything.
@@ -3418,6 +3715,9 @@
     resetUses: () => { for (const k of Object.keys(uses)) delete uses[k]; store.del(USES_KEY); },
     // The worker runtime, for tests: what is loaded, where each body is, what broke.
     runtime: () => ({ bodies: runtime.bodies, broken: runtime.broken, loaded: runtime.loaded, budgetMs: RUN_BUDGET_MS }),
+    // Frames, for tests: the wired code a member renders with, and a frame as files.
+    wiredCodeOf: (id) => wiredCodeOf(session.getState(), id),
+    exportFrame: (id) => exportFrameFiles(id),
     // The tank, for tests: step a definition's clock by hand and read where its bodies are.
     tank: () => ({
       defs: tank.defs,

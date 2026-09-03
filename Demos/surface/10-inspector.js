@@ -140,9 +140,30 @@
         html += clockRows(s, id);
       }
     }
+    // A frame: what it holds and how it is wired, each connection with its reason and what it carries now.
+    if (isArtifact && MM.isFrame(node)) {
+      const f = MM.frameOfNode(node);
+      const r = MM.resolveFrame(f, s.nodes);
+      html += '<div class="sep"></div><div class="eyebrow">frame</div>';
+      html += '<div class="row"><span class="k">members</span><span class="v">' + esc(f.members.map((m) => MM.wordOf(s.nodes.get(m)) || m).join(', ')) + '</span></div>';
+      if (!f.connections.length) html += '<div class="why">no connections — nothing among them offers a value another accepts</div>';
+      r.carried.forEach((c) => {
+        html += '<div class="row"><span class="k">wire</span><span class="v">' + esc((MM.wordOf(s.nodes.get(c.connection.from.id)) || c.connection.from.id) + '.' + c.connection.from.port + ' → ' + (MM.wordOf(s.nodes.get(c.connection.to.id)) || c.connection.to.id) + '.' + c.connection.to.port) +
+          (c.value !== undefined ? ' = ' + esc(typeof c.value === 'number' ? (+c.value.toFixed(3)).toString() : String(c.value)) : '') + '</span></div>';
+        if (c.connection.reasoning) html += '<div class="why">' + esc(c.connection.reasoning) + '</div>';
+      });
+      const files = exportFrameFiles(id);
+      if (files) html += '<div class="row"><span class="k">exports as</span><span class="v">' + esc(Object.keys(files).join(', ')) + '</span></div>';
+    }
+    // A control: its value is where the knob sits.
+    if (isArtifact && codes.length && (codes[codes.length - 1].data.kind === 'control')) {
+      const c = MM.controlOf(node, s.nodes);
+      html += '<div class="row"><span class="k">value</span><span class="v">' + (c ? esc((+c.value.toFixed(3)).toString() + ' of ' + c.min + '–' + c.max) : 'no knob on the track') + '</span></div>';
+      if (c) html += '<div class="why">' + esc(c.reasoning) + ' — drag the knob to set it</div>';
+    }
     // A definition without code has a clock too: play, and its instances move
     // by the built-in behaviour until words or a hand give it another.
-    if (isArtifact && !codes.length) {
+    if (isArtifact && !codes.length && !MM.isFrame(node)) {
       html += '<div class="sep"></div><div class="eyebrow">tank</div>';
       const inst = tankCount(s, id);
       html += '<div class="row"><span class="k">bodies</span><span class="v">' + inst.total + (inst.held ? ' (' + inst.held + ' held, unblessed)' : '') + '</span></div>';

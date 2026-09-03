@@ -71,6 +71,7 @@ var MetaMediumCore = (() => {
     aboutIdsOf: () => aboutIdsOf,
     addExample: () => addExample,
     addressablesOf: () => addressablesOf,
+    alongSegment: () => alongSegment,
     analyzeCornerAngles: () => analyzeCornerAngles,
     analyzeStroke: () => analyzeStroke,
     applyWalls: () => applyWalls,
@@ -100,6 +101,8 @@ var MetaMediumCore = (() => {
     commandMarkFeatures: () => commandMarkFeatures,
     compareSignatures: () => compareSignatures,
     complete: () => complete,
+    connectionsFor: () => connectionsFor,
+    controlOf: () => controlOf,
     convexHull: () => convexHull,
     countCorners: () => countCorners,
     countCrossings: () => countCrossings,
@@ -113,6 +116,7 @@ var MetaMediumCore = (() => {
     denoise: () => denoise,
     describeAddressed: () => describeAddressed,
     describeBehaviour: () => describeBehaviour,
+    describeFrame: () => describeFrame,
     describeGraph: () => describeGraph,
     describeLayout: () => describeLayout,
     describeMaths: () => describeMaths,
@@ -130,12 +134,14 @@ var MetaMediumCore = (() => {
     enclosedBy: () => enclosedBy,
     encodeLog: () => encodeLog,
     explanationOf: () => explanationOf,
+    exportFrame: () => exportFrame,
     findCorners: () => findCorners,
     findCornersWithSeparation: () => findCornersWithSeparation,
     fingerprintOf: () => fingerprintOf,
     fit: () => fit2,
     force: () => force,
     frameOf: () => frameOf,
+    frameOfNode: () => frameOfNode,
     functionsOf: () => functionsOf,
     genreOf: () => genreOf,
     getBounds: () => getBounds,
@@ -147,10 +153,12 @@ var MetaMediumCore = (() => {
     headingsOf: () => headingsOf,
     idealize: () => idealize,
     intents: () => intents,
+    interfacesOf: () => interfacesOf,
     interpretationsOf: () => interpretationsOf,
     isCanvasFile: () => isCanvasFile,
     isCheckLike: () => isCheckLike,
     isExplanation: () => isExplanation,
+    isFrame: () => isFrame,
     isGesture: () => isGesture,
     isLassoLike: () => isLassoLike,
     isLetterLike: () => isLetterLike,
@@ -176,6 +184,7 @@ var MetaMediumCore = (() => {
     normalizeStroke: () => normalizeStroke,
     otsu: () => otsu,
     outlineOf: () => outlineOf,
+    paramsOf: () => paramsOf,
     parseBehaviour: () => parseBehaviour,
     parseBehaviourReply: () => parseBehaviourReply,
     parseClause: () => parseClause,
@@ -200,6 +209,7 @@ var MetaMediumCore = (() => {
     relationsOf: () => relationsOf,
     resampleByArcLength: () => resampleByArcLength,
     resemblances: () => resemblances,
+    resolveFrame: () => resolveFrame,
     resolvesLasso: () => resolvesLasso,
     route: () => route,
     rowOf: () => rowOf,
@@ -211,6 +221,8 @@ var MetaMediumCore = (() => {
     simplifyStroke: () => simplifyStroke,
     singular: () => singular,
     sizeOf: () => sizeOf,
+    sliderOf: () => sliderOf,
+    slotsIn: () => slotsIn,
     smoothStroke: () => smoothStroke,
     snapReading: () => snapReading,
     sourcesOf: () => sourcesOf,
@@ -234,6 +246,7 @@ var MetaMediumCore = (() => {
     validateRegions: () => validateRegions,
     wallBoxes: () => wallBoxes,
     whyNotResolved: () => whyNotResolved,
+    withParams: () => withParams,
     wordConfidence: () => wordConfidence,
     wordOf: () => wordOf,
     worldOf: () => worldOf
@@ -1108,6 +1121,12 @@ var MetaMediumCore = (() => {
   }
   function behavioursOf(node) {
     return node.reps.filter((r) => r.modality === "behaviour").reverse();
+  }
+  function isFrame(node) {
+    return getRep(node, "frame") !== void 0;
+  }
+  function frameOfNode(node) {
+    return getRep(node, "frame")?.data;
   }
 
   // src/session/interpretations.ts
@@ -2009,6 +2028,508 @@ var MetaMediumCore = (() => {
     return ex;
   }
 
+  // src/kinds/address.ts
+  function addressablesOf(kind, source) {
+    switch (kind) {
+      case "js":
+        return functionsOf(source);
+      case "json":
+        return keysOf(source);
+      case "md":
+        return headingsOf(source);
+      case "svg":
+        return elementsOf(source);
+      case "text":
+        return runsOf(source);
+      default:
+        return [];
+    }
+  }
+  function matchBrace(src, open) {
+    let depth = 0, i = open;
+    while (i < src.length) {
+      const c = src[i];
+      if (c === '"' || c === "'" || c === "`") {
+        const q = c;
+        i++;
+        while (i < src.length && src[i] !== q) {
+          if (src[i] === "\\") i++;
+          if (q === "`" && src[i] === "$" && src[i + 1] === "{") {
+            const e = matchBrace(src, i + 1);
+            if (e === -1) return -1;
+            i = e;
+            continue;
+          }
+          i++;
+        }
+        i++;
+        continue;
+      }
+      if (c === "/" && src[i + 1] === "/") {
+        i = src.indexOf("\n", i);
+        if (i === -1) return -1;
+        continue;
+      }
+      if (c === "/" && src[i + 1] === "*") {
+        i = src.indexOf("*/", i);
+        if (i === -1) return -1;
+        i += 2;
+        continue;
+      }
+      if (c === "{") depth++;
+      else if (c === "}") {
+        depth--;
+        if (depth === 0) return i + 1;
+      }
+      i++;
+    }
+    return -1;
+  }
+  var DECL = /^(?:export\s+)?(?:default\s+)?(?:async\s+)?(?:(function\*?)\s+([A-Za-z_$][\w$]*)|(class)\s+([A-Za-z_$][\w$]*)|(const|let|var)\s+([A-Za-z_$][\w$]*)\s*=)/;
+  function functionsOf(src) {
+    const out = [];
+    const seen = /* @__PURE__ */ new Map();
+    let i = 0;
+    while (i < src.length) {
+      const lineEnd = src.indexOf("\n", i);
+      const line = src.slice(i, lineEnd === -1 ? src.length : lineEnd);
+      const m = DECL.exec(line);
+      if (m) {
+        const name = m[2] ?? m[4] ?? m[6];
+        const isBlock = !!(m[1] || m[3]);
+        let end;
+        if (isBlock) {
+          const open = src.indexOf("{", i);
+          end = open === -1 ? -1 : matchBrace(src, open);
+        } else {
+          end = statementEnd(src, i);
+        }
+        if (end !== -1) {
+          const n2 = (seen.get(name) ?? 0) + 1;
+          seen.set(name, n2);
+          out.push({ id: `fn:${name}${n2 > 1 ? "#" + n2 : ""}`, label: name, start: i, end, depth: 0 });
+          i = end;
+          continue;
+        }
+      }
+      if (lineEnd === -1) break;
+      i = lineEnd + 1;
+    }
+    return out;
+  }
+  function statementEnd(src, from) {
+    let depth = 0, i = from;
+    while (i < src.length) {
+      const c = src[i];
+      if (c === '"' || c === "'" || c === "`") {
+        const q = c;
+        i++;
+        while (i < src.length && src[i] !== q) {
+          if (src[i] === "\\") i++;
+          i++;
+        }
+        i++;
+        continue;
+      }
+      if (c === "/" && src[i + 1] === "/") {
+        i = src.indexOf("\n", i);
+        if (i === -1) return src.length;
+        continue;
+      }
+      if (c === "/" && src[i + 1] === "*") {
+        i = src.indexOf("*/", i);
+        if (i === -1) return src.length;
+        i += 2;
+        continue;
+      }
+      if (c === "{" || c === "(" || c === "[") depth++;
+      else if (c === "}" || c === ")" || c === "]") depth--;
+      else if (c === ";" && depth === 0) return i + 1;
+      else if (c === "\n" && depth === 0 && /^\s*\n/.test(src.slice(i + 1, i + 3))) return i + 1;
+      i++;
+    }
+    return src.length;
+  }
+  function keysOf(src, maxDepth = 3) {
+    const out = [];
+    let parsed;
+    try {
+      parsed = JSON.parse(src);
+    } catch {
+      return out;
+    }
+    const walk = (obj, path, from, depth) => {
+      if (!obj || typeof obj !== "object" || Array.isArray(obj) || depth > maxDepth) return from;
+      let cursor = from;
+      for (const key2 of Object.keys(obj)) {
+        const needle = JSON.stringify(key2);
+        const at = src.indexOf(needle + ":", cursor) !== -1 ? src.indexOf(needle + ":", cursor) : src.indexOf(needle, cursor);
+        if (at === -1) continue;
+        const valueStart = src.indexOf(":", at) + 1;
+        const end = valueEnd(src, valueStart);
+        const id = ["key", ...path, key2].join(path.length ? "." : ":").replace(/^key\./, "key:");
+        out.push({ id: path.length ? `key:${[...path, key2].join(".")}` : `key:${key2}`, label: [...path, key2].join("."), start: at, end, depth });
+        void id;
+        walk(obj[key2], [...path, key2], valueStart, depth + 1);
+        cursor = end;
+      }
+      return cursor;
+    };
+    walk(parsed, [], 0, 0);
+    return out;
+  }
+  function valueEnd(src, from) {
+    let i = from;
+    while (i < src.length && /\s/.test(src[i])) i++;
+    const c = src[i];
+    if (c === "{" || c === "[") {
+      const close = c === "{" ? "}" : "]";
+      let depth = 0;
+      for (; i < src.length; i++) {
+        const ch = src[i];
+        if (ch === '"') {
+          i++;
+          while (i < src.length && src[i] !== '"') {
+            if (src[i] === "\\") i++;
+            i++;
+          }
+          continue;
+        }
+        if (ch === c) depth++;
+        else if (ch === close) {
+          depth--;
+          if (depth === 0) return i + 1;
+        }
+      }
+      return src.length;
+    }
+    if (c === '"') {
+      i++;
+      while (i < src.length && src[i] !== '"') {
+        if (src[i] === "\\") i++;
+        i++;
+      }
+      return i + 1;
+    }
+    while (i < src.length && !/[,}\]\n]/.test(src[i])) i++;
+    return i;
+  }
+  function headingsOf(src) {
+    const out = [];
+    const re = /^(#{1,6})[ \t]+(.+?)[ \t]*#*[ \t]*$/gm;
+    const heads = [];
+    let m;
+    while (m = re.exec(src)) heads.push({ level: m[1].length, text: m[2], start: m.index });
+    const seen = /* @__PURE__ */ new Map();
+    heads.forEach((h2, i) => {
+      let end = src.length;
+      for (let j = i + 1; j < heads.length; j++) if (heads[j].level <= h2.level) {
+        end = heads[j].start;
+        break;
+      }
+      const slug = h2.text.toLowerCase().replace(/[^\w]+/g, "-").replace(/^-|-$/g, "") || "section";
+      const n2 = (seen.get(slug) ?? 0) + 1;
+      seen.set(slug, n2);
+      out.push({ id: `h:${slug}${n2 > 1 ? "#" + n2 : ""}`, label: h2.text, start: h2.start, end, depth: h2.level - 1 });
+    });
+    return out;
+  }
+  function elementsOf(source) {
+    const out = [];
+    const src = source.replace(/<!--[\s\S]*?-->/g, (c) => " ".repeat(c.length));
+    const root = src.search(/<svg[\s>]/i);
+    if (root === -1) return out;
+    const rootOpenEnd = src.indexOf(">", root);
+    if (rootOpenEnd === -1) return out;
+    const counts = /* @__PURE__ */ new Map();
+    let i = rootOpenEnd + 1, depth = 0;
+    const tag = /<\/?([A-Za-z][\w:-]*)([^>]*?)(\/?)>/g;
+    tag.lastIndex = i;
+    let m;
+    let openAt = -1, openName = "", openAttrs = "";
+    while (m = tag.exec(src)) {
+      const closing = src[m.index + 1] === "/";
+      const name = m[1], selfClosing = m[3] === "/";
+      if (closing) {
+        if (name.toLowerCase() === "svg" && depth === 0) break;
+        depth--;
+        if (depth === 0 && openAt !== -1) {
+          push(openName, openAttrs, openAt, m.index + m[0].length);
+          openAt = -1;
+        }
+        continue;
+      }
+      if (depth === 0) {
+        if (selfClosing) {
+          push(name, m[2], m.index, m.index + m[0].length);
+          continue;
+        }
+        openAt = m.index;
+        openName = name;
+        openAttrs = m[2];
+      }
+      if (!selfClosing) depth++;
+    }
+    function push(name, attrs, start, end) {
+      const idAttr = /\bid\s*=\s*"([^"]+)"/.exec(attrs)?.[1];
+      const n2 = (counts.get(name) ?? 0) + 1;
+      counts.set(name, n2);
+      out.push({ id: idAttr ? `el:${idAttr}` : `el:${name}#${n2}`, label: idAttr ?? `${name} ${n2}`, start, end, depth: 0 });
+    }
+    return out;
+  }
+  function runsOf(src) {
+    const out = [];
+    const re = /[^\n][\s\S]*?(?=\n\s*\n|$)/g;
+    let m, n2 = 0;
+    while (m = re.exec(src)) {
+      if (!m[0].trim()) continue;
+      n2++;
+      out.push({ id: `p:${n2}`, label: m[0].trim().slice(0, 40), start: m.index, end: m.index + m[0].length, depth: 0 });
+      if (m.index === re.lastIndex) re.lastIndex++;
+    }
+    return out;
+  }
+
+  // src/frames/frame.ts
+  function alongSegment(a, b, p) {
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const len2 = dx * dx + dy * dy;
+    if (len2 < 1e-9) return { t: 0, off: Math.hypot(p.x - a.x, p.y - a.y) };
+    const t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / len2));
+    const q = { x: a.x + dx * t, y: a.y + dy * t };
+    return { t, off: Math.hypot(p.x - q.x, p.y - q.y) };
+  }
+  function centreOf(node) {
+    const b = boundsOf(node);
+    return b ? { x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2 } : null;
+  }
+  function endsOf(node) {
+    const pts = strokePointsOf(node);
+    if (!pts || pts.length < 2) return null;
+    return { a: pts[0], b: pts[pts.length - 1] };
+  }
+  function topShape(node) {
+    return resemblances(node)[0]?.to.replace(/^type:/, "");
+  }
+  function sliderOf(ids, nodes, scale = 1) {
+    const members = ids.map((id) => nodes.get(id)).filter((n2) => !!n2);
+    const tracks = members.filter((n2) => topShape(n2) === "line" || topShape(n2) === "arrow");
+    const knobs = members.filter((n2) => {
+      const s = topShape(n2);
+      if (s === "dot") return true;
+      if (s !== "circle") return false;
+      const fp = fingerprintOf(n2);
+      return !!fp && fp.size / scale <= 40;
+    });
+    let best = null;
+    for (const tr of tracks) {
+      const ends = endsOf(tr);
+      if (!ends) continue;
+      for (const k of knobs) {
+        const c = centreOf(k);
+        if (!c) continue;
+        const { t, off } = alongSegment(ends.a, ends.b, c);
+        const trackLen = Math.hypot(ends.b.x - ends.a.x, ends.b.y - ends.a.y);
+        if (off > Math.max(12 * scale, trackLen * 0.12)) continue;
+        if (!best || off < best.off) best = { track: tr.id, knob: k.id, t, off };
+      }
+    }
+    if (!best) return null;
+    return { ...best, reasoning: `the knob sits ${Math.round(best.t * 100)}% along the track, ${Math.round(best.off)}px off it` };
+  }
+  function controlOf(artifact, nodes) {
+    const code = [...artifact.reps].reverse().find((r) => r.modality === "code" && r.data.kind === "control");
+    if (!code) return null;
+    let data = { min: 0, max: 1 };
+    try {
+      data = { ...data, ...JSON.parse(code.data.code) };
+    } catch {
+    }
+    const members = artifact.edges.filter((e) => e.rel === "has-part").map((e) => e.to);
+    const s = sliderOf(members, nodes);
+    if (!s) return null;
+    const value = data.min + (data.max - data.min) * s.t;
+    return { value, t: s.t, min: data.min, max: data.max, reasoning: s.reasoning };
+  }
+  var PARAM = /^(?:const|let)\s+([A-Za-z_$][\w$]*)\s*=\s*(-?\d+(?:\.\d+)?)\s*;?/;
+  function paramsOf(source) {
+    const out = [];
+    for (const f of functionsOf(source)) {
+      const text = source.slice(f.start, f.end);
+      const m = PARAM.exec(text);
+      if (!m) continue;
+      const at = text.indexOf(m[2], m[0].indexOf("=")) + f.start;
+      out.push({ name: m[1], value: Number(m[2]), start: at, end: at + m[2].length });
+    }
+    return out;
+  }
+  function withParams(source, values) {
+    const params = paramsOf(source).filter((p) => p.name in values).sort((a, b) => b.start - a.start);
+    let out = source;
+    for (const p of params) out = out.slice(0, p.start) + String(values[p.name]) + out.slice(p.end);
+    return out;
+  }
+  function slotsIn(html) {
+    const out = [];
+    const re = /data-region="([^"]+)"/g;
+    let m;
+    while (m = re.exec(html)) if (!out.includes(m[1])) out.push(m[1]);
+    return out;
+  }
+  function newestCode(node) {
+    const r = [...node.reps].reverse().find((x) => x.modality === "code");
+    if (!r) return null;
+    const d = r.data;
+    return { kind: d.kind ?? d.language ?? "html", code: d.code };
+  }
+  function interfacesOf(node, nodes) {
+    const offers = [];
+    const accepts = [];
+    const code = newestCode(node);
+    const name = wordOf(node);
+    if (code?.kind === "control") {
+      const c = controlOf(node, nodes);
+      if (c) offers.push({ id: "value", label: name ?? "value", type: "number", min: c.min, max: c.max, value: c.value });
+    } else if (code?.kind === "js") {
+      for (const p of paramsOf(code.code)) accepts.push({ id: `param:${p.name}`, label: p.name, type: "number", value: p.value });
+    } else if (code?.kind === "json") {
+      try {
+        const obj = JSON.parse(code.code);
+        for (const [k, v] of Object.entries(obj)) {
+          if (typeof v === "number") accepts.push({ id: `key:${k}`, label: k, type: "number", value: v });
+          else if (typeof v === "string") accepts.push({ id: `key:${k}`, label: k, type: "text", value: v });
+        }
+      } catch {
+      }
+    } else if (code?.kind === "html") {
+      for (const id of slotsIn(code.code)) accepts.push({ id: `slot:${id}`, label: id, type: "text" });
+    } else if (code?.kind === "text") {
+      offers.push({ id: "words", label: name ?? "words", type: "text", value: code.code });
+    }
+    const said = transcriptOf(node);
+    if (said && !offers.some((o) => o.id === "words")) offers.push({ id: "words", label: said, type: "text", value: said });
+    const b = blessedBehaviourOf(node);
+    if (b) {
+      accepts.push({ id: "speed", label: "speed", type: "number", min: 10, max: 600, value: b.speed ?? 120 });
+      b.terms.forEach((t, i) => {
+        accepts.push({ id: `term:${i}`, label: `${t.verb}${t.target ? " " + t.target : ""} weight`, type: "number", min: 0, max: 2, value: t.weight });
+      });
+    }
+    return { offers, accepts };
+  }
+  function similarity(a, b) {
+    const x = a.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim(), y = b.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+    if (!x || !y) return 0;
+    if (x === y) return 1;
+    if (x.includes(y) || y.includes(x)) return 0.8;
+    const wa = new Set(x.split(" ")), wb = new Set(y.split(" "));
+    let shared = 0;
+    for (const w2 of wa) if (wb.has(w2)) shared++;
+    return shared ? 0.6 * shared / Math.max(wa.size, wb.size) : 0;
+  }
+  function connectionsFor(ids, nodes) {
+    const ifaces = ids.map((id) => ({ id, node: nodes.get(id), iface: nodes.get(id) ? interfacesOf(nodes.get(id), nodes) : { offers: [], accepts: [] } }));
+    const out = [];
+    for (const src of ifaces) {
+      for (const o of src.iface.offers) {
+        for (const dst of ifaces) {
+          if (dst.id === src.id) continue;
+          for (const a of dst.iface.accepts) {
+            if (a.type !== o.type) continue;
+            const named2 = similarity(o.label, a.label);
+            const score = 0.5 + 0.5 * named2;
+            const why = named2 > 0 ? `${o.label} \u2192 ${a.label}: the names match` : `${o.label} \u2192 ${a.label}: a ${o.type} for a ${o.type}`;
+            out.push({ from: { id: src.id, port: o.id }, to: { id: dst.id, port: a.id }, reasoning: why, score });
+          }
+        }
+      }
+    }
+    return out.sort((p, q) => q.score - p.score);
+  }
+  function portValue(node, port, nodes) {
+    const iface = interfacesOf(node, nodes);
+    return iface.offers.find((o) => o.id === port)?.value;
+  }
+  function resolveFrame(frame, nodes) {
+    const code = {};
+    const behaviour = {};
+    const carried = [];
+    const params = {};
+    const keys = {};
+    const slots = {};
+    for (const c of frame.connections) {
+      const src = nodes.get(c.from.id), dst = nodes.get(c.to.id);
+      if (!src || !dst) continue;
+      const raw = portValue(src, c.from.port, nodes);
+      const value = typeof raw === "number" ? +raw.toFixed(4) : raw;
+      carried.push({ connection: c, value });
+      if (value === void 0) continue;
+      const [kind, name] = c.to.port.split(":");
+      if (kind === "param" && typeof value === "number") (params[dst.id] ??= {})[name] = value;
+      else if (kind === "key") (keys[dst.id] ??= {})[name] = value;
+      else if (kind === "slot") (slots[dst.id] ??= {})[name] = String(value);
+      else if (kind === "speed" && typeof value === "number") (behaviour[dst.id] ??= { weights: {} }).speed = value;
+      else if (kind === "term" && typeof value === "number") (behaviour[dst.id] ??= { weights: {} }).weights[Number(name)] = value;
+    }
+    for (const id of frame.members) {
+      const node = nodes.get(id);
+      const nc = node && newestCode(node);
+      if (!node || !nc) continue;
+      if (nc.kind === "js" && params[id]) code[id] = withParams(nc.code, params[id]);
+      if (nc.kind === "json" && keys[id]) {
+        try {
+          code[id] = JSON.stringify({ ...JSON.parse(nc.code), ...keys[id] }, null, 2);
+        } catch {
+        }
+      }
+      if (nc.kind === "html" && slots[id]) {
+        let html = nc.code;
+        for (const [region, text] of Object.entries(slots[id])) {
+          html = html.replace(new RegExp(`(<([a-z0-9]+)[^>]*data-region="${region}"[^>]*>)([\\s\\S]*?)(</\\2>)`, "i"), (_m, open, _tag, _inner, close) => `${open}${escapeHtml(text)}${close}`);
+        }
+        code[id] = html;
+      }
+    }
+    return { code, behaviour, carried };
+  }
+  function escapeHtml(s) {
+    return s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c] ?? c);
+  }
+  function describeFrame(frame, nodes) {
+    const name = (id) => wordOf(nodes.get(id)) ?? id;
+    const wires = frame.connections.map((c) => `${name(c.from.id)}.${c.from.port} \u2192 ${name(c.to.id)}.${c.to.port}`);
+    return `${frame.members.length} member${frame.members.length === 1 ? "" : "s"}` + (wires.length ? `; ${wires.join(", ")}` : "; no connections");
+  }
+  var EXT = { html: "html", js: "js", json: "json", svg: "svg", md: "md", text: "txt", control: "json" };
+  function exportFrame(frameName, frame, nodes) {
+    const resolved = resolveFrame(frame, nodes);
+    const files = {};
+    const safe = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "member";
+    const used = /* @__PURE__ */ new Map();
+    const members = [];
+    for (const id of frame.members) {
+      const node = nodes.get(id);
+      const nc = node && newestCode(node);
+      if (!node) continue;
+      const kind = nc?.kind ?? "control";
+      const base = safe(wordOf(node) ?? id);
+      const n2 = (used.get(base) ?? 0) + 1;
+      used.set(base, n2);
+      const file = `${base}${n2 > 1 ? "-" + n2 : ""}.${EXT[kind] ?? "txt"}`;
+      let content = resolved.code[id] ?? nc?.code ?? "";
+      if (kind === "control") {
+        const c = controlOf(node, nodes);
+        content = JSON.stringify({ value: c?.value ?? null, min: c?.min ?? 0, max: c?.max ?? 1 }, null, 2);
+      }
+      files[file] = content;
+      members.push({ id, file, kind });
+      if (kind === "html" && !files["index.html"]) files["index.html"] = content;
+    }
+    files["frame.json"] = JSON.stringify({ name: frameName, members, connections: frame.connections }, null, 2);
+    return files;
+  }
+
   // src/behave/verbs.ts
   var VERBS = ["wander", "seek", "flee", "home", "school", "hold", "avoid", "consume", "spawn", "drift", "expire"];
   var TARGETED = /* @__PURE__ */ new Set(["seek", "flee", "home", "school", "consume", "spawn", "expire"]);
@@ -2504,269 +3025,6 @@ var MetaMediumCore = (() => {
 return sum(
 ${lines.join("\n")}
 );`;
-  }
-
-  // src/kinds/address.ts
-  function addressablesOf(kind, source) {
-    switch (kind) {
-      case "js":
-        return functionsOf(source);
-      case "json":
-        return keysOf(source);
-      case "md":
-        return headingsOf(source);
-      case "svg":
-        return elementsOf(source);
-      case "text":
-        return runsOf(source);
-      default:
-        return [];
-    }
-  }
-  function matchBrace(src, open) {
-    let depth = 0, i = open;
-    while (i < src.length) {
-      const c = src[i];
-      if (c === '"' || c === "'" || c === "`") {
-        const q = c;
-        i++;
-        while (i < src.length && src[i] !== q) {
-          if (src[i] === "\\") i++;
-          if (q === "`" && src[i] === "$" && src[i + 1] === "{") {
-            const e = matchBrace(src, i + 1);
-            if (e === -1) return -1;
-            i = e;
-            continue;
-          }
-          i++;
-        }
-        i++;
-        continue;
-      }
-      if (c === "/" && src[i + 1] === "/") {
-        i = src.indexOf("\n", i);
-        if (i === -1) return -1;
-        continue;
-      }
-      if (c === "/" && src[i + 1] === "*") {
-        i = src.indexOf("*/", i);
-        if (i === -1) return -1;
-        i += 2;
-        continue;
-      }
-      if (c === "{") depth++;
-      else if (c === "}") {
-        depth--;
-        if (depth === 0) return i + 1;
-      }
-      i++;
-    }
-    return -1;
-  }
-  var DECL = /^(?:export\s+)?(?:default\s+)?(?:async\s+)?(?:(function\*?)\s+([A-Za-z_$][\w$]*)|(class)\s+([A-Za-z_$][\w$]*)|(const|let|var)\s+([A-Za-z_$][\w$]*)\s*=)/;
-  function functionsOf(src) {
-    const out = [];
-    const seen = /* @__PURE__ */ new Map();
-    let i = 0;
-    while (i < src.length) {
-      const lineEnd = src.indexOf("\n", i);
-      const line = src.slice(i, lineEnd === -1 ? src.length : lineEnd);
-      const m = DECL.exec(line);
-      if (m) {
-        const name = m[2] ?? m[4] ?? m[6];
-        const isBlock = !!(m[1] || m[3]);
-        let end;
-        if (isBlock) {
-          const open = src.indexOf("{", i);
-          end = open === -1 ? -1 : matchBrace(src, open);
-        } else {
-          end = statementEnd(src, i);
-        }
-        if (end !== -1) {
-          const n2 = (seen.get(name) ?? 0) + 1;
-          seen.set(name, n2);
-          out.push({ id: `fn:${name}${n2 > 1 ? "#" + n2 : ""}`, label: name, start: i, end, depth: 0 });
-          i = end;
-          continue;
-        }
-      }
-      if (lineEnd === -1) break;
-      i = lineEnd + 1;
-    }
-    return out;
-  }
-  function statementEnd(src, from) {
-    let depth = 0, i = from;
-    while (i < src.length) {
-      const c = src[i];
-      if (c === '"' || c === "'" || c === "`") {
-        const q = c;
-        i++;
-        while (i < src.length && src[i] !== q) {
-          if (src[i] === "\\") i++;
-          i++;
-        }
-        i++;
-        continue;
-      }
-      if (c === "/" && src[i + 1] === "/") {
-        i = src.indexOf("\n", i);
-        if (i === -1) return src.length;
-        continue;
-      }
-      if (c === "/" && src[i + 1] === "*") {
-        i = src.indexOf("*/", i);
-        if (i === -1) return src.length;
-        i += 2;
-        continue;
-      }
-      if (c === "{" || c === "(" || c === "[") depth++;
-      else if (c === "}" || c === ")" || c === "]") depth--;
-      else if (c === ";" && depth === 0) return i + 1;
-      else if (c === "\n" && depth === 0 && /^\s*\n/.test(src.slice(i + 1, i + 3))) return i + 1;
-      i++;
-    }
-    return src.length;
-  }
-  function keysOf(src, maxDepth = 3) {
-    const out = [];
-    let parsed;
-    try {
-      parsed = JSON.parse(src);
-    } catch {
-      return out;
-    }
-    const walk = (obj, path, from, depth) => {
-      if (!obj || typeof obj !== "object" || Array.isArray(obj) || depth > maxDepth) return from;
-      let cursor = from;
-      for (const key2 of Object.keys(obj)) {
-        const needle = JSON.stringify(key2);
-        const at = src.indexOf(needle + ":", cursor) !== -1 ? src.indexOf(needle + ":", cursor) : src.indexOf(needle, cursor);
-        if (at === -1) continue;
-        const valueStart = src.indexOf(":", at) + 1;
-        const end = valueEnd(src, valueStart);
-        const id = ["key", ...path, key2].join(path.length ? "." : ":").replace(/^key\./, "key:");
-        out.push({ id: path.length ? `key:${[...path, key2].join(".")}` : `key:${key2}`, label: [...path, key2].join("."), start: at, end, depth });
-        void id;
-        walk(obj[key2], [...path, key2], valueStart, depth + 1);
-        cursor = end;
-      }
-      return cursor;
-    };
-    walk(parsed, [], 0, 0);
-    return out;
-  }
-  function valueEnd(src, from) {
-    let i = from;
-    while (i < src.length && /\s/.test(src[i])) i++;
-    const c = src[i];
-    if (c === "{" || c === "[") {
-      const close = c === "{" ? "}" : "]";
-      let depth = 0;
-      for (; i < src.length; i++) {
-        const ch = src[i];
-        if (ch === '"') {
-          i++;
-          while (i < src.length && src[i] !== '"') {
-            if (src[i] === "\\") i++;
-            i++;
-          }
-          continue;
-        }
-        if (ch === c) depth++;
-        else if (ch === close) {
-          depth--;
-          if (depth === 0) return i + 1;
-        }
-      }
-      return src.length;
-    }
-    if (c === '"') {
-      i++;
-      while (i < src.length && src[i] !== '"') {
-        if (src[i] === "\\") i++;
-        i++;
-      }
-      return i + 1;
-    }
-    while (i < src.length && !/[,}\]\n]/.test(src[i])) i++;
-    return i;
-  }
-  function headingsOf(src) {
-    const out = [];
-    const re = /^(#{1,6})[ \t]+(.+?)[ \t]*#*[ \t]*$/gm;
-    const heads = [];
-    let m;
-    while (m = re.exec(src)) heads.push({ level: m[1].length, text: m[2], start: m.index });
-    const seen = /* @__PURE__ */ new Map();
-    heads.forEach((h2, i) => {
-      let end = src.length;
-      for (let j = i + 1; j < heads.length; j++) if (heads[j].level <= h2.level) {
-        end = heads[j].start;
-        break;
-      }
-      const slug = h2.text.toLowerCase().replace(/[^\w]+/g, "-").replace(/^-|-$/g, "") || "section";
-      const n2 = (seen.get(slug) ?? 0) + 1;
-      seen.set(slug, n2);
-      out.push({ id: `h:${slug}${n2 > 1 ? "#" + n2 : ""}`, label: h2.text, start: h2.start, end, depth: h2.level - 1 });
-    });
-    return out;
-  }
-  function elementsOf(source) {
-    const out = [];
-    const src = source.replace(/<!--[\s\S]*?-->/g, (c) => " ".repeat(c.length));
-    const root = src.search(/<svg[\s>]/i);
-    if (root === -1) return out;
-    const rootOpenEnd = src.indexOf(">", root);
-    if (rootOpenEnd === -1) return out;
-    const counts = /* @__PURE__ */ new Map();
-    let i = rootOpenEnd + 1, depth = 0;
-    const tag = /<\/?([A-Za-z][\w:-]*)([^>]*?)(\/?)>/g;
-    tag.lastIndex = i;
-    let m;
-    let openAt = -1, openName = "", openAttrs = "";
-    while (m = tag.exec(src)) {
-      const closing = src[m.index + 1] === "/";
-      const name = m[1], selfClosing = m[3] === "/";
-      if (closing) {
-        if (name.toLowerCase() === "svg" && depth === 0) break;
-        depth--;
-        if (depth === 0 && openAt !== -1) {
-          push(openName, openAttrs, openAt, m.index + m[0].length);
-          openAt = -1;
-        }
-        continue;
-      }
-      if (depth === 0) {
-        if (selfClosing) {
-          push(name, m[2], m.index, m.index + m[0].length);
-          continue;
-        }
-        openAt = m.index;
-        openName = name;
-        openAttrs = m[2];
-      }
-      if (!selfClosing) depth++;
-    }
-    function push(name, attrs, start, end) {
-      const idAttr = /\bid\s*=\s*"([^"]+)"/.exec(attrs)?.[1];
-      const n2 = (counts.get(name) ?? 0) + 1;
-      counts.set(name, n2);
-      out.push({ id: idAttr ? `el:${idAttr}` : `el:${name}#${n2}`, label: idAttr ?? `${name} ${n2}`, start, end, depth: 0 });
-    }
-    return out;
-  }
-  function runsOf(src) {
-    const out = [];
-    const re = /[^\n][\s\S]*?(?=\n\s*\n|$)/g;
-    let m, n2 = 0;
-    while (m = re.exec(src)) {
-      if (!m[0].trim()) continue;
-      n2++;
-      out.push({ id: `p:${n2}`, label: m[0].trim().slice(0, 40), start: m.index, end: m.index + m[0].length, depth: 0 });
-      if (m.index === re.lastIndex) re.lastIndex++;
-    }
-    return out;
   }
 
   // src/image/trace.ts
@@ -3737,6 +3995,35 @@ ${lines.join("\n")}
     };
   }
   var BUILTIN_CONCEPTS = [
+    {
+      // The first drawn control (ARCHITECTURE-v8 §15): a line with a dot on it
+      // is a slider, and the dot's place along the line is its value.
+      name: "slider",
+      describes: "a knob on a track",
+      conversions: [
+        { id: "control", label: "Make it a slider", tier: 0, effect: { kind: "control" }, hint: "its value is where the knob sits; drag the knob to set it" },
+        NAME
+      ],
+      match(scope) {
+        const tracks = scope.ids.filter((id) => scope.shapes[id] === "line" || scope.shapes[id] === "arrow");
+        const knobs = scope.ids.filter((id) => scope.shapes[id] === "dot" || scope.shapes[id] === "circle");
+        if (scope.ids.length !== 2 || tracks.length !== 1 || knobs.length !== 1) return null;
+        const track = scope.marks.find((m) => m.id === tracks[0]), knob = scope.marks.find((m) => m.id === knobs[0]);
+        if (!track || !knob) return null;
+        const tb = track.bounds, kb = knob.bounds;
+        const knobSize = Math.max(kb.maxX - kb.minX, kb.maxY - kb.minY);
+        const trackLen = Math.max(tb.maxX - tb.minX, tb.maxY - tb.minY);
+        if (knobSize > trackLen * 0.5) return null;
+        const engaged = scope.relations.some((r) => (r.kind === "touching" || r.kind === "crossing" || r.kind === "near" || r.kind === "contains" || r.kind === "inside") && (r.from === track.id && r.to === knob.id || r.from === knob.id && r.to === track.id));
+        if (!engaged) return null;
+        const confidence = Math.min(0.9, 0.55 + 0.35 * (1 - knobSize / trackLen));
+        return {
+          confidence,
+          reasoning: `a ${scope.shapes[knob.id]} ${Math.round(knobSize)}px across on a ${Math.round(trackLen)}px ${scope.shapes[track.id]}`,
+          roles: { track: [track.id], knob: [knob.id] }
+        };
+      }
+    },
     {
       name: "row",
       describes: "peers side by side",
@@ -4929,17 +5216,17 @@ ${pad}</${tag}>`;
       });
     }
     const SHAPE_NOT_LETTER = 0.72;
-    function topShape(n2) {
+    function topShape2(n2) {
       const top = resemblances(n2)[0];
       if (!top) return null;
       return { type: top.to.replace(/^type:/, ""), weight: top.weight ?? 0 };
     }
     function neverLetter(n2) {
-      const t = topShape(n2);
+      const t = topShape2(n2);
       return !!t && (t.type === "rectangle" || t.type === "triangle") && t.weight >= SHAPE_NOT_LETTER;
     }
     function shapeAlone(n2) {
-      const t = topShape(n2);
+      const t = topShape2(n2);
       return !!t && t.type !== "text" && t.type !== "art" && t.weight >= SHAPE_NOT_LETTER;
     }
     function letterCandidate(id, scale) {
@@ -5131,6 +5418,31 @@ ${pad}</${tag}>`;
           break;
       }
     }
+    function applyFrame(ev) {
+      const members = ev.ids.filter((id) => artifacts.includes(id) && !getRep(nodes.get(id), "erased"));
+      if (members.length < 1 || !ev.name.trim()) return null;
+      const pid = ev.participantId ?? LOCAL_PARTICIPANT;
+      const bs = members.map((id) => boundsOf(nodes.get(id))).filter((b) => !!b);
+      const union = bs.length ? getBounds(bs.flatMap((b) => [{ x: b.minX, y: b.minY }, { x: b.maxX, y: b.maxY }])) : null;
+      const frame = {
+        id: nextId("frame"),
+        reps: [
+          { modality: "word", data: ev.name.trim(), source: pid },
+          { modality: "frame", data: { members, connections: ev.connections.filter((c) => members.includes(c.from.id) && members.includes(c.to.id)) }, source: pid },
+          { modality: "signature", data: signatureOf(members), source: TIER0_PARTICIPANT },
+          ...union ? [{ modality: "bounds", data: union, source: TIER0_PARTICIPANT }] : []
+        ],
+        edges: [
+          { to: pid, rel: "made-by" },
+          ...members.map((id) => ({ to: id, rel: "refers-to", blessed: true }))
+        ],
+        capability: 0,
+        createdAt: ev.at
+      };
+      nodes.set(frame.id, frame);
+      artifacts.push(frame.id);
+      return frame.id;
+    }
     function isHuman(participantId) {
       if (participantId === LOCAL_PARTICIPANT) return true;
       const p = nodes.get(participantId);
@@ -5225,6 +5537,8 @@ ${pad}</${tag}>`;
         case "behave":
           applyBehave(ev);
           return null;
+        case "frame":
+          return applyFrame(ev);
         case "summon":
           return applySummon(ev);
         case "split":
@@ -5326,6 +5640,7 @@ ${pad}</${tag}>`;
       correct: (args) => void dispatch({ type: "correct", ...args }),
       clock: (args) => void dispatch({ type: "clock", ...args }),
       behave: (args) => void dispatch({ type: "behave", ...args }),
+      frame: (args) => dispatch({ type: "frame", ...args }),
       matchesOf: (ids) => matchesFor(ids),
       tidy: (args) => void dispatch({ type: "tidy", ...args }),
       snap: (args) => void dispatch({ type: "snap", ...args }),

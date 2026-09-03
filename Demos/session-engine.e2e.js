@@ -767,6 +767,89 @@ window.__scenario = async function(){
     if (mm.session.getState().summon) mm.session.dismiss(mm.session.getState().summon.id, Date.now());
   }
 
+  // ---- 22. A drawn slider, a frame that wires it into a script, and a frame offered again ----
+  {
+    mm.setView(1, 260 - 8200, 200 - 2000); await wait(30);
+    const W = (x, y) => mm.worldToScreen(x, y);
+    // The slider: a line with a dot a third of the way along it.
+    const a = W(8200, 2100), b = W(8500, 2100), k = W(8300, 2101);
+    t.stroke(t.line(a, b, 60));
+    t.stroke(t.circle(k.x, k.y, 3, 16));
+    const cS = W(8350, 2100);
+    t.stroke(t.circle(cS.x, cS.y, 200));
+    t.takeLoop(cS.x, cS.y, 200); await wait(60);
+    const chipsS = t.chips();
+    step('22. a line with a dot on it reads as a slider, and the palette offers to make it one', chipsS.includes('Make it a slider'), chipsS);
+    const mk = [...document.querySelectorAll('#summon .item')].find(x => /Make it a slider/.test(x.textContent));
+    if (mk) mk.click(); await wait(60);
+    const stC = mm.session.getState();
+    const ctlId = stC.artifacts[stC.artifacts.length - 1];
+    const ctl = MM.controlOf(stC.nodes.get(ctlId), stC.nodes);
+    step('22a. the control\'s value is where the knob sits: a third of the way', !!ctl && Math.abs(ctl.t - 0.333) < 0.03, ctl);
+    // A script with a tunable, beside it.
+    const p = W(8200, 2300);
+    t.stroke(t.rect(p.x, p.y, 220, 130));
+    const cJ = W(8310, 2365);
+    t.stroke(t.circle(cJ.x, cJ.y, 190));
+    t.takeLoop(cJ.x, cJ.y, 190); await wait(60);
+    const jsId = mm.session.bless({ summonId: mm.session.getState().summon.id, name: 'mover', at: Date.now() });
+    mm.session.attachCode({ participantId: MM.LOCAL_PARTICIPANT, nodeId: jsId, kind: 'js', code: 'const SPEED = 60;\nfunction steer(world) {\n  return { fx: SPEED, fy: 0 };\n}\nreturn steer(world);', at: Date.now() });
+    await wait(60);
+    // Circle both artifacts: the palette offers to frame them, with the wiring named.
+    const cF = W(8350, 2230);
+    t.stroke(t.circle(cF.x, cF.y, 330));
+    t.takeLoop(cF.x, cF.y, 330); await wait(60);
+    const frameChip = [...document.querySelectorAll('#summon .item')].find(x => /^Frame these/.test(x.textContent));
+    step('22b. circling the slider and the script offers a frame, naming the wire it would make', !!frameChip && /value → param:SPEED/.test(frameChip.title), frameChip && frameChip.title);
+    const filterF = document.querySelector('#summon input.filter');
+    if (filterF) filterF.value = 'rig';
+    if (frameChip) frameChip.click(); await wait(80);
+    const stF = mm.session.getState();
+    const frameId = stF.artifacts.find(id => MM.isFrame(stF.nodes.get(id)));
+    const fr = frameId && MM.frameOfNode(stF.nodes.get(frameId));
+    step('22c. the frame is an artifact that refers to both and carries the wire', !!fr && fr.members.length === 2 && fr.connections.length === 1 && fr.connections[0].to.port === 'param:SPEED' && MM.wordOf(stF.nodes.get(frameId)) === 'rig', fr);
+    const wired0 = mm.wiredCodeOf(jsId);
+    step('22d. the script renders and runs with the slider\'s value in place of its constant', !!wired0 && /^const SPEED = 0\.33/.test(wired0), wired0 && wired0.split('\n')[0]);
+    // Slide the knob to the end: the value follows, the wired code follows, one move event.
+    const knobId = stC.nodes.get(ctlId).edges.filter(e => e.rel === 'has-part').map(e => e.to).find(id => MM.topInterpretation(stC.nodes.get(id)) !== 'line');
+    const kc = W(8300, 2101), ke = W(8500, 2101);
+    t.stroke([{x: kc.x, y: kc.y}, {x: kc.x + 60, y: kc.y}, {x: kc.x + 130, y: kc.y + 2}, {x: ke.x, y: ke.y}]);
+    await wait(60);
+    const stK = mm.session.getState();
+    const ctl2 = MM.controlOf(stK.nodes.get(ctlId), stK.nodes);
+    const wired1 = mm.wiredCodeOf(jsId);
+    step('22e. a hand on the knob slides it; the value and the wired code follow, from one move event', !!ctl2 && ctl2.t > 0.95 && mm.session.getEvents().slice(-1)[0].type === 'move' && mm.session.getEvents().slice(-1)[0].ids[0] === knobId && /^const SPEED = (1|0\.9[5-9])/.test(wired1), { t: ctl2 && ctl2.t, last: mm.session.getEvents().slice(-1)[0].type, wired: wired1 && wired1.split('\n')[0] });
+    const fj = mm.frames.get(jsId);
+    let shown = null;
+    try { shown = fj && fj.iframe.contentDocument && fj.iframe.contentDocument.body.textContent; } catch (err) { shown = null; }
+    step('22f. …and the rendered source shows the wired value', !!shown && /SPEED = (1|0\.9)/.test(shown), shown && shown.slice(0, 60));
+    const files = mm.exportFrame(frameId);
+    step('22g. the frame exports as a folder: the wired script, the control, frame.json', !!files && Object.keys(files).sort().join(',') === 'frame.json,mover.js,slider.json' && /^const SPEED = (1|0\.9)/.test(files['mover.js']), files && Object.keys(files));
+    // A frame built once is offered again: another slider and script, circled — "Frame these like rig".
+    const a2 = W(8200, 2700), b2 = W(8500, 2700), k2 = W(8250, 2701);
+    t.stroke(t.line(a2, b2, 60)); t.stroke(t.circle(k2.x, k2.y, 3, 16));
+    const cS2 = W(8350, 2700);
+    t.stroke(t.circle(cS2.x, cS2.y, 200)); t.takeLoop(cS2.x, cS2.y, 200); await wait(60);
+    const mk2 = [...document.querySelectorAll('#summon .item')].find(x => /Make it a slider/.test(x.textContent));
+    if (mk2) mk2.click(); await wait(60);
+    const p2 = W(8200, 2900);
+    t.stroke(t.rect(p2.x, p2.y, 220, 130));
+    const cJ2 = W(8310, 2965);
+    t.stroke(t.circle(cJ2.x, cJ2.y, 190)); t.takeLoop(cJ2.x, cJ2.y, 190); await wait(60);
+    const js2 = mm.session.bless({ summonId: mm.session.getState().summon.id, name: 'mover 2', at: Date.now() });
+    mm.session.attachCode({ participantId: MM.LOCAL_PARTICIPANT, nodeId: js2, kind: 'js', code: 'const SPEED = 10;\nreturn { fx: SPEED, fy: 0 };', at: Date.now() });
+    await wait(60);
+    const cF2 = W(8350, 2830);
+    t.stroke(t.circle(cF2.x, cF2.y, 330)); t.takeLoop(cF2.x, cF2.y, 330); await wait(60);
+    const like = [...document.querySelectorAll('#summon .item')].find(x => /Frame these like “rig”/.test(x.textContent));
+    step('22h. the frame built once is offered again to the same kinds of thing, by resemblance', !!like, t.chips());
+    if (like) like.click(); await wait(80);
+    const stL = mm.session.getState();
+    const frames = stL.artifacts.filter(id => MM.isFrame(stL.nodes.get(id)));
+    const f2 = frames.length === 2 && MM.frameOfNode(stL.nodes.get(frames[1]));
+    step('22i. applying it wires the new pair the same way', !!f2 && f2.connections.length === 1 && f2.connections[0].to.port === 'param:SPEED' && /as in rig/.test(f2.connections[0].reasoning), f2);
+  }
+
   // ---- 11. Scratch-out erase ----
   mm.fitAll(); await wait(60);
   const stBefore = mm.session.getState().contentIds.length;

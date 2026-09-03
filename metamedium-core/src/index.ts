@@ -104,7 +104,11 @@ export type { DirHandleLike, FileHandleLike, FileLike, WritableLike } from './st
 export { structuralSignature, compareSignatures, matchDefinition, addExample, describeStructure, MATCH_FLOOR, DIRECTED_LINKS, SYMMETRIC_LINKS } from './session/signature';
 export type { StructuralSignature, Examples, SignatureMatch } from './session/signature';
 export type { Clock } from './session/session';
-export { blessedBehaviourOf, behavioursOf } from './session/nodes';
+export { blessedBehaviourOf, behavioursOf, isFrame, frameOfNode } from './session/nodes';
+
+// Frames: artifacts wired together by reference; the drawn slider (WP-10).
+export { sliderOf, controlOf, alongSegment, paramsOf, withParams, interfacesOf, connectionsFor, resolveFrame, describeFrame, exportFrame, slotsIn } from './frames/frame';
+export type { Port, Interface, Connection as FrameConnection, FrameRep, Resolved, ControlData } from './frames/frame';
 
 // The fourth rung — what a mark DOES: steering verbs, walls, and the fit that
 // turns an acted-out path into a behaviour (ARCHITECTURE-v8 §3, §21).

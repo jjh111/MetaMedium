@@ -298,3 +298,11 @@ export function blessedBehaviourOf(node: MMNode): (Record<string, unknown> & { t
 export function behavioursOf(node: MMNode): Rep[] {
   return node.reps.filter((r) => r.modality === 'behaviour').reverse();
 }
+
+/** A frame: an artifact that refers to other artifacts and wires them. */
+export function isFrame(node: MMNode): boolean {
+  return getRep(node, 'frame') !== undefined;
+}
+export function frameOfNode(node: MMNode): { members: string[]; connections: { from: { id: string; port: string }; to: { id: string; port: string }; reasoning?: string }[] } | undefined {
+  return getRep(node, 'frame')?.data as { members: string[]; connections: { from: { id: string; port: string }; to: { id: string; port: string }; reasoning?: string }[] } | undefined;
+}

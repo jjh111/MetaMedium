@@ -18,6 +18,13 @@
   // explicitly rather than a default that drifted.
   const frames = new Map(); // artifactId -> { wrap, iframe, codeAt }
 
+  /** A cheap content hash, so a re-render happens exactly when the code changes. */
+  function hashOf(str) {
+    let h = 2166136261;
+    for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
+    return (h >>> 0).toString(36) + ':' + str.length;
+  }
+
   function codeRepOf(node) {
     for (let i = node.reps.length - 1; i >= 0; i--) {
       if (node.reps[i].modality === 'code') return node.reps[i];
@@ -69,10 +76,13 @@
       f.wrap.classList.toggle('broken', !!runtimeBroken(id));
       f.wrap.classList.toggle('playing', !!(s.clocks[id] && s.clocks[id].playing));
 
-      const stamp = rep.data.at + ':' + Math.round(fr.w) + 'x' + Math.round(fr.h);
+      // What renders is the WIRED code when a frame feeds this member.
+      const wired = wiredCodeOf(s, id);
+      const code = wired !== null ? wired : rep.data.code;
+      const stamp = rep.data.at + ':' + Math.round(fr.w) + 'x' + Math.round(fr.h) + ':' + hashOf(code);
       if (f.codeAt !== stamp) {
         f.codeAt = stamp;
-        f.iframe.srcdoc = documentForKind(rep, fr.w, fr.h);
+        f.iframe.srcdoc = documentForKind({ data: { ...rep.data, code: code } }, fr.w, fr.h);
       }
     }
     syncRuntime(s);
