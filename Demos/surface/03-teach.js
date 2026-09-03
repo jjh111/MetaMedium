@@ -66,13 +66,22 @@
     padStroke.push({ x: e.clientX - r.left, y: e.clientY - r.top });
     drawPad();
   });
-  pad.addEventListener('pointerup', () => {
+  function endPadStroke() {
     const pts = padStroke; padStroke = null;
-    if (!pts || pts.length < 8) { drawPad(); return; }
+    if (!pts) return;
+    if (pts.length < 8) { drawPad(); return; }
     if (samples.length < MM.COMMAND_MARK_SAMPLES) samples.push(pts);
     drawPad();
     evaluateSamples();
-  });
+  }
+  pad.addEventListener('pointerup', endPadStroke);
+  pad.addEventListener('pointercancel', endPadStroke);
+  // A release that lands anywhere else — capture not taken, the pen lifted
+  // off the pad — still ends the stroke. Otherwise the pad keeps drawing
+  // wherever the pointer goes next, which is the "held pointer" that broke
+  // the first use of the pad.
+  addEventListener('pointerup', () => { if (padStroke) endPadStroke(); }, true);
+  addEventListener('pointercancel', () => { if (padStroke) endPadStroke(); }, true);
 
   function evaluateSamples() {
     const need = MM.COMMAND_MARK_SAMPLES - samples.length;

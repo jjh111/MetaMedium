@@ -409,13 +409,22 @@
     padStroke.push({ x: e.clientX - r.left, y: e.clientY - r.top });
     drawPad();
   });
-  pad.addEventListener('pointerup', () => {
+  function endPadStroke() {
     const pts = padStroke; padStroke = null;
-    if (!pts || pts.length < 8) { drawPad(); return; }
+    if (!pts) return;
+    if (pts.length < 8) { drawPad(); return; }
     if (samples.length < MM.COMMAND_MARK_SAMPLES) samples.push(pts);
     drawPad();
     evaluateSamples();
-  });
+  }
+  pad.addEventListener('pointerup', endPadStroke);
+  pad.addEventListener('pointercancel', endPadStroke);
+  // A release that lands anywhere else — capture not taken, the pen lifted
+  // off the pad — still ends the stroke. Otherwise the pad keeps drawing
+  // wherever the pointer goes next, which is the "held pointer" that broke
+  // the first use of the pad.
+  addEventListener('pointerup', () => { if (padStroke) endPadStroke(); }, true);
+  addEventListener('pointercancel', () => { if (padStroke) endPadStroke(); }, true);
 
   function evaluateSamples() {
     const need = MM.COMMAND_MARK_SAMPLES - samples.length;
@@ -1286,6 +1295,16 @@
   });
 
   canvas.addEventListener('pointerleave', () => { hoverId = null; render(state); });
+  // A release the canvas never sees — capture refused, a dialog, a second
+  // pointer — must still end whatever the hand was doing, or the next move
+  // keeps drawing with no button down.
+  addEventListener('pointerup', (e) => {
+    if (e.target === canvas) return;
+    if (knobEnd() || demoEnd()) return;
+    if (drag) { endDrag(); return; }
+    if (panning) { panning = null; canvas.style.cursor = 'crosshair'; return; }
+    if (live) { live = null; render(state); }
+  }, true);
 
   addEventListener('keydown', (e) => {
     if (e.code === 'Space' && !spaceHeld && e.target === document.body) {
@@ -1572,8 +1591,10 @@
       for (const gid of s.summon.gestureIds) {
         const g = s.nodes.get(gid);
         const role = (MM.getRep(g, 'gesture') || {}).data;
-        // The loop dissolved into the selection outline; the mark that took it up still shows.
-        if (s.selection.length && role && role.role === 'lasso') continue;
+        // The loop and the mark that took it dissolved into the selection: the
+        // command has become the outline and its handles, and showing the
+        // stroke that was the command on top of them says two things at once.
+        if (s.selection.length && role && (role.role === 'lasso' || role.role === 'command' || role.role === 'check')) continue;
         inkOf(g, { color: `rgba(${C.goldRGB},0.55)`, width: inkW * 1.5, gesture: true });
       }
     }
@@ -1827,6 +1848,27 @@
           run: () => session.bless({ summonId: sum.id, name: t.text, at: Date.now() }),
         });
       }
+      // What every selection can do with itself: go, be doubled, be copied out.
+      {
+        const marks = sum.enclosedIds.filter((id) => s.contentIds.includes(id));
+        if (marks.length) {
+          items.push({
+            key: 'erase', group: 'always', groupConf: 0, groupWhy: '',
+            label: 'Erase ' + (marks.length === 1 ? 'it' : 'these'), why: 'the ink stays in the log; undo brings it back', tier: 0,
+            run: () => { const at = Date.now(); session.dismiss(sum.id, at); marks.forEach((id) => session.erase(id, at)); flash('erased ' + marks.length + ' mark' + (marks.length === 1 ? '' : 's')); },
+          });
+          items.push({
+            key: 'duplicate', group: 'always', groupConf: 0, groupWhy: '',
+            label: 'Duplicate ' + (marks.length === 1 ? 'it' : 'these'), why: 'a copy of the ink beside it, selected — a named thing copies as its ink', tier: 0,
+            run: () => duplicateMarks(sum, marks),
+          });
+          items.push({
+            key: 'copy-svg', group: 'always', groupConf: 0, groupWhy: '',
+            label: 'Copy as SVG', why: 'the ink as paths, on the clipboard, for anywhere', tier: 0,
+            run: () => { const svg = svgOf(marks); (navigator.clipboard ? navigator.clipboard.writeText(svg) : Promise.reject()).then(() => flash('copied ' + marks.length + ' mark' + (marks.length === 1 ? '' : 's') + ' as SVG'), () => { downloadText('selection.svg', svg, 'image/svg+xml'); flash('saved selection.svg — the clipboard was not available'); }); },
+          });
+        }
+      }
       // Writing in the loop that a model has read can become text — a file of
       // words that a frame wires into a slot. Only on request: handwriting
       // stays handwriting until it is asked to be a heading.
@@ -2069,7 +2111,7 @@
     else if (g === 'written') l = 1.35;
     else if (g === 'proposed') l = 1.2 + 0.1 * c;
     else if (g === 'clean') l = 0.6 + 0.35 * c;
-    else if (g === 'always') l = { name: 0.58, keep: 0.5, make: 0.56, ask: 0.42, draw: 0.38, read: 0.52 }[item.key] || 0.4;
+    else if (g === 'always') l = { name: 0.58, keep: 0.5, make: 0.56, ask: 0.42, draw: 0.38, read: 0.52, erase: 0.55, duplicate: 0.5, 'copy-svg': 0.44, frame: 0.5 }[item.key] || 0.4;
     else l = 0.5 + 0.45 * c; // a concept's conversions
     if (item.tier === 2) l *= 0.85;
     // Learned use lifts the GENERIC verbs toward the hand that uses them. An
@@ -2428,6 +2470,32 @@
           render(session.getState());
         });
     });
+  }
+
+  /** The ink of some marks, again, beside them; the copies become the selection. */
+  function duplicateMarks(sum, ids) {
+    const s = session.getState();
+    const boxes = ids.map((id) => MM.boundsOf(s.nodes.get(id))).filter(Boolean);
+    if (!boxes.length) return;
+    const b = union(boxes);
+    const dx = (b.maxX - b.minX) + wpx(40), dy = 0;
+    const at = Date.now();
+    session.dismiss(sum.id, at);
+    const made = [];
+    let t = at + 1;
+    const copyInk = (node) => {
+      const pts = MM.strokePointsOf(node);
+      if (pts) {
+        const clean = MM.cleanPointsOf(node);
+        const src = clean || pts;
+        made.push(session.addStroke(src.map((p) => ({ x: p.x + dx, y: p.y + dy })), t++, undefined, 1 / view.zoom, { content: true }));
+        return;
+      }
+      for (const e of node.edges) if (e.rel === 'has-part') { const p = s.nodes.get(e.to); if (p && !p.reps.some((r) => r.modality === 'erased')) copyInk(p); }
+    };
+    for (const id of ids) copyInk(s.nodes.get(id));
+    if (made.length) session.select(made, t);
+    flash('duplicated ' + ids.length + ' as ' + made.length + ' stroke' + (made.length === 1 ? '' : 's'));
   }
 
   function swapToDraw(sum, btn) {
@@ -4250,8 +4318,13 @@
   // session as its log. A page's HTML, a behaviour's source and a frame's
   // bundle are exported from the panel, each by its own kind.
   function exportBoardSVG() {
+    return svgOf(session.getState().contentIds);
+  }
+
+  /** Some marks as SVG paths, the clean form where one is held, each path naming its node and reading. */
+  function svgOf(ids) {
     const s = session.getState();
-    const boxes = s.contentIds.map((id) => MM.boundsOf(s.nodes.get(id))).filter(Boolean);
+    const boxes = ids.map((id) => MM.boundsOf(s.nodes.get(id))).filter(Boolean);
     if (!boxes.length) return '<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"></svg>';
     const b = union(boxes);
     const pad = 20;
@@ -4268,7 +4341,7 @@
       if (depth > 6) return;
       for (const e of node.edges) if (e.rel === 'has-part') { const p = s.nodes.get(e.to); if (p) draw(p, depth + 1); }
     };
-    for (const id of s.contentIds) draw(s.nodes.get(id), 0);
+    for (const id of ids) { const n = s.nodes.get(id); if (n) draw(n, 0); }
     return out + '</svg>\n';
   }
 

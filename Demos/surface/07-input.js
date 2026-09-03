@@ -150,6 +150,16 @@
   });
 
   canvas.addEventListener('pointerleave', () => { hoverId = null; render(state); });
+  // A release the canvas never sees — capture refused, a dialog, a second
+  // pointer — must still end whatever the hand was doing, or the next move
+  // keeps drawing with no button down.
+  addEventListener('pointerup', (e) => {
+    if (e.target === canvas) return;
+    if (knobEnd() || demoEnd()) return;
+    if (drag) { endDrag(); return; }
+    if (panning) { panning = null; canvas.style.cursor = 'crosshair'; return; }
+    if (live) { live = null; render(state); }
+  }, true);
 
   addEventListener('keydown', (e) => {
     if (e.code === 'Space' && !spaceHeld && e.target === document.body) {

@@ -78,6 +78,27 @@
           run: () => session.bless({ summonId: sum.id, name: t.text, at: Date.now() }),
         });
       }
+      // What every selection can do with itself: go, be doubled, be copied out.
+      {
+        const marks = sum.enclosedIds.filter((id) => s.contentIds.includes(id));
+        if (marks.length) {
+          items.push({
+            key: 'erase', group: 'always', groupConf: 0, groupWhy: '',
+            label: 'Erase ' + (marks.length === 1 ? 'it' : 'these'), why: 'the ink stays in the log; undo brings it back', tier: 0,
+            run: () => { const at = Date.now(); session.dismiss(sum.id, at); marks.forEach((id) => session.erase(id, at)); flash('erased ' + marks.length + ' mark' + (marks.length === 1 ? '' : 's')); },
+          });
+          items.push({
+            key: 'duplicate', group: 'always', groupConf: 0, groupWhy: '',
+            label: 'Duplicate ' + (marks.length === 1 ? 'it' : 'these'), why: 'a copy of the ink beside it, selected — a named thing copies as its ink', tier: 0,
+            run: () => duplicateMarks(sum, marks),
+          });
+          items.push({
+            key: 'copy-svg', group: 'always', groupConf: 0, groupWhy: '',
+            label: 'Copy as SVG', why: 'the ink as paths, on the clipboard, for anywhere', tier: 0,
+            run: () => { const svg = svgOf(marks); (navigator.clipboard ? navigator.clipboard.writeText(svg) : Promise.reject()).then(() => flash('copied ' + marks.length + ' mark' + (marks.length === 1 ? '' : 's') + ' as SVG'), () => { downloadText('selection.svg', svg, 'image/svg+xml'); flash('saved selection.svg — the clipboard was not available'); }); },
+          });
+        }
+      }
       // Writing in the loop that a model has read can become text — a file of
       // words that a frame wires into a slot. Only on request: handwriting
       // stays handwriting until it is asked to be a heading.
@@ -320,7 +341,7 @@
     else if (g === 'written') l = 1.35;
     else if (g === 'proposed') l = 1.2 + 0.1 * c;
     else if (g === 'clean') l = 0.6 + 0.35 * c;
-    else if (g === 'always') l = { name: 0.58, keep: 0.5, make: 0.56, ask: 0.42, draw: 0.38, read: 0.52 }[item.key] || 0.4;
+    else if (g === 'always') l = { name: 0.58, keep: 0.5, make: 0.56, ask: 0.42, draw: 0.38, read: 0.52, erase: 0.55, duplicate: 0.5, 'copy-svg': 0.44, frame: 0.5 }[item.key] || 0.4;
     else l = 0.5 + 0.45 * c; // a concept's conversions
     if (item.tier === 2) l *= 0.85;
     // Learned use lifts the GENERIC verbs toward the hand that uses them. An
@@ -679,6 +700,32 @@
           render(session.getState());
         });
     });
+  }
+
+  /** The ink of some marks, again, beside them; the copies become the selection. */
+  function duplicateMarks(sum, ids) {
+    const s = session.getState();
+    const boxes = ids.map((id) => MM.boundsOf(s.nodes.get(id))).filter(Boolean);
+    if (!boxes.length) return;
+    const b = union(boxes);
+    const dx = (b.maxX - b.minX) + wpx(40), dy = 0;
+    const at = Date.now();
+    session.dismiss(sum.id, at);
+    const made = [];
+    let t = at + 1;
+    const copyInk = (node) => {
+      const pts = MM.strokePointsOf(node);
+      if (pts) {
+        const clean = MM.cleanPointsOf(node);
+        const src = clean || pts;
+        made.push(session.addStroke(src.map((p) => ({ x: p.x + dx, y: p.y + dy })), t++, undefined, 1 / view.zoom, { content: true }));
+        return;
+      }
+      for (const e of node.edges) if (e.rel === 'has-part') { const p = s.nodes.get(e.to); if (p && !p.reps.some((r) => r.modality === 'erased')) copyInk(p); }
+    };
+    for (const id of ids) copyInk(s.nodes.get(id));
+    if (made.length) session.select(made, t);
+    flash('duplicated ' + ids.length + ' as ' + made.length + ' stroke' + (made.length === 1 ? '' : 's'));
   }
 
   function swapToDraw(sum, btn) {

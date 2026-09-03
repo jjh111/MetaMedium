@@ -119,8 +119,13 @@
   // session as its log. A page's HTML, a behaviour's source and a frame's
   // bundle are exported from the panel, each by its own kind.
   function exportBoardSVG() {
+    return svgOf(session.getState().contentIds);
+  }
+
+  /** Some marks as SVG paths, the clean form where one is held, each path naming its node and reading. */
+  function svgOf(ids) {
     const s = session.getState();
-    const boxes = s.contentIds.map((id) => MM.boundsOf(s.nodes.get(id))).filter(Boolean);
+    const boxes = ids.map((id) => MM.boundsOf(s.nodes.get(id))).filter(Boolean);
     if (!boxes.length) return '<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"></svg>';
     const b = union(boxes);
     const pad = 20;
@@ -137,7 +142,7 @@
       if (depth > 6) return;
       for (const e of node.edges) if (e.rel === 'has-part') { const p = s.nodes.get(e.to); if (p) draw(p, depth + 1); }
     };
-    for (const id of s.contentIds) draw(s.nodes.get(id), 0);
+    for (const id of ids) { const n = s.nodes.get(id); if (n) draw(n, 0); }
     return out + '</svg>\n';
   }
 

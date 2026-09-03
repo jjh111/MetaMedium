@@ -203,8 +203,10 @@
       for (const gid of s.summon.gestureIds) {
         const g = s.nodes.get(gid);
         const role = (MM.getRep(g, 'gesture') || {}).data;
-        // The loop dissolved into the selection outline; the mark that took it up still shows.
-        if (s.selection.length && role && role.role === 'lasso') continue;
+        // The loop and the mark that took it dissolved into the selection: the
+        // command has become the outline and its handles, and showing the
+        // stroke that was the command on top of them says two things at once.
+        if (s.selection.length && role && (role.role === 'lasso' || role.role === 'command' || role.role === 'check')) continue;
         inkOf(g, { color: `rgba(${C.goldRGB},0.55)`, width: inkW * 1.5, gesture: true });
       }
     }

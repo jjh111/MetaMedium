@@ -611,6 +611,33 @@ window.__scenario = async function(){
     const stU = mm.session.getState();
     step('18d. undo brings the selection back, in place', stU.selection.length === 3 && Math.abs(MM.boundsOf(stU.nodes.get(boxes[0])).minX - after.minX) < 1e-6);
     mm.session.deselect(Date.now());
+    // The verbs a selection was missing: duplicate and erase, through the palette.
+    const c2 = W(5420, 2240);
+    t.stroke(t.circle(c2.x, c2.y, 330)); t.takeLoop(c2.x, c2.y, 330); await wait(60);
+    // The rings show what fits; the rest is a keystroke away in the field.
+    const seek = (word) => { const f = document.querySelector('#summon input.filter'); f.value = word; f.dispatchEvent(new Event('input')); return [...document.querySelectorAll('#summon .item')]; };
+    const has = (word, re) => seek(word).some(b => re.test(b.textContent));
+    step('18e. a selection offers erase, duplicate and copy', has('erase', /^Erase these/) && has('dupl', /^Duplicate these/) && has('copy', /^Copy as SVG/), t.chips());
+    const n18 = mm.session.getState().contentIds.length;
+    const dup = seek('dupl').find(b => /^Duplicate these/.test(b.textContent));
+    if (dup) dup.click(); await wait(60);
+    const stDup = mm.session.getState();
+    step('18f. duplicate makes the ink again beside the original, and the copies are the selection', stDup.contentIds.length === n18 + 3 && stDup.selection.length === 3 && stDup.selection.every(id => !boxes.includes(id)), { content: stDup.contentIds.length, selection: stDup.selection.length });
+    const copies = stDup.selection.slice();
+    mm.session.deselect(Date.now());
+    const cb = copies.map(id => MM.boundsOf(stDup.nodes.get(id))).reduce((a, b) => ({ minX: Math.min(a.minX, b.minX), minY: Math.min(a.minY, b.minY), maxX: Math.max(a.maxX, b.maxX), maxY: Math.max(a.maxY, b.maxY) }));
+    const cc = W((cb.minX + cb.maxX) / 2, (cb.minY + cb.maxY) / 2);
+    t.stroke(t.circle(cc.x, cc.y, 330)); t.takeLoop(cc.x, cc.y, 330); await wait(60);
+    const er = seek('erase').find(b => /^Erase these/.test(b.textContent));
+    if (er) er.click(); await wait(60);
+    const stEr = mm.session.getState();
+    step('18g. erase takes the copies off the board; undo brings one back', stEr.contentIds.length === n18 && copies.every(id => !stEr.contentIds.includes(id)) && (mm.session.undo(), mm.session.getState().contentIds.length === n18 + 1), { content: stEr.contentIds.length });
+    mm.session.undo(); mm.session.undo(); // the other two erases
+    mm.session.deselect(Date.now());
+    const stH = mm.session.getState();
+    // Selection stands, the loop and the mark are gone from view: the gesture strokes are not drawn while a selection stands.
+    step('18h. the copies are back', copies.every(id => stH.contentIds.includes(id)));
+    copies.forEach(id => mm.session.erase(id, Date.now()));
   }
 
   // ---- 19. A js artifact: rendered addressable, run in the worker after a play, broken when it throws ----
