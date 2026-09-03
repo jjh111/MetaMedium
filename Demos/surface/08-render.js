@@ -156,7 +156,9 @@
       const isArtifact = s.artifacts.includes(id);
       const isLive = s.live.includes(id);
       const pending = s.pendingLassoId === id;
-      const color = pending ? `rgba(${C.goldRGB},0.9)` : (isAgentNode(node) ? C.agent : C.ink);
+      // A closed stroke around marks is plain ink until the mark takes it: nothing
+      // lights up on its own. The command mark is what makes it a selection.
+      const color = isAgentNode(node) ? C.agent : C.ink;
 
       // A live artifact keeps its ink: the boxes you drew ARE the outlines of
       // what got built, and that promise is only kept by drawing them on top.
@@ -230,7 +232,7 @@
     if (s.artifacts.length) parts.push(s.artifacts.length + ' artifact' + (s.artifacts.length === 1 ? '' : 's') + (s.live.length ? ' (' + s.live.length + ' live)' : ''));
     if (agents.length) parts.push(agents.map((a) => a.config.model).join(', '));
     if (snapOffers.size) parts.push(snapOffers.size + ' read clean');
-    if (s.pendingLassoId) parts.push('loop held — cross it with ' + (s.commandMark ? 'your mark' : '✓') + ', or use the buttons beside it');
+    if (s.pendingLassoId) parts.push('cross the loop with ' + (s.commandMark ? 'your mark' : '✓') + ' to select what it holds');
     if (fresh) parts.push(flashText);
     statusEl.textContent = parts.join('  ·  ');
   }

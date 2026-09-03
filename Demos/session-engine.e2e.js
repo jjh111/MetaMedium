@@ -32,7 +32,9 @@ window.__helpers = function(){
   function scratch(x,y,w,h,passes){ passes=passes||3; let p=[]; for(let i=0;i<passes;i++){const yi=y+(passes===1?0:h*i/(passes-1)); const a={x:i%2?x+w:x,y:yi},b={x:i%2?x:x+w,y:yi}; if(i)p.push({x:a.x,y:p[p.length-1].y}); p=p.concat(line(a,b,10).slice(i?1:0));} return p; }
   function summary(){ const st=window.__mm.session.getState(); return {loose:st.contentIds.length-st.artifacts.length, artifacts:st.artifacts.length, live:st.live.length, pending:st.pendingLassoId, summon: st.summon?{enclosed:st.summon.enclosedIds.length,onArtifact:st.summon.onArtifact||null}:null, mark: st.commandMark?st.commandMark.name:null, status: document.getElementById('status').textContent}; }
   function chips(){ return [...document.querySelectorAll('#summon .item')].map(b=>b.querySelector('span').textContent.trim()); }
-  window.__t = {stroke,strokeOn,line,rect,circle,caret,check,scratch,word,summary,chips};
+  // Take a loop up the way a hand does: the active command mark drawn across its right edge.
+  function takeLoop(cx, cy, r){ const taught = !!window.__mm.session.getState().commandMark; stroke(taught ? caret(cx + r - 30, cy - 20) : check(cx + r - 35, cy - 8)); }
+  window.__t = {stroke,strokeOn,line,rect,circle,caret,check,scratch,word,summary,chips,takeLoop};
 
   // Teach the caret as the command mark, through the real pad UI.
   window.__teach = function(){
@@ -465,17 +467,18 @@ window.__scenario = async function(){
     step('15. a box drawn twelve degrees off square is still read and offered as a rectangle', tr.shape === 'rectangle' && tr.ok, tr);
     const cL = mm.worldToScreen(2530, 2160);
     t.stroke(t.circle(cL.x, cL.y, 300*z));
-    const held = document.getElementById('held');
-    step('15a. circling them shows what you circled and what you can do, before any mark', !held.hidden && /2/.test(held.textContent) && !document.getElementById('heldSnap').hidden, held.textContent);
-    document.getElementById('heldSnap').click();
+    const stH = mm.session.getState();
+    const snapBtn = document.getElementById('snapBtn');
+    step('15a. a loop around them is plain ink that waits; nothing lights up on its own, and the rail\'s Snap scopes to what it holds', stH.pendingLassoId !== null && !document.getElementById('held') && !snapBtn.hidden && /2/.test(snapBtn.textContent) && /cross the loop/.test(document.getElementById('status').textContent), { snap: snapBtn.textContent, status: document.getElementById('status').textContent });
+    snapBtn.click();
     await wait(80);
     const stS = mm.session.getState();
     const cleaned = stS.contentIds.filter(id => MM.cleanOf(stS.nodes.get(id))).length;
-    step('15b. "Draw them clean" redraws the circled marks and keeps the loop held', cleaned >= 2 && stS.pendingLassoId !== null, { cleaned, held: stS.pendingLassoId });
-    document.getElementById('heldOffer').click();
+    step('15b. Snap redraws the circled marks clean and keeps the loop waiting', cleaned >= 2 && stS.pendingLassoId !== null, { cleaned, held: stS.pendingLassoId });
+    t.takeLoop(cL.x, cL.y, 300*z);
     await wait(80);
     const stO = mm.session.getState();
-    step('15c. "What could these be?" reaches the same offer the mark gives', !!stO.summon && stO.summon.enclosedIds.length === 2 && stO.summon.scopeSource === 'lasso', stO.summon && stO.summon.scopeReasoning);
+    step('15c. the mark across the loop takes it up: the loop is a gesture now, the marks are selected, the offers open', !!stO.summon && stO.summon.enclosedIds.length === 2 && stO.summon.scopeSource === 'lasso' && stO.selection.length === 2 && !stO.contentIds.includes(stO.summon.gestureIds[0]), stO.summon && stO.summon.scopeReasoning);
     if (stO.summon) mm.session.dismiss(stO.summon.id, Date.now());
     // Auto: a box that enclosed something when drawn is a loop-in-waiting, and is still made clean once the next stroke settles it.
     mm.setSnapMode('auto');
@@ -521,7 +524,7 @@ window.__scenario = async function(){
     step('16a. the word is read as a whole by the model that can see', !!word && MM.transcriptOf(word) === 'Pricing', word && MM.transcriptsOf(word).map(x => x.text));
     const cW = W(bx.x + 150, bx.y + 70);
     t.stroke(t.circle(cW.x, cW.y, 260 * z));
-    document.getElementById('heldOffer').click();
+    t.takeLoop(cW.x, cW.y, 260 * z);
     await wait(80);
     const chipsW = t.chips();
     // Step 13 already named a box-plus-word "Pricing"; this group has the same
@@ -542,7 +545,7 @@ window.__scenario = async function(){
     trio(4200, 2100);
     const cT = W(4280, 2100);
     t.stroke(t.circle(cT.x, cT.y, 170 * z));
-    document.getElementById('heldOffer').click();
+    t.takeLoop(cT.x, cT.y, 170 * z);
     await wait(400); // the stubbed model answers the reading
     const chips = t.chips();
     const proposed = chips.find(c => /Name it “page-layout”/.test(c));
@@ -557,7 +560,7 @@ window.__scenario = async function(){
     // The correction: circle the look-alike, refuse the match, and it stays refused.
     const cU = W(4280, 2400);
     t.stroke(t.circle(cU.x, cU.y, 170 * z));
-    document.getElementById('heldOffer').click(); await wait(60);
+    t.takeLoop(cU.x, cU.y, 170 * z); await wait(60);
     const chipsC = t.chips();
     step('17c. the palette offers the match and, beside it, the refusal', chipsC.includes('It’s a page-layout') && chipsC.includes('Not a page-layout'), chipsC);
     const notBtn = [...document.querySelectorAll('#summon .item')].find(b => /Not a page-layout/.test(b.textContent));
@@ -581,7 +584,7 @@ window.__scenario = async function(){
     const boxes = mm.session.getState().contentIds.slice(-3);
     const c = W(5420, 2240);
     t.stroke(t.circle(c.x, c.y, 330));
-    document.getElementById('heldOffer').click(); await wait(60);
+    t.takeLoop(c.x, c.y, 330); await wait(60);
     const stS = mm.session.getState();
     step('18. taking the loop up selects what it held, and the loop is no longer ink', stS.selection.length === 3 && boxes.every(id => stS.selection.includes(id)) && !stS.contentIds.includes(stS.summon.gestureIds[0]), { selection: stS.selection.length });
     mm.session.dismiss(stS.summon.id, Date.now()); // close the palette; the selection stays
@@ -612,7 +615,7 @@ window.__scenario = async function(){
     t.stroke(t.rect(p.x, p.y, 220, 130));
     const c = W(6310, 2165);
     t.stroke(t.circle(c.x, c.y, 190));
-    document.getElementById('heldOffer').click(); await wait(60);
+    t.takeLoop(c.x, c.y, 190); await wait(60);
     const sumJ = mm.session.getState().summon;
     const jsId = mm.session.bless({ summonId: sumJ.id, name: 'mover', at: Date.now() });
     mm.session.attachCode({ participantId: MM.LOCAL_PARTICIPANT, nodeId: jsId, kind: 'js',
@@ -660,7 +663,7 @@ window.__scenario = async function(){
     pair(7200, 2100);
     const cA = W(7240, 2100);
     t.stroke(t.circle(cA.x, cA.y, 110));
-    document.getElementById('heldOffer').click(); await wait(60);
+    t.takeLoop(cA.x, cA.y, 110); await wait(60);
     const defId = mm.session.bless({ summonId: mm.session.getState().summon.id, name: 'A', at: Date.now() });
     // Play, then pause at once: the tank exists, and no frame has stepped it —
     // from here the test steps the clock by hand, so every position is exact.
@@ -716,11 +719,11 @@ window.__scenario = async function(){
     pair(7800, 2100);
     const cB = W(7840, 2100);
     t.stroke(t.circle(cB.x, cB.y, 110));
-    document.getElementById('heldOffer').click(); await wait(60);
+    t.takeLoop(cB.x, cB.y, 110); await wait(60);
     const defB = mm.session.bless({ summonId: mm.session.getState().summon.id, name: 'B', at: Date.now() });
     // Circle the definition and type what it does.
     t.stroke(t.circle(cB.x, cB.y, 120));
-    document.getElementById('heldOffer').click(); await wait(60);
+    t.takeLoop(cB.x, cB.y, 120); await wait(60);
     const filter = document.querySelector('#summon input.filter');
     filter.value = 'flees anything bigger, wanders slowly';
     filter.dispatchEvent(new Event('input'));
@@ -754,7 +757,7 @@ window.__scenario = async function(){
     const heldB = MM.behavioursOf(mm.session.getState().nodes.get(defB)).filter(r => !r.data.blessed);
     step('21b. the path is fitted onto the basis and held on the definition: flee the As, with the residual named', !!fitted && fitted.terms.some(x => x.verb === 'flee' || x.verb === 'avoid') && heldB.length === 1 && heldB[0].data.source === 'demo' && typeof heldB[0].data.residual === 'number', { fitted: fitted && fitted.terms, reasoning: fitted && fitted.reasoning, held: heldB.length });
     t.stroke(t.circle(cB.x, cB.y, 120));
-    document.getElementById('heldOffer').click(); await wait(60);
+    t.takeLoop(cB.x, cB.y, 120); await wait(60);
     const chipsC = t.chips();
     const offer = [...document.querySelectorAll('#summon .item')].find(b => /^B: (flee|avoid)/.test(b.textContent) && /acted out/.test(b.title));
     step('21c. the palette offers the acted-out behaviour, attributed, for the human to give in their name', !!offer, chipsC);

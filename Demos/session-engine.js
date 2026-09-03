@@ -912,7 +912,7 @@
   }
 
 // ===== snap =====
-// Provides: snapping: offers, auto sweep, the rail button, and the held-loop chip.
+// Provides: snapping: offers, auto sweep, the rail button (scoped to a loop while one waits).
 // Uses: core, view, render, input (flash).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () Ellipsis)();`. Shared state is the
@@ -984,26 +984,13 @@
     if (ids.length) session.snap({ ids: ids, at: Date.now() });
   }
 
-  // ===== The held loop: a chip that says what you circled and what you can do =
-  const heldEl = document.getElementById('held');
-  const heldText = document.getElementById('heldText');
-  const heldSnap = document.getElementById('heldSnap');
-  document.getElementById('heldOffer').onclick = (e) => { lastPen = { x: e.clientX, y: e.clientY }; session.summonHeld(Date.now()); };
-  heldSnap.onclick = () => snapAll(heldCandidates.slice(), shapesSummary(heldCandidates.map((id) => snapOffers.get(id))));
-
-  function renderHeld(s) {
-    const enclosed = heldEnclosed(s);
-    if (!s.pendingLassoId || !enclosed.length) { heldEl.hidden = true; return; }
-    const lasso = s.nodes.get(s.pendingLassoId);
-    const b = MM.boundsOf(lasso);
-    heldText.innerHTML = '<b>' + enclosed.length + '</b> circled · cross with ' + (s.commandMark ? 'your mark' : '✓') + ', or';
-    heldSnap.hidden = heldCandidates.length === 0;
-    heldSnap.textContent = 'Draw ' + (heldCandidates.length === enclosed.length ? 'them' : heldCandidates.length) + ' clean';
-    heldEl.hidden = false;
-    const p = worldToScreen(b.minX, b.maxY);
-    heldEl.style.left = Math.max(8, Math.min(p.x, innerWidth - heldEl.offsetWidth - 8)) + 'px';
-    heldEl.style.top = Math.max(8, Math.min(p.y + 12, innerHeight - heldEl.offsetHeight - 52)) + 'px';
-  }
+  // The loop that waits is plain ink. It used to raise a chip beside itself
+  // ("N circled · Draw them clean / What could these be?") the moment it was
+  // drawn — an affordance that fired on every circle, whether or not one was
+  // meant. The command mark is the one thing that turns a loop into a
+  // selection; the loop's ink then leaves in favour of the outline and its
+  // handles. What the loop scopes is the rail's Snap button, quietly.
+  function renderHeld(s) { void s; }
   snapBtn.onclick = () => {
     const ids = heldCandidates.length ? heldCandidates : [...snapOffers.keys()];
     snapAll(ids, shapesSummary(ids.map((id) => snapOffers.get(id))));
@@ -1464,7 +1451,9 @@
       const isArtifact = s.artifacts.includes(id);
       const isLive = s.live.includes(id);
       const pending = s.pendingLassoId === id;
-      const color = pending ? `rgba(${C.goldRGB},0.9)` : (isAgentNode(node) ? C.agent : C.ink);
+      // A closed stroke around marks is plain ink until the mark takes it: nothing
+      // lights up on its own. The command mark is what makes it a selection.
+      const color = isAgentNode(node) ? C.agent : C.ink;
 
       // A live artifact keeps its ink: the boxes you drew ARE the outlines of
       // what got built, and that promise is only kept by drawing them on top.
@@ -1538,7 +1527,7 @@
     if (s.artifacts.length) parts.push(s.artifacts.length + ' artifact' + (s.artifacts.length === 1 ? '' : 's') + (s.live.length ? ' (' + s.live.length + ' live)' : ''));
     if (agents.length) parts.push(agents.map((a) => a.config.model).join(', '));
     if (snapOffers.size) parts.push(snapOffers.size + ' read clean');
-    if (s.pendingLassoId) parts.push('loop held — cross it with ' + (s.commandMark ? 'your mark' : '✓') + ', or use the buttons beside it');
+    if (s.pendingLassoId) parts.push('cross the loop with ' + (s.commandMark ? 'your mark' : '✓') + ' to select what it holds');
     if (fresh) parts.push(flashText);
     statusEl.textContent = parts.join('  ·  ');
   }

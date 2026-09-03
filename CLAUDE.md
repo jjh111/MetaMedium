@@ -299,16 +299,17 @@ apart, so none overlap and wide ones make room. A tap while a palette or a
 selection is up dismisses it and is never a dot. `Demos/surface/05-selection.js`,
 `09-palette.js`.
 
-**A held loop says what you can do with it.** Circle some marks and a chip
-appears beside the loop: *N circled · cross with ✓, or* **Draw them clean** /
-**What could these be?**. The second reaches the same summon the mark does
-(`session.summonHeld`, a `summon` event); the first snaps the circled
-candidates and keeps the loop held. The mark stays the fluent path; the chip
-is the discoverable one, because a grammar nobody can find is a mode with
-extra steps. The rail's *Snap* button scopes to the circled marks while a
-loop is held, and in `auto` every open offer is taken after each stroke —
-including a closed stroke that was a loop-in-waiting until the next stroke
-settled it, which the per-stroke version silently skipped.
+**A loop that waits is plain ink.** Circle some marks and nothing lights
+up: the loop stays ink until the command mark crosses it, and then it is a
+gesture — its ink leaves in favour of the selection outline and handles, and
+the offers open. (It used to raise a chip beside itself the moment it was
+drawn, *N circled · Draw them clean / What could these be?* — an affordance
+that fired on every circle whether or not one was meant, and John called it
+what it was: a leftover.) The rail's *Snap* button quietly scopes to the
+circled marks while a loop waits, and in `auto` every open offer is taken
+after each stroke — including a closed stroke that was a loop-in-waiting
+until the next stroke settled it, which the per-stroke version silently
+skipped. `session.summonHeld` remains for surfaces that need a button.
 
 **The mark reads BACKWARDS.** Requiring a lasso before the mark can act is a
 mode wearing a different hat. The command mark looks back over
