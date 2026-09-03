@@ -29,6 +29,7 @@ A package that needs to change one stops and says so.
 | I8 | Declared content never gestures; a model's marks are declared content. | `draw.test.ts` |
 | I9 | Nothing runs unblessed. Pages keep `allow-same-origin` without scripts; `js` runs in a worker after a bless. | new, WP-8 |
 | I10 | The committed browser bundle matches a fresh build. | CI drift check |
+| I11 | **No domain concept is hard-coded anywhere in the engine or the surface.** "Fish", "coral", "food", "page", "slider" are things a *user* names; the engine knows shapes, roles, verbs, kinds and relations, and nothing else. When this plan says "fish" it is giving an example of what a user might draw and name, never a type to implement. Test fixtures use generic names (`definition A`, `target-b`); a fixture named after a domain thing is a smell. | review; grep for domain words in `src/` |
 
 **Definition of done for every package:** `npm run typecheck`, `npm test`
 (all 468+ tests) and `npm run build:browser` green; the bundle copied to
@@ -152,7 +153,7 @@ Files: `src/session/selection.ts`, events per 1.1, `session.ts` reducer cases, t
 *Done:* select three, move, scale, rotate, deselect, undo; positions and selection match the spec; I2 holds (raw points untouched).
 
 **WP-4 · The verb basis and the fit** (P, engine, pure math)
-Files: `src/behave/verbs.ts`, `src/behave/steer.ts`, `src/behave/fit.ts`, `src/behave/walls.ts` (ported from `fish-engine.js` `applyWallPhysics` with its three rules), tests per verb, a fit test that recovers a known mix from a synthetic demonstration with under 10% error, and a sparsity test (a demo explainable by two verbs fits two, not five).
+Files: `src/behave/verbs.ts`, `src/behave/steer.ts`, `src/behave/fit.ts`, `src/behave/walls.ts` (the wall rules are ported from the personal site's `fish-engine.js` `applyWallPhysics` — the *physics* is what is borrowed, not the fish; the port must not carry any size class, species or name), tests per verb, a fit test that recovers a known mix from a synthetic demonstration with under 10% error, and a sparsity test (a demo explainable by two verbs fits two, not five). Every verb takes its target as a *name supplied at run time*; there are no built-in names.
 *Done:* every verb has a force test with reasoning; `fit` recovers synthetic mixes; walls redirect rather than zero velocity; no DOM, no session imports.
 
 **WP-7 · Kinds and renderers, headless part** (P, engine)
@@ -164,7 +165,7 @@ Files: `src/image/trace.ts` — bitmap (ImageData-like) → strokes. Threshold, 
 *Done:* the fixture traces to marks the engine reads correctly; a photographed-sketch fixture (committed PNG, decoded in a test via a tiny PNG reader or a pre-decoded JSON) yields ≥ 80% of its shapes.
 
 **WP-12 · Structural signatures** (P, engine)
-Files: `src/session/signature.ts` — from histogram to a small graph (shapes + engaging relations); similarity with reasoning; `correct` event (`{type:'correct', ids, definitionId, at}`) that adds to accepted/rejected sets on the definition; tests: fish vs coral fixtures told apart after one correction.
+Files: `src/session/signature.ts` — from histogram to a small graph (shapes + engaging relations); similarity with reasoning; `correct` event (`{type:'correct', ids, definitionId, at}`) that adds to accepted/rejected sets on the definition; tests: two user-named definitions with the *same* type histogram but *different* structure (say, a circle with a triangle touching it, and a circle with two lines inside it) are told apart, and a wrong match is corrected once and stays corrected. Fixtures are named `A` and `B`; the engine never learns the words.
 *Done:* `clusterCandidates` ranks matches plurally with reasoning; the correction test passes; existing `session.scenario.test.ts` unchanged.
 
 ### Level 2 — the surface, as a weave (W, after WP-0; one at a time)
@@ -264,8 +265,9 @@ undo on a 5,000-event synthetic log runs under 50 ms. Then
 `src/store/merge.ts`: `mergeLogs(logs: Record<string, SessionEvent[]>)`
 ordered by `at`, ties by participant id, pure, with a test that merge is
 order-independent. Then WP-12 per §2: signatures as small graphs, similarity
-with reasoning, the `correct` event, the fish-vs-coral fixture told apart
-after one correction. Do not change `clusterCandidates`' shape; add a
+with reasoning, the `correct` event, two generic definitions with the same
+histogram and different structure told apart after one correction (I11:
+name the fixtures A and B, not after anything). Do not change `clusterCandidates`' shape; add a
 `reasoning` and keep `matches` plural.
 
 **Brief C (WP-4).** Build `src/behave/` per contract 1.4. Port wall physics
@@ -275,8 +277,10 @@ sustained-contact disengage) into `walls.ts` with tests that a body in
 contact with a wall is never stationary. `fit.ts` is least squares onto
 the verb basis with an L1 sweep; the sparsest fit within 10% of the best
 residual wins; the result carries `explained` per verb as reasoning. Test:
-synthesize a path from `seek food 1.0 + flee fish 1.4`, fit it, recover
-the two terms within 10% and no third term above 0.1. No DOM, no session
+synthesize a path from `seek target-a 1.0 + flee target-b 1.4` against a
+world of generically named bodies, fit it, recover the two terms within 10%
+and no third term above 0.1. Targets are names the world supplies at run
+time; nothing in `src/behave/` knows any particular name (I11). No DOM, no session
 import; `World` is a plain object.
 
 **Brief D (WP-7 then WP-9a).** Build `src/kinds/kinds.ts` (the closed

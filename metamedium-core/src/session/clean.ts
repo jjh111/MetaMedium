@@ -22,8 +22,8 @@
 
 import type { Bounds, Point } from '../types';
 import type { MMNode } from './nodes';
-import { fingerprintOf, getRep, wordOf } from './nodes';
-import { getBounds } from '../geometry';
+import { fingerprintOf, getRep, wordOf, placed } from './nodes';
+
 import { interpretationsOf } from './interpretations';
 
 export interface CleanShape {
@@ -251,19 +251,8 @@ export function cleanOf(node: MMNode): CleanShape | undefined {
 export function cleanPointsOf(node: MMNode): Point[] | undefined {
   const clean = cleanOf(node);
   if (!clean) return undefined;
-  const to = getRep(node, 'transform')?.data as Bounds | undefined;
-  if (!to) return clean.points;
-  const raw = (getRep(node, 'stroke')?.data as { points?: Point[] } | undefined)?.points;
-  if (!raw) return clean.points;
-  const from = getBounds(raw);
-  const fw = Math.max(1e-6, from.maxX - from.minX);
-  const fh = Math.max(1e-6, from.maxY - from.minY);
-  const sx = (to.maxX - to.minX) / fw;
-  const sy = (to.maxY - to.minY) / fh;
-  return clean.points.map((p) => ({
-    x: to.minX + (p.x - from.minX) * sx,
-    y: to.minY + (p.y - from.minY) * sy,
-  }));
+  if (!getRep(node, 'stroke')) return clean.points;
+  return placed(node, clean.points);
 }
 
 /** A one-line account of a mark's snap standing, for status lines and hints. */

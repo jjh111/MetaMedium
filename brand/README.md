@@ -10,8 +10,8 @@ and use the switch at the bottom right to put it on the dark canvas ground.
 | `tokens.css` | **The system.** Light tokens on `:root`, dark tokens on `:root[data-theme="dark"]`. Link it, or inline it verbatim into a single-file surface |
 | `styleguide.html` | The living specimen: foundations, palette, type, the mark, ink states, readings, UI, both grounds, an editorial page, voice |
 
-Status: **v1 draft, 3 Sept 2026.** Nothing has been migrated onto it yet — see
-*Convergence* below. Two decisions are still John's: whether the wordmark keeps
+Status: **v1 draft, 3 Sept 2026.** The whitepaper's **figures and diagrams**
+are migrated; the page around them is not — see *Convergence* below. Two decisions are still John's: whether the wordmark keeps
 its two-tone split, and how far the canvas ground travels into `Demos/` before
 the gold is retired.
 
@@ -56,7 +56,8 @@ project had one of its own. In migration order:
 
 | Surface | Carries now | Move to |
 |---|---|---|
-| `index.html` (whitepaper v5) | warm paper `#f8f6f1`, red `#e63946`, DM Sans + Space Grotesk, sketch blue/green/purple | the paper ground; the sketch colours become `--sig-*` |
+| `index.html` — **figures and diagrams** | **done.** One plate, one padding, one caption structure; six diagrams on the diagram roles, IBM Plex Mono labels, one type scale | — |
+| `index.html` — the page around them | warm paper `#f8f6f1`, red `#e63946`, DM Sans + Space Grotesk, sketch blue/green/purple | the paper ground; the sketch colours become `--sig-*` |
 | `Demos/session-engine.html` | `#0a0a0f`, gold `#c9a84c`, Space Grotesk | the canvas ground; gold retires |
 | `Demos/` others, `doodle2-canvas.html`, `metadoodle1.html` | as above | canvas ground, last |
 | `lens-canvas/`, `playground.html`, `manim-explainer/` | the personal-site language (sea-deep, cyan, gold, JetBrains Mono) | **left alone** — these are johnhanacek.com's language, not MetaMedium's |
@@ -65,3 +66,46 @@ The recognition-feedback colours the old surfaces hardcode (accepted `#0066ff`,
 pending `#666`, green/orange confidence) map onto `--sig-read`, `--sig-held`,
 `--sig-high` and `--sig-mid`. Green becomes teal on purpose: green reads as
 *pass*, and a confident reading is still only a reading.
+
+
+## What the whitepaper taught the system
+
+Applying this to `index.html` found four gaps the guide did not cover. All four
+are now in it (§11 Figures &amp; diagrams, §12 Long-form furniture):
+
+- **A figure is one component with one padding.** The old figures padded the
+  drawing `0.75rem` inside a tinted gradient and the caption `1rem/1.5rem`
+  against a border it did not share — which is exactly why the captions read as
+  bolted on. Plate and caption now share `--fig-pad` and one hairline.
+- **The label and description were not captions.** They were `div`s *inside*
+  the plate, so nothing but a sighted reader knew they described the figure.
+  They are now a real `<figcaption>` whose first child is the figure's name.
+- **A diagram needs a unit.** Six diagrams authored at 400, 700, 750 and 800
+  viewBox units picked font sizes independently, so the same role rendered
+  anywhere from 14px to 30px across the document. Every diagram is now authored
+  1000 units wide — **one unit is one pixel at `--fig-wide`** — and one drawn at
+  another width sets `--u` to *width ÷ 1000*.
+- **A diagram is drawn in the engine's own roles.** The figures were authored
+  for a dark board (light blues, navy fills, a `fill="7b8a9a"` typo rendering
+  black) and then dropped onto light paper. Rather than pick colours per figure,
+  a diagram now uses `container / node / edge / label / annotation` plus the two
+  claims a figure can make — the same vocabulary `metamedium-core/src/diagram`
+  reads. The CSS is the only place those colours live, so a diagram inherited
+  from an older palette is re-pointed by adding classes.
+
+Figures also gained a rule the canvas has no need for: **a drawing sits on the
+plate's padding, a scan bleeds to its edge.** A photograph brought its own
+margins; padding one makes a frame inside a frame.
+
+### Not done, and deliberately so
+
+The whitepaper's **prose, nav, callouts, principles, timeline, scenarios and
+footer still carry the old warm-paper palette and DM Sans.** The figure tokens
+were added under new names (`--mm-*`, `--fig-*`, `--dia-*`) precisely so the
+page could keep its own look until that migration is a decision rather than a
+side effect — mono at whitepaper length changes the reading experience of a
+published page, and that is John's call, not a refactor.
+
+One pre-existing bug found while testing and left alone: **the nav overflows by
+about 18px at 375px wide.** It is untouched by this work (the CSS is byte-identical
+to `HEAD`), and it is not a figure problem.

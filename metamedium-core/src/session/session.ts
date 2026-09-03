@@ -132,6 +132,14 @@ export interface SessionState {
   /** Artifacts carrying a 'code' rep — the ones that render and run. */
   live: string[];
   /**
+   * The marks a held loop became once it was taken up (by the mark or the
+   * chip), or that were selected outright. Transient: a hand's next content
+   * stroke clears it; undoing a `deselect` brings it back in place. It is
+   * state the human just made and can see — the one place a stroke's
+   * meaning may depend on state (a tap dismisses it and is never a dot).
+   */
+  selection: string[];
+  /**
    * Content drawn inside the recent window, oldest first — "what you were just
    * doing". The command mark reads back over this.
    */
@@ -178,6 +186,12 @@ export type SessionEvent =
       nodeId: string;
       at: number;
     }
+  | { type: 'select'; ids: string[]; at: number }
+  | { type: 'deselect'; at: number }
+  /** Direct manipulation of a selection: written as transform reps, so the ink is untouched and undo springs back. */
+  | { type: 'move'; ids: string[]; dx: number; dy: number; at: number }
+  | { type: 'scale'; ids: string[]; about: Point; sx: number; sy: number; at: number }
+  | { type: 'rotate'; ids: string[]; about: Point; radians: number; at: number }
   | { type: 'tick'; at: number }
   | { type: 'bless'; summonId: string; name?: string; suggestionId?: string; at: number; participantId?: string }
   | { type: 'dismiss'; summonId: string; at: number; participantId?: string }
@@ -362,6 +376,13 @@ export interface Session {
   summonHeld(at: number): string | null;
   /** Split a held word back into its letter strokes. */
   splitWord(nodeId: string, at: number): void;
+  /** Select marks outright (a grid view, a tap on a card). Ids not in the content plane are ignored. */
+  select(ids: string[], at: number): void;
+  deselect(at: number): void;
+  /** Move, scale or rotate marks — a hand dragging a selection. Artifacts move their members. */
+  move(args: { ids: string[]; dx: number; dy: number; at: number }): void;
+  scale(args: { ids: string[]; about: Point; sx: number; sy: number; at: number }): void;
+  rotate(args: { ids: string[]; about: Point; radians: number; at: number }): void;
   bless(args: {
     summonId: string;
     name?: string;
@@ -403,6 +424,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
   let participants: string[] = [];
   let explanations: string[] = [];
   let live: string[] = [];
+  let selection: string[] = [];
   let commandMark: CommandMark | null = config.gesture.commandMark ?? null;
   let markMiss: MarkMiss | null = null;
   let lastAt = 0;
@@ -419,6 +441,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     participants = [LOCAL_PARTICIPANT, TIER0_PARTICIPANT];
     explanations = [];
     live = [];
+    selection = [];
     commandMark = config.gesture.commandMark ?? null;
     markMiss = null;
     lastAt = 0;
@@ -611,6 +634,9 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
           regionIds: regionsOverlapping(regionsOf(nodes.get(artifactId)!, nodes), scopeBounds).map((r) => r.id),
         }
       : undefined;
+    // Taking a loop up IS selecting what it held: the summon and the
+    // selection are one act, so the palette and the handles agree.
+    selection = ids.slice();
     return {
       id: nextId('summon'),
       enclosedIds: ids,
@@ -849,7 +875,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     // --- Not a gesture: this is content. Drawing past a summon dissolves it —
     //     when it is the human drawing; a model adding a mark while the human
     //     is still choosing takes nothing away from them. ---
-    if (byHand) summon = null;
+    if (byHand) { summon = null; selection = []; }
     contentIds.push(node.id);
 
     // Multi-parse: every qualifying recognition becomes a held 'resembles' edge.
@@ -955,6 +981,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
 
     contentIds.push(artifact.id);
     artifacts.push(artifact.id);
+    selection = [artifact.id];
     summon = null;
     recomputeClusterCandidates();
     return artifact.id;
@@ -972,6 +999,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     // Ink is never destroyed: the node stays in the graph, marked erased.
     node.reps.push({ modality: 'erased', data: { at }, source: 'user' });
     removeFromContent(node.id);
+    selection = selection.filter((id) => id !== node.id);
 
     const li = live.indexOf(node.id);
     if (li >= 0) live.splice(li, 1);
@@ -1318,6 +1346,91 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     word.edges = word.edges.filter((e) => e.rel !== 'has-part');
   }
 
+  // ===== Selection and direct manipulation =====
+
+  function applySelect(ev: Extract<SessionEvent, { type: 'select' }>) {
+    selection = ev.ids.filter((id) => contentIds.includes(id));
+  }
+
+  /** The strokes a manipulation actually moves: a stroke itself, or an artifact's or word's members, recursively. */
+  function manipulable(ids: string[]): MMNode[] {
+    const out: MMNode[] = [];
+    const seen = new Set<string>();
+    const visit = (id: string) => {
+      if (seen.has(id)) return;
+      seen.add(id);
+      const n = nodes.get(id);
+      if (!n || getRep(n, 'erased')) return;
+      if (getRep(n, 'stroke')) { out.push(n); return; }
+      for (const e of n.edges) if (e.rel === 'has-part') visit(e.to);
+    };
+    ids.forEach(visit);
+    return out;
+  }
+
+  function setTransform(node: MMNode, to: Bounds) {
+    node.reps = node.reps.filter((r) => r.modality !== 'transform');
+    node.reps.push({ modality: 'transform', data: to, source: 'user' });
+  }
+
+  /** A mark's current axis-aligned frame, before rotation — the thing transform reps describe. */
+  function frameBounds(node: MMNode): Bounds | undefined {
+    const moved = getRep(node, 'transform')?.data as Bounds | undefined;
+    if (moved) return moved;
+    return fingerprintOf(node)?.bounds;
+  }
+
+  function applyMove(ev: Extract<SessionEvent, { type: 'move' }>) {
+    for (const n of manipulable(ev.ids)) {
+      const b = frameBounds(n);
+      if (!b) continue;
+      setTransform(n, { minX: b.minX + ev.dx, maxX: b.maxX + ev.dx, minY: b.minY + ev.dy, maxY: b.maxY + ev.dy });
+      refreshWordBounds(n);
+    }
+    recomputeClusterCandidates();
+  }
+
+  function applyScale(ev: Extract<SessionEvent, { type: 'scale' }>) {
+    const sx = ev.sx > 1e-3 ? ev.sx : 1e-3, sy = ev.sy > 1e-3 ? ev.sy : 1e-3;
+    for (const n of manipulable(ev.ids)) {
+      const b = frameBounds(n);
+      if (!b) continue;
+      setTransform(n, {
+        minX: ev.about.x + (b.minX - ev.about.x) * sx, maxX: ev.about.x + (b.maxX - ev.about.x) * sx,
+        minY: ev.about.y + (b.minY - ev.about.y) * sy, maxY: ev.about.y + (b.maxY - ev.about.y) * sy,
+      });
+      refreshWordBounds(n);
+    }
+    recomputeClusterCandidates();
+  }
+
+  function applyRotate(ev: Extract<SessionEvent, { type: 'rotate' }>) {
+    const c = Math.cos(ev.radians), s = Math.sin(ev.radians);
+    for (const n of manipulable(ev.ids)) {
+      const b = frameBounds(n);
+      if (!b) continue;
+      // Each mark turns about its own centre, and its centre swings about the pivot.
+      const cx = (b.minX + b.maxX) / 2, cy = (b.minY + b.maxY) / 2;
+      const nx = ev.about.x + (cx - ev.about.x) * c - (cy - ev.about.y) * s;
+      const ny = ev.about.y + (cx - ev.about.x) * s + (cy - ev.about.y) * c;
+      setTransform(n, { minX: b.minX + nx - cx, maxX: b.maxX + nx - cx, minY: b.minY + ny - cy, maxY: b.maxY + ny - cy });
+      const prev = (getRep(n, 'rotation')?.data as number | undefined) ?? 0;
+      n.reps = n.reps.filter((r) => r.modality !== 'rotation');
+      n.reps.push({ modality: 'rotation', data: prev + ev.radians, source: 'user' });
+      refreshWordBounds(n);
+    }
+    recomputeClusterCandidates();
+  }
+
+  /** A moved letter moves its word's bounds with it. */
+  function refreshWordBounds(letter: MMNode) {
+    for (const e of letter.edges) {
+      if (e.rel !== 'part-of') continue;
+      const w = nodes.get(e.to);
+      if (w && isWord(w)) setWordReps(w, lettersOf(w));
+    }
+  }
+
   function applySplit(ev: Extract<SessionEvent, { type: 'split' }>) {
     shrinkWord(ev.nodeId, null);
   }
@@ -1395,6 +1508,21 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       case 'split':
         applySplit(ev);
         return null;
+      case 'select':
+        applySelect(ev);
+        return null;
+      case 'deselect':
+        selection = [];
+        return null;
+      case 'move':
+        applyMove(ev);
+        return null;
+      case 'scale':
+        applyScale(ev);
+        return null;
+      case 'rotate':
+        applyRotate(ev);
+        return null;
       case 'tidy':
         applyTidy(ev);
         return null;
@@ -1457,6 +1585,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       markMiss,
       recentIds: recentWithin(lastAt),
       live: [...live],
+      selection: [...selection],
     };
   }
 
@@ -1519,6 +1648,11 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     tick: (at) => void dispatch({ type: 'tick', at }),
     summonHeld: (at) => dispatch({ type: 'summon', at }),
     splitWord: (nodeId, at) => void dispatch({ type: 'split', nodeId, at }),
+    select: (ids, at) => void dispatch({ type: 'select', ids, at }),
+    deselect: (at) => void dispatch({ type: 'deselect', at }),
+    move: (args) => void dispatch({ type: 'move', ...args }),
+    scale: (args) => void dispatch({ type: 'scale', ...args }),
+    rotate: (args) => void dispatch({ type: 'rotate', ...args }),
     bless: (args) => dispatch({ type: 'bless', ...args }),
     dismiss: (summonId, at) => void dispatch({ type: 'dismiss', summonId, at }),
     erase: (nodeId, at) => void dispatch({ type: 'erase', nodeId, at }),

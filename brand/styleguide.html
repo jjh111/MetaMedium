@@ -1321,6 +1321,7 @@ figure.fig.band { max-width: var(--fig-band); }
       </div>
     </div>
     <p class="note"><b>Two widths, no more:</b> <code>.wide</code> (1040px) for a diagram that needs the room, <code>.band</code> (860px) for one that reads beside the prose. Everything else stays in the measure.</p>
+    <p class="note"><b>A drawing sits on the padding; a scan bleeds.</b> Anything the system drew &mdash; an SVG diagram, a rendered canvas &mdash; sits inside the plate's padding, because its own whitespace was authored. A photograph or a scanned page runs to the plate's edge: it brought its own margins, and padding one only makes a frame inside a frame. The caption keeps its padding either way.</p>
   </div>
 </section>
 

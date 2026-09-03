@@ -175,19 +175,36 @@ export function strokePointsOf(node: MMNode): Point[] | undefined {
   const rep = getRep(node, 'stroke');
   if (!rep) return undefined;
   const points = (rep.data as { points: Point[] }).points;
-  const to = getRep(node, 'transform')?.data as Bounds | undefined;
-  if (!to) return points;
+  return placed(node, points);
+}
 
-  const from = getBounds(points);
-  const fw = Math.max(1e-6, from.maxX - from.minX);
-  const fh = Math.max(1e-6, from.maxY - from.minY);
-  const sx = (to.maxX - to.minX) / fw;
-  const sy = (to.maxY - to.minY) / fh;
-  return points.map((p) => ({
-    ...p,
-    x: to.minX + (p.x - from.minX) * sx,
-    y: to.minY + (p.y - from.minY) * sy,
-  }));
+/**
+ * Where a mark's points stand now: the raw points, fitted to the `transform`
+ * frame if there is one, then turned by the `rotation` rep about that frame's
+ * centre. Both are reps beside the ink; undo drops them and the ink is as it
+ * was. Used for the stroke and for the clean form alike, so they never
+ * disagree.
+ */
+export function placed(node: MMNode, points: Point[]): Point[] {
+  const raw = (getRep(node, 'stroke')?.data as { points: Point[] } | undefined)?.points ?? points;
+  const to = getRep(node, 'transform')?.data as Bounds | undefined;
+  const rotation = (getRep(node, 'rotation')?.data as number | undefined) ?? 0;
+  let out = points;
+  if (to) {
+    const from = getBounds(raw);
+    const fw = Math.max(1e-6, from.maxX - from.minX);
+    const fh = Math.max(1e-6, from.maxY - from.minY);
+    const sx = (to.maxX - to.minX) / fw;
+    const sy = (to.maxY - to.minY) / fh;
+    out = points.map((p) => ({ ...p, x: to.minX + (p.x - from.minX) * sx, y: to.minY + (p.y - from.minY) * sy }));
+  }
+  if (rotation) {
+    const frame = to ?? getBounds(raw);
+    const cx = (frame.minX + frame.maxX) / 2, cy = (frame.minY + frame.maxY) / 2;
+    const c = Math.cos(rotation), s = Math.sin(rotation);
+    out = out.map((p) => ({ ...p, x: cx + (p.x - cx) * c - (p.y - cy) * s, y: cy + (p.x - cx) * s + (p.y - cy) * c }));
+  }
+  return out;
 }
 
 export function wordOf(node: MMNode): string | undefined {
@@ -257,6 +274,8 @@ export function topInterpretation(node: MMNode): string | undefined {
 }
 
 export function boundsOf(node: MMNode): Bounds | undefined {
+  // A turned mark's box is the box of its turned points.
+  if (getRep(node, 'rotation') && getRep(node, 'stroke')) return getBounds(strokePointsOf(node)!);
   // A transform is where the mark IS; the fingerprint records where it was
   // drawn. Anything asking for bounds wants the former.
   const moved = getRep(node, 'transform')?.data as Bounds | undefined;

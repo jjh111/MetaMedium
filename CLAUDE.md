@@ -63,7 +63,7 @@ any structural change.
 |---|---|
 | `metamedium-core/` | **The canonical engine** (TypeScript, zero deps, tested): geometry, recognition (the shape rung), relations, the diagram rung (`src/diagram/`), concepts, the no-modes session engine, the layout and graph parsers, and the LLM transport. New recognition/engine work lands HERE |
 | `index.html` | **Interactive whitepaper v5** "MetaMedium: AI Beyond Chat" (live on GitHub Pages) |
-| `brand/` | **The visual system, one home**: `tokens.css` holds every MetaMedium colour, face and size; `styleguide.html` is the living specimen (light paper first, IBM Plex Mono throughout, teal keyword, colour as signal). v1 draft — no surface has migrated yet; `brand/README.md` carries the four laws and the convergence order |
+| `brand/` | **The visual system, one home**: `tokens.css` holds every MetaMedium colour, face, size and figure/diagram token; `styleguide.html` is the living specimen (light paper first, IBM Plex Mono throughout, teal keyword, colour as signal, §11 figures and diagrams, §12 long-form furniture). v1 draft — the whitepaper's **figures** have migrated, the page around them has not; `brand/README.md` carries the four laws, the convergence order, and what applying it to the whitepaper taught the system |
 | `doodle2-canvas.html` | **Flagship demo**: heuristic recognition, spatial graph, library, undo/redo, touch. No LLM. Single-file (~500KB) |
 | `metadoodle1.html` | Fork of flagship + tiered LLM recognition (WebLLM in-browser, LM Studio local API) + voice. Single-file (~600KB) |
 | `Web App Skeleton/` | React + Vite + TypeScript + Zustand rebuild; Claude API interpreter skeleton in `src/llm/`; recognition/spatial/matching in `src/core/` |
@@ -683,12 +683,13 @@ face** (IBM Plex Mono carries display, prose, UI and code); **colour is
 signal, not decoration** (and never an accent bar); **ink is never covered**
 (a derived form draws in front with the hand's ink visible beneath).
 
-**Status: v1 draft, 3 Sept 2026 — nothing has migrated yet.** Until a surface
-is converted it still carries what it always did:
+**Status: v1 draft, 3 Sept 2026.** The whitepaper's figures and diagrams have
+migrated; everything else still carries what it always did:
 
 | Surface | Carries today | Moves to |
 |---|---|---|
-| `index.html` (whitepaper v5) | warm paper `#f8f6f1` · ink `#1a1a2e` · red `#e63946` · sketch blue/green/purple · DM Sans + Space Grotesk | the paper ground; sketch colours become `--sig-*` |
+| `index.html` — figures/diagrams | **migrated.** One plate, one padding, one caption structure; diagrams drawn in the engine's own roles, authored 1000 units wide so a unit is a pixel, labels in IBM Plex Mono on one type scale | — |
+| `index.html` — the page around them | warm paper `#f8f6f1` · ink `#1a1a2e` · red `#e63946` · sketch blue/green/purple · DM Sans + Space Grotesk | the paper ground; sketch colours become `--sig-*` |
 | `Demos/`, flagship demos | `#0a0a0f` · `#e8e4d9` · gold `#c9a84c` · Space Grotesk | the canvas ground; the gold retires |
 | `lens-canvas/`, `manim-explainer/`, `playground.html` | `#020a12` sea-deep · cyan `#7dd8f7` · gold `#d4af37` · JetBrains Mono | **left alone** — this is johnhanacek.com's language, not MetaMedium's |
 
@@ -697,8 +698,18 @@ Recognition feedback in the unmigrated surfaces (accepted `#0066ff`, pending
 `--sig-high` and `--sig-mid`. Green becomes teal deliberately: green reads as
 *pass*, and a confident reading is still only a reading.
 
+**Figures are a component, not a per-figure decision** (`brand/styleguide.html`
+§11). A figure is a plate and a caption sharing one padding behind one hairline;
+the caption's first child names the figure. A diagram is drawn in the diagram
+rung's own roles — container, node, edge, label, annotation, plus keyword and
+machine — so its CSS classes are the only place its colours live. Diagram type
+is one scale in viewBox units (title 26, node 20, label 17, micro 14, tiny 12),
+which only works because every diagram is authored 1000 units wide.
+
 > 📌 **Pinned, still John's:** whether the wordmark keeps its two-tone split,
-> and how far the canvas ground travels into `Demos/` before the gold goes. The
+> how far the canvas ground travels into `Demos/` before the gold goes, and
+> whether the whitepaper's prose moves to IBM Plex Mono — mono at that length
+> changes how a published page reads, so it is a decision, not a refactor. The
 > whitepaper stays on paper even when it embeds a dark demo — that seam is
 > deliberate (see `WHITEPAPER-v5.1-PLAN.md`).
 

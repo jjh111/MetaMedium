@@ -136,6 +136,7 @@ var MetaMediumCore = (() => {
     parseReadings: () => parseReadings,
     parseShapes: () => parseShapes,
     parseTranscripts: () => parseTranscripts,
+    placed: () => placed,
     prepare: () => prepare,
     providerLabel: () => providerLabel,
     providerTier: () => providerTier,
@@ -966,18 +967,28 @@ var MetaMediumCore = (() => {
     const rep = getRep(node, "stroke");
     if (!rep) return void 0;
     const points = rep.data.points;
+    return placed(node, points);
+  }
+  function placed(node, points) {
+    const raw = getRep(node, "stroke")?.data?.points ?? points;
     const to = getRep(node, "transform")?.data;
-    if (!to) return points;
-    const from = getBounds(points);
-    const fw = Math.max(1e-6, from.maxX - from.minX);
-    const fh = Math.max(1e-6, from.maxY - from.minY);
-    const sx = (to.maxX - to.minX) / fw;
-    const sy = (to.maxY - to.minY) / fh;
-    return points.map((p) => ({
-      ...p,
-      x: to.minX + (p.x - from.minX) * sx,
-      y: to.minY + (p.y - from.minY) * sy
-    }));
+    const rotation = getRep(node, "rotation")?.data ?? 0;
+    let out = points;
+    if (to) {
+      const from = getBounds(raw);
+      const fw = Math.max(1e-6, from.maxX - from.minX);
+      const fh = Math.max(1e-6, from.maxY - from.minY);
+      const sx = (to.maxX - to.minX) / fw;
+      const sy = (to.maxY - to.minY) / fh;
+      out = points.map((p) => ({ ...p, x: to.minX + (p.x - from.minX) * sx, y: to.minY + (p.y - from.minY) * sy }));
+    }
+    if (rotation) {
+      const frame = to ?? getBounds(raw);
+      const cx2 = (frame.minX + frame.maxX) / 2, cy2 = (frame.minY + frame.maxY) / 2;
+      const c = Math.cos(rotation), s = Math.sin(rotation);
+      out = out.map((p) => ({ ...p, x: cx2 + (p.x - cx2) * c - (p.y - cy2) * s, y: cy2 + (p.x - cx2) * s + (p.y - cy2) * c }));
+    }
+    return out;
   }
   function wordOf(node) {
     return getRep(node, "word")?.data;
@@ -1015,6 +1026,7 @@ var MetaMediumCore = (() => {
     return top ? top.to.replace(/^type:/, "") : void 0;
   }
   function boundsOf(node) {
+    if (getRep(node, "rotation") && getRep(node, "stroke")) return getBounds(strokePointsOf(node));
     const moved = getRep(node, "transform")?.data;
     if (moved) return moved;
     const fp = fingerprintOf(node);
@@ -1290,19 +1302,8 @@ var MetaMediumCore = (() => {
   function cleanPointsOf(node) {
     const clean = cleanOf(node);
     if (!clean) return void 0;
-    const to = getRep(node, "transform")?.data;
-    if (!to) return clean.points;
-    const raw = getRep(node, "stroke")?.data?.points;
-    if (!raw) return clean.points;
-    const from = getBounds(raw);
-    const fw = Math.max(1e-6, from.maxX - from.minX);
-    const fh = Math.max(1e-6, from.maxY - from.minY);
-    const sx = (to.maxX - to.minX) / fw;
-    const sy = (to.maxY - to.minY) / fh;
-    return clean.points.map((p) => ({
-      x: to.minX + (p.x - from.minX) * sx,
-      y: to.minY + (p.y - from.minY) * sy
-    }));
+    if (!getRep(node, "stroke")) return clean.points;
+    return placed(node, clean.points);
   }
   function describeSnap(node, nodes) {
     const clean = cleanOf(node);
@@ -2859,6 +2860,7 @@ ${pad}</${tag}>`;
     let participants = [];
     let explanations = [];
     let live = [];
+    let selection = [];
     let commandMark = config.gesture.commandMark ?? null;
     let markMiss = null;
     let lastAt = 0;
@@ -2874,6 +2876,7 @@ ${pad}</${tag}>`;
       participants = [LOCAL_PARTICIPANT, TIER0_PARTICIPANT];
       explanations = [];
       live = [];
+      selection = [];
       commandMark = config.gesture.commandMark ?? null;
       markMiss = null;
       lastAt = 0;
@@ -3008,6 +3011,7 @@ ${pad}</${tag}>`;
         artifactId,
         regionIds: regionsOverlapping(regionsOf(nodes.get(artifactId), nodes), scopeBounds).map((r) => r.id)
       } : void 0;
+      selection = ids.slice();
       return {
         id: nextId("summon"),
         enclosedIds: ids,
@@ -3168,7 +3172,10 @@ ${pad}</${tag}>`;
         for (const id of scratched) eraseNode(id, at);
         return node.id;
       }
-      if (byHand) summon = null;
+      if (byHand) {
+        summon = null;
+        selection = [];
+      }
       contentIds.push(node.id);
       const analysis = analyzeStroke(points, scale);
       for (const r of analysis.results) {
@@ -3242,6 +3249,7 @@ ${pad}</${tag}>`;
       }
       contentIds.push(artifact.id);
       artifacts.push(artifact.id);
+      selection = [artifact.id];
       summon = null;
       recomputeClusterCandidates();
       return artifact.id;
@@ -3255,6 +3263,7 @@ ${pad}</${tag}>`;
       if (getRep(node, "erased")) return;
       node.reps.push({ modality: "erased", data: { at }, source: "user" });
       removeFromContent(node.id);
+      selection = selection.filter((id) => id !== node.id);
       const li = live.indexOf(node.id);
       if (li >= 0) live.splice(li, 1);
       if (pendingLasso?.id === node.id) pendingLasso = null;
@@ -3364,11 +3373,11 @@ ${pad}</${tag}>`;
         { x: t.bounds.maxX, y: t.bounds.maxY }
       ]));
       const axis = ev.axis ?? (w2(span) >= h2(span) ? "row" : "column");
-      let placed;
+      let placed2;
       if (ev.mode === "equalize") {
         const tw = Math.max(...targets.map((t) => w2(t.bounds)));
         const th = Math.max(...targets.map((t) => h2(t.bounds)));
-        placed = targets.map((t) => {
+        placed2 = targets.map((t) => {
           const cx2 = (t.bounds.minX + t.bounds.maxX) / 2;
           const cy2 = (t.bounds.minY + t.bounds.maxY) / 2;
           return { id: t.id, to: { minX: cx2 - tw / 2, maxX: cx2 + tw / 2, minY: cy2 - th / 2, maxY: cy2 + th / 2 } };
@@ -3383,7 +3392,7 @@ ${pad}</${tag}>`;
         const gap = ordered2.length > 1 ? (end - start - total) / (ordered2.length - 1) : 0;
         const cross = ordered2.reduce((acc, t) => acc + (axis === "row" ? (t.bounds.minY + t.bounds.maxY) / 2 : (t.bounds.minX + t.bounds.maxX) / 2), 0) / ordered2.length;
         let cursor = start;
-        placed = ordered2.map((t, i) => {
+        placed2 = ordered2.map((t, i) => {
           const size = sizes[i];
           const half = (axis === "row" ? h2(t.bounds) : w2(t.bounds)) / 2;
           const to = axis === "row" ? { minX: cursor, maxX: cursor + size, minY: cross - half, maxY: cross + half } : { minX: cross - half, maxX: cross + half, minY: cursor, maxY: cursor + size };
@@ -3391,7 +3400,7 @@ ${pad}</${tag}>`;
           return { id: t.id, to };
         });
       }
-      for (const p of placed) {
+      for (const p of placed2) {
         const node = nodes.get(p.id);
         node.reps = node.reps.filter((r) => r.modality !== "transform");
         node.reps.push({ modality: "transform", data: p.to, source: "engine" });
@@ -3512,6 +3521,82 @@ ${pad}</${tag}>`;
       word.reps.push({ modality: "status", data: "dissolved", source: "engine" });
       word.edges = word.edges.filter((e) => e.rel !== "has-part");
     }
+    function applySelect(ev) {
+      selection = ev.ids.filter((id) => contentIds.includes(id));
+    }
+    function manipulable(ids) {
+      const out = [];
+      const seen = /* @__PURE__ */ new Set();
+      const visit = (id) => {
+        if (seen.has(id)) return;
+        seen.add(id);
+        const n2 = nodes.get(id);
+        if (!n2 || getRep(n2, "erased")) return;
+        if (getRep(n2, "stroke")) {
+          out.push(n2);
+          return;
+        }
+        for (const e of n2.edges) if (e.rel === "has-part") visit(e.to);
+      };
+      ids.forEach(visit);
+      return out;
+    }
+    function setTransform(node, to) {
+      node.reps = node.reps.filter((r) => r.modality !== "transform");
+      node.reps.push({ modality: "transform", data: to, source: "user" });
+    }
+    function frameBounds(node) {
+      const moved = getRep(node, "transform")?.data;
+      if (moved) return moved;
+      return fingerprintOf(node)?.bounds;
+    }
+    function applyMove(ev) {
+      for (const n2 of manipulable(ev.ids)) {
+        const b = frameBounds(n2);
+        if (!b) continue;
+        setTransform(n2, { minX: b.minX + ev.dx, maxX: b.maxX + ev.dx, minY: b.minY + ev.dy, maxY: b.maxY + ev.dy });
+        refreshWordBounds(n2);
+      }
+      recomputeClusterCandidates();
+    }
+    function applyScale(ev) {
+      const sx = ev.sx > 1e-3 ? ev.sx : 1e-3, sy = ev.sy > 1e-3 ? ev.sy : 1e-3;
+      for (const n2 of manipulable(ev.ids)) {
+        const b = frameBounds(n2);
+        if (!b) continue;
+        setTransform(n2, {
+          minX: ev.about.x + (b.minX - ev.about.x) * sx,
+          maxX: ev.about.x + (b.maxX - ev.about.x) * sx,
+          minY: ev.about.y + (b.minY - ev.about.y) * sy,
+          maxY: ev.about.y + (b.maxY - ev.about.y) * sy
+        });
+        refreshWordBounds(n2);
+      }
+      recomputeClusterCandidates();
+    }
+    function applyRotate(ev) {
+      const c = Math.cos(ev.radians), s = Math.sin(ev.radians);
+      for (const n2 of manipulable(ev.ids)) {
+        const b = frameBounds(n2);
+        if (!b) continue;
+        const cx2 = (b.minX + b.maxX) / 2, cy2 = (b.minY + b.maxY) / 2;
+        const nx = ev.about.x + (cx2 - ev.about.x) * c - (cy2 - ev.about.y) * s;
+        const ny = ev.about.y + (cx2 - ev.about.x) * s + (cy2 - ev.about.y) * c;
+        setTransform(n2, { minX: b.minX + nx - cx2, maxX: b.maxX + nx - cx2, minY: b.minY + ny - cy2, maxY: b.maxY + ny - cy2 });
+        const prev = getRep(n2, "rotation")?.data ?? 0;
+        n2.reps = n2.reps.filter((r) => r.modality !== "rotation");
+        n2.reps.push({ modality: "rotation", data: prev + ev.radians, source: "user" });
+        refreshWordBounds(n2);
+      }
+      recomputeClusterCandidates();
+    }
+    function refreshWordBounds(letter) {
+      for (const e of letter.edges) {
+        if (e.rel !== "part-of") continue;
+        const w2 = nodes.get(e.to);
+        if (w2 && isWord(w2)) setWordReps(w2, lettersOf(w2));
+      }
+    }
     function applySplit(ev) {
       shrinkWord(ev.nodeId, null);
     }
@@ -3580,6 +3665,21 @@ ${pad}</${tag}>`;
         case "split":
           applySplit(ev);
           return null;
+        case "select":
+          applySelect(ev);
+          return null;
+        case "deselect":
+          selection = [];
+          return null;
+        case "move":
+          applyMove(ev);
+          return null;
+        case "scale":
+          applyScale(ev);
+          return null;
+        case "rotate":
+          applyRotate(ev);
+          return null;
         case "tidy":
           applyTidy(ev);
           return null;
@@ -3631,7 +3731,8 @@ ${pad}</${tag}>`;
         commandMark,
         markMiss,
         recentIds: recentWithin(lastAt),
-        live: [...live]
+        live: [...live],
+        selection: [...selection]
       };
     }
     function subscribe(listener) {
@@ -3689,6 +3790,11 @@ ${pad}</${tag}>`;
       tick: (at) => void dispatch({ type: "tick", at }),
       summonHeld: (at) => dispatch({ type: "summon", at }),
       splitWord: (nodeId, at) => void dispatch({ type: "split", nodeId, at }),
+      select: (ids, at) => void dispatch({ type: "select", ids, at }),
+      deselect: (at) => void dispatch({ type: "deselect", at }),
+      move: (args) => void dispatch({ type: "move", ...args }),
+      scale: (args) => void dispatch({ type: "scale", ...args }),
+      rotate: (args) => void dispatch({ type: "rotate", ...args }),
       bless: (args) => dispatch({ type: "bless", ...args }),
       dismiss: (summonId, at) => void dispatch({ type: "dismiss", summonId, at }),
       erase: (nodeId, at) => void dispatch({ type: "erase", nodeId, at }),

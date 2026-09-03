@@ -41,6 +41,7 @@ export {
   getRep,
   fingerprintOf,
   strokePointsOf,
+  placed,
   wordOf,
   isGesture,
   isParticipant,
