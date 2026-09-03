@@ -246,11 +246,12 @@
   }
 
   /** Where the rings sit: at the pen, pulled in so the outer ring stays on screen and off the panel. */
+  function ringsShown() { return Math.min(innerWidth, innerHeight) < 600 ? 2 : RINGS.length; }
   function placeOrigin() {
     // On a small screen the rings shrink, but never so far that pills collide;
     // the outer rings may run off the edge, and typing still finds them.
     const scale = Math.max(0.72, Math.min(1, (Math.min(innerWidth, innerHeight) - 24) / (2 * RADII[RADII.length - 1] + 120)));
-    const rMax = RADII[RADII.length - 1] * scale + 70;
+    const rMax = RADII[ringsShown() - 1] * scale + 70;
     let x = lastPen ? lastPen.x : innerWidth / 2, y = lastPen ? lastPen.y : innerHeight / 2;
     x = Math.max(rMax, Math.min(innerWidth - rMax, x));
     y = Math.max(rMax, Math.min(innerHeight - rMax - 30, y));
@@ -367,7 +368,7 @@
     const origin = paletteOrigin || { x: innerWidth / 2, y: innerHeight / 2 };
     let i = 0;
     // A phone has room for the two inner rings; the rest is a keystroke away.
-    const maxRings = Math.min(innerWidth, innerHeight) < 600 ? 2 : RINGS.length;
+    const maxRings = ringsShown();
     for (let ring = 0; ring < maxRings && i < shown.length; ring++) {
       const n = Math.min(RINGS[ring], shown.length - i);
       const slots = ringSlots(ring, n, RADII[ring] * scale, origin);

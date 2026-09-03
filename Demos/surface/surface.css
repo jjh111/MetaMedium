@@ -235,6 +235,7 @@ body.panelHidden #inspector { display: none; }
   .controls button { padding: 9px 12px; } /* a finger, not a pointer */
   .controls .zoomRow, #resetBtn, #snapMode { display: none; } /* pinch zooms; the rest is noise on a phone */
   #held { flex-wrap: wrap; white-space: normal; max-width: calc(100vw - 16px); gap: 6px 8px; }
+  #summon.blob .item .why { display: none; } /* no room for the reason on a phone's pill; it is in the title */
   #held .heldText { flex-basis: 100%; }
   .legend { display: none; }
   .status { bottom: 10px; font-size: 10px; }
