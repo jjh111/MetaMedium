@@ -37,23 +37,31 @@ var MetaMediumCore = (() => {
     DEFAULT_SPEED: () => DEFAULT_SPEED,
     DEFAULT_TIMEOUT_MS: () => DEFAULT_TIMEOUT_MS,
     DIRECTED_LINKS: () => DIRECTED_LINKS,
+    FolderStore: () => FolderStore,
     HAND_RESOLUTION_PX: () => HAND_RESOLUTION_PX,
     KINDS: () => KINDS,
     LETTER_MAX_HEIGHT_PX: () => LETTER_MAX_HEIGHT_PX,
     LOCAL_PARTICIPANT: () => LOCAL_PARTICIPANT,
     LOCAL_TIMEOUT_MS: () => LOCAL_TIMEOUT_MS,
+    LOG_DIR: () => LOG_DIR,
+    LOG_EXT: () => LOG_EXT,
+    MANIFEST_PATH: () => MANIFEST_PATH,
     MATCH_FLOOR: () => MATCH_FLOOR,
     MAX_DRAWN: () => MAX_DRAWN,
     MAX_READINGS: () => MAX_READINGS,
     MAX_TIER0_CONFIDENCE: () => MAX_TIER0_CONFIDENCE,
+    META_DIR: () => META_DIR,
     MIN_CONFIDENCE: () => MIN_CONFIDENCE,
+    MemoryStore: () => MemoryStore,
     PRESETS: () => PRESETS,
     ROLES: () => ROLES,
+    ReadOnlyError: () => ReadOnlyError,
     SETTLED_CONFIDENCE: () => SETTLED_CONFIDENCE,
     SNAPPABLE: () => SNAPPABLE,
     SNAP_CONFIDENCE: () => SNAP_CONFIDENCE,
     SNAP_MARGIN: () => SNAP_MARGIN,
     SYMMETRIC_LINKS: () => SYMMETRIC_LINKS,
+    StaticStore: () => StaticStore,
     TARGETED: () => TARGETED,
     TIER0_PARTICIPANT: () => TIER0_PARTICIPANT,
     VERBS: () => VERBS,
@@ -96,6 +104,7 @@ var MetaMediumCore = (() => {
     createExplanationNode: () => createExplanationNode,
     createParticipantNode: () => createParticipantNode,
     createSession: () => createSession,
+    decodeLog: () => decodeLog,
     denoise: () => denoise,
     describeAddressed: () => describeAddressed,
     describeGraph: () => describeGraph,
@@ -113,6 +122,7 @@ var MetaMediumCore = (() => {
     disagreement: () => disagreement,
     elementsOf: () => elementsOf,
     enclosedBy: () => enclosedBy,
+    encodeLog: () => encodeLog,
     explanationOf: () => explanationOf,
     findCorners: () => findCorners,
     findCornersWithSeparation: () => findCornersWithSeparation,
@@ -132,6 +142,7 @@ var MetaMediumCore = (() => {
     idealize: () => idealize,
     intents: () => intents,
     interpretationsOf: () => interpretationsOf,
+    isCanvasFile: () => isCanvasFile,
     isCheckLike: () => isCheckLike,
     isExplanation: () => isExplanation,
     isGesture: () => isGesture,
@@ -146,6 +157,7 @@ var MetaMediumCore = (() => {
     learnCommandMark: () => learnCommandMark,
     lettersOf: () => lettersOf,
     listModels: () => listModels,
+    logPathFor: () => logPathFor,
     luminance: () => luminance,
     matchBrace: () => matchBrace,
     matchConcepts: () => matchConcepts,
@@ -165,6 +177,7 @@ var MetaMediumCore = (() => {
     parseReadings: () => parseReadings,
     parseShapes: () => parseShapes,
     parseTranscripts: () => parseTranscripts,
+    participantOfLog: () => participantOfLog,
     placed: () => placed,
     prepare: () => prepare,
     providerLabel: () => providerLabel,
@@ -200,6 +213,8 @@ var MetaMediumCore = (() => {
     structuralSignature: () => structuralSignature,
     textOf: () => textOf,
     thin: () => thin,
+    toBytes: () => toBytes,
+    toText: () => toText,
     topInterpretation: () => topInterpretation,
     trace: () => trace,
     tracePaths: () => tracePaths,
@@ -1603,6 +1618,278 @@ var MetaMediumCore = (() => {
     return "at" in ev && typeof ev.at === "number" ? ev.at : 0;
   }
 
+  // src/kinds/kinds.ts
+  var KINDS = [
+    { kind: "html", extensions: ["html", "htm"], mime: "text/html", renderer: "page", addressing: "regions", textual: true },
+    { kind: "js", extensions: ["js", "mjs", "ts"], mime: "text/javascript", renderer: "source", addressing: "functions", textual: true },
+    { kind: "json", extensions: ["json"], mime: "application/json", renderer: "tree", addressing: "keys", textual: true },
+    { kind: "svg", extensions: ["svg"], mime: "image/svg+xml", renderer: "vector", addressing: "elements", textual: true },
+    { kind: "md", extensions: ["md", "markdown"], mime: "text/markdown", renderer: "prose", addressing: "headings", textual: true },
+    { kind: "png", extensions: ["png"], mime: "image/png", renderer: "image", addressing: "pixels", textual: false },
+    { kind: "jpg", extensions: ["jpg", "jpeg"], mime: "image/jpeg", renderer: "image", addressing: "pixels", textual: false },
+    { kind: "text", extensions: ["txt"], mime: "text/plain", renderer: "text", addressing: "runs", textual: true },
+    { kind: "control", extensions: [], mime: "application/json", renderer: "control", addressing: "value", textual: true }
+  ];
+  function kindOf(path) {
+    const ext = (path.split(".").pop() ?? "").toLowerCase();
+    if (!ext || ext === path.toLowerCase()) return void 0;
+    return KINDS.find((k) => k.extensions.includes(ext));
+  }
+  function rowOf(kind) {
+    return KINDS.find((k) => k.kind === kind);
+  }
+
+  // src/store/seam.ts
+  var META_DIR = ".metamedium";
+  var LOG_DIR = `${META_DIR}/logs`;
+  var LOG_EXT = ".jsonl";
+  function logPathFor(participant) {
+    const safe = participant.replace(/[^A-Za-z0-9._-]+/g, "_");
+    return `${LOG_DIR}/${safe}${LOG_EXT}`;
+  }
+  function participantOfLog(path) {
+    if (!path.startsWith(LOG_DIR + "/") || !path.endsWith(LOG_EXT)) return null;
+    return path.slice(LOG_DIR.length + 1, -LOG_EXT.length);
+  }
+  function encodeLog(events) {
+    return events.map((ev) => JSON.stringify(ev)).join("\n") + (events.length ? "\n" : "");
+  }
+  function decodeLog(text) {
+    const events = [];
+    let skipped = 0;
+    for (const line of text.split("\n")) {
+      const l = line.trim();
+      if (!l) continue;
+      try {
+        events.push(JSON.parse(l));
+      } catch {
+        skipped++;
+      }
+    }
+    return { events, skipped };
+  }
+  function isCanvasFile(path) {
+    if (path === META_DIR || path.startsWith(META_DIR + "/")) return null;
+    const parts = path.split("/");
+    if (parts.some((p) => p.startsWith(".") && p !== META_DIR)) return null;
+    const row = kindOf(path);
+    return row ? { path, kind: row.kind } : null;
+  }
+  var encoder = new TextEncoder();
+  var decoder = new TextDecoder();
+  function toBytes(data) {
+    return typeof data === "string" ? encoder.encode(data) : data;
+  }
+  function toText(data) {
+    return typeof data === "string" ? data : decoder.decode(data);
+  }
+  var ReadOnlyError = class extends Error {
+    constructor(what) {
+      super(`${what}: this store is read-only`);
+      this.name = "ReadOnlyError";
+    }
+  };
+  var MemoryStore = class {
+    constructor(seed = {}, opts = {}) {
+      this.files = /* @__PURE__ */ new Map();
+      for (const [path, data] of Object.entries(seed)) this.files.set(path, toBytes(data));
+      this.readOnly = !!opts.readOnly;
+    }
+    capabilities() {
+      return { write: !this.readOnly, watch: false };
+    }
+    async list() {
+      const out = [];
+      for (const [path, bytes] of this.files) {
+        const e = isCanvasFile(path);
+        if (e) out.push({ ...e, size: bytes.length });
+      }
+      return out.sort((a, b) => a.path < b.path ? -1 : a.path > b.path ? 1 : 0);
+    }
+    async read(path) {
+      const bytes = this.files.get(path);
+      if (!bytes) throw new Error(`${path}: not in the folder`);
+      const row = kindOf(path);
+      return row && !row.textual ? bytes : toText(bytes);
+    }
+    async write(path, data) {
+      if (this.readOnly) throw new ReadOnlyError(`write ${path}`);
+      this.files.set(path, toBytes(data));
+    }
+    async appendLog(participant, events) {
+      if (this.readOnly) throw new ReadOnlyError(`append to ${participant}'s log`);
+      if (events.length === 0) return;
+      const path = logPathFor(participant);
+      const prev = this.files.get(path);
+      const next = encoder.encode(encodeLog(events));
+      if (!prev) {
+        this.files.set(path, next);
+        return;
+      }
+      const joined = new Uint8Array(prev.length + next.length);
+      joined.set(prev, 0);
+      joined.set(next, prev.length);
+      this.files.set(path, joined);
+    }
+    async readLogs() {
+      const out = {};
+      for (const [path, bytes] of this.files) {
+        const who = participantOfLog(path);
+        if (who) out[who] = decodeLog(toText(bytes)).events;
+      }
+      return out;
+    }
+    /** Every path held, logs included — for tests and for export. */
+    paths() {
+      return [...this.files.keys()].sort();
+    }
+  };
+
+  // src/store/static.ts
+  var MANIFEST_PATH = `${META_DIR}/manifest.json`;
+  var StaticStore = class {
+    constructor(base, fetcher) {
+      this.base = base;
+      this.fetcher = fetcher;
+      this.manifest = null;
+      if (!this.base.endsWith("/")) this.base += "/";
+    }
+    capabilities() {
+      return { write: false, watch: false };
+    }
+    url(path) {
+      return this.base + path.split("/").map(encodeURIComponent).join("/");
+    }
+    async loadManifest() {
+      if (!this.manifest) {
+        this.manifest = (async () => {
+          const r = await this.fetcher(this.url(MANIFEST_PATH));
+          if (!r.ok) throw new Error(`${MANIFEST_PATH}: ${r.status} \u2014 a static canvas needs its manifest`);
+          const m = JSON.parse(await r.text());
+          return { files: Array.isArray(m.files) ? m.files.filter((f) => typeof f === "string") : [] };
+        })();
+      }
+      return this.manifest;
+    }
+    async list() {
+      const m = await this.loadManifest();
+      const out = [];
+      for (const path of m.files) {
+        const e = isCanvasFile(path);
+        if (e) out.push(e);
+      }
+      return out.sort((a, b) => a.path < b.path ? -1 : a.path > b.path ? 1 : 0);
+    }
+    async read(path) {
+      const r = await this.fetcher(this.url(path));
+      if (!r.ok) throw new Error(`${path}: ${r.status}`);
+      const row = kindOf(path);
+      if (row && !row.textual) return new Uint8Array(await r.arrayBuffer());
+      return r.text();
+    }
+    async write(path, _data) {
+      throw new ReadOnlyError(`write ${path}`);
+    }
+    async appendLog(participant, _events) {
+      throw new ReadOnlyError(`append to ${participant}'s log`);
+    }
+    async readLogs() {
+      const m = await this.loadManifest();
+      const out = {};
+      for (const path of m.files) {
+        const who = participantOfLog(path);
+        if (!who) continue;
+        const r = await this.fetcher(this.url(path));
+        if (!r.ok) continue;
+        out[who] = decodeLog(await r.text()).events;
+      }
+      return out;
+    }
+  };
+
+  // src/store/folder.ts
+  var FolderStore = class {
+    constructor(root, opts = {}) {
+      this.root = root;
+      this.opts = opts;
+    }
+    capabilities() {
+      return { write: !this.opts.readOnly, watch: false };
+    }
+    async walk(dir, prefix, out, logs) {
+      for await (const [name, handle] of dir.entries()) {
+        const path = prefix ? `${prefix}/${name}` : name;
+        if (handle.kind === "directory") {
+          if (name.startsWith(".") && path !== ".metamedium" && !path.startsWith(".metamedium/")) continue;
+          await this.walk(handle, path, out, logs);
+          continue;
+        }
+        if (participantOfLog(path)) {
+          logs.push(path);
+          continue;
+        }
+        const e = isCanvasFile(path);
+        if (!e) continue;
+        const f = await handle.getFile();
+        out.push({ ...e, size: f.size, modified: f.lastModified });
+      }
+    }
+    async list() {
+      const out = [];
+      await this.walk(this.root, "", out, []);
+      return out.sort((a, b) => a.path < b.path ? -1 : a.path > b.path ? 1 : 0);
+    }
+    async fileHandle(path, create) {
+      const parts = path.split("/");
+      let dir = this.root;
+      for (const p of parts.slice(0, -1)) dir = await dir.getDirectoryHandle(p, { create });
+      return dir.getFileHandle(parts[parts.length - 1], { create });
+    }
+    async read(path) {
+      const h2 = await this.fileHandle(path, false);
+      const f = await h2.getFile();
+      const row = kindOf(path);
+      if (row && !row.textual) return new Uint8Array(await f.arrayBuffer());
+      return f.text();
+    }
+    async write(path, data) {
+      if (this.opts.readOnly) throw new ReadOnlyError(`write ${path}`);
+      const h2 = await this.fileHandle(path, true);
+      if (!h2.createWritable) throw new ReadOnlyError(`write ${path}`);
+      const w2 = await h2.createWritable();
+      await w2.write(toBytes(data));
+      await w2.close();
+    }
+    async appendLog(participant, events) {
+      if (this.opts.readOnly) throw new ReadOnlyError(`append to ${participant}'s log`);
+      if (events.length === 0) return;
+      const path = logPathFor(participant);
+      const h2 = await this.fileHandle(path, true);
+      if (!h2.createWritable) throw new ReadOnlyError(`append to ${participant}'s log`);
+      const existing = await (await h2.getFile()).text();
+      const w2 = await h2.createWritable({ keepExistingData: false });
+      await w2.write(toBytes(existing + encodeLog(events)));
+      await w2.close();
+    }
+    async readLogs() {
+      const out = {};
+      let dir;
+      try {
+        dir = this.root;
+        for (const p of LOG_DIR.split("/")) dir = await dir.getDirectoryHandle(p, { create: false });
+      } catch {
+        return out;
+      }
+      for await (const [name, handle] of dir.entries()) {
+        if (handle.kind !== "file") continue;
+        const who = participantOfLog(`${LOG_DIR}/${name}`);
+        if (!who) continue;
+        out[who] = decodeLog(toText(await (await handle.getFile()).text())).events;
+      }
+      return out;
+    }
+  };
+
   // src/session/signature.ts
   var DIRECTED_LINKS = /* @__PURE__ */ new Set(["contains", "points-to"]);
   var SYMMETRIC_LINKS = /* @__PURE__ */ new Set(["crossing", "touching", "near", "connects"]);
@@ -2088,27 +2375,6 @@ var MetaMediumCore = (() => {
       explained,
       reasoning: terms.length ? `${terms.map((t) => `${t.verb}${t.target ? " " + t.target : ""} ${t.weight}`).join(", ")}; ${missing}% of the motion is unexplained${missing > 35 ? " \u2014 something is missing" : ""}` : "no verb explains this motion"
     };
-  }
-
-  // src/kinds/kinds.ts
-  var KINDS = [
-    { kind: "html", extensions: ["html", "htm"], mime: "text/html", renderer: "page", addressing: "regions", textual: true },
-    { kind: "js", extensions: ["js", "mjs", "ts"], mime: "text/javascript", renderer: "source", addressing: "functions", textual: true },
-    { kind: "json", extensions: ["json"], mime: "application/json", renderer: "tree", addressing: "keys", textual: true },
-    { kind: "svg", extensions: ["svg"], mime: "image/svg+xml", renderer: "vector", addressing: "elements", textual: true },
-    { kind: "md", extensions: ["md", "markdown"], mime: "text/markdown", renderer: "prose", addressing: "headings", textual: true },
-    { kind: "png", extensions: ["png"], mime: "image/png", renderer: "image", addressing: "pixels", textual: false },
-    { kind: "jpg", extensions: ["jpg", "jpeg"], mime: "image/jpeg", renderer: "image", addressing: "pixels", textual: false },
-    { kind: "text", extensions: ["txt"], mime: "text/plain", renderer: "text", addressing: "runs", textual: true },
-    { kind: "control", extensions: [], mime: "application/json", renderer: "control", addressing: "value", textual: true }
-  ];
-  function kindOf(path) {
-    const ext = (path.split(".").pop() ?? "").toLowerCase();
-    if (!ext || ext === path.toLowerCase()) return void 0;
-    return KINDS.find((k) => k.extensions.includes(ext));
-  }
-  function rowOf(kind) {
-    return KINDS.find((k) => k.kind === kind);
   }
 
   // src/kinds/address.ts

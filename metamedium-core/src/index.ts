@@ -91,6 +91,14 @@ export { isLetterLike, joinsRun, wordConfidence, LETTER_MAX_HEIGHT_PX, WORD_GAP_
 // One log per participant; the canvas is the merge (BUILD-PLAN-v8 §1.5).
 export { mergeLogs } from './store/merge';
 
+// The storage seam: the canvas is a folder; per-participant logs; backends (WP-11).
+export { MemoryStore, ReadOnlyError, logPathFor, participantOfLog, encodeLog, decodeLog, isCanvasFile, toBytes, toText, META_DIR, LOG_DIR, LOG_EXT } from './store/seam';
+export type { Store, Entry, Capabilities } from './store/seam';
+export { StaticStore, MANIFEST_PATH } from './store/static';
+export type { Fetcher, Manifest } from './store/static';
+export { FolderStore } from './store/folder';
+export type { DirHandleLike, FileHandleLike, FileLike, WritableLike } from './store/folder';
+
 // Structural signatures: what a group IS as shapes and the links between them,
 // compared with reasoning, corrected by example (WP-12).
 export { structuralSignature, compareSignatures, matchDefinition, addExample, describeStructure, MATCH_FLOOR, DIRECTED_LINKS, SYMMETRIC_LINKS } from './session/signature';

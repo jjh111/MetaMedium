@@ -190,7 +190,7 @@ Renderers for `js` (source, function by function), `json` (keys), `md`, `svg`; t
 `frame` event; connections offered from members' interfaces; the `control` kind (a drawn slider: a line with a dot reads as a slider); escalate to folder; export bundle; conjure by name and resemblance.
 *Done:* the SNA criterion (v8 §19 S5).
 
-**WP-11 · The folder** (W, needs WP-1)
+**WP-11 · The folder** (W, needs WP-1) — **engine half done 3 Sep 2026**: `src/store/seam.ts` (the `Store` interface per 1.5, `Entry`, the log layout `.metamedium/logs/<participant>.jsonl`, one event per line, `MemoryStore`), `src/store/static.ts` (read-only, discovered through `.metamedium/manifest.json`, so a published canvas can be drawn on and the ink stays the reader's), `src/store/folder.ts` (File System Access, typed structurally so core carries no DOM typings and a fake folder drives the tests). A read-only backend refuses with a `ReadOnlyError` naming what was refused. The surface half — open a folder, discovery into artifacts, autosave, the live budget, grid and focus views — remains.
 The seam, `StaticStore` and `FolderStore`, discovery, per-participant logs, autosave, the live budget with snapshots, grid and focus views.
 *Done:* v8 §19 S4 criterion: this repo opened as a canvas; ink on a demo is a file; a second machine sees it after a pull.
 
