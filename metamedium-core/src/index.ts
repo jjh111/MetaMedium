@@ -88,6 +88,9 @@ export type { Maths, Measure } from './session/measure';
 // Words from letters — printed letters gathered into one held mark (words.ts).
 export { isLetterLike, joinsRun, wordConfidence, LETTER_MAX_HEIGHT_PX, WORD_GAP_RATIO, WORD_WINDOW_MS } from './session/words';
 
+// One log per participant; the canvas is the merge (BUILD-PLAN-v8 §1.5).
+export { mergeLogs } from './store/merge';
+
 // Gesture grammar
 export {
   isLassoLike,

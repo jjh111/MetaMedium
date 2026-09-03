@@ -431,6 +431,41 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
   let counter = 0;
   const listeners = new Set<(state: SessionState) => void>();
 
+  // ===== Checkpoints =====
+  // State is a pure function of the log, and undo is "drop an event and
+  // replay". A log of ten thousand events must not replay from zero on every
+  // undo, so every CHECKPOINT_EVERY events the reducer's state is snapshotted
+  // (structured clone — Maps included) and a replay starts from the nearest
+  // snapshot at or before where it needs to get to. Snapshots are derived,
+  // never logged, and are discarded past any point the log is cut back to.
+  const CHECKPOINT_EVERY = 200;
+  let checkpoints: { length: number; snap: unknown }[] = [];
+
+  function snapshot(): unknown {
+    return structuredClone({
+      nodes, contentIds, artifacts, pendingLasso, summon, clusterCandidates,
+      participants, explanations, live, selection, commandMark, markMiss, lastAt, counter,
+    });
+  }
+  function restore(snap: unknown) {
+    const s = structuredClone(snap) as {
+      nodes: Map<string, MMNode>; contentIds: string[]; artifacts: string[];
+      pendingLasso: { id: string; at: number } | null; summon: Summon | null;
+      clusterCandidates: ClusterCandidate[]; participants: string[]; explanations: string[];
+      live: string[]; selection: string[]; commandMark: CommandMark | null; markMiss: MarkMiss | null;
+      lastAt: number; counter: number;
+    };
+    nodes = s.nodes; contentIds = s.contentIds; artifacts = s.artifacts; pendingLasso = s.pendingLasso;
+    summon = s.summon; clusterCandidates = s.clusterCandidates; participants = s.participants;
+    explanations = s.explanations; live = s.live; selection = s.selection; commandMark = s.commandMark;
+    markMiss = s.markMiss; lastAt = s.lastAt; counter = s.counter;
+  }
+  function maybeCheckpoint(length: number) {
+    if (length > 0 && length % CHECKPOINT_EVERY === 0 && !checkpoints.some((c) => c.length === length)) {
+      checkpoints.push({ length, snap: snapshot() });
+    }
+  }
+
   function reset() {
     nodes = new Map();
     contentIds = [];
@@ -536,16 +571,26 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
    * thresholds, all of them ratios of the marks' own sizes.
    */
   function addSpatialEdges(node: MMNode) {
-    const marks = contentIds.map(markOf).filter((m): m is Mark => !!m);
-    for (const r of relate(marks)) {
-      if (r.from !== node.id && r.to !== node.id) continue;
-      nodes.get(r.from)?.edges.push({
-        to: r.to,
-        rel: r.kind,
-        weight: r.strength,
-        via: TIER0_PARTICIPANT,
-        reasoning: r.reasoning,
-      });
+    // Relations are pairwise, so the new mark is related to each other mark
+    // one pair at a time: linear in the board, and the same relations as
+    // relating everything and keeping this mark's. (It used to relate the
+    // whole board per stroke — quadratic per stroke, cubic over a session —
+    // which is what made undo on a few hundred marks take seconds.)
+    const me = markOf(node.id);
+    if (!me) return;
+    for (const id of contentIds) {
+      if (id === node.id) continue;
+      const other = markOf(id);
+      if (!other) continue;
+      for (const r of relate([me, other])) {
+        nodes.get(r.from)?.edges.push({
+          to: r.to,
+          rel: r.kind,
+          weight: r.strength,
+          via: TIER0_PARTICIPANT,
+          reasoning: r.reasoning,
+        });
+      }
     }
   }
 
@@ -1548,8 +1593,16 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
   }
 
   function replay() {
-    reset();
-    for (const ev of events) applyEvent(ev);
+    // From the nearest checkpoint at or before the log's length; from zero
+    // when there is none. Checkpoints past the log's end are stale.
+    checkpoints = checkpoints.filter((c) => c.length <= events.length);
+    const from = checkpoints[checkpoints.length - 1];
+    let start = 0;
+    if (from) { restore(from.snap); start = from.length; } else reset();
+    for (let i = start; i < events.length; i++) {
+      applyEvent(events[i]);
+      maybeCheckpoint(i + 1);
+    }
   }
 
   // ===== Public API =====
@@ -1557,6 +1610,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
   function dispatch(ev: SessionEvent): string | null {
     events.push(ev);
     const result = applyEvent(ev);
+    maybeCheckpoint(events.length);
     notify();
     return result;
   }
@@ -1662,6 +1716,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     undo,
     load: (log) => {
       events = log.map((ev) => ({ ...ev }));
+      checkpoints = [];
       replay();
       notify();
     },

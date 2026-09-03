@@ -142,7 +142,7 @@ modules later is mechanical. Behaviour identical; e2e 60/60 after.
 
 ### Level 1 — the foundations (all P once WP-0 lands; engine packages are P now)
 
-**WP-1 · Checkpoints and log merge** (P, engine)
+**WP-1 · Checkpoints and log merge** (P, engine) ✅ **done 3 Sep 2026** — `checkpoint` snapshots every 200 events inside `session.ts` (structured clone; discarded past a cut), `mergeLogs` in `src/store/merge.ts`. *Found on the way:* relations were computed for the whole board on every stroke — quadratic per stroke, cubic per session — which made undo on a few hundred marks take seconds; now the new mark is related pairwise, linear per stroke, same relations. The per-pair cost is dominated by crossing tests over full point lists when bounds overlap; a spatial index and simplified outlines for the crossing test are the next scaling steps (WP-11's live budget).
 Files: `src/session/checkpoint.ts`, `src/store/merge.ts`, tests.
 Checkpoint state every K events (K=200) as a structured clone; `load` and `undo` replay from the nearest checkpoint. `mergeLogs` per 1.5. Determinism test: two merges of the same logs in different order give identical state.
 *Done:* replaying a 5,000-event log after undo takes under 50 ms in the test runner; merge is order-independent.

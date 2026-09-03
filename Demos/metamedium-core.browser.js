@@ -126,6 +126,7 @@ var MetaMediumCore = (() => {
     matchPrimitiveFromLibrary: () => matchPrimitiveFromLibrary,
     matchesCommandMark: () => matchesCommandMark,
     measure: () => measure,
+    mergeLogs: () => mergeLogs,
     nodeIdsIn: () => nodeIdsIn,
     normalizeStroke: () => normalizeStroke,
     outlineOf: () => outlineOf,
@@ -1545,6 +1546,23 @@ var MetaMediumCore = (() => {
     return Math.min(0.88, 0.55 + 0.08 * (letters - 2));
   }
 
+  // src/store/merge.ts
+  function mergeLogs(logs) {
+    const names = Object.keys(logs).sort();
+    const tagged = [];
+    for (const name of names) logs[name].forEach((ev, i) => tagged.push({ ev, name, i }));
+    tagged.sort((a, b) => {
+      const ta = atOf(a.ev), tb = atOf(b.ev);
+      if (ta !== tb) return ta - tb;
+      if (a.name !== b.name) return a.name < b.name ? -1 : 1;
+      return a.i - b.i;
+    });
+    return tagged.map((t) => ({ ...t.ev }));
+  }
+  function atOf(ev) {
+    return "at" in ev && typeof ev.at === "number" ? ev.at : 0;
+  }
+
   // src/session/erase.ts
   var DEFAULT_ERASE_CROSSINGS = 3;
   function segmentsIntersect(p1, p2, p3, p4) {
@@ -2866,6 +2884,48 @@ ${pad}</${tag}>`;
     let lastAt = 0;
     let counter2 = 0;
     const listeners = /* @__PURE__ */ new Set();
+    const CHECKPOINT_EVERY = 200;
+    let checkpoints = [];
+    function snapshot() {
+      return structuredClone({
+        nodes,
+        contentIds,
+        artifacts,
+        pendingLasso,
+        summon,
+        clusterCandidates,
+        participants,
+        explanations,
+        live,
+        selection,
+        commandMark,
+        markMiss,
+        lastAt,
+        counter: counter2
+      });
+    }
+    function restore(snap) {
+      const s = structuredClone(snap);
+      nodes = s.nodes;
+      contentIds = s.contentIds;
+      artifacts = s.artifacts;
+      pendingLasso = s.pendingLasso;
+      summon = s.summon;
+      clusterCandidates = s.clusterCandidates;
+      participants = s.participants;
+      explanations = s.explanations;
+      live = s.live;
+      selection = s.selection;
+      commandMark = s.commandMark;
+      markMiss = s.markMiss;
+      lastAt = s.lastAt;
+      counter2 = s.counter;
+    }
+    function maybeCheckpoint(length) {
+      if (length > 0 && length % CHECKPOINT_EVERY === 0 && !checkpoints.some((c) => c.length === length)) {
+        checkpoints.push({ length, snap: snapshot() });
+      }
+    }
     function reset() {
       nodes = /* @__PURE__ */ new Map();
       contentIds = [];
@@ -2945,16 +3005,21 @@ ${pad}</${tag}>`;
       return suggestions;
     }
     function addSpatialEdges(node) {
-      const marks = contentIds.map(markOf).filter((m) => !!m);
-      for (const r of relate(marks)) {
-        if (r.from !== node.id && r.to !== node.id) continue;
-        nodes.get(r.from)?.edges.push({
-          to: r.to,
-          rel: r.kind,
-          weight: r.strength,
-          via: TIER0_PARTICIPANT,
-          reasoning: r.reasoning
-        });
+      const me = markOf(node.id);
+      if (!me) return;
+      for (const id of contentIds) {
+        if (id === node.id) continue;
+        const other = markOf(id);
+        if (!other) continue;
+        for (const r of relate([me, other])) {
+          nodes.get(r.from)?.edges.push({
+            to: r.to,
+            rel: r.kind,
+            weight: r.strength,
+            via: TIER0_PARTICIPANT,
+            reasoning: r.reasoning
+          });
+        }
       }
     }
     function inferWire(node, points, scale) {
@@ -3699,12 +3764,22 @@ ${pad}</${tag}>`;
       }
     }
     function replay() {
-      reset();
-      for (const ev of events) applyEvent(ev);
+      checkpoints = checkpoints.filter((c) => c.length <= events.length);
+      const from = checkpoints[checkpoints.length - 1];
+      let start = 0;
+      if (from) {
+        restore(from.snap);
+        start = from.length;
+      } else reset();
+      for (let i = start; i < events.length; i++) {
+        applyEvent(events[i]);
+        maybeCheckpoint(i + 1);
+      }
     }
     function dispatch(ev) {
       events.push(ev);
       const result2 = applyEvent(ev);
+      maybeCheckpoint(events.length);
       notify();
       return result2;
     }
@@ -3801,6 +3876,7 @@ ${pad}</${tag}>`;
       undo,
       load: (log) => {
         events = log.map((ev) => ({ ...ev }));
+        checkpoints = [];
         replay();
         notify();
       },
