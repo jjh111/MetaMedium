@@ -121,6 +121,10 @@ Ranking = `likelihood × (1 + log(1 + uses))` where `uses` comes from
 
 ## 2. Work packages
 
+> **Status, 3 September 2026:** all fourteen packages done on `next-phases`
+> (WP-0 through WP-14, in the order the weave asked for). Each entry below
+> says what landed, what was found on the way, and what it does not yet do.
+
 Order is dependency order. **P** marks a package another model can take in
 parallel with anything else at the same level. **W** marks weave: serial, on
 the surface. Each has an owner slot; JH assigns.

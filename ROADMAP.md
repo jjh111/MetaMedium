@@ -8,6 +8,24 @@
 
 ## The Vision, Restated
 
+> **v8 accounting, 3 September 2026 (branch `next-phases`, local).** Every
+> work package in `BUILD-PLAN-v8.md` §2 has landed: the surface split into
+> fragments; selection and the blob palette; checkpoints and the log merge;
+> the verb basis and the fit; kinds and addressing; structural signatures
+> with corrections; image tracing; kinds on the surface and the worker;
+> clocks and the tank; words into verbs and acting out; frames and the
+> drawn slider; the folder with three backends, autosave, the live budget
+> and three views; pictures in and the board out; text as an element; and
+> deploy (installable shell, a repository as the folder). Core: 546 tests.
+> The browser e2e drives 115 steps in about 80 s. What is not yet true, said
+> plainly in each package's entry: parked artifacts show cards, not
+> pictures; the tracer's fixture is painted, not photographed; the git
+> backend is tested against a fake API, not GitHub; hit-testing a moving
+> body uses its drawn bounds; a frame whose code transforms a selection is
+> not yet a palette verb. The whole branch waits on John's hand-testing
+> (and Brief Q's report) before it goes to master.
+
+
 MetaMedium's thesis: drawing is a language, and AI is the "meta-word" that lets
 marks carry meaning. The system grounds strokes geometrically (fingerprints,
 spatial graphs), lets users name what they draw (a personal visual vocabulary),

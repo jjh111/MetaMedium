@@ -24,7 +24,13 @@ automatically → ask "why?" and get grounded reasoning.
 `ARCHITECTURE-v7-PARTICIPANTS-AND-TIERS.md` is the active engine plan; MVP.md
 absorbs and raises its Stage D.
 
-Headline: **the MVP loop runs end to end.** Draw boxes on an infinite canvas,
+Headline (v8, 3 Sep 2026, on the local branch `next-phases`): **every
+package of the v8 build plan has landed** — the canvas as a program with
+clocks, a tank, verbs from words or from acting out, frames with a drawn
+slider, the folder as the canvas with three backends, pictures in and the
+board out, text as an element, and an installable shell — 546 core tests and
+a 115-step browser e2e. `ROADMAP.md` carries the honest gaps. Before v8:
+**the MVP loop runs end to end.** Draw boxes on an infinite canvas,
 circle them, cross with a command mark *you taught the system*, prompt them into
 a living page that renders in the canvas with your ink still outlining its
 divs — then draw on that page and the ink addresses the regions underneath it.
