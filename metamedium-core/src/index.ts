@@ -91,6 +91,17 @@ export { isLetterLike, joinsRun, wordConfidence, LETTER_MAX_HEIGHT_PX, WORD_GAP_
 // One log per participant; the canvas is the merge (BUILD-PLAN-v8 §1.5).
 export { mergeLogs } from './store/merge';
 
+// The fourth rung — what a mark DOES: steering verbs, walls, and the fit that
+// turns an acted-out path into a behaviour (ARCHITECTURE-v8 §3, §21).
+export { force, intents, VERBS, TARGETED, sizeOf, DEFAULT_SPEED, DEFAULT_MAX_FORCE } from './behave/verbs';
+export type { Verb, Term, Behaviour, Body, Wall, World, Force, Intent } from './behave/verbs';
+export { steer, step, seeded, worldOf } from './behave/steer';
+export type { Steering, TermResult } from './behave/steer';
+export { applyWalls, wallBoxes } from './behave/walls';
+export type { WallBox, WallState } from './behave/walls';
+export { fit } from './behave/fit';
+export type { Sample, FitResult } from './behave/fit';
+
 // Gesture grammar
 export {
   isLassoLike,

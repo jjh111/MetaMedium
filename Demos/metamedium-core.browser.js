@@ -11,9 +11,9 @@ var MetaMediumCore = (() => {
   };
   var __copyProps = (to, from, except, desc) => {
     if (from && typeof from === "object" || typeof from === "function") {
-      for (let key of __getOwnPropNames(from))
-        if (!__hasOwnProp.call(to, key) && key !== except)
-          __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+      for (let key2 of __getOwnPropNames(from))
+        if (!__hasOwnProp.call(to, key2) && key2 !== except)
+          __defProp(to, key2, { get: () => from[key2], enumerable: !(desc = __getOwnPropDesc(from, key2)) || desc.enumerable });
     }
     return to;
   };
@@ -29,8 +29,10 @@ var MetaMediumCore = (() => {
     DEFAULT_CORNER_OPTIONS: () => DEFAULT_CORNER_OPTIONS,
     DEFAULT_ERASE_CROSSINGS: () => DEFAULT_ERASE_CROSSINGS,
     DEFAULT_GESTURE_CONFIG: () => DEFAULT_GESTURE_CONFIG,
+    DEFAULT_MAX_FORCE: () => DEFAULT_MAX_FORCE,
     DEFAULT_RELATE_CONFIG: () => DEFAULT_RELATE_CONFIG,
     DEFAULT_SESSION_CONFIG: () => DEFAULT_SESSION_CONFIG,
+    DEFAULT_SPEED: () => DEFAULT_SPEED,
     DEFAULT_TIMEOUT_MS: () => DEFAULT_TIMEOUT_MS,
     HAND_RESOLUTION_PX: () => HAND_RESOLUTION_PX,
     LETTER_MAX_HEIGHT_PX: () => LETTER_MAX_HEIGHT_PX,
@@ -46,12 +48,15 @@ var MetaMediumCore = (() => {
     SNAPPABLE: () => SNAPPABLE,
     SNAP_CONFIDENCE: () => SNAP_CONFIDENCE,
     SNAP_MARGIN: () => SNAP_MARGIN,
+    TARGETED: () => TARGETED,
     TIER0_PARTICIPANT: () => TIER0_PARTICIPANT,
+    VERBS: () => VERBS,
     WORD_GAP_RATIO: () => WORD_GAP_RATIO,
     WORD_WINDOW_MS: () => WORD_WINDOW_MS,
     aboutIdsOf: () => aboutIdsOf,
     analyzeCornerAngles: () => analyzeCornerAngles,
     analyzeStroke: () => analyzeStroke,
+    applyWalls: () => applyWalls,
     assignRoles: () => assignRoles,
     between: () => between,
     boundingBoxDistance: () => boundingBoxDistance,
@@ -100,6 +105,8 @@ var MetaMediumCore = (() => {
     findCorners: () => findCorners,
     findCornersWithSeparation: () => findCornersWithSeparation,
     fingerprintOf: () => fingerprintOf,
+    fit: () => fit2,
+    force: () => force,
     frameOf: () => frameOf,
     genreOf: () => genreOf,
     getBounds: () => getBounds,
@@ -109,6 +116,7 @@ var MetaMediumCore = (() => {
     has: () => has,
     hasMultipleSources: () => hasMultipleSources,
     idealize: () => idealize,
+    intents: () => intents,
     interpretationsOf: () => interpretationsOf,
     isCheckLike: () => isCheckLike,
     isExplanation: () => isExplanation,
@@ -153,12 +161,16 @@ var MetaMediumCore = (() => {
     resolvesLasso: () => resolvesLasso,
     route: () => route,
     scratchedOut: () => scratchedOut,
+    seeded: () => seeded,
     segmentsIntersect: () => segmentsIntersect,
     shapeExtent: () => shapeExtent,
     simplifyStroke: () => simplifyStroke,
+    sizeOf: () => sizeOf,
     smoothStroke: () => smoothStroke,
     snapReading: () => snapReading,
     sourcesOf: () => sourcesOf,
+    steer: () => steer,
+    step: () => step,
     stripThink: () => stripThink,
     strokeFor: () => strokeFor,
     strokePointsOf: () => strokePointsOf,
@@ -169,9 +181,11 @@ var MetaMediumCore = (() => {
     transcriptsOf: () => transcriptsOf,
     typeNodeId: () => typeNodeId,
     validateRegions: () => validateRegions,
+    wallBoxes: () => wallBoxes,
     whyNotResolved: () => whyNotResolved,
     wordConfidence: () => wordConfidence,
-    wordOf: () => wordOf
+    wordOf: () => wordOf,
+    worldOf: () => worldOf
   });
 
   // src/geometry.ts
@@ -644,9 +658,9 @@ var MetaMediumCore = (() => {
       const start = pts[0];
       const end = pts[pts.length - 1];
       for (let i = 1; i < pts.length - 1; i++) {
-        const dist = perpendicularDistance(pts[i], start, end);
-        if (dist > maxDist) {
-          maxDist = dist;
+        const dist2 = perpendicularDistance(pts[i], start, end);
+        if (dist2 > maxDist) {
+          maxDist = dist2;
           maxIndex = i;
         }
       }
@@ -1088,18 +1102,18 @@ var MetaMediumCore = (() => {
       if (g) g.push(i);
       else groups.set(i.tier, [i]);
     }
-    return [...groups.entries()].sort((a, b) => a[0] - b[0]).map(([key, list]) => ({ key, label: `tier ${key}`, interpretations: list }));
+    return [...groups.entries()].sort((a, b) => a[0] - b[0]).map(([key2, list]) => ({ key: key2, label: `tier ${key2}`, interpretations: list }));
   }
   function bySource(interpretations) {
     const groups = /* @__PURE__ */ new Map();
     for (const i of interpretations) {
-      const key = i.source ?? TIER0_PARTICIPANT;
-      const g = groups.get(key);
+      const key2 = i.source ?? TIER0_PARTICIPANT;
+      const g = groups.get(key2);
       if (g) g.push(i);
-      else groups.set(key, [i]);
+      else groups.set(key2, [i]);
     }
-    return [...groups.entries()].map(([key, list]) => ({
-      key,
+    return [...groups.entries()].map(([key2, list]) => ({
+      key: key2,
       label: list[0].sourceName,
       interpretations: list
     }));
@@ -1372,11 +1386,11 @@ var MetaMediumCore = (() => {
       return [];
     }
     if (!Array.isArray(parsed)) return [];
-    const num = (v) => typeof v === "number" && Number.isFinite(v) ? v : typeof v === "string" && v.trim() && Number.isFinite(Number(v)) ? Number(v) : null;
+    const num2 = (v) => typeof v === "number" && Number.isFinite(v) ? v : typeof v === "string" && v.trim() && Number.isFinite(Number(v)) ? Number(v) : null;
     const pt = (v) => {
       if (!v || typeof v !== "object") return null;
       const r = v;
-      const x = num(r.x), y = num(r.y);
+      const x = num2(r.x), y = num2(r.y);
       return x === null || y === null ? null : { x, y };
     };
     const out = [];
@@ -1387,13 +1401,13 @@ var MetaMediumCore = (() => {
       const kind = String(r.shape ?? r.type ?? r.kind ?? "").toLowerCase().trim();
       const why = typeof r.why === "string" ? r.why : typeof r.reasoning === "string" ? r.reasoning : void 0;
       if (kind === "line" || kind === "arrow") {
-        const from = pt(r.from) ?? (num(r.x1) !== null && num(r.y1) !== null ? { x: num(r.x1), y: num(r.y1) } : null);
-        const to = pt(r.to) ?? (num(r.x2) !== null && num(r.y2) !== null ? { x: num(r.x2), y: num(r.y2) } : null);
+        const from = pt(r.from) ?? (num2(r.x1) !== null && num2(r.y1) !== null ? { x: num2(r.x1), y: num2(r.y1) } : null);
+        const to = pt(r.to) ?? (num2(r.x2) !== null && num2(r.y2) !== null ? { x: num2(r.x2), y: num2(r.y2) } : null);
         if (from && to) out.push({ shape: kind, from, to, why });
         continue;
       }
       if (kind === "rectangle" || kind === "rect" || kind === "box" || kind === "circle" || kind === "ellipse" || kind === "triangle") {
-        const x = num(r.x), y = num(r.y), w2 = num(r.w ?? r.width), h2 = num(r.h ?? r.height);
+        const x = num2(r.x), y = num2(r.y), w2 = num2(r.w ?? r.width), h2 = num2(r.h ?? r.height);
         if (x === null || y === null || w2 === null || h2 === null) continue;
         const shape = kind === "rect" || kind === "box" ? "rectangle" : kind === "ellipse" ? "circle" : kind;
         out.push({ shape, x, y, w: w2, h: h2, why });
@@ -1563,6 +1577,377 @@ var MetaMediumCore = (() => {
     return "at" in ev && typeof ev.at === "number" ? ev.at : 0;
   }
 
+  // src/behave/verbs.ts
+  var VERBS = ["wander", "seek", "flee", "home", "school", "hold", "avoid", "consume", "spawn", "drift", "expire"];
+  var TARGETED = /* @__PURE__ */ new Set(["seek", "flee", "home", "school", "consume", "spawn", "expire"]);
+  var DEFAULT_SPEED = 120;
+  var DEFAULT_MAX_FORCE = 240;
+  var sizeOf = (b) => Math.max(1, Math.sqrt(Math.max(1, b.w) * Math.max(1, b.h)));
+  var dist = (a, b) => Math.hypot(b.x - a.x, b.y - a.y);
+  var num = (t, k, d) => typeof t.params?.[k] === "number" ? t.params[k] : d;
+  function nearest(world, name, only) {
+    if (!name) return null;
+    const mine = sizeOf(world.me);
+    let best = null;
+    for (const o of world.named(name)) {
+      if (o.id === world.me.id) continue;
+      const s = sizeOf(o);
+      if (only === "bigger" && s < mine * 1.25) continue;
+      if (only === "smaller" && s > mine / 1.25) continue;
+      const d = dist(world.me, o);
+      if (!best || d < best.d) best = { body: o, d };
+    }
+    return best;
+  }
+  function toward(world, to, speed, weight) {
+    const d = dist(world.me, to);
+    if (d < 1e-6) return { fx: 0, fy: 0 };
+    const dx = (to.x - world.me.x) / d * speed, dy = (to.y - world.me.y) / d * speed;
+    return { fx: (dx - world.me.vx) * weight, fy: (dy - world.me.vy) * weight };
+  }
+  var none = (reasoning) => ({ fx: 0, fy: 0, reasoning });
+  function force(term, world, speed = DEFAULT_SPEED) {
+    const me = world.me, w2 = term.weight;
+    switch (term.verb) {
+      case "wander": {
+        const turn = num(term, "turn", 0.9);
+        const a = me.heading + (world.rng() - 0.5) * turn;
+        return { fx: Math.cos(a) * speed * 0.5 * w2, fy: Math.sin(a) * speed * 0.5 * w2, reasoning: "wandering" };
+      }
+      case "seek": {
+        const n2 = nearest(world, term.target);
+        if (!n2) return none(`nothing named ${term.target} to seek`);
+        const f = toward(world, n2.body, speed, w2);
+        return { ...f, reasoning: `seeking ${n2.body.id} (${term.target}) ${Math.round(n2.d)}px away` };
+      }
+      case "flee": {
+        const only = typeof term.params?.only === "string" ? term.params.only : void 0;
+        const n2 = nearest(world, term.target, only);
+        const range = num(term, "range", sizeOf(me) * 6);
+        if (!n2 || n2.d > range) return none(`nothing${only ? " " + only : ""} named ${term.target} within ${Math.round(range)}px`);
+        const falloff = 1 - n2.d / range;
+        const away = { x: me.x + (me.x - n2.body.x), y: me.y + (me.y - n2.body.y) };
+        const f = toward(world, away, speed, w2 * (0.4 + 0.6 * falloff));
+        return { ...f, reasoning: `fleeing ${n2.body.id} (${term.target}${only ? ", " + only : ""}) ${Math.round(n2.d)}px away` };
+      }
+      case "home": {
+        const n2 = nearest(world, term.target);
+        if (!n2) return none(`nothing named ${term.target} to keep to`);
+        const range = num(term, "range", sizeOf(n2.body) * 1.5);
+        if (n2.d > range) {
+          const f = toward(world, n2.body, speed, w2);
+          return { ...f, reasoning: `returning to ${n2.body.id} (${term.target}), ${Math.round(n2.d)}px out` };
+        }
+        const a = me.heading + (world.rng() - 0.5) * 1.2;
+        return { fx: Math.cos(a) * speed * 0.25 * w2, fy: Math.sin(a) * speed * 0.25 * w2, reasoning: `at home in ${n2.body.id} (${term.target})` };
+      }
+      case "school": {
+        const range = num(term, "range", sizeOf(me) * 5);
+        const peers = (term.target ? world.named(term.target) : world.others).filter((o) => o.id !== me.id && dist(me, o) <= range);
+        if (!peers.length) return none(`no ${term.target ?? "peers"} within ${Math.round(range)}px to school with`);
+        let cx2 = 0, cy2 = 0, ax = 0, ay = 0, sx = 0, sy = 0;
+        const tooClose = sizeOf(me) * 1.4;
+        for (const o of peers) {
+          cx2 += o.x;
+          cy2 += o.y;
+          ax += o.vx;
+          ay += o.vy;
+          const d = dist(me, o);
+          if (d < tooClose && d > 1e-6) {
+            sx += (me.x - o.x) / d * (1 - d / tooClose);
+            sy += (me.y - o.y) / d * (1 - d / tooClose);
+          }
+        }
+        const n2 = peers.length;
+        const coh = toward(world, { x: cx2 / n2, y: cy2 / n2 }, speed, 1);
+        const ali = { fx: ax / n2 - me.vx, fy: ay / n2 - me.vy };
+        return {
+          fx: (coh.fx * 0.6 + ali.fx * 0.8 + sx * speed * 1.5) * w2,
+          fy: (coh.fy * 0.6 + ali.fy * 0.8 + sy * speed * 1.5) * w2,
+          reasoning: `schooling with ${n2} ${term.target ?? "peer"}${n2 === 1 ? "" : "s"}`
+        };
+      }
+      case "hold": {
+        const o = me.origin ?? { x: me.x, y: me.y };
+        const radius = num(term, "radius", sizeOf(me) * 3);
+        const d = dist(me, o);
+        if (d <= radius) return none(`holding within ${Math.round(radius)}px of where it began`);
+        const f = toward(world, o, speed, w2 * Math.min(1, (d - radius) / radius + 0.3));
+        return { ...f, reasoning: `${Math.round(d - radius)}px past its ${Math.round(radius)}px hold \u2014 returning` };
+      }
+      case "drift": {
+        const deg2 = num(term, "direction", -90);
+        const a = deg2 * Math.PI / 180;
+        return { fx: Math.cos(a) * speed * 0.6 * w2, fy: Math.sin(a) * speed * 0.6 * w2, reasoning: `drifting toward ${deg2}\xB0` };
+      }
+      case "avoid":
+        return none("sliding along walls");
+      case "consume":
+      case "spawn":
+      case "expire":
+        return none(`${term.verb} is an intent, not a force`);
+    }
+  }
+  function intents(term, world) {
+    const me = world.me;
+    switch (term.verb) {
+      case "consume": {
+        const n2 = nearest(world, term.target);
+        if (n2 && n2.d <= (sizeOf(me) + sizeOf(n2.body)) / 2) return [{ kind: "consume", target: term.target, body: n2.body.id }];
+        return [];
+      }
+      case "spawn": {
+        const every = num(term, "every", 4);
+        const before = Math.floor((me.age - world.dt) / every), after = Math.floor(me.age / every);
+        return after > before && me.age >= every ? [{ kind: "spawn", target: term.target }] : [];
+      }
+      case "expire": {
+        const after = num(term, "after", Infinity);
+        if (me.age >= after) return [{ kind: "expire" }];
+        const n2 = nearest(world, term.target);
+        if (n2 && n2.d <= (sizeOf(me) + sizeOf(n2.body)) / 2) return [{ kind: "expire", body: n2.body.id }];
+        return [];
+      }
+      default:
+        return [];
+    }
+  }
+
+  // src/behave/walls.ts
+  function wallBoxes(walls) {
+    return walls.map((w2) => {
+      let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+      for (const p of w2.points) {
+        minX = Math.min(minX, p.x);
+        maxX = Math.max(maxX, p.x);
+        minY = Math.min(minY, p.y);
+        maxY = Math.max(maxY, p.y);
+      }
+      return { minX, maxX, minY, maxY };
+    });
+  }
+  var angleDiff = (a, b) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
+  function applyWalls(body, boxes, dt, state = { contactSteps: 0 }) {
+    let { x, y, vx, vy } = body;
+    let reasoning = "";
+    if (!boxes.length) return { vx, vy, x, y, reasoning, state };
+    const size = sizeOf(body);
+    const standoff = Math.max(9, size * 0.45);
+    const half = Math.max(6, Math.min(body.w, body.h) * 0.5);
+    const speed = Math.hypot(vx, vy);
+    const heading = speed > 1e-6 ? Math.atan2(vy, vx) : body.heading;
+    let contact = false;
+    for (const r of boxes) {
+      const look = 24 + size * 1.2;
+      const px = x + Math.cos(heading) * look, py = y + Math.sin(heading) * look;
+      const s = standoff + half;
+      if (px > r.minX - s && px < r.maxX + s && py > r.minY - s && py < r.maxY + s) {
+        const away = Math.atan2(y - (r.minY + r.maxY) / 2, x - (r.minX + r.maxX) / 2);
+        const t1 = away + Math.PI / 2, t2 = away - Math.PI / 2;
+        const slide = Math.abs(angleDiff(t1, heading)) <= Math.abs(angleDiff(t2, heading)) ? t1 : t2;
+        const target = slide + angleDiff(away, slide) * 0.3;
+        const turned = heading + angleDiff(target, heading) * 0.35;
+        const sp = Math.max(speed, 1e-6);
+        vx = Math.cos(turned) * sp;
+        vy = Math.sin(turned) * sp;
+        reasoning = "sliding along a wall ahead";
+      }
+      const m = half + 2;
+      if (x > r.minX - m && x < r.maxX + m && y > r.minY - m && y < r.maxY + m) {
+        contact = true;
+        const pushLeft = x - (r.minX - m), pushRight = r.maxX + m - x, pushUp = y - (r.minY - m), pushDown = r.maxY + m - y;
+        const least = Math.min(pushLeft, pushRight, pushUp, pushDown);
+        const sp = Math.max(Math.hypot(vx, vy), size * 0.8);
+        if (least === pushLeft || least === pushRight) {
+          x = least === pushLeft ? r.minX - m : r.maxX + m;
+          const sign = vy >= 0 ? 1 : -1;
+          vx = 0;
+          vy = sign * sp;
+        } else {
+          y = least === pushUp ? r.minY - m : r.maxY + m;
+          const sign = vx >= 0 ? 1 : -1;
+          vy = 0;
+          vx = sign * sp;
+        }
+        reasoning = "redirected along a wall face";
+      }
+    }
+    const contactSteps = contact ? state.contactSteps + 1 : 0;
+    if (contactSteps > Math.round(1.5 / Math.max(dt, 1e-3))) {
+      let best = null, bd = Infinity;
+      for (const r of boxes) {
+        const d = Math.hypot(x - (r.minX + r.maxX) / 2, y - (r.minY + r.maxY) / 2);
+        if (d < bd) {
+          bd = d;
+          best = r;
+        }
+      }
+      if (best) {
+        const away = Math.atan2(y - (best.minY + best.maxY) / 2, x - (best.minX + best.maxX) / 2);
+        const sp = Math.max(Math.hypot(vx, vy), size * 0.6);
+        vx = Math.cos(away) * sp;
+        vy = Math.sin(away) * sp;
+        reasoning = "pressed against a wall too long \u2014 disengaging";
+      }
+      return { vx, vy, x, y, reasoning, state: { contactSteps: 0 } };
+    }
+    return { vx, vy, x, y, reasoning, state: { contactSteps } };
+  }
+
+  // src/behave/steer.ts
+  function steer(b, world) {
+    const speed = b.speed ?? DEFAULT_SPEED, maxForce = b.maxForce ?? DEFAULT_MAX_FORCE;
+    const results = [];
+    const all = [];
+    let fx = 0, fy = 0;
+    for (const t of b.terms) {
+      const f = force(t, world, speed);
+      results.push({ ...f, verb: t.verb, target: t.target, weight: t.weight, share: 0 });
+      fx += f.fx;
+      fy += f.fy;
+      all.push(...intents(t, world));
+    }
+    const total = results.reduce((a, r) => a + Math.hypot(r.fx, r.fy), 0) || 1;
+    for (const r of results) r.share = Math.hypot(r.fx, r.fy) / total;
+    const mag = Math.hypot(fx, fy);
+    if (mag > maxForce) {
+      fx *= maxForce / mag;
+      fy *= maxForce / mag;
+    }
+    return { fx, fy, terms: results, intents: all };
+  }
+  function step(b, world, wallState = { contactSteps: 0 }) {
+    const speed = b.speed ?? DEFAULT_SPEED;
+    const s = steer(b, world);
+    const me = world.me;
+    let vx = me.vx + s.fx * world.dt, vy = me.vy + s.fy * world.dt;
+    const sp = Math.hypot(vx, vy);
+    if (sp > speed) {
+      vx *= speed / sp;
+      vy *= speed / sp;
+    }
+    const walled = applyWalls({ ...me, vx, vy }, wallBoxes(world.walls), world.dt, wallState);
+    const x = walled.x + walled.vx * world.dt, y = walled.y + walled.vy * world.dt;
+    const moving = Math.hypot(walled.vx, walled.vy) > 1e-6;
+    return {
+      body: { ...me, x, y, vx: walled.vx, vy: walled.vy, heading: moving ? Math.atan2(walled.vy, walled.vx) : me.heading, age: me.age + world.dt },
+      steering: s,
+      wall: walled.reasoning,
+      wallState: walled.state
+    };
+  }
+  function seeded(seed) {
+    let a = seed >>> 0;
+    return () => {
+      a = a + 1831565813 >>> 0;
+      let t = a;
+      t = Math.imul(t ^ t >>> 15, t | 1);
+      t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+  }
+  function worldOf(me, others, walls, t, dt, rng) {
+    return { t, dt, me, others, walls, named: (name) => others.filter((o) => o.name === name), rng };
+  }
+
+  // src/behave/fit.ts
+  var key = (t) => t.target ? `${t.verb}:${t.target}` : t.verb;
+  function fit2(demo, basis, worldAt, speed = 120) {
+    if (demo.length < 3) return { terms: [], residual: 1, explained: {}, reasoning: "too short to fit" };
+    const v = [];
+    for (let i = 0; i < demo.length - 1; i++) {
+      const dt = Math.max(1e-3, demo[i + 1].t - demo[i].t);
+      v.push({ x: (demo[i + 1].x - demo[i].x) / dt, y: (demo[i + 1].y - demo[i].y) / dt });
+    }
+    const rows = [];
+    for (let i = 0; i < v.length - 1; i++) {
+      const dt = Math.max(1e-3, demo[i + 1].t - demo[i].t);
+      const a = [(v[i + 1].x - v[i].x) / dt, (v[i + 1].y - v[i].y) / dt];
+      const me = { id: "demo", name: "demo", x: demo[i + 1].x, y: demo[i + 1].y, vx: v[i].x, vy: v[i].y, w: 20, h: 12, heading: Math.atan2(v[i].y, v[i].x), age: demo[i + 1].t - demo[0].t, origin: { x: demo[0].x, y: demo[0].y } };
+      rows.push({ a, t: demo[i + 1].t, me });
+    }
+    const names = /* @__PURE__ */ new Set();
+    for (const r of rows) for (const o of worldAt(r.t, r.me).others) names.add(o.name);
+    const candidates = [];
+    for (const verb of basis) {
+      if (verb === "wander" || verb === "avoid" || verb === "consume" || verb === "spawn" || verb === "expire") continue;
+      if (verb === "home" && basis.includes("seek")) continue;
+      if (TARGETED.has(verb)) for (const n2 of names) candidates.push({ verb, target: n2, weight: 1 });
+      else candidates.push({ verb, weight: 1 });
+    }
+    if (!candidates.length) return { terms: [], residual: 1, explained: {}, reasoning: "no verb explains this motion" };
+    const F = rows.map((r) => candidates.map((c) => {
+      const f = force(c, worldAt(r.t, r.me), speed);
+      return [f.fx, f.fy];
+    }));
+    const target = rows.map((r) => r.a);
+    const norm = Math.sqrt(target.reduce((s, a) => s + a[0] * a[0] + a[1] * a[1], 0)) || 1;
+    const residualOf = (w2) => {
+      let s = 0;
+      for (let i = 0; i < rows.length; i++) {
+        let px = 0, py = 0;
+        for (let j = 0; j < w2.length; j++) {
+          px += F[i][j][0] * w2[j];
+          py += F[i][j][1] * w2[j];
+        }
+        s += (px - target[i][0]) ** 2 + (py - target[i][1]) ** 2;
+      }
+      return Math.sqrt(s) / norm;
+    };
+    const solve = (lambda) => {
+      const w2 = new Array(candidates.length).fill(0);
+      let scale = 0;
+      for (const row of F) for (const f of row) scale += f[0] * f[0] + f[1] * f[1];
+      const lr = 1 / (scale / rows.length + 1e-9) / 2;
+      for (let it = 0; it < 600; it++) {
+        const g = new Array(w2.length).fill(0);
+        for (let i = 0; i < rows.length; i++) {
+          let px = 0, py = 0;
+          for (let j = 0; j < w2.length; j++) {
+            px += F[i][j][0] * w2[j];
+            py += F[i][j][1] * w2[j];
+          }
+          const ex = px - target[i][0], ey = py - target[i][1];
+          for (let j = 0; j < w2.length; j++) g[j] += (ex * F[i][j][0] + ey * F[i][j][1]) / rows.length;
+        }
+        for (let j = 0; j < w2.length; j++) w2[j] = Math.max(0, w2[j] - lr * (g[j] + lambda * norm * norm / rows.length));
+      }
+      return w2;
+    };
+    const sweep = [0, 1e-3, 3e-3, 0.01, 0.03, 0.1, 0.3];
+    const significant = (w2) => {
+      const m = Math.max(...w2, 1e-9);
+      return w2.filter((x) => x > 0.05 && x > m * 0.1).length;
+    };
+    const fits = sweep.map((l) => {
+      const w2 = solve(l);
+      return { w: w2, residual: residualOf(w2), count: significant(w2) };
+    });
+    const best = Math.min(...fits.map((f) => f.residual));
+    const chosen = fits.filter((f) => f.residual <= best * 1.1 + 1e-9).sort((a, b) => a.count - b.count || a.residual - b.residual)[0];
+    const terms = [];
+    const explained = {};
+    let totalForce = 0;
+    const forces = candidates.map((_, j) => Math.sqrt(F.reduce((s, row) => s + (row[j][0] * chosen.w[j]) ** 2 + (row[j][1] * chosen.w[j]) ** 2, 0)));
+    for (const f of forces) totalForce += f;
+    const maxW = Math.max(...chosen.w, 1e-9);
+    candidates.forEach((c, j) => {
+      if (chosen.w[j] <= 0.05 || chosen.w[j] <= maxW * 0.1) return;
+      const share = totalForce ? forces[j] / totalForce : 0;
+      const t = { ...c, weight: Math.round(chosen.w[j] * 100) / 100, reasoning: `explains ${Math.round(share * 100)}% of what was shown` };
+      terms.push(t);
+      explained[key(t)] = share;
+    });
+    terms.sort((a, b) => b.weight - a.weight);
+    const missing = Math.round(chosen.residual * 100);
+    return {
+      terms,
+      residual: chosen.residual,
+      explained,
+      reasoning: terms.length ? `${terms.map((t) => `${t.verb}${t.target ? " " + t.target : ""} ${t.weight}`).join(", ")}; ${missing}% of the motion is unexplained${missing > 35 ? " \u2014 something is missing" : ""}` : "no verb explains this motion"
+    };
+  }
+
   // src/session/erase.ts
   var DEFAULT_ERASE_CROSSINGS = 3;
   function segmentsIntersect(p1, p2, p3, p4) {
@@ -1706,11 +2091,11 @@ var MetaMediumCore = (() => {
     const f = commandMarkFeatures(fp);
     let worst = 0;
     let worstFeature = FEATURES[0];
-    for (const key of FEATURES) {
-      const normalized = Math.abs(f[key] - mark.features[key]) / mark.tolerance[key];
+    for (const key2 of FEATURES) {
+      const normalized = Math.abs(f[key2] - mark.features[key2]) / mark.tolerance[key2];
       if (normalized > worst) {
         worst = normalized;
-        worstFeature = key;
+        worstFeature = key2;
       }
     }
     if (worst > 1) return { match: false, score: 0, failedOn: worstFeature };
@@ -1925,7 +2310,7 @@ var MetaMediumCore = (() => {
   var h = (b) => b.maxY - b.minY;
   var cx = (b) => (b.minX + b.maxX) / 2;
   var cy = (b) => (b.minY + b.maxY) / 2;
-  var sizeOf = (b) => Math.max(w(b), h(b));
+  var sizeOf2 = (b) => Math.max(w(b), h(b));
   function overlapFraction(aMin, aMax, bMin, bMax) {
     const shorter = Math.min(aMax - aMin, bMax - bMin);
     if (shorter <= 0) return 0;
@@ -1953,17 +2338,17 @@ var MetaMediumCore = (() => {
         const b = marks[j];
         const ab = a.bounds;
         const bb = b.bounds;
-        const ref = Math.max(1, Math.min(sizeOf(ab), sizeOf(bb)));
+        const ref = Math.max(1, Math.min(sizeOf2(ab), sizeOf2(bb)));
         if (boundsContain(ab, bb)) {
           const margin = Math.min(bb.minX - ab.minX, bb.minY - ab.minY, ab.maxX - bb.maxX, ab.maxY - bb.maxY);
-          const strength = Math.min(1, 0.5 + margin / Math.max(1, sizeOf(ab)));
+          const strength = Math.min(1, 0.5 + margin / Math.max(1, sizeOf2(ab)));
           add("contains", a.id, b.id, strength, `${b.id} sits wholly inside ${a.id}`);
           add("inside", b.id, a.id, strength, `${b.id} sits wholly inside ${a.id}`);
           continue;
         }
         if (boundsContain(bb, ab)) {
           const margin = Math.min(ab.minX - bb.minX, ab.minY - bb.minY, bb.maxX - ab.maxX, bb.maxY - ab.maxY);
-          const strength = Math.min(1, 0.5 + margin / Math.max(1, sizeOf(bb)));
+          const strength = Math.min(1, 0.5 + margin / Math.max(1, sizeOf2(bb)));
           add("contains", b.id, a.id, strength, `${a.id} sits wholly inside ${b.id}`);
           add("inside", a.id, b.id, strength, `${a.id} sits wholly inside ${b.id}`);
           continue;
@@ -2012,7 +2397,7 @@ var MetaMediumCore = (() => {
           add("same-column", a.id, b.id, 1 - dx / colTol, `centres within ${Math.round(dx)}px horizontally`);
           add("same-column", b.id, a.id, 1 - dx / colTol, `centres within ${Math.round(dx)}px horizontally`);
         }
-        const ratio = Math.min(sizeOf(ab), sizeOf(bb)) / Math.max(1, Math.max(sizeOf(ab), sizeOf(bb)));
+        const ratio = Math.min(sizeOf2(ab), sizeOf2(bb)) / Math.max(1, Math.max(sizeOf2(ab), sizeOf2(bb)));
         if (ratio > config.peerRatio) {
           add("same-size", a.id, b.id, ratio, `within ${Math.round((1 - ratio) * 100)}% of each other in size`);
           add("same-size", b.id, a.id, ratio, `within ${Math.round((1 - ratio) * 100)}% of each other in size`);
@@ -2060,8 +2445,8 @@ var MetaMediumCore = (() => {
     if (scope.length === 0) return "No relations between these marks.";
     const byPair = /* @__PURE__ */ new Map();
     for (const r of scope) {
-      const key = `${r.from}\u2192${r.to}`;
-      (byPair.get(key) ?? byPair.set(key, []).get(key)).push(r);
+      const key2 = `${r.from}\u2192${r.to}`;
+      (byPair.get(key2) ?? byPair.set(key2, []).get(key2)).push(r);
     }
     const lines = [];
     for (const [pair, rels] of byPair) {
@@ -3029,7 +3414,7 @@ ${pad}</${tag}>`;
       if (kind !== "line" && kind !== "arrow") return;
       const arrow = getRep(node, "reading:arrow")?.data;
       const ends = kind === "arrow" && arrow ? [arrow.tail, arrow.tip] : [points[0], points[points.length - 1]];
-      const nearest = (p) => {
+      const nearest2 = (p) => {
         let best = null;
         for (const c of contentBoundsList(node.id)) {
           const size = Math.max(c.bounds.maxX - c.bounds.minX, c.bounds.maxY - c.bounds.minY);
@@ -3039,8 +3424,8 @@ ${pad}</${tag}>`;
         }
         return best;
       };
-      const a = nearest(ends[0]);
-      const b = nearest(ends[1]);
+      const a = nearest2(ends[0]);
+      const b = nearest2(ends[1]);
       if (!a || !b || a.id === b.id) return;
       const weight = top.weight;
       const why = `its ${kind === "arrow" ? "tail" : "start"} lands on ${a.id} and its ${kind === "arrow" ? "tip" : "end"} on ${b.id}`;
@@ -4193,9 +4578,9 @@ ${pad}</${tag}>`;
       if (!ENGAGING_RELATIONS.includes(r.kind)) continue;
       const a = name(r.from), b = name(r.to);
       if (!a || !b) continue;
-      const key = r.kind === "contains" ? `${r.kind}:${a}:${b}` : `${r.kind}:${[a, b].sort().join(":")}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
+      const key2 = r.kind === "contains" ? `${r.kind}:${a}:${b}` : `${r.kind}:${[a, b].sort().join(":")}`;
+      if (seen.has(key2)) continue;
+      seen.add(key2);
       const verb = r.kind === "contains" ? "contains" : r.kind === "near" ? "is near" : r.kind === "touching" ? "touches" : "crosses";
       sits.push(`${a} ${verb} ${b} (${r.strength.toFixed(2)})`);
     }
