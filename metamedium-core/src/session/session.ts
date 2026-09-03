@@ -64,6 +64,7 @@ import { type SnapReading, idealize, snapReading, cleanOf } from './clean';
 import { isLetterLike, joinsRun, wordConfidence } from './words';
 import { type StructuralSignature, type Examples, structuralSignature, matchDefinition, addExample, MATCH_FLOOR } from './signature';
 import type { Kind } from '../kinds/kinds';
+import type { Behaviour } from '../behave/verbs';
 
 // ===== Public state shape =====
 
@@ -220,6 +221,12 @@ export type SessionEvent =
   | { type: 'join'; kind: ParticipantKind; name: string; at: number; capability?: Capability }
   | { type: 'propose'; participantId: string; nodeId: string; edges: ProposedEdge[]; reps?: ProposedRep[]; at: number }
   | { type: 'teach'; mark: CommandMark | null; at: number }
+  /**
+   * A behaviour for a definition, held as a rep. From a human it is blessed
+   * by the act; from a model or the engine's own fit it is held, attributed,
+   * and drives nothing until a human gives it again in their own name.
+   */
+  | { type: 'behave'; nodeId: string; behaviour: Behaviour; participantId?: string; at: number }
   /** An artifact's clock: play (the bless to run), pause, reset, or reseed. */
   | { type: 'clock'; nodeId: string; op: 'play' | 'pause' | 'reset' | 'seed'; seed?: number; reason?: string; at: number; participantId?: string }
   /**
@@ -350,6 +357,8 @@ export interface Session {
    * teaching is part of the session's history and replays with it.
    */
   teachCommandMark(mark: CommandMark | null, at: number): void;
+  /** Give a definition a behaviour. A human's is blessed by the act; a model's or the fit's is held until a human gives it. */
+  behave(args: { nodeId: string; behaviour: Behaviour; participantId?: string; at: number }): void;
   /** Play, pause, reset or reseed an artifact's clock. Play is the bless that lets its code run (I9). */
   clock(args: { nodeId: string; op: 'play' | 'pause' | 'reset' | 'seed'; seed?: number; reason?: string; at: number; participantId?: string }): void;
   /** Say that a group is, or is not, a definition; the correction is remembered on the definition. */
@@ -1606,6 +1615,28 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     }
   }
 
+  function isHuman(participantId: string): boolean {
+    if (participantId === LOCAL_PARTICIPANT) return true;
+    const p = nodes.get(participantId);
+    const kind = (getRep(p!, 'participant')?.data as { kind?: string } | undefined)?.kind;
+    return kind === 'human';
+  }
+
+  /** A behaviour lands on a definition as a rep; whether it is blessed is who gave it. */
+  function applyBehave(ev: Extract<SessionEvent, { type: 'behave' }>) {
+    const node = nodes.get(ev.nodeId);
+    if (!node || !artifacts.includes(ev.nodeId)) return;
+    const pid = ev.participantId ?? LOCAL_PARTICIPANT;
+    if (!participants.includes(pid)) return;
+    const terms = Array.isArray(ev.behaviour?.terms) ? ev.behaviour.terms : [];
+    if (terms.length === 0 && !ev.behaviour?.code) return;
+    node.reps.push({
+      modality: 'behaviour',
+      data: { ...ev.behaviour, terms, blessed: isHuman(pid), at: ev.at },
+      source: pid,
+    });
+  }
+
   function sameSet(a: readonly string[], b: readonly string[]): boolean {
     if (a.length !== b.length) return false;
     const set = new Set(a);
@@ -1686,6 +1717,9 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
         return null;
       case 'clock':
         applyClock(ev);
+        return null;
+      case 'behave':
+        applyBehave(ev);
         return null;
       case 'summon':
         return applySummon(ev);
@@ -1799,6 +1833,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     teachCommandMark: (mark, at) => void dispatch({ type: 'teach', mark, at }),
     correct: (args) => void dispatch({ type: 'correct', ...args }),
     clock: (args) => void dispatch({ type: 'clock', ...args }),
+    behave: (args) => void dispatch({ type: 'behave', ...args }),
     matchesOf: (ids) => matchesFor(ids),
     tidy: (args) => void dispatch({ type: 'tidy', ...args }),
     snap: (args) => void dispatch({ type: 'snap', ...args }),

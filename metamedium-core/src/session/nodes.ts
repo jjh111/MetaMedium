@@ -284,3 +284,17 @@ export function boundsOf(node: MMNode): Bounds | undefined {
   if (fp) return fp.bounds;
   return getRep(node, 'bounds')?.data as Bounds | undefined;
 }
+
+/** The behaviour that drives a definition: the newest one a human gave (or gave again in their name). */
+export function blessedBehaviourOf(node: MMNode): (Record<string, unknown> & { terms: unknown[] }) | undefined {
+  for (let i = node.reps.length - 1; i >= 0; i--) {
+    const r = node.reps[i];
+    if (r.modality === 'behaviour' && (r.data as { blessed?: boolean }).blessed) return r.data as Record<string, unknown> & { terms: unknown[] };
+  }
+  return undefined;
+}
+
+/** Every behaviour held on a definition, newest first, blessed or not — the panel shows them all. */
+export function behavioursOf(node: MMNode): Rep[] {
+  return node.reps.filter((r) => r.modality === 'behaviour').reverse();
+}

@@ -41,10 +41,11 @@
     return inst ? inst.to : artifactId;
   }
 
+  /** What drives a definition: the newest behaviour a human gave it, else the built-in. */
   function behaviourOf(s, defId) {
     const n = s.nodes.get(defId);
-    const rep = n && n.reps.filter((r) => r.modality === 'behaviour').pop();
-    return (rep && rep.data && rep.data.terms) ? rep.data : BUILTIN_BEHAVIOUR;
+    const b = n && MM.blessedBehaviourOf(n);
+    return (b && b.terms && b.terms.length) ? b : BUILTIN_BEHAVIOUR;
   }
 
   /** The bodies of a definition, in creation order: itself, blessed instances, then held candidates. */
@@ -112,6 +113,7 @@
         const world = MM.worldOf(e.body, others, [], d.t, FIXED_DT, d.rng);
         const r = MM.step(behaviour, world, e.wallState);
         e.body = r.body; e.wallState = r.wallState;
+        e.shares = r.steering.terms; // each verb's share of the last step, for the panel
         const sp = Math.hypot(r.body.vx, r.body.vy);
         if (sp > (behaviour.speed || MM.DEFAULT_SPEED) * 0.2) e.angle = r.body.heading;
       }
@@ -135,6 +137,107 @@
     const e = tank.place.get(nodeId);
     if (!e) return null;
     return { dx: e.body.x - e.origin.x, dy: e.body.y - e.origin.y, angle: e.angle, cx: e.origin.x, cy: e.origin.y };
+  }
+
+  /** The last step's shares for a definition's first body: what each verb is doing right now. */
+  function liveShares(defId) {
+    const d = tank.defs.get(defId);
+    if (!d || !d.order.length) return null;
+    return d.bodies.get(d.order[0]).shares || null;
+  }
+
+  // ===== Acting it out ======================================================
+  // Drag a body while its clock runs and the path is a demonstration: sampled
+  // against where everything else was at each moment, fitted onto the verb
+  // basis, and held on the definition with each term's share and the residual
+  // named. The human then gives it in their own name, or not.
+  let demo = null; // { defId, bodyId, samples: [{x, y, t, others}], t0 }
+
+  /** The body a node belongs to, if it is in a playing tank. */
+  function bodyOfNode(s, nodeId) {
+    for (const [defId, d] of tank.defs) {
+      if (!s.clocks[defId] || !s.clocks[defId].playing) continue;
+      for (const id of d.order) {
+        const e = d.bodies.get(id);
+        if (e.entry.memberIds.includes(nodeId)) return { defId, bodyId: id };
+      }
+    }
+    return null;
+  }
+
+  /** Start a demonstration if the selection is a body in a running tank. */
+  function demoBegin(selection, w) {
+    const s = session.getState();
+    const hit = selection.map((id) => bodyOfNode(s, id)).find(Boolean);
+    if (!hit) return false;
+    demo = { defId: hit.defId, bodyId: hit.bodyId, samples: [], t0: performance.now() / 1000 };
+    demoSample(w, 0);
+    canvas.style.cursor = 'grabbing';
+    return true;
+  }
+
+  function demoSample(w, t) {
+    const d = tank.defs.get(demo.defId);
+    const e = d && d.bodies.get(demo.bodyId);
+    if (!e) return;
+    // The hand places the body; the tank keeps running around it.
+    e.body = { ...e.body, x: w.x, y: w.y };
+    refreshPlacements();
+    const others = allBodies().filter((b) => b.id !== demo.bodyId).map((b) => ({ ...b }));
+    demo.samples.push({ x: w.x, y: w.y, t: t, others: others });
+  }
+
+  function demoMove(w) {
+    if (!demo) return false;
+    demoSample(w, performance.now() / 1000 - demo.t0);
+    render(state);
+    return true;
+  }
+
+  /** The path fitted onto the basis, held on the definition — nothing blessed. */
+  function demoEnd() {
+    if (!demo) return false;
+    const done = demo;
+    demo = null;
+    canvas.style.cursor = 'crosshair';
+    actOut(done.defId, done.bodyId, done.samples);
+    return true;
+  }
+
+  function actOut(defId, bodyId, samples) {
+    const s = session.getState();
+    const d = tank.defs.get(defId);
+    const e = d && d.bodies.get(bodyId);
+    if (!e || samples.length < 3) { flash('too short to read as a behaviour'); return null; }
+    // A sample recorded by the hand carries where everything else was; one
+    // fed in bare (a test, a replayed path) sees the tank as it stands now.
+    const now = allBodies().filter((b) => b.id !== bodyId).map((b) => ({ ...b }));
+    const worldAt = (t, me) => {
+      let best = samples[0];
+      for (const smp of samples) if (Math.abs(smp.t - t) < Math.abs(best.t - t)) best = smp;
+      return MM.worldOf(me, best.others || now, [], t, FIXED_DT, () => 0.5);
+    };
+    const behaviour = behaviourOf(s, defId);
+    const basis = MM.VERBS.filter((v) => v !== 'wander' && v !== 'spawn' && v !== 'expire');
+    // The verbs steer toward a speed. A hand drags at its own pace, and a
+    // path faster than the verbs' speed reads as every verb pulling back —
+    // so the fit is made at the pace that was shown, and the behaviour keeps it.
+    let peak = 0;
+    for (let i = 1; i < samples.length; i++) {
+      const dt = Math.max(1e-3, samples[i].t - samples[i - 1].t);
+      peak = Math.max(peak, Math.hypot(samples[i].x - samples[i - 1].x, samples[i].y - samples[i - 1].y) / dt);
+    }
+    const speed = Math.max(behaviour.speed || MM.DEFAULT_SPEED, Math.round(peak * 0.8));
+    const fitted = MM.fit(samples.map((p) => ({ x: p.x, y: p.y, t: p.t })), basis, worldAt, speed, { id: bodyId, name: e.body.name, w: e.body.w, h: e.body.h });
+    if (!fitted.terms.length) { flash('the path fits no verb — ' + fitted.reasoning); return fitted; }
+    session.behave({
+      nodeId: defId,
+      behaviour: { terms: fitted.terms, source: 'demo', speed: speed, residual: fitted.residual, explained: fitted.explained, reasoning: fitted.reasoning + ' at ' + speed + ' px/s' },
+      participantId: MM.TIER0_PARTICIPANT,
+      at: Date.now(),
+    });
+    flash('acted out: ' + MM.describeBehaviour({ terms: fitted.terms }) + ' — ' + Math.round((1 - fitted.residual) * 100) + '% explained; see the panel to use it');
+    return fitted;
   }
 
   function tankTime(defId) {

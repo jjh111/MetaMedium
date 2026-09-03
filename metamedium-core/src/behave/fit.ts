@@ -33,8 +33,9 @@ const key = (t: Term) => (t.target ? `${t.verb}:${t.target}` : t.verb);
  * @param basis    which verbs to consider (wander is ignored)
  * @param worldAt  the world as it was at time t, with `me` at the sample
  * @param speed    the speed the verbs steer toward
+ * @param body     the body that was dragged — its size sets every range-relative verb's reach
  */
-export function fit(demo: Sample[], basis: Verb[], worldAt: (t: number, me: Body) => World, speed = 120): FitResult {
+export function fit(demo: Sample[], basis: Verb[], worldAt: (t: number, me: Body) => World, speed = 120, body: Partial<Body> = {}): FitResult {
   if (demo.length < 3) return { terms: [], residual: 1, explained: {}, reasoning: 'too short to fit' };
 
   // Velocities and accelerations by finite differences.
@@ -47,7 +48,10 @@ export function fit(demo: Sample[], basis: Verb[], worldAt: (t: number, me: Body
   for (let i = 0; i < v.length - 1; i++) {
     const dt = Math.max(1e-3, demo[i + 1].t - demo[i].t);
     const a: [number, number] = [(v[i + 1].x - v[i].x) / dt, (v[i + 1].y - v[i].y) / dt];
-    const me: Body = { id: 'demo', name: 'demo', x: demo[i + 1].x, y: demo[i + 1].y, vx: v[i].x, vy: v[i].y, w: 20, h: 12, heading: Math.atan2(v[i].y, v[i].x), age: demo[i + 1].t - demo[0].t, origin: { x: demo[0].x, y: demo[0].y } };
+    // The demonstrating body at its real size: flee's range, avoid's reach and
+    // school's spacing are ratios of it, and a stand-in the size of a thumbnail
+    // saw nothing within reach.
+    const me: Body = { id: body.id ?? 'demo', name: body.name ?? 'demo', x: demo[i + 1].x, y: demo[i + 1].y, vx: v[i].x, vy: v[i].y, w: body.w ?? 20, h: body.h ?? 12, heading: Math.atan2(v[i].y, v[i].x), age: demo[i + 1].t - demo[0].t, origin: { x: demo[0].x, y: demo[0].y } };
     rows.push({ a, t: demo[i + 1].t, me });
   }
 

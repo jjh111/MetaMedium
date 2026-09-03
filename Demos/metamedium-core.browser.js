@@ -53,6 +53,7 @@ var MetaMediumCore = (() => {
     META_DIR: () => META_DIR,
     MIN_CONFIDENCE: () => MIN_CONFIDENCE,
     MemoryStore: () => MemoryStore,
+    PHRASES: () => PHRASES,
     PRESETS: () => PRESETS,
     ROLES: () => ROLES,
     ReadOnlyError: () => ReadOnlyError,
@@ -74,8 +75,11 @@ var MetaMediumCore = (() => {
     analyzeStroke: () => analyzeStroke,
     applyWalls: () => applyWalls,
     assignRoles: () => assignRoles,
+    behaviourSource: () => behaviourSource,
+    behavioursOf: () => behavioursOf,
     between: () => between,
     binarize: () => binarize,
+    blessedBehaviourOf: () => blessedBehaviourOf,
     boundingBoxDistance: () => boundingBoxDistance,
     boundsContain: () => boundsContain,
     boundsOf: () => boundsOf,
@@ -88,6 +92,7 @@ var MetaMediumCore = (() => {
     calculateStraightness: () => calculateStraightness,
     canonicalCheckSamples: () => canonicalCheckSamples,
     checkOvershoot: () => checkOvershoot,
+    clausesOf: () => clausesOf,
     cleanOf: () => cleanOf,
     cleanPointsOf: () => cleanPointsOf,
     clusters: () => clusters,
@@ -107,6 +112,7 @@ var MetaMediumCore = (() => {
     decodeLog: () => decodeLog,
     denoise: () => denoise,
     describeAddressed: () => describeAddressed,
+    describeBehaviour: () => describeBehaviour,
     describeGraph: () => describeGraph,
     describeLayout: () => describeLayout,
     describeMaths: () => describeMaths,
@@ -170,6 +176,9 @@ var MetaMediumCore = (() => {
     normalizeStroke: () => normalizeStroke,
     otsu: () => otsu,
     outlineOf: () => outlineOf,
+    parseBehaviour: () => parseBehaviour,
+    parseBehaviourReply: () => parseBehaviourReply,
+    parseClause: () => parseClause,
     parseCode: () => parseCode,
     parseFill: () => parseFill,
     parseGraph: () => parseGraph,
@@ -200,6 +209,7 @@ var MetaMediumCore = (() => {
     segmentsIntersect: () => segmentsIntersect,
     shapeExtent: () => shapeExtent,
     simplifyStroke: () => simplifyStroke,
+    singular: () => singular,
     sizeOf: () => sizeOf,
     smoothStroke: () => smoothStroke,
     snapReading: () => snapReading,
@@ -1088,6 +1098,16 @@ var MetaMediumCore = (() => {
     const fp = fingerprintOf(node);
     if (fp) return fp.bounds;
     return getRep(node, "bounds")?.data;
+  }
+  function blessedBehaviourOf(node) {
+    for (let i = node.reps.length - 1; i >= 0; i--) {
+      const r = node.reps[i];
+      if (r.modality === "behaviour" && r.data.blessed) return r.data;
+    }
+    return void 0;
+  }
+  function behavioursOf(node) {
+    return node.reps.filter((r) => r.modality === "behaviour").reverse();
   }
 
   // src/session/interpretations.ts
@@ -2264,7 +2284,7 @@ var MetaMediumCore = (() => {
 
   // src/behave/fit.ts
   var key = (t) => t.target ? `${t.verb}:${t.target}` : t.verb;
-  function fit2(demo, basis, worldAt, speed = 120) {
+  function fit2(demo, basis, worldAt, speed = 120, body = {}) {
     if (demo.length < 3) return { terms: [], residual: 1, explained: {}, reasoning: "too short to fit" };
     const v = [];
     for (let i = 0; i < demo.length - 1; i++) {
@@ -2275,7 +2295,7 @@ var MetaMediumCore = (() => {
     for (let i = 0; i < v.length - 1; i++) {
       const dt = Math.max(1e-3, demo[i + 1].t - demo[i].t);
       const a = [(v[i + 1].x - v[i].x) / dt, (v[i + 1].y - v[i].y) / dt];
-      const me = { id: "demo", name: "demo", x: demo[i + 1].x, y: demo[i + 1].y, vx: v[i].x, vy: v[i].y, w: 20, h: 12, heading: Math.atan2(v[i].y, v[i].x), age: demo[i + 1].t - demo[0].t, origin: { x: demo[0].x, y: demo[0].y } };
+      const me = { id: body.id ?? "demo", name: body.name ?? "demo", x: demo[i + 1].x, y: demo[i + 1].y, vx: v[i].x, vy: v[i].y, w: body.w ?? 20, h: body.h ?? 12, heading: Math.atan2(v[i].y, v[i].x), age: demo[i + 1].t - demo[0].t, origin: { x: demo[0].x, y: demo[0].y } };
       rows.push({ a, t: demo[i + 1].t, me });
     }
     const names = /* @__PURE__ */ new Set();
@@ -2375,6 +2395,115 @@ var MetaMediumCore = (() => {
       explained,
       reasoning: terms.length ? `${terms.map((t) => `${t.verb}${t.target ? " " + t.target : ""} ${t.weight}`).join(", ")}; ${missing}% of the motion is unexplained${missing > 35 ? " \u2014 something is missing" : ""}` : "no verb explains this motion"
     };
+  }
+
+  // src/behave/words.ts
+  var PHRASES = {
+    seek: ["swim toward", "swims toward", "swim towards", "swims towards", "go to", "goes to", "head for", "heads for", "move toward", "moves toward", "seek", "seeks", "chase", "chases", "follow", "follows", "hunt", "hunts", "approach", "approaches", "toward", "towards"],
+    flee: ["run from", "runs from", "swim away from", "swims away from", "run away from", "runs away from", "flee from", "flees from", "flee", "flees", "escape", "escapes", "fear", "fears", "afraid of", "scared of", "away from"],
+    home: ["hide in", "hides in", "hide among", "hides among", "shelter in", "shelters in", "live in", "lives in", "rest in", "rests in", "return to", "returns to", "go home to", "goes home to", "home to", "home"],
+    school: ["school with", "schools with", "flock with", "flocks with", "swim with", "swims with", "stay with", "stays with", "group with", "groups with", "school", "schools", "flock", "flocks"],
+    hold: ["stay put", "stays put", "stay still", "stays still", "keep to", "keeps to", "hold position", "holds position", "stay where", "stays where", "hold", "holds"],
+    avoid: ["steer clear of", "steers clear of", "keep away from", "keeps away from", "avoid", "avoids", "dodge", "dodges"],
+    consume: ["feed on", "feeds on", "eat", "eats", "consume", "consumes", "devour", "devours"],
+    spawn: ["spawn", "spawns", "give off", "gives off", "release", "releases", "emit", "emits"],
+    drift: ["drift", "drifts", "float", "floats", "rise", "rises", "sink", "sinks", "fall", "falls"],
+    expire: ["die", "dies", "expire", "expires", "vanish", "vanishes", "disappear", "disappears", "fade", "fades"],
+    wander: ["wander", "wanders", "roam", "roams", "meander", "meanders", "explore", "explores", "swim around", "swims around", "swim about", "swims about", "mill about", "mills about", "move around", "moves around"]
+  };
+  var ARTICLES = /* @__PURE__ */ new Set(["the", "a", "an", "any", "anything", "everything", "all", "other", "others", "every", "some", "its", "their", "nearby", "near", "nearest", "closest"]);
+  var STOP = /* @__PURE__ */ new Set(["and", "then", "while", "but", "when", "until", "so", "or"]);
+  function modifiers(words) {
+    let only;
+    let weight = 1;
+    let direction;
+    for (const w2 of words) {
+      if (w2 === "bigger" || w2 === "larger" || w2 === "big" || w2 === "large") only = "bigger";
+      if (w2 === "smaller" || w2 === "little" || w2 === "small" || w2 === "tiny") only = "smaller";
+      if (w2 === "slowly" || w2 === "gently" || w2 === "a" || w2 === "little") weight = Math.min(weight, 0.5);
+      if (w2 === "quickly" || w2 === "fast" || w2 === "hard" || w2 === "always") weight = Math.max(weight, 1.5);
+      if (w2 === "up" || w2 === "upward" || w2 === "upwards") direction = "up";
+      if (w2 === "down" || w2 === "downward" || w2 === "downwards") direction = "down";
+    }
+    return { only, weight, direction };
+  }
+  function clausesOf(text) {
+    return text.toLowerCase().replace(/[“”"']/g, "").split(/[,;.\n]+|\b(?:and|then|while|but)\b/).map((c) => c.trim()).filter(Boolean);
+  }
+  function parseClause(clause) {
+    const c = " " + clause.replace(/\s+/g, " ").trim() + " ";
+    let best = null;
+    for (const verb of VERBS) {
+      for (const phrase of PHRASES[verb]) {
+        const at = c.indexOf(" " + phrase + " ");
+        if (at < 0) continue;
+        if (!best || phrase.length > best.phrase.length || phrase.length === best.phrase.length && at < best.at) best = { verb, phrase, at };
+      }
+    }
+    if (!best) return null;
+    const before = c.slice(0, best.at).trim().split(" ").filter(Boolean);
+    const afterWords = c.slice(best.at + best.phrase.length + 2).trim().split(" ").filter(Boolean);
+    const mods = modifiers([...before, ...afterWords]);
+    const targetWords = [];
+    for (const w2 of afterWords) {
+      if (STOP.has(w2)) break;
+      if (ARTICLES.has(w2) || w2 === "bigger" || w2 === "larger" || w2 === "smaller" || w2 === "big" || w2 === "large" || w2 === "small" || w2 === "little" || w2 === "tiny" || w2 === "slowly" || w2 === "quickly" || w2 === "fast" || w2 === "gently" || w2 === "hard" || w2 === "always" || w2 === "than" || w2 === "it" || w2 === "itself" || w2 === "them") continue;
+      targetWords.push(w2);
+    }
+    const term = { verb: best.verb, weight: mods.weight, reasoning: `from \u201C${clause.trim()}\u201D` };
+    if (TARGETED.has(best.verb)) {
+      if (targetWords.length) term.target = singular(targetWords.join(" "));
+      else if (mods.only) term.target = "*";
+    }
+    const params = {};
+    if (mods.only && (best.verb === "flee" || best.verb === "seek" || best.verb === "avoid" || best.verb === "consume")) params.only = mods.only;
+    if (mods.direction && best.verb === "drift") params.direction = mods.direction;
+    if (Object.keys(params).length) term.params = params;
+    return term;
+  }
+  function singular(word) {
+    if (word.endsWith("ies") && word.length > 4) return word.slice(0, -3) + "y";
+    if (word.endsWith("shes") || word.endsWith("ches") || word.endsWith("xes") || word.endsWith("sses")) return word.slice(0, -2);
+    if (word.endsWith("s") && !word.endsWith("ss") && word.length > 3) return word.slice(0, -1);
+    return word;
+  }
+  function parseBehaviour(text) {
+    const clauses = clausesOf(text);
+    const terms = [];
+    const unparsed = [];
+    for (const c of clauses) {
+      const t = parseClause(c);
+      if (t) terms.push(t);
+      else unparsed.push(c);
+    }
+    const reasoning = terms.length ? `${terms.length} of ${clauses.length} clause${clauses.length === 1 ? "" : "s"} read as verbs` + (unparsed.length ? `; could not read: ${unparsed.map((u) => `\u201C${u}\u201D`).join(", ")}` : "") : clauses.length ? "no clause names a verb the tank knows" : "nothing written";
+    return {
+      behaviour: terms.length ? { terms, source: "words" } : null,
+      terms,
+      unparsed,
+      reasoning
+    };
+  }
+  function describeBehaviour(b) {
+    return b.terms.map((t) => {
+      const only = typeof t.params?.only === "string" ? ` ${t.params.only}` : "";
+      const target = t.target ? ` ${t.target === "*" ? "anything" : t.target}${only}` : "";
+      const w2 = Math.abs(t.weight - 1) > 1e-6 ? ` (${t.weight.toFixed(2)})` : "";
+      return `${t.verb}${target}${w2}`;
+    }).join(" \xB7 ") || "nothing";
+  }
+  function behaviourSource(b) {
+    const lines = b.terms.map((t) => {
+      const args = [];
+      if (t.target) args.push(JSON.stringify(t.target));
+      args.push(String(+t.weight.toFixed(2)));
+      if (t.params && Object.keys(t.params).length) args.push(JSON.stringify(t.params));
+      return `  ${t.verb}(${args.join(", ")}),${t.reasoning ? "  // " + t.reasoning : ""}`;
+    });
+    return `// steer(world): the sum of these verbs, each a force
+return sum(
+${lines.join("\n")}
+);`;
   }
 
   // src/kinds/address.ts
@@ -5002,6 +5131,25 @@ ${pad}</${tag}>`;
           break;
       }
     }
+    function isHuman(participantId) {
+      if (participantId === LOCAL_PARTICIPANT) return true;
+      const p = nodes.get(participantId);
+      const kind = getRep(p, "participant")?.data?.kind;
+      return kind === "human";
+    }
+    function applyBehave(ev) {
+      const node = nodes.get(ev.nodeId);
+      if (!node || !artifacts.includes(ev.nodeId)) return;
+      const pid = ev.participantId ?? LOCAL_PARTICIPANT;
+      if (!participants.includes(pid)) return;
+      const terms = Array.isArray(ev.behaviour?.terms) ? ev.behaviour.terms : [];
+      if (terms.length === 0 && !ev.behaviour?.code) return;
+      node.reps.push({
+        modality: "behaviour",
+        data: { ...ev.behaviour, terms, blessed: isHuman(pid), at: ev.at },
+        source: pid
+      });
+    }
     function sameSet(a, b) {
       if (a.length !== b.length) return false;
       const set = new Set(a);
@@ -5073,6 +5221,9 @@ ${pad}</${tag}>`;
           return null;
         case "clock":
           applyClock(ev);
+          return null;
+        case "behave":
+          applyBehave(ev);
           return null;
         case "summon":
           return applySummon(ev);
@@ -5174,6 +5325,7 @@ ${pad}</${tag}>`;
       teachCommandMark: (mark, at) => void dispatch({ type: "teach", mark, at }),
       correct: (args) => void dispatch({ type: "correct", ...args }),
       clock: (args) => void dispatch({ type: "clock", ...args }),
+      behave: (args) => void dispatch({ type: "behave", ...args }),
       matchesOf: (ids) => matchesFor(ids),
       tidy: (args) => void dispatch({ type: "tidy", ...args }),
       snap: (args) => void dispatch({ type: "snap", ...args }),
@@ -5637,6 +5789,23 @@ Transcribe what it says. Offer up to 3 readings ranked by confidence when the wr
 
 Reply with ONLY a JSON array, no prose, no code fences:
 [{"text":"what it says","confidence":0.0-1.0}]`;
+  var BEHAVE_PROMPT = `You are a participant on a shared drawing canvas. A human wrote, beside a thing they drew and named, some words about what it DOES. Map those words onto the canvas's closed vocabulary of steering verbs \u2014 nothing else runs here:
+
+  wander            drift about (no target)
+  seek <name>       move toward the nearest thing named <name>
+  flee <name>       move away from the nearest thing named <name> (params.only: "bigger" | "smaller" to qualify)
+  home <name>       return to and rest in the nearest thing named <name>
+  school <name>     move with others named <name>
+  hold              keep to where it started
+  avoid <name>      steer around things named <name>
+  consume <name>    eat things named <name> on contact
+  spawn <name>      give off things named <name>
+  drift             float with a direction (params.direction: "up" | "down")
+  expire            disappear after a while
+
+A target is a NAME the human uses for something on the canvas; use the word they used, singular. Weights are 0\u20132, 1 is normal. Reply with JSON only:
+{"terms":[{"verb":"flee","target":"shark","weight":1,"params":{"only":"bigger"},"why":"'runs from big sharks'"}],"unread":["any clause you could not map"]}
+Every term's "why" quotes the words it came from. Do not invent a verb outside the list.`;
   var DRAW_PROMPT = `You are a participant on a shared drawing canvas, alongside a human. You have been asked to ADD MARKS to the drawing.
 
 You are given the marks already on the canvas as measured facts \u2014 positions, sizes, what each reads as and plays \u2014 in canvas units (y grows downward). You are not given an image.
@@ -5864,6 +6033,37 @@ Reply with ONLY a JSON array, no prose, no code fences.`;
       weight: r.confidence,
       reasoning: r.reasoning || (targetIsCluster ? "proposed for this group" : "proposed for this mark")
     }));
+  }
+  function parseBehaviourReply(text) {
+    const json = outermostObject(text);
+    const terms = [];
+    const dropped = [];
+    let unread = [];
+    if (!json) return { terms, unread, dropped };
+    let parsed;
+    try {
+      parsed = JSON.parse(json);
+    } catch {
+      return { terms, unread, dropped };
+    }
+    for (const raw of Array.isArray(parsed.terms) ? parsed.terms : []) {
+      const t = raw;
+      const verb = String(t.verb ?? "").toLowerCase();
+      if (!VERBS.includes(verb)) {
+        dropped.push(String(t.verb ?? "?"));
+        continue;
+      }
+      const term = { verb, weight: Math.max(0, Math.min(2, Number(t.weight) || 1)), reasoning: t.why ? String(t.why) : "from the model" };
+      if (TARGETED.has(verb) && t.target) term.target = String(t.target).toLowerCase().trim();
+      if (t.params && typeof t.params === "object") {
+        const params = {};
+        for (const [k, v] of Object.entries(t.params)) if (typeof v === "number" || typeof v === "string") params[k] = v;
+        if (Object.keys(params).length) term.params = params;
+      }
+      terms.push(term);
+    }
+    unread = (Array.isArray(parsed.unread) ? parsed.unread : []).map((u) => String(u));
+    return { terms, unread, dropped };
   }
   function createAgentParticipant(session, config, at = 0, options = {}) {
     const send = options.transport ?? ((c, m, o) => complete(c, m, o));
@@ -6156,7 +6356,42 @@ The human asks: ${prompt2}` }
       if (ids.length === 0) return { ok: false, ids: [], shapes, error: "every shape had no size", raw: result2.text };
       return { ok: true, ids, shapes, raw: result2.text };
     }
-    return { id, name, config, interpret, ask, generate, read, draw };
+    async function behave(args) {
+      const words = args.words.trim();
+      if (!words) return { ok: false, behaviour: null, via: "none", unread: [], error: "no words" };
+      const state = session.getState();
+      if (!state.artifacts.includes(args.nodeId)) return { ok: false, behaviour: null, via: "none", unread: [], error: "not a definition" };
+      const local = parseBehaviour(words);
+      if (local.unparsed.length === 0 && local.behaviour) {
+        session.behave({ nodeId: args.nodeId, behaviour: local.behaviour, participantId: id, at: args.at });
+        return { ok: true, behaviour: local.behaviour, via: "table", unread: [] };
+      }
+      const names = state.artifacts.map((a) => state.nodes.get(a)).map((n2) => n2 ? getRep(n2, "word")?.data : void 0).filter((w2) => !!w2);
+      const result2 = await send(
+        config,
+        [
+          { role: "system", content: BEHAVE_PROMPT },
+          { role: "user", content: `Things on the canvas are named: ${names.length ? names.join(", ") : "(nothing named yet)"}.
+
+The human wrote: \u201C${words}\u201D` + (local.terms.length ? `
+
+The canvas already read: ${describeBehaviour({ terms: local.terms })}. Read the rest: ${local.unparsed.map((u) => `\u201C${u}\u201D`).join(", ")}.` : "") }
+        ],
+        { signal: args.signal }
+      );
+      if (!result2.ok) {
+        if (local.behaviour) session.behave({ nodeId: args.nodeId, behaviour: local.behaviour, participantId: id, at: args.at });
+        return { ok: !!local.behaviour, behaviour: local.behaviour, via: local.behaviour ? "table" : "none", unread: local.unparsed, error: result2.error };
+      }
+      const reply = parseBehaviourReply(result2.text);
+      const seen = new Set(local.terms.map((t) => `${t.verb}:${t.target ?? ""}`));
+      const terms = [...local.terms, ...reply.terms.filter((t) => !seen.has(`${t.verb}:${t.target ?? ""}`))];
+      if (terms.length === 0) return { ok: false, behaviour: null, via: "none", unread: reply.unread.length ? reply.unread : local.unparsed, error: "nothing in the reply maps onto a verb", raw: result2.text };
+      const behaviour = { terms, source: "model" };
+      session.behave({ nodeId: args.nodeId, behaviour, participantId: id, at: args.at });
+      return { ok: true, behaviour, via: "model", unread: reply.unread, raw: result2.text };
+    }
+    return { id, name, config, interpret, ask, generate, read, draw, behave };
   }
 
   // src/participants/bridge.ts

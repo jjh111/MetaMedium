@@ -4,10 +4,11 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { createSession } from '../session/session';
 import { interpretationsOf, bySource, byTier, disagreement } from '../session/interpretations';
-import { createAgentParticipant, parseReadings, readingsToEdges, MAX_READINGS } from './agent';
+import { createAgentParticipant, parseReadings, readingsToEdges, MAX_READINGS, parseBehaviourReply } from './agent';
 import { describeSession, describeSignature } from './serialize';
 import { PRESETS, providerTier } from '../llm/provider';
-import { circleStroke, lineStroke } from '../test/strokes';
+import { circleStroke, lineStroke, rectStroke, checkStroke } from '../test/strokes';
+import { behavioursOf, blessedBehaviourOf } from '../session/nodes';
 
 const realFetch = globalThis.fetch;
 afterEach(() => {
@@ -320,5 +321,54 @@ describe('the multi-interpretation contract', () => {
     expect(sentBody).toContain(`between 1 and ${MAX_READINGS}`);
     expect(sentBody).toContain('Disagreement is a signal');
     expect(sentBody).toContain('Offer several readings');
+  });
+});
+
+describe('words into a behaviour, through a participant', () => {
+  function definition(s: ReturnType<typeof createSession>) {
+    s.addStroke(rectStroke(100, 100, 200, 120), 1000);
+    s.addStroke(circleStroke(200, 160, 200), 2000);
+    s.addStroke(checkStroke(420, 150), 3000);
+    return s.bless({ summonId: s.getState().summon!.id, name: 'A', at: 4000 })!;
+  }
+
+  it('the table settles the common phrasing without a round trip, and the result is held, not blessed', async () => {
+    const s = createSession();
+    const id = definition(s);
+    globalThis.fetch = vi.fn(async () => { throw new Error('should not be called'); }) as unknown as typeof fetch;
+    const agent = createAgentParticipant(s, localConfig, 4100);
+    const r = await agent.behave({ nodeId: id, words: 'seeks food, flees anything bigger', at: 4200 });
+    expect(r.ok).toBe(true);
+    expect(r.via).toBe('table');
+    expect(r.behaviour?.terms.map((t) => t.verb)).toEqual(['seek', 'flee']);
+    const node = s.getState().nodes.get(id)!;
+    expect(behavioursOf(node)).toHaveLength(1);
+    expect(blessedBehaviourOf(node)).toBeUndefined();
+    expect(behavioursOf(node)[0].source).toBe(agent.id);
+  });
+
+  it('a clause the table cannot read goes to the model; its verbs join the table\'s, and anything outside the basis is dropped', async () => {
+    const s = createSession();
+    const id = definition(s);
+    stubOpenAI('{"terms":[{"verb":"home","target":"weed","weight":1,"why":"\'nestles in the weeds\'"},{"verb":"photosynthesise","weight":1}],"unread":[]}');
+    const agent = createAgentParticipant(s, localConfig, 4100);
+    const r = await agent.behave({ nodeId: id, words: 'wanders, nestles in the weeds', at: 4200 });
+    expect(r.ok).toBe(true);
+    expect(r.via).toBe('model');
+    expect(r.behaviour?.terms.map((t) => [t.verb, t.target])).toEqual([['wander', undefined], ['home', 'weed']]);
+    expect(parseBehaviourReply('{"terms":[{"verb":"glow"}]}').dropped).toEqual(['glow']);
+  });
+
+  it('when the model fails, what the table read still stands', async () => {
+    const s = createSession();
+    const id = definition(s);
+    stubFailure(500);
+    const agent = createAgentParticipant(s, localConfig, 4100);
+    const r = await agent.behave({ nodeId: id, words: 'wanders, photosynthesises', at: 4200 });
+    expect(r.ok).toBe(true);
+    expect(r.via).toBe('table');
+    expect(r.unread).toEqual(['photosynthesises']);
+    expect(r.error).toBeDefined();
+    expect(behavioursOf(s.getState().nodes.get(id)!)).toHaveLength(1);
   });
 });

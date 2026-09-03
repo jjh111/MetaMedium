@@ -619,6 +619,18 @@ runtime, derived by the surface and never in the log. Two things run:
   t = 0 whenever the log changes**, so undo re-derives the tank. The
   drawing is what moves; render translates and turns the ink.
 
+**Words into verbs** (`behave/words.ts`): a table of the ways each verb is
+said reads the common phrasing with no model ("flees anything bigger" →
+`flee *`, only bigger); what it cannot read is returned, not dropped, and
+`agent.behave` asks a model only for that, against the closed verb list. A
+**`behave` event** from a human is blessed by the act; from a model or the
+fit it is held until a human gives it in their name. **Acting it out**: drag
+a body while its clock runs and the path is a demonstration, fitted onto
+the basis at the pace it was shown, with the residual named. The fit takes
+the body's own size — modelled at thumbnail size, every range-relative verb
+saw nothing in reach. The panel's ladder is words → sliders → what each
+verb is doing now → source.
+
 ### Pictures become ink (v8, WP-9a)
 
 > `metamedium-core/src/image/trace.ts` — `trace(bitmap)`.

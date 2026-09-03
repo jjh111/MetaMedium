@@ -43,6 +43,8 @@
     // A hand landing on the selection takes hold of it rather than drawing.
     const w0 = screenToWorld(e.clientX, e.clientY);
     const hit = state.selection.length ? handleAt(w0) : null;
+    // A hand on a body in a running tank is acting it out, not moving ink.
+    if (hit && hit.kind === 'move' && demoBegin(state.selection, w0)) return;
     if (hit) { beginDrag(hit, w0); return; }
     live = [w0];
   });
@@ -63,6 +65,7 @@
         return;
       }
     }
+    if (demoMove(screenToWorld(e.clientX, e.clientY))) return;
     if (drag) { updateDrag(screenToWorld(e.clientX, e.clientY)); return; }
     if (panning) {
       view.panX += e.clientX - panning.x;
@@ -92,6 +95,7 @@
   canvas.addEventListener('pointerup', (e) => {
     if (endTouch(e)) { live = null; return; }
     if (panning) { panning = null; canvas.style.cursor = 'crosshair'; return; }
+    if (demoEnd()) return;
     if (drag) { endDrag(); return; }
     lastPen = { x: e.clientX, y: e.clientY };
     const points = live;
@@ -163,6 +167,17 @@
     if (e.code === 'Space') { spaceHeld = false; canvas.style.cursor = 'crosshair'; }
   });
 
+  // A slider is a term's weight; one event when the hand lets go, so undo is one step.
+  inspectorEl.addEventListener('change', (e) => {
+    const r = e.target;
+    if (!r || r.type !== 'range' || !r.dataset.term) return;
+    const id = r.dataset.id;
+    const n = state.nodes.get(id);
+    const b = n && MM.blessedBehaviourOf(n);
+    if (!b) return;
+    const terms = b.terms.map((t, i) => (i === Number(r.dataset.term) ? { ...t, weight: Number(r.value) } : t));
+    session.behave({ nodeId: id, behaviour: { terms: terms, source: 'hand', speed: b.speed }, participantId: MM.LOCAL_PARTICIPANT, at: Date.now() });
+  });
   document.getElementById('undoBtn').onclick = () => session.undo();
   inspectorEl.addEventListener('click', (e) => {
     const b = e.target.closest && e.target.closest('button[data-act]');
@@ -175,6 +190,13 @@
     else if (act === 'clock-play') session.clock({ nodeId: id, op: 'play', at: Date.now() });
     else if (act === 'clock-pause') session.clock({ nodeId: id, op: 'pause', at: Date.now() });
     else if (act === 'clock-reset') session.clock({ nodeId: id, op: 'reset', at: Date.now() });
+    else if (act === 'behave-use') {
+      // A held behaviour, given in the human's name: that is the bless.
+      const n = state.nodes.get(id);
+      const rep = n && MM.behavioursOf(n)[Number(b.getAttribute('data-index'))];
+      if (rep) session.behave({ nodeId: id, behaviour: { terms: rep.data.terms, source: rep.data.source, speed: rep.data.speed }, participantId: MM.LOCAL_PARTICIPANT, at: Date.now() });
+    }
+    else if (act === 'behave-drop') session.behave({ nodeId: id, behaviour: { terms: [{ verb: 'wander', weight: 1 }, { verb: 'hold', weight: 0.35 }], source: 'hand' }, participantId: MM.LOCAL_PARTICIPANT, at: Date.now() });
     else session.snap({ ids: [id], mode: 'raw', at: Date.now() });
   });
   document.getElementById('resetBtn').onclick = () => location.reload();

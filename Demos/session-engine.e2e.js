@@ -708,6 +708,62 @@ window.__scenario = async function(){
     step('20h. undoing a body re-derives the tank: three bodies, exactly where a fresh run of the shorter program puts them', after.length === 3 && Math.abs(tk.time(defId) - 1) < 1e-6 && JSON.stringify(after) === JSON.stringify(fresh), { after, fresh });
   }
 
+  // ---- 21. Words into verbs, and acting it out ----
+  {
+    mm.setView(1, 260 - 7700, 200 - 2000); await wait(30);
+    const W = (x, y) => mm.worldToScreen(x, y);
+    const pair = (x, y) => { const a = W(x, y); t.stroke(t.circle(a.x, a.y, 30)); const b = W(x + 30, y); t.stroke(t.line(b, W(x + 80, y - 30), 20).concat(t.line(W(x + 80, y - 30), W(x + 80, y + 30), 20).slice(1), t.line(W(x + 80, y + 30), b, 20).slice(1))); };
+    pair(7800, 2100);
+    const cB = W(7840, 2100);
+    t.stroke(t.circle(cB.x, cB.y, 110));
+    document.getElementById('heldOffer').click(); await wait(60);
+    const defB = mm.session.bless({ summonId: mm.session.getState().summon.id, name: 'B', at: Date.now() });
+    // Circle the definition and type what it does.
+    t.stroke(t.circle(cB.x, cB.y, 120));
+    document.getElementById('heldOffer').click(); await wait(60);
+    const filter = document.querySelector('#summon input.filter');
+    filter.value = 'flees anything bigger, wanders slowly';
+    filter.dispatchEvent(new Event('input'));
+    await wait(30);
+    const chipsB = t.chips();
+    const typed = chipsB.find(c => /^B: flee anything bigger · wander \(0\.50\)/.test(c));
+    step('21. words typed at a definition are read as verbs, on the spot, and offered as what it does', !!typed, chipsB);
+    const btnB = [...document.querySelectorAll('#summon .item')].find(b => /^B: flee anything bigger/.test(b.textContent));
+    if (btnB) btnB.click(); await wait(30);
+    const bB = MM.blessedBehaviourOf(mm.session.getState().nodes.get(defB));
+    step('21a. taking it up gives the definition that behaviour, blessed by the act, with the words as each term\'s reason', !!bB && bB.terms.map(x => x.verb).join(',') === 'flee,wander' && /from “flees anything bigger”/.test(bB.terms[0].reasoning), bB);
+    if (mm.session.getState().summon) mm.session.dismiss(mm.session.getState().summon.id, Date.now());
+    // Acting it out: B's clock runs; a path accelerating away from the As nearby is a demonstration.
+    mm.session.clock({ nodeId: defB, op: 'play', at: Date.now() });
+    mm.session.clock({ nodeId: defB, op: 'pause', at: Date.now() });
+    mm.session.clock({ nodeId: defB, op: 'play', at: Date.now() });
+    const tk = mm.tank();
+    const bodyB = tk.positions(defB)[0];
+    // Away from the nearest A: the path a hand would drag to show "flee".
+    const As = tk.bodies().filter(b => b.name === 'A');
+    const nearA = As.reduce((best, b) => (!best || Math.hypot(b.x - bodyB.x, b.y - bodyB.y) < Math.hypot(best.x - bodyB.x, best.y - bodyB.y) ? b : best), null);
+    // The demonstration is what fleeing looks like: the body stepped under a pure flee, as a hand would drag it.
+    const bodies = tk.bodies();
+    const others = bodies.filter(b => b.id !== bodyB.id).map(b => ({ ...b, vx: 0, vy: 0, w: 110, h: 60, heading: 0, age: 0 }));
+    let me = { id: bodyB.id, name: 'B', x: bodyB.x, y: bodyB.y, vx: 0, vy: 0, w: 110, h: 60, heading: 0, age: 0, origin: { x: bodyB.x, y: bodyB.y } };
+    const samples = [{ x: me.x, y: me.y, t: 0 }];
+    for (let i = 1; i <= 40; i++) { me = MM.step({ terms: [{ verb: 'flee', target: 'A', weight: 1 }], speed: 300 }, MM.worldOf(me, others, [], i / 60, 1 / 60, () => 0.5)).body; samples.push({ x: me.x, y: me.y, t: i / 60 }); }
+    void nearA;
+    const fitted = tk.actOut(defB, bodyB.id, samples.map(p => ({ ...p })));
+    mm.session.clock({ nodeId: defB, op: 'pause', at: Date.now() });
+    const heldB = MM.behavioursOf(mm.session.getState().nodes.get(defB)).filter(r => !r.data.blessed);
+    step('21b. the path is fitted onto the basis and held on the definition: flee the As, with the residual named', !!fitted && fitted.terms.some(x => x.verb === 'flee' || x.verb === 'avoid') && heldB.length === 1 && heldB[0].data.source === 'demo' && typeof heldB[0].data.residual === 'number', { fitted: fitted && fitted.terms, reasoning: fitted && fitted.reasoning, held: heldB.length });
+    t.stroke(t.circle(cB.x, cB.y, 120));
+    document.getElementById('heldOffer').click(); await wait(60);
+    const chipsC = t.chips();
+    const offer = [...document.querySelectorAll('#summon .item')].find(b => /^B: (flee|avoid)/.test(b.textContent) && /acted out/.test(b.title));
+    step('21c. the palette offers the acted-out behaviour, attributed, for the human to give in their name', !!offer, chipsC);
+    if (offer) offer.click(); await wait(30);
+    const bB2 = MM.blessedBehaviourOf(mm.session.getState().nodes.get(defB));
+    step('21d. …and taking it up blesses it: the tank now runs what was acted out', !!bB2 && bB2.source === 'demo', bB2 && bB2.source);
+    if (mm.session.getState().summon) mm.session.dismiss(mm.session.getState().summon.id, Date.now());
+  }
+
   // ---- 11. Scratch-out erase ----
   mm.fitAll(); await wait(60);
   const stBefore = mm.session.getState().contentIds.length;

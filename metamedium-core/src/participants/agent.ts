@@ -22,6 +22,9 @@ import { getRep, strokePointsOf } from '../session/nodes';
 import type { Point } from '../types';
 import { buildScaffold, validateRegions, type RegionContent, type Theme } from '../parse/scaffold';
 import { type DrawnShape, parseShapes, strokeFor, MAX_DRAWN } from '../session/synthesize';
+import type { Behaviour, Term, Verb } from '../behave/verbs';
+import { VERBS, TARGETED } from '../behave/verbs';
+import { parseBehaviour, describeBehaviour } from '../behave/words';
 import { boundsOf } from '../session/nodes';
 
 /** One candidate reading, as the model reports it. */
@@ -129,6 +132,24 @@ Reply with ONLY a JSON array, no prose, no code fences:
 // other half (ARCHITECTURE-v7 §1). The vocabulary is closed on purpose: a
 // model that can only draw what the canvas can read makes marks the human can
 // argue with on the same terms as their own.
+const BEHAVE_PROMPT = `You are a participant on a shared drawing canvas. A human wrote, beside a thing they drew and named, some words about what it DOES. Map those words onto the canvas's closed vocabulary of steering verbs — nothing else runs here:
+
+  wander            drift about (no target)
+  seek <name>       move toward the nearest thing named <name>
+  flee <name>       move away from the nearest thing named <name> (params.only: "bigger" | "smaller" to qualify)
+  home <name>       return to and rest in the nearest thing named <name>
+  school <name>     move with others named <name>
+  hold              keep to where it started
+  avoid <name>      steer around things named <name>
+  consume <name>    eat things named <name> on contact
+  spawn <name>      give off things named <name>
+  drift             float with a direction (params.direction: "up" | "down")
+  expire            disappear after a while
+
+A target is a NAME the human uses for something on the canvas; use the word they used, singular. Weights are 0–2, 1 is normal. Reply with JSON only:
+{"terms":[{"verb":"flee","target":"shark","weight":1,"params":{"only":"bigger"},"why":"'runs from big sharks'"}],"unread":["any clause you could not map"]}
+Every term's "why" quotes the words it came from. Do not invent a verb outside the list.`;
+
 const DRAW_PROMPT = `You are a participant on a shared drawing canvas, alongside a human. You have been asked to ADD MARKS to the drawing.
 
 You are given the marks already on the canvas as measured facts — positions, sizes, what each reads as and plays — in canvas units (y grows downward). You are not given an image.
@@ -516,6 +537,51 @@ export interface AgentParticipant {
     at: number;
     signal?: AbortSignal;
   }): Promise<DrawResult>;
+  /**
+   * Turn words into a behaviour for a definition. Tier 0's table reads the
+   * common phrasings first; the model is asked only when a clause was left
+   * unread. What comes back is held on the definition, attributed to this
+   * participant, and drives nothing until a human gives it in their name.
+   *
+   * Never throws.
+   */
+  behave(args: { nodeId: string; words: string; at: number; signal?: AbortSignal }): Promise<BehaveResult>;
+}
+
+export interface BehaveResult {
+  ok: boolean;
+  behaviour: Behaviour | null;
+  /** Where the terms came from: the table alone, or the model for what the table left. */
+  via: 'table' | 'model' | 'none';
+  unread: string[];
+  error?: string;
+  raw?: string;
+}
+
+/** A model's reply as terms of the closed basis; anything outside it is dropped, and said. */
+export function parseBehaviourReply(text: string): { terms: Term[]; unread: string[]; dropped: string[] } {
+  const json = outermostObject(text);
+  const terms: Term[] = [];
+  const dropped: string[] = [];
+  let unread: string[] = [];
+  if (!json) return { terms, unread, dropped };
+  let parsed: { terms?: unknown[]; unread?: unknown[] };
+  try { parsed = JSON.parse(json) as { terms?: unknown[]; unread?: unknown[] }; } catch { return { terms, unread, dropped }; }
+  for (const raw of Array.isArray(parsed.terms) ? parsed.terms : []) {
+    const t = raw as { verb?: string; target?: string; weight?: number; params?: Record<string, number | string>; why?: string };
+    const verb = String(t.verb ?? '').toLowerCase() as Verb;
+    if (!VERBS.includes(verb)) { dropped.push(String(t.verb ?? '?')); continue; }
+    const term: Term = { verb, weight: Math.max(0, Math.min(2, Number(t.weight) || 1)), reasoning: t.why ? String(t.why) : 'from the model' };
+    if (TARGETED.has(verb) && t.target) term.target = String(t.target).toLowerCase().trim();
+    if (t.params && typeof t.params === 'object') {
+      const params: Record<string, number | string> = {};
+      for (const [k, v] of Object.entries(t.params)) if (typeof v === 'number' || typeof v === 'string') params[k] = v;
+      if (Object.keys(params).length) term.params = params;
+    }
+    terms.push(term);
+  }
+  unread = (Array.isArray(parsed.unread) ? parsed.unread : []).map((u) => String(u));
+  return { terms, unread, dropped };
 }
 
 export interface ReadResult {
@@ -937,5 +1003,43 @@ export function createAgentParticipant(
     return { ok: true, ids, shapes, raw: result.text };
   }
 
-  return { id, name, config, interpret, ask, generate, read, draw };
+  async function behave(args: { nodeId: string; words: string; at: number; signal?: AbortSignal }): Promise<BehaveResult> {
+    const words = args.words.trim();
+    if (!words) return { ok: false, behaviour: null, via: 'none', unread: [], error: 'no words' };
+    const state = session.getState();
+    if (!state.artifacts.includes(args.nodeId)) return { ok: false, behaviour: null, via: 'none', unread: [], error: 'not a definition' };
+
+    // Tier 0 first: the table reads what it can, and the model is asked only
+    // for the clauses it left — "the engine knows this" beats a round trip.
+    const local = parseBehaviour(words);
+    if (local.unparsed.length === 0 && local.behaviour) {
+      session.behave({ nodeId: args.nodeId, behaviour: local.behaviour, participantId: id, at: args.at });
+      return { ok: true, behaviour: local.behaviour, via: 'table', unread: [] };
+    }
+
+    const names = state.artifacts.map((a) => state.nodes.get(a)).map((n) => (n ? (getRep(n, 'word')?.data as string | undefined) : undefined)).filter((w): w is string => !!w);
+    const result = await send(
+      config,
+      [
+        { role: 'system', content: BEHAVE_PROMPT },
+        { role: 'user', content: `Things on the canvas are named: ${names.length ? names.join(', ') : '(nothing named yet)'}.\n\nThe human wrote: “${words}”` +
+          (local.terms.length ? `\n\nThe canvas already read: ${describeBehaviour({ terms: local.terms })}. Read the rest: ${local.unparsed.map((u) => `“${u}”`).join(', ')}.` : '') },
+      ],
+      { signal: args.signal }
+    );
+    if (!result.ok) {
+      // The model failed; whatever the table read still stands, attributed to it.
+      if (local.behaviour) session.behave({ nodeId: args.nodeId, behaviour: local.behaviour, participantId: id, at: args.at });
+      return { ok: !!local.behaviour, behaviour: local.behaviour, via: local.behaviour ? 'table' : 'none', unread: local.unparsed, error: result.error };
+    }
+    const reply = parseBehaviourReply(result.text);
+    const seen = new Set(local.terms.map((t) => `${t.verb}:${t.target ?? ''}`));
+    const terms = [...local.terms, ...reply.terms.filter((t) => !seen.has(`${t.verb}:${t.target ?? ''}`))];
+    if (terms.length === 0) return { ok: false, behaviour: null, via: 'none', unread: reply.unread.length ? reply.unread : local.unparsed, error: 'nothing in the reply maps onto a verb', raw: result.text };
+    const behaviour: Behaviour = { terms, source: 'model' };
+    session.behave({ nodeId: args.nodeId, behaviour, participantId: id, at: args.at });
+    return { ok: true, behaviour, via: 'model', unread: reply.unread, raw: result.text };
+  }
+
+  return { id, name, config, interpret, ask, generate, read, draw, behave };
 }

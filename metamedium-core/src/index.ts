@@ -104,6 +104,7 @@ export type { DirHandleLike, FileHandleLike, FileLike, WritableLike } from './st
 export { structuralSignature, compareSignatures, matchDefinition, addExample, describeStructure, MATCH_FLOOR, DIRECTED_LINKS, SYMMETRIC_LINKS } from './session/signature';
 export type { StructuralSignature, Examples, SignatureMatch } from './session/signature';
 export type { Clock } from './session/session';
+export { blessedBehaviourOf, behavioursOf } from './session/nodes';
 
 // The fourth rung — what a mark DOES: steering verbs, walls, and the fit that
 // turns an acted-out path into a behaviour (ARCHITECTURE-v8 §3, §21).
@@ -114,6 +115,8 @@ export type { Steering, TermResult } from './behave/steer';
 export { applyWalls, wallBoxes } from './behave/walls';
 export type { WallBox, WallState } from './behave/walls';
 export { fit } from './behave/fit';
+export { parseBehaviour, parseClause, clausesOf, singular, describeBehaviour, behaviourSource, PHRASES } from './behave/words';
+export type { ParsedBehaviour } from './behave/words';
 export type { Sample, FitResult } from './behave/fit';
 
 // Kinds of code — the closed table — and what ink lands on, per kind.
@@ -233,7 +236,8 @@ export { complete, listModels, providerLabel, providerTier, stripThink, textOf, 
 export type { ProviderConfig, ProviderKind, ChatMessage, ContentPart, CompletionResult, ModelList } from './llm/provider';
 
 // Agent participants — a model joins through the same channel a human uses.
-export { createAgentParticipant, parseReadings, parseCode, parseFill, parseTranscripts, readingsToEdges, MAX_READINGS } from './participants/agent';
+export { createAgentParticipant, parseReadings, parseCode, parseFill, parseTranscripts, parseBehaviourReply, readingsToEdges, MAX_READINGS } from './participants/agent';
+export type { BehaveResult } from './participants/agent';
 export type { AgentParticipant, AgentReading, InterpretResult, AskResult, GenerateResult, ReadResult, TranscriptReading, DrawResult, RegionFill } from './participants/agent';
 export { describeSession, describeSignature, describeRegions, describeAddressed, describeReading } from './participants/serialize';
 export type { ReadingLike, DescribeReadingOptions } from './participants/serialize';

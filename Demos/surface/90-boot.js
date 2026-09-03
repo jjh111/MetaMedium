@@ -21,6 +21,8 @@
     // The tank, for tests: step a definition's clock by hand and read where its bodies are.
     tank: () => ({
       defs: tank.defs,
+      actOut: (defId, bodyId, samples) => actOut(defId, bodyId, samples),
+      bodies: () => allBodies().map((b) => ({ id: b.id, name: b.name, x: b.x, y: b.y })),
       step: (defId, n) => stepTank(session.getState(), defId, n),
       time: (defId) => tankTime(defId),
       positions: (defId) => { const d = tank.defs.get(defId); return d ? d.order.map((id) => { const b = d.bodies.get(id).body; return { id: id, x: +b.x.toFixed(4), y: +b.y.toFixed(4) }; }) : []; },

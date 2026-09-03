@@ -1,10 +1,10 @@
 // The fourth rung: verbs as forces, walls as physics, a demonstration as a fit.
 
 import { describe, it, expect } from 'vitest';
-import { force, intents, type Body, type Term } from './verbs';
+import { force, intents, type Body, type Term, type Behaviour, type Verb } from './verbs';
 import { steer, step, seeded, worldOf } from './steer';
 import { applyWalls, wallBoxes } from './walls';
-import { fit } from './fit';
+import { fit, type Sample } from './fit';
 
 const body = (id: string, name: string, x: number, y: number, w = 20, h = 12, vx = 0, vy = 0): Body =>
   ({ id, name, x, y, vx, vy, w, h, heading: 0, age: 0, origin: { x, y } });
@@ -127,5 +127,26 @@ describe('acting it out: the fit', () => {
     const r = fit(demo, ['seek', 'flee', 'drift'], (t, me) => worldOf(me, [], [], t, 1 / 30, seeded(1)));
     expect(r.terms).toHaveLength(0);
     expect(r.reasoning).toMatch(/no verb explains/);
+  });
+});
+
+describe('the fit at the body\'s own size', () => {
+  it('a flee shown by a body of real size is read as flee — a thumbnail-sized stand-in saw nothing in range', () => {
+    const target: Body = { id: 'a', name: 'A', x: 0, y: 200, vx: 0, vy: 0, w: 110, h: 60, heading: 0, age: 0 };
+    let me: Body = { id: 'b', name: 'B', x: 0, y: 0, vx: 0, vy: 0, w: 110, h: 60, heading: 0, age: 0, origin: { x: 0, y: 0 } };
+    const fleeing: Behaviour = { terms: [{ verb: 'flee', target: 'A', weight: 1 }], speed: 300 };
+    const demo: Sample[] = [{ x: me.x, y: me.y, t: 0 }];
+    for (let i = 1; i <= 40; i++) {
+      const w = worldOf(me, [target], [], i / 60, 1 / 60, () => 0.5);
+      me = step(fleeing, w).body;
+      demo.push({ x: me.x, y: me.y, t: i / 60 });
+    }
+    const worldAt = (t: number, m: Body) => worldOf(m, [target], [], t, 1 / 60, () => 0.5);
+    const basis: Verb[] = ['seek', 'flee', 'hold', 'drift'];
+    const sized = fit(demo, basis, worldAt, 300, { w: 110, h: 60 });
+    expect(sized.terms[0]?.verb).toBe('flee');
+    expect(sized.terms[0]?.target).toBe('A');
+    const thumb = fit(demo, basis, worldAt, 300);
+    expect(thumb.terms.map((t) => t.verb)).not.toContain('flee');
   });
 });

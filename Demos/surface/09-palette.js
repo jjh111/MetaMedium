@@ -78,6 +78,34 @@
           run: () => session.bless({ summonId: sum.id, name: t.text, at: Date.now() }),
         });
       }
+      // A definition in the loop: what it has been offered to do, and what
+      // the words beside it say it does.
+      for (const defId of [...new Set(sum.enclosedIds.filter((id) => s.artifacts.includes(id)).map((id) => definitionOf(s, id)))]) {
+        const dn = s.nodes.get(defId);
+        const name = MM.wordOf(dn) || defId;
+        MM.behavioursOf(dn).forEach((r, i) => {
+          if (r.data.blessed) return;
+          items.unshift({
+            key: 'use-behaviour:' + defId + ':' + i, group: 'proposed', groupConf: typeof r.data.residual === 'number' ? 1 - r.data.residual : 0.7,
+            groupWhy: (r.data.source === 'demo' ? 'acted out' : 'read by ' + nameOfParticipant(r.source)),
+            label: name + ': ' + MM.describeBehaviour(r.data), why: 'give it in your name', tier: 0,
+            run: () => session.behave({ nodeId: defId, behaviour: { terms: r.data.terms, source: r.data.source, speed: r.data.speed }, participantId: MM.LOCAL_PARTICIPANT, at: Date.now() }),
+          });
+        });
+        // Writing in the loop that reads as verbs: the label's words as the behaviour.
+        for (const lid of sum.enclosedIds) {
+          const ln = s.nodes.get(lid);
+          const said = ln && MM.transcriptOf(ln);
+          if (!said) continue;
+          const parsed = MM.parseBehaviour(said);
+          if (!parsed.behaviour) continue;
+          items.unshift({
+            key: 'behave-said:' + defId + ':' + lid, group: 'written', groupConf: 0.9, groupWhy: 'read from your handwriting',
+            label: name + ': ' + MM.describeBehaviour(parsed.behaviour), why: 'the words beside it, as what it does', tier: 0,
+            run: () => session.behave({ nodeId: defId, behaviour: parsed.behaviour, participantId: MM.LOCAL_PARTICIPANT, at: Date.now() }),
+          });
+        }
+      }
       // A definition in the loop: its clock. Play is the bless that lets it run (I9).
       const defs = [...new Set(sum.enclosedIds.filter((id) => s.artifacts.includes(id)).map((id) => definitionOf(s, id)))];
       for (const defId of defs) {
@@ -347,8 +375,34 @@
   function visibleItems(query) {
     const q = query.trim().toLowerCase();
     if (!q) return paletteItems;
-    return paletteItems.filter((i) =>
+    const matching = paletteItems.filter((i) =>
       (i.label + ' ' + i.group + ' ' + i.why).toLowerCase().includes(q));
+    // Words typed at a definition are its behaviour, when the table can read
+    // them: Tier 0, blessed by the act. What it cannot read goes to a model.
+    const s = session.getState();
+    const sum = s.summon;
+    const defs = sum ? [...new Set(sum.enclosedIds.filter((id) => s.artifacts.includes(id)).map((id) => definitionOf(s, id)))] : [];
+    if (defs.length && q.length > 3) {
+      const parsed = MM.parseBehaviour(query);
+      for (const defId of defs) {
+        const name = MM.wordOf(s.nodes.get(defId)) || defId;
+        if (parsed.behaviour) {
+          matching.unshift({
+            key: 'behave:' + defId, group: 'written', groupConf: 1, groupWhy: parsed.reasoning,
+            label: name + ': ' + MM.describeBehaviour(parsed.behaviour), why: parsed.unparsed.length ? 'could not read: ' + parsed.unparsed.join(', ') : 'from your words — every ' + name + ' will', tier: 0,
+            run: () => { session.behave({ nodeId: defId, behaviour: parsed.behaviour, participantId: MM.LOCAL_PARTICIPANT, at: Date.now() }); },
+          });
+        }
+        if (parsed.unparsed.length && agents.length) {
+          matching.push({
+            key: 'behave-model:' + defId, group: 'always', groupConf: 0, groupWhy: '',
+            label: 'Read it with the model', why: 'for what the table could not: ' + parsed.unparsed.join(', '), tier: 2,
+            run: () => { agents.forEach((a) => a.behave({ nodeId: defId, words: query, at: Date.now() }).then(() => render(session.getState()))); },
+          });
+        }
+      }
+    }
+    return matching;
   }
 
   /**

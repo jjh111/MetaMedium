@@ -6,6 +6,45 @@
 // closure's; no imports, no exports, no build step beyond the concatenation.
 
   // ===== Inspector: what the machine currently holds, and why ==============
+  /**
+   * THE LADDER of a behaviour: words → sliders → what each verb is doing now →
+   * source. The blessed one is what runs; held ones are offers with a reason.
+   */
+  function behaviourRows(s, node, id) {
+    const reps = MM.behavioursOf(node);
+    if (!reps.length) {
+      return '<div class="row"><span class="k">behaves</span><span class="v">wander, and keep to its spot — the built-in</span></div>' +
+        '<div class="why">write what it does beside it, type it in the loop\'s palette, or drag it while the clock runs to act it out</div>';
+    }
+    let html = '';
+    const blessedRep = reps.find((r) => r.data.blessed);
+    if (blessedRep) {
+      const b = blessedRep.data;
+      html += '<div class="row"><span class="k">behaves</span><span class="v">' + esc(MM.describeBehaviour(b)) + '</span></div>';
+      html += '<div class="why">' + esc(b.source === 'words' ? 'from the words' : b.source === 'demo' ? 'acted out' : b.source === 'model' ? 'read by a model, given by you' : 'set by hand') + ' · given by ' + esc(nameOfParticipant(blessedRep.source)) + '</div>';
+      const shares = liveShares(id);
+      b.terms.forEach((t, i) => {
+        const share = shares && shares[i] ? Math.round(shares[i].share * 100) : null;
+        html += '<div class="slider"><label>' + esc(t.verb + (t.target ? ' ' + (t.target === '*' ? 'anything' : t.target) : '') + (t.params && t.params.only ? ' ' + t.params.only : '')) + '</label>' +
+          '<input type="range" min="0" max="2" step="0.05" value="' + (+t.weight).toFixed(2) + '" data-id="' + esc(id) + '" data-term="' + i + '">' +
+          '<span class="v">' + (+t.weight).toFixed(2) + (share !== null ? ' · ' + share + '% now' : '') + '</span>' +
+          (t.reasoning ? '<div class="why">' + esc(t.reasoning) + '</div>' : '') + '</div>';
+      });
+      html += '<details class="src"><summary>source</summary><pre>' + esc(MM.behaviourSource(b)) + '</pre></details>';
+      html += '<button class="mini" data-act="behave-drop" data-id="' + esc(id) + '">back to the built-in</button>';
+    }
+    reps.forEach((r, i) => {
+      if (r.data.blessed) return;
+      const b = r.data;
+      const who = nameOfParticipant(r.source);
+      const how = b.source === 'demo' ? 'acted out' : b.source === 'model' ? 'read by ' + who : 'from the words, by ' + who;
+      html += '<div class="row"><span class="k">offered</span><span class="v">' + esc(MM.describeBehaviour(b)) + '</span></div>';
+      html += '<div class="why">' + esc(how) + (typeof b.residual === 'number' ? ' · ' + Math.round((1 - b.residual) * 100) + '% of the path explained' : '') + (b.reasoning ? ' — ' + esc(b.reasoning) : '') + '</div>';
+      html += '<div class="acts"><button class="mini" data-act="behave-use" data-id="' + esc(id) + '" data-index="' + i + '">use it</button></div>';
+    });
+    return html;
+  }
+
   /** The clock's state and its buttons, for any artifact that can run. */
   function clockRows(s, id) {
     const c = s.clocks[id];
@@ -108,6 +147,7 @@
       const inst = tankCount(s, id);
       html += '<div class="row"><span class="k">bodies</span><span class="v">' + inst.total + (inst.held ? ' (' + inst.held + ' held, unblessed)' : '') + '</span></div>';
       html += clockRows(s, id);
+      html += behaviourRows(s, node, id);
     }
 
     // THE LADDER. Every rung a mark has climbed, with why at each one — ink,
