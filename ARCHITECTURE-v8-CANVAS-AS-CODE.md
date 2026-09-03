@@ -4,6 +4,8 @@
 **Builds on:** `ARCHITECTURE-v6-SESSION-ENGINE.md` (the log), `KEYFRAMES.md` (the
 rungs), `MVP.md` (living artifacts), `ARCHITECTURE-v7-PARTICIPANTS-AND-TIERS.md`
 **Worked example:** the fish canvas from johnhanacek.com, rebuilt from primitives
+**Part II (§11–20):** the folder as the canvas, three views, selection, frames
+literal and virtual, the blob palette, images, deployment
 
 ---
 
@@ -397,3 +399,236 @@ A–C are the paradigm; D–F make it a tool; G is the proof.
 - **Where it lives.** The reference surface, or a new `Demos/tank.html` that
   is the fish canvas and nothing else? The plan assumes the reference
   surface, so that a page, a diagram and a tank can share one canvas.
+
+---
+
+# Part II — The folder, the views, frames, selection, the palette
+
+*Added 3 September 2026, after John's answers to §10 and a look at the
+review canvas in `jh-deng-template`. Part I is the fish; Part II is the rest
+of the paradigm the fish sits inside.*
+
+## 11. The folder is the canvas
+
+Nothing is invented. A canvas is a folder. Every file of a known kind
+(`html`, `js`, `json`, `svg`, `png`/`jpg`, `md`, later `csv`) is an artifact
+with a renderer and an addressing scheme; a subfolder is a sub-canvas; the
+ink log is `canvas.json` beside the files. If MetaMedium vanished, the folder
+would still be a website, some scripts, some data, and a pile of drawings.
+
+The review canvas (`jh-deng-template/index.html`) is the precedent, and it
+solved the hard parts for one file kind and one activity: discovery of a
+repo's HTML into cards; three views over the same state; per-reviewer JSON
+that lives in git; a storage seam with three backends (static read-only on
+Pages, File System Access in Chrome, a cloud adapter later); an agent
+contract in which the agent **never writes the human's file** and answers
+through a side file with stable ids; and a loading budget that keeps forty
+live iframes from bringing the tab down. MetaMedium absorbs those ideas and
+none of that code. The review canvas stays as it is: a record of the
+workflow before this one — generate by chat, then review in a bounded grid.
+MetaMedium is the same workflow with the model at the pen tip, unbounded, and
+the safety has to come with it.
+
+**One log per participant.** The side-file pattern generalises into the
+sync model. Each participant — each person, each machine, each agent —
+appends to its own log file: `canvas/john.json`, `canvas/john-laptop.json`,
+`canvas/qwen.json`. The canvas is the *merge*: every event is already
+attributed and timestamped, state is a pure function of the merged log, and
+nobody ever writes anyone else's file. Git carries the files between
+machines with no locks and no merge conflicts, because two people never
+touch the same file. A model's proposals are, literally, its own file.
+
+## 12. Loading conservation and safety
+
+The point of the canvas is to let one person craft the kind of complexity
+the review canvas had to be hardened against. So the hardening is part of
+the design, not a patch:
+
+- **A budget of live artifacts.** Only the nearest N render live (iframes,
+  workers, simulations); the rest show their last snapshot, a PNG the
+  renderer took when it was last live. Panning swaps them. The budget is a
+  preference and the status line says what is live.
+- **Snapshots as checkpoints.** A log of ten thousand events must not replay
+  from zero on every undo. The engine checkpoints state every K events and
+  replays from the nearest checkpoint; `load(events)` and `seek` use them.
+  Checkpoints are derived, never stored in the log.
+- **Nothing runs by default.** Pages keep `allow-same-origin` and no scripts
+  (the MVP's sandbox). A `js` artifact runs in a worker under a contract,
+  with a time slice, and only after the human blessed it. An artifact that
+  throws is marked broken, shows its snapshot, and says so; it never takes
+  the board with it.
+- **The log is saved as it grows.** Autosave to the folder handle when there
+  is one, to browser storage when there is not, after every event. A crash
+  loses nothing; reload replays.
+- **Memory has a ceiling and the surface says when it is near.** Strokes are
+  bounded (500 points), artifacts are bounded (100 per folder before the
+  surface asks you to make a subfolder), images are downsampled on import and
+  the original kept as a file, not in the log.
+
+## 13. Three views, one log
+
+- **Canvas** — the pure form: an infinite plane, ink and artifacts at their
+  drawn positions. Where things are made.
+- **Grid** — every frame, page and item surfaced explicitly, as cards, in a
+  structure: by folder, by kind, by recency, by name. Sortable, filterable,
+  reorderable; the order is a `json` beside the log. Where things are found
+  without panning forever, and where remixes start: pick cards, and the
+  selection they form is a selection like any other.
+- **Focus** — one artifact full-screen, ink addressing its regions, prev and
+  next through the grid's order.
+
+They are lenses over the same log, never states of their own; ink drawn in
+any of them is the same ink. A frame made in the grid appears on the canvas
+where its members were.
+
+## 14. Selection
+
+The lasso, crossed with the mark or taken up from the chip, **becomes** the
+selection. The loop dissolves as ink; in its place is a soft outline hugging
+the marks, with handles. Drag moves them (the same `transform` reps tidy
+writes, so undo springs them back); handles scale and rotate; the palette
+blooms at the pen. It is not a mode: the next stroke drawn elsewhere
+dissolves it, and drawing over the selected marks addresses them.
+
+**Being selected is in the log.** `select(ids)` and `deselect` are events, so
+undo after a deselect brings the selection back without moving anything, and
+a replay shows what was selected when.
+
+**The dead state.** A tap while something is dismissable — a selection, a
+held loop, a palette — is consumed as the dismissal and never becomes a dot.
+Only a tap on empty ground with nothing to dismiss is a dot. That is the
+one place a stroke's meaning depends on state, and it is the state the human
+just made and can see.
+
+## 15. Frames, literal and virtual
+
+A **frame** is a named definition whose code maps a selection to an
+artifact. Behaviours (Part I) are frames whose code is steering; modules are
+frames used as slots in pages; the SNA-diagram-to-table mapper is a frame
+whose code is a transform. One mechanism, three kinds of code.
+
+**Literal frames** are folders: `library/sna/` holds the frame's ink, its
+structural signature, its code, and its parameters. **Virtual frames** are
+made on the canvas from whatever is there: grab a `js` blob, some text, draw
+a slider, circle it all, *make frame*. The engine reads the members'
+interfaces — a script's exports and parameters, a control's value, a text's
+words, a page's slots — and the palette offers the **connections**: *slider
+→ speed*, *text → title*. A drawn slider is itself an artifact of kind
+`control`, the first of the drawn UI elements, with a value and a range.
+Connections are `json`; the frame's harness is `js` the engine writes.
+
+Virtual frames **reference** their members wherever they live, across
+folders, by id and path; nothing is copied. **Escalating** a virtual frame to
+a literal folder copies its members in, so the folder is self-contained (the
+question of a prime object shared by reference across folders is deferred,
+and named as deferred). **Export** collapses a virtual frame to the most
+portable artifact its functions allow: a single HTML page bundling its
+script, its data, and its controls, that runs anywhere.
+
+**Conjuring.** Doodle something diagram-like, write *sna* beside it, select:
+the palette offers the frame by name (the transcript matches) and by
+resemblance (the structural signature matches), ranked together, attributed
+to why. Taking it applies the frame's code to the selection. The name is
+what conserves the symbol across sessions and machines, because the frame
+is a folder and git carries it.
+
+## 16. The blob palette
+
+A palette is for artists. This is bio-inspired packing at the pen tip: the
+two most likely verbs nearest the cursor, then four around them, then eight,
+each ring further out and smaller, growing as the pen dwells. Likelihood is
+the scope's reading times learned use — a mark under the pen puts its own
+verbs first, a selection puts group verbs first, empty ground puts board
+verbs first; a counts file in the folder learns which you take. Every verb
+in §"affordances" of the earlier discussion is reachable in the packing; no
+drill-down, only rings. Typing filters all of it fuzzily; text that matches
+nothing is a prompt on the scope; handwriting replaces typing when it can.
+The scope is drawn as a soft outline before anything is taken, so a wrong
+guess is visible first.
+
+**Text is an element.** A written word that stays ink cannot be a heading.
+A `text` artifact kind with a real editor — caret, selection, styles — is a
+prerequisite for pages, frames and the palette's own free text, and it is
+drawn on the canvas like everything else: a box, then type or write into it.
+
+## 17. Images and pastiche
+
+Import keeps both representations: the raster as an `image` artifact (the
+file stays in the folder; the log holds the reference), and traced strokes
+as marks that enter through `addStroke` and get everything a pen stroke
+gets — fingerprint, readings, relations, snap, names. A photographed sketch
+of boxes and an arrow is a page the engine can build. Handwriting on paper is
+read like handwriting on screen. For photographs of the world, SAM on request:
+a segment becomes an `image` artifact with a cutout, and cutouts are things —
+selected, moved, named, recombined, composed into pages. Direct SVG import
+is the same path with the tracing skipped.
+
+Export is the kinds list read backwards, one verb with a kind: the board as
+SVG or PNG; a page as HTML; a behaviour as JS; a frame as its portable
+bundle; the session as its log; the folder as itself.
+
+## 18. Deployment
+
+The review canvas's three backends, adopted: a static deploy (GitHub Pages)
+is read-only and shows everything; a Chrome session with a folder handle
+edits and autosaves; git carries the per-participant logs between machines.
+A PWA install makes it an app that opens a folder. A git-backed adapter
+later (the GitHub API, or a small function on Cloudflare) lets a phone or a
+browser without folder access append to its own log file directly. Opening
+MetaMedium at the head of the GitHub folder is then: discovery walks the
+repos, each is a card, each opens into its own canvas, and the ink you leave
+in any of them is a file in that repo.
+
+## 19. Stages for Part II
+
+Each shippable alone, each on the reference surface, each with a criterion.
+
+**S1. Selection.** Lasso-into-selection with handles; drag, scale, rotate as
+transform reps; `select`/`deselect` events; the dead state for taps.
+*Criterion:* circle three boxes, take the chip, drag them across the board,
+tap off, undo the tap-off, and they are selected again where they are.
+
+**S2. The blob palette.** Rings from the pen tip; scope ranking; learned
+use; fuzzy text; free text to the model. *Criterion:* every verb the surface
+has is reachable within two rings from a mark, a selection, or empty ground.
+
+**S3. Text as an element.** The `text` kind with an editor; a written word
+converts to it on request. *Criterion:* a page's heading can be typed on the
+canvas and revised in place.
+
+**S4. The folder.** Discovery, per-participant logs and the merge, autosave,
+the storage seam with static and folder backends, grid and focus views, the
+live budget with snapshots, checkpoints. *Criterion:* open this repository as
+a canvas; its demos are cards; ink drawn on one is a file in `Demos/`; a
+second machine sees it after a pull.
+
+**S5. Frames.** Literal frames as folders; virtual frames from a selection
+with connections offered; the `control` kind (a drawn slider); escalate to a
+folder; export to a bundle; conjure by name and by resemblance.
+*Criterion:* the SNA example — a frame built once is offered later to a
+doodle labelled *sna*, and applying it yields the table.
+
+**S6. Images.** Import with tracing; SVG import; export kinds. Then SAM on
+request. *Criterion:* a phone photo of a paper sketch of boxes becomes a
+page inside its own ink.
+
+**S7. Deploy.** PWA; the git-backed adapter. *Criterion:* draw on a phone,
+see it on the desktop after a pull, with no folder handle on the phone.
+
+Part I's stages A–G and Part II's S1–S7 interleave: S1 and S2 first, since
+every later stage is used through them; then A (time) and S4 (the folder),
+which are independent; then the rest as the demos demand.
+
+## 20. Decisions, answered and open
+
+Answered by John, 3 Sep 2026: one surface — MetaMedium absorbs the review
+canvas's ideas and stays this codebase; frames are named definitions whose
+code maps a selection to an artifact, literal and virtual; selection is
+transient, with undo that brings it back in place, and taps that dismiss are
+never dots.
+
+Still open: the verb table's starting point (§10); determinism versus a live
+tank (§10); whether behaviour source is rendered for ink by default or only
+when the verbs run out (§10); and the prime-object question — whether a
+member shared by two virtual frames is one thing or two once either frame
+becomes a folder.
