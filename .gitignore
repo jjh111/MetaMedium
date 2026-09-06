@@ -14,3 +14,9 @@ metamedium-core/dist/
 manim-explainer/media/
 manim-explainer/__pycache__/
 manim-explainer/*.mp4
+
+# Secrets never enter git: keys are typed into the surface that uses them
+# or read by a process from its environment (SURFACE-v9-PLAN.md D9).
+.env
+.env.*
+!.env.example

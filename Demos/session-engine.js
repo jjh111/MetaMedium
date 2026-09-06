@@ -505,16 +505,13 @@
     const held = !!session.getState().commandMark;
     teachForget.hidden = !held;
     if (held) {
-      teachHint.innerHTML = 'This is <b>your mark</b> — the canvas watches for it instead of the check. ' +
-        'To replace it, <b>Clear</b> and draw a new one five times. <b>Forget</b> goes back to ✓.';
+      teachHint.innerHTML = '<b>Your mark.</b> Draw here to teach a new one. <b>Forget</b> goes back to ✓.';
       teachStatus.className = '';
       teachStatus.textContent = samples.length
         ? 'Held on this device. These are the five it learned from — draw here to start a new one.'
         : 'Held on this device.';
     } else {
-      teachHint.innerHTML = 'The canvas watches for a <b>check ✓</b> until you replace it. Draw your own mark ' +
-        '<b>five times</b>: it learns your hand\'s spread, so the sixth one it has never seen still counts. ' +
-        'It will refuse a mark that looks like something you draw.';
+      teachHint.innerHTML = 'Draw your mark <b>five times</b>.';
       evaluateSamples();
     }
   }
@@ -2684,8 +2681,7 @@
     const node = id && s.nodes.get(id);
     if (!node) {
       inspectorEl.innerHTML = '<div class="eyebrow">mark</div>' +
-        '<div class="empty">Draw something. Each mark keeps every reading it has; ' +
-        'nothing is committed until you bless it.</div>';
+        '<div class="empty">nothing here yet</div>';
       return;
     }
 

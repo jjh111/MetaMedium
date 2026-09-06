@@ -68,8 +68,7 @@
     const node = id && s.nodes.get(id);
     if (!node) {
       inspectorEl.innerHTML = '<div class="eyebrow">mark</div>' +
-        '<div class="empty">Draw something. Each mark keeps every reading it has; ' +
-        'nothing is committed until you bless it.</div>';
+        '<div class="empty">nothing here yet</div>';
       return;
     }
 
