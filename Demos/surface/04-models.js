@@ -1,6 +1,7 @@
 // ===== models =====
-// Provides: the model pane: probing local servers, joining by key, remembering the pick, offerModel, askModels/cancelReading.
-// Uses: core, teach (togglePanel), render, palette (refreshPalette).
+// Provides: the model pane: probing local servers, joining by key, remembering the pick, offerModel;
+//   the work-in-progress register (withWork); askModelsAbout/cancelReading — a model is asked only by a deliberate act.
+// Uses: core, ui, teach (togglePanel), render, palette (refreshPalette), input (say).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () Ellipsis)();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -20,6 +21,7 @@
   //     something no longer running is worse than no memory at all.
   const modelBtn = document.getElementById('modelBtn');
   const panel = document.getElementById('modelPanel');
+  ui.pane(panel, 'models', () => closePanel(panel, modelBtn));
   const mpProvider = document.getElementById('mpProvider');
   const mpEndpoint = document.getElementById('mpEndpoint');
   const mpModel = document.getElementById('mpModel');
@@ -92,8 +94,7 @@
 
   function renderLocal() {
     if (!localServers.length) {
-      mpLocal.innerHTML = '<div class="note">No local server answered on :11434 or :1234. ' +
-        'Start Ollama or LM Studio, then Detect.</div>';
+      mpLocal.innerHTML = '<div class="note">nothing answered on :11434 or :1234</div>';
       return;
     }
     let html = '';
@@ -129,12 +130,13 @@
     const agent = MM.createAgentParticipant(session, config, Date.now());
     agents.push(agent);
     if (pick) store.set(PICK_KEY, Object.assign({ baseUrl: config.baseUrl, model: config.model, kind: config.kind }, pick));
-    mpStatus.textContent = agent.name + ' joined (tier ' + MM.providerTier(config) + '). It reads what you summon' +
-      (config.vision ? ', reads your writing,' : '') + ' and builds what you describe.';
-    readWriting(session.getState());
+    mpStatus.textContent = agent.name + ' joined (tier ' + MM.providerTier(config) + (config.vision ? ', sees' : '') + ').';
     renderAgents();
     renderLocal();
+    syncTiles();
     render(session.getState());
+    // Nothing is read on join: a model is asked when you ask (§6.3). Auto-read is the one exception, and it is a tile.
+    if (autoRead) readWriting(session.getState());
     return agent;
   }
 
@@ -147,6 +149,7 @@
     mpStatus.textContent = agent.name + ' left.';
     renderAgents();
     renderLocal();
+    syncTiles();
     render(session.getState());
   }
 
@@ -243,51 +246,45 @@
   }
 
   function offerModel(why) {
-    if (panel.hasAttribute('hidden')) togglePanel(panel, modelBtn);
+    if (panel.hasAttribute('hidden')) openPane(panel, modelBtn);
     probeLocal();
-    mpStatus.textContent = why || 'That needs a model. Tap one to join it.';
+    mpStatus.textContent = why || 'That needs a model.';
   }
 
-  // When a group is summoned, ask EVERY model at once. They answer in parallel
-  // and each proposal lands independently — no escalation, no waiting for a
-  // cheaper tier to fail first.
+  // A model is asked what a group IS only when the human asks (§6.3): the
+  // field's *What is this?*, or `what:` typed at a selection. Every joined
+  // model is asked at once and each reading lands independently, held and
+  // attributed, so the certainty row can show them beside Tier 0's.
   //
   // A reading is worth having, but it is NOT worth making the human wait for.
-  // A local server answers one request at a time, so an unasked-for
-  // interpretation sits in front of whatever they type next — 35 seconds of a
-  // model describing a drawing they were about to replace. So it is cancellable,
-  // and committing to a prompt cancels it.
-  let lastAskedSummon = null;
+  // A local server answers one request at a time, so it is cancellable, and
+  // committing to a prompt cancels it.
   let reading = null; // AbortController for interpretations in flight
 
   function cancelReading(why) {
     if (!reading) return;
     reading.abort();
     reading = null;
-    if (why) mpStatus.textContent = why;
+    if (why) say(why);
   }
 
-  function askModels(s) {
-    if (!s.summon || agents.length === 0) return;
-    if (s.summon.id === lastAskedSummon) return;
-    lastAskedSummon = s.summon.id;
-    if (s.summon.enclosedIds.length === 0) return; // nothing to read (ink on a page)
-
+  function askModelsAbout(ids) {
+    if (!ids || !ids.length) { say('nothing to read'); return false; }
+    if (agents.length === 0) { offerModel('Reading a group needs a model.'); return false; }
     cancelReading();
     const ctl = new AbortController();
     reading = ctl;
-    const ids = s.summon.enclosedIds.slice();
-    mpStatus.textContent = 'reading with ' + agents.length + ' model(s)…';
     let left = agents.length;
     agents.forEach((agent) => {
-      withWork('read:' + agent.id + ':' + ids.join('+'), ids, agent.name + ' is reading the group…', agent.interpret(ids, Date.now(), ctl.signal)).then((res) => {
+      withWork('read:' + agent.id + ':' + ids.join('+'), ids, agent.name + ' · reading the group', agent.interpret(ids, Date.now(), ctl.signal)).then((res) => {
         if (ctl.signal.aborted) return;
         if (--left === 0 && reading === ctl) reading = null;
-        mpStatus.textContent = res.ok
-          ? agent.name + ': ' + res.readings.map((r) => r.label).join(', ')
-          : agent.name + ' unavailable (' + res.error + ') — tier 0 still holds.';
+        say(res.ok
+          ? agent.name + ' reads it as ' + res.readings.map((r) => r.label).join(', ')
+          : agent.name + ' unavailable (' + res.error + ')');
         render(session.getState());
         refreshPalette();
       });
     });
+    return true;
   }

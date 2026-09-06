@@ -34,9 +34,14 @@ window.__helpers = function(){
   function scratch(x,y,w,h,passes){ passes=passes||3; let p=[]; for(let i=0;i<passes;i++){const yi=y+(passes===1?0:h*i/(passes-1)); const a={x:i%2?x+w:x,y:yi},b={x:i%2?x:x+w,y:yi}; if(i)p.push({x:a.x,y:p[p.length-1].y}); p=p.concat(line(a,b,10).slice(i?1:0));} return p; }
   function summary(){ const st=window.__mm.session.getState(); return {loose:st.contentIds.length-st.artifacts.length, artifacts:st.artifacts.length, live:st.live.length, pending:st.pendingLassoId, summon: st.summon?{enclosed:st.summon.enclosedIds.length,onArtifact:st.summon.onArtifact||null}:null, mark: st.commandMark?st.commandMark.name:null, status: document.getElementById('status').textContent}; }
   function chips(){ return [...document.querySelectorAll('#summon .item')].map(b=>b.querySelector('span').textContent.trim()); }
+  // The field: type, read, Enter — the one way anything is asked for (SURFACE-v9-PLAN §6).
+  function typeIn(text){ const f=document.querySelector('#summon input.filter'); if(!f) return null; f.value=text; f.dispatchEvent(new Event('input',{bubbles:true})); return f; }
+  function typeEnter(text){ const f=typeIn(text); if(!f) return null; f.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true})); return f; }
+  function readingLine(){ const r=document.querySelector('#summon .reading'); return r ? r.textContent : ''; }
+  function coreSlots(){ return [...document.querySelectorAll('#summon .row.core .pill')].map(b=>b.textContent.trim()); }
   // Take a loop up the way a hand does: the active command mark drawn across its right edge.
   function takeLoop(cx, cy, r){ const taught = !!window.__mm.session.getState().commandMark; stroke(taught ? caret(cx + r - 30, cy - 20) : check(cx + r - 35, cy - 8)); }
-  window.__t = {stroke,strokeOn,line,rect,circle,caret,check,scratch,word,summary,chips,takeLoop};
+  window.__t = {stroke,strokeOn,line,rect,circle,caret,check,scratch,word,summary,chips,takeLoop,typeIn,typeEnter,readingLine,coreSlots};
 
   // Teach the caret as the command mark, through the real pad UI.
   window.__teach = function(){
@@ -70,6 +75,8 @@ window.__setup = function(){
   window.__mm.session.load([]);
   window.__snapModeBefore = window.__mm.snapMode();
   window.__mm.setSnapMode('offer');
+  window.__autoReadBefore = window.__mm.autoRead();
+  window.__mm.setAutoRead(false);
   // Learned palette use is device state; a run starts from none and puts it back.
   try { window.__usesBefore = localStorage.getItem('mm-palette-uses'); } catch (e) {}
   window.__mm.resetUses();
@@ -226,13 +233,13 @@ window.__scenario = async function(){
   const sum = t.summary().summon;
   step('5. crossing with the taught mark summons', sum && sum.enclosed === 3,
     {enclosed: sum && sum.enclosed, chips: t.chips()});
-  step('5b. the offer includes a freeform prompt', t.chips().some(x=>x.startsWith('Describe it')), t.chips());
+  step('5b. the field opens with its four core slots, and a brief typed there reads as a build', t.coreSlots().join(',') === 'Name…,Copy,Paste,Erase' && mm.readField('website with the copy in the squares').kind === 'brief' && /builds a page/.test(mm.readField('website with the copy in the squares').line), { core: t.coreSlots(), line: mm.readField('website with the copy in the squares').line });
   {
     const st0 = mm.session.getState();
     step('5c. a held lasso is never offered for snapping — it is a gesture in waiting', ![...mm.snapOffers().keys()].some(id => st0.summon && st0.summon.gestureIds.includes(id)));
     // Drawing them clean is a Tier 0 offer in the palette, and the summon survives it.
     const chip = [...document.querySelectorAll('#summon .item')].find(b => /Draw them clean/.test(b.textContent));
-    step('5d. the palette offers to draw them clean, needing no model', !!chip && /·now/.test(chip.textContent), t.chips());
+    step('5d. the palette offers to draw them clean, needing no model', !!chip && !chip.querySelector('.dot'), t.chips());
     if (chip) chip.click();
     await wait(150);
     const st = mm.session.getState();
@@ -244,12 +251,11 @@ window.__scenario = async function(){
   }
 
   // ---- 6. Prompt it into living code ----
-  const make = [...document.querySelectorAll('#summon .item')].find(b=>b.textContent.trim().startsWith('Describe it'));
-  make.click();
-  const input = document.querySelector('#summon input.make');
-  input.value = 'website with the copy in the squares';
-  input.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}));
+  t.typeIn('website with the copy in the squares');
+  const line6 = t.readingLine();
+  t.typeEnter('website with the copy in the squares');
   await wait(350);
+  step('6a. the reading line said what Enter would do before it was pressed', /builds a page/.test(line6), { line: line6 });
 
   const st1 = mm.session.getState();
   const artId = st1.artifacts[0];
@@ -319,8 +325,8 @@ window.__scenario = async function(){
   step('9. the summon resolves the ink to a REGION of the running artifact',
     !!addressed && addressed.artifactId === artId && addressed.regionIds.length >= 1,
     addressed);
-  step('9b. the offer on a live page is a change, not a build',
-    t.chips().some(x=>x.startsWith('Change it')), t.chips());
+  step('9b. a brief typed on a live page reads as a change, not a build',
+    /changes what the loop covers/.test(mm.readField('make this one purple').line), { line: mm.readField('make this one purple').line });
 
   // ---- 10. Revise only what the ink covers ----
   // Ask the summon which region the ink actually landed on rather than assuming
@@ -338,11 +344,7 @@ window.__scenario = async function(){
   const textOf = (d, id) => { const el = id && d && d.querySelector('[data-region="' + id + '"]'); return el ? el.textContent : null; };
   const beforeAddressed = textOf(doc, hitId);
   const beforeOther = textOf(doc, otherId);
-  const chg = [...document.querySelectorAll('#summon .item')].find(b=>b.textContent.trim().startsWith('Change it'));
-  chg.click();
-  const inp2 = document.querySelector('#summon input.make');
-  inp2.value = 'make this one purple';
-  inp2.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}));
+  t.typeEnter('make this one purple');
   await wait(500);
 
   const doc2 = document.querySelector('.artifactFrame iframe').contentDocument;
@@ -382,18 +384,14 @@ window.__scenario = async function(){
     reading3.roles.filter((r) => r.role === 'edge' && r.direction).length === 1,
     reading3 && { genre: reading3.genre.genre, roles: reading3.roles.map((r) => r.role) });
 
-  const describeBtn = [...document.querySelectorAll('#summon button')].find((b) => /Describe it/.test(b.textContent));
-  if (!describeBtn) {
+  if (!document.querySelector('#summon input.filter')) {
     step('10e. it compiled as a diagram', false, {
-      reason: 'no palette to build from', summon: !!sum3, miss: mm.session.getState().markMiss,
+      reason: 'no field to build from', summon: !!sum3, miss: mm.session.getState().markMiss,
       buttons: [...document.querySelectorAll('#summon button')].map((b) => b.textContent.trim()),
     });
     return R;
   }
-  describeBtn.click();
-  const inp3 = document.querySelector('#summon input.make');
-  inp3.value = 'a two-step process';
-  inp3.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+  t.typeEnter('a two-step process');
   await wait(500);
   const flowId = mm.session.getState().artifacts.find((a) => mm.session.getState().live.includes(a) && a !== artId);
   const flowCode = flowId && String(mm.session.getState().nodes.get(flowId).reps.filter((r) => r.modality === 'code').pop().data.code);
@@ -409,27 +407,35 @@ window.__scenario = async function(){
     mm.setView(1, 260 - 1300, 200 - 1500); await wait(30); // world (1300,1500) at screen (260,200), zoom 1
     const z = mm.view.zoom;
     const base = mm.worldToScreen(1300, 1500); // clear of the flowchart and the page
+    const calls13 = window.__calls.length;
     t.stroke(t.rect(base.x, base.y, 300*z, 180*z));                       // a box
     t.stroke(t.word(base.x + 40*z, base.y + 60*z, 200*z, 40*z, 7));        // a word inside it
-    await wait(300);                                                        // the read is asynchronous
+    await wait(300);
     const stW = mm.session.getState();
     const wordId = stW.contentIds[stW.contentIds.length - 1];
     const wordNode = stW.nodes.get(wordId);
     const shape = MM.interpretationsOf(wordNode, stW.nodes).filter(r=>r.tier===0)[0];
     step('13. one cursive stroke reads as writing', !!shape && shape.label === 'text', shape && (shape.label + ' ' + shape.weight.toFixed(2)));
-    step('13a. it was handed to the model that can see, as an image', !!window.__lastRead && window.__lastRead.hasImage, window.__lastRead);
-    const said = MM.transcriptsOf(wordNode);
-    step('13b. every transcript is held on the mark, attributed and ranked', said.length === 2 && said[0].text === 'Pricing' && said[0].source === mm.agents[0].id,
-      said.map(x => x.text + ' ' + x.confidence));
-    // Lasso both, cross with the mark: the word becomes the offer to name with.
+    // The gate (§6.3): drawing asks no model. The writing is read when the human says read.
+    step('13g. drawing writing asks no model — nothing is called until you say read', window.__calls.length === calls13 && !MM.transcriptOf(wordNode), { calls: window.__calls.length - calls13 });
     const c2 = mm.worldToScreen(1450, 1590);
     t.stroke(t.circle(c2.x, c2.y, 230*z));
     const e2 = mm.worldToScreen(1450+230, 1590);
     const k2 = (230 * z) / 132;
     t.stroke(t.caret(e2.x - 60*k2, e2.y - 40*k2, 120*k2, 78*k2));
+    const readPill = [...document.querySelectorAll('#summon .item')].find(b => /^Read the writing/.test(b.textContent));
+    step('13h. the field offers to read the writing, marked as asking a model', !!readPill && !!readPill.querySelector('.dot') && /Read the writing/.test(mm.readField('read').line), t.chips());
+    t.typeEnter('read');
+    await wait(300);                                                        // the read is asynchronous
+    step('13a. it was handed to the model that can see, as an image', !!window.__lastRead && window.__lastRead.hasImage && window.__calls.length === calls13 + 1, window.__lastRead);
+    const said = MM.transcriptsOf(mm.session.getState().nodes.get(wordId));
+    step('13b. every transcript is held on the mark, attributed and ranked', said.length === 2 && said[0].text === 'Pricing' && said[0].source === mm.agents[0].id,
+      said.map(x => x.text + ' ' + x.confidence));
+    // The word is now what this IS: it leads the certainty row, with its number, and taking it names the box.
+    t.typeIn('');
     const chipsW = t.chips();
-    step('13c. the palette leads with the word, as a name, needing no model', chipsW[0] === 'Name it “Pricing”', chipsW);
-    const nameChip = [...document.querySelectorAll('#summon .item')].find(b => /Name it/.test(b.textContent));
+    step('13c. the field leads with the word as a reading, with its number, needing no model', /^“Pricing” 0\.92/.test(chipsW[0] || '') && /“Pricing”/.test(mm.readField('').line), chipsW);
+    const nameChip = [...document.querySelectorAll('#summon .item')].find(b => /“Pricing”/.test(b.textContent));
     if (nameChip) nameChip.click();
     const stN = mm.session.getState();
     const named = stN.artifacts.map(id => MM.wordOf(stN.nodes.get(id)));
@@ -448,14 +454,11 @@ window.__scenario = async function(){
     const eD = mm.worldToScreen(1530+300, 2160);
     const kD = (300 * z) / 132;
     t.stroke(t.caret(eD.x - 60*kD, eD.y - 40*kD, 120*kD, 78*kD));
-    const drawChip = [...document.querySelectorAll('#summon .item')].find(b => /Ask it to draw/.test(b.textContent));
-    step('14. the palette offers to let the model draw', !!drawChip, t.chips());
+    const drawRead = mm.readField('draw: add a footer under these');
+    step('14. `draw:` typed at the field reads as the model drawing', drawRead.kind === 'draw' && /draws/.test(drawRead.line), drawRead.line);
     const before = mm.session.getState().contentIds.length;
-    if (drawChip) {
-      drawChip.click();
-      const inp = document.querySelector('#summon input.ask');
-      inp.value = 'add a footer under these';
-      inp.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}));
+    if (drawRead.kind === 'draw') {
+      t.typeEnter('draw: add a footer under these');
       await wait(300);
     }
     const stD = mm.session.getState();
@@ -491,8 +494,10 @@ window.__scenario = async function(){
     t.stroke(t.circle(cL.x, cL.y, 300*z));
     const stH = mm.session.getState();
     const snapBtn = document.getElementById('snapBtn');
-    step('15a. a loop around them is plain ink that waits; nothing lights up on its own, and the rail\'s Snap scopes to what it holds', stH.pendingLassoId !== null && !document.getElementById('held') && !snapBtn.hidden && /2/.test(snapBtn.textContent) && /cross the loop/.test(document.getElementById('status').textContent), { snap: snapBtn.textContent, status: document.getElementById('status').textContent });
+    mm.openCC();
+    step('15a. a loop around them is plain ink that waits; nothing lights up on its own, and the snap tile scopes to what it holds', stH.pendingLassoId !== null && !document.getElementById('held') && !snapBtn.hidden && /circled/.test(snapBtn.textContent) && /2/.test(snapBtn.textContent) && /cross the loop/.test(document.getElementById('status').textContent), { snap: snapBtn.textContent, status: document.getElementById('status').textContent });
     snapBtn.click();
+    mm.closeCC();
     await wait(80);
     const stS = mm.session.getState();
     const cleaned = stS.contentIds.filter(id => MM.cleanOf(stS.nodes.get(id))).length;
@@ -531,6 +536,7 @@ window.__scenario = async function(){
     const sp = (x, y) => ({ x: o.x + x, y: o.y + y });
     const ss = (a, b) => t.line(sp(a.x, a.y), sp(b.x, b.y), 14);
     const h = 30;
+    mm.setAutoRead(true); // reading as you write is the tile, on for this step
     const strokes = [
       ss({ x: 0, y: h }, { x: 0, y: 0 }).concat(ss({ x: 0, y: 0 }, { x: 18, y: h }).slice(1), ss({ x: 18, y: h }, { x: 18, y: 0 }).slice(1)),
       ss({ x: 26, y: h }, { x: 36, y: 0 }).concat(ss({ x: 36, y: 0 }, { x: 46, y: h }).slice(1)),
@@ -539,6 +545,7 @@ window.__scenario = async function(){
     ];
     for (const pts of strokes) t.stroke(pts);
     await wait(300); // the read is asynchronous
+    mm.setAutoRead(false);
     const stW = mm.session.getState();
     const wordId = stW.contentIds.find(id => MM.isWord(stW.nodes.get(id)));
     const word = wordId && stW.nodes.get(wordId);
@@ -551,8 +558,8 @@ window.__scenario = async function(){
     const chipsW = t.chips();
     // Step 13 already named a box-plus-word "Pricing"; this group has the same
     // signature, so the match may lead — either way the word is the offer.
-    step('16b. the palette leads with the word as the box\'s name', chipsW.slice(0, 2).includes('Name it “Pricing”') || chipsW[0] === 'It’s a Pricing', chipsW);
-    const nameChip = [...document.querySelectorAll('#summon .item')].find(b => /Name it/.test(b.textContent));
+    step('16b. the field leads with the word as the box\'s name', chipsW.slice(0, 2).some(c => /^“Pricing” 0\.92/.test(c)) || /^Pricing 0\./.test(chipsW[0] || ''), chipsW);
+    const nameChip = [...document.querySelectorAll('#summon .item')].find(b => /“Pricing” 0\.92/.test(b.textContent)) || [...document.querySelectorAll('#summon .item')].find(b => /^Pricing 0\./.test(b.textContent));
     if (nameChip) nameChip.click();
     const stN = mm.session.getState();
     step('16c. the printed word is now the box\'s name — the ship criterion for printed letters', stN.artifacts.map(id => MM.wordOf(stN.nodes.get(id))).filter(n => n === 'Pricing').length >= 1);
@@ -568,11 +575,16 @@ window.__scenario = async function(){
     const cT = W(4280, 2100);
     t.stroke(t.circle(cT.x, cT.y, 170 * z));
     t.takeLoop(cT.x, cT.y, 170 * z);
+    const calls17 = window.__calls.length;
+    await wait(120);
+    step('17g. taking a loop up asks no model on its own', window.__calls.length === calls17, { calls: window.__calls.length - calls17 });
+    t.typeEnter('what'); // What is this? — the deliberate ask
     await wait(400); // the stubbed model answers the reading
+    t.typeIn('');
     const chips = t.chips();
-    const proposed = chips.find(c => /Name it “page-layout”/.test(c));
-    step('17. what the model read the group as is offered as a name, attributed', !!proposed, chips);
-    const btn = [...document.querySelectorAll('#summon .item')].find(b => /Name it “page-layout”/.test(b.textContent));
+    const proposed = chips.find(c => /^page-layout 0\.78 · /.test(c));
+    step('17. what the model read the group as joins the certainty row, with its number, attributed', !!proposed && window.__calls.length === calls17 + 1, chips);
+    const btn = [...document.querySelectorAll('#summon .item')].find(b => /^page-layout 0\.78/.test(b.textContent));
     if (btn) btn.click();
     const named = mm.session.getState().artifacts.map(id => MM.wordOf(mm.session.getState().nodes.get(id)));
     step('17a. blessing it holds the entry — the model proposed, the human decided', named.includes('page-layout'), named);
@@ -584,12 +596,12 @@ window.__scenario = async function(){
     t.stroke(t.circle(cU.x, cU.y, 170 * z));
     t.takeLoop(cU.x, cU.y, 170 * z); await wait(60);
     const chipsC = t.chips();
-    step('17c. the palette offers the match and, beside it, the refusal', chipsC.includes('It’s a page-layout') && chipsC.includes('Not a page-layout'), chipsC);
+    step('17c. the field shows the match with its number and, beside it, the refusal', chipsC.some(c => /^page-layout [01]\.\d\d$/.test(c)) && chipsC.includes('Not a page-layout'), chipsC);
     const notBtn = [...document.querySelectorAll('#summon .item')].find(b => /Not a page-layout/.test(b.textContent));
     if (notBtn) notBtn.click(); await wait(60);
     const chipsD = t.chips();
     const stC = mm.session.getState();
-    step('17d. refusing it is a correct event; the offer leaves the open palette and the candidate goes', mm.session.getEvents().slice(-1)[0].type === 'correct' && !chipsD.includes('It’s a page-layout') && !stC.clusterCandidates.some(c => c.matches.some(m => m.name === 'page-layout')), { last: mm.session.getEvents().slice(-1)[0].type, chips: chipsD });
+    step('17d. refusing it is a correct event; the offer leaves the open field and the candidate goes', mm.session.getEvents().slice(-1)[0].type === 'correct' && !chipsD.some(c => /^page-layout 0\./.test(c)) && !stC.clusterCandidates.some(c => c.matches.some(m => m.name === 'page-layout')), { last: mm.session.getEvents().slice(-1)[0].type, chips: chipsD });
     if (stC.summon) mm.session.dismiss(stC.summon.id, Date.now());
     trio(4200, 2700);
     const candsE = mm.session.getState().clusterCandidates;
@@ -630,13 +642,11 @@ window.__scenario = async function(){
     // The verbs a selection was missing: duplicate and erase, through the palette.
     const c2 = W(5420, 2240);
     t.stroke(t.circle(c2.x, c2.y, 330)); t.takeLoop(c2.x, c2.y, 330); await wait(60);
-    // The rings show what fits; the rest is a keystroke away in the field.
-    const seek = (word) => { const f = document.querySelector('#summon input.filter'); f.value = word; f.dispatchEvent(new Event('input')); return [...document.querySelectorAll('#summon .item')]; };
-    const has = (word, re) => seek(word).some(b => re.test(b.textContent));
-    step('18e. a selection offers erase, duplicate and copy', has('erase', /^Erase these/) && has('dupl', /^Duplicate these/) && has('copy', /^Copy as SVG/), t.chips());
+    // The core slots never move; a verb typed by name is read before Enter.
+    const line = (w) => mm.readField(w).line;
+    step('18e. the core row is Name, Copy, Paste, Erase; erase, duplicate and copy read by name', t.coreSlots().join(',') === 'Name…,Copy,Paste,Erase' && line('erase') === '↵ Erase' && line('dupl') === '↵ Duplicate these' && line('copy') === '↵ Copy' && line('delete') === '↵ Erase', { core: t.coreSlots(), erase: line('erase'), dup: line('dupl'), copy: line('copy') });
     const n18 = mm.session.getState().contentIds.length;
-    const dup = seek('dupl').find(b => /^Duplicate these/.test(b.textContent));
-    if (dup) dup.click(); await wait(60);
+    t.typeEnter('dupl'); await wait(60);
     const stDup = mm.session.getState();
     step('18f. duplicate makes the ink again beside the original, and the copies are the selection', stDup.contentIds.length === n18 + 3 && stDup.selection.length === 3 && stDup.selection.every(id => !boxes.includes(id)), { content: stDup.contentIds.length, selection: stDup.selection.length });
     const copies = stDup.selection.slice();
@@ -644,8 +654,7 @@ window.__scenario = async function(){
     const cb = copies.map(id => MM.boundsOf(stDup.nodes.get(id))).reduce((a, b) => ({ minX: Math.min(a.minX, b.minX), minY: Math.min(a.minY, b.minY), maxX: Math.max(a.maxX, b.maxX), maxY: Math.max(a.maxY, b.maxY) }));
     const cc = W((cb.minX + cb.maxX) / 2, (cb.minY + cb.maxY) / 2);
     t.stroke(t.circle(cc.x, cc.y, 330)); t.takeLoop(cc.x, cc.y, 330); await wait(60);
-    const er = seek('erase').find(b => /^Erase these/.test(b.textContent));
-    if (er) er.click(); await wait(60);
+    t.typeEnter('erase'); await wait(60);
     const stEr = mm.session.getState();
     step('18g. erase takes the copies off the board; undo brings one back', stEr.contentIds.length === n18 && copies.every(id => !stEr.contentIds.includes(id)) && (mm.session.undo(), mm.session.getState().contentIds.length === n18 + 1), { content: stEr.contentIds.length });
     mm.session.undo(); mm.session.undo(); // the other two erases
@@ -932,10 +941,8 @@ window.__scenario = async function(){
     const cP = mm.worldToScreen(9500, 2200);
     t.stroke(t.circle(cP.x, cP.y, 340));
     t.takeLoop(cP.x, cP.y, 340); await wait(60);
-    const makeP = [...document.querySelectorAll('#summon .item')].find(b => b.textContent.trim().startsWith('Describe it'));
-    if (makeP) makeP.click();
-    const inputP = document.querySelector('#summon input.make');
-    if (inputP) { inputP.value = 'a page with a banner and two columns'; inputP.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); }
+    const inputP = t.typeEnter('a page with a banner and two columns');
+    const makeP = inputP;
     await wait(400);
     const stQ = mm.session.getState();
     const pageId = stQ.live.find(id => { const r = codeRepOfNode(stQ.nodes.get(id)); return r && r.data.kind === 'html' && stQ.nodes.get(id).edges.some(e => e.rel === 'has-part' && traced.includes(e.to)); });
@@ -1007,12 +1014,12 @@ window.__scenario = async function(){
     field.dispatchEvent(new Event('input'));
     const shownNow = [...document.querySelectorAll('#summon .item')].map(b => b.querySelector('span').textContent.trim());
     field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
-    const thinking = /is building/.test(document.getElementById('status').textContent);
+    const thinking = /building “website/.test(document.getElementById('status').textContent);
     await wait(400);
     const st26 = mm.session.getState();
     const built = st26.live.length === before26 + 1;
     const newest = built && st26.nodes.get(st26.live[st26.live.length - 1]);
-    step('26. free text that names no verb goes to the model as the brief, with the thinking shown while it works', built && thinking && MM.wordOf(newest) === 'website about dolphins' && !/is building/.test(document.getElementById('status').textContent), { built, thinking, shownWhileTyping: shownNow, status: document.getElementById('status').textContent.slice(0, 120) });
+    step('26. free text that names no verb goes to the model as the brief, with the thinking shown while it works', built && thinking && MM.wordOf(newest) === 'website about dolphins' && !/building “website/.test(document.getElementById('status').textContent), { built, thinking, shownWhileTyping: shownNow, status: document.getElementById('status').textContent.slice(0, 120) });
   }
 
   // ---- 27. The moment: two circles, "torus in 3d", a program in the frame; then the library answers first ----
@@ -1112,9 +1119,9 @@ window.__scenario = async function(){
       concepts.some(c => c.concept === 'row'),
       concepts.map(c => c.concept + ' ' + c.confidence.toFixed(2)));
 
-    const items = [...document.querySelectorAll('#summon .item')].map(b => b.textContent);
+    const first = document.querySelector('#summon .item');
     step('12d. the palette leads with what needs no model',
-      /·now/.test(items[0] || ''), { first: (items[0] || '').trim() });
+      !!first && !first.querySelector('.dot'), { first: first ? first.textContent.trim() : null });
 
     const ids = sum.enclosedIds.slice();
     const cy = () => ids.map(id => {
@@ -1149,6 +1156,7 @@ window.__scenario = async function(){
   window.__teach();
   while (mm.session.getEvents().length) mm.session.undo();
   if (window.__snapModeBefore) mm.setSnapMode(window.__snapModeBefore);
+  mm.setAutoRead(!!window.__autoReadBefore);
   try { if (window.__usesBefore) localStorage.setItem('mm-palette-uses', window.__usesBefore); } catch (e) {}
   step('12. the rail follows the grammar — undoing the teach restores the check',
     mm.session.getState().commandMark === null &&
@@ -1166,7 +1174,7 @@ window.__scenario = async function(){
     await mm.openStore(store, 'store', 'fake');
     const st = mm.session.getState();
     const paths = st.artifacts.map(id => { const r = st.nodes.get(id).reps.find(x => x.modality === 'code'); return r && r.data.path; }).filter(Boolean).sort();
-    step('23. opening a folder: every file of a known kind is an artifact of its kind, at its path; the Makefile is not', paths.join(',') === 'index.html,notes/a.md,scripts/x.js' && st.live.length === 3 && /folder fake · 3 files/.test(document.getElementById('status').textContent), { paths, status: document.getElementById('status').textContent });
+    step('23. opening a folder: every file of a known kind is an artifact of its kind, at its path; the Makefile is not', paths.join(',') === 'index.html,notes/a.md,scripts/x.js' && st.live.length === 3 && /folder fake · 3 files/.test(document.getElementById('status').dataset.standing), { paths, status: document.getElementById('status').dataset.standing });
     const before = mm.session.getEvents().length;
     const bx = mm.worldToScreen(100, -300);
     t.stroke(t.rect(bx.x, bx.y, 120, 80));
@@ -1185,7 +1193,7 @@ window.__scenario = async function(){
     await wait(60);
     const iframes = document.querySelectorAll('#stage .artifactFrame iframe').length;
     const parked = document.querySelectorAll('#stage .artifactFrame.parked').length;
-    step('23c. past the live budget, artifacts are parked cards, and the status says so', iframes === 12 && parked === 4 && /12 of 16 live/.test(document.getElementById('status').textContent), { iframes, parked });
+    step('23c. past the live budget, artifacts are parked cards, and the status says so', iframes === 12 && parked === 4 && /12 of 16 live/.test(document.getElementById('status').dataset.standing), { iframes, parked, standing: document.getElementById('status').dataset.standing });
     // Views: the grid lists every artifact; a card focuses it; Esc is the canvas again.
     mm.setViewMode('grid');
     const cards = document.querySelectorAll('#grid .card').length;

@@ -1,6 +1,6 @@
 // ===== input =====
-// Provides: pointer input (draw, pan, pinch), keys, flash().
-// Uses: core, view, snap (autoSweep), render.
+// Provides: pointer input (draw, pan, pinch), keys (undo, copy, paste, erase, zoom), say()/flash() for the status line.
+// Uses: core, view, snap (autoSweep), render, palette (copyMarks, pasteClip), handwriting (autoRead).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () Ellipsis)();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -137,6 +137,8 @@
     // it. Never the held loop itself; that is a gesture until the next mark
     // says otherwise.
     if (!g) autoSweep();
+    // Reading handwriting as it is written is a preference, off by default.
+    if (autoRead && !g) readWriting(after);
     if (g && g.data && g.data.role === 'scratch') {
       const n = (g.data.erased || []).length;
       flash('erased ' + n + ' mark' + (n === 1 ? '' : 's'));
@@ -166,6 +168,8 @@
       spaceHeld = true; canvas.style.cursor = 'grab'; e.preventDefault();
     }
     if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); session.undo(); }
+    // Copy holds the selection's ink (and puts it on the clipboard as SVG); paste is handled with files, in the images fragment.
+    if ((e.ctrlKey || e.metaKey) && e.key === 'c' && e.target === document.body && state.selection.length) { e.preventDefault(); copyMarks(state.selection.slice()); }
     if (e.target === document.body && e.key === 'Escape' && state.selection.length && !state.summon) session.deselect(Date.now());
     if (e.target === document.body && (e.key === 'Backspace' || e.key === 'Delete') && state.selection.length) {
       e.preventDefault();
@@ -227,16 +231,20 @@
   // Reset is a fresh board: what browser storage held goes too, or the reload would bring it back.
   document.getElementById('resetBtn').onclick = () => { forgetLocalLog(); location.reload(); };
 
-  // A transient line in the status bar. It must re-render IMMEDIATELY: the
-  // render triggered by the stroke itself has already happened by the time we
-  // know what the stroke did, so without this the message is set and never
-  // shown, and an erase looks silent.
-  let flashText = null, flashAt = 0, flashTimer = null;
-  const FLASH_MS = 1600;
-  function flash(msg) {
+  // The status line says ONE thing: the last thing that happened, for a
+  // while, then the standing state. `say` is for outcomes worth reading
+  // (a model wrote a program); `flash` for the quick ones (erased 3). Both
+  // re-render at once: the render triggered by the stroke itself has already
+  // happened by the time we know what the stroke did, and a message set
+  // after it would never show — an erase would look silent.
+  let flashText = null, flashAt = 0, flashTimer = null, flashFor = 0;
+  const FLASH_MS = 1600, SAY_MS = 7000;
+  function say(msg, ms) {
     flashText = msg;
     flashAt = Date.now();
+    flashFor = ms || SAY_MS;
     render(session.getState());
     clearTimeout(flashTimer);
-    flashTimer = setTimeout(() => { flashText = null; render(session.getState()); }, FLASH_MS);
+    flashTimer = setTimeout(() => { flashText = null; render(session.getState()); }, flashFor);
   }
+  function flash(msg) { say(msg, FLASH_MS); }

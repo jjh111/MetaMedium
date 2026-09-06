@@ -1,5 +1,5 @@
 // ===== snap =====
-// Provides: snapping: offers, auto sweep, the rail button (scoped to a loop while one waits).
+// Provides: snapping: offers, auto sweep, the snap tiles (scoped to a loop while one waits).
 // Uses: core, view, render, input (flash).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () Ellipsis)();`. Shared state is the
@@ -40,11 +40,8 @@
     const s = session.getState();
     snapOffers = snapMode === 'off' ? new Map() : new Map(session.snapCandidates().map((c) => [c.id, c]));
     heldCandidates = heldEnclosed(s).filter((id) => snapOffers.has(id));
-    // A held loop scopes the button: what you circled, not everything.
-    const n = heldCandidates.length || snapOffers.size;
-    snapBtn.hidden = n === 0;
-    snapBtn.textContent = (heldCandidates.length ? 'Snap circled ' : 'Snap ') + n;
-    snapModeBtn.textContent = 'snap · ' + snapMode;
+    // A held loop scopes the tile: what you circled, not everything.
+    if (ccOpen()) syncTiles();
   }
   function shapesSummary(cands) {
     const counts = {};
@@ -71,13 +68,8 @@
     if (ids.length) session.snap({ ids: ids, at: Date.now() });
   }
 
-  // The loop that waits is plain ink. It used to raise a chip beside itself
-  // ("N circled · Draw them clean / What could these be?") the moment it was
-  // drawn — an affordance that fired on every circle, whether or not one was
-  // meant. The command mark is the one thing that turns a loop into a
-  // selection; the loop's ink then leaves in favour of the outline and its
-  // handles. What the loop scopes is the rail's Snap button, quietly.
-  function renderHeld(s) { void s; }
+  // The loop that waits is plain ink: the command mark is the one thing that
+  // turns it into a selection. What the loop scopes is the snap tile, quietly.
   snapBtn.onclick = () => {
     const ids = heldCandidates.length ? heldCandidates : [...snapOffers.keys()];
     snapAll(ids, shapesSummary(ids.map((id) => snapOffers.get(id))));

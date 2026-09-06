@@ -157,6 +157,114 @@ The invariants in `BUILD-PLAN-v8.md` §0 hold, plus two for the surface:
 
 ---
 
+## 5. Where we are, and the gaps (6 September, evening)
+
+S5 landed and the moment works with a real model. Trying it exposed three
+things the surface does wrong, all of them about *who speaks when*.
+
+**5.1 The model is asked without being asked.** `render()` called
+`askModels` and `readWriting` on every paint. Every stroke the shape rung
+could not place read as `text` and was handed to every model that can see;
+every check across a loop asked every model to interpret the group before a
+word was typed; joining a model read the whole board. A doodle session is a
+stream of model calls the human never made. The rule from v7 — *LLM calls
+never block drawing* — was kept; the rule it needed beside it was not:
+**a model is asked only by a deliberate act.**
+
+**5.2 Six things write text, and none owns it.** The status line joined
+nine parts with dots; the model pane's status doubled as a second status
+line; `flash` wrote a third; every mark carried a label with its shape and
+its role; a matching group carried a sentence in the canvas; a working
+model carried another; each pill in the palette carried a hint. The palette
+itself packed the same verbs into rings that landed somewhere new on every
+open. Reading the board meant reading a dozen fragments that were each
+right and together said nothing.
+
+**5.3 The verbs were three vocabularies.** "Describe it…", "Ask about
+it…", "Ask it to draw…", "Name this…" and the filter field were five ways
+to type; a verb was a pill, a name was a pill, a brief was whatever the
+pills did not match. Enter did something different depending on which of
+them was in front.
+
+What closes the gaps is not more chrome. It is one grammar for what is
+typed, one place for each kind of text, and controls that stay put.
+
+---
+
+## 6. The command system: parse once, present in four places
+
+**6.1 Parse.** Everything typed at a selection goes through one reader,
+`readField(text)`, which returns *what Enter will do* as a reading — one of
+seven kinds, in this order of precedence:
+
+| kind | when | Enter does |
+|---|---|---|
+| `empty` | nothing typed | nothing (the rows below are the offers) |
+| `prefix` | `ask: …`, `draw: …`, `page: …`, `run: …`, `new: …`, `name: …` | that act on the rest |
+| `verb` | the text names an offer this selection has, by its label or an alias (`erase`, `delete`, `dup`, `copy`, `paste`, `clean`, `line up`, `play`, `frame`, `slider`, `read`, `undo` …) | runs it |
+| `library` | the text is an entry's name, or every word of the entry's name | reuses the entry, no model |
+| `behaviour` | at a definition, words the verb table reads | gives it that behaviour |
+| `brief` | anything else | the model builds a page or writes a program, by the reading |
+
+The reading is **shown under the field as it is typed**, one line that
+begins with ↵: *↵ erase 3 marks*, *↵ torus in 3d — from the library*,
+*↵ GLM writes a program*, *↵ needs a model*. Enter never surprises,
+because what it will do was on screen before it was pressed. Reading is
+Tier 0 and costs nothing.
+
+**6.2 Present.** Every sentence the surface says goes to exactly one of
+four places, and each place has one voice.
+
+1. **The field** — only while a selection stands. The text, the reading
+   line, then three rows in fixed order: **core** (Copy · Paste · Erase ·
+   Undo, always the same four in the same slots), **what this is** (the
+   readings, each with its number: *molecule 0.92*, *“Pricing”*,
+   *page-layout 0.78 · GLM*, *row 0.81* — tapping one takes it as the
+   name), and **what it affords** (Draw them clean, Line up, Frame these,
+   Play A, Not a molecule …, ranked by the reading and by use). Pills carry
+   a label; their reason is the tooltip. A pill that needs a model carries
+   a dot in the model's colour. The field fans to the right of the pen tip;
+   a setting mirrors it for a left hand.
+2. **At the mark** — a name, a match chip (*molecule 0.92*), a working
+   model (*GLM · writing “torus in 3d”*), an answer card. The reading of a
+   mark (shape · role) shows under the mark the hand just made or is
+   hovering, not under every mark on the board.
+3. **The panel** — rows. It says what a mark is; it does not explain the
+   system.
+4. **The status line** — one sentence: the last thing that happened, or,
+   when nothing just happened, the standing state in a few words (*3 loose ·
+   1 artifact · GLM · folder x · saved*). The model pane's status stays in
+   the pane.
+
+**6.3 Gate.** A model is called from exactly these acts, and no other:
+Enter on a brief, `ask:`, `draw:`, the *Read the writing* offer (or the
+panel's *read it*), *What is this?* (asks the joined models to read the
+group, and their answers join the certainty row), and a behaviour the verb
+table could not read. Nothing on draw, nothing on summon, nothing on join.
+An *auto-read* tile in the control centre restores reading handwriting as
+it is written, off by default.
+
+**6.4 The frame.** One bar: the wordmark and the panel toggle on the left;
+the mark chip, undo and the control centre on the right. The centre is a
+grid of tiles that keep their slots: zoom, snap, view (canvas · grid),
+theme (system · light · dark), hand (right · left), auto-read, folder,
+import, export, models, teach, reset. The grid view keeps the same bar,
+its sort in the bar; focus steps with ← → in the bar. Light and dark are
+the same tokens inverted (`brand/tokens.css`), following the system until
+a tile says otherwise. The canvas reads its colours from the same tokens,
+so ink and chrome never disagree.
+
+| # | Package | Done when |
+|---|---|---|
+| S7 | **Gate** ✅ | No model call without one of the acts in 6.3; the e2e counts calls |
+| S1 | **The frame** ✅ | One bar, the control centre, blurbs out, theme and hand as tiles |
+| S2 | **One field** ✅ | The reading line; the four core slots never move; every verb reachable by typing |
+| S3 | **Matches as chips** ✅ first cut | *name 0.92* beside a matching group; the sentence is gone |
+| S4 | Code at every zoom | unchanged |
+| S6 | Live logs | unchanged |
+
+---
+
 ## 4. Open, John's
 
 - Right-handed default with a setting, or handedness inferred from which

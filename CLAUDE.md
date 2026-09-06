@@ -24,18 +24,23 @@ automatically → ask "why?" and get grounded reasoning.
 `ARCHITECTURE-v7-PARTICIPANTS-AND-TIERS.md` is the active engine plan; MVP.md
 absorbs and raises its Stage D.
 
-Headline (v8, 3 Sep 2026, on the local branch `next-phases`): **every
-package of the v8 build plan has landed** — the canvas as a program with
-clocks, a tank, verbs from words or from acting out, frames with a drawn
-slider, the folder as the canvas with three backends, pictures in and the
-board out, text as an element, and an installable shell — 546 core tests and
-a 115-step browser e2e. `ROADMAP.md` carries the honest gaps. Before v8:
+Headline (v9 S1/S2/S7, 6 Sep 2026, on the local branch `next-phases`):
+**the surface is a system** — a model is asked only by a deliberate act;
+one field at the pen tip reads what is typed and says what Enter will do;
+core verbs in slots that never move; one bar with a control centre; light
+and dark from one token set; every sentence in one of four places
+(`SURFACE-v9-PLAN.md` §5–§6). Before that (v8, 3 Sep): **every package of
+the v8 build plan has landed** — the canvas as a program with clocks, a
+tank, verbs from words or from acting out, frames with a drawn slider, the
+folder as the canvas with three backends, pictures in and the board out,
+text as an element, and an installable shell — 550 core tests and a
+132-step browser e2e. `ROADMAP.md` carries the honest gaps. Before v8:
 **the MVP loop runs end to end.** Draw boxes on an infinite canvas,
 circle them, cross with a command mark *you taught the system*, prompt them into
 a living page that renders in the canvas with your ink still outlining its
 divs — then draw on that page and the ink addresses the regions underneath it.
 Scratch anything out to erase. `Demos/session-engine.html` is the surface;
-`Demos/session-engine.e2e.js` drives 105 steps through the real UI: page, flowchart, handwriting, the model drawing, the user-side loop, selection and the blob palette, corrections, the worker, the tank, words into verbs and acting out, frames and the drawn slider, and the folder. A run takes about 75 s; start it with `__scenario().then(r => window.__R = r)` and read `__R` when it lands.
+`Demos/session-engine.e2e.js` drives 132 steps through the real UI: page, flowchart, handwriting (read only when asked), the model drawing, the user-side loop, selection and the field, corrections, the worker, the tank, words into verbs and acting out, frames and the drawn slider, the folder, pictures, text, and the moment. A run takes about 90 s; run it **in its own tab** (`?fresh=1&nosw=1` — it replaces `fetch` with a stub and joins a stub model, so never in a tab you are working in), start it with `__setup(); __scenario().then(r => window.__R = r)` and read `__R` when it lands.
 v7 Stage E (handwriting) shipped 1 Sep 2026: a word written beside a shape is read by a
 model that can see and offered as that shape's name. Whitepaper v5.1 stays parked until the
 conversation benchmark passes end to end.
@@ -74,7 +79,7 @@ any structural change.
 | `doodle2-canvas.html` | **Flagship demo**: heuristic recognition, spatial graph, library, undo/redo, touch. No LLM. Single-file (~500KB) |
 | `metadoodle1.html` | Fork of flagship + tiered LLM recognition (WebLLM in-browser, LM Studio local API) + voice. Single-file (~600KB) |
 | `Web App Skeleton/` | React + Vite + TypeScript + Zustand rebuild; Claude API interpreter skeleton in `src/llm/`; recognition/spatial/matching in `src/core/` |
-| `Demos/surface/` | **The reference surface's source**: `surface.css` and twenty script fragments (`00-core` … `19-text`, then `90-boot`, which must stay last), one concern each, concatenated in name order into one closure by `Demos/build-surface.mjs` → the committed `Demos/session-engine.js` (CI checks it has not drifted). Fragments share the closure's variables — no imports; each fragment's header says what it provides and uses. Edit a fragment, run the build, commit both |
+| `Demos/surface/` | **The reference surface's source**: `surface.css` and twenty-two script fragments (`00-core`, `00-ui` … `19-text`, `20-controls`, then `90-boot`, which must stay last), one concern each, concatenated in name order into one closure by `Demos/build-surface.mjs` → the committed `Demos/session-engine.js` (CI checks it has not drifted). Fragments share the closure's variables — no imports; each fragment's header says what it provides and uses. Edit a fragment, run the build, commit both |
 | `Demos/` | **`session-engine.html` is the MVP surface** (it links `surface/surface.css` and loads `session-engine.js`) — infinite canvas, the taught command mark, living artifacts in a DOM overlay, ink-over-artifact addressing, "why" inspector, model participants, canvas answers. Uses the committed `metamedium-core.browser.js` bundle. **`session-engine.e2e.js`** drives the whole loop through the real UI with a stubbed model (browser console; not part of `npm test`). `build-standalone.mjs` inlines the bundle into a single shareable file. Plus fish, composition diagrams, no-modes graph, etc. |
 | `skills/` | Claude Code skills: `metamedium-code` (code patterns), `metamedium-design` (design principles) |
 | `Assets/` | Figures and design rationale (recognition strategy, point-primitive proposal) |
@@ -294,16 +299,27 @@ samples and offers *Forget*; teaching a new one means *Clear* first.
   or come close relative to the selection's own size** (`checkProximityRatio`).
   No fixed pixel term remains in the gesture grammar.
 
-**The palette is packing, not a list.** Taking a loop up dissolves it into a
-selection — a dashed outline with corner handles and a knob; drag inside
-moves, a corner scales, the knob turns, one event per drag, the ink untouched
-— and the verbs bloom in rings from where the pen let go: the two most likely
-above and below the text field, four on the diagonals, then eight, then
-twelve. Likelihood comes from the reading (a known match, the word just
-written, a model's reading of the group sit above every generic verb), times
-learned use for the generic ones, capped. Pills are measured and relaxed
-apart, so none overlap and wide ones make room. A tap while a palette or a
-selection is up dismisses it and is never a dot. `Demos/surface/05-selection.js`,
+**The field: one input, one reader, three rows in fixed slots** (v9 S2,
+`SURFACE-v9-PLAN.md` §6). Taking a loop up dissolves it into a selection — a
+dashed outline with corner handles and a knob; drag inside moves, a corner
+scales, the knob turns, one event per drag, the ink untouched — and **the
+field** opens at the pen tip, fanning to the hand's side (a tile flips it).
+Everything typed there goes through one reader, `readField`, which returns
+*what Enter will do* and shows it under the text as it is typed: a verb the
+selection has (`erase`, `dup`, `clean`, `line up`, `play`, `frame`, `read`,
+`what` …, by label or alias), a name the library knows (reused, no model
+asked), words the verb table reads at a definition, a prefix (`name:`,
+`ask:`, `draw:`, `page:`, `run:`, `new:`, `what:`), or else the brief. Under
+the field, three rows whose slots never move (I12): the **core** — Name…,
+Copy, Paste, Erase, always the same four; **what this is** — readings with
+their numbers (*molecule 0.92*, *“Pricing” 0.92*, *page-layout 0.78 · GLM*,
+*row 0.81*), and tapping one takes it as the name; **what it affords** — Draw
+them clean, Line up, Frame these, Play A, Not a molecule …, ranked by the
+reading and by use, the rest a keystroke away. A pill carries a label; its
+reason is the tooltip; a pill that asks a model carries a dot. Copy holds the
+ink (and puts it on the clipboard as SVG); Paste puts it beside the selection
+or, from the keyboard, at the pen. A tap while the field or a selection is up
+dismisses it and is never a dot. `Demos/surface/05-selection.js`,
 `09-palette.js`.
 
 **A loop that waits is plain ink.** Circle some marks and nothing lights
@@ -312,8 +328,8 @@ gesture — its ink leaves in favour of the selection outline and handles, and
 the offers open. (It used to raise a chip beside itself the moment it was
 drawn, *N circled · Draw them clean / What could these be?* — an affordance
 that fired on every circle whether or not one was meant, and John called it
-what it was: a leftover.) The rail's *Snap* button quietly scopes to the
-circled marks while a loop waits, and in `auto` every open offer is taken
+what it was: a leftover.) The control centre's *snap* tile quietly scopes to
+the circled marks while a loop waits, and in `auto` every open offer is taken
 after each stroke — including a closed stroke that was a loop-in-waiting
 until the next stroke settled it, which the per-stroke version silently
 skipped. `session.summonHeld` remains for surfaces that need a button.
@@ -532,27 +548,55 @@ differ only by base URL and key. Anthropic needs its own client.
   relatives think inside `<think>…</think>`, and a brace in there is exactly what
   the tolerant JSON readers downstream would latch onto.
 
-**The surface's chrome** (`Demos/session-engine.html`): the panel that reports
-on the last or hovered mark tucks under the title, scrolls, and collapses as
-a whole (*details ▾*, remembered per device; closed by default on narrow
-screens). Its labels are plain — *mark*, *reading*, *read as*, *maths*,
-*measured*, *selection*, *roles*, *relations*. Scrolling **pans**; a pinch or
-ctrl/cmd + wheel **zooms** — the trackpad convention every infinite canvas
-uses — and the rail and keyboard still zoom for a mouse. Touch: one finger
-draws, two fingers pinch and pan; on a phone the rail wraps, the zoom row is
-hidden (pinch does it), and the held-loop chip wraps to fit.
+**The surface's chrome** (`Demos/session-engine.html`, v9 S1): **one bar**
+— the wordmark and the panel toggle on the left, the mark chip, undo and the
+**control centre** on the right — and nothing in it explains the system
+(D3). The centre is a grid of tiles in fixed slots (zoom · snap · view ·
+theme · hand · auto-read · folder · import · export · models · mark · reset ·
+help), each saying its state on its face, closing on the next stroke, Esc, or
+a tap outside. The panes (models, your mark) open under the bar, one at a
+time. The chrome is built from six components in `surface/00-ui.js` — pill,
+chip, tile, row, pane — one stylesheet section each. **Light and dark are
+the same tokens inverted**: the stylesheet defines the light set on `:root`
+and the dark set on `[data-theme="dark"]`, the page stamps one of the two
+(*system* follows the OS until the tile says otherwise), and the canvas reads
+its colours from the same tokens (`readColours`), so ink and chrome never
+disagree. The panel that reports on the last or hovered mark tucks under the
+bar, scrolls, and collapses as a whole (*details ▾*, remembered per device;
+closed by default on narrow screens). Its labels are plain — *mark*,
+*reading*, *read as*, *maths*, *measured*, *selection*, *roles*,
+*relations*. Scrolling **pans**; a pinch or ctrl/cmd + wheel **zooms**; the
+zoom tile and keyboard still zoom for a mouse. Touch: one finger draws, two
+fingers pinch and pan. **The grid is under the same bar**: the view's own
+controls (the count and sort; focus's ← →) join the bar rather than a second
+bar over the cards.
 
-**A model at work is shown where it works.** Every call to a model —
-building, revising, reading a group or the writing, drawing, answering,
-reading words into verbs — is registered while it runs (`withWork` in
-`04-models.js`) and drawn as a breathing gold dot with the model's name and
-its task **above the marks it is about**, and in the status line; it leaves
-when the call ends, however it ends. **Typed text at a loop is a brief
-unless it names a verb**: Enter runs a pill only when the arrows chose one
-or a pill's name begins with what was typed; "website about dolphins" goes
-to the model as the prompt (a word inside a pill's hint, like *about* in
-*Ask about it…*, is not a command — that is what made four boxes and a
-brief do nothing). With no model joined, the pane opens and says so.
+**Every sentence has one place** (§6.2 of the v9 plan): the field (while a
+selection stands), the canvas beside a mark (a name, a match chip with its
+number, a working model, an answer card — and the reading of the mark the
+hand just made, under that mark only), the panel (rows), and the status line
+(one sentence: what just happened, via `say`/`flash`, else the standing state
+in a few words). The model pane's status stays in the pane.
+
+**A model is asked only by a deliberate act** (v9 S7, §6.3 of the plan):
+Enter on a brief, `ask:`, `draw:`, *Read the writing* (or the panel's *read
+it*), *What is this?* (every joined model reads the group and its readings
+join the certainty row), and a behaviour the verb table could not read.
+Nothing on draw, nothing on summon, nothing on join — `render()` never calls
+a model. The *auto-read* tile restores reading handwriting as it is written,
+off by default. Found the hard way: every stroke the shape rung could not
+place read as `text` and was handed to every model that can see, and every
+check asked every model to interpret the group before a word was typed — a
+doodle session was a stream of calls nobody made.
+
+**A model at work is shown where it works.** Every call to a model is
+registered while it runs (`withWork` in `04-models.js`) and drawn as a
+breathing gold dot with the model's name and its task **above the marks it
+is about**, and in the status line; it leaves when the call ends, however it
+ends. **Typed text at a loop is a brief unless it names a verb**: the reading
+line says which before Enter is pressed; "website about dolphins" goes to
+the model as the prompt. With no model joined, the reading line says so and
+Enter opens the pane.
 
 **Keys never leave the device.** A hosted provider's key lives in
 `agents[].config` in memory and, only when *remember* is ticked, in
@@ -567,8 +611,8 @@ embedding-only models and says so** (an Ollama holding only `nomic-embed-text`
 used to show nothing and explain nothing), and **remembers the pick as a
 preference** — honoured when that server still offers that model, quietly
 ignored otherwise. Hosted providers and a custom OpenAI-compatible endpoint
-join by key; the key is remembered only when asked. The palette's "Describe
-it…" opens this pane when no model is present: the escalation, made visible.
+join by key; the key is remembered only when asked. A brief typed with no
+model present opens this pane: the escalation, made visible.
 Model participants are surface-side (`agents[]`); the session keeps every
 `join` in its history, so leaving only stops a model being asked.
 

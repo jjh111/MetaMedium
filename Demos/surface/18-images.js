@@ -101,9 +101,10 @@
     if (e.target !== document.body) return;
     const items = [...(e.clipboardData ? e.clipboardData.items : [])];
     const files = items.filter((i) => i.kind === 'file').map((i) => i.getAsFile()).filter(Boolean);
-    if (!files.length) return;
-    e.preventDefault();
     const at = lastPen ? screenToWorld(lastPen.x, lastPen.y) : screenToWorld(innerWidth / 2, innerHeight / 2);
+    // No file on the clipboard: what Copy held is pasted where the pen last was.
+    if (!files.length) { if (clip) { e.preventDefault(); pasteClip(at); } return; }
+    e.preventDefault();
     for (const f of files) importFile(f, at);
   });
   const importInput = document.getElementById('importInput');

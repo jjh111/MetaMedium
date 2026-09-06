@@ -11,6 +11,7 @@
   // the canvas, so the canvas itself never enters a mode (MVP.md §5.2).
   const teachPanel = document.getElementById('teachPanel');
   const teachBtn = document.getElementById('teachBtn');
+  ui.pane(teachPanel, 'your mark', () => closePanel(teachPanel, teachBtn));
   const pad = document.getElementById('teachPad');
   const padCtx = pad.getContext('2d');
   const teachStatus = document.getElementById('teachStatus');
@@ -162,11 +163,9 @@
     const held = !!session.getState().commandMark;
     teachForget.hidden = !held;
     if (held) {
-      teachHint.innerHTML = '<b>Your mark.</b> Draw here to teach a new one. <b>Forget</b> goes back to ✓.';
+      teachHint.innerHTML = '<b>Your mark.</b> Draw here to teach a new one; <b>Forget</b> goes back to ✓.';
       teachStatus.className = '';
-      teachStatus.textContent = samples.length
-        ? 'Held on this device. These are the five it learned from — draw here to start a new one.'
-        : 'Held on this device.';
+      teachStatus.textContent = samples.length ? 'Held on this device — the five it learned from.' : 'Held on this device.';
     } else {
       teachHint.innerHTML = 'Draw your mark <b>five times</b>.';
       evaluateSamples();
@@ -181,13 +180,13 @@
     session.teachCommandMark(mark, Date.now());
     rememberMark(mark, samples);
     showPadState();
-    teachStatus.textContent = 'Learned, and held on this device. The check ✓ no longer summons — your mark does.';
+    teachStatus.textContent = 'Learned, and held on this device. Your mark summons now; the check does not.';
     render(session.getState());
   };
   document.getElementById('teachClear').onclick = () => {
     samples = []; samplesHeld = false; teachUse.disabled = true; teachStatus.textContent = ''; drawPad();
     if (session.getState().commandMark) {
-      teachStatus.textContent = 'Draw the new mark five times. Your held mark stays until you use the new one.';
+      teachStatus.textContent = 'Draw the new mark five times; the held one stays until you use this one.';
     }
   };
   teachForget.onclick = forgetMark;
@@ -196,6 +195,8 @@
     togglePanel(teachPanel, teachBtn);
     if (!teachPanel.hasAttribute('hidden')) { sizePad(); showPadState(); }
   };
+  // The mark chip in the bar is drawn in the theme's colour; a theme change redraws it.
+  function redrawMarkChip() { shownMark = undefined; shownGlyph = undefined; syncMarkChip(session.getState()); }
   document.getElementById('markChip').onclick = () => teachBtn.click();
 
   // The ACTIVE mark, echoed in the rail. Shown from the start, not only once you
@@ -232,11 +233,11 @@
     chip.hidden = false;
   }
 
+  // Panes are exclusive: opening one closes the other (openPane, in the controls fragment).
   function togglePanel(el, btn) {
     const open = el.hasAttribute('hidden');
-    if (open) el.removeAttribute('hidden'); else el.setAttribute('hidden', '');
-    btn.setAttribute('aria-pressed', String(open));
+    if (open) openPane(el, btn); else closePanel(el, btn);
   }
   function closePanel(el, btn) {
-    el.setAttribute('hidden', ''); btn.setAttribute('aria-pressed', 'false');
+    el.setAttribute('hidden', ''); if (btn) btn.setAttribute('aria-pressed', 'false');
   }

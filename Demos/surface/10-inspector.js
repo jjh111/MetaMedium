@@ -13,8 +13,7 @@
   function behaviourRows(s, node, id) {
     const reps = MM.behavioursOf(node);
     if (!reps.length) {
-      return '<div class="row"><span class="k">behaves</span><span class="v">wander, and keep to its spot — the built-in</span></div>' +
-        '<div class="why">write what it does beside it, type it in the loop\'s palette, or drag it while the clock runs to act it out</div>';
+      return '<div class="row"><span class="k">behaves</span><span class="v">wander, and keep to its spot — the built-in</span></div>';
     }
     let html = '';
     const blessedRep = reps.find((r) => r.data.blessed);
@@ -49,13 +48,13 @@
   function clockRows(s, id) {
     const c = s.clocks[id];
     const err = runtimeBroken(id);
-    const stateText = !c ? 'not played — nothing of it runs until you play it'
+    const stateText = !c ? 'not played'
       : c.playing ? 'playing · t = ' + tankTime(id).toFixed(1) + 's' : 'paused' + (c.reason ? ' — ' + c.reason : '') + ' · t = ' + tankTime(id).toFixed(1) + 's';
     return '<div class="row"><span class="k">clock</span><span class="v' + (err ? ' warn' : '') + '">' + esc(stateText) + '</span></div>' +
       '<div class="acts">' +
       (c && c.playing
         ? '<button class="mini" data-act="clock-pause" data-id="' + esc(id) + '">pause</button>'
-        : '<button class="mini" data-act="clock-play" data-id="' + esc(id) + '">' + (c ? 'play' : 'play — let it run') + '</button>') +
+        : '<button class="mini" data-act="clock-play" data-id="' + esc(id) + '">play</button>') +
       '<button class="mini" data-act="clock-reset" data-id="' + esc(id) + '">reset</button></div>';
   }
 
@@ -133,7 +132,6 @@
         html += '<div class="row"><span class="k">addresses</span><span class="v">' +
           esc(parts.map((r) => r.id).join(' ') || 'nothing yet') + '</span></div>';
       }
-      if (codes.length > 1) html += '<div class="why">Earlier versions are kept.</div>';
       if (kind !== 'png' && kind !== 'jpg' && kind !== 'control') {
         html += '<div class="acts">' + (kind === 'text' ? '<button class="mini" data-act="edit-text" data-id="' + esc(id) + '">edit the words</button>' : '') +
           '<button class="mini" data-act="export-code" data-id="' + esc(id) + '">save as .' + esc(kind === 'text' ? 'txt' : kind) + '</button></div>';
@@ -279,7 +277,7 @@
       } else if (seeing().length) {
         html += '<div class="why">not read yet</div><button class="mini" data-act="read" data-id="' + esc(id) + '">read it</button>';
       } else {
-        html += '<div class="why">writing, unread — needs a model that can see (add one that says “sees”)</div>';
+        html += '<div class="why">unread — needs a model that can see</div>';
       }
     }
 

@@ -47,7 +47,7 @@ canvas: every file of a known kind (`html`, `js`, `json`, `svg`, `md`, `txt`,
 `png`, `jpg`) becomes an artifact you can draw on, and your ink is saved
 beside them as your own log under `.metamedium/logs/`. Three ways in:
 
-- **A folder on disk** — *Open a folder…* in the rail (Chrome or Edge).
+- **A folder on disk** — the *folder* tile in the control centre (Chrome or Edge).
   Autosave rewrites only your log file; git carries it between machines.
 - **A repository** — `session-engine.html?git=owner/repo` (or
   `owner/repo@branch`, `owner/repo/some/dir`). Reading a public repository

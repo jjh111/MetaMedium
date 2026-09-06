@@ -8,6 +8,21 @@
 
 ## The Vision, Restated
 
+> **v9 accounting, 6 September 2026 (branch `next-phases`, local).** The
+> surface as a system (`SURFACE-v9-PLAN.md` §5–§6): **a model is asked only
+> by a deliberate act** — `render()` never calls one, and drawing, the check
+> and joining ask nothing (S7); **one field** at the pen tip reads what is
+> typed and says what Enter will do before it is pressed, over three rows
+> whose slots never move — Name · Copy · Paste · Erase, what this is with its
+> numbers, what it affords (S2); **one bar** and a control centre of tiles,
+> light and dark as the same tokens inverted, the hand as a setting, the
+> grid under the same bar, no sentence of philosophy on the page (S1); a
+> match is a chip with its number (S3, first cut); the moment — nested
+> circles, "torus in 3d", a three.js program in the drawing's frame,
+> reused from the library the second time (S5). The e2e drives 132 steps.
+> Still open: code legible at every zoom (S4), live logs (S6), a tap on a
+> match chip opening the field.
+
 > **v8 accounting, 3 September 2026 (branch `next-phases`, local).** Every
 > work package in `BUILD-PLAN-v8.md` §2 has landed: the surface split into
 > fragments; selection and the blob palette; checkpoints and the log merge;

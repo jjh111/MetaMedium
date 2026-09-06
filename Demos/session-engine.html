@@ -12,37 +12,43 @@
 <div id="stage"></div>
 <canvas id="canvas"></canvas>
 
-<div class="rail">
-  <div class="title">
-    <h1>MetaMedium <span>MVP</span></h1>
+<header class="bar" id="bar">
+  <div class="barLeft">
+    <span class="wordmark">MetaMedium</span>
     <button id="panelToggle" aria-expanded="true" title="Show or hide the panel">details ▾</button>
+    <div id="viewBar" hidden></div>
   </div>
-  <div class="controls">
-    <div class="markChip" id="markChip" title="The mark that turns a circled group into an offer. Click to teach your own.">
+  <div class="barRight">
+    <div class="markChip" id="markChip" title="The mark that turns a circled group into a selection. Click to teach your own.">
       <canvas id="markGlyph" width="34" height="22"></canvas><span id="markName">check</span>
     </div>
-    <div class="zoomRow">
-      <button id="zoomOut" title="Zoom out">−</button>
-      <span class="z" id="zoomPct">100%</span>
-      <button id="zoomIn" title="Zoom in">+</button>
-      <button id="fitBtn" title="Fit everything on screen">Fit</button>
-    </div>
-    <button id="teachBtn" aria-pressed="false" title="Teach the canvas your command mark">Teach a mark…</button>
-    <button id="modelBtn" aria-pressed="false" title="Add a model as a participant (Tier 1–2)">Add a model…</button>
-    <button id="snapBtn" hidden title="Redraw every confidently read shape clean. The ink stays underneath; undo puts it back in front.">Snap</button>
-    <button id="snapMode" title="offer: ghost the clean form and wait · auto: snap as you draw · off">snap · offer</button>
-    <button id="folderBtn" title="Open a folder as the canvas: its files become artifacts, and your ink is saved beside them">Open a folder…</button>
-    <button id="importBtn" title="A picture is traced into ink beside the picture; a file of a known kind becomes an artifact. Drop or paste works too">Import…</button>
-    <input id="importInput" type="file" accept="image/*,.svg,.html,.htm,.js,.mjs,.json,.md,.txt" multiple capture="environment" hidden>
-    <button id="exportBtn" title="The board as SVG or PNG, or the session as its log">Export…</button>
-    <button id="gridBtn" aria-pressed="false" title="Every artifact as a card; click one to focus it">Grid</button>
-    <button id="undoBtn" title="Ctrl+Z">Undo</button>
-    <button id="resetBtn">Reset</button>
+    <button id="undoBtn" title="Undo (⌘Z)">undo</button>
+    <button id="ccBtn" aria-pressed="false" title="Controls" aria-label="Controls"><i></i><i></i><i></i><i></i></button>
   </div>
+</header>
+
+<div id="cc" hidden>
+  <div class="tile wide" id="zoomTile">
+    <span class="k">zoom</span>
+    <span class="zoomRow"><button id="zoomOut" title="Zoom out">−</button><span class="z" id="zoomPct">100%</span><button id="zoomIn" title="Zoom in">+</button><button id="fitBtn" title="Fit everything on screen">fit</button></span>
+  </div>
+  <button id="snapMode"></button>
+  <button id="snapBtn" hidden></button>
+  <button id="gridBtn" aria-pressed="false"></button>
+  <button id="themeBtn"></button>
+  <button id="handBtn"></button>
+  <button id="autoReadBtn"></button>
+  <button id="folderBtn"></button>
+  <button id="importBtn"></button>
+  <button id="exportBtn"></button>
+  <button id="modelBtn" aria-pressed="false"></button>
+  <button id="teachBtn" aria-pressed="false"></button>
+  <button id="resetBtn"></button>
+  <button id="helpBtn"></button>
+  <input id="importInput" type="file" accept="image/*,.svg,.html,.htm,.js,.mjs,.json,.md,.txt" multiple capture="environment" hidden>
 </div>
 
 <div id="teachPanel" hidden>
-  <div class="eyebrow">your command mark</div>
   <p class="hint" id="teachHint"></p>
   <canvas id="teachPad"></canvas>
   <div id="teachDots"><i></i><i></i><i></i><i></i><i></i></div>
@@ -50,16 +56,15 @@
     <button id="teachUse" disabled>Use this mark</button>
     <button id="teachClear">Clear</button>
     <button id="teachForget" hidden>Forget</button>
-    <button id="teachClose">Close</button>
+    <button id="teachClose" hidden>Close</button>
   </div>
   <div id="teachStatus"></div>
 </div>
 
 <div id="modelPanel" hidden>
-  <div class="eyebrow">models</div>
   <div class="mpSection">
     <div class="mpHead"><span>on this machine</span><button id="mpDetect" class="ghost">Detect</button></div>
-    <div id="mpLocal" class="mpLocal"><div class="hint">Ollama and LM Studio are looked for when this opens.</div></div>
+    <div id="mpLocal" class="mpLocal"></div>
   </div>
   <div class="mpSection">
     <div class="mpHead"><span>by key</span></div>
@@ -74,7 +79,7 @@
     <label class="mpRemember"><input type="checkbox" id="mpRememberKey" /> remember the key on this device</label>
     <div class="mpRow">
       <button id="mpAdd">Join</button>
-      <button id="mpClose" class="ghost">Close</button>
+      <button id="mpClose" class="ghost" hidden>Close</button>
     </div>
   </div>
   <div id="mpStatus" class="hint"></div>
@@ -94,11 +99,6 @@
   <input id="rpScrub" type="range" min="0" max="0" value="0" />
   <span class="rpStep" id="rpStep"></span>
   <div class="rpCaption" id="rpCaption"></div>
-</div>
-<div class="legend">
-  <span><i style="background:#e8e4d9"></i>you</span>
-  <span><i style="background:#8ab4c8"></i>model</span>
-  <span><i style="background:#c9a84c"></i>gesture / artifact</span>
 </div>
 
 <script src="metamedium-core.browser.js"></script>

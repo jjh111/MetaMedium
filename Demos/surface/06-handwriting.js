@@ -1,6 +1,6 @@
 // ===== handwriting =====
-// Provides: handwriting: inkImage, isWriting, readOne, readWriting.
-// Uses: core, models (agents), render.
+// Provides: handwriting: inkImage, isWriting, readOne, readWriting; the auto-read preference (off by default).
+// Uses: core (prefs), models (agents, withWork), render, input (say).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () Ellipsis)();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -13,6 +13,16 @@
   // and ranked, never blessed (v7 Stage E). A model that cannot see is never
   // asked; with none present the mark simply stays "text".
   const seeing = () => agents.filter((a) => a.config.vision);
+  // Reading as you write is a preference, off by default: a model is asked
+  // when you say *read* (§6.3). On, every mark that reads as writing is handed
+  // to the models that can see as it lands.
+  let autoRead = prefs.get('autoRead', false) === true;
+  function setAutoRead(on) {
+    autoRead = !!on;
+    prefs.set('autoRead', autoRead);
+    if (autoRead) readWriting(session.getState());
+    syncTiles();
+  }
   const askedToRead = new Set(); // node ids handed out already (per model join, see below)
 
   function inkImage(node, size) {
@@ -53,14 +63,14 @@
     askedToRead.add(key);
     const image = inkImage(node);
     if (!image) return false;
-    mpStatus.textContent = 'reading the writing with ' + readers.map((a) => a.name).join(', ') + '…';
     readers.forEach((agent) => {
-      withWork('write:' + agent.id + ':' + node.id, [node.id], agent.name + ' is reading the writing…', agent.read({ nodeId: node.id, image: image, at: Date.now() })).then((res) => {
-        mpStatus.textContent = res.ok
+      withWork('write:' + agent.id + ':' + node.id, [node.id], agent.name + ' · reading the writing', agent.read({ nodeId: node.id, image: image, at: Date.now() })).then((res) => {
+        say(res.ok
           ? agent.name + ' read “' + res.transcripts[0].text + '”' + (res.transcripts.length > 1 ? ' (or ' + res.transcripts.slice(1).map((t) => '“' + t.text + '”').join(', ') + ')' : '')
-          : agent.name + ' could not read it (' + res.error + ').';
+          : agent.name + ' could not read it (' + res.error + ')');
         if (!res.ok && res.raw) window.__mm.lastRaw = res.raw;
         render(session.getState());
+        refreshPalette();
       });
     });
     return true;

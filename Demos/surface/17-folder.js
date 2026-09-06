@@ -237,13 +237,41 @@
     else gridEl.hidden = true;
     document.getElementById('gridBtn').setAttribute('aria-pressed', String(mode === 'grid'));
     if (mode === 'canvas') focusIndex = -1;
+    renderViewBar();
+    syncTiles();
   }
+
+  // The view's own controls live in the bar, not in a second bar over the
+  // cards: the grid's count and sort, focus's prev and next (one frame, three
+  // lenses — the review canvas's rule).
+  const viewBarEl = document.getElementById('viewBar');
+  function renderViewBar() {
+    const s = session.getState();
+    if (viewMode === 'canvas') { viewBarEl.hidden = true; viewBarEl.innerHTML = ''; return; }
+    viewBarEl.hidden = false;
+    const order = gridOrder(s);
+    if (viewMode === 'grid') {
+      viewBarEl.innerHTML = '<b>' + order.length + '</b> artifact' + (order.length === 1 ? '' : 's') + ' · sort ' +
+        ['name', 'kind', 'recency', 'folder'].map((k) => '<button data-sort="' + k + '"' + (gridSort === k ? ' class="on"' : '') + '>' + k + '</button>').join('') +
+        '<button data-view="canvas" title="Esc">canvas</button>';
+    } else {
+      const id = order[focusIndex];
+      const name = id ? (MM.wordOf(s.nodes.get(id)) || id) : '';
+      viewBarEl.innerHTML = '<button data-focus="-1" title="←">←</button><b>' + esc(name) + '</b> ' + (focusIndex + 1) + '/' + order.length +
+        '<button data-focus="1" title="→">→</button><button data-view="canvas" title="Esc">canvas</button>';
+    }
+  }
+  viewBarEl.addEventListener('click', (e) => {
+    const b = e.target.closest && e.target.closest('button');
+    if (!b) return;
+    if (b.dataset.sort) { gridSort = b.dataset.sort; renderGrid(session.getState()); renderViewBar(); }
+    else if (b.dataset.focus) focusStep(Number(b.dataset.focus));
+    else if (b.dataset.view) setViewMode('canvas');
+  });
 
   function renderGrid(s) {
     const order = gridOrder(s);
-    let html = '<div class="gridBar"><b>' + order.length + '</b> artifact' + (order.length === 1 ? '' : 's') +
-      ' · sort <button data-sort="name">name</button><button data-sort="kind">kind</button><button data-sort="recency">recency</button><button data-sort="folder">folder</button>' +
-      '<span class="how">click a card to focus it; Esc back to the canvas</span></div><div class="cards">';
+    let html = order.length ? '<div class="cards">' : '<div class="empty">no artifacts yet — name something, or open a folder</div><div class="cards">';
     for (const id of order) {
       const n = s.nodes.get(id);
       const r = codeRepOf(n);
@@ -257,8 +285,6 @@
   }
 
   gridEl.addEventListener('click', (e) => {
-    const sortBtn = e.target.closest && e.target.closest('button[data-sort]');
-    if (sortBtn) { gridSort = sortBtn.getAttribute('data-sort'); renderGrid(session.getState()); return; }
     const card = e.target.closest && e.target.closest('button.card');
     if (card) focusOn(card.getAttribute('data-id'));
   });
@@ -277,7 +303,7 @@
     view.panX = (innerWidth - w * view.zoom) / 2 - b.minX * view.zoom;
     view.panY = (innerHeight - h * view.zoom) / 2 - b.minY * view.zoom;
     afterViewChange();
-    flash('focus: ' + (MM.wordOf(s.nodes.get(id)) || id) + ' · ← → for the next, Esc for the canvas');
+    renderViewBar();
   }
   function focusStep(delta) {
     const order = gridOrder(session.getState());
@@ -287,7 +313,7 @@
   }
 
   document.getElementById('gridBtn').onclick = () => setViewMode(viewMode === 'grid' ? 'canvas' : 'grid');
-  document.getElementById('folderBtn').onclick = () => { openFolder(); };
+  document.getElementById('folderBtn').onclick = () => { closeCC(); openFolder(); };
   addEventListener('keydown', (e) => {
     if (e.target !== document.body && e.target !== document && e.target !== window) return;
     if (e.key === 'Escape' && viewMode !== 'canvas') { setViewMode('canvas'); e.preventDefault(); }

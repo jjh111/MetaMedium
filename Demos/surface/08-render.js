@@ -1,6 +1,7 @@
 // ===== render =====
-// Provides: queries over state, the rungs cache, render(), ink, labels, explanations.
-// Uses: core, view, artifacts, snap, models, handwriting, palette, inspector, teach (syncMarkChip).
+// Provides: queries over state, the rungs cache, render(), ink, the label under the inspected mark, match chips,
+//   the working dot, explanations, the status line (one sentence).
+// Uses: core, view, artifacts, snap, models, palette, inspector, teach (syncMarkChip), folder (folderStatus, liveSet).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () Ellipsis)();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -118,8 +119,7 @@
 
   function render(s) {
     state = s;
-    askModels(s);
-    readWriting(s);
+    // No model is asked from here: a paint is not a request (§6.3).
     syncStage(s);
     refreshOffers();
 
@@ -145,8 +145,9 @@
       ctx.lineWidth = wpx(1);
       ctx.strokeRect(b.minX - pad, b.minY - pad, b.maxX - b.minX + pad * 2, b.maxY - b.minY + pad * 2);
       ctx.setLineDash([]);
-      // Plural, like every reading: two definitions with the same shapes are both named.
-      text(c.matches.map((m) => m.name).join(' or ') + '?  circle + mark to confirm', b.minX - wpx(12), b.minY - wpx(20), `rgba(${C.goldRGB},0.72)`);
+      // A match is a chip beside the group, with its number (D8). Plural, like
+      // every reading: two definitions with the same shapes are both named.
+      chipText(c.matches.slice(0, 2).map((m) => m.name + ' ' + m.score.toFixed(2)).join('  ·  '), b.minX - pad, b.minY - pad - wpx(8));
     }
 
     const inspectedId = hoverId || lastContentId(s);
@@ -183,19 +184,16 @@
       if (isArtifact && b) {
         brackets(b, isLive ? C.gold : `rgba(${C.goldRGB},0.7)`);
         text((MM.wordOf(node) || '') + (isLive ? '  ·  live' : ''), b.minX, b.minY - wpx(10), C.gold);
-      } else if (b && !pending) {
-        // Two rungs at a glance: what it is, and what it plays.
-        // What it IS: the blessed name, the words it says, or the shape rung's
-        // reading. A model's reading of the GROUP this mark is in lands on the
-        // mark too, and it belongs in the panel and the palette, not under a
-        // circle as if the circle were "network-node-connections".
+      } else if (b && !pending && id === inspectedId && !s.selection.length) {
+        // The reading of the mark the hand just made (or is over), and only
+        // that one: what it is, and what it plays. Under every mark it was a
+        // board of fragments; the panel has the rest.
         const said = MM.transcriptOf(node);
         const shape = MM.interpretationsOf(node, s.nodes).filter((r) => r.tier === 0)[0];
         const top = MM.wordOf(node) || (said ? '“' + said + '”' : shape ? shape.label : MM.topInterpretation(node));
         const role = readRungs(s).roles.get(id);
         const played = role && role.role !== 'unclassified' && role.role !== top ? ' · ' + role.role : '';
-        if (top) text(top + played, b.minX, b.maxY + wpx(15),
-          id === inspectedId ? `rgba(${C.labelRGB},0.95)` : `rgba(${C.labelRGB},0.5)`);
+        if (top) text(top + played, b.minX, b.maxY + wpx(15), `rgba(${C.labelRGB},0.85)`);
       }
     }
 
@@ -228,11 +226,14 @@
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0); // back to screen space for the chrome
     syncMarkChip(s);
     renderSummon(s);
-    renderHeld(s);
     renderInspector(s, inspectedId);
 
+    // The status line: what just happened, else the standing state, in a few
+    // words — and a model at work is always in it, whichever it shows.
+    const fresh = flashText && Date.now() - flashAt < flashFor;
+    const ws = workingSummary();
+    const hint = s.pendingLassoId ? 'cross the loop with ' + (s.commandMark ? 'your mark' : '✓') + ' to select what it holds' : '';
     const strokes = s.contentIds.length - s.artifacts.length;
-    const fresh = flashText && Date.now() - flashAt < FLASH_MS;
     const parts = [strokes + ' loose'];
     if (s.artifacts.length) {
       const running = liveSet(s).size;
@@ -240,13 +241,16 @@
     }
     const fs = folderStatus();
     if (fs) parts.push(fs);
-    const ws = workingSummary();
-    if (ws) parts.push('⋯ ' + ws);
     if (agents.length) parts.push(agents.map((a) => a.config.model).join(', '));
-    if (snapOffers.size) parts.push(snapOffers.size + ' read clean');
-    if (s.pendingLassoId) parts.push('cross the loop with ' + (s.commandMark ? 'your mark' : '✓') + ' to select what it holds');
-    if (fresh) parts.push(flashText);
-    statusEl.textContent = parts.join('  ·  ');
+    if (ws) parts.push('⋯ ' + ws);
+    if (hint) parts.push(hint);
+    const standing = parts.join('  ·  ');
+    // A fresh message takes the line; the one hint a waiting loop needs, and
+    // a model at work, stay beside it. The standing state is kept on the
+    // element for anything that needs to read it while a message shows.
+    statusEl.textContent = fresh ? flashText + (ws ? '  ·  ⋯ ' + ws : '') + (hint ? '  ·  ' + hint : '') : standing;
+    statusEl.dataset.standing = standing;
+    statusEl.classList.toggle('said', !!fresh);
   }
 
   /** A model at work: a breathing dot and its words, above the marks it is working on. */
@@ -275,6 +279,20 @@
     ctx.fillText(str, x, y);
   }
 
+  /** A chip in the canvas: a small pill with a reading and its number, in the chrome's own size. */
+  function chipText(str, x, y) {
+    ctx.font = wpx(10.5).toFixed(2) + 'px ui-monospace, SFMono-Regular, Menlo, monospace';
+    const w = ctx.measureText(str).width + wpx(14), h = wpx(17);
+    roundRect(x, y - h, w, h, h / 2);
+    ctx.fillStyle = `rgba(${C.panelRGB},0.92)`;
+    ctx.fill();
+    ctx.strokeStyle = `rgba(${C.goldRGB},0.45)`;
+    ctx.lineWidth = wpx(1);
+    ctx.stroke();
+    ctx.fillStyle = C.gold;
+    ctx.fillText(str, x + wpx(7), y - wpx(5));
+  }
+
   function brackets(b, color) {
     const L = wpx(12), p = wpx(9);
     ctx.strokeStyle = color;
@@ -298,7 +316,7 @@
    * inspector, which is the one place it is guaranteed to be unreadable.
    */
   function viewportWorld() {
-    const rail = document.querySelector('.rail');
+    const rail = document.querySelector('.bar');
     const insp = document.getElementById('inspector');
     const railH = rail ? rail.getBoundingClientRect().height : 0;
     const inspRect = insp && insp.offsetParent !== null ? insp.getBoundingClientRect() : null;
@@ -353,21 +371,21 @@
         ctx.beginPath();
         ctx.moveTo(subject.maxX, (subject.minY + subject.maxY) / 2);
         ctx.lineTo(x, y + h / 2);
-        ctx.strokeStyle = 'rgba(138,180,200,0.32)';
+        ctx.strokeStyle = `rgba(${C.agentRGB},0.32)`;
         ctx.lineWidth = wpx(1);
         ctx.setLineDash([wpx(3), wpx(4)]);
         ctx.stroke();
         ctx.setLineDash([]);
       }
 
-      ctx.fillStyle = 'rgba(10,10,15,0.86)';
-      ctx.strokeStyle = 'rgba(138,180,200,0.38)';
+      ctx.fillStyle = `rgba(${C.panelRGB},0.92)`;
+      ctx.strokeStyle = `rgba(${C.agentRGB},0.38)`;
       ctx.lineWidth = wpx(1);
       roundRect(x, y, w, h, 6);
       ctx.fill();
       ctx.stroke();
 
-      ctx.fillStyle = 'rgba(138,180,200,0.85)';
+      ctx.fillStyle = C.agent;
       ctx.font = '10px ui-monospace, SFMono-Regular, Menlo, monospace';
       ctx.fillText(who, x + pad, y + pad + 8);
 

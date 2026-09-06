@@ -7,7 +7,7 @@
 // build shows on the next reload, not the one after, and nothing is ever
 // served stale while the network is there. Bumping VERSION drops the old
 // cache on activate.
-const VERSION = 'mm-shell-v2';
+const VERSION = 'mm-shell-v3';
 const SHELL = [
   './session-engine.html',
   './session-engine.js',

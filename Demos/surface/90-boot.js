@@ -11,7 +11,11 @@
     screenToWorld: screenToWorld, worldToScreen: worldToScreen,
     fitAll: fitAll, regionsUnderInk: regionsUnderInk,
     snapMode: () => snapMode, setSnapMode: setSnapMode, snapOffers: () => snapOffers,
-    inkImage: inkImage, readOne: readOne, readWriting: readWriting,
+    inkImage: inkImage, readOne: readOne, readWriting: readWriting, askModelsAbout: askModelsAbout,
+    // Device preferences and the chrome, for tests: the theme, the hand, auto-read, the field's reader, the clip.
+    themeMode: () => themeMode, setThemeMode: setThemeMode, hand: () => hand, setHand: setHand,
+    autoRead: () => autoRead, setAutoRead: setAutoRead, readField: (q) => readField(q), clip: () => clip,
+    copyMarks: copyMarks, pasteClip: pasteClip, openCC: openCC, closeCC: closeCC, syncTiles: syncTiles,
     replay: () => rp, rpGoTo: (i) => rpGoTo(i), theme: THEME,
     // For tests: pin the view so world coordinates map to known screen ones.
     setView: (zoom, panX, panY) => { view.zoom = zoom; view.panX = panX; view.panY = panY; afterViewChange(); },
@@ -64,6 +68,7 @@
   }
   session.subscribe(scheduleSave);
   document.fonts.ready.then(() => { sizePad(); render(session.getState()); });
+  syncTiles();
   // Installable, and open with no network: the shell is cached by a service
   // worker when the page is served, never from a file on disk.
   if ('serviceWorker' in navigator && /^https?:/.test(location.protocol) && !params.has('nosw')) {

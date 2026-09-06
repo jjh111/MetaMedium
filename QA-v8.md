@@ -1,24 +1,35 @@
-# QA for v8 — a demo you can run by hand
+# QA for v8 and v9 — a demo you can run by hand
 
 **Branch:** `next-phases` · **Surface:** `Demos/session-engine.html` (serve the
 repo root with `python3 -m http.server 8000`, open
-`http://localhost:8000/Demos/session-engine.html`) · **Date:** 3 September 2026
+`http://localhost:8000/Demos/session-engine.html`) · **Date:** 6 September 2026
 
 Every step below says what to do and what you should see. Tick the ones that
 hold; write down the ones that do not, with what happened instead. Steps
-marked **(model)** need a model joined — see §0.
+marked **(model)** need a model joined — see §0. The *help* tile in the
+control centre opens this file.
 
-## 0. Setup
+## 0. Setup, and the frame
 
-1. Press **Reset** in the rail. The board is empty. (Reset also forgets the
-   board that browser storage held; a plain reload brings the last board back.)
-2. Rail shows **snap · offer**. If it says `auto` or `off`, click it until it
-   says `offer`.
-3. **(model)** Click **Add a model…**. Choose *OpenRouter*, paste your key,
-   pick a model OpenRouter lists (for handwriting, one that can see). Tick
-   *remember on this device* only if you want the key kept in this browser's
-   storage; it is never written to the log, the folder, or any file. The pane
-   should say the model joined and the status line should name it.
+1. The page is **one bar**: the wordmark and *details* on the left; the mark
+   chip, *undo* and a four-dot button (the **control centre**) on the right.
+   Nothing on the page explains the system.
+2. Open the control centre. Tiles in a grid, each saying its state: *zoom*,
+   *snap · offer*, *view · canvas*, *theme · system*, *hand · right*,
+   *auto-read · off*, *folder*, *import*, *export*, *models · none*, *mark*,
+   *reset*, *help*. It closes on Esc, on a tap outside, and on the next stroke.
+3. Tap **theme** until it says *light*: the page is paper, the ink dark, the
+   mark chip redrawn. *dark* is the grey room. *system* follows the OS.
+4. Tap **reset**. The board is empty. (Reset also forgets the board that
+   browser storage held; a plain reload brings the last board back.)
+5. **snap** says *offer*. If it says `auto` or `off`, tap it until it says `offer`.
+6. **(model)** Tap **models**. A pane opens under the bar. Choose
+   *OpenRouter*, paste your key, type a model id (for handwriting, one that
+   can see). Tick *remember on this device* only if you want the key kept in
+   this browser's storage; it is never written to the log, the folder, or
+   any file. The pane says the model joined; the *models* tile names it; the
+   status line names it. **Nothing is sent to it yet** — and nothing will be
+   until you ask (§5–§6).
 
    Without a model, everything in §1–§4, §7–§12 still works. §5–§6 need one.
 
@@ -33,44 +44,58 @@ marked **(model)** need a model joined — see §0.
 4. Scribble three passes across a mark. It is erased; the status says so.
    **Undo** brings it back.
 
-## 2. The loop, the mark, the selection, the palette
+## 2. The loop, the mark, the selection, the field
 
 1. Draw three boxes in a row, at the size your hand draws them (small is
    fine). Circle them. **Nothing lights up**: the loop is plain ink, and the
    status says *cross the loop with ✓ to select what it holds*.
 2. Draw a **check ✓** across the loop's edge (down to a sharp elbow, then a
    longer flick up). The loop and the check both **leave the view**; the
-   three boxes get a dashed outline with corner handles and a knob; the
-   palette blooms in rings from where the pen let go.
-3. In the rings: *Draw them clean*, *Line up across*, *Match sizes*, *Name
-   this…*, *Erase these*, *Duplicate these*, *Copy as SVG*, *Describe it…*.
-   Type `dup` in the field: the rings narrow to *Duplicate these*.
-4. Take *Duplicate these*. A copy of the three appears beside them and **the
-   copies are the selection**. Tap empty ground: the selection is gone. Undo:
-   it is back, in place.
-5. Circle the copies, check, *Erase these*. They go; undo three times brings
+   three boxes get a dashed outline with corner handles and a knob; **the
+   field** opens to the right of where the pen let go (to the left, if the
+   *hand* tile says *left*).
+3. The field has a text input, an empty reading line under it, and three
+   rows: **Name… · Copy · Paste · Erase** (always these four, in this
+   order; *Paste* is dim until something is copied), then what the marks
+   read as (with numbers — for three plain boxes there may be nothing), then
+   what they afford: *Draw them clean*, *Line up across*, *Match sizes*,
+   *What is this?* (with a dot: it asks a model).
+4. Type `dup`. The reading line says **↵ Duplicate these** before you press
+   anything. Enter: a copy of the three appears beside them and **the copies
+   are the selection**. Tap empty ground: the selection is gone. Undo: it is
+   back, in place.
+5. Type `er` — the line says *↵ Erase*. Type `clean` — *↵ Draw them clean*.
+   Type `line` — *↵ Line up across*. Type `xyzzy` — *↵ building needs a
+   model* (no model) or *↵ <model> builds a page* (one joined). Enter never
+   does anything the line did not say.
+6. Circle the copies, check, take **Erase**. They go; undo three times brings
    them back.
-6. Drag inside a selection: it moves. Drag a corner: it scales. Drag the
+7. Circle three marks, check, **Copy**; tap off; circle another mark, check,
+   **Paste**: the copied ink lands beside it and is the selection. ⌘C on a
+   selection copies too; ⌘V pastes where the pen last was.
+8. Drag inside a selection: it moves. Drag a corner: it scales. Drag the
    knob: it turns. Each is **one** undo step.
 
 ## 3. Name it, recognise it, correct it
 
 1. Draw three small circles and two short lines between them. Circle, check,
-   *Name this…*, type `molecule`, Enter. The five become one artifact with
-   brackets and the name.
-2. Draw the same arrangement again nearby. A dashed box appears around it:
-   **molecule? circle + mark to confirm**.
-3. Circle it, check. The palette offers *It's a molecule* and, beside it,
-   *Not a molecule*. Take *Not a molecule*. The dashed box goes.
+   tap **Name…** (the field fills with `name: `), type `molecule`, Enter —
+   the line said *↵ name it “molecule”* first. The five become one artifact
+   with brackets and the name.
+2. Draw the same arrangement again nearby. A dashed box appears around it
+   with a chip: **molecule 0.9x**.
+3. Circle it, check. The field's second row leads with **molecule 0.9x**
+   (the reading line says *↵ molecule … — take it as another molecule*) and
+   the third row has *Not a molecule*. Take *Not a molecule*. The chip goes.
 4. Draw the arrangement a third time. It is **not** offered as a molecule.
    The correction held.
 
 ## 4. Teach your own mark
 
-1. **Teach a mark…**. The pane shows the check it watches for. Draw a caret
-   (^) five times in the pad; the dots fill; the pane says *Consistent (N%)*.
-2. *Use this mark*. The rail chip now shows **your caret**, labelled *your
-   mark*. Close the pane.
+1. Control centre → **mark**. A pane opens under the bar. Draw a caret (^)
+   five times in the pad; the dots fill; the pane says *Consistent (N%)*.
+2. *Use this mark*. The chip in the bar now shows **your caret**, labelled
+   *your mark*; the *mark* tile says *your mark*. Close the pane (×).
 3. Circle some marks and cross the loop with a **caret**. It selects. Cross a
    different loop with a **check**: the status says *no summon — that is not
    your mark*.
@@ -83,29 +108,42 @@ marked **(model)** need a model joined — see §0.
 
 ## 5. Handwriting **(model that can see)**
 
-1. Draw a box. Beside it write a word in cursive, one stroke. The panel says
-   *reading the writing…* near the word, then holds what the model read
-   (several readings, ranked).
-2. Circle the box and the word, check. The palette leads with **Name it
-   “<the word>”**. Take it: the box is named that.
-3. Print a word letter by letter (N, A, V). The letters gather into **one
+1. Draw a box. Beside it write a word in cursive, one stroke. **Nothing is
+   sent**: no gold dot, the status line quiet, the panel says *unread*.
+2. Circle the box and the word, check. The third row has **Read the
+   writing** with a dot. Take it (or type `read`, Enter): the gold dot and
+   *<model> · reading the writing* appear over the word; then the field's
+   second row leads with **“<the word>” 0.9x** and the panel holds every
+   reading, ranked.
+3. Take the word's pill: the box is named that.
+4. Print a word letter by letter (N, A, V). The letters gather into **one
    word** as you go; the panel offers *not a word — split it*. Small circles
    and lines drawn quickly do **not** gather into a word.
+5. Control centre → **auto-read · on**. Write another word: it is read as it
+   lands, with the dot over it. Turn it off again.
 
 ## 6. A page from four boxes **(model)**
 
-1. Draw four boxes in a 2×2. Circle them, check.
-2. In the palette field type `website about dolphins` and press **Enter**.
-   The field says *building with 1 model…*; a **breathing gold dot and the
-   words "<model> is building “website about…”…" appear above the boxes**
-   and in the status line while the model works.
+1. Draw four boxes in a 2×2. Circle them, check. **No call is made** by the
+   check: no dot, nothing in the status line.
+2. In the field type `website about dolphins`. The reading line says
+   **↵ <model> builds a page**. Press **Enter**: a **breathing gold dot and
+   "<model> · building “website about…”" appear above the boxes** and in the
+   status line while the model works.
 3. A page renders **inside your ink**, one region per box, your boxes still
-   drawn on top. The panel says *living page*, lists `r1…r4`.
-4. Draw a loop **on** one region of the page, check, type `make this a
-   headline`, Enter. Only that region changes; the others are untouched.
-5. *Ask about it…* on the page: an answer card appears **in the canvas**
-   beside it, attributed to the model. *Ask it to draw…* `add a footer`: the
-   model's marks arrive in its own colour, each with a short why beside it.
+   drawn on top. The status line says *<model> built r1, r2, r3, r4*; the
+   panel says *living page*, lists `r1…r4`.
+4. Draw a loop **on** one region of the page, check. The field's placeholder
+   says *on <name> — type what to change…*. Type `make this a headline`: the
+   line says *↵ <model> changes what the loop covers*. Enter. Only that
+   region changes; the others are untouched.
+5. Circle the page, check, type `ask: what relates these?`, Enter: an answer
+   card appears **in the canvas** beside it, attributed to the model. Circle
+   two boxes, check, `draw: add a footer under these`, Enter: the model's
+   marks arrive in its own colour, each with a short why beside it.
+6. Circle any group, check, take **What is this?** (or type `what`): every
+   joined model reads it; the readings join the second row as *<label> 0.xx ·
+   <model>*; tapping one names the group that.
 
 ## 7. The tank: definitions, instances, clocks
 
@@ -157,26 +195,28 @@ marked **(model)** need a model joined — see §0.
 
 ## 10. The folder
 
-1. **Open a folder…** (Chrome/Edge). Pick a small folder with some `.html`,
-   `.md`, `.js`, `.png` files. Each becomes a card-sized artifact; the status
-   says *folder <name> · N files · saved*.
+1. Control centre → **folder** (Chrome/Edge). Pick a small folder with some
+   `.html`, `.md`, `.js`, `.png` files. Each becomes a card-sized artifact;
+   the *folder* tile names it; the status says *folder <name> · N files ·
+   saved*.
 2. Draw a stroke. Look in the folder: `.metamedium/logs/local.jsonl` exists
    and grows. Reload the page and open the same folder: the board is back,
    nothing imported twice.
-3. **Grid** in the rail: every artifact as a card, sortable by name, kind,
-   recency, folder. Click one: it fills the screen (focus); ← → step through;
-   **Esc** back to the canvas.
+3. Control centre → **view · grid**: every artifact as a card, **under the
+   same bar** — the bar now carries the count and *sort name · kind · recency
+   · folder*, and *canvas*. Click a card: it fills the screen (focus), and
+   the bar carries ← its name and position →. **Esc** back to the canvas.
 4. Open a folder with more than twelve pages: the nearest twelve run, the
    rest are **parked cards**, and the status says *12 of N live*.
 
 ## 11. Pictures in, the board out
 
-1. Drop a photo of a paper sketch of boxes on the canvas (or **Import…**, or
-   paste). The sketch is **traced into ink** where you dropped it; the photo
+1. Drop a photo of a paper sketch of boxes on the canvas (or the **import**
+   tile, or paste). The sketch is **traced into ink** where you dropped it; the photo
    sits beside it. Circle the traced ink, check, and prompt a page **(model)**:
    it renders inside the traced outlines.
 2. Drop an `.svg`: it is an artifact whose elements ink can address.
-3. **Export…** → `svg`: a file of paths, one per stroke, clean forms where
+3. The **export** tile → `svg`: a file of paths, one per stroke, clean forms where
    held. → `log`: the session as one event per line.
 
 ## 12. Text
@@ -205,3 +245,6 @@ marked **(model)** need a model joined — see §0.
 - A tank that does not return to its drawn positions on Reset.
 - Anything from §6 that silently does nothing: with a model joined, typing
   and Enter must always show the thinking dot or a reason in the status.
+- **A model called without being asked**: a gold dot appearing after a plain
+  stroke, a check, or a join, with *auto-read* off.
+- Enter doing something the reading line did not say.
