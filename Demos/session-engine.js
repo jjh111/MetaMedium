@@ -3275,7 +3275,9 @@
   const THREE_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';
   const reported = new Map(); // artifactId -> [{ id, x, y, w, h }] in frame pixels
   const RUN_HARNESS = [
-    '(function(){',
+    '// three.js is loaded beside this script, not before it: a program that draws in 2D',
+    '// must not wait on a download, and one that needs 3D waits at most a few seconds.',
+    'function __start(){',
     '  var W = __W__, H = __H__, ID = __ID__;',
     '  var parts = new Map(), frames = [];',
     '  function post(m){ m.mm = true; m.id = ID; parent.postMessage(m, "*"); }',
@@ -3322,15 +3324,21 @@
     '  requestAnimationFrame(loop);',
     '  setInterval(report, 300);',
     '  post({ type: "ready" });',
+    '}',
+    '(function(){',
+    '  var started = false; function go(){ if (!started) { started = true; __start(); } }',
+    '  var s = document.createElement("script"); s.src = __THREE__; s.async = true; s.onload = go; s.onerror = go;',
+    '  document.head.appendChild(s);',
+    '  setTimeout(go, 4000);',
     '})();',
   ].join('\n');
 
   /** The program in its harness: a clear frame that runs the code and reports its parts. */
   function runDocument(id, code, w, h) {
     const safe = (s) => JSON.stringify(String(s)).replace(/<\//g, '<\\/');
-    const script = RUN_HARNESS.replace('__W__', Math.round(w)).replace('__H__', Math.round(h)).replace('__ID__', safe(id)).replace('__CODE__', safe(code));
+    const script = RUN_HARNESS.replace('__W__', Math.round(w)).replace('__H__', Math.round(h)).replace('__ID__', safe(id)).replace('__CODE__', safe(code)).replace('__THREE__', JSON.stringify(THREE_CDN));
     return '<!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0;background:transparent;overflow:hidden;width:' + Math.round(w) + 'px;height:' + Math.round(h) + 'px}</style>' +
-      '<script src="' + THREE_CDN + '"><\/script></head><body><script>' + script + '<\/script></body></html>';
+      '</head><body><script>' + script + '<\/script></body></html>';
   }
 
   // What a running frame says: its parts, or that it broke.
