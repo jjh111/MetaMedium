@@ -18,6 +18,9 @@
     resetUses: () => { for (const k of Object.keys(uses)) delete uses[k]; store.del(USES_KEY); },
     // The worker runtime, for tests: what is loaded, where each body is, what broke.
     runtime: () => ({ bodies: runtime.bodies, broken: runtime.broken, loaded: runtime.loaded, budgetMs: RUN_BUDGET_MS, log: runtime.log, pending: runtime.pending, stepOnce: stepOnce }),
+    // Programs, for tests: what a running frame reported, and the library.
+    reportedRegions: (id) => reportedRegions(id),
+    libraryEntries: () => libraryEntries(session.getState()),
     // Text as an element, for tests.
     typeText: typeText, editText: editText, wordToText: wordToText, beginTextEdit: beginTextEdit, commitTextEdit: commitTextEdit,
     // Pictures in and the board out, for tests.

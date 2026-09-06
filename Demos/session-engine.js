@@ -274,16 +274,21 @@
         f = { wrap: wrap, iframe: null, codeAt: 'parked', parked: true };
         frames.set(id, f);
       }
+      const kind = rep.data.kind || 'html';
+      if (f && !f.parked && f.kind !== kind) { f.wrap.remove(); frames.delete(id); f = null; }
       if (!f) {
         const wrap = document.createElement('div');
-        wrap.className = 'artifactFrame';
+        wrap.className = 'artifactFrame' + (kind === 'run' ? ' run' : '');
         const iframe = document.createElement('iframe');
-        iframe.setAttribute('sandbox', 'allow-same-origin');
+        // Two sandboxes, never both: a page keeps its origin and runs no script,
+        // so ink can hit-test into it; a program runs scripts in an opaque
+        // origin and reports its parts back (SURFACE-v9-PLAN D7).
+        iframe.setAttribute('sandbox', kind === 'run' ? 'allow-scripts' : 'allow-same-origin');
         iframe.setAttribute('scrolling', 'no');
         iframe.title = MM.wordOf(node) || id;
         wrap.appendChild(iframe);
         stage.appendChild(wrap);
-        f = { wrap: wrap, iframe: iframe, codeAt: null, parked: false };
+        f = { wrap: wrap, iframe: iframe, codeAt: null, parked: false, kind: kind };
         frames.set(id, f);
       }
       // Where the drawing put it, plus where its own behaviour has taken it
@@ -299,10 +304,12 @@
       // What renders is the WIRED code when a frame feeds this member.
       const wired = wiredCodeOf(s, id);
       const code = wired !== null ? wired : rep.data.code;
-      const stamp = rep.data.at + ':' + Math.round(fr.w) + 'x' + Math.round(fr.h) + ':' + hashOf(code);
+      const playing = !!(s.clocks[id] && s.clocks[id].playing);
+      const stamp = rep.data.at + ':' + Math.round(fr.w) + 'x' + Math.round(fr.h) + ':' + hashOf(code) + (kind === 'run' ? ':' + (playing ? 'run' : 'still') : '');
       if (!f.parked && f.codeAt !== stamp) {
         f.codeAt = stamp;
-        f.iframe.srcdoc = documentForKind({ data: { ...rep.data, code: code } }, fr.w, fr.h);
+        if (kind === 'run') reported.delete(id);
+        f.iframe.srcdoc = documentForKind({ data: { ...rep.data, code: code } }, fr.w, fr.h, { id: id, playing: playing });
       }
     }
     syncRuntime(s);
@@ -323,6 +330,14 @@
     const fr = node && MM.frameOf(node);
     const found = new Set();
     if (!f || !fr) return [];
+    // A program reports its own parts; the ink lands on those.
+    if (f.kind === 'run') {
+      const x0 = bounds.minX - fr.x, y0 = bounds.minY - fr.y, x1 = bounds.maxX - fr.x, y1 = bounds.maxY - fr.y;
+      for (const r of reportedRegions(artifactId)) {
+        if (r.x < x1 && r.x + r.w > x0 && r.y < y1 && r.y + r.h > y0) found.add(r.id);
+      }
+      return [...found];
+    }
     let doc = null;
     try { doc = f.iframe ? f.iframe.contentDocument : null; } catch (err) { doc = null; }
     if (!doc || !doc.elementFromPoint) return [];
@@ -1874,7 +1889,13 @@
           key: 'sug:' + sug.id, group: 'known', groupConf: sug.score || 1,
           groupWhy: 'you have named this shape before',
           label: 'It’s a ' + sug.label, why: sug.reasoning || 'hold it as another one', tier: 0,
-          run: () => session.bless({ summonId: sum.id, suggestionId: sug.id, at: Date.now() }),
+          run: () => {
+            const made = session.bless({ summonId: sum.id, suggestionId: sug.id, at: Date.now() });
+            // A definition that holds a program hands it to its instance: a
+            // drawing that matches the library IS a reuse, with no words typed.
+            const entry = made && libraryEntries(session.getState()).find((e) => e.id === sug.artifactId);
+            if (entry) reuseEntry(made, entry);
+          },
         });
       }
     }
@@ -2254,6 +2275,20 @@
     const s = session.getState();
     const sum = s.summon;
     const defs = sum ? [...new Set(sum.enclosedIds.filter((id) => s.artifacts.includes(id)).map((id) => definitionOf(s, id)))] : [];
+    // Typing the name of something the library holds completes to it: Enter
+    // reuses the entry on this loop, and no model is asked.
+    if (sum && q.length >= 2 && !sum.onArtifact) {
+      for (const e of libraryEntries(s)) {
+        const name = e.name.toLowerCase();
+        if (name.startsWith(q) || name.includes(q) || q.includes(name)) {
+          matching.unshift({
+            key: 'lib:' + e.id, group: 'known', groupConf: 1, groupWhy: 'in the library',
+            label: e.name, why: 'from the library — the same program, here', tier: 0,
+            run: () => applyLibrary(sum, e),
+          });
+        }
+      }
+    }
     if (defs.length && q.length > 3) {
       const parsed = MM.parseBehaviour(query);
       for (const defId of defs) {
@@ -2491,9 +2526,69 @@
     input.setSelectionRange(input.value.length, input.value.length);
   }
 
+  /** The library: every artifact holding a program, by name. */
+  function libraryEntries(s) {
+    const out = [];
+    for (const id of s.artifacts) {
+      const n = s.nodes.get(id);
+      const rep = n && codeRepOf(n);
+      if (!rep || rep.data.kind !== 'run' || n.reps.some((r) => r.modality === 'erased')) continue;
+      out.push({ id: id, name: MM.wordOf(n) || id, code: rep.data.code });
+    }
+    return out;
+  }
+
+  /** An entry's program on a new artifact: reused, not rewritten, and running because the human asked. */
+  function reuseEntry(artifactId, entry) {
+    const at = Date.now();
+    session.attachCode({ participantId: MM.LOCAL_PARTICIPANT, nodeId: artifactId, kind: 'run', code: entry.code, prompt: 'reused from ' + entry.name, from: entry.id, at: at });
+    session.clock({ nodeId: artifactId, op: 'play', at: at + 1 });
+    flash('reused ' + entry.name + ' from the library — nothing was written');
+  }
+
+  /** The loop becomes an artifact carrying an entry's program. */
+  function applyLibrary(sum, entry) {
+    const at = Date.now();
+    const id = session.bless({ summonId: sum.id, name: entry.name, at: at });
+    if (id) reuseEntry(id, entry);
+    return id;
+  }
+
+  /** What a brief asks for: a page (a layout of regions) or a program (anything else), unless it says. */
+  function targetOf(sum, prompt) {
+    const m = /^(page|run|program|new)\s*:\s*/i.exec(prompt);
+    const brief = m ? prompt.slice(m[0].length).trim() : prompt;
+    if (m) return { target: m[1].toLowerCase() === 'page' ? 'page' : 'program', brief: brief, fresh: m[1].toLowerCase() === 'new' };
+    const s = session.getState();
+    const marks = sum.enclosedIds.filter((id) => s.contentIds.includes(id));
+    const reading = marks.length ? session.read(marks) : null;
+    const boxes = marks.filter((id) => { const n = s.nodes.get(id); return n && MM.topInterpretation(n) === 'rectangle'; }).length;
+    // A drawing the diagram rung compiles — boxes tiling a space, nodes joined
+    // by edges, or both — is a page or a diagram. Anything else (one shape,
+    // nested circles, a figure) is a program that renders itself.
+    const genre = reading ? reading.genre.genre : 'empty';
+    const page = (genre === 'graph' || genre === 'mixed') || (genre === 'layout' && boxes >= 2);
+    return { target: page ? 'page' : 'program', brief: brief, fresh: false };
+  }
+
   function runPrompt(sum, prompt, revising) {
     const at = Date.now();
     let artifactId, addressed;
+
+    // A brief the library already answers is not sent anywhere: the entry is
+    // reused. The model is asked only for what nothing here does (the
+    // conservation John asked for — the library grows, the bloat does not).
+    const want = revising ? null : targetOf(sum, prompt);
+    if (want && want.target === 'program') {
+      const words = want.brief.toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length > 2);
+      const entry = want.fresh ? null : libraryEntries(session.getState()).find((e) => {
+        const name = e.name.toLowerCase();
+        return name === want.brief.toLowerCase() || name.split(/[^a-z0-9]+/).filter((w) => w.length > 2).every((w) => words.includes(w));
+      });
+      if (entry) { applyLibrary(sum, entry); return; }
+      runProgram(sum, want.brief);
+      return;
+    }
 
     if (revising) {
       artifactId = sum.onArtifact.artifactId;
@@ -2557,6 +2652,37 @@
     for (const id of ids) copyInk(s.nodes.get(id));
     if (made.length) session.select(made, t);
     flash('duplicated ' + ids.length + ' as ' + made.length + ' stroke' + (made.length === 1 ? '' : 's'));
+  }
+
+  /** A program from a brief: the loop is blessed, every model is asked with the library in its brief, and what comes back runs. */
+  function runProgram(sum, brief) {
+    const at = Date.now();
+    const name = brief.length > 30 ? brief.slice(0, 30) + '…' : brief;
+    const artifactId = session.bless({ summonId: sum.id, name: name, at: at });
+    if (!artifactId) { mpStatus.textContent = 'Could not hold that group.'; return; }
+    cancelReading();
+    const library = libraryEntries(session.getState()).map((e) => ({ id: e.id, name: e.name }));
+    mpStatus.textContent = 'writing a program with ' + agents.length + ' model(s)…';
+    agents.forEach((agent) => {
+      withWork('program:' + agent.id + ':' + artifactId, [artifactId], agent.name + ' is writing “' + brief.slice(0, 32) + (brief.length > 32 ? '…' : '') + '”…',
+        agent.program({ prompt: brief, artifactId: artifactId, library: library, at: Date.now() }))
+        .then((res) => {
+          if (res.ok && res.reuse) {
+            const entry = libraryEntries(session.getState()).find((e) => e.name.toLowerCase() === res.reuse.toLowerCase());
+            if (entry) { reuseEntry(artifactId, entry); mpStatus.textContent = agent.name + ' pointed at ' + entry.name + ' in the library'; }
+            else mpStatus.textContent = agent.name + ' pointed at “' + res.reuse + '”, which the library does not hold';
+          } else if (res.ok) {
+            // The human asked for it: it runs on arrival. A program that
+            // arrived any other way waits for play (I9).
+            session.clock({ nodeId: artifactId, op: 'play', at: Date.now() });
+            mpStatus.textContent = agent.name + ' wrote ' + (res.name || 'a program') + (res.parts && res.parts.length ? ' — parts: ' + res.parts.join(', ') : '');
+          } else {
+            mpStatus.textContent = agent.name + ' could not write it (' + res.error + ') — the drawing is untouched.';
+            if (res.raw) window.__mm.lastRaw = res.raw;
+          }
+          render(session.getState());
+        });
+    });
   }
 
   function swapToDraw(sum, btn) {
@@ -3139,11 +3265,95 @@
       '<body><div id="mmroot">' + out + '</div></body></html>';
   }
 
+  // ===== A program that renders itself: the run harness ====================
+  // The other sandbox (SURFACE-v9-PLAN D7): scripts allowed, same-origin
+  // NOT — an opaque origin that can draw and compute and cannot reach the
+  // page, its storage or its keys. The frame's background is clear, so the
+  // thing drawn is a figure on the canvas, not a page. Addressing comes FROM
+  // the frame: the program reports its parts as named rectangles, and the
+  // canvas reads them back through postMessage.
+  const THREE_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';
+  const reported = new Map(); // artifactId -> [{ id, x, y, w, h }] in frame pixels
+  const RUN_HARNESS = [
+    '(function(){',
+    '  var W = __W__, H = __H__, ID = __ID__;',
+    '  var parts = new Map(), frames = [];',
+    '  function post(m){ m.mm = true; m.id = ID; parent.postMessage(m, "*"); }',
+    '  var mm = { width: W, height: H, THREE: window.THREE, onFrame: function(fn){ frames.push(fn); }, report: function(name, x, y, w, h){ parts.set(String(name), { x: x, y: y, w: w, h: h }); } };',
+    '  var scene = null, camera = null, renderer = null;',
+    '  if (mm.THREE) {',
+    '    try {',
+    '      renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true }); renderer.setClearColor(0x000000, 0); renderer.setSize(W, H);',
+    '      renderer.domElement.style.position = "absolute"; renderer.domElement.style.left = "0"; renderer.domElement.style.top = "0"; document.body.appendChild(renderer.domElement);',
+    '      scene = new THREE.Scene(); camera = new THREE.PerspectiveCamera(45, W / H, 0.1, 1000); camera.position.set(0, 0, 6); camera.lookAt(0, 0, 0);',
+    '      scene.add(new THREE.AmbientLight(0xffffff, 0.7)); var dl = new THREE.DirectionalLight(0xffffff, 0.8); dl.position.set(3, 4, 5); scene.add(dl);',
+    '      mm.scene = scene; mm.camera = camera; mm.renderer = renderer;',
+    '    } catch (e) { mm.THREE = undefined; }',
+    '  }',
+    '  var c2 = document.createElement("canvas"); c2.width = W; c2.height = H; c2.style.position = "absolute"; c2.style.left = "0"; c2.style.top = "0"; document.body.appendChild(c2);',
+    '  mm.ctx = c2.getContext("2d");',
+    '  try { (new Function("mm", __CODE__))(mm); } catch (e) { post({ type: "error", error: String(e && e.message || e) }); return; }',
+    '  function report(){ var out = []; parts.forEach(function(r, id){ out.push({ id: id, x: r.x, y: r.y, w: r.w, h: r.h }); }); post({ type: "regions", regions: out }); }',
+    '  var v = new THREE_VEC();',
+    '  function THREE_VEC(){ this.x = 0; this.y = 0; this.z = 0; }',
+    '  function projectParts(){',
+    '    if (!scene || !camera) return;',
+    '    scene.traverse(function(obj){',
+    '      if (!obj.name || !obj.geometry) return;',
+    '      var box = new THREE.Box3().setFromObject(obj); if (box.isEmpty()) return;',
+    '      var minX = 1e9, minY = 1e9, maxX = -1e9, maxY = -1e9;',
+    '      [[box.min.x,box.min.y,box.min.z],[box.max.x,box.min.y,box.min.z],[box.min.x,box.max.y,box.min.z],[box.max.x,box.max.y,box.min.z],[box.min.x,box.min.y,box.max.z],[box.max.x,box.min.y,box.max.z],[box.min.x,box.max.y,box.max.z],[box.max.x,box.max.y,box.max.z]].forEach(function(c){',
+    '        var p = new THREE.Vector3(c[0], c[1], c[2]).project(camera); var sx = (p.x + 1) / 2 * W, sy = (1 - p.y) / 2 * H;',
+    '        minX = Math.min(minX, sx); minY = Math.min(minY, sy); maxX = Math.max(maxX, sx); maxY = Math.max(maxY, sy);',
+    '      });',
+    '      parts.set(obj.name, { x: minX, y: minY, w: maxX - minX, h: maxY - minY });',
+    '    });',
+    '  }',
+    '  var t0 = performance.now(), last = t0;',
+    '  function loop(now){',
+    '    var t = (now - t0) / 1000, dt = Math.min(0.1, (now - last) / 1000); last = now;',
+    '    try { for (var i = 0; i < frames.length; i++) frames[i](t, dt); if (renderer) renderer.render(scene, camera); projectParts(); }',
+    '    catch (e) { post({ type: "error", error: String(e && e.message || e) }); return; }',
+    '    requestAnimationFrame(loop);',
+    '  }',
+    '  // The first frame runs at once, so the parts are known before any timer fires — a hidden tab gets none for a while.',
+    '  try { for (var k = 0; k < frames.length; k++) frames[k](0, 0); if (renderer) renderer.render(scene, camera); projectParts(); } catch (e) { post({ type: "error", error: String(e && e.message || e) }); return; }',
+    '  report();',
+    '  requestAnimationFrame(loop);',
+    '  setInterval(report, 300);',
+    '  post({ type: "ready" });',
+    '})();',
+  ].join('\n');
+
+  /** The program in its harness: a clear frame that runs the code and reports its parts. */
+  function runDocument(id, code, w, h) {
+    const safe = (s) => JSON.stringify(String(s)).replace(/<\//g, '<\\/');
+    const script = RUN_HARNESS.replace('__W__', Math.round(w)).replace('__H__', Math.round(h)).replace('__ID__', safe(id)).replace('__CODE__', safe(code));
+    return '<!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0;background:transparent;overflow:hidden;width:' + Math.round(w) + 'px;height:' + Math.round(h) + 'px}</style>' +
+      '<script src="' + THREE_CDN + '"><\/script></head><body><script>' + script + '<\/script></body></html>';
+  }
+
+  // What a running frame says: its parts, or that it broke.
+  addEventListener('message', (e) => {
+    const m = e.data;
+    if (!m || m.mm !== true || typeof m.id !== 'string') return;
+    const f = frames.get(m.id);
+    if (!f || !f.iframe || f.iframe.contentWindow !== e.source) return; // only the frame that owns the id
+    if (m.type === 'regions' && Array.isArray(m.regions)) { reported.set(m.id, m.regions); return; }
+    if (m.type === 'error') { markBroken(m.id, 'threw: ' + m.error); }
+  });
+  function reportedRegions(id) { return reported.get(id) || []; }
+
   /** The document an artifact's newest code rep renders as, by its kind. */
-  function documentForKind(rep, w, h) {
+  function documentForKind(rep, w, h, ctx) {
     const kind = rep.data.kind || 'html';
     const code = rep.data.code;
     if (kind === 'html') return documentFor(code, w, h);
+    if (kind === 'run') {
+      // Playing, the program runs in its clear frame; standing, its source shows, addressable like any script.
+      if (ctx && ctx.playing) return runDocument(ctx.id, code, w, h);
+      return regionsDocument(code, MM.addressablesOf('js', code), w, h);
+    }
     if (kind === 'png' || kind === 'jpg') {
       const url = rep.data.path ? imageUrlFor(rep.data.path) : null;
       return '<!doctype html><html><head><meta charset="utf-8"><style>' + SOURCE_CSS +
@@ -4573,6 +4783,9 @@
     resetUses: () => { for (const k of Object.keys(uses)) delete uses[k]; store.del(USES_KEY); },
     // The worker runtime, for tests: what is loaded, where each body is, what broke.
     runtime: () => ({ bodies: runtime.bodies, broken: runtime.broken, loaded: runtime.loaded, budgetMs: RUN_BUDGET_MS, log: runtime.log, pending: runtime.pending, stepOnce: stepOnce }),
+    // Programs, for tests: what a running frame reported, and the library.
+    reportedRegions: (id) => reportedRegions(id),
+    libraryEntries: () => libraryEntries(session.getState()),
     // Text as an element, for tests.
     typeText: typeText, editText: editText, wordToText: wordToText, beginTextEdit: beginTextEdit, commitTextEdit: commitTextEdit,
     // Pictures in and the board out, for tests.

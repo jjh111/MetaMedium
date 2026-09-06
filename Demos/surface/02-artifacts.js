@@ -69,16 +69,21 @@
         f = { wrap: wrap, iframe: null, codeAt: 'parked', parked: true };
         frames.set(id, f);
       }
+      const kind = rep.data.kind || 'html';
+      if (f && !f.parked && f.kind !== kind) { f.wrap.remove(); frames.delete(id); f = null; }
       if (!f) {
         const wrap = document.createElement('div');
-        wrap.className = 'artifactFrame';
+        wrap.className = 'artifactFrame' + (kind === 'run' ? ' run' : '');
         const iframe = document.createElement('iframe');
-        iframe.setAttribute('sandbox', 'allow-same-origin');
+        // Two sandboxes, never both: a page keeps its origin and runs no script,
+        // so ink can hit-test into it; a program runs scripts in an opaque
+        // origin and reports its parts back (SURFACE-v9-PLAN D7).
+        iframe.setAttribute('sandbox', kind === 'run' ? 'allow-scripts' : 'allow-same-origin');
         iframe.setAttribute('scrolling', 'no');
         iframe.title = MM.wordOf(node) || id;
         wrap.appendChild(iframe);
         stage.appendChild(wrap);
-        f = { wrap: wrap, iframe: iframe, codeAt: null, parked: false };
+        f = { wrap: wrap, iframe: iframe, codeAt: null, parked: false, kind: kind };
         frames.set(id, f);
       }
       // Where the drawing put it, plus where its own behaviour has taken it
@@ -94,10 +99,12 @@
       // What renders is the WIRED code when a frame feeds this member.
       const wired = wiredCodeOf(s, id);
       const code = wired !== null ? wired : rep.data.code;
-      const stamp = rep.data.at + ':' + Math.round(fr.w) + 'x' + Math.round(fr.h) + ':' + hashOf(code);
+      const playing = !!(s.clocks[id] && s.clocks[id].playing);
+      const stamp = rep.data.at + ':' + Math.round(fr.w) + 'x' + Math.round(fr.h) + ':' + hashOf(code) + (kind === 'run' ? ':' + (playing ? 'run' : 'still') : '');
       if (!f.parked && f.codeAt !== stamp) {
         f.codeAt = stamp;
-        f.iframe.srcdoc = documentForKind({ data: { ...rep.data, code: code } }, fr.w, fr.h);
+        if (kind === 'run') reported.delete(id);
+        f.iframe.srcdoc = documentForKind({ data: { ...rep.data, code: code } }, fr.w, fr.h, { id: id, playing: playing });
       }
     }
     syncRuntime(s);
@@ -118,6 +125,14 @@
     const fr = node && MM.frameOf(node);
     const found = new Set();
     if (!f || !fr) return [];
+    // A program reports its own parts; the ink lands on those.
+    if (f.kind === 'run') {
+      const x0 = bounds.minX - fr.x, y0 = bounds.minY - fr.y, x1 = bounds.maxX - fr.x, y1 = bounds.maxY - fr.y;
+      for (const r of reportedRegions(artifactId)) {
+        if (r.x < x1 && r.x + r.w > x0 && r.y < y1 && r.y + r.h > y0) found.add(r.id);
+      }
+      return [...found];
+    }
     let doc = null;
     try { doc = f.iframe ? f.iframe.contentDocument : null; } catch (err) { doc = null; }
     if (!doc || !doc.elementFromPoint) return [];

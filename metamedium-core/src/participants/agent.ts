@@ -150,6 +150,28 @@ A target is a NAME the human uses for something on the canvas; use the word they
 {"terms":[{"verb":"flee","target":"shark","weight":1,"params":{"only":"bigger"},"why":"'runs from big sharks'"}],"unread":["any clause you could not map"]}
 Every term's "why" quotes the words it came from. Do not invent a verb outside the list.`;
 
+const PROGRAM_PROMPT = `You are a participant on a shared drawing canvas. The human circled a drawing and typed a brief, and the canvas cannot answer it from what it holds — so you write a PROGRAM that renders it, right there, in the drawing's own frame.
+
+THE CONTRACT. Your code is the body of a function with one argument, \`mm\`:
+  mm.width, mm.height     the frame in pixels — fill it; the drawing sits exactly here
+  mm.THREE                three.js, when it loaded (r128); may be undefined offline
+  mm.scene, mm.camera, mm.renderer   a ready three.js scene with a TRANSPARENT background, a perspective camera looking at the origin, and a renderer that draws every frame — add meshes to mm.scene; do not create your own renderer or canvas
+  mm.ctx                  a 2D canvas context the size of the frame, for drawings with no 3D; clear it yourself each frame
+  mm.onFrame(fn)          fn(t, dt) runs every frame; use it to animate
+  mm.report(name, x, y, w, h)   a PART: a named rectangle in frame pixels, so ink drawn over it lands on that name. Report every distinct thing you draw, every frame, at where it is now. For three.js, give each mesh a .name and the canvas reports it for you.
+Rules:
+- The background must stay CLEAR: nothing fills the frame; only the thing itself is drawn. It is a figure on the human's canvas, not a page.
+- No imports, no fetch, no network, no DOM outside what mm gives you. Plain JavaScript that runs as written.
+- Fit the frame: size the thing to mm.width/mm.height.
+- Keep it short and readable — this program becomes a library entry the human will read and reuse.
+
+THE LIBRARY. Programs the canvas already holds are listed below by name. If one already IS what was asked, do not write a new one: reply {"reuse":"<its name>"}. Reuse is the point; write fresh only when nothing there fits.
+
+Reply with ONLY a JSON object, no prose, no code fences:
+{"name":"torus","parts":["torus"],"code":"…the function body, as one JSON string…"}
+or
+{"reuse":"<library name>"}`;
+
 const DRAW_PROMPT = `You are a participant on a shared drawing canvas, alongside a human. You have been asked to ADD MARKS to the drawing.
 
 You are given the marks already on the canvas as measured facts — positions, sizes, what each reads as and plays — in canvas units (y grows downward). You are not given an image.
@@ -538,6 +560,15 @@ export interface AgentParticipant {
     signal?: AbortSignal;
   }): Promise<DrawResult>;
   /**
+   * Write a program that renders a brief in the drawing's frame — or point at
+   * a library entry that already does. The program is held as `run` code,
+   * attributed; whether it runs is the clock's business.
+   *
+   * Never throws.
+   */
+  program(args: { prompt: string; artifactId: string; library?: { id: string; name: string }[]; at: number; signal?: AbortSignal }): Promise<ProgramResult>;
+
+  /**
    * Turn words into a behaviour for a definition. Tier 0's table reads the
    * common phrasings first; the model is asked only when a clause was left
    * unread. What comes back is held on the definition, attributed to this
@@ -546,6 +577,42 @@ export interface AgentParticipant {
    * Never throws.
    */
   behave(args: { nodeId: string; words: string; at: number; signal?: AbortSignal }): Promise<BehaveResult>;
+}
+
+export interface ProgramResult {
+  ok: boolean;
+  /** The library entry the model pointed at instead of writing, when it did. */
+  reuse?: string;
+  /** The short name the model gave the program. */
+  name?: string;
+  parts?: string[];
+  code?: string;
+  error?: string;
+  raw?: string;
+}
+
+/** A model's program reply: JSON first; a fenced code block as the fallback a model that ignored the contract still gives. */
+export function parseProgram(text: string): { reuse?: string; name?: string; parts?: string[]; code?: string } | null {
+  const json = outermostObject(text);
+  if (json) {
+    try {
+      const o = JSON.parse(json) as { reuse?: unknown; name?: unknown; parts?: unknown; code?: unknown };
+      if (typeof o.reuse === 'string' && o.reuse.trim()) return { reuse: o.reuse.trim() };
+      if (typeof o.code === 'string' && o.code.trim()) {
+        return {
+          name: typeof o.name === 'string' ? o.name.trim() : undefined,
+          parts: Array.isArray(o.parts) ? o.parts.filter((p): p is string => typeof p === 'string') : undefined,
+          code: o.code,
+        };
+      }
+    } catch { /* fall through to the fence */ }
+  }
+  const fence = /```(?:js|javascript)?\s*([\s\S]*?)```/.exec(text);
+  if (fence && fence[1].trim()) {
+    const name = /"?name"?\s*[:=]\s*"([^"]+)"/.exec(text)?.[1];
+    return { code: fence[1].trim(), name };
+  }
+  return null;
 }
 
 export interface BehaveResult {
@@ -1003,6 +1070,35 @@ export function createAgentParticipant(
     return { ok: true, ids, shapes, raw: result.text };
   }
 
+  async function program(args: { prompt: string; artifactId: string; library?: { id: string; name: string }[]; at: number; signal?: AbortSignal }): Promise<ProgramResult> {
+    const prompt = args.prompt.trim();
+    if (!prompt) return { ok: false, error: 'no prompt' };
+    const state = session.getState();
+    const artifact = state.nodes.get(args.artifactId);
+    if (!artifact) return { ok: false, error: 'no such artifact' };
+    const frame = frameOf(artifact);
+    if (!frame) return { ok: false, error: 'artifact has no frame' };
+    const members = artifact.edges.filter((e) => e.rel === 'has-part').map((e) => e.to).filter((m) => state.nodes.has(m));
+    const drawing = members.length ? describeReading(session.read(members), { noun: 'mark' }) : 'nothing but the frame';
+    const library = (args.library ?? []).map((l) => `  - ${l.name}`).join('\n');
+    const result = await send(
+      config,
+      [
+        { role: 'system', content: PROGRAM_PROMPT },
+        { role: 'user', content:
+          `THE FRAME: ${Math.round(frame.w)}×${Math.round(frame.h)} pixels.\n\nTHE DRAWING inside it:\n${drawing}\n\nTHE LIBRARY holds:\n${library || '  (nothing yet)'}\n\nThe human typed: ${prompt}` },
+      ],
+      { signal: args.signal }
+    );
+    if (!result.ok) return { ok: false, error: result.error };
+    const parsed = parseProgram(result.text);
+    if (!parsed) return { ok: false, error: 'no program in the reply', raw: result.text };
+    if (parsed.reuse) return { ok: true, reuse: parsed.reuse, raw: result.text };
+    const accepted = session.attachCode({ participantId: id, nodeId: args.artifactId, code: parsed.code!, kind: 'run', prompt, at: args.at });
+    if (!accepted) return { ok: false, error: 'the canvas did not accept the program', raw: result.text };
+    return { ok: true, name: parsed.name, parts: parsed.parts, code: parsed.code, raw: result.text };
+  }
+
   async function behave(args: { nodeId: string; words: string; at: number; signal?: AbortSignal }): Promise<BehaveResult> {
     const words = args.words.trim();
     if (!words) return { ok: false, behaviour: null, via: 'none', unread: [], error: 'no words' };
@@ -1041,5 +1137,5 @@ export function createAgentParticipant(
     return { ok: true, behaviour, via: 'model', unread: reply.unread, raw: result.text };
   }
 
-  return { id, name, config, interpret, ask, generate, read, draw, behave };
+  return { id, name, config, interpret, ask, generate, read, draw, behave, program };
 }

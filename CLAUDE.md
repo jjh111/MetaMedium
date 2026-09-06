@@ -736,6 +736,27 @@ prompted into a page inside its own ink; an SVG or any file of a known kind
 becomes an artifact of its kind. *Export…* writes the board as SVG or PNG
 or the session as its log, and the panel saves any artifact's code.
 
+### Programs, and the library first (v9 S5)
+
+> `kind: 'run'` in `src/kinds/kinds.ts`; `agent.program` in
+> `participants/agent.ts`; the harness in `Demos/surface/13-kinds.js`;
+> `targetOf` / `runProgram` / `libraryEntries` in `09-palette.js`.
+
+A brief at a loop is a **page** when the reading is a layout of boxes and
+a **program** otherwise (`page:` / `run:` / `new:` override). A program is
+`run` code: it renders itself in the other sandbox — `allow-scripts`
+without `allow-same-origin`, an opaque origin that can draw and cannot
+reach the page or its keys — on a **clear background**, sized to the ink's
+frame, with three.js when it loads and a 2D context always, and it
+**reports its parts** (named rectangles) back over `postMessage`, so ink
+over a running torus lands on `torus`. **The library first:** before any
+model is asked, a brief the library already answers reuses that entry
+(typing an entry's name completes to it; a drawing that matches a coded
+definition carries its program), and the model's brief lists what the
+library holds so it may answer `{"reuse": name}` instead of writing.
+Reused code says where it came from (`from`). A program the human asked
+for runs on arrival; one that arrived any other way waits for play.
+
 ### The model holds a pen (the conversation benchmark's other half)
 
 > `agent.draw()` in `participants/agent.ts`; `strokeFor` / `parseShapes` in

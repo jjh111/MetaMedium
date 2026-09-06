@@ -80,6 +80,11 @@ reveals structure (a script's functions get their own boxes; a page's
 regions show their ids). The panel's *source* is the same text as the
 frame's, so there is one place code is read and it is the frame.
 
+**D7a · A program the human asked for runs on arrival.** I9 says nothing
+runs unblessed; the brief typed at the loop *is* the human's act for the
+program that answers it, so it plays when it lands. A program that arrives
+any other way — discovered in a folder, proposed unasked — waits for play.
+
 **D7 · A script that runs is a different sandbox.** Today a page keeps
 `allow-same-origin` and no scripts, which is what lets ink address its
 regions. A three.js frame needs scripts. It gets an iframe with
@@ -130,7 +135,7 @@ what removes the most friction first.
 | S2 | **One field** | The field at the tip with reading-as-you-type; core fan fixed; certainty row with numbers; affordance row; "Describe/Ask/Draw/Make" retired into the field's grammar (`ask: …`, `draw: …` as prefixes, and plain text as the brief) | Every verb the surface has is reachable by typing its name; the four core slots never move; QA §2 and §6 pass by hand |
 | S3 | **Matches as chips** | The recognised-group chip in the certainty style; opens the field pre-filled | QA §3 by hand |
 | S4 | **Code at every zoom** | Screen-sized source in frames; structure revealed past 1:1; parking under a card size | A script and a page stay readable from fit to 4× |
-| S5 | **Scripts that run** | The `run` sandbox (scripts, opaque origin, postMessage regions); a `three.js` example artifact; "torus in 3d" through a model that writes the program | The torus renders under the two circles; ink over it lands on a named part; nothing runs before play |
+| S5 | **Scripts that run** ✅ **first cut, 6 Sep 2026** | The `run` kind and sandbox (scripts, opaque origin, a clear background, parts reported back over `postMessage`); the harness with three.js r128 when it loads and a 2D context always; `agent.program` with the library in its brief and `{"reuse": name}` as an answer; the brief's target decided by the reading (a layout of boxes is a page, anything else a program; `page:` / `run:` / `new:` override); **the library first**: a brief the library answers is reused without a model, typing an entry's name completes to it, and a drawing that matches a coded definition carries its program. A program the human asked for runs on arrival; one that arrived otherwise waits for play. e2e 27–27g | The torus renders under the two circles; ink over it lands on a named part; the second torus is reused, not rewritten. *Still to do:* three.js itself tried with a real model (GLM 5.3), the model's short name offered as the entry's name, and the reuse-versus-fresh choice shown in the field before Enter |
 | S6 | **Live logs** | The `watch` store over a relay; presence; other hands' ink live | Two browsers on one canvas see each other's ink within a second |
 
 S1 and S2 are the system; S3–S4 make it calm; S5 is the scene; S6 is the

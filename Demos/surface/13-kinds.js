@@ -56,11 +56,95 @@
       '<body><div id="mmroot">' + out + '</div></body></html>';
   }
 
+  // ===== A program that renders itself: the run harness ====================
+  // The other sandbox (SURFACE-v9-PLAN D7): scripts allowed, same-origin
+  // NOT — an opaque origin that can draw and compute and cannot reach the
+  // page, its storage or its keys. The frame's background is clear, so the
+  // thing drawn is a figure on the canvas, not a page. Addressing comes FROM
+  // the frame: the program reports its parts as named rectangles, and the
+  // canvas reads them back through postMessage.
+  const THREE_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';
+  const reported = new Map(); // artifactId -> [{ id, x, y, w, h }] in frame pixels
+  const RUN_HARNESS = [
+    '(function(){',
+    '  var W = __W__, H = __H__, ID = __ID__;',
+    '  var parts = new Map(), frames = [];',
+    '  function post(m){ m.mm = true; m.id = ID; parent.postMessage(m, "*"); }',
+    '  var mm = { width: W, height: H, THREE: window.THREE, onFrame: function(fn){ frames.push(fn); }, report: function(name, x, y, w, h){ parts.set(String(name), { x: x, y: y, w: w, h: h }); } };',
+    '  var scene = null, camera = null, renderer = null;',
+    '  if (mm.THREE) {',
+    '    try {',
+    '      renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true }); renderer.setClearColor(0x000000, 0); renderer.setSize(W, H);',
+    '      renderer.domElement.style.position = "absolute"; renderer.domElement.style.left = "0"; renderer.domElement.style.top = "0"; document.body.appendChild(renderer.domElement);',
+    '      scene = new THREE.Scene(); camera = new THREE.PerspectiveCamera(45, W / H, 0.1, 1000); camera.position.set(0, 0, 6); camera.lookAt(0, 0, 0);',
+    '      scene.add(new THREE.AmbientLight(0xffffff, 0.7)); var dl = new THREE.DirectionalLight(0xffffff, 0.8); dl.position.set(3, 4, 5); scene.add(dl);',
+    '      mm.scene = scene; mm.camera = camera; mm.renderer = renderer;',
+    '    } catch (e) { mm.THREE = undefined; }',
+    '  }',
+    '  var c2 = document.createElement("canvas"); c2.width = W; c2.height = H; c2.style.position = "absolute"; c2.style.left = "0"; c2.style.top = "0"; document.body.appendChild(c2);',
+    '  mm.ctx = c2.getContext("2d");',
+    '  try { (new Function("mm", __CODE__))(mm); } catch (e) { post({ type: "error", error: String(e && e.message || e) }); return; }',
+    '  function report(){ var out = []; parts.forEach(function(r, id){ out.push({ id: id, x: r.x, y: r.y, w: r.w, h: r.h }); }); post({ type: "regions", regions: out }); }',
+    '  var v = new THREE_VEC();',
+    '  function THREE_VEC(){ this.x = 0; this.y = 0; this.z = 0; }',
+    '  function projectParts(){',
+    '    if (!scene || !camera) return;',
+    '    scene.traverse(function(obj){',
+    '      if (!obj.name || !obj.geometry) return;',
+    '      var box = new THREE.Box3().setFromObject(obj); if (box.isEmpty()) return;',
+    '      var minX = 1e9, minY = 1e9, maxX = -1e9, maxY = -1e9;',
+    '      [[box.min.x,box.min.y,box.min.z],[box.max.x,box.min.y,box.min.z],[box.min.x,box.max.y,box.min.z],[box.max.x,box.max.y,box.min.z],[box.min.x,box.min.y,box.max.z],[box.max.x,box.min.y,box.max.z],[box.min.x,box.max.y,box.max.z],[box.max.x,box.max.y,box.max.z]].forEach(function(c){',
+    '        var p = new THREE.Vector3(c[0], c[1], c[2]).project(camera); var sx = (p.x + 1) / 2 * W, sy = (1 - p.y) / 2 * H;',
+    '        minX = Math.min(minX, sx); minY = Math.min(minY, sy); maxX = Math.max(maxX, sx); maxY = Math.max(maxY, sy);',
+    '      });',
+    '      parts.set(obj.name, { x: minX, y: minY, w: maxX - minX, h: maxY - minY });',
+    '    });',
+    '  }',
+    '  var t0 = performance.now(), last = t0;',
+    '  function loop(now){',
+    '    var t = (now - t0) / 1000, dt = Math.min(0.1, (now - last) / 1000); last = now;',
+    '    try { for (var i = 0; i < frames.length; i++) frames[i](t, dt); if (renderer) renderer.render(scene, camera); projectParts(); }',
+    '    catch (e) { post({ type: "error", error: String(e && e.message || e) }); return; }',
+    '    requestAnimationFrame(loop);',
+    '  }',
+    '  // The first frame runs at once, so the parts are known before any timer fires — a hidden tab gets none for a while.',
+    '  try { for (var k = 0; k < frames.length; k++) frames[k](0, 0); if (renderer) renderer.render(scene, camera); projectParts(); } catch (e) { post({ type: "error", error: String(e && e.message || e) }); return; }',
+    '  report();',
+    '  requestAnimationFrame(loop);',
+    '  setInterval(report, 300);',
+    '  post({ type: "ready" });',
+    '})();',
+  ].join('\n');
+
+  /** The program in its harness: a clear frame that runs the code and reports its parts. */
+  function runDocument(id, code, w, h) {
+    const safe = (s) => JSON.stringify(String(s)).replace(/<\//g, '<\\/');
+    const script = RUN_HARNESS.replace('__W__', Math.round(w)).replace('__H__', Math.round(h)).replace('__ID__', safe(id)).replace('__CODE__', safe(code));
+    return '<!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0;background:transparent;overflow:hidden;width:' + Math.round(w) + 'px;height:' + Math.round(h) + 'px}</style>' +
+      '<script src="' + THREE_CDN + '"><\/script></head><body><script>' + script + '<\/script></body></html>';
+  }
+
+  // What a running frame says: its parts, or that it broke.
+  addEventListener('message', (e) => {
+    const m = e.data;
+    if (!m || m.mm !== true || typeof m.id !== 'string') return;
+    const f = frames.get(m.id);
+    if (!f || !f.iframe || f.iframe.contentWindow !== e.source) return; // only the frame that owns the id
+    if (m.type === 'regions' && Array.isArray(m.regions)) { reported.set(m.id, m.regions); return; }
+    if (m.type === 'error') { markBroken(m.id, 'threw: ' + m.error); }
+  });
+  function reportedRegions(id) { return reported.get(id) || []; }
+
   /** The document an artifact's newest code rep renders as, by its kind. */
-  function documentForKind(rep, w, h) {
+  function documentForKind(rep, w, h, ctx) {
     const kind = rep.data.kind || 'html';
     const code = rep.data.code;
     if (kind === 'html') return documentFor(code, w, h);
+    if (kind === 'run') {
+      // Playing, the program runs in its clear frame; standing, its source shows, addressable like any script.
+      if (ctx && ctx.playing) return runDocument(ctx.id, code, w, h);
+      return regionsDocument(code, MM.addressablesOf('js', code), w, h);
+    }
     if (kind === 'png' || kind === 'jpg') {
       const url = rep.data.path ? imageUrlFor(rep.data.path) : null;
       return '<!doctype html><html><head><meta charset="utf-8"><style>' + SOURCE_CSS +

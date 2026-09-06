@@ -92,3 +92,12 @@ c
     expect(addressablesOf('png', '')).toEqual([]);
   });
 });
+
+describe('the run kind', () => {
+  it('a program that renders itself is its own kind, named by a compound extension', async () => {
+    const { kindOf } = await import('./kinds');
+    expect(kindOf('torus.run.js')?.kind).toBe('run');
+    expect(kindOf('steer.js')?.kind).toBe('js');
+    expect(kindOf('x.run.js')?.renderer).toBe('run');
+  });
+});

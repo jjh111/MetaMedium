@@ -6,10 +6,10 @@
 // the whole vocabulary; it grows by adding a row with a test, never by a
 // special case elsewhere (BUILD-PLAN-v8 I6).
 
-export type Kind = 'html' | 'js' | 'json' | 'svg' | 'md' | 'png' | 'jpg' | 'text' | 'control';
+export type Kind = 'html' | 'js' | 'json' | 'svg' | 'md' | 'png' | 'jpg' | 'text' | 'control' | 'run';
 
-export type Renderer = 'page' | 'source' | 'tree' | 'vector' | 'prose' | 'image' | 'text' | 'control';
-export type Addressing = 'regions' | 'functions' | 'keys' | 'elements' | 'headings' | 'pixels' | 'runs' | 'value';
+export type Renderer = 'page' | 'source' | 'tree' | 'vector' | 'prose' | 'image' | 'text' | 'control' | 'run';
+export type Addressing = 'regions' | 'functions' | 'keys' | 'elements' | 'headings' | 'pixels' | 'runs' | 'value' | 'parts';
 
 export interface KindRow {
   kind: Kind;
@@ -33,9 +33,16 @@ export const KINDS: readonly KindRow[] = [
   { kind: 'jpg', extensions: ['jpg', 'jpeg'], mime: 'image/jpeg', renderer: 'image', addressing: 'pixels', textual: false },
   { kind: 'text', extensions: ['txt'], mime: 'text/plain', renderer: 'text', addressing: 'runs', textual: true },
   { kind: 'control', extensions: [], mime: 'application/json', renderer: 'control', addressing: 'value', textual: true },
+  // A program that renders itself (a three.js scene, a 2D drawing) in a
+  // scripts-only, opaque-origin frame with a clear background, and REPORTS
+  // its parts — named things at named places — so ink over it lands on them.
+  { kind: 'run', extensions: ['run.js'], mime: 'text/javascript', renderer: 'run', addressing: 'parts', textual: true },
 ];
 
 export function kindOf(path: string): KindRow | undefined {
+  const lower = path.toLowerCase();
+  // A compound extension names a kind before its last segment does: `x.run.js` is a program, not a script.
+  for (const row of KINDS) for (const e of row.extensions) if (e.includes('.') && lower.endsWith('.' + e)) return row;
   const ext = (path.split('.').pop() ?? '').toLowerCase();
   if (!ext || ext === path.toLowerCase()) return undefined;
   return KINDS.find((k) => k.extensions.includes(ext));

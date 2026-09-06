@@ -277,6 +277,8 @@ export type SessionEvent =
       language?: string;
       /** Which kind of artifact this code makes (the closed table). Default: html. */
       kind?: Kind;
+      /** The library entry this code was taken from, when it was reused rather than written. */
+      from?: string;
       prompt?: string;
       /**
        * The per-region content the code was built from. Kept so a revision can
@@ -396,6 +398,7 @@ export interface Session {
     kind?: Kind;
     prompt?: string;
     fill?: unknown;
+    from?: string;
     at: number;
   }): string | null;
   /**
@@ -1777,6 +1780,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
         language: ev.language ?? ev.kind ?? 'html',
         kind: ev.kind ?? 'html',
         prompt: ev.prompt,
+        from: ev.from,
         fill: ev.fill,
         regions: regionsOf(node, nodes),
         at: ev.at,

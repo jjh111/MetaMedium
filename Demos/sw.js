@@ -7,7 +7,7 @@
 // build shows on the next reload, not the one after, and nothing is ever
 // served stale while the network is there. Bumping VERSION drops the old
 // cache on activate.
-const VERSION = 'mm-shell-v1';
+const VERSION = 'mm-shell-v2';
 const SHELL = [
   './session-engine.html',
   './session-engine.js',
@@ -27,7 +27,9 @@ self.addEventListener('activate', (e) => {
 self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
   if (e.request.method !== 'GET' || url.origin !== self.location.origin) return;
-  e.respondWith(fetch(e.request).then((res) => {
+  // `no-cache` revalidates with the server every time, so a fresh build is
+  // never hidden behind the browser's own HTTP cache under this worker.
+  e.respondWith(fetch(e.request, { cache: 'no-cache' }).then((res) => {
     if (res.ok) caches.open(VERSION).then((c) => c.put(e.request, res.clone()));
     return res;
   }).catch(() => caches.match(e.request, { ignoreSearch: true })));

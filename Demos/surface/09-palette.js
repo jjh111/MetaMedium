@@ -61,7 +61,13 @@
           key: 'sug:' + sug.id, group: 'known', groupConf: sug.score || 1,
           groupWhy: 'you have named this shape before',
           label: 'It’s a ' + sug.label, why: sug.reasoning || 'hold it as another one', tier: 0,
-          run: () => session.bless({ summonId: sum.id, suggestionId: sug.id, at: Date.now() }),
+          run: () => {
+            const made = session.bless({ summonId: sum.id, suggestionId: sug.id, at: Date.now() });
+            // A definition that holds a program hands it to its instance: a
+            // drawing that matches the library IS a reuse, with no words typed.
+            const entry = made && libraryEntries(session.getState()).find((e) => e.id === sug.artifactId);
+            if (entry) reuseEntry(made, entry);
+          },
         });
       }
     }
@@ -441,6 +447,20 @@
     const s = session.getState();
     const sum = s.summon;
     const defs = sum ? [...new Set(sum.enclosedIds.filter((id) => s.artifacts.includes(id)).map((id) => definitionOf(s, id)))] : [];
+    // Typing the name of something the library holds completes to it: Enter
+    // reuses the entry on this loop, and no model is asked.
+    if (sum && q.length >= 2 && !sum.onArtifact) {
+      for (const e of libraryEntries(s)) {
+        const name = e.name.toLowerCase();
+        if (name.startsWith(q) || name.includes(q) || q.includes(name)) {
+          matching.unshift({
+            key: 'lib:' + e.id, group: 'known', groupConf: 1, groupWhy: 'in the library',
+            label: e.name, why: 'from the library — the same program, here', tier: 0,
+            run: () => applyLibrary(sum, e),
+          });
+        }
+      }
+    }
     if (defs.length && q.length > 3) {
       const parsed = MM.parseBehaviour(query);
       for (const defId of defs) {
@@ -678,9 +698,69 @@
     input.setSelectionRange(input.value.length, input.value.length);
   }
 
+  /** The library: every artifact holding a program, by name. */
+  function libraryEntries(s) {
+    const out = [];
+    for (const id of s.artifacts) {
+      const n = s.nodes.get(id);
+      const rep = n && codeRepOf(n);
+      if (!rep || rep.data.kind !== 'run' || n.reps.some((r) => r.modality === 'erased')) continue;
+      out.push({ id: id, name: MM.wordOf(n) || id, code: rep.data.code });
+    }
+    return out;
+  }
+
+  /** An entry's program on a new artifact: reused, not rewritten, and running because the human asked. */
+  function reuseEntry(artifactId, entry) {
+    const at = Date.now();
+    session.attachCode({ participantId: MM.LOCAL_PARTICIPANT, nodeId: artifactId, kind: 'run', code: entry.code, prompt: 'reused from ' + entry.name, from: entry.id, at: at });
+    session.clock({ nodeId: artifactId, op: 'play', at: at + 1 });
+    flash('reused ' + entry.name + ' from the library — nothing was written');
+  }
+
+  /** The loop becomes an artifact carrying an entry's program. */
+  function applyLibrary(sum, entry) {
+    const at = Date.now();
+    const id = session.bless({ summonId: sum.id, name: entry.name, at: at });
+    if (id) reuseEntry(id, entry);
+    return id;
+  }
+
+  /** What a brief asks for: a page (a layout of regions) or a program (anything else), unless it says. */
+  function targetOf(sum, prompt) {
+    const m = /^(page|run|program|new)\s*:\s*/i.exec(prompt);
+    const brief = m ? prompt.slice(m[0].length).trim() : prompt;
+    if (m) return { target: m[1].toLowerCase() === 'page' ? 'page' : 'program', brief: brief, fresh: m[1].toLowerCase() === 'new' };
+    const s = session.getState();
+    const marks = sum.enclosedIds.filter((id) => s.contentIds.includes(id));
+    const reading = marks.length ? session.read(marks) : null;
+    const boxes = marks.filter((id) => { const n = s.nodes.get(id); return n && MM.topInterpretation(n) === 'rectangle'; }).length;
+    // A drawing the diagram rung compiles — boxes tiling a space, nodes joined
+    // by edges, or both — is a page or a diagram. Anything else (one shape,
+    // nested circles, a figure) is a program that renders itself.
+    const genre = reading ? reading.genre.genre : 'empty';
+    const page = (genre === 'graph' || genre === 'mixed') || (genre === 'layout' && boxes >= 2);
+    return { target: page ? 'page' : 'program', brief: brief, fresh: false };
+  }
+
   function runPrompt(sum, prompt, revising) {
     const at = Date.now();
     let artifactId, addressed;
+
+    // A brief the library already answers is not sent anywhere: the entry is
+    // reused. The model is asked only for what nothing here does (the
+    // conservation John asked for — the library grows, the bloat does not).
+    const want = revising ? null : targetOf(sum, prompt);
+    if (want && want.target === 'program') {
+      const words = want.brief.toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length > 2);
+      const entry = want.fresh ? null : libraryEntries(session.getState()).find((e) => {
+        const name = e.name.toLowerCase();
+        return name === want.brief.toLowerCase() || name.split(/[^a-z0-9]+/).filter((w) => w.length > 2).every((w) => words.includes(w));
+      });
+      if (entry) { applyLibrary(sum, entry); return; }
+      runProgram(sum, want.brief);
+      return;
+    }
 
     if (revising) {
       artifactId = sum.onArtifact.artifactId;
@@ -744,6 +824,37 @@
     for (const id of ids) copyInk(s.nodes.get(id));
     if (made.length) session.select(made, t);
     flash('duplicated ' + ids.length + ' as ' + made.length + ' stroke' + (made.length === 1 ? '' : 's'));
+  }
+
+  /** A program from a brief: the loop is blessed, every model is asked with the library in its brief, and what comes back runs. */
+  function runProgram(sum, brief) {
+    const at = Date.now();
+    const name = brief.length > 30 ? brief.slice(0, 30) + '…' : brief;
+    const artifactId = session.bless({ summonId: sum.id, name: name, at: at });
+    if (!artifactId) { mpStatus.textContent = 'Could not hold that group.'; return; }
+    cancelReading();
+    const library = libraryEntries(session.getState()).map((e) => ({ id: e.id, name: e.name }));
+    mpStatus.textContent = 'writing a program with ' + agents.length + ' model(s)…';
+    agents.forEach((agent) => {
+      withWork('program:' + agent.id + ':' + artifactId, [artifactId], agent.name + ' is writing “' + brief.slice(0, 32) + (brief.length > 32 ? '…' : '') + '”…',
+        agent.program({ prompt: brief, artifactId: artifactId, library: library, at: Date.now() }))
+        .then((res) => {
+          if (res.ok && res.reuse) {
+            const entry = libraryEntries(session.getState()).find((e) => e.name.toLowerCase() === res.reuse.toLowerCase());
+            if (entry) { reuseEntry(artifactId, entry); mpStatus.textContent = agent.name + ' pointed at ' + entry.name + ' in the library'; }
+            else mpStatus.textContent = agent.name + ' pointed at “' + res.reuse + '”, which the library does not hold';
+          } else if (res.ok) {
+            // The human asked for it: it runs on arrival. A program that
+            // arrived any other way waits for play (I9).
+            session.clock({ nodeId: artifactId, op: 'play', at: Date.now() });
+            mpStatus.textContent = agent.name + ' wrote ' + (res.name || 'a program') + (res.parts && res.parts.length ? ' — parts: ' + res.parts.join(', ') : '');
+          } else {
+            mpStatus.textContent = agent.name + ' could not write it (' + res.error + ') — the drawing is untouched.';
+            if (res.raw) window.__mm.lastRaw = res.raw;
+          }
+          render(session.getState());
+        });
+    });
   }
 
   function swapToDraw(sum, btn) {

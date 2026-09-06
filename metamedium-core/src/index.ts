@@ -242,8 +242,8 @@ export { complete, listModels, providerLabel, providerTier, stripThink, textOf, 
 export type { ProviderConfig, ProviderKind, ChatMessage, ContentPart, CompletionResult, ModelList } from './llm/provider';
 
 // Agent participants — a model joins through the same channel a human uses.
-export { createAgentParticipant, parseReadings, parseCode, parseFill, parseTranscripts, parseBehaviourReply, readingsToEdges, MAX_READINGS } from './participants/agent';
-export type { BehaveResult } from './participants/agent';
+export { createAgentParticipant, parseReadings, parseCode, parseFill, parseTranscripts, parseBehaviourReply, parseProgram, readingsToEdges, MAX_READINGS } from './participants/agent';
+export type { BehaveResult, ProgramResult } from './participants/agent';
 export type { AgentParticipant, AgentReading, InterpretResult, AskResult, GenerateResult, ReadResult, TranscriptReading, DrawResult, RegionFill } from './participants/agent';
 export { describeSession, describeSignature, describeRegions, describeAddressed, describeReading } from './participants/serialize';
 export type { ReadingLike, DescribeReadingOptions } from './participants/serialize';

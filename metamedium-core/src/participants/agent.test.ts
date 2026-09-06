@@ -4,7 +4,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { createSession } from '../session/session';
 import { interpretationsOf, bySource, byTier, disagreement } from '../session/interpretations';
-import { createAgentParticipant, parseReadings, readingsToEdges, MAX_READINGS, parseBehaviourReply } from './agent';
+import { createAgentParticipant, parseReadings, readingsToEdges, MAX_READINGS, parseBehaviourReply, parseProgram } from './agent';
 import { describeSession, describeSignature } from './serialize';
 import { PRESETS, providerTier } from '../llm/provider';
 import { circleStroke, lineStroke, rectStroke, checkStroke } from '../test/strokes';
@@ -370,5 +370,47 @@ describe('words into a behaviour, through a participant', () => {
     expect(r.unread).toEqual(['photosynthesises']);
     expect(r.error).toBeDefined();
     expect(behavioursOf(s.getState().nodes.get(id)!)).toHaveLength(1);
+  });
+});
+
+describe('a program from a brief, with the library in the brief', () => {
+  function circled(s: ReturnType<typeof createSession>) {
+    s.addStroke(circleStroke(200, 200, 90), 1000);
+    s.addStroke(circleStroke(200, 200, 40), 1200);
+    s.addStroke(circleStroke(200, 200, 160), 2000);
+    s.addStroke(checkStroke(350, 190), 3000);
+    return s.bless({ summonId: s.getState().summon!.id, name: 'torus in 3d', at: 4000 })!;
+  }
+
+  it('the reply is held as run code, attributed, with the model\'s short name and parts', async () => {
+    const s = createSession();
+    const id = circled(s);
+    stubOpenAI('{"name":"torus","parts":["torus"],"code":"mm.report(\'torus\', 0, 0, mm.width, mm.height);"}');
+    const agent = createAgentParticipant(s, localConfig, 4100);
+    const r = await agent.program({ prompt: 'torus in 3d', artifactId: id, library: [{ id: 'x', name: 'spinning cube' }], at: 4200 });
+    expect(r.ok).toBe(true);
+    expect(r.name).toBe('torus');
+    expect(r.parts).toEqual(['torus']);
+    const rep = s.getState().nodes.get(id)!.reps.filter((x) => x.modality === 'code').pop()!;
+    expect((rep.data as { kind: string }).kind).toBe('run');
+    expect(rep.source).toBe(agent.id);
+    expect(s.getState().live).toContain(id);
+  });
+
+  it('a reply that points at the library attaches nothing and says which entry', async () => {
+    const s = createSession();
+    const id = circled(s);
+    stubOpenAI('{"reuse":"torus"}');
+    const agent = createAgentParticipant(s, localConfig, 4100);
+    const r = await agent.program({ prompt: 'a torus', artifactId: id, library: [{ id: 'x', name: 'torus' }], at: 4200 });
+    expect(r.ok).toBe(true);
+    expect(r.reuse).toBe('torus');
+    expect(s.getState().live).not.toContain(id);
+  });
+
+  it('a fenced program is still read, and nothing else is', () => {
+    expect(parseProgram('Here you go:\n```js\nmm.report("ring", 0, 0, 10, 10);\n```\nname: "ring"')).toEqual({ code: 'mm.report("ring", 0, 0, 10, 10);', name: 'ring' });
+    expect(parseProgram('I cannot do that.')).toBeNull();
+    expect(parseProgram('{"code":""}')).toBeNull();
   });
 });

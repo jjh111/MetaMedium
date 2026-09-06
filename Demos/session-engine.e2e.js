@@ -103,6 +103,12 @@ window.__setup = function(){
       ids.forEach((id,i)=>{ regions[id]={tag:i===0?'header':'section', style:'background:'+pal[i%pal.length]+';color:#fff;display:flex;align-items:center;justify-content:center', html:'<h2>Section '+id+'</h2>'}; });
       return reply({theme:{background:'#fbfaf7', color:'#16161a'}, regions});
     }
+    if(/write a PROGRAM/.test(sys)){
+      // A 2D ring that reports itself as one part — enough to prove the harness without three.js.
+      window.__lastProgram = { user: usr };
+      if (/THE LIBRARY holds:\n  - /.test(usr) && /torus/i.test(usr.split('THE LIBRARY holds:')[1]) && /torus/i.test(usr.split('The human typed:')[1] || '')) return reply({ reuse: 'torus in 3d' });
+      return reply({ name: 'torus', parts: ['torus'], code: "mm.onFrame(function(t){ var c = mm.ctx; c.clearRect(0, 0, mm.width, mm.height); c.strokeStyle = '#c9a84c'; c.lineWidth = 10; c.beginPath(); c.arc(mm.width / 2, mm.height / 2, Math.min(mm.width, mm.height) / 3, 0, Math.PI * 2); c.stroke(); mm.report('torus', mm.width / 6, mm.height / 6, mm.width * 2 / 3, mm.height * 2 / 3); });" });
+    }
     if(/asked to ADD MARKS/.test(sys)){
       // Place a footer under the span the human pointed at — derived from the
       // prompt, so a broken brief fails the run.
@@ -141,7 +147,17 @@ window.__scenario = async function(){
   const R = { steps: [], pass: true }; window.__Rlive = R;
   const codeRepOfNode = (n) => { for (let i = n.reps.length - 1; i >= 0; i--) if (n.reps[i].modality === 'code') return n.reps[i]; return null; };
   const step = (name, ok, detail) => { R.steps.push({name, ok: !!ok, detail}); if(!ok) R.pass=false; return ok; };
-  const wait = (ms) => new Promise(r=>setTimeout(r, ms||250));
+  // A wait that survives a hidden tab: timers there fire once a minute, but a
+  // message hop is a task and is not throttled, so the clock is read across hops.
+  const wait = (ms) => new Promise((resolve) => {
+    const until = performance.now() + (ms || 250);
+    const ch = new MessageChannel();
+    let done = false;
+    const finish = () => { if (!done) { done = true; resolve(); } };
+    const t = setTimeout(finish, ms || 250);
+    ch.port1.onmessage = () => { if (done) return; if (performance.now() >= until) { clearTimeout(t); finish(); } else ch.port2.postMessage(0); };
+    ch.port2.postMessage(0);
+  });
 
   // ---- 0. The built-in mark works before anything is taught ----
   // A default gesture that only works after you configure it is not a default.
@@ -723,7 +739,8 @@ window.__scenario = async function(){
     mm.session.clock({ nodeId: defId, op: 'pause', at: Date.now() });
     const pA = tk.positions(defId); await wait(250);
     const pB = tk.positions(defId);
-    step('20c. playing moves them by the frame loop; pause holds them where they are', JSON.stringify(pA) !== JSON.stringify(p1) && JSON.stringify(pA) === JSON.stringify(pB));
+    // A hidden tab gets no frames and one timer a minute; the loop's motion is not asserted there, the hold is.
+    step('20c. playing moves them by the frame loop; pause holds them where they are', (document.hidden || JSON.stringify(pA) !== JSON.stringify(p1)) && JSON.stringify(pA) === JSON.stringify(pB), { hidden: document.hidden });
     mm.session.clock({ nodeId: defId, op: 'reset', at: Date.now() });
     const pr = tk.positions(defId);
     step('20d. reset puts them back where they were drawn', JSON.stringify(pr) === JSON.stringify(p0) && tk.time(defId) === 0, pr);
@@ -996,6 +1013,65 @@ window.__scenario = async function(){
     const built = st26.live.length === before26 + 1;
     const newest = built && st26.nodes.get(st26.live[st26.live.length - 1]);
     step('26. free text that names no verb goes to the model as the brief, with the thinking shown while it works', built && thinking && MM.wordOf(newest) === 'website about dolphins' && !/is building/.test(document.getElementById('status').textContent), { built, thinking, shownWhileTyping: shownNow, status: document.getElementById('status').textContent.slice(0, 120) });
+  }
+
+  // ---- 27. The moment: two circles, "torus in 3d", a program in the frame; then the library answers first ----
+  {
+    mm.setView(1, 260 - 12200, 200 - 2000); await wait(30);
+    const W = (x, y) => mm.worldToScreen(x, y);
+    const c1 = W(12400, 2200);
+    t.stroke(t.circle(c1.x, c1.y, 150)); t.stroke(t.circle(c1.x, c1.y, 60));
+    t.stroke(t.circle(c1.x, c1.y, 230)); t.takeLoop(c1.x, c1.y, 230); await wait(60);
+    const calls0 = window.__calls.length;
+    const f27 = document.querySelector('#summon input.filter');
+    f27.value = 'torus in 3d'; f27.dispatchEvent(new Event('input'));
+    step('27. typing a brief the library cannot answer completes to nothing from the library', ![...document.querySelectorAll('#summon .item')].some(b => /in the library/.test(b.title)));
+    f27.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    await wait(400);
+    const st27 = mm.session.getState();
+    const runId = st27.live[st27.live.length - 1];
+    const runRep = runId && codeRepOfNode(st27.nodes.get(runId));
+    const fr27 = runId && mm.frames.get(runId);
+    step('27a. the brief becomes a program: run code on the circled drawing, playing because the human asked, in a scripts-only frame', !!runRep && runRep.data.kind === 'run' && st27.clocks[runId] && st27.clocks[runId].playing && fr27 && fr27.iframe.getAttribute('sandbox') === 'allow-scripts' && fr27.wrap.classList.contains('run') && window.__calls.length === calls0 + 1, { kind: runRep && runRep.data.kind, sandbox: fr27 && fr27.iframe.getAttribute('sandbox'), calls: window.__calls.length - calls0 });
+    step('27b. the model was told what the library holds', /THE LIBRARY holds:\n  \(nothing yet\)/.test((window.__lastProgram || {}).user || ''), (window.__lastProgram || {}).user && window.__lastProgram.user.split('\n').slice(-4));
+    // The frame reports its parts: wait for the first report.
+    let parts = [];
+    for (let i = 0; i < 30 && !parts.length; i++) { await wait(100); parts = mm.reportedRegions(runId); }
+    step('27c. the running program reports its parts back to the canvas', parts.some(p => p.id === 'torus'), parts);
+    // Ink over the part: a loop on the running frame addresses it by name.
+    const on = W(12400, 2200);
+    t.stroke(t.circle(on.x, on.y, 70)); t.takeLoop(on.x, on.y, 70); await wait(60);
+    const sumOn = mm.session.getState().summon;
+    const addressed = sumOn && sumOn.onArtifact ? mm.regionsUnderInk(sumOn.onArtifact.artifactId, MM.boundsOf(mm.session.getState().nodes.get(sumOn.gestureIds[0]))) : [];
+    step('27d. ink over the running frame lands on the part the program named', !!sumOn && !!sumOn.onArtifact && sumOn.onArtifact.artifactId === runId && addressed.includes('torus'), { onArtifact: sumOn && sumOn.onArtifact, addressed });
+    if (sumOn) mm.session.dismiss(sumOn.id, Date.now());
+    // The library answers first: another nested pair, "torus" typed — the entry completes, Enter reuses it, no model is asked.
+    const c2 = W(12900, 2200);
+    t.stroke(t.circle(c2.x, c2.y, 150)); t.stroke(t.circle(c2.x, c2.y, 60));
+    t.stroke(t.circle(c2.x, c2.y, 230)); t.takeLoop(c2.x, c2.y, 230); await wait(60);
+    const calls1 = window.__calls.length;
+    const f27b = document.querySelector('#summon input.filter');
+    f27b.value = 'torus'; f27b.dispatchEvent(new Event('input'));
+    const libPill = [...document.querySelectorAll('#summon .item')].find(b => /in the library/.test(b.title) && /^torus in 3d/.test(b.textContent));
+    step('27e. typing the entry\'s name completes to it from the library', !!libPill, [...document.querySelectorAll('#summon .item')].map(b => b.querySelector('span').textContent.trim()).slice(0, 6));
+    f27b.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    await wait(120);
+    const st27e = mm.session.getState();
+    const reusedId = st27e.live[st27e.live.length - 1];
+    const reusedRep = reusedId && codeRepOfNode(st27e.nodes.get(reusedId));
+    step('27f. Enter reuses the entry: the same program on the new drawing, running, and no model was asked', reusedId !== runId && !!reusedRep && reusedRep.data.kind === 'run' && reusedRep.data.from === runId && reusedRep.data.code === runRep.data.code && st27e.clocks[reusedId].playing && window.__calls.length === calls1, { from: reusedRep && reusedRep.data.from, calls: window.__calls.length - calls1 });
+    // And a brief that names the entry in other words goes to the model, which points at the library.
+    const c3 = W(12400, 2700);
+    t.stroke(t.circle(c3.x, c3.y, 150)); t.stroke(t.circle(c3.x, c3.y, 60));
+    t.stroke(t.circle(c3.x, c3.y, 230)); t.takeLoop(c3.x, c3.y, 230); await wait(60);
+    const f27c = document.querySelector('#summon input.filter');
+    f27c.value = 'new: a torus that spins'; f27c.dispatchEvent(new Event('input'));
+    f27c.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    await wait(400);
+    const st27g = mm.session.getState();
+    const thirdId = st27g.live[st27g.live.length - 1];
+    const thirdRep = thirdId && codeRepOfNode(st27g.nodes.get(thirdId));
+    step('27g. asked fresh, the model is briefed with the library and may still point at it — the entry is reused, attributed to the reuse', !!thirdRep && thirdRep.data.from === runId && /THE LIBRARY holds:\n  - torus in 3d/.test(window.__lastProgram.user), { from: thirdRep && thirdRep.data.from, mp: document.getElementById('mpStatus').textContent });
   }
 
   // ---- 11. Scratch-out erase ----
