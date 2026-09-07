@@ -80,20 +80,22 @@
       .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
     const out = [];
     let list = null; // 'ul' | 'ol'
+    let para = [];   // the lines of a paragraph, joined at the next blank line
     const closeList = () => { if (list) { out.push('</' + list + '>'); list = null; } };
+    const closePara = () => { if (para.length) { out.push('<p>' + para.join(' ') + '</p>'); para = []; } };
     for (const raw of md.split('\n')) {
       const line = raw.replace(/\s+$/, '');
       const h = /^(#{1,3})\s+(.*)$/.exec(line);
       const li = /^\s*(?:[-*]|\d+\.)\s+(.*)$/.exec(line);
       const cont = /^\s{2,}(\S.*)$/.exec(line);
-      if (h) { closeList(); out.push('<h' + (h[1].length + 1) + '>' + inline(h[2]) + '</h' + (h[1].length + 1) + '>'); }
-      else if (li) { const kind = /^\s*\d+\./.test(line) ? 'ol' : 'ul'; if (list !== kind) { closeList(); list = kind; out.push('<' + kind + '>'); } out.push('<li>' + inline(li[1]) + '</li>'); }
+      if (h) { closeList(); closePara(); out.push('<h' + (h[1].length + 1) + '>' + inline(h[2]) + '</h' + (h[1].length + 1) + '>'); }
+      else if (li) { closePara(); const kind = /^\s*\d+\./.test(line) ? 'ol' : 'ul'; if (list !== kind) { closeList(); list = kind; out.push('<' + kind + '>'); } out.push('<li>' + inline(li[1]) + '</li>'); }
       else if (cont && list) { out[out.length - 1] = out[out.length - 1].replace(/<\/li>$/, ' ' + inline(cont[1]) + '</li>'); }
-      else if (!line.trim()) { closeList(); }
-      else if (/^---+$/.test(line)) { closeList(); out.push('<hr>'); }
-      else { closeList(); out.push('<p>' + inline(line) + '</p>'); }
+      else if (!line.trim()) { closeList(); closePara(); }
+      else if (/^---+$/.test(line)) { closeList(); closePara(); out.push('<hr>'); }
+      else { closeList(); para.push(inline(line)); }
     }
-    closeList();
+    closeList(); closePara();
     return out.join('\n');
   }
 
