@@ -29,7 +29,7 @@ describe('interpretationsOf — nothing is collapsed', () => {
 
     expect(reads.length).toBeGreaterThan(0);
     expect(reads.every((r) => r.tier === 0)).toBe(true);
-    expect(reads[0].sourceName).toBe('tier0-heuristics');
+    expect(reads[0].sourceName).toBe('engine');
     // The substance behind "why?" travels with the reading.
     expect(reads[0].reasoning).toBeTruthy();
   });
@@ -75,7 +75,7 @@ describe('interpretationsOf — nothing is collapsed', () => {
 
     // tier0 + two agents — three distinct voices, none merged.
     expect(groups.map((g) => g.label).sort()).toEqual(
-      ['llm:llama3', 'llm:qwen3', 'tier0-heuristics'].sort()
+      ['llm:llama3', 'llm:qwen3', 'engine'].sort()
     );
   });
 
@@ -95,7 +95,7 @@ describe('interpretationsOf — nothing is collapsed', () => {
     // The high-confidence hosted reading does NOT evict the cheaper ones.
     expect(sourcesOf(reads)).toHaveLength(3);
     expect(hasMultipleSources(reads)).toBe(true);
-    expect(reads.some((r) => r.sourceName === 'tier0-heuristics')).toBe(true);
+    expect(reads.some((r) => r.sourceName === 'engine')).toBe(true);
     expect(reads.some((r) => r.sourceName === 'llm:qwen3')).toBe(true);
     expect(reads.some((r) => r.sourceName === 'llm:claude-opus-5')).toBe(true);
   });
@@ -163,7 +163,7 @@ describe('disagreement is a first-class signal', () => {
     expect(disagreement([])).toBeNull();
     expect(
       disagreement([
-        { label: 'circle', to: 'type:circle', sourceName: 'tier0-heuristics',
+        { label: 'circle', to: 'type:circle', sourceName: 'engine',
           tier: 0, weight: 0.8, blessed: false },
       ])
     ).toBeNull();

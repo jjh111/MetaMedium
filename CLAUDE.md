@@ -40,7 +40,7 @@ circle them, cross with a command mark *you taught the system*, prompt them into
 a living page that renders in the canvas with your ink still outlining its
 divs — then draw on that page and the ink addresses the regions underneath it.
 Scratch anything out to erase. `Demos/session-engine.html` is the surface;
-`Demos/session-engine.e2e.js` drives 138 steps through the real UI: page, flowchart, handwriting (read only when asked), the model drawing, the user-side loop, selection and the field, corrections, the worker, the tank, words into verbs and acting out, frames and the drawn slider, the folder, pictures, text, and the moment. A run takes about 90 s; run it **in its own tab** (`?fresh=1&nosw=1` — it replaces `fetch` with a stub and joins a stub model, so never in a tab you are working in), start it with `__setup(); __scenario().then(r => window.__R = r)` and read `__R` when it lands.
+`Demos/session-engine.e2e.js` drives 138 steps through the real UI: page, flowchart, handwriting (read only when asked), the model drawing, the user-side loop, selection and the field, corrections, the worker, the tank, words into verbs and acting out, frames and the drawn slider, the folder, pictures, text, and the moment. A run takes about 90 s; run it **in its own tab on its own origin** (`http://127.0.0.1:8010/…?fresh=1&nosw=1` — `__setup` refuses any other URL: it replaces `fetch` with a stub, joins a stub model named `e2e-stub`, and wipes the origin's saved board), start it with `__setup(); __scenario().then(r => window.__R = r)` and read `__R` when it lands.
 v7 Stage E (handwriting) shipped 1 Sep 2026: a word written beside a shape is read by a
 model that can see and offered as that shape's name. Whitepaper v5.1 stays parked until the
 conversation benchmark passes end to end.
@@ -423,7 +423,7 @@ makes it render as real DOM in the canvas. The rules:
   that framed it, and a page rendering over erased ink is the silent phantom
   degradation exists to prevent.
 
-### Relations and concepts (Tier 0)
+### Relations and concepts (Tier 1)
 
 > `metamedium-core/src/relate/relations.ts` and `src/concepts/concept.ts`.
 
@@ -449,7 +449,7 @@ band; how straight they are is how sure the reading is, and it says so
 ("roughly lined up", "not lined up yet"). Adjacency must hold between
 *neighbours*, not on average.
 
-**Tier 0 conversions need no model**: `session.tidy()` lines marks up and spaces
+**Tier 1 conversions need no model**: `session.tidy()` lines marks up and spaces
 them evenly across the span already used, or matches sizes to the largest. Ink
 is never destroyed — the original stroke is untouched and the mark gains a
 `'transform'` rep, so undo springs it back exactly.
@@ -491,9 +491,19 @@ relative to the target's own size. Legacy copies still exist for reference in
 
 ### Tiered LLM Interpretation
 
-> **Status (Aug 2026): Tiers 1–2 are live in the engine.** A model joins via
-> `createAgentParticipant()` and proposes through the same channel a human uses.
-> Design: `ARCHITECTURE-v7-PARTICIPANTS-AND-TIERS.md`.
+> **Status (redressed 6 Sep 2026): three tiers, and a tier is a kind of
+> knowing, not a place.** **Tier 0** is the shape rung — a stroke read as one
+> of eight shapes. **Tier 1** is the engine's instant library
+> (`src/tier1/library.ts`, a registry of fourteen modules: relations, the
+> diagram rung, concepts, tidy, clean forms, the structure, signatures, words
+> into verbs, the program library, tracing, the maths, acting out, wiring,
+> words from letters) — everything that answers with no model and no wait.
+> **Tier 2** is a model, local or hosted alike; *locality* is a cost the
+> router pays attention to (local before hosted), never a tier. Before this
+> a local model was "tier 1" and every instant conversion said "tier 0",
+> which made a tier a place rather than a kind of knowing. A model joins via
+> `createAgentParticipant()` and proposes through the same channel a human
+> uses. Design: `ARCHITECTURE-v7-PARTICIPANTS-AND-TIERS.md`.
 >
 > **Multi-interpretation is a hard rule, not a nicety.** Models are asked for
 > *several* readings, several models can answer in the same tier, and **all
@@ -503,13 +513,26 @@ relative to the target's own size. Legacy copies still exist for reference in
 > to see. Read with `interpretationsOf()` / `byTier()` / `bySource()` /
 > `disagreement()`; `topInterpretation()` is a headline helper, not the truth.
 
-- **Tier 0:** engine heuristics (always available, offline) — **built**
-- **Tier 1:** local model via Ollama (`localhost:11434/v1`) or LM Studio (`localhost:1234/v1`) — **built**
-- **Tier 2:** hosted model via OpenRouter or Anthropic, bring-your-own-key — **built**
+- **Tier 0:** the shape rung (`recognition.ts`) — always available, offline — **built**
+- **Tier 1:** the instant library (`tier1/library.ts`): relations, roles,
+  concepts, tidy, clean forms, **the structure** (`buildStructure`: a page or
+  a diagram from the drawing with every region in place and no words —
+  what the canvas knows and nothing it does not), signatures, verbs, the
+  program library, tracing, the maths, acting out, wiring, words — **built**
+- **Tier 2:** a model — local via Ollama (`localhost:11434/v1`) or LM Studio
+  (`localhost:1234/v1`), hosted via OpenRouter or Anthropic with your own key
+  — **built**. `providerLocality()` says which; the router asks local first
+  because it is cheaper, not higher
 - **Tier 3:** structural proposals (growing what the board can know) — reserved
 
-Tier is derived from the provider by `providerTier()` (localhost → 1, hosted →
-2) and carried on the participant node via `join(kind, name, at, capability)`.
+Every model joins at tier 2 (`providerTier()`), with its locality carried on
+the `join` event and the participant node (`localityOf`). The engine is one
+participant, named `engine`, whose readings are tier 0 and whose library is
+tier 1. **A brief builds the structure first**: `runPrompt` attaches the tier
+1 structure in the engine's name the moment Enter is pressed, so the page
+stands at once; a joined model's words then land as the next version. With
+no model, that structure *is* the page, and the status says so. Nothing
+fakes words.
 
 **A model's reading of a group is an offer to name it.** When a circled group
 is summoned, every joined model is asked for readings (`interpret`); each
@@ -526,12 +549,15 @@ and gesture: visible and erasable, but not ink — they never join a lasso, a
 cluster, or a signature. Several participants may answer the same question and
 every answer is held.
 
-**Routing** (`src/participants/router.ts`): Tier 0 answers first, and a model is
-asked only for what it cannot do. `route(ability, state, {concepts})` reports
-`settledLocally` when the engine already has the answer — "the engine knows
-this" beats a spinner, and "nobody here can do that" beats silence. It is not a
-fallback chain: every candidate is returned, ranked cheapest-first, because
-several participants answering at once is the point.
+**Routing** (`src/participants/router.ts`): the canvas answers first — tiers
+0 and 1 — and a model is asked only for what they cannot do.
+`route(ability, state, {concepts})` reports `settledLocally` when the engine
+already has the answer, names the tier-1 module that answers at once
+(`instant`: concepts for *read*, tidy for *arrange*, the structure for
+*build*, signatures for *name*), and ranks every candidate cheapest-first
+(local before hosted) — "the canvas has this" beats a spinner, and "nobody
+here can do that" beats silence. It is not a fallback chain: every candidate
+is returned, because several participants answering at once is the point.
 
 **A participant can be answered by hand** (`src/participants/bridge.ts`). The
 transport is injectable, so a bridge is not a new kind of participant — same
@@ -540,7 +566,7 @@ instead of posted. Any model can take part, including one with no HTTP API. It
 is also the honest test of the serializer: if a capable reader cannot make sense
 of `describeSession`, that is worth knowing before blaming a small local model.
 
-**One transport covers Tier 1 and most of Tier 2:** Ollama, LM Studio, and
+**One transport covers every model:** Ollama, LM Studio, and
 OpenRouter all speak the OpenAI-compatible `/v1/chat/completions` shape and
 differ only by base URL and key. Anthropic needs its own client.
 

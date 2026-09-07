@@ -48,10 +48,10 @@ export interface Conversion {
   id: string;
   label: string;
   /**
-   * Whether the engine can do this alone. Tier 0 conversions are the ones that
-   * make the canvas worth using with no model attached at all.
+   * Who does it: 1 is the engine's instant library (what makes the canvas
+   * worth using with no model attached at all), 2 asks a model.
    */
-  tier: 0 | 2;
+  tier: 1 | 2;
   /** What it does, for the surface to carry out. */
   effect:
     | { kind: 'name' }
@@ -87,7 +87,7 @@ export interface Concept {
 const NAME: Conversion = {
   id: 'name',
   label: 'Name this…',
-  tier: 0,
+  tier: 1,
   effect: { kind: 'name' },
   hint: 'hold it as a thing you can use again',
 };
@@ -103,7 +103,7 @@ const prompt = (id: string, label: string, seed: string, hint: string): Conversi
 const tidy = (axis: 'row' | 'column'): Conversion => ({
   id: `tidy-${axis}`,
   label: axis === 'row' ? 'Line up across' : 'Line up down',
-  tier: 0,
+  tier: 1,
   effect: { kind: 'tidy', axis },
   hint: 'align and space them evenly',
 });
@@ -111,7 +111,7 @@ const tidy = (axis: 'row' | 'column'): Conversion => ({
 const EQUALIZE: Conversion = {
   id: 'equalize',
   label: 'Match sizes',
-  tier: 0,
+  tier: 1,
   effect: { kind: 'equalize' },
   hint: 'make them the same size as the largest',
 };
@@ -231,7 +231,7 @@ export const BUILTIN_CONCEPTS: Concept[] = [
     name: 'slider',
     describes: 'a knob on a track',
     conversions: [
-      { id: 'control', label: 'Make it a slider', tier: 0, effect: { kind: 'control' }, hint: 'its value is where the knob sits; drag the knob to set it' },
+      { id: 'control', label: 'Make it a slider', tier: 1, effect: { kind: 'control' }, hint: 'its value is where the knob sits; drag the knob to set it' },
       NAME,
     ],
     match(scope) {

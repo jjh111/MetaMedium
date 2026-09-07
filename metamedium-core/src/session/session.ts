@@ -43,6 +43,7 @@ import {
   lettersOf,
   LOCAL_PARTICIPANT,
   TIER0_PARTICIPANT,
+  type Locality,
 } from './nodes';
 import {
   type GestureConfig,
@@ -227,7 +228,7 @@ export type SessionEvent =
   | { type: 'bless'; summonId: string; name?: string; suggestionId?: string; at: number; participantId?: string }
   | { type: 'dismiss'; summonId: string; at: number; participantId?: string }
   | { type: 'erase'; nodeId: string; at: number; participantId?: string }
-  | { type: 'join'; kind: ParticipantKind; name: string; at: number; capability?: Capability }
+  | { type: 'join'; kind: ParticipantKind; name: string; at: number; capability?: Capability; locality?: Locality }
   | { type: 'propose'; participantId: string; nodeId: string; edges: ProposedEdge[]; reps?: ProposedRep[]; at: number }
   | { type: 'teach'; mark: CommandMark | null; at: number }
   /**
@@ -360,7 +361,7 @@ export const DEFAULT_SESSION_CONFIG: SessionConfig = {
 export interface Session {
   addStroke(points: Point[], at: number, participantId?: string, scale?: number, options?: { content?: boolean }): string;
   /** Register a participant (human or AI agent). Returns its node id. */
-  join(kind: ParticipantKind, name: string, at: number, capability?: Capability): string;
+  join(kind: ParticipantKind, name: string, at: number, capability?: Capability, locality?: Locality): string;
   /** Offer attributed, inferred edges on a node — the channel LLM tiers use. */
   propose(args: { participantId: string; nodeId: string; edges: ProposedEdge[]; reps?: ProposedRep[]; at: number }): void;
   /**
@@ -1186,7 +1187,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
   }
 
   function applyJoin(ev: Extract<SessionEvent, { type: 'join' }>): string {
-    const node = createParticipantNode(nextId('participant'), ev.kind, ev.name, ev.at, ev.capability ?? 0);
+    const node = createParticipantNode(nextId('participant'), ev.kind, ev.name, ev.at, ev.capability ?? 0, ev.locality);
     nodes.set(node.id, node);
     participants.push(node.id);
     return node.id;
@@ -1954,7 +1955,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
   return {
     addStroke: (points, at, participantId, scale, options) =>
       dispatch({ type: 'stroke', points, at, participantId, scale, content: options?.content }) as string,
-    join: (kind, name, at, capability) => dispatch({ type: 'join', kind, name, at, capability }) as string,
+    join: (kind, name, at, capability, locality) => dispatch({ type: 'join', kind, name, at, capability, ...(locality ? { locality } : {}) }) as string,
     propose: (args) => void dispatch({ type: 'propose', ...args }),
     answer: (args) => dispatch({ type: 'answer', ...args }),
     teachCommandMark: (mark, at) => void dispatch({ type: 'teach', mark, at }),

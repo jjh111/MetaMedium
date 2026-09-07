@@ -48,6 +48,8 @@ export interface BridgeOptions {
   name?: string;
   /** Defaults to 2 — a bridge is normally a capable reader, not a local heuristic. */
   tier?: Capability;
+  /** Where the answering hand sits, as a cost for the router. Defaults to hosted. */
+  locality?: 'local' | 'hosted';
   /** How long a question waits before it reports failure rather than hanging. */
   timeoutMs?: number;
 }
@@ -124,6 +126,7 @@ export function createBridgeParticipant(
     transport,
     name,
     tier: options.tier ?? 2,
+    locality: options.locality ?? 'hosted',
   });
 
   return {

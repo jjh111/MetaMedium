@@ -73,6 +73,7 @@
     stage.style.transform =
       'translate(' + view.panX + 'px,' + view.panY + 'px) scale(' + view.zoom + ')';
     render(state);
+    sizeFramesToScreen(); // code stays legible at every zoom (S4)
   }
 
   document.getElementById('zoomIn').onclick = () => zoomAround(innerWidth / 2, innerHeight / 2, 1.25);

@@ -100,15 +100,27 @@ export function providerLabel(config: ProviderConfig): string {
 }
 
 /**
- * Which tier a provider speaks at: 1 when the model runs on this machine,
- * 2 when it is hosted.
+ * Where a provider runs: on this machine, or hosted. Locality is a COST —
+ * local before hosted when the router ranks who to ask — never a tier.
+ */
+export type Locality = 'local' | 'hosted';
+export function providerLocality(config: ProviderConfig): Locality {
+  return /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:|\/|$)/i.test(config.baseUrl) ? 'local' : 'hosted';
+}
+
+/**
+ * Which tier a provider speaks at: 2, always. Tier 0 is the shape rung, tier
+ * 1 the engine's instant library, tier 2 a model — local or hosted alike
+ * (redressed 6 Sep 2026; before that a local model was "tier 1", which made
+ * a tier a place rather than a kind of knowing).
  *
  * This labels a voice so surfaces can group by tier. It does NOT rank one
- * above another — tiers are simultaneous, and a tier-1 reading is never
- * suppressed by a tier-2 one (ARCHITECTURE-v7 §4.1).
+ * above another — tiers are simultaneous, and no reading is suppressed by
+ * another (ARCHITECTURE-v7 §4.1).
  */
-export function providerTier(config: ProviderConfig): 1 | 2 {
-  return /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:|\/|$)/i.test(config.baseUrl) ? 1 : 2;
+export function providerTier(config: ProviderConfig): 2 {
+  void config;
+  return 2;
 }
 
 /**
@@ -285,7 +297,7 @@ export async function complete(
   opts: { signal?: AbortSignal } = {}
 ): Promise<CompletionResult> {
   const timeoutMs =
-    config.timeoutMs ?? (providerTier(config) === 1 ? LOCAL_TIMEOUT_MS : DEFAULT_TIMEOUT_MS);
+    config.timeoutMs ?? (providerLocality(config) === 'local' ? LOCAL_TIMEOUT_MS : DEFAULT_TIMEOUT_MS);
   try {
     return config.kind === 'anthropic'
       ? await completeAnthropic(config, messages, timeoutMs, opts.signal)

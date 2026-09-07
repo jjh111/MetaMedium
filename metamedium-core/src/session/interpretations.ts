@@ -25,7 +25,7 @@ export interface Interpretation {
   to: string;
   /** Participant id that made the claim; undefined for un-attributed engine edges. */
   source?: string;
-  /** Human-readable participant name ('tier0-heuristics', 'llm:qwen3', 'local'). */
+  /** Human-readable participant name ('engine', 'llm:qwen3', 'local'). */
   sourceName: string;
   /** Capability tier of the source. Tier 0 = engine heuristics. */
   tier: Capability;

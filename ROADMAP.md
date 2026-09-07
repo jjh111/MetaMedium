@@ -20,7 +20,11 @@
 > match is a chip with its number (S3, first cut); the moment — nested
 > circles, "torus in 3d", a three.js program in the drawing's frame,
 > reused from the library the second time (S5); a tap on a match chip opens
-> the field on the group (S3). The e2e drives 138 steps. Still open: code
+> the field on the group (S3); **the tiers redressed** (S8): tier 0 the
+> shape rung, tier 1 the engine's instant library (a registry of fourteen
+> modules, with the structure of a drawing built from it with no words),
+> tier 2 every model, locality a cost — and a brief stands as its structure
+> at once, the model's words following. The e2e drives 138 steps. Still open: code
 > legible at every zoom (S4), live logs (S6), a brace as a scoping mark in
 > the diagram rung.
 

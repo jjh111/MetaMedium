@@ -66,6 +66,9 @@ window.__helpers = function(){
 
 /** Helpers plus a stubbed model, for a deterministic run. */
 window.__setup = function(){
+  // The stub replaces fetch and wipes this origin's saved board: never on a page someone is using.
+  const q = new URLSearchParams(location.search);
+  if (!q.has('fresh') || !q.has('nosw')) throw new Error('the e2e runs only on session-engine.html?fresh=1&nosw=1, in its own tab, on its own origin');
   window.__helpers();
   // A mark held on this device from an earlier run would make step 0 — "the
   // built-in check summons with nothing taught" — untrue before we begin.
@@ -137,7 +140,7 @@ window.__setup = function(){
     return new Response(JSON.stringify({choices:[{message:{content:'[{"label":"page-layout","confidence":0.78,"reasoning":"three rectangles in a header/two-column arrangement"}]'}}]}),{status:200,headers:{'content-type':'application/json'}});
   };
   window.__mm.agents.splice(0); // a remembered model may have rejoined at boot
-  const a=window.__mm.MM.createAgentParticipant(window.__mm.session, Object.assign({},window.__mm.MM.PRESETS.ollama,{model:'stub-qwen', vision:true}), Date.now());
+  const a=window.__mm.MM.createAgentParticipant(window.__mm.session, Object.assign({},window.__mm.MM.PRESETS.ollama,{model:'e2e-stub', vision:true}), Date.now());
   window.__mm.agents.push(a);
 
   return 'ready · ' + a.name;
@@ -233,7 +236,7 @@ window.__scenario = async function(){
   const sum = t.summary().summon;
   step('5. crossing with the taught mark summons', sum && sum.enclosed === 3,
     {enclosed: sum && sum.enclosed, chips: t.chips()});
-  step('5b. the field opens with its four core slots, and a brief typed there reads as a build', t.coreSlots().join(',') === 'name,copy,paste,erase' && mm.readField('website with the copy in the squares').kind === 'brief' && /builds a page/.test(mm.readField('website with the copy in the squares').line), { core: t.coreSlots(), line: mm.readField('website with the copy in the squares').line });
+  step('5b. the field opens with its four core slots, and a brief typed there reads as a build', t.coreSlots().join(',') === 'name,copy,paste,erase' && mm.readField('website with the copy in the squares').kind === 'brief' && /structure at once \(tier 1\), then .* writes the words/.test(mm.readField('website with the copy in the squares').line), { core: t.coreSlots(), line: mm.readField('website with the copy in the squares').line });
   {
     const st0 = mm.session.getState();
     step('5c. a held lasso is never offered for snapping — it is a gesture in waiting', ![...mm.snapOffers().keys()].some(id => st0.summon && st0.summon.gestureIds.includes(id)));
@@ -255,7 +258,7 @@ window.__scenario = async function(){
   const line6 = t.readingLine();
   t.typeEnter('website with the copy in the squares');
   await wait(350);
-  step('6a. the reading line said what Enter would do before it was pressed', /builds a page/.test(line6), { line: line6 });
+  step('6a. the reading line said what Enter would do before it was pressed: the structure first, the words after', /structure at once/.test(line6) && /writes the words/.test(line6), { line: line6 });
 
   const st1 = mm.session.getState();
   const artId = st1.artifacts[0];
@@ -355,7 +358,7 @@ window.__scenario = async function(){
     {region: otherId, before: beforeOther, after: q(otherId)});
 
   const codes = mm.session.getState().nodes.get(artId).reps.filter(r=>r.modality==='code');
-  step('10c. both versions are held — generation is a proposal', codes.length === 2, {versions: codes.length});
+  step('10c. every version is held — the structure tier 1 stood first, the build, then the revision; generation is a proposal', codes.length === 3 && codes[0].source === MM.ENGINE_PARTICIPANT, {versions: codes.length, first: codes[0].source});
 
   // ---- 10d. A flowchart compiles as a diagram, not a page ----
   // Boxes joined by an arrow have the genre `graph`: nodes keep their drawn
@@ -708,6 +711,18 @@ window.__scenario = async function(){
     let region = null;
     try { region = fj && fj.iframe.contentDocument && fj.iframe.contentDocument.querySelector('[data-region="fn:steer"]'); } catch (err) { region = null; }
     step('19. a js artifact renders as source, its functions addressable by ink', !!region, { hasFrame: !!fj });
+    {
+      // S4: the source is set in screen pixels, whatever the zoom — smaller in the document as the board zooms in, larger as it zooms out.
+      const docFont = () => { try { return parseFloat(fj.iframe.contentDocument.documentElement.style.fontSize); } catch (err) { return NaN; } };
+      mm.setView(0.25, 260 - 6200 * 0.25, 200 - 2100 * 0.25); await wait(40);
+      const far = docFont();
+      mm.setView(2, 260 - 6200 * 2, 200 - 2100 * 2); await wait(40);
+      const near = docFont();
+      const revealed = (() => { try { return fj.iframe.contentDocument.documentElement.classList.contains('mm-reveal'); } catch (err) { return false; } })();
+      mm.setView(1, 260 - 6200, 200 - 2100); await wait(40);
+      // Far out, the type grows toward 11 screen pixels but never past a dozen characters per line (the frame is 220 wide: 220 / 12).
+      step('19z. the source is legible at every zoom: its type is set for the screen — larger in the document zoomed out, capped so a line keeps a dozen characters; half at double; structure revealed past 1:1', Math.abs(far - Math.min(11 / 0.25, 220 / 12)) < 0.1 && Math.abs(near - 5.5) < 0.2 && revealed, { far, near, revealed });
+    }
     await wait(250);
     const b0 = mm.runtime().bodies.get(jsId);
     step('19a. nothing runs unblessed: no step before a hand plays it', !b0 && !mm.session.getState().clocks[jsId], { body: b0 || null });

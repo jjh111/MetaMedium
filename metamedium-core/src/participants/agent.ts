@@ -13,14 +13,12 @@
 import type { Session, ProposedEdge } from '../session/session';
 import type { Capability } from '../session/nodes';
 import type { ChatMessage, CompletionResult, ProviderConfig } from '../llm/provider';
-import { complete, providerLabel, providerTier } from '../llm/provider';
+import { complete, providerLabel, providerTier, providerLocality, type Locality } from '../llm/provider';
 import { describeSession, describeSignature, describeReading } from './serialize';
 import { frameOf, regionsOf } from '../session/regions';
-import { parseLayout, describeLayout, regionIdsIn } from '../parse/layout';
-import { parseGraph, describeGraph, nodeIdsIn, buildGraphScaffold } from '../parse/graph';
-import { getRep, strokePointsOf } from '../session/nodes';
-import type { Point } from '../types';
-import { buildScaffold, validateRegions, type RegionContent, type Theme } from '../parse/scaffold';
+import { planFor } from '../parse/plan';
+import { getRep } from '../session/nodes';
+import { validateRegions, type RegionContent, type Theme } from '../parse/scaffold';
 import { type DrawnShape, parseShapes, strokeFor, MAX_DRAWN } from '../session/synthesize';
 import type { Behaviour, Term, Verb } from '../behave/verbs';
 import { VERBS, TARGETED } from '../behave/verbs';
@@ -710,9 +708,10 @@ export type Transport = (
 export interface AgentOptions {
   /** Defaults to the HTTP transport. */
   transport?: Transport;
-  /** Overrides the display name and the tier derived from the provider. */
+  /** Overrides the display name, the tier and the locality derived from the provider. */
   name?: string;
   tier?: Capability;
+  locality?: Locality;
 }
 
 export function createAgentParticipant(
@@ -723,8 +722,9 @@ export function createAgentParticipant(
 ): AgentParticipant {
   const send: Transport = options.transport ?? ((c, m, o) => complete(c, m, o));
   const name = options.name ?? providerLabel(config);
-  // Join at the provider's tier so surfaces can group readings by voice.
-  const id = session.join('agent', name, at, options.tier ?? providerTier(config));
+  // Join at the provider's tier (2: a model) with its locality, so surfaces
+  // can group readings by voice and the router can ask the cheaper first.
+  const id = session.join('agent', name, at, options.tier ?? providerTier(config), options.locality ?? providerLocality(config));
 
   async function interpret(nodeIds: string[], now: number, signal?: AbortSignal): Promise<InterpretResult> {
     const state = session.getState();
@@ -805,22 +805,6 @@ export function createAgentParticipant(
   }
 
   /** Wires the engine already inferred between member marks, as region pairs. */
-  function connectionsOf(
-    artifact: { edges: { to: string; rel: string }[] },
-    state: ReturnType<Session['getState']>,
-    regions: { id: string; nodeId: string }[]
-  ) {
-    const byNode = new Map(regions.map((r) => [r.nodeId, r.id]));
-    const out: { from: string; to: string; via?: string }[] = [];
-    for (const e of artifact.edges) {
-      if (e.rel !== 'has-part') continue;
-      const node = state.nodes.get(e.to);
-      if (!node) continue;
-      const ends = node.edges.filter((x) => x.rel === 'connects').map((x) => byNode.get(x.to)).filter(Boolean) as string[];
-      if (ends.length === 2) out.push({ from: ends[0], to: ends[1], via: byNode.get(node.id) });
-    }
-    return out;
-  }
 
   async function generate(args: {
     prompt: string;
@@ -841,12 +825,13 @@ export function createAgentParticipant(
     const regions = regionsOf(artifact, state.nodes);
     if (regions.length === 0) return { ok: false, error: 'nothing was drawn inside the artifact' };
 
-    // The diagram rung decides how this drawing compiles. A page reflows; a
-    // flowchart keeps its positions and its arrows (KEYFRAMES.md Stage 3–4).
-    const reading = session.read(regions.map((r) => r.nodeId));
-    const genre = reading.genre.genre;
-    // The brief speaks in region ids — the same names the layout, the model's
-    // reply and the DOM use — so a role placed on a mark lands on its region.
+    // The diagram rung decides how this drawing compiles — one plan, shared
+    // with the engine's own structure (parse/plan.ts). The brief speaks in
+    // region ids — the same names the layout, the model's reply and the DOM
+    // use — so a role placed on a mark lands on its region.
+    const planned = planFor(session, args.artifactId);
+    if ('error' in planned) return { ok: false, error: planned.error };
+    const reading = planned.reading;
     const regionIdOf = new Map(regions.map((r) => [r.nodeId, r.id]));
     const idOf = (id: string) => regionIdOf.get(id);
     // Concepts are matched over a scope, and a container is not a peer of what
@@ -864,34 +849,7 @@ export function createAgentParticipant(
       }
     }
     const brief = describeReading(reading, { idOf }) + (inside.length ? `\n\nWITHIN CONTAINERS:\n${inside.join('\n')}` : '');
-    let plan: { describe: string; ids: string[]; build: (c: Record<string, RegionContent>, t: Theme) => string };
-    if (genre === 'graph' || genre === 'mixed') {
-      const strokes: Record<string, Point[]> = {};
-      const arrows: Record<string, { tip: Point; tail: Point }> = {};
-      for (const r of regions) {
-        const n = state.nodes.get(r.nodeId);
-        if (!n) continue;
-        const pts = strokePointsOf(n);
-        if (pts) strokes[r.nodeId] = pts;
-        const a = getRep(n, 'reading:arrow')?.data as { tip: Point; tail: Point } | undefined;
-        if (a) arrows[r.nodeId] = a;
-      }
-      const graph = parseGraph(regions, frame, reading.roles, { strokes, arrows });
-      plan = {
-        describe: `${describeGraph(graph)}\n\n${brief}`,
-        ids: nodeIdsIn(graph),
-        build: (c, t) => buildGraphScaffold(graph, c, t),
-      };
-    } else {
-      const layout = parseLayout(regions, frame, connectionsOf(artifact, state, regions));
-      plan = {
-        describe: `${describeLayout(layout)}\n\n${brief}`,
-        // What the layout PLACES, not every mark that was drawn: a connector
-        // is an edge, and content written for a line is content thrown away.
-        ids: regionIdsIn(layout),
-        build: (c, t) => buildScaffold(layout, c, t),
-      };
-    }
+    const plan = { describe: `${planned.describe}\n\n${brief}`, ids: planned.ids, build: planned.build };
 
     // The newest fill is what the surface renders, so it is what we revise.
     const existing = [...artifact.reps].reverse().find((r) => r.modality === 'code');
@@ -979,7 +937,7 @@ export function createAgentParticipant(
       ok: true,
       code,
       revised: revising,
-      genre,
+      genre: planned.genre,
       filled,
       changed,
       unfilled: ids.filter((x) => !merged.regions[x]),

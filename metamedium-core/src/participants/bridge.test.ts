@@ -134,7 +134,7 @@ describe('routing', () => {
     const concepts = s.read(ids).concepts;
     const r = route('read', s.getState(), { concepts });
     expect(r.settledLocally).toBe(true);
-    expect(describeRoute(r)).toMatch(/Tier 0 has this/);
+    expect(describeRoute(r)).toMatch(/The canvas has this/);
   });
 
   it('does send one it cannot', () => {
@@ -146,8 +146,8 @@ describe('routing', () => {
 
   it('offers the cheapest first — local before hosted', () => {
     const s = createSession();
-    const hosted = createBridgeParticipant(s, 1000, { name: 'hosted', tier: 2 });
-    const local = createBridgeParticipant(s, 1000, { name: 'local', tier: 1 });
+    const hosted = createBridgeParticipant(s, 1000, { name: 'hosted', locality: 'hosted' });
+    const local = createBridgeParticipant(s, 1000, { name: 'local', locality: 'local' });
     const r = route('build', s.getState());
     expect(r.candidates.map((c) => c.name)).toEqual(['local', 'hosted']);
     expect(r.candidates[0].why).toMatch(/this machine/);
@@ -165,6 +165,6 @@ describe('routing', () => {
     const { s } = boardWithBridge();
     const r = route('answer', s.getState());
     expect(r.candidates.map((c) => c.name)).not.toContain('you');
-    expect(r.candidates.map((c) => c.name)).not.toContain('tier0-heuristics');
+    expect(r.candidates.map((c) => c.name)).not.toContain('engine');
   });
 });

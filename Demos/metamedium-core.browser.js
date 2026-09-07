@@ -38,6 +38,8 @@ var MetaMediumCore = (() => {
     DEFAULT_SPEED: () => DEFAULT_SPEED,
     DEFAULT_TIMEOUT_MS: () => DEFAULT_TIMEOUT_MS,
     DIRECTED_LINKS: () => DIRECTED_LINKS,
+    ENGINE_NAME: () => ENGINE_NAME,
+    ENGINE_PARTICIPANT: () => ENGINE_PARTICIPANT,
     FolderStore: () => FolderStore,
     GITHUB_API: () => GITHUB_API,
     GitStore: () => GitStore,
@@ -69,6 +71,7 @@ var MetaMediumCore = (() => {
     StaticStore: () => StaticStore,
     TARGETED: () => TARGETED,
     TIER0_PARTICIPANT: () => TIER0_PARTICIPANT,
+    TIER1_LIBRARY: () => TIER1_LIBRARY,
     VERBS: () => VERBS,
     WORD_GAP_RATIO: () => WORD_GAP_RATIO,
     WORD_WINDOW_MS: () => WORD_WINDOW_MS,
@@ -91,6 +94,7 @@ var MetaMediumCore = (() => {
     boundsOverlap: () => boundsOverlap,
     buildGraphScaffold: () => buildGraphScaffold,
     buildScaffold: () => buildScaffold,
+    buildStructure: () => buildStructure,
     bySource: () => bySource,
     byTier: () => byTier,
     calculateDistance: () => calculateDistance,
@@ -106,6 +110,7 @@ var MetaMediumCore = (() => {
     compareSignatures: () => compareSignatures,
     complete: () => complete,
     connectionsFor: () => connectionsFor,
+    connectionsOf: () => connectionsOf,
     controlOf: () => controlOf,
     convexHull: () => convexHull,
     countCorners: () => countCorners,
@@ -133,6 +138,7 @@ var MetaMediumCore = (() => {
     describeSignature: () => describeSignature,
     describeSnap: () => describeSnap,
     describeStructure: () => describeStructure,
+    describeTier1: () => describeTier1,
     disagreement: () => disagreement,
     elementsOf: () => elementsOf,
     enclosedBy: () => enclosedBy,
@@ -156,6 +162,7 @@ var MetaMediumCore = (() => {
     hasMultipleSources: () => hasMultipleSources,
     headingsOf: () => headingsOf,
     idealize: () => idealize,
+    instantFor: () => instantFor,
     intents: () => intents,
     interfacesOf: () => interfacesOf,
     interpretationsOf: () => interpretationsOf,
@@ -175,6 +182,7 @@ var MetaMediumCore = (() => {
     learnCommandMark: () => learnCommandMark,
     lettersOf: () => lettersOf,
     listModels: () => listModels,
+    localityOf: () => localityOf,
     logPathFor: () => logPathFor,
     luminance: () => luminance,
     matchBrace: () => matchBrace,
@@ -203,8 +211,10 @@ var MetaMediumCore = (() => {
     parseTranscripts: () => parseTranscripts,
     participantOfLog: () => participantOfLog,
     placed: () => placed,
+    planFor: () => planFor,
     prepare: () => prepare,
     providerLabel: () => providerLabel,
+    providerLocality: () => providerLocality,
     providerTier: () => providerTier,
     readingsToEdges: () => readingsToEdges,
     regionAt: () => regionAt,
@@ -988,11 +998,18 @@ var MetaMediumCore = (() => {
   }
   var LOCAL_PARTICIPANT = "participant:local";
   var TIER0_PARTICIPANT = "participant:tier0";
-  function createParticipantNode(id, kind, name, at, capability = 0) {
+  var ENGINE_PARTICIPANT = TIER0_PARTICIPANT;
+  var ENGINE_NAME = "engine";
+  function localityOf(node) {
+    const rep = node.reps.find((r) => r.modality === "participant");
+    const l = rep?.data?.locality;
+    return l === "local" || l === "hosted" ? l : null;
+  }
+  function createParticipantNode(id, kind, name, at, capability = 0, locality) {
     return {
       id,
       reps: [
-        { modality: "participant", data: { kind } },
+        { modality: "participant", data: locality ? { kind, locality } : { kind } },
         { modality: "word", data: name }
       ],
       edges: [],
@@ -1039,7 +1056,7 @@ var MetaMediumCore = (() => {
         createdAt: at
       })),
       createParticipantNode(LOCAL_PARTICIPANT, "human", "local", at),
-      createParticipantNode(TIER0_PARTICIPANT, "engine", "tier0-heuristics", at)
+      createParticipantNode(TIER0_PARTICIPANT, "engine", ENGINE_NAME, at)
     ];
   }
   function getRep(node, modality) {
@@ -4053,7 +4070,7 @@ ${lines.join("\n")}
   var NAME = {
     id: "name",
     label: "Name this\u2026",
-    tier: 0,
+    tier: 1,
     effect: { kind: "name" },
     hint: "hold it as a thing you can use again"
   };
@@ -4067,14 +4084,14 @@ ${lines.join("\n")}
   var tidy = (axis) => ({
     id: `tidy-${axis}`,
     label: axis === "row" ? "Line up across" : "Line up down",
-    tier: 0,
+    tier: 1,
     effect: { kind: "tidy", axis },
     hint: "align and space them evenly"
   });
   var EQUALIZE = {
     id: "equalize",
     label: "Match sizes",
-    tier: 0,
+    tier: 1,
     effect: { kind: "equalize" },
     hint: "make them the same size as the largest"
   };
@@ -4145,7 +4162,7 @@ ${lines.join("\n")}
       name: "slider",
       describes: "a knob on a track",
       conversions: [
-        { id: "control", label: "Make it a slider", tier: 0, effect: { kind: "control" }, hint: "its value is where the knob sits; drag the knob to set it" },
+        { id: "control", label: "Make it a slider", tier: 1, effect: { kind: "control" }, hint: "its value is where the knob sits; drag the knob to set it" },
         NAME
       ],
       match(scope) {
@@ -5200,7 +5217,7 @@ ${pad}</${tag}>`;
       recomputeClusterCandidates();
     }
     function applyJoin(ev) {
-      const node = createParticipantNode(nextId("participant"), ev.kind, ev.name, ev.at, ev.capability ?? 0);
+      const node = createParticipantNode(nextId("participant"), ev.kind, ev.name, ev.at, ev.capability ?? 0, ev.locality);
       nodes.set(node.id, node);
       participants.push(node.id);
       return node.id;
@@ -5830,7 +5847,7 @@ ${pad}</${tag}>`;
     }
     return {
       addStroke: (points, at, participantId, scale, options) => dispatch({ type: "stroke", points, at, participantId, scale, content: options?.content }),
-      join: (kind, name, at, capability) => dispatch({ type: "join", kind, name, at, capability }),
+      join: (kind, name, at, capability, locality) => dispatch({ type: "join", kind, name, at, capability, ...locality ? { locality } : {} }),
       propose: (args) => void dispatch({ type: "propose", ...args }),
       answer: (args) => dispatch({ type: "answer", ...args }),
       teachCommandMark: (mark, at) => void dispatch({ type: "teach", mark, at }),
@@ -5938,8 +5955,12 @@ ${pad}</${tag}>`;
   function providerLabel(config) {
     return config.label ?? `llm:${config.model}`;
   }
+  function providerLocality(config) {
+    return /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:|\/|$)/i.test(config.baseUrl) ? "local" : "hosted";
+  }
   function providerTier(config) {
-    return /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:|\/|$)/i.test(config.baseUrl) ? 1 : 2;
+    void config;
+    return 2;
   }
   function withTimeout(ms, external) {
     const ctl = new AbortController();
@@ -6038,7 +6059,7 @@ ${pad}</${tag}>`;
     return { ok: true, text, model: firstString(body.model) ?? config.model };
   }
   async function complete(config, messages, opts = {}) {
-    const timeoutMs = config.timeoutMs ?? (providerTier(config) === 1 ? LOCAL_TIMEOUT_MS : DEFAULT_TIMEOUT_MS);
+    const timeoutMs = config.timeoutMs ?? (providerLocality(config) === "local" ? LOCAL_TIMEOUT_MS : DEFAULT_TIMEOUT_MS);
     try {
       return config.kind === "anthropic" ? await completeAnthropic(config, messages, timeoutMs, opts.signal) : await completeOpenAICompatible(config, messages, timeoutMs, opts.signal);
     } catch (err) {
@@ -6059,6 +6080,95 @@ ${pad}</${tag}>`;
     } catch (err) {
       return { ok: false, models: [], error: err instanceof Error ? err.message : String(err) };
     }
+  }
+
+  // src/parse/plan.ts
+  function connectionsOf(artifact, state, regions) {
+    const byNode = new Map(regions.map((r) => [r.nodeId, r.id]));
+    const out = [];
+    for (const e of artifact.edges) {
+      if (e.rel !== "has-part") continue;
+      const node = state.nodes.get(e.to);
+      if (!node) continue;
+      const ends = node.edges.filter((x) => x.rel === "connects").map((x) => byNode.get(x.to)).filter(Boolean);
+      if (ends.length === 2) out.push({ from: ends[0], to: ends[1], via: byNode.get(node.id) });
+    }
+    return out;
+  }
+  function planFor(session, artifactId) {
+    const state = session.getState();
+    const artifact = state.nodes.get(artifactId);
+    if (!artifact) return { error: "no such artifact" };
+    const frame = frameOf(artifact);
+    if (!frame) return { error: "artifact has no frame" };
+    const regions = regionsOf(artifact, state.nodes);
+    if (regions.length === 0) return { error: "nothing was drawn inside the artifact" };
+    const reading = session.read(regions.map((r) => r.nodeId));
+    const genre = reading.genre.genre;
+    if (genre === "graph" || genre === "mixed") {
+      const strokes = {};
+      const arrows = {};
+      for (const r of regions) {
+        const n2 = state.nodes.get(r.nodeId);
+        if (!n2) continue;
+        const pts = strokePointsOf(n2);
+        if (pts) strokes[r.nodeId] = pts;
+        const a = getRep(n2, "reading:arrow")?.data;
+        if (a) arrows[r.nodeId] = a;
+      }
+      const graph = parseGraph(regions, frame, reading.roles, { strokes, arrows });
+      return { genre, regions, reading, ids: nodeIdsIn(graph), describe: describeGraph(graph), build: (c, t) => buildGraphScaffold(graph, c, t) };
+    }
+    const layout = parseLayout(regions, frame, connectionsOf(artifact, state, regions));
+    return { genre, regions, reading, ids: regionIdsIn(layout), describe: describeLayout(layout), build: (c, t) => buildScaffold(layout, c, t) };
+  }
+
+  // src/tier1/library.ts
+  var TIER1_LIBRARY = [
+    { id: "relations", name: "relations", ability: "read", does: "what the canvas can see between marks \u2014 inside, near, crossing, aligned \u2014 every threshold a ratio of their size", source: "relate/relations.ts" },
+    { id: "roles", name: "the diagram rung", ability: "read", does: "what a mark plays: container, node, edge, label, annotation", source: "diagram/roles.ts" },
+    { id: "concepts", name: "concepts", ability: "read", does: "a row, a column, a frame, a flow, a grid, a label, a slider \u2014 matched plurally, ranked", source: "concepts/concept.ts" },
+    { id: "tidy", name: "tidy", ability: "arrange", does: "line marks up and space them evenly, or match their sizes; the ink untouched", source: "session/session.ts (tidy)" },
+    { id: "clean", name: "clean forms", ability: "clean", does: "a confident, unambiguous reading redrawn from the ink's own measurements", source: "session/clean.ts" },
+    { id: "structure", name: "structure", ability: "structure", does: "a page or a diagram from the drawing \u2014 the regions in place, no words", source: "tier1/library.ts, parse/" },
+    { id: "signature", name: "signatures", ability: "name", does: "a named group recognised again by its shapes and the links between them", source: "session/signature.ts" },
+    { id: "verbs", name: "words into verbs", ability: "verbs", does: "the common ways each verb is said, read with no model", source: "behave/words.ts" },
+    { id: "library", name: "the library", ability: "reuse", does: "a brief the library already answers reuses that program", source: "kinds/, Demos/surface/09-palette.js" },
+    { id: "trace", name: "tracing", ability: "trace", does: "a picture of a sketch becomes ink", source: "image/trace.ts" },
+    { id: "measure", name: "the maths", ability: "measure", does: "what follows from a reading, as numbers", source: "session/measure.ts" },
+    { id: "fit", name: "acting out", ability: "fit", does: "a dragged path fitted onto the verb basis, the residual named", source: "behave/fit.ts" },
+    { id: "frames", name: "wiring", ability: "wire", does: "artifacts wired by their ports, connections offered by type and ranked by name", source: "frames/frame.ts" },
+    { id: "words", name: "words from letters", ability: "words", does: "printed letters gathered into one word", source: "session/words.ts" }
+  ];
+  function describeTier1() {
+    return TIER1_LIBRARY.map((m) => `${m.name} \u2014 ${m.does}`).join("\n");
+  }
+  var tagFor = (role) => role === "container" ? "section" : role === "label" ? "header" : "div";
+  function buildStructure(session, artifactId) {
+    const plan = planFor(session, artifactId);
+    if ("error" in plan) return { ok: false, error: plan.error };
+    const roleOf = new Map(plan.reading.roles.map((r) => [r.id, r.role]));
+    const regionRole = new Map(plan.regions.map((r) => [r.id, roleOf.get(r.nodeId)]));
+    const content = {};
+    for (const id of plan.ids) {
+      const role = regionRole.get(id) ?? "region";
+      content[id] = {
+        tag: tagFor(role),
+        html: `<span class="mm-slot">${id} \xB7 ${role}</span>`,
+        style: "display:flex;align-items:center;justify-content:center;border:1px dashed rgba(0,0,0,0.22);color:rgba(0,0,0,0.5);font:12px system-ui,sans-serif;min-height:0;"
+      };
+    }
+    const code = plan.build(content, { background: "#fbfaf7", color: "#3a3a3a" });
+    const check = validateRegions(code, plan.ids);
+    if (!check.ok) return { ok: false, error: `the structure does not match the drawing (missing ${check.missing.join(", ") || "none"})` };
+    return {
+      ok: true,
+      code,
+      ids: plan.ids,
+      genre: plan.genre,
+      reasoning: `${plan.genre}: ${plan.ids.length} region${plan.ids.length === 1 ? "" : "s"} from the drawing, in place, with no words \u2014 the structure only`,
+      participantId: ENGINE_PARTICIPANT
+    };
   }
 
   // src/participants/serialize.ts
@@ -6626,7 +6736,7 @@ Reply with ONLY a JSON array, no prose, no code fences.`;
   function createAgentParticipant(session, config, at = 0, options = {}) {
     const send = options.transport ?? ((c, m, o) => complete(c, m, o));
     const name = options.name ?? providerLabel(config);
-    const id = session.join("agent", name, at, options.tier ?? providerTier(config));
+    const id = session.join("agent", name, at, options.tier ?? providerTier(config), options.locality ?? providerLocality(config));
     async function interpret(nodeIds, now, signal) {
       const state = session.getState();
       const targets = nodeIds.filter((n2) => state.nodes.has(n2));
@@ -6693,18 +6803,6 @@ Question: ${q}` }
       if (!explanationId) return { ok: false, error: "the canvas did not accept the answer", text };
       return { ok: true, text, explanationId };
     }
-    function connectionsOf(artifact, state, regions) {
-      const byNode = new Map(regions.map((r) => [r.nodeId, r.id]));
-      const out = [];
-      for (const e of artifact.edges) {
-        if (e.rel !== "has-part") continue;
-        const node = state.nodes.get(e.to);
-        if (!node) continue;
-        const ends = node.edges.filter((x) => x.rel === "connects").map((x) => byNode.get(x.to)).filter(Boolean);
-        if (ends.length === 2) out.push({ from: ends[0], to: ends[1], via: byNode.get(node.id) });
-      }
-      return out;
-    }
     async function generate(args) {
       const prompt2 = args.prompt.trim();
       if (!prompt2) return { ok: false, error: "no prompt" };
@@ -6715,8 +6813,9 @@ Question: ${q}` }
       if (!frame) return { ok: false, error: "artifact has no frame" };
       const regions = regionsOf(artifact, state.nodes);
       if (regions.length === 0) return { ok: false, error: "nothing was drawn inside the artifact" };
-      const reading = session.read(regions.map((r) => r.nodeId));
-      const genre = reading.genre.genre;
+      const planned = planFor(session, args.artifactId);
+      if ("error" in planned) return { ok: false, error: planned.error };
+      const reading = planned.reading;
       const regionIdOf = new Map(regions.map((r) => [r.nodeId, r.id]));
       const idOf = (id2) => regionIdOf.get(id2);
       const inside = [];
@@ -6734,38 +6833,9 @@ Question: ${q}` }
 
 WITHIN CONTAINERS:
 ${inside.join("\n")}` : "");
-      let plan;
-      if (genre === "graph" || genre === "mixed") {
-        const strokes = {};
-        const arrows = {};
-        for (const r of regions) {
-          const n2 = state.nodes.get(r.nodeId);
-          if (!n2) continue;
-          const pts = strokePointsOf(n2);
-          if (pts) strokes[r.nodeId] = pts;
-          const a = getRep(n2, "reading:arrow")?.data;
-          if (a) arrows[r.nodeId] = a;
-        }
-        const graph = parseGraph(regions, frame, reading.roles, { strokes, arrows });
-        plan = {
-          describe: `${describeGraph(graph)}
+      const plan = { describe: `${planned.describe}
 
-${brief}`,
-          ids: nodeIdsIn(graph),
-          build: (c, t) => buildGraphScaffold(graph, c, t)
-        };
-      } else {
-        const layout = parseLayout(regions, frame, connectionsOf(artifact, state, regions));
-        plan = {
-          describe: `${describeLayout(layout)}
-
-${brief}`,
-          // What the layout PLACES, not every mark that was drawn: a connector
-          // is an edge, and content written for a line is content thrown away.
-          ids: regionIdsIn(layout),
-          build: (c, t) => buildScaffold(layout, c, t)
-        };
-      }
+${brief}`, ids: planned.ids, build: planned.build };
       const existing = [...artifact.reps].reverse().find((r) => r.modality === "code");
       const previous = existing?.data?.fill;
       const revising = !!previous;
@@ -6835,7 +6905,7 @@ ${brief}`,
         ok: true,
         code,
         revised: revising,
-        genre,
+        genre: planned.genre,
         filled,
         changed,
         unfilled: ids.filter((x) => !merged.regions[x]),
@@ -7030,7 +7100,8 @@ The canvas already read: ${describeBehaviour({ terms: local.terms })}. Read the 
     const agent = createAgentParticipant(session, config, at, {
       transport,
       name,
-      tier: options.tier ?? 2
+      tier: options.tier ?? 2,
+      locality: options.locality ?? "hosted"
     });
     return {
       ...agent,
@@ -7053,17 +7124,21 @@ The canvas already read: ${describeBehaviour({ terms: local.terms })}. Read the 
   }
 
   // src/participants/router.ts
-  var TIER0_ABILITIES = {
+  var SETTLED_BY_TIER1 = {
     read: true,
     arrange: true,
     answer: false,
     build: false,
     name: false
   };
+  function instantFor(ability) {
+    const id = ability === "read" ? "concepts" : ability === "arrange" ? "tidy" : ability === "build" ? "structure" : ability === "name" ? "signature" : null;
+    return id ? TIER1_LIBRARY.find((m) => m.id === id) : void 0;
+  }
   var SETTLED_CONFIDENCE = 0.6;
   function route(ability, state, options = {}) {
     const top = options.concepts?.[0];
-    const settledLocally = TIER0_ABILITIES[ability] && !!top && top.confidence >= SETTLED_CONFIDENCE;
+    const settledLocally = SETTLED_BY_TIER1[ability] && !!top && top.confidence >= SETTLED_CONFIDENCE;
     const ids = options.participantIds ?? state.participants;
     const candidates = [];
     for (const pid of ids) {
@@ -7072,28 +7147,34 @@ The canvas already read: ${describeBehaviour({ terms: local.terms })}. Read the 
       const kind = node.reps.find((r) => r.modality === "participant")?.data?.kind;
       if (kind !== "agent") continue;
       const tier = node.capability ?? 0;
+      const locality = localityOf(node);
       candidates.push({
         participantId: pid,
         name: wordOf(node) ?? pid,
         tier,
         // Local before hosted: on a machine you own, latency is the only price,
-        // and it is one you have already paid for.
-        cost: tier,
-        why: tier === 1 ? "runs on this machine" : "hosted"
+        // and it is one you have already paid for. Locality is a cost, not a tier.
+        cost: locality === "local" ? 1 : 2,
+        why: locality === "local" ? "runs on this machine" : "hosted",
+        ...locality ? { locality } : {}
       });
     }
     candidates.sort((a, b) => a.cost - b.cost || a.name.localeCompare(b.name));
+    const instant = instantFor(ability);
     return {
       ability,
       settledLocally,
       localAnswer: settledLocally ? `${top.concept} (${top.confidence.toFixed(2)}) \u2014 ${top.reasoning}` : void 0,
-      candidates
+      candidates,
+      ...instant ? { instant } : {}
     };
   }
   function describeRoute(r) {
-    if (r.settledLocally) return `Tier 0 has this: ${r.localAnswer}`;
-    if (r.candidates.length === 0) return `Nothing here can ${r.ability} \u2014 add a model, or bridge one in.`;
-    return `${r.ability}: ${r.candidates.map((c) => `${c.name} (tier ${c.tier})`).join(", ")}`;
+    if (r.settledLocally) return `The canvas has this (tier 1): ${r.localAnswer}`;
+    if (r.candidates.length === 0) {
+      return r.instant ? `Tier 1 can ${r.instant.does.split(" \u2014 ")[0]}; nothing here can ${r.ability} beyond that \u2014 add a model, or bridge one in.` : `Nothing here can ${r.ability} \u2014 add a model, or bridge one in.`;
+    }
+    return `${r.ability}: ${r.candidates.map((c) => `${c.name} (tier ${c.tier}${c.locality ? ", " + c.locality : ""})`).join(", ")}`;
   }
   return __toCommonJS(index_exports);
 })();

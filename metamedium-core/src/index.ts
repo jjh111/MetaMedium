@@ -59,6 +59,9 @@ export {
   BUILTIN_TYPES,
   LOCAL_PARTICIPANT,
   TIER0_PARTICIPANT,
+  ENGINE_PARTICIPANT,
+  ENGINE_NAME,
+  localityOf,
 } from './session/nodes';
 export type { MMNode, Rep, Edge, Capability, ParticipantKind, ExplanationData, Transcript } from './session/nodes';
 
@@ -236,10 +239,19 @@ export {
 } from './session/interpretations';
 export type { Interpretation, InterpretationGroup, Disagreement } from './session/interpretations';
 
-// LLM transport (Tier 1–2). One client covers Ollama / LM Studio / OpenRouter;
-// Anthropic has its own. Failures are returned, never thrown.
-export { complete, listModels, providerLabel, providerTier, stripThink, textOf, PRESETS, DEFAULT_TIMEOUT_MS, LOCAL_TIMEOUT_MS } from './llm/provider';
-export type { ProviderConfig, ProviderKind, ChatMessage, ContentPart, CompletionResult, ModelList } from './llm/provider';
+// LLM transport (tier 2 — every model; local or hosted is a cost, not a tier).
+// One client covers Ollama / LM Studio / OpenRouter; Anthropic has its own.
+// Failures are returned, never thrown.
+export { complete, listModels, providerLabel, providerTier, providerLocality, stripThink, textOf, PRESETS, DEFAULT_TIMEOUT_MS, LOCAL_TIMEOUT_MS } from './llm/provider';
+export type { ProviderConfig, ProviderKind, ChatMessage, ContentPart, CompletionResult, ModelList, Locality } from './llm/provider';
+
+// Tier 1 — the engine's instant library: what answers with no model and no
+// wait, as a registry a surface and the router read; and the structure of a
+// drawing built from it, with no words.
+export { TIER1_LIBRARY, describeTier1, buildStructure } from './tier1/library';
+export type { InstantModule, InstantAbility, StructureResult } from './tier1/library';
+export { planFor, connectionsOf } from './parse/plan';
+export type { Plan } from './parse/plan';
 
 // Agent participants — a model joins through the same channel a human uses.
 export { createAgentParticipant, parseReadings, parseCode, parseFill, parseTranscripts, parseBehaviourReply, parseProgram, readingsToEdges, MAX_READINGS } from './participants/agent';
@@ -254,8 +266,8 @@ export type { Transport, AgentOptions } from './participants/agent';
 export { createBridgeParticipant } from './participants/bridge';
 export type { BridgeParticipant, BridgeRequest, BridgeOptions } from './participants/bridge';
 
-// Routing — Tier 0 answers first, and a model is asked only for what it cannot.
-export { route, describeRoute, SETTLED_CONFIDENCE } from './participants/router';
+// Routing — the canvas (tiers 0 and 1) answers first, and a model is asked only for what it cannot.
+export { route, describeRoute, instantFor, SETTLED_CONFIDENCE } from './participants/router';
 export type { Ability, Route, Candidate, RouteOptions } from './participants/router';
 export type { SerializeOptions } from './participants/serialize';
 

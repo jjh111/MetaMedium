@@ -103,7 +103,7 @@
       for (const m of sv.models) {
         const on = isJoined(sv.baseUrl, m);
         html += '<button class="model' + (on ? ' on' : '') + '" data-base="' + esc(sv.baseUrl) + '" data-model="' + esc(m) + '">' +
-          '<span>' + esc(m) + '</span><span class="why">' + (on ? 'joined' : 'tier 1' + (sv.vision.includes(m) ? ' · sees' : '') + ' · tap to join') + '</span></button>';
+          '<span>' + esc(m) + '</span><span class="why">' + (on ? 'joined' : 'local' + (sv.vision.includes(m) ? ' · sees' : '') + ' · tap to join') + '</span></button>';
       }
       if (!sv.models.length && sv.skipped.length) {
         html += '<div class="note">only embedding models here — they cannot chat</div>';
@@ -126,11 +126,12 @@
       mpStatus.textContent = config.model + ' is already here.';
       return null;
     }
-    // Several models may run in the same tier — that is the point.
+    // Several models may run at once — that is the point. Every model is
+    // tier 2; local or hosted is a cost the router pays attention to.
     const agent = MM.createAgentParticipant(session, config, Date.now());
     agents.push(agent);
     if (pick) store.set(PICK_KEY, Object.assign({ baseUrl: config.baseUrl, model: config.model, kind: config.kind }, pick));
-    mpStatus.textContent = agent.name + ' joined (tier ' + MM.providerTier(config) + (config.vision ? ', sees' : '') + ').';
+    mpStatus.textContent = agent.name + ' joined (' + MM.providerLocality(config) + (config.vision ? ', sees' : '') + ').';
     renderAgents();
     renderLocal();
     syncTiles();
@@ -156,7 +157,7 @@
   function renderAgents() {
     mpList.innerHTML = agents.map((a, i) =>
       '<div class="mpItem"><span>' + esc(a.name) + '</span>' +
-      '<span class="t">tier ' + MM.providerTier(a.config) + (a.config.vision ? ' · sees' : '') + '</span>' +
+      '<span class="t">' + MM.providerLocality(a.config) + (a.config.vision ? ' · sees' : '') + '</span>' +
       '<button class="ghost" data-leave="' + i + '">leave</button></div>'
     ).join('');
     mpList.querySelectorAll('[data-leave]').forEach((b) => { b.onclick = () => leave(agents[Number(b.dataset.leave)]); });

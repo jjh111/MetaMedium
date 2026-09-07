@@ -15,13 +15,13 @@ import {
 import { circleStroke, lineStroke, checkStroke } from '../test/strokes';
 
 describe('participants are nodes', () => {
-  it('every session starts with the local human and the tier-0 heuristics', () => {
+  it('every session starts with the local human and the engine', () => {
     const s = createSession();
     const state = s.getState();
     expect(state.participants).toEqual([LOCAL_PARTICIPANT, TIER0_PARTICIPANT]);
     expect(isParticipant(state.nodes.get(LOCAL_PARTICIPANT)!)).toBe(true);
     // The medium is itself a participant.
-    expect(wordOf(state.nodes.get(TIER0_PARTICIPANT)!)).toBe('tier0-heuristics');
+    expect(wordOf(state.nodes.get(TIER0_PARTICIPANT)!)).toBe('engine');
   });
 
   it('join registers an agent as a node in the graph', () => {

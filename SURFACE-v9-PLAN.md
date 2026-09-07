@@ -244,6 +244,19 @@ table could not read. Nothing on draw, nothing on summon, nothing on join.
 An *auto-read* tile in the control centre restores reading handwriting as
 it is written, off by default.
 
+**6.5 Tiers, redressed (6 Sep, evening).** A tier is a kind of knowing,
+not a place. **Tier 0** is the shape rung. **Tier 1** is the engine's
+instant library — a registry (`src/tier1/library.ts`) of the modules that
+answer with no model and no wait: relations, the diagram rung, concepts,
+tidy, clean forms, *the structure*, signatures, verbs, the program library,
+tracing, the maths, acting out, wiring, words. **Tier 2** is a model, local
+or hosted; locality is a cost the router pays, not a tier. The surface says
+which tier answers before Enter: *↵ the structure at once (tier 1), then GLM
+writes the words*. **Fallback is graceful, never fake**: with no model, a
+brief on a layout builds the structure — every region in place, labelled
+with its id and what it plays, no words — and the status says to join a
+model for the words; a program with no model is refused, not invented.
+
 **6.4 The frame.** One bar: the wordmark and the panel toggle on the left;
 the mark chip, undo and the control centre on the right. The centre is a
 grid of tiles that keep their slots: zoom, snap, view (canvas · grid),
@@ -257,6 +270,7 @@ so ink and chrome never disagree.
 | # | Package | Done when |
 |---|---|---|
 | S7 | **Gate** ✅ | No model call without one of the acts in 6.3; the e2e counts calls |
+| S8 | **Tiers redressed** ✅ | Tier 0 shape · tier 1 the instant library (a registry, 14 modules) · tier 2 models with locality as cost; the structure stands first and a model's words follow; no fake output anywhere |
 | S1 | **The frame** ✅ | One bar, the control centre, blurbs out, theme and hand as tiles |
 | S2 | **One field** ✅ | The reading line; the four core slots never move; every verb reachable by typing |
 | S3 | **Matches as chips** ✅ | *name 0.92* beside a matching group; a tap on it opens the field with the match leading (`summonMarks`); the sentence is gone |

@@ -153,9 +153,9 @@ describe('several participants may answer the same question', () => {
     expect(state.explanations).toContain(ra.explanationId);
     expect(state.explanations).toContain(rb.explanationId);
 
-    // Two voices, two tiers, same question — both on the record.
+    // Two voices, one tier (a model is a model), same question — both on the record.
     const tiers = state.explanations.map((id) => state.nodes.get(id)!.capability);
-    expect(tiers.sort()).toEqual([1, 2]);
+    expect(tiers.sort()).toEqual([2, 2]);
   });
 });
 
@@ -212,7 +212,7 @@ describe('the question is grounded in the graph', () => {
 
     expect(sent).toContain('straightness');
     expect(sent).toContain('relations');
-    expect(sent).toContain('tier0-heuristics');
+    expect(sent).toContain('engine');
     expect(sent).toContain('CITE THE EVIDENCE');
     expect(sent).toContain('Question: why these?');
     expect(sent.toLowerCase()).not.toContain('base64');

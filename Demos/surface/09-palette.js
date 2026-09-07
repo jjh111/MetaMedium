@@ -41,7 +41,7 @@
         key: 'sug:' + sug.id, certain: true, group: 'known', groupConf: sug.score || 1,
         groupWhy: 'you named this shape before',
         label: sug.label + ' ' + (sug.score || 1).toFixed(2), name: sug.label,
-        why: (sug.reasoning || 'like the one you named') + ' — take it as another ' + sug.label, tier: 0,
+        why: (sug.reasoning || 'like the one you named') + ' — take it as another ' + sug.label, tier: 1,
         run: () => {
           const made = session.bless({ summonId: sum.id, suggestionId: sug.id, at: Date.now() });
           // A definition that holds a program hands it to its instance: a
@@ -54,7 +54,7 @@
       // making is a mode, and the correction is what teaches it (WP-12).
       items.push({
         key: 'not:' + sug.id, group: 'always', groupConf: 0, groupWhy: '', verbs: ['not', 'not a'],
-        label: 'Not a ' + sug.label, why: 'remembered — a group like this is not offered as one again', tier: 0,
+        label: 'Not a ' + sug.label, why: 'remembered — a group like this is not offered as one again', tier: 1,
         run: () => {
           session.correct({ ids: sum.enclosedIds.slice(), definitionId: sug.artifactId, verdict: 'is-not', at: Date.now() });
           refreshPalette(); // the summon stays open; the refused offer is gone from it
@@ -70,7 +70,7 @@
           key: 'said:' + r.id, certain: true, group: 'written', groupConf: t.confidence,
           groupWhy: 'read from your handwriting by ' + nameOfParticipant(t.source),
           label: '“' + t.text + '” ' + t.confidence.toFixed(2), name: t.text,
-          why: (r.targets.length ? 'the word beside it' : 'the word you wrote') + ' — take it as the name', tier: 0,
+          why: (r.targets.length ? 'the word beside it' : 'the word you wrote') + ' — take it as the name', tier: 1,
           run: () => session.bless({ summonId: sum.id, name: t.text, at: Date.now() }),
         });
       }
@@ -95,7 +95,7 @@
           key: 'proposed:' + r.label, certain: true, group: 'proposed', groupConf: r.weight,
           groupWhy: 'read this way by ' + r.sourceName,
           label: r.label + ' ' + r.weight.toFixed(2) + ' · ' + r.sourceName, name: r.label,
-          why: r.sourceName + (r.reasoning ? ' — ' + r.reasoning.slice(0, 80) : '') + ' — take it as the name', tier: 0,
+          why: r.sourceName + (r.reasoning ? ' — ' + r.reasoning.slice(0, 80) : '') + ' — take it as the name', tier: 1,
           run: () => session.bless({ summonId: sum.id, name: r.label, at: Date.now() }),
         });
       });
@@ -106,7 +106,7 @@
       items.push({
         key: 'concept:' + concept.concept, certain: true, group: 'concept', groupConf: concept.confidence,
         groupWhy: concept.reasoning, label: concept.concept + ' ' + concept.confidence.toFixed(2), name: concept.concept,
-        why: concept.reasoning + ' — take it as the name', tier: 0,
+        why: concept.reasoning + ' — take it as the name', tier: 1,
         run: () => session.bless({ summonId: sum.id, name: concept.concept, at: Date.now() }),
       });
     });
@@ -138,7 +138,7 @@
         key: 'snap', group: 'clean', groupConf: offers.reduce((a, o) => a + o.weight, 0) / offers.length,
         groupWhy: 'each reads confidently as one shape', verbs: ['clean', 'snap', 'draw clean'],
         label: all ? 'Draw them clean' : 'Draw ' + offers.length + ' of ' + sum.enclosedIds.length + ' clean',
-        why: shapesSummary(offers) + ' · ink kept', tier: 0,
+        why: shapesSummary(offers) + ' · ink kept', tier: 1,
         run: () => { shownSummonId = null; snapAll(offers.map((o) => o.id), shapesSummary(offers)); },
       });
     }
@@ -149,7 +149,7 @@
       if (!said) continue;
       items.push({
         key: 'word-text:' + lid, group: 'always', groupConf: 0, groupWhy: '', verbs: ['text'],
-        label: 'Make it text “' + said + '”', why: 'a file of words where the writing is; the ink stays', tier: 0,
+        label: 'Make it text “' + said + '”', why: 'a file of words where the writing is; the ink stays', tier: 1,
         run: () => { session.dismiss(sum.id, Date.now()); wordToText(lid); },
       });
     }
@@ -162,7 +162,7 @@
         if (arts.length >= 2 || wiring.length) {
           items.push({
             key: 'frame', group: 'always', groupConf: 0, groupWhy: '', verbs: ['frame', 'wire'],
-            label: 'Frame these', why: wiring.length ? wiring.length + ' connection' + (wiring.length === 1 ? '' : 's') + ': ' + wiring.map((c) => c.from.port + ' → ' + c.to.port).join(', ') : arts.length + ' artifacts, nothing to wire yet', tier: 0,
+            label: 'Frame these', why: wiring.length ? wiring.length + ' connection' + (wiring.length === 1 ? '' : 's') + ': ' + wiring.map((c) => c.from.port + ' → ' + c.to.port).join(', ') : arts.length + ' artifacts, nothing to wire yet', tier: 1,
             run: () => { const f = fieldInput(); const v = f ? f.value.trim().replace(/^frame\s*:?\s*/i, '') : ''; makeFrame(sum, v); },
           });
         }
@@ -170,7 +170,7 @@
           const name = MM.wordOf(tpl.frame) || tpl.frame.id;
           items.push({
             key: 'frame-like:' + tpl.frame.id, group: tpl.how === 'name' ? 'written' : 'known', groupConf: tpl.how === 'name' ? 0.95 : 0.8,
-            groupWhy: tpl.why, label: 'Frame these like “' + name + '”', why: 'the same wiring, on these', tier: 0,
+            groupWhy: tpl.why, label: 'Frame these like “' + name + '”', why: 'the same wiring, on these', tier: 1,
             run: () => frameLike(sum, tpl.frame),
           });
         }
@@ -187,7 +187,7 @@
         items.push({
           key: 'use-behaviour:' + defId + ':' + i, group: 'proposed', groupConf: typeof r.data.residual === 'number' ? 1 - r.data.residual : 0.7,
           groupWhy: (r.data.source === 'demo' ? 'acted out' : 'read by ' + nameOfParticipant(r.source)),
-          label: name + ': ' + MM.describeBehaviour(r.data), why: 'give it in your name', tier: 0,
+          label: name + ': ' + MM.describeBehaviour(r.data), why: 'give it in your name', tier: 1,
           run: () => session.behave({ nodeId: defId, behaviour: { terms: r.data.terms, source: r.data.source, speed: r.data.speed }, participantId: MM.LOCAL_PARTICIPANT, at: Date.now() }),
         });
       });
@@ -199,7 +199,7 @@
         if (!parsed.behaviour) continue;
         items.push({
           key: 'behave-said:' + defId + ':' + lid, group: 'written', groupConf: 0.9, groupWhy: 'read from your handwriting',
-          label: name + ': ' + MM.describeBehaviour(parsed.behaviour), why: 'the words beside it, as what it does', tier: 0,
+          label: name + ': ' + MM.describeBehaviour(parsed.behaviour), why: 'the words beside it, as what it does', tier: 1,
           run: () => session.behave({ nodeId: defId, behaviour: parsed.behaviour, participantId: MM.LOCAL_PARTICIPANT, at: Date.now() }),
         });
       }
@@ -208,12 +208,12 @@
         key: 'clock:' + defId, group: 'always', groupConf: 0, groupWhy: '',
         verbs: c && c.playing ? ['pause', 'stop', 'hold'] : ['play', 'run', 'start', 'go'],
         label: (c && c.playing ? 'Pause ' : 'Play ') + name,
-        why: c && c.playing ? 'hold every ' + name + ' where it is' : 'let every ' + name + ' move', tier: 0,
+        why: c && c.playing ? 'hold every ' + name + ' where it is' : 'let every ' + name + ' move', tier: 1,
         run: () => session.clock({ nodeId: defId, op: c && c.playing ? 'pause' : 'play', at: Date.now() }),
       });
       if (c) items.push({
         key: 'reset:' + defId, group: 'always', groupConf: 0, groupWhy: '', verbs: ['reset', 'rewind'],
-        label: 'Reset ' + name, why: 'back to t = 0, where they were drawn', tier: 0,
+        label: 'Reset ' + name, why: 'back to t = 0, where they were drawn', tier: 1,
         run: () => session.clock({ nodeId: defId, op: 'reset', at: Date.now() }),
       });
     }
@@ -237,12 +237,12 @@
     if (marks.length) {
       items.push({
         key: 'duplicate', group: 'hidden', groupConf: 0, groupWhy: '', verbs: ['dup', 'duplicate', 'double'],
-        label: 'Duplicate ' + (marks.length === 1 ? 'it' : 'these'), why: 'a copy of the ink beside it, selected', tier: 0,
+        label: 'Duplicate ' + (marks.length === 1 ? 'it' : 'these'), why: 'a copy of the ink beside it, selected', tier: 1,
         run: () => duplicateMarks(sum, marks),
       });
       items.push({
         key: 'keep', group: 'hidden', groupConf: 0, groupWhy: '', verbs: ['keep', 'keep as drawing'],
-        label: 'Keep as drawing', why: 'leave the marks as they are', tier: 0,
+        label: 'Keep as drawing', why: 'leave the marks as they are', tier: 1,
         run: () => {
           const keep = sum.suggestions.find((x) => x.kind === 'keep-as-drawing');
           if (keep) session.bless({ summonId: sum.id, suggestionId: keep.id, at: Date.now() });
@@ -319,13 +319,13 @@
     const marks = selectionMarks(s);
     const sum = s.summon;
     return [
-      { key: 'name', core: true, label: 'Name…', verbs: [], why: 'Name — hold it as a thing you can use again; type the name', disabled: !marks.length && !(sum && sum.onArtifact), tier: 0,
+      { key: 'name', core: true, label: 'Name…', verbs: [], why: 'Name — hold it as a thing you can use again; type the name', disabled: !marks.length && !(sum && sum.onArtifact), tier: 1,
         run: () => { const f = fieldInput(); if (f) { f.value = 'name: '; paintField(f.value); f.focus(); f.setSelectionRange(f.value.length, f.value.length); } } },
-      { key: 'copy', core: true, label: 'Copy', verbs: ['copy', 'cp'], why: 'Copy — hold the ink to paste; it is on the clipboard as SVG too', disabled: !marks.length, tier: 0,
+      { key: 'copy', core: true, label: 'Copy', verbs: ['copy', 'cp'], why: 'Copy — hold the ink to paste; it is on the clipboard as SVG too', disabled: !marks.length, tier: 1,
         run: () => copyMarks(marks) },
-      { key: 'paste', core: true, label: 'Paste', verbs: ['paste'], why: clip ? 'Paste — the copied ink, beside these' : 'Paste — nothing copied yet', disabled: !clip, tier: 0,
+      { key: 'paste', core: true, label: 'Paste', verbs: ['paste'], why: clip ? 'Paste — the copied ink, beside these' : 'Paste — nothing copied yet', disabled: !clip, tier: 1,
         run: () => { if (!clip) return; const b = selectionBounds(s) || (marks.length ? union(marks.map((id) => MM.boundsOf(s.nodes.get(id))).filter(Boolean)) : null); if (sum) session.dismiss(sum.id, Date.now()); pasteClip(b ? { x: b.maxX + wpx(40), y: b.minY } : screenToWorld(innerWidth / 2, innerHeight / 2)); } },
-      { key: 'erase', core: true, label: 'Erase', verbs: ['erase', 'delete', 'del', 'remove', 'rm'], why: 'Erase — the ink stays in the log; undo brings it back', disabled: !marks.length, tier: 0,
+      { key: 'erase', core: true, label: 'Erase', verbs: ['erase', 'delete', 'del', 'remove', 'rm'], why: 'Erase — the ink stays in the log; undo brings it back', disabled: !marks.length, tier: 1,
         run: () => { const at = Date.now(); if (sum) session.dismiss(sum.id, at); marks.forEach((id) => session.erase(id, at)); flash('erased ' + marks.length + ' mark' + (marks.length === 1 ? '' : 's')); } },
     ];
   }
@@ -455,11 +455,17 @@
         } };
       }
     }
-    // The brief.
-    if (!agents.length) return needsModel('building');
-    if (revising) return { kind: 'brief', line: '↵ ' + who() + ' changes what the loop covers', run: () => runPrompt(sum, text, true) };
+    // The brief. Tier 1 builds the structure of a page or a diagram at once,
+    // with no words; tier 2 — a model — writes the words, and a program.
+    if (revising) return agents.length ? { kind: 'brief', line: '↵ ' + who() + ' changes what the loop covers', run: () => runPrompt(sum, text, true) } : needsModel('changing a page');
     const want = targetOf(sum, text);
-    return { kind: 'brief', line: '↵ ' + who() + (want.target === 'page' ? ' builds a page' : ' writes a program'), run: () => runPrompt(sum, text, false) };
+    if (want.target === 'page') {
+      return agents.length
+        ? { kind: 'brief', line: '↵ the structure at once (tier 1), then ' + who() + ' writes the words', run: () => runPrompt(sum, text, false) }
+        : { kind: 'structure', line: '↵ the structure, at once (tier 1) — join a model for the words', run: () => runPrompt(sum, text, false) };
+    }
+    if (!agents.length) return needsModel('writing a program');
+    return { kind: 'brief', line: '↵ ' + who() + ' writes a program', run: () => runPrompt(sum, text, false) };
 
     function needsModel(what) {
       return { kind: 'blocked', line: '↵ ' + what + ' needs a model — controls › models', quiet: true, run: () => offerModel(what[0].toUpperCase() + what.slice(1) + ' needs a model.') };
@@ -745,6 +751,14 @@
       artifactId = session.bless({ summonId: sum.id, name: name, at: at });
       addressed = undefined;
       if (!artifactId) { say('could not hold that group'); return; }
+      // Tier 1 first: the structure stands at once, in the engine's name —
+      // every region in place, no words. It is what the canvas knows. A model
+      // then writes the words into it; with none joined, this is the page.
+      const structure = MM.buildStructure(session, artifactId);
+      if (structure.ok) {
+        session.attachCode({ participantId: structure.participantId, nodeId: artifactId, kind: 'html', code: structure.code, prompt: brief, at: at + 1 });
+        if (!agents.length) { say('the structure (tier 1): ' + structure.ids.join(', ') + ' — join a model for the words'); return; }
+      } else if (!agents.length) { say('could not build the structure: ' + structure.error); return; }
     }
 
     // What the human typed outranks a reading nobody asked for.

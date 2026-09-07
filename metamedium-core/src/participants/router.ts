@@ -1,10 +1,11 @@
 // Who gets asked, and whether anyone needs to be.
 //
-// The rule the rest of the engine already follows, made explicit: **Tier 0
-// answers first, and a model is asked only for what Tier 0 cannot do.** Shape,
-// insideness, nearness, alignment, layout structure — those are measurements the
-// canvas holds. Sending them to a model is slower, less reliable, costs
-// something, and produces an answer the engine already had.
+// The rule the rest of the engine already follows, made explicit: **the
+// canvas answers first — tier 0 (the shape rung) and tier 1 (the instant
+// library, tier1/library.ts) — and a model (tier 2) is asked only for what
+// they cannot do.** Shape, insideness, nearness, alignment, layout structure —
+// those are measurements the canvas holds. Sending them to a model is slower,
+// less reliable, costs something, and produces an answer the engine already had.
 //
 // What is left over is genuinely a model's work: naming a thing in a way a
 // person would recognise, writing the words that go in a box, explaining a
@@ -19,6 +20,8 @@ import type { Capability } from '../session/nodes';
 import type { SessionState } from '../session/session';
 import { wordOf } from '../session/nodes';
 import type { ConceptMatch } from '../concepts/concept';
+import { localityOf } from '../session/nodes';
+import { TIER1_LIBRARY, type InstantModule } from '../tier1/library';
 
 /** The kinds of work a participant can be asked for. */
 export type Ability =
@@ -40,6 +43,8 @@ export interface Candidate {
   /** Lower is cheaper to ask: local before hosted, engine before either. */
   cost: number;
   why: string;
+  /** Where it runs, when it said. */
+  locality?: 'local' | 'hosted';
 }
 
 export interface Route {
@@ -53,16 +58,28 @@ export interface Route {
   localAnswer?: string;
   /** Everyone who could answer, cheapest first. Empty is a normal outcome. */
   candidates: Candidate[];
+  /**
+   * The tier-1 module that answers this at once, fully (read, arrange) or in
+   * part (build: the structure without the words; name: a signature the
+   * library already holds). A surface says it before asking anyone.
+   */
+  instant?: InstantModule;
 }
 
-/** What the engine can do unaided. */
-const TIER0_ABILITIES: Record<Ability, boolean> = {
+/** Which of the askable abilities the instant library settles on its own. */
+const SETTLED_BY_TIER1: Record<Ability, boolean> = {
   read: true,
   arrange: true,
   answer: false,
   build: false,
   name: false,
 };
+
+/** The tier-1 module for an ability, when one applies. */
+export function instantFor(ability: Ability): InstantModule | undefined {
+  const id = ability === 'read' ? 'concepts' : ability === 'arrange' ? 'tidy' : ability === 'build' ? 'structure' : ability === 'name' ? 'signature' : null;
+  return id ? TIER1_LIBRARY.find((m) => m.id === id) : undefined;
+}
 
 /**
  * How confident a Tier 0 reading has to be before asking a model about it is
@@ -81,7 +98,7 @@ export interface RouteOptions {
 export function route(ability: Ability, state: SessionState, options: RouteOptions = {}): Route {
   const top = options.concepts?.[0];
   const settledLocally =
-    TIER0_ABILITIES[ability] && !!top && top.confidence >= SETTLED_CONFIDENCE;
+    SETTLED_BY_TIER1[ability] && !!top && top.confidence >= SETTLED_CONFIDENCE;
 
   const ids = options.participantIds ?? state.participants;
   const candidates: Candidate[] = [];
@@ -92,19 +109,22 @@ export function route(ability: Ability, state: SessionState, options: RouteOptio
     const kind = (node.reps.find((r) => r.modality === 'participant')?.data as { kind?: string } | undefined)?.kind;
     if (kind !== 'agent') continue; // humans and the engine are not "asked"
     const tier = node.capability ?? 0;
+    const locality = localityOf(node);
     candidates.push({
       participantId: pid,
       name: wordOf(node) ?? pid,
       tier,
       // Local before hosted: on a machine you own, latency is the only price,
-      // and it is one you have already paid for.
-      cost: tier,
-      why: tier === 1 ? 'runs on this machine' : 'hosted',
+      // and it is one you have already paid for. Locality is a cost, not a tier.
+      cost: locality === 'local' ? 1 : 2,
+      why: locality === 'local' ? 'runs on this machine' : 'hosted',
+      ...(locality ? { locality } : {}),
     });
   }
 
   candidates.sort((a, b) => a.cost - b.cost || a.name.localeCompare(b.name));
 
+  const instant = instantFor(ability);
   return {
     ability,
     settledLocally,
@@ -112,6 +132,7 @@ export function route(ability: Ability, state: SessionState, options: RouteOptio
       ? `${top!.concept} (${top!.confidence.toFixed(2)}) — ${top!.reasoning}`
       : undefined,
     candidates,
+    ...(instant ? { instant } : {}),
   };
 }
 
@@ -123,7 +144,11 @@ export function route(ability: Ability, state: SessionState, options: RouteOptio
  * answer than silence.
  */
 export function describeRoute(r: Route): string {
-  if (r.settledLocally) return `Tier 0 has this: ${r.localAnswer}`;
-  if (r.candidates.length === 0) return `Nothing here can ${r.ability} — add a model, or bridge one in.`;
-  return `${r.ability}: ${r.candidates.map((c) => `${c.name} (tier ${c.tier})`).join(', ')}`;
+  if (r.settledLocally) return `The canvas has this (tier 1): ${r.localAnswer}`;
+  if (r.candidates.length === 0) {
+    return r.instant
+      ? `Tier 1 can ${r.instant.does.split(' — ')[0]}; nothing here can ${r.ability} beyond that — add a model, or bridge one in.`
+      : `Nothing here can ${r.ability} — add a model, or bridge one in.`;
+  }
+  return `${r.ability}: ${r.candidates.map((c) => `${c.name} (tier ${c.tier}${c.locality ? ', ' + c.locality : ''})`).join(', ')}`;
 }

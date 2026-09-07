@@ -174,8 +174,8 @@ describe('concepts', () => {
 
   it('offers conversions the engine can do alone, not only ones needing a model', () => {
     const row = rowOfThree().read().concepts.find((c) => c.concept === 'row')!;
-    const tier0 = row.conversions.filter((c) => c.tier === 0);
-    expect(tier0.map((c) => c.id)).toEqual(expect.arrayContaining(['tidy-row', 'equalize', 'name']));
+    const instant = row.conversions.filter((c) => c.tier === 1);
+    expect(instant.map((c) => c.id)).toEqual(expect.arrayContaining(['tidy-row', 'equalize', 'name']));
   });
 
   it('says nothing about a single mark that relates to nothing', () => {

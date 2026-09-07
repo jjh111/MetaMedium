@@ -37,6 +37,18 @@ what it resembles, and who made it.
 
 Tier 0 had to work first for exactly this reason. It does now.
 
+> **Redressed, 6 September 2026.** The tiers below were written when a local
+> model was "tier 1" and a hosted one "tier 2". That made a tier a *place*.
+> Now a tier is a kind of knowing: **tier 0** the shape rung, **tier 1** the
+> engine's instant library (`src/tier1/library.ts` — relations, the diagram
+> rung, concepts, tidy, clean forms, the structure, signatures, verbs, the
+> program library, tracing, the maths, acting out, wiring, words), **tier 2**
+> every model, local or hosted, with *locality* carried on the `join` event
+> as a cost the router pays (local before hosted). Everything else in this
+> document holds: tiers are simultaneous, no tier evicts another, and the
+> canvas answers first. Read "tier 1" below as "a local model" and "tier 2"
+> as "a hosted model" where the examples name them.
+
 ---
 
 ## 2. The seam already exists

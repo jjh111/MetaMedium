@@ -39,6 +39,9 @@
       "font-family:'Space Grotesk',system-ui,-apple-system,sans-serif;}" +
       '#mmroot{position:relative;width:' + Math.round(w) + 'px;height:' + Math.round(h) + 'px;overflow:hidden;}' +
       '*{box-sizing:border-box;}' +
+      // Past 1:1 the board reveals a page's structure: each region says its id (S4).
+      'html.mm-reveal [data-region]{outline:1px dashed rgba(138,109,31,0.6);outline-offset:-1px;}' +
+      'html.mm-reveal [data-region]::before{content:attr(data-region);position:absolute;left:2px;top:0;font:var(--mm-ui,10px)/1.3 ui-monospace,Menlo,monospace;color:rgba(138,109,31,0.95);background:rgba(251,250,247,0.85);padding:0 3px;z-index:9;pointer-events:none;}' +
       '</style></head><body><div id="mmroot">' + code + '</div></body></html>';
   }
 
@@ -81,6 +84,7 @@
         iframe.setAttribute('sandbox', kind === 'run' ? 'allow-scripts' : 'allow-same-origin');
         iframe.setAttribute('scrolling', 'no');
         iframe.title = MM.wordOf(node) || id;
+        iframe.onload = sizeFramesToScreen; // the type is set for the screen as soon as the document is there
         wrap.appendChild(iframe);
         stage.appendChild(wrap);
         f = { wrap: wrap, iframe: iframe, codeAt: null, parked: false, kind: kind };
@@ -110,6 +114,7 @@
         if (f.codeAt !== null) {
           const next = document.createElement('iframe');
           for (const attr of ['sandbox', 'scrolling', 'title']) { const v = f.iframe.getAttribute(attr); if (v !== null) next.setAttribute(attr, v); }
+          next.onload = sizeFramesToScreen;
           f.iframe.replaceWith(next);
           f.iframe = next;
         }

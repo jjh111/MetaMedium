@@ -14,16 +14,45 @@
   // headings; a vector has elements. All of them render into the same
   // same-origin, script-less iframe, carrying `data-region` on what ink
   // lands on, so `regionsUnderInk` reads a script exactly as it reads a page.
+  // Type is set on the root in ems, so the surface can hold it at a SCREEN
+  // size whatever the zoom (sizeFramesToScreen): the frame scales with the
+  // board, the text inside stays readable (SURFACE-v9-PLAN D6).
   const SOURCE_CSS =
-    'html,body{margin:0;padding:0;background:#fbfaf7;color:#14140f;}' +
-    '#mmroot{position:relative;overflow:auto;font:11px/1.45 "IBM Plex Mono",ui-monospace,Menlo,monospace;}' +
+    'html{font-size:11px;}html,body{margin:0;padding:0;background:#fbfaf7;color:#14140f;}' +
+    '#mmroot{position:relative;overflow:auto;font:1em/1.45 "IBM Plex Mono",ui-monospace,Menlo,monospace;}' +
     '*{box-sizing:border-box;}' +
-    '.src{margin:0;padding:6px 8px;white-space:pre-wrap;word-break:break-word;}' +
-    '.rg{position:relative;padding:2px 6px 4px 6px;margin:0 0 2px 0;border-left:2px solid rgba(20,20,15,0.12);}' +
+    '.src{margin:0;padding:0.55em 0.75em;white-space:pre-wrap;word-break:break-word;}' +
+    '.rg{position:relative;padding:0.2em 0.55em 0.35em 0.55em;margin:0 0 0.2em 0;border-left:2px solid rgba(20,20,15,0.12);}' +
     '.rg:hover{background:rgba(201,168,76,0.08);}' +
-    '.lb{display:block;font-size:9px;letter-spacing:0.06em;text-transform:uppercase;color:rgba(20,20,15,0.45);margin-bottom:1px;}' +
+    'html.mm-reveal .rg{border:1px dashed rgba(138,109,31,0.55);border-left-width:2px;margin-bottom:0.4em;}' +
+    '.lb{display:block;font-size:0.82em;letter-spacing:0.06em;text-transform:uppercase;color:rgba(20,20,15,0.45);margin-bottom:0.1em;}' +
     '.gap{color:rgba(20,20,15,0.55);}' +
     'svg{max-width:100%;max-height:100%;display:block;margin:auto;}';
+
+  // ===== Code legible at every zoom (v9 S4) =================================
+  // A frame scales with the board; the type inside is held at a screen size —
+  // set on the document root, in the frame's own pixels, as the board zooms —
+  // until the frame is too small for a line, when it is left alone. Past 1:1
+  // the zoom does not enlarge the text; it reveals structure: a script's
+  // regions get their own boxes, a page's regions show their ids.
+  const SOURCE_PX = 11, UI_PX = 10, REVEAL_ZOOM = 1.6;
+  function sizeFramesToScreen() {
+    const z = view.zoom;
+    for (const f of frames.values()) {
+      if (!f.iframe) continue;
+      let doc = null;
+      try { doc = f.iframe.contentDocument; } catch (err) { doc = null; }
+      if (!doc || !doc.documentElement) continue; // an opaque frame draws at its own scale
+      const kind = f.kind || 'html';
+      const w = parseFloat(f.wrap.style.width) || 360;
+      // The size that reads as SOURCE_PX on screen, but never so large that a line holds fewer than a dozen characters.
+      const px = Math.min(SOURCE_PX / z, Math.max(SOURCE_PX, w / 12));
+      const root = doc.documentElement;
+      if (kind !== 'html' && kind !== 'png' && kind !== 'jpg') root.style.fontSize = px.toFixed(2) + 'px';
+      root.style.setProperty('--mm-ui', (UI_PX / z).toFixed(2) + 'px');
+      root.classList.toggle('mm-reveal', z > REVEAL_ZOOM);
+    }
+  }
 
   /** The source with its top-level regions wrapped, so each is an element ink can land on. */
   function regionsDocument(source, regions, w, h) {

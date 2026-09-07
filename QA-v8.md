@@ -132,12 +132,18 @@ control centre opens this file.
 1. Draw four boxes in a 2×2. Circle them, check. **No call is made** by the
    check: no dot, nothing in the status line.
 2. In the field type `website about dolphins`. The reading line says
-   **↵ <model> builds a page**. Press **Enter**: a **breathing gold dot and
-   "<model> · building “website about…”" appear above the boxes** and in the
-   status line while the model works.
-3. A page renders **inside your ink**, one region per box, your boxes still
-   drawn on top. The status line says *<model> built r1, r2, r3, r4*; the
-   panel says *living page*, lists `r1…r4`.
+   **↵ the structure at once (tier 1), then <model> writes the words**. Press
+   **Enter**: the page's **structure stands at once** inside your ink — each
+   region a dashed box saying its id and role (*r1 · node*), no words — and a
+   **breathing gold dot and "<model> · building “website about…”" appear
+   above the boxes** and in the status line while the model works.
+   (With no model joined the line says *↵ the structure, at once (tier 1) —
+   join a model for the words*, Enter builds that structure, and the status
+   says so. Nothing invents words.)
+3. The words land: a page renders **inside your ink**, one region per box,
+   your boxes still drawn on top. The status line says *<model> built r1, r2,
+   r3, r4*; the panel says *living page*, lists `r1…r4`, and counts two
+   versions — the engine's structure, then the model's page.
 4. Draw a loop **on** one region of the page, check. The field's placeholder
    says *on <name> — type what to change…*. Type `make this a headline`: the
    line says *↵ <model> changes what the loop covers*. Enter. Only that

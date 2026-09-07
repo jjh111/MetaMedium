@@ -54,8 +54,25 @@ export type ParticipantKind = 'human' | 'agent' | 'engine';
 
 /** The default local human, present in every session. */
 export const LOCAL_PARTICIPANT = 'participant:local';
-/** The engine's Tier-0 heuristics — the medium is itself a participant. */
+/**
+ * The engine itself — the medium is a participant. Its readings are tier 0
+ * (the shape rung) and its instant library is tier 1; one voice, two rungs.
+ * The id keeps its old name for the logs' sake.
+ */
 export const TIER0_PARTICIPANT = 'participant:tier0';
+export const ENGINE_PARTICIPANT = TIER0_PARTICIPANT;
+/** What the engine participant is called wherever a participant is named. */
+export const ENGINE_NAME = 'engine';
+
+/** Where a participant runs: a cost when choosing who to ask, never a tier. */
+export type Locality = 'local' | 'hosted';
+
+/** Where a participant runs, when it said: a model's locality, else null. */
+export function localityOf(node: MMNode): Locality | null {
+  const rep = node.reps.find((r) => r.modality === 'participant');
+  const l = (rep?.data as { locality?: Locality } | undefined)?.locality;
+  return l === 'local' || l === 'hosted' ? l : null;
+}
 
 export function createParticipantNode(
   id: string,
@@ -63,17 +80,20 @@ export function createParticipantNode(
   name: string,
   at: number,
   /**
-   * Which tier this participant speaks at. Humans and the engine's own
-   * heuristics are 0; a local model is 1, a hosted one 2 (ARCHITECTURE-v7 §4).
-   * Tiers are simultaneous, so this labels a voice — it never ranks one above
-   * another or gates what a participant may propose.
+   * Which tier this participant speaks at. Humans and the engine are 0 (the
+   * shape rung; the engine's instant library is tier 1 of the same voice);
+   * every model is 2, local or hosted (ARCHITECTURE-v7 §4, redressed 6 Sep
+   * 2026). Tiers are simultaneous, so this labels a voice — it never ranks
+   * one above another or gates what a participant may propose.
    */
-  capability: Capability = 0
+  capability: Capability = 0,
+  /** Where it runs, when it is a model: the router asks local before hosted. */
+  locality?: Locality
 ): MMNode {
   return {
     id,
     reps: [
-      { modality: 'participant', data: { kind } },
+      { modality: 'participant', data: locality ? { kind, locality } : { kind } },
       { modality: 'word', data: name },
     ],
     edges: [],
@@ -148,7 +168,7 @@ export function createBootstrapNodes(at: number): MMNode[] {
       createdAt: at,
     })),
     createParticipantNode(LOCAL_PARTICIPANT, 'human', 'local', at),
-    createParticipantNode(TIER0_PARTICIPANT, 'engine', 'tier0-heuristics', at),
+    createParticipantNode(TIER0_PARTICIPANT, 'engine', ENGINE_NAME, at),
   ];
 }
 

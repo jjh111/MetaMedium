@@ -1,12 +1,13 @@
 // The agent adapter. No network: `complete()` is driven through a stub server
 // via a patched global fetch, so these tests pin behaviour, not connectivity.
 
+import { localityOf } from '../session/nodes';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { createSession } from '../session/session';
 import { interpretationsOf, bySource, byTier, disagreement } from '../session/interpretations';
 import { createAgentParticipant, parseReadings, readingsToEdges, MAX_READINGS, parseBehaviourReply, parseProgram } from './agent';
 import { describeSession, describeSignature } from './serialize';
-import { PRESETS, providerTier } from '../llm/provider';
+import { PRESETS, providerTier, providerLocality } from '../llm/provider';
 import { circleStroke, lineStroke, rectStroke, checkStroke } from '../test/strokes';
 import { behavioursOf, blessedBehaviourOf } from '../session/nodes';
 
@@ -129,7 +130,7 @@ describe('the agent as a participant', () => {
     const groups = bySource(interpretationsOf(node, s.getState().nodes));
 
     // Even at 0.95 the model does not evict the engine's own reading.
-    expect(groups.map((g) => g.label).sort()).toEqual(['llm:qwen3', 'tier0-heuristics']);
+    expect(groups.map((g) => g.label).sort()).toEqual(['engine', 'llm:qwen3']);
 
     const d = disagreement(interpretationsOf(node, s.getState().nodes));
     expect(d?.crossSource).toBe(true);
@@ -231,7 +232,7 @@ describe('the prompt sends grounded facts, not pixels', () => {
     expect(text).toContain('straightness');
     expect(text).toContain('corner(s)');
     expect(text).toContain('read as:');
-    expect(text).toContain('tier0-heuristics');
+    expect(text).toContain('engine');
     // Never an image reference — the commitment is grounded-not-pixels.
     expect(text.toLowerCase()).not.toContain('base64');
     expect(text.toLowerCase()).not.toContain('image');
@@ -247,7 +248,7 @@ describe('the prompt sends grounded facts, not pixels', () => {
 
     const text = describeSession(s.getState(), { nodeIds: [id] });
     expect(text).toContain('llm:qwen3');
-    expect(text).toContain('tier0-heuristics');
+    expect(text).toContain('engine');
     expect(text).toContain('letter-o');
   });
 
@@ -269,7 +270,7 @@ describe('the prompt sends grounded facts, not pixels', () => {
 });
 
 describe('tiers label the voice', () => {
-  it('joins a local model at tier 1 and a hosted one at tier 2', async () => {
+  it('joins every model at tier 2 — local and hosted are one tier, told apart by locality', async () => {
     const s = createSession();
     const id = s.addStroke(circleStroke(200, 200, 40), 1000);
 
@@ -286,17 +287,21 @@ describe('tiers label the voice', () => {
     const node = s.getState().nodes.get(id)!;
     const tiers = byTier(interpretationsOf(node, s.getState().nodes));
 
-    // Three tiers present at once: engine 0, local 1, hosted 2 — none hidden.
-    expect(tiers.map((g) => g.key)).toEqual([0, 1, 2]);
-    expect(tiers.find((g) => g.key === 1)!.interpretations[0].sourceName).toBe('llm:qwen3');
-    expect(tiers.find((g) => g.key === 2)!.interpretations[0].sourceName).toBe('llm:some/model');
+    // Two tiers present at once: the engine at 0, both models at 2 — none hidden, both models kept apart by source.
+    expect(tiers.map((g) => g.key)).toEqual([0, 2]);
+    const names = tiers.find((g) => g.key === 2)!.interpretations.map((i) => i.sourceName).sort();
+    expect(names).toEqual(['llm:qwen3', 'llm:some/model']);
+    const st = s.getState();
+    expect(localityOf(st.nodes.get(local.id)!)).toBe('local');
+    expect(localityOf(st.nodes.get(hosted.id)!)).toBe('hosted');
   });
 
-  it('reads localhost as tier 1 regardless of port, and anything else as tier 2', () => {
-    expect(providerTier({ kind: 'openai-compatible', baseUrl: 'http://localhost:11434/v1', model: 'm' })).toBe(1);
-    expect(providerTier({ kind: 'openai-compatible', baseUrl: 'http://127.0.0.1:1234/v1', model: 'm' })).toBe(1);
-    expect(providerTier({ kind: 'openai-compatible', baseUrl: 'https://openrouter.ai/api/v1', model: 'm' })).toBe(2);
-    expect(providerTier({ kind: 'anthropic', baseUrl: 'https://api.anthropic.com/v1', model: 'm' })).toBe(2);
+  it('reads localhost as local regardless of port, anything else as hosted, and every provider as tier 2', () => {
+    expect(providerLocality({ kind: 'openai-compatible', baseUrl: 'http://localhost:11434/v1', model: 'm' })).toBe('local');
+    expect(providerLocality({ kind: 'openai-compatible', baseUrl: 'http://127.0.0.1:1234/v1', model: 'm' })).toBe('local');
+    expect(providerLocality({ kind: 'openai-compatible', baseUrl: 'https://openrouter.ai/api/v1', model: 'm' })).toBe('hosted');
+    expect(providerLocality({ kind: 'anthropic', baseUrl: 'https://api.anthropic.com/v1', model: 'm' })).toBe('hosted');
+    expect(providerTier({ kind: 'openai-compatible', baseUrl: 'http://localhost:11434/v1', model: 'm' })).toBe(2);
   });
 });
 
