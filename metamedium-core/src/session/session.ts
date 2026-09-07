@@ -175,7 +175,7 @@ export interface SessionState {
 // Every event is attributed: participantId defaults to the local human.
 // Humans and AI agents contribute through the SAME events — there is no
 // separate "AI input" channel (one class of citizen).
-export type SessionEvent =
+type SessionEventUnion =
   | {
       type: 'stroke';
       points: Point[];
@@ -305,6 +305,15 @@ export type SessionEvent =
       aboutIds: string[];
       at: number;
     };
+
+/**
+ * Every event, and where it came from. `by` is the name of the log another
+ * participant's event was merged from (store/merge.ts): the session
+ * attributes such an event to a participant of that name, made on first
+ * sight, so another hand's ink is another hand's. Events from this
+ * participant's own log carry no `by`.
+ */
+export type SessionEvent = SessionEventUnion & { by?: string };
 
 /**
  * An attributed, inferred REP offered by a participant — what a model read
@@ -1819,7 +1828,23 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     return node.id;
   }
 
-  function applyEvent(ev: SessionEvent): string | null {
+  /** The participant another log's events belong to, made on first sight; a stable id from the log's name. */
+  function handParticipant(name: string): string {
+    const id = 'participant:hand:' + name.replace(/[^A-Za-z0-9._-]+/g, '_');
+    if (!nodes.has(id)) {
+      nodes.set(id, createParticipantNode(id, 'human', name, lastAt));
+      participants.push(id);
+    }
+    return id;
+  }
+
+  function applyEvent(raw: SessionEvent): string | null {
+    // An event from another hand's log is that hand's: attributed to a
+    // participant of the log's name unless it already says who (a model's
+    // proposal in their log names their model).
+    const ev: SessionEvent = raw.by && !('participantId' in raw && raw.participantId)
+      ? ({ ...raw, participantId: handParticipant(raw.by) } as SessionEvent)
+      : raw;
     if ('at' in ev && typeof ev.at === 'number') lastAt = Math.max(lastAt, ev.at);
     switch (ev.type) {
       case 'stroke':

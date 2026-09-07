@@ -20,7 +20,7 @@
     view: document.getElementById('gridBtn'), theme: document.getElementById('themeBtn'), hand: document.getElementById('handBtn'),
     autoRead: document.getElementById('autoReadBtn'), folder: document.getElementById('folderBtn'), imp: document.getElementById('importBtn'),
     exp: document.getElementById('exportBtn'), models: document.getElementById('modelBtn'), teach: document.getElementById('teachBtn'),
-    reset: document.getElementById('resetBtn'), help: document.getElementById('helpBtn'),
+    reset: document.getElementById('resetBtn'), help: document.getElementById('helpBtn'), live: document.getElementById('liveBtn'),
   };
 
   function ccOpen() { return !ccEl.hasAttribute('hidden'); }
@@ -54,11 +54,26 @@
     ui.tile(tiles.teach, 'mark', s.commandMark ? s.commandMark.name : 'check ✓', { on: !!s.commandMark, why: 'the mark that turns a circled group into a selection; teach your own' });
     ui.tile(tiles.reset, 'reset', 'fresh board', { why: 'a fresh board; the one in browser storage is forgotten too' });
     ui.tile(tiles.help, 'help', '?', { why: 'the hand QA plan, which doubles as the manual' });
+    ui.tile(tiles.live, 'live', folder.how === 'live' ? folder.name : 'room…', { on: folder.how === 'live', why: 'a room other hands can join: between tabs on this machine, or across machines through a relay' });
   }
 
   tiles.theme.onclick = () => setThemeMode(THEME_MODES[(THEME_MODES.indexOf(themeMode) + 1) % THEME_MODES.length]);
   tiles.hand.onclick = () => setHand(hand === 'right' ? 'left' : 'right');
   tiles.autoRead.onclick = () => setAutoRead(!autoRead);
+  // A live room: a name, and a relay when the other hand is on another machine.
+  const livePanel = document.getElementById('livePanel');
+  ui.pane(livePanel, 'live', () => closePanel(livePanel, tiles.live));
+  tiles.live.onclick = () => { togglePanel(livePanel, tiles.live); if (!livePanel.hasAttribute('hidden')) { const r = document.getElementById('liveRoom'); if (!r.value) r.value = folder.how === 'live' ? folder.name : 'table'; document.getElementById('liveName').value = folder.me === 'local' ? (prefs.get('hand-name', '') || '') : folder.me; } };
+  document.getElementById('liveJoin').onclick = () => {
+    const room = document.getElementById('liveRoom').value.trim();
+    const name = document.getElementById('liveName').value.trim();
+    const relay = document.getElementById('liveRelay').value.trim();
+    if (!room) { document.getElementById('liveStatus').textContent = 'a room needs a name'; return; }
+    if (name) { prefs.set('hand-name', name); setParticipant(name); }
+    openLive(room, relay ? { relay } : {}).then(() => { closePanel(livePanel, tiles.live); say('in room ' + room + ' as ' + folder.me + (relay ? ' through ' + relay : ' — other tabs on this machine can join')); syncTiles(); })
+      .catch((err) => { document.getElementById('liveStatus').textContent = 'could not join: ' + (err.message || err); });
+  };
+
   // Help is the hand QA plan, which doubles as the manual, read into a pane.
   const helpPanel = document.getElementById('helpPanel');
   ui.pane(helpPanel, 'help', () => closePanel(helpPanel, tiles.help));

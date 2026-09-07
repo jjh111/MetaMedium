@@ -32,6 +32,7 @@
     // The folder, for tests: open any store (a MemoryStore stands in for a folder), and read the board's home.
     openStore: (store, how, name) => openStore(store, how, name),
     openGit: (spec, token, remember) => openGit(spec, token, remember),
+    openLive: (room, opts) => openLive(room, opts), mergeLive: mergeLive, handColour: handColour,
     folder: () => folder,
     setParticipant: setParticipant,
     forgetLocalLog: forgetLocalLog,
@@ -63,6 +64,7 @@
     if (restored) flash('your last board is back — Reset starts a fresh one');
     if (params.get('folder')) openStatic(params.get('folder'));
     else if (params.get('git')) openGit(params.get('git'));
+    else if (params.get('live')) openLive(params.get('live'), params.get('relay') ? { relay: params.get('relay') } : {});
   } else {
     startReplay(replayUrl);
   }

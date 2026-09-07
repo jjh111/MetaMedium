@@ -193,6 +193,10 @@ html, body {
 /* The export pane: three files. */
 #exportPanel .exRow { display: flex; gap: 7px; }
 #exportPanel .exRow button { flex: 1; font-family: var(--mono); font-size: 11px; }
+/* The live pane: a room, a name, a relay. */
+#livePanel .mpRow { display: flex; gap: 7px; margin-top: 11px; }
+#livePanel .mpRow button { flex: 1; }
+#livePanel #liveStatus { margin-top: 8px; }
 /* The help pane: the QA plan, read into the page. */
 #helpPanel { width: min(420px, calc(100vw - 24px)); max-height: calc(100vh - 80px); overflow-y: auto; overscroll-behavior: contain; font-size: 11.5px; line-height: 1.5; scrollbar-width: thin; }
 #helpPanel .helpBody h2 { font-size: 13px; margin: 6px 0 4px; color: var(--gold); }

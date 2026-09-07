@@ -74,6 +74,12 @@ export function localityOf(node: MMNode): Locality | null {
   return l === 'local' || l === 'hosted' ? l : null;
 }
 
+/** Who made a node: the `made-by` edge's target, else the local human. */
+export function authorOf(node: MMNode): string {
+  const e = node.edges.find((x) => x.rel === 'made-by');
+  return e ? e.to : LOCAL_PARTICIPANT;
+}
+
 export function createParticipantNode(
   id: string,
   kind: ParticipantKind,

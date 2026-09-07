@@ -243,6 +243,20 @@ control centre opens this file.
 4. **(model)** Circle a handwritten word the model has read, check: **Make it
    text “<word>”**.
 
+## 13a. A live room
+
+1. Control centre → **live**. Type a room name (`table`) and your name, leave
+   the relay empty, **Join**. The status says *live table · you are <name> ·
+   alone so far*; the *live* tile says *table*.
+2. Open the same page in a **second tab**, join the same room with another
+   name. Draw in either tab: the stroke appears in the other **within a
+   moment, in that hand's own colour**; the status in each says *with
+   <the other>*. Undo in one tab takes back only that hand's mark.
+3. Close one tab and reopen the room from it: the board is back, both hands'
+   marks, nothing doubled.
+4. Across two machines: `node Demos/relay.mjs` on one, and on both open
+   `session-engine.html?live=table&relay=http://<host>:8020`.
+
 ## 13. Installable
 
 1. In Chrome's address bar the install icon appears; install it. It opens as

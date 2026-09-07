@@ -50,6 +50,8 @@ var MetaMediumCore = (() => {
     LOCAL_TIMEOUT_MS: () => LOCAL_TIMEOUT_MS,
     LOG_DIR: () => LOG_DIR,
     LOG_EXT: () => LOG_EXT,
+    LiveStore: () => LiveStore,
+    LocalHub: () => LocalHub,
     MANIFEST_PATH: () => MANIFEST_PATH,
     MATCH_FLOOR: () => MATCH_FLOOR,
     MAX_DRAWN: () => MAX_DRAWN,
@@ -83,6 +85,7 @@ var MetaMediumCore = (() => {
     analyzeStroke: () => analyzeStroke,
     applyWalls: () => applyWalls,
     assignRoles: () => assignRoles,
+    authorOf: () => authorOf,
     behaviourSource: () => behaviourSource,
     behavioursOf: () => behavioursOf,
     between: () => between,
@@ -1005,6 +1008,10 @@ var MetaMediumCore = (() => {
     const l = rep?.data?.locality;
     return l === "local" || l === "hosted" ? l : null;
   }
+  function authorOf(node) {
+    const e = node.edges.find((x) => x.rel === "made-by");
+    return e ? e.to : LOCAL_PARTICIPANT;
+  }
   function createParticipantNode(id, kind, name, at, capability = 0, locality) {
     return {
       id,
@@ -1664,7 +1671,7 @@ var MetaMediumCore = (() => {
   }
 
   // src/store/merge.ts
-  function mergeLogs(logs) {
+  function mergeLogs(logs, opts = {}) {
     const names = Object.keys(logs).sort();
     const tagged = [];
     for (const name of names) logs[name].forEach((ev, i) => tagged.push({ ev, name, i }));
@@ -1674,7 +1681,8 @@ var MetaMediumCore = (() => {
       if (a.name !== b.name) return a.name < b.name ? -1 : 1;
       return a.i - b.i;
     });
-    return tagged.map((t) => ({ ...t.ev }));
+    const stamp = opts.me !== void 0;
+    return tagged.map((t) => stamp && t.name !== opts.me ? { ...t.ev, by: t.name } : { ...t.ev });
   }
   function atOf(ev) {
     return "at" in ev && typeof ev.at === "number" ? ev.at : 0;
@@ -1810,6 +1818,105 @@ var MetaMediumCore = (() => {
     /** Every path held, logs included — for tests and for export. */
     paths() {
       return [...this.files.keys()].sort();
+    }
+  };
+
+  // src/store/live.ts
+  var LiveStore = class {
+    constructor(transport, me, room = "room") {
+      this.transport = transport;
+      this.me = me;
+      this.room = room;
+      this.logs = {};
+      this.seen = /* @__PURE__ */ new Map();
+      this.listeners = [];
+      this.logs[me] = [];
+      this.off = transport.onMessage((line) => this.receive(line));
+    }
+    capabilities() {
+      return { write: true, watch: true };
+    }
+    /** A live room holds logs, not files: nothing to list, read or write. */
+    async list() {
+      return [];
+    }
+    async read(path) {
+      throw new Error(`${path}: a live room holds no files`);
+    }
+    async write(path, _data) {
+      void _data;
+      throw new ReadOnlyError(path);
+    }
+    async appendLog(participant, events) {
+      if (!events.length) return;
+      const log = this.logs[participant] ??= [];
+      log.push(...events);
+      this.transport.send({ participant, events: events.slice(), at: Date.now() });
+    }
+    async readLogs() {
+      const out = {};
+      for (const [k, v] of Object.entries(this.logs)) out[k] = v.slice();
+      return out;
+    }
+    /** Ask the room for its logs; every peer answers with its own, in full. */
+    hello() {
+      this.transport.send({ participant: this.me, events: [], at: Date.now(), hello: true });
+    }
+    /** Every hand heard from, and when. */
+    presence() {
+      return [...this.seen.entries()].map(([participant, at]) => ({ participant, at })).sort((a, b) => b.at - a.at);
+    }
+    /** Fires when another participant's events land, with what landed. */
+    subscribe(cb) {
+      this.listeners.push(cb);
+      return () => {
+        this.listeners = this.listeners.filter((l) => l !== cb);
+      };
+    }
+    close() {
+      if (this.off) this.off();
+      this.off = null;
+      if (this.transport.close) this.transport.close();
+    }
+    receive(line) {
+      if (!line || typeof line.participant !== "string" || line.participant === this.me) return;
+      this.seen.set(line.participant, Date.now());
+      if (line.hello) {
+        this.transport.send({ participant: this.me, events: this.logs[this.me].slice(), at: Date.now(), full: true });
+        this.notify(line.participant, []);
+        return;
+      }
+      const events = Array.isArray(line.events) ? line.events : [];
+      if (line.full) this.logs[line.participant] = events.slice();
+      else (this.logs[line.participant] ??= []).push(...events);
+      this.notify(line.participant, events);
+    }
+    notify(participant, events) {
+      for (const l of this.listeners) l(participant, events);
+    }
+  };
+  var LocalHub = class {
+    constructor() {
+      this.members = [];
+    }
+    connect() {
+      let cb = null;
+      const hub = this;
+      const transport = {
+        send(line) {
+          const copy = JSON.parse(JSON.stringify(line));
+          for (const m of hub.members) if (m !== cb) queueMicrotask(() => m(copy));
+        },
+        onMessage(fn) {
+          cb = fn;
+          hub.members.push(fn);
+          return () => {
+            hub.members = hub.members.filter((m) => m !== fn);
+            cb = null;
+          };
+        }
+      };
+      return transport;
     }
   };
 
@@ -5723,7 +5830,16 @@ ${pad}</${tag}>`;
       if (!live.includes(node.id)) live.push(node.id);
       return node.id;
     }
-    function applyEvent(ev) {
+    function handParticipant(name) {
+      const id = "participant:hand:" + name.replace(/[^A-Za-z0-9._-]+/g, "_");
+      if (!nodes.has(id)) {
+        nodes.set(id, createParticipantNode(id, "human", name, lastAt));
+        participants.push(id);
+      }
+      return id;
+    }
+    function applyEvent(raw) {
+      const ev = raw.by && !("participantId" in raw && raw.participantId) ? { ...raw, participantId: handParticipant(raw.by) } : raw;
       if ("at" in ev && typeof ev.at === "number") lastAt = Math.max(lastAt, ev.at);
       switch (ev.type) {
         case "stroke":

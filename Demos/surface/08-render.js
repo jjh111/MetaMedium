@@ -12,6 +12,21 @@
     return e ? e.to : MM.LOCAL_PARTICIPANT;
   };
   const isAgentNode = (node) => authorOf(node) !== MM.LOCAL_PARTICIPANT;
+  /** The colour a mark is drawn in: yours, a model's, or another hand's — a hue from its name. */
+  function colourOf(node) {
+    const pid = authorOf(node);
+    if (pid === MM.LOCAL_PARTICIPANT) return C.ink;
+    const p = state.nodes.get(pid);
+    const kind = p && (p.reps.find((r) => r.modality === 'participant') || {}).data;
+    if (!p || !kind || kind.kind === 'agent' || kind.kind === 'engine') return C.agent;
+    return handColour(MM.wordOf(p) || pid);
+  }
+  const handHues = new Map();
+  function handColour(name) {
+    let h = handHues.get(name);
+    if (h === undefined) { let x = 0; for (const c of name) x = (x * 31 + c.charCodeAt(0)) >>> 0; h = x % 360; handHues.set(name, h); }
+    return 'hsl(' + h + ' 55% ' + (document.documentElement.getAttribute('data-theme') === 'dark' ? '68%' : '42%') + ')';
+  }
   const nameOfParticipant = (pid) =>
     pid === MM.LOCAL_PARTICIPANT ? 'you' : (MM.wordOf(state.nodes.get(pid)) || pid);
 
@@ -169,7 +184,7 @@
       const pending = s.pendingLassoId === id;
       // A closed stroke around marks is plain ink until the mark takes it: nothing
       // lights up on its own. The command mark is what makes it a selection.
-      const color = isAgentNode(node) ? C.agent : C.ink;
+      const color = colourOf(node);
 
       // A live artifact keeps its ink: the boxes you drew ARE the outlines of
       // what got built, and that promise is only kept by drawing them on top.

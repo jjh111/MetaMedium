@@ -274,8 +274,8 @@ so ink and chrome never disagree.
 | S1 | **The frame** ✅ | One bar, the control centre, blurbs out, theme and hand as tiles |
 | S2 | **One field** ✅ | The reading line; the four core slots never move; every verb reachable by typing |
 | S3 | **Matches as chips** ✅ | *name 0.92* beside a matching group; a tap on it opens the field with the match leading (`summonMarks`); the sentence is gone |
-| S4 | Code at every zoom | unchanged |
-| S6 | Live logs | unchanged |
+| S4 | **Code at every zoom** ✅ | source cards set their type for the screen as the board zooms, capped so a line keeps a dozen characters; past 1.6× a page's regions show their ids and a script's regions get boxes. e2e 19z |
+| S6 | **Live logs** ✅ first cut | `LiveStore` over a transport (BroadcastChannel between tabs; a relay between machines, `Demos/relay.mjs`); hello and full logs for a newcomer; another hand's events stamped `by` and drawn in its own colour; presence in the status line; the *live* tile and `?live=room`. e2e 28–28d. *Still to do:* a model's proposals in another hand's log (their participant ids), reconnection and replay from the relay's last id, and two browsers on two machines tried by hand |
 
 *Known, from hardening the harness (6 Sep, evening):* a playing program whose frame is **off-screen** has its timers and frames throttled by the browser (a cross-origin iframe out of the viewport), so its parts stop reporting and an error it throws is reported late, until it is back in view. The clock still says *playing*; the pause-on-error lands when the frame wakes. Nothing in the engine can change this; the surface could pause such clocks itself and say why.
 

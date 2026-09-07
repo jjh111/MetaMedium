@@ -34,13 +34,13 @@ the v8 build plan has landed** — the canvas as a program with clocks, a
 tank, verbs from words or from acting out, frames with a drawn slider, the
 folder as the canvas with three backends, pictures in and the board out,
 text as an element, and an installable shell — 550 core tests and a
-138-step browser e2e. `ROADMAP.md` carries the honest gaps. Before v8:
+144-step browser e2e. `ROADMAP.md` carries the honest gaps. Before v8:
 **the MVP loop runs end to end.** Draw boxes on an infinite canvas,
 circle them, cross with a command mark *you taught the system*, prompt them into
 a living page that renders in the canvas with your ink still outlining its
 divs — then draw on that page and the ink addresses the regions underneath it.
 Scratch anything out to erase. `Demos/session-engine.html` is the surface;
-`Demos/session-engine.e2e.js` drives 138 steps through the real UI: page, flowchart, handwriting (read only when asked), the model drawing, the user-side loop, selection and the field, corrections, the worker, the tank, words into verbs and acting out, frames and the drawn slider, the folder, pictures, text, and the moment. A run takes about 90 s; run it **in its own tab on its own origin** (`http://127.0.0.1:8010/…?fresh=1&nosw=1` — `__setup` refuses any other URL: it replaces `fetch` with a stub, joins a stub model named `e2e-stub`, and wipes the origin's saved board), start it with `__setup(); __scenario().then(r => window.__R = r)` and read `__R` when it lands.
+`Demos/session-engine.e2e.js` drives 144 steps through the real UI: page, flowchart, handwriting (read only when asked), the model drawing, the user-side loop, selection and the field, corrections, the worker, the tank, words into verbs and acting out, frames and the drawn slider, the folder, pictures, text, and the moment. A run takes about 90 s; run it **in its own tab on its own origin** (`http://127.0.0.1:8010/…?fresh=1&nosw=1` — `__setup` refuses any other URL: it replaces `fetch` with a stub, joins a stub model named `e2e-stub`, and wipes the origin's saved board), start it with `__setup(); __scenario().then(r => window.__R = r)` and read `__R` when it lands.
 v7 Stage E (handwriting) shipped 1 Sep 2026: a word written beside a shape is read by a
 model that can see and offered as that shape's name. Whitepaper v5.1 stays parked until the
 conversation benchmark passes end to end.
@@ -777,6 +777,31 @@ network-first with the cache as the fallback. **Loops do not depend on paint**: 
 the browser stops painting gets no animation frames, so the tank and the
 worker take a timer's tick when no frame comes (`nextFrame` in
 `01-view.js`) — time is state, not a movie.
+
+### Live logs: multiplayer as a transport (v9 S6)
+
+> `metamedium-core/src/store/live.ts` (`LiveStore`, `LocalHub`),
+> `store/merge.ts` (`mergeLogs(logs, { me })`), `Demos/surface/17-folder.js`
+> (`openLive`), `Demos/relay.mjs`.
+
+Nothing in the engine changes: a second person on the canvas is a second
+log arriving live instead of after a pull. `LiveStore` is a `Store` with
+`watch: true` whose transport carries lines — a participant's appended
+events — between hands: a `BroadcastChannel` between tabs on one machine
+(`?live=<room>`, or the *live* tile), or a relay between machines
+(`?live=<room>&relay=http://host:8020`; `node Demos/relay.mjs` is sixty
+lines of Server-Sent Events in and POST out, with no truth of its own). A
+newcomer says hello and every peer answers with its whole log, so history
+is caught up the way a pull would. **Whose hand:** `mergeLogs(logs, { me })`
+stamps every event from another log with `by: <log name>`, and the session
+attributes such an event to a participant of that name — made on first
+sight, id `participant:hand:<name>`, no join event anyone had to write — so
+another hand's ink draws in its own colour (a hue from the name) and is
+never yours. The merge runs as each line lands (debounced), my unsent
+events kept; autosave sends the delta. Presence is who was heard in the
+last minute, in the status line. Known gap: a model's proposals in
+another hand's log reference that hand's participant ids, which the merge
+does not translate yet.
 
 ### Text as an element (v8, WP-13)
 

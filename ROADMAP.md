@@ -24,7 +24,10 @@
 > shape rung, tier 1 the engine's instant library (a registry of fourteen
 > modules, with the structure of a drawing built from it with no words),
 > tier 2 every model, locality a cost — and a brief stands as its structure
-> at once, the model's words following. The e2e drives 138 steps. Still open: code
+> at once, the model's words following; **code legible at every zoom**
+> (S4); **live logs** (S6, first cut): a room over a BroadcastChannel or a
+> relay, another hand's log merged as it lands and drawn in its own colour.
+> The e2e drives 144 steps. Still open: code
 > legible at every zoom (S4), live logs (S6), a brace as a scoping mark in
 > the diagram rung.
 

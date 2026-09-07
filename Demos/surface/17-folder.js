@@ -1,7 +1,8 @@
 // ===== folder =====
 // Provides: the folder as the canvas — openFolder/openStatic/openStore (discovery into artifacts,
 //   per-participant logs merged), autosave (to the folder, else browser storage), the live budget
-//   (liveSet), the grid and focus views (setViewMode, focusOn), imageUrlFor, folderStatus.
+//   (liveSet), the grid and focus views (setViewMode, focusOn), imageUrlFor, folderStatus;
+//   a live room (openLive: logs arriving live over a BroadcastChannel or a relay, merged as they land).
 // Uses: core, view (fitAll, afterViewChange), artifacts, render.
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () { ... })();`. Shared state is the
@@ -75,6 +76,73 @@
     return openStore(store, 'static', base);
   }
 
+  // ===== A live room (v9 S6) =================================================
+  // Multiplayer is a transport over the per-participant logs: another hand is
+  // another log arriving live. Between tabs on one machine the transport is a
+  // BroadcastChannel; between machines it is a relay that forwards lines
+  // (Demos/relay.mjs, Server-Sent Events in, POST out). The merge runs as each
+  // line lands, and the other hand's ink draws in its colour.
+  function broadcastTransport(room) {
+    const ch = new BroadcastChannel('mm-live:' + room);
+    return {
+      send: (line) => ch.postMessage(line),
+      onMessage: (cb) => { const h = (e) => cb(e.data); ch.addEventListener('message', h); return () => ch.removeEventListener('message', h); },
+      close: () => ch.close(),
+    };
+  }
+  function relayTransport(url, room) {
+    const base = url.replace(/\/+$/, '') + '/rooms/' + encodeURIComponent(room) + '/events';
+    const es = new EventSource(base);
+    return {
+      send: (line) => { fetch(base, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(line) }).catch(() => {}); },
+      onMessage: (cb) => { const h = (e) => { try { cb(JSON.parse(e.data)); } catch (err) { /* not a line */ } }; es.addEventListener('message', h); return () => es.removeEventListener('message', h); },
+      close: () => es.close(),
+    };
+  }
+  // The merge runs on a microtask, not a timer: a hidden tab throttles timers
+  // to once a second, and another hand's line should land at once. Lines
+  // that arrive in one tick coalesce into one merge.
+  let liveMergePending = false;
+  async function openLive(room, opts) {
+    opts = opts || {};
+    if (folder.store && folder.store.close) folder.store.close();
+    const me = folder.me === 'local' ? handName() : folder.me;
+    setParticipant(me);
+    const transport = opts.transport || (opts.relay ? relayTransport(opts.relay, room) : broadcastTransport(room));
+    const store = new MM.LiveStore(transport, me, room);
+    // What this hand already drew is its opening log in the room.
+    const mine = session.getEvents().filter((e) => !e.by);
+    if (mine.length) await store.appendLog(me, mine);
+    folder.sentCount = mine.length;
+    store.subscribe(() => { if (liveMergePending) return; liveMergePending = true; Promise.resolve().then(() => { liveMergePending = false; return mergeLive(); }); });
+    await openStore(store, 'live', room);
+    folder.loadedCount = session.getEvents().length;
+    store.hello();
+    return folder;
+  }
+  /** A name for this hand in a room: remembered on the device, or minted. */
+  function handName() {
+    const held = prefs.get('hand-name', '');
+    if (held) return held;
+    const name = 'hand-' + Math.random().toString(36).slice(2, 6);
+    prefs.set('hand-name', name);
+    return name;
+  }
+  /** Every log the room has, merged and loaded; my own events stay mine. */
+  async function mergeLive() {
+    if (!folder.store || folder.how !== 'live') return;
+    const logs = await folder.store.readLogs();
+    const mine = logs[folder.me] || [];
+    // Events I made since the last send are not in the room yet: keep them.
+    const evs = session.getEvents();
+    const unsent = evs.slice(folder.loadedCount).filter((e) => !e.by);
+    const merged = MM.mergeLogs(Object.assign({}, logs, { [folder.me]: mine.concat(unsent) }), { me: folder.me });
+    session.load(merged);
+    folder.myPrevious = mine.concat(unsent);
+    folder.loadedCount = merged.length;
+    if (typeof syncTiles === 'function') syncTiles();
+  }
+
   /**
    * Open any store: load the merged logs, discover the files, place what is
    * new. Opening the same store again is what a second machine does after a
@@ -84,8 +152,8 @@
     folder.store = store; folder.how = how || 'store'; folder.name = name || ''; folder.error = '';
     let logs = {};
     try { logs = await store.readLogs(); } catch (err) { folder.error = 'could not read the logs: ' + (err.message || err); }
-    const merged = MM.mergeLogs(logs);
-    const meKey = MM.participantOfLog(MM.logPathFor(folder.me));
+    const merged = MM.mergeLogs(logs, folder.how === 'live' ? { me: folder.me } : {});
+    const meKey = folder.how === 'live' ? folder.me : MM.participantOfLog(MM.logPathFor(folder.me));
     folder.myPrevious = (logs[meKey] || []).slice();
     session.load(merged);
     // What was loaded is everyone's; from here on, every event is this
@@ -153,6 +221,17 @@
 
   async function saveNow() {
     const evs = session.getEvents();
+    if (folder.store && folder.how === 'live') {
+      // A live room takes the delta: my events since the last send, appended.
+      const mine = myLogNow();
+      const delta = mine.slice(folder.sentCount || 0);
+      if (!delta.length) return;
+      folder.saving = true;
+      try { await folder.store.appendLog(folder.me, delta); folder.sentCount = mine.length; folder.error = ''; }
+      catch (err) { folder.error = 'could not send: ' + (err.message || err); }
+      folder.saving = false;
+      return;
+    }
     if (folder.store && folder.store.capabilities().write) {
       const mine = myLogNow();
       const text = MM.encodeLog(mine);
@@ -189,6 +268,11 @@
 
   function folderStatus() {
     if (!folder.store) return '';
+    if (folder.how === 'live') {
+      const now = Date.now();
+      const here = folder.store.presence().filter((p) => now - p.at < 60000).map((p) => p.participant);
+      return 'live ' + folder.name + ' · you are ' + folder.me + (here.length ? ' · with ' + here.join(', ') : ' · alone so far') + (folder.error ? ' · ' + folder.error : '');
+    }
     const n = folder.entries.length;
     return (folder.how === 'static' ? 'site' : folder.how === 'git' ? 'repo' : 'folder') + (folder.name ? ' ' + folder.name : '') + ' · ' + n + ' file' + (n === 1 ? '' : 's') +
       (folder.truncated ? '+' : '') + (folder.error ? ' · ' + folder.error : folder.store.capabilities().write ? (folder.saving ? ' · saving' : ' · saved') : ' · read-only');

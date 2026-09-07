@@ -43,6 +43,7 @@
   <button id="exportBtn"></button>
   <button id="modelBtn" aria-pressed="false"></button>
   <button id="teachBtn" aria-pressed="false"></button>
+  <button id="liveBtn"></button>
   <button id="resetBtn"></button>
   <button id="helpBtn"></button>
   <input id="importInput" type="file" accept="image/*,.svg,.html,.htm,.js,.mjs,.json,.md,.txt" multiple capture="environment" hidden>
@@ -94,6 +95,13 @@
   </div>
 </div>
 <div id="helpPanel" hidden><div class="helpBody"></div></div>
+<div id="livePanel" hidden>
+  <input id="liveRoom" placeholder="room" autocomplete="off" spellcheck="false" />
+  <input id="liveName" placeholder="your name in the room" autocomplete="off" spellcheck="false" />
+  <input id="liveRelay" placeholder="relay URL — empty for other tabs on this machine" autocomplete="off" spellcheck="false" />
+  <div class="mpRow"><button id="liveJoin">Join</button></div>
+  <div id="liveStatus" class="hint"></div>
+</div>
 
 <div id="grid" hidden></div>
 <textarea id="textEditor" hidden spellcheck="false" placeholder="type here — Enter keeps it, Shift+Enter for a new line, Esc drops it"></textarea>

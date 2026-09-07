@@ -48,6 +48,10 @@ canvas: every file of a known kind (`html`, `js`, `json`, `svg`, `md`, `txt`,
 beside them as your own log under `.metamedium/logs/`. Three ways in:
 
 - **A folder on disk** — the *folder* tile in the control centre (Chrome or Edge).
+- **A live room** — the *live* tile, or `session-engine.html?live=<room>`:
+  other tabs on this machine that open the same room see each other's ink
+  as it lands, each hand in its own colour. Across machines, run
+  `node Demos/relay.mjs` and add `&relay=http://<host>:8020`.
   Autosave rewrites only your log file; git carries it between machines.
 - **A repository** — `session-engine.html?git=owner/repo` (or
   `owner/repo@branch`, `owner/repo/some/dir`). Reading a public repository

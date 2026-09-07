@@ -62,6 +62,7 @@ export {
   ENGINE_PARTICIPANT,
   ENGINE_NAME,
   localityOf,
+  authorOf,
 } from './session/nodes';
 export type { MMNode, Rep, Edge, Capability, ParticipantKind, ExplanationData, Transcript } from './session/nodes';
 
@@ -93,6 +94,10 @@ export { isLetterLike, joinsRun, wordConfidence, LETTER_MAX_HEIGHT_PX, WORD_GAP_
 
 // One log per participant; the canvas is the merge (BUILD-PLAN-v8 §1.5).
 export { mergeLogs } from './store/merge';
+export type { MergeOptions } from './store/merge';
+// Live logs — multiplayer as a transport over the per-participant logs (v9 S6).
+export { LiveStore, LocalHub } from './store/live';
+export type { LiveLine, LiveTransport, Presence } from './store/live';
 
 // The storage seam: the canvas is a folder; per-participant logs; backends (WP-11).
 export { MemoryStore, ReadOnlyError, logPathFor, participantOfLog, encodeLog, decodeLog, isCanvasFile, toBytes, toText, META_DIR, LOG_DIR, LOG_EXT } from './store/seam';

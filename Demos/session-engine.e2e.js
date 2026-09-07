@@ -1234,6 +1234,38 @@ window.__scenario = async function(){
     document.getElementById('markName').textContent === 'check',
     { mark: mm.session.getState().commandMark, chip: document.getElementById('markName').textContent });
 
+  // ---- 28. A live room: another hand's log arrives live, its ink in its own colour ----
+  {
+    mm.session.load([]); mm.setView(1, 0, 0);
+    const hub = new MM.LocalHub();
+    const other = new MM.LiveStore(hub.connect(), 'alice', 'table');
+    // Alice drew a box before this hand joined; joining says hello and gets her log.
+    const s2 = MM.createSession(); s2.addStroke(t.rect(100, 100, 120, 80).map(p => ({ x: p.x, y: p.y })), 1000);
+    await other.appendLog('alice', s2.getEvents());
+    await mm.openLive('table', { transport: hub.connect() });
+    for (let i = 0; i < 20 && mm.session.getState().contentIds.length < 1; i++) await new Promise(r => setTimeout(r, 100));
+    const st28 = mm.session.getState();
+    const theirs = st28.contentIds.map(id => st28.nodes.get(id)).filter(n => MM.authorOf(n) === 'participant:hand:alice');
+    step('28. joining a room brings the other hand\'s log, its marks attributed to a participant of her name', theirs.length === 1 && st28.participants.includes('participant:hand:alice') && MM.wordOf(st28.nodes.get('participant:hand:alice')) === 'alice', { theirs: theirs.length, participants: st28.participants });
+    step('28a. her ink draws in her own colour, not yours and not a model\'s', theirs.length === 1 && mm.handColour('alice') !== mm.handColour('bob') && /^hsl\(/.test(mm.handColour('alice')), { colour: mm.handColour('alice') });
+    // She draws again while this hand is in the room: it lands live.
+    const s3 = MM.createSession(); s3.load(s2.getEvents()); s3.addStroke(t.circle(400, 160, 40).map(p => ({ x: p.x, y: p.y })), 2000);
+    await other.appendLog('alice', s3.getEvents().slice(s2.getEvents().length));
+    for (let i = 0; i < 20 && mm.session.getState().contentIds.length < 2; i++) await new Promise(r => setTimeout(r, 100));
+    const st28b = mm.session.getState();
+    step('28b. a mark she makes now lands on this board within a moment', st28b.contentIds.length === 2 && /with alice/.test(document.getElementById('status').dataset.standing || ''), { content: st28b.contentIds.length, standing: document.getElementById('status').dataset.standing });
+    // This hand draws: alice's store hears it under this hand's name, and the merge keeps both.
+    t.stroke(t.rect(600, 100, 120, 80));
+    await mm.saveNow(); await wait(200);
+    const herLogs = await other.readLogs();
+    const me28 = mm.folder().me;
+    step('28c. what this hand draws reaches her under its own name, and this board keeps both hands\' marks', !!herLogs[me28] && herLogs[me28].length >= 1 && mm.session.getState().contentIds.length === 3 && me28 !== 'alice', { mine: herLogs[me28] && herLogs[me28].length, me: me28, hers: Object.keys(herLogs) });
+    mm.session.undo();
+    step('28d. undo takes back this hand\'s mark and leaves hers', mm.session.getState().contentIds.length === 2);
+    if (mm.folder().store && mm.folder().store.close) mm.folder().store.close();
+    mm.session.load([]);
+  }
+
   // ---- 23. The folder as the canvas: files are artifacts, ink is a log in the folder, a second machine sees it ----
   {
     const store = new MM.MemoryStore({
