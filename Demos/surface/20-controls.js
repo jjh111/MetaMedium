@@ -63,14 +63,14 @@
   // A live room: a name, and a relay when the other hand is on another machine.
   const livePanel = document.getElementById('livePanel');
   ui.pane(livePanel, 'live', () => closePanel(livePanel, tiles.live));
-  tiles.live.onclick = () => { togglePanel(livePanel, tiles.live); if (!livePanel.hasAttribute('hidden')) { const r = document.getElementById('liveRoom'); if (!r.value) r.value = folder.how === 'live' ? folder.name : 'table'; document.getElementById('liveName').value = folder.me === 'local' ? (prefs.get('hand-name', '') || '') : folder.me; } };
+  tiles.live.onclick = () => { togglePanel(livePanel, tiles.live); if (!livePanel.hasAttribute('hidden')) { const r = document.getElementById('liveRoom'); if (!r.value) r.value = folder.how === 'live' ? folder.name : 'table'; document.getElementById('liveName').value = prefs.get('hand-name', '') || ''; } };
   document.getElementById('liveJoin').onclick = () => {
     const room = document.getElementById('liveRoom').value.trim();
     const name = document.getElementById('liveName').value.trim();
     const relay = document.getElementById('liveRelay').value.trim();
     if (!room) { document.getElementById('liveStatus').textContent = 'a room needs a name'; return; }
-    if (name) { prefs.set('hand-name', name); setParticipant(name); }
-    openLive(room, relay ? { relay } : {}).then(() => { closePanel(livePanel, tiles.live); say('in room ' + room + ' as ' + folder.me + (relay ? ' through ' + relay : ' — other tabs on this machine can join')); syncTiles(); })
+    if (name) prefs.set('hand-name', name);
+    openLive(room, relay ? { relay } : {}).then(() => { closePanel(livePanel, tiles.live); say('in room ' + room + ' as ' + handLabel(folder.me) + (relay ? ' through ' + relay : ' — other tabs on this machine can join')); syncTiles(); })
       .catch((err) => { document.getElementById('liveStatus').textContent = 'could not join: ' + (err.message || err); });
   };
 

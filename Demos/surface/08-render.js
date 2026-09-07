@@ -19,7 +19,7 @@
     const p = state.nodes.get(pid);
     const kind = p && (p.reps.find((r) => r.modality === 'participant') || {}).data;
     if (!p || !kind || kind.kind === 'agent' || kind.kind === 'engine') return C.agent;
-    return handColour(MM.wordOf(p) || pid);
+    return handColour(handLabel(MM.wordOf(p) || pid));
   }
   const handHues = new Map();
   function handColour(name) {
@@ -28,7 +28,7 @@
     return 'hsl(' + h + ' 55% ' + (document.documentElement.getAttribute('data-theme') === 'dark' ? '68%' : '42%') + ')';
   }
   const nameOfParticipant = (pid) =>
-    pid === MM.LOCAL_PARTICIPANT ? 'you' : (MM.wordOf(state.nodes.get(pid)) || pid);
+    pid === MM.LOCAL_PARTICIPANT ? 'you' : handLabel(MM.wordOf(state.nodes.get(pid)) || pid);
 
   function nodeAt(x, y) {
     const slack = wpx(8);

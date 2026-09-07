@@ -1259,7 +1259,7 @@ window.__scenario = async function(){
     await mm.saveNow(); await wait(200);
     const herLogs = await other.readLogs();
     const me28 = mm.folder().me;
-    step('28c. what this hand draws reaches her under its own name, and this board keeps both hands\' marks', !!herLogs[me28] && herLogs[me28].length >= 1 && mm.session.getState().contentIds.length === 3 && me28 !== 'alice', { mine: herLogs[me28] && herLogs[me28].length, me: me28, hers: Object.keys(herLogs) });
+    step('28c. what this hand draws reaches her under its own name — the person\'s, with this tab\'s suffix — and this board keeps both hands\' marks', !!herLogs[me28] && herLogs[me28].length >= 1 && mm.session.getState().contentIds.length === 3 && me28 !== 'alice' && /~/.test(me28), { mine: herLogs[me28] && herLogs[me28].length, me: me28, hers: Object.keys(herLogs) });
     mm.session.undo();
     step('28d. undo takes back this hand\'s mark and leaves hers', mm.session.getState().contentIds.length === 2);
     if (mm.folder().store && mm.folder().store.close) mm.folder().store.close();

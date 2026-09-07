@@ -797,9 +797,13 @@ stamps every event from another log with `by: <log name>`, and the session
 attributes such an event to a participant of that name — made on first
 sight, id `participant:hand:<name>`, no join event anyone had to write — so
 another hand's ink draws in its own colour (a hue from the name) and is
-never yours. The merge runs as each line lands (debounced), my unsent
-events kept; autosave sends the delta. Presence is who was heard in the
-last minute, in the status line. Known gap: a model's proposals in
+never yours. The merge runs as each line lands (on a microtask — a hidden tab throttles
+timers), my unsent events kept; autosave sends the delta. Presence is who
+was heard in the last minute, in the status line. **A hand in a room is one
+tab**: the name is the person's (a preference) and a suffix is the tab's
+(`john~a1b2`, shown as *john*), because a second tab of the same person is
+a second log — under one name its lines would be taken for its own and
+dropped. Known gap: a model's proposals in
 another hand's log reference that hand's participant ids, which the merge
 does not translate yet.
 

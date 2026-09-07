@@ -106,7 +106,10 @@
   async function openLive(room, opts) {
     opts = opts || {};
     if (folder.store && folder.store.close) folder.store.close();
-    const me = folder.me === 'local' ? handName() : folder.me;
+    // A hand in a room is one TAB: a second tab of the same person is a
+    // second log, or their lines would be taken for its own and dropped.
+    // The name is the person's; the suffix is the tab's.
+    const me = handName();
     setParticipant(me);
     const transport = opts.transport || (opts.relay ? relayTransport(opts.relay, room) : broadcastTransport(room));
     const store = new MM.LiveStore(transport, me, room);
@@ -120,14 +123,15 @@
     store.hello();
     return folder;
   }
-  /** A name for this hand in a room: remembered on the device, or minted. */
+  /** A name for this hand in a room: the person's name (a preference), and a suffix this tab keeps. */
   function handName() {
-    const held = prefs.get('hand-name', '');
-    if (held) return held;
-    const name = 'hand-' + Math.random().toString(36).slice(2, 6);
-    prefs.set('hand-name', name);
-    return name;
+    let tab = '';
+    try { tab = sessionStorage.getItem('mm-tab') || ''; if (!tab) { tab = Math.random().toString(36).slice(2, 6); sessionStorage.setItem('mm-tab', tab); } } catch (err) { tab = Math.random().toString(36).slice(2, 6); }
+    const name = (prefs.get('hand-name', '') || 'hand').replace(/~.*$/, '');
+    return name + '~' + tab;
   }
+  /** A hand's name as shown: the person's, without the tab's suffix. */
+  function handLabel(name) { return String(name || '').replace(/~[^~]*$/, ''); }
   /** Every log the room has, merged and loaded; my own events stay mine. */
   async function mergeLive() {
     if (!folder.store || folder.how !== 'live') return;
@@ -270,8 +274,8 @@
     if (!folder.store) return '';
     if (folder.how === 'live') {
       const now = Date.now();
-      const here = folder.store.presence().filter((p) => now - p.at < 60000).map((p) => p.participant);
-      return 'live ' + folder.name + ' · you are ' + folder.me + (here.length ? ' · with ' + here.join(', ') : ' · alone so far') + (folder.error ? ' · ' + folder.error : '');
+      const here = folder.store.presence().filter((p) => now - p.at < 60000).map((p) => handLabel(p.participant));
+      return 'live ' + folder.name + ' · you are ' + handLabel(folder.me) + (here.length ? ' · with ' + here.join(', ') : ' · alone so far') + (folder.error ? ' · ' + folder.error : '');
     }
     const n = folder.entries.length;
     return (folder.how === 'static' ? 'site' : folder.how === 'git' ? 'repo' : 'folder') + (folder.name ? ' ' + folder.name : '') + ' · ' + n + ' file' + (n === 1 ? '' : 's') +

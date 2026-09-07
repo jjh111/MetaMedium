@@ -1643,7 +1643,7 @@
     const p = state.nodes.get(pid);
     const kind = p && (p.reps.find((r) => r.modality === 'participant') || {}).data;
     if (!p || !kind || kind.kind === 'agent' || kind.kind === 'engine') return C.agent;
-    return handColour(MM.wordOf(p) || pid);
+    return handColour(handLabel(MM.wordOf(p) || pid));
   }
   const handHues = new Map();
   function handColour(name) {
@@ -1652,7 +1652,7 @@
     return 'hsl(' + h + ' 55% ' + (document.documentElement.getAttribute('data-theme') === 'dark' ? '68%' : '42%') + ')';
   }
   const nameOfParticipant = (pid) =>
-    pid === MM.LOCAL_PARTICIPANT ? 'you' : (MM.wordOf(state.nodes.get(pid)) || pid);
+    pid === MM.LOCAL_PARTICIPANT ? 'you' : handLabel(MM.wordOf(state.nodes.get(pid)) || pid);
 
   function nodeAt(x, y) {
     const slack = wpx(8);
@@ -4486,7 +4486,10 @@
   async function openLive(room, opts) {
     opts = opts || {};
     if (folder.store && folder.store.close) folder.store.close();
-    const me = folder.me === 'local' ? handName() : folder.me;
+    // A hand in a room is one TAB: a second tab of the same person is a
+    // second log, or their lines would be taken for its own and dropped.
+    // The name is the person's; the suffix is the tab's.
+    const me = handName();
     setParticipant(me);
     const transport = opts.transport || (opts.relay ? relayTransport(opts.relay, room) : broadcastTransport(room));
     const store = new MM.LiveStore(transport, me, room);
@@ -4500,14 +4503,15 @@
     store.hello();
     return folder;
   }
-  /** A name for this hand in a room: remembered on the device, or minted. */
+  /** A name for this hand in a room: the person's name (a preference), and a suffix this tab keeps. */
   function handName() {
-    const held = prefs.get('hand-name', '');
-    if (held) return held;
-    const name = 'hand-' + Math.random().toString(36).slice(2, 6);
-    prefs.set('hand-name', name);
-    return name;
+    let tab = '';
+    try { tab = sessionStorage.getItem('mm-tab') || ''; if (!tab) { tab = Math.random().toString(36).slice(2, 6); sessionStorage.setItem('mm-tab', tab); } } catch (err) { tab = Math.random().toString(36).slice(2, 6); }
+    const name = (prefs.get('hand-name', '') || 'hand').replace(/~.*$/, '');
+    return name + '~' + tab;
   }
+  /** A hand's name as shown: the person's, without the tab's suffix. */
+  function handLabel(name) { return String(name || '').replace(/~[^~]*$/, ''); }
   /** Every log the room has, merged and loaded; my own events stay mine. */
   async function mergeLive() {
     if (!folder.store || folder.how !== 'live') return;
@@ -4650,8 +4654,8 @@
     if (!folder.store) return '';
     if (folder.how === 'live') {
       const now = Date.now();
-      const here = folder.store.presence().filter((p) => now - p.at < 60000).map((p) => p.participant);
-      return 'live ' + folder.name + ' · you are ' + folder.me + (here.length ? ' · with ' + here.join(', ') : ' · alone so far') + (folder.error ? ' · ' + folder.error : '');
+      const here = folder.store.presence().filter((p) => now - p.at < 60000).map((p) => handLabel(p.participant));
+      return 'live ' + folder.name + ' · you are ' + handLabel(folder.me) + (here.length ? ' · with ' + here.join(', ') : ' · alone so far') + (folder.error ? ' · ' + folder.error : '');
     }
     const n = folder.entries.length;
     return (folder.how === 'static' ? 'site' : folder.how === 'git' ? 'repo' : 'folder') + (folder.name ? ' ' + folder.name : '') + ' · ' + n + ' file' + (n === 1 ? '' : 's') +
@@ -5160,14 +5164,14 @@
   // A live room: a name, and a relay when the other hand is on another machine.
   const livePanel = document.getElementById('livePanel');
   ui.pane(livePanel, 'live', () => closePanel(livePanel, tiles.live));
-  tiles.live.onclick = () => { togglePanel(livePanel, tiles.live); if (!livePanel.hasAttribute('hidden')) { const r = document.getElementById('liveRoom'); if (!r.value) r.value = folder.how === 'live' ? folder.name : 'table'; document.getElementById('liveName').value = folder.me === 'local' ? (prefs.get('hand-name', '') || '') : folder.me; } };
+  tiles.live.onclick = () => { togglePanel(livePanel, tiles.live); if (!livePanel.hasAttribute('hidden')) { const r = document.getElementById('liveRoom'); if (!r.value) r.value = folder.how === 'live' ? folder.name : 'table'; document.getElementById('liveName').value = prefs.get('hand-name', '') || ''; } };
   document.getElementById('liveJoin').onclick = () => {
     const room = document.getElementById('liveRoom').value.trim();
     const name = document.getElementById('liveName').value.trim();
     const relay = document.getElementById('liveRelay').value.trim();
     if (!room) { document.getElementById('liveStatus').textContent = 'a room needs a name'; return; }
-    if (name) { prefs.set('hand-name', name); setParticipant(name); }
-    openLive(room, relay ? { relay } : {}).then(() => { closePanel(livePanel, tiles.live); say('in room ' + room + ' as ' + folder.me + (relay ? ' through ' + relay : ' — other tabs on this machine can join')); syncTiles(); })
+    if (name) prefs.set('hand-name', name);
+    openLive(room, relay ? { relay } : {}).then(() => { closePanel(livePanel, tiles.live); say('in room ' + room + ' as ' + handLabel(folder.me) + (relay ? ' through ' + relay : ' — other tabs on this machine can join')); syncTiles(); })
       .catch((err) => { document.getElementById('liveStatus').textContent = 'could not join: ' + (err.message || err); });
   };
 
