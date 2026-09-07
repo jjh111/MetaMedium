@@ -259,9 +259,11 @@ so ink and chrome never disagree.
 | S7 | **Gate** ✅ | No model call without one of the acts in 6.3; the e2e counts calls |
 | S1 | **The frame** ✅ | One bar, the control centre, blurbs out, theme and hand as tiles |
 | S2 | **One field** ✅ | The reading line; the four core slots never move; every verb reachable by typing |
-| S3 | **Matches as chips** ✅ first cut | *name 0.92* beside a matching group; the sentence is gone |
+| S3 | **Matches as chips** ✅ | *name 0.92* beside a matching group; a tap on it opens the field with the match leading (`summonMarks`); the sentence is gone |
 | S4 | Code at every zoom | unchanged |
 | S6 | Live logs | unchanged |
+
+*Known, from hardening the harness (6 Sep, evening):* a playing program whose frame is **off-screen** has its timers and frames throttled by the browser (a cross-origin iframe out of the viewport), so its parts stop reporting and an error it throws is reported late, until it is back in view. The clock still says *playing*; the pause-on-error lands when the frame wakes. Nothing in the engine can change this; the surface could pause such clocks itself and say why.
 
 ---
 

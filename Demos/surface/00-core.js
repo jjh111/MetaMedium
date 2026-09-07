@@ -40,6 +40,12 @@
   function readColours() {
     const cs = getComputedStyle(document.documentElement);
     const v = (name) => cs.getPropertyValue(name).trim();
+    // No stylesheet (a broken link, a build that inlined nothing): ink must
+    // still be visible, so the instrument's own values stand in.
+    if (!v('--ink')) {
+      return { ink: '#e8e4d9', inkFaint: 'rgba(232,228,217,0.14)', halo: 'rgba(10,10,15,0.55)', haloText: 'rgba(10,10,15,0.7)',
+        agent: '#8ab4c8', agentRGB: '138,180,200', gold: '#c9a84c', goldRGB: '201,168,76', labelRGB: '160,152,128', panelRGB: '18,18,26', dim: '#a09880' };
+    }
     return {
       ink: v('--ink'), inkFaint: v('--ink-faint'), halo: v('--halo'), haloText: v('--halo-text'),
       agent: v('--agent'), agentRGB: v('--agent-rgb'), gold: v('--gold'), goldRGB: v('--gold-rgb'),

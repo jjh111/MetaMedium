@@ -86,6 +86,15 @@
   <div id="mpList"></div>
 </div>
 
+<div id="exportPanel" hidden>
+  <div class="exRow">
+    <button data-export="svg" title="Every mark as a path, the clean form where one is held">board.svg</button>
+    <button data-export="png" title="The canvas as pixels, as it is on screen">board.png</button>
+    <button data-export="log" title="The session as one event per line">canvas.jsonl</button>
+  </div>
+</div>
+<div id="helpPanel" hidden><div class="helpBody"></div></div>
+
 <div id="grid" hidden></div>
 <textarea id="textEditor" hidden spellcheck="false" placeholder="type here — Enter keeps it, Shift+Enter for a new line, Esc drops it"></textarea>
 <aside id="inspector" aria-live="polite"></aside>

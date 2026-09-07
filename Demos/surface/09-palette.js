@@ -530,7 +530,10 @@
     body.appendChild(list);
     summonEl.appendChild(body);
     paintField('');
-    setTimeout(() => filter.focus(), 0);
+    // A keyboard that pops up on every selection covers the pills on a phone;
+    // a finger taps the input when it wants to type. A pointer gets the focus.
+    const coarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+    if (!coarse) setTimeout(() => filter.focus(), 0);
   }
 
   /** Recompute the offers for the open summon and repaint, keeping what was typed. */

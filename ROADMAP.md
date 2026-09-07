@@ -19,9 +19,10 @@
 > grid under the same bar, no sentence of philosophy on the page (S1); a
 > match is a chip with its number (S3, first cut); the moment — nested
 > circles, "torus in 3d", a three.js program in the drawing's frame,
-> reused from the library the second time (S5). The e2e drives 135 steps.
-> Still open: code legible at every zoom (S4), live logs (S6), a tap on a
-> match chip opening the field.
+> reused from the library the second time (S5); a tap on a match chip opens
+> the field on the group (S3). The e2e drives 138 steps. Still open: code
+> legible at every zoom (S4), live logs (S6), a brace as a scoping mark in
+> the diagram rung.
 
 > **v8 accounting, 3 September 2026 (branch `next-phases`, local).** Every
 > work package in `BUILD-PLAN-v8.md` §2 has landed: the surface split into

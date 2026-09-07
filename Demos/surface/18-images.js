@@ -167,9 +167,18 @@
     downloadBlob(name, new Blob([text], { type: type || 'text/plain' }));
   }
 
-  document.getElementById('exportBtn').onclick = () => {
-    const which = (prompt('Export the board as: svg, png, or log', 'svg') || '').trim().toLowerCase();
-    if (which === 'svg') downloadText('board.svg', exportBoardSVG(), 'image/svg+xml');
-    else if (which === 'png') exportBoardPNG().then((b) => b && downloadBlob('board.png', b));
-    else if (which === 'log') downloadText('canvas.jsonl', MM.encodeLog(session.getEvents()), 'application/json');
-  };
+  // The export pane: the board as SVG or PNG, the session as its log.
+  const exportPanel = document.getElementById('exportPanel');
+  const exportBtn = document.getElementById('exportBtn');
+  ui.pane(exportPanel, 'export', () => closePanel(exportPanel, exportBtn));
+  exportBtn.onclick = () => togglePanel(exportPanel, exportBtn);
+  exportPanel.addEventListener('click', (e) => {
+    const b = e.target.closest && e.target.closest('button[data-export]');
+    if (!b) return;
+    const which = b.dataset.export;
+    const n = session.getState().contentIds.length;
+    if (which === 'svg') { downloadText('board.svg', exportBoardSVG(), 'image/svg+xml'); flash('board.svg — ' + n + ' marks as paths'); }
+    else if (which === 'png') exportBoardPNG().then((blob) => { if (blob) { downloadBlob('board.png', blob); flash('board.png — the canvas as pixels'); } });
+    else if (which === 'log') { const evs = session.getEvents(); downloadText('canvas.jsonl', MM.encodeLog(evs), 'application/json'); flash('canvas.jsonl — ' + evs.length + ' events'); }
+    closePanel(exportPanel, exportBtn);
+  });

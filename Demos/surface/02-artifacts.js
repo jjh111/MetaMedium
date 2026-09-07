@@ -102,6 +102,17 @@
       const playing = !!(s.clocks[id] && s.clocks[id].playing);
       const stamp = rep.data.at + ':' + Math.round(fr.w) + 'x' + Math.round(fr.h) + ':' + hashOf(code) + (kind === 'run' ? ':' + (playing ? 'run' : 'still') : '');
       if (!f.parked && f.codeAt !== stamp) {
+        // A document that CHANGES gets a new element. Assigning srcdoc twice
+        // in one tick — the source card at import, the harness at play — lost
+        // the second navigation on a board with a dozen frames loading: the
+        // program never started and nothing said so. A fresh iframe always
+        // navigates; the message listener ignores the old window by identity.
+        if (f.codeAt !== null) {
+          const next = document.createElement('iframe');
+          for (const attr of ['sandbox', 'scrolling', 'title']) { const v = f.iframe.getAttribute(attr); if (v !== null) next.setAttribute(attr, v); }
+          f.iframe.replaceWith(next);
+          f.iframe = next;
+        }
         f.codeAt = stamp;
         if (kind === 'run') reported.delete(id);
         f.iframe.srcdoc = documentForKind({ data: { ...rep.data, code: code } }, fr.w, fr.h, { id: id, playing: playing });

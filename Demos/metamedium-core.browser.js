@@ -5647,6 +5647,21 @@ ${pad}</${tag}>`;
       return b.every((x) => set.has(x));
     }
     function applySummon(ev) {
+      if (ev.ids) {
+        const ids = ev.ids.filter((id) => contentIds.includes(id));
+        const boxes = ids.map((id) => boundsOf(nodes.get(id))).filter((b) => !!b);
+        if (!ids.length || !boxes.length) return null;
+        const union = boxes.reduce((a, b) => ({
+          minX: Math.min(a.minX, b.minX),
+          minY: Math.min(a.minY, b.minY),
+          maxX: Math.max(a.maxX, b.maxX),
+          maxY: Math.max(a.maxY, b.maxY)
+        }));
+        summon = buildSummon(ids, "pointed", `you pointed at ${ids.length} mark${ids.length === 1 ? "" : "s"}`, [], union, "", ev.at);
+        markMiss = null;
+        recomputeClusterCandidates();
+        return summon.id;
+      }
       if (!pendingLasso) return null;
       const lassoNode = nodes.get(pendingLasso.id);
       const lassoFp = lassoNode && fingerprintOf(lassoNode);
@@ -5867,6 +5882,7 @@ ${pad}</${tag}>`;
       },
       tick: (at) => void dispatch({ type: "tick", at }),
       summonHeld: (at) => dispatch({ type: "summon", at }),
+      summonMarks: (ids, at) => dispatch({ type: "summon", ids: ids.slice(), at }),
       splitWord: (nodeId, at) => void dispatch({ type: "split", nodeId, at }),
       select: (ids, at) => void dispatch({ type: "select", ids, at }),
       deselect: (at) => void dispatch({ type: "deselect", at }),

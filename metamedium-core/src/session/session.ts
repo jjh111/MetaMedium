@@ -86,7 +86,9 @@ export type ScopeSource =
   /** The mark crossed it. */
   | 'crossed'
   /** It came along with something the mark crossed, because you had just drawn them together. */
-  | 'recent';
+  | 'recent'
+  /** You pointed at it — a tap on the chip beside a matching group, a card, a button. */
+  | 'pointed';
 
 export interface Summon {
   id: string;
@@ -202,6 +204,12 @@ export type SessionEvent =
       type: 'summon';
       at: number;
       participantId?: string;
+      /**
+       * Summon THESE marks rather than the held lasso: a tap on the chip
+       * beside a group the engine matched. Ids not in the content plane are
+       * ignored; nothing is summoned when none remain.
+       */
+      ids?: string[];
     }
   | {
       /** Split a held word back into its letters — the grouping was inferred, and this is the human saying no. */
@@ -442,6 +450,11 @@ export interface Session {
    * Returns the summon id, or null when nothing is held.
    */
   summonHeld(at: number): string | null;
+  /**
+   * Summon some marks outright — a tap on the chip beside a matching group.
+   * The same summon a loop and a mark would reach, with `scopeSource: 'pointed'`.
+   */
+  summonMarks(ids: string[], at: number): string | null;
   /** Split a held word back into its letter strokes. */
   splitWord(nodeId: string, at: number): void;
   /** Select marks outright (a grid view, a tap on a card). Ids not in the content plane are ignored. */
@@ -1739,6 +1752,20 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
   }
 
   function applySummon(ev: Extract<SessionEvent, { type: 'summon' }>): string | null {
+    if (ev.ids) {
+      // Pointed at: the marks named, no loop involved. A tap on a match chip.
+      const ids = ev.ids.filter((id) => contentIds.includes(id));
+      const boxes = ids.map((id) => boundsOf(nodes.get(id)!)).filter((b): b is Bounds => !!b);
+      if (!ids.length || !boxes.length) return null;
+      const union = boxes.reduce((a, b) => ({
+        minX: Math.min(a.minX, b.minX), minY: Math.min(a.minY, b.minY),
+        maxX: Math.max(a.maxX, b.maxX), maxY: Math.max(a.maxY, b.maxY),
+      }));
+      summon = buildSummon(ids, 'pointed', `you pointed at ${ids.length} mark${ids.length === 1 ? '' : 's'}`, [], union, '', ev.at);
+      markMiss = null;
+      recomputeClusterCandidates();
+      return summon.id;
+    }
     if (!pendingLasso) return null;
     const lassoNode = nodes.get(pendingLasso.id);
     const lassoFp = lassoNode && fingerprintOf(lassoNode);
@@ -1981,6 +2008,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     },
     tick: (at) => void dispatch({ type: 'tick', at }),
     summonHeld: (at) => dispatch({ type: 'summon', at }),
+    summonMarks: (ids, at) => dispatch({ type: 'summon', ids: ids.slice(), at }),
     splitWord: (nodeId, at) => void dispatch({ type: 'split', nodeId, at }),
     select: (ids, at) => void dispatch({ type: 'select', ids, at }),
     deselect: (at) => void dispatch({ type: 'deselect', at }),

@@ -34,13 +34,13 @@ the v8 build plan has landed** — the canvas as a program with clocks, a
 tank, verbs from words or from acting out, frames with a drawn slider, the
 folder as the canvas with three backends, pictures in and the board out,
 text as an element, and an installable shell — 550 core tests and a
-135-step browser e2e. `ROADMAP.md` carries the honest gaps. Before v8:
+138-step browser e2e. `ROADMAP.md` carries the honest gaps. Before v8:
 **the MVP loop runs end to end.** Draw boxes on an infinite canvas,
 circle them, cross with a command mark *you taught the system*, prompt them into
 a living page that renders in the canvas with your ink still outlining its
 divs — then draw on that page and the ink addresses the regions underneath it.
 Scratch anything out to erase. `Demos/session-engine.html` is the surface;
-`Demos/session-engine.e2e.js` drives 135 steps through the real UI: page, flowchart, handwriting (read only when asked), the model drawing, the user-side loop, selection and the field, corrections, the worker, the tank, words into verbs and acting out, frames and the drawn slider, the folder, pictures, text, and the moment. A run takes about 90 s; run it **in its own tab** (`?fresh=1&nosw=1` — it replaces `fetch` with a stub and joins a stub model, so never in a tab you are working in), start it with `__setup(); __scenario().then(r => window.__R = r)` and read `__R` when it lands.
+`Demos/session-engine.e2e.js` drives 138 steps through the real UI: page, flowchart, handwriting (read only when asked), the model drawing, the user-side loop, selection and the field, corrections, the worker, the tank, words into verbs and acting out, frames and the drawn slider, the folder, pictures, text, and the moment. A run takes about 90 s; run it **in its own tab** (`?fresh=1&nosw=1` — it replaces `fetch` with a stub and joins a stub model, so never in a tab you are working in), start it with `__setup(); __scenario().then(r => window.__R = r)` and read `__R` when it lands.
 v7 Stage E (handwriting) shipped 1 Sep 2026: a word written beside a shape is read by a
 model that can see and offered as that shape's name. Whitepaper v5.1 stays parked until the
 conversation benchmark passes end to end.
@@ -413,6 +413,12 @@ makes it render as real DOM in the canvas. The rules:
   gesture; whether the artifact already carries code decides which.
 - Every version is held and attributed. Rendering the newest is a display
   choice, not a commitment.
+- **A frame whose document changes gets a new iframe element**
+  (`syncStage`). Assigning `srcdoc` twice in one tick — the source card at
+  import, the harness at play — lost the second navigation on a board with
+  a dozen frames loading: the program never started and nothing said so.
+  A fresh element always navigates, and the message listener ignores the
+  old window by identity.
 - A **broken** artifact leaves the live plane: code is a contract with the marks
   that framed it, and a page rendering over erased ink is the silent phantom
   degradation exists to prevent.
@@ -583,7 +589,13 @@ selection stands), the canvas beside a mark (a name, a match chip with its
 number, a working model, an answer card — and the reading of the mark the
 hand just made, under that mark only), the panel (rows), and the status line
 (one sentence: what just happened, via `say`/`flash`, else the standing state
-in a few words). The model pane's status stays in the pane.
+in a few words). The model pane's status stays in the pane. **A match chip
+is a button** (D8): a tap on it summons the group it stands beside —
+`session.summonMarks(ids, at)`, the same summon a loop and a mark reach,
+with `scopeSource: 'pointed'` — so the second molecule is one tap from being
+held. Export is a pane of three files (SVG, PNG, the log); help is the hand
+QA plan read into a pane. On a touch screen the field does not take the
+focus until the input is tapped, or the keyboard would cover the pills.
 
 **A model is asked only by a deliberate act** (v9 S7, §6.3 of the plan):
 Enter on a brief, `ask:`, `draw:`, *Read the writing* (or the panel's *read
@@ -724,7 +736,12 @@ whole log in browser storage when there is no folder — a reload brings the
 board back and *Reset* forgets it. A static site is opened read-only through
 `.metamedium/manifest.json` (`?folder=<base>`), so a published canvas can be
 drawn on and the ink stays the reader's. **The live budget**: the nearest
-twelve live artifacts render; the rest stand as parked cards. Grid and
+twelve live artifacts render; the rest stand as parked cards — except that
+**a playing artifact is never parked** (its clock is running, and a card in
+its place would silence it; found when a program past the budget never
+started). A cross-origin frame that is off-screen is throttled by the
+browser itself, so a playing program out of view reports late until it is
+back. Grid and
 focus are lenses over the same log. **A repository is a folder too**
 (`store/git.ts`, `?git=owner/repo`): the tree in one request, files by
 path, this participant's log committed as one file; reads need no token,
@@ -800,7 +817,9 @@ without `allow-same-origin`, an opaque origin that can draw and cannot
 reach the page or its keys — on a **clear background**, sized to the ink's
 frame, with three.js when it loads and a 2D context always, and it
 **reports its parts** (named rectangles) back over `postMessage`, so ink
-over a running torus lands on `torus`. **The library first:** before any
+over a running torus lands on `torus`. An error thrown at any time — while
+the code loads, in a frame, later in a timer or a promise — is posted back
+and pauses the clock with the reason, the frame marked broken. **The library first:** before any
 model is asked, a brief the library already answers reuses that entry
 (typing an entry's name completes to it; a drawing that matches a coded
 definition carries its program), and the model's brief lists what the

@@ -117,8 +117,16 @@
     }
   }
 
+  let chipHits = []; // the match chips drawn this frame, in world coordinates: { ids, x, y, w, h }
+  /** The match chip under a world point, if any. */
+  function chipAt(w) {
+    for (const c of chipHits) if (w.x >= c.x && w.x <= c.x + c.w && w.y >= c.y && w.y <= c.y + c.h) return c;
+    return null;
+  }
+
   function render(s) {
     state = s;
+    chipHits = [];
     // No model is asked from here: a paint is not a request (§6.3).
     syncStage(s);
     refreshOffers();
@@ -145,9 +153,11 @@
       ctx.lineWidth = wpx(1);
       ctx.strokeRect(b.minX - pad, b.minY - pad, b.maxX - b.minX + pad * 2, b.maxY - b.minY + pad * 2);
       ctx.setLineDash([]);
-      // A match is a chip beside the group, with its number (D8). Plural, like
-      // every reading: two definitions with the same shapes are both named.
-      chipText(c.matches.slice(0, 2).map((m) => m.name + ' ' + m.score.toFixed(2)).join('  ·  '), b.minX - pad, b.minY - pad - wpx(8));
+      // A match is a chip beside the group, with its number (D8); a tap on it
+      // opens the field with the match leading. Plural, like every reading:
+      // two definitions with the same shapes are both named.
+      const hit = chipText(c.matches.slice(0, 2).map((m) => m.name + ' ' + m.score.toFixed(2)).join('  ·  '), b.minX - pad, b.minY - pad - wpx(8));
+      chipHits.push({ ids: c.nodeIds.slice(), x: hit.x, y: hit.y, w: hit.w, h: hit.h });
     }
 
     const inspectedId = hoverId || lastContentId(s);
@@ -291,6 +301,7 @@
     ctx.stroke();
     ctx.fillStyle = C.gold;
     ctx.fillText(str, x + wpx(7), y - wpx(5));
+    return { x: x, y: y - h, w: w, h: h };
   }
 
   function brackets(b, color) {

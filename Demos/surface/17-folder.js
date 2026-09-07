@@ -200,13 +200,17 @@
   function liveSet(s) {
     const live = s.live.filter((id) => !s.nodes.get(id).reps.some((r) => r.modality === 'erased'));
     if (live.length <= LIVE_BUDGET) return new Set(live);
+    // A playing artifact is never parked: its clock is running, and a card
+    // in its place would silence it without a word. It takes the budget
+    // first; the nearest of the rest fill what is left.
+    const playing = live.filter((id) => s.clocks[id] && s.clocks[id].playing);
     const c = screenToWorld(innerWidth / 2, innerHeight / 2);
-    const scored = live.map((id) => {
+    const scored = live.filter((id) => !playing.includes(id)).map((id) => {
       const b = MM.boundsOf(s.nodes.get(id));
       const d = b ? Math.hypot((b.minX + b.maxX) / 2 - c.x, (b.minY + b.maxY) / 2 - c.y) : Infinity;
       return { id, d };
     }).sort((p, q) => p.d - q.d);
-    return new Set(scored.slice(0, LIVE_BUDGET).map((x) => x.id));
+    return new Set(playing.concat(scored.slice(0, Math.max(0, LIVE_BUDGET - playing.length)).map((x) => x.id)));
   }
 
   // ===== Three views, one log ==================================================

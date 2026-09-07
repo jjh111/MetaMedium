@@ -86,7 +86,9 @@ control centre opens this file.
    the line said *↵ name it “molecule”* first. The five become one artifact
    with brackets and the name.
 2. Draw the same arrangement again nearby. A dashed box appears around it
-   with a chip: **molecule 0.9x**.
+   with a chip: **molecule 0.9x**. **Tap the chip**: the field opens on the
+   group with *molecule 0.9x* leading (the reading line says *take it as
+   another molecule*); Enter holds it as one. Undo, for the next step.
 3. Circle it, check. The field's second row leads with **molecule 0.9x**
    (the reading line says *↵ molecule … — take it as another molecule*) and
    the third row has *Not a molecule*. Take *Not a molecule*. The chip goes.
@@ -210,7 +212,8 @@ control centre opens this file.
    · folder*, and *canvas*. Click a card: it fills the screen (focus), and
    the bar carries ← its name and position →. **Esc** back to the canvas.
 4. Open a folder with more than twelve pages: the nearest twelve run, the
-   rest are **parked cards**, and the status says *12 of N live*.
+   rest are **parked cards**, and the status says *12 of N live*. Play a
+   program while more than twelve are live: it is never the one parked.
 
 ## 11. Pictures in, the board out
 
@@ -219,7 +222,7 @@ control centre opens this file.
    sits beside it. Circle the traced ink, check, and prompt a page **(model)**:
    it renders inside the traced outlines.
 2. Drop an `.svg`: it is an artifact whose elements ink can address.
-3. The **export** tile → `svg`: a file of paths, one per stroke, clean forms where
+3. The **export** tile opens a pane of three files; *board.svg*: a file of paths, one per stroke, clean forms where
    held. → `log`: the session as one event per line.
 
 ## 12. Text

@@ -42,6 +42,12 @@
   function readColours() {
     const cs = getComputedStyle(document.documentElement);
     const v = (name) => cs.getPropertyValue(name).trim();
+    // No stylesheet (a broken link, a build that inlined nothing): ink must
+    // still be visible, so the instrument's own values stand in.
+    if (!v('--ink')) {
+      return { ink: '#e8e4d9', inkFaint: 'rgba(232,228,217,0.14)', halo: 'rgba(10,10,15,0.55)', haloText: 'rgba(10,10,15,0.7)',
+        agent: '#8ab4c8', agentRGB: '138,180,200', gold: '#c9a84c', goldRGB: '201,168,76', labelRGB: '160,152,128', panelRGB: '18,18,26', dim: '#a09880' };
+    }
     return {
       ink: v('--ink'), inkFaint: v('--ink-faint'), halo: v('--halo'), haloText: v('--halo-text'),
       agent: v('--agent'), agentRGB: v('--agent-rgb'), gold: v('--gold'), goldRGB: v('--gold-rgb'),
@@ -426,6 +432,17 @@
       const playing = !!(s.clocks[id] && s.clocks[id].playing);
       const stamp = rep.data.at + ':' + Math.round(fr.w) + 'x' + Math.round(fr.h) + ':' + hashOf(code) + (kind === 'run' ? ':' + (playing ? 'run' : 'still') : '');
       if (!f.parked && f.codeAt !== stamp) {
+        // A document that CHANGES gets a new element. Assigning srcdoc twice
+        // in one tick — the source card at import, the harness at play — lost
+        // the second navigation on a board with a dozen frames loading: the
+        // program never started and nothing said so. A fresh iframe always
+        // navigates; the message listener ignores the old window by identity.
+        if (f.codeAt !== null) {
+          const next = document.createElement('iframe');
+          for (const attr of ['sandbox', 'scrolling', 'title']) { const v = f.iframe.getAttribute(attr); if (v !== null) next.setAttribute(attr, v); }
+          f.iframe.replaceWith(next);
+          f.iframe = next;
+        }
         f.codeAt = stamp;
         if (kind === 'run') reported.delete(id);
         f.iframe.srcdoc = documentForKind({ data: { ...rep.data, code: code } }, fr.w, fr.h, { id: id, playing: playing });
@@ -1417,6 +1434,11 @@
       // needs no mark at all, for a hand that finds the check hard to draw
       // apart from an arrow. The first tap is nothing; the second, close in
       // time and place, is the summon.
+      // A tap on the chip beside a matching group opens the field on it, with the match leading.
+      {
+        const chip = chipAt(screenToWorld(e.clientX, e.clientY));
+        if (chip && !s0.summon) { lastTap = null; session.summonMarks(chip.ids, now); render(session.getState()); return; }
+      }
       if (s0.pendingLassoId && !s0.summon) {
         const w = screenToWorld(e.clientX, e.clientY);
         const loop = s0.nodes.get(s0.pendingLassoId);
@@ -1712,8 +1734,16 @@
     }
   }
 
+  let chipHits = []; // the match chips drawn this frame, in world coordinates: { ids, x, y, w, h }
+  /** The match chip under a world point, if any. */
+  function chipAt(w) {
+    for (const c of chipHits) if (w.x >= c.x && w.x <= c.x + c.w && w.y >= c.y && w.y <= c.y + c.h) return c;
+    return null;
+  }
+
   function render(s) {
     state = s;
+    chipHits = [];
     // No model is asked from here: a paint is not a request (§6.3).
     syncStage(s);
     refreshOffers();
@@ -1740,9 +1770,11 @@
       ctx.lineWidth = wpx(1);
       ctx.strokeRect(b.minX - pad, b.minY - pad, b.maxX - b.minX + pad * 2, b.maxY - b.minY + pad * 2);
       ctx.setLineDash([]);
-      // A match is a chip beside the group, with its number (D8). Plural, like
-      // every reading: two definitions with the same shapes are both named.
-      chipText(c.matches.slice(0, 2).map((m) => m.name + ' ' + m.score.toFixed(2)).join('  ·  '), b.minX - pad, b.minY - pad - wpx(8));
+      // A match is a chip beside the group, with its number (D8); a tap on it
+      // opens the field with the match leading. Plural, like every reading:
+      // two definitions with the same shapes are both named.
+      const hit = chipText(c.matches.slice(0, 2).map((m) => m.name + ' ' + m.score.toFixed(2)).join('  ·  '), b.minX - pad, b.minY - pad - wpx(8));
+      chipHits.push({ ids: c.nodeIds.slice(), x: hit.x, y: hit.y, w: hit.w, h: hit.h });
     }
 
     const inspectedId = hoverId || lastContentId(s);
@@ -1886,6 +1918,7 @@
     ctx.stroke();
     ctx.fillStyle = C.gold;
     ctx.fillText(str, x + wpx(7), y - wpx(5));
+    return { x: x, y: y - h, w: w, h: h };
   }
 
   function brackets(b, color) {
@@ -2545,7 +2578,10 @@
     body.appendChild(list);
     summonEl.appendChild(body);
     paintField('');
-    setTimeout(() => filter.focus(), 0);
+    // A keyboard that pops up on every selection covers the pills on a phone;
+    // a finger taps the input when it wants to type. A pointer gets the focus.
+    const coarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+    if (!coarse) setTimeout(() => filter.focus(), 0);
   }
 
   /** Recompute the offers for the open summon and repaint, keeping what was typed. */
@@ -3375,6 +3411,9 @@
     '// must not wait on a download, and one that needs 3D waits at most a few seconds.',
     'function __start(){',
     '  var W = __W__, H = __H__, ID = __ID__;',
+    '  // An error thrown later — in a timer, a promise, an event — is reported like one thrown now.',
+    '  window.onerror = function(msg){ parent.postMessage({ mm: true, id: ID, type: "error", error: String(msg) }, "*"); };',
+    '  window.addEventListener("unhandledrejection", function(e){ parent.postMessage({ mm: true, id: ID, type: "error", error: String(e && e.reason && e.reason.message || e && e.reason || "rejected") }, "*"); });',
     '  var parts = new Map(), frames = [];',
     '  function post(m){ m.mm = true; m.id = ID; parent.postMessage(m, "*"); }',
     '  var mm = { width: W, height: H, THREE: window.THREE, onFrame: function(fn){ frames.push(fn); }, report: function(name, x, y, w, h){ parts.set(String(name), { x: x, y: y, w: w, h: h }); } };',
@@ -4476,13 +4515,17 @@
   function liveSet(s) {
     const live = s.live.filter((id) => !s.nodes.get(id).reps.some((r) => r.modality === 'erased'));
     if (live.length <= LIVE_BUDGET) return new Set(live);
+    // A playing artifact is never parked: its clock is running, and a card
+    // in its place would silence it without a word. It takes the budget
+    // first; the nearest of the rest fill what is left.
+    const playing = live.filter((id) => s.clocks[id] && s.clocks[id].playing);
     const c = screenToWorld(innerWidth / 2, innerHeight / 2);
-    const scored = live.map((id) => {
+    const scored = live.filter((id) => !playing.includes(id)).map((id) => {
       const b = MM.boundsOf(s.nodes.get(id));
       const d = b ? Math.hypot((b.minX + b.maxX) / 2 - c.x, (b.minY + b.maxY) / 2 - c.y) : Infinity;
       return { id, d };
     }).sort((p, q) => p.d - q.d);
-    return new Set(scored.slice(0, LIVE_BUDGET).map((x) => x.id));
+    return new Set(playing.concat(scored.slice(0, Math.max(0, LIVE_BUDGET - playing.length)).map((x) => x.id)));
   }
 
   // ===== Three views, one log ==================================================
@@ -4766,12 +4809,21 @@
     downloadBlob(name, new Blob([text], { type: type || 'text/plain' }));
   }
 
-  document.getElementById('exportBtn').onclick = () => {
-    const which = (prompt('Export the board as: svg, png, or log', 'svg') || '').trim().toLowerCase();
-    if (which === 'svg') downloadText('board.svg', exportBoardSVG(), 'image/svg+xml');
-    else if (which === 'png') exportBoardPNG().then((b) => b && downloadBlob('board.png', b));
-    else if (which === 'log') downloadText('canvas.jsonl', MM.encodeLog(session.getEvents()), 'application/json');
-  };
+  // The export pane: the board as SVG or PNG, the session as its log.
+  const exportPanel = document.getElementById('exportPanel');
+  const exportBtn = document.getElementById('exportBtn');
+  ui.pane(exportPanel, 'export', () => closePanel(exportPanel, exportBtn));
+  exportBtn.onclick = () => togglePanel(exportPanel, exportBtn);
+  exportPanel.addEventListener('click', (e) => {
+    const b = e.target.closest && e.target.closest('button[data-export]');
+    if (!b) return;
+    const which = b.dataset.export;
+    const n = session.getState().contentIds.length;
+    if (which === 'svg') { downloadText('board.svg', exportBoardSVG(), 'image/svg+xml'); flash('board.svg — ' + n + ' marks as paths'); }
+    else if (which === 'png') exportBoardPNG().then((blob) => { if (blob) { downloadBlob('board.png', blob); flash('board.png — the canvas as pixels'); } });
+    else if (which === 'log') { const evs = session.getEvents(); downloadText('canvas.jsonl', MM.encodeLog(evs), 'application/json'); flash('canvas.jsonl — ' + evs.length + ' events'); }
+    closePanel(exportPanel, exportBtn);
+  });
 
 // ===== text =====
 // Provides: text as an element — typeText (a text artifact at a point), editText (a new version of one),
@@ -4955,7 +5007,43 @@
   tiles.theme.onclick = () => setThemeMode(THEME_MODES[(THEME_MODES.indexOf(themeMode) + 1) % THEME_MODES.length]);
   tiles.hand.onclick = () => setHand(hand === 'right' ? 'left' : 'right');
   tiles.autoRead.onclick = () => setAutoRead(!autoRead);
-  tiles.help.onclick = () => { window.open('../QA-v8.md', '_blank'); };
+  // Help is the hand QA plan, which doubles as the manual, read into a pane.
+  const helpPanel = document.getElementById('helpPanel');
+  ui.pane(helpPanel, 'help', () => closePanel(helpPanel, tiles.help));
+  let helpLoaded = false;
+  tiles.help.onclick = () => {
+    togglePanel(helpPanel, tiles.help);
+    if (helpPanel.hasAttribute('hidden') || helpLoaded) return;
+    const body = helpPanel.querySelector('.helpBody');
+    body.textContent = 'loading…';
+    fetch('../QA-v8.md', { cache: 'no-cache' }).then((r) => (r.ok ? r.text() : Promise.reject(new Error('HTTP ' + r.status)))).then((md) => { body.innerHTML = markdownToHtml(md); helpLoaded = true; })
+      .catch((err) => { body.innerHTML = '<p>could not load QA-v8.md (' + esc(err.message || err) + ') — it is in the repository root.</p>'; });
+  };
+  /** Enough markdown for the QA plan: headings, lists, bold, code, links. */
+  function markdownToHtml(md) {
+    const inline = (t) => esc(t)
+      .replace(/`([^`]+)`/g, '<code>$1</code>')
+      .replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>')
+      .replace(/\*([^*]+)\*/g, '<i>$1</i>')
+      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+    const out = [];
+    let list = null; // 'ul' | 'ol'
+    const closeList = () => { if (list) { out.push('</' + list + '>'); list = null; } };
+    for (const raw of md.split('\n')) {
+      const line = raw.replace(/\s+$/, '');
+      const h = /^(#{1,3})\s+(.*)$/.exec(line);
+      const li = /^\s*(?:[-*]|\d+\.)\s+(.*)$/.exec(line);
+      const cont = /^\s{2,}(\S.*)$/.exec(line);
+      if (h) { closeList(); out.push('<h' + (h[1].length + 1) + '>' + inline(h[2]) + '</h' + (h[1].length + 1) + '>'); }
+      else if (li) { const kind = /^\s*\d+\./.test(line) ? 'ol' : 'ul'; if (list !== kind) { closeList(); list = kind; out.push('<' + kind + '>'); } out.push('<li>' + inline(li[1]) + '</li>'); }
+      else if (cont && list) { out[out.length - 1] = out[out.length - 1].replace(/<\/li>$/, ' ' + inline(cont[1]) + '</li>'); }
+      else if (!line.trim()) { closeList(); }
+      else if (/^---+$/.test(line)) { closeList(); out.push('<hr>'); }
+      else { closeList(); out.push('<p>' + inline(line) + '</p>'); }
+    }
+    closeList();
+    return out.join('\n');
+  }
 
   // Panes open under the bar, one at a time.
   const panes = [];

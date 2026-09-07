@@ -190,6 +190,21 @@ html, body {
 #teachStatus { margin-top: 9px; color: var(--dim); font-size: 10.5px; line-height: 1.45; }
 #teachStatus.warn { color: var(--gold); }
 
+/* The export pane: three files. */
+#exportPanel .exRow { display: flex; gap: 7px; }
+#exportPanel .exRow button { flex: 1; font-family: var(--mono); font-size: 11px; }
+/* The help pane: the QA plan, read into the page. */
+#helpPanel { width: min(420px, calc(100vw - 24px)); max-height: calc(100vh - 80px); overflow-y: auto; overscroll-behavior: contain; font-size: 11.5px; line-height: 1.5; scrollbar-width: thin; }
+#helpPanel .helpBody h2 { font-size: 13px; margin: 6px 0 4px; color: var(--gold); }
+#helpPanel .helpBody h3 { font-size: 11.5px; margin: 12px 0 4px; color: var(--ink); letter-spacing: 0.02em; }
+#helpPanel .helpBody h4 { font-size: 11px; margin: 10px 0 3px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.08em; }
+#helpPanel .helpBody p { margin: 0 0 6px; color: var(--ink); }
+#helpPanel .helpBody ul, #helpPanel .helpBody ol { margin: 0 0 8px 18px; }
+#helpPanel .helpBody li { margin: 0 0 4px; }
+#helpPanel .helpBody code { font-family: var(--mono); font-size: 10.5px; background: var(--well); padding: 0 3px; border-radius: 3px; }
+#helpPanel .helpBody a { color: var(--gold); }
+#helpPanel .helpBody hr { border: 0; border-top: 1px solid var(--rule); margin: 10px 0; }
+
 /* The model pane. */
 #modelPanel .mpRow { display: flex; gap: 7px; margin-top: 11px; }
 #modelPanel .mpRow button { flex: 1; }
@@ -394,6 +409,11 @@ body.embed .markChip, body.embed #ccBtn, body.embed #undoBtn { display: none; }
 body.embed #inspector { width: 250px; font-size: 10.5px; }
 body.embed.summoning #inspector { display: none; }
 
+@media (max-width: 560px) {
+  .wordmark { display: none; }
+  .bar { padding: 0 8px; gap: 6px; }
+  .markChip span { display: none; }
+}
 @media (max-width: 820px) {
   #inspector { top: auto; bottom: 34px; right: 10px; left: 10px; width: auto; max-height: 34vh; font-size: 11px; }
   #cc { grid-template-columns: repeat(3, 96px); right: 6px; }

@@ -59,7 +59,43 @@
   tiles.theme.onclick = () => setThemeMode(THEME_MODES[(THEME_MODES.indexOf(themeMode) + 1) % THEME_MODES.length]);
   tiles.hand.onclick = () => setHand(hand === 'right' ? 'left' : 'right');
   tiles.autoRead.onclick = () => setAutoRead(!autoRead);
-  tiles.help.onclick = () => { window.open('../QA-v8.md', '_blank'); };
+  // Help is the hand QA plan, which doubles as the manual, read into a pane.
+  const helpPanel = document.getElementById('helpPanel');
+  ui.pane(helpPanel, 'help', () => closePanel(helpPanel, tiles.help));
+  let helpLoaded = false;
+  tiles.help.onclick = () => {
+    togglePanel(helpPanel, tiles.help);
+    if (helpPanel.hasAttribute('hidden') || helpLoaded) return;
+    const body = helpPanel.querySelector('.helpBody');
+    body.textContent = 'loading…';
+    fetch('../QA-v8.md', { cache: 'no-cache' }).then((r) => (r.ok ? r.text() : Promise.reject(new Error('HTTP ' + r.status)))).then((md) => { body.innerHTML = markdownToHtml(md); helpLoaded = true; })
+      .catch((err) => { body.innerHTML = '<p>could not load QA-v8.md (' + esc(err.message || err) + ') — it is in the repository root.</p>'; });
+  };
+  /** Enough markdown for the QA plan: headings, lists, bold, code, links. */
+  function markdownToHtml(md) {
+    const inline = (t) => esc(t)
+      .replace(/`([^`]+)`/g, '<code>$1</code>')
+      .replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>')
+      .replace(/\*([^*]+)\*/g, '<i>$1</i>')
+      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+    const out = [];
+    let list = null; // 'ul' | 'ol'
+    const closeList = () => { if (list) { out.push('</' + list + '>'); list = null; } };
+    for (const raw of md.split('\n')) {
+      const line = raw.replace(/\s+$/, '');
+      const h = /^(#{1,3})\s+(.*)$/.exec(line);
+      const li = /^\s*(?:[-*]|\d+\.)\s+(.*)$/.exec(line);
+      const cont = /^\s{2,}(\S.*)$/.exec(line);
+      if (h) { closeList(); out.push('<h' + (h[1].length + 1) + '>' + inline(h[2]) + '</h' + (h[1].length + 1) + '>'); }
+      else if (li) { const kind = /^\s*\d+\./.test(line) ? 'ol' : 'ul'; if (list !== kind) { closeList(); list = kind; out.push('<' + kind + '>'); } out.push('<li>' + inline(li[1]) + '</li>'); }
+      else if (cont && list) { out[out.length - 1] = out[out.length - 1].replace(/<\/li>$/, ' ' + inline(cont[1]) + '</li>'); }
+      else if (!line.trim()) { closeList(); }
+      else if (/^---+$/.test(line)) { closeList(); out.push('<hr>'); }
+      else { closeList(); out.push('<p>' + inline(line) + '</p>'); }
+    }
+    closeList();
+    return out.join('\n');
+  }
 
   // Panes open under the bar, one at a time.
   const panes = [];

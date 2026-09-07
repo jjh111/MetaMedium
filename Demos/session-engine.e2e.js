@@ -602,6 +602,20 @@ window.__scenario = async function(){
     trio(4200, 2400);
     const cands = mm.session.getState().clusterCandidates;
     step('17b. the next group like it is recognised by its signature: the model\'s word, in the library', cands.some(c => c.matches.some(m => m.name === 'page-layout')), cands.map(c => c.matches.map(m => m.name)));
+    {
+      // A tap on the chip beside the matching group opens the field on it, the match leading; undo puts it back.
+      const cand = cands.find(c => c.matches.some(m => m.name === 'page-layout'));
+      const cb = cand && cand.nodeIds.map(id => MM.boundsOf(mm.session.getState().nodes.get(id))).reduce((a, b) => ({ minX: Math.min(a.minX, b.minX), minY: Math.min(a.minY, b.minY), maxX: Math.max(a.maxX, b.maxX), maxY: Math.max(a.maxY, b.maxY) }));
+      // The chip sits at the dashed box's top-left corner, just above it: aim at the chip's middle.
+      const pad = 14 / mm.view.zoom;
+      const chipAt = cb && mm.worldToScreen(cb.minX - pad + 30 / mm.view.zoom, cb.minY - pad - 8 / mm.view.zoom - 8 / mm.view.zoom);
+      if (chipAt) t.stroke([chipAt, chipAt]);
+      const stChip = mm.session.getState();
+      const chipsT = t.chips();
+      step('17b2. a tap on the match chip opens the field on the group, the match leading, and the marks selected', !!stChip.summon && stChip.summon.scopeSource === 'pointed' && stChip.summon.enclosedIds.length === 3 && /^page-layout [01]\.\d\d$/.test(chipsT[0] || '') && stChip.selection.length === 3, { source: stChip.summon && stChip.summon.scopeSource, chips: chipsT, at: chipAt });
+      if (stChip.summon) mm.session.undo();
+      step('17b3. undoing the tap leaves the group as it was, still matched', !mm.session.getState().summon && mm.session.getState().clusterCandidates.some(c => c.matches.some(m => m.name === 'page-layout')));
+    }
     // The correction: circle the look-alike, refuse the match, and it stays refused.
     const cU = W(4280, 2400);
     t.stroke(t.circle(cU.x, cU.y, 170 * z));
@@ -1062,6 +1076,22 @@ window.__scenario = async function(){
     const sumOn = mm.session.getState().summon;
     const addressed = sumOn && sumOn.onArtifact ? mm.regionsUnderInk(sumOn.onArtifact.artifactId, MM.boundsOf(mm.session.getState().nodes.get(sumOn.gestureIds[0]))) : [];
     step('27d. ink over the running frame lands on the part the program named', !!sumOn && !!sumOn.onArtifact && sumOn.onArtifact.artifactId === runId && addressed.includes('torus'), { onArtifact: sumOn && sumOn.onArtifact, addressed });
+    {
+      // A program that throws LATER — in a timer — is reported like one that throws now: the clock pauses with the reason, the frame is broken.
+      // Its own artifact (a file of the run kind), so the torus and the library are untouched; erased afterwards.
+      if (sumOn) mm.session.dismiss(sumOn.id, Date.now());
+      // Imported, then played at once — two documents in one tick, which is the case that used to lose the second.
+      const lateId = mm.importText('late.run.js', 'setTimeout(function(){ throw new Error("later"); }, 10);', { x: 11960, y: 2020 }, 120); // in view: a cross-origin frame off-screen has its timers throttled by the browser
+      mm.session.clock({ nodeId: lateId, op: 'play', at: Date.now() });
+      // The harness starts when three.js loads or after its four-second fallback. Waited on a plain timer: the
+      // message-hop wait saturates the event loop and starves a frame that is still loading.
+      for (let i = 0; i < 24 && (mm.session.getState().clocks[lateId] || {}).playing; i++) await new Promise((r) => setTimeout(r, 500));
+      const stL = mm.session.getState();
+      const fL = mm.frames.get(lateId);
+      const lateRep = codeRepOfNode(stL.nodes.get(lateId));
+      step('27d2. an error thrown later inside a program pauses its clock with the reason and marks the frame broken — a program played the moment it was imported', !!stL.clocks[lateId] && !stL.clocks[lateId].playing && /later/.test(stL.clocks[lateId].reason || '') && !!fL && fL.wrap.classList.contains('broken'), { clock: stL.clocks[lateId], kind: lateRep && lateRep.data.kind, parked: !!(fL && fL.parked), frames: mm.frames.size, hidden: document.hidden });
+      mm.session.erase(lateId, Date.now());
+    }
     if (sumOn) mm.session.dismiss(sumOn.id, Date.now());
     // The library answers first: another nested pair, "torus" typed — the entry completes, Enter reuses it, no model is asked.
     const c2 = W(12900, 2200);

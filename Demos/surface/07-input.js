@@ -115,6 +115,11 @@
       // needs no mark at all, for a hand that finds the check hard to draw
       // apart from an arrow. The first tap is nothing; the second, close in
       // time and place, is the summon.
+      // A tap on the chip beside a matching group opens the field on it, with the match leading.
+      {
+        const chip = chipAt(screenToWorld(e.clientX, e.clientY));
+        if (chip && !s0.summon) { lastTap = null; session.summonMarks(chip.ids, now); render(session.getState()); return; }
+      }
       if (s0.pendingLassoId && !s0.summon) {
         const w = screenToWorld(e.clientX, e.clientY);
         const loop = s0.nodes.get(s0.pendingLassoId);
