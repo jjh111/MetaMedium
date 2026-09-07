@@ -110,11 +110,28 @@
     const tiny = points && points.length < 3;
     if (tiny) {
       const s0 = session.getState();
-      if (s0.summon) session.dismiss(s0.summon.id, Date.now());
-      else if (s0.selection.length) session.deselect(Date.now());
+      const now = Date.now();
+      // A double-tap inside a waiting loop takes it up — the way in that
+      // needs no mark at all, for a hand that finds the check hard to draw
+      // apart from an arrow. The first tap is nothing; the second, close in
+      // time and place, is the summon.
+      if (s0.pendingLassoId && !s0.summon) {
+        const w = screenToWorld(e.clientX, e.clientY);
+        const loop = s0.nodes.get(s0.pendingLassoId);
+        const b = loop && MM.boundsOf(loop);
+        const inside = b && w.x >= b.minX && w.x <= b.maxX && w.y >= b.minY && w.y <= b.maxY;
+        const again = lastTap && now - lastTap.t < DOUBLE_TAP_MS && Math.hypot(e.clientX - lastTap.x, e.clientY - lastTap.y) < 24;
+        lastTap = { x: e.clientX, y: e.clientY, t: now };
+        if (inside && again) { lastTap = null; session.summonHeld(now); render(session.getState()); return; }
+        if (inside) { render(session.getState()); return; }
+      }
+      lastTap = { x: e.clientX, y: e.clientY, t: now };
+      if (s0.summon) session.dismiss(s0.summon.id, now);
+      else if (s0.selection.length) session.deselect(now);
       render(session.getState());
       return;
     }
+    lastTap = null;
 
     // Clear hover *before* the engine notifies: the render it triggers must
     // report the mark just made, not whatever the cursor was resting on.
@@ -148,8 +165,33 @@
       // wrong, waited too long, or made it too big. Saying nothing about marks
       // that were plainly just drawing keeps this from becoming nagging.
       flash('no summon — ' + after.markMiss.detail);
+    } else if (!g && made) {
+      // A scratch one pass short: the stroke turned back on itself and crossed
+      // one mark's outline twice, where three erases. Said, so the rule can
+      // be learned by doing rather than by reading.
+      const near = scratchNearMiss(after, made, points);
+      if (near) flash('crossed it twice — one more pass erases it');
     }
   });
+
+  let lastTap = null; // the last tap on empty ground, for the double-tap
+  const DOUBLE_TAP_MS = 400;
+
+  /** The mark a stroke crossed exactly twice while turning back on itself, if any. */
+  function scratchNearMiss(s, node, points) {
+    const fp = MM.fingerprintOf(node);
+    if (!fp || fp.isClosed || fp.corners < 2 || !points || points.length < 6) return null;
+    for (const id of s.contentIds) {
+      if (id === node.id || s.artifacts.includes(id)) continue;
+      const t = s.nodes.get(id);
+      const pts = t && MM.strokePointsOf(t);
+      if (!pts) continue;
+      const tf = MM.fingerprintOf(t);
+      const outline = MM.outlineOf({ points: pts, closed: !!(tf && tf.isClosed) });
+      if (outline && MM.countCrossings(points, outline, 3) === 2) return id;
+    }
+    return null;
+  }
 
   canvas.addEventListener('pointerleave', () => { hoverId = null; render(state); });
   // A release the canvas never sees — capture refused, a dialog, a second

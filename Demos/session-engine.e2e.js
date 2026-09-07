@@ -38,7 +38,7 @@ window.__helpers = function(){
   function typeIn(text){ const f=document.querySelector('#summon input.filter'); if(!f) return null; f.value=text; f.dispatchEvent(new Event('input',{bubbles:true})); return f; }
   function typeEnter(text){ const f=typeIn(text); if(!f) return null; f.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true})); return f; }
   function readingLine(){ const r=document.querySelector('#summon .reading'); return r ? r.textContent : ''; }
-  function coreSlots(){ return [...document.querySelectorAll('#summon .row.core .pill')].map(b=>b.textContent.trim()); }
+  function coreSlots(){ return [...document.querySelectorAll('#summon .row.core .pill')].map(b=>b.dataset.verb); }
   // Take a loop up the way a hand does: the active command mark drawn across its right edge.
   function takeLoop(cx, cy, r){ const taught = !!window.__mm.session.getState().commandMark; stroke(taught ? caret(cx + r - 30, cy - 20) : check(cx + r - 35, cy - 8)); }
   window.__t = {stroke,strokeOn,line,rect,circle,caret,check,scratch,word,summary,chips,takeLoop,typeIn,typeEnter,readingLine,coreSlots};
@@ -233,7 +233,7 @@ window.__scenario = async function(){
   const sum = t.summary().summon;
   step('5. crossing with the taught mark summons', sum && sum.enclosed === 3,
     {enclosed: sum && sum.enclosed, chips: t.chips()});
-  step('5b. the field opens with its four core slots, and a brief typed there reads as a build', t.coreSlots().join(',') === 'Name…,Copy,Paste,Erase' && mm.readField('website with the copy in the squares').kind === 'brief' && /builds a page/.test(mm.readField('website with the copy in the squares').line), { core: t.coreSlots(), line: mm.readField('website with the copy in the squares').line });
+  step('5b. the field opens with its four core slots, and a brief typed there reads as a build', t.coreSlots().join(',') === 'name,copy,paste,erase' && mm.readField('website with the copy in the squares').kind === 'brief' && /builds a page/.test(mm.readField('website with the copy in the squares').line), { core: t.coreSlots(), line: mm.readField('website with the copy in the squares').line });
   {
     const st0 = mm.session.getState();
     step('5c. a held lasso is never offered for snapping — it is a gesture in waiting', ![...mm.snapOffers().keys()].some(id => st0.summon && st0.summon.gestureIds.includes(id)));
@@ -502,6 +502,17 @@ window.__scenario = async function(){
     const stS = mm.session.getState();
     const cleaned = stS.contentIds.filter(id => MM.cleanOf(stS.nodes.get(id))).length;
     step('15b. Snap redraws the circled marks clean and keeps the loop waiting', cleaned >= 2 && stS.pendingLassoId !== null, { cleaned, held: stS.pendingLassoId });
+    // A double-tap inside the waiting loop takes it up too — no mark needed.
+    const tapAt = { x: cL.x - 40, y: cL.y + 120 * z };
+    t.stroke([tapAt, tapAt]);
+    const oneTap = mm.session.getState();
+    t.stroke([tapAt, tapAt]);
+    const stDT = mm.session.getState();
+    step('15b2. one tap inside a waiting loop is nothing; a second, at once, takes the loop up without a mark', !oneTap.summon && oneTap.pendingLassoId !== null && !!stDT.summon && stDT.summon.enclosedIds.length === 2 && stDT.summon.scopeSource === 'lasso', { oneTap: !!oneTap.summon, twoTaps: !!stDT.summon, source: stDT.summon && stDT.summon.scopeSource });
+    if (stDT.summon) { mm.session.undo(); }
+    mm.session.deselect(Date.now());
+    const stBack = mm.session.getState();
+    step('15b3. undoing the double-tap leaves the loop waiting again', stBack.pendingLassoId !== null && !stBack.summon, { pending: stBack.pendingLassoId });
     t.takeLoop(cL.x, cL.y, 300*z);
     await wait(80);
     const stO = mm.session.getState();
@@ -644,7 +655,7 @@ window.__scenario = async function(){
     t.stroke(t.circle(c2.x, c2.y, 330)); t.takeLoop(c2.x, c2.y, 330); await wait(60);
     // The core slots never move; a verb typed by name is read before Enter.
     const line = (w) => mm.readField(w).line;
-    step('18e. the core row is Name, Copy, Paste, Erase; erase, duplicate and copy read by name', t.coreSlots().join(',') === 'Name…,Copy,Paste,Erase' && line('erase') === '↵ Erase' && line('dupl') === '↵ Duplicate these' && line('copy') === '↵ Copy' && line('delete') === '↵ Erase', { core: t.coreSlots(), erase: line('erase'), dup: line('dupl'), copy: line('copy') });
+    step('18e. the core row is Name, Copy, Paste, Erase; erase, duplicate and copy read by name', t.coreSlots().join(',') === 'name,copy,paste,erase' && line('erase') === '↵ Erase' && line('dupl') === '↵ Duplicate these' && line('copy') === '↵ Copy' && line('delete') === '↵ Erase', { core: t.coreSlots(), erase: line('erase'), dup: line('dupl'), copy: line('copy') });
     const n18 = mm.session.getState().contentIds.length;
     t.typeEnter('dupl'); await wait(60);
     const stDup = mm.session.getState();
@@ -1098,6 +1109,21 @@ window.__scenario = async function(){
   mm.session.undo();
   step('11b. and undo brings them back', mm.session.getState().artifacts.length === artsBefore,
     {artifacts: mm.session.getState().artifacts.length});
+  {
+    // A scratch one pass short erases nothing and says how close it was.
+    // At hand size: fitted out, two small strokes side by side are letters.
+    mm.setView(1, 260 - 150, 300 - 700); await wait(30);
+    const p0 = mm.worldToScreen(150, 700), p1 = mm.worldToScreen(300, 700);
+    t.stroke(t.line(p0, p1, 30));
+    const n0 = mm.session.getState().contentIds.length;
+    const z = mm.view.zoom;
+    const A = mm.worldToScreen(170, 670), B = mm.worldToScreen(190, 732), Cc = mm.worldToScreen(212, 670), D = mm.worldToScreen(250, 682);
+    t.stroke(t.line(A, B, 20).concat(t.line(B, Cc, 20).slice(1), t.line(Cc, D, 14).slice(1)));
+    const stN = mm.session.getState();
+    step('11c. a scratch that crossed a mark twice erases nothing, and the status says one more pass would', stN.contentIds.length === n0 + 1 && /crossed it twice/.test(document.getElementById('status').textContent), { status: document.getElementById('status').textContent, z });
+    mm.session.undo(); mm.session.undo();
+    mm.fitAll(); await wait(60);
+  }
 
   // ---- 12b. The canvas on its own: no lasso, no model ----
   // The mark reads BACK over what was just drawn, the palette offers what the

@@ -34,13 +34,13 @@ the v8 build plan has landed** — the canvas as a program with clocks, a
 tank, verbs from words or from acting out, frames with a drawn slider, the
 folder as the canvas with three backends, pictures in and the board out,
 text as an element, and an installable shell — 550 core tests and a
-132-step browser e2e. `ROADMAP.md` carries the honest gaps. Before v8:
+135-step browser e2e. `ROADMAP.md` carries the honest gaps. Before v8:
 **the MVP loop runs end to end.** Draw boxes on an infinite canvas,
 circle them, cross with a command mark *you taught the system*, prompt them into
 a living page that renders in the canvas with your ink still outlining its
 divs — then draw on that page and the ink addresses the regions underneath it.
 Scratch anything out to erase. `Demos/session-engine.html` is the surface;
-`Demos/session-engine.e2e.js` drives 132 steps through the real UI: page, flowchart, handwriting (read only when asked), the model drawing, the user-side loop, selection and the field, corrections, the worker, the tank, words into verbs and acting out, frames and the drawn slider, the folder, pictures, text, and the moment. A run takes about 90 s; run it **in its own tab** (`?fresh=1&nosw=1` — it replaces `fetch` with a stub and joins a stub model, so never in a tab you are working in), start it with `__setup(); __scenario().then(r => window.__R = r)` and read `__R` when it lands.
+`Demos/session-engine.e2e.js` drives 135 steps through the real UI: page, flowchart, handwriting (read only when asked), the model drawing, the user-side loop, selection and the field, corrections, the worker, the tank, words into verbs and acting out, frames and the drawn slider, the folder, pictures, text, and the moment. A run takes about 90 s; run it **in its own tab** (`?fresh=1&nosw=1` — it replaces `fetch` with a stub and joins a stub model, so never in a tab you are working in), start it with `__setup(); __scenario().then(r => window.__R = r)` and read `__R` when it lands.
 v7 Stage E (handwriting) shipped 1 Sep 2026: a word written beside a shape is read by a
 model that can see and offered as that shape's name. Whitepaper v5.1 stays parked until the
 conversation benchmark passes end to end.
@@ -310,22 +310,27 @@ selection has (`erase`, `dup`, `clean`, `line up`, `play`, `frame`, `read`,
 `what` …, by label or alias), a name the library knows (reused, no model
 asked), words the verb table reads at a definition, a prefix (`name:`,
 `ask:`, `draw:`, `page:`, `run:`, `new:`, `what:`), or else the brief. Under
-the field, three rows whose slots never move (I12): the **core** — Name…,
-Copy, Paste, Erase, always the same four; **what this is** — readings with
-their numbers (*molecule 0.92*, *“Pricing” 0.92*, *page-layout 0.78 · GLM*,
-*row 0.81*), and tapping one takes it as the name; **what it affords** — Draw
-them clean, Line up, Frame these, Play A, Not a molecule …, ranked by the
-reading and by use, the rest a keystroke away. A pill carries a label; its
-reason is the tooltip; a pill that asks a model carries a dot. Copy holds the
+the field, laid out as John sketched it (6 Sep): the **core** — four round
+buttons at the left, Name · Copy · Paste · Erase, always the same four in
+the same slots (a circle with a mark in it; the name is the tooltip and the
+reading line while the pointer rests on one); then, stacked to their right,
+**what this is** — readings with their numbers (*molecule 0.92*, *“Pricing”
+0.92*, *page-layout 0.78 · GLM*, *row 0.81*), and tapping one takes it as
+the name; and **what it affords** — Draw them clean, Line up, Frame these,
+Play A, Not a molecule …, ranked by the reading and by use, the rest a
+keystroke away. A pill carries a label; its reason is the tooltip; a pill
+that asks a model carries a dot. Copy holds the
 ink (and puts it on the clipboard as SVG); Paste puts it beside the selection
 or, from the keyboard, at the pen. A tap while the field or a selection is up
 dismisses it and is never a dot. `Demos/surface/05-selection.js`,
 `09-palette.js`.
 
 **A loop that waits is plain ink.** Circle some marks and nothing lights
-up: the loop stays ink until the command mark crosses it, and then it is a
-gesture — its ink leaves in favour of the selection outline and handles, and
-the offers open. (It used to raise a chip beside itself the moment it was
+up: the loop stays ink until the command mark crosses it — **or a
+double-tap lands inside it** (`summonHeld`; the way in that needs no mark,
+for a hand that finds the check hard to draw apart from an arrow) — and
+then it is a gesture: its ink leaves in favour of the selection outline and
+handles, and the offers open. (It used to raise a chip beside itself the moment it was
 drawn, *N circled · Draw them clean / What could these be?* — an affordance
 that fired on every circle whether or not one was meant, and John called it
 what it was: a leftover.) The control centre's *snap* tile quietly scopes to
@@ -346,7 +351,9 @@ crossings between the stroke and the target's own outline; three erases it. No
 speed, density, or size constant to tune, zoom-invariant, and it degrades
 honestly — a line drawn *through* a shape crosses twice and is safe. Two rules
 keep it safe: a **closed** stroke is never a scratch (it is a lasso), and
-scratch targets are **ink**, never artifacts.
+scratch targets are **ink**, never artifacts. The surface says when a
+scratch was one pass short (*crossed it twice — one more pass erases it*),
+so the rule is learned by doing.
 
 ### Parsing: the drawing as a layout
 

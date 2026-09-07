@@ -42,7 +42,8 @@ control centre opens this file.
 3. Draw a pentagon. The panel holds rectangle and circle close together and
    does **not** offer to draw it clean — a tie is not settled for you.
 4. Scribble three passes across a mark. It is erased; the status says so.
-   **Undo** brings it back.
+   **Undo** brings it back. Scribble only two passes: the status says
+   *crossed it twice — one more pass erases it*, and nothing is erased.
 
 ## 2. The loop, the mark, the selection, the field
 
@@ -50,16 +51,18 @@ control centre opens this file.
    fine). Circle them. **Nothing lights up**: the loop is plain ink, and the
    status says *cross the loop with ✓ to select what it holds*.
 2. Draw a **check ✓** across the loop's edge (down to a sharp elbow, then a
-   longer flick up). The loop and the check both **leave the view**; the
-   three boxes get a dashed outline with corner handles and a knob; **the
-   field** opens to the right of where the pen let go (to the left, if the
-   *hand* tile says *left*).
-3. The field has a text input, an empty reading line under it, and three
-   rows: **Name… · Copy · Paste · Erase** (always these four, in this
-   order; *Paste* is dim until something is copied), then what the marks
-   read as (with numbers — for three plain boxes there may be nothing), then
-   what they afford: *Draw them clean*, *Line up across*, *Match sizes*,
-   *What is this?* (with a dot: it asks a model).
+   longer flick up) — **or tap twice inside the loop**. The loop and the
+   check both **leave the view**; the three boxes get a dashed outline with
+   corner handles and a knob; **the field** opens to the right of where the
+   pen let go (to the left, if the *hand* tile says *left*).
+3. The field has a text input, an empty reading line under it, and below:
+   **four round buttons** at the left — Name (Aa) · Copy · Paste · Erase (×),
+   always these four in this order, *Paste* dim until something is copied;
+   resting the pointer on one puts its name in the reading line — and,
+   stacked to their right, what the marks read as (with numbers — for three
+   plain boxes there may be nothing), then what they afford: *Draw them
+   clean*, *Line up across*, *Match sizes*, *What is this?* (with a dot: it
+   asks a model).
 4. Type `dup`. The reading line says **↵ Duplicate these** before you press
    anything. Enter: a copy of the three appears beside them and **the copies
    are the selection**. Tap empty ground: the selection is gone. Undo: it is

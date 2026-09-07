@@ -19,7 +19,7 @@
 > grid under the same bar, no sentence of philosophy on the page (S1); a
 > match is a chip with its number (S3, first cut); the moment — nested
 > circles, "torus in 3d", a three.js program in the drawing's frame,
-> reused from the library the second time (S5). The e2e drives 132 steps.
+> reused from the library the second time (S5). The e2e drives 135 steps.
 > Still open: code legible at every zoom (S4), live logs (S6), a tap on a
 > match chip opening the field.
 

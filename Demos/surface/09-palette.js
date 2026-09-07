@@ -26,7 +26,7 @@
   let paletteIndex = -1;     // the pill the arrows chose among the visible ones; -1 is none
   let paletteNavigated = false;
   let clip = null;           // what Copy held: { strokes: [{ points }], bounds, from }
-  const MAX_AFFORD = 7;      // pills shown in the affordance row before "+N more"
+  const MAX_AFFORD = 5;      // pills shown in the affordance column before "+N more"
 
   function conversionsFor(s) {
     const sum = s.summon;
@@ -115,6 +115,9 @@
     for (const concept of reading.concepts) {
       for (const conv of concept.conversions) {
         if (conv.effect.kind === 'name') continue; // the reading's own pill does this
+        // A seeded brief ("Make a button…") is the field with words in it: four
+        // of them crowded the column and said nothing the reading's pill does not.
+        if (conv.effect.kind === 'prompt') continue;
         const seen = items.find((i) => i.key === concept.concept + ':' + conv.id);
         if (seen) continue;
         items.push({
@@ -305,17 +308,24 @@
     const sum = s.summon;
     return sum ? sum.enclosedIds.filter((id) => s.contentIds.includes(id)) : s.selection.filter((id) => s.contentIds.includes(id));
   }
+  // The glyphs on the round buttons: the sketch drew them as circles with a mark inside.
+  const GLYPH = {
+    name: '<span class="g">Aa</span>',
+    copy: '<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="5.5" y="5.5" width="8" height="8" rx="1.5"/><path d="M10.5 4.5V3.5A1 1 0 0 0 9.5 2.5h-6a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h1"/></svg>',
+    paste: '<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="3.5" y="3.5" width="9" height="10.5" rx="1.5"/><path d="M6 3.5V2.5h4v1M6 8h4M6 10.5h4"/></svg>',
+    erase: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg>',
+  };
   function coreItems(s) {
     const marks = selectionMarks(s);
     const sum = s.summon;
     return [
-      { key: 'name', core: true, label: 'Name…', verbs: [], why: 'hold it as a thing you can use again — type the name', disabled: !marks.length && !(sum && sum.onArtifact), tier: 0,
+      { key: 'name', core: true, label: 'Name…', verbs: [], why: 'Name — hold it as a thing you can use again; type the name', disabled: !marks.length && !(sum && sum.onArtifact), tier: 0,
         run: () => { const f = fieldInput(); if (f) { f.value = 'name: '; paintField(f.value); f.focus(); f.setSelectionRange(f.value.length, f.value.length); } } },
-      { key: 'copy', core: true, label: 'Copy', verbs: ['copy', 'cp'], why: 'hold the ink to paste; it is on the clipboard as SVG too', disabled: !marks.length, tier: 0,
+      { key: 'copy', core: true, label: 'Copy', verbs: ['copy', 'cp'], why: 'Copy — hold the ink to paste; it is on the clipboard as SVG too', disabled: !marks.length, tier: 0,
         run: () => copyMarks(marks) },
-      { key: 'paste', core: true, label: 'Paste', verbs: ['paste'], why: clip ? 'the copied ink, beside these' : 'nothing copied yet', disabled: !clip, tier: 0,
+      { key: 'paste', core: true, label: 'Paste', verbs: ['paste'], why: clip ? 'Paste — the copied ink, beside these' : 'Paste — nothing copied yet', disabled: !clip, tier: 0,
         run: () => { if (!clip) return; const b = selectionBounds(s) || (marks.length ? union(marks.map((id) => MM.boundsOf(s.nodes.get(id))).filter(Boolean)) : null); if (sum) session.dismiss(sum.id, Date.now()); pasteClip(b ? { x: b.maxX + wpx(40), y: b.minY } : screenToWorld(innerWidth / 2, innerHeight / 2)); } },
-      { key: 'erase', core: true, label: 'Erase', verbs: ['erase', 'delete', 'del', 'remove', 'rm'], why: 'the ink stays in the log; undo brings it back', disabled: !marks.length, tier: 0,
+      { key: 'erase', core: true, label: 'Erase', verbs: ['erase', 'delete', 'del', 'remove', 'rm'], why: 'Erase — the ink stays in the log; undo brings it back', disabled: !marks.length, tier: 0,
         run: () => { const at = Date.now(); if (sum) session.dismiss(sum.id, at); marks.forEach((id) => session.erase(id, at)); flash('erased ' + marks.length + ' mark' + (marks.length === 1 ? '' : 's')); } },
     ];
   }
@@ -503,11 +513,22 @@
     reading.className = 'reading';
     top.appendChild(reading);
     summonEl.appendChild(top);
-    for (const cls of ['core', 'certain', 'afford items']) {
+    // The body, as the sketch has it: the round buttons at the left, the
+    // pills stacked to their right — what this is, then what it affords.
+    const body = document.createElement('div');
+    body.className = 'fieldBody';
+    const core = document.createElement('div');
+    core.className = 'row core';
+    body.appendChild(core);
+    const list = document.createElement('div');
+    list.className = 'list';
+    for (const cls of ['certain', 'afford items']) {
       const row = document.createElement('div');
       row.className = 'row ' + cls;
-      summonEl.appendChild(row);
+      list.appendChild(row);
     }
+    body.appendChild(list);
+    summonEl.appendChild(body);
     paintField('');
     setTimeout(() => filter.focus(), 0);
   }
@@ -576,9 +597,23 @@
     const affordRow = summonEl.querySelector('.row.afford');
     const readingEl = summonEl.querySelector('.reading');
     if (!core || !certainRow || !affordRow) return;
-    // The core: the same four, in the same slots.
+    // The core: the same four round buttons, in the same slots. The name is
+    // the tooltip and the reading line while the pointer rests on one.
     core.innerHTML = '';
-    for (const c of coreItems(s)) core.appendChild(ui.pill(c.label, { cls: 'core', why: c.why, disabled: c.disabled, onclick: () => { noteUse(c); c.run(); } }));
+    for (const c of coreItems(s)) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'pill core';
+      b.dataset.verb = c.key;
+      b.setAttribute('aria-label', c.label);
+      b.title = c.why;
+      b.innerHTML = GLYPH[c.key] || '<span class="g">' + esc(c.label) + '</span>';
+      if (c.disabled) b.disabled = true;
+      b.onclick = () => { noteUse(c); c.run(); };
+      b.onmouseenter = () => { if (readingEl && !query.trim()) readingEl.textContent = '↵ ' + c.label + (c.disabled ? ' — ' + c.why.split(' — ')[1] : ''); };
+      b.onmouseleave = () => { if (readingEl && !query.trim()) readingEl.textContent = readField(query).line || ''; };
+      core.appendChild(b);
+    }
     // What this is, and what it affords.
     const shown = visibleItems(query);
     const r = readField(query);
