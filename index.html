@@ -559,7 +559,9 @@
         a:hover { color: var(--accent-hover); }
         
         /* Pull quote: bounded by two teal hairlines, never a left bar and
-           never a wash (brand/styleguide.html §09). */
+           never a wash (brand/styleguide.html §09). The text is inset one
+           step from the rules: a quote running flush into the ends of its
+           own hairlines reads as unpadded, not bounded. */
         blockquote {
             font-family: var(--face);
             font-size: 1.12rem;
@@ -567,7 +569,7 @@
             font-style: normal;
             line-height: 1.5;
             color: var(--ink);
-            padding: var(--space-md) 0;
+            padding: var(--space-md);
             margin: var(--space-lg) 0;
             border-top: 1px solid var(--accent);
             border-bottom: 1px solid var(--accent);
@@ -719,6 +721,9 @@
             position: relative;
         }
         figure.band { width: min(var(--fig-band), calc(100vw - 3rem)); max-width: var(--fig-band); }
+        /* A small drawing wants a small plate: half the figure width, so the
+           gif reads as an illustration, not a billboard. */
+        figure.half { width: min(calc(var(--fig-wide) / 2), calc(100vw - 3rem)); max-width: calc(var(--fig-wide) / 2); }
 
         figure > .plate { padding: var(--fig-pad); }
         figure > .plate > .image { width: 100%; }
@@ -815,6 +820,10 @@
         .ticks { list-style: none; padding-left: 0; margin-bottom: 0; }
         .ticks > li { padding-left: 1.3em; position: relative; margin-bottom: 0; }
         .ticks > li::before { content: "\2192"; position: absolute; left: 0; color: var(--accent); }
+        /* A list's conclusion, one row of its own under the columns: quiet
+           ink, no marker — what the items add up to. */
+        .ticks > li.coda { grid-column: 1 / -1; padding-left: 0; margin-top: var(--space-xs); color: var(--muted); }
+        .ticks > li.coda::before { content: none; }
 
         /* A grid of use-cases keeps the card; the grid owns the spacing. */
         .use-case-grid .use-case { margin: 0; min-width: 0; }
@@ -1615,7 +1624,7 @@
             .media-placeholder.video { aspect-ratio: 16/9; }
             .media-placeholder.image { aspect-ratio: 3/2; }
             .timeline-video { aspect-ratio: 16/9; }
-            blockquote { padding-left: var(--space-sm); }
+            blockquote { padding: var(--space-sm); }
             .hero { padding: var(--space-lg) var(--space-md); }
             .hero-hint { bottom: 7rem; }
         }
@@ -2620,9 +2629,8 @@
                 <li>keeps them open until context settles it</li>
                 <li>learns your vocabulary</li>
                 <li>moves between sketch, equation, code and text</li>
+                <li class="coda">Less a tool than a part of speech.</li>
             </ul>
-            
-            <p>Less a tool than a part of speech.</p>
              <blockquote>
                 "Thanks to a mapping, full-fledged meaning can suddenly appear in a spot where it was entirely unsuspected."
                 <cite>— Douglas Hofstadter, <em>I Am a Strange Loop</em>, 2007</cite>
@@ -2636,7 +2644,7 @@
             </div>
             
             <p>The answer becomes obvious the moment you <em>visualize</em> two monks walking the path simultaneously—one going up, one going down. They must meet somewhere. But this visualization requires what Fauconnier and Turner call an "integration network"—a blended mental space where separate inputs combine to reveal emergent structure. I have animated their central figure illustrating the blending space as a diagram.</p>
-            <figure>
+            <figure class="half">
                 <img src="./Assets/fig-Conceptual Blending slower.gif" alt="Conceptual Blending Animation - Integration network showing blend space">
                 <figcaption><b>Figure &middot; Conceptual Blending</b>Fauconnier &amp; Turner's model: two input spaces merge into a blended space revealing emergent structure.</figcaption>
             </figure>
@@ -3243,9 +3251,9 @@
             <figure>
                 <div class="plate">
                     <div class="image">
-                        <svg class="dia" style="--u:0.75" viewBox="0 0 750 400" xmlns="http://www.w3.org/2000/svg">
+                        <svg class="dia" style="--u:0.75" viewBox="0 0 770 400" xmlns="http://www.w3.org/2000/svg">
                             <!-- Title -->
-                            <text class="t-title" x="375" y="38" text-anchor="middle">Two paradigms for AI alignment</text>
+                            <text class="t-title" x="385" y="38" text-anchor="middle">Two paradigms for AI alignment</text>
 
                             <g>
                                 <rect class="r-well" x="40" y="50" width="330" height="310" rx="6"/>
@@ -3308,8 +3316,9 @@
                                 <line class="r-edge" x1="120" y1="150" x2="160" y2="180" marker-end="url(#arrow8)"/>
                                 <line class="r-edge" x1="290" y1="150" x2="250" y2="180" marker-end="url(#arrow8)"/>
 
-                                <!-- Shared visible canvas -->
-                                <g transform="translate(205, 200)">
+                                <!-- Shared visible canvas — 14u lower than it was, so the
+                                     "treaty" quote above it keeps its air -->
+                                <g transform="translate(205, 214)">
                                     <rect class="r-well" x="-75" y="0" width="150" height="95" rx="4"/>
 
                                     <circle class="r-edge w-2" cx="-30" cy="25" r="13" fill="none"/>
@@ -3333,7 +3342,7 @@
                             </g>
 
                             <!-- Bottom insight -->
-                            <text class="t-micro" x="375" y="385" text-anchor="middle">Control assumes conflict. Communication builds shared ground.</text>
+                            <text class="t-micro" x="385" y="385" text-anchor="middle">Control assumes conflict. Communication builds shared ground.</text>
 
                             <!-- Arrow markers -->
                             <defs>
