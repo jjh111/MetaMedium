@@ -20,3 +20,9 @@ manim-explainer/*.mp4
 .env
 .env.*
 !.env.example
+
+# Assets/make-card.mjs stages a copy of index.html beside it (the hero needs
+# its own relative assets) and gives Chrome a scratch profile. Both are removed
+# on the way out; these cover a run that was killed.
+.card-build.html
+.card-build-profile/
