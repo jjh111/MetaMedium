@@ -15,6 +15,16 @@ function fingerprint(s: ReturnType<typeof createSession>) {
 }
 
 describe('checkpoints', () => {
+  // These build a drawing PAST the 200- and 400-event checkpoints — which is
+  // the only way to exercise them — and then replay the log from zero to
+  // compare, so the engine does ~420 strokes of real work about twice over:
+  // four seconds on a fast machine, seven on CI's. Vitest's 5s default is a
+  // "did something hang?" guard, not a claim about how long that should take,
+  // and the speed this file actually guarantees is the RATIO asserted below,
+  // measured on one machine in one run and so true of any hardware. A cap
+  // this generous still catches a real hang.
+  const SLOW = 20000;
+
   it('a long log replayed from its checkpoints matches a replay from zero', () => {
     const s = createSession();
     let t = 1000;
@@ -30,7 +40,7 @@ describe('checkpoints', () => {
     const fresh = createSession();
     fresh.load(JSON.parse(JSON.stringify(s.getEvents())));
     expect(fingerprint(fresh)).toBe(viaCheckpoints);
-  });
+  }, SLOW);
 
   it('undo on a long log is fast, and correct', () => {
     const s = createSession();
@@ -51,7 +61,7 @@ describe('checkpoints', () => {
     // 20 events from the checkpoint against 420 from zero; the snapshot's
     // clone and the later strokes' longer relation passes eat some of the gap.
     expect(fromCheckpoint).toBeLessThan(fromZero / 2);
-  });
+  }, SLOW);
 
   it('a checkpoint past a cut is never used', () => {
     const s = createSession();
@@ -64,5 +74,5 @@ describe('checkpoints', () => {
     const fresh = createSession();
     fresh.load(JSON.parse(JSON.stringify(s.getEvents())));
     expect(fingerprint(fresh)).toBe(fingerprint(s));
-  });
+  }, SLOW);
 });
