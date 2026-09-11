@@ -276,6 +276,18 @@
             font-weight: 400;
             margin-left: 0.25em;
         }
+        /* The way in: hero to the loop. The hero content deliberately lets
+           drawing through, so the link re-enables its own pointer events. */
+        .hero-loop-link {
+            margin-top: var(--space-sm);
+            font-size: var(--text-sm);
+            font-weight: 500;
+            color: rgba(111, 179, 184, 0.9);
+            text-decoration: underline;
+            text-underline-offset: 3px;
+            pointer-events: auto;
+        }
+        .hero-loop-link:hover { color: #93cbcf; }
         
         .scroll-indicator {
             position: absolute;
@@ -1287,126 +1299,6 @@
             letter-spacing: 0.05em;
         }
 
-        /* Demo Canvas - Fish Animation */
-        .demo-wrapper {
-            margin: var(--space-lg) 0 var(--space-md);
-            /* Break out of text column */
-            width: 90vw;
-            max-width: 900px;
-            margin-left: 50%;
-            transform: translateX(-50%);
-            position: relative;
-        }
-
-        .demo-prompt {
-            text-align: center;
-            margin-bottom: 1rem;
-            font-size: 1.25rem;
-            color: var(--ink);
-            font-weight: 500;
-            min-height: 2rem;
-        }
-
-        .demo-prompt .highlight {
-            color: var(--accent);
-            font-weight: 600;
-        }
-
-        .demo-canvas-container {
-            position: relative;
-            background: var(--paper-lt);
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            box-shadow: 0 1px 2px var(--shadow);
-            overflow: hidden;
-        }
-
-        #demoCanvas {
-            display: block;
-            width: 100%;
-            aspect-ratio: 4/3;
-            cursor: crosshair;
-            touch-action: none;
-        }
-
-        #demoCanvas.grabbing {
-            cursor: grabbing;
-        }
-
-        .demo-labels {
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            pointer-events: none;
-        }
-
-        .demo-label {
-            position: absolute;
-            font-size: 0.75rem;
-            font-weight: 600;
-            padding: 0.25rem 0.5rem;
-            border-radius: var(--radius-sm);
-            transform: translate(-50%, -100%);
-            margin-top: -8px;
-            opacity: 0;
-            transition: opacity 0.3s ease;
-        }
-
-        .demo-label.visible {
-            opacity: 1;
-        }
-
-        .demo-label.fish {
-            background: var(--sketch-blue);
-            color: var(--paper-lt);
-        }
-
-        .demo-label.food {
-            background: var(--accent);
-            color: var(--paper-lt);
-        }
-
-        .demo-controls {
-            display: flex;
-            justify-content: center;
-            margin-top: 1rem;
-            gap: 0.75rem;
-        }
-
-        .demo-reset-btn {
-            font-family: inherit;
-            font-size: 0.875rem;
-            font-weight: 500;
-            padding: 0.625rem 1.25rem;
-            border: none;
-            border-radius: var(--radius);
-            cursor: pointer;
-            transition: all 0.2s ease;
-            background: var(--ink);
-            color: var(--paper);
-            opacity: 0;
-            pointer-events: none;
-        }
-
-        .demo-reset-btn.visible {
-            opacity: 1;
-            pointer-events: auto;
-        }
-
-        .demo-reset-btn:hover {
-            background: var(--accent);
-        }
-
-        .demo-status {
-            text-align: center;
-            margin-top: 0.75rem;
-            font-size: var(--text-xs);
-            color: var(--muted-light);
-            min-height: 1.25rem;
-        }
-
         /* Image Modal / Lightbox */
         .image-modal {
             position: fixed;
@@ -1598,9 +1490,6 @@
                 width: calc(100vw - 1rem);
                 grid-template-columns: 1fr;
                 gap: 1rem;
-            }
-            .demo-wrapper {
-                width: calc(100vw - 1rem);
             }
             .demo-container {
                 width: calc(100vw - 1rem);
@@ -1930,7 +1819,7 @@
 
         @media print {
             body { font-size: 11pt; line-height: 1.5; }
-            nav, .scroll-indicator, #heroCanvas, .hero-hint, .demo-wrapper,
+            nav, .scroll-indicator, #heroCanvas, .hero-hint,
             .theme-toggle, .gallery-thumbs, .gallery-arrow { display: none; }
             .hero { min-height: auto; padding: 1.5rem 0; background: none; }
             .hero::after { display: none; }
@@ -1984,6 +1873,7 @@
             <p class="tagline">beyond chat</p>
             <p class="subtitle">Semantic Drawing as AI Interface</p>
             <p class="byline">John Hanacek <span class="role">Product Designer</span></p>
+            <a class="hero-loop-link" href="#loop">see the loop ↓</a>
         </div>
         <a href="#abstract" class="scroll-indicator" aria-label="Scroll to content">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
@@ -2001,8 +1891,25 @@
                 <p>MetaMedium is a way of working with AI by drawing. You sketch on a canvas and the canvas reads what you drew — a circle is a circle, two boxes side by side are a row, a word beside a shape is its name — and offers its reading back where you can see it and argue with it. Name a pattern and the canvas learns your vocabulary. A model can join, reading with you and drawing back. The drawing stays yours.</p>
 
                 <p>The idea underneath: AI as a <em>meta-word</em>, a new part of language that turns rough marks into meaning from their context. Drawing becomes something a person and a machine can do together, with a seven-year-old's sketch and an engineer's diagram on the same canvas, each read at its own level.</p>
+
+                <p>The loop it describes is <a href="#loop">replayed just below</a> — then the argument for it.</p>
             </div>
 
+        </section>
+
+        <!-- THE LOOP, RUNNING — the lede: one real session, replayed by the engine -->
+        <section id="loop">
+            <h2>The Loop, Running</h2>
+
+            <p>This is the canonical loop, run once through the engine and recorded as the events it produced. What you step through below is not a video: it is the engine replaying its own log in your browser, and the inspector on the right holds every reading at every step. Draw on it at any point and the session continues with your marks.</p>
+
+            <div class="demo-container">
+                <div class="demo-header">
+                    <span>Draw a circle, name it, compose it, and the canvas reads with your word</span>
+                    <span><a href="Demos/session-engine.html?replay=recordings/canonical-loop.json" target="_blank" rel="noopener"><strong>Open it →</strong></a></span>
+                </div>
+                <iframe src="Demos/session-engine.html?replay=recordings/canonical-loop.json&amp;embed=1&amp;theme=paper" title="The canonical loop, replayed by the engine" loading="lazy"></iframe>
+            </div>
         </section>
 
         <!-- SECTION 1: THE PROBLEM -->
@@ -2671,40 +2578,7 @@
             
             <p>Most AI interfaces treat the model as a tool: something you call, ask, command. MetaMedium puts it in the medium. You are not using the computer to sketch; you are sketching in a material that can read, and the AI is the part of the material that understands.</p>
 
-            <h3>The Loop, Recorded</h3>
-
-            <p>This is the canonical loop, run once through the engine and recorded as the events it produced. What you step through below is the engine replaying its own log in your browser, and the inspector on the right holds every reading at every step. Draw on it at any point and the session continues with your marks.</p>
-
-            <div class="demo-container">
-                <div class="demo-header">
-                    <span>Draw a circle, name it, compose it, and the canvas reads with your word</span>
-                    <span><a href="Demos/session-engine.html?replay=recordings/canonical-loop.json" target="_blank" rel="noopener"><strong>Open it →</strong></a></span>
-                </div>
-                <iframe src="Demos/session-engine.html?replay=recordings/canonical-loop.json&amp;embed=1&amp;theme=paper" title="The canonical loop, replayed by the engine" loading="lazy"></iframe>
-            </div>
-
-            <h3>Try It: Draw, Name, Interact</h3>
-
-            <p>This is the core loop in miniature. Draw a shape, and the system recognizes and names it. Draw another, and it gains behavior. Your marks become meaning — and meaning becomes interaction.</p>
-
-            <!-- Interactive Demo Canvas -->
-            <div class="demo-wrapper">
-                <div class="demo-prompt" id="demoPrompt">Draw a <span class="highlight">fish</span></div>
-
-                <div class="demo-canvas-container">
-                    <canvas id="demoCanvas"></canvas>
-                    <div class="demo-labels">
-                        <div class="demo-label fish" id="fishLabel">🐟 fish</div>
-                        <div class="demo-label food" id="foodLabel">🍎 food</div>
-                    </div>
-                </div>
-
-                <div class="demo-controls">
-                    <button class="demo-reset-btn" id="demoResetBtn">Reset</button>
-                </div>
-
-                <div class="demo-status" id="demoStatus"></div>
-            </div>
+            <p>Everything interactive in this paper is a recording from the same engine. The surface itself — live, drawable, yours to try — is in <a href="#development">Current Development</a>.</p>
 
         </section>
 
@@ -3385,21 +3259,7 @@
         <section id="conclusion">
             <h2>Conclusion</h2>
             
-            <p>The claim is simple: the limit has been the channel, not the model. The medium between people and AI has been too thin to work in together.</p>
-            
-            <p>Let a mark be a sign, a placement be a statement, a note be an instruction, and the canvas becomes somewhere two kinds of mind can work. The computer has always been a metamedium. AI can now read and write across media. What was missing is the surface where a person brings their whole way of thinking to it.</p>
-            <p>We should not have to type our thinking into a box. An interface can meet us where we think: on a surface where a mark is a proposal, where the machine's reading is visible and arguable, and where the two of us are building the same drawing.</p>
-            <!--
-                  <div class="callout key">
-                <h4>The Promise</h4>
-                
-            </div>
-            
-            -->
-      
-            <p>The MetaMedium is that interface. The engine accompanying this paper reads a drawing, redraws it clean, measures it, compiles it, reads the writing on it, and lets a model draw back in marks the human can read on the same terms as their own. What it does not yet do is listed above as plainly as what it does. Development continues. Contributions welcome.</p>
-
-            <p>It's time to bring the computer to life at the depth of mind with the speed and intuitive action of our hands.</p>
+            <p>The limit has been the channel, not the model. The MetaMedium is the surface where a person brings their whole way of thinking to a machine that can read: a mark is a proposal, the machine's reading is visible and arguable, and the two of them are building the same drawing. What it does not yet do is listed above as plainly as what it does. Development continues. It's time to bring the computer to life at the depth of mind with the speed and intuitive action of our hands.</p>
 
         </section>
     </main>
@@ -4627,357 +4487,6 @@
         canvas.addEventListener('touchend', endDraw);
         canvas.addEventListener('touchcancel', endDraw);
 
-        // ============================================
-        // Demo Canvas - Interactive Fish Animation
-        // ============================================
-        const demoCanvas = document.getElementById('demoCanvas');
-        if (demoCanvas) {
-            const demoCtx = demoCanvas.getContext('2d');
-            const demoPrompt = document.getElementById('demoPrompt');
-            const demoStatus = document.getElementById('demoStatus');
-            const demoResetBtn = document.getElementById('demoResetBtn');
-            const fishLabel = document.getElementById('fishLabel');
-            const foodLabel = document.getElementById('foodLabel');
-
-            // State
-            let demoState = 'draw-fish'; // draw-fish, draw-food, animating
-            let demoIsDrawing = false;
-            let demoIsDraggingFood = false;
-            let demoCurrentStroke = [];
-            let demoFish = null;
-            let demoFood = null;
-            let demoAnimationId = null;
-            let demoWigglePhase = 0;
-
-            // High DPI support
-            function setupDemoCanvas() {
-                const rect = demoCanvas.getBoundingClientRect();
-                const dpr = window.devicePixelRatio || 1;
-                demoCanvas.width = rect.width * dpr;
-                demoCanvas.height = rect.height * dpr;
-                demoCtx.scale(dpr, dpr);
-                demoCanvas.style.width = rect.width + 'px';
-                demoCanvas.style.height = rect.height + 'px';
-            }
-            setupDemoCanvas();
-            window.addEventListener('resize', () => {
-                setupDemoCanvas();
-                redrawDemo();
-            });
-
-            // Get canvas dimensions
-            function getDemoCanvasSize() {
-                return {
-                    width: demoCanvas.getBoundingClientRect().width,
-                    height: demoCanvas.getBoundingClientRect().height
-                };
-            }
-
-            // Get position from event
-            function getDemoPos(e) {
-                const rect = demoCanvas.getBoundingClientRect();
-                if (e.touches) {
-                    return {
-                        x: e.touches[0].clientX - rect.left,
-                        y: e.touches[0].clientY - rect.top
-                    };
-                }
-                return {
-                    x: e.clientX - rect.left,
-                    y: e.clientY - rect.top
-                };
-            }
-
-            function demoBounds(points) {
-                let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-                points.forEach(p => {
-                    minX = Math.min(minX, p.x);
-                    minY = Math.min(minY, p.y);
-                    maxX = Math.max(maxX, p.x);
-                    maxY = Math.max(maxY, p.y);
-                });
-                return { minX, minY, maxX, maxY };
-            }
-
-            function updateDemoLabel(labelEl, pos, visible) {
-                const rect = demoCanvas.getBoundingClientRect();
-                labelEl.style.left = pos.x + 'px';
-                labelEl.style.top = pos.y + 'px';
-                labelEl.classList.toggle('visible', visible);
-            }
-
-            // Drawing handlers
-            function demoStartDraw(e) {
-                e.preventDefault();
-                const pos = getDemoPos(e);
-
-                // Check if clicking on food to drag it
-                if (demoFood && demoState === 'animating') {
-                    const dx = pos.x - demoFood.center.x;
-                    const dy = pos.y - demoFood.center.y;
-                    const dist = Math.sqrt(dx * dx + dy * dy);
-                    if (dist < 40) {
-                        demoIsDraggingFood = true;
-                        demoCanvas.classList.add('grabbing');
-                        return;
-                    }
-                }
-
-                if (demoState === 'animating') return;
-                demoIsDrawing = true;
-                demoCurrentStroke = [pos];
-            }
-
-            function demoDraw(e) {
-                e.preventDefault();
-                const pos = getDemoPos(e);
-
-                // Handle dragging food
-                if (demoIsDraggingFood && demoFood) {
-                    const dx = pos.x - demoFood.center.x;
-                    const dy = pos.y - demoFood.center.y;
-                    demoFood.center.x = pos.x;
-                    demoFood.center.y = pos.y;
-                    demoFood.points = demoFood.points.map(p => ({
-                        x: p.x + dx,
-                        y: p.y + dy
-                    }));
-                    updateDemoLabel(foodLabel, demoFood.center, true);
-                    return;
-                }
-
-                if (!demoIsDrawing) return;
-                demoCurrentStroke.push(pos);
-                redrawDemo();
-
-                // Draw current stroke
-                if (demoCurrentStroke.length > 1) {
-                    demoCtx.strokeStyle = demoState === 'draw-fish' ? 'rgba(28, 95, 184, 0.85)' : 'rgba(11, 111, 125, 0.85)';
-                    demoCtx.lineWidth = 3;
-                    demoCtx.lineCap = 'round';
-                    demoCtx.lineJoin = 'round';
-                    demoCtx.beginPath();
-                    demoCtx.moveTo(demoCurrentStroke[0].x, demoCurrentStroke[0].y);
-                    for (let i = 1; i < demoCurrentStroke.length; i++) {
-                        demoCtx.lineTo(demoCurrentStroke[i].x, demoCurrentStroke[i].y);
-                    }
-                    demoCtx.stroke();
-                }
-            }
-
-            function demoEndDraw() {
-                if (demoIsDraggingFood) {
-                    demoIsDraggingFood = false;
-                    demoCanvas.classList.remove('grabbing');
-                    return;
-                }
-
-                if (!demoIsDrawing) return;
-                demoIsDrawing = false;
-
-                if (demoCurrentStroke.length < 5) {
-                    demoCurrentStroke = [];
-                    return;
-                }
-
-                // Calculate bounds and center
-                const bounds = demoBounds(demoCurrentStroke);
-                const center = {
-                    x: (bounds.minX + bounds.maxX) / 2,
-                    y: (bounds.minY + bounds.maxY) / 2
-                };
-
-                if (demoState === 'draw-fish') {
-                    demoFish = {
-                        points: [...demoCurrentStroke],
-                        originalPoints: [...demoCurrentStroke],
-                        center: { ...center },
-                        bounds: { ...bounds },
-                        velocity: { x: 0, y: 0 }
-                    };
-
-                    demoPrompt.innerHTML = 'Draw some <span class="highlight">food</span>';
-                    demoStatus.textContent = 'Your fish is waiting...';
-                    updateDemoLabel(fishLabel, demoFish.center, true);
-                    demoState = 'draw-food';
-
-                } else if (demoState === 'draw-food') {
-                    demoFood = {
-                        points: [...demoCurrentStroke],
-                        center: { ...center },
-                        bounds: { ...bounds }
-                    };
-
-                    demoPrompt.innerHTML = '🎬 <span class="highlight">Drag the food!</span>';
-                    demoStatus.textContent = 'Your fish will follow...';
-                    updateDemoLabel(foodLabel, demoFood.center, true);
-                    demoResetBtn.classList.add('visible');
-
-                    demoState = 'animating';
-                    startDemoAnimation();
-                }
-
-                demoCurrentStroke = [];
-                redrawDemo();
-            }
-
-            // Animation
-            function startDemoAnimation() {
-                function animate() {
-                    if (demoState !== 'animating') return;
-
-                    demoWigglePhase += 0.15;
-
-                    // Calculate direction to food
-                    const dx = demoFood.center.x - demoFish.center.x;
-                    const dy = demoFood.center.y - demoFish.center.y;
-                    const dist = Math.sqrt(dx * dx + dy * dy);
-
-                    // Move fish toward food
-                    if (dist > 5) {
-                        const speed = Math.min(2.5, dist * 0.05);
-                        const vx = (dx / dist) * speed;
-                        const vy = (dy / dist) * speed;
-
-                        demoFish.center.x += vx;
-                        demoFish.center.y += vy;
-
-                        demoFish.originalPoints = demoFish.originalPoints.map(p => ({
-                            x: p.x + vx,
-                            y: p.y + vy
-                        }));
-                    }
-
-                    // Apply wiggle
-                    const wiggleAmount = dist < 20 ? 2 : 1.5;
-                    const wiggleSpeed = dist < 20 ? 1.5 : 1;
-                    demoFish.points = demoFish.originalPoints.map((p, i) => {
-                        const offset = Math.sin(demoWigglePhase * wiggleSpeed + i * 0.3) * wiggleAmount;
-                        const perpX = -dy / (dist || 1);
-                        const perpY = dx / (dist || 1);
-                        return {
-                            x: p.x + perpX * offset,
-                            y: p.y + perpY * offset
-                        };
-                    });
-
-                    updateDemoLabel(fishLabel, demoFish.center, true);
-                    redrawDemo();
-
-                    demoAnimationId = requestAnimationFrame(animate);
-                }
-
-                demoAnimationId = requestAnimationFrame(animate);
-            }
-
-            // Redraw everything
-            function redrawDemo() {
-                const { width, height } = getDemoCanvasSize();
-                demoCtx.clearRect(0, 0, width, height);
-
-                // Draw grid
-                demoCtx.strokeStyle = 'rgba(90, 72, 44, 0.07)';
-                demoCtx.lineWidth = 1;
-                const gridSize = 20;
-                for (let x = 0; x < width; x += gridSize) {
-                    demoCtx.beginPath();
-                    demoCtx.moveTo(x, 0);
-                    demoCtx.lineTo(x, height);
-                    demoCtx.stroke();
-                }
-                for (let y = 0; y < height; y += gridSize) {
-                    demoCtx.beginPath();
-                    demoCtx.moveTo(0, y);
-                    demoCtx.lineTo(width, y);
-                    demoCtx.stroke();
-                }
-
-                // Draw food
-                if (demoFood) {
-                    demoCtx.strokeStyle = 'rgba(111, 179, 184, 0.8)';
-                    demoCtx.lineWidth = 3;
-                    demoCtx.lineCap = 'round';
-                    demoCtx.lineJoin = 'round';
-                    demoCtx.beginPath();
-                    demoCtx.moveTo(demoFood.points[0].x, demoFood.points[0].y);
-                    for (let i = 1; i < demoFood.points.length; i++) {
-                        demoCtx.lineTo(demoFood.points[i].x, demoFood.points[i].y);
-                    }
-                    demoCtx.stroke();
-
-                    // Draw drag hint circle
-                    if (demoState === 'animating') {
-                        demoCtx.strokeStyle = 'rgba(111, 179, 184, 0.3)';
-                        demoCtx.lineWidth = 2;
-                        demoCtx.setLineDash([4, 4]);
-                        demoCtx.beginPath();
-                        demoCtx.arc(demoFood.center.x, demoFood.center.y, 35, 0, Math.PI * 2);
-                        demoCtx.stroke();
-                        demoCtx.setLineDash([]);
-                    }
-                }
-
-                // Draw fish
-                if (demoFish) {
-                    demoCtx.strokeStyle = 'rgba(28, 95, 184, 0.85)';
-                    demoCtx.lineWidth = 3;
-                    demoCtx.lineCap = 'round';
-                    demoCtx.lineJoin = 'round';
-                    demoCtx.beginPath();
-                    demoCtx.moveTo(demoFish.points[0].x, demoFish.points[0].y);
-                    for (let i = 1; i < demoFish.points.length; i++) {
-                        demoCtx.lineTo(demoFish.points[i].x, demoFish.points[i].y);
-                    }
-                    demoCtx.stroke();
-                }
-            }
-
-            // Reset
-            function resetDemo() {
-                if (demoAnimationId) cancelAnimationFrame(demoAnimationId);
-
-                demoState = 'draw-fish';
-                demoFish = null;
-                demoFood = null;
-                demoCurrentStroke = [];
-                demoIsDraggingFood = false;
-                demoWigglePhase = 0;
-
-                demoPrompt.innerHTML = 'Draw a <span class="highlight">fish</span>';
-                demoStatus.textContent = '';
-                demoResetBtn.classList.remove('visible');
-                fishLabel.classList.remove('visible');
-                foodLabel.classList.remove('visible');
-
-                redrawDemo();
-            }
-
-            // Event listeners
-            demoCanvas.addEventListener('mousedown', demoStartDraw);
-            demoCanvas.addEventListener('mousemove', (e) => {
-                demoDraw(e);
-                // Update cursor when hovering over food
-                if (demoFood && demoState === 'animating' && !demoIsDraggingFood) {
-                    const pos = getDemoPos(e);
-                    const dx = pos.x - demoFood.center.x;
-                    const dy = pos.y - demoFood.center.y;
-                    const dist = Math.sqrt(dx * dx + dy * dy);
-                    demoCanvas.style.cursor = dist < 40 ? 'grab' : 'crosshair';
-                }
-            });
-            demoCanvas.addEventListener('mouseup', demoEndDraw);
-            demoCanvas.addEventListener('mouseleave', demoEndDraw);
-
-            demoCanvas.addEventListener('touchstart', demoStartDraw, { passive: false });
-            demoCanvas.addEventListener('touchmove', demoDraw, { passive: false });
-            demoCanvas.addEventListener('touchend', demoEndDraw);
-            demoCanvas.addEventListener('touchcancel', demoEndDraw);
-
-            demoResetBtn.addEventListener('click', resetDemo);
-
-            // Initial draw
-            redrawDemo();
-        }
     </script>
 
     <!-- Image Modal / Lightbox -->
