@@ -950,6 +950,24 @@
             border: none;
             display: block;
         }
+        /* On a touch screen the embedded surface claims every touch for
+           drawing (its canvas is touch-action: none), so a swipe that starts
+           on an embed cannot scroll the paper — and on a phone the embeds are
+           nearly full width. Coarse pointers get watch-only viewers: touch
+           falls through to the page, and "Open it →" opens the full surface,
+           which is built for touch. */
+        @media (pointer: coarse) {
+            .demo-container iframe { pointer-events: none; }
+            .demo-container::after {
+                content: "View-only on touch — tap Open it → to draw in it";
+                display: block;
+                padding: 0.55rem 1rem;
+                border-top: 1px solid var(--border);
+                font-family: var(--face);
+                font-size: var(--text-xs);
+                color: var(--muted-light);
+            }
+        }
         
         /* Callout */
         .principle-now {
