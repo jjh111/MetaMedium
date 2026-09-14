@@ -4,10 +4,15 @@
   "configurations": [
     {
       "name": "metadoodle",
+      "url": "http://localhost:8010",
+      "port": 8010
+    },
+    {
+      "name": "metadoodle-start",
       "runtimeExecutable": "sh",
       "runtimeArgs": [
         "-c",
-        "exec python3 -m http.server \"${PORT:-8000}\""
+        "exec python3 -m http.server \"${PORT:-8010}\""
       ],
       "port": 8010
     }
