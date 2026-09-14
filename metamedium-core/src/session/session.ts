@@ -1832,7 +1832,10 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
   function handParticipant(name: string): string {
     const id = 'participant:hand:' + name.replace(/[^A-Za-z0-9._-]+/g, '_');
     if (!nodes.has(id)) {
-      nodes.set(id, createParticipantNode(id, 'human', name, lastAt));
+      // A hand in a room is one tab or one process, named `person~suffix`
+      // (the surface's convention); the person's name is what is shown on
+      // its cards and readings, the suffix only tells the logs apart.
+      nodes.set(id, createParticipantNode(id, 'human', name.replace(/~[^~]*$/, ''), lastAt));
       participants.push(id);
     }
     return id;

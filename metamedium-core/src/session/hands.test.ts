@@ -2,7 +2,7 @@
 // also what it said, proposed and wrote in its own "local" name (v10 T2).
 import { describe, it, expect } from 'vitest';
 import { createSession } from './session';
-import { LOCAL_PARTICIPANT, transcriptsOf } from './nodes';
+import { LOCAL_PARTICIPANT, transcriptsOf, wordOf } from './nodes';
 import { mergeLogs } from '../store/merge';
 
 function box(x: number, y: number, w: number, h: number) {
@@ -32,6 +32,16 @@ describe('a hand in a room', () => {
     expect(answer.edges.some((e) => e.rel === 'made-by' && e.to === hand)).toBe(true);
     expect(answer.edges.some((e) => e.to === LOCAL_PARTICIPANT)).toBe(false);
     expect(transcriptsOf(mark)[0].source).toBe(hand);
+  });
+
+  it('shows a hand by the person\'s name, without the suffix that tells their tabs apart', () => {
+    const ann = createSession();
+    ann.addStroke(box(0, 0, 100, 60), 1000);
+    const me = createSession();
+    me.load(mergeLogs({ 'ann~k3x9': ann.getEvents(), me: [] }, { me: 'me' }));
+    const s = me.getState();
+    expect(s.participants).toContain('participant:hand:ann_k3x9');
+    expect(wordOf(s.nodes.get('participant:hand:ann_k3x9')!)).toBe('ann');
   });
 
   it('leaves my own log unstamped and mine', () => {

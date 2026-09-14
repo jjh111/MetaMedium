@@ -5608,7 +5608,7 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
   function handParticipant(name) {
     const id = "participant:hand:" + name.replace(/[^A-Za-z0-9._-]+/g, "_");
     if (!nodes.has(id)) {
-      nodes.set(id, createParticipantNode(id, "human", name, lastAt));
+      nodes.set(id, createParticipantNode(id, "human", name.replace(/~[^~]*$/, ""), lastAt));
       participants.push(id);
     }
     return id;
