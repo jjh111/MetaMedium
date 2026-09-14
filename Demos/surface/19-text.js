@@ -35,6 +35,20 @@
   }
 
   /** A written word (its transcript) becomes a text artifact where the writing is; the ink stays. */
+  /** A line of writing as one text artifact, standing where the line is. */
+  function lineToText(ids, text) {
+    const s = session.getState();
+    const pts = ids.map((id) => s.nodes.get(id)).filter(Boolean).map((n) => MM.boundsOf(n)).filter(Boolean).flatMap((b) => [{ x: b.minX, y: b.minY }, { x: b.maxX, y: b.maxY }]);
+    if (!text || !pts.length) return null;
+    const b = MM.getBounds(pts);
+    const w = Math.max(TEXT_W, b.maxX - b.minX), h = Math.max(48, b.maxY - b.minY);
+    textCount++;
+    return session.import({
+      kind: 'text', path: TEXT_DIR + '/' + textCount + '.txt', name: text,
+      bounds: { minX: b.minX, minY: b.minY, maxX: b.minX + w, maxY: b.minY + h }, code: text, at: Date.now(),
+    });
+  }
+
   function wordToText(wordId) {
     const s = session.getState();
     const n = s.nodes.get(wordId);

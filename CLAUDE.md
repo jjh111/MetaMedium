@@ -24,7 +24,15 @@ automatically → ask "why?" and get grounded reasoning.
 `ARCHITECTURE-v7-PARTICIPANTS-AND-TIERS.md` is the active engine plan; MVP.md
 absorbs and raises its Stage D.
 
-Headline (v9 S1/S2/S7, 6 Sep 2026, on the local branch `next-phases`):
+Headline (v10 T1–T6, 14 Sep 2026, on the local branch `next-phases`):
+**the canvas reaches out** — an MCP hand (`Demos/mcp.mjs`, registered in
+`.mcp.json`) lets Claude Code look, see, draw, say, propose, transcribe and
+write on the board as a participant in a live room; a playing program
+takes the pointer while ink begun outside goes over it; words gather by
+nearness into a line of writing read as one; press-and-hold holds a mark
+with what it hangs together with, and the standing line is a ladder of the
+next move; circles joined by lines stand in 3D at once, each sphere named
+for its mark (`SURFACE-v10-PLAN.md`). Before that (v9 S1/S2/S7, 6 Sep):
 **the surface is a system** — a model is asked only by a deliberate act;
 one field at the pen tip reads what is typed and says what Enter will do;
 core verbs in slots that never move; one bar with a control centre; light
@@ -40,7 +48,7 @@ circle them, cross with a command mark *you taught the system*, prompt them into
 a living page that renders in the canvas with your ink still outlining its
 divs — then draw on that page and the ink addresses the regions underneath it.
 Scratch anything out to erase. `Demos/session-engine.html` is the surface;
-`Demos/session-engine.e2e.js` drives 144 steps through the real UI: page, flowchart, handwriting (read only when asked), the model drawing, the user-side loop, selection and the field, corrections, the worker, the tank, words into verbs and acting out, frames and the drawn slider, the folder, pictures, text, and the moment. A run takes about 90 s; run it **in its own tab on its own origin** (`http://127.0.0.1:8010/…?fresh=1&nosw=1` — `__setup` refuses any other URL: it replaces `fetch` with a stub, joins a stub model named `e2e-stub`, and wipes the origin's saved board), start it with `__setup(); __scenario().then(r => window.__R = r)` and read `__R` when it lands.
+`Demos/session-engine.e2e.js` drives 161 steps through the real UI: page, flowchart, handwriting (read only when asked; a line read as one), the model drawing, the user-side loop, selection and the field, corrections, the worker, the tank, words into verbs and acting out, frames and the drawn slider, the folder, pictures, text, the moment, a live room, a playing frame that takes the pointer, hold by long-press, and the graph in 3D. A run takes about 100 s; run it **in its own tab on its own origin** (`http://127.0.0.1:8010/…?fresh=1&nosw=1` — `__setup` refuses any other URL: it replaces `fetch` with a stub, joins a stub model named `e2e-stub`, and wipes the origin's saved board), start it with `__setup(); __scenario().then(r => window.__R = r)` and read `__R` when it lands.
 v7 Stage E (handwriting) shipped 1 Sep 2026: a word written beside a shape is read by a
 model that can see and offered as that shape's name. Whitepaper v5.1 stays parked until the
 conversation benchmark passes end to end.
@@ -53,6 +61,12 @@ Architecture documents (chronological; **read MVP.md, then v7, then v6**):
 - `ARCHITECTURE-v7-PARTICIPANTS-AND-TIERS.md` — **active plan**: putting a model in the loop through the `propose` channel; the conversation benchmark; one OpenAI-compatible transport for Ollama/LM Studio/OpenRouter
 - `ARCHITECTURE-v8-CANVAS-AS-CODE.md` — **the next paradigm, proposed**: the canvas as a program (the log is its source, simulation state is derived), a fourth rung of closed steering verbs, definitions and instances, time as events, nested artifacts with `js`/`json` code that ink can address, export as a folder. Worked example: the fish canvas rebuilt from primitives. Part II: the folder as the canvas (per-participant logs merged, the review canvas's storage seam and loading budget absorbed as ideas), three views, selection as the lasso that finished, frames literal and virtual, the blob palette, images and pastiche, deployment
 - `SURFACE-v9-PLAN.md` — **the surface as a system, proposed 6 Sep 2026**: one field everything funnels through, a fixed palette geometry the hand can learn, a control centre instead of a rail, six components, code legible at every zoom, a scripts-that-run sandbox for a three.js frame, keys and secrets (D9), and multiplayer as a transport over the per-participant logs (D10)
+- `SURFACE-v10-PLAN.md` — **the canvas reaches out, 14 Sep 2026**: an MCP
+  server as a hand in a live room (D1), the frame that takes the pointer
+  while it plays (D2), writing gathered by nearness (D3), questions as
+  drawn candidates (D4), affordances at rest (D5), the map of what a
+  drawing becomes (D6), the molecule chain as the demo (D7), ids per hand
+  as a debt (D8); packages T1–T8 with status
 - `BUILD-PLAN-v8.md` — **the executable plan for v8**: invariants no package may break, fixed contracts (events, reps, kinds, the verb basis, the storage seam, the palette item), fourteen work packages with owned files and done-criteria, the parallel threads and the surface weave, and self-contained briefs for sub-contracting models
 - `WHITEPAPER-v5.1-PLAN.md` — **the package**: what the whitepaper shows vs. what the engine does, replays-as-figures, the demos as the paper's spine, the prose pass, and the palette decision John owns
 - `ARCHITECTURE-v6-SESSION-ENGINE.md` — **active design**: the no-modes session engine (deferred commitment, summoning, promotion ladder, capability tiers), implemented in `metamedium-core/`
@@ -80,7 +94,7 @@ any structural change.
 | `metadoodle1.html` | Fork of flagship + tiered LLM recognition (WebLLM in-browser, LM Studio local API) + voice. Single-file (~600KB) |
 | `Web App Skeleton/` | React + Vite + TypeScript + Zustand rebuild; Claude API interpreter skeleton in `src/llm/`; recognition/spatial/matching in `src/core/` |
 | `Demos/surface/` | **The reference surface's source**: `surface.css` and twenty-two script fragments (`00-core`, `00-ui` … `19-text`, `20-controls`, then `90-boot`, which must stay last), one concern each, concatenated in name order into one closure by `Demos/build-surface.mjs` → the committed `Demos/session-engine.js` (CI checks it has not drifted). Fragments share the closure's variables — no imports; each fragment's header says what it provides and uses. Edit a fragment, run the build, commit both |
-| `Demos/` | **`session-engine.html` is the MVP surface** (it links `surface/surface.css` and loads `session-engine.js`) — infinite canvas, the taught command mark, living artifacts in a DOM overlay, ink-over-artifact addressing, "why" inspector, model participants, canvas answers. Uses the committed `metamedium-core.browser.js` bundle. **`session-engine.e2e.js`** drives the whole loop through the real UI with a stubbed model (browser console; not part of `npm test`). `build-standalone.mjs` inlines the bundle into a single shareable file. Plus fish, composition diagrams, no-modes graph, etc. |
+| `Demos/` | **`session-engine.html` is the MVP surface** (it links `surface/surface.css` and loads `session-engine.js`) — infinite canvas, the taught command mark, living artifacts in a DOM overlay, ink-over-artifact addressing, "why" inspector, model participants, canvas answers. Uses the committed `metamedium-core.browser.js` bundle. **`session-engine.e2e.js`** drives the whole loop through the real UI with a stubbed model (browser console; not part of `npm test`). `build-standalone.mjs` inlines the bundle into a single shareable file. **`mcp.mjs`** is the MCP hand (Claude Code's way onto the board; `.mcp.json` at the root registers it), over `relay.mjs` and `live-node.mjs`, with `ink-png.mjs` for the ink as a picture and `mcp-smoke.mjs` as its stdio test; `metamedium-core.node.mjs` is the committed Node bundle it runs (`npm run build:node`, drift-checked in CI like the browser bundle). Plus fish, composition diagrams, no-modes graph, etc. |
 | `skills/` | Claude Code skills: `metamedium-code` (code patterns), `metamedium-design` (design principles) |
 | `Assets/` | Figures and design rationale (recognition strategy, point-primitive proposal), and the social card. `make-card.mjs` regenerates that card from index.html's own hero — synthetic pointer input, so the picture shows the engine really reading a mark; `node Assets/make-card.mjs`. Change the picture and you must change the FILENAME and the four og:/twitter: tags in `index.html` and `404.html`, because scrapers cache by URL |
 | `archive/` | Retired versions and superseded plans, incl. whitepaper v4 (root `MetaMedium_Whitepaper_v4.html` is a redirect stub — keep it) and PRDs v3.2/v4 |
@@ -422,6 +436,17 @@ makes it render as real DOM in the canvas. The rules:
 - A **broken** artifact leaves the live plane: code is a contract with the marks
   that framed it, and a page rendering over erased ink is the silent phantom
   degradation exists to prevent.
+- **A playing program takes the pointer; ink begun outside goes over it**
+  (v10 D2, `pointerFrameAt` / `postPointer`). The canvas keeps every
+  pointer — the stage stays under the ink — and a pointer-down inside a
+  *playing* `run` frame is forwarded to it: the harness dispatches it inside
+  as real pointer and mouse events (a click after a still release) and
+  hands it to `mm.onPointer`; every move and the release follow, nothing
+  drawn. A stroke begun anywhere else is ink across any frame it crosses,
+  which is how the 3D thing is doodled on. A page and a still program take
+  ink from anywhere (nothing in them to press); a loop that waits is the
+  hand's wherever it lies, so the tap or mark that takes it up lands in
+  the loop, not the frame. The cursor changes over a playing frame.
 
 ### Relations and concepts (Tier 1)
 
@@ -518,7 +543,13 @@ relative to the target's own size. Legacy copies still exist for reference in
   concepts, tidy, clean forms, **the structure** (`buildStructure`: a page or
   a diagram from the drawing with every region in place and no words —
   what the canvas knows and nothing it does not), signatures, verbs, the
-  program library, tracing, the maths, acting out, wiring, words — **built**
+  program library, tracing, the maths, acting out, wiring, words, and **a
+  graph in 3D** (`buildGraph3D`, v10 D7: circles joined by lines stand as
+  spheres and bonds in a `run` program built from the drawing, each sphere
+  named for its region so ink over it lands on that mark, turning on its
+  own and by a hand pressed inside; the field's *Show it in 3D*, and a
+  definition that holds one is rebuilt for the next drawing, never copied
+  — `GRAPH3D_MARK`) — **built**
 - **Tier 2:** a model — local via Ollama (`localhost:11434/v1`) or LM Studio
   (`localhost:1234/v1`), hosted via OpenRouter or Anthropic with your own key
   — **built**. `providerLocality()` says which; the router asks local first
@@ -623,6 +654,20 @@ held. Export is a pane of three files (SVG, PNG, the log); help is the hand
 QA plan read into a pane. On a touch screen the field does not take the
 focus until the input is tapped, or the keyboard would cover the pills.
 
+**Affordances at rest** (v10 D5): **press and hold a mark** and it is held
+with everything it hangs together with — the cluster over the relations
+the canvas sees (`holdAround` in `07-input.js`, `MM.relate` +
+`MM.clusters`) — and the field opens with no loop drawn; a tap stays a tap
+and a stroke a stroke. The **standing line is a ladder**: the next move in
+a few words, keyed to the board (empty → *draw anything*; marks → *press
+and hold a mark, or circle marks and double-tap inside*; a loop → *or
+double-tap inside the loop*; a selection → the handles; the field →
+*type, or tap a pill*). **The map of becoming** (v10 D6, the plan's §4):
+the panel's *becomes* row says the selection's rung — shapes, writing, a
+concept, a structure (a layout or a graph), a definition, an artifact —
+and the rung after it, in one line; a pill whose verb leads somewhere says
+so in its tooltip (*→ then: What is this? asks which molecule*).
+
 **A model is asked only by a deliberate act** (v9 S7, §6.3 of the plan):
 Enter on a brief, `ask:`, `draw:`, *Read the writing* (or the panel's *read
 it*), *What is this?* (every joined model reads the group and its readings
@@ -708,6 +753,15 @@ fingerprint carries it, so the model is asked to *read*, not to interpret.
   the lasso and the mark had nothing to act on.
 - `propose()` carries `reps` as well as edges, so a transcript is held through
   the same channel as every other reading and undo drops it.
+- **Writing gathers by nearness into a line** (v10 D3; the `writing`
+  concept in `concepts/concept.ts`): text marks — cursive words, gathered
+  words — on one band, a word's gap apart, read as *writing 0.8x* with the
+  words in reading order, and no clock: letters gather by succession, words
+  by nearness. *Read the writing* on a line renders the whole line as one
+  image and asks once (`readLine`, `agent.read({ hold: false })`), so the
+  reader has the phrase; one word per mark lands on each mark, otherwise
+  the line is held on the first and the rest were read with it. The field
+  then leads with the line as one name and offers *Make it text* once.
 
 ### Time: clocks, tanks, and code that runs (v8)
 
@@ -803,9 +857,39 @@ was heard in the last minute, in the status line. **A hand in a room is one
 tab**: the name is the person's (a preference) and a suffix is the tab's
 (`john~a1b2`, shown as *john*), because a second tab of the same person is
 a second log — under one name its lines would be taken for its own and
-dropped. Known gap: a model's proposals in
-another hand's log reference that hand's participant ids, which the merge
+dropped. **"Local" in another hand's log means that hand**: an event stamped `by`
+whose `participantId` is the local participant, or none, is attributed to
+the hand — its answers, proposals and code arrive in its name, never in the
+reader's. **My log is the session's own unstamped events**, sent or not,
+never the room's copy of it: a line landing between a send and the next
+merge would otherwise count every sent mark twice (found by the MCP smoke
+test; e2e 28c2). Known gap: a model's proposals in another hand's log
+reference that hand's participant ids (`participant:N`), which the merge
 does not translate yet.
+
+### The MCP hand: Claude Code on the board (v10 T2)
+
+> `Demos/mcp.mjs` (the server), `Demos/live-node.mjs` (the relay as a
+> transport in Node, reconnecting from its last id), `Demos/ink-png.mjs`
+> (ink to PNG with no canvas API), `Demos/mcp-smoke.mjs` (the stdio test,
+> run in CI), `.mcp.json` (registers it for Claude Code).
+
+An MCP server is **a hand in a room** (SURFACE-v10-PLAN D1): it joins the
+live room `claude` through the relay on this machine (starting one when
+none answers), keeps a session from the merged logs exactly as a tab does,
+and its seven tools are verbs a hand already has — `canvas_look` (the
+board in words, with ids), `canvas_see` (the ink as a PNG: how the caller
+reads handwriting or looks at a sketch — the tier 2 seat, taken by whoever
+is in the conversation), `canvas_draw` (the shape rung's vocabulary or raw
+strokes, declared content), `canvas_say` (a sentence beside marks),
+`canvas_propose` (a reading, held), `canvas_transcribe` (what writing
+says, held), `canvas_write` (code for a new artifact or a new version).
+It **proposes and never blesses**; it can write a program and **cannot
+play it**; it holds no keys. MCP over stdio is newline-delimited JSON-RPC
+written by hand, so the repo takes no dependency; it imports the committed
+Node bundle `Demos/metamedium-core.node.mjs`. In the canvas: the *live*
+tile → *with Claude*, or `?live=claude&relay=http://127.0.0.1:8020`. Its
+ink arrives as its own log, stamped `by` on arrival, in its own colour.
 
 ### Text as an element (v8, WP-13)
 

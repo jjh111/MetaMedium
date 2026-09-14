@@ -30,6 +30,15 @@
   const nameOfParticipant = (pid) =>
     pid === MM.LOCAL_PARTICIPANT ? 'you' : handLabel(MM.wordOf(state.nodes.get(pid)) || pid);
 
+  /** The next move, for the standing line: one rung of the ladder, by what stands. */
+  function nextMove(s, strokes) {
+    if (s.summon) return 'type in the field, or tap a pill · a tap on the ground lets go';
+    if (s.selection.length) return 'drag inside to move, a corner to scale, the knob to turn · Esc lets go';
+    if (s.pendingLassoId) return 'or double-tap inside the loop';
+    if (!strokes && !s.artifacts.length) return 'draw anything · double-click empty ground to type';
+    return 'press and hold a mark to hold it · or circle marks and double-tap inside';
+  }
+
   function nodeAt(x, y) {
     const slack = wpx(8);
     for (let i = state.contentIds.length - 1; i >= 0; i--) {
@@ -269,6 +278,11 @@
     if (agents.length) parts.push(agents.map((a) => a.config.model).join(', '));
     if (ws) parts.push('⋯ ' + ws);
     if (hint) parts.push(hint);
+    // The standing line is a ladder (SURFACE-v10-PLAN D5): the next move, in a
+    // few words, keyed to what the board holds — so what the board can do is
+    // said before anything is asked, and never as a sentence of philosophy.
+    const next = nextMove(s, strokes);
+    if (next) parts.push(next);
     const standing = parts.join('  ·  ');
     // A fresh message takes the line; the one hint a waiting loop needs, and
     // a model at work, stay beside it. The standing state is kept on the

@@ -4,7 +4,8 @@
 import { describe, it, expect } from 'vitest';
 import { createSession } from '../session/session';
 import { rectStroke, circleStroke, lineStroke } from '../test/strokes';
-import { TIER1_LIBRARY, describeTier1, buildStructure } from './library';
+import { TIER1_LIBRARY, describeTier1, buildStructure, buildGraph3D, GRAPH3D_MARK } from './library';
+import { regionsOf } from '../session/regions';
 import { route, describeRoute, instantFor } from '../participants/router';
 import { ENGINE_PARTICIPANT, ENGINE_NAME, wordOf } from '../session/nodes';
 import { createAgentParticipant } from '../participants/agent';
@@ -97,5 +98,42 @@ describe('the tier 1 library', () => {
   it('says why when there is nothing to build', () => {
     const s = createSession();
     expect(buildStructure(s, 'nope')).toEqual({ ok: false, error: 'no such artifact' });
+  });
+});
+
+// A graph in 3D (SURFACE-v10-PLAN D7): spheres and bonds from the drawing, no model.
+describe('a graph in 3D', () => {
+  function molecule() {
+    const s = createSession();
+    s.addStroke(circleStroke(300, 300, 40), 1000);
+    s.addStroke(circleStroke(500, 300, 40), 1100);
+    s.addStroke(circleStroke(400, 460, 40), 1200);
+    s.addStroke(lineStroke({ x: 340, y: 300 }, { x: 460, y: 300 }), 1300);
+    s.addStroke(lineStroke({ x: 328, y: 328 }, { x: 372, y: 432 }), 1400);
+    s.addStroke(circleStroke(400, 370, 190), 2000);
+    const sum = s.summonHeld(2500)!;
+    const id = s.bless({ summonId: sum, name: 'molecule', at: 3000 })!;
+    return { s, id };
+  }
+  it('stands three circles joined by two lines as three spheres and two bonds, each sphere named for its region', () => {
+    const { s, id } = molecule();
+    const r = buildGraph3D(s, id);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.atoms).toBe(3);
+    expect(r.bonds).toBe(2);
+    expect(r.code.startsWith(GRAPH3D_MARK)).toBe(true);
+    expect(r.participantId).toBe(ENGINE_PARTICIPANT);
+    const regionIds = regionsOf(s.getState().nodes.get(id)!, s.getState().nodes).map((x) => x.id);
+    for (const a of r.ids) expect(regionIds).toContain(a);
+    expect(r.code).toMatch(/mm\.onPointer/); // a hand inside the playing frame turns it
+    expect(r.code).toMatch(/mm\.report\(/); // and with no three.js the parts are still reported
+    expect(TIER1_LIBRARY.some((m) => m.id === 'graph3d')).toBe(true);
+  });
+  it('refuses a layout: boxes tiling a space are a page, not a graph', () => {
+    const { s, id } = fourBoxes();
+    const r = buildGraph3D(s, id);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toMatch(/not a graph/);
   });
 });

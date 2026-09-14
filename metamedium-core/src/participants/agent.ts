@@ -542,6 +542,8 @@ export interface AgentParticipant {
     image: string;
     at: number;
     signal?: AbortSignal;
+    /** Hold the transcripts on the mark (default). `false` returns them for the caller to place — a line read as one image lands word by word. */
+    hold?: boolean;
   }): Promise<ReadResult>;
   /**
    * Ask the model to add marks to the drawing. What it says it would draw, in
@@ -945,7 +947,7 @@ export function createAgentParticipant(
     };
   }
 
-  async function read(args: { nodeId: string; image: string; at: number; signal?: AbortSignal }): Promise<ReadResult> {
+  async function read(args: { nodeId: string; image: string; at: number; signal?: AbortSignal; hold?: boolean }): Promise<ReadResult> {
     if (!config.vision) return { ok: false, transcripts: [], error: `${name} cannot see images` };
     const state = session.getState();
     const node = state.nodes.get(args.nodeId);
@@ -967,13 +969,15 @@ export function createAgentParticipant(
 
     // Every reading is its own held rep. The human sees them all, ranked by
     // confidence like every other reading on the canvas.
-    session.propose({
-      participantId: id,
-      nodeId: args.nodeId,
-      edges: [],
-      reps: transcripts.map((t) => ({ modality: 'transcript', data: { text: t.text }, confidence: t.confidence })),
-      at: args.at,
-    });
+    if (args.hold !== false) {
+      session.propose({
+        participantId: id,
+        nodeId: args.nodeId,
+        edges: [],
+        reps: transcripts.map((t) => ({ modality: 'transcript', data: { text: t.text }, confidence: t.confidence })),
+        at: args.at,
+      });
+    }
     return { ok: true, transcripts, raw: result.text };
   }
 

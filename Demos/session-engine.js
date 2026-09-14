@@ -330,7 +330,7 @@
   }
 
 // ===== artifacts =====
-// Provides: the live plane: frames of iframes for artifacts with code, syncStage, regionsUnderInk.
+// Provides: the live plane: frames of iframes for artifacts with code, syncStage, regionsUnderInk, pointerFrameAt.
 // Uses: core, view.
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () Ellipsis)();`. Shared state is the
@@ -455,6 +455,28 @@
       }
     }
     syncRuntime(s);
+  }
+
+  /**
+   * The playing program under a world point, if any: the one frame that takes
+   * the pointer (SURFACE-v10-PLAN D2). A page has no script to receive a
+   * click and a still program is its source card, so both take ink from
+   * anywhere; only a program that runs has something to press.
+   */
+  function pointerFrameAt(w) {
+    let hit = null;
+    for (const [id, f] of frames) {
+      if (f.parked || f.kind !== 'run' || !f.iframe) continue;
+      const c = state.clocks[id];
+      if (!c || !c.playing) continue;
+      const node = state.nodes.get(id);
+      const fr = node && MM.frameOf(node);
+      if (!fr) continue;
+      const o = runtimeOffset(id);
+      const x = fr.x + o.dx, y = fr.y + o.dy;
+      if (w.x >= x && w.x <= x + fr.w && w.y >= y && w.y <= y + fr.h) hit = { id: id, f: f, x: x, y: y };
+    }
+    return hit;
   }
 
   /**
@@ -1236,7 +1258,7 @@
   snapModeBtn.onclick = () => setSnapMode(SNAP_MODES[(SNAP_MODES.indexOf(snapMode) + 1) % SNAP_MODES.length]);
 
 // ===== handwriting =====
-// Provides: handwriting: inkImage, isWriting, readOne, readWriting; the auto-read preference (off by default).
+// Provides: handwriting: inkImage, isWriting, isRead, readOne, readLine (a line of writing as one image), readWriting; the auto-read preference (off by default).
 // Uses: core (prefs), models (agents, withWork), render, input (say).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () Ellipsis)();`. Shared state is the
@@ -1261,12 +1283,19 @@
     syncTiles();
   }
   const askedToRead = new Set(); // node ids handed out already (per model join, see below)
+  // A mark read as part of a line whose words did not split cleanly: the line's
+  // text is held on the first mark, and this one was read with it. Runtime only.
+  const readWith = new Map();
+  const isRead = (node) => !!MM.transcriptOf(node) || readWith.has(node.id);
 
-  function inkImage(node, size) {
-    // A word is several strokes; a cursive word is one. Same image either way.
-    const runs = MM.isWord(node)
+  /** The ink of a mark, as runs of points: a word is several strokes, a cursive word is one. */
+  function runsOf(node) {
+    return MM.isWord(node)
       ? MM.lettersOf(node).map((id) => state.nodes.get(id)).filter(Boolean).map((n) => MM.strokePointsOf(n)).filter((p) => p && p.length > 1)
       : [MM.strokePointsOf(node)].filter((p) => p && p.length > 1);
+  }
+  function inkImage(node, size) { return inkImageOf(runsOf(node), size); }
+  function inkImageOf(runs, size) {
     if (!runs.length) return null;
     const pts = runs.flat();
     const b = MM.getBounds(pts);
@@ -1313,6 +1342,48 @@
     return true;
   }
 
+  /**
+   * A line of writing, read as one image (SURFACE-v10-PLAN D3): words gathered
+   * by nearness are handed over together, so the reader has the phrase. When
+   * the reply has one word per mark, each lands on its own mark; otherwise
+   * the whole line is held on the first mark and the rest were read with it.
+   */
+  function readLine(ids, force) {
+    const readers = seeing();
+    if (!readers.length) return false;
+    const s = session.getState();
+    const nodes = ids.map((id) => s.nodes.get(id)).filter(Boolean);
+    if (nodes.length < 2) return nodes.length === 1 ? readOne(nodes[0], force) : false;
+    const key = 'line:' + ids.join(',');
+    if (!force && askedToRead.has(key)) return false;
+    askedToRead.add(key);
+    const image = inkImageOf(nodes.flatMap(runsOf));
+    if (!image) return false;
+    const first = nodes[0];
+    readers.forEach((agent) => {
+      withWork('write:' + agent.id + ':' + first.id, ids, agent.name + ' · reading the line', agent.read({ nodeId: first.id, image: image, at: Date.now(), hold: false })).then((res) => {
+        if (res.ok) {
+          const top = res.transcripts[0];
+          const words = top.text.trim().split(/\s+/);
+          const at = Date.now();
+          if (words.length === nodes.length) {
+            nodes.forEach((n, i) => session.propose({ participantId: agent.id, nodeId: n.id, edges: [], reps: [{ modality: 'transcript', data: { text: words[i], line: top.text }, confidence: top.confidence }], at: at }));
+          } else {
+            session.propose({ participantId: agent.id, nodeId: first.id, edges: [], reps: res.transcripts.map((t) => ({ modality: 'transcript', data: { text: t.text }, confidence: t.confidence })), at: at });
+            nodes.slice(1).forEach((n) => readWith.set(n.id, first.id));
+          }
+          say(agent.name + ' read “' + top.text + '”' + (res.transcripts.length > 1 ? ' (or ' + res.transcripts.slice(1).map((t) => '“' + t.text + '”').join(', ') + ')' : ''));
+        } else {
+          say(agent.name + ' could not read it (' + res.error + ')');
+          if (res.raw) window.__mm.lastRaw = res.raw;
+        }
+        render(session.getState());
+        refreshPalette();
+      });
+    });
+    return true;
+  }
+
   function readWriting(s) {
     if (!seeing().length) return;
     const ids = s.contentIds.filter((id) => !s.artifacts.includes(id));
@@ -1326,7 +1397,7 @@
 
 // ===== input =====
 // Provides: pointer input (draw, pan, pinch), keys (undo, copy, paste, erase, zoom), say()/flash() for the status line.
-// Uses: core, view, snap (autoSweep), render, palette (copyMarks, pasteClip), handwriting (autoRead).
+// Uses: core, view, snap (autoSweep), render, palette (copyMarks, pasteClip), handwriting (autoRead), artifacts (pointerFrameAt), kinds (postPointer).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () Ellipsis)();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -1337,6 +1408,8 @@
   // is what makes "doodle on top of the running page" work at all.
   let panning = null;
   let spaceHeld = false;
+  // A hand inside a playing program: the frame has it until the hand lifts (SURFACE-v10-PLAN D2).
+  let forward = null;
 
   // Pointer capture is a nicety — it keeps a stroke alive when the pointer
   // leaves the element. It is NOT allowed to be the reason a stroke fails to
@@ -1355,7 +1428,7 @@
       if (touches.size === 2) {
         // Two fingers: this is a pinch, not a stroke. Drop the live ink — it
         // was the first finger landing, not a mark.
-        live = null;
+        live = null; pressEnd();
         const [a, b] = [...touches.values()];
         pinch = { dist: Math.hypot(a.x - b.x, a.y - b.y), mid: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, zoom: view.zoom };
         return;
@@ -1374,8 +1447,57 @@
     // A hand on a body in a running tank is acting it out, not moving ink.
     if (hit && hit.kind === 'move' && demoBegin(state.selection, w0)) return;
     if (hit) { beginDrag(hit, w0); return; }
+    // A hand landing inside a playing program is the program's: every move and
+    // the release go to it, and nothing is drawn. A stroke begun anywhere else
+    // is ink, and stays ink across any frame it crosses — doodling on the 3D
+    // thing is a stroke begun beside it.
+    // A loop that waits is the hand's wherever it lies: the tap that takes it
+    // up, or the mark across it, lands inside the loop, not in the frame.
+    const pf = pointerFrameAt(w0);
+    if (pf && !insideWaitingLoop(w0)) { forward = pf; postPointer(pf, 'down', e, w0); return; }
+    pressBegin(e, w0);
     live = [w0];
   });
+
+  // ===== Hold by long-press (SURFACE-v10-PLAN D5) ============================
+  // Press a mark and hold still: it is held, with what it hangs together
+  // with, and the field opens — no loop drawn, which is what a newcomer tries
+  // first. A tap stays a tap and a stroke stays a stroke; only stillness, on
+  // a mark, with nothing held, is a hold.
+  const HOLD_MS = 450, HOLD_SLOP = 6;
+  let press = null; // { id, x, y, timer } while a hand rests on a mark
+  let held = false; // the release after a hold is not a tap
+  function pressBegin(e, w) {
+    const id = nodeAt(w.x, w.y);
+    if (!id || state.summon || state.selection.length || touches.size > 1) return;
+    press = { id: id, x: e.clientX, y: e.clientY, timer: setTimeout(() => { const p = press; press = null; if (!p || !live) return; live = null; held = true; holdAround(p.id); }, HOLD_MS) };
+  }
+  function pressMove(e) { if (press && Math.hypot(e.clientX - press.x, e.clientY - press.y) > HOLD_SLOP) pressEnd(); }
+  function pressEnd() { if (press) { clearTimeout(press.timer); press = null; } }
+  /** Hold a mark with everything it hangs together with: the cluster over the relations the canvas sees. */
+  function holdAround(id) {
+    const s = session.getState();
+    const marks = s.contentIds.filter((cid) => !s.artifacts.includes(cid)).map((cid) => {
+      const n = s.nodes.get(cid);
+      const b = n && MM.boundsOf(n);
+      if (!b) return null;
+      const fp = MM.fingerprintOf(n);
+      return { id: cid, bounds: b, points: MM.strokePointsOf(n) || undefined, closed: !!(fp && fp.isClosed) };
+    }).filter(Boolean);
+    const group = MM.clusters(marks, MM.relate(marks)).find((g) => g.includes(id)) || [id];
+    lastTap = null;
+    session.summonMarks(group, Date.now());
+    render(session.getState());
+    if (group.length > 1) flash('held with ' + (group.length - 1) + ' it hangs together with');
+  }
+
+  /** Is a world point inside the loop that waits to be taken up? */
+  function insideWaitingLoop(w) {
+    if (!state.pendingLassoId) return false;
+    const loop = state.nodes.get(state.pendingLassoId);
+    const b = loop && MM.boundsOf(loop);
+    return !!b && w.x >= b.minX && w.x <= b.maxX && w.y >= b.minY && w.y <= b.maxY;
+  }
 
   canvas.addEventListener('pointermove', (e) => {
     if (e.pointerType === 'touch' && touches.has(e.pointerId)) {
@@ -1393,6 +1515,8 @@
         return;
       }
     }
+    if (forward) { postPointer(forward, 'move', e, screenToWorld(e.clientX, e.clientY)); return; }
+    pressMove(e);
     if (knobMove(screenToWorld(e.clientX, e.clientY))) return;
     if (demoMove(screenToWorld(e.clientX, e.clientY))) return;
     if (drag) { updateDrag(screenToWorld(e.clientX, e.clientY)); return; }
@@ -1405,6 +1529,8 @@
     }
     if (!live) {
       const w = screenToWorld(e.clientX, e.clientY);
+      // Over a playing frame the cursor says the frame is live to the hand.
+      if (!spaceHeld) canvas.style.cursor = pointerFrameAt(w) && !insideWaitingLoop(w) ? 'default' : 'crosshair';
       const over = nodeAt(w.x, w.y);
       if (over !== hoverId) { hoverId = over; render(state); }
       return;
@@ -1419,11 +1545,17 @@
     if (touches.size < 2) pinch = null;
     return touches.size > 0; // a finger is still down: nothing to commit yet
   };
-  canvas.addEventListener('pointercancel', (e) => { endTouch(e); live = null; });
+  canvas.addEventListener('pointercancel', (e) => {
+    endTouch(e); live = null; pressEnd();
+    if (forward) { postPointer(forward, 'cancel', e, screenToWorld(e.clientX, e.clientY)); forward = null; }
+  });
 
   canvas.addEventListener('pointerup', (e) => {
     if (endTouch(e)) { live = null; return; }
     if (panning) { panning = null; canvas.style.cursor = 'crosshair'; return; }
+    if (forward) { postPointer(forward, 'up', e, screenToWorld(e.clientX, e.clientY)); forward = null; return; }
+    pressEnd();
+    if (held) { held = false; live = null; return; } // the release after a hold: the field is open, nothing else happens
     if (knobEnd()) return;
     if (demoEnd()) return;
     if (drag) { endDrag(); return; }
@@ -1530,6 +1662,7 @@
   // keeps drawing with no button down.
   addEventListener('pointerup', (e) => {
     if (e.target === canvas) return;
+    if (forward) { postPointer(forward, 'up', e, screenToWorld(e.clientX, e.clientY)); forward = null; return; }
     if (knobEnd() || demoEnd()) return;
     if (drag) { endDrag(); return; }
     if (panning) { panning = null; canvas.style.cursor = 'crosshair'; return; }
@@ -1653,6 +1786,15 @@
   }
   const nameOfParticipant = (pid) =>
     pid === MM.LOCAL_PARTICIPANT ? 'you' : handLabel(MM.wordOf(state.nodes.get(pid)) || pid);
+
+  /** The next move, for the standing line: one rung of the ladder, by what stands. */
+  function nextMove(s, strokes) {
+    if (s.summon) return 'type in the field, or tap a pill · a tap on the ground lets go';
+    if (s.selection.length) return 'drag inside to move, a corner to scale, the knob to turn · Esc lets go';
+    if (s.pendingLassoId) return 'or double-tap inside the loop';
+    if (!strokes && !s.artifacts.length) return 'draw anything · double-click empty ground to type';
+    return 'press and hold a mark to hold it · or circle marks and double-tap inside';
+  }
 
   function nodeAt(x, y) {
     const slack = wpx(8);
@@ -1893,6 +2035,11 @@
     if (agents.length) parts.push(agents.map((a) => a.config.model).join(', '));
     if (ws) parts.push('⋯ ' + ws);
     if (hint) parts.push(hint);
+    // The standing line is a ladder (SURFACE-v10-PLAN D5): the next move, in a
+    // few words, keyed to what the board holds — so what the board can do is
+    // said before anything is asked, and never as a sentence of philosophy.
+    const next = nextMove(s, strokes);
+    if (next) parts.push(next);
     const standing = parts.join('  ·  ');
     // A fresh message takes the line; the one hint a waiting loop needs, and
     // a model at work, stay beside it. The standing state is kept on the
@@ -2131,9 +2278,26 @@
         },
       });
     }
+    // A line of writing — words gathered by nearness (v10 D3) — is one thing to
+    // name and one thing to make text, once every word on it has been read.
+    const writing = reading.concepts.find((c) => c.concept === 'writing');
+    const lineIds = writing && writing.roles && writing.roles.words ? writing.roles.words.slice() : [];
+    const lineSaid = lineIds.map((id) => MM.transcriptsOf(s.nodes.get(id))[0]);
+    const lineRead = lineIds.length >= 2 && lineSaid.every((t) => t && t.text);
+    const lineText = lineRead ? lineSaid.map((t) => t.text).join(' ') : '';
+    if (lineRead) {
+      const conf = Math.min(...lineSaid.map((t) => t.confidence));
+      items.push({
+        key: 'line:' + lineIds.join(','), certain: true, group: 'written', groupConf: conf,
+        groupWhy: 'read from your handwriting by ' + nameOfParticipant(lineSaid[0].source),
+        label: '“' + lineText + '” ' + conf.toFixed(2), name: lineText,
+        why: 'the line you wrote — take it as the name', tier: 1,
+        run: () => session.bless({ summonId: sum.id, name: lineText, at: Date.now() }),
+      });
+    }
     // What the writing says: write a word beside a shape and it is the shape's name.
     {
-      const labels = reading.roles.filter((r) => r.role === 'label' && sum.enclosedIds.includes(r.id));
+      const labels = reading.roles.filter((r) => r.role === 'label' && sum.enclosedIds.includes(r.id) && !(lineRead && lineIds.includes(r.id)));
       const said = labels.map((r) => ({ r, t: MM.transcriptsOf(s.nodes.get(r.id))[0] })).filter((x) => x.t);
       for (const { r, t } of said) {
         items.push({
@@ -2213,14 +2377,31 @@
       });
     }
     // Writing a model has read can become text — a file of words a frame wires into a slot. Only on request.
+    if (lineRead) {
+      items.push({
+        key: 'line-text:' + lineIds.join(','), group: 'always', groupConf: 0, groupWhy: '', verbs: ['text'],
+        label: 'Make it text “' + lineText + '”', why: 'a file of words where the line is; the ink stays', tier: 1,
+        run: () => { session.dismiss(sum.id, Date.now()); lineToText(lineIds, lineText); },
+      });
+    }
     for (const lid of sum.enclosedIds) {
       const ln = s.nodes.get(lid);
-      const said = ln && !s.artifacts.includes(lid) && MM.transcriptOf(ln);
+      const said = ln && !s.artifacts.includes(lid) && !(lineRead && lineIds.includes(lid)) && MM.transcriptOf(ln);
       if (!said) continue;
       items.push({
         key: 'word-text:' + lid, group: 'always', groupConf: 0, groupWhy: '', verbs: ['text'],
         label: 'Make it text “' + said + '”', why: 'a file of words where the writing is; the ink stays', tier: 1,
         run: () => { session.dismiss(sum.id, Date.now()); wordToText(lid); },
+      });
+    }
+    // A graph — nodes joined by edges — can stand in 3D at once: spheres and
+    // bonds in the loop's frame, from the drawing, no model (v10 D7, tier 1).
+    if ((reading.genre.genre === 'graph' || reading.genre.genre === 'mixed') && marks.length >= 2 && !artifactsIn(s, sum.enclosedIds).length) {
+      const nodesN = reading.roles.filter((r) => r.role === 'node').length, edgesN = reading.roles.filter((r) => r.role === 'edge').length;
+      if (nodesN >= 2 && edgesN >= 1) items.push({
+        key: '3d', group: 'always', groupConf: 0, groupWhy: '', verbs: ['3d', 'show in 3d', 'in 3d', 'spheres'],
+        label: 'Show it in 3D', why: nodesN + ' spheres and ' + edgesN + ' bond' + (edgesN === 1 ? '' : 's') + ' in the frame, turning — press inside to turn it; ink over a sphere lands on its mark → then: What is this? asks which molecule', tier: 1,
+        run: () => showIn3D(sum),
       });
     }
     // Artifacts in the loop can be wired into a frame — and a frame built
@@ -2288,12 +2469,21 @@
       });
     }
     // The acts that ask a model, and say so with a dot.
-    const unread = sum.enclosedIds.filter((id) => { const n = s.nodes.get(id); return n && isWriting(n) && !MM.transcriptOf(n); });
+    const unread = sum.enclosedIds.filter((id) => { const n = s.nodes.get(id); return n && isWriting(n) && !isRead(n); });
     if (unread.length) {
+      // A line of writing is read as one image, so the reader has the phrase; the rest one by one.
+      const line = lineIds.length >= 2 && lineIds.some((id) => unread.includes(id)) ? lineIds : [];
+      const single = unread.filter((id) => !line.includes(id));
+      const what = (line.length ? 'a line of ' + line.length + ' words' : '') + (line.length && single.length ? ' and ' : '') + (single.length ? single.length + ' mark' + (single.length === 1 ? '' : 's') + ' of writing' : '');
       items.push({
         key: 'read', group: 'always', groupConf: 0, groupWhy: '', verbs: ['read'],
-        label: 'Read the writing', why: unread.length + ' mark' + (unread.length === 1 ? '' : 's') + ' of writing, unread' + (seeing().length ? '' : ' — needs a model that can see'), tier: 2,
-        run: () => { let any = false; unread.forEach((id) => { any = readOne(s.nodes.get(id), true) || any; }); if (!any) offerModel('Reading writing needs a model that can see — one marked “sees”.'); },
+        label: 'Read the writing', why: what + ', unread' + (seeing().length ? '' : ' — needs a model that can see'), tier: 2,
+        run: () => {
+          let any = false;
+          if (line.length) any = readLine(line, true) || any;
+          single.forEach((id) => { any = readOne(s.nodes.get(id), true) || any; });
+          if (!any) offerModel('Reading writing needs a model that can see — one marked “sees”.');
+        },
       });
     }
     if (marks.length) {
@@ -2759,9 +2949,31 @@
     return out;
   }
 
+  /** The graph as spheres and bonds (tier 1): the loop is blessed, the program built from the drawing, played because the hand asked. */
+  function showIn3D(sum) {
+    const at = Date.now();
+    const match = sum.suggestions.find((x) => x.kind === 'match');
+    const artifactId = match ? session.bless({ summonId: sum.id, suggestionId: match.id, at: at }) : session.bless({ summonId: sum.id, name: 'graph in 3d', at: at });
+    if (!artifactId) { say('could not hold that group'); return; }
+    const built = MM.buildGraph3D(session, artifactId);
+    if (!built.ok) { say('could not stand it in 3D: ' + built.error); return; }
+    session.attachCode({ participantId: built.participantId, nodeId: artifactId, kind: 'run', code: built.code, prompt: 'show it in 3D', at: at + 1 });
+    session.clock({ nodeId: artifactId, op: 'play', at: at + 2 });
+    say('in 3D (tier 1): ' + built.reasoning);
+  }
+
   /** An entry's program on a new artifact: reused, not rewritten, and running because the human asked. */
   function reuseEntry(artifactId, entry) {
     const at = Date.now();
+    if (entry.code.startsWith(MM.GRAPH3D_MARK)) {
+      // A structure the engine built from one drawing is rebuilt from this one: the atoms are these marks, not those.
+      const built = MM.buildGraph3D(session, artifactId);
+      if (!built.ok) { say('could not stand it in 3D: ' + built.error); return; }
+      session.attachCode({ participantId: built.participantId, nodeId: artifactId, kind: 'run', code: built.code, prompt: 'show it in 3D', from: entry.id, at: at });
+      session.clock({ nodeId: artifactId, op: 'play', at: at + 1 });
+      say('in 3D again, from this drawing (tier 1) — ' + built.reasoning);
+      return;
+    }
     session.attachCode({ participantId: MM.LOCAL_PARTICIPANT, nodeId: artifactId, kind: 'run', code: entry.code, prompt: 'reused from ' + entry.name, from: entry.id, at: at });
     session.clock({ nodeId: artifactId, op: 'play', at: at + 1 });
     say('reused ' + entry.name + ' from the library — nothing was written');
@@ -3233,6 +3445,37 @@
     inspectorEl.innerHTML = html;
   }
 
+  /**
+   * A selection's rung on the map of becoming, and the rung after it — ink →
+   * shape → concept or definition → structure → artifact → refined (v10 D6).
+   * One line, so depth is legible a step at a time; the field's pills are
+   * the step itself.
+   */
+  function becomesOf(s, sum, reading) {
+    const ids = sum.enclosedIds;
+    const arts = ids.filter((id) => s.artifacts.includes(id));
+    if (arts.length) {
+      const a = s.nodes.get(arts[0]);
+      const rep = a && codeRepOf(a);
+      if (rep) {
+        const kind = rep.data.kind || 'html';
+        const what = kind === 'run' ? (rep.data.code && rep.data.code.startsWith(MM.GRAPH3D_MARK) ? 'a 3D thing' : 'a program') : kind === 'html' ? 'a page' : kind === 'text' ? 'text' : kind === 'png' || kind === 'jpg' ? 'a picture' : 'a ' + kind + ' file';
+        return { here: 'an artifact, ' + what, next: 'ink over it addresses its parts · a brief is a new version · wire it in a frame' };
+      }
+      return { here: 'a definition' + (MM.wordOf(a) ? ' “' + MM.wordOf(a) + '”' : ''), next: 'another like it is matched · a brief builds on it · its tank plays' };
+    }
+    const match = sum.suggestions.find((x) => x.kind === 'match');
+    if (match) return { here: 'a definition, ' + match.label + ' ' + (match.score || 1).toFixed(2), next: (libraryEntries(s).some((e) => e.id === match.artifactId) ? 'its program on this drawing' : 'take the name') + ' · a brief builds from it' };
+    const genre = reading.genre && reading.genre.genre;
+    const concept = reading.concepts[0];
+    if (genre === 'graph' || genre === 'mixed') return { here: 'a structure, a graph' + (concept ? ' (' + concept.concept + ')' : ''), next: 'Show it in 3D · a brief builds the diagram, then a model writes the words' };
+    if (genre === 'layout') return { here: 'a structure, a layout' + (concept ? ' (' + concept.concept + ')' : ''), next: 'a brief builds the page at once, then a model writes the words' };
+    if (concept) return { here: 'a concept, ' + concept.concept + ' ' + concept.confidence.toFixed(2), next: concept.conversions.filter((c) => c.effect.kind !== 'name' && c.effect.kind !== 'prompt').map((c) => c.label).concat(['a name']).join(' · ') };
+    const shapes = ids.map((id) => MM.topInterpretation(s.nodes.get(id))).filter(Boolean);
+    if (shapes.length && shapes.every((x) => x === 'text')) return { here: 'writing', next: 'Read the writing · a name · text' };
+    return { here: 'shapes' + (shapes.length ? ', ' + [...new Set(shapes)].join(', ') : ''), next: 'draw them clean · a name · a brief is a program' };
+  }
+
   function renderSummonScope(s) {
     const sum = s.summon;
     const reading = session.read(sum.enclosedIds);
@@ -3247,6 +3490,9 @@
       html += '<div class="row"><span class="k">genre</span><span class="v">' + esc(reading.genre.genre) + '</span></div>';
       html += '<div class="why">' + esc(reading.genre.reasoning) + '</div>';
     }
+    // Where this stands on the map of becoming, and the rung after it (SURFACE-v10-PLAN §4).
+    const rung = becomesOf(s, sum, reading);
+    if (rung) html += '<div class="row"><span class="k">becomes</span><span class="v">' + esc(rung.here + ' → ' + rung.next) + '</span></div>';
     if (reading.roles && reading.roles.length) {
       html += '<div class="sep"></div><div class="eyebrow">roles</div>';
       reading.roles.forEach((r) => {
@@ -3376,7 +3622,7 @@
   canvas.addEventListener('pointerdown', () => { if (rp.rec && rp.timer) { rpStop(); rpCaption.innerHTML = '<b>' + (rp.step + 1) + '.</b> ' + esc(rp.rec.steps[rp.step].caption) + ' <span style="color:var(--dim)">— continuing from here with your marks</span>'; } });
 
 // ===== kinds =====
-// Provides: documentForKind (the renderers: every kind as a document ink can address), the worker runtime
+// Provides: documentForKind (the renderers: every kind as a document ink can address), postPointer (a hand forwarded into a playing frame), the worker runtime
 //   (a blessed `js` artifact's code runs in a worker with a budget; a throw or a hang pauses its clock
 //   with the reason), runtimeOffset, runtimeBroken, syncRuntime.
 // Uses: core (session, esc), artifacts (frames, documentFor).
@@ -3494,6 +3740,26 @@
     '  }',
     '  var c2 = document.createElement("canvas"); c2.width = W; c2.height = H; c2.style.position = "absolute"; c2.style.left = "0"; c2.style.top = "0"; document.body.appendChild(c2);',
     '  mm.ctx = c2.getContext("2d");',
+    '  // A hand that lands inside this frame while it plays is forwarded here by the canvas (SURFACE-v10-PLAN D2):',
+    '  // dispatched as real pointer and mouse events at the point, and handed to mm.onPointer. mm.pointer is the latest.',
+    '  var pointerFns = [], downAt = null;',
+    '  mm.pointer = { x: 0, y: 0, down: false };',
+    '  mm.onPointer = function(fn){ pointerFns.push(fn); };',
+    '  window.addEventListener("message", function(e){',
+    '    var m = e.data; if (!m || m.mmPointer !== true) return;',
+    '    var x = m.x, y = m.y, type = m.type;',
+    '    mm.pointer.x = x; mm.pointer.y = y; if (type === "down") mm.pointer.down = true; if (type === "up" || type === "cancel") mm.pointer.down = false;',
+    '    var target = (renderer && renderer.domElement) || c2;',
+    '    var init = { bubbles: true, cancelable: true, clientX: x, clientY: y, screenX: x, screenY: y, button: m.button || 0, buttons: (type === "up" || type === "cancel") ? 0 : 1, pointerId: 1, pointerType: m.pointerType || "mouse", isPrimary: true, shiftKey: !!m.shiftKey, altKey: !!m.altKey, ctrlKey: !!m.ctrlKey, metaKey: !!m.metaKey };',
+    '    var pn = type === "down" ? "pointerdown" : type === "move" ? "pointermove" : type === "cancel" ? "pointercancel" : "pointerup";',
+    '    var mn = type === "down" ? "mousedown" : type === "move" ? "mousemove" : type === "cancel" ? null : "mouseup";',
+    '    try { target.dispatchEvent(new PointerEvent(pn, init)); } catch (err) { /* no PointerEvent here */ }',
+    '    if (mn) { try { target.dispatchEvent(new MouseEvent(mn, init)); } catch (err) { /* no MouseEvent here */ } }',
+    '    if (type === "down") downAt = { x: x, y: y };',
+    '    if (type === "up" && downAt && Math.hypot(x - downAt.x, y - downAt.y) < 6) { try { target.dispatchEvent(new MouseEvent("click", init)); } catch (err) { /* no click */ } }',
+    '    if (type === "up" || type === "cancel") downAt = null;',
+    '    for (var i = 0; i < pointerFns.length; i++) { try { pointerFns[i]({ type: type, x: x, y: y, button: m.button || 0, pointerType: m.pointerType || "mouse" }); } catch (err) { post({ type: "error", error: String(err && err.message || err) }); } }',
+    '  });',
     '  try { (new Function("mm", __CODE__))(mm); } catch (e) { post({ type: "error", error: String(e && e.message || e) }); return; }',
     '  function report(){ var out = []; parts.forEach(function(r, id){ out.push({ id: id, x: r.x, y: r.y, w: r.w, h: r.h }); }); post({ type: "regions", regions: out }); }',
     '  var v = new THREE_VEC();',
@@ -3551,6 +3817,13 @@
     if (m.type === 'error') { markBroken(m.id, 'threw: ' + m.error); }
   });
   function reportedRegions(id) { return reported.get(id) || []; }
+
+  /** Forward a pointer to a playing frame, in the frame's own pixels (SURFACE-v10-PLAN D2). */
+  function postPointer(hit, type, e, w) {
+    const win = hit.f.iframe && hit.f.iframe.contentWindow;
+    if (!win) return;
+    win.postMessage({ mmPointer: true, type: type, x: w.x - hit.x, y: w.y - hit.y, button: e.button || 0, pointerType: e.pointerType || 'mouse', shiftKey: !!e.shiftKey, altKey: !!e.altKey, ctrlKey: !!e.ctrlKey, metaKey: !!e.metaKey }, '*');
+  }
 
   /** The document an artifact's newest code rep renders as, by its kind. */
   function documentForKind(rep, w, h, ctx) {
@@ -4516,13 +4789,14 @@
   async function mergeLive() {
     if (!folder.store || folder.how !== 'live') return;
     const logs = await folder.store.readLogs();
-    const mine = logs[folder.me] || [];
-    // Events I made since the last send are not in the room yet: keep them.
-    const evs = session.getEvents();
-    const unsent = evs.slice(folder.loadedCount).filter((e) => !e.by);
-    const merged = MM.mergeLogs(Object.assign({}, logs, { [folder.me]: mine.concat(unsent) }), { me: folder.me });
+    // My log is what this session holds of mine — sent or not — never the
+    // room's copy of it: a line that lands between a send and this merge
+    // would otherwise count my sent events twice, and every mark of mine
+    // would stand doubled.
+    const mine = myLogNow();
+    const merged = MM.mergeLogs(Object.assign({}, logs, { [folder.me]: mine }), { me: folder.me });
     session.load(merged);
-    folder.myPrevious = mine.concat(unsent);
+    folder.myPrevious = mine;
     folder.loadedCount = merged.length;
     if (typeof syncTiles === 'function') syncTiles();
   }
@@ -5015,6 +5289,20 @@
   }
 
   /** A written word (its transcript) becomes a text artifact where the writing is; the ink stays. */
+  /** A line of writing as one text artifact, standing where the line is. */
+  function lineToText(ids, text) {
+    const s = session.getState();
+    const pts = ids.map((id) => s.nodes.get(id)).filter(Boolean).map((n) => MM.boundsOf(n)).filter(Boolean).flatMap((b) => [{ x: b.minX, y: b.minY }, { x: b.maxX, y: b.maxY }]);
+    if (!text || !pts.length) return null;
+    const b = MM.getBounds(pts);
+    const w = Math.max(TEXT_W, b.maxX - b.minX), h = Math.max(48, b.maxY - b.minY);
+    textCount++;
+    return session.import({
+      kind: 'text', path: TEXT_DIR + '/' + textCount + '.txt', name: text,
+      bounds: { minX: b.minX, minY: b.minY, maxX: b.minX + w, maxY: b.minY + h }, code: text, at: Date.now(),
+    });
+  }
+
   function wordToText(wordId) {
     const s = session.getState();
     const n = s.nodes.get(wordId);
@@ -5165,6 +5453,12 @@
   const livePanel = document.getElementById('livePanel');
   ui.pane(livePanel, 'live', () => closePanel(livePanel, tiles.live));
   tiles.live.onclick = () => { togglePanel(livePanel, tiles.live); if (!livePanel.hasAttribute('hidden')) { const r = document.getElementById('liveRoom'); if (!r.value) r.value = folder.how === 'live' ? folder.name : 'table'; document.getElementById('liveName').value = prefs.get('hand-name', '') || ''; } };
+  // The room Claude Code joins (Demos/mcp.mjs, SURFACE-v10-PLAN D1): room "claude" through the relay the MCP hand starts on this machine.
+  document.getElementById('liveClaude').onclick = () => {
+    document.getElementById('liveRoom').value = 'claude';
+    document.getElementById('liveRelay').value = 'http://127.0.0.1:8020';
+    document.getElementById('liveJoin').click();
+  };
   document.getElementById('liveJoin').onclick = () => {
     const room = document.getElementById('liveRoom').value.trim();
     const name = document.getElementById('liveName').value.trim();

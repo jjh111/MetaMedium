@@ -1,5 +1,5 @@
 // ===== handwriting =====
-// Provides: handwriting: inkImage, isWriting, readOne, readWriting; the auto-read preference (off by default).
+// Provides: handwriting: inkImage, isWriting, isRead, readOne, readLine (a line of writing as one image), readWriting; the auto-read preference (off by default).
 // Uses: core (prefs), models (agents, withWork), render, input (say).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () Ellipsis)();`. Shared state is the
@@ -24,12 +24,19 @@
     syncTiles();
   }
   const askedToRead = new Set(); // node ids handed out already (per model join, see below)
+  // A mark read as part of a line whose words did not split cleanly: the line's
+  // text is held on the first mark, and this one was read with it. Runtime only.
+  const readWith = new Map();
+  const isRead = (node) => !!MM.transcriptOf(node) || readWith.has(node.id);
 
-  function inkImage(node, size) {
-    // A word is several strokes; a cursive word is one. Same image either way.
-    const runs = MM.isWord(node)
+  /** The ink of a mark, as runs of points: a word is several strokes, a cursive word is one. */
+  function runsOf(node) {
+    return MM.isWord(node)
       ? MM.lettersOf(node).map((id) => state.nodes.get(id)).filter(Boolean).map((n) => MM.strokePointsOf(n)).filter((p) => p && p.length > 1)
       : [MM.strokePointsOf(node)].filter((p) => p && p.length > 1);
+  }
+  function inkImage(node, size) { return inkImageOf(runsOf(node), size); }
+  function inkImageOf(runs, size) {
     if (!runs.length) return null;
     const pts = runs.flat();
     const b = MM.getBounds(pts);
@@ -69,6 +76,48 @@
           ? agent.name + ' read “' + res.transcripts[0].text + '”' + (res.transcripts.length > 1 ? ' (or ' + res.transcripts.slice(1).map((t) => '“' + t.text + '”').join(', ') + ')' : '')
           : agent.name + ' could not read it (' + res.error + ')');
         if (!res.ok && res.raw) window.__mm.lastRaw = res.raw;
+        render(session.getState());
+        refreshPalette();
+      });
+    });
+    return true;
+  }
+
+  /**
+   * A line of writing, read as one image (SURFACE-v10-PLAN D3): words gathered
+   * by nearness are handed over together, so the reader has the phrase. When
+   * the reply has one word per mark, each lands on its own mark; otherwise
+   * the whole line is held on the first mark and the rest were read with it.
+   */
+  function readLine(ids, force) {
+    const readers = seeing();
+    if (!readers.length) return false;
+    const s = session.getState();
+    const nodes = ids.map((id) => s.nodes.get(id)).filter(Boolean);
+    if (nodes.length < 2) return nodes.length === 1 ? readOne(nodes[0], force) : false;
+    const key = 'line:' + ids.join(',');
+    if (!force && askedToRead.has(key)) return false;
+    askedToRead.add(key);
+    const image = inkImageOf(nodes.flatMap(runsOf));
+    if (!image) return false;
+    const first = nodes[0];
+    readers.forEach((agent) => {
+      withWork('write:' + agent.id + ':' + first.id, ids, agent.name + ' · reading the line', agent.read({ nodeId: first.id, image: image, at: Date.now(), hold: false })).then((res) => {
+        if (res.ok) {
+          const top = res.transcripts[0];
+          const words = top.text.trim().split(/\s+/);
+          const at = Date.now();
+          if (words.length === nodes.length) {
+            nodes.forEach((n, i) => session.propose({ participantId: agent.id, nodeId: n.id, edges: [], reps: [{ modality: 'transcript', data: { text: words[i], line: top.text }, confidence: top.confidence }], at: at }));
+          } else {
+            session.propose({ participantId: agent.id, nodeId: first.id, edges: [], reps: res.transcripts.map((t) => ({ modality: 'transcript', data: { text: t.text }, confidence: t.confidence })), at: at });
+            nodes.slice(1).forEach((n) => readWith.set(n.id, first.id));
+          }
+          say(agent.name + ' read “' + top.text + '”' + (res.transcripts.length > 1 ? ' (or ' + res.transcripts.slice(1).map((t) => '“' + t.text + '”').join(', ') + ')' : ''));
+        } else {
+          say(agent.name + ' could not read it (' + res.error + ')');
+          if (res.raw) window.__mm.lastRaw = res.raw;
+        }
         render(session.getState());
         refreshPalette();
       });

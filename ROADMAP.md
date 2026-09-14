@@ -8,6 +8,26 @@
 
 ## The Vision, Restated
 
+> **v10 accounting, 14 September 2026 (branch `next-phases`, local).** The
+> canvas reaches out (`SURFACE-v10-PLAN.md`): **an MCP hand** —
+> `Demos/mcp.mjs`, a participant in a live room with seven tools (look, see
+> the ink as a picture, draw, say, propose, transcribe, write), registered
+> in `.mcp.json`, tested over stdio in CI — so Claude Code writes to the
+> board and reads handwriting from it; **a playing program takes the
+> pointer** while ink begun outside goes over it (`mm.onPointer`);
+> **writing gathers by nearness** into a line read as one (the `writing`
+> concept); **press-and-hold** holds a mark with what it hangs together
+> with, and the standing line is a ladder of the next move. Found on the
+> way: "local" in another hand's log is that hand, and a live merge takes
+> my log from the session, never the room's copy. **The molecule chain
+> stands**: circles joined by lines offer *Show it in 3D*, and the tier 1
+> library builds spheres and bonds from the drawing, each sphere named for
+> its mark, turning under a pressed hand (T6); the panel says what a
+> selection *becomes* and the rung after it (T5, first cut). Core 570
+> tests; e2e 161 steps. Still to build: which molecule (a model's answer
+> named on the artifact), questions as drawn candidates (T7), ids per hand
+> (T8).
+>
 > **v9 accounting, 6 September 2026 (branch `next-phases`, local).** The
 > surface as a system (`SURFACE-v9-PLAN.md` §5–§6): **a model is asked only
 > by a deliberate act** — `render()` never calls one, and drawing, the check

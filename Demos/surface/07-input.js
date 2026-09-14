@@ -1,6 +1,6 @@
 // ===== input =====
 // Provides: pointer input (draw, pan, pinch), keys (undo, copy, paste, erase, zoom), say()/flash() for the status line.
-// Uses: core, view, snap (autoSweep), render, palette (copyMarks, pasteClip), handwriting (autoRead).
+// Uses: core, view, snap (autoSweep), render, palette (copyMarks, pasteClip), handwriting (autoRead), artifacts (pointerFrameAt), kinds (postPointer).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () Ellipsis)();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -11,6 +11,8 @@
   // is what makes "doodle on top of the running page" work at all.
   let panning = null;
   let spaceHeld = false;
+  // A hand inside a playing program: the frame has it until the hand lifts (SURFACE-v10-PLAN D2).
+  let forward = null;
 
   // Pointer capture is a nicety — it keeps a stroke alive when the pointer
   // leaves the element. It is NOT allowed to be the reason a stroke fails to
@@ -29,7 +31,7 @@
       if (touches.size === 2) {
         // Two fingers: this is a pinch, not a stroke. Drop the live ink — it
         // was the first finger landing, not a mark.
-        live = null;
+        live = null; pressEnd();
         const [a, b] = [...touches.values()];
         pinch = { dist: Math.hypot(a.x - b.x, a.y - b.y), mid: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, zoom: view.zoom };
         return;
@@ -48,8 +50,57 @@
     // A hand on a body in a running tank is acting it out, not moving ink.
     if (hit && hit.kind === 'move' && demoBegin(state.selection, w0)) return;
     if (hit) { beginDrag(hit, w0); return; }
+    // A hand landing inside a playing program is the program's: every move and
+    // the release go to it, and nothing is drawn. A stroke begun anywhere else
+    // is ink, and stays ink across any frame it crosses — doodling on the 3D
+    // thing is a stroke begun beside it.
+    // A loop that waits is the hand's wherever it lies: the tap that takes it
+    // up, or the mark across it, lands inside the loop, not in the frame.
+    const pf = pointerFrameAt(w0);
+    if (pf && !insideWaitingLoop(w0)) { forward = pf; postPointer(pf, 'down', e, w0); return; }
+    pressBegin(e, w0);
     live = [w0];
   });
+
+  // ===== Hold by long-press (SURFACE-v10-PLAN D5) ============================
+  // Press a mark and hold still: it is held, with what it hangs together
+  // with, and the field opens — no loop drawn, which is what a newcomer tries
+  // first. A tap stays a tap and a stroke stays a stroke; only stillness, on
+  // a mark, with nothing held, is a hold.
+  const HOLD_MS = 450, HOLD_SLOP = 6;
+  let press = null; // { id, x, y, timer } while a hand rests on a mark
+  let held = false; // the release after a hold is not a tap
+  function pressBegin(e, w) {
+    const id = nodeAt(w.x, w.y);
+    if (!id || state.summon || state.selection.length || touches.size > 1) return;
+    press = { id: id, x: e.clientX, y: e.clientY, timer: setTimeout(() => { const p = press; press = null; if (!p || !live) return; live = null; held = true; holdAround(p.id); }, HOLD_MS) };
+  }
+  function pressMove(e) { if (press && Math.hypot(e.clientX - press.x, e.clientY - press.y) > HOLD_SLOP) pressEnd(); }
+  function pressEnd() { if (press) { clearTimeout(press.timer); press = null; } }
+  /** Hold a mark with everything it hangs together with: the cluster over the relations the canvas sees. */
+  function holdAround(id) {
+    const s = session.getState();
+    const marks = s.contentIds.filter((cid) => !s.artifacts.includes(cid)).map((cid) => {
+      const n = s.nodes.get(cid);
+      const b = n && MM.boundsOf(n);
+      if (!b) return null;
+      const fp = MM.fingerprintOf(n);
+      return { id: cid, bounds: b, points: MM.strokePointsOf(n) || undefined, closed: !!(fp && fp.isClosed) };
+    }).filter(Boolean);
+    const group = MM.clusters(marks, MM.relate(marks)).find((g) => g.includes(id)) || [id];
+    lastTap = null;
+    session.summonMarks(group, Date.now());
+    render(session.getState());
+    if (group.length > 1) flash('held with ' + (group.length - 1) + ' it hangs together with');
+  }
+
+  /** Is a world point inside the loop that waits to be taken up? */
+  function insideWaitingLoop(w) {
+    if (!state.pendingLassoId) return false;
+    const loop = state.nodes.get(state.pendingLassoId);
+    const b = loop && MM.boundsOf(loop);
+    return !!b && w.x >= b.minX && w.x <= b.maxX && w.y >= b.minY && w.y <= b.maxY;
+  }
 
   canvas.addEventListener('pointermove', (e) => {
     if (e.pointerType === 'touch' && touches.has(e.pointerId)) {
@@ -67,6 +118,8 @@
         return;
       }
     }
+    if (forward) { postPointer(forward, 'move', e, screenToWorld(e.clientX, e.clientY)); return; }
+    pressMove(e);
     if (knobMove(screenToWorld(e.clientX, e.clientY))) return;
     if (demoMove(screenToWorld(e.clientX, e.clientY))) return;
     if (drag) { updateDrag(screenToWorld(e.clientX, e.clientY)); return; }
@@ -79,6 +132,8 @@
     }
     if (!live) {
       const w = screenToWorld(e.clientX, e.clientY);
+      // Over a playing frame the cursor says the frame is live to the hand.
+      if (!spaceHeld) canvas.style.cursor = pointerFrameAt(w) && !insideWaitingLoop(w) ? 'default' : 'crosshair';
       const over = nodeAt(w.x, w.y);
       if (over !== hoverId) { hoverId = over; render(state); }
       return;
@@ -93,11 +148,17 @@
     if (touches.size < 2) pinch = null;
     return touches.size > 0; // a finger is still down: nothing to commit yet
   };
-  canvas.addEventListener('pointercancel', (e) => { endTouch(e); live = null; });
+  canvas.addEventListener('pointercancel', (e) => {
+    endTouch(e); live = null; pressEnd();
+    if (forward) { postPointer(forward, 'cancel', e, screenToWorld(e.clientX, e.clientY)); forward = null; }
+  });
 
   canvas.addEventListener('pointerup', (e) => {
     if (endTouch(e)) { live = null; return; }
     if (panning) { panning = null; canvas.style.cursor = 'crosshair'; return; }
+    if (forward) { postPointer(forward, 'up', e, screenToWorld(e.clientX, e.clientY)); forward = null; return; }
+    pressEnd();
+    if (held) { held = false; live = null; return; } // the release after a hold: the field is open, nothing else happens
     if (knobEnd()) return;
     if (demoEnd()) return;
     if (drag) { endDrag(); return; }
@@ -204,6 +265,7 @@
   // keeps drawing with no button down.
   addEventListener('pointerup', (e) => {
     if (e.target === canvas) return;
+    if (forward) { postPointer(forward, 'up', e, screenToWorld(e.clientX, e.clientY)); forward = null; return; }
     if (knobEnd() || demoEnd()) return;
     if (drag) { endDrag(); return; }
     if (panning) { panning = null; canvas.style.cursor = 'crosshair'; return; }

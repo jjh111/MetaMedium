@@ -1,5 +1,5 @@
 // ===== artifacts =====
-// Provides: the live plane: frames of iframes for artifacts with code, syncStage, regionsUnderInk.
+// Provides: the live plane: frames of iframes for artifacts with code, syncStage, regionsUnderInk, pointerFrameAt.
 // Uses: core, view.
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () Ellipsis)();`. Shared state is the
@@ -124,6 +124,28 @@
       }
     }
     syncRuntime(s);
+  }
+
+  /**
+   * The playing program under a world point, if any: the one frame that takes
+   * the pointer (SURFACE-v10-PLAN D2). A page has no script to receive a
+   * click and a still program is its source card, so both take ink from
+   * anywhere; only a program that runs has something to press.
+   */
+  function pointerFrameAt(w) {
+    let hit = null;
+    for (const [id, f] of frames) {
+      if (f.parked || f.kind !== 'run' || !f.iframe) continue;
+      const c = state.clocks[id];
+      if (!c || !c.playing) continue;
+      const node = state.nodes.get(id);
+      const fr = node && MM.frameOf(node);
+      if (!fr) continue;
+      const o = runtimeOffset(id);
+      const x = fr.x + o.dx, y = fr.y + o.dy;
+      if (w.x >= x && w.x <= x + fr.w && w.y >= y && w.y <= y + fr.h) hit = { id: id, f: f, x: x, y: y };
+    }
+    return hit;
   }
 
   /**

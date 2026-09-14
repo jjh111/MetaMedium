@@ -61,9 +61,26 @@
         },
       });
     }
+    // A line of writing — words gathered by nearness (v10 D3) — is one thing to
+    // name and one thing to make text, once every word on it has been read.
+    const writing = reading.concepts.find((c) => c.concept === 'writing');
+    const lineIds = writing && writing.roles && writing.roles.words ? writing.roles.words.slice() : [];
+    const lineSaid = lineIds.map((id) => MM.transcriptsOf(s.nodes.get(id))[0]);
+    const lineRead = lineIds.length >= 2 && lineSaid.every((t) => t && t.text);
+    const lineText = lineRead ? lineSaid.map((t) => t.text).join(' ') : '';
+    if (lineRead) {
+      const conf = Math.min(...lineSaid.map((t) => t.confidence));
+      items.push({
+        key: 'line:' + lineIds.join(','), certain: true, group: 'written', groupConf: conf,
+        groupWhy: 'read from your handwriting by ' + nameOfParticipant(lineSaid[0].source),
+        label: '“' + lineText + '” ' + conf.toFixed(2), name: lineText,
+        why: 'the line you wrote — take it as the name', tier: 1,
+        run: () => session.bless({ summonId: sum.id, name: lineText, at: Date.now() }),
+      });
+    }
     // What the writing says: write a word beside a shape and it is the shape's name.
     {
-      const labels = reading.roles.filter((r) => r.role === 'label' && sum.enclosedIds.includes(r.id));
+      const labels = reading.roles.filter((r) => r.role === 'label' && sum.enclosedIds.includes(r.id) && !(lineRead && lineIds.includes(r.id)));
       const said = labels.map((r) => ({ r, t: MM.transcriptsOf(s.nodes.get(r.id))[0] })).filter((x) => x.t);
       for (const { r, t } of said) {
         items.push({
@@ -143,14 +160,31 @@
       });
     }
     // Writing a model has read can become text — a file of words a frame wires into a slot. Only on request.
+    if (lineRead) {
+      items.push({
+        key: 'line-text:' + lineIds.join(','), group: 'always', groupConf: 0, groupWhy: '', verbs: ['text'],
+        label: 'Make it text “' + lineText + '”', why: 'a file of words where the line is; the ink stays', tier: 1,
+        run: () => { session.dismiss(sum.id, Date.now()); lineToText(lineIds, lineText); },
+      });
+    }
     for (const lid of sum.enclosedIds) {
       const ln = s.nodes.get(lid);
-      const said = ln && !s.artifacts.includes(lid) && MM.transcriptOf(ln);
+      const said = ln && !s.artifacts.includes(lid) && !(lineRead && lineIds.includes(lid)) && MM.transcriptOf(ln);
       if (!said) continue;
       items.push({
         key: 'word-text:' + lid, group: 'always', groupConf: 0, groupWhy: '', verbs: ['text'],
         label: 'Make it text “' + said + '”', why: 'a file of words where the writing is; the ink stays', tier: 1,
         run: () => { session.dismiss(sum.id, Date.now()); wordToText(lid); },
+      });
+    }
+    // A graph — nodes joined by edges — can stand in 3D at once: spheres and
+    // bonds in the loop's frame, from the drawing, no model (v10 D7, tier 1).
+    if ((reading.genre.genre === 'graph' || reading.genre.genre === 'mixed') && marks.length >= 2 && !artifactsIn(s, sum.enclosedIds).length) {
+      const nodesN = reading.roles.filter((r) => r.role === 'node').length, edgesN = reading.roles.filter((r) => r.role === 'edge').length;
+      if (nodesN >= 2 && edgesN >= 1) items.push({
+        key: '3d', group: 'always', groupConf: 0, groupWhy: '', verbs: ['3d', 'show in 3d', 'in 3d', 'spheres'],
+        label: 'Show it in 3D', why: nodesN + ' spheres and ' + edgesN + ' bond' + (edgesN === 1 ? '' : 's') + ' in the frame, turning — press inside to turn it; ink over a sphere lands on its mark → then: What is this? asks which molecule', tier: 1,
+        run: () => showIn3D(sum),
       });
     }
     // Artifacts in the loop can be wired into a frame — and a frame built
@@ -218,12 +252,21 @@
       });
     }
     // The acts that ask a model, and say so with a dot.
-    const unread = sum.enclosedIds.filter((id) => { const n = s.nodes.get(id); return n && isWriting(n) && !MM.transcriptOf(n); });
+    const unread = sum.enclosedIds.filter((id) => { const n = s.nodes.get(id); return n && isWriting(n) && !isRead(n); });
     if (unread.length) {
+      // A line of writing is read as one image, so the reader has the phrase; the rest one by one.
+      const line = lineIds.length >= 2 && lineIds.some((id) => unread.includes(id)) ? lineIds : [];
+      const single = unread.filter((id) => !line.includes(id));
+      const what = (line.length ? 'a line of ' + line.length + ' words' : '') + (line.length && single.length ? ' and ' : '') + (single.length ? single.length + ' mark' + (single.length === 1 ? '' : 's') + ' of writing' : '');
       items.push({
         key: 'read', group: 'always', groupConf: 0, groupWhy: '', verbs: ['read'],
-        label: 'Read the writing', why: unread.length + ' mark' + (unread.length === 1 ? '' : 's') + ' of writing, unread' + (seeing().length ? '' : ' — needs a model that can see'), tier: 2,
-        run: () => { let any = false; unread.forEach((id) => { any = readOne(s.nodes.get(id), true) || any; }); if (!any) offerModel('Reading writing needs a model that can see — one marked “sees”.'); },
+        label: 'Read the writing', why: what + ', unread' + (seeing().length ? '' : ' — needs a model that can see'), tier: 2,
+        run: () => {
+          let any = false;
+          if (line.length) any = readLine(line, true) || any;
+          single.forEach((id) => { any = readOne(s.nodes.get(id), true) || any; });
+          if (!any) offerModel('Reading writing needs a model that can see — one marked “sees”.');
+        },
       });
     }
     if (marks.length) {
@@ -689,9 +732,31 @@
     return out;
   }
 
+  /** The graph as spheres and bonds (tier 1): the loop is blessed, the program built from the drawing, played because the hand asked. */
+  function showIn3D(sum) {
+    const at = Date.now();
+    const match = sum.suggestions.find((x) => x.kind === 'match');
+    const artifactId = match ? session.bless({ summonId: sum.id, suggestionId: match.id, at: at }) : session.bless({ summonId: sum.id, name: 'graph in 3d', at: at });
+    if (!artifactId) { say('could not hold that group'); return; }
+    const built = MM.buildGraph3D(session, artifactId);
+    if (!built.ok) { say('could not stand it in 3D: ' + built.error); return; }
+    session.attachCode({ participantId: built.participantId, nodeId: artifactId, kind: 'run', code: built.code, prompt: 'show it in 3D', at: at + 1 });
+    session.clock({ nodeId: artifactId, op: 'play', at: at + 2 });
+    say('in 3D (tier 1): ' + built.reasoning);
+  }
+
   /** An entry's program on a new artifact: reused, not rewritten, and running because the human asked. */
   function reuseEntry(artifactId, entry) {
     const at = Date.now();
+    if (entry.code.startsWith(MM.GRAPH3D_MARK)) {
+      // A structure the engine built from one drawing is rebuilt from this one: the atoms are these marks, not those.
+      const built = MM.buildGraph3D(session, artifactId);
+      if (!built.ok) { say('could not stand it in 3D: ' + built.error); return; }
+      session.attachCode({ participantId: built.participantId, nodeId: artifactId, kind: 'run', code: built.code, prompt: 'show it in 3D', from: entry.id, at: at });
+      session.clock({ nodeId: artifactId, op: 'play', at: at + 1 });
+      say('in 3D again, from this drawing (tier 1) — ' + built.reasoning);
+      return;
+    }
     session.attachCode({ participantId: MM.LOCAL_PARTICIPANT, nodeId: artifactId, kind: 'run', code: entry.code, prompt: 'reused from ' + entry.name, from: entry.id, at: at });
     session.clock({ nodeId: artifactId, op: 'play', at: at + 1 });
     say('reused ' + entry.name + ' from the library — nothing was written');

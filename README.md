@@ -52,6 +52,10 @@ beside them as your own log under `.metamedium/logs/`. Three ways in:
   other tabs on this machine that open the same room see each other's ink
   as it lands, each hand in its own colour. Across machines, run
   `node Demos/relay.mjs` and add `&relay=http://<host>:8020`.
+  **Claude Code is a hand too**: `node Demos/mcp.mjs` (registered in the
+  repo's `.mcp.json`) joins room `claude` and gives Claude seven tools —
+  look, see the ink, draw, say, propose, transcribe, write — and the
+  *live* pane's **with Claude** button joins the same room from the canvas.
   Autosave rewrites only your log file; git carries it between machines.
 - **A repository** — `session-engine.html?git=owner/repo` (or
   `owner/repo@branch`, `owner/repo/some/dir`). Reading a public repository

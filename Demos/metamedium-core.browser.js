@@ -42,6 +42,7 @@ var MetaMediumCore = (() => {
     ENGINE_PARTICIPANT: () => ENGINE_PARTICIPANT,
     FolderStore: () => FolderStore,
     GITHUB_API: () => GITHUB_API,
+    GRAPH3D_MARK: () => GRAPH3D_MARK,
     GitStore: () => GitStore,
     HAND_RESOLUTION_PX: () => HAND_RESOLUTION_PX,
     KINDS: () => KINDS,
@@ -95,6 +96,7 @@ var MetaMediumCore = (() => {
     boundsContain: () => boundsContain,
     boundsOf: () => boundsOf,
     boundsOverlap: () => boundsOverlap,
+    buildGraph3D: () => buildGraph3D,
     buildGraphScaffold: () => buildGraphScaffold,
     buildScaffold: () => buildScaffold,
     buildStructure: () => buildStructure,
@@ -4384,6 +4386,52 @@ ${lines.join("\n")}
       }
     },
     {
+      // Words and cursive marks on one band, near each other, gather by NEARNESS
+      // into a line of writing (SURFACE-v10-PLAN D3) — the unit a reader wants,
+      // since a phrase is read better than its words. Letters gather into a
+      // word by succession (session/words.ts); this is the rung above it, and
+      // needs no clock: the writing is there, however long ago it was written.
+      name: "writing",
+      describes: "a line of writing",
+      conversions: [NAME],
+      match(scope) {
+        const words = scope.ids.filter((id) => scope.shapes[id] === "text").map((id) => scope.marks.find((m) => m.id === id)).filter((m) => !!m);
+        if (words.length < 2) return null;
+        const sorted = words.slice().sort((a, b) => a.bounds.minX - b.bounds.minX);
+        const heights = sorted.map((m) => Math.max(1, m.bounds.maxY - m.bounds.minY));
+        const meanH = heights.reduce((a, b) => a + b, 0) / heights.length;
+        const bandOverlap = (a, b) => {
+          const overlap = Math.min(a.bounds.maxY, b.bounds.maxY) - Math.max(a.bounds.minY, b.bounds.minY);
+          const shorter = Math.max(1, Math.min(a.bounds.maxY - a.bounds.minY, b.bounds.maxY - b.bounds.minY));
+          return overlap / shorter;
+        };
+        const bands2 = [];
+        for (const m of sorted) {
+          const bd = bands2.find((x) => x.some((o) => bandOverlap(o, m) >= 0.35));
+          if (bd) bd.push(m);
+          else bands2.push([m]);
+        }
+        const best = bands2.slice().sort((a, b) => b.length - a.length)[0];
+        const line = [best[0]];
+        let band = 1, spacing = 1;
+        for (let i = 1; i < best.length; i++) {
+          const a = line[line.length - 1], b = best[i];
+          const gap = b.bounds.minX - a.bounds.maxX;
+          if (gap > meanH * 2.5) break;
+          band = Math.min(band, Math.min(1, bandOverlap(a, b)));
+          spacing = Math.min(spacing, 1 - Math.max(0, gap) / (meanH * 2.5));
+          line.push(b);
+        }
+        if (line.length < 2) return null;
+        const confidence = Math.min(0.9, 0.5 + 0.2 * band + 0.1 * spacing + 0.05 * (line.length - 2));
+        return {
+          confidence,
+          reasoning: `${line.length} marks of writing on one line, a word's gap apart${line.length < words.length ? ` (${words.length - line.length} more not on it)` : ""}`,
+          roles: { words: line.map((m) => m.id) }
+        };
+      }
+    },
+    {
       name: "labelled",
       describes: "a mark with something written in it",
       conversions: [
@@ -5839,7 +5887,8 @@ ${pad}</${tag}>`;
       return id;
     }
     function applyEvent(raw) {
-      const ev = raw.by && !("participantId" in raw && raw.participantId) ? { ...raw, participantId: handParticipant(raw.by) } : raw;
+      const pid = "participantId" in raw ? raw.participantId : void 0;
+      const ev = raw.by && (!pid || pid === LOCAL_PARTICIPANT) ? { ...raw, participantId: handParticipant(raw.by) } : raw;
       if ("at" in ev && typeof ev.at === "number") lastAt = Math.max(lastAt, ev.at);
       switch (ev.type) {
         case "stroke":
@@ -6254,7 +6303,8 @@ ${pad}</${tag}>`;
     { id: "measure", name: "the maths", ability: "measure", does: "what follows from a reading, as numbers", source: "session/measure.ts" },
     { id: "fit", name: "acting out", ability: "fit", does: "a dragged path fitted onto the verb basis, the residual named", source: "behave/fit.ts" },
     { id: "frames", name: "wiring", ability: "wire", does: "artifacts wired by their ports, connections offered by type and ranked by name", source: "frames/frame.ts" },
-    { id: "words", name: "words from letters", ability: "words", does: "printed letters gathered into one word", source: "session/words.ts" }
+    { id: "words", name: "words from letters", ability: "words", does: "printed letters gathered into one word", source: "session/words.ts" },
+    { id: "graph3d", name: "a graph in 3D", ability: "structure", does: "nodes as spheres and edges as bonds, turning in the frame, each sphere named for its mark", source: "tier1/library.ts (buildGraph3D)" }
   ];
   function describeTier1() {
     return TIER1_LIBRARY.map((m) => `${m.name} \u2014 ${m.does}`).join("\n");
@@ -6283,6 +6333,84 @@ ${pad}</${tag}>`;
       ids: plan.ids,
       genre: plan.genre,
       reasoning: `${plan.genre}: ${plan.ids.length} region${plan.ids.length === 1 ? "" : "s"} from the drawing, in place, with no words \u2014 the structure only`,
+      participantId: ENGINE_PARTICIPANT
+    };
+  }
+  var GRAPH3D_MARK = "// mm:structure graph3d";
+  var GRAPH3D_PROGRAM = `
+var W = mm.width, H = mm.height, S = Math.max(W, H) / 3.6; // pixels per unit at z = 0
+var byId = {};
+ATOMS.forEach(function (a) { byId[a.id] = a; });
+if (mm.THREE && mm.scene) {
+  var group = new THREE.Group();
+  var atomMat = new THREE.MeshStandardMaterial({ color: 0x2b5f8e, roughness: 0.4, metalness: 0.05 });
+  var bondMat = new THREE.MeshStandardMaterial({ color: 0x9a978c, roughness: 0.7 });
+  ATOMS.forEach(function (a) {
+    var m = new THREE.Mesh(new THREE.SphereGeometry(a.r, 32, 24), atomMat);
+    m.position.set(a.x, a.y, 0); m.name = a.id; group.add(m);
+  });
+  BONDS.forEach(function (b) {
+    var p = byId[b[0]], q = byId[b[1]]; if (!p || !q) return;
+    var from = new THREE.Vector3(p.x, p.y, 0), to = new THREE.Vector3(q.x, q.y, 0);
+    var d = new THREE.Vector3().subVectors(to, from), len = d.length(); if (!(len > 0)) return;
+    var c = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, len, 12), bondMat);
+    c.position.copy(from).addScaledVector(d, 0.5);
+    c.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.clone().normalize());
+    group.add(c);
+  });
+  mm.scene.add(group);
+  // It turns on its own; a hand inside the frame turns it by dragging (the frame takes the pointer while it plays).
+  var dragging = false, lastX = 0, spin = 0;
+  mm.onPointer(function (p) {
+    if (p.type === 'down') { dragging = true; lastX = p.x; }
+    else if (p.type === 'move' && dragging) { spin += (p.x - lastX) * 0.01; lastX = p.x; }
+    else { dragging = false; }
+  });
+  mm.onFrame(function (t, dt) { if (!dragging) spin += dt * 0.4; group.rotation.y = spin; group.rotation.x = Math.sin(t * 0.25) * 0.2; });
+} else {
+  // No three.js (offline, or it never loaded): the same graph flat, and the parts reported by hand.
+  var cx = W / 2, cy = H / 2;
+  mm.onFrame(function () {
+    var g = mm.ctx; g.clearRect(0, 0, W, H);
+    g.lineWidth = 3; g.strokeStyle = '#9a978c';
+    BONDS.forEach(function (b) { var p = byId[b[0]], q = byId[b[1]]; if (!p || !q) return; g.beginPath(); g.moveTo(cx + p.x * S, cy - p.y * S); g.lineTo(cx + q.x * S, cy - q.y * S); g.stroke(); });
+    g.fillStyle = '#2b5f8e';
+    ATOMS.forEach(function (a) { var x = cx + a.x * S, y = cy - a.y * S, r = a.r * S; g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill(); mm.report(a.id, x - r, y - r, r * 2, r * 2); });
+  });
+}
+`;
+  function buildGraph3D(session, artifactId) {
+    const plan = planFor(session, artifactId);
+    if ("error" in plan) return { ok: false, error: plan.error };
+    if (plan.genre !== "graph" && plan.genre !== "mixed") return { ok: false, error: `a ${plan.genre} is not a graph \u2014 nothing to stand as spheres` };
+    const state = session.getState();
+    const artifact = state.nodes.get(artifactId);
+    const frame = frameOf(artifact);
+    const roleOf = new Map(plan.reading.roles.map((r) => [r.id, r.role]));
+    const atoms = plan.regions.filter((r) => roleOf.get(r.nodeId) === "node");
+    if (atoms.length < 2) return { ok: false, error: "fewer than two nodes to join" };
+    const known = new Set(atoms.map((a) => a.id));
+    const bonds = connectionsOf(artifact, state, plan.regions).filter((c) => known.has(c.from) && known.has(c.to));
+    const s = 3.6 / Math.max(1, frame.w, frame.h);
+    const A = atoms.map((a) => ({
+      id: a.id,
+      x: +((a.rect.x + a.rect.w / 2 - frame.w / 2) * s).toFixed(3),
+      y: +((frame.h / 2 - (a.rect.y + a.rect.h / 2)) * s).toFixed(3),
+      r: +Math.max(0.08, Math.min(a.rect.w, a.rect.h) / 2 * s).toFixed(3)
+    }));
+    const code = [
+      `${GRAPH3D_MARK} \u2014 ${A.length} spheres, ${bonds.length} bonds, from the drawing`,
+      `var ATOMS = ${JSON.stringify(A)};`,
+      `var BONDS = ${JSON.stringify(bonds.map((b) => [b.from, b.to]))};`,
+      GRAPH3D_PROGRAM.trim()
+    ].join("\n");
+    return {
+      ok: true,
+      code,
+      ids: A.map((a) => a.id),
+      atoms: A.length,
+      bonds: bonds.length,
+      reasoning: `${A.length} nodes as spheres and ${bonds.length} edge${bonds.length === 1 ? "" : "s"} as bonds, in the frame, turning \u2014 each sphere named for its mark`,
       participantId: ENGINE_PARTICIPANT
     };
   }
@@ -7045,13 +7173,15 @@ ${brief}`, ids: planned.ids, build: planned.build };
       if (!result2.ok) return { ok: false, transcripts: [], error: result2.error };
       const transcripts = parseTranscripts(result2.text);
       if (transcripts.length === 0) return { ok: false, transcripts: [], error: "no readable transcript in reply", raw: result2.text };
-      session.propose({
-        participantId: id,
-        nodeId: args.nodeId,
-        edges: [],
-        reps: transcripts.map((t) => ({ modality: "transcript", data: { text: t.text }, confidence: t.confidence })),
-        at: args.at
-      });
+      if (args.hold !== false) {
+        session.propose({
+          participantId: id,
+          nodeId: args.nodeId,
+          edges: [],
+          reps: transcripts.map((t) => ({ modality: "transcript", data: { text: t.text }, confidence: t.confidence })),
+          at: args.at
+        });
+      }
       return { ok: true, transcripts, raw: result2.text };
     }
     async function draw(args) {

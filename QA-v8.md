@@ -126,6 +126,12 @@ control centre opens this file.
    and lines drawn quickly do **not** gather into a word.
 5. Control centre → **auto-read · on**. Write another word: it is read as it
    lands, with the dot over it. Turn it off again.
+6. Write three words on one line, a word's gap apart. Circle them, take
+   the loop: the second row has **writing 0.8x**, and one **Read the
+   writing** (its tooltip says *a line of 3 words*). Take it: one call, and
+   each word lands on its own mark; the field then leads with **“the whole
+   line” 0.9x** and offers **Make it text “…”** once. A word written on a
+   line of its own below is not on the line, and the tooltip says so.
 
 ## 6. A page from four boxes **(model)**
 
@@ -256,6 +262,59 @@ control centre opens this file.
    marks, nothing doubled.
 4. Across two machines: `node Demos/relay.mjs` on one, and on both open
    `session-engine.html?live=table&relay=http://<host>:8020`.
+
+## 13b. A playing program takes the pointer
+
+1. Circle two circles, type `torus in 3d`, Enter (a model joined) — or
+   import any `.run.js`. While it **plays**, move over it: the cursor is an
+   arrow, not the pen. Press inside and drag: the program gets it (a
+   three.js scene with controls turns; `mm.onPointer` fires); nothing is
+   drawn.
+2. Start a stroke **beside** the frame and drag across it: ink, over the
+   running thing, exactly as before. Circle a part starting from outside:
+   the loop lands on the part by name.
+3. Pause it: presses inside are ink again. A page never takes the pointer.
+
+## 13c. Press and hold, and the ladder
+
+1. On an empty board the status line says *draw anything · double-click
+   empty ground to type*. Draw a box, a line from it, a circle at the
+   line's end: it says *press and hold a mark to hold it · or circle marks
+   and double-tap inside*.
+2. Press on the box and hold still for half a second: the three are held
+   together (they hang together), the field opens, the status says *held
+   with 2 it hangs together with* and then *type in the field, or tap a
+   pill*. A quick tap on a mark does nothing; a tap on the ground lets go.
+
+## 13d. Claude on the board (MCP)
+
+1. In a terminal at the repo: `node Demos/mcp.mjs` says it started a relay.
+   In the canvas: *live* tile → **with Claude**. The status line says *live
+   claude · you are … · alone so far* (Claude's hand appears when a tool is
+   called).
+2. In Claude Code (the repo's `.mcp.json` registers `metamedium`): ask it
+   to look at the canvas, then to draw a circle beside your box and say
+   why. The circle lands in its own colour with a card beside it, attributed
+   to *claude*. Ask it to read your handwriting: it sees the ink
+   (`canvas_see`) and the transcript appears on the mark as an offer.
+3. `node Demos/mcp-smoke.mjs` runs the same over stdio with no browser.
+
+## 13e. The molecule chain
+
+1. Draw three circles and join them with two lines. Circle them, take the
+   loop: the third row has **Show it in 3D** with no dot; its tooltip ends
+   *→ then: What is this? asks which molecule*. Take it: spheres and bonds
+   stand in the loop's frame, turning; the status says *in 3D (tier 1): 3
+   nodes as spheres and 2 edges as bonds…*. No model was asked.
+2. Press inside the frame and drag: it turns under your hand. Start a
+   stroke beside the frame and circle one sphere: the panel names the mark
+   it stands for.
+3. With a model joined, **What is this?** on the same loop: its readings
+   join the second row (*water 0.7 · GLM*…). Take one: the definition is
+   named, and holds the program.
+4. Draw the same three-and-two again: the chip beside it offers the name;
+   take it, and the new drawing stands in 3D from *its own* circles, not
+   the first drawing's.
 
 ## 13. Installable
 

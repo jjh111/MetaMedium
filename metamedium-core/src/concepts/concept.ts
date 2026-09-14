@@ -336,6 +336,58 @@ export const BUILTIN_CONCEPTS: Concept[] = [
     },
   },
   {
+    // Words and cursive marks on one band, near each other, gather by NEARNESS
+    // into a line of writing (SURFACE-v10-PLAN D3) — the unit a reader wants,
+    // since a phrase is read better than its words. Letters gather into a
+    // word by succession (session/words.ts); this is the rung above it, and
+    // needs no clock: the writing is there, however long ago it was written.
+    name: 'writing',
+    describes: 'a line of writing',
+    conversions: [NAME],
+    match(scope) {
+      const words = scope.ids
+        .filter((id) => scope.shapes[id] === 'text')
+        .map((id) => scope.marks.find((m) => m.id === id))
+        .filter((m): m is Mark => !!m);
+      if (words.length < 2) return null;
+      const sorted = words.slice().sort((a, b) => a.bounds.minX - b.bounds.minX);
+      const heights = sorted.map((m) => Math.max(1, m.bounds.maxY - m.bounds.minY));
+      const meanH = heights.reduce((a, b) => a + b, 0) / heights.length;
+      // Bands first: a word joins the band of a word it shares a vertical
+      // extent with. The fullest band is the line; walked left to right, each
+      // word must sit within a couple of x-heights of the one before it — the
+      // gap a hand leaves between words, never the gap that starts a column.
+      const bandOverlap = (a: Mark, b: Mark) => {
+        const overlap = Math.min(a.bounds.maxY, b.bounds.maxY) - Math.max(a.bounds.minY, b.bounds.minY);
+        const shorter = Math.max(1, Math.min(a.bounds.maxY - a.bounds.minY, b.bounds.maxY - b.bounds.minY));
+        return overlap / shorter;
+      };
+      const bands: Mark[][] = [];
+      for (const m of sorted) {
+        const bd = bands.find((x) => x.some((o) => bandOverlap(o, m) >= 0.35));
+        if (bd) bd.push(m); else bands.push([m]);
+      }
+      const best = bands.slice().sort((a, b) => b.length - a.length)[0];
+      const line = [best[0]];
+      let band = 1, spacing = 1;
+      for (let i = 1; i < best.length; i++) {
+        const a = line[line.length - 1], b = best[i];
+        const gap = b.bounds.minX - a.bounds.maxX;
+        if (gap > meanH * 2.5) break;
+        band = Math.min(band, Math.min(1, bandOverlap(a, b)));
+        spacing = Math.min(spacing, 1 - Math.max(0, gap) / (meanH * 2.5));
+        line.push(b);
+      }
+      if (line.length < 2) return null;
+      const confidence = Math.min(0.9, 0.5 + 0.2 * band + 0.1 * spacing + 0.05 * (line.length - 2));
+      return {
+        confidence,
+        reasoning: `${line.length} marks of writing on one line, a word's gap apart${line.length < words.length ? ` (${words.length - line.length} more not on it)` : ''}`,
+        roles: { words: line.map((m) => m.id) },
+      };
+    },
+  },
+  {
     name: 'labelled',
     describes: 'a mark with something written in it',
     conversions: [NAME,

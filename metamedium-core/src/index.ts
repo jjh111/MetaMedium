@@ -253,8 +253,8 @@ export type { ProviderConfig, ProviderKind, ChatMessage, ContentPart, Completion
 // Tier 1 — the engine's instant library: what answers with no model and no
 // wait, as a registry a surface and the router read; and the structure of a
 // drawing built from it, with no words.
-export { TIER1_LIBRARY, describeTier1, buildStructure } from './tier1/library';
-export type { InstantModule, InstantAbility, StructureResult } from './tier1/library';
+export { TIER1_LIBRARY, describeTier1, buildStructure, buildGraph3D, GRAPH3D_MARK } from './tier1/library';
+export type { InstantModule, InstantAbility, StructureResult, Graph3DResult } from './tier1/library';
 export { planFor, connectionsOf } from './parse/plan';
 export type { Plan } from './parse/plan';
 

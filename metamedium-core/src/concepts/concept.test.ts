@@ -184,3 +184,42 @@ describe('concepts', () => {
     expect(s.read([id]).concepts).toEqual([]);
   });
 });
+
+// Writing gathers by nearness: text marks on one band, a word's gap apart,
+// are a line — the unit a reader wants (SURFACE-v10-PLAN D3).
+describe('a line of writing', () => {
+  // A cursive word as one stroke: low, wide, open, turning many times — what the shape rung reads as text.
+  const word = (x: number, y: number, w: number, h: number, humps = 6): Point[] => {
+    const out: Point[] = [];
+    const n = humps * 14;
+    for (let i = 0; i <= n; i++) {
+      const t = i / n, a = t * humps * Math.PI;
+      out.push({ x: x + w * t, y: y + h / 2 - (h / 2) * Math.abs(Math.sin(a)) * (0.7 + 0.3 * Math.cos(a * 0.37)) });
+    }
+    return out;
+  };
+  it('reads three words on one band as writing, in reading order', () => {
+    const b = board([word(200, 300, 90, 28), word(320, 302, 110, 26, 7), word(460, 300, 80, 28, 5)]);
+    const r = b.read();
+    const w = r.concepts.find((c) => c.concept === 'writing');
+    expect(w).toBeDefined();
+    expect(w!.roles!.words).toEqual(b.ids);
+    expect(w!.confidence).toBeGreaterThan(0.6);
+    expect(w!.reasoning).toMatch(/3 marks of writing on one line/);
+  });
+  it('does not join a word on another line, and says how many stood apart', () => {
+    const b = board([word(200, 300, 90, 28), word(320, 302, 110, 26, 7), word(200, 400, 80, 28, 5)]);
+    const w = b.read().concepts.find((c) => c.concept === 'writing');
+    expect(w).toBeDefined();
+    expect(w!.roles!.words).toEqual(b.ids.slice(0, 2));
+    expect(w!.reasoning).toMatch(/1 more not on it/);
+  });
+  it('is not a line when the words sit a column apart', () => {
+    const b = board([word(200, 300, 90, 28), word(600, 300, 110, 26, 7)]);
+    expect(b.read().concepts.find((c) => c.concept === 'writing')).toBeUndefined();
+  });
+  it('needs writing, not shapes on a band', () => {
+    const b = board([handRect(100, 100, 150, 120, { seed: 1 }), handRect(290, 100, 150, 120, { seed: 2 })]);
+    expect(b.read().concepts.find((c) => c.concept === 'writing')).toBeUndefined();
+  });
+});

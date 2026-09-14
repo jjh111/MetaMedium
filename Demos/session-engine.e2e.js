@@ -132,7 +132,7 @@ window.__setup = function(){
       const parts = body.messages.find(m=>m.role==='user').content;
       const img = Array.isArray(parts) && parts.find(p=>p.type==='image_url');
       window.__lastRead = { hasImage: !!img && /^data:image\/png;base64,/.test(img.image_url.url) };
-      return reply([{text:'Pricing',confidence:0.92},{text:'Prizing',confidence:0.31}]);
+      return reply(window.__readReply || [{text:'Pricing',confidence:0.92},{text:'Prizing',confidence:0.31}]);
     }
     if(/answering a question/.test(sys)){
       return new Response(JSON.stringify({choices:[{message:{content:'The three rectangles share edges only through the region frame you drew; nothing else relates them.'}}]}),{status:200,headers:{'content-type':'application/json'}});
@@ -1085,9 +1085,12 @@ window.__scenario = async function(){
     let parts = [];
     for (let i = 0; i < 30 && !parts.length; i++) { await wait(100); parts = mm.reportedRegions(runId); }
     step('27c. the running program reports its parts back to the canvas', parts.some(p => p.id === 'torus'), parts);
-    // Ink over the part: a loop on the running frame addresses it by name.
+    // Ink over the part: a loop on the running frame addresses it by name. The
+    // loop is begun OUTSIDE the playing frame (a hand that lands inside a
+    // playing program is the program's, v10 D2) and swings in across it; the
+    // mark that takes it up lands inside the waiting loop, which is the hand's.
     const on = W(12400, 2200);
-    t.stroke(t.circle(on.x, on.y, 70)); t.takeLoop(on.x, on.y, 70); await wait(60);
+    t.stroke(t.circle(on.x, on.y, 260)); t.takeLoop(on.x, on.y, 260); await wait(60);
     const sumOn = mm.session.getState().summon;
     const addressed = sumOn && sumOn.onArtifact ? mm.regionsUnderInk(sumOn.onArtifact.artifactId, MM.boundsOf(mm.session.getState().nodes.get(sumOn.gestureIds[0]))) : [];
     step('27d. ink over the running frame lands on the part the program named', !!sumOn && !!sumOn.onArtifact && sumOn.onArtifact.artifactId === runId && addressed.includes('torus'), { onArtifact: sumOn && sumOn.onArtifact, addressed });
@@ -1260,8 +1263,16 @@ window.__scenario = async function(){
     const herLogs = await other.readLogs();
     const me28 = mm.folder().me;
     step('28c. what this hand draws reaches her under its own name — the person\'s, with this tab\'s suffix — and this board keeps both hands\' marks', !!herLogs[me28] && herLogs[me28].length >= 1 && mm.session.getState().contentIds.length === 3 && me28 !== 'alice' && /~/.test(me28), { mine: herLogs[me28] && herLogs[me28].length, me: me28, hers: Object.keys(herLogs) });
+    // She draws again AFTER this hand sent: the line lands between a send and a merge, and this hand's mark must stand once, not twice.
+    const s4 = MM.createSession(); s4.load(s3.getEvents()); s4.addStroke(t.circle(400, 300, 30).map(p => ({ x: p.x, y: p.y })), 3000);
+    await other.appendLog('alice', s4.getEvents().slice(s3.getEvents().length));
+    for (let i = 0; i < 20 && mm.session.getState().contentIds.length < 4; i++) await new Promise(r => setTimeout(r, 100));
+    await wait(100);
+    const st28c2 = mm.session.getState();
+    const mine28 = st28c2.contentIds.map(id => st28c2.nodes.get(id)).filter(n => MM.authorOf(n) === MM.LOCAL_PARTICIPANT);
+    step('28c2. a line that lands after this hand sent does not double this hand\'s marks', st28c2.contentIds.length === 4 && mine28.length === 1, { content: st28c2.contentIds.length, mine: mine28.length });
     mm.session.undo();
-    step('28d. undo takes back this hand\'s mark and leaves hers', mm.session.getState().contentIds.length === 2);
+    step('28d. undo takes back this hand\'s mark and leaves hers', mm.session.getState().contentIds.length === 3);
     if (mm.folder().store && mm.folder().store.close) mm.folder().store.close();
     mm.session.load([]);
   }
@@ -1304,6 +1315,103 @@ window.__scenario = async function(){
     const focused = mm.viewMode() === 'focus';
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     step('23d. grid: every artifact as a card; a card focuses it; Escape is the canvas', cards === 16 && focused && mm.viewMode() === 'canvas', { cards, focused, mode: mm.viewMode() });
+    mm.session.load([]);
+  }
+
+  // ---- 29. A playing program takes the pointer; ink that starts outside goes over it (v10 T1, D2) ----
+  {
+    mm.setView(1, 0, 0);
+    const code = 'mm.report("idle", 0, 0, 1, 1); mm.onPointer(function(p){ if (p.type === "down") mm.report("hit", p.x - 4, p.y - 4, 8, 8); });';
+    const touchId = mm.importText('touch.run.js', code, { x: 300, y: 300 }, 200); // 200 × 132 in world units
+    mm.session.clock({ nodeId: touchId, op: 'play', at: Date.now() }); // play is the hand's event: an imported program waits for it
+    let until = performance.now() + 6000;
+    while (performance.now() < until && !mm.reportedRegions(touchId).some(r => r.id === 'idle')) await wait(100);
+    const s29 = mm.session.getState();
+    const before = s29.contentIds.length;
+    const inside = mm.worldToScreen(400, 360);
+    t.stroke([{ x: inside.x, y: inside.y }]); // a tap: down and up at one point, inside the frame
+    until = performance.now() + 3000;
+    while (performance.now() < until && !mm.reportedRegions(touchId).some(r => r.id === 'hit')) await wait(100);
+    const hit = mm.reportedRegions(touchId).find(r => r.id === 'hit');
+    step('29. a tap inside a playing program reaches it — the program reported a part where the tap landed, in its own pixels — and drew nothing', !!hit && Math.abs(hit.x - 96) < 2 && Math.abs(hit.y - 56) < 2 && mm.session.getState().contentIds.length === before && s29.clocks[touchId] && s29.clocks[touchId].playing, { hit, content: mm.session.getState().contentIds.length - before, playing: !!(s29.clocks[touchId] && s29.clocks[touchId].playing), parts: mm.reportedRegions(touchId) });
+    const a = mm.worldToScreen(250, 280), b = mm.worldToScreen(550, 420);
+    t.stroke(t.line(a, b, 40)); // begun outside the frame, dragged across it
+    step('29a. a stroke begun outside the frame is ink across it', mm.session.getState().contentIds.length === before + 1, { content: mm.session.getState().contentIds.length - before });
+    document.getElementById('canvas').dispatchEvent(new PointerEvent('pointermove', { pointerId: 1, isPrimary: true, bubbles: true, clientX: inside.x, clientY: inside.y, buttons: 0 }));
+    const overFrame = document.getElementById('canvas').style.cursor;
+    const outside = mm.worldToScreen(100, 100);
+    document.getElementById('canvas').dispatchEvent(new PointerEvent('pointermove', { pointerId: 1, isPrimary: true, bubbles: true, clientX: outside.x, clientY: outside.y, buttons: 0 }));
+    step('29b. over a playing frame the cursor says the frame is live to the hand; off it, the pen again', overFrame === 'default' && document.getElementById('canvas').style.cursor === 'crosshair', { overFrame, off: document.getElementById('canvas').style.cursor });
+    mm.session.load([]);
+  }
+
+  // ---- 30. Writing by nearness: three words on one line are one thing to read (v10 T3, D3) ----
+  {
+    mm.session.load([]); mm.setView(1, 0, 0);
+    // An earlier step wiped the log, and the stub's join with it: a model is a participant only through its join event, so it joins again.
+    mm.agents.length = 0; mm.agents.push(MM.createAgentParticipant(mm.session, Object.assign({}, MM.PRESETS.ollama, { model: 'e2e-stub', vision: true }), Date.now()));
+    // Three cursive words on a band, a word's gap apart: three marks the shape rung reads as text.
+    t.stroke(t.word(200, 300, 90, 28, 6)); t.stroke(t.word(320, 302, 110, 26, 7)); t.stroke(t.word(460, 300, 80, 28, 5));
+    t.stroke(t.circle(370, 330, 220)); t.takeLoop(370, 330, 220); await wait(60);
+    const chips30 = t.chips();
+    step('30. three words on one line read as writing, with a number', chips30.some(c => /^writing 0\.\d\d/.test(c)), chips30);
+    window.__readReply = [{ text: 'hello wide world', confidence: 0.9 }];
+    const calls30 = window.__calls.length;
+    const readPill = [...document.querySelectorAll('#summon .item')].find(b => /Read the writing/.test(b.textContent));
+    step('30a. one offer to read the line, not three', !!readPill && /line of 3/.test(readPill.title), readPill && readPill.title);
+    if (readPill) readPill.click();
+    const wordsNow = () => { const st = mm.session.getState(); return st.contentIds.filter(id => MM.transcriptOf(st.nodes.get(id))).map(id => MM.transcriptOf(st.nodes.get(id))); };
+    for (let i = 0; i < 30 && wordsNow().length < 3; i++) await wait(100); // the stub thinks for a moment before it answers
+    await wait(100);
+    const words = wordsNow();
+    step('30b. the line is read in one call, and each word lands on its own mark', window.__calls.length === calls30 + 1 && words.join(' ') === 'hello wide world', { calls: window.__calls.length - calls30, words });
+    const chips30b = t.chips();
+    step('30c. the field leads with the line as one name, and offers it as text once', chips30b.some(c => /^“hello wide world” 0\.90/.test(c)) && chips30b.filter(c => /Make it text/.test(c)).length === 1 && !chips30b.some(c => /^“hello” /.test(c)), chips30b);
+    window.__readReply = null;
+    mm.session.load([]);
+  }
+
+  // ---- 31. Press and hold a mark: held with what it hangs together with, no loop drawn (v10 T4, D5) ----
+  {
+    mm.session.load([]); mm.setView(1, 0, 0);
+    t.stroke(t.rect(200, 200, 120, 80)); t.stroke(t.line({ x: 320, y: 240 }, { x: 420, y: 240 }, 30)); t.stroke(t.circle(460, 240, 40));
+    t.stroke(t.rect(700, 200, 100, 60)); // apart: not held with them
+    const c31 = document.getElementById('canvas');
+    const ev31 = (type, x, y) => c31.dispatchEvent(new PointerEvent(type, { pointerId: 1, isPrimary: true, bubbles: true, clientX: x, clientY: y, button: 0, buttons: type === 'pointerup' ? 0 : 1 }));
+    step('31z. with marks and nothing held, the standing line says how to hold one', /press and hold a mark/.test(document.getElementById('status').dataset.standing), document.getElementById('status').dataset.standing);
+    const on = mm.worldToScreen(260, 200); // on the box's top edge
+    ev31('pointerdown', on.x, on.y); await wait(1300); ev31('pointerup', on.x, on.y);
+    const st31 = mm.session.getState();
+    step('31. press and hold a mark: it is held with what it hangs together with, and the field opens', !!st31.summon && st31.summon.enclosedIds.length === 3 && st31.summon.scopeSource === 'pointed' && !!document.querySelector('#summon input.filter') && st31.contentIds.length === 4, { held: st31.summon && st31.summon.enclosedIds, source: st31.summon && st31.summon.scopeSource, content: st31.contentIds.length });
+    step('31a. the standing line says the next move while the field is open', /type in the field/.test(document.getElementById('status').dataset.standing), document.getElementById('status').dataset.standing);
+    const far = mm.worldToScreen(600, 400); ev31('pointerdown', far.x, far.y); ev31('pointerup', far.x, far.y); // a tap on the ground lets go
+    const letGo = !mm.session.getState().summon;
+    ev31('pointerdown', on.x, on.y); ev31('pointerup', on.x, on.y); // a quick tap on a mark is not a hold, and not a dot
+    step('31b. a tap on the ground lets go; a quick tap on a mark is neither a hold nor a dot', letGo && !mm.session.getState().summon && mm.session.getState().contentIds.length === 4, { letGo, summon: !!mm.session.getState().summon, content: mm.session.getState().contentIds.length });
+    mm.session.load([]);
+  }
+
+  // ---- 32. The molecule chain: circles joined by lines stand in 3D at once, each sphere named for its mark (v10 T6, D7) ----
+  {
+    mm.session.load([]); mm.setView(1, 0, 0);
+    t.stroke(t.circle(300, 300, 40)); t.stroke(t.circle(500, 300, 40)); t.stroke(t.circle(400, 460, 40));
+    t.stroke(t.line({ x: 340, y: 300 }, { x: 460, y: 300 }, 30)); t.stroke(t.line({ x: 328, y: 328 }, { x: 372, y: 432 }, 30));
+    t.stroke(t.circle(400, 370, 190)); t.takeLoop(400, 370, 190); await wait(60);
+    const pill32 = [...document.querySelectorAll('#summon .item')].find(b => /Show it in 3D/.test(b.textContent));
+    step('32. circles joined by lines offer to stand in 3D with no model, and the pill says where it leads', !!pill32 && !pill32.querySelector('.dot') && /then: What is this/.test(pill32.title), { chips: t.chips(), title: pill32 && pill32.title });
+    step('32z. the panel says where the selection stands on the map of becoming, and the rung after it', /becomes\s*a structure, a graph.*Show it in 3D/.test(document.getElementById('inspector').textContent), document.getElementById('inspector').textContent.slice(0, 200));
+    const calls32 = window.__calls.length;
+    if (pill32) pill32.click();
+    await wait(100);
+    const st32 = mm.session.getState();
+    const id32 = st32.live[st32.live.length - 1];
+    const rep32 = id32 && codeRepOfNode(st32.nodes.get(id32));
+    step('32a. the program is the engine\'s, from the drawing: three spheres, two bonds, playing, no model asked', !!rep32 && rep32.data.kind === 'run' && /3 spheres, 2 bonds/.test(rep32.data.code) && rep32.source === MM.ENGINE_PARTICIPANT && !!st32.clocks[id32] && st32.clocks[id32].playing && window.__calls.length === calls32, { code: rep32 && rep32.data.code.slice(0, 60), source: rep32 && rep32.source, calls: window.__calls.length - calls32 });
+    let parts32 = [];
+    for (let i = 0; i < 60 && parts32.length < 3; i++) { await wait(100); parts32 = mm.reportedRegions(id32); }
+    const regionIds32 = id32 ? MM.regionsOf(st32.nodes.get(id32), st32.nodes).map(r => r.id) : [];
+    step('32b. the running frame reports each sphere under the id of the mark it stands for', parts32.length >= 3 && parts32.every(p => regionIds32.includes(p.id)), { parts: parts32.map(p => p.id), regionIds: regionIds32 });
+    step('32c. the library now holds it, so the next drawing like it is one tap from 3D', mm.libraryEntries().some(e => e.id === id32 && e.code.startsWith(MM.GRAPH3D_MARK)), mm.libraryEntries().map(e => e.name));
     mm.session.load([]);
   }
 

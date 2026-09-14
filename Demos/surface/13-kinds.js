@@ -1,5 +1,5 @@
 // ===== kinds =====
-// Provides: documentForKind (the renderers: every kind as a document ink can address), the worker runtime
+// Provides: documentForKind (the renderers: every kind as a document ink can address), postPointer (a hand forwarded into a playing frame), the worker runtime
 //   (a blessed `js` artifact's code runs in a worker with a budget; a throw or a hang pauses its clock
 //   with the reason), runtimeOffset, runtimeBroken, syncRuntime.
 // Uses: core (session, esc), artifacts (frames, documentFor).
@@ -117,6 +117,26 @@
     '  }',
     '  var c2 = document.createElement("canvas"); c2.width = W; c2.height = H; c2.style.position = "absolute"; c2.style.left = "0"; c2.style.top = "0"; document.body.appendChild(c2);',
     '  mm.ctx = c2.getContext("2d");',
+    '  // A hand that lands inside this frame while it plays is forwarded here by the canvas (SURFACE-v10-PLAN D2):',
+    '  // dispatched as real pointer and mouse events at the point, and handed to mm.onPointer. mm.pointer is the latest.',
+    '  var pointerFns = [], downAt = null;',
+    '  mm.pointer = { x: 0, y: 0, down: false };',
+    '  mm.onPointer = function(fn){ pointerFns.push(fn); };',
+    '  window.addEventListener("message", function(e){',
+    '    var m = e.data; if (!m || m.mmPointer !== true) return;',
+    '    var x = m.x, y = m.y, type = m.type;',
+    '    mm.pointer.x = x; mm.pointer.y = y; if (type === "down") mm.pointer.down = true; if (type === "up" || type === "cancel") mm.pointer.down = false;',
+    '    var target = (renderer && renderer.domElement) || c2;',
+    '    var init = { bubbles: true, cancelable: true, clientX: x, clientY: y, screenX: x, screenY: y, button: m.button || 0, buttons: (type === "up" || type === "cancel") ? 0 : 1, pointerId: 1, pointerType: m.pointerType || "mouse", isPrimary: true, shiftKey: !!m.shiftKey, altKey: !!m.altKey, ctrlKey: !!m.ctrlKey, metaKey: !!m.metaKey };',
+    '    var pn = type === "down" ? "pointerdown" : type === "move" ? "pointermove" : type === "cancel" ? "pointercancel" : "pointerup";',
+    '    var mn = type === "down" ? "mousedown" : type === "move" ? "mousemove" : type === "cancel" ? null : "mouseup";',
+    '    try { target.dispatchEvent(new PointerEvent(pn, init)); } catch (err) { /* no PointerEvent here */ }',
+    '    if (mn) { try { target.dispatchEvent(new MouseEvent(mn, init)); } catch (err) { /* no MouseEvent here */ } }',
+    '    if (type === "down") downAt = { x: x, y: y };',
+    '    if (type === "up" && downAt && Math.hypot(x - downAt.x, y - downAt.y) < 6) { try { target.dispatchEvent(new MouseEvent("click", init)); } catch (err) { /* no click */ } }',
+    '    if (type === "up" || type === "cancel") downAt = null;',
+    '    for (var i = 0; i < pointerFns.length; i++) { try { pointerFns[i]({ type: type, x: x, y: y, button: m.button || 0, pointerType: m.pointerType || "mouse" }); } catch (err) { post({ type: "error", error: String(err && err.message || err) }); } }',
+    '  });',
     '  try { (new Function("mm", __CODE__))(mm); } catch (e) { post({ type: "error", error: String(e && e.message || e) }); return; }',
     '  function report(){ var out = []; parts.forEach(function(r, id){ out.push({ id: id, x: r.x, y: r.y, w: r.w, h: r.h }); }); post({ type: "regions", regions: out }); }',
     '  var v = new THREE_VEC();',
@@ -174,6 +194,13 @@
     if (m.type === 'error') { markBroken(m.id, 'threw: ' + m.error); }
   });
   function reportedRegions(id) { return reported.get(id) || []; }
+
+  /** Forward a pointer to a playing frame, in the frame's own pixels (SURFACE-v10-PLAN D2). */
+  function postPointer(hit, type, e, w) {
+    const win = hit.f.iframe && hit.f.iframe.contentWindow;
+    if (!win) return;
+    win.postMessage({ mmPointer: true, type: type, x: w.x - hit.x, y: w.y - hit.y, button: e.button || 0, pointerType: e.pointerType || 'mouse', shiftKey: !!e.shiftKey, altKey: !!e.altKey, ctrlKey: !!e.ctrlKey, metaKey: !!e.metaKey }, '*');
+  }
 
   /** The document an artifact's newest code rep renders as, by its kind. */
   function documentForKind(rep, w, h, ctx) {

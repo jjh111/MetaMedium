@@ -136,13 +136,14 @@
   async function mergeLive() {
     if (!folder.store || folder.how !== 'live') return;
     const logs = await folder.store.readLogs();
-    const mine = logs[folder.me] || [];
-    // Events I made since the last send are not in the room yet: keep them.
-    const evs = session.getEvents();
-    const unsent = evs.slice(folder.loadedCount).filter((e) => !e.by);
-    const merged = MM.mergeLogs(Object.assign({}, logs, { [folder.me]: mine.concat(unsent) }), { me: folder.me });
+    // My log is what this session holds of mine — sent or not — never the
+    // room's copy of it: a line that lands between a send and this merge
+    // would otherwise count my sent events twice, and every mark of mine
+    // would stand doubled.
+    const mine = myLogNow();
+    const merged = MM.mergeLogs(Object.assign({}, logs, { [folder.me]: mine }), { me: folder.me });
     session.load(merged);
-    folder.myPrevious = mine.concat(unsent);
+    folder.myPrevious = mine;
     folder.loadedCount = merged.length;
     if (typeof syncTiles === 'function') syncTiles();
   }

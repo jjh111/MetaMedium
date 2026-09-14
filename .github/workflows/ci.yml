@@ -23,11 +23,16 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
-      - name: Committed browser bundle must match source
+      - name: Committed browser and node bundles must match source
         run: |
           npm run build:browser
           cp dist/metamedium-core.browser.js ../Demos/metamedium-core.browser.js
           git diff --exit-code -- ../Demos/metamedium-core.browser.js
+          npm run build:node
+          cp dist/metamedium-core.node.mjs ../Demos/metamedium-core.node.mjs
+          git diff --exit-code -- ../Demos/metamedium-core.node.mjs
+      - name: The MCP hand answers over stdio
+        run: node ../Demos/mcp-smoke.mjs
       - name: Surface fragments must match the built script
         run: node ../Demos/build-surface.mjs --check
 

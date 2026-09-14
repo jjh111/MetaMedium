@@ -324,6 +324,37 @@
     inspectorEl.innerHTML = html;
   }
 
+  /**
+   * A selection's rung on the map of becoming, and the rung after it — ink →
+   * shape → concept or definition → structure → artifact → refined (v10 D6).
+   * One line, so depth is legible a step at a time; the field's pills are
+   * the step itself.
+   */
+  function becomesOf(s, sum, reading) {
+    const ids = sum.enclosedIds;
+    const arts = ids.filter((id) => s.artifacts.includes(id));
+    if (arts.length) {
+      const a = s.nodes.get(arts[0]);
+      const rep = a && codeRepOf(a);
+      if (rep) {
+        const kind = rep.data.kind || 'html';
+        const what = kind === 'run' ? (rep.data.code && rep.data.code.startsWith(MM.GRAPH3D_MARK) ? 'a 3D thing' : 'a program') : kind === 'html' ? 'a page' : kind === 'text' ? 'text' : kind === 'png' || kind === 'jpg' ? 'a picture' : 'a ' + kind + ' file';
+        return { here: 'an artifact, ' + what, next: 'ink over it addresses its parts · a brief is a new version · wire it in a frame' };
+      }
+      return { here: 'a definition' + (MM.wordOf(a) ? ' “' + MM.wordOf(a) + '”' : ''), next: 'another like it is matched · a brief builds on it · its tank plays' };
+    }
+    const match = sum.suggestions.find((x) => x.kind === 'match');
+    if (match) return { here: 'a definition, ' + match.label + ' ' + (match.score || 1).toFixed(2), next: (libraryEntries(s).some((e) => e.id === match.artifactId) ? 'its program on this drawing' : 'take the name') + ' · a brief builds from it' };
+    const genre = reading.genre && reading.genre.genre;
+    const concept = reading.concepts[0];
+    if (genre === 'graph' || genre === 'mixed') return { here: 'a structure, a graph' + (concept ? ' (' + concept.concept + ')' : ''), next: 'Show it in 3D · a brief builds the diagram, then a model writes the words' };
+    if (genre === 'layout') return { here: 'a structure, a layout' + (concept ? ' (' + concept.concept + ')' : ''), next: 'a brief builds the page at once, then a model writes the words' };
+    if (concept) return { here: 'a concept, ' + concept.concept + ' ' + concept.confidence.toFixed(2), next: concept.conversions.filter((c) => c.effect.kind !== 'name' && c.effect.kind !== 'prompt').map((c) => c.label).concat(['a name']).join(' · ') };
+    const shapes = ids.map((id) => MM.topInterpretation(s.nodes.get(id))).filter(Boolean);
+    if (shapes.length && shapes.every((x) => x === 'text')) return { here: 'writing', next: 'Read the writing · a name · text' };
+    return { here: 'shapes' + (shapes.length ? ', ' + [...new Set(shapes)].join(', ') : ''), next: 'draw them clean · a name · a brief is a program' };
+  }
+
   function renderSummonScope(s) {
     const sum = s.summon;
     const reading = session.read(sum.enclosedIds);
@@ -338,6 +369,9 @@
       html += '<div class="row"><span class="k">genre</span><span class="v">' + esc(reading.genre.genre) + '</span></div>';
       html += '<div class="why">' + esc(reading.genre.reasoning) + '</div>';
     }
+    // Where this stands on the map of becoming, and the rung after it (SURFACE-v10-PLAN §4).
+    const rung = becomesOf(s, sum, reading);
+    if (rung) html += '<div class="row"><span class="k">becomes</span><span class="v">' + esc(rung.here + ' → ' + rung.next) + '</span></div>';
     if (reading.roles && reading.roles.length) {
       html += '<div class="sep"></div><div class="eyebrow">roles</div>';
       reading.roles.forEach((r) => {

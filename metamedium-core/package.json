@@ -13,7 +13,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "build:browser": "esbuild src/index.ts --bundle --format=iife --global-name=MetaMediumCore --banner:js='/* metamedium-core browser bundle — built from metamedium-core/src via: npm run build:browser. Do not edit directly. */' --outfile=dist/metamedium-core.browser.js"
+    "build:browser": "esbuild src/index.ts --bundle --format=iife --global-name=MetaMediumCore --banner:js='/* metamedium-core browser bundle \u2014 built from metamedium-core/src via: npm run build:browser. Do not edit directly. */' --outfile=dist/metamedium-core.browser.js",
+    "build:node": "esbuild src/index.ts --bundle --format=esm --platform=node --banner:js='/* metamedium-core node bundle \u2014 built from metamedium-core/src via: npm run build:node. Do not edit directly. */' --outfile=dist/metamedium-core.node.mjs"
   },
   "license": "MIT",
   "devDependencies": {

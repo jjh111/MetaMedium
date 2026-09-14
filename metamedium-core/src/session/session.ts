@@ -1841,8 +1841,11 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
   function applyEvent(raw: SessionEvent): string | null {
     // An event from another hand's log is that hand's: attributed to a
     // participant of the log's name unless it already says who (a model's
-    // proposal in their log names their model).
-    const ev: SessionEvent = raw.by && !('participantId' in raw && raw.participantId)
+    // proposal in their log names their model). "Local" in their log means
+    // THEM — their answers, proposals and code arrive in their name, not in
+    // the name of whoever is reading.
+    const pid = 'participantId' in raw ? raw.participantId : undefined;
+    const ev: SessionEvent = raw.by && (!pid || pid === LOCAL_PARTICIPANT)
       ? ({ ...raw, participantId: handParticipant(raw.by) } as SessionEvent)
       : raw;
     if ('at' in ev && typeof ev.at === 'number') lastAt = Math.max(lastAt, ev.at);

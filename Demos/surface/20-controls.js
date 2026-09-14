@@ -64,6 +64,12 @@
   const livePanel = document.getElementById('livePanel');
   ui.pane(livePanel, 'live', () => closePanel(livePanel, tiles.live));
   tiles.live.onclick = () => { togglePanel(livePanel, tiles.live); if (!livePanel.hasAttribute('hidden')) { const r = document.getElementById('liveRoom'); if (!r.value) r.value = folder.how === 'live' ? folder.name : 'table'; document.getElementById('liveName').value = prefs.get('hand-name', '') || ''; } };
+  // The room Claude Code joins (Demos/mcp.mjs, SURFACE-v10-PLAN D1): room "claude" through the relay the MCP hand starts on this machine.
+  document.getElementById('liveClaude').onclick = () => {
+    document.getElementById('liveRoom').value = 'claude';
+    document.getElementById('liveRelay').value = 'http://127.0.0.1:8020';
+    document.getElementById('liveJoin').click();
+  };
   document.getElementById('liveJoin').onclick = () => {
     const room = document.getElementById('liveRoom').value.trim();
     const name = document.getElementById('liveName').value.trim();
