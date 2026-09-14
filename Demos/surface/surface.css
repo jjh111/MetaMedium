@@ -427,3 +427,11 @@ body.embed.summoning #inspector { display: none; }
   .status { bottom: 10px; font-size: 10px; }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
+/* ==========================================================================
+   The minimap: the whole board in a corner, the viewport on it; a tap or a
+   drag there pans (SURFACE-v10-PLAN F7). Hidden while the board is empty.
+   ========================================================================== */
+#minimap { position: absolute; right: 14px; bottom: 36px; width: 176px; height: 108px; z-index: 5; border-radius: 6px; background: rgba(var(--panel-rgb), 0.88); box-shadow: 0 0 0 1px rgba(var(--gold-rgb), 0.3); cursor: pointer; touch-action: none; }
+#minimap[hidden] { display: none; }
+@media (max-width: 560px) { #minimap { display: none; } }

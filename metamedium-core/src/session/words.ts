@@ -15,10 +15,23 @@
 
 import type { Bounds } from '../types';
 
-/** A stroke taller than this on screen is a shape, not a letter. */
-export const LETTER_MAX_HEIGHT_PX = 44;
-/** …or wider than this: an underline, a line, a box. */
-export const LETTER_MAX_WIDTH_PX = 60;
+/**
+ * A stroke taller than this on screen is a shape, not a letter. A generous
+ * ceiling, not the rule: a letter is a letter by its RUN — on a band, a
+ * word's gap apart, similar in height to the letters beside it. The first
+ * cap (44 px) was written for x-height letters and threw out every ascender
+ * a real hand makes (v10 F1: John's h, l and d were 72–88 px tall).
+ */
+export const LETTER_MAX_HEIGHT_PX = 150;
+/** …or wider than this: an underline, a rule, a box. */
+export const LETTER_MAX_WIDTH_PX = 150;
+/**
+ * A letter may be this many times shorter than the run it joins, at most: an
+ * x-height o beside a run that already holds an ascender and a descender
+ * (h, e, l, l — the run's box is ascender + x-height + descender, some
+ * 3.4 x-heights in John's hand). Four is the ratio with headroom.
+ */
+export const LETTER_HEIGHT_RATIO = 4;
 /** Letters sit closer than this fraction of the run's height. */
 export const WORD_GAP_RATIO = 0.7;
 /** Their vertical bands overlap by at least this fraction of the shorter. */
@@ -26,9 +39,16 @@ export const WORD_BAND_OVERLAP = 0.35;
 /** A letter belongs to the word being written now, not one from a minute ago. */
 export const WORD_WINDOW_MS = 3000;
 
+/** A flat stroke wider than this is a rule or an underline, not a dash or a crossbar. */
+export const DASH_MAX_WIDTH_PX = 60;
+
 export function isLetterLike(b: Bounds, scale: number): boolean {
   const h = (b.maxY - b.minY) / scale, w = (b.maxX - b.minX) / scale;
-  return h <= LETTER_MAX_HEIGHT_PX && w <= LETTER_MAX_WIDTH_PX;
+  if (h > LETTER_MAX_HEIGHT_PX || w > LETTER_MAX_WIDTH_PX) return false;
+  // A flat, wide stroke is a rule under something, not a letter — unless it
+  // is short enough to be a dash or the bar of a t.
+  if (h < 10 && w > DASH_MAX_WIDTH_PX) return false;
+  return true;
 }
 
 /**
@@ -58,9 +78,9 @@ export function joinsRun(
   const gap = Math.max(lb.minX - rb.maxX, rb.minX - lb.maxX, 0);
   const ref = Math.max(runH, letH) / scale;
   if (gap / scale > ref * WORD_GAP_RATIO) return { ok: false, reasoning: 'too far from the last letter to be the same word' };
-  // Sizes should match — unless one of them is a dash or a dot.
+  // Sizes should match to within an ascender — unless one of them is a dash or a dot.
   const tiny = Math.min(runH, letH) / scale < 10;
-  if (!tiny && (letH / runH > 2.2 || runH / letH > 2.2)) return { ok: false, reasoning: 'a different size from the letters beside it' };
+  if (!tiny && (letH / runH > LETTER_HEIGHT_RATIO || runH / letH > LETTER_HEIGHT_RATIO)) return { ok: false, reasoning: 'a different size from the letters beside it' };
   return { ok: true, reasoning: `beside the last letter, on its line, ${Math.round(gap / scale)}px away` };
 }
 

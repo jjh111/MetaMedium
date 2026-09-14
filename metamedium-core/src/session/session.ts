@@ -799,17 +799,6 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     return { id, bounds: b, points: strokePointsOf(n) ?? undefined, closed: fingerprintOf(n)?.isClosed };
   }
 
-  /** Does this stroke engage that mark — cross it, overlap it, or sit close to it? */
-  function engages(points: Point[], fp: Fingerprint, target: Mark): boolean {
-    if (target.points && strokesIntersect(points, target.points)) return true;
-    if (boundsOverlap(fp.bounds, target.bounds)) return true;
-    const size = Math.max(
-      1,
-      Math.max(target.bounds.maxX - target.bounds.minX, target.bounds.maxY - target.bounds.minY)
-    );
-    return boundingBoxDistance(fp.bounds, target.bounds) < size * config.gesture.checkProximityRatio;
-  }
-
   /**
    * What the command mark is about, when nothing was circled first.
    *
@@ -828,7 +817,19 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       .map(markOf)
       .filter((m): m is Mark => !!m && !getRep(nodes.get(m.id)!, 'erased'));
 
-    const engaged = candidates.filter((m) => engages(points, fp, m));
+    // With no loop, the mark fires on what it CROSSES — and, for a closed
+    // mark (a box, a loop, an artifact's frame: a thing you point at), on
+    // what it lands inside or close beside, relative to that mark's size. An
+    // open stroke is engaged only by a crossing: a letter the mark merely
+    // sits near is every letter of a word being written, and a letter shaped
+    // like the mark summoned the word mid-sentence (v10 F3).
+    const engaged = candidates.filter((m) => {
+      if (m.points && strokesIntersect(points, m.points)) return true;
+      if (m.points && !m.closed) return false;
+      if (boundsOverlap(fp.bounds, m.bounds)) return true;
+      const size = Math.max(1, m.bounds.maxX - m.bounds.minX, m.bounds.maxY - m.bounds.minY);
+      return boundingBoxDistance(fp.bounds, m.bounds) < size * config.gesture.checkProximityRatio;
+    });
     if (engaged.length === 0) return null;
 
     // A mark that dwarfs everything it touched is a drawing, not a gesture.

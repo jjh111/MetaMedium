@@ -118,9 +118,11 @@
       }
       inkStroke(points, false, style);
       // The offer: a ghost of what this mark would be, drawn clean. Dashed and
-      // faint so it reads as a question, not a change already made.
+      // faint so it reads as a question, not a change already made — and for
+      // a moment, not forever (v10 F4): the mark just drawn, what is hovered,
+      // what is held. The offer itself stands; the dashes do not.
       const offer = snapOffers.get(node.id);
-      if (offer && !style.gesture) {
+      if (offer && !style.gesture && ghostShown(state, node.id)) {
         const ideal = idealOf(node, offer.shape);
         if (ideal) {
           // The ghost follows the ink: same placement (transform, rotation).
@@ -139,6 +141,16 @@
       const m = state.nodes.get(e.to);
       if (m && !m.reps.some((r) => r.modality === 'erased')) inkOf(m, style);
     }
+  }
+
+  // The clean-form ghost is an offer for a moment, not a fixture.
+  const GHOST_MS = 6000;
+  let lastDrawAt = 0, ghostTimer = null;
+  function ghostShown(s, id) {
+    if (hoverId === id || s.selection.includes(id)) return true;
+    if (s.summon && s.summon.enclosedIds.includes(id)) return true;
+    if (heldCandidates.includes(id)) return true;
+    return id === lastContentId(s) && Date.now() - lastDrawAt < GHOST_MS;
   }
 
   let chipHits = []; // the match chips drawn this frame, in world coordinates: { ids, x, y, w, h }
@@ -182,6 +194,24 @@
       // two definitions with the same shapes are both named.
       const hit = chipText(c.matches.slice(0, 2).map((m) => m.name + ' ' + m.score.toFixed(2)).join('  ·  '), b.minX - pad, b.minY - pad - wpx(8));
       chipHits.push({ ids: c.nodeIds.slice(), x: hit.x, y: hit.y, w: hit.w, h: hit.h });
+    }
+    // What a model read a group as stays beside it (v10 F6): a chip with the
+    // number and the reader, whether or not the field is still open, and a
+    // tap on it opens the field on those marks again. A reading held on a
+    // group's first member speaks for the group it was asked about.
+    for (const id of s.contentIds) {
+      const n = s.nodes.get(id);
+      if (!n || n.reps.some((r) => r.modality === 'erased')) continue;
+      const reads = MM.interpretationsOf(n, s.nodes).filter((r) => r.tier === 2 && !r.blessed).sort((a, b) => b.weight - a.weight);
+      if (!reads.length) continue;
+      const group = (readGroups.get(id) || [id]).filter((g) => s.contentIds.includes(g));
+      const boxes = (group.length ? group : [id]).map((g) => MM.boundsOf(s.nodes.get(g))).filter(Boolean);
+      if (!boxes.length) continue;
+      const b = union(boxes);
+      const pad = wpx(14);
+      const text = reads.slice(0, 2).map((r) => r.label + ' ' + r.weight.toFixed(2)).join('  ·  ') + '  ·  ' + reads[0].sourceName;
+      const hit = chipText(text, b.minX - pad, b.maxY + pad + wpx(17));
+      chipHits.push({ ids: group.length ? group : [id], x: hit.x, y: hit.y, w: hit.w, h: hit.h });
     }
 
     const inspectedId = hoverId || lastContentId(s);
@@ -261,6 +291,7 @@
     syncMarkChip(s);
     renderSummon(s);
     renderInspector(s, inspectedId);
+    renderMinimap(s);
 
     // The status line: what just happened, else the standing state, in a few
     // words — and a model at work is always in it, whichever it shows.

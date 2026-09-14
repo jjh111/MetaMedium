@@ -232,10 +232,16 @@ function detectArrow(fp: Fingerprint, points: Point[], scale = 1): RecognitionRe
     const straight = calculateStraightness(shaft);
     const sharpest = Math.max(...cs.map((c) => c.angle));
     const shaftOk = ramp(straight, 0.72, 0.95);
-    const barbOk = ramp(sharpest, (55 * Math.PI) / 180, (110 * Math.PI) / 180);
+    // A barb DRAWS BACK on the shaft: the wing turns past ninety degrees
+    // (a hand's wing leaves the tip at ~30° off the shaft, a 150° turn). The
+    // earlier ramp (55°–110°) took the hook a pen leaves at liftoff for a
+    // barb, and every tall l read as an arrow 0.6 (v10 F2).
+    const barbOk = ramp(sharpest, (95 * Math.PI) / 180, (140 * Math.PI) / 180);
     // The head is short next to the shaft: a long tail after the corner is a
-    // bent line, not a barb. One wing is ~15% of the path, two wings ~35%.
+    // bent line, not a barb. One wing is ~15% of the path, two wings ~35% —
+    // and under a sixteenth of it is a liftoff hook, not a wing anyone meant.
     const headLen = head === 'end' ? 1 - first : first;
+    if (headLen < 0.06) return null;
     const shortHead = 1 - ramp(headLen, 0.3, 0.45);
     const tipIdx = Math.round(first * 99);
     return {

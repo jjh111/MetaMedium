@@ -1415,5 +1415,58 @@ window.__scenario = async function(){
     mm.session.load([]);
   }
 
+  // ---- 33. Foundations (v10 F1–F7): letters at any size, a mark that crosses, every option, readings that stay, a minimap ----
+  {
+    mm.session.load([]); mm.setView(1, 0, 0);
+    mm.agents.length = 0; mm.agents.push(MM.createAgentParticipant(mm.session, Object.assign({}, MM.PRESETS.ollama, { model: 'e2e-stub', vision: true }), Date.now()));
+    // F1: a hand twice the size the old cap allowed — an unplaced stroke 90 tall, a line, an x-height circle, a line — is one word.
+    const zig = t.line({ x: 300, y: 390 }, { x: 300, y: 300 }, 14).concat(t.line({ x: 300, y: 300 }, { x: 318, y: 390 }, 14).slice(1), t.line({ x: 318, y: 390 }, { x: 318, y: 300 }, 14).slice(1));
+    t.stroke(zig); t.stroke(t.line({ x: 332, y: 300 }, { x: 332, y: 390 }, 14)); t.stroke(t.circle(358, 372, 18)); t.stroke(t.line({ x: 386, y: 300 }, { x: 386, y: 390 }, 14));
+    const st33 = mm.session.getState();
+    const word33 = st33.contentIds.map(id => st33.nodes.get(id)).find(n => MM.isWord(n));
+    step('33. letters with ascenders, at a big hand, gather into one word', st33.contentIds.length === 1 && !!word33 && MM.lettersOf(word33).length === 4, { content: st33.contentIds.length, letters: word33 && MM.lettersOf(word33).length });
+    // F3: a stroke shaped like the mark beside the word, crossing nothing, summons nothing.
+    t.stroke(t.check(420, 330, 1));
+    step('33a. a mark-shaped stroke that crosses nothing summons nothing', !mm.session.getState().summon, { summon: !!mm.session.getState().summon, source: mm.session.getState().summon && mm.session.getState().summon.scopeSource });
+    // F5: bubbles the rung reads as circles still offer to be read as writing, on request.
+    mm.session.load([]);
+    mm.agents.length = 0; mm.agents.push(MM.createAgentParticipant(mm.session, Object.assign({}, MM.PRESETS.ollama, { model: 'e2e-stub', vision: true }), Date.now()));
+    t.stroke(t.circle(300, 300, 30)); t.stroke(t.circle(380, 300, 30)); t.stroke(t.circle(460, 300, 30));
+    t.stroke(t.circle(380, 300, 120)); t.takeLoop(380, 300, 120); await wait(60);
+    t.typeIn('read');
+    step('33b. typing read on marks the rung did not call writing offers Read as writing, marked as asking a model', t.chips().some(c => /Read as writing/.test(c)) && !!([...document.querySelectorAll('#summon .item')].find(b => /Read as writing/.test(b.textContent)) || {}).querySelector('.dot'), t.chips());
+    t.typeIn('');
+    // F6: what a model reads the group as stays beside it after the field is gone.
+    const whatPill = [...document.querySelectorAll('#summon .item')].find(b => /What is this/.test(b.textContent));
+    const calls33 = window.__calls.length;
+    if (whatPill) whatPill.click();
+    for (let i = 0; i < 30 && window.__calls.length === calls33; i++) await wait(100);
+    for (let i = 0; i < 30 && !mm.chips().some(c => c.ids.length === 3); i++) await wait(100);
+    const s33 = mm.session.getState();
+    const ground = mm.worldToScreen(700, 600);
+    t.stroke([{ x: ground.x, y: ground.y }]); // a tap on the ground lets the field go
+    await wait(50);
+    const chip33 = mm.chips().find(c => c.ids.length === 3);
+    step('33c. the model\'s reading of the group is a chip beside it, and it stays when the field is gone', !!chip33 && !mm.session.getState().summon && mm.readGroups.size >= 1, { chips: mm.chips().map(c => c.ids.length), summon: !!mm.session.getState().summon });
+    // A tap on the chip opens the field on the group again.
+    if (chip33) { const at = mm.worldToScreen(chip33.x + chip33.w / 2, chip33.y + chip33.h / 2); t.stroke([{ x: at.x, y: at.y }]); }
+    const s33b = mm.session.getState();
+    step('33d. a tap on the reading\'s chip opens the field on those marks', !!s33b.summon && s33b.summon.enclosedIds.length === 3 && s33b.summon.scopeSource === 'pointed', { summon: s33b.summon && s33b.summon.enclosedIds });
+    if (s33b.summon) mm.session.dismiss(s33b.summon.id, Date.now());
+    // F7: the minimap shows the board; a press on it pans there.
+    const mini = mm.minimap();
+    const miniEl = document.getElementById('minimap');
+    step('33e. the minimap is shown while the board holds marks', !!mini && !miniEl.hidden && miniEl.getBoundingClientRect().width > 0, { mini: !!mini, hidden: miniEl.hidden });
+    if (mini) {
+      const r = miniEl.getBoundingClientRect();
+      const px = r.left + (mini.ox + 460 * mini.scale) * (r.width / 176), py = r.top + (mini.oy + 300 * mini.scale) * (r.height / 108);
+      miniEl.dispatchEvent(new PointerEvent('pointerdown', { pointerId: 2, isPrimary: true, bubbles: true, clientX: px, clientY: py, button: 0, buttons: 1 }));
+      miniEl.dispatchEvent(new PointerEvent('pointerup', { pointerId: 2, isPrimary: true, bubbles: true, clientX: px, clientY: py, button: 0, buttons: 0 }));
+      const c = mm.screenToWorld(innerWidth / 2, innerHeight / 2);
+      step('33f. a press on the minimap centres the view there', Math.hypot(c.x - 460, c.y - 300) < 40, { centre: { x: Math.round(c.x), y: Math.round(c.y) } });
+    }
+    mm.session.load([]);
+  }
+
   return R;
 };

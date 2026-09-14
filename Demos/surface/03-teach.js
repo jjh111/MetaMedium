@@ -109,7 +109,7 @@
       teachStatus.className = 'warn';
       teachStatus.textContent =
         'Careful — this mark also matches something already on the canvas. It would fire while you draw.';
-    } else if (mark.consistency < 0.35) {
+    } else if (mark.consistency < 0.5) {
       teachStatus.className = 'warn';
       teachStatus.textContent =
         'Those five were quite different from each other, so the band is wide and it may over-trigger. Clear and try again for a tighter mark.';

@@ -32,6 +32,17 @@ describe('words from letters', () => {
     expect(topInterpretation(word)).toBe('text');
   });
 
+  it('letters with ascenders gather at a big hand: h, e, l, l, o twice the height the old cap allowed', () => {
+    // An unplaced stroke 90 px tall, a line 90 tall, a circle 36 tall (the x-height), another line: one word.
+    const s = createSession();
+    const { ids } = write(s, [...N(100, 100, 90), ...I(132, 100, 90), circleStroke(158, 172, 18), ...I(186, 100, 90)], 1000);
+    const st = s.getState();
+    expect(st.contentIds).toHaveLength(1);
+    const word = st.nodes.get(st.contentIds[0])!;
+    expect(isWord(word)).toBe(true);
+    expect(lettersOf(word)).toEqual(ids);
+  });
+
   it('two boxes side by side are not a word — they are too big to be letters', () => {
     const s = createSession();
     s.addStroke(rectStroke(100, 100, 200, 120), 1000);

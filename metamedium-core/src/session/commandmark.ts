@@ -76,6 +76,13 @@ const TOLERANCE_FLOOR: Record<Feature, number> = {
 
 /** Observed spread is widened by this much before it becomes the accept band. */
 const SPREAD_MULTIPLIER = 2.5;
+/**
+ * …but never past this many floors. Five samples that disagree would
+ * otherwise learn a band so wide the mark fires on ordinary writing (v10
+ * F3: a mark learned at consistency 0.37 fired on the letters of a word).
+ * The teach pane says when the samples disagree; the band stays a mark.
+ */
+const MAX_WIDEN = 2.5;
 
 export interface CommandMark {
   name: string;
@@ -161,7 +168,7 @@ export function learnCommandMark(samples: Point[][], name = 'command'): CommandM
     const values = perFeature.map((p) => p[f]);
     features[f] = mean(values);
     const sd = stddev(values);
-    tolerance[f] = Math.max(sd * SPREAD_MULTIPLIER, TOLERANCE_FLOOR[f]);
+    tolerance[f] = Math.min(Math.max(sd * SPREAD_MULTIPLIER, TOLERANCE_FLOOR[f]), TOLERANCE_FLOOR[f] * MAX_WIDEN);
     // How much of the accept band the user's own variation already used up.
     spreadRatios.push(Math.min(1, (sd * SPREAD_MULTIPLIER) / tolerance[f]));
   }

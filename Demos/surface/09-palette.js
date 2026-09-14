@@ -269,6 +269,17 @@
         },
       });
     }
+    // Writing the rung did not spot — big letters, a scrawl — can still be
+    // read: any ink, as one image, on request (v10 F5). The rung called
+    // John's h an arc and his o a triangle; the field must still offer to read them.
+    if (!unread.length) {
+      const ink = marks.filter((id) => { const n = s.nodes.get(id); return n && !s.artifacts.includes(id) && (MM.strokePointsOf(n) || MM.isWord(n)) && !isRead(n); });
+      if (ink.length) items.push({
+        key: 'read-any', group: 'always', groupConf: 0, groupWhy: '', verbs: ['read', 'read as writing', 'parse', 'writing'],
+        label: 'Read as writing', why: 'the ink as one image, to a model that can see — for writing the shape rung did not spot' + (seeing().length ? '' : ' — needs a model that can see'), tier: 2,
+        run: () => { if (!readLine(ink, true)) offerModel('Reading writing needs a model that can see — one marked “sees”.'); },
+      });
+    }
     if (marks.length) {
       items.push({
         key: 'what', group: 'always', groupConf: 0, groupWhy: '', verbs: ['what', 'what is this', '?', 'read the group'],

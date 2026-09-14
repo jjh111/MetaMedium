@@ -17,6 +17,8 @@
     autoRead: () => autoRead, setAutoRead: setAutoRead, readField: (q) => readField(q), clip: () => clip,
     copyMarks: copyMarks, pasteClip: pasteClip, openCC: openCC, closeCC: closeCC, syncTiles: syncTiles,
     replay: () => rp, rpGoTo: (i) => rpGoTo(i), theme: THEME,
+    // The minimap, for tests: where the last paint put the world.
+    minimap: () => mini, readGroups: readGroups, chips: () => chipHits,
     // For tests: pin the view so world coordinates map to known screen ones.
     setView: (zoom, panX, panY) => { view.zoom = zoom; view.panX = panX; view.panY = panY; afterViewChange(); },
     resetUses: () => { for (const k of Object.keys(uses)) delete uses[k]; store.del(USES_KEY); },

@@ -316,6 +316,27 @@ control centre opens this file.
    take it, and the new drawing stands in 3D from *its own* circles, not
    the first drawing's.
 
+## 13f. The foundations, in your own hand
+
+1. Write *hello* in your own hand, letters as tall as you like: the letters
+   gather into one word as you go (the panel says *a word of 5 strokes*).
+   Write *world* beside it: a second word. Circle both and take the loop:
+   *writing 0.8x* leads, and *Read the writing* is one pill.
+2. Draw a tall *l* with a flick at the end: the panel says *line*, and no
+   *arrow* candidate above 0.3.
+3. Write a *v* beside the words, crossing nothing: no field opens. Draw a
+   check across a box: the field opens on the box.
+4. Draw a circle: its dashed clean form shows for a few seconds and goes.
+   Hover it: it is back. The snap tile still counts it.
+5. Circle three bubbles, type `read`: *Read as writing* is offered with a
+   dot. Type `zzz`: the pills go and the reading line says it is the brief.
+6. With a model joined, *What is this?* on the bubbles, then tap the
+   ground before it answers. When the answer lands, a chip stands under the
+   bubbles with the reading and the model's name, the status line says it,
+   and a tap on the chip opens the field on the bubbles again.
+7. Draw far apart, zoom in: the minimap at the bottom right shows the whole
+   board and where you are; tap the far mark on it and the view goes there.
+
 ## 13. Installable
 
 1. In Chrome's address bar the install icon appears; install it. It opens as

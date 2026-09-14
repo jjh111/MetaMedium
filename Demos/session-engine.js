@@ -631,7 +631,7 @@
       teachStatus.className = 'warn';
       teachStatus.textContent =
         'Careful — this mark also matches something already on the canvas. It would fire while you draw.';
-    } else if (mark.consistency < 0.35) {
+    } else if (mark.consistency < 0.5) {
       teachStatus.className = 'warn';
       teachStatus.textContent =
         'Those five were quite different from each other, so the band is wide and it may over-trigger. Clear and try again for a tighter mark.';
@@ -1035,10 +1035,14 @@
     if (why) say(why);
   }
 
+  // Which marks a reading was asked about: a model's readings are held on the
+  // group's first member, and the chip beside the group needs the group.
+  const readGroups = new Map();
   function askModelsAbout(ids) {
     if (!ids || !ids.length) { say('nothing to read'); return false; }
     if (agents.length === 0) { offerModel('Reading a group needs a model.'); return false; }
     cancelReading();
+    readGroups.set(ids[0], ids.slice());
     const ctl = new AbortController();
     reading = ctl;
     let left = agents.length;
@@ -1603,6 +1607,10 @@
     // when they were drawn. Position belongs in world space, the hand does not —
     // without this, the same check reads as a closed loop at 1.7x zoom.
     const id = session.addStroke(points, Date.now(), undefined, 1 / view.zoom);
+    // The clean-form ghost shows on the mark just drawn for a moment, then goes; a repaint takes it away.
+    lastDrawAt = Date.now();
+    clearTimeout(ghostTimer);
+    ghostTimer = setTimeout(() => render(session.getState()), GHOST_MS + 50);
 
     // Say what happened when a stroke rubbed something out — a silent erase is
     // indistinguishable from a bug. Read it from the stroke's own gesture rep,
@@ -1875,9 +1883,11 @@
       }
       inkStroke(points, false, style);
       // The offer: a ghost of what this mark would be, drawn clean. Dashed and
-      // faint so it reads as a question, not a change already made.
+      // faint so it reads as a question, not a change already made — and for
+      // a moment, not forever (v10 F4): the mark just drawn, what is hovered,
+      // what is held. The offer itself stands; the dashes do not.
       const offer = snapOffers.get(node.id);
-      if (offer && !style.gesture) {
+      if (offer && !style.gesture && ghostShown(state, node.id)) {
         const ideal = idealOf(node, offer.shape);
         if (ideal) {
           // The ghost follows the ink: same placement (transform, rotation).
@@ -1896,6 +1906,16 @@
       const m = state.nodes.get(e.to);
       if (m && !m.reps.some((r) => r.modality === 'erased')) inkOf(m, style);
     }
+  }
+
+  // The clean-form ghost is an offer for a moment, not a fixture.
+  const GHOST_MS = 6000;
+  let lastDrawAt = 0, ghostTimer = null;
+  function ghostShown(s, id) {
+    if (hoverId === id || s.selection.includes(id)) return true;
+    if (s.summon && s.summon.enclosedIds.includes(id)) return true;
+    if (heldCandidates.includes(id)) return true;
+    return id === lastContentId(s) && Date.now() - lastDrawAt < GHOST_MS;
   }
 
   let chipHits = []; // the match chips drawn this frame, in world coordinates: { ids, x, y, w, h }
@@ -1939,6 +1959,24 @@
       // two definitions with the same shapes are both named.
       const hit = chipText(c.matches.slice(0, 2).map((m) => m.name + ' ' + m.score.toFixed(2)).join('  ·  '), b.minX - pad, b.minY - pad - wpx(8));
       chipHits.push({ ids: c.nodeIds.slice(), x: hit.x, y: hit.y, w: hit.w, h: hit.h });
+    }
+    // What a model read a group as stays beside it (v10 F6): a chip with the
+    // number and the reader, whether or not the field is still open, and a
+    // tap on it opens the field on those marks again. A reading held on a
+    // group's first member speaks for the group it was asked about.
+    for (const id of s.contentIds) {
+      const n = s.nodes.get(id);
+      if (!n || n.reps.some((r) => r.modality === 'erased')) continue;
+      const reads = MM.interpretationsOf(n, s.nodes).filter((r) => r.tier === 2 && !r.blessed).sort((a, b) => b.weight - a.weight);
+      if (!reads.length) continue;
+      const group = (readGroups.get(id) || [id]).filter((g) => s.contentIds.includes(g));
+      const boxes = (group.length ? group : [id]).map((g) => MM.boundsOf(s.nodes.get(g))).filter(Boolean);
+      if (!boxes.length) continue;
+      const b = union(boxes);
+      const pad = wpx(14);
+      const text = reads.slice(0, 2).map((r) => r.label + ' ' + r.weight.toFixed(2)).join('  ·  ') + '  ·  ' + reads[0].sourceName;
+      const hit = chipText(text, b.minX - pad, b.maxY + pad + wpx(17));
+      chipHits.push({ ids: group.length ? group : [id], x: hit.x, y: hit.y, w: hit.w, h: hit.h });
     }
 
     const inspectedId = hoverId || lastContentId(s);
@@ -2018,6 +2056,7 @@
     syncMarkChip(s);
     renderSummon(s);
     renderInspector(s, inspectedId);
+    renderMinimap(s);
 
     // The status line: what just happened, else the standing state, in a few
     // words — and a model at work is always in it, whichever it shows.
@@ -2484,6 +2523,17 @@
           single.forEach((id) => { any = readOne(s.nodes.get(id), true) || any; });
           if (!any) offerModel('Reading writing needs a model that can see — one marked “sees”.');
         },
+      });
+    }
+    // Writing the rung did not spot — big letters, a scrawl — can still be
+    // read: any ink, as one image, on request (v10 F5). The rung called
+    // John's h an arc and his o a triangle; the field must still offer to read them.
+    if (!unread.length) {
+      const ink = marks.filter((id) => { const n = s.nodes.get(id); return n && !s.artifacts.includes(id) && (MM.strokePointsOf(n) || MM.isWord(n)) && !isRead(n); });
+      if (ink.length) items.push({
+        key: 'read-any', group: 'always', groupConf: 0, groupWhy: '', verbs: ['read', 'read as writing', 'parse', 'writing'],
+        label: 'Read as writing', why: 'the ink as one image, to a model that can see — for writing the shape rung did not spot' + (seeing().length ? '' : ' — needs a model that can see'), tier: 2,
+        run: () => { if (!readLine(ink, true)) offerModel('Reading writing needs a model that can see — one marked “sees”.'); },
       });
     }
     if (marks.length) {
@@ -5519,6 +5569,79 @@
     closeCC();
   }
 
+// ===== minimap =====
+// Provides: renderMinimap — the whole board in a corner with the viewport on it; a tap or a drag there pans (SURFACE-v10-PLAN F7).
+// Uses: core (C), view (view, afterViewChange, union), render.
+// A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
+// in name order inside `(function () Ellipsis)();`. Shared state is the
+// closure's; no imports, no exports, no build step beyond the concatenation.
+
+  // ===== The minimap ========================================================
+  // Every mark as a small rect, artifacts outlined, answers faint, and the
+  // viewport as a box: where you are on the whole board. The map covers the
+  // content AND the viewport, so panning off the drawing still shows the
+  // drawing. Hidden while the board is empty.
+  const minimapEl = document.getElementById('minimap');
+  const MINI_W = 176, MINI_H = 108, MINI_PAD = 8;
+  let mini = null; // { scale, ox, oy } of the last paint: world → map pixels
+
+  function renderMinimap(s) {
+    if (!minimapEl) return;
+    const ids = s.contentIds.concat(s.explanations);
+    const boxes = ids.map((id) => MM.boundsOf(s.nodes.get(id))).filter(Boolean);
+    if (!boxes.length) { minimapEl.hidden = true; mini = null; return; }
+    minimapEl.hidden = false;
+    const dpr = window.devicePixelRatio || 1;
+    if (minimapEl.width !== Math.round(MINI_W * dpr)) { minimapEl.width = Math.round(MINI_W * dpr); minimapEl.height = Math.round(MINI_H * dpr); }
+    const vp = { minX: -view.panX / view.zoom, minY: -view.panY / view.zoom, maxX: (innerWidth - view.panX) / view.zoom, maxY: (innerHeight - view.panY) / view.zoom };
+    const all = union(boxes.concat([vp]));
+    const w = Math.max(1, all.maxX - all.minX), h = Math.max(1, all.maxY - all.minY);
+    const scale = Math.min((MINI_W - MINI_PAD * 2) / w, (MINI_H - MINI_PAD * 2) / h);
+    const ox = MINI_PAD + ((MINI_W - MINI_PAD * 2) - w * scale) / 2 - all.minX * scale;
+    const oy = MINI_PAD + ((MINI_H - MINI_PAD * 2) - h * scale) / 2 - all.minY * scale;
+    mini = { scale: scale, ox: ox, oy: oy };
+    const g = minimapEl.getContext('2d');
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    g.clearRect(0, 0, MINI_W, MINI_H);
+    for (const id of ids) {
+      const b = MM.boundsOf(s.nodes.get(id));
+      if (!b) continue;
+      const x = ox + b.minX * scale, y = oy + b.minY * scale;
+      const bw = Math.max(1.5, (b.maxX - b.minX) * scale), bh = Math.max(1.5, (b.maxY - b.minY) * scale);
+      if (s.artifacts.includes(id)) { g.strokeStyle = 'rgba(' + C.goldRGB + ',0.8)'; g.lineWidth = 1; g.strokeRect(x + 0.5, y + 0.5, bw, bh); }
+      else { g.fillStyle = s.explanations.includes(id) ? 'rgba(' + C.goldRGB + ',0.35)' : C.inkFaint; g.fillRect(x, y, bw, bh); }
+    }
+    g.strokeStyle = C.ink; g.lineWidth = 1; g.setLineDash([]);
+    g.strokeRect(ox + vp.minX * scale + 0.5, oy + vp.minY * scale + 0.5, Math.max(2, (vp.maxX - vp.minX) * scale), Math.max(2, (vp.maxY - vp.minY) * scale));
+  }
+
+  /** The world point under a pointer on the map. */
+  function miniToWorld(e) {
+    const r = minimapEl.getBoundingClientRect();
+    const mx = (e.clientX - r.left) * (MINI_W / Math.max(1, r.width)), my = (e.clientY - r.top) * (MINI_H / Math.max(1, r.height));
+    return { x: (mx - mini.ox) / mini.scale, y: (my - mini.oy) / mini.scale };
+  }
+  /** Pan so a world point is the centre of the screen. */
+  function miniPanTo(w) {
+    view.panX = innerWidth / 2 - w.x * view.zoom;
+    view.panY = innerHeight / 2 - w.y * view.zoom;
+    afterViewChange();
+  }
+  let miniDrag = false;
+  if (minimapEl) {
+    minimapEl.addEventListener('pointerdown', (e) => {
+      if (!mini) return;
+      miniDrag = true;
+      try { minimapEl.setPointerCapture(e.pointerId); } catch (err) { /* not capturable */ }
+      miniPanTo(miniToWorld(e));
+      e.preventDefault();
+    });
+    minimapEl.addEventListener('pointermove', (e) => { if (miniDrag && mini) miniPanTo(miniToWorld(e)); });
+    const miniEnd = () => { miniDrag = false; };
+    minimapEl.addEventListener('pointerup', miniEnd);
+    minimapEl.addEventListener('pointercancel', miniEnd);
+  }
+
 // ===== boot =====
 // Provides: the debug handle (window.__mm, what the e2e drives), subscription, restore, first render.
 // Uses: everything.
@@ -5538,6 +5661,8 @@
     autoRead: () => autoRead, setAutoRead: setAutoRead, readField: (q) => readField(q), clip: () => clip,
     copyMarks: copyMarks, pasteClip: pasteClip, openCC: openCC, closeCC: closeCC, syncTiles: syncTiles,
     replay: () => rp, rpGoTo: (i) => rpGoTo(i), theme: THEME,
+    // The minimap, for tests: where the last paint put the world.
+    minimap: () => mini, readGroups: readGroups, chips: () => chipHits,
     // For tests: pin the view so world coordinates map to known screen ones.
     setView: (zoom, panX, panY) => { view.zoom = zoom; view.panX = panX; view.panY = panY; afterViewChange(); },
     resetUses: () => { for (const k of Object.keys(uses)) delete uses[k]; store.del(USES_KEY); },

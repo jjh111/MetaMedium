@@ -26,7 +26,15 @@
 > selection *becomes* and the rung after it (T5, first cut). Core 570
 > tests; e2e 161 steps. Still to build: which molecule (a model's answer
 > named on the artifact), questions as drawn candidates (T7), ids per hand
-> (T8).
+> (T8). **Foundations, the same evening** (`SURFACE-v10-PLAN.md` §0, from
+> John's own hand on the board): letters gather at any size (the 44 px cap
+> threw out every ascender), an arrow's barb must draw back on the shaft (a
+> liftoff hook made every tall *l* an arrow 0.6), a loop-less mark fires
+> only on what it crosses (an open stroke it sits near is a letter of a
+> word), the clean-form ghost is offered for a moment rather than stuck, the
+> field offers *Read as writing* on any ink, a model's reading stays as a
+> chip beside the group after the field is gone, and a minimap. Core 572
+> tests; e2e 168 steps.
 >
 > **v9 accounting, 6 September 2026 (branch `next-phases`, local).** The
 > surface as a system (`SURFACE-v9-PLAN.md` §5–§6): **a model is asked only

@@ -27,6 +27,60 @@ is three unrelated `text` marks until a vision model is joined), and when
 the engine is unsure — where an edge ends, which box a line joins — it
 guesses silently instead of asking.
 
+## 0. Foundations first (14 September, evening)
+
+John stepped back after trying T1–T6: *"we need to get foundational so the
+core stuff works — still not seeing it come together in the UI."* He drew a
+circle and wrote *hello world* in his own hand, circled it, and asked
+*What is this?*. What the engine saw, read from his tab:
+
+| He drew | The engine read | Why |
+|---|---|---|
+| **h** (34×72 px on screen) | arc 0.41, not a letter | a letter had to be under 44 px tall |
+| **e** (21×36) | arc 0.63, letter-like | |
+| **l**, **l** (8×73, 9×88) | line 0.82 **· arrow 0.64** | the liftoff hook is a barb to the arrow detector; too tall to be letters |
+| **o** (19×31) | triangle 0.68 | |
+| **w o r** (129×40) | one word, text 0.63 | x-height letters gather; ascenders did not |
+| **l**, **d** of world | line · arrow 0.67; unread | too tall |
+| the loop and *What is this?* | the 27B model read for minutes | the reading, when it lands, shows only while the field is open |
+
+Six foundations, in the order they block the flow:
+
+- **F1 Letters at any size.** Ascenders and descenders are two to three
+  x-heights tall; the letter cap (44 px) and the size-match rule (2.2×)
+  were written for x-height letters. Letters are letters by their run — on
+  a band, a word's gap apart, similar in height to *the run's x-height* —
+  and the cap is a generous ceiling, not the rule. The canonical loop
+  stays protected by what it always was: confident shapes side by side
+  never start a word.
+- **F2 An arrow draws back on itself.** A barb is a wing that turns past
+  ninety degrees and is long enough to be meant — at least a sixteenth of
+  the stroke. A liftoff hook is neither.
+- **F3 The mark crosses what it means.** With no loop, the command mark
+  fires only on marks it actually crosses — not marks it merely sits near,
+  which every letter of a word does. A taught mark's band may widen the
+  designed generosity at most two-and-a-half-fold, and the teach pane says
+  when five samples disagree enough that the mark will fire on more than
+  you mean.
+- **F4 An assessment is offered, not stuck.** The clean-form ghost shows
+  for the mark just drawn, for a few seconds, and for what is hovered or
+  held — not forever over every mark that reads clean. The offer still
+  stands (the snap tile, the panel); the dashes do not.
+- **F5 The field has every option, and falls back to the brief.** *Read as
+  writing* is offered for any ink, not only what the rung called text (the
+  rung missed *hello*); typing matches the direct commands first, and when
+  nothing matches the reading line says it is the brief. Plus F6 below for
+  what a model answered.
+- **F6 A reading anchors on the canvas.** What a model read a group as is
+  a chip beside the group — *greeting 0.80 · qwen* — the moment it lands,
+  whether or not the field is still open, said once in the status line,
+  and a tap on it opens the field on those marks again. A reading that
+  fails or times out is said too.
+- **F7 A minimap.** The whole board in a corner, with the viewport on it;
+  a tap or a drag there pans.
+
+These come before T7 and T8. Everything below stands as written.
+
 ## 1. Decisions
 
 **D1 — An MCP server is a hand in a room.** No new channel into the
@@ -219,3 +273,10 @@ environment (`MM_ROOM`, `MM_RELAY`, `MM_NAME`; defaults `claude`,
 | T6 | Molecule in 3D | ✅ 14 Sep — `buildGraph3D` in the tier 1 library (spheres for nodes, bonds for edges, from the drawing; turns on its own and under a pressed hand; the 2D fallback reports its parts), *Show it in 3D* in the field with its tooltip's next rung, a 3D entry rebuilt for the next drawing; e2e 32–32c. *Still to do:* which molecule — *What is this?* with the graph as the brief, and the answer's name on the artifact |
 | T7 | Questions as strokes | designed |
 | T8 | Ids per hand | designed |
+| F1 | Letters at any size | ✅ 14 Sep — the cap is a ceiling (150 px), an ascender may stand 3.2 x-heights over its neighbours; core test, e2e 33 |
+| F2 | An arrow draws back on itself | ✅ 14 Sep — the barb turns past 95° (full credit at 140°) and is at least a sixteenth of the stroke; the bench corpus still passes |
+| F3 | The mark crosses what it means | ✅ 14 Sep — an open stroke is engaged only by a crossing, a closed mark by a crossing, a landing inside, or nearness; a taught band widens at most 2.5 floors; the teach pane warns below consistency 0.5; e2e 33a. *Open:* a closed letter (o, a) beside a mark-shaped stroke can still engage |
+| F4 | An assessment is offered, not stuck | ✅ 14 Sep — the ghost shows on the mark just drawn for six seconds, and on what is hovered or held |
+| F5 | The field has every option | ✅ 14 Sep — *Read as writing* on any ink (e2e 33b); typing already matches the direct commands first and falls back to the brief |
+| F6 | A reading anchors on the canvas | ✅ 14 Sep — a chip beside the group when the reading lands, a tap reopens the field on it; e2e 33c–33d |
+| F7 | A minimap | ✅ 14 Sep — `21-minimap.js`; e2e 33e–33f |

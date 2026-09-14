@@ -206,6 +206,10 @@
     // when they were drawn. Position belongs in world space, the hand does not —
     // without this, the same check reads as a closed loop at 1.7x zoom.
     const id = session.addStroke(points, Date.now(), undefined, 1 / view.zoom);
+    // The clean-form ghost shows on the mark just drawn for a moment, then goes; a repaint takes it away.
+    lastDrawAt = Date.now();
+    clearTimeout(ghostTimer);
+    ghostTimer = setTimeout(() => render(session.getState()), GHOST_MS + 50);
 
     // Say what happened when a stroke rubbed something out — a silent erase is
     // indistinguishable from a bug. Read it from the stroke's own gesture rep,

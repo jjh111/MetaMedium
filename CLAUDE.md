@@ -24,7 +24,7 @@ automatically → ask "why?" and get grounded reasoning.
 `ARCHITECTURE-v7-PARTICIPANTS-AND-TIERS.md` is the active engine plan; MVP.md
 absorbs and raises its Stage D.
 
-Headline (v10 T1–T6, 14 Sep 2026, on the local branch `next-phases`):
+Headline (v10 T1–T6 and F1–F7, 14 Sep 2026, on the local branch `next-phases`):
 **the canvas reaches out** — an MCP hand (`Demos/mcp.mjs`, registered in
 `.mcp.json`) lets Claude Code look, see, draw, say, propose, transcribe and
 write on the board as a participant in a live room; a playing program
@@ -32,7 +32,11 @@ takes the pointer while ink begun outside goes over it; words gather by
 nearness into a line of writing read as one; press-and-hold holds a mark
 with what it hangs together with, and the standing line is a ladder of the
 next move; circles joined by lines stand in 3D at once, each sphere named
-for its mark (`SURFACE-v10-PLAN.md`). Before that (v9 S1/S2/S7, 6 Sep):
+for its mark; and the foundations John's own hand exposed — letters at any
+size, an arrow that draws back on itself, a mark that fires only on what it
+crosses, assessments that do not stick, every option in the field, readings
+that stay on the canvas, a minimap (`SURFACE-v10-PLAN.md` §0). Before that
+(v9 S1/S2/S7, 6 Sep):
 **the surface is a system** — a model is asked only by a deliberate act;
 one field at the pen tip reads what is typed and says what Enter will do;
 core verbs in slots that never move; one bar with a control centre; light
@@ -48,7 +52,7 @@ circle them, cross with a command mark *you taught the system*, prompt them into
 a living page that renders in the canvas with your ink still outlining its
 divs — then draw on that page and the ink addresses the regions underneath it.
 Scratch anything out to erase. `Demos/session-engine.html` is the surface;
-`Demos/session-engine.e2e.js` drives 161 steps through the real UI: page, flowchart, handwriting (read only when asked; a line read as one), the model drawing, the user-side loop, selection and the field, corrections, the worker, the tank, words into verbs and acting out, frames and the drawn slider, the folder, pictures, text, the moment, a live room, a playing frame that takes the pointer, hold by long-press, and the graph in 3D. A run takes about 100 s; run it **in its own tab on its own origin** (`http://127.0.0.1:8010/…?fresh=1&nosw=1` — `__setup` refuses any other URL: it replaces `fetch` with a stub, joins a stub model named `e2e-stub`, and wipes the origin's saved board), start it with `__setup(); __scenario().then(r => window.__R = r)` and read `__R` when it lands.
+`Demos/session-engine.e2e.js` drives 168 steps through the real UI: page, flowchart, handwriting (read only when asked; a line read as one), the model drawing, the user-side loop, selection and the field, corrections, the worker, the tank, words into verbs and acting out, frames and the drawn slider, the folder, pictures, text, the moment, a live room, a playing frame that takes the pointer, hold by long-press, the graph in 3D, and the foundations (letters at any size, a mark that crosses, readings that stay, the minimap). A run takes about 100 s; run it **in its own tab on its own origin** (`http://127.0.0.1:8010/…?fresh=1&nosw=1` — `__setup` refuses any other URL: it replaces `fetch` with a stub, joins a stub model named `e2e-stub`, and wipes the origin's saved board), start it with `__setup(); __scenario().then(r => window.__R = r)` and read `__R` when it lands.
 v7 Stage E (handwriting) shipped 1 Sep 2026: a word written beside a shape is read by a
 model that can see and offered as that shape's name. Whitepaper v5.1 stays parked until the
 conversation benchmark passes end to end.
@@ -179,7 +183,10 @@ A hand rarely draws square to the screen.
 
 **The shape rung is closed: eight entries.** `line`, `arc`, `triangle`,
 `rectangle`, `circle`, and — because the rung above cannot do without them —
-`arrow` (a straight shaft with a barb: an edge with no arrow has no direction),
+`arrow` (a straight shaft with a barb that **draws back on it** — a wing
+turning past ninety degrees and at least a sixteenth of the stroke long;
+the hook a pen leaves at liftoff is neither, and used to make every tall
+*l* an arrow 0.6 — v10 F2),
 `text` (writing, *without reading it*: open, turns many times, low and wide,
 mostly-empty box — enough to make a mark a `label`), and `dot`. **Below the
 hand's resolution (`HAND_RESOLUTION_PX`) only `dot` is offered**: a 5px blob has
@@ -275,10 +282,13 @@ ink faint beneath it. **Ink is never replaced**; undo drops the rep. Three rules
 - **Zero wrong snaps over the whole corpus** is pinned in `clean.bench.test.ts`,
   alongside ≥95% offered for every drawable shape and 0% for writing.
 
-In the surface the offer is a dashed ghost under each qualifying mark; the rail's
-*Snap N* button, the palette's *Draw them clean* (Tier 0, and the summon stays
-open so the next offer is taken from the cleaned marks) and the inspector's
-*draw it clean* take it up. `snap · offer / auto / off` is a device preference;
+In the surface the offer is a dashed ghost under a qualifying mark **for a
+moment, not forever** (v10 F4): the mark just drawn, for a few seconds,
+and whatever is hovered or held — the offer itself stands in the snap tile
+and the panel, the dashes do not stick to every mark that reads clean. The
+rail's *Snap N* button, the palette's *Draw them clean* (Tier 0, and the
+summon stays open so the next offer is taken from the cleaned marks) and
+the inspector's *draw it clean* take it up. `snap · offer / auto / off` is a device preference;
 *auto* takes the offer as you draw, never for a stroke the grammar is still
 deciding about. A held lasso is never offered.
 
@@ -359,6 +369,15 @@ mode wearing a different hat. The command mark looks back over
 drawn alongside them just now comes with it. An explicit circle still wins, and
 `Summon.scopeSource` (`lasso` / `crossed` / `recent`) plus `scopeReasoning` say
 which way it decided, so a wrong guess is visible before you act on it.
+**What the mark engages, with no loop** (v10 F3): a mark it crosses; a
+*closed* mark — a box, a loop, an artifact's frame, a thing you point at —
+it lands inside or close beside, relative to that mark's size; never an
+open stroke it merely sits near, because that is every letter of a word
+being written, and a letter shaped like the mark summoned the word
+mid-sentence. **A taught mark's band widens at most two-and-a-half
+floors** (`MAX_WIDEN`): five samples that disagree learned a band so wide
+the mark fired on ordinary writing; the teach pane warns below a
+consistency of 0.5.
 
 **Erasing is relational, not gestural** (`src/session/erase.ts`): count
 crossings between the stroke and the target's own outline; three erases it. No
@@ -568,7 +587,13 @@ fakes words.
 **A model's reading of a group is an offer to name it.** When a circled group
 is summoned, every joined model is asked for readings (`interpret`); each
 lands as a held `resembles` edge, and the palette lists the top ones as *Name
-it "…"*, attributed, repainting when they arrive. Blessing one holds an
+it "…"*, attributed, repainting when they arrive. **The reading stays on the
+canvas** (v10 F6): a chip beside the group — *greeting 0.80 · qwen* — drawn
+the moment it lands whether or not the field is still open (a slow model
+answers minutes later), said once in the status line, and a tap on the chip
+opens the field on those marks again (`readGroups` remembers which marks a
+reading was asked about; the reading itself is held on the group's first
+member). Blessing one holds an
 artifact with the group's signature, so the next group like it is matched —
 the model proposed, the human decided, the engine remembers. This closed the
 conversation benchmark's last clause.
@@ -653,6 +678,13 @@ with `scopeSource: 'pointed'` — so the second molecule is one tap from being
 held. Export is a pane of three files (SVG, PNG, the log); help is the hand
 QA plan read into a pane. On a touch screen the field does not take the
 focus until the input is tapped, or the keyboard would cover the pills.
+
+**Read as writing** (v10 F5): the field offers to read any ink as one image
+— not only what the shape rung called `text` — because the rung called
+John's *h* an arc and his *o* a triangle, and the offer to read them was
+missing. **The minimap** (v10 F7, `21-minimap.js`): the whole board in the
+bottom-right corner with the viewport drawn on it, hidden while the board is
+empty; a tap or a drag there pans.
 
 **Affordances at rest** (v10 D5): **press and hold a mark** and it is held
 with everything it hangs together with — the cluster over the relations
@@ -747,7 +779,12 @@ fingerprint carries it, so the model is asked to *read*, not to interpret.
   confident shapes side by side never start one (a confident rectangle or
   triangle never joins one at all); an O or an l may *join* a word being
   written, and the word gathers back the letter-like strokes written just
-  before it. Found the hard way: at hand size, three bubbles and two lines
+  before it. **Letters are letters by their run, not by an absolute size**
+  (v10 F1): the cap (`LETTER_MAX_HEIGHT_PX`, 150) is a ceiling, and a
+  letter may stand up to `LETTER_HEIGHT_RATIO` (3.2) x-heights over its
+  neighbours — the old cap of 44 px threw out every ascender a real hand
+  makes (John's h, l and d were 72–88 px tall), so *hello* was five
+  shapes and *world* gathered only its x-height letters. Found the hard way: at hand size, three bubbles and two lines
   drawn quickly are exactly a run of small strokes on one line, and the
   earlier rule folded the whole canonical loop into one word — after which
   the lasso and the mark had nothing to act on.

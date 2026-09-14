@@ -921,8 +921,9 @@ var MetaMediumCore = (() => {
       const straight = calculateStraightness(shaft);
       const sharpest = Math.max(...cs.map((c) => c.angle));
       const shaftOk = ramp(straight, 0.72, 0.95);
-      const barbOk = ramp(sharpest, 55 * Math.PI / 180, 110 * Math.PI / 180);
+      const barbOk = ramp(sharpest, 95 * Math.PI / 180, 140 * Math.PI / 180);
       const headLen = head === "end" ? 1 - first : first;
+      if (headLen < 0.06) return null;
       const shortHead = 1 - ramp(headLen, 0.3, 0.45);
       const tipIdx = Math.round(first * 99);
       return {
@@ -1641,14 +1642,18 @@ var MetaMediumCore = (() => {
   }
 
   // src/session/words.ts
-  var LETTER_MAX_HEIGHT_PX = 44;
-  var LETTER_MAX_WIDTH_PX = 60;
+  var LETTER_MAX_HEIGHT_PX = 150;
+  var LETTER_MAX_WIDTH_PX = 150;
+  var LETTER_HEIGHT_RATIO = 4;
   var WORD_GAP_RATIO = 0.7;
   var WORD_BAND_OVERLAP = 0.35;
   var WORD_WINDOW_MS = 3e3;
+  var DASH_MAX_WIDTH_PX = 60;
   function isLetterLike(b, scale) {
     const h2 = (b.maxY - b.minY) / scale, w2 = (b.maxX - b.minX) / scale;
-    return h2 <= LETTER_MAX_HEIGHT_PX && w2 <= LETTER_MAX_WIDTH_PX;
+    if (h2 > LETTER_MAX_HEIGHT_PX || w2 > LETTER_MAX_WIDTH_PX) return false;
+    if (h2 < 10 && w2 > DASH_MAX_WIDTH_PX) return false;
+    return true;
   }
   function joinsRun(run, letter, scale) {
     if (letter.at - run.lastAt > WORD_WINDOW_MS) return { ok: false, reasoning: "drawn too long after the last letter" };
@@ -1665,7 +1670,7 @@ var MetaMediumCore = (() => {
     const ref = Math.max(runH, letH) / scale;
     if (gap / scale > ref * WORD_GAP_RATIO) return { ok: false, reasoning: "too far from the last letter to be the same word" };
     const tiny = Math.min(runH, letH) / scale < 10;
-    if (!tiny && (letH / runH > 2.2 || runH / letH > 2.2)) return { ok: false, reasoning: "a different size from the letters beside it" };
+    if (!tiny && (letH / runH > LETTER_HEIGHT_RATIO || runH / letH > LETTER_HEIGHT_RATIO)) return { ok: false, reasoning: "a different size from the letters beside it" };
     return { ok: true, reasoning: `beside the last letter, on its line, ${Math.round(gap / scale)}px away` };
   }
   function wordConfidence(letters) {
@@ -3574,6 +3579,7 @@ ${lines.join("\n")}
     endRise: 0.42
   };
   var SPREAD_MULTIPLIER = 2.5;
+  var MAX_WIDEN = 2.5;
   function dominantCorner(fp) {
     const corners = fp.cornerData;
     if (!corners || corners.length === 0) return null;
@@ -3617,7 +3623,7 @@ ${lines.join("\n")}
       const values = perFeature.map((p) => p[f]);
       features[f] = mean(values);
       const sd = stddev(values);
-      tolerance[f] = Math.max(sd * SPREAD_MULTIPLIER, TOLERANCE_FLOOR[f]);
+      tolerance[f] = Math.min(Math.max(sd * SPREAD_MULTIPLIER, TOLERANCE_FLOOR[f]), TOLERANCE_FLOOR[f] * MAX_WIDEN);
       spreadRatios.push(Math.min(1, sd * SPREAD_MULTIPLIER / tolerance[f]));
     }
     const closedCount = fps.filter((f) => f.isClosed).length;
@@ -5105,18 +5111,15 @@ ${pad}</${tag}>`;
       if (!n2 || !b) return null;
       return { id, bounds: b, points: strokePointsOf(n2) ?? void 0, closed: fingerprintOf(n2)?.isClosed };
     }
-    function engages(points, fp, target) {
-      if (target.points && strokesIntersect(points, target.points)) return true;
-      if (boundsOverlap(fp.bounds, target.bounds)) return true;
-      const size = Math.max(
-        1,
-        Math.max(target.bounds.maxX - target.bounds.minX, target.bounds.maxY - target.bounds.minY)
-      );
-      return boundingBoxDistance(fp.bounds, target.bounds) < size * config.gesture.checkProximityRatio;
-    }
     function scopeFromMark(points, fp, at) {
       const candidates = contentIds.map(markOf).filter((m) => !!m && !getRep(nodes.get(m.id), "erased"));
-      const engaged = candidates.filter((m) => engages(points, fp, m));
+      const engaged = candidates.filter((m) => {
+        if (m.points && strokesIntersect(points, m.points)) return true;
+        if (m.points && !m.closed) return false;
+        if (boundsOverlap(fp.bounds, m.bounds)) return true;
+        const size = Math.max(1, m.bounds.maxX - m.bounds.minX, m.bounds.maxY - m.bounds.minY);
+        return boundingBoxDistance(fp.bounds, m.bounds) < size * config.gesture.checkProximityRatio;
+      });
       if (engaged.length === 0) return null;
       const union = engaged.reduce(
         (acc, m) => ({

@@ -269,10 +269,14 @@
     if (why) say(why);
   }
 
+  // Which marks a reading was asked about: a model's readings are held on the
+  // group's first member, and the chip beside the group needs the group.
+  const readGroups = new Map();
   function askModelsAbout(ids) {
     if (!ids || !ids.length) { say('nothing to read'); return false; }
     if (agents.length === 0) { offerModel('Reading a group needs a model.'); return false; }
     cancelReading();
+    readGroups.set(ids[0], ids.slice());
     const ctl = new AbortController();
     reading = ctl;
     let left = agents.length;
