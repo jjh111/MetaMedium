@@ -1468,5 +1468,43 @@ window.__scenario = async function(){
     mm.session.load([]);
   }
 
+  // ---- 34. Writing taken is text in place: fitted, flippable, editable, never a definition (v10 F8–F10) ----
+  {
+    mm.session.load([]); mm.setView(1, 0, 0);
+    mm.agents.length = 0; mm.agents.push(MM.createAgentParticipant(mm.session, Object.assign({}, MM.PRESETS.ollama, { model: 'e2e-stub', vision: true }), Date.now()));
+    t.stroke(t.word(200, 300, 90, 28, 6)); t.stroke(t.word(320, 302, 110, 26, 7)); t.stroke(t.word(460, 300, 80, 28, 5));
+    t.stroke(t.circle(370, 330, 220)); t.takeLoop(370, 330, 220); await wait(60);
+    window.__readReply = [{ text: 'hello wide world', confidence: 0.9 }];
+    const readPill34 = [...document.querySelectorAll('#summon .item')].find(b => /Read the writing/.test(b.textContent));
+    if (readPill34) readPill34.click();
+    const readCount34 = () => { const st = mm.session.getState(); return st.contentIds.filter(id => MM.transcriptOf(st.nodes.get(id))).length; };
+    for (let i = 0; i < 30 && readCount34() < 3; i++) await wait(100);
+    await wait(100);
+    const linePill = [...document.querySelectorAll('#summon .item')].find(b => /^“hello wide world” 0\.90/.test(b.textContent.trim()));
+    step('34. the line, read, is offered as text in place — not as a name', !!linePill && /as text, here/.test(linePill.title), linePill && linePill.title);
+    if (linePill) linePill.click();
+    await wait(60);
+    const st34 = mm.session.getState();
+    const textArt = st34.artifacts.map(id => st34.nodes.get(id)).find(n => { const r = codeRepOfNode(n); return r && r.data.kind === 'text' && r.data.from === 'writing'; });
+    const f34 = textArt && mm.frames.get(textArt.id);
+    step('34a. taken, the writing is one text artifact holding the words — live, fitted, clear — and nothing stays selected', !!textArt && st34.contentIds.length === 1 && st34.live.includes(textArt.id) && !st34.selection.length && !st34.summon && !!f34 && f34.wrap.classList.contains('writing') && /textLength=/.test(f34.iframe.srcdoc), { content: st34.contentIds.length, selection: st34.selection.length, summon: !!st34.summon, writing: !!(f34 && f34.wrap.classList.contains('writing')) });
+    t.stroke(t.word(200, 500, 90, 28, 6)); t.stroke(t.word(320, 502, 110, 26, 7)); t.stroke(t.word(460, 500, 80, 28, 5));
+    step('34b. writing taken as text is not vocabulary: more writing like it is never offered as another “hello wide world”', mm.session.getState().clusterCandidates.length === 0, mm.session.getState().clusterCandidates.map(c => c.matches.map(m => m.name)));
+    if (textArt) mm.session.summonMarks([textArt.id], Date.now());
+    await wait(30);
+    const chips34 = t.chips();
+    step('34c. the field on the text offers to edit it and to show the ink, and never to play it', chips34.some(c => /Edit the text/.test(c)) && chips34.some(c => /Show the ink/.test(c)) && !chips34.some(c => /^Play /.test(c)), chips34);
+    const flipPill = [...document.querySelectorAll('#summon .item')].find(b => /Show the ink/.test(b.textContent));
+    if (flipPill) flipPill.click();
+    await wait(30);
+    step('34d. flipped, the frame steps aside and the writing shows', !!f34 && f34.wrap.classList.contains('flipped') && t.chips().some(c => /Show the text/.test(c)), t.chips());
+    const g34 = mm.worldToScreen(900, 700);
+    t.stroke([{ x: g34.x, y: g34.y }]); // one tap on the ground lets go of the field and the selection together
+    const s34e = mm.session.getState();
+    step('34e. one tap on the ground lets go of the field and the selection together', !s34e.summon && !s34e.selection.length, { summon: !!s34e.summon, selection: s34e.selection.length });
+    window.__readReply = null;
+    mm.session.load([]);
+  }
+
   return R;
 };

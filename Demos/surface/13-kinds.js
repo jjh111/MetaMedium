@@ -202,11 +202,36 @@
     win.postMessage({ mmPointer: true, type: type, x: w.x - hit.x, y: w.y - hit.y, button: e.button || 0, pointerType: e.pointerType || 'mouse', shiftKey: !!e.shiftKey, altKey: !!e.altKey, ctrlKey: !!e.ctrlKey, metaKey: !!e.metaKey }, '*');
   }
 
+  /**
+   * Writing taken as text: the words where the writing was, fitted to the
+   * ink's width and height (v10 F8). SVG text with `textLength` fits with no
+   * script; the ground is clear so the text stands on the canvas like ink,
+   * in the ink's colour; one region, `text`, so ink over it addresses it.
+   */
+  function writingDocument(code, w, h) {
+    const lines = String(code).split(/\r?\n/).filter((l) => l.length);
+    if (!lines.length) lines.push('');
+    const W = Math.max(1, Math.round(w)), H = Math.max(1, Math.round(h));
+    const lineH = H / lines.length;
+    const longest = Math.max(1, ...lines.map((l) => l.length));
+    const fs = Math.max(6, Math.min(lineH * 0.78, W / (longest * 0.62)));
+    const svgText = lines.map((l, i) => {
+      const y = lineH * i + lineH * 0.72;
+      const fit = lines.length === 1 ? ' textLength="' + W + '" lengthAdjust="spacing"' : '';
+      return '<text data-region="' + (lines.length === 1 ? 'text' : 'line' + (i + 1)) + '" x="0" y="' + y.toFixed(1) + '" font-size="' + fs.toFixed(1) + '"' + fit + '>' + esc(l) + '</text>';
+    }).join('');
+    return '<!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0;padding:0;background:transparent;overflow:hidden;}' +
+      'svg{display:block;}text{font-family:"IBM Plex Mono",ui-monospace,Menlo,monospace;fill:' + (C ? C.ink : '#e8e4d9') + ';}' +
+      'html.mm-reveal text{outline:1px dashed rgba(138,109,31,0.6);}</style></head>' +
+      '<body><div id="mmroot" style="width:' + W + 'px;height:' + H + 'px"><svg xmlns="http://www.w3.org/2000/svg" width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '">' + svgText + '</svg></div></body></html>';
+  }
+
   /** The document an artifact's newest code rep renders as, by its kind. */
   function documentForKind(rep, w, h, ctx) {
     const kind = rep.data.kind || 'html';
     const code = rep.data.code;
     if (kind === 'html') return documentFor(code, w, h);
+    if (kind === 'text' && rep.data.from === 'writing') return writingDocument(code, w, h);
     if (kind === 'run') {
       // Playing, the program runs in its clear frame; standing, its source shows, addressable like any script.
       if (ctx && ctx.playing) return runDocument(ctx.id, code, w, h);

@@ -13,6 +13,19 @@
   // and ranked, never blessed (v7 Stage E). A model that cannot see is never
   // asked; with none present the mark simply stays "text".
   const seeing = () => agents.filter((a) => a.config.vision);
+  /**
+   * Who READS: the smallest model that can see, not every one. Reading a word
+   * is a small job, and a 27B model takes minutes at it while a 0.8B answers
+   * in seconds; a dedicated handwriting model is the next step (v10 F11).
+   * The size is read from the model's name (0.8b, 8b, 27b); with none to
+   * read, the first that sees.
+   */
+  function readers() {
+    const sees = seeing();
+    if (sees.length <= 1) return sees;
+    const size = (a) => { const m = /(\d+(?:\.\d+)?)\s*b\b/i.exec(a.config.model || ''); return m ? parseFloat(m[1]) : Infinity; };
+    return [sees.slice().sort((a, b) => size(a) - size(b))[0]];
+  }
   // Reading as you write is a preference, off by default: a model is asked
   // when you say *read* (§6.3). On, every mark that reads as writing is handed
   // to the models that can see as it lands.
@@ -63,14 +76,14 @@
   }
 
   function readOne(node, force) {
-    const readers = seeing();
-    if (!readers.length) return false;
+    const who = readers();
+    if (!who.length) return false;
     const key = node.id;
     if (!force && askedToRead.has(key)) return false;
     askedToRead.add(key);
     const image = inkImage(node);
     if (!image) return false;
-    readers.forEach((agent) => {
+    who.forEach((agent) => {
       withWork('write:' + agent.id + ':' + node.id, [node.id], agent.name + ' · reading the writing', agent.read({ nodeId: node.id, image: image, at: Date.now() })).then((res) => {
         say(res.ok
           ? agent.name + ' read “' + res.transcripts[0].text + '”' + (res.transcripts.length > 1 ? ' (or ' + res.transcripts.slice(1).map((t) => '“' + t.text + '”').join(', ') + ')' : '')
@@ -90,8 +103,8 @@
    * the whole line is held on the first mark and the rest were read with it.
    */
   function readLine(ids, force) {
-    const readers = seeing();
-    if (!readers.length) return false;
+    const who = readers();
+    if (!who.length) return false;
     const s = session.getState();
     const nodes = ids.map((id) => s.nodes.get(id)).filter(Boolean);
     if (nodes.length < 2) return nodes.length === 1 ? readOne(nodes[0], force) : false;
@@ -101,7 +114,7 @@
     const image = inkImageOf(nodes.flatMap(runsOf));
     if (!image) return false;
     const first = nodes[0];
-    readers.forEach((agent) => {
+    who.forEach((agent) => {
       withWork('write:' + agent.id + ':' + first.id, ids, agent.name + ' · reading the line', agent.read({ nodeId: first.id, image: image, at: Date.now(), hold: false })).then((res) => {
         if (res.ok) {
           const top = res.transcripts[0];

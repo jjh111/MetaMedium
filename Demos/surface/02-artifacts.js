@@ -17,6 +17,12 @@
   // prove the loop — so scripts stay off, and this is a choice to revisit
   // explicitly rather than a default that drifted.
   const frames = new Map(); // artifactId -> { wrap, iframe, codeAt }
+  // Text made from writing is flipped over to show the ink it came from (v10 F8). Runtime only.
+  const flipped = new Set();
+  function isWritingArtifact(node) {
+    const rep = node && codeRepOf(node);
+    return !!rep && rep.data.kind === 'text' && rep.data.from === 'writing';
+  }
 
   /** A cheap content hash, so a re-render happens exactly when the code changes. */
   function hashOf(str) {
@@ -99,6 +105,8 @@
       f.wrap.style.height = fr.h + 'px';
       f.wrap.classList.toggle('broken', !!runtimeBroken(id));
       f.wrap.classList.toggle('playing', !!(s.clocks[id] && s.clocks[id].playing));
+      f.wrap.classList.toggle('writing', isWritingArtifact(node));
+      f.wrap.classList.toggle('flipped', flipped.has(id));
 
       // What renders is the WIRED code when a frame feeds this member.
       const wired = wiredCodeOf(s, id);

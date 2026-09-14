@@ -348,6 +348,12 @@
   // prove the loop — so scripts stay off, and this is a choice to revisit
   // explicitly rather than a default that drifted.
   const frames = new Map(); // artifactId -> { wrap, iframe, codeAt }
+  // Text made from writing is flipped over to show the ink it came from (v10 F8). Runtime only.
+  const flipped = new Set();
+  function isWritingArtifact(node) {
+    const rep = node && codeRepOf(node);
+    return !!rep && rep.data.kind === 'text' && rep.data.from === 'writing';
+  }
 
   /** A cheap content hash, so a re-render happens exactly when the code changes. */
   function hashOf(str) {
@@ -430,6 +436,8 @@
       f.wrap.style.height = fr.h + 'px';
       f.wrap.classList.toggle('broken', !!runtimeBroken(id));
       f.wrap.classList.toggle('playing', !!(s.clocks[id] && s.clocks[id].playing));
+      f.wrap.classList.toggle('writing', isWritingArtifact(node));
+      f.wrap.classList.toggle('flipped', flipped.has(id));
 
       // What renders is the WIRED code when a frame feeds this member.
       const wired = wiredCodeOf(s, id);
@@ -992,6 +1000,7 @@
   // about — not only in a pane the hand may have closed. A call that ends,
   // succeeds or fails, leaves the list.
   const working = new Map(); // key -> { ids, label, since }
+  const workControllers = new Map(); // key -> AbortController, for a call the hand can stop
   let workingPulse = 0;
   function beginWork(key, ids, label) {
     working.set(key, { ids: (ids || []).slice(), label: label, since: performance.now() });
@@ -1001,6 +1010,7 @@
   }
   function endWork(key) {
     working.delete(key);
+    workControllers.delete(key);
     render(session.getState());
   }
   /** Run a model call with the thinking shown; the promise is passed through untouched. */
@@ -1008,8 +1018,28 @@
     beginWork(key, ids, label);
     return promise.finally(() => endWork(key));
   }
+  /** A signal for a call registered under this key, so Esc can stop it. */
+  function workSignal(key) {
+    const ctl = new AbortController();
+    workControllers.set(key, ctl);
+    return ctl.signal;
+  }
+  /** How long a call has been running, said after a few seconds — a model that takes a minute is not a hang. */
+  function workingLabel(w) {
+    const secs = Math.round((performance.now() - w.since) / 1000);
+    return w.label + (secs >= 3 ? ' · ' + secs + ' s' : '') + (secs >= 30 ? ' · Esc stops it' : '');
+  }
   function workingSummary() {
-    return [...working.values()].map((w) => w.label).join(' · ');
+    return [...working.values()].map(workingLabel).join(' · ');
+  }
+  /** Stop every model call in flight: the hand's Esc. Nothing that landed is undone. */
+  function cancelWork() {
+    let n = 0;
+    for (const ctl of workControllers.values()) { ctl.abort(); n++; }
+    workControllers.clear();
+    if (reading) { cancelReading('stopped'); n++; }
+    if (n) say('stopped ' + n + ' model call' + (n === 1 ? '' : 's'));
+    return n;
   }
 
   function offerModel(why) {
@@ -1276,6 +1306,19 @@
   // and ranked, never blessed (v7 Stage E). A model that cannot see is never
   // asked; with none present the mark simply stays "text".
   const seeing = () => agents.filter((a) => a.config.vision);
+  /**
+   * Who READS: the smallest model that can see, not every one. Reading a word
+   * is a small job, and a 27B model takes minutes at it while a 0.8B answers
+   * in seconds; a dedicated handwriting model is the next step (v10 F11).
+   * The size is read from the model's name (0.8b, 8b, 27b); with none to
+   * read, the first that sees.
+   */
+  function readers() {
+    const sees = seeing();
+    if (sees.length <= 1) return sees;
+    const size = (a) => { const m = /(\d+(?:\.\d+)?)\s*b\b/i.exec(a.config.model || ''); return m ? parseFloat(m[1]) : Infinity; };
+    return [sees.slice().sort((a, b) => size(a) - size(b))[0]];
+  }
   // Reading as you write is a preference, off by default: a model is asked
   // when you say *read* (§6.3). On, every mark that reads as writing is handed
   // to the models that can see as it lands.
@@ -1326,14 +1369,14 @@
   }
 
   function readOne(node, force) {
-    const readers = seeing();
-    if (!readers.length) return false;
+    const who = readers();
+    if (!who.length) return false;
     const key = node.id;
     if (!force && askedToRead.has(key)) return false;
     askedToRead.add(key);
     const image = inkImage(node);
     if (!image) return false;
-    readers.forEach((agent) => {
+    who.forEach((agent) => {
       withWork('write:' + agent.id + ':' + node.id, [node.id], agent.name + ' · reading the writing', agent.read({ nodeId: node.id, image: image, at: Date.now() })).then((res) => {
         say(res.ok
           ? agent.name + ' read “' + res.transcripts[0].text + '”' + (res.transcripts.length > 1 ? ' (or ' + res.transcripts.slice(1).map((t) => '“' + t.text + '”').join(', ') + ')' : '')
@@ -1353,8 +1396,8 @@
    * the whole line is held on the first mark and the rest were read with it.
    */
   function readLine(ids, force) {
-    const readers = seeing();
-    if (!readers.length) return false;
+    const who = readers();
+    if (!who.length) return false;
     const s = session.getState();
     const nodes = ids.map((id) => s.nodes.get(id)).filter(Boolean);
     if (nodes.length < 2) return nodes.length === 1 ? readOne(nodes[0], force) : false;
@@ -1364,7 +1407,7 @@
     const image = inkImageOf(nodes.flatMap(runsOf));
     if (!image) return false;
     const first = nodes[0];
-    readers.forEach((agent) => {
+    who.forEach((agent) => {
       withWork('write:' + agent.id + ':' + first.id, ids, agent.name + ' · reading the line', agent.read({ nodeId: first.id, image: image, at: Date.now(), hold: false })).then((res) => {
         if (res.ok) {
           const top = res.transcripts[0];
@@ -1593,8 +1636,10 @@
         if (inside) { render(session.getState()); return; }
       }
       lastTap = { x: e.clientX, y: e.clientY, t: now };
+      // One tap on the ground lets go of everything — the field and the
+      // selection — so the next stroke draws rather than moves (v10 F9).
       if (s0.summon) session.dismiss(s0.summon.id, now);
-      else if (s0.selection.length) session.deselect(now);
+      if (s0.selection.length) session.deselect(now);
       render(session.getState());
       return;
     }
@@ -1685,6 +1730,8 @@
     // Copy holds the selection's ink (and puts it on the clipboard as SVG); paste is handled with files, in the images fragment.
     if ((e.ctrlKey || e.metaKey) && e.key === 'c' && e.target === document.body && state.selection.length) { e.preventDefault(); copyMarks(state.selection.slice()); }
     if (e.target === document.body && e.key === 'Escape' && state.selection.length && !state.summon) session.deselect(Date.now());
+    // Esc with nothing held stops every model call in flight: a slow model is not a hang, and the hand can say enough.
+    else if (e.target === document.body && e.key === 'Escape' && !state.selection.length && !state.summon) cancelWork();
     if (e.target === document.body && (e.key === 'Backspace' || e.key === 'Delete') && state.selection.length) {
       e.preventDefault();
       const ids = state.selection.slice();
@@ -1901,6 +1948,8 @@
       }
       return;
     }
+    // Text made from writing stands in place of the ink: the writing shows only when flipped over (v10 F8).
+    if (isWritingArtifact(node) && !flipped.has(node.id)) return;
     for (const e of node.edges) { // artifact: draw its members (transparent within)
       if (e.rel !== 'has-part') continue;
       const m = state.nodes.get(e.to);
@@ -2324,14 +2373,18 @@
     const lineSaid = lineIds.map((id) => MM.transcriptsOf(s.nodes.get(id))[0]);
     const lineRead = lineIds.length >= 2 && lineSaid.every((t) => t && t.text);
     const lineText = lineRead ? lineSaid.map((t) => t.text).join(' ') : '';
+    // Writing alone, taken, becomes TEXT where it is — fitted to the ink, the
+    // ink underneath, editable — never a definition (v10 F8). Writing beside
+    // a shape names the shape, as before.
+    const allWriting = marks.length > 0 && marks.every((id) => { const n = s.nodes.get(id); return n && (isWriting(n) || MM.isWord(n)); });
     if (lineRead) {
       const conf = Math.min(...lineSaid.map((t) => t.confidence));
       items.push({
         key: 'line:' + lineIds.join(','), certain: true, group: 'written', groupConf: conf,
         groupWhy: 'read from your handwriting by ' + nameOfParticipant(lineSaid[0].source),
         label: '“' + lineText + '” ' + conf.toFixed(2), name: lineText,
-        why: 'the line you wrote — take it as the name', tier: 1,
-        run: () => session.bless({ summonId: sum.id, name: lineText, at: Date.now() }),
+        why: allWriting ? 'the line you wrote — take it as text, here; the ink stays underneath' : 'the line you wrote — take it as the name', tier: 1,
+        run: () => { if (allWriting) writingToText(sum, lineText); else session.bless({ summonId: sum.id, name: lineText, at: Date.now() }); },
       });
     }
     // What the writing says: write a word beside a shape and it is the shape's name.
@@ -2343,8 +2396,8 @@
           key: 'said:' + r.id, certain: true, group: 'written', groupConf: t.confidence,
           groupWhy: 'read from your handwriting by ' + nameOfParticipant(t.source),
           label: '“' + t.text + '” ' + t.confidence.toFixed(2), name: t.text,
-          why: (r.targets.length ? 'the word beside it' : 'the word you wrote') + ' — take it as the name', tier: 1,
-          run: () => session.bless({ summonId: sum.id, name: t.text, at: Date.now() }),
+          why: r.targets.length ? 'the word beside it — take it as the name' : allWriting ? 'the word you wrote — take it as text, here; the ink stays underneath' : 'the word you wrote — take it as the name', tier: 1,
+          run: () => { if (allWriting && !r.targets.length) writingToText(sum, t.text); else session.bless({ summonId: sum.id, name: t.text, at: Date.now() }); },
         });
       }
     }
@@ -2419,8 +2472,8 @@
     if (lineRead) {
       items.push({
         key: 'line-text:' + lineIds.join(','), group: 'always', groupConf: 0, groupWhy: '', verbs: ['text'],
-        label: 'Make it text “' + lineText + '”', why: 'a file of words where the line is; the ink stays', tier: 1,
-        run: () => { session.dismiss(sum.id, Date.now()); lineToText(lineIds, lineText); },
+        label: 'Make it text “' + lineText + '”', why: allWriting ? 'text where the line is, fitted to the ink; flip it to see the writing' : 'a file of words where the line is; the ink stays', tier: 1,
+        run: () => { if (allWriting) writingToText(sum, lineText); else { session.dismiss(sum.id, Date.now()); lineToText(lineIds, lineText); } },
       });
     }
     for (const lid of sum.enclosedIds) {
@@ -2468,10 +2521,29 @@
     }
     // A definition in the loop: what it has been offered to do, what the words
     // beside it say it does, and its clock.
+    // A text artifact is edited, and one made from writing can be flipped to the ink (v10 F8).
+    for (const aid of sum.enclosedIds.filter((id) => s.artifacts.includes(id))) {
+      const an = s.nodes.get(aid);
+      const arep = an && codeRepOf(an);
+      if (!arep || arep.data.kind !== 'text') continue;
+      items.push({
+        key: 'edit-text:' + aid, group: 'always', groupConf: 0, groupWhy: '', verbs: ['edit', 'edit the text', 'retype'],
+        label: 'Edit the text', why: 'a new version of the words; every version kept', tier: 1,
+        run: () => { session.dismiss(sum.id, Date.now()); session.deselect(Date.now()); beginTextEdit(aid); },
+      });
+      if (arep.data.from === 'writing') items.push({
+        key: 'flip:' + aid, group: 'always', groupConf: 0, groupWhy: '', verbs: ['flip', 'ink', 'show the ink', 'show the text'],
+        label: flipped.has(aid) ? 'Show the text' : 'Show the ink', why: flipped.has(aid) ? 'the text in front again' : 'flip it over: the writing it came from', tier: 1,
+        run: () => { if (flipped.has(aid)) flipped.delete(aid); else flipped.add(aid); render(session.getState()); refreshPalette(); },
+      });
+    }
     const defs = [...new Set(sum.enclosedIds.filter((id) => s.artifacts.includes(id)).map((id) => definitionOf(s, id)))];
     for (const defId of defs) {
       const dn = s.nodes.get(defId);
       const name = MM.wordOf(dn) || defId;
+      // Only what can play plays: a drawing's tank, or a program. A page, a text, a picture has no clock to offer.
+      const drep = codeRepOf(dn);
+      if (drep && drep.data.kind !== 'run' && drep.data.kind !== 'js') continue;
       MM.behavioursOf(dn).forEach((r, i) => {
         if (r.data.blessed) return;
         items.push({
@@ -3054,6 +3126,31 @@
     return { target: page ? 'page' : 'program', brief: brief, fresh: false };
   }
 
+  /**
+   * Writing, taken: the group becomes a text artifact where the writing is —
+   * the words fitted to the ink's width, the ink held underneath (flip to see
+   * it), editable — and never a definition (v10 F8). The selection ends with
+   * the act, so the next stroke draws.
+   */
+  function writingToText(sum, text) {
+    const at = Date.now();
+    const id = session.bless({ summonId: sum.id, name: text, at: at });
+    if (!id) { say('could not hold the writing'); return null; }
+    session.attachCode({ participantId: MM.LOCAL_PARTICIPANT, nodeId: id, kind: 'text', code: text, from: 'writing', at: at + 1 });
+    session.deselect(at + 2);
+    say('“' + text + '” — text now, the writing underneath; flip it to see the ink, double-click it to edit');
+    return id;
+  }
+
+  /** A brief that failed leaves no artifact named after it: the bless is undone when nothing has happened since. */
+  function dropFailedBless(artifactId) {
+    const evs = session.getEvents();
+    const last = evs[evs.length - 1];
+    const s = session.getState();
+    if (last && last.type === 'bless' && s.artifacts[s.artifacts.length - 1] === artifactId) { session.undo(); return true; }
+    return false;
+  }
+
   // ===== The prompts: what a model is asked, and only when asked =============
   function runPrompt(sum, prompt, revising) {
     const at = Date.now();
@@ -3097,8 +3194,9 @@
     cancelReading();
     const aboutIds = session.getState().nodes.get(artifactId) ? [artifactId] : sum.enclosedIds;
     agents.forEach((agent) => {
-      withWork('build:' + agent.id + ':' + artifactId, aboutIds, agent.name + (revising ? ' · changing “' : ' · building “') + brief.slice(0, 32) + (brief.length > 32 ? '…' : '') + '”',
-        agent.generate({ prompt: brief, artifactId: artifactId, at: Date.now(), addressed: addressed }))
+      const key = 'build:' + agent.id + ':' + artifactId;
+      withWork(key, aboutIds, agent.name + (revising ? ' · changing “' : ' · building “') + brief.slice(0, 32) + (brief.length > 32 ? '…' : '') + '”',
+        agent.generate({ prompt: brief, artifactId: artifactId, at: Date.now(), addressed: addressed, signal: workSignal(key) }))
         .then((res) => {
           if (res.ok) {
             const short = res.unfilled && res.unfilled.length ? ' — left ' + res.unfilled.join(', ') + ' empty' : '';
@@ -3122,8 +3220,9 @@
     cancelReading();
     const library = libraryEntries(session.getState()).map((e) => ({ id: e.id, name: e.name }));
     agents.forEach((agent) => {
-      withWork('program:' + agent.id + ':' + artifactId, [artifactId], agent.name + ' · writing “' + brief.slice(0, 32) + (brief.length > 32 ? '…' : '') + '”',
-        agent.program({ prompt: brief, artifactId: artifactId, library: library, at: Date.now() }))
+      const key = 'program:' + agent.id + ':' + artifactId;
+      withWork(key, [artifactId], agent.name + ' · writing “' + brief.slice(0, 32) + (brief.length > 32 ? '…' : '') + '”',
+        agent.program({ prompt: brief, artifactId: artifactId, library: library, at: Date.now(), signal: workSignal(key) }))
         .then((res) => {
           if (res.ok && res.reuse) {
             const entry = libraryEntries(session.getState()).find((e) => e.name.toLowerCase() === res.reuse.toLowerCase());
@@ -3135,7 +3234,8 @@
             session.clock({ nodeId: artifactId, op: 'play', at: Date.now() });
             say(agent.name + ' wrote ' + (res.name || 'a program') + (res.parts && res.parts.length ? ' — parts: ' + res.parts.join(', ') : ''));
           } else {
-            say(agent.name + ' could not write it (' + res.error + ') — the drawing is untouched');
+            const dropped = dropFailedBless(artifactId);
+            say(agent.name + ' could not write it (' + res.error + ')' + (dropped ? ' — nothing was made; the drawing is as it was' : ' — the drawing is untouched'));
             if (res.raw) window.__mm.lastRaw = res.raw;
           }
           render(session.getState());
@@ -3875,11 +3975,36 @@
     win.postMessage({ mmPointer: true, type: type, x: w.x - hit.x, y: w.y - hit.y, button: e.button || 0, pointerType: e.pointerType || 'mouse', shiftKey: !!e.shiftKey, altKey: !!e.altKey, ctrlKey: !!e.ctrlKey, metaKey: !!e.metaKey }, '*');
   }
 
+  /**
+   * Writing taken as text: the words where the writing was, fitted to the
+   * ink's width and height (v10 F8). SVG text with `textLength` fits with no
+   * script; the ground is clear so the text stands on the canvas like ink,
+   * in the ink's colour; one region, `text`, so ink over it addresses it.
+   */
+  function writingDocument(code, w, h) {
+    const lines = String(code).split(/\r?\n/).filter((l) => l.length);
+    if (!lines.length) lines.push('');
+    const W = Math.max(1, Math.round(w)), H = Math.max(1, Math.round(h));
+    const lineH = H / lines.length;
+    const longest = Math.max(1, ...lines.map((l) => l.length));
+    const fs = Math.max(6, Math.min(lineH * 0.78, W / (longest * 0.62)));
+    const svgText = lines.map((l, i) => {
+      const y = lineH * i + lineH * 0.72;
+      const fit = lines.length === 1 ? ' textLength="' + W + '" lengthAdjust="spacing"' : '';
+      return '<text data-region="' + (lines.length === 1 ? 'text' : 'line' + (i + 1)) + '" x="0" y="' + y.toFixed(1) + '" font-size="' + fs.toFixed(1) + '"' + fit + '>' + esc(l) + '</text>';
+    }).join('');
+    return '<!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0;padding:0;background:transparent;overflow:hidden;}' +
+      'svg{display:block;}text{font-family:"IBM Plex Mono",ui-monospace,Menlo,monospace;fill:' + (C ? C.ink : '#e8e4d9') + ';}' +
+      'html.mm-reveal text{outline:1px dashed rgba(138,109,31,0.6);}</style></head>' +
+      '<body><div id="mmroot" style="width:' + W + 'px;height:' + H + 'px"><svg xmlns="http://www.w3.org/2000/svg" width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '">' + svgText + '</svg></div></body></html>';
+  }
+
   /** The document an artifact's newest code rep renders as, by its kind. */
   function documentForKind(rep, w, h, ctx) {
     const kind = rep.data.kind || 'html';
     const code = rep.data.code;
     if (kind === 'html') return documentFor(code, w, h);
+    if (kind === 'text' && rep.data.from === 'writing') return writingDocument(code, w, h);
     if (kind === 'run') {
       // Playing, the program runs in its clear frame; standing, its source shows, addressable like any script.
       if (ctx && ctx.playing) return runDocument(ctx.id, code, w, h);
@@ -5433,7 +5558,9 @@
   // a dot is drawn, not tapped, and a tap is the dead state.
   canvas.addEventListener('dblclick', (e) => {
     const w = screenToWorld(e.clientX, e.clientY);
-    if (nodeAt(w.x, w.y)) return;
+    const under = nodeAt(w.x, w.y);
+    // A double-click on a text — typed, or writing taken as text — edits it in place.
+    if (under) { if (beginTextEdit(under)) { const s0 = session.getState(); if (s0.summon) session.dismiss(s0.summon.id, Date.now()); if (s0.selection.length) session.deselect(Date.now()); } return; }
     beginTextEdit(null, w);
   });
 

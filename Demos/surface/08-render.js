@@ -136,6 +136,8 @@
       }
       return;
     }
+    // Text made from writing stands in place of the ink: the writing shows only when flipped over (v10 F8).
+    if (isWritingArtifact(node) && !flipped.has(node.id)) return;
     for (const e of node.edges) { // artifact: draw its members (transparent within)
       if (e.rel !== 'has-part') continue;
       const m = state.nodes.get(e.to);

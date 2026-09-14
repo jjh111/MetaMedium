@@ -192,8 +192,10 @@
         if (inside) { render(session.getState()); return; }
       }
       lastTap = { x: e.clientX, y: e.clientY, t: now };
+      // One tap on the ground lets go of everything — the field and the
+      // selection — so the next stroke draws rather than moves (v10 F9).
       if (s0.summon) session.dismiss(s0.summon.id, now);
-      else if (s0.selection.length) session.deselect(now);
+      if (s0.selection.length) session.deselect(now);
       render(session.getState());
       return;
     }
@@ -284,6 +286,8 @@
     // Copy holds the selection's ink (and puts it on the clipboard as SVG); paste is handled with files, in the images fragment.
     if ((e.ctrlKey || e.metaKey) && e.key === 'c' && e.target === document.body && state.selection.length) { e.preventDefault(); copyMarks(state.selection.slice()); }
     if (e.target === document.body && e.key === 'Escape' && state.selection.length && !state.summon) session.deselect(Date.now());
+    // Esc with nothing held stops every model call in flight: a slow model is not a hang, and the hand can say enough.
+    else if (e.target === document.body && e.key === 'Escape' && !state.selection.length && !state.summon) cancelWork();
     if (e.target === document.body && (e.key === 'Backspace' || e.key === 'Delete') && state.selection.length) {
       e.preventDefault();
       const ids = state.selection.slice();

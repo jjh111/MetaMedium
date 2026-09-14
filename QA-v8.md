@@ -336,6 +336,16 @@ control centre opens this file.
    and a tap on the chip opens the field on the bubbles again.
 7. Draw far apart, zoom in: the minimap at the bottom right shows the whole
    board and where you are; tap the far mark on it and the view goes there.
+8. Read *hello world* and take **“hello world” 0.9x**: the writing is
+   replaced by clean text in its place, fitted to the ink, nothing selected.
+   Draw a box right under it: it is a box, not a move. Circle the text:
+   *Edit the text* and *Show the ink* are offered, *Play* is not; flip it and
+   the writing is back. Double-click the text: the editor opens on it. Write
+   *hello world* again elsewhere: no chip calls it another “hello world”.
+9. Type a brief a tiny model cannot answer (*draw a svg of a flower* with a
+   0.8B): the dot shows its seconds; after thirty it says *Esc stops it*;
+   Esc stops it, and when it fails the loop is as it was — no artifact named
+   after the brief.
 
 ## 13. Installable
 

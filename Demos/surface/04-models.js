@@ -226,6 +226,7 @@
   // about — not only in a pane the hand may have closed. A call that ends,
   // succeeds or fails, leaves the list.
   const working = new Map(); // key -> { ids, label, since }
+  const workControllers = new Map(); // key -> AbortController, for a call the hand can stop
   let workingPulse = 0;
   function beginWork(key, ids, label) {
     working.set(key, { ids: (ids || []).slice(), label: label, since: performance.now() });
@@ -235,6 +236,7 @@
   }
   function endWork(key) {
     working.delete(key);
+    workControllers.delete(key);
     render(session.getState());
   }
   /** Run a model call with the thinking shown; the promise is passed through untouched. */
@@ -242,8 +244,28 @@
     beginWork(key, ids, label);
     return promise.finally(() => endWork(key));
   }
+  /** A signal for a call registered under this key, so Esc can stop it. */
+  function workSignal(key) {
+    const ctl = new AbortController();
+    workControllers.set(key, ctl);
+    return ctl.signal;
+  }
+  /** How long a call has been running, said after a few seconds — a model that takes a minute is not a hang. */
+  function workingLabel(w) {
+    const secs = Math.round((performance.now() - w.since) / 1000);
+    return w.label + (secs >= 3 ? ' · ' + secs + ' s' : '') + (secs >= 30 ? ' · Esc stops it' : '');
+  }
   function workingSummary() {
-    return [...working.values()].map((w) => w.label).join(' · ');
+    return [...working.values()].map(workingLabel).join(' · ');
+  }
+  /** Stop every model call in flight: the hand's Esc. Nothing that landed is undone. */
+  function cancelWork() {
+    let n = 0;
+    for (const ctl of workControllers.values()) { ctl.abort(); n++; }
+    workControllers.clear();
+    if (reading) { cancelReading('stopped'); n++; }
+    if (n) say('stopped ' + n + ' model call' + (n === 1 ? '' : 's'));
+    return n;
   }
 
   function offerModel(why) {

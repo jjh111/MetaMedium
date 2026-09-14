@@ -54,3 +54,21 @@ describe('a hand in a room', () => {
     expect(answer.edges.some((e) => e.rel === 'made-by' && e.to === LOCAL_PARTICIPANT)).toBe(true);
   });
 });
+
+// Writing taken as text is a transcription, not vocabulary (v10 F8).
+describe('writing as text', () => {
+  it('a blessed group carrying text code is never offered as a match for other writing', () => {
+    const s = createSession();
+    const a = s.addStroke(box(0, 0, 40, 60), 1000);
+    const b = s.addStroke(box(60, 0, 40, 60), 1100);
+    s.addStroke(box(-30, -30, 160, 120), 1200);
+    const sum = s.summonHeld(1300)!;
+    const id = s.bless({ summonId: sum, name: 'hello world', at: 1400 })!;
+    s.attachCode({ participantId: LOCAL_PARTICIPANT, nodeId: id, kind: 'text', code: 'hello world', from: 'writing', at: 1500 });
+    void a; void b;
+    // Another pair of boxes like the first: no chip, because a text is not a definition.
+    s.addStroke(box(300, 0, 40, 60), 2000);
+    s.addStroke(box(360, 0, 40, 60), 2100);
+    expect(s.getState().clusterCandidates).toHaveLength(0);
+  });
+});

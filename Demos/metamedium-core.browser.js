@@ -4976,6 +4976,8 @@ ${pad}</${tag}>`;
       const out = [];
       for (const aid of artifacts) {
         const a = nodes.get(aid);
+        const code = [...a.reps].reverse().find((r) => r.modality === "code")?.data;
+        if (code?.kind === "text") continue;
         const aSig = getRep(a, "signature")?.data;
         if (!aSig) continue;
         const examples = getRep(a, "examples")?.data;
@@ -5116,6 +5118,7 @@ ${pad}</${tag}>`;
       const engaged = candidates.filter((m) => {
         if (m.points && strokesIntersect(points, m.points)) return true;
         if (m.points && !m.closed) return false;
+        if (!m.points) return boundsOverlap(fp.bounds, m.bounds);
         if (boundsOverlap(fp.bounds, m.bounds)) return true;
         const size = Math.max(1, m.bounds.maxX - m.bounds.minX, m.bounds.maxY - m.bounds.minY);
         return boundingBoxDistance(fp.bounds, m.bounds) < size * config.gesture.checkProximityRatio;

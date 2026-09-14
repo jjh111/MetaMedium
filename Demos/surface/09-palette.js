@@ -68,14 +68,18 @@
     const lineSaid = lineIds.map((id) => MM.transcriptsOf(s.nodes.get(id))[0]);
     const lineRead = lineIds.length >= 2 && lineSaid.every((t) => t && t.text);
     const lineText = lineRead ? lineSaid.map((t) => t.text).join(' ') : '';
+    // Writing alone, taken, becomes TEXT where it is — fitted to the ink, the
+    // ink underneath, editable — never a definition (v10 F8). Writing beside
+    // a shape names the shape, as before.
+    const allWriting = marks.length > 0 && marks.every((id) => { const n = s.nodes.get(id); return n && (isWriting(n) || MM.isWord(n)); });
     if (lineRead) {
       const conf = Math.min(...lineSaid.map((t) => t.confidence));
       items.push({
         key: 'line:' + lineIds.join(','), certain: true, group: 'written', groupConf: conf,
         groupWhy: 'read from your handwriting by ' + nameOfParticipant(lineSaid[0].source),
         label: '“' + lineText + '” ' + conf.toFixed(2), name: lineText,
-        why: 'the line you wrote — take it as the name', tier: 1,
-        run: () => session.bless({ summonId: sum.id, name: lineText, at: Date.now() }),
+        why: allWriting ? 'the line you wrote — take it as text, here; the ink stays underneath' : 'the line you wrote — take it as the name', tier: 1,
+        run: () => { if (allWriting) writingToText(sum, lineText); else session.bless({ summonId: sum.id, name: lineText, at: Date.now() }); },
       });
     }
     // What the writing says: write a word beside a shape and it is the shape's name.
@@ -87,8 +91,8 @@
           key: 'said:' + r.id, certain: true, group: 'written', groupConf: t.confidence,
           groupWhy: 'read from your handwriting by ' + nameOfParticipant(t.source),
           label: '“' + t.text + '” ' + t.confidence.toFixed(2), name: t.text,
-          why: (r.targets.length ? 'the word beside it' : 'the word you wrote') + ' — take it as the name', tier: 1,
-          run: () => session.bless({ summonId: sum.id, name: t.text, at: Date.now() }),
+          why: r.targets.length ? 'the word beside it — take it as the name' : allWriting ? 'the word you wrote — take it as text, here; the ink stays underneath' : 'the word you wrote — take it as the name', tier: 1,
+          run: () => { if (allWriting && !r.targets.length) writingToText(sum, t.text); else session.bless({ summonId: sum.id, name: t.text, at: Date.now() }); },
         });
       }
     }
@@ -163,8 +167,8 @@
     if (lineRead) {
       items.push({
         key: 'line-text:' + lineIds.join(','), group: 'always', groupConf: 0, groupWhy: '', verbs: ['text'],
-        label: 'Make it text “' + lineText + '”', why: 'a file of words where the line is; the ink stays', tier: 1,
-        run: () => { session.dismiss(sum.id, Date.now()); lineToText(lineIds, lineText); },
+        label: 'Make it text “' + lineText + '”', why: allWriting ? 'text where the line is, fitted to the ink; flip it to see the writing' : 'a file of words where the line is; the ink stays', tier: 1,
+        run: () => { if (allWriting) writingToText(sum, lineText); else { session.dismiss(sum.id, Date.now()); lineToText(lineIds, lineText); } },
       });
     }
     for (const lid of sum.enclosedIds) {
@@ -212,10 +216,29 @@
     }
     // A definition in the loop: what it has been offered to do, what the words
     // beside it say it does, and its clock.
+    // A text artifact is edited, and one made from writing can be flipped to the ink (v10 F8).
+    for (const aid of sum.enclosedIds.filter((id) => s.artifacts.includes(id))) {
+      const an = s.nodes.get(aid);
+      const arep = an && codeRepOf(an);
+      if (!arep || arep.data.kind !== 'text') continue;
+      items.push({
+        key: 'edit-text:' + aid, group: 'always', groupConf: 0, groupWhy: '', verbs: ['edit', 'edit the text', 'retype'],
+        label: 'Edit the text', why: 'a new version of the words; every version kept', tier: 1,
+        run: () => { session.dismiss(sum.id, Date.now()); session.deselect(Date.now()); beginTextEdit(aid); },
+      });
+      if (arep.data.from === 'writing') items.push({
+        key: 'flip:' + aid, group: 'always', groupConf: 0, groupWhy: '', verbs: ['flip', 'ink', 'show the ink', 'show the text'],
+        label: flipped.has(aid) ? 'Show the text' : 'Show the ink', why: flipped.has(aid) ? 'the text in front again' : 'flip it over: the writing it came from', tier: 1,
+        run: () => { if (flipped.has(aid)) flipped.delete(aid); else flipped.add(aid); render(session.getState()); refreshPalette(); },
+      });
+    }
     const defs = [...new Set(sum.enclosedIds.filter((id) => s.artifacts.includes(id)).map((id) => definitionOf(s, id)))];
     for (const defId of defs) {
       const dn = s.nodes.get(defId);
       const name = MM.wordOf(dn) || defId;
+      // Only what can play plays: a drawing's tank, or a program. A page, a text, a picture has no clock to offer.
+      const drep = codeRepOf(dn);
+      if (drep && drep.data.kind !== 'run' && drep.data.kind !== 'js') continue;
       MM.behavioursOf(dn).forEach((r, i) => {
         if (r.data.blessed) return;
         items.push({
@@ -798,6 +821,31 @@
     return { target: page ? 'page' : 'program', brief: brief, fresh: false };
   }
 
+  /**
+   * Writing, taken: the group becomes a text artifact where the writing is —
+   * the words fitted to the ink's width, the ink held underneath (flip to see
+   * it), editable — and never a definition (v10 F8). The selection ends with
+   * the act, so the next stroke draws.
+   */
+  function writingToText(sum, text) {
+    const at = Date.now();
+    const id = session.bless({ summonId: sum.id, name: text, at: at });
+    if (!id) { say('could not hold the writing'); return null; }
+    session.attachCode({ participantId: MM.LOCAL_PARTICIPANT, nodeId: id, kind: 'text', code: text, from: 'writing', at: at + 1 });
+    session.deselect(at + 2);
+    say('“' + text + '” — text now, the writing underneath; flip it to see the ink, double-click it to edit');
+    return id;
+  }
+
+  /** A brief that failed leaves no artifact named after it: the bless is undone when nothing has happened since. */
+  function dropFailedBless(artifactId) {
+    const evs = session.getEvents();
+    const last = evs[evs.length - 1];
+    const s = session.getState();
+    if (last && last.type === 'bless' && s.artifacts[s.artifacts.length - 1] === artifactId) { session.undo(); return true; }
+    return false;
+  }
+
   // ===== The prompts: what a model is asked, and only when asked =============
   function runPrompt(sum, prompt, revising) {
     const at = Date.now();
@@ -841,8 +889,9 @@
     cancelReading();
     const aboutIds = session.getState().nodes.get(artifactId) ? [artifactId] : sum.enclosedIds;
     agents.forEach((agent) => {
-      withWork('build:' + agent.id + ':' + artifactId, aboutIds, agent.name + (revising ? ' · changing “' : ' · building “') + brief.slice(0, 32) + (brief.length > 32 ? '…' : '') + '”',
-        agent.generate({ prompt: brief, artifactId: artifactId, at: Date.now(), addressed: addressed }))
+      const key = 'build:' + agent.id + ':' + artifactId;
+      withWork(key, aboutIds, agent.name + (revising ? ' · changing “' : ' · building “') + brief.slice(0, 32) + (brief.length > 32 ? '…' : '') + '”',
+        agent.generate({ prompt: brief, artifactId: artifactId, at: Date.now(), addressed: addressed, signal: workSignal(key) }))
         .then((res) => {
           if (res.ok) {
             const short = res.unfilled && res.unfilled.length ? ' — left ' + res.unfilled.join(', ') + ' empty' : '';
@@ -866,8 +915,9 @@
     cancelReading();
     const library = libraryEntries(session.getState()).map((e) => ({ id: e.id, name: e.name }));
     agents.forEach((agent) => {
-      withWork('program:' + agent.id + ':' + artifactId, [artifactId], agent.name + ' · writing “' + brief.slice(0, 32) + (brief.length > 32 ? '…' : '') + '”',
-        agent.program({ prompt: brief, artifactId: artifactId, library: library, at: Date.now() }))
+      const key = 'program:' + agent.id + ':' + artifactId;
+      withWork(key, [artifactId], agent.name + ' · writing “' + brief.slice(0, 32) + (brief.length > 32 ? '…' : '') + '”',
+        agent.program({ prompt: brief, artifactId: artifactId, library: library, at: Date.now(), signal: workSignal(key) }))
         .then((res) => {
           if (res.ok && res.reuse) {
             const entry = libraryEntries(session.getState()).find((e) => e.name.toLowerCase() === res.reuse.toLowerCase());
@@ -879,7 +929,8 @@
             session.clock({ nodeId: artifactId, op: 'play', at: Date.now() });
             say(agent.name + ' wrote ' + (res.name || 'a program') + (res.parts && res.parts.length ? ' — parts: ' + res.parts.join(', ') : ''));
           } else {
-            say(agent.name + ' could not write it (' + res.error + ') — the drawing is untouched');
+            const dropped = dropFailedBless(artifactId);
+            say(agent.name + ' could not write it (' + res.error + ')' + (dropped ? ' — nothing was made; the drawing is as it was' : ' — the drawing is untouched'));
             if (res.raw) window.__mm.lastRaw = res.raw;
           }
           render(session.getState());

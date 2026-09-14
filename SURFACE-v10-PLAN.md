@@ -79,6 +79,37 @@ Six foundations, in the order they block the flow:
 - **F7 A minimap.** The whole board in a corner, with the viewport on it;
   a tap or a drag there pans.
 
+Four more from the second round the same evening (John read *hello world*
+with a 0.8B model, took it, drew a box, asked for a flower):
+
+- **F8 Taking a transcript makes text, not vocabulary.** *"When I take the
+  name of writing it should not become a library entry alone."* Writing
+  alone, taken, becomes a text artifact where the writing is: the words
+  fitted to the ink's width and height (SVG text, no script), on a clear
+  ground in the ink's colour, holding the words as its parts so the ink is
+  underneath — *Show the ink* flips it over — editable by double-click or
+  *Edit the text*, and **never a definition**: a text is skipped by the
+  matcher, so more writing is not offered as "another hello world". Writing
+  beside a shape still names the shape. *Play* is offered only for what
+  plays (a drawing's tank, a program), never for a text or a page.
+- **F9 One tap lets go.** After an act the selection lingered, and the next
+  stroke inside it moved the thing instead of drawing. Taking writing as
+  text ends the selection; a tap on the ground lets go of the field and
+  the selection together. And an artifact is engaged by a mark ON it,
+  never one beside it: its frame is large, and "close relative to its
+  size" reached across the board.
+- **F10 A brief that fails leaves nothing behind.** *draw a svg of a flower*
+  with a 0.8B model blessed the loop, asked, failed, and left a definition
+  named after the brief. The bless is undone when nothing has happened
+  since, and the status says so. A model at work shows its elapsed time
+  after a few seconds, and after thirty says *Esc stops it*; Esc with
+  nothing held stops every call in flight.
+- **F11 Reading is a small job for a small model.** Reading asks the
+  smallest model that can see (by the size in its name), not every one; a
+  27B model takes minutes at a word a 0.8B reads in seconds. The real
+  answer is a dedicated handwriting model in the browser — a package for
+  another day, noted in §6.
+
 These come before T7 and T8. Everything below stands as written.
 
 ## 1. Decisions
@@ -260,6 +291,14 @@ environment (`MM_ROOM`, `MM_RELAY`, `MM_NAME`; defaults `claude`,
 - **Where questions go when ignored.** Held on the explanation plane until
   the next stroke on the same marks, or forever? The first cut holds
   them until erased.
+- **A handwriting model of its own.** Reading a word through a chat model
+  that can see works, and a 0.8B one is quick enough, but the right tool
+  is a small handwriting recogniser in the browser (a TrOCR-class model
+  through transformers.js is ~80 MB quantised) joined as a reader that
+  never writes. Worth a package once the text flow (F8) has been used.
+- **`svg:` as a brief's target.** *draw a svg of a flower* is neither a
+  page nor a program; it is an `svg` artifact the model writes as markup.
+  A prefix, a kind, one call — but a 0.8B model will not draw a flower.
 
 ## 7. Where we are
 
@@ -280,3 +319,7 @@ environment (`MM_ROOM`, `MM_RELAY`, `MM_NAME`; defaults `claude`,
 | F5 | The field has every option | ✅ 14 Sep — *Read as writing* on any ink (e2e 33b); typing already matches the direct commands first and falls back to the brief |
 | F6 | A reading anchors on the canvas | ✅ 14 Sep — a chip beside the group when the reading lands, a tap reopens the field on it; e2e 33c–33d |
 | F7 | A minimap | ✅ 14 Sep — `21-minimap.js`; e2e 33e–33f |
+| F8 | Taking a transcript makes text | ✅ 14 Sep — `writingToText`, `writingDocument` (fitted SVG text), flip, edit by double-click, the matcher skips texts, play only for what plays; e2e 34–34d |
+| F9 | One tap lets go | ✅ 14 Sep — the ground tap dismisses and deselects; taking writing deselects; artifacts engage by overlap only; e2e 34e |
+| F10 | A failed brief leaves nothing | ✅ 14 Sep — `dropFailedBless`, elapsed time on the working dot, Esc stops model work (`cancelWork`) |
+| F11 | Reading by a small model | ✅ 14 Sep — `readers()` picks the smallest seeing model. *Open:* a dedicated handwriting model in the browser |

@@ -52,7 +52,7 @@ circle them, cross with a command mark *you taught the system*, prompt them into
 a living page that renders in the canvas with your ink still outlining its
 divs — then draw on that page and the ink addresses the regions underneath it.
 Scratch anything out to erase. `Demos/session-engine.html` is the surface;
-`Demos/session-engine.e2e.js` drives 168 steps through the real UI: page, flowchart, handwriting (read only when asked; a line read as one), the model drawing, the user-side loop, selection and the field, corrections, the worker, the tank, words into verbs and acting out, frames and the drawn slider, the folder, pictures, text, the moment, a live room, a playing frame that takes the pointer, hold by long-press, the graph in 3D, and the foundations (letters at any size, a mark that crosses, readings that stay, the minimap). A run takes about 100 s; run it **in its own tab on its own origin** (`http://127.0.0.1:8010/…?fresh=1&nosw=1` — `__setup` refuses any other URL: it replaces `fetch` with a stub, joins a stub model named `e2e-stub`, and wipes the origin's saved board), start it with `__setup(); __scenario().then(r => window.__R = r)` and read `__R` when it lands.
+`Demos/session-engine.e2e.js` drives 174 steps through the real UI: page, flowchart, handwriting (read only when asked; a line read as one), the model drawing, the user-side loop, selection and the field, corrections, the worker, the tank, words into verbs and acting out, frames and the drawn slider, the folder, pictures, text, the moment, a live room, a playing frame that takes the pointer, hold by long-press, the graph in 3D, and the foundations (letters at any size, a mark that crosses, readings that stay, the minimap). A run takes about 100 s; run it **in its own tab on its own origin** (`http://127.0.0.1:8010/…?fresh=1&nosw=1` — `__setup` refuses any other URL: it replaces `fetch` with a stub, joins a stub model named `e2e-stub`, and wipes the origin's saved board), start it with `__setup(); __scenario().then(r => window.__R = r)` and read `__R` when it lands.
 v7 Stage E (handwriting) shipped 1 Sep 2026: a word written beside a shape is read by a
 model that can see and offered as that shape's name. Whitepaper v5.1 stays parked until the
 conversation benchmark passes end to end.
@@ -715,7 +715,13 @@ doodle session was a stream of calls nobody made.
 registered while it runs (`withWork` in `04-models.js`) and drawn as a
 breathing gold dot with the model's name and its task **above the marks it
 is about**, and in the status line; it leaves when the call ends, however it
-ends. **Typed text at a loop is a brief unless it names a verb**: the reading
+ends. After a few seconds the label carries the elapsed time, after thirty
+it says *Esc stops it*, and **Esc with nothing held stops every call in
+flight** (`cancelWork`; builds and programs carry a signal from
+`workSignal`). **A brief that fails leaves nothing behind** (v10 F10,
+`dropFailedBless`): the loop is blessed before the model is asked so the
+code has somewhere to live, and when the model fails and nothing has
+happened since, that bless is undone and the status says so. **Typed text at a loop is a brief unless it names a verb**: the reading
 line says which before Enter is pressed; "website about dolphins" goes to
 the model as the prompt. With no model joined, the reading line says so and
 Enter opens the pane.
@@ -764,7 +770,19 @@ fingerprint carries it, so the model is asked to *read*, not to interpret.
 - **The word becomes the offer to name with.** A label with a transcript puts
   *Name it "Pricing"* at the top of the palette (Tier 0, since the reading is
   already held) — write a word beside a shape and it becomes that shape's name,
-  which was Stage E's ship criterion.
+  which was Stage E's ship criterion. **Writing alone, taken, becomes text
+  where it is** (v10 F8, `writingToText`): the group is blessed with the words
+  as its parts and carries `text` code marked `from: 'writing'`, rendered as
+  SVG text fitted to the ink's width and height on a clear ground in the
+  ink's colour (`writingDocument`), the ink held underneath — *Show the ink*
+  flips it over (`flipped`, runtime) — editable by double-click or *Edit the
+  text*, and **never a definition**: the matcher skips artifacts with `text`
+  code, so more writing is not offered as "another hello world". *Play* is
+  offered only for what plays: a drawing's tank or a program.
+- **Reading asks the smallest model that can see** (`readers()` in
+  `06-handwriting.js`, the size read from the model's name), not every one:
+  a 27B model takes minutes at a word a 0.8B reads in seconds. A dedicated
+  handwriting model in the browser is the next step (the v10 plan, §6).
 - **The words reach the brief.** `describeReading` says *the human wrote
   "Pricing" there — use those words* instead of *handwriting you cannot read*.
 - **Printed letters gather into a word** (`session/words.ts`). Small strokes

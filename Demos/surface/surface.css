@@ -435,3 +435,7 @@ body.embed.summoning #inspector { display: none; }
 #minimap { position: absolute; right: 14px; bottom: 36px; width: 176px; height: 108px; z-index: 5; border-radius: 6px; background: rgba(var(--panel-rgb), 0.88); box-shadow: 0 0 0 1px rgba(var(--gold-rgb), 0.3); cursor: pointer; touch-action: none; }
 #minimap[hidden] { display: none; }
 @media (max-width: 560px) { #minimap { display: none; } }
+
+/* Writing taken as text: the words stand on the canvas like ink, no plate; flipped, the frame steps aside for the writing (v10 F8). */
+.artifactFrame.writing iframe { background: transparent; box-shadow: none; border-radius: 0; }
+.artifactFrame.flipped { visibility: hidden; }

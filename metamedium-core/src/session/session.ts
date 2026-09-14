@@ -609,6 +609,10 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     const out: { artifactId: string; name: string; score: number; reasoning: string }[] = [];
     for (const aid of artifacts) {
       const a = nodes.get(aid)!;
+      // Writing taken as text is a transcription, not vocabulary: a group of
+      // words is never offered as "another hello world" (v10 F8).
+      const code = [...a.reps].reverse().find((r) => r.modality === 'code')?.data as { kind?: string } | undefined;
+      if (code?.kind === 'text') continue;
       const aSig = getRep(a, 'signature')?.data as StructuralSignature | undefined;
       if (!aSig) continue;
       const examples = getRep(a, 'examples')?.data as Examples | undefined;
@@ -826,6 +830,10 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     const engaged = candidates.filter((m) => {
       if (m.points && strokesIntersect(points, m.points)) return true;
       if (m.points && !m.closed) return false;
+      // An artifact is engaged by a mark ON it, never one beside it: its
+      // frame is large, so "close relative to its size" reached across the
+      // board and swept a text into a field opened "on hello world".
+      if (!m.points) return boundsOverlap(fp.bounds, m.bounds);
       if (boundsOverlap(fp.bounds, m.bounds)) return true;
       const size = Math.max(1, m.bounds.maxX - m.bounds.minX, m.bounds.maxY - m.bounds.minY);
       return boundingBoxDistance(fp.bounds, m.bounds) < size * config.gesture.checkProximityRatio;

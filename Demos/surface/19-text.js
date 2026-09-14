@@ -129,6 +129,8 @@
   // a dot is drawn, not tapped, and a tap is the dead state.
   canvas.addEventListener('dblclick', (e) => {
     const w = screenToWorld(e.clientX, e.clientY);
-    if (nodeAt(w.x, w.y)) return;
+    const under = nodeAt(w.x, w.y);
+    // A double-click on a text — typed, or writing taken as text — edits it in place.
+    if (under) { if (beginTextEdit(under)) { const s0 = session.getState(); if (s0.summon) session.dismiss(s0.summon.id, Date.now()); if (s0.selection.length) session.deselect(Date.now()); } return; }
     beginTextEdit(null, w);
   });
