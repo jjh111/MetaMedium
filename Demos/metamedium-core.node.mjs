@@ -1112,19 +1112,19 @@ function idealize(node, shape) {
     }
     case "arc": {
       const a = fp.start, c = fp.end;
-      let mid = raw[Math.floor(raw.length / 2)], best = -1;
+      let mid2 = raw[Math.floor(raw.length / 2)], best = -1;
       for (const p of raw) {
         const d = Math.abs(sideOf(a, c, p));
         if (d > best) {
           best = d;
-          mid = p;
+          mid2 = p;
         }
       }
-      const cc = circumcircle(a, mid, c);
+      const cc = circumcircle(a, mid2, c);
       if (!cc) return { shape: "line", closed: false, points: [a, c], reasoning: "too flat to bow; drawn straight" };
       const a0 = Math.atan2(a.y - cc.cy, a.x - cc.cx);
       const a1 = Math.atan2(c.y - cc.cy, c.x - cc.cx);
-      const am = Math.atan2(mid.y - cc.cy, mid.x - cc.cx);
+      const am = Math.atan2(mid2.y - cc.cy, mid2.x - cc.cx);
       let sweep = a1 - a0;
       const norm = (x) => (x % TAU + TAU) % TAU;
       const viaCcw = norm(am - a0) < norm(a1 - a0);
@@ -1366,6 +1366,130 @@ function describeMaths(maths) {
     const v = Number.isFinite(x.value) ? x.value.toLocaleString("en-US") : "\u221E";
     return `${x.label} ${v}${x.unit}`;
   }).join(" \xB7 ");
+}
+
+// src/session/magnets.ts
+var MAGNET_SCREEN_PX = 14;
+var MAGNET_SIZE_FRACTION = 0.06;
+function magnetRadius(sizePx, scale = 1) {
+  return Math.max(MAGNET_SCREEN_PX * scale, sizePx * MAGNET_SIZE_FRACTION);
+}
+var mid = (a, b) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+function formOf(node, nodes) {
+  const fp = fingerprintOf(node);
+  const ink = strokePointsOf(node);
+  if (!fp || !ink || ink.length < 2) return null;
+  const reading = snapReading(node, nodes);
+  const held = getRep(node, "clean") ? cleanPointsOf(node) : void 0;
+  const ideal = held ?? (reading.ok ? idealize(node, reading.shape)?.points : void 0);
+  if (ideal && ideal.length >= 2 && reading.shape) return { shape: reading.shape, points: ideal };
+  return { shape: "ink", points: ink };
+}
+function magnetSites(node, nodes) {
+  const form = formOf(node, nodes);
+  if (!form) return [];
+  const b = boundsOf(node) ?? getBounds(form.points);
+  const w2 = b.maxX - b.minX, h2 = b.maxY - b.minY;
+  const centre = { x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2 };
+  const out = [];
+  const counts = {};
+  const add = (kind, point, why) => {
+    const index = counts[kind] ?? 0;
+    counts[kind] = index + 1;
+    out.push({ nodeId: node.id, shape: form.shape, kind, index, point, reasoning: why });
+  };
+  switch (form.shape) {
+    case "line":
+    case "arrow": {
+      const arrow = getRep(node, "reading:arrow")?.data;
+      const tail = form.shape === "arrow" && arrow?.tail ? arrow.tail : form.points[0];
+      const tip = form.shape === "arrow" && arrow?.tip ? arrow.tip : form.points[form.points.length - 1];
+      add("tail", tail, `the ${form.shape}'s tail \u2014 where it begins`);
+      add("tip", tip, `the ${form.shape}'s tip \u2014 where it ends`);
+      add("middle", mid(tail, tip), "halfway along it");
+      break;
+    }
+    case "rectangle": {
+      const v = form.points.slice(0, 4);
+      if (v.length === 4) {
+        v.forEach((p) => add("corner", p, "a corner of the rectangle"));
+        for (let i = 0; i < 4; i++) add("middle", mid(v[i], v[(i + 1) % 4]), "the middle of an edge");
+      } else {
+        boundsSites(add, b);
+      }
+      add("centre", centre, "the centre of the rectangle");
+      break;
+    }
+    case "circle": {
+      add("centre", centre, "the centre of the circle");
+      const rx = w2 / 2, ry = h2 / 2;
+      const cardinals = [
+        ["north", { x: centre.x, y: centre.y - ry }],
+        ["east", { x: centre.x + rx, y: centre.y }],
+        ["south", { x: centre.x, y: centre.y + ry }],
+        ["west", { x: centre.x - rx, y: centre.y }]
+      ];
+      for (const [name, p] of cardinals) add("cardinal", p, `the ${name} of the circle`);
+      break;
+    }
+    case "triangle": {
+      const v = form.points.slice(0, 3);
+      if (v.length === 3) {
+        v.forEach((p) => add("corner", p, "a corner of the triangle"));
+        add("centre", { x: (v[0].x + v[1].x + v[2].x) / 3, y: (v[0].y + v[1].y + v[2].y) / 3 }, "the centroid");
+      } else {
+        boundsSites(add, b);
+      }
+      break;
+    }
+    case "arc": {
+      add("tail", form.points[0], "where the arc begins");
+      add("tip", form.points[form.points.length - 1], "where the arc ends");
+      add("centre", centre, "the middle of the arc\u2019s span");
+      break;
+    }
+    case "dot":
+      add("point", centre, "the dot");
+      break;
+    default:
+      boundsSites(add, b);
+      add("centre", centre, "the centre of the mark\u2019s bounds");
+      break;
+  }
+  return out;
+}
+function boundsSites(add, b) {
+  add("corner", { x: b.minX, y: b.minY }, "a corner of the mark\u2019s bounds");
+  add("corner", { x: b.maxX, y: b.minY }, "a corner of the mark\u2019s bounds");
+  add("corner", { x: b.maxX, y: b.maxY }, "a corner of the mark\u2019s bounds");
+  add("corner", { x: b.minX, y: b.maxY }, "a corner of the mark\u2019s bounds");
+}
+function nearestMagnet(at, sites, radius) {
+  let best = null;
+  for (const site of sites) {
+    const distance = Math.hypot(site.point.x - at.x, site.point.y - at.y);
+    if (distance > radius) continue;
+    if (!best || distance < best.distance) best = { site, distance };
+  }
+  return best;
+}
+function magnetsNear(at, nodes, ids, radius, exclude) {
+  const hits = [];
+  for (const id of ids) {
+    if (exclude?.has(id)) continue;
+    const node = nodes.get(id);
+    if (!node) continue;
+    for (const site of magnetSites(node, nodes)) {
+      const distance = Math.hypot(site.point.x - at.x, site.point.y - at.y);
+      if (distance <= radius) hits.push({ site, distance });
+    }
+  }
+  hits.sort((a, b) => a.distance - b.distance);
+  return hits;
+}
+function describeMagnet(site) {
+  const r = (v) => Math.round(v);
+  return `${site.reasoning} at (${r(site.point.x)}, ${r(site.point.y)})`;
 }
 
 // src/session/words.ts
@@ -7202,6 +7326,8 @@ export {
   LOG_EXT,
   LiveStore,
   LocalHub,
+  MAGNET_SCREEN_PX,
+  MAGNET_SIZE_FRACTION,
   MANIFEST_PATH,
   MATCH_FLOOR,
   MAX_DRAWN,
@@ -7282,6 +7408,7 @@ export {
   describeFrame,
   describeGraph,
   describeLayout,
+  describeMagnet,
   describeMaths,
   describeReading,
   describeRegions,
@@ -7339,6 +7466,9 @@ export {
   localityOf,
   logPathFor,
   luminance,
+  magnetRadius,
+  magnetSites,
+  magnetsNear,
   matchBrace,
   matchConcepts,
   matchDefinition,
@@ -7346,6 +7476,7 @@ export {
   matchesCommandMark,
   measure,
   mergeLogs,
+  nearestMagnet,
   nodeIdsIn,
   normalizeStroke,
   otsu,
