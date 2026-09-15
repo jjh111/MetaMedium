@@ -299,6 +299,43 @@
             pointer-events: auto;
         }
         .hero-loop-link:hover { color: #93cbcf; }
+
+        /* An affordance the canvas offers where the hand left off. The hero
+           keeps every touch for drawing, so on a phone a swipe cannot carry
+           you past it; two lines drawn near each other — the shape of a swipe
+           — are read as asking to move on, and this stands under the last
+           touch until the marks fade. A real button, so it is tappable at
+           44px and reachable from the keyboard. */
+        .hero-offer {
+            position: absolute;
+            z-index: 5;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            min-height: 44px;
+            padding: 0.55rem 0.95rem;
+            transform: translateX(-50%);
+            background: rgba(19, 19, 21, 0.92);
+            border: 1px solid rgba(111, 179, 184, 0.55);
+            border-radius: 999px;
+            color: rgba(111, 179, 184, 0.95);
+            font-family: var(--face);
+            font-size: 0.85rem;
+            font-weight: 500;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            cursor: pointer;
+            opacity: 0;
+            transition: opacity 0.25s;
+        }
+        .hero-offer[hidden] { display: none; }
+        .hero-offer.shown { opacity: 1; }
+        .hero-offer:hover { border-color: rgba(111, 179, 184, 0.9); color: #93cbcf; }
+        .hero-offer svg {
+            width: 14px;
+            height: 14px;
+            animation: bounce 2s infinite;
+        }
         
         .scroll-indicator {
             position: absolute;
@@ -966,7 +1003,24 @@
            on an embed cannot scroll the paper — and on a phone the embeds are
            nearly full width. Coarse pointers get watch-only viewers: touch
            falls through to the page, and "Open it →" opens the full surface,
-           which is built for touch. */
+           which is built for touch.
+
+           The media query alone is not enough. It asks what the PRIMARY
+           pointer is, and a touch laptop, a Chromebook, or an iPad with a
+           trackpad answers "fine" while the hand still arrives as a touch —
+           on those, a swipe over an embed was swallowed and the paper stood
+           still. html.touched is stamped by the first touch the document
+           sees, so the rule follows what is actually happening. */
+        html.touched .demo-container iframe { pointer-events: none; }
+        html.touched .demo-container::after {
+            content: "View-only on touch — tap Open it → to draw in it";
+            display: block;
+            padding: 0.55rem 1rem;
+            border-top: 1px solid var(--border);
+            font-family: var(--face);
+            font-size: var(--text-xs);
+            color: var(--muted-light);
+        }
         @media (pointer: coarse) {
             .demo-container iframe { pointer-events: none; }
             .demo-container::after {
@@ -1899,6 +1953,13 @@
             <span class="hint-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M11.2 2.3l2.5 2.5L5.5 13H3v-2.5z"/><path d="M9.6 3.9l2.5 2.5"/></svg></span>
             <span class="hint-text">draw here</span>
         </div>
+        <button class="hero-offer" id="heroOffer" hidden>
+            <span>scroll down</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                 stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M7 13l5 5 5-5M7 6l5 5 5-5"/>
+            </svg>
+        </button>
         
         <div class="hero-content">
             <h1><span class="meta">Meta</span>Medium</h1>
@@ -3306,6 +3367,16 @@
         <p class="version">by John Hanacek · built with Claude Code &amp; OpenCode</p>
     </footer>
 
+    <script>
+        // The first touch the document sees marks the page as touched, so the
+        // view-only treatment for the embeds follows what the hand is actually
+        // doing rather than what the media query says the primary pointer is.
+        // Capturing and passive: it never interferes with the touch itself.
+        addEventListener('touchstart', function stamp() {
+            document.documentElement.classList.add('touched');
+            removeEventListener('touchstart', stamp, true);
+        }, { capture: true, passive: true });
+    </script>
     <script src="Demos/metamedium-core.browser.js"></script>
     <script>
         // Paper / canvas. Same storage key as brand/styleguide.html, so one
@@ -3445,6 +3516,7 @@
         let glyphPulse = 0;
         let lastShapeTime = 0;
         let shapeUid = 0;           // Marks are named by a counter, so a reading can be remembered per group
+        let lastDown = null;        // Where the hand last came down — an offer stands under it
         let saidConcepts = new Set(); // concept + members already whispered, so a row is said once
         let ripples = [];           // Tap ripple effects
         let particles = [];         // Recognition particle bursts
@@ -3828,8 +3900,53 @@
             return null;
         }
         
+        // ============================================
+        // The offer under the hand
+        // ============================================
+        // Two lines near each other and NOT touching is the shape of a swipe,
+        // and it is a reading the canvas already has: `near` between two marks
+        // that both read `line`, with no crossing or overlap to explain them
+        // otherwise. The canvas offers what it reads — here, the way onward.
+        const offerEl = document.getElementById('heroOffer');
+        function swipeRead(relationships) {
+            return relationships.find(r =>
+                r.type === 'adjacent' && r.shapeA.type === 'line' && r.shapeB.type === 'line') || null;
+        }
+        let offerTaken = null;      // The pair whose offer was taken; a new pair offers again
+        function updateOffer(relationships) {
+            if (!offerEl) return;
+            const read = swipeRead(relationships);
+            const pair = read ? [read.shapeA.uid, read.shapeB.uid].sort((a, b) => a - b).join(':') : null;
+            if (read && pair === offerTaken) return;
+            if (!read) {
+                if (!offerEl.hidden) { offerEl.classList.remove('shown'); offerEl.hidden = true; }
+                return;
+            }
+            // Under the last touch, or under the marks when there was none
+            // (a mouse that never came down, a replay).
+            const at = lastDown || { x: (read.shapeA.center.x + read.shapeB.center.x) / 2,
+                                     y: Math.max(read.shapeA.bounds.maxY, read.shapeB.bounds.maxY) };
+            const w = canvas.width / (window.devicePixelRatio || 1);
+            const h = canvas.height / (window.devicePixelRatio || 1);
+            offerEl.style.left = Math.min(Math.max(at.x, 90), w - 90) + 'px';
+            offerEl.style.top = Math.min(at.y + 26, h - 60) + 'px';
+            if (offerEl.hidden) { offerEl.hidden = false; requestAnimationFrame(() => offerEl.classList.add('shown')); }
+        }
+        if (offerEl) {
+            offerEl.addEventListener('click', () => {
+                // Taken for THESE two lines. Draw the pair again and it offers
+                // again — the second asking is as deliberate as the first.
+                const read = swipeRead(detectRelationships());
+                offerTaken = read ? [read.shapeA.uid, read.shapeB.uid].sort((a, b) => a - b).join(':') : null;
+                offerEl.classList.remove('shown');
+                offerEl.hidden = true;
+                document.getElementById('abstract').scrollIntoView({ behavior: 'smooth', block: 'start' });
+            });
+        }
+
         function drawRelationships() {
             const relationships = detectRelationships();
+            updateOffer(relationships);
             const now = Date.now();
             
             relationships.forEach(rel => {
@@ -4552,6 +4669,7 @@
             hero.classList.add('drawing');
             
             const pos = getPos(e);
+            lastDown = pos;
             currentStroke = {
                 points: [pos],
                 startTime: Date.now(),
