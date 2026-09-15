@@ -120,7 +120,15 @@
       const wired = wiredCodeOf(s, id);
       const code = wired !== null ? wired : rep.data.code;
       const playing = !!(s.clocks[id] && s.clocks[id].playing);
-      const stamp = rep.data.at + ':' + Math.round(fr.w) + 'x' + Math.round(fr.h) + ':' + hashOf(code) + (kind === 'run' ? ':' + (playing ? 'run' : 'still') : '');
+      // A figure's document carries the board's own ink colour, baked in when
+      // it was written — an iframe cannot inherit a token from the page — so
+      // the THEME is part of what the document is made of. Without it in the
+      // stamp, switching to paper left every label in the dark theme's near-
+      // white ink on a light ground: a figure that vanished when the light
+      // came on. A page is theme-independent and rebuilds for nothing.
+      const stamp = rep.data.at + ':' + Math.round(fr.w) + 'x' + Math.round(fr.h) + ':' + hashOf(code) +
+        (kind === 'run' ? ':' + (playing ? 'run' : 'still') : '') +
+        (FIGURE_KINDS.has(kind) ? ':' + (document.documentElement.getAttribute('data-theme') || '') : '');
       if (!f.parked && f.codeAt !== stamp) {
         // A document that CHANGES gets a new element. Assigning srcdoc twice
         // in one tick — the source card at import, the harness at play — lost

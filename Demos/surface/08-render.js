@@ -51,6 +51,14 @@
     return null;
   }
 
+  /** An artifact that renders as a figure on the board rather than on a page. */
+  function isFigureArtifact(node) {
+    for (let i = node.reps.length - 1; i >= 0; i--) {
+      if (node.reps[i].modality === 'code') return FIGURE_KINDS.has(node.reps[i].data.kind || 'html');
+    }
+    return false;
+  }
+
   const union = (list) => list.reduce((a, b) => ({
     minX: Math.min(a.minX, b.minX), maxX: Math.max(a.maxX, b.maxX),
     minY: Math.min(a.minY, b.minY), maxY: Math.max(a.maxY, b.maxY),
@@ -180,6 +188,7 @@
   function render(s) {
     state = s;
     chipHits = [];
+    chromeDrawn = [];
     pruneRuntime(s);
     // No model is asked from here: a paint is not a request (§6.3).
     syncStage(s);
@@ -264,8 +273,19 @@
       const b0 = MM.boundsOf(node);
       const b = b0 && pl ? { minX: b0.minX + pl.dx, maxX: b0.maxX + pl.dx, minY: b0.minY + pl.dy, maxY: b0.maxY + pl.dy } : b0;
       if (isArtifact && b) {
-        brackets(b, isLive ? C.gold : `rgba(${C.goldRGB},0.7)`);
-        text((MM.wordOf(node) || '') + (isLive ? '  ·  live' : ''), b.minX, b.minY - wpx(10), C.gold);
+        // A FIGURE wears its chrome only while you point at it. The brackets
+        // and the filename say "a thing with an identity you can grab", which
+        // is what you want over a page or a program; over a title, a label
+        // inside a drawn box, or a note, they are a second drawing on top of
+        // the first, and a figure made of eight of them is unreadable. Same
+        // rule the reading under a mark already follows: shown for the one the
+        // hand is on, not for every mark on the board.
+        const quiet = isFigureArtifact(node) && id !== inspectedId && !s.selection.includes(id);
+        if (!quiet) {
+          chromeDrawn.push(id);
+          brackets(b, isLive ? C.gold : `rgba(${C.goldRGB},0.7)`);
+          text((MM.wordOf(node) || '') + (isLive ? '  ·  live' : ''), b.minX, b.minY - wpx(10), C.gold);
+        }
       } else if (b && !pending && id === inspectedId && !s.selection.length) {
         // The reading of the mark the hand just made (or is over), and only
         // that one: what it is, and what it plays. Under every mark it was a
@@ -443,6 +463,8 @@
   const CARD_FONT = 'px ui-monospace, SFMono-Regular, Menlo, monospace';
   /** Where the last paint put each answer card, in world units. For tests. */
   let cardRects = [];
+  /** Which artifacts wore their brackets and name in the last paint. For tests. */
+  let chromeDrawn = [];
 
   const rectOf = (b) => ({ x: b.minX, y: b.minY, w: b.maxX - b.minX, h: b.maxY - b.minY });
   function overlapArea(a, b) {

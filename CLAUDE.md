@@ -52,7 +52,7 @@ circle them, cross with a command mark *you taught the system*, prompt them into
 a living page that renders in the canvas with your ink still outlining its
 divs — then draw on that page and the ink addresses the regions underneath it.
 Scratch anything out to erase. `Demos/session-engine.html` is the surface;
-`Demos/session-engine.e2e.js` drives 189 steps through the real UI: page, flowchart, handwriting (read only when asked; a line read as one), the model drawing, the user-side loop, selection and the field, corrections, the worker, the tank, words into verbs and acting out, frames and the drawn slider, the folder, pictures, text, the moment, a live room, a playing frame that takes the pointer, hold by long-press, the graph in 3D, and the foundations (letters at any size, a mark that crosses, readings that stay, the minimap), and the explanation plane's layout. A run takes about 100 s; run it **in its own tab on its own origin** (`http://127.0.0.1:8010/…?fresh=1&nosw=1` — `__setup` refuses any other URL: it replaces `fetch` with a stub, joins a stub model named `e2e-stub`, and wipes the origin's saved board), start it with `__setup(); __scenario().then(r => window.__R = r)` and read `__R` when it lands.
+`Demos/session-engine.e2e.js` drives 193 steps through the real UI: page, flowchart, handwriting (read only when asked; a line read as one), the model drawing, the user-side loop, selection and the field, corrections, the worker, the tank, words into verbs and acting out, frames and the drawn slider, the folder, pictures, text, the moment, a live room, a playing frame that takes the pointer, hold by long-press, the graph in 3D, and the foundations (letters at any size, a mark that crosses, readings that stay, the minimap), and the explanation plane's layout. A run takes about 100 s; run it **in its own tab on its own origin** (`http://127.0.0.1:8010/…?fresh=1&nosw=1` — `__setup` refuses any other URL: it replaces `fetch` with a stub, joins a stub model named `e2e-stub`, and wipes the origin's saved board), start it with `__setup(); __scenario().then(r => window.__R = r)` and read `__R` when it lands.
 v7 Stage E (handwriting) shipped 1 Sep 2026: a word written beside a shape is read by a
 model that can see and offered as that shape's name. Whitepaper v5.1 stays parked until the
 conversation benchmark passes end to end.
@@ -415,6 +415,27 @@ way, both by running a real model:
 
 `validateRegions` checks the result still matches the drawing. A promise nobody
 checks is one you find out about from a screenshot.
+
+**A figure wears its chrome only while you point at it.** The gold brackets
+and the filename say *a thing with an identity you can grab*, which is what you
+want over a page or a program; over a title, a label inside a drawn box, or a
+note, they are a second drawing on top of the first, and a figure made of eight
+of them is unreadable. Same rule the reading under a mark already follows —
+shown for the one the hand is on, not for every mark on the board. A page keeps
+its brackets, because it has a plate under it anyway.
+
+**A figure follows the theme.** Its document carries the board's own ink colour
+baked in (an iframe inherits no token), so the theme is part of what the
+document is *made of* and belongs in the frame's stamp. Without it, switching to
+paper left every label in the dark theme's near-white ink on a light ground — a
+figure that vanished when the light came on.
+
+**A few words are a caption and fill their frame** (`TEXT_FITS_LINES` in
+`13-kinds.js`); a file of text flows at a size the screen holds. Writing turned
+to text was the first caption and the rule was written as *did it come from
+ink* — but a label written onto a drawing is a caption however it arrived, and
+held at screen size it floated free of the drawing it labels the moment the
+board zoomed.
 
 **A figure is not a page** (`FIGURE_KINDS` in `Demos/surface/02-artifacts.js`,
 `figureCSS` in `13-kinds.js`). A page, a script, a table or a tree is something

@@ -1621,8 +1621,16 @@ window.__scenario = async function(){
     const fig = (id) => { const f = mm.frames.get(id); return f && f.wrap.classList.contains('figure'); };
     step('37. words and a drawing are figures on the board; a page keeps its plate', fig(txt) && fig(svg) && !fig(page), { text: fig(txt), svg: fig(svg), page: fig(page) });
     const srcOf = (id) => { const f = mm.frames.get(id); return f && f.iframe ? f.iframe.srcdoc : ''; };
-    // A text run's label IS its own first words; printing it over the run set every line twice.
-    step('37a. a text sets its words once, on a clear ground', /background:transparent/.test(srcOf(txt)) && !/class="lb"/.test(srcOf(txt)), { grounds: /background:transparent/.test(srcOf(txt)), heading: /class="lb"/.test(srcOf(txt)) });
+    // A few words are a caption and FILL their frame, so they scale with the board.
+    step('37a. a caption fills its frame, on a clear ground', /background:transparent/.test(srcOf(txt)) && /<svg/.test(srcOf(txt)) && /textLength=/.test(srcOf(txt)), { grounds: /background:transparent/.test(srcOf(txt)), fitted: /textLength=/.test(srcOf(txt)) });
+    // A file of text flows at a size the screen holds — and sets its words ONCE:
+    // a text run's addressable label is its own first words, so printing every
+    // region's label over it, right for a function or a key, doubled every line.
+    const doc = mm.session.import({ kind: 'text', path: 'c/long.txt', name: 'long.txt', code: Array.from({ length: 12 }, (_, i) => 'line ' + (i + 1) + ' of a file, which is a document and not a caption').join('\n\n'), bounds: { minX: 600, minY: 600, maxX: 900, maxY: 900 }, at: Date.now() });
+    for (let i = 0; i < 40 && !mm.frames.get(doc); i++) await wait(50);
+    await wait(120);
+    const shown = (id) => srcOf(id).replace(/ title="[^"]*"/g, ''); // the tooltip is not the page
+    step('37a2. a file of text flows, clear, with its words set once', fig(doc) && /background:transparent/.test(srcOf(doc)) && !/class="lb"/.test(srcOf(doc)) && (shown(doc).match(/line 1 of a file/g) || []).length === 1, { figure: fig(doc), heading: /class="lb"/.test(srcOf(doc)), times: (shown(doc).match(/line 1 of a file/g) || []).length });
     step('37b. a page is still source on a page', /background:#fbfaf7/.test(srcOf(page)), { plate: /background:#fbfaf7/.test(srcOf(page)) });
     // The card says what it is about and how long ago, as chrome.
     t.stroke(t.rect(700, 200, 180, 110));
@@ -1631,6 +1639,30 @@ window.__scenario = async function(){
     await wait(80);
     const card = mm.answerCards().find((c) => c.about[0] === mk);
     step('37c. an answer card carries its subject and its age in the chrome', !!card && card.what === 'rectangle' && card.ago === 'just now', card && { what: card.what, ago: card.ago });
+    // A figure's document carries the board's ink colour, baked in: an iframe
+    // inherits no token, so the theme is part of what the document is made of.
+    const themeBefore = mm.themeMode();
+    const darkSrc = srcOf(txt);
+    mm.setThemeMode(mm.theme === 'paper' ? 'dark' : 'light');
+    for (let i = 0; i < 30 && srcOf(txt) === darkSrc; i++) await wait(50);
+    step('37d. a figure is rebuilt for the theme, so its words never vanish when the light changes', srcOf(txt) !== darkSrc && /fill:/.test(srcOf(txt)), { changed: srcOf(txt) !== darkSrc });
+    mm.setThemeMode(themeBefore);
+    await wait(200);
+    // A figure wears its brackets and its filename only while pointed at.
+    mm.session.load([]); mm.setView(1, 0, 0);
+    const lab = mm.session.import({ kind: 'text', path: 'c/lab.txt', name: 'lab.txt', code: 'a label', bounds: { minX: 300, minY: 300, maxX: 460, maxY: 340 }, at: Date.now() });
+    t.stroke(t.rect(900, 700, 120, 80)); // something else is the mark the hand is on
+    await wait(120);
+    const pg2 = mm.session.import({ kind: 'html', path: 'c/p.html', name: 'p.html', code: '<div data-region="a">a page</div>', bounds: { minX: 300, minY: 500, maxX: 600, maxY: 620 }, at: Date.now() });
+    await wait(150);
+    const atRest = mm.chromeDrawn();
+    step('37e. a figure is quiet at rest; a page keeps its brackets and name', !atRest.includes(lab) && atRest.includes(pg2), { drawn: atRest, label: lab, page: pg2 });
+    // Pointing at it brings its identity back.
+    mm.session.summonMarks([lab], Date.now());
+    await wait(120);
+    step('37f. pointed at, the figure wears its name again', mm.chromeDrawn().includes(lab), mm.chromeDrawn());
+    const su = mm.session.getState().summon;
+    if (su) mm.session.dismiss(su.id, Date.now());
     mm.session.load([]);
   }
 

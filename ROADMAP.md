@@ -47,7 +47,7 @@
 > that is runtime, never in the log; **a figure is not a page** — svg and
 > text render clear on the board, with a text's words set once; and a card
 > carries its subject and its age, so the live layer stops being used as a
-> drawing's caption layer. Core 574 tests; e2e 189 steps.
+> drawing's caption layer. Core 574 tests; e2e 193 steps.
 >
 > **v9 accounting, 6 September 2026 (branch `next-phases`, local).** The
 > surface as a system (`SURFACE-v9-PLAN.md` §5–§6): **a model is asked only

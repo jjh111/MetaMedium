@@ -451,7 +451,15 @@
       const wired = wiredCodeOf(s, id);
       const code = wired !== null ? wired : rep.data.code;
       const playing = !!(s.clocks[id] && s.clocks[id].playing);
-      const stamp = rep.data.at + ':' + Math.round(fr.w) + 'x' + Math.round(fr.h) + ':' + hashOf(code) + (kind === 'run' ? ':' + (playing ? 'run' : 'still') : '');
+      // A figure's document carries the board's own ink colour, baked in when
+      // it was written — an iframe cannot inherit a token from the page — so
+      // the THEME is part of what the document is made of. Without it in the
+      // stamp, switching to paper left every label in the dark theme's near-
+      // white ink on a light ground: a figure that vanished when the light
+      // came on. A page is theme-independent and rebuilds for nothing.
+      const stamp = rep.data.at + ':' + Math.round(fr.w) + 'x' + Math.round(fr.h) + ':' + hashOf(code) +
+        (kind === 'run' ? ':' + (playing ? 'run' : 'still') : '') +
+        (FIGURE_KINDS.has(kind) ? ':' + (document.documentElement.getAttribute('data-theme') || '') : '');
       if (!f.parked && f.codeAt !== stamp) {
         // A document that CHANGES gets a new element. Assigning srcdoc twice
         // in one tick — the source card at import, the harness at play — lost
@@ -1874,6 +1882,14 @@
     return null;
   }
 
+  /** An artifact that renders as a figure on the board rather than on a page. */
+  function isFigureArtifact(node) {
+    for (let i = node.reps.length - 1; i >= 0; i--) {
+      if (node.reps[i].modality === 'code') return FIGURE_KINDS.has(node.reps[i].data.kind || 'html');
+    }
+    return false;
+  }
+
   const union = (list) => list.reduce((a, b) => ({
     minX: Math.min(a.minX, b.minX), maxX: Math.max(a.maxX, b.maxX),
     minY: Math.min(a.minY, b.minY), maxY: Math.max(a.maxY, b.maxY),
@@ -2003,6 +2019,7 @@
   function render(s) {
     state = s;
     chipHits = [];
+    chromeDrawn = [];
     pruneRuntime(s);
     // No model is asked from here: a paint is not a request (§6.3).
     syncStage(s);
@@ -2087,8 +2104,19 @@
       const b0 = MM.boundsOf(node);
       const b = b0 && pl ? { minX: b0.minX + pl.dx, maxX: b0.maxX + pl.dx, minY: b0.minY + pl.dy, maxY: b0.maxY + pl.dy } : b0;
       if (isArtifact && b) {
-        brackets(b, isLive ? C.gold : `rgba(${C.goldRGB},0.7)`);
-        text((MM.wordOf(node) || '') + (isLive ? '  ·  live' : ''), b.minX, b.minY - wpx(10), C.gold);
+        // A FIGURE wears its chrome only while you point at it. The brackets
+        // and the filename say "a thing with an identity you can grab", which
+        // is what you want over a page or a program; over a title, a label
+        // inside a drawn box, or a note, they are a second drawing on top of
+        // the first, and a figure made of eight of them is unreadable. Same
+        // rule the reading under a mark already follows: shown for the one the
+        // hand is on, not for every mark on the board.
+        const quiet = isFigureArtifact(node) && id !== inspectedId && !s.selection.includes(id);
+        if (!quiet) {
+          chromeDrawn.push(id);
+          brackets(b, isLive ? C.gold : `rgba(${C.goldRGB},0.7)`);
+          text((MM.wordOf(node) || '') + (isLive ? '  ·  live' : ''), b.minX, b.minY - wpx(10), C.gold);
+        }
       } else if (b && !pending && id === inspectedId && !s.selection.length) {
         // The reading of the mark the hand just made (or is over), and only
         // that one: what it is, and what it plays. Under every mark it was a
@@ -2266,6 +2294,8 @@
   const CARD_FONT = 'px ui-monospace, SFMono-Regular, Menlo, monospace';
   /** Where the last paint put each answer card, in world units. For tests. */
   let cardRects = [];
+  /** Which artifacts wore their brackets and name in the last paint. For tests. */
+  let chromeDrawn = [];
 
   const rectOf = (b) => ({ x: b.minX, y: b.minY, w: b.maxX - b.minX, h: b.maxY - b.minY });
   function overlapArea(a, b) {
@@ -4235,6 +4265,10 @@
    * script; the ground is clear so the text stands on the canvas like ink,
    * in the ink's colour; one region, `text`, so ink over it addresses it.
    */
+  /** Up to this many lines, a text is a caption that fills its frame. */
+  const TEXT_FITS_LINES = 8;
+  const linesOf = (code) => String(code).split(/\r?\n/).filter((l) => l.trim()).length;
+
   function writingDocument(code, w, h) {
     const lines = String(code).split(/\r?\n/);
     if (!lines.length) lines.push('');
@@ -4267,7 +4301,13 @@
     const kind = rep.data.kind || 'html';
     const code = rep.data.code;
     if (kind === 'html') return documentFor(code, w, h);
-    if (kind === 'text' && rep.data.from === 'writing') return writingDocument(code, w, h);
+    // A few words are a CAPTION and fill their frame, so they scale with the
+    // board the way the ink around them does; a file of text is a document and
+    // flows at a size the screen holds. Writing turned to text was the first
+    // caption, and the rule was written as "did it come from ink" — but a label
+    // written onto a drawing is a caption however it arrived, and held at screen
+    // size it floated free of the drawing it labels as soon as the board zoomed.
+    if (kind === 'text' && (rep.data.from === 'writing' || linesOf(code) <= TEXT_FITS_LINES)) return writingDocument(code, w, h);
     if (kind === 'run') {
       // Playing, the program runs in its clear frame; standing, its source shows, addressable like any script.
       if (ctx && ctx.playing) return runDocument(ctx.id, code, w, h);
@@ -6147,6 +6187,8 @@
     replay: () => rp, rpGoTo: (i) => rpGoTo(i), theme: THEME,
     // The minimap, for tests: where the last paint put the world.
     minimap: () => mini, readGroups: readGroups, chips: () => chipHits,
+    // The chrome a figure wears only while pointed at, for tests.
+    chromeDrawn: () => chromeDrawn.slice(),
     // The explanation plane, for tests: where the last paint put each answer card.
     answerCards: () => cardRects.map((c) => ({ id: c.id, about: c.about.slice(), what: c.what, who: c.who, ago: c.ago, x: c.x, y: c.y, w: c.w, h: c.h })),
     // Text folds back from ink, for tests: the words of a text where they stand.

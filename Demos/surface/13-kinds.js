@@ -236,6 +236,10 @@
    * script; the ground is clear so the text stands on the canvas like ink,
    * in the ink's colour; one region, `text`, so ink over it addresses it.
    */
+  /** Up to this many lines, a text is a caption that fills its frame. */
+  const TEXT_FITS_LINES = 8;
+  const linesOf = (code) => String(code).split(/\r?\n/).filter((l) => l.trim()).length;
+
   function writingDocument(code, w, h) {
     const lines = String(code).split(/\r?\n/);
     if (!lines.length) lines.push('');
@@ -268,7 +272,13 @@
     const kind = rep.data.kind || 'html';
     const code = rep.data.code;
     if (kind === 'html') return documentFor(code, w, h);
-    if (kind === 'text' && rep.data.from === 'writing') return writingDocument(code, w, h);
+    // A few words are a CAPTION and fill their frame, so they scale with the
+    // board the way the ink around them does; a file of text is a document and
+    // flows at a size the screen holds. Writing turned to text was the first
+    // caption, and the rule was written as "did it come from ink" — but a label
+    // written onto a drawing is a caption however it arrived, and held at screen
+    // size it floated free of the drawing it labels as soon as the board zoomed.
+    if (kind === 'text' && (rep.data.from === 'writing' || linesOf(code) <= TEXT_FITS_LINES)) return writingDocument(code, w, h);
     if (kind === 'run') {
       // Playing, the program runs in its clear frame; standing, its source shows, addressable like any script.
       if (ctx && ctx.playing) return runDocument(ctx.id, code, w, h);
