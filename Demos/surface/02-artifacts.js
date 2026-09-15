@@ -20,8 +20,9 @@
   // Text made from writing is flipped over to show the ink it came from (v10 F8). Runtime only.
   const flipped = new Set();
   function isWritingArtifact(node) {
+    // Born from writing: the first version says so, and every version since carries it.
     const rep = node && codeRepOf(node);
-    return !!rep && rep.data.kind === 'text' && rep.data.from === 'writing';
+    return !!rep && rep.data.kind === 'text' && (rep.data.from === 'writing' || node.reps.some((r) => r.modality === 'code' && r.data && r.data.from === 'writing'));
   }
 
   /** A cheap content hash, so a re-render happens exactly when the code changes. */

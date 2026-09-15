@@ -110,6 +110,27 @@ with a 0.8B model, took it, drew a box, asked for a flower):
   answer is a dedicated handwriting model in the browser — a package for
   another day, noted in §6.
 
+Two more from the third round (15 Sep): *"a reader that never writes is
+counter to the ideals — text is first class; from handwriting it becomes;
+I scribble out a word and write something above it, and it folds back."*
+
+- **F12 Text folds back from ink.** Every word of a text made from writing
+  is its own region (`w1`, `w2` …, SVG text fitted per line). Scratch a
+  word and it is **struck**: a gap (`…`) stands where it was, the scratch
+  leaves, the ink underneath is never a scratch target (it is provenance,
+  not a mark). Write beside the gap, read it, and *Fold “…” into the text*
+  puts the word in the gap — or after the nearest word when there is no
+  gap — and the writing leaves. Every step is a version; undo walks them
+  back. So a text is read, written and tracked by the hand, and the
+  reader is the same participant that writes.
+- **F13 Every making prompt says what can be made here.** One paragraph
+  (`HERE`, ~430 characters) on the interpret, ask, make, program and draw
+  prompts: ink and its eight readings, names, pages, programs (the `mm`
+  contract, now with `onPointer`), text, SVG, answers — and nothing else,
+  no files, servers or frameworks beyond three.js. A model with no ground
+  spins off; a small one most of all. Short on purpose: it rides on every
+  call.
+
 These come before T7 and T8. Everything below stands as written.
 
 ## 1. Decisions
@@ -294,8 +315,10 @@ environment (`MM_ROOM`, `MM_RELAY`, `MM_NAME`; defaults `claude`,
 - **A handwriting model of its own.** Reading a word through a chat model
   that can see works, and a 0.8B one is quick enough, but the right tool
   is a small handwriting recogniser in the browser (a TrOCR-class model
-  through transformers.js is ~80 MB quantised) joined as a reader that
-  never writes. Worth a package once the text flow (F8) has been used.
+  through transformers.js is ~80 MB quantised), joined as a participant
+  like any other — it reads, and what it reads is text the hand writes on
+  and tracks (F12), so it is not a reader apart. Worth a package once the
+  text flow has been used.
 - **`svg:` as a brief's target.** *draw a svg of a flower* is neither a
   page nor a program; it is an `svg` artifact the model writes as markup.
   A prefix, a kind, one call — but a 0.8B model will not draw a flower.
@@ -322,4 +345,6 @@ environment (`MM_ROOM`, `MM_RELAY`, `MM_NAME`; defaults `claude`,
 | F8 | Taking a transcript makes text | ✅ 14 Sep — `writingToText`, `writingDocument` (fitted SVG text), flip, edit by double-click, the matcher skips texts, play only for what plays; e2e 34–34d |
 | F9 | One tap lets go | ✅ 14 Sep — the ground tap dismisses and deselects; taking writing deselects; artifacts engage by overlap only; e2e 34e |
 | F10 | A failed brief leaves nothing | ✅ 14 Sep — `dropFailedBless`, elapsed time on the working dot, Esc stops model work (`cancelWork`) |
-| F11 | Reading by a small model | ✅ 14 Sep — `readers()` picks the smallest seeing model. *Open:* a dedicated handwriting model in the browser |
+| F11 | Reading by a small model | ✅ 14 Sep — `readers()` picks the smallest seeing model. *Open:* a dedicated handwriting model in the browser — one that reads and writes like any participant, not a reader apart |
+| F12 | Text folds back from ink | ✅ 15 Sep — words as regions, `strikeOnText`, `foldIntoText`, the ink under a text never a scratch target; e2e 35–35d |
+| F13 | Every making prompt says what can be made here | ✅ 15 Sep — `HERE` on five prompts; `mm.onPointer` in the program contract |

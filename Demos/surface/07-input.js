@@ -238,6 +238,9 @@
       // that were plainly just drawing keeps this from becoming nagging.
       flash('no summon — ' + after.markMiss.detail);
     } else if (!g && made) {
+      // A scratch over a word of a text made from writing strikes the word (v10 F12).
+      const struck = strikeOnText(after, id, points);
+      if (struck) { flash('struck “' + struck + '” — write the word beside the gap and fold it in'); return; }
       // A scratch one pass short: the stroke turned back on itself and crossed
       // one mark's outline twice, where three erases. Said, so the rule can
       // be learned by doing rather than by reading.

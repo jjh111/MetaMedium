@@ -351,8 +351,9 @@
   // Text made from writing is flipped over to show the ink it came from (v10 F8). Runtime only.
   const flipped = new Set();
   function isWritingArtifact(node) {
+    // Born from writing: the first version says so, and every version since carries it.
     const rep = node && codeRepOf(node);
-    return !!rep && rep.data.kind === 'text' && rep.data.from === 'writing';
+    return !!rep && rep.data.kind === 'text' && (rep.data.from === 'writing' || node.reps.some((r) => r.modality === 'code' && r.data && r.data.from === 'writing'));
   }
 
   /** A cheap content hash, so a re-render happens exactly when the code changes. */
@@ -1682,6 +1683,9 @@
       // that were plainly just drawing keeps this from becoming nagging.
       flash('no summon — ' + after.markMiss.detail);
     } else if (!g && made) {
+      // A scratch over a word of a text made from writing strikes the word (v10 F12).
+      const struck = strikeOnText(after, id, points);
+      if (struck) { flash('struck “' + struck + '” — write the word beside the gap and fold it in'); return; }
       // A scratch one pass short: the stroke turned back on itself and crossed
       // one mark's outline twice, where three erases. Said, so the rule can
       // be learned by doing rather than by reading.
@@ -1974,9 +1978,25 @@
     return null;
   }
 
+  /**
+   * Runtime memory keyed by node id — what is flipped, which marks a reading
+   * was asked about, what was read with what, what was already handed to a
+   * reader — forgets a node the log no longer holds. Ids are a counter
+   * derived on replay, so a fresh board reuses them: a text flipped before
+   * a `load([])` kept the next text with the same id flipped, and a scratch
+   * over it struck nothing (found by e2e 35).
+   */
+  function pruneRuntime(s) {
+    for (const id of [...flipped]) if (!s.live.includes(id)) flipped.delete(id);
+    for (const id of [...readGroups.keys()]) if (!s.contentIds.includes(id)) readGroups.delete(id);
+    for (const id of [...readWith.keys()]) if (!s.nodes.has(id)) readWith.delete(id);
+    for (const key of [...askedToRead]) { const first = String(key).replace(/^line:/, '').split(',')[0]; if (!s.nodes.has(first)) askedToRead.delete(key); }
+  }
+
   function render(s) {
     state = s;
     chipHits = [];
+    pruneRuntime(s);
     // No model is asked from here: a paint is not a request (§6.3).
     syncStage(s);
     refreshOffers();
@@ -2385,6 +2405,20 @@
         label: '“' + lineText + '” ' + conf.toFixed(2), name: lineText,
         why: allWriting ? 'the line you wrote — take it as text, here; the ink stays underneath' : 'the line you wrote — take it as the name', tier: 1,
         run: () => { if (allWriting) writingToText(sum, lineText); else session.bless({ summonId: sum.id, name: lineText, at: Date.now() }); },
+      });
+    }
+    // Written words on or beside a text made from writing fold into it (v10 F12):
+    // in place of a struck word's gap, else after the nearest word.
+    {
+      const saidAll = allWriting ? marks.map((id) => MM.transcriptOf(s.nodes.get(id))).filter(Boolean) : [];
+      const folding = lineRead ? lineText : (saidAll.length === marks.length && marks.length ? saidAll.join(' ') : '');
+      const boxes = marks.map((id) => MM.boundsOf(s.nodes.get(id))).filter(Boolean);
+      const nearText = folding && boxes.length ? textNear(s, union(boxes)) : null;
+      if (nearText) items.push({
+        key: 'fold:' + nearText, certain: true, group: 'written', groupConf: 0.95, groupWhy: 'the text it sits beside',
+        label: 'Fold “' + folding + '” into the text', name: folding,
+        why: 'in place of the struck word, or after the nearest one; the writing leaves, the text keeps every version', tier: 1,
+        run: () => { const ids = marks.slice(); session.dismiss(sum.id, Date.now()); session.deselect(Date.now()); foldIntoText(nearText, folding, ids); say('folded “' + folding + '” into the text'); },
       });
     }
     // What the writing says: write a word beside a shape and it is the shape's name.
@@ -3982,19 +4016,28 @@
    * in the ink's colour; one region, `text`, so ink over it addresses it.
    */
   function writingDocument(code, w, h) {
-    const lines = String(code).split(/\r?\n/).filter((l) => l.length);
+    const lines = String(code).split(/\r?\n/);
     if (!lines.length) lines.push('');
     const W = Math.max(1, Math.round(w)), H = Math.max(1, Math.round(h));
     const lineH = H / lines.length;
-    const longest = Math.max(1, ...lines.map((l) => l.length));
-    const fs = Math.max(6, Math.min(lineH * 0.78, W / (longest * 0.62)));
+    let k = 0; // words are regions, numbered across the text: w1, w2 … (v10 F12)
     const svgText = lines.map((l, i) => {
+      const words = l.split(/\s+/).filter(Boolean);
+      const chars = words.reduce((a, wd) => a + wd.length, 0) + Math.max(0, words.length - 1);
+      const unit = W / Math.max(1, chars); // one character's width, the line fitted to the frame
+      const fs = Math.max(6, Math.min(lineH * 0.78, unit / 0.62));
       const y = lineH * i + lineH * 0.72;
-      const fit = lines.length === 1 ? ' textLength="' + W + '" lengthAdjust="spacing"' : '';
-      return '<text data-region="' + (lines.length === 1 ? 'text' : 'line' + (i + 1)) + '" x="0" y="' + y.toFixed(1) + '" font-size="' + fs.toFixed(1) + '"' + fit + '>' + esc(l) + '</text>';
+      let x = 0, out = '';
+      for (const wd of words) {
+        k++;
+        const wpx = wd.length * unit;
+        out += '<text data-region="w' + k + '"' + (wd === '…' ? ' class="gap"' : '') + ' x="' + x.toFixed(1) + '" y="' + y.toFixed(1) + '" font-size="' + fs.toFixed(1) + '" textLength="' + wpx.toFixed(1) + '" lengthAdjust="spacing">' + esc(wd) + '</text>';
+        x += wpx + unit;
+      }
+      return out;
     }).join('');
     return '<!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0;padding:0;background:transparent;overflow:hidden;}' +
-      'svg{display:block;}text{font-family:"IBM Plex Mono",ui-monospace,Menlo,monospace;fill:' + (C ? C.ink : '#e8e4d9') + ';}' +
+      'svg{display:block;}text{font-family:"IBM Plex Mono",ui-monospace,Menlo,monospace;fill:' + (C ? C.ink : '#e8e4d9') + ';}text.gap{opacity:0.45;}' +
       'html.mm-reveal text{outline:1px dashed rgba(138,109,31,0.6);}</style></head>' +
       '<body><div id="mmroot" style="width:' + W + 'px;height:' + H + 'px"><svg xmlns="http://www.w3.org/2000/svg" width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '">' + svgText + '</svg></div></body></html>';
   }
@@ -5430,7 +5473,7 @@
 // ===== text =====
 // Provides: text as an element — typeText (a text artifact at a point), editText (a new version of one),
 //   beginTextEdit/commitTextEdit (the editor on the canvas, opened by a double-click on empty ground or
-//   from the panel), wordToText (a written word becomes a text artifact, on request).
+//   from the panel), wordToText (a written word becomes a text artifact, on request), strikeOnText/foldIntoText/textNear (text folds back from ink).
 // Uses: core, view, artifacts (frames), render.
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () { ... })();`. Shared state is the
@@ -5458,9 +5501,11 @@
     });
   }
 
-  /** A new version of a text artifact's words. */
+  /** A new version of a text artifact's words. Where the text came from (writing) travels with every version. */
   function editText(id, text) {
-    return session.attachCode({ participantId: MM.LOCAL_PARTICIPANT, nodeId: id, kind: 'text', code: text, at: Date.now() });
+    const n = session.getState().nodes.get(id);
+    const rep = n && codeRepOf(n);
+    return session.attachCode({ participantId: MM.LOCAL_PARTICIPANT, nodeId: id, kind: 'text', code: text, from: rep && rep.data.from, at: Date.now() });
   }
 
   /** A written word (its transcript) becomes a text artifact where the writing is; the ink stays. */
@@ -5476,6 +5521,96 @@
       kind: 'text', path: TEXT_DIR + '/' + textCount + '.txt', name: text,
       bounds: { minX: b.minX, minY: b.minY, maxX: b.minX + w, maxY: b.minY + h }, code: text, at: Date.now(),
     });
+  }
+
+  // ===== Text folds back from ink (v10 F12) ===================================
+  // Text is first class and it came from the hand: scratch a word of a text
+  // made from writing and the word is struck — a gap stands where it was;
+  // write beside the gap, read it, and *Fold “…” into the text* puts the new
+  // word in its place. Every step is a new version of the text; undo walks
+  // them back.
+  const GAP = '…';
+
+  /** The words of a text with their positions on the canvas, from the frame's own document. */
+  function textWords(s, aid) {
+    const an = s.nodes.get(aid);
+    const fr = an && MM.frameOf(an);
+    const f = frames.get(aid);
+    let doc = null;
+    try { doc = f && f.iframe ? f.iframe.contentDocument : null; } catch (err) { doc = null; }
+    if (!fr || !doc) return [];
+    const out = [];
+    for (const el of doc.querySelectorAll('text[data-region]')) {
+      const r = el.getBoundingClientRect();
+      out.push({ index: Number(el.dataset.region.slice(1)) - 1, word: el.textContent, box: { minX: fr.x + r.left, minY: fr.y + r.top, maxX: fr.x + r.right, maxY: fr.y + r.bottom } });
+    }
+    return out;
+  }
+  /** A text's code with word k replaced, or a word inserted after k — lines kept. */
+  function withWord(code, k, word, insertAfter) {
+    let i = 0;
+    return String(code).split(/\r?\n/).map((l) => l.split(/\s+/).filter(Boolean).flatMap((wd) => {
+      const j = i++;
+      if (j !== k) return [wd];
+      return insertAfter ? [wd, word] : [word];
+    }).join(' ')).join('\n');
+  }
+  /** A scratch over a word of a text strikes it: a gap where it was, the scratch gone, one version. Returns the word struck. */
+  function strikeOnText(s, strokeId, points) {
+    const node = s.nodes.get(strokeId);
+    const fp = node && MM.fingerprintOf(node);
+    if (!fp || fp.isClosed || fp.corners < 2) return null;
+    const b = fp.bounds;
+    for (const aid of s.live) {
+      const an = s.nodes.get(aid);
+      if (!isWritingArtifact(an) || flipped.has(aid)) continue;
+      const fr = MM.frameOf(an);
+      if (!fr || b.maxX < fr.x || b.minX > fr.x + fr.w || b.maxY < fr.y || b.minY > fr.y + fr.h) continue;
+      for (const wd of textWords(s, aid)) {
+        if (wd.word === GAP) continue;
+        const outline = MM.outlineOf({ bounds: wd.box, closed: true });
+        if (!outline || MM.countCrossings(points, outline, 3) < 3) continue;
+        editText(aid, withWord(codeRepOf(an).data.code, wd.index, GAP, false));
+        session.erase(strokeId, Date.now());
+        return wd.word;
+      }
+    }
+    return null;
+  }
+  /** The text made from writing that this writing sits on or just beside (above a gap, say), if any. */
+  function textNear(s, b) {
+    const h = Math.max(1, b.maxY - b.minY);
+    for (const aid of s.live) {
+      const an = s.nodes.get(aid);
+      if (!isWritingArtifact(an)) continue;
+      const fr = MM.frameOf(an);
+      if (!fr) continue;
+      // Beside: within four lines of the text, or four heights of the writing, whichever is the taller — a hand writes the replacement a line or two above.
+      const lines = Math.max(1, String(codeRepOf(an).data.code).split(/\r?\n/).length);
+      const tol = 4 * Math.max(h, fr.h / lines);
+      if (b.maxX >= fr.x - tol && b.minX <= fr.x + fr.w + tol && b.maxY >= fr.y - tol && b.minY <= fr.y + fr.h + tol) return aid;
+    }
+    return null;
+  }
+  /** Written words fold into a text: in place of the nearest gap, else after the nearest word. The writing leaves; the text is a version richer. */
+  function foldIntoText(aid, text, markIds) {
+    const s = session.getState();
+    const an = s.nodes.get(aid);
+    const rep = an && codeRepOf(an);
+    if (!rep) return null;
+    const boxes = markIds.map((id) => MM.boundsOf(s.nodes.get(id))).filter(Boolean);
+    const cx = boxes.length ? (Math.min(...boxes.map((x) => x.minX)) + Math.max(...boxes.map((x) => x.maxX))) / 2 : 0;
+    const words = textWords(s, aid);
+    const dist = (wd) => Math.abs((wd.box.minX + wd.box.maxX) / 2 - cx);
+    const gaps = words.filter((wd) => wd.word === GAP).sort((p, q) => dist(p) - dist(q));
+    const at = Date.now();
+    let next;
+    if (gaps.length) next = withWord(rep.data.code, gaps[0].index, text, false);
+    else if (words.length) { const near = words.slice().sort((p, q) => dist(p) - dist(q))[0]; next = withWord(rep.data.code, near.index, text, true); }
+    else next = text;
+    editText(aid, next);
+    markIds.forEach((id, i) => session.erase(id, at + 1 + i));
+    return next;
   }
 
   function wordToText(wordId) {
@@ -5790,6 +5925,9 @@
     replay: () => rp, rpGoTo: (i) => rpGoTo(i), theme: THEME,
     // The minimap, for tests: where the last paint put the world.
     minimap: () => mini, readGroups: readGroups, chips: () => chipHits,
+    // Text folds back from ink, for tests: the words of a text where they stand.
+    textWords: (id) => textWords(session.getState(), id), foldIntoText: foldIntoText,
+    strikeOnText: (strokeId, pts) => strikeOnText(session.getState(), strokeId, pts), textNear: (b) => textNear(session.getState(), b),
     // For tests: pin the view so world coordinates map to known screen ones.
     setView: (zoom, panX, panY) => { view.zoom = zoom; view.panX = panX; view.panY = panY; afterViewChange(); },
     resetUses: () => { for (const k of Object.keys(uses)) delete uses[k]; store.del(USES_KEY); },

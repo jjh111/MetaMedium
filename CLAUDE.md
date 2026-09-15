@@ -52,7 +52,7 @@ circle them, cross with a command mark *you taught the system*, prompt them into
 a living page that renders in the canvas with your ink still outlining its
 divs — then draw on that page and the ink addresses the regions underneath it.
 Scratch anything out to erase. `Demos/session-engine.html` is the surface;
-`Demos/session-engine.e2e.js` drives 174 steps through the real UI: page, flowchart, handwriting (read only when asked; a line read as one), the model drawing, the user-side loop, selection and the field, corrections, the worker, the tank, words into verbs and acting out, frames and the drawn slider, the folder, pictures, text, the moment, a live room, a playing frame that takes the pointer, hold by long-press, the graph in 3D, and the foundations (letters at any size, a mark that crosses, readings that stay, the minimap). A run takes about 100 s; run it **in its own tab on its own origin** (`http://127.0.0.1:8010/…?fresh=1&nosw=1` — `__setup` refuses any other URL: it replaces `fetch` with a stub, joins a stub model named `e2e-stub`, and wipes the origin's saved board), start it with `__setup(); __scenario().then(r => window.__R = r)` and read `__R` when it lands.
+`Demos/session-engine.e2e.js` drives 179 steps through the real UI: page, flowchart, handwriting (read only when asked; a line read as one), the model drawing, the user-side loop, selection and the field, corrections, the worker, the tank, words into verbs and acting out, frames and the drawn slider, the folder, pictures, text, the moment, a live room, a playing frame that takes the pointer, hold by long-press, the graph in 3D, and the foundations (letters at any size, a mark that crosses, readings that stay, the minimap). A run takes about 100 s; run it **in its own tab on its own origin** (`http://127.0.0.1:8010/…?fresh=1&nosw=1` — `__setup` refuses any other URL: it replaces `fetch` with a stub, joins a stub model named `e2e-stub`, and wipes the origin's saved board), start it with `__setup(); __scenario().then(r => window.__R = r)` and read `__R` when it lands.
 v7 Stage E (handwriting) shipped 1 Sep 2026: a word written beside a shape is read by a
 model that can see and offered as that shape's name. Whitepaper v5.1 stays parked until the
 conversation benchmark passes end to end.
@@ -711,6 +711,13 @@ place read as `text` and was handed to every model that can see, and every
 check asked every model to interpret the group before a word was typed — a
 doodle session was a stream of calls nobody made.
 
+**Every making prompt says what can be made here** (v10 F13, `HERE` in
+`participants/agent.ts`): one paragraph on the interpret, ask, make,
+program and draw prompts naming ink and its readings, names, pages,
+programs (the `mm` contract, with `onPointer`), text, SVG and answers, and
+nothing else. A model with no ground spins off into files, servers and
+frameworks; a small one most of all.
+
 **A model at work is shown where it works.** Every call to a model is
 registered while it runs (`withWork` in `04-models.js`) and drawn as a
 breathing gold dot with the model's name and its task **above the marks it
@@ -783,6 +790,19 @@ fingerprint carries it, so the model is asked to *read*, not to interpret.
   `06-handwriting.js`, the size read from the model's name), not every one:
   a 27B model takes minutes at a word a 0.8B reads in seconds. A dedicated
   handwriting model in the browser is the next step (the v10 plan, §6).
+- **Text folds back from ink** (v10 F12, `19-text.js`): every word of a
+  text made from writing is its own region (`w1`, `w2` …; `writingDocument`
+  fits each line to the frame), so ink over a word addresses it. A scratch
+  across a word **strikes** it (`strikeOnText`): a gap `…` stands where it
+  was, the scratch leaves, and the strokes underneath are never scratch
+  targets (`scratchTargets` skips a text's members — they are provenance).
+  Writing beside the gap, read, is offered as *Fold “…” into the text*
+  (`foldIntoText`): the word goes into the nearest gap, or after the nearest
+  word, and the writing leaves. Every step is a version; undo walks back.
+  **Runtime memory keyed by node id forgets what the log no longer holds**
+  (`pruneRuntime` in `08-render.js`): ids are a counter derived on replay,
+  so a fresh board reuses them, and a text flipped before a `load([])` kept
+  the next text with the same id flipped.
 - **The words reach the brief.** `describeReading` says *the human wrote
   "Pricing" there — use those words* instead of *handwriting you cannot read*.
 - **Printed letters gather into a word** (`session/words.ts`). Small strokes
@@ -945,6 +965,12 @@ written by hand, so the repo takes no dependency; it imports the committed
 Node bundle `Demos/metamedium-core.node.mjs`. In the canvas: the *live*
 tile → *with Claude*, or `?live=claude&relay=http://127.0.0.1:8020`. Its
 ink arrives as its own log, stamped `by` on arrival, in its own colour.
+**In a session without the tools loaded** (the `.mcp.json` was added after
+the session began), the hand still works from the shell: run `mcp.mjs` with
+its stdin fed by `tail -f` on a command file and its stdout to an output
+file, append one JSON-RPC line per call, read the reply — the same seven
+tools, one process kept alive across turns. `QA-v10.md` is the hand test
+run that way, with the hand in the room checking each step.
 
 ### Text as an element (v8, WP-13)
 

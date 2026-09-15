@@ -209,19 +209,28 @@
    * in the ink's colour; one region, `text`, so ink over it addresses it.
    */
   function writingDocument(code, w, h) {
-    const lines = String(code).split(/\r?\n/).filter((l) => l.length);
+    const lines = String(code).split(/\r?\n/);
     if (!lines.length) lines.push('');
     const W = Math.max(1, Math.round(w)), H = Math.max(1, Math.round(h));
     const lineH = H / lines.length;
-    const longest = Math.max(1, ...lines.map((l) => l.length));
-    const fs = Math.max(6, Math.min(lineH * 0.78, W / (longest * 0.62)));
+    let k = 0; // words are regions, numbered across the text: w1, w2 … (v10 F12)
     const svgText = lines.map((l, i) => {
+      const words = l.split(/\s+/).filter(Boolean);
+      const chars = words.reduce((a, wd) => a + wd.length, 0) + Math.max(0, words.length - 1);
+      const unit = W / Math.max(1, chars); // one character's width, the line fitted to the frame
+      const fs = Math.max(6, Math.min(lineH * 0.78, unit / 0.62));
       const y = lineH * i + lineH * 0.72;
-      const fit = lines.length === 1 ? ' textLength="' + W + '" lengthAdjust="spacing"' : '';
-      return '<text data-region="' + (lines.length === 1 ? 'text' : 'line' + (i + 1)) + '" x="0" y="' + y.toFixed(1) + '" font-size="' + fs.toFixed(1) + '"' + fit + '>' + esc(l) + '</text>';
+      let x = 0, out = '';
+      for (const wd of words) {
+        k++;
+        const wpx = wd.length * unit;
+        out += '<text data-region="w' + k + '"' + (wd === '…' ? ' class="gap"' : '') + ' x="' + x.toFixed(1) + '" y="' + y.toFixed(1) + '" font-size="' + fs.toFixed(1) + '" textLength="' + wpx.toFixed(1) + '" lengthAdjust="spacing">' + esc(wd) + '</text>';
+        x += wpx + unit;
+      }
+      return out;
     }).join('');
     return '<!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0;padding:0;background:transparent;overflow:hidden;}' +
-      'svg{display:block;}text{font-family:"IBM Plex Mono",ui-monospace,Menlo,monospace;fill:' + (C ? C.ink : '#e8e4d9') + ';}' +
+      'svg{display:block;}text{font-family:"IBM Plex Mono",ui-monospace,Menlo,monospace;fill:' + (C ? C.ink : '#e8e4d9') + ';}text.gap{opacity:0.45;}' +
       'html.mm-reveal text{outline:1px dashed rgba(138,109,31,0.6);}</style></head>' +
       '<body><div id="mmroot" style="width:' + W + 'px;height:' + H + 'px"><svg xmlns="http://www.w3.org/2000/svg" width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '">' + svgText + '</svg></div></body></html>';
   }

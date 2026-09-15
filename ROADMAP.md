@@ -33,8 +33,16 @@
 > only on what it crosses (an open stroke it sits near is a letter of a
 > word), the clean-form ghost is offered for a moment rather than stuck, the
 > field offers *Read as writing* on any ink, a model's reading stays as a
-> chip beside the group after the field is gone, and a minimap. Core 572
-> tests; e2e 168 steps.
+> chip beside the group after the field is gone, and a minimap. Then, from
+> a second and third round in his hand: taking a transcript makes **text in
+> place** (fitted to the ink, the writing underneath and flippable,
+> editable, never a definition), one tap lets go, a failed brief leaves
+> nothing, Esc stops a model, reading goes to the smallest model that sees;
+> **text folds back from ink** — scratch a word to strike it, write beside
+> the gap and fold the word in, every step a version; and every making
+> prompt carries one paragraph of what can be made here. `QA-v10.md` is
+> the hand test with the MCP hand in the room. Core 574 tests; e2e 179
+> steps.
 >
 > **v9 accounting, 6 September 2026 (branch `next-phases`, local).** The
 > surface as a system (`SURFACE-v9-PLAN.md` §5–§6): **a model is asked only

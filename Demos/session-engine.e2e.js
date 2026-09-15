@@ -1506,5 +1506,57 @@ window.__scenario = async function(){
     mm.session.load([]);
   }
 
+  // ---- 35. Text folds back from ink: scratch a word to strike it, write beside the gap, fold it in (v10 F12) ----
+  {
+    mm.session.load([]); mm.setView(1, 0, 0);
+    mm.agents.length = 0; mm.agents.push(MM.createAgentParticipant(mm.session, Object.assign({}, MM.PRESETS.ollama, { model: 'e2e-stub', vision: true }), Date.now()));
+    t.stroke(t.word(200, 300, 90, 28, 6)); t.stroke(t.word(320, 302, 110, 26, 7)); t.stroke(t.word(460, 300, 80, 28, 5));
+    t.stroke(t.circle(370, 330, 220)); t.takeLoop(370, 330, 220); await wait(60);
+    window.__readReply = [{ text: 'hello wide world', confidence: 0.9 }];
+    const rp35 = [...document.querySelectorAll('#summon .item')].find(b => /Read the writing/.test(b.textContent));
+    if (rp35) rp35.click();
+    const read35 = () => { const st = mm.session.getState(); return st.contentIds.filter(id => MM.transcriptOf(st.nodes.get(id))).length; };
+    for (let i = 0; i < 30 && read35() < 3; i++) await wait(100);
+    await wait(100);
+    const lp35 = [...document.querySelectorAll('#summon .item')].find(b => /^“hello wide world” 0\.90/.test(b.textContent.trim()));
+    if (lp35) lp35.click();
+    await wait(60);
+    const st35 = mm.session.getState();
+    const art35 = st35.artifacts.map(id => st35.nodes.get(id)).find(n => { const r = codeRepOfNode(n); return r && r.data.kind === 'text' && r.data.from === 'writing'; });
+    for (let i = 0; i < 40 && (!art35 || mm.textWords(art35.id).length < 3); i++) await wait(100);
+    const words35 = art35 ? mm.textWords(art35.id) : [];
+    step('35. the text made from writing stands as three words, each a region where it is', words35.length === 3 && words35.map(w => w.word).join(' ') === 'hello wide world', words35.map(w => w.word));
+    const w2 = words35.find(w => w.index === 1);
+    if (w2) {
+      const bw = w2.box.maxX - w2.box.minX, bh = w2.box.maxY - w2.box.minY;
+      const a = mm.worldToScreen(w2.box.minX - 12, w2.box.minY + bh * 0.2), b = mm.worldToScreen(w2.box.maxX + 12, w2.box.minY + bh * 0.8);
+      t.stroke(t.scratch(a.x, a.y, b.x - a.x, b.y - a.y, 3)); // three passes across the second word
+      await wait(60);
+    }
+    const st35b = mm.session.getState();
+    const code35 = art35 && codeRepOfNode(st35b.nodes.get(art35.id)).data.code;
+    step('35a. a scratch across a word strikes it: a gap where it was, the scratch gone, the strokes underneath untouched', code35 === 'hello … world' && st35b.contentIds.length === 1 && st35b.live.includes(art35 && art35.id), { code: code35, content: st35b.contentIds.length, status: document.getElementById('status').textContent.slice(0, 80) });
+    // Write beside the gap, read it, fold it in.
+    if (w2) t.stroke(t.word(w2.box.minX, w2.box.minY - 44, 110, 28, 5)); // a line or two above the gap
+    if (w2) { t.stroke(t.circle(w2.box.minX + 55, w2.box.minY - 37, 80)); t.takeLoop(w2.box.minX + 55, w2.box.minY - 37, 80); }
+    await wait(60);
+    window.__readReply = [{ text: 'wide', confidence: 0.9 }];
+    const rp35b = [...document.querySelectorAll('#summon .item')].find(b => /Read the writing/.test(b.textContent));
+    if (rp35b) rp35b.click();
+    for (let i = 0; i < 30 && !t.chips().some(c => /Fold “wide” into the text/.test(c)); i++) await wait(100);
+    const foldPill = [...document.querySelectorAll('#summon .item')].find(b => /Fold “wide” into the text/.test(b.textContent));
+    step('35b. writing beside the gap, read, is offered to fold into the text', !!foldPill, t.chips());
+    if (foldPill) foldPill.click();
+    await wait(60);
+    const st35c = mm.session.getState();
+    const code35c = art35 && codeRepOfNode(st35c.nodes.get(art35.id)).data.code;
+    step('35c. folded, the text is whole again, the writing has left, nothing is held', code35c === 'hello wide world' && st35c.contentIds.length === 1 && !st35c.summon && !st35c.selection.length, { code: code35c, content: st35c.contentIds.length });
+    mm.session.undo(); mm.session.undo();
+    const code35d = art35 && codeRepOfNode(mm.session.getState().nodes.get(art35.id)).data.code;
+    step('35d. undo walks the versions back: the gap returns', code35d === 'hello … world', { code: code35d });
+    window.__readReply = null;
+    mm.session.load([]);
+  }
+
   return R;
 };

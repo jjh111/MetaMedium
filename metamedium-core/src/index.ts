@@ -259,7 +259,7 @@ export { planFor, connectionsOf } from './parse/plan';
 export type { Plan } from './parse/plan';
 
 // Agent participants — a model joins through the same channel a human uses.
-export { createAgentParticipant, parseReadings, parseCode, parseFill, parseTranscripts, parseBehaviourReply, parseProgram, readingsToEdges, MAX_READINGS } from './participants/agent';
+export { HERE, createAgentParticipant, parseReadings, parseCode, parseFill, parseTranscripts, parseBehaviourReply, parseProgram, readingsToEdges, MAX_READINGS } from './participants/agent';
 export type { BehaveResult, ProgramResult } from './participants/agent';
 export type { AgentParticipant, AgentReading, InterpretResult, AskResult, GenerateResult, ReadResult, TranscriptReading, DrawResult, RegionFill } from './participants/agent';
 export { describeSession, describeSignature, describeRegions, describeAddressed, describeReading } from './participants/serialize';

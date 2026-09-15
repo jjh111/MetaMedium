@@ -72,3 +72,28 @@ describe('writing as text', () => {
     expect(s.getState().clusterCandidates).toHaveLength(0);
   });
 });
+
+// The ink under a text is provenance: a scratch over it erases nothing (v10 F12).
+describe('a text holds its ink', () => {
+  it('a scratch across a text made from writing erases none of the strokes underneath', () => {
+    const s = createSession();
+    s.addStroke(box(0, 0, 40, 60), 1000);
+    s.addStroke(box(60, 0, 40, 60), 1100);
+    s.addStroke(box(-30, -30, 160, 120), 1200);
+    const sum = s.summonHeld(1300)!;
+    const id = s.bless({ summonId: sum, name: 'hello world', at: 1400 })!;
+    s.attachCode({ participantId: LOCAL_PARTICIPANT, nodeId: id, kind: 'text', code: 'hello world', from: 'writing', at: 1500 });
+    const before = s.getState().contentIds.slice();
+    // Three passes across the first word's box: a scratch by every rule.
+    const pts = [];
+    for (let i = 0; i <= 20; i++) pts.push({ x: -10 + (60 * i) / 20, y: 10 });
+    for (let i = 0; i <= 20; i++) pts.push({ x: 50 - (60 * i) / 20, y: 30 });
+    for (let i = 0; i <= 20; i++) pts.push({ x: -10 + (60 * i) / 20, y: 50 });
+    const scratch = s.addStroke(pts, 2000);
+    const st = s.getState();
+    expect(st.contentIds).toEqual(before.concat(scratch));
+    expect(st.live).toContain(id);
+    const members = st.nodes.get(id)!.edges.filter((e) => e.rel === 'has-part').map((e) => e.to);
+    for (const m of members) expect(st.nodes.get(m)!.reps.some((r) => r.modality === 'erased')).toBe(false);
+  });
+});

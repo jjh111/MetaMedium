@@ -4801,6 +4801,8 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
         ids.add(id);
         continue;
       }
+      const code = [...n2.reps].reverse().find((r) => r.modality === "code")?.data;
+      if (code?.kind === "text") continue;
       for (const e of n2.edges) if (e.rel === "has-part") ids.add(e.to);
     }
     return [...ids].map((id) => nodes.get(id)).filter((n2) => !!n2 && !getRep(n2, "erased") && !!strokePointsOf(n2)).map((n2) => ({
@@ -6319,7 +6321,10 @@ function describeReading(reading, options = {}) {
 
 // src/participants/agent.ts
 var MAX_READINGS = 4;
+var HERE = `THE CANVAS holds only these: ink (the human's marks, read as rectangle, circle, triangle, line, arrow, text or dot), names the human gives a group, PAGES (regions the drawing laid out, filled per region id), PROGRAMS (the body of a function of \`mm\`: width, height, ctx, THREE/scene/camera when 3D loaded, onFrame, onPointer, report), TEXT (plain words, editable), SVG markup, and short answers placed beside marks. Nothing else exists here \u2014 no files, servers, frameworks or libraries beyond three.js r128.`;
 var SYSTEM_PROMPT = `You are a participant on a shared drawing canvas, alongside a human and the canvas's own geometric recognizer.
+
+${HERE}
 
 You are given GROUNDED FACTS about marks that were drawn: measured geometry, spatial relations, and how other participants already read them. You are not given an image. Trust the measurements \u2014 they are exact.
 
@@ -6336,6 +6341,8 @@ Reply with ONLY a JSON array, no prose, no code fences:
 [{"label":"short-name","confidence":0.0-1.0,"reasoning":"one sentence citing the evidence"}]`;
 var ASK_PROMPT = `You are a participant on a shared drawing canvas, answering a question about specific marks the human has selected.
 
+${HERE}
+
 You are given GROUNDED FACTS: measured geometry, spatial relations between marks, and how each participant (including the canvas's own recognizer) currently reads them. You are not given an image.
 
 Answer the question directly, in 1\u20133 short sentences of plain prose.
@@ -6347,6 +6354,8 @@ Rules:
 - If the facts do not support an answer, say what is missing rather than guessing.
 - No preamble, no markdown, no bullet points. Just the answer.`;
 var MAKE_PROMPT = `You are a participant on a shared drawing canvas. The human drew a layout and asked you to build it.
+
+${HERE}
 
 THE LAYOUT IS ALREADY DECIDED. It was measured from their drawing and the canvas will assemble it. You are not writing the page structure and you must not try to: no wrappers, no positioning, no widths or heights, no flexbox. If you emit layout it will be discarded, and if you omit a region it will render empty.
 
@@ -6409,12 +6418,15 @@ A target is a NAME the human uses for something on the canvas; use the word they
 Every term's "why" quotes the words it came from. Do not invent a verb outside the list.`;
 var PROGRAM_PROMPT = `You are a participant on a shared drawing canvas. The human circled a drawing and typed a brief, and the canvas cannot answer it from what it holds \u2014 so you write a PROGRAM that renders it, right there, in the drawing's own frame.
 
+${HERE}
+
 THE CONTRACT. Your code is the body of a function with one argument, \`mm\`:
   mm.width, mm.height     the frame in pixels \u2014 fill it; the drawing sits exactly here
   mm.THREE                three.js, when it loaded (r128); may be undefined offline
   mm.scene, mm.camera, mm.renderer   a ready three.js scene with a TRANSPARENT background, a perspective camera looking at the origin, and a renderer that draws every frame \u2014 add meshes to mm.scene; do not create your own renderer or canvas
   mm.ctx                  a 2D canvas context the size of the frame, for drawings with no 3D; clear it yourself each frame
   mm.onFrame(fn)          fn(t, dt) runs every frame; use it to animate
+  mm.onPointer(fn)        fn({type:'down'|'move'|'up', x, y}) when a hand presses inside the frame while it plays; mm.pointer holds the latest
   mm.report(name, x, y, w, h)   a PART: a named rectangle in frame pixels, so ink drawn over it lands on that name. Report every distinct thing you draw, every frame, at where it is now. For three.js, give each mesh a .name and the canvas reports it for you.
 Rules:
 - The background must stay CLEAR: nothing fills the frame; only the thing itself is drawn. It is a figure on the human's canvas, not a page.
@@ -6429,6 +6441,8 @@ Reply with ONLY a JSON object, no prose, no code fences:
 or
 {"reuse":"<library name>"}`;
 var DRAW_PROMPT = `You are a participant on a shared drawing canvas, alongside a human. You have been asked to ADD MARKS to the drawing.
+
+${HERE}
 
 You are given the marks already on the canvas as measured facts \u2014 positions, sizes, what each reads as and plays \u2014 in canvas units (y grows downward). You are not given an image.
 
@@ -7179,6 +7193,7 @@ export {
   GRAPH3D_MARK,
   GitStore,
   HAND_RESOLUTION_PX,
+  HERE,
   KINDS,
   LETTER_MAX_HEIGHT_PX,
   LOCAL_PARTICIPANT,

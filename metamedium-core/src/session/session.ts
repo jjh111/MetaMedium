@@ -744,6 +744,11 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
         ids.add(id);
         continue;
       }
+      // The ink under a text made from writing is provenance, not a target:
+      // a scratch over the text strikes a WORD (the surface's act), never
+      // the hidden strokes that would break the text (v10 F12).
+      const code = [...n.reps].reverse().find((r) => r.modality === 'code')?.data as { kind?: string } | undefined;
+      if (code?.kind === 'text') continue;
       for (const e of n.edges) if (e.rel === 'has-part') ids.add(e.to);
     }
     return [...ids]

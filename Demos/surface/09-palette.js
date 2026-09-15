@@ -82,6 +82,20 @@
         run: () => { if (allWriting) writingToText(sum, lineText); else session.bless({ summonId: sum.id, name: lineText, at: Date.now() }); },
       });
     }
+    // Written words on or beside a text made from writing fold into it (v10 F12):
+    // in place of a struck word's gap, else after the nearest word.
+    {
+      const saidAll = allWriting ? marks.map((id) => MM.transcriptOf(s.nodes.get(id))).filter(Boolean) : [];
+      const folding = lineRead ? lineText : (saidAll.length === marks.length && marks.length ? saidAll.join(' ') : '');
+      const boxes = marks.map((id) => MM.boundsOf(s.nodes.get(id))).filter(Boolean);
+      const nearText = folding && boxes.length ? textNear(s, union(boxes)) : null;
+      if (nearText) items.push({
+        key: 'fold:' + nearText, certain: true, group: 'written', groupConf: 0.95, groupWhy: 'the text it sits beside',
+        label: 'Fold “' + folding + '” into the text', name: folding,
+        why: 'in place of the struck word, or after the nearest one; the writing leaves, the text keeps every version', tier: 1,
+        run: () => { const ids = marks.slice(); session.dismiss(sum.id, Date.now()); session.deselect(Date.now()); foldIntoText(nearText, folding, ids); say('folded “' + folding + '” into the text'); },
+      });
+    }
     // What the writing says: write a word beside a shape and it is the shape's name.
     {
       const labels = reading.roles.filter((r) => r.role === 'label' && sum.enclosedIds.includes(r.id) && !(lineRead && lineIds.includes(r.id)));

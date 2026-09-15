@@ -44,7 +44,17 @@ export interface InterpretResult {
 
 export const MAX_READINGS = 4;
 
+/**
+ * What can be made here, in one paragraph, on every prompt that makes or
+ * reads (v10 F13). A model with no ground spins off — a React app, a file,
+ * a server — and a small one most of all. Short on purpose: it rides on
+ * every call.
+ */
+export const HERE = `THE CANVAS holds only these: ink (the human's marks, read as rectangle, circle, triangle, line, arrow, text or dot), names the human gives a group, PAGES (regions the drawing laid out, filled per region id), PROGRAMS (the body of a function of \`mm\`: width, height, ctx, THREE/scene/camera when 3D loaded, onFrame, onPointer, report), TEXT (plain words, editable), SVG markup, and short answers placed beside marks. Nothing else exists here — no files, servers, frameworks or libraries beyond three.js r128.`;
+
 const SYSTEM_PROMPT = `You are a participant on a shared drawing canvas, alongside a human and the canvas's own geometric recognizer.
+
+${HERE}
 
 You are given GROUNDED FACTS about marks that were drawn: measured geometry, spatial relations, and how other participants already read them. You are not given an image. Trust the measurements — they are exact.
 
@@ -62,6 +72,8 @@ Reply with ONLY a JSON array, no prose, no code fences:
 
 const ASK_PROMPT = `You are a participant on a shared drawing canvas, answering a question about specific marks the human has selected.
 
+${HERE}
+
 You are given GROUNDED FACTS: measured geometry, spatial relations between marks, and how each participant (including the canvas's own recognizer) currently reads them. You are not given an image.
 
 Answer the question directly, in 1–3 short sentences of plain prose.
@@ -74,6 +86,8 @@ Rules:
 - No preamble, no markdown, no bullet points. Just the answer.`;
 
 const MAKE_PROMPT = `You are a participant on a shared drawing canvas. The human drew a layout and asked you to build it.
+
+${HERE}
 
 THE LAYOUT IS ALREADY DECIDED. It was measured from their drawing and the canvas will assemble it. You are not writing the page structure and you must not try to: no wrappers, no positioning, no widths or heights, no flexbox. If you emit layout it will be discarded, and if you omit a region it will render empty.
 
@@ -150,12 +164,15 @@ Every term's "why" quotes the words it came from. Do not invent a verb outside t
 
 const PROGRAM_PROMPT = `You are a participant on a shared drawing canvas. The human circled a drawing and typed a brief, and the canvas cannot answer it from what it holds — so you write a PROGRAM that renders it, right there, in the drawing's own frame.
 
+${HERE}
+
 THE CONTRACT. Your code is the body of a function with one argument, \`mm\`:
   mm.width, mm.height     the frame in pixels — fill it; the drawing sits exactly here
   mm.THREE                three.js, when it loaded (r128); may be undefined offline
   mm.scene, mm.camera, mm.renderer   a ready three.js scene with a TRANSPARENT background, a perspective camera looking at the origin, and a renderer that draws every frame — add meshes to mm.scene; do not create your own renderer or canvas
   mm.ctx                  a 2D canvas context the size of the frame, for drawings with no 3D; clear it yourself each frame
   mm.onFrame(fn)          fn(t, dt) runs every frame; use it to animate
+  mm.onPointer(fn)        fn({type:'down'|'move'|'up', x, y}) when a hand presses inside the frame while it plays; mm.pointer holds the latest
   mm.report(name, x, y, w, h)   a PART: a named rectangle in frame pixels, so ink drawn over it lands on that name. Report every distinct thing you draw, every frame, at where it is now. For three.js, give each mesh a .name and the canvas reports it for you.
 Rules:
 - The background must stay CLEAR: nothing fills the frame; only the thing itself is drawn. It is a figure on the human's canvas, not a page.
@@ -171,6 +188,8 @@ or
 {"reuse":"<library name>"}`;
 
 const DRAW_PROMPT = `You are a participant on a shared drawing canvas, alongside a human. You have been asked to ADD MARKS to the drawing.
+
+${HERE}
 
 You are given the marks already on the canvas as measured facts — positions, sizes, what each reads as and plays — in canvas units (y grows downward). You are not given an image.
 

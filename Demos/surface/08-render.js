@@ -162,9 +162,25 @@
     return null;
   }
 
+  /**
+   * Runtime memory keyed by node id — what is flipped, which marks a reading
+   * was asked about, what was read with what, what was already handed to a
+   * reader — forgets a node the log no longer holds. Ids are a counter
+   * derived on replay, so a fresh board reuses them: a text flipped before
+   * a `load([])` kept the next text with the same id flipped, and a scratch
+   * over it struck nothing (found by e2e 35).
+   */
+  function pruneRuntime(s) {
+    for (const id of [...flipped]) if (!s.live.includes(id)) flipped.delete(id);
+    for (const id of [...readGroups.keys()]) if (!s.contentIds.includes(id)) readGroups.delete(id);
+    for (const id of [...readWith.keys()]) if (!s.nodes.has(id)) readWith.delete(id);
+    for (const key of [...askedToRead]) { const first = String(key).replace(/^line:/, '').split(',')[0]; if (!s.nodes.has(first)) askedToRead.delete(key); }
+  }
+
   function render(s) {
     state = s;
     chipHits = [];
+    pruneRuntime(s);
     // No model is asked from here: a paint is not a request (§6.3).
     syncStage(s);
     refreshOffers();

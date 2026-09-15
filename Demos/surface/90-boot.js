@@ -19,6 +19,9 @@
     replay: () => rp, rpGoTo: (i) => rpGoTo(i), theme: THEME,
     // The minimap, for tests: where the last paint put the world.
     minimap: () => mini, readGroups: readGroups, chips: () => chipHits,
+    // Text folds back from ink, for tests: the words of a text where they stand.
+    textWords: (id) => textWords(session.getState(), id), foldIntoText: foldIntoText,
+    strikeOnText: (strokeId, pts) => strikeOnText(session.getState(), strokeId, pts), textNear: (b) => textNear(session.getState(), b),
     // For tests: pin the view so world coordinates map to known screen ones.
     setView: (zoom, panX, panY) => { view.zoom = zoom; view.panX = panX; view.panY = panY; afterViewChange(); },
     resetUses: () => { for (const k of Object.keys(uses)) delete uses[k]; store.del(USES_KEY); },
