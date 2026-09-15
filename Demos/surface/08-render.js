@@ -297,6 +297,21 @@
       ctx.strokeStyle = C.ink;
       ctx.lineWidth = inkW;
       ctx.stroke();
+      // The hold, while the pen is in a site's reach: a ring and the site's
+      // name, in the participant colour — an offer, never a trap (P1).
+      if (magnetHold) {
+        const p = magnetHold.site.point;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, wpx(8), 0, Math.PI * 2);
+        ctx.strokeStyle = C.agent;
+        ctx.lineWidth = wpx(1.5);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, wpx(2.2), 0, Math.PI * 2);
+        ctx.fillStyle = C.agent;
+        ctx.fill();
+        text(magnetHold.site.kind, p.x + wpx(13), p.y - wpx(9), C.agent);
+      }
     }
 
     renderFrames(s);

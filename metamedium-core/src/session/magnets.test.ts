@@ -111,3 +111,53 @@ describe('magnets — the places a mark offers attachment', () => {
     expect(describeMagnet(sites[0])).toContain('(100, 300)');
   });
 });
+
+describe('bind — an arrow ends AT the box, and the graph says so', () => {
+  it('a bind lands as a blessed bound-to edge, the site kept as a rep', () => {
+    const s = createSession();
+    const box = s.addStroke(rectStroke(100, 100, 200, 120), 1000);
+    const line = s.addStroke(lineStroke({ x: 100, y: 100 }, { x: 500, y: 400 }), 1001);
+    s.bind({ strokeId: line, nodeId: box, site: { kind: 'corner', index: 0 }, end: 'start', at: 1002 });
+    const node = s.getState().nodes.get(line)!;
+    const edge = node.edges.find((e) => e.rel === 'bound-to');
+    expect(edge?.to).toBe(box);
+    expect(edge?.blessed).toBe(true);
+    expect(edge?.reasoning).toContain('start');
+    const rep = node.reps.find((r) => r.modality === 'bound');
+    expect(rep?.data).toEqual({ end: 'start', nodeId: box, site: { kind: 'corner', index: 0 } });
+  });
+
+  it('binding the same end again moves the claim, never doubles it', () => {
+    const s = createSession();
+    const a = s.addStroke(rectStroke(100, 100, 100, 80), 1000);
+    const b = s.addStroke(circleStroke(400, 140, 40), 1001);
+    const line = s.addStroke(lineStroke({ x: 100, y: 100 }, { x: 400, y: 140 }), 1002);
+    s.bind({ strokeId: line, nodeId: a, site: { kind: 'corner', index: 0 }, end: 'start', at: 1003 });
+    s.bind({ strokeId: line, nodeId: b, site: { kind: 'cardinal', index: 3 }, end: 'start', at: 1004 });
+    const node = s.getState().nodes.get(line)!;
+    expect(node.edges.filter((e) => e.rel === 'bound-to' && e.to === a)).toHaveLength(0);
+    expect(node.reps.filter((r) => r.modality === 'bound' && (r.data as { end: string }).end === 'start')).toHaveLength(1);
+    expect((node.reps.find((r) => r.modality === 'bound')!.data as { nodeId: string }).nodeId).toBe(b);
+  });
+
+  it('undo lets the bind go; the stroke stays', () => {
+    const s = createSession();
+    const box = s.addStroke(rectStroke(100, 100, 200, 120), 1000);
+    const line = s.addStroke(lineStroke({ x: 100, y: 100 }, { x: 500, y: 400 }), 1001);
+    s.bind({ strokeId: line, nodeId: box, site: { kind: 'corner', index: 0 }, end: 'end', at: 1002 });
+    s.undo();
+    const node = s.getState().nodes.get(line)!;
+    expect(node.edges.some((e) => e.rel === 'bound-to')).toBe(false);
+    expect(node.reps.some((r) => r.modality === 'bound')).toBe(false);
+    // The stroke itself is untouched — only the claim went.
+    expect(s.getState().nodes.has(line)).toBe(true);
+    expect(s.getEvents().filter((e) => e.type === 'stroke')).toHaveLength(2);
+  });
+
+  it('a bind to a mark that is not there is nothing, not an error', () => {
+    const s = createSession();
+    const line = s.addStroke(lineStroke({ x: 100, y: 100 }, { x: 500, y: 400 }), 1001);
+    s.bind({ strokeId: line, nodeId: 'stroke:nope', site: { kind: 'corner', index: 0 }, end: 'end', at: 1002 });
+    expect(s.getState().nodes.get(line)!.edges.some((e) => e.rel === 'bound-to')).toBe(false);
+  });
+});

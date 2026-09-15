@@ -1219,6 +1219,48 @@ window.__scenario = async function(){
       { spreadNow: Math.round(spread(cy())) });
   }
 
+  // ---- 12g. Magnets: a connector released near a mark's site binds to it ----
+  while (mm.session.getEvents().length) mm.session.undo();
+  mm.setView(1, 0, 0); await wait(30);
+  {
+    t.stroke(t.rect(300, 300, 200, 140)); await wait(60); // corners (300,300)…(500,440)
+    // A line taller than the letter caps, ending 8px from the box's bottom-right
+    // corner: inside the hand's radius. (Letter-sized strokes never snap — the
+    // 16/33 guard — so the test connector must be bigger than a letter.)
+    t.stroke(t.line({x: 700, y: 600}, {x: 508, y: 448}, 30)); await wait(60);
+    const st1 = mm.session.getState();
+    const box = st1.contentIds[st1.contentIds.length - 2];
+    const ln1 = st1.contentIds[st1.contentIds.length - 1];
+    const n1 = st1.nodes.get(ln1);
+    const pts1 = MM.strokePointsOf(n1);
+    const end1 = pts1[pts1.length - 1];
+    const bound = n1.edges.filter(e => e.rel === 'bound-to' && e.to === box);
+    step('12g. a line released near a corner lands on it, and the bind is an edge in the log',
+      bound.length === 1 && Math.abs(end1.x - 500) < 3 && Math.abs(end1.y - 440) < 3,
+      { end: { x: Math.round(end1.x), y: Math.round(end1.y) }, edges: bound.length });
+    // A line drawn past every site binds to nothing — an offer, never a trap.
+    t.stroke(t.line({x: 900, y: 700}, {x: 1100, y: 760}, 30)); await wait(60);
+    const st2 = mm.session.getState();
+    const ln2 = st2.contentIds[st2.contentIds.length - 1];
+    step('12h. a line drawn past every site is plain ink',
+      !st2.nodes.get(ln2).edges.some(e => e.rel === 'bound-to'));
+    // Undo is event-granular: the second line goes first, then the bind.
+    mm.session.undo();
+    step('12i. undo takes the second line back first', !mm.session.getState().contentIds.includes(ln2));
+    mm.session.undo();
+    const st3 = mm.session.getState();
+    step('12j. and the next undo lets the bind go; the first line stays',
+      !st3.nodes.get(ln1).edges.some(e => e.rel === 'bound-to') && st3.contentIds.includes(ln1));
+    // The guard: a command mark begun 11px off the corner is still the mark —
+    // its shape is its meaning, and magnets never pull it (found by e2e 12b).
+    t.stroke(t.check(492, 430, 1));
+    const st4 = mm.session.getState();
+    step('12k. the check beside the box is read as the mark, not pulled onto a site',
+      !!st4.summon && st4.summon.enclosedIds.length >= 1,
+      { summon: !!st4.summon, miss: st4.markMiss });
+    if (st4.summon) mm.session.dismiss(st4.summon.id, Date.now());
+  }
+
   // ---- 11c. Forgetting the mark goes back to the check, on the device too ----
   mm.forgetMark();
   step('11c. Forget clears the held mark and the check is back',

@@ -41,7 +41,7 @@ mark, carrying the site — so it replays, merges live, and is queryable
 
 ## Packages
 
-### P0 — magnets in core · **this branch, first commit**
+### P0 — magnets in core · **landed 15 Sep 2026 (a4096d7)**
 
 `metamedium-core/src/session/magnets.ts`: `magnetSites(node, nodes)` per
 shape — line/arrow: tail, tip, middle (tip and tail from the `reading:arrow`
@@ -55,7 +55,7 @@ centre (invariant 5). `nearestMagnet(at, sites, radius)` and
 nearest-site query's radius and tie behaviour; `npm test` in metamedium-core
 is green with the suite's existing 574.
 
-### P1 — the pen feels them (surface)
+### P1 — the pen feels them (surface) · **landed 15 Sep 2026**
 
 While a stroke is being drawn, its moving end attracts to the nearest magnet
 within radius; the hold draws as a ghost dot with the site's name on hover;
@@ -66,6 +66,16 @@ corner binds to it; a line drawn past does not.
 
 **Done when:** the felt thing is true in the hand — draw an arrow roughly at
 a traced box and it *clicks* — and the e2e passes at its full length.
+
+**Landed as:** the hold in `05-snap`, the hooks in `07-input`, the ghost in
+`08-render`; engine event `bind` (edge `bound-to` + `'bound'` rep, undo lets
+it go); e2e steps 12g–12k, suite at 184 steps / 0 failed. **Found on the way,
+each now a guard in `07-input`:** binding is for connectors (only what reads
+line/arrow/arc snaps — a check multi-parses as arrow 0.52, so…); gestures are
+not marks (a stroke matching the active command mark — taught or the built-in
+check — is never pulled: its shape is its meaning, e2e 12b); a letter-sized
+stroke is writing, not a connector (`isLetterLike` — an l beside a box reads
+line 0.9, and pulling its foot unwrites the word, e2e 16/33).
 
 **← the MVP line: everything above it is the felt feature.**
 
@@ -101,6 +111,11 @@ tracer's ROADMAP entry can drop its "painted, not photographed" caveat.
 
 ## Debts, said plainly
 
+- **Connectors under 150 px never snap.** The letter guard uses the word
+  rung's caps (`LETTER_MAX_* = 150`), so a short connector aimed at a small
+  mark is read as possible writing and left alone. The right discriminator is
+  probably run-context (letters near letters) rather than size alone; P2's
+  handle work will make the gap obvious if it matters.
 - Junctions (where two strokes cross) are not sites in P0; the spatial graph
   knows the crossings, and P1's pen will want them. Added to P1 if the felt
   gap shows, P3 at the latest.

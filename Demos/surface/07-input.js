@@ -31,7 +31,7 @@
       if (touches.size === 2) {
         // Two fingers: this is a pinch, not a stroke. Drop the live ink — it
         // was the first finger landing, not a mark.
-        live = null; pressEnd();
+        live = null; pressEnd(); magnetStart = null; magnetHold = null;
         const [a, b] = [...touches.values()];
         pinch = { dist: Math.hypot(a.x - b.x, a.y - b.y), mid: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, zoom: view.zoom };
         return;
@@ -60,6 +60,9 @@
     if (pf && !insideWaitingLoop(w0)) { forward = pf; postPointer(pf, 'down', e, w0); return; }
     pressBegin(e, w0);
     live = [w0];
+    // The stroke may begin ON a magnet — an arrow drawn out of a box's corner.
+    magnetStart = magnetQuery(w0);
+    magnetHold = magnetStart;
   });
 
   // ===== Hold by long-press (SURFACE-v10-PLAN D5) ============================
@@ -139,6 +142,7 @@
       return;
     }
     live.push(screenToWorld(e.clientX, e.clientY));
+    magnetHold = magnetQuery(live[live.length - 1]); // the offer follows the pen; out of reach, it lets go
     render(state); // live ink
   });
 
@@ -149,7 +153,7 @@
     return touches.size > 0; // a finger is still down: nothing to commit yet
   };
   canvas.addEventListener('pointercancel', (e) => {
-    endTouch(e); live = null; pressEnd();
+    endTouch(e); live = null; pressEnd(); magnetStart = null; magnetHold = null;
     if (forward) { postPointer(forward, 'cancel', e, screenToWorld(e.clientX, e.clientY)); forward = null; }
   });
 
@@ -158,7 +162,7 @@
     if (panning) { panning = null; canvas.style.cursor = 'crosshair'; return; }
     if (forward) { postPointer(forward, 'up', e, screenToWorld(e.clientX, e.clientY)); forward = null; return; }
     pressEnd();
-    if (held) { held = false; live = null; return; } // the release after a hold: the field is open, nothing else happens
+    if (held) { held = false; live = null; magnetStart = null; magnetHold = null; return; } // the release after a hold: the field is open, nothing else happens
     if (knobEnd()) return;
     if (demoEnd()) return;
     if (drag) { endDrag(); return; }
@@ -169,7 +173,7 @@
     // and never a dot. Only a tap on empty ground with nothing to dismiss
     // could be a dot — and a bare tap is not one either; a dot is drawn.
     const tiny = points && points.length < 3;
-    if (tiny) {
+    if (tiny) { magnetStart = null; magnetHold = null;
       const s0 = session.getState();
       const now = Date.now();
       // A double-tap inside a waiting loop takes it up — the way in that
@@ -201,6 +205,38 @@
     }
     lastTap = null;
 
+    // A stroke released inside a hold lands its endpoint exactly on the site;
+    // one begun on a magnet starts exactly there. Only the endpoints move,
+    // and only by the hand's own radius — the shape of the stroke is the hand's.
+    // Two guards, both in the medium's own terms:
+    //   - BINDING IS FOR CONNECTORS. Lines, arrows and arcs have ends that
+    //     attach; a closed shape or a letter has nothing to tie. Snap only
+    //     what reads as a connector.
+    //   - GESTURES ARE NOT MARKS. A command mark's shape is its meaning — a
+    //     check pulled seven pixels onto a box's edge-middle is no longer a
+    //     check (found by e2e 12b). A stroke that matches the held mark is
+    //     left exactly as drawn.
+    if (points && points.length >= 3 && (magnetStart || magnetHold)) {
+      const analysis = MM.analyzeStroke(points, 1 / view.zoom);
+      const connector = analysis.results.some((r) => (r.type === 'line' || r.type === 'arrow' || r.type === 'arc') && r.confidence >= 0.5);
+      // The ACTIVE mark: the taught one when the device holds one, else the
+      // built-in check — a check multi-parses as arrow 0.52, so the connector
+      // test alone is not enough (found by e2e 12b, second pass).
+      const activeMark = state.commandMark || MM.BUILTIN_COMMAND_MARK;
+      const isMark = !!(activeMark && MM.matchesCommandMark(analysis.fingerprint, activeMark).match);
+      // …and a letter-sized stroke is writing, not a connector: an l beside a
+      // box reads line 0.9, and pulling its foot onto the box's edge unwrites
+      // the word (found by e2e 16 and 33).
+      const letterLike = MM.isLetterLike(MM.getBounds(points), 1 / view.zoom);
+      if (connector && !isMark && !letterLike) {
+        if (magnetStart) points[0] = { x: magnetStart.site.point.x, y: magnetStart.site.point.y };
+        if (magnetHold) points[points.length - 1] = { x: magnetHold.site.point.x, y: magnetHold.site.point.y };
+      } else {
+        magnetStart = null;
+        magnetHold = null;
+      }
+    }
+
     // Clear hover *before* the engine notifies: the render it triggers must
     // report the mark just made, not whatever the cursor was resting on.
     hoverId = null;
@@ -221,6 +257,18 @@
     const after = session.getState();
     const made = after.nodes.get(id);
     const g = made && MM.getRep(made, 'gesture');
+    // Content, not a gesture: what the stroke touched, it is now tied to. The
+    // bind is an edge in the log — it replays, merges, and one undo lets it go.
+    if (!g && (magnetStart || magnetHold)) {
+      const at = Date.now();
+      if (magnetStart) session.bind({ strokeId: id, nodeId: magnetStart.site.nodeId, site: { kind: magnetStart.site.kind, index: magnetStart.site.index }, end: 'start', at: at });
+      if (magnetHold) {
+        session.bind({ strokeId: id, nodeId: magnetHold.site.nodeId, site: { kind: magnetHold.site.kind, index: magnetHold.site.index }, end: 'end', at: at });
+        flash('bound — ' + MM.describeMagnet(magnetHold.site));
+      }
+    }
+    magnetStart = null;
+    magnetHold = null;
     // Auto: take every open offer the moment it is made — this stroke, and any
     // earlier closed stroke that was a loop-in-waiting until this one settled
     // it. Never the held loop itself; that is a gesture until the next mark

@@ -75,3 +75,32 @@
     snapAll(ids, shapesSummary(ids.map((id) => snapOffers.get(id))));
   };
   snapModeBtn.onclick = () => setSnapMode(SNAP_MODES[(SNAP_MODES.indexOf(snapMode) + 1) % SNAP_MODES.length]);
+
+  // ===== Magnets: the pen feels where a mark offers attachment ===============
+  // (CONTROL-POINTS-PLAN P1.) Sites are derived in core (session/magnets.ts)
+  // from each mark's clean form; the surface asks what is near the live
+  // stroke's end and shows the hold. Nothing pulls the stroke mid-draw — the
+  // hold is an offer; releasing inside it lands the endpoint exactly on the
+  // site and logs the bind, and leaving the reach dissolves it (invariant 4).
+  let magnetHold = null;   // the hit the live stroke's end is in reach of, if any
+  let magnetStart = null;  // the hit the live stroke began on, if any
+  const magnetCache = new WeakMap(); // node → sites (nodes are rebuilt on replay)
+  function sitesForMagnet(node, nodes) {
+    let sites = magnetCache.get(node);
+    if (!sites) { sites = MM.magnetSites(node, nodes); magnetCache.set(node, sites); }
+    return sites;
+  }
+  /** The nearest site to a world point within the hand's radius, or null. */
+  function magnetQuery(w) {
+    const s = session.getState();
+    const radius = MM.MAGNET_SCREEN_PX / view.zoom; // about the hand, not the world (invariant 3)
+    let best = null;
+    for (const [id, n] of s.nodes) {
+      if (!MM.strokePointsOf(n)) continue;
+      for (const site of sitesForMagnet(n, s.nodes)) {
+        const distance = Math.hypot(site.point.x - w.x, site.point.y - w.y);
+        if (distance <= radius && (!best || distance < best.distance)) best = { site, distance };
+      }
+    }
+    return best;
+  }

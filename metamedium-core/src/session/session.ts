@@ -279,6 +279,21 @@ type SessionEventUnion =
       participantId?: string;
     }
   | {
+      /**
+       * Bind a stroke's endpoint to a magnet site on another mark
+       * (CONTROL-POINTS-PLAN P1): the arrow ends AT the box, and the graph
+       * says so — an edge `bound-to`, with the site kept as a `'bound'` rep
+       * so a later package can re-anchor the point when the target moves.
+       */
+      type: 'bind';
+      strokeId: string;
+      nodeId: string;
+      site: { kind: string; index: number };
+      end: 'start' | 'end';
+      at: number;
+      participantId?: string;
+    }
+  | {
       type: 'code';
       participantId: string;
       nodeId: string;
@@ -433,6 +448,8 @@ export interface Session {
    * not a command that can fail.
    */
   snap(args: { ids: string[]; mode?: 'clean' | 'raw'; at: number }): void;
+  /** Tie a stroke's endpoint to a magnet site on another mark (CONTROL-POINTS-PLAN P1). */
+  bind(args: { strokeId: string; nodeId: string; site: { kind: string; index: number }; end: 'start' | 'end'; at: number; participantId?: string }): void;
   /**
    * Which marks read cleanly enough to be redrawn, and as what. Defaults to
    * every loose mark on the board. Marks already snapped are not offered again.
@@ -1396,6 +1413,30 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     }
   }
 
+  /** A stroke's end tied to another mark's site: the edge is the claim, the rep keeps the payload. */
+  function applyBind(ev: Extract<SessionEvent, { type: 'bind' }>) {
+    const stroke = nodes.get(ev.strokeId);
+    const target = nodes.get(ev.nodeId);
+    if (!stroke || !target || ev.strokeId === ev.nodeId) return;
+    // Re-binding an end MOVES the claim: the old target's edge goes with it.
+    const prev = stroke.reps.find((r) => r.modality === 'bound' && (r.data as { end?: string }).end === ev.end);
+    const prevTarget = (prev?.data as { nodeId?: string } | undefined)?.nodeId;
+    stroke.edges = stroke.edges.filter((e) => !(e.rel === 'bound-to' && (e.to === ev.nodeId || e.to === prevTarget)));
+    stroke.edges.push({
+      to: ev.nodeId,
+      rel: 'bound-to',
+      blessed: true,
+      via: ev.participantId ?? LOCAL_PARTICIPANT,
+      reasoning: `its ${ev.end} was released on ${ev.site.kind} ${ev.site.index} of this mark`,
+    });
+    stroke.reps = stroke.reps.filter((r) => !(r.modality === 'bound' && (r.data as { end?: string }).end === ev.end));
+    stroke.reps.push({
+      modality: 'bound',
+      data: { end: ev.end, nodeId: ev.nodeId, site: ev.site },
+      source: ev.participantId ?? LOCAL_PARTICIPANT,
+    });
+  }
+
   // ===== Words from letters (words.ts) =====
 
   function wordBounds(letterIds: string[]): Bounds {
@@ -1920,6 +1961,9 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       case 'snap':
         applySnap(ev);
         return null;
+      case 'bind':
+        applyBind(ev);
+        return null;
       case 'code':
         return applyCode(ev);
       case 'dismiss':
@@ -2012,6 +2056,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     matchesOf: (ids) => matchesFor(ids),
     tidy: (args) => void dispatch({ type: 'tidy', ...args }),
     snap: (args) => void dispatch({ type: 'snap', ...args }),
+    bind: (args) => void dispatch({ type: 'bind', ...args }),
     snapCandidates: (ids) => candidatesAmong(ids ?? snappableIds()),
     attachCode: (args) => dispatch({ type: 'code', ...args }),
     regions: (artifactId) => {

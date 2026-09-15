@@ -5651,6 +5651,27 @@ ${pad}</${tag}>`;
         node.reps.push({ modality: "clean", data: clean, confidence: c.weight, source: ev.participantId ?? "engine" });
       }
     }
+    function applyBind(ev) {
+      const stroke = nodes.get(ev.strokeId);
+      const target = nodes.get(ev.nodeId);
+      if (!stroke || !target || ev.strokeId === ev.nodeId) return;
+      const prev = stroke.reps.find((r) => r.modality === "bound" && r.data.end === ev.end);
+      const prevTarget = prev?.data?.nodeId;
+      stroke.edges = stroke.edges.filter((e) => !(e.rel === "bound-to" && (e.to === ev.nodeId || e.to === prevTarget)));
+      stroke.edges.push({
+        to: ev.nodeId,
+        rel: "bound-to",
+        blessed: true,
+        via: ev.participantId ?? LOCAL_PARTICIPANT,
+        reasoning: `its ${ev.end} was released on ${ev.site.kind} ${ev.site.index} of this mark`
+      });
+      stroke.reps = stroke.reps.filter((r) => !(r.modality === "bound" && r.data.end === ev.end));
+      stroke.reps.push({
+        modality: "bound",
+        data: { end: ev.end, nodeId: ev.nodeId, site: ev.site },
+        source: ev.participantId ?? LOCAL_PARTICIPANT
+      });
+    }
     function wordBounds(letterIds) {
       return getBounds(letterIds.flatMap((id) => {
         const b = boundsOf(nodes.get(id));
@@ -6084,6 +6105,9 @@ ${pad}</${tag}>`;
         case "snap":
           applySnap(ev);
           return null;
+        case "bind":
+          applyBind(ev);
+          return null;
         case "code":
           return applyCode(ev);
         case "dismiss":
@@ -6164,6 +6188,7 @@ ${pad}</${tag}>`;
       matchesOf: (ids) => matchesFor(ids),
       tidy: (args) => void dispatch({ type: "tidy", ...args }),
       snap: (args) => void dispatch({ type: "snap", ...args }),
+      bind: (args) => void dispatch({ type: "bind", ...args }),
       snapCandidates: (ids) => candidatesAmong(ids ?? snappableIds()),
       attachCode: (args) => dispatch({ type: "code", ...args }),
       regions: (artifactId) => {
