@@ -71,6 +71,14 @@ Architecture documents (chronological; **read MVP.md, then v7, then v6**):
   drawn candidates (D4), affordances at rest (D5), the map of what a
   drawing becomes (D6), the molecule chain as the demo (D7), ids per hand
   as a debt (D8); packages T1–T8 with status
+- `NOTES-DRAWING-WITH-THE-HAND.md` — **what using it taught, 15 Sep 2026**:
+  one figure drawn on a live board with the MCP hand — what the medium already
+  does well, the six faults it cost (two logs under one name eating each other,
+  a figure rendered as a page, a caption held at screen size, a figure that
+  vanished on paper, eight filenames over one drawing, the answer card doing the
+  caption's job) and the six still open, biggest first: **node ids do not
+  survive the merge**, so `canvas_say` and `canvas_propose` land on the wrong
+  marks in any room holding another hand's work
 - `BUILD-PLAN-v8.md` — **the executable plan for v8**: invariants no package may break, fixed contracts (events, reps, kinds, the verb basis, the storage seam, the palette item), fourteen work packages with owned files and done-criteria, the parallel threads and the surface weave, and self-contained briefs for sub-contracting models
 - `WHITEPAPER-v5.1-PLAN.md` — **the package**: what the whitepaper shows vs. what the engine does, replays-as-figures, the demos as the paper's spine, the prose pass, and the palette decision John owns
 - `ARCHITECTURE-v6-SESSION-ENGINE.md` — **active design**: the no-modes session engine (deferred commitment, summoning, promotion ladder, capability tiers), implemented in `metamedium-core/`
