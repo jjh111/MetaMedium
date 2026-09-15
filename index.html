@@ -1012,27 +1012,42 @@
            still. html.touched is stamped by the first touch the document
            sees, so the rule follows what is actually happening. */
         html.touched .demo-container iframe { pointer-events: none; }
-        html.touched .demo-container::after {
-            content: "View-only on touch — tap Open it → to draw in it";
-            display: block;
+        @media (pointer: coarse) {
+            .demo-container iframe { pointer-events: none; }
+        }
+        /* The bar under a view-only embed. The recording's own transport is
+           inside the iframe and out of reach of a touch, so this stands in
+           for it: the button presses the embed's own play, which keeps the
+           replay clock in one place (Demos/surface/11-replay.js) rather than
+           growing a second one here. */
+        .demo-touch {
+            display: none;
+            align-items: center;
+            gap: 0.75rem;
             padding: 0.55rem 1rem;
             border-top: 1px solid var(--border);
             font-family: var(--face);
             font-size: var(--text-xs);
             color: var(--muted-light);
         }
-        @media (pointer: coarse) {
-            .demo-container iframe { pointer-events: none; }
-            .demo-container::after {
-                content: "View-only on touch — tap Open it → to draw in it";
-                display: block;
-                padding: 0.55rem 1rem;
-                border-top: 1px solid var(--border);
-                font-family: var(--face);
-                font-size: var(--text-xs);
-                color: var(--muted-light);
-            }
+        .demo-touch .demo-play {
+            flex: none;
+            min-height: 44px;
+            padding: 0.5rem 1.1rem;
+            background: var(--paper-warm);
+            border: 1px solid var(--border);
+            border-radius: 999px;
+            font: inherit;
+            font-weight: 500;
+            color: var(--ink);
+            cursor: pointer;
         }
+        .demo-touch .demo-play:hover { border-color: var(--accent); color: var(--accent); }
+        .demo-touch .demo-play[hidden] { display: none; }
+        /* Shown only where the embed has been made view-only — after the base
+           rule above, so the later declaration is the one that stands. */
+        html.touched .demo-touch { display: flex; }
+        @media (pointer: coarse) { .demo-touch { display: flex; } }
         
         /* Callout */
         .principle-now {
@@ -2002,6 +2017,10 @@
                     <span><a href="Demos/session-engine.html?replay=recordings/canonical-loop.json" target="_blank" rel="noopener"><strong>Open it →</strong></a></span>
                 </div>
                 <iframe src="Demos/session-engine.html?replay=recordings/canonical-loop.json&amp;embed=1&amp;theme=paper" title="The canonical loop, replayed by the engine" loading="lazy"></iframe>
+                <div class="demo-touch">
+                    <button class="demo-play" type="button" hidden>Play</button>
+                    <span class="demo-touch-note">View-only on touch — tap Open it &rarr; to draw in it</span>
+                </div>
             </div>
         </section>
 
@@ -3084,6 +3103,10 @@
                     <span><a href="Demos/session-engine.html?replay=recordings/mvp-page.json" target="_blank" rel="noopener"><strong>Open it →</strong></a></span>
                 </div>
                 <iframe src="Demos/session-engine.html?replay=recordings/mvp-page.json&amp;embed=1&amp;theme=paper" title="Ink over a living artifact, replayed by the engine" loading="lazy"></iframe>
+                <div class="demo-touch">
+                    <button class="demo-play" type="button" hidden>Play</button>
+                    <span class="demo-touch-note">View-only on touch — tap Open it &rarr; to draw in it</span>
+                </div>
             </div>
 
             <p>And the surface itself, live. Everything here works offline; join a local model in the full page to build, read handwriting, or have it draw.</p>
@@ -3094,6 +3117,10 @@
                     <span><a href="https://jjh111.github.io/MetaMedium/Demos/session-engine.html" target="_blank" rel="noopener"><strong>Open it →</strong></a></span>
                 </div>
                 <iframe src="Demos/session-engine.html?embed=1&theme=paper" title="MetaMedium — the session engine" loading="lazy"></iframe>
+                <div class="demo-touch">
+                    <button class="demo-play" type="button" hidden>Play</button>
+                    <span class="demo-touch-note">View-only on touch — tap Open it &rarr; to draw in it</span>
+                </div>
             </div>
 
             <div class="callout">
@@ -4803,6 +4830,53 @@
         canvas.addEventListener('touchend', endDraw);
         canvas.addEventListener('touchcancel', endDraw);
 
+    </script>
+
+    <script>
+        // A view-only embed cannot be tapped, so the recording's transport is
+        // proxied out here: this button presses the embed's OWN play button,
+        // and wears whatever that button says. The replay clock stays in one
+        // place (Demos/surface/11-replay.js) instead of growing a second one
+        // in the paper. Same origin, so reaching in is allowed; if it ever is
+        // not, the control stays hidden and the embed is simply a still.
+        (function () {
+            document.querySelectorAll('.demo-container').forEach(function (box) {
+                const frame = box.querySelector('iframe');
+                const play = box.querySelector('.demo-play');
+                if (!frame || !play) return;
+                // Only a recording has something to play; the live surface does not.
+                if (!/[?&]replay=/.test(frame.getAttribute('src') || '')) return;
+                let timer = null;
+                function innerPlay() {
+                    try { return frame.contentDocument && frame.contentDocument.getElementById('rpPlay'); }
+                    catch (err) { return null; }   // cross-origin one day: stay a still
+                }
+                function sync() {
+                    const btn = innerPlay();
+                    if (!btn) return;
+                    play.hidden = false;
+                    play.textContent = btn.textContent.trim() === '\u25b6' ? 'Play' : 'Pause';
+                }
+                function watch() {
+                    clearInterval(timer);
+                    // The recording stops itself at the last step, so the label
+                    // has to be read back rather than assumed.
+                    timer = setInterval(function () {
+                        sync();
+                        if (play.textContent === 'Play') clearInterval(timer);
+                    }, 700);
+                }
+                frame.addEventListener('load', sync);
+                sync();
+                play.addEventListener('click', function () {
+                    const btn = innerPlay();
+                    if (!btn) return;
+                    btn.click();
+                    sync();
+                    watch();
+                });
+            });
+        })();
     </script>
 
     <!-- Image Modal / Lightbox -->
