@@ -348,13 +348,16 @@
     const at = Date.now();
     const ids = sum.enclosedIds.slice();
     if (conv.effect.kind === 'tidy') {
-      session.dismiss(sum.id, at);
+      // The field stays open: a button click never closes it (the hand chains
+      // commands — line up, then match sizes, then name). Clicking off, Esc,
+      // naming, or erasing the marks themselves ends it.
       session.tidy({ ids: ids, mode: 'align', axis: conv.effect.axis, at: at });
       flash('lined up ' + ids.length + ' marks');
+      refreshPalette();
     } else if (conv.effect.kind === 'equalize') {
-      session.dismiss(sum.id, at);
       session.tidy({ ids: ids, mode: 'equalize', at: at });
       flash('matched ' + ids.length + ' sizes');
+      refreshPalette();
     } else if (conv.effect.kind === 'name') {
       session.bless({ summonId: sum.id, name: concept.concept, at: at });
     } else if (conv.effect.kind === 'prompt') {
@@ -415,7 +418,7 @@
       { key: 'copy', core: true, label: 'Copy', verbs: ['copy', 'cp'], why: 'Copy — hold the ink to paste; it is on the clipboard as SVG too', disabled: !marks.length, tier: 1,
         run: () => copyMarks(marks) },
       { key: 'paste', core: true, label: 'Paste', verbs: ['paste'], why: clip ? 'Paste — the copied ink, beside these' : 'Paste — nothing copied yet', disabled: !clip, tier: 1,
-        run: () => { if (!clip) return; const b = selectionBounds(s) || (marks.length ? union(marks.map((id) => MM.boundsOf(s.nodes.get(id))).filter(Boolean)) : null); if (sum) session.dismiss(sum.id, Date.now()); pasteClip(b ? { x: b.maxX + wpx(40), y: b.minY } : screenToWorld(innerWidth / 2, innerHeight / 2)); } },
+        run: () => { if (!clip) return; const b = selectionBounds(s) || (marks.length ? union(marks.map((id) => MM.boundsOf(s.nodes.get(id))).filter(Boolean)) : null); pasteClip(b ? { x: b.maxX + wpx(40), y: b.minY } : screenToWorld(innerWidth / 2, innerHeight / 2)); refreshPalette(); } },
       { key: 'erase', core: true, label: 'Erase', verbs: ['erase', 'delete', 'del', 'remove', 'rm'], why: 'Erase — the ink stays in the log; undo brings it back', disabled: !marks.length, tier: 1,
         run: () => { const at = Date.now(); if (sum) session.dismiss(sum.id, at); marks.forEach((id) => session.erase(id, at)); flash('erased ' + marks.length + ' mark' + (marks.length === 1 ? '' : 's')); } },
     ];
@@ -460,10 +463,12 @@
     const b = union(boxes);
     const held = clip;
     if (!copyMarks(ids)) return;
-    if (sum) session.dismiss(sum.id, Date.now());
+    // The field stays open — the copies land selected beside the group, and
+    // the hand can go straight to the next verb.
     const made = pasteClip({ x: b.maxX + wpx(40), y: b.minY });
     clip = held || clip; // a duplicate does not overwrite what Copy held
     flash('duplicated ' + ids.length + ' as ' + made.length + ' stroke' + (made.length === 1 ? '' : 's'));
+    refreshPalette();
   }
 
   // ===== The reader: what Enter will do, from what was typed ================
