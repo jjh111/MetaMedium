@@ -202,8 +202,19 @@
             pointer-events: none;
         }
         .hero-hint .hint-icon {
-            font-size: 0.9rem;
+            display: block;
+            width: 1em;
+            height: 1em;
             animation: pencil-wiggle 2s ease-in-out infinite;
+        }
+        .hero-hint .hint-icon svg { display: block; width: 100%; height: 100%; }
+        /* A mark inside prose, drawn in the text's own colour at the text's own size. */
+        .glyph {
+            display: inline-block;
+            width: 0.85em;
+            height: 0.85em;
+            vertical-align: -0.08em;
+            margin-left: 0.15em;
         }
         @keyframes pencil-wiggle {
             0%, 100% { transform: rotate(-5deg); }
@@ -1885,7 +1896,7 @@
         <!-- Interactive Blueprint Canvas -->
         <canvas id="heroCanvas"></canvas>
         <div class="hero-hint">
-            <span class="hint-icon">✎</span>
+            <span class="hint-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M11.2 2.3l2.5 2.5L5.5 13H3v-2.5z"/><path d="M9.6 3.9l2.5 2.5"/></svg></span>
             <span class="hint-text">draw here</span>
         </div>
         
@@ -2738,7 +2749,7 @@
                         </svg>
                     </div>
                 </div>
-                <figcaption><b>Figure &middot; The Negotiation Loop</b>User sketches rough shape → System offers: "Circle? Oval? Face?" → User adds two dots → System updates: "Face ✓" → User writes "happy" → System adds smile, adjusts interpretation confidence. Understanding emerges through exchange, not one-shot recognition. Each turn updates the possibility graph.</figcaption>
+                <figcaption><b>Figure &middot; The Negotiation Loop</b>User sketches rough shape → System offers: "Circle? Oval? Face?" → User adds two dots → System updates: "Face<svg class="glyph" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-label="check"><path d="M3 8.5l3.2 3.2L13 4.5"/></svg>" → User writes "happy" → System adds smile, adjusts interpretation confidence. Understanding emerges through exchange, not one-shot recognition. Each turn updates the possibility graph.</figcaption>
             </figure>
             
             <p>MetaMedium makes the possibility graph learnable, accumulating your patterns over time, and adds annotation as another way to navigate it. A misreading is information. Each correction adds to a shared vocabulary.</p>
@@ -3716,7 +3727,7 @@
                 whisperLabels.push({
                     concept: c.concept, members,
                     text: c.concept.charAt(0).toUpperCase() + c.concept.slice(1) + '  ·  ' + c.confidence.toFixed(2),
-                    sub: c.reasoning,
+                    sub: c.reasoning.replace(/\bwriting\b/g, 'drawing'),
                     x: (b.minX + b.maxX) / 2,
                     y: b.minY - 4 - stacked * 34,
                     createdAt: now,
@@ -4623,7 +4634,8 @@
                     keepCompany(landed);
                     
                     // Whisper what it is, the maths that follows, and why it read that way.
-                    const name = shape.type === 'text' ? 'Writing' : shape.type.charAt(0).toUpperCase() + shape.type.slice(1);
+                    // A scribble the shape rung cannot place is writing to the engine; here, it is a drawing.
+                    const name = shape.type === 'text' ? 'Drawing' : shape.type.charAt(0).toUpperCase() + shape.type.slice(1);
                     const maths = shortMaths(shape);
                     whisperLabels.push({
                         text: name + (maths ? '  ·  ' + maths : ''),
