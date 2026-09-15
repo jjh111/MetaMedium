@@ -458,6 +458,41 @@
     y: Math.max(box.y, Math.min(toward.y, box.y + box.h)),
   });
 
+  /**
+   * WHAT a card is about, as a few words: the names its marks carry, else the
+   * one mark's reading, else how many there are. A card is a sentence in a
+   * live layer, not a caption someone will read cold, so the subject belongs in
+   * its chrome — writing "Box 3 of six" into the prose is the writer doing by
+   * hand, badly, what the card already knows.
+   */
+  function subjectOf(s, about) {
+    const names = about.map((id) => { const n = s.nodes.get(id); return n && MM.wordOf(n); }).filter(Boolean);
+    if (names.length) return names.slice(0, 2).join(', ') + (names.length > 2 ? ' +' + (names.length - 2) : '');
+    if (about.length === 1) {
+      const n = s.nodes.get(about[0]);
+      if (!n) return 'a mark';
+      const said = MM.transcriptOf(n);
+      if (said) return '\u201c' + said + '\u201d';
+      return MM.topInterpretation(n) || 'a mark';
+    }
+    return about.length + ' marks';
+  }
+
+  /**
+   * How long ago, in a word. The explanation plane is the live layer — what
+   * someone is saying now, not what the board holds — and a card that never
+   * says its age reads as permanent, which is how it came to be used for
+   * labels that belong in the drawing.
+   */
+  function agoOf(at) {
+    const ms = Date.now() - (at || 0);
+    if (!(ms > 0) || ms < 45000) return 'just now';
+    const m = Math.round(ms / 60000);
+    if (m < 60) return m + 'm ago';
+    const h = Math.round(m / 60);
+    return h < 24 ? h + 'h ago' : Math.round(h / 24) + 'd ago';
+  }
+
   /** Measure one card: its lines at the chrome's own size, and the box they need. */
   function measureCard(s, id) {
     const node = s.nodes.get(id);
@@ -474,6 +509,8 @@
     return {
       id: id, lines: lines, about: about,
       who: (madeBy && MM.wordOf(s.nodes.get(madeBy.to))) || 'agent',
+      what: subjectOf(s, about),
+      ago: agoOf(node.createdAt),
       subject: boxes.length ? union(boxes) : anchor,
       own: new Set(about),
       w: w, h: pad * 2 + wpx(CARD_HEAD) + lines.length * wpx(CARD_LINE),
@@ -575,7 +612,7 @@
     for (const card of cards) {
       card.rect = placeCard(card, placed, obstacles, vw, gap);
       placed.push(card.rect);
-      cardRects.push({ id: card.id, about: card.about.slice(), x: card.rect.x, y: card.rect.y, w: card.rect.w, h: card.rect.h });
+      cardRects.push({ id: card.id, about: card.about.slice(), what: card.what, who: card.who, ago: card.ago, x: card.rect.x, y: card.rect.y, w: card.rect.w, h: card.rect.h });
     }
 
     for (const card of cards) {
@@ -602,15 +639,34 @@
       ctx.fill();
       ctx.stroke();
 
-      ctx.fillStyle = C.agent;
+      // The header carries who said it, what it is about, and how long ago —
+      // the three things that used to be smuggled into the sentence.
       ctx.font = wpx(10).toFixed(2) + CARD_FONT;
+      const agoW = ctx.measureText(card.ago).width;
+      ctx.fillStyle = `rgba(${C.labelRGB},0.7)`;
+      ctx.fillText(card.ago, r.x + r.w - pad - agoW, r.y + pad + wpx(8));
+      ctx.fillStyle = C.agent;
+      const whoW = ctx.measureText(card.who).width;
       ctx.fillText(card.who, r.x + pad, r.y + pad + wpx(8));
+      const room = r.w - pad * 2 - whoW - agoW - wpx(16);
+      if (card.what && room > wpx(30)) {
+        ctx.fillStyle = `rgba(${C.labelRGB},0.95)`;
+        ctx.fillText(clipText(card.what, room), r.x + pad + whoW + wpx(8), r.y + pad + wpx(8));
+      }
 
       ctx.fillStyle = C.ink;
       ctx.font = wpx(11).toFixed(2) + CARD_FONT;
       card.lines.forEach((ln, i) =>
         ctx.fillText(ln, r.x + pad, r.y + pad + wpx(CARD_HEAD) + wpx(8) + i * wpx(CARD_LINE)));
     }
+  }
+
+  /** As much of a word as fits, with an ellipsis when it does not. */
+  function clipText(str, maxWidth) {
+    if (ctx.measureText(str).width <= maxWidth) return str;
+    let out = String(str);
+    while (out.length > 1 && ctx.measureText(out + '\u2026').width > maxWidth) out = out.slice(0, -1);
+    return out + '\u2026';
   }
 
   function wrapText(text, maxWidth) {

@@ -367,9 +367,11 @@ body.panelHidden #inspector { display: none; }
 /* A parked artifact: past the live budget, a card stands where the iframe would. */
 .artifactFrame.parked .park { width: 100%; height: 100%; box-sizing: border-box; border-radius: 2px; background: #f2efe8; color: #5a5a4e; font-family: var(--mono); font-size: 11px; padding: 10px; box-shadow: 0 0 0 1px rgba(var(--gold-rgb), 0.25); overflow: hidden; }
 .artifactFrame.parked .park b { display: block; color: #14140f; margin-bottom: 4px; }
-/* A program's frame is clear: the thing itself on the canvas, no plate, no shadow. */
-.artifactFrame.run iframe { background: transparent; box-shadow: none; border-radius: 0; }
-.artifactFrame.run.playing iframe { box-shadow: none; }
+/* A FIGURE's frame is clear: the thing itself on the canvas, no plate, no
+   shadow — a program, a drawing, a line of words. A page, a script or a table
+   keeps its plate, because the plate is the page it is read on. */
+.artifactFrame.figure iframe { background: transparent; box-shadow: none; border-radius: 0; }
+.artifactFrame.figure.playing iframe { box-shadow: none; }
 
 /* ==========================================================================
    The grid view: every artifact as a card, under the same bar.
@@ -437,5 +439,6 @@ body.embed.summoning #inspector { display: none; }
 @media (max-width: 560px) { #minimap { display: none; } }
 
 /* Writing taken as text: the words stand on the canvas like ink, no plate; flipped, the frame steps aside for the writing (v10 F8). */
+/* Writing turned to text was the first figure; it is one of the set now. */
 .artifactFrame.writing iframe { background: transparent; box-shadow: none; border-radius: 0; }
 .artifactFrame.flipped { visibility: hidden; }

@@ -1610,5 +1610,29 @@ window.__scenario = async function(){
     mm.session.load([]);
   }
 
+  // ---- 37. A figure is not a page: svg and text on the board, a card that says its subject ----
+  {
+    mm.session.load([]); mm.setView(1, 0, 0);
+    const txt = mm.session.import({ kind: 'text', path: 'c/anchor.txt', name: 'anchor.txt', code: 'THE ANCHOR', bounds: { minX: 200, minY: 200, maxX: 440, maxY: 250 }, at: Date.now() });
+    const svg = mm.session.import({ kind: 'svg', path: 'c/badge.svg', name: 'badge.svg', code: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 60"><text x="16" y="38">1</text></svg>', bounds: { minX: 200, minY: 320, maxX: 440, maxY: 380 }, at: Date.now() });
+    const page = mm.session.import({ kind: 'html', path: 'c/page.html', name: 'page.html', code: '<div data-region="a">a page</div>', bounds: { minX: 200, minY: 430, maxX: 520, maxY: 530 }, at: Date.now() });
+    for (let i = 0; i < 40 && !(mm.frames.get(txt) && mm.frames.get(svg) && mm.frames.get(page)); i++) await wait(50);
+    await wait(150);
+    const fig = (id) => { const f = mm.frames.get(id); return f && f.wrap.classList.contains('figure'); };
+    step('37. words and a drawing are figures on the board; a page keeps its plate', fig(txt) && fig(svg) && !fig(page), { text: fig(txt), svg: fig(svg), page: fig(page) });
+    const srcOf = (id) => { const f = mm.frames.get(id); return f && f.iframe ? f.iframe.srcdoc : ''; };
+    // A text run's label IS its own first words; printing it over the run set every line twice.
+    step('37a. a text sets its words once, on a clear ground', /background:transparent/.test(srcOf(txt)) && !/class="lb"/.test(srcOf(txt)), { grounds: /background:transparent/.test(srcOf(txt)), heading: /class="lb"/.test(srcOf(txt)) });
+    step('37b. a page is still source on a page', /background:#fbfaf7/.test(srcOf(page)), { plate: /background:#fbfaf7/.test(srcOf(page)) });
+    // The card says what it is about and how long ago, as chrome.
+    t.stroke(t.rect(700, 200, 180, 110));
+    const mk = mm.session.getState().contentIds.slice(-1)[0];
+    mm.session.answer({ participantId: MM.LOCAL_PARTICIPANT, question: 'why', text: 'a sentence with no label smuggled into it', aboutIds: [mk], at: Date.now() });
+    await wait(80);
+    const card = mm.answerCards().find((c) => c.about[0] === mk);
+    step('37c. an answer card carries its subject and its age in the chrome', !!card && card.what === 'rectangle' && card.ago === 'just now', card && { what: card.what, ago: card.ago });
+    mm.session.load([]);
+  }
+
   return R;
 };

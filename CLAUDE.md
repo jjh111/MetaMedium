@@ -52,7 +52,7 @@ circle them, cross with a command mark *you taught the system*, prompt them into
 a living page that renders in the canvas with your ink still outlining its
 divs — then draw on that page and the ink addresses the regions underneath it.
 Scratch anything out to erase. `Demos/session-engine.html` is the surface;
-`Demos/session-engine.e2e.js` drives 185 steps through the real UI: page, flowchart, handwriting (read only when asked; a line read as one), the model drawing, the user-side loop, selection and the field, corrections, the worker, the tank, words into verbs and acting out, frames and the drawn slider, the folder, pictures, text, the moment, a live room, a playing frame that takes the pointer, hold by long-press, the graph in 3D, and the foundations (letters at any size, a mark that crosses, readings that stay, the minimap), and the explanation plane's layout. A run takes about 100 s; run it **in its own tab on its own origin** (`http://127.0.0.1:8010/…?fresh=1&nosw=1` — `__setup` refuses any other URL: it replaces `fetch` with a stub, joins a stub model named `e2e-stub`, and wipes the origin's saved board), start it with `__setup(); __scenario().then(r => window.__R = r)` and read `__R` when it lands.
+`Demos/session-engine.e2e.js` drives 189 steps through the real UI: page, flowchart, handwriting (read only when asked; a line read as one), the model drawing, the user-side loop, selection and the field, corrections, the worker, the tank, words into verbs and acting out, frames and the drawn slider, the folder, pictures, text, the moment, a live room, a playing frame that takes the pointer, hold by long-press, the graph in 3D, and the foundations (letters at any size, a mark that crosses, readings that stay, the minimap), and the explanation plane's layout. A run takes about 100 s; run it **in its own tab on its own origin** (`http://127.0.0.1:8010/…?fresh=1&nosw=1` — `__setup` refuses any other URL: it replaces `fetch` with a stub, joins a stub model named `e2e-stub`, and wipes the origin's saved board), start it with `__setup(); __scenario().then(r => window.__R = r)` and read `__R` when it lands.
 v7 Stage E (handwriting) shipped 1 Sep 2026: a word written beside a shape is read by a
 model that can see and offered as that shape's name. Whitepaper v5.1 stays parked until the
 conversation benchmark passes end to end.
@@ -416,6 +416,18 @@ way, both by running a real model:
 `validateRegions` checks the result still matches the drawing. A promise nobody
 checks is one you find out about from a screenshot.
 
+**A figure is not a page** (`FIGURE_KINDS` in `Demos/surface/02-artifacts.js`,
+`figureCSS` in `13-kinds.js`). A page, a script, a table or a tree is something
+you read *on a page*, and the white plate under it is that page. A program, a
+drawing and a line of words are marks among the ink, and a plate behind them
+fights what they stand in. `run` had the rule alone; `svg` and `text` have it
+now — clear ground, no plate, no shadow, type in the board's own ink token, so
+a figure written onto the canvas reads in either theme. And **a text sets its
+words once**: a text run's addressable label *is* its own first forty
+characters, so printing every region's label over it, which is right for a
+function or a key, set every line of a text twice. Found by writing a label
+with the MCP hand and getting a white card with the words on it twice.
+
 ### Living artifacts
 
 An artifact may carry a `'code'` rep, which puts it on `SessionState.live` and
@@ -604,6 +616,15 @@ Explanations are a **third plane** (`SessionState.explanations`) beside content
 and gesture: visible and erasable, but not ink — they never join a lasso, a
 cluster, or a signature. Several participants may answer the same question and
 every answer is held.
+
+**A card says what it is about, and how long ago** (`subjectOf` / `agoOf` in
+`08-render.js`). The header carries the speaker, the subject — the names its
+marks hold, else the one mark's reading, else how many there are — and the age.
+The plane is the *live* layer, what someone is saying now; a card that never
+says its age reads as permanent, and a card that never says its subject makes
+the writer put the label in the prose. Both were true, and answer cards were
+being used as the caption layer of drawings. The permanent words of a drawing
+are a `text` or `svg` artifact, which is a figure on the board.
 
 **The explanation plane has a layout, and it is the surface's**
 (`renderExplanations` in `Demos/surface/08-render.js`). Core anchors an answer

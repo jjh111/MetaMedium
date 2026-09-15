@@ -5,6 +5,9 @@
 // in name order inside `(function () Ellipsis)();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
 
+  /** Kinds that render as a figure on the board rather than as a page: no plate, clear ground. */
+  const FIGURE_KINDS = new Set(['run', 'svg', 'text']);
+
   // ===== The live plane: artifacts that render and run ====================
   // Generated code becomes real DOM in an iframe, positioned in world space
   // inside the shared transform. The ink canvas sits ON TOP of it, so the boxes
@@ -83,7 +86,11 @@
       if (f && !f.parked && f.kind !== kind) { f.wrap.remove(); frames.delete(id); f = null; }
       if (!f) {
         const wrap = document.createElement('div');
-        wrap.className = 'artifactFrame' + (kind === 'run' ? ' run' : '');
+        // A FIGURE has no plate. A page, a script or a table is something you
+        // read on a page, and the white card is that page; a drawing and a line
+        // of words are marks among the ink, and a card behind them fights it.
+        // The program's frame had this rule alone; svg and text need it too.
+        wrap.className = 'artifactFrame' + (kind === 'run' ? ' run' : '') + (FIGURE_KINDS.has(kind) ? ' figure' : '');
         const iframe = document.createElement('iframe');
         // Two sandboxes, never both: a page keeps its origin and runs no script,
         // so ink can hit-test into it; a program runs scripts in an opaque
