@@ -2254,7 +2254,7 @@
   // consequence of the view, so it is found again on every zoom and pan:
   // positions in canvas units, every size in screen ones.
   const CARD_W = 260, CARD_PAD = 9, CARD_HEAD = 15, CARD_LINE = 15, CARD_GAP = 14;
-  const CARD_STEPS = 6;        // half-card shifts either way along the free side
+  const CARD_STEPS = 8;        // half-card shifts either way along the free side
   const MAX_OBSTACLES = 200;   // the ink the search reads: bounded, so a busy board still paints
   const CARD_FONT = 'px ui-monospace, SFMono-Regular, Menlo, monospace';
   /** Where the last paint put each answer card, in world units. For tests. */
@@ -2322,9 +2322,15 @@
   /**
    * The free place for one card: right, left, below, above the anchor, each
    * shifted along its own free side. The first candidate that hits nothing
-   * wins; when the board is too full for any of them the least-bad one does,
-   * weighted so that a card would rather sit off screen than over the marks it
-   * is about, and rather over other ink than off screen.
+   * wins; when the board is too full for any of them the least-bad one does.
+   *
+   * The weights are an order of what may be given up. A card UNDER another
+   * card is lost — nobody can read either — so that is the last thing sacrificed
+   * and it outweighs every other cost put together; next comes covering the very
+   * marks the card speaks for; then standing off screen, which costs the reader
+   * only a pan; and cheapest, lying over other ink. Found on a board of two
+   * dozen answers: with card-on-card merely dear, a small overlap kept beating
+   * a whole card's worth of off-screen, and three pairs stacked.
    */
   function placeCard(card, placed, obstacles, vw, gap) {
     const s = card.subject, w = card.w, h = card.h;
@@ -2340,19 +2346,29 @@
     const reach = { x: s.minX - reachW, y: s.minY - reachH,
                     w: (s.maxX - s.minX) + reachW * 2, h: (s.maxY - s.minY) + reachH * 2 };
     const near = obstacles.filter((o) => meets(o.rect, reach));
+    // Staying on screen is a preference among places beside the anchor, never a
+    // reason to leave it: when the marks themselves are off screen the card
+    // belongs with them. Without this a card anchored a screenful away walked
+    // its shifts back toward the viewport and crowded the cards that live there.
+    const onScreen = meets(rectOf(s), rectOf(vw));
+    const area = w * h;
     let best = null;
     for (const side of sides) {
       for (let k = 0; k <= CARD_STEPS; k++) {
         for (const sign of k === 0 ? [1] : [1, -1]) {
           const r = { x: side.x + side.dx * k * sign, y: side.y + side.dy * k * sign, w: w, h: h };
           let score = 0;
-          for (const p of placed) score += overlapArea(r, p) * 3;
-          for (const o of near) score += overlapArea(r, o.rect) * (card.own.has(o.id) ? 3 : 1);
-          const iw = Math.max(0, Math.min(r.x + w, vw.maxX) - Math.max(r.x, vw.minX));
-          const ih = Math.max(0, Math.min(r.y + h, vw.maxY) - Math.max(r.y, vw.minY));
-          score += (w * h - iw * ih) * 2;
+          for (const p of placed) score += overlapArea(r, p) * 24;
+          for (const o of near) score += overlapArea(r, o.rect) * (card.own.has(o.id) ? 4 : 1);
+          if (onScreen) {
+            const iw = Math.max(0, Math.min(r.x + w, vw.maxX) - Math.max(r.x, vw.minX));
+            const ih = Math.max(0, Math.min(r.y + h, vw.maxY) - Math.max(r.y, vw.minY));
+            score += (area - iw * ih) * 2; // off screen: a pan away, so cheaper than a card lost under one
+          }
           if (score <= 0) return r;
-          if (!best || score < best.score) best = { x: r.x, y: r.y, w: w, h: h, score: score };
+          // Among places that all cost something, the nearest the anchor wins:
+          // the leader is short and the card is plainly that mark's.
+          if (!best || score + k * area * 0.05 < best.score) best = { x: r.x, y: r.y, w: w, h: h, score: score + k * area * 0.05 };
         }
       }
     }

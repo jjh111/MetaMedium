@@ -44,7 +44,7 @@
 > the hand test with the MCP hand in the room. Since: **the explanation
 > plane has a layout** — answer cards keep a leader to the marks they are
 > about and are pushed off each other and off the ink by a greedy placing
-> that is runtime, never in the log. Core 574 tests; e2e 184 steps.
+> that is runtime, never in the log. Core 574 tests; e2e 185 steps.
 >
 > **v9 accounting, 6 September 2026 (branch `next-phases`, local).** The
 > surface as a system (`SURFACE-v9-PLAN.md` §5–§6): **a model is asked only

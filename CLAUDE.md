@@ -52,7 +52,7 @@ circle them, cross with a command mark *you taught the system*, prompt them into
 a living page that renders in the canvas with your ink still outlining its
 divs — then draw on that page and the ink addresses the regions underneath it.
 Scratch anything out to erase. `Demos/session-engine.html` is the surface;
-`Demos/session-engine.e2e.js` drives 184 steps through the real UI: page, flowchart, handwriting (read only when asked; a line read as one), the model drawing, the user-side loop, selection and the field, corrections, the worker, the tank, words into verbs and acting out, frames and the drawn slider, the folder, pictures, text, the moment, a live room, a playing frame that takes the pointer, hold by long-press, the graph in 3D, and the foundations (letters at any size, a mark that crosses, readings that stay, the minimap), and the explanation plane's layout. A run takes about 100 s; run it **in its own tab on its own origin** (`http://127.0.0.1:8010/…?fresh=1&nosw=1` — `__setup` refuses any other URL: it replaces `fetch` with a stub, joins a stub model named `e2e-stub`, and wipes the origin's saved board), start it with `__setup(); __scenario().then(r => window.__R = r)` and read `__R` when it lands.
+`Demos/session-engine.e2e.js` drives 185 steps through the real UI: page, flowchart, handwriting (read only when asked; a line read as one), the model drawing, the user-side loop, selection and the field, corrections, the worker, the tank, words into verbs and acting out, frames and the drawn slider, the folder, pictures, text, the moment, a live room, a playing frame that takes the pointer, hold by long-press, the graph in 3D, and the foundations (letters at any size, a mark that crosses, readings that stay, the minimap), and the explanation plane's layout. A run takes about 100 s; run it **in its own tab on its own origin** (`http://127.0.0.1:8010/…?fresh=1&nosw=1` — `__setup` refuses any other URL: it replaces `fetch` with a stub, joins a stub model named `e2e-stub`, and wipes the origin's saved board), start it with `__setup(); __scenario().then(r => window.__R = r)` and read `__R` when it lands.
 v7 Stage E (handwriting) shipped 1 Sep 2026: a word written beside a shape is read by a
 model that can see and offered as that shape's name. Whitepaper v5.1 stays parked until the
 conversation benchmark passes end to end.
@@ -616,8 +616,20 @@ then below, then above, shifted along the free side until nothing is hit,
 scored so a card would rather sit off screen than over the marks it speaks for.
 The placing is **runtime, never in the log** — a card's place follows the view,
 so it is found again on every zoom and pan: positions in canvas units, every
-size in screen ones. The search is bounded (four sides, six half-card shifts
+size in screen ones. The search is bounded (four sides, eight half-card shifts
 either way, the ink near the viewport capped), for a few dozen cards at most.
+
+**The weights are an order of what may be given up.** A card *under another
+card* is lost — nobody can read either — so it outweighs everything else put
+together; then covering the very marks the card speaks for; then standing off
+screen, which costs the reader only a pan; and cheapest, lying over other ink.
+Found on a board of two dozen answers: with card-on-card merely dear, a hair of
+overlap kept beating a whole card's worth of off-screen and three pairs stacked.
+**And staying on screen is a preference among the places beside a mark, never a
+reason to leave it**: the term is dropped when the marks themselves are off
+screen, or a card anchored a screenful away walks its shifts back toward the
+viewport and crowds the cards that live there. Among places that all cost
+something, the nearest the anchor wins.
 Found with it: **the readable viewport was a sliver.** The panel stands on the
 LEFT and `viewportWorld` read its left edge as the right margin, so in a
 1400px window the world an answer could occupy was 112px wide and every card

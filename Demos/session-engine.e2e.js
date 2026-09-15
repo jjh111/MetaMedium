@@ -1596,6 +1596,16 @@ window.__scenario = async function(){
     mm.setView(1, -300, -80);
     await wait(30);
     step('36d. panned, they are placed again and still clear', mm.answerCards().length === 6 && pairs().length === 0 && overAnchor().length === 0, { overlapping: pairs(), onInk: overAnchor() });
+    // Staying on screen is a preference among the places beside a mark, never a
+    // reason to leave it: a card whose marks are a screenful away belongs with
+    // them, not crowded against the edge of what is being looked at.
+    mm.setView(1, 0, 0);
+    t.stroke(t.rect(3000, 200, 150, 62));
+    const far = mm.session.getState().contentIds.slice(-1)[0];
+    mm.session.answer({ participantId: MM.LOCAL_PARTICIPANT, question: 'why', text: 'a sentence about marks that are nowhere near the viewport', aboutIds: [far], at: Date.now() });
+    await wait(60);
+    const farCard = mm.answerCards().find((c) => c.about[0] === far);
+    step('36e. a card whose marks are off screen stays with them', !!farCard && farCard.x > 2400 && pairs().length === 0, farCard && { x: Math.round(farCard.x), y: Math.round(farCard.y) });
     mm.setView(1, 0, 0);
     mm.session.load([]);
   }
