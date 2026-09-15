@@ -46,7 +46,7 @@ const CHROME = process.env.CHROME
 const W = 1200, H = 630, SCALE = 2;
 // Virtual milliseconds. The circle is drawn first so its label has faded by the
 // capture; the rectangle follows, and its reading is what the card says out loud.
-const BUDGET = 3900;
+const BUDGET = 7600;
 
 // The hero scatters ambient dots with Math.random, so two runs of the same
 // page are not the same picture. Seeding it at the top of the document — before
@@ -130,8 +130,8 @@ const INJECT = `
   setTimeout(settle, 100);
 
   setTimeout(circle, 150);
-  setTimeout(box, 2300);
-  setTimeout(function () { cv.dispatchEvent(new MouseEvent('mouseleave', {bubbles: true})); }, 2800);
+  setTimeout(box, 6000);
+  setTimeout(function () { cv.dispatchEvent(new MouseEvent('mouseleave', {bubbles: true})); }, 6500);
 })();
 </script>
 `;

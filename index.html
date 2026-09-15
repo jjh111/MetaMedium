@@ -3399,24 +3399,24 @@
         // ============================================
         const TIMING = {
             // Raw strokes
-            strokeHold: 1500,       // Time before stroke starts fading
+            strokeHold: 3000,       // Time before stroke starts fading
             strokeFade: 2000,       // Fade duration for strokes
             
             // Recognized shapes
             morphDuration: 400,     // Shape morph animation
-            shapeHold: 4000,        // Time shape stays at full opacity
+            shapeHold: 8000,        // Time shape stays at full opacity
             shapeFade: 1500,        // Fade duration for shapes
             
             // Whisper labels
             labelFadeIn: 200,       // Label fade in
-            labelHold: 2500,        // Label at full opacity  
+            labelHold: 5000,        // Label at full opacity  
             labelFade: 800,         // Label fade out
             
             // Relationships & intersections
             relationshipFade: 1200, // Relationship indicator fade
             
             // Glyph reaction
-            glyphActive: 2500,      // How long glyphs react after shape
+            glyphActive: 5000,      // How long glyphs react after shape
         };
         
         // Computed totals
@@ -3565,7 +3565,7 @@
         // later mark relates to is kept (see keepCompany), while the morph from
         // ink to clean form still runs once, from createdAt.
         const holdAge = (shape, now) => now - (shape.holdFrom ?? shape.createdAt);
-        const liveShapes = (now) => recognizedShapes.filter(s => holdAge(s, now) < TIMING.shapeTotal && s.type !== 'dot');
+        const liveShapes = (now) => recognizedShapes.filter(s => holdAge(s, now) < TIMING.shapeTotal);
         const markOf = (sh) => ({ id: String(sh.uid), bounds: sh.bounds, points: sh.idealPoints, closed: CLOSED_SHAPES.has(sh.type) });
 
         function detectRelationships() {
@@ -3710,12 +3710,15 @@
                     sh.holdFrom = now;
                     b.minX = Math.min(b.minX, sh.bounds.minX); b.maxX = Math.max(b.maxX, sh.bounds.maxX); b.minY = Math.min(b.minY, sh.bounds.minY);
                 }
+                // Two readings of one group — a dot in a box is a frame AND a
+                // labelled mark — stack above it rather than speak over each other.
+                const stacked = whisperLabels.filter(w => w.concept && w.members.length === members.length && w.members.every(id => members.includes(id))).length;
                 whisperLabels.push({
                     concept: c.concept, members,
                     text: c.concept.charAt(0).toUpperCase() + c.concept.slice(1) + '  ·  ' + c.confidence.toFixed(2),
                     sub: c.reasoning,
                     x: (b.minX + b.maxX) / 2,
-                    y: b.minY - 4,
+                    y: b.minY - 4 - stacked * 34,
                     createdAt: now,
                 });
             }
@@ -4577,9 +4580,12 @@
                         confidence: 1,
                         rawPoints: [...currentStroke.points],
                         idealPoints: [center],
+                        bounds: { minX: center.x - 6, maxX: center.x + 6, minY: center.y - 6, maxY: center.y + 6 },
                         createdAt: Date.now()
                     });
                     
+                    keepCompany(recognizedShapes[recognizedShapes.length - 1]);
+
                     // Add whisper label
                     whisperLabels.push({
                         text: 'Point',
