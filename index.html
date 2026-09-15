@@ -3935,9 +3935,35 @@
         // that both read `line`, with no crossing or overlap to explain them
         // otherwise. The canvas offers what it reads — here, the way onward.
         const offerEl = document.getElementById('heroOffer');
+        // Near and both lines is not enough on its own: two sides of a box drawn
+        // as separate strokes, a letter beside a letter, a dash after a dash —
+        // all of those are two straightish marks lying near each other, and all
+        // of them were offering to scroll the page away. Two lines are a SWIPE
+        // only when they were drawn like one: the two marks just made, running
+        // the same way, about the same length, and set apart ACROSS the way they
+        // run rather than end to end.
+        const SWIPE_TURN = 0.35;    // radians — about 20 degrees out of parallel
+        const SWIPE_PEER = 0.6;     // the shorter line, as a fraction of the longer
         function swipeRead(relationships) {
-            return relationships.find(r =>
-                r.type === 'adjacent' && r.shapeA.type === 'line' && r.shapeB.type === 'line') || null;
+            const dir = (m) => Math.atan2(m.end.y - m.start.y, m.end.x - m.start.x);
+            const len = (m) => Math.hypot(m.end.x - m.start.x, m.end.y - m.start.y);
+            return relationships.find(r => {
+                const a = r.shapeA, b = r.shapeB;
+                if (r.type !== 'adjacent' || a.type !== 'line' || b.type !== 'line') return false;
+                // The two marks just made, one straight after the other.
+                if (Math.max(a.uid, b.uid) !== shapeUid || Math.min(a.uid, b.uid) !== shapeUid - 1) return false;
+                // Running the same way — either direction along the same axis.
+                let turn = Math.abs(dir(a) - dir(b)) % Math.PI;
+                if (turn > Math.PI / 2) turn = Math.PI - turn;
+                if (turn > SWIPE_TURN) return false;
+                const la = len(a), lb = len(b);
+                if (Math.min(la, lb) / Math.max(la, lb) < SWIPE_PEER) return false;
+                // Side by side, not end to end: the gap between their centres
+                // lies across the way they run.
+                const ax = Math.cos(dir(a)), ay = Math.sin(dir(a));
+                const dx = b.center.x - a.center.x, dy = b.center.y - a.center.y;
+                return Math.abs(dx * -ay + dy * ax) > Math.abs(dx * ax + dy * ay);
+            }) || null;
         }
         let offerTaken = null;      // The pair whose offer was taken; a new pair offers again
         function updateOffer(relationships) {
