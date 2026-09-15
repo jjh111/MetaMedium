@@ -19,6 +19,8 @@
     replay: () => rp, rpGoTo: (i) => rpGoTo(i), theme: THEME,
     // The minimap, for tests: where the last paint put the world.
     minimap: () => mini, readGroups: readGroups, chips: () => chipHits,
+    // The explanation plane, for tests: where the last paint put each answer card.
+    answerCards: () => cardRects.map((c) => ({ id: c.id, about: c.about.slice(), x: c.x, y: c.y, w: c.w, h: c.h })),
     // Text folds back from ink, for tests: the words of a text where they stand.
     textWords: (id) => textWords(session.getState(), id), foldIntoText: foldIntoText,
     strikeOnText: (strokeId, pts) => strikeOnText(session.getState(), strokeId, pts), textNear: (b) => textNear(session.getState(), b),

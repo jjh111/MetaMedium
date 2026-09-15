@@ -52,7 +52,7 @@ circle them, cross with a command mark *you taught the system*, prompt them into
 a living page that renders in the canvas with your ink still outlining its
 divs — then draw on that page and the ink addresses the regions underneath it.
 Scratch anything out to erase. `Demos/session-engine.html` is the surface;
-`Demos/session-engine.e2e.js` drives 179 steps through the real UI: page, flowchart, handwriting (read only when asked; a line read as one), the model drawing, the user-side loop, selection and the field, corrections, the worker, the tank, words into verbs and acting out, frames and the drawn slider, the folder, pictures, text, the moment, a live room, a playing frame that takes the pointer, hold by long-press, the graph in 3D, and the foundations (letters at any size, a mark that crosses, readings that stay, the minimap). A run takes about 100 s; run it **in its own tab on its own origin** (`http://127.0.0.1:8010/…?fresh=1&nosw=1` — `__setup` refuses any other URL: it replaces `fetch` with a stub, joins a stub model named `e2e-stub`, and wipes the origin's saved board), start it with `__setup(); __scenario().then(r => window.__R = r)` and read `__R` when it lands.
+`Demos/session-engine.e2e.js` drives 184 steps through the real UI: page, flowchart, handwriting (read only when asked; a line read as one), the model drawing, the user-side loop, selection and the field, corrections, the worker, the tank, words into verbs and acting out, frames and the drawn slider, the folder, pictures, text, the moment, a live room, a playing frame that takes the pointer, hold by long-press, the graph in 3D, and the foundations (letters at any size, a mark that crosses, readings that stay, the minimap), and the explanation plane's layout. A run takes about 100 s; run it **in its own tab on its own origin** (`http://127.0.0.1:8010/…?fresh=1&nosw=1` — `__setup` refuses any other URL: it replaces `fetch` with a stub, joins a stub model named `e2e-stub`, and wipes the origin's saved board), start it with `__setup(); __scenario().then(r => window.__R = r)` and read `__R` when it lands.
 v7 Stage E (handwriting) shipped 1 Sep 2026: a word written beside a shape is read by a
 model that can see and offered as that shape's name. Whitepaper v5.1 stays parked until the
 conversation benchmark passes end to end.
@@ -604,6 +604,24 @@ Explanations are a **third plane** (`SessionState.explanations`) beside content
 and gesture: visible and erasable, but not ink — they never join a lasso, a
 cluster, or a signature. Several participants may answer the same question and
 every answer is held.
+
+**The explanation plane has a layout, and it is the surface's**
+(`renderExplanations` in `Demos/surface/08-render.js`). Core anchors an answer
+beside the marks it is about; six marks stacked in a column each given a
+sentence — what the MCP hand does with `canvas_say` — anchor six cards to the
+same edge, and they land on each other and on the ink they are about. So each
+card keeps its anchor (a dashed leader to its marks, by the nearest edges) and
+the cards are pushed apart by a greedy search: right of the anchor, then left,
+then below, then above, shifted along the free side until nothing is hit,
+scored so a card would rather sit off screen than over the marks it speaks for.
+The placing is **runtime, never in the log** — a card's place follows the view,
+so it is found again on every zoom and pan: positions in canvas units, every
+size in screen ones. The search is bounded (four sides, six half-card shifts
+either way, the ink near the viewport capped), for a few dozen cards at most.
+Found with it: **the readable viewport was a sliver.** The panel stands on the
+LEFT and `viewportWorld` read its left edge as the right margin, so in a
+1400px window the world an answer could occupy was 112px wide and every card
+was clamped into it, on top of the last.
 
 **Routing** (`src/participants/router.ts`): the canvas answers first — tiers
 0 and 1 — and a model is asked only for what they cannot do.

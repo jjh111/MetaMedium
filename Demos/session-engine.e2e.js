@@ -1558,5 +1558,47 @@ window.__scenario = async function(){
     mm.session.load([]);
   }
 
+  // ---- 36. The explanation plane has a layout: cards off each other, off the ink they are about ----
+  {
+    mm.session.load([]); mm.setView(1, 0, 0);
+    // Six boxes in a column, each given a sentence — the shape of a canvas_say
+    // run from the MCP hand. Anchored alike, six cards would land on each other.
+    const boxes = [];
+    for (let i = 0; i < 6; i++) { t.stroke(t.rect(520, 120 + i * 96, 150, 62)); boxes.push(mm.session.getState().contentIds[i]); }
+    // Sentences long enough that a card is taller than the gap between two
+    // marks: side by side at the anchor they would overlap, so the placing
+    // has to shift them along the free side to find room.
+    const said = [0, 1, 2, 3, 4, 5].map((i) => 'box ' + (i + 1) + ' is a container; the marks inside it sit in a row, roughly lined up, and the one below points back at it — so the whole reads as a frame holding a flow');
+    boxes.forEach((id, i) => mm.session.answer({ participantId: MM.LOCAL_PARTICIPANT, question: 'why', text: said[i], aboutIds: [id], at: Date.now() + i }));
+    await wait(60);
+    const cards36 = mm.answerCards();
+    const hit = (a, b) => Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x) > 0.5 && Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y) > 0.5;
+    const pairs = () => { const c = mm.answerCards(); const bad = []; for (let i = 0; i < c.length; i++) for (let j = i + 1; j < c.length; j++) if (hit(c[i], c[j])) bad.push([i, j]); return bad; };
+    const overAnchor = () => mm.answerCards().filter((c) => c.about.some((id) => {
+      const b = MM.boundsOf(mm.session.getState().nodes.get(id));
+      return b && hit(c, { x: b.minX, y: b.minY, w: b.maxX - b.minX, h: b.maxY - b.minY });
+    })).map((c) => c.id);
+    step('36. six answers on six stacked marks are six cards, none on another', cards36.length === 6 && pairs().length === 0, { cards: cards36.length, overlapping: pairs() });
+    step('36a. no card covers the marks it is about', overAnchor().length === 0, overAnchor());
+    // The placing is runtime: an answer event carries what was said and what it
+    // is about, and nothing about where its card ended up.
+    const answers36 = JSON.parse(mm.exportLog()).filter((e) => e.type === 'answer');
+    const keys36 = [...new Set(answers36.flatMap((e) => Object.keys(e)))].sort();
+    step('36b. the placing is runtime, never in the log', answers36.length === 6 && keys36.join(',') === 'aboutIds,at,participantId,question,text,type', keys36);
+    // Positions are in canvas units and sizes in screen ones, so a zoom re-places them.
+    const before36 = mm.answerCards().map((c) => c.w)[0];
+    mm.setView(0.5, 0, 0);
+    await wait(30);
+    const after36 = mm.answerCards();
+    step('36c. zoomed out, the cards keep their screen size and are re-placed, still clear of each other',
+      after36.length === 6 && Math.abs(after36[0].w - before36 * 2) < 1 && pairs().length === 0 && overAnchor().length === 0,
+      { w: after36.length ? Math.round(after36[0].w) : 0, was: Math.round(before36), overlapping: pairs(), onInk: overAnchor() });
+    mm.setView(1, -300, -80);
+    await wait(30);
+    step('36d. panned, they are placed again and still clear', mm.answerCards().length === 6 && pairs().length === 0 && overAnchor().length === 0, { overlapping: pairs(), onInk: overAnchor() });
+    mm.setView(1, 0, 0);
+    mm.session.load([]);
+  }
+
   return R;
 };
