@@ -1,0 +1,14 @@
+{
+  "name": "metamedium-e2e",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "The release gate: the browser scenarios that already exist, run without a human console (DIRECTOR-REVIEW-2026-09-15.md, QA-1).",
+  "scripts": {
+    "e2e": "node run.mjs",
+    "install:browsers": "playwright install chromium"
+  },
+  "devDependencies": {
+    "playwright": "1.63.0"
+  }
+}

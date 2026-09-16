@@ -28,3 +28,8 @@ manim-explainer/*.mp4
 # on the way out; these cover a run that was killed.
 .card-build.html
 .card-build-profile/
+
+# The browser gate (e2e/): Playwright and a run's structured results. The
+# runner and its lockfile are tracked; what it downloads and what it writes are not.
+e2e/node_modules/
+e2e/results/

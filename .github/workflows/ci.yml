@@ -36,6 +36,58 @@ jobs:
       - name: Surface fragments must match the built script
         run: node ../Demos/build-surface.mjs --check
 
+  shard:
+    name: shard-3d — typecheck, test, build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: shard-3d
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: shard-3d/package-lock.json
+      # The shard imports metamedium-core FROM SOURCE through a vite/vitest
+      # alias, and core is zero-dependency TypeScript — so there is nothing to
+      # install over there and no bundle to drift.
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+
+  browser:
+    name: the browser gate — the canvas and shard scenarios
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: The runner
+        working-directory: e2e
+        run: npm ci
+      - name: The shard's own dependencies (vite serves it)
+        working-directory: shard-3d
+        run: npm ci
+      - name: Chromium
+        working-directory: e2e
+        run: npx playwright install --with-deps chromium
+      # Starts its own servers on free ports, opens a fresh context per
+      # scenario, awaits each harness's own result, exits nonzero on a failed
+      # assertion, a harness exception, an unexpected page error, or any
+      # attempt to reach a real model.
+      - name: Run them
+        run: node e2e/run.mjs
+      - name: What the run saw
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-results
+          path: e2e/results
+          if-no-files-found: warn
+
   web-app:
     name: Web App Skeleton — typecheck, lint, test, build
     runs-on: ubuntu-latest
