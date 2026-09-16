@@ -2020,16 +2020,119 @@
     return { jump, dist: after.dist, azimuth: `${before.azimuth} → ${after.azimuth}` };
   });
 
-  step('a snap that leaves the CHOSEN plane edge-on says so, rather than letting the pen find out', () => {
-    S().choose('height'); // XY — edge-on from above
+  // ---- the axis view IS the choice (16 September 2026) --------------------
+  //
+  // John: "in explicitly selected gizmo x, y, or z, treat that surface as
+  // selected automatically rather than needing the plane click; hide the plane
+  // click option when in a gizmo-clicked x, y, or z; only show the planes when
+  // in alt views." The camera and the pen were two decisions where a hand
+  // makes one: standing square onto the height plane and THEN clicking the
+  // height tile is saying it twice.
+
+  step('tapping a ball chooses the plane that view faces, and the tiles go away', () => {
+    S().clear();
+    S().view('free');
+    S().choose(null);
+    assert(S().state().tiles === true, 'the tiles were already hidden in a free view');
+
+    const went = S().nav.tap('z');
+    assert(went === 'front', `it went to ${went}`);
+    assert(S().state().chosen === 'height', `the front view chose ${S().state().chosen}`);
+    assert(S().state().viewChose === true, 'the view does not own the choice');
+    assert(S().state().tiles === false, 'the picker still shows its tiles in an axis view');
+    const said = S().state().status;
+    assert(/^front · height chosen/.test(said), `the status line said "${said}"`);
+    // The ink says the camera chose it, not a tile nobody held.
+    assert(/front view faces it/.test(S().state().chosenWhy), `the reason is "${S().state().chosenWhy}"`);
+    // The compass still says WHICH plane: the ball you tapped is the lit one.
+    const lit = S().nav.balls().filter((b) => b.chosen).map((b) => b.view).sort();
+    assert(JSON.stringify(lit) === JSON.stringify(['back', 'front']), `the lit balls are ${JSON.stringify(lit)}`);
+    return { went, chosen: S().state().chosen, tiles: false, status: said };
+  });
+
+  step('a rectangle drawn there lands on the height plane, chosen', () => {
+    const id = S().strokeScreen(onScreen(rectPath(-2, -1.2, 3.4, 2.2)));
+    assert(id, 'no mark was made');
+    const m = markOf(id);
+    assert(m.plane.name === 'height', `it landed on ${m.plane.name}`);
+    assert(m.plane.source === 'chosen', `the source is ${m.plane.source} — the view's choice must be the same decision a tile makes`);
+    // …and the ink says who chose it. A tile nobody held is not the reason.
+    assert(/front view faces it/.test(m.plane.why), `the ink's reason is "${m.plane.why}"`);
+    assert(m.readings[0].label === 'rectangle', `it read as ${m.readings[0].label}`);
+    S().undo();
+    return { plane: m.plane.name, source: m.plane.source, why: m.plane.why };
+  });
+
+  step('the other two axes choose the other two planes, and the flip keeps the plane', () => {
     S().nav.tap('y');
-    assert(S().state().camera.view === 'top', `the camera is at ${S().state().camera.view}`);
+    assert(S().state().chosen === 'foundation', `the top view chose ${S().state().chosen}`);
+    assert(/^top · foundation chosen/.test(S().state().status), `the status said "${S().state().status}"`);
+    // The second tap flips to the underside — the same plane, seen from below.
+    const back = S().nav.tap('y');
+    assert(back === 'bottom', `the flip went to ${back}`);
+    assert(S().state().chosen === 'foundation', `the bottom view chose ${S().state().chosen}`);
+    S().nav.tap('x');
+    assert(S().state().chosen === 'width', `the right view chose ${S().state().chosen}`);
+    assert(S().state().tiles === false, 'the tiles came back inside an axis view');
+    return { top: 'foundation', bottom: 'foundation', right: 'width' };
+  });
+
+  step('orbit off the axis — the tiles come back, and the plane was the VIEW’S', () => {
+    // Nothing was ever chosen by hand in this run, so nothing comes back: the
+    // board is read from what you draw again. `planeAfterLeavingAxisView` is
+    // the one line that decides this.
+    S().orbit(0.6, 0.22);
+    assert(S().state().camera.view === null, 'the orbit stayed on the axis');
+    assert(S().state().tiles === true, 'the picker did not put its tiles back in an alt view');
+    assert(S().state().chosen === null, `the view's choice outlived the view: ${S().state().chosen}`);
+    assert(S().state().viewChose === false, 'the view still claims the choice');
+    assert(/plane read from what you draw/.test(S().state().status), `the status said "${S().state().status}"`);
+    return { tiles: true, chosen: null, status: S().state().status };
+  });
+
+  step('a tile the HAND held outlives the axis view it was carried through', () => {
+    S().choose('width'); // the hand's own, in an alt view
+    assert(S().state().chosen === 'width', 'the tile did not take');
+    S().nav.tap('y'); // the top view takes over: foundation
+    assert(S().state().chosen === 'foundation', `the top view chose ${S().state().chosen}`);
+    S().orbit(0.6, 0.2); // …and leaves again
+    assert(S().state().camera.view === null, 'the orbit stayed on the axis');
+    assert(S().state().chosen === 'width', `the hand's own tile did not come back: ${S().state().chosen}`);
+    assert(/width chosen — the tile you held/.test(S().state().status), `the status said "${S().state().status}"`);
+    return { through: 'foundation', back: 'width' };
+  });
+
+  step('0 in an axis view un-chooses, and the tiles come back with it', () => {
+    S().nav.tap('z');
+    assert(S().state().tiles === false, 'the tiles did not go away');
+    assert(S().state().chosen === 'height', `the front view chose ${S().state().chosen}`);
+    S().choose(null); // John's `0`, and the centre of the picker
+    assert(S().state().chosen === null, 'the un-choose did not take');
+    assert(S().state().tiles === true, 'un-choosing in an axis view left the hand with no way to choose');
+    assert(S().state().viewChose === false, 'the view still claims the choice');
+    // And from there a tile can be held by hand, standing in the same view.
+    S().choose('height');
+    assert(S().state().chosen === 'height' && S().state().tiles === true, 'the tiles went away again on a hand-held tile');
+    return { unchosen: true, tiles: true };
+  });
+
+  step('a plane chosen BY HAND that is edge-on from here still says so', () => {
+    // The warning a snap used to carry. An axis view now always faces the
+    // plane it chose, so the only way left to stand where the ink cannot land
+    // is to choose it by hand — and that is where it has to be said, rather
+    // than letting the pen find out (§10's last risk).
+    S().nav.tap('y'); // the top view: foundation
+    S().choose(null); // the tiles back
+    S().choose('height'); // XY — edge-on from above
     const said = S().state().status;
     assert(/edge-on/.test(said), `the status line said "${said}"`);
     assert(/height/.test(said), `it does not name the plane: "${said}"`);
     // …and the ball that faces the plane you ARE drawing on is one tap away.
     S().nav.tap('z');
-    assert(/flat on/.test(S().state().status), `the status line said "${S().state().status}"`);
+    assert(S().state().chosen === 'height', `the front view chose ${S().state().chosen}`);
+    assert(/^front · height chosen/.test(S().state().status), `the status line said "${S().state().status}"`);
+    S().view('free');
+    S().choose(null);
     return { edgeOn: said, flatOn: S().state().status };
   });
 

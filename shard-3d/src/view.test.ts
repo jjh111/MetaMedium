@@ -1,7 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { dot, cross, normalize, sub, v3, type Pose, type Vec3 } from './plane';
+import { dot, cross, normalize, sub, v3, type PlaneName, type Pose, type Vec3 } from './plane';
 import {
   AXIS_VIEWS,
+  AXIS_VIEW_TOLERANCE_DEG,
+  axisPlaneFor,
+  isAxisView,
+  planeAfterLeavingAxisView,
   balls,
   ballScale,
   boundsOf,
@@ -123,6 +127,84 @@ describe('the compass and the plane picker agree', () => {
   it('a plane a little off flat-on is still drawable', () => {
     const look = normalize(v3(0, -1, 0.35)); // a shallow look down at the ground
     expect(tooOblique('foundation', look)).toBe(false);
+  });
+});
+
+// ---- the axis view IS the choice (16 September 2026) ----------------------
+// John: "in explicitly selected gizmo x, y, or z, treat that surface as
+// selected automatically rather than needing the plane click; hide the plane
+// click option when in a gizmo-clicked x, y, or z; only show the planes when
+// in alt views." The arithmetic of that rule lives here; the wiring is
+// `navgizmo.ts` calling back into `main.ts`.
+
+describe('an axis view chooses its plane', () => {
+  it('maps all six views onto the three planes, both sides of each axis alike', () => {
+    expect(axisPlaneFor('front')).toBe('height');
+    expect(axisPlaneFor('back')).toBe('height');
+    expect(axisPlaneFor('top')).toBe('foundation');
+    expect(axisPlaneFor('bottom')).toBe('foundation');
+    expect(axisPlaneFor('right')).toBe('width');
+    expect(axisPlaneFor('left')).toBe('width');
+  });
+
+  it('chooses the plane that view faces FLAT ON — never one it cannot draw', () => {
+    for (const view of AXIS_VIEWS) {
+      const look = v3(-VIEW_DIR[view].x, -VIEW_DIR[view].y, -VIEW_DIR[view].z);
+      near(facingFrom(axisPlaneFor(view), look), 1);
+      expect(tooOblique(axisPlaneFor(view), look)).toBe(false);
+    }
+  });
+
+  it('is the same mapping the compass lights its ball by — one decision, one home', () => {
+    for (const view of AXIS_VIEWS) expect(axisPlaneFor(view)).toBe(planeFacedBy(view));
+    // …and the ball you tapped is one of the two the chosen plane lights.
+    for (const view of AXIS_VIEWS) {
+      const lit = viewFacingPlane(axisPlaneFor(view));
+      expect(view === lit || view === opposite(lit)).toBe(true);
+    }
+  });
+});
+
+describe('standing in an axis view, and leaving it', () => {
+  it('says yes exactly where `viewOfPose` says which', () => {
+    for (const view of AXIS_VIEWS) {
+      const p = poseForAxis(view, { target: v3(0, 0, 0), dist: 9, ...BASE });
+      expect(isAxisView(p)).toBe(true);
+      expect(viewOfPose(p)).toBe(view);
+    }
+    const free = { ...poseForAxis('front', { target: v3(0, 0, 0), dist: 9, ...BASE }), position: v3(6, 5, 7) };
+    expect(isAxisView(free)).toBe(false);
+  });
+
+  it('holds within the tolerance and lets go outside it', () => {
+    // A hand that orbits to within a couple of degrees of front meant front;
+    // ten degrees off is a view of its own.
+    const near2 = { ...poseForAxis('front', { target: v3(0, 0, 0), dist: 10, ...BASE }), position: v3(0.35, 0, 10) };
+    expect(isAxisView(near2)).toBe(true);
+    const off10 = { ...poseForAxis('front', { target: v3(0, 0, 0), dist: 10, ...BASE }), position: v3(1.8, 0, 10) };
+    expect(isAxisView(off10)).toBe(false);
+    // The tolerance is one number, and it is the one `viewOfPose` uses.
+    expect(isAxisView(off10, 12)).toBe(true);
+    expect(AXIS_VIEW_TOLERANCE_DEG).toBe(3);
+  });
+
+  it('gives the plane back to the hand on the way out — nothing, unless the hand had chosen', () => {
+    // The choice was the VIEW'S, so it goes with the view.
+    expect(planeAfterLeavingAxisView(null)).toBeNull();
+    // …and a tile the hand held before the camera moved is still the hand's.
+    expect(planeAfterLeavingAxisView('height')).toBe('height');
+    expect(planeAfterLeavingAxisView('foundation')).toBe('foundation');
+  });
+
+  it('round trips: enter an axis view, leave it, and the hand has what it had', () => {
+    const hands: (PlaneName | null)[] = [null, 'foundation', 'height', 'width'];
+    for (const hand of hands) {
+      for (const view of AXIS_VIEWS) {
+        const whileThere = axisPlaneFor(view); // what the view chose
+        expect(whileThere).toBe(planeFacedBy(view));
+        expect(planeAfterLeavingAxisView(hand)).toBe(hand); // what came back
+      }
+    }
   });
 });
 

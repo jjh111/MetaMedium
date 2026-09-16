@@ -42,9 +42,12 @@ import { createChips } from './chips';
 import { placeCursor } from './cursor';
 import { createNav } from './navgizmo';
 import {
+  axisPlaneFor,
   balls,
   boundsOf as boundsOfPoints,
   opposite,
+  planeAfterLeavingAxisView,
+  tooOblique,
   unionBounds,
   viewFacingPlane,
   viewForAxis,
@@ -95,6 +98,19 @@ const space = createSpace(host, colours);
 const log = createLog();
 const gizmo = createGizmo(colours);
 space.scene.add(gizmo.group);
+
+// ---- the compass and the picker, coupled (16 September 2026) ---------------
+// John: "in explicitly selected gizmo x, y, or z, treat that surface as
+// selected automatically rather than needing the plane click; hide the plane
+// click option when in a gizmo-clicked x, y, or z; only show the planes when
+// in alt views." So an axis view chooses the plane it faces, and while it is
+// doing the choosing the tiles are away. Two things have to be remembered for
+// that to be reversible: what the HAND chose for itself, and whether the view
+// is the one choosing now.
+/** The plane the hand chose with a tile or a key — what comes back on leaving an axis view. */
+let handChosen: PlaneName | null = gizmo.chosen;
+/** True while the camera's own axis view holds the choice; the picker's tiles are then hidden. */
+let viewChoosing = false;
 const chips = createChips(chipsEl, space.project);
 const panel = createPanel(panelEl, statusEl, log, {
   broken: (id) => solids.brokenOf(id),
@@ -177,7 +193,7 @@ function whoIs(id: string): { by: string; origin: 'engine' | 'model' | 'hand' } 
 }
 
 /** What the gizmo holds when the pen goes down. The candidates are the pen's. */
-const pen = (): PenState => ({ chosen: gizmo.chosen, offset: gizmo.offset });
+const pen = (): PenState => ({ chosen: gizmo.chosen, why: gizmo.chosenWhy, offset: gizmo.offset });
 
 /**
  * **The cursor** — where the hand is working, as one world point, and where
@@ -574,6 +590,17 @@ const nav = createNav({
   bounds: boardBounds,
   pinned: () => pinnedViews(log),
   say: (sentence) => panel.say(sentence),
+  // The axis view IS the choice. It goes through the same `choose` a tile
+  // reaches, so every downstream rule — the profile and its extent, the
+  // edge-on gate, the picker's slide — is looking at the plane it always was.
+  enterAxisView: (view, plane) => {
+    viewChoosing = true;
+    choose(plane, 'view', `the ${view} view faces it — the camera chose the plane`);
+  },
+  leaveAxisView: () => {
+    viewChoosing = false;
+    choose(planeAfterLeavingAxisView(handChosen), 'view');
+  },
 });
 
 // ---- P5: the generator seat ------------------------------------------------
@@ -1538,16 +1565,48 @@ function report() {
   panel.show(panel.subject(), selection.current());
 }
 
-function choose(name: PlaneName | null) {
-  gizmo.choose(name);
+/**
+ * The one decision about where ink lands, whoever made it.
+ *
+ * `by` is which of the two said so. A hand's choice is remembered as the
+ * hand's, and it **overrules the view**: choosing anything other than what the
+ * camera is facing — a different tile, or nothing at all with `0` or the
+ * centre — hands the picker's tiles back, because from then on the hand is
+ * doing the choosing and it needs them.
+ */
+function choose(name: PlaneName | null, by: 'hand' | 'view' = 'hand', why?: string) {
+  if (by === 'hand') {
+    handChosen = name;
+    const at = nav.standing();
+    if (viewChoosing && (!name || !at || name !== axisPlaneFor(at))) viewChoosing = false;
+  }
+  gizmo.choose(name, why);
+  gizmo.showTiles(!viewChoosing);
   space.render();
   nav.sync(); // the picker's tile and the compass's ball say the same thing
+  // The compass says its own sentence when the view is the one choosing.
+  if (by === 'view') {
+    report();
+    return;
+  }
   panel.say(
     name
-      ? `${name} chosen · ink lands ${whereOn(name)}`
+      ? tooOblique(name, lookOfCamera())
+        // The warning a snap used to carry. An axis view now always faces the
+        // plane it chose, so the only way left to stand somewhere the ink
+        // cannot land is to choose it by hand from here — which is where it
+        // has to be said, rather than letting the pen find out.
+        ? `${name} chosen · it is edge-on from here — orbit, or tap the ball that faces it`
+        : `${name} chosen · ink lands ${whereOn(name)}`
       : 'nothing chosen · the plane is read from the evidence, and the panel says why'
   );
   report();
+}
+
+/** Which way the camera looks, for the edge-on check. */
+function lookOfCamera(): Vec3 {
+  const pose = space.pose();
+  return sub(pose.target, pose.position);
 }
 
 function undo() {
@@ -1704,6 +1763,12 @@ export interface ShardHook {
   viewport(): { left: number; top: number; width: number; height: number };
   state(): {
     chosen: PlaneName | null;
+    /** Why it is chosen, in the words the ink will carry. */
+    chosenWhy: string;
+    /** Whether the picker is showing its three tiles — away in an axis view. */
+    tiles: boolean;
+    /** True while the camera's own axis view is the one choosing. */
+    viewChose: boolean;
     offset: number;
     marks: {
       id: string;
@@ -2056,6 +2121,9 @@ const hook: ShardHook = {
     const forms = log.forms();
     return {
       chosen: gizmo.chosen,
+      chosenWhy: gizmo.chosenWhy,
+      tiles: gizmo.tilesShown,
+      viewChose: viewChoosing,
       offset: gizmo.offset,
       marks: log.marks().map((m: Mark) => {
         const f = forms.find((x) => x.id === m.id);

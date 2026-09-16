@@ -27,6 +27,13 @@ const TILE_AT = 1.1; // where the tile's near corner sits
 export interface Gizmo {
   group: THREE.Group;
   chosen: PlaneName | null;
+  /**
+   * Why the chosen plane is the chosen plane, carried onto every stroke that
+   * lands on it. A tile held under the pen is one reason; the camera standing
+   * square onto the plane is another, and the panel must not claim the first
+   * when it was the second.
+   */
+  chosenWhy: string;
   offset: number;
   /**
    * The cursor: where the whole picker stands, and where the planes it hands
@@ -36,9 +43,20 @@ export interface Gizmo {
   origin: Vec3;
   /** The chosen plane as it stands, through the cursor and slid; null when nothing is chosen. */
   plane(): Plane | null;
-  choose(name: PlaneName | null): void;
+  choose(name: PlaneName | null, why?: string): void;
   /** Put the cursor here. The picker moves with it. */
   setOrigin(at: Vec3): void;
+  /**
+   * Show or hide the three tiles and the slide handle (16 September 2026).
+   *
+   * Hidden while the camera's own axis view is doing the choosing: the plane
+   * is already chosen, and the tile would be a redundant click on a thing
+   * that, seen flat on, is a square over the drawing anyway. **The axes and
+   * the cursor mark stay** — that is where the cursor IS, and shift + click
+   * still has to read.
+   */
+  showTiles(on: boolean): void;
+  tilesShown: boolean;
   /** Objects a pointer may hit: tiles, the centre, the slide handle. */
   pickables(): THREE.Object3D[];
   /** What a hit object means, or null when it is not the gizmo's. */
@@ -131,21 +149,27 @@ export function createGizmo(colours: Colours): Gizmo {
   stem.visible = false;
   group.add(stem);
 
+  /** The reason a tile gives: the picker's own, and the default. */
+  const tileWhy = (name: PlaneName) => `the ${name} tile was held when the pen went down`;
+
   const g: Gizmo = {
     group,
     chosen: 'foundation',
+    chosenWhy: tileWhy('foundation'),
     offset: 0,
+    tilesShown: true,
     origin: v3(0, 0, 0),
     plane() {
       if (!g.chosen) return null;
-      const named = NAMED[g.chosen]('chosen', `the ${g.chosen} tile was held when the pen went down`);
+      const named = NAMED[g.chosen]('chosen', g.chosenWhy);
       // Through the cursor. At the world origin — where the cursor starts —
       // this is the plane `NAMED` already returned, unchanged.
       const p: Plane = { ...named, origin: g.origin };
       return g.offset ? slide(p, g.offset) : p;
     },
-    choose(name) {
+    choose(name, why) {
       g.chosen = name;
+      g.chosenWhy = name ? why ?? tileWhy(name) : '';
       if (!name) g.offset = 0;
       g.refresh();
     },
@@ -153,9 +177,15 @@ export function createGizmo(colours: Colours): Gizmo {
       g.origin = at;
       g.refresh();
     },
+    showTiles(on) {
+      g.tilesShown = on;
+      g.refresh();
+    },
     pickables() {
+      // The centre is always reachable: it is how a hand un-chooses, and in an
+      // axis view — where the tiles are away — that is the way back to them.
       const out: THREE.Object3D[] = [centre];
-      tiles.forEach((t) => out.push(t.face));
+      if (g.tilesShown) tiles.forEach((t) => out.push(t.face));
       if (handle.visible) out.push(handle);
       return out;
     },
@@ -203,8 +233,10 @@ export function createGizmo(colours: Colours): Gizmo {
         const o = on ? slid : v3(0, 0, 0);
         face.position.set(p.pos[0] + o.x, p.pos[1] + o.y, p.pos[2] + o.z);
         edge.position.copy(face.position);
+        face.visible = g.tilesShown;
+        edge.visible = g.tilesShown;
       });
-      if (plane) {
+      if (plane && g.tilesShown) {
         const n = new THREE.Vector3(plane.normal.x, plane.normal.y, plane.normal.z).normalize();
         const base = new THREE.Vector3(slid.x, slid.y, slid.z);
         const at = base.clone().add(n.clone().multiplyScalar(1.5));
