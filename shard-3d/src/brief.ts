@@ -85,11 +85,34 @@ export interface BriefSolid {
   honours?: Honours;
 }
 
-/** How much of the drawing a body actually contains (§4, re-run on a proposal). */
+/**
+ * How much of the drawing a body actually contains (§4, re-run on a proposal).
+ *
+ * **The claims are separate and they say which kind they are** (GRAPH-1): an
+ * outline drawn at this body, an outline of the definition it was placed from
+ * carried onto it, and an outline drawn against it since are three different
+ * claims, and a row that averaged them without saying so reported a placed mug
+ * as dishonouring a drawing it had never been compared with. `constraints.ts`
+ * does the classifying; this is what comes back out.
+ */
 export interface Honours {
-  /** The mean coverage over every plane a profile of it was drawn on. */
+  /** The mean coverage over every claim that was counted. */
   overall: number;
-  per: { view: string; markId: string; coverage: number }[];
+  per: {
+    view: string;
+    markId: string;
+    coverage: number;
+    /** `target` — drawn here · `source` — carried from the definition · `revision` — drawn since. */
+    kind?: 'target' | 'source' | 'revision';
+    /** The definition it was carried from, when it was carried. */
+    of?: string;
+    /** Why this claim is expected to read low — a hole cut since it was drawn. */
+    note?: string;
+    /** What was measured, and where it was carried from, in the terms it was measured in. */
+    why?: string;
+  }[];
+  /** Claims kept for their provenance and deliberately not counted, each saying why. */
+  aside?: string[];
   /** *honours the drawing 93% · front 96 · top 95 · side 88* */
   sentence: string;
 }
@@ -265,12 +288,33 @@ export function describeSpace(scene: SpaceScene): string {
   return out.join('\n');
 }
 
-/** The *honours the drawing* sentence, from the coverages the diff measured. */
-export function honoursSentence(per: { view: string; coverage: number }[]): string {
-  if (!per.length) return 'honours the drawing — no profile of it has been drawn to check against';
+/**
+ * The *honours the drawing* sentence, from the coverages the diff measured.
+ *
+ * Every claim says which kind it is when it is not simply the drawing at this
+ * body, and a claim the tree expects to read low says why it does — *a bare low
+ * number* was exactly the complaint: 20% against an outline lying somewhere
+ * else is not a measurement of anything. Claims that were kept and not counted
+ * (a hole's outline; a correspondence whose pose could not be derived) come
+ * after, so nothing is dropped to make the number look better.
+ */
+export function honoursSentence(
+  per: { view: string; coverage: number; kind?: 'target' | 'source' | 'revision'; of?: string; note?: string }[],
+  aside: string[] = []
+): string {
+  const rest = aside.length
+    ? ` · not counted: ${aside.join('; ')}`
+    : '';
+  if (!per.length) {
+    return `honours the drawing — no profile of it has been drawn to check against${rest}`;
+  }
   const overall = per.reduce((n, p) => n + p.coverage, 0) / per.length;
-  return (
-    `honours the drawing ${(overall * 100).toFixed(0)}% · ` +
-    per.map((p) => `${p.view} ${(p.coverage * 100).toFixed(0)}`).join(' · ')
-  );
+  const say = (p: (typeof per)[number]) => {
+    const qual: string[] = [];
+    if (p.kind === 'source') qual.push(`carried from ${p.of ?? 'the definition'}`);
+    if (p.kind === 'revision') qual.push('drawn since');
+    if (p.note) qual.push(p.note);
+    return `${p.view} ${(p.coverage * 100).toFixed(0)}${qual.length ? ` (${qual.join('; ')})` : ''}`;
+  };
+  return `honours the drawing ${(overall * 100).toFixed(0)}% · ${per.map(say).join(' · ')}${rest}`;
 }

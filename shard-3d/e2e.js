@@ -1993,6 +1993,42 @@
     };
   });
 
+  demo('6d · the placed mug’s row answers about THIS mug, not the first one', () => {
+    const placed = S().solids()[1];
+    const h = S().honours(placed.id);
+    assert(h, 'nothing was measured against the placed mug');
+    assert(h.per.length >= 2, `${h.per.length} claim(s), expected the outline drawn here and the one carried`);
+
+    // The defect GRAPH-1 names: the second number used to be the FIRST mug's
+    // plan, rasterised where the first mug's plan lies — a 0% view about a body
+    // standing somewhere else. Every claim here is measured where THIS body is,
+    // so none of them can read zero for that reason.
+    for (const p of h.per) {
+      assert(
+        p.coverage > 0.05,
+        `the ${p.view} claim (${p.kind} ${p.markId}) is ${(p.coverage * 100).toFixed(0)}% — measured somewhere else?`
+      );
+    }
+
+    // …and the row says which claim is which.
+    const kinds = h.per.map((p) => p.kind);
+    assert(kinds.includes('target'), `no claim is the outline drawn here: ${kinds.join(', ')}`);
+    assert(kinds.includes('source'), `nothing was carried from the definition: ${kinds.join(', ')}`);
+    const carried = h.per.find((p) => p.kind === 'source');
+    assert(carried.of === 'mug', `the carried claim says it came from ${carried.of}`);
+    assert(/carried from mug/.test(h.sentence), `the sentence said "${h.sentence}"`);
+    // The hole and the handle are kept and said, and deliberately not counted:
+    // a feature is a claim about a face, not about the body's extent.
+    assert(h.aside && h.aside.length >= 1, 'the features were dropped rather than set aside');
+    assert(/not counted/.test(h.sentence), `the sentence does not say what it set aside: "${h.sentence}"`);
+    assert(/honours/.test(S().panelText()), 'the panel does not carry the row');
+    return {
+      sentence: h.sentence,
+      per: h.per.map((p) => `${p.view} ${(p.coverage * 100).toFixed(0)} ${p.kind}`),
+      aside: h.aside.length,
+    };
+  });
+
   window.__demo = async function () {
     const out = { ok: true, passed: 0, failed: 0, totalMs: 0, steps: [] };
     if (!S()) {

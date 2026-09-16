@@ -1673,7 +1673,13 @@ export interface ShardHook {
   /** P6: *Not a mug* — the correction, held in the log. */
   correct(name: string, markId: string): { definition: string; why: string } | null;
   /** How much of the drawing a body contains, per plane — the version's own row. */
-  honours(solidId: string): { overall: number; per: { view: string; coverage: number }[]; sentence: string } | null;
+  honours(solidId: string): {
+    overall: number;
+    /** Each claim with the kind it is: drawn here, carried from a definition, or drawn since (GRAPH-1). */
+    per: { view: string; markId: string; coverage: number; kind?: string; of?: string; note?: string }[];
+    aside?: string[];
+    sentence: string;
+  } | null;
   /** The materials the tree binds, in the step's own id. */
   materials(solidId: string): { stepId: string; name?: string; colour: string }[];
   /** Stop every call in flight, as Esc does. */
@@ -2010,7 +2016,21 @@ const hook: ShardHook = {
   },
   honours: (solidId) => {
     const h = log.honoursOf(solidId);
-    return h ? { overall: h.overall, per: h.per.map((p) => ({ view: p.view, coverage: p.coverage })), sentence: h.sentence } : null;
+    return h
+      ? {
+          overall: h.overall,
+          per: h.per.map((p) => ({
+            view: p.view,
+            markId: p.markId,
+            coverage: p.coverage,
+            ...(p.kind ? { kind: p.kind } : {}),
+            ...(p.of ? { of: p.of } : {}),
+            ...(p.note ? { note: p.note } : {}),
+          })),
+          ...(h.aside ? { aside: h.aside } : {}),
+          sentence: h.sentence,
+        }
+      : null;
   },
   materials: (solidId) =>
     (log.solidOf(solidId)?.tree.steps ?? [])
