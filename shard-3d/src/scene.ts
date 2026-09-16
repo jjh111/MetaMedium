@@ -9,10 +9,12 @@
 // draw." The split is here so that ink.ts never has to ask whether a drag was
 // meant as a camera move.
 //
-// Two fingers pan and pinch rather than orbit (they used to orbit): with the
-// navigation gizmo in the corner there is now a place to orbit from with one
-// finger that is chrome rather than canvas, and a map's gesture is what a hand
-// reaches for on a touch screen. The README says so in the key map.
+// TRACKPAD and TOUCH take Blender's map, and what each gesture means is read
+// by `gesture.ts`, which is pure: a two-finger swipe orbits, `Shift` + swipe
+// pans, a pinch or `Ctrl`/`Cmd` + swipe dollies; on a screen, two fingers
+// pinch or orbit and three pan. A mouse wheel keeps the dolly it always had.
+// This file is left holding the listeners and nothing else — every threshold
+// and every sign is named and tested over there.
 
 import * as THREE from 'three';
 import type { Colours } from './theme';
@@ -27,6 +29,15 @@ import {
   type AxisView,
   type Bounds3,
 } from './view';
+import {
+  noTouchMemory,
+  noWheelMemory,
+  readTouch,
+  readWheel,
+  type TouchMemory,
+  type TouchPoint,
+  type WheelMemory,
+} from './gesture';
 
 export type Projection = 'persp' | 'ortho';
 
@@ -69,6 +80,20 @@ export interface Space {
   orbiting(): boolean;
   /** Called on every camera change, so the chrome can re-place itself. */
   onChange(fn: () => void): void;
+  /**
+   * Called when a stroke in progress turns out to have been the first finger
+   * of a camera gesture — **drop it, do not finish it**.
+   *
+   * A touch screen has no way to know that a second finger is coming, so one
+   * finger has already been drawing for a moment by the time it lands. Ending
+   * that stroke the ordinary way would leave a stray mark on the board after
+   * every pinch. The scene is the only thing that sees the second finger, and
+   * `ink.ts` is the only thing that holds the live stroke, so this is the seam
+   * between them; `pointercancel` could not carry it, because a real
+   * `pointercancel` means the pen was taken away mid-stroke and that stroke is
+   * still the hand's.
+   */
+  onAbandon(fn: () => void): void;
   target: THREE.Vector3;
 
   // ---- the navigation gizmo drives these ----------------------------------
@@ -162,6 +187,8 @@ export function createSpace(host: HTMLElement, colours: Colours): Space {
   let pivotFn: ((screen: Point, why: 'orbit' | 'dolly') => Vec3 | null) | null = null;
   const changeFns: (() => void)[] = [];
   const emit = () => changeFns.forEach((f) => f());
+  const abandonFns: (() => void)[] = [];
+  const abandon = () => abandonFns.forEach((f) => f());
 
   function place() {
     const r = Math.max(0.5, dist);
@@ -539,8 +566,8 @@ export function createSpace(host: HTMLElement, colours: Colours): Space {
   // ---- the split -----------------------------------------------------------
   let last = { x: 0, y: 0 };
   let touches = 0;
-  let pinch = 0;
-  let twoFinger: { x: number; y: number } | null = null;
+  let wheelMemory: WheelMemory = noWheelMemory();
+  let touchMemory: TouchMemory = noTouchMemory();
 
   function wantsCamera(e: PointerEvent): 'orbit' | 'pan' | null {
     if (e.pointerType === 'touch') return null; // touch is handled by touchmove
@@ -555,7 +582,13 @@ export function createSpace(host: HTMLElement, colours: Colours): Space {
   canvas.addEventListener(
     'pointerdown',
     (e) => {
-      if (e.pointerType === 'touch') touches++;
+      if (e.pointerType === 'touch') {
+        touches++;
+        // The second finger of a gesture. Whatever the first one has been
+        // drawing since it landed was never a stroke — drop it before the
+        // camera starts moving under it.
+        if (touches === 2) abandon();
+      }
       const want = wantsCamera(e);
       if (!want) return;
       dragging = want;
@@ -596,38 +629,56 @@ export function createSpace(host: HTMLElement, colours: Colours): Space {
   canvas.addEventListener('pointerup', end, true);
   canvas.addEventListener('pointercancel', end, true);
 
+  /**
+   * A wheel is three devices wearing one event: a mouse, a trackpad swiping,
+   * and a trackpad pinching. `readWheel` says which and what it means; this
+   * handler only spends the answer.
+   *
+   * A dolly goes toward the POINTER. An orbit and a pan do not: they are the
+   * same acts a drag makes, and a drag turns about the view's centre.
+   */
   canvas.addEventListener(
     'wheel',
     (e) => {
-      // Ctrl/⌘ + wheel is a pinch on a trackpad; both dolly, both toward the
-      // pointer rather than toward the middle of the screen.
-      const step = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY;
-      const factor = Math.exp(Math.max(-0.5, Math.min(0.5, step * 0.0016)));
-      dolly(factor, { x: e.clientX, y: e.clientY });
+      const rect = canvas.getBoundingClientRect();
+      const move = readWheel(e, wheelMemory, { width: rect.width, height: rect.height }, performance.now());
+      wheelMemory = move.memory;
+      if (move.act === 'dolly') dolly(move.factor, { x: e.clientX, y: e.clientY });
+      else if (move.act === 'pan') pan(move.dxPx, move.dyPx);
+      else turn(move.dTheta, move.dPhi, pivotFn?.({ x: e.clientX, y: e.clientY }, 'orbit') ?? null);
       e.preventDefault();
     },
     { passive: false }
   );
 
-  // Two fingers pan and pinch. One finger draws; orbit on a touch screen is a
-  // drag on the compass, which is chrome rather than canvas.
-  canvas.addEventListener(
-    'touchmove',
-    (e) => {
-      if (e.touches.length !== 2) return;
-      const a = e.touches[0];
-      const b = e.touches[1];
-      const d = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
-      const mid = { x: (a.clientX + b.clientX) / 2, y: (a.clientY + b.clientY) / 2 };
-      if (pinch) dolly(pinch / d, mid);
-      if (twoFinger) pan(mid.x - twoFinger.x, mid.y - twoFinger.y);
-      pinch = d;
-      twoFinger = mid;
-      e.preventDefault();
-    },
-    { passive: false }
-  );
-  canvas.addEventListener('touchend', () => { pinch = 0; twoFinger = null; });
+  /**
+   * One finger draws. **Two fingers pinch or orbit; three pan.** Which of the
+   * two a pair is doing is decided once, by `readTouch`, after they have
+   * travelled far enough to say — and nothing moves before then.
+   */
+  const onTouch = (e: TouchEvent) => {
+    const points: TouchPoint[] = Array.from(e.touches, (t) => ({
+      id: t.identifier,
+      x: t.clientX,
+      y: t.clientY,
+    }));
+    const move = readTouch(points, touchMemory);
+    touchMemory = move.memory;
+    if (!move.act) {
+      // A landing or a lifting still has to be swallowed, or the browser takes
+      // the second finger for a page zoom.
+      if (points.length > 1 && e.cancelable) e.preventDefault();
+      return;
+    }
+    if (move.act === 'dolly') dolly(move.factor, move.at);
+    else if (move.act === 'pan') pan(move.dxPx, move.dyPx);
+    else turn(move.dTheta, move.dPhi, pivotFn?.(move.at, 'orbit') ?? null);
+    if (e.cancelable) e.preventDefault();
+  };
+  canvas.addEventListener('touchstart', onTouch, { passive: false });
+  canvas.addEventListener('touchmove', onTouch, { passive: false });
+  canvas.addEventListener('touchend', onTouch, { passive: false });
+  canvas.addEventListener('touchcancel', onTouch, { passive: false });
 
   window.addEventListener('keydown', (e) => {
     if (e.code === 'Space') spaceHeld = true;
@@ -667,8 +718,12 @@ export function createSpace(host: HTMLElement, colours: Colours): Space {
     paint: (c) => { paint(c); render(); },
     render,
     view,
-    orbiting: () => dragging !== null,
+    // A second finger down IS a camera move in progress, whether or not it has
+    // travelled yet — which is what stops `ink.ts` starting a stroke from it.
+    // The first finger's stroke is already live by then; `onAbandon` drops it.
+    orbiting: () => dragging !== null || touches >= 2,
     onChange: (fn) => void changeFns.push(fn),
+    onAbandon: (fn) => void abandonFns.push(fn),
     target,
     turn,
     pan,

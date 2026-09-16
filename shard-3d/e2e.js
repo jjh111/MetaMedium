@@ -68,6 +68,51 @@
   /** Plane points → screen path, under the camera as it stands right now. */
   const onScreen = (uv) => uv.map((p) => S().screenFor(p));
 
+  const stage = () => document.querySelector('canvas.stage');
+
+  /**
+   * One wheel event on the canvas, in the shape the DEVICE would send it.
+   *
+   * A mouse and a trackpad reach the page through the same event and are told
+   * apart by its shape, so the only way to test that is to build both shapes —
+   * `{ deltaY: 120 }` is a notch, `{ deltaX: 24, deltaY: -1.5 }` is a swipe.
+   */
+  const spin = (over, at) =>
+    stage().dispatchEvent(
+      new WheelEvent('wheel', {
+        deltaX: 0,
+        deltaY: 0,
+        deltaMode: 0,
+        clientX: at.x,
+        clientY: at.y,
+        bubbles: true,
+        cancelable: true,
+        ...over,
+      })
+    );
+
+  /** One touch frame on the canvas — the real event `scene.ts` listens to. */
+  function fingers(type, at) {
+    const el = stage();
+    const touches = at.map(
+      ([x, y], i) => new Touch({ identifier: i, target: el, clientX: x, clientY: y })
+    );
+    el.dispatchEvent(
+      new TouchEvent(type, {
+        touches,
+        targetTouches: touches,
+        changedTouches: touches,
+        bubbles: true,
+        cancelable: true,
+      })
+    );
+  }
+
+  const apart = (a, b) => Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
+
+  /** Pointer ids for the synthetic fingers, clear of the hook's own. */
+  let touchId = 9000;
+
   const markOf = (id) => S().state().marks.find((m) => m.id === id);
 
   // ---- UI-2: the panel's summary, read off the panel ------------------------
@@ -2131,6 +2176,164 @@
     S().select(null);
     S().clear();
     return { jump, dist: after.dist, azimuth: `${before.azimuth} → ${after.azimuth}` };
+  });
+
+  // Trackpad and touch (16 Sep 2026). John: *"Make the view work with trackpad
+  // and touch."* Both reach the page through events the shard was reading as
+  // one thing — every wheel was a dolly, and two fingers only ever panned — so
+  // what these steps assert is that the same event, in a different SHAPE, now
+  // moves the camera a different way.
+
+  step('a notch dollies, a swipe orbits, shift + swipe pans, a pinch dollies', () => {
+    S().clear();
+    S().view('free');
+    S().choose(null);
+    const r = S().viewport();
+    const mid = { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+
+    // 1 · A mouse wheel: one axis, whole, large. The dolly it always had.
+    const b1 = S().state().camera;
+    spin({ deltaY: 120 }, mid);
+    const a1 = S().state().camera;
+    assert(a1.dist > b1.dist + 0.01, `a notch left the distance at ${b1.dist} → ${a1.dist}`);
+    assert(Math.abs(a1.azimuth - b1.azimuth) < 1e-9, `a notch turned the view to ${a1.azimuth}`);
+
+    // 2 · A trackpad swipe: small, fractional, on two axes. It orbits.
+    const b2 = S().state().camera;
+    for (let i = 0; i < 12; i++) spin({ deltaX: 24, deltaY: -1.5 }, mid);
+    const a2 = S().state().camera;
+    assert(Math.abs(a2.azimuth - b2.azimuth) > 5, `the swipe went ${b2.azimuth} → ${a2.azimuth}`);
+    assert(Math.abs(a2.dist - b2.dist) < 1e-9, `the swipe zoomed: ${b2.dist} → ${a2.dist}`);
+    assert(apart(a2.target, b2.target) < 1e-9, 'the swipe dragged the centre of the view');
+
+    // 3 · Shift + swipe pans, and turns nothing.
+    const b3 = S().state().camera;
+    for (let i = 0; i < 8; i++) spin({ deltaX: 24, deltaY: -12, shiftKey: true }, mid);
+    const a3 = S().state().camera;
+    const panned = apart(a3.target, b3.target);
+    assert(panned > 0.2, `shift + swipe moved the centre by ${panned.toFixed(4)} — it did not pan`);
+    assert(Math.abs(a3.azimuth - b3.azimuth) < 1e-9, `shift + swipe turned the view to ${a3.azimuth}`);
+    assert(Math.abs(a3.dist - b3.dist) < 1e-9, `shift + swipe zoomed: ${b3.dist} → ${a3.dist}`);
+
+    // 4 · Ctrl + wheel is how macOS sends a pinch. It dollies, and IN.
+    const b4 = S().state().camera;
+    for (let i = 0; i < 8; i++) spin({ deltaY: -12, ctrlKey: true }, mid);
+    const a4 = S().state().camera;
+    assert(a4.dist < b4.dist - 0.01, `the pinch left the distance at ${b4.dist} → ${a4.dist}`);
+    assert(Math.abs(a4.azimuth - b4.azimuth) < 1e-9, `the pinch turned the view to ${a4.azimuth}`);
+    return {
+      notch: `${b1.dist} → ${a1.dist}`,
+      swipe: `${b2.azimuth}° → ${a2.azimuth}°`,
+      pan: +panned.toFixed(3),
+      pinch: `${b4.dist} → ${a4.dist}`,
+    };
+  });
+
+  step('two fingers pinch or orbit; three fingers pan', () => {
+    S().clear();
+    S().view('free');
+    S().choose(null);
+    const r = S().viewport();
+    const cx = r.left + r.width / 2;
+    const cy = r.top + r.height / 2;
+
+    // 1 · A pinch: the fingers spread, the centre between them does not move.
+    const b1 = S().state().camera;
+    fingers('touchstart', [[cx - 60, cy], [cx + 60, cy]]);
+    for (let i = 1; i <= 10; i++)
+      fingers('touchmove', [[cx - 60 - i * 12, cy], [cx + 60 + i * 12, cy]]);
+    fingers('touchend', []);
+    const a1 = S().state().camera;
+    assert(a1.dist < b1.dist - 0.01, `spreading two fingers left the distance at ${b1.dist} → ${a1.dist}`);
+    assert(Math.abs(a1.azimuth - b1.azimuth) < 1e-9, `the pinch turned the view to ${a1.azimuth}`);
+    assert(apart(a1.target, b1.target) < 1e-9, 'the pinch dragged the centre of the view');
+
+    // 2 · Two fingers dragging together: an orbit, about the view's centre.
+    const b2 = S().state().camera;
+    fingers('touchstart', [[cx - 50, cy], [cx + 50, cy]]);
+    for (let i = 1; i <= 12; i++)
+      fingers('touchmove', [[cx - 50 + i * 14, cy - i * 3], [cx + 50 + i * 14, cy - i * 3]]);
+    fingers('touchend', []);
+    const a2 = S().state().camera;
+    assert(Math.abs(a2.azimuth - b2.azimuth) > 5, `the two-finger drag went ${b2.azimuth} → ${a2.azimuth}`);
+    assert(Math.abs(a2.dist - b2.dist) < 1e-9, `the two-finger drag zoomed: ${b2.dist} → ${a2.dist}`);
+    assert(apart(a2.target, b2.target) < 1e-9, 'the two-finger drag dragged the centre of the view');
+
+    // 3 · Three fingers pan, and turn nothing.
+    const b3 = S().state().camera;
+    fingers('touchstart', [[cx - 80, cy], [cx, cy], [cx + 80, cy + 40]]);
+    for (let i = 1; i <= 8; i++)
+      fingers('touchmove', [
+        [cx - 80 + i * 14, cy - i * 8],
+        [cx + i * 14, cy - i * 8],
+        [cx + 80 + i * 14, cy + 40 - i * 8],
+      ]);
+    fingers('touchend', []);
+    const a3 = S().state().camera;
+    const moved = apart(a3.target, b3.target);
+    assert(moved > 0.2, `three fingers moved the centre by ${moved.toFixed(4)} — they did not pan`);
+    assert(Math.abs(a3.azimuth - b3.azimuth) < 1e-9, `three fingers turned the view to ${a3.azimuth}`);
+    assert(Math.abs(a3.dist - b3.dist) < 1e-9, `three fingers zoomed: ${b3.dist} → ${a3.dist}`);
+    return {
+      pinch: `${b1.dist} → ${a1.dist}`,
+      orbit: `${b2.azimuth}° → ${a2.azimuth}°`,
+      pan: +moved.toFixed(3),
+    };
+  });
+
+  step('one finger draws; a second finger drops the stroke the first had begun', () => {
+    S().clear();
+    S().choose('foundation');
+    const r = S().viewport();
+    // Well clear of the picker standing at the centre: a pointer that lands on
+    // it is CLAIMED and never becomes ink, which would let the second half of
+    // this step pass for a reason that has nothing to do with the rule.
+    const cx = r.left + r.width * 0.25;
+    const cy = r.top + r.height * 0.72;
+    const finger = (pid, type, x, y, buttons) =>
+      stage().dispatchEvent(
+        new PointerEvent(type, {
+          pointerId: pid,
+          pointerType: 'touch',
+          isPrimary: true,
+          button: 0,
+          buttons,
+          clientX: x,
+          clientY: y,
+          bubbles: true,
+          cancelable: true,
+        })
+      );
+    const drag = (pid, n) => {
+      finger(pid, 'pointerdown', cx - 40, cy, 1);
+      for (let i = 1; i <= n; i++) finger(pid, 'pointermove', cx - 40 + i * 8, cy + i * 3, 1);
+    };
+
+    // 1 · One finger, all the way through: a mark, exactly as before.
+    const alone = ++touchId;
+    drag(alone, 10);
+    finger(alone, 'pointerup', cx + 40, cy + 30, 0);
+    const drew = S().state().marks.length;
+    assert(drew === 1, `one finger left ${drew} marks — drawing is broken`);
+
+    // 2 · The same stroke, interrupted. A screen cannot know the second finger
+    //     is coming, so there is already a live stroke when it lands.
+    S().clear();
+    const first = ++touchId;
+    drag(first, 6);
+    const second = ++touchId;
+    finger(second, 'pointerdown', cx + 60, cy, 1);
+    fingers('touchstart', [[cx + 8, cy + 18], [cx + 60, cy]]);
+    for (let i = 1; i <= 8; i++)
+      fingers('touchmove', [[cx + 8 - i * 10, cy + 18], [cx + 60 + i * 10, cy]]);
+    fingers('touchend', []);
+    finger(first, 'pointerup', cx + 8, cy + 18, 0);
+    finger(second, 'pointerup', cx + 60, cy, 0);
+    const left = S().state().marks.length;
+    assert(left === 0, `the pinch left ${left} stray mark(s) on the board`);
+    S().clear();
+    S().choose(null);
+    return { oneFinger: drew, afterPinch: left };
   });
 
   step('a snap that leaves the CHOSEN plane edge-on says so, rather than letting the pen find out', () => {

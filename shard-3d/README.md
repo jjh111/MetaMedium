@@ -127,9 +127,10 @@ there is no bundle to drift.
    ink is read onto that plane instead — one act, and one undo puts it back.
    The ink never moves on screen; only which plane it is taken to lie on.
 3. **Move the eye.** **Orbit** right-drag, a drag on the **compass** in the
-   top-right corner, or `Space`+drag — about the view's centre, where a pan
-   left it, or about the selection. **Pan** middle-drag, `Shift`+right-drag,
-   two fingers. **Dolly** wheel or pinch, toward the pointer. Tap a ball to
+   top-right corner, `Space`+drag, a trackpad swipe, or two fingers — about the
+   view's centre, where a pan left it, or about the selection. **Pan**
+   middle-drag, `Shift`+right-drag, `Shift`+swipe, three fingers. **Dolly**
+   wheel, pinch, or `Ctrl`/`Cmd`+swipe, toward the pointer. Tap a ball to
    look along that axis, again to flip; *home* frames everything; *view* is
    persp / ortho; the pinned views are chips under it. `1` `2` `3` choose a
    PLANE, `0` un-chooses; the camera's keys are the numpad — `1` front, `3`
@@ -270,7 +271,8 @@ there is no bundle to drift.
 | `src/planarity.ts` | **Pure.** P1's whole read: the candidates (`face` / `previous` / `world` / `view`), the pen-down pick, the pen-up re-rank, the scorer and its four terms, `nameFace`, the chip's text. The camera arrives as a ray-caster function, so there is no three.js here either — §11 names this first for landing back in core |
 | `src/chips.ts` | The runner-up, standing beside the mark in screen space: an HTML overlay positioned by projecting the stroke's centre, built from `ui.ts`'s `chip`, gone after `CHIP_MS` or on the next stroke |
 | `src/log.ts` | The engine's session as the shard's log: a stroke in plane coordinates with its scale, the plane held as a rep, and readings / maths / clean forms / undo for free |
-| `src/scene.ts` | three.js, the camera — **perspective or orthographic, the same pose through two lenses** — the orbit / pan / draw split, the ground grid, and the camera **as a ray-caster function** so `plane.ts` never imports three. Plus `rayForPose`, which rebuilds a ray-caster from a pose the log holds (that is what lets a stroke drawn minutes ago be re-projected onto another plane, and it rebuilds an ORTHO stand-in for a pose taken through that lens), `project`, `easeTo` — the one easing every camera move the chrome starts — and what the compass drives: `turn`, `pan`, `dolly` (toward the pointer), `snap`, `frame`, `setProjection` and `setPivot` |
+| `src/scene.ts` | three.js, the camera — **perspective or orthographic, the same pose through two lenses** — the orbit / pan / draw split, the ground grid, and the camera **as a ray-caster function** so `plane.ts` never imports three. Plus `rayForPose`, which rebuilds a ray-caster from a pose the log holds (that is what lets a stroke drawn minutes ago be re-projected onto another plane, and it rebuilds an ORTHO stand-in for a pose taken through that lens), `project`, `easeTo` — the one easing every camera move the chrome starts — and what the compass drives: `turn`, `pan`, `dolly` (toward the pointer), `snap`, `frame`, `setProjection` and `setPivot`. The wheel and touch listeners live here and decide nothing — `gesture.ts` does — and `onAbandon` is the seam that drops a stroke the second finger of a pinch had begun |
+| `src/gesture.ts` | **Pure.** What a wheel event or a set of touch points MEANS for the camera: `classifyWheel` (mouse / trackpad / pinch, off the event's shape and a short memory), `readWheel` (Blender's map — swipe orbits, `Shift`+swipe pans, pinch and `Ctrl`/`Cmd`+swipe dolly, a notch dollies) and `readTouch` (one finger draws, two pinch or orbit by a decision made once after twelve pixels, three pan). Every threshold named, every sign stated as the drag the same travel would make. No three.js, no DOM |
 | `src/view.ts` | **Pure.** The camera's own arithmetic: the six axis views with the up that makes each named plane read in its own frame, the flip to the other side, `viewFacingPlane` / `planeFacedBy` (the compass and the plane picker agreeing), `tooOblique` against the scorer's own `FACING_FLOOR`, `frameFor` (a bounds → a pose that fits it, sphere not box, at any aspect, in persp and in ortho), `orthoHeightFor` / `distForOrthoHeight` (why the projection toggle does not jump), and `balls` — the six axes projected onto the camera's screen basis, farthest first. No three.js |
 | `src/navgizmo.ts` | The compass in the corner, as an **SVG overlay** built from the tokens: three arms from a centre with a labelled ball on each positive end and a hollow one on each negative, depth-sorted and turning with the camera, tappable (snap, and flip on a second tap), draggable (orbit, one finger, because it is chrome rather than canvas) — plus the *home* and *view* tiles and the pinned-view chips |
 | `src/gizmo.ts` | The three axes, the three tiles, the slide handle, the centre — all of it standing at **the cursor**, whose planes it hands out through that point (`origin` / `setOrigin`) |
@@ -912,15 +914,68 @@ digits for a keyboard without one:
 | numpad `9`, or `Shift`+`9` | flip to the far side of the view you are at |
 | `f`, `Home` | frame everything |
 | right-drag, `Space`+drag, drag on the compass | orbit, about the view's centre or the selection |
-| middle-drag, `Shift`+right-drag, two fingers | pan |
-| wheel, pinch | dolly, toward the pointer |
+| middle-drag, `Shift`+right-drag | pan |
+| wheel | dolly, toward the pointer |
+| trackpad swipe | orbit |
+| `Shift` + swipe | pan |
+| pinch, `Ctrl`/`Cmd` + swipe | dolly, toward the pointer |
+| one finger | draw |
+| two fingers | pinch → dolly; drag → orbit |
+| three fingers | pan |
 | `Cmd/Ctrl`+`Z` | undo |
 
-**Two fingers pan and pinch rather than orbit.** They orbited in P0; the
-compass is what makes the change payable, since there is now a place to orbit
-from with one finger that is chrome rather than canvas, and on a touch screen
-two fingers are the gesture a hand already has for a map. One finger still
-draws, which is the rule nothing may break.
+### Trackpad and touch
+
+John, 16 September 2026: *"Make the view work with trackpad and touch."* On a
+trackpad there was no orbit at all — no right button on the machine — and every
+swipe zoomed, because the browser sends a trackpad's everything as `wheel` and
+the shard read every wheel as a dolly. On a screen, turning the view meant
+dragging a compass the size of a thumbnail.
+
+**The map is Blender's**, which is the reference John keeps naming: swipe
+orbits, `Shift`+swipe pans, pinch or `Ctrl`/`Cmd`+swipe zooms. A hand that has
+Blender in its fingers should not have to learn a second map.
+
+**Telling a trackpad from a mouse is the only part Blender cannot lend**, since
+both arrive as `wheel` with the same fields. They are told apart by the event's
+**shape** (`classifyWheel` in `src/gesture.ts`, read top to bottom, first match
+wins): `ctrl` is a pinch, because that is how macOS sends one; lines or pages
+are a wheel's units; a delta on **both axes** is the sign a wheel cannot make; a
+fractional delta is a trackpad measuring a finger; a whole step under 40px is a
+trackpad nudged, and one at or over it is a notch. The two-axis verdict is
+**remembered for 800ms**, because the middle of a real swipe runs straight and
+sends deltas that look exactly like notches — without the memory a gesture turns
+into a zoom halfway through — and it expires, so putting the trackpad down and
+picking up a mouse does not inherit it.
+
+**A swipe worth a canvas width is half a turn**: π/width radians a delta unit,
+about 0.0026 on a 1200px canvas. Deliberately gentler than the 0.006 a mouse
+drag turns at, because a trackpad's deltas are accelerated and a swipe spends
+more of them than a finger travels.
+
+**On a screen: one finger draws, two fingers pinch or orbit, three pan.** They
+pinched and panned until now (P0's rule, and the canvas's) — but this is a place
+for making 3D things, where turning the view is the commonest thing a hand does,
+and asking for that from a corner of chrome is asking too much of a thumb.
+Which of the two a pair is doing is decided **once**, after they have travelled
+twelve pixels, by whether the spread or the centre grew faster — deferred
+commitment, the way the plane is picked, and nothing moves before the decision.
+Once made it holds until a finger lands or leaves, so a swipe whose fingers
+splay a little does not flick into a zoom. A change in how many fingers are down
+**restarts** the gesture and moves nothing: the centre of three is nowhere near
+the centre of two, and carrying a delta across that jump would fling the view.
+
+**No stroke is ever begun by a gesture that turns out to be two-fingered.** A
+screen cannot know the second finger is coming, so the first one has already
+been drawing by the time it lands; the scene sees it land and `ink.ts` **drops**
+the live stroke rather than finishing it (`space.onAbandon`) — nothing read,
+nothing logged, nothing to undo. Deliberately not `pointercancel`, which means
+the pen was taken away mid-stroke and that stroke is still the hand's. And while
+two fingers are down `space.orbiting()` is true, so the second finger does not
+start a stroke of its own.
+
+Every rule above is arithmetic in **`src/gesture.ts`**, which is pure and
+tested; `scene.ts` holds the listeners and spends the answers.
 
 ### Orbit around the centre of the view
 
