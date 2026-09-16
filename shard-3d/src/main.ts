@@ -478,10 +478,23 @@ function boardBounds(): Bounds3 | null {
 }
 
 /**
- * What an orbit turns AROUND: the selection, else whatever is under the
- * pointer when the drag begins, else the target as it stands. Blender's "orbit
- * around selection" with its auto depth — and the reason a drag near a thing
- * you are working on does not swing it off the screen.
+ * What a camera move turns or travels AROUND.
+ *
+ * An ORBIT turns about the **selection** when there is one — you are working
+ * on that thing — and otherwise about **nothing**, which the scene reads as
+ * the target: the centre the hand last panned to. Either way the turn is
+ * rigid, so a view panned off-centre stays where it was put.
+ *
+ * What is gone: the old fallback that orbited about whatever the pointer
+ * happened to be over. It made the centre of the turn a different point on
+ * every drag, and with the rigid rule it would drift the view off the place
+ * the hand had panned to for no act the hand performed. A selection is asked
+ * for; a pixel under the cursor is not.
+ *
+ * A DOLLY still asks the same question and gets a different answer on purpose:
+ * it goes toward whatever is under the pointer, selected or not, because there
+ * you are pointing at where you want to be rather than at what you are working
+ * on. That is why the function is told *why* it is being asked.
  */
 space.setPivot((screen, why) => {
   const sel = selection.current();
@@ -497,6 +510,7 @@ space.setPivot((screen, why) => {
       if (at) return at;
     }
   }
+  if (why === 'orbit') return null;
   const rect = space.canvas.getBoundingClientRect();
   const ndc = new THREE.Vector2(
     ((screen.x - rect.left) / rect.width) * 2 - 1,
@@ -1601,6 +1615,8 @@ export interface ShardHook {
   view(which: 'free' | 'top' | 'front' | 'side'): void;
   /** Turn the camera by hand, in radians and world units — the orbit, without a drag. */
   orbit(dTheta: number, dPhi: number): void;
+  /** Slide the view, in screen pixels — a middle-drag, through the real handler. */
+  pan(dxPx: number, dyPx: number): void;
   /** Take a mark's runner-up (or the nth candidate). One act; one undo puts it back. */
   flipPlane(id: string, which?: number): string | null;
   /** The chip standing beside a mark right now, or null. */
@@ -1809,6 +1825,25 @@ export interface ShardHook {
 }
 
 /** Where the camera stands, in the words a result object can be read in. */
+/**
+ * A camera drag the e2e makes, through the canvas's own pointer handlers —
+ * button 2 is the orbit, button 1 the pan. Going through the events rather
+ * than calling `space.turn` is what makes the pivot rule testable at all: the
+ * pivot is asked for on pointerdown and nowhere else.
+ */
+function dragCamera(button: number, dxPx: number, dyPx: number) {
+  const id = ++syntheticId;
+  const start = { x: 400, y: 400 };
+  const buttons = button === 1 ? 4 : 2;
+  const at = (x: number, y: number, type: string, held: number) =>
+    space.canvas.dispatchEvent(
+      new PointerEvent(type, { pointerId: id, pointerType: 'mouse', button, buttons: held, clientX: x, clientY: y, bubbles: true, cancelable: true })
+    );
+  at(start.x, start.y, 'pointerdown', buttons);
+  at(start.x + dxPx, start.y + dyPx, 'pointermove', buttons);
+  at(start.x + dxPx, start.y + dyPx, 'pointerup', 0);
+}
+
 function cameraState() {
   const pose = space.pose();
   const f = space.look();
@@ -1871,11 +1906,13 @@ const hook: ShardHook = {
   view: (w) => { space.view(w); report(); },
   orbit: (dTheta, dPhi) => {
     // The same drag the hand makes, in the same handler: 0.006 radians a pixel.
-    const id = ++syntheticId;
-    const start = { x: 400, y: 400 };
-    space.canvas.dispatchEvent(new PointerEvent('pointerdown', { pointerId: id, pointerType: 'mouse', button: 2, buttons: 2, clientX: start.x, clientY: start.y, bubbles: true, cancelable: true }));
-    space.canvas.dispatchEvent(new PointerEvent('pointermove', { pointerId: id, pointerType: 'mouse', button: 2, buttons: 2, clientX: start.x - dTheta / 0.006, clientY: start.y + dPhi / 0.006, bubbles: true, cancelable: true }));
-    space.canvas.dispatchEvent(new PointerEvent('pointerup', { pointerId: id, pointerType: 'mouse', button: 2, buttons: 0, clientX: start.x - dTheta / 0.006, clientY: start.y + dPhi / 0.006, bubbles: true, cancelable: true }));
+    dragCamera(2, -dTheta / 0.006, dPhi / 0.006);
+    report();
+  },
+  // The middle button, which is the pan — again through the real handler, so
+  // the e2e is asserting on what a hand would get and not on a method call.
+  pan: (dxPx, dyPx) => {
+    dragCamera(1, dxPx, dyPx);
     report();
   },
   flipPlane: (id, which = 1) => flipPlane(id, which),
@@ -2375,10 +2412,9 @@ if (DEMO === 'read' || DEMO === 'view') {
         })
       );
       // Far enough that the pose really has been LEFT. A turn about Y of half
-      // a radian is only ~15° of look direction from a camera this high — and
-      // an orbit now swings about what the pointer was over rather than about
-      // the origin, which shaved it under `VIEW_TOLERANCE_DEG` and left the
-      // demo showing ink that had not gone faint. Measured, not guessed.
+      // a radian is only ~15° of look direction from a camera this high, which
+      // shaved it under `VIEW_TOLERANCE_DEG` and left the demo showing ink that
+      // had not gone faint. Measured, not guessed.
       hook.orbit(0.9, 0.12);
       if (id) panel.show(id, selection.current());
     }
@@ -2526,14 +2562,15 @@ if (DEMO === 'mug') {
       choose('height');
       hook.strokeScreen(run({ x: MUG.plan.x, y: 0 }, { x: MUG.plan.x, y: -MUG.top }).map((p) => hook.screenFor(p)));
       // 3 · un-choose, orbit, and a circle on the top face → *Cut a hole*.
-      // The orbit goes far enough UP to be looking into the mug: the rim is
-      // then 0.96 face-on and takes the stroke. It used to stop at 0.04, which
-      // left the rim 0.70 face-on — an angle at which the face still outscored
-      // the view plane and the circle landed on it as a 1.4:1 ellipse. The
-      // gate holds that now (16 Sep 2026), so the demo orbits to the angle it
-      // was always describing: you look into the cup, then you draw the hole.
+      // Round and a little up, to the three-quarter angle this demo has always
+      // shown — azimuth 77.6°, elevation 59.6°: you look into the cup, then you
+      // draw the hole. The numbers changed on 16 Sep 2026 and the picture did
+      // not. An orbit used to move the target onto its pivot, so a pair of
+      // radians meant something different in a sentence about the camera;
+      // turning about the view's centre, the same pose is (0.664, 0.035). The
+      // e2e's step 3 carries the same pair and says what happens off it.
       choose(null);
-      hook.orbit(0.3, 0.3);
+      hook.orbit(0.664, 0.035);
       hook.strokeScreen(ringOnFace());
       hook.field('Cut a hole');
       // 4 · the brief. A stub, so the demo is a demo and not a call.

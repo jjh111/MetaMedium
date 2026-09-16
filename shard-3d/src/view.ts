@@ -307,3 +307,65 @@ export function ballScale(depth: number, near = 1, far = 0.66): number {
 export function labelFor(view: AxisView): string {
   return view;
 }
+
+// ---- the orbit -------------------------------------------------------------
+
+/** The camera as the orbit holds it: a target, a distance off it, two angles. */
+export interface Orbit {
+  target: Vec3;
+  /** Around Y. */
+  theta: number;
+  /** Up from the ground plane. */
+  phi: number;
+}
+
+/** Rodrigues: a vector turned about a unit axis, by an angle. */
+export function turnAbout(v: Vec3, axis: Vec3, angle: number): Vec3 {
+  const c = Math.cos(angle);
+  const s = Math.sin(angle);
+  const k = cross(axis, v);
+  const d = dot(axis, v) * (1 - c);
+  return v3(v.x * c + k.x * s + axis.x * d, v.y * c + k.y * s + axis.y * d, v.z * c + k.z * s + axis.z * d);
+}
+
+/**
+ * An orbit, as arithmetic.
+ *
+ * **Around the target by default** — the centre the hand panned to. The target
+ * does not move, so the view's translation survives every turn: pan somewhere
+ * and rotating stays there.
+ *
+ * Given a `pivot`, the camera and the target turn **rigidly together** about
+ * that point. The two angles change exactly as they would anyway, and the
+ * target swings about the pivot by the same rotation — which, since the camera
+ * is the target plus the offset those angles describe, is the same as turning
+ * the whole camera about the pivot. The pivot therefore keeps its place in the
+ * camera's own frame: it stays under the pixel it was under, and nothing jumps
+ * at the first radian of the drag.
+ *
+ * What this replaces: moving the target ONTO the pivot and rebuilding the
+ * angles from where the camera stood. That re-aimed the camera, so the picture
+ * swung the pivot to the middle of the screen the moment a drag began — a view
+ * panned off-centre snapped back to it.
+ *
+ * The clamp is part of the turn: when `phi` hits the pole the rotation applied
+ * to the target is the angle actually travelled, not the one asked for, or the
+ * rigid pair comes apart at the top of the arc.
+ */
+export function orbitBy(
+  o: Orbit,
+  dTheta: number,
+  dPhi: number,
+  pivot?: Vec3 | null,
+  poleLimit = Math.PI / 2 - 0.002
+): Orbit {
+  const phi = Math.max(-poleLimit, Math.min(poleLimit, o.phi + dPhi));
+  const theta = o.theta + dTheta;
+  if (!pivot) return { target: o.target, theta, phi };
+  // The axis a pitch turns about: the camera's own right, which is horizontal
+  // and square to the azimuth the camera stands at BEFORE this turn.
+  const right = v3(-Math.cos(o.theta), 0, Math.sin(o.theta));
+  const rel = sub(o.target, pivot);
+  const turned = turnAbout(turnAbout(rel, right, phi - o.phi), v3(0, 1, 0), dTheta);
+  return { target: add(pivot, turned), theta, phi };
+}

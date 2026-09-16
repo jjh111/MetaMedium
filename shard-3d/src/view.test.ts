@@ -17,6 +17,8 @@ import {
   viewFacingPlane,
   viewForAxis,
   viewOfPose,
+  orbitBy,
+  turnAbout,
   VIEW_DIR,
   VIEW_UP,
   type AxisView,
@@ -321,5 +323,95 @@ describe('the vocabulary is closed', () => {
       near(Math.hypot(VIEW_DIR[v].x, VIEW_DIR[v].y, VIEW_DIR[v].z), 1);
       near(Math.hypot(VIEW_UP[v].x, VIEW_UP[v].y, VIEW_UP[v].z), 1);
     }
+  });
+});
+
+// ---- the orbit -------------------------------------------------------------
+//
+// The rule John asked for: an orbit must respect the translation of the view.
+// The default pivot is the target — the centre the hand panned to — so a turn
+// never moves it. With a pivot, the camera and the target turn rigidly about
+// that point, which is the same claim said twice: the distance is kept, and
+// the pivot keeps its place in the camera's own frame, so it stays under its
+// own pixel and nothing snaps to the middle of the screen.
+
+const len = (v: Vec3) => Math.hypot(v.x, v.y, v.z);
+
+/** Where the camera stands, from the orbit's own three numbers. */
+const eyeOf = (o: { target: Vec3; theta: number; phi: number }, dist: number): Vec3 =>
+  v3(
+    o.target.x + dist * Math.cos(o.phi) * Math.sin(o.theta),
+    o.target.y + dist * Math.sin(o.phi),
+    o.target.z + dist * Math.cos(o.phi) * Math.cos(o.theta)
+  );
+
+/** A world point in the camera's own frame — right, up, forward — as the eye sees it. */
+function inCameraFrame(o: { target: Vec3; theta: number; phi: number }, dist: number, p: Vec3): Vec3 {
+  const eye = eyeOf(o, dist);
+  const forward = normalize(sub(o.target, eye));
+  const right = normalize(cross(forward, v3(0, 1, 0)));
+  const up = cross(right, forward);
+  const d = sub(p, eye);
+  return v3(dot(d, right), dot(d, up), dot(d, forward));
+}
+
+describe('an orbit respects the translation of the view', () => {
+  const panned = { target: v3(3.4, 1.2, -2.6), theta: 0.7, phi: 0.4 };
+
+  it('leaves the target alone with no pivot — pan, then turn, and the centre stays put', () => {
+    // The pan is the only thing that moved the target; the orbit must not.
+    for (const [dTheta, dPhi] of [[0.9, 0.2], [-1.4, -0.35], [0.03, 0]] as [number, number][]) {
+      const after = orbitBy(panned, dTheta, dPhi);
+      nearV(after.target, panned.target);
+      near(after.theta, panned.theta + dTheta);
+      near(after.phi, panned.phi + dPhi);
+      // And the distance is the orbit's own invariant — it is not a parameter
+      // of the turn at all, so the eye stays on the same sphere about the
+      // target it did not move.
+      near(len(sub(eyeOf(after, 9), after.target)), 9);
+    }
+  });
+
+  it('does nothing at all at the first radian — t = 0 is the identity', () => {
+    const pivot = v3(-1, 0.5, 2);
+    const at0 = orbitBy(panned, 0, 0, pivot);
+    nearV(at0.target, panned.target);
+    near(at0.theta, panned.theta);
+    near(at0.phi, panned.phi);
+  });
+
+  it('turns camera and target rigidly about an off-centre pivot', () => {
+    const pivot = v3(-1.5, 0.8, 2.2);
+    const dist = 9;
+    const before = inCameraFrame(panned, dist, pivot);
+    const eyeBefore = eyeOf(panned, dist);
+    for (const [dTheta, dPhi] of [[0.25, 0.12], [-0.6, -0.2], [1.1, 0.05]] as [number, number][]) {
+      const after = orbitBy(panned, dTheta, dPhi, pivot);
+      // The camera–target vector keeps its length: a turn is not a dolly.
+      near(len(sub(eyeOf(after, dist), after.target)), dist, 1e-9);
+      // The pivot is the same distance from the eye as it was — rigid.
+      near(len(sub(pivot, eyeOf(after, dist))), len(sub(pivot, eyeBefore)), 1e-9);
+      // And it sits in the same place in the camera's own frame, which is the
+      // whole claim: it stays under its own pixel, so nothing snaps.
+      nearV(inCameraFrame(after, dist, pivot), before, 1e-9);
+    }
+  });
+
+  it('keeps the pair rigid at the pole, where the turn is clamped short', () => {
+    const pivot = v3(2, 0, 1);
+    const dist = 7;
+    const high = { target: v3(1, 0, 0), theta: 0.2, phi: 1.4 };
+    const before = inCameraFrame(high, dist, pivot);
+    // Asking for far more climb than the clamp allows: the target must swing
+    // by the angle actually travelled, not by the one asked for.
+    const after = orbitBy(high, 0.1, 5, pivot, 1.45);
+    near(after.phi, 1.45);
+    nearV(inCameraFrame(after, dist, pivot), before, 1e-9);
+  });
+
+  it('turns a vector about an axis the way Rodrigues says', () => {
+    nearV(turnAbout(v3(1, 0, 0), v3(0, 1, 0), Math.PI / 2), v3(0, 0, -1));
+    nearV(turnAbout(v3(0, 0, 1), v3(0, 1, 0), Math.PI / 2), v3(1, 0, 0));
+    nearV(turnAbout(v3(2, 3, 4), v3(0, 1, 0), 0), v3(2, 3, 4));
   });
 });

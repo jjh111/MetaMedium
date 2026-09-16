@@ -1852,6 +1852,66 @@
     return { azimuth: `${before} → ${after}`, projection: 'persp' };
   });
 
+  // The rotation respects the translation of the view (16 Sep 2026). An orbit
+  // used to move the target ONTO its pivot and rebuild the camera from where it
+  // stood, which re-aimed it: the pivot swung to the middle of the screen the
+  // moment a drag began, and a view the hand had panned off-centre snapped back.
+  // Now the target IS the pivot unless something is selected, and a selection's
+  // pivot turns camera and target rigidly together — so nothing moves at the
+  // first pixel either way.
+
+  step('pan the view, then orbit — the centre stays where the hand put it', () => {
+    S().clear();
+    S().view('free');
+    S().choose(null);
+    const home = S().state().camera.target;
+    S().pan(150, -95);
+    const panned = S().state().camera.target;
+    const moved = Math.hypot(panned.x - home.x, panned.y - home.y, panned.z - home.z);
+    assert(moved > 0.5, `the pan moved the target by ${moved.toFixed(4)} — it did not pan`);
+
+    const before = S().state().camera;
+    S().orbit(0.7, 0.18);
+    const after = S().state().camera;
+    const drift = Math.hypot(
+      after.target.x - panned.x,
+      after.target.y - panned.y,
+      after.target.z - panned.z
+    );
+    assert(drift < 1e-9, `the orbit dragged the centre ${drift.toFixed(6)} from where the pan left it`);
+    assert(Math.abs(after.dist - before.dist) < 1e-9, `the orbit changed the distance ${before.dist} → ${after.dist}`);
+    assert(Math.abs(after.azimuth - before.azimuth) > 5, `the azimuth went ${before.azimuth} → ${after.azimuth} — it did not turn`);
+    return { panned: +moved.toFixed(3), drift, azimuth: `${before.azimuth} → ${after.azimuth}` };
+  });
+
+  step('with a mark selected the orbit is rigid — the first pixel moves nothing', () => {
+    S().choose('foundation');
+    const id = S().strokeScreen(onScreen(circlePath(0.6, 0.4, 1.2)));
+    assert(id, 'no mark was made');
+    S().select(id);
+    S().pan(-120, 70);
+    const before = S().state().camera;
+    // A press and a release with no travel between them. The old rule re-aimed
+    // the camera on pointerdown alone, so this was the whole of the snap.
+    S().orbit(0, 0);
+    const still = S().state().camera;
+    const jump = Math.hypot(
+      still.target.x - before.target.x,
+      still.target.y - before.target.y,
+      still.target.z - before.target.z
+    );
+    assert(jump < 1e-9, `starting an orbit moved the view ${jump.toFixed(6)} before the hand travelled a pixel`);
+    assert(Math.abs(still.azimuth - before.azimuth) < 1e-9, `it re-aimed the camera: ${before.azimuth} → ${still.azimuth}`);
+    // A real turn about the selection then keeps the distance: rigid, not a dolly.
+    S().orbit(0.5, 0.1);
+    const after = S().state().camera;
+    assert(Math.abs(after.dist - before.dist) < 1e-9, `the distance went ${before.dist} → ${after.dist}`);
+    assert(Math.abs(after.azimuth - before.azimuth) > 3, `the azimuth went ${before.azimuth} → ${after.azimuth}`);
+    S().select(null);
+    S().clear();
+    return { jump, dist: after.dist, azimuth: `${before.azimuth} → ${after.azimuth}` };
+  });
+
   step('a snap that leaves the CHOSEN plane edge-on says so, rather than letting the pen find out', () => {
     S().choose('height'); // XY — edge-on from above
     S().nav.tap('y');
@@ -2098,12 +2158,20 @@
   demo('3 · orbit, nothing chosen — a circle on the top face is a FEATURE, and *Cut a hole* takes it', () => {
     const m = MUG();
     S().choose(null);
-    // Far enough UP to be looking into the mug: the rim is then 0.96 face-on
-    // and takes the stroke. It used to stop at 0.04, which left the rim 0.70
-    // face-on — an angle at which the face still outscored the view plane and
-    // the circle landed on it stretched 1.4:1. The gate holds that now
-    // (16 Sep 2026); the demo orbits to the angle it was always describing.
-    S().orbit(0.3, 0.3);
+    // Round and a little up, to the three-quarter angle the demo has always
+    // shown: azimuth 77.6°, elevation 59.6°. The numbers changed on 16 Sep
+    // 2026 and the PICTURE did not — an orbit used to move the target onto its
+    // pivot, so (0.3, 0.3) meant something different in a sentence about the
+    // camera; turning about the view's centre, the same pose is (0.664, 0.035).
+    //
+    // Not an arbitrary re-tune: at elevation 74.8° with azimuth 56.8° — where
+    // the old numbers now land — this step fails, and its neighbours a few
+    // degrees either side pass. That is a fragility in row 3, not in the
+    // camera: `formMarkOf` reads the face's own extent off `candidates[0]`,
+    // and at that pose the two candidates for this face swap order, so row 3
+    // measures the ink against the other one's box and no row places the mark.
+    // Written down rather than chased; the demo is not the place for it.
+    S().orbit(0.664, 0.035);
     mugHole = S().strokeScreen(
       Array.from({ length: 57 }, (_, i) => {
         const t = (i / 56) * Math.PI * 2;

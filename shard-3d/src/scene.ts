@@ -21,6 +21,7 @@ import { v3, type Pose, type Ray, type Vec3 } from './plane';
 import {
   distForOrthoHeight,
   frameFor,
+  orbitBy,
   orthoHeightFor,
   poseForAxis,
   type AxisView,
@@ -71,8 +72,13 @@ export interface Space {
   target: THREE.Vector3;
 
   // ---- the navigation gizmo drives these ----------------------------------
-  /** Turn by hand, in radians — what a drag on the compass does. */
-  turn(dTheta: number, dPhi: number): void;
+  /**
+   * Turn by hand, in radians — what a drag on the compass does.
+   *
+   * Around the TARGET unless a pivot is given, in which case the camera and
+   * the target turn rigidly about it and the pivot stays under its own pixel.
+   */
+  turn(dTheta: number, dPhi: number, pivot?: Vec3 | null): void;
   /** Slide the target across the screen plane, in screen pixels. */
   pan(dxPx: number, dyPx: number): void;
   /** Dolly by a factor, toward a screen point when one is given. */
@@ -97,10 +103,12 @@ export interface Space {
    *
    * The scene knows about neither selections nor solids, so it asks — and it
    * says WHY it is asking, because the two answers differ: an ORBIT turns
-   * around the selection when there is one (you are working on that thing),
-   * while a DOLLY goes toward whatever is under the pointer, selected or not
-   * (you are pointing at where you want to be). Answering both with "the
-   * selection" is how a wheel over the corner of a thing sails past it.
+   * around the selection when there is one (you are working on that thing)
+   * and around the target otherwise, while a DOLLY goes toward whatever is
+   * under the pointer, selected or not (you are pointing at where you want to
+   * be). Answering both with "the selection" is how a wheel over the corner of
+   * a thing sails past it. A null answer is the ordinary one for an orbit: the
+   * target is the centre the hand panned to, and a turn keeps it.
    */
   setPivot(fn: (screen: Point, why: 'orbit' | 'dolly') => Vec3 | null): void;
 }
@@ -148,6 +156,8 @@ export function createSpace(host: HTMLElement, colours: Colours): Space {
   let theta = DEFAULT_THETA; // around Y
   let phi = DEFAULT_PHI; // from the ground plane, up
   let dragging: 'orbit' | 'pan' | null = null;
+  /** What the orbit in progress turns about. Null is the target. */
+  let orbitPivot: Vec3 | null = null;
   let spaceHeld = false;
   let pivotFn: ((screen: Point, why: 'orbit' | 'dolly') => Vec3 | null) | null = null;
   const changeFns: (() => void)[] = [];
@@ -394,9 +404,23 @@ export function createSpace(host: HTMLElement, colours: Colours): Space {
 
   // ---- moving the camera by hand -------------------------------------------
 
-  function turn(dTheta: number, dPhi: number) {
-    theta += dTheta;
-    phi = Math.max(-DRAG_POLE, Math.min(DRAG_POLE, phi + dPhi));
+  /**
+   * Turn. **Around the target** by default — the centre the hand panned to, so
+   * an orbit after a pan turns about where the hand is looking and the view's
+   * translation survives it. Around a pivot when one is given, rigidly: the
+   * arithmetic is `orbitBy`, and it is tested there.
+   */
+  function turn(dTheta: number, dPhi: number, pivot?: Vec3 | null) {
+    const next = orbitBy(
+      { target: v3(target.x, target.y, target.z), theta, phi },
+      dTheta,
+      dPhi,
+      pivot ?? null,
+      DRAG_POLE
+    );
+    theta = next.theta;
+    phi = next.phi;
+    target.set(next.target.x, next.target.y, next.target.z);
     place();
     emit();
     render();
@@ -464,24 +488,6 @@ export function createSpace(host: HTMLElement, colours: Colours): Space {
       (n.x * (target.x - r.origin.x) + n.y * (target.y - r.origin.y) + n.z * (target.z - r.origin.z)) / denom;
     if (!Number.isFinite(t)) return null;
     return v3(r.origin.x + r.direction.x * t, r.origin.y + r.direction.y * t, r.origin.z + r.direction.z * t);
-  }
-
-  /**
-   * Orbit around what you are looking AT. The target moves to the pivot and
-   * the spherical coordinates are rebuilt from where the camera already
-   * stands, so nothing jumps: the same picture, turning about a different
-   * point from the next pixel of the drag onward.
-   */
-  function retarget(p: Vec3) {
-    const c = cam();
-    const d = new THREE.Vector3(c.position.x - p.x, c.position.y - p.y, c.position.z - p.z);
-    const r = d.length();
-    if (!Number.isFinite(r) || r < 0.5) return;
-    dist = Math.min(120, r);
-    phi = Math.max(-DRAG_POLE, Math.min(DRAG_POLE, Math.asin(Math.max(-1, Math.min(1, d.y / r)))));
-    theta = Math.atan2(d.x, d.z);
-    target.set(p.x, p.y, p.z);
-    place();
   }
 
   function snap(view: AxisView, ms = 420) {
@@ -554,13 +560,10 @@ export function createSpace(host: HTMLElement, colours: Colours): Space {
       if (!want) return;
       dragging = want;
       last = { x: e.clientX, y: e.clientY };
-      // Orbit around the selection, else around what the pointer is over, else
-      // around the target as it stands — Blender's "orbit around selection"
-      // with its auto depth, asked once, at the moment the drag begins.
-      if (want === 'orbit') {
-        const pivot = pivotFn?.({ x: e.clientX, y: e.clientY }, 'orbit') ?? null;
-        if (pivot) retarget(pivot);
-      }
+      // What this orbit turns about, asked once, at the moment the drag
+      // begins: the selection when there is one, else nothing — and nothing
+      // means the target, which is where the hand last panned to.
+      orbitPivot = want === 'orbit' ? pivotFn?.({ x: e.clientX, y: e.clientY }, 'orbit') ?? null : null;
       try { canvas.setPointerCapture(e.pointerId); } catch { /* not a live pointer */ }
       e.preventDefault();
     },
@@ -575,7 +578,7 @@ export function createSpace(host: HTMLElement, colours: Colours): Space {
       const dy = e.clientY - last.y;
       last = { x: e.clientX, y: e.clientY };
       if (dragging === 'pan') pan(dx, dy);
-      else turn(-dx * 0.006, dy * 0.006);
+      else turn(-dx * 0.006, dy * 0.006, orbitPivot);
       e.preventDefault();
       e.stopPropagation();
     },
@@ -586,6 +589,7 @@ export function createSpace(host: HTMLElement, colours: Colours): Space {
     if (e.pointerType === 'touch') touches = Math.max(0, touches - 1);
     if (dragging) {
       dragging = null;
+      orbitPivot = null;
       e.stopPropagation();
     }
   };

@@ -126,9 +126,9 @@ there is no bundle to drift.
    ink is read onto that plane instead — one act, and one undo puts it back.
    The ink never moves on screen; only which plane it is taken to lie on.
 3. **Move the eye.** **Orbit** with the right button, a drag on the **compass**
-   in the top-right corner, or a drag with `Space` held — around the selection
-   when there is one, else around whatever the pointer was over when the drag
-   began, else around what the camera is already looking at. **Pan** with the
+   in the top-right corner, or a drag with `Space` held — around the centre of
+   the view, where a pan left it, or around the selection when there is one.
+   **Pan** with the
    middle button, `Shift` + the right button, or two fingers. The wheel or a
    pinch **dollies toward the pointer**, not toward the middle of the screen.
    Tap a ball on the compass to look along that axis (and again to flip to the
@@ -902,14 +902,27 @@ from with one finger that is chrome rather than canvas, and on a touch screen a
 two-finger drag is the gesture a hand already has for a map. One finger still
 draws, which is the rule nothing may break.
 
-### Orbit around what you are looking at
+### Orbit around the centre of the view
 
 An orbit asks, once, at the moment the drag begins: the **selection** if there
-is one, else whatever the pointer is **over** (a solid by a real ray hit, else
-ink by its centre), else the target as it stands. The target moves to that
-point and the spherical coordinates are rebuilt from where the camera already
-is, so nothing jumps — the same picture, turning about a different point from
-the next pixel onward.
+is one, else **nothing** — and nothing means the target, the centre the hand
+panned to. Either way the target is not moved onto anything: with a pivot the
+camera **and** the target turn rigidly about it, so the pivot keeps its place
+in the camera's own frame and stays under its own pixel. The arithmetic is
+`orbitBy` in `view.ts`, and it is tested there.
+
+This is the fix for *"the rotation needs to respect the translation of the
+overall view so it doesn't snap to center"* (John, 16 Sep 2026). The first
+version moved the target **onto** the pivot and rebuilt the angles from where
+the camera stood — which re-aimed the camera, so the picture swung the pivot to
+the middle of the screen the moment a drag began, and a view panned off-centre
+snapped back to it. Pan somewhere and turn now, and the centre stays where it
+was put.
+
+Gone with it: orbiting about whatever the pointer happened to be **over**. Even
+made rigid it would put the centre of the turn on a different point every drag
+and drift the view off the place the hand panned to, for no act the hand
+performed. A selection is asked for; a pixel under a cursor is not.
 
 A **dolly** asks the same question and gets a different answer on purpose: it
 goes toward whatever is under the pointer, selected or not, because there you
