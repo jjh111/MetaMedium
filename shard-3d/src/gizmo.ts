@@ -154,8 +154,8 @@ export function createGizmo(colours: Colours): Gizmo {
 
   const g: Gizmo = {
     group,
-    chosen: 'foundation',
-    chosenWhy: tileWhy('foundation'),
+    chosen: null, // nothing chosen at boot: free ink lies on the view plane through the cursor, as Blender's 3D-cursor placement does; a tile or an axis view is the hand choosing
+    chosenWhy: '',
     offset: 0,
     tilesShown: true,
     origin: v3(0, 0, 0),
