@@ -638,20 +638,115 @@ export function createLog(): Log {
   }
 
   /**
-   * Undo drops the last ACT, not the last event.
+   * Undo drops the last ACT, not the last event — and the act is written down,
+   * not guessed at.
    *
-   * A stroke is two events (the ink, then the plane proposed on it); a solid
-   * is three (the marks pointed at, the bless that makes the artifact, the
-   * tree attached to it); a FLIP is three besides (the re-projected stroke,
-   * its plane, and the erase of the one it replaced — in that order, so the
-   * erase is dropped first and the first plane comes back). `session.undo()`
-   * drops one event, so the shard walks back until a whole act has gone — the
-   * solid if one stands on top, else a stroke — and then stops. That is what
-   * "undo removes the solid and leaves the ink" means in a log where a solid
-   * IS three events, and what makes one undo restore a flipped mark's first
-   * plane rather than half of it.
+   * A stroke is two events (the ink, then the plane proposed on it); a solid is
+   * three (the marks pointed at, the bless that makes the artifact, the tree
+   * attached to it); a FLIP is three besides; a model's proposal is `3n + 1`,
+   * where n is however many profiles it drew. `session.undo()` drops one event,
+   * so the shard has to know where the act ends.
+   *
+   * **The boundary is the act's own timestamp, and it is already in the log.**
+   * Every act in this file threads ONE `at` through every event it writes —
+   * `make` stamps its summon, its bless and its code alike; `applyProposal`
+   * stamps every profile it drew, the version and every take-in the same — so
+   * an act is exactly the run of consecutive events that agree on `at`. Nothing
+   * new is recorded, no event gains a field, and no marker is written: the
+   * grouping is read back out of the log the shard has always written, which is
+   * what makes it survive a JSON round trip for free (invariant 4 — the log is
+   * the source, and a runtime ledger of act spans would be a second one).
+   *
+   * Two stamps make that a rule rather than a coincidence:
+   *
+   *   * `stamp()` never hands out a time the log already holds, so no two acts
+   *     share one. Two strokes drawn in the same millisecond — which a
+   *     synthetic pointer does constantly, and a fast hand can — would
+   *     otherwise be one undo.
+   *   * A LATE result is stamped when it LANDS, not when it was asked for: a
+   *     reply carrying a request's old `at` is still stamped after the stroke
+   *     the hand drew while it waited, so it forms its own act on top and one
+   *     undo takes back the reply and leaves the stroke.
+   *
+   * `undoByWalking` below is what this replaced, kept for a log whose events
+   * carry no usable time at all (see its comment).
    */
   function undo() {
+    const events = session.getEvents() as ReadonlyArray<{ type: string; at?: number }>;
+    let top = events.length - 1;
+    while (top >= 0 && events[top].type === 'tick') top--;
+    if (top < 0) return;
+    const stamp = events[top].at;
+    if (typeof stamp !== 'number' || !Number.isFinite(stamp)) {
+      undoByWalking();
+      return;
+    }
+    // Ticks are not acts and are not dropped; core's own undo steps over them,
+    // so they are stepped over here too rather than ending the run.
+    let n = 0;
+    for (let i = top; i >= 0; i--) {
+      if (events[i].type === 'tick') continue;
+      if (events[i].at !== stamp) break;
+      n++;
+    }
+    for (let i = 0; i < n; i++) {
+      const before = session.getEvents().length;
+      session.undo();
+      if (session.getEvents().length === before) break; // nothing left to drop
+    }
+  }
+
+  /**
+   * A stamp for an act: the time it happened, never one the log already holds.
+   *
+   * The clock can hand out the same millisecond twice and a caller can pass a
+   * time that has already gone by (a model's reply carrying the moment it was
+   * asked). Either would fold two acts into one, so the second is recorded a
+   * millisecond after the log's last event — the order events were APPLIED in,
+   * which is the order undo walks back.
+   */
+  function stamp(at: number): number {
+    const events = session.getEvents() as ReadonlyArray<{ type: string; at?: number }>;
+    for (let i = events.length - 1; i >= 0; i--) {
+      if (events[i].type === 'tick') continue;
+      const last = events[i].at;
+      if (typeof last !== 'number' || !Number.isFinite(last)) break;
+      return at > last ? at : last + 1;
+    }
+    return at;
+  }
+
+  /**
+   * Every act goes out through here, and this table is the only place an act
+   * boundary is declared: the index of each verb's `at`, whose stamp is
+   * allocated ONCE and then threaded by the function itself through every event
+   * it writes. A verb missing from the table would write events under a time
+   * the log may already hold — which is why `act.test.ts` checks the table
+   * against what each verb actually stamps rather than trusting the numbers.
+   */
+  function acting<F extends (...args: never[]) => unknown>(fn: F, atIndex: number): F {
+    return ((...args: unknown[]) => {
+      const raw = args[atIndex];
+      args[atIndex] = stamp(typeof raw === 'number' ? raw : Date.now());
+      return (fn as unknown as (...a: unknown[]) => unknown)(...args);
+    }) as unknown as F;
+  }
+
+  /**
+   * What undo was before the act's own timestamp was read back out of the log:
+   * a walk of up to twelve events that stopped when something it could see
+   * changed — a stroke count, an artifact, a tree, a correction, a definition.
+   *
+   * It is kept for the one log the rule above cannot read: one whose events
+   * carry no usable `at`. Every log this shard has ever written carries one on
+   * every event, and threads a single one through each act, so an older log
+   * groups correctly under the new rule and never reaches this. A log from
+   * somewhere else might not, and it undoes here exactly as it always did.
+   *
+   * Its limit is why it was replaced: twelve was a guess at how long an act
+   * could be, and a model that drew sixteen profiles wrote forty-nine events.
+   */
+  function undoByWalking() {
     const artifactsBefore = session.getState().artifacts.length;
     const strokesBefore = strokeCount();
     // A VERSION is an act too (P3): a cut is `code` plus the proposals that
@@ -2300,8 +2395,9 @@ export function createLog(): Log {
   return {
     session,
     sees: (s) => { space = s; formCache = null; diffCache.clear(); honoursCache.clear(); matchCache.clear(); },
-    add,
-    flip,
+    // The act table (see `acting`): the index of each verb's `at`.
+    add: acting(add, 3),
+    flip: acting(flip, 4),
     whyNotFlip,
     marks,
     markOf,
@@ -2314,43 +2410,43 @@ export function createLog(): Log {
     forms,
     formOf,
     makeable,
-    make,
+    make: acting(make, 1),
     features,
     featureFor,
-    cut,
-    boss,
-    mirror,
-    dup,
+    cut: acting(cut, 1),
+    boss: acting(boss, 1),
+    mirror: acting(mirror, 2),
+    dup: acting(dup, 1),
     scratchOf,
-    scratch,
+    scratch: acting(scratch, 2),
     profilesOf,
     diffFor,
     matchable,
-    match,
+    match: acting(match, 2),
     solids,
     solidOf,
     solidFor,
-    name,
-    remove,
+    name: acting(name, 2),
+    remove: acting(remove, 1),
     massable,
-    mass,
+    mass: acting(mass, 1),
     growable,
-    growMassing,
-    joinAgent,
-    applyProposal,
-    replaceSteps,
+    growMassing: acting(growMassing, 1),
+    joinAgent: acting(joinAgent, 2),
+    applyProposal: acting(applyProposal, 3),
+    replaceSteps: acting(replaceSteps, 4),
     versionOf,
-    take,
+    take: acting(take, 1),
     definitions,
     definitionMatches,
-    correct,
-    place,
+    correct: acting(correct, 3),
+    place: acting(place, 2),
     whyNotPlace,
     namesInPlay,
     honoursOf,
-    dropSteps,
-    paintSteps,
-    teachSaying,
+    dropSteps: acting(dropSteps, 3),
+    paintSteps: acting(paintSteps, 4),
+    teachSaying: acting(teachSaying, 1),
     sayings,
     scene,
     subscribe(fn) {
