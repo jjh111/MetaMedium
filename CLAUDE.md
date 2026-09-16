@@ -106,6 +106,12 @@ Architecture documents (chronological; **read MVP.md, then v7, then v6**):
 - `DIRECTOR-REVIEW-2026-09-15.md` — **the review, all nine packages landed
   16 Sep 2026**: QA-1, STATE-1, ACT-1, DATA-1, UI-1, GRAPH-1, BIND-1,
   SEAM-1, UI-2, each with its regression, its owner and its evidence
+- `SHARD-3D-PUSH-2.md` — **geometry from the drawing, proposed 16 Sep 2026**:
+  what John's first real use showed (a footprint and elevations from free
+  views stood nothing, and a brief with nothing to fill was refused in one
+  invisible sentence); every free stroke as a silhouette claim; the sketch
+  hull as the massing generalised to any plane; parts said in words; the
+  brief a small model can answer; packages G0–G4
 - `BUILD-PLAN-v8.md` — **the executable plan for v8**: invariants no package may break, fixed contracts (events, reps, kinds, the verb basis, the storage seam, the palette item), fourteen work packages with owned files and done-criteria, the parallel threads and the surface weave, and self-contained briefs for sub-contracting models
 - `WHITEPAPER-v5.1-PLAN.md` — **the package**: what the whitepaper shows vs. what the engine does, replays-as-figures, the demos as the paper's spine, the prose pass, and the palette decision John owns
 - `ARCHITECTURE-v6-SESSION-ENGINE.md` — **active design**: the no-modes session engine (deferred commitment, summoning, promotion ladder, capability tiers), implemented in `metamedium-core/`
