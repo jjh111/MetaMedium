@@ -21,7 +21,11 @@
 
 import { listModels, PRESETS, providerLocality, type ProviderConfig } from 'metamedium-core';
 import type { SpaceTransport } from './generator';
+import { splitPrompt, type Room } from './room';
 import { chip, esc, pill, row, sep } from './ui';
+
+/** The seat a hand in the room sits in. One name, so the pane and the e2e agree. */
+export const HAND_SEAT = 'Claude Code (MCP hand)';
 
 export interface Seat {
   /** The participant id in the session — what everything it proposes is attributed to. */
@@ -45,6 +49,15 @@ export interface Models {
   probe(): Promise<void>;
   /** Seat a model with a transport of its own — the e2e's stub, and the tests'. */
   joinWith(name: string, transport: SpaceTransport, config?: Partial<ProviderConfig>): Seat;
+  /**
+   * Seat the hand in the room (G5). Everything upstream — `runBrief`, the
+   * field's reading line, the work panel, Esc — sees a model, because the seat
+   * IS a model: one `transport`, the same `CompletionResult`, the same signal.
+   * The only difference is where the question goes.
+   */
+  joinHand(room: Room): Seat;
+  /** The seat the hand sits in, if it is seated. */
+  hand(): Seat | null;
   leave(id: string): void;
   onChange(fn: () => void): void;
 }
@@ -54,6 +67,17 @@ export interface ModelsOptions {
   /** Seat a participant in the session and hand back its id. */
   join(name: string, locality: 'local' | 'hosted'): string;
   say(sentence: string): void;
+  /**
+   * What a brief is about, in this hand's ids — the selected solid, else the
+   * selected mark. A parked brief is an answer on the explanation plane, and
+   * an answer stands beside what it is about; with nothing selected there is
+   * nowhere to park it, and `runBrief` has already refused by then.
+   */
+  subject?(): string[];
+  /** The room, when one has been joined — what `joinHand` needs and the pane reports. */
+  room?(): Room | null;
+  /** Join a room on demand, so the pane's *in the room* button can. */
+  enterRoom?(): Promise<Room | null>;
 }
 
 interface Found {
@@ -170,6 +194,58 @@ export function createModels(o: ModelsOptions): Models {
     return s;
   }
 
+  /**
+   * The hand's seat: a transport that PARKS the question in the room instead
+   * of posting it to a server, and settles when `space_answer` lands.
+   *
+   * This is `participants/bridge.ts` with the room as the wire, and it is
+   * deliberately the whole of the difference. `propose()` sends the same
+   * prompts, `parseProposal` reads the same reply, `runBrief` applies it the
+   * same way and attributes the version to this seat — so a brief answered by
+   * Claude Code in a conversation takes the identical path a small model takes,
+   * which is the point of the package: the contract is argued about first hand
+   * before anything is tuned against it.
+   */
+  function joinHand(room: Room): Seat {
+    const held = seats.find((s) => s.name === HAND_SEAT);
+    if (held) return held;
+    const transport: SpaceTransport = async (_config, messages, opts) => {
+      const system = messages.filter((m) => m.role === 'system').map((m) => String(m.content)).join('\n\n');
+      const user = messages.filter((m) => m.role === 'user').map((m) => String(m.content)).join('\n\n');
+      const { brief, words } = splitPrompt(user);
+      const out = await room.ask({
+        // Everything a model was told, so the hand answers the same question —
+        // the contract included. `bridge.ts`'s rule: park the question, do not
+        // paraphrase it.
+        prompt: `${system}\n\n----\n\n${user}`,
+        brief,
+        words,
+        about: o.subject?.() ?? [],
+        ...(opts.signal ? { signal: opts.signal } : {}),
+      });
+      return out.ok ? { ok: true as const, text: out.text, model: HAND_SEAT } : { ok: false as const, error: out.error };
+    };
+    const s = seat(
+      HAND_SEAT,
+      // The relay IS where the brief goes, so it is the seat's base URL — and
+      // a relay on this machine reads as `local`, which is true and is what the
+      // router's cost model should see. A made-up scheme read as `hosted`.
+      { kind: 'openai-compatible', baseUrl: room.relay || 'http://127.0.0.1:8020', model: HAND_SEAT, label: HAND_SEAT },
+      transport
+    );
+    // **The hand takes the front.** `first()` is who a brief goes to, and
+    // sitting down in this seat is a deliberate act that says *ask me* — with a
+    // local model already seated, a brief typed at the hand would otherwise go
+    // to the model, which is the opposite of what was just asked for. *Leave
+    // the seat* puts it back.
+    seats.splice(seats.indexOf(s), 1);
+    seats.unshift(s);
+    o.say(
+      `${HAND_SEAT} is seated in room “${room.room}” as ${room.label} — a brief waits here until a hand answers it; nothing is posted anywhere`
+    );
+    return s;
+  }
+
   function joinLocal(server: Found, model: string) {
     if (seats.some((s) => s.name === model)) return;
     seat(model, { kind: 'openai-compatible', baseUrl: server.baseUrl, model, label: model });
@@ -212,6 +288,43 @@ export function createModels(o: ModelsOptions): Models {
     if (seats.length) {
       html += sep + '<div class="eyebrow">seated</div>';
       for (const s of seats) html += row(s.name, `tier 2 · ${s.locality}`, `everything it proposes is attributed to ${s.id}`);
+    }
+
+    // ---- the hand in the room (G5) -----------------------------------------
+    // Above the servers on purpose: it is the seat John reaches for while the
+    // contract is still being argued about.
+    const room = o.room?.() ?? null;
+    const handSeated = seats.some((s) => s.name === HAND_SEAT);
+    html += sep + '<div class="eyebrow">a hand in the room</div>';
+    html += '<div class="why">' + esc(
+      'Claude Code, over MCP, as the model. A brief typed at this seat is PARKED in the room — it is a question on the ' +
+        'explanation plane, in the log, beside what it is about — and the hand answers it in the same contract a model ' +
+        'answers in. Nothing is posted to any server, and no key is held.'
+    ) + '</div>';
+    if (room) {
+      const here = room.presence();
+      html += row(
+        `room “${room.room}”`,
+        here.length ? `with ${here.join(', ')}` : 'alone so far',
+        `you are ${room.label} — every hand keeps its own log, and the merge is the board`
+      );
+      const waitingNow = room.waiting();
+      if (waitingNow.length) {
+        html += row(
+          `${waitingNow.length} brief${waitingNow.length === 1 ? '' : 's'} parked`,
+          waitingNow.map((w) => `“${w.words || 'no words'}”`).join(', '),
+          'space_pending lists them; space_answer answers one'
+        );
+      }
+    }
+    html += '<div class="fieldPills">';
+    if (handSeated) html += `<button class="pill" id="mpHandLeave">Leave the seat</button>`;
+    else html += `<button class="pill" id="mpHand">${esc(room ? `Seat the hand in “${room.room}”` : 'Join the room, and seat the hand')}</button>`;
+    html += '</div>';
+    if (!room) {
+      html += '<div class="why">' + esc(
+        'The room is the relay on this machine: run `node Demos/relay.mjs`, and `node shard-3d/mcp.mjs` beside it — or open this page with ?live=shard&relay=http://127.0.0.1:8020.'
+      ) + '</div>';
     }
 
     html += sep + '<div class="eyebrow">on this machine</div>';
@@ -258,6 +371,28 @@ export function createModels(o: ModelsOptions): Models {
       status = 'looking…';
       render();
       void probe();
+    });
+    (o.host.querySelector('#mpHand') as HTMLElement | null)?.addEventListener('click', () => {
+      void (async () => {
+        const inRoom = o.room?.() ?? (await o.enterRoom?.()) ?? null;
+        if (!inRoom) {
+          status = 'no room — start the relay (node Demos/relay.mjs) and reload with ?live=shard&relay=http://127.0.0.1:8020';
+          render();
+          return;
+        }
+        joinHand(inRoom);
+        render();
+      })();
+    });
+    (o.host.querySelector('#mpHandLeave') as HTMLElement | null)?.addEventListener('click', () => {
+      const held = seats.find((s) => s.name === HAND_SEAT);
+      if (held) {
+        const i = seats.indexOf(held);
+        seats.splice(i, 1);
+        o.say(`${HAND_SEAT} left the seat — the room is still joined, and its ink still arrives`);
+      }
+      render();
+      changed();
     });
     o.host.querySelectorAll('button[data-model]').forEach((el) => {
       el.addEventListener('click', () => {
@@ -317,6 +452,8 @@ export function createModels(o: ModelsOptions): Models {
         { kind: 'openai-compatible', baseUrl: 'http://localhost:0/v1', model: name, label: name, ...config },
         transport
       ),
+    joinHand,
+    hand: () => seats.find((s) => s.name === HAND_SEAT) ?? null,
     leave: (id) => {
       const i = seats.findIndex((s) => s.id === id);
       if (i >= 0) seats.splice(i, 1);
