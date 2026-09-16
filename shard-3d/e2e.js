@@ -1719,6 +1719,72 @@
     return { status: S().state().status };
   });
 
+  // ---- DATA-1: a tree that will not read is isolated, not fatal ------------
+
+  step('a malformed tree loaded onto the board does not take the board with it', () => {
+    S().clear();
+    S().choose('foundation');
+
+    // A real box, made the way a hand makes one: the rest of the board, which
+    // has to go on drawing and selecting whatever arrives beside it.
+    const goodProfile = S().strokeScreen(onScreen(rectPath(-7, -2, 4, 2.6)));
+    S().choose('height');
+    const goodExtent = S().strokeScreen(onScreen(linePath({ x: -7, y: 0 }, { x: -7, y: -DEPTH })));
+    assert(S().state().solids.length === 1, 'the box did not stand');
+    const goodId = S().state().solids[0].id;
+
+    // …and an artifact whose code says it is one of ours and cannot be read:
+    // an extrude with no depth — the tree that used to parse clean and then
+    // threw out of `depth.toFixed()` the moment the panel described it.
+    S().choose('foundation');
+    const loose = S().strokeScreen(onScreen(circlePath(4, 0, 1)));
+    const malformed =
+      '// mm:op tree v1\n' +
+      JSON.stringify({ mm: 'op', version: 1, steps: [{ id: 's1', op: 'extrude', from: [loose], reasoning: 'a box' }] });
+    const badId = S().seedCode([loose], malformed, 'thing');
+    assert(badId, 'the artifact was not seeded');
+
+    // It STANDS — it did not vanish from the board — and it carries the reason.
+    const solids = S().state().solids;
+    assert(solids.length === 2, `${solids.length} solids, expected the box and the bad one`);
+    const bad = solids.find((s) => s.id === badId);
+    assert(bad, 'the malformed artifact is not on the board at all');
+    assert(bad.steps.length === 0, `the malformed tree yielded ${bad.steps.length} steps`);
+    assert(bad.broken, 'the malformed artifact says nothing about why');
+    assert(/profile is missing/.test(bad.broken), `it says "${bad.broken}"`);
+    assert(/steps\[0\]/.test(bad.broken), `it does not say where: "${bad.broken}"`);
+
+    // The panel's *broken* row names the reason, in the panel, in words.
+    S().select(badId);
+    const panel = S().panelText();
+    assert(/broken/.test(panel), 'the panel has no broken row');
+    assert(/could not be read/.test(panel), `the panel said "${panel.replace(/\s+/g, ' ').slice(0, 200)}"`);
+    assert(/profile is missing/.test(panel), 'the panel does not carry the validator\'s reason');
+    assert(/still in the log/.test(panel), 'the panel does not say the code is recoverable');
+
+    // …and the other solid still selects, and still says what it is.
+    S().select(goodId);
+    const good = S().panelText();
+    assert(/extrude/.test(good), 'the good solid lost its step');
+    assert(!/could not be read/.test(good), 'the good solid was tarred with the bad one\'s reason');
+    const still = S().state().solids.find((s) => s.id === goodId);
+    assert(still.steps.length === 1 && still.steps[0].op === 'extrude', 'the good tree did not survive');
+    assert(!still.broken, `the good solid says it is broken: ${still.broken}`);
+
+    // …and the board still takes ink, with the bad artifact standing on it.
+    const after = S().strokeScreen(onScreen(rectPath(8, -2, 2, 2)));
+    assert(after, 'the board stopped taking ink');
+    assert(markOf(after).readings.length > 0, 'the new mark was not read');
+
+    S().clear();
+    return {
+      solids: solids.length,
+      broken: bad.broken,
+      goodSteps: still.steps.map((s) => s.op),
+      panel: panel.replace(/\s+/g, ' ').slice(0, 200),
+    };
+  });
+
   // ---- the runner ----------------------------------------------------------
 
   window.__scenario = async function () {

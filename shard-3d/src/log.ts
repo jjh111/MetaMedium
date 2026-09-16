@@ -76,7 +76,7 @@ import {
   matchStep,
   mirrorStep,
   nextStepId,
-  parseOpTree,
+  readOpTree,
   placeDefinitionStep,
   placeStep,
   revolveStep,
@@ -138,6 +138,13 @@ export interface Solid {
   tree: OpTree;
   /** The marks it was made from — what ink over it addresses. */
   memberIds: string[];
+  /**
+   * DATA-1: why this artifact's own tree could not be read, when it could not.
+   * The solid then stands with no steps and this reason on it — its code rep is
+   * still in the log, exactly as it arrived — rather than vanishing from the
+   * board or taking the panel down with it.
+   */
+  broken?: string;
 }
 
 /**
@@ -2376,15 +2383,20 @@ export function createLog(): Log {
       const node = s.nodes.get(id);
       if (!node) continue;
       const code = [...node.reps].reverse().find((r) => r.modality === 'code')?.data as { code?: string } | undefined;
-      const tree = parseOpTree(code?.code);
-      if (!tree) continue; // some other artifact — not one of the shard's trees
+      // DATA-1: a tree from the log is a tree from OUTSIDE — validated, never
+      // cast. One that is not ours at all is somebody else's artifact and is
+      // skipped; one that is ours and will not read stands as a broken solid
+      // with the reason, so the rest of the board draws and selects normally.
+      const read = readOpTree(code?.code);
+      if (!read.ok && !read.mine) continue; // some other artifact — not one of the shard's trees
       const given = [...node.reps].reverse().find((r) => r.modality === 'name')?.data as { text?: string } | undefined;
       out.push({
         id,
         name: given?.text ?? wordOf(node) ?? id,
         named: given ? 'human' : 'engine',
-        tree,
+        tree: read.ok ? read.tree : { mm: 'op', version: 1, steps: [] },
         memberIds: node.edges.filter((e) => e.rel === 'has-part').map((e) => e.to),
+        ...(read.ok ? {} : { broken: `${read.reason}${read.at ? ` (at ${read.at})` : ''}` }),
       });
     }
     solidCache = { version, solids: out };

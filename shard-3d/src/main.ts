@@ -1686,6 +1686,13 @@ export interface ShardHook {
   cancel(): number;
   /** The brief `describeSpace` would build right now — what a model is actually told. */
   brief(words?: string, mutable?: string[]): string;
+  /**
+   * DATA-1: bless some marks and hang a `code` rep on them verbatim — the way
+   * a folder, a merged log or another hand's machine puts an artifact on this
+   * board. The only way to drive the LOAD boundary from outside, and the only
+   * way to put a tree in front of the validator that this build did not write.
+   */
+  seedCode(markIds: string[], code: string, name?: string): string | null;
 }
 
 /** Where the camera stands, in the words a result object can be read in. */
@@ -2038,6 +2045,23 @@ const hook: ShardHook = {
       .map((st) => ({ stepId: st.id, ...(st.name ? { name: st.name } : {}), colour: st.material!.colour })),
   cancel: () => work.cancelAll(),
   brief: (words = '', mutable) => describeSpace(log.scene(words, mutable?.length ? { mutable } : {})),
+  seedCode: (markIds, code, name = 'thing') => {
+    const summonId = log.session.summonMarks(markIds, Date.now());
+    if (!summonId) return null;
+    const id = log.session.bless({ summonId, name, at: Date.now(), participantId: ENGINE_PARTICIPANT });
+    if (!id) return null;
+    log.session.attachCode({
+      participantId: ENGINE_PARTICIPANT,
+      nodeId: id,
+      code,
+      kind: 'json',
+      language: 'json',
+      prompt: 'a code rep from somewhere else',
+      at: Date.now(),
+    });
+    report();
+    return id;
+  },
 };
 
 (window as unknown as { __shard: ShardHook }).__shard = hook;

@@ -242,8 +242,18 @@ function renderSolid(log: Log, sel: Sel | null, o: PanelOptions): string {
         : 'a model proposed it and it is standing, attributed and unblessed — *Take it* names the thing and holds its parts as definitions'
     );
   }
-  const why = broken?.(solid.id) ?? null;
-  if (why) {
+  // DATA-1: a tree that would not READ and a tree that read and derived nothing
+  // are two different facts, and saying the second about the first sends the
+  // reader looking for a step that is not there. An unreadable artifact says
+  // what the validator found, and says its code is still in the log.
+  const unreadable = solid.broken ?? null;
+  const why = unreadable ?? broken?.(solid.id) ?? null;
+  if (unreadable) {
+    html += row('broken', 'this tree could not be read', unreadable);
+    html += '<div class="why">' + esc(
+      'the code rep is still in the log exactly as it arrived — nothing was dropped and nothing was repaired; the ink it was made from is still on the board, and the rest of the board draws and selects as it did'
+    ) + '</div>';
+  } else if (why) {
     html += row('broken', 'the derivation did not come off', why);
     html += '<div class="why">' + esc(
       'the tree is still the truth of the thing — the body is what it was before this step, and the step is still in the log as the intent it is'

@@ -806,6 +806,21 @@ export function createSolids(o: SolidOptions): Solids {
   }
 
   function build(s: Solid) {
+    // DATA-1: an artifact whose own tree would not read has no steps to walk,
+    // and the validator's reason is the truth about it — not "the tree derived
+    // no geometry", which is what a body that WAS read and came to nothing
+    // says. It is isolated here: no mesh, one reason, and the board goes on.
+    if (s.broken) {
+      built.set(s.id, {
+        mesh: new THREE.Mesh(),
+        edges: new THREE.LineSegments(),
+        parts: [],
+        signature: signatureOf(s),
+        broken: s.broken,
+      });
+      onBroken?.(s.id, s.broken);
+      return;
+    }
     // The tree is walked, not flattened: `cut(extrude(…))` is one body, not two
     // bodies standing in the same place (`deriveTree`).
     const { geometry: geo, broken, parts } = deriveTree(s.tree, context);

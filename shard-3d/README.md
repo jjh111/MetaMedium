@@ -290,6 +290,22 @@ in through the door that is already open: `summonMarks` → `bless` →
 anything else on the board is not one of the shard's trees and is left alone.
 When core grows the `op` kind, the marker goes and the kind takes its place.
 
+**A tree that arrives as text is validated, never cast** (DATA-1). `OpStep` is
+a type the compiler enforces on the code that BUILDS a tree and it says nothing
+about one that comes out of the log, a folder, another hand's log or a model:
+`{"op":"extrude"}` with no `depth` used to parse clean and then throw out of
+`depth.toFixed()` the moment the panel described it. So `validateOpTree` walks
+every step against those same discriminated types — the version, each op's own
+required fields (a revolve's axis and sweep, never an extrude's depth), finite
+numbers, reference types, ids unique per level with `on` pointing at a step
+that already stood, and the bounds named in `OP_LIMITS` — and returns a
+structured reason (`{ at: 'steps[3].depth', reason: … }`). `parseOpTree` keeps
+its null contract; `readOpTree` is the sibling that carries the reason, and
+`solids()` uses it: a rep that is not ours is skipped in silence, and one that
+is ours and will not read stands as a **broken solid** whose panel row names
+the fault and says the code rep is still in the log, untouched. Every accepted
+tree is safe to `describeStep`.
+
 Three consequences, each deliberate:
 
 - **The engine is the author.** `bless` and `attachCode` are attributed to

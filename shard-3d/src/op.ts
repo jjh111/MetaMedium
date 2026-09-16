@@ -23,7 +23,7 @@
 // mentions a mesh.
 
 import type { Point } from 'metamedium-core';
-import { dot, length, normalize, offsetOf, sub, toWorld, uAxis, vAxis, type Plane, type Vec3 } from './plane';
+import { cross, dot, length, normalize, offsetOf, sub, toWorld, uAxis, vAxis, type Plane, type Vec3 } from './plane';
 
 /** The whole vocabulary of §2.4. Closed: it grows only by a release. */
 export type OpKind =
@@ -911,20 +911,356 @@ export function isOpTree(code: string | undefined): boolean {
   return !!code && code.trimStart().startsWith(OP_MARK);
 }
 
-/** The tree back out of the text, or null when the text is not one. */
-export function parseOpTree(code: string | undefined): OpTree | null {
-  if (!isOpTree(code)) return null;
+// ---- the tree as it arrives from somewhere else ------------------------------
+//
+// **A type is not a check.** `OpStep` is a discriminated union the compiler
+// enforces on the code that BUILDS a tree; it says nothing about a tree that
+// arrives as text — out of the log, out of a folder, out of another hand's
+// log, out of a model. Casting JSON to `OpTree` and trusting the cast is the
+// one place in the shard where a value nobody measured is read as a number,
+// and it showed: a tree holding `{"op":"extrude"}` with no `depth` parsed
+// clean, then threw out of `depth.toFixed()` the moment the panel described
+// it — one malformed artifact taking the whole board's panel with it.
+//
+// So every tree that comes from outside is walked once, against the same
+// discriminated types, and what cannot be read is refused WITH A REASON. The
+// rules below are about SHAPE and SAFETY, not about geometry: an extrude with
+// no depth cannot be read at all, while an extrude of depth 0 reads fine and
+// derives no body — and saying so is `deriveTree`'s job, per step, where the
+// panel can say it about that step instead of condemning the artifact.
+
+/**
+ * The bounds a tree from outside is held to. Named, because an unnamed bound
+ * is a magic number and because a reader has to be able to say which one a
+ * tree broke.
+ *
+ * They are ceilings on nonsense, not budgets a real drawing approaches: the
+ * biggest tree the demo makes is nine steps, and a `place` nests one level.
+ */
+export const OP_LIMITS = {
+  /** Steps in one `steps` array — the tree's own, or a `place`'s copy. */
+  steps: 512,
+  /** Steps in the whole tree, nesting included: what stops a deep file eating the frame. */
+  totalSteps: 4096,
+  /** How far `place` may nest a copied tree inside a copied tree. */
+  placeDepth: 8,
+  /** Points in one profile's outline. */
+  profilePoints: 4096,
+  /**
+   * …and the fewest. An outline of two points has no area, and an EMPTY one
+   * makes `bounds2` return ±Infinity, which `sizeOfProfile` turns into an
+   * Infinity every transform downstream becomes NaN from. Three is an outline.
+   */
+  profileMinPoints: 3,
+  /** Profiles in one massing — plan, elevation, section, and room to spare. */
+  massingProfiles: 64,
+  /** Stroke ids one step may name. */
+  refs: 512,
+  /** Characters in an id. */
+  idChars: 200,
+  /** Characters in a reasoning, a name, or a shape's word. */
+  textChars: 20000,
+} as const;
+
+/** Why a tree could not be read: where in it, and what was wrong. */
+export interface OpTreeFault {
+  /**
+   * Whether the text CLAIMED to be one of ours. A code rep that is some other
+   * artifact's JSON is not a fault — it is somebody else's business — and the
+   * caller skips it; a rep carrying `OP_MARK` that will not read is a fault to
+   * report, because the hand made that solid and it is not on the board.
+   */
+  mine: boolean;
+  /** The path to what failed, in the tree's own shape: `steps[3].depth`. */
+  at: string;
+  /** What was wrong, in the words the panel says. */
+  reason: string;
+}
+
+export type OpTreeCheck = ({ ok: true; tree: OpTree }) | ({ ok: false } & OpTreeFault);
+
+/** Thrown inside the walk and caught at its door, so every check can be one line. */
+class Fault {
+  constructor(readonly at: string, readonly reason: string) {}
+}
+const bad = (at: string, reason: string): never => {
+  throw new Fault(at, reason);
+};
+
+const isRecord = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
+
+function wantRecord(v: unknown, at: string, what: string): Record<string, unknown> {
+  if (!isRecord(v)) bad(at, `${what} is ${v === undefined ? 'missing' : `${typeof v}, not an object`}`);
+  return v as Record<string, unknown>;
+}
+
+function wantText(v: unknown, at: string, what: string, max: number = OP_LIMITS.textChars): string {
+  if (typeof v !== 'string') bad(at, `${what} is ${v === undefined ? 'missing' : `${typeof v}, not text`}`);
+  const s = v as string;
+  if (s.length > max) bad(at, `${what} is ${s.length} characters long, past the ${max} a tree may carry`);
+  return s;
+}
+
+function wantId(v: unknown, at: string, what: string): string {
+  const s = wantText(v, at, what, OP_LIMITS.idChars);
+  if (!s.trim()) bad(at, `${what} is empty — a reference has to name something`);
+  return s;
+}
+
+function wantNumber(v: unknown, at: string, what: string): number {
+  if (typeof v !== 'number') bad(at, `${what} is ${v === undefined ? 'missing' : `${typeof v}, not a number`}`);
+  if (!Number.isFinite(v as number)) bad(at, `${what} is ${String(v)} — a measurement has to be a finite number`);
+  return v as number;
+}
+
+function wantVec(v: unknown, at: string, what: string): Vec3 {
+  const r = wantRecord(v, at, what);
+  return {
+    x: wantNumber(r.x, `${at}.x`, `${what}'s x`),
+    y: wantNumber(r.y, `${at}.y`, `${what}'s y`),
+    z: wantNumber(r.z, `${at}.z`, `${what}'s z`),
+  };
+}
+
+/**
+ * A plane, as a frame that can actually be stood in.
+ *
+ * Its normal and its up must both have length and must not be parallel:
+ * `uAxis` is `normalize(cross(normal, up))`, so a plane whose up lies along
+ * its normal has no u axis at all and every point put through it comes out
+ * NaN — a body that renders as nothing, silently, with no step to blame.
+ */
+function wantPlane(v: unknown, at: string, what: string): void {
+  const r = wantRecord(v, at, what);
+  const normal = wantVec(r.normal, `${at}.normal`, `${what}'s normal`);
+  const up = wantVec(r.up, `${at}.up`, `${what}'s up`);
+  wantVec(r.origin, `${at}.origin`, `${what}'s origin`);
+  if (length(normal) < 1e-9) bad(`${at}.normal`, `${what}'s normal has no length — it points nowhere`);
+  if (length(up) < 1e-9) bad(`${at}.up`, `${what}'s up has no length — it points nowhere`);
+  if (length(cross(normal, up)) < 1e-9) {
+    bad(`${at}.up`, `${what}'s up runs along its normal, so the plane has no frame to stand in`);
+  }
+  if (r.name !== undefined) wantText(r.name, `${at}.name`, `${what}'s name`);
+}
+
+/** A profile: the clean outline a step is grown from, in its plane's own (u, v). */
+function wantProfile(v: unknown, at: string, what: string): void {
+  const r = wantRecord(v, at, what);
+  wantText(r.shape, `${at}.shape`, `${what}'s shape`);
+  wantText(r.reasoning, `${at}.reasoning`, `${what}'s reasoning`);
+  if (typeof r.closed !== 'boolean') bad(`${at}.closed`, `${what} does not say whether it is closed`);
+  if (!Array.isArray(r.points)) bad(`${at}.points`, `${what} has no points — an outline is its points`);
+  const points = r.points as unknown[];
+  if (points.length < OP_LIMITS.profileMinPoints) {
+    bad(`${at}.points`, `${what} has ${points.length} point(s); an outline needs ${OP_LIMITS.profileMinPoints}`);
+  }
+  if (points.length > OP_LIMITS.profilePoints) {
+    bad(`${at}.points`, `${what} has ${points.length} points, past the ${OP_LIMITS.profilePoints} a profile may carry`);
+  }
+  points.forEach((p, i) => {
+    const q = wantRecord(p, `${at}.points[${i}]`, `${what}'s point ${i}`);
+    wantNumber(q.x, `${at}.points[${i}].x`, `${what}'s point ${i} x`);
+    wantNumber(q.y, `${at}.points[${i}].y`, `${what}'s point ${i} y`);
+  });
+}
+
+/** A budget shared by the whole walk, so nesting cannot multiply the work. */
+interface Budget {
+  left: number;
+}
+
+/**
+ * One `steps` array — the tree's own, or the copy a `place` carries.
+ *
+ * Ids are unique WITHIN their array and `on` points at a step EARLIER in it:
+ * the tree is built by appending (`withStep`), so a step can only ever act on
+ * one that already stood. That makes the `on` edges acyclic by construction
+ * rather than by a walk with a guard, which is what `rootOf` and `depthsOf`
+ * already assume when they cap their recursion at the step count.
+ */
+function walkSteps(v: unknown, at: string, depth: number, budget: Budget): void {
+  if (!Array.isArray(v)) bad(at, `steps is ${v === undefined ? 'missing' : `not an array`} — a tree is its steps`);
+  const steps = v as unknown[];
+  if (steps.length > OP_LIMITS.steps) {
+    bad(at, `${steps.length} steps in one tree, past the ${OP_LIMITS.steps} a tree may carry`);
+  }
+  budget.left -= steps.length;
+  if (budget.left < 0) {
+    bad(at, `more than ${OP_LIMITS.totalSteps} steps in the whole tree, nesting included`);
+  }
+  const seen = new Set<string>();
+  steps.forEach((s, i) => walkStep(s, `${at}[${i}]`, seen, depth, budget));
+}
+
+function walkStep(v: unknown, at: string, seen: Set<string>, depth: number, budget: Budget): void {
+  const s = wantRecord(v, at, 'the step');
+  const id = wantId(s.id, `${at}.id`, "the step's id");
+  if (seen.has(id)) bad(`${at}.id`, `two steps in this tree are both called ${id}`);
+
+  const op = wantText(s.op, `${at}.op`, "the step's op", OP_LIMITS.idChars);
+  if (!OP_KINDS.includes(op as OpKind)) {
+    bad(`${at}.op`, `“${op}” is not one of the ${OP_KINDS.length} steps this vocabulary has`);
+  }
+  wantText(s.reasoning, `${at}.reasoning`, "the step's reasoning");
+
+  if (!Array.isArray(s.from)) bad(`${at}.from`, 'the step does not say which strokes it was made from');
+  const from = s.from as unknown[];
+  if (from.length > OP_LIMITS.refs) {
+    bad(`${at}.from`, `the step names ${from.length} strokes, past the ${OP_LIMITS.refs} one step may name`);
+  }
+  from.forEach((f, i) => wantId(f, `${at}.from[${i}]`, `the stroke ${i} it was made from`));
+
+  if (s.name !== undefined) wantText(s.name, `${at}.name`, "the step's name");
+  if (s.by !== undefined) wantText(s.by, `${at}.by`, 'who put the step in the tree');
+  if (s.material !== undefined) {
+    const m = wantRecord(s.material, `${at}.material`, "the step's material");
+    wantText(m.colour, `${at}.material.colour`, "the material's colour word");
+  }
+
+  /** A step this one stands on: a name, and a step that already stood. */
+  const earlier = (value: unknown, key: string, what: string): void => {
+    const ref = wantId(value, `${at}.${key}`, what);
+    if (!seen.has(ref)) bad(`${at}.${key}`, `${what} is ${ref}, and no step before it in this tree is called that`);
+  };
+
+  if (s.on !== undefined) earlier(s.on, 'on', 'the step it acts on');
+
+  const kind = op as OpKind;
+  if (kind === 'extrude') {
+    wantProfile(s.profile, `${at}.profile`, "the extrude's profile");
+    wantPlane(s.plane, `${at}.plane`, "the extrude's plane");
+    wantNumber(s.depth, `${at}.depth`, "the extrude's depth");
+  } else if (kind === 'revolve') {
+    wantProfile(s.profile, `${at}.profile`, "the revolve's profile");
+    wantPlane(s.plane, `${at}.plane`, "the revolve's plane");
+    const axis = wantRecord(s.axis, `${at}.axis`, "the revolve's axis");
+    wantVec(axis.point, `${at}.axis.point`, "the axis's point");
+    const dir = wantVec(axis.direction, `${at}.axis.direction`, "the axis's direction");
+    if (length(dir) < 1e-9) bad(`${at}.axis.direction`, 'the axis points nowhere — there is nothing to turn about');
+    wantNumber(s.sweep, `${at}.sweep`, "the revolve's sweep");
+  } else if (kind === 'cut' || kind === 'boss') {
+    if (s.on === undefined) bad(`${at}.on`, `a ${kind} changes a body, and this one does not say whose`);
+    wantProfile(s.profile, `${at}.profile`, `the ${kind}'s feature`);
+    wantPlane(s.plane, `${at}.plane`, `the ${kind}'s face`);
+    wantNumber(s.depth, `${at}.depth`, `the ${kind}'s depth`);
+    wantNumber(s.start, `${at}.start`, `where the ${kind}'s tool starts along the face's normal`);
+    if (s.through !== undefined && typeof s.through !== 'boolean') {
+      bad(`${at}.through`, `the ${kind} says “through” as ${typeof s.through}, not as yes or no`);
+    }
+  } else if (kind === 'mirror') {
+    if (s.on === undefined) bad(`${at}.on`, 'a mirror reflects a body, and this one does not say whose');
+    wantPlane(s.plane, `${at}.plane`, "the mirror's plane");
+  } else if (kind === 'match') {
+    if (s.on === undefined) bad(`${at}.on`, 'a match resolves a diff against a body, and this one does not say whose');
+    if (s.how !== 'add' && s.how !== 'remove') {
+      bad(`${at}.how`, `a match either adds what is missing or takes off what is extra, not “${String(s.how)}”`);
+    }
+    wantPlane(s.plane, `${at}.plane`, "the plane the match is measured on");
+  } else if (kind === 'massing') {
+    if (!Array.isArray(s.profiles)) bad(`${at}.profiles`, 'a massing does not say which profiles it is made of');
+    const profiles = s.profiles as unknown[];
+    if (profiles.length > OP_LIMITS.massingProfiles) {
+      bad(`${at}.profiles`, `${profiles.length} profiles in one massing, past the ${OP_LIMITS.massingProfiles} it may carry`);
+    }
+    profiles.forEach((p, i) => {
+      const r = wantRecord(p, `${at}.profiles[${i}]`, `the massing's profile ${i}`);
+      wantId(r.id, `${at}.profiles[${i}].id`, `the mark profile ${i} was drawn as`);
+      wantProfile(r.profile, `${at}.profiles[${i}].profile`, `the massing's profile ${i}`);
+      wantPlane(r.plane, `${at}.profiles[${i}].plane`, `the plane profile ${i} lies on`);
+    });
+    // A clip: the volume it keeps its body inside is a step that already stood.
+    if (s.bound !== undefined) earlier(s.bound, 'bound', 'the step whose body does the clipping');
+  } else if (kind === 'place') {
+    if (depth >= OP_LIMITS.placeDepth) {
+      bad(`${at}.steps`, `a placement nested more than ${OP_LIMITS.placeDepth} deep — a copy of a copy of a copy`);
+    }
+    wantVec(s.offset, `${at}.offset`, "the placement's offset");
+    walkSteps(s.steps, `${at}.steps`, depth + 1, budget);
+    // A placement OF A DEFINITION re-derives its pose from two inks every walk
+    // (`placeFrames`), so it must name both of them and the planes they lie on.
+    // A dup carries neither: its offset is the whole of its pose.
+    if (s.definition !== undefined) {
+      wantText(s.definition, `${at}.definition`, "the definition's name");
+      wantId(s.of, `${at}.of`, "the definition's own profile this was matched against");
+      wantPlane(s.fromPlane, `${at}.fromPlane`, "the plane the definition's profile lies on");
+      if (s.toMark !== undefined) {
+        wantId(s.toMark, `${at}.toMark`, 'the mark the copy was placed at');
+        wantPlane(s.toPlane, `${at}.toPlane`, 'the plane that mark lies on');
+      } else if (s.toPoint !== undefined) {
+        wantVec(s.toPoint, `${at}.toPoint`, 'the point the copy was placed at');
+      } else {
+        bad(at, `the placement of ${String(s.definition)} does not say where it goes — no mark and no point`);
+      }
+    }
+  }
+  // Every other row of §2.4 is declared and unbuilt: it carries the base
+  // fields, which are checked above, and nothing a package has not filled yet.
+
+  seen.add(id);
+}
+
+/**
+ * A tree from outside, walked once against the types that build one.
+ *
+ * Returns the tree when every step can be read, and otherwise WHERE and WHY —
+ * so the artifact can stand as a broken solid with the reason on it rather
+ * than vanishing from the board or taking the panel down with it.
+ */
+export function validateOpTree(value: unknown): OpTreeCheck {
+  try {
+    const t = wantRecord(value, '', 'the tree');
+    if (t.mm !== 'op') bad('mm', `the tree says it is “${String(t.mm)}”, not an op tree`);
+    if (t.version !== 1) {
+      bad('version', `this is an op tree of version ${String(t.version)}, and the shard reads version 1`);
+    }
+    walkSteps(t.steps, 'steps', 0, { left: OP_LIMITS.totalSteps });
+    return { ok: true, tree: value as OpTree };
+  } catch (err) {
+    if (err instanceof Fault) return { ok: false, mine: true, at: err.at, reason: err.reason };
+    throw err;
+  }
+}
+
+/**
+ * The tree back out of the text, with the reason when it will not read.
+ *
+ * The sibling of `parseOpTree`, for the callers that have somewhere to SAY a
+ * reason — the load boundary, which stands a broken solid in the panel.
+ */
+export function readOpTree(code: string | undefined): OpTreeCheck {
+  if (!isOpTree(code)) {
+    return { ok: false, mine: false, at: '', reason: 'this code is not one of the shard\'s op trees' };
+  }
   const body = code!
     .split('\n')
     .filter((l) => !l.trimStart().startsWith('//'))
     .join('\n');
+  let parsed: unknown;
   try {
-    const parsed = JSON.parse(body) as OpTree;
-    if (parsed?.mm !== 'op' || !Array.isArray(parsed.steps)) return null;
-    return parsed;
-  } catch {
-    return null;
+    parsed = JSON.parse(body);
+  } catch (err) {
+    return {
+      ok: false,
+      mine: true,
+      at: '',
+      reason: `the tree is marked as one of ours and is not JSON: ${err instanceof Error ? err.message : String(err)}`,
+    };
   }
+  return validateOpTree(parsed);
+}
+
+/**
+ * The tree back out of the text, or null when the text is not one — or is one
+ * and cannot be read.
+ *
+ * The null contract every caller already has, now with the second reason: a
+ * tree that parses as JSON but is not a tree this shard can walk is refused
+ * here rather than three files downstream, where it arrives as a number that
+ * is not there.
+ */
+export function parseOpTree(code: string | undefined): OpTree | null {
+  const read = readOpTree(code);
+  return read.ok ? read.tree : null;
 }
 
 // ---- what a step is, in words and in numbers --------------------------------
