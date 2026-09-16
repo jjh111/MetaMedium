@@ -293,6 +293,45 @@ So, three rules, and they replace what §3 said before:
    eases the camera back to the view a stroke was drawn in, where it
    reads as what it is. Nothing about what is visible depends on them.
 
+**The axis view IS the choice** (16 September 2026). John, looking at the
+picker and the compass together: *"In explicitly selected gizmo x, y, or
+z, treat that surface as selected automatically rather than needing the
+plane click; hide the plane click option when in a gizmo-clicked x, y, or
+z; only show the planes when in alt views."* Standing square onto the
+height plane and **then** clicking the height tile is one decision said
+twice, and the tile you must click is a square lying over the drawing you
+came to make. So:
+
+- **Tapping a compass ball — or the numpad / shift-digit key for that
+  view — chooses the plane that view faces.** Front or back → height
+  (`XY`); top or bottom → foundation (`XZ`); right or left → width
+  (`YZ`). `axisPlaneFor` in `src/view.ts`, the same mapping the ball was
+  already lit teal by. The status says *front · height chosen*. It is the
+  same `chosen` decision a tile makes, so everything downstream — the
+  profile and its extent, the edge-on gate, the slide — is unchanged; only
+  the **reason** differs, and the ink carries it rather than claiming a
+  tile nobody held.
+- **The rule is about where the camera stands**, not which control moved
+  it: an orbit that lands on an axis view by eye chooses the same plane
+  (`isAxisView`, within `AXIS_VIEW_TOLERANCE_DEG`).
+- **The picker's tiles and slide handle are hidden in an axis view** and
+  return the moment the camera leaves. The cursor mark and its axes stay:
+  that is where the cursor is, and shift + click must keep reading.
+- **Leaving an axis view returns the plane to the hand.** The choice was
+  the view's, so it goes with the view: back comes whatever the hand had
+  chosen with a tile or a key, which is nothing when it never did — *free
+  view · plane read from what you draw*. The rule is one function,
+  `planeAfterLeavingAxisView`, so the other reading (the view's choice
+  sticks) is one edit.
+- **The hand overrules the view**: `0` or the picker's centre un-chooses
+  in an axis view and hands the tiles straight back, and so does choosing
+  a different tile by key.
+
+The edge-on warning moves with it. A snap can no longer leave the chosen
+plane edge-on — an axis view faces its own plane by construction — so the
+sentence now belongs to choosing a plane **by hand** from where you stand,
+which is the only way left to be somewhere the ink cannot land.
+
 **View-plane ink has three fates**, and the form rung decides which:
 
 - **A correction in space** when it relates to modelled geometry. A

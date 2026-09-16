@@ -295,7 +295,7 @@ there is no bundle to drift.
 | `src/verbs.ts` | **Pure.** The verb table with name-resolved targets (§2.6 rule 4), `behave/words.ts`'s pattern ported: `SAYINGS` per verb, `CHANGES` for the size words, `namesIn` resolving a noun singular or plural against the names in play (core's own `singular`), and **what it cannot read is returned, not dropped** |
 | `src/models.ts` | The model pane, `Demos/surface/04-models.js` ported: both local servers probed in parallel, embedding-only models hidden **and said**, the pick remembered as a preference, hosted providers by key — and **no key ever enters the log**. `joinWith` seats a model with a transport of its own, which is what `__shard.joinStub` is |
 | `src/work.ts` | A model at work, shown **where it works**: a breathing `--sig-model` dot with the model's name and its task above the solid, the elapsed time after a few seconds, *Esc stops it* after thirty, and one `AbortSignal` per call so Esc really does |
-| `e2e.js` | The whole loop through the real pointer path — **92 steps, P0 → P6, the compass and the panel's toggle** — and, beside it, `__demo()`: the two-minute demo of §9 in eleven asserted steps, with a timing on each |
+| `e2e.js` | The whole loop through the real pointer path — **101 steps, P0 → P6, the compass, the panel's toggle, trackpad and touch, and the axis views** — and, beside it, `__demo()`: the two-minute demo of §9 in eleven asserted steps, with a timing on each |
 | `build-standalone.mjs` | **One file.** Runs `npm run build` (which typechecks first), then inlines every asset Vite emitted — the bundle as one inline module, the stylesheet as one `<style>` — into `dist/shard-3d.html`, and refuses to write a page that still points at anything that would not travel with it. The font `@import` stays external, because the tokens name a fallback stack and a face is not worth trebling the file for |
 
 ## The design decision: how a solid is held in the log
@@ -864,12 +864,69 @@ on the canvas draws. Under it, *home* frames everything on the board (or the
 plane picker itself, when the board is empty, because that is the next move),
 *view* is persp / ortho, and every pinned view is a chip.
 
-**A snap never leaves you edge-on in silence.** If the plane you have chosen is
-too oblique to draw on from where the camera has arrived — the scorer's own
-`FACING_FLOOR`, so the compass and the planarity read use one number — the
-status line says *top · ortho — the height plane is edge-on from here, so
-choose another or orbit*. §10's last risk is that the pen works and the ink
-goes nowhere; the fix is to say so before the hand finds out.
+### The axis view IS the choice (16 September 2026)
+
+John, looking at the two widgets: *"in explicitly selected gizmo x, y, or z,
+treat that surface as selected automatically rather than needing the plane
+click; hide the plane click option when in a gizmo-clicked x, y, or z; only
+show the planes when in alt views."*
+
+They were two decisions where a hand makes one. Standing square onto the height
+plane and **then** clicking the height tile is saying the same thing twice, and
+the tile you must click is a square lying over the drawing you came here to
+make.
+
+- **Tapping a ball chooses the plane that view faces.** Front or back (along Z)
+  → **height**; top or bottom (along Y) → **foundation**; right or left (along
+  X) → **width** (`axisPlaneFor`, the same mapping the teal ball was already
+  lit by — one decision, one home). The status says it in the trimmed register:
+  *front · height chosen*. It is the same `chosen` decision a tile makes, so
+  the profile and its extent, the edge-on gate and the picker's slide are all
+  looking at the plane they always were; only the **reason** differs, and the
+  ink carries it — *the front view faces it — the camera chose the plane*,
+  never a tile nobody held.
+- **The rule is about where the camera STANDS, not which control moved it.** An
+  orbit that lands on the front by eye chooses the same plane a tap would
+  (`isAxisView`, within `AXIS_VIEW_TOLERANCE_DEG`).
+- **The tiles are hidden in an axis view** and come back the moment the camera
+  leaves. What stays is the cursor mark and its three axes — that is where the
+  cursor *is*, and shift + click has to keep reading.
+- **Leaving an axis view gives the plane back to the hand.** The choice was the
+  view's, so it goes with the view: what comes back is whatever the hand had
+  chosen with a tile or a key, which is *nothing* when it never did — *free
+  view · plane read from what you draw*. The rule is one line
+  (`planeAfterLeavingAxisView` in `view.ts`) so the other reading — the view's
+  choice sticks until something else is said — is one edit rather than an
+  argument spread through the wiring. It stays quiet when nothing changed: a
+  camera move must not push *massing from 3 profiles · tier 1* out of the one
+  status line.
+- **The hand overrules the view.** `0` (or the picker's centre) in an axis view
+  un-chooses and hands the tiles straight back; so does choosing a *different*
+  tile by key. `1` `2` `3` are unchanged in alt views, and in an axis view the
+  matching one is the choice the view already made.
+- **The compass still says which plane is chosen** in both states — in an axis
+  view the lit ball is the one you tapped.
+
+**A plane chosen by hand that is edge-on from here still says so.** If the
+plane you have chosen is too oblique to draw on from where the camera stands —
+the scorer's own `FACING_FLOOR`, so the compass and the planarity read use one
+number — the status line says *height chosen · it is edge-on from here — orbit,
+or tap the ball that faces it*. §10's last risk is that the pen works and the
+ink goes nowhere; the fix is to say so before the hand finds out. The warning
+used to live on the snap, and the coupling above retired it there: an axis view
+now faces the plane it chose, by construction, so the only way left to stand
+somewhere the ink cannot land is to choose it by hand — which is where the
+sentence moved.
+
+**A snap ends when the camera arrives**, not on a stopwatch. The ease is
+wall-clock and its last few degrees ride on a single frame; on a deadline of
+`ms + 60` a frame that came late put the arrival after it, the lens was handed
+back to auto-perspective while the camera was still a degree off the axis, and
+the ortho a tap promises quietly came undone — and, once the two widgets were
+coupled, the plane was taken away and given back mid-snap as well. Arrival is
+the normal end; the timer is a generous backstop (`SNAP_GRACE_MS`) for an ease
+that is never going to arrive. Found by hand, watching the *view* tile say
+*persp* in a front view.
 
 ### The decision: perspective follows the camera
 
@@ -906,10 +963,10 @@ digits for a keyboard without one:
 
 | Key | What |
 |---|---|
-| `1` `2` `3` | choose the foundation / height / width **plane** (unchanged) |
-| `0` | un-choose — from here the plane is read |
-| numpad `1` / `3` / `7`, or `Shift`+`1` / `3` / `7` | front / right / top |
-| `Ctrl`/`Cmd` + either | the far side — back / left / bottom |
+| `1` `2` `3` | choose the foundation / height / width **plane** (unchanged; in an axis view the matching one is the choice the view already made, and a different one hands the tiles back) |
+| `0` | un-choose — from here the plane is read; in an axis view it also brings the picker's tiles back |
+| numpad `1` / `3` / `7`, or `Shift`+`1` / `3` / `7` | front / right / top — **and the plane that view faces** (height / width / foundation) |
+| `Ctrl`/`Cmd` + either | the far side — back / left / bottom, the same three planes |
 | numpad `5`, or `Shift`+`5` | persp / ortho |
 | numpad `9`, or `Shift`+`9` | flip to the far side of the view you are at |
 | `f`, `Home` | frame everything |
@@ -1572,7 +1629,7 @@ Open `http://localhost:5174` in its own tab, then in the console:
 ```js
 const src = await fetch('/e2e.js').then(r => r.text());
 (0, eval)(src);
-__scenario().then(r => window.__R = r);   // the seven packages and the compass, 80 steps
+__scenario().then(r => window.__R = r);   // the seven packages and the compass, 95 steps
 __demo().then(r => window.__D = r);       // the two-minute demo, 10 steps
 ```
 
@@ -1583,21 +1640,31 @@ run started after somebody had driven the compass by hand would read a circle
 on an edge-on plane as a dot. The board is not the only state a run begins
 from; that was found by running it after driving the compass by hand.
 
-**The compass's eight**, at the end: the balls are six, depth-sorted, labelled
-`X` `Y` `Z` on the positive ends, and the two that face the chosen plane light;
-tap the Z ball and the camera's forward is −Z within a hundredth, tap it again
-and it is +Z; an axis view took the ortho lens *and the projection matrix is
-really parallel* (read off `m[15]`, so it cannot pass because a flag was set
-and the camera was not swapped); a drag on the widget — real pointer events on
-the SVG — moves the azimuth and brings perspective back; a snap that leaves the
-chosen plane edge-on says *edge-on* in the status line and names the plane, and
-the ball that faces the plane you are on says *flat on*; a rectangle drawn
-under ortho still reads `rectangle > 0.8` with a measured scale, and so does
-the same rectangle under perspective; *home* puts every one of the board's
+**The compass's fourteen**, at the end: the balls are six, depth-sorted,
+labelled `X` `Y` `Z` on the positive ends, and the two that face the chosen
+plane light; tap the Z ball and the camera's forward is −Z within a hundredth,
+tap it again and it is +Z; an axis view took the ortho lens *and the projection
+matrix is really parallel* (read off `m[15]`, so it cannot pass because a flag
+was set and the camera was not swapped); a drag on the widget — real pointer
+events on the SVG — moves the azimuth and brings perspective back; a rectangle
+drawn under ortho still reads `rectangle > 0.8` with a measured scale, and so
+does the same rectangle under perspective; *home* puts every one of the board's
 eight bounding corners inside the viewport; and *home* on an empty board frames
 the plane picker and says so.
 
-Seventy of them are P0 → P6. **P0's twelve:** choose the foundation, draw a rectangle by
+**The coupling's six** are among them (16 September 2026): tapping Z chooses
+the height plane, hides the picker's tiles, says *front · height chosen* and
+lights the ball you tapped; a rectangle drawn there lands on `height · chosen`
+and its reason names the camera, not a tile; the other two axes choose the
+other two planes and a flip keeps the plane; an orbit off the axis puts the
+tiles back and — nothing having been chosen by hand — leaves the plane read
+from the drawing again; a tile the hand *did* hold comes back after an axis
+view carried a different one; `0` in an axis view un-chooses and hands the
+tiles back, and a tile can then be held by hand from the same view; and a plane
+so chosen that is edge-on from here says *edge-on* and names it, while the ball
+that faces it is one tap away.
+
+Eighty-one of them are P0 → P6. **P0's twelve:** choose the foundation, draw a rectangle by
 screen path, assert the top reading is `rectangle ≥ 0.8` on
 `foundation · chosen`; choose the height plane, draw a circle, assert
 `circle ≥ 0.8` on `height · chosen`; assert the two marks carry different

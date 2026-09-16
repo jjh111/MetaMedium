@@ -14,18 +14,16 @@
 // the whole reason the pinned chips moved out of the panel to sit under it.
 
 import type { Colours } from './theme';
-import { mul, type PlaneName, type Pose, type Vec3 } from './plane';
+import type { PlaneName, Pose } from './plane';
 import type { Projection, Space } from './scene';
 import {
+  axisPlaneFor,
   balls,
   ballScale,
   opposite,
-  planeFacedBy,
-  tooOblique,
   viewFacingPlane,
   viewForAxis,
   viewOfPose,
-  VIEW_DIR,
   type Axis,
   type AxisView,
   type Bounds3,
@@ -38,6 +36,12 @@ const R = 33;
 const BALL = 11;
 /** A press that travels this far is a drag, not a tap. */
 const DRAG_PX = 4;
+/**
+ * How long after an ease's nominal end a snap is still considered in flight.
+ * Only the backstop for an ease that is never going to arrive; arrival itself
+ * is what normally ends one.
+ */
+const SNAP_GRACE_MS = 400;
 
 export interface NavOptions {
   host: HTMLElement;
@@ -50,6 +54,17 @@ export interface NavOptions {
   /** The pinned views — camera bookmarks, as `panel.pinnedViews` reads them off the log. */
   pinned(): { pose: Pose; label: string; count: number }[];
   say(sentence: string): void;
+  /**
+   * The camera has come to stand in an axis view, so **that view's plane is
+   * chosen** — the same `chosen` decision a tile makes, and the picker's
+   * tiles go away behind it (16 September 2026).
+   */
+  enterAxisView(view: AxisView, plane: PlaneName): void;
+  /**
+   * …and it has left again: the tiles come back, and the plane is whatever
+   * the hand had chosen for itself (`planeAfterLeavingAxisView`).
+   */
+  leaveAxisView(): void;
 }
 
 export interface NavGizmo {
@@ -68,6 +83,12 @@ export interface NavGizmo {
   setProjection(p: Projection | 'toggle'): Projection;
   /** Which of the six the camera is at, or null when it is anywhere else. */
   facing(): AxisView | null;
+  /**
+   * The axis view the compass has told the surface it is STANDING in — which
+   * lags `facing()` through a snap's ease on purpose, so the plane is chosen
+   * once at the tap and not re-chosen a dozen times on the way there.
+   */
+  standing(): AxisView | null;
 }
 
 export function createNav(o: NavOptions): NavGizmo {
@@ -137,6 +158,17 @@ export function createNav(o: NavOptions): NavGizmo {
   let autoProjection = true;
   let snapping = false;
   let snapTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Where the snap in flight is going, so its arrival can end it. */
+  let snapTo: AxisView | null = null;
+
+  /**
+   * The axis view the surface has been told about — `null` in an alt view.
+   * Not the same question as `facing()`: through a snap's ease the camera is
+   * nowhere in particular, and the plane must be chosen once, at the tap.
+   */
+  let stood: AxisView | null = null;
+  /** False until the surface holds the handle this widget calls back through. */
+  let wired = false;
 
   function facing(): AxisView | null {
     return viewOfPose(space.pose());
@@ -149,47 +181,103 @@ export function createNav(o: NavOptions): NavGizmo {
     const at = facing();
     // A second tap on the same ball flips to the other side, as Blender does.
     const view = at === asked ? opposite(asked) : asked;
+    // A snap is in progress from here: the lens is set to ortho a line before
+    // the camera is actually on the axis, and auto-perspective would see an
+    // orthographic camera in an alt view and undo it on the spot.
     snapping = true;
+    snapTo = view;
     if (snapTimer) clearTimeout(snapTimer);
-    snapTimer = setTimeout(() => { snapping = false; sync(); }, Math.max(0, ms) + 60);
+    // `ms <= 0` is "be there now" — `easeTo`'s own words. Only a real ease
+    // needs holding open; a window kept for an instantaneous snap is a window
+    // in which the very next camera move is not noticed at all.
+    //
+    // A snap normally ends when the camera ARRIVES (`sync` below). The timer
+    // is only the backstop for an ease that never does — one cancelled by
+    // another camera move — and it is deliberately generous, because the ease
+    // is wall-clock and its last few degrees ride on a single frame: at
+    // `ms + 60` a frame that came late put the arrival after the deadline, the
+    // lens went back to auto-perspective while the camera was still a degree
+    // off the axis, and the ortho a tap promises quietly came undone. Found by
+    // hand, watching the *view* tile say persp in a front view.
+    if (ms > 0) snapTimer = setTimeout(() => { arrived(); sync(); }, ms + SNAP_GRACE_MS);
     // A tap on a ball hands the lens back to the camera, whatever the tile was
     // pinned to — which is what the tile's own tooltip promises, and it means
     // there is one way out of a pin rather than a mode to remember.
     autoProjection = true;
     space.setProjection('ortho');
     space.snap(view, ms);
+    if (ms <= 0) arrived(); // there was never a mid-snap to hold open
+    // The choice is made HERE, at the tap, not when the ease lands: the hand
+    // asked for that view, and the plane it faces is chosen by the asking.
+    enter(view);
     sync();
     announce(view);
     return view;
   }
 
-  /**
-   * Say where the camera went — and say it out loud when the plane the ink is
-   * going to land on is now edge-on. A camera move that quietly leaves the
-   * chosen plane un-drawable is §10's last risk: the pen would work and
-   * nothing would land where the hand meant it.
-   */
-  function announce(view: AxisView) {
-    const chosen = o.chosen();
-    const lens = space.projection() === 'ortho' ? ' · ortho' : '';
-    if (chosen && tooOblique(chosen, lookOf(view))) {
-      o.say(`${view}${lens} · ${chosen} is edge-on here — choose another, or orbit`);
-      return;
-    }
-    if (chosen && planeFacedBy(view) === chosen) {
-      o.say(`${view}${lens} · ${chosen} flat on — where a plan is drawn`);
-      return;
-    }
-    o.say(`${view}${lens} · ${describeLens()}`);
+  /** The snap is over: the camera is where it was sent, or the wait ran out. */
+  function arrived() {
+    snapping = false;
+    snapTo = null;
+    if (snapTimer) clearTimeout(snapTimer);
+    snapTimer = null;
   }
 
-  /** Where a view looks: back down the axis the camera stands on. */
-  const lookOf = (view: AxisView): Vec3 => mul(VIEW_DIR[view], -1);
+  /** Tell the surface the camera stands in this view, once. */
+  function enter(view: AxisView) {
+    if (stood === view) return;
+    stood = view;
+    o.enterAxisView(view, axisPlaneFor(view));
+  }
 
-  const describeLens = () =>
-    space.projection() === 'ortho'
-      ? 'parallel — equal edges measure the same at any depth'
-      : 'perspective — depth says the thing is solid';
+  /**
+   * Watch the camera cross the line between an axis view and an alt one. An
+   * orbit, a pinned view, anything: the rule is about where the camera STANDS,
+   * not about which control moved it, so a hand that orbits onto the front by
+   * eye gets the same plane a tap on the ball would have chosen.
+   *
+   * Never mid-snap: the ease passes through a dozen poses that are not an axis
+   * view on its way to one, and each would take the plane away and give it
+   * back.
+   */
+  function settle() {
+    // Not while the widget is still being built: the surface's own callbacks
+    // reach back through the handle `createNav` has not returned yet, and the
+    // first thing they would touch is a `const` in its dead zone. The surface
+    // settles the boot pose with its first `sync()`, which is one line later.
+    if (!wired || snapping) return;
+    const at = facing();
+    if (at === stood) return;
+    if (at) {
+      enter(at);
+      announce(at);
+      return;
+    }
+    stood = null;
+    const was = o.chosen();
+    o.leaveAxisView();
+    const held = o.chosen();
+    // Quiet when nothing changed. Turning the camera off an axis whose plane
+    // the hand had chosen anyway takes nothing away, and a sentence about it
+    // would push whatever the board just did out of the one status line —
+    // which is what it did to *massing from 3 profiles · tier 1*.
+    if (held === was) return;
+    o.say(
+      held
+        ? `free view · ${held} chosen — the tile you held`
+        : 'free view · plane read from what you draw'
+    );
+  }
+
+  /**
+   * Say where the camera went, and what that chose. An axis view faces its own
+   * plane flat on by construction, so the edge-on warning that used to live
+   * here has moved to where it is still live: choosing a tile BY HAND from a
+   * view that leaves it edge-on (`choose` in `main.ts`).
+   */
+  function announce(view: AxisView) {
+    o.say(`${view} · ${axisPlaneFor(view)} chosen`);
+  }
 
   function home(ms = 420) {
     const b = o.bounds();
@@ -275,14 +363,23 @@ export function createNav(o: NavOptions): NavGizmo {
   function sync() {
     const pose = space.pose();
     const order = balls(pose);
-    const chosen = o.chosen();
-    const chosenView = chosen ? viewFacingPlane(chosen) : null;
     const at = facing();
+
+    // The snap has landed: end it here rather than on the clock.
+    if (snapping && snapTo && at === snapTo) arrived();
 
     // Auto-perspective: an orbit that left the axis comes back to a lens where
     // depth reads. Never mid-snap — the ease passes through a dozen poses that
     // are not an axis view on its way to one.
     if (autoProjection && !snapping && space.projection() === 'ortho' && !at) space.setProjection('persp');
+
+    // The axis view is the choice: crossing in or out of one chooses the plane
+    // or gives it back, wherever the camera move came from. FIRST, because the
+    // ball that lights teal is the chosen plane's and this is what changes it.
+    settle();
+
+    const chosen = o.chosen();
+    const chosenView = chosen ? viewFacingPlane(chosen) : null;
 
     // Painter's order: the farthest ball first, so the near ones cover it.
     for (const b of order) {
@@ -363,5 +460,16 @@ export function createNav(o: NavOptions): NavGizmo {
   space.onChange(sync);
   sync();
 
-  return { sync, paint, tap, home, setProjection, facing };
+  return {
+    sync: () => {
+      wired = true;
+      sync();
+    },
+    paint,
+    tap,
+    home,
+    setProjection,
+    facing,
+    standing: () => stood,
+  };
 }

@@ -117,6 +117,31 @@ export function planeFacedBy(view: AxisView): PlaneName {
   return axis === 'y' ? 'foundation' : axis === 'z' ? 'height' : 'width';
 }
 
+/**
+ * **The axis view IS the choice** (16 September 2026, John: "in explicitly
+ * selected gizmo x, y, or z, treat that surface as selected automatically
+ * rather than needing the plane click").
+ *
+ * The same mapping as `planeFacedBy`, under the name the coupling is read by:
+ * standing square onto a plane and then clicking the tile for it is a second
+ * way of saying the thing the camera already said.
+ */
+export const axisPlaneFor = planeFacedBy;
+
+/**
+ * What becomes of the chosen plane when the camera LEAVES an axis view.
+ *
+ * The plain reading of John's words is that the choice was the VIEW'S, so it
+ * goes with the view: what comes back is whatever the hand had chosen for
+ * itself with a tile or a key, which is nothing when it never did — and the
+ * picker's tiles come back with it. One line, deliberately, so the other
+ * reading (the view's choice sticks until something else is said) is one edit
+ * rather than an argument spread through the wiring.
+ */
+export function planeAfterLeavingAxisView(handsOwn: PlaneName | null): PlaneName | null {
+  return handsOwn;
+}
+
 /** The normal of one of the three named planes. */
 export function planeNormal(name: PlaneName): Vec3 {
   return name === 'foundation' ? v3(0, 1, 0) : name === 'height' ? v3(0, 0, 1) : v3(1, 0, 0);
@@ -169,12 +194,27 @@ export function poseForAxis(view: AxisView, o: PoseOptions): Pose {
   };
 }
 
+/**
+ * How near an axis counts as standing on it. A camera eased onto a ball lands
+ * within a float's worth of exact; a hand that orbits to within three degrees
+ * of front meant front.
+ */
+export const AXIS_VIEW_TOLERANCE_DEG = 3;
+
 /** Which axis view a pose is already at, within a tolerance, or null. */
-export function viewOfPose(pose: Pose, withinDeg = 3): AxisView | null {
+export function viewOfPose(pose: Pose, withinDeg = AXIS_VIEW_TOLERANCE_DEG): AxisView | null {
   const d = normalize(sub(pose.position, pose.target));
   const cos = Math.cos((withinDeg * Math.PI) / 180);
   for (const v of AXIS_VIEWS) if (dot(d, VIEW_DIR[v]) >= cos) return v;
   return null;
+}
+
+/**
+ * Whether the camera STANDS in an axis view — the state the picker's tiles
+ * are hidden in, asked as a yes or no rather than as "which".
+ */
+export function isAxisView(pose: Pose, withinDeg = AXIS_VIEW_TOLERANCE_DEG): boolean {
+  return viewOfPose(pose, withinDeg) !== null;
 }
 
 // ---- framing ---------------------------------------------------------------

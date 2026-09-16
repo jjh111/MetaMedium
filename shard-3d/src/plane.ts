@@ -223,6 +223,12 @@ export const PLANE_NAMES: PlaneName[] = ['foundation', 'height', 'width'];
 export interface PenState {
   /** The tile held, if any. */
   chosen: PlaneName | null;
+  /**
+   * Why that plane is the chosen one, when it was not a tile that said so —
+   * an axis view chooses the plane it faces (16 September 2026), and the ink
+   * must not claim a tile nobody held. Absent means the tile.
+   */
+  why?: string;
   /** How far the chosen plane has been slid along its normal. */
   offset: number;
   /**
@@ -246,7 +252,10 @@ export interface PenState {
  */
 export function planeForPenDown(state: PenState): Plane {
   if (state.chosen) {
-    const p = NAMED[state.chosen]('chosen', `the ${state.chosen} tile was held when the pen went down`);
+    const p = NAMED[state.chosen](
+      'chosen',
+      state.why ?? `the ${state.chosen} tile was held when the pen went down`
+    );
     return state.offset ? slide(p, state.offset) : p;
   }
   const read = state.candidates?.[0];
