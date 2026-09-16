@@ -13,7 +13,14 @@ import '../../brand/tokens.css';
 import './shard.css';
 
 import * as THREE from 'three';
-import { complete, DEFAULT_SESSION_CONFIG, ENGINE_PARTICIPANT, type Point } from 'metamedium-core';
+import {
+  complete,
+  DEFAULT_SESSION_CONFIG,
+  ENGINE_PARTICIPANT,
+  getRep,
+  LOCAL_PARTICIPANT,
+  type Point,
+} from 'metamedium-core';
 import { createSpace } from './scene';
 import { createGizmo } from './gizmo';
 import { createInk } from './ink';
@@ -105,17 +112,69 @@ const panel = createPanel(panelEl, statusEl, log, {
   // P5: how much of the drawing the body actually contains, whose version
   // stands, and what the library holds.
   honours: (id) => log.honoursOf(id),
+  // UI-2: the panel says WHO made a version from typed provenance, never from
+  // the shape of a name. The participant ids are here, so the typing is here:
+  // a seated model is tier 2, the engine participant is tier 1, and the local
+  // participant is the hand's own act.
   version: (id) => {
     const v = log.versionOf(id);
     if (!v) return null;
-    const seat = models.seats().find((m) => m.id === v.by);
-    return { by: seat ? seat.name : v.by === ENGINE_PARTICIPANT ? 'the engine' : v.by, taken: v.taken };
+    return { ...whoIs(v.by), taken: v.taken };
   },
-  definitions: () => log.definitions().map((d) => ({ name: d.name, basedOn: d.basedOn, why: d.why })),
+  // …and a definition carries the ancestry of the version it was taken out of,
+  // so a placement can say whose work it is reusing without claiming that work
+  // as its own.
+  definitions: () =>
+    log.definitions().map((d) => {
+      const v = log.versionOf(d.solidId);
+      return { name: d.name, basedOn: d.basedOn, why: d.why, ...(v ? whoIs(v.by) : {}) };
+    }),
+  // UI-2: who drew a mark. A model's profile comes in through the same door.
+  author: (markId) => {
+    const mark = log.markOf(markId);
+    const rep = mark ? getRep(mark.node, 'stroke') : undefined;
+    return rep ? whoIs(rep.source ?? LOCAL_PARTICIPANT) : null;
+  },
+  // UI-2: what the next deliberate act would do — the field's leading offer,
+  // said in words in the panel.
+  //
+  // **Undo is never the next move.** It is the way back, and it is the only
+  // verb always enabled, so on a board holding one profile it was the leading
+  // pill and the panel dutifully said *↵ Undo* to a hand that had just drawn
+  // its first mark. When nothing else is afforded the leading BLOCKED offer is
+  // the honest answer, because its reason is the instruction: *nothing to grow
+  // along yet — draw a line from this profile's edge, off its plane*.
+  next: () => {
+    const offers = verbOffers();
+    const first =
+      offers.find((v) => v.enabled && v.verb !== 'undo') ??
+      offers.find((v) => !v.enabled) ??
+      offers.find((v) => v.enabled);
+    return first
+      ? { label: first.label, why: first.why, enabled: first.enabled, ...(first.verb === 'regen' ? { asks: true } : {}) }
+      : null;
+  },
   // P6: what the library says this outline could be — under the shape
   // readings, in the engine's name, plural and ranked.
   matches: (markId) => log.definitionMatches(markId),
 });
+
+/**
+ * UI-2: a participant id, TYPED — the one place the shard decides which of the
+ * three kinds of author made something.
+ *
+ * `engine` is tier 1 and no model was asked. `hand` is the human's own act.
+ * Everything else in this space is a model seat: the shard has no second hand,
+ * so an id that is neither of the two knowns is a model that has since left
+ * its seat, and calling it the hand's would credit the human with a proposal.
+ */
+function whoIs(id: string): { by: string; origin: 'engine' | 'model' | 'hand' } {
+  const seat = models.seats().find((m) => m.id === id);
+  if (seat) return { by: seat.name, origin: 'model' };
+  if (id === ENGINE_PARTICIPANT) return { by: 'the engine', origin: 'engine' };
+  if (id === LOCAL_PARTICIPANT) return { by: 'you', origin: 'hand' };
+  return { by: id, origin: 'model' };
+}
 
 /** What the gizmo holds when the pen goes down. The candidates are the pen's. */
 const pen = (): PenState => ({ chosen: gizmo.chosen, offset: gizmo.offset });
@@ -848,7 +907,12 @@ async function runBrief(text: string, opts: { regen?: string[] } = {}) {
     `${seat.name} · ${out.steps.length} step${out.steps.length === 1 ? '' : 's'}` +
       `${named.length ? ` named ${named.join(', ')}` : ''}` +
       `${out.drawn.length ? ` · ${out.drawn.length} profile${out.drawn.length === 1 ? '' : 's'} drawn` : ''}` +
-      `${honours ? ` · ${honours.sentence}` : ''}` +
+      // UI-2: the status line is ONE short sentence. The whole per-claim
+      // honours list — every view, what each one is carried from, what was set
+      // aside and why — rode in here after a proposal and made the line longer
+      // than the line is. The number belongs in a status line; its workings
+      // belong in the panel, which is open, two rows away, and says all of it.
+      `${honours ? ` · honours the drawing ${(honours.overall * 100).toFixed(0)}% — details in the panel` : ''}` +
       `${out.dropped.length ? ` · ${out.dropped.length} dropped` : ''} · tier 2`
   );
   // The panel has to be re-read, not only the field: the version row, the named
@@ -1023,7 +1087,25 @@ function verbOffers(): VerbOffer[] {
     ? `${solid.name} and its reflection across the ${gizmo.chosen ?? 'height'} plane${gizmo.chosen ? ' — the tile you are holding' : ' — nothing is chosen, so the wall you face'}, as one body`
     : 'nothing selected to mirror — tap a solid';
 
-  return [
+  /**
+   * DATA-1 + UI-2: a solid whose tree would not READ affords two things and no
+   * others. *Extrude* and *Cut a hole* were still standing on a body with no
+   * steps — verbs about a tree, offered over a tree that could not be read —
+   * and taking one wrote a version onto an artifact whose code nobody had been
+   * able to parse. Remove takes it off the board and Undo walks it back; every
+   * other pill says the reason it is not on offer.
+   */
+  const unreadable = solid?.broken ?? null;
+  const gate = (offers: VerbOffer[]): VerbOffer[] =>
+    unreadable
+      ? offers.map((v) =>
+          v.verb === 'remove' || v.verb === 'undo'
+            ? v
+            : { ...v, enabled: false, why: `this tree could not be read — ${unreadable}`, run: () => {} }
+        )
+      : offers;
+
+  return gate([
     {
       verb: 'extrude',
       label: 'Extrude',
@@ -1183,7 +1265,7 @@ function verbOffers(): VerbOffer[] {
       why: 'drop the last act — the solid if one stands on top of the log, else the last stroke',
       run: () => undo(),
     },
-  ];
+  ]);
 }
 
 /** The name taking a version would give the thing: the deepest named step. */
@@ -1384,6 +1466,14 @@ function report() {
           ? `${made.length} solid${made.length === 1 ? '' : 's'} · type what this is and ${models.first()!.name} fills the massing`
         : `${n} mark${n === 1 ? '' : 's'}${made.length ? ` · ${made.length} solid${made.length === 1 ? '' : 's'}` : ''} · ${gizmo.chosen ? describePlane(plane) : 'the plane is read from what you draw'}${gizmo.offset ? ` at ${gizmo.offset.toFixed(2)}` : ''} · draw a line off a profile's edge to stand it up`
   );
+  // UI-2: the panel's summary says what the next deliberate act will do, and
+  // that is the same sentence the field is showing — so it has to be read at
+  // the same moment. Rendering the panel only where an act happened left it a
+  // beat behind: choosing a plane re-read the field and not the panel, and the
+  // two then said *across the foundation* and *nothing is chosen* about one
+  // verb. The panel is derived from the log and the hand's state like
+  // everything else (invariant 4), so it is re-read here, last.
+  panel.show(panel.subject(), selection.current());
 }
 
 function choose(name: PlaneName | null) {
