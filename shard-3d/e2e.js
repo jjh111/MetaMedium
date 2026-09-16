@@ -2600,6 +2600,129 @@
     };
   });
 
+  // ---- G5: the hand in the room, and the seat ------------------------------
+  //
+  // The seat is a model to everything upstream of it: the field reads the same
+  // brief, `runBrief` asks the same way, and the reply is applied by the same
+  // code. What differs is only where the question goes — parked in the room,
+  // answered by a hand. So the step drives the REAL path (`room.ts`) with a
+  // second hand inside the page; the stdio half is `mcp-smoke.mjs`'s to prove.
+
+  let handRoom = null;
+  let seatSolidId = null;
+
+  step('the hand takes the seat, and the field says Enter asks it', () => {
+    S().clear();
+    // Something to fill: a plan, and a line up from its edge — a box at tier 1.
+    S().choose('foundation');
+    const plan = S().strokeScreen(onScreen(rectPath(-2, -1.3, 4, 2.6)));
+    assert(plan, 'no plan was drawn');
+    S().choose('height');
+    S().strokeScreen(onScreen(linePath({ x: -2, y: 0 }, { x: -2, y: -3 })));
+    const solids = S().state().solids;
+    assert(solids.length === 1, `${solids.length} solids, expected 1`);
+    seatSolidId = solids[0].id;
+
+    handRoom = S().joinHand();
+    const seats = S().models().seats;
+    // The hand takes the FRONT: `first()` is who a brief goes to, and sitting
+    // down in this seat is what says *ask me* — a stub seated earlier in this
+    // run would otherwise answer the brief typed at the hand.
+    assert(seats[0] && seats[0].name === 'Claude Code (MCP hand)', `seated: ${JSON.stringify(seats)}`);
+    // No model was asked to seat it, and nothing is parked before Enter.
+    assert(handRoom.pending().length === 0, 'a brief was parked before one was typed');
+
+    S().select(seatSolidId);
+    const read = S().fieldRead('a castle with green tops');
+    assert(/Claude Code \(MCP hand\)/.test(read.line), `the reading line said "${read.line}"`);
+    return { line: read.line, solid: seatSolidId, me: handRoom.me };
+  });
+
+  step('Enter PARKS the brief in the room — the words and the contract reach the hand', async () => {
+    S().select(seatSolidId);
+    const ran = S().field('a castle with green tops');
+    assert(ran.ran, `Enter did nothing: "${ran.line}"`);
+    // The park crosses a hub, so it lands on a later microtask, not this one.
+    for (let i = 0; i < 40 && handRoom.pending().length === 0; i++) await new Promise((r) => setTimeout(r, 25));
+
+    const waiting = handRoom.pending();
+    assert(waiting.length === 1, `${waiting.length} briefs parked, expected 1`);
+    const brief = waiting[0];
+    assert(brief.words === 'a castle with green tops', `the words came through as "${brief.words}"`);
+    assert(/foundation|height|plane/i.test(brief.brief), `the brief carries no scene: "${brief.brief.slice(0, 120)}"`);
+    assert(/john/.test(brief.from), `it says it came from "${brief.from}"`);
+    // It is a question, not a change: nothing was written while it waits.
+    const solid = S().solids().find((x) => x.id === seatSolidId);
+    assert(solid.versions === 1, `${solid.versions} versions while the brief only waits`);
+    // And the human is told a model is at work, in the same words as any model.
+    assert(S().models().working.length === 1, `${S().models().working.length} calls in flight, expected 1`);
+    return { key: brief.key, words: brief.words, brief: brief.brief.replace(/\s+/g, ' ').slice(0, 160) };
+  });
+
+  step('the hand answers, and the version lands named and green — attributed to the seat', async () => {
+    const brief = handRoom.pending()[0];
+    const reply = JSON.stringify({
+      steps: [
+        { id: 's1', op: 'extrude', profile: S().state().marks[0].id, depth: 3, name: 'castle', why: 'the plan, grown' },
+        { id: 's2', op: 'boss', on: 's1', profile: 'p1', depth: 0.5, name: 'top', material: { colour: 'green' }, why: 'its cap' },
+      ],
+      profiles: [{ id: 'p1', shape: 'rectangle', plane: 'foundation', at: 3, centre: { x: 0, y: 0 }, w: 1.2, h: 1.2 }],
+    });
+    assert(handRoom.answer(brief.key, reply), 'the answer was not accepted');
+    for (let i = 0; i < 60 && (S().solids().find((x) => x.id === seatSolidId) || {}).versions === 1; i++)
+      await new Promise((r) => setTimeout(r, 25));
+
+    const solid = S().solids().find((x) => x.id === seatSolidId);
+    assert(solid, 'the solid went away');
+    assert(solid.broken === null, `the derivation broke: ${solid.broken}`);
+    assert(solid.versions === 2, `${solid.versions} versions held, expected 2`);
+
+    const names = S().names().filter((n) => n.solidId === seatSolidId).map((n) => n.name).sort();
+    assert(JSON.stringify(names) === JSON.stringify(['castle', 'top']), `the names are ${JSON.stringify(names)}`);
+    const green = S().materials(seatSolidId);
+    assert(green.length === 1 && green[0].colour === 'green', `the materials are ${JSON.stringify(green)}`);
+
+    // The version is the SEAT'S — the hand answered it, and the seat is who the
+    // shard asked, exactly as with a model.
+    assert(/Claude Code \(MCP hand\)/.test(S().panelText()), 'the panel does not say who proposed it');
+    assert(/tier 2/.test(S().state().status), `the status said "${S().state().status}"`);
+    // Nothing is left waiting, and nothing is left in flight.
+    assert(handRoom.pending().length === 0, 'the brief is still parked after it was answered');
+    assert(S().models().working.length === 0, `${S().models().working.length} calls still in flight`);
+    return { names, colour: green[0].colour, versions: solid.versions };
+  });
+
+  step('a refusal writes nothing, and says why in the human’s own line', async () => {
+    S().select(seatSolidId);
+    const before = S().solids().find((x) => x.id === seatSolidId).versions;
+    const ran = S().field('a castle with red tops');
+    assert(ran.ran, `Enter did nothing: "${ran.line}"`);
+    for (let i = 0; i < 40 && handRoom.pending().length === 0; i++) await new Promise((r) => setTimeout(r, 25));
+    const brief = handRoom.pending()[0];
+    assert(brief, 'nothing was parked');
+    assert(handRoom.refuse(brief.key, 'the drawing does not say how much taller'), 'the refusal was not accepted');
+    for (let i = 0; i < 60 && !/does not say how much taller/.test(S().state().status); i++)
+      await new Promise((r) => setTimeout(r, 25));
+
+    const after = S().solids().find((x) => x.id === seatSolidId).versions;
+    assert(after === before, `${before} → ${after} versions: a refusal wrote something`);
+    assert(/does not say how much taller/.test(S().state().status), `the status said "${S().state().status}"`);
+    assert(S().models().working.length === 0, 'the call is still in flight after a refusal');
+    return { status: S().state().status, versions: after };
+  });
+
+  step('what the hand says lands on the board, in its own name', async () => {
+    // `space_say`'s path: an explanation from another hand, said in the status
+    // line as it arrives, because the shard draws no card for one.
+    const marks = S().state().marks;
+    assert(marks.length, 'no marks to speak about');
+    assert(handRoom.say('the plan is 4 × 2.6 — a courtyard, not a keep', [marks[0].id]), 'it was not placed');
+    for (let i = 0; i < 60 && !/courtyard/.test(S().state().status); i++) await new Promise((r) => setTimeout(r, 25));
+    assert(/courtyard, not a keep/.test(S().state().status), `the status said "${S().state().status}"`);
+    assert(/claude/.test(S().state().status), `it does not say whose: "${S().state().status}"`);
+    return { status: S().state().status };
+  });
+
   // ---- the runner ----------------------------------------------------------
 
   window.__scenario = async function () {

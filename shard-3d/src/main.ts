@@ -18,6 +18,7 @@ import {
   DEFAULT_SESSION_CONFIG,
   ENGINE_PARTICIPANT,
   getRep,
+  LocalHub,
   LOCAL_PARTICIPANT,
   type Point,
 } from 'metamedium-core';
@@ -31,7 +32,8 @@ import { createSelection, type Sel } from './selection';
 import { createField, readField, type FieldContext, type KnownName, type VerbOffer } from './field';
 import { SCRATCH_NEAR, type Makeable } from './form';
 import { COLOUR_WORDS, describeStep } from './op';
-import { createModels } from './models';
+import { createModels, HAND_SEAT } from './models';
+import { joinRoom, otherHand, saidInRoom, type Room } from './room';
 import { createWork } from './work';
 import { describeSpace } from './brief';
 import { meaningMessages, parseMeaning, propose, type Proposal } from './generator';
@@ -608,10 +610,74 @@ const nav = createNav({
 // so that everything it proposes is attributed to it. Nothing here is called on
 // draw, on select or on join: `propose` is reached only from Enter on a brief
 // and from a regen (invariant 6).
+// ---- the room (G5) ---------------------------------------------------------
+// A second hand on this board is a second log arriving live (`room.ts`). The
+// shard's log IS a core session, so this is transport and nothing else: no
+// event type is new, and a shard-specific rep — the plane held on a stroke,
+// the op tree's `json` code — merges because it rides inside an event the
+// engine already carries.
+let room: Room | null = null;
+const LIVE = new URLSearchParams(location.search);
+/** How many sentences from other hands have already been said out loud here. */
+let saidSeen = 0;
+
+/**
+ * What another hand said, in the status line as it lands. The shard draws no
+ * card for an explanation, so this is where `space_say` shows: one sentence,
+ * attributed, and the log holds it whether or not anyone was looking.
+ */
+function sayWhatLanded() {
+  const said = saidInRoom(log.session);
+  if (said.length > saidSeen && said.length) {
+    const newest = said[said.length - 1];
+    panel.say(`${newest.by}: ${newest.text}`);
+  }
+  saidSeen = said.length;
+}
+
+/** Join the room named in the URL, or the default one, once. */
+async function enterRoom(name?: string): Promise<Room | null> {
+  if (room) return room;
+  const relay = LIVE.get('relay') || 'http://127.0.0.1:8020';
+  const which = name || LIVE.get('live') || 'shard';
+  try {
+    room = joinRoom({
+      session: log.session,
+      room: which,
+      relay,
+      name: 'john',
+      onMerge: () => {
+        // Another hand's events are events: everything derived re-derives.
+        ink.sync();
+        solids.sync();
+        sayWhatLanded();
+        report();
+      },
+      onWaiting: () => report(),
+    });
+  } catch (err) {
+    panel.say(`the room could not be joined — ${err instanceof Error ? err.message : String(err)}`);
+    return null;
+  }
+  panel.say(`in room “${which}” as ${room.label} · relay ${relay} — another hand's ink arrives in its own colour`);
+  report();
+  return room;
+}
+
 const models = createModels({
   host: modelsEl,
   join: (name, locality) => log.joinAgent(name, locality),
   say: (sentence) => panel.say(sentence),
+  // A parked brief stands beside what it is about; `runBrief` has already made
+  // sure something is selected before a seat is asked at all.
+  subject: () => {
+    const solid = selectedSolid();
+    if (solid) return [solid.id];
+    const sel = selection.current();
+    return sel ? [sel.id] : [];
+  },
+  room: () => room,
+  enterRoom: () => enterRoom(),
 });
 models.onChange(() => report());
 
@@ -1913,6 +1979,25 @@ export interface ShardHook {
    * network and the loop it drives is the real one.
    */
   joinStub(replies: (string | { text: string; delayMs?: number })[], name?: string): string;
+
+  // ---- G5: the hand in the room --------------------------------------------
+  /**
+   * Join a room over an in-memory hub, seat the MCP hand in it, and hand back
+   * the OTHER hand — the one `shard-3d/mcp.mjs` is in a real room.
+   *
+   * No relay, no network, no MCP: the e2e drives the same `room.ts` the server
+   * does, so what it proves is the path (park, merge, answer, apply), not a
+   * mock of it. The stdio half is `mcp-smoke.mjs`'s to prove.
+   */
+  joinHand(roomName?: string): {
+    seat: string;
+    me: string;
+    pending(): { key: string; words: string; brief: string; from: string }[];
+    answer(key: string, text: string): boolean;
+    refuse(key: string, why: string): boolean;
+    /** `space_say` from the other side: a sentence beside some marks, in its name. */
+    say(text: string, about: string[]): boolean;
+  };
   /** Who is seated, and whether anything is in flight. */
   models(): { seats: { id: string; name: string; locality: string }[]; working: { label: string }[] };
   /** Every name in play, in its step's own id. */
@@ -2279,6 +2364,46 @@ const hook: ShardHook = {
     });
     report();
     return seat.id;
+  },
+
+  joinHand: (roomName = 'e2e-room') => {
+    // One hub, two hands: this page, and the hand that answers. The hub is
+    // `LocalHub` — the shape a BroadcastChannel or the relay has to match — so
+    // the lines that cross it are the lines that would cross a wire.
+    const hub = new LocalHub();
+    if (room) room.close();
+    room = joinRoom({
+      session: log.session,
+      room: roomName,
+      transport: hub.connect(),
+      name: 'john',
+      onMerge: () => {
+        ink.sync();
+        solids.sync();
+        sayWhatLanded();
+        report();
+      },
+      onWaiting: () => report(),
+    });
+    for (const held of models.seats().filter((m) => m.name === HAND_SEAT)) models.leave(held.id);
+    const seat = models.joinHand(room);
+    const hand = otherHand(hub.connect(), 'claude', roomName);
+    report();
+    return {
+      seat: seat.id,
+      me: hand.me,
+      pending: () => hand.pending().map((b) => ({ key: b.key, words: b.words, brief: b.brief, from: b.from })),
+      answer: (key, text) => hand.answer(key, text),
+      refuse: (key, why) => hand.refuse(key, why),
+      say: (text, about) =>
+        !!hand.session.answer({
+          participantId: LOCAL_PARTICIPANT,
+          question: 'note',
+          text,
+          aboutIds: about,
+          at: Date.now(),
+        }),
+    };
   },
   models: () => ({
     seats: models.seats().map((m) => ({ id: m.id, name: m.name, locality: m.locality })),
@@ -2793,5 +2918,18 @@ if (new URLSearchParams(location.search).has('demo') && !DEMO) {
     // Stand back far enough to see both, through the same wheel a hand turns.
     for (let i = 0; i < 3; i++)
       space.canvas.dispatchEvent(new WheelEvent('wheel', { deltaY: 120, bubbles: true, cancelable: true }));
+  });
+}
+
+// `?live=shard&relay=http://127.0.0.1:8020` — the canvas's own way in, and the
+// seat follows, because a hand that opened the page in a room meant to use it.
+//
+// **At the END of the file, with the demo, not beside `createModels`.** Up
+// there this runs during module evaluation, and `report()` reads chrome that is
+// declared further down — so it threw into a promise nobody was awaiting, the
+// room joined, the seat silently did not, and nothing said why.
+if (LIVE.has('live')) {
+  void enterRoom().then((r) => {
+    if (r) models.joinHand(r);
   });
 }

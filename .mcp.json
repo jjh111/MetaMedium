@@ -3,6 +3,10 @@
     "metamedium": {
       "command": "node",
       "args": ["Demos/mcp.mjs"]
+    },
+    "metamedium-3d": {
+      "command": "node",
+      "args": ["shard-3d/mcp.mjs"]
     }
   }
 }

@@ -293,9 +293,12 @@ there is no bundle to drift.
 | `src/brief.ts` | **Pure.** `describeSpace` (§6) — the `describeReading` of this shard, and the **region-id rule** kept in stroke ids and step ids: what stands (the massing first, said to be the extent to stay inside), the planes and what lies on each in that plane's own units, the diff regions, **every name in play in its step's own id**, the library, the words, and then `HERE_IN_SPACE` — one paragraph on what can be made here and, as importantly, what cannot |
 | `src/generator.ts` | **Pure.** The generator seat: the making and regen prompts, `parseProposal` (strict JSON first, then core's own two repairs, then reported — never guessed), the closed lists a reply may use (`PROPOSABLE`, `PROPOSABLE_SHAPES`, the colour words), and `propose`, whose transport is **injectable** so a stub never touches the network. Also `meaningMessages` / `parseMeaning`: asking a model which of the shard's own verbs a phrase meant, which is the only thing here a model is asked that is not geometry |
 | `src/verbs.ts` | **Pure.** The verb table with name-resolved targets (§2.6 rule 4), `behave/words.ts`'s pattern ported: `SAYINGS` per verb, `CHANGES` for the size words, `namesIn` resolving a noun singular or plural against the names in play (core's own `singular`), and **what it cannot read is returned, not dropped** |
-| `src/models.ts` | The model pane, `Demos/surface/04-models.js` ported: both local servers probed in parallel, embedding-only models hidden **and said**, the pick remembered as a preference, hosted providers by key — and **no key ever enters the log**. `joinWith` seats a model with a transport of its own, which is what `__shard.joinStub` is |
+| `src/models.ts` | The model pane, `Demos/surface/04-models.js` ported, plus **the hand's seat** (G5: `joinHand`, which parks a brief in the room instead of posting it and takes the front, because `first()` is who a brief goes to): both local servers probed in parallel, embedding-only models hidden **and said**, the pick remembered as a preference, hosted providers by key — and **no key ever enters the log**. `joinWith` seats a model with a transport of its own, which is what `__shard.joinStub` is |
+| `src/room.ts` | **The live room, and the brief parked in it** (G5). `joinRoom` is `Demos/surface/17-folder.js`'s `openLive` in TypeScript over one session: a `LiveStore` on the relay, `mergeLogs(logs, { me })` on every line that lands, my own unstamped events as my log. `ask()` parks a question on the explanation plane as `brief:<key>` and settles when `answer:<key>` lands — `participants/bridge.ts`'s pattern with the room as the wire. `otherHand()` is the same loop from the other side, which is what the e2e drives in the page and what `mcp.mjs` re-implements in JavaScript |
+| `mcp.mjs` | **The hand, and the seat**, over MCP on stdio — newline-delimited JSON-RPC written by hand, so the repo takes no dependency, importing the committed Node bundle beside `Demos/mcp.mjs`. Six tools: `space_look`, `space_pending`, `space_answer`, `space_draw`, `space_propose`, `space_say`. Its one duplication is named where it stands: the three named planes and the `plane` rep, because this process cannot import the shard's TypeScript |
+| `mcp-smoke.mjs` | The stdio test, in CI's `shard` job: a relay on a **free port**, a second hand in Node as the tab, and the whole round trip — look, draw, park, list, answer, refuse, say |
 | `src/work.ts` | A model at work, shown **where it works**: a breathing `--sig-model` dot with the model's name and its task above the solid, the elapsed time after a few seconds, *Esc stops it* after thirty, and one `AbortSignal` per call so Esc really does |
-| `e2e.js` | The whole loop through the real pointer path — **101 steps, P0 → P6, the compass, the panel's toggle, trackpad and touch, and the axis views** — and, beside it, `__demo()`: the two-minute demo of §9 in eleven asserted steps, with a timing on each |
+| `e2e.js` | The whole loop through the real pointer path — **106 steps, P0 → P6, the compass, the panel's toggle, trackpad and touch, the axis views, and G5's hand in the room** — and, beside it, `__demo()`: the two-minute demo of §9 in eleven asserted steps, with a timing on each |
 | `build-standalone.mjs` | **One file.** Runs `npm run build` (which typechecks first), then inlines every asset Vite emitted — the bundle as one inline module, the stylesheet as one `<style>` — into `dist/shard-3d.html`, and refuses to write a page that still points at anything that would not travel with it. The font `@import` stays external, because the tokens name a fallback stack and a face is not worth trebling the file for |
 
 ## The design decision: how a solid is held in the log
@@ -1621,6 +1624,129 @@ The field is still at the foot of the panel rather than at the pen tip. P1 has
 the screen position it needs now (`space.project`, and the chips layer proves
 it places), so this is the next cheap move rather than a missing piece; the
 READER is the part that does not move.
+
+## The hand, and the seat
+
+> `mcp.mjs` (the server), `src/room.ts` (the transport), `src/models.ts`
+> (the seat), `mcp-smoke.mjs` (the stdio test, in CI). G5 of
+> `SHARD-3D-PUSH-2.md`.
+
+The shard joins a live room the way the canvas does, and the same process is
+both halves of it: **a hand** in the room, and **the model seat**. John types a
+brief in his tab; Claude Code, in a conversation, reads it and answers it; the
+shard applies that answer exactly as it applies a small model's. That is the
+point — the contract a model is asked to fill gets argued about first hand,
+before anything is tuned against it.
+
+```bash
+node Demos/relay.mjs          # the room, on :8020 — sixty lines, no truth of its own
+node shard-3d/mcp.mjs         # the hand; it starts a relay itself when none answers
+```
+
+Then open the shard at `?live=shard&relay=http://127.0.0.1:8020`, or open the
+models pane and press *Join the room, and seat the hand*. `.mcp.json` registers
+the server as `metamedium-3d` beside the canvas's `metamedium`.
+
+**Six tools**, each a verb a hand in this space already has, or the seat:
+
+| Tool | What it takes |
+|---|---|
+| `space_look` | nothing — the three planes, every mark with its reading and the plane it lies on, every solid's op tree with step ids, names and materials, and whether a brief waits |
+| `space_pending` | nothing — the parked briefs: the key, the human's words, the contract to answer in, the brief itself |
+| `space_answer` | `key`, and either `reply` (the contract object) or `refuse` (one clause) |
+| `space_draw` | `claims`: each a shape (`rectangle`/`circle`/`triangle`/`line`/`arrow`) or raw `points`, on a named `plane` (with an optional `at` along its normal) or a view plane through `through` facing `facing` |
+| `space_propose` | `solid` (id or name) and `reply` — held on the solid, never blessed |
+| `space_say` | `text` and `about` — a sentence beside marks, said in the human's status line as it lands |
+
+### How a brief travels, and why it is a log event
+
+The plan left it open: a log event, or a side channel over the relay. **It is a
+log event — an answer on the explanation plane**, for three reasons:
+
+1. **The canvas already parks questions there.** `session.answer()` is the third
+   plane beside content and gesture — visible and erasable, never ink, never
+   joining a lasso or a signature. A brief changes no mark, stands no solid and
+   writes no version. It is a question, and this is where this engine has always
+   put questions and their answers.
+2. **The log is the source.** A side channel would be a second truth that does
+   not replay, does not undo and is not exported; the transcript would have to
+   be told about it separately. In the log, the brief and its answer *are* the
+   record.
+3. **It costs no protocol.** `LiveStore` already carries log lines between the
+   tab and the hand, and the relay keeps no truth of its own.
+
+The one thing the log cannot carry is the **pairing**, because node ids are per
+hand: they are a counter derived on replay, and two hands merging the same lines
+in a different order can number the same node differently (SURFACE-v10-PLAN D8,
+still a debt). So the pairing rides in the event's own payload, which merges
+identically everywhere — a brief is an answer whose `question` is `brief:<key>`,
+its reply is one whose `question` is `answer:<key>`, and **no id is matched
+across hands**. The hand answers about the ids it read off the brief's own node
+in its own session, never the ones the asking hand used.
+
+### The seat is a model, and that is the whole of it
+
+`runBrief` has no case for this. A seat carries an injectable `transport` — the
+same hook the e2e's stub uses, which is `participants/bridge.ts`'s pattern — and
+the hand's transport parks the question instead of posting it, returning the
+same `CompletionResult`. So the prompts are the same, `parseProposal` is the
+same, everything outside the closed vocabulary is dropped and counted the same,
+the work indicator and **Esc** work the same, and the version is held and
+attributed the same. The only difference is where the question goes.
+
+**The hand takes the front seat.** `first()` is who a brief goes to, and sitting
+down in this seat is a deliberate act that says *ask me*; with a local model
+already seated, a brief typed at the hand would otherwise go to the model.
+*Leave the seat* puts it back.
+
+**It proposes and never blesses**, holds no keys, writes no code that runs and
+cannot play anything — the canvas's hand's rules, unchanged.
+
+### When the tools are not loaded
+
+A session that started before `.mcp.json` named this server has no tools for it.
+The hand still works from the shell, exactly as `CLAUDE.md` documents for the
+canvas: run `mcp.mjs` with its stdin fed by `tail -f` on a command file and its
+stdout to an output file, append one JSON-RPC line per call, and read the reply.
+One process stays alive across turns.
+
+```bash
+mkfifo /tmp/mm3d.in 2>/dev/null; : > /tmp/mm3d.cmd
+tail -f /tmp/mm3d.cmd | node shard-3d/mcp.mjs > /tmp/mm3d.out 2>/tmp/mm3d.err &
+
+echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{}}}' >> /tmp/mm3d.cmd
+echo '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"space_pending","arguments":{}}}' >> /tmp/mm3d.cmd
+tail -c 4000 /tmp/mm3d.out
+```
+
+### What proves it
+
+- `src/room.test.ts` — two hands on a `LocalHub`: another hand's stroke arrives
+  stamped `by` and reads as its own mark, my marks are not doubled by the merge,
+  and a brief is parked, listed, answered, refused, cancelled by a signal.
+- `mcp-smoke.mjs` — the stdio half, in CI's `shard` job: a relay of its own on a
+  **free port**, a second hand in Node as the tab, and the round trip end to end.
+- `e2e.js` — five steps through the real UI: the seat takes the front, Enter
+  parks and writes nothing while it waits, the answer lands named and green, a
+  refusal writes nothing and says why, and what the hand says reaches the status
+  line.
+
+### What it does not do
+
+- **`space_propose` is held, and nothing takes it up yet.** It lands through
+  `propose()` as an attributed, unblessed rep with a sentence beside the solid.
+  Taking one up from the surface is G3's, with the parts contract. Answering a
+  brief the human actually typed — `space_answer` — is the path that lands.
+- **`space_look` reads the log, not the geometry.** It cannot import the shard's
+  TypeScript, so it reports marks, planes, readings and op trees; it does not
+  compute the form rung, the hull or the parts. G2 puts parts in the brief,
+  which is where the hand will read them.
+- **The hand cannot see.** There is no `space_see`: the canvas's hand renders
+  ink to a PNG, and the shard's marks lie on planes in space. A picture of the
+  board is the obvious next tool and is not here.
+- **Ids per hand remain a debt.** Two hands both drawing in one room can number
+  the same node differently. The brief pairing is immune by construction; a
+  `space_say` aimed at an id read from an out-of-date `space_look` is not.
 
 ## The e2e
 

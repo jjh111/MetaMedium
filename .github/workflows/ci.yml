@@ -62,6 +62,11 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+      # The hand, and the seat: MCP over stdio, a relay of its own on a free
+      # port, and a second hand in Node standing in for the tab. It needs no
+      # shard build — it runs the committed Node bundle, as the canvas's does.
+      - name: The shard's MCP hand answers over stdio
+        run: node mcp-smoke.mjs
 
   browser:
     name: the browser gate — the canvas and shard scenarios
