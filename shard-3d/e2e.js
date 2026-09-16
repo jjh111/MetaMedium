@@ -70,6 +70,30 @@
 
   const markOf = (id) => S().state().marks.find((m) => m.id === id);
 
+  // ---- UI-2: the panel's summary, read off the panel ------------------------
+  // The summary is DOM, not a hook: it is what the hand reads, and asserting on
+  // a hook's copy of it would let the two drift. Every row is `k` → `v`.
+
+  function summaryRows() {
+    const el = document.querySelector('#panel .summary');
+    if (!el) return {};
+    const out = {};
+    for (const r of el.querySelectorAll('.row')) {
+      const k = (r.querySelector('.k') || {}).textContent;
+      const v = (r.querySelector('.v') || {}).textContent;
+      if (k) out[k.trim()] = (v || '').trim();
+    }
+    return out;
+  }
+
+  /** The whole summary as one string — what stands above the fold. */
+  const summaryText = () => {
+    const el = document.querySelector('#panel .summary');
+    return el ? el.textContent.replace(/\s+/g, ' ').trim() : '';
+  };
+
+  const evidence = () => document.querySelector('#panel details.evidence');
+
   // ---- the steps -----------------------------------------------------------
 
   let rectId = null;
@@ -272,6 +296,37 @@
     assert(/extrude/.test(text), 'the panel does not name the step');
     assert(/tier 1/.test(text), 'the panel does not say which tier made it');
     return { selection: sel, panel: text.replace(/\s+/g, ' ').slice(0, 220) };
+  });
+
+  // UI-2: the panel leads with the THING, and the engine-only path never claims
+  // a model call. This box was made at tier 1 with nobody seated, so *from*
+  // must say the engine made it and must not contain the word *proposed*.
+  step('the summary leads: what it is, where it came from, what Enter does — and no model is claimed', () => {
+    const rows = summaryRows();
+    assert(Object.keys(rows).length, 'there is no summary above the evidence');
+    assert(rows.what, 'the summary does not say what is selected');
+    assert(/^box|^solid|plinth|extrude/i.test(rows.what) || rows.what.length > 0, `what said "${rows.what}"`);
+    assert(rows.from === 'made by the engine at tier 1', `from said "${rows.from}"`);
+    assert(/^↵ /.test(rows.next || ''), `next said "${rows.next}"`);
+    assert(/→/.test(rows.becomes || ''), `becomes said "${rows.becomes}"`);
+    // The bug in one line: *proposed* is a claim about a call that was made.
+    // Saying no model was asked is the opposite claim, and it is the true one.
+    assert(!/proposed/i.test(summaryText()), `the engine-only path claims a proposal: "${summaryText()}"`);
+    assert(/no model was asked/.test(summaryText()), 'it does not say the canvas answered by itself');
+
+    // …and the evidence is all still here, one disclosure down and shut.
+    const ev = evidence();
+    assert(ev, 'there is no evidence disclosure');
+    assert(ev.open === false, 'the evidence is open by default — the first screenful is telemetry again');
+    assert(/why \/ measurements/i.test(ev.querySelector('summary').textContent), 'the disclosure is not named');
+    const body = ev.querySelector('.evidenceBody').textContent;
+    for (const word of ['plane', 'reading', 'measured', 'extent', 'solid']) {
+      assert(new RegExp(word, 'i').test(body), `the evidence lost its ${word} row`);
+    }
+    // The summary comes FIRST in the panel, not after a screenful of numbers.
+    const panel = S().panelText();
+    assert(panel.indexOf(rows.what) < panel.indexOf('points'), 'the mark telemetry still stands above the summary');
+    return { rows, evidenceOpen: ev.open, evidenceChars: body.length };
   });
 
   step('the ink is still on the board, on the face', () => {
@@ -1283,6 +1338,22 @@
     return { sentence: h.sentence, per: h.per.map((p) => `${p.view} ${(p.coverage * 100).toFixed(0)}`) };
   });
 
+  // UI-2: a version a MODEL wrote and the hand has not taken says exactly that
+  // — and it is the only state that may say *proposed*.
+  step('the summary says the version is a model’s proposal, held', () => {
+    S().select(castleId);
+    const rows = summaryRows();
+    assert(rows.from === 'proposed by e2e-stub, held', `from said "${rows.from}"`);
+    assert(/a solid → a definition/.test(rows.becomes || ''), `becomes said "${rows.becomes}"`);
+    // The version row in the evidence says the same thing, against the id.
+    const body = evidence().querySelector('.evidenceBody').textContent;
+    assert(/held · e2e-stub/.test(body.replace(/\s+/g, ' ')), 'the version row does not name the model');
+    // …and the honours row is per CLAIM now, each naming the kind it is
+    // (GRAPH-1's data, said out loud) rather than one sentence of the panel's.
+    assert(/drawn here/.test(body), 'the honours rows do not say which kind of claim each is');
+    return { rows, version: body.replace(/\s+/g, ' ').match(/version[^·]*· [^ ]+/)?.[0] ?? '' };
+  });
+
   step('*Take it* names the thing castle, and holds turret and top as definitions', () => {
     const take = S().fieldRead('Take it');
     assert(take.enabled, `Take it was not offered: "${take.line}"`);
@@ -1305,6 +1376,18 @@
     // …and each of them carries the outlines it would be recognised by.
     for (const d of defs) assert(d.profiles.length > 0, `${d.name} carries no profile to be recognised by`);
     return { name: solid.name, definitions: defs.map((d) => `${d.name} ← ${d.basedOn}`) };
+  });
+
+  // UI-2: taken is the hand's own act, and the row says so — while still
+  // naming who wrote the version, because that has not stopped being true.
+  step('the summary says the hand took it, and still names who wrote it', () => {
+    const rows = summaryRows();
+    assert(rows.what === 'castle', `what said "${rows.what}"`);
+    assert(rows.from === 'taken by you', `from said "${rows.from}"`);
+    assert(/a definition → placed again/.test(rows.becomes || ''), `becomes said "${rows.becomes}"`);
+    const why = summaryText();
+    assert(/e2e-stub wrote the version/.test(why), `the reason does not name the author: "${why}"`);
+    return { rows };
   });
 
   step('*make the turrets taller* regens those steps alone; every other id is unchanged', async () => {
@@ -1518,6 +1601,24 @@
     assert(first.steps.length === 1 && first.steps[0].op === 'extrude', 'the original tree changed');
     assert(/placed from box/.test(S().panelText()), 'the panel does not say where it came from');
     return { placed: placed.id, top: +hit.y.toFixed(3), steps: placed.steps.map((s) => s.op), status: S().state().status };
+  });
+
+  // UI-2's verified bug, on the path that exposed it: a placement is made by
+  // the ENGINE — a `place` step, tier 1 arithmetic on two outlines — and the
+  // panel used to print *a model proposed it* over that. It says where the
+  // thing came from now, and it separates THIS operation's author from the
+  // ancestry of the definition it reused. Here that ancestry is the engine's
+  // own: the box was made at tier 1 and the hand took it.
+  step('the placed box says it was placed, from a definition the engine made and you took', () => {
+    const rows = summaryRows();
+    assert(rows.what === 'box', `what said "${rows.what}"`);
+    assert(rows.from === 'placed from box, a definition the engine made and you took', `from said "${rows.from}"`);
+    assert(/a placement of box → a thing of its own/.test(rows.becomes || ''), `becomes said "${rows.becomes}"`);
+    const why = summaryText();
+    assert(/tier 1, and no model was asked for it/.test(why), `the reason does not say whose act it is: "${why}"`);
+    assert(/the ancestry named is the DEFINITION's/.test(why), 'the two authorships are not told apart');
+    assert(!/proposed/.test(why), `an engine-placed body claims a proposal: "${why}"`);
+    return { rows };
   });
 
   step('undo takes the placement off and leaves both inks', () => {
@@ -1761,6 +1862,22 @@
     assert(/could not be read/.test(panel), `the panel said "${panel.replace(/\s+/g, ' ').slice(0, 200)}"`);
     assert(/profile is missing/.test(panel), 'the panel does not carry the validator\'s reason');
     assert(/still in the log/.test(panel), 'the panel does not say the code is recoverable');
+
+    // UI-2: and the FIELD says the same thing. *Extrude* and *Cut a hole* used
+    // to stand enabled over a body with no steps — verbs about a tree, offered
+    // over a tree that could not be read. Two pills are afforded here and no
+    // others, and every other one carries the reason rather than nothing.
+    const brokenRows = summaryRows();
+    assert(brokenRows.broken === 'this tree could not be read', `the summary said "${brokenRows.broken}"`);
+    for (const verb of ['Extrude', 'Revolve', 'Cut a hole', 'Raise a boss', 'Mirror', 'Dup', 'Take it']) {
+      const r = S().fieldRead(verb);
+      assert(!r.enabled, `${verb} is still offered on a tree that could not be read`);
+      assert(/this tree could not be read/.test(r.line), `${verb} says "${r.line}"`);
+    }
+    for (const verb of ['Remove', 'Undo']) {
+      const r = S().fieldRead(verb);
+      assert(r.enabled, `${verb} is not offered on a broken solid: "${r.line}"`);
+    }
 
     // …and the other solid still selects, and still says what it is.
     S().select(goodId);
@@ -2057,6 +2174,47 @@
       panel: S().panelText().replace(/\s+/g, ' ').match(/place[^·]*·[^·]*/)?.[0] ?? '',
       status: S().state().status,
     };
+  });
+
+  // UI-2, the case the review reproduced: an engine-placed mug read `held ·
+  // the engine` and then claimed *a model proposed it*. The mug's definition
+  // DOES have a model in its ancestry — e2e-stub wrote the version with the
+  // handle in it, and the hand took that — so the row has to tell the two
+  // apart: the engine placed this one, and the definition is the model's work
+  // the hand accepted.
+  demo('6c2 · the placed mug’s summary: its name and its reuse provenance, above the fold', () => {
+    const rows = summaryRows();
+    assert(rows.what === 'mug', `what said "${rows.what}"`);
+    assert(
+      rows.from === 'placed from mug, a definition e2e-stub proposed and you took',
+      `from said "${rows.from}"`
+    );
+    assert(/^↵ /.test(rows.next || ''), `next said "${rows.next}"`);
+    assert(/a placement of mug → a thing of its own/.test(rows.becomes || ''), `becomes said "${rows.becomes}"`);
+
+    // Above the fold: the summary stands before the evidence, and the evidence
+    // is shut. Nothing was discarded — every row that used to lead is in it.
+    const panel = S().panelText();
+    assert(panel.indexOf('mug') < panel.indexOf('why / measurements'), 'the summary is not first');
+    const ev = evidence();
+    assert(ev && ev.open === false, 'the evidence is not behind a shut disclosure');
+    const body = ev.querySelector('.evidenceBody').textContent;
+    assert(/placed from mug/.test(body), 'the step reasoning left the evidence');
+    assert(/honours/.test(body), 'the honours rows left the evidence');
+
+    // The reading line and the panel say the same thing about the same verb —
+    // one sentence, one place, read at the same moment. They drifted while the
+    // panel was only re-read where an act happened: choosing a plane re-read
+    // the field and not the panel, and the two then disagreed about which
+    // plane a mirror would use.
+    // Only when the panel is naming an OFFER (↵): a blocked leading row is the
+    // panel saying what it would take, which the field shows as a dimmed pill.
+    const line = S().fieldRead('').line;
+    if (/^↵ /.test(rows.next || '')) {
+      const verb = rows.next.replace(/^↵ /, '').replace(/ · asks a model$/, '');
+      assert(line.indexOf(verb) === 2, `the panel says "${rows.next}" and the field says "${line}"`);
+    }
+    return { rows, evidenceOpen: ev.open, field: line };
   });
 
   demo('6d · the placed mug’s row answers about THIS mug, not the first one', () => {

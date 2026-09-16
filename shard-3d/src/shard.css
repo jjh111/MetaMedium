@@ -162,6 +162,42 @@ html, body {
 .sep { height: 1px; background: var(--rule-soft); margin: var(--s2) 0; }
 .empty { color: var(--ink-4); }
 
+/* ---- UI-2: the summary, and the evidence behind a disclosure -------------
+   The first screenful is the THING, not its telemetry: what this is, what it
+   could be, where it came from, what the next act does, what it becomes. Its
+   rows carry sentences rather than numbers, so the value is left-aligned and
+   wraps under a fixed label column — the right-aligned, tabular value of an
+   ordinary row is for measurements, and these are not measurements. */
+.summary .row { align-items: baseline; }
+.summary .row .k { flex: 0 0 62px; }
+.summary .row .v {
+  flex: 1;
+  text-align: left;
+  font-variant-numeric: normal;
+  overflow-wrap: anywhere;
+}
+/* *what* is the name of the thing, and it reads as one. The eyebrow is always
+   the first child of the summary, so the first row after it is *what*. */
+.summary > .row:nth-child(2) .v { font-weight: 600; }
+
+/* Nothing is discarded — the plane and its candidates, the readings' reasons,
+   the op tree, the diff, the maths and the fingerprint are all one disclosure
+   away, and the disclosure is remembered per device. */
+details.evidence > summary {
+  cursor: pointer;
+  list-style: none;
+  color: var(--ink-3);
+  font-size: var(--t-micro);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: var(--s1) 0;
+}
+details.evidence > summary::-webkit-details-marker { display: none; }
+details.evidence > summary::after { content: ' ▾'; }
+details.evidence[open] > summary::after { content: ' ▴'; }
+details.evidence > summary:hover { color: var(--teal); }
+details.evidence > summary:focus-visible { outline: 1px solid var(--teal); outline-offset: 2px; }
+
 /* ---- the field: one input, one reader, the verbs it affords -------------- */
 /* At the foot of the panel for now, not at the pen tip (§7 wants the tip; the
    tip needs the selection's screen position, which is P1's). The READER is the
@@ -232,7 +268,17 @@ html, body {
 }
 
 @media (max-width: 720px) {
-  #panel { width: 100%; max-height: 32vh; border-left: 0; }
+  /* UI-2: 32vh was set when the panel opened on measurements, where a cut-off
+     row costs a number you can scroll to. It now opens on the summary, and a
+     summary whose last row is below the fold is the fault this package exists
+     to fix — at 390 × 844 *becomes* fell 24px short. It takes as much as it
+     needs up to 48vh, and never more than the room above the field, which is
+     measured rather than guessed. The canvas keeps the strip between them. */
+  #panel {
+    width: 100%;
+    max-height: min(48vh, calc(100vh - 40px - 30px - var(--field-h, 190px) - 6px));
+    border-left: 0;
+  }
   #field { width: 100%; border-left: 0; }
   /* The panel and the field both take the whole width on a phone, so the
      compass sits in the strip between them — above the field, whose height is

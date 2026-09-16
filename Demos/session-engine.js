@@ -4202,6 +4202,22 @@
 
     const node = id && s.nodes.get(id);
     if (!node) {
+      // UI-2: on an EMPTY board the panel used to say "nothing here yet" — true,
+      // and no help at all, while the one thing a first-time hand needs (what
+      // to do) sat in the status line. So the panel shows the loop that already
+      // exists, in its own plain voice, in the place it will report the answer.
+      // It is not a tour and not a mode: it is the empty state of one row, and
+      // the first mark drawn replaces it with that mark's reading.
+      if (!s.contentIds.length && !s.artifacts.length) {
+        inspectorEl.innerHTML = '<div class="eyebrow">nothing drawn yet</div>' +
+          '<ol class="firstLoop">' +
+          '<li><b>draw a few marks</b> — a box, a circle, a line</li>' +
+          '<li><b>press and hold one</b> — it is held with what it sits with</li>' +
+          '<li><b>choose what it becomes</b> — tap a pill, or type in the field</li>' +
+          '</ol>' +
+          '<div class="why">the canvas reads every mark as you draw it; a model is asked only when you ask one</div>';
+        return;
+      }
       inspectorEl.innerHTML = '<div class="eyebrow">mark</div>' +
         '<div class="empty">nothing here yet</div>';
       return;

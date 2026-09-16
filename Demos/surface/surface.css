@@ -272,6 +272,13 @@ body.panelHidden #inspector { display: none; }
 #inspector .acts { display: flex; gap: 6px; flex-wrap: wrap; margin: 4px 0 2px; }
 #inspector .acts button.mini { margin-left: 0; }
 #inspector .empty { color: var(--dim); font-family: var(--ui); font-size: 12px; }
+/* UI-2: the empty board's own row — the loop that already exists, in the
+   panel's plain voice. No box, no accent, no call to action: it reads as the
+   panel reporting on a board with nothing on it, and the first mark replaces
+   it with that mark's reading. */
+#inspector .firstLoop { margin: 2px 0 6px; padding: 0 0 0 16px; color: var(--dim); font-size: 12px; line-height: 1.55; }
+#inspector .firstLoop li { margin: 0 0 3px; }
+#inspector .firstLoop b { color: var(--ink); font-weight: 500; }
 #inspector .srccount { color: var(--dim); font-weight: 400; letter-spacing: 0; }
 #inspector .gap { margin: 6px 0 4px; padding: 5px 7px; font-size: 10.5px; line-height: 1.4; color: var(--gold); border-left: 2px solid var(--gold); background: rgba(var(--gold-rgb), 0.07); }
 #inspector .srchead { display: flex; justify-content: space-between; align-items: baseline; margin: 8px 0 2px; padding-bottom: 2px; border-bottom: 1px solid var(--edge); }
