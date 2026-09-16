@@ -448,9 +448,9 @@ describe('the gate: off-axis ink is conserved', () => {
     expect(ranked(steep, look, path.map(steep.project))[0].plane.source).toBe('face');
 
     // Sixty degrees off it — a face you are looking ACROSS, from a corner where
-    // no world plane is square to the eye either. The ink still lands where the
-    // hand pointed, because the view plane stands at the face's own depth; it
-    // simply is not stretched across the face to get there.
+    // no world plane is square to the eye either. The ink still lands at the
+    // face's own depth here, because the CURSOR was put on that face (shift +
+    // click, `cursor.ts`); it simply is not stretched across it to get there.
     const across = camera(v3(6, 5, 6.5), v3(0, 0, 0));
     expect(facingOf(across, topFace.normal)).toBeCloseTo(0.5, 1);
     const oblique = scopeOf(across, {
@@ -461,7 +461,7 @@ describe('the gate: off-axis ink is conserved', () => {
     });
     const picked = pickAtPenDown(oblique, candidatesFor(oblique));
     expect(picked.plane.source).toBe('view');
-    expect(picked.plane.origin.y).toBe(TOP); // the face's own depth, not the ground
+    expect(picked.plane.origin.y).toBe(TOP); // the cursor, put on that face
 
     const out = ranked(across, oblique, path.map(across.project));
     expect(out[0].plane.source).toBe('view');
@@ -469,6 +469,92 @@ describe('the gate: off-axis ink is conserved', () => {
     expect(face.gated).toBe(true);
     // …and the chip offers it, so a hand that meant the face is one tap away.
     expect(chipTextFor(out)).toMatch(/^view 0\.\d\d · top of artifact:7 0\.\d\d$/);
+  });
+});
+
+// ===========================================================================
+// THE CURSOR (16 September 2026)
+//
+// John, with two Blender screenshots: *"The mapping of drawing in non-standard
+// axes should behave like Blender does."* Blender's Annotation tool with
+// **Placement: 3D Cursor** puts the stroke on the plane through the 3D cursor
+// facing the camera at that moment. So the view plane passes through the
+// cursor, always — `viewAnchor` IS the cursor, and the heuristic it replaces
+// (the depth of the thing under the pen, else the last thing touched, else the
+// origin) is gone.
+//
+// A face under the pen that passes the facing gate still wins outright: that
+// is Blender's *Surface* placement, and P2/P3 need it.
+
+describe('the view plane passes through the cursor', () => {
+  it('stands at the cursor whatever is under the pen', () => {
+    // A face under the pen, and the cursor somewhere else entirely. The view
+    // candidate does NOT follow the face: the hand said where, and that is
+    // the whole of the rule.
+    const elsewhere = v3(-5, 1.25, 3);
+    const scope = scopeOf(steep, {
+      faces: [topFace],
+      pen: steep.project(v3(0, TOP, 0)),
+      viewAnchor: elsewhere,
+      viewAnchorWhy: 'through the cursor',
+    });
+    const view = candidatesFor(scope).find((c) => c.plane.source === 'view')!;
+    expect(view.plane.origin).toEqual(elsewhere);
+    // …and it is screen-facing, which is what conserves the shape.
+    expect(Math.abs(dot(normalize(view.plane.normal), normalize(steep.look)))).toBeCloseTo(1, 6);
+    expect(view.reasoning).toMatch(/through the cursor/);
+  });
+
+  it('moves with the cursor: the same screen path lands at the cursor’s own depth', () => {
+    // Nothing under the pen at all. The only thing that decides where the ink
+    // ends up in the world is where the cursor is — near the camera it is a
+    // small circle close by, far from it a large one far away, and the SHAPE
+    // is the same either way (a similarity transform: §3's conservation).
+    const path = screenCircle(120, -40, 90);
+    const near = scopeOf(overhead, { viewAnchor: v3(0, 0, 8), viewAnchorWhy: 'through the cursor' });
+    const far = scopeOf(overhead, { viewAnchor: v3(0, 0, -8), viewAnchorWhy: 'through the cursor' });
+
+    const nearView = candidatesFor(near).find((c) => c.plane.source === 'view')!;
+    const farView = candidatesFor(far).find((c) => c.plane.source === 'view')!;
+    expect(nearView.plane.origin).toEqual(v3(0, 0, 8));
+    expect(farView.plane.origin).toEqual(v3(0, 0, -8));
+
+    const a = projectOnto(nearView.plane, path, overhead.ray)!;
+    const b = projectOnto(farView.plane, path, overhead.ray)!;
+    // Further away, the same screen circle is a bigger circle in the world.
+    expect(sizeOfPoints(b)).toBeGreaterThan(sizeOfPoints(a) * 1.1);
+    // …and it is still a circle, at both depths, to within a percent.
+    expect(aspectOf(a)).toBeCloseTo(1, 2);
+    expect(aspectOf(b)).toBeCloseTo(1, 2);
+  });
+
+  it('picks the view plane through the cursor when nothing is chosen and nothing is under the pen', () => {
+    const scope = scopeOf(overhead, { viewAnchor: v3(2, 3, -1), viewAnchorWhy: 'through the cursor' });
+    const picked = pickAtPenDown(scope, candidatesFor(scope));
+    expect(picked.plane.source).toBe('view');
+    expect(picked.plane.origin).toEqual(v3(2, 3, -1));
+  });
+
+  it('still lets a face under the pen win when it passes the gate — Blender’s *Surface* placement', () => {
+    // The cursor is far away and has nothing to do with this stroke. A face
+    // the camera can actually read is still the answer: the cursor is the
+    // DEFAULT's home, not a veto on the evidence.
+    const path = worldLoop([v3(-1, TOP, -1), v3(1, TOP, -1), v3(1, TOP, 1), v3(-1, TOP, 1)]);
+    const scope = scopeOf(steep, {
+      faces: [topFace],
+      pen: steep.project(v3(0, TOP, 0)),
+      viewAnchor: v3(-9, 0.5, 6),
+      viewAnchorWhy: 'through the cursor',
+    });
+    expect(facingOf(steep, topFace.normal)).toBeGreaterThan(FACING_TAKES);
+    expect(pickAtPenDown(scope, candidatesFor(scope)).plane.source).toBe('face');
+
+    const out = ranked(steep, scope, path.map(steep.project));
+    expect(out[0].plane.source).toBe('face');
+    expect(out[0].gated).toBe(false);
+    // The view plane is scored and beaten on the evidence, not held off.
+    const view = out.find((c) => c.plane.source === 'view')!;
+    expect(out[0].confidence).toBeGreaterThan(view.confidence);
   });
 });
 

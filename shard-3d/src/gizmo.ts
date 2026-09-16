@@ -1,16 +1,24 @@
 // ===== gizmo =====
-// "The plane is chosen by the hand, read otherwise" (§3). Three axes at the
-// world origin, a square tile at each corner where two axes meet — foundation
+// "The plane is chosen by the hand, read otherwise" (§3). Three axes at **the
+// cursor**, a square tile at each corner where two axes meet — foundation
 // (XZ), height (XY), width (YZ) — and a handle on the chosen tile's normal
 // that slides the plane along it. Tapping the centre un-chooses.
 //
 // The tile is the mitigation for §10's first risk: drawing on a scene with a
 // mouse is hard, and a chosen plane is the hand saying where, not the engine
 // guessing.
+//
+// **The picker's origin IS the cursor** (16 September 2026, Blender's 3D
+// Cursor placement — `cursor.ts`). It stood at the world origin and could
+// slide; now shift + click puts it somewhere, the whole picker moves there,
+// and the planes it hands out pass through it. The slide is unchanged: it
+// offsets the chosen plane along its own normal, from the cursor rather than
+// from the world origin. With the cursor at the origin — where it starts —
+// every plane this hands out is exactly the plane it handed out before.
 
 import * as THREE from 'three';
 import type { Colours } from './theme';
-import { NAMED, PLANE_NAMES, slide, type Plane, type PlaneName } from './plane';
+import { NAMED, PLANE_NAMES, slide, sub, v3, type Plane, type PlaneName, type Vec3 } from './plane';
 
 const ARM = 3.2; // how far the axes reach
 const TILE = 1.5; // the square at each corner
@@ -20,9 +28,17 @@ export interface Gizmo {
   group: THREE.Group;
   chosen: PlaneName | null;
   offset: number;
-  /** The chosen plane as it stands, slid; null when nothing is chosen. */
+  /**
+   * The cursor: where the whole picker stands, and where the planes it hands
+   * out pass through. Starts at the world origin; shift + click moves it
+   * (`cursor.ts`). Runtime, never a log event.
+   */
+  origin: Vec3;
+  /** The chosen plane as it stands, through the cursor and slid; null when nothing is chosen. */
   plane(): Plane | null;
   choose(name: PlaneName | null): void;
+  /** Put the cursor here. The picker moves with it. */
+  setOrigin(at: Vec3): void;
   /** Objects a pointer may hit: tiles, the centre, the slide handle. */
   pickables(): THREE.Object3D[];
   /** What a hit object means, or null when it is not the gizmo's. */
@@ -119,14 +135,22 @@ export function createGizmo(colours: Colours): Gizmo {
     group,
     chosen: 'foundation',
     offset: 0,
+    origin: v3(0, 0, 0),
     plane() {
       if (!g.chosen) return null;
-      const p = NAMED[g.chosen]('chosen', `the ${g.chosen} tile was held when the pen went down`);
+      const named = NAMED[g.chosen]('chosen', `the ${g.chosen} tile was held when the pen went down`);
+      // Through the cursor. At the world origin — where the cursor starts —
+      // this is the plane `NAMED` already returned, unchanged.
+      const p: Plane = { ...named, origin: g.origin };
       return g.offset ? slide(p, g.offset) : p;
     },
     choose(name) {
       g.chosen = name;
       if (!name) g.offset = 0;
+      g.refresh();
+    },
+    setOrigin(at) {
+      g.origin = at;
       g.refresh();
     },
     pickables() {
@@ -164,18 +188,25 @@ export function createGizmo(colours: Colours): Gizmo {
     },
     refresh() {
       const plane = g.plane();
+      // The whole picker stands AT THE CURSOR, so everything inside it is
+      // placed in the picker's own space and the cursor is one number in one
+      // place. What is left over — the chosen plane's origin minus the cursor
+      // — is exactly the slide, which is the only thing that moves a tile off
+      // the others.
+      group.position.set(g.origin.x, g.origin.y, g.origin.z);
+      const slid = plane ? sub(plane.origin, g.origin) : v3(0, 0, 0);
       // Every tile, and the whole gizmo, rides the chosen plane's slide, so
       // the hand can see where the ink will land.
       tiles.forEach(({ face, edge }, name) => {
         const p = TILE_PLACEMENT[name];
         const on = plane && name === g.chosen;
-        const o = on ? plane.origin : { x: 0, y: 0, z: 0 };
+        const o = on ? slid : v3(0, 0, 0);
         face.position.set(p.pos[0] + o.x, p.pos[1] + o.y, p.pos[2] + o.z);
         edge.position.copy(face.position);
       });
       if (plane) {
         const n = new THREE.Vector3(plane.normal.x, plane.normal.y, plane.normal.z).normalize();
-        const base = new THREE.Vector3(plane.origin.x, plane.origin.y, plane.origin.z);
+        const base = new THREE.Vector3(slid.x, slid.y, slid.z);
         const at = base.clone().add(n.clone().multiplyScalar(1.5));
         handle.position.copy(at);
         handle.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), n);
