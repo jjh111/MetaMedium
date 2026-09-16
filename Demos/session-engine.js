@@ -3686,7 +3686,7 @@
     // slide past it when there is room, never when that would push the field
     // off the screen (which is what an unconditional nudge did on a phone).
     const p = o.panel;
-    if (p && hand !== 'left' && x < p.right + FIELD_M && x + w > p.left && y < p.bottom && y + h > p.top
+    if (p && o.hand !== 'left' && x < p.right + FIELD_M && x + w > p.left && y < p.bottom && y + h > p.top
         && p.right + FIELD_M + w <= u.right - FIELD_M) x = p.right + FIELD_M;
     x = fitSpan(x, w, { lo: u.left + FIELD_M, hi: u.right - FIELD_M }, { lo: v.left + FIELD_M, hi: v.right - FIELD_M });
     y = fitSpan(y, h, { lo: u.top + FIELD_M, hi: u.bottom - FIELD_M }, { lo: v.top + FIELD_TOP, hi: v.bottom - FIELD_M });
