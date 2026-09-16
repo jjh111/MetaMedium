@@ -125,19 +125,16 @@ there is no bundle to drift.
    them, and the runner-up stands beside the mark as a **chip**. Tap it and the
    ink is read onto that plane instead — one act, and one undo puts it back.
    The ink never moves on screen; only which plane it is taken to lie on.
-3. **Move the eye.** **Orbit** with the right button, a drag on the **compass**
-   in the top-right corner, or a drag with `Space` held — around the centre of
-   the view, where a pan left it, or around the selection when there is one.
-   **Pan** with the
-   middle button, `Shift` + the right button, or two fingers. The wheel or a
-   pinch **dollies toward the pointer**, not toward the middle of the screen.
-   Tap a ball on the compass to look along that axis (and again to flip to the
-   other side); *home* frames everything; the *view* tile is persp / ortho; the
-   pinned views are chips under it. `1` `2` `3` choose a PLANE and `0`
-   un-chooses; the camera's own keys are on the numpad — `1` front, `3` right,
-   `7` top, `5` persp/ortho, `9` the opposite side — or `Shift` + those digits,
-   with `Ctrl`/`Cmd` for the far side and `f` / `Home` to frame.
-   `Cmd/Ctrl+Z` undoes.
+3. **Move the eye.** **Orbit** right-drag, a drag on the **compass** in the
+   top-right corner, or `Space`+drag — about the view's centre, where a pan
+   left it, or about the selection. **Pan** middle-drag, `Shift`+right-drag,
+   two fingers. **Dolly** wheel or pinch, toward the pointer. Tap a ball to
+   look along that axis, again to flip; *home* frames everything; *view* is
+   persp / ortho; the pinned views are chips under it. `1` `2` `3` choose a
+   PLANE, `0` un-chooses; the camera's keys are the numpad — `1` front, `3`
+   right, `7` top, `5` persp/ortho, `9` the far side — or `Shift` + those
+   digits, `Ctrl`/`Cmd` for the far side, `f` / `Home` to frame. `Cmd/Ctrl+Z`
+   undoes.
 4. **Read it.** Hover a mark; the panel says *mark*, *plane*, *reading*,
    *plays*, *maths*, *measured*, and the status line says the one sentence.
 5. **Stand it up.** A closed shape on a chosen plane is a **profile**. A line
@@ -877,29 +874,29 @@ ortho re-projects correctly minutes later, which is what the flip chip needs.
 
 ### The keys, and why they are where they are
 
-`1` `2` `3` `0` were already the plane picker's, and they stay the plane
-picker's: a plane is chosen far more often than a camera is snapped, and the
-older binding wins. So the camera takes the **numpad**, exactly where Blender
-has it, and `Shift` + the same digits for a keyboard without one:
+`1` `2` `3` `0` were the plane picker's and stay the plane picker's: a plane is
+chosen far more often than a camera is snapped, and the older binding wins. So
+the camera takes the **numpad**, where Blender has it, and `Shift` + the same
+digits for a keyboard without one:
 
 | Key | What |
 |---|---|
 | `1` `2` `3` | choose the foundation / height / width **plane** (unchanged) |
 | `0` | un-choose — from here the plane is read |
 | numpad `1` / `3` / `7`, or `Shift`+`1` / `3` / `7` | front / right / top |
-| `Ctrl`/`Cmd` + either | the opposite side — back / left / bottom |
+| `Ctrl`/`Cmd` + either | the far side — back / left / bottom |
 | numpad `5`, or `Shift`+`5` | persp / ortho |
-| numpad `9`, or `Shift`+`9` | flip to the opposite side of the view you are at |
+| numpad `9`, or `Shift`+`9` | flip to the far side of the view you are at |
 | `f`, `Home` | frame everything |
-| right-drag, `Space`+drag, drag on the compass | orbit |
+| right-drag, `Space`+drag, drag on the compass | orbit, about the view's centre or the selection |
 | middle-drag, `Shift`+right-drag, two fingers | pan |
 | wheel, pinch | dolly, toward the pointer |
 | `Cmd/Ctrl`+`Z` | undo |
 
-**Two fingers now pan and pinch rather than orbit.** They orbited in P0, and
-the compass is what makes the change payable: there is now a place to orbit
-from with one finger that is chrome rather than canvas, and on a touch screen a
-two-finger drag is the gesture a hand already has for a map. One finger still
+**Two fingers pan and pinch rather than orbit.** They orbited in P0; the
+compass is what makes the change payable, since there is now a place to orbit
+from with one finger that is chrome rather than canvas, and on a touch screen
+two fingers are the gesture a hand already has for a map. One finger still
 draws, which is the rule nothing may break.
 
 ### Orbit around the centre of the view

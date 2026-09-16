@@ -1448,7 +1448,7 @@ function report() {
   renderField();
   chips.place();
   nav.sync();
-  tile(undoTile, 'undo', n ? String(n) : '', { why: 'drop the last act — the solid if one stands, else the last stroke' });
+  tile(undoTile, 'undo', n ? String(n) : '', { why: 'drop the last act · the solid if one stands, else the stroke' });
   tile(themeTile, 'theme', theme === 'system' ? `sys · ${effectiveTheme(theme)}` : theme, {
     why: 'light and dark are the same tokens inverted',
   });
@@ -1461,7 +1461,7 @@ function report() {
     on: models.isOpen() || busy > 0,
     why: seats.length
       ? `${seats.map((m) => `${m.name} (tier 2 · ${m.locality})`).join(', ')} — asked only on Enter over a brief, or a regen`
-      : 'no model has joined; a brief typed in the field opens this pane',
+      : 'no model joined · a brief in the field opens this pane',
   });
   work.place();
   // The standing line is the next move, keyed to what the board is.
@@ -1470,21 +1470,21 @@ function report() {
   panel.stand(
     !n
       ? gizmo.chosen
-        ? `the ${gizmo.chosen} is chosen — draw a closed shape on it`
-        : 'nothing chosen — draw anywhere and the plane is read from what you draw'
+        ? `${gizmo.chosen} chosen · draw a closed shape on it`
+        : 'nothing chosen · draw anywhere, the plane is read'
       : afford.length
-        ? `${afford[0].kind === 'extrude' ? 'a profile with an extent' : 'a profile with an axis'} — the field will ${afford[0].kind} it`
+        ? `a profile with an ${afford[0].kind === 'extrude' ? 'extent' : 'axis'} · ↵ ${afford[0].kind}`
         : log.massable()
-          ? `${log.massable()!.profileIds.length} profiles on ${log.massable()!.planes.length} planes — the massing stands as you draw`
+          ? `${log.massable()!.profileIds.length} profiles on ${log.massable()!.planes.length} planes · the massing stands as you draw`
         : made.length && log.versionOf(made[0].id) && !log.versionOf(made[0].id)!.taken && log.namesInPlay().length
-          ? `a version is standing, held — ↵ Take it to name ${made[0].name === 'massing' ? 'it' : made[0].name} and hold its parts as definitions`
+          ? `a version is held · ↵ Take it to name ${made[0].name === 'massing' ? 'it' : made[0].name}, its parts become definitions`
         : log.definitions().length
           // Taken: the names are the next move. *make the turrets taller*,
           // *the tops are red*, or the name on its own.
-          ? `${made[0].name} · ${log.definitions().map((d) => d.name).join(', ')} ${log.definitions().length === 1 ? 'is a definition' : 'are definitions'} — type a name, or say what to do to one`
+          ? `${made[0].name} · ${log.definitions().length === 1 ? 'definition' : 'definitions'}: ${log.definitions().map((d) => d.name).join(', ')} — type one, or say what to do to it`
         : made.length && models.first()
           ? `${made.length} solid${made.length === 1 ? '' : 's'} · type what this is and ${models.first()!.name} fills the massing`
-        : `${n} mark${n === 1 ? '' : 's'}${made.length ? ` · ${made.length} solid${made.length === 1 ? '' : 's'}` : ''} · ${gizmo.chosen ? describePlane(plane) : 'the plane is read from what you draw'}${gizmo.offset ? ` at ${gizmo.offset.toFixed(2)}` : ''} · draw a line off a profile's edge to stand it up`
+        : `${n} mark${n === 1 ? '' : 's'}${made.length ? ` · ${made.length} solid${made.length === 1 ? '' : 's'}` : ''} · ${gizmo.chosen ? describePlane(plane) : 'the plane is read'}${gizmo.offset ? ` at ${gizmo.offset.toFixed(2)}` : ''} · a line off a profile's edge stands it up`
   );
   // UI-2: the panel's summary says what the next deliberate act will do, and
   // that is the same sentence the field is showing — so it has to be read at
@@ -1502,8 +1502,8 @@ function choose(name: PlaneName | null) {
   nav.sync(); // the picker's tile and the compass's ball say the same thing
   panel.say(
     name
-      ? `the ${name} plane is chosen — ink lands ${whereOn(name)}`
-      : 'nothing chosen — from here the plane is read from the evidence, and the panel says which and why'
+      ? `${name} chosen · ink lands ${whereOn(name)}`
+      : 'nothing chosen · the plane is read from the evidence, and the panel says why'
   );
   report();
 }
@@ -1566,7 +1566,7 @@ window.addEventListener('keydown', (e) => {
     e.preventDefault();
     const at = nav.facing();
     if (at) nav.tap(at); // a tap on the ball you are already at is the flip
-    else panel.say('the camera is not on an axis — tap a ball, or shift + 1 / 3 / 7');
+    else panel.say('not on an axis · tap a ball, or shift + 1 / 3 / 7');
     return;
   }
   if (e.key === 'Home' || (e.key.toLowerCase() === 'f' && !e.metaKey && !e.ctrlKey)) {

@@ -78,7 +78,7 @@ export function createNav(o: NavOptions): NavGizmo {
   svg.setAttribute('viewBox', '-50 -50 100 100');
   svg.setAttribute('class', 'compass');
   svg.setAttribute('role', 'group');
-  svg.setAttribute('aria-label', 'navigation gizmo — tap an axis to look along it, drag to orbit');
+  svg.setAttribute('aria-label', 'compass — tap a ball for that view, drag to orbit');
   host.appendChild(svg);
 
   const tiles = document.createElement('div');
@@ -114,7 +114,7 @@ export function createNav(o: NavOptions): NavGizmo {
     t.setAttribute('text-anchor', 'middle');
     t.setAttribute('dominant-baseline', 'central');
     const title = document.createElementNS(SVG, 'title');
-    title.textContent = `${view} — look along this axis (tap again for ${opposite(view)})`;
+    title.textContent = `${view} · tap again for ${opposite(view)}`;
     g.append(line, c, t, title);
     svg.appendChild(g);
     arms.set(view, line);
@@ -173,14 +173,14 @@ export function createNav(o: NavOptions): NavGizmo {
     const chosen = o.chosen();
     const lens = space.projection() === 'ortho' ? ' · ortho' : '';
     if (chosen && tooOblique(chosen, lookOf(view))) {
-      o.say(`${view}${lens} — the ${chosen} plane is edge-on from here, so choose another or orbit`);
+      o.say(`${view}${lens} · ${chosen} is edge-on here — choose another, or orbit`);
       return;
     }
     if (chosen && planeFacedBy(view) === chosen) {
-      o.say(`${view}${lens} — the ${chosen} plane is flat on, which is where a plan is drawn`);
+      o.say(`${view}${lens} · ${chosen} flat on — where a plan is drawn`);
       return;
     }
-    o.say(`${view}${lens} — ${describeLens()}`);
+    o.say(`${view}${lens} · ${describeLens()}`);
   }
 
   /** Where a view looks: back down the axis the camera stands on. */
@@ -188,19 +188,19 @@ export function createNav(o: NavOptions): NavGizmo {
 
   const describeLens = () =>
     space.projection() === 'ortho'
-      ? 'parallel, so two equal edges measure the same at any depth'
-      : 'in perspective, where depth is what says the thing is solid';
+      ? 'parallel — equal edges measure the same at any depth'
+      : 'perspective — depth says the thing is solid';
 
   function home(ms = 420) {
     const b = o.bounds();
     if (b) {
       space.frame(b, ms);
-      o.say('framed everything on the board');
+      o.say('framed everything');
     } else {
       // Nothing drawn: frame the picker itself, so the three tiles are the
       // thing you are looking at — which is the next move on an empty board.
       space.frame({ min: { x: -3.6, y: -0.6, z: -3.6 }, max: { x: 3.6, y: 3.6, z: 3.6 } }, ms);
-      o.say('nothing on the board yet — framed the plane picker');
+      o.say('nothing on the board — framed the plane picker');
     }
     sync();
   }
@@ -211,8 +211,8 @@ export function createNav(o: NavOptions): NavGizmo {
     space.setProjection(next);
     o.say(
       next === 'ortho'
-        ? 'orthographic — parallel, and pinned there until you tap a ball'
-        : 'perspective — pinned there until you tap a ball'
+        ? 'ortho · parallel, pinned until you tap a ball'
+        : 'persp · pinned until you tap a ball'
     );
     sync();
     return next;
@@ -318,12 +318,12 @@ export function createNav(o: NavOptions): NavGizmo {
       );
     }
 
-    tile(homeTile, 'home', '', { why: 'frame everything on the board — Home, or f' });
+    tile(homeTile, 'home', '', { why: 'frame everything · Home or f' });
     tile(projTile, 'view', space.projection() === 'ortho' ? 'ortho' : 'persp', {
       on: space.projection() === 'ortho',
       why: autoProjection
-        ? 'follows the camera: a tap on a ball goes orthographic, orbiting off the axis comes back to perspective. Press to pin it'
-        : 'pinned by hand — a tap on a ball takes it back to following the camera',
+        ? 'follows the camera: a ball goes ortho, orbiting off the axis returns to persp · press to pin'
+        : 'pinned · a ball hands it back to the camera',
     });
 
     renderPinned();
@@ -337,10 +337,10 @@ export function createNav(o: NavOptions): NavGizmo {
       pinnedBox.appendChild(
         chip(`${v.label} · ${v.count}`, {
           cls: 'pinChip',
-          why: `${v.count} stroke${v.count === 1 ? '' : 's'} on the view plane were drawn from here — tap to go back, and they are sharp again`,
+          why: `${v.count} stroke${v.count === 1 ? '' : 's'} drawn from here · tap to go back, sharp again`,
           onclick: () => {
             space.easeTo(v.pose);
-            o.say('back to the view that ink was drawn from — it is sharp again');
+            o.say('back to the view that ink was drawn from · sharp again');
           },
         })
       );

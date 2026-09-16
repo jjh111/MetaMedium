@@ -37,88 +37,77 @@
 
   <div id="panel"></div>
   <div id="field"></div>
-  <div id="status">tap a tile, then draw</div>
+  <div id="status">choose a plane · draw on it</div>
 
   <div id="help" hidden>
-    <p><b>Choose a plane, then draw on it.</b> The three tiles at the gizmo are the
+    <p><b>Choose a plane, then draw on it.</b> The gizmo's three tiles are the
       <i>foundation</i> (the ground), the <i>height</i> plane (the wall you face) and the
-      <i>width</i> plane (the wall on your right). The chosen tile lights; the cone on its
-      normal slides the plane along it; tapping the sphere at the centre un-chooses.</p>
-    <p><b>Draw</b> with the left button or one finger. <b>Orbit</b> with the right button, a
-      drag on the compass in the corner, or a drag with <kbd>Space</kbd> held. <b>Pan</b> with
-      the middle button, <kbd>Shift</kbd> + the right button, or two fingers. The wheel or a
-      pinch <b>dollies toward the pointer</b>, not toward the middle of the screen. An orbit
-      turns around <b>the centre of the view</b> — where a pan left it — or around the
-      selection when there is one, and that turn is rigid: nothing moves at the first pixel,
-      and a view panned off-centre stays off-centre.</p>
-    <p><b>The compass</b> in the top-right corner turns with the camera. Tap a ball to look
-      along that axis — <kbd>X</kbd> is the <i>right</i> view, <kbd>Y</kbd> the <i>top</i>,
-      <kbd>Z</kbd> the <i>front</i>, and the hollow balls are their opposites; tapping the ball
-      you are already at flips to the other side. The ball that faces the <b>chosen plane</b>
-      lights in the same teal as its tile, so one tap puts you flat on what you are drawing on.
-      Drag anywhere on the compass to orbit — one finger, because it is chrome rather than
-      canvas. Under it: <i>home</i> frames everything on the board, <i>view</i> swaps
-      <b>persp / ortho</b>, and each pinned view is a chip.</p>
-    <p><b>Perspective follows the camera.</b> A tap on a ball goes orthographic — a front, top
-      or side view is a draftsman's, and in perspective two equal edges at different depths
-      measure differently — and orbiting off the axis comes back to perspective, where depth is
-      what says the thing is solid. Press the <i>view</i> tile and it stays where you put it
-      until you tap a ball again. The tile says which it is either way.</p>
-    <p><b>Keys for the camera:</b> the numpad, where Blender has it — <kbd>1</kbd> front,
-      <kbd>3</kbd> right, <kbd>7</kbd> top, <kbd>5</kbd> persp/ortho, <kbd>9</kbd> the opposite
-      side — or <kbd>Shift</kbd> + those digits on a keyboard without one, since plain
-      <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> already choose a PLANE and a plane is chosen far
-      more often than a camera is snapped. <kbd>Ctrl</kbd>/<kbd>Cmd</kbd> with either takes the
-      opposite side, and <kbd>f</kbd> or <kbd>Home</kbd> frames everything.</p>
-    <p>Every stroke is projected onto its plane as it is drawn and stored in that plane's
-      own coordinates, so the shape rung reads a drawing on the ground exactly as it reads
-      one on paper — at the scale the pen was working at, which under perspective changes
-      with depth.</p>
-    <p><b>Or don't choose, and the plane is read.</b> Tap the sphere at the gizmo's centre
-      and every stroke's plane becomes a <i>reading</i>: the faces under the pen, the plane
-      you were drawing on a moment ago, the three world planes standing where the pen came
-      down, and the plane facing you. It is fixed at pen-down from where the pen is and
-      <i>re-ranked at pen-up</i> against the whole stroke — the first moment there is a
-      stroke to read. The panel lists every candidate with its number and its reason, and
-      the runner-up stands beside the mark as a chip: tap it and the ink is read onto that
-      plane instead, one <kbd>Cmd/Ctrl</kbd>+<kbd>Z</kbd> back. A straight stroke reads the
-      same on every plane, so a line rising off a profile is genuinely ambiguous — that is
-      what the chip, and the tiles, are for.</p>
-    <p><b>Ink on the view plane keeps its view.</b> It is sharp from the camera it was drawn
-      at and faint from anywhere else; the panel's <i>pinned views</i> row takes you back.</p>
-    <p><b>Stand it up.</b> A closed shape on a chosen plane is a <i>profile</i>. A line
-      that starts on its edge and leaves its plane is an <i>extent</i>, and a box stands at
-      once — tier 1, no model, no wait. A line lying <i>beside</i> the profile in its own
-      plane is an <i>axis</i>, and the profile turns about it. The panel's <i>plays</i> row
-      says which row of the form table placed each mark, and why.</p>
+      <i>width</i> plane (the wall on your right). The chosen tile lights. The cone slides
+      the plane along its normal; the centre sphere un-chooses.</p>
+    <p><b>Draw</b> left button, one finger. <b>Orbit</b> right-drag, a drag on the compass,
+      or <kbd>Space</kbd>+drag. <b>Pan</b> middle-drag, <kbd>Shift</kbd>+right-drag, two
+      fingers. <b>Dolly</b> wheel or pinch, toward the pointer. An orbit turns about the
+      view's centre — where a pan left it — or about the selection. Nothing snaps to the
+      middle.</p>
+    <p><b>The compass</b> turns with the camera. Tap a ball to look along that axis:
+      <kbd>X</kbd> right, <kbd>Y</kbd> top, <kbd>Z</kbd> front, the hollow balls their
+      opposites; tap the one you are at to flip. The ball facing the <b>chosen plane</b>
+      lights teal, like its tile. Drag anywhere on it to orbit — one finger, because it is
+      chrome. Under it: <i>home</i> frames everything, <i>view</i> is persp / ortho, each
+      pinned view is a chip.</p>
+    <p><b>Perspective follows the camera.</b> A ball goes ortho — in a front, top or side
+      view perspective makes two equal edges at different depths measure differently — and
+      orbiting off the axis returns to perspective, where depth says the thing is solid.
+      Press <i>view</i> and it stays put until you tap a ball. The tile says which.</p>
+    <p><b>Camera keys</b> are the numpad, where Blender has them: <kbd>1</kbd> front,
+      <kbd>3</kbd> right, <kbd>7</kbd> top, <kbd>5</kbd> persp/ortho, <kbd>9</kbd> the far
+      side. Without a numpad, <kbd>Shift</kbd> + the digit; <kbd>Ctrl</kbd>/<kbd>Cmd</kbd>
+      takes the far side; <kbd>f</kbd> or <kbd>Home</kbd> frames. Plain <kbd>1</kbd>
+      <kbd>2</kbd> <kbd>3</kbd> choose a PLANE and <kbd>0</kbd> un-chooses — a plane is
+      chosen far more often than a camera is snapped.</p>
+    <p>Every stroke is stored in its plane's own coordinates, so the shape rung reads a
+      drawing on the ground as it reads one on paper — at the pen's scale, which under
+      perspective changes with depth.</p>
+    <p><b>Or don't choose, and the plane is read.</b> Tap the gizmo's centre sphere and every
+      stroke's plane becomes a <i>reading</i>: the faces under the pen, the plane you last
+      drew on, the three world planes at the pen, the plane facing you. It is fixed at
+      pen-down and <i>re-ranked at pen-up</i> against the whole stroke. The panel lists each
+      candidate with its number and its reason; the runner-up stands beside the mark as a
+      chip — tap it and the ink is read onto that plane instead, one
+      <kbd>Cmd/Ctrl</kbd>+<kbd>Z</kbd> back. A straight stroke reads the same on every plane,
+      which is what the chip and the tiles are for.</p>
+    <p><b>Ink on the view plane keeps its view</b> — sharp from the camera it was drawn at,
+      faint from anywhere else. The panel's <i>pinned views</i> row takes you back.</p>
+    <p><b>Stand it up.</b> A closed shape on a chosen plane is a <i>profile</i>. A line from
+      its edge, off its plane, is an <i>extent</i>, and a box stands at once — tier 1, no
+      model, no wait. A line <i>beside</i> it in its own plane is an <i>axis</i>, and the
+      profile turns about it. The panel's <i>plays</i> row says which row of the form table
+      placed each mark, and why.</p>
     <p><b>The field</b> is under the panel: type a verb (<kbd>extrude</kbd>,
-      <kbd>revolve</kbd>, <kbd>remove</kbd>, <kbd>undo</kbd>) or <kbd>name: …</kbd>, and the
-      line under it says what <kbd>Enter</kbd> will do before you press it.</p>
-    <p><b>Two or three views are a solid already.</b> Draw a plan on the foundation, a front on
-      the height plane and a side on the width plane; where their projections overlap is the
-      <i>massing</i>, and it stands the moment the second one lands — tier 1, in the engine's
-      name, with no word said. The drawing IS the extent.</p>
-    <p><b>Then say what it is.</b> Type <i>a castle with green turret tops</i> in the field and
-      press <kbd>Enter</kbd>: the reading line says <i>→ asks &lt;model&gt;</i> first, and if none
-      has joined it opens the model pane instead. What comes back is an op tree with its steps
-      named from your own words and a colour word bound where you said one — never code, never a
-      mesh. It is <b>clipped to the massing</b> before you ever see it, so a proposal cannot leave
-      the drawing, and the panel says <i>honours the drawing 93% · front 96 · top 95 · side 88</i>.
-      A model is asked only by that act; nothing on draw, nothing on join. <kbd>Esc</kbd> stops
-      every call in flight, and a brief that fails leaves nothing behind.</p>
+      <kbd>revolve</kbd>, <kbd>remove</kbd>, <kbd>undo</kbd>) or <kbd>name: …</kbd>. The line
+      under it says what <kbd>Enter</kbd> will do.</p>
+    <p><b>Two or three views are a solid already.</b> A plan on the foundation, a front on the
+      height plane, a side on the width plane: where they overlap is the <i>massing</i>, and
+      it stands the moment the second lands — tier 1, in the engine's name, with no word said.
+      The drawing IS the extent.</p>
+    <p><b>Then say what it is.</b> Type <i>a castle with green turret tops</i> and press
+      <kbd>Enter</kbd>. The reading line says <i>→ asks &lt;model&gt;</i> first; with none
+      joined it opens the model pane. Back comes an op tree with its steps named from your own
+      words and a colour word bound where you said one — never code, never a mesh. It is
+      <b>clipped to the massing</b> before you see it, so a proposal cannot leave the drawing,
+      and the panel says <i>honours the drawing 93% · front 96 · top 95 · side 88</i>. A model
+      is asked only by that act. <kbd>Esc</kbd> stops every call in flight; a brief that fails
+      leaves nothing behind.</p>
     <p><b>Names are yours, and they conserve.</b> <i>Take it</i> names the thing from the root
       step and holds every named sub-tree as a definition based on the whole, so typing
-      <i>turret</i> afterwards completes from the library before any model is asked. Verbs then
-      bind by name: <i>make the turrets taller</i> asks for those steps again and leaves every
-      other step's id alone; <i>remove the turret</i> and <i>the tops are red</i> are tier 1 and
-      instant. A phrasing the table cannot read is handed back, not dropped — the field offers to
-      ask a model which of the space's own verbs you meant, once, and holds the answer in the log
-      as a way of saying it.</p>
+      <i>turret</i> completes from the library before any model is asked. Verbs then bind by
+      name: <i>make the turrets taller</i> asks for those steps again and leaves every other
+      step's id alone; <i>remove the turret</i> and <i>the tops are red</i> are tier 1 and
+      instant. A phrasing the table cannot read is handed back, not dropped — the field offers
+      to ask a model which of the space's own verbs you meant, once, and holds the answer.</p>
     <p><kbd>Cmd/Ctrl</kbd>+<kbd>Z</kbd> undoes the last act — the solid if one stands, else
-      the last stroke; the ink always stays. Hover a mark to read it in the panel; a tap on a
-      solid selects it, <kbd>Esc</kbd> lets it go.
-      Keys <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> choose a plane, <kbd>0</kbd> un-chooses; the
-      camera's own keys are on the numpad, or <kbd>Shift</kbd> + the digit.</p>
+      the last stroke; the ink always stays. Hover a mark to read it in the panel; tap a solid
+      to select it, <kbd>Esc</kbd> to let it go.</p>
   </div>
 
   <script type="module" src="./src/main.ts"></script>

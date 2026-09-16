@@ -102,7 +102,7 @@ export interface PanelOptions {
 
 export function createPanel(host: HTMLElement, statusEl: HTMLElement, log: Log, o: PanelOptions): Panel {
   let current: string | null = null;
-  let standing = 'tap a tile, then draw';
+  let standing = 'choose a plane · draw on it';
 
   function show(id: string | null, sel: Sel | null = null) {
     current = id;
@@ -303,8 +303,8 @@ function renderSummary(log: Log, sel: Sel | null, hovered: Mark | null, o: Panel
       '<div class="empty">' +
       esc(
         log.marks().length
-          ? 'tap a mark or a solid, or hover one — this row says what it is before it says what it measures'
-          : 'choose a plane and draw a closed shape; a line off its edge stands it up'
+          ? 'tap or hover a mark or a solid'
+          : 'choose a plane, draw a closed shape · a line off its edge stands it up'
       ) +
       '</div></div>'
     );
@@ -539,12 +539,12 @@ function becomesOf(
         value: matches.length
           ? `a profile → a solid, or ${matches[0].name} placed here`
           : 'a profile → a solid',
-        why: 'draw a line off its edge, off its plane, and it stands up at tier 1; a line beside it in its own plane turns it instead',
+        why: 'a line off its edge, off its plane, stands it up at tier 1; a line beside it, in its plane, turns it',
       };
     case 'extent':
       return { value: 'an extent → how tall the solid stands', why: 'the depth is the drawing; no number here came from anywhere else' };
     case 'axis':
-      return { value: 'an axis → what the profile turns about', why: 'a line in the profile\'s own plane, beside it — revolve sweeps around it' };
+      return { value: 'an axis → what the profile turns about', why: 'a line beside the profile, in its own plane · revolve sweeps around it' };
     case 'feature':
       return {
         value: 'a feature on a face → a hole, or a boss',
@@ -736,14 +736,14 @@ function renderMark(mark: Mark, log: Log, faded: boolean): string {
   html += row('normal', `(${round2(n.x)}, ${round2(n.y)}, ${round2(n.z)})`);
   if (o.x || o.y || o.z) html += row('origin', `(${o.x.toFixed(2)}, ${o.y.toFixed(2)}, ${o.z.toFixed(2)})`);
   if (mark.flippedFrom) {
-    html += row('flipped from', mark.flippedFrom, 'a chip was tapped — one undo puts the first plane back');
+    html += row('flipped from', mark.flippedFrom, 'a chip was tapped · one undo puts the first plane back');
   }
   if (mark.plane.source === 'view' && mark.pose) {
     html += row(
       'held with',
       faded ? 'a view you have left' : 'this view',
       faded
-        ? 'drawn faint from here — tap its chip under *pinned views* and the camera goes back, and it is sharp'
+        ? 'faint from here · tap its chip under *pinned views* to go back, sharp again'
         : 'the camera is within the tolerance of the pose it was drawn at, so it is sharp'
     );
   }
