@@ -22,8 +22,14 @@
        LANDS — and it stays in the world. -->
   <div id="nav"></div>
 
+  <!-- The bar, in the canvas's own slot logic: the wordmark and the panel's
+       toggle on the left, the controls on the right. *details* shows and hides
+       the panel, which is DOWN by default at every width — the space is for
+       drawing in, and the field and the status line carry what acting on a
+       selection needs. -->
   <div id="bar">
     <span class="wordmark">MetaMedium <span class="dim">· shard 3d</span></span>
+    <button id="panelToggle" class="tile" type="button" aria-expanded="false">details ▸</button>
     <span class="grow"></span>
     <button id="tileUndo" type="button"></button>
     <button id="tileModels" type="button"></button>

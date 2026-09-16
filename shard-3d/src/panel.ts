@@ -17,6 +17,19 @@
 // what it becomes — and every measurement that was here stays here, one
 // disclosure down under *why / measurements*. Nothing was discarded and no
 // alternative was hidden; the order changed.
+//
+// **UI-3: and it is not on screen unless you ask for it.** The panel is a
+// description card, and a description card standing open in the corner of a
+// space you are trying to draw in is chrome sitting on the work. So it is
+// HIDDEN by default at every width, and the bar's *details* toggle shows it —
+// the canvas's own word and the canvas's own mechanism (`Demos/surface/
+// 00-core.js`: a `panelHidden` class on the body, remembered per device). What
+// it says is still computed and still in the DOM while it is hidden, so
+// `panelText()` and every assertion that reads the panel work either way; only
+// the CSS changes. What the hand loses when it is down is carried by the two
+// places that stay: the FIELD, which stands on its own at the bottom right and
+// already says what Enter will do, and the STATUS LINE, which takes the
+// selection's name and its next act (`selectionLine`).
 
 import { fingerprintOf, type Point } from 'metamedium-core';
 import type { Diff, DiffRegion } from './diff';
@@ -133,6 +146,28 @@ export function createPanel(host: HTMLElement, statusEl: HTMLElement, log: Log, 
     // Remembered per device, like the reference surface's *details ▾*: a hand
     // that wants the numbers wants them on the next mark too.
     if (details) details.addEventListener('toggle', () => setEvidenceOpen(details.open));
+
+    // UI-3: with the panel down, what stands SELECTED still has to be legible,
+    // and the status line is the place for it (SURFACE-v9 §6.2 — a sentence has
+    // one home). Selecting never pops the panel open: the two sentences that
+    // matter, the name and the next deliberate act, come down here instead.
+    // A HOVER deliberately does not — a hover is a question about a mark and
+    // the answer to it is the panel, so hovering with the panel down would put
+    // a sentence in the status line about something the hand cannot see.
+    if (!panelOnScreen() && sel) {
+      const line = selectionLine(subjectOf(sel), o.next?.() ?? null);
+      if (line) stand(line);
+    }
+  }
+
+  /** What to call what stands selected: a body by its name, a mark by its reading. */
+  function subjectOf(sel: Sel): string | null {
+    const solid = sel.kind === 'solid' ? log.solidOf(sel.id) : log.solidFor(sel.id);
+    if (solid) return solid.name;
+    const mark = sel.kind === 'mark' ? log.markOf(sel.id) : null;
+    if (!mark) return null;
+    const top = mark.readings[0];
+    return top ? `${top.label} ${num(top.weight || 0)}` : `ink · ${mark.id}`;
   }
 
   /**
@@ -254,6 +289,120 @@ export function createPanel(host: HTMLElement, statusEl: HTMLElement, log: Log, 
   }
 
   return { show, say, stand, subject: () => current };
+}
+
+// ---- UI-3: the panel is hidden by default, and the bar's toggle shows it ---
+
+const PANEL_KEY = 'shard.panel';
+const SHOWN = 'shown';
+
+/**
+ * Where a device preference lives. `localStorage` in a browser, and injectable
+ * so the RULE — hidden until this hand has said otherwise — can be asked
+ * questions in Node, where the pure rungs are tested and there is no window.
+ */
+export interface PrefStore {
+  getItem(key: string): string | null;
+  setItem(key: string, value: string): void;
+}
+
+function deviceStore(): PrefStore | null {
+  try {
+    return (globalThis as { localStorage?: PrefStore }).localStorage ?? null;
+  } catch {
+    return null; // a private window, or blocked site data
+  }
+}
+
+/**
+ * Whether this device wants the panel on screen. **False on a first run at
+ * every width**: the shard is a space you draw in, and a description card
+ * standing open in its corner is chrome sitting on the work. Only the literal
+ * word this hand's own toggle wrote turns it on, so a missing preference, an
+ * unreadable store and a value from some older build all read the same way.
+ *
+ * (The canvas defaults by width — `innerWidth > 820` — because its panel is
+ * the only place its readings live. The shard's field carries the acts and the
+ * status line carries the selection, so there is nothing to default *on* for.)
+ */
+export function panelShown(store: PrefStore | null = deviceStore()): boolean {
+  try {
+    return store?.getItem(PANEL_KEY) === SHOWN;
+  } catch {
+    return false;
+  }
+}
+
+export function setPanelShown(shown: boolean, store: PrefStore | null = deviceStore()): void {
+  try {
+    store?.setItem(PANEL_KEY, shown ? SHOWN : 'hidden');
+  } catch {
+    /* nothing to remember it with — the toggle still works for this session */
+  }
+}
+
+/**
+ * Whether the panel is on screen *right now*. The class the toggle stamps IS
+ * the state — the canvas reads its own the same way (`Demos/surface/
+ * 09-palette.js`) — so the preference is read at boot and on a toggle, and
+ * never on every hover.
+ */
+function panelOnScreen(): boolean {
+  return typeof document !== 'undefined' && !document.body.classList.contains('panelHidden');
+}
+
+/**
+ * What the status line says about the selection while the panel is down: its
+ * name, and the next deliberate act in the same words the field is showing.
+ *
+ * A blocked offer still names itself and says it is not yet — the same rule
+ * the panel's *next* row follows, and for the same reason: *nothing to do
+ * here* is the least useful thing to say to a hand holding a first profile.
+ */
+export function selectionLine(name: string | null, next: NextAct | null): string | null {
+  if (!name) return null;
+  if (!next) return name;
+  return next.enabled
+    ? `${name} · ↵ ${next.label}${next.asks ? ' · asks a model' : ''}`
+    : `${name} · ${next.label} — not yet`;
+}
+
+/** The bar's *details* toggle: it shows and hides the panel, and remembers. */
+export interface PanelToggle {
+  shown(): boolean;
+  set(shown: boolean): void;
+  toggle(): void;
+}
+
+/**
+ * The canvas's toggle, ported rather than forked (`Demos/surface/00-core.js`):
+ * a class on the body, the word *details* with the disclosure arrow the panel's
+ * own summary uses, `aria-expanded`, and the preference written on every press.
+ * The shard's differs in one thing only — what it defaults to.
+ */
+export function createPanelToggle(button: HTMLElement, onChange?: (shown: boolean) => void): PanelToggle {
+  let on = panelShown();
+
+  function sync() {
+    document.body.classList.toggle('panelHidden', !on);
+    button.textContent = on ? 'details ▾' : 'details ▸';
+    button.classList.toggle('on', on);
+    button.setAttribute('aria-expanded', String(on));
+    button.title = on
+      ? 'Hide the panel — the field and the status line stay'
+      : 'Show the panel — what this is, where it came from, and every measurement';
+  }
+
+  function set(next: boolean) {
+    on = next;
+    setPanelShown(on);
+    sync();
+    onChange?.(on);
+  }
+
+  button.addEventListener('click', () => set(!on));
+  sync();
+  return { shown: () => on, set, toggle: () => set(!on) };
 }
 
 // ---- UI-2: the summary, and the disclosure the evidence lives behind -------

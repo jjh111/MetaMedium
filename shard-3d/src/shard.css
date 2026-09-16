@@ -35,6 +35,12 @@ html, body {
 .wordmark .dim { color: var(--ink-3); font-weight: 400; }
 .grow { flex: 1; }
 
+/* The panel's own toggle, beside the wordmark as the canvas has it. It carries
+   no `k`/`v` face — its whole label is its state — so `.on` colours the word
+   itself rather than the spans `.tile.on` expects. */
+#panelToggle { color: var(--ink-3); white-space: nowrap; }
+#panelToggle.on { color: var(--teal); }
+
 /* ---- components (surface/00-ui.js, ported) ------------------------------ */
 .pill, .chip, .tile {
   font-family: var(--face);
@@ -110,6 +116,10 @@ html, body {
   border: 1px solid var(--rule-soft);
   border-radius: 50%;
 }
+/* …and with the panel down, the top-right of the canvas IS the right edge, so
+   the compass takes the width the panel was holding. It stays in the same
+   corner and keeps the same gutter; nothing else moves. */
+body.panelHidden #nav { right: var(--s3); }
 .compass:active { cursor: grabbing; }
 .compass .arm { stroke: var(--ink-4); stroke-width: 2.6; stroke-linecap: round; }
 .compass .ball { cursor: pointer; }
@@ -148,6 +158,13 @@ html, body {
   z-index: 9;
 }
 #panel[hidden] { display: none; }
+
+/* UI-3: hidden by DEFAULT, at every width. The bar's *details* stamps the
+   class (`src/panel.ts`, the canvas's own mechanism in `surface/00-core.js`)
+   and the canvas then has the full width. Only the display changes: the panel's
+   rows are still built and still in the DOM, so `panelText()` and every
+   assertion that reads them work with it down. */
+body.panelHidden #panel { display: none; }
 .eyebrow {
   margin: var(--s2) 0 var(--s1);
   font-size: var(--t-micro);
@@ -211,6 +228,17 @@ details.evidence > summary:focus-visible { outline: 1px solid var(--teal); outli
   font-size: var(--t-meta);
   z-index: 11;
 }
+/* With the panel down the field is on its own, and it has to read as a thing
+   rather than as the torn-off bottom edge of one: it keeps its place and its
+   width, gains the lift the panes carry, and rounds its free corner. It is
+   already only what it needs to be — the input, the reading line, the pills —
+   because the rows above it were never the field's. */
+body.panelHidden #field {
+  border-top-left-radius: var(--radius);
+  box-shadow: var(--lift);
+  background: var(--paper-lt);
+}
+
 .fieldInput {
   width: 100%;
   font-family: var(--face);
@@ -268,6 +296,17 @@ details.evidence > summary:focus-visible { outline: 1px solid var(--teal); outli
 }
 
 @media (max-width: 720px) {
+  /* UI-3: the bar already asked for more room than a phone has — 420px of
+     controls in 375px, with *theme* and *help* simply off the end and no way
+     to reach them — and *details* makes it 511. So on a narrow screen the bar
+     SCROLLS sideways, which keeps every control reachable, and the wordmark
+     stops wrapping into a second line the 40px bar has no room for. (The
+     canvas's answer to a crowded bar is its control centre; the shard has no
+     pane to put one in, and inventing one is not this change.) */
+  #bar { gap: var(--s1); padding: 0 var(--s2); overflow-x: auto; scrollbar-width: none; }
+  #bar::-webkit-scrollbar { display: none; }
+  #bar > button, #bar .wordmark { flex: 0 0 auto; white-space: nowrap; }
+
   /* UI-2: 32vh was set when the panel opened on measurements, where a cut-off
      row costs a number you can scroll to. It now opens on the summary, and a
      summary whose last row is below the fold is the fault this package exists

@@ -25,7 +25,7 @@ import { createSpace } from './scene';
 import { createGizmo } from './gizmo';
 import { createInk } from './ink';
 import { createLog, type Mark } from './log';
-import { createPanel, pinnedViews } from './panel';
+import { createPanel, createPanelToggle, pinnedViews } from './panel';
 import { createSolids } from './solid';
 import { createSelection, type Sel } from './selection';
 import { createField, readField, type FieldContext, type KnownName, type VerbOffer } from './field';
@@ -1452,6 +1452,10 @@ const undoTile = document.getElementById('tileUndo')!;
 const themeTile = document.getElementById('tileTheme')!;
 const helpTile = document.getElementById('tileHelp')!;
 const modelsTile = document.getElementById('tileModels')!;
+// UI-3: the panel is down by default and this shows it. It owns the class, the
+// label and the preference (`panel.ts`); the report is re-run because the
+// panel's own standing line depends on whether it is on screen.
+createPanelToggle(document.getElementById('panelToggle')!, () => report());
 pane(helpEl, 'shard 3d', () => helpEl.setAttribute('hidden', ''));
 
 modelsTile.onclick = () => {

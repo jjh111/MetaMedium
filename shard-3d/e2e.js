@@ -94,6 +94,46 @@
 
   const evidence = () => document.querySelector('#panel details.evidence');
 
+  // ---- UI-3: the panel is hidden by default, and the bar's toggle shows it --
+  // Visibility is asserted the way a hand sees it, not off a class: an element
+  // whose `offsetParent` is null is not on screen. `panelText()` is deliberately
+  // NOT affected — the rows are built and in the DOM either way — which is why
+  // every assertion below this line reads the panel without caring.
+
+  const panelToggleEl = () => document.getElementById('panelToggle');
+  /**
+   * Whether an element actually takes up room on screen. By its own box, NOT
+   * by `offsetParent`: the panel, the field and the bar are all `position:
+   * fixed`, and a fixed element's `offsetParent` is null by spec whether it is
+   * displayed or not — which reads every one of them as hidden.
+   */
+  const onScreenNow = (el) => {
+    if (!el) return false;
+    const r = el.getBoundingClientRect();
+    return r.width > 0 && r.height > 0;
+  };
+  const pref = (key) => {
+    try {
+      return localStorage.getItem(key);
+    } catch (err) {
+      return null;
+    }
+  };
+
+  /** Wait until a just-said sentence has given the line back to the standing one. */
+  function settled(within = 8000) {
+    const el = document.getElementById('status');
+    const t0 = performance.now();
+    return new Promise((resolve, reject) => {
+      const tick = () => {
+        if (!el.classList.contains('said')) return resolve();
+        if (performance.now() - t0 > within) return reject(new Error('the status line never gave the sentence back'));
+        setTimeout(tick, 120);
+      };
+      tick();
+    });
+  }
+
   // ---- the steps -----------------------------------------------------------
 
   let rectId = null;
@@ -111,6 +151,45 @@
     assert(S().state().marks.length === 0, 'the board did not clear');
     assert(S().state().camera.projection === 'persp', 'the camera is not in perspective');
     return { marks: 0, camera: S().state().camera.view ?? 'free' };
+  });
+
+  // UI-3. This runs on a context nothing has touched, so the preference has
+  // never been written — which is exactly the first run the rule is about.
+  step('on a fresh board the panel is down and the field is up', () => {
+    const panelOn = onScreenNow(document.getElementById('panel'));
+    const fieldOn = onScreenNow(document.getElementById('field'));
+    assert(!panelOn, 'the panel is on screen on a fresh board');
+    assert(fieldOn, 'the field is not on screen — there is no deliberate way to act');
+    assert(document.body.classList.contains('panelHidden'), 'the body does not carry the class');
+    const t = panelToggleEl();
+    assert(t, 'the bar has no *details* toggle');
+    assert(/details/.test(t.textContent), `the toggle says "${t.textContent}"`);
+    assert(t.getAttribute('aria-expanded') === 'false', 'the toggle does not say it is closed');
+    assert(pref('shard.panel') === null, `a preference was written before anyone pressed anything: ${pref('shard.panel')}`);
+    // …and the panel still SAYS what it says. Nothing below this line changes.
+    assert(typeof S().panelText() === 'string', 'the panel has no text with it hidden');
+    return { panelOn, fieldOn, toggle: t.textContent.trim(), pref: pref('shard.panel') };
+  });
+
+  step('*details* shows it and hides it again, and remembers each time', () => {
+    const t = panelToggleEl();
+    t.click();
+    const shownNow = onScreenNow(document.getElementById('panel'));
+    assert(shownNow, 'the panel did not come up');
+    assert(!document.body.classList.contains('panelHidden'), 'the class stayed on the body');
+    assert(t.getAttribute('aria-expanded') === 'true', 'the toggle does not say it is open');
+    assert(/▾/.test(t.textContent), `the arrow did not turn: "${t.textContent}"`);
+    const remembered = pref('shard.panel');
+    assert(remembered === 'shown', `the preference says "${remembered}"`);
+    // …and the field is still there beside it, which is the whole point of it
+    // standing on its own: nothing about it depends on the panel.
+    assert(onScreenNow(document.getElementById('field')), 'the field left when the panel arrived');
+
+    t.click();
+    assert(!onScreenNow(document.getElementById('panel')), 'the panel did not go back down');
+    assert(pref('shard.panel') === 'hidden', `the preference says "${pref('shard.panel')}" after hiding`);
+    assert(/▸/.test(t.textContent), `the arrow did not turn back: "${t.textContent}"`);
+    return { shownNow, remembered, after: pref('shard.panel') };
   });
 
   step('choose the foundation', () => {
@@ -327,6 +406,40 @@
     const panel = S().panelText();
     assert(panel.indexOf(rows.what) < panel.indexOf('points'), 'the mark telemetry still stands above the summary');
     return { rows, evidenceOpen: ev.open, evidenceChars: body.length };
+  });
+
+  // UI-3: and with the panel down, selecting says the two things that matter in
+  // the place that is left. Selecting must NOT pop the panel open — that would
+  // be the card coming back uninvited, which is the thing being fixed.
+  step('with the panel down, the status line carries the selection and its next act', () => {
+    assert(!onScreenNow(document.getElementById('panel')), 'the panel is up — this step proves nothing');
+    const rows = summaryRows();
+    const solid = S().state().solids[0];
+
+    // Re-select through the real door, as a tap does.
+    S().select(solid.id);
+    assert(!onScreenNow(document.getElementById('panel')), 'selecting popped the panel open');
+
+    // `say` wins the line for a few seconds after an act; the STANDING line is
+    // what is being asserted, so wait out the fade rather than race it.
+    return settled().then(() => {
+      const el = document.getElementById('status');
+      const line = el.textContent;
+      const name = rows.what.replace(/\s+[\d.]+$/, '');
+      assert(line.includes(name), `the status line does not name the selection: "${line}" (want "${name}")`);
+      assert(/↵|not yet/.test(line), `the status line does not say what the next act is: "${line}"`);
+      // The same act the field is offering — one sentence, two places, and no
+      // disagreement between them.
+      const offered = S().fieldRead('');
+      const verb = (offered.line.match(/↵ ([^—]+)/) || [])[1];
+      if (verb) {
+        assert(
+          line.includes(verb.trim()),
+          `the status line says a different act from the field: "${line}" vs "${offered.line}"`
+        );
+      }
+      return { line, name, field: offered.line };
+    });
   });
 
   step('the ink is still on the board, on the face', () => {

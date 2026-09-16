@@ -69,8 +69,8 @@ it extends the one seam P0 left for it.
 > **Done when:** save the mug as *mug*; draw its profile elsewhere; *mug 0.8x*
 > is offered and one tap places it.
 
-All seven criteria run in `e2e.js` (70 steps), and the two-minute demo runs
-beside them as `__demo()` (10 steps). `?demo` draws P0's and P2's at
+All seven criteria run in `e2e.js` (92 steps), and the two-minute demo runs
+beside them as `__demo()` (11 steps). `?demo` draws P0's and P2's at
 boot; `?demo=read` draws the rectangle read onto a box's top face with the chip
 beside it; `?demo=view` draws a circle on the view plane and then orbits off it, so it
 stands there as the thin, fully drawn ellipse of John's Blender screenshot; `?demo=diff` draws the box and the side profile
@@ -136,8 +136,14 @@ there is no bundle to drift.
    right, `7` top, `5` persp/ortho, `9` the far side — or `Shift` + those
    digits, `Ctrl`/`Cmd` for the far side, `f` / `Home` to frame. `Cmd/Ctrl+Z`
    undoes.
-4. **Read it.** Hover a mark; the panel says *mark*, *plane*, *reading*,
-   *plays*, *maths*, *measured*, and the status line says the one sentence.
+4. **Read it.** The panel is **hidden by default** — at every width, until this
+   device says otherwise — and ***details*** in the bar, beside the wordmark,
+   shows and hides it; the choice is remembered per device. With it down the
+   canvas has the full width, the field still stands on its own at the bottom
+   right (at the bottom on a phone) with the input, the reading line and the
+   pills, and the status line carries what stands selected and what Enter would
+   do to it. Selecting never pops the panel open. With it up, hover a mark and
+   it says *mark*, *plane*, *reading*, *plays*, *maths*, *measured*.
 5. **Stand it up.** A closed shape on a chosen plane is a **profile**. A line
    whose end lies on its edge and which leaves its plane is an **extent**, and
    a box stands *at once* — tier 1, no model, no wait, and the status says so.
@@ -243,7 +249,9 @@ there is no bundle to drift.
    holds no pose — only the two stroke ids the scale, the turn and the shift
    are worked out from, every time the tree is walked. A model that answers
    `{"reuse":"mug"}` to a brief does exactly the same thing and writes nothing.
-15. **Say it.** The field is at the foot of the panel: type `extrude`,
+15. **Say it.** The field is at the foot of the panel, and stands on its own
+   there when the panel is down — it is the one deliberate way to act, so it
+   never goes with it. Type `extrude`,
    `revolve`, `cut`, `boss`, `add it`, `take it off`, `mirror`, `dup`,
    `remove`, `undo` or `name: …` — by label or by alias (`drill`, `pad`,
    `copy`, `fill it in`, …) — and the line underneath says what Enter will do
@@ -277,7 +285,7 @@ there is no bundle to drift.
 | `src/solid.ts` | three.js. The mesh, **derived by WALKING the tree on every log change** (`deriveTree`) — `ExtrudeGeometry` and `LatheGeometry` for the leaves, the CSG seam for `cut` / `boss` / `mirror` / `match`, a plain merge for a `dup`'s disjoint copy; a quiet lit material from the tokens, `hardEdges` (the creases only, never the triangulation), the picking, `facesAt` (the faces under the pen as a plane plus the face's own corners, which is what a `face` candidate anchors on), `spanAlong` (what a cut goes THROUGH), `silhouetteOf` (the hull a scratch is counted against), `silhouetteOn` (the orthographic picture the diff reads, cached) and `brokenOf`. `deriveTree` takes a **`DeriveContext`** — `inkOf` and `silhouetteOf` — because a `match` step stores nothing derived and has to ask |
 | `src/selection.ts` | Selection by default (§7): one thing at a time, a teal cage around a solid, and a diff region outlined on its own plane while its chip is hovered. Runtime state, never the log's |
 | `src/field.ts` | One input, one reader. `readField(text, ctx)` returns *what Enter will do*; the verbs and their reasons are handed in, so the reader knows nothing about the DOM. Thirteen verbs now — `extrude`, `revolve`, `cut`, `boss`, `add`, `takeoff`, `mirror`, `dup`, `remove`, `regen`, `take`, and P6's `place` and `reject` (*Not a mug*) — each with its aliases in one table |
-| `src/panel.ts` | The rows and the status line — and `pinnedViews`, still read off the log here though the chips are drawn in the corner — including *plays*, ***could be*** (P6: what the library says this outline is, ranked, in the engine's name), *solid* — the latter showing the tree **nested** (`↳ cut · through · from stroke:5` under `extrude · depth 2.40 u`) and a *broken* row with the seam's own words when a derivation did not come off — and ***matches the drawing***: one block per plane a profile of the selected solid was drawn on, with the coverage, the sentence, which outline it read, and a chip per region |
+| `src/panel.ts` | **Hidden by default** (`panelShown` / `setPanelShown`, the key `shard.panel`, and `createPanelToggle` — the canvas's *details ▾* ported from `Demos/surface/00-core.js`: a `panelHidden` class on the body, remembered per device, and the rows still built and still in the DOM while it is down, so `panelText()` and every assertion on it are the same either way). `selectionLine` is what the status line says in its place — the selection's name and the next act, in the field's own words. Then the rows and the status line — and `pinnedViews`, still read off the log here though the chips are drawn in the corner — including *plays*, ***could be*** (P6: what the library says this outline is, ranked, in the engine's name), *solid* — the latter showing the tree **nested** (`↳ cut · through · from stroke:5` under `extrude · depth 2.40 u`) and a *broken* row with the seam's own words when a derivation did not come off — and ***matches the drawing***: one block per plane a profile of the selected solid was drawn on, with the coverage, the sentence, which outline it read, and a chip per region |
 | `src/ui.ts` | pill · chip · tile · row · pane — `Demos/surface/00-ui.js` ported, not forked |
 | `src/theme.ts` | The tokens read back off `../brand/tokens.css` at boot; nothing here restates a hex |
 | `src/brief.ts` | **Pure.** `describeSpace` (§6) — the `describeReading` of this shard, and the **region-id rule** kept in stroke ids and step ids: what stands (the massing first, said to be the extent to stay inside), the planes and what lies on each in that plane's own units, the diff regions, **every name in play in its step's own id**, the library, the words, and then `HERE_IN_SPACE` — one paragraph on what can be made here and, as importantly, what cannot |
@@ -285,7 +293,7 @@ there is no bundle to drift.
 | `src/verbs.ts` | **Pure.** The verb table with name-resolved targets (§2.6 rule 4), `behave/words.ts`'s pattern ported: `SAYINGS` per verb, `CHANGES` for the size words, `namesIn` resolving a noun singular or plural against the names in play (core's own `singular`), and **what it cannot read is returned, not dropped** |
 | `src/models.ts` | The model pane, `Demos/surface/04-models.js` ported: both local servers probed in parallel, embedding-only models hidden **and said**, the pick remembered as a preference, hosted providers by key — and **no key ever enters the log**. `joinWith` seats a model with a transport of its own, which is what `__shard.joinStub` is |
 | `src/work.ts` | A model at work, shown **where it works**: a breathing `--sig-model` dot with the model's name and its task above the solid, the elapsed time after a few seconds, *Esc stops it* after thirty, and one `AbortSignal` per call so Esc really does |
-| `e2e.js` | The whole loop through the real pointer path — **80 steps, P0 → P6 and the compass** — and, beside it, `__demo()`: the two-minute demo of §9 in ten asserted steps, with a timing on each |
+| `e2e.js` | The whole loop through the real pointer path — **92 steps, P0 → P6, the compass and the panel's toggle** — and, beside it, `__demo()`: the two-minute demo of §9 in eleven asserted steps, with a timing on each |
 | `build-standalone.mjs` | **One file.** Runs `npm run build` (which typechecks first), then inlines every asset Vite emitted — the bundle as one inline module, the stylesheet as one `<style>` — into `dist/shard-3d.html`, and refuses to write a page that still points at anything that would not travel with it. The font `@import` stays external, because the tokens name a fallback stack and a face is not worth trebling the file for |
 
 ## The design decision: how a solid is held in the log
@@ -1258,6 +1266,22 @@ Honest gaps rather than bugs, and two of them are core's:
   measures itself into `--field-h` on every render and the panel stops where the
   field starts. A layout constant about another element's content is a constant
   that goes wrong the first time that content grows.
+- **`offsetParent` says nothing about whether a fixed element is on screen.**
+  The first version of UI-3's e2e check asked `el.offsetParent !== null`, which
+  is the usual way to ask *is this displayed*, and it read the panel as hidden
+  while the panel was plainly up: a `position: fixed` element's `offsetParent`
+  is **null by spec**, displayed or not. Every piece of this surface's chrome is
+  fixed — the bar, the panel, the field, the status line — so that test called
+  all of them invisible. The honest question is whether the thing takes up room:
+  `getBoundingClientRect()`, whose width and height are zero under
+  `display: none` and nonzero otherwise.
+- **The bar was already over a phone's width before anything was added to it.**
+  At 375px its controls wanted 420px, so *theme* and *help* sat off the right
+  end with no way to reach them — invisible because nothing had ever measured
+  it. Adding *details* made it 511 and made it visible, by wrapping the wordmark
+  onto a second line the 40px bar has no room for. The bar scrolls sideways on a
+  narrow screen now. (The canvas's answer to a crowded bar is its control
+  centre; the shard has no pane to put one in yet.)
 - **Core's own primitive comparison is too forgiving between two closed
   outlines.** `matchPrimitiveFromLibrary` divides the corner difference by four
   and does not read `extent` at all, so a plain rectangle scored 0.79 against a
