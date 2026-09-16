@@ -299,15 +299,74 @@ Three consequences, each deliberate:
   `extrusion`, `revolve`) is the engine's word for what it *made*, never a name
   anyone gave it (§2.6); the hand's own name arrives through the field.
 - **One act, three events, one undo.** A solid is `summon` + `bless` + `code`.
-  `session.undo()` drops one event, so `log.undo()` walks back until a whole
-  act has gone — the solid if one stands on top of the log, else a stroke and
-  the plane held with it — and drops the orphaned `summon` behind a bless.
-  The ink is untouched either way, which is the done-criterion.
+  `session.undo()` drops one event, so `log.undo()` drops the whole act — see
+  *How undo knows where an act ends* below. The ink is untouched, which is the
+  done-criterion.
 - **Blessing takes the members off the content plane, and the shard puts them
   back.** That is right for a canvas (a page is one thing, not five strokes)
   and wrong for a shard, where the profile that became a box is still ink lying
   on the box's face. `log.marks()` therefore derives from every node carrying
   ink and a plane rather than from `contentIds`.
+
+## How undo knows where an act ends
+
+**The act boundary is the act's own timestamp, and it was already in the log.**
+
+An act is rarely one event. A stroke is two (the ink, then the plane proposed
+on it); a solid is three; a flip is three; a model's proposal is `3n + 1`,
+where n is however many profiles it drew — sixteen profiles is forty-nine
+events. `session.undo()` drops one event, so the shard has to know where the
+act ends.
+
+It used to guess: walk back up to **twelve** events and stop when something
+visible changed — a stroke count, an artifact, a tree, a correction, a
+definition. Twelve was a guess at how long an act could be, and the stopping
+rule was a guess at what an act does. The director review of 15 September 2026
+(ACT-1) reproduced both failing: with one generated profile, undo restored the
+old tree and left the model's circle standing on a board whose tree no longer
+mentioned it; with sixteen, it never reached the version at all and left all
+sixteen circles and the eighteen-step tree.
+
+Every act in `log.ts` already threads **one `at`** through every event it
+writes — `make` stamps its summon, its bless and its code alike, `applyProposal`
+stamps every profile it drew, the version and every take-in the same — so an
+act is exactly the run of consecutive events that agree on `at`. `undo` reads
+that run and drops it. Nothing new is recorded, no event gains a field, no
+marker is written, and **core's event schema is untouched**: changing that is a
+cross-surface contract and an architectural decision, not a worker's aside.
+Because the grouping is in the log rather than in memory, it survives a JSON
+round trip for free — a replayed log undoes exactly as the live one does, which
+is invariant 4 doing its job (a runtime ledger of act spans would be a second
+source of truth beside the log).
+
+Two stamps make that a rule rather than a coincidence, and both live in
+`stamp()`:
+
+- **No two acts share a time.** The clock can hand out the same millisecond
+  twice — a synthetic pointer does it constantly, and a fast hand can — and two
+  strokes a millisecond apart are still two strokes. An act whose time the log
+  already holds is recorded one millisecond later.
+- **A late result is stamped when it LANDS, not when it was asked for.** A
+  reply carrying the moment Enter was pressed is still stamped after the stroke
+  the hand drew while it waited, so it forms its own act on top: one undo takes
+  back the reply and leaves the stroke.
+
+The act table at the bottom of `createLog` is the only place a boundary is
+declared — the index of each verb's `at`, stamped once and then threaded by the
+verb itself.
+
+**Older logs.** Every log this shard has ever written carries an `at` on every
+event and threads a single one through each act, so an older log groups
+correctly under this rule with nothing to migrate — it undoes as it did, and in
+the two cases above, better. The old walk is kept as `undoByWalking` for the one
+log the rule cannot read: one whose events carry no usable time at all, from
+somewhere that is not this shard. That log undoes exactly as it always did.
+
+`src/act.test.ts` pins it: the review's own regression at one and sixteen
+profiles, human ink and names untouched, a late reply, two proposals on two
+solids, a JSON round trip undoing identically, two acts in one millisecond, the
+old walk on a log with no times, and a check that every verb in the table really
+does stamp one time of its own.
 
 ## The CSG seam, and what it does when it fails
 
@@ -942,9 +1001,9 @@ readings, the fingerprint and the maths were all computed from the ink at
 `addStroke` — a second `stroke` rep would never be seen, and a mark whose
 plane changed but whose readings did not would be a lie. So the flip is a new
 stroke, and it is **additive**: `add` the re-projected stroke, then `erase` the
-first, in that order. `log.undo()` walks back from the top until the stroke
-count falls, so it drops the erase, the plane and the stroke together and the
-first mark comes back on its first plane — one act, three events, one undo.
+first, in that order, all three under the flip's one timestamp — so `log.undo()`
+drops the erase, the plane and the stroke together and the first mark comes back
+on its first plane — one act, three events, one undo.
 The other order would leave the first mark erased. A mark a solid was made
 from is refused, and says why: the tree references that stroke id and was
 measured in that plane.
@@ -1300,11 +1359,11 @@ Open `http://localhost:5174` in its own tab, then in the console:
 ```js
 const src = await fetch('/e2e.js').then(r => r.text());
 (0, eval)(src);
-__scenario().then(r => window.__R = r);   // the seven packages and the compass, 78 steps
+__scenario().then(r => window.__R = r);   // the seven packages and the compass, 80 steps
 __demo().then(r => window.__D = r);       // the two-minute demo, 9 steps
 ```
 
-Seventy-eight steps. The first one clears the board **and parks the camera** —
+Eighty steps. The first one clears the board **and parks the camera** —
 `nav.projection('persp')`, `view('free')` — because every shape below is stated
 in a plane's own units and projected through the camera *as it stands*, so a
 run started after somebody had driven the compass by hand would read a circle

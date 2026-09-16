@@ -292,14 +292,25 @@
     return { line: r.line, name: after.name, named: after.named };
   });
 
-  step('undo removes the solid and leaves both strokes', () => {
+  // ACT-1 (the director review, 15 September 2026): the name is an act of its
+  // own, so it takes the first undo and the solid takes the second. This step
+  // used to press undo ONCE and find the solid gone — the walk it did then ate
+  // the name and the solid's tree together, and left the bless behind them:
+  // an artifact standing in the log with no tree, which is not a board anyone
+  // asked for. Undo taking MORE than one act is the same defect as taking less.
+  step('undo takes the name back; undo again removes the solid and leaves both strokes', () => {
+    S().undo();
+    const named = S().state().solids;
+    assert(named.length === 1, `${named.length} solids after the first undo — it took the solid as well as the name`);
+    assert(named[0].named === 'engine', `it is still named by ${named[0].named} — the name did not come off`);
+
     S().undo();
     assert(S().state().solids.length === 0, 'the solid survived the undo');
     const ids = S().state().marks.map((m) => m.id);
     assert(ids.length === 2, `${ids.length} marks left, expected 2`);
     assert(ids.includes(baseId) && ids.includes(extentId), 'the wrong marks survived');
     const status = S().state().status;
-    return { marks: ids.length, solids: 0, status };
+    return { marks: ids.length, solids: 0, name: named[0].name, status };
   });
 
   step('a closed profile and a line beside it, on one plane → a revolve', () => {
@@ -1052,6 +1063,8 @@
   const CASTLE = () => window.__castle;
 
   let castleId = null;
+  /** The stub's castle reply, with the plan's real stroke id in it — kept so it can be re-stubbed. */
+  let castleReply = null;
 
   /**
    * The stub's castle: three named steps, two circles of its own, green on the
@@ -1154,8 +1167,8 @@
     // The plan's stroke id is what the reply refers to — the region-id rule,
     // in stroke ids. The e2e reads it off the board rather than assuming it.
     const planId = S().state().marks[0].id;
-    const reply = CASTLE_REPLY.replace('"PLAN"', JSON.stringify(planId));
-    S().joinStub([reply, TALLER_REPLY]);
+    castleReply = CASTLE_REPLY.replace('"PLAN"', JSON.stringify(planId));
+    S().joinStub([castleReply, TALLER_REPLY]);
     const seats = S().models().seats;
     assert(seats.length === 1 && seats[0].name === 'e2e-stub', `seated: ${JSON.stringify(seats)}`);
     S().select(castleId);
@@ -1192,6 +1205,57 @@
     assert(/e2e-stub/.test(S().panelText()), 'the panel does not say who proposed it');
     assert(/tier 2/.test(S().state().status), `the status said "${S().state().status}"`);
     return { steps: solid.steps.map((st) => `${st.op}${st.name ? `:${st.name}` : ''}`), names: said, material: green[0] };
+  });
+
+  // ACT-1 (the director review, 15 September 2026). The model's reply is ONE
+  // act: two profiles drawn in its name (two events each), the version, and
+  // the take-in that makes each profile the tree's provenance — seven events
+  // under one timestamp. Undo used to walk back event by event and stop when
+  // it saw the tree change, which is the version — so the two circles the
+  // model had drawn were left standing on a board whose tree no longer
+  // mentioned them. One undo is the whole act now, and nothing else.
+  step('one undo takes the model’s whole act — the version AND both profiles it drew', () => {
+    const before = S().solids().find((x) => x.id === castleId);
+    assert(before.versions === 3, `${before.versions} versions before the undo, expected 3`);
+    const ink = S().state().marks.length;
+
+    S().undo();
+
+    const after = S().solids().find((x) => x.id === castleId);
+    assert(after, 'the undo took the whole solid — it should have taken one version');
+    assert(after.versions === 2, `${after.versions} versions after one undo, expected 2`);
+    assert(
+      after.steps.length === 1 && after.steps[0].op === 'massing',
+      `the tree is ${after.steps.map((st) => st.op).join(', ')}, expected the massing alone`
+    );
+    assert(after.broken === null, `the derivation broke: ${after.broken}`);
+    // The two circles went with the version they were drawn for; the three
+    // views the HAND drew are untouched.
+    const left = S().state().marks.length;
+    assert(left === ink - 2, `${ink - left} marks came off, expected the 2 profiles the model drew`);
+    assert(left === 3, `${left} marks left, expected the hand's three views`);
+    const names = S().names().filter((n) => n.solidId === castleId);
+    assert(names.length === 0, `the model's names are still in play: ${JSON.stringify(names.map((n) => n.name))}`);
+    return { versions: after.versions, marks: `${ink} → ${left}`, steps: after.steps.map((st) => st.op) };
+  });
+
+  step('the same brief again puts the castle back, whole', async () => {
+    // Re-stubbed rather than re-run off the queue: the seat answers the next
+    // call with the NEXT reply, and *make the turrets taller* below wants the
+    // one after this. Re-seating starts the queue again.
+    S().joinStub([castleReply, TALLER_REPLY]);
+    S().select(castleId);
+    const ran = S().field('a castle with green turret tops');
+    assert(ran.ran, `Enter did nothing: "${ran.line}"`);
+    await new Promise((r) => setTimeout(r, 140));
+
+    const solid = S().solids().find((x) => x.id === castleId);
+    assert(solid.versions === 3, `${solid.versions} versions, expected 3`);
+    assert(solid.broken === null, `the derivation broke: ${solid.broken}`);
+    const said = S().names().filter((n) => n.solidId === castleId).map((n) => n.name).sort();
+    assert(JSON.stringify(said) === JSON.stringify(['castle', 'top', 'turret']), `the names are ${JSON.stringify(said)}`);
+    assert(S().state().marks.length === 5, `${S().state().marks.length} marks, expected the hand's 3 and the model's 2`);
+    return { versions: solid.versions, names: said, marks: S().state().marks.length };
   });
 
   step('the extent invariant: the model’s tree is clipped to the massing, in the engine’s name', () => {
