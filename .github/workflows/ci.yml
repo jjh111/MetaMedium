@@ -35,6 +35,12 @@ jobs:
         run: node ../Demos/mcp-smoke.mjs
       - name: Surface fragments must match the built script
         run: node ../Demos/build-surface.mjs --check
+      # The one surface fragment that names nothing outside itself, so it can be
+      # asked questions without a browser (SEAM-1). node --test needs nothing
+      # installed, and the test finds the fragment relative to itself, so this
+      # job's working directory does not matter.
+      - name: The field's reader, on its own
+        run: node --test ../Demos/surface/09-field.test.mjs
 
   shard:
     name: shard-3d — typecheck, test, build

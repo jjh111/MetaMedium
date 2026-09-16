@@ -109,7 +109,7 @@ any structural change.
 | `doodle2-canvas.html` | **Flagship demo**: heuristic recognition, spatial graph, library, undo/redo, touch. No LLM. Single-file (~500KB) |
 | `metadoodle1.html` | Fork of flagship + tiered LLM recognition (WebLLM in-browser, LM Studio local API) + voice. Single-file (~600KB) |
 | `Web App Skeleton/` | React + Vite + TypeScript + Zustand rebuild; Claude API interpreter skeleton in `src/llm/`; recognition/spatial/matching in `src/core/` |
-| `Demos/surface/` | **The reference surface's source**: `surface.css` and twenty-two script fragments (`00-core`, `00-ui` … `19-text`, `20-controls`, then `90-boot`, which must stay last), one concern each, concatenated in name order into one closure by `Demos/build-surface.mjs` → the committed `Demos/session-engine.js` (CI checks it has not drifted). Fragments share the closure's variables — no imports; each fragment's header says what it provides and uses. Edit a fragment, run the build, commit both |
+| `Demos/surface/` | **The reference surface's source**: `surface.css` and twenty-four script fragments (`00-core`, `00-ui` … `20-controls`, `21-minimap`, then `90-boot`, which must stay last), one concern each, concatenated in name order into one closure by `Demos/build-surface.mjs` → the committed `Demos/session-engine.js` (CI checks it has not drifted). Fragments share the closure's variables — no imports; each fragment's header says what it provides and uses. Edit a fragment, run the build, commit both. **`09-field.js` is the exception that proves the rule** (SEAM-1): it names nothing outside itself, so the field's query is a pure function of a record and is unit-tested in Node with no browser — `node --test Demos/surface/09-field.test.mjs`, in CI's `core` job. A fragment's `.test.mjs` is not concatenated into the build |
 | `Demos/` | **`session-engine.html` is the MVP surface** (it links `surface/surface.css` and loads `session-engine.js`) — infinite canvas, the taught command mark, living artifacts in a DOM overlay, ink-over-artifact addressing, "why" inspector, model participants, canvas answers. Uses the committed `metamedium-core.browser.js` bundle. **`session-engine.e2e.js`** drives the whole loop through the real UI with a stubbed model (browser console; not part of `npm test`). `build-standalone.mjs` inlines the bundle into a single shareable file. **`mcp.mjs`** is the MCP hand (Claude Code's way onto the board; `.mcp.json` at the root registers it), over `relay.mjs` and `live-node.mjs`, with `ink-png.mjs` for the ink as a picture and `mcp-smoke.mjs` as its stdio test; `metamedium-core.node.mjs` is the committed Node bundle it runs (`npm run build:node`, drift-checked in CI like the browser bundle). Plus fish, composition diagrams, no-modes graph, etc. |
 | `skills/` | Claude Code skills: `metamedium-code` (code patterns), `metamedium-design` (design principles) |
 | `Assets/` | Figures and design rationale (recognition strategy, point-primitive proposal), and the social card. `make-card.mjs` regenerates that card from index.html's own hero — synthetic pointer input, so the picture shows the engine really reading a mark; `node Assets/make-card.mjs`. Change the picture and you must change the FILENAME and the four og:/twitter: tags in `index.html` and `404.html`, because scrapers cache by URL |
@@ -362,6 +362,22 @@ ink (and puts it on the clipboard as SVG); Paste puts it beside the selection
 or, from the keyboard, at the pen. A tap while the field or a selection is up
 dismisses it and is never a dot. `Demos/surface/05-selection.js`,
 `09-palette.js`.
+
+**The reader decides; it no longer acts** (SEAM-1, `Demos/surface/09-field.js`).
+What Enter will do is a pure function — `readFieldCommand(ctx)` — of a
+**`FieldContext`** record (the text, whether a summon stands and whether it is
+over a live artifact, the offers as labels and aliases, the joined models by
+name, what the library holds, the definition in the loop and what the verb table
+read in the words, and a thunk for the drawing's genre) returning a
+**`FieldReading`** (`kind`, the `line` shown under the field, `quiet`, and a
+**named command** — `take` · `name` · `ask-what` · `ask` · `draw` · `build` ·
+`library` · `behave` · `need-model`). `09-palette.js` is the adapter on both
+sides: `fieldContext` gathers, `runFieldCommand` performs, and `readField` keeps
+its old shape so nothing else changed. The point is that the field's query can
+now be asked questions in Node with no browser, no DOM and no session —
+`node --test Demos/surface/09-field.test.mjs`, in CI's `core` job. The genre is
+a thunk because reading it costs a pass over the marks and most keystrokes
+settle on a verb or a name long before the brief.
 
 **A loop that waits is plain ink.** Circle some marks and nothing lights
 up: the loop stays ink until the command mark crosses it — **or a
