@@ -92,6 +92,32 @@ be drawn on), whether the ends land on geometry that lies in it, and
 continuity with the last strokes. The inspector says it: *on the top face
 of box:1 — rectangle 0.88 there, a sliver on the ground*.
 
+**The gate: off-axis ink is conserved** (16 September 2026). John, drawing
+with nothing chosen: *"drawings off the main axis are on the camera plane
+mapped rather than the way it is stretching the shapes out now; the shapes
+drawn off main axes should stay conserved size at the angles that make
+sense."* The scorer above is a comparison, and a half-oblique plane can
+win one — at forty-five degrees a world plane loses only 22% of its
+facing term, and continuity and an anchor pay that back twice over. But
+casting a screen path onto a plane at that angle is not a reading of what
+the hand drew; it is a stretch of it, and a circle came back a long
+ellipse on the ground.
+
+So the rule, and it sits above the formula rather than inside it: **the
+`view` plane is the default, and a candidate has to make sense at its
+angle before its evidence counts at all.** Below `FACING_TAKES` (0.80,
+37° off face-on — under the 0.844 at which the shard's own default view
+sees the ground, so the view you are given can still take a face) a
+`world`, `previous` or `face` candidate is kept, said out loud, offered by
+the runner-up chip, and **cannot outrank the view plane**, whatever it
+scores; above it nothing changes. At pen-down a face under the pen keeps
+its precedence only if it passes, and otherwise the stroke lands on the
+view plane **at the depth of that face** — where the hand pointed, at the
+size it was drawn, because a screen-facing plane makes the cast a
+similarity transform. A **chosen** plane is untouched: it is blessed by
+the act, and the hand may lay ink on it at any angle, with the edge-on
+warning of §10 as it was.
+
 ### 2.2 The shape rung — unchanged
 
 `line`, `arc`, `triangle`, `rectangle`, `circle`, `arrow`, `text`, `dot`,

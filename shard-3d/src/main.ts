@@ -246,16 +246,22 @@ function scopeAt(screen: Point): PenScope {
   };
 }
 
+/** A path's own box, in whatever units the path is in. */
+function inkBounds(points: Point[]): { minX: number; minY: number; maxX: number; maxY: number } {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const p of points) {
+    minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
+    minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y);
+  }
+  return { minX, minY, maxX, maxY };
+}
+
 /** A mark's centre in world space — where a chip stands, and how deep it is. */
 function centreWorld(id: string): Vec3 | null {
   const m = log.markOf(id);
   if (!m) return null;
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-  for (const p of m.points) {
-    minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
-    minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y);
-  }
-  return toWorld(m.plane, { x: (minX + maxX) / 2, y: (minY + maxY) / 2 });
+  const b = inkBounds(m.points);
+  return toWorld(m.plane, { x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2 });
 }
 
 // ---- the gizmo claims a tap before the pen sees it -------------------------
@@ -1629,6 +1635,13 @@ export interface ShardHook {
       id: string;
       plane: { name?: string; source: string; why: string };
       scale: number;
+      /**
+       * The ink's own box **in the plane's units** — the shape as it ended up
+       * lying there. What a cast onto the view plane conserves and a cast onto
+       * an oblique plane stretches is exactly this box's aspect, so the e2e can
+       * measure the conservation rather than take the plane's word for it.
+       */
+      bounds: { minX: number; minY: number; maxX: number; maxY: number };
       readings: { label: string; weight: number; reasoning?: string }[];
       plays?: {
         role: string;
@@ -1640,7 +1653,17 @@ export interface ShardHook {
         against?: { solidId: string; name: string; view: string; iou: number };
       };
       /** The ranked plane candidates the winner beat — the plural reading. */
-      candidates?: { label: string; source: string; confidence: number; reasoning: string; oblique: boolean }[];
+      candidates?: {
+        label: string;
+        source: string;
+        confidence: number;
+        reasoning: string;
+        oblique: boolean;
+        /** Held below the view plane: too oblique to take the stroke without stretching it. */
+        gated: boolean;
+        /** |n · look| — how face-on it is, the number the gate is read against. */
+        facing: number;
+      }[];
       /** True when this ink's own view has been left, so it is drawn faint. */
       faded: boolean;
       pose?: Pose;
@@ -1920,6 +1943,7 @@ const hook: ShardHook = {
           id: m.id,
           plane: { name: m.plane.name, source: m.plane.source, why: m.plane.why },
           scale: m.scale,
+          bounds: inkBounds(m.points),
           readings: m.readings.map((r) => ({ label: r.label, weight: r.weight || 0, reasoning: r.reasoning })),
           plays: f
             ? {
@@ -1946,6 +1970,8 @@ const hook: ShardHook = {
             confidence: c.confidence,
             reasoning: c.reasoning,
             oblique: c.oblique,
+            gated: !!c.gated,
+            facing: c.terms?.facingRaw ?? 1,
           })),
           faded: ink.faded(m.id),
           ...(m.pose ? { pose: m.pose } : {}),
@@ -2500,8 +2526,14 @@ if (DEMO === 'mug') {
       choose('height');
       hook.strokeScreen(run({ x: MUG.plan.x, y: 0 }, { x: MUG.plan.x, y: -MUG.top }).map((p) => hook.screenFor(p)));
       // 3 · un-choose, orbit, and a circle on the top face → *Cut a hole*.
+      // The orbit goes far enough UP to be looking into the mug: the rim is
+      // then 0.96 face-on and takes the stroke. It used to stop at 0.04, which
+      // left the rim 0.70 face-on — an angle at which the face still outscored
+      // the view plane and the circle landed on it as a 1.4:1 ellipse. The
+      // gate holds that now (16 Sep 2026), so the demo orbits to the angle it
+      // was always describing: you look into the cup, then you draw the hole.
       choose(null);
-      hook.orbit(0.3, 0.04);
+      hook.orbit(0.3, 0.3);
       hook.strokeScreen(ringOnFace());
       hook.field('Cut a hole');
       // 4 · the brief. A stub, so the demo is a demo and not a call.

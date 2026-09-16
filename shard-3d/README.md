@@ -995,7 +995,9 @@ never scored zero for a squiggle. **Facing** is
 gentle on purpose because a box's top seen from above is only 84% face-on and
 must not lose to the view plane for being 100%; below `FACING_FLOOR` the
 candidate is **kept, marked *too oblique to read*, and can never win** (plan
-§10's last risk). **Anchor** is how much of the stroke lies on geometry that
+§10's last risk), and below `FACING_TAKES` it is **kept, marked *too oblique to
+take the stroke*, and cannot outrank the view plane** — see *the gate*, below.
+**Anchor** is how much of the stroke lies on geometry that
 lies in that plane — a face's own corners, the previous stroke's bounds — as a
 ratio of the stroke's own size: `ANCHOR_BASE` when there is nothing there
 (absence of evidence), up to 1 when the ink lies on it, and **down to
@@ -1007,6 +1009,57 @@ evidence and any one of them being bad *should* pull the whole candidate down:
 a plane the stroke reads as nothing on, seen nearly edge-on, with nothing in
 it, is not saved by being recent. Every term is returned on the candidate, so
 the panel shows the evidence and not only the number.
+
+## The design decision: the gate — off-axis ink is conserved
+
+John, 16 September 2026, drawing with nothing chosen: *"drawings off the main
+axis are on the camera plane mapped rather than the way it is stretching the
+shapes out now; the shapes drawn off main axes should stay conserved size at
+the angles that make sense."*
+
+The scorer is a comparison of evidence, and a half-oblique plane can win one.
+At forty-five degrees a world plane's facing term costs it only 22%, and
+continuity plus an anchor pay that back twice over — so a circle drawn beside a
+box came back a long ellipse lying on the ground. Casting a screen path onto a
+plane at that angle is not a reading of what the hand drew; it is a stretch of
+it, and no amount of confidence makes the stretch the shape John made.
+
+So with nothing chosen the **view plane is the default**, and evidence does not
+merely have to beat it — it has to **make sense at its angle** first.
+`FACING_TAKES` (0.80, 37° off face-on) is that gate: below it a `world`,
+`previous` or `face` candidate is kept, said out loud, still offered by the
+runner-up chip, and **cannot outrank the view plane**, whatever its shape score.
+Above it the four terms decide exactly as before. It applies at pen-down too: a
+face under the pen keeps its precedence only if it passes, and otherwise the
+stroke goes on the **view plane at the depth of that face**, so the ink lies
+where the hand pointed without being stretched across it.
+
+The number is bounded from above by the shard's own default three-quarter view,
+which sees a horizontal plane at **0.844** (`DEFAULT_PHI`, 57.6° above the
+horizon). A gate over that would mean the view the shard *opens on* could not
+take a face at all, and P2/P3 — a profile on a face, a feature in one — would
+have nowhere to land. So it sits just under it.
+
+What the view plane conserves is not a threshold but a property: it is
+screen-facing by construction, so the cast is a **similarity transform** — the
+circle is the circle, at the depth the hand pointed at. `planarity.test.ts`
+pins the aspect to within 1%, and the e2e measures the same thing through the
+real pointer path at a 49° view: `1.0000` on the view plane, `0.825` the moment
+the ground is taken from the chip.
+
+Two things the gate deliberately does **not** do. It does not touch a **chosen**
+plane: the gizmo's tile is a decision, and a decision is not a reading to argue
+with — choose the foundation and the stroke lies on it at any angle, with the
+edge-on warning as it was. And it does not *drop* anything: the gated plane is
+in the panel with its number, its facing, and what taking it would cost, and the
+chip takes it in one act. The hand overrules the gate; the gate never overrules
+the hand.
+
+The demo was leaning on the defect. `?demo=mug` orbited by 0.04 before drawing
+the hole, which left the rim 0.70 face-on — an angle at which the face outscored
+the view plane 0.68 to 0.55 and the circle landed on the rim as a 1.4:1 ellipse.
+It now orbits to 0.3 and looks *into* the mug, which is the angle the demo's own
+sentence was always describing.
 
 ## The design decision: how a flip is one act
 

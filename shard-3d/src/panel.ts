@@ -25,6 +25,7 @@ import type { Honours } from './brief';
 import type { ProfileMatch } from './library';
 import { depthsOf, describeStep, rootOf } from './op';
 import { poseAngle, type Plane, type Pose } from './plane';
+import { candidateNote } from './planarity';
 import type { Sel } from './selection';
 import { chip, esc, eyebrow, row, sep } from './ui';
 
@@ -749,10 +750,14 @@ function renderMark(mark: Mark, log: Log, faded: boolean): string {
   if (mark.candidates?.length) {
     html += eyebrow('read against', `${mark.candidates.length} candidates`);
     for (const c of mark.candidates) {
-      html += row(c.label, c.confidence.toFixed(2), c.reasoning);
+      // The number, and then what the number does not say: *shape conserved*
+      // for the view plane, *too oblique to take the stroke* for a candidate
+      // the gate holds below it. Visible in the list, not only in the tooltip.
+      html += row(c.label, c.confidence.toFixed(2) + candidateNote(c), c.reasoning);
     }
     html += '<div class="why">' + esc(
-      'confidence = shape × facing × anchor × continuity — the shape rung on that plane, how face-on it is, whether the ink lies on geometry there, and whether the stroke before lay on it'
+      'confidence = shape × facing × anchor × continuity — the shape rung on that plane, how face-on it is, whether the ink lies on geometry there, and whether the stroke before lay on it. ' +
+      'With nothing chosen the view plane is the default: it is screen-facing, so the ink keeps the shape it was drawn at, and a plane too oblique to take the stroke cannot outrank it however well the ink reads there — the chip takes it in one act if that is what you meant'
     ) + '</div>';
   } else if (mark.plane.source === 'chosen') {
     html += '<div class="why">' + esc('chosen by the hand — blessed by the act, so nothing was scored against it') + '</div>';

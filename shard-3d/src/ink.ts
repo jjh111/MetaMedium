@@ -414,6 +414,9 @@ export function createInk(o: InkOptions): Ink {
         at: scope.at,
         recentWindowMs: scope.recentWindowMs,
       });
+      // `rank` has already banded them — everything that makes sense at its
+      // angle, then everything the gate holds below the view plane, then
+      // everything too oblique to read — so the winner is simply the first.
       const win = ranked.find((c) => !c.oblique) ?? ranked[0];
       const projected = win ? projectOnto(win.plane, screen, space.rayFor) : null;
       if (win && projected) {

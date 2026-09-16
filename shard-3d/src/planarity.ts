@@ -24,6 +24,9 @@
 //     above is 0.85 face-on and must not be beaten by the view plane for
 //     being 1.0. Below FACING_FLOOR the candidate is kept and marked
 //     *too oblique to read*, and can never win (§10's last risk).
+//     Below FACING_TAKES — well above that floor — the candidate is kept,
+//     marked *too oblique to take the stroke*, and cannot outrank the VIEW
+//     plane however well the stroke reads on it. See THE GATE, below.
 //   * **anchor** — how much of the stroke lies on geometry that lies in that
 //     plane (a face's own bounds, the previous stroke's bounds), as a ratio
 //     of the stroke's own size. Three cases, and the third is the one that
@@ -47,6 +50,39 @@
 // independent evidence and any one of them being bad SHOULD pull the whole
 // candidate down: a plane the stroke reads as nothing on, seen nearly
 // edge-on, with nothing in it, is not saved by being recent.
+// ---------------------------------------------------------------------------
+//
+// ---------------------------------------------------------------------------
+// THE GATE: off-axis ink is CONSERVED (16 September 2026)
+//
+// John, drawing with nothing chosen: *"drawings off the main axis are on the
+// camera plane mapped rather than the way it is stretching the shapes out
+// now; the shapes drawn off main axes should stay conserved size at the
+// angles that make sense."*
+//
+// The formula above is a comparison of evidence, and a half-oblique plane can
+// win one: at forty-five degrees a world plane's facing term costs it only
+// 22%, and continuity plus an anchor pay that back twice over. But casting a
+// screen path onto a plane at forty-five degrees is not a reading of what the
+// hand drew — it is a stretch of it. The circle John drew came back a long
+// ellipse lying on the ground, and no amount of confidence makes that the
+// shape he made.
+//
+// So the view plane is the DEFAULT, and evidence does not merely have to beat
+// it — it has to **make sense at its angle** first. `FACING_TAKES` is that
+// gate: below it a `world`, `previous` or `face` candidate is kept, said out
+// loud, offered by the chip, and **cannot outrank the view plane**, whatever
+// its shape score. Above it the evidence decides exactly as before.
+//
+// The view plane is screen-facing by construction, so casting the screen path
+// onto it is a SIMILARITY transform — the same shape at the same aspect, at
+// the depth of whatever the hand pointed at. That is the conservation, and it
+// is a property of the geometry, not a threshold: `planarity.test.ts` pins a
+// circle's aspect to within 1%.
+//
+// Nothing here touches a CHOSEN plane: the gizmo's tile is a decision, and a
+// decision is not a reading to argue with (§2.1). Choose the foundation and
+// the stroke lies on it at any angle, with the edge-on warning as it was.
 // ---------------------------------------------------------------------------
 //
 // No three.js. The camera arrives as a ray-caster function, the way `plane.ts`
@@ -82,6 +118,23 @@ export const SHAPE_FLOOR = 0.15;
 export const FACING_BASE = 0.55;
 /** Below this |n · look| a candidate is *too oblique to read* and never wins (§10). */
 export const FACING_FLOOR = 0.15;
+/**
+ * **The gate** (see THE GATE, above). Below this |n · look| a `world`,
+ * `previous` or `face` candidate cannot outrank the VIEW plane, whatever it
+ * scores: at that angle the screen path is not read onto the plane, it is
+ * stretched across it, and a shape the hand did not draw is not evidence.
+ *
+ * 0.80 is 37° off face-on, and it is bounded from above by the shard's own
+ * default three-quarter view, which sees a horizontal plane — the ground, a
+ * box's top — at 0.844 (`DEFAULT_PHI` in `scene.ts`, 57.6° above the
+ * horizon). A gate over that number would mean the view the shard OPENS on
+ * could not take a face at all, and P2/P3 — a profile on a face, a feature in
+ * one — would have nowhere to land. So it sits just under it: the view you
+ * are given can draw on a face, and tilting further off it conserves the
+ * shape instead. At the gate the stretch is 1/0.8 = 25%, which is the most
+ * distortion a reading is allowed to carry before the hand's own shape wins.
+ */
+export const FACING_TAKES = 0.8;
 /** The anchor term with nothing in the plane to anchor to — absence of evidence. */
 export const ANCHOR_BASE = 0.7;
 /** The anchor term when there IS geometry in the plane and the ink is nowhere near it. */
@@ -126,6 +179,12 @@ export interface PlaneCandidate {
   reasoning: string;
   /** Kept, but never the winner (§10). */
   oblique: boolean;
+  /**
+   * Kept, offered by the chip, and never above the view plane: at this angle
+   * taking the stroke would stretch it rather than read it (THE GATE). The
+   * view plane itself is screen-facing by construction and is never gated.
+   */
+  gated?: boolean;
   /** The geometry in this plane the stroke may lie on. */
   anchor?: Anchor;
   /** Every term of the formula, so the panel can show the evidence, not only the number. */
@@ -393,18 +452,27 @@ export function candidatesFor(scope: PenScope): PlaneCandidate[] {
 /**
  * The plane to project LIVE onto, from the pen-down evidence alone (§3: "a
  * stroke's plane is fixed at pen-down and the stroke is projected live so it
- * stays flat"). A face under the pen beats everything; else the previous
- * plane when it is recent AND the pen came down near that stroke; else the
- * view plane, which is the default the table names.
+ * stays flat"). A face under the pen beats everything **that makes sense at
+ * its angle**; else the previous plane when it is recent AND the pen came
+ * down near that stroke, under the same gate; else the view plane, which is
+ * the default the table names.
+ *
+ * A face under the pen that is too oblique to take the stroke (THE GATE) does
+ * not lose its depth, only its angle: the view plane already stands at the
+ * depth of the thing under the pen (`viewAnchor`), so the ink lies exactly
+ * where the hand pointed and is not stretched across the face. The chip then
+ * offers the face, one tap away.
  *
  * It is deliberately NOT the scorer: at pen-down there is no stroke to read,
  * so the only evidence is where the pen is. The scorer runs at pen-up.
  */
 export function pickAtPenDown(scope: PenScope, candidates: PlaneCandidate[]): PlaneCandidate {
-  const face = candidates.find((c) => c.plane.source === 'face');
-  if (face) return face;
+  const takeable = (c: PlaneCandidate) => facing(c.plane, scope.look) >= FACING_TAKES;
 
-  const prev = candidates.find((c) => c.plane.source === 'previous');
+  const face = candidates.find((c) => c.plane.source === 'face');
+  if (face && takeable(face)) return face;
+
+  const prev = candidates.find((c) => c.plane.source === 'previous' && takeable(c));
   if (prev && scope.previous) {
     const at = rayPlane(scope.ray(scope.pen), prev.plane);
     if (at) {
@@ -470,6 +538,12 @@ export function rank(scope: RankScope): PlaneCandidate[] {
     const facingRaw = facing(c.plane, scope.look);
     const facingTerm = FACING_BASE + (1 - FACING_BASE) * facingRaw;
     const oblique = facingRaw < FACING_FLOOR;
+    // THE GATE: the view plane is the default, and a plane that does not make
+    // sense at its angle cannot take the stroke from it however well the ink
+    // reads there. The view plane is screen-facing by construction, so it is
+    // never gated — it is the thing the gate protects.
+    const isView = c.plane.source === 'view';
+    const gated = !isView && facingRaw < FACING_TAKES;
 
     // ---- anchor: does the ink lie on geometry in this plane? ---------------
     const size = Math.max(sizeOfPoints(points), 1e-6);
@@ -499,24 +573,46 @@ export function rank(scope: RankScope): PlaneCandidate[] {
       `, ${facingRaw > 0.85 ? 'nearly flat on' : `${(facingRaw * 100).toFixed(0)}% face-on`} to the camera` +
       anchorWhy +
       (continues ? ', and the stroke a moment ago lay on it' : '') +
-      (oblique ? ` — too oblique to read (under ${(FACING_FLOOR * 100).toFixed(0)}% face-on), so it is held but cannot win` : '');
+      // The view plane says what it conserves; a gated one says what it would
+      // have cost. Both are reasons, said out loud, in the panel's own list.
+      (isView ? ' — shape conserved: the screen path lands here at the size it was drawn' : '') +
+      (oblique
+        ? ` — too oblique to read (under ${(FACING_FLOOR * 100).toFixed(0)}% face-on), so it is held but cannot win`
+        : gated
+          ? ` — too oblique to take the stroke (facing ${facingRaw.toFixed(2)}, under ${FACING_TAKES.toFixed(2)}): ` +
+            `casting it here would stretch it by up to ×${(1 / Math.max(facingRaw, 1e-6)).toFixed(2)} across the plane's steepest direction, ` +
+            `so the view plane keeps it — tap to take this one anyway`
+          : '');
 
     scored.push({
       ...c,
       confidence,
       reasoning,
       oblique,
+      gated,
       terms: { shape, shapeLabel, facing: facingTerm, facingRaw, anchor: anchorTerm, continuity },
     });
   }
 
-  // Ranked by confidence, with every oblique candidate below every readable
-  // one: it is kept and said out loud, and it never wins (§10).
-  scored.sort((a, b) => Number(a.oblique) - Number(b.oblique) || b.confidence - a.confidence);
+  // Ranked by confidence in three bands, and the bands are the two rules:
+  // every candidate that makes sense at its angle first, then every one that
+  // does not (THE GATE — it cannot outrank the view plane, which is never
+  // gated), then every one too oblique to read at all (§10). Each is kept and
+  // said out loud; neither can win.
+  const band = (c: PlaneCandidate) => (c.oblique ? 2 : c.gated ? 1 : 0);
+  scored.sort((a, b) => band(a) - band(b) || b.confidence - a.confidence);
   return scored;
 }
 
-/** The winner and the runner-up, for the chip: `top of artifact:7 0.82 · view 0.41`. */
+/**
+ * The winner and the runner-up, for the chip: `top of artifact:7 0.82 · view 0.41`.
+ *
+ * A GATED runner-up is still offered. The gate says the evidence may not TAKE
+ * the stroke by itself; it does not say the hand cannot have meant it, and a
+ * hand that drew on the foundation from three-quarters on must be able to say
+ * so in one act. Only a candidate too oblique to read at all is withheld —
+ * there is nothing to flip onto.
+ */
 export function chipTextFor(ranked: PlaneCandidate[]): string | null {
   if (ranked.length < 2) return null;
   const [win, next] = ranked;
@@ -524,7 +620,19 @@ export function chipTextFor(ranked: PlaneCandidate[]): string | null {
   return `${win.label} ${win.confidence.toFixed(2)} · ${next.label} ${next.confidence.toFixed(2)}`;
 }
 
+/**
+ * What a candidate's number does NOT say, in a few words: why it cannot win,
+ * or — for the view plane — what it keeps. The panel puts this beside the
+ * confidence so the gate is visible in the list itself and not only in a
+ * tooltip: a reading the hand cannot see the reason for is a verdict.
+ */
+export function candidateNote(c: PlaneCandidate): string {
+  if (c.oblique) return ' · too oblique to read';
+  if (c.gated) return ` · too oblique to take the stroke (facing ${(c.terms?.facingRaw ?? 0).toFixed(2)})`;
+  return c.plane.source === 'view' ? ' · shape conserved' : '';
+}
+
 /** One line for the panel and the status line: the plane, its source, its number. */
 export function describeCandidate(c: PlaneCandidate): string {
-  return `${c.label} ${c.confidence.toFixed(2)}${c.oblique ? ' · too oblique to read' : ''}`;
+  return `${c.label} ${c.confidence.toFixed(2)}${candidateNote(c)}`;
 }

@@ -580,6 +580,117 @@
     return { solids: s.solids.length, marks: s.marks.length, sources };
   });
 
+  step('off the main axis, a circle keeps the shape it was drawn — and the ground says what it would have cost', () => {
+    // John, 16 September 2026: *"drawings off the main axis are on the camera
+    // plane mapped rather than the way it is stretching the shapes out now;
+    // the shapes drawn off main axes should stay conserved size at the angles
+    // that make sense."* The circle here is drawn as a SCREEN path, which is
+    // what a hand leaves; the question is only what it becomes.
+    //
+    // Its own board, and a box built the way P2 builds one: the marks before it
+    // are on CHOSEN planes, so the read is about where this stroke lands and
+    // not about an argument the last stroke left standing.
+    const aspect = (b) => (b.maxX - b.minX) / (b.maxY - b.minY);
+    S().clear();
+    S().view('free');
+    S().choose('foundation');
+    assert(S().strokeScreen(onScreen(rectPath(BOX.x0, BOX.z0, BOX.x1 - BOX.x0, BOX.z1 - BOX.z0))), 'no profile was made');
+    S().choose('height');
+    assert(S().strokeScreen(onScreen(linePath({ x: BOX.x0, y: 0 }, { x: BOX.x0, y: -BOX.top }))), 'no extent was made');
+    S().choose(null);
+    assert(S().state().solids.length === 1, 'the box did not stand');
+    const vp = S().viewport();
+    const ring = () => {
+      const cx = vp.left + vp.width * 0.62;
+      const cy = vp.top + vp.height * 0.45;
+      return Array.from({ length: 65 }, (_, i) => {
+        const t = (i / 64) * Math.PI * 2;
+        return { x: cx + Math.cos(t) * 90, y: cy + Math.sin(t) * 90 };
+      });
+    };
+
+    // 1 · the view the shard opens on. The ground is 0.84 face-on here — inside
+    // the gate — so it is a fair candidate and simply loses on the evidence.
+    S().view('free');
+    const home = S().strokeScreen(ring());
+    assert(home, 'no mark was made');
+    const hm = markOf(home);
+    assert(hm.plane.source === 'view', `the plane was read as ${hm.plane.source}, not view`);
+    const homeAspect = aspect(hm.bounds);
+    assert(Math.abs(homeAspect - 1) < 0.01, `the circle came back ${homeAspect.toFixed(3)} : 1 in its own plane`);
+    const ground = hm.candidates.find((c) => c.label === 'foundation');
+    assert(ground, `the ground was not offered: ${hm.candidates.map((c) => c.label).join(', ')}`);
+    assert(!ground.gated, `the ground is gated at ${ground.facing.toFixed(2)} face-on from the default view`);
+    S().undo();
+
+    // 2 · orbit down to a real three-quarter angle and draw the same circle.
+    // The ground is now too oblique to TAKE it: casting the path there would
+    // stretch it, so the view plane keeps it at the size it was drawn.
+    S().orbit(0, -0.15);
+    const id = S().strokeScreen(ring());
+    assert(id, 'no mark was made off-axis');
+    const m = markOf(id);
+    assert(m.plane.source === 'view', `the plane was read as ${m.plane.source}, not view`);
+    const planeAspect = aspect(m.bounds);
+    assert(
+      Math.abs(planeAspect - 1) < 0.01,
+      `the circle is ${planeAspect.toFixed(3)} : 1 in its own plane — it was stretched, not conserved`
+    );
+    assert(/shape conserved/.test(m.candidates[0].reasoning), `the winner's reason was "${m.candidates[0].reasoning}"`);
+
+    // The ground is held, said out loud, and below the view whatever it scored.
+    const gated = m.candidates.find((c) => c.label === 'foundation');
+    assert(gated, `the ground was not offered: ${m.candidates.map((c) => c.label).join(', ')}`);
+    assert(gated.gated === true, `the ground was not gated at ${gated.facing.toFixed(2)} face-on`);
+    assert(gated.facing < 0.8, `the ground is ${gated.facing.toFixed(2)} face-on — not off-axis at all`);
+    assert(!gated.oblique, 'the ground was called unreadable, not merely too oblique to take the stroke');
+    assert(
+      /too oblique to take the stroke \(facing 0\.\d\d/.test(gated.reasoning),
+      `the ground's reason was "${gated.reasoning}"`
+    );
+    assert(/stretch it by up to ×1\.\d\d/.test(gated.reasoning), `it does not say what it would cost: "${gated.reasoning}"`);
+    assert(m.candidates.indexOf(gated) > 0, 'a gated plane outranked the view');
+    assert(
+      m.candidates.every((c) => !c.gated || m.candidates.indexOf(c) > 0),
+      'a gated candidate is at the top of the reading'
+    );
+
+    // …and it is still one act away: the chip offers it, and the panel says why.
+    const chip = S().chipFor(id);
+    assert(chip && /foundation/.test(chip), `the chip does not offer the ground: "${chip}"`);
+    const text = S().panelText();
+    assert(/shape conserved/.test(text), 'the panel does not say the view plane conserved the shape');
+    assert(/too oblique to take the stroke/.test(text), 'the panel does not say why the ground could not have it');
+
+    // The flip is the hand overruling the gate — one act, and it lands.
+    const which = m.candidates.indexOf(gated);
+    const flipped = S().flipPlane(id, which);
+    assert(flipped, 'the ground could not be taken');
+    const after = markOf(flipped);
+    assert(after.plane.name === 'foundation', `it flipped to ${after.plane.name}`);
+    // …and there, plainly, is what the gate is about: on the ground the same
+    // screen path is no longer a circle. (It runs long in v, the direction
+    // going away from the camera, so the ratio falls below 1 rather than above.)
+    const stretched = aspect(after.bounds);
+    assert(
+      Math.abs(stretched - 1) > 0.1,
+      `taken onto the ground the circle is ${stretched.toFixed(3)} : 1 — no stretch, so there was nothing to gate`
+    );
+    S().undo();
+    S().undo();
+
+    return {
+      home: { aspect: +homeAspect.toFixed(4), ground: `${ground.label} f${ground.facing.toFixed(2)}` },
+      offAxis: {
+        plane: m.plane.source,
+        aspect: +planeAspect.toFixed(4),
+        chip,
+        onTheGround: +stretched.toFixed(3),
+        candidates: m.candidates.map((c) => `${c.label} ${c.confidence.toFixed(2)} f${c.facing.toFixed(2)}${c.gated ? ' gated' : ''}`),
+      },
+    };
+  });
+
   step('an extent drawn with nothing chosen is ambiguous, and the chip settles it', () => {
     // The honest case, and the one §10's first risk is about: a straight screen
     // stroke reads `line 0.9` on EVERY plane, so the shape rung — the strongest
@@ -1987,7 +2098,12 @@
   demo('3 · orbit, nothing chosen — a circle on the top face is a FEATURE, and *Cut a hole* takes it', () => {
     const m = MUG();
     S().choose(null);
-    S().orbit(0.3, 0.04);
+    // Far enough UP to be looking into the mug: the rim is then 0.96 face-on
+    // and takes the stroke. It used to stop at 0.04, which left the rim 0.70
+    // face-on — an angle at which the face still outscored the view plane and
+    // the circle landed on it stretched 1.4:1. The gate holds that now
+    // (16 Sep 2026); the demo orbits to the angle it was always describing.
+    S().orbit(0.3, 0.3);
     mugHole = S().strokeScreen(
       Array.from({ length: 57 }, (_, i) => {
         const t = (i / 56) * Math.PI * 2;

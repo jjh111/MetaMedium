@@ -536,12 +536,18 @@ export function createLog(): Log {
    */
   function strip(candidates?: PlaneCandidate[]): PlaneCandidate[] | undefined {
     if (!candidates) return undefined;
-    return candidates.map(({ plane, label, confidence, reasoning, oblique, terms, anchor }) => ({
+    return candidates.map(({ plane, label, confidence, reasoning, oblique, gated, terms, anchor }) => ({
       plane,
       label,
       confidence,
       reasoning,
       oblique,
+      // Why this candidate could not take the stroke is part of the reading,
+      // not part of the geometry: a mark read back from the log must still be
+      // able to say *the ground was held below the view, and here is what it
+      // would have cost*. Dropped, the panel showed a gated plane outranked
+      // with no reason on its face.
+      gated,
       ...(terms ? { terms } : {}),
       ...(anchor ? { anchor } : {}),
     }));
