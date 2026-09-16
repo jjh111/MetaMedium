@@ -1,0 +1,296 @@
+/* ==========================================================================
+   shard 3d — the surface.
+   Every colour, face and size comes from ../brand/tokens.css. Nothing here
+   restates a hex, and no rule below the token layer branches on theme: light
+   and dark are the same tokens inverted (brand/README.md, law 1).
+   ========================================================================== */
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--face);
+  font-size: var(--t-small);
+  -webkit-font-smoothing: antialiased;
+}
+
+#space { position: fixed; inset: 0; }
+.stage { display: block; width: 100%; height: 100%; touch-action: none; cursor: crosshair; }
+
+/* ---- the bar: one line, and nothing in it explains the system ----------- */
+#bar {
+  position: fixed; top: 0; left: 0; right: 0; height: 40px;
+  display: flex; align-items: center; gap: var(--s2);
+  padding: 0 var(--s3);
+  background: color-mix(in srgb, var(--paper) 88%, transparent);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--rule-soft);
+  z-index: 10;
+}
+.wordmark { font-weight: 600; letter-spacing: -0.01em; }
+.wordmark .dim { color: var(--ink-3); font-weight: 400; }
+.grow { flex: 1; }
+
+/* ---- components (surface/00-ui.js, ported) ------------------------------ */
+.pill, .chip, .tile {
+  font-family: var(--face);
+  font-size: var(--t-meta);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--rule);
+  background: var(--paper-lt);
+  color: var(--ink);
+  padding: 3px 8px;
+  line-height: 1.5;
+}
+.pill { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; }
+.pill:hover, .tile:hover { border-color: var(--teal); color: var(--teal); }
+.pill:disabled { opacity: 0.45; cursor: default; }
+.pill .dot { width: 5px; height: 5px; border-radius: 50%; background: var(--sig-model); display: inline-block; }
+.chip { color: var(--ink-3); }
+.tile { cursor: pointer; display: inline-flex; align-items: baseline; gap: 6px; }
+.tile .k { color: var(--ink-3); }
+.tile .v { color: var(--ink); }
+.tile.on { border-color: var(--teal); background: var(--wash); }
+.tile.on .k, .tile.on .v { color: var(--teal); }
+
+/* ---- chips beside a mark, in screen space -------------------------------
+   The runner-up plane, a tap from being taken. The layer passes the pointer
+   through; only the chip itself takes it, so a chip never stops a stroke. */
+#chips { position: fixed; inset: 0; pointer-events: none; z-index: 8; }
+#chips .planeChip {
+  pointer-events: auto;
+  transform: translate(12px, -50%);
+  white-space: nowrap;
+  cursor: pointer;
+  color: var(--teal);
+  border-color: var(--teal);
+  background: color-mix(in srgb, var(--paper-lt) 94%, transparent);
+  box-shadow: var(--lift);
+}
+#chips .planeChip:hover { background: var(--wash); }
+
+/* P6: what the LIBRARY says this outline could be — *mug 0.82*, a tap from
+   being placed. The same chip, standing under the plane's rather than over it:
+   two offers about one mark are two chips, because they are about two
+   different things. */
+#chips .libChip {
+  pointer-events: auto;
+  transform: translate(12px, calc(-50% + 26px));
+  white-space: nowrap;
+  cursor: pointer;
+  color: var(--teal);
+  border-color: var(--teal);
+  background: color-mix(in srgb, var(--paper-lt) 94%, transparent);
+  box-shadow: var(--lift);
+}
+#chips .libChip:hover { background: var(--wash); }
+
+/* ---- the compass: the camera's own corner --------------------------------
+   Every way of moving the camera in one place — the compass, *home*, the
+   projection, the pinned views. It stands clear of the panel rather than over
+   it: the top-right of the CANVAS is where the panel is not.
+
+   Nothing here carries a hex. The axes are the sea ink, the ball that faces
+   the chosen plane is the teal keyword — the same signal the picker's tile
+   uses, because they are saying the same thing. */
+#nav {
+  position: fixed; top: 48px; right: calc(320px + var(--s3));
+  display: flex; flex-direction: column; align-items: flex-end; gap: 6px;
+  z-index: 9;
+}
+.compass {
+  width: 104px; height: 104px; display: block;
+  touch-action: none; cursor: grab;
+  /* A ground of its own, so the balls read over the grid and the solids. */
+  background: color-mix(in srgb, var(--paper) 72%, transparent);
+  border: 1px solid var(--rule-soft);
+  border-radius: 50%;
+}
+.compass:active { cursor: grabbing; }
+.compass .arm { stroke: var(--ink-4); stroke-width: 2.6; stroke-linecap: round; }
+.compass .ball { cursor: pointer; }
+.compass .ball circle { fill: var(--paper-lt); stroke: var(--ink-3); stroke-width: 2; }
+.compass .ball.pos circle { fill: var(--ink-3); }
+.compass .letter { fill: var(--paper); font-family: var(--face); font-weight: 600; pointer-events: none; }
+.compass .ball:hover circle { stroke: var(--teal); }
+.compass .ball.pos:hover circle { fill: var(--teal); }
+/* The ball that faces the plane the ink is landing on. */
+.compass .ball.chosen circle { stroke: var(--teal); }
+.compass .ball.chosen.pos circle { fill: var(--teal); }
+/* Where the camera already is: a ring round it, so a second tap reads as a flip. */
+.compass .ball.at circle { stroke: var(--teal); stroke-width: 3; }
+
+.navTiles { display: flex; gap: 5px; }
+.navPinned { display: flex; flex-wrap: wrap; gap: 5px; justify-content: flex-end; max-width: 150px; }
+.navPinned .pinChip { cursor: pointer; }
+.navPinned .pinChip:hover { border-color: var(--teal); color: var(--teal); }
+
+/* ---- the panel, tucked under the bar ------------------------------------ */
+/* The panel stops where the FIELD starts. The field grows with the verbs this
+   selection affords — P4's two took it past a guessed 220px and it began
+   covering the bottom of the panel, which is where the newest row (*matches the
+   drawing*) lives — so the height is measured and handed over as `--field-h` on
+   every render rather than assumed. 40px of bar, 30px of status line, and a
+   hairline of air. */
+#panel {
+  position: fixed; top: 40px; right: 0; width: 320px;
+  max-height: calc(100vh - 40px - 30px - var(--field-h, 190px) - 6px);
+  overflow-y: auto;
+  padding: var(--s2) var(--s3) var(--s3);
+  background: color-mix(in srgb, var(--paper-lt) 92%, transparent);
+  border-left: 1px solid var(--rule-soft);
+  border-bottom: 1px solid var(--rule-soft);
+  font-size: var(--t-meta);
+  z-index: 9;
+}
+#panel[hidden] { display: none; }
+.eyebrow {
+  margin: var(--s2) 0 var(--s1);
+  font-size: var(--t-micro);
+  letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--teal);
+}
+.eyebrow .srccount { color: var(--ink-4); letter-spacing: 0; text-transform: none; }
+.row { display: flex; gap: var(--s2); justify-content: space-between; padding: 1px 0; }
+.row .k { color: var(--ink-3); flex: 0 0 auto; }
+.row .v { color: var(--ink); text-align: right; font-variant-numeric: tabular-nums; }
+.why { color: var(--ink-4); font-size: var(--t-micro); line-height: 1.45; margin: 0 0 var(--s1); }
+.sep { height: 1px; background: var(--rule-soft); margin: var(--s2) 0; }
+.empty { color: var(--ink-4); }
+
+/* ---- the field: one input, one reader, the verbs it affords -------------- */
+/* At the foot of the panel for now, not at the pen tip (§7 wants the tip; the
+   tip needs the selection's screen position, which is P1's). The READER is the
+   part that does not move. */
+#field {
+  position: fixed; right: 0; bottom: 30px; width: 320px;
+  padding: var(--s2) var(--s3) var(--s3);
+  background: color-mix(in srgb, var(--paper-lt) 96%, transparent);
+  border-left: 1px solid var(--rule-soft);
+  border-top: 1px solid var(--rule-soft);
+  font-size: var(--t-meta);
+  z-index: 11;
+}
+.fieldInput {
+  width: 100%;
+  font-family: var(--face);
+  font-size: var(--t-meta);
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
+  padding: 5px 8px;
+}
+.fieldInput:focus { outline: none; border-color: var(--teal); }
+.fieldLine { margin: var(--s1) 0 var(--s2); color: var(--teal); min-height: 1.4em; line-height: 1.4; }
+.fieldLine.quiet { color: var(--ink-4); }
+.fieldPills { display: flex; flex-wrap: wrap; gap: 5px; }
+
+/* The diff's regions (P4). Colour is signal: what the drawing asks for and the
+   body lacks is the keyword teal — it is the thing the row is saying — and what
+   the body has and the drawing does not is amber, a medium claim about a
+   difference rather than a fault. Hovering one outlines it in the space. */
+.chip.regionMissing { color: var(--teal); border-color: var(--teal); cursor: default; }
+.chip.regionExtra { color: var(--sig-mid); border-color: var(--sig-mid); cursor: default; }
+
+/* ---- the status line: one sentence --------------------------------------- */
+#status {
+  position: fixed; left: 0; right: 0; bottom: 0; height: 30px;
+  display: flex; align-items: center; padding: 0 var(--s3);
+  font-size: var(--t-meta);
+  color: var(--ink-3);
+  background: color-mix(in srgb, var(--paper) 88%, transparent);
+  border-top: 1px solid var(--rule-soft);
+  z-index: 10;
+}
+#status.said { color: var(--ink); }
+
+/* ---- panes --------------------------------------------------------------- */
+.pane {
+  position: fixed; top: 44px; left: 50%; transform: translateX(-50%);
+  width: min(560px, calc(100vw - 32px)); max-height: 70vh; overflow-y: auto;
+  padding: var(--s3);
+  background: var(--paper-lt);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  box-shadow: var(--lift);
+  font-size: var(--t-meta);
+  line-height: var(--lead-body);
+  z-index: 20;
+}
+.paneHead { display: flex; align-items: center; margin: 0 0 var(--s2); }
+.paneTitle { flex: 1; color: var(--teal); text-transform: uppercase; letter-spacing: 0.08em; font-size: var(--t-micro); }
+.paneClose { background: none; border: 0; color: var(--ink-3); font-size: 18px; cursor: pointer; line-height: 1; }
+.pane p { margin: 0 0 var(--s2); }
+.pane kbd {
+  background: var(--paper-dk); border: 1px solid var(--rule-soft); border-radius: var(--radius-sm);
+  padding: 0 4px; font-family: var(--face); font-size: var(--t-micro);
+}
+
+@media (max-width: 720px) {
+  #panel { width: 100%; max-height: 32vh; border-left: 0; }
+  #field { width: 100%; border-left: 0; }
+  /* The panel and the field both take the whole width on a phone, so the
+     compass sits in the strip between them — above the field, whose height is
+     measured and handed over as `--field-h` on every render (the panel is
+     bounded by the same number, and guessing it is how a widget ends up
+     underneath the thing it was meant to sit above). */
+  #nav {
+    top: auto;
+    bottom: calc(30px + var(--field-h, 190px) + var(--s2));
+    right: var(--s3);
+    align-items: flex-end;
+  }
+  .compass { width: 84px; height: 84px; }
+  .navPinned { display: none; }
+}
+
+/* ---- P5: a model at work, shown where it works --------------------------
+   A breathing dot with the model's name and its task, above the solid it is
+   about. `--sig-model` is the token that means *a model contributed this*;
+   colour is signal, not decoration, and nothing else in the space uses it. */
+.work {
+  position: absolute;
+  transform: translate(-50%, calc(-100% - 10px));
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: var(--t-meta);
+  color: var(--sig-model);
+  background: color-mix(in srgb, var(--paper) 90%, transparent);
+  border: 1px solid var(--sig-model);
+  border-radius: var(--radius-sm);
+  padding: 2px 8px;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 8;
+}
+.work.workLoose { position: fixed; left: 50%; top: 52px; transform: translateX(-50%); }
+.workDot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--sig-model);
+  animation: workBreathe 1.6s ease-in-out infinite;
+}
+@keyframes workBreathe {
+  0%, 100% { opacity: 0.35; transform: scale(0.8); }
+  50%      { opacity: 1;    transform: scale(1.25); }
+}
+@media (prefers-reduced-motion: reduce) { .workDot { animation: none; opacity: 0.85; } }
+
+/* ---- P5: the model pane -------------------------------------------------- */
+#models {
+  position: fixed; top: 44px; right: var(--s3);
+  width: min(360px, calc(100vw - 2 * var(--s3)));
+  max-height: calc(100vh - 120px); overflow: auto;
+  z-index: 11;
+}
+#models .keyRow { display: flex; flex-direction: column; gap: 5px; margin: var(--s1) 0 var(--s2); }
+#models select, #models .fieldInput { width: 100%; }
+#models select {
+  font-family: var(--face); font-size: var(--t-meta);
+  background: var(--paper-lt); color: var(--ink);
+  border: 1px solid var(--rule); border-radius: var(--radius-sm); padding: 3px 6px;
+}
+#models label.why { display: flex; align-items: center; gap: 5px; margin: 0; cursor: pointer; }

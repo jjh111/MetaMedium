@@ -15,6 +15,18 @@
         "exec python3 -m http.server \"${PORT:-8010}\""
       ],
       "port": 8010
+    },
+    {
+      "name": "shard-3d",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--prefix",
+        "shard-3d"
+      ],
+      "port": 5174,
+      "url": "http://localhost:5174"
     }
   ]
 }

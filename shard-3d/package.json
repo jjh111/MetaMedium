@@ -1,0 +1,25 @@
+{
+  "name": "shard-3d",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "A bounded MetaMedium for making things in space. P0: the space — ink on a chosen plane, read by the shape rung. See ../SHARD-3D-PLAN.md.",
+  "scripts": {
+    "dev": "vite --port 5174 --strictPort",
+    "build": "tsc --noEmit && vite build",
+    "build:standalone": "node build-standalone.mjs",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "three": "0.186.0",
+    "three-bvh-csg": "0.0.18",
+    "three-mesh-bvh": "0.9.15"
+  },
+  "devDependencies": {
+    "@types/three": "0.186.0",
+    "typescript": "~5.6.2",
+    "vite": "^5.4.10",
+    "vitest": "^1.6.1"
+  }
+}

@@ -71,6 +71,10 @@ Architecture documents (chronological; **read MVP.md, then v7, then v6**):
   drawn candidates (D4), affordances at rest (D5), the map of what a
   drawing becomes (D6), the molecule chain as the demo (D7), ids per hand
   as a debt (D8); packages T1–T8 with status
+- `SHARD-3D-PLAN.md` — **a bounded shard for 3D, proposed 15 Sep 2026**:
+  ink on planes chosen by a gizmo or read; a form rung; solids as op
+  trees; the diff as the brief; wrap and turn-into from your own
+  definitions; packages P0–P11 with the MVP line after P6
 - `BUILD-PLAN-v8.md` — **the executable plan for v8**: invariants no package may break, fixed contracts (events, reps, kinds, the verb basis, the storage seam, the palette item), fourteen work packages with owned files and done-criteria, the parallel threads and the surface weave, and self-contained briefs for sub-contracting models
 - `WHITEPAPER-v5.1-PLAN.md` — **the package**: what the whitepaper shows vs. what the engine does, replays-as-figures, the demos as the paper's spine, the prose pass, and the palette decision John owns
 - `ARCHITECTURE-v6-SESSION-ENGINE.md` — **active design**: the no-modes session engine (deferred commitment, summoning, promotion ladder, capability tiers), implemented in `metamedium-core/`
@@ -118,6 +122,7 @@ not the product. Each entry's rationale and what it feeds back lives in
 | `test-llm.html` | Standalone LLM harness |
 | `manim-explainer/` | ~50s explainer video. Source + stills tracked; renders and `media/` cache gitignored (regenerate from the scripts) |
 | `playground.html` | Personal sandbox on the personal-site design language |
+| `shard-3d/` | **Live · P0–P6, the MVP line, plus the navigation compass** (`SHARD-3D-PLAN.md`, `shard-3d/README.md`): a bounded MetaMedium for making 3D things — ink on planes, a form rung, op trees, the diff as the brief, wrap and turn-into. **P0**: the gizmo's three plane tiles, a stroke projected live onto the chosen plane and read by the shape rung in that plane's own coordinates at the pen's scale, the plane held as a rep on the stroke. **P2**: the form rung (`src/form.ts`, a closed vocabulary of seven placed by a table read top to bottom, the diagram rung's sibling, every threshold a ratio of the marks' own size measured in world space), the op tree (`src/op.ts`, §2.4's vocabulary whole with `extrude` and `revolve` built), a solid held in the log as a blessed artifact whose `json` code is that tree marked `// mm:op tree v1` and attributed to the engine, the mesh derived from the tree on every change, ink kept visible on the face, selection by default, and one field with one reader for the tier 1 verbs. A rectangle plus a line off its edge stands a box at once, tier 1, and one undo removes the solid and leaves the ink. **P1–P6** followed (the plane read from the evidence — it needed faces, so it came after P2 — features and cuts, the diff as the brief, the generator seat, the library); **the compass** (`src/navgizmo.ts`, `src/view.ts`) is the camera's own corner — a Blender-style navigation gizmo as an SVG overlay, the six axis views a tap away, home, persp/ortho and the pinned views beside it, the ball that faces the chosen plane in the same teal as that plane's tile, and a snap that would leave it edge-on saying so. The plane picker at the origin is untouched: it says where ink LANDS, the compass says where the EYE is. `npm install && npm run dev` in `shard-3d/` (vite on :5174; `?demo` draws both done-criteria); `npm test` is vitest on the pure rungs; the engine is imported from source, so there is no bundle to drift |
 
 **Known duplication:** recognition logic still exists independently in
 `doodle2-canvas.html`, `metadoodle1.html`, `Web App Skeleton/src/core/`, and
