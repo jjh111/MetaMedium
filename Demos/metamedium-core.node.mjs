@@ -3628,6 +3628,24 @@ function readable(feature) {
   }
 }
 
+// src/session/stale.ts
+function describeStale(reason, what, name) {
+  const who = name ? `${name}'s ` : "";
+  const answer = what === "code" ? "code" : what === "answer" ? "answer" : "reading";
+  switch (reason) {
+    case "erased":
+      return `the target was erased before ${who}${answer} arrived`;
+    case "missing":
+      return `the target was gone before ${who}${answer} arrived`;
+    case "replaced":
+      return `the board was replaced before ${who}${answer} arrived`;
+    case "superseded":
+      return `the target moved on before ${who}${answer} arrived \u2014 it was written against an older version`;
+    case "unknown-participant":
+      return `${who || "that participant "}is not in this session`;
+  }
+}
+
 // src/session/regions.ts
 var rectOf = (b) => ({
   x: b.minX,
@@ -4745,6 +4763,8 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
   let selection = [];
   let commandMark = config.gesture.commandMark ?? null;
   let markMiss = null;
+  let staleResult = null;
+  let generation = 0;
   let lastAt = 0;
   let counter2 = 0;
   const listeners = /* @__PURE__ */ new Set();
@@ -5239,6 +5259,7 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
   function applyPropose(ev) {
     const node = nodes.get(ev.nodeId);
     if (!node || !participants.includes(ev.participantId)) return;
+    if (getRep(node, "erased")) return;
     for (const e of ev.edges) {
       node.edges.push({
         to: e.to,
@@ -5260,7 +5281,10 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
   }
   function applyAnswer(ev) {
     if (!participants.includes(ev.participantId)) return null;
-    const about = ev.aboutIds.filter((id) => nodes.has(id));
+    const about = ev.aboutIds.filter((id) => {
+      const n2 = nodes.get(id);
+      return !!n2 && !getRep(n2, "erased");
+    });
     if (about.length === 0) return null;
     const subject = about.map((id) => boundsOf(nodes.get(id))).filter((b) => !!b);
     const union = subject.length ? getBounds(
@@ -5738,9 +5762,68 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
   function applyTeach(ev) {
     commandMark = ev.mark;
   }
+  function codeVersion(nodeId) {
+    const node = nodes.get(nodeId);
+    return node ? node.reps.filter((r) => r.modality === "code").length : 0;
+  }
+  function staleFor(ev, expect) {
+    let what;
+    let targets;
+    switch (ev.type) {
+      case "code":
+        what = "code";
+        targets = [ev.nodeId];
+        break;
+      case "propose":
+        what = "propose";
+        targets = [ev.nodeId];
+        break;
+      // An answer may be about several marks. It is refused only when NOTHING
+      // it was about is left; while one mark survives the answer still has
+      // something to be anchored beside, and applyAnswer drops the rest.
+      case "answer":
+        what = "answer";
+        targets = ev.aboutIds;
+        break;
+      default:
+        return null;
+    }
+    const participantId = "participantId" in ev ? ev.participantId : void 0;
+    const at = "at" in ev && typeof ev.at === "number" ? ev.at : lastAt;
+    const pNode = participantId ? nodes.get(participantId) : void 0;
+    const name = pNode ? getRep(pNode, "word")?.data : void 0;
+    const refuse = (reason, nodeId) => ({
+      what,
+      reason,
+      nodeId,
+      participantId,
+      detail: describeStale(reason, what, typeof name === "string" ? name : void 0),
+      at
+    });
+    if (expect?.generation !== void 0 && expect.generation !== generation) {
+      return refuse("replaced", targets[0] ?? "");
+    }
+    if (participantId !== void 0 && !participants.includes(participantId)) {
+      return refuse("unknown-participant", targets[0] ?? "");
+    }
+    const alive = targets.filter((id) => {
+      const n2 = nodes.get(id);
+      return !!n2 && !getRep(n2, "erased");
+    });
+    if (alive.length === 0) {
+      const id = targets[0] ?? "";
+      const n2 = nodes.get(id);
+      return refuse(!n2 ? "missing" : "erased", id);
+    }
+    if (expect?.version !== void 0 && what === "code" && codeVersion(targets[0]) !== expect.version) {
+      return refuse("superseded", targets[0]);
+    }
+    return null;
+  }
   function applyCode(ev) {
     const node = nodes.get(ev.nodeId);
     if (!node || !participants.includes(ev.participantId)) return null;
+    if (getRep(node, "erased")) return null;
     node.reps.push({
       modality: "code",
       data: {
@@ -5853,11 +5936,21 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
     }
   }
   function dispatch(ev) {
+    staleResult = null;
     events.push(ev);
     const result2 = applyEvent(ev);
     maybeCheckpoint(events.length);
     notify();
     return result2;
+  }
+  function guarded(ev, expect) {
+    const stale = staleFor(ev, expect);
+    if (stale) {
+      staleResult = stale;
+      notify();
+      return null;
+    }
+    return dispatch(ev);
   }
   function undo() {
     for (let i = events.length - 1; i >= 0; i--) {
@@ -5881,6 +5974,8 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
       explanations: [...explanations],
       commandMark,
       markMiss,
+      staleResult,
+      generation,
       recentIds: recentWithin(lastAt),
       live: [...live],
       clocks: { ...clocks },
@@ -5896,8 +5991,8 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
   return {
     addStroke: (points, at, participantId, scale, options) => dispatch({ type: "stroke", points, at, participantId, scale, content: options?.content }),
     join: (kind, name, at, capability, locality) => dispatch({ type: "join", kind, name, at, capability, ...locality ? { locality } : {} }),
-    propose: (args) => void dispatch({ type: "propose", ...args }),
-    answer: (args) => dispatch({ type: "answer", ...args }),
+    propose: ({ expect, ...args }) => void guarded({ type: "propose", ...args }, expect),
+    answer: ({ expect, ...args }) => guarded({ type: "answer", ...args }, expect),
     teachCommandMark: (mark, at) => void dispatch({ type: "teach", mark, at }),
     correct: (args) => void dispatch({ type: "correct", ...args }),
     clock: (args) => void dispatch({ type: "clock", ...args }),
@@ -5909,7 +6004,8 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
     snap: (args) => void dispatch({ type: "snap", ...args }),
     bind: (args) => void dispatch({ type: "bind", ...args }),
     snapCandidates: (ids) => candidatesAmong(ids ?? snappableIds()),
-    attachCode: (args) => dispatch({ type: "code", ...args }),
+    attachCode: ({ expect, ...args }) => guarded({ type: "code", ...args }, expect),
+    codeVersion,
     regions: (artifactId) => {
       const node = nodes.get(artifactId);
       return node ? regionsOf(node, nodes) : [];
@@ -5960,6 +6056,8 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
     erase: (nodeId, at) => void dispatch({ type: "erase", nodeId, at }),
     undo,
     load: (log) => {
+      generation++;
+      staleResult = null;
       events = log.map((ev) => ({ ...ev }));
       checkpoints = [];
       replay();
@@ -6877,8 +6975,10 @@ function createAgentParticipant(session, config, at = 0, options = {}) {
   const send = options.transport ?? ((c, m, o) => complete(c, m, o));
   const name = options.name ?? providerLabel(config);
   const id = session.join("agent", name, at, options.tier ?? providerTier(config), options.locality ?? providerLocality(config));
+  const staleWhy = (fallback) => session.getState().staleResult?.detail ?? fallback;
   async function interpret(nodeIds, now, signal) {
     const state = session.getState();
+    const generation = state.generation;
     const targets = nodeIds.filter((n2) => state.nodes.has(n2));
     if (targets.length === 0) return { ok: false, readings: [], error: "no such nodes" };
     const isCluster = targets.length > 1;
@@ -6907,14 +7007,18 @@ ${question}` }
       participantId: id,
       nodeId: target,
       edges: readingsToEdges(readings, isCluster),
-      at: now
+      at: now,
+      expect: { generation }
     });
+    const stale = session.getState().staleResult;
+    if (stale) return { ok: false, readings, error: stale.detail, raw: result2.text };
     return { ok: true, readings, raw: result2.text };
   }
   async function ask(question, nodeIds, now, signal) {
     const q = question.trim();
     if (!q) return { ok: false, error: "no question" };
     const state = session.getState();
+    const generation = state.generation;
     const targets = nodeIds.filter((n2) => state.nodes.has(n2));
     if (targets.length === 0) return { ok: false, error: "no such nodes" };
     const context = describeSession(state, { nodeIds: targets }) + (targets.length > 1 ? `
@@ -6938,15 +7042,18 @@ Question: ${q}` }
       question: q,
       text,
       aboutIds: targets,
-      at: now
+      at: now,
+      expect: { generation }
     });
-    if (!explanationId) return { ok: false, error: "the canvas did not accept the answer", text };
+    if (!explanationId) return { ok: false, error: staleWhy("the canvas did not accept the answer"), text };
     return { ok: true, text, explanationId };
   }
   async function generate(args) {
     const prompt2 = args.prompt.trim();
     if (!prompt2) return { ok: false, error: "no prompt" };
     const state = session.getState();
+    const generation = state.generation;
+    const version = session.codeVersion(args.artifactId);
     const artifact = state.nodes.get(args.artifactId);
     if (!artifact) return { ok: false, error: "no such artifact" };
     const frame = frameOf(artifact);
@@ -7036,10 +7143,14 @@ ${brief}`, ids: planned.ids, build: planned.build };
       language: "html",
       prompt: prompt2,
       fill: merged,
-      at: args.at
+      at: args.at,
+      // A build is not pinned to a version: several participants may each
+      // offer code for the same artifact and every offer is held. Only a
+      // revision, which was written from one particular version, is pinned.
+      expect: revising ? { generation, version } : { generation }
     });
     if (!accepted) {
-      return { ok: false, error: "the canvas did not accept the code", code, raw: result2.text };
+      return { ok: false, error: staleWhy("the canvas did not accept the code"), code, raw: result2.text };
     }
     return {
       ok: true,
@@ -7055,6 +7166,7 @@ ${brief}`, ids: planned.ids, build: planned.build };
   async function read(args) {
     if (!config.vision) return { ok: false, transcripts: [], error: `${name} cannot see images` };
     const state = session.getState();
+    const generation = state.generation;
     const node = state.nodes.get(args.nodeId);
     if (!node) return { ok: false, transcripts: [], error: "no such node" };
     if (!/^data:image\//.test(args.image)) return { ok: false, transcripts: [], error: "image must be a data URL" };
@@ -7075,8 +7187,11 @@ ${brief}`, ids: planned.ids, build: planned.build };
         nodeId: args.nodeId,
         edges: [],
         reps: transcripts.map((t) => ({ modality: "transcript", data: { text: t.text }, confidence: t.confidence })),
-        at: args.at
+        at: args.at,
+        expect: { generation }
       });
+      const stale = session.getState().staleResult;
+      if (stale) return { ok: false, transcripts, error: stale.detail, raw: result2.text };
     }
     return { ok: true, transcripts, raw: result2.text };
   }
@@ -7130,6 +7245,7 @@ The human asks: ${prompt2}` }
     const prompt2 = args.prompt.trim();
     if (!prompt2) return { ok: false, error: "no prompt" };
     const state = session.getState();
+    const generation = state.generation;
     const artifact = state.nodes.get(args.artifactId);
     if (!artifact) return { ok: false, error: "no such artifact" };
     const frame = frameOf(artifact);
@@ -7157,8 +7273,8 @@ The human typed: ${prompt2}` }
     const parsed = parseProgram(result2.text);
     if (!parsed) return { ok: false, error: "no program in the reply", raw: result2.text };
     if (parsed.reuse) return { ok: true, reuse: parsed.reuse, raw: result2.text };
-    const accepted = session.attachCode({ participantId: id, nodeId: args.artifactId, code: parsed.code, kind: "run", prompt: prompt2, at: args.at });
-    if (!accepted) return { ok: false, error: "the canvas did not accept the program", raw: result2.text };
+    const accepted = session.attachCode({ participantId: id, nodeId: args.artifactId, code: parsed.code, kind: "run", prompt: prompt2, at: args.at, expect: { generation } });
+    if (!accepted) return { ok: false, error: staleWhy("the canvas did not accept the program"), raw: result2.text };
     return { ok: true, name: parsed.name, parts: parsed.parts, code: parsed.code, raw: result2.text };
   }
   async function behave(args) {
@@ -7443,6 +7559,7 @@ export {
   describeSession,
   describeSignature,
   describeSnap,
+  describeStale,
   describeStructure,
   describeTier1,
   disagreement,

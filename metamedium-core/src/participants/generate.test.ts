@@ -372,7 +372,9 @@ describe('an agent never claims what the canvas refused', () => {
 
     const r = await agent.generate({ prompt: 'a page', artifactId: id, at: 3200 });
     expect(r.ok).toBe(false);
-    expect(r.error).toMatch(/did not accept/);
+    // The refusal says which refusal it was (STATE-1): a generic "did not
+    // accept" is the silent drop with a sentence in front of it.
+    expect(r.error).toMatch(/not in this session/);
     expect(s.getState().live).toEqual([]);
   });
 
@@ -384,8 +386,70 @@ describe('an agent never claims what the canvas refused', () => {
 
     const r = await agent.ask('why?', [id], 3200);
     expect(r.ok).toBe(false);
-    expect(r.error).toMatch(/did not accept/);
+    expect(r.error).toMatch(/not in this session/);
     expect(s.getState().explanations).toEqual([]);
+  });
+});
+
+// STATE-1. The defect in its real shape: the human does not wait for the
+// model. The erase lands WHILE the call is in flight, and the reply comes back
+// to a board where its target is gone.
+describe('a model answering after the human has moved on', () => {
+  it('does not resurrect an artifact erased while it was thinking', async () => {
+    const { s, id } = board();
+    const agent = createAgentParticipant(s, config, 3100);
+
+    // The transport waits to be released, so the erase happens mid-call.
+    let release: (v: string) => void;
+    const reply = new Promise<string>((r) => { release = r; });
+    globalThis.fetch = vi.fn(async () => {
+      const content = await reply;
+      return new Response(JSON.stringify({ model: 'stub', choices: [{ message: { content } }] }), {
+        status: 200, headers: { 'content-type': 'application/json' },
+      });
+    }) as unknown as typeof fetch;
+
+    const pending = agent.generate({ prompt: 'a page', artifactId: id, at: 3200 });
+    const events = s.getEvents().length;
+    s.erase(id, 3300);
+    release!(fillReply({ r1: { html: '<h1>too late</h1>' } }));
+    const r = await pending;
+
+    expect(r.ok).toBe(false);
+    // Said, not swallowed: the surface can put this in the status line.
+    expect(r.error).toMatch(/erased before/);
+    expect(s.getState().live).toEqual([]);
+    expect(s.getState().nodes.get(id)!.reps.filter((x) => x.modality === 'code')).toHaveLength(0);
+    // No unexpected history effect: the erase is the only event that landed.
+    expect(s.getEvents().length).toBe(events + 1);
+
+    // And taking the erase back restores the artifact, not the refused reply.
+    s.undo();
+    expect(s.getState().artifacts).toContain(id);
+    expect(s.getState().live).toEqual([]);
+  });
+
+  it('does not land a reading on a board that was replaced while it was thinking', async () => {
+    const { s, id } = board();
+    const agent = createAgentParticipant(s, config, 3100);
+
+    let release: (v: string) => void;
+    const reply = new Promise<string>((r) => { release = r; });
+    globalThis.fetch = vi.fn(async () => {
+      const content = await reply;
+      return new Response(JSON.stringify({ model: 'stub', choices: [{ message: { content } }] }), {
+        status: 200, headers: { 'content-type': 'application/json' },
+      });
+    }) as unknown as typeof fetch;
+
+    const pending = agent.interpret([id], 3200);
+    s.load([]); // the human opened another folder
+    release!('[{"label":"molecule","confidence":0.8,"reasoning":"three circles"}]');
+    const r = await pending;
+
+    expect(r.ok).toBe(false);
+    expect(r.error).toMatch(/board was replaced/);
+    expect(s.getEvents()).toEqual([]);
   });
 });
 

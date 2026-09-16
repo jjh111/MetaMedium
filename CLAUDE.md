@@ -501,6 +501,28 @@ makes it render as real DOM in the canvas. The rules:
 - A **broken** artifact leaves the live plane: code is a contract with the marks
   that framed it, and a page rendering over erased ink is the silent phantom
   degradation exists to prevent.
+- **A late result never resurrects a deleted target** (STATE-1,
+  `src/session/stale.ts`). A model thinks for minutes while the hand keeps
+  drawing, so every deferred result says which board it was asked about, and
+  `attachCode` / `propose` / `answer` refuse it at the session's own door when
+  that board is gone: the target `erased` or `missing`, the board `replaced`
+  (a `load`, which bumps `state.generation`), or the version `superseded`.
+  Three rules, each a failure that was live: **never a throw** — the hand knows
+  nothing about the call; **never a silent drop** — the refusal lands on
+  `state.staleResult` (`MarkMiss`'s sibling: nonfatal, transient, cleared by
+  the next event) and the agent returns its sentence, so the surface says *the
+  target was erased before qwen3's code arrived*; and **never into the log** —
+  a refused event is rejected *before* it is appended, because an event in the
+  log is replayed, and one parked there came back to life the moment the human
+  undid the erase that discarded it. The pin is scoped by generation and
+  target/version, never a global busy flag: a second model must still answer
+  about unrelated marks while the first one thinks. A **build** is unpinned, so
+  several participants may each offer code (no tier commits); only a
+  **revision** pins `codeVersion`, and the conflict policy is that **the
+  standing newer version wins** — a revision written from a version the
+  artifact has moved past is refused, not silently overwritten. The erased
+  check also lives in the apply path, so a merged log that arrives
+  erase-before-code reads the same way: state stays a pure function of the log.
 - **A playing program takes the pointer; ink begun outside goes over it**
   (v10 D2, `pointerFrameAt` / `postPointer`). The canvas keeps every
   pointer — the stage stays under the ink — and a pointer-down inside a

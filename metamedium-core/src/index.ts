@@ -158,6 +158,9 @@ export {
   DEFAULT_GESTURE_CONFIG,
 } from './session/gesture';
 export type { GestureConfig, MarkMiss, MissReason } from './session/gesture';
+// A late result and the board it was about (STATE-1).
+export type { StaleResult, StaleReason, Expectation } from './session/stale';
+export { describeStale } from './session/stale';
 
 // The command mark — a gesture the user teaches the system (MVP.md §5.2).
 export {

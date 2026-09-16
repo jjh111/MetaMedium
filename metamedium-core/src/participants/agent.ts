@@ -747,8 +747,17 @@ export function createAgentParticipant(
   // can group readings by voice and the router can ask the cheaper first.
   const id = session.join('agent', name, at, options.tier ?? providerTier(config), options.locality ?? providerLocality(config));
 
+  // A model thinks for a long time — a cold local one for minutes — and the
+  // human keeps drawing. Every result therefore says which board it was asked
+  // about; the canvas refuses it if that board is gone, and says why in words
+  // the surface can put in the status line (STATE-1). Pinned to the board and
+  // the target, never a global busy flag: a second model must still be able to
+  // answer about unrelated marks while the first one thinks.
+  const staleWhy = (fallback: string) => session.getState().staleResult?.detail ?? fallback;
+
   async function interpret(nodeIds: string[], now: number, signal?: AbortSignal): Promise<InterpretResult> {
     const state = session.getState();
+    const generation = state.generation;
     const targets = nodeIds.filter((n) => state.nodes.has(n));
     if (targets.length === 0) return { ok: false, readings: [], error: 'no such nodes' };
 
@@ -785,7 +794,10 @@ export function createAgentParticipant(
       nodeId: target,
       edges: readingsToEdges(readings, isCluster),
       at: now,
+      expect: { generation },
     });
+    const stale = session.getState().staleResult;
+    if (stale) return { ok: false, readings, error: stale.detail, raw: result.text };
 
     return { ok: true, readings, raw: result.text };
   }
@@ -795,6 +807,7 @@ export function createAgentParticipant(
     if (!q) return { ok: false, error: 'no question' };
 
     const state = session.getState();
+    const generation = state.generation;
     const targets = nodeIds.filter((n) => state.nodes.has(n));
     if (targets.length === 0) return { ok: false, error: 'no such nodes' };
 
@@ -819,8 +832,9 @@ export function createAgentParticipant(
       text,
       aboutIds: targets,
       at: now,
+      expect: { generation },
     });
-    if (!explanationId) return { ok: false, error: 'the canvas did not accept the answer', text };
+    if (!explanationId) return { ok: false, error: staleWhy('the canvas did not accept the answer'), text };
 
     return { ok: true, text, explanationId };
   }
@@ -838,6 +852,11 @@ export function createAgentParticipant(
     if (!prompt) return { ok: false, error: 'no prompt' };
 
     const state = session.getState();
+    const generation = state.generation;
+    // The version this answer will be written FROM. A revision that lands
+    // after a newer version is standing is refused: it was written against
+    // content that is no longer what the artifact holds.
+    const version = session.codeVersion(args.artifactId);
     const artifact = state.nodes.get(args.artifactId);
     if (!artifact) return { ok: false, error: 'no such artifact' };
 
@@ -949,9 +968,13 @@ export function createAgentParticipant(
       prompt,
       fill: merged,
       at: args.at,
+      // A build is not pinned to a version: several participants may each
+      // offer code for the same artifact and every offer is held. Only a
+      // revision, which was written from one particular version, is pinned.
+      expect: revising ? { generation, version } : { generation },
     });
     if (!accepted) {
-      return { ok: false, error: 'the canvas did not accept the code', code, raw: result.text };
+      return { ok: false, error: staleWhy('the canvas did not accept the code'), code, raw: result.text };
     }
 
     return {
@@ -969,6 +992,7 @@ export function createAgentParticipant(
   async function read(args: { nodeId: string; image: string; at: number; signal?: AbortSignal; hold?: boolean }): Promise<ReadResult> {
     if (!config.vision) return { ok: false, transcripts: [], error: `${name} cannot see images` };
     const state = session.getState();
+    const generation = state.generation;
     const node = state.nodes.get(args.nodeId);
     if (!node) return { ok: false, transcripts: [], error: 'no such node' };
     if (!/^data:image\//.test(args.image)) return { ok: false, transcripts: [], error: 'image must be a data URL' };
@@ -995,7 +1019,10 @@ export function createAgentParticipant(
         edges: [],
         reps: transcripts.map((t) => ({ modality: 'transcript', data: { text: t.text }, confidence: t.confidence })),
         at: args.at,
+        expect: { generation },
       });
+      const stale = session.getState().staleResult;
+      if (stale) return { ok: false, transcripts, error: stale.detail, raw: result.text };
     }
     return { ok: true, transcripts, raw: result.text };
   }
@@ -1055,6 +1082,7 @@ export function createAgentParticipant(
     const prompt = args.prompt.trim();
     if (!prompt) return { ok: false, error: 'no prompt' };
     const state = session.getState();
+    const generation = state.generation;
     const artifact = state.nodes.get(args.artifactId);
     if (!artifact) return { ok: false, error: 'no such artifact' };
     const frame = frameOf(artifact);
@@ -1075,8 +1103,8 @@ export function createAgentParticipant(
     const parsed = parseProgram(result.text);
     if (!parsed) return { ok: false, error: 'no program in the reply', raw: result.text };
     if (parsed.reuse) return { ok: true, reuse: parsed.reuse, raw: result.text };
-    const accepted = session.attachCode({ participantId: id, nodeId: args.artifactId, code: parsed.code!, kind: 'run', prompt, at: args.at });
-    if (!accepted) return { ok: false, error: 'the canvas did not accept the program', raw: result.text };
+    const accepted = session.attachCode({ participantId: id, nodeId: args.artifactId, code: parsed.code!, kind: 'run', prompt, at: args.at, expect: { generation } });
+    if (!accepted) return { ok: false, error: staleWhy('the canvas did not accept the program'), raw: result.text };
     return { ok: true, name: parsed.name, parts: parsed.parts, code: parsed.code, raw: result.text };
   }
 

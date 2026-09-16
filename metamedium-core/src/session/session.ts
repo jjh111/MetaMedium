@@ -55,6 +55,7 @@ import {
 } from './gesture';
 import { type CommandMark } from './commandmark';
 import { type MarkMiss, whyNotResolved } from './gesture';
+import { type Expectation, type StaleResult, describeStale } from './stale';
 import { DEFAULT_ERASE_CROSSINGS, scratchedOut } from './erase';
 import { type Region, regionsOf, regionsOverlapping } from './regions';
 import { type Mark, type Relation, clusters, relate } from '../relate/relations';
@@ -148,6 +149,21 @@ export interface SessionState {
    * by the next stroke. A gesture that fails silently cannot be learned.
    */
   markMiss: MarkMiss | null;
+  /**
+   * The last deferred result refused because the board had moved on — the
+   * target erased, the board replaced, the version superseded. Nonfatal and
+   * transient, like `markMiss`: cleared by the next event. A model answering
+   * late must not stop the board, and must not vanish without a reason
+   * (STATE-1; see `stale.ts`).
+   */
+  staleResult: StaleResult | null;
+  /**
+   * How many times the whole board has been replaced (a `load`, including
+   * `load([])` to reset). A deferred caller pins its request to the generation
+   * it was made in, so a result computed against a board that has since been
+   * thrown away is refused rather than landing on whatever now holds that id.
+   */
+  generation: number;
   /** Artifacts carrying a 'code' rep — the ones that render and run. */
   live: string[];
   /**
@@ -386,13 +402,18 @@ export interface Session {
   addStroke(points: Point[], at: number, participantId?: string, scale?: number, options?: { content?: boolean }): string;
   /** Register a participant (human or AI agent). Returns its node id. */
   join(kind: ParticipantKind, name: string, at: number, capability?: Capability, locality?: Locality): string;
-  /** Offer attributed, inferred edges on a node — the channel LLM tiers use. */
-  propose(args: { participantId: string; nodeId: string; edges: ProposedEdge[]; reps?: ProposedRep[]; at: number }): void;
+  /**
+   * Offer attributed, inferred edges on a node — the channel LLM tiers use.
+   * Refused, with a reason on `state.staleResult`, when the node is gone or
+   * `expect` says the board has moved on since the request (STATE-1).
+   */
+  propose(args: { participantId: string; nodeId: string; edges: ProposedEdge[]; reps?: ProposedRep[]; at: number; expect?: Expectation }): void;
   /**
    * Place an answer in the canvas, anchored to the marks it is about.
    *
    * Returns the explanation node's id. Several participants may answer the
-   * same question — every answer is held, none replaces another.
+   * same question — every answer is held, none replaces another. Refused when
+   * every mark it was about has been erased.
    */
   answer(args: {
     participantId: string;
@@ -400,6 +421,7 @@ export interface Session {
     text: string;
     aboutIds: string[];
     at: number;
+    expect?: Expectation;
   }): string | null;
   /**
    * Install (or clear) the mark that resolves a lasso. An event, not a setting:
@@ -422,6 +444,10 @@ export interface Session {
    * Attach generated code to an artifact — the 'code' rep that makes it live.
    * Several participants may each attach code to the same artifact; every
    * attempt is held and attributed, and the surface renders the chosen one.
+   *
+   * Returns null, and leaves a reason on `state.staleResult`, when the target
+   * is gone or `expect` says the board has moved on since the request went
+   * out. A refused attachment never enters the log (STATE-1).
    */
   attachCode(args: {
     participantId: string;
@@ -433,7 +459,13 @@ export interface Session {
     fill?: unknown;
     from?: string;
     at: number;
+    expect?: Expectation;
   }): string | null;
+  /**
+   * How many versions of code the node carries. A deferred revision pins the
+   * version it was written from, so a newer one standing refuses it.
+   */
+  codeVersion(nodeId: string): number;
   /**
    * Straighten a set of marks — a Tier 0 conversion, needing no model at all.
    * The originals are untouched; each mark gains a transform saying where it
@@ -536,6 +568,10 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
   let selection: string[] = [];
   let commandMark: CommandMark | null = config.gesture.commandMark ?? null;
   let markMiss: MarkMiss | null = null;
+  // Runtime notices, not log facts: neither is derived from the events, so
+  // neither is checkpointed and neither survives into another session's log.
+  let staleResult: StaleResult | null = null;
+  let generation = 0;
   let lastAt = 0;
   let counter = 0;
   const listeners = new Set<(state: SessionState) => void>();
@@ -1236,6 +1272,9 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
   function applyPropose(ev: Extract<SessionEvent, { type: 'propose' }>) {
     const node = nodes.get(ev.nodeId);
     if (!node || !participants.includes(ev.participantId)) return;
+    // A reading of ink that is no longer there is about a board that no longer
+    // exists (STATE-1). Checked here too, for a log that arrives out of order.
+    if (getRep(node, 'erased')) return;
     // Proposals are held like every other interpretation: attributed,
     // inferred, never blessed by the act of proposing.
     for (const e of ev.edges) {
@@ -1260,7 +1299,13 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
 
   function applyAnswer(ev: Extract<SessionEvent, { type: 'answer' }>): string | null {
     if (!participants.includes(ev.participantId)) return null;
-    const about = ev.aboutIds.filter((id) => nodes.has(id));
+    // Anchored only to marks that are still there. An answer about marks the
+    // human has since rubbed out would be placed beside nothing; when every
+    // mark it was about is gone, the answer is refused outright (STATE-1).
+    const about = ev.aboutIds.filter((id) => {
+      const n = nodes.get(id);
+      return !!n && !getRep(n, 'erased');
+    });
     if (about.length === 0) return null;
 
     // Anchor the answer beside what it is about, so the reader never has to
@@ -1858,9 +1903,83 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     commandMark = ev.mark;
   }
 
+  /** How many versions of code a node carries. A revision is pinned to one of these. */
+  function codeVersion(nodeId: string): number {
+    const node = nodes.get(nodeId);
+    return node ? node.reps.filter((r) => r.modality === 'code').length : 0;
+  }
+
+  /**
+   * Is this result about a board that still exists? The one place the question
+   * is asked — the canonical mutation boundary, not the surface, because a
+   * second surface (the MCP hand, another tab) reaches the same session by
+   * the same door.
+   *
+   * Returns the refusal, or null to let the event through.
+   */
+  function staleFor(ev: SessionEvent, expect?: Expectation): StaleResult | null {
+    let what: StaleResult['what'];
+    let targets: string[];
+    switch (ev.type) {
+      case 'code': what = 'code'; targets = [ev.nodeId]; break;
+      case 'propose': what = 'propose'; targets = [ev.nodeId]; break;
+      // An answer may be about several marks. It is refused only when NOTHING
+      // it was about is left; while one mark survives the answer still has
+      // something to be anchored beside, and applyAnswer drops the rest.
+      case 'answer': what = 'answer'; targets = ev.aboutIds; break;
+      default: return null;
+    }
+    const participantId = 'participantId' in ev ? ev.participantId : undefined;
+    const at = 'at' in ev && typeof ev.at === 'number' ? ev.at : lastAt;
+    // A participant's name is its 'word' rep — the name the human sees on its
+    // cards, so the name the refusal says.
+    const pNode = participantId ? nodes.get(participantId) : undefined;
+    const name = pNode ? getRep(pNode, 'word')?.data : undefined;
+    const refuse = (reason: Parameters<typeof describeStale>[0], nodeId: string): StaleResult => ({
+      what,
+      reason,
+      nodeId,
+      participantId,
+      detail: describeStale(reason, what, typeof name === 'string' ? name : undefined),
+      at,
+    });
+
+    // The board itself was thrown away and another loaded: whatever holds this
+    // id now is not what the request was about. Checked FIRST, because on a
+    // replaced board everything else is downstream of it — the target and the
+    // participant are both gone, and "who was that?" is a worse answer than
+    // "the board you asked about is no longer here".
+    if (expect?.generation !== undefined && expect.generation !== generation) {
+      return refuse('replaced', targets[0] ?? '');
+    }
+    if (participantId !== undefined && !participants.includes(participantId)) {
+      return refuse('unknown-participant', targets[0] ?? '');
+    }
+    const alive = targets.filter((id) => {
+      const n = nodes.get(id);
+      return !!n && !getRep(n, 'erased');
+    });
+    if (alive.length === 0) {
+      const id = targets[0] ?? '';
+      const n = nodes.get(id);
+      return refuse(!n ? 'missing' : 'erased', id);
+    }
+    // A revision was written FROM a particular version; if the target has
+    // moved past it, the standing newer version wins and this one is refused.
+    // Only when the caller pins it — an unpinned attachment stays plural.
+    if (expect?.version !== undefined && what === 'code' && codeVersion(targets[0]) !== expect.version) {
+      return refuse('superseded', targets[0]);
+    }
+    return null;
+  }
+
   function applyCode(ev: Extract<SessionEvent, { type: 'code' }>): string | null {
     const node = nodes.get(ev.nodeId);
     if (!node || !participants.includes(ev.participantId)) return null;
+    // Also checked here, not only at the door: a merged or loaded log can put
+    // an erase BEFORE a code event (another hand's log arriving out of order),
+    // and state must be a pure function of the log either way.
+    if (getRep(node, 'erased')) return null;
 
     // Held, attributed, and NOT blessed — generated code is a proposal like any
     // other reading. Several participants may each attach code to the same
@@ -1995,11 +2114,29 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
   // ===== Public API =====
 
   function dispatch(ev: SessionEvent): string | null {
+    staleResult = null;
     events.push(ev);
     const result = applyEvent(ev);
     maybeCheckpoint(events.length);
     notify();
     return result;
+  }
+
+  /**
+   * The door a deferred result comes back through. A refused result never
+   * reaches the log — an event in the log is replayed, so a discarded answer
+   * parked there would come back to life the moment the human undid the erase
+   * that discarded it (STATE-1). It is a notice, not a throw: the board goes
+   * on drawing and the surface says what happened.
+   */
+  function guarded(ev: SessionEvent, expect?: Expectation): string | null {
+    const stale = staleFor(ev, expect);
+    if (stale) {
+      staleResult = stale;
+      notify();
+      return null;
+    }
+    return dispatch(ev);
   }
 
   function undo() {
@@ -2027,6 +2164,8 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       explanations: [...explanations],
       commandMark,
       markMiss,
+      staleResult,
+      generation,
       recentIds: recentWithin(lastAt),
       live: [...live],
       clocks: { ...clocks },
@@ -2045,8 +2184,8 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     addStroke: (points, at, participantId, scale, options) =>
       dispatch({ type: 'stroke', points, at, participantId, scale, content: options?.content }) as string,
     join: (kind, name, at, capability, locality) => dispatch({ type: 'join', kind, name, at, capability, ...(locality ? { locality } : {}) }) as string,
-    propose: (args) => void dispatch({ type: 'propose', ...args }),
-    answer: (args) => dispatch({ type: 'answer', ...args }),
+    propose: ({ expect, ...args }) => void guarded({ type: 'propose', ...args }, expect),
+    answer: ({ expect, ...args }) => guarded({ type: 'answer', ...args }, expect),
     teachCommandMark: (mark, at) => void dispatch({ type: 'teach', mark, at }),
     correct: (args) => void dispatch({ type: 'correct', ...args }),
     clock: (args) => void dispatch({ type: 'clock', ...args }),
@@ -2058,7 +2197,8 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     snap: (args) => void dispatch({ type: 'snap', ...args }),
     bind: (args) => void dispatch({ type: 'bind', ...args }),
     snapCandidates: (ids) => candidatesAmong(ids ?? snappableIds()),
-    attachCode: (args) => dispatch({ type: 'code', ...args }),
+    attachCode: ({ expect, ...args }) => guarded({ type: 'code', ...args }, expect),
+    codeVersion,
     regions: (artifactId) => {
       const node = nodes.get(artifactId);
       return node ? regionsOf(node, nodes) : [];
@@ -2111,6 +2251,12 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     erase: (nodeId, at) => void dispatch({ type: 'erase', nodeId, at }),
     undo,
     load: (log) => {
+      // The whole board is replaced — including `load([])`, which is how a
+      // surface resets. Anything asked for against the old board is now about
+      // a board that no longer exists, and says so rather than landing on
+      // whatever holds that id next (STATE-1).
+      generation++;
+      staleResult = null;
       events = log.map((ev) => ({ ...ev }));
       checkpoints = [];
       replay();
