@@ -442,6 +442,24 @@ export function createInk(o: InkOptions): Ink {
     if (live && e.pointerId === live.id) finish();
   });
 
+  /**
+   * Drop the stroke in progress **without logging it**.
+   *
+   * A second finger landed, so the first one was never drawing — it was the
+   * opening of a pinch or a two-finger swipe, and a touch screen cannot know
+   * that until the second finger arrives. Deliberately not `finish()`: nothing
+   * is read, nothing is added to the log, and there is nothing to undo. The
+   * scene is what sees the second finger, so it is what calls this.
+   */
+  space.onAbandon(() => {
+    if (!live) return;
+    group.remove(live.line);
+    live.line.geometry.dispose();
+    live = null;
+    space.render();
+    o.onStroke('', null);
+  });
+
   log.subscribe(sync);
 
   const opacityOf = (id: string): number | null => {
