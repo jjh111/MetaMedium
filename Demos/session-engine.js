@@ -175,8 +175,9 @@
   };
 
 // ===== view =====
-// Provides: view {zoom, panX, panY}, screenToWorld/worldToScreen/wpx, zoomAround, fitAll, afterViewChange, the wheel/pinch/keyboard zoom, resize.
-// Uses: core; input (panning/pinch state).
+// Provides: view {zoom, panX, panY}, screenToWorld/worldToScreen/wpx, zoomAround, fitAll, afterViewChange, the wheel/pinch/keyboard zoom, resize,
+//   and the space actually visible: usableRect (pure), viewportRect, usableViewport, relayoutChrome.
+// Uses: core; input (panning/pinch state); palette (replaceOpenField).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () Ellipsis)();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -214,22 +215,110 @@
     afterViewChange();
   }
 
+  // ===== The space actually visible =======================================
+  // Chrome docks where the stylesheet puts it, and the stylesheet changes its
+  // mind: the panel stands at the LEFT on a wide screen and lies along the
+  // BOTTOM under 820px, the bar is always on top, the replay bar at the foot.
+  // Fit and the field both need the rectangle that is left over, and neither
+  // may assume which side a panel took — the inspector's right edge used to be
+  // the canvas's left boundary even when CSS had docked it at the bottom,
+  // which fitted a whole board into a ten-pixel strip and slammed the zoom to
+  // its minimum (DIRECTOR-REVIEW-2026-09-15, UI-1). So the side is MEASURED,
+  // from the geometry the browser actually laid out.
+  const DOCK_HUG = 0.12;    // a docked panel sits within this of the edge it stands on
+  const DOCK_COVER = 0.3;   // …and runs along at least this much of it
+  const DOCK_MAX = 0.7;     // no one panel may eat more of an axis than this
+  const MIN_USABLE = 120;   // a canvas smaller than this is not a canvas
+
+  /**
+   * Pure: the viewport minus whatever is docked to its edges.
+   * @param {{left:number,top:number,right:number,bottom:number}} v the visible viewport
+   * @param {Array<{id?:string,left:number,top:number,right:number,bottom:number}>} panels chrome rects, in the same space
+   * @returns {{left,top,right,bottom,width,height,docks:Array<{id,edge,why}>}}
+   */
+  function usableRect(v, panels) {
+    const vw = Math.max(1, v.right - v.left), vh = Math.max(1, v.bottom - v.top);
+    const free = { left: v.left, top: v.top, right: v.right, bottom: v.bottom };
+    const docks = [];
+    for (const p of panels || []) {
+      // Only the part of the panel that is on screen can occlude anything.
+      const ox = Math.min(p.right, v.right) - Math.max(p.left, v.left);
+      const oy = Math.min(p.bottom, v.bottom) - Math.max(p.top, v.top);
+      if (!(ox > 0 && oy > 0)) { docks.push({ id: p.id, edge: 'none', why: 'off screen' }); continue; }
+      // Which edge it hugs, and whether it runs along enough of that edge to
+      // be a wall rather than a card in a corner (the minimap is a card).
+      const hug = { left: p.left - v.left, right: v.right - p.right, top: p.top - v.top, bottom: v.bottom - p.bottom };
+      const side = oy >= ox            // taller than wide is a side panel; wider than tall is a band
+        ? (hug.left <= hug.right ? 'left' : 'right')
+        : (hug.top <= hug.bottom ? 'top' : 'bottom');
+      const vertical = side === 'left' || side === 'right';
+      const hugs = hug[side] <= (vertical ? vw : vh) * DOCK_HUG;
+      const cover = (vertical ? oy / vh : ox / vw);
+      const eats = (vertical ? (side === 'left' ? p.right - v.left : v.right - p.left) / vw
+        : (side === 'top' ? p.bottom - v.top : v.bottom - p.top) / vh);
+      if (!hugs) { docks.push({ id: p.id, edge: 'none', why: 'floats, ' + Math.round(hug[side]) + 'px off the ' + side }); continue; }
+      if (cover < DOCK_COVER) { docks.push({ id: p.id, edge: 'none', why: 'covers ' + Math.round(cover * 100) + '% of the ' + side + ' edge' }); continue; }
+      if (eats > DOCK_MAX) { docks.push({ id: p.id, edge: 'none', why: 'would eat ' + Math.round(eats * 100) + '% of the canvas' }); continue; }
+      docks.push({ id: p.id, edge: side, why: 'covers ' + Math.round(cover * 100) + '% of the ' + side + ' edge' });
+      if (side === 'left') free.left = Math.max(free.left, p.right);
+      else if (side === 'right') free.right = Math.min(free.right, p.left);
+      else if (side === 'top') free.top = Math.max(free.top, p.bottom);
+      else free.bottom = Math.min(free.bottom, p.top);
+    }
+    // Chrome that has eaten the canvas between them leaves the whole viewport:
+    // a field or a fit inside nothing is worse than one under a panel.
+    if (free.right - free.left < MIN_USABLE || free.bottom - free.top < MIN_USABLE) {
+      return { left: v.left, top: v.top, right: v.right, bottom: v.bottom, width: vw, height: vh,
+        docks: docks.map((d) => ({ id: d.id, edge: 'none', why: 'the chrome left no room; the whole viewport stands' })) };
+    }
+    return { left: free.left, top: free.top, right: free.right, bottom: free.bottom,
+      width: free.right - free.left, height: free.bottom - free.top, docks: docks };
+  }
+
+  // A test may pin the viewport, and the chrome rects with it, so the
+  // narrow-screen layout can be checked in a tab that cannot resize itself —
+  // a media query the browser will not run at this width is exactly what the
+  // defect lived behind. Nothing in the surface ever sets it.
+  let testViewport = null;
+  function setTestViewport(w, h, panels) { testViewport = w ? { width: w, height: h, panels: panels || null } : null; }
+
+  /** The space actually visible — the VISUAL viewport, so an on-screen keyboard counts. */
+  function viewportRect() {
+    if (testViewport) return { left: 0, top: 0, right: testViewport.width, bottom: testViewport.height, width: testViewport.width, height: testViewport.height };
+    const vv = window.visualViewport;
+    if (vv && vv.width > 0 && vv.height > 0) {
+      return { left: vv.offsetLeft, top: vv.offsetTop, right: vv.offsetLeft + vv.width, bottom: vv.offsetTop + vv.height, width: vv.width, height: vv.height };
+    }
+    return { left: 0, top: 0, right: innerWidth, bottom: innerHeight, width: innerWidth, height: innerHeight };
+  }
+
+  const CHROME_IDS = ['bar', 'inspector', 'replay'];
+  /** The chrome as rects, each measured only while it is shown. */
+  function chromeRects() {
+    if (testViewport && testViewport.panels) return testViewport.panels;
+    const out = [];
+    for (const id of CHROME_IDS) {
+      const el = document.getElementById(id);
+      if (!el || el.hidden) continue;
+      const cs = getComputedStyle(el);
+      if (cs.display === 'none' || cs.visibility === 'hidden') continue;
+      const r = el.getBoundingClientRect();
+      if (r.width > 0 && r.height > 0) out.push({ id: id, left: r.left, top: r.top, right: r.right, bottom: r.bottom });
+    }
+    return out;
+  }
+
+  function usableViewport() { return usableRect(viewportRect(), chromeRects()); }
+
   function fitAll() {
     const ids = state.contentIds.concat(state.explanations);
     const boxes = ids.map((id) => MM.boundsOf(state.nodes.get(id))).filter(Boolean);
     if (!boxes.length) { view.panX = 0; view.panY = 0; view.zoom = 1; afterViewChange(); return; }
     const b = union(boxes);
-    // Fit into the area the chrome leaves FREE, not the whole window: the
-    // inspector stands on the left and the replay bar along the bottom, and a
-    // drawing centred on the window sat half under them in the whitepaper's
-    // embeds. Each panel is measured only while it is shown.
-    const free = { left: 0, top: 0, right: innerWidth, bottom: innerHeight };
-    const shown = (el) => el && !el.hidden && getComputedStyle(el).display !== 'none' && el.getBoundingClientRect().width > 0;
-    const insp = document.getElementById('inspector');
-    if (shown(insp)) free.left = Math.max(free.left, insp.getBoundingClientRect().right);
-    const rpBar = document.getElementById('replay');
-    if (shown(rpBar)) free.bottom = Math.min(free.bottom, rpBar.getBoundingClientRect().top);
-    const freeW = Math.max(1, free.right - free.left), freeH = Math.max(1, free.bottom - free.top);
+    // Fit into the area the chrome leaves FREE, not the whole window: a drawing
+    // centred on the window sat half under the panel in the whitepaper's embeds.
+    const free = usableViewport();
+    const freeW = Math.max(1, free.width), freeH = Math.max(1, free.height);
     // Guard the viewport: a window smaller than the padding (or one not laid
     // out yet) would compute a negative scale and slam into MIN_ZOOM.
     const pad = Math.max(0, Math.min(90, freeW / 6, freeH / 6));
@@ -314,7 +403,46 @@
     // A replayed figure is fitted once so stepping never moves the view; a
     // lazily loaded iframe can be sized after that fit, so refit on resize.
     if (typeof rp !== 'undefined' && rp.rec) fitAll();
+    relayoutChrome();
   });
+
+  // ===== Layout changes, without touching what is in the field =============
+  // The field is placed once, at the pen tip, and then the window turns, the
+  // panel docks at the bottom, or the on-screen keyboard eats half the height
+  // — and the field sat where it was, right edge at 878 on a 390px screen
+  // (UI-1). Geometry is now re-run on every layout change, and only geometry:
+  // the field's DOM node is not rebuilt, so the text, the caret, the focus and
+  // the scroll are still there because nothing touched them. Drawings never
+  // move: the view's zoom and pan are not read or written here.
+  let relayoutPending = null;
+  function relayoutChrome() {
+    if (relayoutPending) return;
+    relayoutPending = nextFrame(() => {
+      relayoutPending = null;
+      if (typeof replaceOpenField === 'function') replaceOpenField();
+    });
+  }
+  if (window.visualViewport) {
+    // The keyboard: on iOS the layout viewport does not change when it opens,
+    // only the visual one, so `resize` alone never hears about it.
+    visualViewport.addEventListener('resize', relayoutChrome);
+    visualViewport.addEventListener('scroll', relayoutChrome);
+  }
+  // The panel growing a row, or changing size with the theme — a box that
+  // changed, whatever caused it.
+  if (window.ResizeObserver) {
+    const chromeObserver = new ResizeObserver(relayoutChrome);
+    for (const id of CHROME_IDS) { const el = document.getElementById(id); if (el) chromeObserver.observe(el); }
+  }
+  // The panel COLLAPSING is not a resize: `display: none` takes the element
+  // out of layout altogether and a ResizeObserver reports nothing, either way
+  // — so the class that does it is watched instead. `panelHidden` on the body
+  // and `data-theme` on the root are the two switches that move the chrome.
+  if (window.MutationObserver) {
+    const classObserver = new MutationObserver(relayoutChrome);
+    classObserver.observe(document.body, { attributes: true, attributeFilter: ['class'] });
+    classObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme', 'class'] });
+  }
 
   // A frame that comes even when the page is not painting. Time is state
   // here, not a movie: a tank in a tab the browser has stopped painting
@@ -3347,27 +3475,87 @@
   // ===== The field on screen ===================================================
   function fieldInput() { return summonEl.querySelector('input.filter'); }
 
-  /** Where the field opens: at the pen tip, fanning to the hand's side, on screen, off the panel. */
+  // ===== The field's geometry, apart from its content =====================
+  // The field opens at the pen tip and stays put while the window turns, the
+  // panel docks at the bottom or a keyboard rises. Placement is therefore a
+  // function of the space actually visible (01-view's `usableRect`) and of the
+  // field's MEASURED size — a fixed 230px guess put its foot under the panel
+  // the moment the pills wrapped to three rows (UI-1).
+  const FIELD_W = 380;       // the design width; narrower when the space is
+  const FIELD_MIN_W = 200;   // …but never so narrow the input is unusable
+  const FIELD_H_GUESS = 230; // only until the content has been laid out once
+  const FIELD_M = 8;         // the margin the field keeps off every edge
+  const FIELD_TOP = 52;      // under the bar, when the usable rect cannot hold it
+  let fieldAnchor = null;    // where the hand was when this field opened, on screen
+
+  /** Pure: fit `size` at `want` inside `soft` if it fits there, inside `hard` otherwise. */
+  function fitSpan(want, size, soft, hard) {
+    const box = (soft.hi - soft.lo) >= size ? soft : hard;
+    const hi = Math.max(box.lo, box.hi - size);
+    return Math.max(box.lo, Math.min(hi, want));
+  }
+
+  /**
+   * Pure: where the field stands, given where the hand is and what is visible.
+   * @param {{x:number,y:number}} anchor the pen tip, on screen
+   * @param {{viewport:object,usable:object,height:number,hand:string,panel:object|null}} o
+   * @returns {{x:number,y:number,w:number}} in the viewport's own space
+   */
+  function fieldBox(anchor, o) {
+    const v = o.viewport, u = o.usable || v;
+    const w = Math.max(FIELD_MIN_W, Math.min(FIELD_W, u.width - FIELD_M * 2, v.width - FIELD_M * 2));
+    const h = o.height > 0 ? o.height : FIELD_H_GUESS;
+    const at = anchor || { x: v.left + v.width / 2, y: v.top + v.height / 2 };
+    let x = o.hand === 'left' ? at.x - 14 - w : at.x + 14;
+    let y = at.y - 22;
+    // Off a panel that is neither a wall nor a sheet but a card in the way:
+    // slide past it when there is room, never when that would push the field
+    // off the screen (which is what an unconditional nudge did on a phone).
+    const p = o.panel;
+    if (p && hand !== 'left' && x < p.right + FIELD_M && x + w > p.left && y < p.bottom && y + h > p.top
+        && p.right + FIELD_M + w <= u.right - FIELD_M) x = p.right + FIELD_M;
+    x = fitSpan(x, w, { lo: u.left + FIELD_M, hi: u.right - FIELD_M }, { lo: v.left + FIELD_M, hi: v.right - FIELD_M });
+    y = fitSpan(y, h, { lo: u.top + FIELD_M, hi: u.bottom - FIELD_M }, { lo: v.top + FIELD_TOP, hi: v.bottom - FIELD_M });
+    return { x: x, y: y, w: w };
+  }
+
+  /** The panel's rect while it stands, else null — a hidden panel is in nobody's way. */
+  function panelRect() {
+    if (document.body.classList.contains('panelHidden') || inspectorEl.hidden) return null;
+    const r = inspectorEl.getBoundingClientRect();
+    return r.width > 0 && r.height > 0 ? r : null;
+  }
+
+  /** Place the field where it stands now. Touches left/top/width and NOTHING else. */
   function placeField() {
-    const w = Math.min(380, innerWidth - 16);
-    let x = lastPen ? lastPen.x : innerWidth / 2, y = lastPen ? lastPen.y : innerHeight / 2;
-    x = hand === 'left' ? x - 14 - w : x + 14;
-    y = y - 22;
-    const panel = inspectorEl.getBoundingClientRect();
-    if (!document.body.classList.contains('panelHidden') && panel.width && x < panel.right + 8 && y < panel.bottom && hand !== 'left') x = panel.right + 8;
-    x = Math.max(8, Math.min(innerWidth - w - 8, x));
-    y = Math.max(52, Math.min(innerHeight - 230, y));
-    summonEl.style.left = x + 'px';
-    summonEl.style.top = y + 'px';
-    summonEl.style.width = w + 'px';
+    const v = viewportRect(), u = usableViewport();
+    // Width first: the height below is whatever the content comes to at that
+    // width, measured rather than assumed.
+    const first = fieldBox(fieldAnchor, { viewport: v, usable: u, height: 0, hand: hand, panel: panelRect() });
+    summonEl.style.width = first.w + 'px';
+    const box = fieldBox(fieldAnchor, { viewport: v, usable: u, height: summonEl.offsetHeight, hand: hand, panel: panelRect() });
+    summonEl.style.left = box.x + 'px';
+    summonEl.style.top = box.y + 'px';
+    summonEl.style.width = box.w + 'px';
+    return box;
+  }
+
+  /** A layout change: re-place the open field, keeping every character and the caret. */
+  function replaceOpenField() {
+    if (!summonEl.classList.contains('field') || summonEl.style.display === 'none') return;
+    placeField();
   }
 
   function renderSummon(s) {
     document.body.classList.toggle('summoning', !!s.summon);
-    if (!s.summon) { summonEl.style.display = 'none'; summonEl.className = ''; shownSummonId = null; return; }
+    if (!s.summon) { summonEl.style.display = 'none'; summonEl.className = ''; shownSummonId = null; fieldAnchor = null; return; }
     const sum = s.summon;
-    if (shownSummonId === sum.id) return;
+    // The same field, rendered again: its content already stands and rebuilding
+    // it would throw away the caret — but the space it stands in may have
+    // changed since, so geometry is re-run and content is not (UI-1).
+    if (shownSummonId === sum.id) { placeField(); return; }
     shownSummonId = sum.id;
+    fieldAnchor = lastPen ? { x: lastPen.x, y: lastPen.y } : null;
     paletteItems = rankItems(conversionsFor(s));
     paletteIndex = -1;
     paletteNavigated = false;
@@ -3511,6 +3699,19 @@
     const hidden = shown.filter((x) => !x.certain).length - shownAfford;
     if (hidden > 0) { const more = document.createElement('span'); more.className = 'more'; more.textContent = '+' + hidden + ' more — type to find'; affordRow.appendChild(more); }
     if (readingEl) { readingEl.textContent = r.line || ''; readingEl.classList.toggle('quiet', !!r.quiet); }
+    keepFieldOnScreen();
+  }
+
+  /**
+   * The pills just rewrapped and the field grew: re-place it only if its foot
+   * has gone off the bottom. Re-placing on every keystroke would walk the
+   * field up the screen under the hand.
+   */
+  function keepFieldOnScreen() {
+    if (!summonEl.classList.contains('field')) return;
+    const r = summonEl.getBoundingClientRect(), v = viewportRect();
+    if (r.bottom <= v.bottom - 2 && r.right <= v.right - 2 && r.top >= v.top - 2 && r.left >= v.left - 2) return;
+    placeField();
   }
 
   function onPaletteKey(e) {
@@ -6430,6 +6631,13 @@
     strikeOnText: (strokeId, pts) => strikeOnText(session.getState(), strokeId, pts), textNear: (b) => textNear(session.getState(), b),
     // For tests: pin the view so world coordinates map to known screen ones.
     setView: (zoom, panX, panY) => { view.zoom = zoom; view.panX = panX; view.panY = panY; afterViewChange(); },
+    // The space actually visible, and where the field stands in it (UI-1).
+    // `usableRect` and `fieldBox` are pure: a test hands them rects.
+    usableRect: usableRect, usableViewport: usableViewport, viewportRect: viewportRect,
+    fieldBox: fieldBox, placeField: placeField, chromeRects: chromeRects,
+    // For tests: pin the viewport, so narrow-screen geometry can be checked in
+    // a tab that cannot resize itself.
+    setTestViewport: setTestViewport,
     resetUses: () => { for (const k of Object.keys(uses)) delete uses[k]; store.del(USES_KEY); },
     // The worker runtime, for tests: what is loaded, where each body is, what broke.
     runtime: () => ({ bodies: runtime.bodies, broken: runtime.broken, loaded: runtime.loaded, budgetMs: RUN_BUDGET_MS, log: runtime.log, pending: runtime.pending, stepOnce: stepOnce }),

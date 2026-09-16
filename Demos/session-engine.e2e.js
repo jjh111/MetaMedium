@@ -1708,5 +1708,77 @@ window.__scenario = async function(){
     mm.session.load([]);
   }
 
+  // ---- 38. The space actually visible: the field and the fit respect it ----
+  // The reproduction (DIRECTOR-REVIEW-2026-09-15, UI-1): open the field at
+  // 1440x1000, resize to 390x844, and it stays at x=504 with its right edge at
+  // 878 — off the screen; fit-to-content with the panel docked along the
+  // BOTTOM reads that sheet as a left sidebar and sets the zoom to 0.08.
+  // A tab cannot resize itself, so the narrow layout is pinned instead: the
+  // viewport and the chrome rects the stylesheet would lay out at that width.
+  {
+    const V = { w: 390, h: 844 };
+    // 390px: the bar across the top, the panel along the bottom (surface.css
+    // @media max-width 820), and the minimap hidden.
+    const BAR = { id: 'bar', left: 0, top: 0, right: 390, bottom: 46 };
+    const SHEET = { id: 'inspector', left: 10, top: 523, right: 380, bottom: 810 };
+    const WIDE = { left: 0, top: 0, right: 1440, bottom: 1000 };
+    const SIDE = { id: 'inspector', left: 14, top: 52, right: 314, bottom: 652 };
+    const CARD = { id: 'minimap', left: 1250, top: 856, right: 1426, bottom: 964 };
+
+    const uSheet = mm.usableRect({ left: 0, top: 0, right: V.w, bottom: V.h }, [BAR, SHEET]);
+    step('38. a panel lying along the bottom is read as a bottom sheet, not as a left sidebar',
+      uSheet.docks.find(d => d.id === 'inspector').edge === 'bottom' && uSheet.left === 0 && uSheet.right === 390 && uSheet.top === 46 && uSheet.bottom === 523,
+      { docks: uSheet.docks.map(d => d.id + ':' + d.edge), rect: [uSheet.left, uSheet.top, uSheet.right, uSheet.bottom] });
+
+    const uSide = mm.usableRect(WIDE, [{ id: 'bar', left: 0, top: 0, right: 1440, bottom: 46 }, SIDE, CARD]);
+    step('38a. the same panel standing at the left is read as a side wall, and a card in a corner walls nothing',
+      uSide.docks.find(d => d.id === 'inspector').edge === 'left' && uSide.left === 314
+        && uSide.docks.find(d => d.id === 'minimap').edge === 'none' && uSide.bottom === 1000,
+      { docks: uSide.docks.map(d => d.id + ':' + d.edge + ' (' + d.why + ')'), rect: [uSide.left, uSide.top, uSide.right, uSide.bottom] });
+
+    // The fit, through the real fitAll, with the narrow layout pinned.
+    mm.setView(1, 0, 0);
+    t.stroke(t.rect(200, 180, 400, 300));
+    mm.setTestViewport(V.w, V.h, [BAR, SHEET]);
+    mm.fitAll();
+    const zoomSheet = mm.view.zoom;
+    const fitted = MM.boundsOf(mm.session.getState().nodes.get(mm.session.getState().contentIds[0]));
+    const a36 = mm.worldToScreen(fitted.minX, fitted.minY), z36 = mm.worldToScreen(fitted.maxX, fitted.maxY);
+    step('38b. fit with the panel docked at the bottom does not slam the zoom to its minimum, and lands the drawing in the free band',
+      zoomSheet > 0.5 && a36.x >= 0 && z36.x <= V.w && a36.y >= 46 && z36.y <= 523,
+      { zoom: +zoomSheet.toFixed(3), min: 0.08, box: [a36.x, a36.y, z36.x, z36.y].map(Math.round), band: [0, 46, V.w, 523] });
+
+    // The field, through the real placeField, at the narrow viewport.
+    mm.setTestViewport(null);
+    mm.setView(1, 0, 0);
+    t.stroke(t.circle(400, 330, 190));
+    t.takeLoop(400, 330, 190);
+    await wait(60);
+    const f36 = t.typeIn('hello there');
+    const openedAt = document.getElementById('summon').getBoundingClientRect();
+    if (f36) { f36.focus(); f36.setSelectionRange(2, 7); }
+    const boundsBefore = MM.boundsOf(mm.session.getState().nodes.get(mm.session.getState().contentIds[0]));
+    const viewBefore = { zoom: mm.view.zoom, panX: mm.view.panX, panY: mm.view.panY };
+    // The resize the user makes: the viewport narrows, the panel docks below.
+    mm.setTestViewport(V.w, V.h, [BAR, SHEET]);
+    mm.placeField();
+    const after = document.getElementById('summon').getBoundingClientRect();
+    const g36 = document.querySelector('#summon input.filter');
+    const boundsAfter = MM.boundsOf(mm.session.getState().nodes.get(mm.session.getState().contentIds[0]));
+    step('38c. the field re-placed at 390x844 is inside the viewport, clear of the sheet, and its text, caret and focus are untouched',
+      !!g36 && after.left >= 0 && after.right <= V.w && after.top >= 0 && after.bottom <= 523
+        && g36 === f36 && g36.value === 'hello there' && g36.selectionStart === 2 && g36.selectionEnd === 7
+        && document.activeElement === g36,
+      { opened: [Math.round(openedAt.left), Math.round(openedAt.right)], after: [after.left, after.top, after.right, after.bottom].map(Math.round),
+        value: g36 && g36.value, sel: g36 && [g36.selectionStart, g36.selectionEnd], focused: document.activeElement === g36, sameNode: g36 === f36 });
+    step('38d. the drawing did not move: re-placing the field is geometry, never the view',
+      boundsAfter.minX === boundsBefore.minX && boundsAfter.minY === boundsBefore.minY
+        && mm.view.zoom === viewBefore.zoom && mm.view.panX === viewBefore.panX && mm.view.panY === viewBefore.panY,
+      { before: [boundsBefore.minX, boundsBefore.minY], after: [boundsAfter.minX, boundsAfter.minY], view: viewBefore });
+    mm.setTestViewport(null);
+    mm.session.load([]);
+    mm.setView(1, 0, 0);
+  }
+
   return R;
 };
