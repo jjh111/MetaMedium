@@ -1600,5 +1600,113 @@ window.__scenario = async function(){
     mm.session.load([]);
   }
 
+  // ---- 36. The explanation plane has a layout: cards off each other, off the ink they are about ----
+  {
+    mm.session.load([]); mm.setView(1, 0, 0);
+    // Six boxes in a column, each given a sentence — the shape of a canvas_say
+    // run from the MCP hand. Anchored alike, six cards would land on each other.
+    const boxes = [];
+    for (let i = 0; i < 6; i++) { t.stroke(t.rect(520, 120 + i * 96, 150, 62)); boxes.push(mm.session.getState().contentIds[i]); }
+    // Sentences long enough that a card is taller than the gap between two
+    // marks: side by side at the anchor they would overlap, so the placing
+    // has to shift them along the free side to find room.
+    const said = [0, 1, 2, 3, 4, 5].map((i) => 'box ' + (i + 1) + ' is a container; the marks inside it sit in a row, roughly lined up, and the one below points back at it — so the whole reads as a frame holding a flow');
+    boxes.forEach((id, i) => mm.session.answer({ participantId: MM.LOCAL_PARTICIPANT, question: 'why', text: said[i], aboutIds: [id], at: Date.now() + i }));
+    await wait(60);
+    const cards36 = mm.answerCards();
+    const hit = (a, b) => Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x) > 0.5 && Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y) > 0.5;
+    const pairs = () => { const c = mm.answerCards(); const bad = []; for (let i = 0; i < c.length; i++) for (let j = i + 1; j < c.length; j++) if (hit(c[i], c[j])) bad.push([i, j]); return bad; };
+    const overAnchor = () => mm.answerCards().filter((c) => c.about.some((id) => {
+      const b = MM.boundsOf(mm.session.getState().nodes.get(id));
+      return b && hit(c, { x: b.minX, y: b.minY, w: b.maxX - b.minX, h: b.maxY - b.minY });
+    })).map((c) => c.id);
+    step('36. six answers on six stacked marks are six cards, none on another', cards36.length === 6 && pairs().length === 0, { cards: cards36.length, overlapping: pairs() });
+    step('36a. no card covers the marks it is about', overAnchor().length === 0, overAnchor());
+    // The placing is runtime: an answer event carries what was said and what it
+    // is about, and nothing about where its card ended up.
+    const answers36 = JSON.parse(mm.exportLog()).filter((e) => e.type === 'answer');
+    const keys36 = [...new Set(answers36.flatMap((e) => Object.keys(e)))].sort();
+    step('36b. the placing is runtime, never in the log', answers36.length === 6 && keys36.join(',') === 'aboutIds,at,participantId,question,text,type', keys36);
+    // Positions are in canvas units and sizes in screen ones, so a zoom re-places them.
+    const before36 = mm.answerCards().map((c) => c.w)[0];
+    mm.setView(0.5, 0, 0);
+    await wait(30);
+    const after36 = mm.answerCards();
+    step('36c. zoomed out, the cards keep their screen size and are re-placed, still clear of each other',
+      after36.length === 6 && Math.abs(after36[0].w - before36 * 2) < 1 && pairs().length === 0 && overAnchor().length === 0,
+      { w: after36.length ? Math.round(after36[0].w) : 0, was: Math.round(before36), overlapping: pairs(), onInk: overAnchor() });
+    mm.setView(1, -300, -80);
+    await wait(30);
+    step('36d. panned, they are placed again and still clear', mm.answerCards().length === 6 && pairs().length === 0 && overAnchor().length === 0, { overlapping: pairs(), onInk: overAnchor() });
+    // Staying on screen is a preference among the places beside a mark, never a
+    // reason to leave it: a card whose marks are a screenful away belongs with
+    // them, not crowded against the edge of what is being looked at.
+    mm.setView(1, 0, 0);
+    t.stroke(t.rect(3000, 200, 150, 62));
+    const far = mm.session.getState().contentIds.slice(-1)[0];
+    mm.session.answer({ participantId: MM.LOCAL_PARTICIPANT, question: 'why', text: 'a sentence about marks that are nowhere near the viewport', aboutIds: [far], at: Date.now() });
+    await wait(60);
+    const farCard = mm.answerCards().find((c) => c.about[0] === far);
+    step('36e. a card whose marks are off screen stays with them', !!farCard && farCard.x > 2400 && pairs().length === 0, farCard && { x: Math.round(farCard.x), y: Math.round(farCard.y) });
+    mm.setView(1, 0, 0);
+    mm.session.load([]);
+  }
+
+  // ---- 37. A figure is not a page: svg and text on the board, a card that says its subject ----
+  {
+    mm.session.load([]); mm.setView(1, 0, 0);
+    const txt = mm.session.import({ kind: 'text', path: 'c/anchor.txt', name: 'anchor.txt', code: 'THE ANCHOR', bounds: { minX: 200, minY: 200, maxX: 440, maxY: 250 }, at: Date.now() });
+    const svg = mm.session.import({ kind: 'svg', path: 'c/badge.svg', name: 'badge.svg', code: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 60"><text x="16" y="38">1</text></svg>', bounds: { minX: 200, minY: 320, maxX: 440, maxY: 380 }, at: Date.now() });
+    const page = mm.session.import({ kind: 'html', path: 'c/page.html', name: 'page.html', code: '<div data-region="a">a page</div>', bounds: { minX: 200, minY: 430, maxX: 520, maxY: 530 }, at: Date.now() });
+    for (let i = 0; i < 40 && !(mm.frames.get(txt) && mm.frames.get(svg) && mm.frames.get(page)); i++) await wait(50);
+    await wait(150);
+    const fig = (id) => { const f = mm.frames.get(id); return f && f.wrap.classList.contains('figure'); };
+    step('37. words and a drawing are figures on the board; a page keeps its plate', fig(txt) && fig(svg) && !fig(page), { text: fig(txt), svg: fig(svg), page: fig(page) });
+    const srcOf = (id) => { const f = mm.frames.get(id); return f && f.iframe ? f.iframe.srcdoc : ''; };
+    // A few words are a caption and FILL their frame, so they scale with the board.
+    step('37a. a caption fills its frame, on a clear ground', /background:transparent/.test(srcOf(txt)) && /<svg/.test(srcOf(txt)) && /textLength=/.test(srcOf(txt)), { grounds: /background:transparent/.test(srcOf(txt)), fitted: /textLength=/.test(srcOf(txt)) });
+    // A file of text flows at a size the screen holds — and sets its words ONCE:
+    // a text run's addressable label is its own first words, so printing every
+    // region's label over it, right for a function or a key, doubled every line.
+    const doc = mm.session.import({ kind: 'text', path: 'c/long.txt', name: 'long.txt', code: Array.from({ length: 12 }, (_, i) => 'line ' + (i + 1) + ' of a file, which is a document and not a caption').join('\n\n'), bounds: { minX: 600, minY: 600, maxX: 900, maxY: 900 }, at: Date.now() });
+    for (let i = 0; i < 40 && !mm.frames.get(doc); i++) await wait(50);
+    await wait(120);
+    const shown = (id) => srcOf(id).replace(/ title="[^"]*"/g, ''); // the tooltip is not the page
+    step('37a2. a file of text flows, clear, with its words set once', fig(doc) && /background:transparent/.test(srcOf(doc)) && !/class="lb"/.test(srcOf(doc)) && (shown(doc).match(/line 1 of a file/g) || []).length === 1, { figure: fig(doc), heading: /class="lb"/.test(srcOf(doc)), times: (shown(doc).match(/line 1 of a file/g) || []).length });
+    step('37b. a page is still source on a page', /background:#fbfaf7/.test(srcOf(page)), { plate: /background:#fbfaf7/.test(srcOf(page)) });
+    // The card says what it is about and how long ago, as chrome.
+    t.stroke(t.rect(700, 200, 180, 110));
+    const mk = mm.session.getState().contentIds.slice(-1)[0];
+    mm.session.answer({ participantId: MM.LOCAL_PARTICIPANT, question: 'why', text: 'a sentence with no label smuggled into it', aboutIds: [mk], at: Date.now() });
+    await wait(80);
+    const card = mm.answerCards().find((c) => c.about[0] === mk);
+    step('37c. an answer card carries its subject and its age in the chrome', !!card && card.what === 'rectangle' && card.ago === 'just now', card && { what: card.what, ago: card.ago });
+    // A figure's document carries the board's ink colour, baked in: an iframe
+    // inherits no token, so the theme is part of what the document is made of.
+    const themeBefore = mm.themeMode();
+    const darkSrc = srcOf(txt);
+    mm.setThemeMode(mm.theme === 'paper' ? 'dark' : 'light');
+    for (let i = 0; i < 30 && srcOf(txt) === darkSrc; i++) await wait(50);
+    step('37d. a figure is rebuilt for the theme, so its words never vanish when the light changes', srcOf(txt) !== darkSrc && /fill:/.test(srcOf(txt)), { changed: srcOf(txt) !== darkSrc });
+    mm.setThemeMode(themeBefore);
+    await wait(200);
+    // A figure wears its brackets and its filename only while pointed at.
+    mm.session.load([]); mm.setView(1, 0, 0);
+    const lab = mm.session.import({ kind: 'text', path: 'c/lab.txt', name: 'lab.txt', code: 'a label', bounds: { minX: 300, minY: 300, maxX: 460, maxY: 340 }, at: Date.now() });
+    t.stroke(t.rect(900, 700, 120, 80)); // something else is the mark the hand is on
+    await wait(120);
+    const pg2 = mm.session.import({ kind: 'html', path: 'c/p.html', name: 'p.html', code: '<div data-region="a">a page</div>', bounds: { minX: 300, minY: 500, maxX: 600, maxY: 620 }, at: Date.now() });
+    await wait(150);
+    const atRest = mm.chromeDrawn();
+    step('37e. a figure is quiet at rest; a page keeps its brackets and name', !atRest.includes(lab) && atRest.includes(pg2), { drawn: atRest, label: lab, page: pg2 });
+    // Pointing at it brings its identity back.
+    mm.session.summonMarks([lab], Date.now());
+    await wait(120);
+    step('37f. pointed at, the figure wears its name again', mm.chromeDrawn().includes(lab), mm.chromeDrawn());
+    const su = mm.session.getState().summon;
+    if (su) mm.session.dismiss(su.id, Date.now());
+    mm.session.load([]);
+  }
+
   return R;
 };

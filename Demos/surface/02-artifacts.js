@@ -5,6 +5,9 @@
 // in name order inside `(function () Ellipsis)();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
 
+  /** Kinds that render as a figure on the board rather than as a page: no plate, clear ground. */
+  const FIGURE_KINDS = new Set(['run', 'svg', 'text']);
+
   // ===== The live plane: artifacts that render and run ====================
   // Generated code becomes real DOM in an iframe, positioned in world space
   // inside the shared transform. The ink canvas sits ON TOP of it, so the boxes
@@ -83,7 +86,11 @@
       if (f && !f.parked && f.kind !== kind) { f.wrap.remove(); frames.delete(id); f = null; }
       if (!f) {
         const wrap = document.createElement('div');
-        wrap.className = 'artifactFrame' + (kind === 'run' ? ' run' : '');
+        // A FIGURE has no plate. A page, a script or a table is something you
+        // read on a page, and the white card is that page; a drawing and a line
+        // of words are marks among the ink, and a card behind them fights it.
+        // The program's frame had this rule alone; svg and text need it too.
+        wrap.className = 'artifactFrame' + (kind === 'run' ? ' run' : '') + (FIGURE_KINDS.has(kind) ? ' figure' : '');
         const iframe = document.createElement('iframe');
         // Two sandboxes, never both: a page keeps its origin and runs no script,
         // so ink can hit-test into it; a program runs scripts in an opaque
@@ -113,7 +120,15 @@
       const wired = wiredCodeOf(s, id);
       const code = wired !== null ? wired : rep.data.code;
       const playing = !!(s.clocks[id] && s.clocks[id].playing);
-      const stamp = rep.data.at + ':' + Math.round(fr.w) + 'x' + Math.round(fr.h) + ':' + hashOf(code) + (kind === 'run' ? ':' + (playing ? 'run' : 'still') : '');
+      // A figure's document carries the board's own ink colour, baked in when
+      // it was written — an iframe cannot inherit a token from the page — so
+      // the THEME is part of what the document is made of. Without it in the
+      // stamp, switching to paper left every label in the dark theme's near-
+      // white ink on a light ground: a figure that vanished when the light
+      // came on. A page is theme-independent and rebuilds for nothing.
+      const stamp = rep.data.at + ':' + Math.round(fr.w) + 'x' + Math.round(fr.h) + ':' + hashOf(code) +
+        (kind === 'run' ? ':' + (playing ? 'run' : 'still') : '') +
+        (FIGURE_KINDS.has(kind) ? ':' + (document.documentElement.getAttribute('data-theme') || '') : '');
       if (!f.parked && f.codeAt !== stamp) {
         // A document that CHANGES gets a new element. Assigning srcdoc twice
         // in one tick — the source card at import, the harness at play — lost

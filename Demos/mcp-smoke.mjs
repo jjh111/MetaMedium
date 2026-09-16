@@ -78,14 +78,20 @@ try {
   const drew = await call('canvas_draw', { shapes: [{ shape: 'circle', x: 340, y: 100, w: 120, h: 120, why: 'a bubble beside the box' }] });
   const t2 = textOf(drew);
   check('canvas_draw reads back as a circle', /circle/.test(t2), t2);
-  const got = await until(() => heard.slice(before).some((h) => h.participant === 'smoke~mcp' && h.events.some((e) => e.type === 'stroke')), 4000);
-  check('the tab hears the circle as a line from smoke~mcp', got, heard.slice(before).map((h) => h.participant + ':' + h.events.map((e) => e.type).join('+')));
+  // A hand in a room is one PROCESS: the name is the caller's, the suffix says
+  // which hand. Two mcp.mjs under one name are taken for one log, and the last
+  // to answer a hello replaces the other — so the suffix is per process and the
+  // test must not know it.
+  const fromSmoke = (h) => /^smoke~/.test(h.participant);
+  const got = await until(() => heard.slice(before).some((h) => fromSmoke(h) && h.events.some((e) => e.type === 'stroke')), 4000);
+  check('the tab hears the circle as a line from the hand "smoke"', got, heard.slice(before).map((h) => h.participant + ':' + h.events.map((e) => e.type).join('+')));
+  const handId = 'participant:hand:' + heard.filter(fromSmoke).map((h) => h.participant)[0].replace(/[^A-Za-z0-9]/g, '_');
   const logs = await tab.readLogs();
   tabSession.load(MM.mergeLogs(logs, { me: tabMe }));
   const st = tabSession.getState();
-  const theirs = st.contentIds.map((id) => st.nodes.get(id)).find((n) => n.edges.some((e) => e.rel === 'made-by' && e.to === 'participant:hand:smoke_mcp'));
+  const theirs = st.contentIds.map((id) => st.nodes.get(id)).find((n) => n.edges.some((e) => e.rel === 'made-by' && e.to === handId));
   check('merged in the tab, the circle is the hand "smoke"\'s, read as a circle', !!theirs && MM.topInterpretation(theirs) === 'circle', theirs && MM.topInterpretation(theirs));
-  const why = st.explanations.map((id) => st.nodes.get(id)).find((n) => n.edges.some((e) => e.rel === 'made-by' && e.to === 'participant:hand:smoke_mcp'));
+  const why = st.explanations.map((id) => st.nodes.get(id)).find((n) => n.edges.some((e) => e.rel === 'made-by' && e.to === handId));
   check('its "why" stands beside the circle, in the hand\'s name — not the tab\'s local', !!why, st.explanations);
 
   // Seeing: the ink as a PNG.
@@ -104,7 +110,7 @@ try {
   check('canvas_transcribe holds a transcript', /read as “hello”/.test(textOf(tr)), textOf(tr));
   const wrote = await call('canvas_write', { kind: 'run', code: 'mm.ctx.fillRect(0,0,10,10);', name: 'dot', bounds: { x: 600, y: 100, w: 200, h: 120 } });
   check('canvas_write places a program that waits for play', /placed at 600,100/.test(textOf(wrote)) && /waits for the hand/.test(textOf(wrote)), textOf(wrote));
-  await until(() => heard.some((h) => h.participant === 'smoke~mcp' && h.events.some((e) => e.type === 'import')), 4000);
+  await until(() => heard.some((h) => fromSmoke(h) && h.events.some((e) => e.type === 'import')), 4000);
   tabSession.load(MM.mergeLogs(await tab.readLogs(), { me: tabMe }));
   const st2 = tabSession.getState();
   const boxNode = st2.nodes.get(boxId);

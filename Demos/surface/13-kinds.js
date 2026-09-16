@@ -29,6 +29,25 @@
     '.gap{color:rgba(20,20,15,0.55);}' +
     'svg{max-width:100%;max-height:100%;display:block;margin:auto;}';
 
+  // A FIGURE is not source. A script, a page or a table is something you read
+  // on a page, and its white ground is the page; a drawing and a line of words
+  // are marks on the board, and a white card behind them fights the ink they
+  // stand among — the run harness and writing-turned-text have always known
+  // this, and svg and text did not. Same type, same regions, clear ground, the
+  // board's own ink colour, so a figure written onto the canvas reads in either
+  // theme (brand/tokens.css by way of readColours).
+  const figureCSS = () =>
+    'html{font-size:11px;}html,body{margin:0;padding:0;background:transparent;color:' + (C ? C.ink : '#e8e4d9') + ';}' +
+    '#mmroot{position:relative;overflow:hidden;font:1em/1.45 "IBM Plex Mono",ui-monospace,Menlo,monospace;}' +
+    '*{box-sizing:border-box;}' +
+    '.src{margin:0;padding:0.55em 0.75em;white-space:pre-wrap;word-break:break-word;}' +
+    '.rg{position:relative;padding:0.2em 0.55em 0.35em 0.55em;margin:0 0 0.2em 0;}' +
+    '.rg:hover{background:rgba(201,168,76,0.10);}' +
+    'html.mm-reveal .rg{outline:1px dashed rgba(138,109,31,0.55);margin-bottom:0.4em;}' +
+    '.gap{opacity:0.55;}' +
+    'svg{max-width:100%;max-height:100%;display:block;margin:auto;}' +
+    'text{fill:currentColor;}';
+
   // ===== Code legible at every zoom (v9 S4) =================================
   // A frame scales with the board; the type inside is held at a screen size —
   // set on the document root, in the frame's own pixels, as the board zooms —
@@ -55,17 +74,26 @@
   }
 
   /** The source with its top-level regions wrapped, so each is an element ink can land on. */
-  function regionsDocument(source, regions, w, h) {
+  /**
+   * Source with its regions marked. `named` says whether a region's label is a
+   * NAME worth printing over it — a function, a key, a heading — or the region's
+   * own first words, which is what text runs carry: printing those set every
+   * line of a text twice, once in small caps and once as itself.
+   */
+  function regionsDocument(source, regions, w, h, opts) {
+    const named = !opts || opts.named !== false;
+    const css = opts && opts.figure ? figureCSS() : SOURCE_CSS;
     const tops = regions.filter((r) => r.depth === 0).sort((a, b) => a.start - b.start);
     let html = '', at = 0;
     for (const r of tops) {
       if (r.start > at) html += '<span class="gap">' + esc(source.slice(at, r.start)) + '</span>';
-      html += '<div class="rg" data-region="' + esc(r.id) + '"><span class="lb">' + esc(r.label) + '</span>' +
+      html += '<div class="rg" data-region="' + esc(r.id) + '" title="' + esc(r.label) + '">' +
+        (named ? '<span class="lb">' + esc(r.label) + '</span>' : '') +
         esc(source.slice(r.start, r.end)) + '</div>';
       at = r.end;
     }
     if (at < source.length) html += '<span class="gap">' + esc(source.slice(at)) + '</span>';
-    return '<!doctype html><html><head><meta charset="utf-8"><style>' + SOURCE_CSS +
+    return '<!doctype html><html><head><meta charset="utf-8"><style>' + css +
       '#mmroot{width:' + Math.round(w) + 'px;height:' + Math.round(h) + 'px;}</style></head>' +
       '<body><div id="mmroot"><pre class="src">' + html + '</pre></div></body></html>';
   }
@@ -80,7 +108,7 @@
       while (i < out.length && !/[\s\/>]/.test(out[i])) i++;
       out = out.slice(0, i) + ' data-region="' + esc(r.id) + '"' + out.slice(i);
     }
-    return '<!doctype html><html><head><meta charset="utf-8"><style>' + SOURCE_CSS +
+    return '<!doctype html><html><head><meta charset="utf-8"><style>' + figureCSS() +
       '#mmroot{width:' + Math.round(w) + 'px;height:' + Math.round(h) + 'px;display:flex;align-items:center;justify-content:center;}</style></head>' +
       '<body><div id="mmroot">' + out + '</div></body></html>';
   }
@@ -208,6 +236,10 @@
    * script; the ground is clear so the text stands on the canvas like ink,
    * in the ink's colour; one region, `text`, so ink over it addresses it.
    */
+  /** Up to this many lines, a text is a caption that fills its frame. */
+  const TEXT_FITS_LINES = 8;
+  const linesOf = (code) => String(code).split(/\r?\n/).filter((l) => l.trim()).length;
+
   function writingDocument(code, w, h) {
     const lines = String(code).split(/\r?\n/);
     if (!lines.length) lines.push('');
@@ -240,7 +272,13 @@
     const kind = rep.data.kind || 'html';
     const code = rep.data.code;
     if (kind === 'html') return documentFor(code, w, h);
-    if (kind === 'text' && rep.data.from === 'writing') return writingDocument(code, w, h);
+    // A few words are a CAPTION and fill their frame, so they scale with the
+    // board the way the ink around them does; a file of text is a document and
+    // flows at a size the screen holds. Writing turned to text was the first
+    // caption, and the rule was written as "did it come from ink" — but a label
+    // written onto a drawing is a caption however it arrived, and held at screen
+    // size it floated free of the drawing it labels as soon as the board zoomed.
+    if (kind === 'text' && (rep.data.from === 'writing' || linesOf(code) <= TEXT_FITS_LINES)) return writingDocument(code, w, h);
     if (kind === 'run') {
       // Playing, the program runs in its clear frame; standing, its source shows, addressable like any script.
       if (ctx && ctx.playing) return runDocument(ctx.id, code, w, h);
@@ -254,6 +292,8 @@
     }
     const regions = MM.addressablesOf(kind, code);
     if (kind === 'svg') return svgDocument(code, regions, w, h);
+    // Words written onto the board are a figure; a script or a table is source.
+    if (kind === 'text') return regionsDocument(code, regions, w, h, { named: false, figure: true });
     return regionsDocument(code, regions, w, h);
   }
 

@@ -1,6 +1,6 @@
 // ===== render =====
 // Provides: queries over state, the rungs cache, render(), ink, the label under the inspected mark, match chips,
-//   the working dot, explanations, the status line (one sentence).
+//   the working dot, the explanation plane and its layout, the status line (one sentence).
 // Uses: core, view, artifacts, snap, models, palette, inspector, teach (syncMarkChip), folder (folderStatus, liveSet).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () Ellipsis)();`. Shared state is the
@@ -49,6 +49,14 @@
       }
     }
     return null;
+  }
+
+  /** An artifact that renders as a figure on the board rather than on a page. */
+  function isFigureArtifact(node) {
+    for (let i = node.reps.length - 1; i >= 0; i--) {
+      if (node.reps[i].modality === 'code') return FIGURE_KINDS.has(node.reps[i].data.kind || 'html');
+    }
+    return false;
   }
 
   const union = (list) => list.reduce((a, b) => ({
@@ -180,6 +188,7 @@
   function render(s) {
     state = s;
     chipHits = [];
+    chromeDrawn = [];
     pruneRuntime(s);
     // No model is asked from here: a paint is not a request (§6.3).
     syncStage(s);
@@ -264,8 +273,19 @@
       const b0 = MM.boundsOf(node);
       const b = b0 && pl ? { minX: b0.minX + pl.dx, maxX: b0.maxX + pl.dx, minY: b0.minY + pl.dy, maxY: b0.maxY + pl.dy } : b0;
       if (isArtifact && b) {
-        brackets(b, isLive ? C.gold : `rgba(${C.goldRGB},0.7)`);
-        text((MM.wordOf(node) || '') + (isLive ? '  ·  live' : ''), b.minX, b.minY - wpx(10), C.gold);
+        // A FIGURE wears its chrome only while you point at it. The brackets
+        // and the filename say "a thing with an identity you can grab", which
+        // is what you want over a page or a program; over a title, a label
+        // inside a drawn box, or a note, they are a second drawing on top of
+        // the first, and a figure made of eight of them is unreadable. Same
+        // rule the reading under a mark already follows: shown for the one the
+        // hand is on, not for every mark on the board.
+        const quiet = isFigureArtifact(node) && id !== inspectedId && !s.selection.includes(id);
+        if (!quiet) {
+          chromeDrawn.push(id);
+          brackets(b, isLive ? C.gold : `rgba(${C.goldRGB},0.7)`);
+          text((MM.wordOf(node) || '') + (isLive ? '  ·  live' : ''), b.minX, b.minY - wpx(10), C.gold);
+        }
       } else if (b && !pending && id === inspectedId && !s.selection.length) {
         // The reading of the mark the hand just made (or is over), and only
         // that one: what it is, and what it plays. Under every mark it was a
@@ -416,65 +436,232 @@
   /**
    * The world rectangle a canvas object can occupy and still be READ — the
    * viewport minus the chrome that floats over it. Fitting to the raw viewport
-   * is not enough: an answer card placed at the right edge lands underneath the
-   * inspector, which is the one place it is guaranteed to be unreadable.
+   * is not enough: an answer card placed under the panel lands in the one place
+   * it is guaranteed to be unreadable. The panel tucks under the bar on ONE
+   * side, so the free ground is whichever side it leaves — reading its left
+   * edge as the right margin (it stands on the left) left a 120px sliver of
+   * world, and every answer was clamped into it, on top of the last.
    */
   function viewportWorld() {
     const rail = document.querySelector('.bar');
     const insp = document.getElementById('inspector');
     const railH = rail ? rail.getBoundingClientRect().height : 0;
-    const inspRect = insp && insp.offsetParent !== null ? insp.getBoundingClientRect() : null;
-    const right = inspRect ? Math.min(innerWidth, inspRect.left) - 16 : innerWidth - 8;
-    const a = screenToWorld(8, railH + 8);
-    const b = screenToWorld(Math.max(120, right), innerHeight - 46);
+    const r = insp && insp.offsetParent !== null ? insp.getBoundingClientRect() : null;
+    let left = 8, right = innerWidth - 8;
+    if (r && r.width > 0) {
+      if (r.left + r.width / 2 < innerWidth / 2) left = Math.max(left, r.right + 16);
+      else right = Math.min(right, r.left - 16);
+    }
+    // A window narrower than the panel leaves no free side; the whole of it is
+    // better than a sliver nothing fits in.
+    if (right - left < 120) { left = 8; right = Math.max(128, innerWidth - 8); }
+    const a = screenToWorld(left, railH + 8);
+    const b = screenToWorld(right, innerHeight - 46);
     return { minX: a.x, minY: a.y, maxX: b.x, maxY: b.y };
   }
 
+  // The explanation plane has a LAYOUT of its own — runtime, never in the log.
+  // Core anchors every answer beside the marks it is about, which is right;
+  // but six marks stacked in a column each given a sentence — what the MCP
+  // hand does with canvas_say — anchor six cards to the same edge, and they
+  // land on each other and on the ink they are about. Ink is never covered,
+  // and an answer nobody can read is not an answer. So the placing is the
+  // surface's: each card keeps its anchor (a short dashed leader to the marks
+  // it speaks for), and cards are pushed off each other and off the marks by a
+  // greedy search — right of the anchor, then left, then below, then above,
+  // shifting along the free side until it is clear. A card's place is a
+  // consequence of the view, so it is found again on every zoom and pan:
+  // positions in canvas units, every size in screen ones.
+  const CARD_W = 260, CARD_PAD = 9, CARD_HEAD = 15, CARD_LINE = 15, CARD_GAP = 14;
+  const CARD_STEPS = 8;        // half-card shifts either way along the free side
+  const MAX_OBSTACLES = 200;   // the ink the search reads: bounded, so a busy board still paints
+  const CARD_FONT = 'px ui-monospace, SFMono-Regular, Menlo, monospace';
+  /** Where the last paint put each answer card, in world units. For tests. */
+  let cardRects = [];
+  /** Which artifacts wore their brackets and name in the last paint. For tests. */
+  let chromeDrawn = [];
+
+  const rectOf = (b) => ({ x: b.minX, y: b.minY, w: b.maxX - b.minX, h: b.maxY - b.minY });
+  function overlapArea(a, b) {
+    const ox = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x);
+    const oy = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y);
+    return ox > 0 && oy > 0 ? ox * oy : 0;
+  }
+  const meets = (a, b) =>
+    a.x <= b.x + b.w && b.x <= a.x + a.w && a.y <= b.y + b.h && b.y <= a.y + a.h;
+  /** The point of `box` nearest the given one — on its border when that one is outside. */
+  const edgePoint = (box, toward) => ({
+    x: Math.max(box.x, Math.min(toward.x, box.x + box.w)),
+    y: Math.max(box.y, Math.min(toward.y, box.y + box.h)),
+  });
+
+  /**
+   * WHAT a card is about, as a few words: the names its marks carry, else the
+   * one mark's reading, else how many there are. A card is a sentence in a
+   * live layer, not a caption someone will read cold, so the subject belongs in
+   * its chrome — writing "Box 3 of six" into the prose is the writer doing by
+   * hand, badly, what the card already knows.
+   */
+  function subjectOf(s, about) {
+    const names = about.map((id) => { const n = s.nodes.get(id); return n && MM.wordOf(n); }).filter(Boolean);
+    if (names.length) return names.slice(0, 2).join(', ') + (names.length > 2 ? ' +' + (names.length - 2) : '');
+    if (about.length === 1) {
+      const n = s.nodes.get(about[0]);
+      if (!n) return 'a mark';
+      const said = MM.transcriptOf(n);
+      if (said) return '\u201c' + said + '\u201d';
+      return MM.topInterpretation(n) || 'a mark';
+    }
+    return about.length + ' marks';
+  }
+
+  /**
+   * How long ago, in a word. The explanation plane is the live layer — what
+   * someone is saying now, not what the board holds — and a card that never
+   * says its age reads as permanent, which is how it came to be used for
+   * labels that belong in the drawing.
+   */
+  function agoOf(at) {
+    const ms = Date.now() - (at || 0);
+    if (!(ms > 0) || ms < 45000) return 'just now';
+    const m = Math.round(ms / 60000);
+    if (m < 60) return m + 'm ago';
+    const h = Math.round(m / 60);
+    return h < 24 ? h + 'h ago' : Math.round(h / 24) + 'd ago';
+  }
+
+  /** Measure one card: its lines at the chrome's own size, and the box they need. */
+  function measureCard(s, id) {
+    const node = s.nodes.get(id);
+    if (!node || MM.getRep(node, 'erased')) return null;
+    const data = MM.explanationOf(node);
+    const anchor = MM.boundsOf(node);
+    if (!data || !anchor) return null;
+    const about = MM.aboutIdsOf(node);
+    const boxes = about.map((a) => (s.nodes.get(a) ? MM.boundsOf(s.nodes.get(a)) : null)).filter(Boolean);
+    const w = wpx(CARD_W), pad = wpx(CARD_PAD);
+    ctx.font = wpx(11).toFixed(2) + CARD_FONT;
+    const lines = wrapText(data.text, w - pad * 2);
+    const madeBy = node.edges.find((e) => e.rel === 'made-by');
+    return {
+      id: id, lines: lines, about: about,
+      who: (madeBy && MM.wordOf(s.nodes.get(madeBy.to))) || 'agent',
+      what: subjectOf(s, about),
+      ago: agoOf(node.createdAt),
+      subject: boxes.length ? union(boxes) : anchor,
+      own: new Set(about),
+      w: w, h: pad * 2 + wpx(CARD_HEAD) + lines.length * wpx(CARD_LINE),
+    };
+  }
+
+  /**
+   * The ink a card must stay off: what the content plane holds near the
+   * viewport, bounded. A mark with no thickness — a level line, a dot — is
+   * given the hand's own, or an overlap with it measures zero and a card sits
+   * straight on top of it.
+   */
+  function inkObstacles(s, vw) {
+    const m = wpx(600), thin = wpx(3);
+    const win = { x: vw.minX - m, y: vw.minY - m, w: (vw.maxX - vw.minX) + m * 2, h: (vw.maxY - vw.minY) + m * 2 };
+    const out = [];
+    for (const id of s.contentIds) {
+      const b = MM.boundsOf(s.nodes.get(id));
+      if (!b) continue;
+      const r = rectOf(b);
+      if (r.w < thin) { r.x -= (thin - r.w) / 2; r.w = thin; }
+      if (r.h < thin) { r.y -= (thin - r.h) / 2; r.h = thin; }
+      if (!meets(r, win)) continue;
+      out.push({ id: id, rect: r });
+      if (out.length >= MAX_OBSTACLES) break;
+    }
+    return out;
+  }
+
+  /**
+   * The free place for one card: right, left, below, above the anchor, each
+   * shifted along its own free side. The first candidate that hits nothing
+   * wins; when the board is too full for any of them the least-bad one does.
+   *
+   * The weights are an order of what may be given up. A card UNDER another
+   * card is lost — nobody can read either — so that is the last thing sacrificed
+   * and it outweighs every other cost put together; next comes covering the very
+   * marks the card speaks for; then standing off screen, which costs the reader
+   * only a pan; and cheapest, lying over other ink. Found on a board of two
+   * dozen answers: with card-on-card merely dear, a small overlap kept beating
+   * a whole card's worth of off-screen, and three pairs stacked.
+   */
+  function placeCard(card, placed, obstacles, vw, gap) {
+    const s = card.subject, w = card.w, h = card.h;
+    const vstep = (h + gap) / 2, hstep = (w + gap) / 2;
+    const sides = [
+      { x: s.maxX + gap, y: s.minY, dx: 0, dy: vstep },
+      { x: s.minX - gap - w, y: s.minY, dx: 0, dy: vstep },
+      { x: s.minX, y: s.maxY + gap, dx: hstep, dy: 0 },
+      { x: s.minX, y: s.minY - gap - h, dx: hstep, dy: 0 },
+    ];
+    // Only the ink the search could reach, so a busy board costs no more.
+    const reachW = w + hstep * CARD_STEPS + gap, reachH = h + vstep * CARD_STEPS + gap;
+    const reach = { x: s.minX - reachW, y: s.minY - reachH,
+                    w: (s.maxX - s.minX) + reachW * 2, h: (s.maxY - s.minY) + reachH * 2 };
+    const near = obstacles.filter((o) => meets(o.rect, reach));
+    // Staying on screen is a preference among places beside the anchor, never a
+    // reason to leave it: when the marks themselves are off screen the card
+    // belongs with them. Without this a card anchored a screenful away walked
+    // its shifts back toward the viewport and crowded the cards that live there.
+    const onScreen = meets(rectOf(s), rectOf(vw));
+    const area = w * h;
+    let best = null;
+    for (const side of sides) {
+      for (let k = 0; k <= CARD_STEPS; k++) {
+        for (const sign of k === 0 ? [1] : [1, -1]) {
+          const r = { x: side.x + side.dx * k * sign, y: side.y + side.dy * k * sign, w: w, h: h };
+          let score = 0;
+          for (const p of placed) score += overlapArea(r, p) * 24;
+          for (const o of near) score += overlapArea(r, o.rect) * (card.own.has(o.id) ? 4 : 1);
+          if (onScreen) {
+            const iw = Math.max(0, Math.min(r.x + w, vw.maxX) - Math.max(r.x, vw.minX));
+            const ih = Math.max(0, Math.min(r.y + h, vw.maxY) - Math.max(r.y, vw.minY));
+            score += (area - iw * ih) * 2; // off screen: a pan away, so cheaper than a card lost under one
+          }
+          if (score <= 0) return r;
+          // Among places that all cost something, the nearest the anchor wins:
+          // the leader is short and the card is plainly that mark's.
+          if (!best || score + k * area * 0.05 < best.score) best = { x: r.x, y: r.y, w: w, h: h, score: score + k * area * 0.05 };
+        }
+      }
+    }
+    return { x: best.x, y: best.y, w: w, h: h };
+  }
+
   function renderExplanations(s) {
+    cardRects = [];
     if (!s.explanations.length) return;
     const vw = viewportWorld();
-    const stacked = new Map(); // subject key -> how many answers already drawn
+    const gap = wpx(CARD_GAP), pad = wpx(CARD_PAD);
 
-    for (const id of s.explanations) {
-      const node = s.nodes.get(id);
-      if (!node || MM.getRep(node, 'erased')) continue;
-      const data = MM.explanationOf(node);
-      const b = MM.boundsOf(node);
-      if (!data || !b) continue;
+    const cards = s.explanations.map((id) => measureCard(s, id)).filter(Boolean);
+    if (!cards.length) return;
+    // A stable order — top-left first — so a card keeps its place when another
+    // answer lands below it, and the plane does not reshuffle as it is read.
+    cards.sort((a, b) => a.subject.minY - b.subject.minY || a.subject.minX - b.subject.minX || (a.id < b.id ? -1 : 1));
+    const obstacles = inkObstacles(s, vw);
+    const placed = [];
+    for (const card of cards) {
+      card.rect = placeCard(card, placed, obstacles, vw, gap);
+      placed.push(card.rect);
+      cardRects.push({ id: card.id, about: card.about.slice(), what: card.what, who: card.who, ago: card.ago, x: card.rect.x, y: card.rect.y, w: card.rect.w, h: card.rect.h });
+    }
 
-      const about = MM.aboutIdsOf(node);
-      const key = about.join(',');
-      const slot = stacked.get(key) || 0;
-
-      const pad = 9, w = b.maxX - b.minX;
-      ctx.font = '11px ui-monospace, SFMono-Regular, Menlo, monospace';
-      const lines = wrapText(data.text, w - pad * 2);
-      const madeBy = node.edges.find((e) => e.rel === 'made-by');
-      const who = (madeBy && MM.wordOf(s.nodes.get(madeBy.to))) || 'agent';
-      const headH = 15, lineH = 15;
-      const h = pad * 2 + headH + lines.length * lineH;
-
-      // Core anchors the answer beside its subject; only the surface knows the
-      // viewport, so fitting it on screen is the surface's job. Stack later
-      // answers below earlier ones rather than overlapping them.
-      let x = b.minX, y = b.minY + slot * (h + 10);
-      const subjectBounds = about
-        .map((a) => (s.nodes.get(a) ? MM.boundsOf(s.nodes.get(a)) : null))
-        .filter(Boolean);
-      const subject = subjectBounds.length ? union(subjectBounds) : null;
-      // No room to the right of the subject — tuck the card under it instead.
-      if (x + w > vw.maxX && subject) {
-        x = Math.min(subject.minX, vw.maxX - w);
-        y = subject.maxY + wpx(16) + slot * (h + 10);
-      }
-      x = Math.max(vw.minX, Math.min(x, vw.maxX - w));
-      y = Math.max(vw.minY, Math.min(y, vw.maxY - h));
-      stacked.set(key, slot + 1);
-
-      if (subject) {
+    for (const card of cards) {
+      const r = card.rect, sub = rectOf(card.subject);
+      // The leader keeps the anchor the placing moved: marks to card, by the
+      // nearest edges, so a card always says which ink it speaks for.
+      const from = edgePoint(sub, { x: r.x + r.w / 2, y: r.y + r.h / 2 });
+      const to = edgePoint(r, { x: sub.x + sub.w / 2, y: sub.y + sub.h / 2 });
+      if (Math.hypot(to.x - from.x, to.y - from.y) > wpx(2)) {
         ctx.beginPath();
-        ctx.moveTo(subject.maxX, (subject.minY + subject.maxY) / 2);
-        ctx.lineTo(x, y + h / 2);
+        ctx.moveTo(from.x, from.y);
+        ctx.lineTo(to.x, to.y);
         ctx.strokeStyle = `rgba(${C.agentRGB},0.32)`;
         ctx.lineWidth = wpx(1);
         ctx.setLineDash([wpx(3), wpx(4)]);
@@ -485,18 +672,38 @@
       ctx.fillStyle = `rgba(${C.panelRGB},0.92)`;
       ctx.strokeStyle = `rgba(${C.agentRGB},0.38)`;
       ctx.lineWidth = wpx(1);
-      roundRect(x, y, w, h, 6);
+      roundRect(r.x, r.y, r.w, r.h, wpx(6));
       ctx.fill();
       ctx.stroke();
 
+      // The header carries who said it, what it is about, and how long ago —
+      // the three things that used to be smuggled into the sentence.
+      ctx.font = wpx(10).toFixed(2) + CARD_FONT;
+      const agoW = ctx.measureText(card.ago).width;
+      ctx.fillStyle = `rgba(${C.labelRGB},0.7)`;
+      ctx.fillText(card.ago, r.x + r.w - pad - agoW, r.y + pad + wpx(8));
       ctx.fillStyle = C.agent;
-      ctx.font = '10px ui-monospace, SFMono-Regular, Menlo, monospace';
-      ctx.fillText(who, x + pad, y + pad + 8);
+      const whoW = ctx.measureText(card.who).width;
+      ctx.fillText(card.who, r.x + pad, r.y + pad + wpx(8));
+      const room = r.w - pad * 2 - whoW - agoW - wpx(16);
+      if (card.what && room > wpx(30)) {
+        ctx.fillStyle = `rgba(${C.labelRGB},0.95)`;
+        ctx.fillText(clipText(card.what, room), r.x + pad + whoW + wpx(8), r.y + pad + wpx(8));
+      }
 
       ctx.fillStyle = C.ink;
-      ctx.font = '11px ui-monospace, SFMono-Regular, Menlo, monospace';
-      lines.forEach((ln, i) => ctx.fillText(ln, x + pad, y + pad + headH + 8 + i * lineH));
+      ctx.font = wpx(11).toFixed(2) + CARD_FONT;
+      card.lines.forEach((ln, i) =>
+        ctx.fillText(ln, r.x + pad, r.y + pad + wpx(CARD_HEAD) + wpx(8) + i * wpx(CARD_LINE)));
     }
+  }
+
+  /** As much of a word as fits, with an ellipsis when it does not. */
+  function clipText(str, maxWidth) {
+    if (ctx.measureText(str).width <= maxWidth) return str;
+    let out = String(str);
+    while (out.length > 1 && ctx.measureText(out + '\u2026').width > maxWidth) out = out.slice(0, -1);
+    return out + '\u2026';
   }
 
   function wrapText(text, maxWidth) {

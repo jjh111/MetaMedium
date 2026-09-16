@@ -52,7 +52,7 @@ circle them, cross with a command mark *you taught the system*, prompt them into
 a living page that renders in the canvas with your ink still outlining its
 divs — then draw on that page and the ink addresses the regions underneath it.
 Scratch anything out to erase. `Demos/session-engine.html` is the surface;
-`Demos/session-engine.e2e.js` drives 179 steps through the real UI: page, flowchart, handwriting (read only when asked; a line read as one), the model drawing, the user-side loop, selection and the field, corrections, the worker, the tank, words into verbs and acting out, frames and the drawn slider, the folder, pictures, text, the moment, a live room, a playing frame that takes the pointer, hold by long-press, the graph in 3D, and the foundations (letters at any size, a mark that crosses, readings that stay, the minimap). A run takes about 100 s; run it **in its own tab on its own origin** (`http://127.0.0.1:8010/…?fresh=1&nosw=1` — `__setup` refuses any other URL: it replaces `fetch` with a stub, joins a stub model named `e2e-stub`, and wipes the origin's saved board), start it with `__setup(); __scenario().then(r => window.__R = r)` and read `__R` when it lands.
+`Demos/session-engine.e2e.js` drives 193 steps through the real UI: page, flowchart, handwriting (read only when asked; a line read as one), the model drawing, the user-side loop, selection and the field, corrections, the worker, the tank, words into verbs and acting out, frames and the drawn slider, the folder, pictures, text, the moment, a live room, a playing frame that takes the pointer, hold by long-press, the graph in 3D, and the foundations (letters at any size, a mark that crosses, readings that stay, the minimap), and the explanation plane's layout. A run takes about 100 s; run it **in its own tab on its own origin** (`http://127.0.0.1:8010/…?fresh=1&nosw=1` — `__setup` refuses any other URL: it replaces `fetch` with a stub, joins a stub model named `e2e-stub`, and wipes the origin's saved board), start it with `__setup(); __scenario().then(r => window.__R = r)` and read `__R` when it lands.
 v7 Stage E (handwriting) shipped 1 Sep 2026: a word written beside a shape is read by a
 model that can see and offered as that shape's name. Whitepaper v5.1 stays parked until the
 conversation benchmark passes end to end.
@@ -75,6 +75,14 @@ Architecture documents (chronological; **read MVP.md, then v7, then v6**):
   ink on planes chosen by a gizmo or read; a form rung; solids as op
   trees; the diff as the brief; wrap and turn-into from your own
   definitions; packages P0–P11 with the MVP line after P6
+- `NOTES-DRAWING-WITH-THE-HAND.md` — **what using it taught, 15 Sep 2026**:
+  one figure drawn on a live board with the MCP hand — what the medium already
+  does well, the six faults it cost (two logs under one name eating each other,
+  a figure rendered as a page, a caption held at screen size, a figure that
+  vanished on paper, eight filenames over one drawing, the answer card doing the
+  caption's job) and the six still open, biggest first: **node ids do not
+  survive the merge**, so `canvas_say` and `canvas_propose` land on the wrong
+  marks in any room holding another hand's work
 - `BUILD-PLAN-v8.md` — **the executable plan for v8**: invariants no package may break, fixed contracts (events, reps, kinds, the verb basis, the storage seam, the palette item), fourteen work packages with owned files and done-criteria, the parallel threads and the surface weave, and self-contained briefs for sub-contracting models
 - `WHITEPAPER-v5.1-PLAN.md` — **the package**: what the whitepaper shows vs. what the engine does, replays-as-figures, the demos as the paper's spine, the prose pass, and the palette decision John owns
 - `ARCHITECTURE-v6-SESSION-ENGINE.md` — **active design**: the no-modes session engine (deferred commitment, summoning, promotion ladder, capability tiers), implemented in `metamedium-core/`
@@ -421,6 +429,39 @@ way, both by running a real model:
 `validateRegions` checks the result still matches the drawing. A promise nobody
 checks is one you find out about from a screenshot.
 
+**A figure wears its chrome only while you point at it.** The gold brackets
+and the filename say *a thing with an identity you can grab*, which is what you
+want over a page or a program; over a title, a label inside a drawn box, or a
+note, they are a second drawing on top of the first, and a figure made of eight
+of them is unreadable. Same rule the reading under a mark already follows —
+shown for the one the hand is on, not for every mark on the board. A page keeps
+its brackets, because it has a plate under it anyway.
+
+**A figure follows the theme.** Its document carries the board's own ink colour
+baked in (an iframe inherits no token), so the theme is part of what the
+document is *made of* and belongs in the frame's stamp. Without it, switching to
+paper left every label in the dark theme's near-white ink on a light ground — a
+figure that vanished when the light came on.
+
+**A few words are a caption and fill their frame** (`TEXT_FITS_LINES` in
+`13-kinds.js`); a file of text flows at a size the screen holds. Writing turned
+to text was the first caption and the rule was written as *did it come from
+ink* — but a label written onto a drawing is a caption however it arrived, and
+held at screen size it floated free of the drawing it labels the moment the
+board zoomed.
+
+**A figure is not a page** (`FIGURE_KINDS` in `Demos/surface/02-artifacts.js`,
+`figureCSS` in `13-kinds.js`). A page, a script, a table or a tree is something
+you read *on a page*, and the white plate under it is that page. A program, a
+drawing and a line of words are marks among the ink, and a plate behind them
+fights what they stand in. `run` had the rule alone; `svg` and `text` have it
+now — clear ground, no plate, no shadow, type in the board's own ink token, so
+a figure written onto the canvas reads in either theme. And **a text sets its
+words once**: a text run's addressable label *is* its own first forty
+characters, so printing every region's label over it, which is right for a
+function or a key, set every line of a text twice. Found by writing a label
+with the MCP hand and getting a white card with the words on it twice.
+
 ### Living artifacts
 
 An artifact may carry a `'code'` rep, which puts it on `SessionState.live` and
@@ -609,6 +650,45 @@ Explanations are a **third plane** (`SessionState.explanations`) beside content
 and gesture: visible and erasable, but not ink — they never join a lasso, a
 cluster, or a signature. Several participants may answer the same question and
 every answer is held.
+
+**A card says what it is about, and how long ago** (`subjectOf` / `agoOf` in
+`08-render.js`). The header carries the speaker, the subject — the names its
+marks hold, else the one mark's reading, else how many there are — and the age.
+The plane is the *live* layer, what someone is saying now; a card that never
+says its age reads as permanent, and a card that never says its subject makes
+the writer put the label in the prose. Both were true, and answer cards were
+being used as the caption layer of drawings. The permanent words of a drawing
+are a `text` or `svg` artifact, which is a figure on the board.
+
+**The explanation plane has a layout, and it is the surface's**
+(`renderExplanations` in `Demos/surface/08-render.js`). Core anchors an answer
+beside the marks it is about; six marks stacked in a column each given a
+sentence — what the MCP hand does with `canvas_say` — anchor six cards to the
+same edge, and they land on each other and on the ink they are about. So each
+card keeps its anchor (a dashed leader to its marks, by the nearest edges) and
+the cards are pushed apart by a greedy search: right of the anchor, then left,
+then below, then above, shifted along the free side until nothing is hit,
+scored so a card would rather sit off screen than over the marks it speaks for.
+The placing is **runtime, never in the log** — a card's place follows the view,
+so it is found again on every zoom and pan: positions in canvas units, every
+size in screen ones. The search is bounded (four sides, eight half-card shifts
+either way, the ink near the viewport capped), for a few dozen cards at most.
+
+**The weights are an order of what may be given up.** A card *under another
+card* is lost — nobody can read either — so it outweighs everything else put
+together; then covering the very marks the card speaks for; then standing off
+screen, which costs the reader only a pan; and cheapest, lying over other ink.
+Found on a board of two dozen answers: with card-on-card merely dear, a hair of
+overlap kept beating a whole card's worth of off-screen and three pairs stacked.
+**And staying on screen is a preference among the places beside a mark, never a
+reason to leave it**: the term is dropped when the marks themselves are off
+screen, or a card anchored a screenful away walks its shifts back toward the
+viewport and crowds the cards that live there. Among places that all cost
+something, the nearest the anchor wins.
+Found with it: **the readable viewport was a sliver.** The panel stands on the
+LEFT and `viewportWorld` read its left edge as the right margin, so in a
+1400px window the world an answer could occupy was 112px wide and every card
+was clamped into it, on top of the last.
 
 **Routing** (`src/participants/router.ts`): the canvas answers first — tiers
 0 and 1 — and a model is asked only for what they cannot do.

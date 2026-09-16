@@ -37,7 +37,14 @@ const flag = (name) => { const i = argv.indexOf('--' + name); return i >= 0 ? ar
 const ROOM = flag('room') || process.env.MM_ROOM || 'claude';
 const RELAY = (flag('relay') || process.env.MM_RELAY || 'http://127.0.0.1:8020').replace(/\/+$/, '');
 const NAME = (flag('name') || process.env.MM_NAME || 'claude').replace(/~.*$/, '');
-const ME = NAME + '~mcp'; // a hand in a room is one process: the name is the caller's, the suffix says which
+// A hand in a room is ONE PROCESS, the way a hand in a room is one tab: the
+// name is the caller's and the suffix says which hand, because two logs under
+// one name are taken for one log. With a fixed '~mcp' suffix, a second
+// mcp.mjs on this machine — a leftover from an earlier session, a restart —
+// answered every newcomer's hello with ITS log under the same name, and the
+// last answer to land replaced the others: a tab that joined the room saw one
+// hand's drawing and never the other's, with nothing to say so.
+const ME = NAME + '~' + Math.random().toString(36).slice(2, 6);
 
 // ----- The engine, built --------------------------------------------------
 const distPath = path.join(here, 'metamedium-core.node.mjs');
