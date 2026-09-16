@@ -571,27 +571,87 @@
   // ===== The field on screen ===================================================
   function fieldInput() { return summonEl.querySelector('input.filter'); }
 
-  /** Where the field opens: at the pen tip, fanning to the hand's side, on screen, off the panel. */
+  // ===== The field's geometry, apart from its content =====================
+  // The field opens at the pen tip and stays put while the window turns, the
+  // panel docks at the bottom or a keyboard rises. Placement is therefore a
+  // function of the space actually visible (01-view's `usableRect`) and of the
+  // field's MEASURED size — a fixed 230px guess put its foot under the panel
+  // the moment the pills wrapped to three rows (UI-1).
+  const FIELD_W = 380;       // the design width; narrower when the space is
+  const FIELD_MIN_W = 200;   // …but never so narrow the input is unusable
+  const FIELD_H_GUESS = 230; // only until the content has been laid out once
+  const FIELD_M = 8;         // the margin the field keeps off every edge
+  const FIELD_TOP = 52;      // under the bar, when the usable rect cannot hold it
+  let fieldAnchor = null;    // where the hand was when this field opened, on screen
+
+  /** Pure: fit `size` at `want` inside `soft` if it fits there, inside `hard` otherwise. */
+  function fitSpan(want, size, soft, hard) {
+    const box = (soft.hi - soft.lo) >= size ? soft : hard;
+    const hi = Math.max(box.lo, box.hi - size);
+    return Math.max(box.lo, Math.min(hi, want));
+  }
+
+  /**
+   * Pure: where the field stands, given where the hand is and what is visible.
+   * @param {{x:number,y:number}} anchor the pen tip, on screen
+   * @param {{viewport:object,usable:object,height:number,hand:string,panel:object|null}} o
+   * @returns {{x:number,y:number,w:number}} in the viewport's own space
+   */
+  function fieldBox(anchor, o) {
+    const v = o.viewport, u = o.usable || v;
+    const w = Math.max(FIELD_MIN_W, Math.min(FIELD_W, u.width - FIELD_M * 2, v.width - FIELD_M * 2));
+    const h = o.height > 0 ? o.height : FIELD_H_GUESS;
+    const at = anchor || { x: v.left + v.width / 2, y: v.top + v.height / 2 };
+    let x = o.hand === 'left' ? at.x - 14 - w : at.x + 14;
+    let y = at.y - 22;
+    // Off a panel that is neither a wall nor a sheet but a card in the way:
+    // slide past it when there is room, never when that would push the field
+    // off the screen (which is what an unconditional nudge did on a phone).
+    const p = o.panel;
+    if (p && hand !== 'left' && x < p.right + FIELD_M && x + w > p.left && y < p.bottom && y + h > p.top
+        && p.right + FIELD_M + w <= u.right - FIELD_M) x = p.right + FIELD_M;
+    x = fitSpan(x, w, { lo: u.left + FIELD_M, hi: u.right - FIELD_M }, { lo: v.left + FIELD_M, hi: v.right - FIELD_M });
+    y = fitSpan(y, h, { lo: u.top + FIELD_M, hi: u.bottom - FIELD_M }, { lo: v.top + FIELD_TOP, hi: v.bottom - FIELD_M });
+    return { x: x, y: y, w: w };
+  }
+
+  /** The panel's rect while it stands, else null — a hidden panel is in nobody's way. */
+  function panelRect() {
+    if (document.body.classList.contains('panelHidden') || inspectorEl.hidden) return null;
+    const r = inspectorEl.getBoundingClientRect();
+    return r.width > 0 && r.height > 0 ? r : null;
+  }
+
+  /** Place the field where it stands now. Touches left/top/width and NOTHING else. */
   function placeField() {
-    const w = Math.min(380, innerWidth - 16);
-    let x = lastPen ? lastPen.x : innerWidth / 2, y = lastPen ? lastPen.y : innerHeight / 2;
-    x = hand === 'left' ? x - 14 - w : x + 14;
-    y = y - 22;
-    const panel = inspectorEl.getBoundingClientRect();
-    if (!document.body.classList.contains('panelHidden') && panel.width && x < panel.right + 8 && y < panel.bottom && hand !== 'left') x = panel.right + 8;
-    x = Math.max(8, Math.min(innerWidth - w - 8, x));
-    y = Math.max(52, Math.min(innerHeight - 230, y));
-    summonEl.style.left = x + 'px';
-    summonEl.style.top = y + 'px';
-    summonEl.style.width = w + 'px';
+    const v = viewportRect(), u = usableViewport();
+    // Width first: the height below is whatever the content comes to at that
+    // width, measured rather than assumed.
+    const first = fieldBox(fieldAnchor, { viewport: v, usable: u, height: 0, hand: hand, panel: panelRect() });
+    summonEl.style.width = first.w + 'px';
+    const box = fieldBox(fieldAnchor, { viewport: v, usable: u, height: summonEl.offsetHeight, hand: hand, panel: panelRect() });
+    summonEl.style.left = box.x + 'px';
+    summonEl.style.top = box.y + 'px';
+    summonEl.style.width = box.w + 'px';
+    return box;
+  }
+
+  /** A layout change: re-place the open field, keeping every character and the caret. */
+  function replaceOpenField() {
+    if (!summonEl.classList.contains('field') || summonEl.style.display === 'none') return;
+    placeField();
   }
 
   function renderSummon(s) {
     document.body.classList.toggle('summoning', !!s.summon);
-    if (!s.summon) { summonEl.style.display = 'none'; summonEl.className = ''; shownSummonId = null; return; }
+    if (!s.summon) { summonEl.style.display = 'none'; summonEl.className = ''; shownSummonId = null; fieldAnchor = null; return; }
     const sum = s.summon;
-    if (shownSummonId === sum.id) return;
+    // The same field, rendered again: its content already stands and rebuilding
+    // it would throw away the caret — but the space it stands in may have
+    // changed since, so geometry is re-run and content is not (UI-1).
+    if (shownSummonId === sum.id) { placeField(); return; }
     shownSummonId = sum.id;
+    fieldAnchor = lastPen ? { x: lastPen.x, y: lastPen.y } : null;
     paletteItems = rankItems(conversionsFor(s));
     paletteIndex = -1;
     paletteNavigated = false;
@@ -735,6 +795,19 @@
     const hidden = shown.filter((x) => !x.certain).length - shownAfford;
     if (hidden > 0) { const more = document.createElement('span'); more.className = 'more'; more.textContent = '+' + hidden + ' more — type to find'; affordRow.appendChild(more); }
     if (readingEl) { readingEl.textContent = r.line || ''; readingEl.classList.toggle('quiet', !!r.quiet); }
+    keepFieldOnScreen();
+  }
+
+  /**
+   * The pills just rewrapped and the field grew: re-place it only if its foot
+   * has gone off the bottom. Re-placing on every keystroke would walk the
+   * field up the screen under the hand.
+   */
+  function keepFieldOnScreen() {
+    if (!summonEl.classList.contains('field')) return;
+    const r = summonEl.getBoundingClientRect(), v = viewportRect();
+    if (r.bottom <= v.bottom - 2 && r.right <= v.right - 2 && r.top >= v.top - 2 && r.left >= v.left - 2) return;
+    placeField();
   }
 
   function onPaletteKey(e) {

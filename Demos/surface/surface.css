@@ -426,6 +426,10 @@ body.embed.summoning #inspector { display: none; }
   .tile.wide .zoomRow { display: none; } /* pinch zooms */
   .pane { right: 6px; width: min(300px, calc(100vw - 12px)); }
   #summon { width: min(380px, calc(100vw - 12px)); }
+  /* The panel lies along the BOTTOM here, so the field's own height is what
+     is left: the pills scroll rather than push the input off the screen. The
+     input and its reading line stay visible whatever the offers come to. */
+  #summon .list { max-height: 34vh; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
   .status { bottom: 10px; font-size: 10px; }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
