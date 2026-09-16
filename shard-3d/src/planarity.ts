@@ -291,13 +291,16 @@ export interface PenScope {
    */
   worldOrigins?: { foundation?: Vec3; height?: Vec3; width?: Vec3; where?: string };
   /**
-   * Where the view plane sits: **the cursor**, always (16 September 2026 —
-   * Blender's 3D Cursor placement, SHARD-3D-PLAN §3). It used to be the depth
-   * of the thing under the pen, or of the last thing touched, or the gizmo's
-   * origin if nothing — a heuristic that put the plane somewhere different on
-   * every stroke and left the hand no way to say where it wanted it. Blender's
-   * answer is one place the hand puts and can see; `cursor.ts` is how it is
-   * put, and the picker stands on it.
+   * Where the view plane sits: **the volume the hand is working in** — the
+   * centre of the view, or the cursor once a shift + click has placed one
+   * (16 September 2026, Blender's 3D Cursor placement, SHARD-3D-PLAN §3; the
+   * following half is push 2's G1). It used to be the depth of the thing under
+   * the pen, or of the last thing touched, or the gizmo's origin if nothing —
+   * a heuristic that put the plane somewhere different on every stroke. Then
+   * it was a cursor that started at the world origin and stayed there, which
+   * put every free stroke of John's second board at floor level while he
+   * looked one to four units up. `cursor.ts` holds the rule; the picker stands
+   * on the same point.
    */
   viewAnchor: Vec3;
   /** Why the view plane sits there — said out loud like every other reading. */
@@ -621,6 +624,16 @@ export interface RankScope {
  * Ranked, plural, never winner-take-all: the caller logs the winner and holds
  * them all, and the chip offers the runner-up (invariant 2).
  */
+/**
+ * Where a view candidate's plane stands, in the words the candidate itself
+ * carries — *through the centre of the view*, or *through the placed cursor*.
+ * Read off the plane rather than passed in, so one sentence says one thing in
+ * every place it is said (push 2, G1).
+ */
+function anchorSaid(c: PlaneCandidate): string {
+  return c.plane.why.replace(/^the view plane,\s*/, '').replace(/\s*\(.*\)\s*$/, '') || 'through the view';
+}
+
 export function rank(scope: RankScope): PlaneCandidate[] {
   const mid = scope.screen[Math.floor(scope.screen.length / 2)] ?? scope.screen[0];
   const recent =
@@ -681,7 +694,7 @@ export function rank(scope: RankScope): PlaneCandidate[] {
       // The view plane says what it conserves; a gated one says what it would
       // have cost. Both are reasons, said out loud, in the panel's own list.
       (isView
-        ? ' — shape conserved: the screen path lands on the plane through the cursor at the size it was drawn'
+        ? ` — shape conserved: the screen path lands on the plane ${anchorSaid(c)} at the size it was drawn`
         : '') +
       (oblique
         ? ` — too oblique to read (under ${(FACING_FLOOR * 100).toFixed(0)}% face-on), so it is held but cannot win`

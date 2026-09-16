@@ -66,17 +66,18 @@ const down: LineInput = { id: 'stroke:2', plane: height(), points: [{ x: -7, y: 
 
 describe('the vocabulary is whole, and says which package fills each row', () => {
   it('carries every step of §2.4', () => {
-    // `match` is P4's growth of the closed vocabulary and `massing` is P5's —
-    // both sanctioned by their package, which is the only way §2.6 lets a
-    // closed rung grow.
+    // `match` is P4's growth of the closed vocabulary, `massing` is P5's and
+    // `hull` is push 2 G1's — each sanctioned by its package, which is the
+    // only way §2.6 lets a closed rung grow.
     expect(OP_KINDS).toEqual([
-      'extrude', 'revolve', 'sweep', 'loft', 'cut', 'boss', 'union', 'mirror', 'place', 'along', 'match', 'massing', 'mesh',
+      'extrude', 'revolve', 'sweep', 'loft', 'cut', 'boss', 'union', 'mirror', 'place', 'along', 'match', 'massing', 'hull', 'mesh',
     ]);
     expect(OP_KINDS.every((k) => !!OP_PACKAGES[k])).toBe(true);
     expect(OP_PACKAGES.extrude).toBe('P2');
     expect(OP_PACKAGES.cut).toBe('P3');
     expect(OP_PACKAGES.match).toMatch(/^P4/);
     expect(OP_PACKAGES.massing).toMatch(/^P5/);
+    expect(OP_PACKAGES.hull).toMatch(/^push 2/);
   });
 });
 
@@ -578,7 +579,7 @@ describe('DATA-1 · numbers, references and ids', () => {
   it('refuses an op outside the closed vocabulary', () => {
     const check = validateOpTree(withValue(box, 'steps[0].op', 'chamfer'));
     expect(check.ok).toBe(false);
-    if (!check.ok) expect(check.reason).toMatch(/not one of the 13 steps/);
+    if (!check.ok) expect(check.reason).toMatch(/not one of the 14 steps/);
   });
 
   it('refuses a plane whose up runs along its normal — a frame with no u axis', () => {

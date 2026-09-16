@@ -52,11 +52,13 @@ import {
   assignForms,
   featuresFrom,
   makeableFrom,
+  hullableFrom,
   massableFrom,
   scratchAgainst,
   type FeatureOffer,
   type FormMark,
   type FormReading,
+  type Hullable,
   type Makeable,
   type Massable,
   type Silhouette,
@@ -72,6 +74,7 @@ import {
   extrudeAt,
   extrudeStep,
   featureAt,
+  hullStep,
   massingStep,
   matchStep,
   mirrorStep,
@@ -87,6 +90,7 @@ import {
   treeOf,
   withStep,
   type FeatureInput,
+  type HullStep,
   type LineInput,
   type MassingStep,
   type MirrorStep,
@@ -95,6 +99,21 @@ import {
   type Profile2D,
   type ProfileInput,
 } from './op';
+
+/**
+ * The hull the board affords, as the surface acts on it (push 2, G1).
+ *
+ * `hullableFrom`'s answer, plus the two things only the log knows: which solid
+ * is already standing on these claims, and which of them it has yet to take in.
+ * One record for both acts, because standing a hull and growing one are the
+ * same act — the claims are re-derived through each other either way.
+ */
+export interface Hullish extends Hullable {
+  /** The standing hull these claims grow, when one stands. */
+  solidId?: string;
+  /** The claims it has yet to take in — all of them, for a hull that does not stand yet. */
+  add: string[];
+}
 
 /** A mark as the shard reads it: the engine's node, plus where it lies. */
 export interface Mark {
@@ -315,6 +334,20 @@ export interface Log {
   growable(): { solidId: string; add: string[]; reasoning: string } | null;
   /** Take that view into the massing: a new version of the one step, and one undo. */
   growMassing(g: { solidId: string; add: string[]; reasoning: string }, at?: number): { id: string; count: number } | null;
+  /**
+   * The HULL the board affords (push 2, G1): silhouette claims on any planes
+   * whose prisms meet — a footprint with elevations drawn from wherever the
+   * hand stood, which the massing's three world planes cannot take. Returns a
+   * hull to stand, or the claims to grow a standing one by.
+   */
+  hullable(): Hullish | null;
+  /**
+   * Stand it up, or grow it. One act either way: a new hull is a summon, a
+   * bless and the code (the same three events as `mass`), and a claim landing
+   * on a standing hull is one new version of its one step — so undo removes
+   * that claim's contribution and leaves every other claim where it was.
+   */
+  hull(h: Hullish, at?: number): { id: string; step: OpStep; name: string; count: number } | null;
   /** Seat a model in the session, so everything it proposes is attributed to it. */
   joinAgent(name: string, locality: 'local' | 'hosted', at?: number): string;
   /**
@@ -1538,6 +1571,110 @@ export function createLog(): Log {
     return { id: solid.id, count: profiles.length };
   }
 
+  // ---- push 2, G1: the hull -------------------------------------------------
+
+  /**
+   * A claim's own form, for the hull's step.
+   *
+   * A closed claim is its clean form, exactly as a profile is. An ELEVATION is
+   * not: the ⊓ *is* the silhouette, and the clean form the shape rung would
+   * offer for it (a rectangle, say, because that is what a ⊓ reads as) would
+   * throw away the very shape that was claimed. So a ground claim carries its
+   * own ink, simplified the way `profileShape` simplifies an outline the rung
+   * offered nothing for — and `closed: true`, because the ground between its
+   * feet is its fourth side.
+   */
+  function claimShape(mark: Mark, ground: boolean): Profile2D {
+    if (!ground) return profileShape(mark);
+    const size = fingerprintOf(mark.node)?.size ?? 0;
+    const points = simplifyStroke(mark.points, Math.max(size * PROFILE_SIMPLIFY, 1e-4));
+    return {
+      shape: 'polygon',
+      points: points.length >= 3 ? points : mark.points,
+      closed: true,
+      reasoning:
+        `the stroke's own ink, closed on the ground — its two feet stand on the foundation, so the segment ` +
+        `between them is its fourth side (simplified from ${mark.points.length} to ${points.length} points at ` +
+        `${(PROFILE_SIMPLIFY * 100).toFixed(1)}% of its own size, which drops the sampling rate and keeps the shape)`,
+    };
+  }
+
+  /** The hull to stand, or the claims a standing one has yet to take in. */
+  function hullable(): Hullish | null {
+    const taken = new Set(solids().flatMap((sd) => sd.memberIds));
+    const isClaim = (f: FormReading) => f.role === 'elevation' || (f.role === 'profile' && !f.against);
+
+    // A claim landing beside a standing hull goes INTO it — the same rule a
+    // massing keeps, and for the same reason: every prism is grown through the
+    // span of the OTHERS, so a third claim re-derives the first two as well.
+    for (const solid of solids()) {
+      const only = solid.tree.steps.length === 1 ? solid.tree.steps[0] : null;
+      if (!only || only.op !== 'hull' || only.on) continue;
+      const have = only.from;
+      const loose = forms().filter((f) => isClaim(f) && !taken.has(f.id) && !have.includes(f.id));
+      if (!loose.length) continue;
+      const ids = new Set([...have, ...loose.map((f) => f.id)]);
+      const scope = formMarks().filter((m) => ids.has(m.id));
+      const readings = forms()
+        .filter((f) => ids.has(f.id))
+        .map((f) => ({ ...f, against: undefined }));
+      const h = hullableFrom(readings, scope);
+      if (!h) continue;
+      const add = h.claimIds.filter((id) => !have.includes(id));
+      if (!add.length) continue;
+      return { ...h, solidId: solid.id, add };
+    }
+
+    const marks = formMarks().filter((m) => !taken.has(m.id));
+    const readings = forms().filter((f) => !taken.has(f.id));
+    const h = hullableFrom(readings, marks);
+    return h ? { ...h, add: h.claimIds } : null;
+  }
+
+  /**
+   * Stand the hull up, or grow it — one act either way, in the ENGINE's name,
+   * because this is tier 1 answering and no model was asked.
+   */
+  function hull(h: Hullish, at = Date.now()) {
+    const ground = new Map(h.claims.map((c) => [c.id, c.ground]));
+    const claims = h.claimIds
+      .map((id) => markOf(id))
+      .filter((x): x is Mark => !!x)
+      .map((mark) => ({
+        id: mark.id,
+        plane: mark.plane,
+        clean: claimShape(mark, !!ground.get(mark.id)),
+        ...(ground.get(mark.id) ? { ground: true } : {}),
+      }));
+    if (claims.length < 2) return null;
+
+    if (h.solidId) {
+      const solid = solidOf(h.solidId);
+      const only = solid?.tree.steps[0] as HullStep | undefined;
+      if (!solid || !only || only.op !== 'hull') return null;
+      const step = hullStep(claims, only.id, h.reasoning, h.footprintId);
+      newVersion(solid.id, { ...solid.tree, steps: [step] }, h.reasoning, at);
+      for (const id of h.add) takeInto(solid.id, id, at);
+      return { id: solid.id, step: step as OpStep, name: solid.name, count: claims.length };
+    }
+
+    const step = hullStep(claims, 'step:1', h.reasoning, h.footprintId);
+    const summonId = session.summonMarks(h.claimIds, at);
+    if (!summonId) return null;
+    const id = session.bless({ summonId, name: 'hull', at, participantId: ENGINE_PARTICIPANT });
+    if (!id) return null;
+    session.attachCode({
+      participantId: ENGINE_PARTICIPANT,
+      nodeId: id,
+      code: encodeOpTree(treeOf(step)),
+      kind: 'json',
+      language: 'json',
+      prompt: step.reasoning,
+      at,
+    });
+    return { id, step: step as OpStep, name: 'hull', count: claims.length };
+  }
+
   function joinAgent(name: string, locality: 'local' | 'hosted', at = Date.now()): string {
     return session.join('agent', name, at, 2, locality);
   }
@@ -1750,14 +1887,17 @@ export function createLog(): Log {
     // (§4). Clipping to the base extrude instead meant a model asked for a mug
     // with a handle could never put the handle outside the box — found by
     // asking for one.
-    const bound = base.steps.find((st) => st.op === 'massing' && !st.on) ?? null;
+    // Push 2, G1: a HULL is a massing on any planes, so it bounds a proposal in
+    // exactly the same way — the extent invariant is about the volume the
+    // drawing's own views describe, whichever door stood it up.
+    const bound = base.steps.find((st) => (st.op === 'massing' || st.op === 'hull') && !st.on) ?? null;
     const root = rootOf(tree);
     if (bound && root && root.id !== bound.id) {
       const clip = clipStep(
         root.id,
         bound.id,
         nextStepId(tree),
-        `${by.name}'s tree kept only where it lies inside ${bound.op === 'massing' ? 'the massing' : bound.id} — ` +
+        `${by.name}'s tree kept only where it lies inside ${bound.op === 'massing' ? 'the massing' : bound.op === 'hull' ? 'the hull' : bound.id} — ` +
           `the drawing is the extent, and nothing proposed may leave it (§6). Added in the engine's name, after the proposal`
       );
       tree = withStep(tree, clip);
@@ -2570,6 +2710,8 @@ export function createLog(): Log {
     mass: acting(mass, 1),
     growable,
     growMassing: acting(growMassing, 1),
+    hullable,
+    hull: acting(hull, 1),
     joinAgent: acting(joinAgent, 2),
     applyProposal: acting(applyProposal, 3),
     replaceSteps: acting(replaceSteps, 4),

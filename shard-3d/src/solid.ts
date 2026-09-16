@@ -28,6 +28,8 @@ import {
   type ExtrudeStep,
   type FeatureStep,
   type MassingStep,
+  type PlaneRef,
+  type Profile2D,
   type MatchStep,
   type MirrorStep,
   type OpStep,
@@ -529,31 +531,86 @@ function placementMatrix(step: PlaceStep, ctx: DeriveContext): { matrix: THREE.M
  * another — the lesson `TOOL_OVERLAP` taught, on the tool the massing builds.
  */
 function massingGeometry(step: MassingStep): { geometry: THREE.BufferGeometry | null; broken: string | null } {
-  const profiles = step.profiles;
-  if (!profiles.length) return { geometry: null, broken: 'a massing with no profiles in it' };
+  if (!step.profiles.length) return { geometry: null, broken: 'a massing with no profiles in it' };
+  // A massing IS a hull of axis-aligned claims (push 2, G1): one derivation,
+  // two doors. The profiles are closed by their own ink, and the one on the
+  // foundation is the footprint — which is what it always was.
+  const footprint = step.profiles.find((p) => p.plane.name === 'foundation');
+  return hullBody(
+    step.profiles.map((p) => ({ id: p.id, profile: p.profile, plane: p.plane })),
+    footprint?.id,
+    'massing'
+  );
+}
 
-  const world: Vec3[] = [];
-  for (const p of profiles) {
-    const plane = planeOfStep(p);
-    for (const pt of p.profile.points) world.push(toWorld(plane, pt));
-  }
+/**
+ * **The claims, each grown through the span of the OTHERS, and intersected.**
+ *
+ * The one derivation behind both `massing` and `hull`, and the fix John's
+ * second board asked for: the span a claim's prism runs through is measured
+ * over the other claims' world points, **never its own**. A footprint drawn on
+ * the floor has all of its points at y = 0, and reading its own points into
+ * its own vertical span is exactly how the ground gets into a hull that no
+ * claim's feet reach (push 2 §1, *the volume*).
+ *
+ * Two rules follow from that, and they are the whole of the volume rule:
+ *
+ *   * **A claim is bounded by what the other claims say.** Two loops drawn a
+ *     unit above the floor make a hull a unit above the floor, because that is
+ *     where their prisms cross.
+ *   * **The footprint runs from the ground up to the tallest claim.** A
+ *     footprint is a statement that the thing stands *here*, so its prism
+ *     starts at the ground — and the other claims still bound the bottom, so
+ *     the hull only reaches the floor when one of them does.
+ *
+ * A ratio of the span pads each end, so no face of one prism is ever coplanar
+ * with a face of another — the lesson `TOOL_OVERLAP` taught.
+ */
+function hullBody(
+  claims: { id: string; profile: Profile2D; plane: PlaneRef; ground?: boolean }[],
+  footprintId: string | undefined,
+  what: 'massing' | 'hull'
+): { geometry: THREE.BufferGeometry | null; broken: string | null } {
+  if (!claims.length) return { geometry: null, broken: `a ${what} with no claims in it` };
+
+  const worldOf = (c: (typeof claims)[number]): Vec3[] => {
+    const plane = planeOfStep(c);
+    return c.profile.points.map((pt) => toWorld(plane, pt));
+  };
+  const world = new Map(claims.map((c) => [c.id, worldOf(c)]));
 
   let out: THREE.BufferGeometry | null = null;
   let broken: string | null = null;
-  for (const p of profiles) {
-    const plane = planeOfStep(p);
+  for (const c of claims) {
+    const plane = planeOfStep(c);
     let min = Infinity;
     let max = -Infinity;
-    for (const w of world) {
-      const d = offsetOf(plane, w);
-      if (d < min) min = d;
-      if (d > max) max = d;
+    for (const other of claims) {
+      if (other.id === c.id) continue;
+      for (const w of world.get(other.id)!) {
+        const d = offsetOf(plane, w);
+        if (d < min) min = d;
+        if (d > max) max = d;
+      }
     }
+    if (!Number.isFinite(min)) {
+      // One claim on its own: nothing else says how far it runs, so it runs
+      // through its own extent rather than through nothing.
+      for (const w of world.get(c.id)!) {
+        const d = offsetOf(plane, w);
+        if (d < min) min = d;
+        if (d > max) max = d;
+      }
+    }
+    // The footprint stands on the ground and runs up to the tallest claim.
+    if (c.id === footprintId) min = Math.min(min, offsetOf(plane, { x: 0, y: 0, z: 0 }));
     const span = Math.max(max - min, 1e-3);
     const pad = span * TOOL_OVERLAP;
-    const tool = prism(p.profile.points, p.profile.closed, plane, min - pad, span + pad * 2);
+    // An OPEN elevation is closed by the ground: joining its two feet is the
+    // fourth side, and both of them stand on the floor.
+    const tool = prism(c.profile.points, c.profile.closed || !!c.ground, plane, min - pad, span + pad * 2);
     if (!tool) {
-      if (!broken) broken = `the profile ${p.id} is degenerate — a massing cannot be grown from it`;
+      if (!broken) broken = `the claim ${c.id} is degenerate — a ${what} cannot be grown from it`;
       continue;
     }
     const geometry = tool.geometry.clone();
@@ -623,6 +680,16 @@ export function deriveTree(tree: OpTree, ctx: DeriveContext = {}): Derived {
 
     if (step.op === 'massing' && !step.on) {
       const r = massingGeometry(step);
+      if (r.geometry) {
+        bodies.set(step.id, r.geometry);
+        paint(step, r.geometry);
+      }
+      if (r.broken && !broken) broken = r.broken;
+      continue;
+    }
+
+    if (step.op === 'hull') {
+      const r = hullBody(step.claims, step.footprint, 'hull');
       if (r.geometry) {
         bodies.set(step.id, r.geometry);
         paint(step, r.geometry);

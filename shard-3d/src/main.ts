@@ -53,7 +53,15 @@ import { describePhrase, PHRASE_VERBS, type NameRef, type PhraseReading, type Ph
 import { readColours, storedTheme, applyTheme, effectiveTheme, type ThemeName } from './theme';
 import { pane, tile } from './ui';
 import { createChips } from './chips';
-import { placeCursor } from './cursor';
+import {
+  cursorAt,
+  cursorFollowsTarget,
+  describeAnchor,
+  FOLLOWING,
+  placeCursor,
+  shiftClick,
+  type CursorState,
+} from './cursor';
 import { createNav } from './navgizmo';
 import {
   axisPlaneFor,
@@ -75,6 +83,7 @@ import {
   height,
   NAMED,
   planeForPenDown,
+  length,
   rayPlane,
   toPlane,
   toWorld,
@@ -237,15 +246,38 @@ const pen = (): PenState => ({ chosen: gizmo.chosen, why: gizmo.chosenWhy, offse
  *
  * Runtime, not the log — a camera-side thing, like the pose. The picker's
  * origin was never a log event either, so this follows what was there.
+ *
+ * **And until it is placed it FOLLOWS the centre of the view** (push 2, G1).
+ * On John's second board every free stroke landed at floor level, because the
+ * cursor had never left (0, 0, 0) while he looked one to four units up: the
+ * ink went in front of or behind the volume he was working in, never in it.
+ * Blender's cursor is static; the shard's follows the view until a shift +
+ * click puts it somewhere, and then it sticks until `0`, a clear, or a shift
+ * + click on the cursor itself.
  */
-let cursor: Vec3 = v3(0, 0, 0);
-/** How the cursor came to be there, for the panel and the status line. */
-let cursorWhy = 'the world origin — shift + click to put it somewhere';
+let cursorState: CursorState = FOLLOWING;
+
+/**
+ * What a hand's width comes to at the depth it is working at, as a fraction of
+ * the eye's distance from it — the one number *clicking the cursor itself*
+ * needs, and it is a ratio rather than a pixel count so it holds at any zoom.
+ */
+const HAND_OF_VIEW = 0.04;
+
+/**
+ * Where the cursor stands right now — the placed point, else the centre of the
+ * view. Derived on every read rather than held, so orbiting and panning move
+ * it without anything having to remember to.
+ */
+function cursorNow(): { at: Vec3; why: string; follows: boolean } {
+  return cursorAt(cursorState, space.pose().target);
+}
 
 /**
  * Shift + click, as Blender has it: the cursor goes to the surface under the
  * pointer, else to the foundation plane under it. The picker moves with it,
- * and the status says so once.
+ * and the status says so once. A shift + click on the cursor where it already
+ * stands lets it GO — back to following the centre of the view.
  */
 function putCursor(screen: Point) {
   const face = solids.facesAt(screen)[0];
@@ -258,12 +290,32 @@ function putCursor(screen: Point) {
     panel.say('nothing under the pointer to put the cursor on');
     return;
   }
-  cursor = got.at;
-  cursorWhy = got.why;
-  gizmo.setOrigin(cursor);
-  panel.say(`cursor placed · ${got.why}`);
+  // A hand's width where the click landed — a fraction of how far the eye is
+  // from it — so *clicking the cursor itself* is the same gesture at any zoom.
+  const hand = length(sub(space.pose().position, got.at)) * HAND_OF_VIEW;
+  const next = shiftClick(cursorState, got, hand);
+  cursorState = next.state;
+  syncCursor();
+  panel.say(next.said);
   space.render();
   report();
+}
+
+/**
+ * The picker stands on the PLACED cursor, and at the world origin while there
+ * is none.
+ *
+ * Deliberately not on the following anchor, and both reasons were found by
+ * driving it: the picker's origin is *where the planes it hands out pass
+ * through*, so a foundation that followed the centre of the view would be a
+ * ground that lifts off the ground when you look up; and the picker is a thing
+ * you can click, so standing it in the middle of the view puts three tiles
+ * under the middle of every drawing — the first stroke aimed at the centre of
+ * the screen was eaten by the height tile. Where the VIEW plane passes is said
+ * in the status line and in the panel instead (`describeAnchor`).
+ */
+function syncCursor() {
+  gizmo.setOrigin(cursorState.placed ?? v3(0, 0, 0));
 }
 
 /** The stroke drawn a moment ago, as the `previous` candidate needs it. */
@@ -286,6 +338,7 @@ function previousRef(): PreviousRef | null {
  */
 function scopeAt(screen: Point): PenScope {
   const faces = solids.facesAt(screen);
+  const anchor = cursorNow();
   // What the pen came down ON, as a world point: a face it met, or the point
   // where its ray crosses the plane of the ink it landed on. Not the mark's
   // centre — the pen touched a place, and that place is what the world planes
@@ -315,8 +368,11 @@ function scopeAt(screen: Point): PenScope {
     // hand, stroke by stroke, and gave it no way to say where it wanted it.
     // A face under the pen that passes the facing gate still wins outright —
     // that is Blender's *Surface* placement, and P2/P3 need it.
-    viewAnchor: cursor,
-    viewAnchorWhy: `through the cursor (${cursorWhy})`,
+    // THE VIEW PLANE PASSES THROUGH THE VOLUME THE HAND IS WORKING IN: the
+    // centre of the view, which pans and orbits with the hand, or the cursor
+    // once shift + click has put one somewhere (push 2, G1 — `cursor.ts`).
+    viewAnchor: anchor.at,
+    viewAnchorWhy: `through ${anchor.follows ? 'the centre of the view' : 'the placed cursor'} (${anchor.why})`,
     at: Date.now(),
     recentWindowMs: DEFAULT_SESSION_CONFIG.recentWindowMs,
   };
@@ -487,7 +543,7 @@ const ink = createInk({
           // longer true: a view stroke is world geometry, drawn the same from
           // every angle. What is worth saying is where the plane passed
           // through, because that is the thing the hand can move.
-          (mark.plane.source === 'view' ? ' · view · through the cursor' : '') +
+          (mark.plane.source === 'view' ? ` · ${describeAnchor(cursorState)}` : '') +
           (form ? ` · plays ${form.role}` : '')
       );
     }
@@ -936,6 +992,25 @@ function tier1(strokeId: string): { id: string; name: string } | null {
           `the drawing is the extent; type what it is and a model fills it`
       );
       return { id: made.id, name: made.name };
+    }
+  }
+  // Push 2, G1 — §1: every free stroke is a silhouette claim. A footprint and
+  // a ⊓ from wherever the hand stood are a HULL, and tier 1 stands it the
+  // moment the second claim lands; each claim after that goes into the same
+  // hull as a new version of its one step, so undo takes back exactly the
+  // claim that was drawn.
+  const claims = log.hullable();
+  if (claims && claims.add.includes(strokeId)) {
+    const stood = log.hull(claims);
+    if (stood) {
+      panel.say(
+        `${stood.name} from ${stood.count} claim${stood.count === 1 ? '' : 's'} · tier 1 — ` +
+          (claims.solidId
+            ? 'this claim went into it, and every prism was re-derived through the others’ span'
+            : 'the drawing is the extent, in the volume its claims define') +
+          (claims.dropped.length ? ` · ${claims.dropped.length} left out` : '')
+      );
+      return { id: stood.id, name: stood.name };
     }
   }
   // …and a further view goes INTO a massing that is still only a massing,
@@ -2053,7 +2128,20 @@ window.addEventListener('keydown', (e) => {
   if (e.key === '1') choose('foundation');
   else if (e.key === '2') choose('height');
   else if (e.key === '3') choose('width');
-  else if (e.key === '0') choose(null);
+  else if (e.key === '0') {
+    // Nothing chosen, and nothing pinned: `0` is the one key that says *let
+    // the drawing decide where the ink goes*, so it lets a placed cursor go
+    // as well as a held tile (push 2, G1).
+    const held = !cursorFollowsTarget(cursorState);
+    choose(null);
+    if (held) {
+      cursorState = FOLLOWING;
+      syncCursor();
+      panel.say('nothing chosen · the cursor let go — the view plane follows the centre of the view');
+      space.render();
+      report();
+    }
+  }
   else if (e.key === 'Escape') {
     // Esc with nothing held stops EVERY call in flight, through the
     // transport's own signal — the canvas's rule (`cancelWork`).
@@ -2070,7 +2158,10 @@ window.addEventListener('keydown', (e) => {
 });
 
 
-space.onChange(report);
+// The picker stands where the hand is working, and while the cursor is
+// FOLLOWING that is the centre of the view — so it travels with every orbit
+// and every pan rather than being left at the origin (push 2, G1).
+space.onChange(() => { syncCursor(); report(); });
 log.subscribe(report);
 panel.show(null);
 report();
@@ -2465,7 +2556,7 @@ const hook: ShardHook = {
   flipPlane: (id, which = 1) => flipPlane(id, which),
   chipFor: (id) => chips.textFor(id),
   pinned: () => pinnedViews(log).map((v) => ({ label: v.label, count: v.count })),
-  cursor: () => ({ at: cursor, why: cursorWhy }),
+  cursor: () => { const c = cursorNow(); return { at: c.at, why: c.why }; },
   shiftTap: (screen) => {
     // Through `claimed`, the way a real shift + click reaches it, so what the
     // e2e exercises is the gesture and not a back door onto `putCursor`.
@@ -2475,7 +2566,8 @@ const hook: ShardHook = {
         clientX: screen.x, clientY: screen.y, shiftKey: true, bubbles: true, cancelable: true,
       })
     );
-    return { at: cursor, why: cursorWhy };
+    const c = cursorNow();
+    return { at: c.at, why: c.why };
   },
   worldPointsOf: (id) => {
     const m = log.markOf(id);
@@ -2664,7 +2756,7 @@ const hook: ShardHook = {
     return { line: r.line, kind: r.kind, enabled: !!r.run };
   },
   undo,
-  clear: () => { log.clear(); chips.clear(); work.cancelAll(); cursor = v3(0, 0, 0); cursorWhy = 'the world origin — shift + click to put it somewhere'; gizmo.setOrigin(cursor); ink.sync(); solids.sync(); selection.clear(); panel.show(null); report(); },
+  clear: () => { log.clear(); chips.clear(); work.cancelAll(); cursorState = FOLLOWING; syncCursor(); ink.sync(); solids.sync(); selection.clear(); panel.show(null); report(); },
   panelText: () => panelEl.textContent || '',
 
   joinStub: (replies, name = 'e2e-stub') => {

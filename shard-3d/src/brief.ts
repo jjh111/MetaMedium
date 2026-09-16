@@ -202,11 +202,13 @@ export function describeSpace(scene: SpaceScene): string {
   } else {
     out.push(`WHAT STANDS — ${scene.solids.length} solid${scene.solids.length === 1 ? '' : 's'}, each an op tree:`);
     for (const s of scene.solids) {
-      const massing = s.tree.steps.some((st) => st.op === 'massing' && !st.on);
+      // A HULL is the massing on any planes (push 2, G1), and it is the same
+      // invariant: whatever a model proposes is clipped to it.
+      const massing = s.tree.steps.some((st) => (st.op === 'massing' || st.op === 'hull') && !st.on);
       out.push(
         `${s.id} “${s.name}”${s.named === 'engine' ? " (the engine's own word for what it made — nobody has named it)" : ' (the hand named it)'}` +
           (massing
-            ? ' — a MASSING: it is already standing, built from the profiles below, and it is the extent your proposal must stay inside'
+            ? ' — a MASSING: it is already standing, built from the profiles and silhouette claims below, and it is the extent your proposal must stay inside'
             : '')
       );
       for (const step of s.tree.steps) out.push(stepLine(step));

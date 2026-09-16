@@ -3,7 +3,14 @@
 // under the pointer takes it, else the foundation plane does.
 
 import { describe, it, expect } from 'vitest';
-import { placeCursor } from './cursor';
+import {
+  cursorAt,
+  cursorFollowsTarget,
+  describeAnchor,
+  FOLLOWING,
+  placeCursor,
+  shiftClick,
+} from './cursor';
 import { normalize, sub, v3, type Ray } from './plane';
 
 /** A ray from a point, aimed at another. */
@@ -55,5 +62,54 @@ describe('placing the cursor', () => {
     // is not a placement.
     const below: Ray = { origin: v3(0, -3, 0), direction: normalize(v3(0, -1, 0.2)) };
     expect(placeCursor({ surface: null, ray: below })).toBeNull();
+  });
+});
+
+// ---- push 2, G1: the view plane stands where the hand is working ------------
+//
+// John's second board: four free loops, every one of them at floor level,
+// because the view plane stood through a cursor nobody had moved from (0, 0, 0)
+// while the camera looked at targets 0.9–3.7 units up. The ink went in front of
+// or behind the volume he was working in, never in it.
+
+describe('the cursor follows the centre of the view until it is placed', () => {
+  it('follows the camera’s target, and moves with it', () => {
+    expect(cursorFollowsTarget(FOLLOWING)).toBe(true);
+    const first = cursorAt(FOLLOWING, v3(0.581, 0.938, 0.244));
+    expect(first.follows).toBe(true);
+    expect(first.at).toEqual(v3(0.581, 0.938, 0.244));
+    // The hand orbits and pans; the plane goes with it, with nothing to remember.
+    const later = cursorAt(FOLLOWING, v3(4.075, 3.683, 2.773));
+    expect(later.at.y).toBeCloseTo(3.683, 6);
+    expect(describeAnchor(FOLLOWING)).toBe('view · through the centre of the view');
+  });
+
+  it('a placed cursor STICKS, and the target no longer moves it', () => {
+    const placed = placeCursor({ surface: v3(1.5, 2, -0.5), ray: rayTo(v3(0, 10, 14), v3(1.5, 2, -0.5)), what: 'artifact:7' })!;
+    const { state, said } = shiftClick(FOLLOWING, placed, 0.4);
+    expect(cursorFollowsTarget(state)).toBe(false);
+    expect(said).toMatch(/cursor placed/);
+    expect(said).toMatch(/until 0, a clear, or a shift \+ click on it/);
+    // The camera can look anywhere now; the plane stays where it was put.
+    expect(cursorAt(state, v3(99, 99, 99)).at).toEqual(v3(1.5, 2, -0.5));
+    expect(describeAnchor(state)).toBe('view · through the placed cursor');
+  });
+
+  it('a shift + click ON the cursor lets it go again', () => {
+    const at = v3(1.5, 2, -0.5);
+    const held = shiftClick(FOLLOWING, placeCursor({ surface: at, ray: rayTo(v3(0, 10, 14), at) })!, 0.4).state;
+    // A click a hair off where it stands is the cursor itself, at this zoom.
+    const again = placeCursor({ surface: v3(1.6, 2.05, -0.45), ray: rayTo(v3(0, 10, 14), at) })!;
+    const let_go = shiftClick(held, again, 0.4);
+    expect(cursorFollowsTarget(let_go.state)).toBe(true);
+    expect(let_go.said).toMatch(/follows the centre of the view again/);
+  });
+
+  it('a shift + click somewhere ELSE moves it rather than letting it go', () => {
+    const held = shiftClick(FOLLOWING, placeCursor({ surface: v3(1.5, 2, -0.5), ray: rayTo(v3(0, 10, 14), v3(1.5, 2, -0.5)) })!, 0.4).state;
+    const far = v3(6, 0, 3);
+    const moved = shiftClick(held, placeCursor({ surface: far, ray: rayTo(v3(0, 10, 14), far) })!, 0.4);
+    expect(cursorFollowsTarget(moved.state)).toBe(false);
+    expect(moved.state.placed).toEqual(far);
   });
 });

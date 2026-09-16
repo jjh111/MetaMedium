@@ -54,6 +54,7 @@ import type { Point } from 'metamedium-core';
 import {
   frameVectors,
   placeFrames,
+  type HullStep,
   type MassingStep,
   type MatchStep,
   type OpKind,
@@ -365,6 +366,19 @@ function walk(a: WalkArgs): void {
           reasoning:
             `${p.id} is one of the profiles this body's extent was massed from, on the ` +
             `${p.plane.name ?? 'plane'} it was drawn on`,
+        });
+      }
+    }
+
+    // A hull's claims are its profiles under another name (push 2, G1), so the
+    // same row answers for them — and says which of them closed on the ground.
+    if (step.op === 'hull') {
+      for (const c of (step as HullStep).claims) {
+        emit(c.id, step, {
+          ...(cutSince ? { expect: cutSince } : {}),
+          reasoning:
+            `${c.id} is one of the silhouette claims this body's extent was hulled from, on the ` +
+            `${c.plane.name ?? 'plane'} it was drawn on${c.ground ? ', closed on the ground' : ''}`,
         });
       }
     }

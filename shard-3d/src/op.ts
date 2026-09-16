@@ -39,6 +39,7 @@ export type OpKind =
   | 'along'
   | 'match'
   | 'massing'
+  | 'hull'
   | 'mesh';
 
 export const OP_KINDS: readonly OpKind[] = [
@@ -54,6 +55,7 @@ export const OP_KINDS: readonly OpKind[] = [
   'along',
   'match',
   'massing',
+  'hull',
   'mesh',
 ];
 
@@ -71,6 +73,7 @@ export const OP_PACKAGES: Record<OpKind, string> = {
   along: 'P8',
   match: 'P4 — the diff resolved: add what the drawing has and the body lacks, or take off what it does not',
   massing: 'P5 — the drawing as the extent, before it has a name: profiles on different world planes, each grown through the others and intersected. With `on`, the same volume CLIPPING a body — the extent invariant, literal',
+  hull: 'push 2 G1 — the visual hull: silhouette claims on ANY planes, each grown through the span of the others and intersected. The massing is this with three axis claims, and both are derived by one function',
   mesh: 'P10 — opaque, from a generator: a version, never the truth of the thing',
 };
 
@@ -282,9 +285,38 @@ export interface MassingStep extends StepBase {
   bound?: string;
 }
 
+/**
+ * `hull(footprint?, claims[])` — the visual hull of a sketch (push 2, G1).
+ *
+ * The massing generalised: a claim's plane need not be one of the three, and a
+ * claim need not be closed. Each claim is grown along its OWN plane's normal
+ * through the span of the OTHERS and the prisms are intersected, so the body
+ * stands in the volume the claims define — a unit above the floor if that is
+ * where they were drawn.
+ *
+ * **The massing is this with three axis claims.** Both ops are kept, and both
+ * are derived by one function (`hullBody` in `solid.ts`): the massing's step
+ * shape, its path and its tests are untouched, and every tree already written
+ * — in a log, in a folder, in another hand's log — still reads. What is new is
+ * a second door, for the drawings the massing cannot take.
+ *
+ * Nothing derived is held here either: how far each prism runs is worked out
+ * every time the tree is walked (invariant 4), from the claims themselves.
+ */
+export interface HullStep extends StepBase {
+  op: 'hull';
+  /**
+   * The claims this volume is made of: each one's clean form, the plane it
+   * lies on, and whether it closes ON THE GROUND rather than by its own ink.
+   */
+  claims: { id: string; profile: Profile2D; plane: PlaneRef; ground?: boolean }[];
+  /** Which claim is the footprint, when the hand drew one — it runs up to the tallest claim. */
+  footprint?: string;
+}
+
 /** Every other row of §2.4: declared, so a later package adds an implementation, not a shape. */
 export interface UnbuiltStep extends StepBase {
-  op: Exclude<OpKind, 'extrude' | 'revolve' | 'cut' | 'boss' | 'mirror' | 'place' | 'match' | 'massing'>;
+  op: Exclude<OpKind, 'extrude' | 'revolve' | 'cut' | 'boss' | 'mirror' | 'place' | 'match' | 'massing' | 'hull'>;
 }
 
 export type OpStep =
@@ -295,6 +327,7 @@ export type OpStep =
   | PlaceStep
   | MatchStep
   | MassingStep
+  | HullStep
   | UnbuiltStep;
 
 export interface OpTree {
@@ -844,6 +877,37 @@ export function massingStep(
 }
 
 /**
+ * `hull(claims)` — the claims, whole, as one step in the engine's name.
+ *
+ * Each claim carries its clean form, its plane, and whether it closes on the
+ * ground; how far its prism runs, and what the intersection comes to, is
+ * re-derived every walk (invariant 4).
+ */
+export function hullStep(
+  claims: { id: string; plane: Plane; clean: Profile2D; ground?: boolean }[],
+  id = 'step:1',
+  why?: string,
+  footprint?: string
+): HullStep {
+  return {
+    id,
+    op: 'hull',
+    from: claims.map((c) => c.id),
+    ...(footprint ? { footprint } : {}),
+    reasoning:
+      why ??
+      `${claims.length} silhouette claims — each grown through the span of the others along its own plane's ` +
+        `normal, and the prisms intersected. The hull occupies the volume its claims define`,
+    claims: claims.map((c) => ({
+      id: c.id,
+      profile: c.clean,
+      plane: planeRef(c.plane),
+      ...(c.ground ? { ground: true } : {}),
+    })),
+  };
+}
+
+/**
  * The clip: `on` intersected with the body of `bound`.
  *
  * This is §6's extent invariant made literal — a proposal cannot leave the
@@ -954,6 +1018,8 @@ export const OP_LIMITS = {
   profileMinPoints: 3,
   /** Profiles in one massing — plan, elevation, section, and room to spare. */
   massingProfiles: 64,
+  /** Claims in one hull. The form rung caps what it offers at `MAX_CLAIMS`; this is the door's own limit. */
+  hullClaims: 64,
   /** Stroke ids one step may name. */
   refs: 512,
   /** Characters in an id. */
@@ -1170,6 +1236,26 @@ function walkStep(v: unknown, at: string, seen: Set<string>, depth: number, budg
     });
     // A clip: the volume it keeps its body inside is a step that already stood.
     if (s.bound !== undefined) earlier(s.bound, 'bound', 'the step whose body does the clipping');
+  } else if (kind === 'hull') {
+    if (!Array.isArray(s.claims)) bad(`${at}.claims`, 'a hull does not say which claims it is made of');
+    const claims = s.claims as unknown[];
+    if (claims.length > OP_LIMITS.hullClaims) {
+      bad(`${at}.claims`, `${claims.length} claims in one hull, past the ${OP_LIMITS.hullClaims} it may carry`);
+    }
+    const ids = new Set<string>();
+    claims.forEach((c, i) => {
+      const r = wantRecord(c, `${at}.claims[${i}]`, `the hull's claim ${i}`);
+      ids.add(wantId(r.id, `${at}.claims[${i}].id`, `the mark claim ${i} was drawn as`));
+      wantProfile(r.profile, `${at}.claims[${i}].profile`, `the hull's claim ${i}`);
+      wantPlane(r.plane, `${at}.claims[${i}].plane`, `the plane claim ${i} lies on`);
+      if (r.ground !== undefined && typeof r.ground !== 'boolean') {
+        bad(`${at}.claims[${i}].ground`, `claim ${i} says it closes on the ground as ${typeof r.ground}, not as yes or no`);
+      }
+    });
+    if (s.footprint !== undefined) {
+      const fp = wantId(s.footprint, `${at}.footprint`, "the hull's footprint");
+      if (!ids.has(fp)) bad(`${at}.footprint`, `the footprint is ${fp}, and no claim in this hull was drawn as that`);
+    }
   } else if (kind === 'place') {
     if (depth >= OP_LIMITS.placeDepth) {
       bad(`${at}.steps`, `a placement nested more than ${OP_LIMITS.placeDepth} deep — a copy of a copy of a copy`);
@@ -1296,6 +1382,15 @@ export function describeStep(step: OpStep): string {
     return step.bound
       ? `massing · clipped to ${step.bound}${from}`
       : `massing · ${step.profiles.length} profiles intersected${from}`;
+  }
+  if (step.op === 'hull') {
+    const ground = step.claims.filter((c) => c.ground).length;
+    return (
+      `hull · ${step.claims.length} claims intersected` +
+      (ground ? ` (${ground} closed on the ground)` : '') +
+      (step.footprint ? ` · footprint ${step.footprint}` : '') +
+      from
+    );
   }
   if (step.op === 'match') {
     // No region count and no area: the step holds none, and a number printed

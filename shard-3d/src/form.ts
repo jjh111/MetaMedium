@@ -24,6 +24,7 @@ import { countCrossings, DEFAULT_ERASE_CROSSINGS, type Point } from 'metamedium-
 import { overlapOf, viewNameOf } from './diff';
 import {
   add,
+  cross,
   dot,
   length,
   mul,
@@ -37,10 +38,19 @@ import {
   type Vec3,
 } from './plane';
 
-/** The closed vocabulary. It grows only by a release (§2.6). */
+/**
+ * The closed vocabulary. It grows only by a release (§2.6) — and `elevation`
+ * is one: push 2's G1, 16 September 2026. John drew a castle the way a hand
+ * draws one (a footprint on the floor, towers as ⊓ from wherever he stood)
+ * and every one of those ⊓ fell through the table to `annotation`, so nothing
+ * stood and a brief had nothing to fill. An open stroke whose two feet reach
+ * the ground is a SILHOUETTE of a thing standing on the ground, and the ground
+ * is its fourth side.
+ */
 export type FormRole =
   | 'gesture'
   | 'profile'
+  | 'elevation'
   | 'feature'
   | 'extent'
   | 'axis'
@@ -51,6 +61,7 @@ export type FormRole =
 export const FORM_ROLES: readonly FormRole[] = [
   'gesture',
   'profile',
+  'elevation',
   'feature',
   'extent',
   'axis',
@@ -154,6 +165,13 @@ export interface FormScope {
   solids?: SolidRef[];
   /** What stands selected, for row 1's gesture test. */
   selection?: string[];
+  /**
+   * The ground's own height, for row 8's feet. The foundation stands at y = 0,
+   * so this is 0 everywhere in the shard — it is a parameter because the rule
+   * is *the foundation's height*, not *zero*, and saying so keeps the row
+   * honest if the ground ever moves.
+   */
+  groundY?: number;
 }
 
 // ---- the thresholds, every one a ratio -------------------------------------
@@ -184,6 +202,33 @@ export const INSIDE_FACE = 0.9;
 export const SCRATCH_CROSSINGS = DEFAULT_ERASE_CROSSINGS;
 /** Crossings that are one pass short — what the canvas says *one more pass* about. */
 export const SCRATCH_NEAR = SCRATCH_CROSSINGS - 1;
+
+// ---- push 2: the claims (G1) -------------------------------------------------
+
+/**
+ * A foot reaches the ground when it sits this near it, as a fraction of the
+ * stroke's OWN size. A hand aiming at the floor from a three-quarter view
+ * misses it by a little every time; a ⊓ hanging in the air misses it by a lot.
+ */
+export const FEET_ON_GROUND = 0.15;
+/**
+ * …and the stroke has to RISE off the ground by this much of its own size, or
+ * it is a line lying on the floor with both ends on the floor, which is a plan
+ * and not a silhouette.
+ */
+export const ELEVATION_RISE = 0.35;
+/**
+ * A view whose normal is this near vertical is a view from overhead: what it
+ * shows is a plan, not an elevation, and the ⊓ rule does not apply to it (§4's
+ * third risk). Said out loud when it bites.
+ */
+export const PLAN_NORMAL = 0.8;
+/**
+ * How many claims one hull may be grown from. A dozen claims is a dozen CSG
+ * intersections (§4's second risk), so the count is capped and the rest are
+ * SAID rather than silently dropped.
+ */
+export const MAX_CLAIMS = 12;
 
 // ---- geometry, in world units ----------------------------------------------
 
@@ -269,6 +314,208 @@ function gapToBox(a: Point, b: Point, box: ReturnType<typeof bounds2>): number {
     const dy = Math.max(box.minY - y, 0, y - box.maxY);
     const d = Math.hypot(dx, dy);
     if (d < best) best = d;
+  }
+  return best;
+}
+
+// ---- push 2: a stroke as a silhouette claim (G1) -----------------------------
+
+/**
+ * A view plane said in the two numbers the pinned-view chips already use:
+ * where the eye stood, round and up. *34° · +24°* is a place a hand stood, and
+ * it is what a claim from a free view has instead of a name.
+ *
+ * Read off the plane's own NORMAL, which for a view plane faces the camera —
+ * so this needs no pose and no session, the way everything else in this file
+ * needs none.
+ */
+export function viewLabelOf(plane: Plane): string {
+  // A view plane is called `view`, which says nothing about WHICH view — and
+  // which view is the whole content of a claim from a free camera.
+  if (plane.name && plane.name !== 'view') return `the ${plane.name}`;
+  const d = normalize(plane.normal);
+  const up = Math.round((Math.asin(Math.max(-1, Math.min(1, d.y))) * 180) / Math.PI);
+  const round = Math.round((Math.atan2(d.x, d.z) * 180) / Math.PI);
+  return `${round >= 0 ? round : round + 360}° · ${up >= 0 ? '+' : ''}${up}°`;
+}
+
+/**
+ * Do two claims' prisms meet?
+ *
+ * A claim's prism is its outline swept along its own plane's normal, forever.
+ * Two such prisms are convex sets, each unbounded along its own direction, so
+ * a plane that separates them has to contain BOTH directions — which leaves
+ * exactly one candidate axis, `nA × nB`. Project both outlines onto it: the
+ * prisms meet if and only if those two intervals overlap. Exact, one axis, no
+ * sampling and no solver.
+ *
+ * Two planes with the same normal give no axis at all — two views from the
+ * same place say the same thing, and the second one is not a claim about the
+ * first.
+ */
+export function prismsMeet(a: FormMark, b: FormMark): { meet: boolean; overlap: number; why: string } {
+  const axis = cross(normalize(a.plane.normal), normalize(b.plane.normal));
+  const len = length(axis);
+  if (len < 1e-6) {
+    return {
+      meet: false,
+      overlap: 0,
+      why: `${a.id} and ${b.id} were drawn from the same direction — a second view from there is the same view`,
+    };
+  }
+  const d = mul(axis, 1 / len);
+  const span = (m: FormMark) => {
+    let lo = Infinity;
+    let hi = -Infinity;
+    for (const w of outlineOf(m)) {
+      const t = dot(w, d);
+      if (t < lo) lo = t;
+      if (t > hi) hi = t;
+    }
+    return { lo, hi };
+  };
+  const sa = span(a);
+  const sb = span(b);
+  const overlap = Math.min(sa.hi, sb.hi) - Math.max(sa.lo, sb.lo);
+  return {
+    meet: overlap > 0,
+    overlap,
+    why:
+      overlap > 0
+        ? `its prism meets ${b.id}'s — they share ${overlap.toFixed(2)} u across the one direction that could separate them`
+        : `its prism misses ${b.id}'s by ${(-overlap).toFixed(2)} u — two drawings of two things`,
+  };
+}
+
+/** The ground's own height. The foundation plane stands at y = 0 and the hull is measured against it. */
+export const GROUND_Y = 0;
+
+/** A stroke's two ends, and how high it climbs off the ground. */
+function feetOf(mark: FormMark, groundY: number) {
+  const out = outlineOf(mark);
+  let top = -Infinity;
+  for (const w of out) top = Math.max(top, w.y - groundY);
+  const a = Math.abs(out[0].y - groundY);
+  const b = Math.abs(out[out.length - 1].y - groundY);
+  return { near: Math.min(a, b), far: Math.max(a, b), top };
+}
+
+/**
+ * Row 8 — the elevation: an open stroke whose two feet reach the ground.
+ *
+ * §1 of push 2: *an open stroke closes on the ground.* A ⊓ whose feet reach
+ * the foundation's height is the silhouette of a thing standing on the ground,
+ * and the ground is its fourth side — so the claim is the stroke with its ends
+ * joined, which is what `closed: true` on its profile comes to.
+ *
+ * A ⊓ that FLOATS is an annotation, and the panel says why (§5: John's, and
+ * the plan says annotation with the reason). So a miss is returned rather than
+ * a null: the fallthrough says it out loud.
+ */
+function elevationReading(mark: FormMark, groundY: number): { reading: FormReading } | { miss: string } | null {
+  if (mark.closed || isWriting(mark) || mark.points.length < 3) return null;
+  const size = Math.max(mark.size, 1e-6);
+  const n = normalize(mark.plane.normal);
+  const up = Math.abs(n.y);
+  // §4's third risk, and it is read FIRST because it is about the view rather
+  // than about the stroke: a camera nearly overhead shows a plan, and what a
+  // stroke's feet do on a plan says nothing about the ground.
+  if (up > PLAN_NORMAL) {
+    if (mark.plane.source !== 'view') return null;
+    return {
+      miss:
+        `it was drawn from almost overhead (the view's normal is ${(up * 100).toFixed(0)}% vertical, over ` +
+        `${(PLAN_NORMAL * 100).toFixed(0)}%) — what a view from up there shows is a plan, not an elevation, ` +
+        `so where its feet land says nothing about the ground`,
+    };
+  }
+  const feet = feetOf(mark, groundY);
+  // Flat on the floor is a plan, not a silhouette — and this is what keeps
+  // every line drawn on the foundation out of the row.
+  if (feet.top < ELEVATION_RISE * size) return null;
+  const ratio = feet.far / size;
+  if (ratio > FEET_ON_GROUND) {
+    return {
+      miss:
+        `its feet do not reach the ground — the higher one stands ${feet.far.toFixed(2)} u off it ` +
+        `(${(ratio * 100).toFixed(0)}% of its own size, over ${(FEET_ON_GROUND * 100).toFixed(0)}%)`,
+    };
+  }
+  return {
+    reading: {
+      id: mark.id,
+      role: 'elevation',
+      rule: 8,
+      confidence: Math.min(
+        0.95,
+        0.5 + (1 - ratio / FEET_ON_GROUND) * 0.25 + Math.min(1, feet.top / size) * 0.2
+      ),
+      reasoning:
+        `an open ${mark.shape || 'stroke'} from ${viewLabelOf(mark.plane)} whose feet both reach the ground ` +
+        `(the higher is ${(ratio * 100).toFixed(0)}% of its own size off it, under ${(FEET_ON_GROUND * 100).toFixed(0)}%) ` +
+        `and which rises ${feet.top.toFixed(2)} u above it — a silhouette claim, closed on the ground`,
+      targets: [],
+    },
+  };
+}
+
+/**
+ * The marks a closed stroke on a free view can be a claim AGAINST: the
+ * footprint first — a closed mark on the foundation is what a footprint is —
+ * and failing that, any other claim already on the board.
+ */
+function claimTargets(scope: FormScope, mark: FormMark, groundY: number): FormMark[] {
+  const others = scope.marks.filter((m) => m.id !== mark.id);
+  const footprints = others.filter((m) => isClosedShape(m) && m.plane.name === 'foundation');
+  if (footprints.length) return footprints;
+  return others.filter(
+    (m) =>
+      (isClosedShape(m) && isDrawnOn(m)) ||
+      (isClosedShape(m) && m.plane.source === 'view') ||
+      (!m.closed && !!elevationReadingOf(m, groundY))
+  );
+}
+
+/** The elevation reading of a mark, or nothing — the predicate form, for the rows that read against claims. */
+function elevationReadingOf(mark: FormMark, groundY: number): FormReading | null {
+  const r = elevationReading(mark, groundY);
+  return r && 'reading' in r ? r.reading : null;
+}
+
+/**
+ * §1's first rule: **a closed stroke is a silhouette when its prism meets the
+ * footprint's.** That is what makes a loop drawn from a free view a claim
+ * about the thing rather than a doodle beside it — and a loop that meets
+ * nothing is still a profile waiting for an extent (P2), untouched.
+ */
+/**
+ * Why a closed stroke on a free view is NOT a claim — the sentence the
+ * annotation carries, so *nothing stood* is never the whole of what is said.
+ */
+function claimMiss(scope: FormScope, mark: FormMark, groundY: number): string | null {
+  if (!mark.closed || isDrawnOn(mark)) return null;
+  const targets = claimTargets(scope, mark, groundY);
+  if (!targets.length) return 'there is nothing else on the board for its prism to meet';
+  let nearest: { why: string; overlap: number } | null = null;
+  for (const other of targets) {
+    const m = prismsMeet(mark, other);
+    if (!nearest || m.overlap > nearest.overlap) nearest = { why: m.why, overlap: m.overlap };
+  }
+  return nearest ? nearest.why : null;
+}
+
+function claimAgainst(
+  scope: FormScope,
+  mark: FormMark,
+  groundY: number
+): { other: FormMark; overlap: number; why: string } | null {
+  if (!isClosedShape(mark)) return null;
+  let best: { other: FormMark; overlap: number; why: string } | null = null;
+  for (const other of claimTargets(scope, mark, groundY)) {
+    const m = prismsMeet(mark, other);
+    if (!m.meet) continue;
+    if (best && m.overlap <= best.overlap) continue;
+    best = { other, overlap: m.overlap, why: m.why };
   }
   return best;
 }
@@ -372,7 +619,22 @@ function featureReading(mark: FormMark): FormReading | null {
  * a profile here" is a fact about the whole scope, not about one mark.
  */
 function profileReading(scope: FormScope, mark: FormMark): FormReading | null {
-  if (!isClosedShape(mark) || !isDrawnOn(mark)) return null;
+  if (!isClosedShape(mark)) return null;
+  // Push 2, §1's first rule: a closed stroke drawn on a FREE view is a
+  // silhouette claim when its prism meets the footprint's — which is how the
+  // castle's towers, drawn from wherever John stood, become claims about the
+  // thing rather than art beside it. A loop that meets nothing is not refused:
+  // it falls through to the same row it always did, or to the annotation.
+  //
+  // **Actually closed, not merely closed-shaped.** Elsewhere in this file a
+  // mark that READS as a rectangle counts as closed, which is right for a
+  // profile on a plane the hand chose. Here it is wrong: John's towers read
+  // *rectangle 0.88* and were open ⊓, and a ⊓ is a claim closed by the GROUND
+  // (row 8), not by an outline it never drew.
+  const claim = isDrawnOn(mark) || !mark.closed
+    ? null
+    : claimAgainst(scope, mark, scope.groundY ?? GROUND_Y);
+  if (!isDrawnOn(mark) && !claim) return null;
   // P5: a closed shape INSIDE a profile on the same chosen or world plane is a
   // profile of its own, and the massing takes the union of a plane's profiles.
   //
@@ -404,6 +666,18 @@ function profileReading(scope: FormScope, mark: FormMark): FormReading | null {
         `what it affords is the diff`,
       targets: [against.solidId],
       against,
+    };
+  }
+  if (claim) {
+    return {
+      id: mark.id,
+      role: 'profile',
+      rule: 2,
+      confidence: conf,
+      reasoning:
+        `a closed ${mark.shape || 'mark'} ${mark.confidence.toFixed(2)} — a claim from ${viewLabelOf(mark.plane)}: ` +
+        `${claim.why}. What it says is the thing's outline seen from there`,
+      targets: [claim.other.id],
     };
   }
   return {
@@ -582,6 +856,14 @@ function place(scope: FormScope, mark: FormMark, profiles: FormMark[], growable:
   const feature = featureReading(mark);
   if (feature) return feature;
 
+  // Row 8 — the elevation (push 2, G1): an open stroke whose two feet reach
+  // the ground. Read after the closed rows because it cannot collide with
+  // them (they want a closed mark and this one an open one), and before the
+  // extent because a ⊓ that stands on the ground is a claim about a shape,
+  // not a dimension off one.
+  const elevation = elevationReading(mark, scope.groundY ?? GROUND_Y);
+  if (elevation && 'reading' in elevation) return elevation.reading;
+
   // Row 4 — extent. It reads against profiles AND features: a line from a
   // feature's edge is how deep the hole goes (§8), and `makeableFrom` is what
   // refuses to stand a new solid on one.
@@ -601,13 +883,20 @@ function place(scope: FormScope, mark: FormMark, profiles: FormMark[], growable:
   const label = labelReading(scope, mark);
   if (label) return label;
 
-  // The fallthrough. Said out loud: the canvas can name a gap it cannot fill.
+  // The fallthrough. Said out loud: the canvas can name a gap it cannot fill —
+  // and a ⊓ that ALMOST made row 8 says which measurement stopped it (§5: a
+  // floating ⊓ is an annotation, with the reason).
+  const missedClaim = claimMiss(scope, mark, scope.groundY ?? GROUND_Y);
   return {
     id: mark.id,
     role: 'annotation',
     rule: 0,
     confidence: 0.5,
-    reasoning: `a ${mark.shape || 'mark'} on the ${mark.plane.name ?? 'plane'} that no row of the form table places — held as a comment, or as art`,
+    reasoning: elevation
+      ? `a ${mark.shape || 'mark'} from ${viewLabelOf(mark.plane)} that would be an elevation, but ${elevation.miss} — held as a comment, or as art`
+      : missedClaim
+        ? `a closed ${mark.shape || 'mark'} from ${viewLabelOf(mark.plane)} that would be a claim, but ${missedClaim} — held as a comment, or as art`
+        : `a ${mark.shape || 'mark'} on the ${mark.plane.name ?? 'plane'} that no row of the form table places — held as a comment, or as art`,
     targets: [],
   };
 }
@@ -790,5 +1079,117 @@ export function massableFrom(readings: FormReading[], marks: FormMark[]): Massab
       `${sizes.join(', ')} — profiles on ${groups.size} different world planes whose projections overlap ` +
       `(${volume.toFixed(2)} u³ of shared space). Each is grown through the span of the others along its own ` +
       `normal and the prisms are intersected: the drawing IS the extent, and it needs no name and no model`,
+  };
+}
+
+// ---- push 2, G1: the hull, from claims on any plane --------------------------
+
+/**
+ * One silhouette claim, as the hull needs it.
+ *
+ * `ground` is the whole of the difference between the two kinds: a closed
+ * stroke carries its own outline, and an OPEN elevation is closed **by the
+ * ground** — its fourth side is the segment between its feet, which is what
+ * joining its ends comes to when both of them stand on the floor.
+ */
+export interface Claim {
+  id: string;
+  /** Closed on the ground, rather than by its own ink. */
+  ground: boolean;
+  /** Where the hand stood, or the plane's name: `the foundation`, `34° · +24°`. */
+  from: string;
+}
+
+/**
+ * Profiles and elevations on any planes at all, whose prisms meet, ARE a solid
+ * — the visual hull, which is the oldest reconstruction there is and needs no
+ * model, no name and no wait (push 2 §1).
+ *
+ * The massing is the same thing with three axis-aligned claims, and it keeps
+ * its own step and its own path: this one answers for the drawings the massing
+ * cannot take — a footprint with elevations drawn from wherever the hand
+ * stood, which is how an architect sketches and how John sketched.
+ */
+export interface Hullable {
+  /** The claims, in the order they were drawn. */
+  claimIds: string[];
+  claims: Claim[];
+  /** The claim on the foundation, when the hand drew one — it bounds the hull from below and around. */
+  footprintId?: string;
+  /** Claims past `MAX_CLAIMS`, or which met nothing — said, never silently dropped. */
+  dropped: string[];
+  reasoning: string;
+}
+
+/**
+ * The hull the board affords, or null.
+ *
+ * Two rules decide whether it is this function's answer or `massableFrom`'s:
+ *
+ *   * **Two claims at least.** A lone silhouette is one view of a thing and
+ *     says nothing about its depth; it still waits for an extent (P2).
+ *   * **Something the massing cannot take.** Three profiles on the three world
+ *     planes are a massing and stand as one — that path is untouched. A claim
+ *     from a free view, or an elevation closed on the ground, is what brings a
+ *     drawing here instead.
+ */
+export function hullableFrom(readings: FormReading[], marks: FormMark[]): Hullable | null {
+  const byId = new Map(marks.map((m) => [m.id, m]));
+  const found: { mark: FormMark; claim: Claim }[] = [];
+  for (const r of readings) {
+    const mark = byId.get(r.id);
+    if (!mark) continue;
+    if (r.role === 'elevation') {
+      found.push({ mark, claim: { id: r.id, ground: true, from: viewLabelOf(mark.plane) } });
+    } else if (r.role === 'profile' && !r.against) {
+      found.push({ mark, claim: { id: r.id, ground: false, from: viewLabelOf(mark.plane) } });
+    }
+  }
+  if (found.length < 2) return null;
+
+  // A claim has to hang together with another one, or it is a drawing of
+  // something else standing beside this one.
+  const dropped: string[] = [];
+  const kept = found.filter((f) => {
+    const meets = found.some((o) => o.mark.id !== f.mark.id && prismsMeet(f.mark, o.mark).meet);
+    if (!meets) dropped.push(`${f.mark.id} — its prism meets no other claim's, so it is a drawing of something else`);
+    return meets;
+  });
+  if (kept.length < 2) return null;
+
+  // Profiles on the three world planes are a MASSING, and the massing stands
+  // them. Only a drawing that path cannot take comes here.
+  const free = kept.some((f) => f.claim.ground || !MASSING_PLANES.includes((f.mark.plane.name ?? '') as never));
+  if (!free) return null;
+
+  const capped = kept.slice(0, MAX_CLAIMS);
+  for (const over of kept.slice(MAX_CLAIMS)) {
+    dropped.push(`${over.mark.id} — past the ${MAX_CLAIMS} claims one hull is grown from`);
+  }
+
+  const footprint = capped.find((f) => !f.claim.ground && f.mark.plane.name === 'foundation');
+  const elevations = capped.filter((f) => f.claim.ground);
+  const views = capped.filter((f) => !f.claim.ground && f !== footprint);
+  const said = [
+    footprint ? 'a footprint on the foundation' : null,
+    elevations.length
+      ? `${elevations.length} elevation${elevations.length === 1 ? '' : 's'} from ` +
+        `${elevations.map((e) => e.claim.from).join(' and ')}, each closed on the ground`
+      : null,
+    views.length
+      ? `${views.length} claim${views.length === 1 ? '' : 's'} from ${views.map((v) => v.claim.from).join(' and ')}`
+      : null,
+  ].filter(Boolean);
+
+  return {
+    claimIds: capped.map((f) => f.mark.id),
+    claims: capped.map((f) => f.claim),
+    ...(footprint ? { footprintId: footprint.mark.id } : {}),
+    dropped,
+    reasoning:
+      `${said.join(', ')} — each grown through the span of the OTHERS along its own plane's normal and the ` +
+      `prisms intersected. The hull occupies the volume its claims define; the ground bounds it only where a ` +
+      `claim's feet reach it` +
+      (dropped.length ? `. ${dropped.length} left out: ${dropped.join('; ')}` : ''),
   };
 }

@@ -168,6 +168,27 @@ there is no bundle to drift.
    do not touch it. A face under the pen that the camera can actually read
    still wins outright, which is Blender's *Surface* placement.
 
+   **But the shard's cursor FOLLOWS the view until it is placed, and Blender's
+   does not** (push 2, G1 — the one place the shard deliberately parts company
+   with the reference). Blender's cursor is static: it starts at the world
+   origin and stays there until you move it. On John's second board that cost
+   him the whole drawing — he looked one to four units up and drew four free
+   loops, and every one of them landed at floor level, because the view plane
+   stood through a cursor nobody had moved. So the rule here is **the view
+   plane passes through the volume the hand is working in**: by default the
+   camera's *target*, the centre of the view, which pans and orbits with the
+   hand; and a cursor placed by shift + click sticks, until `0`, a clear, or a
+   shift + click on the cursor itself lets it go again. The status line says
+   which in the words you would use — *view · through the centre of the view*
+   or *view · through the placed cursor*.
+
+   **What follows is the view plane, not the picker.** The picker stands on the
+   placed cursor and at the world origin when there is none, because its origin
+   is where the planes it hands out pass through — a foundation on a following
+   cursor would be a ground that lifts off the ground the moment you looked up
+   — and because a picker parked in the middle of the view puts three clickable
+   tiles under the middle of every drawing.
+
    **View ink is world geometry.** It is drawn the same from every angle, like
    every other stroke: orbit off it and it is a thin, fully drawn ellipse, not
    a faded one. (Until 16 September it went faint once the camera left the pose
@@ -283,15 +304,15 @@ there is no bundle to drift.
 | `src/view.ts` | **Pure.** The camera's own arithmetic: the six axis views with the up that makes each named plane read in its own frame, the flip to the other side, `viewFacingPlane` / `planeFacedBy` (the compass and the plane picker agreeing), `tooOblique` against the scorer's own `FACING_FLOOR`, `frameFor` (a bounds → a pose that fits it, sphere not box, at any aspect, in persp and in ortho), `orthoHeightFor` / `distForOrthoHeight` (why the projection toggle does not jump), and `balls` — the six axes projected onto the camera's screen basis, farthest first. No three.js |
 | `src/navgizmo.ts` | The compass in the corner, as an **SVG overlay** built from the tokens: three arms from a centre with a labelled ball on each positive end and a hollow one on each negative, depth-sorted and turning with the camera, tappable (snap, and flip on a second tap), draggable (orbit, one finger, because it is chrome rather than canvas) — plus the *home* and *view* tiles and the pinned-view chips |
 | `src/gizmo.ts` | The three axes, the three tiles, the slide handle, the centre — all of it standing at **the cursor**, whose planes it hands out through that point (`origin` / `setOrigin`) |
-| `src/cursor.ts` | **Pure.** Blender's 3D Cursor placement as one rule: the surface under the pointer takes the cursor, else the foundation plane under it, else nothing happens and the caller says so. No three.js — a surface hit and a ray in, a world point and its reason out |
+| `src/cursor.ts` | **Pure.** Blender's 3D Cursor placement as one rule: the surface under the pointer takes the cursor, else the foundation plane under it, else nothing happens and the caller says so. Plus the cursor's **two states** (push 2, G1): `FOLLOWING` — the view plane passes through the centre of the view, so it goes with every pan and orbit — and placed, where a shift + click put it, until `0`, a clear, or a shift + click on the cursor itself (`cursorAt`, `cursorFollowsTarget`, `shiftClick`, `describeAnchor`). No three.js — a surface hit and a ray in, a world point and its reason out |
 | `src/ink.ts` | Pen-down → plane → live projection → the stroke as a `Line2`; the clean form as a dashed ghost for a few seconds. The scene's ink is **derived from the log** on every change, so undo needs no bookkeeping |
-| `src/form.ts` | **Pure.** The form rung (§2.3): the closed vocabulary `gesture \| profile \| feature \| extent \| axis \| path \| label \| annotation`, placed by a table read top to bottom, first match wins — the sibling of `diagram/roles.ts` and read the same way. Every threshold is a ratio of the marks' own size, measured in world space so it holds across planes. **Row 1** (`gesture`: a scratch, counted against a solid's silhouette with core's own `countCrossings`) and **row 3** (`feature`: a closed mark on a solid's face, inside it) are P3's; **row 2 now also says what a profile is a profile OF** (P4, `against`), which is what turns an outline drawn over a solid into a diff rather than a second solid; row 6 (`path`) is P7's and still carries a comment saying so |
+| `src/form.ts` | **Pure.** The form rung (§2.3): the closed vocabulary `gesture \| profile \| elevation \| feature \| extent \| axis \| path \| label \| annotation`, placed by a table read top to bottom, first match wins — the sibling of `diagram/roles.ts` and read the same way. Every threshold is a ratio of the marks' own size, measured in world space so it holds across planes. **Row 1** (`gesture`: a scratch, counted against a solid's silhouette with core's own `countCrossings`) and **row 3** (`feature`: a closed mark on a solid's face, inside it) are P3's; **row 2 now also says what a profile is a profile OF** (P4, `against`), which is what turns an outline drawn over a solid into a diff rather than a second solid; row 6 (`path`) is P7's and still carries a comment saying so. **Row 8** (`elevation`: an open stroke whose two feet reach the ground) and row 2's **silhouette claim** (a closed stroke on any plane whose prism meets the footprint's) are push 2's G1, with `prismsMeet` — one exact separating axis — `viewLabelOf` (*34° · +24°*) and `hullableFrom` beside them |
 | `src/diff.ts` | **Pure, and where every diff threshold lives** (§4). The grid in plane units, the even–odd rasteriser, connected components, a region's outline (core's `trace` on the boundary pixels), `diffProfile` → coverage, missing and extra regions with their areas and their sentence, `overlapOf` (is this a profile OF that solid?), and `viewNameOf` (the foundation is the *top*, the height plane the *front*, the width plane the *side*). No three.js, so the arithmetic is pinned with no WebGL anywhere near it |
 | `src/silhouette.ts` | three.js, and the only part of the diff that needs a renderer. `silhouetteOnPlane(renderer, geometry, plane)` renders the body flat white on black through an **orthographic** camera looking along the plane's own normal into a small offscreen target, reads the pixels back as a mask, and hands the mask's **boundary** to core's `trace` for the outline in plane units. Plus `planeKey`, the cache key that deliberately ignores the offset along the normal |
 | `src/library.ts` | **Pure.** P6's whole rung: what a definition carries (each profile's fingerprint and the KIND of plane it lay on), `compareProfiles` — core's `matchPrimitiveFromLibrary` re-weighted for a question it does not ask — `matchLibraryDefinition` and `rankMatches` (plural, above a floor, each with the measurements it was scored on), `addProfileExample` (core's `correct` pattern at the profile rung), and `structuresFor`, which uses core's own structural signature only where it applies. **It knows no name**: it is handed definitions the hand has already named |
-| `src/op.ts` | **Pure.** The op tree (§2.4): the whole vocabulary as a type, `extrude`, `revolve`, `cut`, `boss`, `mirror`, `place` (a dup's copy, and P6's placement OF a definition), `match` and `massing` implemented, `placeDefinitionStep` and `placeFrames` — the pose of a placement, worked out from the two inks it names rather than held — the geometry parameters derived from the drawing (the direction, the signed depth, the axis as a world line, a cut's *through* and a boss's own short side), **the nesting** (`on`, `rootOf`, `withStep`, `depthsOf`), the tree as text and back, and the lathe profile as radius-and-height about the axis. No three.js |
+| `src/op.ts` | **Pure.** The op tree (§2.4): the whole vocabulary as a type, `extrude`, `revolve`, `cut`, `boss`, `mirror`, `place` (a dup's copy, and P6's placement OF a definition), `match`, `massing` and `hull` implemented (the hull is the massing on any planes; both ops stay so every tree ever written still reads, and one function derives both), `placeDefinitionStep` and `placeFrames` — the pose of a placement, worked out from the two inks it names rather than held — the geometry parameters derived from the drawing (the direction, the signed depth, the axis as a world line, a cut's *through* and a boss's own short side), **the nesting** (`on`, `rootOf`, `withStep`, `depthsOf`), the tree as text and back, and the lathe profile as radius-and-height about the axis. No three.js |
 | `src/csg.ts` | **The one seam, and the one library behind it** (§10). `subtract(a, b)`, `union(a, b)` and `intersect(a, b)` on `THREE.BufferGeometry`, over `three-bvh-csg` (pinned, with its peer `three-mesh-bvh`). Nothing else in the shard imports the library. **It never throws**: every result is `{ ok, geometry }` or `{ ok: false, error }` |
-| `src/solid.ts` | three.js. The mesh, **derived by WALKING the tree on every log change** (`deriveTree`) — `ExtrudeGeometry` and `LatheGeometry` for the leaves, the CSG seam for `cut` / `boss` / `mirror` / `match`, a plain merge for a `dup`'s disjoint copy; a quiet lit material from the tokens, `hardEdges` (the creases only, never the triangulation), the picking, `facesAt` (the faces under the pen as a plane plus the face's own corners, which is what a `face` candidate anchors on), `spanAlong` (what a cut goes THROUGH), `silhouetteOf` (the hull a scratch is counted against), `silhouetteOn` (the orthographic picture the diff reads, cached) and `brokenOf`. `deriveTree` takes a **`DeriveContext`** — `inkOf` and `silhouetteOf` — because a `match` step stores nothing derived and has to ask |
+| `src/solid.ts` | three.js. The mesh, **derived by WALKING the tree on every log change** (`deriveTree`) — `ExtrudeGeometry` and `LatheGeometry` for the leaves, the CSG seam for `cut` / `boss` / `mirror` / `match`, `hullBody` for `massing` and `hull` alike (each claim grown through the span of the **others** — never its own points — so a hull stands in the volume its claims define), a plain merge for a `dup`'s disjoint copy; a quiet lit material from the tokens, `hardEdges` (the creases only, never the triangulation), the picking, `facesAt` (the faces under the pen as a plane plus the face's own corners, which is what a `face` candidate anchors on), `spanAlong` (what a cut goes THROUGH), `silhouetteOf` (the hull a scratch is counted against), `silhouetteOn` (the orthographic picture the diff reads, cached) and `brokenOf`. `deriveTree` takes a **`DeriveContext`** — `inkOf` and `silhouetteOf` — because a `match` step stores nothing derived and has to ask |
 | `src/selection.ts` | Selection by default (§7): one thing at a time, a teal cage around a solid, and a diff region outlined on its own plane while its chip is hovered. Runtime state, never the log's |
 | `src/field.ts` | One input, one reader. `readField(text, ctx)` returns *what Enter will do*; the verbs and their reasons are handed in, so the reader knows nothing about the DOM. Thirteen verbs now — `extrude`, `revolve`, `cut`, `boss`, `add`, `takeoff`, `mirror`, `dup`, `remove`, `regen`, `take`, and P6's `place` and `reject` (*Not a mug*) — each with its aliases in one table |
 | `src/panel.ts` | **Hidden by default** (`panelShown` / `setPanelShown`, the key `shard.panel`, and `createPanelToggle` — the canvas's *details ▾* ported from `Demos/surface/00-core.js`: a `panelHidden` class on the body, remembered per device, and the rows still built and still in the DOM while it is down, so `panelText()` and every assertion on it are the same either way). `selectionLine` is what the status line says in its place — the selection's name and the next act, in the field's own words. Then the rows and the status line — and `pinnedViews`, still read off the log here though the chips are drawn in the corner — including *plays*, ***could be*** (P6: what the library says this outline is, ranked, in the engine's name), *solid* — the latter showing the tree **nested** (`↳ cut · through · from stroke:5` under `extrude · depth 2.40 u`) and a *broken* row with the seam's own words when a derivation did not come off — and ***matches the drawing***: one block per plane a profile of the selected solid was drawn on, with the coverage, the sentence, which outline it read, and a chip per region |
@@ -307,7 +328,7 @@ there is no bundle to drift.
 | `mcp.mjs` | **The hand, and the seat**, over MCP on stdio — newline-delimited JSON-RPC written by hand, so the repo takes no dependency, importing the committed Node bundle beside `Demos/mcp.mjs`. Six tools: `space_look`, `space_pending`, `space_answer`, `space_draw`, `space_propose`, `space_say`. Its one duplication is named where it stands: the three named planes and the `plane` rep, because this process cannot import the shard's TypeScript |
 | `mcp-smoke.mjs` | The stdio test, in CI's `shard` job: a relay on a **free port**, a second hand in Node as the tab, and the whole round trip — look, draw, park, list, answer, refuse, say |
 | `src/work.ts` | A model at work, shown **where it works**: a breathing `--sig-model` dot with the model's name and its task above the solid, the elapsed time after a few seconds, *Esc stops it* after thirty, and one `AbortSignal` per call so Esc really does |
-| `e2e.js` | The whole loop through the real pointer path — **111 steps, P0 → P6, the compass, the panel's toggle, trackpad and touch, the axis views, and G0's five: the log out and back in, a brief with nothing standing, a brief with nothing selected, the massing standing first, and `?fixture=`** — and, beside it, `__demo()`: the two-minute demo of §9 in eleven asserted steps, with a timing on each 5's hand in the room** — and, beside it, `__demo()`: the two-minute demo of §9 in eleven asserted steps, with a timing on each |
+| `e2e.js` | The whole loop through the real pointer path — **114 steps, P0 → P6, the compass, the panel's toggle, trackpad and touch, the axis views, push 2’s hull (the view plane where you are looking, a ⊓ from a free view standing a hull at tier 1, a second one narrowing it, and undo), and G0's five: the log out and back in, a brief with nothing standing, a brief with nothing selected, the massing standing first, and `?fixture=`** — and, beside it, `__demo()`: the two-minute demo of §9 in eleven asserted steps, with a timing on each 5's hand in the room** — and, beside it, `__demo()`: the two-minute demo of §9 in eleven asserted steps, with a timing on each |
 | `build-standalone.mjs` | **One file.** Runs `npm run build` (which typechecks first), then inlines every asset Vite emitted — the bundle as one inline module, the stylesheet as one `<style>` — into `dist/shard-3d.html`, and refuses to write a page that still points at anything that would not travel with it. The font `@import` stays external, because the tokens name a fallback stack and a face is not worth trebling the file for |
 
 ## The design decision: how a solid is held in the log
@@ -711,6 +732,68 @@ The field says which of the three Enter will be **before it is pressed** —
 *↵ a brief → asks glm — the massing stands first*, or *— nothing stands to fill;
 it will say what is missing* — and it asks the same function `runBrief` acts on,
 so the line and the act cannot disagree.
+
+## The hull: every free stroke is a silhouette claim (push 2, G1)
+
+The massing wants the three world planes. John's first real drawing had none of
+them: a rough footprint on the floor, then towers as **⊓ from wherever he
+stood**. Every one of those ⊓ fell through the form table to `annotation`, so
+nothing stood, and a brief with nothing to fill went nowhere. The generalisation
+is the **visual hull**, which is what those marks always were.
+
+A stroke on a view plane was drawn looking along that plane's normal: it says
+*from here, the outline is this*. Two rules turn a sketch into claims
+(`src/form.ts`):
+
+- **An open stroke closes on the ground.** A ⊓ whose two feet reach the
+  foundation's height — within `FEET_ON_GROUND` of the stroke's own size, and
+  rising `ELEVATION_RISE` of it above the floor — is the silhouette of a thing
+  standing on the ground, and the ground is its fourth side. That is the new
+  role, **`elevation`**, row 8 of the table; the vocabulary grew by a release,
+  which is the only way §2.6 lets a closed rung grow. A ⊓ that **floats** stays
+  an `annotation` and the panel says why — *its feet do not reach the ground,
+  the higher one stands 0.20 u off it (18% of its own size, over 15%)* — which
+  is §5's open question, settled the way the plan proposed.
+- **A closed stroke is a silhouette when its prism meets the footprint's.** Row
+  2 reads it as a `profile` still, with *a claim from 34° · +24°* — which view
+  it was drawn from, in the same two numbers the pinned-view chips use. A loop
+  that meets nothing is not refused: it says so (*its prism misses stroke:1's
+  by 3.40 u — two drawings of two things*).
+
+**Whether two prisms meet is one axis, exactly.** Each prism is convex and
+unbounded along its own normal, so a plane that separates them must contain
+*both* normals — which leaves one candidate direction, `nA × nB`. Project both
+outlines onto it and the intervals either overlap or they do not (`prismsMeet`).
+No sampling, no solver, and two views from the same direction come back as *the
+same view*, which is not a claim about anything.
+
+**The hull stands the moment the second claim lands** — a footprint and one
+elevation, or two elevations from different directions — in the engine's name,
+at tier 1, and each claim after that is a **new version of its one step**, so
+one undo takes back exactly the claim that was drawn (`log.hullable()`,
+`log.hull()`; `log.hull` is also the seam G0's `standFor` calls, so a brief
+typed at a sketch can stand the hull before it asks). Claims are capped at
+`MAX_CLAIMS` and the rest are said.
+
+**And the hull stands in the volume its claims define.** Each claim's prism runs
+through the span of the **others'** world points along its own normal, never its
+own — a footprint's own points all sit at y = 0, and reading them into its own
+vertical span is exactly how the ground gets into a body no claim's feet reach.
+The footprint runs from the ground up to the tallest claim; everything else is
+bounded by what the other claims say. So two loops drawn a unit above the floor
+make a hull a unit above the floor, and the ground bounds a hull only where a
+claim's feet reach it. (Measured, not assumed: `hull.test.ts` rebuilds John's
+own three profiles from the exported fixture and derives the massing headless.
+It came out at y 0.97–3.09 — **the massing was never in the floor**; the free
+*ink* was, and that is the view-anchor rule above.)
+
+**`massing` and `hull` are two doors on one derivation.** Both ops stay in the
+vocabulary — every tree ever written still reads, and DATA-1's validator has a
+row for each — and `hullBody` in `solid.ts` derives both. The massing is the
+hull of three axis claims; `hullableFrom` returns null for a drawing the massing
+path already takes, so one drawing never stands twice. A hull bounds a model's
+proposal exactly as a massing does: §6's extent invariant names whichever of the
+two stood the volume up.
 
 ## The brief, and what it will not say
 

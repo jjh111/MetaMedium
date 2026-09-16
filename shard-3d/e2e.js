@@ -668,20 +668,25 @@
     assert(m.plane.source === 'view', `the plane was read as ${m.plane.source}, not view`);
     assert(m.pose, 'the view ink kept no pose');
     assert(m.opacity === 1, `view ink is drawn at ${m.opacity} — it should be opaque like any other mark`);
-    // The plane passes through the CURSOR, which has not been moved, so it
-    // stands at the world origin — not at the depth of anything under the pen.
+    // The plane passes through the volume the hand is working in — the centre
+    // of the view, until a shift + click places a cursor (push 2, G1). Nothing
+    // has moved the camera off the origin here, so that is where it stands;
+    // what matters is that it is not the depth of the thing under the pen.
     const c = S().cursor();
-    assert(c.at.x === 0 && c.at.y === 0 && c.at.z === 0, `the cursor is at ${JSON.stringify(c.at)}`);
+    assert(/centre of the view/.test(c.why), `the cursor says "${c.why}"`);
+    assert(Math.abs(c.at.x) < 1e-6 && Math.abs(c.at.y) < 1e-6 && Math.abs(c.at.z) < 1e-6, `the centre of the view is at ${JSON.stringify(c.at)}`);
     assert(
-      m.plane.origin.x === 0 && m.plane.origin.y === 0 && m.plane.origin.z === 0,
-      `the view plane passes through ${JSON.stringify(m.plane.origin)}, not the cursor`
+      Math.abs(m.plane.origin.x - c.at.x) < 1e-6 &&
+        Math.abs(m.plane.origin.y - c.at.y) < 1e-6 &&
+        Math.abs(m.plane.origin.z - c.at.z) < 1e-6,
+      `the view plane passes through ${JSON.stringify(m.plane.origin)}, not through ${JSON.stringify(c.at)}`
     );
-    assert(/through the cursor/.test(m.plane.why), `the plane's reason was "${m.plane.why}"`);
+    assert(/centre of the view/.test(m.plane.why), `the plane's reason was "${m.plane.why}"`);
     const pinned = S().pinned();
     assert(pinned.length === 1, `${pinned.length} pinned views, expected 1`);
     assert(pinned[0].count === 1, `the pinned view holds ${pinned[0].count} strokes`);
     const status = S().state().status;
-    assert(/view · through the cursor/.test(status), `the status said "${status}"`);
+    assert(/view · through the centre of the view/.test(status), `the status said "${status}"`);
     return { source: m.plane.source, why: m.plane.why, cursor: c.at, pinned, status, top: m.readings[0] && m.readings[0].label };
   });
 
@@ -835,7 +840,8 @@
       Math.abs(m.plane.origin.y - BOX.top) < 0.01,
       `the view plane passes through y=${m.plane.origin.y}, not the cursor at ${BOX.top}`
     );
-    assert(/through the cursor/.test(m.plane.why), `the plane's reason was "${m.plane.why}"`);
+    // A PLACED cursor sticks: the plane says so, in the words the status uses.
+    assert(/through the placed cursor/.test(m.plane.why), `the plane's reason was "${m.plane.why}"`);
     S().undo();
     assert(S().state().marks.length === marksBefore, 'the undo did not take the stroke back');
     return { cursor: got.at, why: got.why, planeOrigin: m.plane.origin };
@@ -2898,6 +2904,181 @@
     assert(/courtyard, not a keep/.test(S().state().status), `the status said "${S().state().status}"`);
     assert(/claude/.test(S().state().status), `it does not say whose: "${S().state().status}"`);
     return { status: S().state().status };
+  });
+
+  // ---- push 2, G1: the sketch hull, and the view plane where you are looking
+  //
+  // What John's first board did, through the real UI: a footprint on the
+  // foundation, then a tower drawn as a ⊓ from a free view with its feet on
+  // the ground. Two claims are a hull, at tier 1, with no model — and a second
+  // ⊓ from another view narrows it.
+
+  step('the view plane stands where you are LOOKING, not at the world origin', () => {
+    S().clear();
+    S().view('free');
+    S().choose(null);
+    // Look somewhere well above the floor. The cursor FOLLOWS the centre of the
+    // view until it is placed, so the plane goes with it — which is the whole
+    // of push 2's first fault: John's four free loops all landed at floor level
+    // because the cursor had never left (0, 0, 0) while he looked up.
+    S().pan(0, 200);
+    const anchor = S().cursor();
+    assert(/centre of the view/.test(anchor.why), `the cursor says "${anchor.why}"`);
+    assert(anchor.at.y > 0.8, `the centre of the view is at y ${anchor.at.y.toFixed(2)} — the pan did not raise it`);
+
+    const at = S().screenForWorld(anchor.at);
+    const ring = [];
+    for (let i = 0; i <= 48; i++) {
+      const t = (i / 48) * Math.PI * 2;
+      ring.push({ x: at.x + Math.cos(t) * 90, y: at.y + Math.sin(t) * 65 });
+    }
+    const loop = S().strokeScreen(ring);
+    assert(loop, 'the free loop was not drawn');
+    const m = markOf(loop);
+    assert(m.plane.source === 'view', `it landed on ${m.plane.source}, not the view plane`);
+    assert(Math.abs(m.plane.origin.y - anchor.at.y) < 1e-6, `the view plane passes through y ${m.plane.origin.y}`);
+    assert(/centre of the view/.test(m.plane.why), `the plane's reason was "${m.plane.why}"`);
+
+    const ys = S().worldPointsOf(loop).map((p) => p.y);
+    const mid = (Math.min(...ys) + Math.max(...ys)) / 2;
+    assert(
+      Math.abs(mid - anchor.at.y) < 0.2,
+      `the loop's middle is at y ${mid.toFixed(2)} and the hand was looking at y ${anchor.at.y.toFixed(2)}`
+    );
+    assert(mid > 0.8, `the loop landed at y ${mid.toFixed(2)} — in the floor, which is the fault push 2 names`);
+    assert(/through the centre of the view/.test(S().state().status), `the status said "${S().state().status}"`);
+    S().clear();
+    return { anchor: +anchor.at.y.toFixed(2), ink: +mid.toFixed(2), plane: m.plane.source };
+  });
+
+  /**
+   * The GROUND LINE of the view plane, on screen.
+   *
+   * The view plane stands through the centre of the view and faces the camera,
+   * and the shard's camera has no roll — so the screen row through that point
+   * IS the set of plane points at the anchor's own height. Frame the board
+   * first and the anchor sits on the ground, which is where a tower's feet go.
+   */
+  const groundLine = () => S().screenForWorld(S().cursor().at);
+
+  /** A ⊓ in screen pixels: up, across, down — its feet on the ground line. */
+  function towerPath(centre, halfWidth, tall, per = 12) {
+    const run = (a, b) => {
+      const out = [];
+      for (let i = 0; i <= per; i++) {
+        const t = i / per;
+        out.push({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t });
+      }
+      return out;
+    };
+    const left = { x: centre.x - halfWidth, y: centre.y };
+    const right = { x: centre.x + halfWidth, y: centre.y };
+    const upL = { x: left.x, y: centre.y - tall };
+    const upR = { x: right.x, y: centre.y - tall };
+    return [...run(left, upL), ...run(upL, upR), ...run(upR, right)];
+  }
+
+  /**
+   * How wide the standing body is along one axis, measured the honest way:
+   * rays fired straight down through a row of points. The board's own bounds
+   * take in the ink as well, and the ink does not narrow.
+   */
+  function bodyWidth(axis) {
+    let lo = Infinity;
+    let hi = -Infinity;
+    for (let t = -3; t <= 3; t += 0.1) {
+      const at = axis === 'x' ? { x: t, z: 0 } : { x: 0, z: t };
+      if (!S().rayDown(at)) continue;
+      lo = Math.min(lo, t);
+      hi = Math.max(hi, t);
+    }
+    return hi > lo ? hi - lo : 0;
+  }
+
+  let hullId = null;
+
+  step('a footprint and a ⊓ from a free view stand a HULL, at tier 1', () => {
+    S().clear();
+    S().view('free');
+    S().choose('foundation');
+    const plan = S().strokeScreen(onScreen(rectPath(-2, -2, 4, 4)));
+    assert(plan, 'the footprint was not drawn');
+    assert(S().state().solids.length === 0, 'a lone footprint stood something up');
+
+    // Frame it, then drop the eye to a sketching angle. From overhead the
+    // foundation is the most face-on plane there is and free ink lands on it,
+    // which is right — and is not an elevation.
+    S().nav.home(0);
+    S().orbit(0.5, -0.75);
+    S().choose(null);
+
+    const at = groundLine();
+    const tower = S().strokeScreen(towerPath(at, 70, 170));
+    assert(tower, 'the tower was not drawn');
+    const read = markOf(tower);
+    assert(read.plane.source === 'view', `the ⊓ landed on ${read.plane.source}, not the view plane`);
+    const feet = S().worldPointsOf(tower);
+    assert(Math.abs(feet[0].y) < 0.35, `its first foot is at y ${feet[0].y.toFixed(2)}, not on the ground`);
+    assert(Math.abs(feet[feet.length - 1].y) < 0.35, `its last foot is at y ${feet[feet.length - 1].y.toFixed(2)}`);
+    assert(read.plays && read.plays.role === 'elevation', `the ⊓ plays ${read.plays && read.plays.role}, expected elevation`);
+    assert(/feet both reach the ground/.test(read.plays.reasoning), `it says "${read.plays.reasoning}"`);
+    assert(/closed on the ground/.test(read.plays.reasoning), `it says "${read.plays.reasoning}"`);
+
+    const solids = S().solids();
+    assert(solids.length === 1, `${solids.length} solids, expected the hull`);
+    hullId = solids[0].id;
+    assert(solids[0].name === 'hull', `it is called ${solids[0].name}`);
+    assert(solids[0].named === 'engine', `it was named by ${solids[0].named}`);
+    assert(solids[0].broken === null, `the derivation broke: ${solids[0].broken}`);
+    const hull = solids[0].steps.find((st) => st.op === 'hull');
+    assert(hull, `the steps are ${solids[0].steps.map((st) => st.op).join(', ')}`);
+    assert(hull.from.length === 2, `the hull references ${hull.from.length} claims, expected 2`);
+    assert(/tier 1/.test(S().state().status), `the status said "${S().state().status}"`);
+    assert(/hull from 2 claims/.test(S().state().status), `the status said "${S().state().status}"`);
+    // Tier 1 means no model was ASKED. (A stub is still seated from the P5
+    // steps above — seating one is not asking it, and the hull never does.)
+    assert(S().models().working.length === 0, 'a model was asked by drawing');
+    // Ink is never covered.
+    assert(S().state().marks.length === 2, `${S().state().marks.length} marks left on the board`);
+    // It stands ON the ground, because both feet of the claim reach it.
+    const down = S().rayDown({ x: 0, z: 0 });
+    assert(down && down.solidId === hullId, 'nothing stands over the middle of the footprint');
+    return { solid: hullId, status: S().state().status, role: read.plays.role, from: read.plays.reasoning.slice(0, 60) };
+  });
+
+  step('a second ⊓ from another view goes INTO the hull, and narrows it', () => {
+    const wide = Math.max(bodyWidth('x'), bodyWidth('z'));
+    assert(wide > 0.5, `nothing stands to narrow — the body measures ${wide.toFixed(2)}`);
+
+    S().orbit(1.3, 0);
+    const at = groundLine();
+    // Drawn AROUND the body: the pen goes down on open ground, so the plane is
+    // read as the view rather than as the face the ray met. A claim that starts
+    // on the body is ink on that face, which is P3's rule and still right.
+    const narrow = S().strokeScreen(towerPath(at, 95, 150));
+    assert(narrow, 'the second tower was not drawn');
+    const read = markOf(narrow);
+    assert(read.plays && read.plays.role === 'elevation', `the second ⊓ plays ${read.plays && read.plays.role} (${read.plane.source})`);
+
+    const solids = S().solids();
+    assert(solids.length === 1, `${solids.length} solids — the second claim stood a second thing`);
+    assert(solids[0].id === hullId, 'the claim stood a new hull instead of going into the one that stands');
+    const hull = solids[0].steps.find((st) => st.op === 'hull');
+    assert(hull.from.length === 3, `the hull references ${hull.from.length} claims, expected 3`);
+    assert(/went into it/.test(S().state().status), `the status said "${S().state().status}"`);
+
+    const tight = Math.max(bodyWidth('x'), bodyWidth('z'));
+    assert(tight < wide - 0.2, `the hull is ${tight.toFixed(2)} across and was ${wide.toFixed(2)} — it did not narrow`);
+
+    // One undo is one act: the claim's contribution goes, the hull stays, and
+    // the ink stays too — it always does.
+    S().undo();
+    const back = S().solids();
+    assert(back.length === 1, `${back.length} solids after the undo`);
+    assert(back[0].steps.find((st) => st.op === 'hull').from.length === 2, 'the undo did not take the claim back out');
+    assert(S().state().marks.length === 3, `${S().state().marks.length} marks — the ink went with the undo`);
+    S().clear();
+    return { wide: +wide.toFixed(2), tight: +tight.toFixed(2) };
   });
 
   // ---- the runner ----------------------------------------------------------
