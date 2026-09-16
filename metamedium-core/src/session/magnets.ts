@@ -11,6 +11,38 @@
 // deterministic and the log stays the only source. A mark with no confident
 // reading still offers its bounds' corners and centre, from its own ink:
 // an offer, never a lie about shape.
+//
+// ===== The binding contract (BIND-1, 16 Sep 2026) =====
+//
+// A bind is a claim about ONE END of a stroke. The contract, decided here so
+// that the edge query and the rep query can agree:
+//
+//   ONE `bound-to` EDGE PER ENDPOINT. The edge carries `end` ('start' |
+//   'end') and the `site` it sits on, and its `reasoning` is that one
+//   endpoint's reason. The `'bound'` rep beside it carries the same payload
+//   — `{ end, nodeId, site }` — and the two are kept in lockstep by
+//   `applyBind`. The ENDPOINT identifies the claim; the target never does.
+//
+// Not one edge carrying every endpoint, because an edge in this graph is one
+// claim with one reason, and two endpoints are two claims: the bug being
+// fixed is precisely that a single edge could only say one of them. Binding
+// both ends of a stroke to two sites on the same rectangle left two reps and
+// one edge, reading "its end was released on middle 2" — the start binding
+// gone. Removal is by `end`, so re-binding one end moves that claim alone.
+//
+// The `bind` EVENT is unchanged from magnets P1, which is the whole backward
+// compatibility story: a P1 log replays into the new representation with no
+// migration, because the event always carried the endpoint — only the derived
+// graph was dropping it.
+//
+// ACTIVE versus HISTORICAL. Erasing a mark does not destroy the claims made
+// about it: ink is never destroyed and neither is provenance, so the edge and
+// the rep stay, and undoing the erase makes the claim an anchor again for
+// free (state is a pure function of the log; the tombstone goes with the
+// event). But a consumer asking where a stroke is ANCHORED — P3's "bindings
+// that follow" above all — must never be handed a tombstone. So every
+// binding reads `active`, false when its target is erased or no longer in
+// the graph, and `activeBindingsOf` is the query that re-anchoring uses.
 
 import type { Point } from '../types';
 import type { MMNode } from './nodes';
@@ -198,4 +230,118 @@ export function magnetsNear(
 export function describeMagnet(site: MagnetSite): string {
   const r = (v: number) => Math.round(v);
   return `${site.reasoning} at (${r(site.point.x)}, ${r(site.point.y)})`;
+}
+
+// ===== The binding graph =====
+// What a stroke's ends are tied to. See the contract in this file's header.
+
+/** Where one end of a stroke was released, and whether that anchor still stands. */
+export interface Binding {
+  /** The stroke whose end this is. */
+  strokeId: string;
+  /** Which end of it: 'start' | 'end'. */
+  end: string;
+  /** The mark it was released on. */
+  nodeId: string;
+  /** The site on that mark — re-derive its point with `magnetSites`. */
+  site: { kind: string; index: number };
+  /** Whose hand or model made the claim. */
+  via?: string;
+  /** Why, in the terms it was measured in. */
+  reasoning?: string;
+  /**
+   * False when the target has been erased or is not in the graph at all: the
+   * claim is history, not an anchor. True when no graph was given to check
+   * against — pass `nodes`, or use `activeBindingsOf`, whenever it matters.
+   */
+  active: boolean;
+}
+
+/** The payload of a `'bound'` rep — the rep half of the contract. */
+export interface BoundRep {
+  end: string;
+  nodeId: string;
+  site: { kind: string; index: number };
+}
+
+function onTheBoard(nodeId: string, nodes?: ReadonlyMap<string, MMNode>): boolean {
+  if (!nodes) return true;
+  const n = nodes.get(nodeId);
+  return !!n && !getRep(n, 'erased');
+}
+
+/**
+ * Every binding this mark's ends carry, historical ones included, read from
+ * the edges — the canonical half of the contract. Pass `nodes` to have each
+ * one say whether its target still stands.
+ */
+export function bindingsOf(node: MMNode, nodes?: ReadonlyMap<string, MMNode>): Binding[] {
+  const out: Binding[] = [];
+  for (const e of node.edges) {
+    // A `bound-to` edge always carries both, because applyBind is the only
+    // thing that writes one; anything else is not a binding.
+    if (e.rel !== 'bound-to' || typeof e.end !== 'string' || !e.site) continue;
+    out.push({
+      strokeId: node.id,
+      end: e.end,
+      nodeId: e.to,
+      site: e.site,
+      via: e.via,
+      reasoning: e.reasoning,
+      active: onTheBoard(e.to, nodes),
+    });
+  }
+  return out;
+}
+
+/** The same claims read from the `'bound'` reps — the two must agree. */
+export function boundRepsOf(node: MMNode): BoundRep[] {
+  return node.reps.filter((r) => r.modality === 'bound').map((r) => r.data as BoundRep);
+}
+
+/**
+ * Where this stroke is actually ANCHORED now: bindings whose target is still
+ * on the board. This is the query re-anchoring asks (CONTROL-POINTS-PLAN P3)
+ * — a tombstoned target is never an anchor, and undoing the erase brings the
+ * binding back here on its own.
+ */
+export function activeBindingsOf(node: MMNode, nodes: ReadonlyMap<string, MMNode>): Binding[] {
+  return bindingsOf(node, nodes).filter((b) => b.active);
+}
+
+/**
+ * What hangs off this mark: the bindings pointing AT `nodeId` from `ids`,
+ * one per endpoint — so a connector tied to it at both ends is counted
+ * twice, once for each end, which is what a mark carrying its arrows needs.
+ * With `{ active: true }`, erased strokes and an erased target are left out.
+ *
+ * `ids` is the set to scan, and which set depends on the question: pass
+ * `contentIds` for what hangs off this mark NOW (P3's re-anchoring), and
+ * every node id for the history, because an erased mark leaves the content
+ * plane while its claims stay in the graph.
+ */
+export function boundToMark(
+  nodeId: string,
+  nodes: ReadonlyMap<string, MMNode>,
+  ids: readonly string[],
+  opts: { active?: boolean } = {},
+): Binding[] {
+  if (opts.active && !onTheBoard(nodeId, nodes)) return [];
+  const out: Binding[] = [];
+  for (const id of ids) {
+    const n = nodes.get(id);
+    if (!n || (opts.active && getRep(n, 'erased'))) continue;
+    for (const b of bindingsOf(n, nodes)) {
+      if (b.nodeId !== nodeId) continue;
+      if (opts.active && !b.active) continue;
+      out.push(b);
+    }
+  }
+  return out;
+}
+
+/** One line for a status line or a brief: "its start on corner 0 of stroke:1". */
+export function describeBinding(b: Binding): string {
+  const where = `its ${b.end} on ${b.site.kind} ${b.site.index} of ${b.nodeId}`;
+  return b.active ? where : `${where} — erased since`;
 }

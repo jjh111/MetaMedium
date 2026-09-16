@@ -82,6 +82,7 @@ var MetaMediumCore = (() => {
     WORD_GAP_RATIO: () => WORD_GAP_RATIO,
     WORD_WINDOW_MS: () => WORD_WINDOW_MS,
     aboutIdsOf: () => aboutIdsOf,
+    activeBindingsOf: () => activeBindingsOf,
     addExample: () => addExample,
     addressablesOf: () => addressablesOf,
     alongSegment: () => alongSegment,
@@ -94,7 +95,10 @@ var MetaMediumCore = (() => {
     behavioursOf: () => behavioursOf,
     between: () => between,
     binarize: () => binarize,
+    bindingsOf: () => bindingsOf,
     blessedBehaviourOf: () => blessedBehaviourOf,
+    boundRepsOf: () => boundRepsOf,
+    boundToMark: () => boundToMark,
     boundingBoxDistance: () => boundingBoxDistance,
     boundsContain: () => boundsContain,
     boundsOf: () => boundsOf,
@@ -133,6 +137,7 @@ var MetaMediumCore = (() => {
     denoise: () => denoise,
     describeAddressed: () => describeAddressed,
     describeBehaviour: () => describeBehaviour,
+    describeBinding: () => describeBinding,
     describeFrame: () => describeFrame,
     describeGraph: () => describeGraph,
     describeLayout: () => describeLayout,
@@ -1772,6 +1777,51 @@ var MetaMediumCore = (() => {
   function describeMagnet(site) {
     const r = (v) => Math.round(v);
     return `${site.reasoning} at (${r(site.point.x)}, ${r(site.point.y)})`;
+  }
+  function onTheBoard(nodeId, nodes) {
+    if (!nodes) return true;
+    const n2 = nodes.get(nodeId);
+    return !!n2 && !getRep(n2, "erased");
+  }
+  function bindingsOf(node, nodes) {
+    const out = [];
+    for (const e of node.edges) {
+      if (e.rel !== "bound-to" || typeof e.end !== "string" || !e.site) continue;
+      out.push({
+        strokeId: node.id,
+        end: e.end,
+        nodeId: e.to,
+        site: e.site,
+        via: e.via,
+        reasoning: e.reasoning,
+        active: onTheBoard(e.to, nodes)
+      });
+    }
+    return out;
+  }
+  function boundRepsOf(node) {
+    return node.reps.filter((r) => r.modality === "bound").map((r) => r.data);
+  }
+  function activeBindingsOf(node, nodes) {
+    return bindingsOf(node, nodes).filter((b) => b.active);
+  }
+  function boundToMark(nodeId, nodes, ids, opts = {}) {
+    if (opts.active && !onTheBoard(nodeId, nodes)) return [];
+    const out = [];
+    for (const id of ids) {
+      const n2 = nodes.get(id);
+      if (!n2 || opts.active && getRep(n2, "erased")) continue;
+      for (const b of bindingsOf(n2, nodes)) {
+        if (b.nodeId !== nodeId) continue;
+        if (opts.active && !b.active) continue;
+        out.push(b);
+      }
+    }
+    return out;
+  }
+  function describeBinding(b) {
+    const where = `its ${b.end} on ${b.site.kind} ${b.site.index} of ${b.nodeId}`;
+    return b.active ? where : `${where} \u2014 erased since`;
   }
 
   // src/session/words.ts
@@ -5680,21 +5730,23 @@ ${pad}</${tag}>`;
       const stroke = nodes.get(ev.strokeId);
       const target = nodes.get(ev.nodeId);
       if (!stroke || !target || ev.strokeId === ev.nodeId) return;
-      const prev = stroke.reps.find((r) => r.modality === "bound" && r.data.end === ev.end);
-      const prevTarget = prev?.data?.nodeId;
-      stroke.edges = stroke.edges.filter((e) => !(e.rel === "bound-to" && (e.to === ev.nodeId || e.to === prevTarget)));
+      const by = ev.participantId ?? LOCAL_PARTICIPANT;
+      const site = { kind: ev.site.kind, index: ev.site.index };
+      stroke.edges = stroke.edges.filter((e) => !(e.rel === "bound-to" && e.end === ev.end));
       stroke.edges.push({
         to: ev.nodeId,
         rel: "bound-to",
         blessed: true,
-        via: ev.participantId ?? LOCAL_PARTICIPANT,
+        via: by,
+        end: ev.end,
+        site,
         reasoning: `its ${ev.end} was released on ${ev.site.kind} ${ev.site.index} of this mark`
       });
       stroke.reps = stroke.reps.filter((r) => !(r.modality === "bound" && r.data.end === ev.end));
       stroke.reps.push({
         modality: "bound",
-        data: { end: ev.end, nodeId: ev.nodeId, site: ev.site },
-        source: ev.participantId ?? LOCAL_PARTICIPANT
+        data: { end: ev.end, nodeId: ev.nodeId, site: { ...site } },
+        source: by
       });
     }
     function wordBounds(letterIds) {

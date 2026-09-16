@@ -18,12 +18,22 @@ export interface Rep {
 
 export interface Edge {
   to: string;
-  rel: string; // 'resembles' | 'part-of' | 'has-part' | 'instance-of' | 'blessed-by' | 'touching' | 'intersecting' | 'contains' | 'connects' | ...
+  rel: string; // 'resembles' | 'part-of' | 'has-part' | 'instance-of' | 'blessed-by' | 'touching' | 'intersecting' | 'contains' | 'connects' | 'bound-to' | ...
   weight?: number;
   blessed?: boolean; // inferred (absent/false) vs blessed (true)
   via?: string;
   /** Grounded justification for this claim — the substance behind "why?". */
   reasoning?: string;
+  /**
+   * Which END of this mark the claim is about, when it is about one end
+   * rather than the whole mark (`bound-to`; magnets.ts). Two ends of one
+   * stroke may land on two sites of the SAME mark, so the endpoint — not the
+   * target — is what identifies the claim: removing by target lost one of
+   * them (DIRECTOR-REVIEW-2026-09-15, BIND-1).
+   */
+  end?: string;
+  /** Where on the target that end sits, when the edge is about an end. */
+  site?: { kind: string; index: number };
 }
 
 export interface MMNode {

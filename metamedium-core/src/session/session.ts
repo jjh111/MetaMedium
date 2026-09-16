@@ -1458,27 +1458,41 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     }
   }
 
-  /** A stroke's end tied to another mark's site: the edge is the claim, the rep keeps the payload. */
+  /**
+   * A stroke's END tied to another mark's site — one `bound-to` edge per
+   * endpoint, carrying that end and its site, with a `'bound'` rep alongside
+   * carrying the same payload (the contract is stated in magnets.ts).
+   *
+   * The ENDPOINT identifies the claim, never the target. Keying removal by
+   * target meant that binding both ends of one stroke to two sites on the
+   * same rectangle left two reps and one edge, whose reason described only
+   * the second end — the first claim was lost at the edge level
+   * (DIRECTOR-REVIEW-2026-09-15, BIND-1). Re-binding an end moves that one
+   * claim and leaves the other end exactly where it was.
+   */
   function applyBind(ev: Extract<SessionEvent, { type: 'bind' }>) {
     const stroke = nodes.get(ev.strokeId);
     const target = nodes.get(ev.nodeId);
     if (!stroke || !target || ev.strokeId === ev.nodeId) return;
-    // Re-binding an end MOVES the claim: the old target's edge goes with it.
-    const prev = stroke.reps.find((r) => r.modality === 'bound' && (r.data as { end?: string }).end === ev.end);
-    const prevTarget = (prev?.data as { nodeId?: string } | undefined)?.nodeId;
-    stroke.edges = stroke.edges.filter((e) => !(e.rel === 'bound-to' && (e.to === ev.nodeId || e.to === prevTarget)));
+    const by = ev.participantId ?? LOCAL_PARTICIPANT;
+    // The site is COPIED, not held: the log is the source, and a derived
+    // graph that aliases an event's object could write back into it.
+    const site = { kind: ev.site.kind, index: ev.site.index };
+    stroke.edges = stroke.edges.filter((e) => !(e.rel === 'bound-to' && e.end === ev.end));
     stroke.edges.push({
       to: ev.nodeId,
       rel: 'bound-to',
       blessed: true,
-      via: ev.participantId ?? LOCAL_PARTICIPANT,
+      via: by,
+      end: ev.end,
+      site,
       reasoning: `its ${ev.end} was released on ${ev.site.kind} ${ev.site.index} of this mark`,
     });
     stroke.reps = stroke.reps.filter((r) => !(r.modality === 'bound' && (r.data as { end?: string }).end === ev.end));
     stroke.reps.push({
       modality: 'bound',
-      data: { end: ev.end, nodeId: ev.nodeId, site: ev.site },
-      source: ev.participantId ?? LOCAL_PARTICIPANT,
+      data: { end: ev.end, nodeId: ev.nodeId, site: { ...site } },
+      source: by,
     });
   }
 
