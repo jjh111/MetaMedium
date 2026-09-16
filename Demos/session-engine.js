@@ -820,8 +820,10 @@
 
   function syncProviderFields() {
     const p = mpProvider.value;
-    mpEndpoint.hidden = p !== 'custom';
-    mpModel.placeholder = DEFAULT_MODEL[p] || 'model id';
+    mpEndpoint.hidden = p !== 'custom' && p !== 'mcp';
+    mpKey.hidden = p === 'mcp';
+    mpEndpoint.placeholder = p === 'mcp' ? 'http://127.0.0.1:8030 — the door (Demos/mcp-client.mjs)' : 'http://host:port/v1';
+    mpModel.placeholder = p === 'mcp' ? 'a name for it (optional)' : (DEFAULT_MODEL[p] || 'model id');
     mpKey.placeholder = p === 'custom' ? 'API key (if the endpoint needs one)' : 'API key';
   }
   mpProvider.onchange = syncProviderFields;
@@ -940,6 +942,7 @@
 
   document.getElementById('mpAdd').onclick = () => {
     const p = mpProvider.value;
+    if (p === 'mcp') { addMcp(); return; }
     const model = (mpModel.value || DEFAULT_MODEL[p] || '').trim();
     const key = mpKey.value.trim();
     if (!model) { mpStatus.textContent = 'Which model? Type its id.'; return; }
@@ -988,6 +991,140 @@
   }
 
   document.getElementById('mpDetect').onclick = () => { mpStatus.textContent = 'looking…'; probeLocal().then((s) => { mpStatus.textContent = s.length ? '' : 'Nothing answered.'; }); };
+
+  // ===== MCP: the door — an MCP server joins as a participant =================
+  // Bidirectional: Demos/mcp.mjs lets a client write to the board; this lets
+  // the board ask a server — a parsing method beside the local and hosted
+  // models. The bridge is Demos/mcp-client.mjs (the browser can spawn nothing,
+  // and most servers send no CORS headers). Three roles are mapped from the
+  // server's tools, and the contract each is called with:
+  //   read:   { brief, ids } — or { image, nodeId, brief } for handwriting —
+  //           answers JSON [{label, confidence, reasoning}] / [{text, confidence}]
+  //   answer: { question, ids, brief } → text, placed IN the canvas
+  //   draw:   { prompt, ids } → JSON { shapes, strokes, why? }
+  // A role with no tool answers gracefully that this participant does not do
+  // that — the field keeps working through the others.
+  function mcpAgent(endpoint, serverName, roles) {
+    const name = 'mcp:' + serverName;
+    const id = session.join('agent', name, Date.now(), 2, MM.providerLocality({ baseUrl: endpoint }));
+    const briefFor = (ids) => MM.describeSession(session.getState(), { nodeIds: ids });
+    const call = async (tool, args) => {
+      const res = await fetch(endpoint + '/call', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: tool, arguments: args }) });
+      const out = await res.json().catch(() => ({}));
+      if (!res.ok || out.error) throw new Error(out.error || 'HTTP ' + res.status);
+      if (out.isError) throw new Error(out.text || 'the tool said no');
+      return out;
+    };
+    // The first JSON value in the text, array or object — tolerant of a word around it.
+    const jsonBlock = (text) => {
+      const m = /(\[[\s\S]*\]|\{[\s\S]*\})/.exec(text || '');
+      if (!m) throw new Error('no JSON in the answer');
+      return JSON.parse(m[0]);
+    };
+    const slug = (s) => String(s).toLowerCase().replace(/\s+/g, '-');
+    return {
+      id: id, name: name, config: { kind: 'mcp', baseUrl: endpoint, model: serverName },
+      async interpret(ids, at) {
+        if (!roles.read) return { ok: false, readings: [], error: 'no read tool mapped' };
+        try {
+          const out = await call(roles.read, { brief: briefFor(ids), ids: ids });
+          const readings = jsonBlock(out.text).map((r) => ({ label: String(r.label || r.type || '?'), confidence: Math.max(0, Math.min(1, Number(r.confidence ?? 0.7))), reasoning: String(r.reasoning || 'read by ' + name) }));
+          const s = session.getState();
+          for (const nid of ids) {
+            if (!s.nodes.has(nid)) continue;
+            session.propose({ participantId: id, nodeId: nid, edges: readings.map((r) => ({ to: 'type:' + slug(r.label), rel: 'resembles', weight: r.confidence, reasoning: r.reasoning })), at: at });
+          }
+          return { ok: true, readings: readings };
+        } catch (err) { return { ok: false, readings: [], error: err.message }; }
+      },
+      async ask(question, ids, at) {
+        if (!roles.answer) return { ok: false, error: 'no answer tool mapped' };
+        try {
+          const out = await call(roles.answer, { question: question, ids: ids, brief: briefFor(ids) });
+          session.answer({ participantId: id, question: question, text: out.text, aboutIds: ids, at: at });
+          return { ok: true };
+        } catch (err) { return { ok: false, error: err.message }; }
+      },
+      async generate() { return { ok: false, error: 'an MCP participant reads, answers and draws; it does not write pages (yet)' }; },
+      async read(args) {
+        if (!roles.read) return { ok: false, transcripts: [], error: 'no read tool mapped' };
+        try {
+          const out = await call(roles.read, { image: args.image, nodeId: args.nodeId, brief: 'Read the handwriting in this ink.' });
+          const ts = jsonBlock(out.text).map((t) => ({ text: String(t.text || t), confidence: Number(t.confidence ?? 0.7) }));
+          if (args.hold !== false) session.propose({ participantId: id, nodeId: args.nodeId, edges: [], reps: ts.map((t) => ({ modality: 'transcript', data: { text: t.text }, confidence: t.confidence })), at: args.at });
+          return { ok: true, transcripts: ts };
+        } catch (err) { return { ok: false, transcripts: [], error: err.message }; }
+      },
+      async draw({ prompt, nodeIds, at }) {
+        if (!roles.draw) return { ok: false, ids: [], shapes: [], error: 'no draw tool mapped' };
+        try {
+          const out = await call(roles.draw, { prompt: prompt, ids: nodeIds });
+          const data = jsonBlock(out.text);
+          const made = [];
+          const shapes = Array.isArray(data.shapes) ? data.shapes : [];
+          for (const sh of MM.parseShapes(JSON.stringify(shapes))) { const pts = MM.strokeFor(sh); if (pts) made.push(session.addStroke(pts, at, id, 1, { content: true })); }
+          for (const st of (Array.isArray(data.strokes) ? data.strokes : [])) {
+            const pts = (Array.isArray(st) ? st : []).map((p) => ({ x: Number(p.x), y: Number(p.y) })).filter((p) => Number.isFinite(p.x) && Number.isFinite(p.y));
+            if (pts.length > 1) made.push(session.addStroke(pts, at, id, 1, { content: true }));
+          }
+          if (data.why && made.length) session.answer({ participantId: id, question: 'why', text: String(data.why), aboutIds: made, at: at });
+          return made.length
+            ? { ok: true, ids: made, shapes: shapes.map((s) => s.shape || '?') }
+            : { ok: false, ids: [], shapes: [], error: 'it drew nothing the canvas can read' };
+        } catch (err) { return { ok: false, ids: [], shapes: [], error: err.message }; }
+      },
+      async behave() { return { ok: false, error: 'no behaviour tool mapped' }; },
+    };
+  }
+
+  /** The likely tool for a role, by name — the hand's own verbs guess themselves. */
+  function guessTool(tools, words) {
+    const t = tools.find((t) => words.some((w) => t.name.toLowerCase().includes(w)));
+    return t ? t.name : '';
+  }
+
+  /** Connect to a door, show its tools with the three role pickers, and join on the hand's word. */
+  async function addMcp() {
+    const endpoint = mpEndpoint.value.trim().replace(/\/+$/, '');
+    if (!endpoint) { mpStatus.textContent = 'Where is the door? e.g. http://127.0.0.1:8030 — node Demos/mcp-client.mjs -- node server.mjs'; return; }
+    mpStatus.textContent = 'knocking…';
+    let server, tools;
+    try {
+      const res = await fetch(endpoint + '/tools', { signal: AbortSignal.timeout(8000) });
+      const out = await res.json().catch(() => ({}));
+      if (!res.ok || out.error) throw new Error(out.error || 'HTTP ' + res.status);
+      server = out.server || {}; tools = out.tools || [];
+    } catch (err) {
+      mpStatus.textContent = 'No answer — is the door running? (node Demos/mcp-client.mjs -- node server.mjs) ' + err.message;
+      return;
+    }
+    const name = (mpModel.value.trim() || server.name || 'server').replace(/\s+/g, '-');
+    const guess = {
+      read: guessTool(tools, ['propose', 'interpret', 'read', 'parse', 'transcribe']),
+      answer: guessTool(tools, ['say', 'answer', 'ask']),
+      draw: guessTool(tools, ['draw']),
+    };
+    let html = '<div class="server"><b>' + esc(server.name || name) + '</b><span>' + tools.length + ' tool' + (tools.length === 1 ? '' : 's') + '</span></div>';
+    if (!tools.length) { mpLocal.innerHTML = html + '<div class="note">no tools here — nothing to map</div>'; mpStatus.textContent = ''; return; }
+    for (const role of ['read', 'answer', 'draw']) {
+      html += '<div class="mpRow"><span class="k">' + role + '</span><select data-role="' + role + '"><option value="">— not offered</option>' +
+        tools.map((t) => '<option value="' + esc(t.name) + '"' + (guess[role] === t.name ? ' selected' : '') + '>' + esc(t.name) + '</option>').join('') + '</select></div>';
+    }
+    html += '<div class="mpRow"><button id="mcpJoin">join as mcp:' + esc(name) + '</button></div>';
+    html += '<div class="note">' + tools.map((t) => esc(t.name)).join(' · ') + '</div>';
+    mpLocal.innerHTML = html;
+    mpStatus.textContent = (server.name || 'The server') + ' answered — map its tools, then join.';
+    mpLocal.querySelector('#mcpJoin').onclick = () => {
+      const roles = {};
+      mpLocal.querySelectorAll('select[data-role]').forEach((sel) => { roles[sel.dataset.role] = sel.value || null; });
+      const agent = mcpAgent(endpoint, name, roles);
+      agents.push(agent);
+      mpStatus.textContent = agent.name + ' joined (' + Object.values(roles).filter(Boolean).length + ' of 3 roles mapped).';
+      renderAgents();
+      syncTiles();
+      render(session.getState());
+    };
+  }
   modelBtn.onclick = () => {
     togglePanel(panel, modelBtn);
     if (!panel.hasAttribute('hidden')) probeLocal();
