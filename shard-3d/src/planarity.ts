@@ -240,7 +240,15 @@ export interface PenScope {
    * origin. `where` says which, in the words the candidate's reason uses.
    */
   worldOrigins?: { foundation?: Vec3; height?: Vec3; width?: Vec3; where?: string };
-  /** Where the view plane sits: the thing under the pen, the last thing touched, else the gizmo's origin. */
+  /**
+   * Where the view plane sits: **the cursor**, always (16 September 2026 —
+   * Blender's 3D Cursor placement, SHARD-3D-PLAN §3). It used to be the depth
+   * of the thing under the pen, or of the last thing touched, or the gizmo's
+   * origin if nothing — a heuristic that put the plane somewhere different on
+   * every stroke and left the hand no way to say where it wanted it. Blender's
+   * answer is one place the hand puts and can see; `cursor.ts` is how it is
+   * put, and the picker stands on it.
+   */
   viewAnchor: Vec3;
   /** Why the view plane sits there — said out loud like every other reading. */
   viewAnchorWhy: string;
@@ -457,11 +465,12 @@ export function candidatesFor(scope: PenScope): PlaneCandidate[] {
  * down near that stroke, under the same gate; else the view plane, which is
  * the default the table names.
  *
- * A face under the pen that is too oblique to take the stroke (THE GATE) does
- * not lose its depth, only its angle: the view plane already stands at the
- * depth of the thing under the pen (`viewAnchor`), so the ink lies exactly
- * where the hand pointed and is not stretched across the face. The chip then
- * offers the face, one tap away.
+ * A face under the pen that is too oblique to take the stroke (THE GATE)
+ * loses it to the view plane, which stands through the CURSOR (`viewAnchor`)
+ * — so the ink lies in the plane the hand put there, at the size it was
+ * drawn, rather than stretched across the face. The chip then offers the
+ * face, one tap away. Shift + click on that face first, and the cursor is on
+ * it: the ink then lands on the face's own depth, facing the camera.
  *
  * It is deliberately NOT the scorer: at pen-down there is no stroke to read,
  * so the only evidence is where the pen is. The scorer runs at pen-up.
@@ -575,7 +584,9 @@ export function rank(scope: RankScope): PlaneCandidate[] {
       (continues ? ', and the stroke a moment ago lay on it' : '') +
       // The view plane says what it conserves; a gated one says what it would
       // have cost. Both are reasons, said out loud, in the panel's own list.
-      (isView ? ' — shape conserved: the screen path lands here at the size it was drawn' : '') +
+      (isView
+        ? ' — shape conserved: the screen path lands on the plane through the cursor at the size it was drawn'
+        : '') +
       (oblique
         ? ` — too oblique to read (under ${(FACING_FLOOR * 100).toFixed(0)}% face-on), so it is held but cannot win`
         : gated

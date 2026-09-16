@@ -90,8 +90,6 @@ export interface PanelOptions {
   next?(): NextAct | null;
   /** P6: what the library says a mark's outline could be, ranked. */
   matches?(markId: string): ProfileMatch[];
-  /** Whether a mark's own view has been left, so the panel can say *faint from here*. */
-  faded(id: string): boolean;
   /** Why a solid's derivation did not come off — the CSG seam's own words, or null. */
   broken?(id: string): string | null;
   /** P4: every plane a profile of this solid was drawn on, with the diff on it. */
@@ -112,7 +110,7 @@ export function createPanel(host: HTMLElement, statusEl: HTMLElement, log: Log, 
     // The evidence, exactly as it was — every row, every number, every reason.
     // It moved; nothing about it changed.
     const evidence = mark
-      ? renderMark(mark, log, o.faded(mark.id)) + renderLibrary(mark.id) + solidRow
+      ? renderMark(mark, log) + renderLibrary(mark.id) + solidRow
       : eyebrow('mark') +
         '<div class="empty">' + esc(log.marks().length ? 'hover a mark, or draw another' : 'nothing drawn yet') + '</div>' +
         solidRow;
@@ -676,9 +674,16 @@ function renderSolid(log: Log, sel: Sel | null, o: PanelOptions): string {
 
 /**
  * The distinct camera poses view ink was drawn from, newest first, with a
- * count. Two strokes drawn from the same orbit are one pinned view: the poses
- * are gathered by how far apart they look, which is the same tolerance that
- * decides sharp from faint.
+ * count — **camera bookmarks**, and nothing else. Two strokes drawn from the
+ * same orbit are one pinned view: the poses are gathered by how far apart they
+ * look.
+ *
+ * They used to be a way of getting ink back: view ink went faint once the
+ * camera left its pose, and a chip was how you made it sharp again. The fade
+ * is gone (16 September 2026 — view ink is world geometry, drawn the same from
+ * every angle), and the chips are kept on their own merit: a stroke drawn in a
+ * three-quarter view reads as what it is from that view, and one tap eases the
+ * camera back to it. Nothing about what is VISIBLE depends on them.
  */
 export function pinnedViews(log: Log): { pose: Pose; label: string; count: number }[] {
   const out: { pose: Pose; label: string; count: number }[] = [];
@@ -691,7 +696,7 @@ export function pinnedViews(log: Log): { pose: Pose; label: string; count: numbe
   return out.reverse();
 }
 
-/** Two poses are the same pinned view within this many degrees. */
+/** Two poses are the same bookmark within this many degrees. */
 export const PINNED_SAME_DEG = 14;
 
 const round2 = (v: number) => +v.toFixed(2);
@@ -709,7 +714,7 @@ function poseLabel(pose: Pose): string {
   return `${round >= 0 ? round : round + 360}° · ${up >= 0 ? '+' : ''}${up}°`;
 }
 
-function renderMark(mark: Mark, log: Log, faded: boolean): string {
+function renderMark(mark: Mark, log: Log): string {
   const fp = fingerprintOf(mark.node);
   let html = eyebrow('mark', mark.id);
 
@@ -739,12 +744,14 @@ function renderMark(mark: Mark, log: Log, faded: boolean): string {
     html += row('flipped from', mark.flippedFrom, 'a chip was tapped · one undo puts the first plane back');
   }
   if (mark.plane.source === 'view' && mark.pose) {
+    // The pose is PROVENANCE: where the camera stood when this plane was
+    // picked. It is not a visibility rule — this ink is world geometry and is
+    // drawn the same from every angle (16 September 2026). The chip under the
+    // navigation gizmo is a bookmark back to the view, nothing more.
     html += row(
-      'held with',
-      faded ? 'a view you have left' : 'this view',
-      faded
-        ? 'faint from here · tap its chip under *pinned views* to go back, sharp again'
-        : 'the camera is within the tolerance of the pose it was drawn at, so it is sharp'
+      'drawn from',
+      poseLabel(mark.pose),
+      'the view this plane was picked from · its chip under the navigation gizmo is a bookmark back to it — the ink itself is world geometry and is drawn the same from every angle'
     );
   }
   if (mark.candidates?.length) {

@@ -47,7 +47,7 @@ export interface NavOptions {
   chosen(): PlaneName | null;
   /** Everything on the board — what *home* frames. Null when it is empty. */
   bounds(): Bounds3 | null;
-  /** The pinned views, as `panel.pinnedViews` reads them off the log. */
+  /** The pinned views — camera bookmarks, as `panel.pinnedViews` reads them off the log. */
   pinned(): { pose: Pose; label: string; count: number }[];
   say(sentence: string): void;
 }
@@ -337,10 +337,13 @@ export function createNav(o: NavOptions): NavGizmo {
       pinnedBox.appendChild(
         chip(`${v.label} · ${v.count}`, {
           cls: 'pinChip',
-          why: `${v.count} stroke${v.count === 1 ? '' : 's'} drawn from here · tap to go back, sharp again`,
+          // A BOOKMARK, not a visibility rule: the ink is world geometry and
+          // is drawn the same from every angle. What a tap gives back is the
+          // view the stroke was drawn in — where it reads as what it is.
+          why: `${v.count} stroke${v.count === 1 ? '' : 's'} drawn from here · tap to look from here again`,
           onclick: () => {
             space.easeTo(v.pose);
-            o.say('back to the view that ink was drawn from · sharp again');
+            o.say('back to the view that ink was drawn from');
           },
         })
       );

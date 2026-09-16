@@ -509,13 +509,22 @@
     const m = markOf(besideId);
     assert(m.plane.source === 'view', `the plane was read as ${m.plane.source}, not view`);
     assert(m.pose, 'the view ink kept no pose');
-    assert(m.faded === false, 'it is faint from the very view it was drawn on');
+    assert(m.opacity === 1, `view ink is drawn at ${m.opacity} — it should be opaque like any other mark`);
+    // The plane passes through the CURSOR, which has not been moved, so it
+    // stands at the world origin — not at the depth of anything under the pen.
+    const c = S().cursor();
+    assert(c.at.x === 0 && c.at.y === 0 && c.at.z === 0, `the cursor is at ${JSON.stringify(c.at)}`);
+    assert(
+      m.plane.origin.x === 0 && m.plane.origin.y === 0 && m.plane.origin.z === 0,
+      `the view plane passes through ${JSON.stringify(m.plane.origin)}, not the cursor`
+    );
+    assert(/through the cursor/.test(m.plane.why), `the plane's reason was "${m.plane.why}"`);
     const pinned = S().pinned();
     assert(pinned.length === 1, `${pinned.length} pinned views, expected 1`);
     assert(pinned[0].count === 1, `the pinned view holds ${pinned[0].count} strokes`);
     const status = S().state().status;
-    assert(/view · pinned/.test(status), `the status said "${status}"`);
-    return { source: m.plane.source, why: m.plane.why, pinned, status, top: m.readings[0] && m.readings[0].label };
+    assert(/view · through the cursor/.test(status), `the status said "${status}"`);
+    return { source: m.plane.source, why: m.plane.why, cursor: c.at, pinned, status, top: m.readings[0] && m.readings[0].label };
   });
 
   step('the chip flips the first stroke to its runner-up, and one undo puts it back', () => {
@@ -558,16 +567,66 @@
     return { to: m.plane.name, source: m.plane.source, restored: back.plane.source, pinned: S().pinned() };
   });
 
-  step('orbit away and the view ink goes faint; the pinned view brings it back', () => {
-    S().orbit(1.1, 0.2);
+  step('orbit away and the view ink is UNCHANGED — world geometry, seen edge-on', () => {
+    // John, 16 September 2026, with two Blender screenshots of the Annotation
+    // tool placed on the 3D cursor: a circle drawn in a free three-quarter
+    // view, seen from away, is a thin ellipse — *fully drawn, opaque*. It does
+    // not follow the camera and it does not fade. What used to be asserted
+    // here is the opposite, and this is what went in its place.
+    const before = markOf(besideId);
+    const beforeWorld = JSON.stringify(S().worldPointsOf(besideId));
+    const beforeCam = S().state().camera.forward;
+    // How thin the stroke is ON SCREEN: 1 is a circle, small is edge-on.
+    const thinness = () => {
+      const pts = S().worldPointsOf(besideId).map((w) => S().screenForWorld(w));
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      for (const q of pts) {
+        minX = Math.min(minX, q.x); maxX = Math.max(maxX, q.x);
+        minY = Math.min(minY, q.y); maxY = Math.max(maxY, q.y);
+      }
+      const w = maxX - minX, h = maxY - minY;
+      return Math.min(w, h) / Math.max(w, h);
+    };
+    const roundThin = thinness();
+    assert(roundThin > 0.9, `it is ${roundThin.toFixed(3)} thin from its own view — it should be a circle`);
+
+    // Go and look at it from the SIDE. An orbit by hand is a poor way to get
+    // across this plane — a turn about Y is much less than that much turn of
+    // LOOK direction from a camera this high (1.1 rad left the circle 0.88
+    // round) and far enough round it comes back to facing you (2.3 rad: 0.97).
+    // A canonical view is one deliberate act and lands square across it.
+    S().view('side');
     const away = markOf(besideId);
-    assert(away.faded === true, 'the view ink is still sharp from a view it was not drawn on');
-    // The face ink is not view ink, so it is untouched by where the camera is.
-    assert(markOf(onFaceId).faded === false, 'ink on a face went faint with the camera');
+    // 1 · it is not drawn any differently.
+    assert(
+      away.opacity === before.opacity,
+      `the ink changed opacity with the camera: ${before.opacity} → ${away.opacity}`
+    );
+    assert(away.opacity === 1, `view ink is drawn at ${away.opacity} from another angle, not opaque`);
+    // 2 · and it has not moved in the world.
+    assert(
+      JSON.stringify(S().worldPointsOf(besideId)) === beforeWorld,
+      'the stroke moved in the world when the camera did — it is not world geometry'
+    );
+    // 3 · what DID change is only where you are standing: it is edge-on now.
+    const thin = thinness();
+    assert(thin < 0.8, `from away it is still ${thin.toFixed(3)} thin — the plane is following the camera`);
+    // The face ink is not view ink, and was never touched by the camera either.
+    assert(markOf(onFaceId).opacity === 1 || markOf(onFaceId).opacity === 0.3,
+      `ink on a face is drawn at ${markOf(onFaceId).opacity}`);
+
+    // The pinned view is a BOOKMARK, not a visibility rule: it brings the
+    // CAMERA back, and the ink is exactly what it already was.
     S().goToPinned(0);
+    const cam = S().state().camera.forward;
+    const dotp = cam.x * beforeCam.x + cam.y * beforeCam.y + cam.z * beforeCam.z;
+    const deg = (Math.acos(Math.max(-1, Math.min(1, dotp))) * 180) / Math.PI;
+    assert(deg < 2, `the bookmark left the camera ${deg.toFixed(1)}° off the view the ink was drawn in`);
     const home = markOf(besideId);
-    assert(home.faded === false, 'the camera came back and the ink is still faint');
-    return { fadedWhenAway: away.faded, sharpWhenBack: !home.faded };
+    assert(home.opacity === before.opacity, `coming back changed the ink to ${home.opacity}`);
+    assert(JSON.stringify(S().worldPointsOf(besideId)) === beforeWorld, 'the bookmark moved the ink');
+    assert(thinness() > 0.9, 'back at its own view it is not a circle again');
+    return { opacity: away.opacity, thinFromItsOwnView: +roundThin.toFixed(3), thinFromAway: +thin.toFixed(3), cameraBackWithin: +deg.toFixed(2) };
   });
 
   step('the board still holds the box, its ink, and both read marks', () => {
@@ -578,6 +637,50 @@
     assert(sources.filter((x) => x === 'chosen').length === 2, `chosen: ${sources.join(', ')}`);
     assert(sources.includes('face') && sources.includes('view'), `sources were ${sources.join(', ')}`);
     return { solids: s.solids.length, marks: s.marks.length, sources };
+  });
+
+  step('shift + click puts the cursor on the box’s top; the next view stroke passes through it', () => {
+    // Blender's gesture, in the shard's terms. The cursor is the plane
+    // picker's own origin, it is runtime (never a log event), and it is the
+    // one thing that decides where an unchosen stroke lands.
+    const started = S().cursor();
+    assert(
+      started.at.x === 0 && started.at.y === 0 && started.at.z === 0,
+      `the cursor did not start at the world origin: ${JSON.stringify(started.at)}`
+    );
+    const marksBefore = S().state().marks.length;
+
+    const onTop = S().screenForWorld({ x: (BOX.x0 + BOX.x1) / 2, y: BOX.top, z: (BOX.z0 + BOX.z1) / 2 });
+    const got = S().shiftTap(onTop);
+    assert(Math.abs(got.at.y - BOX.top) < 0.01, `the cursor landed at y=${got.at.y}, not on the top face at ${BOX.top}`);
+    assert(/artifact/.test(got.why), `the cursor does not say what it landed on: "${got.why}"`);
+    assert(/cursor placed/.test(S().state().status), `the status said "${S().state().status}"`);
+    assert(S().state().marks.length === marksBefore, 'shift + click left a mark — it is a placement, not ink');
+
+    // …and now the view plane stands on that face's depth. Drawn in clear air
+    // well away from every other mark — no face under the pen, and far enough
+    // from the last stroke that `previous` has no claim on it either (it is
+    // near within 1.5 of that stroke's own size, and a circle one world unit
+    // above it is well inside that).
+    const vp = S().viewport();
+    const clear = { x: vp.left + vp.width * 0.86, y: vp.top + vp.height * 0.18 };
+    const id = S().strokeScreen(
+      Array.from({ length: 49 }, (_, i) => {
+        const t = (i / 48) * Math.PI * 2;
+        return { x: clear.x + Math.cos(t) * 46, y: clear.y + Math.sin(t) * 46 };
+      })
+    );
+    assert(id, 'no mark was made');
+    const m = markOf(id);
+    assert(m.plane.source === 'view', `the plane was read as ${m.plane.source}, not view`);
+    assert(
+      Math.abs(m.plane.origin.y - BOX.top) < 0.01,
+      `the view plane passes through y=${m.plane.origin.y}, not the cursor at ${BOX.top}`
+    );
+    assert(/through the cursor/.test(m.plane.why), `the plane's reason was "${m.plane.why}"`);
+    S().undo();
+    assert(S().state().marks.length === marksBefore, 'the undo did not take the stroke back');
+    return { cursor: got.at, why: got.why, planeOrigin: m.plane.origin };
   });
 
   step('off the main axis, a circle keeps the shape it was drawn — and the ground says what it would have cost', () => {
@@ -616,6 +719,11 @@
     assert(home, 'no mark was made');
     const hm = markOf(home);
     assert(hm.plane.source === 'view', `the plane was read as ${hm.plane.source}, not view`);
+    // …through the CURSOR, which `clear()` put back at the world origin.
+    assert(
+      hm.plane.origin.x === 0 && hm.plane.origin.y === 0 && hm.plane.origin.z === 0,
+      `the view plane passes through ${JSON.stringify(hm.plane.origin)}, not the cursor`
+    );
     const homeAspect = aspect(hm.bounds);
     assert(Math.abs(homeAspect - 1) < 0.01, `the circle came back ${homeAspect.toFixed(3)} : 1 in its own plane`);
     const ground = hm.candidates.find((c) => c.label === 'foundation');

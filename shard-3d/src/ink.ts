@@ -23,7 +23,6 @@ import type { Colours } from './theme';
 import type { Log, Mark } from './log';
 import {
   planeForPenDown,
-  poseAngle,
   rayPlane,
   scaleAt,
   toPlane,
@@ -47,15 +46,6 @@ import {
 const LIFT = 0.004;
 /** The offer stands for a moment, not forever (v10 F4). */
 const OFFER_MS = 4000;
-/**
- * How far the camera may turn from a view stroke's own pose before that ink
- * goes faint, in degrees (§12: whether art is drawn faint from other angles or
- * not at all is John's — this is faint, and the two numbers are named so the
- * other choice is one edit).
- */
-export const VIEW_TOLERANCE_DEG = 14;
-/** What view ink drawn from another angle is worth: there, and clearly not here. */
-export const VIEW_FAINT_OPACITY = 0.22;
 
 export interface Ink {
   group: THREE.Group;
@@ -67,8 +57,13 @@ export interface Ink {
   /** Highlight a mark (hover / the panel's subject). */
   highlight(id: string | null): void;
   drawing(): boolean;
-  /** True when this mark's plane is a view the camera has left — it is drawn faint. */
-  faded(id: string): boolean;
+  /**
+   * What this mark's line is drawn at right now. Nothing reads it to decide
+   * anything — it is here so the e2e can assert that orbiting away changes
+   * NOTHING about a view stroke (16 September 2026: view ink is world
+   * geometry, and the fade is gone).
+   */
+  opacityOf(id: string): number | null;
 }
 
 /** The stroke's plane points, lifted just off the plane, as a flat XYZ array. */
@@ -265,29 +260,37 @@ export function createInk(o: InkOptions): Ink {
   }
 
   /**
-   * View ink is held WITH A POSE (§3): a stroke on the view plane only means
-   * anything from the view it was drawn on, so it is sharp while the camera is
-   * within VIEW_TOLERANCE_DEG of that pose and faint otherwise — there, and
-   * clearly not here. Never hidden: nothing is thrown away because the canvas
-   * could not read it, and ink is never covered.
+   * **View ink is world geometry** (16 September 2026, Blender's 3D Cursor
+   * placement — SHARD-3D-PLAN §3).
+   *
+   * A view stroke used to be held with its pose and drawn faint once the
+   * camera had turned more than a tolerance off it: there, and clearly not
+   * here. It is not there any more, and this is the note of what went.
+   *
+   * John's reference is Blender's Annotation tool placed on the 3D cursor: a
+   * circle drawn in a free three-quarter view lands on the plane through the
+   * cursor facing the camera at that moment, and orbiting away shows it as a
+   * thin ellipse — **fully drawn, opaque, ordinary world geometry**. The plane
+   * is chosen by where the camera was; the mark it made is not. Ink that
+   * dimmed when you looked at it from elsewhere said the opposite: that the
+   * stroke was a property of the camera, which is the one thing it is not.
+   *
+   * The pose is still kept on the mark (`plane.ts`, `Pose`) — it is
+   * provenance, it is what the *pinned views* chips bookmark, and it is what
+   * makes any plane derivable from the screen path later. Nothing reads it for
+   * opacity.
    */
-  function faded(id: string): boolean {
-    const mark = log.markOf(id);
-    if (!mark || mark.plane.source !== 'view' || !mark.pose) return false;
-    return poseAngle(mark.pose, space.pose()) > VIEW_TOLERANCE_DEG;
-  }
 
   function highlight(id: string | null) {
     hovered = id;
     lines.forEach((l, key) => {
       const m = l.material as LineMaterial;
       const onFace = faintFor(key);
-      const away = faded(key);
       m.color.set(key === id ? cols.sigRead : cols.strokeHand);
-      m.linewidth = key === id ? 3.4 : onFace || away ? 1.5 : 2.4;
+      m.linewidth = key === id ? 3.4 : onFace ? 1.5 : 2.4;
       // Faint enough that the face is a face and not a pane of glass, dark
       // enough to be read from any angle: the ink is on the face, not in it.
-      m.opacity = key === id ? 1 : away ? VIEW_FAINT_OPACITY : onFace ? 0.3 : 1;
+      m.opacity = key === id ? 1 : onFace ? 0.3 : 1;
       // The depth test is OFF for the ink a solid was made from, and the cost
       // — a box that reads a little like glass — is the one the README calls
       // John's to overturn. It was tried (Sept 2026) and it does not come off:
@@ -300,9 +303,9 @@ export function createInk(o: InkOptions): Ink {
     space.render();
   }
 
-  // The camera moving changes which view ink is at home — so the pass that
-  // decides sharp from faint runs on every camera change, not only on a stroke.
-  space.onChange(() => highlight(hovered));
+  // There is no pass on camera change any more: nothing about how a mark is
+  // drawn depends on where the camera stands. The scene renders itself when
+  // the camera moves (`scene.ts`), which is all that was ever needed.
 
   function pick(screen: Point): string | null {
     const rect = space.canvas.getBoundingClientRect();
@@ -441,5 +444,10 @@ export function createInk(o: InkOptions): Ink {
 
   log.subscribe(sync);
 
-  return { group, sync, paint, pick, highlight, faded, drawing: () => live !== null };
+  const opacityOf = (id: string): number | null => {
+    const line = lines.get(id);
+    return line ? (line.material as LineMaterial).opacity : null;
+  };
+
+  return { group, sync, paint, pick, highlight, opacityOf, drawing: () => live !== null };
 }

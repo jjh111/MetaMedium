@@ -112,9 +112,9 @@ sees the ground, so the view you are given can still take a face) a
 the runner-up chip, and **cannot outrank the view plane**, whatever it
 scores; above it nothing changes. At pen-down a face under the pen keeps
 its precedence only if it passes, and otherwise the stroke lands on the
-view plane **at the depth of that face** — where the hand pointed, at the
-size it was drawn, because a screen-facing plane makes the cast a
-similarity transform. A **chosen** plane is untouched: it is blessed by
+view plane **through the cursor** (the note below) — at the size it was
+drawn, because a screen-facing plane makes the cast a similarity
+transform. A **chosen** plane is untouched: it is blessed by
 the act, and the hand may lay ink on it at any angle, with the edge-on
 warning of §10 as it was.
 
@@ -235,8 +235,44 @@ three plane tiles at their corners (foundation `XZ`, height `XY`, width
 tile and every stroke until the next tap lies on that plane, blessed by
 the act. Hover a solid and its faces light; tap one and it is the plane.
 Tap the gizmo's centre, or orbit, and nothing is chosen: the plane is
-read, and with nothing under the pen it is the **view plane** at the
-depth of the last thing touched.
+read, and with nothing under the pen it is the **view plane through the
+cursor** (the note below).
+
+**Blender's 3D Cursor placement** (16 September 2026). John, with two
+screenshots of Blender's Annotation tool set to **Placement: 3D
+Cursor**: *"The mapping of drawing in non-standard axes should behave
+like Blender does."* In the screenshots a circle drawn in a free
+three-quarter view lands on a plane parallel to the view **at that
+moment**, through the 3D cursor; orbiting away shows it as a thin
+ellipse — fully drawn, opaque, ordinary world geometry. It does not
+follow the camera and it does not fade.
+
+So, three rules, and they replace what §3 said before:
+
+1. **There is a cursor, and it is the plane picker's own origin.** It
+   already stood at the world origin and could slide; now **shift +
+   click** puts it on the surface under the pointer, else on the
+   foundation plane under the pointer, and the whole picker moves there
+   (`src/cursor.ts`, `src/gizmo.ts`). The status says *cursor placed*
+   once. Runtime, never a log event — a camera-side thing, like the
+   pose, and the picker's origin was never logged either. `home` and
+   framing are untouched: where the camera looks and where the hand
+   works are different questions.
+2. **The view plane passes through the cursor, screen-facing, always.**
+   The heuristic it replaces — the depth of the thing under the pen,
+   else the last thing touched, else the origin — moved the plane under
+   the hand on every stroke and gave it no way to say where it wanted
+   it. One point the hand can put and can see is the whole of it. A face
+   under the pen that passes `FACING_TAKES` still wins outright: that is
+   Blender's *Surface* placement, and P2/P3 need it. The chosen tiles
+   are unchanged.
+3. **View ink is world geometry.** The fade is gone. A view stroke is
+   drawn the same from every angle, like every other stroke. The camera
+   pose is still kept on the mark — provenance, and what makes any plane
+   derivable from the screen path later — but nothing reads it for
+   opacity. The **pinned views** chips stay, as *camera bookmarks*: a tap
+   eases the camera back to the view a stroke was drawn in, where it
+   reads as what it is. Nothing about what is visible depends on them.
 
 **View-plane ink has three fates**, and the form rung decides which:
 
@@ -248,10 +284,12 @@ depth of the last thing touched.
 - **The command and comment layer** when it is a gesture or a label. The
   check across a solid summons it; a scratch erases; a word beside a
   solid names it; an arrow from a word to a face is a note.
-- **Art** otherwise. Held with the camera pose it was drawn at, drawn
-  faint from other angles, sharp from its own; a tap on a pinned view's
-  chip returns the camera to it. The board keeps it forever unless
-  erased; nothing is thrown away because the canvas could not read it.
+- **Art** otherwise. Held with the camera pose it was drawn at, and
+  drawn the same from every angle — it is world geometry (the note
+  above). A tap on a pinned view's chip returns the camera to the view
+  it was drawn in, which is where it reads as what it is. The board
+  keeps it forever unless erased; nothing is thrown away because the
+  canvas could not read it.
 
 Orbit is two fingers, or the right button, or a held modifier; one
 finger and the left button draw. A stroke's plane is fixed at pen-down
@@ -460,8 +498,12 @@ own relations. The shard then imports them and deletes its copies, per
 
 ## 12. Still John's
 
-- Whether art on the view plane is drawn faint from other angles or not
-  at all until its view is returned to.
+**Settled, 16 September 2026.** *Whether art on the view plane is drawn
+faint from other angles or not at all until its view is returned to* —
+neither. It is drawn, fully, from every angle: John's answer was
+Blender's, and Blender's annotation on the 3D cursor is world geometry
+(§3). The pinned views survive as bookmarks.
+
 - The gizmo's look: axes at the origin, at the selection, or both.
 - Whether *turn into* ranks by fit alone or also by use, as the field's
   pills do.

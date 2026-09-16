@@ -72,8 +72,8 @@ it extends the one seam P0 left for it.
 All seven criteria run in `e2e.js` (70 steps), and the two-minute demo runs
 beside them as `__demo()` (10 steps). `?demo` draws P0's and P2's at
 boot; `?demo=read` draws the rectangle read onto a box's top face with the chip
-beside it; `?demo=view` draws view ink gone faint from a camera that has left
-the pose it was drawn at; `?demo=diff` draws the box and the side profile
+beside it; `?demo=view` draws a circle on the view plane and then orbits off it, so it
+stands there as the thin, fully drawn ellipse of John's Blender screenshot; `?demo=diff` draws the box and the side profile
 with the bump, with the region named in the panel and *Add it* standing in the
 field; and `?demo=castle` draws P5's three views and leaves the massing
 standing, selected, with the field ready for the brief — no model is asked,
@@ -109,8 +109,8 @@ there is no bundle to drift.
 
 ## The loop
 
-1. **Tap a tile — or don't.** The gizmo sits at the world origin: three axes,
-   and a square where each pair of them meets — **foundation** (XZ, the
+1. **Tap a tile — or don't.** The gizmo sits at **the cursor** (step 6): three
+   axes, and a square where each pair of them meets — **foundation** (XZ, the
    ground), **height** (XY, the wall you face), **width** (YZ, the wall on your
    right). The chosen tile lights in the teal keyword colour. The cone on its
    normal **slides** the plane along it; the sphere at the centre
@@ -118,7 +118,8 @@ there is no bundle to drift.
 2. **Draw.** Left button, or one finger. Every point is raycast onto the plane
    and the stroke is drawn live where it lands. With nothing chosen the plane
    is fixed at pen-down from where the pen is — a face under it beats
-   everything, else the plane you were drawing on a moment ago, else the view —
+   everything, else the plane you were drawing on a moment ago, else the view
+   plane through the cursor —
    and **re-ranked at pen-up** against the whole stroke, which is the first
    moment there is a stroke to read. The winner is what the stroke is logged
    on; every candidate is held with its number and its reason, the panel lists
@@ -142,15 +143,28 @@ there is no bundle to drift.
    a box stands *at once* — tier 1, no model, no wait, and the status says so.
    A line lying **beside** the profile in its own plane is an **axis**, and the
    profile turns about it. The solid just made stands selected, in teal.
-6. **Keep a view.** A stroke the read puts on the **view plane** is held with
-   the camera pose it was drawn at: sharp while the camera is within
-   `VIEW_TOLERANCE_DEG` of that pose, faint at `VIEW_FAINT_OPACITY` from
-   anywhere else — there, and clearly not here (plan §12 leaves *faint vs not
-   at all* to John; this is faint, and both numbers are named in `ink.ts`). The
-   compass's **pinned views** chips list every pose view ink hangs on, with a
-   count, and a tap eases the camera back to it. (They used to be a row in the
-   panel; they live in the corner now, because every way of moving the camera
-   belongs in one place.)
+6. **Put the cursor.** **Shift + click** puts the **cursor** where you clicked:
+   on the surface under the pointer, else on the foundation plane under it. The
+   whole picker moves there, the status says *cursor placed*, and from then on
+   the **view plane passes through it**, screen-facing. This is Blender's 3D
+   Cursor placement, which is what John asked for by name (16 September 2026;
+   plan §3, `src/cursor.ts`): a stroke drawn with nothing chosen lands on the
+   plane parallel to the view **at that moment**, through the cursor. It is a
+   runtime thing, like the camera — never a log event — and `home` and framing
+   do not touch it. A face under the pen that the camera can actually read
+   still wins outright, which is Blender's *Surface* placement.
+
+   **View ink is world geometry.** It is drawn the same from every angle, like
+   every other stroke: orbit off it and it is a thin, fully drawn ellipse, not
+   a faded one. (Until 16 September it went faint once the camera left the pose
+   it was drawn at. That said the stroke was a property of the camera, which is
+   the one thing it is not.) The pose is still kept on the mark — provenance,
+   and what makes any plane derivable from the screen path later. The compass's
+   **pinned views** chips list every pose view ink hangs on, with a count, and a
+   tap eases the camera back to it: **camera bookmarks**, where a stroke reads
+   as what it is. Nothing about what is *visible* depends on them. (They used to
+   be a row in the panel; they live in the corner now, because every way of
+   moving the camera belongs in one place.)
 7. **Cut into it.** Un-choose, and draw a closed shape **on one of the
    solid's faces**. The plane is read as that face (P1) and the mark plays a
    **feature** — and nothing happens, because a hole and a boss are two
@@ -251,7 +265,8 @@ there is no bundle to drift.
 | `src/scene.ts` | three.js, the camera — **perspective or orthographic, the same pose through two lenses** — the orbit / pan / draw split, the ground grid, and the camera **as a ray-caster function** so `plane.ts` never imports three. Plus `rayForPose`, which rebuilds a ray-caster from a pose the log holds (that is what lets a stroke drawn minutes ago be re-projected onto another plane, and it rebuilds an ORTHO stand-in for a pose taken through that lens), `project`, `easeTo` — the one easing every camera move the chrome starts — and what the compass drives: `turn`, `pan`, `dolly` (toward the pointer), `snap`, `frame`, `setProjection` and `setPivot` |
 | `src/view.ts` | **Pure.** The camera's own arithmetic: the six axis views with the up that makes each named plane read in its own frame, the flip to the other side, `viewFacingPlane` / `planeFacedBy` (the compass and the plane picker agreeing), `tooOblique` against the scorer's own `FACING_FLOOR`, `frameFor` (a bounds → a pose that fits it, sphere not box, at any aspect, in persp and in ortho), `orthoHeightFor` / `distForOrthoHeight` (why the projection toggle does not jump), and `balls` — the six axes projected onto the camera's screen basis, farthest first. No three.js |
 | `src/navgizmo.ts` | The compass in the corner, as an **SVG overlay** built from the tokens: three arms from a centre with a labelled ball on each positive end and a hollow one on each negative, depth-sorted and turning with the camera, tappable (snap, and flip on a second tap), draggable (orbit, one finger, because it is chrome rather than canvas) — plus the *home* and *view* tiles and the pinned-view chips |
-| `src/gizmo.ts` | The three axes, the three tiles, the slide handle, the centre |
+| `src/gizmo.ts` | The three axes, the three tiles, the slide handle, the centre — all of it standing at **the cursor**, whose planes it hands out through that point (`origin` / `setOrigin`) |
+| `src/cursor.ts` | **Pure.** Blender's 3D Cursor placement as one rule: the surface under the pointer takes the cursor, else the foundation plane under it, else nothing happens and the caller says so. No three.js — a surface hit and a ray in, a world point and its reason out |
 | `src/ink.ts` | Pen-down → plane → live projection → the stroke as a `Line2`; the clean form as a dashed ghost for a few seconds. The scene's ink is **derived from the log** on every change, so undo needs no bookkeeping |
 | `src/form.ts` | **Pure.** The form rung (§2.3): the closed vocabulary `gesture \| profile \| feature \| extent \| axis \| path \| label \| annotation`, placed by a table read top to bottom, first match wins — the sibling of `diagram/roles.ts` and read the same way. Every threshold is a ratio of the marks' own size, measured in world space so it holds across planes. **Row 1** (`gesture`: a scratch, counted against a solid's silhouette with core's own `countCrossings`) and **row 3** (`feature`: a closed mark on a solid's face, inside it) are P3's; **row 2 now also says what a profile is a profile OF** (P4, `against`), which is what turns an outline drawn over a solid into a diff rather than a second solid; row 6 (`path`) is P7's and still carries a comment saying so |
 | `src/diff.ts` | **Pure, and where every diff threshold lives** (§4). The grid in plane units, the even–odd rasteriser, connected components, a region's outline (core's `trace` on the boundary pixels), `diffProfile` → coverage, missing and extra regions with their areas and their sentence, `overlapOf` (is this a profile OF that solid?), and `viewNameOf` (the foundation is the *top*, the height plane the *front*, the width plane the *side*). No three.js, so the arithmetic is pinned with no WebGL anywhere near it |
@@ -1041,8 +1056,10 @@ merely have to beat it — it has to **make sense at its angle** first.
 runner-up chip, and **cannot outrank the view plane**, whatever its shape score.
 Above it the four terms decide exactly as before. It applies at pen-down too: a
 face under the pen keeps its precedence only if it passes, and otherwise the
-stroke goes on the **view plane at the depth of that face**, so the ink lies
-where the hand pointed without being stretched across it.
+stroke goes on the **view plane through the cursor**, so the ink lies in the
+plane the hand put there without being stretched across the face. Shift + click
+on that face first and the cursor is *on* it, which is how you get the face's
+own depth and the camera's own angle at once.
 
 The number is bounded from above by the shard's own default three-quarter view,
 which sees a horizontal plane at **0.844** (`DEFAULT_PHI`, 57.6° above the
@@ -1052,7 +1069,7 @@ have nowhere to land. So it sits just under it.
 
 What the view plane conserves is not a threshold but a property: it is
 screen-facing by construction, so the cast is a **similarity transform** — the
-circle is the circle, at the depth the hand pointed at. `planarity.test.ts`
+circle is the circle, at the cursor's own depth. `planarity.test.ts`
 pins the aspect to within 1%, and the e2e measures the same thing through the
 real pointer path at a 49° view: `1.0000` on the view plane, `0.825` the moment
 the ground is taken from the chip.
@@ -1533,12 +1550,19 @@ as `face`, that it is named *top of artifact:7*, that the runner-up is `view`,
 that the winner's reason names the rectangle's own confidence, that no oblique
 candidate won, that a chip stands beside the mark and that the panel lists the
 six candidates; draw a circle **beside** the box on screen and assert `view`,
-a pose, one pinned view and a status line saying *view · pinned*; flip the
+a pose, a view plane standing **through the cursor** at the world origin, one
+pinned view and a status line saying *view · through the cursor*; flip the
 first stroke to its runner-up and assert the board still holds four marks and
 one solid, that the flipped mark says where it came from and offers the way
 back, and that **one** undo puts it on the face again; flip it explicitly onto
-`view` and back; orbit away and assert the view ink is faint while the face ink
-is not, then tap the pinned view and assert it is sharp; and, last, draw an
+`view` and back; go and look at it from the **side** and assert that the view
+ink's opacity and its **world points** are both unchanged — it is world
+geometry — while what did change is only that it is 0.60 thin on screen instead
+of round, then tap the pinned view and assert the camera came back within a
+degree and the ink is untouched; **shift + click** on the box's top and assert
+the cursor lands on that face, that the status says *cursor placed*, that no
+mark was left, and that the next stroke drawn in clear air stands on the view
+plane through it; and, last, draw an
 extent from a profile's edge with nothing chosen, assert the read is ambiguous
 and no solid stands, then take `height` from the chip and assert the mark plays
 `extent` and a box stands at tier 1 with the drawn depth.
@@ -1659,8 +1683,11 @@ thing.
 The test hook is `window.__shard`: `strokeScreen`, `screenFor`,
 `screenForWorld` (a world point to screen — how the e2e aims at a face it did
 not choose), `choose`, `view`, `orbit`, `flipPlane`, `chipFor`, `pinned`,
-`goToPinned`, `state` (marks with their `plays`, their ranked plane candidates,
-whether they are faded and their pose; the solids, the selection, the status),
+`goToPinned`, `cursor` (where it stands and why), `shiftTap` (the placement
+gesture, through the real pointer path), `worldPointsOf` (a mark's ink in world
+space — the thing that must not move when the camera does), `state` (marks with
+their `plays`, their ranked plane candidates, their plane's origin, the opacity
+they are drawn at and their pose; the solids, the selection, the status),
 `solids` (the trees, not the meshes — with each step's id, its `on`, its depth
 or sweep, whether a cut goes `through`, how many versions the log holds and
 whether the derivation is broken), `features` (what *Cut a hole* is about), `diffs` (the panel's *matches the

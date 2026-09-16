@@ -39,6 +39,7 @@ import { describePhrase, PHRASE_VERBS, type NameRef, type PhraseReading, type Ph
 import { readColours, storedTheme, applyTheme, effectiveTheme, type ThemeName } from './theme';
 import { pane, tile } from './ui';
 import { createChips } from './chips';
+import { placeCursor } from './cursor';
 import { createNav } from './navgizmo';
 import {
   balls,
@@ -96,7 +97,6 @@ const gizmo = createGizmo(colours);
 space.scene.add(gizmo.group);
 const chips = createChips(chipsEl, space.project);
 const panel = createPanel(panelEl, statusEl, log, {
-  faded: (id) => ink.faded(id),
   broken: (id) => solids.brokenOf(id),
   // P4: *matches the drawing* — every plane a profile of this solid was drawn
   // on, with the diff on it, and a region outlined where it lies on hover.
@@ -180,13 +180,52 @@ function whoIs(id: string): { by: string; origin: 'engine' | 'model' | 'hand' } 
 const pen = (): PenState => ({ chosen: gizmo.chosen, offset: gizmo.offset });
 
 /**
- * The last world point the hand touched — where the VIEW plane sits when
- * nothing is under the pen (§2.1: "the view plane, at the depth of the thing
- * under the pen, or of the last thing touched, or of the gizmo's origin if
- * nothing"). Runtime, not the log's: it is where the hand was, not what the
- * board is.
+ * **The cursor** — where the hand is working, as one world point, and where
+ * the VIEW plane passes through (16 September 2026; SHARD-3D-PLAN §3,
+ * `cursor.ts`).
+ *
+ * John, with two Blender screenshots: *"The mapping of drawing in non-standard
+ * axes should behave like Blender does."* Blender's answer is its 3D cursor:
+ * annotation placed on it lands on the plane through the cursor facing the
+ * camera at that moment. So the shard has one too, and it is the plane
+ * picker's own origin — the thing that already stood at the world origin and
+ * could slide.
+ *
+ * What it replaces is a heuristic: the view plane used to sit at the depth of
+ * the thing under the pen, else the last thing touched, else the origin. Three
+ * rules, none of them the hand's, and the plane moved under it on every
+ * stroke. One point the hand can put and can see is the whole of it.
+ *
+ * Runtime, not the log — a camera-side thing, like the pose. The picker's
+ * origin was never a log event either, so this follows what was there.
  */
-let lastTouched: Vec3 | null = null;
+let cursor: Vec3 = v3(0, 0, 0);
+/** How the cursor came to be there, for the panel and the status line. */
+let cursorWhy = 'the world origin — shift + click to put it somewhere';
+
+/**
+ * Shift + click, as Blender has it: the cursor goes to the surface under the
+ * pointer, else to the foundation plane under it. The picker moves with it,
+ * and the status says so once.
+ */
+function putCursor(screen: Point) {
+  const face = solids.facesAt(screen)[0];
+  const got = placeCursor({
+    surface: face ? face.at : null,
+    ray: space.rayFor(screen),
+    ...(face ? { what: face.solidId } : {}),
+  });
+  if (!got) {
+    panel.say('nothing under the pointer to put the cursor on');
+    return;
+  }
+  cursor = got.at;
+  cursorWhy = got.why;
+  gizmo.setOrigin(cursor);
+  panel.say(`cursor placed · ${got.why}`);
+  space.render();
+  report();
+}
 
 /** The stroke drawn a moment ago, as the `previous` candidate needs it. */
 function previousRef(): PreviousRef | null {
@@ -216,14 +255,6 @@ function scopeAt(screen: Point): PenScope {
   const markPlane = overMark ? log.markOf(overMark)?.plane : null;
   const onInk = markPlane ? rayPlane(space.rayFor(screen), markPlane) : null;
   const touched = faces[0]?.at ?? onInk ?? null;
-  const anchor = touched ?? lastTouched ?? v3(0, 0, 0);
-  const why = faces[0]
-    ? `at the depth of ${faces[0].solidId} under the pen`
-    : onInk
-      ? `at the depth of ${overMark}, the ink under the pen`
-      : lastTouched
-        ? 'at the depth of the last thing touched'
-        : "at the gizmo's own origin — nothing has been touched yet";
   return {
     chosen: gizmo.plane(),
     pen: screen,
@@ -239,8 +270,14 @@ function scopeAt(screen: Point): PenScope {
     worldOrigins: touched
       ? { foundation: touched, height: touched, width: touched, where: `through the point the pen came down on${faces[0] ? ` (${faces[0].solidId})` : overMark ? ` (${overMark})` : ''}` }
       : {},
-    viewAnchor: anchor,
-    viewAnchorWhy: why,
+    // THE VIEW PLANE PASSES THROUGH THE CURSOR, screen-facing, always
+    // (Blender's 3D Cursor placement). Not the depth of the thing under the
+    // pen and not the last thing touched: those moved the plane under the
+    // hand, stroke by stroke, and gave it no way to say where it wanted it.
+    // A face under the pen that passes the facing gate still wins outright —
+    // that is Blender's *Surface* placement, and P2/P3 need it.
+    viewAnchor: cursor,
+    viewAnchorWhy: `through the cursor (${cursorWhy})`,
     at: Date.now(),
     recentWindowMs: DEFAULT_SESSION_CONFIG.recentWindowMs,
   };
@@ -283,6 +320,13 @@ function gizmoAt(screen: Point): ReturnType<typeof gizmo.hit> {
 function claimed(e: PointerEvent): boolean {
   if (e.button !== 0) return false;
   const screen = { x: e.clientX, y: e.clientY };
+  // Shift + click places the CURSOR — Blender's own gesture, and it is not a
+  // mark, so the pen must not see it. `home` and framing are untouched: where
+  // the camera looks and where the hand works are different questions.
+  if (e.shiftKey) {
+    putCursor(screen);
+    return true;
+  }
   const hit = gizmoAt(screen);
   if (!hit) return false;
   if (hit.kind === 'tile') choose(hit.name);
@@ -342,8 +386,6 @@ const ink = createInk({
     // stroke that selected instead of drawing would be a mode.
     if (!id) {
       const hit = solids.pick(lastPointer);
-      const face = solids.facesAt(lastPointer)[0];
-      if (face) lastTouched = face.at;
       selection.set(hit ? { kind: 'solid', id: hit } : null);
       if (hit) {
         const s = log.solidOf(hit);
@@ -356,10 +398,7 @@ const ink = createInk({
     // The next stroke clears the standing offer, the way the canvas's snap
     // offer gives way: one offer at a time, about the mark just made.
     chips.clear();
-    if (mark) {
-      lastTouched = centreWorld(id);
-      offerRunnerUp(mark);
-    }
+    if (mark) offerRunnerUp(mark);
     // P6: the profile drawn again. What the library says this outline could be
     // stands beside it as a chip — one tap places the definition here, scaled
     // to fit (§2.6 rule 3). Tier 1: no model is asked and nothing waits.
@@ -404,9 +443,12 @@ const ink = createInk({
           // A read plane says which way it decided and how sure it is; a
           // chosen one has nothing to report, because the hand decided.
           (read ? ` · ${mark.plane.source} ${read.confidence.toFixed(2)}` : '') +
-          // "the status line says *view · pinned* when such a stroke lands":
-          // this ink only means anything from here, and the board says so.
-          (mark.plane.source === 'view' ? ' · view · pinned' : '') +
+          // The view plane, and where it stood. It used to say *view ·
+          // pinned* — this ink only means anything from here — and that is no
+          // longer true: a view stroke is world geometry, drawn the same from
+          // every angle. What is worth saying is where the plane passed
+          // through, because that is the thing the hand can move.
+          (mark.plane.source === 'view' ? ' · view · through the cursor' : '') +
           (form ? ` · plays ${form.role}` : '')
       );
     }
@@ -1621,9 +1663,25 @@ export interface ShardHook {
   flipPlane(id: string, which?: number): string | null;
   /** The chip standing beside a mark right now, or null. */
   chipFor(id: string): string | null;
-  /** Every pinned view, and a way back to one. */
+  /**
+   * Every pinned view, and a way back to one. **Camera bookmarks**: nothing
+   * about what is visible depends on them (the fade is gone).
+   */
   pinned(): { label: string; count: number }[];
   goToPinned(index: number): void;
+  /** Where the cursor stands, and why — the plane picker's own origin. */
+  cursor(): { at: Vec3; why: string };
+  /**
+   * Shift + click at a screen point, through the real pointer path — the
+   * gesture that places the cursor. Returns where it ended up.
+   */
+  shiftTap(screen: Point): { at: Vec3; why: string };
+  /**
+   * A mark's ink in WORLD space. The thing that must not move when the camera
+   * does: a stroke's plane is picked from where the camera was, the geometry
+   * it made is not.
+   */
+  worldPointsOf(id: string): Vec3[] | null;
   /**
    * The navigation gizmo, as a hand reaches it. `tap` snaps (and flips on a
    * second tap at the same view), `drag` turns the camera by a screen path on
@@ -1649,7 +1707,12 @@ export interface ShardHook {
     offset: number;
     marks: {
       id: string;
-      plane: { name?: string; source: string; why: string };
+      /**
+       * Where the plane passes through, as well as what it is called. For a
+       * READ view plane this is the cursor, and that is the thing the e2e has
+       * to be able to see (16 September 2026).
+       */
+      plane: { name?: string; source: string; why: string; origin: Vec3 };
       scale: number;
       /**
        * The ink's own box **in the plane's units** — the shape as it ended up
@@ -1680,8 +1743,12 @@ export interface ShardHook {
         /** |n · look| — how face-on it is, the number the gate is read against. */
         facing: number;
       }[];
-      /** True when this ink's own view has been left, so it is drawn faint. */
-      faded: boolean;
+      /**
+       * What the line is actually drawn at. View ink is world geometry (16
+       * September 2026): orbiting away changes this by nothing, which is what
+       * the e2e asserts where it used to assert the fade.
+       */
+      opacity: number | null;
       pose?: Pose;
       flippedFrom?: string;
     }[];
@@ -1918,6 +1985,22 @@ const hook: ShardHook = {
   flipPlane: (id, which = 1) => flipPlane(id, which),
   chipFor: (id) => chips.textFor(id),
   pinned: () => pinnedViews(log).map((v) => ({ label: v.label, count: v.count })),
+  cursor: () => ({ at: cursor, why: cursorWhy }),
+  shiftTap: (screen) => {
+    // Through `claimed`, the way a real shift + click reaches it, so what the
+    // e2e exercises is the gesture and not a back door onto `putCursor`.
+    space.canvas.dispatchEvent(
+      new PointerEvent('pointerdown', {
+        pointerId: 71, pointerType: 'mouse', isPrimary: true, button: 0, buttons: 1,
+        clientX: screen.x, clientY: screen.y, shiftKey: true, bubbles: true, cancelable: true,
+      })
+    );
+    return { at: cursor, why: cursorWhy };
+  },
+  worldPointsOf: (id) => {
+    const m = log.markOf(id);
+    return m ? m.points.map((pt) => toWorld(m.plane, pt)) : null;
+  },
   goToPinned: (index) => {
     const v = pinnedViews(log)[index];
     if (v) space.easeTo(v.pose, 0);
@@ -1978,7 +2061,7 @@ const hook: ShardHook = {
         const f = forms.find((x) => x.id === m.id);
         return {
           id: m.id,
-          plane: { name: m.plane.name, source: m.plane.source, why: m.plane.why },
+          plane: { name: m.plane.name, source: m.plane.source, why: m.plane.why, origin: m.plane.origin },
           scale: m.scale,
           bounds: inkBounds(m.points),
           readings: m.readings.map((r) => ({ label: r.label, weight: r.weight || 0, reasoning: r.reasoning })),
@@ -2010,7 +2093,7 @@ const hook: ShardHook = {
             gated: !!c.gated,
             facing: c.terms?.facingRaw ?? 1,
           })),
-          faded: ink.faded(m.id),
+          opacity: ink.opacityOf(m.id),
           ...(m.pose ? { pose: m.pose } : {}),
           ...(m.flippedFrom ? { flippedFrom: m.flippedFrom } : {}),
         };
@@ -2098,7 +2181,7 @@ const hook: ShardHook = {
     return { line: r.line, kind: r.kind, enabled: !!r.run };
   },
   undo,
-  clear: () => { log.clear(); chips.clear(); work.cancelAll(); lastTouched = null; ink.sync(); solids.sync(); selection.clear(); panel.show(null); report(); },
+  clear: () => { log.clear(); chips.clear(); work.cancelAll(); cursor = v3(0, 0, 0); cursorWhy = 'the world origin — shift + click to put it somewhere'; gizmo.setOrigin(cursor); ink.sync(); solids.sync(); selection.clear(); panel.show(null); report(); },
   panelText: () => panelEl.textContent || '',
 
   joinStub: (replies, name = 'e2e-stub') => {
@@ -2402,8 +2485,11 @@ if (DEMO === 'read' || DEMO === 'view') {
       );
       if (id) panel.show(id, selection.current());
     } else {
-      // A circle drawn in clear air beside the box: view ink, held with the
-      // pose — then the camera leaves it, and the ink says so by going faint.
+      // A circle drawn in clear air beside the box: view ink, on the plane
+      // through the cursor facing the camera — then the camera leaves, and it
+      // is the same circle seen edge-on. This is the Blender pair John sent
+      // (16 September 2026): a thin, FULLY DRAWN ellipse from away, the circle
+      // again from its own view. Ordinary world geometry, opaque either way.
       const c = hook.screenForWorld(v3(2.2, 1.4, 1.6));
       const id = hook.strokeScreen(
         Array.from({ length: 65 }, (_, i) => {
@@ -2411,10 +2497,8 @@ if (DEMO === 'read' || DEMO === 'view') {
           return { x: c.x + Math.cos(t) * 78, y: c.y + Math.sin(t) * 78 };
         })
       );
-      // Far enough that the pose really has been LEFT. A turn about Y of half
-      // a radian is only ~15° of look direction from a camera this high, which
-      // shaved it under `VIEW_TOLERANCE_DEG` and left the demo showing ink that
-      // had not gone faint. Measured, not guessed.
+      // Far enough to see it edge-on. Nothing about the ink changes; what
+      // changes is only where you are standing.
       hook.orbit(0.9, 0.12);
       if (id) panel.show(id, selection.current());
     }
