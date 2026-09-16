@@ -8,6 +8,10 @@
 
     "moduleResolution": "Bundler",
     "allowImportingTsExtensions": true,
+    /* G0: `export.test.ts` reads John's own captured board out of `fixtures/`
+       as a module rather than off the disk, so the test needs no node types
+       and the fixture travels with the bundle it is imported into. */
+    "resolveJsonModule": true,
     "isolatedModules": true,
     "moduleDetection": "force",
     "noEmit": true,

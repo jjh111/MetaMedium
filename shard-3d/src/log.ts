@@ -129,6 +129,20 @@ export interface PlaneEvidence {
   flippedFrom?: string;
 }
 
+/**
+ * What a brief can be given to fill (G0, `standFor`). Either something this
+ * drawing can stand right now, or the words naming what is missing.
+ *
+ * `kind` is open on purpose: today only the massing, and G1's sketch hull takes
+ * its place beside it without changing a caller.
+ */
+export interface StandFor {
+  /** Null when nothing can stand — and then `missing` says what would. */
+  can: { kind: 'massing'; massable: Massable } | null;
+  /** *nothing stands yet — a footprint on the foundation and a shape from the side would*. */
+  missing: string;
+}
+
 /** A solid as the log holds it: an artifact whose code is one of the shard's op trees. */
 export interface Solid {
   id: string;
@@ -279,6 +293,19 @@ export interface Log {
 
   /** The massing the board affords right now — tier 1, no model, no wait (§2.6 rule 1). */
   massable(): Massable | null;
+  /**
+   * **What this drawing could stand, for a brief that has nothing to fill**
+   * (G0; the seam G1 widens).
+   *
+   * The plan's rule is *the massing stands first*: a brief typed over a drawing
+   * is not refused for want of a selection — the drawing is stood up and then
+   * the model is asked to fill it. Today that means the massing, which is
+   * profiles on two or three of the named world planes. G1 widens this ONE
+   * function to the sketch hull — every free stroke as a silhouette claim — and
+   * nothing above it changes, because what `runBrief` needs from it is the same
+   * either way: something to stand, or words naming what is missing.
+   */
+  standFor(): StandFor;
   /** Stand it up. One act, three events, one undo — the same shape as `make`. */
   mass(m: Massable, at?: number): { id: string; step: OpStep; name: string } | null;
   /**
@@ -1382,6 +1409,49 @@ export function createLog(): Log {
     const marks = formMarks().filter((m) => !taken.has(m.id));
     const readings = forms().filter((f) => !taken.has(f.id));
     return massableFrom(readings, marks);
+  }
+
+  /**
+   * **What this drawing could stand for a brief** — G0's rule, *the massing
+   * stands first*, and the one function G1 widens to the sketch hull.
+   *
+   * It answers in two halves and never in silence: what can stand, or the words
+   * naming what is missing. Those words are the whole point — a brief that went
+   * nowhere used to say *nothing selected*, which tells a hand what the shard
+   * noticed rather than what to draw.
+   */
+  function standFor(): StandFor {
+    const m = massable();
+    if (m) return { can: { kind: 'massing', massable: m }, missing: '' };
+    // What is missing, said as the next mark rather than as a complaint. The
+    // three cases a hand is actually in: nothing drawn, one plane's worth of
+    // outlines, or outlines that do not overlap.
+    const taken = new Set(solids().flatMap((sd) => sd.memberIds));
+    const profiles = forms().filter((f) => f.role === 'profile' && !f.against && !taken.has(f.id));
+    const planes = new Set(
+      profiles.map((f) => markOf(f.id)?.plane.name).filter((n): n is string => !!n)
+    );
+    if (!profiles.length)
+      return {
+        can: null,
+        missing:
+          'nothing stands yet — a footprint on the foundation and a shape from the side would: ' +
+          'two closed outlines on two of the tiles are a solid already',
+      };
+    if (planes.size < 2)
+      return {
+        can: null,
+        missing:
+          `nothing stands yet — ${profiles.length} outline${profiles.length === 1 ? '' : 's'} ` +
+          `${planes.size ? `on the ${[...planes].join(' and ')} alone` : 'on no named plane'}; ` +
+          'a shape from another side, on another tile, would stand it',
+      };
+    return {
+      can: null,
+      missing:
+        `nothing stands yet — the outlines on the ${[...planes].join(' and ')} do not overlap ` +
+        'where they are, so their views are of two different things; move one over the other',
+    };
   }
 
   /**
@@ -2496,6 +2566,7 @@ export function createLog(): Log {
     name: acting(name, 2),
     remove: acting(remove, 1),
     massable,
+    standFor,
     mass: acting(mass, 1),
     growable,
     growMassing: acting(growMassing, 1),

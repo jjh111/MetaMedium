@@ -24,7 +24,7 @@ import {
 import { createSpace } from './scene';
 import { createGizmo } from './gizmo';
 import { createInk } from './ink';
-import { createLog, type Mark } from './log';
+import { createLog, type Mark, type Solid, type StandFor } from './log';
 import { createPanel, createPanelToggle, pinnedViews } from './panel';
 import { createSolids } from './solid';
 import { createSelection, type Sel } from './selection';
@@ -34,6 +34,18 @@ import { COLOUR_WORDS, describeStep } from './op';
 import { createModels } from './models';
 import { createWork } from './work';
 import { describeSpace } from './brief';
+import { createTranscript } from './exchange';
+import {
+  boardFilename,
+  boardFromFixture,
+  decodeBoard,
+  downloadText,
+  encodeBoard,
+  looksLikeLog,
+  pickTextFile,
+  FIXTURE_PEN_PX,
+  type Fixture,
+} from './export';
 import { meaningMessages, parseMeaning, propose, type Proposal } from './generator';
 import { describePhrase, PHRASE_VERBS, type NameRef, type PhraseReading, type PhraseScope } from './verbs';
 import { readColours, storedTheme, applyTheme, effectiveTheme, type ThemeName } from './theme';
@@ -59,6 +71,7 @@ import { describeMatch } from './library';
 import {
   describePlane,
   height,
+  NAMED,
   planeForPenDown,
   rayPlane,
   toPlane,
@@ -112,8 +125,16 @@ let handChosen: PlaneName | null = gizmo.chosen;
 /** True while the camera's own axis view holds the choice; the picker's tiles are then hidden. */
 let viewChoosing = false;
 const chips = createChips(chipsEl, space.project);
+/**
+ * G0: every exchange with a model, kept for the last few — who was asked, the
+ * brief as sent, the reply as received, what parsed, what was dropped, and how
+ * it ended. Runtime, never the log (`exchange.ts` says why at length).
+ */
+const transcript = createTranscript();
 const panel = createPanel(panelEl, statusEl, log, {
   broken: (id) => solids.brokenOf(id),
+  // G0: the *model* section, under *why / measurements*.
+  exchanges: () => transcript.all(),
   // P4: *matches the drawing* — every plane a profile of this solid was drawn
   // on, with the diff on it, and a region outlined where it lies on hover.
   diffs: (solidId) =>
@@ -905,9 +926,45 @@ function solidAt(solidId: string): Vec3 | null {
  * canvas has to — the massing was already standing in the engine's name before
  * the model was asked, and it is exactly what it was afterwards.
  */
+/**
+ * **What a brief would fill** (G0). One function, so the reading line and the
+ * act can never disagree — the field asks it to say what Enter will do, and
+ * `runBrief` acts on the answer.
+ *
+ * The order is the order a hand means things in: what you pointed at, then the
+ * one thing standing, then the drawing stood up, then what is missing.
+ */
+type BriefTarget =
+  /** What stands selected — a solid, or the outline a `reuse` would be placed at. */
+  | { kind: 'selected'; solid: Solid | null; markId: string | null }
+  /** Nothing selected and one solid on the board: that is the thing. */
+  | { kind: 'standing'; solid: Solid }
+  /** Nothing standing, and the drawing can stand one — the plan's own rule. */
+  | { kind: 'will-stand'; stand: NonNullable<StandFor['can']> }
+  /** Nothing to fill, and the words naming what is missing. */
+  | { kind: 'nothing'; missing: string };
+
+function briefTarget(): BriefTarget {
+  const solid = selectedSolid();
+  const sel = selection.current();
+  const markId = sel?.kind === 'mark' ? sel.id : null;
+  if (solid || markId) return { kind: 'selected', solid, markId };
+  const made = log.solids().filter((s) => !s.broken);
+  // One solid standing IS what a brief is about — it used to be refused for
+  // want of a tap, which is a mode wearing a different hat.
+  if (made.length === 1) return { kind: 'standing', solid: made[0] };
+  if (made.length > 1)
+    return {
+      kind: 'nothing',
+      missing: `${made.length} solids stand — tap the one to fill: ${made.map((s) => s.name).join(', ')}`,
+    };
+  const stand = log.standFor();
+  return stand.can ? { kind: 'will-stand', stand: stand.can } : { kind: 'nothing', missing: stand.missing };
+}
+
 async function runBrief(text: string, opts: { regen?: string[] } = {}) {
   const seat = models.first();
-  const solid = selectedSolid();
+  let solid = selectedSolid();
   // P6: a brief may also be typed with an OUTLINE selected and nothing standing
   // — *another one like that* — because the answer may be `{"reuse": …}`, which
   // needs somewhere to put a definition rather than something to fill. A reply
@@ -915,14 +972,61 @@ async function runBrief(text: string, opts: { regen?: string[] } = {}) {
   // place that knows which it was.
   const sel = selection.current();
   const atMark = sel?.kind === 'mark' ? sel.id : null;
+  const task = opts.regen ? 'the regen' : 'the brief';
+  /** Every exit path says the same sentence twice: to the hand, and to the transcript. */
+  const stop = (id: string, outcome: 'refused' | 'failed', sentence: string) => {
+    transcript.ended(id, outcome, sentence);
+    panel.say(sentence);
+    report();
+  };
   if (!seat) {
+    const sentence = 'no model has joined — the pane is open; a brief needs one';
+    // It never reached a model, and it is still an exchange the hand attempted:
+    // the whole point of the transcript is that an attempt leaves a trace.
+    transcript.refused({ who: 'nobody', what: task, words: text, reason: sentence });
     models.open();
-    panel.say('no model has joined — the pane is open; a brief needs one');
+    panel.say(sentence);
+    report();
     return;
   }
+  // **G0: a brief always answers, and the massing stands first.**
+  //
+  // The plan's own rule (§0 fault 2) is that a brief is not refused for want of
+  // a selection: the drawing is stood up and THEN the model is asked to fill
+  // it. `log.standFor()` is the one seam that says what this drawing can stand
+  // — the massing today, G1's sketch hull tomorrow — and when nothing can, it
+  // names what is MISSING rather than what the shard noticed.
   if (!solid && !atMark) {
-    panel.say('nothing selected — draw profiles on two or three planes, and the massing is what a brief fills');
-    return;
+    const target = briefTarget();
+    if (target.kind === 'nothing') {
+      transcript.refused({ who: seat.name, what: task, words: text, reason: target.missing });
+      panel.say(target.missing);
+      report();
+      return;
+    }
+    if (target.kind === 'standing') {
+      // One solid on the board and nothing selected: that is the thing a brief
+      // is about, and taking it is not a guess.
+      selection.set({ kind: 'solid', id: target.solid.id });
+      solid = target.solid;
+    } else if (target.kind === 'will-stand') {
+      const made = log.mass(target.stand.massable);
+      if (!made) {
+        const sentence = `${target.stand.massable.profileIds.length} outlines could stand and the massing would not derive — nothing was written`;
+        transcript.refused({ who: seat.name, what: task, words: text, reason: sentence });
+        panel.say(sentence);
+        report();
+        return;
+      }
+      solids.sync();
+      ink.sync();
+      selection.set({ kind: 'solid', id: made.id });
+      solid = log.solidOf(made.id);
+      panel.say(
+        `massing from ${target.stand.massable.profileIds.length} profiles · tier 1 — ` +
+          `it stood first, and ${seat.name} is being asked to fill it`
+      );
+    }
   }
   const key = `brief:${solid?.id ?? atMark}:${Date.now()}`;
   const label = `${seat.name} · ${opts.regen ? 'the regen' : 'the brief'}`;
@@ -931,6 +1035,10 @@ async function runBrief(text: string, opts: { regen?: string[] } = {}) {
   report();
 
   const brief = describeSpace(log.scene(text, opts.regen ? { mutable: opts.regen } : {}));
+  // G0: the exchange is recorded the moment it is SENT, so a model still
+  // thinking is already a row — which is what the first board needed and did
+  // not have.
+  const ex = transcript.asked({ who: seat.name, what: task, words: text, brief });
   const result = await propose({
     config: seat.config,
     brief,
@@ -940,13 +1048,30 @@ async function runBrief(text: string, opts: { regen?: string[] } = {}) {
     ...(opts.regen ? { regen: true } : {}),
   });
   work.end(key);
+  // What came back, verbatim, whether or not it could be used. `raw` is kept by
+  // `propose` on the failure path too — that is the reply John never saw.
+  transcript.came(ex, {
+    ...(result.raw !== undefined ? { reply: result.raw } : {}),
+    ...(result.proposal
+      ? {
+          parsed: {
+            steps: result.proposal.steps.length,
+            profiles: result.proposal.profiles.length,
+            ...(result.proposal.reuse ? { reuse: result.proposal.reuse } : {}),
+          },
+          dropped: result.proposal.droppedWhy,
+        }
+      : {}),
+  });
 
   if (!result.ok || !result.proposal) {
     // Nothing was written, and the status says why rather than leaving the
     // board looking as though something had happened.
-    panel.say(`${seat.name} — ${result.error ?? 'nothing usable came back'}. Nothing was written; the drawing is as it was`);
-    report();
-    return;
+    return stop(
+      ex,
+      'failed',
+      `${seat.name} — ${result.error ?? 'nothing usable came back'}. Nothing was written; the drawing is as it was`
+    );
   }
   const proposal: Proposal = result.proposal;
   // **`reuse` is HONOURED, not only reported** (v9 S5's rule, P6). The brief
@@ -957,41 +1082,45 @@ async function runBrief(text: string, opts: { regen?: string[] } = {}) {
   if (proposal.reuse && !proposal.steps.length) {
     const why = log.whyNotPlace(proposal.reuse, atMark);
     if (why) {
-      panel.say(`${seat.name} says the library already holds “${proposal.reuse}”, but ${why}`);
-      report();
-      return;
+      return stop(ex, 'refused', `${seat.name} says the library already holds “${proposal.reuse}”, but ${why}`);
     }
     placeHere(proposal.reuse, atMark);
-    panel.say(
-      `${seat.name} says the library already holds “${proposal.reuse}” — placed from the library, not written · tier 1`
-    );
+    const sentence = `${seat.name} says the library already holds “${proposal.reuse}” — placed from the library, not written · tier 1`;
+    transcript.ended(ex, 'applied', sentence);
+    panel.say(sentence);
     report();
     return;
   }
-  // A tree came back, and there is nothing for it to fill. Said rather than
-  // guessed at: a proposal built onto a solid nobody selected would be a tree
+  // A tree came back, and there is nothing for it to fill. Since G0 stands the
+  // massing first this is the narrow case that is left: a brief typed at a bare
+  // OUTLINE whose answer was a tree rather than a `reuse`. Said rather than
+  // guessed at — a proposal built onto a solid nobody selected would be a tree
   // standing somewhere the hand did not ask for.
   if (!solid) {
-    panel.say(
+    return stop(
+      ex,
+      'refused',
       `${seat.name} wrote a tree of ${proposal.steps.length} step${proposal.steps.length === 1 ? '' : 's'}, and ` +
-        `nothing is selected for it to fill — draw profiles on two or three planes, or tap a solid. Nothing was written`
+        `nothing stands for it to fill — ${log.standFor().missing}. Nothing was written`
     );
-    report();
-    return;
   }
   const out = opts.regen
     ? log.replaceSteps(solid.id, opts.regen, proposal, { id: seat.id, name: seat.name })
     : log.applyProposal(solid.id, proposal, { id: seat.id, name: seat.name });
   if (!out) {
-    panel.say(`${seat.name} — nothing in the reply could be built here. Nothing was written`);
-    report();
-    return;
+    return stop(ex, 'refused', `${seat.name} — nothing in the reply could be built here. Nothing was written`);
   }
   solids.sync();
   ink.sync();
   selection.set({ kind: 'solid', id: solid.id });
   const honours = log.honoursOf(solid.id);
   const named = [...new Set(out.steps.map((st) => st.name).filter(Boolean))];
+  const landed =
+    `${out.steps.length} step${out.steps.length === 1 ? '' : 's'} applied to ${solid.name}` +
+    `${named.length ? `, named ${named.join(', ')}` : ''}` +
+    `${out.drawn.length ? `, ${out.drawn.length} profile${out.drawn.length === 1 ? '' : 's'} drawn` : ''}` +
+    `${honours ? ` · honours the drawing ${(honours.overall * 100).toFixed(0)}%` : ''}`;
+  transcript.ended(ex, 'applied', landed);
   panel.say(
     `${seat.name} · ${out.steps.length} step${out.steps.length === 1 ? '' : 's'}` +
       `${named.length ? ` named ${named.join(', ')}` : ''}` +
@@ -1446,6 +1575,11 @@ function fieldContext(): FieldContext {
       model: seat ? seat.name : null,
       run: (text) => void runBrief(text),
       openPane: () => { models.open(); report(); },
+      // G0: which of the three Enter will be, asked of the same function
+      // `runBrief` acts on, so the line and the act can never disagree.
+      standing: ((k) => (k === 'will-stand' ? 'will-stand' : k === 'nothing' ? 'nothing' : 'stands'))(
+        briefTarget().kind
+      ),
     },
   };
 }
@@ -1476,6 +1610,8 @@ function lastStroke(): string | null {
 
 // ---- the chrome ------------------------------------------------------------
 const undoTile = document.getElementById('tileUndo')!;
+const openTile = document.getElementById('tileOpen')!;
+const exportTile = document.getElementById('tileExport')!;
 const themeTile = document.getElementById('tileTheme')!;
 const helpTile = document.getElementById('tileHelp')!;
 const modelsTile = document.getElementById('tileModels')!;
@@ -1491,6 +1627,165 @@ modelsTile.onclick = () => {
 };
 
 undoTile.onclick = () => undo();
+
+// ---- G0: the board as its log, out and back in -----------------------------
+
+/**
+ * *Export…* — the board as its own log, downloaded.
+ *
+ * `encodeLog` of the session's events, one JSON event per line: the canvas's
+ * format unchanged (`metamedium-core/src/store/seam.ts`), so a board exported
+ * here is a log a folder store, a merge or the canvas itself can read. This is
+ * how John's boards become fixtures, and it is what settles G1's Y fault
+ * against a real drawing rather than a synthetic one.
+ */
+function exportBoard(): { name: string; events: number } {
+  const events = log.session.getEvents();
+  const name = boardFilename();
+  downloadText(name, encodeBoard(events), 'application/json');
+  panel.say(`${name} — ${events.length} event${events.length === 1 ? '' : 's'}; the board, as its log`);
+  report();
+  return { name, events: events.length };
+}
+
+/**
+ * *Open…* — a log replacing the board.
+ *
+ * **It is not undoable, and it says so before it happens.** `session.load`
+ * replaces the whole event list and bumps the generation, so there is no act
+ * for undo to walk back to — the honest thing is a confirm on a board that
+ * holds work, and none on an empty one. The e2e and the fixture loader pass
+ * `confirm: false`, because they have already decided.
+ */
+function openBoard(text: string, o: { confirm?: boolean; what?: string } = {}): { events: number; skipped: number } | null {
+  const { events, skipped } = decodeBoard(text);
+  if (!events.length) {
+    panel.say(`${o.what ?? 'that file'} holds no events the shard can read${skipped ? ` — ${skipped} lines were not JSON` : ''}`);
+    report();
+    return null;
+  }
+  const standing = log.marks().length;
+  if (o.confirm !== false && standing && !window.confirm(
+    `Open ${o.what ?? 'this log'}?\n\n${standing} mark${standing === 1 ? '' : 's'} on this board will be replaced, and opening a log cannot be undone.`
+  )) {
+    panel.say('left as it was — opening a log replaces the board, and that cannot be undone');
+    report();
+    return null;
+  }
+  log.session.load(events);
+  chips.clear();
+  work.cancelAll();
+  selection.clear();
+  ink.sync();
+  solids.sync();
+  panel.show(null);
+  panel.say(
+    `${o.what ?? 'a log'} opened — ${events.length} event${events.length === 1 ? '' : 's'}, ` +
+      `${log.marks().length} mark${log.marks().length === 1 ? '' : 's'}, ${log.solids().length} solid${log.solids().length === 1 ? '' : 's'}` +
+      `${skipped ? ` · ${skipped} line${skipped === 1 ? '' : 's'} were not JSON and were skipped` : ''}`
+  );
+  report();
+  return { events: events.length, skipped };
+}
+
+/**
+ * `?fixture=<name>` — one of `shard-3d/fixtures/` at boot, for the e2e and the
+ * demo.
+ *
+ * A `.mm.log` or `.jsonl` there is a real log and is replayed. A `.json` is a
+ * captured **view** of a board — what `__shard.state()` exposed before there
+ * was an export — and is REBUILT from its marks' bounds, which is a
+ * reconstruction and says so in the status line (`export.ts`).
+ */
+async function loadFixture(name: string): Promise<{ marks: number; solids: number; from: 'log' | 'fixture' } | null> {
+  const base = `fixtures/${name.replace(/[^A-Za-z0-9._-]/g, '')}`;
+  for (const ext of ['.mm.log', '.log', '.jsonl', '.json']) {
+    let text: string;
+    try {
+      const res = await fetch(`${base}${ext}`);
+      if (!res.ok) continue;
+      text = await res.text();
+    } catch {
+      continue;
+    }
+    // **What it is, is read from what is IN it.** A dev server answers a path
+    // it does not have with the page itself, so an extension that is missing
+    // comes back 200 with a document in it — and a probe that trusted the name
+    // would have handed the log reader a page of HTML and reported an empty
+    // board. Found the first time `?fixture=` ran against vite.
+    const head = text.trimStart().slice(0, 200).toLowerCase();
+    if (head.startsWith('<!doctype') || head.startsWith('<html')) continue;
+    let asFixture: Fixture | null = null;
+    try {
+      const parsed = JSON.parse(text) as unknown;
+      // One JSON object with `marks` in it is a captured VIEW; a log is many
+      // JSON objects, one per line, and never parses whole.
+      if (parsed && typeof parsed === 'object' && Array.isArray((parsed as Fixture).marks)) asFixture = parsed as Fixture;
+    } catch {
+      /* not one object — a log, then */
+    }
+    if (asFixture) {
+      const built = rebuildFixture(asFixture, `${name}${ext}`);
+      return built ? { ...built, from: 'fixture' as const } : null;
+    }
+    const out = openBoard(text, { confirm: false, what: `${name}${ext}` });
+    return out ? { marks: log.marks().length, solids: log.solids().length, from: 'log' as const } : null;
+  }
+  panel.say(`no fixture called “${name}” — fixtures/ holds the boards this plan is settled on`);
+  report();
+  return null;
+}
+
+/**
+ * A captured view back into a board: each mark redrawn from its own bounds on
+ * its own plane, through the same `log.add` a hand's ink goes through, and then
+ * through the same `tier1` that stands a massing as you draw.
+ *
+ * It is a reconstruction of a drawing, not a replay of one — the fixture holds
+ * no stroke points — and the sentence says so every time.
+ */
+function rebuildFixture(fixture: Fixture, what: string): { marks: number; solids: number } | null {
+  const built = boardFromFixture(fixture);
+  if (!built.marks.length) {
+    panel.say(`${what} — nothing in it could be rebuilt: ${built.dropped[0] ?? 'it holds no marks'}`);
+    report();
+    return null;
+  }
+  log.clear();
+  chips.clear();
+  selection.clear();
+  for (const m of built.marks) {
+    // The scale a fixture does not record. Stated once in `export.ts` and used
+    // here: the mark as though it were drawn across two hundred screen pixels.
+    const size = Math.max(
+      Math.abs(m.points.reduce((mx, p) => Math.max(mx, p.x), -Infinity) - m.points.reduce((mn, p) => Math.min(mn, p.x), Infinity)),
+      Math.abs(m.points.reduce((mx, p) => Math.max(mx, p.y), -Infinity) - m.points.reduce((mn, p) => Math.min(mn, p.y), Infinity))
+    );
+    const id = log.add(m.points, NAMED[m.plane]('chosen', m.why), size / FIXTURE_PEN_PX);
+    // The same door a drawn stroke goes through: a massing stands the moment
+    // the second profile lands, tier 1, with nothing asked.
+    if (id) tier1(id);
+  }
+  ink.sync();
+  solids.sync();
+  panel.show(null);
+  panel.say(`${what} — ${built.sentence}`);
+  report();
+  return { marks: log.marks().length, solids: log.solids().length };
+}
+
+openTile.onclick = () => {
+  void pickTextFile().then((picked) => {
+    if (!picked) return;
+    if (!looksLikeLog(picked.name)) {
+      panel.say(`${picked.name} is not a log — the shard opens what it exports: one JSON event per line`);
+      return report();
+    }
+    openBoard(picked.text, { what: picked.name });
+  });
+};
+exportTile.onclick = () => exportBoard();
+
 themeTile.onclick = () => {
   theme = theme === 'system' ? 'light' : theme === 'light' ? 'dark' : 'system';
   applyTheme(theme);
@@ -1522,6 +1817,15 @@ function report() {
   chips.place();
   nav.sync();
   tile(undoTile, 'undo', n ? String(n) : '', { why: 'drop the last act · the solid if one stands, else the stroke' });
+  // G0: the board out and back in, in the format the canvas writes. The export
+  // tile says how many events would travel, which is the one number that says
+  // whether there is anything to export.
+  tile(openTile, 'open', '', {
+    why: 'open a log — it REPLACES this board, and that cannot be undone',
+  });
+  tile(exportTile, 'export', String(log.session.getEvents().length), {
+    why: 'the board as its own log · one JSON event per line, the canvas’s own format',
+  });
   tile(themeTile, 'theme', theme === 'system' ? `sys · ${effectiveTheme(theme)}` : theme, {
     why: 'light and dark are the same tokens inverted',
   });
@@ -1958,6 +2262,28 @@ export interface ShardHook {
    * way to put a tree in front of the validator that this build did not write.
    */
   seedCode(markIds: string[], code: string, name?: string): string | null;
+
+  // ---- G0: the transcript, and the board as its log ------------------------
+  /** Every exchange with a model that is still kept, newest first. */
+  exchanges(): {
+    who: string;
+    what: string;
+    words: string;
+    outcome: string;
+    reason: string;
+    brief: string;
+    reply?: string;
+    parsed?: { steps: number; profiles: number; reuse?: string };
+    dropped: string[];
+  }[];
+  /** The board as its log — the text the *export* tile downloads. */
+  logText(): string;
+  /** Open a log, as *Open…* does, with the confirm already decided. */
+  openLog(text: string): { events: number; skipped: number } | null;
+  /** `?fixture=<name>`'s own path: a log replayed, or a captured view rebuilt. */
+  loadFixture(name: string): Promise<{ marks: number; solids: number; from: 'log' | 'fixture' } | null>;
+  /** What a brief would find to fill, and what is missing when it would find nothing. */
+  standFor(): { can: string | null; missing: string };
 }
 
 /** Where the camera stands, in the words a result object can be read in. */
@@ -2370,9 +2696,38 @@ const hook: ShardHook = {
     report();
     return id;
   },
+
+  // ---- G0 ------------------------------------------------------------------
+  exchanges: () =>
+    transcript.all().map((ex) => ({
+      who: ex.who,
+      what: ex.what,
+      words: ex.words,
+      outcome: ex.outcome,
+      reason: ex.reason,
+      brief: ex.brief,
+      ...(ex.reply !== undefined ? { reply: ex.reply } : {}),
+      ...(ex.parsed ? { parsed: ex.parsed } : {}),
+      dropped: ex.dropped,
+    })),
+  logText: () => encodeBoard(log.session.getEvents()),
+  openLog: (text) => openBoard(text, { confirm: false, what: 'a log' }),
+  loadFixture: (name) => loadFixture(name),
+  standFor: () => {
+    const s = log.standFor();
+    return { can: s.can ? s.can.kind : null, missing: s.missing };
+  },
 };
 
 (window as unknown as { __shard: ShardHook }).__shard = hook;
+
+// ---- `?fixture=<name>` — a board from `shard-3d/fixtures/` at boot ----------
+// The e2e and the demo both need a board that is John's rather than a synthetic
+// one, and G1 needs his second board standing in front of it to fix the Y
+// fault. A log there is replayed; a captured view is rebuilt from its bounds
+// and the status line says which it was.
+const FIXTURE = new URLSearchParams(location.search).get('fixture');
+if (FIXTURE) whenSized(() => void loadFixture(FIXTURE));
 
 /**
  * The castle's three views (P5's done-criterion), in each plane's own units.
@@ -2673,6 +3028,116 @@ if (DEMO === 'castle') {
     hook.strokeScreen(loop(CASTLE.side).map((p) => hook.screenFor(p)));
     space.view('free');
     choose(null);
+    report();
+  });
+}
+
+/**
+ * **`?demo=castle-sketch` — John's first board, 16 September 2026**
+ * (`SHARD-3D-PUSH-2.md` §0's table).
+ *
+ * A rough footprint on the foundation, and then towers and walls drawn as ⊓
+ * from wherever the camera happened to stand — free strokes, each landing on
+ * the view plane through the cursor, exactly as the first push made them. It is
+ * an architect's drawing: a plan and some elevations, sketched from anywhere.
+ *
+ * **Today it stands nothing**, and that is the point of the demo. The footprint
+ * is a profile waiting for an extent; every ⊓ is an open stroke on a view plane
+ * crossing no solid's silhouette, so the form table's fallthrough calls it
+ * `annotation`. No massing, no solid — and with G0 in, a brief typed over it no
+ * longer disappears: the field says *nothing stands to fill; it will say what
+ * is missing* before Enter, and Enter says what is missing.
+ *
+ * G1 is what changes it: every free stroke as a silhouette claim, and a ⊓ whose
+ * feet reach the ground closing on the ground. When it lands, this same demo
+ * stands a blocky castle with no model asked. The numbers below are the demo's
+ * own, so the two runs are of the same drawing.
+ */
+const CASTLE_SKETCH = {
+  /** The footprint, on the foundation: a rough 6 × 4 keep. */
+  plan: [
+    { x: -3, y: -2 },
+    { x: 3, y: -2 },
+    { x: 3, y: 2 },
+    { x: -3, y: 2 },
+  ] as Point[],
+  /**
+   * Three ⊓ — two towers and a wall — each a world anchor to aim at and a
+   * height and half-width **in screen pixels**, because that is what drawing on
+   * the view plane is: a shape made where the pen is, at the size the hand made
+   * it, on the plane facing the camera.
+   */
+  ups: [
+    { at: v3(-2.4, 0, -1.4), halfW: 52, tall: 150, from: 0 },
+    { at: v3(2.4, 0, -1.4), halfW: 52, tall: 150, from: 0 },
+    { at: v3(0, 0, 1.8), halfW: 96, tall: 124, from: 1 },
+  ],
+  /**
+   * The two free poses the hand wandered to, as orbits from where the camera
+   * starts. Both drop the eye toward the ground: drawing an elevation is
+   * something you do from beside a thing, not from above it — and from above,
+   * the foundation the footprint is on outscores the view plane and the ⊓ lands
+   * flat on the floor, which is not what the hand did.
+   */
+  views: [
+    { dTheta: 0.42, dPhi: -0.5 },
+    { dTheta: 1.25, dPhi: -0.12 },
+  ],
+};
+if (DEMO === 'castle-sketch') {
+  const loop = (corners: Point[], per = 14) => {
+    const out: Point[] = [];
+    for (let i = 0; i < corners.length; i++) {
+      const a = corners[i];
+      const b = corners[(i + 1) % corners.length];
+      for (let k = 0; k < per; k++) {
+        const t = k / per;
+        out.push({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t });
+      }
+    }
+    out.push(corners[0]);
+    return out;
+  };
+  /** A ⊓ in SCREEN points: up the left side, across the top, down the right. */
+  const arch = (base: Point, halfW: number, tall: number, per = 20): Point[] => {
+    const corners = [
+      { x: base.x - halfW, y: base.y },
+      { x: base.x - halfW, y: base.y - tall },
+      { x: base.x + halfW, y: base.y - tall },
+      { x: base.x + halfW, y: base.y },
+    ];
+    const out: Point[] = [];
+    for (let i = 0; i < corners.length - 1; i++)
+      for (let s = 0; s < per; s++) {
+        const t = s / per;
+        out.push({
+          x: corners[i].x + (corners[i + 1].x - corners[i].x) * t,
+          y: corners[i].y + (corners[i + 1].y - corners[i].y) * t,
+        });
+      }
+    out.push(corners[corners.length - 1]);
+    return out;
+  };
+  whenSized(() => {
+    // 1 · the footprint, on the foundation. A profile — and on its own, one
+    //     that is still waiting for an extent.
+    choose('foundation');
+    hook.strokeScreen(loop(CASTLE_SKETCH.plan).map((p) => hook.screenFor(p)));
+    // 2 · un-choose, and draw from wherever you are standing. Nothing is
+    //     chosen from here on: this is the hand that does not use the tiles.
+    choose(null);
+    let at = -1;
+    for (const up of CASTLE_SKETCH.ups) {
+      if (up.from !== at) {
+        const turn = CASTLE_SKETCH.views[up.from];
+        hook.orbit(turn.dTheta, turn.dPhi);
+        at = up.from;
+      }
+      hook.strokeScreen(arch(hook.screenForWorld(up.at), up.halfW, up.tall));
+    }
+    // …and stand back, so the whole sketch is on the screen. The last pose the
+    // hand happened to draw from is not a view of the drawing.
+    hook.nav.home(0);
     report();
   });
 }

@@ -215,6 +215,40 @@ details.evidence[open] > summary::after { content: ' ▴'; }
 details.evidence > summary:hover { color: var(--teal); }
 details.evidence > summary:focus-visible { outline: 1px solid var(--teal); outline-offset: 2px; }
 
+/* ---- G0: the transcript — one row per exchange, opening on the verbatim ---
+   A row says who · what · outcome · how long; opening it gives the brief as
+   SENT and the reply as RECEIVED, neither of them tidied. A reply is a wall of
+   JSON and a brief is a page of prose, so both scroll in their own box rather
+   than pushing the rest of the evidence down the panel. */
+details.exchange > summary {
+  cursor: pointer;
+  list-style: none;
+  color: var(--ink-2);
+  font-size: var(--t-micro);
+  padding: var(--s1) 0;
+}
+details.exchange > summary::-webkit-details-marker { display: none; }
+details.exchange > summary::before { content: '▸ '; color: var(--ink-3); }
+details.exchange[open] > summary::before { content: '▾ '; }
+details.exchange > summary:hover { color: var(--teal); }
+details.exchange > summary:focus-visible { outline: 1px solid var(--teal); outline-offset: 2px; }
+pre.verbatim {
+  margin: 0 0 var(--s2);
+  padding: var(--s1) var(--s2);
+  max-height: 14em;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: var(--t-micro);
+  line-height: 1.5;
+  color: var(--ink-2);
+  /* The tokens' own recessed ground — "wells, code grounds", which is what a
+     reply verbatim is. No hex here and no new token invented for it. */
+  background: var(--paper-dk);
+  border: 1px solid var(--rule-soft);
+  border-radius: var(--radius-sm);
+}
+
 /* ---- the field: one input, one reader, the verbs it affords -------------- */
 /* At the foot of the panel for now, not at the pen tip (§7 wants the tip; the
    tip needs the selection's screen position, which is P1's). The READER is the

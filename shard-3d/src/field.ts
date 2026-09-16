@@ -104,7 +104,18 @@ export interface FieldContext {
    * Enter opens the pane rather than doing nothing — the escalation, made
    * visible, exactly as the canvas does it.
    */
-  brief?: { model: string | null; run(text: string): void; openPane(): void };
+  brief?: {
+    model: string | null;
+    run(text: string): void;
+    openPane(): void;
+    /**
+     * G0: what a brief would find to fill — something already standing, the
+     * drawing stood up first, or nothing at all. It is what the reading line
+     * says before Enter, and it comes from `log.standFor()`, the one seam G1
+     * widens to the sketch hull.
+     */
+    standing?: 'stands' | 'will-stand' | 'nothing';
+  };
 }
 
 const NAME_PREFIX = /^(name)\s*:\s*(.*)$/i;
@@ -193,10 +204,19 @@ export function readField(text: string, ctx: FieldContext): FieldReading {
 
   if (ctx.brief) {
     const model = ctx.brief.model;
+    // G0: the line says WHICH of the three a brief will be, before Enter is
+    // pressed — filling what already stands, standing the drawing up first, or
+    // coming back with what is missing. The shard knows all three already; the
+    // hand used to find out afterwards, from a sentence that then faded.
+    const standing = ctx.brief.standing ?? 'stands';
     return {
       kind: 'brief',
       line: model
-        ? `↵ a brief → asks ${model} — the massing is the extent and the reply is clipped to it`
+        ? standing === 'stands'
+          ? `↵ a brief → asks ${model} — the massing is the extent and the reply is clipped to it`
+          : standing === 'will-stand'
+            ? `↵ a brief → asks ${model} — the massing stands first, and the reply is clipped to it`
+            : `↵ a brief → asks ${model} — nothing stands to fill; it will say what is missing`
         : 'no model has joined — ↵ opens the model pane, and a brief needs one',
       run: model ? () => ctx.brief!.run(t) : () => ctx.brief!.openPane(),
       asks: true,

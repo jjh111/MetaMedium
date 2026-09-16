@@ -1,4 +1,4 @@
-# shard-3d — P0 the space, P1 the planarity read, P2 solids, P3 features and cuts, P4 the diff, P5 the generator seat, P6 the library, and the compass
+# shard-3d — P0 the space, P1 the planarity read, P2 solids, P3 features and cuts, P4 the diff, P5 the generator seat, P6 the library, the compass, and G0 the transcript and the export
 
 A bounded MetaMedium for making things in space. See `../SHARD-3D-PLAN.md` for
 the whole plan. **Seven packages are in, and P6 is the plan's MVP line** — the
@@ -69,7 +69,7 @@ it extends the one seam P0 left for it.
 > **Done when:** save the mug as *mug*; draw its profile elsewhere; *mug 0.8x*
 > is offered and one tap places it.
 
-All seven criteria run in `e2e.js` (92 steps), and the two-minute demo runs
+All seven criteria run in `e2e.js` (106 steps), and the two-minute demo runs
 beside them as `__demo()` (11 steps). `?demo` draws P0's and P2's at
 boot; `?demo=read` draws the rectangle read onto a box's top face with the chip
 beside it; `?demo=view` draws a circle on the view plane and then orbits off it, so it
@@ -81,8 +81,15 @@ because that is the human's next act and the whole point of the package.
 **`?demo=mug` runs the whole two-minute demo** (§9) and leaves the finished
 board: a mug with a hole cut through it and a handle a model named from your
 words, and a second mug placed from the library where its plan was drawn again.
-`?theme=light|dark|system` picks a theme, the way the whitepaper shares
-a surface.
+**`?demo=castle-sketch` draws John's FIRST board** (`SHARD-3D-PUSH-2.md` §0): a
+footprint on the foundation and three ⊓ towers and walls drawn from two free
+views — and **it stands nothing**, which is the point. The footprint is a
+profile still waiting for an extent; every ⊓ is an open stroke on a view plane
+crossing no solid's silhouette, so the form table's fallthrough calls it
+`annotation`. It is the target G1 aims at, and the demo the fault can be looked
+at in rather than described. `?fixture=<name>` loads a board out of
+`fixtures/` at boot. `?theme=light|dark|system` picks a theme, the way the
+whitepaper shares a surface.
 
 ## Run it
 
@@ -290,12 +297,14 @@ there is no bundle to drift.
 | `src/panel.ts` | **Hidden by default** (`panelShown` / `setPanelShown`, the key `shard.panel`, and `createPanelToggle` — the canvas's *details ▾* ported from `Demos/surface/00-core.js`: a `panelHidden` class on the body, remembered per device, and the rows still built and still in the DOM while it is down, so `panelText()` and every assertion on it are the same either way). `selectionLine` is what the status line says in its place — the selection's name and the next act, in the field's own words. Then the rows and the status line — and `pinnedViews`, still read off the log here though the chips are drawn in the corner — including *plays*, ***could be*** (P6: what the library says this outline is, ranked, in the engine's name), *solid* — the latter showing the tree **nested** (`↳ cut · through · from stroke:5` under `extrude · depth 2.40 u`) and a *broken* row with the seam's own words when a derivation did not come off — and ***matches the drawing***: one block per plane a profile of the selected solid was drawn on, with the coverage, the sentence, which outline it read, and a chip per region |
 | `src/ui.ts` | pill · chip · tile · row · pane — `Demos/surface/00-ui.js` ported, not forked |
 | `src/theme.ts` | The tokens read back off `../brand/tokens.css` at boot; nothing here restates a hex |
+| `src/exchange.ts` | **Pure.** G0's transcript: every exchange with a model — who was asked, the brief as sent, the human's words, the reply as **received**, what parsed, what was dropped and why, the outcome and the time it took — the last `KEEP` (8) of them. **Runtime, never the log**, and the file says at length why: what a reply DID is already in the log, attributed and undoable, and this is the evidence about the exchange rather than state of the board |
+| `src/export.ts` | **The board as its log, out and back in** (G0). `encodeBoard` / `decodeBoard` are core's own `encodeLog` / `decodeLog` — one JSON event per line, the canvas's format unchanged — plus `boardFilename`, the download, the file picker, and `boardFromFixture`: a captured VIEW of a board rebuilt from its marks' bounds, which is a reconstruction and says so every time |
 | `src/brief.ts` | **Pure.** `describeSpace` (§6) — the `describeReading` of this shard, and the **region-id rule** kept in stroke ids and step ids: what stands (the massing first, said to be the extent to stay inside), the planes and what lies on each in that plane's own units, the diff regions, **every name in play in its step's own id**, the library, the words, and then `HERE_IN_SPACE` — one paragraph on what can be made here and, as importantly, what cannot |
 | `src/generator.ts` | **Pure.** The generator seat: the making and regen prompts, `parseProposal` (strict JSON first, then core's own two repairs, then reported — never guessed), the closed lists a reply may use (`PROPOSABLE`, `PROPOSABLE_SHAPES`, the colour words), and `propose`, whose transport is **injectable** so a stub never touches the network. Also `meaningMessages` / `parseMeaning`: asking a model which of the shard's own verbs a phrase meant, which is the only thing here a model is asked that is not geometry |
 | `src/verbs.ts` | **Pure.** The verb table with name-resolved targets (§2.6 rule 4), `behave/words.ts`'s pattern ported: `SAYINGS` per verb, `CHANGES` for the size words, `namesIn` resolving a noun singular or plural against the names in play (core's own `singular`), and **what it cannot read is returned, not dropped** |
 | `src/models.ts` | The model pane, `Demos/surface/04-models.js` ported: both local servers probed in parallel, embedding-only models hidden **and said**, the pick remembered as a preference, hosted providers by key — and **no key ever enters the log**. `joinWith` seats a model with a transport of its own, which is what `__shard.joinStub` is |
 | `src/work.ts` | A model at work, shown **where it works**: a breathing `--sig-model` dot with the model's name and its task above the solid, the elapsed time after a few seconds, *Esc stops it* after thirty, and one `AbortSignal` per call so Esc really does |
-| `e2e.js` | The whole loop through the real pointer path — **101 steps, P0 → P6, the compass, the panel's toggle, trackpad and touch, and the axis views** — and, beside it, `__demo()`: the two-minute demo of §9 in eleven asserted steps, with a timing on each |
+| `e2e.js` | The whole loop through the real pointer path — **106 steps, P0 → P6, the compass, the panel's toggle, trackpad and touch, the axis views, and G0's five: the log out and back in, a brief with nothing standing, a brief with nothing selected, the massing standing first, and `?fixture=`** — and, beside it, `__demo()`: the two-minute demo of §9 in eleven asserted steps, with a timing on each |
 | `build-standalone.mjs` | **One file.** Runs `npm run build` (which typechecks first), then inlines every asset Vite emitted — the bundle as one inline module, the stylesheet as one `<style>` — into `dist/shard-3d.html`, and refuses to write a page that still points at anything that would not travel with it. The font `@import` stays external, because the tokens name a fallback stack and a face is not worth trebling the file for |
 
 ## The design decision: how a solid is held in the log
@@ -586,6 +595,119 @@ Three consequences, each deliberate:
   built from is now simplified at `PROFILE_SIMPLIFY` of the mark's own size
   (the fraction `getFingerprint` finds corners at); the ink is untouched, the
   shape is unchanged, and the same run takes **8 seconds**.
+
+## G0: the board leaves the tab, and a brief always answers
+
+Three faults from John's first real use (`SHARD-3D-PUSH-2.md` §0), and the
+three things that answer them.
+
+### The board as its log, out and back in
+
+**The format is the canvas's, unchanged**: `encodeLog` of the session's own
+events, one JSON event per line (`metamedium-core/src/store/seam.ts`). That is
+what `.metamedium/logs/*.log` holds, what the canvas's export pane writes as
+`canvas.jsonl`, and what `mergeLogs` reads — so a board exported from either
+surface is the same kind of thing and needs no converter. *Export…* in the bar
+downloads it as `shard-<date>.mm.log`; *Open…* picks one and replays it.
+
+**Opening is not undoable, and it says so first.** `session.load` replaces the
+whole event list and bumps the generation, so there is no act for undo to walk
+back to. The honest thing is a confirm on a board holding work, and none on an
+empty one — not a fake undo that could not put the old board back.
+
+A board round-trips: `export.test.ts` pins that the marks, the solids, the
+names, the planes and the trees come back identical, which is invariant 4 doing
+its job — the export IS the log, and state is a pure function of it.
+
+### A fixture is a VIEW of a board, and an exported log supersedes it
+
+`fixtures/john-2026-09-16-massing.json` was captured from the live tab through
+`__shard.state()` **before there was an export**, so it holds each mark's plane,
+bounds and readings and **no stroke points at all**. `boardFromFixture` rebuilds
+a board from those bounds — circles and rectangles from the boxes they filled,
+on their own planes — and the status line calls it what it is: *a reconstruction,
+not a replay*. Four of his ten marks come back: the three profiles he drew on
+the tiles and one line on the foundation. The six view-plane strokes are dropped
+**and counted**, because a fixture records the camera pose a stroke was drawn
+from but not the (u, v) frame the shard built from it, and guessing at that
+frame would be calling the guess John's drawing.
+
+A fixture records no pen scale either, so a rebuilt mark is treated as though it
+had been drawn across `FIXTURE_PEN_PX` (200) screen pixels — stated once in
+`export.ts`, because every fixed threshold in the shape rung is about the hand.
+
+**What `?fixture=john-2026-09-16-massing` stands, measured.** The three profiles
+stand the massing, tier 1, exactly as they did on his screen — and the body
+comes out at **y ∈ [0.97, 3.09]**, floating, not on the floor: the height
+profile spans y 1.02–3.18 and the width profile y 1.05–3.01, and the massing
+occupies the volume they define. So on this board the massing's own vertical
+arithmetic is **not** what drags anything down. What does sit at floor level is
+the free-view ink: every stroke drawn with nothing chosen lands on the view
+plane through the **cursor**, and the cursor never left the world origin — which
+is what the fixture's own `reading` field says, and what G1's rule (*the view
+plane passes through the volume the hand is working in*) is about. G1 owns
+pinning that; this is the measurement it starts from.
+
+**What it is, is read from what is IN the file**, never from its name: a dev
+server answers a path it does not have with the page itself, so probing
+`fixtures/x.mm.log` came back 200 with a document in it. One JSON object with
+`marks` in it is a captured view; a log is many objects, one per line, and never
+parses whole.
+
+### The transcript: what was sent, and what came back
+
+`src/exchange.ts`, and the panel's ***model*** section under
+*why / measurements*. One row per exchange — *glm-5.3-flash · the brief ·
+applied · 159 ms* — opening on the outcome and its reason, the words the hand
+typed, what parsed (counted, never the reply's own claim), what was dropped and
+why, and then **the brief as sent** and **the reply as received**, each verbatim
+in its own scrolling box. The reply is shown *before any repair*: what a model
+actually wrote is the evidence, and a repaired copy of it is the shard's account
+of what the model meant.
+
+Two rules it keeps:
+
+- **It is runtime, not the log.** What a reply DID is already in the log — the
+  version, the profiles it drew, the steps it named, each attributed and each
+  undoable — and a board replayed from its log must derive the same drawing
+  whether or not anyone ever saw the prompt. Putting the brief in the log would
+  also put a model's whole reply into every export, every merge and every other
+  hand's copy of the board. The last eight are kept (`KEEP`); §5 leaves the
+  number to John.
+- **A row a hand opened stays open.** The panel is rebuilt on every report —
+  every camera move, every hover — and a disclosure rebuilt is a disclosure
+  shut, so reading a reply on a live board was impossible until which row is
+  open was remembered across the rebuilds.
+
+**Every exit path of `runBrief` ends in a sentence AND a row**, the same
+sentence in both, including the two that never reach a model: no seat joined,
+and nothing on the board to fill. An attempt that leaves no trace is the fault
+this package exists to close.
+
+### A brief always answers, and the massing stands first
+
+The plan's own rule (§0, fault 2). A brief is no longer refused for want of a
+selection: `briefTarget()` says what Enter will fill, in the order a hand means
+things in — **what you pointed at**, then **the one solid standing** (a brief
+with nothing selected on a board holding one body is about that body; requiring
+a tap was a mode wearing a different hat), then **the drawing stood up first**,
+then **what is missing**.
+
+`log.standFor()` is the seam underneath it, and **the one function G1 widens**:
+today it is the massing — profiles on two or three of the named world planes —
+and G1 replaces it with the sketch hull without changing a caller, because what
+`runBrief` needs from it is the same either way. When nothing can stand it names
+what is **missing**, as the next mark to draw rather than as what the shard
+noticed: *nothing stands yet — a footprint on the foundation and a shape from
+the side would*; *… 1 outline on the foundation alone; a shape from another
+side, on another tile, would stand it*; *… the outlines on the foundation and
+height do not overlap where they are, so their views are of two different
+things*.
+
+The field says which of the three Enter will be **before it is pressed** —
+*↵ a brief → asks glm — the massing stands first*, or *— nothing stands to fill;
+it will say what is missing* — and it asks the same function `runBrief` acts on,
+so the line and the act cannot disagree.
 
 ## The brief, and what it will not say
 

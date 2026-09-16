@@ -2600,6 +2600,182 @@
     };
   });
 
+  // ===== G0: the transcript, the export, and a brief that always answers ====
+  //
+  // SHARD-3D-PUSH-2 §0's three faults, driven through the real UI: a board that
+  // can leave the tab and come back, a brief that answers instead of being
+  // refused into a status line, and an exchange with a model that leaves
+  // evidence behind.
+
+  step('the board goes out as its log, and comes back the same board', () => {
+    S().clear();
+    // A known board: three views and the massing they stand.
+    S().choose('foundation');
+    S().strokeScreen(onScreen(rectPath(-2, -1.5, 4, 3)));
+    S().choose('height');
+    S().strokeScreen(onScreen(rectPath(-2, -3, 4, 3)));
+    S().choose('width');
+    S().strokeScreen(onScreen(rectPath(-1.5, -3, 3, 3)));
+    const before = S().state();
+    assert(before.solids.length === 1, `${before.solids.length} solids before the export, expected the massing`);
+    S().field('name: keep');
+
+    const text = S().logText();
+    assert(text.split('\n').filter((l) => l.trim()).length >= 4, 'the log came out with almost nothing in it');
+    // One JSON event per LINE — the canvas's own format, so a board from either
+    // surface is a log. Asserted rather than assumed, because a format that
+    // drifts is a format nobody else can read.
+    for (const line of text.split('\n').filter((l) => l.trim())) JSON.parse(line);
+
+    S().clear();
+    assert(S().state().marks.length === 0, 'clear left marks behind');
+    const opened = S().openLog(text);
+    assert(opened, 'the log would not open');
+
+    const after = S().state();
+    assert(after.marks.length === before.marks.length, `${after.marks.length} marks back, expected ${before.marks.length}`);
+    assert(after.solids.length === 1, `${after.solids.length} solids back, expected 1`);
+    assert(after.solids[0].name === 'keep', `the name came back as "${after.solids[0].name}"`);
+    assert(
+      after.marks.map((m) => m.plane.name).join(',') === before.marks.map((m) => m.plane.name).join(','),
+      'the planes did not survive the round trip'
+    );
+    // The tree is the same tree, not a tree of the same shape.
+    assert(
+      JSON.stringify(after.solids[0].steps) === JSON.stringify(before.solids[0].steps),
+      'the op tree changed across the round trip'
+    );
+    return { events: opened.events, marks: after.marks.length, name: after.solids[0].name };
+  });
+
+  step('a brief with nothing standing answers, and the answer names what is missing', async () => {
+    S().clear();
+    S().joinStub([JSON.stringify({ steps: [{ id: 's1', op: 'extrude', profile: 'p1', depth: 1, why: 'x' }], profiles: [] })]);
+
+    // The reading line says which it will be BEFORE Enter — the whole point of
+    // the field: a hand should not find out what a brief does by pressing it.
+    const read = S().fieldRead('castle with green tops');
+    assert(/nothing stands to fill/.test(read.line), `the reading line said "${read.line}"`);
+    assert(/it will say what is missing/.test(read.line), `the reading line said "${read.line}"`);
+
+    const stand = S().standFor();
+    assert(stand.can === null, `something stood on an empty board: ${stand.can}`);
+    assert(/footprint on the foundation/.test(stand.missing), `it said "${stand.missing}"`);
+
+    const ran = S().field('castle with green tops');
+    assert(ran.ran, `Enter did nothing: "${ran.line}"`);
+    await new Promise((r) => setTimeout(r, 140));
+
+    // …and it left a row in the transcript, with the reason. This is the fault:
+    // the model was reached, the reply was dropped, and the only word about it
+    // was a sentence that faded.
+    const ex = S().exchanges();
+    assert(ex.length >= 1, 'the brief left no exchange behind');
+    assert(ex[0].outcome === 'refused', `the outcome was "${ex[0].outcome}"`);
+    assert(/footprint on the foundation/.test(ex[0].reason), `the reason was "${ex[0].reason}"`);
+    assert(ex[0].words === 'castle with green tops', `the words were "${ex[0].words}"`);
+    assert(S().state().solids.length === 0, 'something was written onto a board with nothing standing');
+    return { line: read.line, outcome: ex[0].outcome, reason: ex[0].reason };
+  });
+
+  step('a brief with NOTHING SELECTED fills the solid that stands, and the transcript has both halves', async () => {
+    S().clear();
+    S().joinStub([
+      JSON.stringify({
+        steps: [{ id: 's1', op: 'boss', profile: 'p1', depth: 0.6, name: 'turret', why: 'a turret' }],
+        profiles: [{ id: 'p1', shape: 'rectangle', plane: 'height', centre: { x: 0, y: -1 }, w: 0.6, h: 0.8 }],
+      }),
+    ]);
+    // Two views, so the massing stands as the second one lands — and then
+    // NOTHING is selected. This used to be refused with *nothing selected*,
+    // which is a mode wearing a different hat: one solid standing is what a
+    // brief is about.
+    S().choose('foundation');
+    S().strokeScreen(onScreen(rectPath(-2, -1.5, 4, 3)));
+    S().choose('height');
+    S().strokeScreen(onScreen(rectPath(-2, -3, 4, 3)));
+    S().select(null);
+    assert(S().state().solids.length === 1, 'the massing did not stand as the second view landed');
+
+    const read = S().fieldRead('a castle with green tops');
+    assert(/the massing is the extent/.test(read.line), `the reading line said "${read.line}"`);
+
+    const ran = S().field('a castle with green tops');
+    assert(ran.ran, `Enter did nothing: "${ran.line}"`);
+    await new Promise((r) => setTimeout(r, 200));
+
+    const solids = S().state().solids;
+    assert(solids.length === 1, `${solids.length} solids, expected the massing that stood first`);
+    const ex = S().exchanges();
+    assert(ex.length >= 1, 'the brief left no exchange behind');
+    assert(ex[0].outcome === 'applied', `the outcome was "${ex[0].outcome}" — ${ex[0].reason}`);
+    // The brief as SENT and the reply as RECEIVED, both verbatim.
+    assert(ex[0].brief.length > 50, 'the brief was not kept');
+    assert(/THE SPACE|stands|plane/i.test(ex[0].brief), 'what was kept does not look like the brief');
+    assert(/"op":"boss"/.test(ex[0].reply || ''), `the reply was not kept verbatim: ${String(ex[0].reply).slice(0, 80)}`);
+    assert(ex[0].parsed && ex[0].parsed.steps === 1, `parsed: ${JSON.stringify(ex[0].parsed)}`);
+
+    // …and the panel's *model* section says it, under the disclosure where
+    // every other set of workings lives.
+    const panel = S().panelText();
+    assert(/model/.test(panel), 'the panel has no model section');
+    assert(/exchange/.test(panel), `the panel does not carry the transcript: "${panel.replace(/\s+/g, ' ').slice(0, 160)}"`);
+    return { line: read.line, outcome: ex[0].outcome, parsed: ex[0].parsed, briefChars: ex[0].brief.length };
+  });
+
+  step('a brief over outlines with nothing standing stands the massing FIRST, then asks', async () => {
+    S().clear();
+    S().joinStub([
+      JSON.stringify({
+        steps: [{ id: 's1', op: 'boss', profile: 'p1', depth: 0.6, name: 'turret', why: 'a turret' }],
+        profiles: [{ id: 'p1', shape: 'rectangle', plane: 'height', centre: { x: 0, y: -1 }, w: 0.6, h: 0.8 }],
+      }),
+    ]);
+    S().choose('foundation');
+    S().strokeScreen(onScreen(rectPath(-2, -1.5, 4, 3)));
+    S().choose('height');
+    S().strokeScreen(onScreen(rectPath(-2, -3, 4, 3)));
+    // …and take the massing back off. The outlines stay — ink is never
+    // destroyed — so the drawing can still stand one, and nothing does.
+    S().undo();
+    assert(S().state().solids.length === 0, 'undo left the massing standing');
+    assert(S().state().marks.length === 2, `undo took the ink: ${S().state().marks.length} marks`);
+    S().select(null);
+
+    const stand = S().standFor();
+    assert(stand.can === 'massing', `standFor said ${JSON.stringify(stand)}`);
+    const read = S().fieldRead('a castle with green tops');
+    assert(/the massing stands first/.test(read.line), `the reading line said "${read.line}"`);
+
+    const ran = S().field('a castle with green tops');
+    assert(ran.ran, `Enter did nothing: "${ran.line}"`);
+    await new Promise((r) => setTimeout(r, 200));
+
+    // It stood the drawing up and then filled it — one brief, and the model
+    // was asked about a volume that existed.
+    const solids = S().state().solids;
+    assert(solids.length === 1, `${solids.length} solids, expected the massing that stood first`);
+    assert(solids[0].steps.some((s) => s.op === 'massing'), `the tree has no massing: ${JSON.stringify(solids[0].steps)}`);
+    const ex = S().exchanges();
+    assert(ex[0].outcome === 'applied', `the outcome was "${ex[0].outcome}" — ${ex[0].reason}`);
+    return { line: read.line, steps: solids[0].steps.map((s) => s.op), outcome: ex[0].outcome };
+  });
+
+  step('?fixture= loads John’s own board, and it stands the massing it stood', async () => {
+    S().clear();
+    const out = await S().loadFixture('john-2026-09-16-massing');
+    assert(out, 'the fixture did not load');
+    assert(out.from === 'fixture', `it loaded as "${out.from}" — a captured view is a rebuild, not a replay`);
+    // The three profiles he drew on the tiles: a circle on the height plane, a
+    // circle on the width plane, and the rectangle footprint. The six
+    // view-plane strokes are not rebuilt, and the status line says so.
+    assert(out.marks === 4, `${out.marks} marks rebuilt, expected the 4 on named planes`);
+    assert(out.solids === 1, `${out.solids} solids, expected the massing`);
+    const solid = S().state().solids[0];
+    assert(solid.steps.length === 1 && solid.steps[0].op === 'massing', `the tree is ${JSON.stringify(solid.steps)}`);
+    return { marks: out.marks, solids: out.solids, from: out.from };
+  });
+
   // ---- the runner ----------------------------------------------------------
 
   window.__scenario = async function () {

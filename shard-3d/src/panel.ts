@@ -33,6 +33,7 @@
 
 import { fingerprintOf, type Point } from 'metamedium-core';
 import type { Diff, DiffRegion } from './diff';
+import { describeExchange, type Exchange } from './exchange';
 import type { Log, Mark, ProfileOfSolid, Solid } from './log';
 import type { Honours } from './brief';
 import type { ProfileMatch } from './library';
@@ -109,11 +110,18 @@ export interface PanelOptions {
   diffs?(solidId: string): { profile: ProfileOfSolid; diff: Diff }[];
   /** P4: outline a region where it lies while its chip is hovered, or take it away. */
   onRegion?(at: { plane: Plane; outline: Point[] } | null): void;
+  /**
+   * G0: the last few exchanges with a model, newest first — the transcript.
+   * Runtime evidence, never the log (`exchange.ts` says why).
+   */
+  exchanges?(): Exchange[];
 }
 
 export function createPanel(host: HTMLElement, statusEl: HTMLElement, log: Log, o: PanelOptions): Panel {
   let current: string | null = null;
   let standing = 'choose a plane · draw on it';
+  /** G0: which exchange's verbatim is open, across the panel's rebuilds. */
+  let openExchange: string | null = null;
 
   function show(id: string | null, sel: Sel | null = null) {
     current = id;
@@ -122,11 +130,12 @@ export function createPanel(host: HTMLElement, statusEl: HTMLElement, log: Log, 
 
     // The evidence, exactly as it was — every row, every number, every reason.
     // It moved; nothing about it changed.
-    const evidence = mark
-      ? renderMark(mark, log) + renderLibrary(mark.id) + solidRow
-      : eyebrow('mark') +
-        '<div class="empty">' + esc(log.marks().length ? 'hover a mark, or draw another' : 'nothing drawn yet') + '</div>' +
-        solidRow;
+    const evidence =
+      (mark
+        ? renderMark(mark, log) + renderLibrary(mark.id) + solidRow
+        : eyebrow('mark') +
+          '<div class="empty">' + esc(log.marks().length ? 'hover a mark, or draw another' : 'nothing drawn yet') + '</div>' +
+          solidRow) + renderExchanges(o.exchanges?.() ?? []);
 
     host.innerHTML =
       renderSummary(log, sel, mark, o) +
@@ -142,6 +151,14 @@ export function createPanel(host: HTMLElement, statusEl: HTMLElement, log: Log, 
       // The diff's region chips carry listeners, so they are built as elements
       // and appended — inside the disclosure, with the rest of the evidence.
       renderMatches(body, sel);
+      // G0: remember which exchange the hand opened, so the next report does
+      // not shut it again.
+      for (const el of body.querySelectorAll('details.exchange')) {
+        const d = el as HTMLDetailsElement;
+        d.addEventListener('toggle', () => {
+          openExchange = d.open ? d.dataset.ex ?? null : openExchange === d.dataset.ex ? null : openExchange;
+        });
+      }
     }
     // Remembered per device, like the reference surface's *details ▾*: a hand
     // that wants the numbers wants them on the next mark too.
@@ -195,6 +212,62 @@ export function createPanel(host: HTMLElement, statusEl: HTMLElement, log: Log, 
       'outline was measured against them. Take one and it is placed here, scaled to fit; *Not a …* says it is not, ' +
       'and the correction is held in the log'
     ) + '</div>';
+    return html;
+  }
+
+  /**
+   * ***model*** — **the transcript** (G0): one row per exchange, expanding to
+   * the brief and the reply **verbatim**.
+   *
+   * The third fault of John's first board was that a model was reached, its
+   * reply was dropped, and the only word about it was a status line that faded.
+   * A number in a status line is a claim; this is the workings behind it, in
+   * the same place every other set of workings lives — one disclosure down,
+   * under *why / measurements*.
+   *
+   * The reply is shown **as it was received**, before any repair: what a model
+   * actually wrote is the evidence, and a repaired copy of it would be the
+   * shard's account of what the model meant. Nothing here is in the log
+   * (`exchange.ts`), and the status line keeps its one sentence.
+   */
+  function renderExchanges(list: Exchange[]): string {
+    if (!list.length) return '';
+    let html = sep + eyebrow('model', `${list.length} exchange${list.length === 1 ? '' : 's'} kept`);
+    for (const ex of list) {
+      const parsed = ex.parsed
+        ? `${ex.parsed.steps} step${ex.parsed.steps === 1 ? '' : 's'}, ` +
+          `${ex.parsed.profiles} profile${ex.parsed.profiles === 1 ? '' : 's'}` +
+          `${ex.parsed.reuse ? ` · reuse “${ex.parsed.reuse}”` : ''}`
+        : ex.outcome === 'asking'
+          ? 'still waiting'
+          : 'nothing parsed';
+      html +=
+        // **The row a hand opened STAYS open.** The panel is rebuilt on every
+        // report — every camera move, every hover — and a disclosure rebuilt is
+        // a disclosure shut, so reading a reply on a live board was impossible:
+        // the row snapped closed the moment the mouse went near the canvas.
+        // Which one is open is runtime, like the exchange itself.
+        `<details class="exchange" data-ex="${esc(ex.id)}"${openExchange === ex.id ? ' open' : ''}>` +
+        '<summary>' + esc(describeExchange(ex)) + '</summary>' +
+        row('outcome', ex.outcome, ex.reason) +
+        row('words', ex.words || '—', 'what the hand typed') +
+        row('parsed', parsed, 'what the shard could read out of the reply — counted, never the reply’s own claim') +
+        (ex.dropped.length
+          ? row('dropped', String(ex.dropped.length), ex.dropped.join(' · '))
+          : row('dropped', 'none', 'everything the reply carried was inside the closed vocabulary')) +
+        '<div class="eyebrow">the brief as sent</div>' +
+        '<pre class="verbatim">' + esc(ex.brief || '— nothing was sent: no model was asked') + '</pre>' +
+        '<div class="eyebrow">the reply as received</div>' +
+        '<pre class="verbatim">' + esc(ex.reply ?? '— nothing came back') + '</pre>' +
+        '</details>';
+    }
+    html +=
+      '<div class="why">' +
+      esc(
+        'runtime, not the log: what a reply DID is already in the log — the version, the profiles it drew, ' +
+        'each attributed and each undoable — and this is the evidence about the exchange. The last few are kept'
+      ) +
+      '</div>';
     return html;
   }
 
