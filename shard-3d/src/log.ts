@@ -47,7 +47,7 @@ import {
   type ProfileStructure,
 } from './library';
 import { diffProfile, viewNameOf, type Diff } from './diff';
-import type { PlaneCandidate } from './planarity';
+import { samePlane, type PlaneCandidate } from './planarity';
 import {
   assignForms,
   featuresFrom,
@@ -536,7 +536,7 @@ export function createLog(): Log {
    */
   function strip(candidates?: PlaneCandidate[]): PlaneCandidate[] | undefined {
     if (!candidates) return undefined;
-    return candidates.map(({ plane, label, confidence, reasoning, oblique, gated, terms, anchor }) => ({
+    return candidates.map(({ plane, label, confidence, reasoning, oblique, gated, behind, terms, anchor }) => ({
       plane,
       label,
       confidence,
@@ -546,8 +546,10 @@ export function createLog(): Log {
       // not part of the geometry: a mark read back from the log must still be
       // able to say *the ground was held below the view, and here is what it
       // would have cost*. Dropped, the panel showed a gated plane outranked
-      // with no reason on its face.
+      // with no reason on its face. A face held back for being the FAR side of
+      // the solid under the pen is the same kind of fact, and travels the same.
       gated,
+      ...(behind ? { behind } : {}),
       ...(terms ? { terms } : {}),
       ...(anchor ? { anchor } : {}),
     }));
@@ -898,9 +900,26 @@ export function createLog(): Log {
     const fp = fingerprintOf(mark.node);
     const closed = !!fp?.isClosed;
     // The face this mark's plane was read off, with the face's OWN extent —
-    // the winner's anchor, kept in the plane rep (see `strip`).
-    const won = mark.candidates?.[0];
-    const anchor = mark.plane.source === 'face' ? won?.anchor : undefined;
+    // the anchor of the candidate the mark's plane IS, kept in the plane rep
+    // (see `strip`).
+    //
+    // Found the winner by `candidates[0]` until 16 September 2026, which is a
+    // different claim: it says the reading's own order is the reading. The
+    // order can move — a winner past an oblique candidate, a flip that brings
+    // the taken plane to the front, two faces of one solid that score the same
+    // — and when it moved, row 3 measured the ink against another face's box
+    // and no row placed a circle plainly drawn on a top. The plane rep is the
+    // decision; the candidate that matches it is the face it was read off.
+    const onFace =
+      mark.plane.source === 'face'
+        ? (mark.candidates ?? []).filter(
+            (c) => c.plane.source === 'face' && c.anchor?.solidId && samePlane(c.plane, mark.plane)
+          )
+        : [];
+    // Two solids can have coplanar faces, so the plane's own name settles which
+    // one it is when it can; the geometry settles it when it cannot.
+    const won = onFace.find((c) => c.plane.name === mark.plane.name) ?? onFace[0];
+    const anchor = won?.anchor;
     // Row 1 needs the screen path AND the solids as they stood in that view.
     // Only an OPEN stroke can be a scratch, so nothing else pays for a hull.
     const silhouettes = !closed && mark.pose && space ? space.silhouettes(mark.pose) : undefined;

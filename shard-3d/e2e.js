@@ -2165,12 +2165,14 @@
     // camera; turning about the view's centre, the same pose is (0.664, 0.035).
     //
     // Not an arbitrary re-tune: at elevation 74.8° with azimuth 56.8° — where
-    // the old numbers now land — this step fails, and its neighbours a few
-    // degrees either side pass. That is a fragility in row 3, not in the
-    // camera: `formMarkOf` reads the face's own extent off `candidates[0]`,
-    // and at that pose the two candidates for this face swap order, so row 3
-    // measures the ink against the other one's box and no row places the mark.
-    // Written down rather than chased; the demo is not the place for it.
+    // the old numbers now land — this step used to fail while its neighbours a
+    // few degrees either side passed. That was a fragility in the reading, not
+    // in the camera: the pen's ray meets the box twice, both faces came back
+    // under the top's own name scoring the same to the last bit of a double,
+    // and row 3 measured the ink against whichever of them sorted first.
+    // Chased and fixed on 16 Sep 2026 (`src/feature.test.ts` sweeps elevation
+    // 30°–85° at every 15° of azimuth, and THE TIE in `planarity.ts` says why);
+    // the pose here stays as it is, because the demo is not the place to test it.
     S().orbit(0.664, 0.035);
     mugHole = S().strokeScreen(
       Array.from({ length: 57 }, (_, i) => {

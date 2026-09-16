@@ -118,6 +118,25 @@ similarity transform. A **chosen** plane is untouched: it is blessed by
 the act, and the hand may lay ink on it at any angle, with the edge-on
 warning of §10 as it was.
 
+**The tie: a comparison stops where the evidence stops** (16 September
+2026). The pen's ray meets a box twice and both faces are offered — the
+near one and what is behind it. They are parallel, so the screen path
+casts onto them as the same shape at the same facing with the same
+continuity, and when the far one's own box happens to hold the cast ink
+its anchor saturates too: four equal terms, two confidences equal to
+fifteen digits, and an order decided by the last bits of a double. That
+is how a circle plainly drawn on a box's top read as an `annotation` at
+one pose and as a `feature` three degrees away. So: confidences closer
+than `TIE` compare equal and the table's own order stands (the faces the
+pen met, nearest first, then `previous`, the world planes, the view);
+one face reported twice is one candidate; and the far side of the solid
+under the pen is named apart from the near one, banded with the gated,
+and never the winner — **you cannot draw on the side of a thing you are
+looking at**. It stays held, scored, said out loud and a tap away on the
+chip, like everything else the gate holds back. And what the form rung's
+row 3 measures against is the face the winning plane **is**, never
+whichever candidate happens to be first.
+
 ### 2.2 The shape rung — unchanged
 
 `line`, `arc`, `triangle`, `rectangle`, `circle`, `arrow`, `text`, `dot`,

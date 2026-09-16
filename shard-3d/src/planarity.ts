@@ -85,6 +85,30 @@
 // the stroke lies on it at any angle, with the edge-on warning as it was.
 // ---------------------------------------------------------------------------
 //
+// ---------------------------------------------------------------------------
+// THE TIE: two faces the same ray met (16 September 2026)
+//
+// The pen's ray meets a box twice, and `solids.facesAt` offers both — "the
+// near one and what is behind it". They are PARALLEL, so the screen path casts
+// onto them as the same shape at the same facing with the same continuity; and
+// when the far one's own box happens to hold the cast ink, its anchor
+// saturates at 1 like the near one's. Four equal terms: the two confidences
+// came out equal to fifteen significant digits, and which of them sorted first
+// was decided by the last bits of a double.
+//
+// That is how a circle on a box's top read as an `annotation` at elevation
+// 74.8° / azimuth 56.8° while its neighbours a few degrees either side read as
+// a `feature`: the underside won the coin toss, the ink was re-projected 1.8
+// units off the solid, and the form rung's row 3 measured it against the wrong
+// face's bounds. Nothing about that pose was special.
+//
+// So a comparison of evidence stops where the evidence stops (`TIE`), and the
+// table's own order takes over: the faces the pen met, nearest first, then the
+// previous plane, then the world planes, then the view. You cannot draw on the
+// face behind the one you are looking at, and the far face stays exactly what
+// it was — held, scored, said out loud, and a tap away on the chip.
+// ---------------------------------------------------------------------------
+//
 // No three.js. The camera arrives as a ray-caster function, the way `plane.ts`
 // takes it, so the whole module is arithmetic and tests headlessly — which is
 // what §11 names first for landing back in core.
@@ -147,6 +171,24 @@ export const CONTINUITY_BASE = 0.85;
 export const NEAR_PREVIOUS = 1.5;
 /** A runner-up below this is not worth a chip — the read was not close. */
 export const RUNNER_UP_FLOOR = 0.25;
+/**
+ * **The tie** (see THE TIE, below). Two confidences closer than this are the
+ * same number: the evidence did not tell those candidates apart, and what is
+ * left is the last bits of a double. Where that happens the TABLE's own order
+ * decides — the faces the pen met, nearest first, then the previous plane, the
+ * world planes, the view — because that order is a statement about the hand
+ * (you draw on the face you can see) and a float's last bit is a statement
+ * about nothing.
+ */
+export const TIE = 1e-9;
+/**
+ * How far apart, in world units, two face candidates' origins may sit and
+ * still be the SAME face — with the same solid and the same normal. Two hits
+ * on one face (a ray that grazes the seam between its triangles, a mesh a cut
+ * left with coplanar faces) are one candidate, not two, so nothing downstream
+ * can be handed a pair it has to tell apart by their numbers.
+ */
+export const SAME_FACE = 1e-6;
 
 // ---- what a candidate is ---------------------------------------------------
 
@@ -185,6 +227,14 @@ export interface PlaneCandidate {
    * view plane itself is screen-facing by construction and is never gated.
    */
   gated?: boolean;
+  /**
+   * A face of the same solid BEHIND the face the pen came down on — the one
+   * its ray left through. Kept, scored, said out loud and a tap away, and
+   * never the winner: the hand cannot draw on the side of a thing it is
+   * looking at. `facesAt` offers two faces so that the thing standing behind
+   * another can be drawn on; that is a second SOLID, and this is not one.
+   */
+  behind?: boolean;
   /** The geometry in this plane the stroke may lie on. */
   anchor?: Anchor;
   /** Every term of the formula, so the panel can show the evidence, not only the number. */
@@ -296,6 +346,22 @@ export function downScreen(normal: Vec3, cameraUp: Vec3, look: Vec3): Vec3 {
   if (length(second) > 1e-4) return normalize(second);
   // Degenerate only if the normal is parallel to both, which cannot happen.
   return normalize(cross(n, { x: 0, y: 1, z: 0 }));
+}
+
+/**
+ * Two FACE candidates are the same face: the same solid, the same normal, and
+ * an origin within `SAME_FACE` of it. Stricter than `samePlane` on purpose —
+ * this is about one face reported twice (a ray through the seam between its
+ * triangles, coplanar faces a cut left behind), and the tolerance is a
+ * tolerance, not the general coplanarity test.
+ */
+function sameFace(a: PlaneCandidate, b: PlaneCandidate): boolean {
+  if (a.plane.source !== 'face' || b.plane.source !== 'face') return false;
+  if (!a.anchor?.solidId || a.anchor.solidId !== b.anchor?.solidId) return false;
+  const na = normalize(a.plane.normal);
+  const nb = normalize(b.plane.normal);
+  if (Math.abs(Math.abs(dot(na, nb)) - 1) > 1e-6) return false;
+  return length(sub(b.plane.origin, a.plane.origin)) < SAME_FACE;
 }
 
 /** Two candidates name the same plane when their normals agree and one's origin lies on the other. */
@@ -445,7 +511,35 @@ export function candidatesFor(scope: PenScope): PlaneCandidate[] {
   out.push(viewCandidate(scope));
 
   const kept: PlaneCandidate[] = [];
-  for (const c of out) if (!kept.some((k) => samePlane(k.plane, c.plane))) kept.push(c);
+  for (const c of out) {
+    // One face reported twice is one candidate (`sameFace`), and one PLANE
+    // offered twice is one candidate (`samePlane`) — by the priority above, so
+    // a previous plane that IS the foundation is offered once, as `previous`.
+    if (kept.some((k) => sameFace(k, c) || samePlane(k.plane, c.plane))) continue;
+    kept.push(c);
+  }
+
+  // A face BEHIND another face of the same solid says so, and is named apart
+  // from it. The pen's ray leaves the solid through it, and `facesAt` negates a
+  // normal that points away from the pen — so the underside of a box comes back
+  // wearing the top's own normal and the top's own name. Two candidates under
+  // one name is a panel that cannot be read, a chip that offers you what you
+  // already have, and a `flip` that drops both (it matches candidates by label).
+  for (let i = 0; i < kept.length; i++) {
+    const c = kept[i];
+    if (c.plane.source !== 'face') continue;
+    const infront = kept
+      .slice(0, i)
+      .find((k) => k.plane.source === 'face' && k.anchor?.solidId && k.anchor.solidId === c.anchor?.solidId);
+    if (!infront) continue;
+    kept[i] = {
+      ...c,
+      behind: true,
+      label: `${c.label} · behind`,
+      reasoning: `${c.reasoning}, behind ${infront.label} — the ray left ${c.anchor?.solidId ?? 'the solid'} through it`,
+      plane: { ...c.plane, name: `${c.plane.name ?? c.label} · behind` },
+    };
+  }
   return kept;
 }
 
@@ -544,6 +638,8 @@ export function rank(scope: RankScope): PlaneCandidate[] {
     // never gated — it is the thing the gate protects.
     const isView = c.plane.source === 'view';
     const gated = !isView && facingRaw < FACING_TAKES;
+    // The hidden side of the thing under the pen: held and offered, never taken.
+    const behind = !!c.behind;
 
     // ---- anchor: does the ink lie on geometry in this plane? ---------------
     const size = Math.max(sizeOfPoints(points), 1e-6);
@@ -578,11 +674,14 @@ export function rank(scope: RankScope): PlaneCandidate[] {
       (isView ? ' — shape conserved: the screen path lands here at the size it was drawn' : '') +
       (oblique
         ? ` — too oblique to read (under ${(FACING_FLOOR * 100).toFixed(0)}% face-on), so it is held but cannot win`
-        : gated
-          ? ` — too oblique to take the stroke (facing ${facingRaw.toFixed(2)}, under ${FACING_TAKES.toFixed(2)}): ` +
-            `casting it here would stretch it by up to ×${(1 / Math.max(facingRaw, 1e-6)).toFixed(2)} across the plane's steepest direction, ` +
-            `so the view plane keeps it — tap to take this one anyway`
-          : '');
+        : behind
+          ? ' — the far side of the solid under the pen: the hand cannot draw on the side it cannot see, ' +
+            'so it is held but cannot win — tap to take it anyway'
+          : gated
+            ? ` — too oblique to take the stroke (facing ${facingRaw.toFixed(2)}, under ${FACING_TAKES.toFixed(2)}): ` +
+              `casting it here would stretch it by up to ×${(1 / Math.max(facingRaw, 1e-6)).toFixed(2)} across the plane's steepest direction, ` +
+              `so the view plane keeps it — tap to take this one anyway`
+            : '');
 
     scored.push({
       ...c,
@@ -590,17 +689,30 @@ export function rank(scope: RankScope): PlaneCandidate[] {
       reasoning,
       oblique,
       gated,
+      ...(behind ? { behind } : {}),
       terms: { shape, shapeLabel, facing: facingTerm, facingRaw, anchor: anchorTerm, continuity },
     });
   }
 
-  // Ranked by confidence in three bands, and the bands are the two rules:
-  // every candidate that makes sense at its angle first, then every one that
-  // does not (THE GATE — it cannot outrank the view plane, which is never
-  // gated), then every one too oblique to read at all (§10). Each is kept and
-  // said out loud; neither can win.
-  const band = (c: PlaneCandidate) => (c.oblique ? 2 : c.gated ? 1 : 0);
-  scored.sort((a, b) => band(a) - band(b) || b.confidence - a.confidence);
+  // Ranked by confidence in three bands, and the bands are the rules: every
+  // candidate that makes sense at its angle first, then every one that does
+  // not — a plane the gate holds below the view plane (which is never gated),
+  // and the far side of the solid the pen came down on (THE TIE) — then every
+  // one too oblique to read at all (§10). Each is kept and said out loud; none
+  // of the held ones can win.
+  //
+  // Within a band the comparison stops where the evidence stops (THE TIE):
+  // confidences closer than `TIE` compare EQUAL, and the sort is stable, so
+  // the order they arrived in — the table of §2.1, faces nearest first — is
+  // what decides. A ranking whose last place is settled by a float's last bit
+  // is not a ranking.
+  const band = (c: PlaneCandidate) => (c.oblique ? 2 : c.gated || c.behind ? 1 : 0);
+  scored.sort((a, b) => {
+    const bands = band(a) - band(b);
+    if (bands) return bands;
+    const by = b.confidence - a.confidence;
+    return Math.abs(by) < TIE ? 0 : by;
+  });
   return scored;
 }
 
@@ -628,6 +740,7 @@ export function chipTextFor(ranked: PlaneCandidate[]): string | null {
  */
 export function candidateNote(c: PlaneCandidate): string {
   if (c.oblique) return ' · too oblique to read';
+  if (c.behind) return ' · the far side, behind what the pen came down on';
   if (c.gated) return ` · too oblique to take the stroke (facing ${(c.terms?.facingRaw ?? 0).toFixed(2)})`;
   return c.plane.source === 'view' ? ' · shape conserved' : '';
 }
