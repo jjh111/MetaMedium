@@ -32,6 +32,7 @@ import {
 } from 'metamedium-core';
 import { length, NAMED, slide, sub, toWorld, type Plane, type PlaneName, type Pose, type Vec3 } from './plane';
 import { honoursSentence, type BriefPlane, type Honours, type NameInPlay, type SpaceScene } from './brief';
+import { activeConstraints, carryOutline } from './constraints';
 import type { Proposal } from './generator';
 import {
   addProfileExample,
@@ -2161,9 +2162,14 @@ export function createLog(): Log {
    *
    * The profiles a massing was made from are MEMBERS of the solid, so the form
    * rung never reads them as profiles OF it — a mark a solid was made from is
-   * its provenance. So this asks the question directly: for every stroke the
-   * massing references, the diff between that ink and this body's silhouette
-   * on that stroke's own plane.
+   * its provenance. So this asks the question directly, of the body's ACTIVE
+   * CONSTRAINTS (`constraints.ts`): every closed mark the tree references,
+   * classified as an outline drawn at this body, a correspondence carried from
+   * the definition it was placed from, or a revision drawn against it since —
+   * each measured where THIS body stands, never where some other body's ink
+   * happens to lie. Reading `steps[0].from` and rasterising each mark in place
+   * is what made a placed mug report *20% · top 39 · top 0*: the second number
+   * was the first mug's plan, at the first mug's position (GRAPH-1).
    */
   /**
    * Cached per log version, like the diff — and for the same reason, only more
@@ -2183,37 +2189,61 @@ export function createLog(): Log {
     return out;
   }
 
+  /** An extent is a line, and a line has no area to honour — so it is no claim. */
+  function closedMark(id: string): boolean {
+    const mark = markOf(id);
+    return !!mark && !!fingerprintOf(mark.node)?.isClosed;
+  }
+
   function measureHonours(solidId: string): Honours | null {
     const solid = solidOf(solidId);
     if (!solid || !space) return null;
-    const massing = solid.tree.steps.find((st) => st.op === 'massing' && !st.on) as MassingStep | undefined;
-    const ids = massing ? massing.from : solid.tree.steps[0]?.from ?? [];
+    const constraints = activeConstraints(
+      solid.tree,
+      { inkOf: (id) => inkFor(id), closed: closedMark },
+      profilesOf(solidId).map((p) => p.markId)
+    );
     const per: Honours['per'] = [];
-    for (const id of ids) {
-      const mark = markOf(id);
-      const ink = inkFor(id);
-      if (!mark || !ink) continue;
-      // An extent is a line, and a line has no area to honour. A tree with no
-      // massing in it references the extent that said how tall as well as the
-      // profile that said what shape; rasterising a line reports a coverage
-      // about the rasteriser rather than about the drawing.
-      if (!fingerprintOf(mark.node)?.isClosed) continue;
-      const sil = space.silhouetteOn(solid.id, mark.plane);
+    const aside: string[] = [];
+    for (const c of constraints) {
+      if (!c.scores) {
+        if (c.aside) aside.push(c.aside);
+        continue;
+      }
+      const mark = markOf(c.markId);
+      const ink = inkFor(c.markId);
+      if (!mark || !ink) {
+        aside.push(`${c.markId} is not on the board any more`);
+        continue;
+      }
+      // Carried FIRST, measured second: a correspondence is rasterised where
+      // this body stands, on the plane the placement's own pose puts it on.
+      const here = carryOutline(c.carry, mark.plane, ink.points);
+      const sil = space.silhouetteOn(solid.id, here.plane);
       if (!sil) continue;
       const diff = diffProfile({
-        ink: ink.points,
+        ink: here.points,
         from: ink.from,
         inkWhy: ink.why,
         silhouetteMask: { mask: sil.mask, grid: sil.grid },
-        view: viewNameOf(mark.plane.name),
+        view: viewNameOf(here.plane.name),
       });
-      per.push({ view: diff.view, markId: id, coverage: diff.coverage });
+      per.push({
+        view: diff.view,
+        markId: c.markId,
+        coverage: diff.coverage,
+        kind: c.kind,
+        ...(c.definition ? { of: c.definition } : {}),
+        ...(c.expect ? { note: c.expect } : {}),
+        why: c.reasoning,
+      });
     }
     if (!per.length) return null;
     return {
       overall: per.reduce((n, p) => n + p.coverage, 0) / per.length,
       per,
-      sentence: honoursSentence(per),
+      ...(aside.length ? { aside } : {}),
+      sentence: honoursSentence(per, aside),
     };
   }
 

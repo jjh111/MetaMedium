@@ -70,7 +70,7 @@ it extends the one seam P0 left for it.
 > is offered and one tap places it.
 
 All seven criteria run in `e2e.js` (70 steps), and the two-minute demo runs
-beside them as `__demo()` (9 steps). `?demo` draws P0's and P2's at
+beside them as `__demo()` (10 steps). `?demo` draws P0's and P2's at
 boot; `?demo=read` draws the rectangle read onto a box's top face with the chip
 beside it; `?demo=view` draws view ink gone faint from a camera that has left
 the pose it was drawn at; `?demo=diff` draws the box and the side profile
@@ -273,7 +273,7 @@ there is no bundle to drift.
 | `src/verbs.ts` | **Pure.** The verb table with name-resolved targets (§2.6 rule 4), `behave/words.ts`'s pattern ported: `SAYINGS` per verb, `CHANGES` for the size words, `namesIn` resolving a noun singular or plural against the names in play (core's own `singular`), and **what it cannot read is returned, not dropped** |
 | `src/models.ts` | The model pane, `Demos/surface/04-models.js` ported: both local servers probed in parallel, embedding-only models hidden **and said**, the pick remembered as a preference, hosted providers by key — and **no key ever enters the log**. `joinWith` seats a model with a transport of its own, which is what `__shard.joinStub` is |
 | `src/work.ts` | A model at work, shown **where it works**: a breathing `--sig-model` dot with the model's name and its task above the solid, the elapsed time after a few seconds, *Esc stops it* after thirty, and one `AbortSignal` per call so Esc really does |
-| `e2e.js` | The whole loop through the real pointer path — **78 steps, P0 → P6 and the compass** — and, beside it, `__demo()`: the two-minute demo of §9 in nine asserted steps, with a timing on each |
+| `e2e.js` | The whole loop through the real pointer path — **80 steps, P0 → P6 and the compass** — and, beside it, `__demo()`: the two-minute demo of §9 in ten asserted steps, with a timing on each |
 | `build-standalone.mjs` | **One file.** Runs `npm run build` (which typechecks first), then inlines every asset Vite emitted — the bundle as one inline module, the stylesheet as one `<style>` — into `dist/shard-3d.html`, and refuses to write a page that still points at anything that would not travel with it. The font `@import` stays external, because the tokens name a fallback stack and a face is not worth trebling the file for |
 
 ## The design decision: how a solid is held in the log
@@ -1199,7 +1199,45 @@ Honest gaps rather than bugs, and two of them are core's:
   its plan was drawn as — because from above the thing is now an annulus with a
   handle. That is the diff being right, and it is worth saying out loud: the
   row measures the body against the drawing it was made from, and cutting into
-  a thing is a way of leaving that drawing behind.
+  a thing is a way of leaving that drawing behind. **The row now says that
+  itself** — *top 56 (material was taken off since it was drawn — less is
+  expected to show)* — because a bare low number is indistinguishable from a
+  wrong one.
+
+### What a body is answering to (`src/constraints.ts`)
+
+The *honours* row used to take `steps[0].from` and rasterise every closed mark
+it found where that mark happens to lie. On a placement that is wrong twice
+over: a `place` step's two stroke ids play **different roles** — the outline it
+stands at, drawn here, and the outline the definition it copied was made from,
+lying at the original — and comparing the second one in place compares this
+body against somewhere else. The completed mug said *honours the drawing 20% ·
+top 39 · top 0*, and the 0 was the first mug's plan.
+
+`activeConstraints(tree, ctx, drawnSince)` walks the tree instead and classifies
+every closed mark it references:
+
+| kind | what it is | where it scores |
+|---|---|---|
+| `target` | drawn at this instance: a massing's profiles, an `extrude`/`revolve` profile, a `match`'s profile, a `place`'s `toMark` | where it lies |
+| `source` | the definition a `place` copied was made from — `of`, and every stroke the copied steps name | **carried** onto this body by the placement's own pose |
+| `revision` | drawn against this body after it stood (the form rung's *profile of*) | where it lies |
+
+**A correspondence is carried, not dropped.** The pose is already re-derived
+from two inks on every walk (`placeFrames`, invariant 4), so the same pose puts
+the definition's outlines where this body stands — a translation, a turn or a
+half-scale placement cannot lower agreement merely because the source sketch is
+still lying elsewhere. When the pose cannot be derived (the source ink was
+erased — the same condition that calls the solid broken), the constraint keeps
+its ids and loses its number: *not counted: …*. Provenance is never dropped to
+improve a score.
+
+**A feature is a claim about a face, not about the extent.** Coverage is an
+intersection over a union, so a small circle measured against a whole body
+reads near zero whether it was cut or bossed — and a cut's outline is a claim
+that there is *nothing* there. Both are kept, both say why, neither is counted.
+The placed mug now reads *honours the drawing 47% · top 39 (…) · top 54
+(carried from mug; …) · not counted: …*.
 
 ## What P0, P1, P2, P3, P4, P5 and P6 do not do
 
@@ -1360,7 +1398,7 @@ Open `http://localhost:5174` in its own tab, then in the console:
 const src = await fetch('/e2e.js').then(r => r.text());
 (0, eval)(src);
 __scenario().then(r => window.__R = r);   // the seven packages and the compass, 80 steps
-__demo().then(r => window.__D = r);       // the two-minute demo, 9 steps
+__demo().then(r => window.__D = r);       // the two-minute demo, 10 steps
 ```
 
 Eighty steps. The first one clears the board **and parks the camera** —
