@@ -164,9 +164,17 @@ export function createInk(o: InkOptions): Ink {
 
   function reshape(line: Line2, plane: Plane, points: Point[]) {
     const flat = points.length > 1 ? worldPoints(plane, points) : worldPoints(plane, [points[0], points[0]]);
-    (line.geometry as LineGeometry).setPositions(flat);
+    // A fresh geometry, not setPositions on the old one: the renderer caches
+    // an instanced geometry's maximum instance count the first time it draws
+    // it, so a live line that grows from one segment kept drawing one segment
+    // — the stroke did not show while drawing, only the dot at pen-down, and
+    // the whole stroke appeared at pen-up when sync() rebuilt it from the log.
+    const geo = new LineGeometry();
+    geo.setPositions(flat);
+    line.geometry.dispose();
+    line.geometry = geo;
     line.computeLineDistances();
-    line.geometry.computeBoundingSphere();
+    geo.computeBoundingSphere();
   }
 
   // ---- derived: the scene's ink is a function of the log --------------------
