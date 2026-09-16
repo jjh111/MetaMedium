@@ -111,7 +111,7 @@ Architecture documents (chronological; **read MVP.md, then v7, then v6**):
   views stood nothing, and a brief with nothing to fill was refused in one
   invisible sentence); every free stroke as a silhouette claim; the sketch
   hull as the massing generalised to any plane; parts said in words; the
-  brief a small model can answer; packages G0–G4
+  brief a small model can answer; the hull in the volume its claims define (the Y fault); the shard's own MCP hand and Claude Code as the model seat (G5); packages G0–G5
 - `BUILD-PLAN-v8.md` — **the executable plan for v8**: invariants no package may break, fixed contracts (events, reps, kinds, the verb basis, the storage seam, the palette item), fourteen work packages with owned files and done-criteria, the parallel threads and the surface weave, and self-contained briefs for sub-contracting models
 - `WHITEPAPER-v5.1-PLAN.md` — **the package**: what the whitepaper shows vs. what the engine does, replays-as-figures, the demos as the paper's spine, the prose pass, and the palette decision John owns
 - `ARCHITECTURE-v6-SESSION-ENGINE.md` — **active design**: the no-modes session engine (deferred commitment, summoning, promotion ladder, capability tiers), implemented in `metamedium-core/`

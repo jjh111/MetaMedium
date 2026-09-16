@@ -29,7 +29,33 @@ floor selected, asks the model, receives a tree, and refuses the tree
 was dropped; the only word about it was a line at the bottom of the
 screen.
 
-Three faults, each its own package below:
+Two more, from his second board (four loops from free views, three
+profiles on the tiles, a massing standing):
+
+- **The Y definition is not working.** The massing stood *on the floor*
+  while the side and front profiles were drawn above it. The prisms are
+  meant to run through the span of every profile, so a hull should float
+  wherever its claims are; either a claim's vertical extent is lost on the
+  way in, or the foundation profile's own points (at y = 0) drag the span
+  down. His words: *the way the shapes are drawn in the volume of space is
+  always in the floor; we can assume within a general volume of the space
+  so it fits in better with the pure planes.* The rule, stated: **a hull
+  occupies the volume its claims define; the ground bounds it only where a
+  claim's feet reach the ground.** Settled against his exported board, not
+  a synthetic one (G0 exports; G1 pins it).
+- **The model seat should be a hand in the room.** *Use MCP bidirectionally
+  as a model, so I can push back here to you doing it, and we model the
+  usage of other models first hand.* The canvas has both halves already —
+  `Demos/mcp.mjs` is a hand on the board, `Demos/mcp-client.mjs` is the
+  door that lets the board ask a server; the shard has neither. With them,
+  Claude Code in the conversation *is* the model: the brief is parked in
+  the room, the hand reads it, answers in the reply contract, and the
+  shard applies the answer exactly as it would a model's. What a model
+  receives and what it should return is then something John and Claude
+  argue about on the board, before any small model is tuned against it.
+
+Three faults from the first board, each its own package below, and the
+two above folded into G0, G1 and G5:
 
 1. **The drawing a hand makes is not what tier 1 knows how to stand.** A
    footprint and elevations sketched from arbitrary views is an
@@ -71,6 +97,15 @@ referencing the strokes; the log is the source; it re-derives as strokes
 land and undoes by act. The massing is the hull with three axis-aligned
 claims — one mechanism, not two.
 
+**The volume.** A claim carries its plane, and the plane carries where in
+space the stroke was drawn — its height above the ground included. The
+hull is the intersection of prisms *where they are*: two loops drawn a
+unit above the floor make a hull a unit above the floor, and the ground
+enters only as the fourth side of a ⊓ whose feet reach it. The massing's
+prisms already run through the span of the others' points, so nothing
+here should touch the floor unless a claim does; G1 pins that with John's
+own board and fixes whatever drags it down.
+
 Then **parts**: each ⊓ (each run of an elevation between ground touches)
 and each closed silhouette is a *part claim*; a part is the hull's
 material inside that claim's prism. Parts get engine ids and a sentence
@@ -83,15 +118,19 @@ the hand's words make it *turret*; the model binds *green* to its top.
 
 | # | Package | Builds | Done when |
 |---|---|---|---|
-| G0 | **The transcript, and a brief that always answers** | a *model* section in the details panel: the brief as sent (folded), the reply as received, what parsed, what was dropped and why, the time it took — kept for the last few exchanges; every brief ends in a sentence naming the reason, in the status line and in the transcript; a brief typed with nothing standing **stands the sketch hull first** (G1) and then asks, instead of refusing; `?demo=castle-sketch` reproduces John's board from his strokes | on John's board, Enter on *castle with green tops* either lands a version or says exactly why not, and the details show the brief and the reply verbatim |
-| G1 | **The sketch hull** | form rung: `elevation` (an open stroke whose feet reach the ground) and the silhouette reading of a closed stroke on any plane; the `hull` step; prisms along each plane's normal through the footprint's span; CSG intersect (the seam has it); stands at tier 1 on the second claim, re-derives per stroke; the massing re-expressed as a hull of three axis claims with its tests unchanged | John's footprint + two towers from two views → a blocky castle stands, attributed to the engine, with no model; undo removes a claim's contribution |
+| G0 | **The transcript, the export, and a brief that always answers** | **Export the board as its log** (one JSON file, the canvas's export pane ported) and **open one**, so John's boards become fixtures and this plan's claims are settled on them; a *model* section in the details panel: the brief as sent (folded), the reply as received, what parsed, what was dropped and why, the time it took — kept for the last few exchanges; every brief ends in a sentence naming the reason, in the status line and in the transcript; a brief typed with nothing standing **stands the sketch hull first** (G1) and then asks, instead of refusing; `?demo=castle-sketch` reproduces John's first board from his strokes | on John's board, Enter on *castle with green tops* either lands a version or says exactly why not, the details show the brief and the reply verbatim, and his two boards are in the repo as fixtures |
+| G1 | **The sketch hull, in the volume** | form rung: `elevation` (an open stroke whose feet reach the ground) and the silhouette reading of a closed stroke on any plane; the `hull` step; prisms along each plane's normal through the *others'* span, **where the claims are** — the ground bounds a hull only where a claim's feet reach it; CSG intersect (the seam has it); stands at tier 1 on the second claim, re-derives per stroke; the massing re-expressed as a hull of three axis claims with its tests unchanged; **the Y fault from John's second board reproduced from its export and fixed** | John's footprint + two towers from two views → a blocky castle stands, attributed to the engine, with no model; two loops drawn a unit above the floor make a hull a unit above the floor; undo removes a claim's contribution |
 | G2 | **Parts of the hull, said** | part claims from ⊓ runs and closed silhouettes; each part's span, height and place on the footprint in words (*at the north-west corner*, *along the east edge*, *in the middle*); engine ids `part:1…n`; the panel's summary and *becomes* list them; ink over a part addresses it | the castle's two towers and the wall are three parts with sentences; hovering one outlines it |
 | G3 | **The brief a small model can answer** | `describeSpace` for a hull: the footprint, the parts with numbers and words, the extent, the names in play; the ask: a name for each part from the hand's words, a material per part, optional small ops **by part id** (`boss`, `cut`, `mirror`) — never raw geometry; the reply contract `{ parts: [{ id, name, material? }], steps?: [] }`, repaired never guessed; `regen` by part name; tested against qwen3:8b locally and glm-flash through John's seat, the transcripts kept as fixtures | *castle with green tops* on the standing hull → parts named from the words and green bound to the tops, with both models; a reply that names nothing still lands what it did name |
+| G5 | **The hand, and the seat, over MCP** | the shard joins a live room the way the canvas does (`LiveStore` over `Demos/relay.mjs`; the shard's log is a core session, so nothing new in the engine); `shard-3d/mcp.mjs` as the hand — `space_look` (the board in words: planes, claims, the hull and its parts, with ids), `space_draw` (claims in the shape vocabulary on a named plane, or the view plane through the cursor from a given pose), `space_propose` (a reply in G3's contract: names, materials, small ops by part id — held, never blessed), `space_say`; and **the seat**: the model pane gains *Claude Code (MCP hand)* — a brief typed at it is parked in the room, `space_pending` lists it, `space_answer` returns the reply, and the shard applies it exactly as a model's, transcript and all; registered in `.mcp.json` as `metamedium-3d` beside the canvas's hand; the stdio smoke in CI | John types *castle with green tops* in his tab; Claude Code, in the conversation, reads the brief with `space_pending`, answers with `space_answer`, and the castle's parts are named and green on John's screen — the same path a small model takes, argued about first hand |
 | G4 | **The loop on John's own drawing** | John's board exported from the log as a fixture; the demo re-cut: footprint → walk around → towers from two views → the hull stands → the brief → names and green → *why* → *name: castle* → the footprint drawn again is offered as castle; the e2e drives it from the recorded strokes | the fixture runs green in the headless gate |
 
-Order: G0 → G1 → G2 → G3 → G4. G0 is small and first because it is what
-lets everything after it be *seen*. Rough weight: G0 a day, G1 two, G2
-one, G3 two, G4 one.
+Order: G0 → G1 → G5 → G2 → G3 → G4. G0 is small and first because it is
+what lets everything after it be *seen*; G5 comes before the parts and
+the brief so that G2 and G3 are shaped with Claude in the seat, on John's
+boards, and the small models are tuned against exchanges that already
+worked once. Rough weight: G0 a day, G1 two, G5 two, G2 one, G3 two,
+G4 one.
 
 ## 3. What stays
 
@@ -125,3 +164,5 @@ open vocabulary.
   left as annotation. The plan says annotation, with the reason.
 - Whether the hull stands on the *second* claim or waits for a footprint.
 - How many exchanges the transcript keeps.
+- Whether the MCP seat should be able to *bless* — name a part outright —
+  or, like the canvas's hand, only propose. The plan says propose.
