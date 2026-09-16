@@ -24,7 +24,23 @@ automatically → ask "why?" and get grounded reasoning.
 `ARCHITECTURE-v7-PARTICIPANTS-AND-TIERS.md` is the active engine plan; MVP.md
 absorbs and raises its Stage D.
 
-Headline (v10 T1–T6 and F1–F7, 14 Sep 2026, on the local branch `next-phases`):
+Headline (16 Sep 2026, on the local branch `control-points`, ready to merge
+to `master`): **the board is worked like a diagram, the door opens both
+ways, a shard makes things in space, and the review's nine packages are
+in.** Magnets P0–P1 (`CONTROL-POINTS-PLAN.md`): the pen feels where a mark
+offers attachment and a connector released on a site binds to it, one
+`bound-to` edge per endpoint (BIND-1). The MCP door (`Demos/mcp-client.mjs`):
+the canvas is an MCP client too — a server's tools map to read, answer and
+draw, and it joins as `mcp:<name>`. The 3D shard (`SHARD-3D-PLAN.md`,
+`shard-3d/`): P0–P6 to the MVP line plus a navigation compass. And
+`DIRECTOR-REVIEW-2026-09-15.md`, every package landed: a late result never
+resurrects an erased target (STATE-1), the browser scenarios run headless
+in CI (QA-1, `node e2e/run.mjs`), the shard undoes whole acts (ACT-1) and
+validates every op tree it reads (DATA-1), the field stays in the visible
+viewport (UI-1), a placed instance is scored against its own constraints
+(GRAPH-1), the field's reader is a pure fragment (SEAM-1, `09-field.js`),
+and the shard's panel leads with what is selected and where it came from
+(UI-2). Before that (v10 T1–T6 and F1–F7, 14 Sep 2026, on `next-phases`):
 **the canvas reaches out** — an MCP hand (`Demos/mcp.mjs`, registered in
 `.mcp.json`) lets Claude Code look, see, draw, say, propose, transcribe and
 write on the board as a participant in a live room; a playing program
@@ -52,7 +68,7 @@ circle them, cross with a command mark *you taught the system*, prompt them into
 a living page that renders in the canvas with your ink still outlining its
 divs — then draw on that page and the ink addresses the regions underneath it.
 Scratch anything out to erase. `Demos/session-engine.html` is the surface;
-`Demos/session-engine.e2e.js` drives 193 steps through the real UI: page, flowchart, handwriting (read only when asked; a line read as one), the model drawing, the user-side loop, selection and the field, corrections, the worker, the tank, words into verbs and acting out, frames and the drawn slider, the folder, pictures, text, the moment, a live room, a playing frame that takes the pointer, hold by long-press, the graph in 3D, and the foundations (letters at any size, a mark that crosses, readings that stay, the minimap), and the explanation plane's layout. A run takes about 100 s; run it **in its own tab on its own origin** (`http://127.0.0.1:8010/…?fresh=1&nosw=1` — `__setup` refuses any other URL: it replaces `fetch` with a stub, joins a stub model named `e2e-stub`, and wipes the origin's saved board), start it with `__setup(); __scenario().then(r => window.__R = r)` and read `__R` when it lands.
+`Demos/session-engine.e2e.js` drives 203 records through the real UI (202 checks and one honest skip, 25d; headless with the shard's two scenarios via `node e2e/run.mjs` from `e2e/`, which CI runs): page, flowchart, handwriting (read only when asked; a line read as one), the model drawing, the user-side loop, selection and the field, corrections, the worker, the tank, words into verbs and acting out, frames and the drawn slider, the folder, pictures, text, the moment, a live room, a playing frame that takes the pointer, hold by long-press, the graph in 3D, and the foundations (letters at any size, a mark that crosses, readings that stay, the minimap), and the explanation plane's layout. A run takes about 100 s; run it **in its own tab on its own origin** (`http://127.0.0.1:8010/…?fresh=1&nosw=1` — `__setup` refuses any other URL: it replaces `fetch` with a stub, joins a stub model named `e2e-stub`, and wipes the origin's saved board), start it with `__setup(); __scenario().then(r => window.__R = r)` and read `__R` when it lands.
 v7 Stage E (handwriting) shipped 1 Sep 2026: a word written beside a shape is read by a
 model that can see and offered as that shape's name. Whitepaper v5.1 stays parked until the
 conversation benchmark passes end to end.
@@ -83,6 +99,13 @@ Architecture documents (chronological; **read MVP.md, then v7, then v6**):
   caption's job) and the six still open, biggest first: **node ids do not
   survive the merge**, so `canvas_say` and `canvas_propose` land on the wrong
   marks in any room holding another hand's work
+- `CONTROL-POINTS-PLAN.md` — **magnets and handles, 15 Sep 2026**: snap
+  points the pen feels (P0–P1, built), control points that reshape (P2),
+  bindings that follow (P3), the diagram-repair demo (P4); the binding
+  contract is BIND-1's, one `bound-to` edge per endpoint
+- `DIRECTOR-REVIEW-2026-09-15.md` — **the review, all nine packages landed
+  16 Sep 2026**: QA-1, STATE-1, ACT-1, DATA-1, UI-1, GRAPH-1, BIND-1,
+  SEAM-1, UI-2, each with its regression, its owner and its evidence
 - `BUILD-PLAN-v8.md` — **the executable plan for v8**: invariants no package may break, fixed contracts (events, reps, kinds, the verb basis, the storage seam, the palette item), fourteen work packages with owned files and done-criteria, the parallel threads and the surface weave, and self-contained briefs for sub-contracting models
 - `WHITEPAPER-v5.1-PLAN.md` — **the package**: what the whitepaper shows vs. what the engine does, replays-as-figures, the demos as the paper's spine, the prose pass, and the palette decision John owns
 - `ARCHITECTURE-v6-SESSION-ENGINE.md` — **active design**: the no-modes session engine (deferred commitment, summoning, promotion ladder, capability tiers), implemented in `metamedium-core/`
@@ -131,7 +154,7 @@ not the product. Each entry's rationale and what it feeds back lives in
 | `test-llm.html` | Standalone LLM harness |
 | `manim-explainer/` | ~50s explainer video. Source + stills tracked; renders and `media/` cache gitignored (regenerate from the scripts) |
 | `playground.html` | Personal sandbox on the personal-site design language |
-| `shard-3d/` | **Live · P0–P6, the MVP line, plus the navigation compass** (`SHARD-3D-PLAN.md`, `shard-3d/README.md`): a bounded MetaMedium for making 3D things — ink on planes, a form rung, op trees, the diff as the brief, wrap and turn-into. **P0**: the gizmo's three plane tiles, a stroke projected live onto the chosen plane and read by the shape rung in that plane's own coordinates at the pen's scale, the plane held as a rep on the stroke. **P2**: the form rung (`src/form.ts`, a closed vocabulary of seven placed by a table read top to bottom, the diagram rung's sibling, every threshold a ratio of the marks' own size measured in world space), the op tree (`src/op.ts`, §2.4's vocabulary whole with `extrude` and `revolve` built), a solid held in the log as a blessed artifact whose `json` code is that tree marked `// mm:op tree v1` and attributed to the engine, the mesh derived from the tree on every change, ink kept visible on the face, selection by default, and one field with one reader for the tier 1 verbs. A rectangle plus a line off its edge stands a box at once, tier 1, and one undo removes the solid and leaves the ink. **P1–P6** followed (the plane read from the evidence — it needed faces, so it came after P2 — features and cuts, the diff as the brief, the generator seat, the library); **the compass** (`src/navgizmo.ts`, `src/view.ts`) is the camera's own corner — a Blender-style navigation gizmo as an SVG overlay, the six axis views a tap away, home, persp/ortho and the pinned views beside it, the ball that faces the chosen plane in the same teal as that plane's tile, and a snap that would leave it edge-on saying so. The plane picker at the origin is untouched: it says where ink LANDS, the compass says where the EYE is. **The panel leads with the thing, not its telemetry** (UI-2, `src/panel.ts`): five rows above everything — *what* this is, *could be* (the library's ranked names), *from* (typed provenance: made by the engine at tier 1 · proposed by a model, held · taken by you · **placed from mug, a definition qwen3:8b proposed and you took**, which tells this operation's author from the definition's ancestry), *next* (the field's leading offer, in the same words the field is showing, and never *Undo*), and *becomes* — with every measurement it used to open on kept behind *why / measurements ▾*, remembered per device. A version the hand has not taken no longer claims a model proposed it; the honours row is one line per claim carrying GRAPH-1's own `why` and `aside`, and the status line after a proposal says the number and sends you to the panel for the workings. `npm install && npm run dev` in `shard-3d/` (vite on :5174; `?demo` draws both done-criteria); `npm test` is vitest on the pure rungs; the engine is imported from source, so there is no bundle to drift |
+| `shard-3d/` | **Live · P0–P6, the MVP line, the navigation compass, and the review's four shard packages** (undo reverts one whole act grouped by the act's own `at`, ACT-1; every op tree read from the log or a reply is validated with a structured reason and a malformed one stands isolated, DATA-1; a placed instance is scored against its own target sketch, its carried source correspondences and later revisions, never a zero-percent source view, GRAPH-1; the panel leads with what is selected, what it could be, where it came from and the next act, with the evidence behind a disclosure, UI-2) (`SHARD-3D-PLAN.md`, `shard-3d/README.md`): a bounded MetaMedium for making 3D things — ink on planes, a form rung, op trees, the diff as the brief, wrap and turn-into. **P0**: the gizmo's three plane tiles, a stroke projected live onto the chosen plane and read by the shape rung in that plane's own coordinates at the pen's scale, the plane held as a rep on the stroke. **P2**: the form rung (`src/form.ts`, a closed vocabulary of seven placed by a table read top to bottom, the diagram rung's sibling, every threshold a ratio of the marks' own size measured in world space), the op tree (`src/op.ts`, §2.4's vocabulary whole with `extrude` and `revolve` built), a solid held in the log as a blessed artifact whose `json` code is that tree marked `// mm:op tree v1` and attributed to the engine, the mesh derived from the tree on every change, ink kept visible on the face, selection by default, and one field with one reader for the tier 1 verbs. A rectangle plus a line off its edge stands a box at once, tier 1, and one undo removes the solid and leaves the ink. **P1–P6** followed (the plane read from the evidence — it needed faces, so it came after P2 — features and cuts, the diff as the brief, the generator seat, the library); **the compass** (`src/navgizmo.ts`, `src/view.ts`) is the camera's own corner — a Blender-style navigation gizmo as an SVG overlay, the six axis views a tap away, home, persp/ortho and the pinned views beside it, the ball that faces the chosen plane in the same teal as that plane's tile, and a snap that would leave it edge-on saying so. The plane picker at the origin is untouched: it says where ink LANDS, the compass says where the EYE is. **The panel leads with the thing, not its telemetry** (UI-2, `src/panel.ts`): five rows above everything — *what* this is, *could be* (the library's ranked names), *from* (typed provenance: made by the engine at tier 1 · proposed by a model, held · taken by you · **placed from mug, a definition qwen3:8b proposed and you took**, which tells this operation's author from the definition's ancestry), *next* (the field's leading offer, in the same words the field is showing, and never *Undo*), and *becomes* — with every measurement it used to open on kept behind *why / measurements ▾*, remembered per device. A version the hand has not taken no longer claims a model proposed it; the honours row is one line per claim carrying GRAPH-1's own `why` and `aside`, and the status line after a proposal says the number and sends you to the panel for the workings. `npm install && npm run dev` in `shard-3d/` (vite on :5174; `?demo` draws both done-criteria); `npm test` is vitest on the pure rungs; the engine is imported from source, so there is no bundle to drift |
 
 **Known duplication:** recognition logic still exists independently in
 `doodle2-canvas.html`, `metadoodle1.html`, `Web App Skeleton/src/core/`, and
@@ -417,6 +440,34 @@ keep it safe: a **closed** stroke is never a scratch (it is a lasso), and
 scratch targets are **ink**, never artifacts. The surface says when a
 scratch was one pass short (*crossed it twice — one more pass erases it*),
 so the rule is learned by doing.
+
+### Magnets and bindings: the pen feels where a mark offers attachment
+
+> `metamedium-core/src/session/magnets.ts` (sites, `magnetRadius`, the
+> binding queries), `bind.test.ts`; `Demos/surface/05-snap.js`, `07-input.js`.
+
+**Sites are derived, never stored**: a line's ends and middle, a box's
+corners, edge-middles and centre, a circle's centre and cardinals, a
+triangle's corners and centroid, an arrow's tip and tail — arithmetic on
+the clean form a mark carries or would be offered, so replay is
+deterministic; unread ink offers its bounds, never a pretended shape.
+Radii are about the hand (`magnetRadius(sizePx, scale)`). While a
+connector is drawn its end shows the nearest site in reach as a ghost
+ring; releasing inside lands the endpoint on the site and logs `bind`.
+**A magnet is an offer, not a trap**: the hand can push through it, and
+drawing past dissolves it. Binding is for connectors (line, arrow, arc); a
+stroke matching the active command mark is never pulled, and a
+letter-sized stroke is writing.
+
+**One `bound-to` edge per endpoint** (BIND-1): an edge is one claim with
+one reason, and two endpoints are two claims — a single edge could only
+state one of them, which was the bug. The edge carries `end` and `site`,
+the `bound` rep beside it carries the same, removal is keyed by `end`, and
+`bindingsOf` / `boundRepsOf` agree. **Erasing a target keeps the claim**:
+the edge and rep stay, `active: false`; `activeBindingsOf` never returns a
+tombstoned target, and undo of the erase makes it an anchor again, because
+state is a pure function of the log. P1-era logs replay into this
+representation unchanged. P3, bindings that follow, builds on it.
 
 ### Parsing: the drawing as a layout
 
