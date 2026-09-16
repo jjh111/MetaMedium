@@ -92,6 +92,14 @@ raster parked beside it, and undo restores both.
 
 ### P3 — bindings follow
 
+**The graph it re-anchors from is specified** (BIND-1, 16 Sep 2026): one
+`bound-to` edge per endpoint, carrying that end and its site, with the
+`'bound'` rep agreeing; removal keyed by the endpoint, never the target, so
+both ends of one connector may sit on one box and rebinding one leaves the
+other. `activeBindingsOf(stroke, nodes)` is the query P3 asks — it never
+returns a tombstoned target. The contract is in `magnets.ts`'s header;
+`bind.test.ts` pins it through replay, checkpoints and merge.
+
 Moving or reshaping a mark re-anchors the endpoints bound to its sites: no
 solver — on a `move`/`reshape`, each inbound `bound-to` re-derives its point
 from the site's new position. A moved box carries its arrows.
@@ -119,6 +127,10 @@ tracer's ROADMAP entry can drop its "painted, not photographed" caveat.
 - Junctions (where two strokes cross) are not sites in P0; the spatial graph
   knows the crossings, and P1's pen will want them. Added to P1 if the felt
   gap shows, P3 at the latest.
-- A bound endpoint that its site *leaves* (the target is erased) must fall
+- ~~A bound endpoint that its site *leaves* (the target is erased) must fall
   back to plain ink gracefully — the edge dies with the mark, the stroke
-  stays. Covered by engine erase semantics; a test in P1.
+  stays.~~ **Settled by BIND-1, and the other way round:** the edge does *not*
+  die with the mark. Provenance is not destroyed to tidy away a dangling
+  reference, so the claim stays and reads `active: false`; undoing the erase
+  makes it an anchor again for free. What must never see a tombstone is the
+  consumer asking where a stroke is *anchored* — that is `activeBindingsOf`.

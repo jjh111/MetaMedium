@@ -92,6 +92,8 @@ export type { Maths, Measure } from './session/measure';
 // Magnets — the places a mark offers attachment, derived from its clean form.
 export { magnetSites, nearestMagnet, magnetsNear, magnetRadius, describeMagnet, MAGNET_SCREEN_PX, MAGNET_SIZE_FRACTION } from './session/magnets';
 export type { MagnetSite, MagnetKind, MagnetHit } from './session/magnets';
+export { bindingsOf, boundRepsOf, activeBindingsOf, boundToMark, describeBinding } from './session/magnets';
+export type { Binding, BoundRep } from './session/magnets';
 
 // Words from letters — printed letters gathered into one held mark (words.ts).
 export { isLetterLike, joinsRun, wordConfidence, LETTER_MAX_HEIGHT_PX, WORD_GAP_RATIO, WORD_WINDOW_MS } from './session/words';
