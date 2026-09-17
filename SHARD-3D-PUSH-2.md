@@ -164,5 +164,15 @@ open vocabulary.
   left as annotation. The plan says annotation, with the reason.
 - Whether the hull stands on the *second* claim or waits for a footprint.
 - How many exchanges the transcript keeps.
+- **What a hull is when a tower is seen only once.** G2 found that three
+  partial silhouettes from two standpoints determine two masses, not
+  three: a tower drawn from one view has no depth, and the visual hull
+  cannot invent it. The honest reading stands (two parts, the shortfall
+  pinned in `parts.test.ts`). The alternative — the hull as a *union of
+  masses*, each ⊓ bounded by the footprint rather than by the other
+  claims — gives every tower a body at the cost of inventing its depth
+  (a 2.8 u slab across a 6 × 4 plan, measured). A third option is to ask:
+  a part seen once is a *question* on the board (*how deep is this?*), a
+  second view or a word answering it. John's call; the plan says ask.
 - Whether the MCP seat should be able to *bless* — name a part outright —
   or, like the canvas's hand, only propose. The plan says propose.
