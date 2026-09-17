@@ -24,10 +24,12 @@ automatically → ask "why?" and get grounded reasoning.
 `ARCHITECTURE-v7-PARTICIPANTS-AND-TIERS.md` is the active engine plan; MVP.md
 absorbs and raises its Stage D.
 
-Headline (16 Sep 2026, on the local branch `control-points`, ready to merge
-to `master`): **the board is worked like a diagram, the door opens both
-ways, a shard makes things in space, and the review's nine packages are
-in.** Magnets P0–P1 (`CONTROL-POINTS-PLAN.md`): the pen feels where a mark
+Headline (17 Sep 2026, everything on `master`; `DIRECTOR-VIEW-2026-09-17.md`
+is the director's view of where it all stands, the 15 Sep review reviewed,
+where a decision-only model such as Jev would fit, and the next steps in
+order — ids per hand first): **the board is worked like a diagram, the
+door opens both ways, a shard makes things in space, and the review's nine
+packages are in.** Magnets P0–P1 (`CONTROL-POINTS-PLAN.md`): the pen feels where a mark
 offers attachment and a connector released on a site binds to it, one
 `bound-to` edge per endpoint (BIND-1). The MCP door (`Demos/mcp-client.mjs`):
 the canvas is an MCP client too — a server's tools map to read, answer and
@@ -106,6 +108,14 @@ Architecture documents (chronological; **read MVP.md, then v7, then v6**):
 - `DIRECTOR-REVIEW-2026-09-15.md` — **the review, all nine packages landed
   16 Sep 2026**: QA-1, STATE-1, ACT-1, DATA-1, UI-1, GRAPH-1, BIND-1,
   SEAM-1, UI-2, each with its regression, its owner and its evidence
+- `DIRECTOR-VIEW-2026-09-17.md` — **the director's view, 17 Sep 2026**:
+  one engine, two surfaces, three doors, with the numbers on `master`; the
+  15 Sep review reviewed (right on direction and discipline; it never
+  reached ids per hand, audited with stubs only, left three items
+  unpromoted); Jev as a *decision seat* behind an injectable transport, never
+  a dependency, with five places it would fit in order of value; next steps
+  — ids per hand (T8) first, then a review of use, a label primitive, the
+  shard asking, the seat experiment, the paper's next figures
 - `SHARD-3D-PUSH-2.md` — **geometry from the drawing, G0–G5 all landed
   16 Sep 2026**: what John's first real use showed (a footprint and elevations
   from free views stood nothing, and a brief with nothing to fill was refused
