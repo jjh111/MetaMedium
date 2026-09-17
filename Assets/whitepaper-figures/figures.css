@@ -1,0 +1,214 @@
+/* Interactive editorial plates. Page/brand tokens own every colour and face.
+   SVG carries geometry; HTML carries reading-size text and native controls.
+   Do not squeeze a desktop text drawing into a phone-sized viewBox. */
+.folio-plate {
+  --fp-pad: clamp(18px, 2.6vw, 32px);
+  --fp-line: var(--ink-soft);
+  isolation: isolate;
+  scroll-margin-top: 90px;
+  color: var(--ink);
+  border-radius: 3px;
+  box-shadow: none;
+}
+.folio-plate [hidden] { display: none !important; }
+.folio-plate :is(h3,h4,p,dl,dt,dd,button,input) { font-family: var(--face); }
+.folio-plate .fp-heading { padding: var(--fp-pad); border-bottom: 1px solid var(--fig-edge); }
+.folio-plate .fp-kicker { display: flex; justify-content: space-between; gap: 16px; font-size: 13px; line-height: 1.5; color: var(--ink-soft); letter-spacing: .055em; }
+.folio-plate .fp-heading h3 { margin: 20px 0 12px; padding: 0; border: 0; color: var(--ink); font-size: clamp(26px, 3vw, 36px); line-height: 1.22; font-weight: 500; letter-spacing: -.05em; max-width: 24ch; text-wrap: balance; }
+.folio-plate .fp-dek { margin: 0; font-size: 16px; line-height: 1.65; color: var(--ink-soft); max-width: 78ch; text-wrap: pretty; }
+
+/* ── Toolbar: choices + overview toggle + instruction ── */
+.fp-toolbar { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 12px; padding: 10px var(--fp-pad); border-bottom: 1px solid var(--fig-edge); }
+.fp-toolbar .fp-controls { margin-bottom: 0; }
+.fp-toolbar .fp-instruction { border: 0; margin: 0; padding: 0; }
+.fp-overview-toggle { appearance: none; border: 1px solid var(--ink-soft); border-radius: 2px; background: var(--fig-plate); color: var(--ink); padding: 6px 10px; font-size: 13px; font-weight: 400; line-height: 1.45; cursor: pointer; touch-action: manipulation; transition: background 160ms, border-color 160ms; }
+.fp-overview-toggle[aria-pressed="true"] { border-color: var(--dia-key); background: var(--dia-tint); box-shadow: inset 0 -2px var(--dia-key); }
+.fp-overview-toggle:focus-visible { outline: 3px solid var(--focus); outline-offset: 4px; }
+
+/* ── Shared-map (overview) layout: spectrum, triad ── */
+.fp-body { display: grid; grid-template-columns: minmax(0, 1.48fr) minmax(0, 1fr); }
+.fp-visual { min-width: 0; display: flex; flex-direction: column; padding: 12px 8px 0; }
+.fp-map { position: relative; width: 100%; aspect-ratio: 1000 / 920; flex: 0 0 auto; }
+.fp-art { display: block; width: 100%; height: auto; overflow: visible; pointer-events: none; }
+.fp-art * { pointer-events: none; }
+
+/* All readings visible in overview; current one emphasized */
+.fp-readings .fp-reading { padding: 16px 0; border-bottom: 1px solid var(--fig-edge); transition: opacity 200ms ease; }
+.fp-readings .fp-reading:last-child { border-bottom: none; }
+.fp-overview .fp-readings .fp-reading.is-current { opacity: 1; }
+.fp-overview .fp-readings .fp-reading:not(.is-current) { opacity: .5; }
+
+/* ── Comparison layout: capacity, negotiation, semiotic, lenses, alignment ── */
+.fp-scenes { display: grid; grid-template-columns: repeat(var(--scenes, 2), minmax(0, 1fr)); }
+.fp-scene { display: flex; flex-direction: column; padding: var(--fp-pad); border-right: 1px solid var(--fig-edge); transition: opacity 200ms ease; }
+.fp-scene:last-child { border-right: none; }
+.fp-comparison .fp-scene.is-current { opacity: 1; }
+.fp-comparison .fp-scene:not(.is-current) { opacity: .5; }
+.fp-scene-heading { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-size: 14px; line-height: 1.4; color: var(--ink-soft); letter-spacing: .04em; }
+.fp-step { font-size: 12px; margin-right: 4px; }
+.fp-scene .fp-map { aspect-ratio: 1000 / 920; margin-bottom: 14px; }
+.fp-scene .fp-reading { flex: 1; min-width: 0; }
+/* Snapshot layers are always fully visible (only one layer per snapshot) */
+.fp-snapshot-layer { opacity: 1 !important; }
+
+/* ── SVG artwork tokens ── */
+.fp-grid { fill: none; stroke: var(--dia-grid); stroke-width: 1.2; }
+.fp-registration { fill: none; stroke: var(--dia-hold); stroke-width: 1.6; }
+.fp-line { fill: none; stroke: var(--fp-line); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+.fp-hair { stroke-width: 1.6; }
+.fp-dash { stroke-dasharray: 9 10; }
+.fp-held { color: var(--ink-soft); stroke: var(--ink-soft); }
+.fp-key { color: var(--dia-key); stroke: var(--dia-key); }
+.fp-model { color: var(--dia-model); stroke: var(--dia-model); }
+.fp-dot { stroke: none; fill: currentColor; }
+.fp-dot.fp-held { color: var(--ink-soft); }
+.fp-dot.fp-key { color: var(--dia-key); }
+.fp-dot.fp-model { color: var(--dia-model); }
+.fp-surface { fill: var(--fig-plate); stroke-width: 3; }
+.fp-source { color: var(--ink-soft); stroke: var(--ink-soft); stroke-width: 5; }
+.fp-dot.fp-source { fill: var(--ink-soft); stroke: none; }
+.fp-opaque { fill: var(--ink); stroke: var(--ink); }
+.fp-hatch { stroke: var(--fig-plate); opacity: .3; stroke-width: 1.4; }
+.fp-arrowhead { fill: var(--dia-key); stroke: none; }
+.fp-model-arrow { fill: var(--dia-model); }
+.fp-line.fp-model { stroke-dasharray: 8 7; }
+.fp-clear { fill: var(--fig-plate); stroke: none; }
+.fp-map-action { position: absolute; left: var(--x); top: var(--y); transform: translate(-50%,-50%); max-width: 45%; }
+
+/* ── Layer visibility (shared-map plates) ── */
+[data-enhanced] .fp-node-name { visibility: hidden; }
+[data-plate="triad"][data-active="language"] [data-emphasis="language"] > circle,
+[data-plate="triad"][data-active="computation"] [data-emphasis="computation"] > circle,
+[data-plate="triad"][data-active="meaning"] [data-emphasis="meaning"] > circle { stroke-width: 6; }
+[data-emphasis] > circle { transition: stroke-width 200ms ease; }
+.fp-layer { opacity: 0; transition: opacity 240ms ease; }
+.fp-layer.is-selected { opacity: 1; }
+[data-plate="spectrum"] .fp-layer { opacity: .42; }
+[data-plate="spectrum"] .fp-layer.is-selected { opacity: 1; }
+.fp-feedback, .fp-shared-path { transition: opacity 240ms ease; }
+[data-loop-open="true"] .fp-feedback { opacity: 0; }
+
+/* ── Map labels ── */
+.fp-map-label { position: absolute; left: var(--x); top: var(--y); transform: translate(-50%, -50%); max-width: 86%; width: max-content; padding: 3px 6px; background: var(--fig-plate); color: var(--ink-soft); font-size: 14px; line-height: 1.35; text-align: center; pointer-events: none; }
+.fp-word { display: none; color: var(--ink-soft); font-size: 20px; }
+/* Single-view word rule (kept for no-JS fallback) */
+[data-active="word"] .fp-word { display: block; }
+/* Comparison override: word label only in its scene */
+.folio-plate.fp-comparison .fp-word { display: none; }
+.folio-plate.fp-comparison .fp-scene[data-state="word"] .fp-word { display: block; }
+/* Feedback / shared labels */
+[data-loop-open="true"] .fp-feedback-label { visibility: hidden; }
+/* Shared-label: only visible in shared scene for comparison alignment */
+.folio-plate.fp-comparison .fp-shared-label { display: none; }
+.folio-plate.fp-comparison .fp-scene[data-state="shared"] .fp-shared-label { display: block; }
+
+/* ── Legend ── */
+.fp-legend { display: flex; flex-wrap: wrap; gap: 10px 18px; margin-top: auto; padding: 16px 20px; font-size: 14px; line-height: 1.6; color: var(--ink-soft); }
+.fp-legend span { display: flex; align-items: center; gap: 8px; }
+.fp-legend i { display: inline-block; width: 20px; height: 0; border-top: 2px solid currentColor; flex-shrink: 0; }
+.fp-legend .fp-model { color: var(--dia-model); border-top-style: dashed; }
+.fp-legend .fp-key { color: var(--dia-key); }
+
+/* ── Aside (shared-map plates) ── */
+.fp-aside { padding: 24px; border-left: 1px solid var(--fig-edge); min-width: 0; background: var(--dia-tint-flat); }
+
+/* ── Controls ── */
+.fp-controls { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 24px; }
+.folio-plate button { appearance: none; border: 1px solid var(--ink-soft); border-radius: 2px; background: var(--fig-plate); color: var(--ink); padding: 10px 12px; min-height: 46px; min-width: 46px; font-size: 14px; font-weight: 400; line-height: 1.45; text-align: left; cursor: pointer; touch-action: manipulation; transition: background 160ms, border-color 160ms; }
+.folio-plate button[aria-pressed="true"] { color: var(--ink); border-color: var(--dia-key); background: var(--dia-tint); box-shadow: inset 0 -2px var(--dia-key); }
+.fp-option-number { margin-right: 8px; color: var(--ink-soft); font-size: 12px; }
+.folio-plate :is(button,input):focus-visible { outline: 3px solid var(--focus); outline-offset: 4px; }
+@media (hover: hover) { .folio-plate button:hover { background: var(--dia-tint); border-color: var(--dia-key); } }
+.folio-plate button:active { background: var(--highlight); }
+
+/* ── Readings ── */
+.folio-plate .fp-reading h4 { margin: 0 0 14px; font-size: 21px; line-height: 1.4; font-weight: 500; color: var(--ink); letter-spacing: -.03em; }
+.folio-plate .fp-reading p { margin: 0 0 24px; color: var(--ink-soft); font-size: 15px; line-height: 1.75; max-width: none; }
+.fp-facts { margin: 0; }
+.fp-facts > div { border-top: 1px solid var(--fig-edge); padding: 12px 0; }
+.fp-facts dt { font-size: 14px; color: var(--ink-soft); margin: 0 0 4px; }
+.fp-facts dd { font-size: 14px; line-height: 1.65; color: var(--ink); margin: 0; overflow-wrap: anywhere; }
+.folio-plate .fp-instruction { border-top: 1px solid var(--fig-edge); margin: 16px 0 0; padding-top: 14px; font-size: 14px; line-height: 1.6; color: var(--ink-soft); }
+.fp-check label { display: flex; align-items: center; gap: 12px; min-height: 48px; cursor: pointer; font-size: 14px; line-height: 1.5; color: var(--ink); }
+.fp-check input { accent-color: var(--dia-key); width: 22px; height: 22px; margin: 0; flex-shrink: 0; }
+.fp-secondary { margin-top: -8px; }
+.fp-secondary button { width: 100%; display: flex; justify-content: space-between; gap: 8px; }
+.fp-share-link { width: 100%; min-width: 0; min-height: 46px; border: 1px solid var(--ink-soft); padding: 10px; font-size: 16px; background: var(--fig-plate); color: var(--ink); }
+.fp-footnote { border-top: 1px solid var(--fig-edge); padding: 12px var(--fp-pad); font-size: 14px; line-height: 1.6; color: var(--ink-soft); }
+.folio-plate figcaption { padding: 20px var(--fp-pad); font-size: 15px; line-height: 1.7; color: var(--ink-soft); border-top: 1px solid var(--fig-edge); }
+.folio-plate figcaption b { font-size: 14px; font-weight: 500; letter-spacing: 0; text-transform: none; color: var(--ink); margin: 0 0 8px; }
+.fp-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+/* ── Static output: complete and readable before JS and in print ── */
+.fp-print-note { display: none; }
+.folio-plate:not([data-enhanced]) .fp-reading + .fp-reading { margin-top: 28px; padding-top: 24px; border-top: 1px solid var(--fig-edge); }
+/* Before enhancement, show all scenes at full opacity */
+.folio-plate:not([data-enhanced]) .fp-scene { opacity: 1; }
+.folio-plate:not([data-enhanced]) .fp-readings .fp-reading { opacity: 1; }
+
+/* ── Tablet portrait / split-screen ── */
+@media (max-width: 850px) {
+  .fp-body { grid-template-columns: 1fr; }
+  .fp-visual { max-width: 650px; width: 100%; margin-inline: auto; }
+  .fp-aside { border-left: 0; border-top: 1px solid var(--fig-edge); padding: var(--fp-pad); }
+  .fp-map { max-width: 600px; margin-inline: auto; }
+  .fp-controls { margin-bottom: 20px; }
+  .fp-facts { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 20px; }
+  /* Comparison plates: 2-col grid on tablet */
+  .fp-scenes { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .fp-scene .fp-map { max-width: 100%; }
+}
+
+/* ── Phone ── */
+@media (max-width: 560px) {
+  .folio-plate { width: 100%; max-width: 100%; }
+  .fp-edition { display: none; }
+  .folio-plate .fp-heading h3 { letter-spacing: -.045em; }
+  .fp-map-label { font-size: 13px; padding: 2px 4px; }
+  .fp-word { font-size: 17px; }
+  .fp-facts { display: block; }
+  .fp-controls { gap: 8px; }
+  .folio-plate button { font-size: 14px; padding: 10px; }
+  .fp-legend { padding: 14px 10px; gap: 7px 12px; }
+  .folio-plate .fp-reading p, .fp-facts dd { font-size: 16px; }
+  /* Comparison: stack scenes, focus mode hides non-current */
+  .fp-scenes { grid-template-columns: 1fr; }
+  .fp-scene { border-right: none; border-bottom: 1px solid var(--fig-edge); }
+  .fp-scene:last-child { border-bottom: none; }
+  .fp-comparison[data-enhanced]:not([data-overview="true"]) .fp-scene:not(.is-current) { display: none; }
+  .fp-overview[data-enhanced]:not([data-overview="true"]) .fp-readings .fp-reading:not(.is-current) { display: none; }
+  /* In overview mode, show everything */
+  .fp-comparison[data-enhanced][data-overview="true"] .fp-scene { display: flex; opacity: 1; }
+  .fp-overview[data-enhanced][data-overview="true"] .fp-readings .fp-reading { display: block; opacity: 1; }
+}
+
+/* ── Reduced motion ── */
+@media (prefers-reduced-motion: reduce) {
+  .folio-plate *, .folio-plate *::before, .folio-plate *::after { transition: none !important; animation: none !important; }
+}
+
+/* ── High contrast ── */
+@media (forced-colors: active) {
+  .folio-plate button[aria-pressed="true"] { border: 3px solid Highlight; }
+  .fp-line, .fp-surface, .fp-registration { stroke: CanvasText; }
+  .fp-dot, .fp-arrowhead, .fp-opaque { fill: CanvasText; }
+  .fp-surface { fill: Canvas; }
+  .fp-line.fp-hatch { stroke: Canvas; opacity: 1; }
+}
+
+/* ── Print ── */
+@media print {
+  .folio-plate { width: 100%; max-width: 100%; margin-left: 0; transform: none; break-inside: auto; }
+  .fp-body { display: block; }
+  .fp-map { width: 65%; margin-inline: auto; }
+  .fp-aside { border: 0; }
+  .folio-plate .fp-controls, .folio-plate .fp-instruction, .folio-plate .fp-map-action, .fp-overview-toggle { display: none !important; }
+  .folio-plate[data-enhanced] .fp-node-name { visibility: visible; }
+  .folio-plate .fp-reading[hidden] { display: block !important; }
+  .fp-reading { break-inside: avoid; padding-top: 18px; }
+  .fp-print-note { display: block; padding: 14px var(--fp-pad); font-size: 14px; color: var(--ink-soft); }
+  .fp-art { break-inside: avoid; }
+  /* All scenes visible in print */
+  .fp-scene { opacity: 1 !important; display: flex !important; }
+  .fp-readings .fp-reading { opacity: 1 !important; display: block !important; }
+}
