@@ -65,6 +65,13 @@ export interface Solids {
   facesAt(screen: Point): FaceRef[];
   /** World bounds of a solid, for the selection outline. */
   boundsOf(id: string): THREE.Box3 | null;
+  /**
+   * The geometry standing for a solid right now — what `parts.ts` cuts up
+   * (push 2, G2). Derived, never held: it is whatever the last `sync` built.
+   */
+  geometryOf(id: string): THREE.BufferGeometry | null;
+  /** The tree signature the current build was made from — what a parts cache is keyed on. */
+  signatureOf(id: string): string | null;
   /** How far a solid reaches along a direction — what a cut goes THROUGH. */
   spanAlong(id: string, direction: Vec3): number;
   /**
@@ -196,6 +203,27 @@ function prism(
 
 function toolGeometry(step: FeatureStep): { geometry: THREE.BufferGeometry; matrix: THREE.Matrix4 } | null {
   return prism(step.profile.points, step.profile.closed, planeOfStep(step), step.start, step.depth);
+}
+
+/**
+ * The same prism, **in world space** — the one door other files come through
+ * (push 2, G2: `parts.ts` cuts a hull with a run's prism).
+ *
+ * The shard has one place that knows how a profile stands up on a plane, and a
+ * second copy of it would be a second place for the frame convention to drift.
+ */
+export function prismOn(
+  points: Point[],
+  closed: boolean,
+  plane: Plane,
+  start: number,
+  depth: number
+): THREE.BufferGeometry | null {
+  const built = prism(points, closed, plane, start, depth);
+  if (!built) return null;
+  const geometry = built.geometry.clone();
+  geometry.applyMatrix4(built.matrix);
+  return geometry;
 }
 
 /**
@@ -565,6 +593,24 @@ function massingGeometry(step: MassingStep): { geometry: THREE.BufferGeometry | 
  *
  * A ratio of the span pads each end, so no face of one prism is ever coplanar
  * with a face of another — the lesson `TOOL_OVERLAP` taught.
+ *
+ * **One standpoint is one silhouette** (push 2, G2 — found by standing John's
+ * own castle up). A hand that walks to one side and draws two towers has drawn
+ * ONE outline with two pieces in it, not two claims to intersect: intersecting
+ * them gives the empty set, which is what his first board came to. So claims
+ * that share a plane DIRECTION are gathered into one silhouette before anything
+ * is intersected, and within that silhouette:
+ *
+ *   * claims whose outlines lie APART are pieces of the one outline, and are
+ *     **unioned** — two towers seen from the path;
+ *   * claims whose outlines OVERLAP are two accounts of the same outline, and
+ *     are **intersected** — the narrower ⊓ drawn over the first is a correction,
+ *     and a correction tightens.
+ *
+ * Across directions nothing changes: silhouettes are intersected, which is the
+ * visual hull as it has always been defined. The massing is untouched, because
+ * its three profiles are on three different planes and each is a silhouette of
+ * one.
  */
 function hullBody(
   claims: { id: string; profile: Profile2D; plane: PlaneRef; ground?: boolean }[],
@@ -579,14 +625,28 @@ function hullBody(
   };
   const world = new Map(claims.map((c) => [c.id, worldOf(c)]));
 
+  // ---- one standpoint, one silhouette -------------------------------------
+  // Claims are gathered by the DIRECTION their prism runs along — the plane's
+  // normal, up to sign, because a view from in front and a view from behind
+  // sweep the same line. Two claims in one group say nothing about how far the
+  // other runs along that shared direction, so the span is measured over the
+  // OTHER groups.
+  const groups: (typeof claims)[] = [];
+  for (const c of claims) {
+    const n = normalize(c.plane.normal);
+    const into = groups.find((g) => Math.abs(dot(normalize(g[0].plane.normal), n)) > 1 - 1e-6);
+    if (into) into.push(c);
+    else groups.push([c]);
+  }
+
   let out: THREE.BufferGeometry | null = null;
   let broken: string | null = null;
-  for (const c of claims) {
-    const plane = planeOfStep(c);
+  for (const group of groups) {
+    const plane = planeOfStep(group[0]);
     let min = Infinity;
     let max = -Infinity;
     for (const other of claims) {
-      if (other.id === c.id) continue;
+      if (group.some((c) => c.id === other.id)) continue;
       for (const w of world.get(other.id)!) {
         const d = offsetOf(plane, w);
         if (d < min) min = d;
@@ -594,36 +654,122 @@ function hullBody(
       }
     }
     if (!Number.isFinite(min)) {
-      // One claim on its own: nothing else says how far it runs, so it runs
-      // through its own extent rather than through nothing.
-      for (const w of world.get(c.id)!) {
-        const d = offsetOf(plane, w);
-        if (d < min) min = d;
-        if (d > max) max = d;
-      }
+      // One silhouette on its own: nothing else says how far it runs, so it
+      // runs through its own extent rather than through nothing.
+      for (const c of group)
+        for (const w of world.get(c.id)!) {
+          const d = offsetOf(plane, w);
+          if (d < min) min = d;
+          if (d > max) max = d;
+        }
     }
     // The footprint stands on the ground and runs up to the tallest claim.
-    if (c.id === footprintId) min = Math.min(min, offsetOf(plane, { x: 0, y: 0, z: 0 }));
+    if (group.some((c) => c.id === footprintId)) min = Math.min(min, offsetOf(plane, { x: 0, y: 0, z: 0 }));
     const span = Math.max(max - min, 1e-3);
     const pad = span * TOOL_OVERLAP;
-    // An OPEN elevation is closed by the ground: joining its two feet is the
-    // fourth side, and both of them stand on the floor.
-    const tool = prism(c.profile.points, c.profile.closed || !!c.ground, plane, min - pad, span + pad * 2);
-    if (!tool) {
-      if (!broken) broken = `the claim ${c.id} is degenerate — a ${what} cannot be grown from it`;
-      continue;
+
+    // Each claim in the group, as a prism on the group's own plane.
+    const built: { claim: (typeof claims)[number]; geometry: THREE.BufferGeometry }[] = [];
+    for (const c of group) {
+      // An OPEN elevation is closed by the ground: joining its two feet is the
+      // fourth side, and both of them stand on the floor.
+      const tool = prism(c.profile.points, c.profile.closed || !!c.ground, planeOfStep(c), min - pad, span + pad * 2);
+      if (!tool) {
+        if (!broken) broken = `the claim ${c.id} is degenerate — a ${what} cannot be grown from it`;
+        continue;
+      }
+      const geometry = tool.geometry.clone();
+      geometry.applyMatrix4(tool.matrix);
+      built.push({ claim: c, geometry });
     }
-    const geometry = tool.geometry.clone();
-    geometry.applyMatrix4(tool.matrix);
+    if (!built.length) continue;
+
+    // Within the silhouette: outlines that OVERLAP are two accounts of the one
+    // outline and are intersected; outlines that lie APART are two pieces of it
+    // and are unioned. Overlap is read on the shared plane, in its own (u, v).
+    const silhouette = gatherSilhouette(built, plane, world, what);
+    if (silhouette.broken && !broken) broken = silhouette.broken;
+    if (!silhouette.geometry) continue;
+
     if (!out) {
-      out = geometry;
+      out = silhouette.geometry;
       continue;
     }
-    const r = intersect(out, geometry);
+    const r = intersect(out, silhouette.geometry);
     if (r.ok) out = r.geometry;
     else if (!broken) broken = r.error;
   }
   return { geometry: out, broken };
+}
+
+/**
+ * One standpoint's claims, combined into that standpoint's one silhouette.
+ *
+ * Overlap is read as the boxes of the outlines in the shared plane's own
+ * (u, v) — the question being asked is *are these two drawings of the same
+ * piece*, and a box answers it without a third boolean per pair.
+ */
+function gatherSilhouette(
+  built: { claim: { id: string }; geometry: THREE.BufferGeometry }[],
+  plane: Plane,
+  world: Map<string, Vec3[]>,
+  what: 'massing' | 'hull'
+): { geometry: THREE.BufferGeometry | null; broken: string | null } {
+  if (built.length === 1) return { geometry: built[0].geometry, broken: null };
+  const U = uAxis(plane);
+  const V = vAxis(plane);
+  const boxOf = (id: string) => {
+    let minU = Infinity;
+    let maxU = -Infinity;
+    let minV = Infinity;
+    let maxV = -Infinity;
+    for (const w of world.get(id) ?? []) {
+      const u = w.x * U.x + w.y * U.y + w.z * U.z;
+      const v = w.x * V.x + w.y * V.y + w.z * V.z;
+      minU = Math.min(minU, u);
+      maxU = Math.max(maxU, u);
+      minV = Math.min(minV, v);
+      maxV = Math.max(maxV, v);
+    }
+    return { minU, maxU, minV, maxV };
+  };
+  const apart = (a: ReturnType<typeof boxOf>, b: ReturnType<typeof boxOf>) =>
+    a.maxU <= b.minU || b.maxU <= a.minU || a.maxV <= b.minV || b.maxV <= a.minV;
+
+  // Clusters of mutually overlapping outlines, so the answer does not depend on
+  // the order the hand happened to draw them in.
+  const clusters: { ids: string[]; box: ReturnType<typeof boxOf>; geometry: THREE.BufferGeometry }[] = [];
+  let broken: string | null = null;
+  for (const b of built) {
+    const box = boxOf(b.claim.id);
+    const into = clusters.find((c) => !apart(c.box, box));
+    if (!into) {
+      clusters.push({ ids: [b.claim.id], box, geometry: b.geometry });
+      continue;
+    }
+    into.ids.push(b.claim.id);
+    into.box = {
+      minU: Math.min(into.box.minU, box.minU),
+      maxU: Math.max(into.box.maxU, box.maxU),
+      minV: Math.min(into.box.minV, box.minV),
+      maxV: Math.max(into.box.maxV, box.maxV),
+    };
+    const r = intersect(into.geometry, b.geometry);
+    if (r.ok) into.geometry = r.geometry;
+    else if (!broken) broken = r.error;
+  }
+
+  let geometry: THREE.BufferGeometry | null = null;
+  for (const c of clusters) {
+    if (!geometry) {
+      geometry = c.geometry;
+      continue;
+    }
+    const r = union(geometry, c.geometry);
+    if (r.ok) geometry = r.geometry;
+    else if (!broken) broken = `${what}: ${r.error}`;
+  }
+  return { geometry, broken };
 }
 
 /**
@@ -1051,6 +1197,15 @@ export function createSolids(o: SolidOptions): Solids {
     return new THREE.Box3().setFromObject(b.mesh);
   }
 
+  function geometryOf(id: string): THREE.BufferGeometry | null {
+    const b = built.get(id);
+    return b && b.mesh.parent ? b.mesh.geometry : null;
+  }
+
+  function signatureFor(id: string): string | null {
+    return built.get(id)?.signature ?? null;
+  }
+
   /**
    * How far the solid reaches along a direction — the span a cut goes THROUGH
    * when no extent said how deep. Measured on its own bounding box, which for
@@ -1118,6 +1273,8 @@ export function createSolids(o: SolidOptions): Solids {
     pick,
     facesAt,
     boundsOf,
+    geometryOf,
+    signatureOf: signatureFor,
     spanAlong,
     silhouetteOf,
     silhouetteOn,

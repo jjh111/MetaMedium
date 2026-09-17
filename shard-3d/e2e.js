@@ -3081,6 +3081,152 @@
     return { wide: +wide.toFixed(2), tight: +tight.toFixed(2) };
   });
 
+  // ---- push 2, G2: the parts of a hull, said
+  //
+  // John's own first board, drawn through the real UI with the numbers
+  // `CASTLE_SKETCH` carries (`main.ts`): a 6 × 4 plan on the foundation, two ⊓
+  // from one standpoint and a third from another, each with its feet on the
+  // ground. What it stands is a hull with PARTS — pieces the engine can point
+  // at, each with an id, a place on the footprint and a sentence.
+  //
+  // **Two parts, not three**, and that is pinned rather than worked around:
+  // three PARTIAL silhouettes from two standpoints do not determine three
+  // masses (`parts.test.ts` §5, and `siteOf` in `parts.ts` for what was tried
+  // instead). What the step proves is the machinery: runs, ids, places, the
+  // merge, the cage and the act.
+
+  let sketchId = null;
+
+  step('John’s castle-sketch board stands a hull with PARTS, each with a sentence', () => {
+    S().clear();
+    S().view('free');
+
+    // 1 · the plan, on the foundation.
+    S().choose('foundation');
+    const plan = S().strokeScreen(onScreen(rectPath(-3, -2, 6, 4)));
+    assert(plan, 'the plan was not drawn');
+    S().choose(null);
+
+    // 2 · three ⊓ from two standpoints. Before drawing from one, shift + click
+    //     on clear ground: the view plane stands through the CURSOR, so without
+    //     that the feet land wherever the screen ray crosses a plane well above
+    //     the floor, and every ⊓ reads *its feet do not reach the ground*.
+    const ups = [
+      { at: { x: -2.4, y: 0, z: -1.4 }, halfW: 52, tall: 150, from: 0 },
+      { at: { x: 2.4, y: 0, z: -1.4 }, halfW: 52, tall: 150, from: 0 },
+      { at: { x: 0, y: 0, z: 1.8 }, halfW: 96, tall: 124, from: 1 },
+    ];
+    const views = [
+      { dTheta: 0.42, dPhi: -0.5, stand: { x: 0, y: 0, z: 7 } },
+      { dTheta: 1.25, dPhi: -0.12, stand: { x: 7, y: 0, z: 1 } },
+    ];
+    let standing = -1;
+    let groundRow = 0;
+    const drawn = [];
+    for (const up of ups) {
+      if (up.from !== standing) {
+        S().orbit(views[up.from].dTheta, views[up.from].dPhi);
+        standing = up.from;
+        groundRow = S().screenForWorld(S().shiftTap(S().screenForWorld(views[standing].stand)).at).y;
+        S().choose(null); // the tap chooses the plane it hit; this hand uses none
+      }
+      const id = S().strokeScreen(towerPath({ x: S().screenForWorld(up.at).x, y: groundRow }, up.halfW, up.tall));
+      assert(id, `the ⊓ at ${JSON.stringify(up.at)} was not drawn`);
+      const read = markOf(id);
+      assert(read.plays && read.plays.role === 'elevation', `it plays ${read.plays && read.plays.role}, expected elevation`);
+      drawn.push(id);
+    }
+    S().nav.home(0);
+
+    const solids = S().solids();
+    assert(solids.length === 1, `${solids.length} solids, expected the hull`);
+    sketchId = solids[0].id;
+    assert(solids[0].broken === null, `the derivation broke: ${solids[0].broken}`);
+    const hull = solids[0].steps.find((st) => st.op === 'hull');
+    assert(hull && hull.from.length === 4, `the hull references ${hull && hull.from.length} claims, expected 4`);
+
+    const parts = S().parts(sketchId);
+    assert(parts.length >= 2, `${parts.length} parts, expected at least 2`);
+    // Every part says its numbers, where it stands, and which strokes claimed it.
+    for (const p of parts) {
+      assert(/^part \d+$/.test(p.id.replace(':', ' ').replace('part ', 'part ')) || /^part:\d+$/.test(p.id), `the id is ${p.id}`);
+      assert(
+        /^part \d+ — [\d.]+ × [\d.]+ u on the footprint, [\d.]+ u tall, .+; from stroke:/.test(p.sentence),
+        `the sentence reads "${p.sentence}"`
+      );
+      assert(/corner|edge|middle|whole footprint/.test(p.place), `its place reads "${p.place}"`);
+      assert(p.from.length >= 1, `${p.id} names no stroke it came from`);
+    }
+    // …and the ids run in reading order, left to right across the plan.
+    const xs = parts.map((p) => (p.bounds.min.x + p.bounds.max.x) / 2);
+    assert(
+      xs.every((x, i) => i === 0 || x >= xs[i - 1] - 1e-6),
+      `the parts are not in reading order: ${xs.map((x) => x.toFixed(2)).join(', ')}`
+    );
+    // Tier 1: nothing about parts asks a model.
+    assert(S().models().working.length === 0, 'a model was asked by standing a hull');
+    return { solid: sketchId, claims: hull.from.length, parts: parts.map((p) => p.sentence) };
+  });
+
+  step('the panel lists the parts as chips, and hovering one outlines it', () => {
+    assert(sketchId, 'no castle stands');
+    S().select(sketchId);
+    const text = S().panelText();
+    assert(/parts/.test(text), `the panel says "${text.slice(0, 200)}"`);
+
+    const chips = document.querySelectorAll('.partsRow .chip');
+    const parts = S().parts(sketchId);
+    assert(chips.length === parts.length, `${chips.length} chips for ${parts.length} parts`);
+    // A chip carries the part's whole sentence as its reason.
+    assert(chips[0].title === parts[0].sentence, `the chip's reason reads "${chips[0].title}"`);
+
+    // Nothing is caged until the pointer rests on one…
+    S().showPart(sketchId, null);
+    assert(S().partOutlined() === null, 'a part was caged before anything was hovered');
+    // …and hovering the chip cages the part it stands for.
+    chips[0].dispatchEvent(new MouseEvent('mouseenter', { bubbles: false }));
+    const on = S().partOutlined();
+    assert(on && on.partId === parts[0].id, `hovering ${parts[0].id} caged ${on && on.partId}`);
+    chips[0].dispatchEvent(new MouseEvent('mouseleave', { bubbles: false }));
+    assert(S().partOutlined() === null, 'the cage stayed after the pointer left');
+    return { chips: chips.length, caged: parts[0].id, why: chips[0].title };
+  });
+
+  step('taking a part up and removing it drops ONE claim, and undo puts it back', () => {
+    assert(sketchId, 'no castle stands');
+    const parts = S().parts(sketchId);
+    const target = parts[parts.length - 1]; // the last part, so the footprint is never it
+    assert(target.from.length === 1, `${target.id} is claimed by ${target.from.length} strokes, not one`);
+
+    // Tapping its chip takes it up: the solid stays selected, the part is held.
+    assert(S().selectPart(sketchId, target.id), `${target.id} could not be taken up`);
+    const held = S().selectedPart();
+    assert(held && held.partId === target.id, `${held && held.partId} is held, expected ${target.id}`);
+
+    // …and the field's *Remove* now means that part, and says so before Enter.
+    const reading = S().fieldRead('Remove');
+    assert(new RegExp(target.id.replace(':', ' ')).test(reading.line), `the field says "${reading.line}"`);
+
+    const before = S().solids()[0].steps.find((st) => st.op === 'hull').from.length;
+    const ran = S().field('Remove');
+    assert(ran.ran, `Remove did not run: ${ran.line}`);
+    const after = S().solids()[0].steps.find((st) => st.op === 'hull').from.length;
+    assert(after === before - 1, `the hull has ${after} claims, expected ${before - 1}`);
+    assert(!S().solids()[0].steps.find((st) => st.op === 'hull').from.includes(target.from[0]),
+      `${target.from[0]} is still a claim`);
+    // Ink is never covered: the stroke that claimed it is still on the board.
+    assert(S().state().marks.length === 4, `${S().state().marks.length} marks — the ink went with the part`);
+    assert(S().parts(sketchId).length === parts.length - 1, 'the part count did not fall');
+
+    // One act, one undo.
+    S().undo();
+    const back = S().solids()[0].steps.find((st) => st.op === 'hull').from.length;
+    assert(back === before, `after the undo the hull has ${back} claims, expected ${before}`);
+    assert(S().parts(sketchId).length === parts.length, 'the part did not come back');
+    S().clear();
+    return { removed: target.id, claims: `${before} → ${after} → ${back}` };
+  });
+
   // ---- the runner ----------------------------------------------------------
 
   window.__scenario = async function () {

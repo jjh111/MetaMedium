@@ -136,6 +136,15 @@ export interface SpaceScene {
   planes: BriefPlane[];
   /** Every diff the board is reporting — §4's regions, when there are any. */
   diffs?: { markId: string; view: string; sentence: string }[];
+  /**
+   * G2: the parts a standing hull is made of, one sentence each, in the engine's
+   * own `part:n` ids.
+   *
+   * This is the thing a small model is actually asked to do (G3): not to invent
+   * geometry, but to put the hand's words onto pieces the engine can already
+   * point at. The region-id rule again — *part 2* comes back as *part 2*.
+   */
+  parts?: { solidId: string; sentences: string[] }[];
   names?: NameInPlay[];
   /**
    * What the library holds, so a model may answer `{"reuse": "turret"}` and
@@ -214,6 +223,20 @@ export function describeSpace(scene: SpaceScene): string {
       for (const step of s.tree.steps) out.push(stepLine(step));
       if (s.honours) out.push(`  ${s.honours.sentence}`);
       if (s.versions?.length) out.push(`  ${s.versions.length} version${s.versions.length === 1 ? '' : 's'} held: ${s.versions.join(' → ')}`);
+    }
+  }
+
+  // ---- the parts of what stands (G2) ---------------------------------------
+  const withParts = (scene.parts ?? []).filter((p) => p.sentences.length);
+  if (withParts.length) {
+    out.push('');
+    out.push(
+      'PARTS OF WHAT STANDS — the pieces the engine can point at, in its own ids. ' +
+        'Say what each one IS, by its id; do not invent geometry for it:'
+    );
+    for (const p of withParts) {
+      if (withParts.length > 1) out.push(`${p.solidId}:`);
+      for (const sentence of p.sentences) out.push(`  ${sentence}`);
     }
   }
 

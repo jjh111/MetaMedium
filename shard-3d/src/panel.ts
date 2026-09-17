@@ -110,6 +110,12 @@ export interface PanelOptions {
   diffs?(solidId: string): { profile: ProfileOfSolid; diff: Diff }[];
   /** P4: outline a region where it lies while its chip is hovered, or take it away. */
   onRegion?(at: { plane: Plane; outline: Point[] } | null): void;
+  /** G2: the parts of a hull, in reading order, each with its sentence. */
+  parts?(solidId: string): { id: string; place: string; height: number; sentence: string; from: string[] }[];
+  /** G2: cage a part while its chip is hovered, or take the cage away. */
+  onPart?(solidId: string, partId: string | null): void;
+  /** G2: take a part up — the chip's tap, which selects it. */
+  takePart?(solidId: string, partId: string): void;
   /**
    * G0: the last few exchanges with a model, newest first — the transcript.
    * Runtime evidence, never the log (`exchange.ts` says why).
@@ -143,6 +149,10 @@ export function createPanel(host: HTMLElement, statusEl: HTMLElement, log: Log, 
       '<summary>why / measurements</summary>' +
       '<div class="evidenceBody"></div>' +
       '</details>';
+
+    // G2: the parts' chips carry listeners, so they are built as elements and
+    // appended into the row the summary left for them.
+    renderParts(host.querySelector('.partsRow') as HTMLElement | null);
 
     const details = host.querySelector('details.evidence') as HTMLDetailsElement | null;
     const body = host.querySelector('.evidenceBody') as HTMLElement | null;
@@ -314,6 +324,32 @@ export function createPanel(host: HTMLElement, statusEl: HTMLElement, log: Log, 
       }
       for (const region of regions) box.appendChild(regionChip(r.profile, region));
       el.appendChild(box);
+    }
+  }
+
+  /**
+   * G2: one chip per part, in the hull's own reading order.
+   *
+   * The chip says the part's id and where it stands; its whole sentence — the
+   * numbers, and which strokes claimed it — is the tooltip, because a row of
+   * chips has to stay a row. Hovering cages the part on the board: a number is
+   * a claim, and the board has to be able to point at what it is about.
+   */
+  function renderParts(el: HTMLElement | null) {
+    const solidId = el?.dataset.solid;
+    if (!el || !solidId || !o.parts) return;
+    for (const part of o.parts(solidId)) {
+      const c = chip(`${part.id.replace(':', ' ')} · ${part.place}`, {
+        why: part.sentence,
+        ...(o.takePart ? { onclick: () => o.takePart!(solidId, part.id) } : {}),
+      });
+      if (o.onPart) {
+        c.addEventListener('mouseenter', () => o.onPart!(solidId, part.id));
+        c.addEventListener('mouseleave', () => o.onPart!(solidId, null));
+        c.addEventListener('focus', () => o.onPart!(solidId, part.id));
+        c.addEventListener('blur', () => o.onPart!(solidId, null));
+      }
+      el.appendChild(c);
     }
   }
 
@@ -602,6 +638,19 @@ function renderSummary(log: Log, sel: Sel | null, hovered: Mark | null, o: Panel
   // ---- and what it becomes (the map of becoming, D6) -----------------------
   const becomes = becomesOf(log, solid, mark, matchOn, !!(solid && o.version?.(solid.id)?.taken));
   if (becomes) html += row('becomes', becomes.value, becomes.why);
+
+  // ---- the parts it is made of (G2) ----------------------------------------
+  // A row of its own rather than a line inside *becomes*: each part is a thing
+  // the board can point at, so each is a chip, and hovering one cages it.
+  const parts = solid ? o.parts?.(solid.id) ?? [] : [];
+  if (parts.length) {
+    html +=
+      row(
+        'parts',
+        `${parts.length} · ${parts.map((p) => p.place).join(' · ')}`,
+        'each run of a claim between its ground touches, cut out of the standing body — hover one to see it, tap it to take it up'
+      ) + `<div class="fieldPills partsRow" data-solid="${esc(solid!.id)}"></div>`;
+  }
 
   return html + '</div>' + sep;
 }

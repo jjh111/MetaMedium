@@ -95,6 +95,15 @@ export interface FormReading {
     iou: number;
     why: string;
   };
+  /**
+   * G2: the engine id of the PART of a hull this mark lies within — `part:2`.
+   *
+   * Set by the log from the space's own parts, not by the table: the rung reads
+   * a mark against planes and silhouettes, and a part is a boolean on a derived
+   * body. What it changes is who the mark is about — a cut goes into that part,
+   * and a scratch takes that part's claim out rather than the whole hull.
+   */
+  part?: string;
 }
 
 /** The face a mark was drawn on, when its plane was READ as one (§2.1's first row). */

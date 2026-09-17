@@ -38,6 +38,14 @@ export interface Selection {
    * pointing at while the chip is hovered. Null takes it away.
    */
   showRegion(at: { plane: Plane; outline: Point[] } | null): void;
+  /**
+   * G2: a PART of a hull, caged where it stands — the same teal, because the
+   * board is pointing at what a sentence in the panel is a claim about. Null
+   * takes it away. A second cage rather than the selection's own: a part is
+   * shown *inside* whatever stands selected, and moving the one cage would say
+   * the selection had changed when it had not.
+   */
+  showPart(bounds: THREE.Box3 | null): void;
 }
 
 export function createSelection(space: Space, solids: Solids, colours: Colours): Selection {
@@ -65,6 +73,39 @@ export function createSelection(space: Space, solids: Solids, colours: Colours):
   box.renderOrder = 20;
   box.visible = false;
   group.add(box);
+
+  // ---- a part of a hull, caged where it stands (G2) ------------------------
+  // Dashed rather than solid, so the two cages never read as one thing: the
+  // selection is what the acts apply to, a part is what a sentence is about.
+  const partMaterial = new THREE.LineDashedMaterial({
+    color: new THREE.Color(cols.teal),
+    transparent: true,
+    opacity: 0.95,
+    depthTest: false,
+    dashSize: 0.12,
+    gapSize: 0.08,
+  });
+  const partBox = new THREE.Box3Helper(new THREE.Box3(), new THREE.Color(cols.teal));
+  (partBox.material as THREE.Material).dispose();
+  partBox.material = partMaterial;
+  partBox.renderOrder = 22;
+  partBox.visible = false;
+  group.add(partBox);
+
+  function showPart(bounds: THREE.Box3 | null) {
+    if (!bounds || bounds.isEmpty()) {
+      partBox.visible = false;
+      space.render();
+      return;
+    }
+    const size = bounds.getSize(new THREE.Vector3());
+    partBox.box.copy(bounds.clone().expandByScalar(Math.max(size.x, size.y, size.z) * 0.02));
+    partBox.visible = true;
+    // A dashed line needs its distances computed, and a Box3Helper rebuilds its
+    // own geometry when the box moves — so this cannot be done once at set-up.
+    (partBox as unknown as THREE.Line).computeLineDistances();
+    space.render();
+  }
 
   // ---- the diff region, outlined on its own plane (P4) ---------------------
   // Depth test off, like the cage: a region that is half inside the body it is
@@ -140,9 +181,11 @@ export function createSelection(space: Space, solids: Solids, colours: Colours):
       cols = c;
       material.color.set(cols.teal);
       regionMaterial.color.set(cols.teal);
+      partMaterial.color.set(cols.teal);
       sync();
     },
     onChange: (fn) => void listeners.push(fn),
     showRegion,
+    showPart,
   };
 }

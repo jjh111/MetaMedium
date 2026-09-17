@@ -313,6 +313,7 @@ there is no bundle to drift.
 | `src/op.ts` | **Pure.** The op tree (§2.4): the whole vocabulary as a type, `extrude`, `revolve`, `cut`, `boss`, `mirror`, `place` (a dup's copy, and P6's placement OF a definition), `match`, `massing` and `hull` implemented (the hull is the massing on any planes; both ops stay so every tree ever written still reads, and one function derives both), `placeDefinitionStep` and `placeFrames` — the pose of a placement, worked out from the two inks it names rather than held — the geometry parameters derived from the drawing (the direction, the signed depth, the axis as a world line, a cut's *through* and a boss's own short side), **the nesting** (`on`, `rootOf`, `withStep`, `depthsOf`), the tree as text and back, and the lathe profile as radius-and-height about the axis. No three.js |
 | `src/csg.ts` | **The one seam, and the one library behind it** (§10). `subtract(a, b)`, `union(a, b)` and `intersect(a, b)` on `THREE.BufferGeometry`, over `three-bvh-csg` (pinned, with its peer `three-mesh-bvh`). Nothing else in the shard imports the library. **It never throws**: every result is `{ ok, geometry }` or `{ ok: false, error }` |
 | `src/solid.ts` | three.js. The mesh, **derived by WALKING the tree on every log change** (`deriveTree`) — `ExtrudeGeometry` and `LatheGeometry` for the leaves, the CSG seam for `cut` / `boss` / `mirror` / `match`, `hullBody` for `massing` and `hull` alike (each claim grown through the span of the **others** — never its own points — so a hull stands in the volume its claims define), a plain merge for a `dup`'s disjoint copy; a quiet lit material from the tokens, `hardEdges` (the creases only, never the triangulation), the picking, `facesAt` (the faces under the pen as a plane plus the face's own corners, which is what a `face` candidate anchors on), `spanAlong` (what a cut goes THROUGH), `silhouetteOf` (the hull a scratch is counted against), `silhouetteOn` (the orthographic picture the diff reads, cached) and `brokenOf`. `deriveTree` takes a **`DeriveContext`** — `inkOf` and `silhouetteOf` — because a `match` step stores nothing derived and has to ask |
+| `src/parts.ts` | **Pure but for the CSG seam.** The parts of a hull (push 2, G2): `runsOf` splits a claim into the runs that stand between its ground touches (a ⊓ is one, three touches is two, a closed silhouette is one by its own ink — and `ground` is read BEFORE `closed`, because an elevation is held closed *on the ground*), `footprintFrame` builds the frame the places are said in (the long side of the tightest box, never the diagonal; north is −Z), `placeOf` cuts it in thirds, and `partsOfHull` cuts each run's prism out of the standing body, merges the ones that turn out to be the same material (`PART_OVERLAP`, a ratio of the smaller) and numbers them `part:1 … part:n` in reading order with a sentence each. Nothing is thrown: a run that claims nothing, or a boolean that does not come off, is dropped with its reason |
 | `src/selection.ts` | Selection by default (§7): one thing at a time, a teal cage around a solid, and a diff region outlined on its own plane while its chip is hovered. Runtime state, never the log's |
 | `src/field.ts` | One input, one reader. `readField(text, ctx)` returns *what Enter will do*; the verbs and their reasons are handed in, so the reader knows nothing about the DOM. Thirteen verbs now — `extrude`, `revolve`, `cut`, `boss`, `add`, `takeoff`, `mirror`, `dup`, `remove`, `regen`, `take`, and P6's `place` and `reject` (*Not a mug*) — each with its aliases in one table |
 | `src/panel.ts` | **Hidden by default** (`panelShown` / `setPanelShown`, the key `shard.panel`, and `createPanelToggle` — the canvas's *details ▾* ported from `Demos/surface/00-core.js`: a `panelHidden` class on the body, remembered per device, and the rows still built and still in the DOM while it is down, so `panelText()` and every assertion on it are the same either way). `selectionLine` is what the status line says in its place — the selection's name and the next act, in the field's own words. Then the rows and the status line — and `pinnedViews`, still read off the log here though the chips are drawn in the corner — including *plays*, ***could be*** (P6: what the library says this outline is, ranked, in the engine's name), *solid* — the latter showing the tree **nested** (`↳ cut · through · from stroke:5` under `extrude · depth 2.40 u`) and a *broken* row with the seam's own words when a derivation did not come off — and ***matches the drawing***: one block per plane a profile of the selected solid was drawn on, with the coverage, the sentence, which outline it read, and a chip per region |
@@ -328,7 +329,7 @@ there is no bundle to drift.
 | `mcp.mjs` | **The hand, and the seat**, over MCP on stdio — newline-delimited JSON-RPC written by hand, so the repo takes no dependency, importing the committed Node bundle beside `Demos/mcp.mjs`. Six tools: `space_look`, `space_pending`, `space_answer`, `space_draw`, `space_propose`, `space_say`. Its one duplication is named where it stands: the three named planes and the `plane` rep, because this process cannot import the shard's TypeScript |
 | `mcp-smoke.mjs` | The stdio test, in CI's `shard` job: a relay on a **free port**, a second hand in Node as the tab, and the whole round trip — look, draw, park, list, answer, refuse, say |
 | `src/work.ts` | A model at work, shown **where it works**: a breathing `--sig-model` dot with the model's name and its task above the solid, the elapsed time after a few seconds, *Esc stops it* after thirty, and one `AbortSignal` per call so Esc really does |
-| `e2e.js` | The whole loop through the real pointer path — **114 steps, P0 → P6, the compass, the panel's toggle, trackpad and touch, the axis views, push 2’s hull (the view plane where you are looking, a ⊓ from a free view standing a hull at tier 1, a second one narrowing it, and undo), and G0's five: the log out and back in, a brief with nothing standing, a brief with nothing selected, the massing standing first, and `?fixture=`** — and, beside it, `__demo()`: the two-minute demo of §9 in eleven asserted steps, with a timing on each 5's hand in the room** — and, beside it, `__demo()`: the two-minute demo of §9 in eleven asserted steps, with a timing on each |
+| `e2e.js` | The whole loop through the real pointer path — **117 steps, P0 → P6, the compass, the panel's toggle, trackpad and touch, the axis views, push 2’s hull (the view plane where you are looking, a ⊓ from a free view standing a hull at tier 1, a second one narrowing it, and undo), G2's three (John's castle-sketch board standing a hull with parts and a sentence each, the panel's chips with the hover cage, and taking a part up to remove its one claim with undo), and G0's five: the log out and back in, a brief with nothing standing, a brief with nothing selected, the massing standing first, and `?fixture=`** — and, beside it, `__demo()`: the two-minute demo of §9 in eleven asserted steps, with a timing on each 5's hand in the room** — and, beside it, `__demo()`: the two-minute demo of §9 in eleven asserted steps, with a timing on each |
 | `build-standalone.mjs` | **One file.** Runs `npm run build` (which typechecks first), then inlines every asset Vite emitted — the bundle as one inline module, the stylesheet as one `<style>` — into `dist/shard-3d.html`, and refuses to write a page that still points at anything that would not travel with it. The font `@import` stays external, because the tokens name a fallback stack and a face is not worth trebling the file for |
 
 ## The design decision: how a solid is held in the log
@@ -794,6 +795,108 @@ hull of three axis claims; `hullableFrom` returns null for a drawing the massing
 path already takes, so one drawing never stands twice. A hull bounds a model's
 proposal exactly as a massing does: §6's extent invariant names whichever of the
 two stood the volume up.
+
+**One standpoint is one silhouette** (push 2, G2, found standing John's own
+castle). A hand who walks to one side and draws two towers has drawn *one*
+outline with two pieces in it, not two claims to intersect — and intersecting
+them gives the empty set, which is exactly what his board came to (*"three-bvh-csg
+returned an empty intersect"*). So `hullBody` gathers claims that share a plane
+**direction** into one silhouette before anything is intersected: within it,
+outlines that lie APART are unioned (two towers seen from the path) and outlines
+that OVERLAP are intersected (a narrower ⊓ drawn over the first is a correction,
+and a correction tightens). Across directions nothing changed — silhouettes are
+intersected, which is the visual hull as it has always been defined — and the
+massing is untouched, because its three profiles are on three planes and each is
+a silhouette of one.
+
+## The parts of a hull, said (push 2, G2)
+
+A hull is one body, and a hand that drew a castle did not draw one thing. §2.6's
+rule is that *names bind to steps*, and a model can only name what the engine can
+point at — so before a brief can ask for a name per part, the engine has to have
+parts, with ids, numbers and a sentence each. `src/parts.ts`.
+
+**A part claim is a RUN.** An elevation is an open stroke closed on the ground,
+and where it touches the ground it finishes one thing and starts the next: a ⊓
+touches twice and is one run; a stroke that touches three times is two runs (a
+hand draws two towers without lifting the pen); a closed silhouette is one run,
+by its own ink. A part is then **the hull's material inside that run's prism**,
+through the CSG seam, which never throws — a run that claims nothing, or whose
+boolean does not come off, is dropped with its reason and the rest still stand.
+Cut once per version and cached on the signature the build was made from, so a
+new claim, an undo or a load invalidates it without anything remembering to.
+
+Two rules keep the count honest:
+
+- **The same material seen twice is one part.** A tower drawn from the front and
+  again from the side is two runs and one thing, so parts whose bodies overlap by
+  more than `PART_OVERLAP` (a half) of the **smaller** are merged, and the merged
+  part carries both runs as its provenance. Measured on bounding boxes, and said
+  so: an exact intersection volume is a third boolean per pair, and the question
+  is only *are these the same thing*.
+- **A part's place is said in the footprint's own frame.** The frame's `u` is the
+  footprint's longest edge — **the long side of the tightest box**, not the
+  direction of furthest reach, which for any rectangle is its diagonal and turned
+  a 6 × 4 plan by 34°. The plan is cut in thirds each way and the part's footprint
+  centre lands in one of nine: *at the north-west corner*, *along the east edge*,
+  *in the middle* — or it covers most of both axes and is *the whole footprint*.
+  **North is −Z**, east is +X, and every sentence that uses it says so, because a
+  compass on a drawing is a convention and not a measurement.
+
+Ids are `part:1 … part:n` per hull, in reading order: left to right along that
+longest edge. The sentence is the numbers and the words together —
+
+> part 2 — 1.2 × 1.0 u on the footprint, 3.1 u tall, at the north-west corner;
+> from stroke:4 (drawn from 34° · +24°)
+
+— and it reaches three places: the brief's `PARTS OF WHAT STANDS` section (in the
+engine's own ids, so a reply about *part 2* can be attached to part 2 — G3's
+door), the panel's `parts` row as one chip each (the sentence is the chip's
+reason; hovering cages the part on the board in a dashed teal, a second cage so
+that pointing at a part never reads as the selection moving), and
+`__shard.parts(solidId)`.
+
+**Ink over a part addresses that part.** A closed mark on a hull's face that lies
+wholly within one part is a `feature` *of that part*, and the form rung's own
+reason says so (`FormReading.part`), so *Cut a hole* reads **take it out of part 2
+of hull**. A mark that straddles two parts, or none, is left exactly as the rung
+read it: naming one would be choosing for the hand. A **scratch across a single
+part takes that part's claim out** rather than the hull off the board — one new
+version of the one hull step, so one undo puts the claim back and every other
+claim stays where it was (`log.dropPart`); with a part held, the field's *Remove*
+means the same act and says `Remove part 2` before Enter. Two guards, both said
+rather than silent: a part **two views agree on** is not unsaid by dropping one of
+them, and a hull is never left with fewer than two claims.
+
+### The honest limit: two parts, not three
+
+G2's done-criterion asks John's castle-sketch for *two towers and a wall, three
+parts*. It gives **two**, and the reason is in the drawing rather than in the
+code.
+
+The visual hull is the intersection of **complete** silhouettes. A hand sketching
+a castle draws a **partial** one from each place it stands — two towers seen from
+the path, a wall seen from the other side — and intersecting partial silhouettes
+keeps only what every standpoint happens to agree on. Measured on his own
+numbers: read one prism at a time the intersection was empty outright; with the
+silhouette rule above it stands, but his three ⊓, each 2.6 u tall, come out as
+lumps 0.3 and 0.9 u tall. A tower seen once has no depth, and nothing in the
+drawing supplies it.
+
+The alternative was built and measured before being rejected: bound each run by
+the **footprint** instead — *the thing stands here, to this plan*. It sounds right
+and it is wrong, because it invents the missing depth. John's tower came out a
+slab 2.8 u across a 6 × 4 plan, which is the engine making up a size nobody drew.
+So a part stays the hull's own material, the cage the panel draws is always
+around something standing, and the shortfall is written down here and pinned in
+`parts.test.ts` §5 rather than worked around.
+
+What would close it is a **second view of each mass** — which is what an
+architect's sketch actually contains, and what the two-view tower in
+`parts.test.ts` §3 has: two runs in, one part out, 0.7 × 0.6 u and 1.8 u tall.
+Whether the hull should instead become a *union of masses*, so that one ⊓ per
+thing is enough, is a question about what a hull MEANS, and belongs with G1/G3
+rather than here.
 
 ## The brief, and what it will not say
 
@@ -1944,8 +2047,23 @@ tail -c 4000 /tmp/mm3d.out
   brief the human actually typed — `space_answer` — is the path that lands.
 - **`space_look` reads the log, not the geometry.** It cannot import the shard's
   TypeScript, so it reports marks, planes, readings and op trees; it does not
-  compute the form rung, the hull or the parts. G2 puts parts in the brief,
-  which is where the hand will read them.
+  compute the form rung, the hull or the parts. G2 puts the parts in the brief,
+  which is where the hand reads them today — `PARTS OF WHAT STANDS`, in the
+  engine's own `part:n` ids, so a reply can name one.
+
+  **What it would take for `space_look` to see parts itself** is worth stating,
+  because it is not a small thing. A part is `hull ∩ a run's prism` — a CSG
+  boolean on a derived mesh — so the server would need three.js and
+  `three-bvh-csg` in Node, and `solid.ts`, `parts.ts` and `form.ts` compiled
+  rather than duplicated (`mcp.mjs` already names its one duplication, the three
+  planes, as the thing it would not do twice). Two honest ways out, neither built:
+  publish a committed Node bundle of the shard's own modules the way
+  `Demos/metamedium-core.node.mjs` is published for the canvas, and import it; or
+  have the **tab** put its parts into the room, since the tab has the renderer
+  and already computes them — a sentence per part beside the solid, which every
+  hand in the room then reads with no geometry at all. The second is cheaper and
+  fits the rule that the log is the source; the first is what a hand needs to
+  look at a board nobody has open.
 - **The hand cannot see.** There is no `space_see`: the canvas's hand renders
   ink to a PNG, and the shard's marks lie on planes in space. A picture of the
   board is the obvious next tool and is not here.

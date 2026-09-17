@@ -31,7 +31,8 @@ import { createSolids } from './solid';
 import { createSelection, type Sel } from './selection';
 import { createField, readField, type FieldContext, type KnownName, type VerbOffer } from './field';
 import { SCRATCH_NEAR, type Makeable } from './form';
-import { COLOUR_WORDS, describeStep } from './op';
+import { COLOUR_WORDS, describeStep, type HullStep } from './op';
+import { partsOfHull, type Part, type PartsOfHull } from './parts';
 import { createModels, HAND_SEAT } from './models';
 import { joinRoom, otherHand, saidInRoom, type Room } from './room';
 import { createWork } from './work';
@@ -157,6 +158,18 @@ const panel = createPanel(panelEl, statusEl, log, {
       })
       .filter((x): x is NonNullable<typeof x> => x !== null),
   onRegion: (at) => selection.showRegion(at),
+  // G2: the parts of a hull, as chips. Hovering one cages it where it stands;
+  // tapping one takes it up, so the field's verbs mean that part's material.
+  parts: (solidId) =>
+    (partsFor(solidId)?.parts ?? []).map((p) => ({
+      id: p.id,
+      place: p.place.words,
+      height: p.height,
+      sentence: p.sentence,
+      from: p.from,
+    })),
+  onPart: (solidId, partId) => void cagePart(solidId, partId),
+  takePart: (solidId, partId) => hook.selectPart(solidId, partId),
   // P5: how much of the drawing the body actually contains, whose version
   // stands, and what the library holds.
   honours: (id) => log.honoursOf(id),
@@ -482,9 +495,19 @@ const ink = createInk({
     if (!id) {
       const hit = solids.pick(lastPointer);
       selection.set(hit ? { kind: 'solid', id: hit } : null);
+      // G2: a tap on a hull lands on a PART of it — the ray's hit, and the part
+      // whose prism it fell inside. The solid is still what is selected; the
+      // part says which of its material the verbs mean.
+      holdPart(hit ? partAtScreen(lastPointer) : null);
       if (hit) {
         const s = log.solidOf(hit);
-        if (s) panel.say(`${s.name} · ${s.tree.steps.map((st) => st.op).join(' · ')} · tier 1`);
+        const part = heldPart?.partId;
+        if (s) {
+          panel.say(
+            `${s.name} · ${s.tree.steps.map((st) => st.op).join(' · ')} · tier 1` +
+              (part ? ` — you are on ${part.replace(':', ' ')}` : '')
+          );
+        }
       }
       panel.show(panel.subject(), selection.current());
       return report();
@@ -589,6 +612,23 @@ log.sees({
   // what the diff is run against, and what tells a profile OF a solid from the
   // start of a new one.
   silhouetteOn: (id, plane) => solids.silhouetteOn(id, plane),
+  // G2: the parts of a standing hull, for the brief's own section. Derived from
+  // the body, so the space is what holds them — never the log.
+  partsOf: (id) => (partsFor(id)?.parts ?? []).map((p) => p.sentence),
+  // …and which part a mark lies within: the part whose body contains every one
+  // of the mark's own world points. Every one, not most — a mark that straddles
+  // two parts is about both, and naming one would be choosing for the hand.
+  partAt: (solidId, markId) => {
+    const found = partsFor(solidId);
+    const mark = log.markOf(markId);
+    if (!found || !mark) return null;
+    const world = mark.points.map((p) => toWorld(mark.plane, p));
+    const inside = found.parts.filter((part) =>
+      world.every((w) => part.bounds.containsPoint(new THREE.Vector3(w.x, w.y, w.z)))
+    );
+    return inside.length === 1 ? inside[0].id : null;
+  },
+  claimsOfPart: (solidId, partId) => partOf(solidId, partId)?.from ?? [],
 });
 
 // A derivation that did not come off says so where it happened, once.
@@ -596,6 +636,77 @@ solids.onBroken((id, why) => panel.say(`${log.solidOf(id)?.name ?? id} — ${why
 
 const selection = createSelection(space, solids, colours);
 const field = createField(fieldEl, () => renderField());
+
+// ---- push 2, G2: the parts of a hull ---------------------------------------
+// Cut once per version and kept: a part is a boolean, and a panel that rebuilds
+// on every hover would run one per frame. The key is the SIGNATURE the build
+// itself was made from, so a new claim, an undo or a load invalidates it
+// without anything having to remember to.
+const partCache = new Map<string, { signature: string; found: PartsOfHull }>();
+
+/** The parts of a solid, when it is a hull. Cached per version; never held in the log. */
+function partsFor(solidId: string): PartsOfHull | null {
+  const solid = log.solidOf(solidId);
+  if (!solid) return null;
+  const step = solid.tree.steps.find((s) => s.op === 'hull' && !s.on) as HullStep | undefined;
+  if (!step) return null;
+  const signature = solids.signatureOf(solidId) ?? '';
+  const held = partCache.get(solidId);
+  if (held && held.signature === signature) return held.found;
+  const found = partsOfHull(step, solids.geometryOf(solidId));
+  partCache.set(solidId, { signature, found });
+  return found;
+}
+
+/** One part by its engine id, with the solid it belongs to. */
+function partOf(solidId: string, partId: string): Part | null {
+  return partsFor(solidId)?.parts.find((p) => p.id === partId) ?? null;
+}
+
+/**
+ * What stands selected as a PART — runtime, like the selection itself.
+ *
+ * A part is selected *within* a solid, so the solid stays selected too: the
+ * verbs still act on a body, and the part says which of its material they mean.
+ */
+let heldPart: { solidId: string; partId: string } | null = null;
+
+/** A part under a screen point: the ray's hit, and the smallest part's box it lands in. */
+function partAtScreen(screen: Point): { solidId: string; partId: string } | null {
+  const solidId = solids.pick(screen);
+  if (!solidId) return null;
+  const hit = solids.facesAt(screen)[0];
+  const found = partsFor(solidId);
+  if (!hit || !found) return null;
+  const at = new THREE.Vector3(hit.at.x, hit.at.y, hit.at.z);
+  // The smallest box the hit lands in: where two parts overlap, the tighter
+  // claim is the one the hand is pointing at.
+  let best: { partId: string; size: number } | null = null;
+  for (const p of found.parts) {
+    if (!p.bounds.containsPoint(at)) continue;
+    const s = p.bounds.getSize(new THREE.Vector3());
+    const size = s.x * s.y * s.z;
+    if (!best || size < best.size) best = { partId: p.id, size };
+  }
+  return best ? { solidId, partId: best.partId } : null;
+}
+
+/** Which part the board is currently caging — runtime, and what the e2e reads. */
+let caged: { solidId: string; partId: string } | null = null;
+
+/** Cage a part where it stands, or take the cage away. One door, so `caged` cannot drift. */
+function cagePart(solidId: string, partId: string | null) {
+  const part = partId ? partOf(solidId, partId) : null;
+  caged = part ? { solidId, partId: part.id } : null;
+  selection.showPart(part ? part.bounds : null);
+  return !!part;
+}
+
+/** Hold a part, or let it go — the cage follows. */
+function holdPart(next: { solidId: string; partId: string } | null) {
+  heldPart = next && partOf(next.solidId, next.partId) ? next : null;
+  cagePart(heldPart?.solidId ?? '', heldPart?.partId ?? null);
+}
 
 // ---- the camera's own compass ----------------------------------------------
 // Every way of moving the camera in one corner: the compass, *home*, the
@@ -1404,6 +1515,15 @@ function verbOffers(): VerbOffer[] {
     );
   };
 
+  /**
+   * G2: what a feature's verb is ABOUT — the solid, or the part of it the ink
+   * lies within. The mark carries the part the form rung named on it.
+   */
+  const featTarget = (name: string) => {
+    const part = feat ? log.formOf(feat.featureId)?.part : null;
+    return part ? `${part.replace(':', ' ')} of ${name}` : name;
+  };
+
   /** …and what it says when it is not: never "nothing", always which of the reasons it is. */
   const noMatch = (how: 'add' | 'remove') => {
     if (!solid) return 'nothing selected — tap a solid, then draw its outline on a plane';
@@ -1483,7 +1603,9 @@ function verbOffers(): VerbOffer[] {
       verb: 'cut',
       label: 'Cut a hole',
       enabled: !!feat && !!featSolid,
-      why: feat && featSolid ? `take it out of ${featSolid.name}, ${depthSaid} · tier 1` : noFeature,
+      // G2: ink over a part addresses that part, so the reason says which one
+      // the hole goes into. The boolean is the same; who it is about is not.
+      why: feat && featSolid ? `take it out of ${featTarget(featSolid.name)}, ${depthSaid} · tier 1` : noFeature,
       run: () => {
         if (!feat) return;
         const made = log.cut(feat);
@@ -1496,7 +1618,7 @@ function verbOffers(): VerbOffer[] {
       label: 'Raise a boss',
       enabled: !!feat && !!featSolid,
       why: feat && featSolid
-        ? `stand it proud of ${featSolid.name}, ${feat.extentId ? depthSaid : 'by its own short side — the only depth the drawing contains'} · tier 1`
+        ? `stand it proud of ${featTarget(featSolid.name)}, ${feat.extentId ? depthSaid : 'by its own short side — the only depth the drawing contains'} · tier 1`
         : noFeature,
       run: () => {
         if (!feat) return;
@@ -1546,11 +1668,37 @@ function verbOffers(): VerbOffer[] {
       },
     },
     {
+      // G2: with a PART held, *remove* means that part — the claim it was cut
+      // from goes, and the rest of the hull stands. Without one it is the whole
+      // solid, as it always was.
       verb: 'remove',
-      label: 'Remove',
+      label: heldPart && solid && solid.id === heldPart.solidId ? `Remove ${heldPart.partId.replace(':', ' ')}` : 'Remove',
       enabled: !!solid,
-      why: solid ? `take ${solid.name} off the board — its ink stays exactly where it is` : 'nothing selected to remove — tap a solid',
-      run: () => { if (solid) { log.remove(solid.id); selection.clear(); panel.say(`${solid.name} removed — its ink stays`); report(); } },
+      why: !solid
+        ? 'nothing selected to remove — tap a solid'
+        : heldPart && solid.id === heldPart.solidId
+          ? `drop the claim ${heldPart.partId.replace(':', ' ')} was cut from — the rest of ${solid.name} stands, and the ink stays`
+          : `take ${solid.name} off the board — its ink stays exactly where it is`,
+      run: () => {
+        if (!solid) return;
+        if (heldPart && solid.id === heldPart.solidId) {
+          const gone = log.dropPart(solid.id, heldPart.partId, `${heldPart.partId} was removed`);
+          if (gone) {
+            panel.say(`${heldPart.partId.replace(':', ' ')} removed from ${gone.name} — its ink stays`);
+            holdPart(null);
+            report();
+            return;
+          }
+          // Said, never silent: a part two views agree on is not unsaid by one.
+          panel.say(`${heldPart.partId.replace(':', ' ')} is claimed by more than one view, or is all that holds ${solid.name} up — removing the whole thing instead would not be what you asked`);
+          return;
+        }
+        log.remove(solid.id);
+        selection.clear();
+        holdPart(null);
+        panel.say(`${solid.name} removed — its ink stays`);
+        report();
+      },
     },
     {
       verb: 'regen',
@@ -2460,6 +2608,29 @@ export interface ShardHook {
   loadFixture(name: string): Promise<{ marks: number; solids: number; from: 'log' | 'fixture' } | null>;
   /** What a brief would find to fill, and what is missing when it would find nothing. */
   standFor(): { can: string | null; missing: string };
+
+  // ---- G2: the parts of a hull ---------------------------------------------
+  /** Every part of a hull, in reading order, with its numbers and its sentence. */
+  parts(solidId: string): {
+    id: string;
+    from: string[];
+    sentence: string;
+    place: string;
+    span: { u: number; v: number };
+    height: number;
+    bounds: { min: Vec3; max: Vec3 };
+    dropped: string[];
+  }[];
+  /** Outline a part where it stands, as hovering its chip does. Null takes it away. */
+  showPart(solidId: string, partId: string | null): boolean;
+  /** Which part the board is caging right now, or null — what a hover leaves behind. */
+  partOutlined(): { solidId: string; partId: string } | null;
+  /** Which part a screen point is over — the raycast a tap on the geometry makes. */
+  partAt(screen: Point): { solidId: string; partId: string } | null;
+  /** What stands selected as a PART, or null. */
+  selectedPart(): { solidId: string; partId: string } | null;
+  /** Select a part, as tapping its chip does. */
+  selectPart(solidId: string, partId: string | null): boolean;
 }
 
 /** Where the camera stands, in the words a result object can be read in. */
@@ -2934,6 +3105,41 @@ const hook: ShardHook = {
     const s = log.standFor();
     return { can: s.can ? s.can.kind : null, missing: s.missing };
   },
+
+  // ---- G2: the parts of a hull ---------------------------------------------
+  parts: (solidId) => {
+    const found = partsFor(solidId);
+    if (!found) return [];
+    return found.parts.map((p) => ({
+      id: p.id,
+      from: p.from,
+      sentence: p.sentence,
+      place: p.place.words,
+      span: p.span,
+      height: p.height,
+      bounds: {
+        min: { x: p.bounds.min.x, y: p.bounds.min.y, z: p.bounds.min.z },
+        max: { x: p.bounds.max.x, y: p.bounds.max.y, z: p.bounds.max.z },
+      },
+      dropped: found.dropped,
+    }));
+  },
+  showPart: (solidId, partId) => cagePart(solidId, partId) || partId === null,
+  partOutlined: () => caged,
+  partAt: (screen) => partAtScreen(screen),
+  selectedPart: () => heldPart,
+  selectPart: (solidId, partId) => {
+    if (!partId) {
+      holdPart(null);
+      report();
+      return true;
+    }
+    if (!partOf(solidId, partId)) return false;
+    selection.set({ kind: 'solid', id: solidId });
+    holdPart({ solidId, partId });
+    report();
+    return true;
+  },
 };
 
 (window as unknown as { __shard: ShardHook }).__shard = hook;
@@ -3291,14 +3497,21 @@ const CASTLE_SKETCH = {
   ],
   /**
    * The two free poses the hand wandered to, as orbits from where the camera
-   * starts. Both drop the eye toward the ground: drawing an elevation is
-   * something you do from beside a thing, not from above it — and from above,
-   * the foundation the footprint is on outscores the view plane and the ⊓ lands
-   * flat on the floor, which is not what the hand did.
+   * starts, and **where it stood to draw from each**. Both drop the eye toward
+   * the ground: drawing an elevation is something you do from beside a thing,
+   * not from above it — and from above, the foundation the footprint is on
+   * outscores the view plane and the ⊓ lands flat on the floor, which is not
+   * what the hand did.
+   *
+   * `stand` is a point on the ground, clear of the plan, that the demo shift +
+   * clicks before drawing from that pose (push 2, G2). It has to be clear of
+   * the plan for two reasons, both of which this demo hit: a tap that lands on
+   * the standing hull puts the plane through its ROOF, and a pen that goes down
+   * near the footprint's own ink reads the foundation instead of the view.
    */
   views: [
-    { dTheta: 0.42, dPhi: -0.5 },
-    { dTheta: 1.25, dPhi: -0.12 },
+    { dTheta: 0.42, dPhi: -0.5, stand: v3(0, 0, 7) },
+    { dTheta: 1.25, dPhi: -0.12, stand: v3(7, 0, 1) },
   ],
 };
 if (DEMO === 'castle-sketch') {
@@ -3344,13 +3557,32 @@ if (DEMO === 'castle-sketch') {
     //     chosen from here on: this is the hand that does not use the tiles.
     choose(null);
     let at = -1;
+    let groundRow = 0;
     for (const up of CASTLE_SKETCH.ups) {
       if (up.from !== at) {
         const turn = CASTLE_SKETCH.views[up.from];
         hook.orbit(turn.dTheta, turn.dPhi);
         at = up.from;
+        // **Stand somewhere before drawing from it** (push 2, G2). A free ⊓
+        // lands on the view plane, and that plane stands through the CURSOR —
+        // which follows the centre of the view. So a ⊓ aimed at the screen
+        // position of a point ON the ground had its feet wherever that screen
+        // ray happened to cross the cursor's plane, which is well above it:
+        // every ⊓ of this demo read *would be an elevation, but its feet do not
+        // reach the ground*, and the board stood nothing at all.
+        //
+        // Shift + click on clear ground — the gesture that says *I am working
+        // here* — puts the plane through the ground. The camera has no roll, so
+        // on a screen-facing plane the ground is then ONE SCREEN ROW, and every
+        // ⊓ drawn from this standpoint has its feet on that row. One standpoint,
+        // one plane, one ground line: which is also what a hand standing in one
+        // place actually does.
+        groundRow = hook.screenForWorld(hook.shiftTap(hook.screenForWorld(turn.stand)).at).y;
+        // The tap chooses the plane it landed on; the hand that does not use
+        // the tiles un-chooses it again before drawing.
+        choose(null);
       }
-      hook.strokeScreen(arch(hook.screenForWorld(up.at), up.halfW, up.tall));
+      hook.strokeScreen(arch({ x: hook.screenForWorld(up.at).x, y: groundRow }, up.halfW, up.tall));
     }
     // …and stand back, so the whole sketch is on the screen. The last pose the
     // hand happened to draw from is not a view of the drawing.

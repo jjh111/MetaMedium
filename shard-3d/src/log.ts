@@ -201,6 +201,22 @@ export interface SpaceRead {
    * rung reads to tell a profile OF a solid from the start of a new one.
    */
   silhouetteOn(solidId: string, plane: Plane): PlaneSilhouette | null;
+  /**
+   * G2: the parts a standing hull is made of, one sentence each.
+   *
+   * A part is cut out of the DERIVED body, which the log does not hold and must
+   * never hold (invariant 4) — so it is asked for, the way silhouettes are.
+   * Optional: a board with no renderer (every pure test in this repo) still
+   * builds a brief, one without a parts section.
+   */
+  partsOf?(solidId: string): string[];
+  /**
+   * G2: which PART of a hull a mark lies within — `part:2`, or null when it
+   * lies in none or straddles more than one.
+   */
+  partAt?(solidId: string, markId: string): string | null;
+  /** G2: which claims (stroke ids) a part was cut from — one, or more when views agree. */
+  claimsOfPart?(solidId: string, partId: string): string[];
 }
 
 /** A closed mark read as a profile of a solid, on the plane it was drawn on (P4). */
@@ -284,6 +300,15 @@ export interface Log {
    * own act removed.
    */
   scratch(markId: string, reading: FormReading, at?: number): { solidId: string; name: string; crossings: number } | null;
+  /**
+   * G2: take one PART of a hull out — drop the claim it was cut from, as one
+   * new version of the hull's one step. Undo puts the claim back.
+   *
+   * Null when the part is claimed by more than one stroke (two views agree, so
+   * dropping one does not unsay it), or when dropping it would leave fewer than
+   * two claims — below which there is no hull, only ink waiting for an extent.
+   */
+  dropPart(solidId: string, partId: string, why?: string, at?: number): { solidId: string; name: string } | null;
   // ---- P4: the diff is the brief -----------------------------------------
   /** Every closed mark read as a profile OF this solid, oldest first. */
   profilesOf(solidId: string): ProfileOfSolid[];
@@ -1030,8 +1055,34 @@ export function createLog(): Log {
       solids: solids().map((sd) => ({ id: sd.id, memberIds: sd.memberIds })),
       selection: s.selection,
     }).map((f) => heldGesture(f.id) ?? f);
-    formCache = { version, forms: out };
-    return out;
+    formCache = { version, forms: namePart(out) };
+    return formCache.forms;
+  }
+
+  /**
+   * G2: **ink over a part addresses that part**, and the rung says so.
+   *
+   * A closed mark on a hull's face is already a `feature` of that solid; when it
+   * lies inside exactly one of the hull's parts, the reading names the part —
+   * so the panel, the field and any brief built from it all talk about
+   * `part:2` rather than about the whole castle. A mark that straddles two
+   * parts, or none, is left exactly as the rung read it: naming one would be
+   * choosing for the hand.
+   *
+   * A SCRATCH is named the same way, because *what a scratch is over* is what
+   * decides whether it takes the hull off the board or takes one claim out of
+   * it (`scratch`).
+   */
+  function namePart(readings: FormReading[]): FormReading[] {
+    if (!space?.partAt) return readings;
+    return readings.map((f) => {
+      if (f.role !== 'feature' && f.role !== 'gesture') return f;
+      const solidId = f.targets[0];
+      if (!solidId) return f;
+      const part = space!.partAt!(solidId, f.id);
+      if (!part) return f;
+      return { ...f, part, reasoning: `${f.reasoning} — and it lies within ${part}, so it is ink on that part` };
+    });
   }
 
   function formOf(id: string): FormReading | null {
@@ -1277,7 +1328,59 @@ export function createLog(): Log {
    * held reading is dropped first, then the erase, and the solid comes back
    * with the mark reading as ordinary ink again — one act, two events, one undo.
    */
+  /**
+   * G2: **a scratch across ONE part takes that part's claim out**, not the hull.
+   *
+   * Scratching out a tower on a castle means *not that tower*, and taking the
+   * whole castle off the board for it is the surface deciding something the
+   * hand did not. The claim is the stroke the part was read from; dropping it
+   * is one new version of the one hull step — exactly what a claim landing does,
+   * run backwards — so one undo puts it back with every other claim untouched.
+   *
+   * Only when the part is claimed by a SINGLE stroke: a part two views agree on
+   * is not undone by dropping one of them, and the hand meant the thing, so
+   * that falls through to the ordinary scratch.
+   */
+  function dropPart(solidId: string, partId: string, why: string, at: number): { solidId: string; name: string } | null {
+    const solid = solidOf(solidId);
+    const step = solid?.tree.steps.find((s) => s.op === 'hull' && !s.on) as HullStep | undefined;
+    if (!solid || !step) return null;
+    const claims = space?.claimsOfPart?.(solid.id, partId) ?? [];
+    if (claims.length !== 1) return null;
+    const kept = step.claims.filter((c) => c.id !== claims[0]);
+    // Two claims is the floor for a hull: below it there is nothing to
+    // intersect, and what is left is ink waiting for an extent again.
+    if (kept.length === step.claims.length || kept.length < 2) return null;
+    const next: HullStep = {
+      ...step,
+      from: kept.map((c) => c.id),
+      claims: kept,
+      ...(step.footprint && kept.some((c) => c.id === step.footprint) ? { footprint: step.footprint } : {}),
+      reasoning:
+        `${why}, so ${partId} is no longer claimed — ${kept.length} claims left, each still grown through the ` +
+        `span of the others`,
+    };
+    newVersion(
+      solid.id,
+      { ...solid.tree, steps: solid.tree.steps.map((s) => (s.id === step.id ? next : s)) },
+      next.reasoning,
+      at
+    );
+    return { solidId: solid.id, name: solid.name };
+  }
+
+  function scratchPart(markId: string, reading: FormReading, at: number): { solidId: string; name: string; crossings: number } | null {
+    if (!reading.part || !reading.targets[0]) return null;
+    const mark = markOf(markId);
+    const crossings = mark ? scratchAgainst(formMarkOf(mark))?.crossings ?? 0 : 0;
+    const gone = dropPart(reading.targets[0], reading.part, `${markId} was scratched across it`, at);
+    return gone ? { ...gone, crossings } : null;
+  }
+
   function scratch(markId: string, reading: FormReading, at = Date.now()) {
+    // One part, one claim: the claim goes and the hull stays.
+    const part = scratchPart(markId, reading, at);
+    if (part) return part;
     const solidId = reading.targets[0];
     const solid = solidId ? solidOf(solidId) : null;
     if (!solid) return null;
@@ -2579,6 +2682,12 @@ export function createLog(): Log {
           .filter((st) => opts.mutable!.includes(st.id))
           .map((st) => ({ stepId: st.id, ...(st.name ? { name: st.name } : {}) }))
       : undefined;
+    // G2: the parts of every standing hull, asked of the space.
+    const parts: NonNullable<SpaceScene['parts']> = [];
+    for (const solid of solids()) {
+      const sentences = space?.partsOf?.(solid.id) ?? [];
+      if (sentences.length) parts.push({ solidId: solid.id, sentences });
+    }
     return {
       solids: solids().map((sd) => {
         const node = session.getState().nodes.get(sd.id);
@@ -2594,6 +2703,7 @@ export function createLog(): Log {
       }),
       planes: [...byPlane.values()],
       ...(diffs.length ? { diffs } : {}),
+      ...(parts.length ? { parts } : {}),
       names: namesInPlay(),
       definitions: definitions().map((d) => ({
         name: d.name,
@@ -2696,6 +2806,10 @@ export function createLog(): Log {
     dup: acting(dup, 1),
     scratchOf,
     scratch: acting(scratch, 2),
+    dropPart: acting(
+      (solidId: string, partId: string, why = 'it was taken out', at = Date.now()) => dropPart(solidId, partId, why, at),
+      3
+    ),
     profilesOf,
     diffFor,
     matchable,
