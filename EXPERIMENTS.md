@@ -226,7 +226,9 @@ read is **returned, not dropped**: the field offers to ask a model which of the
 space's own verbs it was, once, and the answer is held in the log as a way of
 saying it. A model at work is drawn above the solid it is about with its
 elapsed time, **Esc stops every call in flight**, and a brief that fails leaves
-nothing behind. `?demo=castle` draws the three views.
+nothing behind. `?demo=castle-views` draws the three canonical views (it was
+`?demo=castle` until push 2's G4 gave that name to the whole loop on John's own
+drawing).
 
 **P6 is in — the plan's MVP line** (names, and the loop in 3D): taking a
 version now holds **the whole of a thing** under its own name as well as every
@@ -246,9 +248,12 @@ definition's rejected examples, held in the log as its own event, so the same
 shape is never offered again and a replay remembers it; one undo takes it back.
 A model that answers `{"reuse":"mug"}` to a brief is **honoured by placing**
 rather than by writing, so the library answers before the model does. `e2e.js`
-runs seventy steps, and `__demo()` runs the plan's two-minute demo in nine
-asserted steps in about a second; `?demo=mug` draws the finished board, and
-`npm run build:standalone` writes the whole thing as one 936KB file.
+carries three harnesses — `__scenario()` (the whole loop), `__demo()` (the
+two-minute demo of §9) and `__demo2()` (push 2's G4, the loop on John's own
+drawing) — and `node e2e/run.mjs` runs all three headless beside the canvas's:
+**342 records, one honest skip**. `?demo=mug` and `?demo=castle` draw the two
+finished boards, and `npm run build:standalone` writes the whole thing as one
+file.
 
 **The compass is in** (§7's viewcube, and navigating the space): a Blender-style
 navigation gizmo in the top-right corner — an SVG overlay drawn from the tokens,

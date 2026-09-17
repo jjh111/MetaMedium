@@ -1,781 +1,498 @@
-# shard-3d — P0 the space, P1 the planarity read, P2 solids, P3 features and cuts, P4 the diff, P5 the generator seat, P6 the library, the compass, and G0 the transcript and the export
+# shard-3d — a bounded MetaMedium for making things in space
 
-A bounded MetaMedium for making things in space. See `../SHARD-3D-PLAN.md` for
-the whole plan. **Seven packages are in, and P6 is the plan's MVP line** — the
-thing that is pitched. **P1 was deliberately deferred** until after P2, because
-reading a plane from the evidence needs faces to read it off; it is in now, and
-it extends the one seam P0 left for it.
+Draw on a plane; the shape rung reads the mark as it would on paper; a second
+mark stands it up as a solid, at tier 1, with no model and no wait. The solid is
+an **op tree** in the log — the tree is the source and the mesh is derived — so
+undo is one act, a replayed log stands the same body, and ink is never covered.
+Everything a model is asked for is a claim about *meaning* over geometry the
+drawing already settled.
 
-> **P0 · the space.** Vite + three.js + core; the orbit / draw split; the gizmo
-> with three plane tiles and the slide; a stroke projected live onto the chosen
-> plane; the shape rung on plane coordinates with the pen's scale; the panel's
-> *plane* and *reading* rows.
->
-> **Done when:** draw a rectangle on the foundation and a circle on the height
-> plane; both read as they would on paper; the panel says the plane and why.
+**What it is for.** `../SHARD-3D-PLAN.md` is the plan (P0–P11, with the MVP line
+after P6) and `../SHARD-3D-PUSH-2.md` is push 2 (G0–G5, geometry from the
+drawing). The shard is an **experiment** in the repo's subordinate tier
+(`../EXPERIMENTS.md`): it may fork and re-implement to move fast, and what it
+proves lands in `metamedium-core` with tests. What it is probing is whether the
+canvas's rungs — a closed shape vocabulary, a role table, concepts, the log as
+the source, tiers that propose and never commit — hold when the medium is space
+rather than a page. So far they do; §*What core would need* is the bill.
 
-> **P2 · the form rung and solids.** `form.ts` (the seven-row table); the op
-> tree; `extrude` and `revolve` from clean profiles with an `extent` or an
-> `axis`; the mesh derived on replay; ink kept on the face; selection by
-> default; the field with the tier 1 verbs.
->
-> **Done when:** rectangle + a line up from its edge → a box, instantly,
-> attributed to the engine; profile + axis → a revolve; undo removes the solid
-> and leaves the ink.
-
-> **P1 · the planarity read.** The plane scorer over `face` / `view` / `world` /
-> `previous`; the runner-up chip; the deferred re-rank at pen-up; view-plane ink
-> held with a pose.
->
-> **Done when:** with nothing chosen, a stroke on a box's top reads `face` over
-> `view` with a reason; a stroke beside it reads `view`; a chip flips it and
-> undo drops it.
-
-> **P3 · features, cuts and the rest of tier 1.** `cut` / `boss` from a closed
-> shape on a face; `mirror`; `dup`; `remove`; a CSG seam with one library
-> behind it.
->
-> **Done when:** a circle on the box's top → *Cut a hole* / *Raise a boss*,
-> both tier 1; a scratch across a solid erases it (three crossings of its
-> silhouette).
-
-> **P4 · the diff is the brief.** Front / top / side profiles; the orthographic
-> silhouette via `trace`; missing / extra regions; tier 1 resolution by extrude
-> and cut; the panel's *matches the drawing* row.
->
-> **Done when:** draw the box's side profile with a bump; the diff names the
-> missing region; *Add it* extrudes it; the diff then reads clean.
-
-> **P5 · the generator seat, and names.** The massing from unnamed profiles
-> (tier 1); `describeSpace` with the names in play; a model proposing an op
-> tree with named steps and bound materials; repair; the diff re-run on the
-> proposal; names held on steps and, on taking, as definitions based on the
-> whole; the verb table with name-resolved targets; work shown above the solid;
-> Esc stops it; a failed brief leaves nothing.
->
-> **Done when:** draw three unnamed profiles; type *a castle with green turret
-> tops*: the massing stands at once in the engine's name, a stub model's tree
-> fills it with steps named `castle` / `turret` / `top` and green bound to the
-> tops, the diff says it honours the profiles; *make the turrets taller* regens
-> those steps alone; typing *turret* afterwards completes from the library.
-
-> **P6 · names, and the loop in 3D.** A solid named holds a definition with the
-> op tree and its profiles' fingerprints; drawing one of those profiles again
-> is matched against them and offers the solid; *Not a …* corrects a wrong
-> match and the correction replays; `{"reuse": …}` is honoured by placing
-> rather than by writing; the standalone build; the two-minute demo in the
-> e2e.
->
-> **Done when:** save the mug as *mug*; draw its profile elsewhere; *mug 0.8x*
-> is offered and one tap places it.
-
-All seven criteria run in `e2e.js` (106 steps), and the two-minute demo runs
-beside them as `__demo()` (11 steps). `?demo` draws P0's and P2's at
-boot; `?demo=read` draws the rectangle read onto a box's top face with the chip
-beside it; `?demo=view` draws a circle on the view plane and then orbits off it, so it
-stands there as the thin, fully drawn ellipse of John's Blender screenshot; `?demo=diff` draws the box and the side profile
-with the bump, with the region named in the panel and *Add it* standing in the
-field; and `?demo=castle` draws P5's three views and leaves the massing
-standing, selected, with the field ready for the brief — no model is asked,
-because that is the human's next act and the whole point of the package.
-**`?demo=mug` runs the whole two-minute demo** (§9) and leaves the finished
-board: a mug with a hole cut through it and a handle a model named from your
-words, and a second mug placed from the library where its plan was drawn again.
-**`?demo=castle-sketch` draws John's FIRST board** (`SHARD-3D-PUSH-2.md` §0): a
-footprint on the foundation and three ⊓ towers and walls drawn from two free
-views — and **it stands nothing**, which is the point. The footprint is a
-profile still waiting for an extent; every ⊓ is an open stroke on a view plane
-crossing no solid's silhouette, so the form table's fallthrough calls it
-`annotation`. It is the target G1 aims at, and the demo the fault can be looked
-at in rather than described. `?fixture=<name>` loads a board out of
-`fixtures/` at boot. `?theme=light|dark|system` picks a theme, the way the
-whitepaper shares a surface.
+**Where it stands.** P0–P6 and the navigation compass are in, which is the
+plan's MVP line; the director review's four shard packages are in (ACT-1,
+DATA-1, GRAPH-1, UI-2); and push 2's G0–G5 are in — the board leaves the tab as
+its own log, every free stroke is a silhouette claim so the drawing a **hand**
+makes stands, a hull is cut into parts the engine can point at, the brief a
+small model can answer is 1048 characters, and Claude Code takes the model seat
+over MCP. G4 is the demo re-cut on John's own drawing and this document.
+P1 was deliberately deferred until after P2, because reading a plane from the
+evidence needs faces to read it off.
 
 ## Run it
 
 ```bash
 cd shard-3d
 npm install
-npm run dev        # vite on http://localhost:5174
-npm test           # vitest — the pure rungs, headless, no WebGL
+npm run dev                # vite on http://localhost:5174
+npm test                   # vitest — 555 tests on the pure rungs, headless, no WebGL
 npm run typecheck
-npm run build:standalone   # → dist/shard-3d.html, one file, 936KB
+npm run build              # typecheck, then vite
+npm run build:standalone   # → dist/shard-3d.html, one file, ~1.0MB
+node fixtures/make.mjs     # regenerate the board fixtures as logs
 ```
 
-The one dependency P3 adds is the CSG library, behind `src/csg.ts` and
-imported nowhere else; **P4, P5 and P6 add none** — P4's renderer is the three.js
-already here and its tracer is core's own, and P5's transport, tolerant JSON
-readers and `HERE` paragraph are core's own patterns, ported rather than
-forked, and P6's comparison is core's `matchPrimitiveFromLibrary` re-weighted
-in a file of its own. The engine is imported **from source** (`metamedium-core` is aliased to
+```bash
+cd ..
+node e2e/run.mjs           # the headless gate: the canvas, and the shard's three
+node e2e/run.mjs demo2     # just the demo
+```
+
+The engine is imported **from source** — `metamedium-core` is aliased to
 `../metamedium-core/src/index.ts` in `vite.config.ts`, `vitest.config.ts` and
-`tsconfig.json`), so the shard always runs against the engine as it stands and
-there is no bundle to drift.
+`tsconfig.json` — so the shard always runs against the engine as it stands and
+there is no bundle to drift. `.claude/launch.json` carries a `shard-3d`
+configuration on the same port.
 
-`.claude/launch.json` carries a `shard-3d` configuration on the same port.
+**The one dependency is the CSG library**, behind `src/csg.ts` and imported
+nowhere else. P4's renderer is the three.js already here and its tracer is
+core's own; P5's transport, tolerant JSON readers and `HERE` paragraph are
+core's patterns ported rather than forked; P6's comparison is core's
+`matchPrimitiveFromLibrary` re-weighted in a file of its own.
 
-## The loop
+**The hand in the room** (G5):
 
-1. **Tap a tile — or don't.** The gizmo sits at **the cursor** (step 6): three
-   axes, and a square where each pair of them meets — **foundation** (XZ, the
-   ground), **height** (XY, the wall you face), **width** (YZ, the wall on your
-   right). The chosen tile lights in the teal keyword colour. The cone on its
-   normal **slides** the plane along it; the sphere at the centre
-   **un-chooses**, and from then on the plane is **read**.
-2. **Draw.** Left button, or one finger. Every point is raycast onto the plane
-   and the stroke is drawn live where it lands. With nothing chosen the plane
-   is fixed at pen-down from where the pen is — a face under it beats
-   everything, else the plane you were drawing on a moment ago, else the view
-   plane through the cursor —
-   and **re-ranked at pen-up** against the whole stroke, which is the first
-   moment there is a stroke to read. The winner is what the stroke is logged
-   on; every candidate is held with its number and its reason, the panel lists
-   them, and the runner-up stands beside the mark as a **chip**. Tap it and the
-   ink is read onto that plane instead — one act, and one undo puts it back.
-   The ink never moves on screen; only which plane it is taken to lie on.
-3. **Move the eye.** **Orbit** right-drag, a drag on the **compass** in the
-   top-right corner, `Space`+drag, a trackpad swipe, or two fingers — about the
-   view's centre, where a pan left it, or about the selection. **Pan**
-   middle-drag, `Shift`+right-drag, `Shift`+swipe, three fingers. **Dolly**
-   wheel, pinch, or `Ctrl`/`Cmd`+swipe, toward the pointer. Tap a ball to
-   look along that axis, again to flip; *home* frames everything; *view* is
-   persp / ortho; the pinned views are chips under it. `1` `2` `3` choose a
-   PLANE, `0` un-chooses; the camera's keys are the numpad — `1` front, `3`
-   right, `7` top, `5` persp/ortho, `9` the far side — or `Shift` + those
-   digits, `Ctrl`/`Cmd` for the far side, `f` / `Home` to frame. `Cmd/Ctrl+Z`
-   undoes.
-4. **Read it.** The panel is **hidden by default** — at every width, until this
-   device says otherwise — and ***details*** in the bar, beside the wordmark,
-   shows and hides it; the choice is remembered per device. With it down the
-   canvas has the full width, the field still stands on its own at the bottom
-   right (at the bottom on a phone) with the input, the reading line and the
-   pills, and the status line carries what stands selected and what Enter would
-   do to it. Selecting never pops the panel open. With it up, hover a mark and
-   it says *mark*, *plane*, *reading*, *plays*, *maths*, *measured*.
-5. **Stand it up.** A closed shape on a chosen plane is a **profile**. A line
-   whose end lies on its edge and which leaves its plane is an **extent**, and
-   a box stands *at once* — tier 1, no model, no wait, and the status says so.
-   A line lying **beside** the profile in its own plane is an **axis**, and the
-   profile turns about it. The solid just made stands selected, in teal.
-6. **Put the cursor.** **Shift + click** puts the **cursor** where you clicked:
-   on the surface under the pointer, else on the foundation plane under it. The
-   whole picker moves there, the status says *cursor placed*, and from then on
-   the **view plane passes through it**, screen-facing. This is Blender's 3D
-   Cursor placement, which is what John asked for by name (16 September 2026;
-   plan §3, `src/cursor.ts`): a stroke drawn with nothing chosen lands on the
-   plane parallel to the view **at that moment**, through the cursor. It is a
-   runtime thing, like the camera — never a log event — and `home` and framing
-   do not touch it. A face under the pen that the camera can actually read
-   still wins outright, which is Blender's *Surface* placement.
+```bash
+node Demos/relay.mjs      # the room, on :8020 — sixty lines, no truth of its own
+node shard-3d/mcp.mjs     # the hand; it starts a relay itself when none answers
+```
 
-   **But the shard's cursor FOLLOWS the view until it is placed, and Blender's
-   does not** (push 2, G1 — the one place the shard deliberately parts company
-   with the reference). Blender's cursor is static: it starts at the world
-   origin and stays there until you move it. On John's second board that cost
-   him the whole drawing — he looked one to four units up and drew four free
-   loops, and every one of them landed at floor level, because the view plane
-   stood through a cursor nobody had moved. So the rule here is **the view
-   plane passes through the volume the hand is working in**: by default the
-   camera's *target*, the centre of the view, which pans and orbits with the
-   hand; and a cursor placed by shift + click sticks, until `0`, a clear, or a
-   shift + click on the cursor itself lets it go again. The status line says
-   which in the words you would use — *view · through the centre of the view*
-   or *view · through the placed cursor*.
+Then open the shard at `?live=shard&relay=http://127.0.0.1:8020`, or open the
+models pane and press *Join the room, and seat the hand*. `.mcp.json` registers
+the server as `metamedium-3d` beside the canvas's `metamedium`.
 
-   **What follows is the view plane, not the picker.** The picker stands on the
-   placed cursor and at the world origin when there is none, because its origin
-   is where the planes it hands out pass through — a foundation on a following
-   cursor would be a ground that lifts off the ground the moment you looked up
-   — and because a picker parked in the middle of the view puts three clickable
-   tiles under the middle of every drawing.
+**URLs.** `?demo=castle` runs the whole loop below at boot;
+`?demo=castle-sketch` draws John's first board and stops there;
+`?demo=castle-views` draws P5's three canonical views and leaves the massing
+standing with the field ready; `?demo=mug` runs `SHARD-3D-PLAN.md` §9's
+two-minute demo; `?demo` draws P0's and P2's done-criteria; `?demo=read` and
+`?demo=view` draw P1's; `?demo=diff` draws P4's. `?fixture=<name>` loads a board
+out of `fixtures/`. `?theme=light|dark|system` picks a theme, the way the
+whitepaper shares a surface. `?live=<room>&relay=<url>` joins a room.
 
-   **View ink is world geometry.** It is drawn the same from every angle, like
-   every other stroke: orbit off it and it is a thin, fully drawn ellipse, not
-   a faded one. (Until 16 September it went faint once the camera left the pose
-   it was drawn at. That said the stroke was a property of the camera, which is
-   the one thing it is not.) The pose is still kept on the mark — provenance,
-   and what makes any plane derivable from the screen path later. The compass's
-   **pinned views** chips list every pose view ink hangs on, with a count, and a
-   tap eases the camera back to it: **camera bookmarks**, where a stroke reads
-   as what it is. Nothing about what is *visible* depends on them. (They used to
-   be a row in the panel; they live in the corner now, because every way of
-   moving the camera belongs in one place.)
-7. **Cut into it.** Un-choose, and draw a closed shape **on one of the
-   solid's faces**. The plane is read as that face (P1) and the mark plays a
-   **feature** — and nothing happens, because a hole and a boss are two
-   different intentions and the drawing does not say which. The solid it is on
-   stands selected with no loop drawn, and the field offers both: *Cut a hole*
-   takes it out (**through** the body, unless a line drawn from the feature's
-   edge says how deep), *Raise a boss* stands it proud (by the feature's own
-   short side, unless an extent says otherwise). Either is a new **version**
-   of the same solid's tree — `cut(extrude(…), feature, depth)` — and one undo
-   walks back one version, leaving the circle lying on the face.
-8. **Scratch it out.** A stroke that crosses a solid's silhouette **three
-   times** erases it — core's own rule (`session/erase.ts`), counted in the
-   view the stroke was drawn in. One pass through crosses twice and is safe,
-   and the board says *crossed it twice — one more pass erases it*. The
-   solid's ink stays where it is, because ink is provenance; one undo brings
-   the solid back.
-9. **Check it against the drawing.** Tap the side view, choose the **width**
-   tile and draw the outline you meant *over the solid*. A closed stroke whose
-   outline overlaps a solid's silhouette on its own plane is read as that
-   solid's **side profile** — not the start of a new one, and nothing waits for
-   an extent beside it. The panel's ***matches the drawing*** row then says
-   *side · matches 91% · missing 1 region (0.61 u²) at the right · extra none*,
-   with a chip per region; hover one and it is outlined where it lies, in the
-   keyword teal. **Add it** runs every missing region right through the body
-   along that plane's normal; **Take it off** cuts every extra one out. Either
-   is a version, one undo back, and the row re-reads afterwards — *matches 99%
-   · missing none · extra none*. The ink stays on its plane, because it is a
-   standing claim about the shape and not a feature that has been used up.
-10. **Two views are a solid already.** Choose the foundation and draw the
-   plan; choose the height plane and draw the front; choose the width plane and
-   draw the side. Where the three projections overlap is the **massing** — each
-   profile grown through the span of the others along its own normal and the
-   prisms intersected — and it stands **the moment the second one lands**, tier
-   1, in the engine's name, with no word said and no model asked. A third view
-   goes *into* it rather than beside it, and every prism is re-derived through
-   the others' span. The drawing IS the extent (§2.6 rule 1), and it is the
-   extent a generator cannot leave. A lone profile is still not a massing: it
-   waits for an extent, as in step 5.
-11. **Then say what it is.** Type *a castle with green turret tops* and the
-   reading line says *→ asks qwen3:8b* **before** you press Enter; with no
-   model joined it says so, and Enter opens the model pane. What comes back is
-   an op tree in the shard's own closed vocabulary — steps over profiles, a
-   name on each from your own words, a colour word where you said one, and
-   profiles the model may ADD, drawn into the log through the same door your
-   ink goes through and attributed to it. Never code, never a mesh. It is
-   **clipped to the massing** before you see it, and the panel says *honours
-   the drawing 93% · front 96 · top 95 · side 88*. A model at work is a
-   breathing dot above the solid it is about, with its elapsed time; **Esc**
-   stops every call in flight; and a brief that fails leaves nothing behind.
-12. **Take it, and the names are yours.** *Take it* names the thing — the name
-   you typed if you typed one, else the deepest named step — and holds **the
-   whole of it** and every named sub-tree as a **definition**, each with the
-   outlines it was made from. From then on typing *turret* completes from the library before any
-   model is asked, and verbs bind by name: *make the turrets taller* asks for
-   those steps again and leaves every other step's id alone, while *remove the
-   turret* and *the tops are red* are tier 1 and instant. A phrasing the table
-   cannot read comes back rather than being guessed at — the field offers to
-   ask a model which of the space's own verbs you meant, once, and holds the
-   answer in the log as a way of saying it.
-13. **Draw it again, and it is offered back.** A definition carries each of its
-   profiles as the engine's own fingerprint of that stroke, taken at the scale
-   it was drawn at, and the kind of plane it lay on. So a closed outline drawn
-   anywhere that plays `profile` is measured against every definition in the
-   library — corner count, extent, aspect, closure, with core's straightness
-   veto — and what it could be stands beside it as a chip: ***mug 0.97***. It
-   is a plural reading like every other: the panel's ***could be*** row lists
-   them all with the measurements each was scored on, the plane it was drawn on
-   lifts an agreement and lowers a disagreement without ever vetoing, and
-   ***Not a mug*** puts this outline on that definition's rejected examples so
-   the same shape is never offered as one again — held in the log, so it
-   replays and one undo takes it back.
-14. **One tap places it.** *Place mug*, the chip, or typing the name: the
-   definition's tree stands where the outline was drawn, **scaled so the
-   profile it was matched on fits the one drawn here** and turned onto that
-   outline's own plane. It is a new artifact with a `place` step, and the step
-   holds no pose — only the two stroke ids the scale, the turn and the shift
-   are worked out from, every time the tree is walked. A model that answers
-   `{"reuse":"mug"}` to a brief does exactly the same thing and writes nothing.
-15. **Say it.** The field is at the foot of the panel, and stands on its own
-   there when the panel is down — it is the one deliberate way to act, so it
-   never goes with it. Type `extrude`,
-   `revolve`, `cut`, `boss`, `add it`, `take it off`, `mirror`, `dup`,
-   `remove`, `undo` or `name: …` — by label or by alias (`drill`, `pad`,
-   `copy`, `fill it in`, …) — and the line underneath says what Enter will do
-   *before* you press it. A verb this selection does not afford says what is
-   missing instead: `extrude` with no extent never guesses a depth, `mirror`
-   says which plane it will reflect across (the tile you are holding, else the
-   height plane), and *Add it* with nothing missing says the sentence that
-   makes it so. `Cmd/Ctrl+Z` drops the last **act**: a version if one stands on
-   top of the log, else the solid, else the last stroke. The ink always stays.
+**Front the tab before driving it.** A hidden Browser-pane tab lays the canvas
+out at zero size, `screenFor` returns (0, 0) for every point and no stroke is
+made. `resize()` refuses an aspect of 0; nothing can refuse a viewport that is
+genuinely not there.
 
-## What is in here
+## The loop, as it is now
+
+Eight beats, on John's own first board. `?demo=castle` draws them at boot and
+`__demo2()` in `e2e.js` drives the same numbers through the same pointer path
+and asserts each one; both read `src/demo.ts`, so what is shown and what is
+proved are one board. The mug of `SHARD-3D-PLAN.md` §9 is still here as
+`?demo=mug` / `__demo()` — a draftsman's board on the three tiles. This is its
+successor, and it is a **hand's** board: a rough footprint on the floor and
+towers drawn as ⊓ from wherever you happen to be standing.
+
+**1 · Nothing chosen. Tap the compass's Y ball, and draw the footprint.** The
+top view faces the foundation, so tapping the ball chooses that plane and the
+picker's tiles go away while it does — the axis view **is** the choice. A rough
+6 × 4 rectangle reads *rectangle 0.92 · profile*, on `foundation · chosen`, and
+the ink's reason names the camera rather than a tile nobody held. One footprint
+stands nothing: a profile is waiting for an extent.
+
+**2 · Leave the axis view, orbit to where you would stand, and draw two towers
+as ⊓.** Leaving gives the plane back to the hand, and this hand chose nothing,
+so from here the plane is **read**. Shift + click on clear ground first: the
+view plane passes through the cursor, and that is what puts a ⊓'s feet on the
+floor instead of a unit above it. The first ⊓ reads `elevation` — an open stroke
+whose two feet reach the ground, the ground its fourth side — and with the
+footprint it is two claims, which **are** a hull: *hull from 2 claims · tier 1*,
+in the engine's name, no model asked. The second tower from the same standpoint
+goes into it as a third claim.
+
+**3 · Orbit the other way and draw what you see from there.** The hull narrows,
+and it is **two parts**, each said in words:
+
+> part 1 — 1.8 × 1.4 u on the footprint, 0.3 u tall, along the east edge; from
+> stroke:2 (drawn from 64° · +29°) and stroke:9 (drawn from 135° · +22°)
+>
+> part 2 — 1.6 × 1.7 u on the footprint, 0.9 u tall, at the north-east corner;
+> from stroke:8 (drawn from 64° · +29°)
+
+Two parts and not three, on a drawing of three towers, and the reason is in the
+drawing rather than in the code — see *the honest limit* below. **Three ⊓ and
+two standpoints, not two and two**: a tower seen once has no depth, so two
+claims from two standpoints give one part, and the count only reaches two when
+one standpoint has shown two towers.
+
+**4 · The free loop test.** With nothing chosen, let the cursor go (a shift +
+click on the cursor where it stands), raise the eye, and draw a loop in clear
+air. It lands on the view plane **through the centre of the view**, its aspect
+conserved to a thousandth — 1.394 drawn, 1.394 landed — and **not** in the
+floor, which is the fault push 2 opens on. And because it is a closed silhouette
+whose prism meets the footprint's, the hull **takes it** as a fifth claim: a loop
+beside the castle is not a doodle, it is another claim about the same thing. So
+the beat puts the board back in the two acts it took to change it — the first
+undo takes the claim out and leaves the ink, the second takes the stroke.
+
+**5 · *castle with green tops*.** The brief is the short one (a hull with parts
+takes 1048 characters before `HERE_ON_A_HULL`) and the reading line says which
+contract Enter uses before it is pressed. The reply names the parts from the
+human's own words — `part:1` *wall*, `part:2` *turret* — binds one colour word
+each from the closed list, and asks for two small ops by part id. The transcript
+keeps the brief as sent and the reply as received; an ideal reply drops nothing,
+which is what makes it ideal. The honours row says how much of the drawing the
+body contains, and on a sketch hull that number is **low and true**: *honours
+the drawing 9% · top 9 (material was taken off since it was drawn — less is
+expected to show)*, because the footprint is the whole keep and the hull is the
+volume three views share.
+
+**6 · *make the turrets taller*.** A regen over that **part** alone: the brief
+gains `ONLY THESE PARTS MAY CHANGE`, the step the last reply left on that part
+comes off before the new one goes on, every other step keeps its own id, and the
+name does not move. The words are *turrets* and not *towers* for a reason — a
+regen resolves a name that is **in play**, and nothing on this board is called a
+tower until someone says so.
+
+**7 · *Why*, and then the names are yours.** Tap a part's chip and the panel's
+summary answers about **that part**: *what* — `turret · green`, with its whole
+sentence as the reason; *from* — `cut from 1 claim of hull`, because a part is
+material and not a sub-tree of steps; *next* — what Enter would do to it. Then
+`name: castle` and *Take it*: three definitions, each based on `castle` — the
+whole of it, and `wall` and `turret` as parts of it.
+
+**8 · Draw the footprint again, elsewhere.** The library offers *castle 1.00*
+with the corners, the extent, the aspect and the plane named in its reason, and
+one tap places it: a second artifact, three quarters the size, standing inside
+the outline that was drawn.
+
+**9 (optional) · the MCP seat.** The demo runs on a stub; this beat runs the
+same path with a **hand** at the end of it. `__shard.joinHand()` joins a room
+over an in-memory hub and seats the MCP hand in it — the same `src/room.ts` that
+`mcp.mjs` drives — so what is proved is the path (park, merge, answer, apply)
+rather than a mock of it. Enter parks the brief and writes nothing while it
+waits; the hand answers in the parts contract; the version is attributed to the
+seat. From a Claude Code conversation the identical round trip is `space_pending`
+→ `space_answer`.
+
+### The gestures, in one place
+
+| | |
+|---|---|
+| draw | left button, one finger |
+| orbit | right-drag · `Space`+drag · a drag on the compass · a trackpad swipe · two fingers |
+| pan | middle-drag · `Shift`+right-drag · `Shift`+swipe · three fingers |
+| dolly | wheel · pinch · `Ctrl`/`Cmd`+swipe — toward the pointer |
+| put the cursor | `Shift`+click; again on the cursor itself lets it go |
+| choose a plane | `1` `2` `3` (foundation / height / width), `0` un-chooses |
+| the camera's views | numpad `1` `3` `7` (front / right / top) or `Shift` + those; `Ctrl`/`Cmd` for the far side; numpad `5` persp/ortho; numpad `9` flips |
+| frame everything | `f`, `Home`, or the compass's *home* |
+| undo | `Cmd`/`Ctrl`+`Z` — one whole act |
+
+`1` `2` `3` `0` were the plane picker's and stay the plane picker's: a plane is
+chosen far more often than a camera is snapped, and the older binding wins. So
+the camera takes the numpad, where Blender has it. In an axis view the matching
+plane key is the choice the view already made, and a different one hands the
+tiles back.
+
+## The rungs, and their vocabularies
+
+Each rung is closed, each is placed by evidence rather than by a mode, and each
+says its reasoning out loud. The vocabulary grows by a release and never by a
+special case (`SHARD-3D-PLAN.md` §2.6).
+
+**The plane** — `foundation` (XZ, the ground) · `height` (XY, the wall you
+face) · `width` (YZ, the wall on your right). A plane is
+`{ origin, normal, up, source, name, why }` and its `source` is one of `chosen`
+· `face` · `view` · `world` · `previous`. A **chosen** plane is a decision,
+blessed by the act of tapping a tile or a ball; with nothing chosen the plane is
+**read**, and every candidate is kept with its number and its reason.
+
+**The shape rung** is core's, unchanged, run on the stroke in the plane's own
+(u, v) at the pen's own scale: `line` · `arc` · `triangle` · `rectangle` ·
+`circle` · `arrow` · `text` · `dot`. Reading a stroke on a plane is what makes
+drawing in space feel like drawing on paper, and it is the whole of P0.
+
+**The form rung** (`src/form.ts`) is the diagram rung's sibling and says what a
+mark *plays* in space: `gesture` · `profile` · `elevation` · `feature` ·
+`extent` · `axis` · `path` · `label` · `annotation`. Nine rows, read top to
+bottom, first match wins, and a mark no row places is `annotation` — said out
+loud. Every threshold is a ratio of the marks' own size, measured in **world**
+space so it holds across planes. Row 6 (`path`) is P7's and carries a comment
+saying so.
+
+**The hull, and its parts** (`src/form.ts`, `src/solid.ts`, `src/parts.ts`). A
+silhouette claim is a closed stroke on any plane whose prism meets the
+footprint's, or an open stroke whose feet reach the ground. The hull is the
+intersection of their prisms; a part is the hull's material inside one claim's
+run, with an id (`part:1 … part:n`), a place in the footprint's own frame and a
+sentence.
+
+**The op tree** (`src/op.ts`) is the solid: `extrude` · `revolve` · `cut` ·
+`boss` · `mirror` · `place` · `match` · `massing` · `hull` implemented, and
+`sweep` · `loft` · `union` · `along` declared for P7 and not built. A step
+carries what the drawing said and **nothing derived**.
+
+**Names** are the one open vocabulary, and they are the hand's. The engine's own
+word for what it made (`box`, `cylinder`, `wedge`, `extrusion`, `revolve`,
+`massing`, `hull`, `part 2`) is never a name anyone gave it; a model's word is a
+claim, held and attributed, that the hand takes or leaves.
+
+## The files
 
 | File | What it is |
 |---|---|
-| `src/plane.ts` | **Pure.** `Plane { origin, normal, up, source, name, why }`, world ↔ plane (u, v), ray–plane, `scaleAt`, `facing`, the camera's `Pose` and `poseAngle`, the three named planes, and `planeForPenDown` — the one seam, now picking the read plane from the candidates the scorer built. No three.js, so it tests headlessly |
-| `src/planarity.ts` | **Pure.** P1's whole read: the candidates (`face` / `previous` / `world` / `view`), the pen-down pick, the pen-up re-rank, the scorer and its four terms, `nameFace`, the chip's text. The camera arrives as a ray-caster function, so there is no three.js here either — §11 names this first for landing back in core |
-| `src/chips.ts` | The runner-up, standing beside the mark in screen space: an HTML overlay positioned by projecting the stroke's centre, built from `ui.ts`'s `chip`, gone after `CHIP_MS` or on the next stroke |
-| `src/log.ts` | The engine's session as the shard's log: a stroke in plane coordinates with its scale, the plane held as a rep, and readings / maths / clean forms / undo for free |
-| `src/scene.ts` | three.js, the camera — **perspective or orthographic, the same pose through two lenses** — the orbit / pan / draw split, the ground grid, and the camera **as a ray-caster function** so `plane.ts` never imports three. Plus `rayForPose`, which rebuilds a ray-caster from a pose the log holds (that is what lets a stroke drawn minutes ago be re-projected onto another plane, and it rebuilds an ORTHO stand-in for a pose taken through that lens), `project`, `easeTo` — the one easing every camera move the chrome starts — and what the compass drives: `turn`, `pan`, `dolly` (toward the pointer), `snap`, `frame`, `setProjection` and `setPivot`. The wheel and touch listeners live here and decide nothing — `gesture.ts` does — and `onAbandon` is the seam that drops a stroke the second finger of a pinch had begun |
-| `src/gesture.ts` | **Pure.** What a wheel event or a set of touch points MEANS for the camera: `classifyWheel` (mouse / trackpad / pinch, off the event's shape and a short memory), `readWheel` (Blender's map — swipe orbits, `Shift`+swipe pans, pinch and `Ctrl`/`Cmd`+swipe dolly, a notch dollies) and `readTouch` (one finger draws, two pinch or orbit by a decision made once after twelve pixels, three pan). Every threshold named, every sign stated as the drag the same travel would make. No three.js, no DOM |
-| `src/view.ts` | **Pure.** The camera's own arithmetic: the six axis views with the up that makes each named plane read in its own frame, the flip to the other side, `viewFacingPlane` / `planeFacedBy` (the compass and the plane picker agreeing), `tooOblique` against the scorer's own `FACING_FLOOR`, `frameFor` (a bounds → a pose that fits it, sphere not box, at any aspect, in persp and in ortho), `orthoHeightFor` / `distForOrthoHeight` (why the projection toggle does not jump), and `balls` — the six axes projected onto the camera's screen basis, farthest first. No three.js |
-| `src/navgizmo.ts` | The compass in the corner, as an **SVG overlay** built from the tokens: three arms from a centre with a labelled ball on each positive end and a hollow one on each negative, depth-sorted and turning with the camera, tappable (snap, and flip on a second tap), draggable (orbit, one finger, because it is chrome rather than canvas) — plus the *home* and *view* tiles and the pinned-view chips |
-| `src/gizmo.ts` | The three axes, the three tiles, the slide handle, the centre — all of it standing at **the cursor**, whose planes it hands out through that point (`origin` / `setOrigin`) |
-| `src/cursor.ts` | **Pure.** Blender's 3D Cursor placement as one rule: the surface under the pointer takes the cursor, else the foundation plane under it, else nothing happens and the caller says so. Plus the cursor's **two states** (push 2, G1): `FOLLOWING` — the view plane passes through the centre of the view, so it goes with every pan and orbit — and placed, where a shift + click put it, until `0`, a clear, or a shift + click on the cursor itself (`cursorAt`, `cursorFollowsTarget`, `shiftClick`, `describeAnchor`). No three.js — a surface hit and a ray in, a world point and its reason out |
+| `src/plane.ts` | **Pure.** `Plane`, world ↔ plane (u, v), ray–plane, `scaleAt`, `facing`, the camera's `Pose` and `poseAngle`, the three named planes, and `planeForPenDown` — the one seam, picking the read plane from the candidates the scorer built. No three.js, so it tests headlessly |
+| `src/planarity.ts` | **Pure.** P1's whole read: the candidates (`face` / `previous` / `world` / `view`), the pen-down pick, the pen-up re-rank, the scorer and its four terms, `nameFace`, the chip's text. The camera arrives as a ray-caster function, so no three.js here either |
+| `src/gesture.ts` | **Pure.** What a wheel event or a set of touch points MEANS for the camera: `classifyWheel`, `readWheel` (Blender's map) and `readTouch`. Every threshold named, every sign stated as the drag the same travel would make. No three.js, no DOM |
+| `src/view.ts` | **Pure.** The camera's arithmetic: the six axis views with the up that makes each named plane read in its own frame, the flip, `viewFacingPlane` / `planeFacedBy`, `tooOblique` against the scorer's own `FACING_FLOOR`, `frameFor` (bounds → a pose, sphere not box, at any aspect, in both lenses), `orthoHeightFor` / `distForOrthoHeight`, `orbitBy`, `planeAfterLeavingAxisView`, and `balls` |
+| `src/cursor.ts` | **Pure.** Blender's 3D Cursor placement as one rule — the surface under the pointer, else the foundation plane under it, else nothing and the caller says so — plus the cursor's two states: `FOLLOWING` (the view plane through the centre of the view) and placed (`cursorAt`, `cursorFollowsTarget`, `shiftClick`, `describeAnchor`) |
+| `src/diff.ts` | **Pure, and where every diff threshold lives.** The grid in plane units, the even–odd rasteriser, connected components, a region's outline (core's `trace` on the boundary pixels), `diffProfile`, `overlapOf`, `viewNameOf` (the foundation is the *top*, height the *front*, width the *side*) |
+| `src/library.ts` | **Pure.** P6's rung: what a definition carries (each profile's fingerprint and the KIND of plane it lay on), `compareProfiles`, `matchLibraryDefinition`, `rankMatches`, `addProfileExample`, `structuresFor`. **It knows no name** — it is handed definitions the hand has already named |
+| `src/op.ts` | **Pure.** The op tree, `placeDefinitionStep` / `placeFrames`, the geometry parameters derived from the drawing, the nesting (`on`, `rootOf`, `withStep`, `depthsOf`), the tree as text and back, the lathe profile, `validateOpTree` and `OP_LIMITS` |
+| `src/form.ts` | **Pure.** The form rung's nine-row table, `prismsMeet`, `viewLabelOf` (*34° · +24°*), `hullableFrom`, `massableFrom`, `makeableFrom`, `featuresFrom`, `scratchAgainst` |
+| `src/parts.ts` | **Pure but for the CSG seam.** `runsOf`, `footprintFrame`, `placeOf`, `partsOfHull`, `hullReadOf`, and the three small ops a reply may ask for by part id (`bossOnPart`, `cutOnPart`, `mirrorOnPart`) |
+| `src/constraints.ts` | **Pure.** `activeConstraints(tree, ctx, drawnSince)` — what a body is answering to, each closed mark it references classified `target` / `source` / `revision`, and `carryOutline` |
+| `src/field.ts` | One input, one reader. `readField(text, ctx)` returns *what Enter will do*; the verbs and their reasons are handed in, so the reader knows nothing about the DOM. Thirteen verbs, each with its aliases in one table |
+| `src/verbs.ts` | **Pure.** The verb table with name-resolved targets, `behave/words.ts`'s pattern ported: `SAYINGS` per verb, `CHANGES` for the size words, `namesIn` resolving a noun singular or plural, and **what it cannot read is returned, not dropped** |
+| `src/brief.ts` | **Pure.** `describeSpace` — the `describeReading` of this shard, in stroke ids and step ids — and `describeHull`, the short brief a standing hull takes. `partIdsOf` is the one test for which shape, and so for which contract. `HERE_IN_SPACE` and `HERE_ON_A_HULL` say what can be made here and what cannot |
+| `src/generator.ts` | **Pure.** The making and regen prompts, `messagesFor`, `parseProposal` (strict JSON first, then core's two repairs, then reported — never guessed), the closed lists (`PROPOSABLE`, `PROPOSABLE_SHAPES`, `PART_OPS`, `PART_RULES`, the colour words), and `propose`, whose transport is **injectable**. Also `meaningMessages` / `parseMeaning` |
+| `src/exchange.ts` | **Pure.** The transcript: every exchange with a model — who, the brief as sent, the words, the reply as **received**, what parsed, what was dropped and why, the outcome and the time — the last `KEEP` (8). **Runtime, never the log** |
+| `src/export.ts` | **The board as its log, out and back in.** `encodeBoard` / `decodeBoard` are core's own `encodeLog` / `decodeLog`, plus `boardFilename`, the download, the file picker, and `boardFromFixture` |
+| `src/demo.ts` | **Pure.** `CASTLE_DEMO`: the numbers of `?demo=castle`, stated once, so the boot demo and `__demo2()` cannot draw two different boards. Its own module because `main.ts` carries three.js and nothing in it can be imported by a test — `src/demo.test.ts` holds its reply against the exchange fixture it is a copy of |
+| `src/log.ts` | The engine's session as the shard's log: a stroke in plane coordinates with its scale, the plane held as a rep, readings / maths / clean forms / undo for free — and every verb above tier 0 (`make`, `mass`, `hull`, `cut`, `boss`, `mirror`, `dup`, `match`, `dropPart`, `applyProposal`, `applyParts`, `nameParts`, `replaceSteps`, `take`, `place`, `correct`, `standFor`, `scene`) |
+| `src/scene.ts` | three.js, the camera — perspective or orthographic, the same pose through two lenses — the orbit / pan / draw split, the ground grid, and the camera **as a ray-caster function** so `plane.ts` never imports three. Plus `rayForPose`, `project`, `easeTo`, and what the compass drives (`turn`, `pan`, `dolly`, `snap`, `frame`, `setProjection`, `setPivot`). The wheel and touch listeners live here and decide nothing; `onAbandon` drops a stroke the second finger of a pinch had begun |
+| `src/solid.ts` | three.js. The mesh, **derived by walking the tree on every log change** (`deriveTree`) — `ExtrudeGeometry` and `LatheGeometry` for the leaves, the CSG seam for `cut` / `boss` / `mirror` / `match`, `hullBody` for `massing` and `hull` alike, a plain merge for a `dup`; a quiet lit material from the tokens, `hardEdges`, the picking, `facesAt`, `spanAlong`, `silhouetteOf`, `silhouetteOn`, `brokenOf`. It takes a `DeriveContext` — `inkOf` and `silhouetteOf` — because a `match` step stores nothing derived |
+| `src/csg.ts` | **The one seam, and the one library behind it.** `subtract`, `union`, `intersect` on `THREE.BufferGeometry`, over `three-bvh-csg` (pinned, with `three-mesh-bvh`). **It never throws**: every result is `{ ok, geometry }` or `{ ok: false, error }` |
+| `src/silhouette.ts` | three.js, and the only part of the diff that needs a renderer: the body rendered flat white on black through an orthographic camera into a small offscreen target, the pixels read back as a mask, the mask's **boundary** handed to core's `trace`. Plus `planeKey`, which deliberately ignores the offset along the normal |
 | `src/ink.ts` | Pen-down → plane → live projection → the stroke as a `Line2`; the clean form as a dashed ghost for a few seconds. The scene's ink is **derived from the log** on every change, so undo needs no bookkeeping |
-| `src/form.ts` | **Pure.** The form rung (§2.3): the closed vocabulary `gesture \| profile \| elevation \| feature \| extent \| axis \| path \| label \| annotation`, placed by a table read top to bottom, first match wins — the sibling of `diagram/roles.ts` and read the same way. Every threshold is a ratio of the marks' own size, measured in world space so it holds across planes. **Row 1** (`gesture`: a scratch, counted against a solid's silhouette with core's own `countCrossings`) and **row 3** (`feature`: a closed mark on a solid's face, inside it) are P3's; **row 2 now also says what a profile is a profile OF** (P4, `against`), which is what turns an outline drawn over a solid into a diff rather than a second solid; row 6 (`path`) is P7's and still carries a comment saying so. **Row 8** (`elevation`: an open stroke whose two feet reach the ground) and row 2's **silhouette claim** (a closed stroke on any plane whose prism meets the footprint's) are push 2's G1, with `prismsMeet` — one exact separating axis — `viewLabelOf` (*34° · +24°*) and `hullableFrom` beside them |
-| `src/diff.ts` | **Pure, and where every diff threshold lives** (§4). The grid in plane units, the even–odd rasteriser, connected components, a region's outline (core's `trace` on the boundary pixels), `diffProfile` → coverage, missing and extra regions with their areas and their sentence, `overlapOf` (is this a profile OF that solid?), and `viewNameOf` (the foundation is the *top*, the height plane the *front*, the width plane the *side*). No three.js, so the arithmetic is pinned with no WebGL anywhere near it |
-| `src/silhouette.ts` | three.js, and the only part of the diff that needs a renderer. `silhouetteOnPlane(renderer, geometry, plane)` renders the body flat white on black through an **orthographic** camera looking along the plane's own normal into a small offscreen target, reads the pixels back as a mask, and hands the mask's **boundary** to core's `trace` for the outline in plane units. Plus `planeKey`, the cache key that deliberately ignores the offset along the normal |
-| `src/library.ts` | **Pure.** P6's whole rung: what a definition carries (each profile's fingerprint and the KIND of plane it lay on), `compareProfiles` — core's `matchPrimitiveFromLibrary` re-weighted for a question it does not ask — `matchLibraryDefinition` and `rankMatches` (plural, above a floor, each with the measurements it was scored on), `addProfileExample` (core's `correct` pattern at the profile rung), and `structuresFor`, which uses core's own structural signature only where it applies. **It knows no name**: it is handed definitions the hand has already named |
-| `src/op.ts` | **Pure.** The op tree (§2.4): the whole vocabulary as a type, `extrude`, `revolve`, `cut`, `boss`, `mirror`, `place` (a dup's copy, and P6's placement OF a definition), `match`, `massing` and `hull` implemented (the hull is the massing on any planes; both ops stay so every tree ever written still reads, and one function derives both), `placeDefinitionStep` and `placeFrames` — the pose of a placement, worked out from the two inks it names rather than held — the geometry parameters derived from the drawing (the direction, the signed depth, the axis as a world line, a cut's *through* and a boss's own short side), **the nesting** (`on`, `rootOf`, `withStep`, `depthsOf`), the tree as text and back, and the lathe profile as radius-and-height about the axis. No three.js |
-| `src/csg.ts` | **The one seam, and the one library behind it** (§10). `subtract(a, b)`, `union(a, b)` and `intersect(a, b)` on `THREE.BufferGeometry`, over `three-bvh-csg` (pinned, with its peer `three-mesh-bvh`). Nothing else in the shard imports the library. **It never throws**: every result is `{ ok, geometry }` or `{ ok: false, error }` |
-| `src/solid.ts` | three.js. The mesh, **derived by WALKING the tree on every log change** (`deriveTree`) — `ExtrudeGeometry` and `LatheGeometry` for the leaves, the CSG seam for `cut` / `boss` / `mirror` / `match`, `hullBody` for `massing` and `hull` alike (each claim grown through the span of the **others** — never its own points — so a hull stands in the volume its claims define), a plain merge for a `dup`'s disjoint copy; a quiet lit material from the tokens, `hardEdges` (the creases only, never the triangulation), the picking, `facesAt` (the faces under the pen as a plane plus the face's own corners, which is what a `face` candidate anchors on), `spanAlong` (what a cut goes THROUGH), `silhouetteOf` (the hull a scratch is counted against), `silhouetteOn` (the orthographic picture the diff reads, cached) and `brokenOf`. `deriveTree` takes a **`DeriveContext`** — `inkOf` and `silhouetteOf` — because a `match` step stores nothing derived and has to ask |
-| `src/parts.ts` | **Pure but for the CSG seam.** The parts of a hull (push 2, G2): `runsOf` splits a claim into the runs that stand between its ground touches (a ⊓ is one, three touches is two, a closed silhouette is one by its own ink — and `ground` is read BEFORE `closed`, because an elevation is held closed *on the ground*), `footprintFrame` builds the frame the places are said in (the long side of the tightest box, never the diagonal; north is −Z), `placeOf` cuts it in thirds, and `partsOfHull` cuts each run's prism out of the standing body, merges the ones that turn out to be the same material (`PART_OVERLAP`, a ratio of the smaller) and numbers them `part:1 … part:n` in reading order with a sentence each. Nothing is thrown: a run that claims nothing, or a boolean that does not come off, is dropped with its reason. **G3** adds what is SAID about a part — the name and the material resolved onto it from the hull step's `said`, keyed by the claims it was cut from — and the three small ops a reply may ask for by part id (`bossOnPart`, `cutOnPart`, `mirrorOnPart`), each built from the part the engine already cut so that nothing a reply wrote becomes geometry; `hullReadOf` is the one wiring the surface and the tests share |
-| `src/selection.ts` | Selection by default (§7): one thing at a time, a teal cage around a solid, and a diff region outlined on its own plane while its chip is hovered. Runtime state, never the log's |
-| `src/field.ts` | One input, one reader. `readField(text, ctx)` returns *what Enter will do*; the verbs and their reasons are handed in, so the reader knows nothing about the DOM. Thirteen verbs now — `extrude`, `revolve`, `cut`, `boss`, `add`, `takeoff`, `mirror`, `dup`, `remove`, `regen`, `take`, and P6's `place` and `reject` (*Not a mug*) — each with its aliases in one table |
-| `src/panel.ts` | **Hidden by default** (`panelShown` / `setPanelShown`, the key `shard.panel`, and `createPanelToggle` — the canvas's *details ▾* ported from `Demos/surface/00-core.js`: a `panelHidden` class on the body, remembered per device, and the rows still built and still in the DOM while it is down, so `panelText()` and every assertion on it are the same either way). `selectionLine` is what the status line says in its place — the selection's name and the next act, in the field's own words. Then the rows and the status line — and `pinnedViews`, still read off the log here though the chips are drawn in the corner — including *plays*, ***could be*** (P6: what the library says this outline is, ranked, in the engine's name), *solid* — the latter showing the tree **nested** (`↳ cut · through · from stroke:5` under `extrude · depth 2.40 u`) and a *broken* row with the seam's own words when a derivation did not come off — and ***matches the drawing***: one block per plane a profile of the selected solid was drawn on, with the coverage, the sentence, which outline it read, and a chip per region |
-| `src/ui.ts` | pill · chip · tile · row · pane — `Demos/surface/00-ui.js` ported, not forked |
+| `src/gizmo.ts` | The three axes, the three tiles, the slide handle, the centre — all standing at **the cursor**, whose planes it hands out through that point (`origin` / `setOrigin`) |
+| `src/navgizmo.ts` | The compass in the corner as an **SVG overlay** built from the tokens: three arms from a centre with a labelled ball on each positive end and a hollow one on each negative, depth-sorted and turning with the camera, tappable (snap, flip on a second tap), draggable (orbit, one finger, because it is chrome) — plus *home*, *view* and the pinned-view chips |
+| `src/chips.ts` | The runner-up, standing beside the mark in screen space: an HTML overlay positioned by projecting the stroke's centre, built from `ui.ts`'s `chip`, gone after `CHIP_MS` or on the next stroke |
+| `src/selection.ts` | Selection by default: one thing at a time, a teal cage around a solid, a diff region outlined on its own plane while its chip is hovered, and a second cage for a hovered part. Runtime state, never the log's |
+| `src/panel.ts` | **Hidden by default** (`panelShown` / `setPanelShown`, the key `shard.panel`, `createPanelToggle`). The summary above everything — *what* · *could be* · *from* · *next* · *becomes* · *parts* — with every measurement behind *why / measurements ▾*; `selectionLine` is what the status line says in its place; then the rows, the nested tree, the *broken* row, *matches the drawing*, *honours*, and the ***model*** section, which is the transcript |
+| `src/models.ts` | The model pane, `Demos/surface/04-models.js` ported, plus **the hand's seat** (`joinHand`): both local servers probed in parallel, embedding-only models hidden **and said**, the pick remembered as a preference, hosted providers by key — and **no key ever enters the log**. `joinWith` seats a model with a transport of its own, which is what `__shard.joinStub` is |
+| `src/room.ts` | **The live room, and the brief parked in it.** `joinRoom` is `17-folder.js`'s `openLive` in TypeScript over one session; `ask()` parks a question on the explanation plane as `brief:<key>` and settles when `answer:<key>` lands; `splitPrompt` reads the brief and the words back out of either ask; `otherHand()` is the same loop from the other side |
+| `src/work.ts` | A model at work, shown **where it works**: a breathing `--sig-model` dot with the model's name and its task above the solid, the elapsed time after a few seconds, *Esc stops it* after thirty, and one `AbortSignal` per call so Esc really does |
 | `src/theme.ts` | The tokens read back off `../brand/tokens.css` at boot; nothing here restates a hex |
-| `src/exchange.ts` | **Pure.** G0's transcript: every exchange with a model — who was asked, the brief as sent, the human's words, the reply as **received**, what parsed, what was dropped and why, the outcome and the time it took — the last `KEEP` (8) of them. **Runtime, never the log**, and the file says at length why: what a reply DID is already in the log, attributed and undoable, and this is the evidence about the exchange rather than state of the board |
-| `src/export.ts` | **The board as its log, out and back in** (G0). `encodeBoard` / `decodeBoard` are core's own `encodeLog` / `decodeLog` — one JSON event per line, the canvas's format unchanged — plus `boardFilename`, the download, the file picker, and `boardFromFixture`: a captured VIEW of a board rebuilt from its marks' bounds, which is a reconstruction and says so every time |
-| `src/brief.ts` | **Pure.** `describeSpace` (§6) — the `describeReading` of this shard, and the **region-id rule** kept in stroke ids and step ids: what stands (the massing first, said to be the extent to stay inside), the planes and what lies on each in that plane's own units, the diff regions, **every name in play in its step's own id**, the library, the words, and then `HERE_IN_SPACE` — one paragraph on what can be made here and, as importantly, what cannot. **G3**: with a hull standing it takes a second, SHORT shape (`describeHull`) — the footprint, the extent, the parts with their numbers and their words, and `HERE_ON_A_HULL`, which forbids the profiles the other paragraph offers. `partIdsOf` is the one test for which shape, and so for which contract |
-| `src/generator.ts` | **Pure.** The generator seat: the making and regen prompts, `parseProposal` (strict JSON first, then core's own two repairs, then reported — never guessed), the closed lists a reply may use (`PROPOSABLE`, `PROPOSABLE_SHAPES`, the colour words), and `propose`, whose transport is **injectable** so a stub never touches the network. Also `meaningMessages` / `parseMeaning`: asking a model which of the shard's own verbs a phrase meant, which is the only thing here a model is asked that is not geometry. **G3** adds the second contract: `PART_RULES` (a name, a material and small ops BY PART ID, and no profiles at all) and the `parts` branch of `parseProposal` — a part id the hull does not have dropped and counted, a colour outside the closed list dropped with its reason and the name kept, a step whose op is outside `PART_OPS` dropped saying which four there are |
-| `src/verbs.ts` | **Pure.** The verb table with name-resolved targets (§2.6 rule 4), `behave/words.ts`'s pattern ported: `SAYINGS` per verb, `CHANGES` for the size words, `namesIn` resolving a noun singular or plural against the names in play (core's own `singular`), and **what it cannot read is returned, not dropped** |
-| `src/models.ts` | The model pane, `Demos/surface/04-models.js` ported, plus **the hand's seat** (G5: `joinHand`, which parks a brief in the room instead of posting it and takes the front, because `first()` is who a brief goes to): both local servers probed in parallel, embedding-only models hidden **and said**, the pick remembered as a preference, hosted providers by key — and **no key ever enters the log**. `joinWith` seats a model with a transport of its own, which is what `__shard.joinStub` is |
-| `src/room.ts` | **The live room, and the brief parked in it** (G5). `joinRoom` is `Demos/surface/17-folder.js`'s `openLive` in TypeScript over one session: a `LiveStore` on the relay, `mergeLogs(logs, { me })` on every line that lands, my own unstamped events as my log. `ask()` parks a question on the explanation plane as `brief:<key>` and settles when `answer:<key>` lands — `participants/bridge.ts`'s pattern with the room as the wire. `otherHand()` is the same loop from the other side, which is what the e2e drives in the page and what `mcp.mjs` re-implements in JavaScript |
+| `src/ui.ts` | pill · chip · tile · row · pane — `Demos/surface/00-ui.js` ported, not forked |
+| `src/main.ts` | The wiring, the chrome, the field's adapter, `tier1()`, `runBrief()`, `?demo=` and `?fixture=`, and `window.__shard` — the test hook |
+| `src/shard.css` | The surface, on `brand/tokens.css` |
 | `mcp.mjs` | **The hand, and the seat**, over MCP on stdio — newline-delimited JSON-RPC written by hand, so the repo takes no dependency, importing the committed Node bundle beside `Demos/mcp.mjs`. Six tools: `space_look`, `space_pending`, `space_answer`, `space_draw`, `space_propose`, `space_say`. Its one duplication is named where it stands: the three named planes and the `plane` rep, because this process cannot import the shard's TypeScript |
 | `mcp-smoke.mjs` | The stdio test, in CI's `shard` job: a relay on a **free port**, a second hand in Node as the tab, and the whole round trip — look, draw, park, list, answer, refuse, say |
-| `src/work.ts` | A model at work, shown **where it works**: a breathing `--sig-model` dot with the model's name and its task above the solid, the elapsed time after a few seconds, *Esc stops it* after thirty, and one `AbortSignal` per call so Esc really does |
-| `fixtures/exchanges/` | **What was sent, and what came back** (G3): one file per model per board — the brief as sent, the reply as received verbatim and unrepaired, and what became of it. The stub (imperfect on purpose), an *ideal* written by hand as the contract's worked example, qwen3:8b through Ollama on both boards. `src/namedparts.test.ts` reads every one of them as a module, so the contract is pinned against text a model actually produced; `fixtures/exchanges/README.md` says how to add another |
-| `e2e.js` | The whole loop through the real pointer path — **120 steps, P0 → P6, the compass, the panel's toggle, trackpad and touch, the axis views, push 2’s hull (the view plane where you are looking, a ⊓ from a free view standing a hull at tier 1, a second one narrowing it, and undo), G2's three (John's castle-sketch board standing a hull with parts and a sentence each, the panel's chips with the hover cage, and taking a part up to remove its one claim with undo), G3's three (the short brief and the field saying which contract Enter uses, a reply naming the parts from the words with green on the tops and three faults dropped and counted in the transcript, and *make the turrets taller* as a regen over that part alone), G5's five (the hand in the room) and G0's five: the log out and back in, a brief with nothing standing, a brief with nothing selected, the massing standing first, and `?fixture=`** — and, beside it, `__demo()`: the two-minute demo of §9 in eleven asserted steps, with a timing on each |
-| `build-standalone.mjs` | **One file.** Runs `npm run build` (which typechecks first), then inlines every asset Vite emitted — the bundle as one inline module, the stylesheet as one `<style>` — into `dist/shard-3d.html`, and refuses to write a page that still points at anything that would not travel with it. The font `@import` stays external, because the tokens name a fallback stack and a face is not worth trebling the file for |
+| `e2e.js` | The whole loop through the real pointer path: `__scenario()` (P0 → P6, the compass, the panel's toggle, trackpad and touch, the axis views, G0's five, G5's five, G1's three, G2's three, G3's three), `__demo()` (the mug of §9, eleven steps) and `__demo2()` (G4's nine beats). Every shape is stated in a plane's own units and projected by `screenFor`; `strokeScreen` dispatches real pointer events, so nothing here can pass by calling the engine directly |
+| `build-standalone.mjs` | **One file.** Runs `npm run build`, then inlines every asset Vite emitted into `dist/shard-3d.html`, and refuses to write a page that still points at anything that would not travel with it |
+| `fixtures/` | John's own boards as logs, and `make.mjs` which writes them. `fixtures/README.md` says which door each came through |
+| `fixtures/exchanges/` | What was sent to a model about a board and what came back, verbatim and unrepaired. `fixtures/exchanges/README.md` says how to add one |
+| `src/*.test.ts` | 555 tests, vitest, no WebGL except where the CSG seam is the subject |
 
-## The design decision: how a solid is held in the log
+## How it works, decision by decision
 
-**A solid is an artifact the engine already supports, blessed by tier 1, whose
-`code` rep is the op tree as `json` with a marker on its first line.**
+### A solid is an artifact whose code rep is the op tree
 
-The plan's §2.4 asks for a new `op` kind beside `run` in `kinds.ts`. That is
-core's to add (§11 lists it), and P2 was not to touch core — so the tree goes
-in through the door that is already open: `summonMarks` → `bless` → 
-`attachCode({ kind: 'json' })`, and the code's first line is
-`// mm:op tree v1`, exactly the way `GRAPH3D_MARK` marks a program in
-`tier1/library.ts`. `parseOpTree` strips the comment lines and reads the rest;
-anything else on the board is not one of the shard's trees and is left alone.
-When core grows the `op` kind, the marker goes and the kind takes its place.
+**Blessed by tier 1, with a marker on the code's first line.** The plan's §2.4
+asks for a new `op` kind beside `run` in `kinds.ts`; that is core's to add, so
+the tree goes in through the door already open — `summonMarks` → `bless` →
+`attachCode({ kind: 'json' })`, with `// mm:op tree v1` as the first line,
+exactly the way `GRAPH3D_MARK` marks a program in `tier1/library.ts`.
+`parseOpTree` strips the comments and reads the rest; anything else on the board
+is not one of the shard's trees and is left alone. When core grows the `op`
+kind, the marker goes and the kind takes its place.
 
-**A tree that arrives as text is validated, never cast** (DATA-1). `OpStep` is
-a type the compiler enforces on the code that BUILDS a tree and it says nothing
-about one that comes out of the log, a folder, another hand's log or a model:
-`{"op":"extrude"}` with no `depth` used to parse clean and then throw out of
-`depth.toFixed()` the moment the panel described it. So `validateOpTree` walks
-every step against those same discriminated types — the version, each op's own
-required fields (a revolve's axis and sweep, never an extrude's depth), finite
-numbers, reference types, ids unique per level with `on` pointing at a step
-that already stood, and the bounds named in `OP_LIMITS` — and returns a
-structured reason (`{ at: 'steps[3].depth', reason: … }`). `parseOpTree` keeps
-its null contract; `readOpTree` is the sibling that carries the reason, and
-`solids()` uses it: a rep that is not ours is skipped in silence, and one that
-is ours and will not read stands as a **broken solid** whose panel row names
-the fault and says the code rep is still in the log, untouched. Every accepted
-tree is safe to `describeStep`.
+**The engine is the author.** `bless` and `attachCode` are attributed to
+`ENGINE_PARTICIPANT` — a box from a rectangle and a line is tier 1, the canvas
+answering first — and the panel and the status line both say so.
 
-Three consequences, each deliberate:
+**Blessing takes the members off the content plane, and the shard puts them
+back.** That is right for a canvas (a page is one thing, not five strokes) and
+wrong for a shard, where the profile that became a box is still ink lying on the
+box's face. `log.marks()` therefore derives from every node carrying ink and a
+plane rather than from `contentIds`.
 
-- **The engine is the author.** `bless` and `attachCode` are attributed to
-  `ENGINE_PARTICIPANT` — a box from a rectangle and a line is tier 1, the
-  canvas answering first (invariant 7), and the panel and the status line both
-  say so. The word it is blessed with (`box`, `cylinder`, `wedge`,
-  `extrusion`, `revolve`) is the engine's word for what it *made*, never a name
-  anyone gave it (§2.6); the hand's own name arrives through the field.
-- **One act, three events, one undo.** A solid is `summon` + `bless` + `code`.
-  `session.undo()` drops one event, so `log.undo()` drops the whole act — see
-  *How undo knows where an act ends* below. The ink is untouched, which is the
-  done-criterion.
-- **Blessing takes the members off the content plane, and the shard puts them
-  back.** That is right for a canvas (a page is one thing, not five strokes)
-  and wrong for a shard, where the profile that became a box is still ink lying
-  on the box's face. `log.marks()` therefore derives from every node carrying
-  ink and a plane rather than from `contentIds`.
+**A tree that arrives as text is validated, never cast** (DATA-1). `OpStep` is a
+type the compiler enforces on the code that *builds* a tree and says nothing
+about one out of the log, a folder, another hand's log or a model:
+`{"op":"extrude"}` with no `depth` parsed clean and then threw out of
+`depth.toFixed()` the moment the panel described it. `validateOpTree` walks every
+step against those same discriminated types — the version, each op's own required
+fields (a revolve's axis and sweep, never an extrude's depth), finite numbers,
+reference types, ids unique per level with `on` pointing at a step that already
+stood, and the bounds in `OP_LIMITS` — and returns a structured reason
+(`{ at: 'steps[3].depth', reason: … }`). `parseOpTree` keeps its null contract;
+`readOpTree` carries the reason, and `solids()` uses it: a rep that is not ours
+is skipped in silence, and one that is ours and will not read stands as a
+**broken solid** whose panel row names the fault and says the code rep is still
+in the log, untouched.
 
-## How undo knows where an act ends
+### Undo knows where an act ends because the act's own timestamp is in the log
 
-**The act boundary is the act's own timestamp, and it was already in the log.**
+An act is rarely one event. A stroke is two (the ink, then the plane proposed on
+it); a solid is three; a flip is three; a model's proposal is `3n + 1`, where n
+is however many profiles it drew — sixteen profiles is forty-nine events.
+`session.undo()` drops one event.
 
-An act is rarely one event. A stroke is two (the ink, then the plane proposed
-on it); a solid is three; a flip is three; a model's proposal is `3n + 1`,
-where n is however many profiles it drew — sixteen profiles is forty-nine
-events. `session.undo()` drops one event, so the shard has to know where the
-act ends.
+It used to guess: walk back up to twelve events and stop when something visible
+changed. Twelve was a guess at how long an act could be and the stopping rule
+was a guess at what an act does, and the director review (ACT-1) reproduced both
+failing: with one generated profile, undo restored the old tree and left the
+model's circle standing on a board whose tree no longer mentioned it; with
+sixteen, it never reached the version at all.
 
-It used to guess: walk back up to **twelve** events and stop when something
-visible changed — a stroke count, an artifact, a tree, a correction, a
-definition. Twelve was a guess at how long an act could be, and the stopping
-rule was a guess at what an act does. The director review of 15 September 2026
-(ACT-1) reproduced both failing: with one generated profile, undo restored the
-old tree and left the model's circle standing on a board whose tree no longer
-mentioned it; with sixteen, it never reached the version at all and left all
-sixteen circles and the eighteen-step tree.
+Every act in `log.ts` already threads **one `at`** through every event it writes,
+so an act is exactly the run of consecutive events that agree on `at`. `undo`
+reads that run and drops it. Nothing new is recorded, no event gains a field,
+and **core's event schema is untouched** — changing that is a cross-surface
+contract, not a worker's aside. Because the grouping is in the log rather than in
+memory it survives a JSON round trip for free. Two stamps in `stamp()` make it a
+rule rather than a coincidence: **no two acts share a time** (an act whose time
+the log already holds is recorded a millisecond later), and **a late result is
+stamped when it LANDS**, so a reply carrying the moment Enter was pressed still
+forms its own act on top of the stroke drawn while it waited.
 
-Every act in `log.ts` already threads **one `at`** through every event it
-writes — `make` stamps its summon, its bless and its code alike, `applyProposal`
-stamps every profile it drew, the version and every take-in the same — so an
-act is exactly the run of consecutive events that agree on `at`. `undo` reads
-that run and drops it. Nothing new is recorded, no event gains a field, no
-marker is written, and **core's event schema is untouched**: changing that is a
-cross-surface contract and an architectural decision, not a worker's aside.
-Because the grouping is in the log rather than in memory, it survives a JSON
-round trip for free — a replayed log undoes exactly as the live one does, which
-is invariant 4 doing its job (a runtime ledger of act spans would be a second
-source of truth beside the log).
+Every log this shard has written carries an `at` on every event, so an older log
+groups correctly with nothing to migrate. `undoByWalking` is kept for the one log
+the rule cannot read: one whose events carry no usable time at all.
 
-Two stamps make that a rule rather than a coincidence, and both live in
-`stamp()`:
+### The CSG seam never throws
 
-- **No two acts share a time.** The clock can hand out the same millisecond
-  twice — a synthetic pointer does it constantly, and a fast hand can — and two
-  strokes a millisecond apart are still two strokes. An act whose time the log
-  already holds is recorded one millisecond later.
-- **A late result is stamped when it LANDS, not when it was asked for.** A
-  reply carrying the moment Enter was pressed is still stamped after the stroke
-  the hand drew while it waited, so it forms its own act on top: one undo takes
-  back the reply and leaves the stroke.
+**One module knows a boolean library exists.** If it were ripped out, `cut`,
+`boss` and `mirror` would still stand in the tree as the intent they are —
+because the tree is the source and the mesh is derived. That is §10's second risk
+(*CSG is fragile on messy input*) given exactly one address.
 
-The act table at the bottom of `createLog` is the only place a boundary is
-declared — the index of each verb's `at`, stamped once and then threaded by the
-verb itself.
+Every call comes back `{ ok: true, geometry }` or `{ ok: false, error }`, and on
+a failure the body **stays exactly as it was** (`deriveTree` keeps the geometry
+of the step the failed one acts `on`), the solid is **marked broken** with the
+library's own words, and the status line says it once, where it happened.
 
-**Older logs.** Every log this shard has ever written carries an `at` on every
-event and threads a single one through each act, so an older log groups
-correctly under this rule with nothing to migrate — it undoes as it did, and in
-the two cases above, better. The old walk is kept as `undoByWalking` for the one
-log the rule cannot read: one whose events carry no usable time at all, from
-somewhere that is not this shard. That log undoes exactly as it always did.
+Three things keep the failure rate down, each found by looking at a cut that came
+out wrong:
 
-`src/act.test.ts` pins it: the review's own regression at one and sixteen
-profiles, human ink and names untouched, a late reply, two proposals on two
-solids, a JSON round trip undoing identically, two acts in one millisecond, the
-old walk on a log with no times, and a check that every verb in the table really
-does stamp one time of its own.
-
-## The CSG seam, and what it does when it fails
-
-**One module knows a boolean library exists: `src/csg.ts`.** It exposes
-`subtract(a, b)` and `union(a, b)` on `THREE.BufferGeometry`, and behind it is
-`three-bvh-csg` 0.0.18 with its peer `three-mesh-bvh` 0.9.15, both pinned.
-Nothing else in the shard imports either; swapping the library is an edit to
-that one file, and if it were ripped out altogether, `cut`, `boss` and `mirror`
-would still stand in the tree as the intent they are — because the tree is the
-source and the mesh is derived (invariant 4). That is §10's second risk
-answered: *CSG is fragile on messy input*, so the fragility has exactly one
-address.
-
-**The seam never throws.** A boolean on a hand-drawn profile can fail — a
-self-crossing outline, a degenerate tool, an assertion deep in a triangle
-splitter — and a derivation that threw would take the whole board down while
-the log was perfectly fine. So every call comes back `{ ok: true, geometry }`
-or `{ ok: false, error }`, and on a failure:
-
-- **the body stays exactly as it was.** `deriveTree` keeps the geometry of the
-  step the failed one acts `on`, so the solid renders as its previous version
-  rather than vanishing;
-- **the solid is marked broken**, and the panel's *solid* row says so in the
-  library's own words, under a line saying that the tree is still the truth of
-  the thing;
-- **the status line says it once**, where it happened.
-
-Three things keep the failure rate down, and each was found by looking at a
-cut that came out wrong:
-
-- **No face of a tool is ever coplanar with a face of the body.** A cut's
-  prism starts a hair *above* the face and a THROUGH cut runs a hair *past* the
-  far side; a boss's prism sinks a hair *into* the body. The hair is
-  `TOOL_OVERLAP`, a ratio of the feature's own size. Without the second one the
-  library returned `ok` and left the prism standing in its own hole.
-- **Inputs are normalised before they are handed over** — non-indexed,
-  position + normal + uv and nothing else, no groups — so a whole class of
+- **No face of a tool is ever coplanar with a face of the body.** A cut's prism
+  starts a hair *above* the face and a THROUGH cut runs a hair *past* the far
+  side; a boss's prism sinks a hair *into* the body. The hair is `TOOL_OVERLAP`,
+  a ratio of the feature's own size. Without the second one the library returned
+  `ok` and left the prism standing in its own hole.
+- **Inputs are normalised before they are handed over** — non-indexed, position
+  + normal + uv and nothing else, no groups — so a whole class of
   attribute-mismatch assertion becomes arithmetic that cannot fail.
 - **A `dup`'s copy is merged, not unioned.** It stands beside the body by the
-  body's own width, so the two are disjoint by construction; asking a boolean
-  to weld two shapes that do not touch is work that can only fail.
+  body's own width, so the two are disjoint by construction; asking a boolean to
+  weld two shapes that do not touch is work that can only fail.
 
-In every browser run of the e2e and by hand — cut, boss, mirror, a mirror of a
-mirror (which is a union of a body with itself, the nastiest case there is) —
-the seam has not failed yet. The failure path is covered by `csg.test.ts` and
+In every browser run and by hand — cut, boss, mirror, a mirror of a mirror
+(which is a union of a body with itself, the nastiest case there is) — the seam
+has not failed. The failure path is covered by `csg.test.ts` and
 `geometry.test.ts` instead, which is the honest way to test a path you cannot
 provoke.
 
-## The diff is the brief
+### A prism is built on the shape, not on the sampling rate
 
-A solid claims to be what was drawn. **P4 checks the claim**, and that is the
-whole package: `validateRegions` (`metamedium-core/src/parse/scaffold.ts`)
-generalised from *"every region id the layout named appears once in the code"*
-to *"every square unit the drawing asked for is in the body"* — the promise that
-the thing matches the drawing, checked rather than assumed. Five parts, in the
-order they run:
+A hand leaves a nine-corner outline as a hundred and twenty-seven samples, and
+`ExtrudeGeometry` then builds a hundred and twenty-seven walls where nine will
+do. The boolean has to split every one of them against every face of the next
+prism; on the castle's three views it reached the BVH's own depth limit — *"Max
+depth of 40 reached"*, a library saying it has been handed a shape made of noise
+— and the e2e took **136 seconds**. The outline a SOLID is built from is
+simplified at `PROFILE_SIMPLIFY` of the mark's own size (the fraction
+`getFingerprint` finds corners at); the ink is untouched, the shape is unchanged,
+and the same run takes **8 seconds**.
+
+### The diff is the brief
+
+A solid claims to be what was drawn, and P4 checks the claim:
+`validateRegions` generalised from *every region id the layout named appears once
+in the code* to *every square unit the drawing asked for is in the body*.
 
 - **A profile is a profile OF something.** A closed stroke on a chosen or world
-  plane still plays `profile` (row 2) — but if its outline overlaps a solid's
-  silhouette on that plane it is *that solid's* profile, not the start of a new
-  one, and the reading says so: *the side profile of box: its outline and that
-  solid's silhouette share 91% of their material on this plane*. The overlap is
-  the IoU over a floor **or** one containing the other, because a profile drawn
-  to correct a solid is usually bigger or smaller than it and that is exactly
-  when the IoU is low. Nothing waits for an extent beside such a mark, and
-  `makeableFrom` will not grow one: a box inside the body it was correcting is
-  the one thing the row must never produce.
-- **The comparison is orthographic, along the plane's own normal.** So how far
-  the plane has been slid along that normal does not enter into it: choose the
-  width tile, slide it out beside the box or leave it at the origin, and the
-  side view is the same side view. That fact is a test, not a remark.
-- **The silhouette is rendered and then traced.** Flat white on black through an
-  orthographic camera into a few hundred pixels across the solid's own extent,
-  the pixels read back as a mask, and the mask's **boundary** handed to core's
-  `trace`. The boundary and not the blob: core's tracer thins what it is given
-  down to a centreline, so a filled rectangle comes back as its medial axis — a
-  spine, not an outline. Found by handing it the silhouette straight and getting
-  a cross.
+  plane still plays `profile` — but if its outline overlaps a solid's silhouette
+  on that plane it is *that solid's* profile, not the start of a new one, and the
+  reading says so. The overlap is the IoU over a floor **or** one containing the
+  other, because a profile drawn to correct a solid is usually bigger or smaller
+  than it and that is exactly when the IoU is low. Nothing waits for an extent
+  beside such a mark, and `makeableFrom` will not grow one.
+- **The comparison is orthographic, along the plane's own normal**, so how far
+  the plane has been slid along that normal does not enter into it. That fact is
+  a test, not a remark.
+- **The silhouette is rendered and then traced** — and the mask's **boundary**,
+  not the blob: core's tracer thins what it is given down to a centreline, so a
+  filled rectangle comes back as its medial axis. Found by handing it the
+  silhouette straight and getting a cross.
 - **The diff is masks.** Both outlines rasterised at one resolution over what
   they jointly cover, so a pixel means the same thing on both sides:
   `missing = ink & !silhouette`, `extra = silhouette & !ink`. Connected islands
-  become **regions** with an area in plane units², a place in the drawing (*at
-  the right*, *at the top left*) and an outline to build a prism on. Anything
-  under `NOISE_FRACTION` of the drawing's own area is a speck where the two
-  edges disagree, and the sentence says how many were dropped rather than hiding
-  them.
+  become regions with an area in plane units², a place in the drawing and an
+  outline to build a prism on. Anything under `NOISE_FRACTION` of the drawing's
+  own area is a speck where the two edges disagree, and the sentence says how
+  many were dropped rather than hiding them.
 - **Tier 1 resolves it.** *Add it* runs every missing region right through the
-  body along the plane's normal and unions it; *Take it off* cuts every extra
-  one out. Both are one `match` step, both instant, both a version with one undo
-  — and the profile's ink is deliberately **not** taken into the solid the way a
-  feature's is, because a profile is a standing claim about the shape rather
-  than something the act used up. That is what lets the row re-read afterwards
-  and say *matches 99% · missing none · extra none*.
+  body along the plane's normal and unions it; *Take it off* cuts every extra one
+  out. One `match` step, instant, a version with one undo — and the profile's ink
+  is deliberately **not** taken into the solid the way a feature's is, because a
+  profile is a standing claim about the shape rather than something the act used
+  up. That is what lets the row re-read afterwards.
 
-### The `match` step holds nothing derived
+**The `match` step holds nothing derived.** It carries which profile, which way
+(`add` / `remove`) and which plane — no region, no area, no outline, no span.
+Everything else is worked out again every time the tree is walked. A region
+cached in the step would be a second source of truth that goes stale the moment
+the ink is flipped, redrawn or undone, and a replayed log would then stand up a
+solid nobody drew. The cost is that `deriveTree` cannot be a function of the tree
+alone, so it takes a `DeriveContext`; both halves are injectable, and
+`match.test.ts` walks the tree with a silhouette computed by arithmetic and no
+renderer anywhere. One consequence: a tree with a `match` in it signs the **ink
+it references** as well, or ink redrawn under a match would leave the old body
+standing and nothing would say why.
 
-This is invariant 4 taken at its word, and it is the design decision of the
-package. A `match` step carries **which profile, which way (`add` / `remove`),
-and which plane** — and no region, no area, no outline, no span. Everything else
-is worked out again every time the tree is walked: the ink comes back out of the
-log, the body-so-far is re-rendered flat on the plane, and the diff is run
-again. A region cached in the step would be a second source of truth that goes
-stale the moment the ink is flipped, redrawn or undone, and a replayed log would
-then stand up a solid nobody drew.
+**A tool may only be grown where growing it cannot change the answer.** A missing
+region abuts the body exactly — it is *defined* as what the body is not — so a
+prism on its raw boundary has a face coplanar with a face of the body. The
+outline is grown by `REGION_DILATE` pixels; grown in *every* direction, as the
+first version did, it overstepped the hand's own outline and *Add it* left a rim
+the drawing had not asked for — **the diff caught the diff's own tool**. A
+missing region may now grow only into the silhouette and an extra region only
+away from the ink. The prism's overlap **along** the normal is a different number
+for a different reason: `MATCH_OVERLAP` is a five-hundredth of the body's own
+span rather than `TOOL_OVERLAP`'s fiftieth of a feature's, because a fiftieth of
+a whole box is four per cent of its width. Found by asserting the bounding box
+after an add and getting −7.08 where −7 was drawn.
 
-The cost is that `deriveTree` cannot be a function of the tree alone, so it
-takes a **`DeriveContext`** — `inkOf(strokeId)` from the log and
-`silhouetteOf(geometry, plane)` from the scene. Both are seams, and both are
-injectable: `match.test.ts` walks the tree with a silhouette computed by
-arithmetic and no renderer anywhere, which is also how the round-trip is pinned
-(the whole log replayed into a fresh session derives the same body). A step
-whose ink is no longer on the board marks the solid **broken** with that reason
-and leaves the body exactly as it was — the same rule the CSG seam keeps.
-
-One consequence worth knowing: a solid's mesh is cached on its tree's signature,
-and a tree with a `match` in it therefore signs the **ink it references** as
-well. Without that, ink redrawn under a match would leave the old body standing
-and nothing would say why.
-
-### A tool may only be grown where growing it cannot change the answer
-
-A missing region abuts the body exactly — it is *defined* as what the body is
-not — so a prism built on its raw boundary has a face coplanar with a face of
-the body, which is the classic way to make a boolean produce a hole with a skin
-over it (`TOOL_OVERLAP`, learned once already in P3). So the region's outline is
-grown by `REGION_DILATE` pixels before the prism is built.
-
-Grown in **every** direction, as the first version did, it oversteps the hand's
-own outline: *Add it* left a rim of material the drawing had not asked for, and
-the row that was supposed to read *nothing missing, nothing extra* came back
-*extra 1 region (0.15 u²) at the right*. **The diff caught the diff's own tool**,
-which is at least the machinery working. A missing region may now grow only into
-the silhouette and an extra region only away from the ink — into the places
-where the growth cannot change what the region means. What is left after *Add
-it* is a few half-pixel specks along the seam, under the noise floor, counted
-and said out loud.
-
-The prism's overlap **along** the normal is a different number and for a
-different reason: `MATCH_OVERLAP` is a five-hundredth of the body's own span
-rather than `TOOL_OVERLAP`'s fiftieth of a feature's, because a fiftieth of a
-whole box is four per cent of its width — a bump visibly wider than the thing it
-is on. Found by asserting the bounding box after an add and getting −7.08 where
-−7 was drawn.
-
-## The massing: the drawing is the extent, before it has a name
+### The massing, the hull, and the volume its claims define
 
 Two or three profiles on different world planes whose projections overlap **are
-a solid already**. That is the oldest way of drawing a thing in space — plan,
-elevation, section — and the shard stands it up the moment the second one
-lands: each profile grown through the span of the *others* along its own
-normal, and the prisms intersected (`intersect`, the CSG seam's third verb).
-One `massing` step, in the engine's name, tier 1, with no name and no model.
+a solid already** — plan, elevation, section, the oldest way of drawing a thing
+in space — and the shard stands it up the moment the second lands: each profile
+grown through the span of the *others* along its own normal, and the prisms
+intersected. One `massing` step, in the engine's name, tier 1.
 
-Three consequences, each deliberate:
-
-- **A massing GROWS while it is still only a massing.** The third elevation has
-  to go *into* it rather than beside it, because each prism runs through the
-  span of the others and a new view changes that span. So `growable` re-derives
-  the whole step as a new version. The moment anything has been BUILT on the
-  massing, another view is a standing claim about the shape and the diff (P4)
-  is what it affords. One rule, one line, and the board never has to guess
-  which of the two a mark meant.
-- **Row 2's *nothing inside it* clause had to go.** It refused both marks of a
-  nest, and it threw out the commonest plan there is: a castle's footprint with
-  its turrets' footprints inside it. §2.3's clause is about a FACE — "only a
-  closed shape inside a face is a feature", which is row 3 and a disjoint
-  predicate, since a plane has one source — so a nest is now **reported** in
-  the reasoning ("with 2 profiles inside it … a massing takes the union of a
-  plane's profiles") rather than refused. `form.test.ts` pins the new reading;
-  `match.test.ts` had to change too, because two profiles of one solid can now
-  both stand and *Add it* is about the newest that still has something to say.
-- **A prism is built on the shape, not on the sampling rate.** A hand leaves a
-  nine-corner outline as a hundred and twenty-seven samples, and
-  `ExtrudeGeometry` then builds a hundred and twenty-seven walls where nine
-  will do. The boolean has to split every one of them against every face of the
-  next prism; on the castle's three views it reached the BVH's own depth limit
-  — *"Max depth of 40 reached"*, a library saying it has been handed a shape
-  made of noise — and the e2e took **136 seconds**. The outline a SOLID is
-  built from is now simplified at `PROFILE_SIMPLIFY` of the mark's own size
-  (the fraction `getFingerprint` finds corners at); the ink is untouched, the
-  shape is unchanged, and the same run takes **8 seconds**.
-
-## G0: the board leaves the tab, and a brief always answers
-
-Three faults from John's first real use (`SHARD-3D-PUSH-2.md` §0), and the
-three things that answer them.
-
-### The board as its log, out and back in
-
-**The format is the canvas's, unchanged**: `encodeLog` of the session's own
-events, one JSON event per line (`metamedium-core/src/store/seam.ts`). That is
-what `.metamedium/logs/*.log` holds, what the canvas's export pane writes as
-`canvas.jsonl`, and what `mergeLogs` reads — so a board exported from either
-surface is the same kind of thing and needs no converter. *Export…* in the bar
-downloads it as `shard-<date>.mm.log`; *Open…* picks one and replays it.
-
-**Opening is not undoable, and it says so first.** `session.load` replaces the
-whole event list and bumps the generation, so there is no act for undo to walk
-back to. The honest thing is a confirm on a board holding work, and none on an
-empty one — not a fake undo that could not put the old board back.
-
-A board round-trips: `export.test.ts` pins that the marks, the solids, the
-names, the planes and the trees come back identical, which is invariant 4 doing
-its job — the export IS the log, and state is a pure function of it.
-
-### A fixture is a VIEW of a board, and an exported log supersedes it
-
-`fixtures/john-2026-09-16-massing.json` was captured from the live tab through
-`__shard.state()` **before there was an export**, so it holds each mark's plane,
-bounds and readings and **no stroke points at all**. `boardFromFixture` rebuilds
-a board from those bounds — circles and rectangles from the boxes they filled,
-on their own planes — and the status line calls it what it is: *a reconstruction,
-not a replay*. Four of his ten marks come back: the three profiles he drew on
-the tiles and one line on the foundation. The six view-plane strokes are dropped
-**and counted**, because a fixture records the camera pose a stroke was drawn
-from but not the (u, v) frame the shard built from it, and guessing at that
-frame would be calling the guess John's drawing.
-
-A fixture records no pen scale either, so a rebuilt mark is treated as though it
-had been drawn across `FIXTURE_PEN_PX` (200) screen pixels — stated once in
-`export.ts`, because every fixed threshold in the shape rung is about the hand.
-
-**What `?fixture=john-2026-09-16-massing` stands, measured.** The three profiles
-stand the massing, tier 1, exactly as they did on his screen — and the body
-comes out at **y ∈ [0.97, 3.09]**, floating, not on the floor: the height
-profile spans y 1.02–3.18 and the width profile y 1.05–3.01, and the massing
-occupies the volume they define. So on this board the massing's own vertical
-arithmetic is **not** what drags anything down. What does sit at floor level is
-the free-view ink: every stroke drawn with nothing chosen lands on the view
-plane through the **cursor**, and the cursor never left the world origin — which
-is what the fixture's own `reading` field says, and what G1's rule (*the view
-plane passes through the volume the hand is working in*) is about. G1 owns
-pinning that; this is the measurement it starts from.
-
-**What it is, is read from what is IN the file**, never from its name: a dev
-server answers a path it does not have with the page itself, so probing
-`fixtures/x.mm.log` came back 200 with a document in it. One JSON object with
-`marks` in it is a captured view; a log is many objects, one per line, and never
-parses whole.
-
-### The transcript: what was sent, and what came back
-
-`src/exchange.ts`, and the panel's ***model*** section under
-*why / measurements*. One row per exchange — *glm-5.3-flash · the brief ·
-applied · 159 ms* — opening on the outcome and its reason, the words the hand
-typed, what parsed (counted, never the reply's own claim), what was dropped and
-why, and then **the brief as sent** and **the reply as received**, each verbatim
-in its own scrolling box. The reply is shown *before any repair*: what a model
-actually wrote is the evidence, and a repaired copy of it is the shard's account
-of what the model meant.
-
-Two rules it keeps:
-
-- **It is runtime, not the log.** What a reply DID is already in the log — the
-  version, the profiles it drew, the steps it named, each attributed and each
-  undoable — and a board replayed from its log must derive the same drawing
-  whether or not anyone ever saw the prompt. Putting the brief in the log would
-  also put a model's whole reply into every export, every merge and every other
-  hand's copy of the board. The last eight are kept (`KEEP`); §5 leaves the
-  number to John.
-- **A row a hand opened stays open.** The panel is rebuilt on every report —
-  every camera move, every hover — and a disclosure rebuilt is a disclosure
-  shut, so reading a reply on a live board was impossible until which row is
-  open was remembered across the rebuilds.
-
-**Every exit path of `runBrief` ends in a sentence AND a row**, the same
-sentence in both, including the two that never reach a model: no seat joined,
-and nothing on the board to fill. An attempt that leaves no trace is the fault
-this package exists to close.
-
-### A brief always answers, and the massing stands first
-
-The plan's own rule (§0, fault 2). A brief is no longer refused for want of a
-selection: `briefTarget()` says what Enter will fill, in the order a hand means
-things in — **what you pointed at**, then **the one solid standing** (a brief
-with nothing selected on a board holding one body is about that body; requiring
-a tap was a mode wearing a different hat), then **the drawing stood up first**,
-then **what is missing**.
-
-`log.standFor()` is the seam underneath it, and **the one function G1 widens**:
-today it is the massing — profiles on two or three of the named world planes —
-and G1 replaces it with the sketch hull without changing a caller, because what
-`runBrief` needs from it is the same either way. When nothing can stand it names
-what is **missing**, as the next mark to draw rather than as what the shard
-noticed: *nothing stands yet — a footprint on the foundation and a shape from
-the side would*; *… 1 outline on the foundation alone; a shape from another
-side, on another tile, would stand it*; *… the outlines on the foundation and
-height do not overlap where they are, so their views are of two different
-things*.
-
-The field says which of the three Enter will be **before it is pressed** —
-*↵ a brief → asks glm — the massing stands first*, or *— nothing stands to fill;
-it will say what is missing* — and it asks the same function `runBrief` acts on,
-so the line and the act cannot disagree.
-
-## The hull: every free stroke is a silhouette claim (push 2, G1)
-
-The massing wants the three world planes. John's first real drawing had none of
-them: a rough footprint on the floor, then towers as **⊓ from wherever he
-stood**. Every one of those ⊓ fell through the form table to `annotation`, so
-nothing stood, and a brief with nothing to fill went nowhere. The generalisation
-is the **visual hull**, which is what those marks always were.
-
-A stroke on a view plane was drawn looking along that plane's normal: it says
-*from here, the outline is this*. Two rules turn a sketch into claims
-(`src/form.ts`):
+John's first real drawing had none of those planes: a rough footprint on the
+floor, then towers as **⊓ from wherever he stood**. Every one fell through the
+form table to `annotation`, so nothing stood, and a brief with nothing to fill
+went nowhere. The generalisation is the **visual hull**, which is what those
+marks always were. Two rules turn a sketch into claims:
 
 - **An open stroke closes on the ground.** A ⊓ whose two feet reach the
   foundation's height — within `FEET_ON_GROUND` of the stroke's own size, and
   rising `ELEVATION_RISE` of it above the floor — is the silhouette of a thing
-  standing on the ground, and the ground is its fourth side. That is the new
-  role, **`elevation`**, row 8 of the table; the vocabulary grew by a release,
-  which is the only way §2.6 lets a closed rung grow. A ⊓ that **floats** stays
-  an `annotation` and the panel says why — *its feet do not reach the ground,
-  the higher one stands 0.20 u off it (18% of its own size, over 15%)* — which
-  is §5's open question, settled the way the plan proposed.
-- **A closed stroke is a silhouette when its prism meets the footprint's.** Row
-  2 reads it as a `profile` still, with *a claim from 34° · +24°* — which view
-  it was drawn from, in the same two numbers the pinned-view chips use. A loop
-  that meets nothing is not refused: it says so (*its prism misses stroke:1's
-  by 3.40 u — two drawings of two things*).
+  standing on the ground, and the ground is its fourth side. That is row 8,
+  `elevation`. A ⊓ that **floats** stays an `annotation` and the panel says why —
+  *its feet do not reach the ground, the higher one stands 0.20 u off it (18% of
+  its own size, over 15%)*.
+- **A closed stroke is a silhouette when its prism meets the footprint's.** Row 2
+  reads it as a `profile` still, with *a claim from 34° · +24°* — which view it
+  was drawn from, in the same two numbers the pinned-view chips use. A loop that
+  meets nothing is not refused: it says so (*its prism misses stroke:1's by
+  3.40 u — two drawings of two things*).
 
 **Whether two prisms meet is one axis, exactly.** Each prism is convex and
-unbounded along its own normal, so a plane that separates them must contain
-*both* normals — which leaves one candidate direction, `nA × nB`. Project both
-outlines onto it and the intervals either overlap or they do not (`prismsMeet`).
-No sampling, no solver, and two views from the same direction come back as *the
-same view*, which is not a claim about anything.
+unbounded along its own normal, so a plane separating them must contain *both*
+normals — which leaves one candidate direction, `nA × nB`. Project both outlines
+onto it and the intervals either overlap or they do not (`prismsMeet`). No
+sampling, no solver, and two views from the same direction come back as *the same
+view*, which is not a claim about anything.
 
-**The hull stands the moment the second claim lands** — a footprint and one
-elevation, or two elevations from different directions — in the engine's name,
-at tier 1, and each claim after that is a **new version of its one step**, so
-one undo takes back exactly the claim that was drawn (`log.hullable()`,
-`log.hull()`; `log.hull` is also the seam G0's `standFor` calls, so a brief
-typed at a sketch can stand the hull before it asks). Claims are capped at
-`MAX_CLAIMS` and the rest are said.
+**The hull stands the moment the second claim lands**, and each claim after that
+is a **new version of its one step**, so one undo takes back exactly the claim
+that was drawn. Claims are capped at `MAX_CLAIMS` and the rest are said.
 
 **And the hull stands in the volume its claims define.** Each claim's prism runs
 through the span of the **others'** world points along its own normal, never its
@@ -784,48 +501,56 @@ vertical span is exactly how the ground gets into a body no claim's feet reach.
 The footprint runs from the ground up to the tallest claim; everything else is
 bounded by what the other claims say. So two loops drawn a unit above the floor
 make a hull a unit above the floor, and the ground bounds a hull only where a
-claim's feet reach it. (Measured, not assumed: `hull.test.ts` rebuilds John's
-own three profiles from the exported fixture and derives the massing headless.
-It came out at y 0.97–3.09 — **the massing was never in the floor**; the free
-*ink* was, and that is the view-anchor rule above.)
+claim's feet reach it. Measured rather than assumed: `hull.test.ts` rebuilds
+John's own three profiles from his exported board and derives the massing
+headless at **y 0.97–3.09** — the massing was never in the floor. The free *ink*
+was, and that is the view-anchor rule below.
 
 **`massing` and `hull` are two doors on one derivation.** Both ops stay in the
 vocabulary — every tree ever written still reads, and DATA-1's validator has a
-row for each — and `hullBody` in `solid.ts` derives both. The massing is the
-hull of three axis claims; `hullableFrom` returns null for a drawing the massing
-path already takes, so one drawing never stands twice. A hull bounds a model's
-proposal exactly as a massing does: §6's extent invariant names whichever of the
-two stood the volume up.
+row for each — and `hullBody` derives both. `hullableFrom` returns null for a
+drawing the massing path already takes, so one drawing never stands twice. A hull
+bounds a model's proposal exactly as a massing does.
 
-**One standpoint is one silhouette** (push 2, G2, found standing John's own
-castle). A hand who walks to one side and draws two towers has drawn *one*
-outline with two pieces in it, not two claims to intersect — and intersecting
-them gives the empty set, which is exactly what his board came to (*"three-bvh-csg
-returned an empty intersect"*). So `hullBody` gathers claims that share a plane
-**direction** into one silhouette before anything is intersected: within it,
-outlines that lie APART are unioned (two towers seen from the path) and outlines
-that OVERLAP are intersected (a narrower ⊓ drawn over the first is a correction,
-and a correction tightens). Across directions nothing changed — silhouettes are
-intersected, which is the visual hull as it has always been defined — and the
-massing is untouched, because its three profiles are on three planes and each is
-a silhouette of one.
+**One standpoint is one silhouette**, found standing John's own castle. A hand who
+walks to one side and draws two towers has drawn *one* outline with two pieces in
+it, not two claims to intersect — and intersecting them gives the empty set,
+which is exactly what his board came to (*"three-bvh-csg returned an empty
+intersect"*). So `hullBody` gathers claims that share a plane **direction** into
+one silhouette before anything is intersected: within it, outlines that lie APART
+are unioned (two towers seen from the path) and outlines that OVERLAP are
+intersected (a narrower ⊓ over the first is a correction, and a correction
+tightens). Across directions nothing changed — silhouettes are intersected, which
+is the visual hull as it has always been defined — and the massing is untouched.
 
-## The parts of a hull, said (push 2, G2)
+**A massing GROWS while it is still only a massing.** The third elevation goes
+*into* it rather than beside it, because each prism runs through the span of the
+others and a new view changes that span; `growable` re-derives the whole step as
+a new version. The moment anything has been BUILT on the massing, another view is
+a standing claim about the shape and the diff is what it affords.
+
+**Row 2's *nothing inside it* clause had to go.** It refused both marks of a nest
+and threw out the commonest plan there is: a castle's footprint with its turrets'
+footprints inside it. §2.3's clause is about a FACE — "only a closed shape inside
+a face is a feature", which is row 3 and a disjoint predicate, since a plane has
+one source — so a nest is now **reported** in the reasoning rather than refused.
+
+### The parts of a hull, said
 
 A hull is one body, and a hand that drew a castle did not draw one thing. §2.6's
-rule is that *names bind to steps*, and a model can only name what the engine can
-point at — so before a brief can ask for a name per part, the engine has to have
-parts, with ids, numbers and a sentence each. `src/parts.ts`.
+rule is that names bind to steps, and a model can only name what the engine can
+point at.
 
 **A part claim is a RUN.** An elevation is an open stroke closed on the ground,
 and where it touches the ground it finishes one thing and starts the next: a ⊓
 touches twice and is one run; a stroke that touches three times is two runs (a
-hand draws two towers without lifting the pen); a closed silhouette is one run,
-by its own ink. A part is then **the hull's material inside that run's prism**,
-through the CSG seam, which never throws — a run that claims nothing, or whose
-boolean does not come off, is dropped with its reason and the rest still stand.
-Cut once per version and cached on the signature the build was made from, so a
-new claim, an undo or a load invalidates it without anything remembering to.
+hand draws two towers without lifting the pen); a closed silhouette is one run by
+its own ink. `ground` is read **before** `closed`, because an elevation is held
+closed *on the ground*. A part is then **the hull's material inside that run's
+prism**, through the CSG seam — a run that claims nothing, or whose boolean does
+not come off, is dropped with its reason and the rest still stand. Cut once per
+version and cached on the signature the build was made from, so a new claim, an
+undo or a load invalidates it without anything remembering to.
 
 Two rules keep the count honest:
 
@@ -836,40 +561,40 @@ Two rules keep the count honest:
   so: an exact intersection volume is a third boolean per pair, and the question
   is only *are these the same thing*.
 - **A part's place is said in the footprint's own frame.** The frame's `u` is the
-  footprint's longest edge — **the long side of the tightest box**, not the
-  direction of furthest reach, which for any rectangle is its diagonal and turned
-  a 6 × 4 plan by 34°. The plan is cut in thirds each way and the part's footprint
-  centre lands in one of nine: *at the north-west corner*, *along the east edge*,
-  *in the middle* — or it covers most of both axes and is *the whole footprint*.
-  **North is −Z**, east is +X, and every sentence that uses it says so, because a
-  compass on a drawing is a convention and not a measurement.
+  **long side of the tightest box**, not the direction of furthest reach, which
+  for any rectangle is its diagonal and turned a 6 × 4 plan by 34°. The plan is
+  cut in thirds each way and the part's footprint centre lands in one of nine:
+  *at the north-west corner*, *along the east edge*, *in the middle* — or it
+  covers most of both axes and is *the whole footprint*. **North is −Z**, east is
+  +X, and every sentence that uses it says so, because a compass on a drawing is
+  a convention and not a measurement.
 
-Ids are `part:1 … part:n` per hull, in reading order: left to right along that
-longest edge. The sentence is the numbers and the words together —
+Ids are `part:1 … part:n` per hull, in reading order along that longest edge. The
+sentence reaches three places: the brief's parts section (in the engine's own ids,
+so a reply about *part 2* can be attached to part 2), the panel's `parts` row as
+one chip each (the sentence is the chip's reason; hovering cages the part in
+dashed teal, a **second** cage so that pointing at a part never reads as the
+selection moving), and `__shard.parts(solidId)`.
 
-> part 2 — 1.2 × 1.0 u on the footprint, 3.1 u tall, at the north-west corner;
-> from stroke:4 (drawn from 34° · +24°)
+**Ink over a part addresses that part.** A closed mark on a hull's face lying
+wholly within one part is a `feature` *of that part*, and the rung's own reason
+says so, so *Cut a hole* reads **take it out of part 2 of hull**. A mark that
+straddles two parts, or none, is left exactly as the rung read it: naming one
+would be choosing for the hand. A **scratch across a single part takes that
+part's claim out** rather than the hull off the board — one new version of the one
+hull step, so one undo puts the claim back — and with a part held the field's
+*Remove* means the same act and says `Remove part 2` before Enter. Two guards,
+both said rather than silent: a part **two views agree on** is not unsaid by
+dropping one of them, and a hull is never left with fewer than two claims.
 
-— and it reaches three places: the brief's `PARTS OF WHAT STANDS` section (in the
-engine's own ids, so a reply about *part 2* can be attached to part 2 — G3's
-door), the panel's `parts` row as one chip each (the sentence is the chip's
-reason; hovering cages the part on the board in a dashed teal, a second cage so
-that pointing at a part never reads as the selection moving), and
-`__shard.parts(solidId)`.
+**A held part is the subject of the panel** (G4). The field already scoped to it;
+the panel went on saying *hull*, so *why* about a turret answered about the
+castle. With a part taken up, *what* is the part's name and material with its
+whole sentence as the reason, and *from* is **cut from N claims of hull** —
+because a part is material, not a sub-tree of steps. *becomes*, the parts row and
+the evidence are unchanged, because they are about the body either way.
 
-**Ink over a part addresses that part.** A closed mark on a hull's face that lies
-wholly within one part is a `feature` *of that part*, and the form rung's own
-reason says so (`FormReading.part`), so *Cut a hole* reads **take it out of part 2
-of hull**. A mark that straddles two parts, or none, is left exactly as the rung
-read it: naming one would be choosing for the hand. A **scratch across a single
-part takes that part's claim out** rather than the hull off the board — one new
-version of the one hull step, so one undo puts the claim back and every other
-claim stays where it was (`log.dropPart`); with a part held, the field's *Remove*
-means the same act and says `Remove part 2` before Enter. Two guards, both said
-rather than silent: a part **two views agree on** is not unsaid by dropping one of
-them, and a hull is never left with fewer than two claims.
-
-### The honest limit: two parts, not three
+#### The honest limit: two parts, not three
 
 G2's done-criterion asks John's castle-sketch for *two towers and a wall, three
 parts*. It gives **two**, and the reason is in the drawing rather than in the
@@ -888,43 +613,56 @@ The alternative was built and measured before being rejected: bound each run by
 the **footprint** instead — *the thing stands here, to this plan*. It sounds right
 and it is wrong, because it invents the missing depth. John's tower came out a
 slab 2.8 u across a 6 × 4 plan, which is the engine making up a size nobody drew.
-So a part stays the hull's own material, the cage the panel draws is always
-around something standing, and the shortfall is written down here and pinned in
-`parts.test.ts` §5 rather than worked around.
+So a part stays the hull's own material, the cage the panel draws is always around
+something standing, and the shortfall is pinned in `parts.test.ts` §5 rather than
+worked around.
 
 What would close it is a **second view of each mass** — which is what an
 architect's sketch actually contains, and what the two-view tower in
 `parts.test.ts` §3 has: two runs in, one part out, 0.7 × 0.6 u and 1.8 u tall.
-Whether the hull should instead become a *union of masses*, so that one ⊓ per
-thing is enough, is a question about what a hull MEANS, and belongs with G1/G3
-rather than here.
 
-## The brief a small model can answer (push 2, G3)
+### The brief, and what it will not say
 
-> `src/brief.ts` (`describeHull`, `partIdsOf`), `src/generator.ts`
-> (`PART_RULES`, the `parts` branch of `parseProposal`), `src/parts.ts`
-> (`bossOnPart` / `cutOnPart` / `mirrorOnPart`), `src/log.ts` (`applyParts`,
-> `nameParts`), `fixtures/exchanges/`.
+`describeSpace` is the `describeReading` of this shard, and the rule it exists to
+keep is the **region-id rule**: the model is told about things *in the ids the log
+uses for them* — stroke ids and step ids — so that what comes back can be attached
+to the very same things. A brief that said "the big rectangle at the left" would
+get back a reply about the big rectangle at the left, and nothing could be done
+with it.
 
-With a hull standing and cut into parts, there is nothing left for a model to
-invent: the drawing has said what the shape is, and what is missing is what the
-pieces **are**. So the brief takes a second shape and the reply a second
-contract, and both are decided by one function — `partIdsOf(scene)` — so the
-brief, the prompt, the parser and the landing can never each decide differently.
+It leads with **what stands**, and says the massing or hull is already standing
+and is the extent to stay inside: a model asked to fill a volume that exists
+writes into it; a model asked to invent one invents one. Then the planes and what
+lies on each, in that plane's own units, so a depth in the reply is in them too;
+then the diff if the board is reporting one; then **every name in play, in its
+step's own id**, with *do not invent a synonym for one* said out loud — this is
+what makes a regen reuse `turret` rather than reach for `tower`; then the library,
+so a model may answer `{"reuse": "turret"}` and write nothing at all; then, for a
+regen, exactly which steps or parts may change and that a reply touching any other
+is refused; then the words.
 
-### The brief has two shapes, and says which
+It ends with `HERE_IN_SPACE`, v10 F13's rule rewritten for space. The half that
+earns its place is the refusal: *no meshes, no vertices, no triangles, no code, no
+files, no libraries, no textures, lights or cameras* — and **you do not write
+geometry**. That is the extent invariant said to the model in its own prompt
+rather than only enforced on the way back in.
 
-A hull with parts gets the short brief: what stands, the footprint, the extent,
-the parts with their numbers and their words, then the names, the library and
-the human's words. It does **not** walk the planes mark by mark. That is not
-economy for its own sake — every line of a plane-by-plane listing is a line
-inviting a small model to restate the drawing instead of naming it, and the
-drawing is not in question here. John's castle comes to well under **1200
-characters** before `HERE_IN_SPACE` (`brief.test.ts` pins it). With no hull
-standing — P5's path, three profiles on the world planes — the long brief is
-unchanged, and so is its contract.
+**The brief has two shapes, and one function says which.** A hull with parts gets
+the short brief (`describeHull`): what stands, the footprint, the extent, the
+parts with their numbers and their words, then the names, the library and the
+words. It does **not** walk the planes mark by mark — not economy for its own
+sake, but because every line of a plane-by-plane listing invites a small model to
+restate the drawing instead of naming it, and the drawing is not in question here.
+John's castle comes to **1048 characters** before `HERE_ON_A_HULL`, which forbids
+the profiles the other paragraph offers. `partIdsOf(scene)` is the one test for
+which shape, and so for which contract, so the brief, the prompt, the parser and
+the landing can never each decide differently.
 
-### The reply contract
+### The two reply contracts
+
+With no hull standing — three profiles on the world planes — the reply is steps
+and profiles, and the model may add profiles of its own. With a hull standing and
+cut into parts there is nothing left to invent:
 
 ```json
 {
@@ -942,48 +680,73 @@ unchanged, and so is its contract.
 }
 ```
 
-`steps` is optional and `reuse` answers instead of both. Four rules, each one
-checked and each one a reason:
+`steps` is optional and `reuse` answers instead of both. Four rules, each checked
+and each a reason:
 
-- **Never raw geometry, and never a profile it invents.** There is no
-  `profiles` list on this path at all. A small op names a part and gives a
-  number; the geometry comes from the part the engine already cut — its own
-  footprint, its own top, its own height — so `boss` raises exactly that part,
-  `cut` sinks a hole through that part's own top face in that face's own units,
-  and `mirror` reflects that part's own prism rather than the whole body. They
-  come out as ordinary `boss` / `cut` steps carrying `part`, so the derivation,
-  the clip, the diff, undo and the export take them without knowing parts exist.
-- **A part id the hull does not have is dropped and counted**, with the ids it
-  does have said in the same sentence. The region-id rule, checked on the way
-  back in: `part:9` on a two-part hull is about nothing, and keeping it would
-  put a name on whichever body happened to be ninth next time.
-- **A material is a colour word from the closed list**, else dropped with its
-  reason and the rest of the entry kept. Both `"material":"green"` and
-  `"material":{"colour":"green"}` are read, because models write both; neither
-  is guessed at.
-- **What it cannot name, it leaves.** An unnamed part keeps the engine's
-  `part:n`; a reply that names nothing and binds one material still lands the
-  material; only a reply that came to *nothing at all* is unusable, and that is
-  the one case where the board is left exactly as it was.
+- **Never raw geometry, and never a profile it invents.** There is no `profiles`
+  list on this path at all. A small op names a part and gives a number; the
+  geometry comes from the part the engine already cut — its own footprint, its own
+  top, its own height — so `boss` raises exactly that part, `cut` sinks a hole
+  through that part's own top face in that face's own units, and `mirror` reflects
+  that part's own prism rather than the whole body. They come out as ordinary
+  `boss` / `cut` steps carrying `part`, so the derivation, the clip, the diff, undo
+  and the export take them without knowing parts exist.
+- **A part id the hull does not have is dropped and counted**, with the ids it does
+  have said in the same sentence. `part:9` on a two-part hull is about nothing, and
+  keeping it would put a name on whichever body happened to be ninth next time.
+- **A material is a colour word from the closed list**, else dropped with its reason
+  and the rest of the entry kept. Both `"material":"green"` and
+  `"material":{"colour":"green"}` are read, because models write both; neither is
+  guessed at.
+- **What it cannot name, it leaves.** An unnamed part keeps the engine's `part:n`; a
+  reply that names nothing and binds one material still lands the material; only a
+  reply that came to *nothing at all* is unusable, and that is the one case where the
+  board is left exactly as it was.
 
-A name is taken **as written**. The brief lists the hand's own words and asks
-that names come from them, and that is where the pressure belongs — the engine
-never decides what a thing is called (§2.6), and a model's word is a claim,
-held and attributed, that the hand takes or leaves.
+A name is taken **as written**. The brief lists the hand's own words and asks that
+names come from them, and that is where the pressure belongs — the engine never
+decides what a thing is called, and a model's word is a claim, held and attributed.
+
+**Strict JSON first, always.** The two repairs that follow are core's own
+(`parseFill`) for core's own two reasons — a JavaScript template literal where a
+JSON string was asked for, and a trailing comma — and they run only on text that
+has already failed. Nothing infers intent; a reply that still will not read is
+reported as unusable and the log is untouched. Everything outside the closed
+vocabulary is **dropped AND COUNTED**, never coerced into something near it: a
+proposal quietly reduced is a proposal nobody agreed to.
+
+**The profiles a model adds are drawn into the log** through the same `addStroke` a
+hand's ink goes through, attributed to it and declared content — the canvas's
+`agent.draw` rule. They get the same fingerprint, readings, clean form and eraser,
+and the model's steps reference them by the ids they were given. Two rules were
+learned by running one: **ink a model drew is the tree's provenance**, so it is
+taken into the solid the way a feature's ink is (without that, two circles
+qwen3:8b had drawn on the foundation read as the castle's own *top profile* and the
+panel dutifully reported eleven square units of material the drawing "did not ask
+for"); and **a profile no step uses is not drawn at all** (the same model's first
+reply re-stated the three views as rectangles it never mentioned again — litter the
+form rung reads as three more standing claims, each costing a render and a
+rasterisation on every report).
+
+**Then the whole thing is CLIPPED to the massing or hull**, as a final step in the
+engine's name: the extent invariant taken literally. The clip holds no geometry —
+only `on` and `bound`, the step whose BODY does the clipping, re-derived every time
+the tree is walked, exactly as `match` does. A model that asks for a forty-unit
+turret on a three-unit drawing gets a three-unit turret.
 
 ### Where a part's name lives, and why it is not the part id
 
 **On the hull step, keyed by the claims the part was cut from** — `HullStep.said`,
 a list of `PartSaying { claims, said, name?, material?, by, reasoning }`.
 
-A part is derived and its id is a **reading order**: `part:1 … part:n`, left to
-right across the footprint. Drop one claim and every part after it renumbers. A
-name keyed on `part:2` would then slide silently onto a different body, which is
-the exact failure the region-id rule exists to prevent — so the id a reply used
-is resolved, at the moment the reply lands, into the thing behind it that does
-not move: the claim strokes, which are in the log. `partsOfHull` re-attaches
-each saying to whichever part those claims cut, and the id the reply used is
-kept beside it for the transcript and the panel.
+A part is derived and its id is a **reading order**. Drop one claim and every part
+after it renumbers; a name keyed on `part:2` would then slide silently onto a
+different body, which is the exact failure the region-id rule exists to prevent. So
+the id a reply used is resolved, at the moment the reply lands, into the thing behind
+it that does not move: the claim strokes, which are in the log. `partsOfHull`
+re-attaches each saying by containment (exact first, then the part whose claims
+contain it — a small op regrows the body and a part can come back merged), and the id
+the reply used is kept beside it for the transcript and the panel.
 
 It is one place, and everything reads it:
 
@@ -993,1148 +756,320 @@ It is one place, and everything reads it:
 | the brief | the part's sentence leads with the name — *part 1 “turret”, green — 1.2 × 1.0 u …* |
 | `namesInPlay()` | one entry per named part, carrying `partId` beside the hull's `stepId` |
 | the verb table | `NameRef.partIds`, so *the towers* resolves to parts and not to the whole tree |
-| `take()` | a named part is held as a definition **based on the whole** — the hull of its own claims (with the footprint that bounds them), because a part is material and not a sub-tree of steps |
+| `take()` | a named part is held as a definition **based on the whole** — the hull of its own claims, with the footprint that bounds them, because a part is material and not a sub-tree of steps |
 | the render | the colour paints the part's own body, through `Derived.parts`' own path, via `SolidOptions.painted` |
 
-### A regen over a part
+### A regen over a name
 
-*Make the towers taller* resolves the name to **parts**, not steps, and asks
-again with only those parts mutable: the brief gains an `ONLY THESE PARTS MAY
-CHANGE` section, the reply is checked against it and anything about another part
-is dropped saying so, and the steps the last reply left on those parts (found by
-their own `part` field) come off before the new ones go on. Every other part —
-and every other step — keeps its own id. *The towers are red* and *remove the
-tower* stay tier 1 and never reach a model: the first is a saying, the second is
-`dropPart`, one version of the one hull step each, one undo apiece.
+*Make the towers taller* resolves the name to **parts** (or to steps, on a tree
+without parts) and asks again with only those mutable: the brief gains `ONLY THESE
+PARTS MAY CHANGE`, the reply is checked against it and anything about another part is
+dropped saying so, and the steps the last reply left on those parts (found by their
+own `part` field) come off before the new ones go on. Every other part and every
+other step keeps its own id. *The towers are red* and *remove the tower* stay tier 1
+and never reach a model: the first is a saying, the second is `dropPart`.
 
-### The transcripts are fixtures
+**A step id is recycled when the step that held it is dropped.** `nextStepId` fills
+the lowest free number, so a regen that replaces the only named step hands the
+replacement the same id. Nothing points at a step id across a version, so nothing is
+wrong today — but the id is not a name, and a test that asserted "the id changed" was
+asserting the tree's arithmetic rather than the act. What the e2e asserts is that the
+STEP changed and that no other step did.
 
-`fixtures/exchanges/` holds the brief as sent and the reply as received for each
-model that has answered on a board — the stub, an **ideal** reply written by
-hand as the contract's own worked example, and a real local model. They are read
-by `generator.test.ts`, so the contract is pinned against text a model actually
-produced rather than against text this repo wrote for itself.
-`fixtures/exchanges/README.md` says how to add one.
+### The verb table, and what it hands back
 
-## The brief, and what it will not say
+`behave/words.ts`'s pattern, ported: a table of the ways each verb is said, longest
+phrase first, and **what it cannot read is returned, not dropped**. The three verbs
+are `regen`, `drop` and `paint`, and what separates them is not which word a phrase
+starts with — *make* says all three — but what else it carries: a colour word and
+something asking for it (*the tops are red*), a change word (*make the turrets
+taller*), or a way of saying remove (*remove the turret*). A noun resolves against the
+names in play, singular or plural, with core's own `singular`.
 
-`describeSpace` is the `describeReading` of this shard, and the rule it exists
-to keep is the **region-id rule**: the model is told about things *in the ids
-the log uses for them* — stroke ids and step ids — so that what comes back can
-be attached to the very same things. A brief that said "the big rectangle at
-the left" would get back a reply about the big rectangle at the left, and
-nothing could be done with it.
+Two of the three are **tier 1 and instant**: `drop` is a new version without those
+steps, with anything that stood on them re-pointed at what they stood on, so removing
+a turret does not take the castle with it; `paint` binds a colour word to those steps.
+Only `regen` asks a model, and its pill carries the dot.
 
-It leads with **what stands**, and says the massing is already standing and is
-the extent to stay inside. A model asked to fill a volume that exists writes
-into it; a model asked to invent one invents one. Then the planes and what lies
-on each, in that plane's own units, so a depth in the reply is in them too;
-then the diff if the board is reporting one; then **every name in play, in its
-step's own id**, with *do not invent a synonym for one* said out loud (§2.6
-rule 2 — this is what makes a regen reuse `turret` rather than reach for
-`tower`); then the library, so a model may answer `{"reuse": "turret"}` and
-write nothing at all; then, for a regen, exactly which steps may change and
-that a reply touching any other is refused; then the words.
+A phrase with a name in it that the table cannot place comes back whole, with its
+reason — *"turret" (2 steps) is a name this space knows, but nothing in "the turrets
+should feel more medieval" says what to do with it*. The field then offers to **ask a
+model what it means**, once, against the closed verb list and the names in play; the
+model is not asked what to do, only which of the verbs the shard already has the human
+meant, so the worst it can be wrong about is a word. The answer is held in the log as
+a `saying`, replayed with the session, and the table reads that phrase itself from
+then on. A phrase with NO name in it is not a phrase over names at all: it is a brief.
 
-It ends with `HERE_IN_SPACE`, v10 F13's rule rewritten for space. The half that
-earns its place is the refusal: *no meshes, no vertices, no triangles, no code,
-no files, no libraries, no textures, lights or cameras* — and **you do not
-write geometry**. That is invariant 5 said to the model in its own prompt
-rather than only enforced on the way back in.
+### A material is drawn where the word was said
 
-## The reply: dropped and counted, then clipped
+A boolean erases which material came from where: once a boss is unioned into a body
+there is no face on it that knows it was a turret's top. So a colour word on a step is
+drawn as **that step's own contributed volume**, standing in front of the body — which
+is exactly the volume the word was said about — rather than the body being split into
+coloured groups it cannot carry. `deriveTree` returns those volumes as `parts`; nothing
+about them is stored, and a step with no colour contributes none.
 
-Strict JSON first, always. The two repairs that follow are core's own
-(`parseFill`) for core's own two reasons — a JavaScript template literal where
-a JSON string was asked for, and a trailing comma — and they run only on text
-that has already failed. Nothing infers intent; a reply that still will not
-read is reported as unusable and the log is untouched.
+One thing this exposed, and it is the model's constraint rather than the shard's: **a
+named world plane passes through the origin**, so a reply could say *a circle on the
+foundation* and could not say *and it sits on top of the tower*. A cap asked for that
+way came back buried inside the castle. A proposed profile therefore carries `at` — the
+gizmo's own slide handle, said as a number — and the prompt shows it.
 
-Everything outside the closed vocabulary is **dropped AND COUNTED**, never
-coerced into something near it: a step whose `op` is not one of the five a
-model may propose (`extrude`, `revolve`, `cut`, `boss`, `mirror` — `massing`
-and `match` are the engine's own), a profile shaped like nothing the shape rung
-reads, a colour word the shard cannot paint, a step acting on one below it. A
-proposal quietly reduced is a proposal nobody agreed to, so the count is said.
+### Where a definition lives, and what it carries
 
-**The profiles a model adds are drawn into the log** through the same
-`addStroke` a hand's ink goes through, attributed to it and declared content —
-the canvas's `agent.draw` rule (`synthesize.ts`). They get the same
-fingerprint, the same readings, the same clean form and the same eraser, and
-the model's steps then reference them by the ids they were given. Two rules
-were learned by running one:
+**As a `definition` rep on the ROOT artifact, one per named sub-tree — not as an
+artifact of its own.** The plan asks for an artifact per named sub-tree and the engine
+cannot give one: `bless` needs marks that are still on the CONTENT plane, and a made
+solid's members are not. A rep goes in through `propose()`: it replays with the session,
+carries its own reasoning, undoes like everything else, and costs nothing but the
+ability to point at a definition with an id of its own.
 
-- **Ink a model drew is the tree's provenance**, so it is taken into the solid
-  the way a feature's ink is. Without that, two circles qwen3:8b had drawn on
-  the foundation read as the castle's own *top profile*, and the panel
-  dutifully reported eleven square units of material the drawing "did not ask
-  for". A mark a solid was made from is never a claim about it.
-- **A profile no step uses is not drawn at all.** The same model's first reply
-  re-stated the three views as rectangles it then never mentioned again. Ink a
-  model leaves behind that is part of nothing is not provenance, it is litter —
-  and litter the form rung reads as three more standing claims, each costing a
-  render and a rasterisation on every report.
+Taking a version is **one act**: the name and every definition go in as one `propose`,
+so one undo puts the board back to a version standing held. The name of the THING has
+two cases and both are the same rule — *the part never names the whole*. **A name the
+hand typed wins**: a solid already called *mug* with one step a model named `handle` is
+a mug with a handle, and reading only the steps took it as a *handle* (and, before that,
+refused *Take it* altogether because no step carried a name). Otherwise it is the
+**deepest** named step the root stands on, not the nearest: walking up from the base,
+`castle` is what the turret stands on and the turret is what the top stands on. Taking
+the nearest named one instead named the castle "top".
 
-**Then the whole thing is CLIPPED to the massing**, as a final step in the
-engine's name: §6's extent invariant, taken literally. The clip holds no
-geometry — only `on` and `bound`, the step whose BODY does the clipping, which
-is re-derived every time the tree is walked, exactly as `match` does. A model
-that asks for a forty-unit turret on a three-unit drawing gets a three-unit
-turret, and the row afterwards says how much of the drawing the body honours,
-per plane, measured rather than claimed.
+**The WHOLE is held too, under its own name.** P5 held only the parts, because only the
+parts were typed afterwards; P6's whole point is that the thing itself comes back when
+its own profile is drawn again. `taken` therefore means *the definitions are held*, not
+*it has a name* — reading the name rep disabled the very verb that holds the library.
 
-## Where a definition lives, and why
+**Each profile is the engine's OWN fingerprint of that stroke**, at the scale it was
+drawn at, plus the KIND of plane it lay on — and nothing else. Nothing here is a new
+measurement, so a replayed log derives the same numbers. Three decisions:
 
-**As a `definition` rep on the ROOT artifact, one per named sub-tree — not as
-an artifact of its own.**
-
-The plan asks for an artifact per named sub-tree, and the engine cannot give
-one: `bless` needs marks that are still on the CONTENT plane, and a made
-solid's members are not, because blessing took them off. That is the same core
-gap P3's `dup` ran into, and it is listed below. A rep goes into the log
-through `propose()`: it replays with the session, carries its own reasoning,
-undoes like everything else, and costs nothing but the ability to point at a
-definition with an id of its own. P6 matches definitions by their profiles, so
-that costs nothing yet; the day core grows a door to bless an artifact from
-data, a definition moves.
-
-Taking a version is **one act**: the name and every definition go in as one
-`propose`, so one undo puts the board back to a version standing held. The name
-of the THING has two cases, and both are the same rule — *the part never names
-the whole*. **A name the hand typed wins**: a solid already called *mug* with
-one step a model named `handle` is a mug with a handle, and reading only the
-steps took it as a *handle* (and, before that, refused *Take it* altogether
-because no step carried a name — found by naming one). Otherwise it is the
-**deepest** named step the root stands on, not the nearest: walking up from the
-base, `castle` is what the turret stands on and the turret is what the top
-stands on. Taking the nearest named one instead named the castle "top".
-
-**The WHOLE is held too, under its own name.** P5 held only the parts, because
-only the parts were typed afterwards. P6's whole point is that the thing itself
-comes back when its own profile is drawn again, so *mug* goes into the library
-beside *handle*, marked as the whole of it and carrying every outline the tree
-was made from. `taken` therefore means *the definitions are held*, not *it has
-a name* — reading the name rep disabled the very verb that holds the library.
-
-## A definition carries its profiles
-
-**Each profile is the engine's OWN fingerprint of that stroke, at the scale it
-was drawn at, plus the KIND of plane it lay on — and nothing else.**
-
-Nothing here is a new measurement. `getFingerprint` already ran on that ink
-when it was logged, at the scale the pen was working at; what a definition
-holds is that fingerprint's scale-free half (aspect, straightness, closure,
-extent, corners) and the stroke's id. So a replayed log derives the same
-numbers, which is invariant 4 for a thing that looks like a cache and is not.
-
-Three decisions are worth writing down.
-
-- **Only closed marks.** A tree's `from` carries the extent that said how tall
-  as well as the profile that said what shape, and a line is not an outline:
-  matching one would offer a definition for every straight stroke on the board.
-  The same rule keeps a line out of the *honours* row, where rasterising one
-  reported a coverage about the rasteriser.
-- **Size does not score.** It is held — `place` scales by the ratio of it — but
-  two mugs of different sizes are the same mug, and that is the whole reason
-  for holding a definition rather than a drawing. Core's own comparison weighs
-  size at a tenth because it is matching a stroke against a user's primitive,
-  where it is evidence; here it is the answer to a different question.
+- **Only closed marks.** A tree's `from` carries the extent that said how tall as well
+  as the profile that said what shape, and a line is not an outline: matching one would
+  offer a definition for every straight stroke on the board. The same rule keeps a line
+  out of the *honours* row, where rasterising one reported a coverage about the
+  rasteriser.
+- **Size does not score.** It is held — `place` scales by the ratio of it — but two mugs
+  of different sizes are the same mug, and that is the whole reason for holding a
+  definition rather than a drawing.
 - **The plane is evidence, not a gate.** Drawn on the same kind of plane the
-  definition's profile lay on, a match is lifted by `PLANE_LIFT`; on another,
-  lowered by `PLANE_DROP` — never vetoed, because a mug drawn on the width
-  plane is still a mug. Both are smaller than the corner term, deliberately.
+  definition's profile lay on, a match is lifted by `PLANE_LIFT`; on another, lowered by
+  `PLANE_DROP` — never vetoed, because a mug drawn on the width plane is still a mug.
+  Both are smaller than the corner term, deliberately.
 
 **The weights are core's, re-weighted, and the re-weighting was measured.**
-`matchPrimitiveFromLibrary` divides the corner difference by four and scores
-extent not at all; with those numbers a plain 2.4-square rectangle scored
-**0.79** against a mug's side outline — over any floor worth having. Between
-two closed profiles the two terms that actually separate them are the **corner
-count** and the **extent** (a rectangle fills its box; the mug's outline fills
-three quarters of it), so those carry more than half the weight and their
-falloffs are steeper. The same rectangle now scores **0.62** against the mug
-and **1.00** against a box; the mug's own outline scores 1.00 against the mug
-and 0.62 against the box. Core's straightness **veto** is unchanged and still
-comes first.
-
-**A correction is an event, not an edit.** `propose()` appends, so a definition
-rep is written once and never touched; *Not a mug* goes in as its own
-`correction` rep beside it and `definitions()` composes the examples in log
-order — core's `addExample`, at the profile rung. That is what makes a
-correction replay with the session and come off with one undo, which a mutated
-definition could not. It also made the undo walk learn a new act: a correction
-sits on top of the stroke it was said about, and a walk that did not stop at it
-dropped the mark as well — *Not a mug* erased the mug's profile.
-
-## The placement holds no pose
-
-`place(definition, pose)` (§2.4) is the third step in the tree that stores
-**nothing derived**, after `match` and the clip. It carries the definition's
-name, its tree, and **two stroke ids**: the profile of the definition the
-outline was matched against, and the outline drawn here. The scale (the ratio
-of the two outlines' own sizes), the turn (one plane's frame onto the other's)
-and the shift (one outline's centre onto the other's) are worked out from those
-two inks every time the tree is walked. A scale cached in the step would go
-stale the moment either mark was undone, and a replayed log would stand a solid
-nobody drew.
-
-Both plane frames are (u, v, n) with `cross(u, v) = −n`, so the turn between
-any two of them has determinant +1 and nothing comes out inside out — the same
-left-handedness that had to be signed for in `solid.ts`, paying its way for
-once. A placement whose source ink has gone marks the solid **broken** with
-that reason and leaves the body as it was, exactly as a `match` does.
-
-**It is a new ARTIFACT, and that is the door P3's `dup` could not find.**
-`bless` needs marks that are still on the content plane; `session.import`
-stands an artifact up from DATA — a name, bounds and a code rep — which is
-precisely what a placement is. So a placed mug is a thing of its own that can
-be cut, moved and named, rather than a second body inside somebody else's tree.
-The core gap is therefore narrower than P3 thought: what is missing is a
-*bless from data*, and `import` is the door that already exists.
-
-## One file, and what it took
-
-`build-standalone.mjs` runs `npm run build` and inlines what Vite emitted. Two
-things in it are worth knowing, and the first was found the hard way:
-
-- **`String.replace` reads `$&` in the REPLACEMENT.** A minified bundle is full
-  of them, and the first run put the whole `<script src=…>` tag back into the
-  middle of three.js — the script guard then said, correctly, that the page
-  still referenced a file that would not travel with it. The replacement is a
-  function now, which turns the substitution off.
-- **A literal `</script>` would close the tag early.** In valid JavaScript that
-  sequence can only occur inside a string or a regular expression, where
-  `<\/script` means exactly the same thing, so it is escaped rather than
-  merely refused.
-
-The font stays external: `brand/tokens.css` pulls IBM Plex Mono with an
-`@import`, the tokens name a real fallback stack, and the face is not worth
-trebling the file for. The result is **936KB**, one `<script type="module">`
-and one `<style>`, and it runs from a plain static server with no console
-errors — `?demo=mug` included.
-
-## The verb table, and what it hands back
-
-`behave/words.ts`'s pattern, ported: a table of the ways each verb is said,
-longest phrase first, and **what it cannot read is returned, not dropped**.
-The three verbs are `regen`, `drop` and `paint`, and what separates them is not
-which word a phrase starts with — *make* says all three — but what else it
-carries: a colour word and something asking for it (*the tops are red*), a
-change word (*make the turrets taller*), or a way of saying remove (*remove the
-turret*). A noun resolves against the names in play, singular or plural, with
-core's own `singular`, and the scope is the step ids that name covers.
-
-Two of the three are **tier 1 and instant**: `drop` is a new version without
-those steps, with anything that stood on them re-pointed at what they stood on,
-so removing a turret does not take the castle with it; `paint` binds a colour
-word to those steps. Only `regen` asks a model, and its pill carries the dot.
-
-A phrase with a name in it that the table cannot place comes back whole, with
-its reason — *"turret" (2 steps) is a name this space knows, but nothing in
-"the turrets should feel more medieval" says what to do with it*. The field
-then offers to **ask a model what it means**, once, against the closed verb
-list and the names in play; the model is not asked what to do, only which of
-the verbs the shard already has the human meant, so the worst it can be wrong
-about is a word. The answer is held in the log as a `saying`, replayed with the
-session, and the table reads that phrase itself from then on.
-
-A phrase with NO name in it is not a phrase over names at all. It is a brief,
-and the field sends it to a model as one.
-
-## A material is drawn where the word was said
-
-A boolean erases which material came from where: once a boss is unioned into a
-body there is no face on it that knows it was a turret's top. So a colour word
-on a step is drawn as **that step's own contributed volume**, standing in front
-of the body — which is exactly the volume the word was said about — rather than
-the body being split into coloured groups it cannot carry. `deriveTree` returns
-those volumes as `parts`; nothing about them is stored, and a step with no
-colour contributes none.
-
-One thing this exposed, and it is the model's constraint rather than the
-shard's: **a named world plane passes through the origin**, so a reply could
-say *a circle on the foundation* and could not say *and it sits on top of the
-tower*. A cap asked for that way came back buried inside the castle. A proposed
-profile therefore carries `at` — the gizmo's own slide handle, said as a number
-— and the prompt shows it.
-
-## The compass in the corner, and the plane picker at the origin
-
-They look alike and they answer different questions, so they are two widgets
-and they always will be. **The plane picker** stands at the world origin, in
-the scene, and its three tiles say *where ink lands* — a decision, blessed by
-the act of tapping one (§3). **The compass** sits in the top-right corner, is
-chrome rather than world, and says *where the eye is*. Nothing the compass does
-touches the log: a camera pose is runtime, and the only pose the log holds is
-the one a view stroke already carries.
-
-The compass is an **SVG overlay**, not a second three.js scene rendered to a
-corner viewport. It is a hundred pixels of six circles and three lines; an SVG
-takes its colours from `brand/tokens.css` like the rest of the chrome, so light
-and dark are the same tokens inverted with no second palette, and it costs no
-draw call. `view.ts` does the only hard part — projecting the six axes onto the
-camera's own screen basis and sorting them by depth — and it is pure, so it is
-tested without a canvas.
-
-**What it shows.** Three arms from a centre, each ending in a ball: the
-positives labelled `X` `Y` `Z`, the negatives hollow and bare. The world
-convention is Y up, so `X` is the **right** view, `Y` the **top**, `Z` the
-**front**, and each ball's tooltip says its name and what a second tap would do.
-Near balls are drawn larger and over the far ones (`ballScale`, and a painter's
-order rather than a z-buffer). The ball that faces the **chosen plane** carries
-the teal keyword colour — the same signal the picker's tile carries, because
-they are saying the same thing — so the view that puts your drawing plane flat
-on is one tap away, and you can see which one it is without trying.
-
-**What it does.** A tap snaps, keeping the target and the distance: a snap is a
-turn, not a re-frame. A second tap on the same ball flips to the other side, as
-Blender does. A drag anywhere on it orbits at the same radians-per-pixel the
-canvas drag turns at — one finger, because the widget is chrome and one finger
-on the canvas draws. Under it, *home* frames everything on the board (or the
-plane picker itself, when the board is empty, because that is the next move),
-*view* is persp / ortho, and every pinned view is a chip.
-
-### The axis view IS the choice (16 September 2026)
-
-John, looking at the two widgets: *"in explicitly selected gizmo x, y, or z,
-treat that surface as selected automatically rather than needing the plane
-click; hide the plane click option when in a gizmo-clicked x, y, or z; only
-show the planes when in alt views."*
-
-They were two decisions where a hand makes one. Standing square onto the height
-plane and **then** clicking the height tile is saying the same thing twice, and
-the tile you must click is a square lying over the drawing you came here to
-make.
-
-- **Tapping a ball chooses the plane that view faces.** Front or back (along Z)
-  → **height**; top or bottom (along Y) → **foundation**; right or left (along
-  X) → **width** (`axisPlaneFor`, the same mapping the teal ball was already
-  lit by — one decision, one home). The status says it in the trimmed register:
-  *front · height chosen*. It is the same `chosen` decision a tile makes, so
-  the profile and its extent, the edge-on gate and the picker's slide are all
-  looking at the plane they always were; only the **reason** differs, and the
-  ink carries it — *the front view faces it — the camera chose the plane*,
-  never a tile nobody held.
-- **The rule is about where the camera STANDS, not which control moved it.** An
-  orbit that lands on the front by eye chooses the same plane a tap would
-  (`isAxisView`, within `AXIS_VIEW_TOLERANCE_DEG`).
-- **The tiles are hidden in an axis view** and come back the moment the camera
-  leaves. What stays is the cursor mark and its three axes — that is where the
-  cursor *is*, and shift + click has to keep reading.
-- **Leaving an axis view gives the plane back to the hand.** The choice was the
-  view's, so it goes with the view: what comes back is whatever the hand had
-  chosen with a tile or a key, which is *nothing* when it never did — *free
-  view · plane read from what you draw*. The rule is one line
-  (`planeAfterLeavingAxisView` in `view.ts`) so the other reading — the view's
-  choice sticks until something else is said — is one edit rather than an
-  argument spread through the wiring. It stays quiet when nothing changed: a
-  camera move must not push *massing from 3 profiles · tier 1* out of the one
-  status line.
-- **The hand overrules the view.** `0` (or the picker's centre) in an axis view
-  un-chooses and hands the tiles straight back; so does choosing a *different*
-  tile by key. `1` `2` `3` are unchanged in alt views, and in an axis view the
-  matching one is the choice the view already made.
-- **The compass still says which plane is chosen** in both states — in an axis
-  view the lit ball is the one you tapped.
-
-**A plane chosen by hand that is edge-on from here still says so.** If the
-plane you have chosen is too oblique to draw on from where the camera stands —
-the scorer's own `FACING_FLOOR`, so the compass and the planarity read use one
-number — the status line says *height chosen · it is edge-on from here — orbit,
-or tap the ball that faces it*. §10's last risk is that the pen works and the
-ink goes nowhere; the fix is to say so before the hand finds out. The warning
-used to live on the snap, and the coupling above retired it there: an axis view
-now faces the plane it chose, by construction, so the only way left to stand
-somewhere the ink cannot land is to choose it by hand — which is where the
-sentence moved.
-
-**A snap ends when the camera arrives**, not on a stopwatch. The ease is
-wall-clock and its last few degrees ride on a single frame; on a deadline of
-`ms + 60` a frame that came late put the arrival after it, the lens was handed
-back to auto-perspective while the camera was still a degree off the axis, and
-the ortho a tap promises quietly came undone — and, once the two widgets were
-coupled, the plane was taken away and given back mid-snap as well. Arrival is
-the normal end; the timer is a generous backstop (`SNAP_GRACE_MS`) for an ease
-that is never going to arrive. Found by hand, watching the *view* tile say
-*persp* in a front view.
-
-### The decision: perspective follows the camera
-
-**A tap on a ball goes orthographic, and orbiting off the axis comes back to
-perspective.** This is Blender's "auto perspective", and the reason for it is
-the reason the three canonical views exist: a front, top or side view is a
-draftsman's, and perspective is a lie in it — two equal edges at different
-depths measure differently, which is exactly what you went to that view to
-check. Off the axis, perspective is the truth-teller instead: depth is what
-says the thing is solid.
-
-Pressing the *view* tile **pins** the projection where you put it, and a tap on
-a ball hands it back to the camera. One way in, one way out, and the tile says
-which state it is in on its face (its tooltip says the rest). The toggle does
-not jump: going to ortho, the frustum height is the perspective frustum's
-height **at the target** (`orthoHeightFor`); coming back, the distance is the
-one that frames that height (`distForOrthoHeight`). Each is the other's
-inverse, and the pair is pinned by a test.
-
-Both cameras stand in the same place and `space.camera` is whichever is live,
-so everything that takes a camera — the ray-caster the planes are read through,
-`scaleAt`, the picking, the projection of a world point to screen — swaps with
-it and nothing else in the shard knows. A pose taken through the ortho lens
-carries its frustum height (`Pose.ortho`), so `rayForPose` rebuilds an
-orthographic stand-in rather than fanning parallel rays: view ink drawn in
-ortho re-projects correctly minutes later, which is what the flip chip needs.
-
-### The keys, and why they are where they are
-
-`1` `2` `3` `0` were the plane picker's and stay the plane picker's: a plane is
-chosen far more often than a camera is snapped, and the older binding wins. So
-the camera takes the **numpad**, where Blender has it, and `Shift` + the same
-digits for a keyboard without one:
-
-| Key | What |
-|---|---|
-| `1` `2` `3` | choose the foundation / height / width **plane** (unchanged; in an axis view the matching one is the choice the view already made, and a different one hands the tiles back) |
-| `0` | un-choose — from here the plane is read; in an axis view it also brings the picker's tiles back |
-| numpad `1` / `3` / `7`, or `Shift`+`1` / `3` / `7` | front / right / top — **and the plane that view faces** (height / width / foundation) |
-| `Ctrl`/`Cmd` + either | the far side — back / left / bottom, the same three planes |
-| numpad `5`, or `Shift`+`5` | persp / ortho |
-| numpad `9`, or `Shift`+`9` | flip to the far side of the view you are at |
-| `f`, `Home` | frame everything |
-| right-drag, `Space`+drag, drag on the compass | orbit, about the view's centre or the selection |
-| middle-drag, `Shift`+right-drag | pan |
-| wheel | dolly, toward the pointer |
-| trackpad swipe | orbit |
-| `Shift` + swipe | pan |
-| pinch, `Ctrl`/`Cmd` + swipe | dolly, toward the pointer |
-| one finger | draw |
-| two fingers | pinch → dolly; drag → orbit |
-| three fingers | pan |
-| `Cmd/Ctrl`+`Z` | undo |
-
-### Trackpad and touch
-
-John, 16 September 2026: *"Make the view work with trackpad and touch."* On a
-trackpad there was no orbit at all — no right button on the machine — and every
-swipe zoomed, because the browser sends a trackpad's everything as `wheel` and
-the shard read every wheel as a dolly. On a screen, turning the view meant
-dragging a compass the size of a thumbnail.
-
-**The map is Blender's**, which is the reference John keeps naming: swipe
-orbits, `Shift`+swipe pans, pinch or `Ctrl`/`Cmd`+swipe zooms. A hand that has
-Blender in its fingers should not have to learn a second map.
-
-**Telling a trackpad from a mouse is the only part Blender cannot lend**, since
-both arrive as `wheel` with the same fields. They are told apart by the event's
-**shape** (`classifyWheel` in `src/gesture.ts`, read top to bottom, first match
-wins): `ctrl` is a pinch, because that is how macOS sends one; lines or pages
-are a wheel's units; a delta on **both axes** is the sign a wheel cannot make; a
-fractional delta is a trackpad measuring a finger; a whole step under 40px is a
-trackpad nudged, and one at or over it is a notch. The two-axis verdict is
-**remembered for 800ms**, because the middle of a real swipe runs straight and
-sends deltas that look exactly like notches — without the memory a gesture turns
-into a zoom halfway through — and it expires, so putting the trackpad down and
-picking up a mouse does not inherit it.
-
-**A swipe worth a canvas width is half a turn**: π/width radians a delta unit,
-about 0.0026 on a 1200px canvas. Deliberately gentler than the 0.006 a mouse
-drag turns at, because a trackpad's deltas are accelerated and a swipe spends
-more of them than a finger travels.
-
-**On a screen: one finger draws, two fingers pinch or orbit, three pan.** They
-pinched and panned until now (P0's rule, and the canvas's) — but this is a place
-for making 3D things, where turning the view is the commonest thing a hand does,
-and asking for that from a corner of chrome is asking too much of a thumb.
-Which of the two a pair is doing is decided **once**, after they have travelled
-twelve pixels, by whether the spread or the centre grew faster — deferred
-commitment, the way the plane is picked, and nothing moves before the decision.
-Once made it holds until a finger lands or leaves, so a swipe whose fingers
-splay a little does not flick into a zoom. A change in how many fingers are down
-**restarts** the gesture and moves nothing: the centre of three is nowhere near
-the centre of two, and carrying a delta across that jump would fling the view.
-
-**No stroke is ever begun by a gesture that turns out to be two-fingered.** A
-screen cannot know the second finger is coming, so the first one has already
-been drawing by the time it lands; the scene sees it land and `ink.ts` **drops**
-the live stroke rather than finishing it (`space.onAbandon`) — nothing read,
-nothing logged, nothing to undo. Deliberately not `pointercancel`, which means
-the pen was taken away mid-stroke and that stroke is still the hand's. And while
-two fingers are down `space.orbiting()` is true, so the second finger does not
-start a stroke of its own.
-
-Every rule above is arithmetic in **`src/gesture.ts`**, which is pure and
-tested; `scene.ts` holds the listeners and spends the answers.
-
-### Orbit around the centre of the view
-
-An orbit asks, once, at the moment the drag begins: the **selection** if there
-is one, else **nothing** — and nothing means the target, the centre the hand
-panned to. Either way the target is not moved onto anything: with a pivot the
-camera **and** the target turn rigidly about it, so the pivot keeps its place
-in the camera's own frame and stays under its own pixel. The arithmetic is
-`orbitBy` in `view.ts`, and it is tested there.
-
-This is the fix for *"the rotation needs to respect the translation of the
-overall view so it doesn't snap to center"* (John, 16 Sep 2026). The first
-version moved the target **onto** the pivot and rebuilt the angles from where
-the camera stood — which re-aimed the camera, so the picture swung the pivot to
-the middle of the screen the moment a drag began, and a view panned off-centre
-snapped back to it. Pan somewhere and turn now, and the centre stays where it
-was put.
-
-Gone with it: orbiting about whatever the pointer happened to be **over**. Even
-made rigid it would put the centre of the turn on a different point every drag
-and drift the view off the place the hand panned to, for no act the hand
-performed. A selection is asked for; a pixel under a cursor is not.
-
-A **dolly** asks the same question and gets a different answer on purpose: it
-goes toward whatever is under the pointer, selected or not, because there you
-are pointing at where you want to be rather than at what you are working on.
-Answering both with "the selection" is how a wheel over the corner of a thing
-sails past it — which is what the first version did, and it is why
-`setPivot`'s function is told *why* it is being asked.
-
-## Ink is never covered, on a face
-
-Invariant 3 says a solid made from a sketch draws **with the sketch still on
-its face, faint**. A solid grows *out of* the plane its profile lies on, so the
-profile's ink ends up flush with a face or inside the solid, and an ordinary
-depth test would hide the very mark the thing was made from — from every angle
-that matters.
-
-So the marks a solid was made from are drawn with **the depth test off**, at
-0.3 opacity, above the solid, while the solid's material carries a polygon
-offset so a coplanar face never fights a line. The cost is honest and visible:
-a box with its footprint showing through reads a little like glass. The
-alternative — lifting the ink to the outside of the base face — is physically
-truer and shows the hand nothing, because the ink would then be *under* the
-box. This is the trade, and it is John's to overturn.
-
-**It was tried, in September 2026, and it does not come off.** Turning the
-depth test ON is an immediate visual win: the box stops reading like glass and
-reads like a box, in both themes, and a screenshot settles it in a second. What
-it costs is the thing invariant 3 is for. Three findings, in the order they
-turned up:
-
-- **A polygon offset does not win the tie.** The obvious way — depth test on,
-  with the ink offset toward the eye against the face's own offset away from it
-  — leaves the ink invisible. Every stroke is already lifted `LIFT` (0.004 u)
-  along its plane's normal, which for a profile is *into* the solid; a polygon
-  offset in depth-slope units never recovers that, and a `Line2` is a
-  screen-widened quad whose slope at a face seen head-on is near zero, which is
-  the worst case for the offset.
-- **A camera-facing lift does win it** — move the ink object a fraction of the
-  camera's distance toward the eye before the test, recomputed on every camera
-  change — and the mechanism is demonstrable: exaggerate it and the ink pops
-  out in front of the body from every angle.
-- **And it still shows the hand nothing**, because of where the ink IS. A solid
-  grows *away* from the plane its profile lies on, so the profile's ink ends up
-  on the one face you are never looking at; from underneath, where it is
-  visible, it coincides with the body's own silhouette edge and says nothing
-  you could not already see. Depth-testing it buys a better-looking box and
-  loses the only view in which the sketch was telling you something.
-
-So the glass stays, and the trade is still John's — but it is now a trade with
-a measured price rather than an untried alternative. The one place the argument
-could change is a **feature** drawn on a face that stays visible (a circle for a
-cut or a boss, on a top face): there depth-testing would show the ink crisply
-where it lies. That is an argument for deciding per-mark — profile ink through
-the body, feature ink on its face — and not for one flag over all of it.
-
-## The design decision: how the plane is held on the stroke
-
-**The plane is a `plane` rep on the stroke node, proposed by the local
-participant through `session.propose()`.** §2.1 says the plane is "a rep on the
-stroke with a reason, either way it came to be there", and `Rep.data` is
-deliberately `unknown`, so this needed no new event type: the plane goes into
-the log as a `propose` event, replays with the session, and carries its `why`
-and its confidence like every other reading. A parallel shard-owned map keyed
-by stroke id would have been a second source of truth beside the log, which is
-invariant 4 broken on the first package.
-
-The one cost is **undo**. `session.undo()` drops the last non-tick event, and
-for a stroke that is the `propose`, not the stroke — one undo would leave the
-ink with no plane. So `log.undo()` walks back until the number of `stroke`
-events actually falls (`src/log.ts`). This is worth knowing if the engine ever
-grows a "drop this event and its dependents" undo; until then the loop is four
-lines and the test pins it.
-
-## The design decision: the scorer, in one paragraph
-
-**`confidence = shape × facing × anchor × continuity`**, and it lives in one
-place (`src/planarity.ts`, `rank`). **Shape** is the shape rung's own top
-confidence on the stroke's screen path cast onto that candidate, read at that
-plane's own `scaleAt` — the strongest term, and the only one that knows what
-was drawn; floored at `SHAPE_FLOOR` when the rung places nothing, so a plane is
-never scored zero for a squiggle. **Facing** is
-`FACING_BASE + (1 − FACING_BASE)·|n · look|`: 1 flat on, `FACING_BASE` edge-on,
-gentle on purpose because a box's top seen from above is only 84% face-on and
-must not lose to the view plane for being 100%; below `FACING_FLOOR` the
-candidate is **kept, marked *too oblique to read*, and can never win** (plan
-§10's last risk), and below `FACING_TAKES` it is **kept, marked *too oblique to
-take the stroke*, and cannot outrank the view plane** — see *the gate*, below.
-**Anchor** is how much of the stroke lies on geometry that
-lies in that plane — a face's own corners, the previous stroke's bounds — as a
-ratio of the stroke's own size: `ANCHOR_BASE` when there is nothing there
-(absence of evidence), up to 1 when the ink lies on it, and **down to
-`ANCHOR_MISS`, below the base, when there is geometry and the ink is nowhere
-near it** (evidence against — see below). **Continuity** is 1 for the previous
-stroke's own plane within `recentWindowMs` and `CONTINUITY_BASE` otherwise.
-Multiplicative rather than a weighted sum, because the terms are independent
-evidence and any one of them being bad *should* pull the whole candidate down:
-a plane the stroke reads as nothing on, seen nearly edge-on, with nothing in
-it, is not saved by being recent. Every term is returned on the candidate, so
-the panel shows the evidence and not only the number.
-
-## The design decision: the gate — off-axis ink is conserved
-
-John, 16 September 2026, drawing with nothing chosen: *"drawings off the main
-axis are on the camera plane mapped rather than the way it is stretching the
-shapes out now; the shapes drawn off main axes should stay conserved size at
-the angles that make sense."*
-
-The scorer is a comparison of evidence, and a half-oblique plane can win one.
-At forty-five degrees a world plane's facing term costs it only 22%, and
-continuity plus an anchor pay that back twice over — so a circle drawn beside a
-box came back a long ellipse lying on the ground. Casting a screen path onto a
-plane at that angle is not a reading of what the hand drew; it is a stretch of
-it, and no amount of confidence makes the stretch the shape John made.
-
-So with nothing chosen the **view plane is the default**, and evidence does not
-merely have to beat it — it has to **make sense at its angle** first.
-`FACING_TAKES` (0.80, 37° off face-on) is that gate: below it a `world`,
-`previous` or `face` candidate is kept, said out loud, still offered by the
-runner-up chip, and **cannot outrank the view plane**, whatever its shape score.
-Above it the four terms decide exactly as before. It applies at pen-down too: a
-face under the pen keeps its precedence only if it passes, and otherwise the
-stroke goes on the **view plane through the cursor**, so the ink lies in the
-plane the hand put there without being stretched across the face. Shift + click
-on that face first and the cursor is *on* it, which is how you get the face's
-own depth and the camera's own angle at once.
-
-The number is bounded from above by the shard's own default three-quarter view,
-which sees a horizontal plane at **0.844** (`DEFAULT_PHI`, 57.6° above the
-horizon). A gate over that would mean the view the shard *opens on* could not
-take a face at all, and P2/P3 — a profile on a face, a feature in one — would
-have nowhere to land. So it sits just under it.
-
-What the view plane conserves is not a threshold but a property: it is
-screen-facing by construction, so the cast is a **similarity transform** — the
-circle is the circle, at the cursor's own depth. `planarity.test.ts`
-pins the aspect to within 1%, and the e2e measures the same thing through the
-real pointer path at a 49° view: `1.0000` on the view plane, `0.825` the moment
-the ground is taken from the chip.
-
-Two things the gate deliberately does **not** do. It does not touch a **chosen**
-plane: the gizmo's tile is a decision, and a decision is not a reading to argue
-with — choose the foundation and the stroke lies on it at any angle, with the
-edge-on warning as it was. And it does not *drop* anything: the gated plane is
-in the panel with its number, its facing, and what taking it would cost, and the
-chip takes it in one act. The hand overrules the gate; the gate never overrules
-the hand.
-
-The demo was leaning on the defect. `?demo=mug` orbited by 0.04 before drawing
-the hole, which left the rim 0.70 face-on — an angle at which the face outscored
-the view plane 0.68 to 0.55 and the circle landed on the rim as a 1.4:1 ellipse.
-It now orbits to 0.3 and looks *into* the mug, which is the angle the demo's own
-sentence was always describing.
-
-## The design decision: how a flip is one act
-
-A flip re-reads the mark's **kept screen path** onto another candidate, under
-the **pose in the log** rather than wherever the camera is now. It cannot be a
-new rep on the same node: `getRep` returns the FIRST rep of a modality, and the
-readings, the fingerprint and the maths were all computed from the ink at
-`addStroke` — a second `stroke` rep would never be seen, and a mark whose
-plane changed but whose readings did not would be a lie. So the flip is a new
-stroke, and it is **additive**: `add` the re-projected stroke, then `erase` the
-first, in that order, all three under the flip's one timestamp — so `log.undo()`
-drops the erase, the plane and the stroke together and the first mark comes back
-on its first plane — one act, three events, one undo.
-The other order would leave the first mark erased. A mark a solid was made
-from is refused, and says why: the tree references that stroke id and was
-measured in that plane.
-
-## What P0, P1, P2, P3, P4, P5 and P6 found
-
-Honest gaps rather than bugs, and two of them are core's:
-
-- **`measure()` assumes world units are screen pixels.** It rounds to whole
-  units (`r0 = Math.round`) and labels every length `px`. In plane units a
-  1.2-unit circle comes back as "radius 1px" — the shape rounded away. The
-  shard measures each mark on a copy scaled by `1/scale`, where the engine's
-  own unit label is literally true, and the panel says which space it is in.
-  **For core (§11): `measure()` should take the stroke's scale the way
-  `analyzeStroke` does, and name its unit.**
-- **The tokens have no `prefers-color-scheme` block.** `brand/tokens.css`
-  defines dark under `[data-theme="dark"]` only, so a surface whose theme is
-  *system* must stamp the attribute itself — stamping nothing renders light on
-  a dark machine while the tile says `sys · dark`. `src/theme.ts` stamps.
-- **`linewidth` is ignored on a plain `THREE.Line`,** and a hairline is not
-  ink. The ink is drawn with `Line2` (screen-space quads) so a stroke reads as
-  a stroke at any zoom.
-- **`propose()` composes a rep's `reasoning` INTO its `data` with a spread**
-  (`{ ...(r.data as object), reasoning }`), which turns a string rep into a map
-  of its own characters: `'plinth'` comes back as `{0:'p',1:'l',…}`. The shard
-  passes an object (`{ text, why }`) instead. **For core (§11): either reject a
-  non-object `data` when `reasoning` is given, or keep the reason beside the
-  data rather than inside it.**
-- **There is no rename.** `bless` takes a name once and `wordOf` reads the
-  *first* `word` rep, so a second name is never seen. The hand's name is held
-  as the shard's own `name` rep, newest first. **For core: a rename event, or
-  `wordOf` reading the newest.**
-- **A plane's frame is left-handed.** The plane's axes are (u, v, n) with v
-  running *down* the screen, and `cross(u, v)` is exactly `-n` for every plane
-  — so a matrix made of (u, v, n) is a mirror and every face of every solid
-  comes out inside out. `solid.ts` builds (u, v, cross(u, v)) and signs the
-  extrusion to suit. Pinned in `geometry.test.ts`.
-- **The engine's relations are per-plane, and the form rung's are not.** A
-  bless computes a signature and union bounds over marks whose coordinates are
-  in *different planes*, which is arithmetic on incomparable numbers. Nothing
-  in P2 reads those, and the form rung measures in world space — but a
-  signature across planes will mean nothing to P6's matching. **For core, or
-  for the shard to carry: a signature that knows which plane each mark is on.**
-- **three.js lighting is physically correct, and the tokens are not exposure
-  values.** `--paper-dk` under an ambient of 0.9 renders as slate; the scene's
-  levels are set so a face of that token comes back on the paper it was named
-  for.
-- **Geometry in a plane that the ink misses is evidence AGAINST it, not the
-  absence of evidence.** A face's plane is infinite and the face is not. With
-  the anchor term floored at its neutral base, a circle drawn in clear air
-  beside a box read as lying on the box's **top face**, purely because the
-  stroke before it had been drawn there and continuity carried the plane. The
-  anchor now runs down to `ANCHOR_MISS`, below the neutral base, when there is
-  geometry in the plane and the ink is more than its own size away from it.
-- **A world plane read from the evidence should stand where the pen is.** §2.1
-  says "the three world planes through the origin (or through the gizmo's slid
-  origins)", and the parenthetical is the point: where a world plane stands is
-  a choice, and the gizmo's slide is the hand making it. With nothing chosen
-  there is no slide, but there is still a place the hand is working. Standing
-  them at the world origin offered a `height` plane a profile does not touch,
-  so flipping an extent onto it produced a mark the form rung could not see as
-  an extent — a chip that settled nothing. They now stand through the point the
-  pen came down on when it came down on something, and say so. It also settled
-  the runner-up on a box's top face: the horizontal plane through the pen IS
-  that face, so it is offered once, and what is left second is `view`.
-- **A stroke's screen path is meaningless without the camera it was drawn
-  under,** so every stroke carries a `Pose` in its plane rep, not only view ink.
-  That is what lets the chip's flip re-project a stroke drawn minutes and an
-  orbit ago; `scene.rayForPose` rebuilds a ray-caster from it against a spare
-  camera, and nothing about the live camera moves.
-- **`getRep` returns the FIRST rep of a modality, so a reading cannot be
-  revised in place.** A mark's readings, fingerprint and maths are all computed
-  from the ink at `addStroke`, and a second `stroke` rep proposed later is
-  never read — so re-reading a stroke onto another plane has to be a new node,
-  and the flip is shaped around that (above). It is the same gap as "there is
-  no rename". **For core (§11): a rep that supersedes — newest wins for the
-  modalities that are readings, or an explicit `revise` that re-derives what
-  was derived from the ink.**
-- **A gesture's reading is not derivable from the board it changed.** Row 1
-  reads a stroke against the silhouettes of the solids standing in its view —
-  so the moment a scratch has done its work there is no solid left to cross,
-  and the table re-derives the very same mark as an `annotation`. The reading
-  is therefore HELD on the mark as a `gesture` rep the way core holds one
-  (`session.ts`, `role: 'scratch'`), and `forms()` prefers it. *What a mark did
-  is not a function of the board it left behind.* Found by asserting `plays`
-  after the scratch and getting `annotation`.
-- **A zigzag that comes back to where it started reads CLOSED, and a closed
-  stroke is never a scratch** — it is a lasso, which is core's rule and the
-  right one. An even number of traversals ends on the side it began, so the
-  e2e scratches with three.
-- **A boolean's output cannot be given to `THREE.EdgesGeometry`.** It keeps an
-  edge when the two faces sharing it disagree by more than the threshold *and*
-  when nothing shares it, because that is a boundary — and a triangle splitter
-  leaves coincident-but-separate vertices and T-junctions all over a re-cut
-  face, so a box with a hole in it came back drawn like a spider's web. Every
-  solid the shard derives is a CLOSED body, so a genuine boundary edge cannot
-  exist: `hardEdges` keeps only edges shared by exactly two faces that
-  disagree, and drops the rest as what they are — the triangulation talking.
-- **`bless` needs marks that are still on the CONTENT plane**, and a made
-  solid's members are not (blessing took them off). So there is no way to
-  BLESS a second artifact up from a tree alone, which is why `dup` is a `place`
-  step on the same tree — one tree, two bodies — rather than a second solid.
-  **P6 found the door that does exist: `session.import` stands an artifact up
-  from data** (a name, bounds and a code rep), which is exactly what a
-  placement is, so a placed definition IS a thing of its own. The gap is
-  therefore narrower than it looked: what core still lacks is a *bless from
-  data* — an artifact made from a tree, attributed and summon-less, with the
-  membership a bless gives it. `import` gives everything but the name of the
-  act.
-- **The e2e's tab must be fronted.** A hidden Browser-pane tab lays the canvas
-  out at zero size, `screenFor` returns (0, 0) for every point and no stroke is
-  made. `resize()` already refuses an aspect of 0; nothing can refuse a
-  viewport that is genuinely not there. **And `?demo=` needs the same thing for
-  a different reason**: the demos wait for a laid-out canvas on
-  `requestAnimationFrame`, and a tab the browser is not painting gets no frames
-  at all, so the demo simply never starts. The canvas has the same lesson
-  (`nextFrame` in `Demos/surface/01-view.js`): a loop that depends on paint is a
-  loop that stops when nobody is looking.
-- **`trace` thins what it is given, so it must be given a BOUNDARY.** Handing
-  core's tracer a filled silhouette returns the medial axis of the blob — a
-  spine, not an outline — because thinning is the second of its four steps. The
-  mask's own one-pixel boundary is what it wants, and then it does exactly the
-  right thing. **For core (§11): nothing to change; this is a note for the next
-  caller, and the diff's `outlineOfMask` is the reusable half.**
-- **A prism built on a hand's sampling rate is a shape made of noise.** See the
-  massing section: 127 walls where 9 will do took the e2e from 8 seconds to
-  136, and the boolean library said so in its own words. **For core (§11):
-  nothing to change — `simplifyStroke` is already there and is exactly the
-  right tool; this is a note for the next caller who hands raw ink to a
-  triangulator.**
-- **A derived measurement the panel asks for on every hover has to be cached.**
-  `honoursOf` is three offscreen renders and three rasterisations, and the
-  panel asks for it on every hover and every report; uncached, a board with a
-  massing on it spent whole seconds a frame re-measuring a body nobody had
-  touched. Cached per log version, like the diff.
-- **`propose()` has no rename, so the shard's `name` rep is read newest-first —
-  and a definition has the same shape of problem.** Definitions are reps on the
-  root artifact because `bless` cannot stand an artifact up from data (below).
-- **A model can name a plane and cannot say how high up it stands.** The three
-  world planes pass through the origin, so a reply had no way to put a cap on
-  top of a tower; a proposed profile now carries `at`, the gizmo's own slide.
-  Found by asking a stub for a cap and getting one inside the castle.
-- **A real local model stays in the vocabulary and drifts on the words.**
-  qwen3:8b returned valid JSON in the closed vocabulary first time — five
-  steps, two mirrors, no repair needed — but named its steps `castle_base`,
-  `turret_front` and `turret_side` rather than reusing the brief's own words,
-  and bound no colour at all. A second run named them `castle body` and
-  `turret` and bound `grey` and `green`. The brief says *use these exact
-  words*; a small model reads that as advice. **Reusing an existing name is
-  checked (the regen's `mutable` list); INVENTING one from the human's words is
-  not, and cannot be without the shard deciding what the human meant.**
-- **The panel's height was a guessed number, and P4's two pills found it.**
-  `#panel` stopped at `100vh - 220px`, which assumed how tall the field would
-  be; two more verbs made the field taller and it began covering the bottom of
-  the panel — which is exactly where the newest row lives. The field now
-  measures itself into `--field-h` on every render and the panel stops where the
-  field starts. A layout constant about another element's content is a constant
-  that goes wrong the first time that content grows.
-- **`offsetParent` says nothing about whether a fixed element is on screen.**
-  The first version of UI-3's e2e check asked `el.offsetParent !== null`, which
-  is the usual way to ask *is this displayed*, and it read the panel as hidden
-  while the panel was plainly up: a `position: fixed` element's `offsetParent`
-  is **null by spec**, displayed or not. Every piece of this surface's chrome is
-  fixed — the bar, the panel, the field, the status line — so that test called
-  all of them invisible. The honest question is whether the thing takes up room:
-  `getBoundingClientRect()`, whose width and height are zero under
-  `display: none` and nonzero otherwise.
-- **The bar was already over a phone's width before anything was added to it.**
-  At 375px its controls wanted 420px, so *theme* and *help* sat off the right
-  end with no way to reach them — invisible because nothing had ever measured
-  it. Adding *details* made it 511 and made it visible, by wrapping the wordmark
-  onto a second line the 40px bar has no room for. The bar scrolls sideways on a
-  narrow screen now. (The canvas's answer to a crowded bar is its control
-  centre; the shard has no pane to put one in yet.)
-- **Core's own primitive comparison is too forgiving between two closed
-  outlines.** `matchPrimitiveFromLibrary` divides the corner difference by four
-  and does not read `extent` at all, so a plain rectangle scored 0.79 against a
-  mug's outline. It is right for what it was written for — a stroke against a
-  user's primitive, where size is evidence and the stroke may be open — and
-  wrong for *is this outline that definition*. **For core (§11): the weighting
-  is the caller's business, so what would land there is the comparison with its
-  weights as an argument, not a second copy of it.**
-- **`taken` meant two things, and the second one broke the first.**
-  `versionOf().taken` read a `name` rep, which was the same as *the definitions
-  are held* only while `take` was the only way to name a solid. Naming one by
-  hand first — which is exactly what P6's demo does — disabled *Take it*, the
-  verb that holds the library.
-- **`String.replace` substitutes `$&` in the REPLACEMENT string**, and a
-  minified bundle is full of them. The standalone build put the very
-  `<script src=…>` tag it was replacing back into the middle of three.js. A
-  replacement function turns the substitution off; the guard that refuses to
-  write a page still pointing at a file is what caught it.
-- **A demo that waits for a frame waits forever in a tab nobody is painting.**
-  The `?demo=` blocks wait for a laid-out canvas on `requestAnimationFrame`;
-  whichever comes first, a frame or a timer's tick, now moves them on — the
-  canvas's own lesson (`nextFrame` in `Demos/surface/01-view.js`). It does not
-  save a HIDDEN pane, where the canvas genuinely has no size and every
-  projected point is (0, 0): that is the tab-fronting note below, and it is
-  still true.
-- **A step id is recycled when the step that held it is dropped.**
-  `nextStepId` fills the lowest free number, so a regen that replaces the only
-  named step hands the replacement the same id. Nothing points at a step id
-  across a version, so nothing is wrong today — but the id is not a name, and
-  a test that asserted "the id changed" was asserting the tree's arithmetic
-  rather than the act. What the e2e asserts is that the STEP changed and that
-  no other step did.
-- **A hole cut through a body makes its own plan stop describing it.** After
-  *Cut a hole*, the *honours* row for the mug reads 56% against the rectangle
-  its plan was drawn as — because from above the thing is now an annulus with a
-  handle. That is the diff being right, and it is worth saying out loud: the
-  row measures the body against the drawing it was made from, and cutting into
-  a thing is a way of leaving that drawing behind. **The row now says that
-  itself** — *top 56 (material was taken off since it was drawn — less is
-  expected to show)* — because a bare low number is indistinguishable from a
-  wrong one.
+`matchPrimitiveFromLibrary` divides the corner difference by four and scores extent not
+at all; with those numbers a plain 2.4-square rectangle scored **0.79** against a mug's
+side outline. Between two closed profiles the two terms that actually separate them are
+the **corner count** and the **extent**, so those carry more than half the weight and
+their falloffs are steeper. The same rectangle now scores **0.62** against the mug and
+**1.00** against a box; the mug's own outline scores 1.00 against the mug and 0.62
+against the box. Core's straightness **veto** is unchanged and still comes first.
+
+**A correction is an event, not an edit.** `propose()` appends, so a definition rep is
+written once and never touched; *Not a mug* goes in as its own `correction` rep beside it
+and `definitions()` composes the examples in log order — core's `addExample`, at the
+profile rung. That is what makes a correction replay with the session and come off with
+one undo. It also made the undo walk learn a new act: a correction sits on top of the
+stroke it was said about, and a walk that did not stop at it dropped the mark as well —
+*Not a mug* erased the mug's profile.
+
+### The placement holds no pose
+
+`place(definition, pose)` is the third step that stores **nothing derived**, after
+`match` and the clip. It carries the definition's name, its tree, and **two stroke ids**:
+the profile of the definition the outline was matched against, and the outline drawn
+here. The scale (the ratio of the two outlines' own sizes), the turn (one plane's frame
+onto the other's) and the shift (one outline's centre onto the other's) are worked out
+from those two inks every time the tree is walked. A scale cached in the step would go
+stale the moment either mark was undone.
+
+Both plane frames are (u, v, n) with `cross(u, v) = −n`, so the turn between any two of
+them has determinant +1 and nothing comes out inside out — the same left-handedness that
+had to be signed for in `solid.ts`, paying its way for once. A placement whose source ink
+has gone marks the solid **broken** with that reason and leaves the body as it was.
+
+**It is a new ARTIFACT, and that is the door P3's `dup` could not find.** `bless` needs
+marks that are still on the content plane; `session.import` stands an artifact up from
+DATA — a name, bounds and a code rep — which is precisely what a placement is. So a
+placed mug is a thing of its own that can be cut, moved and named. The core gap is
+therefore narrower than P3 thought: what is missing is a *bless from data*, and `import`
+is the door that already exists.
 
 ### What a body is answering to (`src/constraints.ts`)
 
-The *honours* row used to take `steps[0].from` and rasterise every closed mark
-it found where that mark happens to lie. On a placement that is wrong twice
-over: a `place` step's two stroke ids play **different roles** — the outline it
-stands at, drawn here, and the outline the definition it copied was made from,
-lying at the original — and comparing the second one in place compares this
-body against somewhere else. The completed mug said *honours the drawing 20% ·
-top 39 · top 0*, and the 0 was the first mug's plan.
+The *honours* row used to take `steps[0].from` and rasterise every closed mark it found
+where that mark happens to lie. On a placement that is wrong twice over: a `place` step's
+two stroke ids play **different roles** — the outline it stands at, drawn here, and the
+outline the definition it copied was made from, lying at the original — and comparing the
+second one in place compares this body against somewhere else. The completed mug said
+*honours the drawing 20% · top 39 · top 0*, and the 0 was the first mug's plan.
 
-`activeConstraints(tree, ctx, drawnSince)` walks the tree instead and classifies
-every closed mark it references:
+`activeConstraints(tree, ctx, drawnSince)` walks the tree instead and classifies every
+closed mark it references:
 
 | kind | what it is | where it scores |
 |---|---|---|
-| `target` | drawn at this instance: a massing's profiles, an `extrude`/`revolve` profile, a `match`'s profile, a `place`'s `toMark` | where it lies |
+| `target` | drawn at this instance: a massing's or hull's claims, an `extrude`/`revolve` profile, a `match`'s profile, a `place`'s `toMark` | where it lies |
 | `source` | the definition a `place` copied was made from — `of`, and every stroke the copied steps name | **carried** onto this body by the placement's own pose |
 | `revision` | drawn against this body after it stood (the form rung's *profile of*) | where it lies |
 
-**A correspondence is carried, not dropped.** The pose is already re-derived
-from two inks on every walk (`placeFrames`, invariant 4), so the same pose puts
-the definition's outlines where this body stands — a translation, a turn or a
-half-scale placement cannot lower agreement merely because the source sketch is
-still lying elsewhere. When the pose cannot be derived (the source ink was
-erased — the same condition that calls the solid broken), the constraint keeps
-its ids and loses its number: *not counted: …*. Provenance is never dropped to
-improve a score.
+**A correspondence is carried, not dropped.** The pose is already re-derived from two inks
+on every walk, so the same pose puts the definition's outlines where this body stands — a
+translation, a turn or a half-scale placement cannot lower agreement merely because the
+source sketch is still lying elsewhere. When the pose cannot be derived (the source ink
+was erased — the same condition that calls the solid broken), the constraint keeps its ids
+and loses its number: *not counted: …*. Provenance is never dropped to improve a score.
 
-**A feature is a claim about a face, not about the extent.** Coverage is an
-intersection over a union, so a small circle measured against a whole body
-reads near zero whether it was cut or bossed — and a cut's outline is a claim
-that there is *nothing* there. Both are kept, both say why, neither is counted.
-The placed mug now reads *honours the drawing 47% · top 39 (…) · top 54
-(carried from mug; …) · not counted: …*.
+**A feature is a claim about a face, not about the extent.** Coverage is an intersection
+over a union, so a small circle measured against a whole body reads near zero whether it
+was cut or bossed — and a cut's outline is a claim that there is *nothing* there. Both are
+kept, both say why, neither is counted.
 
-## What P0, P1, P2, P3, P4, P5 and P6 do not do
+**A hole cut through a body makes its own plan stop describing it.** After *Cut a hole*,
+the row for the mug reads 56% against the rectangle its plan was drawn as — because from
+above the thing is now an annulus with a handle. That is the diff being right, and the row
+says it itself: *top 56 (material was taken off since it was drawn — less is expected to
+show)*, because a bare low number is indistinguishable from a wrong one. The same sentence
+is what a sketch hull's 9% carries.
 
-**The read cannot tell a line going away on the ground from a line rising.**
-This is the honest limit, and it is plan §10's first risk arriving on
-schedule. A straight screen stroke reads `line 0.92` on *every* plane, so the
-strongest term — the shape rung — says nothing; the two readings are the same
-picture, and no term in the scorer can separate them. So an extent drawn from
-a profile's edge with **nothing chosen** reads `previous · foundation 0.64`,
-with `view 0.55` and `height 0.40` behind it, and no box stands. That is not a
-bug to tune away: it is the read saying what it actually knows. The answers are
-the two the plan already gives — **choose the height tile** (a decision, blessed
-by the act, which is why the gizmo exists), or **take the chip**: flipping the
-mark onto `height` makes it an `extent` and the box stands at tier 1, with one
-undo back. The e2e drives exactly that. The evidence that *would* separate them
-is occlusion — the ground rectangle under a box is somewhere the pen could not
-have reached — and that is a fifth term the plan does not name; noted, not
-built.
+**A derived measurement the panel asks for on every hover has to be cached.** `honoursOf`
+is three offscreen renders and three rasterisations, and the panel asks for it on every
+hover and every report; uncached, a board with a massing on it spent whole seconds a frame
+re-measuring a body nobody had touched. Cached per log version, like the diff.
 
-**The scorer's terms are the four §2.1 names and no others.** No occlusion, no
-prior over which plane a hand uses most, no learning from what was taken. Each
-of those would help; each is a new kind of evidence and wants the plan's
-sanction first.
+### The board leaves the tab as its own log
 
-**`pickAtPenDown` is not the scorer.** At pen-down there is no stroke to read,
-so the live plane comes from where the pen is: a face beats everything, else
-the previous plane when it is recent AND the pen came down near that stroke,
-else the view. The full read happens once, at pen-up.
+**The format is the canvas's, unchanged**: `encodeLog` of the session's own events, one
+JSON event per line. That is what `.metamedium/logs/*.log` holds, what the canvas's export
+pane writes as `canvas.jsonl`, and what `mergeLogs` reads — so a board exported from either
+surface is the same kind of thing and needs no converter. *Export…* downloads it as
+`shard-<date>.mm.log`; *Open…* picks one and replays it.
 
-**A flip does not re-read what the flipped mark affords beyond tier 1.** It
-does run the tier 1 check (a line that was flat on the ground and is now rising
-off a profile IS an extent, and the box stands) — but a flip of ink a solid was
-made from is refused outright rather than rebuilt, and `whyNotFlip` says so.
+**Opening is not undoable, and it says so first.** `session.load` replaces the whole event
+list and bumps the generation, so there is no act for undo to walk back to. The honest thing
+is a confirm on a board holding work, and none on an empty one — not a fake undo that could
+not put the old board back.
 
-**Row 1 is not restricted to the view plane, and the plan's §2.3 does not
-restrict it either** (its *Where* column is "crosses a selection or a solid",
-with no plane named; it is row 6 that is about the view plane). What is
-enforced is the rule that matters: **ink ON a solid's own face is never a
-scratch — it is a feature**, and neither is the ink a solid was made from,
-which is its provenance. The reasoning says which plane the stroke was
-actually read on. In practice the e2e's scratch reads `previous` rather than
-`view`, because a straight screen stroke reads much the same on every plane
-and continuity carries the last one — §10's first risk again, and the same
-answer: the read says what it knows, and the chip is there to argue with.
+A board round-trips: `export.test.ts` pins that the marks, the solids, the names, the planes
+and the trees come back identical, which is the log being the source.
 
-**The silhouette is a convex HULL, not a true silhouette.** The mesh's
-vertices are projected and taken round; a concave solid's dent is inside it, so
-a scratch through the mouth of a C counts as crossing the C. Good enough for
-this rung — erasing is a coarse act and it still takes three crossings — and
-it is one function to replace.
+**What a file is, is read from what is IN it**, never from its name: a dev server answers a
+path it does not have with the page itself, so probing `fixtures/x.mm.log` came back 200
+with a document in it. One JSON object with `marks` in it is a captured view; a log is many
+objects, one per line, and never parses whole.
 
-**`dup` is not a second solid.** It is a `place` step on the same tree: one
-tree, two bodies. See the core gap above; a copy that can be moved on its own
-wants P6's definitions.
+### The transcript: what was sent, and what came back
 
-**The diff is a silhouette, and a silhouette is not a section.** A body with a
-hollow inside it — a mug, once there is one — has the same side silhouette as a
-solid block, so the diff says they match. What P4 compares is what you would
-SEE from a plane, which is what the plan asks for and what a hand drawing a side
-profile means; a cut-plane section is a different reading and wants its own row.
-Noted, not built.
+`src/exchange.ts`, and the panel's ***model*** section under *why / measurements*. One row
+per exchange — *glm-5.3-flash · the brief · applied · 159 ms* — opening on the outcome and
+its reason, the words the hand typed, what parsed (counted, never the reply's own claim),
+what was dropped and why, and then **the brief as sent** and **the reply as received**, each
+verbatim in its own scrolling box. The reply is shown *before any repair*: what a model
+actually wrote is the evidence, and a repaired copy of it is the shard's account of what the
+model meant.
 
-**A profile of a solid is read against its whole silhouette, so a second body
-on the same plane is a second candidate, and only the best overlap wins.** Two
-solids standing one behind the other across the same view will both be offered
-and the larger overlap takes it. There is no chip yet to argue with that
-reading, the way P1's plane chip does — it is the same shape of problem and the
-same shape of answer, and it is the first thing P4 would grow.
+Two rules it keeps:
 
-**`Add it` resolves every missing region at once, not one at a time.** The
-sentence says how many and how much, and the chips name them individually, but
-the verb takes them together. Regions the hand wants and regions it does not are
-not told apart yet; §4's *"what tier 1 cannot resolve is the brief for regen"*
-is P5's.
+- **It is runtime, not the log.** What a reply DID is already in the log — the version, the
+  profiles it drew, the steps it named, each attributed and each undoable — and a board
+  replayed from its log must derive the same drawing whether or not anyone ever saw the
+  prompt. Putting the brief in the log would also put a model's whole reply into every
+  export, every merge and every other hand's copy of the board. The last eight are kept
+  (`KEEP`); how many is still John's.
+- **A row a hand opened stays open.** The panel is rebuilt on every report — every camera
+  move, every hover — and a disclosure rebuilt is a disclosure shut, so reading a reply on a
+  live board was impossible until which row is open was remembered across the rebuilds.
 
-**The noise floor is one number for both kinds.** A speck of `missing` and a
-speck of `extra` are dropped at the same fraction of the drawing's area. In
-practice the specks that survive an *Add it* are the half-pixel seam between the
-region and the body — counted and said out loud, which is honest, but a reader
-seeing *3 specks dropped as noise* on a body that matches is being told
-something about the rasteriser rather than about the drawing.
+**Every exit path of `runBrief` ends in a sentence AND a row**, the same sentence in both,
+including the two that never reach a model: no seat joined, and nothing on the board to fill.
+An attempt that leaves no trace is the fault G0 exists to close.
 
-**A massing is an intersection of extrusions, and nothing else.** Three views
-that describe a sphere describe, to this rung, the box they share. That is what
-plan-elevation-section has always meant and it is what §2.6 rule 1 asks for;
-anything rounder is what the brief is for.
+### A brief always answers, and the drawing stands first
 
-**A model is asked one at a time, and only the first seat is asked.** Several
-models may join and the pane lists them all, but a brief goes to
-`models.first()`. The canvas asks every joined model and shows the
-disagreement; the shard has one op tree per version and no row to show two
-proposals side by side yet. It is the same shape of problem as P4's "only the
-best overlap wins", and the same shape of answer.
+A brief is no longer refused for want of a selection. `briefTarget()` says what Enter will
+fill, in the order a hand means things in — **what you pointed at**, then **the one solid
+standing** (a brief with nothing selected on a board holding one body is about that body;
+requiring a tap was a mode wearing a different hat), then **the drawing stood up first**,
+then **what is missing**.
 
-**A regen replaces steps; it does not argue with them.** The scope is the step
-ids a name covers, the brief says which may change, and the reply is built into
-the hole they left — but nothing checks that what came back is *about* the same
-thing. A model that returns a step named `turret` which is in fact a moat gets
-its moat, named turret. What protects the drawing is the clip, not the name.
+`log.standFor()` is the seam underneath, and the one G1 widened from the massing to the
+sketch hull without changing a caller. When nothing can stand it names what is **missing**,
+as the next mark to draw rather than as what the shard noticed: *nothing stands yet — a
+footprint on the foundation and a shape from the side would*; *… 1 outline on the foundation
+alone; a shape from another side, on another tile, would stand it*; *… the outlines on the
+foundation and height do not overlap where they are, so their views are of two different
+things*.
 
-**The derivation is synchronous.** A tree of a dozen booleans derives in a few
-hundred milliseconds here (qwen3:8b's five-step castle: 137 ms measured
-headlessly), and the drawing loop is blocked for that long. Nothing runs in a
-worker; the canvas's own lesson about clocks and paint (`nextFrame`) has no
-sibling here yet. A proposal large enough to matter would want one.
+The field says which of the three Enter will be **before it is pressed**, and it asks the
+same function `runBrief` acts on, so the line and the act cannot disagree.
 
-**Only one thing a model says is not geometry, and it is a verb.** `parseMeaning`
-asks which of three verbs a phrase meant, against the names in play, and
-refuses anything else. That is deliberate — it is the smallest possible opening
-— but it means the shard learns a *synonym*, not a new way of acting, and a
-phrase that means something the three verbs cannot express stays unread.
+### The hand, and the seat
 
-**A definition is matched by ONE outline at a time.** The structural signature
-of the profiles that share a plane is held (core's own, where it applies) and
-nothing reads it yet: a single outline drawn again is a group of one, and a
-group of one has no links. Matching a GROUP of marks against a definition —
-which is what the canvas's own `matchDefinition` does — is the next thing this
-file would grow, and it is already the right shape for it.
-
-**The offer is about a SHAPE, so a correction is too.** *Not a mug* rejects
-every outline like the one corrected, not the one stroke, which is what makes
-it worth holding — and it means a hand that wants to reject exactly one drawing
-cannot. There is no *only this one* yet, and it is not obvious there should be.
-
-**A placement copies the definition's tree.** Change the mug and the mugs
-already placed do not change with it: they hold what the tree was when they
-were placed. That is the honest shape while a definition is a rep rather than
-an artifact (there is nothing to point AT), and it is exactly the same gap
-`dup` ran into — but an instance that tracks its definition is a different and
-better thing, and it wants the core door named above.
-
-**A placement is a similarity, so a definition cannot be stretched.** The scale
-is uniform, from the ratio of the two outlines' own sizes, so an outline drawn
-twice as wide as it is tall places a mug that fits the diagonal rather than
-filling the rectangle. That is what §2.5 asks for; a non-uniform fit is a
-different operation and would want its own word.
-
-**Nothing re-reads what a placed body affords.** A placed mug is a solid like
-any other — it can be cut, scratched, mirrored and named — but the outline it
-stands at is taken into it as provenance, so it is never offered a second
-definition. Drawing another outline is how you place another one.
-
-Row 6 (`path`) is still in the table with a comment naming P7. The op tree
-declares `sweep`, `loft`, `union` and `along` and implements none of them —
-`deriveTree` passes the body through unchanged and marks the solid broken with
-the row's own name rather than dropping the step.
-
-The field is still at the foot of the panel rather than at the pen tip. P1 has
-the screen position it needs now (`space.project`, and the chips layer proves
-it places), so this is the next cheap move rather than a missing piece; the
-READER is the part that does not move.
-
-## The hand, and the seat
-
-> `mcp.mjs` (the server), `src/room.ts` (the transport), `src/models.ts`
-> (the seat), `mcp-smoke.mjs` (the stdio test, in CI). G5 of
-> `SHARD-3D-PUSH-2.md`.
-
-The shard joins a live room the way the canvas does, and the same process is
-both halves of it: **a hand** in the room, and **the model seat**. John types a
-brief in his tab; Claude Code, in a conversation, reads it and answers it; the
-shard applies that answer exactly as it applies a small model's. That is the
-point — the contract a model is asked to fill gets argued about first hand,
-before anything is tuned against it.
-
-```bash
-node Demos/relay.mjs          # the room, on :8020 — sixty lines, no truth of its own
-node shard-3d/mcp.mjs         # the hand; it starts a relay itself when none answers
-```
-
-Then open the shard at `?live=shard&relay=http://127.0.0.1:8020`, or open the
-models pane and press *Join the room, and seat the hand*. `.mcp.json` registers
-the server as `metamedium-3d` beside the canvas's `metamedium`.
-
-**Six tools**, each a verb a hand in this space already has, or the seat:
+The shard joins a live room the way the canvas does, and the same process is both halves of
+it: **a hand** in the room, and **the model seat**. John types a brief in his tab; Claude
+Code, in a conversation, reads it and answers it; the shard applies that answer exactly as it
+applies a small model's. That is the point — the contract a model is asked to fill gets
+argued about first hand, before anything is tuned against it.
 
 | Tool | What it takes |
 |---|---|
 | `space_look` | nothing — the three planes, every mark with its reading and the plane it lies on, every solid's op tree with step ids, names and materials, and whether a brief waits |
 | `space_pending` | nothing — the parked briefs: the key, the human's words, the contract to answer in, the brief itself |
-| `space_answer` | `key`, and either `reply` (the contract object the brief carries — `{parts, steps?}` for a standing hull, `{steps, profiles}` otherwise, or `{reuse}`) or `refuse` (one clause) |
+| `space_answer` | `key`, and either `reply` (the contract the brief carries — `{parts, steps?}` for a standing hull, `{steps, profiles}` otherwise, or `{reuse}`) or `refuse` (one clause) |
 | `space_draw` | `claims`: each a shape (`rectangle`/`circle`/`triangle`/`line`/`arrow`) or raw `points`, on a named `plane` (with an optional `at` along its normal) or a view plane through `through` facing `facing` |
 | `space_propose` | `solid` (id or name) and `reply` — held on the solid, never blessed |
 | `space_say` | `text` and `about` — a sentence beside marks, said in the human's status line as it lands |
 
-### How a brief travels, and why it is a log event
+**How a brief travels, and why it is a log event.** The plan left it open: a log event, or a
+side channel over the relay. It is a log event — **an answer on the explanation plane** — for
+three reasons. The canvas already parks questions there (`session.answer()` is the third plane
+beside content and gesture: visible and erasable, never ink, never joining a lasso or a
+signature), and a brief changes no mark, stands no solid and writes no version. The log is the
+source, and a side channel would be a second truth that does not replay, does not undo and is
+not exported. And it costs no protocol: `LiveStore` already carries log lines, and the relay
+keeps no truth of its own.
 
-The plan left it open: a log event, or a side channel over the relay. **It is a
-log event — an answer on the explanation plane**, for three reasons:
+The one thing the log cannot carry is the **pairing**, because node ids are per hand — a
+counter derived on replay, and two hands merging the same lines in a different order can number
+the same node differently (SURFACE-v10-PLAN D8, still a debt). So the pairing rides in the
+event's own payload, which merges identically everywhere: a brief is an answer whose `question`
+is `brief:<key>`, its reply is one whose `question` is `answer:<key>`, and **no id is matched
+across hands**. The hand answers about the ids it read off the brief's own node in its own
+session.
 
-1. **The canvas already parks questions there.** `session.answer()` is the third
-   plane beside content and gesture — visible and erasable, never ink, never
-   joining a lasso or a signature. A brief changes no mark, stands no solid and
-   writes no version. It is a question, and this is where this engine has always
-   put questions and their answers.
-2. **The log is the source.** A side channel would be a second truth that does
-   not replay, does not undo and is not exported; the transcript would have to
-   be told about it separately. In the log, the brief and its answer *are* the
-   record.
-3. **It costs no protocol.** `LiveStore` already carries log lines between the
-   tab and the hand, and the relay keeps no truth of its own.
+**The seat is a model, and that is the whole of it.** `runBrief` has no case for it. A seat
+carries an injectable `transport` — the same hook the e2e's stub uses, which is
+`participants/bridge.ts`'s pattern — and the hand's transport parks the question instead of
+posting it, returning the same `CompletionResult`. So the prompts are the same, `parseProposal`
+is the same, everything outside the closed vocabulary is dropped and counted the same, the work
+indicator and **Esc** work the same, and the version is held and attributed the same.
 
-The one thing the log cannot carry is the **pairing**, because node ids are per
-hand: they are a counter derived on replay, and two hands merging the same lines
-in a different order can number the same node differently (SURFACE-v10-PLAN D8,
-still a debt). So the pairing rides in the event's own payload, which merges
-identically everywhere — a brief is an answer whose `question` is `brief:<key>`,
-its reply is one whose `question` is `answer:<key>`, and **no id is matched
-across hands**. The hand answers about the ids it read off the brief's own node
-in its own session, never the ones the asking hand used.
+**The hand takes the front seat.** `first()` is who a brief goes to, and sitting down in this
+seat is a deliberate act that says *ask me*; with a local model already seated, a brief typed at
+the hand would otherwise go to the model. *Leave the seat* puts it back. **It proposes and never
+blesses**, holds no keys, writes no code that runs and cannot play anything.
 
-### The seat is a model, and that is the whole of it
+**Both asks, because there are two** (G4). `splitPrompt` reads the brief and the human's words
+back out of the prompt a seat was handed, splitting on the literal `messagesFor` writes between
+them — and it knew only *Propose the tree.*, the steps contract's marker. So on a standing hull,
+which is the board the whole of push 2 is about, the hand was handed the brief with the words
+stripped out of it. *Name the parts.* is in the table now; the marker a contract uses is the one
+thing that must not be guessed, so they are listed rather than matched loosely.
 
-`runBrief` has no case for this. A seat carries an injectable `transport` — the
-same hook the e2e's stub uses, which is `participants/bridge.ts`'s pattern — and
-the hand's transport parks the question instead of posting it, returning the
-same `CompletionResult`. So the prompts are the same, `parseProposal` is the
-same, everything outside the closed vocabulary is dropped and counted the same,
-the work indicator and **Esc** work the same, and the version is held and
-attributed the same. The only difference is where the question goes.
+**Three things real use found at once.** `space_look` must read every node carrying ink and a
+plane, not `contentIds` — a mark a solid was made from leaves the content plane, so a board with
+a box standing on two marks reported *0 marks*. A step's provenance is its `from` (stroke ids),
+because `profile` on a step the engine built is the resolved outline and printed as
+`[object Object]`. And the `?live=` boot block must run at the **end** of `main.ts`, with the
+demo — up beside `createModels` it runs during module evaluation, where `report()` reads chrome
+declared further down, so it threw into a promise nobody awaited and the seat silently never
+took while the room joined fine.
 
-**The hand takes the front seat.** `first()` is who a brief goes to, and sitting
-down in this seat is a deliberate act that says *ask me*; with a local model
-already seated, a brief typed at the hand would otherwise go to the model.
-*Leave the seat* puts it back.
-
-**It proposes and never blesses**, holds no keys, writes no code that runs and
-cannot play anything — the canvas's hand's rules, unchanged.
-
-### When the tools are not loaded
-
-A session that started before `.mcp.json` named this server has no tools for it.
-The hand still works from the shell, exactly as `CLAUDE.md` documents for the
-canvas: run `mcp.mjs` with its stdin fed by `tail -f` on a command file and its
-stdout to an output file, append one JSON-RPC line per call, and read the reply.
-One process stays alive across turns.
+**When the tools are not loaded.** A session that started before `.mcp.json` named this server
+has no tools for it. The hand still works from the shell, exactly as `CLAUDE.md` documents for
+the canvas: run `mcp.mjs` with its stdin fed by `tail -f` on a command file and its stdout to an
+output file, append one JSON-RPC line per call, and read the reply. One process stays alive
+across turns.
 
 ```bash
 mkfifo /tmp/mm3d.in 2>/dev/null; : > /tmp/mm3d.cmd
@@ -2145,280 +1080,624 @@ echo '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"space_pend
 tail -c 4000 /tmp/mm3d.out
 ```
 
-### What proves it
+### The cursor, and where free ink lands
 
-- `src/room.test.ts` — two hands on a `LocalHub`: another hand's stroke arrives
-  stamped `by` and reads as its own mark, my marks are not doubled by the merge,
-  and a brief is parked, listed, answered, refused, cancelled by a signal.
-- `mcp-smoke.mjs` — the stdio half, in CI's `shard` job: a relay of its own on a
-  **free port**, a second hand in Node as the tab, and the round trip end to end.
-- `e2e.js` — five steps through the real UI: the seat takes the front, Enter
-  parks and writes nothing while it waits, the answer lands named and green, a
-  refusal writes nothing and says why, and what the hand says reaches the status
+**Shift + click puts the cursor** where you clicked: on the surface under the pointer, else on
+the foundation plane under it. The whole picker moves there, and from then on the **view plane
+passes through it**, screen-facing. This is Blender's 3D Cursor placement, which is what John
+asked for by name. It is a runtime thing, like the camera — never a log event — and `home` and
+framing do not touch it. A face under the pen that the camera can actually read still wins
+outright, which is Blender's *Surface* placement.
+
+**But the shard's cursor FOLLOWS the view until it is placed, and Blender's does not** — the one
+place the shard deliberately parts company with the reference. Blender's cursor is static: it
+starts at the world origin and stays there. On John's second board that cost him the whole
+drawing — he looked one to four units up and drew four free loops, and every one landed at floor
+level, because the view plane stood through a cursor nobody had moved. So the rule here is **the
+view plane passes through the volume the hand is working in**: by default the camera's *target*,
+the centre of the view, which pans and orbits with the hand; and a cursor placed by shift + click
+sticks, until `0`, a clear, or a shift + click on the cursor itself lets it go. The status line
+says which in the words you would use — *view · through the centre of the view* or *view ·
+through the placed cursor*.
+
+**What follows is the view plane, not the picker.** The picker stands on the placed cursor and at
+the world origin when there is none, because its origin is where the planes it hands out pass
+through — a foundation on a following cursor would be a ground that lifts off the ground the
+moment you looked up — and because a picker parked in the middle of the view puts three clickable
+tiles under the middle of every drawing.
+
+**View ink is world geometry.** It is drawn the same from every angle, like every other stroke:
+orbit off it and it is a thin, fully drawn ellipse, not a faded one. (Until 16 September it went
+faint once the camera left the pose it was drawn at. That said the stroke was a property of the
+camera, which is the one thing it is not.) The pose is still kept on the mark — provenance, and
+what makes any plane derivable from the screen path later. The compass's **pinned views** chips
+list every pose view ink hangs on, with a count, and a tap eases the camera back to it: camera
+bookmarks, where a stroke reads as what it is. Nothing about what is *visible* depends on them.
+
+### The scorer, in one paragraph
+
+**`confidence = shape × facing × anchor × continuity`**, in one place
+(`src/planarity.ts`, `rank`). **Shape** is the shape rung's own top confidence on the stroke's
+screen path cast onto that candidate, read at that plane's own `scaleAt` — the strongest term, and
+the only one that knows what was drawn; floored at `SHAPE_FLOOR` when the rung places nothing, so
+a plane is never scored zero for a squiggle. **Facing** is
+`FACING_BASE + (1 − FACING_BASE)·|n · look|`: 1 flat on, `FACING_BASE` edge-on, gentle on purpose
+because a box's top seen from above is only 84% face-on and must not lose to the view plane for
+being 100%; below `FACING_FLOOR` the candidate is kept, marked *too oblique to read*, and can
+never win, and below `FACING_TAKES` it is kept, marked *too oblique to take the stroke*, and
+cannot outrank the view plane. **Anchor** is how much of the stroke lies on geometry that lies in
+that plane — a face's own corners, the previous stroke's bounds — as a ratio of the stroke's own
+size: `ANCHOR_BASE` when there is nothing there (absence of evidence), up to 1 when the ink lies
+on it, and down to `ANCHOR_MISS`, below the base, when there is geometry and the ink is nowhere
+near it (evidence against). **Continuity** is 1 for the previous stroke's own plane within
+`recentWindowMs` and `CONTINUITY_BASE` otherwise. Multiplicative rather than a weighted sum,
+because the terms are independent evidence and any one of them being bad *should* pull the whole
+candidate down: a plane the stroke reads as nothing on, seen nearly edge-on, with nothing in it, is
+not saved by being recent. Every term is returned on the candidate, so the panel shows the
+evidence and not only the number.
+
+**`pickAtPenDown` is not the scorer.** At pen-down there is no stroke to read, so the live plane
+comes from where the pen is: a face beats everything, else the previous plane when it is recent AND
+the pen came down near that stroke, else the view. The full read happens once, at pen-up.
+
+### The gate: off-axis ink is conserved
+
+John, drawing with nothing chosen: *"drawings off the main axis are on the camera plane mapped
+rather than the way it is stretching the shapes out now; the shapes drawn off main axes should stay
+conserved size at the angles that make sense."*
+
+The scorer is a comparison of evidence, and a half-oblique plane can win one. At forty-five degrees
+a world plane's facing term costs it only 22%, and continuity plus an anchor pay that back twice
+over — so a circle drawn beside a box came back a long ellipse lying on the ground. Casting a
+screen path onto a plane at that angle is not a reading of what the hand drew; it is a stretch of
+it.
+
+So with nothing chosen the **view plane is the default**, and evidence does not merely have to beat
+it — it has to **make sense at its angle** first. `FACING_TAKES` (0.80, 37° off face-on) is that
+gate: below it a `world`, `previous` or `face` candidate is kept, said out loud, still offered by
+the runner-up chip, and **cannot outrank the view plane**, whatever its shape score. It applies at
+pen-down too: a face under the pen keeps its precedence only if it passes, and otherwise the stroke
+goes on the view plane through the cursor. Shift + click on that face first and the cursor is *on*
+it, which is how you get the face's own depth and the camera's own angle at once.
+
+The number is bounded from above by the shard's own default three-quarter view, which sees a
+horizontal plane at **0.844** (`DEFAULT_PHI`, 57.6° above the horizon). A gate over that would mean
+the view the shard *opens on* could not take a face at all, and P2/P3 would have nowhere to land.
+
+What the view plane conserves is not a threshold but a property: it is screen-facing by
+construction, so the cast is a **similarity transform** — the circle is the circle, at the cursor's
+own depth. `planarity.test.ts` pins the aspect to within 1%, and the e2e measures the same thing
+through the real pointer path at a 49° view: `1.0000` on the view plane, `0.825` the moment the
+ground is taken from the chip. G4's fourth beat measures it again on a standing board: 1.394 drawn,
+1.394 landed.
+
+Two things the gate deliberately does **not** do. It does not touch a **chosen** plane: the
+gizmo's tile is a decision, and a decision is not a reading to argue with. And it does not *drop*
+anything: the gated plane is in the panel with its number, its facing, and what taking it would
+cost, and the chip takes it in one act. The hand overrules the gate; the gate never overrules the
+hand.
+
+The demo was leaning on the defect. `?demo=mug` orbited by 0.04 before drawing the hole, which left
+the rim 0.70 face-on — an angle at which the face outscored the view plane 0.68 to 0.55 and the
+circle landed on the rim as a 1.4:1 ellipse. It orbits to look *into* the mug now, which is the
+angle the demo's own sentence was always describing.
+
+### A flip is one act
+
+A flip re-reads the mark's **kept screen path** onto another candidate, under the **pose in the log**
+rather than wherever the camera is now. It cannot be a new rep on the same node: `getRep` returns the
+FIRST rep of a modality, and the readings, the fingerprint and the maths were all computed from the
+ink at `addStroke` — a second `stroke` rep would never be seen, and a mark whose plane changed but
+whose readings did not would be a lie. So the flip is a new stroke, and it is **additive**: `add` the
+re-projected stroke, then `erase` the first, in that order, all three under the flip's one timestamp
+— so `log.undo()` drops the erase, the plane and the stroke together and the first mark comes back on
+its first plane. The other order would leave the first mark erased. A mark a solid was made from is
+refused, and says why: the tree references that stroke id and was measured in that plane.
+
+### The plane is a rep on the stroke
+
+**Proposed by the local participant through `session.propose()`.** §2.1 says the plane is "a rep on
+the stroke with a reason, either way it came to be there", and `Rep.data` is deliberately `unknown`,
+so this needed no new event type: the plane goes into the log as a `propose` event, replays with the
+session, and carries its `why` and its confidence like every other reading. A parallel shard-owned map
+keyed by stroke id would have been a second source of truth beside the log.
+
+The one cost is **undo**: for a stroke the last event is the `propose`, not the stroke, so one undo
+would leave the ink with no plane. `log.undo()` walks back until the number of `stroke` events actually
+falls — four lines, and a test pins it.
+
+**A world plane read from the evidence should stand where the pen is.** §2.1 says "the three world
+planes through the origin (or through the gizmo's slid origins)", and the parenthetical is the point.
+Standing them at the world origin offered a `height` plane a profile does not touch, so flipping an
+extent onto it produced a mark the form rung could not see as an extent — a chip that settled nothing.
+They now stand through the point the pen came down on when it came down on something, and say so. It
+also settled the runner-up on a box's top face: the horizontal plane through the pen IS that face, so
+it is offered once, and what is left second is `view`.
+
+**A gesture's reading is not derivable from the board it changed.** Row 1 reads a stroke against the
+silhouettes of the solids standing in its view — so the moment a scratch has done its work there is no
+solid left to cross, and the table re-derives the very same mark as an `annotation`. The reading is
+therefore HELD on the mark as a `gesture` rep the way core holds one, and `forms()` prefers it. *What a
+mark did is not a function of the board it left behind.*
+
+### The compass in the corner, and the plane picker at the cursor
+
+They look alike and they answer different questions, so they are two widgets and they always will be.
+**The plane picker** stands at the cursor, in the scene, and its three tiles say *where ink lands* — a
+decision, blessed by the act of tapping one. **The compass** sits in the top-right corner, is chrome
+rather than world, and says *where the eye is*. Nothing the compass does touches the log: a camera pose
+is runtime, and the only pose the log holds is the one a view stroke already carries.
+
+The compass is an **SVG overlay**, not a second three.js scene rendered to a corner viewport. It is a
+hundred pixels of six circles and three lines; an SVG takes its colours from `brand/tokens.css` like the
+rest of the chrome, so light and dark are the same tokens inverted with no second palette, and it costs
+no draw call. `view.ts` does the only hard part — projecting the six axes onto the camera's own screen
+basis and sorting them by depth — and it is pure, so it is tested without a canvas.
+
+Three arms from a centre, each ending in a ball: the positives labelled `X` `Y` `Z`, the negatives
+hollow and bare. The world convention is Y up, so `X` is the **right** view, `Y` the **top**, `Z` the
+**front**. Near balls are drawn larger and over the far ones (`ballScale`, a painter's order rather than
+a z-buffer). The ball that faces the **chosen plane** carries the teal keyword colour — the same signal
+the picker's tile carries, because they are saying the same thing. A tap snaps, keeping the target and
+the distance: a snap is a turn, not a re-frame. A second tap on the same ball flips to the other side. A
+drag anywhere on it orbits at the same radians-per-pixel the canvas drag turns at — one finger, because
+the widget is chrome and one finger on the canvas draws. Under it, *home* frames everything on the board
+(or the plane picker itself, when the board is empty, because that is the next move), *view* is persp /
+ortho, and every pinned view is a chip.
+
+**The axis view IS the choice.** John, looking at the two widgets: *"in explicitly selected gizmo x, y,
+or z, treat that surface as selected automatically rather than needing the plane click; hide the plane
+click option when in a gizmo-clicked x, y, or z; only show the planes when in alt views."* They were two
+decisions where a hand makes one: standing square onto the height plane and *then* clicking the height
+tile is saying the same thing twice, and the tile you must click is a square lying over the drawing you
+came here to make.
+
+- **Tapping a ball chooses the plane that view faces** — front or back (along Z) → height; top or bottom
+  (along Y) → foundation; right or left (along X) → width (`axisPlaneFor`, the same mapping the teal ball
+  was already lit by). The status says *front · height chosen*. It is the same `chosen` decision a tile
+  makes, so the profile and its extent, the edge-on gate and the picker's slide are all looking at the
+  plane they always were; only the **reason** differs, and the ink carries it — *the front view faces it
+  — the camera chose the plane*, never a tile nobody held.
+- **The rule is about where the camera STANDS, not which control moved it.** An orbit that lands on the
+  front by eye chooses the same plane a tap would (`isAxisView`, within `AXIS_VIEW_TOLERANCE_DEG`).
+- **The tiles are hidden in an axis view** and come back the moment the camera leaves. What stays is the
+  cursor mark and its three axes — that is where the cursor *is*, and shift + click has to keep reading.
+- **Leaving an axis view gives the plane back to the hand.** The choice was the view's, so it goes with
+  the view: what comes back is whatever the hand had chosen with a tile or a key, which is *nothing* when
+  it never did. The rule is one line (`planeAfterLeavingAxisView`) so the other reading — the view's
+  choice sticks until something else is said — is one edit rather than an argument spread through the
+  wiring. It stays quiet when nothing changed: a camera move must not push *massing from 3 profiles ·
+  tier 1* out of the one status line.
+- **The hand overrules the view.** `0` (or the picker's centre) in an axis view un-chooses and hands the
+  tiles straight back; so does choosing a *different* tile by key.
+
+**A plane chosen by hand that is edge-on from here still says so** — the scorer's own `FACING_FLOOR`, so
+the compass and the planarity read use one number: *height chosen · it is edge-on from here — orbit, or
+tap the ball that faces it*. §10's last risk is that the pen works and the ink goes nowhere; the fix is
+to say so before the hand finds out.
+
+**A snap ends when the camera arrives**, not on a stopwatch. The ease is wall-clock and its last few
+degrees ride on a single frame; on a deadline of `ms + 60` a frame that came late put the arrival after
+it, the lens was handed back to auto-perspective while the camera was still a degree off the axis, and
+the ortho a tap promises quietly came undone. Arrival is the normal end; the timer is a generous backstop
+(`SNAP_GRACE_MS`) for an ease that is never going to arrive.
+
+**Perspective follows the camera.** A tap on a ball goes orthographic, and orbiting off the axis comes
+back to perspective — Blender's "auto perspective", and the reason for it is the reason the three
+canonical views exist: a front, top or side view is a draftsman's, and perspective is a lie in it, which
+is exactly what you went to that view to check. Off the axis, depth is what says the thing is solid.
+Pressing the *view* tile **pins** the projection where you put it, and a tap on a ball hands it back to
+the camera. The toggle does not jump: going to ortho, the frustum height is the perspective frustum's
+height at the target (`orthoHeightFor`); coming back, the distance is the one that frames that height
+(`distForOrthoHeight`). Each is the other's inverse, and the pair is pinned by a test. Both cameras stand
+in the same place and `space.camera` is whichever is live, so everything that takes a camera swaps with
+it and nothing else in the shard knows. A pose taken through the ortho lens carries its frustum height
+(`Pose.ortho`), so `rayForPose` rebuilds an orthographic stand-in rather than fanning parallel rays.
+
+**Orbit around the centre of the view.** An orbit asks, once, at the moment the drag begins: the
+**selection** if there is one, else **nothing** — and nothing means the target, the centre the hand panned
+to. Either way the target is not moved onto anything: with a pivot the camera **and** the target turn
+rigidly about it, so the pivot keeps its place in the camera's own frame and stays under its own pixel.
+This is the fix for *"the rotation needs to respect the translation of the overall view so it doesn't snap
+to center"*. The first version moved the target *onto* the pivot and rebuilt the angles from where the
+camera stood — which re-aimed the camera, so the picture swung the pivot to the middle of the screen the
+moment a drag began. Gone with it: orbiting about whatever the pointer happened to be **over**. Even made
+rigid it would put the centre of the turn on a different point every drag, for no act the hand performed.
+A **dolly** asks the same question and gets a different answer on purpose: it goes toward whatever is
+under the pointer, selected or not, because there you are pointing at where you want to be rather than at
+what you are working on. Answering both with "the selection" is how a wheel over the corner of a thing
+sails past it.
+
+### Trackpad and touch
+
+John: *"Make the view work with trackpad and touch."* On a trackpad there was no orbit at all — no right
+button on the machine — and every swipe zoomed, because the browser sends a trackpad's everything as
+`wheel` and the shard read every wheel as a dolly. On a screen, turning the view meant dragging a compass
+the size of a thumbnail.
+
+**The map is Blender's**: swipe orbits, `Shift`+swipe pans, pinch or `Ctrl`/`Cmd`+swipe zooms. A hand that
+has Blender in its fingers should not have to learn a second map.
+
+**Telling a trackpad from a mouse is the only part Blender cannot lend**, since both arrive as `wheel`
+with the same fields. They are told apart by the event's **shape** (`classifyWheel`, read top to bottom,
+first match wins): `ctrl` is a pinch, because that is how macOS sends one; lines or pages are a wheel's
+units; a delta on **both axes** is the sign a wheel cannot make; a fractional delta is a trackpad
+measuring a finger; a whole step under 40px is a trackpad nudged, and one at or over it is a notch. The
+two-axis verdict is **remembered for 800ms**, because the middle of a real swipe runs straight and sends
+deltas that look exactly like notches — without the memory a gesture turns into a zoom halfway through —
+and it expires, so putting the trackpad down and picking up a mouse does not inherit it.
+
+**A swipe worth a canvas width is half a turn**: π/width radians a delta unit, about 0.0026 on a 1200px
+canvas. Deliberately gentler than the 0.006 a mouse drag turns at, because a trackpad's deltas are
+accelerated and a swipe spends more of them than a finger travels.
+
+**On a screen: one finger draws, two fingers pinch or orbit, three pan.** They pinched and panned until
+now (P0's rule, and the canvas's) — but this is a place for making 3D things, where turning the view is the
+commonest thing a hand does, and asking for that from a corner of chrome is asking too much of a thumb.
+Which of the two a pair is doing is decided **once**, after they have travelled twelve pixels, by whether
+the spread or the centre grew faster — deferred commitment, the way the plane is picked, and nothing moves
+before the decision. Once made it holds until a finger lands or leaves. A change in how many fingers are
+down **restarts** the gesture and moves nothing: the centre of three is nowhere near the centre of two, and
+carrying a delta across that jump would fling the view.
+
+**No stroke is ever begun by a gesture that turns out to be two-fingered.** A screen cannot know the second
+finger is coming, so the first one has already been drawing by the time it lands; the scene sees it land and
+`ink.ts` **drops** the live stroke rather than finishing it (`space.onAbandon`) — nothing read, nothing
+logged, nothing to undo. Deliberately not `pointercancel`, which means the pen was taken away mid-stroke and
+that stroke is still the hand's. And while two fingers are down `space.orbiting()` is true, so the second
+finger does not start a stroke of its own.
+
+### Ink is never covered, on a face
+
+Invariant 3 says a solid made from a sketch draws **with the sketch still on its face, faint**. A solid
+grows *out of* the plane its profile lies on, so the profile's ink ends up flush with a face or inside the
+solid, and an ordinary depth test would hide the very mark the thing was made from.
+
+So the marks a solid was made from are drawn with **the depth test off**, at 0.3 opacity, above the solid,
+while the solid's material carries a polygon offset so a coplanar face never fights a line. The cost is
+honest and visible: a box with its footprint showing through reads a little like glass.
+
+**The alternative was tried, and it does not come off.** Turning the depth test ON is an immediate visual
+win — the box stops reading like glass — and what it costs is the thing invariant 3 is for. Three findings,
+in the order they turned up. **A polygon offset does not win the tie**: every stroke is already lifted
+`LIFT` (0.004 u) along its plane's normal, which for a profile is *into* the solid, and a polygon offset in
+depth-slope units never recovers that — a `Line2` is a screen-widened quad whose slope at a face seen head-on
+is near zero, the worst case for the offset. **A camera-facing lift does win it** — move the ink object a
+fraction of the camera's distance toward the eye before the test, recomputed on every camera change — and the
+mechanism is demonstrable. **And it still shows the hand nothing**, because of where the ink IS: a solid grows
+*away* from the plane its profile lies on, so the profile's ink ends up on the one face you are never looking
+at; from underneath, where it is visible, it coincides with the body's own silhouette edge. Depth-testing it
+buys a better-looking box and loses the only view in which the sketch was telling you something.
+
+So the glass stays, and the trade is still John's — but it is now a trade with a measured price. The one place
+the argument could change is a **feature** drawn on a face that stays visible (a circle for a cut or a boss,
+on a top face): there depth-testing would show the ink crisply where it lies. That is an argument for deciding
+per-mark, not for one flag over all of it.
+
+### One file, and what it took
+
+`build-standalone.mjs` runs `npm run build` and inlines what Vite emitted. Two things are worth knowing:
+
+- **`String.replace` reads `$&` in the REPLACEMENT.** A minified bundle is full of them, and the first run
+  put the whole `<script src=…>` tag back into the middle of three.js — the script guard then said, correctly,
+  that the page still referenced a file that would not travel with it. The replacement is a function now,
+  which turns the substitution off.
+- **A literal `</script>` would close the tag early.** In valid JavaScript that sequence can only occur inside
+  a string or a regular expression, where `<\/script` means exactly the same thing, so it is escaped rather
+  than merely refused.
+
+The font stays external: `brand/tokens.css` pulls IBM Plex Mono with an `@import`, the tokens name a real
+fallback stack, and the face is not worth trebling the file for. The result is one `<script type="module">`
+and one `<style>`, and it runs from a plain static server with no console errors — `?demo=castle` included.
+
+### Smaller things, found the hard way
+
+- **`linewidth` is ignored on a plain `THREE.Line`,** and a hairline is not ink. The ink is drawn with `Line2`
+  (screen-space quads) so a stroke reads as a stroke at any zoom.
+- **A plane's frame is left-handed.** The plane's axes are (u, v, n) with v running *down* the screen, and
+  `cross(u, v)` is exactly `−n` for every plane — so a matrix made of (u, v, n) is a mirror and every face of
+  every solid comes out inside out. `solid.ts` builds (u, v, cross(u, v)) and signs the extrusion to suit.
+- **three.js lighting is physically correct, and the tokens are not exposure values.** `--paper-dk` under an
+  ambient of 0.9 renders as slate; the scene's levels are set so a face of that token comes back on the paper
+  it was named for.
+- **The tokens have no `prefers-color-scheme` block.** `brand/tokens.css` defines dark under
+  `[data-theme="dark"]` only, so a surface whose theme is *system* must stamp the attribute itself — stamping
+  nothing renders light on a dark machine while the tile says `sys · dark`. `src/theme.ts` stamps.
+- **A boolean's output cannot be given to `THREE.EdgesGeometry`.** It keeps an edge when the two faces sharing
+  it disagree by more than the threshold *and* when nothing shares it, because that is a boundary — and a
+  triangle splitter leaves coincident-but-separate vertices and T-junctions all over a re-cut face, so a box
+  with a hole in it came back drawn like a spider's web. Every solid the shard derives is a CLOSED body, so a
+  genuine boundary edge cannot exist: `hardEdges` keeps only edges shared by exactly two faces that disagree.
+- **A zigzag that comes back to where it started reads CLOSED, and a closed stroke is never a scratch** — it
+  is a lasso, which is core's rule and the right one. An even number of traversals ends on the side it began,
+  so the e2e scratches with three.
+- **The panel's height was a guessed number, and P4's two pills found it.** `#panel` stopped at
+  `100vh - 220px`, which assumed how tall the field would be; two more verbs made the field taller and it began
+  covering the bottom of the panel — which is exactly where the newest row lives. The field measures itself into
+  `--field-h` on every render now and the panel stops where the field starts. A layout constant about another
+  element's content is a constant that goes wrong the first time that content grows.
+- **`offsetParent` says nothing about whether a fixed element is on screen.** Every piece of this surface's
+  chrome is `position: fixed`, and a fixed element's `offsetParent` is **null by spec**, displayed or not — so
+  the usual *is this displayed* test called all of them invisible. The honest question is whether the thing
+  takes up room: `getBoundingClientRect()`.
+- **The bar was already over a phone's width before anything was added to it.** At 375px its controls wanted
+  420px, so *theme* and *help* sat off the right end with no way to reach them — invisible because nothing had
+  ever measured it. Adding *details* made it 511 and made it visible. The bar scrolls sideways on a narrow
+  screen now.
+- **`taken` meant two things, and the second one broke the first.** `versionOf().taken` read a `name` rep,
+  which was the same as *the definitions are held* only while `take` was the only way to name a solid. Naming
+  one by hand first — which is exactly what P6's demo does — disabled *Take it*.
+- **`newVersion` returned nothing, so a version the session refused was reported as a success.** It returns
+  `attachCode`'s answer now, and `applyParts` says nothing was written rather than claiming two parts were
+  named.
+- **A demo that waits for a frame waits forever in a tab nobody is painting.** Whichever comes first, a frame
+  or a timer's tick, moves the `?demo=` blocks on — the canvas's own lesson (`nextFrame` in
+  `Demos/surface/01-view.js`).
+- **The panel's parts wiring silently dropped `name` and `colour`** (G4). The chip's label is `part.name`, so
+  every chip read *part 2 · at the north-east corner* however the hand or a model had named it, and G3's names
+  showed only in the rows further down.
+- **An axis view changes the camera, so the demo must leave it before it orbits** (G4). `?demo=castle` taps the
+  Y ball for its footprint, and orbiting from *there* by the standpoints' own deltas put the eye somewhere the ⊓
+  read as `annotation` and nothing stood. It goes back to the free view first, which is also what the beat says
+  in words.
+- **A placed sketch hull fills a corner of its own plan, so a ray down the centre proves nothing** (G4). The
+  demo's eighth beat sweeps the outline instead and asserts that something of the placement stands inside it and
+  that nothing else does.
+- **A runner that reads a scenario's name twice can wait thirty seconds for `window[undefined]`** (G4). The
+  shard's whole loop is called `shard` on `e2e/run.mjs`'s command line and `__scenario` in the page; one table
+  (`SHARD_SCENARIOS`) now holds both, plus the label the results are filed under.
+
+## What it does not do
+
+**The read cannot tell a line going away on the ground from a line rising.** The honest limit, and plan §10's
+first risk arriving on schedule. A straight screen stroke reads `line 0.92` on *every* plane, so the strongest
+term says nothing; the two readings are the same picture, and no term in the scorer can separate them. An extent
+drawn from a profile's edge with **nothing chosen** reads `previous · foundation 0.64`, with `view 0.55` and
+`height 0.40` behind it, and no box stands. The answers are the two the plan already gives — choose the height
+tile, or take the chip. The evidence that *would* separate them is occlusion, and that is a fifth term the plan
+does not name: noted, not built.
+
+**The scorer's terms are the four §2.1 names and no others.** No occlusion, no prior over which plane a hand
+uses most, no learning from what was taken. Each would help; each is a new kind of evidence and wants the plan's
+sanction first.
+
+**A flip does not re-read what the flipped mark affords beyond tier 1.** It runs the tier 1 check — a line that
+was flat on the ground and is now rising off a profile IS an extent, and the box stands — but a flip of ink a
+solid was made from is refused outright rather than rebuilt, and `whyNotFlip` says so.
+
+**The silhouette a scratch is counted against is a convex HULL.** The mesh's vertices are projected and taken
+round, so a concave solid's dent is inside it and a scratch through the mouth of a C counts as crossing the C.
+Good enough for this rung — erasing is a coarse act and it still takes three crossings — and it is one function
+to replace.
+
+**Row 1 is not restricted to the view plane**, and §2.3 does not restrict it either. What is enforced is the
+rule that matters: **ink ON a solid's own face is never a scratch — it is a feature**, and neither is the ink a
+solid was made from, which is its provenance. In practice the e2e's scratch reads `previous` rather than `view`,
+because a straight screen stroke reads much the same on every plane and continuity carries the last one.
+
+**`dup` is not a second solid.** It is a `place` step on the same tree: one tree, two bodies. A copy that can be
+moved on its own wants the core door named below.
+
+**The diff is a silhouette, and a silhouette is not a section.** A body with a hollow inside it — a mug, once
+there is one — has the same side silhouette as a solid block, so the diff says they match. What P4 compares is
+what you would SEE from a plane, which is what a hand drawing a side profile means; a cut-plane section is a
+different reading and wants its own row.
+
+**A profile of a solid is read against its whole silhouette, so only the best overlap wins.** Two solids standing
+one behind the other across the same view will both be offered and the larger overlap takes it. There is no chip
+yet to argue with that reading the way P1's plane chip does — the same shape of problem and the same shape of
+answer, and the first thing P4 would grow.
+
+**`Add it` resolves every missing region at once, not one at a time.** The sentence says how many and how much
+and the chips name them individually, but the verb takes them together. Regions the hand wants and regions it
+does not are not told apart yet.
+
+**The noise floor is one number for both kinds.** A speck of `missing` and a speck of `extra` are dropped at the
+same fraction of the drawing's area. The specks that survive an *Add it* are the half-pixel seam between the
+region and the body — counted and said out loud, which is honest, but a reader seeing *3 specks dropped as noise*
+on a body that matches is being told something about the rasteriser rather than about the drawing.
+
+**A massing is an intersection of extrusions, and nothing else.** Three views that describe a sphere describe, to
+this rung, the box they share. That is what plan-elevation-section has always meant; anything rounder is what the
+brief is for.
+
+**A hull is blocky, and partial silhouettes under-determine it.** Two parts on a drawing of three towers, measured
+and pinned; the *honest limit* section above says what would close it.
+
+**A model is asked one at a time, and only the first seat is asked.** Several models may join and the pane lists
+them all, but a brief goes to `models.first()`. The canvas asks every joined model and shows the disagreement; the
+shard has one op tree per version and no row to show two proposals side by side yet.
+
+**A regen replaces steps; it does not argue with them.** The scope is the step ids or part ids a name covers, the
+brief says which may change, and the reply is built into the hole they left — but nothing checks that what came
+back is *about* the same thing. A model that returns a step named `turret` which is in fact a moat gets its moat,
+named turret. What protects the drawing is the clip, not the name.
+
+**A real local model stays in the vocabulary and drifts on the words.** qwen3:8b returned valid JSON in the closed
+vocabulary first time — five steps, two mirrors, no repair needed — but named its steps `castle_base`,
+`turret_front` and `turret_side` rather than reusing the brief's own words, and bound no colour at all. A second run
+named them `castle body` and `turret` and bound `grey` and `green`. The brief says *use these exact words*; a small
+model reads that as advice. **Reusing an existing name is checked** (the regen's mutable list); **inventing one from
+the human's words is not**, and cannot be without the shard deciding what the human meant.
+
+**The derivation is synchronous.** A tree of a dozen booleans derives in a few hundred milliseconds here (qwen3:8b's
+five-step castle: 137 ms measured headlessly), and the drawing loop is blocked for that long. Nothing runs in a
+worker. A proposal large enough to matter would want one.
+
+**Only one thing a model says is not geometry, and it is a verb.** `parseMeaning` asks which of three verbs a phrase
+meant, against the names in play, and refuses anything else. That is the smallest possible opening — but it means
+the shard learns a *synonym*, not a new way of acting, and a phrase that means something the three verbs cannot
+express stays unread.
+
+**A definition is matched by ONE outline at a time.** The structural signature of the profiles that share a plane is
+held (core's own, where it applies) and nothing reads it yet: a single outline drawn again is a group of one, and a
+group of one has no links. Matching a GROUP of marks against a definition — which is what the canvas's own
+`matchDefinition` does — is the next thing `library.ts` would grow, and it is already the right shape for it.
+
+**The offer is about a SHAPE, so a correction is too.** *Not a mug* rejects every outline like the one corrected, not
+the one stroke, which is what makes it worth holding — and it means a hand that wants to reject exactly one drawing
+cannot. There is no *only this one* yet, and it is not obvious there should be.
+
+**A placement copies the definition's tree.** Change the mug and the mugs already placed do not change with it: they
+hold what the tree was when they were placed. That is the honest shape while a definition is a rep rather than an
+artifact (there is nothing to point AT), and it is exactly the gap `dup` ran into.
+
+**A placement is a similarity, so a definition cannot be stretched.** The scale is uniform, from the ratio of the two
+outlines' own sizes, so an outline drawn twice as wide as it is tall places a mug that fits the diagonal rather than
+filling the rectangle. That is what §2.5 asks for; a non-uniform fit is a different operation and would want its own
+word.
+
+**Nothing re-reads what a placed body affords.** A placed mug is a solid like any other — it can be cut, scratched,
+mirrored and named — but the outline it stands at is taken into it as provenance, so it is never offered a second
+definition. Drawing another outline is how you place another one.
+
+**Row 6 (`path`) is in the table with a comment naming P7.** The op tree declares `sweep`, `loft`, `union` and `along`
+and implements none of them — `deriveTree` passes the body through unchanged and marks the solid broken with the row's
+own name rather than dropping the step.
+
+**The field is still at the foot of the panel rather than at the pen tip.** P1 has the screen position it needs
+(`space.project`, and the chips layer proves it places), so this is the next cheap move rather than a missing piece;
+the READER is the part that does not move.
+
+**`space_propose` is held, and nothing takes it up yet.** It lands through `propose()` as an attributed, unblessed rep
+with a sentence beside the solid. Answering a brief the human actually typed — `space_answer` — is the path that lands,
+and since G3 it lands in the parts contract too. Taking an *unasked* proposal up from the surface is still not built.
+
+**`space_look` reads the log, not the geometry.** It cannot import the shard's TypeScript, so it reports marks, planes,
+readings and op trees; it does not compute the form rung, the hull or the parts. G2 puts the parts in the brief, which
+is where the hand reads them today. What it would take for `space_look` to see parts itself is not small: a part is
+`hull ∩ a run's prism` — a CSG boolean on a derived mesh — so the server would need three.js and `three-bvh-csg` in
+Node, and `solid.ts`, `parts.ts` and `form.ts` compiled rather than duplicated. Two honest ways out, neither built:
+publish a committed Node bundle of the shard's own modules the way `Demos/metamedium-core.node.mjs` is published for
+the canvas, and import it; or have the **tab** put its parts into the room, since the tab has the renderer and already
+computes them — a sentence per part beside the solid, which every hand in the room then reads with no geometry at all.
+The second is cheaper and fits the rule that the log is the source; the first is what a hand needs to look at a board
+nobody has open.
+
+**The hand cannot see.** There is no `space_see`: the canvas's hand renders ink to a PNG, and the shard's marks lie on
+planes in space. A picture of the board is the obvious next tool and is not here.
+
+**Ids per hand remain a debt.** Two hands both drawing in one room can number the same node differently. The brief
+pairing is immune by construction; a `space_say` aimed at an id read from an out-of-date `space_look` is not.
+
+**Chromium only.** The gate runs one browser; a WebKit smoke is still owed (`../e2e/README.md`).
+
+### Still John's
+
+- **Whether the ink a solid was made from is depth-tested.** The glass, above — now a trade with a measured price
+  rather than an untried alternative, and the per-mark reading (profile ink through the body, feature ink on its face)
+  is the shape a decision would take.
+- **What a hull is when a tower is seen only once.** The honest reading stands (two parts, pinned). The alternative —
+  the hull as a *union of masses*, each ⊓ bounded by the footprint rather than by the other claims — gives every tower a
+  body at the cost of inventing its depth (a 2.8 u slab across a 6 × 4 plan, measured). A third option is to **ask**: a
+  part seen once is a question on the board (*how deep is this?*), a second view or a word answering it.
+  `SHARD-3D-PUSH-2.md` §5 says ask.
+- **Whether a floating ⊓ is dropped to the ground** (verticals added) or left as an annotation. Built as an annotation,
+  with the reason said.
+- **Whether the hull stands on the *second* claim** or waits for a footprint. Built on the second.
+- **How many exchanges the transcript keeps.** Eight.
+- **Whether the MCP seat should be able to *bless*** — name a part outright — or, like the canvas's hand, only propose.
+  Built as propose.
+
+## What core would need
+
+Every one of these is a gap the shard worked around rather than a bug, and each is written so it could be landed in
+`metamedium-core` with tests (`SHARD-3D-PLAN.md` §11).
+
+- **`measure()` should take the stroke's scale the way `analyzeStroke` does, and name its unit.** It rounds to whole
+  units (`r0 = Math.round`) and labels every length `px`, so in plane units a 1.2-unit circle comes back as "radius 1px"
+  — the shape rounded away. The shard measures each mark on a copy scaled by `1/scale` and the panel says which space it
+  is in.
+- **A rep that supersedes**, or an explicit `revise` that re-derives what was derived from the ink. `getRep` returns the
+  FIRST rep of a modality, so a reading cannot be revised in place: a mark's readings, fingerprint and maths are all
+  computed at `addStroke`, and a second `stroke` rep proposed later is never read. That is why a flip is a new node, and
+  it is the same gap as the next one.
+- **A rename event, or `wordOf` reading the newest.** `bless` takes a name once and `wordOf` reads the *first* `word`
+  rep, so a second name is never seen. The hand's name is held as the shard's own `name` rep, newest first — and a
+  definition has the same shape of problem, which is why definitions are reps on the root artifact.
+- **`propose()` should not compose a rep's `reasoning` INTO its `data` with a spread.** `{ ...(r.data as object),
+  reasoning }` turns a string rep into a map of its own characters: `'plinth'` comes back as `{0:'p',1:'l',…}`. Either
+  reject a non-object `data` when `reasoning` is given, or keep the reason beside the data rather than inside it. The
+  shard passes an object (`{ text, why }`).
+- **A *bless from data*** — an artifact made from a tree, attributed and summon-less, with the membership a bless gives
+  it. `bless` needs marks that are still on the CONTENT plane and a made solid's members are not, so there is no way to
+  bless a second artifact up from a tree alone; that is why `dup` is a `place` step on the same tree. `session.import`
+  gives everything but the name of the act, which is what makes a placement a thing of its own.
+- **An `op` kind beside `run` in `kinds.ts`.** Until then the tree is a `json` rep with `// mm:op tree v1` on its first
   line.
+- **A signature that knows which plane each mark is on.** A bless computes a signature and union bounds over marks whose
+  coordinates are in *different planes*, which is arithmetic on incomparable numbers. Nothing in the shard reads those —
+  the form rung measures in world space — but a signature across planes will mean nothing to a group match.
+- **The primitive comparison with its weights as an argument.** `matchPrimitiveFromLibrary` divides the corner difference
+  by four and does not read `extent` at all, so a plain rectangle scored 0.79 against a mug's outline. It is right for
+  what it was written for — a stroke against a user's primitive, where size is evidence and the stroke may be open — and
+  wrong for *is this outline that definition*. The weighting is the caller's business, so what would land there is the
+  comparison with its weights as an argument, not a second copy of it.
 
-### What it does not do
+Two notes for the next caller rather than changes:
 
-- **`space_propose` is held, and nothing takes it up yet.** It lands through
-  `propose()` as an attributed, unblessed rep with a sentence beside the solid.
-  Answering a brief the human actually typed — `space_answer` — is the path that
-  lands, and since G3 it lands **in the parts contract too**: the brief carries
-  the contract it wants answered in, `space_pending` prints it, and the shard
-  applies the reply exactly as it applies a small model's. Taking an *unasked*
-  proposal up from the surface is still not built.
-- **`space_look` reads the log, not the geometry.** It cannot import the shard's
-  TypeScript, so it reports marks, planes, readings and op trees; it does not
-  compute the form rung, the hull or the parts. G2 puts the parts in the brief,
-  which is where the hand reads them today — the brief's own `THE PARTS`
-  section, in the engine's own `part:n` ids, so a reply can name one.
+- **`trace` thins what it is given, so it must be given a BOUNDARY.** Handing core's tracer a filled silhouette returns
+  the medial axis of the blob — a spine, not an outline — because thinning is the second of its four steps. The mask's own
+  one-pixel boundary is what it wants, and the diff's `outlineOfMask` is the reusable half.
+- **Do not hand raw ink to a triangulator.** `simplifyStroke` is already there and is exactly the right tool; 127 walls
+  where 9 will do took the e2e from 8 seconds to 136, and the boolean library said so in its own words.
 
-  **What it would take for `space_look` to see parts itself** is worth stating,
-  because it is not a small thing. A part is `hull ∩ a run's prism` — a CSG
-  boolean on a derived mesh — so the server would need three.js and
-  `three-bvh-csg` in Node, and `solid.ts`, `parts.ts` and `form.ts` compiled
-  rather than duplicated (`mcp.mjs` already names its one duplication, the three
-  planes, as the thing it would not do twice). Two honest ways out, neither built:
-  publish a committed Node bundle of the shard's own modules the way
-  `Demos/metamedium-core.node.mjs` is published for the canvas, and import it; or
-  have the **tab** put its parts into the room, since the tab has the renderer
-  and already computes them — a sentence per part beside the solid, which every
-  hand in the room then reads with no geometry at all. The second is cheaper and
-  fits the rule that the log is the source; the first is what a hand needs to
-  look at a board nobody has open.
-- **The hand cannot see.** There is no `space_see`: the canvas's hand renders
-  ink to a PNG, and the shard's marks lie on planes in space. A picture of the
-  board is the obvious next tool and is not here.
-- **Ids per hand remain a debt.** Two hands both drawing in one room can number
-  the same node differently. The brief pairing is immune by construction; a
-  `space_say` aimed at an id read from an out-of-date `space_look` is not.
+## The fixtures, and the exchanges
 
-## The e2e
+**`fixtures/`** holds John's own boards, as **logs** — core's own `encodeLog`, one JSON event per line, the canvas's
+format unchanged — so a fixture stands up exactly the drawing it came from and `?fixture=<name>` and *Open…* read the same
+bytes. `fixtures/john-2026-09-16-castle-sketch.mm.log` is his first board (the one the demo above drives);
+`fixtures/john-2026-09-16-massing.mm.log` is his second (three profiles and a massing at y ∈ [0.97, 3.09], floating where
+the profiles are). `node fixtures/make.mjs` writes both: the massing stood up **in Node** through the real session, the
+castle sketch **exported from the surface** because its ⊓ lie on view planes and a camera is three.js. The `.json` capture
+beside them is provenance, not a board. `fixtures/README.md` has the rest.
 
-Open `http://localhost:5174` in its own tab, then in the console:
+**`fixtures/exchanges/`** holds what was sent to a model about a board and what came back, **verbatim and unrepaired**, one
+file per model per board: the stub (imperfect on purpose — a colour outside the closed list, a part id the hull does not
+have, an op outside the part vocabulary, all three dropped and counted), an *ideal* written by hand as the contract's own
+worked example (also the demo's own reply, held against it by `src/demo.test.ts`), and **qwen3:8b through Ollama** on both
+boards (42 s, strict JSON first time, both parts named and painted, nothing repaired — and two honest faults in the file's
+own `why`). `src/namedparts.test.ts` reads **every** file there as a module, so the contract is pinned against text a model
+actually produced and nothing here can quietly drift when the prompt is edited. Still owed: `z-ai/glm-5.3-flash` through
+John's own OpenRouter key, which joins by key in the model pane — a key never leaves the device, so no agent can add that
+one. `fixtures/exchanges/README.md` says how.
+
+## The e2e, and the gate
+
+`node e2e/run.mjs` from the repo root is the headless gate (`../e2e/README.md`): it starts its own servers on free ports,
+opens a **fresh Chromium context per scenario**, loads the harnesses that already exist and awaits the result object each
+returns. It does not reimplement them. Pass, fail and **skip** are counted separately; a failed assertion, a harness
+exception, an attempted request to a real model, or a page error not on the named allowlist each exit nonzero, with
+structured JSON and a screenshot in `e2e/results/`.
+
+Four scenarios: `canvas` (`Demos/session-engine.e2e.js`), and the shard's three — `shard` (`__scenario`, the whole loop),
+`demo` (`__demo`, the mug of §9) and `demo2` (`__demo2`, G4's nine beats).
+
+By hand, in the shard's own tab at `http://localhost:5174`:
 
 ```js
 const src = await fetch('/e2e.js').then(r => r.text());
 (0, eval)(src);
-__scenario().then(r => window.__R = r);   // the seven packages and the compass, 95 steps
-__demo().then(r => window.__D = r);       // the two-minute demo, 10 steps
+__scenario().then(r => window.__R = r);   // the whole loop
+__demo().then(r => window.__D = r);       // the mug, §9
+__demo2().then(r => window.__D2 = r);     // the castle, G4
 ```
 
-Eighty steps. The first one clears the board **and parks the camera** —
-`nav.projection('persp')`, `view('free')` — because every shape below is stated
-in a plane's own units and projected through the camera *as it stands*, so a
-run started after somebody had driven the compass by hand would read a circle
-on an edge-on plane as a dot. The board is not the only state a run begins
+**The first step clears the board AND parks the camera** — `nav.projection('persp')`, `view('free')` — because every shape
+below is stated in a plane's own units and projected through the camera *as it stands*, so a run started after somebody had
+driven the compass by hand would read a circle on an edge-on plane as a dot. The board is not the only state a run begins
 from; that was found by running it after driving the compass by hand.
 
-**The compass's fourteen**, at the end: the balls are six, depth-sorted,
-labelled `X` `Y` `Z` on the positive ends, and the two that face the chosen
-plane light; tap the Z ball and the camera's forward is −Z within a hundredth,
-tap it again and it is +Z; an axis view took the ortho lens *and the projection
-matrix is really parallel* (read off `m[15]`, so it cannot pass because a flag
-was set and the camera was not swapped); a drag on the widget — real pointer
-events on the SVG — moves the azimuth and brings perspective back; a rectangle
-drawn under ortho still reads `rectangle > 0.8` with a measured scale, and so
-does the same rectangle under perspective; *home* puts every one of the board's
-eight bounding corners inside the viewport; and *home* on an empty board frames
-the plane picker and says so.
+Every shape is stated in the plane's own units and projected to a screen path by `__shard.screenFor` — which is what a
+person aiming at the ground does, and it means the oblique camera has to un-project it correctly for a step to pass.
+`__shard.strokeScreen` dispatches real pointer events on the canvas, so nothing in the e2e can pass by calling the engine
+directly.
 
-**The coupling's six** are among them (16 September 2026): tapping Z chooses
-the height plane, hides the picker's tiles, says *front · height chosen* and
-lights the ball you tapped; a rectangle drawn there lands on `height · chosen`
-and its reason names the camera, not a tile; the other two axes choose the
-other two planes and a flip keeps the plane; an orbit off the axis puts the
-tiles back and — nothing having been chosen by hand — leaves the plane read
-from the drawing again; a tile the hand *did* hold comes back after an axis
-view carried a different one; `0` in an axis view un-chooses and hands the
-tiles back, and a tile can then be held by hand from the same view; and a plane
-so chosen that is edge-on from here says *edge-on* and names it, while the ball
-that faces it is one tap away.
-
-Eighty-one of them are P0 → P6. **P0's twelve:** choose the foundation, draw a rectangle by
-screen path, assert the top reading is `rectangle ≥ 0.8` on
-`foundation · chosen`; choose the height plane, draw a circle, assert
-`circle ≥ 0.8` on `height · chosen`; assert the two marks carry different
-scales because the pen worked at different depths; undo twice and assert the
-board is empty.
-
-**P2's ten:** draw a rectangle and assert it *plays* `profile` by row 2; ask
-the field for `extrude` and assert it is refused, with the missing mark named
-rather than a depth guessed; draw a line up from the rectangle's near edge and
-assert it plays `extent` by row 4, that exactly one solid stands, that its one
-step is an `extrude` referencing both strokes, that its author is
-`participant:tier0`, that the depth is within 10% of the line's world length
-and positive, and that the status line said *box … · tier 1*; assert the solid
-is selected and the panel carries the *solid* row, the step and the tier;
-assert both strokes are still marks on the board; name it in the field and
-assert the name is the hand's over the engine's word; undo once and assert the
-solid is gone and both strokes remain; then draw a closed profile and a line
-beside it on one plane and assert a `revolve` with a full sweep.
-
-Every shape is stated in the plane's own units and projected to a screen path
-by `__shard.screenFor` — which is what a person aiming at the ground does, and
-it means the oblique camera has to un-project it correctly for a step to pass.
-`__shard.strokeScreen` dispatches real pointer events on the canvas, so nothing
-in the e2e can pass by calling the engine directly.
-
-**P1's nine:** stand a box as P2 does and **un-choose**; draw a rectangle over
-its top face by world points projected to screen, and assert the plane is read
-as `face`, that it is named *top of artifact:7*, that the runner-up is `view`,
-that the winner's reason names the rectangle's own confidence, that no oblique
-candidate won, that a chip stands beside the mark and that the panel lists the
-six candidates; draw a circle **beside** the box on screen and assert `view`,
-a pose, a view plane standing **through the cursor** at the world origin, one
-pinned view and a status line saying *view · through the cursor*; flip the
-first stroke to its runner-up and assert the board still holds four marks and
-one solid, that the flipped mark says where it came from and offers the way
-back, and that **one** undo puts it on the face again; flip it explicitly onto
-`view` and back; go and look at it from the **side** and assert that the view
-ink's opacity and its **world points** are both unchanged — it is world
-geometry — while what did change is only that it is 0.60 thin on screen instead
-of round, then tap the pinned view and assert the camera came back within a
-degree and the ink is untouched; **shift + click** on the box's top and assert
-the cursor lands on that face, that the status says *cursor placed*, that no
-mark was left, and that the next stroke drawn in clear air stands on the view
-plane through it; and, last, draw an
-extent from a profile's edge with nothing chosen, assert the read is ambiguous
-and no solid stands, then take `height` from the chip and assert the mark plays
-`extent` and a box stands at tier 1 with the drawn depth.
-
-**P3's eleven:** build the box as P2 does and **un-choose**; draw a circle on
-its top face and assert it plays `feature` by row 3, naming the face and the
-solid, and that nothing was made of it; assert the SOLID stands selected with
-no lasso and that *Cut a hole* and *Raise a boss* are both offered, both
-saying *tier 1*, the cut saying it will go *through*, and that the alias
-`drill` reads as the cut; take *Cut a hole* and assert a `cut` step nesting on
-the extrude, `through: true`, referencing the circle, nothing broken, a second
-version held — and then **look through the hole**: a ray straight down its
-centre misses the solid entirely while a ray beside it still meets the top at
-2.40; assert the circle's ink is still on the face and the panel carries the
-nested tree; undo and assert one version came off, the hole closed and the
-circle stayed; take *Raise a boss* instead and assert the ray now meets the
-solid ABOVE the face; undo; draw one pass across the box and assert it is not
-a gesture and the status said *one more pass*; draw three passes and assert it
-plays `gesture` by row 1, the solid is gone, every other mark is still there
-and the status said *scratched out*; undo and assert the box is back at its own
-height; last, assert *Mirror* says which plane before Enter and puts a body on
-the other side of it, and that *Dup* stands a copy a width away.
-
-**P4's eight:** build the box as P2 does, take the **side view** and choose the
-**width** tile (the plane is then flat on to the eye, which is what makes
-drawing a side profile something a hand can do), and assert a ray down where the
-bump is going meets nothing; draw the box's side outline **with a bump on its
-right** and assert it plays `profile` by row 2 *of artifact:7*, that the view is
-called `side`, that the reason says so, that no second solid stood up and that
-the field refuses to `extrude` it; assert the diff reports **one missing region**
-whose area is within 30% of the drawn 0.56 u², at the right, with an outline to
-build on, coverage between 0.8 and 0.97, and that the status line and the panel
-both name it; assert *Add it* is offered saying *tier 1*, how many and how much,
-that the alias `fill it in` reads as it, and that *Take it off* is refused with
-*nothing extra* and the sentence; take *Add it* and assert a `match` step
-nesting on the extrude with `how: 'add'` and the profile referenced, nothing
-broken, a second version held — and then **look at the bump**: a ray down
-through the region meets the solid at the height it was drawn, while beside it
-the box is exactly as tall as it was, and the profile's ink is still on its
-plane; assert the diff re-reads at over 95% with nothing missing and nothing
-extra, and that *Add it* is now refused saying so; undo, and assert the bump is
-gone, the ink is not, and the region is reported again; last, on a fresh box,
-draw a profile **smaller** than it, assert one `extra` region, take *Take it
-off*, and assert the material is gone where the drawing said and the diff reads
-clean.
-
-**P5's fourteen:** draw the castle's plan on the foundation and assert a lone
-profile stands nothing up; draw the keep's front on the height plane — a narrow
-tower off its right-hand corner with a roof on it — and assert **one solid
-stands at once**; draw the side on the width plane and assert the massing grew
-to three profiles, that it is called *massing*, that its author is
-`participant:tier0`, that all three strokes are still ink on the board, that
-the status said *massing from 3 profiles · tier 1*, and that **no model was
-seated by drawing**; assert a ray down through the tower meets the body a unit
-above one down through the keep, and that nothing stands outside the drawing;
-assert that with no model a brief says so and Enter opens the pane; seat
-`joinStub` and assert the reading line now says *→ asks e2e-stub* **before**
-Enter; type *a castle with green turret tops* and assert a third version landed
-with steps named `castle`, `turret` and `top`, each name on its own step id,
-green bound to the top and nothing else, and the status saying *tier 2*; assert
-the last step of the tree is the engine's own **clip**, that it says nothing
-proposed may leave the drawing, and that the turret the reply asked to stand 3.6
-units proud of a 3.6-unit castle comes back **inside** it; assert the row says
-*honours the drawing …* with three views all over 80%; take it, and assert the
-artifact is named `castle` and that `turret` and `top` are definitions based on
-it; type *make the turrets taller* and assert it reads as a regen scoped to that
-name, that the turret step was replaced and **every other step kept its own
-id**; type *turret* and assert it reads as *a definition, based on castle* with
-no model in the line; type *the tops are red* and *remove the turret* and assert
-both are tier 1 and do what they say; type *the turrets should feel more
-medieval* and assert it comes back as an offer to ask, with what the table DID
-understand said out loud; and last, re-stub with a slow reply, press Enter,
-**Esc**, and assert the call is gone, no version was written and the tree is
-exactly as many steps as it was.
-
-**P6's seven:** build the box as P2 does, name it *box* in the field and take
-it — and assert the library holds ONE definition, that it is the whole of it,
-that it carries the plan as its profile and that the EXTENT is not among them,
-because a line is not an outline; draw the same footprint again three quarters
-the size and well clear, and assert it plays `profile`, that it is not read as
-a profile OF the box, that the library offers `box` above the floor with the
-corners and the plane named in its reason, that a chip stands beside the mark
-and that the panel carries the *could be* row; assert *Place box* and *Not a
-box* both stand saying *tier 1*, that the alias `place it` reads as the
-placement, and that typing the NAME says *place it at stroke:n* before Enter;
-take *Place box* and assert a SECOND artifact stands with one `place` step
-referencing the outline, named from the library, and then **look at it** — a
-ray down the middle meets it at three quarters of the original's height and a
-ray a width away meets nothing, while the original's tree is untouched; undo,
-and assert the placement is gone and both inks are not; take *Not a box* and
-assert the offer goes, that the definition holds one rejected example, that an
-outline LIKE it drawn elsewhere is refused too, and that one undo brings the
-offer back; and last, stub a model that answers `{"reuse":"box"}`, assert the
-brief lists the library with its step and profile counts, press Enter and
-assert that a placement stood up, that no version was written into the solid
-the brief was about, and that the status says *placed from the library, not
-written*.
-
-**The two-minute demo is `__demo()`, and it is §9 of the plan**: the foundation
-tile and a plan; the height tile and a line up from a corner (a box, tier 1);
-an orbit, nothing chosen, and a circle on the top face read as a `feature` with
-a runner-up to argue with — *Cut a hole*, and a ray down the middle goes
-through; a stub seated and *a mug with a wide handle* typed, which comes back
-as one step the model named `handle` from your words, attributed, with the
-*honours* row measured (56% against the plan, because the hole is real); the
-side view, the handle profile drawn WIDER than the model made it, and the diff
-naming a 0.71 u² region at the left; *make the handle wider*, which resolves it
-by NAME and leaves every other step alone, after which the row reads *side ·
-matches 100%*; *name: mug* and *Take it*, which hold `mug` (the whole, three
-profiles) and `handle` (a part) in the library; the plan drawn again elsewhere,
-offered back as *mug 0.97* with `handle 0.78` behind it; and one tap, after
-which a second mug stands three quarters the size with its hole and its handle
-scaled with it. Every step asserts, and each carries its own timing; the whole
-run is about **0.9 seconds**. `?demo=mug` draws the same board at boot from the
-same numbers (`window.__mug`), so what is asserted and what is shown are one
-thing.
-
-The test hook is `window.__shard`: `strokeScreen`, `screenFor`,
-`screenForWorld` (a world point to screen — how the e2e aims at a face it did
-not choose), `choose`, `view`, `orbit`, `flipPlane`, `chipFor`, `pinned`,
-`goToPinned`, `cursor` (where it stands and why), `shiftTap` (the placement
-gesture, through the real pointer path), `worldPointsOf` (a mark's ink in world
-space — the thing that must not move when the camera does), `state` (marks with
-their `plays`, their ranked plane candidates, their plane's origin, the opacity
-they are drawn at and their pose; the solids, the selection, the status),
-`solids` (the trees, not the meshes — with each step's id, its `on`, its depth
-or sweep, whether a cut goes `through`, how many versions the log holds and
-whether the derivation is broken), `features` (what *Cut a hole* is about), `diffs` (the panel's *matches the
-drawing* row as data: the view, the coverage, which outline was read, the
-sentence, and every region with its area and where it is),
-`rayDown` (fire a ray down world −Y and say what it meets — the only honest way
-to assert a hole goes through), `scratchOf` and `silhouetteOf` (row 1's
-evidence, before the threshold), `select`, `field` (type and press Enter),
-`fieldRead` (what Enter *would* do), `undo`, `clear`, `panelText`, and P6's
-`definitions` (each with its profiles, its plane kinds and how many corrections
-it carries), `matches` (what the library says an outline could be, ranked, with
-the reason), `place` and `correct`.
-
-**Front the tab before running it.** A hidden Browser-pane tab has a canvas of
-zero size, and every projected screen point comes back (0, 0). The `?demo=`
-blocks no longer wait on PAINT — a frame or a timer's tick, whichever comes
-first, moves them on — but nothing can save a viewport that is genuinely not
-there.
+**The test hook is `window.__shard`**, and it is the same surface the demos drive: `strokeScreen`, `screenFor`,
+`screenForWorld`, `choose`, `view`, `orbit`, `pan`, `flipPlane`, `chipFor`, `pinned`, `goToPinned`, `cursor`, `shiftTap`,
+`worldPointsOf`, `nav` (`tap`, `home`, `drag`, `projection`, `facing`, `balls`), `bounds`, `viewport`, `state` (marks with
+their `plays`, their ranked plane candidates, their plane's origin, the opacity they are drawn at and their pose; the solids,
+the selection, the status, the camera), `solids` (the trees, not the meshes), `features`, `diffs`, `rayDown`, `scratchOf`,
+`silhouetteOf`, `select`, `field`, `fieldRead`, `undo`, `clear`, `panelText`, `joinStub`, `joinHand`, `models`, `names`,
+`definitions`, `matches`, `place`, `correct`, `honours`, `materials`, `cancel`, `brief`, `seedCode`, `exchanges`, `logText`,
+`openLog`, `loadFixture`, `standFor`, `parts`, `showPart`, `partOutlined`, `partAt`, `selectedPart`, `selectPart`.
