@@ -64,6 +64,10 @@ import {
   type Silhouette,
 } from './form';
 import type { PlaneSilhouette } from './silhouette';
+// Type only, and deliberately: `parts.ts` pulls in three.js and the CSG seam,
+// and this file must stay derivable with no renderer. An `import type` is
+// erased, so the shape travels and the dependency does not.
+import type { HullRead } from './parts';
 import {
   bossStep,
   centreAndSize,
@@ -96,6 +100,7 @@ import {
   type MirrorStep,
   type OpStep,
   type OpTree,
+  type PartSaying,
   type Profile2D,
   type ProfileInput,
 } from './op';
@@ -217,6 +222,16 @@ export interface SpaceRead {
   partAt?(solidId: string, markId: string): string | null;
   /** G2: which claims (stroke ids) a part was cut from — one, or more when views agree. */
   claimsOfPart?(solidId: string, partId: string): string[];
+  /**
+   * G3: everything the brief says about a standing hull, and everything the
+   * landing needs to build a small op scoped to one of its parts.
+   *
+   * The same seam, for the same reason: a part is cut out of the DERIVED body,
+   * and the log holds nothing derived. A board with no renderer gets null and
+   * falls back to the long brief, which is exactly what it should do — with
+   * nothing standing there are no parts to name.
+   */
+  hullOf?(solidId: string): HullRead | null;
 }
 
 /** A closed mark read as a profile of a solid, on the plane it was drawn on (P4). */
@@ -387,6 +402,36 @@ export interface Log {
     by: { id: string; name: string },
     at?: number
   ): { id: string; steps: OpStep[]; drawn: string[]; dropped: string[] } | null;
+  /**
+   * **G3: a reply about the PARTS of a hull**, landed as one version —
+   * the names and materials onto the hull step's `said`, the small ops as
+   * steps of the closed vocabulary scoped to each part's own prism.
+   *
+   * Held and attributed like any proposal: the hand takes it or leaves it, and
+   * one undo is the whole act. `scoped` narrows it to a regen — only those
+   * parts may change, and the steps the last reply left on them go first.
+   */
+  applyParts(
+    solidId: string,
+    proposal: Proposal,
+    by: { id: string; name: string },
+    scoped?: string[] | null,
+    at?: number
+  ): {
+    id: string;
+    named: { partId: string; name: string }[];
+    painted: { partId: string; colour: string }[];
+    steps: OpStep[];
+    replaced: string[];
+    dropped: string[];
+  } | null;
+  /** G3, tier 1: the hand's own word on a part — the same saying, said by the hand. */
+  nameParts(
+    solidId: string,
+    said: { partId: string; name?: string; colour?: string }[],
+    why: string,
+    at?: number
+  ): { named: number; painted: number } | null;
   /** The same, scoped: only the named steps are replaced, the rest of the tree is untouched. */
   replaceSteps(
     solidId: string,
@@ -445,7 +490,7 @@ export interface Log {
   teachSaying(s: Saying, at?: number): void;
   sayings(): Saying[];
   /** The whole board as `describeSpace` needs it. */
-  scene(words: string, opts?: { mutable?: string[] }): SpaceScene;
+  scene(words: string, opts?: { mutable?: string[]; mutableParts?: string[] }): SpaceScene;
 }
 
 /**
@@ -465,6 +510,8 @@ export interface Definition extends LibraryDefinition {
   name: string;
   solidId: string;
   stepId: string;
+  /** G3: the part of a hull it names, when it names one rather than a sub-tree. */
+  partId?: string;
   /** The solid's own name — what this definition is based on. For the whole, its own name. */
   basedOn: string;
   /** True for the definition that is the WHOLE thing rather than a named part of it. */
@@ -1218,8 +1265,18 @@ export function createLog(): Log {
    * by, applied to an op tree: a cut is not an edit of the box, it is the next
    * thing the box became.
    */
+  /**
+   * A new version of a solid's tree.
+   *
+   * **It returns what the session made of it**, because `attachCode` is a door
+   * that can refuse (STATE-1: an erased target, a superseded version, a board
+   * that has been replaced) and a caller that ignores the answer reports a
+   * success nobody had. Found by landing a reply in the name of a participant
+   * that had never joined: the row said two parts named, the log said nothing
+   * at all, and it took a debug print to tell them apart.
+   */
   function newVersion(solidId: string, next: OpTree, why: string, at: number, by = ENGINE_PARTICIPANT) {
-    session.attachCode({
+    return session.attachCode({
       participantId: by,
       nodeId: solidId,
       code: encodeOpTree(next),
@@ -2033,6 +2090,244 @@ export function createLog(): Log {
     return { id: solid.id, steps: built.steps, drawn: built.drawn, dropped: built.dropped };
   }
 
+  // ===== push 2, G3: a reply about the PARTS of a hull =======================
+
+  /** The hull step of a solid — the one a hull's parts are cut out of. */
+  function hullStepOf(solid: Solid): HullStep | null {
+    return (solid.tree.steps.find((s) => s.op === 'hull' && !s.on) as HullStep | undefined) ?? null;
+  }
+
+  /**
+   * The same saying list, with these sayings merged in — **keyed by the claims**
+   * (`op.ts`'s `PartSaying` says why at length), so a name survives a claim
+   * being dropped and the parts renumbering under it.
+   *
+   * A second saying about the same part does not replace the first outright: a
+   * reply that binds a colour and says no name leaves the name it had. That is
+   * *what it cannot name, it leaves*, one layer down.
+   */
+  function withSayings(held: PartSaying[], next: PartSaying[]): PartSaying[] {
+    const key = (claims: readonly string[]) => [...claims].sort().join('+');
+    const out = held.map((s) => ({ ...s }));
+    for (const saying of next) {
+      const k = key(saying.claims);
+      const i = out.findIndex((s) => key(s.claims) === k);
+      if (i < 0) {
+        out.push({ ...saying });
+        continue;
+      }
+      out[i] = {
+        ...out[i],
+        said: saying.said,
+        ...(saying.name ? { name: saying.name } : {}),
+        ...(saying.material ? { material: saying.material } : {}),
+        ...(saying.by ? { by: saying.by } : {}),
+        reasoning: saying.reasoning,
+      };
+    }
+    return out;
+  }
+
+  /** The hull step with those sayings on it, as a whole tree. */
+  function treeWithSayings(solid: Solid, step: HullStep, said: PartSaying[], why: string): OpTree {
+    const next: HullStep = { ...step, said, reasoning: `${step.reasoning}. ${why}` };
+    return { ...solid.tree, steps: solid.tree.steps.map((s) => (s.id === step.id ? next : s)) };
+  }
+
+  function applyParts(
+    solidId: string,
+    proposal: Proposal,
+    by: { id: string; name: string },
+    scoped: string[] | null = null,
+    at = Date.now()
+  ) {
+    const solid = solidOf(solidId);
+    const step = solid ? hullStepOf(solid) : null;
+    const read = space?.hullOf?.(solidId) ?? null;
+    if (!solid || !step || !read) return null;
+
+    const dropped: string[] = [...proposal.droppedWhy];
+    const scope = scoped?.length ? new Set(scoped) : null;
+    const partOf = (id: string) => read.parts.find((p) => p.id === id) ?? null;
+    const outOfScope = (id: string, what: string): boolean => {
+      if (!scope || scope.has(id)) return false;
+      dropped.push(`${what} is about ${id}, and only ${[...scope].join(', ')} may change — it was left alone`);
+      return true;
+    };
+
+    // ---- 1 · the names and the materials -----------------------------------
+    const sayings: PartSaying[] = [];
+    const named: { partId: string; name: string }[] = [];
+    const painted: { partId: string; colour: string }[] = [];
+    for (const p of proposal.parts ?? []) {
+      const part = partOf(p.id);
+      if (!part) {
+        dropped.push(`${p.id} is not a part of ${solid.name} — nothing was said about it`);
+        continue;
+      }
+      if (outOfScope(p.id, `the name for ${p.id}`)) continue;
+      sayings.push({
+        claims: [...part.claims],
+        said: p.id,
+        ...(p.name ? { name: p.name } : {}),
+        ...(p.material ? { material: p.material } : {}),
+        by: by.name,
+        reasoning:
+          `${by.name} said ${p.id} is${p.name ? ` “${p.name}”` : ''}${p.material ? `${p.name ? ' and' : ''} ${p.material.colour}` : ''}` +
+          `${p.why ? ` — ${p.why}` : ''}. Held on the claims it was cut from (${part.claims.join(', ')}), not on its ` +
+          `number, so dropping another claim cannot slide the word onto something else`,
+      });
+      if (p.name) named.push({ partId: p.id, name: p.name });
+      if (p.material) painted.push({ partId: p.id, colour: p.material.colour });
+    }
+
+    // ---- 2 · the small ops, by part id -------------------------------------
+    // A `remove` is not a step at all: it unsays a claim, which is `dropPart`'s
+    // own act. It is applied last, after the version below, so that a part
+    // named in the same reply is named before it goes.
+    let tree = solid.tree;
+    const made: OpStep[] = [];
+    const removals: string[] = [];
+    for (const ask of proposal.partSteps ?? []) {
+      const part = partOf(ask.part);
+      if (!part) {
+        dropped.push(`the ${ask.op} ${ask.id} is about ${ask.part}, which is not a part of ${solid.name}`);
+        continue;
+      }
+      if (outOfScope(ask.part, `the ${ask.op} ${ask.id}`)) continue;
+      if (ask.op === 'remove') {
+        removals.push(ask.part);
+        continue;
+      }
+      const root = rootOf(tree)?.id;
+      if (!root) {
+        dropped.push(`the ${ask.op} ${ask.id} has nothing to act on`);
+        continue;
+      }
+      const built = read.stepFor(
+        ask.part,
+        ask.op === 'boss'
+          ? { op: 'boss', height: ask.height ?? 0 }
+          : ask.op === 'cut'
+            ? {
+                op: 'cut',
+                shape: ask.shape ?? 'circle',
+                ...(ask.centre ? { centre: ask.centre } : {}),
+                ...(ask.r !== undefined ? { r: ask.r } : {}),
+                ...(ask.w !== undefined ? { w: ask.w } : {}),
+                ...(ask.h !== undefined ? { h: ask.h } : {}),
+                ...(ask.depth !== undefined ? { depth: ask.depth } : {}),
+              }
+            : { op: 'mirror', plane: ask.plane ?? 'height' },
+        root,
+        nextStepId(tree),
+        by.name
+      );
+      if (!built) {
+        dropped.push(`the ${ask.op} ${ask.id} on ${ask.part} came to no geometry — nothing was written for it`);
+        continue;
+      }
+      if (ask.why) built.reasoning = `${built.reasoning} (${ask.why})`;
+      tree = withStep(tree, built);
+      made.push(built);
+    }
+
+    // ---- 3 · a regen takes the last reply's steps on those parts off first --
+    const replaced: string[] = [];
+    if (scope) {
+      const gone = new Set(
+        solid.tree.steps.filter((s) => s.part && scope.has(s.part)).map((s) => s.id)
+      );
+      if (gone.size) {
+        replaced.push(...gone);
+        tree = withoutSteps(tree, gone);
+      }
+    }
+
+    // ---- 4 · the clip, in the engine's name --------------------------------
+    // The same extent invariant `applyProposal` keeps, and for the same reason:
+    // a boss raised past the drawing is a reply leaving the drawing.
+    if (made.length) {
+      const root = rootOf(tree);
+      if (root && root.id !== step.id) {
+        const clip = clipStep(
+          root.id,
+          step.id,
+          nextStepId(tree),
+          `${by.name}'s small ops kept only where they lie inside the hull — the drawing is the extent, and nothing ` +
+            `proposed may leave it (§6). Added in the engine's name, after the proposal`
+        );
+        tree = withStep(tree, clip);
+        made.push(clip);
+      }
+    }
+
+    if (!sayings.length && !made.length && !removals.length) return null;
+
+    const hull = hullStepOf({ ...solid, tree }) ?? step;
+    const why =
+      `${by.name}: ${named.length ? `${named.map((n) => `${n.partId} “${n.name}”`).join(', ')}` : 'nothing named'}` +
+      `${painted.length ? `; ${painted.map((p) => `${p.partId} ${p.colour}`).join(', ')}` : ''}` +
+      `${made.length ? `; ${made.length} step${made.length === 1 ? '' : 's'} by part id` : ''}` +
+      `${replaced.length ? `; ${replaced.length} step${replaced.length === 1 ? '' : 's'} replaced` : ''}. ` +
+      `${proposal.reasoning}. Held, attributed, and clipped to the drawing`;
+    const landed = newVersion(
+      solid.id,
+      treeWithSayings({ ...solid, tree }, hull, withSayings(step.said ?? [], sayings), why),
+      why,
+      at,
+      by.id
+    );
+    // The session refused it — an erased target, a version moved past, a board
+    // replaced. Nothing was written, and saying otherwise is worse than saying
+    // nothing.
+    if (!landed) return null;
+
+    // A removal is one more version of the one step, the same act `dropPart`
+    // is — said after the names, so what went was named before it went.
+    for (const partId of removals) {
+      const gone = dropPart(solid.id, partId, `${by.name} asked for it to be taken out`, at);
+      if (!gone) dropped.push(`${partId} could not be taken out — it is claimed by more than one view, or the hull would be left with fewer than two claims`);
+    }
+
+    return { id: solid.id, named, painted, steps: made, replaced, dropped };
+  }
+
+  /** The hand's own word on a part — the same saying, in the hand's name. Tier 1. */
+  function nameParts(
+    solidId: string,
+    said: { partId: string; name?: string; colour?: string }[],
+    why: string,
+    at = Date.now()
+  ) {
+    const solid = solidOf(solidId);
+    const step = solid ? hullStepOf(solid) : null;
+    const read = space?.hullOf?.(solidId) ?? null;
+    if (!solid || !step || !read) return null;
+    const sayings: PartSaying[] = [];
+    let named = 0;
+    let painted = 0;
+    for (const s of said) {
+      const part = read.parts.find((p) => p.id === s.partId);
+      if (!part) continue;
+      const colour = s.colour?.trim().toLowerCase();
+      if (colour && !(colour in COLOUR_WORDS)) continue;
+      if (!s.name && !colour) continue;
+      sayings.push({
+        claims: [...part.claims],
+        said: s.partId,
+        ...(s.name ? { name: s.name } : {}),
+        ...(colour ? { material: { colour } } : {}),
+        reasoning: why,
+      });
+      if (s.name) named++;
+      if (colour) painted++;
+    }
+    if (!sayings.length) return null;
+    newVersion(solid.id, treeWithSayings(solid, step, withSayings(step.said ?? [], sayings), why), why, at);
+    return { named, painted };
+  }
+
   /**
    * A regen: only the named steps go, and the reply fills the hole they left.
    *
@@ -2260,6 +2555,62 @@ export function createLog(): Log {
         confidence: 1,
       });
     }
+    /**
+     * **G3: a named PART is a definition too, based on the whole.**
+     *
+     * A part is not a step, so its definition cannot be a sub-tree of steps —
+     * but it is a HULL of its own claims, which is a real tree and the honest
+     * one: *turret* is what the footprint and that one elevation stand up.
+     * Held with the footprint when the hand drew one (a hull of a single claim
+     * is a prism with nothing to intersect), and recognised by the same
+     * profiles the claims carry, so drawing that elevation again offers it.
+     */
+    const hull = hullStepOf(solid);
+    for (const saying of hull?.said ?? []) {
+      if (!saying.name || saying.name === rootName) continue;
+      if (held.includes(saying.name)) continue; // two turrets are one definition
+      const want = new Set(saying.claims);
+      if (hull!.footprint) want.add(hull!.footprint);
+      const claims = hull!.claims.filter((c) => want.has(c.id));
+      if (!claims.length) continue;
+      held.push(saying.name);
+      const steps: OpStep[] = [
+        {
+          ...hull!,
+          id: 'step:1',
+          from: claims.map((c) => c.id),
+          claims,
+          ...(hull!.footprint && want.has(hull!.footprint) ? { footprint: hull!.footprint } : {}),
+          said: [{ ...saying }],
+          name: saying.name,
+          reasoning:
+            `“${saying.name}” is the hull of ${claims.map((c) => c.id).join(' and ')} — the claims ${saying.said} was ` +
+            `cut from${hull!.footprint && want.has(hull!.footprint) ? ', with the footprint that bounds them' : ''}`,
+        } as HullStep,
+      ];
+      const profiles = profilesOfSteps(steps);
+      reps.push({
+        modality: DEFINITION_REP,
+        data: {
+          name: saying.name,
+          solidId: solid.id,
+          stepId: hull!.id,
+          partId: saying.said,
+          basedOn: rootName,
+          steps,
+          profiles,
+          structures: structuresFor(profiles, signatureOfGroup),
+          at,
+          why:
+            `“${saying.name}” names ${saying.said} of ${rootName} — a part of a hull, so what is held is the hull of ` +
+            `its own ${claims.length} claim${claims.length === 1 ? '' : 's'} rather than a sub-tree of steps, since a ` +
+            `part is material and not a step. Based on the whole, so typing the name completes from the library before ` +
+            `any model is asked`,
+        },
+        confidence: 1,
+      });
+    }
+
     session.propose({
       participantId: LOCAL_PARTICIPANT,
       nodeId: solid.id,
@@ -2492,6 +2843,25 @@ export function createLog(): Log {
           ...(def ? { basedOn: def.basedOn, definition: true } : {}),
         });
       }
+      // G3: a name on a PART of a hull is in play too, and it is in play in the
+      // part's own id — `stepId` is the hull step the saying is held on, which
+      // is what `take` needs, and `partId` is what the name is actually about.
+      // Without this a model's *turret* was invisible to the brief, to the verb
+      // table and to the library: named, and nowhere.
+      const hull = hullStepOf(solid);
+      for (const saying of hull?.said ?? []) {
+        if (!saying.name) continue;
+        const def = defs.find((d) => d.name === saying.name && d.solidId === solid.id);
+        out.push({
+          name: saying.name,
+          solidId: solid.id,
+          stepId: hull!.id,
+          partId: saying.said,
+          op: 'hull',
+          ...(saying.material?.colour ? { colour: saying.material.colour } : {}),
+          ...(def ? { basedOn: def.basedOn, definition: true } : {}),
+        });
+      }
       // The artifact's own name is in play even when no step carries it.
       if (solid.named === 'human' && !out.some((n) => n.name === solid.name && n.solidId === solid.id)) {
         const root = rootOf(solid.tree);
@@ -2647,7 +3017,7 @@ export function createLog(): Log {
   }
 
   /** The board as the brief needs it: the planes, what lies on each, the names. */
-  function scene(words: string, opts: { mutable?: string[] } = {}): SpaceScene {
+  function scene(words: string, opts: { mutable?: string[]; mutableParts?: string[] } = {}): SpaceScene {
     const all = marks();
     const byPlane = new Map<string, BriefPlane>();
     const roles = forms();
@@ -2688,6 +3058,34 @@ export function createLog(): Log {
       const sentences = space?.partsOf?.(solid.id) ?? [];
       if (sentences.length) parts.push({ solidId: solid.id, sentences });
     }
+    // G3: the FIRST standing hull with parts takes the brief's short shape, and
+    // with it the parts contract. One hull, because a brief is about one thing
+    // and `runBrief` has already settled which — with two standing it refuses
+    // and asks the hand to tap one.
+    let hull: SpaceScene['hull'];
+    for (const solid of solids()) {
+      const read = space?.hullOf?.(solid.id);
+      if (!read?.parts.length) continue;
+      hull = {
+        solidId: solid.id,
+        name: solid.name,
+        footprint: read.footprint,
+        extent: read.extent,
+        parts: read.parts.map((p) => ({
+          id: p.id,
+          sentence: p.sentence,
+          ...(p.name ? { name: p.name } : {}),
+          ...(p.colour ? { colour: p.colour } : {}),
+        })),
+      };
+      break;
+    }
+    const mutableParts = opts.mutableParts?.length
+      ? opts.mutableParts.map((partId) => {
+          const said = (hull?.parts ?? []).find((p) => p.id === partId);
+          return { partId, ...(said?.name ? { name: said.name } : {}) };
+        })
+      : undefined;
     return {
       solids: solids().map((sd) => {
         const node = session.getState().nodes.get(sd.id);
@@ -2704,6 +3102,7 @@ export function createLog(): Log {
       planes: [...byPlane.values()],
       ...(diffs.length ? { diffs } : {}),
       ...(parts.length ? { parts } : {}),
+      ...(hull ? { hull } : {}),
       names: namesInPlay(),
       definitions: definitions().map((d) => ({
         name: d.name,
@@ -2715,6 +3114,7 @@ export function createLog(): Log {
       })),
       words,
       ...(mutable?.length ? { mutable } : {}),
+      ...(mutableParts?.length ? { mutableParts } : {}),
     };
   }
 
@@ -2828,6 +3228,12 @@ export function createLog(): Log {
     hull: acting(hull, 1),
     joinAgent: acting(joinAgent, 2),
     applyProposal: acting(applyProposal, 3),
+    applyParts: acting(applyParts, 4),
+    nameParts: acting(
+      (solidId: string, said: { partId: string; name?: string; colour?: string }[], why: string, at = Date.now()) =>
+        nameParts(solidId, said, why, at),
+      3
+    ),
     replaceSteps: acting(replaceSteps, 4),
     versionOf,
     take: acting(take, 1),

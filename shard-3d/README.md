@@ -313,7 +313,7 @@ there is no bundle to drift.
 | `src/op.ts` | **Pure.** The op tree (§2.4): the whole vocabulary as a type, `extrude`, `revolve`, `cut`, `boss`, `mirror`, `place` (a dup's copy, and P6's placement OF a definition), `match`, `massing` and `hull` implemented (the hull is the massing on any planes; both ops stay so every tree ever written still reads, and one function derives both), `placeDefinitionStep` and `placeFrames` — the pose of a placement, worked out from the two inks it names rather than held — the geometry parameters derived from the drawing (the direction, the signed depth, the axis as a world line, a cut's *through* and a boss's own short side), **the nesting** (`on`, `rootOf`, `withStep`, `depthsOf`), the tree as text and back, and the lathe profile as radius-and-height about the axis. No three.js |
 | `src/csg.ts` | **The one seam, and the one library behind it** (§10). `subtract(a, b)`, `union(a, b)` and `intersect(a, b)` on `THREE.BufferGeometry`, over `three-bvh-csg` (pinned, with its peer `three-mesh-bvh`). Nothing else in the shard imports the library. **It never throws**: every result is `{ ok, geometry }` or `{ ok: false, error }` |
 | `src/solid.ts` | three.js. The mesh, **derived by WALKING the tree on every log change** (`deriveTree`) — `ExtrudeGeometry` and `LatheGeometry` for the leaves, the CSG seam for `cut` / `boss` / `mirror` / `match`, `hullBody` for `massing` and `hull` alike (each claim grown through the span of the **others** — never its own points — so a hull stands in the volume its claims define), a plain merge for a `dup`'s disjoint copy; a quiet lit material from the tokens, `hardEdges` (the creases only, never the triangulation), the picking, `facesAt` (the faces under the pen as a plane plus the face's own corners, which is what a `face` candidate anchors on), `spanAlong` (what a cut goes THROUGH), `silhouetteOf` (the hull a scratch is counted against), `silhouetteOn` (the orthographic picture the diff reads, cached) and `brokenOf`. `deriveTree` takes a **`DeriveContext`** — `inkOf` and `silhouetteOf` — because a `match` step stores nothing derived and has to ask |
-| `src/parts.ts` | **Pure but for the CSG seam.** The parts of a hull (push 2, G2): `runsOf` splits a claim into the runs that stand between its ground touches (a ⊓ is one, three touches is two, a closed silhouette is one by its own ink — and `ground` is read BEFORE `closed`, because an elevation is held closed *on the ground*), `footprintFrame` builds the frame the places are said in (the long side of the tightest box, never the diagonal; north is −Z), `placeOf` cuts it in thirds, and `partsOfHull` cuts each run's prism out of the standing body, merges the ones that turn out to be the same material (`PART_OVERLAP`, a ratio of the smaller) and numbers them `part:1 … part:n` in reading order with a sentence each. Nothing is thrown: a run that claims nothing, or a boolean that does not come off, is dropped with its reason |
+| `src/parts.ts` | **Pure but for the CSG seam.** The parts of a hull (push 2, G2): `runsOf` splits a claim into the runs that stand between its ground touches (a ⊓ is one, three touches is two, a closed silhouette is one by its own ink — and `ground` is read BEFORE `closed`, because an elevation is held closed *on the ground*), `footprintFrame` builds the frame the places are said in (the long side of the tightest box, never the diagonal; north is −Z), `placeOf` cuts it in thirds, and `partsOfHull` cuts each run's prism out of the standing body, merges the ones that turn out to be the same material (`PART_OVERLAP`, a ratio of the smaller) and numbers them `part:1 … part:n` in reading order with a sentence each. Nothing is thrown: a run that claims nothing, or a boolean that does not come off, is dropped with its reason. **G3** adds what is SAID about a part — the name and the material resolved onto it from the hull step's `said`, keyed by the claims it was cut from — and the three small ops a reply may ask for by part id (`bossOnPart`, `cutOnPart`, `mirrorOnPart`), each built from the part the engine already cut so that nothing a reply wrote becomes geometry; `hullReadOf` is the one wiring the surface and the tests share |
 | `src/selection.ts` | Selection by default (§7): one thing at a time, a teal cage around a solid, and a diff region outlined on its own plane while its chip is hovered. Runtime state, never the log's |
 | `src/field.ts` | One input, one reader. `readField(text, ctx)` returns *what Enter will do*; the verbs and their reasons are handed in, so the reader knows nothing about the DOM. Thirteen verbs now — `extrude`, `revolve`, `cut`, `boss`, `add`, `takeoff`, `mirror`, `dup`, `remove`, `regen`, `take`, and P6's `place` and `reject` (*Not a mug*) — each with its aliases in one table |
 | `src/panel.ts` | **Hidden by default** (`panelShown` / `setPanelShown`, the key `shard.panel`, and `createPanelToggle` — the canvas's *details ▾* ported from `Demos/surface/00-core.js`: a `panelHidden` class on the body, remembered per device, and the rows still built and still in the DOM while it is down, so `panelText()` and every assertion on it are the same either way). `selectionLine` is what the status line says in its place — the selection's name and the next act, in the field's own words. Then the rows and the status line — and `pinnedViews`, still read off the log here though the chips are drawn in the corner — including *plays*, ***could be*** (P6: what the library says this outline is, ranked, in the engine's name), *solid* — the latter showing the tree **nested** (`↳ cut · through · from stroke:5` under `extrude · depth 2.40 u`) and a *broken* row with the seam's own words when a derivation did not come off — and ***matches the drawing***: one block per plane a profile of the selected solid was drawn on, with the coverage, the sentence, which outline it read, and a chip per region |
@@ -321,15 +321,16 @@ there is no bundle to drift.
 | `src/theme.ts` | The tokens read back off `../brand/tokens.css` at boot; nothing here restates a hex |
 | `src/exchange.ts` | **Pure.** G0's transcript: every exchange with a model — who was asked, the brief as sent, the human's words, the reply as **received**, what parsed, what was dropped and why, the outcome and the time it took — the last `KEEP` (8) of them. **Runtime, never the log**, and the file says at length why: what a reply DID is already in the log, attributed and undoable, and this is the evidence about the exchange rather than state of the board |
 | `src/export.ts` | **The board as its log, out and back in** (G0). `encodeBoard` / `decodeBoard` are core's own `encodeLog` / `decodeLog` — one JSON event per line, the canvas's format unchanged — plus `boardFilename`, the download, the file picker, and `boardFromFixture`: a captured VIEW of a board rebuilt from its marks' bounds, which is a reconstruction and says so every time |
-| `src/brief.ts` | **Pure.** `describeSpace` (§6) — the `describeReading` of this shard, and the **region-id rule** kept in stroke ids and step ids: what stands (the massing first, said to be the extent to stay inside), the planes and what lies on each in that plane's own units, the diff regions, **every name in play in its step's own id**, the library, the words, and then `HERE_IN_SPACE` — one paragraph on what can be made here and, as importantly, what cannot |
-| `src/generator.ts` | **Pure.** The generator seat: the making and regen prompts, `parseProposal` (strict JSON first, then core's own two repairs, then reported — never guessed), the closed lists a reply may use (`PROPOSABLE`, `PROPOSABLE_SHAPES`, the colour words), and `propose`, whose transport is **injectable** so a stub never touches the network. Also `meaningMessages` / `parseMeaning`: asking a model which of the shard's own verbs a phrase meant, which is the only thing here a model is asked that is not geometry |
+| `src/brief.ts` | **Pure.** `describeSpace` (§6) — the `describeReading` of this shard, and the **region-id rule** kept in stroke ids and step ids: what stands (the massing first, said to be the extent to stay inside), the planes and what lies on each in that plane's own units, the diff regions, **every name in play in its step's own id**, the library, the words, and then `HERE_IN_SPACE` — one paragraph on what can be made here and, as importantly, what cannot. **G3**: with a hull standing it takes a second, SHORT shape (`describeHull`) — the footprint, the extent, the parts with their numbers and their words, and `HERE_ON_A_HULL`, which forbids the profiles the other paragraph offers. `partIdsOf` is the one test for which shape, and so for which contract |
+| `src/generator.ts` | **Pure.** The generator seat: the making and regen prompts, `parseProposal` (strict JSON first, then core's own two repairs, then reported — never guessed), the closed lists a reply may use (`PROPOSABLE`, `PROPOSABLE_SHAPES`, the colour words), and `propose`, whose transport is **injectable** so a stub never touches the network. Also `meaningMessages` / `parseMeaning`: asking a model which of the shard's own verbs a phrase meant, which is the only thing here a model is asked that is not geometry. **G3** adds the second contract: `PART_RULES` (a name, a material and small ops BY PART ID, and no profiles at all) and the `parts` branch of `parseProposal` — a part id the hull does not have dropped and counted, a colour outside the closed list dropped with its reason and the name kept, a step whose op is outside `PART_OPS` dropped saying which four there are |
 | `src/verbs.ts` | **Pure.** The verb table with name-resolved targets (§2.6 rule 4), `behave/words.ts`'s pattern ported: `SAYINGS` per verb, `CHANGES` for the size words, `namesIn` resolving a noun singular or plural against the names in play (core's own `singular`), and **what it cannot read is returned, not dropped** |
 | `src/models.ts` | The model pane, `Demos/surface/04-models.js` ported, plus **the hand's seat** (G5: `joinHand`, which parks a brief in the room instead of posting it and takes the front, because `first()` is who a brief goes to): both local servers probed in parallel, embedding-only models hidden **and said**, the pick remembered as a preference, hosted providers by key — and **no key ever enters the log**. `joinWith` seats a model with a transport of its own, which is what `__shard.joinStub` is |
 | `src/room.ts` | **The live room, and the brief parked in it** (G5). `joinRoom` is `Demos/surface/17-folder.js`'s `openLive` in TypeScript over one session: a `LiveStore` on the relay, `mergeLogs(logs, { me })` on every line that lands, my own unstamped events as my log. `ask()` parks a question on the explanation plane as `brief:<key>` and settles when `answer:<key>` lands — `participants/bridge.ts`'s pattern with the room as the wire. `otherHand()` is the same loop from the other side, which is what the e2e drives in the page and what `mcp.mjs` re-implements in JavaScript |
 | `mcp.mjs` | **The hand, and the seat**, over MCP on stdio — newline-delimited JSON-RPC written by hand, so the repo takes no dependency, importing the committed Node bundle beside `Demos/mcp.mjs`. Six tools: `space_look`, `space_pending`, `space_answer`, `space_draw`, `space_propose`, `space_say`. Its one duplication is named where it stands: the three named planes and the `plane` rep, because this process cannot import the shard's TypeScript |
 | `mcp-smoke.mjs` | The stdio test, in CI's `shard` job: a relay on a **free port**, a second hand in Node as the tab, and the whole round trip — look, draw, park, list, answer, refuse, say |
 | `src/work.ts` | A model at work, shown **where it works**: a breathing `--sig-model` dot with the model's name and its task above the solid, the elapsed time after a few seconds, *Esc stops it* after thirty, and one `AbortSignal` per call so Esc really does |
-| `e2e.js` | The whole loop through the real pointer path — **117 steps, P0 → P6, the compass, the panel's toggle, trackpad and touch, the axis views, push 2’s hull (the view plane where you are looking, a ⊓ from a free view standing a hull at tier 1, a second one narrowing it, and undo), G2's three (John's castle-sketch board standing a hull with parts and a sentence each, the panel's chips with the hover cage, and taking a part up to remove its one claim with undo), and G0's five: the log out and back in, a brief with nothing standing, a brief with nothing selected, the massing standing first, and `?fixture=`** — and, beside it, `__demo()`: the two-minute demo of §9 in eleven asserted steps, with a timing on each 5's hand in the room** — and, beside it, `__demo()`: the two-minute demo of §9 in eleven asserted steps, with a timing on each |
+| `fixtures/exchanges/` | **What was sent, and what came back** (G3): one file per model per board — the brief as sent, the reply as received verbatim and unrepaired, and what became of it. The stub (imperfect on purpose), an *ideal* written by hand as the contract's worked example, qwen3:8b through Ollama on both boards. `src/namedparts.test.ts` reads every one of them as a module, so the contract is pinned against text a model actually produced; `fixtures/exchanges/README.md` says how to add another |
+| `e2e.js` | The whole loop through the real pointer path — **120 steps, P0 → P6, the compass, the panel's toggle, trackpad and touch, the axis views, push 2’s hull (the view plane where you are looking, a ⊓ from a free view standing a hull at tier 1, a second one narrowing it, and undo), G2's three (John's castle-sketch board standing a hull with parts and a sentence each, the panel's chips with the hover cage, and taking a part up to remove its one claim with undo), G3's three (the short brief and the field saying which contract Enter uses, a reply naming the parts from the words with green on the tops and three faults dropped and counted in the transcript, and *make the turrets taller* as a regen over that part alone), G5's five (the hand in the room) and G0's five: the log out and back in, a brief with nothing standing, a brief with nothing selected, the massing standing first, and `?fixture=`** — and, beside it, `__demo()`: the two-minute demo of §9 in eleven asserted steps, with a timing on each |
 | `build-standalone.mjs` | **One file.** Runs `npm run build` (which typechecks first), then inlines every asset Vite emitted — the bundle as one inline module, the stylesheet as one `<style>` — into `dist/shard-3d.html`, and refuses to write a page that still points at anything that would not travel with it. The font `@import` stays external, because the tokens name a fallback stack and a face is not worth trebling the file for |
 
 ## The design decision: how a solid is held in the log
@@ -897,6 +898,123 @@ architect's sketch actually contains, and what the two-view tower in
 Whether the hull should instead become a *union of masses*, so that one ⊓ per
 thing is enough, is a question about what a hull MEANS, and belongs with G1/G3
 rather than here.
+
+## The brief a small model can answer (push 2, G3)
+
+> `src/brief.ts` (`describeHull`, `partIdsOf`), `src/generator.ts`
+> (`PART_RULES`, the `parts` branch of `parseProposal`), `src/parts.ts`
+> (`bossOnPart` / `cutOnPart` / `mirrorOnPart`), `src/log.ts` (`applyParts`,
+> `nameParts`), `fixtures/exchanges/`.
+
+With a hull standing and cut into parts, there is nothing left for a model to
+invent: the drawing has said what the shape is, and what is missing is what the
+pieces **are**. So the brief takes a second shape and the reply a second
+contract, and both are decided by one function — `partIdsOf(scene)` — so the
+brief, the prompt, the parser and the landing can never each decide differently.
+
+### The brief has two shapes, and says which
+
+A hull with parts gets the short brief: what stands, the footprint, the extent,
+the parts with their numbers and their words, then the names, the library and
+the human's words. It does **not** walk the planes mark by mark. That is not
+economy for its own sake — every line of a plane-by-plane listing is a line
+inviting a small model to restate the drawing instead of naming it, and the
+drawing is not in question here. John's castle comes to well under **1200
+characters** before `HERE_IN_SPACE` (`brief.test.ts` pins it). With no hull
+standing — P5's path, three profiles on the world planes — the long brief is
+unchanged, and so is its contract.
+
+### The reply contract
+
+```json
+{
+  "parts": [
+    { "id": "part:1", "name": "turret", "material": "green", "why": "…" }
+  ],
+  "steps": [
+    { "id": "s1", "op": "boss", "part": "part:1", "height": 0.6, "why": "…" },
+    { "id": "s2", "op": "cut", "part": "part:2", "shape": "circle",
+      "centre": { "x": 0, "y": 0 }, "r": 0.3, "depth": 0.4, "why": "…" },
+    { "id": "s3", "op": "mirror", "part": "part:1", "plane": "height" },
+    { "id": "s4", "op": "remove", "part": "part:3", "why": "…" }
+  ],
+  "reuse": "castle"
+}
+```
+
+`steps` is optional and `reuse` answers instead of both. Four rules, each one
+checked and each one a reason:
+
+- **Never raw geometry, and never a profile it invents.** There is no
+  `profiles` list on this path at all. A small op names a part and gives a
+  number; the geometry comes from the part the engine already cut — its own
+  footprint, its own top, its own height — so `boss` raises exactly that part,
+  `cut` sinks a hole through that part's own top face in that face's own units,
+  and `mirror` reflects that part's own prism rather than the whole body. They
+  come out as ordinary `boss` / `cut` steps carrying `part`, so the derivation,
+  the clip, the diff, undo and the export take them without knowing parts exist.
+- **A part id the hull does not have is dropped and counted**, with the ids it
+  does have said in the same sentence. The region-id rule, checked on the way
+  back in: `part:9` on a two-part hull is about nothing, and keeping it would
+  put a name on whichever body happened to be ninth next time.
+- **A material is a colour word from the closed list**, else dropped with its
+  reason and the rest of the entry kept. Both `"material":"green"` and
+  `"material":{"colour":"green"}` are read, because models write both; neither
+  is guessed at.
+- **What it cannot name, it leaves.** An unnamed part keeps the engine's
+  `part:n`; a reply that names nothing and binds one material still lands the
+  material; only a reply that came to *nothing at all* is unusable, and that is
+  the one case where the board is left exactly as it was.
+
+A name is taken **as written**. The brief lists the hand's own words and asks
+that names come from them, and that is where the pressure belongs — the engine
+never decides what a thing is called (§2.6), and a model's word is a claim,
+held and attributed, that the hand takes or leaves.
+
+### Where a part's name lives, and why it is not the part id
+
+**On the hull step, keyed by the claims the part was cut from** — `HullStep.said`,
+a list of `PartSaying { claims, said, name?, material?, by, reasoning }`.
+
+A part is derived and its id is a **reading order**: `part:1 … part:n`, left to
+right across the footprint. Drop one claim and every part after it renumbers. A
+name keyed on `part:2` would then slide silently onto a different body, which is
+the exact failure the region-id rule exists to prevent — so the id a reply used
+is resolved, at the moment the reply lands, into the thing behind it that does
+not move: the claim strokes, which are in the log. `partsOfHull` re-attaches
+each saying to whichever part those claims cut, and the id the reply used is
+kept beside it for the transcript and the panel.
+
+It is one place, and everything reads it:
+
+| Who | What it sees |
+|---|---|
+| the panel | a named part's chip reads *turret · green*; its own `part:n` and its sentence stay in the chip's reason |
+| the brief | the part's sentence leads with the name — *part 1 “turret”, green — 1.2 × 1.0 u …* |
+| `namesInPlay()` | one entry per named part, carrying `partId` beside the hull's `stepId` |
+| the verb table | `NameRef.partIds`, so *the towers* resolves to parts and not to the whole tree |
+| `take()` | a named part is held as a definition **based on the whole** — the hull of its own claims (with the footprint that bounds them), because a part is material and not a sub-tree of steps |
+| the render | the colour paints the part's own body, through `Derived.parts`' own path, via `SolidOptions.painted` |
+
+### A regen over a part
+
+*Make the towers taller* resolves the name to **parts**, not steps, and asks
+again with only those parts mutable: the brief gains an `ONLY THESE PARTS MAY
+CHANGE` section, the reply is checked against it and anything about another part
+is dropped saying so, and the steps the last reply left on those parts (found by
+their own `part` field) come off before the new ones go on. Every other part —
+and every other step — keeps its own id. *The towers are red* and *remove the
+tower* stay tier 1 and never reach a model: the first is a saying, the second is
+`dropPart`, one version of the one hull step each, one undo apiece.
+
+### The transcripts are fixtures
+
+`fixtures/exchanges/` holds the brief as sent and the reply as received for each
+model that has answered on a board — the stub, an **ideal** reply written by
+hand as the contract's own worked example, and a real local model. They are read
+by `generator.test.ts`, so the contract is pinned against text a model actually
+produced rather than against text this repo wrote for itself.
+`fixtures/exchanges/README.md` says how to add one.
 
 ## The brief, and what it will not say
 
@@ -1961,7 +2079,7 @@ the server as `metamedium-3d` beside the canvas's `metamedium`.
 |---|---|
 | `space_look` | nothing — the three planes, every mark with its reading and the plane it lies on, every solid's op tree with step ids, names and materials, and whether a brief waits |
 | `space_pending` | nothing — the parked briefs: the key, the human's words, the contract to answer in, the brief itself |
-| `space_answer` | `key`, and either `reply` (the contract object) or `refuse` (one clause) |
+| `space_answer` | `key`, and either `reply` (the contract object the brief carries — `{parts, steps?}` for a standing hull, `{steps, profiles}` otherwise, or `{reuse}`) or `refuse` (one clause) |
 | `space_draw` | `claims`: each a shape (`rectangle`/`circle`/`triangle`/`line`/`arrow`) or raw `points`, on a named `plane` (with an optional `at` along its normal) or a view plane through `through` facing `facing` |
 | `space_propose` | `solid` (id or name) and `reply` — held on the solid, never blessed |
 | `space_say` | `text` and `about` — a sentence beside marks, said in the human's status line as it lands |
@@ -2043,13 +2161,16 @@ tail -c 4000 /tmp/mm3d.out
 
 - **`space_propose` is held, and nothing takes it up yet.** It lands through
   `propose()` as an attributed, unblessed rep with a sentence beside the solid.
-  Taking one up from the surface is G3's, with the parts contract. Answering a
-  brief the human actually typed — `space_answer` — is the path that lands.
+  Answering a brief the human actually typed — `space_answer` — is the path that
+  lands, and since G3 it lands **in the parts contract too**: the brief carries
+  the contract it wants answered in, `space_pending` prints it, and the shard
+  applies the reply exactly as it applies a small model's. Taking an *unasked*
+  proposal up from the surface is still not built.
 - **`space_look` reads the log, not the geometry.** It cannot import the shard's
   TypeScript, so it reports marks, planes, readings and op trees; it does not
   compute the form rung, the hull or the parts. G2 puts the parts in the brief,
-  which is where the hand reads them today — `PARTS OF WHAT STANDS`, in the
-  engine's own `part:n` ids, so a reply can name one.
+  which is where the hand reads them today — the brief's own `THE PARTS`
+  section, in the engine's own `part:n` ids, so a reply can name one.
 
   **What it would take for `space_look` to see parts itself** is worth stating,
   because it is not a small thing. A part is `hull ∩ a run's prism` — a CSG

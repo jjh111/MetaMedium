@@ -130,7 +130,45 @@ interface StepBase {
   material?: { colour: string };
   /** Who put this step in the tree — the engine, or a model by name. */
   by?: string;
+  /**
+   * The PART of a hull this step was scoped to (push 2, G3).
+   *
+   * A part is not a step — it is the hull's material inside one claim's prism,
+   * derived — so a small op a reply asked for *by part id* carries the id it
+   * was asked for in. The geometry is baked into the step's own profile and
+   * plane, so the label is not load-bearing; what it is for is the regen
+   * (*make the towers taller* replaces exactly the steps carrying those part
+   * ids) and the panel, which can then say which part a step is about.
+   */
+  part?: string;
   /** Why this step is here, in the terms it was measured in. */
+  reasoning: string;
+}
+
+/**
+ * **What was SAID about a part of a hull** (push 2, G3): a name, a material,
+ * and who said it.
+ *
+ * A part is derived, and its id is a reading order (`part:1 … part:n`) — so a
+ * claim dropped renumbers every part after it, and a name keyed on `part:2`
+ * would silently slide onto a different body. So a saying is keyed on **the
+ * claim strokes the part was cut from**, which are in the log and do not move;
+ * `partsOfHull` re-attaches it to whichever part those claims cut. The part id
+ * the reply used is kept beside it, because that is what the transcript and the
+ * panel have to be able to show.
+ */
+export interface PartSaying {
+  /** The claim stroke ids the part was cut from, sorted — the stable key. */
+  claims: string[];
+  /** The part id as it was said, at the time it was said. */
+  said: string;
+  /** The hand's or a model's word for it. Absent when only a material was bound. */
+  name?: string;
+  /** A colour word from `COLOUR_WORDS`, bound to that part's own body. */
+  material?: { colour: string };
+  /** Who said it — a model by name, or the hand. */
+  by?: string;
+  /** Why, in the words the panel says. */
   reasoning: string;
 }
 
@@ -312,6 +350,13 @@ export interface HullStep extends StepBase {
   claims: { id: string; profile: Profile2D; plane: PlaneRef; ground?: boolean }[];
   /** Which claim is the footprint, when the hand drew one — it runs up to the tallest claim. */
   footprint?: string;
+  /**
+   * G3: what has been said about the hull's PARTS — a name, a material — each
+   * keyed by the claims the part was cut from rather than by its derived id.
+   * The parts themselves are never held here: they are re-cut from the body on
+   * every walk (invariant 4).
+   */
+  said?: PartSaying[];
 }
 
 /** Every other row of §2.4: declared, so a later package adds an implementation, not a shape. */
@@ -1178,6 +1223,7 @@ function walkStep(v: unknown, at: string, seen: Set<string>, depth: number, budg
 
   if (s.name !== undefined) wantText(s.name, `${at}.name`, "the step's name");
   if (s.by !== undefined) wantText(s.by, `${at}.by`, 'who put the step in the tree');
+  if (s.part !== undefined) wantId(s.part, `${at}.part`, 'the part of a hull this step is scoped to');
   if (s.material !== undefined) {
     const m = wantRecord(s.material, `${at}.material`, "the step's material");
     wantText(m.colour, `${at}.material.colour`, "the material's colour word");
@@ -1255,6 +1301,32 @@ function walkStep(v: unknown, at: string, seen: Set<string>, depth: number, budg
     if (s.footprint !== undefined) {
       const fp = wantId(s.footprint, `${at}.footprint`, "the hull's footprint");
       if (!ids.has(fp)) bad(`${at}.footprint`, `the footprint is ${fp}, and no claim in this hull was drawn as that`);
+    }
+    // G3: what was said about the parts. Keyed by claims, so every key has to
+    // be a claim this hull actually carries — a saying about a claim that is
+    // not here could never be re-attached to anything.
+    if (s.said !== undefined) {
+      if (!Array.isArray(s.said)) bad(`${at}.said`, 'what was said about the hull’s parts is not a list');
+      (s.said as unknown[]).forEach((v, i) => {
+        const r = wantRecord(v, `${at}.said[${i}]`, `what was said about part ${i}`);
+        if (!Array.isArray(r.claims) || !r.claims.length) {
+          bad(`${at}.said[${i}].claims`, `what was said about part ${i} names no claim it is about`);
+        }
+        (r.claims as unknown[]).forEach((c, k) => {
+          const claim = wantId(c, `${at}.said[${i}].claims[${k}]`, `the claim part ${i} was cut from`);
+          if (!ids.has(claim)) {
+            bad(`${at}.said[${i}].claims[${k}]`, `it is about ${claim}, and no claim in this hull was drawn as that`);
+          }
+        });
+        wantId(r.said, `${at}.said[${i}].said`, `the part id part ${i} was said as`);
+        wantText(r.reasoning, `${at}.said[${i}].reasoning`, `why part ${i} was said to be that`);
+        if (r.name !== undefined) wantText(r.name, `${at}.said[${i}].name`, `part ${i}'s name`);
+        if (r.by !== undefined) wantText(r.by, `${at}.said[${i}].by`, `who named part ${i}`);
+        if (r.material !== undefined) {
+          const m = wantRecord(r.material, `${at}.said[${i}].material`, `part ${i}'s material`);
+          wantText(m.colour, `${at}.said[${i}].material.colour`, `part ${i}'s colour word`);
+        }
+      });
     }
   } else if (kind === 'place') {
     if (depth >= OP_LIMITS.placeDepth) {
@@ -1385,10 +1457,14 @@ export function describeStep(step: OpStep): string {
   }
   if (step.op === 'hull') {
     const ground = step.claims.filter((c) => c.ground).length;
+    const said = (step.said ?? []).filter((s) => s.name || s.material);
     return (
       `hull · ${step.claims.length} claims intersected` +
       (ground ? ` (${ground} closed on the ground)` : '') +
       (step.footprint ? ` · footprint ${step.footprint}` : '') +
+      (said.length
+        ? ` · ${said.map((s) => `${s.said}${s.name ? ` “${s.name}”` : ''}${s.material?.colour ? ` ${s.material.colour}` : ''}`).join(', ')}`
+        : '') +
       from
     );
   }

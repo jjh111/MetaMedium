@@ -39,6 +39,8 @@ export type Outcome =
 export interface ParsedFacts {
   steps: number;
   profiles: number;
+  /** G3: how many parts the reply said something about — the hull contract's own count. */
+  parts?: number;
   /** The model answering *the library already holds this* (v9 S5's rule). */
   reuse?: string;
 }

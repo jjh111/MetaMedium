@@ -3227,6 +3227,194 @@
     return { removed: target.id, claims: `${before} → ${after} → ${back}` };
   });
 
+  // ===== push 2, G3: the brief a small model can answer ======================
+  //
+  // The same board, and the whole of the package through the real UI: the brief
+  // takes its second shape and says so before Enter; a reply names the parts
+  // from the human's own words and paints one green; what it cannot use is
+  // dropped AND COUNTED, in the transcript as well as the status line; and
+  // *make the towers taller* is a regen over the named PART alone.
+  //
+  // The two replies are the fixtures' own, so the run and
+  // `fixtures/exchanges/` cannot drift apart: `castle-sketch.stub.json` (the
+  // imperfect one) and `castle-sketch.ideal.json` (the contract's example).
+
+  /** `fixtures/exchanges/castle-sketch.stub.json` — three faults on purpose. */
+  const PARTS_REPLY = JSON.stringify({
+    parts: [
+      { id: 'part:1', name: 'wall', material: 'stone', why: 'the low run along the east edge' },
+      { id: 'part:2', name: 'turret', material: 'green', why: 'the tall one at the corner' },
+      { id: 'part:9', name: 'ghost', why: 'a part this hull does not have' },
+    ],
+    steps: [
+      { id: 's1', op: 'boss', part: 'part:2', height: 0.6, why: 'a turret stands over its wall' },
+      { id: 's2', op: 'extrude', part: 'part:1', profile: 'stroke:1', depth: 2, why: 'outside the part vocabulary' },
+    ],
+  });
+  /** The regen: the named part again, taller — and one step about a part out of scope. */
+  const TALLER_PARTS_REPLY = JSON.stringify({
+    parts: [{ id: 'part:2', name: 'turret' }],
+    steps: [
+      { id: 's1', op: 'boss', part: 'part:2', height: 0.9, why: 'taller, as asked' },
+      { id: 's2', op: 'boss', part: 'part:1', height: 0.9, why: 'about a part that may not change' },
+    ],
+  });
+
+  /** John's castle-sketch board again, from its own strokes. */
+  function drawCastleSketch() {
+    S().clear();
+    S().view('free');
+    S().choose('foundation');
+    S().strokeScreen(onScreen(rectPath(-3, -2, 6, 4)));
+    S().choose(null);
+    const ups = [
+      { at: { x: -2.4, y: 0, z: -1.4 }, halfW: 52, tall: 150, from: 0 },
+      { at: { x: 2.4, y: 0, z: -1.4 }, halfW: 52, tall: 150, from: 0 },
+      { at: { x: 0, y: 0, z: 1.8 }, halfW: 96, tall: 124, from: 1 },
+    ];
+    const views = [
+      { dTheta: 0.42, dPhi: -0.5, stand: { x: 0, y: 0, z: 7 } },
+      { dTheta: 1.25, dPhi: -0.12, stand: { x: 7, y: 0, z: 1 } },
+    ];
+    let standing = -1;
+    let groundRow = 0;
+    for (const up of ups) {
+      if (up.from !== standing) {
+        S().orbit(views[up.from].dTheta, views[up.from].dPhi);
+        standing = up.from;
+        groundRow = S().screenForWorld(S().shiftTap(S().screenForWorld(views[standing].stand)).at).y;
+        S().choose(null);
+      }
+      S().strokeScreen(towerPath({ x: S().screenForWorld(up.at).x, y: groundRow }, up.halfW, up.tall));
+    }
+    S().nav.home(0);
+    return S().solids()[0].id;
+  }
+
+  let namedId = null;
+
+  step('a standing hull takes the SHORT brief, and the field says which contract Enter uses', () => {
+    namedId = drawCastleSketch();
+    assert(namedId, 'the castle did not stand');
+    const parts = S().parts(namedId);
+    assert(parts.length === 2, `${parts.length} parts, expected 2`);
+
+    const brief = S().brief('castle with green tops');
+    // It leads with what stands, and it is SHORT: a brief a small model can
+    // answer is one it does not spend its reply restating.
+    assert(brief.startsWith('WHAT STANDS —'), `the brief starts "${brief.slice(0, 40)}"`);
+    assert(/THE FOOTPRINT: [\d.]+ × [\d.]+ u/.test(brief), 'the brief does not say the footprint');
+    assert(/THE EXTENT, in world units/.test(brief), 'the brief does not say the extent');
+    assert(/THE PARTS — 2 pieces/.test(brief), 'the brief does not list the parts');
+    for (const p of parts) assert(brief.includes(p.sentence), `the brief is missing ${p.id}'s sentence`);
+    // The long brief's own sections are not here, and nor is its paragraph.
+    assert(!/THE PLANES, AND WHAT LIES ON EACH/.test(brief), 'the hull brief walked the planes');
+    assert(/You do not write geometry, and you do not add profiles/.test(brief), 'the hull paragraph is missing');
+    const here = brief.indexOf('THE SPACE holds only these');
+    assert(here > 0 && here < 1200, `${here} characters before HERE, expected under 1200`);
+
+    // …and the reading line says which contract, before Enter is pressed.
+    S().joinStub([PARTS_REPLY, TALLER_PARTS_REPLY]);
+    S().select(namedId);
+    const read = S().fieldRead('castle with green tops');
+    assert(/name the 2 parts/.test(read.line), `the reading line said "${read.line}"`);
+    assert(/the hull is the extent/.test(read.line), `the reading line said "${read.line}"`);
+    return { parts: parts.map((p) => p.id), beforeHERE: here, line: read.line };
+  });
+
+  step('the reply names the parts from the words and paints one green; what it cannot use is counted', async () => {
+    S().select(namedId);
+    const ran = S().field('castle with green tops');
+    assert(ran.ran, `Enter did nothing: "${ran.line}"`);
+    await new Promise((r) => setTimeout(r, 200));
+
+    const solid = S().solids().find((x) => x.id === namedId);
+    assert(solid && solid.broken === null, `the derivation broke: ${solid && solid.broken}`);
+
+    // The names are on the PARTS, in the engine's own ids — the region-id rule.
+    const parts = S().parts(namedId);
+    const named = parts.filter((p) => p.name).map((p) => `${p.id}:${p.name}`);
+    assert(named.length === 2, `${named.length} parts named: ${JSON.stringify(named)}`);
+    assert(parts.find((p) => p.id === 'part:1').name === 'wall', `part:1 is “${parts[0].name}”`);
+    assert(parts.find((p) => p.id === 'part:2').name === 'turret', `part:2 is “${parts[1].name}”`);
+    for (const n of S().names()) assert(n.partId || n.stepId, `${n.name} is on nothing`);
+    const turret = S().names().find((n) => n.name === 'turret');
+    assert(turret && turret.partId === 'part:2', `turret is on ${turret && turret.partId}`);
+
+    // Green is on the tops, and nothing else is painted: *stone* is not a
+    // colour the shard can paint, and the name it came with still stands.
+    const green = S().materials(namedId);
+    assert(green.length === 1, `${green.length} materials bound: ${JSON.stringify(green)}`);
+    assert(green[0].colour === 'green' && green[0].name === 'turret', `the material is ${JSON.stringify(green[0])}`);
+    assert(parts.find((p) => p.id === 'part:1').colour === undefined, 'part:1 was painted with a word the shard cannot paint');
+
+    // The small op landed scoped to the part, with the engine's clip after it.
+    const ops = solid.steps.map((st) => `${st.op}${st.part ? '@' + st.part : ''}`);
+    assert(ops.includes('boss@part:2'), `the steps are ${ops.join(', ')}`);
+    assert(ops[ops.length - 1] === 'massing', `the last step is ${ops[ops.length - 1]}, expected the clip`);
+
+    // G0's rule kept through G3: the transcript carries what was dropped AND WHY.
+    const ex = S().exchanges()[0];
+    assert(ex.outcome === 'applied', `the exchange ended ${ex.outcome}`);
+    assert(ex.parsed && ex.parsed.parts === 2, `the row parsed ${JSON.stringify(ex.parsed)}`);
+    assert(ex.dropped.length === 3, `${ex.dropped.length} dropped in the row: ${JSON.stringify(ex.dropped)}`);
+    assert(ex.dropped.join(' ').includes('not one the shard can paint'), 'the bad colour is not in the row');
+    assert(ex.dropped.join(' ').includes('this hull has no such part'), 'the unknown part is not in the row');
+    assert(ex.dropped.join(' ').includes('outside the part vocabulary'), 'the bad op is not in the row');
+    // …and the brief it was an answer to is kept beside it, verbatim.
+    assert(/THE PARTS — 2 pieces/.test(ex.brief), 'the row does not carry the brief as sent');
+
+    assert(/tier 2/.test(S().state().status), `the status said "${S().state().status}"`);
+    // The panel leads with the parts by their NAMES now.
+    S().select(namedId);
+    const text = S().panelText();
+    assert(/turret/.test(text), `the panel says "${text.slice(0, 240)}"`);
+    return { named, material: green[0], steps: ops, dropped: ex.dropped };
+  });
+
+  step('*make the turrets taller* regens that PART alone, and the rest is left where it was', async () => {
+    const before = S().solids().find((x) => x.id === namedId).steps.map((st) => st.id + ':' + st.op);
+    const hullStep = before.find((s) => s.endsWith(':hull'));
+
+    const read = S().fieldRead('make the turrets taller');
+    assert(/regen turret/.test(read.line), `the reading line said "${read.line}"`);
+    // It says PARTS, not steps — a part is not a step, and a line that says
+    // otherwise promises an act the landing does not make.
+    assert(/1 part\b/.test(read.line), `the reading line said "${read.line}"`);
+    const ran = S().field('make the turrets taller');
+    assert(ran.ran, `the regen did not run: ${ran.line}`);
+    await new Promise((r) => setTimeout(r, 250));
+
+    // The brief said which parts may change, and only those.
+    const ex = S().exchanges()[0];
+    assert(ex.what === 'the regen', `the row says ${ex.what}`);
+    assert(/ONLY THESE PARTS MAY CHANGE/.test(ex.brief), 'the regen brief did not scope itself');
+    assert(/part:2 \(“turret”\)/.test(ex.brief), `the scope reads "${ex.brief.split('ONLY THESE PARTS MAY CHANGE')[1]}"`);
+    // …and the step about the part that may NOT change was dropped, saying so.
+    assert(
+      ex.dropped.join(' ').includes('only part:2 may change'),
+      `the out-of-scope step was not reported: ${JSON.stringify(ex.dropped)}`
+    );
+
+    const after = S().solids().find((x) => x.id === namedId);
+    // One boss on the turret, not two: the last reply's step on that part came
+    // off before this one went on.
+    const bosses = after.steps.filter((st) => st.op === 'boss');
+    assert(bosses.length === 1, `${bosses.length} bosses, expected the regen to replace the first`);
+    assert(bosses[0].part === 'part:2', `the boss is on ${bosses[0].part}`);
+    // Every other step kept its own id.
+    assert(after.steps.some((st) => st.id + ':' + st.op === hullStep), `the hull step's id changed: ${hullStep}`);
+    // …and the name did not move.
+    assert(S().parts(namedId).find((p) => p.id === 'part:2').name === 'turret', 'the turret lost its name in the regen');
+
+    // One undo takes the whole regen.
+    S().undo();
+    const backBosses = S().solids().find((x) => x.id === namedId).steps.filter((st) => st.op === 'boss');
+    assert(backBosses.length === 1, `${backBosses.length} bosses after the undo, expected the first one back`);
+    S().clear();
+    return { before, after: after.steps.map((st) => st.id + ':' + st.op), line: read.line };
+  });
+
   // ---- the runner ----------------------------------------------------------
 
   window.__scenario = async function () {

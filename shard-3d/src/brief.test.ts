@@ -93,7 +93,8 @@ describe('describeSpace', () => {
         ],
       })
     );
-    expect(text).toMatch(/NAMES IN PLAY — use these exact words for these exact steps/);
+    // *things*, not *steps*, since G3: a name may be on a part of a hull.
+    expect(text).toMatch(/NAMES IN PLAY — use these exact words for these exact things/);
     expect(text).toMatch(/“castle” = artifact:5\/step:2 \(extrude\)/);
     expect(text).toMatch(/“turret” = artifact:5\/step:3 \(boss\), based on castle — held as a definition/);
     expect(text).toMatch(/“top” = artifact:5\/step:4 \(boss\), material green/);

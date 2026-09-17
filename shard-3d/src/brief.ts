@@ -47,6 +47,24 @@ export const HERE_IN_SPACE =
   `no libraries, no textures, lights or cameras, and no units but the plane's own. **You do not write ` +
   `geometry.** You name steps over profiles and the shard derives the mesh.`;
 
+/**
+ * The same paragraph for a standing HULL (push 2, G3) — and it is shorter,
+ * because less can be made here.
+ *
+ * `HERE_IN_SPACE` ends by offering profiles, which is exactly what the parts
+ * contract forbids: with the drawing already standing there is no outline left
+ * to add, and a paragraph that says *you may add profiles* over a brief that
+ * says *do not invent geometry* is the prompt arguing with itself.
+ */
+export const HERE_ON_A_HULL =
+  `THE SPACE holds only these: INK lying on a plane, the three world PLANES — foundation (the ground, seen from ` +
+  `the top), height (the wall you face) and width (the wall on your right) — a standing HULL, and the PARTS it is ` +
+  `cut into, each with an id of its own. What you may say about a part: a NAME (the human's own word for it), a ` +
+  `MATERIAL (one colour word), and a small op BY PART ID — raise it, cut a hole through its top, mirror it, or take ` +
+  `it out. Nothing else exists here — no meshes, no vertices, no triangles, no code, no files, no libraries, no ` +
+  `textures, lights or cameras, and no units but the ones the parts were given in. **You do not write geometry, and ` +
+  `you do not add profiles.** The drawing already said what the shape is; you say what it is.`;
+
 /** A mark as the brief says it: its id, what the shape rung read, what it plays. */
 export interface BriefMark {
   id: string;
@@ -123,6 +141,12 @@ export interface NameInPlay {
   solidId: string;
   stepId: string;
   op: string;
+  /**
+   * G3: the PART this name is on, when it names a part of a hull rather than a
+   * step of a tree. `stepId` is then the hull's own step — the step the saying
+   * is held on — and the part is what the name is about.
+   */
+  partId?: string;
   /** The material bound to it, when a word bound one. */
   colour?: string;
   /** The solid the name was said about — what a definition is based on. */
@@ -145,6 +169,27 @@ export interface SpaceScene {
    * point at. The region-id rule again — *part 2* comes back as *part 2*.
    */
   parts?: { solidId: string; sentences: string[] }[];
+  /**
+   * G3: the standing HULL, when there is one with parts — and its presence is
+   * what makes the brief take its second shape.
+   *
+   * A brief for a hull leads with what stands and is done in a dozen lines:
+   * the footprint, the parts with their numbers and their words, the extent,
+   * the names, the library, the words. It does not walk the planes mark by
+   * mark, because on this path the model is not being asked to read the
+   * drawing — the engine has already read it, and what is left to say is what
+   * the pieces ARE. A small model given the long brief spent its reply
+   * restating the geometry back.
+   */
+  hull?: {
+    solidId: string;
+    name: string;
+    /** The footprint's size in u, and the stroke it was drawn as. */
+    footprint: { w: number; h: number; markId?: string } | null;
+    /** The volume the hull occupies, in world units — the extent a reply may not leave. */
+    extent: { min: Vec3; max: Vec3 };
+    parts: { id: string; sentence: string; name?: string; colour?: string }[];
+  };
   names?: NameInPlay[];
   /**
    * What the library holds, so a model may answer `{"reuse": "turret"}` and
@@ -161,9 +206,13 @@ export interface SpaceScene {
    * is fixed, and the reply is checked against that.
    */
   mutable?: { stepId: string; name?: string }[];
+  /** G3: for a regen over a hull, only these PARTS may change. */
+  mutableParts?: { partId: string; name?: string }[];
 }
 
 const n2 = (v: number) => (Number.isFinite(v) ? v.toFixed(2) : '∞');
+/** One decimal: the hull brief's own precision. A tenth of a unit is a hand's accuracy. */
+const n1 = (v: number) => (Number.isFinite(v) ? v.toFixed(1) : '∞');
 
 function bounds(points: Point[]) {
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
@@ -202,7 +251,123 @@ function stepLine(step: OpStep): string {
  * regions, every name in play in its step's own id, the definitions the library
  * holds, and the words — then what can be made here.
  */
+/**
+ * **Which shape the brief takes, said out loud** — and it is the reply contract
+ * it is really saying.
+ *
+ * With a hull standing and cut into parts, the model is asked to NAME what the
+ * engine can already point at, and the parts contract applies. With no such
+ * hull — P5's path, three profiles on the world planes and a massing — it is
+ * asked for a tree of steps over profiles, and that contract applies. One
+ * function answers it so the brief, the prompt, the parser and the landing can
+ * never each decide differently.
+ */
+export function partIdsOf(scene: SpaceScene): string[] {
+  return (scene.hull?.parts ?? []).map((p) => p.id);
+}
+
+/** The tail every brief ends with: the names, the library, what may move, the words, HERE. */
+function tail(scene: SpaceScene, out: string[], here = HERE_IN_SPACE): void {
+  // The region-id rule. Every name, in the step's own id, so a reply reuses the
+  // name rather than inventing a synonym for it.
+  out.push('');
+  if (!scene.names?.length) {
+    out.push('NAMES IN PLAY: none. Nothing here has been named yet, so every name in your reply is a new one, and it should come from the words below.');
+  } else {
+    out.push('NAMES IN PLAY — use these exact words for these exact things, and do not invent a synonym for one:');
+    for (const n of scene.names) {
+      out.push(
+        `  “${n.name}” = ${n.partId ? `${n.solidId}/${n.partId}` : `${n.solidId}/${n.stepId} (${n.op})`}` +
+          `${n.colour ? `, material ${n.colour}` : ''}` +
+          `${n.basedOn ? `, based on ${n.basedOn}` : ''}` +
+          `${n.definition ? ' — held as a definition' : ''}`
+      );
+    }
+  }
+
+  out.push('');
+  if (!scene.definitions?.length) {
+    out.push('DEFINITIONS THE LIBRARY HOLDS: none yet.');
+  } else {
+    out.push('DEFINITIONS THE LIBRARY HOLDS — if one of these already IS what was asked for, reply {"reuse":"<name>"} and write nothing; it is placed from the library and no tree is written:');
+    for (const d of scene.definitions) {
+      const based = d.whole
+        ? ' (the whole of it)'
+        : d.basedOn
+          ? ` (a part of ${d.basedOn})`
+          : '';
+      const counts =
+        `${d.steps ?? d.ops.length} step${(d.steps ?? d.ops.length) === 1 ? '' : 's'}` +
+        (d.profiles !== undefined ? `, recognised by ${d.profiles} profile${d.profiles === 1 ? '' : 's'}` : '');
+      out.push(`  “${d.name}”${based} — ${counts}: ${d.ops.join(' · ')}`);
+    }
+  }
+
+  if (scene.mutable?.length) {
+    out.push('');
+    out.push('ONLY THESE STEPS MAY CHANGE. Every other step in the tree is fixed and must be left exactly as it is; a reply that touches one is refused:');
+    for (const m of scene.mutable) out.push(`  ${m.stepId}${m.name ? ` (“${m.name}”)` : ''}`);
+  }
+  if (scene.mutableParts?.length) {
+    out.push('');
+    out.push('ONLY THESE PARTS MAY CHANGE. Every other part is fixed; a reply about one is dropped, and their names stay exactly as they are:');
+    for (const m of scene.mutableParts) out.push(`  ${m.partId}${m.name ? ` (“${m.name}”)` : ''}`);
+  }
+
+  out.push('');
+  out.push(scene.words ? `THE WORDS THE HUMAN TYPED: “${scene.words}”` : 'THE HUMAN TYPED NOTHING.');
+
+  out.push('');
+  out.push(here);
+}
+
+/**
+ * The brief for a standing HULL (push 2, G3): the footprint, the parts, the
+ * extent, the names, the library, the words.
+ *
+ * Short on purpose. Every line of a plane-by-plane listing is a line inviting a
+ * small model to restate the drawing instead of naming it, and the drawing is
+ * not in question here — it is standing, in the engine's name, and it is the
+ * extent. John's castle comes to well under 1200 characters before `HERE`.
+ */
+function describeHull(scene: SpaceScene): string {
+  const hull = scene.hull!;
+  const size = {
+    x: hull.extent.max.x - hull.extent.min.x,
+    y: hull.extent.max.y - hull.extent.min.y,
+    z: hull.extent.max.z - hull.extent.min.z,
+  };
+  const out: string[] = [];
+  out.push(
+    `WHAT STANDS — ${hull.solidId} “${hull.name}”, a HULL the space stood from the drawing, ` +
+      `${n1(size.x)} × ${n1(size.z)} u on the ground and ${n1(size.y)} u tall. It is already standing, in the ` +
+      `engine's name, and it is the extent your reply must stay inside.`
+  );
+  out.push(
+    hull.footprint
+      ? `THE FOOTPRINT: ${n1(hull.footprint.w)} × ${n1(hull.footprint.h)} u, drawn on the ground` +
+        `${hull.footprint.markId ? ` as ${hull.footprint.markId}` : ''}.`
+      : 'THE FOOTPRINT: none was drawn — the claims bound it from every side and the ground from below.'
+  );
+  out.push(
+    `THE EXTENT, in world units: x ${n1(hull.extent.min.x)}…${n1(hull.extent.max.x)}, ` +
+      `y ${n1(hull.extent.min.y)}…${n1(hull.extent.max.y)}, z ${n1(hull.extent.min.z)}…${n1(hull.extent.max.z)}. ` +
+      `Nothing you propose may leave it; whatever does is cut off.`
+  );
+  out.push('');
+  out.push(
+    `THE PARTS — ${hull.parts.length} piece${hull.parts.length === 1 ? '' : 's'} the engine can point at, in its own ids. ` +
+      `Say what each one IS and what it is made of, by its id. Do not invent geometry for one:`
+  );
+  for (const p of hull.parts) out.push(`  ${p.sentence}`);
+  tail(scene, out, HERE_ON_A_HULL);
+  return out.join('\n');
+}
+
 export function describeSpace(scene: SpaceScene): string {
+  // G3: a hull with parts takes the short brief, and with it the parts
+  // contract. `partIdsOf` is the same test everywhere.
+  if (scene.hull?.parts.length) return describeHull(scene);
   const out: string[] = [];
 
   // ---- what stands ---------------------------------------------------------
@@ -259,57 +424,7 @@ export function describeSpace(scene: SpaceScene): string {
     for (const d of scene.diffs) out.push(`  ${d.markId} — ${d.sentence}`);
   }
 
-  // ---- the names ------------------------------------------------------------
-  // The region-id rule. Every name, in the step's own id, so a reply reuses the
-  // name rather than inventing a synonym for it.
-  out.push('');
-  if (!scene.names?.length) {
-    out.push('NAMES IN PLAY: none. Nothing here has been named yet, so every name in your reply is a new one, and it should come from the words below.');
-  } else {
-    out.push('NAMES IN PLAY — use these exact words for these exact steps, and do not invent a synonym for one:');
-    for (const n of scene.names) {
-      out.push(
-        `  “${n.name}” = ${n.solidId}/${n.stepId} (${n.op})` +
-          `${n.colour ? `, material ${n.colour}` : ''}` +
-          `${n.basedOn ? `, based on ${n.basedOn}` : ''}` +
-          `${n.definition ? ' — held as a definition' : ''}`
-      );
-    }
-  }
-
-  // ---- the library ----------------------------------------------------------
-  out.push('');
-  if (!scene.definitions?.length) {
-    out.push('DEFINITIONS THE LIBRARY HOLDS: none yet.');
-  } else {
-    out.push('DEFINITIONS THE LIBRARY HOLDS — if one of these already IS what was asked for, reply {"reuse":"<name>"} and write nothing; it is placed from the library and no tree is written:');
-    for (const d of scene.definitions) {
-      const based = d.whole
-        ? ' (the whole of it)'
-        : d.basedOn
-          ? ` (a part of ${d.basedOn})`
-          : '';
-      const counts =
-        `${d.steps ?? d.ops.length} step${(d.steps ?? d.ops.length) === 1 ? '' : 's'}` +
-        (d.profiles !== undefined ? `, recognised by ${d.profiles} profile${d.profiles === 1 ? '' : 's'}` : '');
-      out.push(`  “${d.name}”${based} — ${counts}: ${d.ops.join(' · ')}`);
-    }
-  }
-
-  // ---- what may move --------------------------------------------------------
-  if (scene.mutable?.length) {
-    out.push('');
-    out.push('ONLY THESE STEPS MAY CHANGE. Every other step in the tree is fixed and must be left exactly as it is; a reply that touches one is refused:');
-    for (const m of scene.mutable) out.push(`  ${m.stepId}${m.name ? ` (“${m.name}”)` : ''}`);
-  }
-
-  // ---- the words ------------------------------------------------------------
-  out.push('');
-  out.push(scene.words ? `THE WORDS THE HUMAN TYPED: “${scene.words}”` : 'THE HUMAN TYPED NOTHING.');
-
-  out.push('');
-  out.push(HERE_IN_SPACE);
-
+  tail(scene, out);
   return out.join('\n');
 }
 

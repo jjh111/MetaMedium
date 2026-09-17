@@ -40,3 +40,10 @@ So: when one of these boards can be captured again from a live tab, export the
 
 `src/export.test.ts` reads this fixture as a module and pins both halves: what
 rebuilds, and that the three profiles stand a massing.
+
+## `exchanges/` — the briefs and the replies
+
+`exchanges/` is the other kind of fixture: not a board, but **what was sent to a
+model about one and what came back**, verbatim and unrepaired. Its own README
+says what is in it and how to add another. A board fixture stands a drawing up;
+an exchange fixture pins the contract a model is asked to answer in.

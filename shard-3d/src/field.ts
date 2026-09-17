@@ -115,6 +115,15 @@ export interface FieldContext {
      * widens to the sketch hull.
      */
     standing?: 'stands' | 'will-stand' | 'nothing';
+    /**
+     * G3: how many PARTS the thing standing is cut into, when it is a hull.
+     *
+     * The line says which contract Enter will use, because they ask for
+     * different things — a tree of steps over the drawing's outlines, or the
+     * pieces named. The line used to promise a massing over a board where the
+     * brief would in fact be about two parts.
+     */
+    parts?: number;
   };
 }
 
@@ -213,7 +222,9 @@ export function readField(text: string, ctx: FieldContext): FieldReading {
       kind: 'brief',
       line: model
         ? standing === 'stands'
-          ? `↵ a brief → asks ${model} — the massing is the extent and the reply is clipped to it`
+          ? ctx.brief.parts
+            ? `↵ a brief → asks ${model} to name the ${ctx.brief.parts} part${ctx.brief.parts === 1 ? '' : 's'} — the hull is the extent and the reply is clipped to it`
+            : `↵ a brief → asks ${model} — the massing is the extent and the reply is clipped to it`
           : standing === 'will-stand'
             ? `↵ a brief → asks ${model} — the massing stands first, and the reply is clipped to it`
             : `↵ a brief → asks ${model} — nothing stands to fill; it will say what is missing`

@@ -111,7 +111,16 @@ export interface PanelOptions {
   /** P4: outline a region where it lies while its chip is hovered, or take it away. */
   onRegion?(at: { plane: Plane; outline: Point[] } | null): void;
   /** G2: the parts of a hull, in reading order, each with its sentence. */
-  parts?(solidId: string): { id: string; place: string; height: number; sentence: string; from: string[] }[];
+  parts?(solidId: string): {
+    id: string;
+    place: string;
+    height: number;
+    sentence: string;
+    from: string[];
+    /** G3: the name and the material said about it, when anything has been said. */
+    name?: string;
+    colour?: string;
+  }[];
   /** G2: cage a part while its chip is hovered, or take the cage away. */
   onPart?(solidId: string, partId: string | null): void;
   /** G2: take a part up — the chip's tap, which selects it. */
@@ -339,7 +348,14 @@ export function createPanel(host: HTMLElement, statusEl: HTMLElement, log: Log, 
     const solidId = el?.dataset.solid;
     if (!el || !solidId || !o.parts) return;
     for (const part of o.parts(solidId)) {
-      const c = chip(`${part.id.replace(':', ' ')} · ${part.place}`, {
+      // G3: **a named part reads as its name.** Once the hand or a model has
+      // said what a piece IS, *turret · green* is what the chip is for; the
+      // engine's own `part:2` stays in the chip's reason, where the id a reply
+      // has to use is still one hover away.
+      const label = part.name
+        ? `${part.name}${part.colour ? ` · ${part.colour}` : ''}`
+        : `${part.id.replace(':', ' ')} · ${part.place}`;
+      const c = chip(label, {
         why: part.sentence,
         ...(o.takePart ? { onclick: () => o.takePart!(solidId, part.id) } : {}),
       });
@@ -647,8 +663,9 @@ function renderSummary(log: Log, sel: Sel | null, hovered: Mark | null, o: Panel
     html +=
       row(
         'parts',
-        `${parts.length} · ${parts.map((p) => p.place).join(' · ')}`,
-        'each run of a claim between its ground touches, cut out of the standing body — hover one to see it, tap it to take it up'
+        `${parts.length} · ${parts.map((p) => p.name ?? p.place).join(' · ')}`,
+        'each run of a claim between its ground touches, cut out of the standing body — hover one to see it, tap it to take it up' +
+          (parts.some((p) => p.name) ? '. A named part carries its name; its own part:n is in the chip’s reason' : '')
       ) + `<div class="fieldPills partsRow" data-solid="${esc(solid!.id)}"></div>`;
   }
 

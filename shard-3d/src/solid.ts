@@ -923,6 +923,20 @@ export interface SolidOptions {
   space: Space;
   log: Log;
   colours: Colours;
+  /**
+   * G3: volumes to paint that the TREE does not know about — a colour word
+   * bound to a PART of a hull, whose body is cut out of the derived geometry
+   * and so cannot be a `paint` inside the walk.
+   *
+   * It is handed the geometry it was just derived from rather than asked to
+   * look it up, because at this point the build has not been recorded yet and
+   * `geometryOf` would answer about the version before it. Optional: nothing
+   * about a solid depends on anyone filling it.
+   */
+  painted?(
+    solid: Solid,
+    geometry: THREE.BufferGeometry
+  ): { stepId: string; name?: string; colour: string; geometry: THREE.BufferGeometry }[];
 }
 
 export function createSolids(o: SolidOptions): Solids {
@@ -1061,7 +1075,18 @@ export function createSolids(o: SolidOptions): Solids {
     // contributed. Not pickable — a tap is about the solid, not about a word
     // said over part of it — so they carry no `userData.solid`.
     const painted: THREE.Mesh[] = [];
-    for (const part of parts ?? []) {
+    // …and the volumes the tree does not know about: a colour word said about a
+    // PART of a hull, whose body is a cut of this very geometry (G3).
+    const said = (() => {
+      try {
+        return o.painted?.(s, geo) ?? [];
+      } catch {
+        // A boolean that will not come off is never a reason for a body to
+        // vanish; the part simply goes unpainted.
+        return [];
+      }
+    })();
+    for (const part of [...(parts ?? []), ...said]) {
       const m = new THREE.Mesh(
         part.geometry,
         new THREE.MeshStandardMaterial({

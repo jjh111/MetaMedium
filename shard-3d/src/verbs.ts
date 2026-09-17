@@ -69,6 +69,14 @@ export interface NameRef {
   name: string;
   /** Every step that name covers, in the tree's own ids. */
   stepIds: string[];
+  /**
+   * G3: every PART that name covers, in the engine's own `part:n` ids.
+   *
+   * A name on a hull's part is not a name on a step — *make the towers taller*
+   * has to reach the parts, and a `stepIds`-only reading would have found
+   * nothing to scope the regen to and sent the whole tree.
+   */
+  partIds?: string[];
   solidId: string;
 }
 
@@ -78,6 +86,8 @@ export interface PhraseReading {
   names: string[];
   /** Every step those names cover — what the act is scoped to. */
   stepIds: string[];
+  /** G3: every part those names cover — the other thing an act may be scoped to. */
+  partIds: string[];
   solidId?: string;
   /** For `regen`: which way the change goes, in the human's own word. */
   change?: Change;
@@ -155,6 +165,7 @@ function reading(
     verb,
     names: hits.map((h) => h.name),
     stepIds: hits.flatMap((h) => h.stepIds),
+    partIds: hits.flatMap((h) => h.partIds ?? []),
     ...(hits[0] ? { solidId: hits[0].solidId } : {}),
     reasoning,
     ...extra,
@@ -195,7 +206,19 @@ export function readPhrase(text: string, scope: PhraseScope): PhraseResult | nul
 
   const hits = namesIn(t, scope.names);
   if (!hits.length) return null;
-  const said = hits.map((h) => `“${h.name}” (${h.stepIds.length} step${h.stepIds.length === 1 ? '' : 's'})`).join(', ');
+  const said = hits
+    .map((h) => {
+      const parts = h.partIds?.length ?? 0;
+      const what = parts
+        ? `${parts} part${parts === 1 ? '' : 's'}${h.stepIds.length ? ` and ${h.stepIds.length} step${h.stepIds.length === 1 ? '' : 's'}` : ''}`
+        : `${h.stepIds.length} step${h.stepIds.length === 1 ? '' : 's'}`;
+      return `“${h.name}” (${what})`;
+    })
+    .join(', ');
+  // *steps* or *parts*, whichever the names actually cover (G3). A part is not
+  // a step, and a line that says otherwise is the reading line promising an act
+  // the landing does not make.
+  const covering = hits.some((h) => h.partIds?.length) ? 'parts' : 'steps';
 
   // A colour word ASKS for something when the phrase also says so — a paint
   // saying, or the plain copula a hand uses (*the tops are red*). A colour
@@ -204,20 +227,31 @@ export function readPhrase(text: string, scope: PhraseScope): PhraseResult | nul
   const colour = colourIn(t, scope.colours);
   const asks = SAYINGS.paint.some((p) => lower.includes(p)) || /\b(is|are|should be|go)\b/.test(lower);
   if (colour && asks) {
-    return reading('paint', hits, `${said} painted ${colour} — the material is a word bound to those steps, tier 1`, { colour });
+    return reading(
+      'paint',
+      hits,
+      `${said} painted ${colour} — the material is a word bound to those ${covering}, tier 1`,
+      { colour }
+    );
   }
 
   const change = changeIn(t);
   if (change) {
-    return reading('regen', hits, `${said} made ${change} — only those steps are asked for again, the rest of the tree is fixed`, { change });
+    return reading('regen', hits, `${said} made ${change} — only those ${covering} are asked for again, the rest is fixed`, { change });
   }
 
   if (SAYINGS.drop.some((p) => t.toLowerCase().includes(p))) {
-    return reading('drop', hits, `${said} taken out of the tree — a new version without them, tier 1`);
+    return reading(
+      'drop',
+      hits,
+      covering === 'parts'
+        ? `${said} unsaid — their claims come out of the hull, one version each, tier 1`
+        : `${said} taken out of the tree — a new version without them, tier 1`
+    );
   }
 
   if (SAYINGS.regen.some((p) => words(t).includes(p))) {
-    return reading('regen', hits, `${said} asked for again — the rest of the tree is fixed`, { change: 'different' });
+    return reading('regen', hits, `${said} asked for again — the rest is fixed`, { change: 'different' });
   }
 
   return {
@@ -237,5 +271,7 @@ export function describePhrase(r: PhraseReading): string {
       : r.verb === 'drop'
         ? `remove ${r.names.join(', ')}`
         : `regen ${r.names.join(', ')}${r.change && r.change !== 'different' ? ` — ${r.change}` : ''}`;
-  return `${what} · ${r.stepIds.length} step${r.stepIds.length === 1 ? '' : 's'}`;
+  const n = r.stepIds.length + r.partIds.length;
+  const kind = r.partIds.length && !r.stepIds.length ? 'part' : 'step';
+  return `${what} · ${n} ${kind}${n === 1 ? '' : 's'}`;
 }

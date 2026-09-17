@@ -89,6 +89,18 @@ export function offsetOf(plane: Plane, world: Vec3): number {
   return dot(sub(world, plane.origin), normalize(plane.normal));
 }
 
+/**
+ * A world point reflected across a plane (push 2, G3).
+ *
+ * The arithmetic `solid.ts`'s `reflectionOf` does as a matrix, said as a point
+ * — so a profile can be mirrored without a renderer, which is what a part's
+ * mirror needs and what makes it testable.
+ */
+export function reflectAcross(plane: Plane, world: Vec3): Vec3 {
+  const n = normalize(plane.normal);
+  return sub(world, mul(n, 2 * offsetOf(plane, world)));
+}
+
 /** The same plane, slid along its own normal. The gizmo's handle. */
 export function slide(plane: Plane, distance: number): Plane {
   return {

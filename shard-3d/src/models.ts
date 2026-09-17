@@ -58,6 +58,15 @@ export interface Models {
   joinHand(room: Room): Seat;
   /** The seat the hand sits in, if it is seated. */
   hand(): Seat | null;
+  /**
+   * Move a seat to the FRONT — `first()` is who a brief goes to, so this is
+   * *ask this one*.
+   *
+   * `joinHand` does it inline because sitting down in that seat is itself the
+   * deliberate act; this is the same move said out loud, for the stub, whose
+   * whole purpose is to be the one a brief reaches.
+   */
+  front(id: string): void;
   leave(id: string): void;
   onChange(fn: () => void): void;
 }
@@ -454,6 +463,13 @@ export function createModels(o: ModelsOptions): Models {
       ),
     joinHand,
     hand: () => seats.find((s) => s.name === HAND_SEAT) ?? null,
+    front: (id) => {
+      const i = seats.findIndex((s) => s.id === id);
+      if (i <= 0) return;
+      const [held] = seats.splice(i, 1);
+      seats.unshift(held);
+      changed();
+    },
     leave: (id) => {
       const i = seats.findIndex((s) => s.id === id);
       if (i >= 0) seats.splice(i, 1);

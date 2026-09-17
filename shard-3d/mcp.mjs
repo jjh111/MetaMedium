@@ -549,7 +549,7 @@ const TOOLS = [
   },
   {
     name: 'space_answer',
-    description: 'Answer a parked brief in the contract it carries — {steps, profiles} (and {parts} where the brief asks for them), or {reuse}. Pass the object as "reply". Refuse it with "refuse" and one clause saying why, and nothing is written. The shard applies your reply exactly as it applies a model\'s: everything outside its closed vocabulary is dropped and counted, and the version is held and attributed.',
+    description: 'Answer a parked brief IN THE CONTRACT IT CARRIES — space_pending prints that contract above the brief, and it is one of two. When a HULL is standing, the brief lists its PARTS and the contract is {"parts":[{"id":"part:1","name":"turret","material":"green","why":"…"}],"steps":[{"id":"s1","op":"boss","part":"part:1","height":0.6,"why":"…"}]}: name each part from the human\'s own words, bind one colour word from the closed list, and add small ops BY PART ID only (boss, cut, mirror, remove) — you write no geometry and no profiles on that path, and "steps" is optional. Otherwise the contract is {"steps":[…],"profiles":[…]} over the drawing\'s own stroke ids. Either way {"reuse":"<name>"} says the library already holds it. Pass the object as "reply". Refuse it with "refuse" and one clause saying why, and nothing is written. The shard applies your reply exactly as it applies a model\'s: everything outside the closed vocabulary is dropped and counted, a part id this hull does not have is dropped and counted, what you could not name keeps its own part:n, and the version is held and attributed.',
     inputSchema: {
       type: 'object',
       required: ['key'],

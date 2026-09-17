@@ -31,12 +31,12 @@ import { createSolids } from './solid';
 import { createSelection, type Sel } from './selection';
 import { createField, readField, type FieldContext, type KnownName, type VerbOffer } from './field';
 import { SCRATCH_NEAR, type Makeable } from './form';
-import { COLOUR_WORDS, describeStep, type HullStep } from './op';
-import { partsOfHull, type Part, type PartsOfHull } from './parts';
+import { colourOf, COLOUR_WORDS, describeStep, type HullStep } from './op';
+import { hullReadOf, partsOfHull, type Part, type PartsOfHull } from './parts';
 import { createModels, HAND_SEAT } from './models';
 import { joinRoom, otherHand, saidInRoom, type Room } from './room';
 import { createWork } from './work';
-import { describeSpace } from './brief';
+import { describeSpace, partIdsOf } from './brief';
 import { createTranscript } from './exchange';
 import {
   boardFilename,
@@ -590,7 +590,28 @@ const ink = createInk({
   },
 });
 
-const solids = createSolids({ space, log, colours });
+const solids = createSolids({
+  space,
+  log,
+  colours,
+  // G3: *green tops* paints the PARTS the word was said about. Their bodies
+  // are cuts of the geometry just derived, so they are computed here from that
+  // geometry — the part cache is primed with it at the same time, which is
+  // also what keeps the panel's chips and the painted meshes the same cut.
+  painted: (solid, geometry) => {
+    const step = solid.tree.steps.find((s) => s.op === 'hull' && !s.on) as HullStep | undefined;
+    if (!step?.said?.some((s) => s.material?.colour)) return [];
+    const found = partsFor(solid.id, geometry);
+    return (found?.parts ?? [])
+      .filter((p) => p.material?.colour)
+      .map((p) => ({
+        stepId: p.id,
+        ...(p.name ? { name: p.name } : {}),
+        colour: colourOf(p.material) ?? '#888',
+        geometry: p.geometry,
+      }));
+  },
+});
 
 /**
  * What the log has to ask the SPACE for: the solids' silhouettes in the view a
@@ -629,6 +650,30 @@ log.sees({
     return inside.length === 1 ? inside[0].id : null;
   },
   claimsOfPart: (solidId, partId) => partOf(solidId, partId)?.from ?? [],
+  // G3: the hull as the brief and the landing need it — the footprint, the
+  // extent, the parts with what has been said about each, and the one door
+  // that turns a small op *by part id* into a step of the closed vocabulary.
+  // Everything geometric comes from the part the engine already cut, so
+  // nothing a reply wrote ever becomes geometry.
+  hullOf: (solidId) => {
+    const solid = log.solidOf(solidId);
+    const step = solid?.tree.steps.find((s) => s.op === 'hull' && !s.on) as HullStep | undefined;
+    const found = partsFor(solidId);
+    if (!solid || !step || !found) return null;
+    const box = solids.boundsOf(solidId);
+    const claim = step.footprint ? step.claims.find((c) => c.id === step.footprint) : null;
+    return hullReadOf(
+      found,
+      claim ?? null,
+      box && !box.isEmpty()
+        ? { min: v3(box.min.x, box.min.y, box.min.z), max: v3(box.max.x, box.max.y, box.max.z) }
+        : { min: v3(0, 0, 0), max: v3(0, 0, 0) },
+      (name) => {
+        const which = (['foundation', 'height', 'width'] as const).find((n) => n === name);
+        return which ? NAMED[which]('world', `the ${which} plane, named in a reply`) : null;
+      }
+    );
+  },
 });
 
 // A derivation that did not come off says so where it happened, once.
@@ -644,8 +689,15 @@ const field = createField(fieldEl, () => renderField());
 // without anything having to remember to.
 const partCache = new Map<string, { signature: string; found: PartsOfHull }>();
 
-/** The parts of a solid, when it is a hull. Cached per version; never held in the log. */
-function partsFor(solidId: string): PartsOfHull | null {
+/**
+ * The parts of a solid, when it is a hull. Cached per version; never held in
+ * the log.
+ *
+ * `geometry` is passed in only from inside a build, where the body has been
+ * derived but not yet recorded — asking `geometryOf` there would answer about
+ * the version before it, and paint the last cut of a part that has since moved.
+ */
+function partsFor(solidId: string, geometry?: THREE.BufferGeometry): PartsOfHull | null {
   const solid = log.solidOf(solidId);
   if (!solid) return null;
   const step = solid.tree.steps.find((s) => s.op === 'hull' && !s.on) as HullStep | undefined;
@@ -653,7 +705,7 @@ function partsFor(solidId: string): PartsOfHull | null {
   const signature = solids.signatureOf(solidId) ?? '';
   const held = partCache.get(solidId);
   if (held && held.signature === signature) return held.found;
-  const found = partsOfHull(step, solids.geometryOf(solidId));
+  const found = partsOfHull(step, geometry ?? solids.geometryOf(solidId));
   partCache.set(solidId, { signature, found });
   return found;
 }
@@ -1146,8 +1198,12 @@ function tier1(strokeId: string): { id: string; name: string } | null {
 function nameRefs(): NameRef[] {
   const out = new Map<string, NameRef>();
   for (const n of log.namesInPlay()) {
-    const held = out.get(n.name) ?? { name: n.name, stepIds: [], solidId: n.solidId };
-    held.stepIds.push(n.stepId);
+    const held = out.get(n.name) ?? { name: n.name, stepIds: [], partIds: [], solidId: n.solidId };
+    // G3: a name on a PART scopes to the part, not to the hull step it is held
+    // on — scoping *make the towers taller* to the hull step would ask for the
+    // whole castle again.
+    if (n.partId) held.partIds!.push(n.partId);
+    else held.stepIds.push(n.stepId);
     out.set(n.name, held);
   }
   return [...out.values()];
@@ -1214,7 +1270,7 @@ function briefTarget(): BriefTarget {
   return stand.can ? { kind: 'will-stand', stand: stand.can } : { kind: 'nothing', missing: stand.missing };
 }
 
-async function runBrief(text: string, opts: { regen?: string[] } = {}) {
+async function runBrief(text: string, opts: { regen?: string[]; regenParts?: string[] } = {}) {
   const seat = models.first();
   let solid = selectedSolid();
   // P6: a brief may also be typed with an OUTLINE selected and nothing standing
@@ -1224,7 +1280,8 @@ async function runBrief(text: string, opts: { regen?: string[] } = {}) {
   // place that knows which it was.
   const sel = selection.current();
   const atMark = sel?.kind === 'mark' ? sel.id : null;
-  const task = opts.regen ? 'the regen' : 'the brief';
+  const regenning = !!(opts.regen?.length || opts.regenParts?.length);
+  const task = regenning ? 'the regen' : 'the brief';
   /** Every exit path says the same sentence twice: to the hand, and to the transcript. */
   const stop = (id: string, outcome: 'refused' | 'failed', sentence: string) => {
     transcript.ended(id, outcome, sentence);
@@ -1281,12 +1338,20 @@ async function runBrief(text: string, opts: { regen?: string[] } = {}) {
     }
   }
   const key = `brief:${solid?.id ?? atMark}:${Date.now()}`;
-  const label = `${seat.name} · ${opts.regen ? 'the regen' : 'the brief'}`;
+  const label = `${seat.name} · ${task}`;
   const signal = work.start(key, label, solid ? solidAt(solid.id) : null);
   panel.say(`${label} — ${seat.locality}; Esc stops it`);
   report();
 
-  const brief = describeSpace(log.scene(text, opts.regen ? { mutable: opts.regen } : {}));
+  // G3: one scene, and the brief's own shape decides the contract. `partIdsOf`
+  // is the same test in the brief, in the prompt, in the parser and here, so
+  // the four can never each decide differently.
+  const scene = log.scene(text, {
+    ...(opts.regen?.length ? { mutable: opts.regen } : {}),
+    ...(opts.regenParts?.length ? { mutableParts: opts.regenParts } : {}),
+  });
+  const brief = describeSpace(scene);
+  const partIds = partIdsOf(scene);
   // G0: the exchange is recorded the moment it is SENT, so a model still
   // thinking is already a row — which is what the first board needed and did
   // not have.
@@ -1297,7 +1362,8 @@ async function runBrief(text: string, opts: { regen?: string[] } = {}) {
     words: text,
     ...(seat.transport ? { transport: seat.transport } : {}),
     signal,
-    ...(opts.regen ? { regen: true } : {}),
+    ...(regenning ? { regen: true } : {}),
+    ...(partIds.length ? { parts: partIds } : {}),
   });
   work.end(key);
   // What came back, verbatim, whether or not it could be used. `raw` is kept by
@@ -1307,8 +1373,9 @@ async function runBrief(text: string, opts: { regen?: string[] } = {}) {
     ...(result.proposal
       ? {
           parsed: {
-            steps: result.proposal.steps.length,
+            steps: result.proposal.steps.length + (result.proposal.partSteps?.length ?? 0),
             profiles: result.proposal.profiles.length,
+            ...(result.proposal.parts?.length ? { parts: result.proposal.parts.length } : {}),
             ...(result.proposal.reuse ? { reuse: result.proposal.reuse } : {}),
           },
           dropped: result.proposal.droppedWhy,
@@ -1343,6 +1410,40 @@ async function runBrief(text: string, opts: { regen?: string[] } = {}) {
     report();
     return;
   }
+  // **G3: a reply about the PARTS of a hull.** It lands as one version — the
+  // names and materials onto the hull step, the small ops as steps scoped to
+  // each part's own prism — and it is taken whenever the reply said anything
+  // about a part, even if it said nothing else. *What it cannot name, it
+  // leaves*: an unnamed part keeps its `part:n`.
+  if (solid && partIds.length && (proposal.parts?.length || proposal.partSteps?.length)) {
+    const out = log.applyParts(
+      solid.id,
+      proposal,
+      { id: seat.id, name: seat.name },
+      opts.regenParts?.length ? opts.regenParts : null
+    );
+    if (!out) {
+      return stop(ex, 'refused', `${seat.name} — nothing in the reply could be said about ${solid.name}'s parts. Nothing was written`);
+    }
+    solids.sync();
+    ink.sync();
+    selection.set({ kind: 'solid', id: solid.id });
+    // G0's rule, kept through G3's landing: **what was dropped is dropped in
+    // the transcript too.** The parser's drops were recorded when the reply
+    // came; the LANDING drops more — a part id that has gone, an op out of
+    // scope for a regen — and the row said *1 dropped* with an empty list.
+    if (out.dropped.length) transcript.came(ex, { dropped: out.dropped });
+    const landed =
+      `${out.named.length ? out.named.map((n) => `${n.partId} “${n.name}”`).join(', ') : 'nothing named'}` +
+      `${out.painted.length ? ` · ${out.painted.map((p) => `${p.partId} ${p.colour}`).join(', ')}` : ''}` +
+      `${out.steps.length ? ` · ${out.steps.length} step${out.steps.length === 1 ? '' : 's'} by part id` : ''}` +
+      `${out.dropped.length ? ` · ${out.dropped.length} dropped` : ''}`;
+    transcript.ended(ex, 'applied', landed);
+    panel.say(`${seat.name} · ${landed} · tier 2`);
+    panel.show(panel.subject() ?? lastStroke(), selection.current());
+    report();
+    return;
+  }
   // A tree came back, and there is nothing for it to fill. Since G0 stands the
   // massing first this is the narrow case that is left: a brief typed at a bare
   // OUTLINE whose answer was a tree rather than a `reuse`. Said rather than
@@ -1356,7 +1457,7 @@ async function runBrief(text: string, opts: { regen?: string[] } = {}) {
         `nothing stands for it to fill — ${log.standFor().missing}. Nothing was written`
     );
   }
-  const out = opts.regen
+  const out = opts.regen?.length
     ? log.replaceSteps(solid.id, opts.regen, proposal, { id: seat.id, name: seat.name })
     : log.applyProposal(solid.id, proposal, { id: seat.id, name: seat.name });
   if (!out) {
@@ -1431,23 +1532,35 @@ async function askMeaning(phrase: string) {
 /** A phrase the table DID read: tier 1 for two of the three, a model for the regen. */
 function runPhrase(r: PhraseReading) {
   if (!r.solidId) return;
+  const why = `${describePhrase(r)} — ${r.reasoning}`;
   if (r.verb === 'drop') {
-    const next = log.dropSteps(r.solidId, r.stepIds, `${describePhrase(r)} — ${r.reasoning}`);
-    if (!next) return panel.say('nothing there to take out');
+    // G3: a name that covers PARTS drops those parts' claims — the same act a
+    // scratch across one makes, one version of the one hull step each.
+    let gone = 0;
+    for (const partId of r.partIds) if (log.dropPart(r.solidId, partId, why)) gone++;
+    const next = r.stepIds.length ? log.dropSteps(r.solidId, r.stepIds, why) : null;
+    if (!gone && !next) return panel.say('nothing there to take out');
     solids.sync();
-    return after(r.solidId, `${r.names.join(', ')} taken out — ${next.steps.length} steps left · tier 1`);
+    ink.sync();
+    return after(
+      r.solidId,
+      `${r.names.join(', ')} taken out — ${gone ? `${gone} part${gone === 1 ? '' : 's'}` : `${next!.steps.length} steps left`} · tier 1`
+    );
   }
   if (r.verb === 'paint') {
-    const next = log.paintSteps(r.solidId, r.stepIds, r.colour!, `${describePhrase(r)} — ${r.reasoning}`);
-    if (!next) return panel.say(`“${r.colour}” is not a colour the shard can paint`);
+    const parts = r.partIds.length
+      ? log.nameParts(r.solidId, r.partIds.map((partId) => ({ partId, colour: r.colour! })), why)
+      : null;
+    const next = r.stepIds.length ? log.paintSteps(r.solidId, r.stepIds, r.colour!, why) : null;
+    if (!parts && !next) return panel.say(`“${r.colour}” is not a colour the shard can paint`);
     solids.sync();
     return after(r.solidId, `${r.names.join(', ')} painted ${r.colour} · tier 1`);
   }
-  // regen: only those steps, and the brief says so.
+  // regen: only those steps — or only those PARTS — and the brief says so.
   selection.set({ kind: 'solid', id: r.solidId });
   void runBrief(
     `${r.change && r.change !== 'different' ? `make the ${r.names.join(' and ')} ${r.change}` : `do the ${r.names.join(' and ')} again`}`,
-    { regen: r.stepIds }
+    r.partIds.length ? { regenParts: r.partIds } : { regen: r.stepIds }
   );
 }
 
@@ -1869,6 +1982,10 @@ function fieldContext(): FieldContext {
       standing: ((k) => (k === 'will-stand' ? 'will-stand' : k === 'nothing' ? 'nothing' : 'stands'))(
         briefTarget().kind
       ),
+      // G3: and which CONTRACT it will be. Asked of the same seam the brief
+      // itself asks (`partIdsOf` over the scene), so the line cannot promise a
+      // massing over a board whose brief is about parts.
+      ...((n) => (n ? { parts: n } : {}))(partIdsOf(log.scene('')).length),
     },
   };
 }
@@ -2476,6 +2593,8 @@ export interface ShardHook {
       by?: string;
       /** P5: for a clip, the step whose body does the clipping. */
       bound?: string;
+      /** G3: the part of a hull this step was scoped to, when a reply asked for it by id. */
+      part?: string;
       reasoning: string;
     }[];
   }[];
@@ -2544,7 +2663,16 @@ export interface ShardHook {
   /** Who is seated, and whether anything is in flight. */
   models(): { seats: { id: string; name: string; locality: string }[]; working: { label: string }[] };
   /** Every name in play, in its step's own id. */
-  names(): { name: string; solidId: string; stepId: string; op: string; colour?: string; definition?: boolean }[];
+  names(): {
+    name: string;
+    solidId: string;
+    stepId: string;
+    op: string;
+    /** G3: the part of a hull the name is on, when it names one. */
+    partId?: string;
+    colour?: string;
+    definition?: boolean;
+  }[];
   /** Every definition the library holds. */
   definitions(): {
     name: string;
@@ -2615,6 +2743,9 @@ export interface ShardHook {
     id: string;
     from: string[];
     sentence: string;
+    /** G3: what has been said about it — a name, a material — when anything has. */
+    name?: string;
+    colour?: string;
     place: string;
     span: { u: number; v: number };
     height: number;
@@ -2876,6 +3007,7 @@ const hook: ShardHook = {
           ...(st.material?.colour ? { colour: st.material.colour } : {}),
           ...(st.by ? { by: st.by } : {}),
           ...(st.op === 'massing' && st.bound ? { bound: st.bound } : {}),
+          ...(st.part ? { part: st.part } : {}),
         })),
       };
     }),
@@ -2951,6 +3083,12 @@ const hook: ShardHook = {
         });
       });
     });
+    // **The stub takes the front.** `first()` is who a brief goes to, and the
+    // whole purpose of a stub is to be that — seating one BEHIND a hand that
+    // had taken the front (G5's seat does, deliberately) sent the brief to the
+    // hand, which parks it and answers never. The step that found it reported
+    // *0 parts named* and everything else about the run was right.
+    models.front(seat.id);
     report();
     return seat.id;
   },
@@ -3004,6 +3142,7 @@ const hook: ShardHook = {
       solidId: n.solidId,
       stepId: n.stepId,
       op: n.op,
+      ...(n.partId ? { partId: n.partId } : {}),
       ...(n.colour ? { colour: n.colour } : {}),
       ...(n.definition ? { definition: true } : {}),
     })),
@@ -3061,10 +3200,17 @@ const hook: ShardHook = {
         }
       : null;
   },
-  materials: (solidId) =>
-    (log.solidOf(solidId)?.tree.steps ?? [])
+  materials: (solidId) => [
+    ...(log.solidOf(solidId)?.tree.steps ?? [])
       .filter((st) => st.material?.colour)
       .map((st) => ({ stepId: st.id, ...(st.name ? { name: st.name } : {}), colour: st.material!.colour })),
+    // G3: a colour word said about a PART is a material too. It is held on the
+    // hull step's `said` rather than on a step of its own, and it is reported
+    // in the part's own id, which is what a reply used to say it.
+    ...(partsFor(solidId)?.parts ?? [])
+      .filter((p) => p.material?.colour)
+      .map((p) => ({ stepId: p.id, ...(p.name ? { name: p.name } : {}), colour: p.material!.colour })),
+  ],
   cancel: () => work.cancelAll(),
   brief: (words = '', mutable) => describeSpace(log.scene(words, mutable?.length ? { mutable } : {})),
   seedCode: (markIds, code, name = 'thing') => {
@@ -3114,6 +3260,8 @@ const hook: ShardHook = {
       id: p.id,
       from: p.from,
       sentence: p.sentence,
+      ...(p.name ? { name: p.name } : {}),
+      ...(p.material?.colour ? { colour: p.material.colour } : {}),
       place: p.place.words,
       span: p.span,
       height: p.height,

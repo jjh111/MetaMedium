@@ -45,6 +45,26 @@ export type ProposableOp = (typeof PROPOSABLE)[number];
 /** The shapes a model may add a profile in — the shape rung's own closed vocabulary. */
 export const PROPOSABLE_SHAPES = ['rectangle', 'circle', 'polygon', 'triangle'] as const;
 
+/**
+ * The small ops a reply may ask for **by part id** (push 2, G3).
+ *
+ * A strict, smaller vocabulary than `PROPOSABLE`, and deliberately so: on a
+ * standing hull the drawing has already said what the shape is, and what is
+ * left for a model to say is what the pieces ARE, what they are made of, and
+ * at most a little more or a little less of one. `extrude` and `revolve` are
+ * not here — they would be the reply inventing a body beside the one the hand
+ * drew — and **no profile a model writes is taken on this path at all**.
+ */
+export const PART_OPS = ['boss', 'cut', 'mirror', 'remove'] as const;
+export type PartOp = (typeof PART_OPS)[number];
+
+/** The shapes a hole may be given in, on a part's own top face. */
+export const HOLE_SHAPES = ['circle', 'rectangle'] as const;
+
+/** At most this many parts named in one reply, and this many small ops. */
+export const MAX_PARTS = 32;
+export const MAX_PART_STEPS = 24;
+
 /** At most this many steps in one reply. A tree nobody can read is not a proposal. */
 export const MAX_STEPS = 24;
 /** At most this many profiles drawn into the log by one reply. */
@@ -94,9 +114,54 @@ export interface ProposedProfile {
   h?: number;
 }
 
+/**
+ * A part, named and painted (push 2, G3). The whole of what a model is asked
+ * for on a standing hull, and the reason the contract has a second shape: the
+ * engine can already point at the pieces, so the model's job is to say what
+ * they are — not to make any.
+ */
+export interface ProposedPart {
+  /** A `part:n` from the brief. One that is not in the brief is dropped and counted. */
+  id: string;
+  /** The hand's own word for it, taken as written. */
+  name?: string;
+  /** A colour word from the closed list; anything else is dropped with its reason. */
+  material?: { colour: string };
+  why?: string;
+}
+
+/** A small op asked for by part id — never raw geometry. */
+export interface ProposedPartStep {
+  id: string;
+  op: PartOp;
+  /** The `part:n` it acts on. */
+  part: string;
+  /** `boss`: how much higher, in u. */
+  height?: number;
+  /** `cut`: the hole, in the part's own top-face units. */
+  shape?: 'circle' | 'rectangle';
+  centre?: Point;
+  r?: number;
+  w?: number;
+  h?: number;
+  /** `cut`: how deep, in u. Absent means THROUGH. */
+  depth?: number;
+  /** `mirror`: the world plane to reflect across. */
+  plane?: string;
+  why?: string;
+}
+
 export interface Proposal {
   steps: ProposedStep[];
   profiles: ProposedProfile[];
+  /**
+   * G3: the parts named and painted — the hull path's whole answer. Absent on
+   * a P5 proposal, which is about profiles and steps and has no parts to speak
+   * of; `parseProposal` always sets both, empty when there were none.
+   */
+  parts?: ProposedPart[];
+  /** G3: the small ops asked for by part id. */
+  partSteps?: ProposedPartStep[];
   /** The model saying the library already holds what was asked for (v9 S5's rule). */
   reuse?: string;
   /** How much of the reply was outside the vocabulary and dropped. */
@@ -148,8 +213,75 @@ Rules, and each of them is checked:
 
 If a definition the library already holds IS what was asked for, reply {"reuse":"<its name>"} and nothing else.`;
 
+/**
+ * The OTHER contract (push 2, G3): a hull is standing and the engine has
+ * already cut it into parts it can point at.
+ *
+ * What is asked for is the smallest thing that is still the whole job — a name
+ * per part from the human's own words, a colour per part, and at most a little
+ * more or a little less of one. **No profiles at all**: the drawing said the
+ * shape, and a model adding outlines to a body the hand drew is the fault this
+ * package exists to stop.
+ */
+const PART_RULES = `Reply with ONLY a JSON object, no prose, no code fences:
+
+{"parts":[ … ], "steps":[ … ]}
+
+A PART entry says what one of the parts above IS. Use the engine's own ids:
+  {"id":"part:1","name":"turret","material":"green","why":"…"}
+
+  - "id" must be one of the part ids listed above. Any other id is dropped.
+  - "name" is the human's own word for it, from the words they typed. One word or two.
+    Several parts may share a name — two towers are two parts both named "turret".
+  - "material" is ONE colour word, and only one of: ${Object.keys(COLOUR_WORDS).join(', ')}.
+  - Leave out what you cannot say. A part you do not name keeps the engine's own "part:n",
+    and a reply that names nothing but binds a material still lands the material.
+
+A STEP is a small change to ONE part, by its id, and one of exactly these:
+  {"id":"s1","op":"boss","part":"part:1","height":<u>,"why":"…"}        raise that part
+  {"id":"s2","op":"cut","part":"part:2","shape":"circle","centre":{"x":0,"y":0},"r":0.3,"depth":<u>,"why":"…"}
+  {"id":"s3","op":"cut","part":"part:2","shape":"rectangle","centre":{"x":0,"y":0},"w":0.4,"h":0.4,"why":"…"}
+  {"id":"s4","op":"mirror","part":"part:1","plane":"height","why":"…"}  that part, reflected
+  {"id":"s5","op":"remove","part":"part:3","why":"…"}                   unsay that part's claim
+
+Rules, and each of them is checked:
+- "op" must be one of ${PART_OPS.join(', ')}. Anything else is dropped and counted.
+- "part" must be one of the part ids above. Every number is in the units the parts are given in.
+- A "cut" is measured on that part's OWN TOP FACE, in that face's own u, v, from its centre at (0, 0).
+  Leave "depth" out and the hole goes all the way through the part.
+- **You do not write geometry here.** There is no "profiles" list on this reply and no coordinates
+  in world space: the drawing already says what the shape is. Steps are optional — a reply of names
+  and materials alone is a good reply.
+- At most ${MAX_PARTS} parts and ${MAX_PART_STEPS} steps.
+- "why" is one short clause the human will see beside it.
+
+If a definition the library already holds IS what was asked for, reply {"reuse":"<its name>"} and nothing else.`;
+
 /** The making prompt, with the brief as the user message. */
-export function messagesFor(brief: string, words: string, opts: { regen?: boolean } = {}): ChatMessage[] {
+export function messagesFor(
+  brief: string,
+  words: string,
+  opts: { regen?: boolean; parts?: boolean } = {}
+): ChatMessage[] {
+  if (opts.parts) {
+    const system = opts.regen
+      ? `You are a participant in a 3D drawing space, and a human has asked for part of a standing thing again.
+
+The thing is a HULL the space stood from the human's own drawing, cut into parts the space can point at. Only the parts named below may change; every other part is fixed and must be left exactly as it is. Keep the names as they are: a part named "turret" that gets taller is still named "turret".
+
+${PART_RULES}`
+      : `You are a participant in a 3D drawing space, alongside a human and the space's own geometric reader.
+
+The human drew a plan and some elevations, and the space has already stood a HULL up from them — the volume their views share — and cut it into the PARTS listed below, each with its own id. It is all standing, in the engine's name, and it is the extent your reply must stay inside: whatever you propose is clipped to it.
+
+Your job is to say what those parts ARE, in the human's own words, and what they are made of. The drawing says the shape; your reply says the meaning.
+
+${PART_RULES}`;
+    return [
+      { role: 'system', content: system },
+      { role: 'user', content: `${brief}\n\nName the parts.${words ? ` The human asked for: “${words}”` : ''}` },
+    ];
+  }
   const system = opts.regen
     ? `You are a participant in a 3D drawing space, changing part of a solid you or another participant already proposed.
 
@@ -279,11 +411,13 @@ function pointsOf(v: unknown): Point[] | undefined {
  * and *2 steps outside the vocabulary were dropped*, said out loud, because a
  * proposal quietly reduced is a proposal nobody agreed to.
  */
-export function parseProposal(text: string): Proposal {
+export function parseProposal(text: string, known: { parts?: readonly string[] } = {}): Proposal {
   const droppedWhy: string[] = [];
   const empty = (why: string): Proposal => ({
     steps: [],
     profiles: [],
+    parts: [],
+    partSteps: [],
     dropped: 0,
     droppedWhy: [why],
     reasoning: why,
@@ -301,8 +435,151 @@ export function parseProposal(text: string): Proposal {
   const reuse = str(rec.reuse);
   const rawProfiles = Array.isArray(rec.profiles) ? rec.profiles : [];
   const rawSteps = Array.isArray(rec.steps) ? rec.steps : [];
-  if (reuse && !rawSteps.length) {
-    return { steps: [], profiles: [], reuse, dropped: 0, droppedWhy: [], reasoning: `the library already holds “${reuse}” — reused, not written` };
+  const rawParts = Array.isArray(rec.parts) ? rec.parts : [];
+  if (reuse && !rawSteps.length && !rawParts.length) {
+    return {
+      steps: [],
+      profiles: [],
+      parts: [],
+      partSteps: [],
+      reuse,
+      dropped: 0,
+      droppedWhy: [],
+      reasoning: `the library already holds “${reuse}” — reused, not written`,
+    };
+  }
+
+  // ---- the part ids the brief actually offered -----------------------------
+  // The region-id rule, checked on the way back in: a reply about `part:9` on a
+  // hull with two parts is about nothing, and quietly keeping it would put a
+  // name on whichever body happened to be second next time.
+  const knownParts = known.parts ? new Set(known.parts) : null;
+  const unknownPart = (id: string, what: string): boolean => {
+    if (!knownParts || knownParts.has(id)) return false;
+    droppedWhy.push(
+      `${what} is about ${id}, and this hull has no such part — its parts are ${[...knownParts].join(', ') || '(none)'}`
+    );
+    return true;
+  };
+
+  /** A colour word, or nothing and the reason it was nothing. */
+  const colourOf = (v: unknown, what: string): { colour: string } | undefined => {
+    // A model writes `"material":"green"` at least as often as the object the
+    // contract asks for. Both are read; neither is guessed at.
+    const raw =
+      typeof v === 'string'
+        ? str(v)?.toLowerCase()
+        : v && typeof v === 'object'
+          ? str((v as Record<string, unknown>).colour)?.toLowerCase()
+          : undefined;
+    if (!raw) return undefined;
+    if (!(raw in COLOUR_WORDS)) {
+      droppedWhy.push(`the colour word “${raw}” on ${what} is not one the shard can paint`);
+      return undefined;
+    }
+    return { colour: raw };
+  };
+
+  // ---- the parts, named and painted (G3) -----------------------------------
+  const parts: ProposedPart[] = [];
+  for (const raw of rawParts) {
+    if (parts.length >= MAX_PARTS) {
+      droppedWhy.push(`more than ${MAX_PARTS} parts — the rest were dropped`);
+      break;
+    }
+    if (!raw || typeof raw !== 'object') continue;
+    const p = raw as Record<string, unknown>;
+    const id = str(p.id) ?? str(p.part);
+    if (!id) {
+      droppedWhy.push('a part entry that names no part id');
+      continue;
+    }
+    if (unknownPart(id, 'a part entry')) continue;
+    if (parts.some((held) => held.id === id)) {
+      droppedWhy.push(`two entries both about ${id}`);
+      continue;
+    }
+    // The name is taken AS WRITTEN. The brief lists the hand's own words and
+    // asks that names come from them; what comes back is still the model's
+    // claim, held and attributed, and the hand takes it or leaves it — the
+    // engine never decides what a thing is called (§2.6).
+    const name = str(p.name);
+    const material = colourOf(p.material ?? p.colour, id);
+    if (!name && !material) {
+      droppedWhy.push(`${id} was named nothing and painted nothing`);
+      continue;
+    }
+    parts.push({ id, ...(name ? { name } : {}), ...(material ? { material } : {}), ...(str(p.why) ? { why: str(p.why)! } : {}) });
+  }
+
+  // ---- the small ops by part id --------------------------------------------
+  // A step that names a `part` is on the hull path and is read against
+  // `PART_OPS`; a step that does not is P5's, read against `PROPOSABLE` below.
+  // Which contract a reply is answering is therefore never a mode the parser
+  // has to be told about — the reply says.
+  const partSteps: ProposedPartStep[] = [];
+  const forParts: unknown[] = [];
+  const forTree: unknown[] = [];
+  for (const raw of rawSteps) {
+    const s = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : null;
+    if (s && str(s.part)) forParts.push(raw);
+    else forTree.push(raw);
+  }
+  for (const raw of forParts) {
+    if (partSteps.length >= MAX_PART_STEPS) {
+      droppedWhy.push(`more than ${MAX_PART_STEPS} steps by part id — the rest were dropped`);
+      break;
+    }
+    const s = raw as Record<string, unknown>;
+    const part = str(s.part)!;
+    const op = str(s.op)?.toLowerCase();
+    const id = str(s.id) ?? `p${partSteps.length + 1}`;
+    if (!op || !(PART_OPS as readonly string[]).includes(op)) {
+      droppedWhy.push(`a step about ${part} whose op is “${op ?? 'missing'}” — outside the part vocabulary (${PART_OPS.join(', ')})`);
+      continue;
+    }
+    if (unknownPart(part, `the ${op} ${id}`)) continue;
+    const height = num(s.height) ?? num(s.depth);
+    if (op === 'boss' && (height === undefined || Math.abs(height) < 1e-6)) {
+      droppedWhy.push(`the boss ${id} on ${part} says no height, and nothing in the drawing says one for it`);
+      continue;
+    }
+    const shape = str(s.shape)?.toLowerCase();
+    if (op === 'cut') {
+      if (!shape || !(HOLE_SHAPES as readonly string[]).includes(shape)) {
+        droppedWhy.push(`the cut ${id} on ${part} is shaped “${shape ?? 'nothing'}” — a hole is a circle or a rectangle`);
+        continue;
+      }
+      const r = num(s.r);
+      const w = num(s.w);
+      const h = num(s.h);
+      if (shape === 'circle' && !(r && r > 0)) {
+        droppedWhy.push(`the circle ${id} on ${part} has no radius`);
+        continue;
+      }
+      if (shape === 'rectangle' && !(w && w > 0 && h && h > 0)) {
+        droppedWhy.push(`the rectangle ${id} on ${part} has no size`);
+        continue;
+      }
+    }
+    const centre =
+      s.centre && typeof s.centre === 'object'
+        ? { x: num((s.centre as Record<string, unknown>).x) ?? 0, y: num((s.centre as Record<string, unknown>).y) ?? 0 }
+        : undefined;
+    partSteps.push({
+      id,
+      op: op as PartOp,
+      part,
+      ...(op === 'boss' && height !== undefined ? { height } : {}),
+      ...(op === 'cut' && shape ? { shape: shape as 'circle' | 'rectangle' } : {}),
+      ...(op === 'cut' && centre ? { centre } : {}),
+      ...(op === 'cut' && num(s.r) !== undefined ? { r: num(s.r)! } : {}),
+      ...(op === 'cut' && num(s.w) !== undefined ? { w: num(s.w)! } : {}),
+      ...(op === 'cut' && num(s.h) !== undefined ? { h: num(s.h)! } : {}),
+      ...(op === 'cut' && num(s.depth) !== undefined ? { depth: num(s.depth)! } : {}),
+      ...(op === 'mirror' ? { plane: str(s.plane) ?? 'height' } : {}),
+      ...(str(s.why) ? { why: str(s.why)! } : {}),
+    });
   }
 
   // ---- the profiles, in the shape rung's own vocabulary ---------------------
@@ -361,7 +638,7 @@ export function parseProposal(text: string): Proposal {
   // ---- the steps -----------------------------------------------------------
   const steps: ProposedStep[] = [];
   const seen = new Set<string>();
-  for (const raw of rawSteps) {
+  for (const raw of forTree) {
     if (steps.length >= MAX_STEPS) {
       droppedWhy.push(`more than ${MAX_STEPS} steps — the rest were dropped`);
       break;
@@ -413,15 +690,27 @@ export function parseProposal(text: string): Proposal {
   }
 
   const dropped = droppedWhy.length;
+  // What it came to, in the terms of whichever contract it answered. A reply of
+  // names alone used to read as "0 steps and 0 profiles", which is a true
+  // sentence about the wrong question.
+  const said: string[] = [];
+  const named = parts.filter((p) => p.name).length;
+  const painted = parts.filter((p) => p.material).length;
+  if (named) said.push(`${named} part${named === 1 ? '' : 's'} named`);
+  if (painted) said.push(`${painted} material${painted === 1 ? '' : 's'} bound`);
+  if (partSteps.length) said.push(`${partSteps.length} small op${partSteps.length === 1 ? '' : 's'} by part id`);
+  if (steps.length) said.push(`${steps.length} step${steps.length === 1 ? '' : 's'}`);
+  if (profiles.length) said.push(`${profiles.length} profile${profiles.length === 1 ? '' : 's'}`);
   return {
     steps,
     profiles,
+    parts,
+    partSteps,
     ...(reuse ? { reuse } : {}),
     dropped,
     droppedWhy,
     reasoning:
-      `${steps.length} step${steps.length === 1 ? '' : 's'} and ${profiles.length} profile${profiles.length === 1 ? '' : 's'} ` +
-      `in the closed vocabulary` +
+      `${said.length ? said.join(', ') : 'nothing'} in the closed vocabulary` +
       (dropped ? `; ${dropped} thing${dropped === 1 ? '' : 's'} outside it were dropped: ${droppedWhy.join('; ')}` : ''),
   };
 }
@@ -433,6 +722,13 @@ export interface ProposeArgs {
   transport?: SpaceTransport;
   signal?: AbortSignal;
   regen?: boolean;
+  /**
+   * G3: the part ids the brief listed. Their presence is what says WHICH
+   * contract applies — the parts one when a hull with parts is standing, P5's
+   * profile-and-step one otherwise — and it is also what a reply's part ids are
+   * checked against on the way back in.
+   */
+  parts?: readonly string[];
 }
 
 /**
@@ -441,19 +737,26 @@ export interface ProposeArgs {
  */
 export async function propose(args: ProposeArgs): Promise<ProposeResult> {
   const send: SpaceTransport = args.transport ?? ((c, m, o) => complete(c, m, o));
+  const onParts = !!args.parts?.length;
   let result: CompletionResult;
   try {
-    result = await send(args.config, messagesFor(args.brief, args.words, { regen: args.regen }), {
-      ...(args.signal ? { signal: args.signal } : {}),
-    });
+    result = await send(
+      args.config,
+      messagesFor(args.brief, args.words, { regen: args.regen, parts: onParts }),
+      { ...(args.signal ? { signal: args.signal } : {}) }
+    );
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) };
   }
   if (!result.ok) return { ok: false, error: result.error };
-  const proposal = parseProposal(result.text);
-  if (!proposal.steps.length && !proposal.reuse) {
-    return { ok: false, error: proposal.reasoning, raw: result.text };
-  }
+  const proposal = parseProposal(result.text, onParts ? { parts: args.parts } : {});
+  // **What it cannot name, it leaves.** A reply that named nothing but bound a
+  // material still lands what it did, and only a reply that came to NOTHING at
+  // all is unusable — which is also the one case where the brief leaves the
+  // board exactly as it was.
+  const anything =
+    proposal.steps.length || proposal.parts?.length || proposal.partSteps?.length || proposal.reuse;
+  if (!anything) return { ok: false, error: proposal.reasoning, raw: result.text };
   return { ok: true, proposal, raw: result.text };
 }
 

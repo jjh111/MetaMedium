@@ -36,10 +36,11 @@
 
 import * as THREE from 'three';
 import { intersect } from './csg';
-import type { HullStep, Profile2D, PlaneRef } from './op';
-import { offsetOf, toWorld, type Plane, type Vec3 } from './plane';
+import { featureAt, type FeatureStep, type HullStep, type PartSaying, type Profile2D, type PlaneRef } from './op';
+import { foundation, reflectAcross, slide, toPlane, toWorld, offsetOf, type Plane, type Vec3 } from './plane';
 import { prismOn } from './solid';
 import { viewLabelOf } from './form';
+import type { Point } from 'metamedium-core';
 
 /**
  * A foot reaches the ground when it sits this near it, as a fraction of the
@@ -110,6 +111,16 @@ export interface Part {
   /** How far it reaches up, in world units. */
   height: number;
   place: Place;
+  /**
+   * G3: the name and the material bound to this part, when something has been
+   * said about it — resolved from the hull step's `said` by the CLAIMS, never
+   * by the part id, so a dropped claim cannot slide a name onto another body.
+   */
+  name?: string;
+  material?: { colour: string };
+  /** Who said it, and why — the panel's reason on a named part. */
+  saidBy?: string;
+  saidWhy?: string;
   /** One sentence: the numbers and the words. */
   sentence: string;
 }
@@ -595,6 +606,7 @@ export function partsOfHull(step: HullStep, hull: THREE.BufferGeometry | null): 
     return ca.u - cb.u || ca.v - cb.v;
   });
 
+  const said = step.said ?? [];
   const parts: Part[] = found.map((f, i) => {
     const centre = centreOf(f.bounds);
     // The part's extent across the ground, in the frame's own axes: measured
@@ -614,6 +626,7 @@ export function partsOfHull(step: HullStep, hull: THREE.BufferGeometry | null): 
     const place = placeOf(frame, centre, span);
     const from = [...new Set(f.runs.map((r) => r.claimId))];
     const id = `part:${i + 1}`;
+    const mine = sayingFor(said, from);
     return {
       id,
       runs: f.runs,
@@ -623,7 +636,11 @@ export function partsOfHull(step: HullStep, hull: THREE.BufferGeometry | null): 
       span,
       height,
       place,
-      sentence: sentenceFor(id, span, height, place, f.runs),
+      ...(mine?.name ? { name: mine.name } : {}),
+      ...(mine?.material ? { material: mine.material } : {}),
+      ...(mine?.by ? { saidBy: mine.by } : {}),
+      ...(mine ? { saidWhy: mine.reasoning } : {}),
+      sentence: sentenceFor(id, span, height, place, f.runs, mine),
     };
   });
 
@@ -636,12 +653,50 @@ export function partsOfHull(step: HullStep, hull: THREE.BufferGeometry | null): 
  *     part 2 — 1.2 × 1.0 u on the footprint, 3.1 u tall, at the north-west
  *     corner; from stroke:4 (drawn from 34° · +24°)
  */
+/**
+ * The key a saying is held under: the claims, sorted, joined.
+ *
+ * Sorted because a part's `from` is in run order and a saying's `claims` is in
+ * whatever order it was written — and the same two claims in the other order
+ * are the same part.
+ */
+export const claimKey = (claims: readonly string[]): string => [...claims].sort().join('+');
+
+/**
+ * What was said about the part these claims cut, or nothing.
+ *
+ * **Exact first, then by containment** — and the second half was found by
+ * landing a reply that both named a part and raised it. A small op grows the
+ * body, the parts are re-cut from the body it grew into, and a part that was
+ * cut from one claim can come back merged with its neighbour and carrying two.
+ * An exact key stopped matching at exactly the moment the name was most needed:
+ * the reply had just named the thing it was changing.
+ *
+ * So a saying belongs to the part whose claims CONTAIN its own — the material
+ * it was said about is still in there — and when several could, the one that
+ * shares the most claims wins, which is the tightest reading of the two.
+ */
+export function sayingFor(said: readonly PartSaying[], from: readonly string[]): PartSaying | null {
+  const key = claimKey(from);
+  const exact = said.find((s) => claimKey(s.claims) === key);
+  if (exact) return exact;
+  const here = new Set(from);
+  let best: { saying: PartSaying; shared: number } | null = null;
+  for (const saying of said) {
+    if (!saying.claims.length || !saying.claims.every((c) => here.has(c))) continue;
+    const shared = saying.claims.length;
+    if (!best || shared > best.shared) best = { saying, shared };
+  }
+  return best?.saying ?? null;
+}
+
 function sentenceFor(
   id: string,
   span: { u: number; v: number },
   height: number,
   place: Place,
-  runs: Run[]
+  runs: Run[],
+  said: PartSaying | null = null
 ): string {
   const seen = new Set<string>();
   const sources: string[] = [];
@@ -651,8 +706,12 @@ function sentenceFor(
     seen.add(key);
     sources.push(`${r.claimId} (drawn from ${viewLabelOf(planeOf(r.plane))})`);
   }
+  // The name and the material come FIRST after the id, because once a part has
+  // a name that is what it is — the numbers are how big it is.
+  const named = said?.name ? ` “${said.name}”` : '';
+  const painted = said?.material?.colour ? `, ${said.material.colour}` : '';
   return (
-    `${id.replace(':', ' ')} — ${span.u.toFixed(1)} × ${span.v.toFixed(1)} u on the footprint, ` +
+    `${id.replace(':', ' ')}${named}${painted} — ${span.u.toFixed(1)} × ${span.v.toFixed(1)} u on the footprint, ` +
     `${height.toFixed(1)} u tall, ${place.words}; from ${sources.join(' and ')}`
   );
 }
@@ -660,4 +719,261 @@ function sentenceFor(
 /** Every part of a hull, one sentence each. */
 export function describeParts(found: PartsOfHull): string[] {
   return found.parts.map((p) => p.sentence);
+}
+
+// ---- the small ops a reply may ask for, BY PART ID (push 2, G3) --------------
+//
+// **A part is not a step, and these are steps.** What makes them honest is that
+// the geometry comes from the part the engine already cut — its own footprint,
+// its own top, its own height — and the reply supplies only a number and a
+// word. A model that says *raise part 2 by 0.6 u* has not written geometry; it
+// has pointed at a piece the engine can see and said how much more of it there
+// should be. That is §2.6's rule with a hull under it, and it is why the
+// contract forbids raw profiles on this path.
+//
+// Every one of them comes out as an ordinary `cut` / `boss` over a profile and
+// a plane, so the derivation, the clip to the hull, the diff, undo and the
+// export all take them without knowing parts exist at all. They carry `part`,
+// so a regen can find exactly the steps a part's name covers.
+
+/** How far a boss's own tool is seated INTO the part it rises from, as a ratio of its rise. */
+const PART_SEAT = 0.02;
+
+/** The plane lying on a part's TOP face: the foundation, slid up to it. */
+export function topPlaneOf(part: Part): Plane {
+  return slide(
+    foundation('face', `the top of ${part.id}, ${part.bounds.max.y.toFixed(2)} u up — the face a small op acts on`),
+    part.bounds.max.y
+  );
+}
+
+/** A part's own footprint — the box the panel cages it with — in a plane's own (u, v). */
+export function footprintOf(part: Part, plane: Plane): Profile2D {
+  const corners: Vec3[] = [
+    { x: part.bounds.min.x, y: plane.origin.y, z: part.bounds.min.z },
+    { x: part.bounds.max.x, y: plane.origin.y, z: part.bounds.min.z },
+    { x: part.bounds.max.x, y: plane.origin.y, z: part.bounds.max.z },
+    { x: part.bounds.min.x, y: plane.origin.y, z: part.bounds.max.z },
+  ];
+  return {
+    shape: 'rectangle',
+    points: corners.map((c) => toPlane(plane, c)),
+    closed: true,
+    reasoning:
+      `${part.id}'s own ground box — the same box the panel cages it with, so a small op by part id acts on ` +
+      `exactly the material the hand can see`,
+  };
+}
+
+/** A circle or a rectangle a reply gave in a part's top-face units, as a profile. */
+export function holeProfile(
+  hole: { shape: 'circle' | 'rectangle'; centre?: Point; r?: number; w?: number; h?: number },
+  why: string
+): Profile2D | null {
+  const c = hole.centre ?? { x: 0, y: 0 };
+  if (hole.shape === 'circle') {
+    const r = hole.r ?? 0;
+    if (!(r > 0)) return null;
+    const points: Point[] = [];
+    for (let i = 0; i < 32; i++) {
+      const t = (i / 32) * Math.PI * 2;
+      points.push({ x: c.x + Math.cos(t) * r, y: c.y + Math.sin(t) * r });
+    }
+    return { shape: 'circle', points, closed: true, reasoning: why };
+  }
+  const w = hole.w ?? 0;
+  const h = hole.h ?? 0;
+  if (!(w > 0) || !(h > 0)) return null;
+  return {
+    shape: 'rectangle',
+    points: [
+      { x: c.x - w / 2, y: c.y - h / 2 },
+      { x: c.x + w / 2, y: c.y - h / 2 },
+      { x: c.x + w / 2, y: c.y + h / 2 },
+      { x: c.x - w / 2, y: c.y + h / 2 },
+    ],
+    closed: true,
+    reasoning: why,
+  };
+}
+
+/**
+ * **`boss` by part id**: the part's own footprint, raised from its own top.
+ *
+ * The one number the reply supplies is how much higher. Nothing about where, or
+ * how wide, is a model's to say — that is the drawing's.
+ */
+export function bossOnPart(part: Part, height: number, on: string, id: string, by?: string): FeatureStep | null {
+  if (!(Math.abs(height) > 1e-6)) return null;
+  const plane = topPlaneOf(part);
+  const step = featureAt(
+    'boss',
+    { id: part.from[0] ?? part.id, plane, clean: footprintOf(part, plane) },
+    Math.abs(height),
+    on,
+    id,
+    `${part.id}${part.name ? ` “${part.name}”` : ''} raised ${Math.abs(height).toFixed(2)} u from its own top at ` +
+      `${part.bounds.max.y.toFixed(2)} u, on its own footprint` +
+      `${by ? ` — ${by} asked for it by part id, and wrote no geometry` : ''}`
+  );
+  step.from = [...part.from];
+  step.part = part.id;
+  if (part.name) step.name = part.name;
+  if (by) step.by = by;
+  // Seated a hair INTO the part it rises from, so no face of the tool is ever
+  // coplanar with the face it is welding to.
+  step.start = -Math.max(Math.abs(height) * PART_SEAT, 1e-4);
+  return step;
+}
+
+/**
+ * **`cut` by part id**: a hole down through the part's top face.
+ *
+ * With no depth the cut goes THROUGH — as far as the part itself reaches —
+ * which is §8's rule said for a part rather than for a body.
+ */
+export function cutOnPart(
+  part: Part,
+  hole: { shape: 'circle' | 'rectangle'; centre?: Point; r?: number; w?: number; h?: number; depth?: number },
+  on: string,
+  id: string,
+  by?: string
+): FeatureStep | null {
+  const plane = topPlaneOf(part);
+  const through = hole.depth === undefined || !(Math.abs(hole.depth) > 1e-6);
+  const reach = through ? Math.max(part.height, 1e-3) : Math.abs(hole.depth as number);
+  const profile = holeProfile(
+    hole,
+    `a ${hole.shape} the reply gave in ${part.id}'s own top-face units — that face's own (u, v)`
+  );
+  if (!profile) return null;
+  const step = featureAt(
+    'cut',
+    { id: part.from[0] ?? part.id, plane, clean: profile },
+    reach,
+    on,
+    id,
+    `a ${hole.shape} taken out of ${part.id}${part.name ? ` “${part.name}”` : ''} through its top face, ` +
+      `${through ? `through — as far as the part reaches, ${reach.toFixed(2)} u` : `${reach.toFixed(2)} u deep`}` +
+      `${by ? ` — ${by} asked for it by part id` : ''}`
+  );
+  step.from = [...part.from];
+  step.part = part.id;
+  if (through) step.through = true;
+  if (by) step.by = by;
+  return step;
+}
+
+/**
+ * **What a standing hull is, as the brief and the landing need it** (G3).
+ *
+ * The one place that turns a small op *by part id* into a step of the closed
+ * vocabulary, so the surface and the tests wire it the same way and the two
+ * can never drift. `log.ts` asks the space for this; nothing in it is held.
+ */
+export interface HullRead {
+  footprint: { w: number; h: number; markId?: string } | null;
+  extent: { min: Vec3; max: Vec3 };
+  parts: {
+    id: string;
+    sentence: string;
+    /** The claim strokes it was cut from — the key a name is held under. */
+    claims: string[];
+    name?: string;
+    colour?: string;
+  }[];
+  stepFor(
+    partId: string,
+    ask:
+      | { op: 'boss'; height: number }
+      | { op: 'cut'; shape: 'circle' | 'rectangle'; centre?: Point; r?: number; w?: number; h?: number; depth?: number }
+      | { op: 'mirror'; plane: string },
+    on: string,
+    id: string,
+    by?: string
+  ): FeatureStep | null;
+}
+
+/** The hull read, from the parts already cut and the footprint claim as drawn. */
+export function hullReadOf(
+  found: PartsOfHull,
+  footprint: { profile: Profile2D; plane: PlaneRef } & { id?: string } | null,
+  extent: { min: Vec3; max: Vec3 },
+  named: (name: string) => Plane | null
+): HullRead {
+  let feet: HullRead['footprint'] = null;
+  if (footprint) {
+    const world = worldOf(footprint.profile, footprint.plane);
+    const xs = world.map((w) => w.x);
+    const zs = world.map((w) => w.z);
+    feet = {
+      w: Math.max(...xs) - Math.min(...xs),
+      h: Math.max(...zs) - Math.min(...zs),
+      ...(footprint.id ? { markId: footprint.id } : {}),
+    };
+  }
+  const by = (id: string) => found.parts.find((p) => p.id === id) ?? null;
+  return {
+    footprint: feet,
+    extent,
+    parts: found.parts.map((p) => ({
+      id: p.id,
+      sentence: p.sentence,
+      claims: p.from,
+      ...(p.name ? { name: p.name } : {}),
+      ...(p.material?.colour ? { colour: p.material.colour } : {}),
+    })),
+    stepFor: (partId, ask, on, id, who) => {
+      const part = by(partId);
+      if (!part) return null;
+      if (ask.op === 'boss') return bossOnPart(part, ask.height, on, id, who);
+      if (ask.op === 'cut') return cutOnPart(part, ask, on, id, who);
+      const across = named(ask.plane);
+      return across ? mirrorOnPart(part, across, on, id, who) : null;
+    },
+  };
+}
+
+/**
+ * **`mirror` by part id**: the part's own prism, reflected across a world plane
+ * and welded on.
+ *
+ * Not the tree's `mirror` step, which reflects a whole body — asked about one
+ * part, that would be the reply changing everything else too. What is reflected
+ * is exactly the part's own footprint at its own height, so the material that
+ * appears is the material that was pointed at, standing on the other side. The
+ * hull's clip then keeps whatever of it lies inside the drawing, like anything
+ * else a reply proposes.
+ */
+export function mirrorOnPart(part: Part, across: Plane, on: string, id: string, by?: string): FeatureStep | null {
+  const base = slide(
+    foundation('world', `${part.id}'s own foot, ${part.bounds.min.y.toFixed(2)} u up`),
+    part.bounds.min.y
+  );
+  const here = footprintOf(part, base);
+  const points = here.points.map((p) => toPlane(base, reflectAcross(across, toWorld(base, p))));
+  const step = featureAt(
+    'boss',
+    {
+      id: part.from[0] ?? part.id,
+      plane: base,
+      clean: {
+        shape: 'rectangle',
+        points,
+        closed: true,
+        reasoning: `${part.id}'s own footprint reflected across the ${across.name ?? 'named'} plane`,
+      },
+    },
+    Math.max(part.height, 1e-3),
+    on,
+    id,
+    `${part.id}${part.name ? ` “${part.name}”` : ''} mirrored across the ${across.name ?? 'named'} plane — its own ` +
+      `footprint reflected and raised to its own ${part.height.toFixed(2)} u, then clipped to the hull like anything ` +
+      `else proposed${by ? `; ${by} asked for it by part id` : ''}`
+  );
+  step.from = [...part.from];
+  step.part = part.id;
+  if (part.name) step.name = part.name;
+  if (by) step.by = by;
+  return step;
 }
