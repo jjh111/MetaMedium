@@ -3,9 +3,9 @@
 // The release gate: the browser scenarios that already exist, run without a
 // human console (DIRECTOR-REVIEW-2026-09-15.md, QA-1).
 //
-//     node e2e/run.mjs              # both surfaces
-//     node e2e/run.mjs canvas       # just the canvas scenario
-//     node e2e/run.mjs shard demo   # just the shard's two
+//     node e2e/run.mjs                    # both surfaces
+//     node e2e/run.mjs canvas             # just the canvas scenario
+//     node e2e/run.mjs shard demo demo2   # just the shard's three
 //
 // It starts its own servers on ports the OS hands out, opens a FRESH browser
 // context per scenario (no profile, no cache, no board carried over from the
@@ -109,7 +109,7 @@ function sortErrors(pageErrors) {
 }
 
 // ---------------------------------------------------------------------------
-// The three scenarios. Each one only ever: opens a page, loads the harness that
+// The four scenarios. Each one only ever: opens a page, loads the harness that
 // already exists, calls it, and returns what it returned.
 // ---------------------------------------------------------------------------
 
@@ -148,24 +148,41 @@ async function runCanvas(browser, servers) {
   return out;
 }
 
-async function runShard(browser, servers, which /* 'scenario' | 'demo' */) {
-  const guards = await freshContext(browser, { origins: [servers.shardOrigin], label: `shard-${which}` });
+/**
+ * Which harness the shard exports, by the name this runner is asked for.
+ *
+ * `__scenario` is the whole loop, `__demo` the mug of `SHARD-3D-PLAN.md` §9,
+ * and `__demo2` its successor — the loop on John's own drawing
+ * (`SHARD-3D-PUSH-2.md` G4). The scenario is called `shard` on the command
+ * line and `__scenario` in the page, and that mismatch is the whole reason
+ * this is a table: reading the name twice, once here and once at the call, is
+ * how the scenario silently waited thirty seconds for `window[undefined]`.
+ */
+const SHARD_SCENARIOS = {
+  shard: { as: 'scenario', harness: '__scenario' },
+  demo: { as: 'demo', harness: '__demo' },
+  demo2: { as: 'demo2', harness: '__demo2' },
+};
+
+async function runShard(browser, servers, which /* 'shard' | 'demo' | 'demo2' */) {
+  const { as, harness } = SHARD_SCENARIOS[which];
+  const guards = await freshContext(browser, { origins: [servers.shardOrigin], label: `shard-${as}` });
   const page = await guards.context.newPage();
   // A bare URL, never `?demo=…`: a demo page seats its own stub before the test
   // arrives, and the run that failed on that in the review was the test's
   // mistake, not the app's. The gate can only open the clean page.
-  const out = { name: `shard-${which}`, url: `${servers.shardOrigin}/` };
+  const out = { name: `shard-${as}`, url: `${servers.shardOrigin}/` };
   try {
     await page.goto(out.url, { waitUntil: 'load', timeout: 90000 });
     await page.waitForFunction(() => !!window.__shard, null, { timeout: 90000 });
     await page.addScriptTag({ path: join(root, 'shard-3d', 'e2e.js') });
-    await page.waitForFunction((w) => typeof window[w] === 'function', which === 'demo' ? '__demo' : '__scenario', { timeout: 30000 });
+    await page.waitForFunction((w) => typeof window[w] === 'function', harness, { timeout: 30000 });
     const r = await page.evaluate(
       async (w) => {
         const res = await window[w]();
         return { steps: res.steps, ok: res.ok, passed: res.passed, failed: res.failed, error: res.error, totalMs: res.totalMs };
       },
-      which === 'demo' ? '__demo' : '__scenario',
+      harness,
       { timeout: SCENARIO_TIMEOUT },
     );
     out.steps = r.steps;
@@ -201,7 +218,7 @@ async function screenshot(page, name) {
 
 async function main() {
   const wanted = process.argv.slice(2).filter((a) => !a.startsWith('-'));
-  const all = ['canvas', 'shard', 'demo'];
+  const all = ['canvas', 'shard', 'demo', 'demo2'];
   const picked = wanted.length ? all.filter((n) => wanted.includes(n)) : all;
   if (!picked.length) {
     console.error(`nothing to run — pick from: ${all.join(', ')}`);
@@ -212,7 +229,7 @@ async function main() {
   mkdirSync(RESULTS, { recursive: true });
 
   const needCanvas = picked.includes('canvas');
-  const needShard = picked.includes('shard') || picked.includes('demo');
+  const needShard = picked.includes('shard') || picked.includes('demo') || picked.includes('demo2');
 
   const started = Date.now();
   const servers = {};
@@ -247,7 +264,7 @@ async function main() {
       const at = Date.now();
       const r = name === 'canvas'
         ? await runCanvas(browser, servers)
-        : await runShard(browser, servers, name === 'demo' ? 'demo' : 'scenario');
+        : await runShard(browser, servers, name);
       r.durationMs = Date.now() - at;
       scenarios.push(r);
       console.log(

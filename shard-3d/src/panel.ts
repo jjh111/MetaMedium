@@ -126,6 +126,16 @@ export interface PanelOptions {
   /** G2: take a part up — the chip's tap, which selects it. */
   takePart?(solidId: string, partId: string): void;
   /**
+   * G4: which part the hand has taken up, or null.
+   *
+   * A part is a thing the board can point at, so when one is held the summary
+   * answers about THAT — the thing the hand is looking at — rather than about
+   * the hull it is a piece of. The field already scopes to it (*Remove part 2*);
+   * the panel used to go on saying *hull*, so *why* about a turret answered
+   * about the castle.
+   */
+  heldPart?(): { solidId: string; partId: string } | null;
+  /**
    * G0: the last few exchanges with a model, newest first — the transcript.
    * Runtime evidence, never the log (`exchange.ts` says why).
    */
@@ -582,10 +592,37 @@ function renderSummary(log: Log, sel: Sel | null, hovered: Mark | null, o: Panel
     );
   }
 
-  let html = '<div class="summary">' + eyebrow('selected', solid ? `solid · ${solid.id}` : `mark · ${mark!.id}`);
+  // **G4: a held part is the subject.** The hand took up a piece of the hull,
+  // so *what*, *from* and *next* are about that piece; the hull is named in the
+  // reasons, where it belongs. Everything below — *becomes*, the parts row, the
+  // evidence — is unchanged, because they are about the body either way.
+  const takenUp = solid ? o.heldPart?.() ?? null : null;
+  const heldOn =
+    takenUp && takenUp.solidId === solid!.id ? (o.parts?.(solid!.id) ?? []).find((p) => p.id === takenUp.partId) ?? null : null;
+
+  let html =
+    '<div class="summary">' +
+    eyebrow(
+      'selected',
+      heldOn ? `${heldOn.id.replace(':', ' ')} · of ${solid!.name}` : solid ? `solid · ${solid.id}` : `mark · ${mark!.id}`
+    );
 
   // ---- what this is --------------------------------------------------------
-  if (solid) {
+  if (heldOn) {
+    html += row(
+      'what',
+      `${heldOn.name ?? heldOn.id.replace(':', ' ')}${heldOn.colour ? ` · ${heldOn.colour}` : ''}`,
+      heldOn.sentence
+    );
+    html += row(
+      'from',
+      `cut from ${heldOn.from.length} claim${heldOn.from.length === 1 ? '' : 's'} of ${solid!.name}`,
+      `the hull's own material inside the prism of ${heldOn.from.join(' and ')} — a part is material, not a sub-tree of steps, ` +
+        `so its name is held on the claims it was cut from and cannot slide onto another body when a claim is dropped` +
+        (heldOn.name ? '' : '. Nothing has named it, so it keeps the engine’s own part:n')
+    );
+    if (solid!.broken) html += row('broken', 'this tree could not be read', solid!.broken);
+  } else if (solid) {
     html += row(
       'what',
       solid.name,
@@ -635,7 +672,9 @@ function renderSummary(log: Log, sel: Sel | null, hovered: Mark | null, o: Panel
   }
 
   // ---- where it came from --------------------------------------------------
-  const from = solid ? provenanceOf(solid, o) : mark ? authorOfMark(mark, o) : null;
+  // A held part said its own *from* above: the claims it was cut from. The
+  // body's provenance is a different fact and belongs to the body.
+  const from = heldOn ? null : solid ? provenanceOf(solid, o) : mark ? authorOfMark(mark, o) : null;
   if (from) html += row('from', from.value, from.why);
 
   // ---- what the next deliberate act will do --------------------------------

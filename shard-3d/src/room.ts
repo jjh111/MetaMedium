@@ -226,14 +226,26 @@ function explanationsOf(session: Session): { question: string; text: string; by:
  * (a prompt that file has since re-worded), the whole thing is the brief and
  * the words are empty. The hand still has everything; it is only told less
  * about which part is which.
+ *
+ * **Both asks, because there are two** (G4). `messagesFor` writes *Propose the
+ * tree.* for the steps-and-profiles contract and *Name the parts.* for G3's
+ * parts contract, and this knew only the first — so on a standing hull, which
+ * is the board the whole of push 2 is about, the hand was handed the brief with
+ * the human's own words stripped out of it. Found by the demo's ninth beat;
+ * the marker a contract uses is the one thing that must not be guessed, so
+ * they are listed rather than matched loosely.
  */
+const ASK_MARKS = ['\n\nPropose the tree.', '\n\nName the parts.'];
+
 export function splitPrompt(user: string): { brief: string; words: string } {
-  const mark = '\n\nPropose the tree.';
-  const i = user.indexOf(mark);
-  if (i < 0) return { brief: user, words: '' };
-  const tail = user.slice(i + mark.length);
-  const said = /The human asked for: [“"](.*)[”"]\s*$/.exec(tail);
-  return { brief: user.slice(0, i), words: said ? said[1] : '' };
+  for (const mark of ASK_MARKS) {
+    const i = user.indexOf(mark);
+    if (i < 0) continue;
+    const tail = user.slice(i + mark.length);
+    const said = /The human asked for: [“"](.*)[”"]\s*$/.exec(tail);
+    return { brief: user.slice(0, i), words: said ? said[1] : '' };
+  }
+  return { brief: user, words: '' };
 }
 
 /**

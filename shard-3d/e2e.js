@@ -2767,19 +2767,43 @@
     return { line: read.line, steps: solids[0].steps.map((s) => s.op), outcome: ex[0].outcome };
   });
 
-  step('?fixture= loads John’s own board, and it stands the massing it stood', async () => {
+  step('?fixture= loads John’s own board as its LOG, and *Open…* loads the same board', async () => {
     S().clear();
     const out = await S().loadFixture('john-2026-09-16-massing');
     assert(out, 'the fixture did not load');
-    assert(out.from === 'fixture', `it loaded as "${out.from}" — a captured view is a rebuild, not a replay`);
+    // G4: the board is a LOG now (`fixtures/make.mjs`), so this is a replay and
+    // not a rebuild — an exported log supersedes a captured view, which is what
+    // `fixtures/README.md` has said since G0 and what `loadFixture` probes for
+    // first. The `.json` capture is still John's own provenance and is still
+    // read as a module by `export.test.ts`; nothing here rebuilds from it.
+    assert(out.from === 'log', `it loaded as "${out.from}" — the .mm.log should have been found first`);
     // The three profiles he drew on the tiles: a circle on the height plane, a
-    // circle on the width plane, and the rectangle footprint. The six
-    // view-plane strokes are not rebuilt, and the status line says so.
-    assert(out.marks === 4, `${out.marks} marks rebuilt, expected the 4 on named planes`);
+    // circle on the width plane, and the rectangle footprint, plus the line.
+    assert(out.marks === 4, `${out.marks} marks, expected the 4 on named planes`);
     assert(out.solids === 1, `${out.solids} solids, expected the massing`);
     const solid = S().state().solids[0];
     assert(solid.steps.length === 1 && solid.steps[0].op === 'massing', `the tree is ${JSON.stringify(solid.steps)}`);
-    return { marks: out.marks, solids: out.solids, from: out.from };
+    // …and it stands where its claims are, not on the floor: G1's fault, pinned
+    // here on the board it was found on.
+    const planes = S().state().marks.map((m) => m.plane.name).sort();
+    assert(
+      JSON.stringify(planes) === JSON.stringify(['foundation', 'foundation', 'height', 'width']),
+      `the planes are ${JSON.stringify(planes)}`
+    );
+
+    // The OTHER door, on the same file: *Open…* takes the log text a hand would
+    // have downloaded. Same board, event for event — because state is a pure
+    // function of the log and both doors hand it the same events.
+    const text = S().logText();
+    S().clear();
+    assert(S().state().marks.length === 0, 'the board did not clear');
+    const opened = S().openLog(text);
+    assert(opened, '*Open…* refused the log it had just written');
+    assert(opened.skipped === 0, `${opened.skipped} lines were not JSON`);
+    assert(S().state().marks.length === out.marks, `${S().state().marks.length} marks after *Open…*, expected ${out.marks}`);
+    assert(S().solids().length === 1 && S().solids()[0].steps[0].op === 'massing', 'the massing did not come back');
+    assert(S().logText() === text, 'the board that came back does not write the same log');
+    return { marks: out.marks, solids: out.solids, from: out.from, events: opened.events };
   });
 
 
@@ -3781,6 +3805,546 @@
     };
   });
 
+  // ===== the demo, re-cut (push 2, G4) ======================================
+  //
+  // `SHARD-3D-PLAN.md` §9's demo is the mug, above: a draftsman's board on the
+  // three tiles. This is its successor, and it is the board a HAND makes —
+  // John's first board of 16 September 2026, the one that stood nothing at all
+  // before G1 (`SHARD-3D-PUSH-2.md` §0).
+  //
+  //     __demo2().then(r => window.__D2 = r)
+  //
+  // `?demo=castle` draws the same board at boot from the same numbers
+  // (`window.__castleDemo`), so what is shown and what is asserted are one
+  // board. Every beat returns the numbers a reader would want in its `detail`.
+  //
+  // Nine beats: eight, and then the MCP seat, which is optional because it is
+  // the only one whose absence is not a regression — the demo itself runs on
+  // the stub, and the seat is the same path with a hand at the end of it.
+
+  const demo2Steps = [];
+  const demo2 = (name, fn) => demo2Steps.push({ name, fn });
+  const CD = () => window.__castleDemo;
+
+  let demoCastleId = null;
+  let demoCastleAgain = null;
+  let demoLoopId = null;
+
+  /** A ⊓ in screen pixels, its feet on the ground line — the hand's own elevation. */
+  const archPath = (base, halfW, tall, per = 12) => {
+    const run = (a, b) => {
+      const out = [];
+      for (let i = 0; i <= per; i++) {
+        const t = i / per;
+        out.push({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t });
+      }
+      return out;
+    };
+    const left = { x: base.x - halfW, y: base.y };
+    const right = { x: base.x + halfW, y: base.y };
+    return [
+      ...run(left, { x: left.x, y: base.y - tall }),
+      ...run({ x: left.x, y: base.y - tall }, { x: right.x, y: base.y - tall }),
+      ...run({ x: right.x, y: base.y - tall }, right),
+    ];
+  };
+
+  demo2('1 · nothing chosen — tap Y, and the footprint lands on the foundation', () => {
+    const D = CD();
+    assert(D, 'window.__castleDemo is not there — the surface did not export the demo’s numbers');
+    S().clear();
+    S().view('free');
+    S().choose(null);
+    assert(S().state().chosen === null, `${S().state().chosen} was chosen before anything was tapped`);
+
+    // The axis view IS the choice (16 Sep 2026): the top view faces the
+    // foundation, so tapping the compass's Y ball chooses it, and the picker's
+    // tiles go away while it does.
+    const went = S().nav.tap('y', 0);
+    assert(went === 'top', `the Y ball went to ${went}`);
+    assert(S().state().chosen === 'foundation', `the top view chose ${S().state().chosen}`);
+    assert(S().state().tiles === false, 'the tiles are still showing inside an axis view');
+
+    const plan = S().strokeScreen(onScreen(rectPath(D.plan.x, D.plan.y, D.plan.w, D.plan.h)));
+    assert(plan, 'the footprint was not drawn');
+    const m = markOf(plan);
+    assert(m.readings[0].label === 'rectangle', `it read as ${m.readings[0].label}`);
+    assert(m.readings[0].weight >= 0.85, `rectangle ${m.readings[0].weight.toFixed(2)}`);
+    assert(m.plane.name === 'foundation' && m.plane.source === 'chosen', `on the ${m.plane.name} (${m.plane.source})`);
+    assert(/top view faces it/.test(m.plane.why), `the ink's reason is "${m.plane.why}"`);
+    assert(m.plays.role === 'profile', `it plays ${m.plays.role}`);
+    // One footprint stands nothing: a profile is waiting for an extent.
+    assert(S().solids().length === 0, 'a lone footprint stood something up');
+    return {
+      ball: went,
+      chosen: S().state().chosen,
+      reading: `${m.readings[0].label} ${m.readings[0].weight.toFixed(2)}`,
+      plays: m.plays.role,
+      why: m.plane.why,
+      footprint: `${D.plan.w} × ${D.plan.h} u`,
+    };
+  });
+
+  demo2('2 · leave the axis view, orbit, two ⊓ with their feet on the ground — the hull stands on the first', () => {
+    const D = CD();
+    // Leaving the axis view gives the plane back to whatever the HAND chose,
+    // and this hand chose nothing: from here the plane is read.
+    S().view('free');
+    assert(S().state().chosen === null, `${S().state().chosen} survived the axis view nobody chose it in`);
+    assert(S().state().tiles === true, 'the tiles did not come back outside the axis view');
+
+    S().orbit(D.views[0].dTheta, D.views[0].dPhi);
+    // Stand somewhere before drawing from it: the view plane passes through the
+    // CURSOR, so a shift + click on clear ground is what puts a ⊓'s feet on the
+    // floor instead of a unit above it.
+    const groundRow = S().screenForWorld(S().shiftTap(S().screenForWorld(D.views[0].stand)).at).y;
+    S().choose(null); // the tap chooses the plane it hit; this hand uses none
+
+    const first = D.ups[0];
+    const a = S().strokeScreen(archPath({ x: S().screenForWorld(first.at).x, y: groundRow }, first.halfW, first.tall));
+    assert(a, 'the first ⊓ was not drawn');
+    const read = markOf(a);
+    assert(read.plane.source === 'view', `the ⊓ landed on ${read.plane.source}, not the view plane`);
+    assert(read.plays.role === 'elevation', `the ⊓ plays ${read.plays.role}, expected elevation`);
+    assert(/feet both reach the ground/.test(read.plays.reasoning), `it says "${read.plays.reasoning}"`);
+    const feet = S().worldPointsOf(a);
+    assert(Math.abs(feet[0].y) < 0.35, `its first foot is at y ${feet[0].y.toFixed(2)}, not on the ground`);
+
+    // Two claims — the footprint and this ⊓ — ARE a hull, at tier 1.
+    const stoodStatus = S().state().status;
+    assert(/hull from 2 claims/.test(stoodStatus), `the status said "${stoodStatus}"`);
+    assert(/tier 1/.test(stoodStatus), `the status said "${stoodStatus}"`);
+    let solids = S().solids();
+    assert(solids.length === 1, `${solids.length} solids, expected the hull`);
+    demoCastleId = solids[0].id;
+    assert(solids[0].name === 'hull' && solids[0].named === 'engine', `${solids[0].name}, named by ${solids[0].named}`);
+    assert(S().models().working.length === 0, 'a model was asked by drawing');
+
+    // …and the second tower, from the same standpoint. One standpoint is one
+    // silhouette (G2): two towers seen from here are one outline with two
+    // pieces, and it takes a second standpoint to give either of them a depth.
+    const second = D.ups[1];
+    const b = S().strokeScreen(archPath({ x: S().screenForWorld(second.at).x, y: groundRow }, second.halfW, second.tall));
+    assert(b, 'the second ⊓ was not drawn');
+    assert(markOf(b).plays.role === 'elevation', `the second ⊓ plays ${markOf(b).plays.role}`);
+    solids = S().solids();
+    assert(solids.length === 1 && solids[0].id === demoCastleId, `${solids.length} solids — the second ⊓ stood a second thing`);
+    const claims = solids[0].steps.find((st) => st.op === 'hull').from.length;
+    assert(claims === 3, `the hull references ${claims} claims, expected 3`);
+    assert(solids[0].broken === null, `the derivation broke: ${solids[0].broken}`);
+    // Ink is never covered.
+    assert(S().state().marks.length === 3, `${S().state().marks.length} marks on the board`);
+    return { solid: demoCastleId, stood: stoodStatus, claims, marks: S().state().marks.length, standpoint: '64° · +29°' };
+  });
+
+  demo2('3 · orbit the other way — the third ⊓ narrows the hull, and it is two parts, said in words', () => {
+    const D = CD();
+    const wideBefore = S().parts(demoCastleId).length;
+    S().orbit(D.views[1].dTheta, D.views[1].dPhi);
+    const groundRow = S().screenForWorld(S().shiftTap(S().screenForWorld(D.views[1].stand)).at).y;
+    S().choose(null);
+
+    const third = D.ups[2];
+    const c = S().strokeScreen(archPath({ x: S().screenForWorld(third.at).x, y: groundRow }, third.halfW, third.tall));
+    assert(c, 'the third ⊓ was not drawn');
+    assert(markOf(c).plays.role === 'elevation', `the third ⊓ plays ${markOf(c).plays.role}`);
+    assert(/went into it/.test(S().state().status), `the status said "${S().state().status}"`);
+
+    S().nav.home(0);
+    const solid = S().solids().find((x) => x.id === demoCastleId);
+    assert(solid, 'the hull went away');
+    assert(S().solids().length === 1, `${S().solids().length} solids — the claim stood a second thing`);
+    const claims = solid.steps.find((st) => st.op === 'hull').from.length;
+    assert(claims === 4, `the hull references ${claims} claims, expected 4`);
+    assert(solid.broken === null, `the derivation broke: ${solid.broken}`);
+
+    // Two parts, and each one says its numbers, its place and the strokes that
+    // claimed it — in the footprint's own frame, with north at −Z.
+    const parts = S().parts(demoCastleId);
+    assert(parts.length === 2, `${parts.length} parts, expected 2 (was ${wideBefore} before this claim)`);
+    for (const p of parts) {
+      assert(/^part:\d+$/.test(p.id), `the id is ${p.id}`);
+      assert(
+        /^part \d+ — [\d.]+ × [\d.]+ u on the footprint, [\d.]+ u tall, .+; from stroke:/.test(p.sentence),
+        `the sentence reads "${p.sentence}"`
+      );
+      assert(/corner|edge|middle|whole footprint/.test(p.place), `its place reads "${p.place}"`);
+    }
+    // The ids run in reading order across the plan.
+    const xs = parts.map((p) => (p.bounds.min.x + p.bounds.max.x) / 2);
+    assert(xs.every((x, i) => i === 0 || x >= xs[i - 1] - 1e-6), `not in reading order: ${xs.map((x) => x.toFixed(2)).join(', ')}`);
+    assert(S().models().working.length === 0, 'a model was asked by standing a hull');
+    return { claims, parts: parts.map((p) => p.sentence), tier: 'tier 1, no model' };
+  });
+
+  demo2('4 · the free loop test — nothing chosen, and it lands where you are LOOKING, not in the floor', () => {
+    const D = CD();
+    const before = S().state().marks.length;
+    S().choose(null);
+    // Let the cursor GO first. Beats 2 and 3 each shift + clicked a standpoint,
+    // and a placed cursor stays placed — so the view plane would still be
+    // standing on the ground where the last tower was drawn from. A shift +
+    // click on the cursor where it already stands is the gesture that releases
+    // it, and then it follows the centre of the view again.
+    S().shiftTap(S().screenForWorld(S().cursor().at));
+    assert(/centre of the view/.test(S().cursor().why), `the cursor still says "${S().cursor().why}"`);
+    // Raise the eye so the centre of the view is above the castle, then draw in
+    // clear air. The view plane stands through that centre.
+    S().pan(0, D.loop.raise);
+    const anchor = S().cursor();
+    assert(anchor.at.y > 0.8, `the centre of the view is at y ${anchor.at.y.toFixed(2)} — the pan did not raise it`);
+
+    const eye = S().screenForWorld(anchor.at);
+    const ring = [];
+    for (let i = 0; i <= 48; i++) {
+      const t = (i / 48) * Math.PI * 2;
+      ring.push({ x: eye.x + Math.cos(t) * D.loop.rx, y: eye.y + Math.sin(t) * D.loop.ry });
+    }
+    demoLoopId = S().strokeScreen(ring);
+    assert(demoLoopId, 'the free loop was not drawn');
+    const m = markOf(demoLoopId);
+    assert(m.plane.source === 'view' || m.plane.source === 'previous', `it landed on ${m.plane.source}, not the view plane`);
+    assert(Math.abs(m.plane.origin.y - anchor.at.y) < 1e-6, `the plane passes through y ${m.plane.origin.y}`);
+
+    // NOT in the floor — push 2's first fault, which was the cursor never
+    // leaving the world origin while the hand looked a unit or four above it.
+    const ys = S().worldPointsOf(demoLoopId).map((p) => p.y);
+    const mid = (Math.min(...ys) + Math.max(...ys)) / 2;
+    assert(mid > 0.8, `the loop landed at y ${mid.toFixed(2)} — in the floor`);
+    assert(Math.abs(mid - anchor.at.y) < 0.2, `the loop is at y ${mid.toFixed(2)} and the eye at y ${anchor.at.y.toFixed(2)}`);
+
+    // The aspect is CONSERVED: a cast onto the plane facing the camera keeps
+    // the shape the hand made, and only an oblique plane would stretch it.
+    const drawn = D.loop.rx / D.loop.ry;
+    const landed = (m.bounds.maxX - m.bounds.minX) / (m.bounds.maxY - m.bounds.minY);
+    assert(Math.abs(landed - drawn) / drawn < 0.02, `drawn ${drawn.toFixed(3)}, landed ${landed.toFixed(3)}`);
+    assert(markOf(demoLoopId).readings[0].label === 'circle', `it read as ${markOf(demoLoopId).readings[0].label}`);
+
+    // …and being a CLOSED silhouette whose prism meets the footprint's, the
+    // hull takes it: a loop drawn in clear air beside the castle is not a
+    // doodle, it is another claim about the same thing (G1, §1's first rule).
+    const solid = S().solids().find((x) => x.id === demoCastleId);
+    const withLoop = solid.steps.find((st) => st.op === 'hull').from;
+    assert(withLoop.includes(demoLoopId), `the hull's claims are ${withLoop.join(', ')} — the loop was not taken`);
+    assert(/went into it/.test(S().state().status), `the status said "${S().state().status}"`);
+
+    // So the test puts the board back, in the two acts it took to change it.
+    // The FIRST undo takes the claim out and leaves the ink — ink is never
+    // destroyed, which is the rule and not an accident of this beat; the second
+    // takes the stroke. Left there, the loop stands a second hull with the
+    // footprint drawn again in beat 8.
+    S().undo();
+    assert(
+      S().solids().find((x) => x.id === demoCastleId).steps.find((st) => st.op === 'hull').from.length === withLoop.length - 1,
+      'the first undo did not take the claim back out'
+    );
+    assert(S().state().marks.length === before + 1, `${S().state().marks.length} marks — the first undo took the ink with it`);
+    S().undo();
+    assert(S().state().marks.length === before, `${S().state().marks.length} marks after the second undo, expected ${before}`);
+    S().nav.home(0);
+    return {
+      eye: +anchor.at.y.toFixed(2),
+      ink: +mid.toFixed(2),
+      plane: m.plane.source,
+      aspect: { drawn: +drawn.toFixed(3), landed: +landed.toFixed(3) },
+      claims: `${before} → ${withLoop.length} → ${withLoop.length - 1}`,
+    };
+  });
+
+  demo2('5 · *castle with green tops* — the parts are named from the words, and the tops are green', async () => {
+    const D = CD();
+    // The stub answers with the IDEAL reply, verbatim from
+    // `fixtures/exchanges/castle-sketch.ideal.json` — the contract's own worked
+    // example. `?demo=castle` seats the same two replies.
+    S().joinStub([D.reply, D.taller], 'e2e-stub');
+    S().select(demoCastleId);
+
+    const brief = S().brief(D.words.brief);
+    assert(brief.startsWith('WHAT STANDS —'), `the brief starts "${brief.slice(0, 40)}"`);
+    assert(/THE PARTS — 2 pieces/.test(brief), 'the brief does not list the parts');
+    assert(!/THE PLANES, AND WHAT LIES ON EACH/.test(brief), 'the hull brief walked the planes');
+    const beforeHERE = brief.indexOf('THE SPACE holds only these');
+    assert(beforeHERE > 0 && beforeHERE < 1200, `${beforeHERE} characters before HERE, expected under 1200`);
+
+    const read = S().fieldRead(D.words.brief);
+    assert(read.kind === 'brief', `it read as ${read.kind}`);
+    assert(/name the 2 parts/.test(read.line), `the reading line said "${read.line}"`);
+
+    const ran = S().field(D.words.brief);
+    assert(ran.ran, `Enter did nothing: "${ran.line}"`);
+    for (let i = 0; i < 60 && S().exchanges().length === 0; i++) await new Promise((r) => setTimeout(r, 25));
+    await new Promise((r) => setTimeout(r, 120));
+
+    const solid = S().solids().find((x) => x.id === demoCastleId);
+    assert(solid && solid.broken === null, `the derivation broke: ${solid && solid.broken}`);
+    const parts = S().parts(demoCastleId);
+    assert(parts.every((p) => p.name), `${parts.filter((p) => !p.name).length} parts kept the engine’s own part:n`);
+    assert(parts[0].name === 'wall' && parts[1].name === 'turret', `the parts are ${parts.map((p) => p.name).join(', ')}`);
+    // Green is on the tops. The wall is grey — one colour word each, both from
+    // the closed list, which is what the ideal reply is an example of.
+    const mats = S().materials(demoCastleId);
+    const green = mats.find((x) => x.colour === 'green');
+    assert(green && green.name === 'turret', `the materials are ${JSON.stringify(mats)}`);
+    assert(parts[1].colour === 'green', `part:2 is painted ${parts[1].colour}`);
+    // The small op landed scoped to the part, and the engine's clip is last.
+    const ops = solid.steps.map((st) => `${st.op}${st.part ? '@' + st.part : ''}`);
+    assert(ops.includes('boss@part:2'), `the steps are ${ops.join(', ')}`);
+    assert(ops[ops.length - 1] === 'massing', `the last step is ${ops[ops.length - 1]}, expected the clip`);
+
+    // The transcript's row: the brief as sent, the reply as received, and what
+    // became of it. An ideal reply drops nothing — that is what makes it ideal.
+    const ex = S().exchanges()[0];
+    assert(ex.outcome === 'applied', `the exchange ended ${ex.outcome} — ${ex.reason}`);
+    assert(ex.parsed && ex.parsed.parts === 2, `the row parsed ${JSON.stringify(ex.parsed)}`);
+    assert(ex.dropped.length === 0, `${ex.dropped.length} dropped from the ideal reply: ${JSON.stringify(ex.dropped)}`);
+    assert(/THE PARTS — 2 pieces/.test(ex.brief), 'the row does not carry the brief as sent');
+    assert(ex.reply === D.reply, 'the row does not carry the reply as received');
+
+    // The honours row: how much of the DRAWING this body contains. A sketch
+    // hull is the volume three views share, and the footprint is the whole
+    // keep — so the number is low, and it is the truth rather than a score.
+    const h = S().honours(demoCastleId);
+    assert(h && h.per.length >= 1, 'nothing was measured against the castle');
+    assert(/honours the drawing/.test(h.sentence), `the sentence said "${h.sentence}"`);
+    assert(/tier 2/.test(S().state().status), `the status said "${S().state().status}"`);
+    return {
+      named: parts.map((p) => `${p.id} “${p.name}”`),
+      painted: mats.map((x) => `${x.name} ${x.colour}`),
+      steps: ops,
+      beforeHERE,
+      dropped: ex.dropped.length,
+      honours: h.sentence,
+    };
+  });
+
+  demo2('6 · *make the turrets taller* — a regen over that PART alone', async () => {
+    const D = CD();
+    const before = S().solids().find((x) => x.id === demoCastleId);
+    const hullStep = before.steps.find((st) => st.op === 'hull').id;
+    const bossesBefore = before.steps.filter((st) => st.op === 'boss').length;
+
+    S().select(demoCastleId);
+    const read = S().fieldRead(D.words.regen);
+    assert(/regen turret/.test(read.line), `the reading line said "${read.line}"`);
+    assert(/1 part\b/.test(read.line), `the reading line said "${read.line}" — a part is not a step`);
+
+    const ran = S().field(D.words.regen);
+    assert(ran.ran, `the regen did not run: "${ran.line}"`);
+    for (let i = 0; i < 60 && S().exchanges()[0].what !== 'the regen'; i++) await new Promise((r) => setTimeout(r, 25));
+    await new Promise((r) => setTimeout(r, 140));
+
+    const ex = S().exchanges()[0];
+    assert(ex.what === 'the regen', `the row says ${ex.what}`);
+    assert(/ONLY THESE PARTS MAY CHANGE/.test(ex.brief), 'the regen brief did not scope itself');
+    assert(/part:2 \(“turret”\)/.test(ex.brief), 'the scope does not name the part');
+
+    const after = S().solids().find((x) => x.id === demoCastleId);
+    assert(after.broken === null, `the derivation broke: ${after.broken}`);
+    // One boss on the turret, not two: the last reply's step on that part came
+    // off before this one went on.
+    const bosses = after.steps.filter((st) => st.op === 'boss');
+    assert(bosses.length === bossesBefore, `${bosses.length} bosses, expected the regen to replace the ${bossesBefore} there was`);
+    assert(bosses[0].part === 'part:2', `the boss is on ${bosses[0].part}`);
+    // Every other step kept its own id, and the name did not move.
+    assert(after.steps.some((st) => st.id === hullStep), `the hull step's id changed: ${hullStep}`);
+    assert(S().parts(demoCastleId).find((p) => p.id === 'part:2').name === 'turret', 'the turret lost its name in the regen');
+    assert(S().parts(demoCastleId).find((p) => p.id === 'part:1').name === 'wall', 'the wall was touched by a regen about the turret');
+    return { line: read.line, steps: after.steps.map((st) => `${st.op}${st.part ? '@' + st.part : ''}`), versions: after.versions };
+  });
+
+  demo2('7 · *why* — the panel’s summary for one part, and then *name: castle* holds the definitions', () => {
+    const D = CD();
+    const parts = S().parts(demoCastleId);
+    // Tapping a part's chip is what selects it — the panel then answers about
+    // THAT part, not about the castle it is a piece of.
+    assert(S().selectPart(demoCastleId, parts[1].id), `part ${parts[1].id} could not be selected`);
+    const held = S().selectedPart();
+    assert(held && held.partId === parts[1].id, `the selection is ${JSON.stringify(held)}`);
+
+    const rows = summaryRows();
+    // *what* is the PART, not the hull it is a piece of — its name and its
+    // material, with its whole sentence as the reason.
+    assert(/turret/.test(rows.what || ''), `what said "${rows.what}"`);
+    assert(/green/.test(rows.what || ''), `what said "${rows.what}" — the material is part of what it is`);
+    // *from* is where a part comes from, and a part is material: the claims it
+    // was cut from, not the body's own version provenance.
+    assert(rows.from, 'the summary has no provenance row');
+    assert(/cut from \d+ claims? of /.test(rows.from), `from said "${rows.from}"`);
+    assert(rows.next, 'the summary does not say what Enter would do');
+    // Above the fold: the summary stands before the evidence, and the evidence
+    // is shut. Nothing was discarded.
+    const ev = evidence();
+    assert(ev && ev.open === false, 'the evidence is not behind a shut disclosure');
+    // The part's own sentence is on the board to be read.
+    assert(S().panelText().includes(parts[1].sentence.slice(0, 40)), 'the panel does not carry the part’s sentence');
+
+    // …and now the hand's own word for the whole thing. `name:` names it and
+    // *Take it* holds what the model proposed — every named sub-tree and every
+    // named part becomes a definition based on the whole.
+    S().selectPart(demoCastleId, null);
+    S().select(demoCastleId);
+    const named = S().field(D.words.name);
+    assert(named.ran, `name: did nothing: "${named.line}"`);
+    assert(S().solids().find((x) => x.id === demoCastleId).name === 'castle', 'it is not called castle');
+    assert(S().solids().find((x) => x.id === demoCastleId).named === 'human', 'the name is not the hand’s');
+    const took = S().field('Take it');
+    assert(took.ran, `Take it did nothing: "${took.line}"`);
+
+    const defs = S().definitions();
+    const byName = Object.fromEntries(defs.map((d) => [d.name, d]));
+    assert(byName.castle && byName.castle.whole === true, 'castle is not held as the whole of it');
+    assert(byName.wall && byName.wall.whole === false, 'wall is not held as a part of it');
+    assert(byName.turret && byName.turret.whole === false, 'turret is not held as a part of it');
+    for (const d of defs) assert(d.basedOn === 'castle', `${d.name} is based on ${d.basedOn}`);
+    return {
+      summary: { what: rows.what, from: rows.from, next: rows.next, becomes: rows.becomes },
+      part: parts[1].sentence,
+      definitions: defs.map((d) => `${d.name}${d.whole ? ' (the whole)' : ' (a part)'}`),
+    };
+  });
+
+  demo2('8 · the footprint drawn again, elsewhere — *castle* is offered, and one tap places it', () => {
+    const D = CD();
+    S().view('free');
+    S().choose('foundation');
+    demoCastleAgain = S().strokeScreen(onScreen(rectPath(D.again.x, D.again.y, D.again.w, D.again.h)));
+    assert(demoCastleAgain, 'the second footprint was not drawn');
+    assert(markOf(demoCastleAgain).readings[0].label === 'rectangle', `it read as ${markOf(demoCastleAgain).readings[0].label}`);
+    // Nothing stood from it on its own: the free loop of beat 4 was undone, so
+    // there is no second claim lying about for it to make a hull with.
+    assert(S().solids().length === 1, `${S().solids().length} solids — the second footprint stood something by itself`);
+
+    // The library offers it, with a number and a reason — measured, not copied.
+    const matches = S().matches(demoCastleAgain);
+    assert(matches.length, 'the library offered nothing for an outline it has seen before');
+    const castle = matches.find((x) => x.name === 'castle');
+    assert(castle, `the library offered ${matches.map((x) => x.name).join(', ')}`);
+    assert(castle.whole === true, 'castle was offered as a part rather than as the whole');
+    assert(castle.score > 0.5, `castle ${castle.score.toFixed(2)} — below the floor`);
+    assert(castle.reasoning, 'the offer carries no reason');
+
+    // One tap places it: a second solid, from the library, scaled to fit.
+    const placed = S().place('castle', demoCastleAgain);
+    assert(placed, `castle ${castle.score.toFixed(2)} was offered at ${demoCastleAgain} and could not be placed there`);
+    assert(S().solids().length === 2, `${S().solids().length} solids after the placement`);
+    const body = S().solids().find((x) => x.id === placed.id);
+    assert(body.broken === null, `the placement broke: ${body.broken}`);
+    assert(body.name === 'castle', `the placed body is called ${body.name}`);
+    // It stands INSIDE the outline that was drawn — swept, not sampled at the
+    // centre: a sketch hull is the volume its claims share, so a castle fills
+    // one corner of its own 6 × 4 plan and the middle of the plan is open air.
+    // A ray down the centre proves nothing either way.
+    let hits = 0;
+    let elsewhere = 0;
+    let top = 0;
+    for (let x = D.again.x + 0.15; x < D.again.x + D.again.w; x += 0.15) {
+      for (let z = D.again.y + 0.15; z < D.again.y + D.again.h; z += 0.15) {
+        const down = S().rayDown({ x, z });
+        if (!down) continue;
+        if (down.solidId === placed.id) {
+          hits++;
+          top = Math.max(top, down.y);
+        } else elsewhere++;
+      }
+    }
+    assert(hits > 0, 'nothing of the placement stands anywhere inside the outline it was placed at');
+    assert(elsewhere === 0, `${elsewhere} rays inside the new outline hit a different body — the first castle is in the way`);
+    assert(top > 0.1, `the placement stands ${top.toFixed(2)} high`);
+    // The first castle is exactly as it was.
+    assert(S().solids().find((x) => x.id === demoCastleId).name === 'castle', 'the first castle changed');
+    assert(/placed from castle/.test(S().panelText()), 'the panel does not say where it came from');
+    S().nav.home(0);
+    return {
+      offered: matches.map((x) => `${x.name} ${x.score.toFixed(2)}`),
+      why: castle.reasoning,
+      placed: placed.id,
+      scale: +placed.scale.toFixed(3),
+      stands: +top.toFixed(3),
+      hits,
+    };
+  });
+
+  demo2('9 (optional) · the MCP seat answers the same brief, and the version is the HAND’S', async () => {
+    // The demo runs on the stub; this beat runs the same path with a hand at
+    // the end of it. `joinHand` joins a room over an in-memory hub and seats
+    // the MCP hand in it — the same `room.ts` `shard-3d/mcp.mjs` drives, so
+    // what is proved is the path (park, merge, answer, apply) and not a mock.
+    // From a Claude Code conversation the identical round trip is
+    // `space_pending` → `space_answer`; the README says how.
+    if (typeof S().joinHand !== 'function') {
+      return { skipped: 'this build has no MCP seat (joinHand)' };
+    }
+    const room = S().joinHand();
+    const seats = S().models().seats;
+    assert(seats[0] && seats[0].name === 'Claude Code (MCP hand)', `seated: ${JSON.stringify(seats)}`);
+
+    S().select(demoCastleId);
+    const read = S().fieldRead('a gatehouse of grey stone');
+    assert(/Claude Code \(MCP hand\)/.test(read.line), `the reading line said "${read.line}"`);
+    const before = S().solids().find((x) => x.id === demoCastleId).versions;
+    const ran = S().field('a gatehouse of grey stone');
+    assert(ran.ran, `Enter did nothing: "${ran.line}"`);
+    for (let i = 0; i < 60 && room.pending().length === 0; i++) await new Promise((r) => setTimeout(r, 25));
+
+    const parked = room.pending()[0];
+    assert(parked, 'nothing was parked in the room');
+    assert(parked.words === 'a gatehouse of grey stone', `the words came through as "${parked.words}"`);
+    assert(/THE PARTS/.test(parked.brief), 'the parts contract did not reach the hand');
+    // It is a question, not a change: nothing is written while it waits.
+    assert(S().solids().find((x) => x.id === demoCastleId).versions === before, 'a version landed while the brief only waited');
+
+    // The hand answers in G3's contract — by part id, no geometry.
+    const reply = JSON.stringify({ parts: [{ id: 'part:2', name: 'keep', material: 'grey', why: 'the tall one' }] });
+    assert(room.answer(parked.key, reply), 'the answer was not accepted');
+    for (let i = 0; i < 80 && S().solids().find((x) => x.id === demoCastleId).versions === before; i++)
+      await new Promise((r) => setTimeout(r, 25));
+
+    const after = S().solids().find((x) => x.id === demoCastleId);
+    assert(after.versions === before + 1, `${after.versions} versions, expected ${before + 1}`);
+    assert(after.broken === null, `the derivation broke: ${after.broken}`);
+    assert(S().parts(demoCastleId).find((p) => p.id === 'part:2').name === 'keep', 'the hand’s name did not land on the part');
+    assert(/Claude Code \(MCP hand\)/.test(S().panelText()), 'the panel does not say who proposed it');
+    assert(room.pending().length === 0, 'the brief is still parked after it was answered');
+    assert(S().models().working.length === 0, `${S().models().working.length} calls still in flight`);
+    return { seat: seats[0].name, parked: parked.words, versions: `${before} → ${after.versions}`, named: 'part:2 “keep”' };
+  });
+
+  window.__demo2 = async function () {
+    const out = { ok: true, passed: 0, failed: 0, totalMs: 0, steps: [] };
+    if (!S()) {
+      out.ok = false;
+      out.error = 'window.__shard is not there — is the page loaded?';
+      return out;
+    }
+    const t0 = performance.now();
+    for (const s of demo2Steps) {
+      const at = performance.now();
+      try {
+        const detail = await s.fn();
+        out.passed++;
+        out.steps.push({
+          name: detail && detail.skipped ? `${s.name} — skipped: ${detail.skipped}` : s.name,
+          ok: true,
+          ms: Math.round(performance.now() - at),
+          ...(detail ? { detail } : {}),
+        });
+      } catch (err) {
+        out.ok = false;
+        out.failed++;
+        out.steps.push({
+          name: s.name,
+          ok: false,
+          ms: Math.round(performance.now() - at),
+          error: String(err && err.message ? err.message : err),
+        });
+        break;
+      }
+      await new Promise((r) => setTimeout(r, 20));
+    }
+    out.totalMs = Math.round(performance.now() - t0);
+    return out;
+  };
+
   window.__demo = async function () {
     const out = { ok: true, passed: 0, failed: 0, totalMs: 0, steps: [] };
     if (!S()) {
@@ -3807,5 +4371,8 @@
     return out;
   };
 
-  console.log('shard-3d e2e loaded — run: __scenario().then(r => window.__R = r), or __demo().then(r => window.__D = r)');
+  console.log(
+    'shard-3d e2e loaded — run: __scenario().then(r => window.__R = r), ' +
+      '__demo().then(r => window.__D = r), or __demo2().then(r => window.__D2 = r)'
+  );
 })();

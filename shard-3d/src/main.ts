@@ -54,6 +54,7 @@ import { describePhrase, PHRASE_VERBS, type NameRef, type PhraseReading, type Ph
 import { readColours, storedTheme, applyTheme, effectiveTheme, type ThemeName } from './theme';
 import { pane, tile } from './ui';
 import { createChips } from './chips';
+import { CASTLE_DEMO } from './demo';
 import {
   cursorAt,
   cursorFollowsTarget,
@@ -160,6 +161,11 @@ const panel = createPanel(panelEl, statusEl, log, {
   onRegion: (at) => selection.showRegion(at),
   // G2: the parts of a hull, as chips. Hovering one cages it where it stands;
   // tapping one takes it up, so the field's verbs mean that part's material.
+  // **The name and the material travel with the part** (G4): the chip's label
+  // is `part.name` and the summary of a held part leads with it, and this
+  // mapping dropped both — so every chip read *part 2 · at the north-east
+  // corner* however the hand or a model had named it, and G3's names showed
+  // only in the rows further down.
   parts: (solidId) =>
     (partsFor(solidId)?.parts ?? []).map((p) => ({
       id: p.id,
@@ -167,9 +173,12 @@ const panel = createPanel(panelEl, statusEl, log, {
       height: p.height,
       sentence: p.sentence,
       from: p.from,
+      ...(p.name ? { name: p.name } : {}),
+      ...(p.material ? { colour: p.material.colour } : {}),
     })),
   onPart: (solidId, partId) => void cagePart(solidId, partId),
   takePart: (solidId, partId) => hook.selectPart(solidId, partId),
+  heldPart: () => heldPart,
   // P5: how much of the drawing the body actually contains, whose version
   // stands, and what the library holds.
   honours: (id) => log.honoursOf(id),
@@ -3569,12 +3578,17 @@ if (DEMO === 'diff') {
 }
 
 // P5: "draw three unnamed profiles; type *a castle with green turret tops*".
-// `?demo=castle` draws the three views — the plan on the foundation, the keep's
-// front with a narrow tower rising off its corner and a roof on that, and the
-// side — and leaves the MASSING standing, selected, in the engine's name, with
-// the field ready for the brief. No model is asked: that is the whole point of
-// the package, and it is the human's next act.
-if (DEMO === 'castle') {
+// `?demo=castle-views` draws the three CANONICAL views — the plan on the
+// foundation, the keep's front with a narrow tower rising off its corner and a
+// roof on that, and the side — and leaves the MASSING standing, selected, in
+// the engine's name, with the field ready for the brief. No model is asked:
+// that is the whole point of the package, and it is the human's next act.
+//
+// It was `?demo=castle` until G4, which gave that name to the whole loop on
+// John's own drawing (`CASTLE_DEMO` below). This is the draftsman's board —
+// three canonical views — and the one below is the architect's; the massing is
+// one case of the hull, so they are two boards, not two mechanisms.
+if (DEMO === 'castle-views') {
   const loop = (corners: Point[], per = 14) => {
     const out: Point[] = [];
     for (let i = 0; i < corners.length; i++) {
@@ -3736,6 +3750,126 @@ if (DEMO === 'castle-sketch') {
     // hand happened to draw from is not a view of the drawing.
     hook.nav.home(0);
     report();
+  });
+}
+
+/**
+ * **`?demo=castle` — the loop on John's own drawing** (push 2, G4).
+ *
+ * `SHARD-3D-PLAN.md` §9's demo was the mug: a draftsman's board, drawn on the
+ * three tiles, with a model filling it. This is its successor, and it is the
+ * board a hand actually makes — John's first board of 16 September 2026, the
+ * one that stood nothing at all before G1. The eight beats, the numbers and the
+ * stub's two replies are all in `src/demo.ts`; `__demo2()` in `e2e.js` drives
+ * the same numbers through the same pointer path and asserts each beat.
+ */
+(window as unknown as { __castleDemo: typeof CASTLE_DEMO }).__castleDemo = CASTLE_DEMO;
+
+if (DEMO === 'castle') {
+  const D = CASTLE_DEMO;
+  const loop = (corners: Point[], per = 22) => {
+    const out: Point[] = [];
+    for (let i = 0; i < corners.length; i++) {
+      const a = corners[i];
+      const b = corners[(i + 1) % corners.length];
+      for (let k = 0; k < per; k++) {
+        const t = k / per;
+        out.push({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t });
+      }
+    }
+    out.push(corners[0]);
+    return out;
+  };
+  const box = (r: { x: number; y: number; w: number; h: number }) =>
+    loop([{ x: r.x, y: r.y }, { x: r.x + r.w, y: r.y }, { x: r.x + r.w, y: r.y + r.h }, { x: r.x, y: r.y + r.h }]);
+  /** A ⊓ in SCREEN points: up the left side, across the top, down the right. */
+  const arch = (base: Point, halfW: number, tall: number, per = 12): Point[] => {
+    const run = (a: Point, b: Point) =>
+      Array.from({ length: per + 1 }, (_, i) => {
+        const t = i / per;
+        return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
+      });
+    const left = { x: base.x - halfW, y: base.y };
+    const right = { x: base.x + halfW, y: base.y };
+    return [
+      ...run(left, { x: left.x, y: base.y - tall }),
+      ...run({ x: left.x, y: base.y - tall }, { x: right.x, y: base.y - tall }),
+      ...run({ x: right.x, y: base.y - tall }, right),
+    ];
+  };
+  const settle = () => new Promise((r) => setTimeout(r, 200));
+  whenSized(() => {
+    void (async () => {
+      // 1 · the top view chooses the foundation, and the footprint lands on it.
+      hook.nav.tap('y', 0);
+      hook.strokeScreen(box(D.plan).map((p) => hook.screenFor(p)));
+      // 2 · leave the axis view — the choice goes with it, because no tile was
+      //     ever held — and orbit to where a hand would stand to draw a wall.
+      space.view('free');
+      choose(null);
+      let standing = -1;
+      let groundRow = 0;
+      for (const up of D.ups) {
+        if (up.from !== standing) {
+          hook.orbit(D.views[up.from].dTheta, D.views[up.from].dPhi);
+          standing = up.from;
+          // Stand somewhere before drawing from it: the view plane passes
+          // through the CURSOR, so a shift + click on clear ground is what puts
+          // the ⊓'s feet on the floor rather than a unit above it.
+          groundRow = hook.screenForWorld(hook.shiftTap(hook.screenForWorld(D.views[standing].stand)).at).y;
+          choose(null);
+        }
+        hook.strokeScreen(arch({ x: hook.screenForWorld(up.at).x, y: groundRow }, up.halfW, up.tall));
+      }
+      hook.nav.home(0);
+      // 4 · a free loop in clear air, with nothing chosen: raise the eye so the
+      //     centre of the view is above the hull, and draw there. It lands on
+      //     the view plane through that centre, keeping the shape it was drawn
+      //     — not flat in the floor, which is the fault push 2 opens on.
+      //
+      //     Being a closed silhouette whose prism meets the footprint's, the
+      //     hull TAKES it — a loop in clear air beside the castle is another
+      //     claim about the same thing. So it is undone, in the two acts it
+      //     took: the first takes the claim out and leaves the ink, the second
+      //     takes the stroke. The test leaves the board as it found it.
+      //     A shift + click on the cursor where it already stands lets it GO:
+      //     beat 2 and beat 3 each placed one, and a placed cursor stays put.
+      hook.shiftTap(hook.screenForWorld(hook.cursor().at));
+      choose(null);
+      hook.pan(0, D.loop.raise);
+      const eye = hook.screenForWorld(hook.cursor().at);
+      hook.strokeScreen(
+        Array.from({ length: 49 }, (_, i) => {
+          const t = (i / 48) * Math.PI * 2;
+          return { x: eye.x + Math.cos(t) * D.loop.rx, y: eye.y + Math.sin(t) * D.loop.ry };
+        })
+      );
+      hook.undo();
+      hook.undo();
+      hook.nav.home(0);
+      // 5 · the brief. A stub, so the demo is a demo and not a call.
+      hook.joinStub([D.reply, D.taller]);
+      const hull = hook.solids()[0];
+      if (hull) hook.select(hull.id);
+      hook.field(D.words.brief);
+      await settle();
+      // 6 · the regen, over the part the reply named.
+      if (hull) hook.select(hull.id);
+      hook.field(D.words.regen);
+      await settle();
+      // 7 · name it, take it — and the names are yours.
+      if (hull) hook.select(hull.id);
+      hook.field(D.words.name);
+      hook.field('Take it');
+      // 8 · …then draw its footprint again, elsewhere, and place what the
+      //     library offers.
+      choose('foundation');
+      const again = hook.strokeScreen(box(D.again).map((p) => hook.screenFor(p)));
+      if (again) hook.place('castle', again);
+      choose(null);
+      hook.nav.home(0);
+      report();
+    })();
   });
 }
 
