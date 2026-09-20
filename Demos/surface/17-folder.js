@@ -111,6 +111,15 @@
     // The name is the person's; the suffix is the tab's.
     const me = handName();
     setParticipant(me);
+    // Say what this tab's log is called, so every id it mints from here is
+    // derived from the event that made it and is the same mark in every hand
+    // in the room (ids per hand, SURFACE-v10-PLAN D8). Unsaid, ids come off a
+    // counter over the MERGED replay, and no two hands in a room merge the
+    // same set of logs — so a sentence, a reading or a version about a mark
+    // would land on whatever mark held that number in the reader's board.
+    // What is already drawn keeps the ids it was drawn with: the name applies
+    // to what is written next, and the two forms cannot collide.
+    session.setLogName(me);
     const transport = opts.transport || (opts.relay ? relayTransport(opts.relay, room) : broadcastTransport(room));
     const store = new MM.LiveStore(transport, me, room);
     // What this hand already drew is its opening log in the room.
@@ -160,6 +169,13 @@
     const merged = MM.mergeLogs(logs, folder.how === 'live' ? { me: folder.me } : {});
     const meKey = folder.how === 'live' ? folder.me : MM.participantOfLog(MM.logPathFor(folder.me));
     folder.myPrevious = (logs[meKey] || []).slice();
+    // A folder is a room too: one log per participant, merged, and the next
+    // machine to pull merges a different set. So the writing session says
+    // what its log is called here as well, under the same name its file is
+    // written and read back under — `meKey`, never a name of the reader's
+    // own devising. Said BEFORE the load, so the load resumes the numbering
+    // past whatever this name already wrote rather than starting it again.
+    session.setLogName(meKey);
     session.load(merged);
     // What was loaded is everyone's; from here on, every event is this
     // participant's — including the mark this device re-teaches at open.
