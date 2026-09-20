@@ -343,8 +343,22 @@ type SessionEventUnion =
  * attributes such an event to a participant of that name, made on first
  * sight, so another hand's ink is another hand's. Events from this
  * participant's own log carry no `by`.
+ *
+ * `origin` and `seq` are the event's AUTHORSHIP: the name of the log that
+ * wrote it, and this event's own number in that log. They are stamped once,
+ * by the writing session, at the moment the event is made, and never
+ * rewritten by anyone who reads it — an input recorded in the log, the way
+ * `at` is, not derived state. Every node id the event mints is derived from
+ * them (ids per hand, SURFACE-v10-PLAN D8), which is what makes an id the
+ * same in every replay on every machine however the logs were merged.
+ * `by` cannot do that job: it is the name the READER's merge gave the log it
+ * found the event in, and it is absent on the reader's own events.
+ *
+ * An event carrying neither was written before this rule, or by a session
+ * that was never told what its log is called; it keeps the numbering it
+ * always had (see `nextId`).
  */
-export type SessionEvent = SessionEventUnion & { by?: string };
+export type SessionEvent = SessionEventUnion & { by?: string; origin?: string; seq?: number };
 
 /**
  * An attributed, inferred REP offered by a participant — what a model read
@@ -388,6 +402,24 @@ export interface SessionConfig {
    * a different hat.
    */
   recentWindowMs: number;
+  /**
+   * What the log THIS session writes is called — one log per hand, per tab,
+   * per process (`john~a1b2`, `claude`, `shard`). It is stamped on every event
+   * this session authors, and the ids those events mint are derived from it,
+   * so a host that shares a room must pass the same name it writes its log
+   * file under (`mergeLogs`' `me`). It is never read back at replay time: an
+   * event carries the name it was written under, so opening a board in a new
+   * tab — a new name, every time — renumbers nothing.
+   *
+   * **Left unset, ids are minted the old way**, off a counter over the replay.
+   * That is not a hedge, it is the honest answer: a writer with no name cannot
+   * be named, and the one thing that could stand in for its name — the log
+   * file its events were found in — is the reader's fact, not the writer's, so
+   * it would change with the reader and be no better than the counter. Saying
+   * the name is therefore the switch, and a host that shares a room must
+   * throw it.
+   */
+  logName?: string;
 }
 
 export const DEFAULT_SESSION_CONFIG: SessionConfig = {
@@ -540,6 +572,19 @@ export interface Session {
   /** Full input log — state is a pure function of this. */
   getEvents(): readonly SessionEvent[];
   /**
+   * Say what this session's own log is called, for a host that learns it
+   * after the session was made — joining a room, opening a folder.
+   *
+   * It applies to what is written NEXT. Every event already in the log keeps
+   * the authorship it was written under, so nothing on the board is
+   * renumbered and no id anyone already holds goes stale. Pass the same name
+   * the log file is written under, or the ids this hand hands out will not be
+   * the ids the room knows its marks by.
+   */
+  setLogName(name: string): void;
+  /** What this session calls its own log, or null when it was never told. */
+  logName(): string | null;
+  /**
    * Replace the log and replay it.
    *
    * State is a pure function of the log, so a recorded session — the canonical
@@ -574,6 +619,13 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
   let generation = 0;
   let lastAt = 0;
   let counter = 0;
+  // Authorship, not derived state: what this session's own log is called and
+  // how many events it has written. Neither is read off the log at replay —
+  // they are what this session STAMPS — so neither is checkpointed, and a
+  // replay of the same log stamps nothing and changes neither.
+  let myLog = config.logName;
+  let logNameSaid = config.logName !== undefined;
+  let mySeq = 0;
   const listeners = new Set<(state: SessionState) => void>();
 
   // ===== Checkpoints =====
@@ -631,7 +683,61 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
   }
   reset();
 
-  const nextId = (prefix: string) => `${prefix}:${++counter}`;
+  // ===== Ids per hand (SURFACE-v10-PLAN D8) =====
+  //
+  // A node id is a function of the EVENT that made it: the log that wrote
+  // that event, and the event's own number in that log. Both travel on the
+  // event itself, so the id is the same in every replay, on every machine, in
+  // every session, however the logs were merged and whatever the reader calls
+  // its own log. Nothing here reads the merged position, a clock, a random
+  // source, or any table held outside the log.
+  //
+  // `counter` — the merged replay position — is the rule as it was, and it
+  // stays the rule for two kinds of event: one written before this change (no
+  // `seq`), and one written by a session that was never told what its log is
+  // called. So every held log opens as itself. That is not politeness: a log's
+  // own events REFER to the ids it minted (`bless` names its summon, `code`
+  // and `propose` name their node, `erase` names its targets), so renumbering
+  // a held log would break it from the inside. The two forms cannot collide —
+  // a counter id is `stroke:7`, an authored one `stroke:ada:7`.
+
+  /** What the event being applied mints from, and what it has minted already. */
+  let mint: string | null = null;
+  const minted = new Map<string, number>();
+
+  /**
+   * What an event mints from, or null for the counter.
+   *
+   * The name goes in **unscrubbed**, and that is the safe choice, not the lazy
+   * one. A scrub that mapped every awkward character onto `_` would give
+   * `qwen3:8b` and `qwen3-8b` the same marks — two hands sharing one id is the
+   * very failure this change exists to end, and the names in this system
+   * really do carry colons. It does not need one: the number is always the
+   * LAST colon-separated field and always digits, so `name:seq` reads back to
+   * exactly one pair of parts whatever the name contains, and one name can
+   * never be another.
+   *
+   * Both parts must be there and well formed, because a log is read, not
+   * trusted (DATA-1): an empty name or a number that is not a whole one would
+   * blur the authored form into the counter's.
+   */
+  function mintKeyOf(ev: SessionEvent): string | null {
+    if (!ev.origin || typeof ev.seq !== 'number') return null;
+    if (!Number.isSafeInteger(ev.seq) || ev.seq < 0) return null;
+    return `${ev.origin}:${ev.seq}`;
+  }
+
+  /**
+   * The id this event mints for a family of node. The first of a family reads
+   * `prefix:log:number`; a second of the SAME family in one event — a summon's
+   * suggestions — is numbered after it, so the common case stays plain.
+   */
+  const nextId = (prefix: string) => {
+    if (mint === null) return `${prefix}:${++counter}`;
+    const n = (minted.get(prefix) ?? 0) + 1;
+    minted.set(prefix, n);
+    return n === 1 ? `${prefix}:${mint}` : `${prefix}:${mint}.${n}`;
+  };
 
   function notify() {
     const state = getState();
@@ -2040,6 +2146,21 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       ? ({ ...raw, participantId: handParticipant(raw.by) } as SessionEvent)
       : raw;
     if ('at' in ev && typeof ev.at === 'number') lastAt = Math.max(lastAt, ev.at);
+    // Every id this event mints comes from the event's own authorship, never
+    // from where it landed in the merge. Cleared again on the way out, so a
+    // node minted outside an event can never be handed an id this event
+    // already gave away.
+    mint = mintKeyOf(ev);
+    minted.clear();
+    try {
+      return applyByType(ev);
+    } finally {
+      mint = null;
+      minted.clear();
+    }
+  }
+
+  function applyByType(ev: SessionEvent): string | null {
     switch (ev.type) {
       case 'stroke':
         return applyStroke(ev);
@@ -2127,8 +2248,15 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
 
   // ===== Public API =====
 
-  function dispatch(ev: SessionEvent): string | null {
+  function dispatch(raw: SessionEvent): string | null {
     staleResult = null;
+    // Authorship is stamped HERE, because this is the only place an event is
+    // made; an event that already carries it was written elsewhere and keeps
+    // what it was written with. `mySeq` is never rewound by undo: a dropped
+    // event's number is not handed to a different one, or a peer that already
+    // heard the first would hold two different marks under a single id.
+    const ev: SessionEvent =
+      myLog === undefined || raw.seq !== undefined ? raw : { ...raw, origin: myLog, seq: ++mySeq };
     events.push(ev);
     const result = applyEvent(ev);
     maybeCheckpoint(events.length);
@@ -2273,11 +2401,36 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       staleResult = null;
       events = log.map((ev) => ({ ...ev }));
       checkpoints = [];
+      // Pick the writing up where this log left it. When the host has not
+      // said what its log is called, take the name this log remembers — my
+      // own events are the ones with no `by`, a merge stamps every other
+      // log's — so an autosave reopened in place goes on being one log
+      // rather than splitting in two.
+      if (!logNameSaid) {
+        let remembered: string | undefined;
+        for (const ev of events) if (!ev.by && ev.origin) remembered = ev.origin;
+        if (remembered !== undefined) myLog = remembered;
+      }
+      // Then resume past the highest number already written UNDER THAT NAME,
+      // wherever in the merge it came from, so no number is ever issued
+      // twice — not by a reopened board, and not by a second tab that took
+      // the same name. A number under another name is another log's business.
+      mySeq = 0;
+      if (myLog !== undefined) {
+        for (const ev of events) {
+          if (ev.origin === myLog && typeof ev.seq === 'number' && ev.seq > mySeq) mySeq = ev.seq;
+        }
+      }
       replay();
       notify();
     },
     getState,
     subscribe,
     getEvents: () => events,
+    setLogName: (name) => {
+      myLog = name;
+      logNameSaid = true;
+    },
+    logName: () => myLog ?? null,
   };
 }
