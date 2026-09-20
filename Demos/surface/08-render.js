@@ -173,10 +173,12 @@
   /**
    * Runtime memory keyed by node id — what is flipped, which marks a reading
    * was asked about, what was read with what, what was already handed to a
-   * reader — forgets a node the log no longer holds. Ids are a counter
-   * derived on replay, so a fresh board reuses them: a text flipped before
-   * a `load([])` kept the next text with the same id flipped, and a scratch
-   * over it struck nothing (found by e2e 35).
+   * reader — forgets a node the log no longer holds. An id is the core's to
+   * mint and opaque here; what matters is that it is NOT unique for all
+   * time, so a fresh board may hand out one this memory still holds: a text
+   * flipped before a `load([])` kept the next text with the same id flipped,
+   * and a scratch over it struck nothing (found by e2e 35). Keying runtime
+   * memory to what the log holds is right whatever the rule.
    */
   function pruneRuntime(s) {
     for (const id of [...flipped]) if (!s.live.includes(id)) flipped.delete(id);

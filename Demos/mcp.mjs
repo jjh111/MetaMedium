@@ -60,7 +60,17 @@ try { relayServer = await ensureRelay(RELAY); } catch (err) { log(err.message); 
 if (relayServer) log(`relay started on ${RELAY} (none was answering)`);
 const transport = relayTransport(RELAY, ROOM);
 const store = new MM.LiveStore(transport, ME, ROOM);
-const session = MM.createSession();
+// This hand SAYS WHAT ITS LOG IS CALLED (ids per hand, SURFACE-v10-PLAN D8).
+// The name is the one its lines are appended under — `ME`, the same name
+// `mergeLogs` is given as `me` — because the core derives every node id it
+// mints from the log that wrote the event and that event's number in it.
+// Unsaid, ids would come off a counter over the MERGED replay, and this
+// process merges a different set of logs from every tab in the room: the ids
+// in `canvas_look` would be this hand's private numbering, and `canvas_say`,
+// `canvas_propose`, `canvas_transcribe` and `canvas_write` — every tool that
+// names a mark — would land on whatever mark held that number here. That is
+// the defect this says one word to close.
+const session = MM.createSession({ ...MM.DEFAULT_SESSION_CONFIG, logName: ME });
 let sentCount = 0; // how many of my events the room has
 let lastAt = 0;
 const now = () => { lastAt = Math.max(Date.now(), lastAt + 1); return lastAt; };
@@ -103,7 +113,12 @@ function authorOf(node, s) {
   const p = e && s.nodes.get(e.to);
   if (!p) return '';
   if (e.to === MM.LOCAL_PARTICIPANT) return 'me';
-  return MM.wordOf(p) || label(e.to.replace(/^participant:hand:/, ''));
+  // The name comes off the participant NODE, never out of its id. An id is
+  // opaque here — received, echoed, compared — because its shape is the
+  // core's business and reading one is how a tool starts guessing at
+  // identity instead of asking. A hand the core made from a log's name
+  // already carries that name as its word.
+  return MM.wordOf(p) || 'another hand';
 }
 function codeRepOf(node) {
   for (let i = node.reps.length - 1; i >= 0; i--) if (node.reps[i].modality === 'code') return node.reps[i];
