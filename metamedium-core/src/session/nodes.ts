@@ -7,7 +7,15 @@
 import type { Bounds, Fingerprint, Point } from '../types';
 import { getBounds } from '../geometry';
 
-export type Capability = 0 | 1 | 2 | 3;
+/**
+ * A kind of knowing, not a place (CLAUDE.md, the tiers redressed 6 Sep 2026):
+ * 0 the shape rung, 1 the instant library, 2 a model, 3 structural proposals —
+ * and **1.5, the decision seat** (`participants/decide.ts`): typed questions in,
+ * a typed value out, slower than the library and narrower than a model. It is a
+ * number rather than a name so that every ordering already written over tiers —
+ * ranking, grouping, the router's cheapest-first — keeps working unchanged.
+ */
+export type Capability = 0 | 1 | 1.5 | 2 | 3;
 
 export interface Rep {
   modality: string; // 'stroke' | 'fingerprint' | 'word' | 'gesture' | 'signature' | 'html' | ... (open set)

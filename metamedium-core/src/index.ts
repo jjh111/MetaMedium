@@ -282,6 +282,43 @@ export type { Transport, AgentOptions } from './participants/agent';
 export { createBridgeParticipant } from './participants/bridge';
 export type { BridgeParticipant, BridgeRequest, BridgeOptions } from './participants/bridge';
 
+// The decision seat (tier 1.5) — typed questions in, a typed value out, behind
+// an injected transport. No vendor, no network: a seat, not a dependency.
+export {
+  createDecideParticipant,
+  createStubDecideTransport,
+  choice,
+  score,
+  noul,
+  isFlat,
+  reasonOf,
+  ranked,
+  leadOf,
+  levelOf,
+  NO_MATCH,
+  FLAT_MARGIN,
+} from './participants/decide';
+export type {
+  DecideSeat,
+  DecideOptions,
+  DecideTransport,
+  DecideResult,
+  DecideRun,
+  DecisionRow,
+  DecisionQuestion,
+  DecisionAnswer,
+  DecisionCandidate,
+  ChoiceQuestion,
+  ScoreQuestion,
+  NoulQuestion,
+  ChoiceAnswer,
+  ScoreAnswer,
+  NoulAnswer,
+  Probability,
+  StubAnswer,
+  StubOptions,
+} from './participants/decide';
+
 // Routing — the canvas (tiers 0 and 1) answers first, and a model is asked only for what it cannot.
 export { route, describeRoute, instantFor, SETTLED_CONFIDENCE } from './participants/router';
 export type { Ability, Route, Candidate, RouteOptions } from './participants/router';
