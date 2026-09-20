@@ -22,7 +22,13 @@ export interface LiveLine {
   at: number;
   /** A newcomer asking for everyone's log. */
   hello?: boolean;
-  /** The whole log of `participant`, replacing what was held (the answer to a hello). */
+  /**
+   * The whole log of `participant`, replacing what was held (the answer to a
+   * hello). Because it replaces, it is only ever applied when it is the
+   * present: one older than what has already landed is a replayed snapshot and
+   * is dropped, and one that DIVERGES from what is held is two hands under one
+   * name and is refused.
+   */
   full?: boolean;
 }
 
@@ -41,6 +47,10 @@ export interface Presence {
 export class LiveStore implements Store {
   private logs: Record<string, SessionEvent[]> = {};
   private seen = new Map<string, number>();
+  /** The newest `at` already applied from each hand, so a replayed snapshot cannot install a past state. */
+  private applied = new Map<string, number>();
+  /** A name two hands are both using: the sentence that says so. */
+  private collided = new Map<string, string>();
   private listeners: ((participant: string, events: SessionEvent[]) => void)[] = [];
   private off: (() => void) | null;
 
@@ -81,6 +91,16 @@ export class LiveStore implements Store {
     return [...this.seen.entries()].map(([participant, at]) => ({ participant, at })).sort((a, b) => b.at - a.at);
   }
 
+  /**
+   * Names heard from two hands at once. An append-only log cannot diverge from
+   * itself, so a `full` that disagrees with what is held under the same name is
+   * two hands answering to one — the fault that silently ate a drawing (§1 of
+   * NOTES-DRAWING-WITH-THE-HAND). One sentence per name, for the status bar.
+   */
+  collisions(): string[] {
+    return [...this.collided.values()];
+  }
+
   /** Fires when another participant's events land, with what landed. */
   subscribe(cb: (participant: string, events: SessionEvent[]) => void): () => void {
     this.listeners.push(cb);
@@ -103,14 +123,49 @@ export class LiveStore implements Store {
       return;
     }
     const events = Array.isArray(line.events) ? line.events : [];
-    if (line.full) this.logs[line.participant] = events.slice();
-    else (this.logs[line.participant] ??= []).push(...events);
+    const at = typeof line.at === 'number' ? line.at : Date.now();
+    if (line.full) {
+      // A `full` REPLACES what is held, so it must be the present. A relay
+      // replays its buffer to a connecting client, and a snapshot out of its
+      // moment would install a past state — the same class of fault as a late
+      // result resurrecting an erased target (STATE-1). A snapshot older than
+      // something already applied from that hand is not the present; drop it.
+      const last = this.applied.get(line.participant);
+      if (last !== undefined && at < last) return;
+      const held = this.logs[line.participant];
+      if (held && held.length) {
+        const i = divergence(held, events);
+        if (i >= 0) {
+          // Two logs under one name. Keep what is held — refusing is the only
+          // answer that cannot lose work — and say so.
+          this.collided.set(line.participant, `two hands are both called "${line.participant}" — their logs disagree from event ${i + 1}; what is held is kept, so rename one`);
+          this.notify(line.participant, []);
+          return;
+        }
+      }
+      this.logs[line.participant] = events.slice();
+    } else {
+      (this.logs[line.participant] ??= []).push(...events);
+    }
+    this.applied.set(line.participant, Math.max(this.applied.get(line.participant) ?? 0, at));
     this.notify(line.participant, events);
   }
 
   private notify(participant: string, events: SessionEvent[]): void {
     for (const l of this.listeners) l(participant, events);
   }
+}
+
+/**
+ * The first event at which two logs under one name disagree, or -1 when one is
+ * a prefix of the other. The test is DIVERGENCE, never length: an append-only
+ * log cannot shrink, but a reset legitimately leaves a shorter log that is
+ * still consistent with what came before it.
+ */
+function divergence(held: readonly SessionEvent[], incoming: readonly SessionEvent[]): number {
+  const n = Math.min(held.length, incoming.length);
+  for (let i = 0; i < n; i++) if (JSON.stringify(held[i]) !== JSON.stringify(incoming[i])) return i;
+  return -1;
 }
 
 /**
