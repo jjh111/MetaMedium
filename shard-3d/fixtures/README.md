@@ -86,3 +86,13 @@ evidence than a script's reconstruction of one, and the format is identical.
 model about one and what came back**, verbatim and unrepaired. Its own README
 says what is in it and how to add another. A board fixture stands a drawing up;
 an exchange fixture pins the contract a model is asked to answer in.
+
+## `decisions/` — what a decision seat was asked, and what it said
+
+The third kind. A **decision-only** seat (`metamedium-core/src/participants/decide.ts`)
+is asked typed questions — a Choice among candidates, a Score over ordered
+levels, a Noul's probability-of-yes — and answers with a typed value and its
+whole distribution, never prose. `decisions/` holds what was asked over a board
+and the measurement it produced; `decisions/README.md` says the shape of a file
+and, at length, why the numbers in the one that is there are **stub numbers and
+not any model's performance**.

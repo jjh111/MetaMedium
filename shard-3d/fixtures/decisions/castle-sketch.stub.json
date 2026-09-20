@@ -1,0 +1,84 @@
+{
+  "board": "castle-sketch",
+  "how": "fixtures/john-2026-09-16-castle-sketch.mm.log, replayed — John's first board (SHARD-3D-PUSH-2.md §0): a 6 × 4 footprint on the foundation and three ⊓ from two standpoints, standing a hull with two parts at tier 1",
+  "words": "castle with green tops",
+  "seat": "the stub — a written-down book, no model and no network",
+  "book": {
+    "shape:stroke:1": {
+      "pick": "rectangle",
+      "p": 0.86
+    },
+    "shape:stroke:2": {
+      "pick": "line",
+      "p": 0.52
+    },
+    "shape:stroke:8": {
+      "pick": "arc",
+      "p": 0.61
+    },
+    "plays:stroke:1": {
+      "pick": "profile",
+      "p": 0.78
+    },
+    "plays:stroke:2": {
+      "pick": "elevation",
+      "p": 0.7
+    },
+    "plays:stroke:8": {
+      "pick": "elevation",
+      "p": 0.66
+    },
+    "plays:stroke:9": {
+      "pick": "elevation",
+      "p": 0.58
+    },
+    "name:part:2": {
+      "pick": "tops",
+      "p": 0.55
+    },
+    "material:part:2": {
+      "pick": "green",
+      "p": 0.74
+    },
+    "answers:part:1": {
+      "level": "a little of them",
+      "p": 0.5
+    },
+    "answers:part:2": {
+      "level": "most of them",
+      "p": 0.6
+    },
+    "about:part:1": {
+      "yes": 0.52
+    },
+    "about:part:2": {
+      "yes": 0.88
+    }
+  },
+  "batchMs": 1,
+  "table": [
+    "board castle-sketch · words “castle with green tops” · answered by the stub — a written-down book, no model and no network",
+    "",
+    "question               kind   the seat said            flat  the engine said  agreed",
+    "shape:stroke:1         choice rectangle 0.86           ·     rectangle        yes",
+    "plays:stroke:1         choice profile 0.78             ·     profile          yes",
+    "shape:stroke:2         choice line 0.52                ·     arc              no",
+    "plays:stroke:2         choice elevation 0.70           ·     elevation        yes",
+    "shape:stroke:8         choice arc 0.61                 ·     arc              yes",
+    "plays:stroke:8         choice elevation 0.66           ·     elevation        yes",
+    "shape:stroke:9         choice nothing led 0.11         flat  —                —",
+    "plays:stroke:9         choice elevation 0.58           ·     elevation        yes",
+    "name:part:1            choice nothing led 0.33         flat  —                —",
+    "material:part:1        choice nothing led 0.07         flat  —                —",
+    "answers:part:1         score  a little of them (1.33)  ·     —                —",
+    "about:part:1           noul   yes 0.52                 flat  —                —",
+    "name:part:2            choice tops 0.55                ·     —                —",
+    "material:part:2        choice green 0.74               ·     —                —",
+    "answers:part:2         score  most of them (1.73)      ·     —                —",
+    "about:part:2           noul   yes 0.88                 ·     —                —",
+    "",
+    "asked 16 · answered 16 · held 12 · flat 4 (25%)",
+    "the engine had a reading for 7 of them; the seat agreed with 6 (86%)"
+  ],
+  "why": "The harness's own run over fixture 1, and the shape of what a decision seat can and cannot do here. Four questions come back flat and are held nowhere — the shape of the ⊓ the rung itself placed nothing for, and everything about part 1, which the human's four words never mention. The three questions the book is deliberately silent about are silent because a stub that has not been told an answer does not know one. NOTE, and it is the whole of the note: these are STUB numbers. They measure the harness, the batching and the plumbing. They say nothing whatever about how well any decision model would answer these questions, and nobody may quote them as if they did."
+}
