@@ -12,7 +12,7 @@
 
 import type { MMNode } from '../session/nodes';
 import type { SessionState } from '../session/session';
-import { fingerprintOf, wordOf, boundsOf, isParticipant, isGesture, transcriptsOf } from '../session/nodes';
+import { fingerprintOf, wordOf, labelOf, boundsOf, isParticipant, isGesture, transcriptsOf } from '../session/nodes';
 import { interpretationsOf } from '../session/interpretations';
 import type { Rect, Region } from '../session/regions';
 import type { Relation } from '../relate/relations';
@@ -70,6 +70,12 @@ function describeNode(
       }
     }
   }
+
+  // The word its maker put on it. Said out loud because a model should not
+  // have to guess what the hand already called its own mark — and said as a
+  // label, not a name, because nothing here is settled.
+  const label = labelOf(node);
+  if (label) lines.push(`  labelled "${label.text}" by the hand that made it`);
 
   // What the writing says, as read — the one fact that came in as pixels.
   const said = transcriptsOf(node);

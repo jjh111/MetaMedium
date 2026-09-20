@@ -14,7 +14,7 @@
 // export rather than an afterthought.
 
 import type { MMNode, Capability } from './nodes';
-import { resemblances, wordOf, isParticipant } from './nodes';
+import { resemblances, wordOf, labelOf, isParticipant } from './nodes';
 import { TIER0_PARTICIPANT, LOCAL_PARTICIPANT } from './nodes';
 
 /** One reading of a node, with everything needed to show who said it and why. */
@@ -80,6 +80,25 @@ export function interpretationsOf(
       weight: 1,
       reasoning: 'blessed by a participant',
       blessed: true,
+    });
+  }
+
+  // The word the maker put on their own ink. It ranks above the engine's
+  // guesses, because somebody who was there said it — and it is NOT blessed,
+  // so the engine's readings stay beside it and a bless is still the human's
+  // separate act (the notes, §B).
+  const label = labelOf(node);
+  if (label) {
+    const source = label.source ?? LOCAL_PARTICIPANT;
+    out.push({
+      label: label.text,
+      to: node.id,
+      source,
+      sourceName: participantName(source, nodes),
+      tier: participantTier(source, nodes),
+      weight: 1,
+      reasoning: 'labelled by the hand that made this mark',
+      blessed: false,
     });
   }
 

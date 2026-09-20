@@ -52,6 +52,8 @@ export {
   resemblances,
   transcriptsOf,
   transcriptOf,
+  labelsOf,
+  labelOf,
   isWord,
   lettersOf,
   topInterpretation,
@@ -64,7 +66,7 @@ export {
   localityOf,
   authorOf,
 } from './session/nodes';
-export type { MMNode, Rep, Edge, Capability, ParticipantKind, ExplanationData, Transcript } from './session/nodes';
+export type { MMNode, Rep, Edge, Capability, ParticipantKind, ExplanationData, Transcript, Label } from './session/nodes';
 
 // Clean forms — a confident reading, redrawn. Held beside the ink as a
 // `'clean'` rep, like tidy's `'transform'`; never a replacement of the stroke.
