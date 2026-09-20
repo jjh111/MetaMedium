@@ -1622,11 +1622,18 @@ window.__scenario = async function(){
     })).map((c) => c.id);
     step('36. six answers on six stacked marks are six cards, none on another', cards36.length === 6 && pairs().length === 0, { cards: cards36.length, overlapping: pairs() });
     step('36a. no card covers the marks it is about', overAnchor().length === 0, overAnchor());
-    // The placing is runtime: an answer event carries what was said and what it
-    // is about, and nothing about where its card ended up.
+    // The placing is runtime: an answer event carries what was said, what it is
+    // about, and the event's own AUTHORSHIP — the log that wrote it and its
+    // number in that log, which is what every node id is derived from once a
+    // hand has joined a room (ids per hand, T8) — and nothing about where its
+    // card ended up. Named, not enumerated: pinning the whole key set made
+    // this step fail for a field that is exactly as much an input as `at`.
     const answers36 = JSON.parse(mm.exportLog()).filter((e) => e.type === 'answer');
     const keys36 = [...new Set(answers36.flatMap((e) => Object.keys(e)))].sort();
-    step('36b. the placing is runtime, never in the log', answers36.length === 6 && keys36.join(',') === 'aboutIds,at,participantId,question,text,type', keys36);
+    const said36 = ['aboutIds', 'at', 'participantId', 'question', 'text', 'type'];
+    const authored36 = ['by', 'origin', 'seq'];
+    const stray36 = keys36.filter((k) => !said36.includes(k) && !authored36.includes(k));
+    step('36b. the placing is runtime, never in the log', answers36.length === 6 && said36.every((k) => keys36.includes(k)) && !stray36.length, { keys: keys36, stray: stray36 });
     // Positions are in canvas units and sizes in screen ones, so a zoom re-places them.
     const before36 = mm.answerCards().map((c) => c.w)[0];
     mm.setView(0.5, 0, 0);

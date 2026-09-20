@@ -26,7 +26,11 @@ const relay = await startRelay(PORT);
 // A tab: a hand in the room with a session of its own, exactly as the surface does it.
 const tabMe = 'tab~1';
 const tab = new MM.LiveStore(relayTransport(RELAY, ROOM), tabMe, ROOM);
-const tabSession = MM.createSession();
+// A hand in a room says what its log is called, exactly as the surface does
+// on joining one (Demos/surface/17-folder.js, openLive): the ids it mints are
+// then derived from the events that made them and are the same mark in every
+// hand's board, however each one merged.
+const tabSession = MM.createSession({ ...MM.DEFAULT_SESSION_CONFIG, logName: tabMe });
 const heard = [];
 tab.subscribe((participant, events) => heard.push({ participant, events }));
 tab.hello();
@@ -65,7 +69,8 @@ try {
 
   // The tab draws first: a box, in its own log.
   const box = MM.strokeFor({ shape: 'rectangle', x: 100, y: 100, w: 200, h: 120 });
-  const boxId = tabSession.addStroke(box, Date.now(), undefined, 1);
+  const boxAt = Date.now();
+  const boxId = tabSession.addStroke(box, boxAt, undefined, 1);
   await tab.appendLog(tabMe, tabSession.getEvents().slice());
 
   // The line takes a moment to cross the relay; a look right after it is a race the test, not the hand, should wait out.
@@ -127,6 +132,64 @@ try {
   check('a kind the canvas does not know is refused in words', /not a kind/.test(textOf(bad)), textOf(bad));
   const gone = await call('canvas_say', { text: 'x', about: ['stroke:999'] });
   check('a sentence about nothing is not placed', /not placed/.test(textOf(gone)), textOf(gone));
+
+  // ===== Two hands in one room: an id crosses the boundary (T8) =============
+  // The defect: a node id used to be a counter over the MERGED replay, and no
+  // two hands in a room merge the same set of logs. A SECOND tab whose mark
+  // is older than the first tab's box shifts every number in this hand's
+  // board — so a sentence about the box, named by the id the first tab holds,
+  // landed on the second tab's triangle, silently and with nothing to say so.
+  // Now the id is a function of the event that made it, so it means the same
+  // mark in every hand and in every merge.
+  const tab2Me = 'tab2~1';
+  const tab2 = new MM.LiveStore(relayTransport(RELAY, ROOM), tab2Me, ROOM);
+  const tab2Session = MM.createSession({ ...MM.DEFAULT_SESSION_CONFIG, logName: tab2Me });
+  tab2.hello();
+  const tri = MM.strokeFor({ shape: 'triangle', x: 100, y: 400, w: 180, h: 160 });
+  const triId = tab2Session.addStroke(tri, boxAt - 1000, undefined, 1);
+  await tab2.appendLog(tab2Me, tab2Session.getEvents().slice());
+
+  let t3 = '';
+  for (let i = 0; i < 25 && !t3.includes(triId); i++) { t3 = textOf(await call('canvas_look', {})); if (!t3.includes(triId)) await wait(100); }
+  check('canvas_look reports the ids the core derives — each hand\'s mark under the id that hand holds', t3.includes(boxId) && t3.includes(triId), { boxId, triId, look: t3 });
+
+  // The hand says a sentence about a mark IT DID NOT DRAW, named by the id
+  // the tab that drew it holds. This is the crossing that used to miss.
+  const SENT = 'this one is the first tab\'s box';
+  const before2 = heard.length;
+  const crossed = await call('canvas_say', { text: SENT, about: [boxId] });
+  check('canvas_say takes another hand\'s id as it was given — never re-parsed, never renumbered', textOf(crossed).includes('placed beside ' + boxId), textOf(crossed));
+  await until(() => heard.slice(before2).some((h) => fromSmoke(h) && h.events.some((e) => e.type === 'answer')), 4000);
+  const allLogs = await tab.readLogs();
+  check('the room holds three logs — two tabs and the hand', Object.keys(allLogs).length === 3, Object.keys(allLogs));
+
+  // Read back by a THIRD reader that was never in the room, in both merge
+  // orders: the triangle before the box, and the triangle after it. The
+  // sentence must land on the box both times.
+  const boxBox = MM.getBounds(box);
+  const near = (a, b) => a && b && Math.abs(a.minX - b.minX) < 1 && Math.abs(a.minY - b.minY) < 1 && Math.abs(a.maxX - b.maxX) < 1 && Math.abs(a.maxY - b.maxY) < 1;
+  function saidAbout(logs) {
+    const s = MM.createSession();
+    s.load(MM.mergeLogs(logs, {}));
+    const st = s.getState();
+    for (const id of st.explanations) {
+      const n = st.nodes.get(id);
+      const d = (n.reps.find((x) => x.modality === 'explanation') || {}).data || {};
+      if (d.text !== SENT) continue;
+      return n.edges.filter((e) => e.rel === 'about').map((e) => st.nodes.get(e.to)).filter(Boolean).map((m) => MM.boundsOf(m));
+    }
+    return null;
+  }
+  const shift = (logs, at) => {
+    const out = {};
+    for (const [k, v] of Object.entries(logs)) out[k] = k === tab2Me ? v.map((e) => ({ ...e, at: e.at === boxAt - 1000 ? at : e.at })) : v.slice();
+    return out;
+  };
+  for (const [order, at] of [['the triangle first', boxAt - 1000], ['the box first', boxAt + 500]]) {
+    const on = saidAbout(shift(allLogs, at));
+    check('with ' + order + ', the sentence stands on the box it was said about', !!on && on.length === 1 && near(on[0], boxBox), { on, boxBox });
+  }
+  tab2.close();
 } catch (err) {
   check('the run finished', false, err.message);
 }
