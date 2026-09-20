@@ -107,6 +107,17 @@ describe('live logs', () => {
       expect(store.collisions()).toEqual([]);
     });
 
+    it('a `full` that CONTAINS what is held is one hand mid-stream, not two: a late arrival hears a suffix', async () => {
+      const w = wire();
+      const store = new LiveStore(w.transport as any, 'me');
+      const whole = drew(100).concat(drew(300)).concat(drew(700));
+      // Everything this hand heard after it arrived — the tail of alice's log.
+      w.deliver({ participant: 'alice', events: whole.slice(2), at: 1000 });
+      w.deliver({ participant: 'alice', events: whole, at: 2000, full: true });
+      expect((await store.readLogs()).alice).toEqual(whole);
+      expect(store.collisions()).toEqual([]);
+    });
+
     it('a `full` older than what has already landed is a stale replay, and installs nothing', async () => {
       const w = wire();
       const store = new LiveStore(w.transport as any, 'me');

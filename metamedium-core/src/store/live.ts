@@ -133,15 +133,13 @@ export class LiveStore implements Store {
       const last = this.applied.get(line.participant);
       if (last !== undefined && at < last) return;
       const held = this.logs[line.participant];
-      if (held && held.length) {
-        const i = divergence(held, events);
-        if (i >= 0) {
-          // Two logs under one name. Keep what is held — refusing is the only
-          // answer that cannot lose work — and say so.
-          this.collided.set(line.participant, `two hands are both called "${line.participant}" — their logs disagree from event ${i + 1}; what is held is kept, so rename one`);
-          this.notify(line.participant, []);
-          return;
-        }
+      const i = held && held.length ? divergence(held, events) : -1;
+      if (i >= 0) {
+        // Two logs under one name. Keep what is held — refusing is the only
+        // answer that cannot lose work — and say so.
+        this.collided.set(line.participant, `two hands are both called "${line.participant}" — their logs disagree from event ${i + 1}; what is held is kept, so rename one`);
+        this.notify(line.participant, []);
+        return;
       }
       this.logs[line.participant] = events.slice();
     } else {
@@ -157,14 +155,41 @@ export class LiveStore implements Store {
 }
 
 /**
- * The first event at which two logs under one name disagree, or -1 when one is
- * a prefix of the other. The test is DIVERGENCE, never length: an append-only
- * log cannot shrink, but a reset legitimately leaves a shorter log that is
- * still consistent with what came before it.
+ * The first held event a `full` cannot account for, or -1 when the two logs
+ * are one hand's.
+ *
+ * The test is DIVERGENCE, never length. Length says nothing here for two
+ * reasons, both of them real:
+ *
+ *  - A **reset** legitimately leaves a hand's log shorter than what was held,
+ *    and everything in it was already seen.
+ *  - What is held is usually a **suffix**, not a prefix: a hand that joins a
+ *    room mid-stream hears only the lines sent after it arrived, and the whole
+ *    log that answers its hello starts at event one. Comparing index to index
+ *    called that a collision and refused the answer — which is how the shard's
+ *    seat stopped hearing the brief parked for it.
+ *
+ * So the question is containment in order: one log accounts for the other, in
+ * either direction, or the two are not one hand's history and nothing can
+ * reconcile them.
  */
 function divergence(held: readonly SessionEvent[], incoming: readonly SessionEvent[]): number {
-  const n = Math.min(held.length, incoming.length);
-  for (let i = 0; i < n; i++) if (JSON.stringify(held[i]) !== JSON.stringify(incoming[i])) return i;
+  const a = held.map((e) => JSON.stringify(e));
+  const b = incoming.map((e) => JSON.stringify(e));
+  const i = unaccounted(a, b);
+  if (i < 0) return -1;                  // the full carries everything already held
+  if (unaccounted(b, a) < 0) return -1;  // what is held carries the whole full: a reset
+  return i;
+}
+
+/** The first line of `a` that is not in `b`, in order, or -1. */
+function unaccounted(a: readonly string[], b: readonly string[]): number {
+  let j = 0;
+  for (let i = 0; i < a.length; i++) {
+    while (j < b.length && b[j] !== a[i]) j++;
+    if (j >= b.length) return i;
+    j++;
+  }
   return -1;
 }
 
