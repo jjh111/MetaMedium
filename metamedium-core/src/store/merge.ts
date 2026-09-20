@@ -12,6 +12,16 @@
 // name — so another hand's ink is another hand's, in its own colour, with
 // no join event anyone had to write. The local log (`me`) is left unstamped:
 // its events are this participant's own.
+//
+// Ids per hand (SURFACE-v10-PLAN D8): an event's AUTHORSHIP — `origin` and
+// `seq`, the log that wrote it and its number in that log — is carried
+// through untouched, because the node ids it mints are derived from it and
+// must be the same here as they were there. The merge adds nothing to it and
+// takes nothing away. It deliberately does not stamp the authorship a held
+// log is missing: the name would be the one the READER found the file under,
+// so it would change with the reader, and a log's own events refer to the ids
+// it minted, so renumbering one would break it from the inside. A log written
+// before that rule keeps the numbering it always had.
 
 import type { SessionEvent } from '../session/session';
 

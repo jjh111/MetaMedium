@@ -7,7 +7,7 @@
 // TARGET, so the second bind took the first one's edge with it.
 
 import { describe, it, expect } from 'vitest';
-import { createSession } from './session';
+import { createSession, DEFAULT_SESSION_CONFIG } from './session';
 import { rectStroke, circleStroke, lineStroke } from '../test/strokes';
 import { bindingsOf, boundRepsOf, activeBindingsOf, boundToMark } from './magnets';
 import { mergeLogs } from '../store/merge';
@@ -228,19 +228,21 @@ describe('bind — replay, checkpoints and merge', () => {
 
   it('a bind arriving from another hand keeps the graph, in that hand’s name', () => {
     // The remote hand draws its box, its connector and binds both ends; the
-    // local hand draws later. Ids are assigned in MERGE order, so the remote
-    // events come first and its own `stroke:1`/`stroke:2` still name its own
-    // marks (the ids-per-hand debt, SURFACE-v10-PLAN D8).
-    const ada = createSession();
+    // local hand drew FIRST, so every one of Ada's events sits a place lower
+    // in the merged replay than it did in her own. Each hand says what its
+    // log is called, so the ids she handed out are the ids this canvas knows
+    // her marks by whatever else is in the room (ids per hand,
+    // SURFACE-v10-PLAN D8; the rule is pinned in ids.test.ts).
+    const ada = createSession({ ...DEFAULT_SESSION_CONFIG, logName: 'ada' });
     const ab = box(ada, 100, 100, 1000);
     const aline = connector(ada, 1001);
     ada.bind({ strokeId: aline, nodeId: ab, site: { kind: 'corner', index: 0 }, end: 'start', at: 1002 });
     ada.bind({ strokeId: aline, nodeId: ab, site: { kind: 'middle', index: 2 }, end: 'end', at: 1003 });
 
-    const mine = createSession();
-    mine.addStroke(circleStroke(900, 900, 60), 5000);
+    const mine = createSession({ ...DEFAULT_SESSION_CONFIG, logName: 'john' });
+    mine.addStroke(circleStroke(900, 900, 60), 500);
 
-    const canvas = createSession();
+    const canvas = createSession({ ...DEFAULT_SESSION_CONFIG, logName: 'john' });
     canvas.load(mergeLogs({ ada: ada.getEvents(), john: mine.getEvents() }, { me: 'john' }));
 
     const st = canvas.getState();
