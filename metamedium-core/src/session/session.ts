@@ -41,6 +41,7 @@ import {
   transcriptOf,
   isWord,
   lettersOf,
+  authorOf,
   LOCAL_PARTICIPANT,
   TIER0_PARTICIPANT,
   type Locality,
@@ -246,6 +247,13 @@ type SessionEventUnion =
   | { type: 'erase'; nodeId: string; at: number; participantId?: string }
   | { type: 'join'; kind: ParticipantKind; name: string; at: number; capability?: Capability; locality?: Locality }
   | { type: 'propose'; participantId: string; nodeId: string; edges: ProposedEdge[]; reps?: ProposedRep[]; at: number }
+  /**
+   * A word a hand puts on its OWN ink (the notes, §B). Not a bless — the
+   * engine's readings stay beside it — and not an artifact, so it never
+   * becomes a file in the folder view. Refused when the mark was made by
+   * another hand: `not-your-ink`. An empty text takes the label off again.
+   */
+  | { type: 'label'; nodeId: string; text: string; participantId?: string; at: number }
   | { type: 'teach'; mark: CommandMark | null; at: number }
   /**
    * A behaviour for a definition, held as a rep. From a human it is blessed
@@ -455,6 +463,17 @@ export interface Session {
     at: number;
     expect?: Expectation;
   }): string | null;
+  /**
+   * Put a word on a mark this participant made — labelling your own ink, which
+   * any hand may do (the notes, §B).
+   *
+   * Returns the mark's id, or null with the reason on `state.staleResult`: the
+   * mark is gone, or it was made by another hand (`not-your-ink`). A label is
+   * NOT a bless — it is one named reading held beside the engine's own, and it
+   * is a rep on the mark rather than an artifact, so it never becomes a file.
+   * An empty `text` takes this hand's label off again.
+   */
+  label(args: { nodeId: string; text: string; participantId?: string; at: number }): string | null;
   /**
    * Install (or clear) the mark that resolves a lasso. An event, not a setting:
    * teaching is part of the session's history and replays with it.
@@ -1403,6 +1422,24 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     recomputeClusterCandidates();
   }
 
+  /**
+   * A hand's word on its own ink. Held as a rep, attributed, never blessed.
+   *
+   * The authorship rule is checked HERE as well as at the door, for the same
+   * reason `applyCode` re-checks `erased`: a merged log can carry another
+   * hand's label event, and state must be a pure function of the log however
+   * the logs were put together. A label whose writer did not make the mark is
+   * dropped on replay exactly as it is refused at the door.
+   */
+  function applyLabel(ev: Extract<SessionEvent, { type: 'label' }>): string | null {
+    const node = nodes.get(ev.nodeId);
+    if (!node || getRep(node, 'erased')) return null;
+    const pid = ev.participantId ?? LOCAL_PARTICIPANT;
+    if (authorOf(node) !== pid) return null;
+    node.reps.push({ modality: 'label', data: { text: ev.text, at: ev.at }, source: pid });
+    return node.id;
+  }
+
   function applyAnswer(ev: Extract<SessionEvent, { type: 'answer' }>): string | null {
     if (!participants.includes(ev.participantId)) return null;
     // Anchored only to marks that are still there. An answer about marks the
@@ -2047,6 +2084,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       // it was about is left; while one mark survives the answer still has
       // something to be anchored beside, and applyAnswer drops the rest.
       case 'answer': what = 'answer'; targets = ev.aboutIds; break;
+      case 'label': what = 'label'; targets = [ev.nodeId]; break;
       default: return null;
     }
     const participantId = 'participantId' in ev ? ev.participantId : undefined;
@@ -2055,12 +2093,12 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     // cards, so the name the refusal says.
     const pNode = participantId ? nodes.get(participantId) : undefined;
     const name = pNode ? getRep(pNode, 'word')?.data : undefined;
-    const refuse = (reason: Parameters<typeof describeStale>[0], nodeId: string): StaleResult => ({
+    const refuse = (reason: Parameters<typeof describeStale>[0], nodeId: string, maker?: string): StaleResult => ({
       what,
       reason,
       nodeId,
       participantId,
-      detail: describeStale(reason, what, typeof name === 'string' ? name : undefined),
+      detail: describeStale(reason, what, typeof name === 'string' ? name : undefined, maker),
       at,
     });
 
@@ -2083,6 +2121,20 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       const id = targets[0] ?? '';
       const n = nodes.get(id);
       return refuse(!n ? 'missing' : 'erased', id);
+    }
+    // A label is a word on your OWN ink. Naming a mark another hand made is
+    // blessing it, and a bless is the human's act — so the hand that made the
+    // mark is the only one that may label it, and the refusal says whose it is
+    // (the notes, §B).
+    if (ev.type === 'label') {
+      const node = nodes.get(targets[0]);
+      const maker = node ? authorOf(node) : LOCAL_PARTICIPANT;
+      const mine = ev.participantId ?? LOCAL_PARTICIPANT;
+      if (node && maker !== mine) {
+        const makerNode = nodes.get(maker);
+        const makerName = makerNode ? getRep(makerNode, 'word')?.data : undefined;
+        return refuse('not-your-ink', targets[0], typeof makerName === 'string' ? makerName : maker);
+      }
     }
     // A revision was written FROM a particular version; if the target has
     // moved past it, the standing newer version wins and this one is refused.
@@ -2173,6 +2225,8 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
         return null;
       case 'answer':
         return applyAnswer(ev);
+      case 'label':
+        return applyLabel(ev);
       case 'teach':
         applyTeach(ev);
         return null;
@@ -2328,6 +2382,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     join: (kind, name, at, capability, locality) => dispatch({ type: 'join', kind, name, at, capability, ...(locality ? { locality } : {}) }) as string,
     propose: ({ expect, ...args }) => void guarded({ type: 'propose', ...args }, expect),
     answer: ({ expect, ...args }) => guarded({ type: 'answer', ...args }, expect),
+    label: (args) => guarded({ type: 'label', ...args }),
     teachCommandMark: (mark, at) => void dispatch({ type: 'teach', mark, at }),
     correct: (args) => void dispatch({ type: 'correct', ...args }),
     clock: (args) => void dispatch({ type: 'clock', ...args }),

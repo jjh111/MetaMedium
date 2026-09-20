@@ -280,6 +280,53 @@ export function transcriptOf(node: MMNode): string | undefined {
   return transcriptsOf(node)[0]?.text;
 }
 
+/**
+ * A word a hand put on its OWN ink.
+ *
+ * Naming a mark somebody else made is blessing — the human's act, and one no
+ * other hand may take. Naming a mark you just made is not: it is labelling
+ * your own ink, which any hand may do (the notes, §B). So a label is held as
+ * a rep on the mark, attributed to whoever wrote it, and it is deliberately
+ * NOT the `word` rep a bless writes: the engine's own readings stay beside it
+ * and nothing is settled.
+ *
+ * It is also not an artifact. A label used to be a text or svg artifact with
+ * a filename, so a figure's six labels showed up as six files in the folder
+ * view (the notes, §D). A word on a drawing is not a file; a rep on the mark
+ * cannot become one.
+ */
+export interface Label {
+  text: string;
+  /** Who wrote it — always the participant that made the mark. */
+  source?: string;
+  at: number;
+}
+
+/** Every label written on a mark, oldest first. Relabelling keeps the history. */
+export function labelsOf(node: MMNode): Label[] {
+  return node.reps
+    .filter((r) => r.modality === 'label')
+    .map((r) => {
+      const d = r.data as { text?: unknown; at?: unknown };
+      return {
+        text: typeof d?.text === 'string' ? d.text : '',
+        source: r.source,
+        at: typeof d?.at === 'number' ? d.at : node.createdAt,
+      };
+    });
+}
+
+/**
+ * What this mark is labelled now: the newest label, or undefined when it was
+ * never labelled — or when the newest one is empty, which is how a hand takes
+ * its own label off again.
+ */
+export function labelOf(node: MMNode): Label | undefined {
+  const all = labelsOf(node);
+  const last = all[all.length - 1];
+  return last && last.text.length > 0 ? last : undefined;
+}
+
 /** A held run of printed letters, standing in the content plane as one mark. */
 export function isWord(node: MMNode): boolean {
   return getRep(node, 'word-run') !== undefined;

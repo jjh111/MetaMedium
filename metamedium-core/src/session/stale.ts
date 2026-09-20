@@ -30,7 +30,13 @@ export type StaleReason =
   /** The target moved past the version this answer was computed against. */
   | 'superseded'
   /** Nobody of that name is in this session. */
-  | 'unknown-participant';
+  | 'unknown-participant'
+  /**
+   * The mark was made by another hand. A label is a word on your OWN ink;
+   * putting one on somebody else's mark is naming it, and naming is the
+   * human's bless (the notes, §B).
+   */
+  | 'not-your-ink';
 
 /**
  * A refused result, in the shape the surface can say out loud. The sibling of
@@ -38,7 +44,7 @@ export type StaleReason =
  */
 export interface StaleResult {
   /** Which channel was refused. */
-  what: 'code' | 'propose' | 'answer';
+  what: 'code' | 'propose' | 'answer' | 'label';
   reason: StaleReason;
   /** What the result was meant for. */
   nodeId: string;
@@ -67,10 +73,18 @@ export interface Expectation {
 }
 
 /** The sentence for a refusal — the surface says this, so it is in the human's terms. */
-export function describeStale(reason: StaleReason, what: StaleResult['what'], name?: string): string {
+export function describeStale(
+  reason: StaleReason,
+  what: StaleResult['what'],
+  name?: string,
+  /** Who the refusal is ABOUT, when that is somebody other than the caller — the hand that made the mark. */
+  maker?: string
+): string {
   const who = name ? `${name}'s ` : '';
-  const answer = what === 'code' ? 'code' : what === 'answer' ? 'answer' : 'reading';
+  const answer = what === 'code' ? 'code' : what === 'answer' ? 'answer' : what === 'label' ? 'label' : 'reading';
   switch (reason) {
+    case 'not-your-ink':
+      return `that mark was made by ${maker ?? 'another hand'} — a label is a word on your own ink, and naming somebody else's mark is theirs to do`;
     case 'erased':
       return `the target was erased before ${who}${answer} arrived`;
     case 'missing':
