@@ -67,6 +67,69 @@ describe('live logs', () => {
     expect(s.getState().participants.filter((p) => p === 'participant:hand:alice')).toHaveLength(1);
   });
 
+  // ===== Two logs under one name (NOTES-DRAWING-WITH-THE-HAND §1) ============
+  // An append-only log cannot disagree with itself, so a `full` that diverges
+  // from what is held under the same name is two hands answering to one.
+  describe('a name collision', () => {
+    /** A transport this test speaks into directly, so a `full` can be put on the wire by hand. */
+    function wire() {
+      let cb: ((line: any) => void) | null = null;
+      const sent: any[] = [];
+      return {
+        sent,
+        deliver: (line: any) => cb && cb(line),
+        transport: { send: (l: any) => sent.push(l), onMessage: (fn: any) => { cb = fn; return () => { cb = null; }; } },
+      };
+    }
+    const drew = (x: number) => eventsOf((s) => s.addStroke(rectStroke(x, 100, 200, 120), 1000 + x));
+
+    it('a shorter `full` that diverges is a collision: what is held is kept, and it says so', async () => {
+      const w = wire();
+      const store = new LiveStore(w.transport as any, 'me');
+      const alice = drew(100).concat(drew(300));
+      w.deliver({ participant: 'alice', events: alice, at: 1000 });
+      w.deliver({ participant: 'alice', events: drew(700), at: 2000, full: true });
+      const logs = await store.readLogs();
+      expect(logs.alice).toEqual(alice); // refused — refusing is the only answer that cannot lose work
+      expect(store.collisions()).toHaveLength(1);
+      expect(store.collisions()[0]).toMatch(/two hands are both called "alice"/);
+      expect(store.collisions()[0]).toMatch(/from event 1/);
+    });
+
+    it('a shorter `full` that is a prefix is a reset, not a collision', async () => {
+      const w = wire();
+      const store = new LiveStore(w.transport as any, 'me');
+      const first = drew(100);
+      w.deliver({ participant: 'alice', events: first.concat(drew(300)), at: 1000 });
+      w.deliver({ participant: 'alice', events: first, at: 2000, full: true });
+      const logs = await store.readLogs();
+      expect(logs.alice).toEqual(first);
+      expect(store.collisions()).toEqual([]);
+    });
+
+    it('a `full` that CONTAINS what is held is one hand mid-stream, not two: a late arrival hears a suffix', async () => {
+      const w = wire();
+      const store = new LiveStore(w.transport as any, 'me');
+      const whole = drew(100).concat(drew(300)).concat(drew(700));
+      // Everything this hand heard after it arrived — the tail of alice's log.
+      w.deliver({ participant: 'alice', events: whole.slice(2), at: 1000 });
+      w.deliver({ participant: 'alice', events: whole, at: 2000, full: true });
+      expect((await store.readLogs()).alice).toEqual(whole);
+      expect(store.collisions()).toEqual([]);
+    });
+
+    it('a `full` older than what has already landed is a stale replay, and installs nothing', async () => {
+      const w = wire();
+      const store = new LiveStore(w.transport as any, 'me');
+      const now = drew(100).concat(drew(300));
+      w.deliver({ participant: 'alice', events: now, at: 5000 });
+      // The relay's buffer, replayed out of its moment: alice's log as it was.
+      w.deliver({ participant: 'alice', events: drew(100), at: 1000, full: true });
+      expect((await store.readLogs()).alice).toEqual(now);
+      expect(store.collisions()).toEqual([]);
+    });
+  });
+
   it('a live room holds no files, and says so', async () => {
     const store = new LiveStore(new LocalHub().connect(), 'me');
     expect(await store.list()).toEqual([]);
