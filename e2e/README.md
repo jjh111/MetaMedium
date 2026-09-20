@@ -14,8 +14,12 @@ exits nonzero if anything in it failed.
 
 ```bash
 cd e2e && npm ci && npx playwright install chromium   # once
-node run.mjs            # from anywhere: all three scenarios
+node run.mjs            # from anywhere: all four scenarios
 cd e2e && npm run e2e   # the same thing
+
+npx playwright install webkit                   # once, for the smoke
+node run.mjs --browser webkit smoke             # the WebKit smoke, ~2 s
+cd e2e && npm run smoke:webkit                  # the same thing
 ```
 
 `shard-3d` needs its own `npm ci` first — the runner says so rather than
@@ -27,6 +31,26 @@ guessing. Pick scenarios by name to run one: `node e2e/run.mjs canvas`,
 | `canvas` | `__setup(); __scenario()` | `Demos/session-engine.html?fresh=1&nosw=1` over a static server on the repo root |
 | `shard` | `__scenario()` | `shard-3d/` over vite |
 | `demo` | `__demo()` | `shard-3d/` over vite, in its own context |
+| `smoke` | three checks written in `run.mjs` itself | `Demos/session-engine.html?fresh=1&nosw=1`, usually with `--browser webkit` |
+
+`--browser chromium` (the default) or `--browser webkit` picks the engine, and
+the run's `e2e.json` records which as `browser` / `browserVersion`. `smoke` is
+**opt-in**: a bare `node run.mjs` still runs the four Chromium scenarios and
+nothing else, so the default gate needs no second engine installed.
+
+### The WebKit smoke, and what it is not
+
+**It is a WebKit smoke, not an iPhone test.** It is desktop WebKit, headless, at
+1440×900 — the engine Safari is built on, not a phone, not a touch screen, and
+not a viewport pretending to be either. What it checks is the short list the
+review asked for: the board loads, a hand draws ink with real pointer input, the
+engine reads that ink back (a line, with a weight), and press-and-hold opens the
+field. It takes about two seconds.
+
+It deliberately does **not** load `Demos/session-engine.e2e.js`. That harness is
+two hundred records and its own stub model; running it on a second engine would
+be a second full gate wearing the word "smoke", and a gate that costs two
+minutes is one whoever waits on it turns off.
 
 A full run is about 70 s headless. `E2E_HEADED=1` watches it;
 `E2E_RESULTS=<dir>` moves the output; `E2E_TIMEOUT_MS` raises the per-scenario
@@ -71,9 +95,12 @@ uploads the directory as an artifact when the job is red.
 
 ## What is not here yet
 
-Chromium only. The review asks for a short WebKit interaction smoke rather than
-a Chromium viewport test pretending to be an iPhone — that is a separate, honest
-addition. Real-model evaluation stays a separate opt-in lane; nothing here is
+The four large scenarios are still Chromium only — WebKit gets the smoke above
+and nothing more, which is the honest version of the review's ask and is all it
+claims to be. **The CI job is still owed**: `.github/workflows/ci.yml` needs
+`npx playwright install --with-deps webkit` and a step running
+`node e2e/run.mjs --browser webkit smoke`; until it does, the smoke is something
+a human runs. Real-model evaluation stays a separate opt-in lane; nothing here is
 evidence about model quality. The two large scenarios are still one case each;
 splitting them is meant to be incremental and must not discard the full-loop
 acceptance run.
