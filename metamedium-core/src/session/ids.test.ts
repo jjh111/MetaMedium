@@ -213,6 +213,22 @@ describe('ids per hand — an id is a function of the event', () => {
     expect(new Set(keys).size).toBe(keys.length);
   });
 
+  it('a traced picture — many marks from one event — gives each its own id', () => {
+    // The one place in the engine where a single event really does mint a
+    // whole family of nodes: a photographed sketch arrives as strokes.
+    const s = named('ada');
+    const first = s.import({
+      kind: 'png', path: 'sketch.png', at: 1000,
+      bounds: { minX: 0, minY: 0, maxX: 800, maxY: 520 },
+      strokes: [rectStroke(100, 100, 200, 120), circleStroke(600, 160, 60), rectStroke(100, 400, 200, 120)],
+    });
+    expect(first).toBe('stroke:ada:1');
+    expect(s.getState().contentIds).toEqual(['stroke:ada:1', 'stroke:ada:1.2', 'stroke:ada:1.3']);
+    const reader = named('cleo');
+    reader.load(mergeLogs({ ada: s.getEvents().slice(), cleo: [] }, { me: 'cleo' }));
+    expect(reader.getState().contentIds).toEqual(s.getState().contentIds);
+  });
+
   it('two log names that differ only in punctuation are two hands', () => {
     // The name goes into the id as it is. A scrub that collapsed both of
     // these to `qwen3_8b` would hand them one another's marks — the very
