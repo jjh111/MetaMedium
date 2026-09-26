@@ -33,3 +33,6 @@ manim-explainer/*.mp4
 # runner and its lockfile are tracked; what it downloads and what it writes are not.
 e2e/node_modules/
 e2e/results/
+# A trailing slash matches directories only; a symlinked node_modules slipped
+# past it once (diagrams-visible-states), so ignore the name however it is made.
+node_modules
