@@ -24,10 +24,12 @@ automatically → ask "why?" and get grounded reasoning.
 `ARCHITECTURE-v7-PARTICIPANTS-AND-TIERS.md` is the active engine plan; MVP.md
 absorbs and raises its Stage D.
 
-**26 Sep 2026: week 1's automated run is on `auto/w1`, not on `master`.**
-`DIRECTOR-PLAN-W2.md` §0 says what that branch holds and lacks and how it
-lands; then the push builds maths (`MATHS-PLAN.md`) and the middle layer.
-Until it lands, the headline below describes `master`.
+**26 Sep 2026: week 1's automated run landed on `master`, with its gaps.**
+It carries ids per hand (with two reproduced defects), the relay's
+catch-up, the label event in core, the decision seat and a WebKit smoke;
+the rest sits on attempt branches. `DIRECTOR-PLAN-W2.md` §0 says exactly
+what, and its L1–L3 finish it before anything new; `MATHS-PLAN.md` and the
+v1 plan follow. The headline below is the 17 Sep state it builds on.
 
 Headline (17 Sep 2026, everything on `master`; `DIRECTOR-VIEW-2026-09-17.md`
 is the director's view of where it all stands, the 15 Sep review reviewed,
