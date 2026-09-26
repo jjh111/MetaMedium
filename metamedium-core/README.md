@@ -61,6 +61,31 @@ session.subscribe((state) => {
 });
 ```
 
+### Sharing a room: say what your log is called
+
+Node ids are derived from the **event that made them** — the log that wrote
+the event and that event's own number in that log — so a mark has one id on
+every machine, however the logs merged (ids per hand, SURFACE-v10-PLAN D8).
+That needs the writing session to know its own name, which only the host
+knows. Pass the same name the log file is written under, which is `mergeLogs`'
+`me`:
+
+```typescript
+const session = createSession({ ...DEFAULT_SESSION_CONFIG, logName: 'john~a1b2' });
+// or, when the host learns it later — joining a room, opening a folder:
+session.setLogName('john~a1b2');
+session.load(mergeLogs(logs, { me: 'john~a1b2' }));
+```
+
+Say nothing and ids fall back to a counter over the replay, which is what
+every log written before this rule carries and what every event of such a log
+keeps: a held log opens as itself and is never renumbered. But two hands in
+one room whose sessions have no names will each give the same event a
+different id, and anything that refers to a mark by id — `canvas_say`,
+`canvas_propose`, a model's own proposals — will land on the wrong mark. **A
+host that shares a room must say its name.** `src/session/ids.test.ts` pins
+both halves, the fix and the defect it closes.
+
 ## Module map
 
 | Module | What it holds |

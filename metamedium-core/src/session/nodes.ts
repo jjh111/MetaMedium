@@ -7,7 +7,15 @@
 import type { Bounds, Fingerprint, Point } from '../types';
 import { getBounds } from '../geometry';
 
-export type Capability = 0 | 1 | 2 | 3;
+/**
+ * A kind of knowing, not a place (CLAUDE.md, the tiers redressed 6 Sep 2026):
+ * 0 the shape rung, 1 the instant library, 2 a model, 3 structural proposals —
+ * and **1.5, the decision seat** (`participants/decide.ts`): typed questions in,
+ * a typed value out, slower than the library and narrower than a model. It is a
+ * number rather than a name so that every ordering already written over tiers —
+ * ranking, grouping, the router's cheapest-first — keeps working unchanged.
+ */
+export type Capability = 0 | 1 | 1.5 | 2 | 3;
 
 export interface Rep {
   modality: string; // 'stroke' | 'fingerprint' | 'word' | 'gesture' | 'signature' | 'html' | ... (open set)
@@ -278,6 +286,53 @@ export function transcriptsOf(node: MMNode): Transcript[] {
 /** The top transcript's text, if any participant has read this mark. */
 export function transcriptOf(node: MMNode): string | undefined {
   return transcriptsOf(node)[0]?.text;
+}
+
+/**
+ * A word a hand put on its OWN ink.
+ *
+ * Naming a mark somebody else made is blessing — the human's act, and one no
+ * other hand may take. Naming a mark you just made is not: it is labelling
+ * your own ink, which any hand may do (the notes, §B). So a label is held as
+ * a rep on the mark, attributed to whoever wrote it, and it is deliberately
+ * NOT the `word` rep a bless writes: the engine's own readings stay beside it
+ * and nothing is settled.
+ *
+ * It is also not an artifact. A label used to be a text or svg artifact with
+ * a filename, so a figure's six labels showed up as six files in the folder
+ * view (the notes, §D). A word on a drawing is not a file; a rep on the mark
+ * cannot become one.
+ */
+export interface Label {
+  text: string;
+  /** Who wrote it — always the participant that made the mark. */
+  source?: string;
+  at: number;
+}
+
+/** Every label written on a mark, oldest first. Relabelling keeps the history. */
+export function labelsOf(node: MMNode): Label[] {
+  return node.reps
+    .filter((r) => r.modality === 'label')
+    .map((r) => {
+      const d = r.data as { text?: unknown; at?: unknown };
+      return {
+        text: typeof d?.text === 'string' ? d.text : '',
+        source: r.source,
+        at: typeof d?.at === 'number' ? d.at : node.createdAt,
+      };
+    });
+}
+
+/**
+ * What this mark is labelled now: the newest label, or undefined when it was
+ * never labelled — or when the newest one is empty, which is how a hand takes
+ * its own label off again.
+ */
+export function labelOf(node: MMNode): Label | undefined {
+  const all = labelsOf(node);
+  const last = all[all.length - 1];
+  return last && last.text.length > 0 ? last : undefined;
 }
 
 /** A held run of printed letters, standing in the content plane as one mark. */

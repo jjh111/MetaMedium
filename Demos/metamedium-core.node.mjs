@@ -1732,6 +1732,10 @@ var LiveStore = class {
     this.room = room;
     this.logs = {};
     this.seen = /* @__PURE__ */ new Map();
+    /** The newest `at` already applied from each hand, so a replayed snapshot cannot install a past state. */
+    this.applied = /* @__PURE__ */ new Map();
+    /** A name two hands are both using: the sentence that says so. */
+    this.collided = /* @__PURE__ */ new Map();
     this.listeners = [];
     this.logs[me] = [];
     this.off = transport.onMessage((line) => this.receive(line));
@@ -1769,6 +1773,15 @@ var LiveStore = class {
   presence() {
     return [...this.seen.entries()].map(([participant, at]) => ({ participant, at })).sort((a, b) => b.at - a.at);
   }
+  /**
+   * Names heard from two hands at once. An append-only log cannot diverge from
+   * itself, so a `full` that disagrees with what is held under the same name is
+   * two hands answering to one — the fault that silently ate a drawing (§1 of
+   * NOTES-DRAWING-WITH-THE-HAND). One sentence per name, for the status bar.
+   */
+  collisions() {
+    return [...this.collided.values()];
+  }
   /** Fires when another participant's events land, with what landed. */
   subscribe(cb) {
     this.listeners.push(cb);
@@ -1790,14 +1803,45 @@ var LiveStore = class {
       return;
     }
     const events = Array.isArray(line.events) ? line.events : [];
-    if (line.full) this.logs[line.participant] = events.slice();
-    else (this.logs[line.participant] ??= []).push(...events);
+    const at = typeof line.at === "number" ? line.at : Date.now();
+    if (line.full) {
+      const last = this.applied.get(line.participant);
+      if (last !== void 0 && at < last) return;
+      const held = this.logs[line.participant];
+      const i = held && held.length ? divergence(held, events) : -1;
+      if (i >= 0) {
+        this.collided.set(line.participant, `two hands are both called "${line.participant}" \u2014 their logs disagree from event ${i + 1}; what is held is kept, so rename one`);
+        this.notify(line.participant, []);
+        return;
+      }
+      this.logs[line.participant] = events.slice();
+    } else {
+      (this.logs[line.participant] ??= []).push(...events);
+    }
+    this.applied.set(line.participant, Math.max(this.applied.get(line.participant) ?? 0, at));
     this.notify(line.participant, events);
   }
   notify(participant, events) {
     for (const l of this.listeners) l(participant, events);
   }
 };
+function divergence(held, incoming) {
+  const a = held.map((e) => JSON.stringify(e));
+  const b = incoming.map((e) => JSON.stringify(e));
+  const i = unaccounted(a, b);
+  if (i < 0) return -1;
+  if (unaccounted(b, a) < 0) return -1;
+  return i;
+}
+function unaccounted(a, b) {
+  let j = 0;
+  for (let i = 0; i < a.length; i++) {
+    while (j < b.length && b[j] !== a[i]) j++;
+    if (j >= b.length) return i;
+    j++;
+  }
+  return -1;
+}
 var LocalHub = class {
   constructor() {
     this.members = [];
@@ -4812,6 +4856,9 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
   let generation = 0;
   let lastAt = 0;
   let counter2 = 0;
+  let myLog = config.logName;
+  let logNameSaid = config.logName !== void 0;
+  let mySeq = 0;
   const listeners = /* @__PURE__ */ new Set();
   const CHECKPOINT_EVERY = 200;
   let checkpoints = [];
@@ -4876,7 +4923,19 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
     for (const n2 of createBootstrapNodes(0)) nodes.set(n2.id, n2);
   }
   reset();
-  const nextId = (prefix) => `${prefix}:${++counter2}`;
+  let mint = null;
+  const minted = /* @__PURE__ */ new Map();
+  function mintKeyOf(ev) {
+    if (!ev.origin || typeof ev.seq !== "number") return null;
+    if (!Number.isSafeInteger(ev.seq) || ev.seq < 0) return null;
+    return `${ev.origin}:${ev.seq}`;
+  }
+  const nextId = (prefix) => {
+    if (mint === null) return `${prefix}:${++counter2}`;
+    const n2 = (minted.get(prefix) ?? 0) + 1;
+    minted.set(prefix, n2);
+    return n2 === 1 ? `${prefix}:${mint}` : `${prefix}:${mint}.${n2}`;
+  };
   function notify() {
     const state = getState();
     listeners.forEach((l) => l(state));
@@ -5900,6 +5959,16 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
     const pid = "participantId" in raw ? raw.participantId : void 0;
     const ev = raw.by && (!pid || pid === LOCAL_PARTICIPANT) ? { ...raw, participantId: handParticipant(raw.by) } : raw;
     if ("at" in ev && typeof ev.at === "number") lastAt = Math.max(lastAt, ev.at);
+    mint = mintKeyOf(ev);
+    minted.clear();
+    try {
+      return applyByType(ev);
+    } finally {
+      mint = null;
+      minted.clear();
+    }
+  }
+  function applyByType(ev) {
     switch (ev.type) {
       case "stroke":
         return applyStroke(ev);
@@ -5982,8 +6051,9 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
       maybeCheckpoint(i + 1);
     }
   }
-  function dispatch(ev) {
+  function dispatch(raw) {
     staleResult = null;
+    const ev = myLog === void 0 || raw.seq !== void 0 ? raw : { ...raw, origin: myLog, seq: ++mySeq };
     events.push(ev);
     const result2 = applyEvent(ev);
     maybeCheckpoint(events.length);
@@ -6107,12 +6177,28 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
       staleResult = null;
       events = log.map((ev) => ({ ...ev }));
       checkpoints = [];
+      if (!logNameSaid) {
+        let remembered;
+        for (const ev of events) if (!ev.by && ev.origin) remembered = ev.origin;
+        if (remembered !== void 0) myLog = remembered;
+      }
+      mySeq = 0;
+      if (myLog !== void 0) {
+        for (const ev of events) {
+          if (ev.origin === myLog && typeof ev.seq === "number" && ev.seq > mySeq) mySeq = ev.seq;
+        }
+      }
       replay();
       notify();
     },
     getState,
     subscribe,
-    getEvents: () => events
+    getEvents: () => events,
+    setLogName: (name) => {
+      myLog = name;
+      logNameSaid = true;
+    },
+    logName: () => myLog ?? null
   };
 }
 

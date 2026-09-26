@@ -52,6 +52,8 @@ export {
   resemblances,
   transcriptsOf,
   transcriptOf,
+  labelsOf,
+  labelOf,
   isWord,
   lettersOf,
   topInterpretation,
@@ -64,7 +66,7 @@ export {
   localityOf,
   authorOf,
 } from './session/nodes';
-export type { MMNode, Rep, Edge, Capability, ParticipantKind, ExplanationData, Transcript } from './session/nodes';
+export type { MMNode, Rep, Edge, Capability, ParticipantKind, ExplanationData, Transcript, Label } from './session/nodes';
 
 // Clean forms — a confident reading, redrawn. Held beside the ink as a
 // `'clean'` rep, like tidy's `'transform'`; never a replacement of the stroke.
@@ -279,6 +281,43 @@ export type { Transport, AgentOptions } from './participants/agent';
 // takes part through the same channel as one behind a URL.
 export { createBridgeParticipant } from './participants/bridge';
 export type { BridgeParticipant, BridgeRequest, BridgeOptions } from './participants/bridge';
+
+// The decision seat (tier 1.5) — typed questions in, a typed value out, behind
+// an injected transport. No vendor, no network: a seat, not a dependency.
+export {
+  createDecideParticipant,
+  createStubDecideTransport,
+  choice,
+  score,
+  noul,
+  isFlat,
+  reasonOf,
+  ranked,
+  leadOf,
+  levelOf,
+  NO_MATCH,
+  FLAT_MARGIN,
+} from './participants/decide';
+export type {
+  DecideSeat,
+  DecideOptions,
+  DecideTransport,
+  DecideResult,
+  DecideRun,
+  DecisionRow,
+  DecisionQuestion,
+  DecisionAnswer,
+  DecisionCandidate,
+  ChoiceQuestion,
+  ScoreQuestion,
+  NoulQuestion,
+  ChoiceAnswer,
+  ScoreAnswer,
+  NoulAnswer,
+  Probability,
+  StubAnswer,
+  StubOptions,
+} from './participants/decide';
 
 // Routing — the canvas (tiers 0 and 1) answers first, and a model is asked only for what it cannot.
 export { route, describeRoute, instantFor, SETTLED_CONFIDENCE } from './participants/router';

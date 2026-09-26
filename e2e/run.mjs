@@ -3,9 +3,10 @@
 // The release gate: the browser scenarios that already exist, run without a
 // human console (DIRECTOR-REVIEW-2026-09-15.md, QA-1).
 //
-//     node e2e/run.mjs                    # both surfaces
-//     node e2e/run.mjs canvas             # just the canvas scenario
-//     node e2e/run.mjs shard demo demo2   # just the shard's three
+//     node e2e/run.mjs                        # both surfaces
+//     node e2e/run.mjs canvas                 # just the canvas scenario
+//     node e2e/run.mjs shard demo demo2       # just the shard's three
+//     node e2e/run.mjs --browser webkit smoke # the WebKit smoke
 //
 // It starts its own servers on ports the OS hands out, opens a FRESH browser
 // context per scenario (no profile, no cache, no board carried over from the
@@ -17,7 +18,7 @@
 //
 // First time: `cd e2e && npm ci && npx playwright install chromium`.
 
-import { chromium } from 'playwright';
+import { chromium, webkit } from 'playwright';
 import { mkdirSync, rmSync, writeFileSync, existsSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -29,6 +30,8 @@ const root = resolve(here, '..');
 const RESULTS = process.env.E2E_RESULTS ? resolve(process.env.E2E_RESULTS) : join(here, 'results');
 
 const HEADLESS = process.env.E2E_HEADED !== '1';
+/** The engines this gate can drive. Chromium runs everything; WebKit runs the smoke. */
+const ENGINES = { chromium, webkit };
 const SCENARIO_TIMEOUT = Number(process.env.E2E_TIMEOUT_MS || 420000);
 
 // ---------------------------------------------------------------------------
@@ -207,6 +210,78 @@ async function runShard(browser, servers, which /* 'shard' | 'demo' | 'demo2' */
   return out;
 }
 
+/**
+ * The WebKit smoke (DIRECTOR-REVIEW-2026-09-15.md; the review's own words).
+ *
+ * This is a SMOKE, not an iPhone test: a desktop WebKit, headless, doing the
+ * shortest thing that is still the product — the board loads, a hand draws ink
+ * with real pointer input, the engine reads that ink back, and press-and-hold
+ * opens the field. It runs in seconds. Anything longer is a second gate, and a
+ * gate whoever waits on it will turn off.
+ *
+ * It deliberately does NOT load `session-engine.e2e.js`: that harness is 200
+ * records and its own stub model, and running it on a second engine would be a
+ * second full gate wearing the word "smoke".
+ */
+async function runSmoke(browser, servers) {
+  const guards = await freshContext(browser, { origins: [servers.staticOrigin], label: 'smoke' });
+  const page = await guards.context.newPage();
+  const out = { name: 'smoke', url: `${servers.staticOrigin}/Demos/session-engine.html?fresh=1&nosw=1` };
+  const steps = [];
+  const check = (name, ok, detail) => steps.push({ name, ok: !!ok, detail });
+  try {
+    await page.goto(out.url, { waitUntil: 'load', timeout: 60000 });
+    await page.waitForFunction(() => window.__mm && window.__mm.session, null, { timeout: 60000 });
+    check('the board loads', true);
+
+    // Ink, drawn the way a hand draws it: down, a path, up. Not `addStroke` —
+    // the point of a second engine is the input path, not the engine's maths.
+    const y = 520, x0 = 400, span = 300;
+    await page.mouse.move(x0, y);
+    await page.mouse.down();
+    for (let i = 1; i <= 20; i++) await page.mouse.move(x0 + (span * i) / 20, y);
+    await page.mouse.up();
+
+    const read = await page.evaluate(() => {
+      const MM = window.__mm.MM, s = window.__mm.session.getState();
+      const ids = s.contentIds.filter((id) => !s.artifacts.includes(id));
+      const n = ids.length ? s.nodes.get(ids[ids.length - 1]) : null;
+      const r = n && MM.interpretationsOf(n, s.nodes)[0];
+      return { marks: ids.length, label: r && r.label, weight: r && r.weight, tier: r && r.tier };
+    });
+    check(
+      `ink is drawn and read back — ${read.marks} mark, read as ${read.label} ${read.weight}`,
+      read.marks === 1 && read.label === 'line' && read.weight > 0,
+      read,
+    );
+
+    // Press and hold, the way in that needs no mark drawn (v10 D5).
+    await page.mouse.move(x0 + span / 2, y);
+    await page.mouse.down();
+    const opened = await page
+      .waitForFunction(() => !!window.__mm.session.getState().summon, null, { timeout: 5000 })
+      .then(() => true)
+      .catch(() => false);
+    await page.mouse.up();
+    check('press and hold opens the field', opened);
+  } catch (err) {
+    out.harnessError = String(err && err.message ? err.message : err);
+    await screenshot(page, 'smoke');
+  }
+  out.steps = steps;
+  out.reportedOk = steps.length > 0 && steps.every((s) => s.ok);
+  Object.assign(out, tally(steps));
+  const sorted = sortErrors(guards.pageErrors);
+  out.expectedErrors = sorted.expected;
+  out.unexpectedErrors = sorted.unexpected;
+  out.modelAttempts = guards.modelAttempts;
+  out.problems = verdict(out, guards);
+  out.ok = out.problems.length === 0;
+  if (!out.ok) await screenshot(page, 'smoke');
+  await guards.context.close();
+  return out;
+}
+
 async function screenshot(page, name) {
   try {
     mkdirSync(RESULTS, { recursive: true });
@@ -217,9 +292,27 @@ async function screenshot(page, name) {
 // ---------------------------------------------------------------------------
 
 async function main() {
-  const wanted = process.argv.slice(2).filter((a) => !a.startsWith('-'));
-  const all = ['canvas', 'shard', 'demo', 'demo2'];
-  const picked = wanted.length ? all.filter((n) => wanted.includes(n)) : all;
+  const argv = process.argv.slice(2);
+  // `--browser webkit` or `--browser=webkit`. Default chromium: the four large
+  // scenarios are Chromium's, and the default run must not need a second engine
+  // installed to say anything at all.
+  let engineName = 'chromium';
+  const flag = argv.findIndex((a) => a === '--browser' || a.startsWith('--browser='));
+  if (flag >= 0) {
+    engineName = argv[flag].includes('=') ? argv[flag].split('=')[1] : argv[flag + 1];
+    if (!ENGINES[engineName]) {
+      console.error(`unknown browser "${engineName}" — pick from: ${Object.keys(ENGINES).join(', ')}`);
+      process.exit(2);
+    }
+    argv.splice(flag, argv[flag].includes('=') ? 1 : 2);
+  }
+
+  const wanted = argv.filter((a) => !a.startsWith('-'));
+  // `smoke` is opt-in: it is the short WebKit interaction, not part of the gate's
+  // own four, and naming it in the default list would run it twice on Chromium.
+  const all = ['canvas', 'shard', 'demo', 'demo2', 'smoke'];
+  const byDefault = ['canvas', 'shard', 'demo', 'demo2'];
+  const picked = wanted.length ? all.filter((n) => wanted.includes(n)) : byDefault;
   if (!picked.length) {
     console.error(`nothing to run — pick from: ${all.join(', ')}`);
     process.exit(2);
@@ -228,14 +321,14 @@ async function main() {
   rmSync(RESULTS, { recursive: true, force: true });
   mkdirSync(RESULTS, { recursive: true });
 
-  const needCanvas = picked.includes('canvas');
+  const needCanvas = picked.includes('canvas') || picked.includes('smoke');
   const needShard = picked.includes('shard') || picked.includes('demo') || picked.includes('demo2');
 
   const started = Date.now();
   const servers = {};
   const stops = [];
   let browser;
-  let chromiumVersion = null;
+  let browserVersion = null;
   const scenarios = [];
 
   try {
@@ -256,15 +349,18 @@ async function main() {
       console.log(`· vite    ${v.origin}  (shard-3d, core from source)`);
     }
 
-    browser = await chromium.launch({ headless: HEADLESS });
-    chromiumVersion = browser.version();
-    console.log(`· chromium ${chromiumVersion}${HEADLESS ? '' : ' (headed)'}\n`);
+    browser = await ENGINES[engineName].launch({ headless: HEADLESS });
+    browserVersion = browser.version();
+    console.log(`· ${engineName} ${browserVersion}${HEADLESS ? '' : ' (headed)'}\n`);
 
     for (const name of picked) {
       const at = Date.now();
       const r = name === 'canvas'
         ? await runCanvas(browser, servers)
-        : await runShard(browser, servers, name);
+        : name === 'smoke'
+          ? await runSmoke(browser, servers)
+          : await runShard(browser, servers, name);
+      r.browser = engineName;
       r.durationMs = Date.now() - at;
       scenarios.push(r);
       console.log(
@@ -287,7 +383,10 @@ async function main() {
     ok,
     startedAt: new Date(started).toISOString(),
     durationMs: Date.now() - started,
-    chromium: chromiumVersion,
+    browser: engineName,
+    browserVersion: browserVersion,
+    // Kept under its old name so anything reading last week's report still reads.
+    chromium: engineName === 'chromium' ? browserVersion : null,
     node: process.version,
     totals,
     allowlist: ALLOWED_PAGE_ERRORS.map(({ name, where, reason }) => ({ name, where, reason })),

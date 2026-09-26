@@ -25,6 +25,10 @@
     me: (() => { try { return localStorage.getItem(PARTICIPANT_KEY) || 'local'; } catch (err) { return 'local'; } })(),
     myPrevious: [], loadedCount: 0, entries: [], truncated: false,
     urls: new Map(), saveTimer: 0, lastSave: '', saving: false, error: '',
+    // What the room itself said about this catch-up: a relay whose buffer has
+    // outlived the room cannot hand over a complete history, and says so
+    // rather than letting the tab believe it has everything.
+    roomNote: '',
   };
 
   function setParticipant(name) {
@@ -95,7 +99,24 @@
     const es = new EventSource(base);
     return {
       send: (line) => { fetch(base, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(line) }).catch(() => {}); },
-      onMessage: (cb) => { const h = (e) => { try { cb(JSON.parse(e.data)); } catch (err) { /* not a line */ } }; es.addEventListener('message', h); return () => es.removeEventListener('message', h); },
+      onMessage: (cb) => {
+        const h = (e) => {
+          let line;
+          try { line = JSON.parse(e.data); } catch (err) { return; /* not a line */ }
+          // The relay's one word of its own: this room has outlived its
+          // buffer, so what follows is not the whole of it. Said, never
+          // swallowed — a partial history nobody mentions is how a tab comes
+          // up holding part of the room and never finds out.
+          if (line && line.relay === 'truncated') {
+            folder.roomNote = 'the room is older than the relay remembers — ' + line.dropped + ' earlier line' + (line.dropped === 1 ? '' : 's') + ' are gone';
+            flash(folder.roomNote);
+            return;
+          }
+          cb(line);
+        };
+        es.addEventListener('message', h);
+        return () => es.removeEventListener('message', h);
+      },
       close: () => es.close(),
     };
   }
@@ -106,11 +127,21 @@
   async function openLive(room, opts) {
     opts = opts || {};
     if (folder.store && folder.store.close) folder.store.close();
+    folder.roomNote = '';
     // A hand in a room is one TAB: a second tab of the same person is a
     // second log, or their lines would be taken for its own and dropped.
     // The name is the person's; the suffix is the tab's.
     const me = handName();
     setParticipant(me);
+    // Say what this tab's log is called, so every id it mints from here is
+    // derived from the event that made it and is the same mark in every hand
+    // in the room (ids per hand, SURFACE-v10-PLAN D8). Unsaid, ids come off a
+    // counter over the MERGED replay, and no two hands in a room merge the
+    // same set of logs — so a sentence, a reading or a version about a mark
+    // would land on whatever mark held that number in the reader's board.
+    // What is already drawn keeps the ids it was drawn with: the name applies
+    // to what is written next, and the two forms cannot collide.
+    session.setLogName(me);
     const transport = opts.transport || (opts.relay ? relayTransport(opts.relay, room) : broadcastTransport(room));
     const store = new MM.LiveStore(transport, me, room);
     // What this hand already drew is its opening log in the room.
@@ -160,6 +191,13 @@
     const merged = MM.mergeLogs(logs, folder.how === 'live' ? { me: folder.me } : {});
     const meKey = folder.how === 'live' ? folder.me : MM.participantOfLog(MM.logPathFor(folder.me));
     folder.myPrevious = (logs[meKey] || []).slice();
+    // A folder is a room too: one log per participant, merged, and the next
+    // machine to pull merges a different set. So the writing session says
+    // what its log is called here as well, under the same name its file is
+    // written and read back under — `meKey`, never a name of the reader's
+    // own devising. Said BEFORE the load, so the load resumes the numbering
+    // past whatever this name already wrote rather than starting it again.
+    session.setLogName(meKey);
     session.load(merged);
     // What was loaded is everyone's; from here on, every event is this
     // participant's — including the mark this device re-teaches at open.
@@ -276,7 +314,12 @@
     if (folder.how === 'live') {
       const now = Date.now();
       const here = folder.store.presence().filter((p) => now - p.at < 60000).map((p) => handLabel(p.participant));
-      return 'live ' + folder.name + ' · you are ' + handLabel(folder.me) + (here.length ? ' · with ' + here.join(', ') : ' · alone so far') + (folder.error ? ' · ' + folder.error : '');
+      // Two hands under one name lose each other's work quietly, which is
+      // exactly what this line is for: the store refuses the divergent log,
+      // and the room is told which name is doubled.
+      const clash = folder.store.collisions ? folder.store.collisions() : [];
+      return 'live ' + folder.name + ' · you are ' + handLabel(folder.me) + (here.length ? ' · with ' + here.join(', ') : ' · alone so far') +
+        (clash.length ? ' · ' + clash.join(' · ') : '') + (folder.roomNote ? ' · ' + folder.roomNote : '') + (folder.error ? ' · ' + folder.error : '');
     }
     const n = folder.entries.length;
     return (folder.how === 'static' ? 'site' : folder.how === 'git' ? 'repo' : 'folder') + (folder.name ? ' ' + folder.name : '') + ' · ' + n + ' file' + (n === 1 ? '' : 's') +
