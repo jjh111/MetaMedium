@@ -24,6 +24,11 @@ automatically → ask "why?" and get grounded reasoning.
 `ARCHITECTURE-v7-PARTICIPANTS-AND-TIERS.md` is the active engine plan; MVP.md
 absorbs and raises its Stage D.
 
+**26 Sep 2026: week 1's automated run is on `auto/w1`, not on `master`.**
+`DIRECTOR-PLAN-W2.md` §0 says what that branch holds and lacks and how it
+lands; then the push builds maths (`MATHS-PLAN.md`) and the middle layer.
+Until it lands, the headline below describes `master`.
+
 Headline (17 Sep 2026, everything on `master`; `DIRECTOR-VIEW-2026-09-17.md`
 is the director's view of where it all stands, the 15 Sep review reviewed,
 where a decision-only model such as Jev would fit, and the next steps in
@@ -116,6 +121,21 @@ Architecture documents (chronological; **read MVP.md, then v7, then v6**):
   a dependency, with five places it would fit in order of value; next steps
   — ids per hand (T8) first, then a review of use, a label primitive, the
   shard asking, the seat experiment, the paper's next figures
+- `DIRECTOR-PLAN-W2.md` — **week 2, 26 Sep 2026**: what week 1's automated
+  run left on `auto/w1` (not on `master`: U1a–U1c, U4 and half of U2 and U5
+  integrated, the rest on attempt branches, the bundles drifted, two id
+  defects reproduced), then the ladder — make week 1 whole (L1–L4), maths
+  (M1–M5), the middle layer (J1–J3), the hand in the gate, a review of use —
+  each unit with what it owns, its red-first test, its checks, invariant and
+  trap, and the protocol and brief the Opus subagents run under
+- `MATHS-PLAN.md` — **the canvas does maths, 26 Sep 2026**: what two pages
+  of garment drafting and a right-triangle question ask of the medium;
+  six rules (a number is a reading, labels rule the thing and the ink the
+  topology, plural with the disagreement said, tier 1 does the arithmetic,
+  units are the hand's, change flows and the ink stays); `src/maths/`
+  (quantities, expressions, the sheet, figures, dimensions, solving); the
+  middle layer as seats that judge — `decide` (Jev), `extract` (GLiNER2),
+  `read` (numerals) — and the demo, *change the bust*
 - `SHARD-3D-PUSH-2.md` — **geometry from the drawing, G0–G5 all landed
   16 Sep 2026**: what John's first real use showed (a footprint and elevations
   from free views stood nothing, and a brief with nothing to fill was refused
@@ -152,7 +172,7 @@ any structural change.
 | `metadoodle1.html` | Fork of flagship + tiered LLM recognition (WebLLM in-browser, LM Studio local API) + voice. Single-file (~600KB) |
 | `Web App Skeleton/` | React + Vite + TypeScript + Zustand rebuild; Claude API interpreter skeleton in `src/llm/`; recognition/spatial/matching in `src/core/` |
 | `Demos/surface/` | **The reference surface's source**: `surface.css` and twenty-four script fragments (`00-core`, `00-ui` … `20-controls`, `21-minimap`, then `90-boot`, which must stay last), one concern each, concatenated in name order into one closure by `Demos/build-surface.mjs` → the committed `Demos/session-engine.js` (CI checks it has not drifted). Fragments share the closure's variables — no imports; each fragment's header says what it provides and uses. Edit a fragment, run the build, commit both. **`09-field.js` is the exception that proves the rule** (SEAM-1): it names nothing outside itself, so the field's query is a pure function of a record and is unit-tested in Node with no browser — `node --test Demos/surface/09-field.test.mjs`, in CI's `core` job. A fragment's `.test.mjs` is not concatenated into the build |
-| `Demos/` | **`session-engine.html` is the MVP surface** (it links `surface/surface.css` and loads `session-engine.js`) — infinite canvas, the taught command mark, living artifacts in a DOM overlay, ink-over-artifact addressing, "why" inspector, model participants, canvas answers. Uses the committed `metamedium-core.browser.js` bundle. **`session-engine.e2e.js`** drives the whole loop through the real UI with a stubbed model (browser console; not part of `npm test`). `build-standalone.mjs` inlines the bundle into a single shareable file. **`mcp.mjs`** is the MCP hand (Claude Code's way onto the board; `.mcp.json` at the root registers it), over `relay.mjs` and `live-node.mjs`, with `ink-png.mjs` for the ink as a picture and `mcp-smoke.mjs` as its stdio test; `metamedium-core.node.mjs` is the committed Node bundle it runs (`npm run build:node`, drift-checked in CI like the browser bundle). Plus fish, composition diagrams, no-modes graph, etc. |
+| `Demos/` | **`session-engine.html` is the MVP surface** (it links `surface/surface.css` and loads `session-engine.js`) — infinite canvas, the taught command mark, living artifacts in a DOM overlay, ink-over-artifact addressing, "why" inspector, model participants, canvas answers. Uses the committed `metamedium-core.browser.js` bundle. **`session-engine.e2e.js`** drives the whole loop through the real UI with a stubbed model (browser console; not part of `npm test`). `build-standalone.mjs` inlines the bundle into a single shareable file. **`mcp.mjs`** is the MCP hand (Claude Code's way onto the board; `.mcp.json` at the root registers it), over `relay.mjs` and `live-node.mjs`, with `ink-png.mjs` for the ink as a picture and `mcp-smoke.mjs` as its stdio test; `metamedium-core.node.mjs` is the committed Node bundle it runs (`npm run build:node`, drift-checked in CI like the browser bundle). `programs/` holds `run` programs written for the canvas (`metamedium-explained.run.js`: the loop told as a program, ending on a real measurement of the viewer's own stroke). Plus fish, composition diagrams, no-modes graph, etc. |
 | `skills/` | Claude Code skills: `metamedium-code` (code patterns), `metamedium-design` (design principles) |
 | `Assets/` | Figures and design rationale (recognition strategy, point-primitive proposal), and the social card. `make-card.mjs` regenerates that card from index.html's own hero — synthetic pointer input, so the picture shows the engine really reading a mark; `node Assets/make-card.mjs`. Change the picture and you must change the FILENAME and the four og:/twitter: tags in `index.html` and `404.html`, because scrapers cache by URL |
 | `archive/` | Retired versions and superseded plans, incl. whitepaper v4 (root `MetaMedium_Whitepaper_v4.html` is a redirect stub — keep it) and PRDs v3.2/v4 |
