@@ -23,8 +23,8 @@ function getBoundsFromStroke(stroke) {
   }
   return getBounds(stroke);
 }
-function calculateDistance(p1, p2) {
-  return Math.sqrt(Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2));
+function calculateDistance(p1, p22) {
+  return Math.sqrt(Math.pow(p22.x - p1.x, 2) + Math.pow(p22.y - p1.y, 2));
 }
 function meanFilter(points, halfWindow) {
   if (halfWindow < 1 || points.length < 3) return points;
@@ -83,8 +83,8 @@ function isStrokeClosed(points, threshold = 50) {
   if (distance < threshold && distance < size * 0.5) return true;
   return relativeGap < 0.2;
 }
-function ccw(p1, p2, p3) {
-  return (p2.x - p1.x) * (p3.y - p1.y) - (p2.y - p1.y) * (p3.x - p1.x);
+function ccw(p1, p22, p3) {
+  return (p22.x - p1.x) * (p3.y - p1.y) - (p22.y - p1.y) * (p3.x - p1.x);
 }
 function convexHull(points) {
   if (!points || points.length < 3) return points;
@@ -428,14 +428,14 @@ function smoothStroke(points, iterations = 2) {
     newPoints.push({ ...smoothed[0] });
     for (let i = 0; i < smoothed.length - 1; i++) {
       const p1 = smoothed[i];
-      const p2 = smoothed[i + 1];
+      const p22 = smoothed[i + 1];
       const q = {
-        x: 0.75 * p1.x + 0.25 * p2.x,
-        y: 0.75 * p1.y + 0.25 * p2.y
+        x: 0.75 * p1.x + 0.25 * p22.x,
+        y: 0.75 * p1.y + 0.25 * p22.y
       };
       const r = {
-        x: 0.25 * p1.x + 0.75 * p2.x,
-        y: 0.25 * p1.y + 0.75 * p2.y
+        x: 0.25 * p1.x + 0.75 * p22.x,
+        y: 0.25 * p1.y + 0.75 * p22.y
       };
       newPoints.push(q);
       newPoints.push(r);
@@ -846,6 +846,21 @@ function transcriptsOf(node) {
 function transcriptOf(node) {
   return transcriptsOf(node)[0]?.text;
 }
+function labelsOf(node) {
+  return node.reps.filter((r) => r.modality === "label").map((r) => {
+    const d = r.data;
+    return {
+      text: typeof d?.text === "string" ? d.text : "",
+      source: r.source,
+      at: typeof d?.at === "number" ? d.at : node.createdAt
+    };
+  });
+}
+function labelOf(node) {
+  const all = labelsOf(node);
+  const last = all[all.length - 1];
+  return last && last.text.length > 0 ? last : void 0;
+}
 function isWord(node) {
   return getRep(node, "word-run") !== void 0;
 }
@@ -913,6 +928,20 @@ function interpretationsOf(node, nodes) {
       weight: 1,
       reasoning: "blessed by a participant",
       blessed: true
+    });
+  }
+  const label = labelOf(node);
+  if (label) {
+    const source = label.source ?? LOCAL_PARTICIPANT;
+    out.push({
+      label: label.text,
+      to: node.id,
+      source,
+      sourceName: participantName(source, nodes),
+      tier: participantTier(source, nodes),
+      weight: 1,
+      reasoning: "labelled by the hand that made this mark",
+      blessed: false
     });
   }
   for (const e of resemblances(node)) {
@@ -2206,12 +2235,12 @@ function compareSignatures(a, b) {
   const l = bagDistance(a.links, b.links);
   const shapeScore = s.total === 0 ? 1 : s.shared / s.total;
   const linkScore = l.total === 0 ? 1 : l.shared / l.total;
-  const score = SHAPE_WEIGHT * shapeScore + LINK_WEIGHT * linkScore;
+  const score2 = SHAPE_WEIGHT * shapeScore + LINK_WEIGHT * linkScore;
   const parts = [];
   parts.push(shapeScore >= SAME ? `same shapes (${printBag(a.shapes)})` : `shapes ${s.shared}/${s.total} in common`);
   if (l.total === 0) parts.push("no links either side");
   else parts.push(linkScore >= SAME ? `same links (${Object.keys(a.links).length} kind${Object.keys(a.links).length === 1 ? "" : "s"})` : `links ${l.shared}/${l.total} in common`);
-  return { score, reasoning: parts.join("; ") };
+  return { score: score2, reasoning: parts.join("; ") };
 }
 function matchDefinition(group2, definition, examples) {
   for (const r of examples?.rejected ?? []) {
@@ -2653,9 +2682,9 @@ function connectionsFor(ids, nodes) {
         for (const a of dst.iface.accepts) {
           if (a.type !== o.type) continue;
           const named2 = similarity(o.label, a.label);
-          const score = 0.5 + 0.5 * named2;
+          const score2 = 0.5 + 0.5 * named2;
           const why = named2 > 0 ? `${o.label} \u2192 ${a.label}: the names match` : `${o.label} \u2192 ${a.label}: a ${o.type} for a ${o.type}`;
-          out.push({ from: { id: src.id, port: o.id }, to: { id: dst.id, port: a.id }, reasoning: why, score });
+          out.push({ from: { id: src.id, port: o.id }, to: { id: dst.id, port: a.id }, reasoning: why, score: score2 });
         }
       }
     }
@@ -3307,16 +3336,16 @@ function thin(mask, width, height) {
       for (let y = 0; y < height; y++) {
         for (let x = 0; x < width; x++) {
           if (!img[y * width + x]) continue;
-          const p2 = at(x, y - 1), p3 = at(x + 1, y - 1), p4 = at(x + 1, y), p5 = at(x + 1, y + 1);
+          const p22 = at(x, y - 1), p3 = at(x + 1, y - 1), p4 = at(x + 1, y), p5 = at(x + 1, y + 1);
           const p6 = at(x, y + 1), p7 = at(x - 1, y + 1), p8 = at(x - 1, y), p9 = at(x - 1, y - 1);
-          const b = p2 + p3 + p4 + p5 + p6 + p7 + p8 + p9;
+          const b = p22 + p3 + p4 + p5 + p6 + p7 + p8 + p9;
           if (b < 2 || b > 6) continue;
-          const seq = [p2, p3, p4, p5, p6, p7, p8, p9, p2];
+          const seq = [p22, p3, p4, p5, p6, p7, p8, p9, p22];
           let a = 0;
           for (let i = 0; i < 8; i++) if (seq[i] === 0 && seq[i + 1] === 1) a++;
           if (a !== 1) continue;
-          const c1 = pass === 0 ? p2 * p4 * p6 : p2 * p4 * p8;
-          const c2 = pass === 0 ? p4 * p6 * p8 : p2 * p6 * p8;
+          const c1 = pass === 0 ? p22 * p4 * p6 : p22 * p4 * p8;
+          const c2 = pass === 0 ? p4 * p6 * p8 : p22 * p6 * p8;
           if (c1 === 0 && c2 === 0) toDelete.push(y * width + x);
         }
       }
@@ -3441,11 +3470,11 @@ function trace(bitmap, opts = {}) {
 
 // src/session/erase.ts
 var DEFAULT_ERASE_CROSSINGS = 3;
-function segmentsIntersect(p1, p2, p3, p4) {
-  const d = (p2.x - p1.x) * (p4.y - p3.y) - (p2.y - p1.y) * (p4.x - p3.x);
+function segmentsIntersect(p1, p22, p3, p4) {
+  const d = (p22.x - p1.x) * (p4.y - p3.y) - (p22.y - p1.y) * (p4.x - p3.x);
   if (Math.abs(d) < 1e-10) return false;
   const t = ((p3.x - p1.x) * (p4.y - p3.y) - (p3.y - p1.y) * (p4.x - p3.x)) / d;
-  const u = ((p3.x - p1.x) * (p2.y - p1.y) - (p3.y - p1.y) * (p2.x - p1.x)) / d;
+  const u = ((p3.x - p1.x) * (p22.y - p1.y) - (p3.y - p1.y) * (p22.x - p1.x)) / d;
   return t >= 0 && t <= 1 && u >= 0 && u <= 1;
 }
 function outlineOf(target) {
@@ -3718,10 +3747,12 @@ function readable(feature) {
 }
 
 // src/session/stale.ts
-function describeStale(reason, what, name) {
+function describeStale(reason, what, name, maker) {
   const who = name ? `${name}'s ` : "";
-  const answer = what === "code" ? "code" : what === "answer" ? "answer" : "reading";
+  const answer = what === "code" ? "code" : what === "answer" ? "answer" : what === "label" ? "label" : "reading";
   switch (reason) {
+    case "not-your-ink":
+      return `that mark was made by ${maker ?? "another hand"} \u2014 a label is a word on your own ink, and naming somebody else's mark is theirs to do`;
     case "erased":
       return `the target was erased before ${who}${answer} arrived`;
     case "missing":
@@ -5383,6 +5414,14 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
     }
     recomputeClusterCandidates();
   }
+  function applyLabel(ev) {
+    const node = nodes.get(ev.nodeId);
+    if (!node || getRep(node, "erased")) return null;
+    const pid = ev.participantId ?? LOCAL_PARTICIPANT;
+    if (authorOf(node) !== pid) return null;
+    node.reps.push({ modality: "label", data: { text: ev.text, at: ev.at }, source: pid });
+    return node.id;
+  }
   function applyAnswer(ev) {
     if (!participants.includes(ev.participantId)) return null;
     const about = ev.aboutIds.filter((id) => {
@@ -5891,6 +5930,10 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
         what = "answer";
         targets = ev.aboutIds;
         break;
+      case "label":
+        what = "label";
+        targets = [ev.nodeId];
+        break;
       default:
         return null;
     }
@@ -5898,12 +5941,12 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
     const at = "at" in ev && typeof ev.at === "number" ? ev.at : lastAt;
     const pNode = participantId ? nodes.get(participantId) : void 0;
     const name = pNode ? getRep(pNode, "word")?.data : void 0;
-    const refuse = (reason, nodeId) => ({
+    const refuse = (reason, nodeId, maker) => ({
       what,
       reason,
       nodeId,
       participantId,
-      detail: describeStale(reason, what, typeof name === "string" ? name : void 0),
+      detail: describeStale(reason, what, typeof name === "string" ? name : void 0, maker),
       at
     });
     if (expect?.generation !== void 0 && expect.generation !== generation) {
@@ -5920,6 +5963,16 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
       const id = targets[0] ?? "";
       const n2 = nodes.get(id);
       return refuse(!n2 ? "missing" : "erased", id);
+    }
+    if (ev.type === "label") {
+      const node = nodes.get(targets[0]);
+      const maker = node ? authorOf(node) : LOCAL_PARTICIPANT;
+      const mine = ev.participantId ?? LOCAL_PARTICIPANT;
+      if (node && maker !== mine) {
+        const makerNode = nodes.get(maker);
+        const makerName = makerNode ? getRep(makerNode, "word")?.data : void 0;
+        return refuse("not-your-ink", targets[0], typeof makerName === "string" ? makerName : maker);
+      }
     }
     if (expect?.version !== void 0 && what === "code" && codeVersion(targets[0]) !== expect.version) {
       return refuse("superseded", targets[0]);
@@ -5981,6 +6034,8 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
         return null;
       case "answer":
         return applyAnswer(ev);
+      case "label":
+        return applyLabel(ev);
       case "teach":
         applyTeach(ev);
         return null;
@@ -6110,6 +6165,7 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
     join: (kind, name, at, capability, locality) => dispatch({ type: "join", kind, name, at, capability, ...locality ? { locality } : {} }),
     propose: ({ expect, ...args }) => void guarded({ type: "propose", ...args }, expect),
     answer: ({ expect, ...args }) => guarded({ type: "answer", ...args }, expect),
+    label: (args) => guarded({ type: "label", ...args }),
     teachCommandMark: (mark, at) => void dispatch({ type: "teach", mark, at }),
     correct: (args) => void dispatch({ type: "correct", ...args }),
     clock: (args) => void dispatch({ type: "clock", ...args }),
@@ -6561,6 +6617,8 @@ function describeNode(node, state, opts) {
       }
     }
   }
+  const label = labelOf(node);
+  if (label) lines.push(`  labelled "${label.text}" by the hand that made it`);
   const said = transcriptsOf(node);
   if (said.length > 0) {
     lines.push("  writing reads:");
@@ -7514,6 +7572,207 @@ function createBridgeParticipant(session, at = 0, options = {}) {
   };
 }
 
+// src/participants/decide.ts
+var NO_MATCH = "no-match";
+var FLAT_MARGIN = 0.05;
+function choice(id, ask, candidates, about) {
+  const has2 = candidates.some((c) => c.id === NO_MATCH);
+  return {
+    kind: "choice",
+    id,
+    ask,
+    about,
+    candidates: has2 ? candidates : [...candidates, { id: NO_MATCH, text: "none of these" }]
+  };
+}
+function score(id, ask, levels, about) {
+  return { kind: "score", id, ask, levels, about };
+}
+function noul(id, statement, about) {
+  return { kind: "noul", id, ask: statement, statement, about };
+}
+var p2 = (p) => p.toFixed(2);
+function ranked(answer) {
+  if (answer.kind === "noul") {
+    return [
+      { of: "yes", p: answer.yes },
+      { of: "no", p: 1 - answer.yes }
+    ];
+  }
+  return [...answer.distribution].sort((a, b) => b.p - a.p);
+}
+function isFlat(answer, margin = FLAT_MARGIN) {
+  if (answer.kind === "noul") {
+    const d = Math.abs(answer.yes - 0.5);
+    return {
+      flat: d < margin,
+      why: `yes ${p2(answer.yes)} \u2014 ${p2(d)} from an even chance`
+    };
+  }
+  const order = ranked(answer);
+  if (order.length === 0) return { flat: true, why: "no distribution came back" };
+  if (order.length === 1) return { flat: false, why: `only one outcome: ${order[0].of} ${p2(order[0].p)}` };
+  const lead = order[0].p - order[1].p;
+  return {
+    flat: lead < margin,
+    why: `${order[0].of} ${p2(order[0].p)} leads ${order[1].of} ${p2(order[1].p)} by ${p2(lead)}`
+  };
+}
+function reasonOf(question, answer) {
+  const dist2 = ranked(answer).map((d) => `${d.of} ${p2(d.p)}`).join(" \xB7 ");
+  if (answer.kind === "noul") return `asked \u201C${question.ask}\u201D \u2014 ${dist2}`;
+  if (answer.kind === "score") {
+    const levels = answer.levels.join(" < ");
+    return `asked \u201C${question.ask}\u201D (score over ${levels}) \u2014 ${dist2}; expectation ${answer.expectation.toFixed(2)}, confidence ${p2(answer.confidence)}`;
+  }
+  const offered = question.candidates.map((c) => c.id).join(", ");
+  return `asked \u201C${question.ask}\u201D (choice among ${offered}) \u2014 ${dist2}; confidence ${p2(answer.confidence)}`;
+}
+function levelOf(answer) {
+  const i = Math.max(0, Math.min(answer.levels.length - 1, Math.round(answer.expectation)));
+  return answer.levels[i] ?? "";
+}
+function leadOf(answer) {
+  return ranked(answer)[0]?.p ?? 0;
+}
+function createDecideParticipant(session, transport, at = 0, options = {}) {
+  const name = options.name ?? "decide";
+  const tier = options.tier ?? 1.5;
+  const margin = options.flatMargin ?? FLAT_MARGIN;
+  const id = session.join("agent", name, at, tier, options.locality ?? "local");
+  async function ask(questions, now, signal) {
+    const snapshot = session.getState().generation;
+    const started = Date.now();
+    let result2;
+    try {
+      result2 = await transport(questions, { signal });
+    } catch (e) {
+      return {
+        ok: false,
+        error: e instanceof Error ? e.message : String(e),
+        rows: [],
+        unanswered: questions.map((q) => q.id),
+        snapshot,
+        ms: Date.now() - started
+      };
+    }
+    const ms = Date.now() - started;
+    if (!result2.ok) {
+      return { ok: false, error: result2.error, rows: [], unanswered: questions.map((q) => q.id), snapshot, ms };
+    }
+    const byId = new Map(result2.answers.map((a) => [a.questionId, a]));
+    const rows = [];
+    const unanswered = [];
+    for (const q of questions) {
+      const answer = byId.get(q.id);
+      if (!answer) {
+        unanswered.push(q.id);
+        continue;
+      }
+      if (answer.kind !== q.kind) {
+        unanswered.push(q.id);
+        continue;
+      }
+      const { flat, why } = isFlat(answer, margin);
+      rows.push({ question: q, answer, flat, flatWhy: why, reason: reasonOf(q, answer), held: false });
+    }
+    const state = session.getState();
+    if (state.generation !== snapshot) {
+      return {
+        ok: true,
+        rows,
+        unanswered,
+        snapshot,
+        ms,
+        via: result2.via,
+        refused: `the board was replaced while the seat was answering (generation ${snapshot} \u2192 ${state.generation})`
+      };
+    }
+    for (const row of rows) {
+      if (row.flat) continue;
+      const targets = (row.question.about ?? []).filter((n2) => state.nodes.has(n2));
+      if (!targets.length) continue;
+      const edges = [];
+      if (row.answer.kind === "choice" && row.answer.pick && row.answer.pick !== NO_MATCH) {
+        edges.push({
+          to: `type:${row.answer.pick.toLowerCase().replace(/\s+/g, "-")}`,
+          rel: "resembles",
+          weight: leadOf(row.answer),
+          reasoning: row.reason
+        });
+      }
+      const rep = {
+        modality: "decision",
+        data: { question: row.question, answer: row.answer, snapshot },
+        confidence: leadOf(row.answer),
+        reasoning: row.reason
+      };
+      session.propose({
+        participantId: id,
+        nodeId: targets[0],
+        edges,
+        reps: [rep],
+        at: now,
+        expect: { generation: snapshot }
+      });
+      const stale = session.getState().staleResult;
+      row.held = !stale;
+      if (stale) {
+        return { ok: true, rows, unanswered, snapshot, ms, via: result2.via, refused: stale.detail };
+      }
+    }
+    return { ok: true, rows, unanswered, snapshot, ms, via: result2.via };
+  }
+  return { id, name, tier, ask };
+}
+var even = (outcomes) => outcomes.map((of) => ({ of, p: outcomes.length ? 1 / outcomes.length : 0 }));
+function spread(outcomes, lead, p) {
+  const rest = outcomes.filter((o) => o !== lead);
+  const each = rest.length ? Math.max(0, 1 - p) / rest.length : 0;
+  return outcomes.map((of) => ({ of, p: of === lead ? p : each }));
+}
+var expectationOf = (levels, dist2) => dist2.reduce((n2, d) => n2 + levels.indexOf(d.of) * d.p, 0);
+function createStubDecideTransport(book, options = {}) {
+  const unscripted = options.unscripted ?? "flat";
+  return async (questions) => {
+    const answers = [];
+    for (const q of questions) {
+      const told = book[q.id];
+      if (!told && unscripted === "unanswered") continue;
+      const entry = told ?? { flat: true };
+      if (q.kind === "noul") {
+        const yes = "yes" in entry ? entry.yes : 0.5;
+        answers.push({ kind: "noul", questionId: q.id, yes });
+        continue;
+      }
+      if (q.kind === "score") {
+        const dist3 = "level" in entry ? spread(q.levels, entry.level, entry.p) : even(q.levels);
+        answers.push({
+          kind: "score",
+          questionId: q.id,
+          levels: q.levels,
+          distribution: dist3,
+          expectation: expectationOf(q.levels, dist3),
+          confidence: "confidence" in entry && entry.confidence !== void 0 ? entry.confidence : "level" in entry ? entry.p : 0
+        });
+        continue;
+      }
+      const ids = q.candidates.map((c) => c.id);
+      const dist2 = "pick" in entry && ids.includes(entry.pick) ? spread(ids, entry.pick, entry.p) : even(ids);
+      const order = [...dist2].sort((a, b) => b.p - a.p);
+      const lead = order.length > 1 && order[0].p - order[1].p < FLAT_MARGIN ? null : order[0]?.of ?? null;
+      answers.push({
+        kind: "choice",
+        questionId: q.id,
+        pick: lead,
+        distribution: dist2,
+        confidence: "confidence" in entry && entry.confidence !== void 0 ? entry.confidence : "pick" in entry ? entry.p : 0
+      });
+    }
+    return { ok: true, answers, via: options.via ?? "stub" };
+  };
+}
+
 // src/participants/router.ts
 var SETTLED_BY_TIER1 = {
   read: true,
@@ -7586,6 +7845,7 @@ export {
   DIRECTED_LINKS,
   ENGINE_NAME,
   ENGINE_PARTICIPANT,
+  FLAT_MARGIN,
   FolderStore,
   GITHUB_API,
   GRAPH3D_MARK,
@@ -7610,6 +7870,7 @@ export {
   META_DIR,
   MIN_CONFIDENCE,
   MemoryStore,
+  NO_MATCH,
   PHRASES,
   PRESETS,
   ROLES,
@@ -7659,6 +7920,7 @@ export {
   calculateStraightness,
   canonicalCheckSamples,
   checkOvershoot,
+  choice,
   clausesOf,
   cleanOf,
   cleanPointsOf,
@@ -7676,9 +7938,11 @@ export {
   createAgentParticipant,
   createBootstrapNodes,
   createBridgeParticipant,
+  createDecideParticipant,
   createExplanationNode,
   createParticipantNode,
   createSession,
+  createStubDecideTransport,
   decodeLog,
   denoise,
   describeAddressed,
@@ -7730,6 +7994,7 @@ export {
   isCanvasFile,
   isCheckLike,
   isExplanation,
+  isFlat,
   isFrame,
   isGesture,
   isLassoLike,
@@ -7740,8 +8005,12 @@ export {
   joinsRun,
   keysOf,
   kindOf,
+  labelOf,
+  labelsOf,
+  leadOf,
   learnCommandMark,
   lettersOf,
+  levelOf,
   listModels,
   localityOf,
   logPathFor,
@@ -7759,6 +8028,7 @@ export {
   nearestMagnet,
   nodeIdsIn,
   normalizeStroke,
+  noul,
   otsu,
   outlineOf,
   paramsOf,
@@ -7781,7 +8051,9 @@ export {
   providerLabel,
   providerLocality,
   providerTier,
+  ranked,
   readingsToEdges,
+  reasonOf,
   regionAt,
   regionIdsIn,
   regionsOf,
@@ -7795,6 +8067,7 @@ export {
   route,
   rowOf,
   runsOf,
+  score,
   scratchedOut,
   seeded,
   segmentsIntersect,
