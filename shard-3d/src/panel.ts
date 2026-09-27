@@ -708,6 +708,23 @@ function renderSummary(log: Log, sel: Sel | null, hovered: Mark | null, o: Panel
       ) + `<div class="fieldPills partsRow" data-solid="${esc(solid!.id)}"></div>`;
   }
 
+  // ---- how deep, when the board is asking (L2c) ----------------------------
+  // The question is on the explanation plane; this is where the hand reads it,
+  // with the depth it took and the other candidate — and, once a word has
+  // answered it, what was said.
+  const depth = solid && !heldOn ? log.depthQuestion(solid.id) : null;
+  if (depth?.open && depth.reading.lack) {
+    const lack = depth.reading.lack;
+    html += row(
+      'asks',
+      `how deep, seen from ${lack.view} only? ${lack.candidates.map((c) => `${num(c.u)} u ${c.took ? 'taken' : c.words}`).join(' · ')}`,
+      lack.question
+    );
+  } else if (depth?.reading.state === 'said' && depth.reading.said) {
+    const said = depth.reading.said;
+    html += row('depth', `${num(said.u)} u — ${said.by ?? 'someone'} said “${said.words}”`, depth.reading.reasoning);
+  }
+
   return html + '</div>' + sep;
 }
 

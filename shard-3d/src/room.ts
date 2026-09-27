@@ -63,6 +63,7 @@
 import {
   createSession,
   DEFAULT_SESSION_CONFIG,
+  ENGINE_PARTICIPANT,
   handLabel as labelOf,
   LiveStore,
   LOCAL_PARTICIPANT,
@@ -255,9 +256,11 @@ function handName(name: string): string {
 }
 
 /** The explanation reps on the board, newest last, with who said each one. */
-function explanationsOf(session: Session): { id: string; question: string; text: string; by: string; at: number }[] {
+function explanationsOf(
+  session: Session
+): { id: string; question: string; text: string; by: string; engine: boolean; at: number }[] {
   const s = session.getState();
-  const out: { id: string; question: string; text: string; by: string; at: number }[] = [];
+  const out: { id: string; question: string; text: string; by: string; engine: boolean; at: number }[] = [];
   for (const id of s.explanations) {
     const node = s.nodes.get(id);
     if (!node || node.reps.some((r) => r.modality === 'erased')) continue;
@@ -270,7 +273,14 @@ function explanationsOf(session: Session): { id: string; question: string; text:
       made && made.to !== LOCAL_PARTICIPANT
         ? wordOf(participant!) || handLabel(made.to.replace(/^participant:hand:/, ''))
         : 'me';
-    out.push({ id, question: String(data.question ?? ''), text: String(data.text ?? ''), by, at: node.createdAt });
+    out.push({
+      id,
+      question: String(data.question ?? ''),
+      text: String(data.text ?? ''),
+      by,
+      engine: made?.to === ENGINE_PARTICIPANT,
+      at: node.createdAt,
+    });
   }
   return out;
 }
@@ -320,8 +330,15 @@ export function saidInRoom(session: Session): { text: string; by: string; at: nu
   // question IS its brief's id, so this is the whole test — no prefix, no
   // guess about what a question string means — plus the old spelling, read.
   const briefs = new Set(said.filter((x) => x.question === BRIEF_QUESTION).map((x) => x.id));
+  // And never the engine's own asking — *how deep?* (L2c) is the board's
+  // question, said where it stood, not a sentence another hand placed.
   return said.filter(
-    (x) => x.by !== 'me' && x.question !== BRIEF_QUESTION && !briefs.has(x.question) && !legacySeatTraffic(x.question)
+    (x) =>
+      x.by !== 'me' &&
+      !x.engine &&
+      x.question !== BRIEF_QUESTION &&
+      !briefs.has(x.question) &&
+      !legacySeatTraffic(x.question)
   );
 }
 

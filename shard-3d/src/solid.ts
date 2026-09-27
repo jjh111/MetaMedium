@@ -27,6 +27,7 @@ import {
   TOOL_OVERLAP,
   type ExtrudeStep,
   type FeatureStep,
+  type HullStep,
   type MassingStep,
   type PlaneRef,
   type Profile2D,
@@ -38,6 +39,7 @@ import {
   type RevolveStep,
 } from './op';
 import { intersect, subtract, union } from './csg';
+import { depthSlabOf } from './depth';
 import { cross, dot, normalize, offsetOf, slide, toWorld, uAxis, vAxis, type Plane, type Pose, type Vec3 } from './plane';
 import type { FaceRef } from './planarity';
 import { diffProfile, viewNameOf, type Diff } from './diff';
@@ -703,6 +705,51 @@ function hullBody(
 }
 
 /**
+ * **A depth a word said, cut into the hull** (L2c, `depth.ts`).
+ *
+ * The hull seen from one standpoint stands as deep as its plan runs behind the
+ * silhouette; a word — *3 deep* — says otherwise, and the body is cut to a slab
+ * that deep, measured back along the sightline from the side the view was
+ * drawn from, because that is the face the hand saw. The slab is a prism like
+ * every other tool here, standing a hair past the near face so no face of it is
+ * coplanar with the body's (`TOOL_OVERLAP`'s lesson). A word deeper than the
+ * plan runs cuts nothing — the plan still bounds it — and a boolean that will
+ * not come off leaves the body as deep as it stood, and says so.
+ */
+function saidDepth(body: THREE.BufferGeometry, step: HullStep): { geometry: THREE.BufferGeometry; broken: string | null } {
+  const slab = depthSlabOf(step);
+  if (!slab) return { geometry: body, broken: null };
+  const pad = Math.max(slab.u, 1e-3) * TOOL_OVERLAP;
+  if (slab.u >= slab.took - pad) return { geometry: body, broken: null };
+  body.computeBoundingBox();
+  const box = body.boundingBox;
+  if (!box || box.isEmpty()) return { geometry: body, broken: null };
+  const reach = box.getSize(new THREE.Vector3()).length() + 1;
+  const centre = box.getCenter(new THREE.Vector3());
+  const plane: Plane = {
+    origin: { x: 0, y: 0, z: 0 },
+    normal: slab.along,
+    up: { x: 0, y: -1, z: 0 },
+    source: 'world',
+    why: 'the depth a word said',
+  };
+  const U = uAxis(plane);
+  const V = vAxis(plane);
+  const cu = dot({ x: centre.x, y: centre.y, z: centre.z }, U);
+  const cv = dot({ x: centre.x, y: centre.y, z: centre.z }, V);
+  const square = [
+    { x: cu - reach, y: cv - reach },
+    { x: cu + reach, y: cv - reach },
+    { x: cu + reach, y: cv + reach },
+    { x: cu - reach, y: cv + reach },
+  ];
+  const tool = prismOn(square, true, plane, slab.near - slab.u, slab.u + pad);
+  if (!tool) return { geometry: body, broken: 'the depth that was said made no slab to cut the hull to' };
+  const r = intersect(body, tool);
+  return r.ok ? { geometry: r.geometry, broken: null } : { geometry: body, broken: r.error };
+}
+
+/**
  * One standpoint's claims, combined into that standpoint's one silhouette.
  *
  * Overlap is read as the boxes of the outlines in the shared plane's own
@@ -836,11 +883,18 @@ export function deriveTree(tree: OpTree, ctx: DeriveContext = {}): Derived {
 
     if (step.op === 'hull') {
       const r = hullBody(step.claims, step.footprint, 'hull');
-      if (r.geometry) {
-        bodies.set(step.id, r.geometry);
-        paint(step, r.geometry);
-      }
+      let geometry = r.geometry;
       if (r.broken && !broken) broken = r.broken;
+      // L2c: a depth a WORD said is part of what the hull is answering to.
+      if (geometry) {
+        const said = saidDepth(geometry, step);
+        if (said.broken && !broken) broken = said.broken;
+        geometry = said.geometry;
+      }
+      if (geometry) {
+        bodies.set(step.id, geometry);
+        paint(step, geometry);
+      }
       continue;
     }
 

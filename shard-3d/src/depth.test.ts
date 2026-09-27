@@ -24,6 +24,7 @@ import { validateOpTree, type HullStep } from './op';
 import { DEPTH_QUESTION, depthOf, readDepthWord } from './depth';
 import { readField, type FieldContext } from './field';
 import { decodeBoard } from './export';
+import { saidInRoom } from './room';
 import type { Plane } from './plane';
 import {
   A_WORD,
@@ -174,6 +175,12 @@ describe('the question is not ink', () => {
     expect(log.solidOf(solidId)!.memberIds).not.toContain(qid);
   });
 
+  it('is the board’s own question, not a sentence another hand placed in the room', () => {
+    const { log } = board(ONE_VIEW);
+    expect(questions(log)).toHaveLength(1);
+    expect(saidInRoom(log.session)).toEqual([]);
+  });
+
   it('joins no lasso: a summon pointed at it holds nothing', () => {
     const { log } = board(ONE_VIEW);
     const qid = questions(log)[0].node.id;
@@ -314,18 +321,21 @@ describe('a word closes it the same way', () => {
 describe('John’s own board, replayed stroke by stroke', () => {
   it('the footprint and one ⊓ ask once; the second ⊓ from there asks nothing new; the third, from 135°, closes it', () => {
     const { events } = decodeBoard(LOGS['../fixtures/john-2026-09-16-castle-sketch.mm.log']);
-    const strokes = events.filter((e): e is Extract<SessionEvent, { type: 'stroke' }> => e.type === 'stroke');
-    const planeOf = (i: number) => {
-      const p = events.filter((e): e is Extract<SessionEvent, { type: 'propose' }> => e.type === 'propose')[i];
-      return p.reps![0].data as Plane & { scale: number };
-    };
-    expect(strokes).toHaveLength(4);
+    // His ink as he drew it: each stroke, and the plane held on it by the
+    // event that follows it — nothing the engine stood from it.
+    const ink: { points: { x: number; y: number }[]; plane: Plane & { scale: number } }[] = [];
+    events.forEach((e, k) => {
+      if (e.type !== 'stroke') return;
+      const next = events[k + 1] as Extract<SessionEvent, { type: 'propose' }>;
+      const plane = next.reps!.find((r) => r.modality === 'plane')!.data as Plane & { scale: number };
+      ink.push({ points: e.points, plane });
+    });
+    expect(ink).toHaveLength(4);
     const log = createLog();
     log.sees(blind);
     const states: { questions: number; open: boolean | null }[] = [];
-    strokes.forEach((s, i) => {
-      const plane = planeOf(i);
-      const id = log.add(s.points, plane, plane.scale, 1000 * (i + 1));
+    ink.forEach(({ points, plane }, i) => {
+      const id = log.add(points, plane, plane.scale, 1000 * (i + 1));
       const h = log.hullable();
       if (h && h.add.includes(id)) log.hull(h, 1000 * (i + 1) + 500);
       const solid = log.solids()[0];

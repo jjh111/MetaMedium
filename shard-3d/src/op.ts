@@ -341,6 +341,32 @@ export interface MassingStep extends StepBase {
  * Nothing derived is held here either: how far each prism runs is worked out
  * every time the tree is walked (invariant 4), from the claims themselves.
  */
+/**
+ * **How deep a hull runs, said in words** (DIRECTOR-PLAN-W2 L2c, `depth.ts`).
+ *
+ * A hull stood on one standpoint has a depth nobody drew, and the board asks
+ * rather than guesses. A second VIEW answers by measuring and is not held here
+ * — the claim is in the log and the hull re-derives from it. A WORD answers by
+ * saying, and this is where it is held: on the hull step, so undo takes it
+ * back, a replay stands the same body and `solid.ts` cuts the body to it.
+ *
+ * It carries the sightline it answered, so it answers nothing once the hull is
+ * no longer asking about that one — never a bare number: an answer whose
+ * question is lost is a default with better manners.
+ */
+export interface HullDepth {
+  /** The sightline across the ground the word answered, toward the standpoint. */
+  along: Vec3;
+  /** How deep, in world units along it. Positive. */
+  u: number;
+  /** What was said, as written — *3 deep*, *as deep as it is wide*. */
+  words: string;
+  /** Who said it — the hand, or a hand in the room. */
+  by?: string;
+  /** The question it answers and how the words were read. */
+  reasoning: string;
+}
+
 export interface HullStep extends StepBase {
   op: 'hull';
   /**
@@ -357,6 +383,12 @@ export interface HullStep extends StepBase {
    * every walk (invariant 4).
    */
   said?: PartSaying[];
+  /**
+   * L2c: how deep it runs along the one standpoint it was seen from, when a
+   * WORD said so. The question itself is never held — `depth.ts` derives it
+   * from the claims on every read.
+   */
+  depth?: HullDepth;
 }
 
 /** Every other row of §2.4: declared, so a later package adds an implementation, not a shape. */
@@ -1328,6 +1360,21 @@ function walkStep(v: unknown, at: string, seen: Set<string>, depth: number, budg
         }
       });
     }
+    // L2c: a depth a word said. A number that is not a positive number would
+    // stand a body nobody asked for, and a depth that does not say which
+    // sightline it answers is the silent default this row exists to refuse.
+    if (s.depth !== undefined) {
+      const dp = wantRecord(s.depth, `${at}.depth`, 'how deep the hull was said to run');
+      const along = wantVec(dp.along, `${at}.depth.along`, 'the sightline the depth answers');
+      if (!(Math.hypot(along.x, along.y, along.z) > 1e-9)) {
+        bad(`${at}.depth.along`, 'the sightline the depth answers has no length — it is about no direction');
+      }
+      const u = wantNumber(dp.u, `${at}.depth.u`, 'how deep the hull was said to run');
+      if (!(u > 0)) bad(`${at}.depth.u`, `it is ${u}, and a depth is a positive number of units`);
+      wantText(dp.words, `${at}.depth.words`, 'what was said about its depth');
+      wantText(dp.reasoning, `${at}.depth.reasoning`, 'the question the depth answers');
+      if (dp.by !== undefined) wantText(dp.by, `${at}.depth.by`, 'who said how deep it runs');
+    }
   } else if (kind === 'place') {
     if (depth >= OP_LIMITS.placeDepth) {
       bad(`${at}.steps`, `a placement nested more than ${OP_LIMITS.placeDepth} deep — a copy of a copy of a copy`);
@@ -1462,6 +1509,7 @@ export function describeStep(step: OpStep): string {
       `hull · ${step.claims.length} claims intersected` +
       (ground ? ` (${ground} closed on the ground)` : '') +
       (step.footprint ? ` · footprint ${step.footprint}` : '') +
+      (step.depth ? ` · ${step.depth.u.toFixed(2)} u deep, said “${step.depth.words}”` : '') +
       (said.length
         ? ` · ${said.map((s) => `${s.said}${s.name ? ` “${s.name}”` : ''}${s.material?.colour ? ` ${s.material.colour}` : ''}`).join(', ')}`
         : '') +
