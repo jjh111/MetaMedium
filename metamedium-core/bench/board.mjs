@@ -692,6 +692,58 @@ export function describeReadings(stats) {
   return out;
 }
 
+/**
+ * Draw `marks` more strokes on a session that already holds a board: the next
+ * diagrams, in a fresh column beside it, by the board's own hand, a few
+ * seconds after its last event — "one more stroke at the end". No rarer acts
+ * (nothing is blessed, moved or rubbed out), so every event timed is a stroke.
+ * `onStroke(kind, ms)` hears what each `addStroke` cost, as the host sees it:
+ * readings, relations, words, wires, the scratch test, the clusters and the
+ * state handed to subscribers.
+ */
+export function extendBoard(core, session, { marks, seed = 99, onStroke } = {}) {
+  const rand = rng(seed);
+  const st = session.getState();
+  let maxX = -Infinity, minY = Infinity;
+  for (const id of st.contentIds) {
+    const b = core.boundsOf(st.nodes.get(id));
+    if (!b) continue;
+    if (b.maxX > maxX) maxX = b.maxX;
+    if (b.minY < minY) minY = b.minY;
+  }
+  const evs = session.getEvents();
+  let at = (evs.length ? evs[evs.length - 1].at || T0 : T0) + 5000;
+  // Timed at the door the surface calls: the same call, the same state handed back.
+  const timed = {
+    ...session,
+    addStroke: (...a) => {
+      const t = performance.now();
+      const id = session.addStroke(...a);
+      last = { id, ms: performance.now() - t };
+      return id;
+    },
+  };
+  let last = null;
+  const kinds = ['flow', 'molecule', 'note', 'hub', 'doodle', 'page'];
+  let drawn = 0, i = 0;
+  const x0 = (Number.isFinite(maxX) ? maxX : 0) + 400, y0 = Number.isFinite(minY) ? minY : 0;
+  while (drawn < marks) {
+    const pen = new Pen(core, timed, rand, at, marks - drawn);
+    const wrap = pen.stroke.bind(pen);
+    pen.stroke = (points, kind) => {
+      const id = wrap(points, kind);
+      if (id && last && last.id === id && onStroke) onStroke(kind, last.ms);
+      return id;
+    };
+    const kind = kinds[i % kinds.length];
+    REGIONS[kind](pen, x0 + (i % 2) * 820, y0 + Math.floor(i / 2) * 620, {}, (p) => rand() < p);
+    drawn += pen.count;
+    at = pen.at + 6000;
+    i++;
+  }
+  return drawn;
+}
+
 // ===== CLI ==================================================================
 
 if (process.argv[1] && import.meta.url === (await import('node:url')).pathToFileURL(process.argv[1]).href) {
