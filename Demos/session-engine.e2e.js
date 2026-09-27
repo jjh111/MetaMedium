@@ -2097,5 +2097,39 @@ window.__scenario = async function(){
     mm.session.load([]); mm.setView(1, 0, 0);
   }
 
+  // ---- 42. A person labels their own ink, from the field (V1-PLAN L2e) ----
+  // Week 1's U2: whoever made a mark can put a word on it. The `label` event
+  // and the MCP hand could (L2b); a person on the canvas could not — labels
+  // reached the board only through the hand. With a mark held, the field
+  // reads `label: word`, the line under it says what Enter will do before
+  // Enter is pressed, and Enter writes one `label` event on the mark, in the
+  // person's name, drawn beside it. No model is asked: a label is not a brief.
+  {
+    mm.session.load([]); mm.setView(1, 0, 0);
+    const drawn42 = () => (typeof mm.labelsDrawn === 'function' ? mm.labelsDrawn() : []);
+    const b0 = mm.worldToScreen(300, 220), b1 = mm.worldToScreen(520, 360);
+    t.stroke(t.rect(b0.x, b0.y, b1.x - b0.x, b1.y - b0.y));
+    const box42 = mm.session.getState().contentIds[0];
+    const c42 = mm.worldToScreen(410, 290);
+    t.stroke(t.circle(c42.x, c42.y, 190)); t.takeLoop(c42.x, c42.y, 190); await wait(60);
+    const held42 = mm.session.getState().summon;
+    t.typeIn('label: inlet');
+    const line42 = t.readingLine();
+    const evs42 = mm.session.getEvents().length, calls42 = window.__calls.length;
+    t.typeEnter('label: inlet'); await wait(60);
+    const labels42 = mm.session.getEvents().slice(evs42).filter((e) => e.type === 'label');
+    const node42 = mm.session.getState().nodes.get(box42);
+    const lab42 = node42 && MM.labelOf(node42);
+    const at42 = drawn42().find((l) => l.id === box42);
+    step('42. with a mark held, the field reads “label: inlet” — the line says ↵ label it “inlet” before Enter',
+      !!held42 && held42.enclosedIds.includes(box42) && line42 === '↵ label it “inlet”',
+      { held: held42 && held42.enclosedIds, line: line42 });
+    step('42a. Enter puts the word on the mark — one label event, in your name, drawn beside it — and asks no model',
+      labels42.length === 1 && labels42[0].nodeId === box42 && !!lab42 && lab42.text === 'inlet' && lab42.source === MM.LOCAL_PARTICIPANT
+        && !!at42 && at42.text === 'inlet' && window.__calls.length === calls42,
+      { events: mm.session.getEvents().slice(evs42).map((e) => e.type), label: lab42, drawn: at42, calls: window.__calls.length - calls42 });
+    mm.session.load([]); mm.setView(1, 0, 0);
+  }
+
   return R;
 };

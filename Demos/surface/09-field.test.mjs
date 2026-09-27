@@ -35,6 +35,8 @@ const ITEMS = [
 const ctx = (over = {}) => ({
   text: '', open: true, revising: false, items: ITEMS,
   models: [], library: [], definition: null, behaviour: null,
+  // The selection's ink: how many marks the person made, and who made the rest (V1-PLAN L2e).
+  marks: { mine: 1, others: [] },
   target: () => 'program',
   ...over,
 });
@@ -152,6 +154,71 @@ test('a prefix that needs a model, with none joined, says so and opens the pane'
   }
   // `name:` never needs one — the engine holds the name itself.
   assert.equal(readFieldCommand(ctx({ text: 'name: bubble' })).kind, 'name');
+});
+
+// ---- A word on your own ink (V1-PLAN L2e) ----
+// Whoever made a mark may put a word on it. A person on the canvas does it by
+// typing `label: word` at a selection: the reader says what Enter will do before
+// it is pressed, and names another hand's marks in the selection, which the
+// label will not go on. Labelling is not naming — it blesses nothing — so it
+// never needs a model, and it is read before any verb, name or brief.
+
+test('label: a word for the selection\'s own ink, and the line says so before Enter', () => {
+  const r = readFieldCommand(ctx({ text: 'label: inlet' }));
+  assert.equal(r.kind, 'label');
+  assert.equal(r.line, '↵ label it “inlet”');
+  assert.deepEqual(r.command, { do: 'label', text: 'inlet' });
+  assert.equal(r.quiet, undefined);
+});
+
+test('label: needs no model, and the prefix outranks a verb of the same word', () => {
+  // "label: clean" puts the word clean on the ink; it is not the clean verb.
+  const r = readFieldCommand(ctx({ text: 'label: clean', models: ['qwen3'] }));
+  assert.equal(r.kind, 'label');
+  assert.deepEqual(r.command, { do: 'label', text: 'clean' });
+  const spaced = readFieldCommand(ctx({ text: 'Label :  inlet valve ' }));
+  assert.deepEqual(spaced.command, { do: 'label', text: 'inlet valve' });
+  assert.equal(spaced.line, '↵ label it “inlet valve”');
+});
+
+test('label: on several marks says the word goes on each of them', () => {
+  const r = readFieldCommand(ctx({ text: 'label: inlet', marks: { mine: 3, others: [] } }));
+  assert.equal(r.line, '↵ label it “inlet” — on each of your 3 marks');
+  assert.deepEqual(r.command, { do: 'label', text: 'inlet' });
+});
+
+test('label: names another hand\'s marks before Enter, and still labels yours', () => {
+  const some = readFieldCommand(ctx({ text: 'label: inlet', marks: { mine: 2, others: ['fern'] } }));
+  assert.equal(some.line, '↵ label it “inlet” — on your 2, not the mark fern made');
+  assert.equal(some.quiet, undefined);
+  assert.deepEqual(some.command, { do: 'label', text: 'inlet' });
+});
+
+test('label: on nothing of yours is said quietly, and Enter still says why in the status line', () => {
+  const none = readFieldCommand(ctx({ text: 'label: inlet', marks: { mine: 0, others: ['fern', 'fern', 'qwen3'] } }));
+  assert.equal(none.kind, 'label');
+  assert.equal(none.quiet, true);
+  assert.equal(none.line, '↵ no label — fern and qwen3 made these 3 marks; a label goes on your own ink');
+  // Quiet is not silent: Enter runs the command, and the adapter says the refusal.
+  assert.deepEqual(none.command, { do: 'label', text: 'inlet' });
+  const one = readFieldCommand(ctx({ text: 'label: inlet', marks: { mine: 0, others: ['fern'] } }));
+  assert.equal(one.line, '↵ no label — fern made this mark; a label goes on your own ink');
+});
+
+test('label: with nothing after it, or nothing held to put it on, asks quietly', () => {
+  const empty = readFieldCommand(ctx({ text: 'label:' }));
+  assert.equal(empty.kind, 'label');
+  assert.equal(empty.quiet, true);
+  assert.equal(empty.command, null);
+  assert.equal(empty.line, '↵ label it… (type the word)');
+  const nothing = readFieldCommand(ctx({ text: 'label: inlet', marks: { mine: 0, others: [] } }));
+  assert.equal(nothing.kind, 'label');
+  assert.equal(nothing.quiet, true);
+  assert.equal(nothing.command, null);
+  // A context that says nothing about the ink holds none: never a brief, never a guess.
+  const bare = readFieldCommand({ text: 'label: inlet', open: true, items: [] });
+  assert.equal(bare.kind, 'label');
+  assert.equal(bare.command, null);
 });
 
 test('a brief with no model joined: a page is still built, a program is not', () => {
