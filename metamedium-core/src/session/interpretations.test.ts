@@ -164,7 +164,7 @@ describe('disagreement is a first-class signal', () => {
     expect(
       disagreement([
         { label: 'circle', to: 'type:circle', sourceName: 'engine',
-          tier: 0, weight: 0.8, blessed: false },
+          tier: 0, weight: 0.8, blessed: false, basis: 'resemblance' },
       ])
     ).toBeNull();
   });

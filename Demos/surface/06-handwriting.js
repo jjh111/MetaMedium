@@ -71,7 +71,7 @@
   }
 
   function isWriting(node) {
-    const shape = MM.interpretationsOf(node, state.nodes).filter((r) => r.tier === 0)[0];
+    const shape = MM.interpretationsOf(node, state.nodes).filter((r) => r.tier === 0 && r.basis !== 'label')[0];
     return !!shape && shape.label === 'text';
   }
 

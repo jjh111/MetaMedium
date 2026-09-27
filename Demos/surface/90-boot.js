@@ -21,6 +21,9 @@
     minimap: () => mini, readGroups: readGroups, chips: () => chipHits,
     // The chrome a figure wears only while pointed at, for tests.
     chromeDrawn: () => chromeDrawn.slice(),
+    // A hand's word on its own ink, for tests: where the last paint drew each label, and a mark's ink colour.
+    labelsDrawn: () => labelsDrawn.map((l) => Object.assign({}, l)),
+    colourOf: (id) => { const n = session.getState().nodes.get(id); return n ? colourOf(n) : null; },
     // The explanation plane, for tests: where the last paint put each answer card.
     answerCards: () => cardRects.map((c) => ({ id: c.id, about: c.about.slice(), what: c.what, who: c.who, ago: c.ago, x: c.x, y: c.y, w: c.w, h: c.h })),
     // Text folds back from ink, for tests: the words of a text where they stand.

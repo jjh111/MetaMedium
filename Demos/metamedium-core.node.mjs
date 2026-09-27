@@ -927,7 +927,8 @@ function interpretationsOf(node, nodes) {
       tier: participantTier(blessedBy ?? LOCAL_PARTICIPANT, nodes),
       weight: 1,
       reasoning: "blessed by a participant",
-      blessed: true
+      blessed: true,
+      basis: "name"
     });
   }
   const label = labelOf(node);
@@ -941,7 +942,8 @@ function interpretationsOf(node, nodes) {
       tier: participantTier(source, nodes),
       weight: 1,
       reasoning: "labelled by the hand that made this mark",
-      blessed: false
+      blessed: false,
+      basis: "label"
     });
   }
   for (const e of resemblances(node)) {
@@ -956,7 +958,8 @@ function interpretationsOf(node, nodes) {
       tier: source ? participantTier(source, nodes) : 0,
       weight: e.weight ?? 0,
       reasoning: e.reasoning,
-      blessed: e.blessed === true
+      blessed: e.blessed === true,
+      basis: "resemblance"
     });
   }
   return out.sort((a, b) => {

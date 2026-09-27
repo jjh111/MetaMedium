@@ -13,7 +13,7 @@
 //
 // It is a hand in a room, nothing more. It keeps a session from the merged
 // logs exactly as a tab does, and every tool is a verb a hand already has —
-// look, see, draw, say, propose, transcribe, write. It proposes and never
+// look, see, draw, say, propose, label, transcribe, write. It proposes and never
 // blesses; it can write a program and cannot play it; it holds no keys and
 // no truth of its own. Its events reach the tab as its own log, stamped
 // `by` on arrival like any other hand's, and draw in its own colour.
@@ -129,8 +129,11 @@ function codeRepOf(node) {
 }
 function describeMark(node, s) {
   const b = MM.boundsOf(node);
-  const reads = MM.interpretationsOf(node, s.nodes).slice(0, 3).map((x) => x.label + ' ' + x.weight.toFixed(2) + (x.tier ? ' · ' + x.sourceName : ''));
+  // Readings are what the engine and the models read; a label is its maker's
+  // word and is said on its own, never as one of them (L2b).
+  const reads = MM.interpretationsOf(node, s.nodes).filter((x) => x.basis !== 'label').slice(0, 3).map((x) => x.label + ' ' + x.weight.toFixed(2) + (x.tier ? ' · ' + x.sourceName : ''));
   const name = MM.wordOf(node);
+  const lab = MM.labelOf(node);
   const said = MM.transcriptOf(node);
   const rep = codeRepOf(node);
   const who = authorOf(node, s);
@@ -138,6 +141,7 @@ function describeMark(node, s) {
   if (rep) parts.push((rep.data.kind || 'html') + (rep.data.path ? ' ' + rep.data.path : ''));
   if (MM.isWord(node)) parts.push('a word of ' + MM.lettersOf(node).length + ' strokes');
   parts.push(reads.join(', ') || 'unread');
+  if (lab) parts.push('labelled “' + lab.text + '”');
   if (said) parts.push('says “' + said + '”');
   if (b) parts.push('at ' + r(b.minX) + ',' + r(b.minY) + ' ' + r(b.maxX - b.minX) + '×' + r(b.maxY - b.minY));
   if (s.live.includes(node.id)) parts.push(s.clocks[node.id] && s.clocks[node.id].playing ? 'playing' : 'live');
@@ -257,6 +261,28 @@ async function propose(args) {
   await flush();
   return { text: '“' + args.label + '” ' + weight.toFixed(2) + ' held on ' + done.join(', ') + ' — an offer to name; the hand decides' };
 }
+// A word on MY OWN ink (V1-PLAN L2b; the notes, §B and §D). Not a bless —
+// naming a mark is the human's act — and not a file: a label is a rep on the
+// mark, drawn beside it in this hand's colour, so a labelled drawing does not
+// fill the folder with one-word text artifacts. The engine refuses a label on
+// a mark this hand did not make and says whose it is; that sentence is what
+// comes back here, never a silent no-op.
+async function labelMark(args) {
+  const ids = Array.isArray(args.ids) ? args.ids.map(String) : args.id ? [String(args.id)] : [];
+  const text = String(args.text ?? '').trim();
+  if (!ids.length) return { text: 'a label needs a mark to sit on (id, or ids)' };
+  const done = [], refused = [];
+  for (const id of ids) {
+    const at = now();
+    const got = session.label({ participantId: MM.LOCAL_PARTICIPANT, nodeId: id, text, at });
+    const stale = session.getState().staleResult;
+    if (got) done.push(id);
+    else refused.push(id + ': ' + (stale && stale.what === 'label' ? stale.detail : 'not labelled'));
+  }
+  if (done.length) await flush();
+  const said = done.length ? (text ? '“' + text + '” on ' + done.join(', ') : 'label taken off ' + done.join(', ')) : '';
+  return { text: [said, ...refused].filter(Boolean).join('\n') };
+}
 async function transcribe(args) {
   const s = session.getState();
   const id = String(args.id || '');
@@ -327,6 +353,12 @@ const TOOLS = [
     run: propose,
   },
   {
+    name: 'canvas_label',
+    description: 'Put a word on ink YOU drew — a caption on your own mark, drawn beside it in your colour at the board\'s scale. Not a bless and not a file: it never appears in the folder and never becomes a name the matcher learns. Labelling a mark another hand made is refused, with the reason. An empty text takes your label off.',
+    inputSchema: { type: 'object', required: ['text'], properties: { id: { type: 'string' }, ids: { type: 'array', items: { type: 'string' } }, text: { type: 'string' } } },
+    run: labelMark,
+  },
+  {
     name: 'canvas_transcribe',
     description: 'Say what a piece of handwriting says (after canvas_see). Held on the mark as a transcript; the human may take it as a name or make it text.',
     inputSchema: { type: 'object', required: ['id', 'text'], properties: { id: { type: 'string' }, text: { type: 'string' }, confidence: num, alternatives: { type: 'array', items: { type: 'string' } } } },
@@ -361,7 +393,7 @@ async function handle(line) {
           protocolVersion: (msg.params && msg.params.protocolVersion) || '2025-06-18',
           capabilities: { tools: {} },
           serverInfo: { name: 'metamedium', version: '0.1.0' },
-          instructions: 'You are a hand on a MetaMedium canvas, in room "' + ROOM + '" as "' + label(ME) + '". The human draws; the engine reads every mark (shape, role, concept) and the human names and builds from those readings. Look first (canvas_look), see the ink when it matters (canvas_see), then act with the same verbs a hand has: draw in the shape vocabulary, say a sentence beside marks, propose a reading, transcribe writing, write code. Everything you do is held and attributed to you; the human blesses or ignores it. Never claim a reading is settled — offer it with a confidence and a reason.',
+          instructions: 'You are a hand on a MetaMedium canvas, in room "' + ROOM + '" as "' + label(ME) + '". The human draws; the engine reads every mark (shape, role, concept) and the human names and builds from those readings. Look first (canvas_look), see the ink when it matters (canvas_see), then act with the same verbs a hand has: draw in the shape vocabulary, say a sentence beside marks, propose a reading, label your own marks, transcribe writing, write code. Everything you do is held and attributed to you; the human blesses or ignores it. Never claim a reading is settled — offer it with a confidence and a reason.',
         });
         break;
       case 'notifications/initialized':

@@ -1,5 +1,6 @@
 // ===== render =====
-// Provides: queries over state, the rungs cache, render(), ink, the label under the inspected mark, match chips,
+// Provides: queries over state, the rungs cache, render(), ink, the reading under the inspected mark,
+//   a hand's label on its own mark (labelsDrawn), match chips,
 //   the working dot, the explanation plane and its layout, the status line (one sentence).
 // Uses: core, view, artifacts, snap, models, palette, inspector, teach (syncMarkChip), folder (folderStatus, liveSet).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
@@ -293,13 +294,16 @@
         // that one: what it is, and what it plays. Under every mark it was a
         // board of fragments; the panel has the rest.
         const said = MM.transcriptOf(node);
-        const shape = MM.interpretationsOf(node, s.nodes).filter((r) => r.tier === 0)[0];
+        // A label is its maker's word, not what the shape rung measured (L2b).
+        const shape = MM.interpretationsOf(node, s.nodes).filter((r) => r.tier === 0 && r.basis !== 'label')[0];
         const top = MM.wordOf(node) || (said ? '“' + said + '”' : shape ? shape.label : MM.topInterpretation(node));
         const role = readRungs(s).roles.get(id);
         const played = role && role.role !== 'unclassified' && role.role !== top ? ' · ' + role.role : '';
         if (top) text(top + played, b.minX, b.maxY + wpx(15), `rgba(${C.labelRGB},0.85)`);
       }
     }
+
+    renderLabels(s, inspectedId);
 
     if (s.summon) {
       for (const gid of s.summon.gestureIds) {
@@ -393,6 +397,76 @@
       ctx.fillStyle = `rgba(${C.goldRGB},0.85)`; ctx.fill();
       text(w.label, x + wpx(16), y, C.gold);
     }
+  }
+
+  // ===== A hand's word on its own ink (V1-PLAN L2b; the notes, §B and §D) ====
+  // A label is a word a mark's maker put on it: not a blessed name and not a
+  // text artifact with a filename, so it makes no file and no card. It is
+  // drawn here, on the canvas, beside the mark — in the ink's own colour,
+  // which is its maker's, from the same tokens in either theme — and at a
+  // size in the BOARD's units: the caption rule of 13-kinds.js, where a few
+  // words written onto a drawing scale with the drawing. Held at screen size
+  // they float off the thing they name the moment the board zooms (the notes,
+  // fault 3). The size is the hand's: LABEL_PX on the screen the mark was
+  // drawn on (its stroke's scale), so a label reads at the size its mark was
+  // made at. Its chrome — who put it there — keeps quiet until the hand
+  // points at the mark, like every other reading.
+  const LABEL_PX = 13;
+  let labelsDrawn = []; // this paint's labels, in world units, for tests: { id, text, x, y, w, size, px, colour, who, whoShown }
+
+  /** A label's size in world units: LABEL_PX in the hand's space when its mark was made. */
+  function labelSizeOf(node) {
+    const scaleOf = (n) => { const st = n && MM.getRep(n, 'stroke'); return st && st.data && st.data.scale > 0 ? st.data.scale : null; };
+    let scale = scaleOf(node);
+    for (const e of node.edges) {
+      if (scale !== null) break;
+      if (e.rel === 'has-part') scale = scaleOf(state.nodes.get(e.to));
+    }
+    return LABEL_PX * (scale || 1);
+  }
+
+  /** Every label on a mark whose ink is on the board: loose marks, and the marks an artifact holds. */
+  function renderLabels(s, inspectedId) {
+    labelsDrawn = [];
+    const pv = dragPreview();
+    const seen = new Set();
+    const visit = (id, placedBy) => {
+      if (seen.has(id)) return;
+      seen.add(id);
+      const node = s.nodes.get(id);
+      if (!node || node.reps.some((r) => r.modality === 'erased')) return;
+      const lab = MM.labelOf(node);
+      if (lab) drawLabel(s, node, lab, placedBy, inspectedId, pv);
+      for (const e of node.edges) if (e.rel === 'has-part') visit(e.to, placedBy);
+    };
+    for (const id of s.contentIds) visit(id, id);
+  }
+
+  function drawLabel(s, node, lab, placedBy, inspectedId, pv) {
+    const b0 = MM.boundsOf(node);
+    if (!b0) return;
+    // A body in a running tank, and a held selection mid-drag, carry their words with them.
+    const pl = bodyPlacement(placedBy);
+    const b = pl ? { minX: b0.minX + pl.dx, maxX: b0.maxX + pl.dx, minY: b0.minY + pl.dy, maxY: b0.maxY + pl.dy } : b0;
+    const held = pv && (pv.ids.includes(node.id) || pv.ids.includes(placedBy));
+    const size = labelSizeOf(node);
+    // Above the artifact's own name when that chrome is showing, else just above the mark.
+    const raised = chromeDrawn.includes(node.id) ? wpx(24) : 0;
+    const x = b.minX, y = b.minY - size * 0.45 - raised;
+    const colour = colourOf(node);
+    const who = nameOfParticipant(lab.source || authorOf(node));
+    const whoShown = node.id === inspectedId || placedBy === inspectedId;
+    if (held) { ctx.save(); applyPreview(pv); }
+    ctx.font = size.toFixed(3) + "px 'Space Grotesk', system-ui, sans-serif";
+    ctx.lineWidth = size * 0.24;
+    ctx.strokeStyle = C.haloText;
+    ctx.strokeText(lab.text, x, y);
+    ctx.fillStyle = colour;
+    ctx.fillText(lab.text, x, y);
+    const w = ctx.measureText(lab.text).width;
+    if (whoShown) text('· ' + who, x + w + size * 0.4, y, `rgba(${C.labelRGB},0.85)`);
+    if (held) ctx.restore();
+    labelsDrawn.push({ id: node.id, text: lab.text, x: x, y: y, w: w, size: size, px: size * view.zoom, colour: colour, who: who, whoShown: whoShown });
   }
 
   function text(str, x, y, color) {

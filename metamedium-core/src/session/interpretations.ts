@@ -35,6 +35,14 @@ export interface Interpretation {
   reasoning?: string;
   /** True when a human has committed to this reading (a blessed name). */
   blessed: boolean;
+  /**
+   * What the reading is based on: a blessed `name`, a hand's `label` on its
+   * own ink, or a `resemblance` — the engine's measurement or a model's
+   * reading. A caller asking "what does the shape rung say?" wants a
+   * resemblance: a label is a word its maker chose, at its maker's tier and
+   * weight 1, and must never stand in for a measurement (V1-PLAN L2b).
+   */
+  basis: 'name' | 'label' | 'resemblance';
 }
 
 /** A group of interpretations sharing a source or a tier. */
@@ -80,6 +88,7 @@ export function interpretationsOf(
       weight: 1,
       reasoning: 'blessed by a participant',
       blessed: true,
+      basis: 'name',
     });
   }
 
@@ -99,6 +108,7 @@ export function interpretationsOf(
       weight: 1,
       reasoning: 'labelled by the hand that made this mark',
       blessed: false,
+      basis: 'label',
     });
   }
 
@@ -115,6 +125,7 @@ export function interpretationsOf(
       weight: e.weight ?? 0,
       reasoning: e.reasoning,
       blessed: e.blessed === true,
+      basis: 'resemblance',
     });
   }
 

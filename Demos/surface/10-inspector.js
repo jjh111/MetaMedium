@@ -194,7 +194,8 @@
     {
       const rung = readRungs(s);
       const role = rung.roles.get(id);
-      const shapeRead = MM.interpretationsOf(node, s.nodes).filter((r) => r.tier === 0)[0];
+      // What the shape rung measured: never a label, which is its maker's word (L2b).
+      const shapeRead = MM.interpretationsOf(node, s.nodes).filter((r) => r.tier === 0 && r.basis !== 'label')[0];
       const rows = [];
       const fpx = MM.fingerprintOf(node);
       if (fpx) {
@@ -204,6 +205,9 @@
         rows.push(['ink', node.edges.filter((e) => e.rel === 'has-part').length + ' marks held', '']);
       }
       if (shapeRead) rows.push(['shape', shapeRead.label + ' ' + shapeRead.weight.toFixed(2), shapeRead.reasoning || '']);
+      // The word its maker put on it (L2b): said as a label, beside the shape, never as it.
+      const lab = MM.labelOf(node);
+      if (lab) rows.push(['label', '“' + lab.text + '” · by ' + nameOfParticipant(lab.source || authorOf(node)), 'a word its maker put on it — not a name, and not a file']);
       // Clean form: held, offered, or neither — and the one-mark way to take it up.
       const clean = MM.cleanOf(node);
       const offer = snapOffers.get(id);
@@ -264,8 +268,10 @@
       html += '<div class="reads">';
       groups.forEach((g) => {
         const tier = g.interpretations[0].tier;
+        // A label is its maker's word and a name is a bless — neither is the shape rung, whatever tier the maker sits at.
+        const basis = g.interpretations[0].basis;
         html += '<div class="srchead"><span class="by">' + esc(g.label) + '</span>' +
-          '<span class="tier">' + (tier === 0 ? 'tier 0 · shape' : tier === 2 ? 'tier 2 · model' : 'tier ' + tier) + '</span></div>';
+          '<span class="tier">' + (basis === 'label' ? 'label · its maker' : basis === 'name' ? 'named' : tier === 0 ? 'tier 0 · shape' : tier === 2 ? 'tier 2 · model' : 'tier ' + tier) + '</span></div>';
         g.interpretations.forEach((r, i) => {
           html += '<div class="read' + (i === 0 ? ' top' : '') + (r.blessed ? ' blessed' : '') + '">' +
             '<span class="type">' + esc(r.label) + '</span>' +
