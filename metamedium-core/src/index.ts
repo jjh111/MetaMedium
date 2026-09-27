@@ -217,6 +217,14 @@ export type {
 // says what cannot hold and by how much; a declared square rules, a measured
 // right angle is only a reading; what the labels leave open is the ink's.
 export { solveFigure, solveBoard, describeSolution } from './maths/solve';
+// Figures of several strokes (V1-PLAN E3): ruled strokes whose ends meet — a
+// magnet tied them, or they touch within the hand's reach — read as one
+// figure: a triangle, a quadrilateral (a diamond, turned about 45°; a
+// rectangle, its corners right), a polygon. Each side keeps the marks it was
+// drawn with, and each figure is the maths lane's own, so
+// `solveBoard(state, { figures: figuresOf(state) })` solves it. Derived.
+export { figuresOf, figuresAmong, describeFigure, STRAIGHT_TURN, STRAIGHT_RUN, ONE_BEND, DIAMOND_SLACK, SLIVER, MAX_FIGURE_STROKES } from './diagram/figures';
+export type { InkFigure, FigureShape, FigureCorner } from './diagram/figures';
 export type {
   SolvedFrom,
   SolvedValue,

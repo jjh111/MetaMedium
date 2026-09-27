@@ -72,7 +72,13 @@ describe('lines whose ends meet read as one figure', () => {
     const figures = figuresOf(s.getState());
     expect(figures).toHaveLength(1);
     expect(figures[0].kind).toBe('triangle');
-    for (const corner of [right, longLegEnd, shortLegEnd]) expect(figures[0].vertices.some((v) => near(v, corner, 4))).toBe(true);
+    // The corner is where the drawn lines meet. At the 18° corner a line drawn
+    // a pixel and a half low moves that meeting some 1/sin 18° ≈ 3 times as far
+    // along the other line, so the ink's corners stand within a few hand-widths
+    // of the ones meant — and the sides within a few percent of their length.
+    for (const corner of [right, longLegEnd, shortLegEnd]) expect(figures[0].vertices.some((v) => near(v, corner, 12))).toBe(true);
+    const long = sideBetween(figures[0], right, longLegEnd, 14);
+    expect(Math.abs(long.length - 240) / 240).toBeLessThan(0.05);
   });
 
   it('ends a magnet bound meet as bound', () => {
