@@ -28,8 +28,12 @@ absorbs and raises its Stage D.
 It carries ids per hand (with two reproduced defects), the relay's
 catch-up, the label event in core, the decision seat and a WebKit smoke;
 the rest sits on attempt branches. `DIRECTOR-PLAN-W2.md` §0 says exactly
-what, and its L1–L3 finish it before anything new; `MATHS-PLAN.md` and the
-v1 plan follow. The headline below is the 17 Sep state it builds on.
+what, and its L1–L3 finish it before anything new. **`V1-PLAN.md` is the
+plan now**: the whole platform as layers (tools, context, library packs,
+seats), diagrams with Mermaid out and in, handles and bindings that
+follow, maths as a tool, and what "ready for true use" takes — ten
+acceptance scenarios, a ladder of units, and when v1.0.0 ships. The
+headline below is the 17 Sep state it builds on.
 
 Headline (17 Sep 2026, everything on `master`; `DIRECTOR-VIEW-2026-09-17.md`
 is the director's view of where it all stands, the 15 Sep review reviewed,
@@ -138,6 +142,18 @@ Architecture documents (chronological; **read MVP.md, then v7, then v6**):
   (quantities, expressions, the sheet, figures, dimensions, solving); the
   middle layer as seats that judge — `decide` (Jev), `extract` (GLiNER2),
   `read` (numerals) — and the demo, *change the bust*
+- `V1-PLAN.md` — **v1, the whole platform ready for true use, 26 Sep
+  2026**: ten acceptance scenarios (flowchart, UML class, sequence, pattern,
+  page and program, notes, two hands, boards, no model, pencil); the
+  platform as layers — ink and the log, readings, the instant library,
+  **tools** (one contract, a registry), **seats**, writers, and across them
+  **context** (conceptual adjacency lifts, never hides; the top offer holds
+  steady) and **library packs** (shipped pre-taught, used by an event,
+  benched); diagrams as notations over the diagram rung with Mermaid out and
+  in; handles, bindings that follow and ports by notation; maths as a tool;
+  what daily use needs (boards, a versioned log, no lost work, budgets,
+  first run, pencil, deploy); the ladder in eight phases, the units, how the
+  agents run, and the release criteria
 - `SHARD-3D-PUSH-2.md` — **geometry from the drawing, G0–G5 all landed
   16 Sep 2026**: what John's first real use showed (a footprint and elevations
   from free views stood nothing, and a brief with nothing to fill was refused
