@@ -170,8 +170,11 @@
     // this sitting replaces what the room holds of it instead of doubling it.
     await store.publish(session.getEvents().filter((e) => !e.by));
     store.subscribe(() => { if (liveMergePending) return; liveMergePending = true; Promise.resolve().then(() => { liveMergePending = false; return mergeLive(); }); });
+    // `openStore` counted what it loaded BEFORE the device re-taught its mark,
+    // so that teach is this hand's and goes out with its log. Counted again
+    // here, it was taken for the room's, and the room's first merge dropped it:
+    // the board judged this hand by the built-in check from then on (L2h).
     await openStore(store, 'live', room);
-    folder.loadedCount = session.getEvents().length;
     store.hello();
     return folder;
   }
@@ -238,8 +241,11 @@
     // participant's — including the mark this device re-teaches at open.
     folder.loadedCount = session.getEvents().length;
     folder.lastSave = '';
-    // The device's mark is re-taught only when no log already teaches one.
-    if (!merged.some((ev) => ev.type === 'teach')) restoreMark();
+    // The device's mark is re-taught only when this hand's own log already
+    // teaches none. A mark is the hand's that taught it (L2h): another hand's
+    // teach — stamped `by` — says nothing about this one's, and waiting on it
+    // left this hand judged by the other's mark.
+    if (!merged.some((ev) => ev.type === 'teach' && !ev.by)) restoreMark();
     let entries = [];
     try { entries = await store.list(); } catch (err) { folder.error = 'could not list the folder: ' + (err.message || err); }
     folder.entries = entries; folder.truncated = !!store.truncated;
