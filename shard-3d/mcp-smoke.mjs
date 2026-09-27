@@ -66,7 +66,10 @@ const relay = await startRelay(PORT);
 // `room.ts` does it.
 const tabMe = 'john~1';
 const tab = new MM.LiveStore(relayTransport(RELAY, ROOM), tabMe, ROOM);
-const tabSession = MM.createSession();
+// The tab says what its log is called, exactly as `joinRoom` does — the switch
+// that makes every id it mints the id the hand derives for the same event
+// (DIRECTOR-PLAN-W2 L2a).
+const tabSession = MM.createSession({ ...MM.DEFAULT_SESSION_CONFIG, logName: tabMe });
 const heard = [];
 tab.subscribe((participant, events) => heard.push({ participant, events }));
 const tabMerge = async () => {
@@ -202,25 +205,29 @@ try {
   check('a claim with no plane is refused in words', /no plane/.test(textOf(nowhere)), textOf(nowhere));
 
   // ---- the seat: a brief parked, listed, answered --------------------------
-  const key = 'k' + Math.random().toString(36).slice(2, 6);
   const CONTRACT = 'Reply with ONLY a JSON object: {"steps":[…],"profiles":[…]}';
   const BRIEF = 'THE SPACE\nfoundation: one profile, 4 × 2.6 u';
-  tabSession.answer({
+  // The brief carries the word and nothing minted beside it: what comes back
+  // is its own node id, and THAT is the pairing the hand answers by
+  // (DIRECTOR-PLAN-W2 L2a) — the tab parks it exactly as `joinRoom` does.
+  const key = tabSession.answer({
     participantId: MM.LOCAL_PARTICIPANT,
-    question: 'brief:' + key,
+    question: 'brief',
     text: `${CONTRACT}\n\n----\n\n${BRIEF}\n\nPropose the tree. The human asked for: “castle with green tops”`,
     aboutIds: [planId],
     at: Date.now(),
   });
+  check('the brief is parked under the tab\'s own node id, in the authored form',
+    !!key && tabSession.getState().nodes.has(key) && key.startsWith('explanation:' + tabMe + ':'), key);
   await tab.appendLog(tabMe, tabSession.getEvents().slice(tabSession.getEvents().length - 1));
 
   let listed = '';
-  for (let i = 0; i < 25 && !new RegExp('brief ' + key).test(listed); i++) {
+  for (let i = 0; i < 25 && !listed.includes('brief ' + key); i++) {
     listed = textOf(await call('space_pending', {}));
-    if (!new RegExp('brief ' + key).test(listed)) await wait(100);
+    if (!listed.includes('brief ' + key)) await wait(100);
   }
-  check('space_pending carries the key, the words, the contract and the brief',
-    new RegExp('brief ' + key).test(listed) && /castle with green tops/.test(listed) && /ONLY a JSON object/.test(listed) && /foundation: one profile/.test(listed),
+  check('space_pending carries the brief by the id the TAB minted, the words, the contract and the brief',
+    listed.includes('brief ' + key) && /castle with green tops/.test(listed) && /ONLY a JSON object/.test(listed) && /foundation: one profile/.test(listed),
     listed);
   check('space_pending says who asked', /from john/.test(listed), listed.split('\n')[0]);
 
@@ -233,7 +240,7 @@ try {
   // the reply had crossed the wire and the check failed on a race of its own
   // making.
   await until(
-    () => heard.some((h) => /^smoke~/.test(h.participant) && h.events.some((e) => e.type === 'answer' && e.question === 'answer:' + key)),
+    () => heard.some((h) => /^smoke~/.test(h.participant) && h.events.some((e) => e.type === 'answer' && e.question === key)),
     4000
   );
   await tabMerge();
@@ -241,8 +248,19 @@ try {
   const reply = after.explanations
     .map((id) => after.nodes.get(id))
     .map((n) => ({ n, rep: n.reps.find((x) => x.modality === 'explanation') }))
-    .find((x) => x.rep && String(x.rep.data.question) === 'answer:' + key);
-  check('the answer lands in the tab, keyed to that brief', !!reply, after.explanations.length);
+    .find((x) => x.rep && String(x.rep.data.question) === key);
+  check('the answer lands in the tab, naming that brief by the id both hands derived', !!reply, after.explanations.length);
+  // The answer as it crossed the wire: its aboutIds are the brief node's own
+  // `about` edges read in the OTHER party's session — the tab's — so no id
+  // was translated anywhere between the two hands.
+  const sentAnswer = heard
+    .filter((h) => /^smoke~/.test(h.participant))
+    .flatMap((h) => h.events)
+    .find((e) => e.type === 'answer' && e.question === key);
+  const briefAbout = after.nodes.get(key).edges.filter((e) => e.rel === 'about').map((e) => e.to);
+  check('its aboutIds are the brief\'s own `about` edges, as the tab reads them',
+    !!sentAnswer && JSON.stringify(sentAnswer.aboutIds) === JSON.stringify(briefAbout) && briefAbout[0] === planId,
+    { sent: sentAnswer && sentAnswer.aboutIds, brief: briefAbout });
   check('and it is the hand\'s, not the tab\'s own', !!reply && reply.n.edges.some((e) => e.rel === 'made-by' && e.to === handId), reply && reply.n.edges);
   check('carrying the tree verbatim, for the shard to read as it reads a model\'s', !!reply && JSON.parse(reply.rep.data.text).steps[0].name === 'castle', reply && reply.rep.data.text);
 
@@ -253,14 +271,12 @@ try {
   check('space_pending is empty again', /no brief is parked/.test(empty), empty);
 
   // ---- a refusal ----------------------------------------------------------
-  const key2 = 'k' + Math.random().toString(36).slice(2, 6);
-  tabSession.answer({ participantId: MM.LOCAL_PARTICIPANT, question: 'brief:' + key2, text: 'nothing much', aboutIds: [planId], at: Date.now() });
+  const key2 = tabSession.answer({ participantId: MM.LOCAL_PARTICIPANT, question: 'brief', text: 'nothing much', aboutIds: [planId], at: Date.now() });
   await tab.appendLog(tabMe, tabSession.getEvents().slice(tabSession.getEvents().length - 1));
-  await until(async () => new RegExp('brief ' + key2).test(textOf(await call('space_pending', {}))), 4000);
   let sawIt = '';
-  for (let i = 0; i < 25 && !new RegExp('brief ' + key2).test(sawIt); i++) {
+  for (let i = 0; i < 25 && !sawIt.includes('brief ' + key2); i++) {
     sawIt = textOf(await call('space_pending', {}));
-    if (!new RegExp('brief ' + key2).test(sawIt)) await wait(100);
+    if (!sawIt.includes('brief ' + key2)) await wait(100);
   }
   const refused = await call('space_answer', { key: key2, refuse: 'nothing is standing for a tree to fill' });
   check('a brief can be refused, with the reason', /refused/.test(textOf(refused)) && /nothing is standing/.test(textOf(refused)), textOf(refused));
