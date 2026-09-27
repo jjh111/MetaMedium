@@ -247,7 +247,7 @@ suite and the gate green, `master` fast-forwarded and pushed.
 
 | Phase | Units | Done when |
 |---|---|---|
-| **0. Make week 1 whole** | L1 ids that hold · L1b one event, applied once · L2a the shard pairs by id · L2b labels on the board · L2c the shard asks · L2d duplicate Enter, fitAll, the cache measured · L2e a person labels their own ink · L2f an artifact is made by whoever blessed it · L3 CI, bundles, docs | every unit week 1 claimed is whole, CI runs what exists (WebKit included), docs say what the code does |
+| **0. Make week 1 whole** | L1 ids that hold · L1b one event, applied once · L2a the shard pairs by id · L2b labels on the board · L2c the shard asks · L2d duplicate Enter, fitAll, the cache measured · L2e a person labels their own ink · L2f an artifact is made by whoever blessed it · L2g a word is made by whoever wrote its letters · L3 CI, bundles, docs | every unit week 1 claimed is whole, CI runs what exists (WebKit included), docs say what the code does |
 | **1. The backbone** | B1 tools · B2 context · B3 packs | a tool is one file; the field ranks by context with reasons; a pack is used by an event and benched |
 | **2. Editing** | E1 handles · E2 bindings follow · E3 ports, heads and figures | a selected mark reshapes by its points; bound arrows follow; notations can declare ports |
 | **3. Diagrams** | D1 flowchart · D2 Mermaid out · D3 Mermaid in · D4 UML class · D5 sequence and state · D6 ER and mind map · D7 routing · D8 the repair demo | A1–A3 pass in the gate |
@@ -408,6 +408,58 @@ to a fresh build; relay and field 40; surface in sync; the canvas MCP smoke
 and the shard's (605 in 31 files, typecheck clean) all pass; the gate 394
 passed and the one honest skip (canvas 248; shard 123 + 11 + 12); WebKit
 smoke 3.
+
+**L2g a word is made by whoever wrote its letters.** Found by L2f: the
+gathering writes every word `made-by` the local participant, whoever wrote
+its letters, so on another hand's board her word reads as the reader's —
+her label on it is dropped there, and that board may label it — while its
+letters draw in her colour. A word is made by the hand that wrote its
+letters on every board: a hand's label on its own word survives every
+replay, another hand's is refused at the door, the letters of two hands
+never gather into one word, and every held log replays as before. *Red
+first:* two hands — A writes a word and labels it, B's board replays A's
+log, B tries to label it — and A's and B's letters interleaved on one band.
+*Trap:* a merge interleaves two hands' events by time, so gathering must
+never see another hand's letter as the next letter of this word.
+
+**L2g status, 27 Sep 2026: done on `w2`** — `9ae7ba9` (red), `a313935`
+(red: the smoke and the gate), `d6d1a37`, `14f28ad` (CLAUDE.md).
+`absorbIntoWord` reads the run over the marks the new stroke's maker made
+and writes the word `made-by` that maker — the attribution each letter
+already carries, "local" in another hand's log meaning that hand. So her
+label on her word survives every replay, attributed to her, and another
+hand's is refused at the door (`not-your-ink`, with her name) and dropped on
+replay, his own board's included; the label rule needed no change. The trap
+was live, not only possible: in the merge's time order the mark before her
+next letter may be his, and taken for her run's last letter it joined her
+word (e2e 44c: this hand's I printed beside fern's word made it five
+letters) or broke it (44: her word split in two where the merge set this
+hand's I between her letters; two hands printing at once on two lines
+gathered no word at all). Read over her own marks, her letters gather into
+her word whoever drew in between, and the letters of two hands — or of a
+hand and a model — never gather into one. A board's own words name its own
+hand as they always did: every held log (none holds a word) replays against
+the `c1aa0ec` bundle node for node — the same ids, nodes, state and next id
+— bare, named, merged as the reader's own, merged with no reader and merged
+as another hand's: 30 of 30; so does single-hand writing, six logs with and
+without a log name in the four ways a reader opens its own log: 48 of 48,
+56 word nodes. `held.test.ts` is unchanged. The MCP hand's look says *by
+tab* on the tab's word and `canvas_label` on it is refused (the smoke, two
+checks); e2e 44–44c (the panel says *by fern*, her label drawn in her hue,
+held it is not this hand's to label, a letter printed beside her word never
+joins it); no surface change — every door reads `authorOf`. *Found, not
+changed:* the session's gesture state — a loop that waits, a summon, a
+selection — is one for the board, not one per hand, so the trap has a
+sibling there. Another hand's stroke that the merge sets between a hand's
+summon and its bless dissolves the summon on replay and the bless is lost on
+every board, the blesser's own included once the room's logs merge (a probe:
+her artifact stands on her live board, and on none of three replays); set
+between a loop and its check, the loop is not taken up and the check reads
+backwards, holding the loop's own ink as a member. Whole suite at the last
+commit: core 804 in 62 files, typecheck clean, both bundles equal to a fresh
+build; relay and field 40; surface in sync; the canvas MCP smoke and the
+shard's (605 in 31 files, typecheck clean) all pass; the gate 398 passed and
+the one honest skip (canvas 252; shard 123 + 11 + 12); WebKit smoke 3.
 
 *L2a status, 26 Sep 2026: done on `w2-shard`* — `0540c1c` (red), `092f747`.
 Taken from `auto/w1-U1d` (6893f53), which takes both prefixes off the write
