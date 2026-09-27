@@ -97,6 +97,9 @@ export interface LiveStoreOptions {
   sitting?: string;
 }
 
+/** How long a line that has not yet gone holds back the next one. */
+export const SEND_WAIT_MS = 10_000;
+
 export interface Presence {
   participant: string;
   /** When their last event landed here (their clock, or ours for a hello). */
@@ -245,9 +248,17 @@ export class LiveStore implements Store {
     const go = (): Promise<void> | undefined => {
       let r: unknown;
       try { r = this.transport.send(line); } catch { return undefined; }
-      return r && typeof (r as Promise<unknown>).then === 'function'
-        ? (r as Promise<unknown>).then(() => undefined, () => undefined)
-        : undefined;
+      if (!r || typeof (r as Promise<unknown>).then !== 'function') return undefined;
+      // Waited for, but never forever: a send that has not settled in
+      // SEND_WAIT_MS lets the next line go rather than wedge the hand.
+      return new Promise<void>((done) => {
+        const timer = setTimeout(done, SEND_WAIT_MS);
+        (timer as unknown as { unref?: () => void }).unref?.();
+        (r as Promise<unknown>).then(
+          () => { clearTimeout(timer); done(); },
+          () => { clearTimeout(timer); done(); }
+        );
+      });
     };
     const settle = (t: Promise<void>) => t.then(() => { if (this.tail === t) this.tail = null; });
     if (!this.tail) {

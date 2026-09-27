@@ -2073,6 +2073,7 @@ var MetaMediumCore = (() => {
   };
 
   // src/store/live.ts
+  var SEND_WAIT_MS = 1e4;
   var LiveStore = class {
     constructor(transport, me, room = "room", opts = {}) {
       this.transport = transport;
@@ -2213,7 +2214,21 @@ var MetaMediumCore = (() => {
         } catch {
           return void 0;
         }
-        return r && typeof r.then === "function" ? r.then(() => void 0, () => void 0) : void 0;
+        if (!r || typeof r.then !== "function") return void 0;
+        return new Promise((done) => {
+          const timer = setTimeout(done, SEND_WAIT_MS);
+          timer.unref?.();
+          r.then(
+            () => {
+              clearTimeout(timer);
+              done();
+            },
+            () => {
+              clearTimeout(timer);
+              done();
+            }
+          );
+        });
       };
       const settle = (t2) => t2.then(() => {
         if (this.tail === t2) this.tail = null;

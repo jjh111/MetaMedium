@@ -1,7 +1,7 @@
 // Two hands on one canvas: two logs arriving live, merged like a folder's.
 
-import { describe, it, expect } from 'vitest';
-import { LiveStore, LocalHub } from './live';
+import { describe, it, expect, vi } from 'vitest';
+import { LiveStore, LocalHub, SEND_WAIT_MS } from './live';
 import { mergeLogs } from './merge';
 import { createSession, DEFAULT_SESSION_CONFIG, type SessionEvent } from '../session/session';
 import { rectStroke, circleStroke } from '../test/strokes';
@@ -263,6 +263,41 @@ describe('live logs', () => {
       w.deliver({ participant: 'ada~1', events: log, at: 5000, full: true, sid: 's-ada' });
       w.deliver({ participant: 'ada~1', events: log.slice(0, 1), at: 3000, full: true, sid: 's-ada', via: 'bob~1' });
       expect((await store.readLogs())['ada~1']).toEqual(log);
+    });
+
+    it('lines leave in the order they were written — and a send that never settles does not wedge the next', async () => {
+      vi.useFakeTimers();
+      try {
+        const went: string[] = [];
+        let release: (() => void) | null = null;
+        const sends: ((line: any) => Promise<void>)[] = [
+          () => new Promise<void>((ok) => { release = ok; }), // the first POST takes its time
+          () => Promise.resolve(),
+          () => new Promise<void>(() => {}),                 // this one never settles
+          () => Promise.resolve(),
+        ];
+        const slow = { send: (line: any) => { went.push(line.full ? 'full' : 'append:' + line.events.length); return sends[went.length - 1](line); }, onMessage: () => () => {} };
+        const store = new LiveStore(slow as any, 'ada~1');
+        const ada = named('ada~1');
+        ada.addStroke(rectStroke(100, 100, 200, 120), 1000);
+        const first = publish(store, mine(ada));
+        ada.addStroke(rectStroke(400, 100, 200, 120), 1100);
+        const second = publish(store, mine(ada));
+        await Promise.resolve();
+        expect(went).toEqual(['full']); // the append waits for the full to have gone
+        release!();
+        await first; await second;
+        expect(went).toEqual(['full', 'append:1']);
+        ada.addStroke(rectStroke(700, 100, 200, 120), 1200);
+        const stuck = publish(store, mine(ada));
+        ada.addStroke(rectStroke(100, 400, 200, 120), 1300);
+        const after = publish(store, mine(ada));
+        await vi.advanceTimersByTimeAsync(SEND_WAIT_MS);
+        await stuck; await after;
+        expect(went).toEqual(['full', 'append:1', 'append:1', 'append:1']);
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
     it('the relay’s word that the room outlived its buffer is a notice, beside the collisions', async () => {
