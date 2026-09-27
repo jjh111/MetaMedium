@@ -1,0 +1,34 @@
+{
+  "about": "The five span types J2 asks for (DIRECTOR-PLAN-W2.md §3 J2), with the descriptions a label may carry into the prompt, and the rules the fixtures were labelled by. Descriptions deliberately name no word that appears in a fixture.",
+  "types": [
+    {
+      "name": "measurement name",
+      "description": "the name of a body or garment measurement, such as hip, inseam or neck"
+    },
+    {
+      "name": "quantity",
+      "description": "a number, a count or a range of numbers, as written"
+    },
+    {
+      "name": "unit",
+      "description": "a unit of length or angle, or its symbol, such as cm, feet or degrees"
+    },
+    {
+      "name": "garment or part name",
+      "description": "a garment, or a named part of the thing being made, such as a sleeve, a roof or a node"
+    },
+    {
+      "name": "operation",
+      "description": "an arithmetic operation or a verb for one, such as plus, minus, times, divided by or halve"
+    }
+  ],
+  "rules": [
+    "Label the words as the drafter wrote them, by what they are, and nothing the text does not say.",
+    "measurement name: the whole name of a measured dimension, connecting words included (Top shoulder to under armpit), and an allowance (seam allowance).",
+    "quantity: a number or a number word, as written; a range is ONE span (3–6, 72–74, 0.8…3.0) and a sign written on the number belongs to it (+29, -1.8…1.0).",
+    "unit: a unit word or symbol that goes with a quantity (\", inch, inches, u, °, world units).",
+    "garment or part name: a garment (apron dress), or a named part of the thing being made (towers, wall, gate, a decision, tops, part 1).",
+    "operation: an arithmetic operator (+ − × ÷ /) or a verb that performs one (Add), and in the shard's brief the ops a reply may ask of a part (raise, cut, mirror, take it out). An = is not an operation: in a running total it marks the next value.",
+    "ignore: spans a careful annotator could type either way, or that belong to another seat, are listed with their reason. A prediction inside one is neither credited nor counted wrong; an ignored span is never required. Step numbers are the decision seat's (J1: is this number an amount or a step?); letter keys and references (A, B, C, ①) are the sheet's (M2); the whole thing being made is neither a garment nor a part (castle, flowchart); ids and the shard brief's words for its own machinery are not words the human wrote."
+  ]
+}

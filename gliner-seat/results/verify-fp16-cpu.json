@@ -1,0 +1,176 @@
+{
+  "model": "fastino/gliner2-multi-v1",
+  "export": "onnx-community/gliner2-multi-v1-agent-ONNX@2d0d8e4",
+  "prompt": [
+    {
+      "text": "Find a one-way ticket from New York to San Francisco on October 9, 2026.",
+      "ok": true,
+      "checks": {
+        "input_ids": true,
+        "word_positions": true,
+        "schema_positions": true,
+        "text_tokens": true,
+        "start_map": true,
+        "end_map": true,
+        "schema_tokens": true
+      },
+      "ids": 159
+    },
+    {
+      "text": "Get directions from Berlin Hauptbahnhof to Brandenburg Gate. Select Walking.",
+      "ok": true,
+      "checks": {
+        "input_ids": true,
+        "word_positions": true,
+        "schema_positions": true,
+        "text_tokens": true,
+        "start_map": true,
+        "end_map": true,
+        "schema_tokens": true
+      },
+      "ids": 152
+    },
+    {
+      "text": "Book a table for 4 people at Nopa on Friday at 7:30 pm.",
+      "ok": true,
+      "checks": {
+        "input_ids": true,
+        "word_positions": true,
+        "schema_positions": true,
+        "text_tokens": true,
+        "start_map": true,
+        "end_map": true,
+        "schema_tokens": true
+      },
+      "ids": 153
+    },
+    {
+      "text": "Search for noise cancelling headphones under $300 and sort by price.",
+      "ok": true,
+      "checks": {
+        "input_ids": true,
+        "word_positions": true,
+        "schema_positions": true,
+        "text_tokens": true,
+        "start_map": true,
+        "end_map": true,
+        "schema_tokens": true
+      },
+      "ids": 151
+    },
+    {
+      "text": "Open the React documentation and find the useEffect page.",
+      "ok": true,
+      "checks": {
+        "input_ids": true,
+        "word_positions": true,
+        "schema_positions": true,
+        "text_tokens": true,
+        "start_map": true,
+        "end_map": true,
+        "schema_tokens": true
+      },
+      "ids": 146
+    },
+    {
+      "text": "Trouver un vol de Paris à Lisbonne le 3 novembre.",
+      "ok": true,
+      "checks": {
+        "input_ids": true,
+        "word_positions": true,
+        "schema_positions": true,
+        "text_tokens": true,
+        "start_map": true,
+        "end_map": true,
+        "schema_tokens": true
+      },
+      "ids": 150
+    }
+  ],
+  "answer": [
+    {
+      "text": "Find a one-way ticket from New York to San Francisco on October 9, 2026.",
+      "ok": true,
+      "maxDelta": 0.00002540041449627939,
+      "found": {
+        "location": [
+          "San Francisco",
+          "New York"
+        ],
+        "date": [
+          "October 9, 2026"
+        ]
+      }
+    },
+    {
+      "text": "Get directions from Berlin Hauptbahnhof to Brandenburg Gate. Select Walking.",
+      "ok": true,
+      "maxDelta": 0.00002190888222697307,
+      "found": {
+        "location": [
+          "Brandenburg Gate",
+          "Berlin Hauptbahnhof"
+        ]
+      }
+    },
+    {
+      "text": "Book a table for 4 people at Nopa on Friday at 7:30 pm.",
+      "ok": true,
+      "maxDelta": 0.0000616782128622928,
+      "found": {
+        "location": [
+          "Nopa"
+        ],
+        "date": [
+          "Friday"
+        ],
+        "time": [
+          "7:30 pm"
+        ],
+        "number": [
+          "4"
+        ]
+      }
+    },
+    {
+      "text": "Search for noise cancelling headphones under $300 and sort by price.",
+      "ok": true,
+      "maxDelta": 0.00010882250998778265,
+      "found": {
+        "money": [
+          "$300"
+        ],
+        "product": [
+          "noise cancelling headphones"
+        ]
+      }
+    },
+    {
+      "text": "Open the React documentation and find the useEffect page.",
+      "ok": true,
+      "maxDelta": 0,
+      "found": {}
+    },
+    {
+      "text": "Trouver un vol de Paris à Lisbonne le 3 novembre.",
+      "ok": true,
+      "maxDelta": 0.00006448401254754987,
+      "found": {
+        "location": [
+          "Lisbonne",
+          "Paris"
+        ],
+        "date": [
+          "3 novembre"
+        ]
+      }
+    }
+  ],
+  "runner": "gliner2-multi-v1 fp16 · onnxruntime-node 1.30.0 · cpu",
+  "worstDelta": 0.00010882250998778265,
+  "summary": {
+    "promptIdentical": "6/6",
+    "answersSame": "6/6",
+    "classificationSkipped": 8
+  }
+}

@@ -301,6 +301,67 @@ what is missing is the act by its right name.
 
 ---
 
+## gliner-seat/ — the extraction seat, a spike (J2)
+
+**Status:** parked with its answer, **not yet** (26 Sep 2026) · Node +
+onnxruntime (node and web), no build step · unit J2 of `V1-PLAN.md`, specified
+in [`DIRECTOR-PLAN-W2.md`](DIRECTOR-PLAN-W2.md) §3; the numbers, the commands
+and the licences are in [`gliner-seat/README.md`](gliner-seat/README.md)
+
+```bash
+cd gliner-seat && npm install
+node fetch.mjs          # the fp16 graph, 633 MB, pinned and sha256-checked (ignored by git)
+node verify.mjs         # the JS processor against the Python library, token for token
+node --test *.test.mjs  # the transport, its fake, the processor, the scorer — no model needed
+node bench/node.mjs --ep webgpu
+```
+
+**Probes** whether the middle layer's `extract` seat (MATHS-PLAN §5) can be
+GLiNER2, and asks four things of it:
+
+- does it run where MetaMedium runs;
+- is it fast enough to ask without a spinner;
+- is its licence one we can ship;
+- does it pull the right typed spans out of our own text?
+
+The text is M1's sample pattern lines, three briefs in words, and the shard's
+part-naming brief: 143 spans labelled by hand as measurement name, quantity,
+unit, garment or part name, and operation.
+
+**What it found.**
+
+- **Where it runs, and how fast.** It runs on the one-graph ONNX export of
+  `fastino/gliner2-multi-v1` (Apache-2.0), through a JavaScript port of the
+  library's processor that is token-identical to the Python original. A line
+  of the page takes 24 ms in a Chromium page on WebGPU and 55 ms in WebKit;
+  in a Node process it takes 23 ms on WebGPU over Metal and 57 ms on the CPU.
+- **What it misses.** It finds the units (28 of 28) and most quantities, which
+  tier 1 reads exactly anyway. It misses most of what a seat would add:
+  measurement names (7 of 11 at best, at 35% precision), part names (6 of 9)
+  and operators (8 of 26). And it reads the label "measurement name" as a
+  measurement.
+- **What it costs a page.** 614 MB on the first visit and about 2.2 GB a tab
+  on WebGPU. CoreML takes none of the graph's nodes.
+- **The smaller model.** GLiNER2.5-small (74M) is faster and worse on our
+  words.
+
+**Feeds the platform:**
+
+- **the seat's shape**: `transport.mjs` mirrors `DecideTransport`, and checks
+  in code that a span is the text's own words and carries no value (never
+  write, never compute, never commit);
+- **the place a seat would run**: a Node process beside the relay, not the
+  page;
+- **what it needs first**: names measured on the real pages (kept out of the
+  repository), a threshold chosen on them (0.3–0.4 here, not 0.5), and the
+  sheet's own names as the labels or a fine-tune;
+- **for decide**: the graph's classification head is a local candidate for
+  decide's Choice questions (not ported);
+- **for any model in a page**: OPFS, not Cache Storage, holds weights that
+  large.
+
+---
+
 ## Design Systems
 
 Two palettes coexist **on purpose**, and the split is by brand, not by drift:

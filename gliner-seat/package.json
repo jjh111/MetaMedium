@@ -1,0 +1,26 @@
+{
+  "name": "gliner-seat",
+  "private": true,
+  "version": "0.0.0",
+  "description": "J2, the extraction seat — a spike: can GLiNER2 pull typed spans out of MetaMedium's own text, locally, fast enough to ask without a spinner?",
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node --test *.test.mjs",
+    "fetch": "node fetch.mjs",
+    "verify": "node verify.mjs",
+    "bench": "node bench/node.mjs",
+    "serve": "node bench/serve.mjs"
+  },
+  "dependencies": {
+    "@huggingface/tokenizers": "0.2.0",
+    "onnxruntime-node": "1.30.0",
+    "onnxruntime-web": "1.30.0"
+  },
+  "devDependencies": {
+    "playwright-core": "1.63.0"
+  }
+}

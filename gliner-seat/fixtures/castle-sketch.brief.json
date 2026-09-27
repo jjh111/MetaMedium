@@ -1,0 +1,567 @@
+{
+  "id": "castle-sketch.brief",
+  "source": "shard-3d/fixtures/exchanges/castle-sketch.ideal.json, `brief` — the part-naming brief the shard sends a model, verbatim",
+  "unit": "the whole brief as one item; the runner reads it in pieces at line breaks",
+  "items": [
+    {
+      "id": "castle-sketch.brief",
+      "text": "WHAT STANDS — artifact:7 “hull”, a HULL the space stood from the drawing, 2.2 × 2.8 u on the ground and 0.9 u tall. It is already standing, in the engine's name, and it is the extent your reply must stay inside.\nTHE FOOTPRINT: 6.0 × 4.0 u, drawn on the ground as stroke:1.\nTHE EXTENT, in world units: x 0.8…3.0, y -0.0…0.9, z -1.8…1.0. Nothing you propose may leave it; whatever does is cut off.\n\nTHE PARTS — 2 pieces the engine can point at, in its own ids. Say what each one IS and what it is made of, by its id. Do not invent geometry for one:\n  part 1 — 1.8 × 1.4 u on the footprint, 0.3 u tall, along the east edge; from stroke:2 (drawn from 64° · +29°) and stroke:9 (drawn from 135° · +22°)\n  part 2 — 1.6 × 1.7 u on the footprint, 0.9 u tall, at the north-east corner; from stroke:8 (drawn from 64° · +29°)\n\nNAMES IN PLAY: none. Nothing here has been named yet, so every name in your reply is a new one, and it should come from the words below.\n\nDEFINITIONS THE LIBRARY HOLDS: none yet.\n\nTHE WORDS THE HUMAN TYPED: “castle with green tops”\n\nTHE SPACE holds only these: INK lying on a plane, the three world PLANES — foundation (the ground, seen from the top), height (the wall you face) and width (the wall on your right) — a standing HULL, and the PARTS it is cut into, each with an id of its own. What you may say about a part: a NAME (the human's own word for it), a MATERIAL (one colour word), and a small op BY PART ID — raise it, cut a hole through its top, mirror it, or take it out. Nothing else exists here — no meshes, no vertices, no triangles, no code, no files, no libraries, no textures, lights or cameras, and no units but the ones the parts were given in. **You do not write geometry, and you do not add profiles.** The drawing already said what the shape is; you say what it is.",
+      "spans": [
+        {
+          "label": "quantity",
+          "text": "2.2",
+          "start": 74,
+          "end": 77
+        },
+        {
+          "label": "quantity",
+          "text": "2.8",
+          "start": 80,
+          "end": 83
+        },
+        {
+          "label": "unit",
+          "text": "u",
+          "start": 84,
+          "end": 85
+        },
+        {
+          "label": "quantity",
+          "text": "0.9",
+          "start": 104,
+          "end": 107
+        },
+        {
+          "label": "unit",
+          "text": "u",
+          "start": 108,
+          "end": 109
+        },
+        {
+          "label": "quantity",
+          "text": "6.0",
+          "start": 227,
+          "end": 230
+        },
+        {
+          "label": "quantity",
+          "text": "4.0",
+          "start": 233,
+          "end": 236
+        },
+        {
+          "label": "unit",
+          "text": "u",
+          "start": 237,
+          "end": 238
+        },
+        {
+          "label": "unit",
+          "text": "world units",
+          "start": 288,
+          "end": 299
+        },
+        {
+          "label": "quantity",
+          "text": "0.8…3.0",
+          "start": 303,
+          "end": 310
+        },
+        {
+          "label": "quantity",
+          "text": "-0.0…0.9",
+          "start": 314,
+          "end": 322
+        },
+        {
+          "label": "quantity",
+          "text": "-1.8…1.0",
+          "start": 326,
+          "end": 334
+        },
+        {
+          "label": "quantity",
+          "text": "2",
+          "start": 409,
+          "end": 410
+        },
+        {
+          "label": "garment or part name",
+          "text": "part 1",
+          "start": 549,
+          "end": 555
+        },
+        {
+          "label": "quantity",
+          "text": "1.8",
+          "start": 558,
+          "end": 561
+        },
+        {
+          "label": "quantity",
+          "text": "1.4",
+          "start": 564,
+          "end": 567
+        },
+        {
+          "label": "unit",
+          "text": "u",
+          "start": 568,
+          "end": 569
+        },
+        {
+          "label": "quantity",
+          "text": "0.3",
+          "start": 588,
+          "end": 591
+        },
+        {
+          "label": "unit",
+          "text": "u",
+          "start": 592,
+          "end": 593
+        },
+        {
+          "label": "quantity",
+          "text": "64",
+          "start": 647,
+          "end": 649
+        },
+        {
+          "label": "unit",
+          "text": "°",
+          "start": 649,
+          "end": 650
+        },
+        {
+          "label": "quantity",
+          "text": "+29",
+          "start": 653,
+          "end": 656
+        },
+        {
+          "label": "unit",
+          "text": "°",
+          "start": 656,
+          "end": 657
+        },
+        {
+          "label": "quantity",
+          "text": "135",
+          "start": 684,
+          "end": 687
+        },
+        {
+          "label": "unit",
+          "text": "°",
+          "start": 687,
+          "end": 688
+        },
+        {
+          "label": "quantity",
+          "text": "+22",
+          "start": 691,
+          "end": 694
+        },
+        {
+          "label": "unit",
+          "text": "°",
+          "start": 694,
+          "end": 695
+        },
+        {
+          "label": "garment or part name",
+          "text": "part 2",
+          "start": 699,
+          "end": 705
+        },
+        {
+          "label": "quantity",
+          "text": "1.6",
+          "start": 708,
+          "end": 711
+        },
+        {
+          "label": "quantity",
+          "text": "1.7",
+          "start": 714,
+          "end": 717
+        },
+        {
+          "label": "unit",
+          "text": "u",
+          "start": 718,
+          "end": 719
+        },
+        {
+          "label": "quantity",
+          "text": "0.9",
+          "start": 738,
+          "end": 741
+        },
+        {
+          "label": "unit",
+          "text": "u",
+          "start": 742,
+          "end": 743
+        },
+        {
+          "label": "quantity",
+          "text": "64",
+          "start": 802,
+          "end": 804
+        },
+        {
+          "label": "unit",
+          "text": "°",
+          "start": 804,
+          "end": 805
+        },
+        {
+          "label": "quantity",
+          "text": "+29",
+          "start": 808,
+          "end": 811
+        },
+        {
+          "label": "unit",
+          "text": "°",
+          "start": 811,
+          "end": 812
+        },
+        {
+          "label": "garment or part name",
+          "text": "tops",
+          "start": 1041,
+          "end": 1045
+        },
+        {
+          "label": "quantity",
+          "text": "three",
+          "start": 1102,
+          "end": 1107
+        },
+        {
+          "label": "quantity",
+          "text": "one",
+          "start": 1387,
+          "end": 1390
+        },
+        {
+          "label": "operation",
+          "text": "raise",
+          "start": 1433,
+          "end": 1438
+        },
+        {
+          "label": "operation",
+          "text": "cut",
+          "start": 1443,
+          "end": 1446
+        },
+        {
+          "label": "operation",
+          "text": "mirror",
+          "start": 1471,
+          "end": 1477
+        },
+        {
+          "label": "operation",
+          "text": "take it out",
+          "start": 1485,
+          "end": 1496
+        }
+      ],
+      "ignore": [
+        {
+          "text": "artifact:7",
+          "start": 14,
+          "end": 24,
+          "why": "an engine id, not a word the human wrote"
+        },
+        {
+          "text": "hull",
+          "start": 26,
+          "end": 30,
+          "why": "the shard's name for its own machinery, not a part of the thing being made"
+        },
+        {
+          "text": "HULL",
+          "start": 35,
+          "end": 39,
+          "why": "the shard's name for its own machinery, not a part of the thing being made"
+        },
+        {
+          "text": "×",
+          "start": 78,
+          "end": 79,
+          "why": "the \"by\" of a size, not an operation to perform"
+        },
+        {
+          "text": "tall",
+          "start": 110,
+          "end": 114,
+          "why": "names a dimension by an adjective; an annotator could go either way"
+        },
+        {
+          "text": "extent",
+          "start": 176,
+          "end": 182,
+          "why": "a region, arguably a measured dimension"
+        },
+        {
+          "text": "FOOTPRINT",
+          "start": 216,
+          "end": 225,
+          "why": "the shard's name for its own machinery, not a part of the thing being made"
+        },
+        {
+          "text": "×",
+          "start": 231,
+          "end": 232,
+          "why": "the \"by\" of a size, not an operation to perform"
+        },
+        {
+          "text": "stroke:1",
+          "start": 263,
+          "end": 271,
+          "why": "an engine id, not a word the human wrote"
+        },
+        {
+          "text": "EXTENT",
+          "start": 277,
+          "end": 283,
+          "why": "a region, arguably a measured dimension"
+        },
+        {
+          "text": "x",
+          "start": 301,
+          "end": 302,
+          "why": "an axis of the extent, which names a direction, not a measurement"
+        },
+        {
+          "text": "y",
+          "start": 312,
+          "end": 313,
+          "why": "an axis of the extent, which names a direction, not a measurement"
+        },
+        {
+          "text": "z",
+          "start": 324,
+          "end": 325,
+          "why": "an axis of the extent, which names a direction, not a measurement"
+        },
+        {
+          "text": "cut off",
+          "start": 387,
+          "end": 394,
+          "why": "clipping, which is the shard's act, not one the reply asks for"
+        },
+        {
+          "text": "PARTS",
+          "start": 401,
+          "end": 406,
+          "why": "a generic word for the category, not a name"
+        },
+        {
+          "text": "pieces",
+          "start": 411,
+          "end": 417,
+          "why": "a generic word for the category, not a name"
+        },
+        {
+          "text": "1",
+          "start": 554,
+          "end": 555,
+          "why": "the number inside a part's id"
+        },
+        {
+          "text": "×",
+          "start": 562,
+          "end": 563,
+          "why": "the \"by\" of a size, not an operation to perform"
+        },
+        {
+          "text": "footprint",
+          "start": 577,
+          "end": 586,
+          "why": "the shard's name for its own machinery, not a part of the thing being made"
+        },
+        {
+          "text": "tall",
+          "start": 594,
+          "end": 598,
+          "why": "names a dimension by an adjective; an annotator could go either way"
+        },
+        {
+          "text": "east edge",
+          "start": 610,
+          "end": 619,
+          "why": "a place on the footprint"
+        },
+        {
+          "text": "stroke:2",
+          "start": 626,
+          "end": 634,
+          "why": "an engine id, not a word the human wrote"
+        },
+        {
+          "text": "stroke:9",
+          "start": 663,
+          "end": 671,
+          "why": "an engine id, not a word the human wrote"
+        },
+        {
+          "text": "2",
+          "start": 704,
+          "end": 705,
+          "why": "the number inside a part's id"
+        },
+        {
+          "text": "×",
+          "start": 712,
+          "end": 713,
+          "why": "the \"by\" of a size, not an operation to perform"
+        },
+        {
+          "text": "footprint",
+          "start": 727,
+          "end": 736,
+          "why": "the shard's name for its own machinery, not a part of the thing being made"
+        },
+        {
+          "text": "tall",
+          "start": 744,
+          "end": 748,
+          "why": "names a dimension by an adjective; an annotator could go either way"
+        },
+        {
+          "text": "north-east corner",
+          "start": 757,
+          "end": 774,
+          "why": "a place on the footprint"
+        },
+        {
+          "text": "stroke:8",
+          "start": 781,
+          "end": 789,
+          "why": "an engine id, not a word the human wrote"
+        },
+        {
+          "text": "castle",
+          "start": 1023,
+          "end": 1029,
+          "why": "the whole thing being made, which is neither a garment nor a part"
+        },
+        {
+          "text": "PLANES",
+          "start": 1114,
+          "end": 1120,
+          "why": "a generic word for the category, not a name"
+        },
+        {
+          "text": "foundation",
+          "start": 1123,
+          "end": 1133,
+          "why": "a world plane's name (or the brief's metaphor for one), not a part of the castle"
+        },
+        {
+          "text": "top",
+          "start": 1161,
+          "end": 1164,
+          "why": "the side a plane is seen from"
+        },
+        {
+          "text": "height",
+          "start": 1167,
+          "end": 1173,
+          "why": "a world plane's name (or the brief's metaphor for one), not a part of the castle"
+        },
+        {
+          "text": "wall",
+          "start": 1179,
+          "end": 1183,
+          "why": "a world plane's name (or the brief's metaphor for one), not a part of the castle"
+        },
+        {
+          "text": "width",
+          "start": 1198,
+          "end": 1203,
+          "why": "a world plane's name (or the brief's metaphor for one), not a part of the castle"
+        },
+        {
+          "text": "wall",
+          "start": 1209,
+          "end": 1213,
+          "why": "a world plane's name (or the brief's metaphor for one), not a part of the castle"
+        },
+        {
+          "text": "HULL",
+          "start": 1242,
+          "end": 1246,
+          "why": "the shard's name for its own machinery, not a part of the thing being made"
+        },
+        {
+          "text": "PARTS",
+          "start": 1256,
+          "end": 1261,
+          "why": "a generic word for the category, not a name"
+        },
+        {
+          "text": "cut into",
+          "start": 1268,
+          "end": 1276,
+          "why": "the engine's act of making the parts"
+        },
+        {
+          "text": "part",
+          "start": 1331,
+          "end": 1335,
+          "why": "a generic word for the category, not a name"
+        },
+        {
+          "text": "op",
+          "start": 1417,
+          "end": 1419,
+          "why": "a generic word for the category, not a name"
+        },
+        {
+          "text": "PART",
+          "start": 1423,
+          "end": 1427,
+          "why": "a generic word for the category, not a name"
+        },
+        {
+          "text": "hole",
+          "start": 1449,
+          "end": 1453,
+          "why": "a feature an op makes, not a part the human named"
+        },
+        {
+          "text": "top",
+          "start": 1466,
+          "end": 1469,
+          "why": "a face of a part"
+        },
+        {
+          "text": "units",
+          "start": 1635,
+          "end": 1640,
+          "why": "a generic word for the category, not a name"
+        },
+        {
+          "text": "parts",
+          "start": 1658,
+          "end": 1663,
+          "why": "a generic word for the category, not a name"
+        },
+        {
+          "text": "add",
+          "start": 1723,
+          "end": 1726,
+          "why": "adding profiles, not arithmetic"
+        }
+      ]
+    }
+  ]
+}
