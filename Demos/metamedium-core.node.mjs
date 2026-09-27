@@ -7843,7 +7843,9 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
   }
   function absorbIntoWord(node, fp, at, scale) {
     if (!isLetterLike(fp.bounds, scale) || neverLetter(node)) return false;
-    const prevId = contentIds.filter((id) => id !== node.id).pop();
+    const maker = authorOf(node);
+    const ordered2 = contentIds.filter((id) => id !== node.id && authorOf(nodes.get(id)) === maker);
+    const prevId = ordered2[ordered2.length - 1];
     if (!prevId) return false;
     const prev = nodes.get(prevId);
     const letter = { bounds: fp.bounds, at };
@@ -7865,8 +7867,7 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
     if (!j.ok) return false;
     const run = [first];
     let bounds = first.bounds;
-    const ordered2 = contentIds.filter((id) => id !== node.id);
-    for (let i = ordered2.indexOf(prevId) - 1; i >= 0; i--) {
+    for (let i = ordered2.length - 2; i >= 0; i--) {
       const cand = letterCandidate(ordered2[i], scale);
       if (!cand) break;
       const back = joinsRun({ bounds, lastAt: cand.at }, { bounds: cand.bounds, at: run[0].at }, cand.scale);
@@ -7875,7 +7876,7 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
       bounds = { minX: Math.min(bounds.minX, cand.bounds.minX), minY: Math.min(bounds.minY, cand.bounds.minY), maxX: Math.max(bounds.maxX, cand.bounds.maxX), maxY: Math.max(bounds.maxY, cand.bounds.maxY) };
     }
     const letterIds = run.map((r) => r.node.id).concat(node.id);
-    const word = { id: nextId("word"), reps: [], edges: [{ to: LOCAL_PARTICIPANT, rel: "made-by" }], capability: 0, createdAt: at };
+    const word = { id: nextId("word"), reps: [], edges: [{ to: maker, rel: "made-by" }], capability: 0, createdAt: at };
     nodes.set(word.id, word);
     setWordReps(word, letterIds);
     for (const id of letterIds) {

@@ -1744,10 +1744,24 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     return { node: n, bounds: fp.bounds, at: st.at, scale: sc };
   }
 
-  /** The stroke just made: does it continue a word, or start one with the strokes before it? */
+  /**
+   * The stroke just made: does it continue a word, or start one with the strokes before it?
+   *
+   * A word is ONE hand's run (V1-PLAN L2g), so the run is read over the marks
+   * this stroke's maker made, never the board's last mark whoever made it: a
+   * merge interleaves the hands' events by time, and the mark just before her
+   * next letter may be his — taken for the last letter of her run, it joined
+   * her word or broke it in two. The word is made by the hand that wrote its
+   * letters, on every board (the gathering wrote the local participant whoever
+   * wrote them, so her word read as the reader's everywhere else, and the
+   * label rule took her word on it for a stranger's). A board's own words name
+   * its own hand as they always did, so every held log replays node for node.
+   */
   function absorbIntoWord(node: MMNode, fp: Fingerprint, at: number, scale: number): boolean {
     if (!isLetterLike(fp.bounds, scale) || neverLetter(node)) return false;
-    const prevId = contentIds.filter((id) => id !== node.id).pop();
+    const maker = authorOf(node);
+    const ordered = contentIds.filter((id) => id !== node.id && authorOf(nodes.get(id)!) === maker);
+    const prevId = ordered[ordered.length - 1];
     if (!prevId) return false;
     const prev = nodes.get(prevId)!;
     const letter = { bounds: fp.bounds, at };
@@ -1772,12 +1786,11 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     const j = joinsRun({ bounds: first.bounds, lastAt: first.at }, letter, scale);
     if (!j.ok) return false;
 
-    // Gather back: the letters written just before these two, while each
-    // still sits on the run's line and came within the window of the next.
+    // Gather back: the letters this hand wrote just before these two, while
+    // each still sits on the run's line and came within the window of the next.
     const run = [first];
     let bounds = first.bounds;
-    const ordered = contentIds.filter((id) => id !== node.id);
-    for (let i = ordered.indexOf(prevId) - 1; i >= 0; i--) {
+    for (let i = ordered.length - 2; i >= 0; i--) {
       const cand = letterCandidate(ordered[i], scale);
       if (!cand) break;
       const back = joinsRun({ bounds, lastAt: cand.at }, { bounds: cand.bounds, at: run[0].at }, cand.scale);
@@ -1788,8 +1801,9 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     const letterIds = run.map((r) => r.node.id).concat(node.id);
 
     // The word takes their place in the content plane, where the first
-    // letter stood, so reading order is where the writing began.
-    const word: MMNode = { id: nextId('word'), reps: [], edges: [{ to: LOCAL_PARTICIPANT, rel: 'made-by' }], capability: 0, createdAt: at };
+    // letter stood, so reading order is where the writing began. It is made
+    // by the hand that wrote them.
+    const word: MMNode = { id: nextId('word'), reps: [], edges: [{ to: maker, rel: 'made-by' }], capability: 0, createdAt: at };
     nodes.set(word.id, word);
     setWordReps(word, letterIds);
     for (const id of letterIds) {
