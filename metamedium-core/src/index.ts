@@ -239,8 +239,14 @@ export { printTiled, PAPERS } from './maths/print';
 export type { Paper, Orientation, PaperSize, PrintOptions, PrintPage, PrintJob } from './maths/print';
 
 // Magnets — the places a mark offers attachment, derived from its clean form.
-export { magnetSites, nearestMagnet, magnetsNear, magnetRadius, describeMagnet, MAGNET_SCREEN_PX, MAGNET_SIZE_FRACTION } from './session/magnets';
+export { magnetSites, nearestMagnet, magnetsNear, magnetRadius, describeMagnet, siteOf, MAGNET_SCREEN_PX, MAGNET_SIZE_FRACTION } from './session/magnets';
 export type { MagnetSite, MagnetKind, MagnetHit } from './session/magnets';
+// Ports by notation (V1-PLAN E3) — the one hook beside magnetSites: a notation
+// that reads a mark as its symbol offers that symbol's ports, points and places
+// along a segment or an outline, through the same queries the pen asks. None
+// registered, nothing changes.
+export { registerPorts, unregisterPorts, registeredPorts, alongIndex, alongOf, ALONG_STEPS } from './session/ports';
+export type { NotationPort, NotationPorts } from './session/ports';
 export { bindingsOf, boundRepsOf, activeBindingsOf, boundToMark, describeBinding } from './session/magnets';
 export type { Binding, BoundRep } from './session/magnets';
 
