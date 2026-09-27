@@ -297,7 +297,8 @@ Found on the way and fixed (`f78522e` red, `c26f850`): `space_pending` lost
 the human's words on every parts brief. Shard smoke 31 checks (28 before).
 
 *L2c status, 26 Sep 2026: done on `w2-shard`* — `1a285fa` (red), `ac2e069`,
-records in `22641f9`. Base `auto/w1-U3` (1acaff7), the attempt that asks on
+records in `22641f9`, and a plan read as the form rung reads one
+(`4cbe983` red, `30634a2`). Base `auto/w1-U3` (1acaff7), the attempt that asks on
 the explanation plane; neither attempt passed the week-1 checks (asked only
 by a deliberate call or not on the plane at all, per part, a word that left
 the body as deep as it was), so the regression is those checks. The hull asks
