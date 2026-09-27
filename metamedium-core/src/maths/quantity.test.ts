@@ -172,6 +172,15 @@ describe('formatQuantity — for people', () => {
     expect(formatQuantity(q("2'"))).toBe('2′');
     expect(formatQuantity(arithmetic('*', q('24"'), q('8"')).quantity!)).toBe('192 in²');
   });
+
+  it('a number written as a fraction stays a fraction; a computed one is decimal unless asked', () => {
+    expect(formatQuantity(q('5/8"'))).toBe('⅝″');
+    expect(formatQuantity(q('1 1/2'))).toBe('1½');
+    expect(formatQuantity(q('3 5/16"'))).toBe('3 5/16″');
+    expect(formatQuantity(quantity(9.625, 'in'))).toBe('9.63″');
+    expect(formatQuantity(quantity(9.625, 'in'), { fractions: 16 })).toBe('9⅝″');
+    expect(formatQuantity(quantity(38 / 3, 'in'), { fractions: 16 })).toBe('12.67″');
+  });
 });
 
 describe('compareQuantities — a written result against the computed one', () => {

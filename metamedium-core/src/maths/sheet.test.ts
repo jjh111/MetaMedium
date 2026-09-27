@@ -208,6 +208,28 @@ describe('what a sheet never does: throw, guess, or settle', () => {
     expect(sheet.entries[0]).toMatchObject({ at: { x: 10, y: 20 }, ids: ['stroke:7'] });
   });
 
+  it('a heading may state its amount; a step that adds it itself is not read twice', () => {
+    const sheet = readSheet(['A. Bust 36', 'Add 5/8" seam allowance', '1. A', '2. A ÷ 4 + 5/8']);
+    const h = sheet.entries[1];
+    expect(h.kind === 'heading' && h.allowance).toMatchObject({ label: 'with seam allowance', from: [] });
+    expect(h.kind === 'heading' && fmt(h.allowance!.amount)).toBe('⅝″');
+    expect(step(sheet, '1').readings.map((r) => [fmt(r.value), r.label ?? null])).toEqual([['36″', null], ['36.63″', 'with seam allowance']]);
+    expect(step(sheet, '2').readings).toHaveLength(1);
+  });
+
+  it('mixed units convert, and the reading says so', () => {
+    const sheet = readSheet(['A. Bust 91 cm', 'B. Waist 30"', '1. A + B']);
+    expect(fmt(step(sheet, '1').value)).toBe('167.2 cm');
+    expect(step(sheet, '1').reason).toMatch(/30″ is 76\.2 cm/);
+  });
+
+  it('a step with no value says why, in the sheet\'s own description too', () => {
+    const d = describeSheet(readSheet(['1. ② + 1', '2. ① + 1', '3. ① × 2', '4. Waist ÷ 4']));
+    expect(d).toMatch(/1\. ② \+ 1 — .*cycle/);
+    expect(d).toMatch(/3\. ① × 2 — step 1 is in a cycle/);
+    expect(d).toMatch(/4\. Waist ÷ 4 — Waist is not on this sheet/);
+  });
+
   it('a unit given is the unit a bare measurement takes; no unit anywhere leaves numbers bare', () => {
     expect(fmt(sheetValue(readSheet(['A. Bust 91'], { unit: 'cm' }), 'A'))).toBe('91 cm');
     const bare = readSheet(['A. 3', '1. A × 2']);

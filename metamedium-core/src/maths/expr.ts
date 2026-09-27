@@ -782,6 +782,8 @@ export interface MathsScope {
   step?(n: number): NameResolution | undefined;
   /** The unit a bare measurement takes — a name a worked line put 36 for is 36 of this. */
   unit?: LengthUnit | null;
+  /** How to say that nothing here defines a name: "Waist is not on this sheet". */
+  describeUnknown?(name: string): string;
 }
 
 /** A scope from plain tables — for tests, and for a caller with the numbers already in hand. */
@@ -825,7 +827,7 @@ export interface ExprEvaluation {
   worked: string;
   /** Keys of the definitions and steps it read. */
   uses: string[];
-  /** Names and steps nothing resolved. */
+  /** Names nothing resolved. (A step that is not there, or has no value, is said in `notes`.) */
   unknowns: string[];
   notes: string[];
   resolved: Resolved[];
@@ -897,7 +899,6 @@ export function evaluateExpr(expr: Expr, scope: MathsScope = {}, options: EvalOp
             shown.set(e, formatQuantity(r.value));
             return r.value;
           }
-          unknowns.add(e.text);
           note(r.reason ?? `step ${e.step} has no value`);
           return null;
         }
@@ -908,7 +909,6 @@ export function evaluateExpr(expr: Expr, scope: MathsScope = {}, options: EvalOp
           shown.set(e, String(e.step));
           return n;
         }
-        unknowns.add(e.text);
         note(`there is no step ${e.step}`);
         return null;
       }
@@ -1305,8 +1305,10 @@ export function evaluateChain(chain: ExprChain, scope: MathsScope = {}): ChainRe
   const plural = first.readings.length > 1;
   return runs.map((run): ChainReading => {
     const ev = evaluateExpr(run.cur, scope, { label: run.label, bindings: run.acc.bindings });
-    const notes = [...run.notes, ...ev.notes];
-    for (const u of ev.unknowns) if (!notes.some((n) => n.includes(u))) notes.push(`${u} is not defined`);
+    const unknown = (u: string) => scope.describeUnknown?.(u) ?? `${u} is not defined`;
+    const notes = [...run.notes];
+    for (const n of ev.notes) if (!notes.includes(n)) notes.push(n);
+    for (const u of ev.unknowns) if (!notes.some((n) => n.includes(u))) notes.push(unknown(u));
     const formula = formatExpr(run.cur);
     const clauses: string[] = [];
     if (plural) clauses.push(run.reading.reason);
@@ -1339,7 +1341,8 @@ export function evaluateChain(chain: ExprChain, scope: MathsScope = {}): ChainRe
             : 'every written number checks'
       );
     }
-    for (const u of ev.unknowns) clauses.push(`${u} is not defined`);
+    // What the arithmetic had to say on the way: a conversion, a carried result, a step that is not there.
+    for (const n of notes) if (!clauses.includes(n)) clauses.push(n);
     return {
       expr: run.cur,
       formula,

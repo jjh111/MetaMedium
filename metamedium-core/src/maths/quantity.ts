@@ -119,8 +119,38 @@ export function unitSuffix(unit: LengthUnit | null, dim: number, words = false):
   return ' per ' + unit + (dim < -1 ? (sup[-dim] ?? `^${-dim}`) : '');
 }
 
-export function formatQuantity(q: Quantity, opts: { digits?: number; words?: boolean } = {}): string {
-  const n = (v: number) => formatNumber(v, opts.digits ?? 2);
+const FRACTION_GLYPH: Record<string, string> = {
+  '1/2': '½', '1/3': '⅓', '2/3': '⅔', '1/4': '¼', '3/4': '¾', '1/5': '⅕', '2/5': '⅖', '3/5': '⅗', '4/5': '⅘',
+  '1/6': '⅙', '5/6': '⅚', '1/8': '⅛', '3/8': '⅜', '5/8': '⅝', '7/8': '⅞',
+};
+const FRACTION_DENOMINATORS = [2, 3, 4, 8, 16, 32];
+
+const gcd = (a: number, b: number): number => (b === 0 ? a : gcd(b, a % b));
+
+/** 5.625 in eighths is 5⅝; null when the value is not a whole number of `den`ths, or is whole. */
+function asFraction(v: number, den: number): string | null {
+  const n = Math.round(v * den);
+  if (Math.abs(v * den - n) > 1e-6 || n % den === 0) return null;
+  const whole = Math.trunc(Math.abs(n) / den);
+  const rem = Math.abs(n) % den;
+  const g = gcd(rem, den);
+  const f = `${rem / g}/${den / g}`;
+  const glyph = FRACTION_GLYPH[f];
+  const sign = v < 0 ? '−' : '';
+  if (!whole) return sign + (glyph ?? f);
+  return sign + String(whole) + (glyph ?? ` ${f}`);
+}
+
+/**
+ * A quantity for people: `36″`, `2–4″`, `~41″`, `12.67″`, `61 cm`, `192 in²`.
+ * A number written as a fraction stays a fraction (`⅝″`, `1½`) — its
+ * precision says so; a computed one is decimal unless `fractions` asks for a
+ * denominator (16 prints 9.625 as 9⅝).
+ */
+export function formatQuantity(q: Quantity, opts: { digits?: number; words?: boolean; fractions?: number } = {}): string {
+  const written = q.precision && q.precision < 1 ? Math.round(1 / q.precision) : 0;
+  const den = opts.fractions ?? (FRACTION_DENOMINATORS.includes(written) && Math.abs(1 / q.precision! - written) < 1e-9 ? written : 0);
+  const n = (v: number) => (den ? asFraction(v, den) : null) ?? formatNumber(v, opts.digits ?? 2);
   let body: string;
   if (!isRange(q)) body = n(q.lo);
   else if (q.lo < 0 || q.hi < 0) body = `${n(q.lo)} to ${n(q.hi)}`;

@@ -143,6 +143,31 @@ export type {
   WorkedBinding,
   ChainReading,
 } from './maths/expr';
+// The sheet (M2): lines of writing or text become definitions, steps, checks
+// and headings; a heading that says to add something is an allowance, read
+// both ways; a pure function of its lines, so a changed measurement
+// re-derives exactly what depends on it. `sheetLines` gathers the lines from
+// a session's state and changes nothing in it.
+export { readSheet, sheetEntry, sheetValue, dependentsOf, checkWritten, diffSheets, describeSheet } from './maths/sheet';
+export type {
+  Sheet,
+  SheetEntry,
+  SheetLineInput,
+  SheetOptions,
+  DefinitionEntry,
+  StepEntry,
+  HeadingEntry,
+  CheckEntry,
+  WorkedEntry,
+  LabelEntry,
+  ValueEntry,
+  NoteEntry,
+  Allowance,
+  StepCheck,
+  StepCheckStatus,
+} from './maths/sheet';
+export { sheetLines } from './maths/gather';
+export type { GatheredLine } from './maths/gather';
 
 // Magnets — the places a mark offers attachment, derived from its clean form.
 export { magnetSites, nearestMagnet, magnetsNear, magnetRadius, describeMagnet, MAGNET_SCREEN_PX, MAGNET_SIZE_FRACTION } from './session/magnets';
