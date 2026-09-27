@@ -247,7 +247,7 @@ suite and the gate green, `master` fast-forwarded and pushed.
 
 | Phase | Units | Done when |
 |---|---|---|
-| **0. Make week 1 whole** | L1 ids that hold · L1b one event, applied once · L2a the shard pairs by id · L2b labels on the board · L2c the shard asks · L2d duplicate Enter, fitAll, the cache measured · L2e a person labels their own ink · L3 CI, bundles, docs | every unit week 1 claimed is whole, CI runs what exists (WebKit included), docs say what the code does |
+| **0. Make week 1 whole** | L1 ids that hold · L1b one event, applied once · L2a the shard pairs by id · L2b labels on the board · L2c the shard asks · L2d duplicate Enter, fitAll, the cache measured · L2e a person labels their own ink · L2f an artifact is made by whoever blessed it · L3 CI, bundles, docs | every unit week 1 claimed is whole, CI runs what exists (WebKit included), docs say what the code does |
 | **1. The backbone** | B1 tools · B2 context · B3 packs | a tool is one file; the field ranks by context with reasons; a pack is used by an event and benched |
 | **2. Editing** | E1 handles · E2 bindings follow · E3 ports, heads and figures | a selected mark reshapes by its points; bound arrows follow; notations can declare ports |
 | **3. Diagrams** | D1 flowchart · D2 Mermaid out · D3 Mermaid in · D4 UML class · D5 sequence and state · D6 ER and mind map · D7 routing · D8 the repair demo | A1–A3 pass in the gate |
@@ -364,6 +364,50 @@ clean, both bundles equal to a fresh build; relay and field 40; surface in
 sync; the canvas MCP smoke and the shard's (573 in 30 files, typecheck
 clean) all pass; the gate 384 passed and the one honest skip (canvas 244;
 shard 120 + 11 + 9); WebKit smoke 3.
+
+**L2f an artifact is made by whoever blessed it.** Found by L2e: a bless
+writes no `made-by` edge, so every board reads an artifact as its own
+reader's — in a room the maker's label on her own artifact is dropped when
+another hand's board replays her log, and another hand may label it at its
+own door. An artifact blessed by a hand is made by that hand on every board
+that replays the log, the attribution a stroke gets: its labels follow the
+label rule everywhere, the surface says whose it is, and a single-hand board
+and every held log replay as before. *Red first:* two hands — A blesses a
+group and labels it, B's board replays A's log, B tries to label it — and
+the replay-unchanged check for every held log. *Trap:* the maker is who
+blessed it, not who drew its marks.
+
+**L2f status, 27 Sep 2026: done on `w2`** — `c004c8e` (red), `34358ac`
+(red, revised before the fix), `6da3554`, `de471c0`, `2358bfb` (CLAUDE.md).
+`applyBless` writes `made-by` for whoever blessed: the participant the bless
+names, "local" in another hand's log meaning that hand. So the maker's word
+on her artifact survives every replay, attributed to her, and another hand's
+is refused at the door (`not-your-ink`, with her name) and dropped on replay.
+Not who drew its marks: a hand may bless a group two hands drew — the thing
+is the blesser's and each mark stays its drawer's, drawn inside it in its
+drawer's colour (`inkOf`'s `byMaker`; it had been drawn in the artifact's).
+A bless is a person's act: the shard blesses its hulls in the engine's name
+inside its hand's act, and those are the hand's, the engine keeping its name
+on the word — the first red asked for the engine's, which would have moved
+the shard's two boards by an edge each and let no person label a hull, and
+was revised before the fix. The edge is written only for a maker other than
+the board's own hand, so every held log (`Demos/recordings/*.json`,
+`shard-3d/fixtures/*.mm.log`) replays against the `ff330a9` bundle node for
+node — the same ids, nodes, state and next id — bare, named, merged as the
+reader's own and merged with no reader: 24 of 24; merged as another hand's,
+the four logs with a bless differ only by the new edge to that hand on their
+six artifacts. `held.test.ts` reads every held log in core. The panel's *by*
+row reads `authorOf` for every node; the MCP hand's look says *by tab* and
+`canvas_label` on the tab's artifact is refused (the smoke, two checks); e2e
+43–43c. *Found, not changed:* a word gathered from another hand's letters is
+still made by the reader (`made-by` the local participant in the word's
+gathering), so her label on her own word is dropped on another board and
+that board may label it; its letters now draw in her colour. Whole suite at
+the last commit: core 797 in 62 files, typecheck clean, both bundles equal
+to a fresh build; relay and field 40; surface in sync; the canvas MCP smoke
+and the shard's (605 in 31 files, typecheck clean) all pass; the gate 394
+passed and the one honest skip (canvas 248; shard 123 + 11 + 12); WebKit
+smoke 3.
 
 *L2a status, 26 Sep 2026: done on `w2-shard`* — `0540c1c` (red), `092f747`.
 Taken from `auto/w1-U1d` (6893f53), which takes both prefixes off the write
