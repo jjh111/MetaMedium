@@ -41,6 +41,12 @@ jobs:
       # job's working directory does not matter.
       - name: The field's reader, on its own
         run: node --test ../Demos/surface/09-field.test.mjs
+      # The relay's catch-up and the rooms over it (DIRECTOR-PLAN-W2 L1): `replay`
+      # is pure; the truncation line and the three-hand room run over a real
+      # relay on a free port of 127.0.0.1, with the committed Node bundle checked
+      # above. Like the field's test, it finds what it imports relative to itself.
+      - name: The relay, on its own
+        run: node --test ../Demos/relay.test.mjs
 
   shard:
     name: shard-3d — typecheck, test, build
@@ -96,6 +102,34 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: e2e-results
+          path: e2e/results
+          if-no-files-found: warn
+
+  webkit:
+    name: the WebKit smoke — the canvas on a second engine
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: The runner
+        working-directory: e2e
+        run: npm ci
+      - name: WebKit
+        working-directory: e2e
+        run: npx playwright install --with-deps webkit
+      # A smoke, not an iPhone test (e2e/README.md): desktop WebKit, headless,
+      # drawing with real pointer input and holding a mark until the field
+      # opens. The canvas only, so the shard needs no install here; the same
+      # model guard and the same exit rules as the gate.
+      - name: Run it
+        run: node e2e/run.mjs --browser webkit smoke
+      - name: What the run saw
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-webkit-results
           path: e2e/results
           if-no-files-found: warn
 
