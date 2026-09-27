@@ -11,7 +11,8 @@
 //
 //   * **When is a depth lacking?** When the hull's claims, gathered by the
 //     direction they look along (the grouping `hullBody` itself uses), are a
-//     plan — claims looking straight down — and exactly ONE other standpoint,
+//     plan — claims looking down, past the form rung's own `PLAN_NORMAL` — and
+//     exactly ONE other standpoint,
 //     and that standpoint's silhouette covers less of the plan across the view
 //     than `SEEN_WHOLE`. A view that shows the whole plan across it is plan and
 //     elevation, the oldest way of drawing a thing, and the plan's depth is the
@@ -34,7 +35,7 @@
 // no session — `log.ts` puts the question on the explanation plane and holds
 // the word; `solid.ts` cuts the body.
 
-import { viewLabelOf } from './form';
+import { PLAN_NORMAL, viewLabelOf } from './form';
 import { dot, normalize, toWorld, type Plane, type Vec3 } from './plane';
 import type { HullDepth, HullStep, PlaneRef } from './op';
 
@@ -142,7 +143,13 @@ function groupsOf(claims: readonly Claim[]): { normal: Vec3; claims: Claim[] }[]
   return out;
 }
 
-const looksDown = (n: Vec3) => Math.abs(n.y) > SAME_DIRECTION;
+/**
+ * A claim looks down — is a PLAN — past the form rung's own `PLAN_NORMAL`: what
+ * a view from up there shows is a plan, not an elevation (`form.ts`), so it
+ * bounds the hull the way a footprint does and is no standpoint to lack a
+ * depth from.
+ */
+const looksDown = (n: Vec3) => Math.abs(n.y) > PLAN_NORMAL;
 
 /** A point across the ground: `a` along the sightline, `b` across it. */
 interface AB {

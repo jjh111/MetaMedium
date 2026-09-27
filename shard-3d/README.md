@@ -32,7 +32,7 @@ evidence needs faces to read it off.
 cd shard-3d
 npm install
 npm run dev                # vite on http://localhost:5174
-npm test                   # vitest — 604 tests on the pure rungs, headless, no WebGL
+npm test                   # vitest — 605 tests on the pure rungs, headless, no WebGL
 npm run typecheck
 npm run build              # typecheck, then vite
 npm run build:standalone   # → dist/shard-3d.html, one file, ~1.0MB
@@ -290,7 +290,7 @@ claim, held and attributed, that the hand takes or leaves.
 | `build-standalone.mjs` | **One file.** Runs `npm run build`, then inlines every asset Vite emitted into `dist/shard-3d.html`, and refuses to write a page that still points at anything that would not travel with it |
 | `fixtures/` | John's own boards as logs, and `make.mjs` which writes them. `fixtures/README.md` says which door each came through |
 | `fixtures/exchanges/` | What was sent to a model about a board and what came back, verbatim and unrepaired. `fixtures/exchanges/README.md` says how to add one |
-| `src/*.test.ts` | 604 tests, vitest, no WebGL except where the CSG seam is the subject |
+| `src/*.test.ts` | 605 tests, vitest, no WebGL except where the CSG seam is the subject |
 
 ## How it works, decision by decision
 
@@ -638,7 +638,8 @@ is the plan. So the tower runs as far back as the keep's footprint — a depth n
 silently until now. The board asks instead.
 
 **When it asks.** The hull's claims, gathered by the direction they look along (the grouping
-`hullBody` itself uses), are a plan — claims looking straight down — and exactly **one** other
+`hullBody` itself uses), are a plan — claims looking down, past the form rung's own
+`PLAN_NORMAL`, since what a view from up there shows is a plan — and exactly **one** other
 standpoint, whose silhouette covers less than `SEEN_WHOLE` (four fifths) of the plan across the
 view. A view that shows the whole plan across it is plan and elevation, and the plan's depth is
 the thing's own; a tower on a keep shows a sliver of it. Two standpoints bound each other, a hull
