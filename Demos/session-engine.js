@@ -3361,7 +3361,7 @@
         key: 'line:' + lineIds.join(','), certain: true, group: 'written', groupConf: conf,
         groupWhy: 'read from your handwriting by ' + nameOfParticipant(lineSaid[0].source),
         label: '“' + lineText + '” ' + conf.toFixed(2), name: lineText,
-        why: allWriting ? 'the line you wrote — take it as text, here; the ink stays underneath' : 'the line you wrote — take it as the name', tier: 1,
+        why: allWriting ? 'the line you wrote — take it as text, here; the ink stays underneath' : 'the line you wrote — ' + NAMING_IS + ' — take it as the name', tier: 1,
         run: () => { if (allWriting) writingToText(sum, lineText); else session.bless({ summonId: sum.id, name: lineText, at: Date.now() }); },
       });
     }
@@ -3388,9 +3388,32 @@
           key: 'said:' + r.id, certain: true, group: 'written', groupConf: t.confidence,
           groupWhy: 'read from your handwriting by ' + nameOfParticipant(t.source),
           label: '“' + t.text + '” ' + t.confidence.toFixed(2), name: t.text,
-          why: r.targets.length ? 'the word beside it — take it as the name' : allWriting ? 'the word you wrote — take it as text, here; the ink stays underneath' : 'the word you wrote — take it as the name', tier: 1,
+          why: r.targets.length ? 'the word beside it — ' + NAMING_IS + ' — take it as the name' : allWriting ? 'the word you wrote — take it as text, here; the ink stays underneath' : 'the word you wrote — ' + NAMING_IS + ' — take it as the name', tier: 1,
           run: () => { if (allWriting && !r.targets.length) writingToText(sum, t.text); else session.bless({ summonId: sum.id, name: t.text, at: Date.now() }); },
         });
+      }
+    }
+    // …or put on your own ink as a label (V1-PLAN L2e): the same word, on the marks
+    // held with the writing — or, with nothing else held, on the writing itself as a
+    // caption. It makes nothing, and says so; the reading above it names.
+    {
+      const writingIds = marks.filter((id) => { const n = s.nodes.get(id); return n && !s.artifacts.includes(id) && (isWriting(n) || MM.isWord(n) || !!MM.transcriptOf(n)); });
+      const others = marks.filter((id) => !writingIds.includes(id));
+      const words = [];
+      if (lineRead) words.push({ word: lineText, from: lineIds.filter((id) => marks.includes(id)), conf: Math.min(...lineSaid.map((t) => t.confidence)), source: lineSaid[0].source });
+      for (const id of writingIds) {
+        if (lineRead && lineIds.includes(id)) continue;
+        const t = MM.transcriptsOf(s.nodes.get(id))[0];
+        if (t && t.text && !words.some((w) => w.word === t.text)) words.push({ word: t.text, from: [id], conf: t.confidence, source: t.source });
+      }
+      for (const w of words) {
+        const targets = others.length ? others : w.from.slice(0, 1);
+        if (!targets.length) continue;
+        items.push(labelItem(sum, targets, w.word, {
+          key: 'label:' + w.word, group: 'written', groupConf: w.conf, verbs: ['label', 'label it'],
+          groupWhy: 'read from your handwriting by ' + nameOfParticipant(w.source),
+          where: others.length ? ', held with the writing' : 'itself',
+        }));
       }
     }
     // What a model read this group as — held, attributed, and an offer to name it.
@@ -3754,6 +3777,117 @@
     refreshPalette();
   }
 
+  // ===== Name it, Label it: one word, two acts (V1-PLAN L2e) ==================
+  // Naming BLESSES: the marks become one thing, a definition the library keeps and
+  // the next drawing like it is offered as. Labelling puts a word on your own ink and
+  // MAKES NOTHING — no definition, no file, nothing the matcher learns (the notes, §B,
+  // §D). Side by side, "Name it “inlet”" and "Label it “inlet”" look like one thing
+  // twice, so the difference is said in the words the field already has — each pill's
+  // tooltip says what it does and what it does not, and the reading line says what a
+  // pill will do while it is pointed at or chosen by the arrows — never a new badge,
+  // row or button. Label is an offer in the row; the four core buttons stay four.
+  const NAMING_IS = 'naming makes one thing of them, a definition the library keeps and the next drawing like it is offered as; it writes no word on the ink';
+  const LABELLING_IS = 'it makes nothing: no definition, no name the library learns, no file; undo takes it off';
+
+  /** The held marks' ink, for the reader and the tooltips: how many the person made, and who made each of the rest. */
+  function whoseInk(s, ids) {
+    const out = { mine: 0, others: [] };
+    for (const id of ids) {
+      const n = s.nodes.get(id);
+      if (!n) continue;
+      const pid = authorOf(n);
+      if (pid === MM.LOCAL_PARTICIPANT) out.mine++;
+      else out.others.push(nameOfParticipant(pid));
+    }
+    return out;
+  }
+
+  /** "the mark fern made", "the 2 marks fern and qwen3 made" — whose ink a label will not go on. */
+  function theirMarks(others) {
+    const m = makersOf(others);
+    return (m.count === 1 ? 'the mark ' : 'the ' + m.count + ' marks ') + m.who + ' made';
+  }
+
+  /**
+   * The Label pill: the word on each of `targets` the person made. Its tooltip says where
+   * the word goes, whose marks it will not go on, and that it makes nothing; `line` is
+   * what the reading line says while it is pointed at.
+   * @param {{key:string, group:string, groupConf:number, groupWhy?:string, verbs?:string[], where?:string}} o
+   *        `where` is said after the marks (", held with the writing"), or 'itself' for writing that captions itself
+   */
+  function labelItem(sum, targets, word, o) {
+    const s = session.getState();
+    const ink = whoseInk(s, targets);
+    const q = '“' + word + '”';
+    const onto = o.where === 'itself' ? 'the writing itself, as a caption'
+      : (ink.mine === 1 ? 'the mark you made' : 'each of the ' + ink.mine + ' marks you made') + (o.where || '');
+    const why = ink.mine
+      ? q + ' on ' + onto + ', in your ink at the board\'s scale' + (ink.others.length ? ' — not on ' + theirMarks(ink.others) + ', which is theirs to label' : '') + ' — ' + LABELLING_IS
+      : 'no label here — ' + theirMarks(ink.others) + ', and a label is a word on your own ink; taking it says so';
+    return {
+      key: o.key, group: o.group, groupConf: o.groupConf, groupWhy: o.groupWhy || '', verbs: o.verbs || [],
+      label: 'Label it ' + q, why: why, tier: 1,
+      line: ink.mine ? '↵ label it ' + q + ' — a word on your own ink; nothing is made' : '↵ no label — ' + theirMarks(ink.others) + '; a label goes on your own ink',
+      run: () => labelMarks(sum, targets, word),
+    };
+  }
+
+  /** The Name pill for a typed word: the same act as `name: word`, said apart from a label. */
+  function nameWordItem(sum, word) {
+    const q = '“' + word + '”';
+    return {
+      key: 'name-word', group: 'always', groupConf: 0, groupWhy: '', verbs: [],
+      label: 'Name it ' + q, why: 'one thing called ' + q + ' — ' + NAMING_IS, tier: 1,
+      line: '↵ name it ' + q + ' — one thing, a definition the library keeps',
+      run: () => session.bless({ summonId: sum.id, name: word, at: Date.now() }),
+    };
+  }
+
+  /**
+   * A word on the person's own ink (V1-PLAN L2e): one `label` event per mark they made,
+   * each through the session's door, which refuses another hand's mark and says whose it
+   * is. Every mark is accounted for in the status line — labelled, already saying the
+   * word, or refused with the reason — never silently skipped. Nothing is made: no bless,
+   * no artifact, no file. When a word is written the field closes FIRST, so the labels
+   * are the last events in the log and undo takes them off, not the close; a mark that
+   * already says the word writes nothing, so a second Enter or tap is not a second event.
+   */
+  function labelMarks(sum, ids, word) {
+    const text = String(word || '').trim();
+    const s = session.getState();
+    const held = (ids || []).filter((id) => s.nodes.get(id) && !MM.getRep(s.nodes.get(id), 'erased'));
+    if (!text || !held.length) return { done: [], saying: [], refused: [] };
+    const mine = (id) => authorOf(s.nodes.get(id)) === MM.LOCAL_PARTICIPANT;
+    const saying = held.filter((id) => { const l = mine(id) && MM.labelOf(s.nodes.get(id)); return !!l && l.text === text; });
+    const asks = held.filter((id) => !saying.includes(id));
+    if (asks.some(mine)) {
+      const at = Date.now();
+      if (s.summon && s.summon.id === sum.id) session.dismiss(sum.id, at);
+      if (session.getState().selection.length) session.deselect(at);
+    }
+    const done = [], refused = [];
+    for (const id of asks) {
+      if (session.label({ nodeId: id, text: text, at: Date.now() })) { done.push(id); continue; }
+      const st = session.getState().staleResult;
+      const maker = s.nodes.get(id) ? nameOfParticipant(authorOf(s.nodes.get(id))) : 'another hand';
+      refused.push({ id: id, reason: st && st.what === 'label' ? st.reason : 'refused', detail: st && st.what === 'label' ? st.detail : '', maker: maker });
+    }
+    say(labelSentence(text, done, saying, refused));
+    return { done: done, saying: saying, refused: refused };
+  }
+
+  /** What a label act did, in one sentence for the status line. */
+  function labelSentence(text, done, saying, refused) {
+    const q = '“' + text + '”';
+    const parts = [];
+    if (done.length) parts.push(done.length === 1 ? 'labelled it ' + q : 'labelled ' + done.length + ' marks ' + q);
+    if (saying.length) parts.push(done.length ? saying.length + ' already said it' : saying.length === 1 ? 'it already says ' + q : 'these ' + saying.length + ' already say ' + q);
+    const theirs = refused.filter((r) => r.reason === 'not-your-ink');
+    if (theirs.length) parts.push((parts.length ? 'not on ' : 'no label on ') + theirMarks(theirs.map((r) => r.maker)) + ' — a label goes on your own ink');
+    for (const r of refused) if (r.reason !== 'not-your-ink') parts.push(r.detail || 'not labelled');
+    return parts.join(' · ');
+  }
+
   // ===== The reader: what Enter will do, from what was typed ================
   // The decision itself is `readFieldCommand` in 09-field.js, which knows nothing
   // about the session, the DOM or this closure (SEAM-1). What is left here is the
@@ -3778,6 +3912,8 @@
       models: agents.map((a) => a.name),
       library: revising ? [] : libraryEntries(s),
       definition: defId ? { id: defId, name: MM.wordOf(s.nodes.get(defId)) || defId } : null,
+      // Whose ink is held: a label goes on the person's own marks only (V1-PLAN L2e).
+      marks: sum ? whoseInk(s, selectionMarks(s)) : { mine: 0, others: [] },
       behaviour: parsed && parsed.behaviour
         ? { described: MM.describeBehaviour(parsed.behaviour), unparsed: parsed.unparsed, value: parsed.behaviour }
         : null,
@@ -3797,6 +3933,9 @@
       return;
     }
     if (cmd.do === 'name') { session.bless({ summonId: sum.id, name: cmd.name, at: at }); return; }
+    // The marks this summon held when Enter was read — not whatever is held when a stale
+    // closure runs again, so a second run finds them already saying the word (L2e).
+    if (cmd.do === 'label') { const s = session.getState(); labelMarks(sum, sum.enclosedIds.filter((id) => s.contentIds.includes(id)), cmd.text); return; }
     if (cmd.do === 'ask-what') { askModelsAbout(selectionMarks(session.getState())); return; }
     if (cmd.do === 'ask') { runAsk(sum, cmd.text); return; }
     if (cmd.do === 'draw') { runDraw(sum, cmd.text); return; }
@@ -3831,6 +3970,9 @@
     // The pill the reading points at, for the row to mark as chosen.
     if (cmd && cmd.do === 'take') out.item = (items[cmd.index] && items[cmd.index].key === cmd.key) ? items[cmd.index] : items.find((i) => i.key === cmd.key);
     if (cmd && cmd.do === 'library') out.entry = libraryEntries(s).find((e) => e.id === cmd.id) || null;
+    // `label:` and `name:` choose one of the pair the row offers for a typed word.
+    if (cmd && cmd.do === 'label') out.item = { key: 'label-word' };
+    if (cmd && cmd.do === 'name') out.item = { key: 'name-word' };
     return out;
   }
 
@@ -4010,6 +4152,21 @@
         }
       }
     }
+    // A word typed at marks is offered two ways, side by side (V1-PLAN L2e): Name it —
+    // one thing, a definition — and Label it — the word on your own ink, nothing made.
+    // At the head of what it affords, the pair together; `typedWord` (pure, 09-field.js)
+    // decides whether there is a word at all. An offer already standing for the same word
+    // — a reading that takes it as the name, a label from the writing — is not repeated.
+    if (sum) {
+      const tw = typedWord(fieldContext(query, s, paletteItems.concat(coreItems(s))));
+      if (tw) {
+        const w = tw.word.toLowerCase();
+        const pair = [nameWordItem(sum, tw.word), labelItem(sum, selectionMarks(s), tw.word, { key: 'label-word', group: 'always', groupConf: 0 })]
+          .filter((p) => !shown.some((i) => i.label === p.label || (p.key === 'name-word' && i.certain && typeof i.name === 'string' && i.name.toLowerCase() === w)));
+        const head = shown.findIndex((i) => !i.certain);
+        shown.splice(head < 0 ? shown.length : head, 0, ...pair);
+      }
+    }
     return shown;
   }
 
@@ -4051,16 +4208,23 @@
     const selectedKey = paletteNavigated && shown[paletteIndex] ? shown[paletteIndex].key : (r.item ? r.item.key : null);
     certainRow.innerHTML = '';
     affordRow.innerHTML = '';
+    // The line under the field says what Enter will do — or, for a pill that carries its
+    // own line (Name it, Label it: one word, two acts), what THAT pill will do while it is
+    // pointed at or chosen by the arrows. The difference said where the hand is looking.
+    const chosen = paletteNavigated && shown[paletteIndex] && shown[paletteIndex].line ? shown[paletteIndex] : null;
+    const sayLine = (line, quiet) => { if (readingEl) { readingEl.textContent = line || ''; readingEl.classList.toggle('quiet', !!quiet); } };
+    const standingLine = () => (chosen ? sayLine(chosen.line, false) : sayLine(r.line, r.quiet));
     let i = 0, shownAfford = 0;
     for (const item of shown) {
       const pill = pillFor(item, i, item.key === selectedKey);
+      if (item.line) { pill.onmouseenter = () => sayLine(item.line, false); pill.onmouseleave = standingLine; }
       if (item.certain) certainRow.appendChild(pill);
       else if (shownAfford < MAX_AFFORD || query.trim()) { affordRow.appendChild(pill); shownAfford++; }
       i++;
     }
     const hidden = shown.filter((x) => !x.certain).length - shownAfford;
     if (hidden > 0) { const more = document.createElement('span'); more.className = 'more'; more.textContent = '+' + hidden + ' more — type to find'; affordRow.appendChild(more); }
-    if (readingEl) { readingEl.textContent = r.line || ''; readingEl.classList.toggle('quiet', !!r.quiet); }
+    standingLine();
     keepFieldOnScreen();
   }
 
