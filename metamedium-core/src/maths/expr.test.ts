@@ -125,7 +125,10 @@ describe('the three lines that read two ways', () => {
     expect(statuses(r[0]).every((s) => s === 'ok')).toBe(true);
     expect(r[0].bindings).toEqual([expect.objectContaining({ kind: 'name', subject: 'Chest', value: expect.objectContaining({ lo: 36 }) })]);
     expect(r[0].reason).toMatch(/worked line/);
-    expect(r[1].reason).toMatch(/worked line does not/);
+    expect(r[1].reason).toMatch(/the worked line “\(36 \+ 6\)\/2” does not have this form/);
+    // By precedence, with the chest the worked line put in, it would be 39″ — not the 21″ written.
+    expect(fmt(r[1].value)).toBe('39″');
+    expect(statuses(r[1])).toEqual(['off']);
   });
 
   it('3–6″ is a range, not three minus six — a length is not negative', () => {

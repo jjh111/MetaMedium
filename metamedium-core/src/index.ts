@@ -91,6 +91,59 @@ export type { DrawnShape } from './session/synthesize';
 export { measure, describeMaths } from './session/measure';
 export type { Maths, Measure } from './session/measure';
 
+// Maths on a page — quantities as the hand writes them (a value or a range, a
+// unit, exact or approximate) and a small grammar of formulas whose `=` chains
+// are running totals, read plurally with reasons (MATHS-PLAN.md §4;
+// DIRECTOR-PLAN-W2 M1). Tier 1: pure, no model, no eval.
+export {
+  quantity,
+  rangeOf,
+  isRange,
+  isBare,
+  holds,
+  parseQuantity,
+  formatQuantity,
+  formatNumber,
+  convertQuantity,
+  arithmetic,
+  negateQuantity,
+  compareQuantities,
+  LENGTH_UNITS,
+} from './maths/quantity';
+export type { Quantity, LengthUnit, QuantityParse, Converted, Arith, ArithOp, CheckStatus, Comparison } from './maths/quantity';
+export {
+  parseExpression,
+  parseChain,
+  parseLine,
+  evaluateExpr,
+  evaluateChain,
+  formatExpr,
+  describeExpr,
+  sameExpr,
+  normName,
+  scopeOf,
+} from './maths/expr';
+export type {
+  Expr,
+  ExprOp,
+  ExprReading,
+  ReadingChoice,
+  ExprChain,
+  ChainSegment,
+  SegmentJoin,
+  LineLabel,
+  LineShape,
+  LineParse,
+  NameResolution,
+  MathsScope,
+  EvalOptions,
+  Resolved as ResolvedName,
+  ExprEvaluation,
+  WrittenCheck,
+  WorkedBinding,
+  ChainReading,
+} from './maths/expr';
+
 // Magnets — the places a mark offers attachment, derived from its clean form.
 export { magnetSites, nearestMagnet, magnetsNear, magnetRadius, describeMagnet, MAGNET_SCREEN_PX, MAGNET_SIZE_FRACTION } from './session/magnets';
 export type { MagnetSite, MagnetKind, MagnetHit } from './session/magnets';
