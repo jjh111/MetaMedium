@@ -51,11 +51,12 @@ click — *Draw them clean*, the held line's one pill that asks no model — aft
 which the line carries its clean form. It takes about two seconds.
 
 It deliberately does **not** load `Demos/session-engine.e2e.js`. That harness is
-two hundred records and its own stub model; running it on a second engine would
+over two hundred records and its own stub model; running it on a second engine would
 be a second full gate wearing the word "smoke", and a gate that costs two
 minutes is one whoever waits on it turns off.
 
-A full run is about 70 s headless. `E2E_HEADED=1` watches it;
+A full run of the four is about 135 s headless (27 Sep 2026, on a shared
+machine). `E2E_HEADED=1` watches it;
 `E2E_RESULTS=<dir>` moves the output; `E2E_TIMEOUT_MS` raises the per-scenario
 ceiling.
 

@@ -231,8 +231,8 @@ async function runShard(browser, servers, which /* 'shard' | 'demo' | 'demo2' */
  * draw, hold, the field opens, one pill taken). It runs in seconds. Anything
  * longer is a second gate, and a gate whoever waits on it will turn off.
  *
- * It deliberately does NOT load `session-engine.e2e.js`: that harness is 200
- * records and its own stub model, and running it on a second engine would be a
+ * It deliberately does NOT load `session-engine.e2e.js`: that harness is over
+ * 200 records and its own stub model, and running it on a second engine would be a
  * second full gate wearing the word "smoke".
  */
 async function runSmoke(browser, servers) {

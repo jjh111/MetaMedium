@@ -247,7 +247,7 @@ suite and the gate green, `master` fast-forwarded and pushed.
 
 | Phase | Units | Done when |
 |---|---|---|
-| **0. Make week 1 whole** | L1 ids that hold · L1b one event, applied once · L2a the shard pairs by id · L2b labels on the board · L2c the shard asks · L2d duplicate Enter, fitAll, the cache measured · L2e a person labels their own ink · L2f an artifact is made by whoever blessed it · L2g a word is made by whoever wrote its letters · L2h gestures are per hand · L3 CI, bundles, docs | every unit week 1 claimed is whole, CI runs what exists (WebKit included), docs say what the code does |
+| **0. Make week 1 whole** — ✅ done on `w2`, 27 Sep (on `master` when John lands it, L4) | L1 ids that hold · L1b one event, applied once · L2a the shard pairs by id · L2b labels on the board · L2c the shard asks · L2d duplicate Enter, fitAll, the cache measured · L2e a person labels their own ink · L2f an artifact is made by whoever blessed it · L2g a word is made by whoever wrote its letters · L2h gestures are per hand · L3 CI, bundles, docs | every unit week 1 claimed is whole, CI runs what exists (WebKit included), docs say what the code does |
 | **0b. A board that holds** (pulled forward by `PERF.md`, 27 Sep) | R3 no lost work · R4b the engine holds 2,000 marks · R4c the surface draws only what changed · R4d a room merges a line, not the board · R4e a brief carries what it is about | nothing is ever lost silently; a 2,000-mark board opens in under 1.5 s, answers a stroke in 16 ms at p95 and draws its reading within 100 ms; a room line costs under 16 ms; the budgets are tests |
 | **1. The backbone** | B1 tools · B2 context · B3 packs | a tool is one file; the field ranks by context with reasons; a pack is used by an event and benched |
 | **2. Editing** | E1 handles · E2 bindings follow · E3 ports, heads and figures | a selected mark reshapes by its points; bound arrows follow; notations can declare ports |
@@ -566,6 +566,40 @@ any gate board is 6 entries, 336 KB (the mug). The cache clears whenever a
 solid rebuilds, so no bound. The losing attempt branches (`auto/w1-U1d-r0920105222`,
 `auto/w1-U3-r0920120035`) are left for the director to delete: this lane
 creates and deletes no branch.
+
+**L3 CI, bundles, docs — status, 27 Sep 2026: done on `w2`** — `bf4b533`
+(CI; its message carries the red-first `rg`, which printed nothing),
+`426f547` (the smoke's pill), `8b2493b` (red), `5487395` (the guard),
+`51194de` (CLAUDE.md), `7bdb2f2` (the other docs), and the commit carrying
+this line. CI's core job runs `Demos/relay.test.mjs` beside the field
+reader's test and `Demos/build-surface.test.mjs` beside `--check`; a
+`webkit` job installs WebKit (`npx playwright install --with-deps webkit`
+in `e2e/`) and runs `node e2e/run.mjs --browser webkit smoke`, uploading
+`e2e-webkit-results` when it fails. The YAML parses (Python's
+`yaml.safe_load`); Actions were not run here. The smoke takes one pill:
+*Draw them clean*, clicked on the held line, which then carries its clean
+form — four checks, shown able to fail with the click sent elsewhere.
+`node Demos/build-surface.mjs`, and its `--check`, refuse a name declared
+at the top of two fragments: the fragments read as one strict block are
+the engine's own early error, and the fragments that declare it are named
+(a scratch copy with a second `renderLabels`: exit 1, `08-render.js,
+21-minimap.js`). Both bundles already equalled a fresh build and still do.
+The docs: CLAUDE.md's headline (phase 0 done, 0b next with `PERF.md`'s
+numbers), documents, map, tier 1½ and working notes, the paragraphs the
+units wrote checked against the code and true as they stand, the finding
+below added to the sitting's; ROADMAP.md's
+entry; T8 done in `SURFACE-v10-PLAN.md` with its commits; QA-v10's two
+hands; the core README's map (it named `spatial`, long gone), both bundles
+and the sitting; `e2e/README.md`. *Found, not changed:* a sitting is its
+own participant, so after a reload a person may not label what they drew
+before it — core refuses (`not-your-ink`) and the field says *no label —
+john made this mark* (shown with the Node bundle: john's second sitting
+labelling his first sitting's box). Whether a sitting inherits its person's
+marks is a decision. Whole suite at the last commit: core 889 in 67 files,
+typecheck clean, both bundles equal to a fresh build; relay and field 40,
+the build's test 4; surface in sync; the canvas MCP smoke and the shard's
+(605 in 31 files, typecheck clean) all pass; the gate 406 passed and the one
+honest skip (canvas 260; shard 123 + 11 + 12); WebKit smoke 4.
 
 ### Phase 0b — a board that holds (pulled forward, 27 September)
 The performance baseline (`PERF.md`, R4a) measured what daily use would meet
