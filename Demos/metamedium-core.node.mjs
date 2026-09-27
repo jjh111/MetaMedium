@@ -1400,6 +1400,1958 @@ function describeMaths(maths) {
   }).join(" \xB7 ");
 }
 
+// src/maths/quantity.ts
+var LENGTH_UNITS = ["in", "ft", "cm", "mm", "m"];
+var MM_PER = { in: 25.4, ft: 304.8, cm: 10, mm: 1, m: 1e3 };
+var UNIT_WORD = {
+  in: ["inch", "inches"],
+  ft: ["foot", "feet"],
+  cm: ["centimetre", "centimetres"],
+  mm: ["millimetre", "millimetres"],
+  m: ["metre", "metres"]
+};
+function quantity(value, unit = null, opts = {}) {
+  const q = { lo: value, hi: value, unit, dim: opts.dim ?? (unit ? 1 : 0), approx: !!opts.approx };
+  if (opts.precision !== void 0) q.precision = opts.precision;
+  return q;
+}
+function rangeOf(lo, hi, unit = null, opts = {}) {
+  const q = quantity(Math.min(lo, hi), unit, opts);
+  q.hi = Math.max(lo, hi);
+  return q;
+}
+function tolFor(...values) {
+  return 1e-6 * Math.max(1, ...values.map((v) => Math.abs(v)));
+}
+function isRange(q) {
+  return q.hi - q.lo > tolFor(q.lo, q.hi);
+}
+function holds(q, v) {
+  const t = tolFor(q.lo, q.hi, v);
+  return v >= q.lo - t && v <= q.hi + t;
+}
+function isBare(q) {
+  return q.unit === null && q.dim === 0;
+}
+function formatNumber(v, digits = 2) {
+  if (!Number.isFinite(v)) return Number.isNaN(v) ? "?" : v > 0 ? "\u221E" : "\u2212\u221E";
+  const f = 10 ** digits;
+  const r = Math.round(v * f) / f;
+  if (r === 0) return "0";
+  const s = digits > 0 ? r.toFixed(digits).replace(/\.?0+$/, "") : r.toFixed(0);
+  return s.startsWith("-") ? "\u2212" + s.slice(1) : s;
+}
+function unitSuffix(unit, dim, words = false) {
+  if (!unit || dim === 0) return "";
+  if (dim === 1) {
+    if (!words && unit === "in") return "\u2033";
+    if (!words && unit === "ft") return "\u2032";
+    return " " + unit;
+  }
+  const sup = { 2: "\xB2", 3: "\xB3" };
+  if (dim > 0) return " " + unit + (sup[dim] ?? `^${dim}`);
+  return " per " + unit + (dim < -1 ? sup[-dim] ?? `^${-dim}` : "");
+}
+var FRACTION_GLYPH = {
+  "1/2": "\xBD",
+  "1/3": "\u2153",
+  "2/3": "\u2154",
+  "1/4": "\xBC",
+  "3/4": "\xBE",
+  "1/5": "\u2155",
+  "2/5": "\u2156",
+  "3/5": "\u2157",
+  "4/5": "\u2158",
+  "1/6": "\u2159",
+  "5/6": "\u215A",
+  "1/8": "\u215B",
+  "3/8": "\u215C",
+  "5/8": "\u215D",
+  "7/8": "\u215E"
+};
+var FRACTION_DENOMINATORS = [2, 3, 4, 8, 16, 32];
+var gcd = (a, b) => b === 0 ? a : gcd(b, a % b);
+function asFraction(v, den) {
+  const n2 = Math.round(v * den);
+  if (Math.abs(v * den - n2) > 1e-6 || n2 % den === 0) return null;
+  const whole = Math.trunc(Math.abs(n2) / den);
+  const rem = Math.abs(n2) % den;
+  const g = gcd(rem, den);
+  const f = `${rem / g}/${den / g}`;
+  const glyph = FRACTION_GLYPH[f];
+  const sign = v < 0 ? "\u2212" : "";
+  if (!whole) return sign + (glyph ?? f);
+  return sign + String(whole) + (glyph ?? ` ${f}`);
+}
+function formatQuantity(q, opts = {}) {
+  const written = q.precision && q.precision < 1 ? Math.round(1 / q.precision) : 0;
+  const den = opts.fractions ?? (FRACTION_DENOMINATORS.includes(written) && Math.abs(1 / q.precision - written) < 1e-9 ? written : 0);
+  const n2 = (v) => (den ? asFraction(v, den) : null) ?? formatNumber(v, opts.digits ?? 2);
+  let body;
+  if (!isRange(q)) body = n2(q.lo);
+  else if (q.lo < 0 || q.hi < 0) body = `${n2(q.lo)} to ${n2(q.hi)}`;
+  else body = `${n2(q.lo)}\u2013${n2(q.hi)}`;
+  return (q.approx ? "~" : "") + body + unitSuffix(q.unit, q.dim, opts.words);
+}
+function unitName(unit, plural) {
+  return UNIT_WORD[unit][plural ? 1 : 0];
+}
+var VULGAR = {
+  "\xBD": [1, 2],
+  "\u2153": [1, 3],
+  "\u2154": [2, 3],
+  "\xBC": [1, 4],
+  "\xBE": [3, 4],
+  "\u2155": [1, 5],
+  "\u2156": [2, 5],
+  "\u2157": [3, 5],
+  "\u2158": [4, 5],
+  "\u2159": [1, 6],
+  "\u215A": [5, 6],
+  "\u2150": [1, 7],
+  "\u215B": [1, 8],
+  "\u215C": [3, 8],
+  "\u215D": [5, 8],
+  "\u215E": [7, 8],
+  "\u2151": [1, 9],
+  "\u2152": [1, 10]
+};
+function isVulgar(c) {
+  return c !== void 0 && c in VULGAR;
+}
+var isDigit = (c) => c !== void 0 && c >= "0" && c <= "9";
+var isLetter = (c) => c !== void 0 && /[A-Za-zÀ-ɏ]/.test(c);
+function scanNumber(s, i) {
+  let j = i;
+  let whole = "";
+  while (isDigit(s[j])) whole += s[j++];
+  let value;
+  let precision = 1;
+  if (s[j] === "." && isDigit(s[j + 1])) {
+    let frac = "";
+    j++;
+    while (isDigit(s[j])) frac += s[j++];
+    value = Number(`${whole || "0"}.${frac}`);
+    precision = 10 ** -frac.length;
+    return { value, precision, text: s.slice(i, j), end: j };
+  }
+  if (!whole) {
+    if (!isVulgar(s[j])) return null;
+    const [a, b] = VULGAR[s[j]];
+    return { value: a / b, precision: 1 / b, text: s[j], end: j + 1 };
+  }
+  value = Number(whole);
+  const k = s[j] === " " && isVulgar(s[j + 1]) ? j + 1 : j;
+  if (isVulgar(s[k])) {
+    const [a, b] = VULGAR[s[k]];
+    return { value: value + a / b, precision: 1 / b, text: s.slice(i, k + 1), end: k + 1 };
+  }
+  const glued = /^[/⁄](\d+)/.exec(s.slice(j));
+  if (glued && !isDigit(s[j + glued[0].length]) && s[j + glued[0].length] !== ".") {
+    const den = Number(glued[1]);
+    if (den > 0 && value < den) return { value: value / den, precision: 1 / den, text: s.slice(i, j + glued[0].length), end: j + glued[0].length };
+  }
+  const mixed = /^ (\d+)[/⁄](\d+)/.exec(s.slice(j));
+  if (mixed) {
+    const num2 = Number(mixed[1]), den = Number(mixed[2]);
+    const after = s[j + mixed[0].length];
+    if (den > 0 && num2 < den && !isDigit(after) && after !== ".") {
+      return { value: value + num2 / den, precision: 1 / den, text: s.slice(i, j + mixed[0].length), end: j + mixed[0].length };
+    }
+  }
+  return { value, precision, text: s.slice(i, j), end: j };
+}
+var INCH_MARKS = ["\u2033", '"', "\u201D", "\u201C", "\u3003"];
+var FOOT_MARKS = ["\u2032", "'", "\u2019", "\u2018"];
+var UNIT_WORDS = {
+  in: "in",
+  "in.": "in",
+  inch: "in",
+  inches: "in",
+  ft: "ft",
+  "ft.": "ft",
+  foot: "ft",
+  feet: "ft",
+  cm: "cm",
+  centimetre: "cm",
+  centimetres: "cm",
+  centimeter: "cm",
+  centimeters: "cm",
+  mm: "mm",
+  millimetre: "mm",
+  millimetres: "mm",
+  millimeter: "mm",
+  millimeters: "mm",
+  m: "m",
+  metre: "m",
+  metres: "m",
+  meter: "m",
+  meters: "m"
+};
+function scanUnit(s, i) {
+  if (s[i] === "'" && s[i + 1] === "'") return { unit: "in", text: "''", end: i + 2 };
+  if (INCH_MARKS.includes(s[i])) return { unit: "in", text: s[i], end: i + 1 };
+  if (FOOT_MARKS.includes(s[i]) && !isLetter(s[i + 1])) return { unit: "ft", text: s[i], end: i + 1 };
+  const k = s[i] === " " ? i + 1 : i;
+  const m = /^[A-Za-z]+\.?/.exec(s.slice(k));
+  if (!m) return null;
+  let word = m[0];
+  let unit = UNIT_WORDS[word.toLowerCase()];
+  if (!unit && word.endsWith(".")) {
+    word = word.slice(0, -1);
+    unit = UNIT_WORDS[word.toLowerCase()];
+  }
+  if (!unit) return null;
+  return { unit, text: s.slice(i, k + word.length), end: k + word.length };
+}
+function scanMeasure(s, i) {
+  const n2 = scanNumber(s, i);
+  if (!n2) return null;
+  const u = scanUnit(s, n2.end);
+  if (!u) return { value: n2.value, precision: n2.precision, unit: null, text: n2.text, end: n2.end };
+  if (u.unit === "ft") {
+    const k = s[u.end] === " " ? u.end + 1 : u.end;
+    const n22 = isDigit(s[k]) || isVulgar(s[k]) ? scanNumber(s, k) : null;
+    const u2 = n22 ? scanUnit(s, n22.end) : null;
+    if (n22 && u2 && u2.unit === "in") {
+      return { value: n2.value * 12 + n22.value, precision: n22.precision, unit: "in", text: s.slice(i, u2.end), end: u2.end };
+    }
+  }
+  return { value: n2.value, precision: n2.precision, unit: u.unit, text: s.slice(i, u.end), end: u.end };
+}
+var DASH_CHARS = "-\u2013\u2014\u2212\u2010\u2011\u2012";
+function parseQuantity(text) {
+  const s = text.replace(/[  -   　]/g, " ").trim();
+  let i = 0;
+  let approx = false;
+  const approxWord = /^(~|≈|about\s+|approx\.?\s*|c\.\s*|ca\.\s*)/i.exec(s);
+  if (approxWord) {
+    approx = true;
+    i = approxWord[0].length;
+  }
+  let sign = 1;
+  if (DASH_CHARS.includes(s[i]) && (isDigit(s[i + 1]) || s[i + 1] === "." || isVulgar(s[i + 1]))) {
+    sign = -1;
+    i++;
+  }
+  const a = scanMeasure(s, i);
+  if (!a) return null;
+  i = a.end;
+  let lo = sign * a.value;
+  let hi = lo;
+  let unit = a.unit;
+  let precision = a.precision;
+  let isRangeWritten = false;
+  const note = [];
+  const rest = /^\s*(?:[-–—−‐‑‒]|to\s)\s*/.exec(s.slice(i));
+  if (rest) {
+    const b = scanMeasure(s, i + rest[0].length);
+    if (!b) return null;
+    if (b.value <= lo) return null;
+    const bv = b.value;
+    if (unit && b.unit && unit !== b.unit) {
+      const c = convertQuantity(quantity(lo, unit), b.unit);
+      note.push(c.note ?? "");
+      lo = c.quantity.lo;
+      if (bv <= lo) return null;
+    }
+    unit = b.unit ?? unit;
+    hi = bv;
+    precision = Math.min(precision, b.precision);
+    isRangeWritten = true;
+    i = b.end;
+  }
+  if (s.slice(i).trim().length > 0) return null;
+  const q = rangeOf(lo, hi, unit, { approx, precision });
+  const unitWords = unit ? ` ${unitName(unit, true)}` : "";
+  let reason;
+  if (isRangeWritten) reason = `a range, from ${formatNumber(lo)} to ${formatNumber(hi)}${unitWords}`;
+  else reason = unit ? `${formatNumber(lo)} ${unitName(unit, lo !== 1)}` : `the number ${formatNumber(lo)}, no unit written`;
+  if (approx) reason = `approximate: ${reason}`;
+  if (a.text.includes("/") || a.text.includes("\u2044") || Object.keys(VULGAR).some((v) => a.text.includes(v))) reason += `, written as a fraction`;
+  if (note.length) reason += ` (${note.filter(Boolean).join("; ")})`;
+  return { quantity: q, text: s, reason };
+}
+function convertQuantity(q, unit) {
+  if (!q.unit || q.dim === 0 || q.unit === unit) return { quantity: q };
+  const f = (MM_PER[q.unit] / MM_PER[unit]) ** q.dim;
+  const out = { ...q, lo: q.lo * f, hi: q.hi * f, unit };
+  delete out.precision;
+  return { quantity: out, note: `${formatQuantity(q)} is ${formatQuantity(out)}` };
+}
+var dimName = (q) => q.dim === 0 ? "a number" : q.dim === 1 ? "a length" : q.dim === 2 ? "an area" : `a quantity of dimension ${q.dim}`;
+function computed(lo, hi, unit, dim, approx) {
+  return { lo: Math.min(lo, hi), hi: Math.max(lo, hi), unit: dim === 0 ? null : unit, dim, approx };
+}
+function negateQuantity(q) {
+  const out = { ...q, lo: -q.hi, hi: -q.lo };
+  delete out.precision;
+  return out;
+}
+function arithmetic(op, a, b) {
+  const notes = [];
+  const approx = a.approx || b.approx;
+  if (op === "+" || op === "-") {
+    let x = a, y2 = b;
+    if (isBare(x) && y2.dim !== 0) x = { ...x, unit: y2.unit, dim: y2.dim };
+    if (isBare(y2) && x.dim !== 0) y2 = { ...y2, unit: x.unit, dim: x.dim };
+    if (x.dim !== y2.dim) return { quantity: null, notes, error: `cannot ${op === "+" ? "add" : "subtract"} ${dimName(y2)} ${op === "+" ? "to" : "from"} ${dimName(x)}` };
+    if (x.unit && y2.unit && x.unit !== y2.unit) {
+      const c = convertQuantity(y2, x.unit);
+      if (c.note) notes.push(c.note);
+      y2 = c.quantity;
+    }
+    const unit2 = x.unit ?? y2.unit;
+    if (op === "+") return { quantity: computed(x.lo + y2.lo, x.hi + y2.hi, unit2, x.dim, approx), notes };
+    return { quantity: computed(x.lo - y2.hi, x.hi - y2.lo, unit2, x.dim, approx), notes };
+  }
+  let y = b;
+  if (a.unit && y.unit && a.unit !== y.unit && y.dim !== 0) {
+    const c = convertQuantity(y, a.unit);
+    if (c.note) notes.push(c.note);
+    y = c.quantity;
+  }
+  const unit = a.unit ?? y.unit;
+  if (op === "*") {
+    const p3 = [a.lo * y.lo, a.lo * y.hi, a.hi * y.lo, a.hi * y.hi];
+    return { quantity: computed(Math.min(...p3), Math.max(...p3), unit, a.dim + y.dim, approx), notes };
+  }
+  if (y.lo <= 0 && y.hi >= 0) {
+    const error = isRange(y) ? `cannot divide by ${formatQuantity(y)}: it holds zero` : "cannot divide by zero";
+    return { quantity: null, notes, error };
+  }
+  const p = [a.lo / y.lo, a.lo / y.hi, a.hi / y.lo, a.hi / y.hi];
+  return { quantity: computed(Math.min(...p), Math.max(...p), unit, a.dim - y.dim, approx), notes };
+}
+function compareQuantities(computedQ, written) {
+  const w2 = formatQuantity(written);
+  if (!computedQ) return { status: "unknown", written, computed: null, reason: `nothing to check ${w2} against` };
+  let c = computedQ;
+  let note;
+  if (written.unit && c.unit && written.unit !== c.unit && written.dim === c.dim) {
+    const conv = convertQuantity(c, written.unit);
+    c = conv.quantity;
+    note = conv.note;
+  }
+  const shown = isBare(written) && c.unit ? { ...written, unit: c.unit, dim: c.dim } : written;
+  const ws = formatQuantity(shown);
+  const cs = formatQuantity(c);
+  const base = { written, computed: computedQ, ...note ? { note } : {} };
+  if (written.unit && c.unit && written.dim !== c.dim) {
+    return { ...base, status: "off", reason: `written ${ws} is ${dimName(written)}, computed ${cs} is ${dimName(c)}` };
+  }
+  const t = tolFor(c.lo, c.hi, written.lo, written.hi);
+  const wRange = isRange(written), cRange = isRange(c);
+  const off = (d) => ({
+    ...base,
+    status: "off",
+    difference: d,
+    reason: `written ${ws}, computed ${cs}: ${formatNumber(Math.abs(d))}${unitSuffix(c.unit ?? written.unit, c.unit ? c.dim : written.dim)} ${d > 0 ? "more" : "less"} than computed`
+  });
+  if (!wRange && !cRange) {
+    const d = written.lo - c.lo;
+    if (Math.abs(d) <= t) return { ...base, status: "ok", difference: 0, reason: `\u2713 ${cs}` };
+    const p = written.precision ?? 0;
+    const slack = written.approx ? Math.max(p, 1) : p / 2;
+    if (p > 0 && Math.abs(d) <= slack + t) return { ...base, status: "rounded", difference: d, reason: `\u2248 ${cs}, written ${ws}` };
+    return off(d);
+  }
+  if (!wRange && cRange) {
+    if (holds(c, written.lo)) return { ...base, status: "within", difference: 0, reason: `${ws} chosen from ${cs}` };
+    return off(written.lo < c.lo ? written.lo - c.lo : written.lo - c.hi);
+  }
+  if (wRange && !cRange) {
+    if (holds(written, c.lo)) return { ...base, status: "within", difference: 0, reason: `${cs} is within the written ${ws}` };
+    return off(c.lo < written.lo ? written.lo - c.lo : written.hi - c.lo);
+  }
+  if (Math.abs(written.lo - c.lo) <= t && Math.abs(written.hi - c.hi) <= t) return { ...base, status: "ok", difference: 0, reason: `\u2713 ${cs}` };
+  if (written.lo <= c.hi + t && c.lo <= written.hi + t) return { ...base, status: "within", difference: 0, reason: `${ws} overlaps ${cs}` };
+  return off(written.lo > c.hi ? written.lo - c.hi : written.hi - c.lo);
+}
+
+// src/maths/expr.ts
+var GLYPH = { "+": "+", "-": "\u2212", "*": "\xD7", "/": "\xF7" };
+function normName(s) {
+  return s.trim().replace(/[-‐]/g, " ").replace(/\s+/g, " ").toLowerCase();
+}
+var SPACES = /[  -   　]/g;
+var DASHES = "-\u2013\u2014\u2212\u2010\u2011\u2012";
+var TIMES = "\xD7*\xB7\u22C5\u2715\u2716";
+var DIVIDES = "\xF7/\u2044";
+var LETTER = /[A-Za-zÀ-ɏ]/;
+var CIRCLED = (() => {
+  const m = {};
+  for (let n2 = 1; n2 <= 20; n2++) m[String.fromCharCode(9312 + n2 - 1)] = n2;
+  for (let n2 = 1; n2 <= 10; n2++) m[String.fromCharCode(10102 + n2 - 1)] = n2;
+  for (let n2 = 1; n2 <= 10; n2++) m[String.fromCharCode(10112 + n2 - 1)] = n2;
+  for (let n2 = 1; n2 <= 10; n2++) m[String.fromCharCode(9461 + n2 - 1)] = n2;
+  return m;
+})();
+var isDigit2 = (c) => c !== void 0 && c >= "0" && c <= "9";
+function operandEnd(t) {
+  return !!t && (t.t === "num" || t.t === "word" || t.t === "name" || t.t === "ref" || t.t === "rp");
+}
+function operandStart(t) {
+  return !!t && (t.t === "num" || t.t === "word" || t.t === "name" || t.t === "ref" || t.t === "lp");
+}
+function scan(s) {
+  const out = [];
+  let i = 0;
+  let space = 0;
+  let approxNext = false;
+  const sp = () => {
+    const v = space;
+    space = 0;
+    return v;
+  };
+  while (i < s.length) {
+    const c = s[i];
+    if (c === " " || c === "," || c === ";") {
+      space += 1;
+      i++;
+      continue;
+    }
+    if (c === "	" || c === "\n" || c === "\r") {
+      space += 4;
+      i++;
+      continue;
+    }
+    if (isDigit2(c) || c === "." && isDigit2(s[i + 1]) || isVulgar(c)) {
+      const m = scanMeasure(s, i);
+      if (m) {
+        const q = quantity(m.value, m.unit, { approx: approxNext, precision: m.precision });
+        out.push({ t: "num", q, text: s.slice(i, m.end), at: i, end: m.end, space: sp() });
+        approxNext = false;
+        i = m.end;
+        continue;
+      }
+    }
+    if (c in CIRCLED) {
+      out.push({ t: "ref", step: CIRCLED[c], text: c, bare: false, at: i, end: i + 1, space: sp() });
+      i++;
+      continue;
+    }
+    if (c === "(") {
+      const m = /^\(\s*(\d{1,2})\s*\)/.exec(s.slice(i));
+      if (m) {
+        out.push({ t: "ref", step: Number(m[1]), text: m[0], bare: true, at: i, end: i + m[0].length, space: sp() });
+        i += m[0].length;
+        continue;
+      }
+      out.push({ t: "lp", at: i, end: i + 1, space: sp() });
+      i++;
+      continue;
+    }
+    if (c === ")") {
+      out.push({ t: "rp", at: i, end: i + 1, space: sp() });
+      i++;
+      continue;
+    }
+    if (c === "+" || c === "\uFF0B") {
+      out.push({ t: "op", op: "+", glyph: c, at: i, end: i + 1, space: sp() });
+      i++;
+      continue;
+    }
+    if (DASHES.includes(c)) {
+      out.push({ t: "dash", glyph: c, at: i, end: i + 1, space: sp() });
+      i++;
+      continue;
+    }
+    if (TIMES.includes(c)) {
+      out.push({ t: "op", op: "*", glyph: c, at: i, end: i + 1, space: sp() });
+      i++;
+      continue;
+    }
+    if (DIVIDES.includes(c)) {
+      out.push({ t: "op", op: "/", glyph: c, at: i, end: i + 1, space: sp() });
+      i++;
+      continue;
+    }
+    if (c === ":") {
+      const prev = out[out.length - 1];
+      if (prev && prev.t === "word" && space === 0) out.push({ t: "eq", approx: false, glyph: ":", at: i, end: i + 1, space: sp() });
+      else out.push({ t: "op", op: "/", glyph: ":", at: i, end: i + 1, space: sp() });
+      i++;
+      continue;
+    }
+    if (c === "=" || c === "\uFF1D") {
+      out.push({ t: "eq", approx: false, glyph: c, at: i, end: i + 1, space: sp() });
+      i++;
+      continue;
+    }
+    if (c === "\u2248") {
+      if (operandEnd(out[out.length - 1])) out.push({ t: "eq", approx: true, glyph: c, at: i, end: i + 1, space: sp() });
+      else approxNext = true;
+      i++;
+      continue;
+    }
+    if (c === "~") {
+      approxNext = true;
+      i++;
+      continue;
+    }
+    if (c === "." && !isDigit2(s[i + 1]) && operandEnd(out[out.length - 1])) {
+      space += 1;
+      i++;
+      continue;
+    }
+    if (LETTER.test(c)) {
+      let j = i + 1;
+      while (j < s.length) {
+        const d = s[j];
+        if (LETTER.test(d)) {
+          j++;
+          continue;
+        }
+        if ((d === "'" || d === "\u2019") && LETTER.test(s[j + 1] ?? "")) {
+          j++;
+          continue;
+        }
+        if ((d === "-" || d === "\u2010") && j - i >= 2 && /^[A-Za-zÀ-ɏ]{2}/.test(s.slice(j + 1))) {
+          j++;
+          continue;
+        }
+        break;
+      }
+      const w2 = s.slice(i, j);
+      if (w2.toLowerCase() === "step") {
+        const m = /^\s*(\d{1,3})(?!\d)/.exec(s.slice(j));
+        if (m) {
+          out.push({ t: "ref", step: Number(m[1]), text: s.slice(i, j + m[0].length), bare: false, at: i, end: j + m[0].length, space: sp() });
+          i = j + m[0].length;
+          continue;
+        }
+      }
+      out.push({ t: "word", w: w2, at: i, end: j, space: sp() });
+      i = j;
+      continue;
+    }
+    out.push({ t: "junk", text: c, at: i, end: i + 1, space: sp() });
+    i++;
+  }
+  return out;
+}
+function refine(toks) {
+  const mapped = toks.map((t, k) => {
+    if (t.t !== "word") return t;
+    const prev = toks[k - 1], next = toks[k + 1];
+    if ((t.w === "x" || t.w === "X") && operandEnd(prev) && operandStart(next)) {
+      return { t: "op", op: "*", glyph: t.w, at: t.at, end: t.end, space: t.space };
+    }
+    if (t.w.toLowerCase() === "to" && prev?.t === "num" && next?.t === "num") {
+      return { t: "dash", glyph: "to", at: t.at, end: t.end, space: t.space };
+    }
+    return t;
+  });
+  const out = [];
+  for (const t of mapped) {
+    if (t.t !== "word") {
+      out.push(t);
+      continue;
+    }
+    const last = out[out.length - 1];
+    if (last && last.t === "name" && last.end <= t.at) {
+      last.name = `${last.name} ${t.w}`;
+      last.end = t.end;
+      continue;
+    }
+    out.push({ t: "name", name: t.w, at: t.at, end: t.end, space: t.space });
+  }
+  return out;
+}
+function parseTokens(toks, leftToRight) {
+  let p = 0;
+  const primary = () => {
+    const t = toks[p];
+    if (!t) return null;
+    switch (t.t) {
+      case "num":
+        p++;
+        return { k: "num", q: t.q, text: t.text, id: t.id };
+      case "name":
+        p++;
+        return { k: "name", name: t.name };
+      case "ref":
+        p++;
+        return t.bare ? { k: "ref", step: t.step, text: t.text, bare: true } : { k: "ref", step: t.step, text: t.text };
+      case "lp": {
+        p++;
+        const e2 = top();
+        if (!e2) return null;
+        if (toks[p]?.t === "rp") p++;
+        return e2;
+      }
+      default:
+        return null;
+    }
+  };
+  const unary = () => {
+    const t = toks[p];
+    if (t?.t === "op" && t.op === "-") {
+      p++;
+      const a = unary();
+      return a ? { k: "neg", a } : null;
+    }
+    if (t?.t === "op" && t.op === "+") {
+      p++;
+      return unary();
+    }
+    return primary();
+  };
+  const level = (ops, next) => () => {
+    let a = next();
+    while (a) {
+      const t = toks[p];
+      if (!t || t.t !== "op" || !ops.includes(t.op)) break;
+      p++;
+      const b = next();
+      if (!b) return null;
+      a = { k: "op", op: t.op, a, b };
+    }
+    return a;
+  };
+  const product = level(["*", "/"], unary);
+  const sum = level(["+", "-"], product);
+  const flat = level(["+", "-", "*", "/"], unary);
+  const top = leftToRight ? flat : sum;
+  const e = top();
+  return e && p === toks.length ? e : null;
+}
+function sameExpr(a, b) {
+  switch (a.k) {
+    case "num":
+      return b.k === "num" && a.q.lo === b.q.lo && a.q.hi === b.q.hi && a.q.unit === b.q.unit && a.q.dim === b.q.dim;
+    case "name":
+      return b.k === "name" && normName(a.name) === normName(b.name);
+    case "ref":
+      return b.k === "ref" && a.step === b.step;
+    case "op":
+      return b.k === "op" && a.op === b.op && sameExpr(a.a, b.a) && sameExpr(a.b, b.b);
+    case "neg":
+      return b.k === "neg" && sameExpr(a.a, b.a);
+    case "carry":
+      return b.k === "carry" && sameExpr(a.a, b.a);
+  }
+}
+function opOf(e) {
+  if (e.k === "op") return e.op;
+  if (e.k === "carry") return opOf(e.a);
+  return null;
+}
+var leafText = (e) => e.k === "num" ? formatQuantity(e.q) : e.k === "name" ? e.name : e.k === "ref" ? e.text : "";
+function fmtExpr(e, sub) {
+  const own = sub?.(e);
+  if (own !== void 0) return own;
+  switch (e.k) {
+    case "num":
+    case "name":
+    case "ref":
+      return leafText(e);
+    case "carry":
+      return fmtExpr(e.a, sub);
+    case "neg": {
+      const inner = fmtExpr(e.a, sub);
+      return "\u2212" + (opOf(e.a) ? `(${inner})` : inner);
+    }
+    case "op": {
+      const la = fmtExpr(e.a, sub), lb = fmtExpr(e.b, sub);
+      const oa = opOf(e.a), ob = opOf(e.b);
+      return `${oa && oa !== e.op ? `(${la})` : la} ${GLYPH[e.op]} ${ob ? `(${lb})` : lb}`;
+    }
+  }
+}
+function formatExpr(e) {
+  return fmtExpr(e);
+}
+function hasNames(e) {
+  switch (e.k) {
+    case "name":
+    case "ref":
+    case "carry":
+      return true;
+    case "num":
+      return false;
+    case "neg":
+      return hasNames(e.a);
+    case "op":
+      return hasNames(e.a) || hasNames(e.b);
+  }
+}
+function fold(e) {
+  if (e.k === "op") {
+    const a = fold(e.a), b = fold(e.b);
+    if (a.k === "num" && b.k === "num") {
+      const r = arithmetic(e.op, a.q, b.q);
+      if (r.quantity) return { k: "num", q: r.quantity, text: formatQuantity(r.quantity), id: -1 };
+    }
+    return { k: "op", op: e.op, a, b };
+  }
+  if (e.k === "neg") {
+    const a = fold(e.a);
+    return a.k === "num" ? { k: "num", q: negateQuantity(a.q), text: formatQuantity(negateQuantity(a.q)), id: -1 } : { k: "neg", a };
+  }
+  return e;
+}
+function depth(e) {
+  if (e.k === "op") return 1 + Math.max(depth(e.a), depth(e.b));
+  if (e.k === "neg" || e.k === "carry") return depth(e.a);
+  return 0;
+}
+var isCount = (e, n2) => e.k === "num" && isBare(e.q) && !isRange(e.q) && e.q.lo === n2;
+function describeExpr(expr) {
+  const e = fold(expr);
+  if (!hasNames(e) || depth(e) > 2) return void 0;
+  const say = (x, top) => {
+    switch (x.k) {
+      case "num":
+      case "name":
+      case "ref":
+        return leafText(x);
+      case "carry":
+        return say(x.a, top);
+      case "neg":
+        return `minus ${say(x.a, false)}`;
+      case "op": {
+        const a = say(x.a, false), b = say(x.b, false);
+        const simple = x.a.k !== "op" && x.b.k === "num";
+        switch (x.op) {
+          case "+":
+            return top && simple ? `${b} more than ${a}` : `${a} plus ${b}`;
+          case "-":
+            return top && simple ? `${b} less than ${a}` : `${a} minus ${b}`;
+          case "*":
+            if (isCount(x.b, 2)) return `twice ${a}`;
+            if (isCount(x.b, 3)) return `three times ${a}`;
+            return `${a} times ${b}`;
+          case "/":
+            if (isCount(x.b, 2)) return `${a}, halved`;
+            if (isCount(x.b, 3)) return `a third of ${a}`;
+            if (isCount(x.b, 4)) return `a quarter of ${a}`;
+            return `${a} over ${b}`;
+        }
+      }
+    }
+  };
+  return say(e, true);
+}
+var MAX_CHOICES = 3;
+function readSegment(toks, src) {
+  const junk = toks.find((t) => t.t === "junk");
+  if (junk && junk.t === "junk") return { readings: [], error: `cannot read \u201C${junk.text}\u201D` };
+  if (toks.some((t) => t.t === "eq")) return { readings: [], error: "more than one expression" };
+  const plans = [];
+  toks.forEach((t, k) => {
+    if (t.t !== "dash") return;
+    const prev = toks[k - 1], next = toks[k + 1];
+    if (!operandEnd(prev)) return plans.push({ index: k, mode: "unary" });
+    if (t.glyph === "to") return plans.push({ index: k, mode: "range" });
+    if (prev.t === "num" && next?.t === "num" && !isRange(prev.q) && !isRange(next.q) && prev.q.lo < next.q.lo && (prev.q.unit === null || next.q.unit === null || prev.q.unit === next.q.unit)) {
+      return plans.push({ index: k, mode: "choice", plain: t.glyph === "\u2212" ? "minus" : "range" });
+    }
+    plans.push({ index: k, mode: "minus" });
+  });
+  const choices = plans.filter((p) => p.mode === "choice");
+  const masks = [];
+  if (choices.length <= MAX_CHOICES) for (let m = 0; m < 1 << choices.length; m++) masks.push(m);
+  else {
+    masks.push(0);
+    choices.forEach((_, j) => masks.push(1 << j));
+  }
+  const out = [];
+  for (const mask of masks) {
+    const asOf = (plan) => {
+      if (plan.mode === "range") return "range";
+      if (plan.mode !== "choice") return "minus";
+      const j = choices.indexOf(plan);
+      const flipped = mask >> j & 1;
+      return flipped ? plan.plain === "range" ? "minus" : "range" : plan.plain;
+    };
+    const ptoks = [];
+    const dashChoices = [];
+    const dashReasons = [];
+    let ok = true;
+    for (let k = 0; k < toks.length; k++) {
+      const t = toks[k];
+      if (t.t === "dash") {
+        const plan = plans.find((p) => p.index === k);
+        const as = asOf(plan);
+        const prevOut = ptoks[ptoks.length - 1];
+        const next = toks[k + 1];
+        if (as === "range" && prevOut?.t === "num" && !isRange(prevOut.q) && next?.t === "num") {
+          const prevTok = toks[k - 1];
+          const q = rangeOf(prevTok.q.lo, next.q.hi, next.q.unit ?? prevTok.q.unit, {
+            approx: prevTok.q.approx || next.q.approx,
+            precision: Math.min(prevTok.q.precision ?? 1, next.q.precision ?? 1)
+          });
+          ptoks.pop();
+          const text = src.slice(prevTok.at, next.end);
+          ptoks.push({ t: "num", q, text, id: prevTok.at });
+          if (plan.mode === "choice") {
+            dashChoices.push({ kind: "dash", text, as: "range", plain: plan.plain === "range" });
+            dashReasons.push(dashReason(prevTok.q, next.q, "range", plan.plain === "range"));
+          }
+          k++;
+          continue;
+        }
+        if (plan.mode === "choice") {
+          const prevTok = toks[k - 1];
+          const nextTok = next;
+          dashChoices.push({ kind: "dash", text: src.slice(prevTok.at, nextTok.end), as: "minus", plain: plan.plain === "minus" });
+          dashReasons.push(dashReason(prevTok.q, nextTok.q, "minus", plan.plain === "minus"));
+        }
+        ptoks.push({ t: "op", op: "-" });
+        continue;
+      }
+      switch (t.t) {
+        case "num":
+          ptoks.push({ t: "num", q: t.q, text: t.text, id: t.at });
+          break;
+        case "name":
+          ptoks.push({ t: "name", name: t.name });
+          break;
+        case "word":
+          ptoks.push({ t: "name", name: t.w });
+          break;
+        case "ref":
+          ptoks.push({ t: "ref", step: t.step, text: t.text, bare: t.bare });
+          break;
+        case "op":
+          ptoks.push({ t: "op", op: t.op });
+          break;
+        case "lp":
+          ptoks.push({ t: "lp" });
+          break;
+        case "rp":
+          ptoks.push({ t: "rp" });
+          break;
+        default:
+          ok = false;
+      }
+    }
+    if (!ok) continue;
+    const byPrecedence = parseTokens(ptoks, false);
+    const leftToRight = parseTokens(ptoks, true);
+    const departures = dashChoices.filter((c) => !c.plain).length;
+    const push = (expr, order, orderReason) => {
+      if (out.some((r) => sameExpr(r.expr, expr))) return;
+      const formula = formatExpr(expr);
+      const clauses = [...dashReasons, ...orderReason ? [orderReason] : []];
+      out.push({
+        expr,
+        formula,
+        reason: clauses.length ? clauses.join("; ") : `one reading: ${formula}`,
+        departures: departures + (order && !order.plain ? 1 : 0),
+        choices: [...dashChoices, ...order ? [order] : []]
+      });
+    };
+    if (byPrecedence && leftToRight && !sameExpr(byPrecedence, leftToRight)) {
+      const f = formatExpr(byPrecedence);
+      push(
+        byPrecedence,
+        { kind: "order", text: f, as: "precedence", plain: true },
+        `by precedence (\xD7 and \xF7 before + and \u2212): ${describeExpr(byPrecedence) ?? f}`
+      );
+      push(
+        leftToRight,
+        { kind: "order", text: formatExpr(leftToRight), as: "left-to-right", plain: false },
+        `as worked, left to right: ${describeExpr(leftToRight) ?? formatExpr(leftToRight)}`
+      );
+    } else if (byPrecedence ?? leftToRight) {
+      push(byPrecedence ?? leftToRight, null, null);
+    }
+  }
+  if (!out.length) return { readings: [], error: `cannot read \u201C${src.slice(toks[0]?.at ?? 0, toks[toks.length - 1]?.end ?? 0)}\u201D as a formula` };
+  const ranked2 = out.map((r, i) => ({ r, i })).sort((x, y) => x.r.departures - y.r.departures || x.i - y.i).map((x) => x.r);
+  return { readings: ranked2 };
+}
+function dashReason(a, b, as, plain) {
+  const A = formatQuantity(a), B = formatQuantity(b);
+  const range = formatQuantity(rangeOf(a.lo, b.hi, b.unit ?? a.unit));
+  const diff = arithmetic("-", a, b).quantity;
+  const D = diff ? formatQuantity(diff) : "?";
+  if (as === "range") {
+    return plain ? `a dash between ${A} and ${B}, the smaller first, reads as a range, ${range}: ${A} \u2212 ${B} would be ${D}, and a length is not negative` : `read as a range instead, ${range}, since a length is not negative`;
+  }
+  return plain ? `a minus sign between ${A} and ${B}: ${A} \u2212 ${B} = ${D}` : `the dash as a minus: ${A} \u2212 ${B} = ${D}, a negative length`;
+}
+function parseExpression(text) {
+  const s = text.replace(SPACES, " ");
+  const toks = refine(scan(s));
+  if (!toks.length || toks.some((t) => t.t === "eq")) return [];
+  const segs = splitSegments(toks);
+  if (segs.length !== 1) return [];
+  return readSegment(segs[0].toks, s).readings;
+}
+var GAP_SPACES = 3;
+function splitSegments(toks) {
+  const segs = [{ toks: [] }];
+  let depth2 = 0;
+  for (const t of toks) {
+    const cur = segs[segs.length - 1];
+    if (t.t === "eq" && depth2 === 0) {
+      segs.push({ toks: [], join: t.approx ? "\u2248" : "=" });
+      continue;
+    }
+    if (depth2 === 0 && operandEnd(cur.toks[cur.toks.length - 1]) && operandStart(t)) {
+      segs.push({ toks: [t], join: t.space >= GAP_SPACES ? "gap" : "beside" });
+      if (t.t === "lp") depth2++;
+      continue;
+    }
+    if (t.t === "lp") depth2++;
+    if (t.t === "rp") depth2 = Math.max(0, depth2 - 1);
+    cur.toks.push(t);
+  }
+  return segs.filter((s) => s.toks.length > 0);
+}
+function parseChain(text) {
+  const s = text.replace(SPACES, " ");
+  const toks = refine(scan(s));
+  const segments = splitSegments(toks).map((seg2) => {
+    const first = seg2.toks[0], last = seg2.toks[seg2.toks.length - 1];
+    const { readings, error } = readSegment(seg2.toks, s);
+    return {
+      text: s.slice(first.at, last.end),
+      ...seg2.join ? { join: seg2.join } : {},
+      readings,
+      ...error ? { error } : {}
+    };
+  });
+  return { text: s, segments };
+}
+var LETTER_LABEL = /^\s*([A-Z])\s*[.):]\s+(?=\S)/;
+var STEP_LABEL = /^\s*(?:step\s*)?(\d{1,3})\s*[.):]\s+(?=\S)/i;
+var PAREN_LABEL = /^\s*\((\d{1,3})\)\s+(?=\S)/;
+var STARTS_WITH_OP = /^\s*[+\-–—−×*·÷/:=]/;
+function splitLabel(s) {
+  let m = LETTER_LABEL.exec(s);
+  if (m) return { label: { kind: "letter", letter: m[1], text: m[0].trim() }, body: s.slice(m[0].length) };
+  m = STEP_LABEL.exec(s);
+  if (m) return { label: { kind: "step", n: Number(m[1]), text: m[0].trim() }, body: s.slice(m[0].length) };
+  m = PAREN_LABEL.exec(s);
+  if (m && !STARTS_WITH_OP.test(s.slice(m[0].length))) return { label: { kind: "step", n: Number(m[1]), text: m[0].trim() }, body: s.slice(m[0].length) };
+  const c = s.trimStart()[0];
+  if (c && c in CIRCLED) {
+    const rest = s.trimStart().slice(1);
+    if (/^\s+\S/.test(rest) && !STARTS_WITH_OP.test(rest)) return { label: { kind: "step", n: CIRCLED[c], text: c }, body: rest.trimStart() };
+  }
+  return { body: s };
+}
+function loneQuantity(seg2) {
+  const e = seg2.readings[0]?.expr;
+  if (!e) return null;
+  if (e.k === "num") return e.q;
+  if (e.k === "neg" && e.a.k === "num") return negateQuantity(e.a.q);
+  return null;
+}
+function parseLine(text) {
+  const s = text.replace(SPACES, " ").trim();
+  const { label, body } = splitLabel(s);
+  const chain = parseChain(body);
+  const segs = chain.segments;
+  const base = { text: s, ...label ? { label } : {}, body: body.trim(), chain };
+  if (!segs.length) return { ...base, shape: "empty" };
+  if (segs.some((g) => !g.readings.length)) return { ...base, shape: "unreadable" };
+  const kinds = segs.map((g) => g.readings[0].expr.k === "name" ? "name" : loneQuantity(g) ? "quantity" : "expr");
+  if (kinds.length === 1 && kinds[0] === "name") return { ...base, shape: "heading" };
+  if (kinds.length === 1 && kinds[0] === "quantity") return { ...base, shape: "value", value: loneQuantity(segs[0]) };
+  if (kinds.length === 2 && kinds[0] === "name" && kinds[1] === "quantity") {
+    const e = segs[0].readings[0].expr;
+    return { ...base, shape: "definition", name: e.k === "name" ? e.name : segs[0].text, value: loneQuantity(segs[1]) };
+  }
+  return { ...base, shape: "formula" };
+}
+function scopeOf(names = {}, steps = {}, unit = null) {
+  const toQ = (v) => typeof v === "string" ? parseQuantity(v)?.quantity ?? null : v;
+  const table = /* @__PURE__ */ new Map();
+  for (const [k, v] of Object.entries(names)) {
+    table.set(normName(k), Array.isArray(v) ? v : [{ value: toQ(v), key: k }]);
+  }
+  return {
+    unit,
+    name: (n2) => table.get(normName(n2)),
+    step: (n2) => steps[n2] !== void 0 ? { value: toQ(steps[n2]), key: String(n2) } : void 0
+  };
+}
+function pick(res, label) {
+  if (label) {
+    const alt = res.find((r) => r.alternative && r.label === label);
+    if (alt) return alt;
+  }
+  return res.find((r) => !r.alternative) ?? res[0];
+}
+function evaluateExpr(expr, scope = {}, options = {}) {
+  const uses = /* @__PURE__ */ new Set();
+  const unknowns = /* @__PURE__ */ new Set();
+  const notes = [];
+  const resolved = [];
+  const shown = /* @__PURE__ */ new Map();
+  const bound = options.bindings;
+  const note = (n2) => {
+    if (!notes.includes(n2)) notes.push(n2);
+  };
+  const rec = (e) => {
+    switch (e.k) {
+      case "num": {
+        const b = bound?.get(`num:${e.id}`);
+        if (b) {
+          shown.set(e, formatQuantity(b));
+          return b;
+        }
+        return e.q;
+      }
+      case "name": {
+        const b = bound?.get(`name:${normName(e.name)}`);
+        if (b) {
+          shown.set(e, formatQuantity(b));
+          resolved.push({ subject: e.name, value: b, from: "worked" });
+          return b;
+        }
+        const res = scope.name?.(e.name);
+        if (!res || !res.length) {
+          unknowns.add(e.name);
+          return null;
+        }
+        const r = pick(res, options.label);
+        if (r.key) uses.add(r.key);
+        resolved.push({ subject: e.name, value: r.value, key: r.key, label: r.label, alternative: r.alternative, from: "scope" });
+        if (!r.value) {
+          unknowns.add(e.name);
+          if (r.reason) note(r.reason);
+          return null;
+        }
+        shown.set(e, formatQuantity(r.value));
+        return r.value;
+      }
+      case "ref": {
+        const b = bound?.get(`ref:${e.step}`);
+        if (b) {
+          shown.set(e, formatQuantity(b));
+          resolved.push({ subject: e.text, value: b, from: "worked" });
+          return b;
+        }
+        const r = scope.step?.(e.step);
+        if (r) {
+          if (r.key) uses.add(r.key);
+          resolved.push({ subject: e.text, value: r.value, key: r.key, from: "scope" });
+          if (r.value) {
+            shown.set(e, formatQuantity(r.value));
+            return r.value;
+          }
+          note(r.reason ?? `step ${e.step} has no value`);
+          return null;
+        }
+        if (e.bare) {
+          const n2 = quantity(e.step);
+          note(`${e.text} read as the number ${e.step}: there is no step ${e.step}`);
+          resolved.push({ subject: e.text, value: n2, from: "number" });
+          shown.set(e, String(e.step));
+          return n2;
+        }
+        note(`there is no step ${e.step}`);
+        return null;
+      }
+      case "neg": {
+        const v = rec(e.a);
+        return v && negateQuantity(v);
+      }
+      case "op": {
+        const a = rec(e.a), b = rec(e.b);
+        if (!a || !b) return null;
+        const r = arithmetic(e.op, a, b);
+        r.notes.forEach(note);
+        if (r.error) note(r.error);
+        return r.quantity;
+      }
+      case "carry": {
+        const v = rec(e.a);
+        if (v) return v;
+        shown.set(e, e.text);
+        note(`carried the written ${e.text}`);
+        return e.written;
+      }
+    }
+  };
+  const value = rec(expr);
+  return {
+    value,
+    worked: fmtExpr(expr, (e) => shown.get(e)),
+    uses: [...uses],
+    unknowns: [...unknowns],
+    notes,
+    resolved
+  };
+}
+function newAcc(from) {
+  return { bindings: new Map(from ?? []), bound: [], keyed: [], checks: [], fails: 0, passes: 0 };
+}
+function constantValue(w2) {
+  if (w2.k === "num") return w2.q;
+  if (w2.k === "ref" && w2.bare) return quantity(w2.step);
+  if (hasNames(w2)) return null;
+  return evaluateExpr(w2).value;
+}
+function tally(acc, c) {
+  acc.checks.push(c);
+  if (c.status === "off") acc.fails++;
+  else if (c.status !== "unknown") acc.passes++;
+}
+function unify(f, w2, ctx, acc) {
+  const partial = () => {
+    const wv = constantValue(w2);
+    if (!wv) return false;
+    const ev = evaluateExpr(f, ctx.scope, { label: ctx.label, bindings: acc.bindings });
+    tally(acc, { ...compareQuantities(ev.value, wv), text: textOf(w2), segment: ctx.segment, what: "restated", subject: formatExpr(f) });
+    return true;
+  };
+  switch (f.k) {
+    case "op":
+      if (w2.k === "op") return f.op === w2.op && unify(f.a, w2.a, ctx, acc) && unify(f.b, w2.b, ctx, acc);
+      return w2.k === "num" || w2.k === "neg" ? partial() : false;
+    case "neg":
+      if (w2.k === "neg") return unify(f.a, w2.a, ctx, acc);
+      return w2.k === "num" ? partial() : false;
+    case "carry":
+      if (w2.k === "num") return partial();
+      return unify(f.a, w2, ctx, acc);
+    case "name":
+    case "ref": {
+      if (w2.k === "name") return f.k === "name" && normName(f.name) === normName(w2.name);
+      if (w2.k === "ref" && !w2.bare) return f.k === "ref" && f.step === w2.step;
+      const wv = constantValue(w2);
+      if (!wv) return false;
+      const subject = f.k === "name" ? f.name : f.text;
+      const known = evaluateExpr(f, ctx.scope, { label: ctx.label, bindings: acc.bindings });
+      if (known.value) {
+        tally(acc, { ...compareQuantities(known.value, wv), text: textOf(w2), segment: ctx.segment, what: "restated", subject });
+        return true;
+      }
+      const v = isBare(wv) && ctx.scope.unit ? { ...wv, unit: ctx.scope.unit, dim: 1 } : wv;
+      const key2 = f.k === "name" ? `name:${normName(f.name)}` : `ref:${f.step}`;
+      const binding = { kind: f.k === "name" ? "name" : "step", subject, value: v, reason: `${subject} as ${formatQuantity(v)}` };
+      acc.bindings.set(key2, v);
+      acc.bound.push(binding);
+      acc.keyed.push({ key: key2, binding });
+      return true;
+    }
+    case "num": {
+      const wv = constantValue(w2);
+      if (!wv) return false;
+      if (isRange(f.q)) {
+        const v = isBare(wv) && f.q.unit ? { ...wv, unit: f.q.unit, dim: f.q.dim } : wv;
+        const subject = formatQuantity(f.q);
+        if (!isRange(v) && holds(f.q, v.lo)) {
+          acc.bindings.set(`num:${f.id}`, v);
+          acc.bound.push({ kind: "range", subject, value: v, reason: `${formatQuantity(v)} chosen from ${subject}` });
+          acc.passes++;
+          return true;
+        }
+        tally(acc, { ...compareQuantities(f.q, v), text: textOf(w2), segment: ctx.segment, what: "restated", subject });
+        return true;
+      }
+      const c = compareQuantities(f.q, wv);
+      if (c.status === "ok" || c.status === "rounded") {
+        acc.passes++;
+        return true;
+      }
+      return false;
+    }
+  }
+}
+function textOf(e) {
+  return e.k === "num" ? e.text : formatExpr(e);
+}
+function leftmostNum(e) {
+  if (e.k === "num") return e;
+  if (e.k === "op") return leftmostNum(e.a);
+  return null;
+}
+function replaceLeaf(e, leaf, by) {
+  if (e === leaf) return by;
+  if (e.k === "op") return { ...e, a: replaceLeaf(e.a, leaf, by), b: replaceLeaf(e.b, leaf, by) };
+  if (e.k === "neg") return { ...e, a: replaceLeaf(e.a, leaf, by) };
+  return e;
+}
+function namesIn(e, out = []) {
+  if (e.k === "name") {
+    if (!out.some((n2) => normName(n2) === normName(e.name))) out.push(e.name);
+  } else if (e.k === "op") {
+    namesIn(e.a, out);
+    namesIn(e.b, out);
+  } else if (e.k === "neg" || e.k === "carry") namesIn(e.a, out);
+  return out;
+}
+function alternativeLabels(exprs, scope) {
+  const labels = [];
+  for (const e of exprs) {
+    for (const n2 of namesIn(e)) {
+      for (const r of scope.name?.(n2) ?? []) if (r.alternative && r.label && !labels.includes(r.label)) labels.push(r.label);
+    }
+  }
+  return labels;
+}
+function takesLabel(e, label, scope) {
+  return namesIn(e).some((n2) => (scope.name?.(n2) ?? []).some((r) => r.alternative && r.label === label));
+}
+function refsIn(e, out = []) {
+  if (e.k === "ref") out.push(e.step);
+  else if (e.k === "op") {
+    refsIn(e.a, out);
+    refsIn(e.b, out);
+  } else if (e.k === "neg" || e.k === "carry") refsIn(e.a, out);
+  return out;
+}
+var cmpScore = (a, b) => {
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return a[i] - b[i];
+  return 0;
+};
+function runChain(reading, rest, scope, label, skip = /* @__PURE__ */ new Set(), seed = []) {
+  let cur = reading.expr;
+  const acc = newAcc();
+  const seeded2 = [];
+  for (const s of seed) {
+    acc.bindings.set(s.key, s.binding.value);
+    seeded2.push(s.binding);
+  }
+  const notes = [];
+  let restated = 0;
+  const restatedSegs = [];
+  const restatedTexts = [];
+  const skipped = [];
+  rest.forEach((seg2, k) => {
+    const segment = k + 1;
+    if (skip.has(segment)) {
+      skipped.push(seg2.text);
+      return;
+    }
+    if (!seg2.readings.length) {
+      notes.push(seg2.error ?? `cannot read \u201C${seg2.text}\u201D`);
+      return;
+    }
+    const lone = loneQuantity(seg2);
+    if (lone) {
+      const ev = evaluateExpr(cur, scope, { label, bindings: acc.bindings });
+      tally(acc, { ...compareQuantities(ev.value, lone), text: seg2.text, segment, what: "result" });
+      if (!ev.value) cur = { k: "carry", a: cur, written: lone, text: seg2.text };
+      return;
+    }
+    const options = [];
+    for (const sr of seg2.readings) {
+      const trial = newAcc(acc.bindings);
+      if (unify(cur, sr.expr, { scope, label, segment }, trial)) {
+        options.push({
+          score: [trial.fails, 0, -trial.passes],
+          apply: () => {
+            for (const [key2, v] of trial.bindings) acc.bindings.set(key2, v);
+            acc.bound.push(...trial.bound);
+            acc.keyed.push(...trial.keyed);
+            acc.checks.push(...trial.checks);
+            acc.fails += trial.fails;
+            acc.passes += trial.passes;
+            restated++;
+            restatedSegs.push(segment);
+            restatedTexts.push(seg2.join === "gap" ? `the worked line \u201C${seg2.text}\u201D` : `\u201C${seg2.text}\u201D`);
+          }
+        });
+      }
+      const leaf = leftmostNum(sr.expr);
+      if (leaf && !isRange(leaf.q)) {
+        const ev = evaluateExpr(cur, scope, { label, bindings: acc.bindings });
+        const c = { ...compareQuantities(ev.value, leaf.q), text: leaf.text, segment, what: "carried" };
+        const next = replaceLeaf(sr.expr, leaf, { k: "carry", a: cur, written: leaf.q, text: leaf.text });
+        options.push({
+          score: [c.status === "off" ? 1 : 0, 1, c.status === "unknown" || c.status === "off" ? 0 : -1],
+          apply: () => {
+            tally(acc, c);
+            cur = next;
+          }
+        });
+      }
+    }
+    if (!options.length) {
+      notes.push(`\u201C${seg2.text}\u201D neither restates the line nor carries it on`);
+      return;
+    }
+    options.reduce((best, o) => cmpScore(o.score, best.score) < 0 ? o : best).apply();
+  });
+  return { reading, label, cur, acc, restated, restatedSegs, restatedTexts, skipped, seeded: seeded2, notes };
+}
+var joinNames = (xs) => xs.length <= 1 ? xs.join("") : `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`;
+var runKey = (r) => [r.acc.fails, -r.restated, -r.acc.passes, r.li, r.reading.departures, r.ri];
+var sortRuns = (runs) => runs.sort((a, b) => cmpScore(runKey(a), runKey(b)));
+function evaluateChain(chain, scope = {}) {
+  const [first, ...rest] = chain.segments;
+  if (!first) return [];
+  if (!first.readings.length) {
+    const why = first.error ?? `cannot read \u201C${first.text}\u201D`;
+    return [{ expr: null, formula: first.text, value: null, worked: first.text, checks: [], bindings: [], restated: 0, uses: [], unknowns: [], notes: [why], reason: why }];
+  }
+  const labels = alternativeLabels(first.readings.map((r) => r.expr), scope);
+  let runs = [];
+  first.readings.forEach((reading, ri) => {
+    [void 0, ...labels].forEach((label, li) => {
+      if (label && !takesLabel(reading.expr, label, scope)) return;
+      runs.push({ ...runChain(reading, rest, scope, label), ri, li });
+    });
+  });
+  sortRuns(runs);
+  const settled = runs.find((r) => r.restated > 0);
+  if (settled) {
+    const worked = new Set(settled.restatedSegs);
+    runs = runs.map((r) => {
+      if (r.restatedSegs.some((s) => worked.has(s))) return r;
+      const names = namesIn(r.reading.expr).map(normName);
+      const refs = refsIn(r.reading.expr);
+      const seed = settled.acc.keyed.filter((x) => x.binding.kind === "name" && names.includes(x.key.slice(5)) || x.binding.kind === "step" && refs.includes(Number(x.key.slice(4)))).map((x) => ({ key: x.key, binding: { ...x.binding, reason: `${x.binding.reason}, as the worked line puts it` } }));
+      return { ...runChain(r.reading, rest, scope, r.label, worked, seed), ri: r.ri, li: r.li };
+    });
+    sortRuns(runs);
+  }
+  const plural = first.readings.length > 1;
+  return runs.map((run) => {
+    const ev = evaluateExpr(run.cur, scope, { label: run.label, bindings: run.acc.bindings });
+    const unknown = (u) => scope.describeUnknown?.(u) ?? `${u} is not defined`;
+    const notes = [...run.notes];
+    for (const n2 of ev.notes) if (!notes.includes(n2)) notes.push(n2);
+    for (const u of ev.unknowns) if (!notes.some((n2) => n2.includes(u))) notes.push(unknown(u));
+    const formula = formatExpr(run.cur);
+    const clauses = [];
+    if (plural) clauses.push(run.reading.reason);
+    if (labels.length) {
+      const taken = ev.resolved.filter((r) => r.from === "scope" && r.value);
+      const alt = taken.filter((r) => r.alternative);
+      if (run.label) {
+        clauses.push(`${run.label} on ${joinNames(alt.map((r) => r.subject))} (${alt.map((r) => `${r.subject} ${formatQuantity(r.value)}`).join(", ")})`);
+      } else {
+        const plainLabel = taken.find((r) => r.label)?.label ?? "as written";
+        clauses.push(`${plainLabel} (${taken.map((r) => `${r.subject} ${formatQuantity(r.value)}`).join(", ")})`);
+      }
+    }
+    if (run.restated) {
+      const fixed = run.acc.bound.map((b) => b.reason);
+      const across = run.restatedTexts.some((t) => t.startsWith("the worked line"));
+      clauses.push(`${run.restatedTexts.join(" and ")} ${across ? "has this form" : "restates it with the numbers put in"}${fixed.length ? `, with ${fixed.join(" and ")}` : ""}`);
+    }
+    if (run.skipped.length) {
+      clauses.push(`the worked line ${run.skipped.map((t) => `\u201C${t}\u201D`).join(" and ")} does not have this form${run.seeded.length ? `; it puts ${run.seeded.map((b) => `${b.subject} as ${formatQuantity(b.value)}`).join(" and ")}` : ""}`);
+    }
+    const offs = run.acc.checks.filter((c) => c.status === "off");
+    clauses.push(ev.value ? `${formula} = ${formatQuantity(ev.value)}` : `${formula}: no value`);
+    if (run.acc.checks.length) {
+      clauses.push(
+        offs.length ? offs.map((c) => c.reason).join("; ") : run.acc.checks.some((c) => c.status === "unknown") ? "nothing to check some of the written numbers against" : "every written number checks"
+      );
+    }
+    for (const n2 of notes) if (!clauses.includes(n2)) clauses.push(n2);
+    return {
+      expr: run.cur,
+      formula,
+      value: ev.value,
+      worked: ev.value && ev.worked !== formatQuantity(ev.value) ? `${ev.worked} = ${formatQuantity(ev.value)}` : ev.worked,
+      checks: run.acc.checks,
+      bindings: [...run.seeded, ...run.acc.bound],
+      restated: run.restated,
+      ...run.label ? { label: run.label } : {},
+      uses: ev.uses,
+      unknowns: ev.unknowns,
+      notes,
+      reason: clauses.join("; ")
+    };
+  });
+}
+
+// src/maths/sheet.ts
+var fmt = (q) => q ? formatQuantity(q) : "no value";
+var ADDS = /^\s*(add|plus)\b/i;
+function unitsWritten(p) {
+  const out = [];
+  const walk = (e) => {
+    if (e.k === "num") {
+      if (e.q.unit && e.q.dim === 1) out.push(e.q.unit);
+    } else if (e.k === "op") {
+      walk(e.a);
+      walk(e.b);
+    } else if (e.k === "neg" || e.k === "carry") walk(e.a);
+  };
+  for (const seg2 of p.chain.segments) if (seg2.readings[0]) walk(seg2.readings[0].expr);
+  return out;
+}
+var UNIT_NAMES = { in: "inches", ft: "feet", cm: "centimetres", mm: "millimetres", m: "metres" };
+function inferUnit(parses) {
+  const lines = /* @__PURE__ */ new Map();
+  for (const p of parses) for (const u of new Set(unitsWritten(p))) lines.set(u, (lines.get(u) ?? 0) + 1);
+  if (!lines.size) return { unit: null, reason: "no unit is written here, so the numbers stay bare" };
+  let best = null;
+  for (const [u, n3] of lines) if (!best || n3 > lines.get(best)) best = u;
+  const n2 = lines.get(best);
+  const others = [...lines.keys()].filter((u) => u !== best);
+  return {
+    unit: best,
+    reason: `${UNIT_NAMES[best]} (${unitSuffix(best, 1).trim()}), the unit written on ${n2} line${n2 === 1 ? "" : "s"}; a bare measurement here is in ${UNIT_NAMES[best]}${others.length ? ` (also written: ${others.join(", ")})` : ""}`
+  };
+}
+function headingAmount(p) {
+  if (!ADDS.test(p.body)) return void 0;
+  const kinds = p.chain.segments.map((g2) => {
+    const e2 = g2.readings[0]?.expr;
+    return !e2 ? "x" : e2.k === "name" ? "name" : e2.k === "num" ? "num" : "x";
+  });
+  if (kinds.includes("x") || kinds.filter((k) => k === "num").length !== 1) return void 0;
+  const g = p.chain.segments[kinds.indexOf("num")];
+  const e = g.readings[0].expr;
+  return e.k === "num" ? e.q : void 0;
+}
+function headingWords(p) {
+  const names = p.chain.segments.map((g) => g.readings[0]?.expr).filter((e) => e?.k === "name").map((e) => e.name);
+  return (names.length ? names.join(" ") : p.body).replace(/^\s*(add|plus)\s*/i, "").trim();
+}
+function classify2(src, line) {
+  const parse = parseLine(src.text);
+  const d = { line, src, parse, kind: "note" };
+  const L = parse.label;
+  const unreadable = () => parse.shape === "empty" ? `${L ? `${L.text} with nothing after it` : "an empty line"}` : `cannot read \u201C${parse.body}\u201D`;
+  if (L?.kind === "letter") {
+    if (parse.shape === "definition") return { ...d, kind: "definition", key: L.letter, letter: L.letter, name: parse.name, value: parse.value };
+    if (parse.shape === "value") return { ...d, kind: "definition", key: L.letter, letter: L.letter, value: parse.value };
+    if (parse.shape === "heading") return { ...d, kind: "definition", key: L.letter, letter: L.letter, name: parse.body, value: null };
+    if (parse.shape === "formula") return { ...d, kind: "step", key: L.letter, letter: L.letter, n: null, chain: parse.chain };
+    return { ...d, note: unreadable() };
+  }
+  if (L?.kind === "step") {
+    if (parse.shape === "value") return { ...d, kind: "label", key: String(L.n), n: L.n, step: String(L.n), written: parse.value, chain: parse.chain };
+    if (parse.shape === "formula" || parse.shape === "definition" || parse.shape === "heading") return { ...d, kind: "step", key: String(L.n), n: L.n, chain: parse.chain };
+    return { ...d, note: unreadable() };
+  }
+  const amount = headingAmount(parse);
+  if (amount) return { ...d, kind: "heading", title: parse.body, amount };
+  if (parse.shape === "heading") return { ...d, kind: "heading", title: parse.body };
+  if (parse.shape === "definition") return { ...d, kind: "definition", key: parse.name, name: parse.name, value: parse.value };
+  if (parse.shape === "value") return { ...d, kind: "value", written: parse.value };
+  if (parse.shape === "formula") return { ...d, kind: "check", chain: parse.chain };
+  return { ...d, note: unreadable() };
+}
+function hasNames2(chain) {
+  const walk = (e) => e.k === "name" || e.k === "ref" ? true : e.k === "op" ? walk(e.a) || walk(e.b) : e.k === "neg" || e.k === "carry" ? walk(e.a) : false;
+  return chain.segments.some((g) => g.readings.some((r) => walk(r.expr)));
+}
+function mentions(chain) {
+  const names = [];
+  const steps = [];
+  const walk = (e) => {
+    if (e.k === "name") names.push(e.name);
+    else if (e.k === "ref") steps.push(e.step);
+    else if (e.k === "op") {
+      walk(e.a);
+      walk(e.b);
+    } else if (e.k === "neg" || e.k === "carry") walk(e.a);
+  };
+  for (const g of chain.segments) for (const r of g.readings) walk(r.expr);
+  return { names, steps };
+}
+function addsAmount(e, amount) {
+  if (!e) return false;
+  if (e.k === "op") {
+    if (e.op === "+" && e.b.k === "num" && !isRange(e.b.q) && compareQuantities(amount, e.b.q).status === "ok") return true;
+    return addsAmount(e.a, amount) || addsAmount(e.b, amount);
+  }
+  if (e.k === "neg" || e.k === "carry") return addsAmount(e.a, amount);
+  return false;
+}
+var stepsPhrase = (keys) => keys.length === 1 ? `step ${keys[0]}` : `steps ${keys.slice(0, -1).join(", ")} and ${keys[keys.length - 1]}`;
+function cyclesOf(keys, deps) {
+  const index = /* @__PURE__ */ new Map();
+  const low = /* @__PURE__ */ new Map();
+  const onStack = /* @__PURE__ */ new Set();
+  const stack = [];
+  const out = /* @__PURE__ */ new Map();
+  let i = 0;
+  const visit = (v) => {
+    index.set(v, i);
+    low.set(v, i);
+    i++;
+    stack.push(v);
+    onStack.add(v);
+    for (const w2 of deps.get(v) ?? []) {
+      if (!index.has(w2)) {
+        visit(w2);
+        low.set(v, Math.min(low.get(v), low.get(w2)));
+      } else if (onStack.has(w2)) low.set(v, Math.min(low.get(v), index.get(w2)));
+    }
+    if (low.get(v) === index.get(v)) {
+      const scc = [];
+      let w2;
+      do {
+        w2 = stack.pop();
+        onStack.delete(w2);
+        scc.push(w2);
+      } while (w2 !== v);
+      if (scc.length > 1 || deps.get(v)?.has(v)) {
+        const members = keys.filter((k) => scc.includes(k));
+        for (const m of members) out.set(m, members);
+      }
+    }
+  };
+  for (const k of keys) if (!index.has(k)) visit(k);
+  return out;
+}
+function readSheet(input, options = {}) {
+  const sources = input.map(
+    (x) => typeof x === "string" ? { text: x } : { text: x.text, ...x.at ? { at: x.at } : {}, ...x.bounds ? { bounds: x.bounds } : {}, ...x.ids ? { ids: [...x.ids] } : {} }
+  );
+  const drafts = sources.map((src, line) => classify2(src, line));
+  const { unit, reason: unitReason } = options.unit !== void 0 ? { unit: options.unit, reason: options.unit ? `${UNIT_NAMES[options.unit]}, as given` : "no unit, as given" } : inferUnit(drafts.map((d) => d.parse));
+  const withUnit = (q) => isBare(q) && unit ? { ...q, unit, dim: 1 } : q;
+  const nameIndex = /* @__PURE__ */ new Map();
+  const defByKey = /* @__PURE__ */ new Map();
+  const stepByKey = /* @__PURE__ */ new Map();
+  for (const d of drafts) {
+    if (d.kind === "definition") {
+      const keys = [d.letter, d.name].filter((k) => !!k).map(normName);
+      const taken = keys.find((k) => nameIndex.has(k));
+      if (taken) {
+        const first = defByKey.get(nameIndex.get(taken));
+        d.conflict = `${d.letter ?? d.name} is written again as ${d.value ? fmt(withUnit(d.value)) : "nothing"}; the first, ${first?.value ? fmt(withUnit(first.value)) : "with no number"}, is kept`;
+        continue;
+      }
+      for (const k of keys) nameIndex.set(k, d.key);
+      defByKey.set(d.key, d);
+    } else if (d.kind === "step") {
+      if (stepByKey.has(d.key) || d.letter && nameIndex.has(normName(d.letter))) {
+        d.conflict = `${d.n !== null && d.n !== void 0 ? `step ${d.n}` : d.letter} is written twice; the first is kept`;
+        continue;
+      }
+      stepByKey.set(d.key, d);
+      if (d.letter) nameIndex.set(normName(d.letter), d.key);
+    }
+  }
+  for (const d of drafts) {
+    if (d.kind === "label" && !stepByKey.has(d.step)) {
+      d.kind = "step";
+      stepByKey.set(d.key, d);
+    }
+  }
+  let heading;
+  for (const d of drafts) {
+    if (d.kind === "heading") {
+      heading = d.line;
+      continue;
+    }
+    if (heading !== void 0) d.under = heading;
+  }
+  drafts.forEach((d, i) => {
+    const above = drafts[i - 1];
+    if (d.kind !== "check" || !above || above.kind !== "step" || above.conflict || above.workedLine !== void 0 || hasNames2(d.chain)) return;
+    if (above.chain.segments.some((g) => g.join === "gap")) return;
+    const joined = parseChain(`${above.parse.body}   ${d.parse.body}`);
+    if (!evaluateChain(joined, { unit }).some((r) => r.restated > 0)) return;
+    above.chain = joined;
+    above.workedLine = d.line;
+    d.kind = "worked";
+    d.step = above.key;
+  });
+  const stepKeys = [...stepByKey.keys()];
+  const deps = /* @__PURE__ */ new Map();
+  for (const k of stepKeys) {
+    const m = mentions(stepByKey.get(k).chain);
+    const set = /* @__PURE__ */ new Set();
+    for (const n2 of m.names) {
+      const key2 = nameIndex.get(normName(n2));
+      if (key2 && stepByKey.has(key2)) set.add(key2);
+    }
+    for (const s of m.steps) if (stepByKey.has(String(s))) set.add(String(s));
+    deps.set(k, set);
+  }
+  const cycles = cyclesOf(stepKeys, deps);
+  const who = (k) => /^\d+$/.test(k) ? `step ${k}` : k;
+  const evaluate = (alternatives2) => {
+    const values = /* @__PURE__ */ new Map();
+    const readings = /* @__PURE__ */ new Map();
+    const scopeFor = (allowance) => ({
+      unit,
+      describeUnknown: (name) => `${name} is not on this sheet`,
+      name: (n2) => {
+        const key2 = nameIndex.get(normName(n2));
+        if (key2 === void 0) return void 0;
+        const def = defByKey.get(key2);
+        if (!def) {
+          const v2 = values.get(key2) ?? null;
+          return [{ value: v2, key: key2, ...v2 ? {} : { reason: cycles.has(key2) ? `${key2} is in a cycle` : `${key2} has no value` } }];
+        }
+        const v = def.value ? withUnit(def.value) : null;
+        const plain2 = { value: v, key: key2, label: "from the measurements", ...v ? {} : { reason: `${key2} has no number yet` } };
+        if (!allowance || !v) return [plain2];
+        const alt = arithmetic("+", v, allowance.amount).quantity;
+        if (!alt) return [plain2];
+        return [plain2, { value: alt, key: key2, label: allowance.label, alternative: true, reason: `${key2} ${fmt(v)} + ${fmt(allowance.amount)}` }];
+      },
+      step: (n2) => {
+        const key2 = String(n2);
+        if (!stepByKey.has(key2)) return void 0;
+        if (cycles.has(key2)) return { value: null, key: key2, reason: `step ${n2} is in a cycle` };
+        const v = values.get(key2) ?? null;
+        return { value: v, key: key2, ...v ? {} : { reason: `step ${n2} has no value` } };
+      }
+    });
+    const run = (key2) => {
+      if (readings.has(key2)) return;
+      const d = stepByKey.get(key2);
+      const loop = cycles.get(key2);
+      if (loop) {
+        const why = loop.length === 1 ? `${who(key2)} refers to itself \u2014 a cycle, so it cannot be worked out` : `${loop.map(who).join(" and ")} refer to each other \u2014 a cycle, so none of them can be worked out`;
+        readings.set(key2, [{ expr: null, formula: d.parse.body, value: null, worked: d.parse.body, checks: [], bindings: [], restated: 0, uses: [...deps.get(key2)], unknowns: [], notes: [why], reason: why }]);
+        values.set(key2, null);
+        return;
+      }
+      for (const dep of deps.get(key2) ?? []) run(dep);
+      const r = evaluateChain(d.chain, scopeFor(alternatives2.get(key2)));
+      readings.set(key2, r);
+      values.set(key2, r[0]?.value ?? null);
+    };
+    stepKeys.forEach(run);
+    return { values, readings, scopeFor };
+  };
+  const plain = evaluate(/* @__PURE__ */ new Map());
+  const allowances = /* @__PURE__ */ new Map();
+  for (const h2 of drafts) {
+    if (h2.kind !== "heading" || !ADDS.test(h2.title) && !/\ballowance\b/i.test(h2.title)) continue;
+    const label = `with ${headingWords(h2.parse)}`;
+    if (h2.amount) {
+      const amount = withUnit(h2.amount);
+      allowances.set(h2.line, { amount, label, from: [], reason: `${h2.title}: ${fmt(amount)}, as the heading says` });
+      continue;
+    }
+    const seen = [];
+    for (const d of drafts) {
+      if (d.kind !== "step" || d.under !== h2.line || d.conflict) continue;
+      const e = plain.readings.get(d.key)?.[0]?.expr;
+      if (e && e.k === "op" && e.op === "+" && e.b.k === "num" && !isRange(e.b.q) && e.a.k !== "num") seen.push({ key: d.key, k: withUnit(e.b.q) });
+    }
+    if (!seen.length) continue;
+    const tally2 = seen.map((s) => ({ ...s, n: seen.filter((o) => compareQuantities(o.k, s.k).status === "ok").length }));
+    const top = tally2.reduce((a, b) => b.n > a.n ? b : a);
+    const from = seen.filter((s) => compareQuantities(s.k, top.k).status === "ok").map((s) => s.key);
+    allowances.set(h2.line, { amount: top.k, label, from, reason: `${h2.title}: ${fmt(top.k)}, as ${stepsPhrase(from)} ${from.length === 1 ? "adds" : "add"} it` });
+  }
+  const alternatives = /* @__PURE__ */ new Map();
+  for (const d of drafts) {
+    if (d.kind !== "step" || d.conflict || d.under === void 0) continue;
+    const a = allowances.get(d.under);
+    if (!a) continue;
+    if (plain.readings.get(d.key)?.some((r) => addsAmount(r.expr, a.amount))) continue;
+    alternatives.set(d.key, a);
+  }
+  const done = alternatives.size ? evaluate(alternatives) : plain;
+  const readingsOf = (key2) => done.readings.get(key2) ?? [];
+  const entries = drafts.map((d) => {
+    const base = {
+      line: d.line,
+      text: d.src.text,
+      ...d.src.at ? { at: d.src.at } : {},
+      ...d.src.bounds ? { bounds: d.src.bounds } : {},
+      ...d.src.ids ? { ids: d.src.ids } : {},
+      ...d.under !== void 0 ? { under: d.under } : {},
+      reason: ""
+    };
+    switch (d.kind) {
+      case "definition": {
+        const value = d.value ? withUnit(d.value) : null;
+        const head = [d.letter, d.name].filter(Boolean).join(" \xB7 ");
+        const reason = d.conflict ? d.conflict : value ? `${head} = ${fmt(value)}${d.value && isBare(d.value) && unit ? `, in the ${UNIT_NAMES[unit]} this page writes` : ""}` : `${head}: a measurement with no number yet`;
+        return { ...base, kind: "definition", key: d.key, ...d.letter ? { letter: d.letter } : {}, ...d.name ? { name: d.name } : {}, value, ...d.conflict ? { conflict: d.conflict } : {}, reason };
+      }
+      case "step": {
+        if (d.conflict) {
+          return { ...base, kind: "step", key: d.key, n: d.n ?? null, ...d.letter ? { letter: d.letter } : {}, formula: d.parse.body, value: null, readings: [], uses: [], conflict: d.conflict, reason: d.conflict };
+        }
+        const readings = readingsOf(d.key);
+        const top = readings[0];
+        const uses = [...new Set(readings.flatMap((r) => r.uses))];
+        return {
+          ...base,
+          kind: "step",
+          key: d.key,
+          n: d.n ?? null,
+          ...d.letter ? { letter: d.letter } : {},
+          formula: top?.formula ?? d.parse.body,
+          value: top?.value ?? null,
+          readings,
+          uses,
+          ...d.workedLine !== void 0 ? { worked: d.workedLine } : {},
+          reason: stepReason(readings, nameIndex)
+        };
+      }
+      case "heading": {
+        const allowance = allowances.get(d.line);
+        return { ...base, kind: "heading", title: d.title, ...allowance ? { allowance } : {}, reason: allowance ? allowance.reason : `${d.title}: kept as context for the lines under it` };
+      }
+      case "check": {
+        const readings = evaluateChain(d.chain, done.scopeFor(void 0));
+        return { ...base, kind: "check", value: readings[0]?.value ?? null, readings, reason: readings[0]?.reason ?? `cannot read \u201C${d.parse.body}\u201D` };
+      }
+      case "worked":
+        return { ...base, kind: "worked", step: d.step, reason: `the worked line of ${who(d.step)}` };
+      case "label": {
+        const written = withUnit(d.written);
+        const check = checkReadings(d.step, readingsOf(d.step), written);
+        return { ...base, kind: "label", step: d.step, written, check, reason: check.reason };
+      }
+      case "value": {
+        const written = withUnit(d.written);
+        const matches = stepKeys.filter((k) => !cycles.has(k)).map((k) => checkReadings(k, readingsOf(k), written)).filter((c) => c.status === "ok" || c.status === "rounded" || c.status === "within" || c.status === "spans");
+        return { ...base, kind: "value", written, matches, reason: matches.length ? matches.map((m) => m.reason).join("; ") : `${fmt(written)} agrees with no step here` };
+      }
+      default:
+        return { ...base, kind: "note", reason: d.note ?? `cannot read \u201C${d.parse.body}\u201D` };
+    }
+  });
+  return { entries, unit, unitReason };
+}
+function nameOf(r, readings) {
+  return r.label ?? (readings.some((x) => x.label) ? "from the measurements" : `as ${r.formula}`);
+}
+function stepReason(readings, nameIndex) {
+  const top = readings[0];
+  if (!top) return "nothing to read";
+  const parts = [top.reason];
+  for (const b of top.bindings) {
+    if (b.kind === "name" && !nameIndex.has(normName(b.subject))) parts.push(`${b.subject} is not on this sheet; the worked line puts ${fmt(b.value)} for it`);
+  }
+  for (const o of readings.slice(1)) parts.push(`or ${fmt(o.value)} ${nameOf(o, readings)}`);
+  return parts.join("; ");
+}
+function checkReadings(key2, readings, w2) {
+  const who = /^\d+$/.test(key2) ? `step ${key2}` : key2;
+  const per = readings.map((r, index) => ({ index, value: r.value, ...pick2(compareQuantities(r.value, w2)) }));
+  const out = (status, reason) => ({
+    step: key2,
+    written: w2,
+    status,
+    readings: per.map((p) => ({ index: p.index, status: p.status, value: p.value })),
+    reason
+  });
+  if (!readings.length) return out("unknown", `${who} has no reading to check ${fmt(w2)} against`);
+  if (isRange(w2) && readings.length >= 2) {
+    const at = (v) => readings.findIndex((r) => r.value && !isRange(r.value) && compareQuantities(r.value, { ...w2, lo: v, hi: v }).status === "ok");
+    const lo = at(w2.lo), hi = at(w2.hi);
+    if (lo >= 0 && hi >= 0 && lo !== hi) {
+      return out("spans", `${fmt(w2)} spans ${who}'s readings: ${fmt(readings[lo].value)} ${nameOf(readings[lo], readings)}, ${fmt(readings[hi].value)} ${nameOf(readings[hi], readings)}`);
+    }
+  }
+  const good = (s) => s === "ok" || s === "rounded" || s === "within";
+  if (good(per[0].status)) return out(per[0].status, `${fmt(w2)} is ${who}: ${per[0].reason}`);
+  const other = per.find((p) => good(p.status));
+  if (other) {
+    const r = readings[other.index];
+    return out(other.status, `${fmt(w2)} is ${who} ${nameOf(r, readings)} (${fmt(r.value)}), not its first reading (${fmt(readings[0].value)})`);
+  }
+  if (per.every((p) => p.status === "unknown")) return out("unknown", `${who} has no value to check ${fmt(w2)} against`);
+  return out("off", `${who} is ${fmt(readings[0].value)}; written ${fmt(w2)}`);
+}
+function pick2(c) {
+  return { status: c.status, reason: c.reason };
+}
+function sheetEntry(sheet, key2) {
+  const k = key2.trim();
+  const live = (e) => (e.kind === "definition" || e.kind === "step") && !e.conflict;
+  const direct = sheet.entries.find((e) => live(e) && e.key === k);
+  if (direct) return direct;
+  const n2 = normName(k.replace(/^step\s+/i, "").replace(/[.)]$/, ""));
+  return sheet.entries.find((e) => {
+    if (!live(e)) return false;
+    if (e.kind === "definition") return normName(e.key) === n2 || !!e.name && normName(e.name) === n2 || !!e.letter && normName(e.letter) === n2;
+    return e.kind === "step" && normName(e.key) === n2;
+  });
+}
+function sheetValue(sheet, key2) {
+  const e = sheetEntry(sheet, key2);
+  return e && (e.kind === "definition" || e.kind === "step") ? e.value : null;
+}
+function dependentsOf(sheet, key2) {
+  const start = sheetEntry(sheet, key2);
+  if (!start || start.kind !== "definition" && start.kind !== "step") return [];
+  const steps = sheet.entries.filter((e) => e.kind === "step" && !e.conflict);
+  const found = /* @__PURE__ */ new Set();
+  const frontier = [start.key];
+  while (frontier.length) {
+    const k = frontier.pop();
+    for (const s of steps) {
+      if (s.uses.includes(k) && !found.has(s.key)) {
+        found.add(s.key);
+        frontier.push(s.key);
+      }
+    }
+  }
+  return steps.filter((s) => found.has(s.key)).map((s) => s.key);
+}
+function checkWritten(sheet, key2, written) {
+  const e = sheetEntry(sheet, key2);
+  if (!e || e.kind !== "step") return null;
+  const q = typeof written === "string" ? parseQuantity(written)?.quantity : written;
+  if (!q) return null;
+  return checkReadings(e.key, e.readings, isBare(q) && sheet.unit ? { ...q, unit: sheet.unit, dim: 1 } : q);
+}
+var sig = (q) => q ? `${q.lo}|${q.hi}|${q.unit}|${q.dim}|${q.approx}` : "-";
+function entryKey(e) {
+  switch (e.kind) {
+    case "definition":
+    case "step":
+      return e.conflict ? null : e.key;
+    case "heading":
+      return `heading ${e.title}`;
+    case "label":
+    case "value":
+    case "check":
+      return `${e.kind} ${e.line}`;
+    default:
+      return null;
+  }
+}
+function signature(e) {
+  const readings = (rs) => rs.map((r) => [sig(r.value), r.label ?? "", r.formula, r.checks.map((c) => `${c.status}:${sig(c.computed)}`).join(",")].join(" ")).join(" / ");
+  switch (e.kind) {
+    case "definition":
+      return sig(e.value);
+    case "step":
+    case "check":
+      return readings(e.readings);
+    case "heading":
+      return e.allowance ? `${sig(e.allowance.amount)} ${e.allowance.from.join(",")}` : "";
+    case "label":
+      return e.check ? `${e.check.status} ${e.check.readings.map((r) => r.status).join(",")}` : "";
+    case "value":
+      return e.matches.map((m) => `${m.step}:${m.status}`).join(",");
+    default:
+      return "";
+  }
+}
+function diffSheets(a, b) {
+  const index = (s) => {
+    const m = /* @__PURE__ */ new Map();
+    for (const e of s.entries) {
+      const k = entryKey(e);
+      if (k !== null && !m.has(k)) m.set(k, signature(e));
+    }
+    return m;
+  };
+  const A = index(a), B = index(b);
+  const out = [];
+  for (const [k, v] of B) if (A.get(k) !== v) out.push(k);
+  for (const k of A.keys()) if (!B.has(k)) out.push(k);
+  return out;
+}
+function describeSheet(sheet) {
+  const lines = [];
+  for (const e of sheet.entries) {
+    switch (e.kind) {
+      case "definition":
+        lines.push(e.conflict ? `${e.text} \u2014 ${e.conflict}` : `${[e.letter, e.name].filter(Boolean).join(" \xB7 ")} = ${fmt(e.value)}`);
+        break;
+      case "heading":
+        lines.push(e.allowance ? `${e.title} \u2014 ${fmt(e.allowance.amount)}${e.allowance.from.length ? `, as ${stepsPhrase(e.allowance.from)} ${e.allowance.from.length === 1 ? "adds" : "add"} it` : ""}` : e.title);
+        break;
+      case "step": {
+        if (e.conflict) {
+          lines.push(`${e.text} \u2014 ${e.conflict}`);
+          break;
+        }
+        const [top, ...rest] = e.readings;
+        if (!top) break;
+        const mark = (r) => {
+          const off = r.checks.find((c) => c.status === "off");
+          if (off) return ` \u2717 written ${fmt(off.written)}`;
+          return r.checks.length && r.checks.every((c) => c.status !== "unknown") ? " \u2713" : "";
+        };
+        const head = e.n !== null ? `${e.n}.` : `${e.letter}.`;
+        if (!top.value) {
+          const why = [...top.notes, ...top.unknowns.map((u) => `${u} is not on this sheet`)].filter((x, i, xs) => xs.indexOf(x) === i);
+          lines.push(`${head} ${top.formula} \u2014 ${why.join("; ") || "no value"}`);
+          break;
+        }
+        lines.push(`${head} ${top.formula} = ${fmt(top.value)}${top.label ? ` ${top.label}` : ""}${mark(top)}${rest.map((r) => ` \xB7 or ${fmt(r.value)} ${nameOf(r, e.readings)}${mark(r)}`).join("")}`);
+        break;
+      }
+      case "label":
+      case "value":
+      case "check":
+        lines.push(`${e.text} \u2014 ${e.reason}`);
+        break;
+      default:
+        break;
+    }
+  }
+  return lines.join("\n");
+}
+
+// src/maths/gather.ts
+var BAND_OVERLAP = 0.35;
+var COLUMN_GAP = 2.5;
+function textCodeOf(node) {
+  for (let i = node.reps.length - 1; i >= 0; i--) {
+    const r = node.reps[i];
+    if (r.modality !== "code") continue;
+    const d = r.data;
+    return d.kind === "text" && typeof d.code === "string" ? d.code : void 0;
+  }
+  return void 0;
+}
+function overlap(a, b) {
+  const o = Math.min(a.maxY, b.maxY) - Math.max(a.minY, b.minY);
+  const shorter = Math.max(1, Math.min(a.maxY - a.minY, b.maxY - b.minY));
+  return o / shorter;
+}
+function median(xs) {
+  const s = xs.slice().sort((a, b) => a - b);
+  return s.length ? s[Math.floor(s.length / 2)] : 0;
+}
+function sheetLines(state) {
+  const out = [];
+  const pieces = [];
+  for (const id of state.contentIds) {
+    const node = state.nodes.get(id);
+    if (!node || getRep(node, "erased")) continue;
+    const b = boundsOf(node);
+    if (!b) continue;
+    if (state.artifacts.includes(id)) {
+      const code = textCodeOf(node);
+      if (code === void 0) continue;
+      const rows = code.split(/\r?\n/);
+      const h2 = (b.maxY - b.minY) / Math.max(1, rows.length);
+      rows.forEach((row, i) => {
+        const text2 = row.trim();
+        if (!text2) return;
+        const lb = { minX: b.minX, maxX: b.maxX, minY: b.minY + i * h2, maxY: b.minY + (i + 1) * h2 };
+        out.push({ text: text2, at: { x: lb.minX, y: lb.minY }, bounds: lb, ids: [id], from: "text" });
+      });
+      continue;
+    }
+    const text = transcriptOf(node)?.trim();
+    if (text) pieces.push({ id, text, b });
+  }
+  pieces.sort((p, q) => p.b.minY + p.b.maxY - (q.b.minY + q.b.maxY));
+  const bands2 = [];
+  for (const p of pieces) {
+    const band = bands2.find((bd) => bd.some((o) => overlap(o.b, p.b) >= BAND_OVERLAP));
+    if (band) band.push(p);
+    else bands2.push([p]);
+  }
+  for (const band of bands2) {
+    band.sort((p, q) => p.b.minX - q.b.minX);
+    const h2 = Math.max(1, median(band.map((p) => p.b.maxY - p.b.minY)));
+    let text = band[0].text;
+    for (let i = 1; i < band.length; i++) {
+      const gap = band[i].b.minX - band[i - 1].b.maxX;
+      text += (gap > COLUMN_GAP * h2 ? "   " : " ") + band[i].text;
+    }
+    const bounds = {
+      minX: Math.min(...band.map((p) => p.b.minX)),
+      maxX: Math.max(...band.map((p) => p.b.maxX)),
+      minY: Math.min(...band.map((p) => p.b.minY)),
+      maxY: Math.max(...band.map((p) => p.b.maxY))
+    };
+    out.push({ text, at: { x: bounds.minX, y: bounds.minY }, bounds, ids: band.map((p) => p.id), from: "writing" });
+  }
+  return out.map((l, i) => ({ l, i })).sort((a, b) => a.l.bounds.minY - b.l.bounds.minY || a.l.bounds.minX - b.l.bounds.minX || a.i - b.i).map((x) => x.l);
+}
+
 // src/session/magnets.ts
 var MAGNET_SCREEN_PX = 14;
 var MAGNET_SIZE_FRACTION = 0.06;
@@ -2504,9 +4456,9 @@ function bagDistance(a, b) {
 function printBag(bag) {
   return Object.entries(bag).sort((p, q) => q[1] - p[1] || p[0].localeCompare(q[0])).map(([k, v]) => v > 1 ? `${v}\xD7${k}` : k).join(" + ");
 }
-function describeStructure(sig) {
-  const shapes = printBag(sig.shapes) || "nothing";
-  const links = Object.entries(sig.links).sort((p, q) => q[1] - p[1] || p[0].localeCompare(q[0])).map(([k, v]) => v > 1 ? `${k} \xD7${v}` : k).join(", ");
+function describeStructure(sig2) {
+  const shapes = printBag(sig2.shapes) || "nothing";
+  const links = Object.entries(sig2.links).sort((p, q) => q[1] - p[1] || p[0].localeCompare(q[0])).map(([k, v]) => v > 1 ? `${k} \xD7${v}` : k).join(", ");
   return links ? `${shapes}; ${links}` : `${shapes}; no links`;
 }
 function compareSignatures(a, b) {
@@ -2538,15 +4490,15 @@ function matchDefinition(group2, definition, examples) {
   }
   return { score: best.score, vetoed: false, reasoning: `${best.reasoning} \u2014 against ${via}` };
 }
-function addExample(examples, sig, verdict) {
+function addExample(examples, sig2, verdict) {
   const ex = { accepted: [...examples?.accepted ?? []], rejected: [...examples?.rejected ?? []] };
-  const same = (s) => compareSignatures(s, sig).score >= SAME;
+  const same = (s) => compareSignatures(s, sig2).score >= SAME;
   if (verdict === "is") {
     ex.rejected = ex.rejected.filter((s) => !same(s));
-    if (!ex.accepted.some(same)) ex.accepted.push(sig);
+    if (!ex.accepted.some(same)) ex.accepted.push(sig2);
   } else {
     ex.accepted = ex.accepted.filter((s) => !same(s));
-    if (!ex.rejected.some(same)) ex.rejected.push(sig);
+    if (!ex.rejected.some(same)) ex.rejected.push(sig2);
   }
   return ex;
 }
@@ -2569,7 +4521,7 @@ function addressablesOf(kind, source) {
   }
 }
 function matchBrace(src, open) {
-  let depth = 0, i = open;
+  let depth2 = 0, i = open;
   while (i < src.length) {
     const c = src[i];
     if (c === '"' || c === "'" || c === "`") {
@@ -2599,10 +4551,10 @@ function matchBrace(src, open) {
       i += 2;
       continue;
     }
-    if (c === "{") depth++;
+    if (c === "{") depth2++;
     else if (c === "}") {
-      depth--;
-      if (depth === 0) return i + 1;
+      depth2--;
+      if (depth2 === 0) return i + 1;
     }
     i++;
   }
@@ -2641,7 +4593,7 @@ function functionsOf(src) {
   return out;
 }
 function statementEnd(src, from) {
-  let depth = 0, i = from;
+  let depth2 = 0, i = from;
   while (i < src.length) {
     const c = src[i];
     if (c === '"' || c === "'" || c === "`") {
@@ -2665,10 +4617,10 @@ function statementEnd(src, from) {
       i += 2;
       continue;
     }
-    if (c === "{" || c === "(" || c === "[") depth++;
-    else if (c === "}" || c === ")" || c === "]") depth--;
-    else if (c === ";" && depth === 0) return i + 1;
-    else if (c === "\n" && depth === 0 && /^\s*\n/.test(src.slice(i + 1, i + 3))) return i + 1;
+    if (c === "{" || c === "(" || c === "[") depth2++;
+    else if (c === "}" || c === ")" || c === "]") depth2--;
+    else if (c === ";" && depth2 === 0) return i + 1;
+    else if (c === "\n" && depth2 === 0 && /^\s*\n/.test(src.slice(i + 1, i + 3))) return i + 1;
     i++;
   }
   return src.length;
@@ -2681,8 +4633,8 @@ function keysOf(src, maxDepth = 3) {
   } catch {
     return out;
   }
-  const walk = (obj, path, from, depth) => {
-    if (!obj || typeof obj !== "object" || Array.isArray(obj) || depth > maxDepth) return from;
+  const walk = (obj, path, from, depth2) => {
+    if (!obj || typeof obj !== "object" || Array.isArray(obj) || depth2 > maxDepth) return from;
     let cursor = from;
     for (const key2 of Object.keys(obj)) {
       const needle = JSON.stringify(key2);
@@ -2691,9 +4643,9 @@ function keysOf(src, maxDepth = 3) {
       const valueStart = src.indexOf(":", at) + 1;
       const end = valueEnd(src, valueStart);
       const id = ["key", ...path, key2].join(path.length ? "." : ":").replace(/^key\./, "key:");
-      out.push({ id: path.length ? `key:${[...path, key2].join(".")}` : `key:${key2}`, label: [...path, key2].join("."), start: at, end, depth });
+      out.push({ id: path.length ? `key:${[...path, key2].join(".")}` : `key:${key2}`, label: [...path, key2].join("."), start: at, end, depth: depth2 });
       void id;
-      walk(obj[key2], [...path, key2], valueStart, depth + 1);
+      walk(obj[key2], [...path, key2], valueStart, depth2 + 1);
       cursor = end;
     }
     return cursor;
@@ -2707,7 +4659,7 @@ function valueEnd(src, from) {
   const c = src[i];
   if (c === "{" || c === "[") {
     const close = c === "{" ? "}" : "]";
-    let depth = 0;
+    let depth2 = 0;
     for (; i < src.length; i++) {
       const ch = src[i];
       if (ch === '"') {
@@ -2718,10 +4670,10 @@ function valueEnd(src, from) {
         }
         continue;
       }
-      if (ch === c) depth++;
+      if (ch === c) depth2++;
       else if (ch === close) {
-        depth--;
-        if (depth === 0) return i + 1;
+        depth2--;
+        if (depth2 === 0) return i + 1;
       }
     }
     return src.length;
@@ -2765,7 +4717,7 @@ function elementsOf(source) {
   const rootOpenEnd = src.indexOf(">", root);
   if (rootOpenEnd === -1) return out;
   const counts = /* @__PURE__ */ new Map();
-  let i = rootOpenEnd + 1, depth = 0;
+  let i = rootOpenEnd + 1, depth2 = 0;
   const tag = /<\/?([A-Za-z][\w:-]*)([^>]*?)(\/?)>/g;
   tag.lastIndex = i;
   let m;
@@ -2774,15 +4726,15 @@ function elementsOf(source) {
     const closing = src[m.index + 1] === "/";
     const name = m[1], selfClosing = m[3] === "/";
     if (closing) {
-      if (name.toLowerCase() === "svg" && depth === 0) break;
-      depth--;
-      if (depth === 0 && openAt !== -1) {
+      if (name.toLowerCase() === "svg" && depth2 === 0) break;
+      depth2--;
+      if (depth2 === 0 && openAt !== -1) {
         push(openName, openAttrs, openAt, m.index + m[0].length);
         openAt = -1;
       }
       continue;
     }
-    if (depth === 0) {
+    if (depth2 === 0) {
       if (selfClosing) {
         push(name, m[2], m.index, m.index + m[0].length);
         continue;
@@ -2791,7 +4743,7 @@ function elementsOf(source) {
       openName = name;
       openAttrs = m[2];
     }
-    if (!selfClosing) depth++;
+    if (!selfClosing) depth2++;
   }
   function push(name, attrs, start, end) {
     const idAttr = /\bid\s*=\s*"([^"]+)"/.exec(attrs)?.[1];
@@ -3659,7 +5611,7 @@ function tracePaths(skeleton, width, height) {
     for (; ; ) {
       const next = freeNeighbours(x, y);
       if (next.length === 0) break;
-      let pick = next[0];
+      let pick3 = next[0];
       if (next.length > 1 && (lx || ly)) {
         let best = -Infinity;
         for (const n2 of next) {
@@ -3667,16 +5619,16 @@ function tracePaths(skeleton, width, height) {
           const cos = (dx * lx + dy * ly) / Math.hypot(dx, dy);
           if (cos > best) {
             best = cos;
-            pick = n2;
+            pick3 = n2;
           }
         }
       } else if (next.length > 1) {
-        pick = next.find((n2) => n2.x === x || n2.y === y) ?? next[0];
+        pick3 = next.find((n2) => n2.x === x || n2.y === y) ?? next[0];
       }
-      lx = pick.x - x;
-      ly = pick.y - y;
-      x = pick.x;
-      y = pick.y;
+      lx = pick3.x - x;
+      ly = pick3.y - y;
+      x = pick3.x;
+      y = pick3.y;
       visited[y * width + x] = 1;
       points.push({ x, y });
     }
@@ -4081,9 +6033,9 @@ function regionsOf(artifact, nodes) {
     }
   }
   const readingOrder = (a, b) => {
-    const overlap = Math.min(a.world.y + a.world.h, b.world.y + b.world.h) - Math.max(a.world.y, b.world.y);
+    const overlap2 = Math.min(a.world.y + a.world.h, b.world.y + b.world.h) - Math.max(a.world.y, b.world.y);
     const shorter = Math.min(a.world.h, b.world.h);
-    if (overlap > shorter * 0.5) return a.world.x - b.world.x;
+    if (overlap2 > shorter * 0.5) return a.world.x - b.world.x;
     return a.world.y - b.world.y;
   };
   const ordered2 = [];
@@ -4182,9 +6134,9 @@ function relate(marks, config = DEFAULT_RELATE_CONFIG) {
         }
       }
       if (boundsOverlap(ab, bb)) {
-        const depth = overlapFraction(ab.minX, ab.maxX, bb.minX, bb.maxX) * overlapFraction(ab.minY, ab.maxY, bb.minY, bb.maxY);
-        add("touching", a.id, b.id, 0.5 + depth * 0.5, "their areas overlap");
-        add("touching", b.id, a.id, 0.5 + depth * 0.5, "their areas overlap");
+        const depth2 = overlapFraction(ab.minX, ab.maxX, bb.minX, bb.maxX) * overlapFraction(ab.minY, ab.maxY, bb.minY, bb.maxY);
+        add("touching", a.id, b.id, 0.5 + depth2 * 0.5, "their areas overlap");
+        add("touching", b.id, a.id, 0.5 + depth2 * 0.5, "their areas overlap");
       }
       const nearLimit = config.nearRatio * ref;
       if (gap < nearLimit) {
@@ -4675,9 +6627,9 @@ var BUILTIN_CONCEPTS = [
       const heights = sorted.map((m) => Math.max(1, m.bounds.maxY - m.bounds.minY));
       const meanH = heights.reduce((a, b) => a + b, 0) / heights.length;
       const bandOverlap = (a, b) => {
-        const overlap = Math.min(a.bounds.maxY, b.bounds.maxY) - Math.max(a.bounds.minY, b.bounds.minY);
+        const overlap2 = Math.min(a.bounds.maxY, b.bounds.maxY) - Math.max(a.bounds.minY, b.bounds.minY);
         const shorter = Math.max(1, Math.min(a.bounds.maxY - a.bounds.minY, b.bounds.maxY - b.bounds.minY));
-        return overlap / shorter;
+        return overlap2 / shorter;
       };
       const bands2 = [];
       for (const m of sorted) {
@@ -4868,17 +6820,17 @@ function parseLayout(regions, frame, connections = []) {
 }
 function describeLayout(layout) {
   const lines = [];
-  const walk = (n2, depth) => {
-    const pad = "  ".repeat(depth + 1);
+  const walk = (n2, depth2) => {
+    const pad = "  ".repeat(depth2 + 1);
     const size = `${Math.round(n2.rect.w)}\xD7${Math.round(n2.rect.h)}`;
     const label = n2.region ? `${n2.id} (${n2.region.shape})` : `${n2.id} [${n2.flow}]`;
-    const share = depth > 0 ? "" : "";
+    const share = depth2 > 0 ? "" : "";
     lines.push(`${pad}${label} ${size} \u2014 ${n2.reasoning}${share}`);
     if (n2.children.length && n2.flow !== "leaf") {
       const pct = n2.fractions.map((f) => `${Math.round(f * 100)}%`).join(" / ");
       if (pct) lines.push(`${pad}  ${n2.flow} split ${pct}, gap ${n2.gap}px`);
     }
-    n2.children.forEach((c) => walk(c, depth + 1));
+    n2.children.forEach((c) => walk(c, depth2 + 1));
   };
   lines.push("LAYOUT the drawing describes:");
   walk(layout.root, 0);
@@ -4913,13 +6865,13 @@ var SAFE_TAGS = /* @__PURE__ */ new Set([
 ]);
 var esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 var styleAttr = (s) => esc(s).replace(/\n/g, " ");
-function renderNode(node, content, depth) {
-  const pad = "  ".repeat(depth);
+function renderNode(node, content, depth2) {
+  const pad = "  ".repeat(depth2);
   const own = node.region ? content[node.id] : void 0;
   const tag = own?.tag && SAFE_TAGS.has(own.tag) ? own.tag : "div";
   const box = [];
-  if (depth === 1) box.push("flex:1 1 0", "min-width:0", "min-height:0");
-  else if (depth > 1) {
+  if (depth2 === 1) box.push("flex:1 1 0", "min-width:0", "min-height:0");
+  else if (depth2 > 1) {
     box.push(`flex:${node.grow ?? 1} 1 0`, "min-width:0", "min-height:0");
   }
   if (node.marginBefore) {
@@ -4933,10 +6885,10 @@ function renderNode(node, content, depth) {
   }
   if (own?.style) fill.push(own.style);
   const attrs = (node.region ? ` data-region="${node.id}"` : "") + (box.length ? ` style="${styleAttr(box.join(";"))}"` : "");
-  const inner = node.children.length && node.flow !== "leaf" ? "\n" + node.children.map((c) => renderNode(c, content, depth + 2)).join("\n") + "\n" + pad + "  " : own?.html ?? "";
+  const inner = node.children.length && node.flow !== "leaf" ? "\n" + node.children.map((c) => renderNode(c, content, depth2 + 2)).join("\n") + "\n" + pad + "  " : own?.html ?? "";
   if (!node.region) {
     const merged = box.concat(fill.filter((f) => !/^(box-sizing|width|height):/.test(f)));
-    return `${pad}<div${merged.length ? ` style="${styleAttr(merged.join(";"))}"` : ""}>${node.children.length ? "\n" + node.children.map((c) => renderNode(c, content, depth + 1)).join("\n") + `
+    return `${pad}<div${merged.length ? ` style="${styleAttr(merged.join(";"))}"` : ""}>${node.children.length ? "\n" + node.children.map((c) => renderNode(c, content, depth2 + 1)).join("\n") + `
 ${pad}` : ""}</div>`;
   }
   return `${pad}<${tag}${attrs}>
@@ -5260,7 +7212,7 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
     return structuralSignature(ids, nodes, (id) => topInterpretation(nodes.get(id)) ?? "art");
   }
   function matchesFor(ids) {
-    const sig = signatureOf(ids);
+    const sig2 = signatureOf(ids);
     const out = [];
     for (const aid of artifacts) {
       const a = nodes.get(aid);
@@ -5269,7 +7221,7 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
       const aSig = getRep(a, "signature")?.data;
       if (!aSig) continue;
       const examples = getRep(a, "examples")?.data;
-      const m = matchDefinition(sig, aSig, examples);
+      const m = matchDefinition(sig2, aSig, examples);
       if (m.vetoed || m.score < MATCH_FLOOR) continue;
       out.push({ artifactId: aid, name: wordOf(a) ?? aid, score: m.score, reasoning: m.reasoning });
     }
@@ -6033,12 +7985,12 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
     if (!def || !artifacts.includes(ev.definitionId)) return;
     const ids = ev.ids.filter((id) => nodes.has(id));
     if (ids.length === 0) return;
-    const sig = signatureOf(ids);
+    const sig2 = signatureOf(ids);
     const prev = getRep(def, "examples")?.data;
     def.reps = def.reps.filter((r) => r.modality !== "examples");
     def.reps.push({
       modality: "examples",
-      data: addExample(prev, sig, ev.verdict),
+      data: addExample(prev, sig2, ev.verdict),
       source: ev.participantId ?? LOCAL_PARTICIPANT
     });
     recomputeClusterCandidates();
@@ -6545,7 +8497,7 @@ var PRESETS = {
   openRouter: { kind: "openai-compatible", baseUrl: "https://openrouter.ai/api/v1" },
   anthropic: { kind: "anthropic", baseUrl: "https://api.anthropic.com/v1" }
 };
-function textOf(content) {
+function textOf2(content) {
   return typeof content === "string" ? content : content.filter((p) => p.type === "text").map((p) => p.text).join("\n");
 }
 function dataUrlParts(dataUrl) {
@@ -6644,7 +8596,7 @@ async function completeOpenAICompatible(config, messages, timeoutMs, external) {
 }
 async function completeAnthropic(config, messages, timeoutMs, external) {
   if (!config.apiKey) return { ok: false, error: "anthropic requires an API key" };
-  const system = messages.filter((m) => m.role === "system").map((m) => textOf(m.content)).join("\n\n");
+  const system = messages.filter((m) => m.role === "system").map((m) => textOf2(m.content)).join("\n\n");
   const user = messages.filter((m) => m.role === "user");
   if (user.length === 0) return { ok: false, error: "no user message" };
   const res = await post(
@@ -7293,7 +9245,7 @@ function parseLoose(text) {
 function outermostObject(text) {
   const start = text.indexOf("{");
   if (start === -1) return null;
-  let depth = 0;
+  let depth2 = 0;
   let inString = false;
   let inTemplate = false;
   let escaped = false;
@@ -7311,8 +9263,8 @@ function outermostObject(text) {
     }
     if (c === '"') inString = true;
     else if (c === "`") inTemplate = true;
-    else if (c === "{") depth++;
-    else if (c === "}" && --depth === 0) return text.slice(start, i + 1);
+    else if (c === "{") depth2++;
+    else if (c === "}" && --depth2 === 0) return text.slice(start, i + 1);
   }
   return null;
 }
@@ -7322,7 +9274,7 @@ function salvageRegions(text) {
   let m;
   while (m = re.exec(text)) {
     const start = m.index + m[0].length - 1;
-    let depth = 0, inString = false, escaped = false, end = -1;
+    let depth2 = 0, inString = false, escaped = false, end = -1;
     for (let i = start; i < text.length; i++) {
       const c = text[i];
       if (inString) {
@@ -7332,8 +9284,8 @@ function salvageRegions(text) {
         continue;
       }
       if (c === '"') inString = true;
-      else if (c === "{") depth++;
-      else if (c === "}" && --depth === 0) {
+      else if (c === "{") depth2++;
+      else if (c === "}" && --depth2 === 0) {
         end = i;
         break;
       }
@@ -7456,8 +9408,8 @@ function createAgentParticipant(session, config, at = 0, options = {}) {
     const context = describeSession(state, { nodeIds: targets }) + (isCluster ? `
 
 ${describeReading(session.read(targets), { noun: "mark" })}` : "");
-    const signature = isCluster ? describeSignature(state, targets) : "";
-    const question = isCluster ? `These ${targets.length} marks were grouped together (${signature}). What could this group be? Offer several readings.` : `What could this mark be? Offer several readings.`;
+    const signature2 = isCluster ? describeSignature(state, targets) : "";
+    const question = isCluster ? `These ${targets.length} marks were grouped together (${signature2}). What could this group be? Offer several readings.` : `What could this mark be? Offer several readings.`;
     const result2 = await send(
       config,
       [
@@ -7811,7 +9763,7 @@ function createBridgeParticipant(session, at = 0, options = {}) {
       id: `bridge:${++counter2}`,
       // A person answering by hand gets the words; an image the bridge cannot
       // show is said to be there rather than silently dropped.
-      system: textOf(messages.find((m) => m.role === "system")?.content ?? ""),
+      system: textOf2(messages.find((m) => m.role === "system")?.content ?? ""),
       user: describeForHand(messages.find((m) => m.role === "user")?.content ?? ""),
       at: Date.now()
     };
@@ -8133,6 +10085,7 @@ export {
   HAND_RESOLUTION_PX,
   HERE,
   KINDS,
+  LENGTH_UNITS,
   LETTER_MAX_HEIGHT_PX,
   LOCAL_PARTICIPANT,
   LOCAL_TIMEOUT_MS,
@@ -8176,6 +10129,7 @@ export {
   analyzeCornerAngles,
   analyzeStroke,
   applyWalls,
+  arithmetic,
   assignRoles,
   authorOf,
   behaviourSource,
@@ -8200,6 +10154,7 @@ export {
   calculateStraightness,
   canonicalCheckSamples,
   checkOvershoot,
+  checkWritten,
   choice,
   clausesOf,
   cleanOf,
@@ -8207,11 +10162,13 @@ export {
   clusters,
   collidesWith,
   commandMarkFeatures,
+  compareQuantities,
   compareSignatures,
   complete,
   connectionsFor,
   connectionsOf,
   controlOf,
+  convertQuantity,
   convexHull,
   countCorners,
   countCrossings,
@@ -8225,10 +10182,12 @@ export {
   createStubDecideTransport,
   decodeLog,
   denoise,
+  dependentsOf,
   describeAddressed,
   describeAuthorshipCollision,
   describeBehaviour,
   describeBinding,
+  describeExpr,
   describeFrame,
   describeGraph,
   describeLayout,
@@ -8240,15 +10199,19 @@ export {
   describeRoles,
   describeRoute,
   describeSession,
+  describeSheet,
   describeSignature,
   describeSnap,
   describeStale,
   describeStructure,
   describeTier1,
+  diffSheets,
   disagreement,
   elementsOf,
   enclosedBy,
   encodeLog,
+  evaluateChain,
+  evaluateExpr,
   explanationOf,
   exportFrame,
   findCorners,
@@ -8256,6 +10219,9 @@ export {
   fingerprintOf,
   fit2 as fit,
   force,
+  formatExpr,
+  formatNumber,
+  formatQuantity,
   frameOf,
   frameOfNode,
   functionsOf,
@@ -8268,11 +10234,13 @@ export {
   has,
   hasMultipleSources,
   headingsOf,
+  holds,
   idealize,
   instantFor,
   intents,
   interfacesOf,
   interpretationsOf,
+  isBare,
   isCanvasFile,
   isCheckLike,
   isExplanation,
@@ -8282,6 +10250,7 @@ export {
   isLassoLike,
   isLetterLike,
   isParticipant,
+  isRange,
   isStrokeClosed,
   isWord,
   joinsRun,
@@ -8308,7 +10277,9 @@ export {
   measure,
   mergeLogs,
   nearestMagnet,
+  negateQuantity,
   nodeIdsIn,
+  normName,
   normalizeStroke,
   noul,
   otsu,
@@ -8316,13 +10287,17 @@ export {
   paramsOf,
   parseBehaviour,
   parseBehaviourReply,
+  parseChain,
   parseClause,
   parseCode,
+  parseExpression,
   parseFill,
   parseGitSpec,
   parseGraph,
   parseLayout,
+  parseLine,
   parseProgram,
+  parseQuantity,
   parseReadings,
   parseShapes,
   parseTranscripts,
@@ -8333,7 +10308,10 @@ export {
   providerLabel,
   providerLocality,
   providerTier,
+  quantity,
+  rangeOf,
   ranked,
+  readSheet,
   readingsToEdges,
   reasonOf,
   regionAt,
@@ -8349,11 +10327,16 @@ export {
   route,
   rowOf,
   runsOf,
+  sameExpr,
+  scopeOf,
   score,
   scratchedOut,
   seeded,
   segmentsIntersect,
   shapeExtent,
+  sheetEntry,
+  sheetLines,
+  sheetValue,
   simplifyStroke,
   singular,
   sittingName,
@@ -8371,7 +10354,7 @@ export {
   strokePointsOf,
   strokesIntersect,
   structuralSignature,
-  textOf,
+  textOf2 as textOf,
   thin,
   toBytes,
   toText,
