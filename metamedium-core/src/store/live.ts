@@ -307,6 +307,9 @@ export class LiveStore implements Store {
     }
     const line = raw as LiveLine;
     if (typeof line.participant !== 'string') return;
+    // A log I handed on in answer to a hello, come back from a relay: it is my
+    // own copy, and there is nothing in it I do not hold.
+    if (line.via === this.me) return;
     const sid = typeof line.sid === 'string' && line.sid ? line.sid : undefined;
     const from = typeof line.via === 'string' && line.via ? line.via : line.participant;
 

@@ -1972,6 +1972,7 @@ var LiveStore = class {
     }
     const line = raw;
     if (typeof line.participant !== "string") return;
+    if (line.via === this.me) return;
     const sid = typeof line.sid === "string" && line.sid ? line.sid : void 0;
     const from = typeof line.via === "string" && line.via ? line.via : line.participant;
     if (line.participant === this.me) {

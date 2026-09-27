@@ -138,6 +138,8 @@ describe('live logs', () => {
   describe('a room of three, one departed', () => {
     const named = (logName: string) => createSession({ ...DEFAULT_SESSION_CONFIG, logName });
     const mine = (s: ReturnType<typeof createSession>) => s.getEvents().filter((e) => !e.by);
+    /** One mark in a named hand's log, as that hand wrote it. */
+    const drewBy = (logName: string, x: number) => { const s = named(logName); s.addStroke(rectStroke(x, 100, 200, 120), 1000 + x); return mine(s); };
     /** The store's flush: a hand's whole log as it stands, sent as whatever makes the room's copy equal it. */
     const publish = (store: LiveStore, events: readonly SessionEvent[]) => store.publish(events);
 
@@ -218,6 +220,17 @@ describe('live logs', () => {
       await tick(); await tick();
       expect(a.collisions()).toEqual([]);
       expect((await a.readLogs())['ada~1']).toEqual(mine(ada));
+      // Nor is a log it handed on to a newcomer, when that comes back too.
+      const bob = drewBy('bob~1', 900);
+      cb!({ participant: 'bob~1', events: bob, at: 5000, sid: 's-bob' });
+      await tick();
+      const landed: string[] = [];
+      a.subscribe((who, evs) => { if (evs.length) landed.push(who); });
+      cb!({ participant: 'cleo~1', events: [], at: 6000, hello: true, sid: 's-cleo' });
+      await tick(); await tick();
+      expect(landed).toEqual([]);
+      expect((await a.readLogs())['bob~1']).toEqual(bob);
+      expect(a.collisions()).toEqual([]);
     });
 
     it('publish sends the new tail when the log only grew, and the whole log when it did not', async () => {
