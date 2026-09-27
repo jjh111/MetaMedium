@@ -1342,6 +1342,34 @@ window.__scenario = async function(){
     deliver28({ relay: 'truncated', room: 'elsewhere', dropped: 12, kept: 5000 });
     for (let i = 0; i < 30 && !/older than the relay remembers/.test(standing28()); i++) await wait(50);
     step('28i. a room older than the relay remembers says so in the status line', /the room is older than the relay remembers — 12 earlier lines are gone/.test(standing28()), { standing: standing28() });
+    // One event, applied once (V1-PLAN L1b). The same stamped event heard in
+    // two logs — a tab that joined again under another person's name hands its
+    // log on under the new name while the room still holds the old one — is
+    // one mark. Merged as two, it was applied twice: one node, its id listed
+    // twice on the board.
+    const dora = MM.createSession(Object.assign({}, MM.DEFAULT_SESSION_CONFIG, { logName: 'dora~d1' }));
+    const doraBox = dora.addStroke(t.rect(900, 100, 120, 80).map(p => ({ x: p.x, y: p.y })), 5000);
+    const doraLog = dora.getEvents().slice();
+    const before28j = mm.session.getState().contentIds.length;
+    deliver28({ participant: 'dora~d1', events: doraLog, at: 5000, sid: 'sitting-d' });
+    deliver28({ participant: 'dory~d1', events: doraLog.map(e => Object.assign({}, e)), at: 5100, sid: 'sitting-d', full: true });
+    for (let i = 0; i < 30 && !mm.session.getState().contentIds.includes(doraBox); i++) await wait(50);
+    await wait(100);
+    const st28j = mm.session.getState();
+    step('28j. one stamped event heard in two logs is one mark, applied once — never its id listed twice',
+      st28j.contentIds.filter(id => id === doraBox).length === 1 && st28j.contentIds.length === before28j + 1 && mm.session.getEvents().filter(e => e.origin === 'dora~d1').length === 1,
+      { box: doraBox, listed: st28j.contentIds.filter(id => id === doraBox).length, content: st28j.contentIds.length, was: before28j });
+    // Two DIFFERENT events under one number are two writers under one name:
+    // the first is kept, and the room says so where it says everything else.
+    const forged28 = MM.createSession(Object.assign({}, MM.DEFAULT_SESSION_CONFIG, { logName: 'dora~d1' }));
+    forged28.addStroke(t.circle(1100, 300, 40).map(p => ({ x: p.x, y: p.y })), 6000);
+    deliver28({ participant: 'eve~e1', events: forged28.getEvents().slice(), at: 6000, sid: 'sitting-e' });
+    for (let i = 0; i < 30 && !/two different events are both "dora~d1" number 1/.test(standing28()); i++) await wait(50);
+    const st28k = mm.session.getState();
+    step('28k. two different events under one number: the first is kept, and the status line says two hands wrote under one name',
+      /two different events are both "dora~d1" number 1 — the one in dora~d1's log is kept and the one in eve~e1's is left out/.test(standing28())
+        && st28k.contentIds.filter(id => id === doraBox).length === 1 && st28k.contentIds.length === before28j + 1,
+      { standing: standing28(), content: st28k.contentIds.length, was: before28j });
     if (mm.folder().store && mm.folder().store.close) mm.folder().store.close();
     mm.session.load([]);
   }

@@ -101,8 +101,8 @@ export type { Binding, BoundRep } from './session/magnets';
 export { isLetterLike, joinsRun, wordConfidence, LETTER_MAX_HEIGHT_PX, WORD_GAP_RATIO, WORD_WINDOW_MS } from './session/words';
 
 // One log per participant; the canvas is the merge (BUILD-PLAN-v8 §1.5).
-export { mergeLogs } from './store/merge';
-export type { MergeOptions } from './store/merge';
+export { mergeLogs, describeAuthorshipCollision } from './store/merge';
+export type { MergeOptions, AuthorshipCollision } from './store/merge';
 // Live logs — multiplayer as a transport over the per-participant logs (v9 S6).
 export { LiveStore, LocalHub } from './store/live';
 export type { LiveLine, LiveTransport, LiveStoreOptions, Presence, RelayNotice } from './store/live';

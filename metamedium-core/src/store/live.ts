@@ -25,6 +25,7 @@
 import type { SessionEvent } from '../session/session';
 import { sittingToken } from '../session/hands';
 import { type Store, type Entry, type Capabilities, ReadOnlyError } from './seam';
+import { mergeLogs, describeAuthorshipCollision } from './merge';
 
 /** One line on the wire: a participant's events, or a hello, or a whole log in answer to one. */
 export interface LiveLine {
@@ -119,6 +120,13 @@ export class LiveStore implements Store {
   private sittings = new Map<string, string>();
   /** A name two hands are both using: the sentence that says so. */
   private collided = new Map<string, string>();
+  /**
+   * A log name two different events were both numbered under, found in the
+   * logs held here (the merge's collision, L1b): one sentence per name.
+   */
+  private misnumbered = new Map<string, string>();
+  /** Whether the logs held here changed since they were last read for `misnumbered`. */
+  private logsChanged = false;
   /** The relay's word that this room is older than its buffer. */
   private truncated: RelayNotice | null = null;
   /** Whether this store has put MY log on the wire yet, in any form. */
@@ -148,6 +156,7 @@ export class LiveStore implements Store {
     if (!events.length) return;
     const log = (this.logs[participant] ??= []);
     log.push(...events);
+    this.logsChanged = true;
     if (participant === this.me) this.published = true;
     await this.post({ participant, events: events.slice(), at: this.stamp(), sid: this.sitting });
   }
@@ -170,6 +179,7 @@ export class LiveStore implements Store {
     }
     this.published = true;
     this.logs[this.me] = events.slice();
+    this.logsChanged = true;
     await this.post({ participant: this.me, events: events.slice(), at: this.stamp(), full: true, sid: this.sitting });
   }
 
@@ -208,9 +218,33 @@ export class LiveStore implements Store {
     return `the room is older than the relay remembers — ${n.dropped} earlier line${n.dropped === 1 ? ' is' : 's are'} gone`;
   }
 
-  /** Everything the room has said about itself, one sentence each: the collisions, then the truncation. */
+  /**
+   * Log names two DIFFERENT events were both numbered under, in the logs held
+   * here — one sentence per name. The same event heard in two logs is one
+   * event, and the merge folds it without a word; two events under one
+   * authorship are two writers under one name, and the merge keeps the first
+   * (L1b). Read when asked, from the logs as they stand, and remembered once
+   * said, like a name collision.
+   */
+  misnumberings(): string[] {
+    if (this.logsChanged) {
+      this.logsChanged = false;
+      mergeLogs(this.logs, {
+        me: this.me,
+        onCollision: (c) => {
+          if (!this.misnumbered.has(c.origin)) this.misnumbered.set(c.origin, describeAuthorshipCollision(c));
+        },
+      });
+    }
+    return [...this.misnumbered.values()];
+  }
+
+  /**
+   * Everything the room has said about itself, one sentence each: the name
+   * collisions, the events numbered twice under one name, then the truncation.
+   */
   notices(): string[] {
-    const out = this.collisions();
+    const out = this.collisions().concat(this.misnumberings());
     const t = this.truncation();
     if (t) out.push(t);
     return out;
@@ -370,6 +404,7 @@ export class LiveStore implements Store {
       // From its own sitting a log may be anything: its writer undid, reset or
       // rewrote it, and what it sends is what it holds.
       this.logs[line.participant] = events.slice();
+      this.logsChanged = true;
       this.carried.set(line.participant, new Set(events.map(authorKey).filter((k): k is string => k !== null)));
     } else {
       // An event already held — one a newcomer was handed in a peer's copy
@@ -386,6 +421,7 @@ export class LiveStore implements Store {
           keys.add(k);
         }
         log.push(ev);
+        this.logsChanged = true;
       }
     }
     this.applied.set(line.participant, Math.max(this.applied.get(line.participant) ?? 0, at));

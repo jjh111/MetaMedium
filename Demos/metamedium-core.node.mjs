@@ -1613,8 +1613,54 @@ function mergeLogs(logs, opts = {}) {
     if (a.name !== b.name) return a.name < b.name ? -1 : 1;
     return a.i - b.i;
   });
+  const kept = foldAuthorship(tagged, opts);
   const stamp = opts.me !== void 0;
-  return tagged.map((t) => stamp && t.name !== opts.me ? { ...t.ev, by: t.name } : { ...t.ev });
+  return kept.map((t) => stamp && t.name !== opts.me ? { ...t.ev, by: t.name } : { ...t.ev });
+}
+function describeAuthorshipCollision(c) {
+  return `two different events are both "${c.origin}" number ${c.seq} \u2014 the one in ${c.kept}'s log is kept and the one in ${c.dropped}'s is left out; two hands have written under one name`;
+}
+function foldAuthorship(tagged, opts) {
+  const winner = /* @__PURE__ */ new Map();
+  for (const t of tagged) {
+    const k = authorKey(t.ev);
+    if (k === null) continue;
+    const held = winner.get(k);
+    if (!held || opts.me !== void 0 && t.name === opts.me && held.name !== opts.me) winner.set(k, t);
+  }
+  const out = [];
+  for (const t of tagged) {
+    const k = authorKey(t.ev);
+    if (k === null) {
+      out.push(t);
+      continue;
+    }
+    const w2 = winner.get(k);
+    if (w2 === t) {
+      out.push(t);
+      continue;
+    }
+    if (opts.onCollision && !sameEvent(w2.ev, t.ev)) {
+      opts.onCollision({ origin: t.ev.origin, seq: t.ev.seq, kept: w2.name, dropped: t.name });
+    }
+  }
+  return out;
+}
+function authorKey(ev) {
+  if (typeof ev.origin !== "string" || !ev.origin) return null;
+  if (typeof ev.seq !== "number" || !Number.isSafeInteger(ev.seq) || ev.seq < 0) return null;
+  return `${ev.origin}#${ev.seq}`;
+}
+function sameEvent(a, b) {
+  if (a === b) return true;
+  return canonical(a, true) === canonical(b, true);
+}
+function canonical(v, top = false) {
+  if (v === null || typeof v !== "object") return JSON.stringify(v) ?? "null";
+  if (Array.isArray(v)) return "[" + v.map((x) => canonical(x)).join(",") + "]";
+  const o = v;
+  const keys = Object.keys(o).filter((k) => o[k] !== void 0 && !(top && k === "by")).sort();
+  return "{" + keys.map((k) => JSON.stringify(k) + ":" + canonical(o[k])).join(",") + "}";
 }
 function atOf(ev) {
   return "at" in ev && typeof ev.at === "number" ? ev.at : 0;
@@ -1785,6 +1831,13 @@ var LiveStore = class {
     this.sittings = /* @__PURE__ */ new Map();
     /** A name two hands are both using: the sentence that says so. */
     this.collided = /* @__PURE__ */ new Map();
+    /**
+     * A log name two different events were both numbered under, found in the
+     * logs held here (the merge's collision, L1b): one sentence per name.
+     */
+    this.misnumbered = /* @__PURE__ */ new Map();
+    /** Whether the logs held here changed since they were last read for `misnumbered`. */
+    this.logsChanged = false;
     /** The relay's word that this room is older than its buffer. */
     this.truncated = null;
     /** Whether this store has put MY log on the wire yet, in any form. */
@@ -1815,6 +1868,7 @@ var LiveStore = class {
     if (!events.length) return;
     const log = this.logs[participant] ??= [];
     log.push(...events);
+    this.logsChanged = true;
     if (participant === this.me) this.published = true;
     await this.post({ participant, events: events.slice(), at: this.stamp(), sid: this.sitting });
   }
@@ -1836,6 +1890,7 @@ var LiveStore = class {
     }
     this.published = true;
     this.logs[this.me] = events.slice();
+    this.logsChanged = true;
     await this.post({ participant: this.me, events: events.slice(), at: this.stamp(), full: true, sid: this.sitting });
   }
   async readLogs() {
@@ -1868,9 +1923,32 @@ var LiveStore = class {
     if (!n2) return null;
     return `the room is older than the relay remembers \u2014 ${n2.dropped} earlier line${n2.dropped === 1 ? " is" : "s are"} gone`;
   }
-  /** Everything the room has said about itself, one sentence each: the collisions, then the truncation. */
+  /**
+   * Log names two DIFFERENT events were both numbered under, in the logs held
+   * here — one sentence per name. The same event heard in two logs is one
+   * event, and the merge folds it without a word; two events under one
+   * authorship are two writers under one name, and the merge keeps the first
+   * (L1b). Read when asked, from the logs as they stand, and remembered once
+   * said, like a name collision.
+   */
+  misnumberings() {
+    if (this.logsChanged) {
+      this.logsChanged = false;
+      mergeLogs(this.logs, {
+        me: this.me,
+        onCollision: (c) => {
+          if (!this.misnumbered.has(c.origin)) this.misnumbered.set(c.origin, describeAuthorshipCollision(c));
+        }
+      });
+    }
+    return [...this.misnumbered.values()];
+  }
+  /**
+   * Everything the room has said about itself, one sentence each: the name
+   * collisions, the events numbered twice under one name, then the truncation.
+   */
   notices() {
-    const out = this.collisions();
+    const out = this.collisions().concat(this.misnumberings());
     const t = this.truncation();
     if (t) out.push(t);
     return out;
@@ -2010,18 +2088,20 @@ var LiveStore = class {
         }
       }
       this.logs[line.participant] = events.slice();
-      this.carried.set(line.participant, new Set(events.map(authorKey).filter((k) => k !== null)));
+      this.logsChanged = true;
+      this.carried.set(line.participant, new Set(events.map(authorKey2).filter((k) => k !== null)));
     } else {
       const log = this.logs[line.participant] ??= [];
       let keys = this.carried.get(line.participant);
       if (!keys) this.carried.set(line.participant, keys = /* @__PURE__ */ new Set());
       for (const ev of events) {
-        const k = authorKey(ev);
+        const k = authorKey2(ev);
         if (k !== null) {
           if (keys.has(k)) continue;
           keys.add(k);
         }
         log.push(ev);
+        this.logsChanged = true;
       }
     }
     this.applied.set(line.participant, Math.max(this.applied.get(line.participant) ?? 0, at));
@@ -2031,12 +2111,12 @@ var LiveStore = class {
     for (const l of this.listeners) l(participant, events);
   }
 };
-function authorKey(ev) {
+function authorKey2(ev) {
   return typeof ev.origin === "string" && ev.origin && typeof ev.seq === "number" && Number.isSafeInteger(ev.seq) ? `${ev.origin}#${ev.seq}` : null;
 }
 var contentKeys = /* @__PURE__ */ new WeakMap();
 function eventKey(ev) {
-  const k = authorKey(ev);
+  const k = authorKey2(ev);
   if (k !== null) return k;
   let s = contentKeys.get(ev);
   if (s === void 0) {
@@ -8143,6 +8223,7 @@ export {
   decodeLog,
   denoise,
   describeAddressed,
+  describeAuthorshipCollision,
   describeBehaviour,
   describeBinding,
   describeFrame,

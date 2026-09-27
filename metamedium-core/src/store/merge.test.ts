@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { mergeLogs } from './merge';
+import { mergeLogs, describeAuthorshipCollision, type AuthorshipCollision } from './merge';
 import { createSession, DEFAULT_SESSION_CONFIG } from '../session/session';
 import { rectStroke, circleStroke } from '../test/strokes';
 
@@ -75,11 +75,40 @@ describe('one event, applied once', () => {
     one.addStroke(rectStroke(100, 100, 200, 120), 1000);
     const two = named('ada~a1');
     two.addStroke(circleStroke(600, 160, 60), 1500);
-    const said: unknown[] = [];
-    const merged = mergeLogs({ x: one.getEvents(), y: two.getEvents() }, { onCollision: (c: unknown) => said.push(c) } as never);
+    const said: AuthorshipCollision[] = [];
+    const merged = mergeLogs({ x: one.getEvents(), y: two.getEvents() }, { onCollision: (c) => said.push(c) });
     expect(merged).toHaveLength(1);
     expect('at' in merged[0] ? merged[0].at : 0).toBe(1000);
     expect(said).toEqual([{ origin: 'ada~a1', seq: 1, kept: 'x', dropped: 'y' }]);
+    expect(describeAuthorshipCollision(said[0])).toMatch(/"ada~a1" number 1 — the one in x's log is kept and the one in y's is left out/);
+  });
+
+  it('a copy that travelled another way is still the same event: `by` and key order are not what was written', () => {
+    const john = named('john~a1');
+    john.addStroke(rectStroke(100, 100, 200, 120), 1000);
+    const [ev] = john.getEvents();
+    // The keys in another order, and a `by` a reader's merge put on it.
+    const moved = Object.fromEntries(Object.entries({ ...ev, by: 'someone' }).reverse()) as typeof ev;
+    const said: AuthorshipCollision[] = [];
+    expect(mergeLogs({ a: [ev], b: [moved] }, { onCollision: (c) => said.push(c) })).toHaveLength(1);
+    expect(said).toEqual([]);
+  });
+
+  it('the reader\'s own event is never left out for another log\'s different one under its number', () => {
+    // Somebody else's log claims my number 1 with an earlier, different mark.
+    // Dropping mine would drop it from what I send next, and it would be gone.
+    const mine = named('ada~a1');
+    const box = mine.addStroke(rectStroke(100, 100, 200, 120), 2000);
+    const forged = named('ada~a1');
+    forged.addStroke(circleStroke(600, 160, 60), 1000);
+    const said: AuthorshipCollision[] = [];
+    const merged = mergeLogs({ 'ada~a1': mine.getEvents(), 'bea~b2': forged.getEvents() }, { me: 'ada~a1', onCollision: (c) => said.push(c) });
+    expect(merged).toHaveLength(1);
+    expect(merged[0].by).toBeUndefined();
+    const canvas = named('ada~a1');
+    canvas.load(merged);
+    expect(canvas.getState().contentIds).toEqual([box]);
+    expect(said).toEqual([{ origin: 'ada~a1', seq: 1, kept: 'ada~a1', dropped: 'bea~b2' }]);
   });
 
   it('the fold does not depend on the order the logs are listed in', () => {

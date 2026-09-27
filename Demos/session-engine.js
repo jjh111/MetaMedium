@@ -5790,6 +5790,10 @@
     // (the store's `notices`) — so each is flashed once, then stands in the
     // status line.
     noticed: new Set(),
+    // What the merge said about a folder's logs: a log name two DIFFERENT
+    // events were both numbered under (L1b) — two writers under one name. A
+    // live room says it through its store; a folder has only the merge.
+    misnumbered: new Map(),
   };
 
   /**
@@ -5972,7 +5976,14 @@
     if (folder.how !== 'live') folder.me = deviceParticipant();
     let logs = {};
     try { logs = await store.readLogs(); } catch (err) { folder.error = 'could not read the logs: ' + (err.message || err); }
-    const merged = MM.mergeLogs(logs, folder.how === 'live' ? { me: folder.me } : {});
+    // One event, applied once (L1b): the merge folds an event found in two
+    // logs, and keeps the first of two DIFFERENT events under one number. A
+    // live room says the second through its store's notices; a folder says it
+    // here, once, and then in the standing line.
+    folder.misnumbered = new Map();
+    const merged = MM.mergeLogs(logs, Object.assign(folder.how === 'live' ? { me: folder.me } : {}, {
+      onCollision: (c) => { if (folder.how !== 'live' && !folder.misnumbered.has(c.origin)) folder.misnumbered.set(c.origin, MM.describeAuthorshipCollision(c)); },
+    }));
     const meKey = folder.how === 'live' ? folder.me : MM.participantOfLog(MM.logPathFor(folder.me));
     folder.myPrevious = (logs[meKey] || []).slice();
     // A folder is a room too: one log per participant, merged, and the next
@@ -5995,7 +6006,9 @@
     await discover(entries);
     render(session.getState());
     fitAll();
-    flash('opened ' + (folder.name || 'a folder') + ': ' + entries.length + ' file' + (entries.length === 1 ? '' : 's') + (folder.truncated ? ' shown — the folder holds more' : ''));
+    const misnumbered = [...folder.misnumbered.values()];
+    flash('opened ' + (folder.name || 'a folder') + ': ' + entries.length + ' file' + (entries.length === 1 ? '' : 's') + (folder.truncated ? ' shown — the folder holds more' : '') +
+      (misnumbered.length ? ' · ' + misnumbered.join(' · ') : ''));
     return folder;
   }
 
@@ -6111,8 +6124,10 @@
         (notes.length ? ' · ' + notes.join(' · ') : '') + (folder.error ? ' · ' + folder.error : '');
     }
     const n = folder.entries.length;
+    const misnumbered = [...folder.misnumbered.values()];
     return (folder.how === 'static' ? 'site' : folder.how === 'git' ? 'repo' : 'folder') + (folder.name ? ' ' + folder.name : '') + ' · ' + n + ' file' + (n === 1 ? '' : 's') +
-      (folder.truncated ? '+' : '') + (folder.error ? ' · ' + folder.error : folder.store.capabilities().write ? (folder.saving ? ' · saving' : ' · saved') : ' · read-only');
+      (folder.truncated ? '+' : '') + (misnumbered.length ? ' · ' + misnumbered.join(' · ') : '') +
+      (folder.error ? ' · ' + folder.error : folder.store.capabilities().write ? (folder.saving ? ' · saving' : ' · saved') : ' · read-only');
   }
 
   // ===== The live budget =======================================================
