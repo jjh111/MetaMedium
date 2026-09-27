@@ -1226,7 +1226,8 @@ log's participant**: when the hand says its log's name, the model's `join`
 mints `participant:<log>:<n>` from that log, so its proposals name the
 same participant in every reader however the logs were merged
 (`ids.test.ts`). A log written with no name — one from before ids per
-hand, and the shard's until it names its log (L2) — keeps counter ids
+hand, or what a shard tab drew before it joined a room (the shard names its
+log as it joins, `shard-3d/src/room.ts`) — keeps counter ids
 (`participant:N`), which a merge can renumber; nothing translates them.
 
 ### The MCP hand: Claude Code on the board (v10 T2)
@@ -1280,11 +1281,28 @@ tuned against it.
 **A brief is a log event, not a side channel** — an answer on the explanation
 plane, where this engine has always put questions (`session.answer`). It changes
 no mark and writes no version; it replays, undoes and exports; and `LiveStore`
-already carries log lines, so the relay learns nothing. The one thing the log
-cannot carry is the **pairing**, because node ids are per hand (D8, still a
-debt), so it rides in the event's own payload: `brief:<key>` out, `answer:<key>`
-back, and the hand answers about the ids it read off the brief's own node in its
-own session. No id is matched across hands.
+already carries log lines, so the relay learns nothing. **The pairing is the
+brief's own node id** (DIRECTOR-PLAN-W2 L2a): every hand names its log as it
+joins (`joinRoom` says `setLogName(me)`, one sitting; `mcp.mjs` and `otherHand`
+open their sessions named), so the id the tab gets back from `session.answer`
+is the id every hand derives for the brief. A brief is an answer whose question
+is `brief`; its reply is an answer whose question IS that id, about the ids the
+brief node's own `about` edges name — the same ids in both sessions. Nothing is
+minted. The old `brief:<key>` / `answer:<key>` spelling is only read, by
+`legacySeatTraffic`, tested against a log the old pairing wrote
+(`shard-3d/fixtures/seat-before-ids.mm.log`).
+
+**A hull seen from one standpoint asks how deep** (L2c, `shard-3d/src/depth.ts`).
+A plan and one other standpoint whose silhouette covers less than four fifths
+of the plan across the view: along that sightline only the plan bounds the
+hull, so the act that stands it also puts one question on the explanation
+plane — `session.answer`, question `how deep?`, the engine's, about the hull —
+naming the axis and carrying the depth it took (the plan's reach behind the
+silhouette) and *as deep as it is wide*, each with its number and reason.
+Whether it still stands is derived from the hull step on every read: a view
+from another standpoint closes it by measuring, a word (*3 deep*, typed at the
+hull) by saying — held as `HullStep.depth`, which `solid.ts` cuts the body to
+— and undo reopens either. No new event type; the question is not ink.
 
 **The seat is a model, and that is the whole of it.** A seat carries an
 injectable `transport` (the `bridge.ts` pattern, which is also what the e2e's

@@ -32,7 +32,7 @@ evidence needs faces to read it off.
 cd shard-3d
 npm install
 npm run dev                # vite on http://localhost:5174
-npm test                   # vitest — 555 tests on the pure rungs, headless, no WebGL
+npm test                   # vitest — 604 tests on the pure rungs, headless, no WebGL
 npm run typecheck
 npm run build              # typecheck, then vite
 npm run build:standalone   # → dist/shard-3d.html, one file, ~1.0MB
@@ -106,10 +106,15 @@ view plane passes through the cursor, and that is what puts a ⊓'s feet on the
 floor instead of a unit above it. The first ⊓ reads `elevation` — an open stroke
 whose two feet reach the ground, the ground its fourth side — and with the
 footprint it is two claims, which **are** a hull: *hull from 2 claims · tier 1*,
-in the engine's name, no model asked. The second tower from the same standpoint
-goes into it as a third claim.
+in the engine's name, no model asked. **And it asks how deep**: seen from one
+standpoint, the hull runs as far back as the footprint does, a depth nobody drew,
+so one question stands on the explanation plane with the depth it took and the
+other candidate beside it (*A hull seen from one standpoint asks how deep*,
+below). The second tower from the same standpoint goes into it as a third claim
+and asks nothing new.
 
-**3 · Orbit the other way and draw what you see from there.** The hull narrows,
+**3 · Orbit the other way and draw what you see from there.** The hull narrows —
+a second standpoint, so the question beat 2 raised is answered by the drawing —
 and it is **two parts**, each said in words:
 
 > part 1 — 1.8 × 1.4 u on the footprint, 0.3 u tall, along the east edge; from
@@ -271,7 +276,9 @@ claim, held and attributed, that the hand takes or leaves.
 | `src/selection.ts` | Selection by default: one thing at a time, a teal cage around a solid, a diff region outlined on its own plane while its chip is hovered, and a second cage for a hovered part. Runtime state, never the log's |
 | `src/panel.ts` | **Hidden by default** (`panelShown` / `setPanelShown`, the key `shard.panel`, `createPanelToggle`). The summary above everything — *what* · *could be* · *from* · *next* · *becomes* · *parts* — with every measurement behind *why / measurements ▾*; `selectionLine` is what the status line says in its place; then the rows, the nested tree, the *broken* row, *matches the drawing*, *honours*, and the ***model*** section, which is the transcript |
 | `src/models.ts` | The model pane, `Demos/surface/04-models.js` ported, plus **the hand's seat** (`joinHand`): both local servers probed in parallel, embedding-only models hidden **and said**, the pick remembered as a preference, hosted providers by key — and **no key ever enters the log**. `joinWith` seats a model with a transport of its own, which is what `__shard.joinStub` is |
-| `src/room.ts` | **The live room, and the brief parked in it.** `joinRoom` is `17-folder.js`'s `openLive` in TypeScript over one session; `ask()` parks a question on the explanation plane as `brief:<key>` and settles when `answer:<key>` lands; `splitPrompt` reads the brief and the words back out of either ask; `otherHand()` is the same loop from the other side |
+| `src/room.ts` | **The live room, and the brief parked in it.** `joinRoom` is `17-folder.js`'s `openLive` in TypeScript over one session, and names the session's log as it joins (one sitting, `sittingName`); `ask()` parks a question on the explanation plane — an answer whose question is `brief` — and settles when an answer naming **the brief's own node id** lands; `splitPrompt` reads the brief and the words back out of either ask; `otherHand()` is the same loop from the other side; `legacySeatTraffic` is the one reader of the old `brief:<key>` spelling |
+| `src/depth.ts` | **Pure.** L2c: `depthOf(step)` — whether a hull seen from one standpoint is asking how deep, the axis it lacks, the depth it took and the other candidate, each with its number and reason; `readDepthWord` (a number, *as deep as it is wide*, *as deep as the plan* — what it cannot read comes back with the reason); `depthSlabOf` for the cut a said depth makes |
+| `src/depthboards.ts` | **Pure.** The boards the question is settled on, stated once (week 1's `auto/w1-U3`, harvested): a keep and one tower, the same with the tower's own plan, a view of the whole keep, a second tower from the same place, and the tower from the other side |
 | `src/work.ts` | A model at work, shown **where it works**: a breathing `--sig-model` dot with the model's name and its task above the solid, the elapsed time after a few seconds, *Esc stops it* after thirty, and one `AbortSignal` per call so Esc really does |
 | `src/theme.ts` | The tokens read back off `../brand/tokens.css` at boot; nothing here restates a hex |
 | `src/ui.ts` | pill · chip · tile · row · pane — `Demos/surface/00-ui.js` ported, not forked |
@@ -279,11 +286,11 @@ claim, held and attributed, that the hand takes or leaves.
 | `src/shard.css` | The surface, on `brand/tokens.css` |
 | `mcp.mjs` | **The hand, and the seat**, over MCP on stdio — newline-delimited JSON-RPC written by hand, so the repo takes no dependency, importing the committed Node bundle beside `Demos/mcp.mjs`. Six tools: `space_look`, `space_pending`, `space_answer`, `space_draw`, `space_propose`, `space_say`. Its one duplication is named where it stands: the three named planes and the `plane` rep, because this process cannot import the shard's TypeScript |
 | `mcp-smoke.mjs` | The stdio test, in CI's `shard` job: a relay on a **free port**, a second hand in Node as the tab, and the whole round trip — look, draw, park, list, answer, refuse, say |
-| `e2e.js` | The whole loop through the real pointer path: `__scenario()` (P0 → P6, the compass, the panel's toggle, trackpad and touch, the axis views, G0's five, G5's five, G1's three, G2's three, G3's three), `__demo()` (the mug of §9, eleven steps) and `__demo2()` (G4's nine beats). Every shape is stated in a plane's own units and projected by `screenFor`; `strokeScreen` dispatches real pointer events, so nothing here can pass by calling the engine directly |
+| `e2e.js` | The whole loop through the real pointer path: `__scenario()` (P0 → P6, the compass, the panel's toggle, trackpad and touch, the axis views, G0's five, G5's five, G1's three, G2's three, G3's three, L2c's three), `__demo()` (the mug of §9, eleven steps) and `__demo2()` (G4's nine beats, L2c's two records on John's board, and the silhouette cache measured). Every shape is stated in a plane's own units and projected by `screenFor`; `strokeScreen` dispatches real pointer events, so nothing here can pass by calling the engine directly |
 | `build-standalone.mjs` | **One file.** Runs `npm run build`, then inlines every asset Vite emitted into `dist/shard-3d.html`, and refuses to write a page that still points at anything that would not travel with it |
 | `fixtures/` | John's own boards as logs, and `make.mjs` which writes them. `fixtures/README.md` says which door each came through |
 | `fixtures/exchanges/` | What was sent to a model about a board and what came back, verbatim and unrepaired. `fixtures/exchanges/README.md` says how to add one |
-| `src/*.test.ts` | 555 tests, vitest, no WebGL except where the CSG seam is the subject |
+| `src/*.test.ts` | 604 tests, vitest, no WebGL except where the CSG seam is the subject |
 
 ## How it works, decision by decision
 
@@ -620,6 +627,58 @@ worked around.
 What would close it is a **second view of each mass** — which is what an
 architect's sketch actually contains, and what the two-view tower in
 `parts.test.ts` §3 has: two runs in, one part out, 0.7 × 0.6 u and 1.8 u tall.
+Until a hull has one, it says so (next section).
+
+### A hull seen from one standpoint asks how deep
+
+DIRECTOR-PLAN-W2 L2c — week 1's U3 — in `src/depth.ts`. A footprint and a ⊓ from one
+standpoint stand a hull at tier 1, and along that standpoint's sightline nothing but the plan
+bounds it: `hullBody` grows every prism through the span of the others, and here the only other
+is the plan. So the tower runs as far back as the keep's footprint — a depth nobody drew, taken
+silently until now. The board asks instead.
+
+**When it asks.** The hull's claims, gathered by the direction they look along (the grouping
+`hullBody` itself uses), are a plan — claims looking straight down — and exactly **one** other
+standpoint, whose silhouette covers less than `SEEN_WHOLE` (four fifths) of the plan across the
+view. A view that shows the whole plan across it is plan and elevation, and the plan's depth is
+the thing's own; a tower on a keep shows a sliver of it. Two standpoints bound each other, a hull
+with no plan is bounded by its views, and a tower's own plan drawn inside the keep's is the plan
+the body stands on (the plan is gathered as the hull gathers it) — none of those ask.
+
+**What it asks.** One question on the explanation plane — `session.answer`, question
+`how deep?`, in the engine's name, about the hull — written in the **same act** that stood the
+hull (or that took a view back out of it), so one undo takes back both. It names the axis it
+lacks — *along the view from 64° · +29°* — and carries the depth it took with its number and its
+reason beside the other candidate: *4.00 u — as far as the plan runs behind it (the depth it
+took) · 2.00 u — as deep as it is wide*. It is asked once per hull; erased, it stays dismissed.
+It is not ink: not content, never in a lasso or a signature, and `saidInRoom` never reads it out
+as another hand's sentence. The status line says it as the hull stands, and the panel's summary
+carries an `asks` row while it stands.
+
+**How it closes.** Nothing is written to close it: whether it stands is derived from the hull
+step on every read (`log.depthQuestion`). A **view from another standpoint** closes it by
+measuring — the claim is in the log and the hull has two standpoints — and the status says *how
+deep is answered*. A **word** closes it by saying: *3 deep*, *as deep as it is wide* or *as deep
+as the plan*, typed at the selected hull, is read by `readDepthWord` (tier 1, no model) and held
+on the hull step as `HullStep.depth` — the sightline it answered, the number, the words, who said
+them and the question — as one new version, validated like every other field (DATA-1).
+`solid.ts` cuts the body to it: a slab that deep, measured back along the sightline from the side
+the view was drawn from, because that is the face the hand saw. One undo reopens it either way.
+A word survives another tower drawn from the same place; a second standpoint measures the depth
+instead, and the word is let go. What the table cannot read comes back with its reason, and
+nothing is written.
+
+Measured through the real UI (`__scenario`'s three `L2c ·` steps): a 6 × 4 keep and a tower ⊓ on
+the height plane ask with *4.00 u taken · 2.00 u as wide*; *3 deep* in the field leaves rays down
+the body finding it 2.9 u deep from the near face, and undo puts it back; a ⊓ from the side
+closes it at 1.15 u. On John's own board (`__demo2`'s 2½ and 3½, and `depth.test.ts` replaying
+his four strokes): the footprint and the first ⊓ ask once, the second ⊓ from 64° · +29° asks
+nothing new, and the third, from 135° · +22°, closes it.
+
+It asks about the **hull**, not about each part — so John's castle, whose part 2 is still seen
+from one standpoint, asks nothing once the hull has two (week 1's own check; the per-part
+question is under *Still John's*). No model is asked how deep, and `space_look` does not say the
+question.
 
 ### The brief, and what it will not say
 
@@ -1014,8 +1073,8 @@ argued about first hand, before anything is tuned against it.
 | Tool | What it takes |
 |---|---|
 | `space_look` | nothing — the three planes, every mark with its reading and the plane it lies on, every solid's op tree with step ids, names and materials, and whether a brief waits |
-| `space_pending` | nothing — the parked briefs: the key, the human's words, the contract to answer in, the brief itself |
-| `space_answer` | `key`, and either `reply` (the contract the brief carries — `{parts, steps?}` for a standing hull, `{steps, profiles}` otherwise, or `{reuse}`) or `refuse` (one clause) |
+| `space_pending` | nothing — the parked briefs: the key (the brief's own node id), the human's words, the contract to answer in, the brief itself |
+| `space_answer` | `key` — copied from `space_pending`, never built — and either `reply` (the contract the brief carries — `{parts, steps?}` for a standing hull, `{steps, profiles}` otherwise, or `{reuse}`) or `refuse` (one clause) |
 | `space_draw` | `claims`: each a shape (`rectangle`/`circle`/`triangle`/`line`/`arrow`) or raw `points`, on a named `plane` (with an optional `at` along its normal) or a view plane through `through` facing `facing` |
 | `space_propose` | `solid` (id or name) and `reply` — held on the solid, never blessed |
 | `space_say` | `text` and `about` — a sentence beside marks, said in the human's status line as it lands |
@@ -1029,13 +1088,24 @@ source, and a side channel would be a second truth that does not replay, does no
 not exported. And it costs no protocol: `LiveStore` already carries log lines, and the relay
 keeps no truth of its own.
 
-The one thing the log cannot carry is the **pairing**, because node ids are per hand — a
-counter derived on replay, and two hands merging the same lines in a different order can number
-the same node differently (SURFACE-v10-PLAN D8, still a debt). So the pairing rides in the
-event's own payload, which merges identically everywhere: a brief is an answer whose `question`
-is `brief:<key>`, its reply is one whose `question` is `answer:<key>`, and **no id is matched
-across hands**. The hand answers about the ids it read off the brief's own node in its own
-session.
+**The pairing is the brief's own node id** (DIRECTOR-PLAN-W2 L2a). It used to be a key the
+asking hand minted — `brief:<key>` out, `answer:<key>` back — because node ids were a counter
+over the merged replay, so two hands merging the same lines in a different order numbered the
+same node differently and nothing could be named across the room. Since ids per hand (L1) an id
+is a function of the event that minted it — its log's name and its number there — so the id the
+tab gets back from `session.answer()` is the id every other hand derives for that brief. A brief
+is an answer whose `question` is the word `brief`; its reply is an answer whose `question` **is**
+that id, about the ids the brief node's own `about` edges name — read in the answering hand's
+session, and the same ids the tab named. Nothing is minted and nothing is matched by hand.
+
+What makes it true is that **every hand says what its log is called**: `joinRoom` calls
+`session.setLogName(me)` before anything is sent, under the same name it sends and merges under
+(one sitting, `sittingName` — a new suffix every page load); `otherHand` and `mcp.mjs` open their
+sessions with `logName` set. Marks drawn before a tab joined keep the counter ids they were drawn
+with — nothing is renumbered — and every reader holding the same unnamed lines numbers them
+alike. The old spelling survives in one reader, `legacySeatTraffic`: a board recorded before the
+change (`fixtures/seat-before-ids.mm.log`, recorded by the code it replaced) replays with its old
+briefs and answers never read out as sentences and never offered to be answered.
 
 **The seat is a model, and that is the whole of it.** `runBrief` has no case for it. A seat
 carries an injectable `transport` — the same hook the e2e's stub uses, which is
@@ -1054,7 +1124,9 @@ back out of the prompt a seat was handed, splitting on the literal `messagesFor`
 them — and it knew only *Propose the tree.*, the steps contract's marker. So on a standing hull,
 which is the board the whole of push 2 is about, the hand was handed the brief with the words
 stripped out of it. *Name the parts.* is in the table now; the marker a contract uses is the one
-thing that must not be guessed, so they are listed rather than matched loosely.
+thing that must not be guessed, so they are listed rather than matched loosely. `mcp.mjs` kept
+its own copy of the split with only the first marker until 26 Sep 2026, so `space_pending` said
+*no words* on every parts brief; it lists both now, and the smoke parks one to prove it.
 
 **Three things real use found at once.** `space_look` must read every node carrying ink and a
 plane, not `contentIds` — a mark a solid was made from leaves the content plane, so a board with
@@ -1390,6 +1462,30 @@ The font stays external: `brand/tokens.css` pulls IBM Plex Mono with an `@import
 fallback stack, and the face is not worth trebling the file for. The result is one `<script type="module">`
 and one `<style>`, and it runs from a plain static server with no console errors — `?demo=castle` included.
 
+### The silhouette cache, measured — and why it has no bound
+
+`solid.ts` caches every orthographic silhouette it renders (`silhouetteOn`: a `Map` keyed by
+solid, the tree's signature and the plane's frame) because the form rung, the diff and the
+honours row all ask for the same picture and a render per hover is a render per hover. Week 1's
+U5 asked for a number before a bound (a bound with no number is risk 4), so the cache counts
+itself — `cacheStats()`, handed out as `__shard.stats()`: entries, approximate bytes (the mask's
+own, 16 per outline point, two per character of key and reason, 64 an entry), the most held at
+once, and every ask, render and clear — and every shard harness returns it for `e2e/run.mjs` to
+print and keep in the result JSON. On 26 Sep 2026 (`node e2e/run.mjs shard demo demo2`, Chromium
+153):
+
+| Run | Held at the end | Peak held at once | Asked · rendered · clears |
+|---|---|---|---|
+| `__scenario`, 123 steps, some forty boards | 0 | 3 entries, 203 KB | 605 · 116 · 70 |
+| `__demo`, the mug | 6 entries, 336 KB | 6 entries, 336 KB | 135 · 15 · 4 |
+| `__demo2`, John's castle | 3 entries, 171 KB — and 3, 171 KB after 80 hovers from eight standpoints with every solid selected each time | 3 entries, 171 KB | 149 · 14 · 8 |
+
+**No bound was added, because the number says none is needed.** Every caller asks about a mark's
+or a claim's own plane, the key ignores the offset along the normal, and the whole cache is
+cleared whenever any solid is rebuilt — so it holds at most the solids times the board's own
+planes, 336 KB at the worst on any board the gate draws, and hovering adds nothing: 135 of
+demo2's 149 asks were answered from it.
+
 ### Smaller things, found the hard way
 
 - **`linewidth` is ignored on a plain `THREE.Line`,** and a hairline is not ink. The ink is drawn with `Line2`
@@ -1577,21 +1673,30 @@ nobody has open.
 **The hand cannot see.** There is no `space_see`: the canvas's hand renders ink to a PNG, and the shard's marks lie on
 planes in space. A picture of the board is the obvious next tool and is not here.
 
-**Ids per hand remain a debt.** Two hands both drawing in one room can number the same node differently. The brief
-pairing is immune by construction; a `space_say` aimed at an id read from an out-of-date `space_look` is not.
+**Ids per hand, since L1 and L2a — with one gap.** Every hand in a room names its log (one sitting), so what it writes
+after joining has the same id in every other hand's board, and the brief is paired by that id. What a tab drew
+**before** it joined keeps the counter ids it was drawn with — nothing is renumbered — and those agree across hands only
+while every reader holds the same unnamed lines: two tabs that both drew before joining, read by a hand holding only
+one of them, would number the second tab's marks differently.
 
-**Chromium only.** The gate runs one browser; a WebKit smoke is still owed (`../e2e/README.md`).
+**The question is the hull's, not a part's.** *How deep?* is asked when the hull as a whole is seen from one
+standpoint; a part cut from one run of a hull that has two standpoints is not asked about, however little of it the
+other view shows. No model is asked how deep, and `space_look` does not report the question.
+
+**Chromium only for the shard.** The gate's WebKit smoke is the canvas's; the shard's three scenarios run on
+Chromium alone (`../e2e/README.md`).
 
 ### Still John's
 
 - **Whether the ink a solid was made from is depth-tested.** The glass, above — now a trade with a measured price
   rather than an untried alternative, and the per-mark reading (profile ink through the body, feature ink on its face)
   is the shape a decision would take.
-- **What a hull is when a tower is seen only once.** The honest reading stands (two parts, pinned). The alternative —
-  the hull as a *union of masses*, each ⊓ bounded by the footprint rather than by the other claims — gives every tower a
-  body at the cost of inventing its depth (a 2.8 u slab across a 6 × 4 plan, measured). A third option is to **ask**: a
-  part seen once is a question on the board (*how deep is this?*), a second view or a word answering it.
-  `SHARD-3D-PUSH-2.md` §5 says ask.
+- **What a hull is when a tower is seen only once.** The honest reading stands (two parts, pinned), and the third
+  option `SHARD-3D-PUSH-2.md` §5 chose is built: the hull **asks** (L2c, above), a second view or a word answering it.
+  What is still John's is whether it should ask per **part** — John's castle's part 2 is seen from one standpoint
+  inside a hull that has two, and week 1's check says the full board asks nothing. The alternative — the hull as a
+  *union of masses*, each ⊓ bounded by the footprint — still invents the depth (a 2.8 u slab across a 6 × 4 plan,
+  measured).
 - **Whether a floating ⊓ is dropped to the ground** (verticals added) or left as an annotation. Built as an annotation,
   with the reason said.
 - **Whether the hull stands on the *second* claim** or waits for a footprint. Built on the second.
@@ -1650,7 +1755,9 @@ bytes. `fixtures/john-2026-09-16-castle-sketch.mm.log` is his first board (the o
 `fixtures/john-2026-09-16-massing.mm.log` is his second (three profiles and a massing at y ∈ [0.97, 3.09], floating where
 the profiles are). `node fixtures/make.mjs` writes both: the massing stood up **in Node** through the real session, the
 castle sketch **exported from the surface** because its ⊓ lie on view planes and a camera is three.js. The `.json` capture
-beside them is provenance, not a board. `fixtures/README.md` has the rest.
+beside them is provenance, not a board. `fixtures/seat-before-ids.mm.log` is not a board of John's: it is a seat exchange
+recorded by the pairing L2a replaced, kept so the one reader of the old spelling is tested against a real old log.
+`fixtures/README.md` has the rest.
 
 **`fixtures/exchanges/`** holds what was sent to a model about a board and what came back, **verbatim and unrepaired**, one
 file per model per board: the stub (imperfect on purpose — a colour outside the closed list, a part id the hull does not
@@ -1671,7 +1778,7 @@ exception, an attempted request to a real model, or a page error not on the name
 structured JSON and a screenshot in `e2e/results/`.
 
 Four scenarios: `canvas` (`Demos/session-engine.e2e.js`), and the shard's three — `shard` (`__scenario`, the whole loop),
-`demo` (`__demo`, the mug of §9) and `demo2` (`__demo2`, G4's nine beats).
+`demo` (`__demo`, the mug of §9) and `demo2` (`__demo2`, G4's nine beats, L2c's two records and the cache measured).
 
 By hand, in the shard's own tab at `http://localhost:5174`:
 
@@ -1700,4 +1807,7 @@ their `plays`, their ranked plane candidates, their plane's origin, the opacity 
 the selection, the status, the camera), `solids` (the trees, not the meshes), `features`, `diffs`, `rayDown`, `scratchOf`,
 `silhouetteOf`, `select`, `field`, `fieldRead`, `undo`, `clear`, `panelText`, `joinStub`, `joinHand`, `models`, `names`,
 `definitions`, `matches`, `place`, `correct`, `honours`, `materials`, `cancel`, `brief`, `seedCode`, `exchanges`, `logText`,
-`openLog`, `loadFixture`, `standFor`, `parts`, `showPart`, `partOutlined`, `partAt`, `selectedPart`, `selectPart`.
+`openLog`, `loadFixture`, `standFor`, `parts`, `showPart`, `partOutlined`, `partAt`, `selectedPart`, `selectPart`,
+`depth` (L2c: whether a hull is asking how deep, its candidates, and how many questions stand on the plane about it) and
+`stats` (L2d: the silhouette cache's own count). A harness that returns `measured` has it printed under its line by
+`e2e/run.mjs` and kept in the result JSON.
