@@ -153,6 +153,13 @@ function over(ins: readonly Iv[], f: (xs: number[]) => number | null): Iv | null
 
 const point = (v: number): Iv => ({ lo: v, hi: v });
 
+/** A range inside a formula stands in brackets, so √(8² + (2–4)²) never reads as 8² + 2 − 4². */
+function bracketRanges(formula: string): string {
+  return formula.replace(/(\(?)(~?\d+(?:\.\d+)?–\d+(?:\.\d+)?)(\)?)/g, (all, open: string, range: string, close: string) =>
+    open && close ? all : `${open}(${range})${close}`
+  );
+}
+
 // ===== Facts =====
 
 interface Fact {
@@ -490,7 +497,7 @@ function rectangleModels(facts: Fact[], inkWide: boolean): Model[] {
     }
     out.push({ basis, vals, how, makes });
   };
-  const word = (x: Fact) => (x.parts ? x.text : `a ${x.key} of ${x.shown}`);
+  const word = (x: Fact) => (x.parts ? x.text : `${/^[aeiou]/.test(x.key) ? 'an' : 'a'} ${x.key} of ${x.shown}`);
   const both = (x: Fact, y: Fact) => `${word(x)} and ${word(y)}`;
   for (const w of W) model([w], w.iv, null, w.parts ? w.parts.join(' + ') : undefined, undefined, word(w), w.parts ? ['width'] : []);
   for (const h of H) model([h], null, h.iv, undefined, h.parts ? h.parts.join(' + ') : undefined, word(h), h.parts ? ['height'] : []);
@@ -656,10 +663,17 @@ function sideModels(f: Figure, facts: Fact[]): Model[] {
 
 // ===== Readings: which labels hold together =====
 
+/** A label that cannot hold, what the reading makes it, and — when the reading was merged from several — the basis it was set against. */
+interface Miss {
+  fact: Fact;
+  derived: Iv;
+  against?: Model;
+}
+
 interface Checked {
   model: Model;
   kept: Fact[];
-  conflicts: { fact: Fact; derived: Iv }[];
+  conflicts: Miss[];
   share: number;
   ink: number;
 }
@@ -672,14 +686,14 @@ const dimOf = (key: string) => (/^angle\d$/.test(key) || key === 'sweep' ? 0 : k
 
 function check(model: Model, facts: Fact[], unit: LengthUnit | null): Checked {
   const kept: Fact[] = [...model.basis];
-  const conflicts: { fact: Fact; derived: Iv }[] = [];
+  const conflicts: Miss[] = [];
   const used = new Set(model.basis.map((x) => x.group));
   const groups = new Map<string, Fact[]>();
   for (const x of facts) if (!used.has(x.group)) (groups.get(x.group) ?? groups.set(x.group, []).get(x.group)!).push(x);
   let share = 0;
   for (const alts of groups.values()) {
     let hit: Fact | null = null;
-    let miss: { fact: Fact; derived: Iv } | null = null;
+    let miss: Miss | null = null;
     for (const x of alts) {
       const v = model.vals.get(x.key);
       if (!v) continue;
@@ -848,8 +862,9 @@ function textOf(iv: Iv, key: string, unit: LengthUnit | null, approx = false): s
 
 const lengthWord = (key: string, more: boolean) => (dimOf(key) === 1 ? (more ? 'longer' : 'shorter') : more ? 'larger' : 'smaller');
 
-function conflictOf(f: Figure, c: { fact: Fact; derived: Iv }, model: Model, unit: LengthUnit | null, right: number | null): Conflict {
+function conflictOf(f: Figure, c: Miss, reading: Model, unit: LengthUnit | null, right: number | null): Conflict {
   const x = c.fact;
+  const model = c.against ?? reading;
   const d = c.derived.lo - x.iv.lo;
   const share = Math.abs(d) / Math.max(TOL, Math.abs(x.iv.lo));
   const verb = model.basis.length > 1 || /\band\b/.test(model.how) ? 'make' : 'makes';
@@ -1065,15 +1080,16 @@ function valuesOf(f: Figure, c: Checked, unit: LengthUnit | null, right: number 
     const value = labelled && v.fact && !v.fact.parts ? { ...v.fact.q, ...(dimOf(key) === 0 ? { unit: null, dim: 0 } : {}) } : toQ(v.iv, unit, dimOf(key), approx);
     const text = labelled && v.fact && !v.fact.parts && dimOf(key) > 0 && v.fact.q.unit === unit ? formatQuantity(v.fact.q) : textOf(v.iv, key, unit, approx);
     const label = labelOf(f, key, right);
+    const formula = v.formula ? bracketRanges(v.formula) : undefined;
     const reason =
       v.from === 'derived'
-        ? `${label} ${text}${v.formula ? ` = ${v.formula}` : ''}`
+        ? `${label} ${text}${formula ? ` = ${formula}` : ''}`
         : v.from === 'declared'
           ? `${label} is right: a square in the corner declares it`
           : v.from === 'assumed'
             ? v.fact?.assumed ?? `${label}, assumed`
             : `${label} ${text}, as labelled`;
-    out.push({ key, label, value, from: v.from, ...(v.formula && v.from === 'derived' ? { formula: v.formula } : {}), text, reason });
+    out.push({ key, label, value, from: v.from, ...(formula && v.from === 'derived' ? { formula } : {}), text, reason });
   }
   // Parts along an edge: each labelled one as written, and one left unlabelled is the whole less the others.
   for (const side of f.sides) {
@@ -1092,7 +1108,7 @@ function valuesOf(f: Figure, c: Checked, unit: LengthUnit | null, right: number 
     if (!(hi > TOL)) continue;
     const iv = { lo: Math.max(0, lo), hi };
     const text = textOf(iv, side.key, unit);
-    const formula = [fmtIv(whole.iv), ...known.map((w) => formatQuantity({ ...w.q, unit: null, dim: 0 }))].join(' − ');
+    const formula = bracketRanges([fmtIv(whole.iv), ...known.map((w) => formatQuantity({ ...w.q, unit: null, dim: 0 }))].join(' − '));
     out.push({ key: open[0].key, label: open[0].label, value: toQ(iv, unit, 1), from: 'derived', formula, text, reason: `${open[0].label} ${text} = ${formula}` });
   }
   return out;
@@ -1108,7 +1124,7 @@ function mergeSides(readings: Checked[]): Checked[] {
   const vals = new Map<string, Val>();
   const basis: Fact[] = [];
   const kept: Fact[] = [];
-  const conflicts: { fact: Fact; derived: Iv }[] = [];
+  const conflicts: Miss[] = [];
   let share = 0;
   for (const rs of bySide.values()) {
     rs.sort((a, b) => b.kept.length - a.kept.length || a.share - b.share);
@@ -1116,7 +1132,8 @@ function mergeSides(readings: Checked[]): Checked[] {
     for (const [k, v] of best.model.vals) vals.set(k, v);
     basis.push(...best.model.basis);
     kept.push(...best.kept);
-    conflicts.push(...best.conflicts);
+    // Each side's conflict is set against that side's own label, not against every side at once.
+    conflicts.push(...best.conflicts.map((c) => ({ ...c, against: best.model })));
     share += best.share;
   }
   const how = basis.map((x) => (x.parts ? x.text : `${x.shown}`)).join(', ');
