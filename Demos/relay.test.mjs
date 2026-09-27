@@ -88,3 +88,47 @@ test('over a real socket: the stream opens, the stale snapshot is gone and the p
     assert.ok(!text.includes('"relay":"truncated"'), 'a room inside its buffer said otherwise');
   } finally { server.close(); }
 });
+
+// ===== Ids that hold (DIRECTOR-PLAN-W2 L1) ====================================
+// Real hands this time — LiveStores over the relay transport a Node hand uses
+// (live-node.mjs), on a relay of their own — because the notice is only worth
+// something if the hand that connects is the one that is told.
+
+import path from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { relayTransport } from './live-node.mjs';
+
+const MM = await import(pathToFileURL(path.join(path.dirname(fileURLToPath(import.meta.url)), 'metamedium-core.node.mjs')).href);
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+const until = async (fn, ms = 4000) => { const end = Date.now() + ms; while (Date.now() < end) { if (await fn()) return true; await wait(25); } return fn(); };
+const boxAt = (x) => [0, 1, 2, 3, 4].map((i) => ({ x: x + [0, 60, 60, 0, 0][i], y: [0, 0, 40, 40, 0][i] })).flatMap((p, i, a) =>
+  i ? Array.from({ length: 8 }, (_, k) => ({ x: a[i - 1].x + ((p.x - a[i - 1].x) * k) / 8, y: a[i - 1].y + ((p.y - a[i - 1].y) * k) / 8 })) : []);
+
+test('a relay capped at 10 lines, 20 posted: a newcomer is told the room is older than the relay remembers — and a hand still here fills it in', async () => {
+  const server = await startRelay(0, { maxLines: 10 });
+  const url = `http://127.0.0.1:${server.address().port}`;
+  const stores = [];
+  try {
+    const ada = MM.createSession({ ...MM.DEFAULT_SESSION_CONFIG, logName: 'ada~1' });
+    const a = new MM.LiveStore(relayTransport(url, 'r'), 'ada~1', 'r');
+    stores.push(a);
+    for (let i = 0; i < 20; i++) {
+      ada.addStroke(boxAt(i * 80), 1000 + i, undefined, 1);
+      await a.appendLog('ada~1', ada.getEvents().slice(-1));
+    }
+    await wait(100);
+    const c = new MM.LiveStore(relayTransport(url, 'r'), 'cleo~1', 'r');
+    stores.push(c);
+    c.hello();
+    const told = await until(() => c.notices().some((n) => /older than the relay remembers/.test(n)));
+    assert.ok(told, 'the newcomer was never told: ' + JSON.stringify(c.notices()));
+    assert.ok(c.notices().some((n) => /10 earlier lines are gone/.test(n)), JSON.stringify(c.notices()));
+    // Ada is still here and answers the hello with her whole log, so what the
+    // relay forgot is not lost to the room.
+    const whole = await until(async () => ((await c.readLogs())['ada~1'] || []).length === 20);
+    assert.ok(whole, 'the newcomer holds ' + (((await c.readLogs())['ada~1'] || []).length) + ' of ada\'s 20');
+  } finally {
+    for (const s of stores) s.close();
+    server.close();
+  }
+});

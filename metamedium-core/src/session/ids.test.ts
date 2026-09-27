@@ -12,8 +12,17 @@
 import { describe, it, expect } from 'vitest';
 import { createSession, DEFAULT_SESSION_CONFIG, type SessionEvent } from './session';
 import { mergeLogs } from '../store/merge';
+import * as live from '../store/live';
 import { rectStroke, circleStroke, checkStroke } from '../test/strokes';
-import { boundsOf, wordOf } from './nodes';
+import { authorOf, boundsOf, wordOf } from './nodes';
+
+// How a hand in a room is named (DIRECTOR-PLAN-W2 L1). Looked up by name so
+// this file reports the regression on its own assertion rather than failing to
+// import when the naming is missing.
+const { sittingName, handLabel } = live as unknown as {
+  sittingName: (person: string) => string;
+  handLabel: (name: string) => string;
+};
 
 const named = (logName: string) => createSession({ ...DEFAULT_SESSION_CONFIG, logName });
 
@@ -285,6 +294,30 @@ describe('ids per hand — an id is a function of the event', () => {
     expect(said.addStroke(circleStroke(900, 900, 60), 2000)).toBe('stroke:john~c3d4:1');
   });
 
+  it('a model joined in another hand’s log proposes under the participant every reader sees', () => {
+    // The join and the proposal are both in Ada's log, so the proposal names
+    // the model by the id Ada's session minted for it. Merged beside another
+    // hand whose own join shifts every event of hers down the replay, the
+    // reading must still hang on her mark and be the model's — not whichever
+    // participant holds that number in the reader's board.
+    const ada = named('ada~t1');
+    const box = ada.addStroke(rectStroke(100, 100, 200, 120), 1000);
+    const pid = ada.join('agent', 'qwen3:8b', 1100, 2);
+    ada.propose({ participantId: pid, nodeId: box, edges: [{ to: 'type:card', rel: 'resembles', weight: 0.8, reasoning: 'a box this shape' }], at: 1200 });
+    const bob = named('bob~t2');
+    bob.addStroke(circleStroke(900, 900, 60), 500);
+    const other = bob.join('agent', 'llama3', 600, 2);
+
+    const reader = named('cleo~t3');
+    reader.load(mergeLogs({ 'ada~t1': ada.getEvents().slice(), 'bob~t2': bob.getEvents().slice() }, { me: 'cleo~t3' }));
+    const st = reader.getState();
+    const held = st.nodes.get(box)!.edges.filter((e) => e.rel === 'resembles' && e.to === 'type:card');
+    expect(held.map((e) => e.via)).toEqual([pid]);
+    expect(pid).not.toBe(other);
+    expect(wordOf(st.nodes.get(pid)!)).toBe('qwen3:8b');
+    expect(wordOf(st.nodes.get(other)!)).toBe('llama3');
+  });
+
   it('a garbled stamp falls back to the counter rather than minting a blurred id', () => {
     // A log is read, not trusted (DATA-1). An empty name or a fractional
     // number would run the two forms into each other.
@@ -296,5 +329,81 @@ describe('ids per hand — an id is a function of the event', () => {
     const s = createSession();
     s.load(events);
     expect(s.getState().contentIds).toEqual(['stroke:1', 'stroke:2', 'stroke:ada:2']);
+  });
+});
+
+// ===== Ids that hold (DIRECTOR-PLAN-W2 L1) ===================================
+// No number is ever issued twice under one log name — not after an undo, not
+// after a peer's line, not after a reload. Both defects were reproduced on 26
+// Sep 2026 with the engine built from source; each is pinned here as it was
+// reproduced, because a fix proven only on the path that did not break is the
+// fix that failed the week before.
+
+/** A 60 × 40 box at x, eight points a side — the reproduction's own ink. */
+const box = (x: number) =>
+  [{ x, y: 0 }, { x: x + 60, y: 0 }, { x: x + 60, y: 40 }, { x, y: 40 }, { x, y: 0 }].flatMap((p, i, a) =>
+    i ? Array.from({ length: 8 }, (_, k) => ({ x: a[i - 1].x + ((p.x - a[i - 1].x) * k) / 8, y: a[i - 1].y + ((p.y - a[i - 1].y) * k) / 8, t: i * 10 + k })) : []
+  );
+/** A hand's own log: the session's unstamped events, sent or not. */
+const mine = (s: ReturnType<typeof createSession>) => s.getEvents().filter((e) => !e.by);
+
+describe('ids that hold — no number issued twice under one log name', () => {
+  it('D1 — an undone mark’s id is not handed to the next mark after a peer’s line reloads the merge', () => {
+    // Draw X, undo, let one peer line arrive (a live tab reloads its merge on
+    // every line), draw Y. The undo was never sent — peers still hold X under
+    // its id — so a Y that took X's number would carry every sentence said
+    // about X.
+    const a = named('john~a1');
+    const b = named('claude~z9');
+    const x = a.addStroke(box(0), 1000, undefined, 1);
+    a.undo();
+    b.addStroke(box(200), 2000, undefined, 1);
+    a.load(mergeLogs({ 'john~a1': mine(a), 'claude~z9': b.getEvents().slice() }, { me: 'john~a1' }));
+    const y = a.addStroke(box(400), 3000, undefined, 1);
+    expect(x).toBe('stroke:john~a1:1');
+    expect(y).not.toBe(x);
+  });
+
+  it('D1 — nor after a reset: `load([])` rewinds the board, never the numbering', () => {
+    const a = named('john~a1');
+    const x = a.addStroke(box(0), 1000, undefined, 1);
+    a.load([]);
+    const y = a.addStroke(box(0), 2000, undefined, 1);
+    expect(y).not.toBe(x);
+  });
+
+  it('D2 — a reloaded live tab is a new sitting: a new log name, the same person, and no number the room already holds', () => {
+    // A live tab keeps no local log and never hears its own lines back, so a
+    // reload knows nothing of what it drew. Under the old naming its suffix
+    // survived the reload and its first mark was `…:1`, a number the room
+    // already held for another mark. Named per sitting, a reload cannot reuse
+    // a number, because it is not writing under the old name at all.
+    const first = sittingName('john');
+    const tab = named(first);
+    const x = tab.addStroke(box(0), 1000, undefined, 1);
+    const room = { [first]: mine(tab) }; // what the room holds of the first sitting
+
+    // The reload: no memory of the first sitting, and a name of its own.
+    const second = sittingName('john');
+    expect(second).not.toBe(first);
+    // The person is unchanged: the name shown, and so the colour, is theirs.
+    expect(handLabel(first)).toBe('john');
+    expect(handLabel(second)).toBe('john');
+    const reloaded = named(second);
+    const y = reloaded.addStroke(box(400), 2000, undefined, 1);
+    expect(y).not.toBe(x);
+
+    // A peer holding both sittings holds two marks, each under its own id,
+    // each attributed to a hand shown as john.
+    const peer = named('claude~z9');
+    peer.load(mergeLogs({ ...room, [second]: mine(reloaded), 'claude~z9': [] }, { me: 'claude~z9' }));
+    const st = peer.getState();
+    expect(st.contentIds).toEqual([x, y]);
+    const hands = st.contentIds.map((id) => authorOf(st.nodes.get(id)!));
+    expect(new Set(hands).size).toBe(2);
+    expect(hands.map((p) => wordOf(st.nodes.get(p)!))).toEqual(['john', 'john']);
+    // A name that already carries a suffix is the person's name plus a new one.
+    expect(handLabel(sittingName(first))).toBe('john');
+    expect(sittingName(first)).not.toBe(first);
   });
 });

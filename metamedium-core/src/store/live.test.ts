@@ -3,7 +3,7 @@
 import { describe, it, expect } from 'vitest';
 import { LiveStore, LocalHub } from './live';
 import { mergeLogs } from './merge';
-import { createSession } from '../session/session';
+import { createSession, DEFAULT_SESSION_CONFIG, type SessionEvent } from '../session/session';
 import { rectStroke, circleStroke } from '../test/strokes';
 import { authorOf } from '../session/nodes';
 
@@ -127,6 +127,79 @@ describe('live logs', () => {
       w.deliver({ participant: 'alice', events: drew(100), at: 1000, full: true });
       expect((await store.readLogs()).alice).toEqual(now);
       expect(store.collisions()).toEqual([]);
+    });
+  });
+
+  // ===== Ids that hold (DIRECTOR-PLAN-W2 L1) ==================================
+  // Every room harness before this was two parties, both alive. A fix proven
+  // only there is the fix that failed: here one hand has left, and the one
+  // that joins after it must still hold what it drew — its undo included.
+  describe('a room of three, one departed', () => {
+    const named = (logName: string) => createSession({ ...DEFAULT_SESSION_CONFIG, logName });
+    const mine = (s: ReturnType<typeof createSession>) => s.getEvents().filter((e) => !e.by);
+    /** The store's flush: a hand's whole log as it stands, sent as whatever makes the room's copy equal it. */
+    const publish = (store: LiveStore, events: readonly SessionEvent[]) =>
+      (store as unknown as { publish(events: readonly SessionEvent[]): Promise<void> }).publish(events);
+
+    it('A appends three, answers a hello in full, appends two, undoes one and leaves; C, joining after, holds A’s final four', async () => {
+      const hub = new LocalHub();
+      const ada = named('ada~1');
+      const a = new LiveStore(hub.connect(), 'ada~1', 'r');
+      for (let i = 0; i < 3; i++) {
+        ada.addStroke(rectStroke(100 + i * 300, 100, 200, 120), 1000 + i * 100);
+        await a.appendLog('ada~1', mine(ada).slice(-1));
+      }
+      // B arrives, says hello, and A answers with its whole log.
+      const bob = named('bob~1');
+      const b = new LiveStore(hub.connect(), 'bob~1', 'r');
+      b.hello();
+      await tick(); await tick();
+      expect((await b.readLogs())['ada~1']).toEqual(mine(ada));
+      bob.addStroke(circleStroke(400, 600, 50), 1500);
+      await publish(b, mine(bob));
+      // A draws two more, takes the last back, and leaves.
+      ada.addStroke(rectStroke(100, 400, 200, 120), 2000);
+      await publish(a, mine(ada));
+      ada.addStroke(rectStroke(400, 400, 200, 120), 2100);
+      await publish(a, mine(ada));
+      ada.undo();
+      await publish(a, mine(ada));
+      await tick(); await tick();
+      a.close();
+      const final = mine(ada);
+      expect(final).toHaveLength(4);
+      // C joins after A has gone: only B can tell it what A drew.
+      const c = new LiveStore(hub.connect(), 'cleo~1', 'r');
+      c.hello();
+      await tick(); await tick(); await tick();
+      const logs = await c.readLogs();
+      expect(logs['ada~1']).toEqual(final);
+      expect(logs['bob~1']).toEqual(mine(bob));
+      expect((await b.readLogs())['ada~1']).toEqual(final);
+      // B told C about A; A is not said to be here.
+      expect(c.presence().map((p) => p.participant)).toEqual(['bob~1']);
+    });
+
+    it('two stores under one name: BOTH hands that share it learn it, and so does the room', async () => {
+      const hub = new LocalHub();
+      const drew = (x: number) => eventsOf((s) => s.addStroke(rectStroke(x, 100, 200, 120), 1000 + x));
+      const x1 = new LiveStore(hub.connect(), 'x~1', 'r');
+      const b = new LiveStore(hub.connect(), 'b~1', 'r');
+      await x1.appendLog('x~1', drew(100));
+      await tick();
+      // A second hand comes up under the same name — a tab duplicated with its
+      // storage, a restart that reused a suffix — and says hello, then draws.
+      const x2 = new LiveStore(hub.connect(), 'x~1', 'r');
+      x2.hello();
+      await tick(); await tick();
+      await x2.appendLog('x~1', drew(700));
+      await tick(); await tick();
+      for (const store of [x1, x2, b]) {
+        expect(store.collisions()).toHaveLength(1);
+        expect(store.collisions()[0]).toMatch(/two hands are both called "x~1"/);
+      }
+      // What the room heard first is kept; the second hand's lines are refused.
+      expect((await b.readLogs())['x~1']).toEqual(drew(100));
     });
   });
 
