@@ -1294,6 +1294,24 @@ hand, or what a shard tab drew before it joined a room (the shard names its
 log as it joins, `shard-3d/src/room.ts`) — keeps counter ids
 (`participant:N`), which a merge can renumber; nothing translates them.
 
+**An artifact is made by whoever blessed it** (V1-PLAN L2f; `applyBless`
+and `authorOf` in core, `session/label.test.ts` and `held.test.ts`, e2e 43).
+A bless used to write no maker, so every board read an artifact as its own
+reader's: the maker's label on her artifact was dropped on every other
+hand's replay, and any other hand could label it at its own door. Now a
+`bless` gets the attribution a stroke gets — "local" in another hand's log
+means that hand — so the label rule holds for things as it does for ink, on
+every board; the MCP hand's look says *by tab*; the panel's *by* row reads
+`authorOf` for every node. **Not who drew its marks**: a hand may bless a
+group several hands drew — the thing is the blesser's, and each mark stays
+its drawer's, drawn inside it in its drawer's colour (`inkOf`'s `byMaker`;
+a live page's gold is the one colour laid over all of them). **A bless is a
+person's act**: one in the engine's name — the shard stands a hull at tier
+1 inside its hand's act — is the hand's whose log holds it, and the engine
+keeps its name on the word. The `made-by` edge is written only for a maker
+other than the board's own hand, which `authorOf` reads from no edge at
+all, so a board's own blesses — every held log — replay node for node.
+
 ### The MCP hand: Claude Code on the board (v10 T2)
 
 > `Demos/mcp.mjs` (the server), `Demos/live-node.mjs` (the relay as a
@@ -1403,6 +1421,8 @@ someone else made is blessing it, the human's act; labelling your own ink is
 not (the notes, §B). A `label` event holds the word as a rep on the mark,
 attributed; it replays and undoes; an empty word takes it off; another hand's
 label on my mark is refused at the door (`not-your-ink`) and dropped on replay.
+A mark's maker is the hand that drew it; an artifact's is whoever blessed it,
+on every board (L2f, under *Live logs*).
 **It is not a bless and not a file** (§D): no `word` rep, no artifact, no
 library entry, no card in the grid, never a name the matcher learns.
 
