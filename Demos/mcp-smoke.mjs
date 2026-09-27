@@ -71,7 +71,7 @@ try {
   child.stdin.write(JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' }) + '\n');
   const list = await rpc('tools/list', {});
   const names = (list.result && list.result.tools || []).map((t) => t.name);
-  check('seven tools, each a verb a hand has', names.length === 7 && ['canvas_look', 'canvas_see', 'canvas_draw', 'canvas_say', 'canvas_propose', 'canvas_transcribe', 'canvas_write'].every((n) => names.includes(n)), names);
+  check('eight tools, each a verb a hand has', names.length === 8 && ['canvas_look', 'canvas_see', 'canvas_draw', 'canvas_say', 'canvas_propose', 'canvas_label', 'canvas_transcribe', 'canvas_write'].every((n) => names.includes(n)), names);
 
   // The tab draws first: a box, in its own log.
   const box = MM.strokeFor({ shape: 'rectangle', x: 100, y: 100, w: 200, h: 120 });
@@ -119,6 +119,15 @@ try {
   check('canvas_propose holds a reading', /“card” 0\.80 held/.test(textOf(prop)), textOf(prop));
   const tr = await call('canvas_transcribe', { id: boxId, text: 'hello', confidence: 0.9, alternatives: ['hallo'] });
   check('canvas_transcribe holds a transcript', /read as “hello”/.test(textOf(tr)), textOf(tr));
+  // A hand labels its OWN ink, and only its own (V1-PLAN L2b; the notes §B, §D):
+  // a word on the mark, not a bless and not a file.
+  const mineId = (t2.split('\n')[0] || '').split(' ')[0];
+  const lab = await call('canvas_label', { id: mineId, text: 'bubble' });
+  check('canvas_label puts a word on the mark the hand drew', /“bubble” on /.test(textOf(lab)) && textOf(lab).includes(mineId), textOf(lab));
+  const refused = await call('canvas_label', { id: boxId, text: 'not mine' });
+  check('canvas_label is refused on the tab\'s box, with the reason in words', /was made by/.test(textOf(refused)) && /your own ink/.test(textOf(refused)) && !/“not mine” on/.test(textOf(refused)), textOf(refused));
+  const looked = textOf(await call('canvas_look', {}));
+  check('canvas_look says the word the hand put on its own mark', new RegExp(mineId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '[^\n]*labelled “bubble”').test(looked), looked);
   const wrote = await call('canvas_write', { kind: 'run', code: 'mm.ctx.fillRect(0,0,10,10);', name: 'dot', bounds: { x: 600, y: 100, w: 200, h: 120 } });
   check('canvas_write places a program that waits for play', /placed at 600,100/.test(textOf(wrote)) && /waits for the hand/.test(textOf(wrote)), textOf(wrote));
   await until(() => heard.some((h) => fromSmoke(h) && h.events.some((e) => e.type === 'import')), 4000);
@@ -128,6 +137,14 @@ try {
   const reading = MM.interpretationsOf(boxNode, st2.nodes).find((x) => x.label === 'card');
   check('in the tab: the reading is held on the box, attributed to smoke', !!reading && reading.sourceName !== 'you' && /smoke/.test(reading.sourceName || ''), reading && { label: reading.label, source: reading.sourceName, weight: reading.weight });
   check('in the tab: the transcript is held on the box', MM.transcriptOf(boxNode) === 'hello', MM.transcriptsOf(boxNode));
+  // The label travelled as a line of the hand's log and landed on the hand's
+  // own circle, in the hand's name — and on nothing of the tab's. It is a rep
+  // on the mark, not an artifact: the only artifact is the program below.
+  const mineLabel = MM.labelOf(st2.nodes.get(mineId));
+  check('in the tab: the hand\'s word stands on its own circle, attributed to the hand, and never on the box',
+    !!mineLabel && mineLabel.text === 'bubble' && mineLabel.source === handId && MM.labelOf(boxNode) === undefined,
+    { mine: mineLabel, box: MM.labelOf(boxNode) });
+  check('in the tab: a label is no artifact and no file — the program is the one artifact', st2.artifacts.length === 1, st2.artifacts);
   const prog = st2.artifacts.map((id) => st2.nodes.get(id)).find((n) => n.reps.some((r) => r.modality === 'code' && r.data.kind === 'run'));
   check('in the tab: the program stands, live, and its clock is not playing', !!prog && st2.live.includes(prog.id) && !(st2.clocks[prog.id] && st2.clocks[prog.id].playing), prog && { id: prog.id, clock: st2.clocks[prog.id] });
   const answers = st2.explanations.length;

@@ -1842,5 +1842,80 @@ window.__scenario = async function(){
     mm.setView(1, 0, 0);
   }
 
+  // ---- 39. A word on your own ink: the label on the board (V1-PLAN L2b; notes §B, §D) ----
+  // Whoever made a mark can put a word on it — a `label` event, attributed,
+  // replayed, undone. Not a bless and not a file: it is drawn beside the mark
+  // in the ink's own colour, at a size in the board's own units (the caption
+  // rule of 13-kinds.js — it scales with the board and is never held at
+  // screen size), in both themes; it makes no artifact, no library entry and
+  // no name; erasing the mark takes it, and undo of the erase brings both.
+  {
+    mm.session.load([]); mm.setView(1, 0, 0);
+    const theme39 = mm.themeMode();
+    mm.setThemeMode('dark');
+    const drawn39 = () => (typeof mm.labelsDrawn === 'function' ? mm.labelsDrawn() : []);
+    const colour39 = (id) => (typeof mm.colourOf === 'function' ? mm.colourOf(id) : null);
+    const ink39 = () => getComputedStyle(document.documentElement).getPropertyValue('--ink').trim();
+    t.stroke(t.rect(300, 220, 220, 140));
+    const box39 = mm.session.getState().contentIds[0];
+    const arts39 = mm.session.getState().artifacts.length, lib39 = mm.libraryEntries().length, evs39 = mm.session.getEvents().length;
+    const took39 = mm.session.label({ nodeId: box39, text: 'inlet', at: Date.now() });
+    await wait(30);
+    const at1 = drawn39().find(l => l.id === box39);
+    const bb39 = MM.boundsOf(mm.session.getState().nodes.get(box39));
+    step('39. a hand labels its own mark: the word is drawn beside it, above its top edge, in the ink\'s own colour',
+      took39 === box39 && !!at1 && at1.text === 'inlet' && at1.y < bb39.minY && Math.abs(at1.x - bb39.minX) < 1 && !!at1.colour && at1.colour === colour39(box39) && at1.colour === ink39(),
+      { took: took39, label: at1, bounds: bb39, ink: colour39(box39), token: ink39() });
+    mm.setView(2, 0, 0); await wait(30);
+    const at2 = drawn39().find(l => l.id === box39);
+    step('39a. it scales with the board — the same size in the board\'s units at every zoom, twice the pixels at twice the zoom: a caption, not screen-size type',
+      !!at1 && !!at2 && Math.abs(at2.size - at1.size) < 1e-9 && Math.abs(at2.px - 2 * at1.px) < 0.01,
+      { zoom1: at1 && { size: at1.size, px: at1.px }, zoom2: at2 && { size: at2.size, px: at2.px } });
+    mm.setView(1, 0, 0);
+    mm.setThemeMode('light'); await wait(30);
+    const atL = drawn39().find(l => l.id === box39);
+    step('39b. in both themes: on paper it is drawn in paper\'s ink, not the dark board\'s',
+      !!at1 && !!atL && atL.colour === ink39() && atL.colour !== at1.colour,
+      { dark: at1 && at1.colour, light: atL && atL.colour, token: ink39() });
+    mm.setThemeMode('dark'); await wait(30);
+    const s39 = mm.session.getState();
+    const panel39 = document.getElementById('inspector').textContent;
+    step('39c. a label is one event — no artifact, no library entry, no name — and the shape rung\'s reading still stands, in the panel too',
+      s39.artifacts.length === arts39 && mm.libraryEntries().length === lib39 && mm.session.getEvents().length === evs39 + 1
+        && !MM.wordOf(s39.nodes.get(box39)) && MM.topInterpretation(s39.nodes.get(box39)) === 'rectangle'
+        && /shape\s*rectangle/.test(panel39) && /label\s*“inlet”/.test(panel39),
+      { artifacts: s39.artifacts.length, library: mm.libraryEntries().length, events: mm.session.getEvents().length - evs39, panel: panel39.slice(0, 600) });
+    // Erasing the mark takes the label with it; undo of the erase brings both.
+    const e0 = mm.worldToScreen(280, 250), e1 = mm.worldToScreen(540, 330);
+    t.stroke(t.scratch(e0.x, e0.y, e1.x - e0.x, e1.y - e0.y, 3));
+    await wait(30);
+    const gone39 = !mm.session.getState().contentIds.includes(box39) && !drawn39().some(l => l.id === box39);
+    mm.session.undo(); await wait(30);
+    const back39 = drawn39().find(l => l.id === box39);
+    step('39d. erasing the mark takes its label; undo of the erase brings mark and label back',
+      gone39 && mm.session.getState().contentIds.includes(box39) && !!back39 && back39.text === 'inlet',
+      { gone: gone39, back: back39 });
+    // A label is the log's: undone like any event, and replayed.
+    mm.session.undo(); await wait(30);
+    const undone39 = !drawn39().some(l => l.id === box39);
+    const evs = mm.session.getEvents().slice();
+    mm.session.load(evs.concat([{ type: 'label', nodeId: box39, text: 'outlet', at: Date.now() }])); await wait(30);
+    const replayed39 = drawn39().find(l => l.id === box39);
+    step('39e. undo takes the label off; a log that carries one replays it',
+      undone39 && !!replayed39 && replayed39.text === 'outlet', { undone: undone39, replayed: replayed39 });
+    // Another hand's word on its own ink arrives in its log and is drawn in
+    // that hand's colour, attributed to it — a label on the merged node.
+    const fern = MM.createSession(Object.assign({}, MM.DEFAULT_SESSION_CONFIG, { logName: 'fern~f1' }));
+    const kite = fern.addStroke(t.circle(700, 300, 50).map(p => ({ x: p.x, y: p.y })), Date.now() - 5000, undefined, 1, { content: true });
+    fern.label({ nodeId: kite, text: 'kite', at: Date.now() - 4000 });
+    mm.session.load(MM.mergeLogs({ 'fern~f1': fern.getEvents(), 'me~m1': mm.session.getEvents().filter(e => !e.by) }, { me: 'me~m1' })); await wait(30);
+    const kite39 = drawn39().find(l => l.id === kite);
+    step('39f. another hand\'s word on its own ink is drawn in that hand\'s colour, attributed to it',
+      !!kite39 && kite39.text === 'kite' && kite39.colour === mm.handColour('fern') && kite39.who === 'fern' && kite39.colour !== colour39(box39),
+      { kite: kite39, hue: mm.handColour('fern') });
+    mm.setThemeMode(theme39);
+    mm.session.load([]); mm.setView(1, 0, 0);
+  }
+
   return R;
 };

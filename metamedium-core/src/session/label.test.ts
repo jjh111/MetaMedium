@@ -87,6 +87,31 @@ describe('labelling your own ink', () => {
     expect(labelOf(s.getState().nodes.get(id)!)).toBeUndefined();
   });
 
+  it('says what the reading is based on, so a label never stands in for the shape rung', () => {
+    // Half the surface asks for "the tier-0 reading" to mean "what the shape
+    // rung measured". A label sits at its maker's tier with weight 1, so it
+    // would lead that list and stand in for a measurement (L2b).
+    const s = createSession();
+    const id = s.addStroke(box(0, 0, 100, 60), 1000, undefined, 1, { content: true });
+    s.label({ nodeId: id, text: 'inlet', at: 1001 });
+    const reads = interpretationsOf(s.getState().nodes.get(id)!, s.getState().nodes);
+    expect(reads.find((r) => r.label === 'inlet')!.basis).toBe('label');
+    expect(reads.find((r) => r.label === 'rectangle')!.basis).toBe('resemblance');
+    const shape = reads.filter((r) => r.tier === 0 && r.basis !== 'label')[0];
+    expect(shape.label).toBe('rectangle');
+  });
+
+  it('erasing the mark takes the label with it, and undo of the erase brings both', () => {
+    const s = createSession();
+    const id = s.addStroke(box(0, 0, 100, 60), 1000, undefined, 1, { content: true });
+    s.label({ nodeId: id, text: 'inlet', at: 1001 });
+    s.erase(id, 1002);
+    expect(s.getState().contentIds).not.toContain(id);
+    s.undo();
+    expect(s.getState().contentIds).toContain(id);
+    expect(labelOf(s.getState().nodes.get(id)!)!.text).toBe('inlet');
+  });
+
   it('says the word in the brief a model is handed', () => {
     const s = createSession();
     const id = s.addStroke(box(0, 0, 100, 60), 1000, undefined, 1, { content: true });
