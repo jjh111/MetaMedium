@@ -2,6 +2,7 @@
 //
 //   node Demos/relay.mjs            # listens on :8020
 //   PORT=9000 node Demos/relay.mjs
+//   MM_RELAY_MAX_LINES=200 node Demos/relay.mjs   # each room remembers 200 lines
 //
 // Then open session-engine.html?live=<room>&relay=http://<host>:8020 on each
 // machine. No dependencies, no truth of its own: a room is the lines its
@@ -11,13 +12,40 @@
 // browser; the relay only carries. Nothing is authenticated — run it on a
 // network you trust, or put it behind something that is.
 //
-// `startRelay(port)` is the same server for a process that hosts one — the
-// MCP hand (Demos/mcp.mjs) starts a relay when none answers.
+// `startRelay(port, { maxLines })` is the same server for a process that hosts
+// one — the MCP hand (Demos/mcp.mjs) starts a relay when none answers.
+//
+// How much a room remembers is settable: `maxLines`, else the environment's
+// MM_RELAY_MAX_LINES, else 5000 lines per room. Past it the oldest lines go,
+// and a hand that connects after is told the room is older than the relay
+// remembers — every hand's store says so (store/live.ts, `truncation`), and
+// the hands still in the room answer its hello with every log they hold.
 
 import { createServer } from 'node:http';
 import { pathToFileURL } from 'node:url';
 
-const MAX_LINES = 5000;
+/** How many lines a room keeps when nothing says otherwise. */
+export const DEFAULT_MAX_LINES = 5000;
+
+/** The cap a relay runs with: the option, else MM_RELAY_MAX_LINES, else the default. */
+export function maxLinesFrom(option, env = process.env) {
+  for (const v of [option, env.MM_RELAY_MAX_LINES]) {
+    const n = Number(v);
+    if (v !== undefined && v !== '' && Number.isSafeInteger(n) && n > 0) return n;
+  }
+  return DEFAULT_MAX_LINES;
+}
+
+/**
+ * What kind of line this is, for the replay: a hello, a writer's own whole
+ * log, a whole log handed on by another hand (`via`) in answer to a hello, or
+ * an append.
+ */
+export function kindOf(line) {
+  if (line && line.hello) return 'hello';
+  if (line && line.full) return line.via ? 'relayed' : 'full';
+  return 'append';
+}
 
 /**
  * What a connecting client is sent: the room brought up to the PRESENT, never
@@ -43,6 +71,12 @@ export function replay(room, after = 0) {
   for (const l of pending) if (l.kind === 'full') newest.set(l.participant, l.id);
   return pending.filter((l) => l.kind !== 'full' || newest.get(l.participant) === l.id);
 }
+// A log handed on by another hand (`relayed`) is replayed as it came and
+// never supersedes the writer's own: it is a copy that may lag the log, and
+// the store that receives it judges it by the writer's clock, dropping a copy
+// older than what already landed. It stays in the replay because it may be
+// the only whole copy left of a hand that has gone, once the relay has
+// forgotten that hand's own early lines.
 
 /**
  * What a client is owed when the room has outlived its buffer: a line saying
@@ -61,8 +95,12 @@ const cors = (res) => {
   res.setHeader('access-control-allow-methods', 'GET, POST, OPTIONS');
 };
 
-/** The relay as a server: resolves once it listens, rejects when the port is taken. */
-export function startRelay(port = Number(process.env.PORT || 8020)) {
+/**
+ * The relay as a server: resolves once it listens, rejects when the port is
+ * taken. `maxLines` is how many lines each room keeps (see `maxLinesFrom`).
+ */
+export function startRelay(port = Number(process.env.PORT || 8020), opts = {}) {
+  const maxLines = maxLinesFrom(opts.maxLines);
   const rooms = new Map(); // room -> { name, lines: [{ id, data, participant, kind }], clients: Set<res>, dropped }
   const roomOf = (name) => rooms.get(name) || rooms.set(name, { name, lines: [], clients: new Set(), dropped: 0 }).get(name);
   const server = createServer((req, res) => {
@@ -97,10 +135,9 @@ export function startRelay(port = Number(process.env.PORT || 8020)) {
         try { line = JSON.parse(body); } catch { res.writeHead(400); res.end('a line is JSON'); return; }
         const id = (room.lines.length ? room.lines[room.lines.length - 1].id : 0) + 1;
         const participant = line && typeof line.participant === 'string' ? line.participant : '';
-        const kind = line && line.hello ? 'hello' : line && line.full ? 'full' : 'append';
-        room.lines.push({ id, data: body, participant, kind });
-        if (room.lines.length > MAX_LINES) {
-          const n = room.lines.length - MAX_LINES;
+        room.lines.push({ id, data: body, participant, kind: kindOf(line) });
+        if (room.lines.length > maxLines) {
+          const n = room.lines.length - maxLines;
           room.lines.splice(0, n);
           room.dropped += n;
         }
@@ -120,6 +157,6 @@ export function startRelay(port = Number(process.env.PORT || 8020)) {
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const port = Number(process.env.PORT || 8020);
   startRelay(port)
-    .then(() => console.log(`relay on :${port} — rooms/<room>/events (GET is a stream, POST is a line)`))
+    .then(() => console.log(`relay on :${port} — rooms/<room>/events (GET is a stream, POST is a line) · ${maxLinesFrom()} lines per room`))
     .catch((err) => { console.error(`relay: could not listen on :${port} — ${err.message}`); process.exit(1); });
 }

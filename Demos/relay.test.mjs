@@ -9,13 +9,13 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { replay, truncationNotice, startRelay } from './relay.mjs';
+import { replay, truncationNotice, startRelay, kindOf, maxLinesFrom, DEFAULT_MAX_LINES } from './relay.mjs';
 
 const room = (...lines) => ({
   name: 'r',
   dropped: 0,
   clients: new Set(),
-  lines: lines.map((l, i) => ({ id: i + 1, data: JSON.stringify(l), participant: l.participant, kind: l.hello ? 'hello' : l.full ? 'full' : 'append' })),
+  lines: lines.map((l, i) => ({ id: i + 1, data: JSON.stringify(l), participant: l.participant, kind: kindOf(l) })),
 });
 const kinds = (ls) => ls.map((l) => l.participant + ':' + l.kind + l.id);
 
@@ -42,6 +42,23 @@ test('the last `full` of EACH hand stands, and the appends around it keep their 
 test('a `hello` IS replayed — it is how a hand that arrived first is answered at last', () => {
   const r = room({ participant: 'carol', hello: true }, { participant: 'alice' });
   assert.deepEqual(kinds(replay(r)), ['carol:hello1', 'alice:append2']);
+});
+
+test('a log handed on by another hand is replayed as it came, and never supersedes the writer\'s own', () => {
+  const r = room(
+    { participant: 'alice', full: true },                // 1 — alice's own, as it stands
+    { participant: 'alice', full: true, via: 'bob' },    // 2 — bob's copy of alice, in answer to a hello
+    { participant: 'alice' },                            // 3
+  );
+  assert.deepEqual(kinds(replay(r)), ['alice:full1', 'alice:relayed2', 'alice:append3']);
+});
+
+test('how much a room remembers: the option, else MM_RELAY_MAX_LINES, else the default', () => {
+  assert.equal(maxLinesFrom(10, {}), 10);
+  assert.equal(maxLinesFrom(undefined, { MM_RELAY_MAX_LINES: '25' }), 25);
+  assert.equal(maxLinesFrom(10, { MM_RELAY_MAX_LINES: '25' }), 10);
+  assert.equal(maxLinesFrom(undefined, {}), DEFAULT_MAX_LINES);
+  for (const bad of [0, -3, 2.5, 'lots', '']) assert.equal(maxLinesFrom(bad, {}), DEFAULT_MAX_LINES, String(bad));
 });
 
 test('a reconnect replays only what it has not seen', () => {
@@ -122,11 +139,65 @@ test('a relay capped at 10 lines, 20 posted: a newcomer is told the room is olde
     c.hello();
     const told = await until(() => c.notices().some((n) => /older than the relay remembers/.test(n)));
     assert.ok(told, 'the newcomer was never told: ' + JSON.stringify(c.notices()));
-    assert.ok(c.notices().some((n) => /10 earlier lines are gone/.test(n)), JSON.stringify(c.notices()));
+    // At least the ten lines past the cap; the newcomer's own hello can race
+    // its stream's connection and push one more out before it is counted.
+    const gone = Number((/— (\d+) earlier lines are gone/.exec(c.notices().join(' ')) || [])[1]);
+    assert.ok(gone >= 10, JSON.stringify(c.notices()));
     // Ada is still here and answers the hello with her whole log, so what the
     // relay forgot is not lost to the room.
     const whole = await until(async () => ((await c.readLogs())['ada~1'] || []).length === 20);
     assert.ok(whole, 'the newcomer holds ' + (((await c.readLogs())['ada~1'] || []).length) + ' of ada\'s 20');
+  } finally {
+    for (const s of stores) s.close();
+    server.close();
+  }
+});
+
+test('MM_RELAY_MAX_LINES caps a room over a real socket, and the notice counts what went', async () => {
+  const before = process.env.MM_RELAY_MAX_LINES;
+  process.env.MM_RELAY_MAX_LINES = '5';
+  const server = await startRelay(0);
+  if (before === undefined) delete process.env.MM_RELAY_MAX_LINES; else process.env.MM_RELAY_MAX_LINES = before;
+  const url = `http://127.0.0.1:${server.address().port}/rooms/r/events`;
+  try {
+    for (let i = 0; i < 8; i++) await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ participant: 'alice', events: [{ type: 'n' + i }], at: i + 1 }) });
+    const res = await fetch(url, { headers: { accept: 'text/event-stream' } });
+    const reader = res.body.getReader();
+    let text = '';
+    while (!text.includes('"n7"')) text += new TextDecoder().decode((await reader.read()).value);
+    await reader.cancel();
+    assert.ok(text.includes('"relay":"truncated"') && text.includes('"dropped":3') && text.includes('"kept":5'), text);
+    assert.ok(!text.includes('"n2"') && text.includes('"n3"'), 'the three oldest lines went, the five newest stayed');
+  } finally { server.close(); }
+});
+
+test('three hands over a real relay, one departed: the one that joins after holds its final log, the undo included', async () => {
+  const server = await startRelay(0);
+  const url = `http://127.0.0.1:${server.address().port}`;
+  const stores = [];
+  const mine = (s) => s.getEvents().filter((e) => !e.by);
+  try {
+    const ada = MM.createSession({ ...MM.DEFAULT_SESSION_CONFIG, logName: 'ada~1' });
+    const a = new MM.LiveStore(relayTransport(url, 'three'), 'ada~1', 'three');
+    stores.push(a);
+    for (let i = 0; i < 3; i++) { ada.addStroke(boxAt(i * 80), 1000 + i, undefined, 1); await a.publish(mine(ada)); }
+    const b = new MM.LiveStore(relayTransport(url, 'three'), 'bob~1', 'three');
+    stores.push(b);
+    b.hello();
+    assert.ok(await until(async () => ((await b.readLogs())['ada~1'] || []).length === 3), 'bob never caught up with ada\'s three');
+    ada.addStroke(boxAt(400), 2000, undefined, 1); await a.publish(mine(ada));
+    ada.addStroke(boxAt(480), 2100, undefined, 1); await a.publish(mine(ada));
+    ada.undo(); await a.publish(mine(ada));
+    const final = mine(ada);
+    assert.equal(final.length, 4);
+    assert.ok(await until(async () => JSON.stringify((await b.readLogs())['ada~1']) === JSON.stringify(final)), 'the undo never reached bob');
+    a.close();
+    const c = new MM.LiveStore(relayTransport(url, 'three'), 'cleo~1', 'three');
+    stores.push(c);
+    c.hello();
+    assert.ok(await until(async () => JSON.stringify((await c.readLogs())['ada~1']) === JSON.stringify(final)),
+      'cleo holds ' + JSON.stringify(((await c.readLogs())['ada~1'] || []).map((e) => e.seq)) + ', not ada\'s final ' + JSON.stringify(final.map((e) => e.seq)));
+    assert.deepEqual(c.collisions(), []);
   } finally {
     for (const s of stores) s.close();
     server.close();
