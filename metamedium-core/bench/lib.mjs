@@ -21,6 +21,7 @@ export const CORE_DIR = resolve(here, '..');
 export const REPO = resolve(CORE_DIR, '..');
 export const OUT_DIR = join(CORE_DIR, 'dist', 'bench');
 export const BUNDLE_PATH = join(REPO, 'Demos', 'metamedium-core.node.mjs');
+const NODE_BANNER = '/* metamedium-core node bundle — built from metamedium-core/src via: npm run build:node. Do not edit directly. */';
 
 /**
  * The engine, as a module namespace.
@@ -64,6 +65,10 @@ export async function loadCore(which = 'bundle', { patch = [], tag = '' } = {}) 
     bundle: true,
     format: 'esm',
     platform: 'node',
+    // The same banner as `npm run build:node`, so this file's lines are the
+    // committed bundle's lines and one source map reads a profile of either.
+    banner: { js: NODE_BANNER },
+    absWorkingDir: CORE_DIR,
     sourcemap: 'linked',
     sourcesContent: false,
     outfile,
