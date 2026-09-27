@@ -70,7 +70,13 @@ row('`session.read` of the whole board (the surface\'s readRungs)', (i) => {
   const b = builds[i] && builds[i].read;
   return b ? `${f1(b.ms)} (${b.ids} marks)` : '—';
 });
-row('**one more stroke: median / p95**', (i) => { const s = (boards[i] && boards[i].stroke) || (builds[i] && builds[i].stroke); return s ? `${pm(s)} (n ${s.n})` : '—'; });
+row('**one more stroke: median / p95**', (i) => {
+  const s = (boards[i] && boards[i].stroke) || (builds[i] && builds[i].stroke);
+  if (s) return `${pm(s)} (n ${s.n})`;
+  // A build stopped short: its last 250 strokes are each "one more stroke" on the board as it stood.
+  const c = builds[i] && builds[i].curve && builds[i].curve[builds[i].curve.length - 1];
+  return c ? `${f1(c.median)} / ${f1(c.p95)} (the build's last 250 strokes, to ${c.strokes.toLocaleString('en-GB')} marks)` : '—';
+});
 row('…the shape rung alone for those strokes', (i) => { const s = boards[i] && boards[i].stroke && boards[i].stroke.readingsAlone; return pm(s); });
 row('`getState()` (handed to subscribers on every event)', (i) => pm(boards[i] && boards[i].getState));
 const briefs = SIZES.map((n, i) => (boards[i] && boards[i].brief) || ((eng(`engine-board-${n}-source.only-brief.json`) || {}).brief) || null);

@@ -122,7 +122,7 @@ Printed from the result files by `node metamedium-core/bench/report.mjs` — a n
 | `relate` over the content plane (pairs → relations) | 6.09 ms (56,280 → 64,734) | 183 ms (947,376 → 939,380) | 1.20 s (5,656,566 → 5,375,998) † |
 | …the relation list it builds, held | 7.5 MB (336 marks) | 109.7 MB (1,377 marks) | 619.1 MB (3,364 marks) |
 | `session.read` of the whole board (the surface's readRungs) | 139 ms (344 marks) | 8.07 s (1403 marks) | 106.1 s (3423 marks) † |
-| **one more stroke: median / p95** | 17.5 ms / 26.9 ms (n 60) | 256 ms / 749 ms (n 40) | — |
+| **one more stroke: median / p95** | 17.5 ms / 26.9 ms (n 60) | 256 ms / 749 ms (n 40) | 2.62 s / 4.04 s (the build's last 250 strokes, to 4,250 marks) |
 | …the shape rung alone for those strokes | 0.07 ms / 0.26 ms | 0.03 ms / 0.10 ms | — |
 | `getState()` (handed to subscribers on every event) | 0.02 ms / 0.03 ms | 0.10 ms / 0.21 ms | — |
 | a model's brief (`describeSession`): five marks · the whole board | 16 KB · 1.7 MB | 113 KB · 23.6 MB | — |
