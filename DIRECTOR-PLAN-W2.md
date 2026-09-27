@@ -110,6 +110,30 @@ as sliders** and **to scale and print** until R1.
 
 ### L1 — ids that hold
 
+**Status, 26 Sep 2026: done on `w2`** — `3f1f4f2` (the regressions, red),
+`65f5870` (core), `b4c4be7` (relay), `6191f87` (canvas and its MCP hand),
+`87f80c0` (shard and its MCP hand), `a1f0fa9` (a send that never settles),
+and the docs commit after them. The recommended design, because the
+regressions asked for exactly it: a live hand's log is one sitting
+(`sittingName`, `session/hands.ts` — a new suffix per page load or process,
+nothing kept where a reload finds it, the shown name and colour from
+`handLabel`), the session's high-water mark only rises, `LiveStore.publish`
+sends a `full` when the log did not only grow, every line carries its
+sitting, a hello is answered with every log held (`via`), and
+`notices()` is said by all three hands. Numbers: core 673 in 57 files (661);
+`relay.test.mjs` 13 (8) and the field's 18; shard 573 in 30 files (568); both
+MCP smokes pass with a doubled name and a truncated room; the gate 347 passed
+and the one honest skip (canvas 207, shard 120 + 11 + 9); WebKit smoke 3.
+Left, and why: the shard's log is still unnamed (U1d, L2 — its name is
+already per sitting, so naming it inherits all of this); two tabs on one
+folder under one device name still share a file (a folder's concurrency, not
+a room's); and one event carried in two logs — a tab that joins again under
+a different person's name in one page load, or two hands that opened the same
+folder and joined one room — is applied twice (one node, its id listed twice
+on the board, attributed to whichever log merged last), because the merge does
+not collapse one event by its authorship. Pre-existing; none of it reissues a
+number.
+
 **Owns:** `metamedium-core/src/session/session.ts` (the sequence),
 `store/live.ts`, `Demos/surface/17-folder.js` (flush, join), `Demos/relay.mjs`,
 `shard-3d/src/room.ts` (the same flush), `Demos/mcp.mjs`, `shard-3d/mcp.mjs`.

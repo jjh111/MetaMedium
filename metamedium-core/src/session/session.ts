@@ -655,7 +655,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
   // what a log replays to: it only decides the next number this sitting
   // writes. A new sitting — a reload, a new process — has no memory of it,
   // which is why a live hand takes a new log name every sitting
-  // (`sittingName` in store/live.ts) and a folder's history is loaded before
+  // (`sittingName` in session/hands.ts) and a folder's history is loaded before
   // its first mark.
   let myLog = config.logName;
   let logNameSaid = config.logName !== undefined;

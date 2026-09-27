@@ -77,7 +77,7 @@ circle them, cross with a command mark *you taught the system*, prompt them into
 a living page that renders in the canvas with your ink still outlining its
 divs — then draw on that page and the ink addresses the regions underneath it.
 Scratch anything out to erase. `Demos/session-engine.html` is the surface;
-`Demos/session-engine.e2e.js` drives 203 records through the real UI (202 checks and one honest skip, 25d; headless with the shard's two scenarios via `node e2e/run.mjs` from `e2e/`, which CI runs): page, flowchart, handwriting (read only when asked; a line read as one), the model drawing, the user-side loop, selection and the field, corrections, the worker, the tank, words into verbs and acting out, frames and the drawn slider, the folder, pictures, text, the moment, a live room, a playing frame that takes the pointer, hold by long-press, the graph in 3D, and the foundations (letters at any size, a mark that crosses, readings that stay, the minimap), and the explanation plane's layout. A run takes about 100 s; run it **in its own tab on its own origin** (`http://127.0.0.1:8010/…?fresh=1&nosw=1` — `__setup` refuses any other URL: it replaces `fetch` with a stub, joins a stub model named `e2e-stub`, and wipes the origin's saved board), start it with `__setup(); __scenario().then(r => window.__R = r)` and read `__R` when it lands.
+`Demos/session-engine.e2e.js` drives 208 records through the real UI (207 checks and one honest skip, 25d; headless with the shard's two scenarios via `node e2e/run.mjs` from `e2e/`, which CI runs): page, flowchart, handwriting (read only when asked; a line read as one), the model drawing, the user-side loop, selection and the field, corrections, the worker, the tank, words into verbs and acting out, frames and the drawn slider, the folder, pictures, text, the moment, a live room (and ids that hold in it: an undo sent, one sitting per page load, a doubled name and a truncated room said), a playing frame that takes the pointer, hold by long-press, the graph in 3D, and the foundations (letters at any size, a mark that crosses, readings that stay, the minimap), and the explanation plane's layout. A run takes about 100 s; run it **in its own tab on its own origin** (`http://127.0.0.1:8010/…?fresh=1&nosw=1` — `__setup` refuses any other URL: it replaces `fetch` with a stub, joins a stub model named `e2e-stub`, and wipes the origin's saved board), start it with `__setup(); __scenario().then(r => window.__R = r)` and read `__R` when it lands.
 v7 Stage E (handwriting) shipped 1 Sep 2026: a word written beside a shape is read by a
 model that can see and offered as that shape's name. Whitepaper v5.1 stays parked until the
 conversation benchmark passes end to end.
@@ -1132,37 +1132,86 @@ worker take a timer's tick when no frame comes (`nextFrame` in
 ### Live logs: multiplayer as a transport (v9 S6)
 
 > `metamedium-core/src/store/live.ts` (`LiveStore`, `LocalHub`),
-> `store/merge.ts` (`mergeLogs(logs, { me })`), `Demos/surface/17-folder.js`
-> (`openLive`), `Demos/relay.mjs`.
+> `session/hands.ts` (`sittingName`, `handLabel`), `store/merge.ts`
+> (`mergeLogs(logs, { me })`), `Demos/surface/17-folder.js` (`openLive`),
+> `Demos/relay.mjs`, `shard-3d/src/room.ts`.
 
 Nothing in the engine changes: a second person on the canvas is a second
 log arriving live instead of after a pull. `LiveStore` is a `Store` with
 `watch: true` whose transport carries lines — a participant's appended
 events — between hands: a `BroadcastChannel` between tabs on one machine
 (`?live=<room>`, or the *live* tile), or a relay between machines
-(`?live=<room>&relay=http://host:8020`; `node Demos/relay.mjs` is sixty
-lines of Server-Sent Events in and POST out, with no truth of its own). A
-newcomer says hello and every peer answers with its whole log, so history
-is caught up the way a pull would. **Whose hand:** `mergeLogs(logs, { me })`
-stamps every event from another log with `by: <log name>`, and the session
-attributes such an event to a participant of that name — made on first
-sight, id `participant:hand:<name>`, no join event anyone had to write — so
-another hand's ink draws in its own colour (a hue from the name) and is
-never yours. The merge runs as each line lands (on a microtask — a hidden tab throttles
-timers), my unsent events kept; autosave sends the delta. Presence is who
-was heard in the last minute, in the status line. **A hand in a room is one
-tab**: the name is the person's (a preference) and a suffix is the tab's
-(`john~a1b2`, shown as *john*), because a second tab of the same person is
-a second log — under one name its lines would be taken for its own and
-dropped. **"Local" in another hand's log means that hand**: an event stamped `by`
+(`?live=<room>&relay=http://host:8020`; `node Demos/relay.mjs` is a page
+of Server-Sent Events in and POST out, with no truth of its own). A
+newcomer says hello and every peer answers with **every log it holds** —
+its own, and each other hand's it has heard, marked `via` itself — so
+history is caught up the way a pull would, even for a hand that has left
+the room; presence is the sender's, never the absent writer's. **Whose
+hand:** `mergeLogs(logs, { me })` stamps every event from another log with
+`by: <log name>`, and the session attributes such an event to a
+participant of that name — made on first sight, id
+`participant:hand:<name>`, no join event anyone had to write — so another
+hand's ink draws in its own colour (a hue from the name) and is never
+yours. The merge runs as each line lands (on a microtask — a hidden tab
+throttles timers), my unsent events kept. Presence is who was heard in the
+last minute, in the status line.
+
+**A log name is reused only when its whole history was loaded first**
+(`session/hands.ts`; DIRECTOR-PLAN-W2 L1). Every id an event mints comes
+from its log's name and its number there, so this rule is what keeps a
+number from being issued twice. A folder's history is its file, loaded
+before anything is minted, so a folder board keeps one name (the device's,
+`mm-participant`); a board in browser storage restores its whole log
+first. A live hand has no history to load — a tab keeps no log of its own
+in a room and never hears its own lines back — so **a live hand's log is
+one sitting**: a tab's page load, an MCP process. `sittingName(person,
+suffix)` mints `john~a1b2` once per sitting, and nothing keeps the suffix
+where a reload would find it; the name shown, and the colour, come from
+`handLabel` — the name without its suffix — so a reload is a new log and
+the same hand (*john*, in john's hue). Within a sitting the session's
+high-water mark (`session.ts`) only rises: an undo, a merge that no longer
+carries a dropped event, and `load([])` never lower it. A tab opened on
+`?live=` does not restore the device's board into the room, since every
+reload would carry it in again under a new name; the *live* tile brings
+the board you are on.
+
+**A hand sends its log as it stands** (`LiveStore.publish`): the new tail
+as an append when the log only grew, the whole of it as a `full` when it
+did not — an undo, a reset — so **an undo reaches every peer**. A store's
+first send is whole, so joining the same room again within a sitting
+replaces what the room holds of you instead of doubling it. An event
+already held by its authorship is held once, and lines leave in the order
+they were written (an asynchronous transport's POST is waited for before
+the next).
+
+**Two hands under one name are said — to the room and to both of them.**
+Every line carries its store's sitting id (`sid`, never shown); a second
+sitting under a name already heard is a collision: what was heard first is
+kept and the other's lines are refused. A store checks its OWN name before
+discarding any line, so the two hands that share it are told too (a hello
+from a hand under my name is still answered, which is how that hand
+learns). A line from before sittings is judged by the old rule: a `full`
+that diverges from what is held. **A room older than the relay remembers
+says so:** the relay keeps `maxLines` lines a room (`startRelay(port, {
+maxLines })`, else `MM_RELAY_MAX_LINES`, else 5000) and tells a client
+that connects after it forgot some, and the store makes that a sentence.
+Both land in `LiveStore.notices()`, which all three hands say: the
+canvas's status line (`folderStatus`), the MCP hand's `canvas_look`, and
+the shard's status line (`Room.notices`) and `space_look`.
+
+**"Local" in another hand's log means that hand**: an event stamped `by`
 whose `participantId` is the local participant, or none, is attributed to
-the hand — its answers, proposals and code arrive in its name, never in the
-reader's. **My log is the session's own unstamped events**, sent or not,
-never the room's copy of it: a line landing between a send and the next
-merge would otherwise count every sent mark twice (found by the MCP smoke
-test; e2e 28c2). Known gap: a model's proposals in another hand's log
-reference that hand's participant ids (`participant:N`), which the merge
-does not translate yet.
+the hand — its answers, proposals and code arrive in its name, never in
+the reader's. **My log is the session's own unstamped events**, sent or
+not, never the room's copy of it: a line landing between a send and the
+next merge would otherwise count every sent mark twice (found by the MCP
+smoke test; e2e 28c2). **A model joined in another hand's log is that
+log's participant**: when the hand says its log's name, the model's `join`
+mints `participant:<log>:<n>` from that log, so its proposals name the
+same participant in every reader however the logs were merged
+(`ids.test.ts`). A log written with no name — one from before ids per
+hand, and the shard's until it names its log (L2) — keeps counter ids
+(`participant:N`), which a merge can renumber; nothing translates them.
 
 ### The MCP hand: Claude Code on the board (v10 T2)
 
@@ -1186,7 +1235,10 @@ play it**; it holds no keys. MCP over stdio is newline-delimited JSON-RPC
 written by hand, so the repo takes no dependency; it imports the committed
 Node bundle `Demos/metamedium-core.node.mjs`. In the canvas: the *live*
 tile → *with Claude*, or `?live=claude&relay=http://127.0.0.1:8020`. Its
-ink arrives as its own log, stamped `by` on arrival, in its own colour.
+ink arrives as its own log, stamped `by` on arrival, in its own colour. It
+is one sitting, named per process (`sittingName`), and `canvas_look` leads
+with what the room says about itself — a name two hands share, a history
+older than the relay remembers (`LiveStore.notices`).
 **In a session without the tools loaded** (the `.mcp.json` was added after
 the session began), the hand still works from the shell: run `mcp.mjs` with
 its stdin fed by `tail -f` on a command file and its stdout to an output
