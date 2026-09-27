@@ -2496,5 +2496,179 @@ window.__scenario = async function(){
     mm.session.load([]); mm.setView(1, 0, 0);
   }
 
+  // ---- 45. Gestures are per hand (V1-PLAN L2h) ----
+  // The gesture state — a loop that waits, a summon, the selection — was one for
+  // the whole board, while a room's logs interleave by time. So a stroke fern
+  // drew while this hand's field stood open dissolved the field at the next
+  // merge, and the name given in it made nothing, on any board; her loop and her
+  // check opened this hand's field on her marks; and her stroke between this
+  // hand's loop and its check left the loop untaken, so the check read backwards
+  // and held the loop's own ink. Two tabs in one room: this one, driven through
+  // its own surface, and fern's, a hand with its own board on the same hub.
+  {
+    // This hand takes its loops up with the built-in check here; a mark held on
+    // the device (record 12 leaves one) is record 46's business.
+    if (mm.savedMark()) mm.forgetMark();
+    mm.session.load([]); mm.setView(1, 0, 0);
+    const S = (x, y) => mm.worldToScreen(x, y);
+    const hub45 = new MM.LocalHub();
+    const fernStore45 = new MM.LiveStore(hub45.connect(), 'fern~f1', 'pair45');
+    const fern45 = MM.createSession(Object.assign({}, MM.DEFAULT_SESSION_CONFIG, { logName: 'fern~f1' }));
+    await mm.openLive('pair45', { transport: hub45.connect() });
+    const me45 = mm.folder().me;
+    const myHand45 = 'participant:hand:' + me45.replace(/[^A-Za-z0-9._-]+/g, '_');
+    // fern acts on her own board and sends what she wrote; this board merges it as it lands.
+    const fernActs45 = async (fn) => { const n = fern45.getEvents().length; const out = fn(); await fernStore45.appendLog('fern~f1', fern45.getEvents().slice(n)); return out; };
+    const until45 = async (pred) => { for (let i = 0; i < 40 && !pred(); i++) await wait(50); };
+    const fieldShown45 = () => { const el = document.getElementById('summon'); return !!el && el.style.display !== 'none'; };
+    // This hand draws two boxes, circles them and takes the loop up: the field opens on the two.
+    const p0 = S(200, 200), p1 = S(340, 290), q0 = S(400, 200), q1 = S(540, 290), c45 = S(370, 245);
+    t.stroke(t.rect(p0.x, p0.y, p1.x - p0.x, p1.y - p0.y));
+    t.stroke(t.rect(q0.x, q0.y, q1.x - q0.x, q1.y - q0.y));
+    const boxes45 = mm.session.getState().contentIds.slice();
+    t.stroke(t.circle(c45.x, c45.y, 240)); t.takeLoop(c45.x, c45.y, 240); await wait(60);
+    const sum45 = mm.session.getState().summon;
+    // fern draws a box well away while the field stands open, and her line lands here.
+    await wait(30);
+    const fernBox45 = await fernActs45(() => fern45.addStroke(t.rect(1100, 700, 120, 80), Date.now(), undefined, 1));
+    await until45(() => mm.session.getState().contentIds.includes(fernBox45));
+    await wait(60);
+    const st45 = mm.session.getState();
+    step('45. fern draws while this hand\'s field stands open on its two boxes: her box lands on this board, and the field stays open on the same two',
+      !!sum45 && JSON.stringify([...sum45.enclosedIds].sort()) === JSON.stringify([...boxes45].sort()) && st45.contentIds.includes(fernBox45)
+        && !!st45.summon && st45.summon.id === sum45.id && JSON.stringify([...st45.summon.enclosedIds].sort()) === JSON.stringify([...boxes45].sort()) && fieldShown45(),
+      { summon: sum45 && sum45.id, boxes: boxes45, now: st45.summon && { id: st45.summon.id, enclosed: st45.summon.enclosedIds }, fern: fernBox45, content: st45.contentIds, shown: fieldShown45() });
+    // This hand names what it circled, in the field.
+    await wait(30);
+    t.typeEnter('name: pair'); await wait(80);
+    const st45a = mm.session.getState();
+    const pair45 = st45a.artifacts.find((id) => MM.wordOf(st45a.nodes.get(id)) === 'pair');
+    const partsOf45 = (s, id) => { const n = id && s.nodes.get(id); return n ? n.edges.filter((e) => e.rel === 'has-part').map((e) => e.to).sort() : []; };
+    step('45a. the name given in the field makes the thing on this board, holding this hand\'s two boxes; fern\'s box stays loose, and hers',
+      !!pair45 && JSON.stringify(partsOf45(st45a, pair45)) === JSON.stringify([...boxes45].sort()) && MM.authorOf(st45a.nodes.get(pair45)) === MM.LOCAL_PARTICIPANT
+        && st45a.contentIds.includes(fernBox45) && MM.authorOf(st45a.nodes.get(fernBox45)) === 'participant:hand:fern_f1' && !st45a.summon && !fieldShown45(),
+      { artifact: pair45 || null, artifacts: st45a.artifacts, parts: partsOf45(st45a, pair45), content: st45a.contentIds, summon: st45a.summon && st45a.summon.id });
+    // What this hand wrote reaches fern; her board is her log and the room's, merged.
+    await mm.saveNow(); await wait(120);
+    const fernBoard45 = () => {
+      const s = MM.createSession(Object.assign({}, MM.DEFAULT_SESSION_CONFIG, { logName: 'fern~f1' }));
+      return fernStore45.readLogs().then((logs) => { s.load(MM.mergeLogs(Object.assign({}, logs, { 'fern~f1': fern45.getEvents().filter((e) => !e.by) }), { me: 'fern~f1' })); return s.getState(); });
+    };
+    const fb45 = await fernBoard45();
+    step('45b. on fern\'s board the thing stands too — this hand\'s, holding this hand\'s two boxes — and no field of hers was ever opened by it',
+      !!pair45 && fb45.artifacts.includes(pair45) && JSON.stringify(partsOf45(fb45, pair45)) === JSON.stringify([...boxes45].sort())
+        && MM.authorOf(fb45.nodes.get(pair45)) === myHand45 && fb45.summon === null && fb45.selection.length === 0,
+      { artifacts: fb45.artifacts, parts: partsOf45(fb45, pair45), maker: pair45 && fb45.nodes.get(pair45) ? MM.authorOf(fb45.nodes.get(pair45)) : null, summon: fb45.summon && fb45.summon.id });
+    // A third reader who was never in the room, the logs handed over in both orders.
+    const logs45 = await fernStore45.readLogs();
+    const mine45 = logs45[me45] || [], hers45 = fern45.getEvents().filter((e) => !e.by);
+    const third45 = [[me45, mine45, 'fern~f1', hers45], ['fern~f1', hers45, me45, mine45]].map(([k1, v1, k2, v2]) => {
+      const s = MM.createSession(Object.assign({}, MM.DEFAULT_SESSION_CONFIG, { logName: 'cleo~c1' }));
+      s.load(MM.mergeLogs({ [k1]: v1, [k2]: v2 }, { me: 'cleo~c1' }));
+      return s.getState();
+    });
+    step('45c. and on a third reader\'s replay, the two logs handed over in either order, the thing stands holding this hand\'s two boxes',
+      !!pair45 && third45.every((s) => s.artifacts.includes(pair45) && JSON.stringify(partsOf45(s, pair45)) === JSON.stringify([...boxes45].sort()) && MM.authorOf(s.nodes.get(pair45)) === myHand45 && s.contentIds.includes(fernBox45)),
+      { mine: mine45.length, hers: hers45.length, third: third45.map((s) => ({ artifacts: s.artifacts, parts: partsOf45(s, pair45) })) });
+    // fern circles her box and takes her loop up on her own board: her field is hers.
+    await wait(30);
+    await fernActs45(() => fern45.addStroke(t.circle(1160, 740, 110), Date.now(), undefined, 1));
+    await wait(30);
+    await fernActs45(() => fern45.addStroke(t.check(1235, 730, 1), Date.now(), undefined, 1));
+    const fernSummon45 = fern45.getState().summon;
+    await until45(() => mm.session.getEvents().filter((e) => e.by === 'fern~f1').length >= 3);
+    await wait(60);
+    const st45d = mm.session.getState();
+    step('45d. fern takes her own loop up and her field opens on her box, on her board — never this hand\'s: nothing opens here, and nothing here is selected or waiting',
+      !!fernSummon45 && fernSummon45.enclosedIds.length === 1 && fernSummon45.enclosedIds[0] === fernBox45
+        && st45d.summon === null && st45d.selection.length === 0 && st45d.pendingLassoId === null && !fieldShown45(),
+      { hers: fernSummon45 && fernSummon45.enclosedIds, here: st45d.summon && st45d.summon.enclosedIds, selection: st45d.selection, pending: st45d.pendingLassoId, shown: fieldShown45() });
+    // This hand circles a new box; fern draws between its loop and its check; the check takes the loop up.
+    const r0 = S(200, 450), r1 = S(340, 540), c45e = S(270, 495);
+    t.stroke(t.rect(r0.x, r0.y, r1.x - r0.x, r1.y - r0.y));
+    const box45e = mm.session.getState().contentIds[mm.session.getState().contentIds.length - 1];
+    t.stroke(t.circle(c45e.x, c45e.y, 150));
+    const loop45e = mm.session.getState().pendingLassoId;
+    await wait(30);
+    const fernLine45 = await fernActs45(() => fern45.addStroke(t.line({ x: 1100, y: 950 }, { x: 1300, y: 950 }, 30), Date.now(), undefined, 1));
+    await until45(() => mm.session.getState().contentIds.includes(fernLine45));
+    await wait(40);
+    const waiting45e = mm.session.getState().pendingLassoId;
+    t.takeLoop(c45e.x, c45e.y, 150); await wait(60);
+    const st45e = mm.session.getState();
+    step('45e. a stroke of fern\'s lands between this hand\'s loop and its check: the loop still waits for this hand, the check takes it up, and the field holds what the loop held — not the loop\'s own ink',
+      !!loop45e && waiting45e === loop45e && !!st45e.summon && st45e.summon.scopeSource === 'lasso'
+        && JSON.stringify(st45e.summon.enclosedIds) === JSON.stringify([box45e]) && !st45e.summon.enclosedIds.includes(loop45e) && fieldShown45(),
+      { loop: loop45e, waiting: waiting45e, summon: st45e.summon && { source: st45e.summon.scopeSource, enclosed: st45e.summon.enclosedIds }, box: box45e });
+    if (st45e.summon) mm.session.dismiss(st45e.summon.id, Date.now());
+    fernStore45.close();
+    if (mm.folder().store && mm.folder().store.close) mm.folder().store.close();
+    mm.session.load([]); mm.setView(1, 0, 0);
+  }
+
+  // ---- 46. A hand's own mark in a room (V1-PLAN L2h) ----
+  // The mark that takes a loop up is the hand's that taught it. The mark held on
+  // this device is re-taught as a room opens — but only when no log taught one,
+  // so a room where fern's log teaches her own mark taught this hand nothing and
+  // judged it by hers; and when it was re-taught, the room's first merge counted
+  // that teach as the room's and dropped it from this hand's log.
+  {
+    mm.session.load([]); mm.setView(1, 0, 0);
+    const S = (x, y) => mm.worldToScreen(x, y);
+    const until46 = async (pred) => { for (let i = 0; i < 40 && !pred(); i++) await wait(50); };
+    const fieldShown46 = () => { const el = document.getElementById('summon'); return !!el && el.style.display !== 'none'; };
+    // This device holds the caret, taught on the pad.
+    window.__teach();
+    mm.session.load([]);
+    const held46 = mm.savedMark();
+    // fern taught a check of her own on her board, and drew a box.
+    const fern46 = MM.createSession(Object.assign({}, MM.DEFAULT_SESSION_CONFIG, { logName: 'fern~f2' }));
+    fern46.teachCommandMark(MM.learnCommandMark(MM.canonicalCheckSamples(), 'fern\'s check'), Date.now() - 3000);
+    const fernBox46 = fern46.addStroke(t.rect(1100, 450, 120, 80), Date.now() - 2000, undefined, 1);
+    const hub46 = new MM.LocalHub();
+    const fernStore46 = new MM.LiveStore(hub46.connect(), 'fern~f2', 'mark46');
+    await fernStore46.appendLog('fern~f2', fern46.getEvents().slice());
+    // The room replays what it holds as a hand connects, the way a relay replays its buffer.
+    const conn46 = hub46.connect();
+    const transport46 = {
+      send: (line) => conn46.send(line),
+      onMessage: (cb) => { const off = conn46.onMessage(cb); cb({ participant: 'fern~f2', events: fern46.getEvents().slice(), at: Date.now(), full: true, sid: fernStore46.sitting }); return off; },
+    };
+    await mm.openLive('mark46', { transport: transport46 });
+    // Wait for the room's answer to this hand's hello — the first merge after opening.
+    await wait(150);
+    const st46 = mm.session.getState();
+    step('46. the mark this device holds is this hand\'s in a room whose other hand taught her own: re-taught as the room opened, and still its mark once the room\'s logs have merged',
+      !!held46 && st46.contentIds.includes(fernBox46) && !!st46.commandMark && st46.commandMark.name === held46.mark.name && document.getElementById('markName').textContent === held46.mark.name,
+      { held: held46 && held46.mark.name, mark: st46.commandMark && st46.commandMark.name, chip: document.getElementById('markName').textContent, teaches: mm.session.getEvents().filter((e) => e.type === 'teach').map((e) => ({ by: e.by || 'me', mark: e.mark && e.mark.name })) });
+    // This hand circles a box and takes the loop up with its caret; fern takes hers up with her check.
+    const b0 = S(300, 450), b1 = S(440, 540), c46 = S(370, 495);
+    t.stroke(t.rect(b0.x, b0.y, b1.x - b0.x, b1.y - b0.y));
+    const box46 = mm.session.getState().contentIds[mm.session.getState().contentIds.length - 1];
+    t.stroke(t.circle(c46.x, c46.y, 150));
+    const loop46 = mm.session.getState().pendingLassoId;
+    t.stroke(t.caret(c46.x + 150 - 30, c46.y - 20)); await wait(60);
+    const sum46 = mm.session.getState().summon;
+    await wait(30);
+    const n46 = fern46.getEvents().length;
+    const fernLoop46 = fern46.addStroke(t.circle(1160, 490, 110), Date.now(), undefined, 1);
+    const fernCheck46 = fern46.addStroke(t.check(1235, 480, 1), Date.now() + 1, undefined, 1);
+    await fernStore46.appendLog('fern~f2', fern46.getEvents().slice(n46));
+    await until46(() => mm.session.getState().contentIds.includes(fernBox46) && mm.session.getEvents().some((e) => e.by === 'fern~f2' && e.seq === fern46.getEvents()[fern46.getEvents().length - 1].seq));
+    await wait(60);
+    const st46a = mm.session.getState();
+    const role46 = (id) => { const n = st46a.nodes.get(id); const g = n && n.reps.find((r) => r.modality === 'gesture'); return g ? g.data.role : null; };
+    step('46a. its caret takes its loop up and the field opens on its box — and stays open when fern takes her loop up with her own check, which is read as hers, on this board',
+      !!loop46 && !!sum46 && sum46.scopeSource === 'lasso' && JSON.stringify(sum46.enclosedIds) === JSON.stringify([box46])
+        && !!st46a.summon && st46a.summon.id === sum46.id && fieldShown46() && !!st46a.commandMark && st46a.commandMark.name === held46.mark.name
+        && role46(fernLoop46) === 'lasso' && role46(fernCheck46) === 'command' && !st46a.contentIds.includes(fernLoop46),
+      { loop: loop46, summon: sum46 && { source: sum46.scopeSource, enclosed: sum46.enclosedIds }, now: st46a.summon && st46a.summon.id, mark: st46a.commandMark && st46a.commandMark.name, hers: { loop: role46(fernLoop46), check: role46(fernCheck46) }, miss: st46a.markMiss });
+    if (st46a.summon) mm.session.dismiss(st46a.summon.id, Date.now());
+    fernStore46.close();
+    if (mm.folder().store && mm.folder().store.close) mm.folder().store.close();
+    mm.forgetMark();
+    mm.session.load([]); mm.setView(1, 0, 0);
+  }
+
   return R;
 };
