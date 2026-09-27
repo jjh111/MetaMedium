@@ -5,7 +5,7 @@
 // brief parked in the room comes back answered through the same channel.
 
 import { describe, it, expect } from 'vitest';
-import { createSession, LocalHub, LOCAL_PARTICIPANT, topInterpretation } from 'metamedium-core';
+import { boundsOf, createSession, LocalHub, LOCAL_PARTICIPANT, topInterpretation } from 'metamedium-core';
 import { joinRoom, otherHand, refusalOf, splitPrompt, ANSWER_PREFIX, BRIEF_PREFIX } from './room';
 
 /** Let the hub's microtask deliveries and the merges that follow them settle. */
@@ -85,6 +85,78 @@ describe('two hands in one room', () => {
     }
     a.close();
     b.close();
+  });
+});
+
+describe('ids that hold in the room (DIRECTOR-PLAN-W2 L1)', () => {
+  it('an undo reaches the other hand — the log shrank, so the whole of it is sent', async () => {
+    const hub = new LocalHub();
+    const mine = createSession();
+    const room = joinRoom({ session: mine, room: 'r', transport: hub.connect(), name: 'john' });
+    const hand = otherHand(hub.connect(), 'claude', 'r');
+    await settle();
+    mine.addStroke(box(0, 0, 100, 60), Date.now(), undefined, 1, { content: true });
+    await settle();
+    mine.addStroke(box(200, 0, 100, 60), Date.now() + 1, undefined, 1, { content: true });
+    await settle();
+    expect(hand.session.getState().contentIds.length).toBe(2);
+    mine.undo();
+    await settle();
+    // Counting what was sent could not say this: the log shrank, nothing was
+    // sent, and the other hand went on holding the mark.
+    expect(hand.session.getState().contentIds.length).toBe(1);
+    room.close();
+    hand.close();
+  });
+
+  it('an undo and a new mark before the next send: the other hand holds the new mark, not the undone one', async () => {
+    const hub = new LocalHub();
+    const mine = createSession();
+    const room = joinRoom({ session: mine, room: 'r', transport: hub.connect(), name: 'john' });
+    const hand = otherHand(hub.connect(), 'claude', 'r');
+    await settle();
+    mine.addStroke(box(0, 0, 100, 60), Date.now(), undefined, 1, { content: true });
+    mine.addStroke(box(200, 0, 100, 60), Date.now() + 1, undefined, 1, { content: true });
+    await settle();
+    mine.undo();
+    mine.addStroke(box(400, 200, 60, 60), Date.now() + 2, undefined, 1, { content: true });
+    await settle();
+    const theirs = hand.session.getState();
+    const lefts = theirs.contentIds.map((id) => Math.round(boundsOf(theirs.nodes.get(id)!)!.minX)).sort((a, b) => a - b);
+    expect(lefts).toEqual([0, 400]);
+    room.close();
+    hand.close();
+  });
+
+  it('a tab is one sitting: joining again in the page load keeps the name, and the person is the label', async () => {
+    const hub = new LocalHub();
+    const first = joinRoom({ session: createSession(), room: 'r', transport: hub.connect(), name: 'john' });
+    first.close();
+    const again = joinRoom({ session: createSession(), room: 'r', transport: hub.connect(), name: 'john' });
+    expect(again.me).toBe(first.me);
+    expect(again.label).toBe('john');
+    expect(again.me).toMatch(/^john~/);
+    again.close();
+  });
+
+  it('a second hand under this tab’s own name is a notice here, for the status line', async () => {
+    const hub = new LocalHub();
+    const room = joinRoom({ session: createSession(), room: 'r', transport: hub.connect(), name: 'john' });
+    await settle();
+    const twin = otherHand(hub.connect(), room.me, 'r');
+    await settle();
+    expect(room.notices().some((n) => n.startsWith(`two hands are both called "${room.me}"`))).toBe(true);
+    room.close();
+    twin.close();
+  });
+
+  it('a room older than the relay remembers is a notice here too', async () => {
+    let deliver: ((line: unknown) => void) | null = null;
+    const quiet = { send: () => undefined, onMessage: (cb: (line: unknown) => void) => { deliver = cb; return () => { deliver = null; }; } };
+    const room = joinRoom({ session: createSession(), room: 'r', transport: quiet as never, name: 'john' });
+    deliver!({ relay: 'truncated', room: 'r', dropped: 7, kept: 5000 });
+    expect(room.notices()).toEqual(['the room is older than the relay remembers — 7 earlier lines are gone']);
+    room.close();
   });
 });
 

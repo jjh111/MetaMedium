@@ -42,9 +42,12 @@
 
 import {
   createSession,
+  handLabel as labelOf,
   LiveStore,
   LOCAL_PARTICIPANT,
   mergeLogs,
+  sittingName,
+  sittingToken,
   wordOf,
   type LiveTransport,
   type Session,
@@ -97,7 +100,13 @@ export interface Room {
   room: string;
   /** Every hand heard from lately, this one excluded, as people not logs. */
   presence(): string[];
-  /** Send whatever this hand has done since the last send. Idempotent. */
+  /**
+   * What the room has said about itself, one sentence each: a name two hands
+   * share (this hand's own included — both hands that share it are told) and a
+   * history older than the relay remembers. The status line says them.
+   */
+  notices(): string[];
+  /** Send this hand's log as it stands: the new tail, or the whole of it when it shrank. Idempotent. */
   flush(): Promise<void>;
   /**
    * Park a question in the room and settle when its answer lands — the
@@ -133,9 +142,9 @@ export interface RoomOptions {
   onWaiting?: (waiting: ParkedBrief[]) => void;
 }
 
-/** A hand's name as a person sees it: without the tab's suffix. */
+/** A hand's name as a person sees it: without the sitting's suffix (core's one rule). */
 export function handLabel(name: string): string {
-  return String(name || '').replace(/~[^~]*$/, '');
+  return labelOf(name);
 }
 
 /**
@@ -157,13 +166,17 @@ export function relayTransport(url: string, room: string): LiveTransport {
   };
   es.addEventListener('message', handler);
   return {
-    send: (line) => {
-      void fetch(base, {
+    // The POST's promise goes back to the store, which sends the next line only
+    // when this one has gone: two POSTs in flight can land the wrong way round.
+    send: (line) =>
+      fetch(base, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(line),
-      }).catch(() => undefined);
-    },
+      }).then(
+        () => undefined,
+        () => undefined
+      ),
     onMessage: (cb) => {
       cbs.push(cb as (line: never) => void);
       return () => {
@@ -178,23 +191,19 @@ export function relayTransport(url: string, room: string): LiveTransport {
 }
 
 /**
- * A hand in a room is ONE TAB. The name is the person's and the suffix is the
- * tab's, because a second tab of the same person is a second log — under one
- * name its lines would be taken for its own and dropped (CLAUDE.md, "Live
- * logs").
+ * A hand in a room is ONE SITTING — this page load (DIRECTOR-PLAN-W2 L1). The
+ * name is the person's and the suffix is this page load's, because a second
+ * tab of the same person is a second log — under one name its lines would be
+ * taken for its own (CLAUDE.md, "Live logs"). The suffix is minted once, here,
+ * and kept nowhere a reload would find it: a tab never hears its own lines
+ * back, so a reload that took its old name again would number from one under
+ * a name the room already holds. Joining again in this page load is the same
+ * sitting, so the store is told the same sitting id.
  */
+const PAGE_SUFFIX = sittingToken();
+const PAGE_SITTING = sittingToken(8);
 function handName(name: string): string {
-  let tab = '';
-  try {
-    tab = sessionStorage.getItem('shard3d.tab') || '';
-    if (!tab) {
-      tab = Math.random().toString(36).slice(2, 6);
-      sessionStorage.setItem('shard3d.tab', tab);
-    }
-  } catch {
-    tab = Math.random().toString(36).slice(2, 6);
-  }
-  return `${String(name || 'hand').replace(/~.*$/, '')}~${tab}`;
+  return sittingName(name || 'hand', PAGE_SUFFIX);
 }
 
 /** The explanation reps on the board, newest last, with who said each one. */
@@ -279,14 +288,13 @@ export function joinRoom(o: RoomOptions): Room {
   const { session } = o;
   const me = handName(o.name ?? 'hand');
   const transport = o.transport ?? relayTransport(o.relay ?? '', o.room);
-  const store = new LiveStore(transport, me, o.room);
+  const store = new LiveStore(transport, me, o.room, { sitting: PAGE_SITTING });
 
   // My log is the session's own UNSTAMPED events — sent or not — never the
   // room's copy of it. A line landing between a send and the next merge would
   // otherwise count every sent mark twice, and every mark of mine would stand
   // doubled (the canvas found this with its MCP smoke test).
   const myLog = (): SessionEvent[] => session.getEvents().filter((e) => !e.by);
-  let sent = 0;
   let merging = false;
   let mergePending = false;
   let closed = false;
@@ -299,14 +307,12 @@ export function joinRoom(o: RoomOptions): Room {
 
   async function flush(): Promise<void> {
     if (closed || merging) return;
-    const mine = myLog();
-    // A `clear()` empties the log under us; resending from a count that no
-    // longer exists would send another hand's idea of my history.
-    if (mine.length < sent) sent = mine.length;
-    const delta = mine.slice(sent);
-    if (!delta.length) return;
-    sent = mine.length;
-    await store.appendLog(me, delta);
+    // My log as it stands (`publish`): the new tail when it only grew, the
+    // whole of it when it did not — an undo, a `clear()` — so every hand in the
+    // room holds what this one holds. Counting what was sent could not say an
+    // undo: the log came back to the same length and the next mark was never
+    // sent at all.
+    await store.publish(myLog());
   }
 
   async function merge(): Promise<void> {
@@ -378,6 +384,7 @@ export function joinRoom(o: RoomOptions): Room {
         .filter((p) => now - p.at < PRESENT_MS && p.participant !== me)
         .map((p) => handLabel(p.participant));
     },
+    notices: () => store.notices(),
     flush,
     waiting: () => [...waiting.values()].map((w) => w.parked),
     ask: (q) =>
@@ -477,7 +484,6 @@ export function otherHand(transport: LiveTransport, name: string, roomName: stri
   const me = name.includes('~') ? name : `${name}~1`;
   const session = createSession();
   const store = new LiveStore(transport, me, roomName);
-  let sent = 0;
   let merging = false;
 
   const myLog = (): SessionEvent[] => session.getEvents().filter((e) => !e.by);
@@ -492,12 +498,7 @@ export function otherHand(transport: LiveTransport, name: string, roomName: stri
   };
   const flush = async () => {
     if (merging) return;
-    const mine = myLog();
-    if (mine.length < sent) sent = mine.length;
-    const delta = mine.slice(sent);
-    if (!delta.length) return;
-    sent = mine.length;
-    await store.appendLog(me, delta);
+    await store.publish(myLog());
   };
   store.subscribe(() => void merge());
   session.subscribe(() => {

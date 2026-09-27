@@ -90,49 +90,55 @@ const boxPoints = (x, y, w, h) => {
 };
 const FOUNDATION = { origin: { x: 0, y: 0, z: 0 }, normal: { x: 0, y: 1, z: 0 }, up: { x: 0, y: 0, z: 1 }, name: 'foundation', source: 'chosen', why: 'the foundation tile was held' };
 
-// The MCP hand.
-const child = spawn(process.execPath, [path.join(here, 'mcp.mjs')], {
-  env: { ...process.env, MM_ROOM: ROOM, MM_RELAY: RELAY, MM_NAME: 'smoke' },
-  stdio: ['pipe', 'pipe', 'pipe'],
-});
-child.stderr.on('data', (d) => process.stderr.write('  [mcp] ' + d));
-let out = '';
-const pendingRpc = new Map();
-child.stdout.on('data', (d) => {
-  out += d;
-  let i;
-  while ((i = out.indexOf('\n')) >= 0) {
-    const line = out.slice(0, i).trim();
-    out = out.slice(i + 1);
-    if (!line) continue;
-    try {
-      const m = JSON.parse(line);
-      if (pendingRpc.has(m.id)) {
-        pendingRpc.get(m.id)(m);
-        pendingRpc.delete(m.id);
-      }
-    } catch {
-      /* not ours */
-    }
-  }
-});
-let nextId = 1;
-const rpc = (method, params) =>
-  new Promise((resolve, reject) => {
-    const id = nextId++;
-    pendingRpc.set(id, resolve);
-    child.stdin.write(JSON.stringify({ jsonrpc: '2.0', id, method, params }) + '\n');
-    setTimeout(() => {
-      if (pendingRpc.has(id)) {
-        pendingRpc.delete(id);
-        reject(new Error(method + ' timed out'));
-      }
-    }, 8000);
+/** An MCP hand: the shard's mcp.mjs as a child process, spoken to over stdio. */
+function spawnHand(env, tag) {
+  const child = spawn(process.execPath, [path.join(here, 'mcp.mjs')], {
+    env: { ...process.env, ...env },
+    stdio: ['pipe', 'pipe', 'pipe'],
   });
-const call = async (name, args) => {
-  const m = await rpc('tools/call', { name, arguments: args || {} });
-  return m.result || m.error;
-};
+  child.stderr.on('data', (d) => process.stderr.write('  [' + tag + '] ' + d));
+  let out = '';
+  const pendingRpc = new Map();
+  child.stdout.on('data', (d) => {
+    out += d;
+    let i;
+    while ((i = out.indexOf('\n')) >= 0) {
+      const line = out.slice(0, i).trim();
+      out = out.slice(i + 1);
+      if (!line) continue;
+      try {
+        const m = JSON.parse(line);
+        if (pendingRpc.has(m.id)) {
+          pendingRpc.get(m.id)(m);
+          pendingRpc.delete(m.id);
+        }
+      } catch {
+        /* not ours */
+      }
+    }
+  });
+  let nextId = 1;
+  const rpc = (method, params) =>
+    new Promise((resolve, reject) => {
+      const id = nextId++;
+      pendingRpc.set(id, resolve);
+      child.stdin.write(JSON.stringify({ jsonrpc: '2.0', id, method, params }) + '\n');
+      setTimeout(() => {
+        if (pendingRpc.has(id)) {
+          pendingRpc.delete(id);
+          reject(new Error(method + ' timed out'));
+        }
+      }, 8000);
+    });
+  const call = async (name, args) => {
+    const m = await rpc('tools/call', { name, arguments: args || {} });
+    return m.result || m.error;
+  };
+  return { child, rpc, call };
+}
+
+// The MCP hand.
+const { child, rpc, call } = spawnHand({ MM_ROOM: ROOM, MM_RELAY: RELAY, MM_NAME: 'smoke' }, 'mcp');
 const textOf = (res) => (res.content || []).filter((c) => c.type === 'text').map((c) => c.text).join('\n');
 
 try {
@@ -270,6 +276,49 @@ try {
 
   const badKey = await call('space_answer', { key: 'nosuch', reply: {} });
   check('answering a brief nobody parked is said plainly', /no brief/.test(textOf(badKey)), textOf(badKey));
+
+  // ---- two hands under one name: BOTH are told (DIRECTOR-PLAN-W2 L1, D4) ----
+  const handLog = heard.filter((h) => /^smoke~/.test(h.participant))[0].participant;
+  const twin = new MM.LiveStore(relayTransport(RELAY, ROOM), handLog, ROOM);
+  twin.hello();
+  let clash = '';
+  for (let i = 0; i < 30 && !/two hands are both called/.test(clash); i++) {
+    clash = textOf(await call('space_look', {}));
+    if (!/two hands are both called/.test(clash)) await wait(100);
+  }
+  check('a second hand under the hand\'s own name: space_look says so, first', /\nroom says: two hands are both called "smoke~[^"]+" — this one/.test(clash), clash.split('\n').slice(0, 3));
+  await until(() => twin.collisions().length === 1, 3000);
+  check('and the second hand is told as well', twin.collisions().length === 1, twin.collisions());
+  twin.close();
+
+  // ---- a room older than the relay remembers (L1) ----------------------------
+  const small = await startRelay(0, { maxLines: 10 });
+  const SMALL = 'http://127.0.0.1:' + small.address().port;
+  const ada = new MM.LiveStore(relayTransport(SMALL, 'old'), 'ada~1', 'old');
+  const adaSession = MM.createSession();
+  for (let i = 0; i < 20; i++) {
+    const t = Date.now();
+    const id = adaSession.addStroke(boxPoints(i * 5, 0, 4, 2.6), t, undefined, 0.013);
+    adaSession.propose({ participantId: MM.LOCAL_PARTICIPANT, nodeId: id, edges: [], reps: [{ modality: 'plane', data: { ...FOUNDATION, scale: 0.013 }, confidence: 1, reasoning: FOUNDATION.why }], at: t });
+    await ada.publish(adaSession.getEvents().filter((e) => !e.by));
+  }
+  const late = spawnHand({ MM_ROOM: 'old', MM_RELAY: SMALL, MM_NAME: 'late' }, 'late');
+  try {
+    await late.rpc('initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'smoke', version: '0' } });
+    let old = '';
+    for (let i = 0; i < 30 && !(/older than the relay remembers/.test(old) && /20 marks/.test(old)); i++) {
+      old = textOf(await late.call('space_look', {}));
+      if (!/20 marks/.test(old)) await wait(100);
+    }
+    check('a hand joining a room the relay has outlived: space_look says the room is older than the relay remembers', /\nroom says: the room is older than the relay remembers — \d+ earlier lines are gone/.test(old), old.split('\n').slice(0, 3));
+    check('and it still holds all twenty of the hand that is still here', /20 marks/.test(old), old.split('\n').slice(0, 4));
+  } finally {
+    late.child.stdin.end();
+    await wait(100);
+    late.child.kill();
+    ada.close();
+    small.close();
+  }
 } catch (err) {
   check('the run finished', false, err.message);
 }

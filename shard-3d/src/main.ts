@@ -870,6 +870,21 @@ const LIVE = new URLSearchParams(location.search);
 /** How many sentences from other hands have already been said out loud here. */
 let saidSeen = 0;
 
+/** What the room has said about itself and has already been said out loud here. */
+const roomNoticed = new Set<string>();
+/**
+ * What the room says about itself, said once as it is heard — a name two
+ * hands share (this hand's own included: both are told), a room older than
+ * the relay remembers — and then it stands in the status line (`report`).
+ */
+function sayRoomNotices() {
+  for (const n of room ? room.notices() : []) {
+    if (roomNoticed.has(n)) continue;
+    roomNoticed.add(n);
+    panel.say(n);
+  }
+}
+
 /**
  * What another hand said, in the status line as it lands. The shard draws no
  * card for an explanation, so this is where `space_say` shows: one sentence,
@@ -900,6 +915,7 @@ async function enterRoom(name?: string): Promise<Room | null> {
         ink.sync();
         solids.sync();
         sayWhatLanded();
+        sayRoomNotices();
         report();
       },
       onWaiting: () => report(),
@@ -2259,8 +2275,11 @@ function report() {
   // The standing line is the next move, keyed to what the board is.
   const plane = planeForPenDown(pen());
   const afford = log.makeable();
+  // What the room says about itself — a name two hands share, a history older
+  // than the relay remembers — stands at the end of the line while it is true.
+  const roomSays = room ? room.notices() : [];
   panel.stand(
-    !n
+    (!n
       ? gizmo.chosen
         ? `${gizmo.chosen} chosen · draw a closed shape on it`
         : 'nothing chosen · draw anywhere, the plane is read'
@@ -2276,7 +2295,8 @@ function report() {
           ? `${made[0].name} · ${log.definitions().length === 1 ? 'definition' : 'definitions'}: ${log.definitions().map((d) => d.name).join(', ')} — type one, or say what to do to it`
         : made.length && models.first()
           ? `${made.length} solid${made.length === 1 ? '' : 's'} · type what this is and ${models.first()!.name} fills the massing`
-        : `${n} mark${n === 1 ? '' : 's'}${made.length ? ` · ${made.length} solid${made.length === 1 ? '' : 's'}` : ''} · ${gizmo.chosen ? describePlane(plane) : 'the plane is read'}${gizmo.offset ? ` at ${gizmo.offset.toFixed(2)}` : ''} · a line off a profile's edge stands it up`
+        : `${n} mark${n === 1 ? '' : 's'}${made.length ? ` · ${made.length} solid${made.length === 1 ? '' : 's'}` : ''} · ${gizmo.chosen ? describePlane(plane) : 'the plane is read'}${gizmo.offset ? ` at ${gizmo.offset.toFixed(2)}` : ''} · a line off a profile's edge stands it up`) +
+      (roomSays.length ? ` · ${roomSays.join(' · ')}` : '')
   );
   // UI-2: the panel's summary says what the next deliberate act will do, and
   // that is the same sentence the field is showing — so it has to be read at
@@ -3117,6 +3137,7 @@ const hook: ShardHook = {
         ink.sync();
         solids.sync();
         sayWhatLanded();
+        sayRoomNotices();
         report();
       },
       onWaiting: () => report(),
