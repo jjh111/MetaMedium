@@ -566,6 +566,16 @@ marks. *Trap:* a printer scales; the tile carries a measured test square.
 M2 (the sheet, `sheetLines`) built in `metamedium-core/src/maths/` on
 `w2-maths` — 94 tests; changing the bust re-derives exactly A, 1, 2 and 5
 (`MATHS-PLAN.md` §4).
+*Status, 27 Sep 2026:* M3a (dimensions — a number beside a mark offered as
+one of its measures, ranked with its reason and runner-up; a piece label
+inside a closed mark; a square declaring a corner right; the underline;
+each drawing's unit and scale) and M4 (solving, figure by figure in closed
+form — the triangle says 25.30″ with `√(24² + 8²)`, its conflict and the
+other reading; `measure.ts` in units, unchanged for a mark with no labels;
+a step's value on an edge checked against its step) built in
+`metamedium-core/src/maths/` on `w2-maths` — 139 maths tests, core 815
+(`MATHS-PLAN.md` §4). M3's figures of several strokes are E3's, which fill
+the same figure through `polygonFigure`.
 
 ### Phase 5 — seats
 J1–J3 as `DIRECTOR-PLAN-W2.md` §3, with §6's addition.

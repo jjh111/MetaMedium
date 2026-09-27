@@ -9,12 +9,22 @@
 // Measured from the clean form where one is held, else from the ink's own
 // fingerprint, in world units. Nothing here is a reading: no confidence, no
 // competing candidates. It is arithmetic on a reading that already exists.
+//
+// **In units, when numbers are written on the mark** (MATHS-PLAN.md §4, M4).
+// Handed the board's maths (`solveBoard`, maths/solve.ts), a mark that
+// carries labels also says its measures in the drawing's unit — what was
+// labelled, what was derived and by which formula, the labels that cannot
+// hold and by how much, the other consistent readings, what the ink says at
+// the drawing's scale — and `describeMaths` speaks them. A mark that carries
+// no labels measures exactly as it always has.
 
 import type { Point } from '../types';
 import type { MMNode } from './nodes';
 import { boundsOf, fingerprintOf, getRep, strokePointsOf } from './nodes';
 import { cleanPointsOf, idealize, snapReading } from './clean';
 import { getBounds } from '../geometry';
+import type { LengthUnit } from '../maths/quantity';
+import type { BoardMaths, Conflict, SolvedValue } from '../maths/solve';
 
 export interface Measure {
   /** e.g. 'radius', 'length' — stable keys a surface can pick from. */
@@ -31,7 +41,34 @@ export interface Measure {
 export interface Maths {
   shape: string;
   measures: Measure[];
+  // ----- Only when numbers are written on the mark (M4) -----
+  /** The unit its drawing speaks. */
+  unit?: LengthUnit | null;
+  /** Every measure the first reading fixes, in that unit: labelled, declared, derived (with its formula). */
+  values?: SolvedValue[];
+  /** The labels that cannot hold in the first reading, and by how much. */
+  conflicts?: Conflict[];
+  /** The other consistent readings, a sentence each. */
+  readings?: string[];
+  /** What the first reading rests on that is not a fact: a corner that measures right. */
+  assumes?: string[];
+  /** Parts that make their whole: '21″ and 22″ make 43″ ✓'. */
+  checks?: string[];
+  /** What the labels leave open, at the drawing's scale — the ink's, never the thing's. */
+  ink?: SolvedValue[];
+  /** The drawing's scale, and how consistently its labels agree with the ink. */
+  scale?: string;
+  notes?: string[];
 }
+
+/**
+ * A measured corner within this many degrees of 90 reads as right — as a
+ * READING of the ink, never a fact: a sketched right angle is rarely 90°, so
+ * the solver takes a corner as right only when a square declares it or a
+ * label says so, and offers a measured one only as *if the corner is right*
+ * (maths/solve.ts cites this; nothing restates it).
+ */
+export const RIGHT_ANGLE_TOLERANCE = 4;
 
 const deg = (rad: number) => (rad * 180) / Math.PI;
 const r0 = (v: number) => Math.round(v);
@@ -45,8 +82,9 @@ function angleAt(prev: Point, v: Point, next: Point): number {
   return deg(d);
 }
 
-function classify(degrees: number): string {
-  if (Math.abs(degrees - 90) < 4) return 'right';
+/** A corner's class as the ink measures it: right within `RIGHT_ANGLE_TOLERANCE`, else acute or obtuse. */
+export function angleClass(degrees: number): 'right' | 'acute' | 'obtuse' {
+  if (Math.abs(degrees - 90) < RIGHT_ANGLE_TOLERANCE) return 'right';
   return degrees < 90 ? 'acute' : 'obtuse';
 }
 
@@ -57,8 +95,37 @@ function classify(degrees: number): string {
  * of the SHAPE, not of the wobble — and falls back to the ink's own bounds
  * and ends for shapes with no clean form. Returns null for marks whose reading
  * is not one geometry can measure (writing, unread ink).
+ *
+ * With the board's maths (`solveBoard(state)`, computed once for a render and
+ * shared by every mark), a mark that carries labels also speaks its drawing's
+ * unit; one that carries none is returned exactly as without it.
  */
-export function measure(node: MMNode, nodes: ReadonlyMap<string, MMNode>): Maths | null {
+export function measure(node: MMNode, nodes: ReadonlyMap<string, MMNode>, board?: BoardMaths): Maths | null {
+  const plain = measureInk(node, nodes);
+  return plain && board ? inUnits(plain, node.id, board) : plain;
+}
+
+/** The labels on this mark's figure, solved: merged into its maths, or the maths untouched when it carries none. */
+function inUnits(plain: Maths, id: string, board: BoardMaths): Maths {
+  const fm = board.figures.find((f) => f.figure.ids.includes(id) && f.labels.some((l) => !l.declared));
+  if (!fm) return plain;
+  const sol = fm.solution;
+  const [top, ...rest] = sol.readings;
+  return {
+    ...plain,
+    unit: sol.unit,
+    values: top?.values ?? [],
+    conflicts: sol.conflicts,
+    readings: rest.map((r) => r.sentence),
+    ...(top?.assumes ? { assumes: top.assumes } : {}),
+    checks: sol.checks,
+    ink: sol.ink,
+    ...(fm.drawing?.scale ? { scale: fm.drawing.scale.reason } : {}),
+    notes: sol.notes,
+  };
+}
+
+function measureInk(node: MMNode, nodes: ReadonlyMap<string, MMNode>): Maths | null {
   const fp = fingerprintOf(node);
   if (!fp) return null;
   const reading = snapReading(node, nodes);
@@ -101,7 +168,7 @@ export function measure(node: MMNode, nodes: ReadonlyMap<string, MMNode>): Maths
       if (v.length < 3) return null;
       const sides = [0, 1, 2].map((i) => Math.hypot(v[(i + 1) % 3].x - v[i].x, v[(i + 1) % 3].y - v[i].y));
       const angles = [0, 1, 2].map((i) => angleAt(v[(i + 2) % 3], v[i], v[(i + 1) % 3]));
-      angles.forEach((a, i) => m.push({ key: `angle${i}`, label: `angle ${'ABC'[i]} (${classify(a)})`, value: r0(a), unit: '°', at: v[i] }));
+      angles.forEach((a, i) => m.push({ key: `angle${i}`, label: `angle ${'ABC'[i]} (${angleClass(a)})`, value: r0(a), unit: '°', at: v[i] }));
       sides.forEach((s, i) => m.push({ key: `side${i}`, label: `side ${'ABC'[i]}${'ABC'[(i + 1) % 3]}`, value: r0(s), unit: 'px' }));
       const s = sides.reduce((a, c) => a + c, 0) / 2;
       m.push({ key: 'area', label: 'area', value: r0(Math.sqrt(Math.max(0, s * (s - sides[0]) * (s - sides[1]) * (s - sides[2])))), unit: 'px²' });
@@ -151,9 +218,15 @@ export function measure(node: MMNode, nodes: ReadonlyMap<string, MMNode>): Maths
   }
 }
 
-/** One line per measure, for a status line or a brief: "radius 62px · area 12,076px²". */
+/**
+ * One line per measure, for a status line or a brief: "radius 62px · area
+ * 12,076px²". With numbers written on the mark it first says what they make
+ * — each derived value with its formula, what cannot hold, the other
+ * readings, the parts that check, the ink's offers and the scale — then the
+ * ink's measures as before.
+ */
 export function describeMaths(maths: Maths): string {
-  return maths.measures
+  const ink = maths.measures
     .filter((x) => x.key !== 'centreY')
     .map((x) => {
       if (x.key === 'centre' && x.at) return `${x.label} (${r0(x.at.x)}, ${r0(x.at.y)})`;
@@ -161,4 +234,15 @@ export function describeMaths(maths: Maths): string {
       return `${x.label} ${v}${x.unit}`;
     })
     .join(' · ');
+  if (!maths.values) return ink;
+  const said: string[] = [];
+  for (const a of maths.assumes ?? []) said.push(a);
+  for (const v of maths.values) if (v.from === 'derived') said.push(`${v.label} ${v.text}${v.formula ? ` = ${v.formula}` : ''}`);
+  for (const c of maths.conflicts ?? []) said.push(c.reason);
+  for (const r of maths.readings ?? []) said.push(`or ${r}`);
+  said.push(...(maths.checks ?? []));
+  for (const v of maths.ink ?? []) said.push(`${v.label} ${v.text} (the ink’s)`);
+  if (maths.scale) said.push(maths.scale);
+  said.push(...(maths.notes ?? []));
+  return [...said, ink].filter(Boolean).join(' · ');
 }
