@@ -24,15 +24,36 @@ automatically → ask "why?" and get grounded reasoning.
 `ARCHITECTURE-v7-PARTICIPANTS-AND-TIERS.md` is the active engine plan; MVP.md
 absorbs and raises its Stage D.
 
-**26 Sep 2026: week 1's automated run landed on `master`, with its gaps.**
-It carries ids per hand (with two reproduced defects), the relay's
-catch-up, the label event in core, the decision seat and a WebKit smoke;
-the rest sits on attempt branches. `DIRECTOR-PLAN-W2.md` §0 says exactly
-what, and its L1–L3 finish it before anything new. **`V1-PLAN.md` is the
-plan now**: the whole platform as layers (tools, context, library packs,
-seats), diagrams with Mermaid out and in, handles and bindings that
-follow, maths as a tool, and what "ready for true use" takes — ten
-acceptance scenarios, a ladder of units, and when v1.0.0 ships. The
+**27 Sep 2026: phase 0 of `V1-PLAN.md` is done on `w2` — week 1 is whole**
+(each unit's dated status line is in the plan's §9). **Ids hold** (L1): a
+live hand's log is one sitting, a page load or an MCP process
+(`sittingName`, `session/hands.ts`), whose high-water mark only rises
+(`session.ts`), so no number is issued twice under one name — not after an
+undo, which now reaches every peer (`LiveStore.publish` sends the whole log
+when it did not only grow), nor after a peer's line or a reload; one event
+is applied once however many logs carry it (L1b, `store/merge.ts`). The
+shard pairs a brief and its answer by the brief's node id
+(L2a, `shard-3d/src/room.ts`) and asks how deep a hull seen from one
+standpoint is (L2c, `shard-3d/src/depth.ts`). A hand puts a word on its own
+ink and never on another's — the MCP hand's `canvas_label` (`Demos/mcp.mjs`),
+a person's `label:` in the field (`09-field.js`; L2b, L2e); an artifact is
+made by whoever blessed it and a word by whoever wrote its letters, on every
+board (`applyBless`, `absorbIntoWord`; L2f, L2g); a hand's gestures are its
+own (`handOf`; L2h); one Enter is one act (`09-palette.js`) and `fitAll`
+fits the content (`01-view.js`; L2d). CI runs what exists
+(`.github/workflows/ci.yml`) — the relay's test, the surface build's guard
+against a function declared in two fragments, and a WebKit smoke that takes
+a pill — and both bundles equal a fresh build (L3). Beside them: the maths core (`src/maths/`), the
+extraction spike's *not yet* (`gliner-seat/`) and the performance baseline
+(`PERF.md`). **Phase 0b, a board that holds, is next, ahead of the
+backbone**, because `PERF.md` measured that 500 marks are usable once open,
+2,000 take 100 s to open and freeze the page for 7.6 s on every stroke,
+5,000 do not open, and autosave stops saving, in silence, at 1,100–1,600
+marks.
+**`V1-PLAN.md` is the plan**: the whole platform as layers (tools, context,
+library packs, seats), diagrams with Mermaid out and in, handles and
+bindings that follow, maths as a tool, and what "ready for true use" takes
+— ten acceptance scenarios, a ladder of units, and when v1.0.0 ships. The
 headline below is the 17 Sep state it builds on.
 
 Headline (17 Sep 2026, everything on `master`; `DIRECTOR-VIEW-2026-09-17.md`
@@ -81,7 +102,7 @@ circle them, cross with a command mark *you taught the system*, prompt them into
 a living page that renders in the canvas with your ink still outlining its
 divs — then draw on that page and the ink addresses the regions underneath it.
 Scratch anything out to erase. `Demos/session-engine.html` is the surface;
-`Demos/session-engine.e2e.js` drives 208 records through the real UI (207 checks and one honest skip, 25d; headless with the shard's two scenarios via `node e2e/run.mjs` from `e2e/`, which CI runs): page, flowchart, handwriting (read only when asked; a line read as one), the model drawing, the user-side loop, selection and the field, corrections, the worker, the tank, words into verbs and acting out, frames and the drawn slider, the folder, pictures, text, the moment, a live room (and ids that hold in it: an undo sent, one sitting per page load, a doubled name and a truncated room said), a playing frame that takes the pointer, hold by long-press, the graph in 3D, and the foundations (letters at any size, a mark that crosses, readings that stay, the minimap), and the explanation plane's layout. A run takes about 100 s; run it **in its own tab on its own origin** (`http://127.0.0.1:8010/…?fresh=1&nosw=1` — `__setup` refuses any other URL: it replaces `fetch` with a stub, joins a stub model named `e2e-stub`, and wipes the origin's saved board), start it with `__setup(); __scenario().then(r => window.__R = r)` and read `__R` when it lands.
+`Demos/session-engine.e2e.js` drives 261 records through the real UI (260 checks and one honest skip, 25d, on 27 Sep; headless with the shard's three scenarios via `node e2e/run.mjs`, which CI runs): page, flowchart, handwriting (read only when asked; a line read as one), the model drawing, the user-side loop, selection and the field, corrections, the worker, the tank, words into verbs and acting out, frames and the drawn slider, the folder, pictures, text, the moment, a live room (and ids that hold in it: an undo sent, one sitting per page load, a doubled name and a truncated room said), a playing frame that takes the pointer, hold by long-press, the graph in 3D, and the foundations (letters at any size, a mark that crosses, readings that stay, the minimap), the explanation plane's layout, one Enter one act and what `fitAll` fits, labels (a hand's and a person's, on their own ink only), who made what, and gestures per hand in a room. A run takes about 100 s; run it **in its own tab on its own origin** (`http://127.0.0.1:8010/…?fresh=1&nosw=1` — `__setup` refuses any other URL: it replaces `fetch` with a stub, joins a stub model named `e2e-stub`, and wipes the origin's saved board), start it with `__setup(); __scenario().then(r => window.__R = r)` and read `__R` when it lands.
 v7 Stage E (handwriting) shipped 1 Sep 2026: a word written beside a shape is read by a
 model that can see and offered as that shape's name. Whitepaper v5.1 stays parked until the
 conversation benchmark passes end to end.
@@ -127,6 +148,17 @@ Architecture documents (chronological; **read MVP.md, then v7, then v6**):
   a dependency, with five places it would fit in order of value; next steps
   — ids per hand (T8) first, then a review of use, a label primitive, the
   shard asking, the seat experiment, the paper's next figures
+- `DIRECTOR-PLAN-W1.md` — **week 1's pre-flight, 20 Sep 2026**: units
+  U1a–U8 (ids per hand, the relay's catch-up, the shard's pairing, a label,
+  the shard asking, the decision seat, housekeeping, the next figures, the
+  hand in the gate, a closing view), each with the command a machine runs to
+  check it, the invariant it is most likely to bend and the trap; its checks
+  are the ones week 2's L2 units were held to
+- `DIAGRAM-REVISION-PLAN.md` — **the whitepaper plates' visible states, 17
+  Sep 2026**: the handoff asking for every state of the seven plates at once
+  on a desktop and one state in focus on a phone; built in
+  `Assets/whitepaper-figures/` (`a449540`, on `master` since 26 Sep) though
+  its header still says *proposed*
 - `DIRECTOR-PLAN-W2.md` — **week 2, 26 Sep 2026**: what week 1's automated
   run left on `auto/w1` (not on `master`: U1a–U1c, U4 and half of U2 and U5
   integrated, the rest on attempt branches, the bundles drifted, two id
@@ -154,6 +186,10 @@ Architecture documents (chronological; **read MVP.md, then v7, then v6**):
   what daily use needs (boards, a versioned log, no lost work, budgets,
   first run, pencil, deploy); the ladder in eight phases, the units, how the
   agents run, and the release criteria
+- `PERF.md` — **the performance baseline, 27 Sep 2026** (V1-PLAN R4a):
+  the engine and the surface measured on generated boards of 500, 2,000 and
+  5,000 marks, every number with its command, the hotspots ranked with
+  file:line, and the budgets phase 0b holds itself to
 - `SHARD-3D-PUSH-2.md` — **geometry from the drawing, G0–G5 all landed
   16 Sep 2026**: what John's first real use showed (a footprint and elevations
   from free views stood nothing, and a brief with nothing to fill was refused
@@ -183,20 +219,20 @@ any structural change.
 
 | Path | What it is |
 |---|---|
-| `metamedium-core/` | **The canonical engine** (TypeScript, zero deps, tested): geometry, recognition (the shape rung), relations, the diagram rung (`src/diagram/`), concepts, the no-modes session engine, the layout and graph parsers, maths on a page (`src/maths/`: quantities, expressions, the sheet), and the LLM transport. New recognition/engine work lands HERE |
+| `metamedium-core/` | **The canonical engine** (TypeScript, zero deps, tested): geometry, recognition (the shape rung), relations, the diagram rung (`src/diagram/`), concepts, the no-modes session engine, the layout and graph parsers, maths (`src/maths/`: quantities, expressions, the sheet, dimensions, solving figure by figure, true size and tiled print), the participants — a model's prompts and parsing, the router, the bridge, and **the decision seat** (`src/participants/decide.ts`, tier 1½; under *Tiered LLM Interpretation*) — and the LLM transport. New recognition/engine work lands HERE |
 | `index.html` | **Interactive whitepaper v5** "MetaMedium: AI Beyond Chat" (live on GitHub Pages). Fully on the `brand/` system as of 3 Sept 2026 — its `:root` is `brand/tokens.css` under the names this page already used, so change a value THERE first |
 | `brand/` | **The visual system, one home**: `tokens.css` holds every MetaMedium colour, face, size and figure/diagram token; `styleguide.html` is the living specimen (light paper first, IBM Plex Mono throughout, teal keyword, colour as signal, §11 figures and diagrams, §12 long-form furniture). v1 draft — the whitepaper's **figures** have migrated, the page around them has not; `brand/README.md` carries the four laws, the convergence order, and what applying it to the whitepaper taught the system |
 | `doodle2-canvas.html` | **Flagship demo**: heuristic recognition, spatial graph, library, undo/redo, touch. No LLM. Single-file (~500KB) |
 | `metadoodle1.html` | Fork of flagship + tiered LLM recognition (WebLLM in-browser, LM Studio local API) + voice. Single-file (~600KB) |
 | `Web App Skeleton/` | React + Vite + TypeScript + Zustand rebuild; Claude API interpreter skeleton in `src/llm/`; recognition/spatial/matching in `src/core/` |
-| `Demos/surface/` | **The reference surface's source**: `surface.css` and twenty-four script fragments (`00-core`, `00-ui` … `20-controls`, `21-minimap`, then `90-boot`, which must stay last), one concern each, concatenated in name order into one closure by `Demos/build-surface.mjs` → the committed `Demos/session-engine.js` (CI checks it has not drifted). Fragments share the closure's variables — no imports; each fragment's header says what it provides and uses. Edit a fragment, run the build, commit both. **`09-field.js` is the exception that proves the rule** (SEAM-1): it names nothing outside itself, so the field's query is a pure function of a record and is unit-tested in Node with no browser — `node --test Demos/surface/09-field.test.mjs`, in CI's `core` job. A fragment's `.test.mjs` is not concatenated into the build |
-| `Demos/` | **`session-engine.html` is the MVP surface** (it links `surface/surface.css` and loads `session-engine.js`) — infinite canvas, the taught command mark, living artifacts in a DOM overlay, ink-over-artifact addressing, "why" inspector, model participants, canvas answers. Uses the committed `metamedium-core.browser.js` bundle. **`session-engine.e2e.js`** drives the whole loop through the real UI with a stubbed model (browser console; not part of `npm test`). `build-standalone.mjs` inlines the bundle into a single shareable file. **`mcp.mjs`** is the MCP hand (Claude Code's way onto the board; `.mcp.json` at the root registers it), over `relay.mjs` and `live-node.mjs`, with `ink-png.mjs` for the ink as a picture and `mcp-smoke.mjs` as its stdio test; `metamedium-core.node.mjs` is the committed Node bundle it runs (`npm run build:node`, drift-checked in CI like the browser bundle). `programs/` holds `run` programs written for the canvas (`metamedium-explained.run.js`: the loop told as a program, ending on a real measurement of the viewer's own stroke). Plus fish, composition diagrams, no-modes graph, etc. |
+| `Demos/surface/` | **The reference surface's source**: `surface.css` and twenty-four script fragments (`00-core`, `00-ui` … `20-controls`, `21-minimap`, then `90-boot`, which must stay last), one concern each, concatenated in name order into one closure by `Demos/build-surface.mjs` → the committed `Demos/session-engine.js` (CI checks it has not drifted). Because they are one closure, the build and its `--check` refuse a name declared at the top of two fragments — the last would silently replace the first everywhere, which broke rendering once — reading the fragments as one strict block, so they must also compile as strict code (`Demos/build-surface.test.mjs`, in CI's `core` job). Fragments share the closure's variables — no imports; each fragment's header says what it provides and uses. Edit a fragment, run the build, commit both. **`09-field.js` is the exception that proves the rule** (SEAM-1): it names nothing outside itself, so the field's query is a pure function of a record and is unit-tested in Node with no browser — `node --test Demos/surface/09-field.test.mjs`, in CI's `core` job. A fragment's `.test.mjs` is not concatenated into the build |
+| `Demos/` | **`session-engine.html` is the MVP surface** (it links `surface/surface.css` and loads `session-engine.js`) — infinite canvas, the taught command mark, living artifacts in a DOM overlay, ink-over-artifact addressing, "why" inspector, model participants, canvas answers. Uses the committed `metamedium-core.browser.js` bundle. **`session-engine.e2e.js`** drives the whole loop through the real UI with a stubbed model (browser console; not part of `npm test`). `build-standalone.mjs` inlines the bundle into a single shareable file. **`mcp.mjs`** is the MCP hand (Claude Code's way onto the board; `.mcp.json` at the root registers it), over `relay.mjs` and `live-node.mjs`, with `ink-png.mjs` for the ink as a picture and `mcp-smoke.mjs` as its stdio test; `metamedium-core.node.mjs` is the committed Node bundle it runs (`npm run build:node`, drift-checked in CI like the browser bundle). **`relay.test.mjs`** is the relay's own test (`node --test Demos/relay.test.mjs`, in CI's `core` job): the catch-up as a pure function, and, over a real relay on a free port, the truncation line and three hands with one departed. `Demos/programs/` holds `run` programs written for the canvas (`metamedium-explained.run.js`: the loop told as a program, ending on a real measurement of the viewer's own stroke). Plus fish, composition diagrams, no-modes graph, etc. |
 | `skills/` | Claude Code skills: `metamedium-code` (code patterns), `metamedium-design` (design principles) |
-| `Assets/` | Figures and design rationale (recognition strategy, point-primitive proposal), and the social card. `make-card.mjs` regenerates that card from index.html's own hero — synthetic pointer input, so the picture shows the engine really reading a mark; `node Assets/make-card.mjs`. Change the picture and you must change the FILENAME and the four og:/twitter: tags in `index.html` and `404.html`, because scrapers cache by URL |
+| `Assets/` | Figures and design rationale (recognition strategy, point-primitive proposal), and the social card. `make-card.mjs` regenerates that card from index.html's own hero — synthetic pointer input, so the picture shows the engine really reading a mark; `node Assets/make-card.mjs`. Change the picture and you must change the FILENAME and the four og:/twitter: tags in `index.html` and `404.html`, because scrapers cache by URL. **`Assets/whitepaper-figures/`** is the whitepaper's seven graphic plates: `build.py` holds their content and geometry and emits the static blocks `index.html` carries between `whitepaper-plate:KEY` markers (`--check` says they are in sync), `figures.css` and `figures.js` style and enhance them with no build, and `e2e/whitepaper-figures.mjs` audits the real page; its README is the workflow |
 | `archive/` | Retired versions and superseded plans, incl. whitepaper v4 (root `MetaMedium_Whitepaper_v4.html` is a redirect stub — keep it) and PRDs v3.2/v4 |
-| `e2e/` | **The browser gate** (`DIRECTOR-REVIEW-2026-09-15.md`, QA-1): `node e2e/run.mjs` starts its own servers on free ports (a static one over the repo root, vite over `shard-3d`), opens a **fresh Chromium context per scenario**, loads the harnesses that already exist — `Demos/session-engine.e2e.js` (`__setup` + `__scenario`) and `shard-3d/e2e.js` (`__scenario`, `__demo`, `__demo2`) — and awaits the result object each one returns. It does not reimplement them. **Four scenarios** (`canvas`, `shard`, `demo`, `demo2`), 342 records and one honest skip as of 16 Sep 2026, in about 110 s. Pass, fail and **skip** are counted separately (a record whose name says it skipped is a skip); a failed assertion, a harness exception, an attempted request to a real model, or a page error not on the named allowlist in `guards.mjs` each exit nonzero, with structured JSON and a screenshot in `e2e/results/`. Chromium only so far — a WebKit smoke is still owed. `e2e/README.md` has the rest |
+| `e2e/` | **The browser gate** (`DIRECTOR-REVIEW-2026-09-15.md`, QA-1): `node e2e/run.mjs` starts its own servers on free ports (a static one over the repo root, vite over `shard-3d`), opens a **fresh browser context per scenario**, loads the harnesses that already exist — `Demos/session-engine.e2e.js` (`__setup` + `__scenario`) and `shard-3d/e2e.js` (`__scenario`, `__demo`, `__demo2`) — and awaits the result object each one returns. It does not reimplement them. **Four scenarios** on Chromium (`canvas`, `shard`, `demo`, `demo2`): 406 passing records and the one honest skip as of 27 Sep 2026 (canvas 260, shard 123 + 11 + 12), in about 135 s. A fifth, **`smoke`**, is opt-in and runs on WebKit (`node e2e/run.mjs --browser webkit smoke`, CI's `webkit` job): the board loads, ink drawn with real pointer input is read back, press-and-hold opens the field and one pill is taken — four checks in `run.mjs` itself, a WebKit smoke and not an iPhone test. Pass, fail and **skip** are counted separately (a record whose name says it skipped is a skip); a failed assertion, a harness exception, an attempted request to a real model, or a page error not on the named allowlist in `guards.mjs` each exit nonzero, with structured JSON and a screenshot in `e2e/results/`. Beside the gate, on its static server and never run by it or by CI: `e2e/perf.mjs` (the surface's half of `PERF.md`, numbers only) and `e2e/whitepaper-figures.mjs` (the plates' audit, Chromium and WebKit). `e2e/README.md` has the rest |
 | `PERF.md`, `metamedium-core/bench/`, `e2e/perf.mjs` | **The performance baseline** (V1-PLAN §9 R4a, 27 Sep 2026): `bench/board.mjs` draws deterministic boards of 500, 2,000 and 5,000 marks from a seed (the generator is kept, never the boards); `bench/engine.mjs` times replay, memory, relations, the whole-board read, one more stroke, a live room's incoming line and a newcomer's hello; `e2e/perf.mjs`, beside the gate and on its servers and model guard, times the surface — open, pan, draw, release → reading drawn — in Chromium and WebKit; `bench/profile.mjs` reads a CPU profile back to `src/…:line` and the surface's fragments; `bench/report.mjs` prints `PERF.md`'s tables from the results. `PERF.md` has the answer (500 marks usable, 2,000 not, 5,000 does not open), every number with its command, the hotspots ranked with file:line, and budgets for R4b. Not in `npm test` or the gate |
-| `.github/workflows/ci.yml` | CI: typecheck + test + build for `metamedium-core` (incl. a bundle-drift check), `shard-3d` and `Web App Skeleton`, plus the **browser gate** (`e2e/run.mjs`, results uploaded on failure), on every push/PR |
+| `.github/workflows/ci.yml` | CI, on every push/PR: typecheck + test + build for `metamedium-core` — with the drift check for both committed bundles, the MCP hand's smoke, the surface's drift check and its build's test, and the field reader's and the relay's Node tests — `shard-3d` (with its MCP hand's smoke) and `Web App Skeleton` (with lint); the **browser gate** (`e2e/run.mjs` on Chromium); and the **WebKit smoke** in a job of its own. Both browser jobs upload `e2e/results` when they fail |
 
 ### Experiments (subordinate tier — see `EXPERIMENTS.md`)
 
@@ -212,7 +248,7 @@ not the product. Each entry's rationale and what it feeds back lives in
 | `test-llm.html` | Standalone LLM harness |
 | `manim-explainer/` | ~50s explainer video. Source + stills tracked; renders and `media/` cache gitignored (regenerate from the scripts) |
 | `playground.html` | Personal sandbox on the personal-site design language |
-| `shard-3d/` | **Live · the plan's MVP line (P0–P6) + the compass + the review's four shard packages + push 2 (G0–G5)** — a bounded MetaMedium for making things in space: ink on a plane read by the shape rung in that plane's own units, a form rung, solids as **op trees in the log** (the tree is the source, the mesh is derived), the diff as the brief, definitions and placements. **Push 2 is geometry from the drawing** (`SHARD-3D-PUSH-2.md`): the board goes out and comes back as its own core-format log; every free stroke is a **silhouette claim**, so a footprint plus ⊓ drawn from wherever the hand stood stands a **hull** at tier 1, in the volume its claims define; the hull is cut into **parts** with ids and a sentence each; the brief a small model can answer is 1048 characters and its reply names parts by id and never writes geometry; and `shard-3d/mcp.mjs` is the shard's own MCP hand **and the model seat** — Claude Code answers the parked brief and the shard applies it as it would a model's (`.mcp.json`, `metamedium-3d`). **`shard-3d/README.md` is the single source** for how it works, what it does not do, what core would need, and the fixtures; don't restate it here. `npm install && npm run dev` in `shard-3d/` (vite on :5174); `?demo=castle` runs the whole loop on John's own drawing at boot and `?fixture=<name>` loads a board from `shard-3d/fixtures/`; `npm test` is vitest on the pure rungs (555); the engine is imported from source, so there is no bundle to drift |
+| `shard-3d/` | **Live · the plan's MVP line (P0–P6) + the compass + the review's four shard packages + push 2 (G0–G5)** — a bounded MetaMedium for making things in space: ink on a plane read by the shape rung in that plane's own units, a form rung, solids as **op trees in the log** (the tree is the source, the mesh is derived), the diff as the brief, definitions and placements. **Push 2 is geometry from the drawing** (`SHARD-3D-PUSH-2.md`): the board goes out and comes back as its own core-format log; every free stroke is a **silhouette claim**, so a footprint plus ⊓ drawn from wherever the hand stood stands a **hull** at tier 1, in the volume its claims define; the hull is cut into **parts** with ids and a sentence each; the brief a small model can answer is 1048 characters and its reply names parts by id and never writes geometry; and `shard-3d/mcp.mjs` is the shard's own MCP hand **and the model seat** — Claude Code answers the parked brief and the shard applies it as it would a model's (`.mcp.json`, `metamedium-3d`). **`shard-3d/README.md` is the single source** for how it works, what it does not do, what core would need, and the fixtures; don't restate it here. `npm install && npm run dev` in `shard-3d/` (vite on :5174); `?demo=castle` runs the whole loop on John's own drawing at boot and `?fixture=<name>` loads a board from `shard-3d/fixtures/`; `npm test` is vitest on the pure rungs (605 in 31 files on 27 Sep); the engine is imported from source, so there is no bundle to drift |
 | `gliner-seat/` | **Parked with its answer, *not yet* (J2, 26 Sep 2026)** — can GLiNER2 be the middle layer's `extract` seat? It runs where MetaMedium runs: the one-graph ONNX export of `fastino/gliner2-multi-v1` (Apache-2.0) with a JS port of the library's processor, token-identical to the Python original; a line of a pattern page in 24 ms in a Chromium page on WebGPU, 55 ms in WebKit, 23 ms in a Node process. But it misses the names a seat would add (measurement names 7/11 at best, part names 6/9, operators 8/26), and a page pays 614 MB and ~2.2 GB of memory. `transport.mjs` is the seat's seam, shaped like `DecideTransport`, with a fake; `node --test gliner-seat/*.test.mjs` needs no model. `gliner-seat/README.md` has the numbers, the commands and what a later unit would need. Weights, venv and caches are never committed (`node fetch.mjs`). **Not in CI** |
 
 **Known duplication:** recognition logic still exists independently in
@@ -860,6 +896,21 @@ relative to the target's own size. Legacy copies still exist for reference in
   own and by a hand pressed inside; the field's *Show it in 3D*, and a
   definition that holds one is rebuilt for the next drawing, never copied
   — `GRAPH3D_MARK`) — **built**
+- **Tier 1½:** the decision seat (`participants/decide.ts`; `1.5` in
+  `Capability`, `session/nodes.ts`, so every ordering over tiers keeps
+  working) — **built in core, on no surface yet**. Typed questions in — a
+  *choice* among candidates the engine already holds, `no-match` always
+  among them; a *score* on levels the engine named; the probability of *yes*
+  for one statement — and a typed value with its whole distribution out,
+  held as one attributed row beside the engine's readings, never evicting
+  them, with the question and the distribution as its reason. A flat answer
+  is not held (`isFlat`). A batch is asked over one snapshot: what it says
+  about a board since replaced, or a mark since erased, is refused the
+  STATE-1 way, never written into the log. It sits
+  **behind an injectable transport** (`DecideTransport`;
+  `createStubDecideTransport` in its tests) — a seat, never a dependency:
+  nothing in `decide.ts` names a vendor or opens a socket, and with nobody in
+  the seat the engine answers from tiers 0 and 1
 - **Tier 2:** a model — local via Ollama (`localhost:11434/v1`) or LM Studio
   (`localhost:1234/v1`), hosted via OpenRouter or Anthropic with your own key
   — **built**. `providerLocality()` says which; the router asks local first
@@ -1303,7 +1354,13 @@ high-water mark (`session.ts`) only rises: an undo, a merge that no longer
 carries a dropped event, and `load([])` never lower it. A tab opened on
 `?live=` does not restore the device's board into the room, since every
 reload would carry it in again under a new name; the *live* tile brings
-the board you are on.
+the board you are on. **The same hand in name and colour, not in
+authorship:** a sitting is a participant of its own
+(`participant:hand:<log name>`), so what a person drew before a reload is
+the earlier sitting's — the reloaded tab may not label it (core refuses,
+`not-your-ink`; the field says *no label — john made this mark*), the
+label rule applied to a sitting. Found writing these docs, not changed;
+whether a sitting should inherit its person's marks is not yet decided.
 
 **A hand sends its log as it stands** (`LiveStore.publish`): the new tail
 as an append when the log only grew, the whole of it as a `full` when it
@@ -1678,13 +1735,16 @@ npm test         # full suite incl. the canonical-loop scenario (keep green)
 npm run typecheck
 npm run build    # ESM + d.ts → dist/
 npm run build:browser  # IIFE bundle; a copy is committed at Demos/metamedium-core.browser.js
+npm run build:node     # ESM bundle for Node; a copy is committed at Demos/metamedium-core.node.mjs
 ```
 
-After engine changes, rebuild the browser bundle and re-copy it to `Demos/`
-(`Demos/session-engine.html` is the live reference surface) — CI fails if the
-committed copy drifts from source. After surface changes, run
+After engine changes, rebuild both bundles and re-copy them to `Demos/`
+(`Demos/session-engine.html` runs the browser one; the MCP hand, the relay's
+test and the smokes run the Node one) — CI fails if either committed copy
+drifts from source. After surface changes, run
 `node Demos/build-surface.mjs` and commit `Demos/session-engine.js` with the
-fragments — CI checks that too.
+fragments — CI checks that too, and the build refuses a name declared at the
+top of two fragments.
 
 `src/session/session.scenario.test.ts` is the executable spec for the
 no-modes flow (lasso → check → summon → bless → artifact). Change it knowingly
