@@ -1105,13 +1105,18 @@ fingerprint carries it, so the model is asked to *read*, not to interpret.
   written, and the word gathers back the letter-like strokes written just
   before it. **Letters are letters by their run, not by an absolute size**
   (v10 F1): the cap (`LETTER_MAX_HEIGHT_PX`, 150) is a ceiling, and a
-  letter may stand up to `LETTER_HEIGHT_RATIO` (3.2) x-heights over its
+  letter may stand up to `LETTER_HEIGHT_RATIO` x-heights over its
   neighbours — the old cap of 44 px threw out every ascender a real hand
   makes (John's h, l and d were 72–88 px tall), so *hello* was five
   shapes and *world* gathered only its x-height letters. Found the hard way: at hand size, three bubbles and two lines
   drawn quickly are exactly a run of small strokes on one line, and the
   earlier rule folded the whole canonical loop into one word — after which
-  the lasso and the mark had nothing to act on.
+  the lasso and the mark had nothing to act on. **A word is one hand's
+  run** (V1-PLAN L2g, `absorbIntoWord`): the run is read over the marks
+  the new stroke's maker made, never the board's last mark whoever made
+  it, so the letters of two hands — or of a hand and a model — never
+  gather into one word, and the word is made by the hand that wrote its
+  letters, on every board (under *Live logs*).
 - `propose()` carries `reps` as well as edges, so a transcript is held through
   the same channel as every other reading and undo drops it.
 - **Writing gathers by nearness into a line** (v10 D3; the `writing`
@@ -1312,6 +1317,23 @@ keeps its name on the word. The `made-by` edge is written only for a maker
 other than the board's own hand, which `authorOf` reads from no edge at
 all, so a board's own blesses — every held log — replay node for node.
 
+**A word is made by whoever wrote its letters** (V1-PLAN L2g;
+`absorbIntoWord` in core, `session/label.test.ts`, e2e 44). The gathering
+wrote every word `made-by` the local participant, whoever wrote its
+letters, so on another hand's board her word read as the reader's: her
+label on it was dropped on every replay but her own, and that board could
+label it — while its letters were hers. Now a word names the maker its
+letters already carry, so the label rule holds for words as for ink, and
+the MCP hand's look says *by tab*. **A word is one hand's run**: the merge
+interleaves the hands' events by time, so the mark just before her next
+letter on the board may be his — taken for the last letter of her run, it
+joined her word (his letter printed beside hers) or broke it in two (his
+mark set between two of hers). The run is read over the marks the new
+stroke's maker made, so her letters gather into her word whoever drew in
+between, and the letters of two hands — or of a hand and a model — never
+gather into one. A board's own words name its own hand as they always did,
+so every held log replays node for node.
+
 ### The MCP hand: Claude Code on the board (v10 T2)
 
 > `Demos/mcp.mjs` (the server), `Demos/live-node.mjs` (the relay as a
@@ -1422,7 +1444,8 @@ not (the notes, §B). A `label` event holds the word as a rep on the mark,
 attributed; it replays and undoes; an empty word takes it off; another hand's
 label on my mark is refused at the door (`not-your-ink`) and dropped on replay.
 A mark's maker is the hand that drew it; an artifact's is whoever blessed it,
-on every board (L2f, under *Live logs*).
+and a word's the hand that wrote its letters, on every board (L2f and L2g,
+under *Live logs*).
 **It is not a bless and not a file** (§D): no `word` rep, no artifact, no
 library entry, no card in the grid, never a name the matcher learns.
 
