@@ -300,6 +300,26 @@ describe('units, kinds and the precision the person wrote', () => {
     expect(bounds.maxX - bounds.minX).toBeCloseTo(12, 3); // a minor arc spans its chord
   });
 
+  it('a document asked for in another unit converts the drawing and keeps the labels as written, and says so', () => {
+    const { s, tri } = triangleBoard({ longSide: false });
+    const doc = trueSize(solveBoard(s.getState(), { unit: 'in' }), { unit: 'cm' });
+    expect(doc.unit).toBe('cm');
+    expect(rootOf(doc.svg).width).toEqual({ value: doc.width, unit: 'cm' });
+    const lengths = sidesOf(outlineOf(doc.svg, tri)).map((x) => x.length).sort((a, b) => a - b);
+    expect(lengths[0]).toBeCloseTo(8 * 2.54, 3);
+    expect(lengths[1]).toBeCloseTo(24 * 2.54, 3);
+    expect(labelTexts(doc.svg, tri)).toEqual(expect.arrayContaining(['24″', '8″', '25.3″']));
+    expect(doc.notes).toContain('the triangle: labelled in inches, drawn in centimetres');
+  });
+
+  it('a figure takes the name the person gave it', () => {
+    const { s, tri } = triangleBoard();
+    const doc = trueSize(solveBoard(s.getState(), { unit: 'in' }), { names: { [tri]: 'gusset' } });
+    expect(doc.figures[0].name).toBe('gusset');
+    expect(labelTexts(doc.svg, tri)).toContain('gusset');
+    expect(doc.notes[0]).toMatch(/^the gusset: the long side is labelled 24/);
+  });
+
   it('figures stand apart in a row, in the order the ink reads left to right', () => {
     const { s, tri } = triangleBoard({ longSide: false });
     const r = s.addStroke(rectStroke(600, 100, 300, 100), 50000);

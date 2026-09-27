@@ -121,7 +121,7 @@ export interface TrueSize {
 }
 
 /** Anything solved: the board's maths, or figures solved one by one. */
-export type Solved = BoardMaths | readonly (FigureMaths | Solution)[];
+export type SolvedFigures = BoardMaths | readonly (FigureMaths | Solution)[];
 
 // ===== The paper's furniture =====
 
@@ -301,11 +301,11 @@ function widthPair(f: Figure): number[] {
 
 // ===== Shapes, before they are placed =====
 
+/** A thin line that is not the outline: a tick, a right angle's square, a dashed radius, chord or rise. */
 interface Mark {
   points: Point[];
   closed?: boolean;
   dashed?: boolean;
-  filled?: boolean;
 }
 
 interface Text {
@@ -493,11 +493,12 @@ function circleShape(c: Ctx): Shape {
   const sides: TrueSizeSide[] = [{ key: 'radius', label: radius.label, from: o, to: east, length: r, text: sideTextOf(c, 'radius'), source: radius.from }];
   const diameter = c.vals.get('diameter');
   if (diameter) sides.push({ key: 'diameter', label: diameter.label, from: west, to: east, length: 2 * r, text: sideTextOf(c, 'diameter'), source: diameter.from });
-  const cross = Math.min(F.corner / 2, r / 4);
+  // The radius drawn dashed to the rim, and a small cross at the centre.
+  const arm = Math.min(F.corner / 2, r / 4);
   const marks: Mark[] = [
     { points: [o, east], dashed: true },
-    { points: [{ x: -cross, y: 0 }, { x: cross, y: 0 }] },
-    { points: [{ x: 0, y: -cross }, { x: 0, y: cross }] },
+    { points: [{ x: -arm, y: 0 }, { x: arm, y: 0 }] },
+    { points: [{ x: 0, y: -arm }, { x: 0, y: arm }] },
   ];
   const texts: Text[] = [{ text: `r ${drawnText(c, 'radius')}`, at: { x: r / 2, y: -(F.labelGap + 0.6 * F.label) }, angle: 0, size: F.label, anchor: 'middle', key: 'radius' }];
   const note = circleNote(c);
@@ -610,7 +611,7 @@ interface Entry {
   labels: readonly FigureLabel[] | null;
 }
 
-function entriesOf(solved: Solved): Entry[] {
+function entriesOf(solved: SolvedFigures): Entry[] {
   const list: readonly (FigureMaths | Solution)[] = 'dimensions' in solved ? solved.figures : solved;
   return list.map((x) => ('solution' in x ? { figure: x.figure, solution: x.solution, labels: x.labels } : { figure: x.figure, solution: x, labels: null }));
 }
@@ -669,9 +670,9 @@ function moved(shape: Shape, by: Point): Shape {
   };
 }
 
+/** How this document writes a coordinate, and its furniture. */
 interface Writer {
   n: (v: number) => string;
-  places: number;
   F: Furniture;
 }
 
@@ -719,7 +720,7 @@ function styleOf(w: Writer, stroke = w.F.stroke): string {
  * drawn, from which reading, and what was left out. Pure: the same figures
  * give the same bytes, and nothing is written anywhere.
  */
-export function trueSize(solved: Solved, options: TrueSizeOptions = {}): TrueSize {
+export function trueSize(solved: SolvedFigures, options: TrueSizeOptions = {}): TrueSize {
   const entries = entriesOf(solved)
     .map((e) => ({ e, b: inkBounds(e.figure) }))
     .sort((p, q) => p.b.minX - q.b.minX || p.b.minY - q.b.minY || (p.e.figure.id < q.e.figure.id ? -1 : p.e.figure.id > q.e.figure.id ? 1 : 0))
@@ -756,7 +757,7 @@ export function trueSize(solved: Solved, options: TrueSizeOptions = {}): TrueSiz
   const U = docUnit;
   const F = furniture(U);
   const places = COORD_PLACES[U];
-  const w: Writer = { n: (v) => fmt(v, places), places, F };
+  const w: Writer = { n: (v) => fmt(v, places), F };
 
   // Each figure built at the origin, then its box: the outline, its marks, its labels, and its name below.
   const built = drawable.map((e) => {
@@ -860,7 +861,12 @@ export function trueSize(solved: Solved, options: TrueSizeOptions = {}): TrueSiz
     return { ...b, shape, box };
   });
   const bottom = placed.length ? Math.max(...placed.map((p) => p.box.maxY)) : y;
-  const region = placed.length ? expandBounds(unionBounds(placed.map((p) => p.box)), F.labelGap) : { minX: 0, maxX: 0, minY: 0, maxY: 0 };
+  // What a print covers, rounded outward to what is written.
+  const q = 10 ** places;
+  const pad = placed.length ? expandBounds(unionBounds(placed.map((p) => p.box)), F.labelGap) : null;
+  const region = pad
+    ? { minX: Math.floor(pad.minX * q + 1e-6) / q, maxX: Math.ceil(pad.maxX * q - 1e-6) / q, minY: Math.floor(pad.minY * q + 1e-6) / q, maxY: Math.ceil(pad.maxY * q - 1e-6) / q }
+    : { minX: 0, maxX: 0, minY: 0, maxY: 0 };
 
   // The scale bar: alternate steps filled, a tick at each, a number at every few.
   const barTop = bottom + F.block;
@@ -881,7 +887,7 @@ export function trueSize(solved: Solved, options: TrueSizeOptions = {}): TrueSiz
   const barRight = F.margin + bar.length + textWidth(barName, F.note) / 2;
 
   // The document's size, rounded up to what is written so nothing is cut.
-  const up = (v: number) => Math.ceil(v * 10 ** places - 1e-6) / 10 ** places;
+  const up = (v: number) => Math.ceil(v * q - 1e-6) / q;
   const width = up(Math.max(x - F.gap + F.margin, F.margin + textWide + F.margin, barRight + F.margin));
   const height = up(barBottom + F.margin);
 

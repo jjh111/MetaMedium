@@ -228,6 +228,15 @@ export type {
   BoardMaths,
   SolveBoardOptions,
 } from './maths/solve';
+// True size and print (M7): solved figures drawn at their real size as a new
+// SVG document — by the solver's first reading, never by the ink, the root in
+// paper units and the viewBox in the drawing's — and that document tiled onto
+// Letter or A4 at 100%, with overlap, alignment marks, grid labels, a map and a
+// measured test square on every page. Pure and deterministic.
+export { trueSize, COORD_PLACES } from './maths/truesize';
+export type { TrueSize, TrueSizeOptions, TrueSizeFigure, TrueSizeSide, TrueSizeOmission, SolvedFigures } from './maths/truesize';
+export { printTiled, PAPERS } from './maths/print';
+export type { Paper, Orientation, PaperSize, PrintOptions, PrintPage, PrintJob } from './maths/print';
 
 // Magnets — the places a mark offers attachment, derived from its clean form.
 export { magnetSites, nearestMagnet, magnetsNear, magnetRadius, describeMagnet, MAGNET_SCREEN_PX, MAGNET_SIZE_FRACTION } from './session/magnets';
