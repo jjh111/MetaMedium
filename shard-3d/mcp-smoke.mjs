@@ -270,6 +270,26 @@ try {
   const empty = textOf(await call('space_pending', {}));
   check('space_pending is empty again', /no brief is parked/.test(empty), empty);
 
+  // ---- a brief in the PARTS contract (G3) keeps its words too ----------------
+  // `messagesFor` ends a parts brief with *Name the parts.*, not *Propose the
+  // tree.*; the hand has to find the human's words after either.
+  const key3 = tabSession.answer({
+    participantId: MM.LOCAL_PARTICIPANT,
+    question: 'brief',
+    text: `${CONTRACT}\n\n----\n\nWHAT STANDS — a hull\n\nName the parts. The human asked for: “castle with green tops”`,
+    aboutIds: [planId],
+    at: Date.now(),
+  });
+  await tab.appendLog(tabMe, tabSession.getEvents().slice(tabSession.getEvents().length - 1));
+  let parts = '';
+  for (let i = 0; i < 25 && !parts.includes('brief ' + key3); i++) {
+    parts = textOf(await call('space_pending', {}));
+    if (!parts.includes('brief ' + key3)) await wait(100);
+  }
+  const block = parts.split('========').find((b) => b.includes('brief ' + key3)) || '';
+  check('a brief in the parts contract carries the human\'s words too', /the human asked for: “castle with green tops”/.test(block), block.split('\n').slice(0, 3));
+  await call('space_answer', { key: key3, refuse: 'the smoke only reads it' });
+
   // ---- a refusal ----------------------------------------------------------
   const key2 = tabSession.answer({ participantId: MM.LOCAL_PARTICIPANT, question: 'brief', text: 'nothing much', aboutIds: [planId], at: Date.now() });
   await tab.appendLog(tabMe, tabSession.getEvents().slice(tabSession.getEvents().length - 1));
