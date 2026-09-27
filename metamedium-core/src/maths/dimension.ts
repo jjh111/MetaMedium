@@ -885,6 +885,10 @@ export interface FigureLabel {
   value: Quantity;
   /** As written: '24', 'r = 12'; a declared right angle is '∟'. */
   text: string;
+  /** The number as written, without its name: '24', '12', '28″'. Unset: the text. */
+  shown?: string;
+  /** The name written with it: 'r', 'waist'. */
+  name?: string;
   /** The number's marks, or the square's. */
   ids: string[];
   /** The number it was read from. Two labels of one number are alternatives — a bare number beside a circle is its radius or its diameter. */
@@ -1132,6 +1136,8 @@ export function dimensionsOf(state: SessionState, options: DimensionOptions = {}
         key: c.key,
         value: a.number.reading.value,
         text: a.number.text,
+        shown: formatQuantity(a.number.reading.value),
+        ...(a.number.reading.name ? { name: a.number.reading.name } : {}),
         ids: [...a.number.ids],
         number: a.number.id,
         confidence: c.confidence,

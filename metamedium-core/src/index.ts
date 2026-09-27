@@ -87,8 +87,11 @@ export type { CleanShape, SnapReading } from './session/clean';
 export { strokeFor, parseShapes, MAX_DRAWN } from './session/synthesize';
 export type { DrawnShape } from './session/synthesize';
 
-// The maths of a mark — what follows from a reading, measured from the ink.
-export { measure, describeMaths } from './session/measure';
+// The maths of a mark — what follows from a reading, measured from the ink;
+// in the drawing's units when numbers are written on it (M4: pass the board's
+// maths, `solveBoard(state)`). A measured corner is right within
+// RIGHT_ANGLE_TOLERANCE — a reading of the ink, never a fact.
+export { measure, describeMaths, angleClass, RIGHT_ANGLE_TOLERANCE } from './session/measure';
 export type { Maths, Measure } from './session/measure';
 
 // Maths on a page — quantities as the hand writes them (a value or a range, a
@@ -207,6 +210,24 @@ export type {
   DimensionOptions,
   BoardDimensions,
 } from './maths/dimension';
+// Solving (M4): figure by figure, in closed form — a triangle from three
+// facts, a rectangle from two, a circle from one, an arc from two, a line,
+// parts along one edge summing to their whole. Every derived value carries
+// its formula; an over-determined figure keeps every consistent reading and
+// says what cannot hold and by how much; a declared square rules, a measured
+// right angle is only a reading; what the labels leave open is the ink's.
+export { solveFigure, solveBoard, describeSolution } from './maths/solve';
+export type {
+  SolvedFrom,
+  SolvedValue,
+  Conflict as MathsConflict,
+  SolveReading,
+  Solution,
+  SolveOptions,
+  FigureMaths,
+  BoardMaths,
+  SolveBoardOptions,
+} from './maths/solve';
 
 // Magnets — the places a mark offers attachment, derived from its clean form.
 export { magnetSites, nearestMagnet, magnetsNear, magnetRadius, describeMagnet, MAGNET_SCREEN_PX, MAGNET_SIZE_FRACTION } from './session/magnets';
