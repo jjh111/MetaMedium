@@ -307,8 +307,16 @@ async function write(args) {
     await flush();
     return { text: id + ': a new version (' + kind + ', ' + code.length + ' chars) — the hand plays it, or looks at it, as it likes' };
   }
-  const q = args.bounds || {};
-  const bounds = { minX: Number(q.x ?? 0), minY: Number(q.y ?? 0), maxX: Number(q.x ?? 0) + Number(q.w ?? 360), maxY: Number(q.y ?? 0) + Number(q.h ?? 240) };
+  let bounds, where = '';
+  if (args.place && !args.bounds) {
+    const placed = placeBy(args.place, s);
+    if (placed.error) return { text: placed.error };
+    bounds = placed.bounds;
+    where = ' — ' + placed.said;
+  } else {
+    const q = args.bounds || {};
+    bounds = { minX: Number(q.x ?? 0), minY: Number(q.y ?? 0), maxX: Number(q.x ?? 0) + Number(q.w ?? 360), maxY: Number(q.y ?? 0) + Number(q.h ?? 240) };
+  }
   const name = String(args.name || 'from-' + label(ME)).replace(/[^A-Za-z0-9._-]+/g, '-');
   const row = MM.rowOf(kind);
   const ext = row.extensions[0];
@@ -316,7 +324,40 @@ async function write(args) {
   const id = session.import({ kind, path: label(ME) + '/' + file, name: file, bounds, code, at: now() });
   if (!id) return { text: 'could not place it' };
   await flush();
-  return { text: id + ' placed at ' + r(bounds.minX) + ',' + r(bounds.minY) + ' ' + r(bounds.maxX - bounds.minX) + '×' + r(bounds.maxY - bounds.minY) + ' (' + kind + ')' + (kind === 'run' ? ' — it waits for the hand to play it' : '') };
+  return { text: id + ' placed at ' + r(bounds.minX) + ',' + r(bounds.minY) + ' ' + r(bounds.maxX - bounds.minX) + '×' + r(bounds.maxY - bounds.minY) + ' (' + kind + ')' + where + (kind === 'run' ? ' — it waits for the hand to play it' : '') };
+}
+
+// Writing a figure is not arithmetic (NOTES-DRAWING-WITH-THE-HAND §F): where
+// a figure goes, said relative to a mark the way a hand would say it —
+// inside it, under it, above it, beside it — instead of bounds worked out by
+// hand from its box. The mark's own bounds are the ground; w and h are the
+// figure's size when given, else the mark's side it shares. Nothing is
+// guessed: a mark that is not on the board is said.
+const PLACE_GAP = 12;
+function placeBy(place, s) {
+  const how = ['in', 'under', 'above', 'right', 'left'].find((k) => typeof place[k] === 'string');
+  if (!how) return { error: 'a placement names a mark: {in|under|above|right|left: id, w?, h?}' };
+  const id = place[how];
+  const node = s.nodes.get(id);
+  const b = node && !node.reps.some((x) => x.modality === 'erased') ? MM.boundsOf(node) : null;
+  if (!b) return { error: 'not placed: no mark ' + id + ' on the board' };
+  const bw = b.maxX - b.minX, bh = b.maxY - b.minY;
+  const want = (v, d) => (Number.isFinite(Number(v)) && Number(v) > 0 ? Number(v) : d);
+  let x, y, w, h;
+  if (how === 'in') {
+    // Inside, with an inset of a tenth of the short side, centred; never larger than the room inside.
+    const inset = Math.min(bw, bh) * 0.1;
+    const roomW = Math.max(1, bw - inset * 2), roomH = Math.max(1, bh - inset * 2);
+    w = Math.min(roomW, want(place.w, roomW)); h = Math.min(roomH, want(place.h, roomH));
+    x = b.minX + (bw - w) / 2; y = b.minY + (bh - h) / 2;
+  } else if (how === 'under' || how === 'above') {
+    w = want(place.w, bw); h = want(place.h, 40);
+    x = b.minX; y = how === 'under' ? b.maxY + PLACE_GAP : b.minY - PLACE_GAP - h;
+  } else {
+    w = want(place.w, 200); h = want(place.h, bh);
+    x = how === 'right' ? b.maxX + PLACE_GAP : b.minX - PLACE_GAP - w; y = b.minY;
+  }
+  return { bounds: { minX: x, minY: y, maxX: x + w, maxY: y + h }, said: (how === 'in' ? 'inside ' : how === 'right' || how === 'left' ? how + ' of ' : how + ' ') + id };
 }
 
 // ----- The tools ------------------------------------------------------------
@@ -366,8 +407,8 @@ const TOOLS = [
   },
   {
     name: 'canvas_write',
-    description: 'Write code onto the canvas: a new artifact in a frame (bounds in canvas units), or a new version of an existing artifact by id. Kinds: html (a page: regions carry data-region), run (a program: `mm` gives width, height, ctx, THREE/scene/camera, onFrame(fn), onPointer(fn), report(name, x, y, w, h)), js, json, svg, md, text. A program is never played by you — the hand plays it.',
-    inputSchema: { type: 'object', required: ['kind', 'code'], properties: { kind: { type: 'string' }, code: { type: 'string' }, name: { type: 'string' }, artifactId: { type: 'string' }, bounds: { type: 'object', properties: { x: num, y: num, w: num, h: num } } } },
+    description: 'Write code onto the canvas: a new artifact in a frame (bounds in canvas units, or place: a spot relative to a mark — {in: id} centred inside it, {under|above: id} as wide as it, {right|left: id} as tall as it, each with an optional w and h), or a new version of an existing artifact by id. Kinds: html (a page: regions carry data-region), run (a program: `mm` gives width, height, ctx, THREE/scene/camera, onFrame(fn), onPointer(fn), report(name, x, y, w, h)), js, json, svg, md, text. A program is never played by you — the hand plays it.',
+    inputSchema: { type: 'object', required: ['kind', 'code'], properties: { kind: { type: 'string' }, code: { type: 'string' }, name: { type: 'string' }, artifactId: { type: 'string' }, bounds: { type: 'object', properties: { x: num, y: num, w: num, h: num } }, place: { type: 'object', properties: { in: { type: 'string' }, under: { type: 'string' }, above: { type: 'string' }, right: { type: 'string' }, left: { type: 'string' }, w: num, h: num } } } },
     run: write,
   },
 ];
