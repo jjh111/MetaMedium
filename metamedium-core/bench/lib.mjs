@@ -81,6 +81,36 @@ export async function loadCore(which = 'bundle', { patch = [], tag = '' } = {}) 
   return { core: await import(url), path: outfile, which };
 }
 
+const BROWSER_BANNER = '/* metamedium-core browser bundle \u2014 built from metamedium-core/src via: npm run build:browser. Do not edit directly. */';
+export const BROWSER_BUNDLE_PATH = join(REPO, 'Demos', 'metamedium-core.browser.js');
+
+/**
+ * The browser bundle built from source with a source map, the way
+ * `npm run build:browser` builds it, so a browser profile of the committed
+ * `Demos/metamedium-core.browser.js` reads back to `src/…:line`. Returns
+ * whether the build is byte-identical to the committed copy (it must be, or
+ * the map would describe a different file).
+ */
+export async function buildBrowserMap() {
+  const { build } = await import('esbuild');
+  mkdirSync(OUT_DIR, { recursive: true });
+  const outfile = join(OUT_DIR, 'core-browser.js');
+  await build({
+    entryPoints: [join(CORE_DIR, 'src', 'index.ts')],
+    bundle: true,
+    format: 'iife',
+    globalName: 'MetaMediumCore',
+    banner: { js: BROWSER_BANNER },
+    absWorkingDir: CORE_DIR,
+    sourcemap: 'linked',
+    sourcesContent: false,
+    outfile,
+    logLevel: 'silent',
+  });
+  const built = readFileSync(outfile, 'utf8').replace(/\n\/\/# sourceMappingURL=.*\n?$/, '\n');
+  return { map: outfile + '.map', identical: built === readFileSync(BROWSER_BUNDLE_PATH, 'utf8') };
+}
+
 /** Median, p95 and the rest of a list of milliseconds. Nearest-rank percentiles. */
 export function summarize(samples) {
   const xs = samples.filter((x) => Number.isFinite(x)).slice().sort((a, b) => a - b);
