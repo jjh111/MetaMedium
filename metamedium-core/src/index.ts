@@ -91,6 +91,84 @@ export type { DrawnShape } from './session/synthesize';
 export { measure, describeMaths } from './session/measure';
 export type { Maths, Measure } from './session/measure';
 
+// Maths on a page — quantities as the hand writes them (a value or a range, a
+// unit, exact or approximate) and a small grammar of formulas whose `=` chains
+// are running totals, read plurally with reasons (MATHS-PLAN.md §4;
+// DIRECTOR-PLAN-W2 M1). Tier 1: pure, no model, no eval.
+export {
+  quantity,
+  rangeOf,
+  isRange,
+  isBare,
+  holds,
+  parseQuantity,
+  formatQuantity,
+  formatNumber,
+  convertQuantity,
+  arithmetic,
+  negateQuantity,
+  compareQuantities,
+  LENGTH_UNITS,
+} from './maths/quantity';
+export type { Quantity, LengthUnit, QuantityParse, Converted, Arith, ArithOp, CheckStatus, Comparison } from './maths/quantity';
+export {
+  parseExpression,
+  parseChain,
+  parseLine,
+  evaluateExpr,
+  evaluateChain,
+  formatExpr,
+  describeExpr,
+  sameExpr,
+  normName,
+  scopeOf,
+} from './maths/expr';
+export type {
+  Expr,
+  ExprOp,
+  ExprReading,
+  ReadingChoice,
+  ExprChain,
+  ChainSegment,
+  SegmentJoin,
+  LineLabel,
+  LineShape,
+  LineParse,
+  NameResolution,
+  MathsScope,
+  EvalOptions,
+  Resolved as ResolvedName,
+  ExprEvaluation,
+  WrittenCheck,
+  WorkedBinding,
+  ChainReading,
+} from './maths/expr';
+// The sheet (M2): lines of writing or text become definitions, steps, checks
+// and headings; a heading that says to add something is an allowance, read
+// both ways; a pure function of its lines, so a changed measurement
+// re-derives exactly what depends on it. `sheetLines` gathers the lines from
+// a session's state and changes nothing in it.
+export { readSheet, sheetEntry, sheetValue, dependentsOf, checkWritten, diffSheets, describeSheet } from './maths/sheet';
+export type {
+  Sheet,
+  SheetEntry,
+  SheetLineInput,
+  SheetOptions,
+  DefinitionEntry,
+  StepEntry,
+  HeadingEntry,
+  CheckEntry,
+  WorkedEntry,
+  LabelEntry,
+  ValueEntry,
+  NoteEntry,
+  Allowance,
+  StepCheck,
+  StepCheckStatus,
+} from './maths/sheet';
+export { sheetLines } from './maths/gather';
+export type { GatheredLine } from './maths/gather';
+
 // Magnets — the places a mark offers attachment, derived from its clean form.
 export { magnetSites, nearestMagnet, magnetsNear, magnetRadius, describeMagnet, MAGNET_SCREEN_PX, MAGNET_SIZE_FRACTION } from './session/magnets';
 export type { MagnetSite, MagnetKind, MagnetHit } from './session/magnets';

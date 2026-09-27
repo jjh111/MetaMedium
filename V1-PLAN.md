@@ -466,6 +466,10 @@ pack** — pattern piece, grain line, fold line, notch, dart, seam allowance,
 each with its samples and bench. **M7 true size and print** — an `svg`
 artifact at true size and a print export tiled onto pages with alignment
 marks. *Trap:* a printer scales; the tile carries a measured test square.
+*Status, 26 Sep 2026:* M1 (quantities, expressions with running totals) and
+M2 (the sheet, `sheetLines`) built in `metamedium-core/src/maths/` on
+`w2-maths` — 94 tests; changing the bust re-derives exactly A, 1, 2 and 5
+(`MATHS-PLAN.md` §4).
 
 ### Phase 5 — seats
 J1–J3 as `DIRECTOR-PLAN-W2.md` §3, with §6's addition.

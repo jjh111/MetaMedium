@@ -146,6 +146,31 @@ clause: numbers are computed by the canvas, never by the model.
   it to scale* makes an `svg` artifact at true size; *print at full size*
   tiles it onto pages.
 
+**Status, 26 Sep 2026: M1 and M2 built** (branch `w2-maths`; red `cf10608`,
+`07b6efc`; built `2bd9426`, `f3fe88e`, `6bc8ba1`). In `src/maths/`:
+`quantity.ts` — a value or a range, a unit (″ ′ in cm mm ft m, or none),
+exact or approximate, and how precisely it was written; converts and says
+so; interval arithmetic; a written result checked against a computed one
+(ok, rounded, within, off with both numbers, or unknown). `expr.ts` — the
+grammar written by hand, no `eval`; a line splits at `=`, at a result
+written beside its formula and at a worked line's gap; each later segment
+is read as the formula restated or as a running total and the arithmetic
+chooses, the computed value flowing on; the three plural lines are ranked
+with reasons, and a worked line one reading restates is checked against
+the others (*Chest + 6″ ÷ 2* by precedence is 39″ against the written
+21″). `sheet.ts` — definitions, steps, headings, labels, values, checks and
+worked lines; an *Add …* heading is an allowance (the apron's 2″, as steps
+1 and 3 add it), read both ways on any step that does not add it itself,
+which is how *4. C 48* checks and *(C × 2) − B* is 72 or 74; cycles,
+unknown names and missing steps said; `diffSheets`, `dependentsOf`,
+`checkWritten`, `describeSheet`. `gather.ts` — `sheetLines(state)` from
+text artifacts and read writing, changing nothing. Fixtures `apron.sample`,
+`tunic.sample`, `triangle`, sample numbers only. 94 tests in four files
+(quantity 26, expr 31, sheet 28, gather 9); core 767 in 61 files (673 in
+57). Change the bust: A from 36 to 38 re-derives A, 1, 2 and 5 and nothing
+else, and undo restores them. Not yet: `measure.ts` in units, the HERE
+clause, and the `maths` tool, which waits for B1's registry.
+
 ## 5. The middle layer — seats that judge
 
 TypeSafe's own guidance for Jev is the pattern this engine already follows:
