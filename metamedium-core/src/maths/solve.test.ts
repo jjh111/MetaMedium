@@ -135,6 +135,14 @@ describe('any triangle from three facts', () => {
     expect(valueOf(sol, 'side1')!.formula).toBe('10 × sin 40° ÷ sin 80°');
   });
 
+  it('SSA: two sides and an angle opposite one of them can make two triangles — both are said', () => {
+    // 40° at A, AB = 10, and BC = 7 opposite it: the angle at C is 66.67° or 113.33°.
+    const sol = solveFigure(tri([{ x: 0, y: 0 }, { x: 1000, y: 0 }, { x: 730, y: 612 }]), [angle(0, 40), side('side0', 10), side('side1', 7)], { unit: 'in' });
+    expect(sol.readings).toHaveLength(2);
+    expect(sol.readings.map((r) => r.values.find((v) => v.key === 'angle2')!.text).sort()).toEqual(['113.33°', '66.67°']);
+    expect(sol.conflicts).toEqual([]);
+  });
+
   it('three angles make no size, and angles that do not add to 180° are said to', () => {
     const sol = solveFigure(tri([{ x: 0, y: 0 }, { x: 1000, y: 0 }, { x: 669, y: 561 }]), [angle(0, 40), angle(1, 60), angle(2, 90)], { unit: 'in' });
     expect(sol.readings).toEqual([]);
