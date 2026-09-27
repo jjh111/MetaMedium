@@ -23,7 +23,7 @@ import { polygonFigure } from './dimension';
 import type { Figure, FigureLabel } from './dimension';
 import { solveBoard, solveFigure, describeSolution } from './solve';
 import type { BoardMaths, Solution } from './solve';
-import { quantity } from './quantity';
+import { quantity, rangeOf } from './quantity';
 import { TRIANGLE_LABELS, TRIANGLE_CORNERS, TRIANGLE_SQUARE, TRIANGLE_LABEL_BOXES, TRIANGLE_EXPECTED } from './fixtures/triangle';
 
 function text(s: Session, code: string, box: Bounds, at: number): string {
@@ -204,6 +204,36 @@ describe('a rectangle, a circle, an arc', () => {
     expect(valueOf(sol, 'radius')).toMatchObject({ text: '7.5″', formula: '12² ÷ (8 × 3) + 3 ÷ 2' });
     expect(valueOf(sol, 'sweep')!.text).toBe('106.26°');
     expect(valueOf(sol, 'arc')!.text).toBe('13.91″');
+  });
+});
+
+describe('how it is said', () => {
+  const right = { key: 'angle0', value: quantity(90), text: '∟', ids: ['sq'], declared: true, confidence: 1, reason: 'a square in the corner' } as FigureLabel;
+  const legs = polygonFigure([{ x: 100, y: 300 }, { x: 340, y: 300 }, { x: 100, y: 220 }], { id: 'figure:legs', sideIds: [['a'], ['b'], ['c']] });
+
+  it('a range stays a range, and a formula puts it in brackets', () => {
+    const sol = solveFigure(legs, [
+      { key: 'side0', value: rangeOf(2, 4, 'in', { precision: 1 }), text: '2–4″', ids: ['n1'], number: 'n1', confidence: 1, reason: 'written' },
+      { key: 'side2', value: quantity(8, 'in', { precision: 1 }), text: '8″', ids: ['n2'], number: 'n2', confidence: 1, reason: 'written' },
+      right,
+    ], { unit: 'in' });
+    expect(valueOf(sol, 'side1')).toMatchObject({ text: '8.25–8.94″', formula: '√(8² + (2–4)²)' });
+  });
+
+  it('an area, not a area', () => {
+    const s = createSession();
+    const r = s.addStroke(rectStroke(100, 100, 300, 100), 1000);
+    text(s, 'area 48', box(250, 150, 80, 30), 20000);
+    text(s, '8', box(250, 80), 21000);
+    const sol = solutionOf(solveBoard(s.getState(), { unit: 'in' }), r);
+    expect(sol.readings[0].sentence).toBe('a width of 8 and an area of 48 make the height 6″');
+  });
+
+  it('two labels on one side of a quadrilateral: the one that cannot hold is set against the other', () => {
+    const quad = polygonFigure([{ x: 0, y: 0 }, { x: 300, y: 0 }, { x: 350, y: 200 }, { x: -20, y: 180 }], { id: 'figure:q', sideIds: [['a'], ['b'], ['c'], ['d']] });
+    const l = (key: string, v: number, id: string): FigureLabel => ({ key, value: quantity(v, 'in', { precision: 1 }), text: String(v), ids: [id], number: id, confidence: 1, reason: 'written' });
+    const sol = solveFigure(quad, [l('side0', 30, 'n1'), l('side1', 20, 'n2'), l('side0', 31, 'n3')], { unit: 'in' });
+    expect(sol.conflicts.map((c) => c.reason)).toEqual(['labelled 31; a length of 30 makes it 30, 1 shorter (3%)']);
   });
 });
 
