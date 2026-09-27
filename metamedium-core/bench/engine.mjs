@@ -602,6 +602,36 @@ async function relateOnly() {
     clusters: groups.length,
   };
   say(`relate over the ${size}-mark board's content plane (${marks.length} marks, ${Math.round(out.relations.pairs).toLocaleString('en-GB')} pairs): median ${ms(out.relations.relate.median)} of ${times.length} → ${relations.length.toLocaleString('en-GB')} relations, ${out.relations.heldMB} MB; clusters ${ms(out.relations.clustersMs)}`);
+  relations = null;
+  writeResult(`engine-relate-${size}-${which}.json`, out);
+
+  // --read: the whole-board read the surface's readRungs runs after every
+  // stroke — session.read's body (session.ts:2426–2459), line for line, over
+  // the same marks, from the same core functions, with no session to replay.
+  if (a.read) {
+    const { readInputs } = generateBoard(core, { marks: size, seed, collectMarks: true });
+    gc();
+    const t0 = now();
+    const rmarks = readInputs.map((x) => x.mark);
+    const rel = core.relate(rmarks);
+    const shapes = {}, shapeConfidence = {}, names = {}, transcripts = {}, wires = {};
+    for (const x of readInputs) {
+      shapes[x.mark.id] = x.shape;
+      shapeConfidence[x.mark.id] = x.confidence;
+      if (x.name) names[x.mark.id] = x.name;
+      if (x.transcript) transcripts[x.mark.id] = x.transcript;
+      if (x.wire) wires[x.mark.id] = x.wire;
+    }
+    const scopeIds = rmarks.map((m) => m.id);
+    const tr = now();
+    const roles = await profiled(`read-${size}-no-replay`, () => core.assignRoles({ ids: scopeIds, shapes, shapeConfidence, relations: rel, wires }));
+    const rolesMs = now() - tr;
+    const genre = core.genreOf(roles);
+    const scope = { ids: scopeIds, marks: rmarks, relations: rel, shapes, names, transcripts, roles };
+    const concepts = core.matchConcepts(scope);
+    out.read = { ids: scopeIds.length, relations: rel.length, genre: genre.genre, concepts: concepts.map((c) => c.concept), ms: now() - t0, assignRolesMs: rolesMs };
+    say(`  the whole-board read (session.read's body): ${scopeIds.length} marks, ${rel.length.toLocaleString('en-GB')} relations, ${ms(out.read.ms)} (assignRoles ${ms(rolesMs)}), genre ${genre.genre}`);
+  }
   const file = writeResult(`engine-relate-${size}-${which}.json`, out);
   say(`  → ${file}`);
 }

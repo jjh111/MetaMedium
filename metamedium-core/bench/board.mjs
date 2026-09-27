@@ -560,6 +560,9 @@ export function generateBoard(core, { marks, seed = 1, hands = ['local'], model 
   // another, so their final content planes together ARE the whole board's —
   // what `relate` is handed on every event (session.ts markOf), with no replay.
   const contentMarks = [];
+  // …and what session.read (session.ts:2426) reads for each mark the surface's
+  // readRungs asks about: loose content and every artifact's members.
+  const readInputs = [];
 
   let r = 0;
   let strokes = 0;
@@ -645,6 +648,24 @@ export function generateBoard(core, { marks, seed = 1, hands = ['local'], model 
     }
 
     if (collectMarks) {
+      const rung = st.contentIds.filter((id) => !st.artifacts.includes(id));
+      for (const aid of st.artifacts) for (const e of st.nodes.get(aid).edges) if (e.rel === 'has-part') rung.push(e.to);
+      for (const id of rung) {
+        const n = st.nodes.get(id);
+        const b = n && core.boundsOf(n);
+        if (!b) continue;
+        const fp = core.fingerprintOf(n);
+        const top = core.resemblances(n)[0];
+        const ends = n.edges.filter((e) => e.rel === 'connects').map((e) => e.to);
+        readInputs.push({
+          mark: { id, bounds: b, points: core.strokePointsOf(n) ?? undefined, closed: fp ? fp.isClosed : undefined },
+          shape: top ? top.to.replace(/^type:/, '') : 'art',
+          confidence: top?.weight ?? 0,
+          name: core.wordOf(n),
+          transcript: core.transcriptOf(n),
+          wire: ends.length ? { ends, from: n.edges.find((e) => e.rel === 'points-from')?.to, to: n.edges.find((e) => e.rel === 'points-to')?.to } : null,
+        });
+      }
       for (const id of st.contentIds) {
         const n = st.nodes.get(id);
         const b = n && core.boundsOf(n);
@@ -686,7 +707,7 @@ export function generateBoard(core, { marks, seed = 1, hands = ['local'], model 
   stats.pointsPerStroke = points / Math.max(1, strokes);
   stats.extent = { w: Math.round(bb.maxX - bb.minX), h: Math.round(bb.maxY - bb.minY) };
   stats.spanMinutes = Math.round((t - T0) / 60000);
-  return { events, logs, stats, contentMarks: collectMarks ? contentMarks : null };
+  return { events, logs, stats, contentMarks: collectMarks ? contentMarks : null, readInputs: collectMarks ? readInputs : null };
 }
 
 /** How the strokes read, as one line per intended kind: `rectangle 96% rectangle, 3% circle`. */

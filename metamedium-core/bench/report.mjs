@@ -26,6 +26,7 @@ out('');
 out('| | 500 | 2,000 | 5,000 |');
 out('|---|---|---|---|');
 const boards = SIZES.map((n) => eng(`engine-board-${n}-source.json`));
+const relOnly = SIZES.map((n) => eng(`engine-relate-${n}-source.json`));
 const builds = SIZES.map((n) => eng(`engine-build-${n}-source.json`));
 const profiled = SIZES.map((n) => eng(`engine-board-${n}-source.profiled.json`));
 const bundles = SIZES.map((n) => eng(`engine-board-${n}-bundle.json`));
@@ -46,7 +47,6 @@ row('**memory held after replay**', (i) => { const m = (boards[i] || builds[i] |
 row('…of which checkpoints (held with them off)', (i) => { const x = ablated[i]; return x ? `${x.memory.heldMB} MB held, replay ${f1(x.replay.coldMs)}` : '—'; });
 row('edges stored in the graph', (i) => { const m = (boards[i] || builds[i] || {}).memory; return m ? m.edges.toLocaleString('en-GB') : '—'; });
 row('max RSS of the process', (i) => { const m = (boards[i] || builds[i] || {}).memory; return m ? `${m.maxRssMB} MB` : '—'; });
-const relOnly = SIZES.map((n) => eng(`engine-relate-${n}-source.json`));
 row('`relate` over the content plane (pairs → relations)', (i) => {
   const r = (boards[i] || {}).relations;
   if (r) return `${f1(r.relate.median)} (${Math.round(r.pairs).toLocaleString('en-GB')} → ${r.relations.toLocaleString('en-GB')})`;
@@ -56,14 +56,21 @@ row('`relate` over the content plane (pairs → relations)', (i) => {
   return b ? `${f1(b.ms)} (${b.marks} marks → ${b.relations.toLocaleString('en-GB')})` : '—';
 });
 row('…the relation list it builds, held', (i) => { const o = relOnly[i] && relOnly[i].relations; return o ? `${o.heldMB} MB (${o.marks.toLocaleString('en-GB')} marks)` : '—'; });
-row('`session.read` of the whole board (the surface\'s readRungs)', (i) => { const r = (boards[i] || {}).read; const b = builds[i] && builds[i].read; if (r) return `${f1(r.median)} (${r.ids} marks)`; return b ? `${f1(b.ms)} (${b.ids} marks)` : '—'; });
+row('`session.read` of the whole board (the surface\'s readRungs)', (i) => {
+  const r = (boards[i] || {}).read;
+  if (r) return `${f1(r.median)} (${r.ids} marks)`;
+  const o = relOnly[i] && relOnly[i].read;
+  if (o) return `${f1(o.ms)} (${o.ids} marks) †`;
+  const b = builds[i] && builds[i].read;
+  return b ? `${f1(b.ms)} (${b.ids} marks)` : '—';
+});
 row('**one more stroke: median / p95**', (i) => { const s = (boards[i] && boards[i].stroke) || (builds[i] && builds[i].stroke); return s ? `${pm(s)} (n ${s.n})` : '—'; });
 row('…the shape rung alone for those strokes', (i) => { const s = boards[i] && boards[i].stroke && boards[i].stroke.readingsAlone; return pm(s); });
 row('`getState()` (handed to subscribers on every event)', (i) => pm(boards[i] && boards[i].getState));
 const briefs = SIZES.map((n, i) => (boards[i] && boards[i].brief) || ((eng(`engine-board-${n}-source.only-brief.json`) || {}).brief) || null);
 row('a model\'s brief (`describeSession`): five marks · the whole board', (i) => { const b = briefs[i]; return b ? `${(b.groupChars / 1024).toFixed(0)} KB · ${(b.wholeChars / 1048576).toFixed(1)} MB` : '—'; });
 out('');
-out('Commands: `node --expose-gc metamedium-core/bench/engine.mjs board --size=N --repeat=K` (500: K=5; 2,000: K=2); 5,000: `node --expose-gc --max-old-space-size=65536 metamedium-core/bench/engine.mjs build --size=5000 --strokes=20`; bundle: add `--core=bundle`; checkpoints off: add `--ablate=checkpoints --only=replay`; the relation list and † (the content plane gathered from the diagrams the board was drawn in, so no replay — the same 336 and 1,377 marks and the same relations the replayed boards hold): `node --expose-gc metamedium-core/bench/engine.mjs relate --size=N`.');
+out('Commands: `node --expose-gc metamedium-core/bench/engine.mjs board --size=N --repeat=K` (500: K=5; 2,000: K=2); 5,000: `node --expose-gc --max-old-space-size=65536 metamedium-core/bench/engine.mjs build --size=5000 --strokes=20`; bundle: add `--core=bundle`; checkpoints off: add `--ablate=checkpoints --only=replay`; the relation list and † (the content plane gathered from the diagrams the board was drawn in, so no replay — the same 336 and 1,377 marks and the same relations the replayed boards hold, and a read within 4% of the session\'s own): `node --expose-gc metamedium-core/bench/engine.mjs relate --size=N --read`.');
 out('');
 
 // --- the stroke's cost as the board grows ---
