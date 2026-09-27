@@ -428,7 +428,8 @@ Everything typed there goes through one reader, `readField`, which returns
 selection has (`erase`, `dup`, `clean`, `line up`, `play`, `frame`, `read`,
 `what` …, by label or alias), a name the library knows (reused, no model
 asked), words the verb table reads at a definition, a prefix (`name:`,
-`ask:`, `draw:`, `page:`, `run:`, `new:`, `what:`), or else the brief. Under
+`label:`, `ask:`, `draw:`, `page:`, `run:`, `new:`, `what:`), or else the
+brief. Under
 the field, laid out as John sketched it (6 Sep): the **core** — four round
 buttons at the left, Name · Copy · Paste · Erase, always the same four in
 the same slots (a circle with a mark in it; the name is the tooltip and the
@@ -437,8 +438,10 @@ reading line while the pointer rests on one); then, stacked to their right,
 0.92*, *page-layout 0.78 · GLM*, *row 0.81*), and tapping one takes it as
 the name; and **what it affords** — Draw them clean, Line up, Frame these,
 Play A, Not a molecule …, ranked by the reading and by use, the rest a
-keystroke away. A pill carries a label; its reason is the tooltip; a pill
-that asks a model carries a dot. Copy holds the
+keystroke away. A word typed, or writing read, is offered two ways side by
+side — *Name it* and *Label it* (see *A label*, below). A pill carries a
+label; its reason is the tooltip; a pill that asks a model carries a dot.
+Copy holds the
 ink (and puts it on the clipboard as SVG); Paste puts it beside the selection
 or, from the keyboard, at the pen. A tap while the field or a selection is up
 dismisses it and is never a dot. `Demos/surface/05-selection.js`,
@@ -449,10 +452,13 @@ What Enter will do is a pure function — `readFieldCommand(ctx)` — of a
 **`FieldContext`** record (the text, whether a summon stands and whether it is
 over a live artifact, the offers as labels and aliases, the joined models by
 name, what the library holds, the definition in the loop and what the verb table
-read in the words, and a thunk for the drawing's genre) returning a
-**`FieldReading`** (`kind`, the `line` shown under the field, `quiet`, and a
-**named command** — `take` · `name` · `ask-what` · `ask` · `draw` · `build` ·
-`library` · `behave` · `need-model`). `09-palette.js` is the adapter on both
+read in the words, whose ink is held — `marks`, how many of the held marks the
+person made and who made each of the rest — and a thunk for the drawing's genre)
+returning a **`FieldReading`** (`kind`, the `line` shown under the field,
+`quiet`, and a **named command** — `take` · `name` · `label` · `ask-what` ·
+`ask` · `draw` · `build` · `library` · `behave` · `need-model`). Beside it,
+`typedWord(ctx)` is as pure: the word a typed text offers to name or label with,
+or null. `09-palette.js` is the adapter on both
 sides: `fieldContext` gathers, `runFieldCommand` performs, and `readField` keeps
 its old shape so nothing else changed. The point is that the field's query can
 now be asked questions in Node with no browser, no DOM and no session —
@@ -1350,11 +1356,13 @@ demo — up beside `createModels` it runs during module evaluation, where
 `report()` reads chrome declared further down, so it threw into a promise nobody
 awaited and the seat silently never took while the room joined fine.
 
-### A label: a hand's word on its own ink (V1-PLAN L2b)
+### A label: a hand's word on its own ink (V1-PLAN L2b, L2e)
 
 > `session.label` / `labelOf` / `labelsOf` in core (`session/label.test.ts`);
 > `renderLabels` in `Demos/surface/08-render.js`; `canvas_label` in
-> `Demos/mcp.mjs`.
+> `Demos/mcp.mjs`; the person's door — `readLabel` and `typedWord` in
+> `Demos/surface/09-field.js`, `labelMarks` and `labelItem` in `09-palette.js`
+> (e2e 42).
 
 **Whoever made a mark may put a word on it; nobody else may.** Naming a mark
 someone else made is blessing it, the human's act; labelling your own ink is
@@ -1371,6 +1379,30 @@ board's units: the caption rule of `13-kinds.js`, so it scales with the
 drawing it names, never held at screen size (`LABEL_PX` on the screen the mark
 was drawn on — its stroke's scale). Who put it there shows only while the hand
 points at the mark; erasing the mark takes the label, and undo brings both.
+
+**A person labels from the field** (V1-PLAN L2e). With marks held, `label:
+word` is a prefix of the pure reader, and the line says before Enter what the
+word will go on — `↵ label it “inlet”`, *on each of your 3 marks*, *on
+yours, not the mark fern made*, or, quietly, *no label — fern made this
+mark*. The row offers it too, as *Label it “…”* beside the naming offer:
+under writing that has been read (the reading that takes the word as the name
+stands above it; the label goes on the marks held with the writing, or, with
+nothing else held, on the writing itself as a caption), and for a word typed
+(`typedWord`: *Name it “…”* and *Label it “…”*, the pair together; `label:`
+and `name:` mark one). Taking it is `labelMarks`: one `label` event per held
+mark the person made, each through the session's door, and every mark said in
+the status line — labelled, already saying the word, or refused with whose it
+is (*not on the mark fern made — a label goes on your own ink*) — never passed
+over in silence. The field closes **before** the word is written, so the
+labels are the last events and one undo takes one off; a mark already saying
+the word writes nothing, so a second Enter or a held pill is not a second
+event. Naming and labelling one word side by side read as one thing twice,
+so the difference is said in words the field already has — each pill's
+tooltip says what it does and what it does not (naming makes one thing, a
+definition the library keeps, and writes no word on the ink; labelling makes
+nothing), and the reading line says what a pill of the pair will do while it
+is pointed at or chosen by the arrows — never a badge, a row, or a fifth core
+button. No model is asked.
 
 **Every reading says what it is based on** (`Interpretation.basis`: `name`,
 `label` or `resemblance`). A label is one named reading among the engine's,
