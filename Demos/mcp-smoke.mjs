@@ -35,28 +35,34 @@ const heard = [];
 tab.subscribe((participant, events) => heard.push({ participant, events }));
 tab.hello();
 
+// An MCP hand: mcp.mjs as a child process, spoken to over stdio.
+function spawnHand(env, tag) {
+  const child = spawn(process.execPath, [path.join(here, 'mcp.mjs')], { env: { ...process.env, ...env }, stdio: ['pipe', 'pipe', 'pipe'] });
+  child.stderr.on('data', (d) => process.stderr.write('  [' + tag + '] ' + d));
+  let out = '';
+  const pending = new Map();
+  child.stdout.on('data', (d) => {
+    out += d;
+    let i;
+    while ((i = out.indexOf('\n')) >= 0) {
+      const line = out.slice(0, i).trim(); out = out.slice(i + 1);
+      if (!line) continue;
+      try { const m = JSON.parse(line); if (pending.has(m.id)) { pending.get(m.id)(m); pending.delete(m.id); } } catch { /* not ours */ }
+    }
+  });
+  let nextId = 1;
+  const rpc = (method, params) => new Promise((resolve, reject) => {
+    const id = nextId++;
+    pending.set(id, resolve);
+    child.stdin.write(JSON.stringify({ jsonrpc: '2.0', id, method, params }) + '\n');
+    setTimeout(() => { if (pending.has(id)) { pending.delete(id); reject(new Error(method + ' timed out')); } }, 8000);
+  });
+  const call = async (name, args) => { const m = await rpc('tools/call', { name, arguments: args || {} }); return m.result || m.error; };
+  return { child, rpc, call };
+}
+
 // The MCP hand.
-const child = spawn(process.execPath, [path.join(here, 'mcp.mjs')], { env: { ...process.env, MM_ROOM: ROOM, MM_RELAY: RELAY, MM_NAME: 'smoke' }, stdio: ['pipe', 'pipe', 'pipe'] });
-child.stderr.on('data', (d) => process.stderr.write('  [mcp] ' + d));
-let out = '';
-const pending = new Map();
-child.stdout.on('data', (d) => {
-  out += d;
-  let i;
-  while ((i = out.indexOf('\n')) >= 0) {
-    const line = out.slice(0, i).trim(); out = out.slice(i + 1);
-    if (!line) continue;
-    try { const m = JSON.parse(line); if (pending.has(m.id)) { pending.get(m.id)(m); pending.delete(m.id); } } catch { /* not ours */ }
-  }
-});
-let nextId = 1;
-const rpc = (method, params) => new Promise((resolve, reject) => {
-  const id = nextId++;
-  pending.set(id, resolve);
-  child.stdin.write(JSON.stringify({ jsonrpc: '2.0', id, method, params }) + '\n');
-  setTimeout(() => { if (pending.has(id)) { pending.delete(id); reject(new Error(method + ' timed out')); } }, 8000);
-});
-const call = async (name, args) => { const m = await rpc('tools/call', { name, arguments: args || {} }); return m.result || m.error; };
+const { child, rpc, call } = spawnHand({ MM_ROOM: ROOM, MM_RELAY: RELAY, MM_NAME: 'smoke' }, 'mcp');
 const textOf = (res) => (res.content || []).filter((c) => c.type === 'text').map((c) => c.text).join('\n');
 
 try {
@@ -190,6 +196,49 @@ try {
     check('with ' + order + ', the sentence stands on the box it was said about', !!on && on.length === 1 && near(on[0], boxBox), { on, boxBox });
   }
   tab2.close();
+
+  // ===== Two hands under one name: BOTH are told (DIRECTOR-PLAN-W2 L1, D4) ====
+  // A second hand comes up under the MCP hand's own log name. The hand's
+  // store checks its own name before discarding any line, so the hand hears
+  // it, says so in every look, and answers the newcomer's hello — which is how
+  // the second hand hears it too.
+  const handLog = heard.filter(fromSmoke).map((h) => h.participant)[0];
+  const twin = new MM.LiveStore(relayTransport(RELAY, ROOM), handLog, ROOM);
+  twin.hello();
+  let t4 = '';
+  for (let i = 0; i < 30 && !/two hands are both called/.test(t4); i++) { t4 = textOf(await call('canvas_look', {})); if (!/two hands are both called/.test(t4)) await wait(100); }
+  check('a second hand under the hand\'s own name: canvas_look says so, before the marks', /\nroom says: two hands are both called "smoke~[^"]+" — this one/.test(t4), t4.split('\n').slice(0, 3));
+  await until(() => twin.collisions().length === 1, 3000);
+  check('and the second hand is told as well', twin.collisions().length === 1, twin.collisions());
+  twin.close();
+
+  // ===== A room older than the relay remembers (L1) ===========================
+  // A relay that keeps ten lines, a hand that has drawn twenty and is still
+  // here, and a second MCP hand that joins after: it is told the room is older
+  // than the relay remembers, and still holds all twenty — the hand still in
+  // the room answers its hello with its whole log.
+  const small = await startRelay(0, { maxLines: 10 });
+  const SMALL = 'http://127.0.0.1:' + small.address().port;
+  const ada = new MM.LiveStore(relayTransport(SMALL, 'old'), 'ada~1', 'old');
+  const adaSession = MM.createSession({ ...MM.DEFAULT_SESSION_CONFIG, logName: 'ada~1' });
+  for (let i = 0; i < 20; i++) {
+    adaSession.addStroke(MM.strokeFor({ shape: 'rectangle', x: (i % 5) * 150, y: Math.floor(i / 5) * 150, w: 100, h: 80 }), Date.now(), undefined, 1);
+    await ada.publish(adaSession.getEvents().filter((e) => !e.by));
+  }
+  const late = spawnHand({ MM_ROOM: 'old', MM_RELAY: SMALL, MM_NAME: 'late' }, 'late');
+  try {
+    await late.rpc('initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'smoke', version: '0' } });
+    let t5 = '';
+    for (let i = 0; i < 30 && !(/older than the relay remembers/.test(t5) && /20 marks/.test(t5)); i++) { t5 = textOf(await late.call('canvas_look', {})); if (!/20 marks/.test(t5)) await wait(100); }
+    check('a hand joining a room the relay has outlived: canvas_look says the room is older than the relay remembers', /\nroom says: the room is older than the relay remembers — \d+ earlier lines are gone/.test(t5), t5.split('\n').slice(0, 3));
+    check('and it still holds all twenty of the hand that is still here', /20 marks/.test(t5), t5.split('\n').slice(0, 3));
+  } finally {
+    late.child.stdin.end();
+    await wait(100);
+    late.child.kill();
+    ada.close();
+    small.close();
+  }
 } catch (err) {
   check('the run finished', false, err.message);
 }

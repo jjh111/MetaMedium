@@ -37,14 +37,6 @@ const flag = (name) => { const i = argv.indexOf('--' + name); return i >= 0 ? ar
 const ROOM = flag('room') || process.env.MM_ROOM || 'claude';
 const RELAY = (flag('relay') || process.env.MM_RELAY || 'http://127.0.0.1:8020').replace(/\/+$/, '');
 const NAME = (flag('name') || process.env.MM_NAME || 'claude').replace(/~.*$/, '');
-// A hand in a room is ONE PROCESS, the way a hand in a room is one tab: the
-// name is the caller's and the suffix says which hand, because two logs under
-// one name are taken for one log. With a fixed '~mcp' suffix, a second
-// mcp.mjs on this machine — a leftover from an earlier session, a restart —
-// answered every newcomer's hello with ITS log under the same name, and the
-// last answer to land replaced the others: a tab that joined the room saw one
-// hand's drawing and never the other's, with nothing to say so.
-const ME = NAME + '~' + Math.random().toString(36).slice(2, 6);
 
 // ----- The engine, built --------------------------------------------------
 const distPath = path.join(here, 'metamedium-core.node.mjs');
@@ -53,6 +45,17 @@ if (!existsSync(distPath)) {
   process.exit(1);
 }
 const MM = await import(pathToFileURL(distPath).href);
+
+// A hand in a room is ONE SITTING — this process — the way a tab's is one page
+// load (`sittingName`, DIRECTOR-PLAN-W2 L1): the name is the caller's and the
+// suffix is this process's, because two logs under one name are taken for one
+// log, and a restart that took an old name back would number its marks from
+// one under a name the room already holds. With a fixed '~mcp' suffix, a
+// second mcp.mjs on this machine — a leftover from an earlier session, a
+// restart — answered every newcomer's hello with ITS log under the same name,
+// and the last answer to land replaced the others. Should two hands come up
+// under one name all the same, the store hears it and `canvas_look` says so.
+const ME = MM.sittingName(NAME);
 
 // ----- The room: a LiveStore over the relay, and a session from its logs -----
 let relayServer = null;
@@ -71,10 +74,9 @@ const store = new MM.LiveStore(transport, ME, ROOM);
 // names a mark — would land on whatever mark held that number here. That is
 // the defect this says one word to close.
 const session = MM.createSession({ ...MM.DEFAULT_SESSION_CONFIG, logName: ME });
-let sentCount = 0; // how many of my events the room has
 let lastAt = 0;
 const now = () => { lastAt = Math.max(Date.now(), lastAt + 1); return lastAt; };
-const label = (name) => String(name || '').replace(/~[^~]*$/, '');
+const label = (name) => MM.handLabel(name);
 
 // My log is the session's unstamped events — sent or not — never the room's
 // copy of it: a line that lands between a send and the next merge would
@@ -86,17 +88,18 @@ async function merge() {
   session.load(merged);
 }
 let mergePending = false;
+const noticed = new Set();
 store.subscribe(() => {
+  // What the room says about itself — a name two hands share, a history older
+  // than the relay remembers — goes to the log once, and stands in every look.
+  for (const n of store.notices()) if (!noticed.has(n)) { noticed.add(n); log('room: ' + n); }
   if (mergePending) return;
   mergePending = true;
   Promise.resolve().then(() => { mergePending = false; return merge(); }).catch((err) => log('merge: ' + err.message));
 });
+/** My log as it stands, to the room: the tail when it only grew, the whole of it when it did not. */
 async function flush() {
-  const mine = myLog();
-  const delta = mine.slice(sentCount);
-  if (!delta.length) return;
-  await store.appendLog(ME, delta);
-  sentCount = mine.length;
+  await store.publish(myLog());
 }
 // A newcomer says hello; the room answers with its logs. Tools wait for the
 // first answer, or a moment, so the first look is not at an empty board.
@@ -146,6 +149,10 @@ function look(args) {
   const t = Date.now();
   const here = store.presence().filter((p) => t - p.at < 60000).map((p) => label(p.participant));
   const lines = ['room ' + ROOM + ' · you are ' + label(ME) + (here.length ? ' · with ' + here.join(', ') : ' · alone so far')];
+  // Said before the marks, because it changes what they mean: two hands under
+  // one name are not both on this board, and a room older than the relay
+  // remembers may be missing its beginning.
+  for (const n of store.notices()) lines.push('room says: ' + n);
   const marks = s.contentIds.filter((id) => !s.artifacts.includes(id));
   lines.push(marks.length + ' mark' + (marks.length === 1 ? '' : 's') + ' · ' + s.artifacts.length + ' artifact' + (s.artifacts.length === 1 ? '' : 's') + ' · ' + s.live.length + ' live' +
     (s.selection.length ? ' · ' + s.selection.length + ' selected' : '') + (s.summon ? ' · the field is open on ' + s.summon.enclosedIds.length : '') + (s.pendingLassoId ? ' · a loop waits' : ''));

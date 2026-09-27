@@ -1315,6 +1315,33 @@ window.__scenario = async function(){
     step('28c2. a line that lands after this hand sent does not double this hand\'s marks', st28c2.contentIds.length === 4 && mine28.length === 1, { content: st28c2.contentIds.length, mine: mine28.length });
     mm.session.undo();
     step('28d. undo takes back this hand\'s mark and leaves hers', mm.session.getState().contentIds.length === 3);
+    // Ids that hold (DIRECTOR-PLAN-W2 L1): the undo is SENT, so she no longer
+    // holds the mark under a number this hand will never use again.
+    await mm.saveNow(); await wait(150);
+    const mine28e = () => mm.session.getEvents().filter(e => !e.by);
+    const hers28e = (await other.readLogs())[me28] || [];
+    step('28e. the undo reaches her — her copy of this hand\'s log is this hand\'s log again, the mark gone', JSON.stringify(hers28e) === JSON.stringify(mine28e()) && !hers28e.some(e => e.type === 'stroke'), { hers: hers28e.map(e => e.type), mine: mine28e().map(e => e.type) });
+    // A tab's page load is one sitting: joining again keeps its name, and what
+    // she holds of it is replaced by the whole log, not doubled.
+    await mm.openLive('table', { transport: hub.connect() });
+    await wait(150);
+    const again28f = (await other.readLogs())[me28] || [];
+    step('28f. joining again in the same page load is the same sitting — the same name — and her copy of this hand is replaced, not doubled', mm.folder().me === me28 && JSON.stringify(again28f) === JSON.stringify(mine28e()), { me: mm.folder().me, me28, hers: again28f.length, mine: mine28e().length });
+    step('28g. no suffix is kept where a reload would find it — a reload is a new sitting under a new name', (() => { try { return sessionStorage.getItem('mm-tab') === null; } catch (e) { return true; } })());
+    // A second hand under this tab's own name — a duplicated tab, a restart
+    // that reused a suffix: both hands are told, this one in its status line.
+    const twin = new MM.LiveStore(hub.connect(), me28, 'table');
+    twin.hello();
+    const standing28 = () => document.getElementById('status').dataset.standing || '';
+    for (let i = 0; i < 30 && !/two hands are both called/.test(standing28()); i++) await wait(50);
+    step('28h. a second hand under this tab\'s own name is said in this tab\'s status line — and the second hand is told too', /two hands are both called "[^"]+~[^"]+" — this one/.test(standing28()) && twin.collisions().length === 1, { standing: standing28(), twin: twin.collisions() });
+    twin.close();
+    // A room the relay has outlived: the relay's own word, said in the status line.
+    let deliver28 = null;
+    await mm.openLive('elsewhere', { transport: { send() {}, onMessage(cb) { deliver28 = cb; return () => { deliver28 = null; }; } } });
+    deliver28({ relay: 'truncated', room: 'elsewhere', dropped: 12, kept: 5000 });
+    for (let i = 0; i < 30 && !/older than the relay remembers/.test(standing28()); i++) await wait(50);
+    step('28i. a room older than the relay remembers says so in the status line', /the room is older than the relay remembers — 12 earlier lines are gone/.test(standing28()), { standing: standing28() });
     if (mm.folder().store && mm.folder().store.close) mm.folder().store.close();
     mm.session.load([]);
   }

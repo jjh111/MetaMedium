@@ -5782,15 +5782,25 @@
 
   const folder = {
     store: null, how: 'none', name: '',
-    me: (() => { try { return localStorage.getItem(PARTICIPANT_KEY) || 'local'; } catch (err) { return 'local'; } })(),
+    me: deviceParticipant(),
     myPrevious: [], loadedCount: 0, entries: [], truncated: false,
     urls: new Map(), saveTimer: 0, lastSave: '', saving: false, error: '',
-    // What the room itself said about this catch-up: a relay whose buffer has
-    // outlived the room cannot hand over a complete history, and says so
-    // rather than letting the tab believe it has everything.
-    roomNote: '',
+    // What the room has said about itself and has already been said out loud
+    // here — a name two hands share, a history older than the relay remembers
+    // (the store's `notices`) — so each is flashed once, then stands in the
+    // status line.
+    noticed: new Set(),
   };
 
+  /**
+   * The name this device writes a FOLDER's log under: a preference, stable
+   * across page loads, because a folder's whole history is loaded before its
+   * first mark (a log name is reused only when its whole history was loaded
+   * first — DIRECTOR-PLAN-W2 L1). A live sitting's name is never written here.
+   */
+  function deviceParticipant() {
+    try { return localStorage.getItem(PARTICIPANT_KEY) || 'local'; } catch (err) { return 'local'; }
+  }
   function setParticipant(name) {
     folder.me = String(name || 'local').trim() || 'local';
     try { localStorage.setItem(PARTICIPANT_KEY, folder.me); } catch (err) { /* private mode */ }
@@ -5858,20 +5868,17 @@
     const base = url.replace(/\/+$/, '') + '/rooms/' + encodeURIComponent(room) + '/events';
     const es = new EventSource(base);
     return {
-      send: (line) => { fetch(base, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(line) }).catch(() => {}); },
+      // The POST's promise goes back to the store, which sends the next line
+      // only when this one has gone — two POSTs in flight can land the wrong
+      // way round.
+      send: (line) => fetch(base, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(line) }).then(() => undefined, () => undefined),
       onMessage: (cb) => {
+        // Every line goes to the store — the relay's own word that the room
+        // has outlived its buffer included: the store says it (`notices`),
+        // and so does every other hand's.
         const h = (e) => {
           let line;
           try { line = JSON.parse(e.data); } catch (err) { return; /* not a line */ }
-          // The relay's one word of its own: this room has outlived its
-          // buffer, so what follows is not the whole of it. Said, never
-          // swallowed — a partial history nobody mentions is how a tab comes
-          // up holding part of the room and never finds out.
-          if (line && line.relay === 'truncated') {
-            folder.roomNote = 'the room is older than the relay remembers — ' + line.dropped + ' earlier line' + (line.dropped === 1 ? '' : 's') + ' are gone';
-            flash(folder.roomNote);
-            return;
-          }
           cb(line);
         };
         es.addEventListener('message', h);
@@ -5884,15 +5891,25 @@
   // to once a second, and another hand's line should land at once. Lines
   // that arrive in one tick coalesce into one merge.
   let liveMergePending = false;
+  // A live tab's log is ONE SITTING (DIRECTOR-PLAN-W2 L1): this page load. The
+  // suffix of its name and the sitting its store says it writes from are
+  // minted once, here, and kept nowhere a reload would find them — a tab
+  // keeps no log of its own in a room and never hears its own lines back, so
+  // a reload that took the old name back would number from one under a name
+  // the room already holds (D2). Joining again in this page load is the same
+  // sitting, so the same name and the same sitting id.
+  const PAGE_SUFFIX = MM.sittingToken();
+  const PAGE_SITTING = MM.sittingToken(8);
   async function openLive(room, opts) {
     opts = opts || {};
     if (folder.store && folder.store.close) folder.store.close();
-    folder.roomNote = '';
-    // A hand in a room is one TAB: a second tab of the same person is a
-    // second log, or their lines would be taken for its own and dropped.
-    // The name is the person's; the suffix is the tab's.
+    folder.noticed = new Set();
+    // A hand in a room is one SITTING: a second tab of the same person is a
+    // second log, or their lines would be taken for its own. The name is the
+    // person's; the suffix is this page load's. Held in memory only: a
+    // sitting's name is never the device's folder name.
     const me = handName();
-    setParticipant(me);
+    folder.me = me;
     // Say what this tab's log is called, so every id it mints from here is
     // derived from the event that made it and is the same mark in every hand
     // in the room (ids per hand, SURFACE-v10-PLAN D8). Unsaid, ids come off a
@@ -5903,26 +5920,23 @@
     // to what is written next, and the two forms cannot collide.
     session.setLogName(me);
     const transport = opts.transport || (opts.relay ? relayTransport(opts.relay, room) : broadcastTransport(room));
-    const store = new MM.LiveStore(transport, me, room);
-    // What this hand already drew is its opening log in the room.
-    const mine = session.getEvents().filter((e) => !e.by);
-    if (mine.length) await store.appendLog(me, mine);
-    folder.sentCount = mine.length;
+    const store = new MM.LiveStore(transport, me, room, { sitting: PAGE_SITTING });
+    // What this hand already drew is its opening log in the room — sent whole,
+    // as a store's first send always is, so joining the same room again in
+    // this sitting replaces what the room holds of it instead of doubling it.
+    await store.publish(session.getEvents().filter((e) => !e.by));
     store.subscribe(() => { if (liveMergePending) return; liveMergePending = true; Promise.resolve().then(() => { liveMergePending = false; return mergeLive(); }); });
     await openStore(store, 'live', room);
     folder.loadedCount = session.getEvents().length;
     store.hello();
     return folder;
   }
-  /** A name for this hand in a room: the person's name (a preference), and a suffix this tab keeps. */
+  /** A name for this hand in a room: the person's name (a preference), and this page load's suffix. */
   function handName() {
-    let tab = '';
-    try { tab = sessionStorage.getItem('mm-tab') || ''; if (!tab) { tab = Math.random().toString(36).slice(2, 6); sessionStorage.setItem('mm-tab', tab); } } catch (err) { tab = Math.random().toString(36).slice(2, 6); }
-    const name = (prefs.get('hand-name', '') || 'hand').replace(/~.*$/, '');
-    return name + '~' + tab;
+    return MM.sittingName(prefs.get('hand-name', '') || 'hand', PAGE_SUFFIX);
   }
-  /** A hand's name as shown: the person's, without the tab's suffix. */
-  function handLabel(name) { return String(name || '').replace(/~[^~]*$/, ''); }
+  /** A hand's name as shown: the person's, without the sitting's suffix (core's one rule). */
+  function handLabel(name) { return MM.handLabel(name); }
   /** Every log the room has, merged and loaded; my own events stay mine. */
   async function mergeLive() {
     if (!folder.store || folder.how !== 'live') return;
@@ -5936,6 +5950,13 @@
     session.load(merged);
     folder.myPrevious = mine;
     folder.loadedCount = merged.length;
+    // What the room says about itself is said here once, the moment it is
+    // heard, and then stands in the status line (folderStatus).
+    for (const n of folder.store.notices ? folder.store.notices() : []) {
+      if (folder.noticed.has(n)) continue;
+      folder.noticed.add(n);
+      say(n);
+    }
     if (typeof syncTiles === 'function') syncTiles();
   }
 
@@ -5946,6 +5967,9 @@
    */
   async function openStore(store, how, name) {
     folder.store = store; folder.how = how || 'store'; folder.name = name || ''; folder.error = '';
+    // A folder is written under the device's own stable name, whatever a live
+    // sitting in this page load was called.
+    if (folder.how !== 'live') folder.me = deviceParticipant();
     let logs = {};
     try { logs = await store.readLogs(); } catch (err) { folder.error = 'could not read the logs: ' + (err.message || err); }
     const merged = MM.mergeLogs(logs, folder.how === 'live' ? { me: folder.me } : {});
@@ -6025,12 +6049,11 @@
   async function saveNow() {
     const evs = session.getEvents();
     if (folder.store && folder.how === 'live') {
-      // A live room takes the delta: my events since the last send, appended.
-      const mine = myLogNow();
-      const delta = mine.slice(folder.sentCount || 0);
-      if (!delta.length) return;
+      // A live room takes my log as it stands (`publish`): the new tail when
+      // it only grew, the whole of it when it did not — an undo, a reset — so
+      // every hand in the room holds what this one holds (DIRECTOR-PLAN-W2 L1).
       folder.saving = true;
-      try { await folder.store.appendLog(folder.me, delta); folder.sentCount = mine.length; folder.error = ''; }
+      try { await folder.store.publish(myLogNow()); folder.error = ''; }
       catch (err) { folder.error = 'could not send: ' + (err.message || err); }
       folder.saving = false;
       return;
@@ -6055,7 +6078,11 @@
 
   /** What browser storage held from last time, when there is no folder. */
   function restoreLocalLog() {
-    if (params.has('replay') || params.has('fresh')) return false;
+    // A tab opened on a room is that room's: its log is one sitting, and the
+    // board this device held before is not carried in by every reload — each
+    // reload is a new name, so it would stand in the room once per reload.
+    // The live tile still brings the board you are on into a room.
+    if (params.has('replay') || params.has('fresh') || params.has('live')) return false;
     try {
       const raw = localStorage.getItem(LOCAL_LOG_KEY);
       if (!raw) return false;
@@ -6074,12 +6101,14 @@
     if (folder.how === 'live') {
       const now = Date.now();
       const here = folder.store.presence().filter((p) => now - p.at < 60000).map((p) => handLabel(p.participant));
-      // Two hands under one name lose each other's work quietly, which is
-      // exactly what this line is for: the store refuses the divergent log,
-      // and the room is told which name is doubled.
-      const clash = folder.store.collisions ? folder.store.collisions() : [];
+      // Two hands under one name lose each other's work quietly, and a room
+      // older than the relay remembers hands over part of itself; this line
+      // is where both are said. The store holds them (`notices`): a doubled
+      // name — this tab's own included, which both hands that share it hear —
+      // and a truncated history.
+      const notes = folder.store.notices ? folder.store.notices() : [];
       return 'live ' + folder.name + ' · you are ' + handLabel(folder.me) + (here.length ? ' · with ' + here.join(', ') : ' · alone so far') +
-        (clash.length ? ' · ' + clash.join(' · ') : '') + (folder.roomNote ? ' · ' + folder.roomNote : '') + (folder.error ? ' · ' + folder.error : '');
+        (notes.length ? ' · ' + notes.join(' · ') : '') + (folder.error ? ' · ' + folder.error : '');
     }
     const n = folder.entries.length;
     return (folder.how === 'static' ? 'site' : folder.how === 'git' ? 'repo' : 'folder') + (folder.name ? ' ' + folder.name : '') + ' · ' + n + ' file' + (n === 1 ? '' : 's') +
