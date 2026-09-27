@@ -150,6 +150,26 @@ try {
   const answers = st2.explanations.length;
   check('in the tab: two answers stand (the why, and the sentence)', answers === 2, answers);
 
+  // Writing a figure is not arithmetic (the notes, §F): a placement relative
+  // to a mark — inside it, or under it — instead of bounds worked out by hand.
+  const inside = await call('canvas_write', { kind: 'text', code: 'inlet', name: 'inlet', place: { in: boxId } });
+  const under = await call('canvas_write', { kind: 'text', code: 'the box', name: 'under', place: { under: boxId, h: 30 } });
+  await until(() => heard.filter((h) => fromSmoke(h)).reduce((n, h) => n + h.events.filter((e) => e.type === 'import').length, 0) >= 3, 4000);
+  tabSession.load(MM.mergeLogs(await tab.readLogs(), { me: tabMe }));
+  const st3 = tabSession.getState();
+  const byPath = (p) => st3.artifacts.map((id) => st3.nodes.get(id)).find((n) => n.reps.some((r) => r.modality === 'code' && r.data.path && r.data.path.endsWith(p)));
+  const boxB = MM.boundsOf(st3.nodes.get(boxId));
+  const inB = byPath('/inlet.txt') && MM.boundsOf(byPath('/inlet.txt'));
+  const underB = byPath('/under.txt') && MM.boundsOf(byPath('/under.txt'));
+  check('canvas_write with place.in lands the figure inside that mark — in the tab, from the hand\'s log',
+    !!inB && !!boxB && inB.minX >= boxB.minX && inB.maxX <= boxB.maxX && inB.minY >= boxB.minY && inB.maxY <= boxB.maxY && inB.maxX - inB.minX > 0 && /inside stroke:/.test(textOf(inside)),
+    { said: textOf(inside), inB, boxB });
+  check('canvas_write with place.under lands it below that mark, as wide as the mark',
+    !!underB && !!boxB && underB.minY >= boxB.maxY && Math.abs(underB.minX - boxB.minX) < 1 && Math.abs(underB.maxX - boxB.maxX) < 1 && Math.abs(underB.maxY - underB.minY - 30) < 1,
+    { said: textOf(under), underB, boxB });
+  const nowhere = await call('canvas_write', { kind: 'text', code: 'x', place: { in: 'stroke:nobody:9' } });
+  check('a placement relative to a mark that is not there is said, not guessed', /no mark stroke:nobody:9/.test(textOf(nowhere)), textOf(nowhere));
+
   // A wrong kind, a missing id: said plainly, not thrown.
   const bad = await call('canvas_write', { kind: 'exe', code: 'x' });
   check('a kind the canvas does not know is refused in words', /not a kind/.test(textOf(bad)), textOf(bad));
