@@ -7880,14 +7880,17 @@ ${pad}</${tag}>`;
           { x: b.maxX, y: b.maxY }
         ])
       );
+      const named2 = ev.participantId ?? LOCAL_PARTICIPANT;
+      const maker = isHuman(named2) ? named2 : ev.by ? handParticipant(ev.by) : LOCAL_PARTICIPANT;
       const artifact = {
         id: nextId("artifact"),
         reps: [
-          { modality: "word", data: name, source: ev.participantId ?? LOCAL_PARTICIPANT },
+          { modality: "word", data: name, source: named2 },
           { modality: "bounds", data: unionBounds },
           { modality: "signature", data: signatureOf(memberIds), source: TIER0_PARTICIPANT }
         ],
         edges: [
+          ...maker !== LOCAL_PARTICIPANT ? [{ to: maker, rel: "made-by" }] : [],
           ...memberIds.map((id) => ({ to: id, rel: "has-part", blessed: true })),
           ...summon.gestureIds.map((id) => ({ to: id, rel: "blessed-by" })),
           ...chosen?.artifactId ? [{ to: chosen.artifactId, rel: "instance-of", blessed: true }] : []
@@ -8416,7 +8419,7 @@ ${pad}</${tag}>`;
     function isHuman(participantId) {
       if (participantId === LOCAL_PARTICIPANT) return true;
       const p = nodes.get(participantId);
-      const kind = getRep(p, "participant")?.data?.kind;
+      const kind = p ? getRep(p, "participant")?.data?.kind : void 0;
       return kind === "human";
     }
     function applyBehave(ev) {

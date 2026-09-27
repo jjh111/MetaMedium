@@ -1298,14 +1298,32 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       ])
     );
 
+    // An artifact is made by whoever BLESSED it (V1-PLAN L2f) — the same
+    // attribution a stroke gets: "local" in another hand's log means that hand
+    // (`applyEvent`). Not whoever drew its marks: a hand may bless a group
+    // several hands drew, and each mark stays its drawer's. With no maker
+    // written, every board read an artifact as its own reader's, so the label
+    // rule (`applyLabel`, `staleFor`) took the maker's word for a stranger's on
+    // every other board and let a stranger's through.
+    //
+    // A bless is a person's act — every tier proposes, none commits — so one
+    // in the ENGINE's name (the shard stands a hull at tier 1, inside its
+    // hand's act) is the act of the hand whose log holds it; the engine keeps
+    // its name on the word, which is its word for what it made. The edge is
+    // written only for a maker other than this board's own hand, which
+    // `authorOf` reads from no edge at all: a board's own blesses — every held
+    // log — replay node for node.
+    const named = ev.participantId ?? LOCAL_PARTICIPANT;
+    const maker = isHuman(named) ? named : ev.by ? handParticipant(ev.by) : LOCAL_PARTICIPANT;
     const artifact: MMNode = {
       id: nextId('artifact'),
       reps: [
-        { modality: 'word', data: name, source: ev.participantId ?? LOCAL_PARTICIPANT },
+        { modality: 'word', data: name, source: named },
         { modality: 'bounds', data: unionBounds },
         { modality: 'signature', data: signatureOf(memberIds), source: TIER0_PARTICIPANT },
       ],
       edges: [
+        ...(maker !== LOCAL_PARTICIPANT ? [{ to: maker, rel: 'made-by' }] : []),
         ...memberIds.map((id) => ({ to: id, rel: 'has-part', blessed: true })),
         ...summon.gestureIds.map((id) => ({ to: id, rel: 'blessed-by' })),
         ...(chosen?.artifactId
@@ -2009,10 +2027,11 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     return node.id;
   }
 
+  /** A person: the local hand, another hand, or a human who joined. Not the engine, not a model — and not an id this board has never seen. */
   function isHuman(participantId: string): boolean {
     if (participantId === LOCAL_PARTICIPANT) return true;
     const p = nodes.get(participantId);
-    const kind = (getRep(p!, 'participant')?.data as { kind?: string } | undefined)?.kind;
+    const kind = p ? (getRep(p, 'participant')?.data as { kind?: string } | undefined)?.kind : undefined;
     return kind === 'human';
   }
 
