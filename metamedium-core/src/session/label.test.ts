@@ -6,10 +6,12 @@
 // an artifact, never a file.
 import { describe, it, expect } from 'vitest';
 import { createSession, DEFAULT_SESSION_CONFIG, type Session } from './session';
-import { LOCAL_PARTICIPANT, ENGINE_PARTICIPANT, authorOf, labelOf, labelsOf, wordOf, resemblances } from './nodes';
+import { LOCAL_PARTICIPANT, ENGINE_PARTICIPANT, authorOf, labelOf, labelsOf, wordOf, resemblances, isWord, lettersOf } from './nodes';
 import { interpretationsOf } from './interpretations';
 import { mergeLogs } from '../store/merge';
 import { describeSession } from '../participants/serialize';
+import { lineStroke } from '../test/strokes';
+import type { Point } from '../types';
 
 function box(x: number, y: number, w: number, h: number) {
   const pts = [];
@@ -341,5 +343,194 @@ describe('an artifact is made by whoever blessed it (V1-PLAN L2f)', () => {
     expect(labelOf(onBob)!.source).toBe('participant:hand:ann');
     expect(bob.label({ nodeId: artifact, text: 'mine now', at: 1500 })).toBeNull();
     expect(bob.getState().staleResult!.reason).toBe('not-your-ink');
+  });
+});
+
+// ===== A word is made by whoever wrote its letters (V1-PLAN L2g) ============
+// Printed letters gather into a held `word` node (words.ts), and the gathering
+// wrote every word `made-by` the LOCAL participant, whoever wrote its letters.
+// So on another hand's board her word read as the reader's: her label on it
+// was dropped on every replay but her own, and that board could label it at
+// its own door — while its letters were hers all along. And gathering never
+// asked who wrote a letter: a merge interleaves the hands' events by time, so
+// his letter printed beside hers read as the next letter of her word, and a
+// mark of his landing between two of hers broke her run.
+//
+// A word is ONE hand's run: made by the hand that wrote its letters, on every
+// board, and never gathered from two hands' letters.
+
+const seg = (a: Point, b: Point) => lineStroke(a, b, 14);
+/** Block capitals as a hand prints them: N and V one stroke each, A two. */
+const N = (x: number, y: number, h = 30) => [seg({ x, y: y + h }, { x, y }).concat(seg({ x, y }, { x: x + 18, y: y + h }).slice(1), seg({ x: x + 18, y: y + h }, { x: x + 18, y }).slice(1))];
+const A = (x: number, y: number, h = 30) => [seg({ x, y: y + h }, { x: x + 10, y }).concat(seg({ x: x + 10, y }, { x: x + 20, y: y + h }).slice(1)), seg({ x: x + 4, y: y + h * 0.6 }, { x: x + 16, y: y + h * 0.6 })];
+const V = (x: number, y: number, h = 30) => [seg({ x, y }, { x: x + 10, y: y + h }).concat(seg({ x: x + 10, y: y + h }, { x: x + 20, y }).slice(1))];
+/** N, A, V printed side by side on one line: four strokes, one word. */
+const NAV = (x: number, y: number) => [...N(x, y), ...A(x + 26, y), ...V(x + 54, y)];
+
+/** The word a letter stands in on this board, if any. */
+function wordHolding(s: Session, letter: string): string | undefined {
+  const st = s.getState();
+  return st.contentIds.find((id) => { const n = st.nodes.get(id)!; return isWord(n) && lettersOf(n).includes(letter); });
+}
+
+/** Print NAV at (x, y), a stroke every 400 ms from `t`: its letters, and the word they gathered into. */
+function print(s: Session, x: number, y: number, t: number) {
+  const letters = NAV(x, y).map((pts, i) => s.addStroke(pts, t + 400 * i));
+  return { letters, word: wordHolding(s, letters[0])! };
+}
+
+describe('a word is made by whoever wrote its letters (V1-PLAN L2g)', () => {
+  it('the writer\'s label on her own word survives every replay, and the word is hers on every board', () => {
+    const ann = hand('ann');
+    const { letters, word } = print(ann, 100, 100, 1000);
+    expect(lettersOf(ann.getState().nodes.get(word)!)).toEqual(letters);
+    expect(ann.label({ nodeId: word, text: 'nav', at: 3000 })).toBe(word);
+    const annLog = ann.getEvents().slice();
+    // Bob has drawn before her, so merging his log moves every one of her events.
+    const bob = hand('bob');
+    bob.addStroke(box(0, 300, 100, 60), 500, undefined, 1, { content: true });
+    const bobLog = bob.getEvents().slice();
+
+    const boards: [string, Record<string, typeof annLog>, string][] = [
+      ['ann', { ann: annLog }, LOCAL_PARTICIPANT],
+      ['ann', { ann: annLog, bob: bobLog }, LOCAL_PARTICIPANT],
+      ['bob', { ann: annLog, bob: bobLog }, 'participant:hand:ann'],
+      ['cleo', { ann: annLog, bob: bobLog }, 'participant:hand:ann'],
+      ['cleo', { bob: bobLog, ann: annLog }, 'participant:hand:ann'],
+    ];
+    for (const [me, logs, maker] of boards) {
+      const board = hand(me);
+      board.load(mergeLogs(logs, { me }));
+      const s = board.getState();
+      const node = s.nodes.get(word)!;
+      expect(isWord(node)).toBe(true);
+      expect(lettersOf(node)).toEqual(letters);
+      // Her letters were always hers on every board; the word they make is too.
+      for (const id of letters) expect(authorOf(s.nodes.get(id)!)).toBe(maker);
+      expect(authorOf(node)).toBe(maker);
+      expect(labelOf(node)?.text).toBe('nav');
+      expect(labelOf(node)?.source).toBe(maker);
+    }
+  });
+
+  it('another hand\'s label on her word is refused at the door, with the reason, and never enters the log', () => {
+    const ann = hand('ann');
+    const { word } = print(ann, 100, 100, 1000);
+    ann.label({ nodeId: word, text: 'nav', at: 3000 });
+
+    const bob = hand('bob');
+    bob.load(mergeLogs({ ann: ann.getEvents().slice(), bob: [] }, { me: 'bob' }));
+    const before = bob.getEvents().length;
+    expect(bob.label({ nodeId: word, text: 'mine now', at: 4000 })).toBeNull();
+
+    const stale = bob.getState().staleResult!;
+    expect(stale.what).toBe('label');
+    expect(stale.reason).toBe('not-your-ink');
+    expect(stale.nodeId).toBe(word);
+    expect(stale.detail).toContain('ann');
+    expect(stale.detail).toContain('your own ink');
+    expect(bob.getEvents().length).toBe(before);
+    // Hers stands, and is still hers.
+    expect(labelOf(bob.getState().nodes.get(word)!)!.text).toBe('nav');
+    expect(labelOf(bob.getState().nodes.get(word)!)!.source).toBe('participant:hand:ann');
+  });
+
+  it('a label another hand wrote on her word is dropped on every replay — his own board\'s too — and hers stands', () => {
+    // Before this unit Bob's own door let it through, so a log of his can
+    // carry it; the apply path is what has to hold the rule on every board.
+    const ann = hand('ann');
+    const { word } = print(ann, 100, 100, 1000);
+    ann.label({ nodeId: word, text: 'nav', at: 3000 });
+    const annLog = ann.getEvents().slice();
+    const bobLog = [{ type: 'label' as const, nodeId: word, text: 'mine now', at: 4000 }];
+
+    for (const me of ['ann', 'bob', 'cleo']) {
+      const board = hand(me);
+      board.load(mergeLogs({ ann: annLog, bob: bobLog }, { me }));
+      const node = board.getState().nodes.get(word)!;
+      expect(labelsOf(node).map((l) => l.text)).toEqual(['nav']);
+      expect(labelOf(node)!.source).toBe(me === 'ann' ? LOCAL_PARTICIPANT : 'participant:hand:ann');
+    }
+  });
+
+  it('letters of two hands never gather into one word: hers and his, interleaved on one band', () => {
+    // She prints an N, he an A right beside it, she a V beside that: one line,
+    // a letter's gap apart, each within the window of the one before. Merged by
+    // time, every board reads exactly a run of letters — but two hands wrote it.
+    const ann = hand('ann'), bob = hand('bob');
+    const [n] = N(100, 100), [a1, a2] = A(126, 100), [v] = V(154, 100);
+    const hers = [ann.addStroke(n, 1000)];
+    const his = [bob.addStroke(a1, 1400), bob.addStroke(a2, 1800)];
+    hers.push(ann.addStroke(v, 2200));
+    const whose = (id: string) => (hers.includes(id) ? 'ann' : his.includes(id) ? 'bob' : id);
+
+    for (const me of ['ann', 'bob', 'cleo']) {
+      const board = hand(me);
+      board.load(mergeLogs({ ann: ann.getEvents().slice(), bob: bob.getEvents().slice() }, { me }));
+      const s = board.getState();
+      for (const w of s.contentIds.map((id) => s.nodes.get(id)!).filter(isWord)) {
+        expect([...new Set(lettersOf(w).map(whose))]).toHaveLength(1);
+        for (const id of lettersOf(w)) expect(authorOf(s.nodes.get(id)!)).toBe(authorOf(w));
+      }
+      // Every letter still stands on the board, in a word of its own hand's or alone.
+      const standing = s.contentIds.flatMap((id) => { const x = s.nodes.get(id)!; return isWord(x) ? lettersOf(x) : [id]; });
+      expect(standing.sort()).toEqual([...hers, ...his].sort());
+    }
+  });
+
+  it('two hands printing at once each make their own word, whole: the merge interleaves them, and neither breaks the other\'s run', () => {
+    // The trap. Her letters come in quick succession from HER hand, but the
+    // merge interleaves the hands by time, so the mark just before her next
+    // letter on the board is his. Taken for the last letter of her run, it
+    // broke her word — here into nothing at all, since his is a line below.
+    const ann = hand('ann'), bob = hand('bob');
+    const hers = print(ann, 100, 100, 1000); // at 1000, 1400, 1800, 2200
+    const his = print(bob, 100, 400, 1200); // at 1200, 1600, 2000, 2400, a line below
+    const boards: [string, string, string][] = [
+      ['ann', LOCAL_PARTICIPANT, 'participant:hand:bob'],
+      ['bob', 'participant:hand:ann', LOCAL_PARTICIPANT],
+      ['cleo', 'participant:hand:ann', 'participant:hand:bob'],
+    ];
+    for (const [me, hersBy, hisBy] of boards) {
+      const board = hand(me);
+      board.load(mergeLogs({ ann: ann.getEvents().slice(), bob: bob.getEvents().slice() }, { me }));
+      const s = board.getState();
+      // Two words, each the one its hand made on its own board: the same id, the same letters.
+      expect(s.contentIds).toEqual([hers.word, his.word]);
+      expect(lettersOf(s.nodes.get(hers.word)!)).toEqual(hers.letters);
+      expect(lettersOf(s.nodes.get(his.word)!)).toEqual(his.letters);
+      expect(authorOf(s.nodes.get(hers.word)!)).toBe(hersBy);
+      expect(authorOf(s.nodes.get(his.word)!)).toBe(hisBy);
+    }
+  });
+
+  it('a mark a model drew beside her letters never joins her word: a word is one maker\'s run', () => {
+    // One board, no merge: a model's mark is declared content in its own name,
+    // and a crossbar it draws inside her run is still its mark, not her letter.
+    const s = createSession();
+    const model = s.join('agent', 'llm:drawer', 900, 2);
+    const [n] = N(100, 100), [a1, a2] = A(126, 100), [v] = V(154, 100);
+    const hers = [s.addStroke(n, 1000), s.addStroke(a1, 1400)];
+    const its = s.addStroke(a2, 1800, model, 1, { content: true });
+    hers.push(s.addStroke(v, 2200));
+    expect(wordHolding(s, its)).toBeUndefined();
+    const word = wordHolding(s, hers[0])!;
+    expect(lettersOf(s.getState().nodes.get(word)!)).toEqual(hers);
+    expect(authorOf(s.getState().nodes.get(word)!)).toBe(LOCAL_PARTICIPANT);
+    expect(authorOf(s.getState().nodes.get(its)!)).toBe(model);
+  });
+
+  it('a board\'s own word is what it always was: made by its own hand, the same edges in the same order', () => {
+    // Every word a board gathers from its own letters named the local
+    // participant, and still does — so a board's own writing replays node for node.
+    for (const s of [createSession(), hand('ann')]) {
+      const { letters, word } = print(s, 100, 100, 1000);
+      const node = s.getState().nodes.get(word)!;
+      expect(lettersOf(node)).toEqual(letters);
+      expect(authorOf(node)).toBe(LOCAL_PARTICIPANT);
+      expect(node.edges[0]).toEqual({ to: LOCAL_PARTICIPANT, rel: 'made-by' });
+      expect(node.edges.map((e) => e.rel)).toEqual(['made-by', 'has-part', 'has-part', 'has-part', 'has-part', 'resembles']);
+      expect(s.label({ nodeId: word, text: 'nav', at: 3000 })).toBe(word);
+    }
   });
 });
