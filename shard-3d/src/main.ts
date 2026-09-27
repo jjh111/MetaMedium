@@ -1362,7 +1362,9 @@ async function runBrief(text: string, opts: { regen?: string[]; regenParts?: str
       );
     }
   }
-  const key = `brief:${solid?.id ?? atMark}:${Date.now()}`;
+  // The work indicator's own key, runtime only and never in the log — the
+  // seat's pairing is the brief's node id (`room.ts`), not anything here.
+  const key = `ask:${solid?.id ?? atMark}:${Date.now()}`;
   const label = `${seat.name} · ${task}`;
   const signal = work.start(key, label, solid ? solidAt(solid.id) : null);
   panel.say(`${label} — ${seat.locality}; Esc stops it`);

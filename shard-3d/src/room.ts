@@ -31,17 +31,38 @@
 //      learn nothing. A side channel would mean a second endpoint on a relay
 //      whose whole virtue is that it only forwards.
 //
-// The one thing the log cannot carry is the pairing, because **node ids are
-// per hand**: they are a counter derived on replay, and two hands merging the
-// same lines in a different order can number the same node differently
-// (SURFACE-v10-PLAN D8, still a debt). So the pairing rides in the event's own
-// payload, which merges identically everywhere: a brief is an answer whose
-// `question` is `brief:<key>`, and its reply is an answer whose `question` is
-// `answer:<key>`, where `<key>` is minted by the hand that asks. No id is
-// matched across hands.
+// ## The pairing is the brief's own node id (DIRECTOR-PLAN-W2 L2a)
+//
+// It used to be a key the asking hand minted — `brief:<key>` out,
+// `answer:<key>` back — because node ids were a counter over the merged
+// replay, so two hands merging the same lines in a different order numbered
+// the same node differently (SURFACE-v10-PLAN D8) and nothing could be named
+// across the room. That key was a second naming system running beside the
+// engine's, and a second naming system is exactly the thing that quietly
+// disagrees with the first.
+//
+// An id is now a function of the event that minted it — the log that wrote it
+// and that event's number in that log (ids per hand, L1) — so the id the
+// asking hand gets back from `session.answer()` is the id every other hand
+// derives for that same brief. **So the brief needs no key: it IS one.** A
+// brief is an answer whose `question` is the word `brief`; its reply is an
+// answer whose `question` is the brief node's id, `about` the marks the brief
+// node's own `about` edges name. Nothing is minted and nothing is matched by
+// hand.
+//
+// The one thing this asks of a hand is that it SAY WHAT ITS LOG IS CALLED,
+// which `joinRoom` and `otherHand` do below, under the name the log is sent
+// under (one sitting, `sittingName`). Unsaid, the core keeps its counter and the
+// ids would be this tab's private numbering again. What was drawn before the
+// join keeps the ids it was drawn with: the name applies to what is written
+// next. Those older ids are the counter's, and the counter moves only for
+// unnamed events, so every reader holding the same unnamed lines numbers them
+// alike — which, with every hand naming its log as it joins, is only ever what
+// a hand drew before it joined.
 
 import {
   createSession,
+  DEFAULT_SESSION_CONFIG,
   handLabel as labelOf,
   LiveStore,
   LOCAL_PARTICIPANT,
@@ -54,9 +75,30 @@ import {
   type SessionEvent,
 } from 'metamedium-core';
 
-/** A question parked in the room carries this, and its answer carries the twin. */
-export const BRIEF_PREFIX = 'brief:';
-export const ANSWER_PREFIX = 'answer:';
+/**
+ * A brief parked for the seat is an answer carrying this word as its question.
+ * It says *this is a question for a hand*, and nothing else: what the reply
+ * refers back to is the brief node's own id.
+ */
+export const BRIEF_QUESTION = 'brief';
+
+/**
+ * The pairing as it was written before ids were per hand: `brief:<key>` and
+ * `answer:<key>`, a key minted by the asking hand. **Read only** — nothing
+ * writes these any more. A log recorded before L2a replays here like any other
+ * (`fixtures/seat-before-ids.mm.log` is one), and its briefs and answers must
+ * not be read out as sentences somebody said in the room: they are the seat's
+ * own traffic, whatever spelling they were written in. An old brief is never
+ * offered to be answered — the tab that could settle it ran code that no
+ * longer exists.
+ */
+const LEGACY_BRIEF = 'brief:';
+const LEGACY_ANSWER = 'answer:';
+
+/** True for a brief or an answer written before L2a. Nothing writes these. */
+export function legacySeatTraffic(question: string): boolean {
+  return question.startsWith(LEGACY_BRIEF) || question.startsWith(LEGACY_ANSWER);
+}
 
 /**
  * How long a parked brief waits before it reports failure rather than hanging.
@@ -70,6 +112,12 @@ export const PARK_TIMEOUT_MS = 600_000;
 const PRESENT_MS = 60_000;
 
 export interface ParkedBrief {
+  /**
+   * **The brief's own node id**, which is the pairing: the reply's `question`
+   * is this string. Every hand in the room derives the same one, because an id
+   * is a function of the event that minted it. Opaque — passed back and
+   * compared, never parsed or built.
+   */
   key: string;
   /** Everything the seat was told — the system message and the user message, as a model gets them. */
   prompt: string;
@@ -207,9 +255,9 @@ function handName(name: string): string {
 }
 
 /** The explanation reps on the board, newest last, with who said each one. */
-function explanationsOf(session: Session): { question: string; text: string; by: string; at: number }[] {
+function explanationsOf(session: Session): { id: string; question: string; text: string; by: string; at: number }[] {
   const s = session.getState();
-  const out: { question: string; text: string; by: string; at: number }[] = [];
+  const out: { id: string; question: string; text: string; by: string; at: number }[] = [];
   for (const id of s.explanations) {
     const node = s.nodes.get(id);
     if (!node || node.reps.some((r) => r.modality === 'erased')) continue;
@@ -222,7 +270,7 @@ function explanationsOf(session: Session): { question: string; text: string; by:
       made && made.to !== LOCAL_PARTICIPANT
         ? wordOf(participant!) || handLabel(made.to.replace(/^participant:hand:/, ''))
         : 'me';
-    out.push({ question: String(data.question ?? ''), text: String(data.text ?? ''), by, at: node.createdAt });
+    out.push({ id, question: String(data.question ?? ''), text: String(data.text ?? ''), by, at: node.createdAt });
   }
   return out;
 }
@@ -267,8 +315,13 @@ export function splitPrompt(user: string): { brief: string; words: string } {
  * place: it is in the log, attributed and erasable, and the human is told.
  */
 export function saidInRoom(session: Session): { text: string; by: string; at: number }[] {
-  return explanationsOf(session).filter(
-    (x) => x.by !== 'me' && !x.question.startsWith(BRIEF_PREFIX) && !x.question.startsWith(ANSWER_PREFIX)
+  const said = explanationsOf(session);
+  // The seat's traffic, by id: the briefs, and whatever answers one. A reply's
+  // question IS its brief's id, so this is the whole test — no prefix, no
+  // guess about what a question string means — plus the old spelling, read.
+  const briefs = new Set(said.filter((x) => x.question === BRIEF_QUESTION).map((x) => x.id));
+  return said.filter(
+    (x) => x.by !== 'me' && x.question !== BRIEF_QUESTION && !briefs.has(x.question) && !legacySeatTraffic(x.question)
   );
 }
 
@@ -287,6 +340,13 @@ export function refusalOf(text: string): string | null {
 export function joinRoom(o: RoomOptions): Room {
   const { session } = o;
   const me = handName(o.name ?? 'hand');
+  // Say what this tab's log is called, BEFORE anything is written into the
+  // room — the name its lines are sent under and `mergeLogs` is given as `me`.
+  // From here every id this session mints is derived from the event that
+  // minted it, so it is the same id in every hand that merges the line: the id
+  // a brief is answered by, and every id `space_look` hands out (L2a). What is
+  // already drawn keeps the ids it was drawn with — nothing is renumbered.
+  session.setLogName(me);
   const transport = o.transport ?? relayTransport(o.relay ?? '', o.room);
   const store = new LiveStore(transport, me, o.room, { sitting: PAGE_SITTING });
 
@@ -334,12 +394,12 @@ export function joinRoom(o: RoomOptions): Room {
     if (!waiting.size) return;
     let changed = false;
     for (const said of explanationsOf(session)) {
-      if (!said.question.startsWith(ANSWER_PREFIX)) continue;
-      const key = said.question.slice(ANSWER_PREFIX.length);
-      const held = waiting.get(key);
+      // A reply says which brief it answers by NAMING it: its question is the
+      // brief node's id, which is the same id here as where it was written.
+      const held = waiting.get(said.question);
       if (!held) continue;
       clearTimeout(held.timer);
-      waiting.delete(key);
+      waiting.delete(said.question);
       changed = true;
       const refused = refusalOf(said.text);
       held.settle(
@@ -393,8 +453,25 @@ export function joinRoom(o: RoomOptions): Room {
           resolve({ ok: false, error: 'a brief is parked beside what it is about, and nothing is selected' });
           return;
         }
-        const key = Math.random().toString(36).slice(2, 8);
         const at = Date.now();
+        // The question goes in as this hand's own, on the explanation plane.
+        // `answer()` refuses outright when nothing it is about is still on the
+        // board, so a brief about erased marks never enters the log — and the
+        // caller is told rather than left waiting.
+        //
+        // What comes back is the brief's node id, and THAT is the pairing:
+        // nothing is minted here.
+        const key = session.answer({
+          participantId: LOCAL_PARTICIPANT,
+          question: BRIEF_QUESTION,
+          text: q.prompt,
+          aboutIds: q.about,
+          at,
+        });
+        if (!key) {
+          resolve({ ok: false, error: 'the marks the brief was about are gone — nothing was parked' });
+          return;
+        }
         const parked: ParkedBrief = {
           key,
           prompt: q.prompt,
@@ -403,21 +480,6 @@ export function joinRoom(o: RoomOptions): Room {
           about: q.about.slice(),
           at,
         };
-        // The question goes in as this hand's own, on the explanation plane.
-        // `answer()` refuses outright when nothing it is about is still on the
-        // board, so a brief about erased marks never enters the log — and the
-        // caller is told rather than left waiting.
-        const id = session.answer({
-          participantId: LOCAL_PARTICIPANT,
-          question: BRIEF_PREFIX + key,
-          text: q.prompt,
-          aboutIds: q.about,
-          at,
-        });
-        if (!id) {
-          resolve({ ok: false, error: 'the marks the brief was about are gone — nothing was parked' });
-          return;
-        }
         let done = false;
         const settle = (r: { ok: true; text: string; by: string } | { ok: false; error: string }) => {
           if (done) return;
@@ -476,13 +538,16 @@ export interface OtherHand {
  * logs, read the parked briefs off the explanation plane, append the answer as
  * this hand's own — written once here in TypeScript so the e2e can drive it
  * inside the page, and once in `mcp.mjs` in JavaScript over the Node bundle,
- * because the two run in different worlds. The protocol they share is three
- * lines wide: `brief:<key>` out, `answer:<key>` back, and the key in the
- * event's own payload rather than in any node id.
+ * because the two run in different worlds. The protocol they share is two
+ * lines wide: a brief is an answer whose question is `brief`, and its reply is
+ * an answer whose question is **the brief's own node id** — which this hand
+ * reads off its own board, having derived it from the same event.
  */
 export function otherHand(transport: LiveTransport, name: string, roomName: string): OtherHand {
   const me = name.includes('~') ? name : `${name}~1`;
-  const session = createSession();
+  // This hand says what its log is called too, for the same reason the tab
+  // does: what it writes must be named the same here and everywhere else.
+  const session = createSession({ ...DEFAULT_SESSION_CONFIG, logName: me });
   const store = new LiveStore(transport, me, roomName);
   let merging = false;
 
@@ -511,18 +576,22 @@ export function otherHand(transport: LiveTransport, name: string, roomName: stri
   const briefs = (): (ParkedBrief & { from: string })[] => {
     const s = session.getState();
     const out: (ParkedBrief & { from: string })[] = [];
-    const answered = new Set<string>();
-    for (const said of explanationsOf(session))
-      if (said.question.startsWith(ANSWER_PREFIX)) answered.add(said.question.slice(ANSWER_PREFIX.length));
+    // A brief is answered when some explanation's question is its id — every
+    // question on the board is enough to ask that with, since an id names one
+    // node and a word like `note` or `brief` names none.
+    const answered = new Set<string>(explanationsOf(session).map((x) => x.question));
     for (const id of s.explanations) {
       const node = s.nodes.get(id);
       if (!node || node.reps.some((r) => r.modality === 'erased')) continue;
       const rep = node.reps.find((r) => r.modality === 'explanation');
       if (!rep) continue;
       const data = rep.data as { question?: string; text?: string };
-      const question = String(data.question ?? '');
-      if (!question.startsWith(BRIEF_PREFIX)) continue;
-      const key = question.slice(BRIEF_PREFIX.length);
+      // Only a brief in today's spelling: an old `brief:<key>` is read (it is
+      // never said aloud) but never offered, because nobody waits on it.
+      if (String(data.question ?? '') !== BRIEF_QUESTION) continue;
+      // The brief's own id IS the key: this hand derived it from the same event
+      // the asking hand did, so no key has to be carried or matched.
+      const key = id;
       if (answered.has(key)) continue;
       const made = node.edges.find((e) => e.rel === 'made-by');
       const participant = made ? s.nodes.get(made.to) : undefined;
@@ -535,8 +604,8 @@ export function otherHand(transport: LiveTransport, name: string, roomName: stri
         prompt,
         brief,
         words,
-        // In THIS hand's ids, read off the node's own edges — never carried
-        // across from the asking hand, whose counters are its own (D8).
+        // Read off the brief node's own edges in THIS session — which, now that
+        // ids are per hand, is the same set of ids the asking hand named.
         about: node.edges.filter((e) => e.rel === 'about').map((e) => e.to),
         at: node.createdAt,
         from: made && participant ? wordOf(participant) || handLabel(made.to.replace(/^participant:hand:/, '')) : 'someone',
@@ -550,7 +619,8 @@ export function otherHand(transport: LiveTransport, name: string, roomName: stri
     if (!held) return false;
     const id = session.answer({
       participantId: LOCAL_PARTICIPANT,
-      question: ANSWER_PREFIX + key,
+      // The reply names the brief it answers, by the brief's own id.
+      question: key,
       text,
       aboutIds: held.about,
       at: Date.now(),
