@@ -337,6 +337,34 @@ labelling creates nothing), and taking it labels each selected mark the
 person made, refusing another hand's marks in words. *Red first:* the
 reader's test for the prefix and an e2e record labelling from the field.
 
+**L2e status, 26 Sep 2026: done on `w2`** — `fea5e3b` (red), `7fa7f7e`,
+`284df79`, `8aa5797`, `765c190`, `626ee58` (CLAUDE.md). `label: word` is a
+prefix of the pure reader (`readLabel` in `09-field.js`), and the line says
+before Enter what the word will go on — `↵ label it “inlet”`, *on each of
+your 3 marks*, *on yours, not the mark fern made*, or quietly *no label —
+fern made this mark*, Enter still saying it; the context gains `marks`
+(whose ink is held). The row offers *Label it “…”* beside the naming offer:
+under read writing, at the head of what it affords (on the marks held with
+the writing, or on the writing itself as a caption), and for a typed word as
+a pair with *Name it “…”* (`typedWord`, pure; `label:`/`name:` mark one).
+Taking it (`labelMarks`, `09-palette.js`) writes one `label` event per mark
+the person made, each through the core door; another hand's (or a model's)
+are refused in the status line with whose they are. The field closes before
+the word is written, so one undo takes one label off; a mark already saying
+the word writes nothing. The difference from naming is said in the tooltips
+(what each does and does not) and in the reading line while a pill of the
+pair is pointed at — no badge, no row, the four core buttons unchanged. No
+model is asked; `mcp-smoke.mjs` unchanged. e2e 42–42p. *Found, not changed
+(core):* a bless writes no `made-by` edge, so every board reads an artifact
+as its own reader's — a label on an artifact is dropped on every other
+hand's replay, and another hand may label it at its own door. *Not built:*
+taking a label off from the canvas (undo does; the core's empty word has no
+door here). Whole suite at the last commit: core 684 in 57 files, typecheck
+clean, both bundles equal to a fresh build; relay and field 40; surface in
+sync; the canvas MCP smoke and the shard's (573 in 30 files, typecheck
+clean) all pass; the gate 384 passed and the one honest skip (canvas 244;
+shard 120 + 11 + 9); WebKit smoke 3.
+
 ### Phase 1 — the backbone
 **B1 Tools.** *Owns* `metamedium-core/src/tools/` (the contract, the
 registry, adapters for today's tier-1 modules and concept conversions),
