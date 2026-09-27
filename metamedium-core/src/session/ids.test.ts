@@ -12,17 +12,9 @@
 import { describe, it, expect } from 'vitest';
 import { createSession, DEFAULT_SESSION_CONFIG, type SessionEvent } from './session';
 import { mergeLogs } from '../store/merge';
-import * as live from '../store/live';
 import { rectStroke, circleStroke, checkStroke } from '../test/strokes';
 import { authorOf, boundsOf, wordOf } from './nodes';
-
-// How a hand in a room is named (DIRECTOR-PLAN-W2 L1). Looked up by name so
-// this file reports the regression on its own assertion rather than failing to
-// import when the naming is missing.
-const { sittingName, handLabel } = live as unknown as {
-  sittingName: (person: string) => string;
-  handLabel: (name: string) => string;
-};
+import { sittingName, handLabel } from './hands';
 
 const named = (logName: string) => createSession({ ...DEFAULT_SESSION_CONFIG, logName });
 

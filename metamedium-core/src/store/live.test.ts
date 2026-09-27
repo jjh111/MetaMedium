@@ -9,6 +9,17 @@ import { authorOf } from '../session/nodes';
 
 const tick = () => new Promise((r) => setTimeout(r, 0));
 
+/** A transport a test speaks into directly, so a line can be put on the wire by hand. */
+function wire() {
+  let cb: ((line: any) => void) | null = null;
+  const sent: any[] = [];
+  return {
+    sent,
+    deliver: (line: any) => cb && cb(line),
+    transport: { send: (l: any) => sent.push(l), onMessage: (fn: any) => { cb = fn; return () => { cb = null; }; } },
+  };
+}
+
 function eventsOf(fn: (s: ReturnType<typeof createSession>) => void) {
   const s = createSession();
   fn(s);
@@ -71,16 +82,6 @@ describe('live logs', () => {
   // An append-only log cannot disagree with itself, so a `full` that diverges
   // from what is held under the same name is two hands answering to one.
   describe('a name collision', () => {
-    /** A transport this test speaks into directly, so a `full` can be put on the wire by hand. */
-    function wire() {
-      let cb: ((line: any) => void) | null = null;
-      const sent: any[] = [];
-      return {
-        sent,
-        deliver: (line: any) => cb && cb(line),
-        transport: { send: (l: any) => sent.push(l), onMessage: (fn: any) => { cb = fn; return () => { cb = null; }; } },
-      };
-    }
     const drew = (x: number) => eventsOf((s) => s.addStroke(rectStroke(x, 100, 200, 120), 1000 + x));
 
     it('a shorter `full` that diverges is a collision: what is held is kept, and it says so', async () => {
@@ -138,8 +139,7 @@ describe('live logs', () => {
     const named = (logName: string) => createSession({ ...DEFAULT_SESSION_CONFIG, logName });
     const mine = (s: ReturnType<typeof createSession>) => s.getEvents().filter((e) => !e.by);
     /** The store's flush: a hand's whole log as it stands, sent as whatever makes the room's copy equal it. */
-    const publish = (store: LiveStore, events: readonly SessionEvent[]) =>
-      (store as unknown as { publish(events: readonly SessionEvent[]): Promise<void> }).publish(events);
+    const publish = (store: LiveStore, events: readonly SessionEvent[]) => store.publish(events);
 
     it('A appends three, answers a hello in full, appends two, undoes one and leaves; C, joining after, holds A’s final four', async () => {
       const hub = new LocalHub();
@@ -200,6 +200,79 @@ describe('live logs', () => {
       }
       // What the room heard first is kept; the second hand's lines are refused.
       expect((await b.readLogs())['x~1']).toEqual(drew(100));
+    });
+
+    it('a hand’s own lines come back from a relay, and are neither a collision nor held twice', async () => {
+      // A relay writes every line back to its sender, and replays them on a
+      // reconnect. Checking my own name before discarding it must not mistake
+      // my own echo for a second hand.
+      let cb: ((line: any) => void) | null = null;
+      const echo = { send: (line: any) => { const copy = JSON.parse(JSON.stringify(line)); queueMicrotask(() => cb && cb(copy)); }, onMessage: (fn: any) => { cb = fn; return () => { cb = null; }; } };
+      const ada = named('ada~1');
+      const a = new LiveStore(echo as any, 'ada~1', 'r');
+      ada.addStroke(rectStroke(100, 100, 200, 120), 1000);
+      await publish(a, mine(ada));
+      a.hello();
+      ada.addStroke(rectStroke(400, 100, 200, 120), 1100);
+      await publish(a, mine(ada));
+      await tick(); await tick();
+      expect(a.collisions()).toEqual([]);
+      expect((await a.readLogs())['ada~1']).toEqual(mine(ada));
+    });
+
+    it('publish sends the new tail when the log only grew, and the whole log when it did not', async () => {
+      const sent: any[] = [];
+      const store = new LiveStore({ send: (l) => void sent.push(l), onMessage: () => () => {} }, 'ada~1', 'r');
+      const ada = named('ada~1');
+      ada.addStroke(rectStroke(100, 100, 200, 120), 1000);
+      await publish(store, mine(ada)); // a store's first send is whole: a hand joining again in its sitting replaces what the room holds
+      ada.addStroke(rectStroke(400, 100, 200, 120), 1100);
+      await publish(store, mine(ada));
+      await publish(store, mine(ada)); // nothing new, nothing sent
+      ada.undo();
+      await publish(store, mine(ada));
+      ada.addStroke(rectStroke(700, 100, 200, 120), 1200);
+      await publish(store, mine(ada)); // grew again from what was last sent
+      expect(sent.map((l) => (l.full ? 'full' : 'append') + ':' + l.events.length)).toEqual(['full:1', 'append:1', 'full:1', 'append:1']);
+      expect(sent.every((l) => l.sid === store.sitting && l.participant === 'ada~1')).toBe(true);
+    });
+
+    it('an event handed on in a peer’s copy before the writer’s own line lands is held once', async () => {
+      const w = wire();
+      const store = new LiveStore(w.transport as any, 'me~1');
+      const ada = named('ada~1');
+      ada.addStroke(rectStroke(100, 100, 200, 120), 1000);
+      ada.addStroke(rectStroke(400, 100, 200, 120), 1100);
+      const log = mine(ada);
+      w.deliver({ participant: 'ada~1', events: log, at: 2000, full: true, sid: 's-ada', via: 'bob~1' });
+      // The peer that handed it on is the one heard from, not the writer…
+      expect(store.presence().map((p) => p.participant)).toEqual(['bob~1']);
+      w.deliver({ participant: 'ada~1', events: log.slice(1), at: 2000, sid: 's-ada' });
+      expect((await store.readLogs())['ada~1']).toEqual(log);
+      // …until her own line lands.
+      expect(store.presence().map((p) => p.participant).sort()).toEqual(['ada~1', 'bob~1']);
+    });
+
+    it('a peer’s copy older than what already landed from the writer installs nothing', async () => {
+      const w = wire();
+      const store = new LiveStore(w.transport as any, 'me~1');
+      const ada = named('ada~1');
+      ada.addStroke(rectStroke(100, 100, 200, 120), 1000);
+      ada.addStroke(rectStroke(400, 100, 200, 120), 1100);
+      const log = mine(ada);
+      w.deliver({ participant: 'ada~1', events: log, at: 5000, full: true, sid: 's-ada' });
+      w.deliver({ participant: 'ada~1', events: log.slice(0, 1), at: 3000, full: true, sid: 's-ada', via: 'bob~1' });
+      expect((await store.readLogs())['ada~1']).toEqual(log);
+    });
+
+    it('the relay’s word that the room outlived its buffer is a notice, beside the collisions', async () => {
+      const w = wire();
+      const store = new LiveStore(w.transport as any, 'me~1');
+      expect(store.notices()).toEqual([]);
+      w.deliver({ relay: 'truncated', room: 'r', dropped: 1, kept: 10 });
+      expect(store.truncation()).toBe('the room is older than the relay remembers — 1 earlier line is gone');
+      w.deliver({ relay: 'truncated', room: 'r', dropped: 12, kept: 10 });
+      expect(store.notices()).toEqual(['the room is older than the relay remembers — 12 earlier lines are gone']);
     });
   });
 

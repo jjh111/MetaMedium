@@ -178,6 +178,7 @@ var MetaMediumCore = (() => {
     getBoundsFromStroke: () => getBoundsFromStroke,
     getFingerprint: () => getFingerprint,
     getRep: () => getRep,
+    handLabel: () => handLabel,
     has: () => has,
     hasMultipleSources: () => hasMultipleSources,
     headingsOf: () => headingsOf,
@@ -269,6 +270,8 @@ var MetaMediumCore = (() => {
     shapeExtent: () => shapeExtent,
     simplifyStroke: () => simplifyStroke,
     singular: () => singular,
+    sittingName: () => sittingName,
+    sittingToken: () => sittingToken,
     sizeOf: () => sizeOf,
     sliderOf: () => sliderOf,
     slotsIn: () => slotsIn,
@@ -1921,6 +1924,21 @@ var MetaMediumCore = (() => {
     return "at" in ev && typeof ev.at === "number" ? ev.at : 0;
   }
 
+  // src/session/hands.ts
+  var ALPHABET = "abcdefghijklmnopqrstuvwxyz0123456789";
+  function sittingToken(length = 4, random = Math.random) {
+    let out = "";
+    for (let i = 0; i < length; i++) out += ALPHABET[Math.floor(random() * ALPHABET.length) % ALPHABET.length];
+    return out;
+  }
+  function sittingName(person, suffix = sittingToken()) {
+    const who = String(person ?? "").replace(/~.*$/, "").trim() || "hand";
+    return `${who}~${suffix}`;
+  }
+  function handLabel(name) {
+    return String(name ?? "").replace(/~[^~]*$/, "");
+  }
+
   // src/kinds/kinds.ts
   var KINDS = [
     { kind: "html", extensions: ["html", "htm"], mime: "text/html", renderer: "page", addressing: "regions", textual: true },
@@ -2056,17 +2074,29 @@ var MetaMediumCore = (() => {
 
   // src/store/live.ts
   var LiveStore = class {
-    constructor(transport, me, room = "room") {
+    constructor(transport, me, room = "room", opts = {}) {
       this.transport = transport;
       this.me = me;
       this.room = room;
       this.logs = {};
+      /** The authorship of every event each held log carries, so an event heard twice is held once. */
+      this.carried = /* @__PURE__ */ new Map();
       this.seen = /* @__PURE__ */ new Map();
       /** The newest `at` already applied from each hand, so a replayed snapshot cannot install a past state. */
       this.applied = /* @__PURE__ */ new Map();
+      /** The sitting heard writing each log. */
+      this.sittings = /* @__PURE__ */ new Map();
       /** A name two hands are both using: the sentence that says so. */
       this.collided = /* @__PURE__ */ new Map();
+      /** The relay's word that this room is older than its buffer. */
+      this.truncated = null;
+      /** Whether this store has put MY log on the wire yet, in any form. */
+      this.published = false;
+      this.lastAt = 0;
+      /** The line still leaving, when the transport is asynchronous. */
+      this.tail = null;
       this.listeners = [];
+      this.sitting = opts.sitting || sittingToken(8);
       this.logs[me] = [];
       this.off = transport.onMessage((line) => this.receive(line));
     }
@@ -2088,31 +2118,71 @@ var MetaMediumCore = (() => {
       if (!events.length) return;
       const log = this.logs[participant] ??= [];
       log.push(...events);
-      this.transport.send({ participant, events: events.slice(), at: Date.now() });
+      if (participant === this.me) this.published = true;
+      await this.post({ participant, events: events.slice(), at: this.stamp(), sid: this.sitting });
+    }
+    /**
+     * Put MY log on the wire as it stands: `events` is the whole of it, and the
+     * store sends whatever makes every peer's copy equal it. When it only grew
+     * since the last send, that is the new tail, as an append. When it did not —
+     * an undo, a reset, anything that is not growth — it is the whole log, as a
+     * `full`, which every peer takes in place of what it held: an undo reaches
+     * the room instead of standing only here (L1). The first send of a store is
+     * always whole, so a hand that joins a room again in the same sitting
+     * replaces what the room holds of it rather than doubling it.
+     */
+    async publish(events) {
+      const sent = this.logs[this.me];
+      if (this.published && extendsLog(sent, events)) {
+        if (events.length > sent.length) await this.appendLog(this.me, events.slice(sent.length));
+        return;
+      }
+      this.published = true;
+      this.logs[this.me] = events.slice();
+      await this.post({ participant: this.me, events: events.slice(), at: this.stamp(), full: true, sid: this.sitting });
     }
     async readLogs() {
       const out = {};
       for (const [k, v] of Object.entries(this.logs)) out[k] = v.slice();
       return out;
     }
-    /** Ask the room for its logs; every peer answers with its own, in full. */
+    /** Ask the room for its logs; every peer answers with every log it holds, in full. */
     hello() {
-      this.transport.send({ participant: this.me, events: [], at: Date.now(), hello: true });
+      void this.post({ participant: this.me, events: [], at: this.stamp(), hello: true, sid: this.sitting });
     }
     /** Every hand heard from, and when. */
     presence() {
       return [...this.seen.entries()].map(([participant, at]) => ({ participant, at })).sort((a, b) => b.at - a.at);
     }
     /**
-     * Names heard from two hands at once. An append-only log cannot diverge from
-     * itself, so a `full` that disagrees with what is held under the same name is
-     * two hands answering to one — the fault that silently ate a drawing (§1 of
-     * NOTES-DRAWING-WITH-THE-HAND). One sentence per name, for the status bar.
+     * Names heard from two hands at once — two sittings writing under one name,
+     * or, for a line from before sittings, a `full` that disagrees with what is
+     * held (an append-only log cannot diverge from itself). The fault that
+     * silently ate a drawing (§1 of NOTES-DRAWING-WITH-THE-HAND). One sentence
+     * per name, for the status bar. The two hands that share the name hear it
+     * too: this hand's own name is checked before any line is discarded.
      */
     collisions() {
       return [...this.collided.values()];
     }
-    /** Fires when another participant's events land, with what landed. */
+    /** The relay's word that this room is older than its buffer, as a sentence, or null. */
+    truncation() {
+      const n2 = this.truncated;
+      if (!n2) return null;
+      return `the room is older than the relay remembers \u2014 ${n2.dropped} earlier line${n2.dropped === 1 ? " is" : "s are"} gone`;
+    }
+    /** Everything the room has said about itself, one sentence each: the collisions, then the truncation. */
+    notices() {
+      const out = this.collisions();
+      const t = this.truncation();
+      if (t) out.push(t);
+      return out;
+    }
+    /**
+     * Fires when another participant's events land, with what landed — and,
+     * with no events, when the room says something about itself (a hello, a
+     * collision, the relay's truncation, whose participant is '').
+     */
     subscribe(cb) {
       this.listeners.push(cb);
       return () => {
@@ -2124,11 +2194,93 @@ var MetaMediumCore = (() => {
       this.off = null;
       if (this.transport.close) this.transport.close();
     }
-    receive(line) {
-      if (!line || typeof line.participant !== "string" || line.participant === this.me) return;
-      this.seen.set(line.participant, Date.now());
+    /** A clock for this store's own lines that never runs backwards, so the newest of them is always the present. */
+    stamp() {
+      this.lastAt = Math.max(Date.now(), this.lastAt + 1);
+      return this.lastAt;
+    }
+    /**
+     * Send lines in the order they were written. A synchronous transport sends
+     * at once; an asynchronous one (a POST) is waited for before the next line
+     * goes, or two POSTs in flight could reach the relay the wrong way round.
+     * A line that fails is gone — the next whole log carries what it held.
+     */
+    post(line) {
+      const go = () => {
+        let r;
+        try {
+          r = this.transport.send(line);
+        } catch {
+          return void 0;
+        }
+        return r && typeof r.then === "function" ? r.then(() => void 0, () => void 0) : void 0;
+      };
+      const settle = (t2) => t2.then(() => {
+        if (this.tail === t2) this.tail = null;
+      });
+      if (!this.tail) {
+        const r = go();
+        if (!r) return Promise.resolve();
+        const t2 = settle(r);
+        this.tail = t2;
+        return t2;
+      }
+      const t = settle(this.tail.then(go));
+      this.tail = t;
+      return t;
+    }
+    /**
+     * Answer a hello: my own log, and every other log held — each still marked
+     * with the sitting that wrote it and the newest line of it applied here — so
+     * a hand that has left is caught up by the hands that stayed.
+     */
+    answer() {
+      void this.post({ participant: this.me, events: this.logs[this.me].slice(), at: this.stamp(), full: true, sid: this.sitting });
+      for (const [name, events] of Object.entries(this.logs)) {
+        if (name === this.me) continue;
+        const at = this.applied.get(name);
+        if (at === void 0) continue;
+        const line = { participant: name, events: events.slice(), at, full: true, via: this.me };
+        const sid = this.sittings.get(name);
+        if (sid) line.sid = sid;
+        void this.post(line);
+      }
+    }
+    collide(name, sentence) {
+      if (this.collided.has(name)) return;
+      this.collided.set(name, sentence);
+      this.notify(name, []);
+    }
+    receive(raw) {
+      if (!raw || typeof raw !== "object") return;
+      if (raw.relay === "truncated") {
+        const n2 = raw;
+        this.truncated = { relay: "truncated", room: n2.room, dropped: Math.max(0, Number(n2.dropped) || 0), kept: n2.kept };
+        this.notify("", []);
+        return;
+      }
+      const line = raw;
+      if (typeof line.participant !== "string") return;
+      const sid = typeof line.sid === "string" && line.sid ? line.sid : void 0;
+      const from = typeof line.via === "string" && line.via ? line.via : line.participant;
+      if (line.participant === this.me) {
+        if (!sid || sid === this.sitting) return;
+        this.collide(this.me, `two hands are both called "${this.me}" \u2014 this one, and another writing under its name; neither is taken for the other, so reload one to give it a new name`);
+        if (line.hello) this.answer();
+        return;
+      }
+      if (from !== this.me) this.seen.set(from, Date.now());
+      if (sid) {
+        const known = this.sittings.get(line.participant);
+        if (known === void 0) this.sittings.set(line.participant, sid);
+        else if (known !== sid) {
+          this.collide(line.participant, `two hands are both called "${line.participant}" \u2014 the one heard first is kept and the other's lines are refused; reload one to give it a new name`);
+          if (line.hello) this.answer();
+          return;
+        }
+      }
       if (line.hello) {
-        this.transport.send({ participant: this.me, events: this.logs[this.me].slice(), at: Date.now(), full: true });
+        this.answer();
         this.notify(line.participant, []);
         return;
       }
@@ -2138,15 +2290,27 @@ var MetaMediumCore = (() => {
         const last = this.applied.get(line.participant);
         if (last !== void 0 && at < last) return;
         const held = this.logs[line.participant];
-        const i = held && held.length ? divergence(held, events) : -1;
-        if (i >= 0) {
-          this.collided.set(line.participant, `two hands are both called "${line.participant}" \u2014 their logs disagree from event ${i + 1}; what is held is kept, so rename one`);
-          this.notify(line.participant, []);
-          return;
+        if (!sid) {
+          const i = held && held.length ? divergence(held, events) : -1;
+          if (i >= 0) {
+            this.collide(line.participant, `two hands are both called "${line.participant}" \u2014 their logs disagree from event ${i + 1}; what is held is kept, so rename one`);
+            return;
+          }
         }
         this.logs[line.participant] = events.slice();
+        this.carried.set(line.participant, new Set(events.map(authorKey).filter((k) => k !== null)));
       } else {
-        (this.logs[line.participant] ??= []).push(...events);
+        const log = this.logs[line.participant] ??= [];
+        let keys = this.carried.get(line.participant);
+        if (!keys) this.carried.set(line.participant, keys = /* @__PURE__ */ new Set());
+        for (const ev of events) {
+          const k = authorKey(ev);
+          if (k !== null) {
+            if (keys.has(k)) continue;
+            keys.add(k);
+          }
+          log.push(ev);
+        }
       }
       this.applied.set(line.participant, Math.max(this.applied.get(line.participant) ?? 0, at));
       this.notify(line.participant, events);
@@ -2155,6 +2319,25 @@ var MetaMediumCore = (() => {
       for (const l of this.listeners) l(participant, events);
     }
   };
+  function authorKey(ev) {
+    return typeof ev.origin === "string" && ev.origin && typeof ev.seq === "number" && Number.isSafeInteger(ev.seq) ? `${ev.origin}#${ev.seq}` : null;
+  }
+  var contentKeys = /* @__PURE__ */ new WeakMap();
+  function eventKey(ev) {
+    const k = authorKey(ev);
+    if (k !== null) return k;
+    let s = contentKeys.get(ev);
+    if (s === void 0) {
+      s = JSON.stringify(ev);
+      contentKeys.set(ev, s);
+    }
+    return s;
+  }
+  function extendsLog(sent, now) {
+    if (now.length < sent.length) return false;
+    for (let i = 0; i < sent.length; i++) if (eventKey(sent[i]) !== eventKey(now[i])) return false;
+    return true;
+  }
   function divergence(held, incoming) {
     const a = held.map((e) => JSON.stringify(e));
     const b = incoming.map((e) => JSON.stringify(e));
@@ -5190,7 +5373,10 @@ ${pad}</${tag}>`;
     let counter2 = 0;
     let myLog = config.logName;
     let logNameSaid = config.logName !== void 0;
-    let mySeq = 0;
+    const highWater = /* @__PURE__ */ new Map();
+    const sawNumber = (name, seq) => {
+      if (Number.isSafeInteger(seq) && seq > (highWater.get(name) ?? 0)) highWater.set(name, seq);
+    };
     const listeners = /* @__PURE__ */ new Set();
     const CHECKPOINT_EVERY = 200;
     let checkpoints = [];
@@ -6304,7 +6490,7 @@ ${pad}</${tag}>`;
     function handParticipant(name) {
       const id = "participant:hand:" + name.replace(/[^A-Za-z0-9._-]+/g, "_");
       if (!nodes.has(id)) {
-        nodes.set(id, createParticipantNode(id, "human", name.replace(/~[^~]*$/, ""), lastAt));
+        nodes.set(id, createParticipantNode(id, "human", handLabel(name), lastAt));
         participants.push(id);
       }
       return id;
@@ -6409,7 +6595,8 @@ ${pad}</${tag}>`;
     }
     function dispatch(raw) {
       staleResult = null;
-      const ev = myLog === void 0 || raw.seq !== void 0 ? raw : { ...raw, origin: myLog, seq: ++mySeq };
+      const ev = myLog === void 0 || raw.seq !== void 0 ? raw : { ...raw, origin: myLog, seq: (highWater.get(myLog) ?? 0) + 1 };
+      if (ev.origin && typeof ev.seq === "number") sawNumber(ev.origin, ev.seq);
       events.push(ev);
       const result2 = applyEvent(ev);
       maybeCheckpoint(events.length);
@@ -6539,11 +6726,8 @@ ${pad}</${tag}>`;
           for (const ev of events) if (!ev.by && ev.origin) remembered = ev.origin;
           if (remembered !== void 0) myLog = remembered;
         }
-        mySeq = 0;
-        if (myLog !== void 0) {
-          for (const ev of events) {
-            if (ev.origin === myLog && typeof ev.seq === "number" && ev.seq > mySeq) mySeq = ev.seq;
-          }
+        for (const ev of events) {
+          if (ev.origin && typeof ev.seq === "number") sawNumber(ev.origin, ev.seq);
         }
         replay();
         notify();

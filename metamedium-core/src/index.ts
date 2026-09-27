@@ -105,7 +105,9 @@ export { mergeLogs } from './store/merge';
 export type { MergeOptions } from './store/merge';
 // Live logs — multiplayer as a transport over the per-participant logs (v9 S6).
 export { LiveStore, LocalHub } from './store/live';
-export type { LiveLine, LiveTransport, Presence } from './store/live';
+export type { LiveLine, LiveTransport, LiveStoreOptions, Presence, RelayNotice } from './store/live';
+// How a hand is named in a room: one sitting, one log (DIRECTOR-PLAN-W2 L1).
+export { sittingName, sittingToken, handLabel } from './session/hands';
 
 // The storage seam: the canvas is a folder; per-participant logs; backends (WP-11).
 export { MemoryStore, ReadOnlyError, logPathFor, participantOfLog, encodeLog, decodeLog, isCanvasFile, toBytes, toText, META_DIR, LOG_DIR, LOG_EXT } from './store/seam';

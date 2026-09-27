@@ -57,6 +57,7 @@ import {
 import { type CommandMark } from './commandmark';
 import { type MarkMiss, whyNotResolved } from './gesture';
 import { type Expectation, type StaleResult, describeStale } from './stale';
+import { handLabel } from './hands';
 import { DEFAULT_ERASE_CROSSINGS, scratchedOut } from './erase';
 import { type Region, regionsOf, regionsOverlapping } from './regions';
 import { type Mark, type Relation, clusters, relate } from '../relate/relations';
@@ -411,8 +412,11 @@ export interface SessionConfig {
    */
   recentWindowMs: number;
   /**
-   * What the log THIS session writes is called — one log per hand, per tab,
-   * per process (`john~a1b2`, `claude`, `shard`). It is stamped on every event
+   * What the log THIS session writes is called — one log per hand, per
+   * sitting (`john~a1b2` for one page load of a tab, `claude~k3j9` for one
+   * process; `sittingName` in `hands.ts`), or one stable name for a folder,
+   * whose whole history is loaded before anything is minted. A log name is
+   * reused only when its whole history was loaded first. It is stamped on every event
    * this session authors, and the ids those events mint are derived from it,
    * so a host that shares a room must pass the same name it writes its log
    * file under (`mergeLogs`' `me`). It is never read back at replay time: an
@@ -638,13 +642,28 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
   let generation = 0;
   let lastAt = 0;
   let counter = 0;
-  // Authorship, not derived state: what this session's own log is called and
-  // how many events it has written. Neither is read off the log at replay —
-  // they are what this session STAMPS — so neither is checkpointed, and a
-  // replay of the same log stamps nothing and changes neither.
+  // Authorship, not derived state: what this session's own log is called, and
+  // the highest number this SITTING has seen or issued under each log name.
+  // Neither is read off the log at replay — they are what this session STAMPS
+  // — so neither is checkpointed, and a replay of the same log stamps nothing.
+  //
+  // The high-water mark is the one thing kept outside the events, and it only
+  // ever rises (DIRECTOR-PLAN-W2 L1). A number dropped by an undo was very
+  // likely already sent, and a peer holds that mark under it; a merge that no
+  // longer carries the dropped event, or a `load([])`, says nothing about what
+  // the room still holds. So nothing `load()` sees lowers it. It never changes
+  // what a log replays to: it only decides the next number this sitting
+  // writes. A new sitting — a reload, a new process — has no memory of it,
+  // which is why a live hand takes a new log name every sitting
+  // (`sittingName` in store/live.ts) and a folder's history is loaded before
+  // its first mark.
   let myLog = config.logName;
   let logNameSaid = config.logName !== undefined;
-  let mySeq = 0;
+  const highWater = new Map<string, number>();
+  /** Note a number written under a name; lower numbers change nothing. */
+  const sawNumber = (name: string, seq: number) => {
+    if (Number.isSafeInteger(seq) && seq > (highWater.get(name) ?? 0)) highWater.set(name, seq);
+  };
   const listeners = new Set<(state: SessionState) => void>();
 
   // ===== Checkpoints =====
@@ -2178,10 +2197,11 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
   function handParticipant(name: string): string {
     const id = 'participant:hand:' + name.replace(/[^A-Za-z0-9._-]+/g, '_');
     if (!nodes.has(id)) {
-      // A hand in a room is one tab or one process, named `person~suffix`
-      // (the surface's convention); the person's name is what is shown on
-      // its cards and readings, the suffix only tells the logs apart.
-      nodes.set(id, createParticipantNode(id, 'human', name.replace(/~[^~]*$/, ''), lastAt));
+      // A hand in a room is one SITTING — a tab's page load, a process —
+      // named `person~suffix` (`sittingName`); the person's name is what is
+      // shown on its cards and readings, the suffix only tells the logs
+      // apart, so a reload is a new log and the same hand.
+      nodes.set(id, createParticipantNode(id, 'human', handLabel(name), lastAt));
       participants.push(id);
     }
     return id;
@@ -2306,11 +2326,14 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     staleResult = null;
     // Authorship is stamped HERE, because this is the only place an event is
     // made; an event that already carries it was written elsewhere and keeps
-    // what it was written with. `mySeq` is never rewound by undo: a dropped
-    // event's number is not handed to a different one, or a peer that already
-    // heard the first would hold two different marks under a single id.
+    // what it was written with. The number is one past the sitting's
+    // high-water mark for this name, which undo, a merge and a reset never
+    // lower: a dropped event's number is not handed to a different one, or a
+    // peer that already heard the first would hold two different marks under
+    // a single id (D1).
     const ev: SessionEvent =
-      myLog === undefined || raw.seq !== undefined ? raw : { ...raw, origin: myLog, seq: ++mySeq };
+      myLog === undefined || raw.seq !== undefined ? raw : { ...raw, origin: myLog, seq: (highWater.get(myLog) ?? 0) + 1 };
+    if (ev.origin && typeof ev.seq === 'number') sawNumber(ev.origin, ev.seq);
     events.push(ev);
     const result = applyEvent(ev);
     maybeCheckpoint(events.length);
@@ -2466,15 +2489,13 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
         for (const ev of events) if (!ev.by && ev.origin) remembered = ev.origin;
         if (remembered !== undefined) myLog = remembered;
       }
-      // Then resume past the highest number already written UNDER THAT NAME,
-      // wherever in the merge it came from, so no number is ever issued
-      // twice — not by a reopened board, and not by a second tab that took
-      // the same name. A number under another name is another log's business.
-      mySeq = 0;
-      if (myLog !== undefined) {
-        for (const ev of events) {
-          if (ev.origin === myLog && typeof ev.seq === 'number' && ev.seq > mySeq) mySeq = ev.seq;
-        }
+      // Then note the highest number already written under every name,
+      // wherever in the merge it came from, so the next one this sitting
+      // writes is past them — a reopened board goes on past its own log.
+      // Noting only RAISES the mark: what this sitting issued and this load
+      // no longer carries (an undo never sent, a reset) stays issued (D1).
+      for (const ev of events) {
+        if (ev.origin && typeof ev.seq === 'number') sawNumber(ev.origin, ev.seq);
       }
       replay();
       notify();
