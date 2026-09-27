@@ -342,7 +342,7 @@ what a definition is called.
 
 ### The maths of a mark
 
-> `metamedium-core/src/session/measure.ts` — `measure(node, nodes)`, `describeMaths`.
+> `metamedium-core/src/session/measure.ts` — `measure(node, nodes, board?)`, `describeMaths`.
 
 What follows from a reading, as numbers: a circle's centre, radius,
 circumference and area; a rectangle's sides, perimeter and area; a line's
@@ -368,6 +368,29 @@ ways), labels and checks; it is a pure function of its lines, so a changed
 measurement re-derives exactly what depends on it (`diffSheets`), and
 `gather.ts` collects the lines from text artifacts and read writing without
 touching the session. Tier 1: no model computes a number.
+
+**Dimensions and solving** (M3a, M4). `maths/dimension.ts` offers a number
+beside a mark as one of its measures, ranked by its distance to a side's
+middle *relative to the side's length* and by how squarely it sits across,
+with the reason and the runner-up; a number inside a closed mark is a piece
+label, a small square in a corner declares it right, a short line under a
+number that reaches nothing is its underline, and `sheetLines` leaves every
+number on a mark out of the page (`maths/writing.ts` reads the board's words
+once for both). The **figure** the solver works on — corners, sides and the
+marks that drew them — is filled by one closed stroke (`figureOfMark`) and,
+for lines meeting, by `polygonFigure`. Each drawing gets a unit (its labels',
+else the page's) and a scale that says how consistently its labels agree
+with the ink (`TO_SCALE_WITHIN`). `maths/solve.ts` works **one figure at a
+time, in closed form** — triangle, rectangle, circle, arc, parts summing to
+their whole — every derived value with its formula, and **an
+over-determined figure keeps every consistent reading and says what cannot
+hold and by how much** (*labelled 24; legs of 24 and 8 make it 25.30, 1.30
+longer (5%)*). A declared square is never dropped; a corner the ink measures
+right is only a reading (`RIGHT_ANGLE_TOLERANCE` in `measure.ts`); what the
+labels leave open is offered at the scale as the ink's. `solveBoard(state)`
+does the board (and checks a step's value on an edge with `checkWritten`);
+`measure(node, nodes, board)` speaks the drawing's unit for a mark with
+labels and is unchanged for one without.
 
 ### Clean forms: a confident reading, redrawn
 
