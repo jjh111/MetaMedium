@@ -35,7 +35,8 @@ import { RIGHT_ANGLE_TOLERANCE, angleClass } from '../session/measure';
 import type { BoardDimensions, Drawing, DrawingScale, Figure, FigureLabel } from './dimension';
 import { dimensionsOf, inkMeasure } from './dimension';
 import { sheetLines } from './gather';
-import { readSheet } from './sheet';
+import { checkWritten, readSheet } from './sheet';
+import type { Sheet, StepCheck } from './sheet';
 import type { LengthUnit, Quantity } from './quantity';
 import { compareQuantities, convertQuantity, formatNumber, formatQuantity, unitSuffix } from './quantity';
 
@@ -1147,10 +1148,14 @@ export interface FigureMaths {
   labels: FigureLabel[];
   drawing: Drawing | null;
   solution: Solution;
+  /** Each step's value written on the figure (`1. 15″` on an edge), checked against its step on the page. */
+  steps: StepCheck[];
 }
 
 export interface BoardMaths {
   dimensions: BoardDimensions;
+  /** The page: every line on the board that is not a number on a mark (`sheetLines`, `readSheet`). */
+  sheet: Sheet;
   /** Every figure on the board, labelled or not, each solved on its own. */
   figures: FigureMaths[];
 }
@@ -1164,19 +1169,37 @@ export interface SolveBoardOptions {
 
 /**
  * The board's maths: every number placed, every figure solved on its own, in
- * the unit its drawing speaks — the one its labels write, else the page's.
- * Reads the session and changes nothing in it.
+ * the unit its drawing speaks — the one its labels write, else the page's —
+ * and every step's value written on a figure checked against the page, which
+ * is read once, without the numbers on marks. Reads the session and changes
+ * nothing in it.
  */
 export function solveBoard(state: SessionState, options: SolveBoardOptions = {}): BoardMaths {
-  const unit = options.unit !== undefined ? options.unit : (except: ReadonlySet<string>) => readSheet(sheetLines(state, { except })).unit;
+  const pages: Sheet[] = [];
+  const readPage = (except: ReadonlySet<string>) => {
+    const sheet = readSheet(sheetLines(state, { except }));
+    pages.push(sheet);
+    return sheet;
+  };
+  const unit = options.unit !== undefined ? options.unit : (except: ReadonlySet<string>) => readPage(except).unit;
   const dimensions = dimensionsOf(state, { unit, ...(options.figures ? { figures: options.figures } : {}) });
+  const sheet = pages[0] ?? readPage(dimensions.numberIds);
   const figures = dimensions.figures.map((figure) => {
     const labels = dimensions.labels.get(figure.id) ?? [];
     const drawing = dimensions.drawings.find((d) => d.figures.includes(figure.id)) ?? null;
     const solution = solveFigure(figure, labels, { unit: drawing?.unit ?? null, scale: drawing?.scale ?? null });
-    return { figure, labels, drawing, solution };
+    // A step's value on an edge is a reference to the step, checked there (M2's checkWritten); one number, one check.
+    const seen = new Set<string>();
+    const steps: StepCheck[] = [];
+    for (const l of labels) {
+      if (l.step === undefined || l.declared || seen.has(l.number ?? l.text)) continue;
+      seen.add(l.number ?? l.text);
+      const check = checkWritten(sheet, String(l.step), l.value);
+      if (check) steps.push(check);
+    }
+    return { figure, labels, drawing, solution, steps };
   });
-  return { dimensions, figures };
+  return { dimensions, sheet, figures };
 }
 
 /** A solution in a few lines, for a status line, a panel or a brief. */
