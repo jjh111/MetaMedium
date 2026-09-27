@@ -247,7 +247,7 @@ suite and the gate green, `master` fast-forwarded and pushed.
 
 | Phase | Units | Done when |
 |---|---|---|
-| **0. Make week 1 whole** | L1 ids that hold · L2a the shard pairs by id · L2b labels on the board · L2c the shard asks · L2d duplicate Enter, fitAll, the cache measured · L3 CI, bundles, docs | every unit week 1 claimed is whole, CI runs what exists (WebKit included), docs say what the code does |
+| **0. Make week 1 whole** | L1 ids that hold · L1b one event, applied once · L2a the shard pairs by id · L2b labels on the board · L2c the shard asks · L2d duplicate Enter, fitAll, the cache measured · L2e a person labels their own ink · L3 CI, bundles, docs | every unit week 1 claimed is whole, CI runs what exists (WebKit included), docs say what the code does |
 | **1. The backbone** | B1 tools · B2 context · B3 packs | a tool is one file; the field ranks by context with reasons; a pack is used by an event and benched |
 | **2. Editing** | E1 handles · E2 bindings follow · E3 ports, heads and figures | a selected mark reshapes by its points; bound arrows follow; notations can declare ports |
 | **3. Diagrams** | D1 flowchart · D2 Mermaid out · D3 Mermaid in · D4 UML class · D5 sequence and state · D6 ER and mind map · D7 routing · D8 the repair demo | A1–A3 pass in the gate |
@@ -328,6 +328,15 @@ canvas MCP smoke and the shard's (573 in 30 files, typecheck clean) all pass;
 the gate 367 passed and the one honest skip (canvas 227; shard 120 + 11 + 9);
 WebKit smoke 3. The attempt branches are left for the director to delete.
 
+**L2e a person labels their own ink.** Week 1's U2 says *whoever made a
+mark can put a word on it*; the event and the MCP hand do, a person on the
+canvas cannot. The field reads `label: word` (a new prefix in the pure
+reader, with its Node test), the affordance row offers *Label it “…”* beside
+*Name it* with tooltips that keep them apart (naming blesses a definition;
+labelling creates nothing), and taking it labels each selected mark the
+person made, refusing another hand's marks in words. *Red first:* the
+reader's test for the prefix and an e2e record labelling from the field.
+
 ### Phase 1 — the backbone
 **B1 Tools.** *Owns* `metamedium-core/src/tools/` (the contract, the
 registry, adapters for today's tier-1 modules and concept conversions),
@@ -403,6 +412,20 @@ marks. *Trap:* a printer scales; the tile carries a measured test square.
 
 ### Phase 5 — seats
 J1–J3 as `DIRECTOR-PLAN-W2.md` §3, with §6's addition.
+
+**J2 status, 26 Sep 2026: done — the answer is *not yet*** (`gliner-seat/`,
+merged at `aa6c2e3`). GLiNER2 `multi-v1` (Apache-2.0, a 614 MB fp16 ONNX
+export, its processor ported to JavaScript and matched to the Python
+library's token ids) runs where MetaMedium runs — about 23 ms a line on
+WebGPU in a Node process or a Chromium page, a second to first answer — but
+on our own text it misses most of the spans a seat would be there for
+(measurement names 7 of 11 at 35% precision, operators 8 of 26), while the
+units and quantities it does find are what M1's parser already reads
+exactly. So: notation is parsed at tier 1; `decide` stays the judging seat;
+extraction waits for a better model or a fine-tune. Unported and worth a
+look: the export's classification head, a possible *local* answer to
+decide's Choice questions. `gliner-seat/README.md` has every number and the
+command that produced it.
 
 ### Phase 6 — ready for use
 **R1 Boards.** A boards list in browser storage; `?board=`; the existing
