@@ -298,6 +298,12 @@ describe('what the chain never does', () => {
     expect(r[0].notes.join(' ')).toMatch(/Waist/);
   });
 
+  it('a full stop after a result is punctuation', () => {
+    const r = run('2. ① ÷ 2 = 14 ÷ 2 = 7.', apron);
+    expect(fmt(r[0].value)).toBe('7″');
+    expect(r[0].checks.map((c) => c.status)).toEqual(['ok', 'ok']);
+  });
+
   it('an unreadable line is a reading that says so, never a throw', () => {
     expect(() => run('1. A ÷ ÷ = ?')).not.toThrow();
     const p = parseLine('1. A ÷ ÷ = ?');

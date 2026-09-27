@@ -174,6 +174,8 @@ function scan(s: string): Tok[] {
       continue;
     }
     if (c === '~') { approxNext = true; i++; continue; }
+    // A full stop after a number or a word is punctuation — `= 7.` — never a decimal point with nothing after it.
+    if (c === '.' && !isDigit(s[i + 1]) && operandEnd(out[out.length - 1])) { space += 1; i++; continue; }
     if (LETTER.test(c)) {
       let j = i + 1;
       while (j < s.length) {
