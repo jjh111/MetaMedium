@@ -1,0 +1,20 @@
+# Nothing heavy is ever committed from this experiment: no dependencies, no
+# weights, no caches, no Python environment. `npm run fetch` puts the model
+# back; the numbers it produced are in results/, which IS committed.
+node_modules/
+.venv/
+venv/
+__pycache__/
+*.pyc
+.cache/
+models/
+*.onnx
+*.onnx_data
+*.onnx.data
+*.safetensors
+*.bin
+*.gguf
+*.tflite
+tokenizer.json
+spm.model
+.DS_Store
