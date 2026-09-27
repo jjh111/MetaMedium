@@ -14,5 +14,10 @@
     "verify": "node verify.mjs",
     "bench": "node bench/node.mjs",
     "serve": "node bench/serve.mjs"
+  },
+  "dependencies": {
+    "@huggingface/tokenizers": "0.2.0",
+    "onnxruntime-node": "1.30.0",
+    "onnxruntime-web": "1.30.0"
   }
 }
