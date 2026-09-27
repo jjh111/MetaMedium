@@ -547,7 +547,7 @@
     return {
       key: o.key, group: o.group, groupConf: o.groupConf, groupWhy: o.groupWhy || '', verbs: o.verbs || [],
       label: 'Label it ' + q, why: why, tier: 1,
-      line: ink.mine ? '↵ label it ' + q + ' — a word on your own ink; nothing is made' : '↵ no label — ' + theirMarks(ink.others) + '; a label goes on your own ink',
+      line: ink.mine ? '↵ label it ' + q + ' — on your ink; makes nothing' : '↵ no label — ' + theirMarks(ink.others) + '; a label goes on your own ink',
       run: () => labelMarks(sum, targets, word),
     };
   }
@@ -558,7 +558,7 @@
     return {
       key: 'name-word', group: 'always', groupConf: 0, groupWhy: '', verbs: [],
       label: 'Name it ' + q, why: 'one thing called ' + q + ' — ' + NAMING_IS, tier: 1,
-      line: '↵ name it ' + q + ' — one thing, a definition the library keeps',
+      line: '↵ name it ' + q + ' — one thing, a definition',
       run: () => session.bless({ summonId: sum.id, name: word, at: Date.now() }),
     };
   }

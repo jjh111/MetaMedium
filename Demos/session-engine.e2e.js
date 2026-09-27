@@ -2128,6 +2128,236 @@ window.__scenario = async function(){
       labels42.length === 1 && labels42[0].nodeId === box42 && !!lab42 && lab42.text === 'inlet' && lab42.source === MM.LOCAL_PARTICIPANT
         && !!at42 && at42.text === 'inlet' && window.__calls.length === calls42,
       { events: mm.session.getEvents().slice(evs42).map((e) => e.type), label: lab42, drawn: at42, calls: window.__calls.length - calls42 });
+    // The field closed BEFORE the word was written, so the label is the last event:
+    // one undo takes it off, and only it.
+    mm.session.undo(); await wait(30);
+    const undone42 = mm.session.getState();
+    step('42b. one undo takes the label off, and only the label: the mark stays, the field stays closed',
+      !MM.labelOf(undone42.nodes.get(box42)) && !drawn42().some((l) => l.id === box42) && !undone42.summon && undone42.contentIds.includes(box42),
+      { label: MM.labelOf(undone42.nodes.get(box42)) || null, summon: !!undone42.summon, last: (mm.session.getEvents().slice(-1)[0] || {}).type });
+    // The same act run twice — a second Enter, a pill's closure held after the first —
+    // writes one label: the second finds the mark already saying the word, and says so.
+    t.stroke(t.circle(c42.x, c42.y, 190)); t.takeLoop(c42.x, c42.y, 190); await wait(60);
+    const r42 = mm.readField('label: inlet');
+    const evs42c = mm.session.getEvents().length;
+    if (r42 && r42.run) { r42.run(); await wait(30); r42.run(); }
+    const labels42c = mm.session.getEvents().slice(evs42c).filter((e) => e.type === 'label');
+    const status42c = document.getElementById('status').textContent;
+    step('42c. the same act run twice writes one label, and the second says the mark already carries it',
+      !!(r42 && r42.run) && labels42c.length === 1 && /already says “inlet”/.test(status42c)
+        && (MM.labelOf(mm.session.getState().nodes.get(box42)) || {}).text === 'inlet',
+      { kind: r42 && r42.kind, labels: labels42c.length, status: status42c });
+    // Drawn exactly as the hand's is. A twin box labelled through the core door — the
+    // way the MCP hand labels — stands beside it, and the two labels are one thing:
+    // the same size in the board's units, the same place over their marks, the same
+    // hand, the ink's own colour in the dark and on paper, twice the pixels at twice
+    // the zoom.
+    const theme42 = mm.themeMode();
+    const ink42 = () => getComputedStyle(document.documentElement).getPropertyValue('--ink').trim();
+    const w0 = mm.worldToScreen(700, 220), w1 = mm.worldToScreen(920, 360);
+    t.stroke(t.rect(w0.x, w0.y, w1.x - w0.x, w1.y - w0.y));
+    const twin42 = mm.session.getState().contentIds[mm.session.getState().contentIds.length - 1];
+    const tookTwin42 = mm.session.label({ nodeId: twin42, text: 'inlet', at: Date.now() });
+    const pair42 = () => { const d = drawn42(); return { mine: d.find((l) => l.id === box42) || null, twin: d.find((l) => l.id === twin42) || null }; };
+    const same42 = (p) => {
+      const st = mm.session.getState();
+      const bm = MM.boundsOf(st.nodes.get(box42)), bt = MM.boundsOf(st.nodes.get(twin42));
+      return !!p.mine && !!p.twin && !!bm && !!bt && Math.abs(p.mine.size - p.twin.size) < 1e-9 && Math.abs(p.mine.px - p.twin.px) < 1e-6
+        && p.mine.colour === p.twin.colour && p.mine.who === p.twin.who
+        && Math.abs((p.mine.x - bm.minX) - (p.twin.x - bt.minX)) < 0.5 && Math.abs((p.mine.y - bm.minY) - (p.twin.y - bt.minY)) < 0.5;
+    };
+    mm.setThemeMode('dark'); await wait(30);
+    const dark42 = pair42(), darkInk42 = ink42();
+    mm.setView(2, 0, 0); await wait(30);
+    const zoom42 = pair42();
+    mm.setView(1, 0, 0); mm.setThemeMode('light'); await wait(30);
+    const light42 = pair42(), lightInk42 = ink42();
+    step('42d. the label from the field is drawn exactly as the hand\'s: the same size in the board\'s units and place over its mark, the ink\'s own colour in both themes, twice the pixels at twice the zoom',
+      tookTwin42 === twin42 && same42(dark42) && same42(zoom42) && same42(light42)
+        && dark42.mine.colour === darkInk42 && light42.mine.colour === lightInk42 && darkInk42 !== lightInk42
+        && Math.abs(zoom42.mine.size - dark42.mine.size) < 1e-9 && Math.abs(zoom42.mine.px - 2 * dark42.mine.px) < 0.01,
+      { dark: dark42, zoom2: zoom42, light: light42, tokens: [darkInk42, lightInk42] });
+    mm.setThemeMode(theme42); await wait(30);
+    // Erasing the mark takes its label; undo of the erase brings both back.
+    const e0 = mm.worldToScreen(280, 250), e1 = mm.worldToScreen(540, 330);
+    t.stroke(t.scratch(e0.x, e0.y, e1.x - e0.x, e1.y - e0.y, 3)); await wait(30);
+    const gone42 = !mm.session.getState().contentIds.includes(box42) && !drawn42().some((l) => l.id === box42);
+    mm.session.undo(); await wait(30);
+    const back42 = drawn42().find((l) => l.id === box42);
+    step('42e. erasing the mark takes the label from the field with it, and undo of the erase brings mark and label back',
+      gone42 && mm.session.getState().contentIds.includes(box42) && !!back42 && back42.text === 'inlet' && drawn42().some((l) => l.id === twin42),
+      { gone: gone42, back: back42 || null });
+    mm.session.load([]); mm.setView(1, 0, 0);
+  }
+
+  // ---- 42f–m. One word, two acts: Name it and Label it, side by side (V1-PLAN L2e) ----
+  // The row offers the word two ways — when the writing has been read, and when a
+  // word is typed — and the two must not read as one thing twice. The difference is
+  // said in words the field already has: each pill's tooltip says what it does and
+  // what it does not, and the reading line says what a pill will do while it is
+  // pointed at. Naming blesses one thing, a definition; labelling makes nothing.
+  // The four core buttons stay four.
+  {
+    mm.session.load([]); mm.setView(1, 0, 0);
+    // A fresh board drops the stub's join; it joins again, as a remembered model does at boot.
+    mm.agents.length = 0; mm.agents.push(MM.createAgentParticipant(mm.session, Object.assign({}, MM.PRESETS.ollama, { model: 'e2e-stub', vision: true }), Date.now()));
+    window.__readReply = null;
+    const S = (x, y) => mm.worldToScreen(x, y);
+    const pills = (row) => [...document.querySelectorAll('#summon .row.' + row + ' .item')];
+    const said = (b) => b.querySelector('span').textContent.trim();
+    const calls = window.__calls.length;
+    // A box with a word written in it, read by the model that can see.
+    const r0 = S(500, 240), r1 = S(800, 420);
+    t.stroke(t.rect(r0.x, r0.y, r1.x - r0.x, r1.y - r0.y));
+    const box = mm.session.getState().contentIds[0];
+    const w0 = S(540, 300);
+    t.stroke(t.word(w0.x, w0.y, 200, 40, 7));
+    const word = mm.session.getState().contentIds[1];
+    const c = S(650, 330);
+    t.stroke(t.circle(c.x, c.y, 230)); t.takeLoop(c.x, c.y, 230); await wait(80);
+    t.typeEnter('read');
+    for (let i = 0; i < 30 && !MM.transcriptOf(mm.session.getState().nodes.get(word)); i++) await wait(100);
+    t.typeIn('');
+    const certainF = pills('certain'), affordF = pills('afford');
+    const namePill = certainF.find((b) => /^“Pricing” 0\.92/.test(said(b)));
+    const labelPill = affordF[0];
+    step('42f. writing read beside a shape: the reading takes the word as the name, and Label it “Pricing” leads what it affords, right under it — the four core buttons still four',
+      !!namePill && !!labelPill && said(labelPill) === 'Label it “Pricing”' && t.coreSlots().join(',') === 'name,copy,paste,erase' && window.__calls.length === calls + 1,
+      { certain: certainF.map(said), afford: affordF.map(said), core: t.coreSlots(), calls: window.__calls.length - calls });
+    step('42g. each says what it does and what it does not: naming makes one thing, a definition, and writes no word on the ink; labelling puts the word on your ink and makes nothing',
+      !!namePill && !!labelPill && /one thing/.test(namePill.title) && /definition/.test(namePill.title) && /writes no word on the ink/.test(namePill.title)
+        && /your ink/.test(labelPill.title) && /makes nothing/.test(labelPill.title) && /no definition/.test(labelPill.title) && !/makes nothing/.test(namePill.title),
+      { name: namePill && namePill.title, label: labelPill && labelPill.title });
+    // Pointed at, the pill says in the reading line what it will do; let go, the line is Enter's again.
+    const before = t.readingLine();
+    if (labelPill) labelPill.dispatchEvent(new MouseEvent('mouseenter'));
+    const pointed = t.readingLine();
+    if (labelPill) labelPill.dispatchEvent(new MouseEvent('mouseleave'));
+    const after = t.readingLine();
+    step('42h. pointed at, Label it says in the reading line what it will do — no badge, no new row — and the line is Enter\'s again when the pointer leaves',
+      pointed === '↵ label it “Pricing” — on your ink; makes nothing' && after === before && /take it as the name/.test(before),
+      { before, pointed, after });
+    const arts = mm.session.getState().artifacts.length, lib = mm.libraryEntries().length, evs = mm.session.getEvents().length;
+    if (labelPill) labelPill.click();
+    await wait(30);
+    const sF = mm.session.getState();
+    const newF = mm.session.getEvents().slice(evs);
+    step('42i. taken, the word goes on the shape held with the writing — not on the writing, which says it already — and nothing is made: no bless, no artifact, no library entry',
+      (MM.labelOf(sF.nodes.get(box)) || {}).text === 'Pricing' && !MM.labelOf(sF.nodes.get(word))
+        && newF.filter((e) => e.type === 'label').length === 1 && !newF.some((e) => e.type === 'bless')
+        && sF.artifacts.length === arts && mm.libraryEntries().length === lib && !MM.wordOf(sF.nodes.get(box)),
+      { events: newF.map((e) => e.type), box: MM.labelOf(sF.nodes.get(box)) || null, word: MM.labelOf(sF.nodes.get(word)) || null });
+
+    // A typed word: Name it and Label it, the pair together, Enter unchanged.
+    mm.session.load([]); mm.setView(1, 0, 0);
+    const t0 = S(300, 220), t1 = S(520, 360);
+    t.stroke(t.rect(t0.x, t0.y, t1.x - t0.x, t1.y - t0.y));
+    const tbox = mm.session.getState().contentIds[0];
+    const tc = S(410, 290);
+    t.stroke(t.circle(tc.x, tc.y, 190)); t.takeLoop(tc.x, tc.y, 190); await wait(60);
+    t.typeIn('inlet');
+    const affordT = pills('afford');
+    const lineT = t.readingLine();
+    step('42j. a typed word is offered two ways, side by side — Name it “inlet”, then Label it “inlet” — as plain pills in the rows the field has, and Enter still does what the line says',
+      affordT.map(said).join(' | ') === 'Name it “inlet” | Label it “inlet”' && !!lineT && !/label/i.test(lineT)
+        && affordT.every((b) => b.className === 'pill item') && document.querySelectorAll('#summon .row').length === 3
+        && t.coreSlots().join(',') === 'name,copy,paste,erase',
+      { afford: affordT.map(said), line: lineT, classes: affordT.map((b) => b.className), rows: document.querySelectorAll('#summon .row').length, core: t.coreSlots() });
+    const nameT = affordT[0], labelT = affordT[1];
+    step('42k. their tooltips keep them apart: Name it makes one thing, a definition, and writes no word on the ink; Label it puts the word on the mark you made and makes nothing',
+      !!nameT && !!labelT && /one thing/.test(nameT.title) && /definition/.test(nameT.title) && /writes no word on the ink/.test(nameT.title)
+        && /on the mark you made/.test(labelT.title) && /makes nothing/.test(labelT.title) && /no definition/.test(labelT.title),
+      { name: nameT && nameT.title, label: labelT && labelT.title });
+    // `label:` and `name:` choose one of the pair: the reading line and the marked pill agree.
+    t.typeIn('label: inlet');
+    const selL = pills('afford').map((b) => said(b) + '=' + b.getAttribute('aria-selected')), lineL = t.readingLine();
+    t.typeIn('name: inlet');
+    const selN = pills('afford').map((b) => said(b) + '=' + b.getAttribute('aria-selected')), lineN = t.readingLine();
+    step('42l. “label: inlet” marks Label it as what Enter will do, “name: inlet” marks Name it — the line and the pill agree',
+      selL.join(' | ') === 'Name it “inlet”=false | Label it “inlet”=true' && lineL === '↵ label it “inlet”'
+        && selN.join(' | ') === 'Name it “inlet”=true | Label it “inlet”=false' && lineN === '↵ name it “inlet”',
+      { label: selL, lineL, name: selN, lineN });
+    // Taken, they stay two acts: Name it blesses one thing; Label it makes nothing.
+    t.typeIn('inlet');
+    const artsT = mm.session.getState().artifacts.length, evsT = mm.session.getEvents().length;
+    const n1 = pills('afford').find((b) => said(b) === 'Name it “inlet”');
+    if (n1) n1.click();
+    await wait(30);
+    const sN = mm.session.getState();
+    const namedArt = sN.artifacts[sN.artifacts.length - 1];
+    const named = !!n1 && sN.artifacts.length === artsT + 1 && MM.wordOf(sN.nodes.get(namedArt)) === 'inlet' && !mm.session.getEvents().slice(evsT).some((e) => e.type === 'label');
+    mm.session.undo(); await wait(60);
+    t.typeIn('inlet');
+    const evsT2 = mm.session.getEvents().length;
+    const l1 = pills('afford').find((b) => said(b) === 'Label it “inlet”');
+    if (l1) l1.click();
+    await wait(30);
+    const sL = mm.session.getState();
+    const newL = mm.session.getEvents().slice(evsT2);
+    step('42m. taken, they stay two acts: Name it blesses one thing called “inlet”; Label it puts “inlet” on the mark and makes nothing — and no model was asked for either',
+      named && !!l1 && sL.artifacts.length === artsT && newL.filter((e) => e.type === 'label').length === 1 && !newL.some((e) => e.type === 'bless')
+        && (MM.labelOf(sL.nodes.get(tbox)) || {}).text === 'inlet' && !MM.wordOf(sL.nodes.get(tbox)) && window.__calls.length === calls + 1,
+      { named, artifacts: [artsT, sL.artifacts.length], events: newL.map((e) => e.type), calls: window.__calls.length - calls });
+    mm.session.load([]); mm.setView(1, 0, 0);
+  }
+
+  // ---- 42n–p. Another hand's ink is refused in words, never skipped (V1-PLAN L2e) ----
+  // A label is a word on your OWN ink: the maker is the only one who may label a
+  // mark (the notes, §B). Held with marks fern and a model made, the word goes on
+  // yours alone; the line names theirs before Enter, and the status line says after
+  // it whose marks were left, and why. Held alone, fern's mark is not labelled and
+  // nothing is written — said quietly before Enter, and out loud after it.
+  {
+    mm.session.load([]); mm.setView(1, 0, 0);
+    const S = (x, y) => mm.worldToScreen(x, y);
+    const fern = MM.createSession(Object.assign({}, MM.DEFAULT_SESSION_CONFIG, { logName: 'fern~f1' }));
+    const kite = fern.addStroke(t.circle(760, 320, 50).map((p) => ({ x: p.x, y: p.y })), Date.now() - 5000, undefined, 1, { content: true });
+    mm.session.load(MM.mergeLogs({ 'fern~f1': fern.getEvents(), 'me~m1': [] }, { me: 'me~m1' }));
+    // A model joins and draws a mark in its own name, as `draw:` has it do.
+    mm.agents.length = 0; mm.agents.push(MM.createAgentParticipant(mm.session, Object.assign({}, MM.PRESETS.ollama, { model: 'e2e-stub', vision: true }), Date.now()));
+    const agentId = mm.agents[0].id;
+    const model = mm.session.addStroke(t.rect(540, 410, 80, 50).map((p) => ({ x: p.x, y: p.y })), Date.now(), agentId, 1, { content: true });
+    const modelName = MM.handLabel(MM.wordOf(mm.session.getState().nodes.get(agentId)) || agentId);
+    const m0 = S(440, 250), m1 = S(590, 360);
+    t.stroke(t.rect(m0.x, m0.y, m1.x - m0.x, m1.y - m0.y));
+    const mine = mm.session.getState().contentIds[mm.session.getState().contentIds.length - 1];
+    const calls = window.__calls.length;
+    const c = S(630, 340);
+    t.stroke(t.circle(c.x, c.y, 250)); t.takeLoop(c.x, c.y, 250); await wait(60);
+    const held = mm.session.getState().summon;
+    // Whose marks the label will not go on, in the order the loop holds them.
+    const theirs = held ? held.enclosedIds.filter((id) => id === kite || id === model).map((id) => (id === kite ? 'fern' : modelName)) : [];
+    t.typeIn('label: inlet');
+    const lineM = t.readingLine();
+    const evsM = mm.session.getEvents().length;
+    t.typeEnter('label: inlet'); await wait(60);
+    const sM = mm.session.getState();
+    const labM = mm.session.getEvents().slice(evsM).filter((e) => e.type === 'label');
+    const statusM = document.getElementById('status').textContent;
+    step('42n. held with marks fern and a model made, the line names them before Enter: the word goes on yours, not on theirs',
+      !!held && [kite, model, mine].every((id) => held.enclosedIds.includes(id))
+        && theirs.length === 2 && lineM === '↵ label it “inlet” — on yours, not the 2 marks ' + theirs.join(' and ') + ' made',
+      { held: held && held.enclosedIds, line: lineM, model: modelName });
+    step('42o. Enter labels your mark alone — one label event — and says in the status line whose marks it left, and why: never passed over in silence, and no model asked',
+      labM.length === 1 && labM[0].nodeId === mine && (MM.labelOf(sM.nodes.get(mine)) || {}).text === 'inlet'
+        && !MM.labelOf(sM.nodes.get(kite)) && !MM.labelOf(sM.nodes.get(model))
+        && /labelled it “inlet”/.test(statusM) && /fern/.test(statusM) && statusM.includes(modelName) && /your own ink/.test(statusM) && window.__calls.length === calls,
+      { events: mm.session.getEvents().slice(evsM).map((e) => e.type), status: statusM, calls: window.__calls.length - calls });
+    // Fern's mark held alone: nothing of yours to label.
+    const k = S(760, 320);
+    t.stroke(t.circle(k.x, k.y, 100)); t.takeLoop(k.x, k.y, 100); await wait(60);
+    const heldK = mm.session.getState().summon;
+    t.typeIn('label: kite');
+    const lineK = t.readingLine();
+    const quietK = !!document.querySelector('#summon .reading.quiet');
+    const evsK = mm.session.getEvents().length;
+    t.typeEnter('label: kite'); await wait(60);
+    const statusK = document.getElementById('status').textContent;
+    step('42p. held alone, fern\'s mark is not yours to label: the line says so quietly before Enter, and Enter writes nothing and says so in the status line',
+      !!heldK && heldK.enclosedIds.length === 1 && heldK.enclosedIds[0] === kite && quietK && lineK === '↵ no label — fern made this mark; a label goes on your own ink'
+        && !mm.session.getEvents().slice(evsK).some((e) => e.type === 'label') && !MM.labelOf(mm.session.getState().nodes.get(kite))
+        && /no label on the mark fern made/.test(statusK) && /your own ink/.test(statusK),
+      { held: heldK && heldK.enclosedIds, line: lineK, quiet: quietK, status: statusK, events: mm.session.getEvents().slice(evsK).map((e) => e.type) });
     mm.session.load([]); mm.setView(1, 0, 0);
   }
 
