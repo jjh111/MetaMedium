@@ -324,6 +324,44 @@ describe('live logs', () => {
     });
   });
 
+  // ===== One event, applied once (V1-PLAN phase 0, L1b) ======================
+  // An event is its authorship — the log that wrote it and its number there.
+  // The same event heard in two logs is one event (the merge folds it); two
+  // DIFFERENT events under one authorship mean two writers under one name, and
+  // the room says so where it says everything else about itself.
+  describe('one event under two logs', () => {
+    const named = (logName: string) => createSession({ ...DEFAULT_SESSION_CONFIG, logName });
+
+    it('the same event heard in two logs is not a collision', async () => {
+      const w = wire();
+      const store = new LiveStore(w.transport as any, 'carl~c3');
+      const john = named('john~a1');
+      john.addStroke(rectStroke(100, 100, 200, 120), 1000);
+      const log = john.getEvents().slice();
+      w.deliver({ participant: 'john~a1', events: log, at: 1000, sid: 's1' });
+      // The same tab, joined again as ann: its log goes out under the new name.
+      w.deliver({ participant: 'ann~a1', events: log.map((e) => ({ ...e })), at: 2000, sid: 's1', full: true });
+      expect(store.notices()).toEqual([]);
+    });
+
+    it('two different events under one number, heard in two logs, raise the notice', async () => {
+      const w = wire();
+      const store = new LiveStore(w.transport as any, 'carl~c3');
+      const one = named('ada~a1');
+      one.addStroke(rectStroke(100, 100, 200, 120), 1000);
+      const two = named('ada~a1');
+      two.addStroke(circleStroke(600, 160, 60), 1500);
+      w.deliver({ participant: 'ada~a1', events: one.getEvents().slice(), at: 1000, sid: 's1' });
+      w.deliver({ participant: 'bea~b2', events: two.getEvents().slice(), at: 1500, sid: 's2' });
+      const said = store.notices();
+      expect(said).toHaveLength(1);
+      expect(said[0]).toMatch(/"ada~a1"/);
+      expect(said[0]).toMatch(/number 1/);
+      // Said once, however often it is asked.
+      expect(store.notices()).toEqual(said);
+    });
+  });
+
   it('a live room holds no files, and says so', async () => {
     const store = new LiveStore(new LocalHub().connect(), 'me');
     expect(await store.list()).toEqual([]);
