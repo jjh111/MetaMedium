@@ -34,8 +34,11 @@ import {
   SECOND_TOWER,
   SECOND_VIEW,
   WHOLE_VIEW,
+  rect,
+  viewPlane,
   type BoardMark,
 } from './depthboards';
+import { PLAN_NORMAL } from './form';
 
 const LOGS = import.meta.glob('../fixtures/john-2026-09-16-castle-sketch.mm.log', {
   eager: true,
@@ -150,6 +153,19 @@ describe('a hull stood on one standpoint asks how deep — once', () => {
     const r = log.depthQuestion(solidId)!.reading;
     expect(r.state).toBe('measured');
     expect(r.reasoning).toMatch(/whole plan/);
+  });
+
+  it('a loop drawn from nearly overhead is a plan, not a standpoint — the form rung’s own PLAN_NORMAL', () => {
+    // From 60° up the view's normal is 87% vertical, over PLAN_NORMAL: what a
+    // view from up there shows is a plan (`form.ts`), so a footprint and such a
+    // loop are two plans, and nothing has given the hull a sightline to lack.
+    const steep = viewPlane({ x: 3, y: 5.2, z: 0 }, { x: 0, y: 0, z: 0 });
+    expect(Math.abs(steep.normal.y)).toBeGreaterThan(PLAN_NORMAL);
+    const loop: BoardMark = { what: 'a loop from high above', points: rect(-1.5, -1.5, 3, 3), plane: steep, at: 2000 };
+    const { log, solidId } = board([ONE_VIEW[0], loop]);
+    expect(solidId).toBeTruthy();
+    expect(questions(log)).toHaveLength(0);
+    expect(log.depthQuestion(solidId)!.reading.state).toBe('measured');
   });
 
   it('a plan drawn under the tower measures it: one view is enough, and nothing is asked', () => {
