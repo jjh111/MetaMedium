@@ -248,6 +248,7 @@ suite and the gate green, `master` fast-forwarded and pushed.
 | Phase | Units | Done when |
 |---|---|---|
 | **0. Make week 1 whole** | L1 ids that hold · L1b one event, applied once · L2a the shard pairs by id · L2b labels on the board · L2c the shard asks · L2d duplicate Enter, fitAll, the cache measured · L2e a person labels their own ink · L2f an artifact is made by whoever blessed it · L2g a word is made by whoever wrote its letters · L2h gestures are per hand · L3 CI, bundles, docs | every unit week 1 claimed is whole, CI runs what exists (WebKit included), docs say what the code does |
+| **0b. A board that holds** (pulled forward by `PERF.md`, 27 Sep) | R3 no lost work · R4b the engine holds 2,000 marks · R4c the surface draws only what changed · R4d a room merges a line, not the board · R4e a brief carries what it is about | nothing is ever lost silently; a 2,000-mark board opens in under 1.5 s, answers a stroke in 16 ms at p95 and draws its reading within 100 ms; a room line costs under 16 ms; the budgets are tests |
 | **1. The backbone** | B1 tools · B2 context · B3 packs | a tool is one file; the field ranks by context with reasons; a pack is used by an event and benched |
 | **2. Editing** | E1 handles · E2 bindings follow · E3 ports, heads and figures | a selected mark reshapes by its points; bound arrows follow; notations can declare ports |
 | **3. Diagrams** | D1 flowchart · D2 Mermaid out · D3 Mermaid in · D4 UML class · D5 sequence and state · D6 ER and mind map · D7 routing · D8 the repair demo | A1–A3 pass in the gate |
@@ -566,6 +567,36 @@ solid rebuilds, so no bound. The losing attempt branches (`auto/w1-U1d-r09201052
 `auto/w1-U3-r0920120035`) are left for the director to delete: this lane
 creates and deletes no branch.
 
+### Phase 0b — a board that holds (pulled forward, 27 September)
+The performance baseline (`PERF.md`, R4a) measured what daily use would meet
+and found the medium does not hold a working board: **500 marks are usable
+once open; 2,000 take 100 s to open and freeze the page 7.6 s on every
+stroke; 5,000 do not open; and autosave stops saving, in silence, near
+1,100–1,600 marks.** A page of handwritten formulas passes 500 marks — every
+letter is a stroke. So this phase comes before the backbone: tools, context,
+notations and the maths on the board all read the board on every stroke, and
+would inherit the cost. The budgets are `PERF.md`'s, enforced as tests.
+
+**R3 no lost work** — as in phase 6 below, run first: never silent, an
+append-only store per board in IndexedDB, flush on the way out, the kill test.
+**R4b the engine holds 2,000 marks** — relations stored only within reach
+(distance-limited, relative to the marks' size; `same-size` across the whole
+board is 88% of what is held), computed for the new mark's neighbourhood
+through a spatial index instead of the whole board on every stroke
+(`recomputeClusterCandidates`, `session.ts`), checkpoints that do not clone
+every relation, and the scratch test's bounding-box check (`erase.ts`);
+replay of every held log node for node, and the budgets as tests on the
+generated boards (`metamedium-core/bench/`). **R4c the surface draws only what
+changed** — the reading of roles for the marks a stroke touched, not the whole
+board (`readRungs` in `08-render.js`, `assignRoles` in `diagram/roles.ts`),
+culling to the viewport, and a pointer move that repaints the stroke in
+progress, not everything. **R4d a room merges a line, not the board** — an
+arriving line appended without a full replay (`17-folder.js`), hellos not
+answered with every log by every hand, and the re-serialisation of every event
+per line gone. **R4e a brief carries what it is about** — `describeSession`
+lists the relations near the scope, not every stored one (113 KB for five
+marks at 2,000).
+
 ### Phase 1 — the backbone
 **B1 Tools.** *Owns* `metamedium-core/src/tools/` (the contract, the
 registry, adapters for today's tier-1 modules and concept conversions),
@@ -775,3 +806,10 @@ the backbone, R1–R3, or A1 and A4.
 5. One photograph of a hand-drawn flowchart for D8.
 6. The decision seat stays in core as a participant at tier 1½ [yes, as
    landed; maths is its second user].
+7. When two hands both bless the same marks, which artifact holds them
+   [today both do; proposed: the first bless in merge order holds them and
+   the second is refused at the door with its reason, the STATE-1 way].
+8. Who makes a hull the shard blesses in the engine's name [the hand whose
+   log holds it, so a person can label it — as landed in L2f].
+9. The precision a derived length is written to [one place finer than the
+   labels it came from: 24 and 8 give 25.3 — as landed in M7].
