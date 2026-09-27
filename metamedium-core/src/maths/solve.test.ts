@@ -25,6 +25,7 @@ import { solveBoard, solveFigure, describeSolution } from './solve';
 import type { BoardMaths, Solution } from './solve';
 import { quantity, rangeOf } from './quantity';
 import { TRIANGLE_LABELS, TRIANGLE_CORNERS, TRIANGLE_SQUARE, TRIANGLE_LABEL_BOXES, TRIANGLE_EXPECTED } from './fixtures/triangle';
+import { APRON_LINES } from './fixtures/apron.sample';
 
 function text(s: Session, code: string, box: Bounds, at: number): string {
   return s.import({ kind: 'text', path: `text/${at}.txt`, name: code, bounds: box, code, at })!;
@@ -286,6 +287,35 @@ describe('parts, conflicts and the ink', () => {
     expect(h.reason).toMatch(/the ink’s/);
     // The labelled width is the thing's, and nothing the ink says moves it.
     expect(valueOf(sol, 'width')).toMatchObject({ from: 'labelled', text: '30″' });
+  });
+});
+
+describe('the page beside the drawing', () => {
+  const page = (s: Session) => APRON_LINES.forEach((line, i) => text(s, line, { minX: 2000, maxX: 2400, minY: 100 + i * 40, maxY: 130 + i * 40 }, 100000 + i));
+
+  it('bare labels take the unit the page speaks', () => {
+    const { s, tri } = triangleBoard({ longSide: false });
+    page(s);
+    const board = solveBoard(s.getState());
+    expect(board.sheet.unit).toBe('in');
+    const f = board.figures.find((x) => x.figure.id === tri)!;
+    expect(f.drawing!.unit).toBe('in');
+    expect(f.solution.readings[0].sentence).toBe(`legs of 24 and 8 make the long side ${TRIANGLE_EXPECTED.longSide}`);
+  });
+
+  it('a step’s value written on an edge is checked against its step: 1. 14″ holds, 1. 15″ does not', () => {
+    const s = createSession();
+    page(s);
+    const r = s.addStroke(rectStroke(100, 100, 140, 200), 1000);
+    text(s, '1. 14″', box(170, 80, 60, 30), 20000);
+    const q = s.addStroke(rectStroke(400, 100, 150, 200), 30000);
+    text(s, '1. 15″', box(475, 80, 60, 30), 40000);
+    const board = solveBoard(s.getState());
+    const steps = (id: string) => board.figures.find((f) => f.figure.id === id)!.steps.map((c) => [c.step, c.status]);
+    expect(steps(r)).toEqual([['1', 'ok']]);
+    expect(steps(q)).toEqual([['1', 'off']]);
+    // The page itself is the page's lines alone: the edge labels are on marks, not steps of their own.
+    expect(board.sheet.entries).toHaveLength(APRON_LINES.length);
   });
 });
 
