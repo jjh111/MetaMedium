@@ -161,7 +161,8 @@ async function board() {
     clusterCandidates: st.clusterCandidates.length,
   };
   out.replay = { coldMs: cold };
-  const resultName = `engine-board-${size}-${which}${ablate ? '-' + ablate : ''}.json`;
+  // A run of some sections only writes a file of its own, never over a full run's.
+  const resultName = `engine-board-${size}-${which}${ablate ? '-' + ablate : ''}${a.only ? '.only-' + String(a.only).replace(/,/g, '-') : ''}.json`;
   writeResult(resultName, out);
 
   // --- warm loads, each on a fresh session after a full collection ---
