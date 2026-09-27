@@ -315,21 +315,31 @@ describe('an artifact is made by whoever blessed it (V1-PLAN L2f)', () => {
     }
   });
 
-  it('a bless that names who blesses is theirs on every board — the shard stands a hull in the engine\'s name', () => {
+  it('a bless in the engine\'s name is its hand\'s act — the shard stands a hull at tier 1 — and the engine keeps its word on it', () => {
+    // Every tier proposes and none commits: a bless is a person's act. The
+    // shard blesses a hull in the ENGINE's name, inside the act of the hand
+    // whose log holds it, so the hull is that hand's on every board — the
+    // hand may put a word on what its drawing stood, and nobody else may.
     const ann = hand('ann');
     const a = ann.addStroke(box(0, 0, 100, 60), 1000, undefined, 1, { content: true });
     const b = ann.addStroke(box(150, 0, 100, 60), 1100, undefined, 1, { content: true });
     const summonId = ann.summonMarks([a, b], 1200)!;
     const artifact = ann.bless({ summonId, name: 'hull', at: 1300, participantId: ENGINE_PARTICIPANT })!;
-    expect(authorOf(ann.getState().nodes.get(artifact)!)).toBe(ENGINE_PARTICIPANT);
+    const hers = ann.getState().nodes.get(artifact)!;
+    expect(authorOf(hers)).toBe(LOCAL_PARTICIPANT);
+    // Her own board's node is what it always was: no edge, and the engine's word.
+    expect(hers.edges.some((e) => e.rel === 'made-by')).toBe(false);
+    expect(hers.reps.find((r) => r.modality === 'word')!.source).toBe(ENGINE_PARTICIPANT);
+    expect(ann.label({ nodeId: artifact, text: 'keep', at: 1400 })).toBe(artifact);
 
     const bob = hand('bob');
     bob.load(mergeLogs({ ann: ann.getEvents().slice(), bob: [] }, { me: 'bob' }));
-    expect(authorOf(bob.getState().nodes.get(artifact)!)).toBe(ENGINE_PARTICIPANT);
-    // Its marks are still the hand's that drew them.
-    expect(authorOf(bob.getState().nodes.get(a)!)).toBe('participant:hand:ann');
-    // The label rule reads the maker, whoever it is: no person's word goes on it.
-    expect(ann.label({ nodeId: artifact, text: 'keep', at: 1400 })).toBeNull();
-    expect(bob.label({ nodeId: artifact, text: 'keep', at: 1400 })).toBeNull();
+    const onBob = bob.getState().nodes.get(artifact)!;
+    expect(authorOf(onBob)).toBe('participant:hand:ann');
+    expect(onBob.reps.find((r) => r.modality === 'word')!.source).toBe(ENGINE_PARTICIPANT);
+    expect(labelOf(onBob)!.text).toBe('keep');
+    expect(labelOf(onBob)!.source).toBe('participant:hand:ann');
+    expect(bob.label({ nodeId: artifact, text: 'mine now', at: 1500 })).toBeNull();
+    expect(bob.getState().staleResult!.reason).toBe('not-your-ink');
   });
 });
