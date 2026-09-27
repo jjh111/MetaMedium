@@ -16,6 +16,7 @@
 
 import { pill } from './ui';
 import { describePhrase, isUnread, readPhrase, type PhraseReading, type PhraseScope } from './verbs';
+import { readDepthWord, type DepthLack } from './depth';
 
 export type FieldVerb =
   | 'extrude'
@@ -72,7 +73,7 @@ export const ALIASES: Record<FieldVerb, string[]> = {
 };
 
 export interface FieldReading {
-  kind: 'empty' | 'verb' | 'name' | 'blocked' | 'unknown' | 'phrase' | 'definition' | 'brief';
+  kind: 'empty' | 'verb' | 'name' | 'blocked' | 'unknown' | 'phrase' | 'definition' | 'brief' | 'depth';
   line: string;
   /** Null when Enter would do nothing — the line says why. */
   run: (() => void) | null;
@@ -97,6 +98,12 @@ export interface FieldContext {
   nameable: { what: string; run: (name: string) => void } | null;
   /** P5: the names in play — a typed word completes from these before any model is asked. */
   names?: KnownName[];
+  /**
+   * L2c: the selected hull is asking how deep (or a word has answered it), so
+   * a depth typed here — *3 deep*, *as deep as it is wide* — is the answer.
+   * Tier 1: read by `depth.ts`'s own table, and no model is asked.
+   */
+  depth?: { lack: DepthLack; run(words: string): void };
   /** P5: the verb table over names, with the names and the taught sayings handed in. */
   phrases?: { scope: PhraseScope; run(r: PhraseReading): void; ask(text: string): void; model: string | null };
   /**
@@ -168,6 +175,19 @@ export function readField(text: string, ctx: FieldContext): FieldReading {
   const verb = verbFor(t, ctx.verbs);
   if (verb && verb.enabled) return { kind: 'verb', verb: verb.verb, line: `↵ ${verb.label} — ${verb.why}`, run: verb.run };
   if (verb) return { kind: 'verb', verb: verb.verb, line: `${verb.label} — ${verb.why}`, run: null, quiet: true };
+
+  // L2c: the hull is asking how deep, and a depth is the answer. Only words the
+  // depth table reads are taken here; anything else goes on down as before.
+  if (ctx.depth) {
+    const word = readDepthWord(t, ctx.depth.lack);
+    if (word.read) {
+      return {
+        kind: 'depth',
+        line: `↵ ${word.u.toFixed(2)} u deep along the view from ${ctx.depth.lack.view} — answers how deep; ${word.reasoning}`,
+        run: () => ctx.depth!.run(t),
+      };
+    }
+  }
 
   // ---- P5, in the order a phrase becomes less specific ----------------------
   //

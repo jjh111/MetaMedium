@@ -68,6 +68,7 @@ import type { PlaneSilhouette } from './silhouette';
 // and this file must stay derivable with no renderer. An `import type` is
 // erased, so the shape travels and the dependency does not.
 import type { HullRead } from './parts';
+import { DEPTH_QUESTION, depthOf, readDepthWord, type DepthReading } from './depth';
 import {
   bossStep,
   centreAndSize,
@@ -387,7 +388,33 @@ export interface Log {
    * on a standing hull is one new version of its one step — so undo removes
    * that claim's contribution and leaves every other claim where it was.
    */
-  hull(h: Hullish, at?: number): { id: string; step: OpStep; name: string; count: number } | null;
+  hull(
+    h: Hullish,
+    at?: number
+  ): {
+    id: string;
+    step: OpStep;
+    name: string;
+    count: number;
+    /** L2c: the question this act put on the explanation plane, when it asked one. */
+    asked: string | null;
+    /** L2c: why a question that stood before this act no longer does, when it closed one. */
+    closed: string | null;
+  } | null;
+  /**
+   * L2c: how deep a hull runs, and whether the board is asking — derived from
+   * the hull step on every read (`depth.ts`). `id` is the question on the
+   * explanation plane when one stands there and is not erased; `open` is that
+   * question still being asked.
+   */
+  depthQuestion(solidId: string): { id: string | null; open: boolean; reading: DepthReading } | null;
+  /**
+   * L2c: answer *how deep?* with a WORD — *3 deep*, *as deep as it is wide* —
+   * held on the hull step as one new version, so the body re-derives to it and
+   * one undo reopens the question. Refused, with the reason and nothing
+   * written, where nothing is asking or the words say no depth.
+   */
+  sayDepth(solidId: string, words: string, by?: string, at?: number): { u: number; how: string; why: string } | { refused: string };
   /** Seat a model in the session, so everything it proposes is attributed to it. */
   joinAgent(name: string, locality: 'local' | 'hosted', at?: number): string;
   /**
@@ -1423,6 +1450,8 @@ export function createLog(): Log {
       next.reasoning,
       at
     );
+    // L2c: taking a view out can leave the hull seen from one standpoint.
+    askDepth(solid.id, next, at);
     return { solidId: solid.id, name: solid.name };
   }
 
@@ -1812,10 +1841,25 @@ export function createLog(): Log {
       const solid = solidOf(h.solidId);
       const only = solid?.tree.steps[0] as HullStep | undefined;
       if (!solid || !only || only.op !== 'hull') return null;
-      const step = hullStep(claims, only.id, h.reasoning, h.footprintId);
+      const built = hullStep(claims, only.id, h.reasoning, h.footprintId);
+      // A depth a word said stays said while the hull is still asking about
+      // the same sightline — another tower from the same place changes
+      // nothing about it. A claim from another standpoint measures it instead,
+      // and the word, answering a question nobody is asking, is let go.
+      const kept = only.depth && depthOf({ ...built, depth: only.depth }).state === 'said' ? only.depth : null;
+      const step: HullStep = kept ? { ...built, depth: kept } : built;
+      const before = depthOf(only).state;
       newVersion(solid.id, { ...solid.tree, steps: [step] }, h.reasoning, at);
       for (const id of h.add) takeInto(solid.id, id, at);
-      return { id: solid.id, step: step as OpStep, name: solid.name, count: claims.length };
+      const after = depthOf(step);
+      return {
+        id: solid.id,
+        step: step as OpStep,
+        name: solid.name,
+        count: claims.length,
+        asked: askDepth(solid.id, step, at),
+        closed: before === 'asking' && after.state === 'measured' ? after.reasoning : null,
+      };
     }
 
     const step = hullStep(claims, 'step:1', h.reasoning, h.footprintId);
@@ -1832,7 +1876,91 @@ export function createLog(): Log {
       prompt: step.reasoning,
       at,
     });
-    return { id, step: step as OpStep, name: 'hull', count: claims.length };
+    // L2c: the hull the drawing stood may have a depth nobody drew — asked in
+    // this same act, so one undo takes back the hull and its question together.
+    return { id, step: step as OpStep, name: 'hull', count: claims.length, asked: askDepth(id, step, at), closed: null };
+  }
+
+  // ---- L2c: how deep a hull runs, asked on the explanation plane ------------
+  //
+  // **The asking is a node; whether it still stands is derived.** A hull stood
+  // on one standpoint gets ONE question — an answer on the explanation plane,
+  // in the engine's name, about the hull, in the very act that stood it (or
+  // that took a view back out of it) — exactly where this engine has always
+  // put questions (`room.ts` parks a brief the same way). It is never ink: not
+  // content, never in a lasso or a signature, and erasable like any card.
+  //
+  // What closes it is not another event: a second view is IN the log (the hull
+  // has two standpoints) and a word is on the hull step (`HullStep.depth`), so
+  // `depthOf` answers on every read and undo, a dropped claim and a replay all
+  // re-ask it with nothing remembered. The question is asked once per hull:
+  // an erased one stays erased, because the hand dismissed it.
+
+  /** Every depth question the engine put on the plane about this solid, erased or not. */
+  function depthQuestionNodes(solidId: string): MMNode[] {
+    const s = session.getState();
+    const out: MMNode[] = [];
+    for (const id of s.explanations) {
+      const node = s.nodes.get(id);
+      if (!node) continue;
+      const rep = node.reps.find((r) => r.modality === 'explanation');
+      if ((rep?.data as { question?: string } | undefined)?.question !== DEPTH_QUESTION) continue;
+      if (!node.edges.some((e) => e.rel === 'made-by' && e.to === ENGINE_PARTICIPANT)) continue;
+      if (!node.edges.some((e) => e.rel === 'about' && e.to === solidId)) continue;
+      out.push(node);
+    }
+    return out;
+  }
+
+  /** Put the question on the plane when the hull is asking and it has never been asked. Part of the caller's act. */
+  function askDepth(solidId: string, step: HullStep, at: number): string | null {
+    const r = depthOf(step);
+    if (r.state !== 'asking' || !r.lack) return null;
+    if (depthQuestionNodes(solidId).length) return null;
+    const id = session.answer({
+      participantId: ENGINE_PARTICIPANT,
+      question: DEPTH_QUESTION,
+      text: r.lack.question,
+      aboutIds: [solidId],
+      at,
+    });
+    return id ? r.lack.question : null;
+  }
+
+  function depthQuestion(solidId: string): { id: string | null; open: boolean; reading: DepthReading } | null {
+    const solid = solidOf(solidId);
+    const step = solid ? hullStepOf(solid) : null;
+    if (!solid || !step) return null;
+    const reading = depthOf(step);
+    const node = depthQuestionNodes(solidId).find((n) => !n.reps.some((r) => r.modality === 'erased')) ?? null;
+    return { id: node?.id ?? null, open: !!node && reading.state === 'asking', reading };
+  }
+
+  function sayDepth(
+    solidId: string,
+    words: string,
+    by = 'you',
+    at = Date.now()
+  ): { u: number; how: string; why: string } | { refused: string } {
+    const solid = solidOf(solidId);
+    const step = solid ? hullStepOf(solid) : null;
+    if (!solid || !step) return { refused: `${solidId} is not a hull, so it is not asking how deep` };
+    const r = depthOf(step);
+    if (!r.lack) return { refused: `${solid.name} is not asking how deep — ${r.reasoning}` };
+    const word = readDepthWord(words, r.lack);
+    if (!word.read) return { refused: word.why };
+    const why = `${r.lack.question} — ${by} answered “${word.words}”: ${word.reasoning}`;
+    const next: HullStep = {
+      ...step,
+      depth: { along: r.lack.along, u: word.u, words: word.words, by, reasoning: why },
+    };
+    newVersion(
+      solid.id,
+      { ...solid.tree, steps: solid.tree.steps.map((st) => (st.id === step.id ? next : st)) },
+      `${solid.name} is ${word.u.toFixed(2)} u deep along the view from ${r.lack.view} — ${by} said “${word.words}”`,
+      at
+    );
+    return { u: word.u, how: word.how, why };
   }
 
   function joinAgent(name: string, locality: 'local' | 'hosted', at = Date.now()): string {
@@ -3226,6 +3354,8 @@ export function createLog(): Log {
     growMassing: acting(growMassing, 1),
     hullable,
     hull: acting(hull, 1),
+    depthQuestion,
+    sayDepth: acting(sayDepth, 3),
     joinAgent: acting(joinAgent, 2),
     applyProposal: acting(applyProposal, 3),
     applyParts: acting(applyParts, 4),

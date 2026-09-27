@@ -183,7 +183,17 @@ async function runShard(browser, servers, which /* 'shard' | 'demo' | 'demo2' */
     const r = await page.evaluate(
       async (w) => {
         const res = await window[w]();
-        return { steps: res.steps, ok: res.ok, passed: res.passed, failed: res.failed, error: res.error, totalMs: res.totalMs };
+        return {
+          steps: res.steps,
+          ok: res.ok,
+          passed: res.passed,
+          failed: res.failed,
+          error: res.error,
+          totalMs: res.totalMs,
+          // A number a harness measured (the shard's silhouette cache, L2d) —
+          // kept in the result JSON and printed under the scenario's line.
+          measured: res.measured,
+        };
       },
       harness,
       { timeout: SCENARIO_TIMEOUT },
@@ -191,6 +201,7 @@ async function runShard(browser, servers, which /* 'shard' | 'demo' | 'demo2' */
     out.steps = r.steps;
     out.reportedOk = r.ok;
     out.totalMs = r.totalMs;
+    if (r.measured) out.measured = r.measured;
     if (r.error) out.harnessError = r.error; // "window.__shard is not there" and its kin
     Object.assign(out, tally(r.steps));
   } catch (err) {
@@ -367,6 +378,7 @@ async function main() {
         `▸ ${r.name} — ${r.ok ? 'ok' : 'FAILED'} — ${r.pass} passed, ${r.fail} failed, ${r.skip} skipped (${Math.round(r.durationMs / 1000)}s)`,
       );
       for (const s of r.skipped || []) console.log(`    skip: ${s}`);
+      if (r.measured) console.log(`    measured: ${JSON.stringify(r.measured)}`);
       for (const p of r.problems || []) console.log(`    ✗ ${p}`);
     }
   } finally {

@@ -365,6 +365,35 @@ sync; the canvas MCP smoke and the shard's (573 in 30 files, typecheck
 clean) all pass; the gate 384 passed and the one honest skip (canvas 244;
 shard 120 + 11 + 9); WebKit smoke 3.
 
+*L2a status, 26 Sep 2026: done on `w2-shard`* — `0540c1c` (red), `092f747`.
+Taken from `auto/w1-U1d` (6893f53), which takes both prefixes off the write
+path and keeps a reader; `auto/w1-U1d-r0920105222` still wrote `answer:<id>`
+and contributed two tests. The shard names its log as it joins (one sitting);
+a brief is an answer whose question is `brief`, its reply names the brief's
+node id and is about the brief node's `about` edges as the asker reads them;
+`legacySeatTraffic` is the one reader of the old spelling, tested against
+`shard-3d/fixtures/seat-before-ids.mm.log`, recorded by the code it replaced.
+Found on the way and fixed (`f78522e` red, `c26f850`): `space_pending` lost
+the human's words on every parts brief. Shard smoke 31 checks (28 before).
+
+*L2c status, 26 Sep 2026: done on `w2-shard`* — `1a285fa` (red), `ac2e069`,
+records in `22641f9`, and a plan read as the form rung reads one
+(`4cbe983` red, `30634a2`). Base `auto/w1-U3` (1acaff7), the attempt that asks on
+the explanation plane; neither attempt passed the week-1 checks (asked only
+by a deliberate call or not on the plane at all, per part, a word that left
+the body as deep as it was), so the regression is those checks. The hull asks
+at the hull level, in the act that stood it; a second view or a word closes
+it, derived; the word cuts the body (`HullStep.depth`); no core change.
+Per-part asking is left to John (`shard-3d/README.md`, *Still John's*).
+
+*L2d status, the cache, 26 Sep 2026: measured on `w2-shard`, no bound* —
+`22641f9`. `node e2e/run.mjs shard demo demo2`: the castle leaves 3 entries,
+171 KB, and 80 hovers from eight standpoints add nothing; the largest held on
+any gate board is 6 entries, 336 KB (the mug). The cache clears whenever a
+solid rebuilds, so no bound. The losing attempt branches (`auto/w1-U1d-r0920105222`,
+`auto/w1-U3-r0920120035`) are left for the director to delete: this lane
+creates and deletes no branch.
+
 ### Phase 1 — the backbone
 **B1 Tools.** *Owns* `metamedium-core/src/tools/` (the contract, the
 registry, adapters for today's tier-1 modules and concept conversions),

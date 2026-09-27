@@ -27,7 +27,7 @@ import { createGizmo } from './gizmo';
 import { createInk } from './ink';
 import { createLog, type Mark, type Solid, type StandFor } from './log';
 import { createPanel, createPanelToggle, pinnedViews } from './panel';
-import { createSolids } from './solid';
+import { createSolids, type SilhouetteCacheStats } from './solid';
 import { createSelection, type Sel } from './selection';
 import { createField, readField, type FieldContext, type KnownName, type VerbOffer } from './field';
 import { SCRATCH_NEAR, type Makeable } from './form';
@@ -35,6 +35,7 @@ import { colourOf, COLOUR_WORDS, describeStep, type HullStep } from './op';
 import { hullReadOf, partsOfHull, type Part, type PartsOfHull } from './parts';
 import { createModels, HAND_SEAT } from './models';
 import { joinRoom, otherHand, saidInRoom, type Room } from './room';
+import { DEPTH_QUESTION } from './depth';
 import { createWork } from './work';
 import { describeSpace, partIdsOf } from './brief';
 import { createTranscript } from './exchange';
@@ -1191,12 +1192,19 @@ function tier1(strokeId: string): { id: string; name: string } | null {
   if (claims && claims.add.includes(strokeId)) {
     const stood = log.hull(claims);
     if (stood) {
+      // L2c: a hull seen from one standpoint asks how deep, in the same breath
+      // it stands — and a view from another side says it is answered.
+      const lack = stood.asked ? log.depthQuestion(stood.id)?.reading.lack ?? null : null;
       panel.say(
         `${stood.name} from ${stood.count} claim${stood.count === 1 ? '' : 's'} · tier 1 — ` +
           (claims.solidId
             ? 'this claim went into it, and every prism was re-derived through the others’ span'
             : 'the drawing is the extent, in the volume its claims define') +
-          (claims.dropped.length ? ` · ${claims.dropped.length} left out` : '')
+          (claims.dropped.length ? ` · ${claims.dropped.length} left out` : '') +
+          (lack
+            ? ` · it asks how deep: seen from ${lack.view} only, it stands ${lack.took.toFixed(2)} u deep, as far as the plan runs — a view from another side, or a word, settles it`
+            : '') +
+          (stood.closed ? ` · how deep is answered — ${stood.closed}` : '')
       );
       return { id: stood.id, name: stood.name };
     }
@@ -1362,7 +1370,9 @@ async function runBrief(text: string, opts: { regen?: string[]; regenParts?: str
       );
     }
   }
-  const key = `brief:${solid?.id ?? atMark}:${Date.now()}`;
+  // The work indicator's own key, runtime only and never in the log — the
+  // seat's pairing is the brief's node id (`room.ts`), not anything here.
+  const key = `ask:${solid?.id ?? atMark}:${Date.now()}`;
   const label = `${seat.name} · ${task}`;
   const signal = work.start(key, label, solid ? solidAt(solid.id) : null);
   panel.say(`${label} — ${seat.locality}; Esc stops it`);
@@ -1983,11 +1993,31 @@ function knownNames(): KnownName[] {
   return out;
 }
 
+/**
+ * L2c: a depth typed at a hull that is asking — the word goes onto the hull
+ * step as one new version, the body re-derives to it, and one undo reopens it.
+ */
+function sayDepth(solidId: string, words: string) {
+  const r = log.sayDepth(solidId, words, 'you');
+  if ('refused' in r) {
+    panel.say(r.refused);
+    report();
+    return;
+  }
+  ink.sync();
+  solids.sync();
+  after(solidId, `${log.solidOf(solidId)?.name ?? 'the hull'} is ${r.u.toFixed(2)} u deep — you said “${words}” · tier 1, and the question is answered`);
+}
+
 function fieldContext(): FieldContext {
   const solid = selectedSolid();
   const seat = models.first();
+  const depth = solid ? log.depthQuestion(solid.id) : null;
   return {
     verbs: verbOffers(),
+    ...(solid && depth?.reading.lack
+      ? { depth: { lack: depth.reading.lack, run: (words: string) => sayDepth(solid.id, words) } }
+      : {}),
     nameable: solid
       ? { what: solid.name, run: (n: string) => { log.name(solid.id, n); panel.say(`named “${n}” — yours, held in the log`); report(); } }
       : null,
@@ -2791,6 +2821,28 @@ export interface ShardHook {
   selectedPart(): { solidId: string; partId: string } | null;
   /** Select a part, as tapping its chip does. */
   selectPart(solidId: string, partId: string | null): boolean;
+
+  // ---- L2d: the silhouette cache, measured ---------------------------------
+  /** What the silhouette cache holds right now, and the most it has held — `solid.ts`'s own count. */
+  stats(): { silhouettes: SilhouetteCacheStats };
+
+  // ---- L2c: the shard asks -------------------------------------------------
+  /**
+   * How deep a hull runs, and whether the board is asking — `log.depthQuestion`
+   * in words a result object can carry. `onPlane` counts the depth questions on
+   * the explanation plane about it that are not erased: the thing the check
+   * says is exactly one.
+   */
+  depth(solidId: string): {
+    state: string;
+    open: boolean;
+    onPlane: number;
+    question: string | null;
+    view: string | null;
+    candidates: { words: string; u: number; took: boolean }[];
+    said: { u: number; words: string; by?: string } | null;
+    reasoning: string;
+  } | null;
 }
 
 /** Where the camera stands, in the words a result object can be read in. */
@@ -3317,6 +3369,29 @@ const hook: ShardHook = {
     holdPart({ solidId, partId });
     report();
     return true;
+  },
+  stats: () => ({ silhouettes: solids.cacheStats() }),
+  depth: (solidId) => {
+    const q = log.depthQuestion(solidId);
+    if (!q) return null;
+    const s = log.session.getState();
+    const onPlane = s.explanations.filter((id) => {
+      const n = s.nodes.get(id);
+      if (!n || n.reps.some((r) => r.modality === 'erased')) return false;
+      const said = n.reps.find((r) => r.modality === 'explanation')?.data as { question?: string } | undefined;
+      return said?.question === DEPTH_QUESTION && n.edges.some((e) => e.rel === 'about' && e.to === solidId);
+    }).length;
+    const lack = q.reading.lack;
+    return {
+      state: q.reading.state,
+      open: q.open,
+      onPlane,
+      question: lack ? lack.question : null,
+      view: lack ? lack.view : null,
+      candidates: lack ? lack.candidates.map((c) => ({ words: c.words, u: c.u, took: c.took })) : [],
+      said: q.reading.said ? { u: q.reading.said.u, words: q.reading.said.words, ...(q.reading.said.by ? { by: q.reading.said.by } : {}) } : null,
+      reasoning: q.reading.reasoning,
+    };
   },
 };
 

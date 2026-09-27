@@ -75,8 +75,11 @@ const NAMED = {
   width: { origin: { x: 0, y: 0, z: 0 }, normal: { x: 1, y: 0, z: 0 }, up: { x: 0, y: -1, z: 0 }, name: 'width' },
 };
 const OP_MARK = '// mm:op tree v1';
-const BRIEF_PREFIX = 'brief:';
-const ANSWER_PREFIX = 'answer:';
+// A brief parked for the seat is an answer carrying this word as its question,
+// and its reply is an answer whose question is THE BRIEF NODE'S OWN ID
+// (DIRECTOR-PLAN-W2 L2a — `src/room.ts` says why). Ids are derived from the
+// event that minted them, so the id here is the id in the tab that asked.
+const BRIEF_QUESTION = 'brief';
 
 // ----- The room: a LiveStore over the relay, and a session from its logs -----
 let relayServer = null;
@@ -84,7 +87,12 @@ try { relayServer = await ensureRelay(RELAY); } catch (err) { log(err.message); 
 if (relayServer) log(`relay started on ${RELAY} (none was answering)`);
 const transport = relayTransport(RELAY, ROOM);
 const store = new MM.LiveStore(transport, ME, ROOM);
-const session = MM.createSession();
+// This hand SAYS WHAT ITS LOG IS CALLED — the name its lines are appended under
+// and the name `mergeLogs` is given as `me`. Unsaid, every id it minted would
+// come off a counter over the merged replay, and this process merges a
+// different set of logs from every tab in the room: the ids `space_look` hands
+// out, and the ones an answer is about, would be this hand's private numbering.
+const session = MM.createSession({ ...MM.DEFAULT_SESSION_CONFIG, logName: ME });
 let lastAt = 0;
 const now = () => { lastAt = Math.max(Date.now(), lastAt + 1); return lastAt; };
 const label = (name) => MM.handLabel(name);
@@ -165,20 +173,26 @@ function parkedBriefs() {
     if (!rep) continue;
     said.push({ node: n, data: rep.data || {} });
   }
+  // A reply names the brief it answers by the brief's id, so every question on
+  // the board is enough to ask "has this one been answered?" — an id names one
+  // node. A brief written before L2a carries `brief:<key>` and is not listed:
+  // the tab that could settle it ran code that no longer exists.
+  for (const x of said) answered.add(String(x.data.question || ''));
   for (const x of said) {
-    const q = String(x.data.question || '');
-    if (q.startsWith(ANSWER_PREFIX)) answered.add(q.slice(ANSWER_PREFIX.length));
-  }
-  for (const x of said) {
-    const q = String(x.data.question || '');
-    if (!q.startsWith(BRIEF_PREFIX)) continue;
-    const key = q.slice(BRIEF_PREFIX.length);
+    if (String(x.data.question || '') !== BRIEF_QUESTION) continue;
+    // The brief's own id IS the key: this hand derived it from the same event
+    // the asking tab did.
+    const key = x.node.id;
     if (answered.has(key)) continue;
     const prompt = String(x.data.text || '');
     // The prompt is the contract, a rule of dashes, then the brief itself.
     const cut = prompt.indexOf('\n\n----\n\n');
     const user = cut >= 0 ? prompt.slice(cut + 8) : prompt;
-    const mark = '\n\nPropose the tree.';
+    // Both asks, because there are two — `generator.ts`'s `messagesFor` ends a
+    // steps brief with *Propose the tree.* and a standing hull's parts brief
+    // with *Name the parts.* (`src/room.ts`'s `splitPrompt` lists the same two).
+    const marks = ['\n\nPropose the tree.', '\n\nName the parts.'];
+    const mark = marks.find((m) => user.includes(m)) || marks[0];
     const at = user.indexOf(mark);
     const tail = at >= 0 ? user.slice(at + mark.length) : '';
     const asked = /The human asked for: [“"](.*)[”"]\s*$/.exec(tail);
@@ -525,10 +539,12 @@ async function answer(args) {
   else return { text: 'an answer is either "reply" (the contract object, or its JSON as a string) or "refuse" (one clause saying why)' };
   const id = session.answer({
     participantId: MM.LOCAL_PARTICIPANT,
-    question: ANSWER_PREFIX + key,
+    // The reply names the brief it answers, by the brief's own id.
+    question: key,
     text,
-    // In THIS hand's ids, read off the brief's own node — never carried across
-    // from the hand that asked, whose id counters are its own.
+    // Read off the brief's own node — the same ids the asking hand named,
+    // because an `about` edge points at a node and a node's id is the same in
+    // every hand's board.
     aboutIds: held.about,
     at: now(),
   });
@@ -561,7 +577,11 @@ const TOOLS = [
     inputSchema: {
       type: 'object',
       required: ['key'],
-      properties: { key: { type: 'string' }, reply: { type: 'object' }, refuse: { type: 'string' } },
+      properties: {
+        key: { type: 'string', description: "The brief's own id, exactly as space_pending printed it. Copy it; never build one." },
+        reply: { type: 'object' },
+        refuse: { type: 'string' },
+      },
     },
     run: answer,
   },
