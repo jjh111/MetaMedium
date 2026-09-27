@@ -115,6 +115,25 @@
 
   const markOf = (id) => S().state().marks.find((m) => m.id === id);
 
+  /**
+   * L2d: the silhouette cache as a run leaves it, in the words the runner
+   * prints — `solid.ts`'s own count (`__shard.stats()`), never an estimate.
+   */
+  const cacheMeasured = () => {
+    const c = S() && S().stats ? S().stats().silhouettes : null;
+    if (!c) return null;
+    const kb = (b) => Math.round(b / 1024);
+    return {
+      silhouetteCache: {
+        now: { entries: c.entries, kb: kb(c.bytes) },
+        peak: { entries: c.peak.entries, kb: kb(c.peak.bytes) },
+        asked: c.asked,
+        rendered: c.rendered,
+        clears: c.clears,
+      },
+    };
+  };
+
   // ---- UI-2: the panel's summary, read off the panel ------------------------
   // The summary is DOM, not a hook: it is what the hand reads, and asserting on
   // a hook's copy of it would let the two drift. Every row is `k` → `v`.
@@ -3439,6 +3458,122 @@
     return { before, after: after.steps.map((st) => st.id + ':' + st.op), line: read.line };
   });
 
+  // ---- L2c: the shard asks (DIRECTOR-PLAN-W2 L2; week 1's U3) ---------------
+  //
+  // A keep's footprint and one tower drawn as a ⊓ on the height plane: one
+  // standpoint, so the hull stands as deep as the keep runs behind the tower
+  // and ASKS how deep. A word typed in the field answers it and the body is cut
+  // to it; undo reopens it; a ⊓ from the side closes it by measuring. On the
+  // named planes, so every number is one a reader can check on paper: the keep
+  // runs z −2…2 and the tower x −3…−1.
+
+  let askId = null;
+  /** A ⊓ in a named wall's own (u, v) — feet on the ground at v = 0, +v down. */
+  const archUV = (u0, u1, tall) => [
+    ...linePath({ x: u0, y: 0 }, { x: u0, y: -tall }, 14),
+    ...linePath({ x: u0, y: -tall }, { x: u1, y: -tall }, 14),
+    ...linePath({ x: u1, y: -tall }, { x: u1, y: 0 }, 14),
+  ];
+  /** How far the BODY runs along z at x, by rays straight down — the geometry, not the tree. */
+  const zRun = (x) => {
+    let lo = Infinity;
+    let hi = -Infinity;
+    for (let z = -2.4; z <= 2.4; z += 0.05) {
+      const down = S().rayDown({ x, z });
+      if (down && down.solidId === askId) {
+        lo = Math.min(lo, z);
+        hi = Math.max(hi, z);
+      }
+    }
+    return hi > lo ? { lo: +lo.toFixed(2), hi: +hi.toFixed(2), run: +(hi - lo).toFixed(2) } : null;
+  };
+
+  step('L2c · a hull stood on one standpoint asks how deep — once, on the explanation plane, with the depth it took', () => {
+    S().clear();
+    S().view('free');
+    S().choose('foundation');
+    assert(S().strokeScreen(onScreen(rectPath(-3, -2, 6, 4))), 'the keep was not drawn');
+    S().choose('height');
+    const tower = S().strokeScreen(onScreen(archUV(-3, -1, 2.6)));
+    assert(tower, 'the tower was not drawn');
+    assert(markOf(tower).plays.role === 'elevation', `the ⊓ plays ${markOf(tower).plays.role}`);
+    const solids = S().solids();
+    assert(solids.length === 1 && solids[0].name === 'hull', `${solids.length} solids: ${solids.map((x) => x.name).join(', ')}`);
+    askId = solids[0].id;
+    const status = S().state().status;
+    assert(/it asks how deep/.test(status), `the status said "${status}"`);
+    const d = S().depth(askId);
+    assert(d && d.onPlane === 1 && d.open && d.state === 'asking', `the question reads ${JSON.stringify(d)}`);
+    assert(d.view === 'the height plane', `seen from ${d.view}`);
+    const took = d.candidates.find((c) => c.took);
+    assert(took && Math.abs(took.u - 4) < 0.05, `the depth it took is ${took && took.u}`);
+    assert(d.candidates.length >= 2, `${d.candidates.length} candidate(s) — a bare prompt, not a reading`);
+    assert(/4\.00 u/.test(d.question), `the question says "${d.question}"`);
+    const run = zRun(-2);
+    assert(run && run.run > 3.8, `the body runs ${JSON.stringify(run)} along z, expected the keep's 4`);
+    assert(S().models().working.length === 0, 'a model was asked by drawing');
+    S().select(askId);
+    const rows = summaryRows();
+    assert(/how deep/.test(rows.asks || ''), `the panel's rows: ${JSON.stringify(rows)}`);
+    return { status, question: d.question, candidates: d.candidates, run, asks: rows.asks };
+  });
+
+  step('L2c · “3 deep” in the field closes it, and the body re-derives three deep; undo reopens it', () => {
+    S().select(askId);
+    const read = S().fieldRead('3 deep');
+    assert(read.kind === 'depth', `the field read it as ${read.kind}: "${read.line}"`);
+    assert(/3\.00 u deep/.test(read.line), `the reading line said "${read.line}"`);
+    const before = S().solids().find((x) => x.id === askId).versions;
+    const ran = S().field('3 deep');
+    assert(ran.ran, `Enter did nothing: "${ran.line}"`);
+    const after = S().solids().find((x) => x.id === askId);
+    assert(after.versions === before + 1, `${after.versions} versions, expected ${before + 1}`);
+    assert(after.broken === null, `the derivation broke: ${after.broken}`);
+    const d = S().depth(askId);
+    assert(!d.open && d.state === 'said' && d.onPlane === 1, `the question reads ${JSON.stringify(d)}`);
+    const run = zRun(-2);
+    assert(run && Math.abs(run.run - 3) < 0.15, `the body runs ${JSON.stringify(run)} along z, expected 3`);
+    // Measured back from the side the view was drawn from: the height plane
+    // faces +z, so the near face stays where it stood.
+    assert(run.hi > 1.85, `the body runs ${JSON.stringify(run)} — it was cut from the wrong side`);
+    assert(/3\.00 u — you said/.test(summaryRows().depth || ''), `the panel's rows: ${JSON.stringify(summaryRows())}`);
+    assert(S().models().working.length === 0, 'a model was asked for a depth');
+    S().undo();
+    const back = S().depth(askId);
+    assert(back.open && back.state === 'asking', `after the undo the question reads ${JSON.stringify(back)}`);
+    const again = zRun(-2);
+    assert(again && again.run > 3.8, `after the undo the body runs ${JSON.stringify(again)}`);
+    return { line: read.line, said: d.said, run, reopened: back.open };
+  });
+
+  step('L2c · a ⊓ from the side closes it by measuring; undo reopens it', () => {
+    S().select(null);
+    // The side view first, so the width plane is flat on to the eye — the way
+    // a hand draws a side (P4's own steps do the same). u = −z on this wall:
+    // u 0.4…1.6 is z −1.6…−0.4, a tower 1.2 u deep. Lower than the tower's
+    // own 2.6, so the ⊓ lies inside its silhouette and crosses none of it: a
+    // ⊓ along the silhouette's top edge crosses it over and over and is read,
+    // rightly, as a scratch.
+    S().view('side');
+    S().choose('width');
+    const side = S().strokeScreen(onScreen(archUV(0.4, 1.6, 2.0)));
+    S().view('free');
+    assert(side, 'the side view was not drawn');
+    assert(markOf(side).plays.role === 'elevation', `the side ⊓ plays ${markOf(side).plays.role}`);
+    const hull = S().solids().find((x) => x.id === askId).steps.find((st) => st.op === 'hull');
+    assert(hull.from.length === 3, `the hull references ${hull.from.length} claims, expected 3`);
+    const status = S().state().status;
+    assert(/how deep is answered/.test(status), `the status said "${status}"`);
+    const d = S().depth(askId);
+    assert(!d.open && d.state === 'measured' && d.onPlane === 1, `the question reads ${JSON.stringify(d)}`);
+    const run = zRun(-2);
+    assert(run && run.run < 1.5, `the body runs ${JSON.stringify(run)} along z — the side view did not bound it`);
+    S().undo();
+    assert(S().depth(askId).open, 'the undo did not reopen the question');
+    S().clear();
+    return { status, reasoning: d.reasoning, run };
+  });
+
   // ---- the runner ----------------------------------------------------------
 
   window.__scenario = async function () {
@@ -3461,6 +3596,8 @@
       }
       await new Promise((r) => setTimeout(r, 20));
     }
+    const measured = cacheMeasured();
+    if (measured) out.measured = measured;
     return out;
   };
 
@@ -3919,6 +4056,10 @@
     demoCastleId = solids[0].id;
     assert(solids[0].name === 'hull' && solids[0].named === 'engine', `${solids[0].name}, named by ${solids[0].named}`);
     assert(S().models().working.length === 0, 'a model was asked by drawing');
+    // L2c: stood on one standpoint, it asks how deep — in the same act, once.
+    assert(/it asks how deep/.test(stoodStatus), `the status said "${stoodStatus}"`);
+    const asked = S().depth(demoCastleId);
+    assert(asked && asked.open && asked.onPlane === 1, `after the first ⊓ the question reads ${JSON.stringify(asked)}`);
 
     // …and the second tower, from the same standpoint. One standpoint is one
     // silhouette (G2): two towers seen from here are one outline with two
@@ -3937,6 +4078,23 @@
     return { solid: demoCastleId, stood: stoodStatus, claims, marks: S().state().marks.length, standpoint: '64° · +29°' };
   });
 
+  demo2('2½ · one standpoint — the hull asks how deep, once, with the depth it took as a candidate', () => {
+    // DIRECTOR-PLAN-W1 U3, check 4, on John's own board: the footprint and the
+    // ⊓ from 64° · +29° stood the hull and asked; the second ⊓ from the same
+    // place is another piece of the same silhouette and asks nothing new.
+    const d = S().depth(demoCastleId);
+    assert(d, 'the hull has no depth reading');
+    assert(d.onPlane === 1, `${d.onPlane} depth questions on the explanation plane, expected exactly one`);
+    assert(d.open && d.state === 'asking', `the question reads ${JSON.stringify(d)}`);
+    assert(d.view === '64° · +29°', `seen from ${d.view}`);
+    const took = d.candidates.find((c) => c.took);
+    assert(took && took.u > 0, `the depth it took: ${JSON.stringify(d.candidates)}`);
+    assert(d.question.includes(`${took.u.toFixed(2)} u`), `the question does not carry the number it took: "${d.question}"`);
+    assert(d.candidates.length >= 2, `${d.candidates.length} candidate(s)`);
+    assert(S().models().working.length === 0, 'a model was asked');
+    return { question: d.question, candidates: d.candidates.map((c) => `${c.u.toFixed(2)} u · ${c.words}${c.took ? ' (taken)' : ''}`) };
+  });
+
   demo2('3 · orbit the other way — the third ⊓ narrows the hull, and it is two parts, said in words', () => {
     const D = CD();
     const wideBefore = S().parts(demoCastleId).length;
@@ -3949,6 +4107,8 @@
     assert(c, 'the third ⊓ was not drawn');
     assert(markOf(c).plays.role === 'elevation', `the third ⊓ plays ${markOf(c).plays.role}`);
     assert(/went into it/.test(S().state().status), `the status said "${S().state().status}"`);
+    // L2c: a second standpoint — the question the first one raised is answered.
+    assert(/how deep is answered/.test(S().state().status), `the status said "${S().state().status}"`);
 
     S().nav.home(0);
     const solid = S().solids().find((x) => x.id === demoCastleId);
@@ -3975,6 +4135,14 @@
     assert(xs.every((x, i) => i === 0 || x >= xs[i - 1] - 1e-6), `not in reading order: ${xs.map((x) => x.toFixed(2)).join(', ')}`);
     assert(S().models().working.length === 0, 'a model was asked by standing a hull');
     return { claims, parts: parts.map((p) => p.sentence), tier: 'tier 1, no model' };
+  });
+
+  demo2('3½ · two standpoints — the question is closed, and stays on the board answered by the drawing', () => {
+    const d = S().depth(demoCastleId);
+    assert(d && d.state === 'measured' && !d.open, `the question reads ${JSON.stringify(d)}`);
+    assert(d.onPlane === 1, `${d.onPlane} depth questions on the plane — closing one is not asking another`);
+    assert(/2 standpoints/.test(d.reasoning), `it says "${d.reasoning}"`);
+    return { reasoning: d.reasoning };
   });
 
   demo2('4 · the free loop test — nothing chosen, and it lands where you are LOOKING, not in the floor', () => {
@@ -4309,6 +4477,54 @@
     return { seat: seats[0].name, parked: parked.words, versions: `${before} → ${after.versions}`, named: 'part:2 “keep”' };
   });
 
+  // L2d: the silhouette cache, measured (week 1's U5). `solid.ts` caches every
+  // orthographic silhouette it renders, keyed by solid, tree and plane frame,
+  // and clears the lot whenever a solid is rebuilt. The number is what says
+  // whether that needs a bound — so it is taken twice: as the castle leaves the
+  // board, and after the hand has hovered every mark from eight standpoints.
+  let demo2Measured = null;
+  demo2('10 · the silhouette cache, measured — after the castle, and after hovering its marks from eight standpoints', () => {
+    const afterCastle = S().stats().silhouettes;
+    const marks = S().state().marks.map((m) => m.id);
+    let hovers = 0;
+    for (let turn = 0; turn < 8; turn++) {
+      S().orbit(0.785, turn % 2 ? 0.08 : -0.08);
+      for (const id of marks) {
+        const pts = S().worldPointsOf(id) || [];
+        for (const k of [0, Math.floor(pts.length / 2)]) {
+          if (!pts[k]) continue;
+          const at = S().screenForWorld(pts[k]);
+          stage().dispatchEvent(
+            new PointerEvent('pointermove', { pointerId: 4242, pointerType: 'mouse', buttons: 0, clientX: at.x, clientY: at.y, bubbles: true })
+          );
+          hovers++;
+        }
+      }
+      // And every solid selected, which asks for its honours and its diffs.
+      for (const solid of S().solids()) {
+        S().select(solid.id);
+        S().panelText();
+      }
+    }
+    S().select(null);
+    const afterHovers = S().stats().silhouettes;
+    for (const n of [afterCastle.entries, afterCastle.bytes, afterHovers.entries, afterHovers.bytes, afterHovers.peak.bytes]) {
+      assert(Number.isFinite(n) && n >= 0, `the probe returned ${JSON.stringify({ afterCastle, afterHovers })}`);
+    }
+    const kb = (b) => Math.round(b / 1024);
+    demo2Measured = {
+      silhouetteCache: {
+        afterCastle: { entries: afterCastle.entries, kb: kb(afterCastle.bytes) },
+        afterHovers: { hovers, entries: afterHovers.entries, kb: kb(afterHovers.bytes) },
+        peak: { entries: afterHovers.peak.entries, kb: kb(afterHovers.peak.bytes) },
+        asked: afterHovers.asked,
+        rendered: afterHovers.rendered,
+        clears: afterHovers.clears,
+      },
+    };
+    return demo2Measured;
+  });
+
   window.__demo2 = async function () {
     const out = { ok: true, passed: 0, failed: 0, totalMs: 0, steps: [] };
     if (!S()) {
@@ -4342,6 +4558,8 @@
       await new Promise((r) => setTimeout(r, 20));
     }
     out.totalMs = Math.round(performance.now() - t0);
+    // What the demo measured, for the runner to print and keep (L2d).
+    if (demo2Measured) out.measured = demo2Measured;
     return out;
   };
 
@@ -4368,6 +4586,8 @@
       await new Promise((r) => setTimeout(r, 20));
     }
     out.totalMs = Math.round(performance.now() - t0);
+    const measured = cacheMeasured();
+    if (measured) out.measured = measured;
     return out;
   };
 

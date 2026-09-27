@@ -96,6 +96,15 @@ export interface Solids {
    * hovering a mark does not re-render the board.
    */
   silhouetteOn(id: string, plane: Plane): PlaneSilhouette | null;
+  /**
+   * L2d: what the silhouette cache holds, measured (week 1's U5). `entries` and
+   * `bytes` are now; `peak` is the most it has held at once since the page
+   * loaded; `asked` and `rendered` are every call and every miss. Bytes are
+   * approximate: the mask's own bytes, eight per coordinate of every outline
+   * point, two per character of the key and of the reason, and a flat 64 for
+   * the objects around them.
+   */
+  cacheStats(): SilhouetteCacheStats;
   /** Why a solid's derivation did not come off, or null. The CSG seam's own words. */
   brokenOf(id: string): string | null;
   /** Told once, when a derivation fails — so the status line says it and the panel keeps it. */
@@ -1069,6 +1078,13 @@ export function createSolids(o: SolidOptions): Solids {
 
   /** `solid | tree | plane frame` → the silhouette. A render is not a thing to do on hover. */
   const silhouettes = new Map<string, PlaneSilhouette | null>();
+  // L2d: the cache, measured rather than guessed at (week 1's U5, risk 4: a
+  // bound with no number). Counted as it fills; nothing here bounds it.
+  const cache = { bytes: 0, peakEntries: 0, peakBytes: 0, asked: 0, rendered: 0, clears: 0 };
+  const bytesOf = (key: string, sil: PlaneSilhouette | null) =>
+    key.length * 2 +
+    64 +
+    (sil ? sil.mask.byteLength + sil.outlines.reduce((n, o) => n + o.length * 16, 0) + sil.reasoning.length * 2 : 0);
 
   function drop(id: string) {
     const b = built.get(id);
@@ -1176,7 +1192,11 @@ export function createSolids(o: SolidOptions): Solids {
     }
     for (const id of [...built.keys()]) if (!seen.has(id)) { drop(id); moved = true; }
     // A silhouette is a picture of a body that no longer stands.
-    if (moved) silhouettes.clear();
+    if (moved && silhouettes.size) {
+      silhouettes.clear();
+      cache.bytes = 0;
+      cache.clears++;
+    }
     space.render();
   }
 
@@ -1189,9 +1209,14 @@ export function createSolids(o: SolidOptions): Solids {
     const b = built.get(id);
     if (!b || !b.mesh.parent) return null;
     const key = `${id}|${b.signature.length}:${hash(b.signature)}|${planeKey(plane)}`;
+    cache.asked++;
     if (silhouettes.has(key)) return silhouettes.get(key) ?? null;
     const out = silhouetteOnPlane(space.renderer, b.mesh.geometry, plane);
     silhouettes.set(key, out);
+    cache.rendered++;
+    cache.bytes += bytesOf(key, out);
+    cache.peakEntries = Math.max(cache.peakEntries, silhouettes.size);
+    cache.peakBytes = Math.max(cache.peakBytes, cache.bytes);
     // The offscreen pass left the live picture behind it; put it back.
     space.render();
     return out;
@@ -1357,11 +1382,33 @@ export function createSolids(o: SolidOptions): Solids {
     spanAlong,
     silhouetteOf,
     silhouetteOn,
+    cacheStats: () => ({
+      entries: silhouettes.size,
+      bytes: cache.bytes,
+      empty: [...silhouettes.values()].filter((x) => !x).length,
+      peak: { entries: cache.peakEntries, bytes: cache.peakBytes },
+      asked: cache.asked,
+      rendered: cache.rendered,
+      clears: cache.clears,
+    }),
     rayDown,
     brokenOf,
     onBroken: (fn: (id: string, why: string) => void) => { onBroken = fn; },
     ids: () => [...built.keys()],
   };
+}
+
+/** What the silhouette cache holds, measured — `Solids.cacheStats`. */
+export interface SilhouetteCacheStats {
+  entries: number;
+  /** Approximate: see `cacheStats`. */
+  bytes: number;
+  /** Entries that are a remembered miss — a body that covered nothing on that plane. */
+  empty: number;
+  peak: { entries: number; bytes: number };
+  asked: number;
+  rendered: number;
+  clears: number;
 }
 
 /**

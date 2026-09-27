@@ -27,7 +27,7 @@ import { createGizmo } from './gizmo';
 import { createInk } from './ink';
 import { createLog, type Mark, type Solid, type StandFor } from './log';
 import { createPanel, createPanelToggle, pinnedViews } from './panel';
-import { createSolids } from './solid';
+import { createSolids, type SilhouetteCacheStats } from './solid';
 import { createSelection, type Sel } from './selection';
 import { createField, readField, type FieldContext, type KnownName, type VerbOffer } from './field';
 import { SCRATCH_NEAR, type Makeable } from './form';
@@ -2822,6 +2822,10 @@ export interface ShardHook {
   /** Select a part, as tapping its chip does. */
   selectPart(solidId: string, partId: string | null): boolean;
 
+  // ---- L2d: the silhouette cache, measured ---------------------------------
+  /** What the silhouette cache holds right now, and the most it has held — `solid.ts`'s own count. */
+  stats(): { silhouettes: SilhouetteCacheStats };
+
   // ---- L2c: the shard asks -------------------------------------------------
   /**
    * How deep a hull runs, and whether the board is asking — `log.depthQuestion`
@@ -3366,6 +3370,7 @@ const hook: ShardHook = {
     report();
     return true;
   },
+  stats: () => ({ silhouettes: solids.cacheStats() }),
   depth: (solidId) => {
     const q = log.depthQuestion(solidId);
     if (!q) return null;
