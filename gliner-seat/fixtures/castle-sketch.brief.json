@@ -337,19 +337,19 @@
           "text": "x",
           "start": 301,
           "end": 302,
-          "why": "an axis"
+          "why": "an axis of the extent, which names a direction, not a measurement"
         },
         {
           "text": "y",
           "start": 312,
           "end": 313,
-          "why": "an axis"
+          "why": "an axis of the extent, which names a direction, not a measurement"
         },
         {
           "text": "z",
           "start": 324,
           "end": 325,
-          "why": "an axis"
+          "why": "an axis of the extent, which names a direction, not a measurement"
         },
         {
           "text": "cut off",
