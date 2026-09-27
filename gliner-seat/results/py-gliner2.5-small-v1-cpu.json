@@ -1,0 +1,9783 @@
+{
+ "measured": "2026-09-26T18:52:08",
+ "runner": "fastino/gliner2.5-small-v1 · gliner2 2.0.0 · torch 2.14.0 · cpu",
+ "load": {
+  "importS": 1.8891679169610143,
+  "fromPretrainedS": 2.5982124579604715,
+  "firstCallMs": 65.47866715118289
+ },
+ "maxRssMB": 1220,
+ "parameters": 73881879,
+ "latency": {
+  "plan, bare": {
+   "n": 105,
+   "median": 29.88979103974998,
+   "p95": 132.56929572671652,
+   "byGroup": {
+    "apron.sample": 29.239750001579523,
+    "briefs": 29.710271046496928,
+    "castle-sketch.brief": 178.15420893020928,
+    "tunic.sample": 30.895499978214502
+   }
+  },
+  "plan, described": {
+   "n": 105,
+   "median": 49.49650005437434,
+   "p95": 187.11220435798168,
+   "byGroup": {
+    "apron.sample": 49.1692079231143,
+    "briefs": 49.30443735793233,
+    "castle-sketch.brief": 245.79566693864763,
+    "tunic.sample": 50.41991686448455
+   }
+  }
+ },
+ "spans": {
+  "plan, bare": {
+   "0.3": {
+    "apron.sample/A": [
+     {
+      "label": "quantity",
+      "text": "36",
+      "start": 8,
+      "end": 10,
+      "score": 0.8210173845291138
+     },
+     {
+      "label": "garment or part name",
+      "text": "A. Bust",
+      "start": 0,
+      "end": 7,
+      "score": 0.4687177538871765
+     }
+    ],
+    "apron.sample/B": [
+     {
+      "label": "measurement name",
+      "text": "Top to waist",
+      "start": 3,
+      "end": 15,
+      "score": 0.3932741582393646
+     },
+     {
+      "label": "quantity",
+      "text": "20",
+      "start": 16,
+      "end": 18,
+      "score": 0.9450467228889465
+     },
+     {
+      "label": "garment or part name",
+      "text": "Top to waist",
+      "start": 3,
+      "end": 15,
+      "score": 0.6515501141548157
+     }
+    ],
+    "apron.sample/C": [
+     {
+      "label": "measurement name",
+      "text": "C. Top",
+      "start": 0,
+      "end": 6,
+      "score": 0.31543487310409546
+     },
+     {
+      "label": "quantity",
+      "text": "46",
+      "start": 17,
+      "end": 19,
+      "score": 0.6455900073051453
+     }
+    ],
+    "apron.sample/seam": [
+     {
+      "label": "measurement name",
+      "text": "seam allowance",
+      "start": 4,
+      "end": 18,
+      "score": 0.4608858823776245
+     },
+     {
+      "label": "operation",
+      "text": "Add seam allowance",
+      "start": 0,
+      "end": 18,
+      "score": 0.7080297470092773
+     }
+    ],
+    "apron.sample/1": [
+     {
+      "label": "measurement name",
+      "text": "A ÷ 3",
+      "start": 3,
+      "end": 8,
+      "score": 0.5394152402877808
+     },
+     {
+      "label": "quantity",
+      "text": "14",
+      "start": 20,
+      "end": 22,
+      "score": 0.5580159425735474
+     },
+     {
+      "label": "quantity",
+      "text": "12",
+      "start": 11,
+      "end": 13,
+      "score": 0.5120607018470764
+     },
+     {
+      "label": "unit",
+      "text": "14",
+      "start": 20,
+      "end": 22,
+      "score": 0.31543317437171936
+     },
+     {
+      "label": "unit",
+      "text": "12",
+      "start": 11,
+      "end": 13,
+      "score": 0.30551058053970337
+     }
+    ],
+    "apron.sample/2": [
+     {
+      "label": "quantity",
+      "text": "7",
+      "start": 20,
+      "end": 21,
+      "score": 0.6832528114318848
+     },
+     {
+      "label": "quantity",
+      "text": "14",
+      "start": 11,
+      "end": 13,
+      "score": 0.6789306402206421
+     },
+     {
+      "label": "quantity",
+      "text": "2",
+      "start": 0,
+      "end": 1,
+      "score": 0.3438800573348999
+     },
+     {
+      "label": "unit",
+      "text": "2",
+      "start": 16,
+      "end": 17,
+      "score": 0.33707383275032043
+     }
+    ],
+    "apron.sample/3": [
+     {
+      "label": "measurement name",
+      "text": "3. B",
+      "start": 0,
+      "end": 4,
+      "score": 0.36951392889022827
+     },
+     {
+      "label": "quantity",
+      "text": "22",
+      "start": 14,
+      "end": 16,
+      "score": 0.45851874351501465
+     }
+    ],
+    "apron.sample/4": [
+     {
+      "label": "measurement name",
+      "text": "4. C",
+      "start": 0,
+      "end": 4,
+      "score": 0.4259668290615082
+     },
+     {
+      "label": "quantity",
+      "text": "48",
+      "start": 5,
+      "end": 7,
+      "score": 0.3523447513580322
+     }
+    ],
+    "apron.sample/5": [],
+    "apron.sample/6": [
+     {
+      "label": "measurement name",
+      "text": "C × 2",
+      "start": 4,
+      "end": 9,
+      "score": 0.35260385274887085
+     },
+     {
+      "label": "unit",
+      "text": "B",
+      "start": 13,
+      "end": 14,
+      "score": 0.3273962438106537
+     }
+    ],
+    "apron.sample/brace": [
+     {
+      "label": "measurement name",
+      "text": "72–74\"",
+      "start": 0,
+      "end": 6,
+      "score": 0.3441106677055359
+     },
+     {
+      "label": "quantity",
+      "text": "72–74",
+      "start": 0,
+      "end": 5,
+      "score": 0.5216802358627319
+     }
+    ],
+    "tunic.sample/1": [
+     {
+      "label": "measurement name",
+      "text": "Chest + 6\"",
+      "start": 3,
+      "end": 13,
+      "score": 0.5521580576896667
+     },
+     {
+      "label": "quantity",
+      "text": "21\"",
+      "start": 33,
+      "end": 36,
+      "score": 0.43564411997795105
+     }
+    ],
+    "tunic.sample/2": [
+     {
+      "label": "measurement name",
+      "text": "+ 2   54",
+      "start": 30,
+      "end": 38,
+      "score": 0.5497896671295166
+     }
+    ],
+    "tunic.sample/3": [
+     {
+      "label": "measurement name",
+      "text": "9 × 2",
+      "start": 46,
+      "end": 51,
+      "score": 0.38331374526023865
+     },
+     {
+      "label": "unit",
+      "text": "22\"",
+      "start": 59,
+      "end": 62,
+      "score": 0.38943126797676086
+     },
+     {
+      "label": "garment or part name",
+      "text": "Top shoulder",
+      "start": 3,
+      "end": 15,
+      "score": 0.46585598587989807
+     },
+     {
+      "label": "garment or part name",
+      "text": "under armpit",
+      "start": 19,
+      "end": 31,
+      "score": 0.3070157766342163
+     }
+    ],
+    "tunic.sample/4": [],
+    "tunic.sample/5": [
+     {
+      "label": "measurement name",
+      "text": "Arm length + 2",
+      "start": 3,
+      "end": 17,
+      "score": 0.40267708897590637
+     },
+     {
+      "label": "quantity",
+      "text": "5",
+      "start": 0,
+      "end": 1,
+      "score": 0.34958261251449585
+     },
+     {
+      "label": "garment or part name",
+      "text": "Arm length",
+      "start": 3,
+      "end": 13,
+      "score": 0.5044694542884827
+     }
+    ],
+    "brief/apron": [
+     {
+      "label": "quantity",
+      "text": "20",
+      "start": 38,
+      "end": 40,
+      "score": 0.5463606715202332
+     },
+     {
+      "label": "quantity",
+      "text": "36 inch",
+      "start": 21,
+      "end": 28,
+      "score": 0.40822935104370117
+     },
+     {
+      "label": "unit",
+      "text": "bust",
+      "start": 29,
+      "end": 33,
+      "score": 0.3500860035419464
+     },
+     {
+      "label": "garment or part name",
+      "text": "apron dress",
+      "start": 3,
+      "end": 14,
+      "score": 0.9099059104919434
+     }
+    ],
+    "brief/flowchart": [
+     {
+      "label": "operation",
+      "text": "checkout",
+      "start": 16,
+      "end": 24,
+      "score": 0.7066967487335205
+     },
+     {
+      "label": "operation",
+      "text": "payment",
+      "start": 44,
+      "end": 51,
+      "score": 0.33050769567489624
+     }
+    ],
+    "brief/castle": [
+     {
+      "label": "quantity",
+      "text": "two",
+      "start": 14,
+      "end": 17,
+      "score": 0.3078530728816986
+     },
+     {
+      "label": "garment or part name",
+      "text": "wall",
+      "start": 28,
+      "end": 32,
+      "score": 0.4800569415092468
+     },
+     {
+      "label": "garment or part name",
+      "text": "gate",
+      "start": 39,
+      "end": 43,
+      "score": 0.42257145047187805
+     },
+     {
+      "label": "garment or part name",
+      "text": "towers",
+      "start": 18,
+      "end": 24,
+      "score": 0.3399387001991272
+     }
+    ],
+    "brief/castle-words": [
+     {
+      "label": "measurement name",
+      "text": "green tops",
+      "start": 12,
+      "end": 22,
+      "score": 0.5219917893409729
+     },
+     {
+      "label": "quantity",
+      "text": "green",
+      "start": 12,
+      "end": 17,
+      "score": 0.44085684418678284
+     },
+     {
+      "label": "unit",
+      "text": "green",
+      "start": 12,
+      "end": 17,
+      "score": 0.40417104959487915
+     }
+    ],
+    "castle-sketch.brief": [
+     {
+      "label": "measurement name",
+      "text": "x 0.8",
+      "start": 301,
+      "end": 306,
+      "score": 0.31634998321533203
+     },
+     {
+      "label": "quantity",
+      "text": "7",
+      "start": 23,
+      "end": 24,
+      "score": 0.3733886182308197
+     },
+     {
+      "label": "quantity",
+      "text": "2",
+      "start": 409,
+      "end": 410,
+      "score": 0.3311259150505066
+     },
+     {
+      "label": "quantity",
+      "text": "0.9",
+      "start": 319,
+      "end": 322,
+      "score": 0.3216269910335541
+     },
+     {
+      "label": "unit",
+      "text": "y",
+      "start": 312,
+      "end": 313,
+      "score": 0.4720504879951477
+     },
+     {
+      "label": "unit",
+      "text": "z",
+      "start": 324,
+      "end": 325,
+      "score": 0.46658849716186523
+     },
+     {
+      "label": "garment or part name",
+      "text": "PARTS",
+      "start": 401,
+      "end": 406,
+      "score": 0.3727227449417114
+     },
+     {
+      "label": "measurement name",
+      "text": "1.6 × 1.7 u",
+      "start": 708,
+      "end": 719,
+      "score": 0.4473082721233368
+     },
+     {
+      "label": "measurement name",
+      "text": "1.8 × 1.4 u",
+      "start": 558,
+      "end": 569,
+      "score": 0.4387975037097931
+     },
+     {
+      "label": "quantity",
+      "text": "9",
+      "start": 740,
+      "end": 741,
+      "score": 0.3790995180606842
+     },
+     {
+      "label": "quantity",
+      "text": "8",
+      "start": 788,
+      "end": 789,
+      "score": 0.3323964774608612
+     },
+     {
+      "label": "quantity",
+      "text": "135",
+      "start": 684,
+      "end": 687,
+      "score": 0.31687456369400024
+     },
+     {
+      "label": "unit",
+      "text": "u",
+      "start": 592,
+      "end": 593,
+      "score": 0.5446043014526367
+     },
+     {
+      "label": "unit",
+      "text": "u",
+      "start": 742,
+      "end": 743,
+      "score": 0.4672832787036896
+     },
+     {
+      "label": "unit",
+      "text": "°",
+      "start": 694,
+      "end": 695,
+      "score": 0.3288147449493408
+     },
+     {
+      "label": "garment or part name",
+      "text": "green tops",
+      "start": 1035,
+      "end": 1045,
+      "score": 0.7196733951568604
+     },
+     {
+      "label": "garment or part name",
+      "text": "castle",
+      "start": 1023,
+      "end": 1029,
+      "score": 0.47899386286735535
+     },
+     {
+      "label": "operation",
+      "text": "stroke",
+      "start": 781,
+      "end": 787,
+      "score": 0.5620317459106445
+     },
+     {
+      "label": "operation",
+      "text": "stroke",
+      "start": 663,
+      "end": 669,
+      "score": 0.4926210343837738
+     },
+     {
+      "label": "operation",
+      "text": "stroke",
+      "start": 626,
+      "end": 632,
+      "score": 0.46699059009552
+     },
+     {
+      "label": "measurement name",
+      "text": "height",
+      "start": 1167,
+      "end": 1173,
+      "score": 0.5526588559150696
+     },
+     {
+      "label": "measurement name",
+      "text": "width",
+      "start": 1198,
+      "end": 1203,
+      "score": 0.4197271168231964
+     },
+     {
+      "label": "measurement name",
+      "text": "foundation",
+      "start": 1123,
+      "end": 1133,
+      "score": 0.3655877411365509
+     },
+     {
+      "label": "unit",
+      "text": "width",
+      "start": 1198,
+      "end": 1203,
+      "score": 0.3485235571861267
+     },
+     {
+      "label": "garment or part name",
+      "text": "one colour word",
+      "start": 1387,
+      "end": 1402,
+      "score": 0.42117685079574585
+     }
+    ]
+   },
+   "0.4": {
+    "apron.sample/A": [
+     {
+      "label": "quantity",
+      "text": "36",
+      "start": 8,
+      "end": 10,
+      "score": 0.8210173845291138
+     },
+     {
+      "label": "garment or part name",
+      "text": "A. Bust",
+      "start": 0,
+      "end": 7,
+      "score": 0.4687177538871765
+     }
+    ],
+    "apron.sample/B": [
+     {
+      "label": "quantity",
+      "text": "20",
+      "start": 16,
+      "end": 18,
+      "score": 0.9450467228889465
+     },
+     {
+      "label": "garment or part name",
+      "text": "Top to waist",
+      "start": 3,
+      "end": 15,
+      "score": 0.6515501141548157
+     }
+    ],
+    "apron.sample/C": [
+     {
+      "label": "quantity",
+      "text": "46",
+      "start": 17,
+      "end": 19,
+      "score": 0.6455900073051453
+     }
+    ],
+    "apron.sample/seam": [
+     {
+      "label": "measurement name",
+      "text": "seam allowance",
+      "start": 4,
+      "end": 18,
+      "score": 0.4608858823776245
+     },
+     {
+      "label": "operation",
+      "text": "Add seam allowance",
+      "start": 0,
+      "end": 18,
+      "score": 0.7080297470092773
+     }
+    ],
+    "apron.sample/1": [
+     {
+      "label": "measurement name",
+      "text": "A ÷ 3",
+      "start": 3,
+      "end": 8,
+      "score": 0.5394152402877808
+     },
+     {
+      "label": "quantity",
+      "text": "14",
+      "start": 20,
+      "end": 22,
+      "score": 0.5580159425735474
+     },
+     {
+      "label": "quantity",
+      "text": "12",
+      "start": 11,
+      "end": 13,
+      "score": 0.5120607018470764
+     }
+    ],
+    "apron.sample/2": [
+     {
+      "label": "quantity",
+      "text": "7",
+      "start": 20,
+      "end": 21,
+      "score": 0.6832528114318848
+     },
+     {
+      "label": "quantity",
+      "text": "14",
+      "start": 11,
+      "end": 13,
+      "score": 0.6789306402206421
+     }
+    ],
+    "apron.sample/3": [
+     {
+      "label": "quantity",
+      "text": "22",
+      "start": 14,
+      "end": 16,
+      "score": 0.45851874351501465
+     }
+    ],
+    "apron.sample/4": [
+     {
+      "label": "measurement name",
+      "text": "4. C",
+      "start": 0,
+      "end": 4,
+      "score": 0.4259668290615082
+     }
+    ],
+    "apron.sample/5": [],
+    "apron.sample/6": [],
+    "apron.sample/brace": [
+     {
+      "label": "quantity",
+      "text": "72–74",
+      "start": 0,
+      "end": 5,
+      "score": 0.5216802358627319
+     }
+    ],
+    "tunic.sample/1": [
+     {
+      "label": "measurement name",
+      "text": "Chest + 6\"",
+      "start": 3,
+      "end": 13,
+      "score": 0.5521580576896667
+     },
+     {
+      "label": "quantity",
+      "text": "21\"",
+      "start": 33,
+      "end": 36,
+      "score": 0.43564411997795105
+     }
+    ],
+    "tunic.sample/2": [
+     {
+      "label": "measurement name",
+      "text": "+ 2   54",
+      "start": 30,
+      "end": 38,
+      "score": 0.5497896671295166
+     }
+    ],
+    "tunic.sample/3": [
+     {
+      "label": "garment or part name",
+      "text": "Top shoulder to under armpit",
+      "start": 3,
+      "end": 31,
+      "score": 0.7219460010528564
+     }
+    ],
+    "tunic.sample/4": [],
+    "tunic.sample/5": [
+     {
+      "label": "measurement name",
+      "text": "Arm length + 2",
+      "start": 3,
+      "end": 17,
+      "score": 0.40267708897590637
+     },
+     {
+      "label": "garment or part name",
+      "text": "Arm length",
+      "start": 3,
+      "end": 13,
+      "score": 0.5044694542884827
+     }
+    ],
+    "brief/apron": [
+     {
+      "label": "quantity",
+      "text": "20",
+      "start": 38,
+      "end": 40,
+      "score": 0.5463606715202332
+     },
+     {
+      "label": "quantity",
+      "text": "36 inch",
+      "start": 21,
+      "end": 28,
+      "score": 0.40822935104370117
+     },
+     {
+      "label": "garment or part name",
+      "text": "apron dress",
+      "start": 3,
+      "end": 14,
+      "score": 0.9099059104919434
+     }
+    ],
+    "brief/flowchart": [
+     {
+      "label": "operation",
+      "text": "checkout",
+      "start": 16,
+      "end": 24,
+      "score": 0.7066967487335205
+     }
+    ],
+    "brief/castle": [
+     {
+      "label": "garment or part name",
+      "text": "wall",
+      "start": 28,
+      "end": 32,
+      "score": 0.4800569415092468
+     },
+     {
+      "label": "garment or part name",
+      "text": "gate",
+      "start": 39,
+      "end": 43,
+      "score": 0.42257145047187805
+     }
+    ],
+    "brief/castle-words": [
+     {
+      "label": "measurement name",
+      "text": "green tops",
+      "start": 12,
+      "end": 22,
+      "score": 0.5219917893409729
+     },
+     {
+      "label": "quantity",
+      "text": "green",
+      "start": 12,
+      "end": 17,
+      "score": 0.44085684418678284
+     },
+     {
+      "label": "unit",
+      "text": "green",
+      "start": 12,
+      "end": 17,
+      "score": 0.40417104959487915
+     }
+    ],
+    "castle-sketch.brief": [
+     {
+      "label": "unit",
+      "text": "y",
+      "start": 312,
+      "end": 313,
+      "score": 0.4720504879951477
+     },
+     {
+      "label": "unit",
+      "text": "z",
+      "start": 324,
+      "end": 325,
+      "score": 0.46658849716186523
+     },
+     {
+      "label": "measurement name",
+      "text": "1.6 × 1.7 u",
+      "start": 708,
+      "end": 719,
+      "score": 0.4473082721233368
+     },
+     {
+      "label": "measurement name",
+      "text": "1.8 × 1.4 u",
+      "start": 558,
+      "end": 569,
+      "score": 0.4387975037097931
+     },
+     {
+      "label": "unit",
+      "text": "u",
+      "start": 592,
+      "end": 593,
+      "score": 0.5446043014526367
+     },
+     {
+      "label": "unit",
+      "text": "u",
+      "start": 742,
+      "end": 743,
+      "score": 0.4672832787036896
+     },
+     {
+      "label": "garment or part name",
+      "text": "green tops",
+      "start": 1035,
+      "end": 1045,
+      "score": 0.7196733951568604
+     },
+     {
+      "label": "garment or part name",
+      "text": "castle",
+      "start": 1023,
+      "end": 1029,
+      "score": 0.47899386286735535
+     },
+     {
+      "label": "operation",
+      "text": "stroke",
+      "start": 781,
+      "end": 787,
+      "score": 0.5620317459106445
+     },
+     {
+      "label": "operation",
+      "text": "stroke",
+      "start": 663,
+      "end": 669,
+      "score": 0.4926210343837738
+     },
+     {
+      "label": "operation",
+      "text": "stroke",
+      "start": 626,
+      "end": 632,
+      "score": 0.46699059009552
+     },
+     {
+      "label": "measurement name",
+      "text": "height",
+      "start": 1167,
+      "end": 1173,
+      "score": 0.5526588559150696
+     },
+     {
+      "label": "measurement name",
+      "text": "width",
+      "start": 1198,
+      "end": 1203,
+      "score": 0.4197271168231964
+     },
+     {
+      "label": "garment or part name",
+      "text": "one colour word",
+      "start": 1387,
+      "end": 1402,
+      "score": 0.42117685079574585
+     }
+    ]
+   },
+   "0.5": {
+    "apron.sample/A": [
+     {
+      "label": "quantity",
+      "text": "36",
+      "start": 8,
+      "end": 10,
+      "score": 0.8210173845291138
+     }
+    ],
+    "apron.sample/B": [
+     {
+      "label": "quantity",
+      "text": "20",
+      "start": 16,
+      "end": 18,
+      "score": 0.9450467228889465
+     },
+     {
+      "label": "garment or part name",
+      "text": "Top to waist",
+      "start": 3,
+      "end": 15,
+      "score": 0.6515501141548157
+     }
+    ],
+    "apron.sample/C": [
+     {
+      "label": "quantity",
+      "text": "46",
+      "start": 17,
+      "end": 19,
+      "score": 0.6455900073051453
+     }
+    ],
+    "apron.sample/seam": [
+     {
+      "label": "operation",
+      "text": "Add seam allowance",
+      "start": 0,
+      "end": 18,
+      "score": 0.7080297470092773
+     }
+    ],
+    "apron.sample/1": [
+     {
+      "label": "measurement name",
+      "text": "A ÷ 3",
+      "start": 3,
+      "end": 8,
+      "score": 0.5394152402877808
+     },
+     {
+      "label": "quantity",
+      "text": "14",
+      "start": 20,
+      "end": 22,
+      "score": 0.5580159425735474
+     },
+     {
+      "label": "quantity",
+      "text": "12",
+      "start": 11,
+      "end": 13,
+      "score": 0.5120607018470764
+     }
+    ],
+    "apron.sample/2": [
+     {
+      "label": "quantity",
+      "text": "7",
+      "start": 20,
+      "end": 21,
+      "score": 0.6832528114318848
+     },
+     {
+      "label": "quantity",
+      "text": "14",
+      "start": 11,
+      "end": 13,
+      "score": 0.6789306402206421
+     }
+    ],
+    "apron.sample/3": [],
+    "apron.sample/4": [],
+    "apron.sample/5": [],
+    "apron.sample/6": [],
+    "apron.sample/brace": [
+     {
+      "label": "quantity",
+      "text": "72–74",
+      "start": 0,
+      "end": 5,
+      "score": 0.5216802358627319
+     }
+    ],
+    "tunic.sample/1": [
+     {
+      "label": "measurement name",
+      "text": "Chest + 6\"",
+      "start": 3,
+      "end": 13,
+      "score": 0.5521580576896667
+     }
+    ],
+    "tunic.sample/2": [
+     {
+      "label": "measurement name",
+      "text": "+ 2   54",
+      "start": 30,
+      "end": 38,
+      "score": 0.5497896671295166
+     }
+    ],
+    "tunic.sample/3": [
+     {
+      "label": "garment or part name",
+      "text": "Top shoulder to under armpit",
+      "start": 3,
+      "end": 31,
+      "score": 0.7219460010528564
+     }
+    ],
+    "tunic.sample/4": [],
+    "tunic.sample/5": [
+     {
+      "label": "garment or part name",
+      "text": "Arm length",
+      "start": 3,
+      "end": 13,
+      "score": 0.5044694542884827
+     }
+    ],
+    "brief/apron": [
+     {
+      "label": "quantity",
+      "text": "20",
+      "start": 38,
+      "end": 40,
+      "score": 0.5463606715202332
+     },
+     {
+      "label": "garment or part name",
+      "text": "apron dress",
+      "start": 3,
+      "end": 14,
+      "score": 0.9099059104919434
+     }
+    ],
+    "brief/flowchart": [
+     {
+      "label": "operation",
+      "text": "checkout",
+      "start": 16,
+      "end": 24,
+      "score": 0.7066967487335205
+     }
+    ],
+    "brief/castle": [],
+    "brief/castle-words": [
+     {
+      "label": "measurement name",
+      "text": "green tops",
+      "start": 12,
+      "end": 22,
+      "score": 0.5219917893409729
+     }
+    ],
+    "castle-sketch.brief": [
+     {
+      "label": "unit",
+      "text": "u",
+      "start": 592,
+      "end": 593,
+      "score": 0.5446043014526367
+     },
+     {
+      "label": "garment or part name",
+      "text": "castle with green tops",
+      "start": 1023,
+      "end": 1045,
+      "score": 0.9137551188468933
+     },
+     {
+      "label": "operation",
+      "text": "stroke",
+      "start": 781,
+      "end": 787,
+      "score": 0.5620317459106445
+     },
+     {
+      "label": "measurement name",
+      "text": "height",
+      "start": 1167,
+      "end": 1173,
+      "score": 0.5526588559150696
+     }
+    ]
+   },
+   "0.6": {
+    "apron.sample/A": [
+     {
+      "label": "quantity",
+      "text": "36",
+      "start": 8,
+      "end": 10,
+      "score": 0.8210173845291138
+     }
+    ],
+    "apron.sample/B": [
+     {
+      "label": "quantity",
+      "text": "20",
+      "start": 16,
+      "end": 18,
+      "score": 0.9450467228889465
+     },
+     {
+      "label": "garment or part name",
+      "text": "Top to waist",
+      "start": 3,
+      "end": 15,
+      "score": 0.6515501141548157
+     }
+    ],
+    "apron.sample/C": [
+     {
+      "label": "quantity",
+      "text": "46",
+      "start": 17,
+      "end": 19,
+      "score": 0.6455900073051453
+     }
+    ],
+    "apron.sample/seam": [
+     {
+      "label": "operation",
+      "text": "Add seam allowance",
+      "start": 0,
+      "end": 18,
+      "score": 0.7080297470092773
+     }
+    ],
+    "apron.sample/1": [],
+    "apron.sample/2": [
+     {
+      "label": "quantity",
+      "text": "7",
+      "start": 20,
+      "end": 21,
+      "score": 0.6832528114318848
+     },
+     {
+      "label": "quantity",
+      "text": "14",
+      "start": 11,
+      "end": 13,
+      "score": 0.6789306402206421
+     }
+    ],
+    "apron.sample/3": [],
+    "apron.sample/4": [],
+    "apron.sample/5": [],
+    "apron.sample/6": [],
+    "apron.sample/brace": [],
+    "tunic.sample/1": [],
+    "tunic.sample/2": [],
+    "tunic.sample/3": [
+     {
+      "label": "garment or part name",
+      "text": "Top shoulder to under armpit",
+      "start": 3,
+      "end": 31,
+      "score": 0.7219460010528564
+     }
+    ],
+    "tunic.sample/4": [],
+    "tunic.sample/5": [],
+    "brief/apron": [
+     {
+      "label": "garment or part name",
+      "text": "apron dress",
+      "start": 3,
+      "end": 14,
+      "score": 0.9099059104919434
+     }
+    ],
+    "brief/flowchart": [
+     {
+      "label": "operation",
+      "text": "checkout",
+      "start": 16,
+      "end": 24,
+      "score": 0.7066967487335205
+     }
+    ],
+    "brief/castle": [],
+    "brief/castle-words": [],
+    "castle-sketch.brief": [
+     {
+      "label": "garment or part name",
+      "text": "castle with green tops",
+      "start": 1023,
+      "end": 1045,
+      "score": 0.9137551188468933
+     }
+    ]
+   },
+   "0.7": {
+    "apron.sample/A": [
+     {
+      "label": "quantity",
+      "text": "36",
+      "start": 8,
+      "end": 10,
+      "score": 0.8210173845291138
+     }
+    ],
+    "apron.sample/B": [
+     {
+      "label": "quantity",
+      "text": "20",
+      "start": 16,
+      "end": 18,
+      "score": 0.9450467228889465
+     }
+    ],
+    "apron.sample/C": [],
+    "apron.sample/seam": [
+     {
+      "label": "operation",
+      "text": "Add seam allowance",
+      "start": 0,
+      "end": 18,
+      "score": 0.7080297470092773
+     }
+    ],
+    "apron.sample/1": [],
+    "apron.sample/2": [],
+    "apron.sample/3": [],
+    "apron.sample/4": [],
+    "apron.sample/5": [],
+    "apron.sample/6": [],
+    "apron.sample/brace": [],
+    "tunic.sample/1": [],
+    "tunic.sample/2": [],
+    "tunic.sample/3": [
+     {
+      "label": "garment or part name",
+      "text": "Top shoulder to under armpit",
+      "start": 3,
+      "end": 31,
+      "score": 0.7219460010528564
+     }
+    ],
+    "tunic.sample/4": [],
+    "tunic.sample/5": [],
+    "brief/apron": [
+     {
+      "label": "garment or part name",
+      "text": "apron dress",
+      "start": 3,
+      "end": 14,
+      "score": 0.9099059104919434
+     }
+    ],
+    "brief/flowchart": [
+     {
+      "label": "operation",
+      "text": "checkout",
+      "start": 16,
+      "end": 24,
+      "score": 0.7066967487335205
+     }
+    ],
+    "brief/castle": [],
+    "brief/castle-words": [],
+    "castle-sketch.brief": [
+     {
+      "label": "garment or part name",
+      "text": "castle with green tops",
+      "start": 1023,
+      "end": 1045,
+      "score": 0.9137551188468933
+     }
+    ]
+   },
+   "0.8": {
+    "apron.sample/A": [
+     {
+      "label": "quantity",
+      "text": "36",
+      "start": 8,
+      "end": 10,
+      "score": 0.8210173845291138
+     }
+    ],
+    "apron.sample/B": [
+     {
+      "label": "quantity",
+      "text": "20",
+      "start": 16,
+      "end": 18,
+      "score": 0.9450467228889465
+     }
+    ],
+    "apron.sample/C": [],
+    "apron.sample/seam": [],
+    "apron.sample/1": [],
+    "apron.sample/2": [],
+    "apron.sample/3": [],
+    "apron.sample/4": [],
+    "apron.sample/5": [],
+    "apron.sample/6": [],
+    "apron.sample/brace": [],
+    "tunic.sample/1": [],
+    "tunic.sample/2": [],
+    "tunic.sample/3": [],
+    "tunic.sample/4": [],
+    "tunic.sample/5": [],
+    "brief/apron": [
+     {
+      "label": "garment or part name",
+      "text": "apron dress",
+      "start": 3,
+      "end": 14,
+      "score": 0.9099059104919434
+     }
+    ],
+    "brief/flowchart": [],
+    "brief/castle": [],
+    "brief/castle-words": [],
+    "castle-sketch.brief": [
+     {
+      "label": "garment or part name",
+      "text": "castle with green tops",
+      "start": 1023,
+      "end": 1045,
+      "score": 0.9137551188468933
+     }
+    ]
+   },
+   "0.9": {
+    "apron.sample/A": [],
+    "apron.sample/B": [
+     {
+      "label": "quantity",
+      "text": "20",
+      "start": 16,
+      "end": 18,
+      "score": 0.9450467228889465
+     }
+    ],
+    "apron.sample/C": [],
+    "apron.sample/seam": [],
+    "apron.sample/1": [],
+    "apron.sample/2": [],
+    "apron.sample/3": [],
+    "apron.sample/4": [],
+    "apron.sample/5": [],
+    "apron.sample/6": [],
+    "apron.sample/brace": [],
+    "tunic.sample/1": [],
+    "tunic.sample/2": [],
+    "tunic.sample/3": [],
+    "tunic.sample/4": [],
+    "tunic.sample/5": [],
+    "brief/apron": [
+     {
+      "label": "garment or part name",
+      "text": "apron dress",
+      "start": 3,
+      "end": 14,
+      "score": 0.9099059104919434
+     }
+    ],
+    "brief/flowchart": [],
+    "brief/castle": [],
+    "brief/castle-words": [],
+    "castle-sketch.brief": [
+     {
+      "label": "garment or part name",
+      "text": "castle with green tops",
+      "start": 1023,
+      "end": 1045,
+      "score": 0.9137551188468933
+     }
+    ]
+   }
+  },
+  "plan, described": {
+   "0.3": {
+    "apron.sample/A": [
+     {
+      "label": "measurement name",
+      "text": "A. Bust",
+      "start": 0,
+      "end": 7,
+      "score": 0.43670833110809326
+     },
+     {
+      "label": "quantity",
+      "text": "36",
+      "start": 8,
+      "end": 10,
+      "score": 0.9542640447616577
+     }
+    ],
+    "apron.sample/B": [
+     {
+      "label": "measurement name",
+      "text": "Top to waist",
+      "start": 3,
+      "end": 15,
+      "score": 0.7201331257820129
+     },
+     {
+      "label": "quantity",
+      "text": "20",
+      "start": 16,
+      "end": 18,
+      "score": 0.9741091132164001
+     },
+     {
+      "label": "garment or part name",
+      "text": "Top",
+      "start": 3,
+      "end": 6,
+      "score": 0.33448293805122375
+     }
+    ],
+    "apron.sample/C": [
+     {
+      "label": "quantity",
+      "text": "46",
+      "start": 17,
+      "end": 19,
+      "score": 0.942464292049408
+     },
+     {
+      "label": "unit",
+      "text": "bottom",
+      "start": 10,
+      "end": 16,
+      "score": 0.3452256917953491
+     }
+    ],
+    "apron.sample/seam": [
+     {
+      "label": "measurement name",
+      "text": "seam allowance",
+      "start": 4,
+      "end": 18,
+      "score": 0.6609594225883484
+     },
+     {
+      "label": "operation",
+      "text": "Add seam allowance",
+      "start": 0,
+      "end": 18,
+      "score": 0.4540645480155945
+     }
+    ],
+    "apron.sample/1": [
+     {
+      "label": "measurement name",
+      "text": "A ÷ 3",
+      "start": 3,
+      "end": 8,
+      "score": 0.4329015016555786
+     },
+     {
+      "label": "quantity",
+      "text": "12",
+      "start": 11,
+      "end": 13,
+      "score": 0.8577756285667419
+     },
+     {
+      "label": "quantity",
+      "text": "14",
+      "start": 20,
+      "end": 22,
+      "score": 0.7995594143867493
+     }
+    ],
+    "apron.sample/2": [
+     {
+      "label": "quantity",
+      "text": "14",
+      "start": 11,
+      "end": 13,
+      "score": 0.7785993218421936
+     },
+     {
+      "label": "quantity",
+      "text": "7",
+      "start": 20,
+      "end": 21,
+      "score": 0.770071268081665
+     }
+    ],
+    "apron.sample/3": [
+     {
+      "label": "quantity",
+      "text": "22",
+      "start": 14,
+      "end": 16,
+      "score": 0.7087436318397522
+     },
+     {
+      "label": "quantity",
+      "text": "20",
+      "start": 5,
+      "end": 7,
+      "score": 0.3897245526313782
+     },
+     {
+      "label": "quantity",
+      "text": "2",
+      "start": 10,
+      "end": 11,
+      "score": 0.3102799355983734
+     }
+    ],
+    "apron.sample/4": [
+     {
+      "label": "quantity",
+      "text": "48",
+      "start": 5,
+      "end": 7,
+      "score": 0.44454464316368103
+     }
+    ],
+    "apron.sample/5": [
+     {
+      "label": "quantity",
+      "text": "38",
+      "start": 5,
+      "end": 7,
+      "score": 0.5796651244163513
+     },
+     {
+      "label": "unit",
+      "text": "\"",
+      "start": 7,
+      "end": 8,
+      "score": 0.6209830641746521
+     }
+    ],
+    "apron.sample/6": [
+     {
+      "label": "measurement name",
+      "text": "6. (C × 2) − B 72\"",
+      "start": 0,
+      "end": 18,
+      "score": 0.37273111939430237
+     },
+     {
+      "label": "quantity",
+      "text": "72",
+      "start": 15,
+      "end": 17,
+      "score": 0.6466332077980042
+     }
+    ],
+    "apron.sample/brace": [
+     {
+      "label": "quantity",
+      "text": "72",
+      "start": 0,
+      "end": 2,
+      "score": 0.6771199107170105
+     },
+     {
+      "label": "quantity",
+      "text": "74",
+      "start": 3,
+      "end": 5,
+      "score": 0.3824170231819153
+     }
+    ],
+    "tunic.sample/1": [
+     {
+      "label": "measurement name",
+      "text": "Chest + 6\" ÷ 2",
+      "start": 3,
+      "end": 17,
+      "score": 0.46169760823249817
+     },
+     {
+      "label": "quantity",
+      "text": "21",
+      "start": 33,
+      "end": 35,
+      "score": 0.5613330602645874
+     },
+     {
+      "label": "quantity",
+      "text": "36",
+      "start": 21,
+      "end": 23,
+      "score": 0.4484822154045105
+     },
+     {
+      "label": "unit",
+      "text": "\"",
+      "start": 12,
+      "end": 13,
+      "score": 0.6960703134536743
+     },
+     {
+      "label": "unit",
+      "text": "\"",
+      "start": 35,
+      "end": 36,
+      "score": 0.48654499650001526
+     },
+     {
+      "label": "operation",
+      "text": "÷ 2",
+      "start": 14,
+      "end": 17,
+      "score": 0.30240070819854736
+     }
+    ],
+    "tunic.sample/2": [
+     {
+      "label": "quantity",
+      "text": "56",
+      "start": 45,
+      "end": 47,
+      "score": 0.45112428069114685
+     },
+     {
+      "label": "quantity",
+      "text": "+ 2",
+      "start": 30,
+      "end": 33,
+      "score": 0.3157341182231903
+     },
+     {
+      "label": "quantity",
+      "text": "54",
+      "start": 36,
+      "end": 38,
+      "score": 0.30413922667503357
+     },
+     {
+      "label": "unit",
+      "text": "\"",
+      "start": 47,
+      "end": 48,
+      "score": 0.6406670212745667
+     },
+     {
+      "label": "operation",
+      "text": "+",
+      "start": 39,
+      "end": 40,
+      "score": 0.31926921010017395
+     }
+    ],
+    "tunic.sample/3": [
+     {
+      "label": "measurement name",
+      "text": "Top shoulder to under armpit",
+      "start": 3,
+      "end": 31,
+      "score": 0.3287673592567444
+     },
+     {
+      "label": "quantity",
+      "text": "6",
+      "start": 40,
+      "end": 41,
+      "score": 0.3829531967639923
+     },
+     {
+      "label": "quantity",
+      "text": "22",
+      "start": 59,
+      "end": 61,
+      "score": 0.3782728314399719
+     },
+     {
+      "label": "quantity",
+      "text": "3",
+      "start": 38,
+      "end": 39,
+      "score": 0.32640740275382996
+     },
+     {
+      "label": "unit",
+      "text": "\"",
+      "start": 41,
+      "end": 42,
+      "score": 0.5588201284408569
+     },
+     {
+      "label": "unit",
+      "text": "22\"",
+      "start": 59,
+      "end": 62,
+      "score": 0.4576411545276642
+     },
+     {
+      "label": "garment or part name",
+      "text": "under armpit",
+      "start": 19,
+      "end": 31,
+      "score": 0.40785807371139526
+     }
+    ],
+    "tunic.sample/4": [
+     {
+      "label": "quantity",
+      "text": "5",
+      "start": 19,
+      "end": 20,
+      "score": 0.5938340425491333
+     },
+     {
+      "label": "quantity",
+      "text": "3",
+      "start": 17,
+      "end": 18,
+      "score": 0.4979773163795471
+     },
+     {
+      "label": "quantity",
+      "text": "5",
+      "start": 29,
+      "end": 30,
+      "score": 0.43049055337905884
+     },
+     {
+      "label": "quantity",
+      "text": "7",
+      "start": 27,
+      "end": 28,
+      "score": 0.41451072692871094
+     },
+     {
+      "label": "quantity",
+      "text": ".",
+      "start": 18,
+      "end": 19,
+      "score": 0.4099505543708801
+     },
+     {
+      "label": "quantity",
+      "text": "2",
+      "start": 10,
+      "end": 11,
+      "score": 0.3608624041080475
+     }
+    ],
+    "tunic.sample/5": [
+     {
+      "label": "measurement name",
+      "text": "21 + 2 = 23\"",
+      "start": 21,
+      "end": 33,
+      "score": 0.5563644170761108
+     },
+     {
+      "label": "quantity",
+      "text": "23",
+      "start": 30,
+      "end": 32,
+      "score": 0.40359097719192505
+     },
+     {
+      "label": "quantity",
+      "text": "5",
+      "start": 0,
+      "end": 1,
+      "score": 0.3892177939414978
+     },
+     {
+      "label": "quantity",
+      "text": "21",
+      "start": 21,
+      "end": 23,
+      "score": 0.3230956792831421
+     }
+    ],
+    "brief/apron": [
+     {
+      "label": "measurement name",
+      "text": "top to waist",
+      "start": 48,
+      "end": 60,
+      "score": 0.47019854187965393
+     },
+     {
+      "label": "measurement name",
+      "text": "apron dress",
+      "start": 3,
+      "end": 14,
+      "score": 0.4263322353363037
+     },
+     {
+      "label": "quantity",
+      "text": "36",
+      "start": 21,
+      "end": 23,
+      "score": 0.8240582346916199
+     },
+     {
+      "label": "quantity",
+      "text": "20",
+      "start": 38,
+      "end": 40,
+      "score": 0.8238632082939148
+     },
+     {
+      "label": "unit",
+      "text": "inch",
+      "start": 24,
+      "end": 28,
+      "score": 0.8227332830429077
+     },
+     {
+      "label": "unit",
+      "text": "inches",
+      "start": 41,
+      "end": 47,
+      "score": 0.5407044887542725
+     },
+     {
+      "label": "garment or part name",
+      "text": "apron dress",
+      "start": 3,
+      "end": 14,
+      "score": 0.5691230297088623
+     }
+    ],
+    "brief/flowchart": [],
+    "brief/castle": [
+     {
+      "label": "measurement name",
+      "text": "wall",
+      "start": 28,
+      "end": 32,
+      "score": 0.7302078008651733
+     },
+     {
+      "label": "measurement name",
+      "text": "gate",
+      "start": 39,
+      "end": 43,
+      "score": 0.6145932674407959
+     },
+     {
+      "label": "measurement name",
+      "text": "towers",
+      "start": 18,
+      "end": 24,
+      "score": 0.4954925775527954
+     },
+     {
+      "label": "garment or part name",
+      "text": "gate",
+      "start": 39,
+      "end": 43,
+      "score": 0.3707657754421234
+     }
+    ],
+    "brief/castle-words": [],
+    "castle-sketch.brief": [
+     {
+      "label": "quantity",
+      "text": "7",
+      "start": 23,
+      "end": 24,
+      "score": 0.6779033541679382
+     },
+     {
+      "label": "quantity",
+      "text": "0.9",
+      "start": 104,
+      "end": 107,
+      "score": 0.6652932167053223
+     },
+     {
+      "label": "quantity",
+      "text": "0.9",
+      "start": 319,
+      "end": 322,
+      "score": 0.5938894152641296
+     },
+     {
+      "label": "quantity",
+      "text": "6.0",
+      "start": 227,
+      "end": 230,
+      "score": 0.5120619535446167
+     },
+     {
+      "label": "quantity",
+      "text": "2.8",
+      "start": 80,
+      "end": 83,
+      "score": 0.501075029373169
+     },
+     {
+      "label": "quantity",
+      "text": "1.0",
+      "start": 331,
+      "end": 334,
+      "score": 0.42691630125045776
+     },
+     {
+      "label": "quantity",
+      "text": "0.0",
+      "start": 315,
+      "end": 318,
+      "score": 0.40971627831459045
+     },
+     {
+      "label": "quantity",
+      "text": "0.8",
+      "start": 303,
+      "end": 306,
+      "score": 0.4012761116027832
+     },
+     {
+      "label": "quantity",
+      "text": "3.0",
+      "start": 307,
+      "end": 310,
+      "score": 0.38606998324394226
+     },
+     {
+      "label": "quantity",
+      "text": "1.8",
+      "start": 327,
+      "end": 330,
+      "score": 0.3847404718399048
+     },
+     {
+      "label": "quantity",
+      "text": "2.2",
+      "start": 74,
+      "end": 77,
+      "score": 0.3463082015514374
+     },
+     {
+      "label": "unit",
+      "text": "u",
+      "start": 84,
+      "end": 85,
+      "score": 0.48871901631355286
+     },
+     {
+      "label": "unit",
+      "text": "x",
+      "start": 301,
+      "end": 302,
+      "score": 0.4812690317630768
+     },
+     {
+      "label": "unit",
+      "text": "y",
+      "start": 312,
+      "end": 313,
+      "score": 0.44165632128715515
+     },
+     {
+      "label": "quantity",
+      "text": "0.9",
+      "start": 738,
+      "end": 741,
+      "score": 0.7207658290863037
+     },
+     {
+      "label": "quantity",
+      "text": "0.3",
+      "start": 588,
+      "end": 591,
+      "score": 0.6877814531326294
+     },
+     {
+      "label": "quantity",
+      "text": "8",
+      "start": 788,
+      "end": 789,
+      "score": 0.5862559080123901
+     },
+     {
+      "label": "quantity",
+      "text": "9",
+      "start": 670,
+      "end": 671,
+      "score": 0.5282164812088013
+     },
+     {
+      "label": "quantity",
+      "text": "8",
+      "start": 560,
+      "end": 561,
+      "score": 0.4309254586696625
+     },
+     {
+      "label": "quantity",
+      "text": "2",
+      "start": 633,
+      "end": 634,
+      "score": 0.33179420232772827
+     },
+     {
+      "label": "unit",
+      "text": "east",
+      "start": 610,
+      "end": 614,
+      "score": 0.7198915481567383
+     },
+     {
+      "label": "unit",
+      "text": "u",
+      "start": 592,
+      "end": 593,
+      "score": 0.6368333101272583
+     },
+     {
+      "label": "unit",
+      "text": "north-east",
+      "start": 757,
+      "end": 767,
+      "score": 0.6228610277175903
+     },
+     {
+      "label": "unit",
+      "text": "u",
+      "start": 742,
+      "end": 743,
+      "score": 0.4715730845928192
+     },
+     {
+      "label": "unit",
+      "text": "u",
+      "start": 568,
+      "end": 569,
+      "score": 0.3723459839820862
+     },
+     {
+      "label": "operation",
+      "text": "stroke",
+      "start": 626,
+      "end": 632,
+      "score": 0.39759954810142517
+     },
+     {
+      "label": "operation",
+      "text": "stroke",
+      "start": 663,
+      "end": 669,
+      "score": 0.3133159577846527
+     },
+     {
+      "label": "measurement name",
+      "text": "height",
+      "start": 1167,
+      "end": 1173,
+      "score": 0.7908828258514404
+     },
+     {
+      "label": "measurement name",
+      "text": "width",
+      "start": 1198,
+      "end": 1203,
+      "score": 0.6863521337509155
+     },
+     {
+      "label": "measurement name",
+      "text": "foundation",
+      "start": 1123,
+      "end": 1133,
+      "score": 0.6434149146080017
+     },
+     {
+      "label": "measurement name",
+      "text": "INK",
+      "start": 1076,
+      "end": 1079,
+      "score": 0.4108176827430725
+     },
+     {
+      "label": "unit",
+      "text": "width",
+      "start": 1198,
+      "end": 1203,
+      "score": 0.5388496518135071
+     },
+     {
+      "label": "garment or part name",
+      "text": "PART",
+      "start": 1423,
+      "end": 1427,
+      "score": 0.34019213914871216
+     }
+    ]
+   },
+   "0.4": {
+    "apron.sample/A": [
+     {
+      "label": "measurement name",
+      "text": "A. Bust",
+      "start": 0,
+      "end": 7,
+      "score": 0.43670833110809326
+     },
+     {
+      "label": "quantity",
+      "text": "36",
+      "start": 8,
+      "end": 10,
+      "score": 0.9542640447616577
+     }
+    ],
+    "apron.sample/B": [
+     {
+      "label": "measurement name",
+      "text": "Top to waist",
+      "start": 3,
+      "end": 15,
+      "score": 0.7201331257820129
+     },
+     {
+      "label": "quantity",
+      "text": "20",
+      "start": 16,
+      "end": 18,
+      "score": 0.9741091132164001
+     }
+    ],
+    "apron.sample/C": [
+     {
+      "label": "quantity",
+      "text": "46",
+      "start": 17,
+      "end": 19,
+      "score": 0.942464292049408
+     }
+    ],
+    "apron.sample/seam": [
+     {
+      "label": "measurement name",
+      "text": "seam allowance",
+      "start": 4,
+      "end": 18,
+      "score": 0.6609594225883484
+     },
+     {
+      "label": "operation",
+      "text": "Add seam allowance",
+      "start": 0,
+      "end": 18,
+      "score": 0.4540645480155945
+     }
+    ],
+    "apron.sample/1": [
+     {
+      "label": "measurement name",
+      "text": "A ÷ 3",
+      "start": 3,
+      "end": 8,
+      "score": 0.4329015016555786
+     },
+     {
+      "label": "quantity",
+      "text": "12",
+      "start": 11,
+      "end": 13,
+      "score": 0.8577756285667419
+     },
+     {
+      "label": "quantity",
+      "text": "14",
+      "start": 20,
+      "end": 22,
+      "score": 0.7995594143867493
+     }
+    ],
+    "apron.sample/2": [
+     {
+      "label": "quantity",
+      "text": "14",
+      "start": 11,
+      "end": 13,
+      "score": 0.7785993218421936
+     },
+     {
+      "label": "quantity",
+      "text": "7",
+      "start": 20,
+      "end": 21,
+      "score": 0.770071268081665
+     }
+    ],
+    "apron.sample/3": [
+     {
+      "label": "quantity",
+      "text": "22",
+      "start": 14,
+      "end": 16,
+      "score": 0.7087436318397522
+     }
+    ],
+    "apron.sample/4": [
+     {
+      "label": "quantity",
+      "text": "48",
+      "start": 5,
+      "end": 7,
+      "score": 0.44454464316368103
+     }
+    ],
+    "apron.sample/5": [
+     {
+      "label": "quantity",
+      "text": "38",
+      "start": 5,
+      "end": 7,
+      "score": 0.5796651244163513
+     },
+     {
+      "label": "unit",
+      "text": "\"",
+      "start": 7,
+      "end": 8,
+      "score": 0.6209830641746521
+     }
+    ],
+    "apron.sample/6": [
+     {
+      "label": "quantity",
+      "text": "72",
+      "start": 15,
+      "end": 17,
+      "score": 0.6466332077980042
+     }
+    ],
+    "apron.sample/brace": [
+     {
+      "label": "quantity",
+      "text": "72",
+      "start": 0,
+      "end": 2,
+      "score": 0.6771199107170105
+     }
+    ],
+    "tunic.sample/1": [
+     {
+      "label": "measurement name",
+      "text": "Chest + 6\" ÷ 2",
+      "start": 3,
+      "end": 17,
+      "score": 0.46169760823249817
+     },
+     {
+      "label": "quantity",
+      "text": "21",
+      "start": 33,
+      "end": 35,
+      "score": 0.5613330602645874
+     },
+     {
+      "label": "quantity",
+      "text": "36",
+      "start": 21,
+      "end": 23,
+      "score": 0.4484822154045105
+     },
+     {
+      "label": "unit",
+      "text": "\"",
+      "start": 12,
+      "end": 13,
+      "score": 0.6960703134536743
+     },
+     {
+      "label": "unit",
+      "text": "\"",
+      "start": 35,
+      "end": 36,
+      "score": 0.48654499650001526
+     }
+    ],
+    "tunic.sample/2": [
+     {
+      "label": "quantity",
+      "text": "+ 2   54",
+      "start": 30,
+      "end": 38,
+      "score": 0.5714588165283203
+     },
+     {
+      "label": "quantity",
+      "text": "56",
+      "start": 45,
+      "end": 47,
+      "score": 0.45112428069114685
+     },
+     {
+      "label": "unit",
+      "text": "\"",
+      "start": 47,
+      "end": 48,
+      "score": 0.6406670212745667
+     }
+    ],
+    "tunic.sample/3": [
+     {
+      "label": "unit",
+      "text": "\"",
+      "start": 41,
+      "end": 42,
+      "score": 0.5588201284408569
+     },
+     {
+      "label": "unit",
+      "text": "22\"",
+      "start": 59,
+      "end": 62,
+      "score": 0.4576411545276642
+     },
+     {
+      "label": "garment or part name",
+      "text": "under armpit",
+      "start": 19,
+      "end": 31,
+      "score": 0.40785807371139526
+     }
+    ],
+    "tunic.sample/4": [
+     {
+      "label": "quantity",
+      "text": "5",
+      "start": 19,
+      "end": 20,
+      "score": 0.5938340425491333
+     },
+     {
+      "label": "quantity",
+      "text": "3",
+      "start": 17,
+      "end": 18,
+      "score": 0.4979773163795471
+     },
+     {
+      "label": "quantity",
+      "text": "5",
+      "start": 29,
+      "end": 30,
+      "score": 0.43049055337905884
+     },
+     {
+      "label": "quantity",
+      "text": "7",
+      "start": 27,
+      "end": 28,
+      "score": 0.41451072692871094
+     },
+     {
+      "label": "quantity",
+      "text": ".",
+      "start": 18,
+      "end": 19,
+      "score": 0.4099505543708801
+     }
+    ],
+    "tunic.sample/5": [
+     {
+      "label": "measurement name",
+      "text": "21 + 2 = 23\"",
+      "start": 21,
+      "end": 33,
+      "score": 0.5563644170761108
+     },
+     {
+      "label": "quantity",
+      "text": "23",
+      "start": 30,
+      "end": 32,
+      "score": 0.40359097719192505
+     }
+    ],
+    "brief/apron": [
+     {
+      "label": "measurement name",
+      "text": "top to waist",
+      "start": 48,
+      "end": 60,
+      "score": 0.47019854187965393
+     },
+     {
+      "label": "measurement name",
+      "text": "apron dress",
+      "start": 3,
+      "end": 14,
+      "score": 0.4263322353363037
+     },
+     {
+      "label": "quantity",
+      "text": "36",
+      "start": 21,
+      "end": 23,
+      "score": 0.8240582346916199
+     },
+     {
+      "label": "quantity",
+      "text": "20",
+      "start": 38,
+      "end": 40,
+      "score": 0.8238632082939148
+     },
+     {
+      "label": "unit",
+      "text": "inch",
+      "start": 24,
+      "end": 28,
+      "score": 0.8227332830429077
+     },
+     {
+      "label": "unit",
+      "text": "inches",
+      "start": 41,
+      "end": 47,
+      "score": 0.5407044887542725
+     },
+     {
+      "label": "garment or part name",
+      "text": "apron dress",
+      "start": 3,
+      "end": 14,
+      "score": 0.5691230297088623
+     }
+    ],
+    "brief/flowchart": [],
+    "brief/castle": [
+     {
+      "label": "measurement name",
+      "text": "wall",
+      "start": 28,
+      "end": 32,
+      "score": 0.7302078008651733
+     },
+     {
+      "label": "measurement name",
+      "text": "gate",
+      "start": 39,
+      "end": 43,
+      "score": 0.6145932674407959
+     },
+     {
+      "label": "measurement name",
+      "text": "towers",
+      "start": 18,
+      "end": 24,
+      "score": 0.4954925775527954
+     }
+    ],
+    "brief/castle-words": [],
+    "castle-sketch.brief": [
+     {
+      "label": "quantity",
+      "text": "7",
+      "start": 23,
+      "end": 24,
+      "score": 0.6779033541679382
+     },
+     {
+      "label": "quantity",
+      "text": "0.9",
+      "start": 104,
+      "end": 107,
+      "score": 0.6652932167053223
+     },
+     {
+      "label": "quantity",
+      "text": "0.9",
+      "start": 319,
+      "end": 322,
+      "score": 0.5938894152641296
+     },
+     {
+      "label": "quantity",
+      "text": "6.0",
+      "start": 227,
+      "end": 230,
+      "score": 0.5120619535446167
+     },
+     {
+      "label": "quantity",
+      "text": "2.8",
+      "start": 80,
+      "end": 83,
+      "score": 0.501075029373169
+     },
+     {
+      "label": "quantity",
+      "text": "1.0",
+      "start": 331,
+      "end": 334,
+      "score": 0.42691630125045776
+     },
+     {
+      "label": "quantity",
+      "text": "0.0",
+      "start": 315,
+      "end": 318,
+      "score": 0.40971627831459045
+     },
+     {
+      "label": "quantity",
+      "text": "0.8",
+      "start": 303,
+      "end": 306,
+      "score": 0.4012761116027832
+     },
+     {
+      "label": "unit",
+      "text": "u",
+      "start": 84,
+      "end": 85,
+      "score": 0.48871901631355286
+     },
+     {
+      "label": "unit",
+      "text": "x",
+      "start": 301,
+      "end": 302,
+      "score": 0.4812690317630768
+     },
+     {
+      "label": "unit",
+      "text": "y",
+      "start": 312,
+      "end": 313,
+      "score": 0.44165632128715515
+     },
+     {
+      "label": "quantity",
+      "text": "0.9",
+      "start": 738,
+      "end": 741,
+      "score": 0.7207658290863037
+     },
+     {
+      "label": "quantity",
+      "text": "0.3",
+      "start": 588,
+      "end": 591,
+      "score": 0.6877814531326294
+     },
+     {
+      "label": "quantity",
+      "text": "8",
+      "start": 788,
+      "end": 789,
+      "score": 0.5862559080123901
+     },
+     {
+      "label": "quantity",
+      "text": "9",
+      "start": 670,
+      "end": 671,
+      "score": 0.5282164812088013
+     },
+     {
+      "label": "quantity",
+      "text": "8",
+      "start": 560,
+      "end": 561,
+      "score": 0.4309254586696625
+     },
+     {
+      "label": "unit",
+      "text": "east",
+      "start": 610,
+      "end": 614,
+      "score": 0.7198915481567383
+     },
+     {
+      "label": "unit",
+      "text": "u",
+      "start": 592,
+      "end": 593,
+      "score": 0.6368333101272583
+     },
+     {
+      "label": "unit",
+      "text": "north-east",
+      "start": 757,
+      "end": 767,
+      "score": 0.6228610277175903
+     },
+     {
+      "label": "unit",
+      "text": "u",
+      "start": 742,
+      "end": 743,
+      "score": 0.4715730845928192
+     },
+     {
+      "label": "measurement name",
+      "text": "height",
+      "start": 1167,
+      "end": 1173,
+      "score": 0.7908828258514404
+     },
+     {
+      "label": "measurement name",
+      "text": "width",
+      "start": 1198,
+      "end": 1203,
+      "score": 0.6863521337509155
+     },
+     {
+      "label": "measurement name",
+      "text": "foundation",
+      "start": 1123,
+      "end": 1133,
+      "score": 0.6434149146080017
+     },
+     {
+      "label": "measurement name",
+      "text": "INK",
+      "start": 1076,
+      "end": 1079,
+      "score": 0.4108176827430725
+     },
+     {
+      "label": "unit",
+      "text": "width",
+      "start": 1198,
+      "end": 1203,
+      "score": 0.5388496518135071
+     }
+    ]
+   },
+   "0.5": {
+    "apron.sample/A": [
+     {
+      "label": "quantity",
+      "text": "36",
+      "start": 8,
+      "end": 10,
+      "score": 0.9542640447616577
+     }
+    ],
+    "apron.sample/B": [
+     {
+      "label": "measurement name",
+      "text": "Top to waist",
+      "start": 3,
+      "end": 15,
+      "score": 0.7201331257820129
+     },
+     {
+      "label": "quantity",
+      "text": "20",
+      "start": 16,
+      "end": 18,
+      "score": 0.9741091132164001
+     }
+    ],
+    "apron.sample/C": [
+     {
+      "label": "quantity",
+      "text": "46",
+      "start": 17,
+      "end": 19,
+      "score": 0.942464292049408
+     }
+    ],
+    "apron.sample/seam": [
+     {
+      "label": "measurement name",
+      "text": "seam allowance",
+      "start": 4,
+      "end": 18,
+      "score": 0.6609594225883484
+     }
+    ],
+    "apron.sample/1": [
+     {
+      "label": "quantity",
+      "text": "12",
+      "start": 11,
+      "end": 13,
+      "score": 0.8577756285667419
+     },
+     {
+      "label": "quantity",
+      "text": "14",
+      "start": 20,
+      "end": 22,
+      "score": 0.7995594143867493
+     }
+    ],
+    "apron.sample/2": [
+     {
+      "label": "quantity",
+      "text": "14",
+      "start": 11,
+      "end": 13,
+      "score": 0.7785993218421936
+     },
+     {
+      "label": "quantity",
+      "text": "7",
+      "start": 20,
+      "end": 21,
+      "score": 0.770071268081665
+     }
+    ],
+    "apron.sample/3": [
+     {
+      "label": "quantity",
+      "text": "22",
+      "start": 14,
+      "end": 16,
+      "score": 0.7087436318397522
+     }
+    ],
+    "apron.sample/4": [],
+    "apron.sample/5": [
+     {
+      "label": "quantity",
+      "text": "38",
+      "start": 5,
+      "end": 7,
+      "score": 0.5796651244163513
+     },
+     {
+      "label": "unit",
+      "text": "\"",
+      "start": 7,
+      "end": 8,
+      "score": 0.6209830641746521
+     }
+    ],
+    "apron.sample/6": [
+     {
+      "label": "quantity",
+      "text": "72",
+      "start": 15,
+      "end": 17,
+      "score": 0.6466332077980042
+     }
+    ],
+    "apron.sample/brace": [
+     {
+      "label": "quantity",
+      "text": "72",
+      "start": 0,
+      "end": 2,
+      "score": 0.6771199107170105
+     }
+    ],
+    "tunic.sample/1": [
+     {
+      "label": "quantity",
+      "text": "21",
+      "start": 33,
+      "end": 35,
+      "score": 0.5613330602645874
+     },
+     {
+      "label": "unit",
+      "text": "\"",
+      "start": 12,
+      "end": 13,
+      "score": 0.6960703134536743
+     }
+    ],
+    "tunic.sample/2": [
+     {
+      "label": "quantity",
+      "text": "+ 2   54",
+      "start": 30,
+      "end": 38,
+      "score": 0.5714588165283203
+     },
+     {
+      "label": "unit",
+      "text": "\"",
+      "start": 47,
+      "end": 48,
+      "score": 0.6406670212745667
+     }
+    ],
+    "tunic.sample/3": [
+     {
+      "label": "unit",
+      "text": "\"",
+      "start": 41,
+      "end": 42,
+      "score": 0.5588201284408569
+     }
+    ],
+    "tunic.sample/4": [
+     {
+      "label": "quantity",
+      "text": "3.5",
+      "start": 17,
+      "end": 20,
+      "score": 0.7390315532684326
+     }
+    ],
+    "tunic.sample/5": [
+     {
+      "label": "measurement name",
+      "text": "21 + 2 = 23\"",
+      "start": 21,
+      "end": 33,
+      "score": 0.5563644170761108
+     }
+    ],
+    "brief/apron": [
+     {
+      "label": "quantity",
+      "text": "36",
+      "start": 21,
+      "end": 23,
+      "score": 0.8240582346916199
+     },
+     {
+      "label": "quantity",
+      "text": "20",
+      "start": 38,
+      "end": 40,
+      "score": 0.8238632082939148
+     },
+     {
+      "label": "unit",
+      "text": "inch",
+      "start": 24,
+      "end": 28,
+      "score": 0.8227332830429077
+     },
+     {
+      "label": "unit",
+      "text": "inches",
+      "start": 41,
+      "end": 47,
+      "score": 0.5407044887542725
+     },
+     {
+      "label": "garment or part name",
+      "text": "apron dress",
+      "start": 3,
+      "end": 14,
+      "score": 0.5691230297088623
+     }
+    ],
+    "brief/flowchart": [],
+    "brief/castle": [
+     {
+      "label": "measurement name",
+      "text": "wall",
+      "start": 28,
+      "end": 32,
+      "score": 0.7302078008651733
+     },
+     {
+      "label": "measurement name",
+      "text": "gate",
+      "start": 39,
+      "end": 43,
+      "score": 0.6145932674407959
+     }
+    ],
+    "brief/castle-words": [],
+    "castle-sketch.brief": [
+     {
+      "label": "quantity",
+      "text": "7",
+      "start": 23,
+      "end": 24,
+      "score": 0.6779033541679382
+     },
+     {
+      "label": "quantity",
+      "text": "0.9",
+      "start": 104,
+      "end": 107,
+      "score": 0.6652932167053223
+     },
+     {
+      "label": "quantity",
+      "text": "0.9",
+      "start": 319,
+      "end": 322,
+      "score": 0.5938894152641296
+     },
+     {
+      "label": "quantity",
+      "text": "6.0",
+      "start": 227,
+      "end": 230,
+      "score": 0.5120619535446167
+     },
+     {
+      "label": "quantity",
+      "text": "2.8",
+      "start": 80,
+      "end": 83,
+      "score": 0.501075029373169
+     },
+     {
+      "label": "quantity",
+      "text": "0.9",
+      "start": 738,
+      "end": 741,
+      "score": 0.7207658290863037
+     },
+     {
+      "label": "quantity",
+      "text": "0.3",
+      "start": 588,
+      "end": 591,
+      "score": 0.6877814531326294
+     },
+     {
+      "label": "quantity",
+      "text": "8",
+      "start": 788,
+      "end": 789,
+      "score": 0.5862559080123901
+     },
+     {
+      "label": "quantity",
+      "text": "9",
+      "start": 670,
+      "end": 671,
+      "score": 0.5282164812088013
+     },
+     {
+      "label": "unit",
+      "text": "east",
+      "start": 610,
+      "end": 614,
+      "score": 0.7198915481567383
+     },
+     {
+      "label": "unit",
+      "text": "u",
+      "start": 592,
+      "end": 593,
+      "score": 0.6368333101272583
+     },
+     {
+      "label": "unit",
+      "text": "north-east",
+      "start": 757,
+      "end": 767,
+      "score": 0.6228610277175903
+     },
+     {
+      "label": "measurement name",
+      "text": "height",
+      "start": 1167,
+      "end": 1173,
+      "score": 0.7908828258514404
+     },
+     {
+      "label": "measurement name",
+      "text": "width",
+      "start": 1198,
+      "end": 1203,
+      "score": 0.6863521337509155
+     },
+     {
+      "label": "measurement name",
+      "text": "foundation",
+      "start": 1123,
+      "end": 1133,
+      "score": 0.6434149146080017
+     },
+     {
+      "label": "unit",
+      "text": "width",
+      "start": 1198,
+      "end": 1203,
+      "score": 0.5388496518135071
+     }
+    ]
+   },
+   "0.6": {
+    "apron.sample/A": [
+     {
+      "label": "quantity",
+      "text": "36",
+      "start": 8,
+      "end": 10,
+      "score": 0.9542640447616577
+     }
+    ],
+    "apron.sample/B": [
+     {
+      "label": "measurement name",
+      "text": "Top to waist",
+      "start": 3,
+      "end": 15,
+      "score": 0.7201331257820129
+     },
+     {
+      "label": "quantity",
+      "text": "20",
+      "start": 16,
+      "end": 18,
+      "score": 0.9741091132164001
+     }
+    ],
+    "apron.sample/C": [
+     {
+      "label": "quantity",
+      "text": "46",
+      "start": 17,
+      "end": 19,
+      "score": 0.942464292049408
+     }
+    ],
+    "apron.sample/seam": [
+     {
+      "label": "measurement name",
+      "text": "seam allowance",
+      "start": 4,
+      "end": 18,
+      "score": 0.6609594225883484
+     }
+    ],
+    "apron.sample/1": [
+     {
+      "label": "quantity",
+      "text": "12",
+      "start": 11,
+      "end": 13,
+      "score": 0.8577756285667419
+     },
+     {
+      "label": "quantity",
+      "text": "14",
+      "start": 20,
+      "end": 22,
+      "score": 0.7995594143867493
+     }
+    ],
+    "apron.sample/2": [
+     {
+      "label": "quantity",
+      "text": "14",
+      "start": 11,
+      "end": 13,
+      "score": 0.7785993218421936
+     },
+     {
+      "label": "quantity",
+      "text": "7",
+      "start": 20,
+      "end": 21,
+      "score": 0.770071268081665
+     }
+    ],
+    "apron.sample/3": [
+     {
+      "label": "quantity",
+      "text": "22",
+      "start": 14,
+      "end": 16,
+      "score": 0.7087436318397522
+     }
+    ],
+    "apron.sample/4": [],
+    "apron.sample/5": [
+     {
+      "label": "unit",
+      "text": "\"",
+      "start": 7,
+      "end": 8,
+      "score": 0.6209830641746521
+     }
+    ],
+    "apron.sample/6": [
+     {
+      "label": "quantity",
+      "text": "72",
+      "start": 15,
+      "end": 17,
+      "score": 0.6466332077980042
+     }
+    ],
+    "apron.sample/brace": [
+     {
+      "label": "quantity",
+      "text": "72",
+      "start": 0,
+      "end": 2,
+      "score": 0.6771199107170105
+     }
+    ],
+    "tunic.sample/1": [
+     {
+      "label": "unit",
+      "text": "\"",
+      "start": 12,
+      "end": 13,
+      "score": 0.6960703134536743
+     }
+    ],
+    "tunic.sample/2": [
+     {
+      "label": "unit",
+      "text": "\"",
+      "start": 47,
+      "end": 48,
+      "score": 0.6406670212745667
+     }
+    ],
+    "tunic.sample/3": [],
+    "tunic.sample/4": [
+     {
+      "label": "quantity",
+      "text": "3.5",
+      "start": 17,
+      "end": 20,
+      "score": 0.7390315532684326
+     }
+    ],
+    "tunic.sample/5": [],
+    "brief/apron": [
+     {
+      "label": "quantity",
+      "text": "36",
+      "start": 21,
+      "end": 23,
+      "score": 0.8240582346916199
+     },
+     {
+      "label": "quantity",
+      "text": "20",
+      "start": 38,
+      "end": 40,
+      "score": 0.8238632082939148
+     },
+     {
+      "label": "unit",
+      "text": "inch",
+      "start": 24,
+      "end": 28,
+      "score": 0.8227332830429077
+     }
+    ],
+    "brief/flowchart": [],
+    "brief/castle": [
+     {
+      "label": "measurement name",
+      "text": "wall",
+      "start": 28,
+      "end": 32,
+      "score": 0.7302078008651733
+     },
+     {
+      "label": "measurement name",
+      "text": "gate",
+      "start": 39,
+      "end": 43,
+      "score": 0.6145932674407959
+     }
+    ],
+    "brief/castle-words": [],
+    "castle-sketch.brief": [
+     {
+      "label": "quantity",
+      "text": "7",
+      "start": 23,
+      "end": 24,
+      "score": 0.6779033541679382
+     },
+     {
+      "label": "quantity",
+      "text": "0.9",
+      "start": 104,
+      "end": 107,
+      "score": 0.6652932167053223
+     },
+     {
+      "label": "quantity",
+      "text": "0.9",
+      "start": 738,
+      "end": 741,
+      "score": 0.7207658290863037
+     },
+     {
+      "label": "quantity",
+      "text": "0.3",
+      "start": 588,
+      "end": 591,
+      "score": 0.6877814531326294
+     },
+     {
+      "label": "unit",
+      "text": "east",
+      "start": 610,
+      "end": 614,
+      "score": 0.7198915481567383
+     },
+     {
+      "label": "unit",
+      "text": "u",
+      "start": 592,
+      "end": 593,
+      "score": 0.6368333101272583
+     },
+     {
+      "label": "unit",
+      "text": "north-east",
+      "start": 757,
+      "end": 767,
+      "score": 0.6228610277175903
+     },
+     {
+      "label": "measurement name",
+      "text": "height",
+      "start": 1167,
+      "end": 1173,
+      "score": 0.7908828258514404
+     },
+     {
+      "label": "measurement name",
+      "text": "width",
+      "start": 1198,
+      "end": 1203,
+      "score": 0.6863521337509155
+     },
+     {
+      "label": "measurement name",
+      "text": "foundation",
+      "start": 1123,
+      "end": 1133,
+      "score": 0.6434149146080017
+     }
+    ]
+   },
+   "0.7": {
+    "apron.sample/A": [
+     {
+      "label": "quantity",
+      "text": "36",
+      "start": 8,
+      "end": 10,
+      "score": 0.9542640447616577
+     }
+    ],
+    "apron.sample/B": [
+     {
+      "label": "measurement name",
+      "text": "Top to waist",
+      "start": 3,
+      "end": 15,
+      "score": 0.7201331257820129
+     },
+     {
+      "label": "quantity",
+      "text": "20",
+      "start": 16,
+      "end": 18,
+      "score": 0.9741091132164001
+     }
+    ],
+    "apron.sample/C": [
+     {
+      "label": "quantity",
+      "text": "46",
+      "start": 17,
+      "end": 19,
+      "score": 0.942464292049408
+     }
+    ],
+    "apron.sample/seam": [],
+    "apron.sample/1": [
+     {
+      "label": "quantity",
+      "text": "12",
+      "start": 11,
+      "end": 13,
+      "score": 0.8577756285667419
+     },
+     {
+      "label": "quantity",
+      "text": "14",
+      "start": 20,
+      "end": 22,
+      "score": 0.7995594143867493
+     }
+    ],
+    "apron.sample/2": [
+     {
+      "label": "quantity",
+      "text": "14",
+      "start": 11,
+      "end": 13,
+      "score": 0.7785993218421936
+     },
+     {
+      "label": "quantity",
+      "text": "7",
+      "start": 20,
+      "end": 21,
+      "score": 0.770071268081665
+     }
+    ],
+    "apron.sample/3": [
+     {
+      "label": "quantity",
+      "text": "22",
+      "start": 14,
+      "end": 16,
+      "score": 0.7087436318397522
+     }
+    ],
+    "apron.sample/4": [],
+    "apron.sample/5": [],
+    "apron.sample/6": [],
+    "apron.sample/brace": [],
+    "tunic.sample/1": [],
+    "tunic.sample/2": [],
+    "tunic.sample/3": [],
+    "tunic.sample/4": [
+     {
+      "label": "quantity",
+      "text": "3.5",
+      "start": 17,
+      "end": 20,
+      "score": 0.7390315532684326
+     }
+    ],
+    "tunic.sample/5": [],
+    "brief/apron": [
+     {
+      "label": "quantity",
+      "text": "36",
+      "start": 21,
+      "end": 23,
+      "score": 0.8240582346916199
+     },
+     {
+      "label": "quantity",
+      "text": "20",
+      "start": 38,
+      "end": 40,
+      "score": 0.8238632082939148
+     },
+     {
+      "label": "unit",
+      "text": "inch",
+      "start": 24,
+      "end": 28,
+      "score": 0.8227332830429077
+     }
+    ],
+    "brief/flowchart": [],
+    "brief/castle": [
+     {
+      "label": "measurement name",
+      "text": "wall",
+      "start": 28,
+      "end": 32,
+      "score": 0.7302078008651733
+     }
+    ],
+    "brief/castle-words": [],
+    "castle-sketch.brief": [
+     {
+      "label": "quantity",
+      "text": "0.9",
+      "start": 738,
+      "end": 741,
+      "score": 0.7207658290863037
+     },
+     {
+      "label": "unit",
+      "text": "east",
+      "start": 610,
+      "end": 614,
+      "score": 0.7198915481567383
+     },
+     {
+      "label": "measurement name",
+      "text": "height",
+      "start": 1167,
+      "end": 1173,
+      "score": 0.7908828258514404
+     }
+    ]
+   },
+   "0.8": {
+    "apron.sample/A": [
+     {
+      "label": "quantity",
+      "text": "36",
+      "start": 8,
+      "end": 10,
+      "score": 0.9542640447616577
+     }
+    ],
+    "apron.sample/B": [
+     {
+      "label": "quantity",
+      "text": "20",
+      "start": 16,
+      "end": 18,
+      "score": 0.9741091132164001
+     }
+    ],
+    "apron.sample/C": [
+     {
+      "label": "quantity",
+      "text": "46",
+      "start": 17,
+      "end": 19,
+      "score": 0.942464292049408
+     }
+    ],
+    "apron.sample/seam": [],
+    "apron.sample/1": [
+     {
+      "label": "quantity",
+      "text": "12",
+      "start": 11,
+      "end": 13,
+      "score": 0.8577756285667419
+     }
+    ],
+    "apron.sample/2": [],
+    "apron.sample/3": [],
+    "apron.sample/4": [],
+    "apron.sample/5": [],
+    "apron.sample/6": [],
+    "apron.sample/brace": [],
+    "tunic.sample/1": [],
+    "tunic.sample/2": [],
+    "tunic.sample/3": [],
+    "tunic.sample/4": [],
+    "tunic.sample/5": [],
+    "brief/apron": [
+     {
+      "label": "quantity",
+      "text": "36",
+      "start": 21,
+      "end": 23,
+      "score": 0.8240582346916199
+     },
+     {
+      "label": "quantity",
+      "text": "20",
+      "start": 38,
+      "end": 40,
+      "score": 0.8238632082939148
+     },
+     {
+      "label": "unit",
+      "text": "inch",
+      "start": 24,
+      "end": 28,
+      "score": 0.8227332830429077
+     }
+    ],
+    "brief/flowchart": [],
+    "brief/castle": [],
+    "brief/castle-words": [],
+    "castle-sketch.brief": []
+   },
+   "0.9": {
+    "apron.sample/A": [
+     {
+      "label": "quantity",
+      "text": "36",
+      "start": 8,
+      "end": 10,
+      "score": 0.9542640447616577
+     }
+    ],
+    "apron.sample/B": [
+     {
+      "label": "quantity",
+      "text": "20",
+      "start": 16,
+      "end": 18,
+      "score": 0.9741091132164001
+     }
+    ],
+    "apron.sample/C": [
+     {
+      "label": "quantity",
+      "text": "46",
+      "start": 17,
+      "end": 19,
+      "score": 0.942464292049408
+     }
+    ],
+    "apron.sample/seam": [],
+    "apron.sample/1": [],
+    "apron.sample/2": [],
+    "apron.sample/3": [],
+    "apron.sample/4": [],
+    "apron.sample/5": [],
+    "apron.sample/6": [],
+    "apron.sample/brace": [],
+    "tunic.sample/1": [],
+    "tunic.sample/2": [],
+    "tunic.sample/3": [],
+    "tunic.sample/4": [],
+    "tunic.sample/5": [],
+    "brief/apron": [],
+    "brief/flowchart": [],
+    "brief/castle": [],
+    "brief/castle-words": [],
+    "castle-sketch.brief": []
+   }
+  },
+  "plain, bare": {
+   "0.3": {
+    "apron.sample/A": [
+     {
+      "label": "measurement name",
+      "text": "A. Bust",
+      "start": 0,
+      "end": 7,
+      "score": 0.6874866485595703
+     },
+     {
+      "label": "quantity",
+      "text": "36",
+      "start": 8,
+      "end": 10,
+      "score": 0.9724560379981995
+     }
+    ],
+    "apron.sample/B": [
+     {
+      "label": "measurement name",
+      "text": "Top to waist",
+      "start": 3,
+      "end": 15,
+      "score": 0.4742966592311859
+     },
+     {
+      "label": "quantity",
+      "text": "20",
+      "start": 16,
+      "end": 18,
+      "score": 0.969285786151886
+     },
+     {
+      "label": "garment or part name",
+      "text": "waist",
+      "start": 10,
+      "end": 15,
+      "score": 0.5764017701148987
+     }
+    ],
+    "apron.sample/C": [
+     {
+      "label": "quantity",
+      "text": "46",
+      "start": 17,
+      "end": 19,
+      "score": 0.8809493184089661
+     }
+    ],
+    "apron.sample/seam": [],
+    "apron.sample/1": [
+     {
+      "label": "quantity",
+      "text": "14",
+      "start": 20,
+      "end": 22,
+      "score": 0.48483189940452576
+     },
+     {
+      "label": "quantity",
+      "text": "1",
+      "start": 0,
+      "end": 1,
+      "score": 0.39022141695022583
+     },
+     {
+      "label": "quantity",
+      "text": "12",
+      "start": 11,
+      "end": 13,
+      "score": 0.37688133120536804
+     },
+     {
+      "label": "quantity",
+      "text": "2",
+      "start": 16,
+      "end": 17,
+      "score": 0.37070828676223755
+     }
+    ],
+    "apron.sample/2": [
+     {
+      "label": "quantity",
+      "text": "7",
+      "start": 20,
+      "end": 21,
+      "score": 0.8169528841972351
+     },
+     {
+      "label": "quantity",
+      "text": "14",
+      "start": 11,
+      "end": 13,
+      "score": 0.8042401671409607
+     },
+     {
+      "label": "quantity",
+      "text": "2",
+      "start": 0,
+      "end": 1,
+      "score": 0.676213800907135
+     },
+     {
+      "label": "quantity",
+      "text": "2",
+      "start": 16,
+      "end": 17,
+      "score": 0.5234967470169067
+     },
+     {
+      "label": "quantity",
+      "text": "2",
+      "start": 7,
+      "end": 8,
+      "score": 0.4760189652442932
+     },
+     {
+      "label": "unit",
+      "text": "2",
+      "start": 16,
+      "end": 17,
+      "score": 0.3228400945663452
+     }
+    ],
+    "apron.sample/3": [
+     {
+      "label": "quantity",
+      "text": "20 + 2",
+      "start": 5,
+      "end": 11,
+      "score": 0.4723164141178131
+     },
+     {
+      "label": "quantity",
+      "text": "22",
+      "start": 14,
+      "end": 16,
+      "score": 0.46883028745651245
+     },
+     {
+      "label": "quantity",
+      "text": "3",
+      "start": 0,
+      "end": 1,
+      "score": 0.32288017868995667
+     }
+    ],
+    "apron.sample/4": [
+     {
+      "label": "quantity",
+      "text": "48",
+      "start": 5,
+      "end": 7,
+      "score": 0.6264384984970093
+     },
+     {
+      "label": "unit",
+      "text": "4. C",
+      "start": 0,
+      "end": 4,
+      "score": 0.340373694896698
+     }
+    ],
+    "apron.sample/5": [
+     {
+      "label": "quantity",
+      "text": "5",
+      "start": 0,
+      "end": 1,
+      "score": 0.46887871623039246
+     }
+    ],
+    "apron.sample/6": [
+     {
+      "label": "quantity",
+      "text": "6",
+      "start": 0,
+      "end": 1,
+      "score": 0.4737233519554138
+     },
+     {
+      "label": "quantity",
+      "text": "72",
+      "start": 15,
+      "end": 17,
+      "score": 0.46299949288368225
+     }
+    ],
+    "apron.sample/brace": [
+     {
+      "label": "quantity",
+      "text": "72",
+      "start": 0,
+      "end": 2,
+      "score": 0.7052906155586243
+     },
+     {
+      "label": "quantity",
+      "text": "74",
+      "start": 3,
+      "end": 5,
+      "score": 0.5381362438201904
+     }
+    ],
+    "tunic.sample/1": [
+     {
+      "label": "measurement name",
+      "text": "Chest + 6\"",
+      "start": 3,
+      "end": 13,
+      "score": 0.5781484842300415
+     },
+     {
+      "label": "quantity",
+      "text": "21",
+      "start": 33,
+      "end": 35,
+      "score": 0.4312626123428345
+     },
+     {
+      "label": "quantity",
+      "text": "1",
+      "start": 0,
+      "end": 1,
+      "score": 0.38314223289489746
+     }
+    ],
+    "tunic.sample/2": [
+     {
+      "label": "measurement name",
+      "text": "Shoulder",
+      "start": 3,
+      "end": 11,
+      "score": 0.31314733624458313
+     },
+     {
+      "label": "quantity",
+      "text": "+ 2   54",
+      "start": 30,
+      "end": 38,
+      "score": 0.7152702808380127
+     },
+     {
+      "label": "quantity",
+      "text": "56",
+      "start": 45,
+      "end": 47,
+      "score": 0.3198622465133667
+     }
+    ],
+    "tunic.sample/3": [
+     {
+      "label": "quantity",
+      "text": "3",
+      "start": 0,
+      "end": 1,
+      "score": 0.35866013169288635
+     },
+     {
+      "label": "quantity",
+      "text": "22",
+      "start": 59,
+      "end": 61,
+      "score": 0.34752365946769714
+     },
+     {
+      "label": "quantity",
+      "text": "9",
+      "start": 46,
+      "end": 47,
+      "score": 0.32918208837509155
+     },
+     {
+      "label": "quantity",
+      "text": "3",
+      "start": 38,
+      "end": 39,
+      "score": 0.32394278049468994
+     },
+     {
+      "label": "quantity",
+      "text": "4",
+      "start": 55,
+      "end": 56,
+      "score": 0.3161846697330475
+     },
+     {
+      "label": "garment or part name",
+      "text": "under armpit",
+      "start": 19,
+      "end": 31,
+      "score": 0.39096716046333313
+     },
+     {
+      "label": "garment or part name",
+      "text": "under armpit",
+      "start": 19,
+      "end": 31,
+      "score": 0.32092398405075073
+     }
+    ],
+    "tunic.sample/4": [
+     {
+      "label": "quantity",
+      "text": "3.5",
+      "start": 17,
+      "end": 20,
+      "score": 0.6170406341552734
+     },
+     {
+      "label": "quantity",
+      "text": "7.5",
+      "start": 27,
+      "end": 30,
+      "score": 0.5423946976661682
+     },
+     {
+      "label": "quantity",
+      "text": "+ 2–4",
+      "start": 8,
+      "end": 13,
+      "score": 0.32774844765663147
+     },
+     {
+      "label": "quantity",
+      "text": "4",
+      "start": 23,
+      "end": 24,
+      "score": 0.3241044282913208
+     }
+    ],
+    "tunic.sample/5": [
+     {
+      "label": "measurement name",
+      "text": "Arm length + 2",
+      "start": 3,
+      "end": 17,
+      "score": 0.4518812596797943
+     },
+     {
+      "label": "quantity",
+      "text": "23",
+      "start": 30,
+      "end": 32,
+      "score": 0.38807275891304016
+     },
+     {
+      "label": "quantity",
+      "text": "21 + 2",
+      "start": 21,
+      "end": 27,
+      "score": 0.30486026406288147
+     }
+    ],
+    "brief/apron": [
+     {
+      "label": "measurement name",
+      "text": "top to waist",
+      "start": 48,
+      "end": 60,
+      "score": 0.7801589965820312
+     },
+     {
+      "label": "measurement name",
+      "text": "bust",
+      "start": 29,
+      "end": 33,
+      "score": 0.5701850652694702
+     },
+     {
+      "label": "quantity",
+      "text": "20",
+      "start": 38,
+      "end": 40,
+      "score": 0.8382360339164734
+     },
+     {
+      "label": "quantity",
+      "text": "36",
+      "start": 21,
+      "end": 23,
+      "score": 0.5247607231140137
+     },
+     {
+      "label": "garment or part name",
+      "text": "apron dress",
+      "start": 3,
+      "end": 14,
+      "score": 0.9630143642425537
+     },
+     {
+      "label": "garment or part name",
+      "text": "waist",
+      "start": 55,
+      "end": 60,
+      "score": 0.3400934040546417
+     },
+     {
+      "label": "garment or part name",
+      "text": "top",
+      "start": 48,
+      "end": 51,
+      "score": 0.3279225528240204
+     }
+    ],
+    "brief/flowchart": [],
+    "brief/castle": [
+     {
+      "label": "garment or part name",
+      "text": "wall",
+      "start": 28,
+      "end": 32,
+      "score": 0.9269072413444519
+     },
+     {
+      "label": "garment or part name",
+      "text": "gate",
+      "start": 39,
+      "end": 43,
+      "score": 0.9198954701423645
+     },
+     {
+      "label": "garment or part name",
+      "text": "towers",
+      "start": 18,
+      "end": 24,
+      "score": 0.7665719985961914
+     }
+    ],
+    "brief/castle-words": [
+     {
+      "label": "measurement name",
+      "text": "green tops",
+      "start": 12,
+      "end": 22,
+      "score": 0.6580901741981506
+     }
+    ],
+    "castle-sketch.brief": [
+     {
+      "label": "quantity",
+      "text": "0.9",
+      "start": 104,
+      "end": 107,
+      "score": 0.7391387820243835
+     },
+     {
+      "label": "quantity",
+      "text": "0.9",
+      "start": 319,
+      "end": 322,
+      "score": 0.6753929257392883
+     },
+     {
+      "label": "quantity",
+      "text": "6.0",
+      "start": 227,
+      "end": 230,
+      "score": 0.6574674248695374
+     },
+     {
+      "label": "quantity",
+      "text": "2.8",
+      "start": 80,
+      "end": 83,
+      "score": 0.644308865070343
+     },
+     {
+      "label": "quantity",
+      "text": "1.0",
+      "start": 331,
+      "end": 334,
+      "score": 0.6321607828140259
+     },
+     {
+      "label": "quantity",
+      "text": "7",
+      "start": 23,
+      "end": 24,
+      "score": 0.6236944198608398
+     },
+     {
+      "label": "quantity",
+      "text": "2",
+      "start": 76,
+      "end": 77,
+      "score": 0.5919041037559509
+     },
+     {
+      "label": "quantity",
+      "text": "3.0",
+      "start": 307,
+      "end": 310,
+      "score": 0.5913462042808533
+     },
+     {
+      "label": "quantity",
+      "text": "1.8",
+      "start": 327,
+      "end": 330,
+      "score": 0.5666000247001648
+     },
+     {
+      "label": "quantity",
+      "text": "0.0",
+      "start": 315,
+      "end": 318,
+      "score": 0.560612678527832
+     },
+     {
+      "label": "quantity",
+      "text": "1",
+      "start": 270,
+      "end": 271,
+      "score": 0.552055299282074
+     },
+     {
+      "label": "quantity",
+      "text": "0.8",
+      "start": 303,
+      "end": 306,
+      "score": 0.5018987655639648
+     },
+     {
+      "label": "unit",
+      "text": "y",
+      "start": 312,
+      "end": 313,
+      "score": 0.45492684841156006
+     },
+     {
+      "label": "unit",
+      "text": "z",
+      "start": 324,
+      "end": 325,
+      "score": 0.4486638605594635
+     },
+     {
+      "label": "unit",
+      "text": "world units",
+      "start": 288,
+      "end": 299,
+      "score": 0.36420756578445435
+     },
+     {
+      "label": "garment or part name",
+      "text": "PARTS",
+      "start": 401,
+      "end": 406,
+      "score": 0.538038432598114
+     },
+     {
+      "label": "garment or part name",
+      "text": "pieces",
+      "start": 411,
+      "end": 417,
+      "score": 0.4195020794868469
+     },
+     {
+      "label": "quantity",
+      "text": "9",
+      "start": 740,
+      "end": 741,
+      "score": 0.8481375575065613
+     },
+     {
+      "label": "quantity",
+      "text": "0.3",
+      "start": 588,
+      "end": 591,
+      "score": 0.8317431807518005
+     },
+     {
+      "label": "quantity",
+      "text": "9",
+      "start": 670,
+      "end": 671,
+      "score": 0.8180598020553589
+     },
+     {
+      "label": "quantity",
+      "text": "8",
+      "start": 788,
+      "end": 789,
+      "score": 0.7989237308502197
+     },
+     {
+      "label": "quantity",
+      "text": "2",
+      "start": 633,
+      "end": 634,
+      "score": 0.7667314410209656
+     },
+     {
+      "label": "quantity",
+      "text": "8",
+      "start": 560,
+      "end": 561,
+      "score": 0.7643812894821167
+     },
+     {
+      "label": "quantity",
+      "text": "1.7",
+      "start": 714,
+      "end": 717,
+      "score": 0.7583677768707275
+     },
+     {
+      "label": "quantity",
+      "text": "1",
+      "start": 558,
+      "end": 559,
+      "score": 0.7420761585235596
+     },
+     {
+      "label": "quantity",
+      "text": "1.4",
+      "start": 564,
+      "end": 567,
+      "score": 0.7188811898231506
+     },
+     {
+      "label": "quantity",
+      "text": "1.6",
+      "start": 708,
+      "end": 711,
+      "score": 0.5182816386222839
+     },
+     {
+      "label": "unit",
+      "text": "u",
+      "start": 718,
+      "end": 719,
+      "score": 0.4087958335876465
+     },
+     {
+      "label": "unit",
+      "text": "u",
+      "start": 742,
+      "end": 743,
+      "score": 0.3939349055290222
+     },
+     {
+      "label": "unit",
+      "text": "u",
+      "start": 568,
+      "end": 569,
+      "score": 0.3549303412437439
+     },
+     {
+      "label": "garment or part name",
+      "text": "green tops",
+      "start": 1035,
+      "end": 1045,
+      "score": 0.6130187511444092
+     },
+     {
+      "label": "garment or part name",
+      "text": "part 2 — 1.6 × 1.7",
+      "start": 699,
+      "end": 717,
+      "score": 0.37825512886047363
+     },
+     {
+      "label": "operation",
+      "text": "“castle with green tops”",
+      "start": 1022,
+      "end": 1046,
+      "score": 0.6972382664680481
+     },
+     {
+      "label": "measurement name",
+      "text": "foundation",
+      "start": 1123,
+      "end": 1133,
+      "score": 0.36927878856658936
+     },
+     {
+      "label": "measurement name",
+      "text": "INK",
+      "start": 1076,
+      "end": 1079,
+      "score": 0.35130858421325684
+     },
+     {
+      "label": "measurement name",
+      "text": "height",
+      "start": 1167,
+      "end": 1173,
+      "score": 0.3334033787250519
+     },
+     {
+      "label": "unit",
+      "text": "width",
+      "start": 1198,
+      "end": 1203,
+      "score": 0.5389043092727661
+     },
+     {
+      "label": "unit",
+      "text": "height",
+      "start": 1167,
+      "end": 1173,
+      "score": 0.35663461685180664
+     },
+     {
+      "label": "garment or part name",
+      "text": "PART ID",
+      "start": 1423,
+      "end": 1430,
+      "score": 0.39590007066726685
+     },
+     {
+      "label": "garment or part name",
+      "text": "MATERIAL",
+      "start": 1377,
+      "end": 1385,
+      "score": 0.30169612169265747
+     }
+    ]
+   },
+   "0.4": {
+    "apron.sample/A": [
+     {
+      "label": "measurement name",
+      "text": "A. Bust",
+      "start": 0,
+      "end": 7,
+      "score": 0.6874866485595703
+     },
+     {
+      "label": "quantity",
+      "text": "36",
+      "start": 8,
+      "end": 10,
+      "score": 0.9724560379981995
+     }
+    ],
+    "apron.sample/B": [
+     {
+      "label": "measurement name",
+      "text": "Top to waist",
+      "start": 3,
+      "end": 15,
+      "score": 0.4742966592311859
+     },
+     {
+      "label": "quantity",
+      "text": "20",
+      "start": 16,
+      "end": 18,
+      "score": 0.969285786151886
+     },
+     {
+      "label": "garment or part name",
+      "text": "waist",
+      "start": 10,
+      "end": 15,
+      "score": 0.5764017701148987
+     }
+    ],
+    "apron.sample/C": [
+     {
+      "label": "quantity",
+      "text": "46",
+      "start": 17,
+      "end": 19,
+      "score": 0.8809493184089661
+     }
+    ],
+    "apron.sample/seam": [],
+    "apron.sample/1": [
+     {
+      "label": "quantity",
+      "text": "14",
+      "start": 20,
+      "end": 22,
+      "score": 0.48483189940452576
+     },
+     {
+      "label": "quantity",
+      "text": "12 + 2",
+      "start": 11,
+      "end": 17,
+      "score": 0.412219375371933
+     }
+    ],
+    "apron.sample/2": [
+     {
+      "label": "quantity",
+      "text": "7",
+      "start": 20,
+      "end": 21,
+      "score": 0.8169528841972351
+     },
+     {
+      "label": "quantity",
+      "text": "14",
+      "start": 11,
+      "end": 13,
+      "score": 0.8042401671409607
+     },
+     {
+      "label": "quantity",
+      "text": "2",
+      "start": 0,
+      "end": 1,
+      "score": 0.676213800907135
+     },
+     {
+      "label": "quantity",
+      "text": "2",
+      "start": 16,
+      "end": 17,
+      "score": 0.5234967470169067
+     },
+     {
+      "label": "quantity",
+      "text": "2",
+      "start": 7,
+      "end": 8,
+      "score": 0.4760189652442932
+     }
+    ],
+    "apron.sample/3": [
+     {
+      "label": "quantity",
+      "text": "20 + 2",
+      "start": 5,
+      "end": 11,
+      "score": 0.4723164141178131
+     },
+     {
+      "label": "quantity",
+      "text": "22",
+      "start": 14,
+      "end": 16,
+      "score": 0.46883028745651245
+     }
+    ],
+    "apron.sample/4": [
+     {
+      "label": "quantity",
+      "text": "48",
+      "start": 5,
+      "end": 7,
+      "score": 0.6264384984970093
+     }
+    ],
+    "apron.sample/5": [
+     {
+      "label": "quantity",
+      "text": "5",
+      "start": 0,
+      "end": 1,
+      "score": 0.46887871623039246
+     }
+    ],
+    "apron.sample/6": [
+     {
+      "label": "quantity",
+      "text": "6",
+      "start": 0,
+      "end": 1,
+      "score": 0.4737233519554138
+     },
+     {
+      "label": "quantity",
+      "text": "72",
+      "start": 15,
+      "end": 17,
+      "score": 0.46299949288368225
+     }
+    ],
+    "apron.sample/brace": [
+     {
+      "label": "quantity",
+      "text": "72",
+      "start": 0,
+      "end": 2,
+      "score": 0.7052906155586243
+     },
+     {
+      "label": "quantity",
+      "text": "74",
+      "start": 3,
+      "end": 5,
+      "score": 0.5381362438201904
+     }
+    ],
+    "tunic.sample/1": [
+     {
+      "label": "measurement name",
+      "text": "Chest + 6\"",
+      "start": 3,
+      "end": 13,
+      "score": 0.5781484842300415
+     },
+     {
+      "label": "quantity",
+      "text": "21",
+      "start": 33,
+      "end": 35,
+      "score": 0.4312626123428345
+     }
+    ],
+    "tunic.sample/2": [
+     {
+      "label": "quantity",
+      "text": "+ 2   54",
+      "start": 30,
+      "end": 38,
+      "score": 0.7152702808380127
+     }
+    ],
+    "tunic.sample/3": [],
+    "tunic.sample/4": [
+     {
+      "label": "quantity",
+      "text": "3.5",
+      "start": 17,
+      "end": 20,
+      "score": 0.6170406341552734
+     },
+     {
+      "label": "quantity",
+      "text": "7.5",
+      "start": 27,
+      "end": 30,
+      "score": 0.5423946976661682
+     }
+    ],
+    "tunic.sample/5": [
+     {
+      "label": "measurement name",
+      "text": "Arm length + 2",
+      "start": 3,
+      "end": 17,
+      "score": 0.4518812596797943
+     }
+    ],
+    "brief/apron": [
+     {
+      "label": "measurement name",
+      "text": "top to waist",
+      "start": 48,
+      "end": 60,
+      "score": 0.7801589965820312
+     },
+     {
+      "label": "measurement name",
+      "text": "bust",
+      "start": 29,
+      "end": 33,
+      "score": 0.5701850652694702
+     },
+     {
+      "label": "quantity",
+      "text": "20",
+      "start": 38,
+      "end": 40,
+      "score": 0.8382360339164734
+     },
+     {
+      "label": "quantity",
+      "text": "36",
+      "start": 21,
+      "end": 23,
+      "score": 0.5247607231140137
+     },
+     {
+      "label": "garment or part name",
+      "text": "apron dress",
+      "start": 3,
+      "end": 14,
+      "score": 0.9630143642425537
+     },
+     {
+      "label": "garment or part name",
+      "text": "top to waist",
+      "start": 48,
+      "end": 60,
+      "score": 0.6083548069000244
+     }
+    ],
+    "brief/flowchart": [],
+    "brief/castle": [
+     {
+      "label": "garment or part name",
+      "text": "wall",
+      "start": 28,
+      "end": 32,
+      "score": 0.9269072413444519
+     },
+     {
+      "label": "garment or part name",
+      "text": "gate",
+      "start": 39,
+      "end": 43,
+      "score": 0.9198954701423645
+     },
+     {
+      "label": "garment or part name",
+      "text": "towers",
+      "start": 18,
+      "end": 24,
+      "score": 0.7665719985961914
+     }
+    ],
+    "brief/castle-words": [
+     {
+      "label": "measurement name",
+      "text": "green tops",
+      "start": 12,
+      "end": 22,
+      "score": 0.6580901741981506
+     }
+    ],
+    "castle-sketch.brief": [
+     {
+      "label": "quantity",
+      "text": "0.9",
+      "start": 104,
+      "end": 107,
+      "score": 0.7391387820243835
+     },
+     {
+      "label": "quantity",
+      "text": "0.9",
+      "start": 319,
+      "end": 322,
+      "score": 0.6753929257392883
+     },
+     {
+      "label": "quantity",
+      "text": "6.0",
+      "start": 227,
+      "end": 230,
+      "score": 0.6574674248695374
+     },
+     {
+      "label": "quantity",
+      "text": "2.8",
+      "start": 80,
+      "end": 83,
+      "score": 0.644308865070343
+     },
+     {
+      "label": "quantity",
+      "text": "1.0",
+      "start": 331,
+      "end": 334,
+      "score": 0.6321607828140259
+     },
+     {
+      "label": "quantity",
+      "text": "7",
+      "start": 23,
+      "end": 24,
+      "score": 0.6236944198608398
+     },
+     {
+      "label": "quantity",
+      "text": "2",
+      "start": 76,
+      "end": 77,
+      "score": 0.5919041037559509
+     },
+     {
+      "label": "quantity",
+      "text": "3.0",
+      "start": 307,
+      "end": 310,
+      "score": 0.5913462042808533
+     },
+     {
+      "label": "quantity",
+      "text": "1.8",
+      "start": 327,
+      "end": 330,
+      "score": 0.5666000247001648
+     },
+     {
+      "label": "quantity",
+      "text": "0.0",
+      "start": 315,
+      "end": 318,
+      "score": 0.560612678527832
+     },
+     {
+      "label": "quantity",
+      "text": "1",
+      "start": 270,
+      "end": 271,
+      "score": 0.552055299282074
+     },
+     {
+      "label": "quantity",
+      "text": "0.8",
+      "start": 303,
+      "end": 306,
+      "score": 0.5018987655639648
+     },
+     {
+      "label": "unit",
+      "text": "y",
+      "start": 312,
+      "end": 313,
+      "score": 0.45492684841156006
+     },
+     {
+      "label": "unit",
+      "text": "z",
+      "start": 324,
+      "end": 325,
+      "score": 0.4486638605594635
+     },
+     {
+      "label": "garment or part name",
+      "text": "PARTS",
+      "start": 401,
+      "end": 406,
+      "score": 0.538038432598114
+     },
+     {
+      "label": "garment or part name",
+      "text": "pieces",
+      "start": 411,
+      "end": 417,
+      "score": 0.4195020794868469
+     },
+     {
+      "label": "quantity",
+      "text": "9",
+      "start": 740,
+      "end": 741,
+      "score": 0.8481375575065613
+     },
+     {
+      "label": "quantity",
+      "text": "0.3",
+      "start": 588,
+      "end": 591,
+      "score": 0.8317431807518005
+     },
+     {
+      "label": "quantity",
+      "text": "9",
+      "start": 670,
+      "end": 671,
+      "score": 0.8180598020553589
+     },
+     {
+      "label": "quantity",
+      "text": "8",
+      "start": 788,
+      "end": 789,
+      "score": 0.7989237308502197
+     },
+     {
+      "label": "quantity",
+      "text": "2",
+      "start": 633,
+      "end": 634,
+      "score": 0.7667314410209656
+     },
+     {
+      "label": "quantity",
+      "text": "8",
+      "start": 560,
+      "end": 561,
+      "score": 0.7643812894821167
+     },
+     {
+      "label": "quantity",
+      "text": "1.7",
+      "start": 714,
+      "end": 717,
+      "score": 0.7583677768707275
+     },
+     {
+      "label": "quantity",
+      "text": "1",
+      "start": 558,
+      "end": 559,
+      "score": 0.7420761585235596
+     },
+     {
+      "label": "quantity",
+      "text": "1.4",
+      "start": 564,
+      "end": 567,
+      "score": 0.7188811898231506
+     },
+     {
+      "label": "quantity",
+      "text": "1.6",
+      "start": 708,
+      "end": 711,
+      "score": 0.5182816386222839
+     },
+     {
+      "label": "unit",
+      "text": "u",
+      "start": 718,
+      "end": 719,
+      "score": 0.4087958335876465
+     },
+     {
+      "label": "garment or part name",
+      "text": "green tops",
+      "start": 1035,
+      "end": 1045,
+      "score": 0.6130187511444092
+     },
+     {
+      "label": "operation",
+      "text": "“castle with green tops”",
+      "start": 1022,
+      "end": 1046,
+      "score": 0.6972382664680481
+     },
+     {
+      "label": "unit",
+      "text": "width",
+      "start": 1198,
+      "end": 1203,
+      "score": 0.5389043092727661
+     }
+    ]
+   },
+   "0.5": {
+    "apron.sample/A": [
+     {
+      "label": "measurement name",
+      "text": "A. Bust",
+      "start": 0,
+      "end": 7,
+      "score": 0.6874866485595703
+     },
+     {
+      "label": "quantity",
+      "text": "36",
+      "start": 8,
+      "end": 10,
+      "score": 0.9724560379981995
+     }
+    ],
+    "apron.sample/B": [
+     {
+      "label": "quantity",
+      "text": "20",
+      "start": 16,
+      "end": 18,
+      "score": 0.969285786151886
+     },
+     {
+      "label": "garment or part name",
+      "text": "waist",
+      "start": 10,
+      "end": 15,
+      "score": 0.5764017701148987
+     }
+    ],
+    "apron.sample/C": [
+     {
+      "label": "quantity",
+      "text": "46",
+      "start": 17,
+      "end": 19,
+      "score": 0.8809493184089661
+     }
+    ],
+    "apron.sample/seam": [],
+    "apron.sample/1": [],
+    "apron.sample/2": [
+     {
+      "label": "quantity",
+      "text": "7",
+      "start": 20,
+      "end": 21,
+      "score": 0.8169528841972351
+     },
+     {
+      "label": "quantity",
+      "text": "14",
+      "start": 11,
+      "end": 13,
+      "score": 0.8042401671409607
+     },
+     {
+      "label": "quantity",
+      "text": "2",
+      "start": 0,
+      "end": 1,
+      "score": 0.676213800907135
+     },
+     {
+      "label": "quantity",
+      "text": "2",
+      "start": 16,
+      "end": 17,
+      "score": 0.5234967470169067
+     }
+    ],
+    "apron.sample/3": [],
+    "apron.sample/4": [
+     {
+      "label": "quantity",
+      "text": "48",
+      "start": 5,
+      "end": 7,
+      "score": 0.6264384984970093
+     }
+    ],
+    "apron.sample/5": [],
+    "apron.sample/6": [],
+    "apron.sample/brace": [
+     {
+      "label": "quantity",
+      "text": "72",
+      "start": 0,
+      "end": 2,
+      "score": 0.7052906155586243
+     },
+     {
+      "label": "quantity",
+      "text": "74",
+      "start": 3,
+      "end": 5,
+      "score": 0.5381362438201904
+     }
+    ],
+    "tunic.sample/1": [
+     {
+      "label": "measurement name",
+      "text": "Chest + 6\"",
+      "start": 3,
+      "end": 13,
+      "score": 0.5781484842300415
+     }
+    ],
+    "tunic.sample/2": [
+     {
+      "label": "quantity",
+      "text": "+ 2   54",
+      "start": 30,
+      "end": 38,
+      "score": 0.7152702808380127
+     }
+    ],
+    "tunic.sample/3": [],
+    "tunic.sample/4": [
+     {
+      "label": "quantity",
+      "text": "3.5",
+      "start": 17,
+      "end": 20,
+      "score": 0.6170406341552734
+     },
+     {
+      "label": "quantity",
+      "text": "7.5",
+      "start": 27,
+      "end": 30,
+      "score": 0.5423946976661682
+     }
+    ],
+    "tunic.sample/5": [],
+    "brief/apron": [
+     {
+      "label": "measurement name",
+      "text": "top to waist",
+      "start": 48,
+      "end": 60,
+      "score": 0.7801589965820312
+     },
+     {
+      "label": "measurement name",
+      "text": "bust",
+      "start": 29,
+      "end": 33,
+      "score": 0.5701850652694702
+     },
+     {
+      "label": "quantity",
+      "text": "20",
+      "start": 38,
+      "end": 40,
+      "score": 0.8382360339164734
+     },
+     {
+      "label": "quantity",
+      "text": "36",
+      "start": 21,
+      "end": 23,
+      "score": 0.5247607231140137
+     },
+     {
+      "label": "garment or part name",
+      "text": "apron dress",
+      "start": 3,
+      "end": 14,
+      "score": 0.9630143642425537
+     },
+     {
+      "label": "garment or part name",
+      "text": "top to waist",
+      "start": 48,
+      "end": 60,
+      "score": 0.6083548069000244
+     }
+    ],
+    "brief/flowchart": [],
+    "brief/castle": [
+     {
+      "label": "garment or part name",
+      "text": "wall",
+      "start": 28,
+      "end": 32,
+      "score": 0.9269072413444519
+     },
+     {
+      "label": "garment or part name",
+      "text": "gate",
+      "start": 39,
+      "end": 43,
+      "score": 0.9198954701423645
+     },
+     {
+      "label": "garment or part name",
+      "text": "towers",
+      "start": 18,
+      "end": 24,
+      "score": 0.7665719985961914
+     }
+    ],
+    "brief/castle-words": [
+     {
+      "label": "measurement name",
+      "text": "green tops",
+      "start": 12,
+      "end": 22,
+      "score": 0.6580901741981506
+     }
+    ],
+    "castle-sketch.brief": [
+     {
+      "label": "quantity",
+      "text": "0.9",
+      "start": 104,
+      "end": 107,
+      "score": 0.7391387820243835
+     },
+     {
+      "label": "quantity",
+      "text": "0.9",
+      "start": 319,
+      "end": 322,
+      "score": 0.6753929257392883
+     },
+     {
+      "label": "quantity",
+      "text": "6.0",
+      "start": 227,
+      "end": 230,
+      "score": 0.6574674248695374
+     },
+     {
+      "label": "quantity",
+      "text": "2.8",
+      "start": 80,
+      "end": 83,
+      "score": 0.644308865070343
+     },
+     {
+      "label": "quantity",
+      "text": "1.0",
+      "start": 331,
+      "end": 334,
+      "score": 0.6321607828140259
+     },
+     {
+      "label": "quantity",
+      "text": "7",
+      "start": 23,
+      "end": 24,
+      "score": 0.6236944198608398
+     },
+     {
+      "label": "quantity",
+      "text": "2",
+      "start": 76,
+      "end": 77,
+      "score": 0.5919041037559509
+     },
+     {
+      "label": "quantity",
+      "text": "3.0",
+      "start": 307,
+      "end": 310,
+      "score": 0.5913462042808533
+     },
+     {
+      "label": "quantity",
+      "text": "1.8",
+      "start": 327,
+      "end": 330,
+      "score": 0.5666000247001648
+     },
+     {
+      "label": "quantity",
+      "text": "0.0",
+      "start": 315,
+      "end": 318,
+      "score": 0.560612678527832
+     },
+     {
+      "label": "quantity",
+      "text": "1",
+      "start": 270,
+      "end": 271,
+      "score": 0.552055299282074
+     },
+     {
+      "label": "quantity",
+      "text": "0.8",
+      "start": 303,
+      "end": 306,
+      "score": 0.5018987655639648
+     },
+     {
+      "label": "garment or part name",
+      "text": "PARTS",
+      "start": 401,
+      "end": 406,
+      "score": 0.538038432598114
+     },
+     {
+      "label": "quantity",
+      "text": "9",
+      "start": 740,
+      "end": 741,
+      "score": 0.8481375575065613
+     },
+     {
+      "label": "quantity",
+      "text": "0.3",
+      "start": 588,
+      "end": 591,
+      "score": 0.8317431807518005
+     },
+     {
+      "label": "quantity",
+      "text": "9",
+      "start": 670,
+      "end": 671,
+      "score": 0.8180598020553589
+     },
+     {
+      "label": "quantity",
+      "text": "8",
+      "start": 788,
+      "end": 789,
+      "score": 0.7989237308502197
+     },
+     {
+      "label": "quantity",
+      "text": "2",
+      "start": 633,
+      "end": 634,
+      "score": 0.7667314410209656
+     },
+     {
+      "label": "quantity",
+      "text": "8",
+      "start": 560,
+      "end": 561,
+      "score": 0.7643812894821167
+     },
+     {
+      "label": "quantity",
+      "text": "1.7",
+      "start": 714,
+      "end": 717,
+      "score": 0.7583677768707275
+     },
+     {
+      "label": "quantity",
+      "text": "1",
+      "start": 558,
+      "end": 559,
+      "score": 0.7420761585235596
+     },
+     {
+      "label": "quantity",
+      "text": "1.4",
+      "start": 564,
+      "end": 567,
+      "score": 0.7188811898231506
+     },
+     {
+      "label": "quantity",
+      "text": "1.6",
+      "start": 708,
+      "end": 711,
+      "score": 0.5182816386222839
+     },
+     {
+      "label": "garment or part name",
+      "text": "green tops",
+      "start": 1035,
+      "end": 1045,
+      "score": 0.6130187511444092
+     },
+     {
+      "label": "operation",
+      "text": "“castle with green tops”",
+      "start": 1022,
+      "end": 1046,
+      "score": 0.6972382664680481
+     },
+     {
+      "label": "unit",
+      "text": "width",
+      "start": 1198,
+      "end": 1203,
+      "score": 0.5389043092727661
+     }
+    ]
+   },
+   "0.6": {
+    "apron.sample/A": [
+     {
+      "label": "measurement name",
+      "text": "A. Bust",
+      "start": 0,
+      "end": 7,
+      "score": 0.6874866485595703
+     },
+     {
+      "label": "quantity",
+      "text": "36",
+      "start": 8,
+      "end": 10,
+      "score": 0.9724560379981995
+     }
+    ],
+    "apron.sample/B": [
+     {
+      "label": "quantity",
+      "text": "20",
+      "start": 16,
+      "end": 18,
+      "score": 0.969285786151886
+     }
+    ],
+    "apron.sample/C": [
+     {
+      "label": "quantity",
+      "text": "46",
+      "start": 17,
+      "end": 19,
+      "score": 0.8809493184089661
+     }
+    ],
+    "apron.sample/seam": [],
+    "apron.sample/1": [],
+    "apron.sample/2": [
+     {
+      "label": "quantity",
+      "text": "7",
+      "start": 20,
+      "end": 21,
+      "score": 0.8169528841972351
+     },
+     {
+      "label": "quantity",
+      "text": "14",
+      "start": 11,
+      "end": 13,
+      "score": 0.8042401671409607
+     },
+     {
+      "label": "quantity",
+      "text": "2",
+      "start": 0,
+      "end": 1,
+      "score": 0.676213800907135
+     }
+    ],
+    "apron.sample/3": [],
+    "apron.sample/4": [
+     {
+      "label": "quantity",
+      "text": "48",
+      "start": 5,
+      "end": 7,
+      "score": 0.6264384984970093
+     }
+    ],
+    "apron.sample/5": [],
+    "apron.sample/6": [],
+    "apron.sample/brace": [
+     {
+      "label": "quantity",
+      "text": "72–74",
+      "start": 0,
+      "end": 5,
+      "score": 0.8185862302780151
+     }
+    ],
+    "tunic.sample/1": [],
+    "tunic.sample/2": [
+     {
+      "label": "quantity",
+      "text": "+ 2   54",
+      "start": 30,
+      "end": 38,
+      "score": 0.7152702808380127
+     }
+    ],
+    "tunic.sample/3": [],
+    "tunic.sample/4": [
+     {
+      "label": "quantity",
+      "text": "3.5",
+      "start": 17,
+      "end": 20,
+      "score": 0.6170406341552734
+     }
+    ],
+    "tunic.sample/5": [],
+    "brief/apron": [
+     {
+      "label": "measurement name",
+      "text": "top to waist",
+      "start": 48,
+      "end": 60,
+      "score": 0.7801589965820312
+     },
+     {
+      "label": "quantity",
+      "text": "20",
+      "start": 38,
+      "end": 40,
+      "score": 0.8382360339164734
+     },
+     {
+      "label": "garment or part name",
+      "text": "apron dress",
+      "start": 3,
+      "end": 14,
+      "score": 0.9630143642425537
+     },
+     {
+      "label": "garment or part name",
+      "text": "top to waist",
+      "start": 48,
+      "end": 60,
+      "score": 0.6083548069000244
+     }
+    ],
+    "brief/flowchart": [],
+    "brief/castle": [
+     {
+      "label": "garment or part name",
+      "text": "wall",
+      "start": 28,
+      "end": 32,
+      "score": 0.9269072413444519
+     },
+     {
+      "label": "garment or part name",
+      "text": "gate",
+      "start": 39,
+      "end": 43,
+      "score": 0.9198954701423645
+     },
+     {
+      "label": "garment or part name",
+      "text": "towers",
+      "start": 18,
+      "end": 24,
+      "score": 0.7665719985961914
+     }
+    ],
+    "brief/castle-words": [
+     {
+      "label": "measurement name",
+      "text": "green tops",
+      "start": 12,
+      "end": 22,
+      "score": 0.6580901741981506
+     }
+    ],
+    "castle-sketch.brief": [
+     {
+      "label": "quantity",
+      "text": "0.9",
+      "start": 104,
+      "end": 107,
+      "score": 0.7391387820243835
+     },
+     {
+      "label": "quantity",
+      "text": "0.9",
+      "start": 319,
+      "end": 322,
+      "score": 0.6753929257392883
+     },
+     {
+      "label": "quantity",
+      "text": "6.0",
+      "start": 227,
+      "end": 230,
+      "score": 0.6574674248695374
+     },
+     {
+      "label": "quantity",
+      "text": "2.8",
+      "start": 80,
+      "end": 83,
+      "score": 0.644308865070343
+     },
+     {
+      "label": "quantity",
+      "text": "1.0",
+      "start": 331,
+      "end": 334,
+      "score": 0.6321607828140259
+     },
+     {
+      "label": "quantity",
+      "text": "7",
+      "start": 23,
+      "end": 24,
+      "score": 0.6236944198608398
+     },
+     {
+      "label": "quantity",
+      "text": "9",
+      "start": 740,
+      "end": 741,
+      "score": 0.8481375575065613
+     },
+     {
+      "label": "quantity",
+      "text": "0.3",
+      "start": 588,
+      "end": 591,
+      "score": 0.8317431807518005
+     },
+     {
+      "label": "quantity",
+      "text": "9",
+      "start": 670,
+      "end": 671,
+      "score": 0.8180598020553589
+     },
+     {
+      "label": "quantity",
+      "text": "8",
+      "start": 788,
+      "end": 789,
+      "score": 0.7989237308502197
+     },
+     {
+      "label": "quantity",
+      "text": "2",
+      "start": 633,
+      "end": 634,
+      "score": 0.7667314410209656
+     },
+     {
+      "label": "quantity",
+      "text": "8",
+      "start": 560,
+      "end": 561,
+      "score": 0.7643812894821167
+     },
+     {
+      "label": "quantity",
+      "text": "1.7",
+      "start": 714,
+      "end": 717,
+      "score": 0.7583677768707275
+     },
+     {
+      "label": "quantity",
+      "text": "1",
+      "start": 558,
+      "end": 559,
+      "score": 0.7420761585235596
+     },
+     {
+      "label": "quantity",
+      "text": "1.4",
+      "start": 564,
+      "end": 567,
+      "score": 0.7188811898231506
+     },
+     {
+      "label": "garment or part name",
+      "text": "green tops",
+      "start": 1035,
+      "end": 1045,
+      "score": 0.6130187511444092
+     },
+     {
+      "label": "operation",
+      "text": "“castle with green tops”",
+      "start": 1022,
+      "end": 1046,
+      "score": 0.6972382664680481
+     }
+    ]
+   },
+   "0.7": {
+    "apron.sample/A": [
+     {
+      "label": "quantity",
+      "text": "36",
+      "start": 8,
+      "end": 10,
+      "score": 0.9724560379981995
+     }
+    ],
+    "apron.sample/B": [
+     {
+      "label": "quantity",
+      "text": "20",
+      "start": 16,
+      "end": 18,
+      "score": 0.969285786151886
+     }
+    ],
+    "apron.sample/C": [
+     {
+      "label": "quantity",
+      "text": "46",
+      "start": 17,
+      "end": 19,
+      "score": 0.8809493184089661
+     }
+    ],
+    "apron.sample/seam": [],
+    "apron.sample/1": [],
+    "apron.sample/2": [
+     {
+      "label": "quantity",
+      "text": "7",
+      "start": 20,
+      "end": 21,
+      "score": 0.8169528841972351
+     },
+     {
+      "label": "quantity",
+      "text": "14",
+      "start": 11,
+      "end": 13,
+      "score": 0.8042401671409607
+     }
+    ],
+    "apron.sample/3": [],
+    "apron.sample/4": [],
+    "apron.sample/5": [],
+    "apron.sample/6": [],
+    "apron.sample/brace": [
+     {
+      "label": "quantity",
+      "text": "72–74",
+      "start": 0,
+      "end": 5,
+      "score": 0.8185862302780151
+     }
+    ],
+    "tunic.sample/1": [],
+    "tunic.sample/2": [
+     {
+      "label": "quantity",
+      "text": "+ 2   54",
+      "start": 30,
+      "end": 38,
+      "score": 0.7152702808380127
+     }
+    ],
+    "tunic.sample/3": [],
+    "tunic.sample/4": [],
+    "tunic.sample/5": [],
+    "brief/apron": [
+     {
+      "label": "measurement name",
+      "text": "top to waist",
+      "start": 48,
+      "end": 60,
+      "score": 0.7801589965820312
+     },
+     {
+      "label": "quantity",
+      "text": "20",
+      "start": 38,
+      "end": 40,
+      "score": 0.8382360339164734
+     },
+     {
+      "label": "garment or part name",
+      "text": "apron dress",
+      "start": 3,
+      "end": 14,
+      "score": 0.9630143642425537
+     }
+    ],
+    "brief/flowchart": [],
+    "brief/castle": [
+     {
+      "label": "garment or part name",
+      "text": "wall",
+      "start": 28,
+      "end": 32,
+      "score": 0.9269072413444519
+     },
+     {
+      "label": "garment or part name",
+      "text": "gate",
+      "start": 39,
+      "end": 43,
+      "score": 0.9198954701423645
+     },
+     {
+      "label": "garment or part name",
+      "text": "towers",
+      "start": 18,
+      "end": 24,
+      "score": 0.7665719985961914
+     }
+    ],
+    "brief/castle-words": [],
+    "castle-sketch.brief": [
+     {
+      "label": "quantity",
+      "text": "0.9",
+      "start": 104,
+      "end": 107,
+      "score": 0.7391387820243835
+     },
+     {
+      "label": "quantity",
+      "text": "9",
+      "start": 740,
+      "end": 741,
+      "score": 0.8481375575065613
+     },
+     {
+      "label": "quantity",
+      "text": "0.3",
+      "start": 588,
+      "end": 591,
+      "score": 0.8317431807518005
+     },
+     {
+      "label": "quantity",
+      "text": "9",
+      "start": 670,
+      "end": 671,
+      "score": 0.8180598020553589
+     },
+     {
+      "label": "quantity",
+      "text": "8",
+      "start": 788,
+      "end": 789,
+      "score": 0.7989237308502197
+     },
+     {
+      "label": "quantity",
+      "text": "2",
+      "start": 633,
+      "end": 634,
+      "score": 0.7667314410209656
+     },
+     {
+      "label": "quantity",
+      "text": "8",
+      "start": 560,
+      "end": 561,
+      "score": 0.7643812894821167
+     },
+     {
+      "label": "quantity",
+      "text": "1.7",
+      "start": 714,
+      "end": 717,
+      "score": 0.7583677768707275
+     },
+     {
+      "label": "quantity",
+      "text": "1",
+      "start": 558,
+      "end": 559,
+      "score": 0.7420761585235596
+     },
+     {
+      "label": "quantity",
+      "text": "1.4",
+      "start": 564,
+      "end": 567,
+      "score": 0.7188811898231506
+     }
+    ]
+   },
+   "0.8": {
+    "apron.sample/A": [
+     {
+      "label": "quantity",
+      "text": "36",
+      "start": 8,
+      "end": 10,
+      "score": 0.9724560379981995
+     }
+    ],
+    "apron.sample/B": [
+     {
+      "label": "quantity",
+      "text": "20",
+      "start": 16,
+      "end": 18,
+      "score": 0.969285786151886
+     }
+    ],
+    "apron.sample/C": [
+     {
+      "label": "quantity",
+      "text": "46",
+      "start": 17,
+      "end": 19,
+      "score": 0.8809493184089661
+     }
+    ],
+    "apron.sample/seam": [],
+    "apron.sample/1": [],
+    "apron.sample/2": [
+     {
+      "label": "quantity",
+      "text": "7",
+      "start": 20,
+      "end": 21,
+      "score": 0.8169528841972351
+     },
+     {
+      "label": "quantity",
+      "text": "14",
+      "start": 11,
+      "end": 13,
+      "score": 0.8042401671409607
+     }
+    ],
+    "apron.sample/3": [],
+    "apron.sample/4": [],
+    "apron.sample/5": [],
+    "apron.sample/6": [],
+    "apron.sample/brace": [
+     {
+      "label": "quantity",
+      "text": "72–74",
+      "start": 0,
+      "end": 5,
+      "score": 0.8185862302780151
+     }
+    ],
+    "tunic.sample/1": [],
+    "tunic.sample/2": [],
+    "tunic.sample/3": [],
+    "tunic.sample/4": [],
+    "tunic.sample/5": [],
+    "brief/apron": [
+     {
+      "label": "quantity",
+      "text": "20",
+      "start": 38,
+      "end": 40,
+      "score": 0.8382360339164734
+     },
+     {
+      "label": "garment or part name",
+      "text": "apron dress",
+      "start": 3,
+      "end": 14,
+      "score": 0.9630143642425537
+     }
+    ],
+    "brief/flowchart": [],
+    "brief/castle": [
+     {
+      "label": "garment or part name",
+      "text": "wall",
+      "start": 28,
+      "end": 32,
+      "score": 0.9269072413444519
+     },
+     {
+      "label": "garment or part name",
+      "text": "gate",
+      "start": 39,
+      "end": 43,
+      "score": 0.9198954701423645
+     }
+    ],
+    "brief/castle-words": [],
+    "castle-sketch.brief": [
+     {
+      "label": "quantity",
+      "text": "9",
+      "start": 740,
+      "end": 741,
+      "score": 0.8481375575065613
+     },
+     {
+      "label": "quantity",
+      "text": "0.3",
+      "start": 588,
+      "end": 591,
+      "score": 0.8317431807518005
+     },
+     {
+      "label": "quantity",
+      "text": "9",
+      "start": 670,
+      "end": 671,
+      "score": 0.8180598020553589
+     }
+    ]
+   },
+   "0.9": {
+    "apron.sample/A": [
+     {
+      "label": "quantity",
+      "text": "36",
+      "start": 8,
+      "end": 10,
+      "score": 0.9724560379981995
+     }
+    ],
+    "apron.sample/B": [
+     {
+      "label": "quantity",
+      "text": "20",
+      "start": 16,
+      "end": 18,
+      "score": 0.969285786151886
+     }
+    ],
+    "apron.sample/C": [],
+    "apron.sample/seam": [],
+    "apron.sample/1": [],
+    "apron.sample/2": [],
+    "apron.sample/3": [],
+    "apron.sample/4": [],
+    "apron.sample/5": [],
+    "apron.sample/6": [],
+    "apron.sample/brace": [],
+    "tunic.sample/1": [],
+    "tunic.sample/2": [],
+    "tunic.sample/3": [],
+    "tunic.sample/4": [],
+    "tunic.sample/5": [],
+    "brief/apron": [
+     {
+      "label": "garment or part name",
+      "text": "apron dress",
+      "start": 3,
+      "end": 14,
+      "score": 0.9630143642425537
+     }
+    ],
+    "brief/flowchart": [],
+    "brief/castle": [
+     {
+      "label": "garment or part name",
+      "text": "wall",
+      "start": 28,
+      "end": 32,
+      "score": 0.9269072413444519
+     },
+     {
+      "label": "garment or part name",
+      "text": "gate",
+      "start": 39,
+      "end": 43,
+      "score": 0.9198954701423645
+     }
+    ],
+    "brief/castle-words": [],
+    "castle-sketch.brief": []
+   }
+  },
+  "plain, described": {
+   "0.3": {
+    "apron.sample/A": [
+     {
+      "label": "measurement name",
+      "text": "A. Bust",
+      "start": 0,
+      "end": 7,
+      "score": 0.406806081533432
+     },
+     {
+      "label": "quantity",
+      "text": "36",
+      "start": 8,
+      "end": 10,
+      "score": 0.9538819789886475
+     }
+    ],
+    "apron.sample/B": [
+     {
+      "label": "measurement name",
+      "text": "Top to waist",
+      "start": 3,
+      "end": 15,
+      "score": 0.5667856335639954
+     },
+     {
+      "label": "quantity",
+      "text": "20",
+      "start": 16,
+      "end": 18,
+      "score": 0.9683951735496521
+     }
+    ],
+    "apron.sample/C": [
+     {
+      "label": "quantity",
+      "text": "46",
+      "start": 17,
+      "end": 19,
+      "score": 0.9402000904083252
+     }
+    ],
+    "apron.sample/seam": [],
+    "apron.sample/1": [
+     {
+      "label": "quantity",
+      "text": "14",
+      "start": 20,
+      "end": 22,
+      "score": 0.6337146162986755
+     },
+     {
+      "label": "quantity",
+      "text": "12",
+      "start": 11,
+      "end": 13,
+      "score": 0.6209392547607422
+     },
+     {
+      "label": "quantity",
+      "text": "1",
+      "start": 0,
+      "end": 1,
+      "score": 0.3212423622608185
+     }
+    ],
+    "apron.sample/2": [
+     {
+      "label": "quantity",
+      "text": "14",
+      "start": 11,
+      "end": 13,
+      "score": 0.7027652263641357
+     },
+     {
+      "label": "quantity",
+      "text": "7",
+      "start": 20,
+      "end": 21,
+      "score": 0.6756182312965393
+     }
+    ],
+    "apron.sample/3": [
+     {
+      "label": "quantity",
+      "text": "22",
+      "start": 14,
+      "end": 16,
+      "score": 0.501842737197876
+     },
+     {
+      "label": "quantity",
+      "text": "2",
+      "start": 10,
+      "end": 11,
+      "score": 0.33522823452949524
+     },
+     {
+      "label": "quantity",
+      "text": "20",
+      "start": 5,
+      "end": 7,
+      "score": 0.3301829993724823
+     }
+    ],
+    "apron.sample/4": [
+     {
+      "label": "quantity",
+      "text": "48",
+      "start": 5,
+      "end": 7,
+      "score": 0.5784076452255249
+     },
+     {
+      "label": "quantity",
+      "text": "4",
+      "start": 0,
+      "end": 1,
+      "score": 0.3481079339981079
+     }
+    ],
+    "apron.sample/5": [
+     {
+      "label": "quantity",
+      "text": "5",
+      "start": 0,
+      "end": 1,
+      "score": 0.5493762493133545
+     },
+     {
+      "label": "unit",
+      "text": "\"",
+      "start": 7,
+      "end": 8,
+      "score": 0.494137704372406
+     }
+    ],
+    "apron.sample/6": [
+     {
+      "label": "quantity",
+      "text": "72",
+      "start": 15,
+      "end": 17,
+      "score": 0.4539320468902588
+     },
+     {
+      "label": "quantity",
+      "text": "6",
+      "start": 0,
+      "end": 1,
+      "score": 0.4147462546825409
+     }
+    ],
+    "apron.sample/brace": [
+     {
+      "label": "quantity",
+      "text": "72–74",
+      "start": 0,
+      "end": 5,
+      "score": 0.7894967198371887
+     }
+    ],
+    "tunic.sample/1": [
+     {
+      "label": "measurement name",
+      "text": "Chest + 6\"",
+      "start": 3,
+      "end": 13,
+      "score": 0.41361212730407715
+     },
+     {
+      "label": "quantity",
+      "text": "1",
+      "start": 0,
+      "end": 1,
+      "score": 0.4562775492668152
+     },
+     {
+      "label": "quantity",
+      "text": "21",
+      "start": 33,
+      "end": 35,
+      "score": 0.440477192401886
+     },
+     {
+      "label": "quantity",
+      "text": "36",
+      "start": 21,
+      "end": 23,
+      "score": 0.33655503392219543
+     },
+     {
+      "label": "unit",
+      "text": "\"",
+      "start": 12,
+      "end": 13,
+      "score": 0.566376268863678
+     }
+    ],
+    "tunic.sample/2": [
+     {
+      "label": "quantity",
+      "text": "+ 2   54",
+      "start": 30,
+      "end": 38,
+      "score": 0.7993002533912659
+     },
+     {
+      "label": "quantity",
+      "text": "+ 2 = 56",
+      "start": 39,
+      "end": 47,
+      "score": 0.3785472810268402
+     },
+     {
+      "label": "unit",
+      "text": "\"",
+      "start": 47,
+      "end": 48,
+      "score": 0.5047326683998108
+     }
+    ],
+    "tunic.sample/3": [
+     {
+      "label": "measurement name",
+      "text": "Top shoulder to under armpit",
+      "start": 3,
+      "end": 31,
+      "score": 0.4308694303035736
+     },
+     {
+      "label": "quantity",
+      "text": "3",
+      "start": 38,
+      "end": 39,
+      "score": 0.45649808645248413
+     },
+     {
+      "label": "quantity",
+      "text": "3",
+      "start": 0,
+      "end": 1,
+      "score": 0.3914063572883606
+     },
+     {
+      "label": "quantity",
+      "text": "4",
+      "start": 55,
+      "end": 56,
+      "score": 0.3832278549671173
+     },
+     {
+      "label": "quantity",
+      "text": "22",
+      "start": 59,
+      "end": 61,
+      "score": 0.35802149772644043
+     },
+     {
+      "label": "unit",
+      "text": "\"",
+      "start": 61,
+      "end": 62,
+      "score": 0.4767189025878906
+     },
+     {
+      "label": "unit",
+      "text": "\"",
+      "start": 41,
+      "end": 42,
+      "score": 0.4309552311897278
+     },
+     {
+      "label": "garment or part name",
+      "text": "under armpit",
+      "start": 19,
+      "end": 31,
+      "score": 0.34330129623413086
+     }
+    ],
+    "tunic.sample/4": [
+     {
+      "label": "quantity",
+      "text": "3.5",
+      "start": 17,
+      "end": 20,
+      "score": 0.633098840713501
+     },
+     {
+      "label": "quantity",
+      "text": "7",
+      "start": 27,
+      "end": 28,
+      "score": 0.3265409469604492
+     },
+     {
+      "label": "quantity",
+      "text": ".5",
+      "start": 28,
+      "end": 30,
+      "score": 0.3246544599533081
+     },
+     {
+      "label": "quantity",
+      "text": "2",
+      "start": 10,
+      "end": 11,
+      "score": 0.31666117906570435
+     }
+    ],
+    "tunic.sample/5": [
+     {
+      "label": "measurement name",
+      "text": "Arm length + 2",
+      "start": 3,
+      "end": 17,
+      "score": 0.48253723978996277
+     },
+     {
+      "label": "quantity",
+      "text": "5",
+      "start": 0,
+      "end": 1,
+      "score": 0.430013507604599
+     },
+     {
+      "label": "quantity",
+      "text": "21",
+      "start": 21,
+      "end": 23,
+      "score": 0.414977490901947
+     },
+     {
+      "label": "quantity",
+      "text": "23",
+      "start": 30,
+      "end": 32,
+      "score": 0.368447870016098
+     }
+    ],
+    "brief/apron": [
+     {
+      "label": "measurement name",
+      "text": "top to waist",
+      "start": 48,
+      "end": 60,
+      "score": 0.6480666399002075
+     },
+     {
+      "label": "measurement name",
+      "text": "bust",
+      "start": 29,
+      "end": 33,
+      "score": 0.32541942596435547
+     },
+     {
+      "label": "quantity",
+      "text": "20",
+      "start": 38,
+      "end": 40,
+      "score": 0.8743323087692261
+     },
+     {
+      "label": "quantity",
+      "text": "36",
+      "start": 21,
+      "end": 23,
+      "score": 0.7875897884368896
+     },
+     {
+      "label": "unit",
+      "text": "inch",
+      "start": 24,
+      "end": 28,
+      "score": 0.7732750177383423
+     },
+     {
+      "label": "unit",
+      "text": "inches",
+      "start": 41,
+      "end": 47,
+      "score": 0.5142622590065002
+     },
+     {
+      "label": "garment or part name",
+      "text": "apron dress",
+      "start": 3,
+      "end": 14,
+      "score": 0.9557834267616272
+     }
+    ],
+    "brief/flowchart": [],
+    "brief/castle": [
+     {
+      "label": "measurement name",
+      "text": "wall",
+      "start": 28,
+      "end": 32,
+      "score": 0.37014302611351013
+     },
+     {
+      "label": "measurement name",
+      "text": "towers",
+      "start": 18,
+      "end": 24,
+      "score": 0.3259705901145935
+     },
+     {
+      "label": "garment or part name",
+      "text": "gate",
+      "start": 39,
+      "end": 43,
+      "score": 0.9298838973045349
+     },
+     {
+      "label": "garment or part name",
+      "text": "wall",
+      "start": 28,
+      "end": 32,
+      "score": 0.5595758557319641
+     }
+    ],
+    "brief/castle-words": [
+     {
+      "label": "measurement name",
+      "text": "castle",
+      "start": 0,
+      "end": 6,
+      "score": 0.6191601157188416
+     }
+    ],
+    "castle-sketch.brief": [
+     {
+      "label": "measurement name",
+      "text": "HULL",
+      "start": 35,
+      "end": 39,
+      "score": 0.463053822517395
+     },
+     {
+      "label": "measurement name",
+      "text": "hull",
+      "start": 26,
+      "end": 30,
+      "score": 0.43073469400405884
+     },
+     {
+      "label": "quantity",
+      "text": "0.9",
+      "start": 104,
+      "end": 107,
+      "score": 0.7102422118186951
+     },
+     {
+      "label": "quantity",
+      "text": "6.0",
+      "start": 227,
+      "end": 230,
+      "score": 0.6919806003570557
+     },
+     {
+      "label": "quantity",
+      "text": "7",
+      "start": 23,
+      "end": 24,
+      "score": 0.6849824786186218
+     },
+     {
+      "label": "quantity",
+      "text": "2.8",
+      "start": 80,
+      "end": 83,
+      "score": 0.6748760938644409
+     },
+     {
+      "label": "quantity",
+      "text": "1.0",
+      "start": 331,
+      "end": 334,
+      "score": 0.635589599609375
+     },
+     {
+      "label": "quantity",
+      "text": "0.0",
+      "start": 315,
+      "end": 318,
+      "score": 0.6267033815383911
+     },
+     {
+      "label": "quantity",
+      "text": "0.9",
+      "start": 319,
+      "end": 322,
+      "score": 0.6191513538360596
+     },
+     {
+      "label": "quantity",
+      "text": "1.8",
+      "start": 327,
+      "end": 330,
+      "score": 0.6034446358680725
+     },
+     {
+      "label": "quantity",
+      "text": "2.2",
+      "start": 74,
+      "end": 77,
+      "score": 0.5962044596672058
+     },
+     {
+      "label": "quantity",
+      "text": "3.0",
+      "start": 307,
+      "end": 310,
+      "score": 0.570846676826477
+     },
+     {
+      "label": "quantity",
+      "text": "0.8",
+      "start": 303,
+      "end": 306,
+      "score": 0.5689942836761475
+     },
+     {
+      "label": "quantity",
+      "text": "1",
+      "start": 270,
+      "end": 271,
+      "score": 0.5390732288360596
+     },
+     {
+      "label": "unit",
+      "text": "y",
+      "start": 312,
+      "end": 313,
+      "score": 0.4758724868297577
+     },
+     {
+      "label": "unit",
+      "text": "u",
+      "start": 84,
+      "end": 85,
+      "score": 0.47313815355300903
+     },
+     {
+      "label": "unit",
+      "text": "z",
+      "start": 324,
+      "end": 325,
+      "score": 0.4554731249809265
+     },
+     {
+      "label": "unit",
+      "text": "x",
+      "start": 301,
+      "end": 302,
+      "score": 0.38763269782066345
+     },
+     {
+      "label": "garment or part name",
+      "text": "PARTS",
+      "start": 401,
+      "end": 406,
+      "score": 0.44971510767936707
+     },
+     {
+      "label": "garment or part name",
+      "text": "pieces",
+      "start": 411,
+      "end": 417,
+      "score": 0.3601599633693695
+     },
+     {
+      "label": "quantity",
+      "text": "1",
+      "start": 714,
+      "end": 715,
+      "score": 0.7591206431388855
+     },
+     {
+      "label": "quantity",
+      "text": "1",
+      "start": 564,
+      "end": 565,
+      "score": 0.7415030598640442
+     },
+     {
+      "label": "quantity",
+      "text": "9",
+      "start": 670,
+      "end": 671,
+      "score": 0.7309046983718872
+     },
+     {
+      "label": "quantity",
+      "text": "8",
+      "start": 788,
+      "end": 789,
+      "score": 0.713719367980957
+     },
+     {
+      "label": "quantity",
+      "text": "8",
+      "start": 560,
+      "end": 561,
+      "score": 0.6750150918960571
+     },
+     {
+      "label": "quantity",
+      "text": "2",
+      "start": 633,
+      "end": 634,
+      "score": 0.6687605381011963
+     },
+     {
+      "label": "quantity",
+      "text": "0.3",
+      "start": 588,
+      "end": 591,
+      "score": 0.6587396264076233
+     },
+     {
+      "label": "quantity",
+      "text": "0.9",
+      "start": 738,
+      "end": 741,
+      "score": 0.6230331659317017
+     },
+     {
+      "label": "quantity",
+      "text": "2",
+      "start": 704,
+      "end": 705,
+      "score": 0.5247846245765686
+     },
+     {
+      "label": "quantity",
+      "text": "1",
+      "start": 554,
+      "end": 555,
+      "score": 0.38304632902145386
+     },
+     {
+      "label": "operation",
+      "text": "castle with green tops",
+      "start": 1023,
+      "end": 1045,
+      "score": 0.8641231656074524
+     },
+     {
+      "label": "measurement name",
+      "text": "foundation",
+      "start": 1123,
+      "end": 1133,
+      "score": 0.5603739619255066
+     },
+     {
+      "label": "measurement name",
+      "text": "INK",
+      "start": 1076,
+      "end": 1079,
+      "score": 0.31900399923324585
+     },
+     {
+      "label": "measurement name",
+      "text": "height",
+      "start": 1167,
+      "end": 1173,
+      "score": 0.3059072494506836
+     },
+     {
+      "label": "unit",
+      "text": "width",
+      "start": 1198,
+      "end": 1203,
+      "score": 0.6874513030052185
+     },
+     {
+      "label": "unit",
+      "text": "height",
+      "start": 1167,
+      "end": 1173,
+      "score": 0.4230670928955078
+     },
+     {
+      "label": "garment or part name",
+      "text": "PART ID",
+      "start": 1423,
+      "end": 1430,
+      "score": 0.31604084372520447
+     }
+    ]
+   },
+   "0.4": {
+    "apron.sample/A": [
+     {
+      "label": "measurement name",
+      "text": "A. Bust",
+      "start": 0,
+      "end": 7,
+      "score": 0.406806081533432
+     },
+     {
+      "label": "quantity",
+      "text": "36",
+      "start": 8,
+      "end": 10,
+      "score": 0.9538819789886475
+     }
+    ],
+    "apron.sample/B": [
+     {
+      "label": "measurement name",
+      "text": "Top to waist",
+      "start": 3,
+      "end": 15,
+      "score": 0.5667856335639954
+     },
+     {
+      "label": "quantity",
+      "text": "20",
+      "start": 16,
+      "end": 18,
+      "score": 0.9683951735496521
+     }
+    ],
+    "apron.sample/C": [
+     {
+      "label": "quantity",
+      "text": "46",
+      "start": 17,
+      "end": 19,
+      "score": 0.9402000904083252
+     }
+    ],
+    "apron.sample/seam": [],
+    "apron.sample/1": [
+     {
+      "label": "quantity",
+      "text": "14",
+      "start": 20,
+      "end": 22,
+      "score": 0.6337146162986755
+     },
+     {
+      "label": "quantity",
+      "text": "12",
+      "start": 11,
+      "end": 13,
+      "score": 0.6209392547607422
+     }
+    ],
+    "apron.sample/2": [
+     {
+      "label": "quantity",
+      "text": "14",
+      "start": 11,
+      "end": 13,
+      "score": 0.7027652263641357
+     },
+     {
+      "label": "quantity",
+      "text": "7",
+      "start": 20,
+      "end": 21,
+      "score": 0.6756182312965393
+     }
+    ],
+    "apron.sample/3": [
+     {
+      "label": "quantity",
+      "text": "22",
+      "start": 14,
+      "end": 16,
+      "score": 0.501842737197876
+     }
+    ],
+    "apron.sample/4": [
+     {
+      "label": "quantity",
+      "text": "48",
+      "start": 5,
+      "end": 7,
+      "score": 0.5784076452255249
+     }
+    ],
+    "apron.sample/5": [
+     {
+      "label": "quantity",
+      "text": "5",
+      "start": 0,
+      "end": 1,
+      "score": 0.5493762493133545
+     },
+     {
+      "label": "unit",
+      "text": "\"",
+      "start": 7,
+      "end": 8,
+      "score": 0.494137704372406
+     }
+    ],
+    "apron.sample/6": [
+     {
+      "label": "quantity",
+      "text": "72",
+      "start": 15,
+      "end": 17,
+      "score": 0.4539320468902588
+     },
+     {
+      "label": "quantity",
+      "text": "6",
+      "start": 0,
+      "end": 1,
+      "score": 0.4147462546825409
+     }
+    ],
+    "apron.sample/brace": [
+     {
+      "label": "quantity",
+      "text": "72–74",
+      "start": 0,
+      "end": 5,
+      "score": 0.7894967198371887
+     }
+    ],
+    "tunic.sample/1": [
+     {
+      "label": "measurement name",
+      "text": "Chest + 6\"",
+      "start": 3,
+      "end": 13,
+      "score": 0.41361212730407715
+     },
+     {
+      "label": "quantity",
+      "text": "1",
+      "start": 0,
+      "end": 1,
+      "score": 0.4562775492668152
+     },
+     {
+      "label": "quantity",
+      "text": "21",
+      "start": 33,
+      "end": 35,
+      "score": 0.440477192401886
+     },
+     {
+      "label": "unit",
+      "text": "\"",
+      "start": 12,
+      "end": 13,
+      "score": 0.566376268863678
+     }
+    ],
+    "tunic.sample/2": [
+     {
+      "label": "quantity",
+      "text": "+ 2   54",
+      "start": 30,
+      "end": 38,
+      "score": 0.7993002533912659
+     },
+     {
+      "label": "unit",
+      "text": "\"",
+      "start": 47,
+      "end": 48,
+      "score": 0.5047326683998108
+     }
+    ],
+    "tunic.sample/3": [
+     {
+      "label": "measurement name",
+      "text": "Top shoulder to under armpit",
+      "start": 3,
+      "end": 31,
+      "score": 0.4308694303035736
+     },
+     {
+      "label": "quantity",
+      "text": "3",
+      "start": 38,
+      "end": 39,
+      "score": 0.45649808645248413
+     },
+     {
+      "label": "unit",
+      "text": "\"",
+      "start": 61,
+      "end": 62,
+      "score": 0.4767189025878906
+     },
+     {
+      "label": "unit",
+      "text": "\"",
+      "start": 41,
+      "end": 42,
+      "score": 0.4309552311897278
+     }
+    ],
+    "tunic.sample/4": [
+     {
+      "label": "quantity",
+      "text": "3.5",
+      "start": 17,
+      "end": 20,
+      "score": 0.633098840713501
+     },
+     {
+      "label": "quantity",
+      "text": "7.5",
+      "start": 27,
+      "end": 30,
+      "score": 0.5264069437980652
+     }
+    ],
+    "tunic.sample/5": [
+     {
+      "label": "measurement name",
+      "text": "Arm length + 2",
+      "start": 3,
+      "end": 17,
+      "score": 0.48253723978996277
+     },
+     {
+      "label": "quantity",
+      "text": "5",
+      "start": 0,
+      "end": 1,
+      "score": 0.430013507604599
+     },
+     {
+      "label": "quantity",
+      "text": "21",
+      "start": 21,
+      "end": 23,
+      "score": 0.414977490901947
+     }
+    ],
+    "brief/apron": [
+     {
+      "label": "measurement name",
+      "text": "top to waist",
+      "start": 48,
+      "end": 60,
+      "score": 0.6480666399002075
+     },
+     {
+      "label": "quantity",
+      "text": "20",
+      "start": 38,
+      "end": 40,
+      "score": 0.8743323087692261
+     },
+     {
+      "label": "quantity",
+      "text": "36",
+      "start": 21,
+      "end": 23,
+      "score": 0.7875897884368896
+     },
+     {
+      "label": "unit",
+      "text": "inch",
+      "start": 24,
+      "end": 28,
+      "score": 0.7732750177383423
+     },
+     {
+      "label": "unit",
+      "text": "inches",
+      "start": 41,
+      "end": 47,
+      "score": 0.5142622590065002
+     },
+     {
+      "label": "garment or part name",
+      "text": "apron dress",
+      "start": 3,
+      "end": 14,
+      "score": 0.9557834267616272
+     }
+    ],
+    "brief/flowchart": [],
+    "brief/castle": [
+     {
+      "label": "garment or part name",
+      "text": "gate",
+      "start": 39,
+      "end": 43,
+      "score": 0.9298838973045349
+     },
+     {
+      "label": "garment or part name",
+      "text": "wall",
+      "start": 28,
+      "end": 32,
+      "score": 0.5595758557319641
+     }
+    ],
+    "brief/castle-words": [
+     {
+      "label": "measurement name",
+      "text": "castle",
+      "start": 0,
+      "end": 6,
+      "score": 0.6191601157188416
+     }
+    ],
+    "castle-sketch.brief": [
+     {
+      "label": "measurement name",
+      "text": "HULL",
+      "start": 35,
+      "end": 39,
+      "score": 0.463053822517395
+     },
+     {
+      "label": "measurement name",
+      "text": "hull",
+      "start": 26,
+      "end": 30,
+      "score": 0.43073469400405884
+     },
+     {
+      "label": "quantity",
+      "text": "0.9",
+      "start": 104,
+      "end": 107,
+      "score": 0.7102422118186951
+     },
+     {
+      "label": "quantity",
+      "text": "6.0",
+      "start": 227,
+      "end": 230,
+      "score": 0.6919806003570557
+     },
+     {
+      "label": "quantity",
+      "text": "7",
+      "start": 23,
+      "end": 24,
+      "score": 0.6849824786186218
+     },
+     {
+      "label": "quantity",
+      "text": "2.8",
+      "start": 80,
+      "end": 83,
+      "score": 0.6748760938644409
+     },
+     {
+      "label": "quantity",
+      "text": "1.0",
+      "start": 331,
+      "end": 334,
+      "score": 0.635589599609375
+     },
+     {
+      "label": "quantity",
+      "text": "0.0",
+      "start": 315,
+      "end": 318,
+      "score": 0.6267033815383911
+     },
+     {
+      "label": "quantity",
+      "text": "0.9",
+      "start": 319,
+      "end": 322,
+      "score": 0.6191513538360596
+     },
+     {
+      "label": "quantity",
+      "text": "1.8",
+      "start": 327,
+      "end": 330,
+      "score": 0.6034446358680725
+     },
+     {
+      "label": "quantity",
+      "text": "2.2",
+      "start": 74,
+      "end": 77,
+      "score": 0.5962044596672058
+     },
+     {
+      "label": "quantity",
+      "text": "3.0",
+      "start": 307,
+      "end": 310,
+      "score": 0.570846676826477
+     },
+     {
+      "label": "quantity",
+      "text": "0.8",
+      "start": 303,
+      "end": 306,
+      "score": 0.5689942836761475
+     },
+     {
+      "label": "quantity",
+      "text": "1",
+      "start": 270,
+      "end": 271,
+      "score": 0.5390732288360596
+     },
+     {
+      "label": "unit",
+      "text": "y",
+      "start": 312,
+      "end": 313,
+      "score": 0.4758724868297577
+     },
+     {
+      "label": "unit",
+      "text": "u",
+      "start": 84,
+      "end": 85,
+      "score": 0.47313815355300903
+     },
+     {
+      "label": "unit",
+      "text": "z",
+      "start": 324,
+      "end": 325,
+      "score": 0.4554731249809265
+     },
+     {
+      "label": "garment or part name",
+      "text": "PARTS",
+      "start": 401,
+      "end": 406,
+      "score": 0.44971510767936707
+     },
+     {
+      "label": "quantity",
+      "text": "1",
+      "start": 714,
+      "end": 715,
+      "score": 0.7591206431388855
+     },
+     {
+      "label": "quantity",
+      "text": "1",
+      "start": 564,
+      "end": 565,
+      "score": 0.7415030598640442
+     },
+     {
+      "label": "quantity",
+      "text": "9",
+      "start": 670,
+      "end": 671,
+      "score": 0.7309046983718872
+     },
+     {
+      "label": "quantity",
+      "text": "8",
+      "start": 788,
+      "end": 789,
+      "score": 0.713719367980957
+     },
+     {
+      "label": "quantity",
+      "text": "8",
+      "start": 560,
+      "end": 561,
+      "score": 0.6750150918960571
+     },
+     {
+      "label": "quantity",
+      "text": "2",
+      "start": 633,
+      "end": 634,
+      "score": 0.6687605381011963
+     },
+     {
+      "label": "quantity",
+      "text": "0.3",
+      "start": 588,
+      "end": 591,
+      "score": 0.6587396264076233
+     },
+     {
+      "label": "quantity",
+      "text": "0.9",
+      "start": 738,
+      "end": 741,
+      "score": 0.6230331659317017
+     },
+     {
+      "label": "quantity",
+      "text": "2",
+      "start": 704,
+      "end": 705,
+      "score": 0.5247846245765686
+     },
+     {
+      "label": "operation",
+      "text": "castle with green tops",
+      "start": 1023,
+      "end": 1045,
+      "score": 0.8641231656074524
+     },
+     {
+      "label": "measurement name",
+      "text": "foundation",
+      "start": 1123,
+      "end": 1133,
+      "score": 0.5603739619255066
+     },
+     {
+      "label": "unit",
+      "text": "width",
+      "start": 1198,
+      "end": 1203,
+      "score": 0.6874513030052185
+     },
+     {
+      "label": "unit",
+      "text": "height",
+      "start": 1167,
+      "end": 1173,
+      "score": 0.4230670928955078
+     }
+    ]
+   },
+   "0.5": {
+    "apron.sample/A": [
+     {
+      "label": "quantity",
+      "text": "36",
+      "start": 8,
+      "end": 10,
+      "score": 0.9538819789886475
+     }
+    ],
+    "apron.sample/B": [
+     {
+      "label": "measurement name",
+      "text": "Top to waist",
+      "start": 3,
+      "end": 15,
+      "score": 0.5667856335639954
+     },
+     {
+      "label": "quantity",
+      "text": "20",
+      "start": 16,
+      "end": 18,
+      "score": 0.9683951735496521
+     }
+    ],
+    "apron.sample/C": [
+     {
+      "label": "quantity",
+      "text": "46",
+      "start": 17,
+      "end": 19,
+      "score": 0.9402000904083252
+     }
+    ],
+    "apron.sample/seam": [],
+    "apron.sample/1": [
+     {
+      "label": "quantity",
+      "text": "14",
+      "start": 20,
+      "end": 22,
+      "score": 0.6337146162986755
+     },
+     {
+      "label": "quantity",
+      "text": "12",
+      "start": 11,
+      "end": 13,
+      "score": 0.6209392547607422
+     }
+    ],
+    "apron.sample/2": [
+     {
+      "label": "quantity",
+      "text": "14",
+      "start": 11,
+      "end": 13,
+      "score": 0.7027652263641357
+     },
+     {
+      "label": "quantity",
+      "text": "7",
+      "start": 20,
+      "end": 21,
+      "score": 0.6756182312965393
+     }
+    ],
+    "apron.sample/3": [
+     {
+      "label": "quantity",
+      "text": "22",
+      "start": 14,
+      "end": 16,
+      "score": 0.501842737197876
+     }
+    ],
+    "apron.sample/4": [
+     {
+      "label": "quantity",
+      "text": "48",
+      "start": 5,
+      "end": 7,
+      "score": 0.5784076452255249
+     }
+    ],
+    "apron.sample/5": [
+     {
+      "label": "quantity",
+      "text": "5",
+      "start": 0,
+      "end": 1,
+      "score": 0.5493762493133545
+     }
+    ],
+    "apron.sample/6": [],
+    "apron.sample/brace": [
+     {
+      "label": "quantity",
+      "text": "72–74",
+      "start": 0,
+      "end": 5,
+      "score": 0.7894967198371887
+     }
+    ],
+    "tunic.sample/1": [
+     {
+      "label": "unit",
+      "text": "\"",
+      "start": 12,
+      "end": 13,
+      "score": 0.566376268863678
+     }
+    ],
+    "tunic.sample/2": [
+     {
+      "label": "quantity",
+      "text": "+ 2   54",
+      "start": 30,
+      "end": 38,
+      "score": 0.7993002533912659
+     },
+     {
+      "label": "unit",
+      "text": "\"",
+      "start": 47,
+      "end": 48,
+      "score": 0.5047326683998108
+     }
+    ],
+    "tunic.sample/3": [],
+    "tunic.sample/4": [
+     {
+      "label": "quantity",
+      "text": "3.5",
+      "start": 17,
+      "end": 20,
+      "score": 0.633098840713501
+     },
+     {
+      "label": "quantity",
+      "text": "7.5",
+      "start": 27,
+      "end": 30,
+      "score": 0.5264069437980652
+     }
+    ],
+    "tunic.sample/5": [],
+    "brief/apron": [
+     {
+      "label": "measurement name",
+      "text": "top to waist",
+      "start": 48,
+      "end": 60,
+      "score": 0.6480666399002075
+     },
+     {
+      "label": "quantity",
+      "text": "20",
+      "start": 38,
+      "end": 40,
+      "score": 0.8743323087692261
+     },
+     {
+      "label": "quantity",
+      "text": "36",
+      "start": 21,
+      "end": 23,
+      "score": 0.7875897884368896
+     },
+     {
+      "label": "unit",
+      "text": "inch",
+      "start": 24,
+      "end": 28,
+      "score": 0.7732750177383423
+     },
+     {
+      "label": "unit",
+      "text": "inches",
+      "start": 41,
+      "end": 47,
+      "score": 0.5142622590065002
+     },
+     {
+      "label": "garment or part name",
+      "text": "apron dress",
+      "start": 3,
+      "end": 14,
+      "score": 0.9557834267616272
+     }
+    ],
+    "brief/flowchart": [],
+    "brief/castle": [
+     {
+      "label": "garment or part name",
+      "text": "gate",
+      "start": 39,
+      "end": 43,
+      "score": 0.9298838973045349
+     },
+     {
+      "label": "garment or part name",
+      "text": "wall",
+      "start": 28,
+      "end": 32,
+      "score": 0.5595758557319641
+     }
+    ],
+    "brief/castle-words": [
+     {
+      "label": "measurement name",
+      "text": "castle",
+      "start": 0,
+      "end": 6,
+      "score": 0.6191601157188416
+     }
+    ],
+    "castle-sketch.brief": [
+     {
+      "label": "quantity",
+      "text": "0.9",
+      "start": 104,
+      "end": 107,
+      "score": 0.7102422118186951
+     },
+     {
+      "label": "quantity",
+      "text": "6.0",
+      "start": 227,
+      "end": 230,
+      "score": 0.6919806003570557
+     },
+     {
+      "label": "quantity",
+      "text": "7",
+      "start": 23,
+      "end": 24,
+      "score": 0.6849824786186218
+     },
+     {
+      "label": "quantity",
+      "text": "2.8",
+      "start": 80,
+      "end": 83,
+      "score": 0.6748760938644409
+     },
+     {
+      "label": "quantity",
+      "text": "1.0",
+      "start": 331,
+      "end": 334,
+      "score": 0.635589599609375
+     },
+     {
+      "label": "quantity",
+      "text": "0.0",
+      "start": 315,
+      "end": 318,
+      "score": 0.6267033815383911
+     },
+     {
+      "label": "quantity",
+      "text": "0.9",
+      "start": 319,
+      "end": 322,
+      "score": 0.6191513538360596
+     },
+     {
+      "label": "quantity",
+      "text": "1.8",
+      "start": 327,
+      "end": 330,
+      "score": 0.6034446358680725
+     },
+     {
+      "label": "quantity",
+      "text": "2.2",
+      "start": 74,
+      "end": 77,
+      "score": 0.5962044596672058
+     },
+     {
+      "label": "quantity",
+      "text": "3.0",
+      "start": 307,
+      "end": 310,
+      "score": 0.570846676826477
+     },
+     {
+      "label": "quantity",
+      "text": "0.8",
+      "start": 303,
+      "end": 306,
+      "score": 0.5689942836761475
+     },
+     {
+      "label": "quantity",
+      "text": "1",
+      "start": 270,
+      "end": 271,
+      "score": 0.5390732288360596
+     },
+     {
+      "label": "quantity",
+      "text": "1",
+      "start": 714,
+      "end": 715,
+      "score": 0.7591206431388855
+     },
+     {
+      "label": "quantity",
+      "text": "1",
+      "start": 564,
+      "end": 565,
+      "score": 0.7415030598640442
+     },
+     {
+      "label": "quantity",
+      "text": "9",
+      "start": 670,
+      "end": 671,
+      "score": 0.7309046983718872
+     },
+     {
+      "label": "quantity",
+      "text": "8",
+      "start": 788,
+      "end": 789,
+      "score": 0.713719367980957
+     },
+     {
+      "label": "quantity",
+      "text": "8",
+      "start": 560,
+      "end": 561,
+      "score": 0.6750150918960571
+     },
+     {
+      "label": "quantity",
+      "text": "2",
+      "start": 633,
+      "end": 634,
+      "score": 0.6687605381011963
+     },
+     {
+      "label": "quantity",
+      "text": "0.3",
+      "start": 588,
+      "end": 591,
+      "score": 0.6587396264076233
+     },
+     {
+      "label": "quantity",
+      "text": "0.9",
+      "start": 738,
+      "end": 741,
+      "score": 0.6230331659317017
+     },
+     {
+      "label": "quantity",
+      "text": "2",
+      "start": 704,
+      "end": 705,
+      "score": 0.5247846245765686
+     },
+     {
+      "label": "operation",
+      "text": "castle with green tops",
+      "start": 1023,
+      "end": 1045,
+      "score": 0.8641231656074524
+     },
+     {
+      "label": "measurement name",
+      "text": "foundation",
+      "start": 1123,
+      "end": 1133,
+      "score": 0.5603739619255066
+     },
+     {
+      "label": "unit",
+      "text": "width",
+      "start": 1198,
+      "end": 1203,
+      "score": 0.6874513030052185
+     }
+    ]
+   },
+   "0.6": {
+    "apron.sample/A": [
+     {
+      "label": "quantity",
+      "text": "36",
+      "start": 8,
+      "end": 10,
+      "score": 0.9538819789886475
+     }
+    ],
+    "apron.sample/B": [
+     {
+      "label": "quantity",
+      "text": "20",
+      "start": 16,
+      "end": 18,
+      "score": 0.9683951735496521
+     }
+    ],
+    "apron.sample/C": [
+     {
+      "label": "quantity",
+      "text": "46",
+      "start": 17,
+      "end": 19,
+      "score": 0.9402000904083252
+     }
+    ],
+    "apron.sample/seam": [],
+    "apron.sample/1": [
+     {
+      "label": "quantity",
+      "text": "14",
+      "start": 20,
+      "end": 22,
+      "score": 0.6337146162986755
+     },
+     {
+      "label": "quantity",
+      "text": "12",
+      "start": 11,
+      "end": 13,
+      "score": 0.6209392547607422
+     }
+    ],
+    "apron.sample/2": [
+     {
+      "label": "quantity",
+      "text": "14",
+      "start": 11,
+      "end": 13,
+      "score": 0.7027652263641357
+     },
+     {
+      "label": "quantity",
+      "text": "7",
+      "start": 20,
+      "end": 21,
+      "score": 0.6756182312965393
+     }
+    ],
+    "apron.sample/3": [],
+    "apron.sample/4": [],
+    "apron.sample/5": [],
+    "apron.sample/6": [],
+    "apron.sample/brace": [
+     {
+      "label": "quantity",
+      "text": "72–74",
+      "start": 0,
+      "end": 5,
+      "score": 0.7894967198371887
+     }
+    ],
+    "tunic.sample/1": [],
+    "tunic.sample/2": [
+     {
+      "label": "quantity",
+      "text": "+ 2   54",
+      "start": 30,
+      "end": 38,
+      "score": 0.7993002533912659
+     }
+    ],
+    "tunic.sample/3": [],
+    "tunic.sample/4": [
+     {
+      "label": "quantity",
+      "text": "3.5",
+      "start": 17,
+      "end": 20,
+      "score": 0.633098840713501
+     }
+    ],
+    "tunic.sample/5": [],
+    "brief/apron": [
+     {
+      "label": "measurement name",
+      "text": "top to waist",
+      "start": 48,
+      "end": 60,
+      "score": 0.6480666399002075
+     },
+     {
+      "label": "quantity",
+      "text": "20",
+      "start": 38,
+      "end": 40,
+      "score": 0.8743323087692261
+     },
+     {
+      "label": "quantity",
+      "text": "36",
+      "start": 21,
+      "end": 23,
+      "score": 0.7875897884368896
+     },
+     {
+      "label": "unit",
+      "text": "inch",
+      "start": 24,
+      "end": 28,
+      "score": 0.7732750177383423
+     },
+     {
+      "label": "garment or part name",
+      "text": "apron dress",
+      "start": 3,
+      "end": 14,
+      "score": 0.9557834267616272
+     }
+    ],
+    "brief/flowchart": [],
+    "brief/castle": [
+     {
+      "label": "garment or part name",
+      "text": "gate",
+      "start": 39,
+      "end": 43,
+      "score": 0.9298838973045349
+     }
+    ],
+    "brief/castle-words": [
+     {
+      "label": "measurement name",
+      "text": "castle",
+      "start": 0,
+      "end": 6,
+      "score": 0.6191601157188416
+     }
+    ],
+    "castle-sketch.brief": [
+     {
+      "label": "quantity",
+      "text": "0.9",
+      "start": 104,
+      "end": 107,
+      "score": 0.7102422118186951
+     },
+     {
+      "label": "quantity",
+      "text": "6.0",
+      "start": 227,
+      "end": 230,
+      "score": 0.6919806003570557
+     },
+     {
+      "label": "quantity",
+      "text": "7",
+      "start": 23,
+      "end": 24,
+      "score": 0.6849824786186218
+     },
+     {
+      "label": "quantity",
+      "text": "2.8",
+      "start": 80,
+      "end": 83,
+      "score": 0.6748760938644409
+     },
+     {
+      "label": "quantity",
+      "text": "1.0",
+      "start": 331,
+      "end": 334,
+      "score": 0.635589599609375
+     },
+     {
+      "label": "quantity",
+      "text": "0.0",
+      "start": 315,
+      "end": 318,
+      "score": 0.6267033815383911
+     },
+     {
+      "label": "quantity",
+      "text": "0.9",
+      "start": 319,
+      "end": 322,
+      "score": 0.6191513538360596
+     },
+     {
+      "label": "quantity",
+      "text": "1.8",
+      "start": 327,
+      "end": 330,
+      "score": 0.6034446358680725
+     },
+     {
+      "label": "quantity",
+      "text": "1",
+      "start": 714,
+      "end": 715,
+      "score": 0.7591206431388855
+     },
+     {
+      "label": "quantity",
+      "text": "1",
+      "start": 564,
+      "end": 565,
+      "score": 0.7415030598640442
+     },
+     {
+      "label": "quantity",
+      "text": "9",
+      "start": 670,
+      "end": 671,
+      "score": 0.7309046983718872
+     },
+     {
+      "label": "quantity",
+      "text": "8",
+      "start": 788,
+      "end": 789,
+      "score": 0.713719367980957
+     },
+     {
+      "label": "quantity",
+      "text": "8",
+      "start": 560,
+      "end": 561,
+      "score": 0.6750150918960571
+     },
+     {
+      "label": "quantity",
+      "text": "2",
+      "start": 633,
+      "end": 634,
+      "score": 0.6687605381011963
+     },
+     {
+      "label": "quantity",
+      "text": "0.3",
+      "start": 588,
+      "end": 591,
+      "score": 0.6587396264076233
+     },
+     {
+      "label": "quantity",
+      "text": "0.9",
+      "start": 738,
+      "end": 741,
+      "score": 0.6230331659317017
+     },
+     {
+      "label": "operation",
+      "text": "castle with green tops",
+      "start": 1023,
+      "end": 1045,
+      "score": 0.8641231656074524
+     },
+     {
+      "label": "unit",
+      "text": "width",
+      "start": 1198,
+      "end": 1203,
+      "score": 0.6874513030052185
+     }
+    ]
+   },
+   "0.7": {
+    "apron.sample/A": [
+     {
+      "label": "quantity",
+      "text": "36",
+      "start": 8,
+      "end": 10,
+      "score": 0.9538819789886475
+     }
+    ],
+    "apron.sample/B": [
+     {
+      "label": "quantity",
+      "text": "20",
+      "start": 16,
+      "end": 18,
+      "score": 0.9683951735496521
+     }
+    ],
+    "apron.sample/C": [
+     {
+      "label": "quantity",
+      "text": "46",
+      "start": 17,
+      "end": 19,
+      "score": 0.9402000904083252
+     }
+    ],
+    "apron.sample/seam": [],
+    "apron.sample/1": [],
+    "apron.sample/2": [
+     {
+      "label": "quantity",
+      "text": "14",
+      "start": 11,
+      "end": 13,
+      "score": 0.7027652263641357
+     }
+    ],
+    "apron.sample/3": [],
+    "apron.sample/4": [],
+    "apron.sample/5": [],
+    "apron.sample/6": [],
+    "apron.sample/brace": [
+     {
+      "label": "quantity",
+      "text": "72–74",
+      "start": 0,
+      "end": 5,
+      "score": 0.7894967198371887
+     }
+    ],
+    "tunic.sample/1": [],
+    "tunic.sample/2": [
+     {
+      "label": "quantity",
+      "text": "+ 2   54",
+      "start": 30,
+      "end": 38,
+      "score": 0.7993002533912659
+     }
+    ],
+    "tunic.sample/3": [],
+    "tunic.sample/4": [],
+    "tunic.sample/5": [],
+    "brief/apron": [
+     {
+      "label": "quantity",
+      "text": "20",
+      "start": 38,
+      "end": 40,
+      "score": 0.8743323087692261
+     },
+     {
+      "label": "quantity",
+      "text": "36",
+      "start": 21,
+      "end": 23,
+      "score": 0.7875897884368896
+     },
+     {
+      "label": "unit",
+      "text": "inch",
+      "start": 24,
+      "end": 28,
+      "score": 0.7732750177383423
+     },
+     {
+      "label": "garment or part name",
+      "text": "apron dress",
+      "start": 3,
+      "end": 14,
+      "score": 0.9557834267616272
+     }
+    ],
+    "brief/flowchart": [],
+    "brief/castle": [
+     {
+      "label": "garment or part name",
+      "text": "gate",
+      "start": 39,
+      "end": 43,
+      "score": 0.9298838973045349
+     }
+    ],
+    "brief/castle-words": [],
+    "castle-sketch.brief": [
+     {
+      "label": "quantity",
+      "text": "0.9",
+      "start": 104,
+      "end": 107,
+      "score": 0.7102422118186951
+     },
+     {
+      "label": "quantity",
+      "text": "1",
+      "start": 714,
+      "end": 715,
+      "score": 0.7591206431388855
+     },
+     {
+      "label": "quantity",
+      "text": "1",
+      "start": 564,
+      "end": 565,
+      "score": 0.7415030598640442
+     },
+     {
+      "label": "quantity",
+      "text": "9",
+      "start": 670,
+      "end": 671,
+      "score": 0.7309046983718872
+     },
+     {
+      "label": "quantity",
+      "text": "8",
+      "start": 788,
+      "end": 789,
+      "score": 0.713719367980957
+     },
+     {
+      "label": "operation",
+      "text": "castle with green tops",
+      "start": 1023,
+      "end": 1045,
+      "score": 0.8641231656074524
+     }
+    ]
+   },
+   "0.8": {
+    "apron.sample/A": [
+     {
+      "label": "quantity",
+      "text": "36",
+      "start": 8,
+      "end": 10,
+      "score": 0.9538819789886475
+     }
+    ],
+    "apron.sample/B": [
+     {
+      "label": "quantity",
+      "text": "20",
+      "start": 16,
+      "end": 18,
+      "score": 0.9683951735496521
+     }
+    ],
+    "apron.sample/C": [
+     {
+      "label": "quantity",
+      "text": "46",
+      "start": 17,
+      "end": 19,
+      "score": 0.9402000904083252
+     }
+    ],
+    "apron.sample/seam": [],
+    "apron.sample/1": [],
+    "apron.sample/2": [],
+    "apron.sample/3": [],
+    "apron.sample/4": [],
+    "apron.sample/5": [],
+    "apron.sample/6": [],
+    "apron.sample/brace": [],
+    "tunic.sample/1": [],
+    "tunic.sample/2": [],
+    "tunic.sample/3": [],
+    "tunic.sample/4": [],
+    "tunic.sample/5": [],
+    "brief/apron": [
+     {
+      "label": "quantity",
+      "text": "20",
+      "start": 38,
+      "end": 40,
+      "score": 0.8743323087692261
+     },
+     {
+      "label": "garment or part name",
+      "text": "apron dress",
+      "start": 3,
+      "end": 14,
+      "score": 0.9557834267616272
+     }
+    ],
+    "brief/flowchart": [],
+    "brief/castle": [
+     {
+      "label": "garment or part name",
+      "text": "gate",
+      "start": 39,
+      "end": 43,
+      "score": 0.9298838973045349
+     }
+    ],
+    "brief/castle-words": [],
+    "castle-sketch.brief": [
+     {
+      "label": "operation",
+      "text": "castle with green tops",
+      "start": 1023,
+      "end": 1045,
+      "score": 0.8641231656074524
+     }
+    ]
+   },
+   "0.9": {
+    "apron.sample/A": [
+     {
+      "label": "quantity",
+      "text": "36",
+      "start": 8,
+      "end": 10,
+      "score": 0.9538819789886475
+     }
+    ],
+    "apron.sample/B": [
+     {
+      "label": "quantity",
+      "text": "20",
+      "start": 16,
+      "end": 18,
+      "score": 0.9683951735496521
+     }
+    ],
+    "apron.sample/C": [
+     {
+      "label": "quantity",
+      "text": "46",
+      "start": 17,
+      "end": 19,
+      "score": 0.9402000904083252
+     }
+    ],
+    "apron.sample/seam": [],
+    "apron.sample/1": [],
+    "apron.sample/2": [],
+    "apron.sample/3": [],
+    "apron.sample/4": [],
+    "apron.sample/5": [],
+    "apron.sample/6": [],
+    "apron.sample/brace": [],
+    "tunic.sample/1": [],
+    "tunic.sample/2": [],
+    "tunic.sample/3": [],
+    "tunic.sample/4": [],
+    "tunic.sample/5": [],
+    "brief/apron": [
+     {
+      "label": "garment or part name",
+      "text": "apron dress",
+      "start": 3,
+      "end": 14,
+      "score": 0.9557834267616272
+     }
+    ],
+    "brief/flowchart": [],
+    "brief/castle": [
+     {
+      "label": "garment or part name",
+      "text": "gate",
+      "start": 39,
+      "end": 43,
+      "score": 0.9298838973045349
+     }
+    ],
+    "brief/castle-words": [],
+    "castle-sketch.brief": []
+   }
+  }
+ },
+ "scores": {
+  "plan, bare": [
+   {
+    "threshold": 0.3,
+    "strict": {
+     "tp": 23,
+     "fp": 35,
+     "fn": 120,
+     "precision": 0.39655172413793105,
+     "recall": 0.16083916083916083,
+     "f1": 0.22885572139303484
+    },
+    "overlap": {
+     "tp": 33,
+     "fp": 25,
+     "fn": 110,
+     "precision": 0.5689655172413793,
+     "recall": 0.23076923076923078,
+     "f1": 0.32835820895522394
+    },
+    "byKindStrict": {
+     "measurement name": {
+      "tp": 2,
+      "fp": 14,
+      "fn": 9,
+      "precision": 0.125,
+      "recall": 0.18181818181818182,
+      "f1": 0.14814814814814814
+     },
+     "quantity": {
+      "tp": 14,
+      "fp": 5,
+      "fn": 55,
+      "precision": 0.7368421052631579,
+      "recall": 0.2028985507246377,
+      "f1": 0.3181818181818182
+     },
+     "unit": {
+      "tp": 3,
+      "fp": 6,
+      "fn": 25,
+      "precision": 0.3333333333333333,
+      "recall": 0.10714285714285714,
+      "f1": 0.16216216216216214
+     },
+     "garment or part name": {
+      "tp": 4,
+      "fp": 7,
+      "fn": 5,
+      "precision": 0.36363636363636365,
+      "recall": 0.4444444444444444,
+      "f1": 0.39999999999999997
+     },
+     "operation": {
+      "tp": 0,
+      "fp": 3,
+      "fn": 26,
+      "precision": 0,
+      "recall": 0,
+      "f1": null
+     }
+    }
+   },
+   {
+    "threshold": 0.4,
+    "strict": {
+     "tp": 16,
+     "fp": 20,
+     "fn": 127,
+     "precision": 0.4444444444444444,
+     "recall": 0.11188811188811189,
+     "f1": 0.1787709497206704
+    },
+    "overlap": {
+     "tp": 22,
+     "fp": 14,
+     "fn": 121,
+     "precision": 0.6111111111111112,
+     "recall": 0.15384615384615385,
+     "f1": 0.2458100558659218
+    },
+    "byKindStrict": {
+     "measurement name": {
+      "tp": 1,
+      "fp": 8,
+      "fn": 10,
+      "precision": 0.1111111111111111,
+      "recall": 0.09090909090909091,
+      "f1": 0.09999999999999999
+     },
+     "quantity": {
+      "tp": 10,
+      "fp": 3,
+      "fn": 59,
+      "precision": 0.7692307692307693,
+      "recall": 0.14492753623188406,
+      "f1": 0.24390243902439027
+     },
+     "unit": {
+      "tp": 2,
+      "fp": 1,
+      "fn": 26,
+      "precision": 0.6666666666666666,
+      "recall": 0.07142857142857142,
+      "f1": 0.12903225806451613
+     },
+     "garment or part name": {
+      "tp": 3,
+      "fp": 6,
+      "fn": 6,
+      "precision": 0.3333333333333333,
+      "recall": 0.3333333333333333,
+      "f1": 0.3333333333333333
+     },
+     "operation": {
+      "tp": 0,
+      "fp": 2,
+      "fn": 26,
+      "precision": 0,
+      "recall": 0,
+      "f1": null
+     }
+    }
+   },
+   {
+    "threshold": 0.5,
+    "strict": {
+     "tp": 11,
+     "fp": 10,
+     "fn": 132,
+     "precision": 0.5238095238095238,
+     "recall": 0.07692307692307693,
+     "f1": 0.13414634146341461
+    },
+    "overlap": {
+     "tp": 14,
+     "fp": 7,
+     "fn": 129,
+     "precision": 0.6666666666666666,
+     "recall": 0.0979020979020979,
+     "f1": 0.17073170731707316
+    },
+    "byKindStrict": {
+     "measurement name": {
+      "tp": 0,
+      "fp": 4,
+      "fn": 11,
+      "precision": 0,
+      "recall": 0,
+      "f1": null
+     },
+     "quantity": {
+      "tp": 9,
+      "fp": 0,
+      "fn": 60,
+      "precision": 1,
+      "recall": 0.13043478260869565,
+      "f1": 0.23076923076923078
+     },
+     "unit": {
+      "tp": 1,
+      "fp": 0,
+      "fn": 27,
+      "precision": 1,
+      "recall": 0.03571428571428571,
+      "f1": 0.0689655172413793
+     },
+     "garment or part name": {
+      "tp": 1,
+      "fp": 4,
+      "fn": 8,
+      "precision": 0.2,
+      "recall": 0.1111111111111111,
+      "f1": 0.14285714285714285
+     },
+     "operation": {
+      "tp": 0,
+      "fp": 2,
+      "fn": 26,
+      "precision": 0,
+      "recall": 0,
+      "f1": null
+     }
+    }
+   },
+   {
+    "threshold": 0.6,
+    "strict": {
+     "tp": 6,
+     "fp": 5,
+     "fn": 137,
+     "precision": 0.5454545454545454,
+     "recall": 0.04195804195804196,
+     "f1": 0.07792207792207792
+    },
+    "overlap": {
+     "tp": 8,
+     "fp": 3,
+     "fn": 135,
+     "precision": 0.7272727272727273,
+     "recall": 0.055944055944055944,
+     "f1": 0.10389610389610389
+    },
+    "byKindStrict": {
+     "measurement name": {
+      "tp": 0,
+      "fp": 0,
+      "fn": 11,
+      "precision": null,
+      "recall": 0,
+      "f1": null
+     },
+     "quantity": {
+      "tp": 5,
+      "fp": 0,
+      "fn": 64,
+      "precision": 1,
+      "recall": 0.07246376811594203,
+      "f1": 0.13513513513513511
+     },
+     "unit": {
+      "tp": 0,
+      "fp": 0,
+      "fn": 28,
+      "precision": null,
+      "recall": 0,
+      "f1": null
+     },
+     "garment or part name": {
+      "tp": 1,
+      "fp": 3,
+      "fn": 8,
+      "precision": 0.25,
+      "recall": 0.1111111111111111,
+      "f1": 0.15384615384615383
+     },
+     "operation": {
+      "tp": 0,
+      "fp": 2,
+      "fn": 26,
+      "precision": 0,
+      "recall": 0,
+      "f1": null
+     }
+    }
+   },
+   {
+    "threshold": 0.7,
+    "strict": {
+     "tp": 3,
+     "fp": 4,
+     "fn": 140,
+     "precision": 0.42857142857142855,
+     "recall": 0.02097902097902098,
+     "f1": 0.039999999999999994
+    },
+    "overlap": {
+     "tp": 5,
+     "fp": 2,
+     "fn": 138,
+     "precision": 0.7142857142857143,
+     "recall": 0.03496503496503497,
+     "f1": 0.06666666666666667
+    },
+    "byKindStrict": {
+     "measurement name": {
+      "tp": 0,
+      "fp": 0,
+      "fn": 11,
+      "precision": null,
+      "recall": 0,
+      "f1": null
+     },
+     "quantity": {
+      "tp": 2,
+      "fp": 0,
+      "fn": 67,
+      "precision": 1,
+      "recall": 0.028985507246376812,
+      "f1": 0.05633802816901409
+     },
+     "unit": {
+      "tp": 0,
+      "fp": 0,
+      "fn": 28,
+      "precision": null,
+      "recall": 0,
+      "f1": null
+     },
+     "garment or part name": {
+      "tp": 1,
+      "fp": 2,
+      "fn": 8,
+      "precision": 0.3333333333333333,
+      "recall": 0.1111111111111111,
+      "f1": 0.16666666666666666
+     },
+     "operation": {
+      "tp": 0,
+      "fp": 2,
+      "fn": 26,
+      "precision": 0,
+      "recall": 0,
+      "f1": null
+     }
+    }
+   },
+   {
+    "threshold": 0.8,
+    "strict": {
+     "tp": 3,
+     "fp": 1,
+     "fn": 140,
+     "precision": 0.75,
+     "recall": 0.02097902097902098,
+     "f1": 0.04081632653061225
+    },
+    "overlap": {
+     "tp": 4,
+     "fp": 0,
+     "fn": 139,
+     "precision": 1,
+     "recall": 0.027972027972027972,
+     "f1": 0.054421768707483
+    },
+    "byKindStrict": {
+     "measurement name": {
+      "tp": 0,
+      "fp": 0,
+      "fn": 11,
+      "precision": null,
+      "recall": 0,
+      "f1": null
+     },
+     "quantity": {
+      "tp": 2,
+      "fp": 0,
+      "fn": 67,
+      "precision": 1,
+      "recall": 0.028985507246376812,
+      "f1": 0.05633802816901409
+     },
+     "unit": {
+      "tp": 0,
+      "fp": 0,
+      "fn": 28,
+      "precision": null,
+      "recall": 0,
+      "f1": null
+     },
+     "garment or part name": {
+      "tp": 1,
+      "fp": 1,
+      "fn": 8,
+      "precision": 0.5,
+      "recall": 0.1111111111111111,
+      "f1": 0.1818181818181818
+     },
+     "operation": {
+      "tp": 0,
+      "fp": 0,
+      "fn": 26,
+      "precision": null,
+      "recall": 0,
+      "f1": null
+     }
+    }
+   },
+   {
+    "threshold": 0.9,
+    "strict": {
+     "tp": 2,
+     "fp": 1,
+     "fn": 141,
+     "precision": 0.6666666666666666,
+     "recall": 0.013986013986013986,
+     "f1": 0.027397260273972605
+    },
+    "overlap": {
+     "tp": 3,
+     "fp": 0,
+     "fn": 140,
+     "precision": 1,
+     "recall": 0.02097902097902098,
+     "f1": 0.0410958904109589
+    },
+    "byKindStrict": {
+     "measurement name": {
+      "tp": 0,
+      "fp": 0,
+      "fn": 11,
+      "precision": null,
+      "recall": 0,
+      "f1": null
+     },
+     "quantity": {
+      "tp": 1,
+      "fp": 0,
+      "fn": 68,
+      "precision": 1,
+      "recall": 0.014492753623188406,
+      "f1": 0.02857142857142857
+     },
+     "unit": {
+      "tp": 0,
+      "fp": 0,
+      "fn": 28,
+      "precision": null,
+      "recall": 0,
+      "f1": null
+     },
+     "garment or part name": {
+      "tp": 1,
+      "fp": 1,
+      "fn": 8,
+      "precision": 0.5,
+      "recall": 0.1111111111111111,
+      "f1": 0.1818181818181818
+     },
+     "operation": {
+      "tp": 0,
+      "fp": 0,
+      "fn": 26,
+      "precision": null,
+      "recall": 0,
+      "f1": null
+     }
+    }
+   }
+  ],
+  "plan, described": [
+   {
+    "threshold": 0.3,
+    "strict": {
+     "tp": 46,
+     "fp": 34,
+     "fn": 97,
+     "precision": 0.575,
+     "recall": 0.32167832167832167,
+     "f1": 0.41255605381165916
+    },
+    "overlap": {
+     "tp": 61,
+     "fp": 19,
+     "fn": 82,
+     "precision": 0.7625,
+     "recall": 0.42657342657342656,
+     "f1": 0.547085201793722
+    },
+    "byKindStrict": {
+     "measurement name": {
+      "tp": 4,
+      "fp": 10,
+      "fn": 7,
+      "precision": 0.2857142857142857,
+      "recall": 0.36363636363636365,
+      "f1": 0.32
+     },
+     "quantity": {
+      "tp": 28,
+      "fp": 18,
+      "fn": 41,
+      "precision": 0.6086956521739131,
+      "recall": 0.4057971014492754,
+      "f1": 0.48695652173913045
+     },
+     "unit": {
+      "tp": 11,
+      "fp": 2,
+      "fn": 17,
+      "precision": 0.8461538461538461,
+      "recall": 0.39285714285714285,
+      "f1": 0.5365853658536585
+     },
+     "garment or part name": {
+      "tp": 2,
+      "fp": 2,
+      "fn": 7,
+      "precision": 0.5,
+      "recall": 0.2222222222222222,
+      "f1": 0.30769230769230765
+     },
+     "operation": {
+      "tp": 1,
+      "fp": 2,
+      "fn": 25,
+      "precision": 0.3333333333333333,
+      "recall": 0.038461538461538464,
+      "f1": 0.06896551724137931
+     }
+    }
+   },
+   {
+    "threshold": 0.4,
+    "strict": {
+     "tp": 36,
+     "fp": 24,
+     "fn": 107,
+     "precision": 0.6,
+     "recall": 0.2517482517482518,
+     "f1": 0.35467980295566504
+    },
+    "overlap": {
+     "tp": 48,
+     "fp": 12,
+     "fn": 95,
+     "precision": 0.8,
+     "recall": 0.3356643356643357,
+     "f1": 0.4729064039408867
+    },
+    "byKindStrict": {
+     "measurement name": {
+      "tp": 3,
+      "fp": 9,
+      "fn": 8,
+      "precision": 0.25,
+      "recall": 0.2727272727272727,
+      "f1": 0.2608695652173913
+     },
+     "quantity": {
+      "tp": 22,
+      "fp": 12,
+      "fn": 47,
+      "precision": 0.6470588235294118,
+      "recall": 0.3188405797101449,
+      "f1": 0.42718446601941745
+     },
+     "unit": {
+      "tp": 10,
+      "fp": 1,
+      "fn": 18,
+      "precision": 0.9090909090909091,
+      "recall": 0.35714285714285715,
+      "f1": 0.5128205128205129
+     },
+     "garment or part name": {
+      "tp": 1,
+      "fp": 1,
+      "fn": 8,
+      "precision": 0.5,
+      "recall": 0.1111111111111111,
+      "f1": 0.1818181818181818
+     },
+     "operation": {
+      "tp": 0,
+      "fp": 1,
+      "fn": 26,
+      "precision": 0,
+      "recall": 0,
+      "f1": null
+     }
+    }
+   },
+   {
+    "threshold": 0.5,
+    "strict": {
+     "tp": 29,
+     "fp": 6,
+     "fn": 114,
+     "precision": 0.8285714285714286,
+     "recall": 0.20279720279720279,
+     "f1": 0.3258426966292135
+    },
+    "overlap": {
+     "tp": 32,
+     "fp": 3,
+     "fn": 111,
+     "precision": 0.9142857142857143,
+     "recall": 0.22377622377622378,
+     "f1": 0.3595505617977528
+    },
+    "byKindStrict": {
+     "measurement name": {
+      "tp": 2,
+      "fp": 3,
+      "fn": 9,
+      "precision": 0.4,
+      "recall": 0.18181818181818182,
+      "f1": 0.25000000000000006
+     },
+     "quantity": {
+      "tp": 19,
+      "fp": 3,
+      "fn": 50,
+      "precision": 0.8636363636363636,
+      "recall": 0.2753623188405797,
+      "f1": 0.4175824175824176
+     },
+     "unit": {
+      "tp": 7,
+      "fp": 0,
+      "fn": 21,
+      "precision": 1,
+      "recall": 0.25,
+      "f1": 0.4
+     },
+     "garment or part name": {
+      "tp": 1,
+      "fp": 0,
+      "fn": 8,
+      "precision": 1,
+      "recall": 0.1111111111111111,
+      "f1": 0.19999999999999998
+     },
+     "operation": {
+      "tp": 0,
+      "fp": 0,
+      "fn": 26,
+      "precision": null,
+      "recall": 0,
+      "f1": null
+     }
+    }
+   },
+   {
+    "threshold": 0.6,
+    "strict": {
+     "tp": 22,
+     "fp": 3,
+     "fn": 121,
+     "precision": 0.88,
+     "recall": 0.15384615384615385,
+     "f1": 0.2619047619047619
+    },
+    "overlap": {
+     "tp": 23,
+     "fp": 2,
+     "fn": 120,
+     "precision": 0.92,
+     "recall": 0.16083916083916083,
+     "f1": 0.27380952380952384
+    },
+    "byKindStrict": {
+     "measurement name": {
+      "tp": 2,
+      "fp": 2,
+      "fn": 9,
+      "precision": 0.5,
+      "recall": 0.18181818181818182,
+      "f1": 0.26666666666666666
+     },
+     "quantity": {
+      "tp": 15,
+      "fp": 1,
+      "fn": 54,
+      "precision": 0.9375,
+      "recall": 0.21739130434782608,
+      "f1": 0.3529411764705882
+     },
+     "unit": {
+      "tp": 5,
+      "fp": 0,
+      "fn": 23,
+      "precision": 1,
+      "recall": 0.17857142857142858,
+      "f1": 0.30303030303030304
+     },
+     "garment or part name": {
+      "tp": 0,
+      "fp": 0,
+      "fn": 9,
+      "precision": null,
+      "recall": 0,
+      "f1": null
+     },
+     "operation": {
+      "tp": 0,
+      "fp": 0,
+      "fn": 26,
+      "precision": null,
+      "recall": 0,
+      "f1": null
+     }
+    }
+   },
+   {
+    "threshold": 0.7,
+    "strict": {
+     "tp": 14,
+     "fp": 1,
+     "fn": 129,
+     "precision": 0.9333333333333333,
+     "recall": 0.0979020979020979,
+     "f1": 0.17721518987341772
+    },
+    "overlap": {
+     "tp": 14,
+     "fp": 1,
+     "fn": 129,
+     "precision": 0.9333333333333333,
+     "recall": 0.0979020979020979,
+     "f1": 0.17721518987341772
+    },
+    "byKindStrict": {
+     "measurement name": {
+      "tp": 1,
+      "fp": 1,
+      "fn": 10,
+      "precision": 0.5,
+      "recall": 0.09090909090909091,
+      "f1": 0.15384615384615385
+     },
+     "quantity": {
+      "tp": 12,
+      "fp": 0,
+      "fn": 57,
+      "precision": 1,
+      "recall": 0.17391304347826086,
+      "f1": 0.29629629629629634
+     },
+     "unit": {
+      "tp": 1,
+      "fp": 0,
+      "fn": 27,
+      "precision": 1,
+      "recall": 0.03571428571428571,
+      "f1": 0.0689655172413793
+     },
+     "garment or part name": {
+      "tp": 0,
+      "fp": 0,
+      "fn": 9,
+      "precision": null,
+      "recall": 0,
+      "f1": null
+     },
+     "operation": {
+      "tp": 0,
+      "fp": 0,
+      "fn": 26,
+      "precision": null,
+      "recall": 0,
+      "f1": null
+     }
+    }
+   },
+   {
+    "threshold": 0.8,
+    "strict": {
+     "tp": 7,
+     "fp": 0,
+     "fn": 136,
+     "precision": 1,
+     "recall": 0.04895104895104895,
+     "f1": 0.09333333333333334
+    },
+    "overlap": {
+     "tp": 7,
+     "fp": 0,
+     "fn": 136,
+     "precision": 1,
+     "recall": 0.04895104895104895,
+     "f1": 0.09333333333333334
+    },
+    "byKindStrict": {
+     "measurement name": {
+      "tp": 0,
+      "fp": 0,
+      "fn": 11,
+      "precision": null,
+      "recall": 0,
+      "f1": null
+     },
+     "quantity": {
+      "tp": 6,
+      "fp": 0,
+      "fn": 63,
+      "precision": 1,
+      "recall": 0.08695652173913043,
+      "f1": 0.16
+     },
+     "unit": {
+      "tp": 1,
+      "fp": 0,
+      "fn": 27,
+      "precision": 1,
+      "recall": 0.03571428571428571,
+      "f1": 0.0689655172413793
+     },
+     "garment or part name": {
+      "tp": 0,
+      "fp": 0,
+      "fn": 9,
+      "precision": null,
+      "recall": 0,
+      "f1": null
+     },
+     "operation": {
+      "tp": 0,
+      "fp": 0,
+      "fn": 26,
+      "precision": null,
+      "recall": 0,
+      "f1": null
+     }
+    }
+   },
+   {
+    "threshold": 0.9,
+    "strict": {
+     "tp": 3,
+     "fp": 0,
+     "fn": 140,
+     "precision": 1,
+     "recall": 0.02097902097902098,
+     "f1": 0.0410958904109589
+    },
+    "overlap": {
+     "tp": 3,
+     "fp": 0,
+     "fn": 140,
+     "precision": 1,
+     "recall": 0.02097902097902098,
+     "f1": 0.0410958904109589
+    },
+    "byKindStrict": {
+     "measurement name": {
+      "tp": 0,
+      "fp": 0,
+      "fn": 11,
+      "precision": null,
+      "recall": 0,
+      "f1": null
+     },
+     "quantity": {
+      "tp": 3,
+      "fp": 0,
+      "fn": 66,
+      "precision": 1,
+      "recall": 0.043478260869565216,
+      "f1": 0.08333333333333333
+     },
+     "unit": {
+      "tp": 0,
+      "fp": 0,
+      "fn": 28,
+      "precision": null,
+      "recall": 0,
+      "f1": null
+     },
+     "garment or part name": {
+      "tp": 0,
+      "fp": 0,
+      "fn": 9,
+      "precision": null,
+      "recall": 0,
+      "f1": null
+     },
+     "operation": {
+      "tp": 0,
+      "fp": 0,
+      "fn": 26,
+      "precision": null,
+      "recall": 0,
+      "f1": null
+     }
+    }
+   }
+  ],
+  "plain, bare": [
+   {
+    "threshold": 0.3,
+    "strict": {
+     "tp": 42,
+     "fp": 34,
+     "fn": 101,
+     "precision": 0.5526315789473685,
+     "recall": 0.2937062937062937,
+     "f1": 0.3835616438356165
+    },
+    "overlap": {
+     "tp": 60,
+     "fp": 16,
+     "fn": 83,
+     "precision": 0.7894736842105263,
+     "recall": 0.4195804195804196,
+     "f1": 0.547945205479452
+    },
+    "byKindStrict": {
+     "measurement name": {
+      "tp": 3,
+      "fp": 6,
+      "fn": 8,
+      "precision": 0.3333333333333333,
+      "recall": 0.2727272727272727,
+      "f1": 0.3
+     },
+     "quantity": {
+      "tp": 31,
+      "fp": 17,
+      "fn": 38,
+      "precision": 0.6458333333333334,
+      "recall": 0.4492753623188406,
+      "f1": 0.5299145299145299
+     },
+     "unit": {
+      "tp": 4,
+      "fp": 2,
+      "fn": 24,
+      "precision": 0.6666666666666666,
+      "recall": 0.14285714285714285,
+      "f1": 0.23529411764705882
+     },
+     "garment or part name": {
+      "tp": 4,
+      "fp": 8,
+      "fn": 5,
+      "precision": 0.3333333333333333,
+      "recall": 0.4444444444444444,
+      "f1": 0.380952380952381
+     },
+     "operation": {
+      "tp": 0,
+      "fp": 1,
+      "fn": 26,
+      "precision": 0,
+      "recall": 0,
+      "f1": null
+     }
+    }
+   },
+   {
+    "threshold": 0.4,
+    "strict": {
+     "tp": 31,
+     "fp": 23,
+     "fn": 112,
+     "precision": 0.5740740740740741,
+     "recall": 0.21678321678321677,
+     "f1": 0.3147208121827411
+    },
+    "overlap": {
+     "tp": 45,
+     "fp": 9,
+     "fn": 98,
+     "precision": 0.8333333333333334,
+     "recall": 0.3146853146853147,
+     "f1": 0.45685279187817257
+    },
+    "byKindStrict": {
+     "measurement name": {
+      "tp": 3,
+      "fp": 4,
+      "fn": 8,
+      "precision": 0.42857142857142855,
+      "recall": 0.2727272727272727,
+      "f1": 0.33333333333333326
+     },
+     "quantity": {
+      "tp": 23,
+      "fp": 15,
+      "fn": 46,
+      "precision": 0.6052631578947368,
+      "recall": 0.3333333333333333,
+      "f1": 0.4299065420560747
+     },
+     "unit": {
+      "tp": 1,
+      "fp": 0,
+      "fn": 27,
+      "precision": 1,
+      "recall": 0.03571428571428571,
+      "f1": 0.0689655172413793
+     },
+     "garment or part name": {
+      "tp": 4,
+      "fp": 3,
+      "fn": 5,
+      "precision": 0.5714285714285714,
+      "recall": 0.4444444444444444,
+      "f1": 0.5
+     },
+     "operation": {
+      "tp": 0,
+      "fp": 1,
+      "fn": 26,
+      "precision": 0,
+      "recall": 0,
+      "f1": null
+     }
+    }
+   },
+   {
+    "threshold": 0.5,
+    "strict": {
+     "tp": 24,
+     "fp": 20,
+     "fn": 119,
+     "precision": 0.5454545454545454,
+     "recall": 0.16783216783216784,
+     "f1": 0.25668449197860965
+    },
+    "overlap": {
+     "tp": 35,
+     "fp": 9,
+     "fn": 108,
+     "precision": 0.7954545454545454,
+     "recall": 0.24475524475524477,
+     "f1": 0.37433155080213903
+    },
+    "byKindStrict": {
+     "measurement name": {
+      "tp": 2,
+      "fp": 3,
+      "fn": 9,
+      "precision": 0.4,
+      "recall": 0.18181818181818182,
+      "f1": 0.25000000000000006
+     },
+     "quantity": {
+      "tp": 18,
+      "fp": 13,
+      "fn": 51,
+      "precision": 0.5806451612903226,
+      "recall": 0.2608695652173913,
+      "f1": 0.36
+     },
+     "unit": {
+      "tp": 0,
+      "fp": 0,
+      "fn": 28,
+      "precision": null,
+      "recall": 0,
+      "f1": null
+     },
+     "garment or part name": {
+      "tp": 4,
+      "fp": 3,
+      "fn": 5,
+      "precision": 0.5714285714285714,
+      "recall": 0.4444444444444444,
+      "f1": 0.5
+     },
+     "operation": {
+      "tp": 0,
+      "fp": 1,
+      "fn": 26,
+      "precision": 0,
+      "recall": 0,
+      "f1": null
+     }
+    }
+   },
+   {
+    "threshold": 0.6,
+    "strict": {
+     "tp": 20,
+     "fp": 11,
+     "fn": 123,
+     "precision": 0.6451612903225806,
+     "recall": 0.13986013986013987,
+     "f1": 0.22988505747126436
+    },
+    "overlap": {
+     "tp": 27,
+     "fp": 4,
+     "fn": 116,
+     "precision": 0.8709677419354839,
+     "recall": 0.1888111888111888,
+     "f1": 0.31034482758620685
+    },
+    "byKindStrict": {
+     "measurement name": {
+      "tp": 1,
+      "fp": 2,
+      "fn": 10,
+      "precision": 0.3333333333333333,
+      "recall": 0.09090909090909091,
+      "f1": 0.14285714285714288
+     },
+     "quantity": {
+      "tp": 15,
+      "fp": 6,
+      "fn": 54,
+      "precision": 0.7142857142857143,
+      "recall": 0.21739130434782608,
+      "f1": 0.3333333333333333
+     },
+     "unit": {
+      "tp": 0,
+      "fp": 0,
+      "fn": 28,
+      "precision": null,
+      "recall": 0,
+      "f1": null
+     },
+     "garment or part name": {
+      "tp": 4,
+      "fp": 2,
+      "fn": 5,
+      "precision": 0.6666666666666666,
+      "recall": 0.4444444444444444,
+      "f1": 0.5333333333333333
+     },
+     "operation": {
+      "tp": 0,
+      "fp": 1,
+      "fn": 26,
+      "precision": 0,
+      "recall": 0,
+      "f1": null
+     }
+    }
+   },
+   {
+    "threshold": 0.7,
+    "strict": {
+     "tp": 16,
+     "fp": 4,
+     "fn": 127,
+     "precision": 0.8,
+     "recall": 0.11188811188811189,
+     "f1": 0.19631901840490798
+    },
+    "overlap": {
+     "tp": 19,
+     "fp": 1,
+     "fn": 124,
+     "precision": 0.95,
+     "recall": 0.13286713286713286,
+     "f1": 0.23312883435582818
+    },
+    "byKindStrict": {
+     "measurement name": {
+      "tp": 1,
+      "fp": 0,
+      "fn": 10,
+      "precision": 1,
+      "recall": 0.09090909090909091,
+      "f1": 0.16666666666666669
+     },
+     "quantity": {
+      "tp": 11,
+      "fp": 4,
+      "fn": 58,
+      "precision": 0.7333333333333333,
+      "recall": 0.15942028985507245,
+      "f1": 0.2619047619047619
+     },
+     "unit": {
+      "tp": 0,
+      "fp": 0,
+      "fn": 28,
+      "precision": null,
+      "recall": 0,
+      "f1": null
+     },
+     "garment or part name": {
+      "tp": 4,
+      "fp": 0,
+      "fn": 5,
+      "precision": 1,
+      "recall": 0.4444444444444444,
+      "f1": 0.6153846153846153
+     },
+     "operation": {
+      "tp": 0,
+      "fp": 0,
+      "fn": 26,
+      "precision": null,
+      "recall": 0,
+      "f1": null
+     }
+    }
+   },
+   {
+    "threshold": 0.8,
+    "strict": {
+     "tp": 11,
+     "fp": 1,
+     "fn": 132,
+     "precision": 0.9166666666666666,
+     "recall": 0.07692307692307693,
+     "f1": 0.14193548387096774
+    },
+    "overlap": {
+     "tp": 12,
+     "fp": 0,
+     "fn": 131,
+     "precision": 1,
+     "recall": 0.08391608391608392,
+     "f1": 0.15483870967741936
+    },
+    "byKindStrict": {
+     "measurement name": {
+      "tp": 0,
+      "fp": 0,
+      "fn": 11,
+      "precision": null,
+      "recall": 0,
+      "f1": null
+     },
+     "quantity": {
+      "tp": 8,
+      "fp": 1,
+      "fn": 61,
+      "precision": 0.8888888888888888,
+      "recall": 0.11594202898550725,
+      "f1": 0.20512820512820512
+     },
+     "unit": {
+      "tp": 0,
+      "fp": 0,
+      "fn": 28,
+      "precision": null,
+      "recall": 0,
+      "f1": null
+     },
+     "garment or part name": {
+      "tp": 3,
+      "fp": 0,
+      "fn": 6,
+      "precision": 1,
+      "recall": 0.3333333333333333,
+      "f1": 0.5
+     },
+     "operation": {
+      "tp": 0,
+      "fp": 0,
+      "fn": 26,
+      "precision": null,
+      "recall": 0,
+      "f1": null
+     }
+    }
+   },
+   {
+    "threshold": 0.9,
+    "strict": {
+     "tp": 5,
+     "fp": 0,
+     "fn": 138,
+     "precision": 1,
+     "recall": 0.03496503496503497,
+     "f1": 0.06756756756756757
+    },
+    "overlap": {
+     "tp": 5,
+     "fp": 0,
+     "fn": 138,
+     "precision": 1,
+     "recall": 0.03496503496503497,
+     "f1": 0.06756756756756757
+    },
+    "byKindStrict": {
+     "measurement name": {
+      "tp": 0,
+      "fp": 0,
+      "fn": 11,
+      "precision": null,
+      "recall": 0,
+      "f1": null
+     },
+     "quantity": {
+      "tp": 2,
+      "fp": 0,
+      "fn": 67,
+      "precision": 1,
+      "recall": 0.028985507246376812,
+      "f1": 0.05633802816901409
+     },
+     "unit": {
+      "tp": 0,
+      "fp": 0,
+      "fn": 28,
+      "precision": null,
+      "recall": 0,
+      "f1": null
+     },
+     "garment or part name": {
+      "tp": 3,
+      "fp": 0,
+      "fn": 6,
+      "precision": 1,
+      "recall": 0.3333333333333333,
+      "f1": 0.5
+     },
+     "operation": {
+      "tp": 0,
+      "fp": 0,
+      "fn": 26,
+      "precision": null,
+      "recall": 0,
+      "f1": null
+     }
+    }
+   }
+  ],
+  "plain, described": [
+   {
+    "threshold": 0.3,
+    "strict": {
+     "tp": 43,
+     "fp": 24,
+     "fn": 100,
+     "precision": 0.6417910447761194,
+     "recall": 0.3006993006993007,
+     "f1": 0.40952380952380946
+    },
+    "overlap": {
+     "tp": 57,
+     "fp": 10,
+     "fn": 86,
+     "precision": 0.8507462686567164,
+     "recall": 0.3986013986013986,
+     "f1": 0.5428571428571429
+    },
+    "byKindStrict": {
+     "measurement name": {
+      "tp": 4,
+      "fp": 6,
+      "fn": 7,
+      "precision": 0.4,
+      "recall": 0.36363636363636365,
+      "f1": 0.380952380952381
+     },
+     "quantity": {
+      "tp": 28,
+      "fp": 15,
+      "fn": 41,
+      "precision": 0.6511627906976745,
+      "recall": 0.4057971014492754,
+      "f1": 0.5
+     },
+     "unit": {
+      "tp": 8,
+      "fp": 0,
+      "fn": 20,
+      "precision": 1,
+      "recall": 0.2857142857142857,
+      "f1": 0.4444444444444445
+     },
+     "garment or part name": {
+      "tp": 3,
+      "fp": 2,
+      "fn": 6,
+      "precision": 0.6,
+      "recall": 0.3333333333333333,
+      "f1": 0.42857142857142855
+     },
+     "operation": {
+      "tp": 0,
+      "fp": 1,
+      "fn": 26,
+      "precision": 0,
+      "recall": 0,
+      "f1": null
+     }
+    }
+   },
+   {
+    "threshold": 0.4,
+    "strict": {
+     "tp": 37,
+     "fp": 15,
+     "fn": 106,
+     "precision": 0.7115384615384616,
+     "recall": 0.25874125874125875,
+     "f1": 0.37948717948717947
+    },
+    "overlap": {
+     "tp": 48,
+     "fp": 4,
+     "fn": 95,
+     "precision": 0.9230769230769231,
+     "recall": 0.3356643356643357,
+     "f1": 0.4923076923076924
+    },
+    "byKindStrict": {
+     "measurement name": {
+      "tp": 3,
+      "fp": 3,
+      "fn": 8,
+      "precision": 0.5,
+      "recall": 0.2727272727272727,
+      "f1": 0.3529411764705882
+     },
+     "quantity": {
+      "tp": 23,
+      "fp": 11,
+      "fn": 46,
+      "precision": 0.6764705882352942,
+      "recall": 0.3333333333333333,
+      "f1": 0.44660194174757284
+     },
+     "unit": {
+      "tp": 8,
+      "fp": 0,
+      "fn": 20,
+      "precision": 1,
+      "recall": 0.2857142857142857,
+      "f1": 0.4444444444444445
+     },
+     "garment or part name": {
+      "tp": 3,
+      "fp": 0,
+      "fn": 6,
+      "precision": 1,
+      "recall": 0.3333333333333333,
+      "f1": 0.5
+     },
+     "operation": {
+      "tp": 0,
+      "fp": 1,
+      "fn": 26,
+      "precision": 0,
+      "recall": 0,
+      "f1": null
+     }
+    }
+   },
+   {
+    "threshold": 0.5,
+    "strict": {
+     "tp": 29,
+     "fp": 11,
+     "fn": 114,
+     "precision": 0.725,
+     "recall": 0.20279720279720279,
+     "f1": 0.3169398907103825
+    },
+    "overlap": {
+     "tp": 36,
+     "fp": 4,
+     "fn": 107,
+     "precision": 0.9,
+     "recall": 0.2517482517482518,
+     "f1": 0.3934426229508197
+    },
+    "byKindStrict": {
+     "measurement name": {
+      "tp": 2,
+      "fp": 0,
+      "fn": 9,
+      "precision": 1,
+      "recall": 0.18181818181818182,
+      "f1": 0.3076923076923077
+     },
+     "quantity": {
+      "tp": 20,
+      "fp": 10,
+      "fn": 49,
+      "precision": 0.6666666666666666,
+      "recall": 0.2898550724637681,
+      "f1": 0.40404040404040403
+     },
+     "unit": {
+      "tp": 4,
+      "fp": 0,
+      "fn": 24,
+      "precision": 1,
+      "recall": 0.14285714285714285,
+      "f1": 0.25
+     },
+     "garment or part name": {
+      "tp": 3,
+      "fp": 0,
+      "fn": 6,
+      "precision": 1,
+      "recall": 0.3333333333333333,
+      "f1": 0.5
+     },
+     "operation": {
+      "tp": 0,
+      "fp": 1,
+      "fn": 26,
+      "precision": 0,
+      "recall": 0,
+      "f1": null
+     }
+    }
+   },
+   {
+    "threshold": 0.6,
+    "strict": {
+     "tp": 20,
+     "fp": 9,
+     "fn": 123,
+     "precision": 0.6896551724137931,
+     "recall": 0.13986013986013987,
+     "f1": 0.23255813953488372
+    },
+    "overlap": {
+     "tp": 26,
+     "fp": 3,
+     "fn": 117,
+     "precision": 0.896551724137931,
+     "recall": 0.18181818181818182,
+     "f1": 0.3023255813953489
+    },
+    "byKindStrict": {
+     "measurement name": {
+      "tp": 1,
+      "fp": 0,
+      "fn": 10,
+      "precision": 1,
+      "recall": 0.09090909090909091,
+      "f1": 0.16666666666666669
+     },
+     "quantity": {
+      "tp": 16,
+      "fp": 8,
+      "fn": 53,
+      "precision": 0.6666666666666666,
+      "recall": 0.2318840579710145,
+      "f1": 0.3440860215053763
+     },
+     "unit": {
+      "tp": 1,
+      "fp": 0,
+      "fn": 27,
+      "precision": 1,
+      "recall": 0.03571428571428571,
+      "f1": 0.0689655172413793
+     },
+     "garment or part name": {
+      "tp": 2,
+      "fp": 0,
+      "fn": 7,
+      "precision": 1,
+      "recall": 0.2222222222222222,
+      "f1": 0.3636363636363636
+     },
+     "operation": {
+      "tp": 0,
+      "fp": 1,
+      "fn": 26,
+      "precision": 0,
+      "recall": 0,
+      "f1": null
+     }
+    }
+   },
+   {
+    "threshold": 0.7,
+    "strict": {
+     "tp": 11,
+     "fp": 4,
+     "fn": 132,
+     "precision": 0.7333333333333333,
+     "recall": 0.07692307692307693,
+     "f1": 0.13924050632911392
+    },
+    "overlap": {
+     "tp": 14,
+     "fp": 1,
+     "fn": 129,
+     "precision": 0.9333333333333333,
+     "recall": 0.0979020979020979,
+     "f1": 0.17721518987341772
+    },
+    "byKindStrict": {
+     "measurement name": {
+      "tp": 0,
+      "fp": 0,
+      "fn": 11,
+      "precision": null,
+      "recall": 0,
+      "f1": null
+     },
+     "quantity": {
+      "tp": 8,
+      "fp": 3,
+      "fn": 61,
+      "precision": 0.7272727272727273,
+      "recall": 0.11594202898550725,
+      "f1": 0.2
+     },
+     "unit": {
+      "tp": 1,
+      "fp": 0,
+      "fn": 27,
+      "precision": 1,
+      "recall": 0.03571428571428571,
+      "f1": 0.0689655172413793
+     },
+     "garment or part name": {
+      "tp": 2,
+      "fp": 0,
+      "fn": 7,
+      "precision": 1,
+      "recall": 0.2222222222222222,
+      "f1": 0.3636363636363636
+     },
+     "operation": {
+      "tp": 0,
+      "fp": 1,
+      "fn": 26,
+      "precision": 0,
+      "recall": 0,
+      "f1": null
+     }
+    }
+   },
+   {
+    "threshold": 0.8,
+    "strict": {
+     "tp": 6,
+     "fp": 1,
+     "fn": 137,
+     "precision": 0.8571428571428571,
+     "recall": 0.04195804195804196,
+     "f1": 0.07999999999999999
+    },
+    "overlap": {
+     "tp": 6,
+     "fp": 1,
+     "fn": 137,
+     "precision": 0.8571428571428571,
+     "recall": 0.04195804195804196,
+     "f1": 0.07999999999999999
+    },
+    "byKindStrict": {
+     "measurement name": {
+      "tp": 0,
+      "fp": 0,
+      "fn": 11,
+      "precision": null,
+      "recall": 0,
+      "f1": null
+     },
+     "quantity": {
+      "tp": 4,
+      "fp": 0,
+      "fn": 65,
+      "precision": 1,
+      "recall": 0.057971014492753624,
+      "f1": 0.1095890410958904
+     },
+     "unit": {
+      "tp": 0,
+      "fp": 0,
+      "fn": 28,
+      "precision": null,
+      "recall": 0,
+      "f1": null
+     },
+     "garment or part name": {
+      "tp": 2,
+      "fp": 0,
+      "fn": 7,
+      "precision": 1,
+      "recall": 0.2222222222222222,
+      "f1": 0.3636363636363636
+     },
+     "operation": {
+      "tp": 0,
+      "fp": 1,
+      "fn": 26,
+      "precision": 0,
+      "recall": 0,
+      "f1": null
+     }
+    }
+   },
+   {
+    "threshold": 0.9,
+    "strict": {
+     "tp": 5,
+     "fp": 0,
+     "fn": 138,
+     "precision": 1,
+     "recall": 0.03496503496503497,
+     "f1": 0.06756756756756757
+    },
+    "overlap": {
+     "tp": 5,
+     "fp": 0,
+     "fn": 138,
+     "precision": 1,
+     "recall": 0.03496503496503497,
+     "f1": 0.06756756756756757
+    },
+    "byKindStrict": {
+     "measurement name": {
+      "tp": 0,
+      "fp": 0,
+      "fn": 11,
+      "precision": null,
+      "recall": 0,
+      "f1": null
+     },
+     "quantity": {
+      "tp": 3,
+      "fp": 0,
+      "fn": 66,
+      "precision": 1,
+      "recall": 0.043478260869565216,
+      "f1": 0.08333333333333333
+     },
+     "unit": {
+      "tp": 0,
+      "fp": 0,
+      "fn": 28,
+      "precision": null,
+      "recall": 0,
+      "f1": null
+     },
+     "garment or part name": {
+      "tp": 2,
+      "fp": 0,
+      "fn": 7,
+      "precision": 1,
+      "recall": 0.2222222222222222,
+      "f1": 0.3636363636363636
+     },
+     "operation": {
+      "tp": 0,
+      "fp": 0,
+      "fn": 26,
+      "precision": null,
+      "recall": 0,
+      "f1": null
+     }
+    }
+   }
+  ]
+ }
+}
