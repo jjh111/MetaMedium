@@ -18,8 +18,8 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const src = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '09-field.js'), 'utf8');
-const { readFieldCommand, verbFor, libraryMatch } = new Function(
-  src + '\n  return { readFieldCommand, verbFor, libraryMatch };'
+const { readFieldCommand, verbFor, libraryMatch, typedWord } = new Function(
+  src + '\n  return { readFieldCommand, verbFor, libraryMatch, typedWord };'
 )();
 
 /** A board with nothing on it but the four core verbs and one reading. */
@@ -219,6 +219,42 @@ test('label: with nothing after it, or nothing held to put it on, asks quietly',
   const bare = readFieldCommand({ text: 'label: inlet', open: true, items: [] });
   assert.equal(bare.kind, 'label');
   assert.equal(bare.command, null);
+});
+
+// The row offers a typed word two ways, side by side: Name it (one thing, a
+// definition) and Label it (a word on your own ink, nothing made). typedWord
+// decides only whether there is a word to offer, and which; Enter stays the
+// reader's — a bare word is still the brief.
+
+test('typedWord: a bare word or two is offered to name the marks or to label them', () => {
+  assert.deepEqual(typedWord(ctx({ text: 'inlet' })), { word: 'inlet', act: null });
+  assert.deepEqual(typedWord(ctx({ text: ' inlet valve ' })), { word: 'inlet valve', act: null });
+  // A single letter is a label a diagram uses all the time: point A, node x.
+  assert.deepEqual(typedWord(ctx({ text: 'A' })), { word: 'A', act: null });
+  // …and Enter on it is still what the reader says, not a label.
+  assert.equal(readFieldCommand(ctx({ text: 'inlet', models: ['qwen3'] })).command.do, 'build');
+});
+
+test('typedWord: the prefixes say what the word is for, and nothing else is a word', () => {
+  assert.deepEqual(typedWord(ctx({ text: 'label: inlet' })), { word: 'inlet', act: 'label' });
+  assert.deepEqual(typedWord(ctx({ text: 'name: the long name of a thing' })), { word: 'the long name of a thing', act: 'name' });
+  for (const text of ['ask: why', 'draw: a box', 'run: a clock', 'what:', 'label:', 'name:', 'label', 'name', 'Draw them', 'clean', 'cp',
+    'website about dolphins', 'a: b', 'x'.repeat(41)]) {
+    assert.equal(typedWord(ctx({ text })), null, text);
+  }
+});
+
+test('typedWord: a library entry, words a definition is told, a revision, or no ink held — no word', () => {
+  assert.equal(typedWord(ctx({ text: 'bouncing ball', library: [{ id: 'artifact:3', name: 'bouncing ball' }] })), null);
+  const definition = { id: 'artifact:7', name: 'fish' };
+  const behaviour = { described: 'wanders', unparsed: [], value: { terms: [{ verb: 'wander' }] } };
+  assert.equal(typedWord(ctx({ text: 'wanders', definition, behaviour })), null);
+  assert.equal(typedWord(ctx({ text: 'inlet', revising: true })), null);
+  assert.equal(typedWord(ctx({ text: 'inlet', open: false })), null);
+  assert.equal(typedWord(ctx({ text: 'inlet', marks: { mine: 0, others: [] } })), null);
+  assert.equal(typedWord({ text: 'inlet', open: true, items: [] }), null);
+  // Another hand's marks are still marks: the offer stands, and taking it says why it is refused.
+  assert.deepEqual(typedWord(ctx({ text: 'inlet', marks: { mine: 0, others: ['fern'] } })), { word: 'inlet', act: null });
 });
 
 test('a brief with no model joined: a page is still built, a program is not', () => {

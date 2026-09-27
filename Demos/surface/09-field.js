@@ -1,7 +1,8 @@
 // ===== field (the reader) =====
 // Provides: the field's QUERY, pure — readFieldCommand (what Enter will do, as a named
 //   command record), and the two matchers it stands on (verbFor, libraryMatch), plus
-//   the prefix pattern (FIELD_PREFIXES).
+//   the prefix pattern (FIELD_PREFIXES) and typedWord (the word a typed text offers to
+//   name the selection with, or to label the person's own ink with — V1-PLAN L2e).
 // Uses: NOTHING. This fragment names no closure variable, touches no DOM, and asks the
 //   session nothing. Everything it needs arrives in a FieldContext record; everything it
 //   decides leaves as a FieldReading record. That is the whole point of it
@@ -43,6 +44,10 @@
    * @property {string[]} models      the joined models, by name
    * @property {{id:string,name:string}[]} library  what the library holds
    * @property {{id:string,name:string}|null} definition  the definition in the loop, if one
+   * @property {{mine:number,others:string[]}} [marks]
+   *           the selection's ink: how many of its marks the person made, and who made each
+   *           of the rest (a name per mark). A label goes on your own ink only; the reader
+   *           says so before Enter. Absent means nothing is held to put a word on.
    * @property {{described:string,unparsed:string[],value:*}|null} behaviour
    *           what the verb table read in `text` at that definition; `value` is opaque here
    *           and travels back out in the command untouched
@@ -53,17 +58,34 @@
    *           that needs it.
    *
    * @typedef {Object} FieldCommand  what Enter will do, named rather than closed over
-   * @property {'take'|'name'|'ask-what'|'ask'|'draw'|'build'|'library'|'behave'|'need-model'} do
+   * @property {'take'|'name'|'label'|'ask-what'|'ask'|'draw'|'build'|'library'|'behave'|'need-model'} do
    *
    * @typedef {Object} FieldReading  the reader's whole answer
-   * @property {string} kind        empty|default|name|what|ask|draw|brief|structure|verb|library|behaviour|blocked|page|run|program|new
+   * @property {string} kind        empty|default|name|label|what|ask|draw|brief|structure|verb|library|behaviour|blocked|page|run|program|new
    * @property {string} line        the sentence under the field: what Enter will do
    * @property {boolean} [quiet]    said, but not as a promise — Enter does nothing
    * @property {FieldCommand|null} command
    */
 
   /** The acts a typed prefix names. */
-  const FIELD_PREFIXES = /^(ask|draw|page|run|program|new|name|what)\s*:\s*([\s\S]*)$/i;
+  const FIELD_PREFIXES = /^(ask|draw|page|run|program|new|name|what|label)\s*:\s*([\s\S]*)$/i;
+  /** The same acts typed bare, before their colon: a command half-typed, never a word to put on marks. */
+  const PREFIX_WORDS = /^(ask|draw|page|run|program|new|name|what|label)$/i;
+  /** The longest word the row offers as a pill; a longer one is still taken by its prefix and Enter. */
+  const WORD_MAX = 40;
+
+  /**
+   * Pure: who made the marks a label will not go on, in a few words. `others` holds one
+   * name per mark, so the count is its length and each name is said once.
+   * @param {string[]} others
+   * @returns {{who:string,count:number}}
+   */
+  function makersOf(others) {
+    const names = [];
+    for (const n of others || []) if (names.indexOf(n) < 0) names.push(n);
+    const who = names.length <= 1 ? (names[0] || 'another hand') : names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1];
+    return { who: who, count: (others || []).length };
+  }
 
   /**
    * Pure: every offer, visible or hidden, that the typed text names — by an alias or by
@@ -137,6 +159,10 @@
           ? { kind: 'name', line: '↵ name it “' + rest + '”', command: { do: 'name', name: rest } }
           : { kind: 'name', line: '↵ name it… (type the name)', quiet: true, command: null };
       }
+      // A word on your own ink (V1-PLAN L2e). Not a name: it blesses nothing, makes
+      // nothing and never asks a model. It goes on each held mark the person made; the
+      // line says before Enter which marks it will not go on, and whose they are.
+      if (act === 'label') return readLabel(rest, c.marks);
       if (act === 'what') return models.length ? { kind: 'what', line: '↵ ask ' + who + ' what this is', command: { do: 'ask-what' } } : needsModel('reading the group');
       if (!models.length) return needsModel(act === 'ask' ? 'a question' : act === 'draw' ? 'drawing' : 'building');
       if (!rest) return { kind: act, line: '↵ ' + act + ':… (say what)', quiet: true, command: null };
@@ -184,4 +210,63 @@
     function needsModel(what) {
       return { kind: 'blocked', line: '↵ ' + what + ' needs a model — controls › models', quiet: true, command: { do: 'need-model', what: what } };
     }
+  }
+
+  /**
+   * Pure: `label: word`, read against the held ink. Three answers, each said before Enter:
+   * the word on each of your marks; on yours and not on another hand's (named); or on
+   * none, said quietly — and Enter still runs, so the adapter says the refusal in the
+   * status line rather than leaving it to a line the hand may not have read.
+   * @param {string} word
+   * @param {{mine:number,others:string[]}} [marks]
+   * @returns {FieldReading}
+   */
+  function readLabel(word, marks) {
+    const ink = marks || {};
+    const mine = ink.mine || 0, others = ink.others || [];
+    if (!word) return { kind: 'label', line: '↵ label it… (type the word)', quiet: true, command: null };
+    if (!mine && !others.length) return { kind: 'label', line: '↵ label… — nothing held to put it on', quiet: true, command: null };
+    const command = { do: 'label', text: word };
+    const theirs = makersOf(others);
+    if (!mine) {
+      return {
+        kind: 'label', quiet: true, command: command,
+        line: '↵ no label — ' + theirs.who + (theirs.count === 1 ? ' made this mark' : ' made these ' + theirs.count + ' marks') + '; a label goes on your own ink',
+      };
+    }
+    const tail = others.length
+      ? ' — on ' + (mine === 1 ? 'yours' : 'your ' + mine) + ', not ' + (theirs.count === 1 ? 'the mark ' : 'the ' + theirs.count + ' marks ') + theirs.who + ' made'
+      : mine > 1 ? ' — on each of your ' + mine + ' marks' : '';
+    return { kind: 'label', line: '↵ label it “' + word + '”' + tail, command: command };
+  }
+
+  /**
+   * Pure: the word a typed text offers to put on the selection — to NAME it (one thing, a
+   * definition) or to LABEL the person's own ink with it (a word on each mark; nothing
+   * made) — or null (V1-PLAN L2e). The row shows those two offers side by side; this only
+   * decides whether there is a word, and which. Enter is still the reader's to decide.
+   *   `name: w` / `label: w`  → w: the hand said what the word is for;
+   *   a bare word or two       → the text, unless it is a verb, a library entry, words a
+   *                              definition can be told, or a prefix typed before its colon;
+   *   anything else            → null — a brief, a question, a drawing.
+   * @param {FieldContext} ctx
+   * @returns {{word:string, act:('name'|'label'|null)}|null}
+   */
+  function typedWord(ctx) {
+    const c = ctx || {};
+    const text = (c.text || '').trim();
+    if (!c.open || c.revising || !text) return null;
+    const ink = c.marks || {};
+    if (!((ink.mine || 0) + (ink.others || []).length)) return null;
+    const m = FIELD_PREFIXES.exec(text);
+    if (m) {
+      const act = m[1].toLowerCase(), rest = m[2].trim();
+      if ((act !== 'name' && act !== 'label') || !rest || rest.length > WORD_MAX || /\n/.test(rest)) return null;
+      return { word: rest, act: act };
+    }
+    if (text.length > WORD_MAX || /[:\n]/.test(text) || text.split(/\s+/).length > 2 || PREFIX_WORDS.test(text)) return null;
+    if (verbFor(text, c.items)) return null;
+    if (libraryMatch(text, c.library)) return null;
+    if (c.definition && c.behaviour && c.behaviour.value) return null;
+    return { word: text, act: null };
   }
