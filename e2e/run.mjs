@@ -226,9 +226,10 @@ async function runShard(browser, servers, which /* 'shard' | 'demo' | 'demo2' */
  *
  * This is a SMOKE, not an iPhone test: a desktop WebKit, headless, doing the
  * shortest thing that is still the product — the board loads, a hand draws ink
- * with real pointer input, the engine reads that ink back, and press-and-hold
- * opens the field. It runs in seconds. Anything longer is a second gate, and a
- * gate whoever waits on it will turn off.
+ * with real pointer input, the engine reads that ink back, press-and-hold
+ * opens the field, and one pill in it is taken with a click (week 1's plan:
+ * draw, hold, the field opens, one pill taken). It runs in seconds. Anything
+ * longer is a second gate, and a gate whoever waits on it will turn off.
  *
  * It deliberately does NOT load `session-engine.e2e.js`: that harness is 200
  * records and its own stub model, and running it on a second engine would be a
@@ -275,6 +276,33 @@ async function runSmoke(browser, servers) {
       .catch(() => false);
     await page.mouse.up();
     check('press and hold opens the field', opened);
+
+    // One pill taken, with a click. A held line is offered *Draw them clean*
+    // — tier 1, the one pill of its three that asks no model — and taking it
+    // gives the mark its clean form beside the ink (`MM.cleanOf`, core's
+    // `session/clean.ts`): the pill found by its label, pressed by the
+    // engine's own pointer, and the board read for what it did.
+    const cleanOfLast = () => {
+      const MM = window.__mm.MM, s = window.__mm.session.getState();
+      const ids = s.contentIds.filter((id) => !s.artifacts.includes(id));
+      const n = ids.length ? s.nodes.get(ids[ids.length - 1]) : null;
+      const c = n && MM.cleanOf(n);
+      return c ? c.shape : null;
+    };
+    const pill = page.locator('#summon .pill.item', { hasText: 'Draw them clean' });
+    const offered = opened ? await pill.count() : 0;
+    const before = await page.evaluate(cleanOfLast);
+    if (offered === 1) await pill.click({ timeout: 5000 });
+    const taken = offered === 1 && await page
+      .waitForFunction(cleanOfLast, null, { timeout: 5000 })
+      .then(() => true)
+      .catch(() => false);
+    const after = await page.evaluate(cleanOfLast);
+    check(
+      `one pill taken — Draw them clean, and the line carries its clean form (${after || 'none'})`,
+      offered === 1 && !before && taken && after === 'line',
+      { offered, before, after },
+    );
   } catch (err) {
     out.harnessError = String(err && err.message ? err.message : err);
     await screenshot(page, 'smoke');

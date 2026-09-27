@@ -120,9 +120,9 @@ jobs:
         working-directory: e2e
         run: npx playwright install --with-deps webkit
       # A smoke, not an iPhone test (e2e/README.md): desktop WebKit, headless,
-      # drawing with real pointer input and holding a mark until the field
-      # opens. The canvas only, so the shard needs no install here; the same
-      # model guard and the same exit rules as the gate.
+      # drawing with real pointer input, holding a mark until the field opens,
+      # and taking one pill. The canvas only, so the shard needs no install
+      # here; the same model guard and the same exit rules as the gate.
       - name: Run it
         run: node e2e/run.mjs --browser webkit smoke
       - name: What the run saw
