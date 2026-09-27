@@ -247,7 +247,7 @@ suite and the gate green, `master` fast-forwarded and pushed.
 
 | Phase | Units | Done when |
 |---|---|---|
-| **0. Make week 1 whole** | L1 ids that hold · L1b one event, applied once · L2a the shard pairs by id · L2b labels on the board · L2c the shard asks · L2d duplicate Enter, fitAll, the cache measured · L2e a person labels their own ink · L2f an artifact is made by whoever blessed it · L2g a word is made by whoever wrote its letters · L3 CI, bundles, docs | every unit week 1 claimed is whole, CI runs what exists (WebKit included), docs say what the code does |
+| **0. Make week 1 whole** | L1 ids that hold · L1b one event, applied once · L2a the shard pairs by id · L2b labels on the board · L2c the shard asks · L2d duplicate Enter, fitAll, the cache measured · L2e a person labels their own ink · L2f an artifact is made by whoever blessed it · L2g a word is made by whoever wrote its letters · L2h gestures are per hand · L3 CI, bundles, docs | every unit week 1 claimed is whole, CI runs what exists (WebKit included), docs say what the code does |
 | **1. The backbone** | B1 tools · B2 context · B3 packs | a tool is one file; the field ranks by context with reasons; a pack is used by an event and benched |
 | **2. Editing** | E1 handles · E2 bindings follow · E3 ports, heads and figures | a selected mark reshapes by its points; bound arrows follow; notations can declare ports |
 | **3. Diagrams** | D1 flowchart · D2 Mermaid out · D3 Mermaid in · D4 UML class · D5 sequence and state · D6 ER and mind map · D7 routing · D8 the repair demo | A1–A3 pass in the gate |
@@ -460,6 +460,82 @@ commit: core 804 in 62 files, typecheck clean, both bundles equal to a fresh
 build; relay and field 40; surface in sync; the canvas MCP smoke and the
 shard's (605 in 31 files, typecheck clean) all pass; the gate 398 passed and
 the one honest skip (canvas 252; shard 123 + 11 + 12); WebKit smoke 3.
+
+**L2h gestures are per hand.** Found by L2g, with a probe: the gesture
+state — a loop waiting to be taken up, a summon, the selection, the command
+mark's look-back over recent marks — is shared by the whole board, while a
+merged log interleaves hands' events by time. Another hand's stroke between
+a hand's summon and its bless dissolves the summon on replay, and the bless
+is lost on every board, the blesser's own included once the room's logs
+merge; between a loop and its check, the loop is not taken up and the check
+gathers recent marks, holding the loop's own ink. Two hands in one room (A7)
+cannot work until each hand's gesture state is its own, keyed by the hand
+exactly as authorship is keyed: a hand's summon survives any other hand's
+events and its bless applies to it, on every board and replay, in both merge
+orders; its loop is taken up by its own check; the look-back counts its own
+marks; the selection and the field on a board are the reader's own; a
+single-hand board is exactly as before. *Red first:* two-hand core tests in
+both merge orders, and gate records that drive two tabs in one room through
+a summon with the other drawing in between. *Trap:* a gesture keyed by a
+participant id that differs between boards (the local participant on one,
+`participant:hand:<name>` on another) splits one hand's gesture in two; key
+by the attribution `authorOf` uses, and test from both boards.
+
+**L2h status, 27 Sep 2026: done on `w2`** — `e9ec56d` (red), `b2a5568`
+(red: the gate), `1f377ec`, `345be9f` (the canvas's half), and CLAUDE.md
+with this entry. Each hand's gestures — its waiting loop, its summon, its
+selection, why its last stroke missed, the mark it taught, and the look-back
+— are held under `handOf`, the rule L2f's maker already was: a person's act
+is theirs ("local" in another hand's log reads as that hand), and a model's
+or the engine's is the act of the hand whose log holds it. So one hand keys
+alike from its own board and from every other: the shard's bless in the
+engine's name takes up its hand's summon, and a model's loop waits for its
+hand (the trap's test, from three boards). Her summon survives his strokes
+and her bless makes her thing on her board, his and a third's, in both merge
+orders (his stroke at the moment of her check falls before it or after it as
+the names break the tie); her loop is taken up by her check whatever he drew
+between; her look-back gathers her own marks, never his box drawn beside her
+row in the same breath; his loop, summon, selection and dismissal never
+touch hers; what is erased leaves every hand's gestures. The board's
+`summon`, `selection`, `pendingLassoId`, `markMiss`, `commandMark` and
+`recentIds` are its reader's own. **A taught mark is its hand's**, and two
+faults in `17-folder.js` kept a hand from its own in a room, found by the
+gate: the device's mark was re-taught only when no log taught one, so a room
+whose other hand taught hers left this hand judged by hers; and `openLive`
+counted the loaded events again after the re-teach, so the room's first
+merge took the teach for the room's and dropped it — from the first line
+another hand sent, the board judged this hand by the built-in check. Now it
+is re-taught unless this hand's own log teaches one, and it stays this
+hand's; either fix alone leaves e2e 46 red. A single-hand board is exactly
+as before: `session.scenario.test.ts` and `held.test.ts` unchanged and
+green; every held log replays against the `a4bccfa` bundle node for node —
+the same ids, nodes, state and next id — bare, named, merged as the
+reader's own, merged with no reader and merged as another hand's (the
+reader's own gesture fields set apart there: the reader drew nothing): 30 of
+30, and at every one of their 515 prefixes; nine single-hand gesture logs
+(the canonical loop, the look-back over an artifact, pointed summons with a
+correction and a dismissal, a double-tap and keep-as-drawing, a taught caret
+forgotten, scratches and erases against gestures, a model's gestures, the
+engine's bless and imports, a word taken up) are written live as the same
+events by either bundle, 18 of 18 with and without a log name, and replay
+the same in all five ways: 90 of 90, and 940 of 940 prefixes. e2e 45–45e
+(fern draws while this hand's field stands open and it stays open; the name
+given in the field makes the thing here, on fern's board and on a third
+reader's replay; fern's own loop and check never open this hand's field;
+fern's stroke between this hand's loop and its check leaves the loop waiting
+for this hand) and 46–46a (the device's caret is this hand's in a room whose
+other hand taught her own check, and takes its loop up while her check takes
+hers). *Found, not changed:* two hands may now hold the same marks at once,
+and when both bless, each thing takes them — a mark part of two things, the
+same on every board; which should win is a decision. A folder opened with
+no reader stamps no `by`, so every log in it is the reader's own: one hand's
+gestures there, as its authorship already was. The MCP hand's look says what
+its own gestures are, so it no longer reports the tab's open field as the
+room's. Whole suite at the last commit: core 860 in 65 files, typecheck
+clean, both bundles equal to a fresh build; relay and field 40; surface in
+sync; the canvas MCP smoke and the shard's (605 in 31 files, typecheck clean)
+all pass; the gate 406 passed and the one honest skip (canvas 260; shard 123
++ 11 + 12); WebKit smoke 3.
 
 *L2a status, 26 Sep 2026: done on `w2-shard`* — `0540c1c` (red), `092f747`.
 Taken from `auto/w1-U1d` (6893f53), which takes both prefixes off the write

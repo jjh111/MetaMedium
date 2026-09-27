@@ -443,7 +443,13 @@ are asymmetric (~1:1.6), unlike anything in the canvas's vocabulary; and it is
 **A taught mark is held on the device** (`localStorage`, with the five samples
 it learned from) and re-taught into the session at boot as a `teach` event, so
 it replays like any other. Opening the pane with a mark held shows those five
-samples and offers *Forget*; teaching a new one means *Clear* first.
+samples and offers *Forget*; teaching a new one means *Clear* first. **A mark
+is its hand's** (V1-PLAN L2h): a `teach` sets the mark of the hand that
+taught it, and judges only that hand's strokes. Opening a board re-teaches
+the device's mark unless this hand's own log (the events with no `by`)
+already teaches one — another hand's teach says nothing about it — and the
+re-taught mark is this hand's, sent with its log (`openStore` in
+`17-folder.js`; a room's first merge used to drop it, e2e 46).
 
 - Features are **scale-free** (ratios, counts, and positions within the stroke's
   own box), so a mark works at any size and any zoom. Three are oriented.
@@ -548,6 +554,27 @@ mid-sentence. **A taught mark's band widens at most two-and-a-half
 floors** (`MAX_WIDEN`): five samples that disagree learned a band so wide
 the mark fired on ordinary writing; the teach pane warns below a
 consistency of 0.5.
+
+**Gestures are per hand** (V1-PLAN L2h; `handOf` and `Gestures` in
+`session.ts`, `session/gesture-hands.test.ts`, e2e 45–46). A loop that
+waits, a summon, the selection, why the last stroke missed, the taught
+mark and the look-back are each **one hand's**, held under the key its
+acts carry — `handOf`, the attribution a bless's maker gets: a person's
+act is theirs ("local" in another hand's log already reads as that hand),
+and a model's or the engine's is the act of the hand whose log holds it,
+so the shard's bless in the engine's name takes up its hand's summon and
+a model's loop waits for its hand. Every board keys one hand alike. So a
+hand's own next stroke dissolves its summon, and another hand's never
+does; its loop waits for its own check or double-tap whatever another
+hand draws meanwhile; the look-back grows the scope through its own
+recent marks only (what the mark *crosses* may be anyone's); another
+hand's loop, summon, selection or dismissal never opens, closes or
+changes the reader's. A mark that is erased leaves every hand's gestures,
+whoever erased it. The board's `summon`, `selection`, `pendingLassoId`,
+`markMiss`, `commandMark` and `recentIds` are its reader's own. Two hands
+may now hold the same marks at once, and when both bless, each thing
+takes them — a mark can be part of two (the same on every board; which
+should win is not yet decided).
 
 **Erasing is relational, not gestural** (`src/session/erase.ts`): count
 crossings between the stroke and the target's own outline; three erases it. No
@@ -1356,6 +1383,20 @@ stroke's maker made, so her letters gather into her word whoever drew in
 between, and the letters of two hands — or of a hand and a model — never
 gather into one. A board's own words name its own hand as they always did,
 so every held log replays node for node.
+
+**Gestures are per hand** (V1-PLAN L2h; under *Gestures*, e2e 45–46). The
+gesture state was one for the board while the merge interleaves the hands'
+events by time: another hand's stroke landing between a hand's summon and
+its bless dissolved the summon at the next merge, and the bless made
+nothing on any board — the blesser's own included, once her live board
+merged the room; set between a loop and its check, the loop was left
+untaken and the check read backwards, holding the loop's own ink; and one
+hand's loop and check opened every other board's field. Now each hand's
+gestures are keyed as authorship is, so the same hand keys alike from its
+own board (the local participant) and from every other
+(`participant:hand:<name>`). **A folder opened with no reader** stamps no
+`by`, so every log in it is the reader's own there — one hand's gestures,
+as its authorship already was.
 
 ### The MCP hand: Claude Code on the board (v10 T2)
 
