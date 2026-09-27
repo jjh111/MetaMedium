@@ -32,7 +32,12 @@ const bundles = SIZES.map((n) => eng(`engine-board-${n}-bundle.json`));
 const ablated = SIZES.map((n) => eng(`engine-board-${n}-source-checkpoints.json`));
 const row = (label, f) => out(`| ${label} | ${SIZES.map((_, i) => f(i)).join(' | ')} |`);
 row('log: events · JSON', (i) => { const b = (boards[i] || builds[i] || {}).board; return b ? `${b.events} · ${b.jsonMB} MB` : '—'; });
-row('content plane after replay (marks, words, artifacts)', (i) => { const s = boards[i] && boards[i].state; return s ? `${s.content} (${s.artifacts} artifacts)` : '—'; });
+row('content plane after replay (marks, words, artifacts)', (i) => {
+  const s = boards[i] && boards[i].state;
+  if (s) return `${s.content} (${s.artifacts} artifacts)`;
+  const c = builds[i] && builds[i].curve && builds[i].curve[builds[i].curve.length - 1];
+  return c ? `${c.content} (after ${c.strokes} strokes)` : '—';
+});
 row('**replay (`load`), cold**', (i) => f1(boards[i] && boards[i].replay && boards[i].replay.coldMs));
 row('replay, warm (median of n)', (i) => { const w = boards[i] && boards[i].replay && boards[i].replay.warm; return w && w.n ? `${f1(w.median)} (n ${w.n})` : '—'; });
 row('replay, committed bundle (cold · warm)', (i) => { const b = bundles[i]; if (!b) return '—'; const w = b.replay.warm; return `${f1(b.replay.coldMs)}${w && w.n ? ' · ' + f1(w.median) : ''}`; });
@@ -41,13 +46,24 @@ row('**memory held after replay**', (i) => { const m = (boards[i] || builds[i] |
 row('…of which checkpoints (held with them off)', (i) => { const x = ablated[i]; return x ? `${x.memory.heldMB} MB held, replay ${f1(x.replay.coldMs)}` : '—'; });
 row('edges stored in the graph', (i) => { const m = (boards[i] || builds[i] || {}).memory; return m ? m.edges.toLocaleString('en-GB') : '—'; });
 row('max RSS of the process', (i) => { const m = (boards[i] || builds[i] || {}).memory; return m ? `${m.maxRssMB} MB` : '—'; });
-row('`relate` over the content plane (pairs → relations)', (i) => { const r = (boards[i] || {}).relations; const b = builds[i] && builds[i].relations; if (r) return `${f1(r.relate.median)} (${Math.round(r.pairs).toLocaleString('en-GB')} → ${r.relations.toLocaleString('en-GB')})`; return b ? `${f1(b.ms)} (${b.marks} marks → ${b.relations.toLocaleString('en-GB')})` : '—'; });
+const relOnly = SIZES.map((n) => eng(`engine-relate-${n}-source.json`));
+row('`relate` over the content plane (pairs → relations)', (i) => {
+  const r = (boards[i] || {}).relations;
+  if (r) return `${f1(r.relate.median)} (${Math.round(r.pairs).toLocaleString('en-GB')} → ${r.relations.toLocaleString('en-GB')})`;
+  const o = relOnly[i] && relOnly[i].relations;
+  if (o) return `${f1(o.relate.median)} (${Math.round(o.pairs).toLocaleString('en-GB')} → ${o.relations.toLocaleString('en-GB')}) †`;
+  const b = builds[i] && builds[i].relations;
+  return b ? `${f1(b.ms)} (${b.marks} marks → ${b.relations.toLocaleString('en-GB')})` : '—';
+});
+row('…the relation list it builds, held', (i) => { const o = relOnly[i] && relOnly[i].relations; return o ? `${o.heldMB} MB (${o.marks.toLocaleString('en-GB')} marks)` : '—'; });
 row('`session.read` of the whole board (the surface\'s readRungs)', (i) => { const r = (boards[i] || {}).read; const b = builds[i] && builds[i].read; if (r) return `${f1(r.median)} (${r.ids} marks)`; return b ? `${f1(b.ms)} (${b.ids} marks)` : '—'; });
 row('**one more stroke: median / p95**', (i) => { const s = (boards[i] && boards[i].stroke) || (builds[i] && builds[i].stroke); return s ? `${pm(s)} (n ${s.n})` : '—'; });
 row('…the shape rung alone for those strokes', (i) => { const s = boards[i] && boards[i].stroke && boards[i].stroke.readingsAlone; return pm(s); });
 row('`getState()` (handed to subscribers on every event)', (i) => pm(boards[i] && boards[i].getState));
+const briefs = SIZES.map((n, i) => (boards[i] && boards[i].brief) || ((eng(`engine-board-${n}-source.only-brief.json`) || {}).brief) || null);
+row('a model\'s brief (`describeSession`): five marks · the whole board', (i) => { const b = briefs[i]; return b ? `${(b.groupChars / 1024).toFixed(0)} KB · ${(b.wholeChars / 1048576).toFixed(1)} MB` : '—'; });
 out('');
-out('Commands: `node --expose-gc metamedium-core/bench/engine.mjs board --size=N --repeat=K` (500: K=5; 2,000: K=2); 5,000: `node --expose-gc --max-old-space-size=65536 metamedium-core/bench/engine.mjs build --size=5000 --strokes=20`; bundle: add `--core=bundle`; checkpoints off: add `--ablate=checkpoints --only=replay`.');
+out('Commands: `node --expose-gc metamedium-core/bench/engine.mjs board --size=N --repeat=K` (500: K=5; 2,000: K=2); 5,000: `node --expose-gc --max-old-space-size=65536 metamedium-core/bench/engine.mjs build --size=5000 --strokes=20`; bundle: add `--core=bundle`; checkpoints off: add `--ablate=checkpoints --only=replay`; the relation list and † (the content plane gathered from the diagrams the board was drawn in, so no replay — the same 336 and 1,377 marks and the same relations the replayed boards hold): `node --expose-gc metamedium-core/bench/engine.mjs relate --size=N`.');
 out('');
 
 // --- the stroke's cost as the board grows ---
@@ -118,7 +134,7 @@ for (const f of existsSync(perfDir) ? readdirSync(perfDir).filter((x) => /^perf-
     out(`| ${label} | ${cells.join(' | ')} |`);
   };
   const why = (w) => /QuotaExceeded/.test(w || '') ? 'browser storage refused the log (QuotaExceededError)' : w;
-  const openCell = (o) => !o ? '—' : o.opened ? `${f1(o.drawnMs)} (longest task ${f1(o.longestTaskMs)})` : `did not open: ${why(o.why)}${o.wallMs ? ` after ${f1(o.wallMs)}` : ''}`;
+  const openCell = (o) => !o ? '—' : o.opened ? `${f1(o.drawnMs)}${Number.isFinite(o.longestTaskMs) ? ` (longest task ${f1(o.longestTaskMs)})` : ''}` : `did not open: ${why(o.why)}${o.wallMs ? ` after ${f1(o.wallMs)}` : ''}`;
   sr('**open, restored from browser storage** (navigation → board drawn)', (s) => openCell(s.open.restore));
   sr('**open as a folder** (`?folder=`)', (s) => openCell(s.open.folder));
   sr('renderer heap after open (used of limit)', (s) => { const o = (s.open.restore && s.open.restore.opened) ? s.open.restore : s.open.folder; return o && o.heap ? `${o.heap.usedMB} of ${o.heap.limitMB} MB` : null; });

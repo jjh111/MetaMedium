@@ -526,7 +526,7 @@ const DEFINITION_NAMES = { molecule: 'molecule', hub: 'hub', page: 'wireframe', 
  * name). Returns the merged log (`events`, as a reader with no log of its own
  * would merge it), each hand's own log, and what was made.
  */
-export function generateBoard(core, { marks, seed = 1, hands = ['local'], model = true } = {}) {
+export function generateBoard(core, { marks, seed = 1, hands = ['local'], model = true, collectMarks = false } = {}) {
   const { createSession, DEFAULT_SESSION_CONFIG, mergeLogs } = core;
   const rand = rng(seed * 7919 + marks);
   const seqs = new Map(hands.map((h) => [h, 0]));
@@ -556,6 +556,10 @@ export function generateBoard(core, { marks, seed = 1, hands = ['local'], model 
     marks: 0, writing: 0, diagrams: {}, intended: {}, confusion: {}, words: 0, lettersInWords: 0,
     definitions: [], texts: [], answers: 0,
   };
+  // The content plane, diagram by diagram: nothing one diagram does reaches
+  // another, so their final content planes together ARE the whole board's —
+  // what `relate` is handed on every event (session.ts markOf), with no replay.
+  const contentMarks = [];
 
   let r = 0;
   let strokes = 0;
@@ -640,6 +644,15 @@ export function generateBoard(core, { marks, seed = 1, hands = ['local'], model 
       }
     }
 
+    if (collectMarks) {
+      for (const id of st.contentIds) {
+        const n = st.nodes.get(id);
+        const b = n && core.boundsOf(n);
+        if (!b) continue;
+        const fp = core.fingerprintOf(n);
+        contentMarks.push({ id, bounds: b, points: core.strokePointsOf(n) ?? undefined, closed: fp ? fp.isClosed : undefined });
+      }
+    }
     const evs = s.getEvents().slice(skip);
     logs[hand].push(...evs);
     if (evs.length) seqs.set(hand, evs[evs.length - 1].seq);
@@ -673,7 +686,7 @@ export function generateBoard(core, { marks, seed = 1, hands = ['local'], model 
   stats.pointsPerStroke = points / Math.max(1, strokes);
   stats.extent = { w: Math.round(bb.maxX - bb.minX), h: Math.round(bb.maxY - bb.minY) };
   stats.spanMinutes = Math.round((t - T0) / 60000);
-  return { events, logs, stats };
+  return { events, logs, stats, contentMarks: collectMarks ? contentMarks : null };
 }
 
 /** How the strokes read, as one line per intended kind: `rectangle 96% rectangle, 3% circle`. */

@@ -564,9 +564,51 @@ async function build() {
   say(`  → ${file}`);
 }
 
-const run = { board, room, hello, build }[what];
+// ===========================================================================
+// relate: relations over every pair of the whole content plane, alone — what
+// recomputeClusterCandidates hands relate() on every event once a definition
+// exists — measured on the board's own content plane, gathered from the
+// diagrams it was drawn in, so no replay is needed (board.mjs, collectMarks).
+// ===========================================================================
+
+async function relateOnly() {
+  const out = header();
+  const { stats, contentMarks } = generateBoard(core, { marks: size, seed, collectMarks: true });
+  out.board = boardSummary(stats);
+  const marks = contentMarks;
+  const times = [];
+  let relations = null;
+  let bytes = 0;
+  for (let i = 0; i < Number(a.repeat || 3); i++) {
+    relations = null;
+    const before = heapUsed();
+    const t = now();
+    relations = core.relate(marks);
+    times.push(now() - t);
+    bytes = heapUsed() - before;
+  }
+  const kinds = {};
+  for (const r of relations) kinds[r.kind] = (kinds[r.kind] || 0) + 1;
+  const t = now();
+  const groups = core.clusters(marks, relations);
+  out.relations = {
+    marks: marks.length,
+    pairs: (marks.length * (marks.length - 1)) / 2,
+    relations: relations.length,
+    heldMB: +(bytes / 1048576).toFixed(1),
+    kinds: Object.fromEntries(Object.entries(kinds).sort((p, q) => q[1] - p[1])),
+    relate: summarize(times),
+    clustersMs: now() - t,
+    clusters: groups.length,
+  };
+  say(`relate over the ${size}-mark board's content plane (${marks.length} marks, ${Math.round(out.relations.pairs).toLocaleString('en-GB')} pairs): median ${ms(out.relations.relate.median)} of ${times.length} → ${relations.length.toLocaleString('en-GB')} relations, ${out.relations.heldMB} MB; clusters ${ms(out.relations.clustersMs)}`);
+  const file = writeResult(`engine-relate-${size}-${which}.json`, out);
+  say(`  → ${file}`);
+}
+
+const run = { board, room, hello, build, relate: relateOnly }[what];
 if (!run) {
-  console.error(`unknown measurement "${what}" — board, build, room or hello`);
+  console.error(`unknown measurement "${what}" — board, build, relate, room or hello`);
   process.exit(2);
 }
 await run();
