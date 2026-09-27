@@ -973,8 +973,14 @@ const UNIT_NAMES: Record<LengthUnit, string> = { in: 'inches', ft: 'feet', cm: '
 
 function scaleOf(labels: readonly { figure: Figure; label: FigureLabel }[], unit: LengthUnit | null): DrawingScale | null {
   const ratios: { figure: string; key: string; text: string; r: number }[] = [];
+  // Alternatives of one number — a bare number beside a circle, its radius or its diameter — are one label: the first reading speaks for it.
+  const counted = new Set<string>();
   for (const { figure, label } of labels) {
     if (label.declared || !isLengthKey(label.key) || isRange(label.value) || label.value.dim !== (unit ? 1 : label.value.dim)) continue;
+    if (label.number) {
+      if (counted.has(label.number)) continue;
+      counted.add(label.number);
+    }
     const ink = inkMeasure(figure, label.key);
     if (!ink || ink <= 0) continue;
     const v = unit && label.value.unit && label.value.unit !== unit ? convertQuantity(label.value, unit).quantity : label.value;
