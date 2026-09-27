@@ -652,6 +652,16 @@ a step's value on an edge checked against its step) built in
 `metamedium-core/src/maths/` on `w2-maths` — 139 maths tests, core 815
 (`MATHS-PLAN.md` §4). M3's figures of several strokes are E3's, which fill
 the same figure through `polygonFigure`.
+*Status, 27 Sep 2026:* M7 (core) built on `w2-maths` — `maths/truesize.ts`
+draws solved figures at true size as a new SVG (the root in paper units,
+the viewBox in the drawing's; each figure from the solver's first reading,
+never from the ink; labels as written, a derived length a place finer; the
+title says when labels conflict, and what was left out), and
+`maths/print.ts` tiles it onto Letter or A4 at 100% with overlap, ⊕
+alignment marks both neighbours print, grid labels, a map, a measured test
+square (1 in, or 2 cm) on every page and one HTML that prints a page per
+sheet; the 22″ × 56″ piece is 28 Letter pages; 29 tests, core 844
+(`MATHS-PLAN.md` §4). The offers and the export pane are M5's.
 
 ### Phase 5 — seats
 J1–J3 as `DIRECTOR-PLAN-W2.md` §3, with §6's addition.
