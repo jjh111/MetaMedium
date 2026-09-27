@@ -113,7 +113,7 @@ as sliders** and **to scale and print** until R1.
 **Status, 26 Sep 2026: done on `w2`** — `3f1f4f2` (the regressions, red),
 `65f5870` (core), `b4c4be7` (relay), `6191f87` (canvas and its MCP hand),
 `87f80c0` (shard and its MCP hand), `a1f0fa9` (a send that never settles),
-and the docs commit after them. The recommended design, because the
+`f8d1960` (docs), `09927fb` (a handed-on log echoed back). The recommended design, because the
 regressions asked for exactly it: a live hand's log is one sitting
 (`sittingName`, `session/hands.ts` — a new suffix per page load or process,
 nothing kept where a reload finds it, the shown name and colour from
@@ -124,6 +124,11 @@ sitting, a hello is answered with every log held (`via`), and
 `relay.test.mjs` 13 (8) and the field's 18; shard 573 in 30 files (568); both
 MCP smokes pass with a doubled name and a truncated room; the gate 347 passed
 and the one honest skip (canvas 207, shard 120 + 11 + 9); WebKit smoke 3.
+Every held log (`Demos/recordings/*.json`, `shard-3d/fixtures/*.mm.log`)
+replays node for node as it did at `c6a9c9b`, named or not, and mints the
+same next id. Outside the gate, two real tabs over a real relay: an undo
+reached the other tab, the next mark did not reissue its number, and a
+reload came back under a new name with the same label.
 Left, and why: the shard's log is still unnamed (U1d, L2 — its name is
 already per sitting, so naming it inherits all of this); two tabs on one
 folder under one device name still share a file (a folder's concurrency, not
