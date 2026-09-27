@@ -1,7 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { createSession } from './session';
-import { measure, describeMaths } from './measure';
+import { measure, describeMaths, RIGHT_ANGLE_TOLERANCE } from './measure';
 import { circleStroke, rectStroke, lineStroke, triangleStroke, handText, handArrow } from '../test/strokes';
+import { solveBoard } from '../maths/solve';
+import { TRIANGLE_LABELS, TRIANGLE_CORNERS, TRIANGLE_SQUARE, TRIANGLE_LABEL_BOXES, TRIANGLE_EXPECTED } from '../maths/fixtures/triangle';
 
 const built = (pts: { x: number; y: number }[]) => {
   const s = createSession();
@@ -55,5 +57,64 @@ describe('measure — the maths of a mark', () => {
   it('describes itself on one line', () => {
     const m = built(circleStroke(300, 200, 80));
     expect(describeMaths(m!)).toMatch(/^centre \(300, 200\) · radius 80px · circumference \d+px · area [\d,]+px²$/);
+  });
+});
+
+// ===== In units, when numbers are written on the mark (MATHS-PLAN §4; DIRECTOR-PLAN-W2 M4) =====
+
+describe('measure — in the drawing’s units, when numbers are written on the mark', () => {
+  function labelled(opts: { labels?: boolean } = {}) {
+    const s = createSession();
+    const { right, longLegEnd, shortLegEnd } = TRIANGLE_CORNERS;
+    const tri = s.addStroke(triangleStroke(right, longLegEnd, shortLegEnd), 1000);
+    s.addStroke(rectStroke(TRIANGLE_SQUARE.x, TRIANGLE_SQUARE.y, TRIANGLE_SQUARE.size, TRIANGLE_SQUARE.size, 12), 20000);
+    const line = s.addStroke(lineStroke({ x: 600, y: 300 }, { x: 900, y: 300 }), 40000);
+    if (opts.labels !== false) {
+      const t = (code: string, bounds: { minX: number; maxX: number; minY: number; maxY: number }, at: number) =>
+        s.import({ kind: 'text', path: `text/${at}.txt`, name: code, bounds, code, at });
+      t(TRIANGLE_LABELS.legs[0], TRIANGLE_LABEL_BOXES.longLeg, 60000);
+      t(TRIANGLE_LABELS.legs[1], TRIANGLE_LABEL_BOXES.shortLeg, 61000);
+      t(TRIANGLE_LABELS.long, TRIANGLE_LABEL_BOXES.longSide, 62000);
+    }
+    return { s, tri, line };
+  }
+
+  it('the tolerance a measured corner reads as right within is one constant, and the labels print it', () => {
+    expect(RIGHT_ANGLE_TOLERANCE).toBeGreaterThan(0);
+    const { s, tri } = labelled();
+    const m = measure(s.getState().nodes.get(tri)!, s.getState().nodes)!;
+    expect(m.measures.filter((x) => x.label.includes('(right)'))).toHaveLength(1);
+  });
+
+  it('a mark that carries no labels measures exactly as before — board or no board', () => {
+    const { s, line, tri } = labelled();
+    const st = s.getState();
+    const board = solveBoard(st, { unit: 'in' });
+    const plain = measure(st.nodes.get(line)!, st.nodes);
+    expect(measure(st.nodes.get(line)!, st.nodes, board)).toEqual(plain);
+    expect(describeMaths(measure(st.nodes.get(line)!, st.nodes, board)!)).toBe(describeMaths(plain!));
+    const bare = labelled({ labels: false });
+    const bst = bare.s.getState();
+    expect(measure(bst.nodes.get(bare.tri)!, bst.nodes, solveBoard(bst))).toEqual(measure(bst.nodes.get(bare.tri)!, bst.nodes));
+    expect(tri).toBeDefined();
+  });
+
+  it('a labelled triangle speaks inches: what was derived, with its formula, the conflict and the other reading', () => {
+    const { s, tri } = labelled();
+    const st = s.getState();
+    const m = measure(st.nodes.get(tri)!, st.nodes, solveBoard(st, { unit: 'in' }))!;
+    expect(m.unit).toBe('in');
+    const long = m.values!.find((v) => v.label === 'the long side')!;
+    expect(long).toMatchObject({ from: 'derived', text: TRIANGLE_EXPECTED.longSide, formula: TRIANGLE_EXPECTED.formula });
+    expect(m.conflicts!.map((c) => c.reason)).toEqual([TRIANGLE_EXPECTED.conflict]);
+    expect(m.readings).toContain(TRIANGLE_EXPECTED.other);
+    expect(m.scale).toMatch(/to scale within \d+%/);
+    // The measures of the ink are still there, in px, as they always were.
+    expect(m.measures.find((x) => x.key === 'side0')!.unit).toBe('px');
+    const line = describeMaths(m);
+    expect(line).toContain(`the long side ${TRIANGLE_EXPECTED.longSide} = ${TRIANGLE_EXPECTED.formula}`);
+    expect(line).toContain(TRIANGLE_EXPECTED.conflict);
+    expect(line).toContain(`or ${TRIANGLE_EXPECTED.other}`);
+    expect(line).toMatch(/side AB \d+px/);
   });
 });
