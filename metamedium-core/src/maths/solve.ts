@@ -192,6 +192,8 @@ interface Model {
   /** What it makes, for the sentence: '[the long side, 25.30″]'. */
   makes: string[];
   assumed?: string;
+  /** Which of SSA's two triangles, when the same labels make two: both are readings. */
+  branch?: number;
 }
 
 // ===== Triangles =====
@@ -428,7 +430,8 @@ function triangleModel(basis: Fact[], sides: Iv[], angles: Iv[], branch: number)
       formulas.set(`angle${vz}`, `180° − ${a(v)}° − ${fmtIv(angles[vy])}°`);
       const third = oppSide(vz);
       formulas.set(sideOf(third), `${n(o)} × sin ${fmtIv(angles[vz])}° ÷ sin ${a(v)}°`);
-      makes.push(sideOf(third));
+      // The angle is what tells SSA's two triangles apart, so the sentence says it.
+      makes.push(sideOf(third), `angle${vy}`);
     }
   } else if (sideKnown.length === 1 && angleKnown.length === 2) {
     const s0 = sideKnown[0];
@@ -460,7 +463,7 @@ function triangleModel(basis: Fact[], sides: Iv[], angles: Iv[], branch: number)
   if (area) vals.set('area', { iv: area, from: 'derived', formula: formulas.get('area') });
   vals.set('perimeter', { iv: { lo: sides[0].lo + sides[1].lo + sides[2].lo, hi: sides[0].hi + sides[1].hi + sides[2].hi }, from: 'derived', formula: formulas.get('perimeter') });
   const assumed = basis.find((x) => x.assumed)?.assumed;
-  return { basis, vals, how, makes, ...(assumed ? { assumed } : {}) };
+  return { basis, vals, how, makes, ...(assumed ? { assumed } : {}), ...(branch >= 0 ? { branch } : {}) };
 }
 
 // ===== Rectangles =====
@@ -914,7 +917,8 @@ export function solveFigure(figure: Figure, labels: readonly FigureLabel[], opti
     c.ink = inkDistance(f, m);
     return c;
   });
-  const sig = (c: Checked) => c.kept.map((x) => x.i).sort((a, b) => a - b).join(',') + (c.model.assumed ? '?' : '');
+  // The same labels kept are one reading — unless they make two triangles (SSA), which are two.
+  const sig = (c: Checked) => c.kept.map((x) => x.i).sort((a, b) => a - b).join(',') + (c.model.assumed ? '?' : '') + (c.model.branch !== undefined ? `#${c.model.branch}` : '');
   const seen = new Map<string, Checked>();
   for (const c of checked) if (!seen.has(sig(c))) seen.set(sig(c), c);
   let distinct = [...seen.values()];
