@@ -920,12 +920,54 @@
     const evs = session.getEvents();
     const last = evs[evs.length - 1];
     const s = session.getState();
-    if (last && last.type === 'bless' && s.artifacts[s.artifacts.length - 1] === artifactId) { session.undo(); return true; }
+    if (last && last.type === 'bless' && s.artifacts[s.artifacts.length - 1] === artifactId) { session.undo(); releasePrompted(); return true; }
     return false;
   }
 
   // ===== The prompts: what a model is asked, and only when asked =============
+
+  /**
+   * One Enter, one act (V1-PLAN L2d; week 1's U5). A brief is a deliberate act
+   * on ONE summon, and a summon is acted on once: a second Enter on a loop
+   * already building blessed a second artifact — or, on a revision, where there
+   * is no bless to fail at, asked every model again: two builds in flight for
+   * one drawing, the later refused as superseded when it landed, minutes after
+   * the hand had stopped watching. Disabling the input covers the key, not the
+   * act: the reading's `run` is a closure over the summon, and a pill, a touch
+   * or a second key still holds it after the first act consumed the summon. So
+   * the guard is here, at the door every brief comes through — the adapter,
+   * not the reader (`09-field.js` decides what Enter will do; it is not asked
+   * whether it already did). `runProgram` and the library are reached only
+   * through `runPrompt`, so they need no door of their own.
+   *
+   * It holds ONE key, so it cannot grow, and the key is not the summon's id
+   * alone: an id from a log with no name is a counter derived on replay, so a
+   * fresh board can hand out one this memory still holds (the `pruneRuntime`
+   * rule in `08-render.js`). The summon's own time and the marks it holds go
+   * into the key, so a later summon that reuses an id is a different act.
+   *
+   * It is released when the act is given up on — a bless that failed, a brief
+   * whose model failed and whose bless was undone — not on the next render:
+   * the revising path dismisses its summon and renders at once, and clearing
+   * there would open the door again in the same tick.
+   */
+  let promptedKey = null;
+
+  function summonKey(sum) { return sum.id + '@' + sum.at + '#' + sum.enclosedIds.join(','); }
+
+  /** True when this summon has already been acted on — and says so. */
+  function alreadyUnderWay(sum) {
+    const key = summonKey(sum);
+    if (promptedKey === key) { say('that brief is already under way — one Enter, one act'); return true; }
+    promptedKey = key;
+    return false;
+  }
+
+  /** The act was given up on: the same summon may be tried again. */
+  function releasePrompted() { promptedKey = null; }
+
   function runPrompt(sum, prompt, revising) {
+    if (alreadyUnderWay(sum)) return;
     const at = Date.now();
     let artifactId, addressed;
 
@@ -952,7 +994,7 @@
       const name = brief.length > 30 ? brief.slice(0, 30) + '…' : brief;
       artifactId = session.bless({ summonId: sum.id, name: name, at: at });
       addressed = undefined;
-      if (!artifactId) { say('could not hold that group'); return; }
+      if (!artifactId) { releasePrompted(); say('could not hold that group'); return; }
       // Tier 1 first: the structure stands at once, in the engine's name —
       // every region in place, no words. It is what the canvas knows. A model
       // then writes the words into it; with none joined, this is the page.
@@ -989,7 +1031,7 @@
     const at = Date.now();
     const name = brief.length > 30 ? brief.slice(0, 30) + '…' : brief;
     const artifactId = session.bless({ summonId: sum.id, name: name, at: at });
-    if (!artifactId) { say('could not hold that group'); return; }
+    if (!artifactId) { releasePrompted(); say('could not hold that group'); return; }
     cancelReading();
     const library = libraryEntries(session.getState()).map((e) => ({ id: e.id, name: e.name }));
     agents.forEach((agent) => {

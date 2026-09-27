@@ -310,11 +310,38 @@
 
   function usableViewport() { return usableRect(viewportRect(), chromeRects()); }
 
+  /**
+   * Fit the CONTENT, and let the answer cards place themselves inside the
+   * result (V1-PLAN L2d; NOTES-DRAWING-WITH-THE-HAND §E).
+   *
+   * `fitAll` used to union the content with the explanation nodes' LOGGED
+   * bounds. Since placing became runtime (`renderExplanations`) a card is not
+   * drawn where it is logged, so one of those two numbers was fiction: the fit
+   * was widened to take in a rectangle nobody would ever see, and the cards
+   * were then placed again inside the wider view, further out than before. A
+   * card logged beside a mark that has since moved far away is the worst of
+   * it — the union fitted twenty thousand units of nothing and slammed the
+   * zoom to MIN_ZOOM (e2e 41d; one way to the slam seen once on a live board).
+   *
+   * So: fit the content; render, which places the cards; then, if a card
+   * landed outside the free ground, widen ONCE to take in the rects the cards
+   * were actually DRAWN at (`cardRects`, world units) and place them again.
+   * One correction pass, never a loop — a wider view only gives the placing
+   * more room, and a fit that chased its own cards would never settle.
+   */
   function fitAll() {
-    const ids = state.contentIds.concat(state.explanations);
-    const boxes = ids.map((id) => MM.boundsOf(state.nodes.get(id))).filter(Boolean);
+    const boxes = state.contentIds.map((id) => MM.boundsOf(state.nodes.get(id))).filter(Boolean);
     if (!boxes.length) { view.panX = 0; view.panY = 0; view.zoom = 1; afterViewChange(); return; }
-    const b = union(boxes);
+    fitTo(union(boxes));
+    if (!state.explanations.length || !cardRects.length) return;
+    const drawn = cardRects.map((c) => ({ minX: c.x, minY: c.y, maxX: c.x + c.w, maxY: c.y + c.h }));
+    const vw = viewportWorld();
+    const out = drawn.some((d) => d.minX < vw.minX || d.minY < vw.minY || d.maxX > vw.maxX || d.maxY > vw.maxY);
+    if (out) fitTo(union(boxes.concat(drawn)));
+  }
+
+  /** Fit a world rectangle into the free ground, zoom capped at 2. */
+  function fitTo(b) {
     // Fit into the area the chrome leaves FREE, not the whole window: a drawing
     // centred on the window sat half under the panel in the whitepaper's embeds.
     const free = usableViewport();
@@ -4088,12 +4115,54 @@
     const evs = session.getEvents();
     const last = evs[evs.length - 1];
     const s = session.getState();
-    if (last && last.type === 'bless' && s.artifacts[s.artifacts.length - 1] === artifactId) { session.undo(); return true; }
+    if (last && last.type === 'bless' && s.artifacts[s.artifacts.length - 1] === artifactId) { session.undo(); releasePrompted(); return true; }
     return false;
   }
 
   // ===== The prompts: what a model is asked, and only when asked =============
+
+  /**
+   * One Enter, one act (V1-PLAN L2d; week 1's U5). A brief is a deliberate act
+   * on ONE summon, and a summon is acted on once: a second Enter on a loop
+   * already building blessed a second artifact — or, on a revision, where there
+   * is no bless to fail at, asked every model again: two builds in flight for
+   * one drawing, the later refused as superseded when it landed, minutes after
+   * the hand had stopped watching. Disabling the input covers the key, not the
+   * act: the reading's `run` is a closure over the summon, and a pill, a touch
+   * or a second key still holds it after the first act consumed the summon. So
+   * the guard is here, at the door every brief comes through — the adapter,
+   * not the reader (`09-field.js` decides what Enter will do; it is not asked
+   * whether it already did). `runProgram` and the library are reached only
+   * through `runPrompt`, so they need no door of their own.
+   *
+   * It holds ONE key, so it cannot grow, and the key is not the summon's id
+   * alone: an id from a log with no name is a counter derived on replay, so a
+   * fresh board can hand out one this memory still holds (the `pruneRuntime`
+   * rule in `08-render.js`). The summon's own time and the marks it holds go
+   * into the key, so a later summon that reuses an id is a different act.
+   *
+   * It is released when the act is given up on — a bless that failed, a brief
+   * whose model failed and whose bless was undone — not on the next render:
+   * the revising path dismisses its summon and renders at once, and clearing
+   * there would open the door again in the same tick.
+   */
+  let promptedKey = null;
+
+  function summonKey(sum) { return sum.id + '@' + sum.at + '#' + sum.enclosedIds.join(','); }
+
+  /** True when this summon has already been acted on — and says so. */
+  function alreadyUnderWay(sum) {
+    const key = summonKey(sum);
+    if (promptedKey === key) { say('that brief is already under way — one Enter, one act'); return true; }
+    promptedKey = key;
+    return false;
+  }
+
+  /** The act was given up on: the same summon may be tried again. */
+  function releasePrompted() { promptedKey = null; }
+
   function runPrompt(sum, prompt, revising) {
+    if (alreadyUnderWay(sum)) return;
     const at = Date.now();
     let artifactId, addressed;
 
@@ -4120,7 +4189,7 @@
       const name = brief.length > 30 ? brief.slice(0, 30) + '…' : brief;
       artifactId = session.bless({ summonId: sum.id, name: name, at: at });
       addressed = undefined;
-      if (!artifactId) { say('could not hold that group'); return; }
+      if (!artifactId) { releasePrompted(); say('could not hold that group'); return; }
       // Tier 1 first: the structure stands at once, in the engine's name —
       // every region in place, no words. It is what the canvas knows. A model
       // then writes the words into it; with none joined, this is the page.
@@ -4157,7 +4226,7 @@
     const at = Date.now();
     const name = brief.length > 30 ? brief.slice(0, 30) + '…' : brief;
     const artifactId = session.bless({ summonId: sum.id, name: name, at: at });
-    if (!artifactId) { say('could not hold that group'); return; }
+    if (!artifactId) { releasePrompted(); say('could not hold that group'); return; }
     cancelReading();
     const library = libraryEntries(session.getState()).map((e) => ({ id: e.id, name: e.name }));
     agents.forEach((agent) => {
@@ -6983,6 +7052,8 @@
     minimap: () => mini, readGroups: readGroups, chips: () => chipHits,
     // The chrome a figure wears only while pointed at, for tests.
     chromeDrawn: () => chromeDrawn.slice(),
+    // The models at work, for tests: the key of every call in flight (one Enter, one act).
+    working: () => [...working.keys()],
     // A hand's word on its own ink, for tests: where the last paint drew each label, and a mark's ink colour.
     labelsDrawn: () => labelsDrawn.map((l) => Object.assign({}, l)),
     colourOf: (id) => { const n = session.getState().nodes.get(id); return n ? colourOf(n) : null; },

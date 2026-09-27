@@ -21,6 +21,8 @@
     minimap: () => mini, readGroups: readGroups, chips: () => chipHits,
     // The chrome a figure wears only while pointed at, for tests.
     chromeDrawn: () => chromeDrawn.slice(),
+    // The models at work, for tests: the key of every call in flight (one Enter, one act).
+    working: () => [...working.keys()],
     // A hand's word on its own ink, for tests: where the last paint drew each label, and a mark's ink colour.
     labelsDrawn: () => labelsDrawn.map((l) => Object.assign({}, l)),
     colourOf: (id) => { const n = session.getState().nodes.get(id); return n ? colourOf(n) : null; },

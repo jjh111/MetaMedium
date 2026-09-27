@@ -134,11 +134,38 @@
 
   function usableViewport() { return usableRect(viewportRect(), chromeRects()); }
 
+  /**
+   * Fit the CONTENT, and let the answer cards place themselves inside the
+   * result (V1-PLAN L2d; NOTES-DRAWING-WITH-THE-HAND §E).
+   *
+   * `fitAll` used to union the content with the explanation nodes' LOGGED
+   * bounds. Since placing became runtime (`renderExplanations`) a card is not
+   * drawn where it is logged, so one of those two numbers was fiction: the fit
+   * was widened to take in a rectangle nobody would ever see, and the cards
+   * were then placed again inside the wider view, further out than before. A
+   * card logged beside a mark that has since moved far away is the worst of
+   * it — the union fitted twenty thousand units of nothing and slammed the
+   * zoom to MIN_ZOOM (e2e 41d; one way to the slam seen once on a live board).
+   *
+   * So: fit the content; render, which places the cards; then, if a card
+   * landed outside the free ground, widen ONCE to take in the rects the cards
+   * were actually DRAWN at (`cardRects`, world units) and place them again.
+   * One correction pass, never a loop — a wider view only gives the placing
+   * more room, and a fit that chased its own cards would never settle.
+   */
   function fitAll() {
-    const ids = state.contentIds.concat(state.explanations);
-    const boxes = ids.map((id) => MM.boundsOf(state.nodes.get(id))).filter(Boolean);
+    const boxes = state.contentIds.map((id) => MM.boundsOf(state.nodes.get(id))).filter(Boolean);
     if (!boxes.length) { view.panX = 0; view.panY = 0; view.zoom = 1; afterViewChange(); return; }
-    const b = union(boxes);
+    fitTo(union(boxes));
+    if (!state.explanations.length || !cardRects.length) return;
+    const drawn = cardRects.map((c) => ({ minX: c.x, minY: c.y, maxX: c.x + c.w, maxY: c.y + c.h }));
+    const vw = viewportWorld();
+    const out = drawn.some((d) => d.minX < vw.minX || d.minY < vw.minY || d.maxX > vw.maxX || d.maxY > vw.maxY);
+    if (out) fitTo(union(boxes.concat(drawn)));
+  }
+
+  /** Fit a world rectangle into the free ground, zoom capped at 2. */
+  function fitTo(b) {
     // Fit into the area the chrome leaves FREE, not the whole window: a drawing
     // centred on the window sat half under the panel in the whitepaper's embeds.
     const free = usableViewport();
