@@ -283,6 +283,15 @@ describe('dimensionsOf — the scale of a drawing', () => {
     expect(sc.reason).toMatch(/one label sets the scale/);
   });
 
+  it('a number read two ways — a circle’s radius or its diameter — counts once for the scale', () => {
+    const s = createSession();
+    s.addStroke(circleStroke(700, 300, 80), 1000);
+    text(s, '24', box(700, 192), 20000);
+    const sc = dimensionsOf(s.getState(), { unit: 'in' }).drawings[0].scale!;
+    expect(sc.labels).toBe(1);
+    expect(sc.reason).toMatch(/one label sets the scale/);
+  });
+
   it('a bare label takes the unit its drawing writes', () => {
     const s = createSession();
     s.addStroke(rectStroke(100, 100, 300, 100), 1000);
