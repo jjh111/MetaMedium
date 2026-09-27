@@ -35,6 +35,11 @@ jobs:
         run: node ../Demos/mcp-smoke.mjs
       - name: Surface fragments must match the built script
         run: node ../Demos/build-surface.mjs --check
+      # …and the check itself, on scratch surfaces: it must refuse a name
+      # declared at the top of two fragments, which one closure would take
+      # without a word.
+      - name: The surface's build refuses a function declared twice
+        run: node --test ../Demos/build-surface.test.mjs
       # The one surface fragment that names nothing outside itself, so it can be
       # asked questions without a browser (SEAM-1). node --test needs nothing
       # installed, and the test finds the fragment relative to itself, so this
