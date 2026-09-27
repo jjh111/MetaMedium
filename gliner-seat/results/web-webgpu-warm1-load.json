@@ -1,0 +1,35 @@
+{
+  "measured": "2026-09-27T01:43:17.661Z",
+  "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Claude/2.9939.2 Chrome/152.0.7977.130 Safari/537.36",
+  "crossOriginIsolated": true,
+  "hardwareConcurrency": 12,
+  "runtime": {
+    "package": "onnxruntime-web",
+    "version": "1.30.0",
+    "ep": "webgpu"
+  },
+  "gpu": {
+    "vendor": "apple",
+    "architecture": "metal-3",
+    "device": "",
+    "description": "",
+    "shaderF16": true
+  },
+  "load": {
+    "kind": "warm (weights read from OPFS)",
+    "fetchMs": 402.0400002002716,
+    "tokenizerMs": 408.3149998188019,
+    "sessionMs": 912.8650000095367,
+    "firstCallMs": 188.07500004768372,
+    "toFirstAnswerMs": 1911.295000076294,
+    "found": [
+      "36:measurement name",
+      "Bust:garment or part name"
+    ]
+  },
+  "memoryAfterLoad": {
+    "jsHeapUsedMB": 683,
+    "jsHeapTotalMB": 688,
+    "uaSpecific": "Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
+  }
+}
