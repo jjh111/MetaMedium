@@ -15,6 +15,7 @@
 // The result is POSTed to /results/web-<ep>[-<tag>].json and kept on window.__result.
 //   …&cleanup=1   empty this origin's stored model and stop.
 //   …&hold=1      keep the session alive when done (for reading memory from outside).
+//   …&store=none  fetch the weights every time, keep nothing.
 
 import * as ort from '../node_modules/onnxruntime-web/dist/ort.webgpu.min.mjs';
 import { Tokenizer } from '../node_modules/@huggingface/tokenizers/dist/tokenizers.mjs';
@@ -30,6 +31,9 @@ const tag = params.get('tag');
 const MODEL = new URL('../models/onnx-community__gliner2-multi-v1-agent-ONNX/', import.meta.url).href;
 const STORE = 'gliner-seat-model-v1';
 const cleanup = params.has('cleanup');
+// &store=none: fetch the weights every time and keep nothing (for a browser
+// whose private file system is unavailable, as in an ephemeral WebKit context).
+const noStore = params.get('store') === 'none';
 
 const logEl = document.getElementById('log');
 const statusEl = document.getElementById('status');
@@ -41,6 +45,7 @@ const log = (line) => {
 const status = (s) => {
   statusEl.textContent = s;
   window.__status = s;
+  if (s !== 'failed') window.__step = s;
 };
 
 async function storeDir() {
@@ -50,6 +55,11 @@ async function storeDir() {
 
 /** The file's bytes from the origin-private file system, fetching and keeping them the first time. */
 async function cached(url) {
+  if (noStore) {
+    const res = await fetch(url, { cache: 'no-store' });
+    if (!res.ok) throw new Error(`${url} → ${res.status}`);
+    return { bytes: new Uint8Array(await res.arrayBuffer()), from: 'network' };
+  }
   const dir = await storeDir();
   const name = url.slice(MODEL.length).replaceAll('/', '__');
   try {
@@ -124,6 +134,9 @@ async function main() {
   }
 
   status('fetching the model…');
+  if (!noStore && !(await navigator.storage.getDirectory().then((d) => d.getFileHandle('probe', { create: true })).then((h) => typeof h.createWritable === 'function'))) {
+    throw new Error('this browser\'s origin-private file system has no createWritable');
+  }
   const t0 = performance.now();
   let graph = await cached(MODEL + 'onnx/model_fp16.onnx');
   let data = await cached(MODEL + 'onnx/model_fp16.onnx_data');
@@ -149,7 +162,11 @@ async function main() {
   const first = await runner.extract('A. Bust 36', KINDS, { threshold: 0.5 });
   const t4 = performance.now();
   result.load = {
-    kind: from.graph === 'network' || from.data === 'network' ? 'cold (weights over loopback, written to OPFS)' : 'warm (weights read from OPFS)',
+    kind: noStore
+      ? 'cold (weights over loopback, not kept)'
+      : from.graph === 'network' || from.data === 'network'
+        ? 'cold (weights over loopback, written to OPFS)'
+        : 'warm (weights read from OPFS)',
     fetchMs: t1 - t0,
     tokenizerMs: t2 - t1,
     sessionMs: t3 - t2,
@@ -184,7 +201,7 @@ async function main() {
 }
 
 main().catch((e) => {
-  const msg = String(e?.stack ?? e?.message ?? e);
+  const msg = `${e?.name ?? 'Error'} while ${window.__step ?? 'starting'}: ${e?.message || String(e)}${e?.stack ? `\n${e.stack}` : ''}`;
   log(`FAILED: ${msg}`);
   window.__error = msg;
   status('failed');

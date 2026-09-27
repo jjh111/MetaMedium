@@ -1,0 +1,31 @@
+{
+  "measured": "2026-09-27T01:54:25.778Z",
+  "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.6 Safari/605.1.15",
+  "crossOriginIsolated": true,
+  "hardwareConcurrency": 8,
+  "runtime": {
+    "package": "onnxruntime-web",
+    "version": "1.30.0",
+    "ep": "webgpu"
+  },
+  "gpu": {
+    "vendor": "apple",
+    "architecture": "apple",
+    "device": "apple",
+    "description": "apple",
+    "shaderF16": true
+  },
+  "load": {
+    "kind": "cold (weights over loopback, not kept)",
+    "fetchMs": 532.98,
+    "tokenizerMs": 159.29999999999995,
+    "sessionMs": 1066.94,
+    "firstCallMs": 131.74,
+    "toFirstAnswerMs": 1890.96,
+    "found": [
+      "36:measurement name",
+      "Bust:garment or part name"
+    ]
+  },
+  "memoryAfterLoad": {}
+}
