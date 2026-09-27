@@ -285,6 +285,49 @@ cards place themselves; the silhouette cache measured with a number, bounded
 only if the number says so. For all four: cherry-pick the attempt's test
 first and show it red; delete the losing attempt branch.
 
+**L1b one event, applied once — status, 26 Sep 2026: done on `w2`** —
+`7d79018` (red), `ad8f17b`. `mergeLogs` keeps one event per `(origin, seq)`:
+the first in merge order, the reader's own log keeping its own copy; events
+with no authorship are never folded; two different events under one
+authorship keep the first and are said (`onCollision`;
+`LiveStore.misnumberings()` in `notices()`, so the canvas, the MCP hand and
+the shard all say it with no change of their own; a folder in its own status
+line). Every held log (`Demos/recordings/*.json`, `shard-3d/fixtures/*.mm.log`)
+replays node for node against the `38daf37` bundle, bare, named and merged,
+and mints the same next id (25 of 25). Gate records 28j and 28k fail on the
+old bundle (the id listed twice) and pass.
+
+**L2b status, 26 Sep 2026: done on `w2`** — `2d6fc90` (red), `edfc841`,
+`15658e3` (red), `894601d`. Harvested from `auto/w1-U2-r0920112732`
+(b9b9de1: `canvas_label` and its smoke), adapted to the core half already
+here; the drawing redone, because the attempt drew the word in screen-size
+type. The label is drawn above its mark in the ink's own colour at 13 units
+of the hand's space when the mark was made, so it scales with the board
+(13 px at zoom 1, 26 at zoom 2), in both themes; no artifact, file, card or
+name; erase takes it and undo brings both. Every reading now says its basis
+(`Interpretation.basis`) — the label had been reading as the panel's shape.
+The notes' §F too: `canvas_write` takes `place: {in|under|above|right|left:
+id}`, and the smoke checks a figure placed `in` the tab's box lies inside it.
+Human UI for labelling is not built: the core event takes any participant's
+label on its own ink, and the MCP hand is the only door so far.
+
+**L2d, the canvas's half — status, 26 Sep 2026: done on `w2`** —
+`295ce6d` (red), `29224d4`. Harvested from `auto/w1-U5-r0920130243`
+(e2dea38 and 30b25f4; the WebKit smoke there was already here). Two Enters
+80 ms apart on one loop, the stub delayed, bless one artifact and ask once
+— the second is refused at the door in `09-palette.js` and says *already
+under way*, a revision included (it had asked twice); `09-field.js` and its
+test untouched. `fitAll` fits the content and widens once only for cards
+drawn outside it; on 36 marks with a card logged twenty thousand units from
+where it is drawn, the old union slammed the zoom to 0.08 with every mark off
+the free ground, and the new fit is 1.098 with every mark and card inside.
+The silhouette cache is the shard's and is not measured here.
+Whole suite at the last commit: core 684 in 57 files, typecheck clean, both
+bundles equal to a fresh build; relay and field 31; surface in sync; the
+canvas MCP smoke and the shard's (573 in 30 files, typecheck clean) all pass;
+the gate 367 passed and the one honest skip (canvas 227; shard 120 + 11 + 9);
+WebKit smoke 3. The attempt branches are left for the director to delete.
+
 ### Phase 1 — the backbone
 **B1 Tools.** *Owns* `metamedium-core/src/tools/` (the contract, the
 registry, adapters for today's tier-1 modules and concept conversions),

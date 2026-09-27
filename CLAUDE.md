@@ -459,6 +459,20 @@ now be asked questions in Node with no browser, no DOM and no session —
 a thunk because reading it costs a pass over the marks and most keystrokes
 settle on a verb or a name long before the brief.
 
+**One Enter, one act** (V1-PLAN L2d; `alreadyUnderWay` in `09-palette.js`). A
+brief is a deliberate act on one summon, and a summon is acted on once: the
+reading's `run` is a closure over the summon, so a pill, a touch or a second
+key still held it after the first act had consumed it — on a fresh loop the
+second failed at the bless and said *could not hold that group*; on a
+revision, with no bless to fail at, it asked every model again. So `runPrompt`
+— the one door every brief, program and library reuse comes through — refuses
+a second act on the same summon and says *that brief is already under way*. A
+guard in the adapter, not the reader: `09-field.js` decides what Enter will
+do and is never asked whether it already did. It holds one key (the summon's
+id, time and marks, so a counter id reused by a fresh board is a new act) and
+lets go when the act is given up on — a failed bless, a failed brief whose
+bless was undone. e2e 40 sends two Enters 80 ms apart with the stub delayed.
+
 **A loop that waits is plain ink.** Circle some marks and nothing lights
 up: the loop stays ink until the command mark crosses it — **or a
 double-tap lands inside it** (`summonHeld`; the way in that needs no mark,
@@ -836,6 +850,17 @@ Found with it: **the readable viewport was a sliver.** The panel stands on the
 LEFT and `viewportWorld` read its left edge as the right margin, so in a
 1400px window the world an answer could occupy was 112px wide and every card
 was clamped into it, on top of the last.
+
+**`fitAll` fits the content, and the cards place themselves in it** (V1-PLAN
+L2d, `01-view.js`). It used to union the content with the explanation nodes'
+*logged* bounds — which, since the placing became runtime, are not where any
+card is drawn. A card logged beside a mark that has since moved twenty
+thousand units away made the old union fit that much nothing and slammed the
+zoom to `MIN_ZOOM` with every mark off the free ground (e2e 41d — one way to
+the slam once seen on a live board). Now the content is fitted, the render
+places the cards, and only when a card landed outside the free ground is the
+fit widened **once** to the rects the cards were drawn at (`cardRects`). One
+correction pass, never a chase: fitting again settles.
 
 **Routing** (`src/participants/router.ts`): the canvas answers first — tiers
 0 and 1 — and a model is asked only for what they cannot do.
@@ -1215,6 +1240,22 @@ Both land in `LiveStore.notices()`, which all three hands say: the
 canvas's status line (`folderStatus`), the MCP hand's `canvas_look`, and
 the shard's status line (`Room.notices`) and `space_look`.
 
+**One event, applied once** (`mergeLogs`, V1-PLAN L1b). An event's authorship
+— `origin` and `seq` — is its identity, and the same stamped event does reach
+a reader in two logs: a tab that joins again under another person's name
+hands its log on under the new name while the room still holds the old; two
+hands that opened one folder carry the same file into one room. Merged as
+two, the one mark was applied twice — one node, its id listed twice on the
+board. So the merge keeps **one event per `(origin, seq)`**: the first
+occurrence in merge order, except that the reader's own log (`me`) always
+keeps its own copy (an event of mine dropped there would drop out of what I
+send next). Copies compare as written — `by` and key order aside — and an
+event with no authorship has no identity and is never folded. **Two
+different events under one authorship** are two writers under one name: the
+first is kept and `onCollision` is told; a room says it through
+`LiveStore.misnumberings()`, one sentence per name, which `notices()`
+carries to all three hands, and a folder says it in its own status line.
+
 **"Local" in another hand's log means that hand**: an event stamped `by`
 whose `participantId` is the local participant, or none, is attributed to
 the hand — its answers, proposals and code arrive in its name, never in
@@ -1239,13 +1280,17 @@ hand, and the shard's until it names its log (L2) — keeps counter ids
 An MCP server is **a hand in a room** (SURFACE-v10-PLAN D1): it joins the
 live room `claude` through the relay on this machine (starting one when
 none answers), keeps a session from the merged logs exactly as a tab does,
-and its seven tools are verbs a hand already has — `canvas_look` (the
+and its eight tools are verbs a hand already has — `canvas_look` (the
 board in words, with ids), `canvas_see` (the ink as a PNG: how the caller
 reads handwriting or looks at a sketch — the tier 2 seat, taken by whoever
 is in the conversation), `canvas_draw` (the shape rung's vocabulary or raw
 strokes, declared content), `canvas_say` (a sentence beside marks),
-`canvas_propose` (a reading, held), `canvas_transcribe` (what writing
-says, held), `canvas_write` (code for a new artifact or a new version).
+`canvas_propose` (a reading, held), `canvas_label` (a word on its OWN ink —
+below — refused on anyone else's, with the reason), `canvas_transcribe`
+(what writing says, held), `canvas_write` (code for a new artifact or a new
+version; where it goes is `bounds`, or `place` — `{in | under | above |
+right | left: id, w?, h?}`, relative to a mark, so a caption inside a box is
+not arithmetic; the notes' §F).
 It **proposes and never blesses**; it can write a program and **cannot
 play it**; it holds no keys. MCP over stdio is newline-delimited JSON-RPC
 written by hand, so the repo takes no dependency; it imports the committed
@@ -1258,7 +1303,7 @@ older than the relay remembers (`LiveStore.notices`).
 **In a session without the tools loaded** (the `.mcp.json` was added after
 the session began), the hand still works from the shell: run `mcp.mjs` with
 its stdin fed by `tail -f` on a command file and its stdout to an output
-file, append one JSON-RPC line per call, read the reply — the same seven
+file, append one JSON-RPC line per call, read the reply — the same eight
 tools, one process kept alive across turns. `QA-v10.md` is the hand test
 run that way, with the hand in the room checking each step.
 
@@ -1303,6 +1348,35 @@ third: **the `?live=` boot block must run at the END of `main.ts`**, with the
 demo — up beside `createModels` it runs during module evaluation, where
 `report()` reads chrome declared further down, so it threw into a promise nobody
 awaited and the seat silently never took while the room joined fine.
+
+### A label: a hand's word on its own ink (V1-PLAN L2b)
+
+> `session.label` / `labelOf` / `labelsOf` in core (`session/label.test.ts`);
+> `renderLabels` in `Demos/surface/08-render.js`; `canvas_label` in
+> `Demos/mcp.mjs`.
+
+**Whoever made a mark may put a word on it; nobody else may.** Naming a mark
+someone else made is blessing it, the human's act; labelling your own ink is
+not (the notes, §B). A `label` event holds the word as a rep on the mark,
+attributed; it replays and undoes; an empty word takes it off; another hand's
+label on my mark is refused at the door (`not-your-ink`) and dropped on replay.
+**It is not a bless and not a file** (§D): no `word` rep, no artifact, no
+library entry, no card in the grid, never a name the matcher learns.
+
+**On the board it is a caption.** The word is drawn beside its mark — above
+the top edge, above an artifact's name when that shows — in the ink's own
+colour (the maker's, from the same tokens in either theme), at a size in the
+board's units: the caption rule of `13-kinds.js`, so it scales with the
+drawing it names, never held at screen size (`LABEL_PX` on the screen the mark
+was drawn on — its stroke's scale). Who put it there shows only while the hand
+points at the mark; erasing the mark takes the label, and undo brings both.
+
+**Every reading says what it is based on** (`Interpretation.basis`: `name`,
+`label` or `resemblance`). A label is one named reading among the engine's,
+at its maker's tier and weight 1 — so it led every "the tier-0 reading" list
+and the panel's shape row read the label. Anything asking what the shape rung
+measured asks for a reading that is not a label; the panel shows a `label` row
+beside the shape.
 
 ### Text as an element (v8, WP-13)
 
