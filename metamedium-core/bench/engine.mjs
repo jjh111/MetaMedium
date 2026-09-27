@@ -236,6 +236,24 @@ async function board() {
   writeResult(resultName, out);
   }
 
+  // --- what a model is handed: describeSession lists every stored relation of
+  //     every mark it describes (participants/serialize.ts:88) — for a small
+  //     group (agent.ts, 04-models.js briefFor) and for the whole board (the
+  //     MCP hand's canvas_look with no ids, mcp.mjs:164) ---
+  if (only('brief')) {
+    const loose = st.contentIds.filter((id) => !st.artifacts.includes(id));
+    const group = loose.slice(-5);
+    let t = now();
+    const small = core.describeSession(st, { nodeIds: group });
+    const smallMs = now() - t;
+    t = now();
+    const whole = core.describeSession(st);
+    const wholeMs = now() - t;
+    out.brief = { groupMarks: group.length, groupChars: small.length, groupMs: smallMs, wholeMarks: loose.length, wholeChars: whole.length, wholeMs };
+    say(`  a model's brief: ${group.length} marks → ${(small.length / 1024).toFixed(0)} KB; the whole board → ${(whole.length / 1048576).toFixed(1)} MB in ${ms(wholeMs)}`);
+    writeResult(resultName, out);
+  }
+
   // --- one more stroke at the end ---
   if (only('stroke')) {
   const perKind = {};

@@ -65,6 +65,8 @@ const seed = Number(a.seed || 1);
 const paths = String(a.paths || 'restore,folder').split(',');
 const strokesToDraw = Number(a.strokes || 5);
 const say = (s) => console.log(s);
+/** One file per browser and set of sizes, so one run never writes over another's numbers. */
+const RESULT_FILE = join(OUT, `perf-${engineName}-${sizes.join('-')}.json`);
 
 // ---------------------------------------------------------------------------
 // In the page: the probe (installed before any page script) and the tools.
@@ -366,6 +368,30 @@ async function interact(page, context, size) {
   return r;
 }
 
+/**
+ * How much browser storage takes under one key — where autosave (the whole
+ * log, 17-folder.js saveNow) stops saving. Found by halving, not assumed.
+ */
+async function storageQuota(browser, origin) {
+  const context = await browser.newContext();
+  try {
+    const page = await context.newPage();
+    await page.goto(`${origin}/404.html`, { waitUntil: 'load' });
+    return await page.evaluate(() => {
+      let lo = 0, hi = 64 * 1024 * 1024, error = null;
+      while (hi - lo > 4096) {
+        const mid = Math.floor((lo + hi) / 2);
+        try { localStorage.setItem('mm-quota-probe', 'x'.repeat(mid)); lo = mid; }
+        catch (err) { hi = mid; error = String(err && err.name ? err.name : err); }
+        try { localStorage.removeItem('mm-quota-probe'); } catch (err) { /* nothing */ }
+      }
+      return { chars: lo, error };
+    });
+  } finally {
+    await context.close().catch(() => {});
+  }
+}
+
 async function main() {
   mkdirSync(OUT, { recursive: true });
   const { core } = await loadCore('bundle');
@@ -384,6 +410,8 @@ async function main() {
     sizes: {},
   };
   say(`· ${engineName} ${report.browserVersion} · load ${report.loadavg.join(' ')}`);
+  report.storageQuota = await storageQuota(browser, server.origin).catch((err) => ({ error: String(err && err.message ? err.message : err) }));
+  say(`· browser storage takes at most ${report.storageQuota.chars ? (report.storageQuota.chars / 1048576).toFixed(2) + ' M characters under one key' : '? (' + report.storageQuota.error + ')'}`);
   try {
     for (const size of sizes) {
       const { events, stats } = generateBoard(core, { marks: size, seed });
@@ -398,7 +426,7 @@ async function main() {
         say(out.opened
           ? `  open (${how}): board drawn ${(out.drawnMs / 1000).toFixed(2)} s after navigation · longest task ${out.longestTaskMs ?? '—'} ms · heap ${out.heap ? out.heap.usedMB + ' of ' + out.heap.limitMB + ' MB' : '—'}`
           : `  open (${how}): did not open — ${out.why}`);
-        writeFileSync(join(OUT, `perf-${engineName}.json`), JSON.stringify(report, null, 2));
+        writeFileSync(RESULT_FILE, JSON.stringify(report, null, 2));
         if (out.opened && !interactive && !a['no-interact']) {
           interactive = how;
           try {
@@ -417,14 +445,14 @@ async function main() {
           }
         }
         await context.close().catch(() => {});
-        writeFileSync(join(OUT, `perf-${engineName}.json`), JSON.stringify(report, null, 2));
+        writeFileSync(RESULT_FILE, JSON.stringify(report, null, 2));
       }
     }
   } finally {
     await browser.close().catch(() => {});
     await server.stop().catch(() => {});
   }
-  const file = join(OUT, `perf-${engineName}.json`);
+  const file = RESULT_FILE;
   writeFileSync(file, JSON.stringify(report, null, 2));
   say(`\nresults: ${file}`);
 }

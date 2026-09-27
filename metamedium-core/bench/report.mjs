@@ -112,8 +112,13 @@ for (const f of existsSync(perfDir) ? readdirSync(perfDir).filter((x) => /^perf-
   const ks = Object.keys(p.sizes);
   out(`| | ${ks.map((k) => Number(k).toLocaleString('en-GB')).join(' | ')} |`);
   out(`|---|${ks.map(() => '---').join('|')}|`);
-  const sr = (label, fn) => out(`| ${label} | ${ks.map((k) => { try { return fn(p.sizes[k]) ?? '—'; } catch { return '—'; } }).join(' | ')} |`);
-  const openCell = (o) => !o ? '—' : o.opened ? `${f1(o.drawnMs)} (longest task ${f1(o.longestTaskMs)})` : `did not open: ${o.why}`;
+  const sr = (label, fn) => {
+    const cells = ks.map((k) => { try { return fn(p.sizes[k]) ?? '—'; } catch { return '—'; } });
+    if (cells.every((c) => c === '—')) return; // a row nothing was measured for says nothing
+    out(`| ${label} | ${cells.join(' | ')} |`);
+  };
+  const why = (w) => /QuotaExceeded/.test(w || '') ? 'browser storage refused the log (QuotaExceededError)' : w;
+  const openCell = (o) => !o ? '—' : o.opened ? `${f1(o.drawnMs)} (longest task ${f1(o.longestTaskMs)})` : `did not open: ${why(o.why)}${o.wallMs ? ` after ${f1(o.wallMs)}` : ''}`;
   sr('**open, restored from browser storage** (navigation → board drawn)', (s) => openCell(s.open.restore));
   sr('**open as a folder** (`?folder=`)', (s) => openCell(s.open.folder));
   sr('renderer heap after open (used of limit)', (s) => { const o = (s.open.restore && s.open.restore.opened) ? s.open.restore : s.open.folder; return o && o.heap ? `${o.heap.usedMB} of ${o.heap.limitMB} MB` : null; });
@@ -126,6 +131,11 @@ for (const f of existsSync(perfDir) ? readdirSync(perfDir).filter((x) => /^perf-
   sr('what the strokes read as', (s) => s.interact.draw.readings.join(', '));
   sr('autosave: stringify · into browser storage', (s) => `${f1(s.interact.save.stringify)} · ${s.interact.save.store === null ? 'refused (' + s.interact.save.error.split(':')[0] + ')' : f1(s.interact.save.store)}`);
   out('');
+  if (p.storageQuota && p.storageQuota.chars) {
+    const perMark = ks.map((k) => p.sizes[k].jsonMB * 1048576 / Number(k)).reduce((x, y) => x + y, 0) / ks.length;
+    out(`Browser storage takes at most **${(p.storageQuota.chars / 1048576).toFixed(2)} M characters** under one key (found by halving); these boards' logs run ${(perMark / 1024).toFixed(1)} K characters a mark, so autosave into browser storage stops saving at about **${Math.round(p.storageQuota.chars / perMark).toLocaleString('en-GB')} marks** — and says nothing (17-folder.js:328 swallows the error).`);
+    out('');
+  }
   out(`Command: \`node e2e/perf.mjs --browser=${p.browser} --sizes=${ks.join(',')}\``);
   out('');
 }
