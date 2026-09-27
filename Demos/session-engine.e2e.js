@@ -2361,5 +2361,59 @@ window.__scenario = async function(){
     mm.session.load([]); mm.setView(1, 0, 0);
   }
 
+  // ---- 43. An artifact is made by whoever blessed it (V1-PLAN L2f) ----
+  // A bless wrote no maker, so every board read an artifact as its reader's own:
+  // fern's word on the thing she made was dropped here, the marks inside it were
+  // drawn in this hand's ink, and this hand could label it. The maker of an
+  // artifact is who BLESSED it — and not who drew its marks: fern takes her
+  // circle up together with this hand's box, and each mark keeps its drawer's colour.
+  {
+    mm.session.load([]); mm.setView(1, 0, 0);
+    const S = (x, y) => mm.worldToScreen(x, y);
+    const b0 = S(300, 250), b1 = S(460, 350);
+    t.stroke(t.rect(b0.x, b0.y, b1.x - b0.x, b1.y - b0.y));
+    const box43 = mm.session.getState().contentIds[0];
+    const mine43 = mm.session.getEvents().filter((e) => !e.by);
+    // Fern, holding this hand's log, draws a circle beside the box, takes the two up as one thing, and puts a word on it.
+    const fern = MM.createSession(Object.assign({}, MM.DEFAULT_SESSION_CONFIG, { logName: 'fern~f1' }));
+    fern.load(MM.mergeLogs({ 'me~m1': mine43, 'fern~f1': [] }, { me: 'fern~f1' }));
+    const at43 = Date.now();
+    const kite43 = fern.addStroke(t.circle(600, 300, 50).map((p) => ({ x: p.x, y: p.y })), at43, undefined, 1, { content: true });
+    const pair43 = fern.bless({ summonId: fern.summonMarks([box43, kite43], at43 + 1), name: 'pair', at: at43 + 2 });
+    const worded43 = fern.label({ nodeId: pair43, text: 'kite and box', at: at43 + 3 });
+    mm.session.load(MM.mergeLogs({ 'fern~f1': fern.getEvents().filter((e) => !e.by), 'me~m1': mine43 }, { me: 'me~m1' })); await wait(30);
+    const s43 = mm.session.getState();
+    const node43 = s43.nodes.get(pair43);
+    const panel43 = document.getElementById('inspector').textContent;
+    step('43. fern blesses her circle with this hand\'s box: on this board the thing is hers, and the panel says so',
+      !!pair43 && s43.artifacts.includes(pair43) && !!node43 && MM.authorOf(node43) === 'participant:hand:fern_f1'
+        && MM.authorOf(s43.nodes.get(box43)) === MM.LOCAL_PARTICIPANT && MM.authorOf(s43.nodes.get(kite43)) === 'participant:hand:fern_f1'
+        && /by\s*fern/.test(panel43),
+      { artifact: pair43, maker: node43 && MM.authorOf(node43), box: MM.authorOf(s43.nodes.get(box43)), panel: panel43.slice(0, 200) });
+    const lab43 = (typeof mm.labelsDrawn === 'function' ? mm.labelsDrawn() : []).find((l) => l.id === pair43);
+    step('43a. her word on the thing she made survives this board\'s replay, drawn in her colour and attributed to her',
+      worded43 === pair43 && !!lab43 && lab43.text === 'kite and box' && lab43.colour === mm.handColour('fern') && lab43.who === 'fern',
+      { worded: worded43, label: lab43, hue: mm.handColour('fern') });
+    const ink43 = (id) => (typeof mm.inkDrawn === 'function' ? mm.inkDrawn(id) : null);
+    step('43b. each mark inside it keeps the colour of the hand that DREW it: this hand\'s box in its own ink, her circle in hers',
+      !!ink43(box43) && ink43(box43) === mm.colourOf(box43) && ink43(kite43) === mm.handColour('fern') && ink43(box43) !== ink43(kite43),
+      { box: ink43(box43), boxOwn: mm.colourOf(box43), circle: ink43(kite43), hue: mm.handColour('fern') });
+    // Held, it is not this hand's to label: the field says so before Enter, and Enter writes nothing.
+    const c43 = S(475, 300);
+    t.stroke(t.circle(c43.x, c43.y, 230)); t.takeLoop(c43.x, c43.y, 230); await wait(60);
+    const held43 = mm.session.getState().summon;
+    t.typeIn('label: mine');
+    const line43 = t.readingLine();
+    const evs43 = mm.session.getEvents().length;
+    t.typeEnter('label: mine'); await wait(60);
+    const status43 = document.getElementById('status').textContent;
+    step('43c. held, fern\'s thing is not this hand\'s to label — though it drew one of its marks: the line says so before Enter, and Enter writes nothing',
+      !!held43 && held43.enclosedIds.length === 1 && held43.enclosedIds[0] === pair43 && line43 === '↵ no label — fern made this mark; a label goes on your own ink'
+        && !mm.session.getEvents().slice(evs43).some((e) => e.type === 'label') && (MM.labelOf(mm.session.getState().nodes.get(pair43)) || {}).text === 'kite and box'
+        && /no label on the mark fern made/.test(status43),
+      { held: held43 && held43.enclosedIds, line: line43, status: status43, events: mm.session.getEvents().slice(evs43).map((e) => e.type) });
+    mm.session.load([]); mm.setView(1, 0, 0);
+  }
+
   return R;
 };

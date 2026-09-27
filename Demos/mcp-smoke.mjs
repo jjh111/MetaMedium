@@ -176,6 +176,26 @@ try {
   const gone = await call('canvas_say', { text: 'x', about: ['stroke:999'] });
   check('a sentence about nothing is not placed', /not placed/.test(textOf(gone)), textOf(gone));
 
+  // ===== An artifact is made by whoever blessed it (V1-PLAN L2f) =============
+  // The tab takes two marks of its own up as one thing and puts a word on it.
+  // A bless used to write no maker, so on the hand's board the tab's artifact
+  // read as the HAND's: the tab's word on it was dropped, no "by tab" was
+  // said, and the hand could label it. Now it is the tab's on every board.
+  const pa = tabSession.addStroke(MM.strokeFor({ shape: 'rectangle', x: 100, y: 700, w: 120, h: 80 }), Date.now(), undefined, 1);
+  const pb = tabSession.addStroke(MM.strokeFor({ shape: 'rectangle', x: 260, y: 700, w: 120, h: 80 }), Date.now() + 1, undefined, 1);
+  const panelSummon = tabSession.summonMarks([pa, pb], Date.now() + 2);
+  const panelId = panelSummon && tabSession.bless({ summonId: panelSummon, name: 'panel', at: Date.now() + 3 });
+  const panelLabelled = panelId && tabSession.label({ nodeId: panelId, text: 'mine', at: Date.now() + 4 });
+  await tab.publish(tabSession.getEvents().filter((e) => !e.by));
+  const panelLine = (text) => text.split('\n').find((l) => l.startsWith(panelId + ' ')) || '';
+  let t6 = '';
+  for (let i = 0; i < 25 && !panelLine(t6); i++) { t6 = textOf(await call('canvas_look', {})); if (!panelLine(t6)) await wait(100); }
+  check('the tab blesses two marks of its own and labels the thing: on the hand\'s board it is the tab\'s, with the tab\'s word on it',
+    !!panelId && panelLabelled === panelId && /“panel”/.test(panelLine(t6)) && /by tab/.test(panelLine(t6)) && /labelled “mine”/.test(panelLine(t6)),
+    { panelId, labelled: panelLabelled, line: panelLine(t6) });
+  const notHis = await call('canvas_label', { id: panelId, text: 'not mine' });
+  check('canvas_label is refused on the tab\'s artifact, with the reason in words', /was made by tab/.test(textOf(notHis)) && /your own ink/.test(textOf(notHis)) && !/“not mine” on/.test(textOf(notHis)), textOf(notHis));
+
   // ===== Two hands in one room: an id crosses the boundary (T8) =============
   // The defect: a node id used to be a counter over the MERGED replay, and no
   // two hands in a room merge the same set of logs. A SECOND tab whose mark
