@@ -22,7 +22,14 @@ export function loadTokenizer(dir = MODEL_DIR) {
 }
 
 /**
- * @param {{ dtype?: 'fp16' | 'fp32', ep?: 'cpu' | 'coreml', threads?: number, dir?: string }} [o]
+ * Execution providers, as measured on Apple silicon (M2 Max, onnxruntime-node 1.30):
+ *   cpu     — runs; the fp16 graph gets casts inserted where the CPU has no fp16 kernel.
+ *   webgpu  — runs (Dawn over Metal); ~130 integer shape nodes fall back to the CPU.
+ *   coreml  — does NOT help: the NeuralNetwork format takes 0 of the graph's 910 nodes
+ *             (so it is the CPU under another name), and the MLProgram format
+ *             (coreMlFlags 0x010) throws while initialising. Kept only to say so.
+ *
+ * @param {{ dtype?: 'fp16' | 'fp32', ep?: 'cpu' | 'webgpu' | 'coreml', threads?: number, dir?: string }} [o]
  */
 export async function loadNodeRunner(o = {}) {
   const dtype = o.dtype ?? 'fp16';
@@ -34,7 +41,7 @@ export async function loadNodeRunner(o = {}) {
   const tokenizer = loadTokenizer(dir);
   const t1 = performance.now();
   const options = {
-    executionProviders: ep === 'coreml' ? [{ name: 'coreml' }, 'cpu'] : ['cpu'],
+    executionProviders: ep === 'coreml' ? [{ name: 'coreml' }, 'cpu'] : ep === 'webgpu' ? ['webgpu', 'cpu'] : ['cpu'],
     graphOptimizationLevel: 'all',
     // The CPU provider has no fp16 kernel to constant-fold a few fused Gemm
     // nodes and says so once per node; it inserts casts and runs them anyway.

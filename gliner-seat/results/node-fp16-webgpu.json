@@ -1,0 +1,5459 @@
+{
+  "measured": "2026-09-27T01:38:26.033Z",
+  "machine": {
+    "cpu": "Apple M2 Max",
+    "cores": 12,
+    "memoryGB": 96,
+    "os": "Darwin 25.6.0 arm64",
+    "node": "v22.23.0"
+  },
+  "model": {
+    "export": "onnx-community/gliner2-multi-v1-agent-ONNX@2d0d8e4",
+    "graph": "onnx/model_fp16.onnx",
+    "dtype": "fp16",
+    "sizeMB": 586
+  },
+  "runtime": {
+    "package": "onnxruntime-node",
+    "ep": "webgpu",
+    "threads": "default"
+  },
+  "cacheProbe": {
+    "firstRead": {
+      "ms": 98.53704200000001,
+      "mbPerS": 5944
+    },
+    "secondRead": {
+      "ms": 51.317083000000025,
+      "mbPerS": 11414
+    }
+  },
+  "loads": {
+    "diskCold": {
+      "runs": [
+        {
+          "importMs": 20.616166000000003,
+          "tokenizerMs": 305.2285,
+          "sessionMs": 1057.016083,
+          "firstCallMs": 297.8950830000001,
+          "toFirstAnswerMs": 1680.916083,
+          "rssMB": 986,
+          "maxRssMB": 1259,
+          "found": [
+            "36:measurement name",
+            "Bust:garment or part name"
+          ]
+        },
+        {
+          "importMs": 20.095584000000002,
+          "tokenizerMs": 300.30029199999996,
+          "sessionMs": 1070.5368750000002,
+          "firstCallMs": 91.52679199999989,
+          "toFirstAnswerMs": 1482.601167,
+          "rssMB": 989,
+          "maxRssMB": 1129,
+          "found": [
+            "36:measurement name",
+            "Bust:garment or part name"
+          ]
+        },
+        {
+          "importMs": 19.886208,
+          "tokenizerMs": 311.226,
+          "sessionMs": 1126.346541,
+          "firstCallMs": 99.78133400000002,
+          "toFirstAnswerMs": 1557.385417,
+          "rssMB": 988,
+          "maxRssMB": 1127,
+          "found": [
+            "36:measurement name",
+            "Bust:garment or part name"
+          ]
+        }
+      ],
+      "toFirstAnswerMs": {
+        "median": 1557.385417,
+        "min": 1482.601167,
+        "max": 1680.916083
+      },
+      "sessionMs": {
+        "median": 1070.5368750000002,
+        "min": 1057.016083,
+        "max": 1126.346541
+      },
+      "maxRssMB": {
+        "median": 1129,
+        "min": 1127,
+        "max": 1259
+      }
+    },
+    "cacheWarm": {
+      "runs": [
+        {
+          "importMs": 20.544208,
+          "tokenizerMs": 318.63966600000003,
+          "sessionMs": 604.379334,
+          "firstCallMs": 91.42383299999995,
+          "toFirstAnswerMs": 1035.140666,
+          "rssMB": 989,
+          "maxRssMB": 1332,
+          "found": [
+            "36:measurement name",
+            "Bust:garment or part name"
+          ]
+        },
+        {
+          "importMs": 21.610665999999995,
+          "tokenizerMs": 311.220208,
+          "sessionMs": 556.6807919999999,
+          "firstCallMs": 102.79333299999996,
+          "toFirstAnswerMs": 992.433583,
+          "rssMB": 988,
+          "maxRssMB": 1119,
+          "found": [
+            "36:measurement name",
+            "Bust:garment or part name"
+          ]
+        },
+        {
+          "importMs": 21.011666999999996,
+          "tokenizerMs": 315.906666,
+          "sessionMs": 544.427209,
+          "firstCallMs": 104.81408399999998,
+          "toFirstAnswerMs": 986.302834,
+          "rssMB": 989,
+          "maxRssMB": 1251,
+          "found": [
+            "36:measurement name",
+            "Bust:garment or part name"
+          ]
+        }
+      ],
+      "toFirstAnswerMs": {
+        "median": 992.433583,
+        "min": 986.302834,
+        "max": 1035.140666
+      },
+      "sessionMs": {
+        "median": 556.6807919999999,
+        "min": 544.427209,
+        "max": 604.379334
+      },
+      "maxRssMB": {
+        "median": 1251,
+        "min": 1119,
+        "max": 1332
+      }
+    }
+  },
+  "memory": {
+    "beforeLoad": {
+      "rssMB": 86,
+      "maxRssMB": 86
+    },
+    "afterLoad": {
+      "rssMB": 975,
+      "maxRssMB": 1156
+    },
+    "afterFirstCall": {
+      "rssMB": 992,
+      "maxRssMB": 1156
+    },
+    "afterAll": {
+      "rssMB": 1056,
+      "maxRssMB": 1156
+    }
+  },
+  "harness": {
+    "runner": "gliner2-multi-v1 fp16 · onnxruntime-node 1.30.0 · webgpu",
+    "firstCallMs": 100.16720800000076,
+    "repeats": 5,
+    "variants": {
+      "names": {
+        "latency": {
+          "all": {
+            "n": 105,
+            "median": 22.87620799999968,
+            "p95": 25.569208000000067,
+            "mean": 27.51184165714294,
+            "min": 21.487332999999126,
+            "max": 129.35316700000112
+          },
+          "graphOnly": {
+            "n": 105,
+            "median": 22.71808299999975,
+            "p95": 25.438491399999837,
+            "mean": 27.318773790476172,
+            "min": 21.426292000000103,
+            "max": 124.92808299999888
+          },
+          "byGroup": {
+            "a line of the page": {
+              "n": 80,
+              "median": 22.73216649999995,
+              "p95": 23.835246450000433,
+              "mean": 22.76249998750011,
+              "min": 21.487332999999126,
+              "max": 25.80620799999997
+            },
+            "a brief in words": {
+              "n": 20,
+              "median": 22.97539549999965,
+              "p95": 24.449021450001148,
+              "mean": 23.051204149999922,
+              "min": 21.50395800000115,
+              "max": 24.62120800000048
+            },
+            "the castle's brief": {
+              "n": 5,
+              "median": 120.36645800000042,
+              "p95": 127.65720020000117,
+              "mean": 121.34385840000031,
+              "min": 117.11195899999984,
+              "max": 129.35316700000112
+            }
+          },
+          "tokens": {
+            "n": 105,
+            "median": 41,
+            "p95": 57,
+            "mean": 76.80952380952381,
+            "min": 32,
+            "max": 792
+          }
+        },
+        "quality": {
+          "strict": {
+            "mode": "strict",
+            "overall": {
+              "tp": 67,
+              "fp": 47,
+              "fn": 76,
+              "precision": 0.5877192982456141,
+              "recall": 0.46853146853146854,
+              "f1": 0.5214007782101168
+            },
+            "byType": {
+              "measurement name": {
+                "tp": 0,
+                "fp": 16,
+                "fn": 11,
+                "precision": 0,
+                "recall": 0,
+                "f1": null
+              },
+              "quantity": {
+                "tp": 39,
+                "fp": 19,
+                "fn": 30,
+                "precision": 0.6724137931034483,
+                "recall": 0.5652173913043478,
+                "f1": 0.6141732283464567
+              },
+              "unit": {
+                "tp": 23,
+                "fp": 0,
+                "fn": 5,
+                "precision": 1,
+                "recall": 0.8214285714285714,
+                "f1": 0.9019607843137255
+              },
+              "garment or part name": {
+                "tp": 1,
+                "fp": 6,
+                "fn": 8,
+                "precision": 0.14285714285714285,
+                "recall": 0.1111111111111111,
+                "f1": 0.125
+              },
+              "operation": {
+                "tp": 4,
+                "fp": 6,
+                "fn": 22,
+                "precision": 0.4,
+                "recall": 0.15384615384615385,
+                "f1": 0.2222222222222222
+              }
+            },
+            "ignored": 24,
+            "errors": [
+              {
+                "item": "apron.sample/A",
+                "kind": "false positive",
+                "label": "measurement name",
+                "text": "36",
+                "start": 8,
+                "score": 0.9515039967560431
+              },
+              {
+                "item": "apron.sample/A",
+                "kind": "false positive",
+                "label": "garment or part name",
+                "text": "Bust",
+                "start": 3,
+                "score": 0.8703770745957927
+              },
+              {
+                "item": "apron.sample/A",
+                "kind": "missed",
+                "label": "measurement name",
+                "text": "Bust",
+                "start": 3
+              },
+              {
+                "item": "apron.sample/A",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "36",
+                "start": 8
+              },
+              {
+                "item": "apron.sample/B",
+                "kind": "false positive",
+                "label": "garment or part name",
+                "text": "Top to waist",
+                "start": 3,
+                "score": 0.7126323258637807
+              },
+              {
+                "item": "apron.sample/B",
+                "kind": "false positive",
+                "label": "measurement name",
+                "text": "20",
+                "start": 16,
+                "score": 0.6053908534601293
+              },
+              {
+                "item": "apron.sample/B",
+                "kind": "missed",
+                "label": "measurement name",
+                "text": "Top to waist",
+                "start": 3
+              },
+              {
+                "item": "apron.sample/C",
+                "kind": "false positive",
+                "label": "measurement name",
+                "text": "46",
+                "start": 17,
+                "score": 0.7070002730499041
+              },
+              {
+                "item": "apron.sample/C",
+                "kind": "missed",
+                "label": "measurement name",
+                "text": "Top to bottom",
+                "start": 3
+              },
+              {
+                "item": "apron.sample/seam",
+                "kind": "false positive",
+                "label": "garment or part name",
+                "text": "seam allowance",
+                "start": 4,
+                "score": 0.7652426642688286
+              },
+              {
+                "item": "apron.sample/seam",
+                "kind": "missed",
+                "label": "measurement name",
+                "text": "seam allowance",
+                "start": 4
+              },
+              {
+                "item": "apron.sample/1",
+                "kind": "missed",
+                "label": "operation",
+                "text": "÷",
+                "start": 5
+              },
+              {
+                "item": "apron.sample/1",
+                "kind": "missed",
+                "label": "operation",
+                "text": "+",
+                "start": 14
+              },
+              {
+                "item": "apron.sample/2",
+                "kind": "missed",
+                "label": "operation",
+                "text": "÷",
+                "start": 5
+              },
+              {
+                "item": "apron.sample/2",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "2",
+                "start": 7
+              },
+              {
+                "item": "apron.sample/2",
+                "kind": "missed",
+                "label": "operation",
+                "text": "÷",
+                "start": 14
+              },
+              {
+                "item": "apron.sample/2",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "2",
+                "start": 16
+              },
+              {
+                "item": "apron.sample/3",
+                "kind": "false positive",
+                "label": "measurement name",
+                "text": "22",
+                "start": 14,
+                "score": 0.6818327122534676
+              },
+              {
+                "item": "apron.sample/3",
+                "kind": "missed",
+                "label": "operation",
+                "text": "+",
+                "start": 8
+              },
+              {
+                "item": "apron.sample/4",
+                "kind": "false positive",
+                "label": "measurement name",
+                "text": "4. C 48",
+                "start": 0,
+                "score": 0.5770187415004098
+              },
+              {
+                "item": "apron.sample/5",
+                "kind": "false positive",
+                "label": "measurement name",
+                "text": "38\"",
+                "start": 5,
+                "score": 0.8991213772699436
+              },
+              {
+                "item": "apron.sample/5",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "38",
+                "start": 5
+              },
+              {
+                "item": "apron.sample/6",
+                "kind": "false positive",
+                "label": "measurement name",
+                "text": "72\"",
+                "start": 15,
+                "score": 0.8033281311678119
+              },
+              {
+                "item": "apron.sample/6",
+                "kind": "missed",
+                "label": "operation",
+                "text": "×",
+                "start": 6
+              },
+              {
+                "item": "apron.sample/6",
+                "kind": "missed",
+                "label": "operation",
+                "text": "−",
+                "start": 11
+              },
+              {
+                "item": "apron.sample/6",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "72",
+                "start": 15
+              },
+              {
+                "item": "apron.sample/brace",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "72–74",
+                "start": 0
+              },
+              {
+                "item": "tunic.sample/1",
+                "kind": "false positive",
+                "label": "measurement name",
+                "text": "21\"",
+                "start": 33,
+                "score": 0.8906751699223611
+              },
+              {
+                "item": "tunic.sample/1",
+                "kind": "false positive",
+                "label": "measurement name",
+                "text": "+ 6\"",
+                "start": 9,
+                "score": 0.6975059041053338
+              },
+              {
+                "item": "tunic.sample/1",
+                "kind": "missed",
+                "label": "measurement name",
+                "text": "Chest",
+                "start": 3
+              },
+              {
+                "item": "tunic.sample/1",
+                "kind": "missed",
+                "label": "operation",
+                "text": "+",
+                "start": 9
+              },
+              {
+                "item": "tunic.sample/1",
+                "kind": "missed",
+                "label": "unit",
+                "text": "\"",
+                "start": 12
+              },
+              {
+                "item": "tunic.sample/1",
+                "kind": "missed",
+                "label": "operation",
+                "text": "÷",
+                "start": 14
+              },
+              {
+                "item": "tunic.sample/1",
+                "kind": "missed",
+                "label": "operation",
+                "text": "+",
+                "start": 24
+              },
+              {
+                "item": "tunic.sample/1",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "6",
+                "start": 26
+              },
+              {
+                "item": "tunic.sample/1",
+                "kind": "missed",
+                "label": "operation",
+                "text": "/",
+                "start": 28
+              },
+              {
+                "item": "tunic.sample/1",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "21",
+                "start": 33
+              },
+              {
+                "item": "tunic.sample/1",
+                "kind": "missed",
+                "label": "unit",
+                "text": "\"",
+                "start": 35
+              },
+              {
+                "item": "tunic.sample/2",
+                "kind": "missed",
+                "label": "measurement name",
+                "text": "Shoulder to length desired",
+                "start": 3
+              },
+              {
+                "item": "tunic.sample/2",
+                "kind": "missed",
+                "label": "operation",
+                "text": "+",
+                "start": 30
+              },
+              {
+                "item": "tunic.sample/2",
+                "kind": "missed",
+                "label": "operation",
+                "text": "+",
+                "start": 39
+              },
+              {
+                "item": "tunic.sample/3",
+                "kind": "false positive",
+                "label": "quantity",
+                "text": "3",
+                "start": 38,
+                "score": 0.9609517072737735
+              },
+              {
+                "item": "tunic.sample/3",
+                "kind": "false positive",
+                "label": "measurement name",
+                "text": "22\"",
+                "start": 59,
+                "score": 0.8187367931713698
+              },
+              {
+                "item": "tunic.sample/3",
+                "kind": "false positive",
+                "label": "garment or part name",
+                "text": "Top shoulder to under armpit",
+                "start": 3,
+                "score": 0.5434993722963195
+              },
+              {
+                "item": "tunic.sample/3",
+                "kind": "missed",
+                "label": "measurement name",
+                "text": "Top shoulder to under armpit",
+                "start": 3
+              },
+              {
+                "item": "tunic.sample/3",
+                "kind": "missed",
+                "label": "operation",
+                "text": "×",
+                "start": 32
+              },
+              {
+                "item": "tunic.sample/3",
+                "kind": "missed",
+                "label": "operation",
+                "text": "+",
+                "start": 36
+              },
+              {
+                "item": "tunic.sample/3",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "3–6",
+                "start": 38
+              },
+              {
+                "item": "tunic.sample/3",
+                "kind": "missed",
+                "label": "operation",
+                "text": "×",
+                "start": 48
+              },
+              {
+                "item": "tunic.sample/3",
+                "kind": "missed",
+                "label": "operation",
+                "text": "+",
+                "start": 53
+              },
+              {
+                "item": "tunic.sample/4",
+                "kind": "false positive",
+                "label": "quantity",
+                "text": "4",
+                "start": 12,
+                "score": 0.9605095953512194
+              },
+              {
+                "item": "tunic.sample/4",
+                "kind": "false positive",
+                "label": "garment or part name",
+                "text": "Fist",
+                "start": 3,
+                "score": 0.8438951025545426
+              },
+              {
+                "item": "tunic.sample/4",
+                "kind": "false positive",
+                "label": "quantity",
+                "text": "2",
+                "start": 10,
+                "score": 0.7692536249190332
+              },
+              {
+                "item": "tunic.sample/4",
+                "kind": "false positive",
+                "label": "measurement name",
+                "text": "7.5\"",
+                "start": 27,
+                "score": 0.6788594333153876
+              },
+              {
+                "item": "tunic.sample/4",
+                "kind": "missed",
+                "label": "measurement name",
+                "text": "Fist",
+                "start": 3
+              },
+              {
+                "item": "tunic.sample/4",
+                "kind": "missed",
+                "label": "operation",
+                "text": "+",
+                "start": 8
+              },
+              {
+                "item": "tunic.sample/4",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "2–4",
+                "start": 10
+              },
+              {
+                "item": "tunic.sample/4",
+                "kind": "missed",
+                "label": "operation",
+                "text": "+",
+                "start": 21
+              },
+              {
+                "item": "tunic.sample/5",
+                "kind": "false positive",
+                "label": "measurement name",
+                "text": "23\"",
+                "start": 30,
+                "score": 0.616935831319445
+              },
+              {
+                "item": "tunic.sample/5",
+                "kind": "false positive",
+                "label": "measurement name",
+                "text": "+ 2\"",
+                "start": 14,
+                "score": 0.5318780878530489
+              },
+              {
+                "item": "tunic.sample/5",
+                "kind": "missed",
+                "label": "measurement name",
+                "text": "Arm length",
+                "start": 3
+              },
+              {
+                "item": "tunic.sample/5",
+                "kind": "missed",
+                "label": "operation",
+                "text": "+",
+                "start": 14
+              },
+              {
+                "item": "tunic.sample/5",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "21",
+                "start": 21
+              },
+              {
+                "item": "tunic.sample/5",
+                "kind": "missed",
+                "label": "operation",
+                "text": "+",
+                "start": 24
+              },
+              {
+                "item": "brief/apron",
+                "kind": "false positive",
+                "label": "measurement name",
+                "text": "36 inch",
+                "start": 21,
+                "score": 0.7401743620390163
+              },
+              {
+                "item": "brief/apron",
+                "kind": "false positive",
+                "label": "measurement name",
+                "text": "20 inches",
+                "start": 38,
+                "score": 0.7129322140836937
+              },
+              {
+                "item": "brief/apron",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "36",
+                "start": 21
+              },
+              {
+                "item": "brief/apron",
+                "kind": "missed",
+                "label": "unit",
+                "text": "inch",
+                "start": 24
+              },
+              {
+                "item": "brief/apron",
+                "kind": "missed",
+                "label": "measurement name",
+                "text": "bust",
+                "start": 29
+              },
+              {
+                "item": "brief/apron",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "20",
+                "start": 38
+              },
+              {
+                "item": "brief/apron",
+                "kind": "missed",
+                "label": "measurement name",
+                "text": "top to waist",
+                "start": 48
+              },
+              {
+                "item": "brief/flowchart",
+                "kind": "false positive",
+                "label": "operation",
+                "text": "checkout",
+                "start": 16,
+                "score": 0.8350804533361768
+              },
+              {
+                "item": "brief/flowchart",
+                "kind": "missed",
+                "label": "garment or part name",
+                "text": "decision",
+                "start": 32
+              },
+              {
+                "item": "brief/castle",
+                "kind": "false positive",
+                "label": "measurement name",
+                "text": "gate",
+                "start": 39,
+                "score": 0.5732603860601143
+              },
+              {
+                "item": "brief/castle",
+                "kind": "missed",
+                "label": "garment or part name",
+                "text": "towers",
+                "start": 18
+              },
+              {
+                "item": "brief/castle",
+                "kind": "missed",
+                "label": "garment or part name",
+                "text": "wall",
+                "start": 28
+              },
+              {
+                "item": "brief/castle",
+                "kind": "missed",
+                "label": "garment or part name",
+                "text": "gate",
+                "start": 39
+              },
+              {
+                "item": "brief/castle-words",
+                "kind": "missed",
+                "label": "garment or part name",
+                "text": "tops",
+                "start": 18
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "false positive",
+                "label": "quantity",
+                "text": "8",
+                "start": 560,
+                "score": 0.9802052211384412
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "false positive",
+                "label": "quantity",
+                "text": "9",
+                "start": 740,
+                "score": 0.9672250161000435
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "false positive",
+                "label": "quantity",
+                "text": "2",
+                "start": 74,
+                "score": 0.9521309935238556
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "false positive",
+                "label": "quantity",
+                "text": "2",
+                "start": 80,
+                "score": 0.9437636542955161
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "false positive",
+                "label": "quantity",
+                "text": "1",
+                "start": 331,
+                "score": 0.9419752510012038
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "false positive",
+                "label": "quantity",
+                "text": "2",
+                "start": 76,
+                "score": 0.9358173563909802
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "false positive",
+                "label": "quantity",
+                "text": "1",
+                "start": 327,
+                "score": 0.9356999454877224
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "false positive",
+                "label": "quantity",
+                "text": "0.8",
+                "start": 303,
+                "score": 0.927099726575378
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "false positive",
+                "label": "quantity",
+                "text": "0.0",
+                "start": 315,
+                "score": 0.922202551391991
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "false positive",
+                "label": "quantity",
+                "text": "1.6 × 1.7",
+                "start": 708,
+                "score": 0.9130583432721083
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "false positive",
+                "label": "quantity",
+                "text": "0.9",
+                "start": 319,
+                "score": 0.909264512360149
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "false positive",
+                "label": "quantity",
+                "text": "3.0",
+                "start": 307,
+                "score": 0.8765287249141699
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "false positive",
+                "label": "garment or part name",
+                "text": "castle with green tops",
+                "start": 1023,
+                "score": 0.8722385876369141
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "false positive",
+                "label": "operation",
+                "text": "drawn",
+                "start": 636,
+                "score": 0.8389438375191766
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "false positive",
+                "label": "operation",
+                "text": "drawn",
+                "start": 673,
+                "score": 0.7967672836747012
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "false positive",
+                "label": "operation",
+                "text": "drawn",
+                "start": 791,
+                "score": 0.7647159477410339
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "false positive",
+                "label": "quantity",
+                "text": "29",
+                "start": 654,
+                "score": 0.6472409964439338
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "false positive",
+                "label": "quantity",
+                "text": "29",
+                "start": 809,
+                "score": 0.5917822203746856
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "false positive",
+                "label": "quantity",
+                "text": "22",
+                "start": 692,
+                "score": 0.5721252305082641
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "false positive",
+                "label": "operation",
+                "text": "drawing",
+                "start": 65,
+                "score": 0.5685954820737726
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "false positive",
+                "label": "quantity",
+                "text": "1",
+                "start": 558,
+                "score": 0.5489153099415687
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "false positive",
+                "label": "operation",
+                "text": "cut a hole",
+                "start": 1443,
+                "score": 0.5356449958505374
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "2.2",
+                "start": 74
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "2.8",
+                "start": 80
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "0.8…3.0",
+                "start": 303
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "-0.0…0.9",
+                "start": 314
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "-1.8…1.0",
+                "start": 326
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "missed",
+                "label": "garment or part name",
+                "text": "part 1",
+                "start": 549
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "1.8",
+                "start": 558
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "64",
+                "start": 647
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "missed",
+                "label": "unit",
+                "text": "°",
+                "start": 649
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "+29",
+                "start": 653
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "135",
+                "start": 684
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "missed",
+                "label": "unit",
+                "text": "°",
+                "start": 687
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "+22",
+                "start": 691
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "missed",
+                "label": "garment or part name",
+                "text": "part 2",
+                "start": 699
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "1.6",
+                "start": 708
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "1.7",
+                "start": 714
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "0.9",
+                "start": 738
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "64",
+                "start": 802
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "+29",
+                "start": 808
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "missed",
+                "label": "garment or part name",
+                "text": "tops",
+                "start": 1041
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "three",
+                "start": 1102
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "one",
+                "start": 1387
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "missed",
+                "label": "operation",
+                "text": "cut",
+                "start": 1443
+              }
+            ],
+            "byFixture": {
+              "apron.sample": {
+                "tp": 17,
+                "fp": 10,
+                "fn": 17,
+                "precision": 0.6296296296296297,
+                "recall": 0.5,
+                "f1": 0.5573770491803278
+              },
+              "tunic.sample": {
+                "tp": 26,
+                "fp": 11,
+                "fn": 26,
+                "precision": 0.7027027027027027,
+                "recall": 0.5,
+                "f1": 0.5842696629213484
+              },
+              "briefs": {
+                "tp": 3,
+                "fp": 4,
+                "fn": 10,
+                "precision": 0.42857142857142855,
+                "recall": 0.23076923076923078,
+                "f1": 0.3
+              },
+              "castle-sketch.brief": {
+                "tp": 21,
+                "fp": 22,
+                "fn": 23,
+                "precision": 0.4883720930232558,
+                "recall": 0.4772727272727273,
+                "f1": 0.4827586206896552
+              }
+            }
+          },
+          "overlap": {
+            "mode": "overlap",
+            "overall": {
+              "tp": 82,
+              "fp": 32,
+              "fn": 61,
+              "precision": 0.7192982456140351,
+              "recall": 0.5734265734265734,
+              "f1": 0.6381322957198444
+            },
+            "byType": {
+              "measurement name": {
+                "tp": 0,
+                "fp": 16,
+                "fn": 11,
+                "precision": 0,
+                "recall": 0,
+                "f1": null
+              },
+              "quantity": {
+                "tp": 52,
+                "fp": 6,
+                "fn": 17,
+                "precision": 0.896551724137931,
+                "recall": 0.7536231884057971,
+                "f1": 0.8188976377952756
+              },
+              "unit": {
+                "tp": 23,
+                "fp": 0,
+                "fn": 5,
+                "precision": 1,
+                "recall": 0.8214285714285714,
+                "f1": 0.9019607843137255
+              },
+              "garment or part name": {
+                "tp": 2,
+                "fp": 5,
+                "fn": 7,
+                "precision": 0.2857142857142857,
+                "recall": 0.2222222222222222,
+                "f1": 0.25
+              },
+              "operation": {
+                "tp": 5,
+                "fp": 5,
+                "fn": 21,
+                "precision": 0.5,
+                "recall": 0.19230769230769232,
+                "f1": 0.2777777777777778
+              }
+            },
+            "ignored": 24,
+            "errors": [
+              {
+                "item": "apron.sample/A",
+                "kind": "false positive",
+                "label": "measurement name",
+                "text": "36",
+                "start": 8,
+                "score": 0.9515039967560431
+              },
+              {
+                "item": "apron.sample/A",
+                "kind": "false positive",
+                "label": "garment or part name",
+                "text": "Bust",
+                "start": 3,
+                "score": 0.8703770745957927
+              },
+              {
+                "item": "apron.sample/A",
+                "kind": "missed",
+                "label": "measurement name",
+                "text": "Bust",
+                "start": 3
+              },
+              {
+                "item": "apron.sample/A",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "36",
+                "start": 8
+              },
+              {
+                "item": "apron.sample/B",
+                "kind": "false positive",
+                "label": "garment or part name",
+                "text": "Top to waist",
+                "start": 3,
+                "score": 0.7126323258637807
+              },
+              {
+                "item": "apron.sample/B",
+                "kind": "false positive",
+                "label": "measurement name",
+                "text": "20",
+                "start": 16,
+                "score": 0.6053908534601293
+              },
+              {
+                "item": "apron.sample/B",
+                "kind": "missed",
+                "label": "measurement name",
+                "text": "Top to waist",
+                "start": 3
+              },
+              {
+                "item": "apron.sample/C",
+                "kind": "false positive",
+                "label": "measurement name",
+                "text": "46",
+                "start": 17,
+                "score": 0.7070002730499041
+              },
+              {
+                "item": "apron.sample/C",
+                "kind": "missed",
+                "label": "measurement name",
+                "text": "Top to bottom",
+                "start": 3
+              },
+              {
+                "item": "apron.sample/seam",
+                "kind": "false positive",
+                "label": "garment or part name",
+                "text": "seam allowance",
+                "start": 4,
+                "score": 0.7652426642688286
+              },
+              {
+                "item": "apron.sample/seam",
+                "kind": "missed",
+                "label": "measurement name",
+                "text": "seam allowance",
+                "start": 4
+              },
+              {
+                "item": "apron.sample/1",
+                "kind": "missed",
+                "label": "operation",
+                "text": "÷",
+                "start": 5
+              },
+              {
+                "item": "apron.sample/1",
+                "kind": "missed",
+                "label": "operation",
+                "text": "+",
+                "start": 14
+              },
+              {
+                "item": "apron.sample/2",
+                "kind": "missed",
+                "label": "operation",
+                "text": "÷",
+                "start": 5
+              },
+              {
+                "item": "apron.sample/2",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "2",
+                "start": 7
+              },
+              {
+                "item": "apron.sample/2",
+                "kind": "missed",
+                "label": "operation",
+                "text": "÷",
+                "start": 14
+              },
+              {
+                "item": "apron.sample/2",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "2",
+                "start": 16
+              },
+              {
+                "item": "apron.sample/3",
+                "kind": "false positive",
+                "label": "measurement name",
+                "text": "22",
+                "start": 14,
+                "score": 0.6818327122534676
+              },
+              {
+                "item": "apron.sample/3",
+                "kind": "missed",
+                "label": "operation",
+                "text": "+",
+                "start": 8
+              },
+              {
+                "item": "apron.sample/4",
+                "kind": "false positive",
+                "label": "measurement name",
+                "text": "4. C 48",
+                "start": 0,
+                "score": 0.5770187415004098
+              },
+              {
+                "item": "apron.sample/5",
+                "kind": "false positive",
+                "label": "measurement name",
+                "text": "38\"",
+                "start": 5,
+                "score": 0.8991213772699436
+              },
+              {
+                "item": "apron.sample/5",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "38",
+                "start": 5
+              },
+              {
+                "item": "apron.sample/6",
+                "kind": "false positive",
+                "label": "measurement name",
+                "text": "72\"",
+                "start": 15,
+                "score": 0.8033281311678119
+              },
+              {
+                "item": "apron.sample/6",
+                "kind": "missed",
+                "label": "operation",
+                "text": "×",
+                "start": 6
+              },
+              {
+                "item": "apron.sample/6",
+                "kind": "missed",
+                "label": "operation",
+                "text": "−",
+                "start": 11
+              },
+              {
+                "item": "apron.sample/6",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "72",
+                "start": 15
+              },
+              {
+                "item": "apron.sample/brace",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "72–74",
+                "start": 0
+              },
+              {
+                "item": "tunic.sample/1",
+                "kind": "false positive",
+                "label": "measurement name",
+                "text": "21\"",
+                "start": 33,
+                "score": 0.8906751699223611
+              },
+              {
+                "item": "tunic.sample/1",
+                "kind": "false positive",
+                "label": "measurement name",
+                "text": "+ 6\"",
+                "start": 9,
+                "score": 0.6975059041053338
+              },
+              {
+                "item": "tunic.sample/1",
+                "kind": "missed",
+                "label": "measurement name",
+                "text": "Chest",
+                "start": 3
+              },
+              {
+                "item": "tunic.sample/1",
+                "kind": "missed",
+                "label": "operation",
+                "text": "+",
+                "start": 9
+              },
+              {
+                "item": "tunic.sample/1",
+                "kind": "missed",
+                "label": "unit",
+                "text": "\"",
+                "start": 12
+              },
+              {
+                "item": "tunic.sample/1",
+                "kind": "missed",
+                "label": "operation",
+                "text": "÷",
+                "start": 14
+              },
+              {
+                "item": "tunic.sample/1",
+                "kind": "missed",
+                "label": "operation",
+                "text": "+",
+                "start": 24
+              },
+              {
+                "item": "tunic.sample/1",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "6",
+                "start": 26
+              },
+              {
+                "item": "tunic.sample/1",
+                "kind": "missed",
+                "label": "operation",
+                "text": "/",
+                "start": 28
+              },
+              {
+                "item": "tunic.sample/1",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "21",
+                "start": 33
+              },
+              {
+                "item": "tunic.sample/1",
+                "kind": "missed",
+                "label": "unit",
+                "text": "\"",
+                "start": 35
+              },
+              {
+                "item": "tunic.sample/2",
+                "kind": "missed",
+                "label": "measurement name",
+                "text": "Shoulder to length desired",
+                "start": 3
+              },
+              {
+                "item": "tunic.sample/2",
+                "kind": "missed",
+                "label": "operation",
+                "text": "+",
+                "start": 30
+              },
+              {
+                "item": "tunic.sample/2",
+                "kind": "missed",
+                "label": "operation",
+                "text": "+",
+                "start": 39
+              },
+              {
+                "item": "tunic.sample/3",
+                "kind": "false positive",
+                "label": "measurement name",
+                "text": "22\"",
+                "start": 59,
+                "score": 0.8187367931713698
+              },
+              {
+                "item": "tunic.sample/3",
+                "kind": "false positive",
+                "label": "garment or part name",
+                "text": "Top shoulder to under armpit",
+                "start": 3,
+                "score": 0.5434993722963195
+              },
+              {
+                "item": "tunic.sample/3",
+                "kind": "missed",
+                "label": "measurement name",
+                "text": "Top shoulder to under armpit",
+                "start": 3
+              },
+              {
+                "item": "tunic.sample/3",
+                "kind": "missed",
+                "label": "operation",
+                "text": "×",
+                "start": 32
+              },
+              {
+                "item": "tunic.sample/3",
+                "kind": "missed",
+                "label": "operation",
+                "text": "+",
+                "start": 36
+              },
+              {
+                "item": "tunic.sample/3",
+                "kind": "missed",
+                "label": "operation",
+                "text": "×",
+                "start": 48
+              },
+              {
+                "item": "tunic.sample/3",
+                "kind": "missed",
+                "label": "operation",
+                "text": "+",
+                "start": 53
+              },
+              {
+                "item": "tunic.sample/4",
+                "kind": "false positive",
+                "label": "garment or part name",
+                "text": "Fist",
+                "start": 3,
+                "score": 0.8438951025545426
+              },
+              {
+                "item": "tunic.sample/4",
+                "kind": "false positive",
+                "label": "quantity",
+                "text": "2",
+                "start": 10,
+                "score": 0.7692536249190332
+              },
+              {
+                "item": "tunic.sample/4",
+                "kind": "false positive",
+                "label": "measurement name",
+                "text": "7.5\"",
+                "start": 27,
+                "score": 0.6788594333153876
+              },
+              {
+                "item": "tunic.sample/4",
+                "kind": "missed",
+                "label": "measurement name",
+                "text": "Fist",
+                "start": 3
+              },
+              {
+                "item": "tunic.sample/4",
+                "kind": "missed",
+                "label": "operation",
+                "text": "+",
+                "start": 8
+              },
+              {
+                "item": "tunic.sample/4",
+                "kind": "missed",
+                "label": "operation",
+                "text": "+",
+                "start": 21
+              },
+              {
+                "item": "tunic.sample/5",
+                "kind": "false positive",
+                "label": "measurement name",
+                "text": "23\"",
+                "start": 30,
+                "score": 0.616935831319445
+              },
+              {
+                "item": "tunic.sample/5",
+                "kind": "false positive",
+                "label": "measurement name",
+                "text": "+ 2\"",
+                "start": 14,
+                "score": 0.5318780878530489
+              },
+              {
+                "item": "tunic.sample/5",
+                "kind": "missed",
+                "label": "measurement name",
+                "text": "Arm length",
+                "start": 3
+              },
+              {
+                "item": "tunic.sample/5",
+                "kind": "missed",
+                "label": "operation",
+                "text": "+",
+                "start": 14
+              },
+              {
+                "item": "tunic.sample/5",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "21",
+                "start": 21
+              },
+              {
+                "item": "tunic.sample/5",
+                "kind": "missed",
+                "label": "operation",
+                "text": "+",
+                "start": 24
+              },
+              {
+                "item": "brief/apron",
+                "kind": "false positive",
+                "label": "measurement name",
+                "text": "36 inch",
+                "start": 21,
+                "score": 0.7401743620390163
+              },
+              {
+                "item": "brief/apron",
+                "kind": "false positive",
+                "label": "measurement name",
+                "text": "20 inches",
+                "start": 38,
+                "score": 0.7129322140836937
+              },
+              {
+                "item": "brief/apron",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "36",
+                "start": 21
+              },
+              {
+                "item": "brief/apron",
+                "kind": "missed",
+                "label": "unit",
+                "text": "inch",
+                "start": 24
+              },
+              {
+                "item": "brief/apron",
+                "kind": "missed",
+                "label": "measurement name",
+                "text": "bust",
+                "start": 29
+              },
+              {
+                "item": "brief/apron",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "20",
+                "start": 38
+              },
+              {
+                "item": "brief/apron",
+                "kind": "missed",
+                "label": "measurement name",
+                "text": "top to waist",
+                "start": 48
+              },
+              {
+                "item": "brief/flowchart",
+                "kind": "false positive",
+                "label": "operation",
+                "text": "checkout",
+                "start": 16,
+                "score": 0.8350804533361768
+              },
+              {
+                "item": "brief/flowchart",
+                "kind": "missed",
+                "label": "garment or part name",
+                "text": "decision",
+                "start": 32
+              },
+              {
+                "item": "brief/castle",
+                "kind": "false positive",
+                "label": "measurement name",
+                "text": "gate",
+                "start": 39,
+                "score": 0.5732603860601143
+              },
+              {
+                "item": "brief/castle",
+                "kind": "missed",
+                "label": "garment or part name",
+                "text": "towers",
+                "start": 18
+              },
+              {
+                "item": "brief/castle",
+                "kind": "missed",
+                "label": "garment or part name",
+                "text": "wall",
+                "start": 28
+              },
+              {
+                "item": "brief/castle",
+                "kind": "missed",
+                "label": "garment or part name",
+                "text": "gate",
+                "start": 39
+              },
+              {
+                "item": "brief/castle-words",
+                "kind": "missed",
+                "label": "garment or part name",
+                "text": "tops",
+                "start": 18
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "false positive",
+                "label": "quantity",
+                "text": "2",
+                "start": 76,
+                "score": 0.9358173563909802
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "false positive",
+                "label": "quantity",
+                "text": "1",
+                "start": 327,
+                "score": 0.9356999454877224
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "false positive",
+                "label": "quantity",
+                "text": "0.9",
+                "start": 319,
+                "score": 0.909264512360149
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "false positive",
+                "label": "quantity",
+                "text": "3.0",
+                "start": 307,
+                "score": 0.8765287249141699
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "false positive",
+                "label": "operation",
+                "text": "drawn",
+                "start": 636,
+                "score": 0.8389438375191766
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "false positive",
+                "label": "operation",
+                "text": "drawn",
+                "start": 673,
+                "score": 0.7967672836747012
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "false positive",
+                "label": "operation",
+                "text": "drawn",
+                "start": 791,
+                "score": 0.7647159477410339
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "false positive",
+                "label": "operation",
+                "text": "drawing",
+                "start": 65,
+                "score": 0.5685954820737726
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "false positive",
+                "label": "quantity",
+                "text": "1",
+                "start": 558,
+                "score": 0.5489153099415687
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "missed",
+                "label": "garment or part name",
+                "text": "part 1",
+                "start": 549
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "64",
+                "start": 647
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "missed",
+                "label": "unit",
+                "text": "°",
+                "start": 649
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "135",
+                "start": 684
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "missed",
+                "label": "unit",
+                "text": "°",
+                "start": 687
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "missed",
+                "label": "garment or part name",
+                "text": "part 2",
+                "start": 699
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "1.7",
+                "start": 714
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "64",
+                "start": 802
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "three",
+                "start": 1102
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "one",
+                "start": 1387
+              }
+            ],
+            "byFixture": {
+              "apron.sample": {
+                "tp": 17,
+                "fp": 10,
+                "fn": 17,
+                "precision": 0.6296296296296297,
+                "recall": 0.5,
+                "f1": 0.5573770491803278
+              },
+              "tunic.sample": {
+                "tp": 28,
+                "fp": 9,
+                "fn": 24,
+                "precision": 0.7567567567567568,
+                "recall": 0.5384615384615384,
+                "f1": 0.6292134831460674
+              },
+              "briefs": {
+                "tp": 3,
+                "fp": 4,
+                "fn": 10,
+                "precision": 0.42857142857142855,
+                "recall": 0.23076923076923078,
+                "f1": 0.3
+              },
+              "castle-sketch.brief": {
+                "tp": 34,
+                "fp": 9,
+                "fn": 10,
+                "precision": 0.7906976744186046,
+                "recall": 0.7727272727272727,
+                "f1": 0.7816091954022988
+              }
+            }
+          }
+        },
+        "sweep": [
+          {
+            "threshold": 0.3,
+            "strict": {
+              "precision": 0.5563380281690141,
+              "recall": 0.5524475524475524,
+              "f1": 0.5543859649122806
+            },
+            "overlap": {
+              "precision": 0.6619718309859155,
+              "recall": 0.6573426573426573,
+              "f1": 0.6596491228070175
+            }
+          },
+          {
+            "threshold": 0.4,
+            "strict": {
+              "precision": 0.5967741935483871,
+              "recall": 0.5174825174825175,
+              "f1": 0.5543071161048689
+            },
+            "overlap": {
+              "precision": 0.717741935483871,
+              "recall": 0.6223776223776224,
+              "f1": 0.6666666666666666
+            }
+          },
+          {
+            "threshold": 0.5,
+            "strict": {
+              "precision": 0.5877192982456141,
+              "recall": 0.46853146853146854,
+              "f1": 0.5214007782101168
+            },
+            "overlap": {
+              "precision": 0.7192982456140351,
+              "recall": 0.5734265734265734,
+              "f1": 0.6381322957198444
+            }
+          },
+          {
+            "threshold": 0.6,
+            "strict": {
+              "precision": 0.6,
+              "recall": 0.3986013986013986,
+              "f1": 0.47899159663865537
+            },
+            "overlap": {
+              "precision": 0.7263157894736842,
+              "recall": 0.4825174825174825,
+              "f1": 0.5798319327731093
+            }
+          },
+          {
+            "threshold": 0.7,
+            "strict": {
+              "precision": 0.6,
+              "recall": 0.3356643356643357,
+              "f1": 0.4304932735426009
+            },
+            "overlap": {
+              "precision": 0.7375,
+              "recall": 0.4125874125874126,
+              "f1": 0.5291479820627802
+            }
+          },
+          {
+            "threshold": 0.8,
+            "strict": {
+              "precision": 0.6190476190476191,
+              "recall": 0.2727272727272727,
+              "f1": 0.3786407766990291
+            },
+            "overlap": {
+              "precision": 0.7936507936507936,
+              "recall": 0.34965034965034963,
+              "f1": 0.4854368932038834
+            }
+          },
+          {
+            "threshold": 0.9,
+            "strict": {
+              "precision": 0.65,
+              "recall": 0.18181818181818182,
+              "f1": 0.2841530054644809
+            },
+            "overlap": {
+              "precision": 0.9,
+              "recall": 0.2517482517482518,
+              "f1": 0.3934426229508197
+            }
+          }
+        ],
+        "spans": {
+          "apron.sample/A": [
+            {
+              "label": "measurement name",
+              "text": "36",
+              "start": 8,
+              "score": 0.9515
+            },
+            {
+              "label": "garment or part name",
+              "text": "Bust",
+              "start": 3,
+              "score": 0.8704
+            }
+          ],
+          "apron.sample/B": [
+            {
+              "label": "measurement name",
+              "text": "20",
+              "start": 16,
+              "score": 0.6054
+            },
+            {
+              "label": "quantity",
+              "text": "20",
+              "start": 16,
+              "score": 0.9877
+            },
+            {
+              "label": "garment or part name",
+              "text": "Top to waist",
+              "start": 3,
+              "score": 0.7126
+            }
+          ],
+          "apron.sample/C": [
+            {
+              "label": "measurement name",
+              "text": "46",
+              "start": 17,
+              "score": 0.707
+            },
+            {
+              "label": "quantity",
+              "text": "46",
+              "start": 17,
+              "score": 0.9268
+            }
+          ],
+          "apron.sample/seam": [
+            {
+              "label": "garment or part name",
+              "text": "seam allowance",
+              "start": 4,
+              "score": 0.7652
+            },
+            {
+              "label": "operation",
+              "text": "Add",
+              "start": 0,
+              "score": 0.5397
+            }
+          ],
+          "apron.sample/1": [
+            {
+              "label": "quantity",
+              "text": "1",
+              "start": 0,
+              "score": 0.9328
+            },
+            {
+              "label": "quantity",
+              "text": "14",
+              "start": 20,
+              "score": 0.9284
+            },
+            {
+              "label": "quantity",
+              "text": "12",
+              "start": 11,
+              "score": 0.9047
+            },
+            {
+              "label": "quantity",
+              "text": "2",
+              "start": 16,
+              "score": 0.7614
+            },
+            {
+              "label": "quantity",
+              "text": "3",
+              "start": 7,
+              "score": 0.6562
+            }
+          ],
+          "apron.sample/2": [
+            {
+              "label": "quantity",
+              "text": "7",
+              "start": 20,
+              "score": 0.9809
+            },
+            {
+              "label": "quantity",
+              "text": "14",
+              "start": 11,
+              "score": 0.9327
+            }
+          ],
+          "apron.sample/3": [
+            {
+              "label": "measurement name",
+              "text": "22",
+              "start": 14,
+              "score": 0.6818
+            },
+            {
+              "label": "quantity",
+              "text": "22",
+              "start": 14,
+              "score": 0.8613
+            },
+            {
+              "label": "quantity",
+              "text": "2",
+              "start": 10,
+              "score": 0.726
+            },
+            {
+              "label": "quantity",
+              "text": "20",
+              "start": 5,
+              "score": 0.6368
+            }
+          ],
+          "apron.sample/4": [
+            {
+              "label": "measurement name",
+              "text": "4. C 48",
+              "start": 0,
+              "score": 0.577
+            },
+            {
+              "label": "quantity",
+              "text": "48",
+              "start": 5,
+              "score": 0.524
+            }
+          ],
+          "apron.sample/5": [
+            {
+              "label": "measurement name",
+              "text": "38\"",
+              "start": 5,
+              "score": 0.8991
+            },
+            {
+              "label": "quantity",
+              "text": "5",
+              "start": 0,
+              "score": 0.7887
+            },
+            {
+              "label": "unit",
+              "text": "\"",
+              "start": 7,
+              "score": 0.5991
+            }
+          ],
+          "apron.sample/6": [
+            {
+              "label": "measurement name",
+              "text": "72\"",
+              "start": 15,
+              "score": 0.8033
+            },
+            {
+              "label": "quantity",
+              "text": "6",
+              "start": 0,
+              "score": 0.7746
+            },
+            {
+              "label": "quantity",
+              "text": "2",
+              "start": 8,
+              "score": 0.5445
+            },
+            {
+              "label": "unit",
+              "text": "\"",
+              "start": 17,
+              "score": 0.7797
+            },
+            {
+              "label": "garment or part name",
+              "text": "B",
+              "start": 13,
+              "score": 0.5996
+            }
+          ],
+          "apron.sample/brace": [
+            {
+              "label": "unit",
+              "text": "\"",
+              "start": 5,
+              "score": 0.8937
+            }
+          ],
+          "tunic.sample/1": [
+            {
+              "label": "measurement name",
+              "text": "21\"",
+              "start": 33,
+              "score": 0.8907
+            },
+            {
+              "label": "measurement name",
+              "text": "+ 6\"",
+              "start": 9,
+              "score": 0.6975
+            },
+            {
+              "label": "quantity",
+              "text": "2",
+              "start": 16,
+              "score": 0.8905
+            },
+            {
+              "label": "quantity",
+              "text": "2",
+              "start": 29,
+              "score": 0.8856
+            },
+            {
+              "label": "quantity",
+              "text": "1",
+              "start": 0,
+              "score": 0.876
+            },
+            {
+              "label": "quantity",
+              "text": "36",
+              "start": 21,
+              "score": 0.8687
+            },
+            {
+              "label": "quantity",
+              "text": "6",
+              "start": 11,
+              "score": 0.5849
+            }
+          ],
+          "tunic.sample/2": [
+            {
+              "label": "quantity",
+              "text": "2",
+              "start": 0,
+              "score": 0.9468
+            },
+            {
+              "label": "quantity",
+              "text": "2",
+              "start": 41,
+              "score": 0.9132
+            },
+            {
+              "label": "quantity",
+              "text": "2",
+              "start": 32,
+              "score": 0.9105
+            },
+            {
+              "label": "quantity",
+              "text": "56",
+              "start": 45,
+              "score": 0.8782
+            },
+            {
+              "label": "quantity",
+              "text": "54",
+              "start": 36,
+              "score": 0.7135
+            },
+            {
+              "label": "unit",
+              "text": "\"",
+              "start": 47,
+              "score": 0.7078
+            }
+          ],
+          "tunic.sample/3": [
+            {
+              "label": "measurement name",
+              "text": "22\"",
+              "start": 59,
+              "score": 0.8187
+            },
+            {
+              "label": "quantity",
+              "text": "3",
+              "start": 0,
+              "score": 0.9785
+            },
+            {
+              "label": "quantity",
+              "text": "3",
+              "start": 38,
+              "score": 0.961
+            },
+            {
+              "label": "quantity",
+              "text": "2",
+              "start": 50,
+              "score": 0.9467
+            },
+            {
+              "label": "quantity",
+              "text": "9",
+              "start": 46,
+              "score": 0.9391
+            },
+            {
+              "label": "quantity",
+              "text": "4",
+              "start": 55,
+              "score": 0.9289
+            },
+            {
+              "label": "quantity",
+              "text": "2",
+              "start": 34,
+              "score": 0.9112
+            },
+            {
+              "label": "quantity",
+              "text": "22",
+              "start": 59,
+              "score": 0.5461
+            },
+            {
+              "label": "unit",
+              "text": "\"",
+              "start": 61,
+              "score": 0.8481
+            },
+            {
+              "label": "unit",
+              "text": "\"",
+              "start": 41,
+              "score": 0.8257
+            },
+            {
+              "label": "garment or part name",
+              "text": "Top shoulder to under armpit",
+              "start": 3,
+              "score": 0.5435
+            }
+          ],
+          "tunic.sample/4": [
+            {
+              "label": "measurement name",
+              "text": "7.5\"",
+              "start": 27,
+              "score": 0.6789
+            },
+            {
+              "label": "quantity",
+              "text": "4",
+              "start": 0,
+              "score": 0.9798
+            },
+            {
+              "label": "quantity",
+              "text": "4",
+              "start": 23,
+              "score": 0.9612
+            },
+            {
+              "label": "quantity",
+              "text": "4",
+              "start": 12,
+              "score": 0.9605
+            },
+            {
+              "label": "quantity",
+              "text": "2",
+              "start": 10,
+              "score": 0.7693
+            },
+            {
+              "label": "quantity",
+              "text": "3.5",
+              "start": 17,
+              "score": 0.7356
+            },
+            {
+              "label": "quantity",
+              "text": "7.5",
+              "start": 27,
+              "score": 0.6495
+            },
+            {
+              "label": "unit",
+              "text": "\"",
+              "start": 30,
+              "score": 0.6971
+            },
+            {
+              "label": "unit",
+              "text": "\"",
+              "start": 13,
+              "score": 0.5444
+            },
+            {
+              "label": "garment or part name",
+              "text": "Fist",
+              "start": 3,
+              "score": 0.8439
+            }
+          ],
+          "tunic.sample/5": [
+            {
+              "label": "measurement name",
+              "text": "23\"",
+              "start": 30,
+              "score": 0.6169
+            },
+            {
+              "label": "measurement name",
+              "text": "+ 2\"",
+              "start": 14,
+              "score": 0.5319
+            },
+            {
+              "label": "quantity",
+              "text": "5",
+              "start": 0,
+              "score": 0.9633
+            },
+            {
+              "label": "quantity",
+              "text": "2",
+              "start": 16,
+              "score": 0.8058
+            },
+            {
+              "label": "quantity",
+              "text": "2",
+              "start": 26,
+              "score": 0.7874
+            },
+            {
+              "label": "quantity",
+              "text": "23",
+              "start": 30,
+              "score": 0.6376
+            },
+            {
+              "label": "unit",
+              "text": "\"",
+              "start": 17,
+              "score": 0.6434
+            },
+            {
+              "label": "unit",
+              "text": "\"",
+              "start": 32,
+              "score": 0.6035
+            }
+          ],
+          "brief/apron": [
+            {
+              "label": "measurement name",
+              "text": "36 inch",
+              "start": 21,
+              "score": 0.7402
+            },
+            {
+              "label": "measurement name",
+              "text": "20 inches",
+              "start": 38,
+              "score": 0.7129
+            },
+            {
+              "label": "unit",
+              "text": "inches",
+              "start": 41,
+              "score": 0.5619
+            },
+            {
+              "label": "garment or part name",
+              "text": "apron dress",
+              "start": 3,
+              "score": 0.9908
+            }
+          ],
+          "brief/flowchart": [
+            {
+              "label": "operation",
+              "text": "checkout",
+              "start": 16,
+              "score": 0.8351
+            }
+          ],
+          "brief/castle": [
+            {
+              "label": "measurement name",
+              "text": "gate",
+              "start": 39,
+              "score": 0.5733
+            },
+            {
+              "label": "quantity",
+              "text": "two",
+              "start": 14,
+              "score": 0.8416
+            },
+            {
+              "label": "garment or part name",
+              "text": "castle",
+              "start": 2,
+              "score": 0.8027
+            }
+          ],
+          "brief/castle-words": [
+            {
+              "label": "garment or part name",
+              "text": "castle",
+              "start": 0,
+              "score": 0.8316
+            }
+          ],
+          "castle-sketch.brief": [
+            {
+              "label": "quantity",
+              "text": "8",
+              "start": 788,
+              "score": 0.9812
+            },
+            {
+              "label": "quantity",
+              "text": "8",
+              "start": 560,
+              "score": 0.9802
+            },
+            {
+              "label": "quantity",
+              "text": "9",
+              "start": 670,
+              "score": 0.9777
+            },
+            {
+              "label": "quantity",
+              "text": "2",
+              "start": 409,
+              "score": 0.9739
+            },
+            {
+              "label": "quantity",
+              "text": "9",
+              "start": 740,
+              "score": 0.9672
+            },
+            {
+              "label": "quantity",
+              "text": "2",
+              "start": 633,
+              "score": 0.967
+            },
+            {
+              "label": "quantity",
+              "text": "2",
+              "start": 74,
+              "score": 0.9521
+            },
+            {
+              "label": "quantity",
+              "text": "1",
+              "start": 270,
+              "score": 0.9474
+            },
+            {
+              "label": "quantity",
+              "text": "7",
+              "start": 23,
+              "score": 0.9467
+            },
+            {
+              "label": "quantity",
+              "text": "2",
+              "start": 80,
+              "score": 0.9438
+            },
+            {
+              "label": "quantity",
+              "text": "1",
+              "start": 331,
+              "score": 0.942
+            },
+            {
+              "label": "quantity",
+              "text": "0.9",
+              "start": 104,
+              "score": 0.9361
+            },
+            {
+              "label": "quantity",
+              "text": "2",
+              "start": 76,
+              "score": 0.9358
+            },
+            {
+              "label": "quantity",
+              "text": "1",
+              "start": 327,
+              "score": 0.9357
+            },
+            {
+              "label": "quantity",
+              "text": "0.8",
+              "start": 303,
+              "score": 0.9271
+            },
+            {
+              "label": "quantity",
+              "text": "0.0",
+              "start": 315,
+              "score": 0.9222
+            },
+            {
+              "label": "quantity",
+              "text": "1.6 × 1.7",
+              "start": 708,
+              "score": 0.9131
+            },
+            {
+              "label": "quantity",
+              "text": "0.9",
+              "start": 319,
+              "score": 0.9093
+            },
+            {
+              "label": "quantity",
+              "text": "0.3",
+              "start": 588,
+              "score": 0.8966
+            },
+            {
+              "label": "quantity",
+              "text": "3.0",
+              "start": 307,
+              "score": 0.8765
+            },
+            {
+              "label": "quantity",
+              "text": "6.0",
+              "start": 227,
+              "score": 0.8713
+            },
+            {
+              "label": "quantity",
+              "text": "2",
+              "start": 704,
+              "score": 0.8332
+            },
+            {
+              "label": "quantity",
+              "text": "4.0",
+              "start": 233,
+              "score": 0.7693
+            },
+            {
+              "label": "quantity",
+              "text": "29",
+              "start": 654,
+              "score": 0.6472
+            },
+            {
+              "label": "quantity",
+              "text": "29",
+              "start": 809,
+              "score": 0.5918
+            },
+            {
+              "label": "quantity",
+              "text": "22",
+              "start": 692,
+              "score": 0.5721
+            },
+            {
+              "label": "quantity",
+              "text": "1",
+              "start": 558,
+              "score": 0.5489
+            },
+            {
+              "label": "quantity",
+              "text": "1.4",
+              "start": 564,
+              "score": 0.536
+            },
+            {
+              "label": "unit",
+              "text": "u",
+              "start": 742,
+              "score": 0.9992
+            },
+            {
+              "label": "unit",
+              "text": "u",
+              "start": 592,
+              "score": 0.999
+            },
+            {
+              "label": "unit",
+              "text": "u",
+              "start": 568,
+              "score": 0.999
+            },
+            {
+              "label": "unit",
+              "text": "u",
+              "start": 718,
+              "score": 0.9986
+            },
+            {
+              "label": "unit",
+              "text": "u",
+              "start": 84,
+              "score": 0.998
+            },
+            {
+              "label": "unit",
+              "text": "u",
+              "start": 237,
+              "score": 0.9977
+            },
+            {
+              "label": "unit",
+              "text": "u",
+              "start": 108,
+              "score": 0.9974
+            },
+            {
+              "label": "unit",
+              "text": "°",
+              "start": 694,
+              "score": 0.9869
+            },
+            {
+              "label": "unit",
+              "text": "°",
+              "start": 811,
+              "score": 0.983
+            },
+            {
+              "label": "unit",
+              "text": "°",
+              "start": 656,
+              "score": 0.9803
+            },
+            {
+              "label": "unit",
+              "text": "world units",
+              "start": 288,
+              "score": 0.6862
+            },
+            {
+              "label": "unit",
+              "text": "°",
+              "start": 804,
+              "score": 0.5852
+            },
+            {
+              "label": "operation",
+              "text": "drawn",
+              "start": 636,
+              "score": 0.8389
+            },
+            {
+              "label": "operation",
+              "text": "raise",
+              "start": 1433,
+              "score": 0.8124
+            },
+            {
+              "label": "operation",
+              "text": "drawn",
+              "start": 673,
+              "score": 0.7968
+            },
+            {
+              "label": "operation",
+              "text": "mirror",
+              "start": 1471,
+              "score": 0.7813
+            },
+            {
+              "label": "operation",
+              "text": "drawn",
+              "start": 791,
+              "score": 0.7647
+            },
+            {
+              "label": "operation",
+              "text": "stroke",
+              "start": 781,
+              "score": 0.7603
+            },
+            {
+              "label": "operation",
+              "text": "stroke",
+              "start": 626,
+              "score": 0.7373
+            },
+            {
+              "label": "operation",
+              "text": "stroke",
+              "start": 663,
+              "score": 0.7017
+            },
+            {
+              "label": "operation",
+              "text": "take it out",
+              "start": 1485,
+              "score": 0.6899
+            },
+            {
+              "label": "operation",
+              "text": "cut off",
+              "start": 387,
+              "score": 0.6309
+            },
+            {
+              "label": "operation",
+              "text": "drawing",
+              "start": 65,
+              "score": 0.5686
+            },
+            {
+              "label": "operation",
+              "text": "cut a hole",
+              "start": 1443,
+              "score": 0.5356
+            },
+            {
+              "label": "garment or part name",
+              "text": "castle with green tops",
+              "start": 1023,
+              "score": 0.8722
+            },
+            {
+              "label": "measurement name",
+              "text": "height",
+              "start": 1167,
+              "score": 0.9874
+            },
+            {
+              "label": "measurement name",
+              "text": "width",
+              "start": 1198,
+              "score": 0.9857
+            },
+            {
+              "label": "measurement name",
+              "text": "foundation",
+              "start": 1123,
+              "score": 0.9825
+            }
+          ]
+        }
+      },
+      "described": {
+        "latency": {
+          "all": {
+            "n": 105,
+            "median": 28.519458000000668,
+            "p95": 31.478758599999125,
+            "mean": 34.774223457143016,
+            "min": 27.122583000000304,
+            "max": 161.59704200000124
+          },
+          "graphOnly": {
+            "n": 105,
+            "median": 28.451708000000508,
+            "p95": 31.397124600000097,
+            "mean": 34.66807421904764,
+            "min": 27.065166000000318,
+            "max": 160.9771240000009
+          },
+          "byGroup": {
+            "a line of the page": {
+              "n": 80,
+              "median": 28.509791500000574,
+              "p95": 30.14486429999979,
+              "mean": 28.626348450000158,
+              "min": 27.122583000000304,
+              "max": 31.55516699999862
+            },
+            "a brief in words": {
+              "n": 20,
+              "median": 28.25,
+              "p95": 29.007746499999666,
+              "mean": 28.233102200000395,
+              "min": 27.126917000001413,
+              "max": 29.63783400000102
+            },
+            "the castle's brief": {
+              "n": 5,
+              "median": 160.3133749999979,
+              "p95": 161.49835040000107,
+              "mean": 159.30470859999915,
+              "min": 154.94745899999907,
+              "max": 161.59704200000124
+            }
+          },
+          "tokens": {
+            "n": 105,
+            "median": 184,
+            "p95": 200,
+            "mean": 233.42857142857142,
+            "min": 175,
+            "max": 1221
+          }
+        },
+        "quality": {
+          "strict": {
+            "mode": "strict",
+            "overall": {
+              "tp": 73,
+              "fp": 34,
+              "fn": 70,
+              "precision": 0.6822429906542056,
+              "recall": 0.5104895104895105,
+              "f1": 0.584
+            },
+            "byType": {
+              "measurement name": {
+                "tp": 4,
+                "fp": 8,
+                "fn": 7,
+                "precision": 0.3333333333333333,
+                "recall": 0.36363636363636365,
+                "f1": 0.34782608695652173
+              },
+              "quantity": {
+                "tp": 37,
+                "fp": 19,
+                "fn": 32,
+                "precision": 0.6607142857142857,
+                "recall": 0.5362318840579711,
+                "f1": 0.5920000000000001
+              },
+              "unit": {
+                "tp": 26,
+                "fp": 0,
+                "fn": 2,
+                "precision": 1,
+                "recall": 0.9285714285714286,
+                "f1": 0.962962962962963
+              },
+              "garment or part name": {
+                "tp": 2,
+                "fp": 3,
+                "fn": 7,
+                "precision": 0.4,
+                "recall": 0.2222222222222222,
+                "f1": 0.2857142857142857
+              },
+              "operation": {
+                "tp": 4,
+                "fp": 4,
+                "fn": 22,
+                "precision": 0.5,
+                "recall": 0.15384615384615385,
+                "f1": 0.23529411764705882
+              }
+            },
+            "ignored": 26,
+            "errors": [
+              {
+                "item": "apron.sample/A",
+                "kind": "false positive",
+                "label": "garment or part name",
+                "text": "Bust",
+                "start": 3,
+                "score": 0.7472472485194995
+              },
+              {
+                "item": "apron.sample/A",
+                "kind": "false positive",
+                "label": "measurement name",
+                "text": "36",
+                "start": 8,
+                "score": 0.6539008565611653
+              },
+              {
+                "item": "apron.sample/A",
+                "kind": "missed",
+                "label": "measurement name",
+                "text": "Bust",
+                "start": 3
+              },
+              {
+                "item": "apron.sample/B",
+                "kind": "false positive",
+                "label": "garment or part name",
+                "text": "Top to waist",
+                "start": 3,
+                "score": 0.7465087674839027
+              },
+              {
+                "item": "apron.sample/B",
+                "kind": "missed",
+                "label": "measurement name",
+                "text": "Top to waist",
+                "start": 3
+              },
+              {
+                "item": "apron.sample/C",
+                "kind": "missed",
+                "label": "measurement name",
+                "text": "Top to bottom",
+                "start": 3
+              },
+              {
+                "item": "apron.sample/seam",
+                "kind": "missed",
+                "label": "measurement name",
+                "text": "seam allowance",
+                "start": 4
+              },
+              {
+                "item": "apron.sample/1",
+                "kind": "missed",
+                "label": "operation",
+                "text": "÷",
+                "start": 5
+              },
+              {
+                "item": "apron.sample/1",
+                "kind": "missed",
+                "label": "operation",
+                "text": "+",
+                "start": 14
+              },
+              {
+                "item": "apron.sample/2",
+                "kind": "missed",
+                "label": "operation",
+                "text": "÷",
+                "start": 5
+              },
+              {
+                "item": "apron.sample/2",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "2",
+                "start": 7
+              },
+              {
+                "item": "apron.sample/2",
+                "kind": "missed",
+                "label": "operation",
+                "text": "÷",
+                "start": 14
+              },
+              {
+                "item": "apron.sample/2",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "2",
+                "start": 16
+              },
+              {
+                "item": "apron.sample/3",
+                "kind": "missed",
+                "label": "operation",
+                "text": "+",
+                "start": 8
+              },
+              {
+                "item": "apron.sample/5",
+                "kind": "false positive",
+                "label": "measurement name",
+                "text": "38\"",
+                "start": 5,
+                "score": 0.7654180546924173
+              },
+              {
+                "item": "apron.sample/5",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "38",
+                "start": 5
+              },
+              {
+                "item": "apron.sample/6",
+                "kind": "false positive",
+                "label": "measurement name",
+                "text": "72\"",
+                "start": 15,
+                "score": 0.6536798130776276
+              },
+              {
+                "item": "apron.sample/6",
+                "kind": "missed",
+                "label": "operation",
+                "text": "×",
+                "start": 6
+              },
+              {
+                "item": "apron.sample/6",
+                "kind": "missed",
+                "label": "operation",
+                "text": "−",
+                "start": 11
+              },
+              {
+                "item": "apron.sample/6",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "72",
+                "start": 15
+              },
+              {
+                "item": "apron.sample/brace",
+                "kind": "false positive",
+                "label": "measurement name",
+                "text": "72–74",
+                "start": 0,
+                "score": 0.5131195464571897
+              },
+              {
+                "item": "apron.sample/brace",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "72–74",
+                "start": 0
+              },
+              {
+                "item": "tunic.sample/1",
+                "kind": "false positive",
+                "label": "measurement name",
+                "text": "21\"",
+                "start": 33,
+                "score": 0.6597340709808103
+              },
+              {
+                "item": "tunic.sample/1",
+                "kind": "missed",
+                "label": "operation",
+                "text": "+",
+                "start": 9
+              },
+              {
+                "item": "tunic.sample/1",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "6",
+                "start": 11
+              },
+              {
+                "item": "tunic.sample/1",
+                "kind": "missed",
+                "label": "operation",
+                "text": "÷",
+                "start": 14
+              },
+              {
+                "item": "tunic.sample/1",
+                "kind": "missed",
+                "label": "operation",
+                "text": "+",
+                "start": 24
+              },
+              {
+                "item": "tunic.sample/1",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "6",
+                "start": 26
+              },
+              {
+                "item": "tunic.sample/1",
+                "kind": "missed",
+                "label": "operation",
+                "text": "/",
+                "start": 28
+              },
+              {
+                "item": "tunic.sample/2",
+                "kind": "missed",
+                "label": "operation",
+                "text": "+",
+                "start": 30
+              },
+              {
+                "item": "tunic.sample/2",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "54",
+                "start": 36
+              },
+              {
+                "item": "tunic.sample/2",
+                "kind": "missed",
+                "label": "operation",
+                "text": "+",
+                "start": 39
+              },
+              {
+                "item": "tunic.sample/3",
+                "kind": "false positive",
+                "label": "quantity",
+                "text": "3",
+                "start": 38,
+                "score": 0.9464978508046773
+              },
+              {
+                "item": "tunic.sample/3",
+                "kind": "false positive",
+                "label": "quantity",
+                "text": "6",
+                "start": 40,
+                "score": 0.6325027540011314
+              },
+              {
+                "item": "tunic.sample/3",
+                "kind": "false positive",
+                "label": "measurement name",
+                "text": "22\"",
+                "start": 59,
+                "score": 0.5632578476003665
+              },
+              {
+                "item": "tunic.sample/3",
+                "kind": "missed",
+                "label": "operation",
+                "text": "×",
+                "start": 32
+              },
+              {
+                "item": "tunic.sample/3",
+                "kind": "missed",
+                "label": "operation",
+                "text": "+",
+                "start": 36
+              },
+              {
+                "item": "tunic.sample/3",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "3–6",
+                "start": 38
+              },
+              {
+                "item": "tunic.sample/3",
+                "kind": "missed",
+                "label": "operation",
+                "text": "×",
+                "start": 48
+              },
+              {
+                "item": "tunic.sample/3",
+                "kind": "missed",
+                "label": "operation",
+                "text": "+",
+                "start": 53
+              },
+              {
+                "item": "tunic.sample/4",
+                "kind": "false positive",
+                "label": "quantity",
+                "text": "4",
+                "start": 12,
+                "score": 0.927099726575378
+              },
+              {
+                "item": "tunic.sample/4",
+                "kind": "missed",
+                "label": "measurement name",
+                "text": "Fist",
+                "start": 3
+              },
+              {
+                "item": "tunic.sample/4",
+                "kind": "missed",
+                "label": "operation",
+                "text": "+",
+                "start": 8
+              },
+              {
+                "item": "tunic.sample/4",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "2–4",
+                "start": 10
+              },
+              {
+                "item": "tunic.sample/4",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "3.5",
+                "start": 17
+              },
+              {
+                "item": "tunic.sample/4",
+                "kind": "missed",
+                "label": "operation",
+                "text": "+",
+                "start": 21
+              },
+              {
+                "item": "tunic.sample/5",
+                "kind": "missed",
+                "label": "operation",
+                "text": "+",
+                "start": 14
+              },
+              {
+                "item": "tunic.sample/5",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "21",
+                "start": 21
+              },
+              {
+                "item": "tunic.sample/5",
+                "kind": "missed",
+                "label": "operation",
+                "text": "+",
+                "start": 24
+              },
+              {
+                "item": "tunic.sample/5",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "23",
+                "start": 30
+              },
+              {
+                "item": "brief/apron",
+                "kind": "false positive",
+                "label": "measurement name",
+                "text": "20 inches",
+                "start": 38,
+                "score": 0.7348812825926613
+              },
+              {
+                "item": "brief/apron",
+                "kind": "false positive",
+                "label": "measurement name",
+                "text": "36 inch",
+                "start": 21,
+                "score": 0.6438892947039139
+              },
+              {
+                "item": "brief/apron",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "36",
+                "start": 21
+              },
+              {
+                "item": "brief/apron",
+                "kind": "missed",
+                "label": "measurement name",
+                "text": "bust",
+                "start": 29
+              },
+              {
+                "item": "brief/apron",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "20",
+                "start": 38
+              },
+              {
+                "item": "brief/apron",
+                "kind": "missed",
+                "label": "measurement name",
+                "text": "top to waist",
+                "start": 48
+              },
+              {
+                "item": "brief/flowchart",
+                "kind": "false positive",
+                "label": "operation",
+                "text": "checkout",
+                "start": 16,
+                "score": 0.7207615303650544
+              },
+              {
+                "item": "brief/flowchart",
+                "kind": "missed",
+                "label": "garment or part name",
+                "text": "decision",
+                "start": 32
+              },
+              {
+                "item": "brief/castle",
+                "kind": "missed",
+                "label": "garment or part name",
+                "text": "towers",
+                "start": 18
+              },
+              {
+                "item": "brief/castle",
+                "kind": "missed",
+                "label": "garment or part name",
+                "text": "gate",
+                "start": 39
+              },
+              {
+                "item": "brief/castle-words",
+                "kind": "missed",
+                "label": "garment or part name",
+                "text": "tops",
+                "start": 18
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "false positive",
+                "label": "quantity",
+                "text": "8",
+                "start": 560,
+                "score": 0.9817006677897865
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "false positive",
+                "label": "quantity",
+                "text": "2",
+                "start": 74,
+                "score": 0.974773174620712
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "false positive",
+                "label": "quantity",
+                "text": "9",
+                "start": 740,
+                "score": 0.9713473306904065
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "false positive",
+                "label": "quantity",
+                "text": "2",
+                "start": 80,
+                "score": 0.9676556676188429
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "false positive",
+                "label": "quantity",
+                "text": "2",
+                "start": 76,
+                "score": 0.9637799441350253
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "false positive",
+                "label": "quantity",
+                "text": "1",
+                "start": 331,
+                "score": 0.9605095953512194
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "false positive",
+                "label": "quantity",
+                "text": "1",
+                "start": 327,
+                "score": 0.96036116089903
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "false positive",
+                "label": "quantity",
+                "text": "0.9",
+                "start": 319,
+                "score": 0.9483462190807312
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "false positive",
+                "label": "quantity",
+                "text": "0.8",
+                "start": 303,
+                "score": 0.9474783252902633
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "false positive",
+                "label": "quantity",
+                "text": "0.0",
+                "start": 315,
+                "score": 0.9407897492587141
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "false positive",
+                "label": "quantity",
+                "text": "1.6 × 1.7",
+                "start": 708,
+                "score": 0.9100669877621353
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "false positive",
+                "label": "quantity",
+                "text": "3.0",
+                "start": 307,
+                "score": 0.8957052736689574
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "false positive",
+                "label": "operation",
+                "text": "drawn",
+                "start": 636,
+                "score": 0.8149381119553916
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "false positive",
+                "label": "garment or part name",
+                "text": "castle with green tops",
+                "start": 1023,
+                "score": 0.8034823745720369
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "false positive",
+                "label": "operation",
+                "text": "drawn",
+                "start": 673,
+                "score": 0.7629543230971159
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "false positive",
+                "label": "operation",
+                "text": "drawn",
+                "start": 791,
+                "score": 0.7523766320725713
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "false positive",
+                "label": "quantity",
+                "text": "29",
+                "start": 654,
+                "score": 0.6789658738724604
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "false positive",
+                "label": "quantity",
+                "text": "29",
+                "start": 809,
+                "score": 0.6626873284257959
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "false positive",
+                "label": "quantity",
+                "text": "1",
+                "start": 558,
+                "score": 0.6336369935948285
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "false positive",
+                "label": "quantity",
+                "text": "22",
+                "start": 692,
+                "score": 0.5984882085958054
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "2.2",
+                "start": 74
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "2.8",
+                "start": 80
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "0.8…3.0",
+                "start": 303
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "-0.0…0.9",
+                "start": 314
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "-1.8…1.0",
+                "start": 326
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "missed",
+                "label": "garment or part name",
+                "text": "part 1",
+                "start": 549
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "1.8",
+                "start": 558
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "1.4",
+                "start": 564
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "64",
+                "start": 647
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "missed",
+                "label": "unit",
+                "text": "°",
+                "start": 649
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "+29",
+                "start": 653
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "135",
+                "start": 684
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "missed",
+                "label": "unit",
+                "text": "°",
+                "start": 687
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "+22",
+                "start": 691
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "missed",
+                "label": "garment or part name",
+                "text": "part 2",
+                "start": 699
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "1.6",
+                "start": 708
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "1.7",
+                "start": 714
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "0.9",
+                "start": 738
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "64",
+                "start": 802
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "+29",
+                "start": 808
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "missed",
+                "label": "garment or part name",
+                "text": "tops",
+                "start": 1041
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "one",
+                "start": 1387
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "missed",
+                "label": "operation",
+                "text": "take it out",
+                "start": 1485
+              }
+            ],
+            "byFixture": {
+              "apron.sample": {
+                "tp": 18,
+                "fp": 6,
+                "fn": 16,
+                "precision": 0.75,
+                "recall": 0.5294117647058824,
+                "f1": 0.6206896551724139
+              },
+              "tunic.sample": {
+                "tp": 29,
+                "fp": 5,
+                "fn": 23,
+                "precision": 0.8529411764705882,
+                "recall": 0.5576923076923077,
+                "f1": 0.6744186046511628
+              },
+              "briefs": {
+                "tp": 5,
+                "fp": 3,
+                "fn": 8,
+                "precision": 0.625,
+                "recall": 0.38461538461538464,
+                "f1": 0.4761904761904762
+              },
+              "castle-sketch.brief": {
+                "tp": 21,
+                "fp": 20,
+                "fn": 23,
+                "precision": 0.5121951219512195,
+                "recall": 0.4772727272727273,
+                "f1": 0.49411764705882355
+              }
+            }
+          },
+          "overlap": {
+            "mode": "overlap",
+            "overall": {
+              "tp": 87,
+              "fp": 20,
+              "fn": 56,
+              "precision": 0.8130841121495327,
+              "recall": 0.6083916083916084,
+              "f1": 0.6960000000000001
+            },
+            "byType": {
+              "measurement name": {
+                "tp": 4,
+                "fp": 8,
+                "fn": 7,
+                "precision": 0.3333333333333333,
+                "recall": 0.36363636363636365,
+                "f1": 0.34782608695652173
+              },
+              "quantity": {
+                "tp": 50,
+                "fp": 6,
+                "fn": 19,
+                "precision": 0.8928571428571429,
+                "recall": 0.7246376811594203,
+                "f1": 0.8
+              },
+              "unit": {
+                "tp": 26,
+                "fp": 0,
+                "fn": 2,
+                "precision": 1,
+                "recall": 0.9285714285714286,
+                "f1": 0.962962962962963
+              },
+              "garment or part name": {
+                "tp": 3,
+                "fp": 2,
+                "fn": 6,
+                "precision": 0.6,
+                "recall": 0.3333333333333333,
+                "f1": 0.42857142857142855
+              },
+              "operation": {
+                "tp": 4,
+                "fp": 4,
+                "fn": 22,
+                "precision": 0.5,
+                "recall": 0.15384615384615385,
+                "f1": 0.23529411764705882
+              }
+            },
+            "ignored": 26,
+            "errors": [
+              {
+                "item": "apron.sample/A",
+                "kind": "false positive",
+                "label": "garment or part name",
+                "text": "Bust",
+                "start": 3,
+                "score": 0.7472472485194995
+              },
+              {
+                "item": "apron.sample/A",
+                "kind": "false positive",
+                "label": "measurement name",
+                "text": "36",
+                "start": 8,
+                "score": 0.6539008565611653
+              },
+              {
+                "item": "apron.sample/A",
+                "kind": "missed",
+                "label": "measurement name",
+                "text": "Bust",
+                "start": 3
+              },
+              {
+                "item": "apron.sample/B",
+                "kind": "false positive",
+                "label": "garment or part name",
+                "text": "Top to waist",
+                "start": 3,
+                "score": 0.7465087674839027
+              },
+              {
+                "item": "apron.sample/B",
+                "kind": "missed",
+                "label": "measurement name",
+                "text": "Top to waist",
+                "start": 3
+              },
+              {
+                "item": "apron.sample/C",
+                "kind": "missed",
+                "label": "measurement name",
+                "text": "Top to bottom",
+                "start": 3
+              },
+              {
+                "item": "apron.sample/seam",
+                "kind": "missed",
+                "label": "measurement name",
+                "text": "seam allowance",
+                "start": 4
+              },
+              {
+                "item": "apron.sample/1",
+                "kind": "missed",
+                "label": "operation",
+                "text": "÷",
+                "start": 5
+              },
+              {
+                "item": "apron.sample/1",
+                "kind": "missed",
+                "label": "operation",
+                "text": "+",
+                "start": 14
+              },
+              {
+                "item": "apron.sample/2",
+                "kind": "missed",
+                "label": "operation",
+                "text": "÷",
+                "start": 5
+              },
+              {
+                "item": "apron.sample/2",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "2",
+                "start": 7
+              },
+              {
+                "item": "apron.sample/2",
+                "kind": "missed",
+                "label": "operation",
+                "text": "÷",
+                "start": 14
+              },
+              {
+                "item": "apron.sample/2",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "2",
+                "start": 16
+              },
+              {
+                "item": "apron.sample/3",
+                "kind": "missed",
+                "label": "operation",
+                "text": "+",
+                "start": 8
+              },
+              {
+                "item": "apron.sample/5",
+                "kind": "false positive",
+                "label": "measurement name",
+                "text": "38\"",
+                "start": 5,
+                "score": 0.7654180546924173
+              },
+              {
+                "item": "apron.sample/5",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "38",
+                "start": 5
+              },
+              {
+                "item": "apron.sample/6",
+                "kind": "false positive",
+                "label": "measurement name",
+                "text": "72\"",
+                "start": 15,
+                "score": 0.6536798130776276
+              },
+              {
+                "item": "apron.sample/6",
+                "kind": "missed",
+                "label": "operation",
+                "text": "×",
+                "start": 6
+              },
+              {
+                "item": "apron.sample/6",
+                "kind": "missed",
+                "label": "operation",
+                "text": "−",
+                "start": 11
+              },
+              {
+                "item": "apron.sample/6",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "72",
+                "start": 15
+              },
+              {
+                "item": "apron.sample/brace",
+                "kind": "false positive",
+                "label": "measurement name",
+                "text": "72–74",
+                "start": 0,
+                "score": 0.5131195464571897
+              },
+              {
+                "item": "apron.sample/brace",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "72–74",
+                "start": 0
+              },
+              {
+                "item": "tunic.sample/1",
+                "kind": "false positive",
+                "label": "measurement name",
+                "text": "21\"",
+                "start": 33,
+                "score": 0.6597340709808103
+              },
+              {
+                "item": "tunic.sample/1",
+                "kind": "missed",
+                "label": "operation",
+                "text": "+",
+                "start": 9
+              },
+              {
+                "item": "tunic.sample/1",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "6",
+                "start": 11
+              },
+              {
+                "item": "tunic.sample/1",
+                "kind": "missed",
+                "label": "operation",
+                "text": "÷",
+                "start": 14
+              },
+              {
+                "item": "tunic.sample/1",
+                "kind": "missed",
+                "label": "operation",
+                "text": "+",
+                "start": 24
+              },
+              {
+                "item": "tunic.sample/1",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "6",
+                "start": 26
+              },
+              {
+                "item": "tunic.sample/1",
+                "kind": "missed",
+                "label": "operation",
+                "text": "/",
+                "start": 28
+              },
+              {
+                "item": "tunic.sample/2",
+                "kind": "missed",
+                "label": "operation",
+                "text": "+",
+                "start": 30
+              },
+              {
+                "item": "tunic.sample/2",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "54",
+                "start": 36
+              },
+              {
+                "item": "tunic.sample/2",
+                "kind": "missed",
+                "label": "operation",
+                "text": "+",
+                "start": 39
+              },
+              {
+                "item": "tunic.sample/3",
+                "kind": "false positive",
+                "label": "quantity",
+                "text": "6",
+                "start": 40,
+                "score": 0.6325027540011314
+              },
+              {
+                "item": "tunic.sample/3",
+                "kind": "false positive",
+                "label": "measurement name",
+                "text": "22\"",
+                "start": 59,
+                "score": 0.5632578476003665
+              },
+              {
+                "item": "tunic.sample/3",
+                "kind": "missed",
+                "label": "operation",
+                "text": "×",
+                "start": 32
+              },
+              {
+                "item": "tunic.sample/3",
+                "kind": "missed",
+                "label": "operation",
+                "text": "+",
+                "start": 36
+              },
+              {
+                "item": "tunic.sample/3",
+                "kind": "missed",
+                "label": "operation",
+                "text": "×",
+                "start": 48
+              },
+              {
+                "item": "tunic.sample/3",
+                "kind": "missed",
+                "label": "operation",
+                "text": "+",
+                "start": 53
+              },
+              {
+                "item": "tunic.sample/4",
+                "kind": "missed",
+                "label": "measurement name",
+                "text": "Fist",
+                "start": 3
+              },
+              {
+                "item": "tunic.sample/4",
+                "kind": "missed",
+                "label": "operation",
+                "text": "+",
+                "start": 8
+              },
+              {
+                "item": "tunic.sample/4",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "3.5",
+                "start": 17
+              },
+              {
+                "item": "tunic.sample/4",
+                "kind": "missed",
+                "label": "operation",
+                "text": "+",
+                "start": 21
+              },
+              {
+                "item": "tunic.sample/5",
+                "kind": "missed",
+                "label": "operation",
+                "text": "+",
+                "start": 14
+              },
+              {
+                "item": "tunic.sample/5",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "21",
+                "start": 21
+              },
+              {
+                "item": "tunic.sample/5",
+                "kind": "missed",
+                "label": "operation",
+                "text": "+",
+                "start": 24
+              },
+              {
+                "item": "tunic.sample/5",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "23",
+                "start": 30
+              },
+              {
+                "item": "brief/apron",
+                "kind": "false positive",
+                "label": "measurement name",
+                "text": "20 inches",
+                "start": 38,
+                "score": 0.7348812825926613
+              },
+              {
+                "item": "brief/apron",
+                "kind": "false positive",
+                "label": "measurement name",
+                "text": "36 inch",
+                "start": 21,
+                "score": 0.6438892947039139
+              },
+              {
+                "item": "brief/apron",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "36",
+                "start": 21
+              },
+              {
+                "item": "brief/apron",
+                "kind": "missed",
+                "label": "measurement name",
+                "text": "bust",
+                "start": 29
+              },
+              {
+                "item": "brief/apron",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "20",
+                "start": 38
+              },
+              {
+                "item": "brief/apron",
+                "kind": "missed",
+                "label": "measurement name",
+                "text": "top to waist",
+                "start": 48
+              },
+              {
+                "item": "brief/flowchart",
+                "kind": "false positive",
+                "label": "operation",
+                "text": "checkout",
+                "start": 16,
+                "score": 0.7207615303650544
+              },
+              {
+                "item": "brief/flowchart",
+                "kind": "missed",
+                "label": "garment or part name",
+                "text": "decision",
+                "start": 32
+              },
+              {
+                "item": "brief/castle",
+                "kind": "missed",
+                "label": "garment or part name",
+                "text": "towers",
+                "start": 18
+              },
+              {
+                "item": "brief/castle",
+                "kind": "missed",
+                "label": "garment or part name",
+                "text": "gate",
+                "start": 39
+              },
+              {
+                "item": "brief/castle-words",
+                "kind": "missed",
+                "label": "garment or part name",
+                "text": "tops",
+                "start": 18
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "false positive",
+                "label": "quantity",
+                "text": "2",
+                "start": 76,
+                "score": 0.9637799441350253
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "false positive",
+                "label": "quantity",
+                "text": "1",
+                "start": 327,
+                "score": 0.96036116089903
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "false positive",
+                "label": "quantity",
+                "text": "0.0",
+                "start": 315,
+                "score": 0.9407897492587141
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "false positive",
+                "label": "quantity",
+                "text": "3.0",
+                "start": 307,
+                "score": 0.8957052736689574
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "false positive",
+                "label": "operation",
+                "text": "drawn",
+                "start": 636,
+                "score": 0.8149381119553916
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "false positive",
+                "label": "operation",
+                "text": "drawn",
+                "start": 673,
+                "score": 0.7629543230971159
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "false positive",
+                "label": "operation",
+                "text": "drawn",
+                "start": 791,
+                "score": 0.7523766320725713
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "false positive",
+                "label": "quantity",
+                "text": "1",
+                "start": 558,
+                "score": 0.6336369935948285
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "missed",
+                "label": "garment or part name",
+                "text": "part 1",
+                "start": 549
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "1.4",
+                "start": 564
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "64",
+                "start": 647
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "missed",
+                "label": "unit",
+                "text": "°",
+                "start": 649
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "135",
+                "start": 684
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "missed",
+                "label": "unit",
+                "text": "°",
+                "start": 687
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "missed",
+                "label": "garment or part name",
+                "text": "part 2",
+                "start": 699
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "1.7",
+                "start": 714
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "64",
+                "start": 802
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "missed",
+                "label": "quantity",
+                "text": "one",
+                "start": 1387
+              },
+              {
+                "item": "castle-sketch.brief",
+                "kind": "missed",
+                "label": "operation",
+                "text": "take it out",
+                "start": 1485
+              }
+            ],
+            "byFixture": {
+              "apron.sample": {
+                "tp": 18,
+                "fp": 6,
+                "fn": 16,
+                "precision": 0.75,
+                "recall": 0.5294117647058824,
+                "f1": 0.6206896551724139
+              },
+              "tunic.sample": {
+                "tp": 31,
+                "fp": 3,
+                "fn": 21,
+                "precision": 0.9117647058823529,
+                "recall": 0.5961538461538461,
+                "f1": 0.7209302325581395
+              },
+              "briefs": {
+                "tp": 5,
+                "fp": 3,
+                "fn": 8,
+                "precision": 0.625,
+                "recall": 0.38461538461538464,
+                "f1": 0.4761904761904762
+              },
+              "castle-sketch.brief": {
+                "tp": 33,
+                "fp": 8,
+                "fn": 11,
+                "precision": 0.8048780487804879,
+                "recall": 0.75,
+                "f1": 0.7764705882352942
+              }
+            }
+          }
+        },
+        "sweep": [
+          {
+            "threshold": 0.3,
+            "strict": {
+              "precision": 0.6691176470588235,
+              "recall": 0.6363636363636364,
+              "f1": 0.6523297491039427
+            },
+            "overlap": {
+              "precision": 0.7794117647058824,
+              "recall": 0.7412587412587412,
+              "f1": 0.7598566308243728
+            }
+          },
+          {
+            "threshold": 0.4,
+            "strict": {
+              "precision": 0.6854838709677419,
+              "recall": 0.5944055944055944,
+              "f1": 0.6367041198501873
+            },
+            "overlap": {
+              "precision": 0.8064516129032258,
+              "recall": 0.6993006993006993,
+              "f1": 0.7490636704119848
+            }
+          },
+          {
+            "threshold": 0.5,
+            "strict": {
+              "precision": 0.6822429906542056,
+              "recall": 0.5104895104895105,
+              "f1": 0.584
+            },
+            "overlap": {
+              "precision": 0.8130841121495327,
+              "recall": 0.6083916083916084,
+              "f1": 0.6960000000000001
+            }
+          },
+          {
+            "threshold": 0.6,
+            "strict": {
+              "precision": 0.6736842105263158,
+              "recall": 0.44755244755244755,
+              "f1": 0.5378151260504201
+            },
+            "overlap": {
+              "precision": 0.8105263157894737,
+              "recall": 0.5384615384615384,
+              "f1": 0.6470588235294118
+            }
+          },
+          {
+            "threshold": 0.7,
+            "strict": {
+              "precision": 0.6933333333333334,
+              "recall": 0.36363636363636365,
+              "f1": 0.4770642201834862
+            },
+            "overlap": {
+              "precision": 0.84,
+              "recall": 0.4405594405594406,
+              "f1": 0.5779816513761468
+            }
+          },
+          {
+            "threshold": 0.8,
+            "strict": {
+              "precision": 0.75,
+              "recall": 0.3356643356643357,
+              "f1": 0.46376811594202905
+            },
+            "overlap": {
+              "precision": 0.921875,
+              "recall": 0.4125874125874126,
+              "f1": 0.570048309178744
+            }
+          },
+          {
+            "threshold": 0.9,
+            "strict": {
+              "precision": 0.6976744186046512,
+              "recall": 0.2097902097902098,
+              "f1": 0.3225806451612903
+            },
+            "overlap": {
+              "precision": 0.9302325581395349,
+              "recall": 0.27972027972027974,
+              "f1": 0.43010752688172044
+            }
+          }
+        ],
+        "spans": {
+          "apron.sample/A": [
+            {
+              "label": "measurement name",
+              "text": "36",
+              "start": 8,
+              "score": 0.6539
+            },
+            {
+              "label": "quantity",
+              "text": "36",
+              "start": 8,
+              "score": 0.5416
+            },
+            {
+              "label": "garment or part name",
+              "text": "Bust",
+              "start": 3,
+              "score": 0.7472
+            }
+          ],
+          "apron.sample/B": [
+            {
+              "label": "quantity",
+              "text": "20",
+              "start": 16,
+              "score": 0.9794
+            },
+            {
+              "label": "garment or part name",
+              "text": "Top to waist",
+              "start": 3,
+              "score": 0.7465
+            }
+          ],
+          "apron.sample/C": [
+            {
+              "label": "quantity",
+              "text": "46",
+              "start": 17,
+              "score": 0.9196
+            }
+          ],
+          "apron.sample/seam": [
+            {
+              "label": "operation",
+              "text": "Add",
+              "start": 0,
+              "score": 0.8155
+            }
+          ],
+          "apron.sample/1": [
+            {
+              "label": "quantity",
+              "text": "14",
+              "start": 20,
+              "score": 0.9447
+            },
+            {
+              "label": "quantity",
+              "text": "12",
+              "start": 11,
+              "score": 0.9167
+            },
+            {
+              "label": "quantity",
+              "text": "1",
+              "start": 0,
+              "score": 0.8032
+            },
+            {
+              "label": "quantity",
+              "text": "2",
+              "start": 16,
+              "score": 0.6862
+            },
+            {
+              "label": "quantity",
+              "text": "3",
+              "start": 7,
+              "score": 0.5123
+            }
+          ],
+          "apron.sample/2": [
+            {
+              "label": "quantity",
+              "text": "7",
+              "start": 20,
+              "score": 0.9667
+            },
+            {
+              "label": "quantity",
+              "text": "14",
+              "start": 11,
+              "score": 0.9121
+            },
+            {
+              "label": "quantity",
+              "text": "2",
+              "start": 0,
+              "score": 0.5068
+            }
+          ],
+          "apron.sample/3": [
+            {
+              "label": "quantity",
+              "text": "22",
+              "start": 14,
+              "score": 0.8013
+            },
+            {
+              "label": "quantity",
+              "text": "2",
+              "start": 10,
+              "score": 0.6368
+            },
+            {
+              "label": "quantity",
+              "text": "20",
+              "start": 5,
+              "score": 0.6319
+            }
+          ],
+          "apron.sample/4": [
+            {
+              "label": "quantity",
+              "text": "48",
+              "start": 5,
+              "score": 0.6885
+            }
+          ],
+          "apron.sample/5": [
+            {
+              "label": "measurement name",
+              "text": "38\"",
+              "start": 5,
+              "score": 0.7654
+            },
+            {
+              "label": "quantity",
+              "text": "5",
+              "start": 0,
+              "score": 0.8946
+            },
+            {
+              "label": "unit",
+              "text": "\"",
+              "start": 7,
+              "score": 0.8425
+            }
+          ],
+          "apron.sample/6": [
+            {
+              "label": "measurement name",
+              "text": "72\"",
+              "start": 15,
+              "score": 0.6537
+            },
+            {
+              "label": "quantity",
+              "text": "6",
+              "start": 0,
+              "score": 0.8378
+            },
+            {
+              "label": "quantity",
+              "text": "2",
+              "start": 8,
+              "score": 0.5743
+            },
+            {
+              "label": "unit",
+              "text": "\"",
+              "start": 17,
+              "score": 0.7756
+            }
+          ],
+          "apron.sample/brace": [
+            {
+              "label": "measurement name",
+              "text": "72–74",
+              "start": 0,
+              "score": 0.5131
+            },
+            {
+              "label": "unit",
+              "text": "\"",
+              "start": 5,
+              "score": 0.673
+            }
+          ],
+          "tunic.sample/1": [
+            {
+              "label": "measurement name",
+              "text": "21\"",
+              "start": 33,
+              "score": 0.6597
+            },
+            {
+              "label": "measurement name",
+              "text": "Chest",
+              "start": 3,
+              "score": 0.5793
+            },
+            {
+              "label": "quantity",
+              "text": "2",
+              "start": 29,
+              "score": 0.8356
+            },
+            {
+              "label": "quantity",
+              "text": "36",
+              "start": 21,
+              "score": 0.8262
+            },
+            {
+              "label": "quantity",
+              "text": "2",
+              "start": 16,
+              "score": 0.803
+            },
+            {
+              "label": "quantity",
+              "text": "1",
+              "start": 0,
+              "score": 0.7972
+            },
+            {
+              "label": "quantity",
+              "text": "21",
+              "start": 33,
+              "score": 0.6375
+            },
+            {
+              "label": "unit",
+              "text": "\"",
+              "start": 12,
+              "score": 0.9105
+            },
+            {
+              "label": "unit",
+              "text": "\"",
+              "start": 35,
+              "score": 0.9036
+            }
+          ],
+          "tunic.sample/2": [
+            {
+              "label": "measurement name",
+              "text": "Shoulder to length desired",
+              "start": 3,
+              "score": 0.5248
+            },
+            {
+              "label": "quantity",
+              "text": "2",
+              "start": 0,
+              "score": 0.9334
+            },
+            {
+              "label": "quantity",
+              "text": "2",
+              "start": 32,
+              "score": 0.9303
+            },
+            {
+              "label": "quantity",
+              "text": "2",
+              "start": 41,
+              "score": 0.8905
+            },
+            {
+              "label": "quantity",
+              "text": "56",
+              "start": 45,
+              "score": 0.7256
+            },
+            {
+              "label": "unit",
+              "text": "\"",
+              "start": 47,
+              "score": 0.8858
+            }
+          ],
+          "tunic.sample/3": [
+            {
+              "label": "measurement name",
+              "text": "Top shoulder to under armpit",
+              "start": 3,
+              "score": 0.6547
+            },
+            {
+              "label": "measurement name",
+              "text": "22\"",
+              "start": 59,
+              "score": 0.5633
+            },
+            {
+              "label": "quantity",
+              "text": "3",
+              "start": 0,
+              "score": 0.9506
+            },
+            {
+              "label": "quantity",
+              "text": "3",
+              "start": 38,
+              "score": 0.9465
+            },
+            {
+              "label": "quantity",
+              "text": "9",
+              "start": 46,
+              "score": 0.9113
+            },
+            {
+              "label": "quantity",
+              "text": "2",
+              "start": 34,
+              "score": 0.8684
+            },
+            {
+              "label": "quantity",
+              "text": "4",
+              "start": 55,
+              "score": 0.8657
+            },
+            {
+              "label": "quantity",
+              "text": "2",
+              "start": 50,
+              "score": 0.8593
+            },
+            {
+              "label": "quantity",
+              "text": "22",
+              "start": 59,
+              "score": 0.6637
+            },
+            {
+              "label": "quantity",
+              "text": "6",
+              "start": 40,
+              "score": 0.6325
+            },
+            {
+              "label": "unit",
+              "text": "\"",
+              "start": 41,
+              "score": 0.9696
+            },
+            {
+              "label": "unit",
+              "text": "\"",
+              "start": 61,
+              "score": 0.9677
+            }
+          ],
+          "tunic.sample/4": [
+            {
+              "label": "quantity",
+              "text": "4",
+              "start": 0,
+              "score": 0.9734
+            },
+            {
+              "label": "quantity",
+              "text": "4",
+              "start": 23,
+              "score": 0.9398
+            },
+            {
+              "label": "quantity",
+              "text": "4",
+              "start": 12,
+              "score": 0.9271
+            },
+            {
+              "label": "quantity",
+              "text": "7.5",
+              "start": 27,
+              "score": 0.625
+            },
+            {
+              "label": "unit",
+              "text": "\"",
+              "start": 30,
+              "score": 0.8579
+            },
+            {
+              "label": "unit",
+              "text": "\"",
+              "start": 13,
+              "score": 0.8448
+            }
+          ],
+          "tunic.sample/5": [
+            {
+              "label": "measurement name",
+              "text": "Arm length",
+              "start": 3,
+              "score": 0.9086
+            },
+            {
+              "label": "quantity",
+              "text": "5",
+              "start": 0,
+              "score": 0.9104
+            },
+            {
+              "label": "quantity",
+              "text": "2",
+              "start": 16,
+              "score": 0.5863
+            },
+            {
+              "label": "quantity",
+              "text": "2",
+              "start": 26,
+              "score": 0.5375
+            },
+            {
+              "label": "unit",
+              "text": "\"",
+              "start": 17,
+              "score": 0.9518
+            },
+            {
+              "label": "unit",
+              "text": "\"",
+              "start": 32,
+              "score": 0.9254
+            }
+          ],
+          "brief/apron": [
+            {
+              "label": "measurement name",
+              "text": "20 inches",
+              "start": 38,
+              "score": 0.7349
+            },
+            {
+              "label": "measurement name",
+              "text": "36 inch",
+              "start": 21,
+              "score": 0.6439
+            },
+            {
+              "label": "unit",
+              "text": "inches",
+              "start": 41,
+              "score": 0.8549
+            },
+            {
+              "label": "unit",
+              "text": "inch",
+              "start": 24,
+              "score": 0.79
+            },
+            {
+              "label": "garment or part name",
+              "text": "apron dress",
+              "start": 3,
+              "score": 0.983
+            }
+          ],
+          "brief/flowchart": [
+            {
+              "label": "operation",
+              "text": "checkout",
+              "start": 16,
+              "score": 0.7208
+            }
+          ],
+          "brief/castle": [
+            {
+              "label": "quantity",
+              "text": "two",
+              "start": 14,
+              "score": 0.821
+            },
+            {
+              "label": "garment or part name",
+              "text": "castle",
+              "start": 2,
+              "score": 0.838
+            },
+            {
+              "label": "garment or part name",
+              "text": "wall",
+              "start": 28,
+              "score": 0.5894
+            }
+          ],
+          "brief/castle-words": [
+            {
+              "label": "garment or part name",
+              "text": "castle",
+              "start": 0,
+              "score": 0.7176
+            }
+          ],
+          "castle-sketch.brief": [
+            {
+              "label": "measurement name",
+              "text": "height",
+              "start": 1167,
+              "score": 0.9526
+            },
+            {
+              "label": "measurement name",
+              "text": "width",
+              "start": 1198,
+              "score": 0.9476
+            },
+            {
+              "label": "measurement name",
+              "text": "foundation",
+              "start": 1123,
+              "score": 0.925
+            },
+            {
+              "label": "measurement name",
+              "text": "HULL",
+              "start": 35,
+              "score": 0.6895
+            },
+            {
+              "label": "measurement name",
+              "text": "footprint",
+              "start": 727,
+              "score": 0.6025
+            },
+            {
+              "label": "measurement name",
+              "text": "hull",
+              "start": 26,
+              "score": 0.6015
+            },
+            {
+              "label": "measurement name",
+              "text": "footprint",
+              "start": 577,
+              "score": 0.5918
+            },
+            {
+              "label": "measurement name",
+              "text": "tall",
+              "start": 744,
+              "score": 0.5234
+            },
+            {
+              "label": "quantity",
+              "text": "8",
+              "start": 788,
+              "score": 0.9858
+            },
+            {
+              "label": "quantity",
+              "text": "2",
+              "start": 409,
+              "score": 0.9842
+            },
+            {
+              "label": "quantity",
+              "text": "9",
+              "start": 670,
+              "score": 0.9824
+            },
+            {
+              "label": "quantity",
+              "text": "8",
+              "start": 560,
+              "score": 0.9817
+            },
+            {
+              "label": "quantity",
+              "text": "2",
+              "start": 74,
+              "score": 0.9748
+            },
+            {
+              "label": "quantity",
+              "text": "9",
+              "start": 740,
+              "score": 0.9713
+            },
+            {
+              "label": "quantity",
+              "text": "7",
+              "start": 23,
+              "score": 0.9678
+            },
+            {
+              "label": "quantity",
+              "text": "2",
+              "start": 80,
+              "score": 0.9677
+            },
+            {
+              "label": "quantity",
+              "text": "2",
+              "start": 633,
+              "score": 0.966
+            },
+            {
+              "label": "quantity",
+              "text": "2",
+              "start": 76,
+              "score": 0.9638
+            },
+            {
+              "label": "quantity",
+              "text": "0.9",
+              "start": 104,
+              "score": 0.9625
+            },
+            {
+              "label": "quantity",
+              "text": "1",
+              "start": 270,
+              "score": 0.9612
+            },
+            {
+              "label": "quantity",
+              "text": "1",
+              "start": 331,
+              "score": 0.9605
+            },
+            {
+              "label": "quantity",
+              "text": "1",
+              "start": 327,
+              "score": 0.9604
+            },
+            {
+              "label": "quantity",
+              "text": "0.9",
+              "start": 319,
+              "score": 0.9483
+            },
+            {
+              "label": "quantity",
+              "text": "0.8",
+              "start": 303,
+              "score": 0.9475
+            },
+            {
+              "label": "quantity",
+              "text": "0.0",
+              "start": 315,
+              "score": 0.9408
+            },
+            {
+              "label": "quantity",
+              "text": "2",
+              "start": 704,
+              "score": 0.9357
+            },
+            {
+              "label": "quantity",
+              "text": "6.0",
+              "start": 227,
+              "score": 0.9201
+            },
+            {
+              "label": "quantity",
+              "text": "1.6 × 1.7",
+              "start": 708,
+              "score": 0.9101
+            },
+            {
+              "label": "quantity",
+              "text": "3.0",
+              "start": 307,
+              "score": 0.8957
+            },
+            {
+              "label": "quantity",
+              "text": "0.3",
+              "start": 588,
+              "score": 0.8918
+            },
+            {
+              "label": "quantity",
+              "text": "4.0",
+              "start": 233,
+              "score": 0.8124
+            },
+            {
+              "label": "quantity",
+              "text": "29",
+              "start": 654,
+              "score": 0.679
+            },
+            {
+              "label": "quantity",
+              "text": "29",
+              "start": 809,
+              "score": 0.6627
+            },
+            {
+              "label": "quantity",
+              "text": "1",
+              "start": 558,
+              "score": 0.6336
+            },
+            {
+              "label": "quantity",
+              "text": "three",
+              "start": 1102,
+              "score": 0.6283
+            },
+            {
+              "label": "quantity",
+              "text": "22",
+              "start": 692,
+              "score": 0.5985
+            },
+            {
+              "label": "unit",
+              "text": "u",
+              "start": 742,
+              "score": 0.9991
+            },
+            {
+              "label": "unit",
+              "text": "u",
+              "start": 592,
+              "score": 0.999
+            },
+            {
+              "label": "unit",
+              "text": "u",
+              "start": 568,
+              "score": 0.999
+            },
+            {
+              "label": "unit",
+              "text": "u",
+              "start": 718,
+              "score": 0.9986
+            },
+            {
+              "label": "unit",
+              "text": "u",
+              "start": 108,
+              "score": 0.9984
+            },
+            {
+              "label": "unit",
+              "text": "u",
+              "start": 84,
+              "score": 0.9983
+            },
+            {
+              "label": "unit",
+              "text": "u",
+              "start": 237,
+              "score": 0.9982
+            },
+            {
+              "label": "unit",
+              "text": "°",
+              "start": 694,
+              "score": 0.991
+            },
+            {
+              "label": "unit",
+              "text": "°",
+              "start": 811,
+              "score": 0.9902
+            },
+            {
+              "label": "unit",
+              "text": "°",
+              "start": 656,
+              "score": 0.9893
+            },
+            {
+              "label": "unit",
+              "text": "world units",
+              "start": 288,
+              "score": 0.6902
+            },
+            {
+              "label": "unit",
+              "text": "°",
+              "start": 804,
+              "score": 0.6457
+            },
+            {
+              "label": "operation",
+              "text": "raise",
+              "start": 1433,
+              "score": 0.8374
+            },
+            {
+              "label": "operation",
+              "text": "drawn",
+              "start": 636,
+              "score": 0.8149
+            },
+            {
+              "label": "operation",
+              "text": "drawn",
+              "start": 673,
+              "score": 0.763
+            },
+            {
+              "label": "operation",
+              "text": "drawn",
+              "start": 791,
+              "score": 0.7524
+            },
+            {
+              "label": "operation",
+              "text": "mirror",
+              "start": 1471,
+              "score": 0.7042
+            },
+            {
+              "label": "operation",
+              "text": "cut off",
+              "start": 387,
+              "score": 0.5818
+            },
+            {
+              "label": "operation",
+              "text": "cut",
+              "start": 1443,
+              "score": 0.5675
+            },
+            {
+              "label": "garment or part name",
+              "text": "castle with green tops",
+              "start": 1023,
+              "score": 0.8035
+            }
+          ]
+        }
+      }
+    },
+    "memoryAfterFirstCall": {
+      "rssMB": 992,
+      "maxRssMB": 1156
+    },
+    "memoryAfterAll": {
+      "rssMB": 1056,
+      "maxRssMB": 1156
+    }
+  }
+}
