@@ -188,7 +188,11 @@ function parkedBriefs() {
     // The prompt is the contract, a rule of dashes, then the brief itself.
     const cut = prompt.indexOf('\n\n----\n\n');
     const user = cut >= 0 ? prompt.slice(cut + 8) : prompt;
-    const mark = '\n\nPropose the tree.';
+    // Both asks, because there are two — `generator.ts`'s `messagesFor` ends a
+    // steps brief with *Propose the tree.* and a standing hull's parts brief
+    // with *Name the parts.* (`src/room.ts`'s `splitPrompt` lists the same two).
+    const marks = ['\n\nPropose the tree.', '\n\nName the parts.'];
+    const mark = marks.find((m) => user.includes(m)) || marks[0];
     const at = user.indexOf(mark);
     const tail = at >= 0 ? user.slice(at + mark.length) : '';
     const asked = /The human asked for: [“"](.*)[”"]\s*$/.exec(tail);
