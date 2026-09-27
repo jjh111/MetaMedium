@@ -2,7 +2,8 @@
 // Provides: the field's QUERY, pure — readFieldCommand (what Enter will do, as a named
 //   command record), and the two matchers it stands on (verbFor, libraryMatch), plus
 //   the prefix pattern (FIELD_PREFIXES) and typedWord (the word a typed text offers to
-//   name the selection with, or to label the person's own ink with — V1-PLAN L2e).
+//   name the selection with, or to label the person's own ink with — V1-PLAN L2e), and
+//   the words for another hand's marks a label will not go on (theirMarks, madeThese).
 // Uses: NOTHING. This fragment names no closure variable, touches no DOM, and asks the
 //   session nothing. Everything it needs arrives in a FieldContext record; everything it
 //   decides leaves as a FieldReading record. That is the whole point of it
@@ -85,6 +86,16 @@
     for (const n of others || []) if (names.indexOf(n) < 0) names.push(n);
     const who = names.length <= 1 ? (names[0] || 'another hand') : names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1];
     return { who: who, count: (others || []).length };
+  }
+  /** Pure: "the mark fern made", "the 2 marks fern and qwen3 made" — the marks a label will not go on. */
+  function theirMarks(others) {
+    const m = makersOf(others);
+    return (m.count === 1 ? 'the mark ' : 'the ' + m.count + ' marks ') + m.who + ' made';
+  }
+  /** Pure: "fern made this mark", "fern made these 3 marks" — when none of the held marks is yours. */
+  function madeThese(others) {
+    const m = makersOf(others);
+    return m.who + (m.count === 1 ? ' made this mark' : ' made these ' + m.count + ' marks');
   }
 
   /**
@@ -227,15 +238,9 @@
     if (!word) return { kind: 'label', line: '↵ label it… (type the word)', quiet: true, command: null };
     if (!mine && !others.length) return { kind: 'label', line: '↵ label… — nothing held to put it on', quiet: true, command: null };
     const command = { do: 'label', text: word };
-    const theirs = makersOf(others);
-    if (!mine) {
-      return {
-        kind: 'label', quiet: true, command: command,
-        line: '↵ no label — ' + theirs.who + (theirs.count === 1 ? ' made this mark' : ' made these ' + theirs.count + ' marks') + '; a label goes on your own ink',
-      };
-    }
+    if (!mine) return { kind: 'label', quiet: true, command: command, line: '↵ no label — ' + madeThese(others) + '; a label goes on your own ink' };
     const tail = others.length
-      ? ' — on ' + (mine === 1 ? 'yours' : 'your ' + mine) + ', not ' + (theirs.count === 1 ? 'the mark ' : 'the ' + theirs.count + ' marks ') + theirs.who + ' made'
+      ? ' — on ' + (mine === 1 ? 'yours' : 'your ' + mine) + ', not ' + theirMarks(others)
       : mine > 1 ? ' — on each of your ' + mine + ' marks' : '';
     return { kind: 'label', line: '↵ label it “' + word + '”' + tail, command: command };
   }

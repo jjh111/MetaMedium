@@ -118,7 +118,7 @@
     // caption. It makes nothing, and says so; the reading above it names.
     {
       const writingIds = marks.filter((id) => { const n = s.nodes.get(id); return n && !s.artifacts.includes(id) && (isWriting(n) || MM.isWord(n) || !!MM.transcriptOf(n)); });
-      const others = marks.filter((id) => !writingIds.includes(id));
+      const besides = marks.filter((id) => !writingIds.includes(id)); // held besides the writing
       const words = [];
       if (lineRead) words.push({ word: lineText, from: lineIds.filter((id) => marks.includes(id)), conf: Math.min(...lineSaid.map((t) => t.confidence)), source: lineSaid[0].source });
       for (const id of writingIds) {
@@ -127,12 +127,12 @@
         if (t && t.text && !words.some((w) => w.word === t.text)) words.push({ word: t.text, from: [id], conf: t.confidence, source: t.source });
       }
       for (const w of words) {
-        const targets = others.length ? others : w.from.slice(0, 1);
+        const targets = besides.length ? besides : w.from.slice(0, 1);
         if (!targets.length) continue;
         items.push(labelItem(sum, targets, w.word, {
           key: 'label:' + w.word, group: 'written', groupConf: w.conf, verbs: ['label', 'label it'],
           groupWhy: 'read from your handwriting by ' + nameOfParticipant(w.source),
-          where: others.length ? ', held with the writing' : 'itself',
+          where: besides.length ? ', held with the writing' : 'itself',
         }));
       }
     }
@@ -498,6 +498,9 @@
   }
 
   // ===== Name it, Label it: one word, two acts (V1-PLAN L2e) ==================
+  // (`makersOf`, `theirMarks` and `madeThese` — the words for another hand's marks —
+  // are the reader's, in 09-field.js, so the line before Enter and the status after it
+  // say the same thing.)
   // Naming BLESSES: the marks become one thing, a definition the library keeps and
   // the next drawing like it is offered as. Labelling puts a word on your own ink and
   // MAKES NOTHING — no definition, no file, nothing the matcher learns (the notes, §B,
@@ -522,12 +525,6 @@
     return out;
   }
 
-  /** "the mark fern made", "the 2 marks fern and qwen3 made" — whose ink a label will not go on. */
-  function theirMarks(others) {
-    const m = makersOf(others);
-    return (m.count === 1 ? 'the mark ' : 'the ' + m.count + ' marks ') + m.who + ' made';
-  }
-
   /**
    * The Label pill: the word on each of `targets` the person made. Its tooltip says where
    * the word goes, whose marks it will not go on, and that it makes nothing; `line` is
@@ -543,11 +540,11 @@
       : (ink.mine === 1 ? 'the mark you made' : 'each of the ' + ink.mine + ' marks you made') + (o.where || '');
     const why = ink.mine
       ? q + ' on ' + onto + ', in your ink at the board\'s scale' + (ink.others.length ? ' — not on ' + theirMarks(ink.others) + ', which is theirs to label' : '') + ' — ' + LABELLING_IS
-      : 'no label here — ' + theirMarks(ink.others) + ', and a label is a word on your own ink; taking it says so';
+      : 'no label here — ' + madeThese(ink.others) + ', and a label is a word on your own ink; taking it says so';
     return {
       key: o.key, group: o.group, groupConf: o.groupConf, groupWhy: o.groupWhy || '', verbs: o.verbs || [],
       label: 'Label it ' + q, why: why, tier: 1,
-      line: ink.mine ? '↵ label it ' + q + ' — on your ink; makes nothing' : '↵ no label — ' + theirMarks(ink.others) + '; a label goes on your own ink',
+      line: ink.mine ? '↵ label it ' + q + ' — on your ink; makes nothing' : '↵ no label — ' + madeThese(ink.others) + '; a label goes on your own ink',
       run: () => labelMarks(sum, targets, word),
     };
   }
@@ -557,7 +554,7 @@
     const q = '“' + word + '”';
     return {
       key: 'name-word', group: 'always', groupConf: 0, groupWhy: '', verbs: [],
-      label: 'Name it ' + q, why: 'one thing called ' + q + ' — ' + NAMING_IS, tier: 1,
+      label: 'Name it ' + q, why: q + ' as the name — ' + NAMING_IS, tier: 1,
       line: '↵ name it ' + q + ' — one thing, a definition',
       run: () => session.bless({ summonId: sum.id, name: word, at: Date.now() }),
     };
