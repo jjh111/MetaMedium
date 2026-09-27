@@ -12,9 +12,13 @@ with their evidence, and budgets R4b can hold itself to. It fixes nothing.*
 
 | Board | Fit for daily use today? | What a hand feels (Chromium, this machine) |
 |---|---|---|
-| **500 marks** | **Yes, with one pause** | Opening freezes the tab for ⟨2.2⟩ s while the log replays. After that, drawing keeps the frame rate, a stroke's reading lands ⟨150⟩ ms after the pen lifts, and panning holds 60 fps at working zoom. |
-| **2,000 marks** | **No** | Opening takes ⟨…⟩ with the tab frozen throughout (Node replays the log in 167–174 s). Every stroke freezes the page for ⟨…⟩ s when the pen lifts, 8 s of it the surface re-reading every mark's role. A live room replays the whole board, about 3 minutes, on every line another hand sends. Browser storage refuses the log, so autosave silently stops saving it. |
-| **5,000 marks** | **No — it does not open** | ⟨…⟩ |
+| **500 marks** | **Yes, with one pause** | Opening freezes the tab for 2.2 s while the log replays (2.3 s opened as a folder). After that, drawing keeps the frame rate (a pointer move costs 3.3 ms) and a stroke's reading lands 147 ms after the pen lifts. Panning holds 60 fps at zoom 1, and 30 fps at fit-all, where this headless build paints on the CPU. |
+| **2,000 marks** | **No** | Opening as a folder takes 100 s with the tab frozen throughout (Node replays the log in 167–174 s). It cannot reopen from browser storage at all: storage refuses its 6.6 M characters, so autosave has silently stopped saving it. Every stroke freezes the page for 7.6 s when the pen lifts, 7.1 s of it the surface re-reading every mark's role. Each pointer move costs 39 ms, so the ink lags the pen, and panning runs at 20 fps. In a live room every line another hand sends replays the whole board again: about 3 minutes. |
+| **5,000 marks** | **No — it does not open** | Chromium's tab crashed 13 minutes (786 s) into opening it as a folder. The renderer's JavaScript heap is capped at 3.5 GB (`jsHeapSizeLimit`, 3,586 MB); the renderer had grown to 3.9 GB of memory, busy on six cores, before it crashed. Browser storage refuses its 16 M characters. Node's default heap limit (4 GB) is far too small for it — by 4,250 marks the process held 31 GB — so it ran with the limit raised to 64 GB. Drawn event by event, the board took 55 minutes to reach 4,250 marks, where I stopped it. By then a stroke cost 2.6 s (p95 4.0 s), and most of the process's time went to the garbage collector. Were the board open, each release would freeze the page for 106 s: the whole-board read, measured on the board's own content plane without a replay. |
+
+WebKit 26.6 tells the same story with different weights: it opens the 2,000
+board faster (76.5 s) and paints slower (56–64 ms a paint), and a release
+takes 6.0 s.
 
 **Why, in three lines.**
 
@@ -24,10 +28,13 @@ with their evidence, and budgets R4b can hold itself to. It fixes nothing.*
    those relations leave.
 2. **The surface re-reads the whole board's roles after every stroke.** Its
    role table scans every relation for every mark: O(n·R), 8 s at 2,000.
+   The same stored relations make every paint walk every mark's edges,
+   several times over.
 3. **Relations with no distance limit are stored on every mark and cloned
    into a checkpoint every 200 events.** 88% of stored edges are `same-size`.
-   That is 1.06 GB held at 2,000 marks, 90% of it in checkpoints, and ⟨…⟩ at
-   5,000 — past the 3.5 GB a Chromium tab may hold.
+   That is 1.06 GB held at 2,000 marks, 90% of it in checkpoints. The 5,000
+   board's process held 31 GB by 4,250 marks — far past the 3.5 GB a
+   Chromium tab may hold.
 
 At 500 marks all three are already there, just small.
 
@@ -37,15 +44,18 @@ At 500 marks all three are already there, just small.
 
 **Machine.** Apple M2 Max (8 performance and 4 efficiency cores), 96 GB,
 macOS 26.6.2 (25G83). Node v22.23.0 (V8 12.4.254.21-node.56). Chromium
-153.0.8010.12 and WebKit ⟨…⟩ through Playwright 1.63.0, headless, 1440×900 at
+153.0.8010.12 and WebKit 26.6 through Playwright 1.63.0, headless, 1440×900 at
 device scale 1: the gate's viewport. Headless Chromium rasterises on the CPU,
 so a frame's paint here is not a GPU's.
 
 **The machine was shared.** Other agents worked in other worktrees throughout.
-The load average (recorded at the start of every result file) ran 3.4–11.4.
+The load average (recorded at the start of every result file) ran 4–11.
 The 5,000-mark build ran alongside the 2,000-mark and browser measurements.
-The same measurement repeated moved by about 10%: five cold and warm replays
-of the 2,000 board took 151–174 s. Read every number here as ±10%.
+At the load most runs saw (4–8), the same measurement repeated moved by about
+10%: five cold and warm replays of the 2,000 board took 151–174 s. Under the
+heaviest load, with a crashing Chromium tab alongside, it took 223 s; that run
+is used only for the size of a model's brief, which does not depend on time.
+Read every number here as ±10%.
 
 **The boards** (`metamedium-core/bench/board.mjs`) come from a seed,
 deterministically; the generator is saved, never the boards. A *mark* is one
@@ -65,8 +75,8 @@ stroke of ink in the log.
 - **The readings.** Every shape reads as what was drawn: boxes, circles,
   lines and triangles 99–100%. Arrows are 96–100% arrow; the rest crossed a
   box as the command mark, which the engine documents.
-- **The sizes.** Logs are 1.5 / 6.6 / 16.1 MB of JSON, over 5.7k / 10.5k /
-  17.2k px square.
+- **The sizes.** Logs are 1.5 / 6.6 / 16.1 MB of JSON, and the boards are
+  about 5.7 k, 10.5 k and 17.2 k px across.
 
 **What a number includes.** Generating a board is setup and is in no number.
 A **cold** load is the first in its process, JIT and all; **warm** loads each
@@ -93,7 +103,131 @@ each frame to `src/<file>:<line>` or `Demos/surface/<fragment>:<line>`.
 
 ## The numbers
 
-⟨TABLES⟩
+Printed from the result files by `node metamedium-core/bench/report.mjs` — a number here is the number a run wrote. Each table ends with the command that made it. Where a cell reads *median / p95*, the percentiles are nearest-rank over the samples named.
+
+### Engine (Node) — replay, memory, relations, the whole-board read, one more stroke
+
+| | 500 | 2,000 | 5,000 |
+|---|---|---|---|
+| log: events · JSON | 530 · 1.53 MB | 2079 · 6.56 MB | 5208 · 16.13 MB |
+| content plane after replay (marks, words, artifacts) | 336 (4 artifacts) | 1377 (10 artifacts) | 2859 (after 4250 strokes) |
+| **replay (`load`), cold** | 2.64 s | 169.7 s | — |
+| replay, warm (median of n) | 2.58 s (n 5) | 166.9 s (n 2) | — |
+| replay, committed bundle (cold · warm) | 2.61 s · 2.57 s | 174.3 s | — |
+| drawn event by event (`build`) | 2.65 s | — | stopped at 4,250 marks after 55 min |
+| **memory held after replay** | 24.7 MB | 1058.1 MB | — |
+| …of which checkpoints (held with them off) | 8.8 MB held, replay 2.55 s | 108.5 MB held, replay 157.7 s | — |
+| edges stored in the graph | 65,336 | 909,566 | — |
+| max RSS of the process | 261 MB | 3039 MB | — |
+| `relate` over the content plane (pairs → relations) | 6.09 ms (56,280 → 64,734) | 183 ms (947,376 → 939,380) | 1.20 s (5,656,566 → 5,375,998) † |
+| …the relation list it builds, held | 7.5 MB (336 marks) | 109.7 MB (1,377 marks) | 619.1 MB (3,364 marks) |
+| `session.read` of the whole board (the surface's readRungs) | 139 ms (344 marks) | 8.07 s (1403 marks) | 106.1 s (3423 marks) † |
+| **one more stroke: median / p95** | 17.5 ms / 26.9 ms (n 60) | 256 ms / 749 ms (n 40) | — |
+| …the shape rung alone for those strokes | 0.07 ms / 0.26 ms | 0.03 ms / 0.10 ms | — |
+| `getState()` (handed to subscribers on every event) | 0.02 ms / 0.03 ms | 0.10 ms / 0.21 ms | — |
+| a model's brief (`describeSession`): five marks · the whole board | 16 KB · 1.7 MB | 113 KB · 23.6 MB | — |
+
+Commands: `node --expose-gc metamedium-core/bench/engine.mjs board --size=N --repeat=K` (500: K=5; 2,000: K=2); 5,000: `node --expose-gc --max-old-space-size=65536 metamedium-core/bench/engine.mjs build --size=5000 --strokes=20`; bundle: add `--core=bundle`; checkpoints off: add `--ablate=checkpoints --only=replay`; the relation list and † (the content plane gathered from the diagrams the board was drawn in, so no replay — the same 336 and 1,377 marks and the same relations the replayed boards hold, and a read within 4% of the session's own): `node --expose-gc metamedium-core/bench/engine.mjs relate --size=N --read`.
+
+### One stroke's cost as the board grows (the 5000-mark board drawn event by event)
+
+| strokes drawn | content marks | median | p95 | max | elapsed |
+|---|---|---|---|---|---|
+| 250 | 160 | 0.70 ms | 4.56 ms | 14.2 ms | 0.4 s |
+| 500 | 330 | 7.44 ms | 18.5 ms | 46.7 ms | 2.6 s |
+| 750 | 496 | 19.1 ms | 40.4 ms | 90.9 ms | 8.2 s |
+| 1000 | 673 | 42.9 ms | 75.4 ms | 261 ms | 20.2 s |
+| 1250 | 849 | 68.7 ms | 130 ms | 358 ms | 40.2 s |
+| 1500 | 1014 | 101 ms | 237 ms | 650 ms | 69.9 s |
+| 1750 | 1171 | 151 ms | 220 ms | 1.11 s | 112.9 s |
+| 2000 | 1347 | 209 ms | 288 ms | 1.08 s | 170.2 s |
+| 2250 | 1510 | 288 ms | 401 ms | 1.79 s | 250.5 s |
+| 2500 | 1675 | 406 ms | 578 ms | 2.04 s | 362.5 s |
+| 2750 | 1843 | 542 ms | 781 ms | 2.41 s | 512.8 s |
+| 3000 | 2018 | 723 ms | 964 ms | 2.78 s | 713.3 s |
+| 3250 | 2192 | 960 ms | 1.41 s | 3.88 s | 973.1 s |
+| 3500 | 2333 | 1.29 s | 1.85 s | 4.36 s | 1326.7 s |
+| 3750 | 2519 | 1.70 s | 2.58 s | 7.29 s | 1789.7 s |
+| 4000 | 2692 | 2.71 s | 5.18 s | 9.14 s | 2537.7 s |
+| 4250 | 2859 | 2.62 s | 4.04 s | 11.8 s | 3274.3 s |
+
+Command: `node --expose-gc --max-old-space-size=65536 metamedium-core/bench/engine.mjs build --size=5000 --every=250`. Each row is the 250 strokes ending at that count; a stroke is one `addStroke`, with every event before it applied.
+
+### A live room — one incoming line at one hand, in a room of three
+
+| step (what `mergeLive` runs, 17-folder.js) | 500-mark board | 2,000-mark board |
+|---|---|---|
+| `receive` the line (LiveStore) | 0.01 ms / 0.01 ms | 0.01 ms / 0.11 ms |
+| `readLogs()` | 0.01 ms / 0.08 ms | 0.01 ms / 0.09 ms |
+| `myLogNow()` — every loaded event stringified | 13.2 ms / 13.6 ms | 64.1 ms / 65.2 ms |
+| `mergeLogs` | 0.28 ms / 0.89 ms | 0.99 ms / 4.85 ms |
+| `notices()` — a second `mergeLogs` | 0.24 ms / 0.70 ms | 1.03 ms / 4.59 ms |
+| **merge work without `notices()`** | 13.6 ms / 13.9 ms | 65.4 ms / 69.0 ms |
+| **merge work with `notices()`** | 13.9 ms / 14.2 ms | 67.3 ms / 70.1 ms |
+| **then `session.load(merged)` — a full replay, every line** | 2.56 s | 172.6 s |
+
+Command: `node --expose-gc metamedium-core/bench/engine.mjs room --size=N` (median / p95 over 12 lines).
+
+### A newcomer's hello — the 2,000-mark board held by the hands already there
+
+| | room of 3 | room of 6 |
+|---|---|---|
+| lines sent in answer | 6 | 30 |
+| bytes sent in answer | 12.14 MB | 32.56 MB |
+| bytes delivered (every line reaches every other hand) | 24.28 MB | 162.81 MB |
+| lines each hand already there hears | 5 | 26 |
+| times each is notified (in the surface: a full re-merge and replay each) | 4 (1 carry events) | 16 (10 carry events) |
+| times the newcomer is notified | 3 | 15 |
+
+Command: `node --expose-gc metamedium-core/bench/engine.mjs hello --size=2000` (LocalHub; the board split between the hands already there; the newcomer publishes its empty log and says hello, as `openLive` does).
+
+### Surface — chromium 153.0.8010.12 (1440x900 @1x, headless)
+
+| | 500 | 2,000 |
+|---|---|---|
+| **open, restored from browser storage** (navigation → board drawn) | 2.21 s (longest task 2.17 s) | did not open: browser storage refused the log (QuotaExceededError) |
+| **open as a folder** (`?folder=`) | 2.32 s (longest task 2.21 s) | 100.4 s (longest task 100.1 s) |
+| renderer heap after open (used of limit) | 98 of 3586 MB | 853 of 3586 MB |
+| one paint alone: fit-all / zoom 1 | 3.40 ms / 2.30 ms | 32.0 ms / 36.3 ms |
+| **pan at fit-all**: handler · frame (median / p95) | 3.30 ms / 3.70 ms · 33.3 ms / 33.4 ms | 38.4 ms / 41.2 ms · 117 ms / 133 ms |
+| **pan at zoom 1**: handler · frame | 2.70 ms / 3.60 ms · 16.7 ms / 16.7 ms | 39.5 ms / 42.9 ms · 49.9 ms / 50.1 ms |
+| **drawing**: pointer-move handler · frame | 3.30 ms / 3.70 ms · 16.7 ms / 16.8 ms | 38.8 ms / 41.2 ms · 16.8 ms / 33.4 ms |
+| **release → reading drawn** (median / p95, n 5) | 147 ms / 148 ms | 7.59 s / 7.65 s |
+| the release handler alone | 143 ms / 144 ms | 7.59 s / 7.65 s |
+| what the strokes read as | rectangle 0.91, rectangle 0.91, rectangle 0.91, rectangle 0.91, rectangle 0.91 | rectangle 0.91, rectangle 0.91, rectangle 0.91, rectangle 0.91, rectangle 0.91 |
+| autosave: stringify · into browser storage | 6.20 ms · 1.30 ms | 29.9 ms · refused (QuotaExceededError) |
+
+Command: `node e2e/perf.mjs --browser=chromium --sizes=500,2000`
+
+### Surface — chromium 153.0.8010.12 (1440x900 @1x, headless)
+
+| | 5,000 |
+|---|---|
+| **open, restored from browser storage** (navigation → board drawn) | did not open: browser storage refused the log (QuotaExceededError) |
+| **open as a folder** (`?folder=`) | did not open: the tab crashed (2026-09-27T23:16:04.449Z) after 786.5 s |
+
+Browser storage takes at most **5.00 M characters** under one key (found by halving); these boards' logs run 3.3 K characters a mark, so autosave into browser storage stops saving at about **1,549 marks** — and says nothing (17-folder.js:328 swallows the error).
+
+Command: `node e2e/perf.mjs --browser=chromium --sizes=5000`
+
+### Surface — webkit 26.6 (1440x900 @1x, headless)
+
+| | 500 | 2,000 |
+|---|---|---|
+| **open, restored from browser storage** (navigation → board drawn) | 2.55 s | did not open: browser storage refused the log (QuotaExceededError) |
+| **open as a folder** (`?folder=`) | 2.13 s | 76.5 s |
+| one paint alone: fit-all / zoom 1 | 7.00 ms / 8.00 ms | 59.0 ms / 56.0 ms |
+| **pan at fit-all**: handler · frame (median / p95) | 8.00 ms / 9.00 ms · 17.0 ms / 17.0 ms | 64.0 ms / 76.0 ms · 66.0 ms / 79.0 ms |
+| **pan at zoom 1**: handler · frame | 7.00 ms / 9.00 ms · 17.0 ms / 18.0 ms | 64.0 ms / 80.0 ms · 66.0 ms / 82.0 ms |
+| **drawing**: pointer-move handler · frame | 7.00 ms / 9.00 ms · 17.0 ms / 27.0 ms | 63.0 ms / 78.0 ms · 66.0 ms / 85.0 ms |
+| **release → reading drawn** (median / p95, n 5) | 91.0 ms / 103 ms | 5.95 s / 6.24 s |
+| the release handler alone | 90.0 ms / 101 ms | 5.95 s / 6.24 s |
+| what the strokes read as | rectangle 0.92, rectangle 0.92, rectangle 0.92, rectangle 0.92, rectangle 0.92 | rectangle 0.92, rectangle 0.92, rectangle 0.92, rectangle 0.92, rectangle 0.92 |
+| autosave: stringify · into browser storage | 3.00 ms · 0.00 ms | 10.0 ms · refused (QuotaExceededError) |
+
+Browser storage takes at most **5.00 M characters** under one key (found by halving); these boards' logs run 3.2 K characters a mark, so autosave into browser storage stops saving at about **1,576 marks** — and says nothing (17-folder.js:328 swallows the error).
+
+Command: `node e2e/perf.mjs --browser=webkit --sizes=500,2000`
 
 ---
 
@@ -118,8 +252,9 @@ of every release at 2,000.**
   `:92`). Each is a filter over the whole relation list, for every mark,
   with `inScope` an `Array.includes` over every id (`roles.ts:61`). With R
   itself O(n²), this is O(n·R).
-- **Evidence.** `session.read` of the board: 146 ms at 500, 8.07 s at
-  2,000. The profile at 2,000 puts 90% of it in `place` and 64% in
+- **Evidence.** `session.read` of the board: 139 ms at 500, 8.07 s at
+  2,000, and 106 s at 5,000 (run on the board's own content plane without a
+  replay; checked against the session's own read at 500 and 2,000). The profile at 2,000 puts 90% of it in `place` and 64% in
   `contents` alone, and 0.8% in `relate`. In Chromium, 7.13 s of the
   7.24 s release handler is this read (`e2e/results/perf/stroke-2000.cpuprofile`).
   Release → reading drawn: 147 ms at 500, **7.59 s** at 2,000.
@@ -142,9 +277,13 @@ the replay is cubic, and it is most of the engine's per-stroke cost.**
   garbage: about a million relation objects, each with a reasoning string,
   per call.
 - **Evidence, one more stroke at 2,000.** 56.5% is in it.
+- **Evidence, at 5,000.** The content plane is 3,364 marks. `relate` over it
+  takes 1.2 s and returns 5.4 million relations holding 619 MB, and this
+  happens on every stroke. That is why, past 3,500 marks, the collector is
+  most of what the process does.
 - **Scale.** The replay goes 2.6 s → 170 s for 4× the marks (×65). The
   stroke's own cost, as the 5,000-mark board is drawn, climbs from 0.7 ms
-  (the first 250 strokes) to 209 ms at 2,000 and ⟨…⟩ at 5,000.
+  (the first 250 strokes) to 209 ms at 2,000 and 2.6 s at 4,250.
 
 **3. A live room replays the whole board on every line — about 3 minutes a
 line at 2,000.**
@@ -159,8 +298,8 @@ line at 2,000.**
   `myLogNow`), then a 173 s replay.
 - **`notices()`.** It does double the merge, as W2's follow-up says: it runs
   `mergeLogs` again (`src/store/live.ts:229–240`, 0.99 → 2.0 ms). That is
-  true, but it is 1.5% of the merge work and a thousandth of a percent of
-  the line.
+  true, but it is 1.5% of the merge work and under a thousandth of a
+  percent of the line.
 - **A hello.** Every hand already in the room answers with every log it
   holds (`live.ts:315`), so a room of k hands sends k(k−1) whole logs:
   30 lines for a room of six on the 2,000 board, 32.6 MB sent and 163 MB
@@ -170,7 +309,7 @@ line at 2,000.**
 
 **4. Relations with no distance limit are stored on every mark, and a
 checkpoint clones them every 200 events — 1.06 GB held at 2,000 marks,
-⟨…⟩ at 5,000.**
+and a 31 GB process by 4,250 marks of the 5,000 board.**
 
 - **Mechanism.** `relate` states direction, alignment and peerhood for any
   two marks that share a band or a size, however far apart
@@ -185,7 +324,9 @@ checkpoint clones them every 200 events — 1.06 GB held at 2,000 marks,
   - concepts compute their own per scope (`src/concepts/concept.ts:210, 328`);
   - the exception is `describeSession`, which lists every stored relation of
     every mark it describes to a model (`src/participants/serialize.ts:88`).
-    A five-mark brief is 16 KB at 500 marks and ⟨…⟩ at 2,000.
+    A five-mark brief is 16 KB at 500 marks and 113 KB at 2,000. The whole
+    board is 23.6 MB at 2,000, and that is what the MCP hand's `canvas_look`
+    hands over when it is given no ids (`Demos/mcp.mjs:164`).
 - **Two costs.**
   - *Every lookup that walks a mark's edges becomes O(n) a mark.* The paint
     does three of them for every mark: `interpretationsOf` for the chips
@@ -194,8 +335,12 @@ checkpoint clones them every 200 events — 1.06 GB held at 2,000 marks,
     (`08-render.js:440`). That makes the paint quadratic (hotspot 6).
   - *The checkpoints.* Every 200 events a checkpoint `structuredClone`s the
     whole graph (`session.ts:676–701`), so memory held grows with the
-    cube: 24.6 MB at 500 (8.8 MB with checkpoints off), 1,058 MB at 2,000
-    (108.5 MB off), ⟨…⟩ at 5,000.
+    cube: 24.7 MB at 500 (8.8 MB with checkpoints off) and 1,058 MB at 2,000
+    (108.5 MB off). By 4,250 marks of the 5,000 board the process held
+    31 GB, and its time went mostly to young-generation collections that walk
+    the whole old generation (`ScavengerCollector::CollectGarbage` and
+    `OldGenerationMemoryChunkIterator::next` top a macOS `sample` of the
+    process).
 - **Where it hurts.** Not time: the clone is 1.9% of the 2,000 replay.
   Memory: a Chromium tab may hold 3,586 MB of JavaScript heap.
 
@@ -220,15 +365,16 @@ checkpoint clones them every 200 events — 1.06 GB held at 2,000 marks,
 - **Evidence, at 500.** A paint is 2.3–3.4 ms, and pan and drawing hold
   60 fps at zoom 1.
 - **Evidence, at 2,000.**
-  - A paint is 32–36 ms: 14× for 4× the marks.
+  - A paint is 32–36 ms: 9–16× the 500 board's for 4× the marks.
   - Panning runs at 20 fps at zoom 1 (50 ms frames) and 8.5 fps at fit-all
     (117 ms). At fit-all the frames are dominated by painting, which this
     headless build does on the CPU.
   - Each pointer move costs 39 ms, where the budget for one frame is
     16.7 ms.
-  - The pan profile at 2,000: `render` 68% of samples, of which
-    `snapCandidates` 19%, `interpretationsOf` 11%, `renderLabels` 11% and
-    the loop itself 21%; native painting 31%.
+  - The pan profile at 2,000 (`e2e/results/perf/pan-2000.cpuprofile`):
+    `render` is 68% of samples. Inside it, as shares of all samples,
+    `snapCandidates` is 19%, `interpretationsOf` 11%, `renderLabels` 11%
+    and the loop itself 21%. Native painting is another 31%.
 
 **7. Autosave rewrites the whole log into browser storage, and fails
 silently at about 1,500 marks.**
@@ -239,7 +385,7 @@ silently at about 1,500 marks.**
 - **Evidence.** Browser storage takes at most 5.00 M characters under one
   key in Chromium, found by halving. These boards' logs run 3.3 K
   characters a mark, and John's recorded strokes run 3.8–4.9 K. So a board
-  kept in browser storage stops being saved at 1,100–1,550 marks, and a
+  kept in browser storage stops being saved at 1,100–1,600 marks, and a
   reload loses what was drawn after that. The 2,000 board's 6.6 M
   characters are refused (the stringify alone is 30 ms). That is R3's
   subject; it is here because it is where size first breaks something.
@@ -267,18 +413,18 @@ the 5,000 column is the headroom to aim for.
 | Measure | 500 today | 2,000 today | **Budget, 2,000** | **Budget, 5,000** |
 |---|---|---|---|---|
 | Open: navigation → board drawn (Chromium) | 2.2 s | 100 s, and only as a folder: storage refuses it | **≤ 1.5 s** | ≤ 3 s |
-| Replay, `load` (Node, warm median) | 2.57 s | 167 s | **≤ 0.5 s** | ≤ 1.5 s |
+| Replay, `load` (Node, warm median) | 2.58 s | 167 s | **≤ 0.5 s** | ≤ 1.5 s |
 | Memory held after replay (Node) | 25 MB | 1,058 MB | **≤ 150 MB** | ≤ 400 MB, so a tab opens it |
-| One more stroke, engine: median / p95 | 15 / 25 ms | 256 / 749 ms | **≤ 4 / 16 ms** | ≤ 4 / 16 ms |
+| One more stroke, engine: median / p95 | 18 / 27 ms | 256 / 749 ms | **≤ 4 / 16 ms** | ≤ 4 / 16 ms |
 | Release → reading drawn, p95 | 148 ms | 7.65 s | **≤ 100 ms** | ≤ 100 ms |
 | A pointer move while drawing: handler, p95 | 3.7 ms | 41 ms | **≤ 4 ms** | ≤ 6 ms |
 | Pan at zoom 1: frame, p95 | 16.7 ms | 50 ms | **≤ 16.7 ms** | ≤ 16.7 ms |
 | Pan at fit-all: frame, p95 | 33 ms | 133 ms | **≤ 33 ms** | ≤ 50 ms |
-| The whole-board read on the stroke path | 146 ms | 8.07 s | **off the stroke path, or ≤ 16 ms** | same |
+| The whole-board read on the stroke path | 139 ms | 8.07 s | **off the stroke path, or ≤ 16 ms** | same |
 | A live room: main-thread work per incoming line | 2.6 s | 173 s | **≤ 16 ms, and no full replay** | ≤ 16 ms |
 | A hello in a room of six: bytes delivered | 34 MB | 163 MB | **each log once, to the newcomer (≈ 6.6 MB)** | ≈ 16 MB |
 | Autosave: main-thread work per change, and does it hold | 7 ms, holds | 30 ms, refused | **≤ 8 ms, and never refused in silence** | same |
-| A model's brief for five marks | 16 KB | ⟨…⟩ | **≤ 4 KB, whatever the board's size** | same |
+| A model's brief for five marks | 16 KB | 113 KB | **≤ 4 KB, whatever the board's size** | same |
 
 Two notes on the table:
 
@@ -295,9 +441,11 @@ Two notes on the table:
 - **The surface at 5,000 marks, beyond whether it opens.** It does not
   open, so there is no pan, draw or release to time. The engine's numbers
   at 5,000 stand for it.
-- **WebKit below 2,000 was measured, but not everything.** The DevTools
-  Protocol (CPU profiles) and `performance.memory` (heap) are Chromium's, and
-  WebKit has no long-task API. ⟨WEBKIT-SCOPE⟩
+- **WebKit's heap, profiles and long tasks.** The DevTools Protocol (CPU
+  profiles) and `performance.memory` (heap) are Chromium's, and WebKit has no
+  long-task API. WebKit ran 500 and 2,000, not 5,000, which Chromium could not
+  open. Its clock is coarsened to whole milliseconds, so its numbers under
+  10 ms are ±1 ms.
 - **A real window.** Headless Chromium paints on the CPU, so the fit-all pan
   frames here are paint-bound in a way a GPU may not be. The viewport is
   the gate's, at device scale 1; John's screen is at 2.
@@ -313,10 +461,20 @@ Two notes on the table:
   their letters sized to John's hand and their strokes to a pointer's
   density, but they are not his drawings.
 - **The shard** (`shard-3d/`) was out of scope.
-- **Repeats at 5,000.** The replay and build there ran once, with the
-  collector dominating the late strokes (see the 5,000 row). A second run
-  would have cost another hour for a number that is only ever
-  "unusable".
+- **The 5,000 board's replay, its memory held, and one more stroke on it.**
+  - *The build.* The board was drawn once, event by event (`build`, which
+    writes the very log it is given). I stopped it by hand at 4,250 marks
+    after 55 minutes. It held 31 GB, its time was going to the collector,
+    and the rest would have taken about another hour of a shared machine
+    for numbers that only say "unusable".
+  - *What stands for them.* The curve to 4,250 stands for "one more stroke".
+    The Chromium crash stands for "does it open". And the two whole-board
+    measures were taken directly on the board's own content plane,
+    gathered from the diagrams it was drawn in and checked at 500 and 2,000
+    against the replayed boards: `relate` at 1.2 s and 619 MB, and the read
+    at 106 s.
+  - *Not replayed.* The 5,000 board was never replayed with `load` in one
+    piece.
 
 ---
 
@@ -332,10 +490,14 @@ node --expose-gc metamedium-core/bench/engine.mjs board --size=2000 --repeat=2
 node --expose-gc --max-old-space-size=65536 metamedium-core/bench/engine.mjs build --size=5000 --strokes=20
 node --expose-gc metamedium-core/bench/engine.mjs room --size=2000
 node --expose-gc metamedium-core/bench/engine.mjs hello --size=2000
+node --expose-gc metamedium-core/bench/engine.mjs board --size=2000 --repeat=0 --only=replay --core=bundle
+node --expose-gc metamedium-core/bench/engine.mjs board --size=2000 --repeat=0 --only=replay --ablate=checkpoints
+node --expose-gc metamedium-core/bench/engine.mjs board --size=2000 --repeat=0 --only=brief
 node --expose-gc metamedium-core/bench/engine.mjs board --size=2000 --repeat=0 --only=read,stroke --profile=replay,read,stroke
 node metamedium-core/bench/profile.mjs metamedium-core/dist/bench/prof/replay-2000.cpuprofile
 node e2e/perf.mjs --sizes=500,2000                                                   # Chromium
-node e2e/perf.mjs --browser=webkit --sizes=500
+node e2e/perf.mjs --sizes=5000 --cap-min=25                                          # Chromium, 5,000: it crashes
+node e2e/perf.mjs --browser=webkit --sizes=500,2000
 node metamedium-core/bench/report.mjs                                                # the tables above
 ```
 

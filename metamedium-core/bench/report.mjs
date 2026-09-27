@@ -42,7 +42,13 @@ row('content plane after replay (marks, words, artifacts)', (i) => {
 row('**replay (`load`), cold**', (i) => f1(boards[i] && boards[i].replay && boards[i].replay.coldMs));
 row('replay, warm (median of n)', (i) => { const w = boards[i] && boards[i].replay && boards[i].replay.warm; return w && w.n ? `${f1(w.median)} (n ${w.n})` : '—'; });
 row('replay, committed bundle (cold · warm)', (i) => { const b = bundles[i]; if (!b) return '—'; const w = b.replay.warm; return `${f1(b.replay.coldMs)}${w && w.n ? ' · ' + f1(w.median) : ''}`; });
-row('drawn event by event (`build`)', (i) => f1(builds[i] && builds[i].totalMs));
+row('drawn event by event (`build`)', (i) => {
+  const b = builds[i];
+  if (!b) return '—';
+  if (Number.isFinite(b.totalMs)) return f1(b.totalMs);
+  const c = b.curve && b.curve[b.curve.length - 1];
+  return c ? `stopped at ${c.strokes.toLocaleString('en-GB')} marks after ${Math.round(c.elapsedS / 60)} min` : '—';
+});
 row('**memory held after replay**', (i) => { const m = (boards[i] || builds[i] || {}).memory; return m ? `${m.heldMB} MB` : '—'; });
 row('…of which checkpoints (held with them off)', (i) => { const x = ablated[i]; return x ? `${x.memory.heldMB} MB held, replay ${f1(x.replay.coldMs)}` : '—'; });
 row('edges stored in the graph', (i) => { const m = (boards[i] || builds[i] || {}).memory; return m ? m.edges.toLocaleString('en-GB') : '—'; });

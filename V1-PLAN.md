@@ -499,7 +499,23 @@ quota said. *Red first:* close the page at random points in a scripted
 session; every completed stroke is there on reopening. **R4 Performance.**
 Synthetic boards of 500, 2,000 and 5,000 marks; budgets for open, replay,
 drawing and reading as tests that record their numbers. *Trap:* relations
-over every pair are quadratic; measure before indexing. **R5 First run.** A
+over every pair are quadratic; measure before indexing.
+
+*R4a status, 27 Sep 2026: measured on `w2-shard`, nothing changed* —
+`c456ac1`…`06b3ea8` and the commit carrying this line; `PERF.md` has every
+number with its command, the hotspots ranked with file:line, and budgets for
+R4b. 500 marks is fit for daily use once open (opening freezes the tab for 2.2
+s). 2,000 is not: Chromium opens it in 100 s, every stroke's release freezes
+the page for 7.6 s, each line in a live room is a full replay, and browser
+storage refuses its log. 5,000 does not open: the Chromium tab crashes 13
+minutes in, and Node had drawn only 4,250 of its marks after 55 minutes,
+holding 31 GB. To blame: every stroke re-relates the whole board once a
+definition exists (60% of the 2,000 replay); the surface re-reads every mark's
+role after every stroke (O(n·R)); and relations with no distance limit, 88% of
+them `same-size`, are stored on every mark and cloned into every checkpoint
+(90% of the 1.06 GB held at 2,000).
+
+**R5 First run.** A
 starter board from the packs; help as a one-page guide; a shortcut sheet;
 examples. **R6 Pencil and WebKit.** Pen, touch and palm; hover from a
 pencil; a WebKit scenario of the canvas's core records in the gate and in CI.
