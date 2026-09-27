@@ -167,7 +167,46 @@ export type {
   StepCheckStatus,
 } from './maths/sheet';
 export { sheetLines } from './maths/gather';
-export type { GatheredLine } from './maths/gather';
+export type { GatheredLine, SheetLinesOptions } from './maths/gather';
+// Dimensions (M3a): a number beside a mark offered as one of its measures —
+// ranked by its distance to a side's middle relative to the side's length and
+// by its alignment, with the reason and the runner-up; a number inside a
+// closed mark is a piece label; a square in a corner declares it right; an
+// underline belongs to its number; each drawing gets a unit and a scale, and
+// says how consistently its labels agree with the ink. `sheetLines` leaves
+// the numbers on marks out of the page.
+export {
+  dimensionsOf,
+  figureOfMark,
+  polygonFigure,
+  readNumber,
+  numbersOf,
+  attachNumber,
+  attachedNumberIds,
+  insideFigure,
+  inkMeasure,
+  describeDimensions,
+  TO_SCALE_WITHIN,
+} from './maths/dimension';
+export type {
+  Figure,
+  FigureKind,
+  FigureSide,
+  FigurePart,
+  MeasureName,
+  NumberReading,
+  BoardNumber,
+  Attachment,
+  AttachmentCandidate,
+  AttachmentKind,
+  FigureLabel,
+  RightAngleMark,
+  Underline,
+  Drawing,
+  DrawingScale,
+  DimensionOptions,
+  BoardDimensions,
+} from './maths/dimension';
 
 // Magnets — the places a mark offers attachment, derived from its clean form.
 export { magnetSites, nearestMagnet, magnetsNear, magnetRadius, describeMagnet, MAGNET_SCREEN_PX, MAGNET_SIZE_FRACTION } from './session/magnets';

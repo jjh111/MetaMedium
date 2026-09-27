@@ -16,7 +16,7 @@ import { describe, it, expect } from 'vitest';
 import type { Bounds, Point } from '../types';
 import { createSession } from '../session/session';
 import type { Session } from '../session/session';
-import { triangleStroke, rectStroke, circleStroke, lineStroke } from '../test/strokes';
+import { triangleStroke, rectStroke, circleStroke, lineStroke, arcStroke } from '../test/strokes';
 import { dimensionsOf, figureOfMark, polygonFigure, readNumber, attachedNumberIds } from './dimension';
 import type { BoardDimensions, Figure } from './dimension';
 import { sheetLines } from './gather';
@@ -228,14 +228,11 @@ describe('dimensionsOf — where a number stands', () => {
 
   it('an arc’s chord', () => {
     const s = createSession();
-    // The top of a circle of radius 100 about (1400, 400): a chord of 188 and a rise of 66.
-    const pts: Point[] = [];
-    for (let i = 0; i <= 60; i++) {
-      const a = Math.PI + 0.35 + ((Math.PI - 0.7) * i) / 60;
-      pts.push({ x: 1400 + 100 * Math.cos(a), y: 400 + 100 * Math.sin(a) });
-    }
-    const arc = s.addStroke(pts, 1000);
-    const n = text(s, '18.8', box(1400, 392, 50, 30), 20000);
+    // Three quarters of a circle of radius 80 about (1400, 400), from east round to north — the
+    // arc the shape rung reads as one (a shallow arc reads as a line). Its chord runs north-east
+    // of the centre, 113 long; the number stands just beyond the chord's middle, away from the bulge.
+    const arc = s.addStroke(arcStroke(1400, 400, 80), 1000);
+    const n = text(s, '11.3', box(1458, 342, 50, 30), 20000);
     const d = dimensionsOf(s.getState());
     expect(d.figures.find((f) => f.id === arc)!.kind).toBe('arc');
     expect(attachmentOf(d, n)).toMatchObject({ as: 'dimension', figure: arc, key: 'chord' });
