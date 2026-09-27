@@ -94,6 +94,9 @@ window.__setup = function(){
     const sys=body.messages.find(m=>m.role==='system').content;
     const usr=body.messages.find(m=>m.role==='user').content;
     window.__calls.push({system:sys.slice(0,60), user:usr});
+    // A model that is still thinking when the hand acts again (e2e 40): the
+    // call is recorded when it is made, and answered only after the delay.
+    if (window.__stubDelayMs) await new Promise((r) => setTimeout(r, window.__stubDelayMs));
     const reply = (o) => new Response(JSON.stringify({choices:[{message:{content:JSON.stringify(o)}}]}),
       {status:200, headers:{'content-type':'application/json'}});
 
@@ -1914,6 +1917,183 @@ window.__scenario = async function(){
       !!kite39 && kite39.text === 'kite' && kite39.colour === mm.handColour('fern') && kite39.who === 'fern' && kite39.colour !== colour39(box39),
       { kite: kite39, hue: mm.handColour('fern') });
     mm.setThemeMode(theme39);
+    mm.session.load([]); mm.setView(1, 0, 0);
+  }
+
+  // ---- 40. One Enter, one act: a brief sent twice on one loop (V1-PLAN L2d; week 1's U5) ----
+  // Two Enters on one loop blessed two artifacts and asked every model twice —
+  // two builds in flight for one drawing, the later refused as superseded
+  // when it landed, minutes after the hand had stopped watching. Disabling the
+  // input covers the key, not the act: the reading's `run` is a closure over
+  // the summon, and a pill, a touch or a second key still holds it after the
+  // first act has consumed the summon. So the second is refused at the door
+  // and says so. The stub is DELAYED, so the model is still thinking when the
+  // second Enter lands, 80 ms after the first.
+  {
+    mm.session.load([]); mm.setView(1, 0, 0);
+    // A fresh board drops the stub's `join`; it joins again, as a remembered model does at boot.
+    mm.agents.length = 0; mm.agents.push(MM.createAgentParticipant(mm.session, Object.assign({}, MM.PRESETS.ollama, { model: 'e2e-stub', vision: true }), Date.now()));
+    const working40 = () => (typeof mm.working === 'function' ? mm.working() : []);
+    const statusNow = () => document.getElementById('status').textContent;
+    t.stroke(t.rect(200, 180, 260, 150));
+    t.stroke(t.rect(520, 180, 260, 150));
+    t.stroke(t.rect(200, 380, 580, 120));
+    t.stroke(t.circle(490, 330, 430));
+    t.takeLoop(490, 330, 430);
+    await wait(60);
+    const before40 = mm.session.getState().artifacts.length;
+    const calls40 = window.__calls.length;
+    window.__stubDelayMs = 700;
+    // The reading Enter would run, held — exactly what a pill's closure holds.
+    const r40 = mm.readField('a pricing page');
+    const ran40 = !!(r40 && r40.run && r40.kind === 'brief');
+    let status40 = '', keys40 = [];
+    if (ran40) {
+      r40.run();
+      await wait(80);
+      r40.run();
+      // The refusal is said the moment the second act is refused: the status
+      // line is the LIVE line, read here and not after the model has answered.
+      status40 = statusNow();
+      keys40 = working40().filter((k) => /^(build|program):/.test(k));
+    }
+    const s40 = mm.session.getState();
+    const art40 = s40.artifacts[s40.artifacts.length - 1];
+    step('40. two Enters within 200 ms on one loop bless exactly one artifact and start one build, while the model is still thinking',
+      ran40 && s40.artifacts.length === before40 + 1 && keys40.length === 1 && keys40[0].endsWith(':' + art40) && window.__calls.length - calls40 === 1,
+      { kind: r40 && r40.kind, artifacts: s40.artifacts.length, was: before40, building: keys40, calls: window.__calls.length - calls40 });
+    step('40a. the second is refused at the door, and the status says it is already under way — not that the group could not be held',
+      /already under way/.test(status40) && !/could not hold/.test(status40), { status: status40 });
+    await wait(900);
+    step('40b. and when the model answers, it was asked once: one call, one artifact',
+      window.__calls.length - calls40 === 1 && mm.session.getState().artifacts.length === before40 + 1,
+      { calls: window.__calls.length - calls40, systems: window.__calls.slice(calls40).map((c) => c.system) });
+    // The REVISION is where it really bit: no bless to fail at, so a second
+    // run dismissed again and asked every model again — two revisions in
+    // flight for one artifact, the later refused as superseded when it landed.
+    const vers40 = () => { const n = mm.session.getState().nodes.get(art40); return n ? n.reps.filter((r) => r.modality === 'code').length : 0; };
+    if (art40 && mm.session.getState().live.includes(art40)) {
+      const codeBefore = vers40();
+      const ab = MM.boundsOf(mm.session.getState().nodes.get(art40));
+      const cx = (ab.minX + ab.maxX) / 2, cy = (ab.minY + ab.maxY) / 2;
+      t.stroke(t.circle(cx, cy, 60));
+      t.takeLoop(cx, cy, 60);
+      await wait(60);
+      const calls40c = window.__calls.length;
+      const r40c = mm.readField('make it blue');
+      let status40c = '';
+      if (r40c && r40c.run) { r40c.run(); await wait(80); r40c.run(); status40c = statusNow(); }
+      await wait(900);
+      step('40c. a revision sent twice within 200 ms asks once and leaves one new version, not two, and says the second was already under way',
+        !!(r40c && r40c.run) && window.__calls.length - calls40c === 1 && vers40() === codeBefore + 1 && /already under way/.test(status40c),
+        { kind: r40c && r40c.kind, calls: window.__calls.length - calls40c, versions: vers40(), was: codeBefore, status: status40c });
+      // A later act on a NEW summon is not refused: the door holds one key.
+      t.stroke(t.circle(cx, cy, 60));
+      t.takeLoop(cx, cy, 60);
+      await wait(60);
+      const calls40d = window.__calls.length;
+      const r40d = mm.readField('make it green');
+      if (r40d && r40d.run) r40d.run();
+      await wait(900);
+      step('40d. a new loop on the same page is a new act: it is asked, not refused',
+        !!(r40d && r40d.run) && window.__calls.length - calls40d === 1 && vers40() === codeBefore + 2,
+        { calls: window.__calls.length - calls40d, versions: vers40(), was: codeBefore });
+    } else {
+      step('40c. a revision sent twice asks once — skipped: no live artifact to revise', true, {});
+    }
+    window.__stubDelayMs = 0;
+    mm.session.load([]); mm.setView(1, 0, 0);
+  }
+
+  // ---- 41. fitAll fits the CONTENT, and the cards place themselves in it (V1-PLAN L2d; notes §E) ----
+  // `fitAll` unioned the content with the explanation nodes' LOGGED bounds.
+  // Placing became runtime, so a card is not drawn where it is logged: one of
+  // the two numbers was fiction. The fit is the content's now, and the cards
+  // are placed inside the result — checked against where they were DRAWN.
+  {
+    mm.session.load([]); mm.setView(1, 0, 0);
+    const boxes41 = [];
+    for (let i = 0; i < 6; i++) { t.stroke(t.rect(520, 120 + i * 96, 150, 62)); boxes41.push(mm.session.getState().contentIds[i]); }
+    // The fit of the CONTENT alone — the number the fix says is the whole of it.
+    mm.fitAll();
+    await wait(30);
+    const bare41 = { zoom: mm.view.zoom, panX: mm.view.panX, panY: mm.view.panY };
+    mm.setView(1, 0, 0);
+    boxes41.forEach((id, i) => mm.session.answer({ participantId: MM.LOCAL_PARTICIPANT, question: 'why',
+      text: 'box ' + (i + 1) + ' is a container; the marks inside it sit in a row, roughly lined up, and the one below points back at it — so the whole reads as a frame holding a flow',
+      aboutIds: [id], at: Date.now() + i }));
+    await wait(60);
+    mm.fitAll();
+    await wait(60);
+    const free41 = mm.usableViewport();
+    const onScreen = (r) => {
+      const a = mm.worldToScreen(r.x, r.y), b = mm.worldToScreen(r.x + r.w, r.y + r.h);
+      return a.x >= free41.left - 1 && a.y >= free41.top - 1 && b.x <= free41.right + 1 && b.y <= free41.bottom + 1;
+    };
+    const markIn = (id) => {
+      const b = MM.boundsOf(mm.session.getState().nodes.get(id));
+      return !!b && onScreen({ x: b.minX, y: b.minY, w: b.maxX - b.minX, h: b.maxY - b.minY });
+    };
+    const cards41 = mm.answerCards();
+    const off41 = cards41.filter((c) => !onScreen(c)).map((c) => c.id);
+    step('41. fitAll lands every content mark in the free ground',
+      boxes41.every(markIn) && mm.view.zoom > 0.08,
+      { zoom: +mm.view.zoom.toFixed(3), min: 0.08, free: [free41.left, free41.top, free41.right, free41.bottom].map(Math.round) });
+    step('41a. six cards, none off screen — the fit read where they were DRAWN, not where they are logged',
+      cards41.length === 6 && off41.length === 0,
+      { cards: cards41.length, off: off41, rects: cards41.map((c) => [c.x, c.y, c.w, c.h].map(Math.round)) });
+    // The fit is the CONTENT'S. Six answers whose cards all land inside it do
+    // not move it at all — the logged bounds of an explanation node are not an
+    // input any more, which is exactly what made the old fit fiction.
+    step('41b. six answers that fit do not move the fit: the explanation nodes\' logged bounds are not an input',
+      Math.abs(mm.view.zoom - bare41.zoom) < 1e-6 && Math.abs(mm.view.panX - bare41.panX) < 0.5 && Math.abs(mm.view.panY - bare41.panY) < 0.5,
+      { content: { zoom: +bare41.zoom.toFixed(4), panX: Math.round(bare41.panX), panY: Math.round(bare41.panY) },
+        withCards: { zoom: +mm.view.zoom.toFixed(4), panX: Math.round(mm.view.panX), panY: Math.round(mm.view.panY) } });
+    // The correction pass is one pass, not a loop: a second fit on the same
+    // board must not walk the view further out every time it is asked.
+    const view41 = { zoom: mm.view.zoom, panX: mm.view.panX, panY: mm.view.panY };
+    mm.fitAll();
+    await wait(60);
+    step('41c. fitting again settles: one correction pass, never a chase',
+      Math.abs(mm.view.zoom - view41.zoom) < 1e-6 && Math.abs(mm.view.panX - view41.panX) < 0.5 && Math.abs(mm.view.panY - view41.panY) < 0.5,
+      { was: { zoom: +view41.zoom.toFixed(4), panX: Math.round(view41.panX), panY: Math.round(view41.panY) },
+        now: { zoom: +mm.view.zoom.toFixed(4), panX: Math.round(mm.view.panX), panY: Math.round(mm.view.panY) } });
+    // A board of a few dozen marks, answers about some of them — and one
+    // answer whose LOGGED place is far from anything: it was said about a
+    // mark while that mark stood twenty thousand units away, and the mark was
+    // moved home after. The card is drawn beside the mark where it is; the
+    // logged bounds stay where the mark was. The old union read that fiction
+    // and fitted a board twenty thousand units wide — the slam to MIN_ZOOM
+    // seen once on a busy live board is one way there.
+    mm.session.load([]); mm.setView(1, 0, 0);
+    const marks41 = [];
+    for (let r = 0; r < 6; r++) for (let c = 0; c < 6; c++) {
+      const pts = (r + c) % 3 === 0 ? t.circle(160 + c * 150, 130 + r * 110, 32) : t.rect(120 + c * 150, 100 + r * 110, 90, 60);
+      marks41.push(mm.session.addStroke(pts.map((p) => ({ x: p.x, y: p.y })), Date.now() + marks41.length, undefined, 1, { content: true }));
+    }
+    for (let i = 0; i < 7; i++) mm.session.answer({ participantId: MM.LOCAL_PARTICIPANT, question: 'why', text: 'mark ' + (i + 1) + ' sits in the grid with its neighbours', aboutIds: [marks41[i * 5 + 1]], at: Date.now() + 100 + i });
+    const moved41 = marks41[35];
+    mm.session.move({ ids: [moved41], dx: 20000, dy: 20000, at: Date.now() + 200 });
+    const stale41 = mm.session.answer({ participantId: MM.LOCAL_PARTICIPANT, question: 'why', text: 'said while this mark stood far away', aboutIds: [moved41], at: Date.now() + 201 });
+    mm.session.move({ ids: [moved41], dx: -20000, dy: -20000, at: Date.now() + 202 });
+    await wait(60);
+    mm.fitAll();
+    await wait(60);
+    const free41d = mm.usableViewport();
+    const inFree = (b) => {
+      const a = mm.worldToScreen(b.minX, b.minY), z = mm.worldToScreen(b.maxX, b.maxY);
+      return a.x >= free41d.left - 1 && a.y >= free41d.top - 1 && z.x <= free41d.right + 1 && z.y <= free41d.bottom + 1;
+    };
+    const content41 = mm.session.getState().contentIds;
+    const outside41 = content41.filter((id) => { const b = MM.boundsOf(mm.session.getState().nodes.get(id)); return !b || !inFree(b); });
+    const cards41d = mm.answerCards();
+    const offCards41 = cards41d.filter((c) => !inFree({ minX: c.x, minY: c.y, maxX: c.x + c.w, maxY: c.y + c.h })).map((c) => c.id);
+    const logged41 = stale41 && MM.boundsOf(mm.session.getState().nodes.get(stale41));
+    step('41d. on a board of ' + content41.length + ' marks and 8 answers — one logged twenty thousand units from its card — every mark lands in the free ground and the zoom stays far above its minimum (the old union slammed it to MIN_ZOOM here)',
+      content41.length === 36 && outside41.length === 0 && mm.view.zoom > 0.5 && cards41d.length === 8 && !!logged41 && logged41.minX > 10000,
+      { marks: content41.length, outside: outside41, zoom: +mm.view.zoom.toFixed(3), min: 0.08, cards: cards41d.length, offCards: offCards41, logged: logged41 && [Math.round(logged41.minX), Math.round(logged41.minY)] });
+    step('41e. and every card is drawn inside the free ground with the marks — placed in the fit, not fitted around',
+      offCards41.length === 0, { off: offCards41, cards: cards41d.map((c) => [c.x, c.y, c.w, c.h].map(Math.round)) });
     mm.session.load([]); mm.setView(1, 0, 0);
   }
 
