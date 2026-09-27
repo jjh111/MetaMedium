@@ -256,7 +256,7 @@ function countCorners(points, optionsOrThreshold = {}, closed) {
   const arm = Math.max(2, Math.round(windowFrac * path.length));
   const sep = Math.max(2, Math.round(sepFrac * path.length));
   const at = (i) => path[(i % path.length + path.length) % path.length];
-  const turn = new Array(path.length).fill(0);
+  const turn2 = new Array(path.length).fill(0);
   for (let i = 0; i < path.length; i++) {
     if (!isClosed2 && (i < arm || i >= path.length - arm)) continue;
     const a = at(i - arm), b = at(i), c = at(i + arm);
@@ -265,20 +265,20 @@ function countCorners(points, optionsOrThreshold = {}, closed) {
     const magB = Math.hypot(bx, by), magC = Math.hypot(cx2, cy2);
     if (magB === 0 || magC === 0) continue;
     const cos = (bx * cx2 + by * cy2) / (magB * magC);
-    turn[i] = Math.acos(Math.max(-1, Math.min(1, cos)));
+    turn2[i] = Math.acos(Math.max(-1, Math.min(1, cos)));
   }
   const taken = [];
   const used = new Array(path.length).fill(false);
   for (; ; ) {
     let best = -1, bestAngle = opts.threshold;
     for (let i = 0; i < path.length; i++) {
-      if (!used[i] && turn[i] > bestAngle) {
-        bestAngle = turn[i];
+      if (!used[i] && turn2[i] > bestAngle) {
+        bestAngle = turn2[i];
         best = i;
       }
     }
     if (best < 0) break;
-    taken.push({ index: best, angle: turn[best] });
+    taken.push({ index: best, angle: turn2[best] });
     for (let d = -sep; d <= sep; d++) {
       const k = ((best + d) % path.length + path.length) % path.length;
       if (!isClosed2 && (best + d < 0 || best + d >= path.length)) continue;
@@ -573,8 +573,8 @@ function detectTriangle(fp) {
   if (fp.aspectRatio < 0.14 || fp.aspectRatio > 7) return null;
   const area2 = fit(fp.extent, 0.5, 0.3);
   const corners = fit(fp.corners, 3, 2);
-  const turn = fp.cornerAngles?.length ? fit(meanTurn(fp), 120 * DEG, 70 * DEG) : 0.5;
-  const confidence = area2 * 0.5 + corners * 0.35 + turn * 0.15;
+  const turn2 = fp.cornerAngles?.length ? fit(meanTurn(fp), 120 * DEG, 70 * DEG) : 0.5;
+  const confidence = area2 * 0.5 + corners * 0.35 + turn2 * 0.15;
   return result(
     "triangle",
     "Triangle",
@@ -587,8 +587,8 @@ function detectRectangle(fp) {
   if (fp.aspectRatio < 0.05 || fp.aspectRatio > 20) return null;
   const area2 = fit(fp.extent, 1, 0.45);
   const corners = fit(fp.corners, 4, 2.5);
-  const turn = fp.cornerAngles?.length ? fit(meanTurn(fp), 90 * DEG, 55 * DEG) : 0.5;
-  const confidence = area2 * 0.45 + corners * 0.35 + turn * 0.2;
+  const turn2 = fp.cornerAngles?.length ? fit(meanTurn(fp), 90 * DEG, 55 * DEG) : 0.5;
+  const confidence = area2 * 0.45 + corners * 0.35 + turn2 * 0.2;
   return result(
     "rectangle",
     "Rectangle",
@@ -881,8 +881,8 @@ function topInterpretation(node) {
 }
 function boundsOf(node) {
   if (getRep(node, "rotation") && getRep(node, "stroke")) return getBounds(strokePointsOf(node));
-  const moved = getRep(node, "transform")?.data;
-  if (moved) return moved;
+  const moved2 = getRep(node, "transform")?.data;
+  if (moved2) return moved2;
   const fp = fingerprintOf(node);
   if (fp) return fp.bounds;
   return getRep(node, "bounds")?.data;
@@ -1144,23 +1144,23 @@ function idealize(node, shape) {
     }
     case "arc": {
       const a = fp.start, c = fp.end;
-      let mid3 = raw[Math.floor(raw.length / 2)], best = -1;
+      let mid4 = raw[Math.floor(raw.length / 2)], best = -1;
       for (const p of raw) {
         const d = Math.abs(sideOf(a, c, p));
         if (d > best) {
           best = d;
-          mid3 = p;
+          mid4 = p;
         }
       }
-      const cc = circumcircle(a, mid3, c);
+      const cc = circumcircle(a, mid4, c);
       if (!cc) return { shape: "line", closed: false, points: [a, c], reasoning: "too flat to bow; drawn straight" };
       const a0 = Math.atan2(a.y - cc.cy, a.x - cc.cx);
       const a1 = Math.atan2(c.y - cc.cy, c.x - cc.cx);
-      const am = Math.atan2(mid3.y - cc.cy, mid3.x - cc.cx);
+      const am = Math.atan2(mid4.y - cc.cy, mid4.x - cc.cx);
       let sweep = a1 - a0;
-      const norm = (x) => (x % TAU + TAU) % TAU;
-      const viaCcw = norm(am - a0) < norm(a1 - a0);
-      sweep = viaCcw ? norm(a1 - a0) : -norm(a0 - a1);
+      const norm2 = (x) => (x % TAU + TAU) % TAU;
+      const viaCcw = norm2(am - a0) < norm2(a1 - a0);
+      sweep = viaCcw ? norm2(a1 - a0) : -norm2(a0 - a1);
       const n2 = 40;
       const points = [];
       for (let i = 0; i <= n2; i++) {
@@ -1444,13 +1444,13 @@ var UNIT_WORD = {
   mm: ["millimetre", "millimetres"],
   m: ["metre", "metres"]
 };
-function quantity(value, unit = null, opts = {}) {
-  const q = { lo: value, hi: value, unit, dim: opts.dim ?? (unit ? 1 : 0), approx: !!opts.approx };
+function quantity(value, unit2 = null, opts = {}) {
+  const q = { lo: value, hi: value, unit: unit2, dim: opts.dim ?? (unit2 ? 1 : 0), approx: !!opts.approx };
   if (opts.precision !== void 0) q.precision = opts.precision;
   return q;
 }
-function rangeOf(lo, hi, unit = null, opts = {}) {
-  const q = quantity(Math.min(lo, hi), unit, opts);
+function rangeOf(lo, hi, unit2 = null, opts = {}) {
+  const q = quantity(Math.min(lo, hi), unit2, opts);
   q.hi = Math.max(lo, hi);
   return q;
 }
@@ -1475,16 +1475,16 @@ function formatNumber(v, digits = 2) {
   const s = digits > 0 ? r.toFixed(digits).replace(/\.?0+$/, "") : r.toFixed(0);
   return s.startsWith("-") ? "\u2212" + s.slice(1) : s;
 }
-function unitSuffix(unit, dim, words = false) {
-  if (!unit || dim === 0) return "";
+function unitSuffix(unit2, dim, words = false) {
+  if (!unit2 || dim === 0) return "";
   if (dim === 1) {
-    if (!words && unit === "in") return "\u2033";
-    if (!words && unit === "ft") return "\u2032";
-    return " " + unit;
+    if (!words && unit2 === "in") return "\u2033";
+    if (!words && unit2 === "ft") return "\u2032";
+    return " " + unit2;
   }
   const sup = { 2: "\xB2", 3: "\xB3" };
-  if (dim > 0) return " " + unit + (sup[dim] ?? `^${dim}`);
-  return " per " + unit + (dim < -1 ? sup[-dim] ?? `^${-dim}` : "");
+  if (dim > 0) return " " + unit2 + (sup[dim] ?? `^${dim}`);
+  return " per " + unit2 + (dim < -1 ? sup[-dim] ?? `^${-dim}` : "");
 }
 var FRACTION_GLYPH = {
   "1/2": "\xBD",
@@ -1527,8 +1527,8 @@ function formatQuantity(q, opts = {}) {
   else body = `${n2(q.lo)}\u2013${n2(q.hi)}`;
   return (q.approx ? "~" : "") + body + unitSuffix(q.unit, q.dim, opts.words);
 }
-function unitName(unit, plural) {
-  return UNIT_WORD[unit][plural ? 1 : 0];
+function unitName(unit2, plural) {
+  return UNIT_WORD[unit2][plural ? 1 : 0];
 }
 var VULGAR = {
   "\xBD": [1, 2],
@@ -1630,13 +1630,13 @@ function scanUnit(s, i) {
   const m = /^[A-Za-z]+\.?/.exec(s.slice(k));
   if (!m) return null;
   let word = m[0];
-  let unit = UNIT_WORDS[word.toLowerCase()];
-  if (!unit && word.endsWith(".")) {
+  let unit2 = UNIT_WORDS[word.toLowerCase()];
+  if (!unit2 && word.endsWith(".")) {
     word = word.slice(0, -1);
-    unit = UNIT_WORDS[word.toLowerCase()];
+    unit2 = UNIT_WORDS[word.toLowerCase()];
   }
-  if (!unit) return null;
-  return { unit, text: s.slice(i, k + word.length), end: k + word.length };
+  if (!unit2) return null;
+  return { unit: unit2, text: s.slice(i, k + word.length), end: k + word.length };
 }
 function scanMeasure(s, i) {
   const n2 = scanNumber(s, i);
@@ -1673,7 +1673,7 @@ function parseQuantity(text) {
   i = a.end;
   let lo = sign * a.value;
   let hi = lo;
-  let unit = a.unit;
+  let unit2 = a.unit;
   let precision = a.precision;
   let isRangeWritten = false;
   const note = [];
@@ -1683,39 +1683,39 @@ function parseQuantity(text) {
     if (!b) return null;
     if (b.value <= lo) return null;
     const bv = b.value;
-    if (unit && b.unit && unit !== b.unit) {
-      const c = convertQuantity(quantity(lo, unit), b.unit);
+    if (unit2 && b.unit && unit2 !== b.unit) {
+      const c = convertQuantity(quantity(lo, unit2), b.unit);
       note.push(c.note ?? "");
       lo = c.quantity.lo;
       if (bv <= lo) return null;
     }
-    unit = b.unit ?? unit;
+    unit2 = b.unit ?? unit2;
     hi = bv;
     precision = Math.min(precision, b.precision);
     isRangeWritten = true;
     i = b.end;
   }
   if (s.slice(i).trim().length > 0) return null;
-  const q = rangeOf(lo, hi, unit, { approx, precision });
-  const unitWords = unit ? ` ${unitName(unit, true)}` : "";
+  const q = rangeOf(lo, hi, unit2, { approx, precision });
+  const unitWords = unit2 ? ` ${unitName(unit2, true)}` : "";
   let reason;
   if (isRangeWritten) reason = `a range, from ${formatNumber(lo)} to ${formatNumber(hi)}${unitWords}`;
-  else reason = unit ? `${formatNumber(lo)} ${unitName(unit, lo !== 1)}` : `the number ${formatNumber(lo)}, no unit written`;
+  else reason = unit2 ? `${formatNumber(lo)} ${unitName(unit2, lo !== 1)}` : `the number ${formatNumber(lo)}, no unit written`;
   if (approx) reason = `approximate: ${reason}`;
   if (a.text.includes("/") || a.text.includes("\u2044") || Object.keys(VULGAR).some((v) => a.text.includes(v))) reason += `, written as a fraction`;
   if (note.length) reason += ` (${note.filter(Boolean).join("; ")})`;
   return { quantity: q, text: s, reason };
 }
-function convertQuantity(q, unit) {
-  if (!q.unit || q.dim === 0 || q.unit === unit) return { quantity: q };
-  const f = (MM_PER[q.unit] / MM_PER[unit]) ** q.dim;
-  const out = { ...q, lo: q.lo * f, hi: q.hi * f, unit };
+function convertQuantity(q, unit2) {
+  if (!q.unit || q.dim === 0 || q.unit === unit2) return { quantity: q };
+  const f = (MM_PER[q.unit] / MM_PER[unit2]) ** q.dim;
+  const out = { ...q, lo: q.lo * f, hi: q.hi * f, unit: unit2 };
   delete out.precision;
   return { quantity: out, note: `${formatQuantity(q)} is ${formatQuantity(out)}` };
 }
 var dimName = (q) => q.dim === 0 ? "a number" : q.dim === 1 ? "a length" : q.dim === 2 ? "an area" : `a quantity of dimension ${q.dim}`;
-function computed(lo, hi, unit, dim, approx) {
-  return { lo: Math.min(lo, hi), hi: Math.max(lo, hi), unit: dim === 0 ? null : unit, dim, approx };
+function computed(lo, hi, unit2, dim, approx) {
+  return { lo: Math.min(lo, hi), hi: Math.max(lo, hi), unit: dim === 0 ? null : unit2, dim, approx };
 }
 function negateQuantity(q) {
   const out = { ...q, lo: -q.hi, hi: -q.lo };
@@ -1735,9 +1735,9 @@ function arithmetic(op, a, b) {
       if (c.note) notes.push(c.note);
       y2 = c.quantity;
     }
-    const unit2 = x.unit ?? y2.unit;
-    if (op === "+") return { quantity: computed(x.lo + y2.lo, x.hi + y2.hi, unit2, x.dim, approx), notes };
-    return { quantity: computed(x.lo - y2.hi, x.hi - y2.lo, unit2, x.dim, approx), notes };
+    const unit3 = x.unit ?? y2.unit;
+    if (op === "+") return { quantity: computed(x.lo + y2.lo, x.hi + y2.hi, unit3, x.dim, approx), notes };
+    return { quantity: computed(x.lo - y2.hi, x.hi - y2.lo, unit3, x.dim, approx), notes };
   }
   let y = b;
   if (a.unit && y.unit && a.unit !== y.unit && y.dim !== 0) {
@@ -1745,17 +1745,17 @@ function arithmetic(op, a, b) {
     if (c.note) notes.push(c.note);
     y = c.quantity;
   }
-  const unit = a.unit ?? y.unit;
+  const unit2 = a.unit ?? y.unit;
   if (op === "*") {
     const p3 = [a.lo * y.lo, a.lo * y.hi, a.hi * y.lo, a.hi * y.hi];
-    return { quantity: computed(Math.min(...p3), Math.max(...p3), unit, a.dim + y.dim, approx), notes };
+    return { quantity: computed(Math.min(...p3), Math.max(...p3), unit2, a.dim + y.dim, approx), notes };
   }
   if (y.lo <= 0 && y.hi >= 0) {
     const error = isRange(y) ? `cannot divide by ${formatQuantity(y)}: it holds zero` : "cannot divide by zero";
     return { quantity: null, notes, error };
   }
   const p = [a.lo / y.lo, a.lo / y.hi, a.hi / y.lo, a.hi / y.hi];
-  return { quantity: computed(Math.min(...p), Math.max(...p), unit, a.dim - y.dim, approx), notes };
+  return { quantity: computed(Math.min(...p), Math.max(...p), unit2, a.dim - y.dim, approx), notes };
 }
 function compareQuantities(computedQ, written) {
   const w2 = formatQuantity(written);
@@ -2073,8 +2073,8 @@ function opOf(e) {
   return null;
 }
 var leafText = (e) => e.k === "num" ? formatQuantity(e.q) : e.k === "name" ? e.name : e.k === "ref" ? e.text : "";
-function fmtExpr(e, sub) {
-  const own = sub?.(e);
+function fmtExpr(e, sub2) {
+  const own = sub2?.(e);
   if (own !== void 0) return own;
   switch (e.k) {
     case "num":
@@ -2082,13 +2082,13 @@ function fmtExpr(e, sub) {
     case "ref":
       return leafText(e);
     case "carry":
-      return fmtExpr(e.a, sub);
+      return fmtExpr(e.a, sub2);
     case "neg": {
-      const inner = fmtExpr(e.a, sub);
+      const inner = fmtExpr(e.a, sub2);
       return "\u2212" + (opOf(e.a) ? `(${inner})` : inner);
     }
     case "op": {
-      const la = fmtExpr(e.a, sub), lb = fmtExpr(e.b, sub);
+      const la = fmtExpr(e.a, sub2), lb = fmtExpr(e.b, sub2);
       const oa = opOf(e.a), ob = opOf(e.b);
       return `${oa && oa !== e.op ? `(${la})` : la} ${GLYPH[e.op]} ${ob ? `(${lb})` : lb}`;
     }
@@ -2394,14 +2394,14 @@ function parseLine(text) {
   }
   return { ...base, shape: "formula" };
 }
-function scopeOf(names = {}, steps = {}, unit = null) {
+function scopeOf(names = {}, steps = {}, unit2 = null) {
   const toQ2 = (v) => typeof v === "string" ? parseQuantity(v)?.quantity ?? null : v;
   const table = /* @__PURE__ */ new Map();
   for (const [k, v] of Object.entries(names)) {
     table.set(normName(k), Array.isArray(v) ? v : [{ value: toQ2(v), key: k }]);
   }
   return {
-    unit,
+    unit: unit2,
     name: (n2) => table.get(normName(n2)),
     step: (n2) => steps[n2] !== void 0 ? { value: toQ2(steps[n2]), key: String(n2) } : void 0
   };
@@ -2855,8 +2855,8 @@ function classify(src, line) {
     if (parse.shape === "formula" || parse.shape === "definition" || parse.shape === "heading") return { ...d, kind: "step", key: String(L.n), n: L.n, chain: parse.chain };
     return { ...d, note: unreadable() };
   }
-  const amount = headingAmount(parse);
-  if (amount) return { ...d, kind: "heading", title: parse.body, amount };
+  const amount2 = headingAmount(parse);
+  if (amount2) return { ...d, kind: "heading", title: parse.body, amount: amount2 };
   if (parse.shape === "heading") return { ...d, kind: "heading", title: parse.body };
   if (parse.shape === "definition") return { ...d, kind: "definition", key: parse.name, name: parse.name, value: parse.value };
   if (parse.shape === "value") return { ...d, kind: "value", written: parse.value };
@@ -2881,13 +2881,13 @@ function mentions(chain) {
   for (const g of chain.segments) for (const r of g.readings) walk(r.expr);
   return { names, steps };
 }
-function addsAmount(e, amount) {
+function addsAmount(e, amount2) {
   if (!e) return false;
   if (e.k === "op") {
-    if (e.op === "+" && e.b.k === "num" && !isRange(e.b.q) && compareQuantities(amount, e.b.q).status === "ok") return true;
-    return addsAmount(e.a, amount) || addsAmount(e.b, amount);
+    if (e.op === "+" && e.b.k === "num" && !isRange(e.b.q) && compareQuantities(amount2, e.b.q).status === "ok") return true;
+    return addsAmount(e.a, amount2) || addsAmount(e.b, amount2);
   }
-  if (e.k === "neg" || e.k === "carry") return addsAmount(e.a, amount);
+  if (e.k === "neg" || e.k === "carry") return addsAmount(e.a, amount2);
   return false;
 }
 var stepsPhrase = (keys) => keys.length === 1 ? `step ${keys[0]}` : `steps ${keys.slice(0, -1).join(", ")} and ${keys[keys.length - 1]}`;
@@ -2932,8 +2932,8 @@ function readSheet(input, options = {}) {
     (x) => typeof x === "string" ? { text: x } : { text: x.text, ...x.at ? { at: x.at } : {}, ...x.bounds ? { bounds: x.bounds } : {}, ...x.ids ? { ids: [...x.ids] } : {} }
   );
   const drafts = sources.map((src, line) => classify(src, line));
-  const { unit, reason: unitReason } = options.unit !== void 0 ? { unit: options.unit, reason: options.unit ? `${UNIT_NAMES[options.unit]}, as given` : "no unit, as given" } : inferUnit(drafts.map((d) => d.parse));
-  const withUnit = (q) => isBare(q) && unit ? { ...q, unit, dim: 1 } : q;
+  const { unit: unit2, reason: unitReason } = options.unit !== void 0 ? { unit: options.unit, reason: options.unit ? `${UNIT_NAMES[options.unit]}, as given` : "no unit, as given" } : inferUnit(drafts.map((d) => d.parse));
+  const withUnit = (q) => isBare(q) && unit2 ? { ...q, unit: unit2, dim: 1 } : q;
   const nameIndex = /* @__PURE__ */ new Map();
   const defByKey = /* @__PURE__ */ new Map();
   const stepByKey = /* @__PURE__ */ new Map();
@@ -2976,7 +2976,7 @@ function readSheet(input, options = {}) {
     if (d.kind !== "check" || !above || above.kind !== "step" || above.conflict || above.workedLine !== void 0 || hasNames2(d.chain)) return;
     if (above.chain.segments.some((g) => g.join === "gap")) return;
     const joined = parseChain(`${above.parse.body}   ${d.parse.body}`);
-    if (!evaluateChain(joined, { unit }).some((r) => r.restated > 0)) return;
+    if (!evaluateChain(joined, { unit: unit2 }).some((r) => r.restated > 0)) return;
     above.chain = joined;
     above.workedLine = d.line;
     d.kind = "worked";
@@ -3000,7 +3000,7 @@ function readSheet(input, options = {}) {
     const values = /* @__PURE__ */ new Map();
     const readings = /* @__PURE__ */ new Map();
     const scopeFor = (allowance) => ({
-      unit,
+      unit: unit2,
       describeUnknown: (name) => `${name} is not on this sheet`,
       name: (n2) => {
         const key2 = nameIndex.get(normName(n2));
@@ -3049,8 +3049,8 @@ function readSheet(input, options = {}) {
     if (h2.kind !== "heading" || !ADDS.test(h2.title) && !/\ballowance\b/i.test(h2.title)) continue;
     const label = `with ${headingWords(h2.parse)}`;
     if (h2.amount) {
-      const amount = withUnit(h2.amount);
-      allowances.set(h2.line, { amount, label, from: [], reason: `${h2.title}: ${fmt(amount)}, as the heading says` });
+      const amount2 = withUnit(h2.amount);
+      allowances.set(h2.line, { amount: amount2, label, from: [], reason: `${h2.title}: ${fmt(amount2)}, as the heading says` });
       continue;
     }
     const seen = [];
@@ -3089,7 +3089,7 @@ function readSheet(input, options = {}) {
       case "definition": {
         const value = d.value ? withUnit(d.value) : null;
         const head = [d.letter, d.name].filter(Boolean).join(" \xB7 ");
-        const reason = d.conflict ? d.conflict : value ? `${head} = ${fmt(value)}${d.value && isBare(d.value) && unit ? `, in the ${UNIT_NAMES[unit]} this page writes` : ""}` : `${head}: a measurement with no number yet`;
+        const reason = d.conflict ? d.conflict : value ? `${head} = ${fmt(value)}${d.value && isBare(d.value) && unit2 ? `, in the ${UNIT_NAMES[unit2]} this page writes` : ""}` : `${head}: a measurement with no number yet`;
         return { ...base, kind: "definition", key: d.key, ...d.letter ? { letter: d.letter } : {}, ...d.name ? { name: d.name } : {}, value, ...d.conflict ? { conflict: d.conflict } : {}, reason };
       }
       case "step": {
@@ -3137,7 +3137,7 @@ function readSheet(input, options = {}) {
         return { ...base, kind: "note", reason: d.note ?? `cannot read \u201C${d.parse.body}\u201D` };
     }
   });
-  return { entries, unit, unitReason };
+  return { entries, unit: unit2, unitReason };
 }
 function nameOf(r, readings) {
   return r.label ?? (readings.some((x) => x.label) ? "from the measurements" : `as ${r.formula}`);
@@ -3340,7 +3340,7 @@ function magnetSites(node, nodes) {
   const centre = { x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2 };
   const out = [];
   const counts = {};
-  const add = (kind, point2, why) => {
+  const add2 = (kind, point2, why) => {
     const index = counts[kind] ?? 0;
     counts[kind] = index + 1;
     out.push({ nodeId: node.id, shape: form.shape, kind, index, point: point2, reasoning: why });
@@ -3351,24 +3351,24 @@ function magnetSites(node, nodes) {
       const arrow = getRep(node, "reading:arrow")?.data;
       const tail = form.shape === "arrow" && arrow?.tail ? arrow.tail : form.points[0];
       const tip = form.shape === "arrow" && arrow?.tip ? arrow.tip : form.points[form.points.length - 1];
-      add("tail", tail, `the ${form.shape}'s tail \u2014 where it begins`);
-      add("tip", tip, `the ${form.shape}'s tip \u2014 where it ends`);
-      add("middle", mid(tail, tip), "halfway along it");
+      add2("tail", tail, `the ${form.shape}'s tail \u2014 where it begins`);
+      add2("tip", tip, `the ${form.shape}'s tip \u2014 where it ends`);
+      add2("middle", mid(tail, tip), "halfway along it");
       break;
     }
     case "rectangle": {
       const v = form.points.slice(0, 4);
       if (v.length === 4) {
-        v.forEach((p) => add("corner", p, "a corner of the rectangle"));
-        for (let i = 0; i < 4; i++) add("middle", mid(v[i], v[(i + 1) % 4]), "the middle of an edge");
+        v.forEach((p) => add2("corner", p, "a corner of the rectangle"));
+        for (let i = 0; i < 4; i++) add2("middle", mid(v[i], v[(i + 1) % 4]), "the middle of an edge");
       } else {
-        boundsSites(add, b);
+        boundsSites(add2, b);
       }
-      add("centre", centre, "the centre of the rectangle");
+      add2("centre", centre, "the centre of the rectangle");
       break;
     }
     case "circle": {
-      add("centre", centre, "the centre of the circle");
+      add2("centre", centre, "the centre of the circle");
       const rx = w2 / 2, ry = h2 / 2;
       const cardinals = [
         ["north", { x: centre.x, y: centre.y - ry }],
@@ -3376,40 +3376,40 @@ function magnetSites(node, nodes) {
         ["south", { x: centre.x, y: centre.y + ry }],
         ["west", { x: centre.x - rx, y: centre.y }]
       ];
-      for (const [name, p] of cardinals) add("cardinal", p, `the ${name} of the circle`);
+      for (const [name, p] of cardinals) add2("cardinal", p, `the ${name} of the circle`);
       break;
     }
     case "triangle": {
       const v = form.points.slice(0, 3);
       if (v.length === 3) {
-        v.forEach((p) => add("corner", p, "a corner of the triangle"));
-        add("centre", { x: (v[0].x + v[1].x + v[2].x) / 3, y: (v[0].y + v[1].y + v[2].y) / 3 }, "the centroid");
+        v.forEach((p) => add2("corner", p, "a corner of the triangle"));
+        add2("centre", { x: (v[0].x + v[1].x + v[2].x) / 3, y: (v[0].y + v[1].y + v[2].y) / 3 }, "the centroid");
       } else {
-        boundsSites(add, b);
+        boundsSites(add2, b);
       }
       break;
     }
     case "arc": {
-      add("tail", form.points[0], "where the arc begins");
-      add("tip", form.points[form.points.length - 1], "where the arc ends");
-      add("centre", centre, "the middle of the arc\u2019s span");
+      add2("tail", form.points[0], "where the arc begins");
+      add2("tip", form.points[form.points.length - 1], "where the arc ends");
+      add2("centre", centre, "the middle of the arc\u2019s span");
       break;
     }
     case "dot":
-      add("point", centre, "the dot");
+      add2("point", centre, "the dot");
       break;
     default:
-      boundsSites(add, b);
-      add("centre", centre, "the centre of the mark\u2019s bounds");
+      boundsSites(add2, b);
+      add2("centre", centre, "the centre of the mark\u2019s bounds");
       break;
   }
   return out;
 }
-function boundsSites(add, b) {
-  add("corner", { x: b.minX, y: b.minY }, "a corner of the mark\u2019s bounds");
-  add("corner", { x: b.maxX, y: b.minY }, "a corner of the mark\u2019s bounds");
-  add("corner", { x: b.maxX, y: b.maxY }, "a corner of the mark\u2019s bounds");
-  add("corner", { x: b.minX, y: b.maxY }, "a corner of the mark\u2019s bounds");
+function boundsSites(add2, b) {
+  add2("corner", { x: b.minX, y: b.minY }, "a corner of the mark\u2019s bounds");
+  add2("corner", { x: b.maxX, y: b.minY }, "a corner of the mark\u2019s bounds");
+  add2("corner", { x: b.maxX, y: b.maxY }, "a corner of the mark\u2019s bounds");
+  add2("corner", { x: b.minX, y: b.maxY }, "a corner of the mark\u2019s bounds");
 }
 function nearestMagnet(at, sites, radius) {
   let best = null;
@@ -3562,7 +3562,7 @@ function crossings(a, b, max = 4) {
 }
 function relate(marks, config = DEFAULT_RELATE_CONFIG) {
   const out = [];
-  const add = (kind, from, to, strength, reasoning) => {
+  const add2 = (kind, from, to, strength, reasoning) => {
     if (strength > 0) out.push({ kind, from, to, strength: Math.min(1, strength), reasoning });
   };
   for (let i = 0; i < marks.length; i++) {
@@ -3575,65 +3575,65 @@ function relate(marks, config = DEFAULT_RELATE_CONFIG) {
       if (boundsContain(ab, bb)) {
         const margin = Math.min(bb.minX - ab.minX, bb.minY - ab.minY, ab.maxX - bb.maxX, ab.maxY - bb.maxY);
         const strength = Math.min(1, 0.5 + margin / Math.max(1, sizeOf(ab)));
-        add("contains", a.id, b.id, strength, `${b.id} sits wholly inside ${a.id}`);
-        add("inside", b.id, a.id, strength, `${b.id} sits wholly inside ${a.id}`);
+        add2("contains", a.id, b.id, strength, `${b.id} sits wholly inside ${a.id}`);
+        add2("inside", b.id, a.id, strength, `${b.id} sits wholly inside ${a.id}`);
         continue;
       }
       if (boundsContain(bb, ab)) {
         const margin = Math.min(ab.minX - bb.minX, ab.minY - bb.minY, bb.maxX - ab.maxX, bb.maxY - ab.maxY);
         const strength = Math.min(1, 0.5 + margin / Math.max(1, sizeOf(bb)));
-        add("contains", b.id, a.id, strength, `${a.id} sits wholly inside ${b.id}`);
-        add("inside", a.id, b.id, strength, `${a.id} sits wholly inside ${b.id}`);
+        add2("contains", b.id, a.id, strength, `${a.id} sits wholly inside ${b.id}`);
+        add2("inside", a.id, b.id, strength, `${a.id} sits wholly inside ${b.id}`);
         continue;
       }
       const gap = boundingBoxDistance(ab, bb);
       if (a.points && b.points && boundsOverlap(ab, bb)) {
         const n2 = crossings(a.points, b.points);
         if (n2 > 0) {
-          add("crossing", a.id, b.id, Math.min(1, 0.5 + n2 * 0.15), `their strokes cross ${n2 === 4 ? "4 or more" : n2} time(s)`);
-          add("crossing", b.id, a.id, Math.min(1, 0.5 + n2 * 0.15), `their strokes cross ${n2 === 4 ? "4 or more" : n2} time(s)`);
+          add2("crossing", a.id, b.id, Math.min(1, 0.5 + n2 * 0.15), `their strokes cross ${n2 === 4 ? "4 or more" : n2} time(s)`);
+          add2("crossing", b.id, a.id, Math.min(1, 0.5 + n2 * 0.15), `their strokes cross ${n2 === 4 ? "4 or more" : n2} time(s)`);
         }
       }
       if (boundsOverlap(ab, bb)) {
         const depth2 = overlapFraction(ab.minX, ab.maxX, bb.minX, bb.maxX) * overlapFraction(ab.minY, ab.maxY, bb.minY, bb.maxY);
-        add("touching", a.id, b.id, 0.5 + depth2 * 0.5, "their areas overlap");
-        add("touching", b.id, a.id, 0.5 + depth2 * 0.5, "their areas overlap");
+        add2("touching", a.id, b.id, 0.5 + depth2 * 0.5, "their areas overlap");
+        add2("touching", b.id, a.id, 0.5 + depth2 * 0.5, "their areas overlap");
       }
       const nearLimit = config.nearRatio * ref;
       if (gap < nearLimit) {
         const strength = 1 - gap / nearLimit;
         const pct2 = Math.round(gap / ref * 100);
-        add("near", a.id, b.id, strength, `${Math.round(gap)}px apart \u2014 ${pct2}% of the smaller mark`);
-        add("near", b.id, a.id, strength, `${Math.round(gap)}px apart \u2014 ${pct2}% of the smaller mark`);
+        add2("near", a.id, b.id, strength, `${Math.round(gap)}px apart \u2014 ${pct2}% of the smaller mark`);
+        add2("near", b.id, a.id, strength, `${Math.round(gap)}px apart \u2014 ${pct2}% of the smaller mark`);
       }
       const vOverlap = overlapFraction(ab.minY, ab.maxY, bb.minY, bb.maxY);
       const hOverlap = overlapFraction(ab.minX, ab.maxX, bb.minX, bb.maxX);
       if (vOverlap >= config.directionOverlap) {
         const [left, right2] = cx(ab) <= cx(bb) ? [a, b] : [b, a];
-        add("left-of", left.id, right2.id, vOverlap, `they share a horizontal band (${Math.round(vOverlap * 100)}%)`);
-        add("right-of", right2.id, left.id, vOverlap, `they share a horizontal band (${Math.round(vOverlap * 100)}%)`);
+        add2("left-of", left.id, right2.id, vOverlap, `they share a horizontal band (${Math.round(vOverlap * 100)}%)`);
+        add2("right-of", right2.id, left.id, vOverlap, `they share a horizontal band (${Math.round(vOverlap * 100)}%)`);
       }
       if (hOverlap >= config.directionOverlap) {
         const [top, bottom2] = cy(ab) <= cy(bb) ? [a, b] : [b, a];
-        add("above", top.id, bottom2.id, hOverlap, `they share a vertical band (${Math.round(hOverlap * 100)}%)`);
-        add("below", bottom2.id, top.id, hOverlap, `they share a vertical band (${Math.round(hOverlap * 100)}%)`);
+        add2("above", top.id, bottom2.id, hOverlap, `they share a vertical band (${Math.round(hOverlap * 100)}%)`);
+        add2("below", bottom2.id, top.id, hOverlap, `they share a vertical band (${Math.round(hOverlap * 100)}%)`);
       }
       const dy = Math.abs(cy(ab) - cy(bb));
       const dx = Math.abs(cx(ab) - cx(bb));
       const rowTol = config.alignRatio * Math.max(1, Math.min(h(ab), h(bb)));
       const colTol = config.alignRatio * Math.max(1, Math.min(w(ab), w(bb)));
       if (dy < rowTol) {
-        add("same-row", a.id, b.id, 1 - dy / rowTol, `centres within ${Math.round(dy)}px vertically`);
-        add("same-row", b.id, a.id, 1 - dy / rowTol, `centres within ${Math.round(dy)}px vertically`);
+        add2("same-row", a.id, b.id, 1 - dy / rowTol, `centres within ${Math.round(dy)}px vertically`);
+        add2("same-row", b.id, a.id, 1 - dy / rowTol, `centres within ${Math.round(dy)}px vertically`);
       }
       if (dx < colTol) {
-        add("same-column", a.id, b.id, 1 - dx / colTol, `centres within ${Math.round(dx)}px horizontally`);
-        add("same-column", b.id, a.id, 1 - dx / colTol, `centres within ${Math.round(dx)}px horizontally`);
+        add2("same-column", a.id, b.id, 1 - dx / colTol, `centres within ${Math.round(dx)}px horizontally`);
+        add2("same-column", b.id, a.id, 1 - dx / colTol, `centres within ${Math.round(dx)}px horizontally`);
       }
       const ratio = Math.min(sizeOf(ab), sizeOf(bb)) / Math.max(1, Math.max(sizeOf(ab), sizeOf(bb)));
       if (ratio > config.peerRatio) {
-        add("same-size", a.id, b.id, ratio, `within ${Math.round((1 - ratio) * 100)}% of each other in size`);
-        add("same-size", b.id, a.id, ratio, `within ${Math.round((1 - ratio) * 100)}% of each other in size`);
+        add2("same-size", a.id, b.id, ratio, `within ${Math.round((1 - ratio) * 100)}% of each other in size`);
+        add2("same-size", b.id, a.id, ratio, `within ${Math.round((1 - ratio) * 100)}% of each other in size`);
       }
     }
   }
@@ -4374,18 +4374,18 @@ function isLengthKey(key2) {
   return !/^angle\d+$/.test(key2) && key2 !== "area" && key2 !== "piece";
 }
 var UNIT_NAMES2 = { in: "inches", ft: "feet", cm: "centimetres", mm: "millimetres", m: "metres" };
-function scaleOf(labels, unit) {
+function scaleOf(labels, unit2) {
   const ratios = [];
   const counted = /* @__PURE__ */ new Set();
   for (const { figure, label } of labels) {
-    if (label.declared || !isLengthKey(label.key) || isRange(label.value) || label.value.dim !== (unit ? 1 : label.value.dim)) continue;
+    if (label.declared || !isLengthKey(label.key) || isRange(label.value) || label.value.dim !== (unit2 ? 1 : label.value.dim)) continue;
     if (label.number) {
       if (counted.has(label.number)) continue;
       counted.add(label.number);
     }
     const ink = inkMeasure(figure, label.key);
     if (!ink || ink <= 0) continue;
-    const v = unit && label.value.unit && label.value.unit !== unit ? convertQuantity(label.value, unit).quantity : label.value;
+    const v = unit2 && label.value.unit && label.value.unit !== unit2 ? convertQuantity(label.value, unit2).quantity : label.value;
     if (!(v.lo > 0)) continue;
     ratios.push({ figure: figure.id, key: label.key, text: label.text, r: v.lo / ink });
   }
@@ -4402,14 +4402,14 @@ function scaleOf(labels, unit) {
     }
   }
   const px = 1 / scale;
-  const one = `1${unit ? unitSuffix(unit, 1) : ""} \u2248 ${formatNumber(px)} px`;
+  const one = `1${unit2 ? unitSuffix(unit2, 1) : ""} \u2248 ${formatNumber(px)} px`;
   const toScale = spread2 <= TO_SCALE_WITHIN;
   let reason;
   if (ratios.length === 1) reason = `one label sets the scale, ${one}; nothing to check it against`;
   else if (toScale) reason = `${one}, to scale within ${Math.max(1, Math.ceil(spread2 * 100 - 1e-9))}%`;
   else reason = `${one}; not to scale; the labels rule (${worst.text} on ${worst.key} is ${pct(spread2)} off the ink)`;
   return {
-    unit,
+    unit: unit2,
     unitsPerCanvasUnit: scale,
     pxPerUnit: px,
     labels: ratios.length,
@@ -4537,13 +4537,13 @@ function dimensionsOf(state, options = {}) {
     for (const f of members) for (const l of raw.get(f.id) ?? []) if (!l.declared && l.value.unit && l.value.dim >= 1) count.set(l.value.unit, (count.get(l.value.unit) ?? 0) + 1);
     let written = null;
     for (const [u, n2] of count) if (!written || n2 > count.get(written)) written = u;
-    const unit = written ?? fallback;
-    const unitReason = written ? `${UNIT_NAMES2[written]}, written on ${count.get(written)} of its labels` : unit ? `${UNIT_NAMES2[unit]}, the unit the page speaks` : "no unit written, so its numbers stay bare";
+    const unit2 = written ?? fallback;
+    const unitReason = written ? `${UNIT_NAMES2[written]}, written on ${count.get(written)} of its labels` : unit2 ? `${UNIT_NAMES2[unit2]}, the unit the page speaks` : "no unit written, so its numbers stay bare";
     const given2 = [];
     for (const f of members) {
       const ls = (raw.get(f.id) ?? []).map((l) => {
-        if (l.declared || /^angle\d+$/.test(l.key) || l.value.unit || !unit) return l;
-        return { ...l, value: { ...l.value, unit, dim: l.key === "area" ? 2 : 1 } };
+        if (l.declared || /^angle\d+$/.test(l.key) || l.value.unit || !unit2) return l;
+        return { ...l, value: { ...l.value, unit: unit2, dim: l.key === "area" ? 2 : 1 } };
       });
       if (ls.length) labels.set(f.id, ls);
       for (const l of ls) given2.push({ figure: f, label: l });
@@ -4553,9 +4553,9 @@ function dimensionsOf(state, options = {}) {
       id: `drawing:${first.id}`,
       figures: members.map((f) => f.id),
       ids: [...new Set(members.flatMap((f) => f.ids))],
-      unit,
+      unit: unit2,
       unitReason,
-      scale: scaleOf(given2, unit)
+      scale: scaleOf(given2, unit2)
     });
   }
   return { figures, numbers, attachments, labels, rightAngles, underlines, drawings, numberIds };
@@ -5049,11 +5049,11 @@ function sideModels(f, facts) {
   }
   return out;
 }
-function toQ(iv, unit, dim, approx = false) {
-  return { lo: iv.lo, hi: iv.hi, unit: dim === 0 ? null : unit, dim: unit ? dim : 0, approx };
+function toQ(iv, unit2, dim, approx = false) {
+  return { lo: iv.lo, hi: iv.hi, unit: dim === 0 ? null : unit2, dim: unit2 ? dim : 0, approx };
 }
 var dimOf = (key2) => /^angle\d$/.test(key2) || key2 === "sweep" ? 0 : key2 === "area" ? 2 : 1;
-function check(model, facts, unit) {
+function check(model, facts, unit2) {
   const kept = [...model.basis];
   const conflicts = [];
   const used = new Set(model.basis.map((x) => x.group));
@@ -5066,7 +5066,7 @@ function check(model, facts, unit) {
     for (const x of alts) {
       const v = model.vals.get(x.key);
       if (!v) continue;
-      const cmp = compareQuantities(toQ(v.iv, unit, dimOf(x.key)), x.q);
+      const cmp = compareQuantities(toQ(v.iv, unit2, dimOf(x.key)), x.q);
       if (cmp.status === "ok" || cmp.status === "rounded" || cmp.status === "within") {
         hit = x;
         break;
@@ -5109,7 +5109,7 @@ function numText(x) {
   if (x.parts) return fmtIv(x.iv);
   return formatQuantity({ ...x.q, unit: null, dim: 0 });
 }
-function factsOf(f, labels, unit, notes) {
+function factsOf(f, labels, unit2, notes) {
   const facts = [];
   const keyOf = (k) => {
     if (/^angle\d+$/.test(k)) return f.kind === "triangle" ? k : null;
@@ -5126,10 +5126,10 @@ function factsOf(f, labels, unit, notes) {
   };
   const inUnit = (q, dim) => {
     if (dim === 0) return q.unit ? null : { ...q, dim: 0 };
-    if (!q.unit) return unit ? { ...q, unit, dim } : { ...q, dim: 0 };
-    if (!unit) return q;
-    if (q.unit === unit) return q;
-    const c = convertQuantity({ ...q, dim }, unit);
+    if (!q.unit) return unit2 ? { ...q, unit: unit2, dim } : { ...q, dim: 0 };
+    if (!unit2) return q;
+    if (q.unit === unit2) return q;
+    const c = convertQuantity({ ...q, dim }, unit2);
     if (c.note) notes.push(c.note);
     return c.quantity;
   };
@@ -5197,25 +5197,25 @@ function labelOf2(f, key2, right2) {
   }
   return key2 === "arc" ? "the arc length" : `the ${key2}`;
 }
-function textOf2(iv, key2, unit, approx = false) {
+function textOf2(iv, key2, unit2, approx = false) {
   const d = dimOf(key2);
-  const suffix = d === 0 ? "\xB0" : unitSuffix(unit, d);
+  const suffix = d === 0 ? "\xB0" : unitSuffix(unit2, d);
   return `${approx ? "~" : ""}${fmtIv(iv)}${suffix}`;
 }
 var lengthWord = (key2, more) => dimOf(key2) === 1 ? more ? "longer" : "shorter" : more ? "larger" : "smaller";
-function conflictOf(f, c, reading, unit, right2) {
+function conflictOf(f, c, reading, unit2, right2) {
   const x = c.fact;
   const model = c.against ?? reading;
   const d = c.derived.lo - x.iv.lo;
   const share = Math.abs(d) / Math.max(TOL, Math.abs(x.iv.lo));
   const verb = model.basis.length > 1 || /\band\b/.test(model.how) ? "make" : "makes";
-  const head = x.parts ? `${x.text} make ${textOf2(x.iv, x.key, unit)}` : `labelled ${x.text}`;
+  const head = x.parts ? `${x.text} make ${textOf2(x.iv, x.key, unit2)}` : `labelled ${x.text}`;
   const reason = `${head}; ${model.how} ${verb} it ${fmtIv(c.derived)}, ${fmtV(Math.abs(d))} ${lengthWord(x.key, d > 0)} (${Math.round(share * 100)}%)`;
   return {
     key: x.key,
     label: labelOf2(f, x.key, right2),
     written: x.q,
-    derived: toQ(c.derived, unit, dimOf(x.key)),
+    derived: toQ(c.derived, unit2, dimOf(x.key)),
     difference: d,
     share,
     text: x.text,
@@ -5226,8 +5226,8 @@ function conflictOf(f, c, reading, unit, right2) {
 function solveFigure(figure, labels, options = {}) {
   const notes = [];
   const written = labels.find((l) => !l.declared && l.value.unit && l.value.dim >= 1)?.value.unit ?? null;
-  const unit = options.unit !== void 0 && options.unit !== null ? options.unit : written;
-  const { facts, partChecks, partLabels } = factsOf(figure, labels, unit, notes);
+  const unit2 = options.unit !== void 0 && options.unit !== null ? options.unit : written;
+  const { facts, partChecks, partLabels } = factsOf(figure, labels, unit2, notes);
   const f = figure;
   let models = [];
   if (f.kind === "triangle") {
@@ -5256,7 +5256,7 @@ function solveFigure(figure, labels, options = {}) {
   else if (f.kind === "arc") models = arcModels(f, facts);
   else models = sideModels(f, facts);
   const checked = models.map((m) => {
-    const c = check(m, facts, unit);
+    const c = check(m, facts, unit2);
     c.ink = inkDistance(f, m);
     return c;
   });
@@ -5275,8 +5275,8 @@ function solveFigure(figure, labels, options = {}) {
   };
   const readings = distinct.map((c) => {
     const right2 = f.kind === "triangle" ? rightOf(c.model) : null;
-    const values = valuesOf(f, c, unit, right2, partLabels);
-    const conflicts = c.conflicts.map((x) => conflictOf(f, x, c.model, unit, right2));
+    const values = valuesOf(f, c, unit2, right2, partLabels);
+    const conflicts = c.conflicts.map((x) => conflictOf(f, x, c.model, unit2, right2));
     const verb = c.model.basis.filter((x) => !x.assumed).length > 1 || /\band\b/.test(c.model.how) ? "make" : "makes";
     const made = c.model.makes.map((k) => {
       const v = values.find((x) => x.key === k);
@@ -5286,7 +5286,7 @@ function solveFigure(figure, labels, options = {}) {
     }).filter((x) => !!x);
     const assumes = c.model.assumed ? [c.model.assumed] : void 0;
     const lead = c.model.assumed ? `if the corner at ${V[Number(c.model.basis.find((x) => x.assumed).key.slice(-1))]} is right, ` : "";
-    const sentence = made.length ? `${lead}${c.model.how} ${verb} ${joinAnd(made)}` : `${lead}${c.model.basis.map((x) => `${labelOf2(f, x.key, right2)} ${textOf2(x.iv, x.key, unit)}`).join(", ")}, as labelled`;
+    const sentence = made.length ? `${lead}${c.model.how} ${verb} ${joinAnd(made)}` : `${lead}${c.model.basis.map((x) => `${labelOf2(f, x.key, right2)} ${textOf2(x.iv, x.key, unit2)}`).join(", ")}, as labelled`;
     return {
       values,
       keeps: c.kept.filter((x) => !x.assumed).map((x) => x.text),
@@ -5302,7 +5302,7 @@ function solveFigure(figure, labels, options = {}) {
     for (const pc of partChecks) {
       if (!top.kept.includes(pc.fact)) continue;
       const whole = top.kept.find((x) => x !== pc.fact && x.key === pc.fact.key);
-      if (whole) checks.push(`${pc.fact.text} make ${textOf2(pc.fact.iv, pc.fact.key, unit)} \u2713`);
+      if (whole) checks.push(`${pc.fact.text} make ${textOf2(pc.fact.iv, pc.fact.key, unit2)} \u2713`);
     }
   }
   if (f.kind === "triangle" && f.angles) {
@@ -5316,7 +5316,7 @@ function solveFigure(figure, labels, options = {}) {
     }
     const declared = facts.filter((x) => x.fixed && !x.assumed);
     if (declared.length) {
-      const free = triangleModels(facts.filter((x) => !x.fixed)).map((m) => check(m, facts.filter((x) => !x.fixed), unit)).filter((c) => !c.conflicts.length);
+      const free = triangleModels(facts.filter((x) => !x.fixed)).map((m) => check(m, facts.filter((x) => !x.fixed), unit2)).filter((c) => !c.conflicts.length);
       for (const c of free) {
         for (const d of declared) {
           const v = c.model.vals.get(d.key);
@@ -5344,13 +5344,13 @@ function solveFigure(figure, labels, options = {}) {
     ink.push({
       key: key2,
       label: labelOf2(f, key2, null),
-      value: toQ(iv, scale?.unit ?? unit, d),
+      value: toQ(iv, scale?.unit ?? unit2, d),
       from: "ink",
       text,
       reason: d === 0 ? `drawn, it measures ${text} \u2014 the ink\u2019s, not the thing\u2019s` : `drawn to scale this would be ${text} \u2014 the ink\u2019s, not the thing\u2019s (${scale.reason})`
     });
   }
-  return { figure: f, unit, readings, conflicts: readings[0]?.conflicts ?? [], checks, ink, notes };
+  return { figure: f, unit: unit2, readings, conflicts: readings[0]?.conflicts ?? [], checks, ink, notes };
 }
 function joinAnd(xs) {
   return xs.length <= 1 ? xs.join("") : `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`;
@@ -5375,7 +5375,7 @@ function keysOf(f) {
       return f.sides.map((s) => s.key);
   }
 }
-function valuesOf(f, c, unit, right2, parts) {
+function valuesOf(f, c, unit2, right2, parts) {
   const out = [];
   const keys = keysOf(f);
   const all = [...keys, ...[...c.model.vals.keys()].filter((k) => !keys.includes(k))];
@@ -5384,8 +5384,8 @@ function valuesOf(f, c, unit, right2, parts) {
     if (!v) continue;
     const approx = !!v.fact?.q.approx;
     const labelled = v.from === "labelled" || v.from === "declared" || v.from === "assumed";
-    const value = labelled && v.fact && !v.fact.parts ? { ...v.fact.q, ...dimOf(key2) === 0 ? { unit: null, dim: 0 } : {} } : toQ(v.iv, unit, dimOf(key2), approx);
-    const text = labelled && v.fact && !v.fact.parts && dimOf(key2) > 0 && v.fact.q.unit === unit ? formatQuantity(v.fact.q) : textOf2(v.iv, key2, unit, approx);
+    const value = labelled && v.fact && !v.fact.parts ? { ...v.fact.q, ...dimOf(key2) === 0 ? { unit: null, dim: 0 } : {} } : toQ(v.iv, unit2, dimOf(key2), approx);
+    const text = labelled && v.fact && !v.fact.parts && dimOf(key2) > 0 && v.fact.q.unit === unit2 ? formatQuantity(v.fact.q) : textOf2(v.iv, key2, unit2, approx);
     const label = labelOf2(f, key2, right2);
     const formula = v.formula ? bracketRanges(v.formula) : void 0;
     const reason = v.from === "derived" ? `${label} ${text}${formula ? ` = ${formula}` : ""}` : v.from === "declared" ? `${label} is right: a square in the corner declares it` : v.from === "assumed" ? v.fact?.assumed ?? `${label}, assumed` : `${label} ${text}, as labelled`;
@@ -5406,9 +5406,9 @@ function valuesOf(f, c, unit, right2, parts) {
     const hi = whole.iv.hi - known.reduce((a, w2) => a + w2.q.lo, 0);
     if (!(hi > TOL)) continue;
     const iv = { lo: Math.max(0, lo), hi };
-    const text = textOf2(iv, side.key, unit);
+    const text = textOf2(iv, side.key, unit2);
     const formula = bracketRanges([fmtIv(whole.iv), ...known.map((w2) => formatQuantity({ ...w2.q, unit: null, dim: 0 }))].join(" \u2212 "));
-    out.push({ key: open[0].key, label: open[0].label, value: toQ(iv, unit, 1), from: "derived", formula, text, reason: `${open[0].label} ${text} = ${formula}` });
+    out.push({ key: open[0].key, label: open[0].label, value: toQ(iv, unit2, 1), from: "derived", formula, text, reason: `${open[0].label} ${text} = ${formula}` });
   }
   return out;
 }
@@ -5442,8 +5442,8 @@ function solveBoard(state, options = {}) {
     pages.push(sheet2);
     return sheet2;
   };
-  const unit = options.unit !== void 0 ? options.unit : (except) => readPage(except).unit;
-  const dimensions = dimensionsOf(state, { unit, ...options.figures ? { figures: options.figures } : {} });
+  const unit2 = options.unit !== void 0 ? options.unit : (except) => readPage(except).unit;
+  const dimensions = dimensionsOf(state, { unit: unit2, ...options.figures ? { figures: options.figures } : {} });
   const sheet = pages[0] ?? readPage(dimensions.numberIds);
   const figures = dimensions.figures.map((figure) => {
     const labels = dimensions.labels.get(figure.id) ?? [];
@@ -5474,6 +5474,850 @@ function describeSolution(sol) {
   for (const v of sol.ink) lines.push(`${v.label} ${v.text} (the ink\u2019s)`);
   lines.push(...sol.notes);
   return lines.join("\n");
+}
+
+// src/maths/svg.ts
+function fmt2(v, places) {
+  const f = 10 ** places;
+  const r = Math.round(v * f) / f;
+  if (r === 0 || !Number.isFinite(r)) return "0";
+  const s = r.toFixed(places);
+  return places > 0 ? s.replace(/\.?0+$/, "") : s;
+}
+function esc(s) {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+var FONT_FAMILY = "IBM Plex Mono, ui-monospace, Menlo, Consolas, monospace";
+var MONO_ADVANCE = 0.6;
+function textWidth(text, size) {
+  return [...text].length * MONO_ADVANCE * size;
+}
+function wrap(text, width, size) {
+  const most = Math.max(8, Math.floor(width / (MONO_ADVANCE * size)));
+  const lines = [];
+  let line = "";
+  for (const word of text.split(" ")) {
+    if (!line) line = word;
+    else if ([...line].length + 1 + [...word].length <= most) line += " " + word;
+    else {
+      lines.push(line);
+      line = word;
+    }
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+function unitFactor(from, to) {
+  return from === to ? 1 : convertQuantity(quantity(1, from), to).quantity.lo;
+}
+function systemOf(unit2) {
+  return unit2 === "in" || unit2 === "ft" ? "imperial" : "metric";
+}
+function unionBounds(boxes) {
+  return {
+    minX: Math.min(...boxes.map((b) => b.minX)),
+    maxX: Math.max(...boxes.map((b) => b.maxX)),
+    minY: Math.min(...boxes.map((b) => b.minY)),
+    maxY: Math.max(...boxes.map((b) => b.maxY))
+  };
+}
+function expandBounds(b, d) {
+  return { minX: b.minX - d, maxX: b.maxX + d, minY: b.minY - d, maxY: b.maxY + d };
+}
+
+// src/maths/truesize.ts
+var IMPERIAL = { margin: 0.25, gap: 1, block: 0.3, label: 0.16, title: 0.2, note: 0.12, caption: 0.14, stroke: 0.02, thin: 0.01, labelGap: 0.1, corner: 0.15, minWidth: 6.5 };
+var METRIC = { margin: 6, gap: 25, block: 8, label: 4, title: 5, note: 3, caption: 3.5, stroke: 0.5, thin: 0.25, labelGap: 2.5, corner: 4, minWidth: 160 };
+function furniture(unit2) {
+  const imperial = systemOf(unit2) === "imperial";
+  const k = unitFactor(imperial ? "in" : "mm", unit2);
+  const base = imperial ? IMPERIAL : METRIC;
+  const out = {};
+  for (const key2 of Object.keys(base)) out[key2] = base[key2] * k;
+  return out;
+}
+var COORD_PLACES = { in: 3, ft: 4, cm: 3, mm: 2, m: 5 };
+var PAPER = {
+  in: { css: "in", per: 1 },
+  ft: { css: "in", per: 12 },
+  cm: { css: "cm", per: 1 },
+  mm: { css: "mm", per: 1 },
+  m: { css: "cm", per: 100 }
+};
+var UNIT_WORDS2 = { in: "inches", ft: "feet", cm: "centimetres", mm: "millimetres", m: "metres" };
+var SCALE_BAR = {
+  in: { length: 6, step: 1, every: 1 },
+  ft: { length: 1, step: 1 / 12, every: 12 },
+  cm: { length: 10, step: 1, every: 5 },
+  mm: { length: 100, step: 10, every: 5 },
+  m: { length: 0.1, step: 0.01, every: 5 }
+};
+function precisionOf(q) {
+  if (q.precision && q.precision > 0) return q.precision;
+  for (let d = 0; d <= 3; d++) {
+    const f = 10 ** d;
+    const whole = (v) => Math.abs(v * f - Math.round(v * f)) < 1e-9 * Math.max(1, Math.abs(v * f));
+    if (whole(q.lo) && whole(q.hi)) return 1 / f;
+  }
+  return 1e-3;
+}
+function finer(p) {
+  const den = Math.round(1 / p);
+  if (p < 1 && [2, 4, 8, 16, 32].includes(den) && Math.abs(1 / p - den) < 1e-9) return { fractions: den * 2 };
+  return { places: Math.max(0, Math.round(-Math.log10(p))) + 1 };
+}
+function derivedNumber(v, p) {
+  const form = finer(p);
+  if ("fractions" in form) return formatQuantity(quantity(Math.round(v * form.fractions) / form.fractions), { fractions: form.fractions });
+  return formatNumber(v, form.places);
+}
+function derivedText(q, p, unit2) {
+  const body = isRange(q) ? `${derivedNumber(q.lo, p)}\u2013${derivedNumber(q.hi, p)}` : derivedNumber(q.lo, p);
+  return (q.approx ? "~" : "") + body + unitSuffix(unit2, q.dim || 1);
+}
+function valueText(v, p, unit2) {
+  if (v.from === "labelled" && v.value.precision !== void 0 && v.value.unit === unit2) return formatQuantity(v.value);
+  return derivedText(v.value, p, unit2);
+}
+function figurePrecision(reading) {
+  const labelled = reading.values.filter((v) => v.from === "labelled");
+  const lengths = labelled.filter((v) => v.value.dim === 1);
+  const ps = (lengths.length ? lengths : labelled).map((v) => precisionOf(v.value));
+  return ps.length ? Math.min(...ps) : 1;
+}
+var add = (a, b) => ({ x: a.x + b.x, y: a.y + b.y });
+var sub = (a, b) => ({ x: a.x - b.x, y: a.y - b.y });
+var mul = (a, k) => ({ x: a.x * k, y: a.y * k });
+var mid3 = (a, b) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+var norm = (a) => Math.hypot(a.x, a.y);
+var unit = (a) => mul(a, 1 / (norm(a) || 1));
+var cross = (a, b) => a.x * b.y - a.y * b.x;
+var DEG3 = 180 / Math.PI;
+var AXES = [{ x: 1, y: 0 }, { x: 0, y: 1 }, { x: -1, y: 0 }, { x: 0, y: -1 }];
+function nearestAxis(from, to) {
+  const t = Math.atan2(to.y - from.y, to.x - from.x);
+  const k = Math.round(t / (Math.PI / 2));
+  return { axis: (k % 4 + 4) % 4, off: Math.abs(t - k * Math.PI / 2) };
+}
+var turn = (d, s) => s > 0 ? { x: -d.y, y: d.x } : { x: d.y, y: -d.x };
+var outward = (d, s) => s > 0 ? { x: d.y, y: -d.x } : { x: -d.y, y: d.x };
+function signedArea(v) {
+  let a = 0;
+  for (let i = 0; i < v.length; i++) a += cross(v[i], v[(i + 1) % v.length]);
+  return a / 2;
+}
+function readable(deg2) {
+  return ((deg2 + 90) % 180 + 180) % 180 - 90;
+}
+function baseSide(v) {
+  let best = 0;
+  let bestOff = Infinity, bestLevel = false;
+  for (let k = 0; k < v.length; k++) {
+    const { axis, off } = nearestAxis(v[k], v[(k + 1) % v.length]);
+    const level = axis % 2 === 0;
+    if (off < bestOff - 1e-9 || Math.abs(off - bestOff) <= 1e-9 && level && !bestLevel) {
+      best = k;
+      bestOff = off;
+      bestLevel = level;
+    }
+  }
+  return best;
+}
+function widthPair(f) {
+  const horizontal = (k) => Math.abs(f.sides[k].to.x - f.sides[k].from.x) >= Math.abs(f.sides[k].to.y - f.sides[k].from.y);
+  const evenWide = horizontal(0) || !horizontal(1) && f.sides[0].length >= f.sides[1].length;
+  return evenWide ? [0, 2] : [1, 3];
+}
+function lengthOf(c, key2) {
+  return c.vals.get(key2).value.lo * c.f;
+}
+function sideTextOf(c, key2) {
+  return valueText(c.vals.get(key2), c.precision, c.unit);
+}
+function drawnText(c, key2) {
+  const conflict = c.conflicts.get(key2);
+  return sideTextOf(c, key2) + (conflict ? ` (labelled ${conflict.text})` : "");
+}
+function alongSide(c, text, from, to, n2, tier, key2) {
+  const F = c.F;
+  const d = sub(to, from);
+  const off = F.labelGap + 0.6 * F.label + (tier - 1) * (1.2 * F.label + F.labelGap);
+  return { text, at: add(mid3(from, to), mul(n2, off)), angle: readable(Math.atan2(d.y, d.x) * DEG3), size: F.label, anchor: "middle", key: key2 };
+}
+function polygonShape(c, v, s, side) {
+  const marks = [];
+  const texts = [];
+  const sides = [];
+  const n2 = v.length;
+  for (let k = 0; k < n2; k++) {
+    const a = v[k], b = v[(k + 1) % n2];
+    const info = side(k);
+    const value = c.vals.get(info.key);
+    const L = norm(sub(b, a));
+    sides.push({ key: `side${k}`, label: info.label, from: a, to: b, length: L, text: sideTextOf(c, info.key), source: value.from });
+    const d = unit(sub(b, a));
+    const out = outward(d, s);
+    const parts = c.fig.sides[k]?.parts ?? [];
+    const pv = parts.map((p) => c.vals.get(p.key));
+    const pl = pv.map((x) => x && !isRange(x.value) && x.value.lo > 0 ? x.value.lo * c.f : NaN);
+    const partsHold = parts.length > 0 && pl.every((x) => x > 0) && Math.abs(pl.reduce((t, x) => t + x, 0) - L) <= 1e-6 * Math.max(1, L);
+    if (partsHold) {
+      let t = 0;
+      pl.forEach((len, i) => {
+        const p0 = add(a, mul(d, t)), p1 = add(a, mul(d, t + len));
+        texts.push(alongSide(c, valueText(pv[i], c.precision, c.unit), p0, p1, out, 1, parts[i].key));
+        t += len;
+        if (i < pl.length - 1) marks.push({ points: [add(p1, mul(out, -c.F.labelGap)), add(p1, mul(out, c.F.labelGap))] });
+      });
+    }
+    if (info.show) texts.push(alongSide(c, drawnText(c, info.key), a, b, out, partsHold ? 2 : 1, info.key));
+  }
+  return { outline: { type: "polygon", points: v }, vertices: v, sides, marks, texts };
+}
+function triangleShape(c) {
+  const L = [0, 1, 2].map((k) => lengthOf(c, `side${k}`));
+  const ink = c.fig.vertices.slice(0, 3);
+  const s = Math.sign(signedArea(ink)) || 1;
+  const b = baseSide(ink);
+  const u = AXES[nearestAxis(ink[b], ink[(b + 1) % 3]).axis];
+  const w2 = turn(u, 1);
+  const [Lb, La, Lc] = [L[b], L[(b + 1) % 3], L[(b + 2) % 3]];
+  const x = (Lb * Lb + Lc * Lc - La * La) / (2 * Lb);
+  const y = Math.sqrt(Math.max(0, Lc * Lc - x * x));
+  const v = [];
+  v[b] = { x: 0, y: 0 };
+  v[(b + 1) % 3] = mul(u, Lb);
+  v[(b + 2) % 3] = add(mul(u, x), mul(w2, s * y));
+  const shape = polygonShape(c, v, s, (k) => ({ key: `side${k}`, label: c.vals.get(`side${k}`).label, show: true }));
+  for (let k = 0; k < 3; k++) {
+    const a = c.vals.get(`angle${k}`)?.value;
+    if (!a || Math.abs(a.lo - 90) > 1e-6 || Math.abs(a.hi - 90) > 1e-6) continue;
+    const at = v[k], e1 = unit(sub(v[(k + 1) % 3], at)), e2 = unit(sub(v[(k + 2) % 3], at));
+    const q = Math.min(c.F.corner, 0.25 * Math.min(L[k], L[(k + 2) % 3]));
+    shape.marks.push({ points: [add(at, mul(e1, q)), add(at, add(mul(e1, q), mul(e2, q))), add(at, mul(e2, q))] });
+  }
+  return shape;
+}
+function rectangleShape(c) {
+  const W = lengthOf(c, "width"), H = lengthOf(c, "height");
+  const ink = c.fig.vertices.slice(0, 4);
+  const s = Math.sign(signedArea(ink)) || 1;
+  const wide = widthPair(c.fig);
+  const d0 = sub(ink[1], ink[0]);
+  let d = wide.includes(0) ? { x: d0.x >= 0 ? 1 : -1, y: 0 } : { x: 0, y: d0.y >= 0 ? 1 : -1 };
+  const v = [{ x: 0, y: 0 }];
+  const dirs = [];
+  for (let k = 0; k < 4; k++) {
+    dirs.push(d);
+    if (k < 3) v.push(add(v[k], mul(d, wide.includes(k) ? W : H)));
+    d = turn(d, s);
+  }
+  const written = (pair) => {
+    for (const l of c.labels ?? []) {
+      const m = /^side(\d)$/.exec(l.key);
+      if (!l.declared && m && pair.includes(Number(m[1]))) return Number(m[1]);
+    }
+    return -1;
+  };
+  const facing = (pair, normal) => pair.find((k) => {
+    const o = outward(dirs[k], s);
+    return o.x === normal.x && o.y === normal.y;
+  }) ?? pair[0];
+  const tall = [0, 1, 2, 3].filter((k) => !wide.includes(k));
+  const wAt = written(wide) >= 0 ? written(wide) : facing(wide, { x: 0, y: -1 });
+  const hAt = written(tall) >= 0 ? written(tall) : facing(tall, { x: -1, y: 0 });
+  return polygonShape(c, v, s, (k) => {
+    const key2 = wide.includes(k) ? "width" : "height";
+    return { key: key2, label: c.vals.get(key2).label, show: k === wAt || k === hAt };
+  });
+}
+function circleNote(c) {
+  const labelled = c.reading.values.find((v) => v.from === "labelled" && ["diameter", "circumference", "area"].includes(v.key));
+  if (!labelled) return null;
+  const text = valueText(labelled, c.precision, c.unit);
+  if (labelled.key === "diameter") return `\u2300 ${text}`;
+  const written = c.labels?.find((l) => l.key === labelled.key && l.name)?.name ?? c.reading.keeps.map((k) => readNumber(k)?.name).find((x) => !!x);
+  return `${written ?? (labelled.key === "area" ? "area" : "C")} ${text}`;
+}
+function circleShape(c) {
+  const F = c.F;
+  const r = lengthOf(c, "radius");
+  const o = { x: 0, y: 0 }, east = { x: r, y: 0 }, west = { x: -r, y: 0 };
+  const radius = c.vals.get("radius");
+  const sides = [{ key: "radius", label: radius.label, from: o, to: east, length: r, text: sideTextOf(c, "radius"), source: radius.from }];
+  const diameter = c.vals.get("diameter");
+  if (diameter) sides.push({ key: "diameter", label: diameter.label, from: west, to: east, length: 2 * r, text: sideTextOf(c, "diameter"), source: diameter.from });
+  const arm = Math.min(F.corner / 2, r / 4);
+  const marks = [
+    { points: [o, east], dashed: true },
+    { points: [{ x: -arm, y: 0 }, { x: arm, y: 0 }] },
+    { points: [{ x: 0, y: -arm }, { x: 0, y: arm }] }
+  ];
+  const texts = [{ text: `r ${drawnText(c, "radius")}`, at: { x: r / 2, y: -(F.labelGap + 0.6 * F.label) }, angle: 0, size: F.label, anchor: "middle", key: "radius" }];
+  const note = circleNote(c);
+  if (note) texts.push({ text: note, at: { x: 0, y: F.labelGap + 1.2 * F.label }, angle: 0, size: F.label, anchor: "middle", key: "measure" });
+  return { outline: { type: "circle", centre: o, r }, vertices: [o], sides, marks, texts, centre: o, radius: r };
+}
+function arcShape(c) {
+  const F = c.F;
+  const chord = lengthOf(c, "chord"), h2 = lengthOf(c, "rise");
+  const r = c.vals.has("radius") ? lengthOf(c, "radius") : chord * chord / (8 * h2) + h2 / 2;
+  const [a, e, bulge] = c.fig.vertices;
+  const u = AXES[nearestAxis(a, e).axis];
+  const w2 = turn(u, 1);
+  const sb = Math.sign(cross(sub(e, a), sub(bulge, a))) || 1;
+  const A = { x: 0, y: 0 }, C = mul(u, chord), M = mul(u, chord / 2);
+  const B = add(M, mul(w2, sb * h2));
+  const O = add(M, mul(w2, sb * (h2 - r)));
+  const large = h2 > r ? 1 : 0;
+  const sweep = cross(sub(A, O), sub(B, O)) > 0 ? 1 : 0;
+  const span = 2 * Math.atan2(cross(sub(A, O), sub(B, O)), (A.x - O.x) * (B.x - O.x) + (A.y - O.y) * (B.y - O.y));
+  const a0 = Math.atan2(A.y - O.y, A.x - O.x);
+  const samples = [];
+  for (let i = 0; i <= 64; i++) samples.push(add(O, mul({ x: Math.cos(a0 + span * i / 64), y: Math.sin(a0 + span * i / 64) }, r)));
+  const chordV = c.vals.get("chord"), riseV = c.vals.get("rise");
+  const sides = [
+    { key: "chord", label: chordV.label, from: A, to: C, length: chord, text: sideTextOf(c, "chord"), source: chordV.from },
+    { key: "rise", label: riseV.label, from: M, to: B, length: h2, text: sideTextOf(c, "rise"), source: riseV.from }
+  ];
+  const riseText = `rise ${drawnText(c, "rise")}`;
+  const along = readable(Math.atan2(u.y, u.x) * DEG3);
+  const t = { x: Math.round(Math.cos(along / DEG3)), y: Math.round(Math.sin(along / DEG3)) };
+  const texts = [
+    alongSide(c, drawnText(c, "chord"), A, C, mul(w2, -sb), 1, "chord"),
+    { text: riseText, at: add(add(M, mul(w2, sb * h2 / 2)), mul(t, F.labelGap + textWidth(riseText, F.label) / 2)), angle: along, size: F.label, anchor: "middle", key: "rise" }
+  ];
+  return {
+    outline: { type: "arc", from: A, to: C, r, large, sweep, samples },
+    vertices: [A, C, B],
+    sides,
+    marks: [{ points: [A, C], dashed: true }, { points: [M, B], dashed: true }],
+    texts,
+    centre: O,
+    radius: r
+  };
+}
+function lineShape(c) {
+  const F = c.F;
+  const L = lengthOf(c, "length");
+  const { from, to } = c.fig.sides[0];
+  const d = nearestAxis(from, to).axis % 2 === 0 ? { x: 1, y: 0 } : { x: 0, y: -1 };
+  const n2 = { x: d.y, y: -d.x };
+  const A = { x: 0, y: 0 }, B = mul(d, L);
+  const value = c.vals.get("length");
+  const tick = (p) => ({ points: [add(p, mul(n2, -F.labelGap)), add(p, mul(n2, F.labelGap))] });
+  return {
+    outline: { type: "line", from: A, to: B },
+    vertices: [A, B],
+    sides: [{ key: "length", label: value.label, from: A, to: B, length: L, text: sideTextOf(c, "length"), source: value.from }],
+    marks: [tick(A), tick(B)],
+    texts: [alongSide(c, drawnText(c, "length"), A, B, n2, 1, "length")]
+  };
+}
+var DRAWN_FROM = {
+  triangle: ["side0", "side1", "side2"],
+  rectangle: ["width", "height"],
+  circle: ["radius"],
+  arc: ["chord", "rise"],
+  line: ["length"]
+};
+function measureWord(f, key2) {
+  const side = /^side(\d)$/.exec(key2);
+  if (side) return f.sides[Number(side[1])]?.label ?? key2;
+  return `its ${key2}`;
+}
+function whyNot(f, sol, labelled) {
+  const reading = sol.readings[0];
+  if (!labelled) return "no numbers on it";
+  if (f.kind === "quadrilateral" || f.kind === "polygon") return "its sides alone do not fix its shape";
+  if (!sol.unit) return "its numbers have no unit: write one on a label, or on the page";
+  if (!reading) return "its labels do not fix it";
+  const keys = DRAWN_FROM[f.kind];
+  if (!keys) return "nothing here draws a figure of this kind";
+  for (const key2 of keys) {
+    const v = reading.values.find((x) => x.key === key2);
+    if (!v) return `nothing fixes ${measureWord(f, key2)}`;
+    const text = v.from === "labelled" && v.value.precision !== void 0 ? formatQuantity(v.value) : derivedText(v.value, figurePrecision(reading), sol.unit);
+    if (isRange(v.value)) return `${v.label} is ${text}, a range: choose one value to draw it`;
+    if (!(v.value.lo > 0)) return `${v.label} is ${text}: no size to draw`;
+  }
+  return null;
+}
+function entriesOf(solved) {
+  const list = "dimensions" in solved ? solved.figures : solved;
+  return list.map((x) => "solution" in x ? { figure: x.figure, solution: x.solution, labels: x.labels } : { figure: x.figure, solution: x, labels: null });
+}
+function inkBounds(f) {
+  const pts = f.outline.length ? f.outline : f.vertices;
+  return unionBounds(pts.map((p) => ({ minX: p.x, maxX: p.x, minY: p.y, maxY: p.y })));
+}
+var article = (kind) => /^[aeiou]/.test(kind) ? "An" : "A";
+function textBox(t) {
+  const w2 = textWidth(t.text, t.size), h2 = 1.2 * t.size;
+  const x0 = t.anchor === "middle" ? -w2 / 2 : 0;
+  const corners = [{ x: x0, y: -h2 / 2 }, { x: x0 + w2, y: -h2 / 2 }, { x: x0 + w2, y: h2 / 2 }, { x: x0, y: h2 / 2 }];
+  const a = t.angle / DEG3, ca = Math.cos(a), sa = Math.sin(a);
+  return unionBounds(corners.map((p) => {
+    const q = { x: t.at.x + p.x * ca - p.y * sa, y: t.at.y + p.x * sa + p.y * ca };
+    return { minX: q.x, maxX: q.x, minY: q.y, maxY: q.y };
+  }));
+}
+function outlinePoints(o) {
+  switch (o.type) {
+    case "polygon":
+      return o.points;
+    case "circle":
+      return [{ x: o.centre.x - o.r, y: o.centre.y - o.r }, { x: o.centre.x + o.r, y: o.centre.y + o.r }];
+    case "arc":
+      return o.samples;
+    case "line":
+      return [o.from, o.to];
+  }
+}
+var pointBox = (pts) => unionBounds(pts.map((p) => ({ minX: p.x, maxX: p.x, minY: p.y, maxY: p.y })));
+function moved(shape, by) {
+  const m = (p) => add(p, by);
+  const o = shape.outline;
+  const outline = o.type === "polygon" ? { type: "polygon", points: o.points.map(m) } : o.type === "circle" ? { ...o, centre: m(o.centre) } : o.type === "arc" ? { ...o, from: m(o.from), to: m(o.to), samples: o.samples.map(m) } : { type: "line", from: m(o.from), to: m(o.to) };
+  return {
+    outline,
+    vertices: shape.vertices.map(m),
+    sides: shape.sides.map((s) => ({ ...s, from: m(s.from), to: m(s.to) })),
+    marks: shape.marks.map((k) => ({ ...k, points: k.points.map(m) })),
+    texts: shape.texts.map((t) => ({ ...t, at: m(t.at) })),
+    ...shape.centre ? { centre: m(shape.centre) } : {},
+    ...shape.radius !== void 0 ? { radius: shape.radius } : {}
+  };
+}
+function pathOf(w2, points, closed) {
+  return points.map((p, i) => `${i ? "L" : "M"} ${w2.n(p.x)} ${w2.n(p.y)}`).join(" ") + (closed ? " Z" : "");
+}
+function textEl(w2, t, attrs = "") {
+  const baseline = t.at.y + 0.35 * t.size;
+  const rot = Math.abs(t.angle) > 1e-9 ? ` transform="rotate(${fmt2(t.angle, 2)} ${w2.n(t.at.x)} ${w2.n(t.at.y)})"` : "";
+  const anchor = t.anchor === "middle" ? ' text-anchor="middle"' : "";
+  const key2 = t.key ? ` data-label="${esc(t.key)}"` : "";
+  return `<text x="${w2.n(t.at.x)}" y="${w2.n(baseline)}" font-size="${w2.n(t.size)}"${anchor}${rot}${key2}${attrs} fill="currentColor" stroke="none">${esc(t.text)}</text>`;
+}
+function markEl(w2, k) {
+  const dash = k.dashed ? ` stroke-dasharray="${w2.n(w2.F.labelGap / 2)} ${w2.n(w2.F.labelGap / 2)}"` : "";
+  return `<path d="${pathOf(w2, k.points, !!k.closed)}" stroke-width="${w2.n(w2.F.thin)}"${dash}/>`;
+}
+function outlineEl(w2, o) {
+  switch (o.type) {
+    case "polygon":
+      return `<path data-role="outline" d="${pathOf(w2, o.points, true)}"/>`;
+    case "circle":
+      return `<circle data-role="outline" cx="${w2.n(o.centre.x)}" cy="${w2.n(o.centre.y)}" r="${w2.n(o.r)}"/>`;
+    case "arc":
+      return `<path data-role="outline" d="M ${w2.n(o.from.x)} ${w2.n(o.from.y)} A ${w2.n(o.r)} ${w2.n(o.r)} 0 ${o.large} ${o.sweep} ${w2.n(o.to.x)} ${w2.n(o.to.y)}"/>`;
+    case "line":
+      return `<path data-role="outline" d="${pathOf(w2, [o.from, o.to], false)}"/>`;
+  }
+}
+function styleOf(w2, stroke = w2.F.stroke) {
+  return `fill="none" stroke="currentColor" stroke-width="${w2.n(stroke)}" stroke-linecap="round" stroke-linejoin="round" font-family="${FONT_FAMILY}"`;
+}
+function trueSize(solved, options = {}) {
+  const entries = entriesOf(solved).map((e) => ({ e, b: inkBounds(e.figure) })).sort((p, q2) => p.b.minX - q2.b.minX || p.b.minY - q2.b.minY || (p.e.figure.id < q2.e.figure.id ? -1 : p.e.figure.id > q2.e.figure.id ? 1 : 0)).map((x2) => x2.e);
+  const count = /* @__PURE__ */ new Map();
+  for (const e of entries) count.set(e.figure.kind, (count.get(e.figure.kind) ?? 0) + 1);
+  const seen = /* @__PURE__ */ new Map();
+  const nameOf2 = /* @__PURE__ */ new Map();
+  for (const e of entries) {
+    const k = e.figure.kind;
+    const i = (seen.get(k) ?? 0) + 1;
+    seen.set(k, i);
+    nameOf2.set(e.figure.id, options.names?.[e.figure.id] ?? ((count.get(k) ?? 0) > 1 ? `${k} ${i}` : k));
+  }
+  const drawable = [];
+  const omitted = [];
+  for (const e of entries) {
+    const labelled = e.labels ? e.labels.some((l) => !l.declared) : true;
+    const why = whyNot(e.figure, e.solution, labelled);
+    if (why) omitted.push({ id: e.figure.id, ids: [...e.figure.ids], kind: e.figure.kind, name: nameOf2.get(e.figure.id), labelled, reason: why });
+    else drawable.push(e);
+  }
+  const units = /* @__PURE__ */ new Map();
+  for (const e of drawable) units.set(e.solution.unit, (units.get(e.solution.unit) ?? 0) + 1);
+  let docUnit = options.unit;
+  if (!docUnit) {
+    for (const [u, n2] of units) if (!docUnit || n2 > units.get(docUnit)) docUnit = u;
+  }
+  docUnit ??= entries.map((e) => e.solution.unit).find((u) => !!u) ?? "in";
+  const U = docUnit;
+  const F = furniture(U);
+  const places = COORD_PLACES[U];
+  const w2 = { n: (v) => fmt2(v, places), F };
+  const built = drawable.map((e) => {
+    const sol = e.solution;
+    const reading = sol.readings[0];
+    const figUnit = sol.unit;
+    const precision = figurePrecision(reading);
+    const c = {
+      fig: e.figure,
+      vals: new Map(reading.values.map((v) => [v.key, v])),
+      f: unitFactor(figUnit, U),
+      F,
+      precision,
+      unit: figUnit,
+      conflicts: new Map(sol.conflicts.map((x2) => [x2.key, x2])),
+      labels: e.labels,
+      reading
+    };
+    const shape = e.figure.kind === "triangle" ? triangleShape(c) : e.figure.kind === "rectangle" ? rectangleShape(c) : e.figure.kind === "circle" ? circleShape(c) : e.figure.kind === "arc" ? arcShape(c) : lineShape(c);
+    const name = nameOf2.get(e.figure.id);
+    const drawnBox = unionBounds([
+      expandBounds(pointBox(outlinePoints(shape.outline)), F.stroke / 2),
+      ...shape.marks.map((k) => expandBounds(pointBox(k.points), F.thin / 2)),
+      ...shape.texts.map(textBox)
+    ]);
+    const caption = { text: name, at: { x: drawnBox.minX, y: drawnBox.maxY + F.labelGap + 0.6 * F.caption }, angle: 0, size: F.caption, anchor: "start", caption: true };
+    shape.texts.push(caption);
+    const box = unionBounds([drawnBox, textBox(caption)]);
+    const notes2 = [];
+    const n2 = sol.readings.length;
+    const from = n2 > 1 ? `from the first of ${n2} readings` : "from its reading";
+    const drawnKeys = new Set(shape.sides.map((x2) => x2.key).concat(DRAWN_FROM[e.figure.kind] ?? []));
+    for (const x2 of sol.conflicts) {
+      const made = derivedText(x2.derived, precision, figUnit);
+      notes2.push(drawnKeys.has(x2.key) ? `the ${name}: ${x2.label} is labelled ${x2.text}, which cannot hold; drawn ${made}, ${from}` : `the ${name}: ${x2.label} is labelled ${x2.text}, which cannot hold; the first of ${n2} readings makes it ${made}`);
+    }
+    if (!sol.conflicts.length && n2 > 1) notes2.push(`the ${name}: its labels read ${n2} ways; drawn from the first`);
+    for (const a of reading.assumes ?? []) {
+      const m = /^the corner at ([A-Z]) measures (\d+)°/.exec(a);
+      notes2.push(m ? `the ${name}: drawn as if the corner at ${m[1]} is right \u2014 the ink measures it ${m[2]}\xB0, a reading, not a fact` : `the ${name}: drawn on a reading \u2014 ${a}`);
+    }
+    if (figUnit !== U) notes2.push(`the ${name}: labelled in ${UNIT_WORDS2[figUnit]}, drawn in ${UNIT_WORDS2[U]}`);
+    return { e, shape, box, name, notes: notes2, precision, figUnit, reading };
+  });
+  const clauses = [];
+  const one = built.length === 1;
+  for (const b of built) {
+    const n2 = b.e.solution.readings.length;
+    const who = one ? "" : `the ${b.name} `;
+    if (b.e.solution.conflicts.length) clauses.push(`${who}drawn from the first of ${n2} readings: its labels conflict`);
+    else if (n2 > 1) clauses.push(`${who}drawn from the first of ${n2} readings`);
+    const assumed = b.reading.assumes?.[0] && /^the corner at ([A-Z])/.exec(b.reading.assumes[0]);
+    if (assumed) clauses.push(`${who}drawn as if the corner at ${assumed[1]} is right`);
+  }
+  const leftOut = omitted.filter((o) => o.labelled);
+  const unlabelled = omitted.filter((o) => !o.labelled);
+  if (leftOut.length) clauses.push(`${leftOut.length} figure${leftOut.length > 1 ? "s" : ""} left out`);
+  const subject = built.length === 0 ? "Nothing" : one ? `${article(built[0].e.figure.kind)} ${built[0].e.figure.kind}` : `${built.length} figures`;
+  const title = `${subject} at true size, in ${UNIT_WORDS2[U]}${clauses.length ? ` \u2014 ${clauses.join("; ")}` : ""}`;
+  const notes = [
+    ...built.flatMap((b) => b.notes),
+    ...leftOut.map((o) => `left out: the ${o.name} \u2014 ${o.reason}`),
+    ...unlabelled.length ? [`left out: ${unlabelled.length} mark${unlabelled.length > 1 ? "s" : ""} with no numbers on ${unlabelled.length > 1 ? "them" : "it"}`] : []
+  ];
+  const bar = SCALE_BAR[U];
+  const rowWidth = built.reduce((t, b) => t + (b.box.maxX - b.box.minX), 0) + F.gap * Math.max(0, built.length - 1);
+  const textWide = Math.max(rowWidth, F.minWidth, bar.length);
+  const heading = [];
+  let y = F.margin;
+  const titleLines = wrap(title, textWide, F.title);
+  for (const line of titleLines) {
+    heading.push({ text: line, at: { x: F.margin, y: y + 0.6 * F.title }, angle: 0, size: F.title, anchor: "start" });
+    y += 1.35 * F.title;
+  }
+  for (const note of notes) {
+    for (const line of wrap(note, textWide, F.note)) {
+      heading.push({ text: line, at: { x: F.margin, y: y + 0.6 * F.note }, angle: 0, size: F.note, anchor: "start" });
+      y += 1.35 * F.note;
+    }
+  }
+  const top = y + F.block;
+  let x = F.margin;
+  const placed2 = built.map((b) => {
+    const by = { x: x - b.box.minX, y: top - b.box.minY };
+    x += b.box.maxX - b.box.minX + F.gap;
+    const shape = moved(b.shape, by);
+    const box = { minX: b.box.minX + by.x, maxX: b.box.maxX + by.x, minY: b.box.minY + by.y, maxY: b.box.maxY + by.y };
+    return { ...b, shape, box };
+  });
+  const bottom2 = placed2.length ? Math.max(...placed2.map((p) => p.box.maxY)) : y;
+  const q = 10 ** places;
+  const pad = placed2.length ? expandBounds(unionBounds(placed2.map((p) => p.box)), F.labelGap) : null;
+  const region = pad ? { minX: Math.floor(pad.minX * q + 1e-6) / q, maxX: Math.ceil(pad.maxX * q - 1e-6) / q, minY: Math.floor(pad.minY * q + 1e-6) / q, maxY: Math.ceil(pad.maxY * q - 1e-6) / q } : { minX: 0, maxX: 0, minY: 0, maxY: 0 };
+  const barTop = bottom2 + F.block;
+  const barH = F.labelGap;
+  const steps = Math.round(bar.length / bar.step);
+  const barParts = [];
+  barParts.push(`<rect x="${w2.n(F.margin)}" y="${w2.n(barTop)}" width="${w2.n(bar.length)}" height="${w2.n(barH)}"/>`);
+  for (let i = 0; i < steps; i += 2) {
+    barParts.push(`<rect x="${w2.n(F.margin + i * bar.step)}" y="${w2.n(barTop)}" width="${w2.n(bar.step)}" height="${w2.n(barH)}" fill="currentColor" stroke="none"/>`);
+  }
+  const barName = `${formatNumber(bar.length, 4)} ${U}`;
+  for (let i = 0; i <= steps; i += bar.every) {
+    const label = i === steps ? barName : formatNumber(i * bar.step, 4);
+    const at = { x: F.margin + i * bar.step, y: barTop + barH + F.labelGap + 0.6 * F.note };
+    barParts.push(textEl(w2, { text: label, at, angle: 0, size: F.note, anchor: i === 0 ? "start" : "middle" }));
+  }
+  const barBottom = barTop + barH + F.labelGap + 1.2 * F.note;
+  const barRight = F.margin + bar.length + textWidth(barName, F.note) / 2;
+  const up = (v) => Math.ceil(v * q - 1e-6) / q;
+  const width = up(Math.max(x - F.gap + F.margin, F.margin + textWide + F.margin, barRight + F.margin));
+  const height = up(barBottom + F.margin);
+  const figureEls = placed2.map((p) => {
+    const lines = [`<g data-figure="${esc(p.e.figure.id)}" data-kind="${p.e.figure.kind}" data-name="${esc(p.name)}">`, outlineEl(w2, p.shape.outline)];
+    for (const k of p.shape.marks) lines.push(markEl(w2, k));
+    for (const t of p.shape.texts) lines.push(textEl(w2, t, t.caption ? ' data-caption="1"' : ""));
+    lines.push("</g>");
+    return lines.join("\n");
+  });
+  const piecesMarkup = placed2.length ? `<g ${styleOf(w2)}>
+${figureEls.join("\n")}
+</g>` : "";
+  const titleMarkup = `<g data-title="1" ${styleOf(w2)}>
+${heading.map((t, i) => textEl(w2, t, i < titleLines.length ? ' font-weight="600"' : "")).join("\n")}
+</g>`;
+  const barMarkup = `<g data-scale-bar="${barName}" ${styleOf(w2, F.thin)}>
+${barParts.join("\n")}
+</g>`;
+  const paper = PAPER[U];
+  const svg = [
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${fmt2(width * paper.per, places)}${paper.css}" height="${fmt2(height * paper.per, places)}${paper.css}" viewBox="0 0 ${w2.n(width)} ${w2.n(height)}">`,
+    `<title>${esc(title)}</title>`,
+    titleMarkup,
+    ...piecesMarkup ? [piecesMarkup] : [],
+    barMarkup,
+    "</svg>",
+    ""
+  ].join("\n");
+  const figures = placed2.map((p) => ({
+    id: p.e.figure.id,
+    ids: [...p.e.figure.ids],
+    kind: p.e.figure.kind,
+    name: p.name,
+    unit: p.figUnit,
+    vertices: p.shape.vertices,
+    sides: p.shape.sides,
+    ...p.shape.centre ? { centre: p.shape.centre } : {},
+    ...p.shape.radius !== void 0 ? { radius: p.shape.radius } : {},
+    bounds: pointBox(outlinePoints(p.shape.outline)),
+    box: p.box,
+    precision: p.precision,
+    reading: p.reading,
+    readings: p.e.solution.readings.length,
+    conflicts: p.e.solution.conflicts,
+    notes: p.notes
+  }));
+  return { svg, unit: U, width, height, title, notes, figures, omitted, print: { markup: piecesMarkup, region } };
+}
+
+// src/maths/print.ts
+var PAPERS = {
+  letter: { name: "Letter", width: 8.5, height: 11, unit: "in", margin: 0.5, pad: 0.15, big: 0.28, small: 0.09, thin: 0.01, cell: 0.16, mapCell: 0.6 },
+  a4: { name: "A4", width: 210, height: 297, unit: "mm", margin: 12, pad: 4, big: 7, small: 2.3, thin: 0.25, cell: 4, mapCell: 15 }
+};
+var PAGE_PLACES = { in: 4, mm: 3 };
+function rowName(r) {
+  let s = "";
+  for (let n2 = r + 1; n2 > 0; n2 = Math.floor((n2 - 1) / 26)) s = String.fromCharCode(65 + (n2 - 1) % 26) + s;
+  return s;
+}
+function amount(v, unit2) {
+  const q = quantity(v, unit2);
+  return systemOf(unit2) === "imperial" ? formatQuantity(q, { fractions: 16, words: true }) : formatQuantity(q, { words: true });
+}
+function tidy(v, places) {
+  return Number(fmt2(v, places));
+}
+function printTiled(doc, options = {}) {
+  const paper = options.paper ?? "letter";
+  const P = PAPERS[paper];
+  const orientation = options.orientation ?? "portrait";
+  const [pw, ph] = orientation === "landscape" ? [P.height, P.width] : [P.width, P.height];
+  const pu = P.unit;
+  const U = doc.unit;
+  const imperial = systemOf(U) === "imperial";
+  const k = unitFactor(U, pu);
+  const pn = (v) => fmt2(v, PAGE_PLACES[pu]);
+  const places = COORD_PLACES[U];
+  const dn = (v) => fmt2(v, places);
+  const testSquare = imperial ? { size: 1, unit: "in", text: "1 in" } : { size: 2, unit: "cm", text: "2 cm" };
+  const S = testSquare.size * unitFactor(testSquare.unit, pu);
+  const m = options.margin ? options.margin.lo * unitFactor(options.margin.unit ?? pu, pu) : P.margin;
+  const footer = S + 2 * P.pad;
+  const Wp = pw - 2 * m, Hp = ph - 2 * m - footer;
+  const od = options.overlap ? options.overlap.lo * unitFactor(options.overlap.unit ?? U, U) : imperial ? unitFactor("in", U) / 2 : unitFactor("cm", U);
+  const Wd = Wp / k, Hd = Hp / k;
+  const region = doc.print.region;
+  const rw = region.maxX - region.minX, rh = region.maxY - region.minY;
+  const base = {
+    paper,
+    orientation,
+    unit: U,
+    tile: { width: tidy(Wd, places), height: tidy(Hd, places) },
+    overlap: tidy(od, places),
+    region,
+    testSquare
+  };
+  const empty = (reason2, error) => ({ ...base, rows: 0, cols: 0, pages: [], assembly: "", html: "", reason: reason2, ...error ? { error } : {} });
+  if (!(rw > 0 && rh > 0) || !doc.print.markup) return empty("nothing to print: no figure is drawn at true size");
+  if (!(od >= 0) || Wd <= od || Hd <= od) {
+    const why = `the margins and a ${amount(od, U)} overlap leave no room on ${P.name} ${orientation}`;
+    return empty(`nothing to print: ${why}`, why);
+  }
+  const count = (len, tile) => len <= tile + 1e-9 ? 1 : Math.ceil((len - od) / (tile - od) - 1e-9);
+  const cols = count(rw, Wd), rows = count(rh, Hd);
+  const n2 = rows * cols;
+  const x0 = (c) => region.minX + c * (Wd - od);
+  const y0 = (r) => region.minY + r * (Hd - od);
+  const label = (r, c) => `${rowName(r)}${c + 1}`;
+  const F = imperial ? { rho: 0.12, font: 0.1, dash: 0.1, thin: 0.01, gap: 0.04 } : { rho: 3, font: 2.5, dash: 2.5, thin: 0.25, gap: 1 };
+  const kf = unitFactor(imperial ? "in" : "mm", U);
+  const longest = 2 * (rowName(rows - 1).length + String(cols).length) + 1;
+  const rho = Math.min(F.rho * kf, 0.4 * od), font = Math.min(F.font * kf, 0.9 * od / (0.6 * longest)), dash = F.dash * kf, gap = F.gap * kf;
+  const text = (x, y, t, anchor) => `<text x="${dn(x)}" y="${dn(y + 0.35 * font)}" font-size="${dn(font)}"${anchor === "middle" ? ' text-anchor="middle"' : ""} fill="currentColor" stroke="none">${esc(t)}</text>`;
+  const dashes = `stroke-dasharray="${dn(dash)} ${dn(dash)}"`;
+  const across = (r, c) => {
+    const x = x0(c + 1) + od / 2, top = y0(r), yM = top + Hd / 2;
+    const name = `${label(r, c)}|${label(r, c + 1)}`;
+    const below = yM + rho + gap + 1.2 * font + gap;
+    return [
+      `<g data-join="${name}">`,
+      `<path d="M ${dn(x)} ${dn(top)} L ${dn(x)} ${dn(yM - rho)} M ${dn(x)} ${dn(below)} L ${dn(x)} ${dn(top + Hd)}" ${dashes}/>`,
+      `<circle cx="${dn(x)}" cy="${dn(yM)}" r="${dn(rho)}"/>`,
+      `<path d="M ${dn(x - rho)} ${dn(yM)} L ${dn(x + rho)} ${dn(yM)} M ${dn(x)} ${dn(yM - rho)} L ${dn(x)} ${dn(yM + rho)}"/>`,
+      text(x, yM + rho + gap + 0.6 * font, name, "middle"),
+      "</g>"
+    ].join("\n");
+  };
+  const down = (r, c) => {
+    const y = y0(r + 1) + od / 2, left = x0(c), xM = left + Wd / 2;
+    const name = `${label(r, c)}/${label(r + 1, c)}`;
+    const after = xM + rho + gap + textWidth(name, font) + gap;
+    return [
+      `<g data-join="${name}">`,
+      `<path d="M ${dn(left)} ${dn(y)} L ${dn(xM - rho)} ${dn(y)} M ${dn(after)} ${dn(y)} L ${dn(left + Wd)} ${dn(y)}" ${dashes}/>`,
+      `<circle cx="${dn(xM)}" cy="${dn(y)}" r="${dn(rho)}"/>`,
+      `<path d="M ${dn(xM - rho)} ${dn(y)} L ${dn(xM + rho)} ${dn(y)} M ${dn(xM)} ${dn(y - rho)} L ${dn(xM)} ${dn(y + rho)}"/>`,
+      text(xM + rho + gap, y, name, "start"),
+      "</g>"
+    ].join("\n");
+  };
+  const square = testSquare.text;
+  const sentences = [
+    `Measure this square before you cut: it must be exactly ${square} on each side.`,
+    "If it is not, the printer scaled this page: print again at 100% (actual size), not fit to page.",
+    `Pages overlap by ${amount(od, U)}: trim one along a dashed line and lay it over its neighbour, matching the \u2295 marks.`
+  ];
+  const lastPage = `page ${n2} of ${n2}`;
+  const colW = Math.max(textWidth("W".repeat(rowName(rows - 1).length + String(cols).length), P.big), textWidth(lastPage, P.small));
+  const gap2 = 1.5 * P.pad;
+  const cell = Math.min(P.cell, S / rows, 1.6 * S / cols);
+  const fy = ph - m - footer;
+  const mapRight = pw - m - colW - gap2;
+  const mapLeft = mapRight - cols * cell;
+  const textLeft = m + S + gap2;
+  const textWide = Math.max(mapLeft - gap2 - textLeft, 10 * P.small);
+  const words = sentences.flatMap((s) => wrap(s, textWide, P.small));
+  const style = (thin2) => `fill="none" stroke="currentColor" stroke-width="${pn(thin2)}" stroke-linecap="round" stroke-linejoin="round" font-family="${FONT_FAMILY}"`;
+  const pages = [];
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const name = label(r, c);
+      const index = pages.length;
+      const joins = [];
+      if (r > 0) joins.push(down(r - 1, c));
+      if (c > 0) joins.push(across(r, c - 1));
+      if (c < cols - 1) joins.push(across(r, c));
+      if (r < rows - 1) joins.push(down(r, c));
+      const e = m - k * x0(c), f = m - k * y0(r);
+      const footerEls = [];
+      footerEls.push(`<rect data-test-square="${square}" x="${pn(m)}" y="${pn(fy + P.pad)}" width="${pn(S)}" height="${pn(S)}" fill="currentColor" fill-opacity="0.12" stroke="none"/>`);
+      footerEls.push(`<rect x="${pn(m + P.thin / 2)}" y="${pn(fy + P.pad + P.thin / 2)}" width="${pn(S - P.thin)}" height="${pn(S - P.thin)}"/>`);
+      footerEls.push(`<text x="${pn(m + S / 2)}" y="${pn(fy + P.pad + S / 2 + 0.35 * P.small)}" font-size="${pn(P.small)}" text-anchor="middle" fill="currentColor" stroke="none">${esc(square)}</text>`);
+      words.forEach((line, i) => {
+        footerEls.push(`<text x="${pn(textLeft)}" y="${pn(fy + P.pad + (i + 0.8) * 1.3 * P.small)}" font-size="${pn(P.small)}" fill="currentColor" stroke="none">${esc(line)}</text>`);
+      });
+      for (let rr = 0; rr < rows; rr++) {
+        for (let cc = 0; cc < cols; cc++) {
+          const here = rr === r && cc === c;
+          footerEls.push(`<rect data-cell="${label(rr, cc)}"${here ? ' data-here="1"' : ""} x="${pn(mapLeft + cc * cell)}" y="${pn(fy + P.pad + rr * cell)}" width="${pn(cell)}" height="${pn(cell)}"${here ? ' fill="currentColor"' : ""}/>`);
+        }
+      }
+      footerEls.push(`<text x="${pn(pw - m)}" y="${pn(fy + P.pad + 0.8 * P.big)}" font-size="${pn(P.big)}" font-weight="600" text-anchor="end" fill="currentColor" stroke="none">${name}</text>`);
+      footerEls.push(`<text x="${pn(pw - m)}" y="${pn(fy + P.pad + P.big + 1.3 * P.small)}" font-size="${pn(P.small)}" text-anchor="end" fill="currentColor" stroke="none">page ${index + 1} of ${n2}</text>`);
+      const svg = [
+        `<svg xmlns="http://www.w3.org/2000/svg" width="${pn(pw)}${pu}" height="${pn(ph)}${pu}" viewBox="0 0 ${pn(pw)} ${pn(ph)}" data-page="${name}">`,
+        `<title>${esc(`${name} \xB7 page ${index + 1} of ${n2} \xB7 ${doc.title}`)}</title>`,
+        `<defs><clipPath id="mm-tile-${name}"><rect x="${pn(m)}" y="${pn(m)}" width="${pn(Wp)}" height="${pn(Hp)}"/></clipPath></defs>`,
+        `<g clip-path="url(#mm-tile-${name})">`,
+        `<g transform="matrix(${fmt2(k, 10)} 0 0 ${fmt2(k, 10)} ${pn(e)} ${pn(f)})">`,
+        doc.print.markup,
+        ...joins.length ? [`<g ${style(F.thin * kf)}>`, ...joins, "</g>"] : [],
+        "</g>",
+        "</g>",
+        `<rect data-tile-frame="${name}" x="${pn(m)}" y="${pn(m)}" width="${pn(Wp)}" height="${pn(Hp)}" fill="none" stroke="currentColor" stroke-width="${pn(P.thin)}" stroke-opacity="0.35"/>`,
+        `<g data-footer="${name}" ${style(P.thin)}>`,
+        ...footerEls,
+        "</g>",
+        "</svg>",
+        ""
+      ].join("\n");
+      pages.push({
+        label: name,
+        row: r,
+        col: c,
+        index,
+        region: { minX: tidy(x0(c), places), maxX: tidy(x0(c) + Wd, places), minY: tidy(y0(r), places), maxY: tidy(y0(r) + Hd, places) },
+        svg
+      });
+    }
+  }
+  const mc = P.mapCell;
+  const assembly = [
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${pn(cols * mc)}${pu}" height="${pn(rows * mc)}${pu}" viewBox="0 0 ${pn(cols * mc)} ${pn(rows * mc)}" data-assembly="${cols}\xD7${rows}">`,
+    `<g ${style(P.thin)}>`,
+    ...pages.map((p) => [
+      `<rect data-cell="${p.label}" x="${pn(p.col * mc)}" y="${pn(p.row * mc)}" width="${pn(mc)}" height="${pn(mc)}"/>`,
+      `<text x="${pn((p.col + 0.5) * mc)}" y="${pn((p.row + 0.5) * mc + 0.35 * 0.3 * mc)}" font-size="${pn(0.3 * mc)}" text-anchor="middle" fill="currentColor" stroke="none">${p.label}</text>`
+    ].join("\n")),
+    "</g>",
+    "</svg>"
+  ].join("\n");
+  const pages1 = n2 === 1 ? "page" : "pages";
+  const reason = `${n2} ${pages1}, ${cols} across and ${rows} down, on ${P.name} ${orientation} at 100%: each shows ${formatNumber(Wd, 2)} \xD7 ${formatNumber(Hd, 2)} ${U} of the drawing, and neighbours share ${amount(od, U)}; measure the ${square} square on any page before cutting`;
+  const sheetW = `${pn(pw)}${pu}`, sheetH = `${pn(ph)}${pu}`;
+  const html = [
+    "<!doctype html>",
+    '<html lang="en">',
+    "<head>",
+    '<meta charset="utf-8">',
+    `<title>${esc(`${doc.title} \u2014 ${n2} ${pages1}, ${P.name} ${orientation}`)}</title>`,
+    "<style>",
+    `@page { size: ${sheetW} ${sheetH}; margin: 0; }`,
+    "html, body { margin: 0; padding: 0; background: #fff; color: #000; }",
+    `.sheet { width: ${sheetW}; height: ${sheetH}; overflow: hidden; break-after: page; page-break-after: always; }`,
+    ".sheet:last-child { break-after: auto; page-break-after: auto; }",
+    `.sheet > svg { display: block; width: ${sheetW}; height: ${sheetH}; }`,
+    `.guide { font: 14px/1.5 ${FONT_FAMILY}; max-width: 46em; margin: 0 auto; padding: 24px 16px; }`,
+    ".guide svg { display: block; max-width: 100%; height: auto; margin-top: 16px; }",
+    "@media screen { body { background: #e9e7e2; } .sheet { margin: 24px auto; background: #fff; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3); } }",
+    "@media print { .guide { display: none; } }",
+    "</style>",
+    "</head>",
+    "<body>",
+    '<div class="guide">',
+    `<h1>${esc(doc.title)}</h1>`,
+    `<p>${esc(`${n2} ${pages1}, ${cols} across and ${rows} down, on ${P.name} ${orientation}.`)}</p>`,
+    "<ol>",
+    "<li>Print at 100% \u2014 \u201Cactual size\u201D \u2014 with fit to page turned off.</li>",
+    `<li>${esc(`Measure the square on the first page before you cut: it must be exactly ${square} on each side. If it is not, the printer scaled the page; print again.`)}</li>`,
+    `<li>${esc(`Lay the pages out as the map shows, A1 at the top left. Pages overlap by ${amount(od, U)}: trim one along a dashed line, lay it over its neighbour with the \u2295 marks on each other, and tape.`)}</li>`,
+    "</ol>",
+    assembly,
+    "</div>",
+    ...pages.map((p) => `<section class="sheet" aria-label="page ${p.label}">
+${p.svg}</section>`),
+    "</body>",
+    "</html>",
+    ""
+  ].join("\n");
+  return { ...base, rows, cols, pages, assembly, html, reason };
 }
 
 // src/session/words.ts
@@ -6993,8 +7837,8 @@ function force(term, world, speed = DEFAULT_SPEED) {
   const me = world.me, w2 = term.weight;
   switch (term.verb) {
     case "wander": {
-      const turn = num(term, "turn", 0.9);
-      const a = me.heading + (world.rng() - 0.5) * turn;
+      const turn2 = num(term, "turn", 0.9);
+      const a = me.heading + (world.rng() - 0.5) * turn2;
       return { fx: Math.cos(a) * speed * 0.5 * w2, fy: Math.sin(a) * speed * 0.5 * w2, reasoning: "wandering" };
     }
     case "seek": {
@@ -7264,7 +8108,7 @@ function fit2(demo, basis, worldAt, speed = 120, body = {}) {
     return [f.fx, f.fy];
   }));
   const target = rows.map((r) => r.a);
-  const norm = Math.sqrt(target.reduce((s, a) => s + a[0] * a[0] + a[1] * a[1], 0)) || 1;
+  const norm2 = Math.sqrt(target.reduce((s, a) => s + a[0] * a[0] + a[1] * a[1], 0)) || 1;
   const residualOf = (w2) => {
     let s = 0;
     for (let i = 0; i < rows.length; i++) {
@@ -7275,7 +8119,7 @@ function fit2(demo, basis, worldAt, speed = 120, body = {}) {
       }
       s += (px - target[i][0]) ** 2 + (py - target[i][1]) ** 2;
     }
-    return Math.sqrt(s) / norm;
+    return Math.sqrt(s) / norm2;
   };
   const k = candidates.length;
   const G = Array.from({ length: k }, () => new Array(k).fill(0));
@@ -7292,9 +8136,9 @@ function fit2(demo, basis, worldAt, speed = 120, body = {}) {
   }
   const solve = (lambda, mask2) => {
     const w2 = new Array(k).fill(0);
-    const shrink = lambda * norm * norm;
+    const shrink = lambda * norm2 * norm2;
     for (let sweep2 = 0; sweep2 < 400; sweep2++) {
-      let moved = 0;
+      let moved2 = 0;
       for (let j = 0; j < k; j++) {
         if (mask2 && !mask2[j]) {
           w2[j] = 0;
@@ -7304,10 +8148,10 @@ function fit2(demo, basis, worldAt, speed = 120, body = {}) {
         let r = bvec[j];
         for (let i = 0; i < k; i++) if (i !== j) r -= G[j][i] * w2[i];
         const next = Math.max(0, (r - shrink) / G[j][j]);
-        moved = Math.max(moved, Math.abs(next - w2[j]));
+        moved2 = Math.max(moved2, Math.abs(next - w2[j]));
         w2[j] = next;
       }
-      if (moved < 1e-9) break;
+      if (moved2 < 1e-9) break;
     }
     return w2;
   };
@@ -7848,7 +8692,7 @@ function whyNotResolved(checkFp, checkAt, lassoFp, lassoAt, config = DEFAULT_GES
     const engaged = strokes && strokesIntersect(strokes.check, strokes.lasso) || boundsOverlap(checkFp.bounds, lassoFp.bounds);
     return {
       reason: "not-the-mark",
-      detail: match.failedOn ? `that is not ${named(mark.name)} \u2014 ${readable(match.failedOn)}` : `that is not ${named(mark.name)}`,
+      detail: match.failedOn ? `that is not ${named(mark.name)} \u2014 ${readable2(match.failedOn)}` : `that is not ${named(mark.name)}`,
       nearMiss: !!engaged && !checkFp.isClosed
     };
   }
@@ -7861,7 +8705,7 @@ function whyNotResolved(checkFp, checkAt, lassoFp, lassoAt, config = DEFAULT_GES
 function named(name) {
   return /^(your|my|the)\b/i.test(name) ? name : `a ${name}`;
 }
-function readable(feature) {
+function readable2(feature) {
   switch (feature) {
     case "armRatio":
       return "its two halves are the wrong lengths";
@@ -8166,7 +9010,7 @@ var prompt = (id, label, seed, hint) => ({
   effect: { kind: "prompt", seed },
   hint
 });
-var tidy = (axis) => ({
+var tidy2 = (axis) => ({
   id: `tidy-${axis}`,
   label: axis === "row" ? "Line up across" : "Line up down",
   tier: 1,
@@ -8274,7 +9118,7 @@ var BUILTIN_CONCEPTS = [
     name: "row",
     describes: "peers side by side",
     conversions: [
-      tidy("row"),
+      tidy2("row"),
       EQUALIZE,
       NAME,
       prompt("nav", "Make a nav bar", "a navigation bar", "links across the top"),
@@ -8288,7 +9132,7 @@ var BUILTIN_CONCEPTS = [
     name: "column",
     describes: "peers stacked",
     conversions: [
-      tidy("column"),
+      tidy2("column"),
       EQUALIZE,
       NAME,
       prompt("list", "Make a list", "a vertical list of items", "one item per row"),
@@ -8613,8 +9457,8 @@ var SAFE_TAGS = /* @__PURE__ */ new Set([
   "figure",
   "form"
 ]);
-var esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
-var styleAttr = (s) => esc(s).replace(/\n/g, " ");
+var esc2 = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+var styleAttr = (s) => esc2(s).replace(/\n/g, " ");
 function renderNode(node, content, depth2) {
   const pad = "  ".repeat(depth2);
   const own = node.region ? content[node.id] : void 0;
@@ -8696,8 +9540,8 @@ function validateRegions(code, expected) {
 }
 
 // src/parse/graph.ts
-var esc2 = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
-var styleAttr2 = (s) => esc2(s).replace(/\n/g, " ");
+var esc3 = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+var styleAttr2 = (s) => esc3(s).replace(/\n/g, " ");
 var SAFE_TAGS2 = /* @__PURE__ */ new Set(["div", "section", "article", "aside", "figure", "header", "footer", "nav", "main", "form"]);
 function closest(points, to) {
   let best = 0;
@@ -9302,7 +10146,7 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
     if (!name) return null;
     const memberIds = summon.enclosedIds;
     const memberBounds = memberIds.map((id) => boundsOf(nodes.get(id)));
-    const unionBounds = getBounds(
+    const unionBounds2 = getBounds(
       memberBounds.flatMap((b) => [
         { x: b.minX, y: b.minY },
         { x: b.maxX, y: b.maxY }
@@ -9315,7 +10159,7 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
       id: nextId("artifact"),
       reps: [
         { modality: "word", data: name, source: named2 },
-        { modality: "bounds", data: unionBounds },
+        { modality: "bounds", data: unionBounds2 },
         { modality: "signature", data: signatureOf(memberIds), source: TIER0_PARTICIPANT }
       ],
       edges: [
@@ -9488,12 +10332,12 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
       const start = axis === "row" ? span.minX : span.minY;
       const end = axis === "row" ? span.maxX : span.maxY;
       const gap = ordered2.length > 1 ? (end - start - total) / (ordered2.length - 1) : 0;
-      const cross = ordered2.reduce((acc, t) => acc + (axis === "row" ? (t.bounds.minY + t.bounds.maxY) / 2 : (t.bounds.minX + t.bounds.maxX) / 2), 0) / ordered2.length;
+      const cross2 = ordered2.reduce((acc, t) => acc + (axis === "row" ? (t.bounds.minY + t.bounds.maxY) / 2 : (t.bounds.minX + t.bounds.maxX) / 2), 0) / ordered2.length;
       let cursor = start;
       placed2 = ordered2.map((t, i) => {
         const size = sizes[i];
         const half = (axis === "row" ? h2(t.bounds) : w2(t.bounds)) / 2;
-        const to = axis === "row" ? { minX: cursor, maxX: cursor + size, minY: cross - half, maxY: cross + half } : { minX: cross - half, maxX: cross + half, minY: cursor, maxY: cursor + size };
+        const to = axis === "row" ? { minX: cursor, maxX: cursor + size, minY: cross2 - half, maxY: cross2 + half } : { minX: cross2 - half, maxX: cross2 + half, minY: cursor, maxY: cursor + size };
         cursor += size + gap;
         return { id: t.id, to };
       });
@@ -9698,8 +10542,8 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
     node.reps.push({ modality: "transform", data: to, source: "user" });
   }
   function frameBounds(node) {
-    const moved = getRep(node, "transform")?.data;
-    if (moved) return moved;
+    const moved2 = getRep(node, "transform")?.data;
+    if (moved2) return moved2;
     return fingerprintOf(node)?.bounds;
   }
   function applyMove(ev) {
@@ -11847,6 +12691,7 @@ export {
   BUILTIN_CONCEPTS,
   BUILTIN_TYPES,
   COMMAND_MARK_SAMPLES,
+  COORD_PLACES,
   DEFAULT_CORNER_OPTIONS,
   DEFAULT_ERASE_CROSSINGS,
   DEFAULT_FILE_LIMIT,
@@ -11888,6 +12733,7 @@ export {
   MIN_CONFIDENCE,
   MemoryStore,
   NO_MATCH,
+  PAPERS,
   PHRASES,
   PRESETS,
   RIGHT_ANGLE_TOLERANCE,
@@ -12102,6 +12948,7 @@ export {
   planFor,
   polygonFigure,
   prepare,
+  printTiled,
   providerLabel,
   providerLocality,
   providerTier,
@@ -12163,6 +13010,7 @@ export {
   tracePaths,
   transcriptOf,
   transcriptsOf,
+  trueSize,
   typeNodeId,
   validateRegions,
   wallBoxes,
