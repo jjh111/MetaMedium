@@ -196,6 +196,33 @@ try {
   const notHis = await call('canvas_label', { id: panelId, text: 'not mine' });
   check('canvas_label is refused on the tab\'s artifact, with the reason in words', /was made by tab/.test(textOf(notHis)) && /your own ink/.test(textOf(notHis)) && !/“not mine” on/.test(textOf(notHis)), textOf(notHis));
 
+  // ===== A word is made by whoever wrote its letters (V1-PLAN L2g) ===========
+  // The tab prints N, A, V — four strokes that gather into a word — and puts a
+  // word on it. The gathering wrote every word made-by the READER, so on the
+  // hand's board the tab's word read as the hand's: the tab's label on it was
+  // dropped, no "by tab" was said, and the hand could label it.
+  const seg = (a, b) => Array.from({ length: 14 }, (_, i) => ({ x: a.x + ((b.x - a.x) * i) / 13, y: a.y + ((b.y - a.y) * i) / 13 }));
+  const printNAV = (x, y, h) => [
+    seg({ x, y: y + h }, { x, y }).concat(seg({ x, y }, { x: x + 18, y: y + h }).slice(1), seg({ x: x + 18, y: y + h }, { x: x + 18, y }).slice(1)),
+    seg({ x: x + 26, y: y + h }, { x: x + 36, y }).concat(seg({ x: x + 36, y }, { x: x + 46, y: y + h }).slice(1)),
+    seg({ x: x + 30, y: y + h * 0.6 }, { x: x + 42, y: y + h * 0.6 }),
+    seg({ x: x + 54, y }, { x: x + 64, y: y + h }).concat(seg({ x: x + 64, y: y + h }, { x: x + 74, y }).slice(1)),
+  ];
+  const navAt = Date.now() + 10;
+  const navLetters = printNAV(100, 900, 30).map((pts, i) => tabSession.addStroke(pts, navAt + 400 * i, undefined, 1));
+  const navState = tabSession.getState();
+  const navId = navState.contentIds.find((id) => MM.isWord(navState.nodes.get(id)) && MM.lettersOf(navState.nodes.get(id)).includes(navLetters[0]));
+  const navLabelled = navId && tabSession.label({ nodeId: navId, text: 'nav', at: navAt + 2000 });
+  await tab.publish(tabSession.getEvents().filter((e) => !e.by));
+  const navLine = (text) => (navId && text.split('\n').find((l) => l.startsWith(navId + ' '))) || '';
+  let t7 = '';
+  for (let i = 0; i < 25 && !navLine(t7); i++) { t7 = textOf(await call('canvas_look', {})); if (!navLine(t7)) await wait(100); }
+  check('the tab prints a word and labels it: on the hand\'s board the word is the tab\'s, with the tab\'s label on it',
+    !!navId && navLabelled === navId && /a word of 4 strokes/.test(navLine(t7)) && /by tab/.test(navLine(t7)) && /labelled “nav”/.test(navLine(t7)),
+    { navId, labelled: navLabelled, line: navLine(t7) });
+  const notHisWord = await call('canvas_label', { id: navId, text: 'not mine' });
+  check('canvas_label is refused on the tab\'s word, with the reason in words', /was made by tab/.test(textOf(notHisWord)) && /your own ink/.test(textOf(notHisWord)) && !/“not mine” on/.test(textOf(notHisWord)), textOf(notHisWord));
+
   // ===== Two hands in one room: an id crosses the boundary (T8) =============
   // The defect: a node id used to be a counter over the MERGED replay, and no
   // two hands in a room merge the same set of logs. A SECOND tab whose mark

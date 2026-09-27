@@ -2415,5 +2415,86 @@ window.__scenario = async function(){
     mm.session.load([]); mm.setView(1, 0, 0);
   }
 
+  // ---- 44. A word is made by whoever wrote its letters (V1-PLAN L2g) ----
+  // Printed letters gather into a word, and the gathering wrote every word made
+  // by this board's own hand: fern's word read as this hand's here, her label on
+  // it was dropped, and this hand could label it. And gathering never asked whose
+  // a letter was: a mark of this hand's that the merge set between two of her
+  // letters broke her run, and a letter printed beside her word joined it. A word
+  // is one hand's run.
+  {
+    mm.session.load([]); mm.setView(1, 0, 0);
+    const S = (x, y) => mm.worldToScreen(x, y);
+    const seg44 = (a, b) => t.line(a, b, 14);
+    // N, A in two strokes, and V, as a hand prints them: 30 units tall, in the board's units.
+    const nav44 = (x, y) => [
+      seg44({ x, y: y + 30 }, { x, y }).concat(seg44({ x, y }, { x: x + 18, y: y + 30 }).slice(1), seg44({ x: x + 18, y: y + 30 }, { x: x + 18, y }).slice(1)),
+      seg44({ x: x + 26, y: y + 30 }, { x: x + 36, y }).concat(seg44({ x: x + 36, y }, { x: x + 46, y: y + 30 }).slice(1)),
+      seg44({ x: x + 30, y: y + 18 }, { x: x + 42, y: y + 18 }),
+      seg44({ x: x + 54, y }, { x: x + 64, y: y + 30 }).concat(seg44({ x: x + 64, y: y + 30 }, { x: x + 74, y }).slice(1)),
+    ];
+    const wordHolding44 = (s, letter) => s.contentIds.find((id) => MM.isWord(s.nodes.get(id)) && MM.lettersOf(s.nodes.get(id)).includes(letter));
+    // This hand prints an I on the line, well to the right of where fern's word will stand.
+    const i0 = S(500, 300), i1 = S(500, 330);
+    t.stroke(t.line(i0, i1, 14));
+    const mine44 = mm.session.getEvents().filter((e) => !e.by);
+    const myI44 = mm.session.getState().contentIds[0];
+    const myAt44 = mine44[mine44.length - 1].at;
+    // Fern prints N A V on her own board — her A's crossbar a moment AFTER this hand's I,
+    // so the merge sets this hand's mark between two of her letters — and puts a word on hers.
+    const fern44 = MM.createSession(Object.assign({}, MM.DEFAULT_SESSION_CONFIG, { logName: 'fern~f1' }));
+    const hers44 = nav44(300, 300).map((pts, i) => fern44.addStroke(pts, myAt44 + [-800, -400, 400, 800][i], undefined, 1));
+    const word44 = wordHolding44(fern44.getState(), hers44[0]);
+    const worded44 = word44 && fern44.label({ nodeId: word44, text: 'nav', at: myAt44 + 1200 });
+    mm.session.load(MM.mergeLogs({ 'fern~f1': fern44.getEvents().filter((e) => !e.by), 'me~m1': mine44 }, { me: 'me~m1' })); await wait(30);
+    // The panel reports on the mark the pointer rests on: rest it on her word.
+    const w44 = S(337, 315);
+    document.getElementById('canvas').dispatchEvent(new PointerEvent('pointermove', { pointerId: 1, isPrimary: true, bubbles: true, clientX: w44.x, clientY: w44.y, buttons: 0 }));
+    await wait(30);
+    const s44 = mm.session.getState();
+    const node44 = word44 && s44.nodes.get(word44);
+    const panel44 = document.getElementById('inspector').textContent;
+    step('44. fern\'s word stands whole on this board — her four letters, though the merge set this hand\'s I between two of them — and it is hers, as the panel says; the I is this hand\'s, alone',
+      !!node44 && MM.isWord(node44) && JSON.stringify(MM.lettersOf(node44)) === JSON.stringify(hers44)
+        && MM.authorOf(node44) === 'participant:hand:fern_f1' && /word/.test(panel44) && /by\s*fern/.test(panel44)
+        && s44.contentIds.includes(myI44) && MM.authorOf(s44.nodes.get(myI44)) === MM.LOCAL_PARTICIPANT,
+      { word: word44, letters: node44 && MM.lettersOf(node44), hers: hers44, maker: node44 && MM.authorOf(node44), content: s44.contentIds, panel: panel44.slice(0, 200) });
+    const lab44 = (typeof mm.labelsDrawn === 'function' ? mm.labelsDrawn() : []).find((l) => l.id === word44);
+    step('44a. her label on her word survives this board\'s replay, drawn in her colour and attributed to her',
+      !!word44 && worded44 === word44 && !!lab44 && lab44.text === 'nav' && lab44.colour === mm.handColour('fern') && lab44.who === 'fern',
+      { worded: worded44, label: lab44, hue: mm.handColour('fern') });
+    // Held, her word is not this hand's to label: the line says so before Enter, and Enter writes nothing.
+    t.stroke(t.circle(w44.x, w44.y, 90)); t.takeLoop(w44.x, w44.y, 90); await wait(60);
+    const held44 = mm.session.getState().summon;
+    t.typeIn('label: mine');
+    const line44 = t.readingLine();
+    const evs44 = mm.session.getEvents().length;
+    t.typeEnter('label: mine'); await wait(60);
+    const status44 = document.getElementById('status').textContent;
+    step('44b. held, fern\'s word is not this hand\'s to label: the line says so before Enter, and Enter writes nothing',
+      !!held44 && held44.enclosedIds.length === 1 && held44.enclosedIds[0] === word44 && line44 === '↵ no label — fern made this mark; a label goes on your own ink'
+        && !mm.session.getEvents().slice(evs44).some((e) => e.type === 'label') && (MM.labelOf(mm.session.getState().nodes.get(word44)) || {}).text === 'nav'
+        && /no label on the mark fern made/.test(status44),
+      { held: held44 && held44.enclosedIds, line: line44, status: status44, events: mm.session.getEvents().slice(evs44).map((e) => e.type) });
+    // Live: fern has just printed a word, and this hand prints a letter beside it — on her
+    // line, a letter's gap from her V, within the moment a word is written. It stays this hand's.
+    const fern44c = MM.createSession(Object.assign({}, MM.DEFAULT_SESSION_CONFIG, { logName: 'fern~f2' }));
+    const now44 = Date.now();
+    const hers44c = nav44(300, 500).map((pts, i) => fern44c.addStroke(pts, now44 - 1600 + 400 * i, undefined, 1));
+    const word44c = wordHolding44(fern44c.getState(), hers44c[0]);
+    mm.session.load(MM.mergeLogs({ 'fern~f2': fern44c.getEvents().filter((e) => !e.by), 'me~m1': [] }, { me: 'me~m1' })); await wait(30);
+    const j0 = S(382, 500), j1 = S(382, 530);
+    t.stroke(t.line(j0, j1, 14)); await wait(30);
+    const s44c = mm.session.getState();
+    const myJ44 = [...s44c.nodes.values()].find((n) => !!MM.strokePointsOf(n) && MM.authorOf(n) === MM.LOCAL_PARTICIPANT);
+    const herWord44c = word44c && s44c.nodes.get(word44c);
+    step('44c. a letter this hand prints beside her word — on her line, a letter\'s gap from it, just after she wrote it — never joins it: a word is one hand\'s run',
+      !!herWord44c && JSON.stringify(MM.lettersOf(herWord44c)) === JSON.stringify(hers44c) && MM.authorOf(herWord44c) === 'participant:hand:fern_f2'
+        && !!myJ44 && s44c.contentIds.includes(myJ44.id) && !wordHolding44(s44c, myJ44.id),
+      { word: word44c, letters: herWord44c && MM.lettersOf(herWord44c), hers: hers44c, mine: myJ44 && myJ44.id, content: s44c.contentIds });
+    document.getElementById('canvas').dispatchEvent(new PointerEvent('pointerleave', { pointerId: 1, isPrimary: true, bubbles: true }));
+    mm.session.load([]); mm.setView(1, 0, 0);
+  }
+
   return R;
 };
