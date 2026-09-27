@@ -392,6 +392,16 @@ does the board (and checks a step's value on an edge with `checkWritten`);
 `measure(node, nodes, board)` speaks the drawing's unit for a mark with
 labels and is unchanged for one without.
 
+**True size and print** (M7). `maths/truesize.ts` draws solved figures at
+their real size as **a new SVG built from the numbers, never from the ink**
+— the root in paper units (`width="24.5in"`), the viewBox in the drawing's
+unit, each figure from the solver's first reading squared to the page,
+labels as written and a derived length a place finer than they were
+written — and `maths/print.ts` tiles it onto Letter or A4 at 100%, with
+overlap and ⊕ marks both neighbours print, grid labels, a map, and **a
+measured test square (1 in, or 2 cm) on every page**, because a printer
+scales without saying so.
+
 ### Clean forms: a confident reading, redrawn
 
 > `metamedium-core/src/session/clean.ts` — `snapReading`, `idealize`,

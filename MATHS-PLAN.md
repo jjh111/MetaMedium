@@ -227,6 +227,43 @@ arrows as spans; figures of several strokes (E3's, through
 `polygonFigure`); an oval; the decision seat for a flat attachment (J1); the
 surface (M5).
 
+**Status, 27 Sep 2026: M7 (core) built — true size and print** (branch
+`w2-maths`; red `cb00056`; built `b805358`, `f4a9bcf`). `truesize.ts` —
+`trueSize(board)` draws solved figures at their real size as a **new SVG
+document built from the numbers, never from the ink**: the root is paper
+(`width="24.5in"`, or cm or mm) and the viewBox is in the drawing's unit,
+so 24″ prints as twenty-four inches. Each figure is drawn from the solver's
+first reading — a triangle from its three sides, a rectangle from its width
+and height, a circle from its radius, an arc from its chord and rise, a line
+from its length — squared to the page on the side the ink draws nearest
+level or plumb, its corners going round the way the ink's do, which is all
+the ink supplies. Labels are set as written; a derived length a place finer
+than the finest label on its figure (24 and 8 make *25.3″*, eighths make
+sixteenths), so it agrees with a ruler and claims no more than was written;
+coordinates are written to a fixed resolution finer than a printer's dot
+(`COORD_PLACES`), so the same figures give the same bytes. Labels that
+conflict are drawn from the first reading, the title says so (*drawn from
+the first of 2 readings: its labels conflict*) and the side carries *25.3″
+(labelled 24)*; a figure its labels do not fix — a quadrilateral's sides
+alone, a rectangle with one side, a range, a bare number — is left out and
+listed. Figures stand apart in a row, because they were solved apart; a
+scale bar closes the page. `print.ts` — `printTiled(doc, { paper,
+orientation })` tiles the pieces with their labels onto Letter or A4: each
+page an SVG the sheet's size, the drawing placed by one transform and
+clipped; neighbours share ½ in (1 cm for a metric drawing), with a dashed
+line and a ⊕ labelled *A1|A2* printed identically on both; a grid label, a
+map, and a **test square of exactly 1 in (2 cm for a metric drawing) with
+the sentence to measure it before cutting** on every page; and one HTML
+document that prints them one per sheet at 100%. The 22″ × 56″ piece on
+Letter: ½ in margins and a 1.3 in footer leave 7.5 × 8.7 in a page,
+advancing 7 × 8.2, so 22.5 × 56.8 in of piece and labels take 4 across and
+7 down — 28 pages; headless Chromium printed the HTML as 28 PDF pages of
+612 × 792 pt with the square exactly 1 in. 29 tests (truesize 18, print 11);
+maths 168 in 8 files; core 844 in 65 (815 in 63). Not yet: the surface
+(M5's *draw it to scale* and the export pane); several figures assembled
+into one piece, which would mean solving them together; grain lines, notches
+and seam allowance (M6); leaving out a page with nothing on it.
+
 ## 5. The middle layer — seats that judge
 
 TypeSafe's own guidance for Jev is the pattern this engine already follows:
