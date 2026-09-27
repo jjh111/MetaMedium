@@ -2311,9 +2311,13 @@
     ctx.stroke();
   }
 
+  /** The colour each mark's ink was stroked in by the last paint, by node id. For tests. */
+  const inkDrawn = new Map();
+
   function inkOf(node, style) {
     const points = MM.strokePointsOf(node);
     if (points) {
+      inkDrawn.set(node.id, style.color);
       const clean = MM.cleanPointsOf(node);
       if (clean) {
         // Snapped: the clean form in front, the hand's ink faint beneath it.
@@ -2350,7 +2354,11 @@
     for (const e of node.edges) { // artifact: draw its members (transparent within)
       if (e.rel !== 'has-part') continue;
       const m = state.nodes.get(e.to);
-      if (m && !m.reps.some((r) => r.modality === 'erased')) inkOf(m, style);
+      // Each mark in the colour of the hand that DREW it, not of the one that made the
+      // whole: an artifact is made by whoever blessed it, and a hand may bless a group
+      // several hands drew (V1-PLAN L2f). A colour the style imposes — a live page's
+      // gold, the outline of what was built — holds for every mark in it.
+      if (m && !m.reps.some((r) => r.modality === 'erased')) inkOf(m, style.byMaker ? Object.assign({}, style, { color: colourOf(m) }) : style);
     }
   }
 
@@ -2392,6 +2400,7 @@
     state = s;
     chipHits = [];
     chromeDrawn = [];
+    inkDrawn.clear();
     pruneRuntime(s);
     // No model is asked from here: a paint is not a request (§6.3).
     syncStage(s);
@@ -2469,6 +2478,7 @@
       inkOf(node, {
         color: isLive ? `rgba(${C.goldRGB},0.85)` : color,
         width: id === inspectedId ? inkW * 1.3 : inkW,
+        byMaker: !isLive,
       });
       if (pl) ctx.restore();
       if (held) ctx.restore();
@@ -4622,9 +4632,8 @@
     const isArtifact = s.artifacts.includes(id);
     const isLive = s.live.includes(id);
     const isWordNode = MM.isWord(node);
-    const author = MM.strokePointsOf(node)
-      ? authorOf(node)
-      : ((node.reps.find((r) => r.modality === 'word') || {}).source || MM.LOCAL_PARTICIPANT);
+    // Who made it: a mark's drawer, an artifact's blesser — never who drew its marks (V1-PLAN L2f).
+    const author = authorOf(node);
     const authorName = nameOfParticipant(author);
     let html = '<div class="eyebrow">' +
       (isLive ? (codeKindOf(node) === 'html' ? 'living page' : 'living ' + codeKindOf(node)) : isArtifact ? 'artifact' : isWordNode ? 'word' : 'mark') + '</div>';
@@ -7308,6 +7317,8 @@
     // A hand's word on its own ink, for tests: where the last paint drew each label, and a mark's ink colour.
     labelsDrawn: () => labelsDrawn.map((l) => Object.assign({}, l)),
     colourOf: (id) => { const n = session.getState().nodes.get(id); return n ? colourOf(n) : null; },
+    // The colour the last paint stroked a mark's ink in — inside an artifact too, where each mark keeps its drawer's (L2f).
+    inkDrawn: (id) => inkDrawn.get(id) || null,
     // The explanation plane, for tests: where the last paint put each answer card.
     answerCards: () => cardRects.map((c) => ({ id: c.id, about: c.about.slice(), what: c.what, who: c.who, ago: c.ago, x: c.x, y: c.y, w: c.w, h: c.h })),
     // Text folds back from ink, for tests: the words of a text where they stand.
