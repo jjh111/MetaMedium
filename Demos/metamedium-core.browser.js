@@ -9206,16 +9206,13 @@ ${pad}</${tag}>`;
     let nodes = /* @__PURE__ */ new Map();
     let contentIds = [];
     let artifacts = [];
-    let pendingLasso = null;
-    let summon = null;
     let clusterCandidates = [];
     let participants = [];
     let explanations = [];
     let live = [];
     let clocks = {};
-    let selection = [];
-    let commandMark = config.gesture.commandMark ?? null;
-    let markMiss = null;
+    let gestures = /* @__PURE__ */ new Map();
+    let markHands = /* @__PURE__ */ new Map();
     let staleResult = null;
     let generation = 0;
     let lastAt = 0;
@@ -9234,15 +9231,12 @@ ${pad}</${tag}>`;
         nodes,
         contentIds,
         artifacts,
-        pendingLasso,
-        summon,
         clusterCandidates,
         participants,
         explanations,
         live,
-        selection,
-        commandMark,
-        markMiss,
+        gestures,
+        markHands,
         lastAt,
         counter: counter2,
         clocks
@@ -9253,15 +9247,12 @@ ${pad}</${tag}>`;
       nodes = s.nodes;
       contentIds = s.contentIds;
       artifacts = s.artifacts;
-      pendingLasso = s.pendingLasso;
-      summon = s.summon;
       clusterCandidates = s.clusterCandidates;
       participants = s.participants;
       explanations = s.explanations;
       live = s.live;
-      selection = s.selection;
-      commandMark = s.commandMark;
-      markMiss = s.markMiss;
+      gestures = s.gestures;
+      markHands = s.markHands;
       lastAt = s.lastAt;
       counter2 = s.counter;
       clocks = s.clocks ?? {};
@@ -9275,16 +9266,13 @@ ${pad}</${tag}>`;
       nodes = /* @__PURE__ */ new Map();
       contentIds = [];
       artifacts = [];
-      pendingLasso = null;
-      summon = null;
       clusterCandidates = [];
       participants = [LOCAL_PARTICIPANT, TIER0_PARTICIPANT];
       explanations = [];
       live = [];
       clocks = {};
-      selection = [];
-      commandMark = config.gesture.commandMark ?? null;
-      markMiss = null;
+      gestures = /* @__PURE__ */ new Map();
+      markHands = /* @__PURE__ */ new Map();
       lastAt = 0;
       counter2 = 0;
       for (const n2 of createBootstrapNodes(0)) nodes.set(n2.id, n2);
@@ -9426,13 +9414,31 @@ ${pad}</${tag}>`;
         closed: fingerprintOf(n2)?.isClosed ?? false
       }));
     }
-    function buildSummon(ids, source, reasoning, gestureIds, scopeBounds, excludeId, at) {
+    function handOf(ev) {
+      const named2 = ev.participantId ?? LOCAL_PARTICIPANT;
+      if (isHuman(named2)) return named2;
+      return ev.by ? handId(ev.by) : LOCAL_PARTICIPANT;
+    }
+    function blankGestures(hand) {
+      const commandMark = hand === LOCAL_PARTICIPANT ? config.gesture.commandMark ?? null : null;
+      return { pendingLasso: null, summon: null, selection: [], markMiss: null, commandMark };
+    }
+    function gesturesOf(hand) {
+      let g = gestures.get(hand);
+      if (!g) gestures.set(hand, g = blankGestures(hand));
+      return g;
+    }
+    function isPendingLasso(id) {
+      for (const g of gestures.values()) if (g.pendingLasso?.id === id) return true;
+      return false;
+    }
+    function buildSummon(ids, source, reasoning, gestureIds, scopeBounds, excludeId, at, g) {
       const artifactId = liveArtifactUnder(scopeBounds, excludeId);
       const onArtifact = artifactId ? {
         artifactId,
         regionIds: regionsOverlapping(regionsOf(nodes.get(artifactId), nodes), scopeBounds).map((r) => r.id)
       } : void 0;
-      selection = ids.slice();
+      g.selection = ids.slice();
       return {
         id: nextId("summon"),
         enclosedIds: ids,
@@ -9444,8 +9450,9 @@ ${pad}</${tag}>`;
         ...onArtifact ? { onArtifact } : {}
       };
     }
-    function recentWithin(at) {
+    function recentWithin(at, hand) {
       return contentIds.filter((id) => {
+        if ((markHands.get(id) ?? LOCAL_PARTICIPANT) !== hand) return false;
         const n2 = nodes.get(id);
         if (!n2 || getRep(n2, "erased")) return false;
         return at - n2.createdAt <= config.recentWindowMs;
@@ -9457,7 +9464,7 @@ ${pad}</${tag}>`;
       if (!n2 || !b) return null;
       return { id, bounds: b, points: strokePointsOf(n2) ?? void 0, closed: fingerprintOf(n2)?.isClosed };
     }
-    function scopeFromMark(points, fp, at) {
+    function scopeFromMark(points, fp, at, hand) {
       const candidates = contentIds.map(markOf).filter((m) => !!m && !getRep(nodes.get(m.id), "erased"));
       const engaged = candidates.filter((m) => {
         if (m.points && strokesIntersect(points, m.points)) return true;
@@ -9479,7 +9486,7 @@ ${pad}</${tag}>`;
       );
       const scopeSize = Math.max(union.maxX - union.minX, union.maxY - union.minY);
       if (fp.size > scopeSize) return null;
-      const recent = new Set(recentWithin(at));
+      const recent = new Set(recentWithin(at, hand));
       const pool = candidates.filter((m) => recent.has(m.id) || engaged.some((e) => e.id === m.id));
       const groups = clusters(pool, relate(pool));
       const ids = new Set(engaged.map((m) => m.id));
@@ -9521,47 +9528,51 @@ ${pad}</${tag}>`;
         createdAt: at
       };
       nodes.set(node.id, node);
+      const hand = handOf(ev);
+      const g = gesturesOf(hand);
+      markHands.set(node.id, hand);
       const byHand = !ev.content;
-      if (pendingLasso && byHand) {
-        const lassoNode = nodes.get(pendingLasso.id);
+      if (g.pendingLasso && byHand) {
+        const lassoNode = nodes.get(g.pendingLasso.id);
         const lassoFp = fingerprintOf(lassoNode);
         const lassoPoints = strokePointsOf(lassoNode) ?? [];
-        const gestureConfig = { ...config.gesture, commandMark };
+        const gestureConfig = { ...config.gesture, commandMark: g.commandMark };
         const strokePair = { check: points, lasso: lassoPoints };
-        if (resolvesLasso(fp, at, lassoFp, pendingLasso.at, gestureConfig, strokePair)) {
+        if (resolvesLasso(fp, at, lassoFp, g.pendingLasso.at, gestureConfig, strokePair)) {
           node.reps.push({
             modality: "gesture",
-            data: { role: commandMark ? "command" : "check" },
-            source: commandMark ? `command-mark:${commandMark.name}` : "heuristic"
+            data: { role: g.commandMark ? "command" : "check" },
+            source: g.commandMark ? `command-mark:${g.commandMark.name}` : "heuristic"
           });
           lassoNode.reps.push({ modality: "gesture", data: { role: "lasso" }, source: "heuristic" });
           removeFromContent(lassoNode.id);
           const enclosedIds = enclosedBy(lassoFp.bounds, contentBoundsList());
-          summon = buildSummon(
+          g.summon = buildSummon(
             enclosedIds,
             "lasso",
             `you circled ${enclosedIds.length} mark${enclosedIds.length === 1 ? "" : "s"}`,
             [lassoNode.id, node.id],
             lassoFp.bounds,
             lassoNode.id,
-            at
+            at,
+            g
           );
-          pendingLasso = null;
-          markMiss = null;
+          g.pendingLasso = null;
+          g.markMiss = null;
           recomputeClusterCandidates();
           return node.id;
         }
-        markMiss = whyNotResolved(fp, at, lassoFp, pendingLasso.at, gestureConfig, strokePair);
+        g.markMiss = whyNotResolved(fp, at, lassoFp, g.pendingLasso.at, gestureConfig, strokePair);
       } else {
-        markMiss = null;
+        g.markMiss = null;
       }
-      if (byHand && matchesCommandMark(fp, commandMark ?? BUILTIN_COMMAND_MARK).match) {
-        const scope = scopeFromMark(points, fp, at);
+      if (byHand && matchesCommandMark(fp, g.commandMark ?? BUILTIN_COMMAND_MARK).match) {
+        const scope = scopeFromMark(points, fp, at, hand);
         if (scope) {
           node.reps.push({
             modality: "gesture",
-            data: { role: commandMark ? "command" : "check", scope: scope.source },
-            source: commandMark ? `command-mark:${commandMark.name}` : "heuristic"
+            data: { role: g.commandMark ? "command" : "check", scope: scope.source },
+            source: g.commandMark ? `command-mark:${g.commandMark.name}` : "heuristic"
           });
           const union = getBounds(
             scope.ids.flatMap((id) => {
@@ -9572,9 +9583,9 @@ ${pad}</${tag}>`;
               ];
             })
           );
-          summon = buildSummon(scope.ids, scope.source, scope.reasoning, [node.id], union, node.id, at);
-          pendingLasso = null;
-          markMiss = null;
+          g.summon = buildSummon(scope.ids, scope.source, scope.reasoning, [node.id], union, node.id, at, g);
+          g.pendingLasso = null;
+          g.markMiss = null;
           recomputeClusterCandidates();
           return node.id;
         }
@@ -9586,14 +9597,14 @@ ${pad}</${tag}>`;
           data: { role: "scratch", erased: scratched },
           source: "heuristic"
         });
-        pendingLasso = null;
-        summon = null;
+        g.pendingLasso = null;
+        g.summon = null;
         for (const id of scratched) eraseNode(id, at);
         return node.id;
       }
       if (byHand) {
-        summon = null;
-        selection = [];
+        g.summon = null;
+        g.selection = [];
       }
       contentIds.push(node.id);
       const analysis = analyzeStroke(points, scale);
@@ -9611,7 +9622,7 @@ ${pad}</${tag}>`;
       for (const r of analysis.results) {
         if (r.meta) node.reps.push({ modality: `reading:${r.type}`, data: r.meta, source: TIER0_PARTICIPANT });
       }
-      if (absorbIntoWord(node, fp, at, scale)) {
+      if (absorbIntoWord(node, fp, at, scale, hand)) {
         recomputeClusterCandidates();
         return node.id;
       }
@@ -9619,12 +9630,15 @@ ${pad}</${tag}>`;
       inferWire(node, points, scale);
       const enclosed = enclosedBy(fp.bounds, contentBoundsList(node.id));
       const onLive = liveArtifactUnder(fp.bounds, node.id);
-      pendingLasso = byHand && (isLassoLike(fp, enclosed.length) || fp.isClosed && onLive) ? { id: node.id, at } : null;
+      g.pendingLasso = byHand && (isLassoLike(fp, enclosed.length) || fp.isClosed && onLive) ? { id: node.id, at } : null;
       recomputeClusterCandidates();
       return node.id;
     }
     function applyBless(ev) {
-      if (!summon || summon.id !== ev.summonId) return null;
+      const hand = handOf(ev);
+      const own = gestures.get(hand);
+      const summon = own?.summon;
+      if (!own || !summon || summon.id !== ev.summonId) return null;
       const chosen = ev.suggestionId ? summon.suggestions.find((s) => s.id === ev.suggestionId) : void 0;
       if (chosen?.kind === "keep-as-drawing") {
         for (const gid of summon.gestureIds) {
@@ -9632,7 +9646,7 @@ ${pad}</${tag}>`;
           g.reps = g.reps.filter((r) => r.modality !== "gesture");
           contentIds.push(gid);
         }
-        summon = null;
+        own.summon = null;
         recomputeClusterCandidates();
         return null;
       }
@@ -9647,7 +9661,8 @@ ${pad}</${tag}>`;
         ])
       );
       const named2 = ev.participantId ?? LOCAL_PARTICIPANT;
-      const maker = isHuman(named2) ? named2 : ev.by ? handParticipant(ev.by) : LOCAL_PARTICIPANT;
+      const maker = hand;
+      if (ev.by && maker === handId(ev.by)) handParticipant(ev.by);
       const artifact = {
         id: nextId("artifact"),
         reps: [
@@ -9665,14 +9680,15 @@ ${pad}</${tag}>`;
         createdAt: ev.at
       };
       nodes.set(artifact.id, artifact);
+      markHands.set(artifact.id, hand);
       for (const id of memberIds) {
         nodes.get(id).edges.push({ to: artifact.id, rel: "part-of", blessed: true });
         removeFromContent(id);
       }
       contentIds.push(artifact.id);
       artifacts.push(artifact.id);
-      selection = [];
-      summon = null;
+      own.selection = [];
+      own.summon = null;
       recomputeClusterCandidates();
       return artifact.id;
     }
@@ -9685,12 +9701,12 @@ ${pad}</${tag}>`;
       if (getRep(node, "erased")) return;
       node.reps.push({ modality: "erased", data: { at }, source: "user" });
       removeFromContent(node.id);
-      selection = selection.filter((id) => id !== node.id);
       const li = live.indexOf(node.id);
       if (li >= 0) live.splice(li, 1);
-      if (pendingLasso?.id === node.id) pendingLasso = null;
-      if (summon && (summon.enclosedIds.includes(node.id) || summon.gestureIds.includes(node.id))) {
-        summon = null;
+      for (const g of gestures.values()) {
+        g.selection = g.selection.filter((id) => id !== node.id);
+        if (g.pendingLasso?.id === node.id) g.pendingLasso = null;
+        if (g.summon && (g.summon.enclosedIds.includes(node.id) || g.summon.gestureIds.includes(node.id))) g.summon = null;
       }
       const degrade = (artifactId) => {
         const artifact = nodes.get(artifactId);
@@ -9842,7 +9858,7 @@ ${pad}</${tag}>`;
       recomputeClusterCandidates();
     }
     function snappableIds() {
-      const out = contentIds.filter((id) => !artifacts.includes(id) && id !== pendingLasso?.id);
+      const out = contentIds.filter((id) => !artifacts.includes(id) && !isPendingLasso(id));
       for (const aid of artifacts) {
         const a = nodes.get(aid);
         if (a) {
@@ -9935,7 +9951,7 @@ ${pad}</${tag}>`;
     }
     function letterCandidate(id, scale) {
       const n2 = nodes.get(id);
-      if (!n2 || isWord(n2) || getRep(n2, "gesture") || pendingLasso?.id === id) return null;
+      if (!n2 || isWord(n2) || getRep(n2, "gesture") || isPendingLasso(id)) return null;
       const fp = fingerprintOf(n2);
       const st = getRep(n2, "stroke")?.data;
       if (!fp || !st) return null;
@@ -9943,7 +9959,7 @@ ${pad}</${tag}>`;
       if (!isLetterLike(fp.bounds, sc) || neverLetter(n2)) return null;
       return { node: n2, bounds: fp.bounds, at: st.at, scale: sc };
     }
-    function absorbIntoWord(node, fp, at, scale) {
+    function absorbIntoWord(node, fp, at, scale, hand) {
       if (!isLetterLike(fp.bounds, scale) || neverLetter(node)) return false;
       const maker = authorOf(node);
       const ordered2 = contentIds.filter((id) => id !== node.id && authorOf(nodes.get(id)) === maker);
@@ -9980,6 +9996,7 @@ ${pad}</${tag}>`;
       const letterIds = run.map((r) => r.node.id).concat(node.id);
       const word = { id: nextId("word"), reps: [], edges: [{ to: maker, rel: "made-by" }], capability: 0, createdAt: at };
       nodes.set(word.id, word);
+      markHands.set(word.id, hand);
       setWordReps(word, letterIds);
       for (const id of letterIds) {
         nodes.get(id).edges.push({ to: word.id, rel: "part-of", reasoning: j.reasoning });
@@ -9987,7 +10004,8 @@ ${pad}</${tag}>`;
       const idx = contentIds.indexOf(letterIds[0]);
       contentIds.splice(idx, 1, word.id);
       for (const id of letterIds.slice(1)) removeFromContent(id);
-      if (pendingLasso?.id === node.id) pendingLasso = null;
+      const own = gestures.get(hand);
+      if (own && own.pendingLasso?.id === node.id) own.pendingLasso = null;
       return true;
     }
     function shrinkWord(wordId, without) {
@@ -10008,7 +10026,7 @@ ${pad}</${tag}>`;
       word.edges = word.edges.filter((e) => e.rel !== "has-part");
     }
     function applySelect(ev) {
-      selection = ev.ids.filter((id) => contentIds.includes(id));
+      gesturesOf(handOf(ev)).selection = ev.ids.filter((id) => contentIds.includes(id));
     }
     function manipulable(ids) {
       const out = [];
@@ -10100,6 +10118,7 @@ ${pad}</${tag}>`;
         source: ev.participantId ?? LOCAL_PARTICIPANT
       });
       recomputeClusterCandidates();
+      const summon = gestures.get(handOf(ev))?.summon;
       if (summon && sameSet(summon.enclosedIds, ids)) {
         summon.suggestions = summon.suggestions.filter((g) => g.kind !== "match");
         summon.suggestions.unshift(...makeSuggestions(ids).filter((g) => g.kind === "match"));
@@ -10156,7 +10175,7 @@ ${pad}</${tag}>`;
         let at = ev.at;
         for (const pts of ev.strokes) {
           if (!pts || pts.length < 2) continue;
-          const id = applyStroke({ type: "stroke", points: pts, at, participantId: pid, scale: 1, content: true });
+          const id = applyStroke({ type: "stroke", points: pts, at, participantId: pid, scale: 1, content: true, ...ev.by ? { by: ev.by } : {} });
           if (id && !first) first = id;
           at += 1;
         }
@@ -10177,6 +10196,7 @@ ${pad}</${tag}>`;
         createdAt: ev.at
       };
       nodes.set(node.id, node);
+      markHands.set(node.id, handOf(ev));
       artifacts.push(node.id);
       contentIds.push(node.id);
       if (ev.kind !== "png" && ev.kind !== "jpg") live.push(node.id);
@@ -10208,6 +10228,7 @@ ${pad}</${tag}>`;
       return b.every((x) => set.has(x));
     }
     function applySummon(ev) {
+      const g = gesturesOf(handOf(ev));
       if (ev.ids) {
         const ids = ev.ids.filter((id) => contentIds.includes(id));
         const boxes = ids.map((id) => boundsOf(nodes.get(id))).filter((b) => !!b);
@@ -10218,34 +10239,37 @@ ${pad}</${tag}>`;
           maxX: Math.max(a.maxX, b.maxX),
           maxY: Math.max(a.maxY, b.maxY)
         }));
-        summon = buildSummon(ids, "pointed", `you pointed at ${ids.length} mark${ids.length === 1 ? "" : "s"}`, [], union, "", ev.at);
-        markMiss = null;
+        const summon2 = buildSummon(ids, "pointed", `you pointed at ${ids.length} mark${ids.length === 1 ? "" : "s"}`, [], union, "", ev.at, g);
+        g.summon = summon2;
+        g.markMiss = null;
         recomputeClusterCandidates();
-        return summon.id;
+        return summon2.id;
       }
-      if (!pendingLasso) return null;
-      const lassoNode = nodes.get(pendingLasso.id);
+      if (!g.pendingLasso) return null;
+      const lassoNode = nodes.get(g.pendingLasso.id);
       const lassoFp = lassoNode && fingerprintOf(lassoNode);
       if (!lassoNode || !lassoFp) return null;
       lassoNode.reps.push({ modality: "gesture", data: { role: "lasso" }, source: "heuristic" });
       removeFromContent(lassoNode.id);
       const enclosedIds = enclosedBy(lassoFp.bounds, contentBoundsList());
-      summon = buildSummon(
+      const summon = buildSummon(
         enclosedIds,
         "lasso",
         `you circled ${enclosedIds.length} mark${enclosedIds.length === 1 ? "" : "s"} and asked`,
         [lassoNode.id],
         lassoFp.bounds,
         lassoNode.id,
-        ev.at
+        ev.at,
+        g
       );
-      pendingLasso = null;
-      markMiss = null;
+      g.summon = summon;
+      g.pendingLasso = null;
+      g.markMiss = null;
       recomputeClusterCandidates();
       return summon.id;
     }
     function applyTeach(ev) {
-      commandMark = ev.mark;
+      gesturesOf(handOf(ev)).commandMark = ev.mark;
     }
     function codeVersion(nodeId) {
       const node = nodes.get(nodeId);
@@ -10340,8 +10364,11 @@ ${pad}</${tag}>`;
       if (!live.includes(node.id)) live.push(node.id);
       return node.id;
     }
+    function handId(name) {
+      return "participant:hand:" + name.replace(/[^A-Za-z0-9._-]+/g, "_");
+    }
     function handParticipant(name) {
-      const id = "participant:hand:" + name.replace(/[^A-Za-z0-9._-]+/g, "_");
+      const id = handId(name);
       if (!nodes.has(id)) {
         nodes.set(id, createParticipantNode(id, "human", handLabel(name), lastAt));
         participants.push(id);
@@ -10401,7 +10428,7 @@ ${pad}</${tag}>`;
           applySelect(ev);
           return null;
         case "deselect":
-          selection = [];
+          gesturesOf(handOf(ev)).selection = [];
           return null;
         case "move":
           applyMove(ev);
@@ -10423,9 +10450,11 @@ ${pad}</${tag}>`;
           return null;
         case "code":
           return applyCode(ev);
-        case "dismiss":
-          if (summon?.id === ev.summonId) summon = null;
+        case "dismiss": {
+          const g = gestures.get(handOf(ev));
+          if (g && g.summon?.id === ev.summonId) g.summon = null;
           return null;
+        }
         case "erase":
           applyErase(ev);
           return null;
@@ -10476,23 +10505,24 @@ ${pad}</${tag}>`;
       }
     }
     function getState() {
+      const reader = gestures.get(LOCAL_PARTICIPANT) ?? blankGestures(LOCAL_PARTICIPANT);
       return {
         nodes,
         contentIds: [...contentIds],
-        pendingLassoId: pendingLasso?.id ?? null,
-        summon: summon ? { ...summon, enclosedIds: [...summon.enclosedIds] } : null,
+        pendingLassoId: reader.pendingLasso?.id ?? null,
+        summon: reader.summon ? { ...reader.summon, enclosedIds: [...reader.summon.enclosedIds] } : null,
         clusterCandidates: clusterCandidates.map((c) => ({ ...c })),
         artifacts: [...artifacts],
         participants: [...participants],
         explanations: [...explanations],
-        commandMark,
-        markMiss,
+        commandMark: reader.commandMark,
+        markMiss: reader.markMiss,
         staleResult,
         generation,
-        recentIds: recentWithin(lastAt),
+        recentIds: recentWithin(lastAt, LOCAL_PARTICIPANT),
         live: [...live],
         clocks: { ...clocks },
-        selection: [...selection]
+        selection: [...reader.selection]
       };
     }
     function subscribe(listener) {

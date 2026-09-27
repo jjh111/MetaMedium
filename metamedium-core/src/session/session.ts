@@ -8,6 +8,9 @@
 //     the NEXT event resolves it (deferred commitment with retroactivity).
 //   - A check summons; it does not confirm. Blessing is a separate act.
 //   - Drawing past an active summon dissolves it (ignoring is a valid answer).
+//   - Gestures are per hand: a loop that waits, a summon, a selection, the
+//     look-back and a taught mark are each hand's own, so another hand's
+//     events never dissolve, take up or open them (V1-PLAN L2h).
 //   - Ink is never destroyed: gesture/member/erased strokes keep their nodes.
 //   - The engine is event-sourced: every input is logged, state is a pure
 //     function of the log, and undo = drop the last input and replay.
@@ -126,13 +129,20 @@ export interface ClusterCandidate {
   matches: { artifactId: string; name: string; score: number; reasoning?: string }[];
 }
 
+/**
+ * The gesture state of the board's own hand — its reader. `pendingLassoId`,
+ * `summon`, `selection`, `markMiss`, `commandMark` and `recentIds` below are
+ * all this hand's; every other hand in a room holds its own, which the board
+ * keeps and replays but never shows as the reader's (V1-PLAN L2h).
+ */
 export interface SessionState {
   /** Live view of the node graph (not a snapshot) — read, don't mutate. */
   nodes: ReadonlyMap<string, MMNode>;
   /** Nodes on the content plane (strokes not yet in artifacts, plus artifacts). */
   contentIds: string[];
-  /** Stroke currently held as gesture-candidate (also still content). */
+  /** This hand's stroke currently held as gesture-candidate (also still content). */
   pendingLassoId: string | null;
+  /** This hand's summon: the field opens on it. Another hand's never does. */
   summon: Summon | null;
   clusterCandidates: ClusterCandidate[];
   artifacts: string[];
@@ -144,11 +154,15 @@ export interface SessionState {
    * lasso, a cluster, or a signature.
    */
   explanations: string[];
-  /** The mark the user taught this session, or null while the built-in check stands. */
+  /**
+   * The mark this hand taught, or null while the built-in check stands. Each
+   * hand's own: a mark another hand taught judges only that hand's strokes.
+   */
   commandMark: CommandMark | null;
   /**
-   * Why the last stroke drawn against a waiting lasso did not summon. Cleared
-   * by the next stroke. A gesture that fails silently cannot be learned.
+   * Why this hand's last stroke drawn against its waiting lasso did not
+   * summon. Cleared by its next stroke. A gesture that fails silently cannot
+   * be learned.
    */
   markMiss: MarkMiss | null;
   /**
@@ -176,18 +190,36 @@ export interface SessionState {
    */
   clocks: Record<string, Clock>;
   /**
-   * The marks a held loop became once it was taken up (by the mark or the
-   * chip), or that were selected outright. Transient: a hand's next content
-   * stroke clears it; undoing a `deselect` brings it back in place. It is
-   * state the human just made and can see — the one place a stroke's
+   * The marks this hand's held loop became once it was taken up (by the mark
+   * or the chip), or that it selected outright. Transient: the hand's next
+   * content stroke clears it; undoing a `deselect` brings it back in place. It
+   * is state the human just made and can see — the one place a stroke's
    * meaning may depend on state (a tap dismisses it and is never a dot).
    */
   selection: string[];
   /**
-   * Content drawn inside the recent window, oldest first — "what you were just
-   * doing". The command mark reads back over this.
+   * Content this hand drew inside the recent window, oldest first — "what you
+   * were just doing". The command mark reads back over this, and over nobody
+   * else's: another hand drawing beside you just now is not you.
    */
   recentIds: string[];
+}
+
+/**
+ * One hand's gestures (V1-PLAN L2h). A merged log interleaves the hands'
+ * events by time, so state shared by the board let another hand's stroke
+ * dissolve a summon on replay — and the bless after it made nothing, on every
+ * board — or leave a loop untaken between it and its check. Each hand holds
+ * its own, under the key its acts carry (`handOf`).
+ */
+interface Gestures {
+  /** This hand's stroke held as a gesture-candidate: a loop waiting for this hand's mark. */
+  pendingLasso: { id: string; at: number } | null;
+  summon: Summon | null;
+  selection: string[];
+  markMiss: MarkMiss | null;
+  /** The mark this hand taught, or null for the built-in check. */
+  commandMark: CommandMark | null;
 }
 
 // Every event is attributed: participantId defaults to the local human.
@@ -626,16 +658,19 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
   let nodes = new Map<string, MMNode>();
   let contentIds: string[] = [];
   let artifacts: string[] = [];
-  let pendingLasso: { id: string; at: number } | null = null;
-  let summon: Summon | null = null;
   let clusterCandidates: ClusterCandidate[] = [];
   let participants: string[] = [];
   let explanations: string[] = [];
   let live: string[] = [];
   let clocks: Record<string, Clock> = {};
-  let selection: string[] = [];
-  let commandMark: CommandMark | null = config.gesture.commandMark ?? null;
-  let markMiss: MarkMiss | null = null;
+  // Every hand's gestures, keyed by the hand whose acts they are (`handOf`):
+  // the board's own under LOCAL_PARTICIPANT, another's under
+  // `participant:hand:<name>` — so every board keys one hand alike (L2h).
+  let gestures = new Map<string, Gestures>();
+  // The hand whose act made each mark on the content plane — the hand of the
+  // event, not only the participant it names: a model's mark is its hand's.
+  // What the command mark's look-back is limited to.
+  let markHands = new Map<string, string>();
   // Runtime notices, not log facts: neither is derived from the events, so
   // neither is checkpointed and neither survives into another session's log.
   let staleResult: StaleResult | null = null;
@@ -678,22 +713,21 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
 
   function snapshot(): unknown {
     return structuredClone({
-      nodes, contentIds, artifacts, pendingLasso, summon, clusterCandidates,
-      participants, explanations, live, selection, commandMark, markMiss, lastAt, counter, clocks,
+      nodes, contentIds, artifacts, clusterCandidates, participants, explanations, live,
+      gestures, markHands, lastAt, counter, clocks,
     });
   }
   function restore(snap: unknown) {
     const s = structuredClone(snap) as {
       nodes: Map<string, MMNode>; contentIds: string[]; artifacts: string[];
-      pendingLasso: { id: string; at: number } | null; summon: Summon | null;
       clusterCandidates: ClusterCandidate[]; participants: string[]; explanations: string[];
-      live: string[]; selection: string[]; commandMark: CommandMark | null; markMiss: MarkMiss | null;
+      live: string[]; gestures: Map<string, Gestures>; markHands: Map<string, string>;
       lastAt: number; counter: number; clocks: Record<string, Clock>;
     };
-    nodes = s.nodes; contentIds = s.contentIds; artifacts = s.artifacts; pendingLasso = s.pendingLasso;
-    summon = s.summon; clusterCandidates = s.clusterCandidates; participants = s.participants;
-    explanations = s.explanations; live = s.live; selection = s.selection; commandMark = s.commandMark;
-    markMiss = s.markMiss; lastAt = s.lastAt; counter = s.counter; clocks = s.clocks ?? {};
+    nodes = s.nodes; contentIds = s.contentIds; artifacts = s.artifacts;
+    clusterCandidates = s.clusterCandidates; participants = s.participants;
+    explanations = s.explanations; live = s.live; gestures = s.gestures; markHands = s.markHands;
+    lastAt = s.lastAt; counter = s.counter; clocks = s.clocks ?? {};
   }
   function maybeCheckpoint(length: number) {
     if (length > 0 && length % CHECKPOINT_EVERY === 0 && !checkpoints.some((c) => c.length === length)) {
@@ -705,16 +739,13 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     nodes = new Map();
     contentIds = [];
     artifacts = [];
-    pendingLasso = null;
-    summon = null;
     clusterCandidates = [];
     participants = [LOCAL_PARTICIPANT, TIER0_PARTICIPANT];
     explanations = [];
     live = [];
     clocks = {};
-    selection = [];
-    commandMark = config.gesture.commandMark ?? null;
-    markMiss = null;
+    gestures = new Map();
+    markHands = new Map();
     lastAt = 0;
     counter = 0;
     for (const n of createBootstrapNodes(0)) nodes.set(n.id, n);
@@ -958,6 +989,45 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       }));
   }
 
+  // ===== Whose gesture (V1-PLAN L2h) =====
+
+  /**
+   * Whose act an event is: the key a hand's gestures are held under, and the
+   * maker of what it blesses (L2f). A person's act is theirs — the board's own
+   * hand, another hand (`participant:hand:<name>`, which "local" in its log
+   * already reads as, `applyEvent`), or a person who joined. Anyone else — a
+   * model, the engine — acts inside the act of the hand whose log holds the
+   * event, because every tier proposes and none commits: the shard's bless in
+   * the engine's name takes up its hand's summon, and a model's loop waits
+   * for its hand. So one hand's gesture keys alike on every board, however
+   * each board names that hand.
+   */
+  function handOf(ev: SessionEvent): string {
+    const named = (ev as { participantId?: string }).participantId ?? LOCAL_PARTICIPANT;
+    if (isHuman(named)) return named;
+    return ev.by ? handId(ev.by) : LOCAL_PARTICIPANT;
+  }
+
+  function blankGestures(hand: string): Gestures {
+    // The configured mark is the session's own hand's; another hand's is
+    // whatever its own log taught.
+    const commandMark = hand === LOCAL_PARTICIPANT ? (config.gesture.commandMark ?? null) : null;
+    return { pendingLasso: null, summon: null, selection: [], markMiss: null, commandMark };
+  }
+
+  /** A hand's gestures, made on first use. */
+  function gesturesOf(hand: string): Gestures {
+    let g = gestures.get(hand);
+    if (!g) gestures.set(hand, (g = blankGestures(hand)));
+    return g;
+  }
+
+  /** Whether a mark is a loop some hand still holds as a gesture-candidate. */
+  function isPendingLasso(id: string): boolean {
+    for (const g of gestures.values()) if (g.pendingLasso?.id === id) return true;
+    return false;
+  }
+
   function buildSummon(
     ids: string[],
     source: ScopeSource,
@@ -965,7 +1035,8 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     gestureIds: string[],
     scopeBounds: Bounds,
     excludeId: string,
-    at: number
+    at: number,
+    g: Gestures
   ): Summon {
     const artifactId = liveArtifactUnder(scopeBounds, excludeId);
     const onArtifact = artifactId
@@ -976,7 +1047,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       : undefined;
     // Taking a loop up IS selecting what it held: the summon and the
     // selection are one act, so the palette and the handles agree.
-    selection = ids.slice();
+    g.selection = ids.slice();
     return {
       id: nextId('summon'),
       enclosedIds: ids,
@@ -989,9 +1060,15 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     };
   }
 
-  /** Content drawn inside the recent window — what the human was just doing. */
-  function recentWithin(at: number): string[] {
+  /**
+   * Content this hand drew inside the recent window — what it was just doing.
+   * Another hand drawing beside it just now is not it (L2h): a merge sets the
+   * hands' marks side by side in time, and the look-back swept a stranger's
+   * box into a hand's group.
+   */
+  function recentWithin(at: number, hand: string): string[] {
     return contentIds.filter((id) => {
+      if ((markHands.get(id) ?? LOCAL_PARTICIPANT) !== hand) return false;
       const n = nodes.get(id);
       if (!n || getRep(n, 'erased')) return false;
       return at - n.createdAt <= config.recentWindowMs;
@@ -1017,7 +1094,8 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
   function scopeFromMark(
     points: Point[],
     fp: Fingerprint,
-    at: number
+    at: number,
+    hand: string
   ): { ids: string[]; source: ScopeSource; reasoning: string } | null {
     const candidates = contentIds
       .map(markOf)
@@ -1055,8 +1133,9 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     const scopeSize = Math.max(union.maxX - union.minX, union.maxY - union.minY);
     if (fp.size > scopeSize) return null;
 
-    // Grow the selection through things drawn in the same breath.
-    const recent = new Set(recentWithin(at));
+    // Grow the selection through things this hand drew in the same breath —
+    // what it crossed may be anyone's, what comes along with it is its own.
+    const recent = new Set(recentWithin(at, hand));
     const pool = candidates.filter((m) => recent.has(m.id) || engaged.some((e) => e.id === m.id));
     const groups = clusters(pool, relate(pool));
     const ids = new Set(engaged.map((m) => m.id));
@@ -1108,6 +1187,12 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       createdAt: at,
     };
     nodes.set(node.id, node);
+    // Whose gesture this stroke can be: its hand's, never the board's. Every
+    // gesture read below is that hand's — its waiting loop, its mark, what it
+    // just drew, its summon — and nothing another hand holds is touched.
+    const hand = handOf(ev);
+    const g = gesturesOf(hand);
+    markHands.set(node.id, hand);
 
     // Declared content is never a gesture. Lassoing, commanding and scratching
     // out are commitments, and a stroke whose author said "this is a drawing"
@@ -1117,59 +1202,60 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     // does. `agent.draw()` always declares it.
     const byHand = !ev.content;
 
-    // --- Gesture resolution first: does this stroke complete a pending lasso? ---
-    if (pendingLasso && byHand) {
-      const lassoNode = nodes.get(pendingLasso.id)!;
+    // --- Gesture resolution first: does this stroke complete its hand's pending lasso? ---
+    if (g.pendingLasso && byHand) {
+      const lassoNode = nodes.get(g.pendingLasso.id)!;
       const lassoFp = fingerprintOf(lassoNode)!;
       const lassoPoints = strokePointsOf(lassoNode) ?? [];
       // No scale correction is needed here any more: every term in the gesture
       // rule is a ratio of the lasso's own size, so it is zoom-free by
       // construction rather than by compensation.
-      const gestureConfig = { ...config.gesture, commandMark };
+      const gestureConfig = { ...config.gesture, commandMark: g.commandMark };
       const strokePair = { check: points, lasso: lassoPoints };
-      if (resolvesLasso(fp, at, lassoFp, pendingLasso.at, gestureConfig, strokePair)) {
+      if (resolvesLasso(fp, at, lassoFp, g.pendingLasso.at, gestureConfig, strokePair)) {
         // Retroactivity: the lasso was a gesture all along. Both strokes get
         // gesture reps and leave the content plane; their ink and prior
         // candidate edges remain (provenance, principle 9).
         node.reps.push({
           modality: 'gesture',
-          data: { role: commandMark ? 'command' : 'check' },
-          source: commandMark ? `command-mark:${commandMark.name}` : 'heuristic',
+          data: { role: g.commandMark ? 'command' : 'check' },
+          source: g.commandMark ? `command-mark:${g.commandMark.name}` : 'heuristic',
         });
         lassoNode.reps.push({ modality: 'gesture', data: { role: 'lasso' }, source: 'heuristic' });
         removeFromContent(lassoNode.id);
 
         const enclosedIds = enclosedBy(lassoFp.bounds, contentBoundsList());
-        summon = buildSummon(
+        g.summon = buildSummon(
           enclosedIds,
           'lasso',
           `you circled ${enclosedIds.length} mark${enclosedIds.length === 1 ? '' : 's'}`,
           [lassoNode.id, node.id],
           lassoFp.bounds,
           lassoNode.id,
-          at
+          at,
+          g
         );
-        pendingLasso = null;
-        markMiss = null;
+        g.pendingLasso = null;
+        g.markMiss = null;
         recomputeClusterCandidates();
         return node.id;
       }
       // It did not resolve the lasso. Fall through — it may still be the mark,
       // acting on what was drawn just now — and remember why, if it is not.
-      markMiss = whyNotResolved(fp, at, lassoFp, pendingLasso.at, gestureConfig, strokePair);
+      g.markMiss = whyNotResolved(fp, at, lassoFp, g.pendingLasso.at, gestureConfig, strokePair);
     } else {
-      markMiss = null;
+      g.markMiss = null;
     }
 
     // --- The mark, with nothing circled first. It reads BACKWARDS: what did
-    //     this stroke cross, and what did you draw alongside it just now? ---
-    if (byHand && matchesCommandMark(fp, commandMark ?? BUILTIN_COMMAND_MARK).match) {
-      const scope = scopeFromMark(points, fp, at);
+    //     this stroke cross, and what did this hand draw alongside it just now? ---
+    if (byHand && matchesCommandMark(fp, g.commandMark ?? BUILTIN_COMMAND_MARK).match) {
+      const scope = scopeFromMark(points, fp, at, hand);
       if (scope) {
         node.reps.push({
           modality: 'gesture',
-          data: { role: commandMark ? 'command' : 'check', scope: scope.source },
-          source: commandMark ? `command-mark:${commandMark.name}` : 'heuristic',
+          data: { role: g.commandMark ? 'command' : 'check', scope: scope.source },
+          source: g.commandMark ? `command-mark:${g.commandMark.name}` : 'heuristic',
         });
         const union = getBounds(
           scope.ids.flatMap((id) => {
@@ -1180,9 +1266,9 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
             ];
           })
         );
-        summon = buildSummon(scope.ids, scope.source, scope.reasoning, [node.id], union, node.id, at);
-        pendingLasso = null;
-        markMiss = null;
+        g.summon = buildSummon(scope.ids, scope.source, scope.reasoning, [node.id], union, node.id, at, g);
+        g.pendingLasso = null;
+        g.markMiss = null;
         recomputeClusterCandidates();
         return node.id;
       }
@@ -1211,16 +1297,17 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
         data: { role: 'scratch', erased: scratched },
         source: 'heuristic',
       });
-      pendingLasso = null;
-      summon = null;
+      g.pendingLasso = null;
+      g.summon = null;
       for (const id of scratched) eraseNode(id, at);
       return node.id;
     }
 
-    // --- Not a gesture: this is content. Drawing past a summon dissolves it —
-    //     when it is the human drawing; a model adding a mark while the human
-    //     is still choosing takes nothing away from them. ---
-    if (byHand) { summon = null; selection = []; }
+    // --- Not a gesture: this is content. A hand drawing past its own summon
+    //     dissolves it — when it is the hand drawing; a model adding a mark
+    //     while the human is still choosing takes nothing away from them, and
+    //     another hand drawing meanwhile takes nothing from either. ---
+    if (byHand) { g.summon = null; g.selection = []; }
     contentIds.push(node.id);
 
     // Multi-parse: every qualifying recognition becomes a held 'resembles' edge.
@@ -1244,7 +1331,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     // Printed letters gather into a word. If this stroke joined one, the WORD
     // now stands in the content plane and this stroke is one of its parts;
     // relations belong to the word and are read live, so none are stored here.
-    if (absorbIntoWord(node, fp, at, scale)) {
+    if (absorbIntoWord(node, fp, at, scale, hand)) {
       recomputeClusterCandidates();
       return node.id;
     }
@@ -1253,14 +1340,15 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     inferWire(node, points, scale);
 
     // Held ambiguity: a closed stroke enclosing content is BOTH a content
-    // candidate (edges above) and the new pending lasso. The next event decides.
+    // candidate (edges above) and its hand's new pending lasso. That hand's
+    // next stroke decides; another hand's decides nothing about it.
     //
     // A closed stroke drawn ON a live artifact is also lasso-like even when it
     // encloses no whole mark — it encloses a REGION of the running thing, which
     // is the whole point of being able to draw on top of it.
     const enclosed = enclosedBy(fp.bounds, contentBoundsList(node.id));
     const onLive = liveArtifactUnder(fp.bounds, node.id);
-    pendingLasso =
+    g.pendingLasso =
       byHand && (isLassoLike(fp, enclosed.length) || (fp.isClosed && onLive)) ? { id: node.id, at } : null;
 
     recomputeClusterCandidates();
@@ -1268,7 +1356,12 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
   }
 
   function applyBless(ev: Extract<SessionEvent, { type: 'bless' }>): string | null {
-    if (!summon || summon.id !== ev.summonId) return null;
+    // A bless takes up its OWN hand's summon — whatever other hands did since,
+    // and on every board (L2h). The maker of what it makes is that hand (L2f).
+    const hand = handOf(ev);
+    const own = gestures.get(hand);
+    const summon = own?.summon;
+    if (!own || !summon || summon.id !== ev.summonId) return null;
 
     const chosen = ev.suggestionId
       ? summon.suggestions.find((s) => s.id === ev.suggestionId)
@@ -1281,7 +1374,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
         g.reps = g.reps.filter((r) => r.modality !== 'gesture');
         contentIds.push(gid);
       }
-      summon = null;
+      own.summon = null;
       recomputeClusterCandidates();
       return null;
     }
@@ -1312,9 +1405,12 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     // its name on the word, which is its word for what it made. The edge is
     // written only for a maker other than this board's own hand, which
     // `authorOf` reads from no edge at all: a board's own blesses — every held
-    // log — replay node for node.
+    // log — replay node for node. That rule is `handOf`'s, and the hand it
+    // names is the one whose summon this bless took up.
     const named = ev.participantId ?? LOCAL_PARTICIPANT;
-    const maker = isHuman(named) ? named : ev.by ? handParticipant(ev.by) : LOCAL_PARTICIPANT;
+    const maker = hand;
+    // Another hand's participant, made on first sight, when the edge names it.
+    if (ev.by && maker === handId(ev.by)) handParticipant(ev.by);
     const artifact: MMNode = {
       id: nextId('artifact'),
       reps: [
@@ -1334,6 +1430,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       createdAt: ev.at,
     };
     nodes.set(artifact.id, artifact);
+    markHands.set(artifact.id, hand);
 
     // Members join the artifact: opaque from outside, transparent within.
     // Their nodes (ink, candidates) persist; they just leave the content plane.
@@ -1347,8 +1444,8 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     // Blessing ends the selection rather than moving it onto the artifact: the
     // hand's next act on a page is usually ink over it, and a selected page
     // would catch that pointer as a drag. A page is selected by circling it.
-    selection = [];
-    summon = null;
+    own.selection = [];
+    own.summon = null;
     recomputeClusterCandidates();
     return artifact.id;
   }
@@ -1365,17 +1462,16 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     // Ink is never destroyed: the node stays in the graph, marked erased.
     node.reps.push({ modality: 'erased', data: { at }, source: 'user' });
     removeFromContent(node.id);
-    selection = selection.filter((id) => id !== node.id);
 
     const li = live.indexOf(node.id);
     if (li >= 0) live.splice(li, 1);
 
-    if (pendingLasso?.id === node.id) pendingLasso = null;
-    if (
-      summon &&
-      (summon.enclosedIds.includes(node.id) || summon.gestureIds.includes(node.id))
-    ) {
-      summon = null;
+    // A mark that is gone is gone from every hand's gestures — whoever erased
+    // it: a loop cannot wait, nor a summon hold, what is no longer there.
+    for (const g of gestures.values()) {
+      g.selection = g.selection.filter((id) => id !== node.id);
+      if (g.pendingLasso?.id === node.id) g.pendingLasso = null;
+      if (g.summon && (g.summon.enclosedIds.includes(node.id) || g.summon.gestureIds.includes(node.id))) g.summon = null;
     }
 
     const degrade = (artifactId: string) => {
@@ -1599,7 +1695,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
   function snappableIds(): string[] {
     // A held lasso is a circle until the next mark says otherwise; offering to
     // draw it clean would be offering to redraw a gesture.
-    const out = contentIds.filter((id) => !artifacts.includes(id) && id !== pendingLasso?.id);
+    const out = contentIds.filter((id) => !artifacts.includes(id) && !isPendingLasso(id));
     for (const aid of artifacts) {
       const a = nodes.get(aid);
       if (a) for (const e of a.edges) if (e.rel === 'has-part') out.push(e.to);
@@ -1735,7 +1831,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
   /** A content stroke that could be a letter of a word being written: small, not a gesture, not a held loop, not a shape. */
   function letterCandidate(id: string, scale: number): { node: MMNode; bounds: Bounds; at: number; scale: number } | null {
     const n = nodes.get(id);
-    if (!n || isWord(n) || getRep(n, 'gesture') || pendingLasso?.id === id) return null;
+    if (!n || isWord(n) || getRep(n, 'gesture') || isPendingLasso(id)) return null;
     const fp = fingerprintOf(n);
     const st = getRep(n, 'stroke')?.data as { at: number; scale?: number } | undefined;
     if (!fp || !st) return null;
@@ -1757,7 +1853,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
    * label rule took her word on it for a stranger's). A board's own words name
    * its own hand as they always did, so every held log replays node for node.
    */
-  function absorbIntoWord(node: MMNode, fp: Fingerprint, at: number, scale: number): boolean {
+  function absorbIntoWord(node: MMNode, fp: Fingerprint, at: number, scale: number, hand: string): boolean {
     if (!isLetterLike(fp.bounds, scale) || neverLetter(node)) return false;
     const maker = authorOf(node);
     const ordered = contentIds.filter((id) => id !== node.id && authorOf(nodes.get(id)!) === maker);
@@ -1805,6 +1901,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     // by the hand that wrote them.
     const word: MMNode = { id: nextId('word'), reps: [], edges: [{ to: maker, rel: 'made-by' }], capability: 0, createdAt: at };
     nodes.set(word.id, word);
+    markHands.set(word.id, hand);
     setWordReps(word, letterIds);
     for (const id of letterIds) {
       nodes.get(id)!.edges.push({ to: word.id, rel: 'part-of', reasoning: j.reasoning });
@@ -1812,7 +1909,8 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     const idx = contentIds.indexOf(letterIds[0]);
     contentIds.splice(idx, 1, word.id);
     for (const id of letterIds.slice(1)) removeFromContent(id);
-    if (pendingLasso?.id === node.id) pendingLasso = null;
+    const own = gestures.get(hand);
+    if (own && own.pendingLasso?.id === node.id) own.pendingLasso = null;
     return true;
   }
 
@@ -1838,8 +1936,9 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
 
   // ===== Selection and direct manipulation =====
 
+  /** A hand selects outright: its own selection, never another's (L2h). */
   function applySelect(ev: Extract<SessionEvent, { type: 'select' }>) {
-    selection = ev.ids.filter((id) => contentIds.includes(id));
+    gesturesOf(handOf(ev)).selection = ev.ids.filter((id) => contentIds.includes(id));
   }
 
   /** The strokes a manipulation actually moves: a stroke itself, or an artifact's or word's members, recursively. */
@@ -1940,9 +2039,10 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       source: ev.participantId ?? LOCAL_PARTICIPANT,
     });
     recomputeClusterCandidates();
-    // A summon open on these very marks reads its matches again, so the offer
-    // the human just refused is gone from the palette rather than waiting for
-    // the next mark.
+    // The corrector's own summon, open on these very marks, reads its matches
+    // again, so the offer the human just refused is gone from the palette
+    // rather than waiting for the next mark. Another hand's field is its own.
+    const summon = gestures.get(handOf(ev))?.summon;
     if (summon && sameSet(summon.enclosedIds, ids)) {
       summon.suggestions = summon.suggestions.filter((g) => g.kind !== 'match');
       summon.suggestions.unshift(...makeSuggestions(ids).filter((g) => g.kind === 'match'));
@@ -2013,7 +2113,8 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       let at = ev.at;
       for (const pts of ev.strokes) {
         if (!pts || pts.length < 2) continue;
-        const id = applyStroke({ type: 'stroke', points: pts, at, participantId: pid, scale: 1, content: true });
+        // `by` carried along, so each stroke is its hand's as the import is.
+        const id = applyStroke({ type: 'stroke', points: pts, at, participantId: pid, scale: 1, content: true, ...(ev.by ? { by: ev.by } : {}) });
         if (id && !first) first = id;
         at += 1;
       }
@@ -2034,6 +2135,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       createdAt: ev.at,
     };
     nodes.set(node.id, node);
+    markHands.set(node.id, handOf(ev));
     artifacts.push(node.id);
     contentIds.push(node.id);
     if (ev.kind !== 'png' && ev.kind !== 'jpg') live.push(node.id);
@@ -2071,6 +2173,8 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
   }
 
   function applySummon(ev: Extract<SessionEvent, { type: 'summon' }>): string | null {
+    // The summoning hand's own: its pointed marks, or the loop IT holds (L2h).
+    const g = gesturesOf(handOf(ev));
     if (ev.ids) {
       // Pointed at: the marks named, no loop involved. A tap on a match chip.
       const ids = ev.ids.filter((id) => contentIds.includes(id));
@@ -2080,36 +2184,40 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
         minX: Math.min(a.minX, b.minX), minY: Math.min(a.minY, b.minY),
         maxX: Math.max(a.maxX, b.maxX), maxY: Math.max(a.maxY, b.maxY),
       }));
-      summon = buildSummon(ids, 'pointed', `you pointed at ${ids.length} mark${ids.length === 1 ? '' : 's'}`, [], union, '', ev.at);
-      markMiss = null;
+      const summon = buildSummon(ids, 'pointed', `you pointed at ${ids.length} mark${ids.length === 1 ? '' : 's'}`, [], union, '', ev.at, g);
+      g.summon = summon;
+      g.markMiss = null;
       recomputeClusterCandidates();
       return summon.id;
     }
-    if (!pendingLasso) return null;
-    const lassoNode = nodes.get(pendingLasso.id);
+    if (!g.pendingLasso) return null;
+    const lassoNode = nodes.get(g.pendingLasso.id);
     const lassoFp = lassoNode && fingerprintOf(lassoNode);
     if (!lassoNode || !lassoFp) return null;
     // Same retroactivity as the mark: the loop was a gesture all along.
     lassoNode.reps.push({ modality: 'gesture', data: { role: 'lasso' }, source: 'heuristic' });
     removeFromContent(lassoNode.id);
     const enclosedIds = enclosedBy(lassoFp.bounds, contentBoundsList());
-    summon = buildSummon(
+    const summon = buildSummon(
       enclosedIds,
       'lasso',
       `you circled ${enclosedIds.length} mark${enclosedIds.length === 1 ? '' : 's'} and asked`,
       [lassoNode.id],
       lassoFp.bounds,
       lassoNode.id,
-      ev.at
+      ev.at,
+      g
     );
-    pendingLasso = null;
-    markMiss = null;
+    g.summon = summon;
+    g.pendingLasso = null;
+    g.markMiss = null;
     recomputeClusterCandidates();
     return summon.id;
   }
 
+  /** A hand's mark is the one IT taught: another hand's teaching judges only that hand's strokes (L2h). */
   function applyTeach(ev: Extract<SessionEvent, { type: 'teach' }>) {
-    commandMark = ev.mark;
+    gesturesOf(handOf(ev)).commandMark = ev.mark;
   }
 
   /** How many versions of code a node carries. A revision is pinned to one of these. */
@@ -2226,9 +2334,14 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     return node.id;
   }
 
+  /** The id of the participant another log's events belong to: stable, from the log's name. */
+  function handId(name: string): string {
+    return 'participant:hand:' + name.replace(/[^A-Za-z0-9._-]+/g, '_');
+  }
+
   /** The participant another log's events belong to, made on first sight; a stable id from the log's name. */
   function handParticipant(name: string): string {
-    const id = 'participant:hand:' + name.replace(/[^A-Za-z0-9._-]+/g, '_');
+    const id = handId(name);
     if (!nodes.has(id)) {
       // A hand in a room is one SITTING — a tab's page load, a process —
       // named `person~suffix` (`sittingName`); the person's name is what is
@@ -2305,7 +2418,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
         applySelect(ev);
         return null;
       case 'deselect':
-        selection = [];
+        gesturesOf(handOf(ev)).selection = [];
         return null;
       case 'move':
         applyMove(ev);
@@ -2327,9 +2440,12 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
         return null;
       case 'code':
         return applyCode(ev);
-      case 'dismiss':
-        if (summon?.id === ev.summonId) summon = null;
+      case 'dismiss': {
+        // A hand dismisses its own field; another hand's is not its to close.
+        const g = gestures.get(handOf(ev));
+        if (g && g.summon?.id === ev.summonId) g.summon = null;
         return null;
+      }
       case 'erase':
         applyErase(ev);
         return null;
@@ -2405,23 +2521,26 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
   }
 
   function getState(): SessionState {
+    // The board's gestures are its reader's own: the board's own hand. Every
+    // other hand's are held and replayed, and shown to nobody here (L2h).
+    const reader = gestures.get(LOCAL_PARTICIPANT) ?? blankGestures(LOCAL_PARTICIPANT);
     return {
       nodes,
       contentIds: [...contentIds],
-      pendingLassoId: pendingLasso?.id ?? null,
-      summon: summon ? { ...summon, enclosedIds: [...summon.enclosedIds] } : null,
+      pendingLassoId: reader.pendingLasso?.id ?? null,
+      summon: reader.summon ? { ...reader.summon, enclosedIds: [...reader.summon.enclosedIds] } : null,
       clusterCandidates: clusterCandidates.map((c) => ({ ...c })),
       artifacts: [...artifacts],
       participants: [...participants],
       explanations: [...explanations],
-      commandMark,
-      markMiss,
+      commandMark: reader.commandMark,
+      markMiss: reader.markMiss,
       staleResult,
       generation,
-      recentIds: recentWithin(lastAt),
+      recentIds: recentWithin(lastAt, LOCAL_PARTICIPANT),
       live: [...live],
       clocks: { ...clocks },
-      selection: [...selection],
+      selection: [...reader.selection],
     };
   }
 
