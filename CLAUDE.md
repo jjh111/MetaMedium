@@ -183,7 +183,7 @@ any structural change.
 
 | Path | What it is |
 |---|---|
-| `metamedium-core/` | **The canonical engine** (TypeScript, zero deps, tested): geometry, recognition (the shape rung), relations, the diagram rung (`src/diagram/`), concepts, the no-modes session engine, the layout and graph parsers, and the LLM transport. New recognition/engine work lands HERE |
+| `metamedium-core/` | **The canonical engine** (TypeScript, zero deps, tested): geometry, recognition (the shape rung), relations, the diagram rung (`src/diagram/`), concepts, the no-modes session engine, the layout and graph parsers, maths on a page (`src/maths/`: quantities, expressions, the sheet), and the LLM transport. New recognition/engine work lands HERE |
 | `index.html` | **Interactive whitepaper v5** "MetaMedium: AI Beyond Chat" (live on GitHub Pages). Fully on the `brand/` system as of 3 Sept 2026 — its `:root` is `brand/tokens.css` under the names this page already used, so change a value THERE first |
 | `brand/` | **The visual system, one home**: `tokens.css` holds every MetaMedium colour, face, size and figure/diagram token; `styleguide.html` is the living specimen (light paper first, IBM Plex Mono throughout, teal keyword, colour as signal, §11 figures and diagrams, §12 long-form furniture). v1 draft — the whitepaper's **figures** have migrated, the page around them has not; `brand/README.md` carries the four laws, the convergence order, and what applying it to the whitepaper taught the system |
 | `doodle2-canvas.html` | **Flagship demo**: heuristic recognition, spatial graph, library, undo/redo, touch. No LLM. Single-file (~500KB) |
@@ -352,6 +352,22 @@ mark carries or would be offered, so it is the maths of the *shape*, not of the
 wobble. It is arithmetic on a reading, not a reading — no confidence and no
 candidates — and writing has none. The inspector shows it as *the maths*; it is
 the one thing the 2025 prototype did that the engine had dropped.
+
+**Maths on a page** (`metamedium-core/src/maths/`; `MATHS-PLAN.md`, units M1
+and M2 of `DIRECTOR-PLAN-W2.md`). `quantity.ts` holds a number as the hand
+writes it — a value or a range, a unit or none, exact or approximate — with
+interval arithmetic that converts units and says so. `expr.ts` is a grammar
+written by hand, no `eval`, in which **a handwritten `=` chain is a running
+total, not an equation** (`A ÷ 3 = 12 + 2 = 14`: A ÷ 3 is 12, then 12 + 2 is
+14), a chain may restate its formula with the numbers put in (`① ÷ 2 = 14 ÷
+2 = 7`), and a line that reads two ways returns both, ranked with reasons — a
+dash between numbers as a range or a minus, precedence or left to right —
+settled by a worked line that has one's form. `sheet.ts` reads plain lines as
+definitions, steps, headings (an *Add …* heading is an allowance, read both
+ways), labels and checks; it is a pure function of its lines, so a changed
+measurement re-derives exactly what depends on it (`diffSheets`), and
+`gather.ts` collects the lines from text artifacts and read writing without
+touching the session. Tier 1: no model computes a number.
 
 ### Clean forms: a confident reading, redrawn
 
