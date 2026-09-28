@@ -575,6 +575,29 @@ tombstoned target, and undo of the erase makes it an anchor again, because
 state is a pure function of the log. P1-era logs replay into this
 representation unchanged. P3, bindings that follow, builds on it.
 
+**Ports by notation, heads, and figures of several strokes** (V1-PLAN E3;
+`session/ports.ts`, `diagram/heads.ts`, `diagram/figures.ts`). A notation that
+reads a mark as one of its symbols registers (`registerPorts`) and offers that
+symbol's ports — a point, or a segment or outline where the nearest point is
+the port — after the mark's own sites, through the same `magnetSites` /
+`nearestMagnet` / `magnetsNear` the pen asks, so the surface feels them
+unchanged. A place along a port binds as `along:<notation>`, its index its
+share of the port, and `siteOf` finds any bound site again where it stands
+now; with no notation registered every query equals a golden captured before
+the hook (`src/test/magnets.golden.ts`). `headsOf` reads what sits at each end
+of a line, an arrow or an arc — the arrow's own barb, a small triangle, diamond
+or circle touching the end on its axis, a separate chevron, a fill — hollow or
+filled, filled measured as ink coverage of the head's own inside, so a fast
+hatch and a head three times the size read alike; writing at an end is a
+label, not a head. `figuresOf` reads ruled strokes whose ends meet — tied by a
+magnet, or touching within the magnet radius — as one figure: a triangle, a
+quadrilateral (a diamond, said as one turned about 45°; a rectangle when its
+corners read right), a polygon. Each side keeps the marks it was drawn with,
+and each figure is the maths lane's own (`polygonFigure`), so
+`solveBoard(state, { figures: figuresOf(state) })` solves a triangle ruled in
+three strokes as it solves one drawn in one. All three are derived: nothing
+enters the log.
+
 ### Parsing: the drawing as a layout
 
 > `metamedium-core/src/parse/` — `layout.ts` reads it, `scaffold.ts` builds from it.

@@ -332,6 +332,24 @@ line's end, lines meeting read as one figure. *Red first:* synthetic
 connectors with each head kind; a two-stroke diamond and a three-line
 triangle read as one figure each. *Trap:* *filled* is ink coverage, and a
 fast hatch leaves gaps; measure coverage relative to the head's own area.
+*Status, 27 Sep 2026:* E3 built in core on `w2-maths` —
+`session/ports.ts` (a notation registers and its point and continuous ports
+come back through `magnetSites`, `nearestMagnet` and `magnetsNear`; a place
+along a port is `along:<notation>` with its share of the port in the index,
+found again by `siteOf`; with none registered every query equals a golden
+captured before the hook), `diagram/heads.ts` (the arrow's own barb, a small
+triangle, diamond or circle on the axis, a separate chevron, a fill; filled as
+coverage of the head's own inside — 804 of 810 hand-drawn heads right, the
+misses a shaky, heavily rounded triangle read as a circle 0.37; writing at an
+end is a label) and `diagram/figures.ts` (ruled strokes whose ends meet, bound
+or touching, as a triangle, a quadrilateral, a diamond said as one turned
+about 45°, a rectangle when its corners read right; sides keep their marks;
+`solveBoard(state, { figures: figuresOf(state) })` gives the three-line
+triangle 25.30″ with the single stroke's conflict and other reading) — 48
+tests, core 892. Left for D1: a diamond drawn as left and right halves inside
+the word window is gathered as a word (`session.ts`) and so is no figure; a
+fill that crosses a head's outline three times is a scratch and erases it; the
+session's inferred wire lands on a head, not the node beyond its `tip`.
 
 ### Phase 3 — diagrams
 **D1 Flowchart** — `src/notations/flowchart.ts`, the `flowchart@1` pack,
