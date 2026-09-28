@@ -1,12 +1,16 @@
 // Reading the writing: the one thing sent as pixels (v7 Stage E; v10 D3, F5).
 // Writing the shape rung found, unread, is offered to a model that can see —
 // a line of it as one image, so the reader has the phrase; the rest one mark
-// at a time. With no writing to read, any ink can still be read as writing
-// on request: the rung called John's h an arc and his o a triangle. Both ask
-// a model, say so, and are never taken automatically; the asking is the
-// host's.
+// at a time. With no writing to read, ink can still be read as writing on
+// request — the rung called John's h an arc and his o a triangle — but only
+// ink the rung could not place for sure (PLAN-USER-SURFACE U1d): offered on a
+// box, a line and a circle it was noise. "For sure" is the clean form's own
+// rule (`snapReading`: confident and unambiguous), one definition in one home.
+// Both ask a model, say so, and are never taken automatically; the asking is
+// the host's.
 
 import { isWord, strokePointsOf } from '../session/nodes';
+import { snapReading } from '../session/clean';
 import type { Offer, Tool } from './tool';
 import { isWritingMark, writingLine } from './board';
 
@@ -43,7 +47,8 @@ export const READ: Tool = {
       const n = s.nodes.get(id);
       return !!n && !s.artifacts.includes(id) && (!!strokePointsOf(n) || isWord(n)) && !scope.host.isRead(id);
     });
-    if (!ink.length) return [];
+    // Offered only when some of it the rung could not place for sure; the image is still all of it.
+    if (!ink.some((id) => { const n = s.nodes.get(id)!; return isWord(n) || !snapReading(n, s.nodes).ok; })) return [];
     return [{
       key: 'read-any',
       label: 'Read as writing',

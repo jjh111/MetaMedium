@@ -22698,6 +22698,8 @@ if (mm.THREE && mm.scene) {
   };
 
   // src/tools/graph3d.ts
+  var SPHERE = /* @__PURE__ */ new Set(["circle", "dot"]);
+  var BOND = /* @__PURE__ */ new Set(["line", "arc"]);
   var GRAPH3D = {
     id: "graph3d",
     name: "a graph in 3D",
@@ -22708,6 +22710,14 @@ if (mm.THREE && mm.scene) {
       if (scope.marks.length < 2 || artifactsIn(scope.state, scope.summon.enclosedIds).length) return [];
       const nodes = reading4.roles.filter((r) => r.role === "node").length, edges = reading4.roles.filter((r) => r.role === "edge").length;
       if (nodes < 2 || edges < 1) return [];
+      const shapeOf = (id) => {
+        const n2 = scope.state.nodes.get(id);
+        return n2 ? interpretationsOf(n2, scope.state.nodes).filter((r) => r.tier === 0 && r.basis !== "label")[0]?.label : void 0;
+      };
+      for (const r of reading4.roles) {
+        if (r.role === "node" && !SPHERE.has(shapeOf(r.id) ?? "")) return [];
+        if (r.role === "edge" && !BOND.has(shapeOf(r.id) ?? "")) return [];
+      }
       return [{
         key: "3d",
         label: "Show it in 3D",
@@ -23049,7 +23059,10 @@ if (mm.THREE && mm.scene) {
         const n2 = s.nodes.get(id);
         return !!n2 && !s.artifacts.includes(id) && (!!strokePointsOf(n2) || isWord(n2)) && !scope.host.isRead(id);
       });
-      if (!ink.length) return [];
+      if (!ink.some((id) => {
+        const n2 = s.nodes.get(id);
+        return isWord(n2) || !snapReading(n2, s.nodes).ok;
+      })) return [];
       return [{
         key: "read-any",
         label: "Read as writing",

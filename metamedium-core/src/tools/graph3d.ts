@@ -6,8 +6,13 @@
 // the program in the engine's name and plays it, because the hand asked.
 
 import { buildGraph3D } from '../tier1/library';
+import { interpretationsOf } from '../session/interpretations';
 import type { Tool } from './tool';
 import { artifactsIn } from './board';
+
+/** The shapes a sphere is drawn as, and a bond (PLAN-USER-SURFACE U1d): circles joined by lines — what the tool builds. */
+const SPHERE = new Set(['circle', 'dot']);
+const BOND = new Set(['line', 'arc']);
 
 export const GRAPH3D: Tool = {
   id: 'graph3d',
@@ -19,6 +24,16 @@ export const GRAPH3D: Tool = {
     if (scope.marks.length < 2 || artifactsIn(scope.state, scope.summon.enclosedIds).length) return [];
     const nodes = reading.roles.filter((r) => r.role === 'node').length, edges = reading.roles.filter((r) => r.role === 'edge').length;
     if (nodes < 2 || edges < 1) return [];
+    // Offered for what it builds, and only that: every node drawn as a circle, every edge as a line.
+    // A flowchart of boxes is a graph too, and "Show it in 3D" on it was noise.
+    const shapeOf = (id: string) => {
+      const n = scope.state.nodes.get(id);
+      return n ? interpretationsOf(n, scope.state.nodes).filter((r) => r.tier === 0 && r.basis !== 'label')[0]?.label : undefined;
+    };
+    for (const r of reading.roles) {
+      if (r.role === 'node' && !SPHERE.has(shapeOf(r.id) ?? '')) return [];
+      if (r.role === 'edge' && !BOND.has(shapeOf(r.id) ?? '')) return [];
+    }
     return [{
       key: '3d',
       label: 'Show it in 3D',
