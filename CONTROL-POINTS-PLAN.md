@@ -116,7 +116,7 @@ A connector's OWN bound end can be dragged too: its form moves and its
 `bound-to` claim stands as it was — whether a hand's drag lets the end go,
 or binds it where it lands as the pen does, is P3's to decide.
 
-### P3 — bindings follow
+### P3 — bindings follow · **landed 28 Sep 2026 (V1-PLAN E2, on `w2`)**
 
 **The graph it re-anchors from is specified** (BIND-1, 16 Sep 2026): one
 `bound-to` edge per endpoint, carrying that end and its site, with the
@@ -132,6 +132,46 @@ from the site's new position. A moved box carries its arrows.
 
 **Done when:** drag a traced box and its bound arrows follow; the log shows
 the re-anchoring as events; undo of the move restores the arrows.
+
+**Amended by V1-PLAN §4:** the re-anchoring is *derived at replay from the
+bindings*, never logged as extra events — state is a pure function of the
+log, and the bindings already are in it. The log shows the move; the arrows
+follow it in the apply path.
+
+**Landed as:** `session/follow.ts`. A connector that follows holds a derived
+`'follow'` rep — an affine map in its own space, applied before the hand's
+transform and turn (`placed`, nodes.ts), because a `'transform'` (a frame and
+a turn about its centre) cannot say *turn about this end and stretch*. After
+every move, scale, turn, tidy, reshape, snap and bind, the connectors bound to
+what changed — and a changed connector that is bound — are read again: one
+bound end pivots and stretches the connector about its free end, two are
+carried by the one similarity that takes both, both on one moved mark
+translate it, both on one site take the mean step and never collapse; down
+the chain, round by round. Only active bindings carry (an erased target moves
+nothing; undo the erase and the next move carries it again), the follower is
+filed where it stands and its wire read again, and a bind carries its end
+onto its site at once, so the board is the same whether a move merged before
+it or after it. **P2's open question, decided by the director:** a
+connector's own bound end dragged by its handle binds where a magnet holds it
+(the old claim for that end replaced) and lets go anywhere else — a new
+`unbind` event, keyed by the end — in the same act as the reshape; moved whole
+by the hand (a move, a scale, a turn, its middle handle) it lets go of the
+ends that no longer sit within the magnet's reach of their sites, in the same
+act. A notation's ports are read from the clean form a symbol holds, and a
+bound port is found by the notations the engine knows whether or not the pen
+is offered them. The surface draws what follows a drag before the hand lets
+go, and a connector's end handle feels the magnets. **The done-when,
+honestly:** a drawn box dragged by the pointer carries two arrows tied to it
+(e2e 53–53d); a traced box is ink like any other, and the photograph it
+would be traced from is still P4's. A move carrying ten bound arrows costs
+1.0 ms on the 2,000-mark board (0.09 ms with none; `bench/budgets.test.mjs`).
+**Found on the way:** a two-wing arrowhead whose tip lands ON a box's outline
+visits it three times, and three crossings rub the box out — an arrow drawn
+to a box must stop short of it, and the bind carries its tip on; the rung's
+arrow tip, which a clean arrow is built from and its tip handle stands on,
+can sit a wing's length short of the ink's; and a head drawn as a separate
+mark (Mermaid in's arcs and `<-->` starts) is bound to nothing and does not
+follow its connector.
 
 ### P4 — the diagram-repair demo
 

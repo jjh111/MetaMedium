@@ -60,7 +60,10 @@ ships is matched there as if taught, attributed to the pack
 (`src/packs/`; *Library packs*, below). **Phase 2, editing, has begun: E1**
 — one mark selected alone shows its own points, and dragging one reshapes
 its clean form by one `reshape` event, the ink untouched
-(`session/handles.ts`; *Handles*, below). **Phase 0b, a board
+(`session/handles.ts`; *Handles*, below) — **and E2**: a connector bound to a
+site follows the mark it is bound to wherever it moves or is reshaped,
+derived at replay and never logged, and a drag draws what follows it before
+the hand lets go (`session/follow.ts`; *Magnets and bindings*, below). **Phase 0b, a board
 that holds, came first, ahead of the backbone**, because `PERF.md` measured that 500 marks are usable once open,
 2,000 take 100 s to open and freeze the page for 7.6 s on every stroke,
 5,000 do not open, and autosave stops saving, in silence, at 1,100–1,600
@@ -997,6 +1000,81 @@ from its own ellipse, placed), so they follow a reshape as the drawn form
 does; an offered form is placed as the ink is, so a moved or tidied mark
 offers its sites where it stands — they stood where it was drawn.
 
+**Bindings follow** (V1-PLAN E2, CONTROL-POINTS-PLAN P3 as amended;
+`session/follow.ts`, `follow.test.ts`). A connector bound to a site
+re-derives its end when the mark it is bound to moves, scales, turns, is
+reshaped, tidied or snapped — **derived in the apply path, never logged**:
+a move is the one event, and undo of it takes the connectors back by itself.
+**The derived form is a `'follow'` rep** (`FollowRep`: `map`, `ends`,
+`reasoning`, source `engine`) — an affine `map` in the connector's OWN space
+(`session/affine.ts`), applied by `placed` before the hand's transform and
+turn (`nodes.ts`; `unplaced` undoes it last, `boundsOf` reads it), so its
+ink, its clean form, its reading's tip and tail, its sites and its handles
+are all carried and the ink is never touched; held in its own space, a
+later move, scale or turn of the connector by the hand acts on the board as
+on any mark. A `'transform'` is a frame and a turn about its centre, and
+cannot say *turn about this end and stretch*. **The correction** (`followed`)
+reads each ACTIVE bound end — `activeBindingsOf`, so an erased target moves
+nothing — where it stands (`connectorEnds`: a held clean form's ends, else
+the ink's, an arrow's tip being the ink the pen first reached farthest along
+its shaft, `inkEndsOf` in `diagram/heads.ts`; the rung's own tip can sit a
+wing's length short) and where its site stands now (`boundSiteOf`), and
+composes onto the map it held the similarity that carries one onto the
+other: **one bound end** pivots and stretches the connector about its free
+end; **two** are carried by the one similarity that takes both; sites that
+moved alike (both ends on one moved mark) translate it; two ends on ONE site
+take the mean step — **never a collapse** (nor a length under the hand's
+floor). Composed onto where it STANDS, a binding let go (an `unbind`, a
+target erased) leaves the connector where it stood, and a bind carries its
+end onto its site at once, so a move merged before a bind or after it gives
+the same board. **Triggers**: the reducer follows after `move`, `scale`,
+`rotate` (one pure function of a mark, `session/manipulate.ts`), `tidy`,
+`reshape`, `snap`, `propose` (which can never propose a `'follow'`) and
+`bind`, carrying the chain on — a connector bound to a connector — round by
+round in id order, each at most `FOLLOW_VISITS` times (`followThrough`); a
+board with no binding pays nothing. `boundBy` (who follows each mark) is kept
+with the index and in checkpoints. **What reads it**: a follower is filed
+where it stands (`boundsMoved`), so the reach index, the components and a
+scope's relations see it there, and its wire is inferred again from its ends
+(`rewire`: `connects`, `points-from`, `points-to`), so a moved box's arrow
+still points at it; its heads and maths read it where it stands. Stored
+relation edges are not recomputed for a follower, as they never were for a
+moved mark. Not followed: a head drawn as a separate mark (it is bound to
+nothing — Mermaid in's arcs and `<-->` starts); a notation's reading that
+changes with its context (a figure's ports appear with a stroke drawn beside
+it) is found again only at the next trigger.
+
+**The hand on a connector's own ends** (the director's decision; the
+session's doors, `reshapeDecision` and `releasedBy`). A connector's own tail
+or tip dragged by its handle and let go where a magnet holds it binds there —
+`reshape`'s `bind`, the site the pen's magnet holds, the old claim for that
+end replaced — and let go anywhere else, that end's binding is released: a new
+event, **`unbind { strokeId, end }`**, keyed by the end as BIND-1 removes.
+Moved whole by the hand — a `move`, `scale` or `rotate` of it, an artifact
+it is in, or its middle handle — it lets go of the ends that no longer sit
+on their sites (`sitsOn`: within the magnet's reach, `holdReach`, in the
+hand's pixels the connector was drawn at); an end on a mark moved with it,
+or one a nudge left in reach (the follow puts it back), is kept. The door
+writes the unbinds first, then the reshape or the move, then any bind — **in
+one act** (L2j), so one undo takes it all back. A free end dragged onto a
+magnet binds too. **The surface** (`05-selection.js`): while a hand moves,
+scales, turns or reshapes marks, the connectors bound to them are drawn
+following as they will stand (`dragFollowers`, by `manipulatedReps`,
+`releasedBy`, `reshapeDecision` and `followPreview` — the functions the
+replay runs, so the preview is the act); a connector's end handle feels
+every other mark's sites as the pen does (`magnetQuery(w, except)`), with the
+pen's ring; the status line says a bind, a let-go and what a move walked off.
+e2e 53–53d; `mm.followDrawn()` and `mm.dragHold()` for tests.
+
+**Ports follow too.** A notation's ports are read from the clean form a lone
+symbol holds (`portOutline` in `notations/flowchart.ts`) — the form is where
+it stands — so a binding at a decision's vertex follows the decision
+reshaped or moved; what the symbol IS is still read from its ink. And a bound
+port is found by the notation the ENGINE knows (`knowPorts`, every
+registered notation's; `portSiteOf`, `boundSiteOf`), whether or not the page
+offers its ports to the pen — the pen's offer is the page's, the log's claim
+is the board's, and state stays a pure function of the log.
+
 ### Handles: the one selected mark's own points (V1-PLAN E1)
 
 > `metamedium-core/src/session/handles.ts` (`handlesOf`, `reshapePreview`,
@@ -1068,18 +1146,13 @@ may drag a handle** — the mouse, the pen, a finger while fingers draw — and
 **a finger that pans while a pen is present never reaches one** (pencil
 P11). A handle drag is never a stroke: no ink, no summon.
 
-**What E2 (bindings follow) is handed:** a `reshape` changes exactly one
-thing, the mark's `'clean'` rep, and every site is derived from it — so the
-point a bound connector's end must go to is `siteOf(node, nodes, site)` of
-the binding's `{ kind, index }`, which after a reshape answers the moved
-point (corner 2 stays corner 2, even through a flip). The same holds after
-a move, scale or turn. Three things are E2's: `standingPointsOf` is the
-one function for where a mark's outline stands, and a connector whose end
-follows must stand there too; a notation's ports (`port:` / `along:`) are
-read from the ink, not the reshaped form (ports.ts); and a connector's own
-bound end can be dragged by its handle — its form moves and its `bound-to`
-claim stands, so whether that drag lets the end go, or binds it where it
-lands, is E2's to decide.
+**What E2 made of it** (*Magnets and bindings*, above): a `reshape` changes
+exactly one thing, the mark's `'clean'` rep, and every site is derived from
+it, so a connector bound to one follows it there (corner 2 stays corner 2,
+even through a flip) — and a follower stands where `standingPointsOf` says,
+carried by its `'follow'` map. A notation's ports are read from the clean
+form. A connector's own bound end dragged by its handle binds where a magnet
+holds it and lets go anywhere else, in the reshape's act.
 
 ### Parsing: the drawing as a layout
 
