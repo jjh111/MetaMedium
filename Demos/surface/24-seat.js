@@ -165,7 +165,7 @@
     let html = '<div class="mpHead"><span>Claude Code</span></div>';
     if (seated()) {
       const waiting = seatAgent.waiting();
-      html += '<button class="model on" id="mpSeatLeave"><span>Claude Code — seated</span><span class="why">reads and answers for you · tap to leave</span></button>';
+      html += '<button class="model on" id="mpSeatLeave" title="it reads and answers for you here — tap to leave the seat"><span>Claude Code — seated</span><span class="why">tap to leave</span></button>';
       html += '<div class="note">' + esc(why ? why
         : here ? here + ' is in room “' + folder.name + '” — What is this?, Read the writing and ask: are parked here until it answers'
           : 'Claude’s hand is not in room “' + folder.name + '” just now — what you ask waits here until it comes back') + '</div>';
@@ -176,7 +176,8 @@
     } else if (why) {
       html += '<div class="note">' + esc(why) + '</div>';
     } else if (here) {
-      html += '<button class="model" id="mpSeatJoin"><span>Claude Code — in this room</span><span class="why">' + esc(here) + ' · sees · one tap, and it reads and answers for you</span></button>';
+      html += '<button class="model" id="mpSeatJoin" title="one tap, and it reads the writing, says what things are and answers questions for you — every question parked in this room until it answers"><span>Claude Code — in this room</span><span class="why">tap to seat</span></button>';
+      html += '<div class="note">' + esc(here + ' is here, and sees: seated, What is this?, Read the writing and ask: go to it') + '</div>';
     } else {
       html += '<div class="note">' + esc(folder.name === CLAUDE_ROOM
         ? 'Claude isn’t in this room yet — it joins whenever Claude Code is open in this project (its hand is node Demos/mcp.mjs), and is offered here the moment it is heard.'
