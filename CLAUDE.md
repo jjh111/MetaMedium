@@ -647,7 +647,12 @@ dashed outline with corner handles and a knob; drag inside moves, a corner
 scales, the knob turns, one event per drag, the ink untouched — and **the
 field** opens at the pen tip, fanning to the hand's side (a tile flips it).
 Everything typed there goes through one reader, `readField`, which returns
-*what Enter will do* and shows it under the text as it is typed: a verb the
+*what Enter will do* and shows it under the text as it is typed. **With
+nothing typed, Enter does the likely act** (PLAN-USER-SURFACE U1e; an item's
+`act` in `09-field.js`): the first act in the ranked order — the top the
+context holds steady — *Draw them clean*, *Line up across*, *read it* for
+writing; never a reading as a name, which is a tap on it or `name:`. With
+only readings the line says so and Enter names nothing. Typed, it reads a verb the
 selection has (`erase`, `dup`, `clean`, `line up`, `play`, `frame`, `read`,
 `what` …, by label or alias), a name the library knows (reused, no model
 asked), words the verb table reads at a definition, a prefix (`name:`,

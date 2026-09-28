@@ -3887,6 +3887,8 @@ window.__fieldGolden = async function () {
 // Recorded again 28 Sep 2026 by design (PLAN-USER-SURFACE U1d): Read as writing ("read-any")
 // leaves the row of boxes and both molecules — shapes the rung reads for sure are not offered as
 // writing — and nothing else in any scope changed.
+// And again (U1e): with nothing typed Enter takes the likely act, never a reading as a name — the
+// line of the row, both molecules and the text made from writing changed, and nothing else.
 window.__FIELD_GOLDEN = {
   "row of three boxes": {
     core: ["name", "copy", "paste", "erase"],

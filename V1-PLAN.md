@@ -2185,6 +2185,17 @@ confident circles, which U1d withdraws; 33b2 pins them not offered);
 `tools/graph3d.ts` only when every node is a circle and every edge a line or
 an arc.
 
+*U1e status, 28 Sep 2026: built on `claude/friendly-galileo-g1z8wo`* —
+`17e701c` (red first: the reader's cases, and e2e 59–59b — Enter on a row of
+boxes and on a molecule named them *row* and *flow*), `7bc32e8` (the fix) and
+`e7f15b4` (e2e 49's lines recorded again by design: the row's, both
+molecules' and the text's, nothing else). `readFieldCommand` takes, with
+nothing typed, the first item marked `act` — every offer the row shows, and
+the readings whose taking acts (writing read, W2; writing taken as text) —
+and with only readings says *tap a reading to take it as the name*; a tap
+still names (59c). e2e 42h pinned Enter's line as a rename and now pins that
+the line is Enter's again when the pointer leaves.
+
 ### Phase 7 — review and release
 **H1** — week 1's U7 (the `hand` gate scenario) plus `QA-v1.md`, a hand
 checklist for A1–A10 with the MCP hand in the room checking each step.
