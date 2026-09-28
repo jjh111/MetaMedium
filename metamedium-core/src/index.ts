@@ -217,6 +217,14 @@ export type {
 // says what cannot hold and by how much; a declared square rules, a measured
 // right angle is only a reading; what the labels leave open is the ink's.
 export { solveFigure, solveBoard, describeSolution } from './maths/solve';
+// Figures of several strokes (V1-PLAN E3): ruled strokes whose ends meet — a
+// magnet tied them, or they touch within the hand's reach — read as one
+// figure: a triangle, a quadrilateral (a diamond, turned about 45°; a
+// rectangle, its corners right), a polygon. Each side keeps the marks it was
+// drawn with, and each figure is the maths lane's own, so
+// `solveBoard(state, { figures: figuresOf(state) })` solves it. Derived.
+export { figuresOf, figuresAmong, describeFigure, STRAIGHT_TURN, STRAIGHT_RUN, ONE_BEND, DIAMOND_SLACK, SLIVER, MAX_FIGURE_STROKES } from './diagram/figures';
+export type { InkFigure, FigureShape, FigureCorner } from './diagram/figures';
 export type {
   SolvedFrom,
   SolvedValue,
@@ -239,8 +247,14 @@ export { printTiled, PAPERS } from './maths/print';
 export type { Paper, Orientation, PaperSize, PrintOptions, PrintPage, PrintJob } from './maths/print';
 
 // Magnets — the places a mark offers attachment, derived from its clean form.
-export { magnetSites, nearestMagnet, magnetsNear, magnetRadius, describeMagnet, MAGNET_SCREEN_PX, MAGNET_SIZE_FRACTION } from './session/magnets';
+export { magnetSites, nearestMagnet, magnetsNear, magnetRadius, describeMagnet, siteOf, MAGNET_SCREEN_PX, MAGNET_SIZE_FRACTION } from './session/magnets';
 export type { MagnetSite, MagnetKind, MagnetHit } from './session/magnets';
+// Ports by notation (V1-PLAN E3) — the one hook beside magnetSites: a notation
+// that reads a mark as its symbol offers that symbol's ports, points and places
+// along a segment or an outline, through the same queries the pen asks. None
+// registered, nothing changes.
+export { registerPorts, unregisterPorts, registeredPorts, alongIndex, alongOf, ALONG_STEPS } from './session/ports';
+export type { NotationPort, NotationPorts } from './session/ports';
 export { bindingsOf, boundRepsOf, activeBindingsOf, boundToMark, describeBinding } from './session/magnets';
 export type { Binding, BoundRep } from './session/magnets';
 
@@ -361,6 +375,27 @@ export type { Relation, RelationKind, Mark, RelateConfig } from './relate/relati
 // (KEYFRAMES.md §3), and the genre that decides how a drawing compiles.
 export { assignRoles, genreOf, describeRoles, ROLES } from './diagram/roles';
 export type { Role, RoleReading, RoleScope, Wire, Genre, GenreReading } from './diagram/roles';
+// Connector heads (V1-PLAN E3): what sits at each end of a line, an arrow or
+// an arc — the arrow's own barb, a small triangle, diamond or circle touching
+// the end, a separate chevron — hollow or filled, filled measured as ink
+// coverage relative to the head's own area. Writing at an end is a label, not
+// a head. Plural, with reasons; derived, never in the log.
+export {
+  headsOf,
+  connectorHeads,
+  describeHeads,
+  HEAD_MAX_SHARE,
+  HEAD_AXIS_SHARE,
+  FILL_CORE,
+  FILL_REACH,
+  FILLED_AT,
+  FILL_UNSURE,
+  BARB_ROUND,
+  BARB_CLOSED,
+  OUTLINE_PATH,
+  HEAD_COMPACT,
+} from './diagram/heads';
+export type { HeadKind, HeadReading, ConnectorEnd, ConnectorHeads } from './diagram/heads';
 
 // Concepts — the meaning-mappings, as a library rather than as code paths.
 export { matchConcepts, BUILTIN_CONCEPTS } from './concepts/concept';
