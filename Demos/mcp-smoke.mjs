@@ -323,6 +323,38 @@ try {
     ada.close();
     small.close();
   }
+
+  // ===== A restarted hand is the same person (V1-PLAN L2i) ====================
+  // A hand in a room is one process, so a restart is a new sitting — a new log
+  // under the same name, `smoke~<new>`. The label rule compared the sitting, so
+  // the restarted hand could not put a word on the circle it drew before; it
+  // asks the person now. The tab's box is still not its to label.
+  const again = spawnHand({ MM_ROOM: ROOM, MM_RELAY: RELAY, MM_NAME: 'smoke' }, 'again');
+  try {
+    await again.rpc('initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'smoke', version: '0' } });
+    let t6 = '';
+    for (let i = 0; i < 30 && !t6.includes(mineId); i++) { t6 = textOf(await again.call('canvas_look', {})); if (!t6.includes(mineId)) await wait(100); }
+    const circleLine = t6.split('\n').find((l) => l.includes(mineId + ' ')) || '';
+    check('a restarted hand sees the circle it drew before the restart — the earlier sitting\'s, by smoke', /by smoke/.test(circleLine) && /labelled “bubble”/.test(circleLine), circleLine || t6.split('\n').slice(0, 4));
+    const heardBefore = heard.length;
+    const relabel = await again.call('canvas_label', { id: mineId, text: 'sun' });
+    check('and may put a word on it: a restart is the same person', /“sun” on /.test(textOf(relabel)) && textOf(relabel).includes(mineId), textOf(relabel));
+    const stillNot = await again.call('canvas_label', { id: boxId, text: 'not mine' });
+    check('the tab\'s box is still not its to label, with the reason in words', /was made by tab/.test(textOf(stillNot)) && /your own ink/.test(textOf(stillNot)) && !/“not mine” on/.test(textOf(stillNot)), textOf(stillNot));
+    const firstLog = heard.filter(fromSmoke).map((h) => h.participant)[0];
+    await until(() => heard.slice(heardBefore).some((h) => fromSmoke(h) && h.participant !== firstLog && h.events.some((e) => e.type === 'label')), 4000);
+    tabSession.load(MM.mergeLogs(await tab.readLogs(), { me: tabMe }));
+    const st6 = tabSession.getState();
+    const sun = MM.labelOf(st6.nodes.get(mineId));
+    check('in the tab: the word stands on the circle, in the restarted hand\'s name — the circle still the first sitting\'s',
+      !!sun && sun.text === 'sun' && /^participant:hand:smoke_/.test(sun.source || '') && sun.source !== handId
+        && MM.authorOf(st6.nodes.get(mineId)) === handId && MM.labelOf(st6.nodes.get(boxId)) === undefined,
+      { label: sun, maker: MM.authorOf(st6.nodes.get(mineId)), first: handId });
+  } finally {
+    again.child.stdin.end();
+    await wait(100);
+    again.child.kill();
+  }
 } catch (err) {
   check('the run finished', false, err.message);
 }
