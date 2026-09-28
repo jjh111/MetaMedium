@@ -2220,6 +2220,18 @@ chip. R5's first run is still its own unit. The harness's fetch stub lets a
 request with no body through to the page's origin, so the help loads in the
 canvas scenario.
 
+*U2 status, 28 Sep 2026: walked on `claude/friendly-galileo-g1z8wo`* — the
+sixteen rows of `UX-AUDIT-2026-09-28.md` walked again in headless Chromium at
+`/app/`, real mouse input, no model (the model rows by the `models` and `seat`
+scenarios): fourteen **resolved**, row 10 (*Read the writing*'s speed) left to
+John's hand with real local models, row 16 the rename's. The table and its
+screenshots (`Assets/ux-audit-2026-09-28/`) are the acceptance; John walks it
+by hand next. The walk found four more, each fixed red-first before the table
+was written: the field slid back over the press at the right edge (e2e 58),
+held writing opened a field over itself (58c), and the panel's *becomes*
+named *Show it in 3D* the field no longer offered (56d) and said writing
+*becomes a name* where Enter reads it (56e).
+
 ### Phase 7 — review and release
 **H1** — week 1's U7 (the `hand` gate scenario) plus `QA-v1.md`, a hand
 checklist for A1–A10 with the MCP hand in the room checking each step.
