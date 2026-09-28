@@ -249,7 +249,7 @@ suite and the gate green, `master` fast-forwarded and pushed.
 |---|---|---|
 | **0. Make week 1 whole** — ✅ done on `w2`, 27 Sep (on `master` when John lands it, L4) | L1 ids that hold · L1b one event, applied once · L2a the shard pairs by id · L2b labels on the board · L2c the shard asks · L2d duplicate Enter, fitAll, the cache measured · L2e a person labels their own ink · L2f an artifact is made by whoever blessed it · L2g a word is made by whoever wrote its letters · L2h gestures are per hand · L3 CI, bundles, docs · and L3's finding, L2i a person is the same person across sittings (27 Sep) · and R4d's, L2j undo is per hand (27 Sep) | every unit week 1 claimed is whole, CI runs what exists (WebKit included), docs say what the code does |
 | **0b. A board that holds** (pulled forward by `PERF.md`, 27 Sep) | R3 no lost work · R4b the engine holds 2,000 marks · R4c the surface draws only what changed · R4d a room merges a line, not the board · R4e a brief carries what it is about | nothing is ever lost silently; a 2,000-mark board opens in under 1.5 s, answers a stroke in 16 ms at p95 and draws its reading within 100 ms; a room line costs under 16 ms; the budgets are tests |
-| **1. The backbone** | B1 tools · B2 context · B3 packs | a tool is one file; the field ranks by context with reasons; a pack is used by an event and benched |
+| **1. The backbone** — ✅ done on `w2`, 28 Sep | B1 tools · B2 context · B3 packs | a tool is one file; the field ranks by context with reasons; a pack is used by an event and benched |
 | **2. Editing** | E1 handles · E2 bindings follow · E3 ports, heads and figures | a selected mark reshapes by its points; bound arrows follow; notations can declare ports |
 | **3. Diagrams** | D1 flowchart · S1 the shape rung holds a diamond, an L and a wide arc · D2 Mermaid out · D3 Mermaid in · D4 UML class · D5 sequence and state · D6 ER and mind map · D7 routing · D8 the repair demo | A1–A3 pass in the gate |
 | **4. Maths** ∥ after B1 | M1 quantities and expressions · M2 the sheet · M3 figures and dimensions · M4 solving · M5 maths on the board · M6 the garment pack · M7 true size and print | A4 passes in the gate |
@@ -1103,6 +1103,77 @@ said, not thrown; a user's own definition wins a tie. *Red first:* a
 scenario test with the test pack. *Invariant:* log as source — the `use`
 event, never a pack silently present. *Trap:* a pack that needs orientation
 or arrowheads cannot be a signature; that is a notation (D1).
+
+**B3 Packs — status, 28 Sep 2026: done on `w2`** — `f092948` (red: a new
+scenario, `src/packs/pack.scenario.test.ts` — the test pack used by one event
+makes the canonical molecule match with no teaching; 2 of its 3 failing, the
+control passing), `c5aa363` (core), `2aee962` (the bench), `16ad04b` (the
+budgets), `0949360`, `2b149b3` (the surface), `6f04823`, `4a7b059`, and the
+docs. `metamedium-core/src/packs/`: the format (`pack.ts` — id, version,
+name, describes, notation?, definitions with samples as `DrawnShape[][]`
+and/or recorded strokes, role, ports, export; connectors; affinities), the
+validator in the DATA-1 manner (`validate.ts` — a pack that cannot be read
+says where and why; a malformed entry refused with its path and reason, the
+rest standing; a frozen copy held; never a throw), the shipped registry by
+`id@version` (`registry.ts`; content code-bundled, one `.ts` module a pack
+under `shipped/`, so both bundles carry it and the shard typechecks it with
+no JSON import): `basics@1` (bubble; molecule drawn three ways),
+`flowchart@1` (names the notation, restates none of `FLOWCHART_TABLE`, which
+stays its symbols' single home; its affinities), `test-molecule@1` (tests
+only, never listed). Events `use { pack }` / `unuse { pack }`
+(`session.use`/`unuse`, `SessionState.packs`): replay, undo per hand, a
+room's merge and line, the journal and the export carry them; the door
+refuses a name that is no pack's or one the build lacks and writes nothing;
+on replay such a name is a standing notice (`SessionState.packNotices` —
+derived from the log, because one cleared by the next event would be gone
+before the replay ended), said, never thrown, and the board loads. A
+definition's drawings are drawn through `strokeFor` with seeded tremor on a
+scratch board of their own (`synthesize.ts`, `definitions.ts`); the first
+one's signature is the definition's and the others' its accepted examples; it
+is a node `library:<id>@<v>:<name>` made by `library:<id>@<v>`, matched by
+`matchDefinition` after the board's own (the summon's suggestions, the
+cluster candidates and `matchesOf` carry `pack`; on a tie the board's own
+leads), corrected by *Not a …* (kept through an `unuse`), never content, an
+artifact, live, erased, labelled, proposed on or written into; an instance
+taken from it is its own definition (`definitionOf`). **The director's three
+decisions held**: recognition is never gated — the flowchart reads on every
+board and `contextAt` reads every notation, a pack in use adding its
+definitions, its notation's ports (`followPacks`: `offerPorts` on use, taken
+back on unuse, its undo, or a board loaded in place) and its affinities
+(`AFFINITY` left `context/rank.ts`; `contextAt` hands the board's packs' in
+as `ctx.affinity`, and a board with no pack keeps B1's order — e2e 49
+unchanged); `FLOWCHART_TABLE` stays one home; content is code-bundled and
+immutable per `id@version`. `packBench(pack, { corpus })`: its own drawings
+redrawn with other seeds, elsewhere, at 0.6× and 1.8× — basics@1 96/96
+(bubble 24/24, molecule 72/72), test-molecule@1 48/48 — and 3,900 corpus
+drawings (the recognition corpus, turned boxes, arcs, 36 flowcharts,
+wireframes, writing, rows of boxes, hubs, 6 canonical molecules labelled as
+such) with 0 false reads for every pack, 12 labelled reads, 216 corpus
+circles said as the bubble's very structure. The 2,000-mark board with
+basics@1 and flowchart@1 in use: replay 263 ms (257 with none), cold 306
+(295), a stroke 0.16 / p95 0.22 ms (0.16 / 0.21), 16.9 MB (16.8), 39 groups
+chipped by a pack — `bench/budgets.test.mjs`, now three tests, green. The
+surface: the control centre's last tile, *packs*, and its pane
+(`23-packs.js`) with *use* / *stop using*; a match's pill and chip say its
+pack (`molecule 0.91 · basics`); the standing line, the tile, the pane and
+the MCP hand's look say a pack the build lacks. e2e 50 now uses flowchart@1
+(the affinity is the pack's); e2e 51–51f and the boards scenario's N17 (the
+journal through a reload). *Found:* a summon's matches were read once, when
+it opened, so a field standing while a pack was used went on offering what
+it had — `use`/`unuse` now re-read every hand's open summon, as a correction
+re-reads its corrector's; and the canvas scenario cannot test the journal at
+its end (a room or folder opened earlier stops the browser's own board), so
+the journal's record is the boards scenario's. *Not changed:* a pack's
+reading of a single mark does not join the reading under a mark (`canLift`
+stays false there): a definition matches groups, and a lone circle's bubble
+is offered when it is held. Whole suite before the last commit: core 1,194
+in 90 files, typecheck clean, both bundles equal to a fresh build; relay,
+field, build, board and release tests 107; surface and app in sync; the
+canvas MCP smoke and the shard's (606 in 31 files, typecheck clean) pass; the
+gate 546 passed and the one honest skip (canvas 314, keep 31, boards 20, app
+14, pencil 14, budgets 7 — open 504 ms, release 40 ms on 2,000 marks, the
+500-mark paint equivalence differing in 0 — shard 123 + 11 + 12); WebKit
+smoke 4 and pencil 14.
 
 ### Phase 2 — editing
 **E1 Handles** — `CONTROL-POINTS-PLAN.md` P2 as written, with the rule that
