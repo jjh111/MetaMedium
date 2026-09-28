@@ -2959,6 +2959,54 @@ window.__scenario = async function(){
     }
   }
 
+  // ---- 49b. A tool is one file and one registration line (V1-PLAN B1) ----
+  // A tool written here, as a file of its own would write it, and registered in
+  // one line: it offers to count the boxes a scope holds, and taking it puts an
+  // answer beside them. The open field offers it the moment it registers (the
+  // registry changes offers with no event, and says so); a scope with no box is
+  // offered nothing from it; taken, what it writes carries its id; unregistered,
+  // it is gone from the field.
+  {
+    mm.session.load([]); mm.setView(1, 0, 0); mm.resetUses();
+    const COUNT_BOXES = {
+      id: 'test:count-boxes', name: 'count the boxes', describe: () => 'says how many boxes a scope holds',
+      offers: (scope) => {
+        const boxes = scope.marks.filter((id) => MM.topInterpretation(scope.state.nodes.get(id)) === 'rectangle');
+        return boxes.length ? [{ key: 'test:count-boxes', label: 'Count ' + boxes.length + ' boxes', reason: 'a tool from one file', base: 0.45, tool: 'test:count-boxes', verbs: ['count'], data: { boxes: boxes } }] : [];
+      },
+      take: (offer, scope, session, at) => { session.answer({ participantId: MM.LOCAL_PARTICIPANT, question: 'how many boxes', text: offer.data.boxes.length + ' boxes', aboutIds: offer.data.boxes, at: at }); return {}; },
+    };
+    const lastId49 = () => { const st = mm.session.getState(); return st.contentIds[st.contentIds.length - 1]; };
+    const boxes49 = [];
+    for (const x of [200, 360, 520]) { t.stroke(t.rect(x, 200, 120, 80)); boxes49.push(lastId49()); }
+    t.stroke(t.circle(900, 240, 50)); const ring49 = lastId49();
+    mm.session.summonMarks(boxes49, Date.now()); await wait(60);
+    const pillOf = () => document.querySelector('#summon .pill[data-key="test:count-boxes"]');
+    const before = !!pillOf();
+    const unregister = MM.registerTool(COUNT_BOXES); // the one registration line
+    await wait(30);
+    const pill49 = pillOf();
+    const offered = !!pill49 && /Count 3 boxes/.test(pill49.textContent) && pill49.title === 'a tool from one file';
+    const slots49 = t.coreSlots().join(',');
+    if (pill49) pill49.click();
+    await wait(30);
+    const evs49 = mm.session.getEvents();
+    const answered = evs49[evs49.length - 1];
+    step('49b. a tool registered in one line is offered in the open field for a scope it applies to, the four core slots unmoved, and what taking it writes carries its id',
+      !before && offered && slots49 === 'name,copy,paste,erase' && answered.type === 'answer' && answered.tool === 'test:count-boxes' && answered.text === '3 boxes',
+      { before, offered, slots: slots49, last: { type: answered.type, tool: answered.tool, text: answered.text } });
+    mm.session.summonMarks([ring49], Date.now()); await wait(60);
+    const onCircle = !!pillOf();
+    mm.session.summonMarks(boxes49, Date.now()); await wait(60);
+    const again = !!pillOf();
+    unregister();
+    await wait(30);
+    const gone = !pillOf();
+    step('49c. a scope it does not apply to is offered nothing from it; unregistered, it is gone from the open field',
+      !onCircle && again && gone, { onCircle, again, gone });
+    mm.session.load([]); mm.setView(1, 0, 0);
+  }
+
   return R;
 };
 
