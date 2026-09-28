@@ -113,6 +113,24 @@ describe('handles — one mark with a clean form shows its own sites', () => {
     expect(s.getEvents()).toHaveLength(n);
   });
 
+  it('a loop that waits to be taken up is a gesture in waiting: its reshape is refused and writes nothing, as a snap never offers it', () => {
+    const s = createSession();
+    const c = s.addStroke(circleStroke(600, 160, 30), 1000, undefined, 1);
+    const loop = s.addStroke(circleStroke(600, 160, 90), 2000, undefined, 1);
+    expect(s.getState().pendingLassoId).toBe(loop);
+    const n = s.getEvents().length;
+    expect(s.reshape({ id: loop, handle: { kind: 'cardinal', index: 1 }, to: { x: 720, y: 160 }, at: 3000 })).toBe(false);
+    expect(s.getEvents()).toHaveLength(n);
+    expect(cleanOf(nodeOf(s, loop))).toBeUndefined();
+    // …and a log that carries one anyway reshapes nothing on replay.
+    const copy = createSession();
+    copy.load([...s.getEvents(), { type: 'reshape', id: loop, handle: { kind: 'cardinal', index: 1 }, to: { x: 720, y: 160 }, at: 3000 }]);
+    expect(cleanOf(nodeOf(copy, loop))).toBeUndefined();
+    // The mark inside it is its own to reshape, and the loop still waits.
+    expect(s.reshape({ id: c, handle: { kind: 'cardinal', index: 1 }, to: { x: 650, y: 160 }, at: 3100 })).toBe(true);
+    expect(s.getState().pendingLassoId).toBe(loop);
+  });
+
   it("a notation's ports are the pen's, never a handle: only the mark's own sites are", () => {
     const s = createSession();
     const b = box(s);
