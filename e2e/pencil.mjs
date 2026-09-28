@@ -39,6 +39,8 @@
 //        preference kept, the switch not said again
 //   P11  the pen drags a handle of the one selected mark (V1-PLAN E1): one reshape, no
 //        stroke and no summon; a finger on a handle, with a pen present, pans and takes none
+//   P12  a tap off the open field with a few pixels of wobble closes it and leaves no dot — the
+//        pen's, and a finger's that draws (PLAN-USER-SURFACE W3)
 
 import { sleep, waitReady } from './keep.mjs';
 
@@ -610,6 +612,38 @@ export async function runPencil(browser, servers, { freshContext, screenshot }) 
           && dx === -60 && dy === -30 && f1.events === f0.events,
         { held: { drawn: held.drawn }, pen, before: before.events, after: after.events, finger: { dx, dy, events: f1.events - f0.events } });
       await page.evaluate(() => window.__mm.setView(1, 0, 0));
+    });
+
+    // ---- P12. A tap off the field never leaves a dot: the pen's, and a finger's that draws (W3) ----
+    await record('P12', async () => {
+      await page.evaluate(() => { window.__mm.session.load([]); window.__mm.setView(1, 0, 0); });
+      await sleep(PAST_PALM_MS);
+      const pts = boxPath({ x: 500, y: 260, w: 200, h: 130 }, 8);
+      await page.evaluate(({ pts, ps }) => window.__hand.penStroke(pts, ps), { pts, ps: pressures(pts.length) });
+      await sleep(40);
+      const open = () => page.evaluate(() => { const mm = window.__mm, s = mm.session.getState(); mm.session.summonMarks(s.contentIds.slice(), Date.now()); return !!mm.session.getState().summon; });
+      const now = () => page.evaluate(() => { const mm = window.__mm, s = mm.session.getState(); return { summon: !!s.summon, strokes: mm.session.getEvents().filter((e) => e.type === 'stroke').length }; });
+      const tries = [];
+      for (const who of ['pen', 'finger']) {
+        if (who === 'finger') await page.evaluate(() => window.__mm.setDraws('finger'));
+        for (const px of [3, 6]) {
+          await sleep(PAST_PALM_MS);
+          const opened = await open();
+          const b = await now();
+          // Each try clicks off at a place of its own, so one that failed leaves nothing in the next one's way.
+          await page.evaluate(({ who, px, k }) => {
+            const h = window.__hand, x = 880 + 60 * k, y = 600;
+            if (who === 'pen') { h.penDown(x, y, 0.3); for (let i = 1; i <= 3; i++) h.penMove(x + (px * i) / 3, y + (px * i) / 6, 0.3); h.penUp(x + px, y + px / 2); }
+            else { h.touchDown(11, x, y); for (let i = 1; i <= 3; i++) h.touchMove(11, x + (px * i) / 3, y + (px * i) / 6); h.touchUp(11, x + px, y + px / 2); }
+          }, { who, px, k: tries.length });
+          await sleep(60);
+          const a = await now();
+          tries.push({ who, px, opened, closed: !a.summon, strokes: a.strokes - b.strokes });
+        }
+      }
+      await page.evaluate(() => window.__mm.setDraws('pen'));
+      check(`P12. a tap off the open field only closes it: the pen and a finger that draws, each with 3 and 6 px of wobble — ${tries.map((x) => x.who + ' ' + x.px + ' px ' + (x.closed ? 'closed' : 'LEFT OPEN') + (x.strokes ? ', a dot' : '')).join('; ')}`,
+        tries.length === 4 && tries.every((x) => x.opened && x.closed && x.strokes === 0), { tries });
     });
   } catch (err) {
     check(`the scenario itself fell over: ${String(err && err.message ? err.message : err).split('\n')[0]}`, false, { stack: String(err && err.stack) });

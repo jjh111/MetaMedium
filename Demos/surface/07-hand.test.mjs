@@ -19,8 +19,8 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const src = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '07-hand.js'), 'utf8');
-const { PALM_MS, PAN_SLOP_PX, handOfPointer, palmNow, fingerRole, whenPenLands, handFace, nextHand } = new Function(
-  src + '\n  return { PALM_MS, PAN_SLOP_PX, handOfPointer, palmNow, fingerRole, whenPenLands, handFace, nextHand };'
+const { PALM_MS, PAN_SLOP_PX, TAP_SLOP_PX, handOfPointer, palmNow, fingerRole, whenPenLands, handFace, nextHand, releaseIs } = new Function(
+  src + '\n  return { PALM_MS, PAN_SLOP_PX, TAP_SLOP_PX, handOfPointer, palmNow, fingerRole, whenPenLands, handFace, nextHand, releaseIs };'
 )();
 
 const FAR = Infinity; // no pen, ever
@@ -127,4 +127,37 @@ test('after, one word of the face changes a tap, and four taps come back', () =>
     h = n;
   }
   assert.deepEqual(seen, ['right · finger', 'left · finger', 'left · pen', 'right · pen']);
+});
+
+// ---- W3: a tap never leaves a dot (PLAN-USER-SURFACE §4, audit row 15) ----
+
+const release = (over = {}) => ({ points: 4, travelPx: 0, dismissable: false, ...over });
+
+test('a press too short to be a mark is a tap, whatever is open', () => {
+  for (const dismissable of [false, true]) {
+    assert.equal(releaseIs(release({ points: 1, dismissable })), 'tap');
+    assert.equal(releaseIs(release({ points: 2, travelPx: 40, dismissable })), 'tap');
+  }
+});
+
+test('while something is dismissable, a press that stays inside the tap slop on screen is the dismissal, however many points it reported', () => {
+  for (const travelPx of [0, 1, 3, 6, TAP_SLOP_PX]) {
+    assert.equal(releaseIs(release({ points: 5, travelPx, dismissable: true })), 'tap', String(travelPx));
+  }
+});
+
+test('…and past the slop it is a stroke, field or no field', () => {
+  assert.equal(releaseIs(release({ points: 12, travelPx: TAP_SLOP_PX + 1, dismissable: true })), 'stroke');
+});
+
+test('with nothing to dismiss, a dot deliberately drawn is still a dot', () => {
+  for (const travelPx of [1, 3, 6]) assert.equal(releaseIs(release({ points: 4, travelPx })), 'stroke', String(travelPx));
+});
+
+test('the dot on an i while the field is open dismisses first: the dead state\'s rule', () => {
+  assert.equal(releaseIs(release({ points: 6, travelPx: 4, dismissable: true })), 'tap');
+});
+
+test('the tap slop is a click\'s wobble: at least the pan slop, and a few pixels', () => {
+  assert.ok(TAP_SLOP_PX >= PAN_SLOP_PX && TAP_SLOP_PX <= 12, String(TAP_SLOP_PX));
 });

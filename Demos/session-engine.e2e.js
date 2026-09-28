@@ -3506,6 +3506,42 @@ window.__scenario = async function(){
     mm.session.load([]); mm.setView(1, 0, 0);
   }
 
+  // ---- 54. A tap never leaves a dot (PLAN-USER-SURFACE W3; audit row 15) ----
+  {
+    mm.session.load([]); mm.setView(1, 0, 0);
+    t.stroke(t.rect(200, 200, 120, 80)); t.stroke(t.line({ x: 320, y: 240 }, { x: 420, y: 240 }, 30)); t.stroke(t.circle(460, 240, 40));
+    const c54 = document.getElementById('canvas');
+    const pe54 = (type, x, y) => c54.dispatchEvent(new PointerEvent(type, { pointerId: 1, isPrimary: true, bubbles: true, clientX: x, clientY: y, button: 0, buttons: type === 'pointerup' ? 0 : 1 }));
+    const strokes54 = () => mm.session.getEvents().filter((e) => e.type === 'stroke').length;
+    // A click with `px` of wobble: down, three moves out to `px` along a diagonal-ish path, up where it ended.
+    const wobble54 = (x, y, px) => { pe54('pointerdown', x, y); for (let i = 1; i <= 3; i++) pe54('pointermove', x + (px * i) / 3, y + (px * i) / 6); pe54('pointerup', x + px, y + px / 2); };
+    const on54 = mm.worldToScreen(260, 200), far54 = mm.worldToScreen(640, 420);
+    const tries54 = [];
+    for (const px of [1, 3, 6]) {
+      pe54('pointerdown', on54.x, on54.y); await wait(700); pe54('pointerup', on54.x, on54.y); await wait(30);
+      const opened = !!mm.session.getState().summon;
+      const n0 = strokes54(), c0 = mm.session.getState().contentIds.length;
+      wobble54(far54.x, far54.y, px); await wait(30);
+      const s1 = mm.session.getState();
+      tries54.push({ px, opened, closed: !s1.summon, strokes: strokes54() - n0, content: s1.contentIds.length - c0 });
+    }
+    step('54. with the field open, a click off it with 1, 3 or 6 px of wobble closes the field and leaves no dot',
+      tries54.every((x) => x.opened && x.closed && x.strokes === 0 && x.content === 0), tries54);
+    // A selection is dismissable too: one mark selected, a wobbling click off it lets go and draws nothing.
+    const ids54 = mm.session.getState().contentIds.slice();
+    mm.session.select([ids54[0]], Date.now()); await wait(20);
+    const n54b = strokes54();
+    wobble54(far54.x, far54.y, 6); await wait(30);
+    const s54b = mm.session.getState();
+    step('54b. with a selection standing, a click off it with 6 px of wobble lets go and leaves no dot',
+      !s54b.selection.length && strokes54() === n54b, { selection: s54b.selection.length, strokes: strokes54() - n54b });
+    // With nothing to dismiss, a dot deliberately drawn is still a dot.
+    const n54c = strokes54();
+    wobble54(far54.x, far54.y, 3); await wait(30);
+    step('54c. with nothing open, a small deliberate dot is still drawn', strokes54() === n54c + 1, { strokes: strokes54() - n54c });
+    mm.session.load([]); mm.setView(1, 0, 0);
+  }
+
   return R;
 };
 
