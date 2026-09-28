@@ -2,13 +2,20 @@
 // document is the number a run wrote, never one copied by hand.
 //
 //     node metamedium-core/bench/report.mjs
+//     node metamedium-core/bench/report.mjs --column="after R4b"
 //
 // Reads `metamedium-core/dist/bench/engine-*.json` (engine.mjs) and
 // `e2e/results/perf/perf-*.json` (e2e/perf.mjs); prints markdown.
+// `--column=<label>` prints the engine's table as ONE column, the three
+// sizes in each cell (500; 2,000; 5,000): how PERF.md's "after R4b" column
+// was printed, from runs made after the ones its other columns came from.
 
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { OUT_DIR, REPO, ms } from './lib.mjs';
+import { OUT_DIR, REPO, ms, args } from './lib.mjs';
+
+const flags = args();
+const oneColumn = flags.column ? (flags.column === true ? 'this run' : String(flags.column)) : null;
 
 const read = (file) => (existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : null);
 const eng = (name) => read(join(OUT_DIR, name));
@@ -23,15 +30,17 @@ const out = (s = '') => lines.push(s);
 // --- engine: replay and memory ---
 out('### Engine (Node) — replay, memory, relations, the whole-board read, one more stroke');
 out('');
-out('| | 500 | 2,000 | 5,000 |');
-out('|---|---|---|---|');
+out(oneColumn ? `| | ${oneColumn}: 500; 2,000; 5,000 |` : '| | 500 | 2,000 | 5,000 |');
+out(oneColumn ? '|---|---|' : '|---|---|---|---|');
 const boards = SIZES.map((n) => eng(`engine-board-${n}-source.json`));
 const relOnly = SIZES.map((n) => eng(`engine-relate-${n}-source.json`));
 const builds = SIZES.map((n) => eng(`engine-build-${n}-source.json`));
 const profiled = SIZES.map((n) => eng(`engine-board-${n}-source.profiled.json`));
-const bundles = SIZES.map((n) => eng(`engine-board-${n}-bundle.json`));
-const ablated = SIZES.map((n) => eng(`engine-board-${n}-source-checkpoints.json`));
-const row = (label, f) => out(`| ${label} | ${SIZES.map((_, i) => f(i)).join(' | ')} |`);
+// PERF.md's commands for these add `--only=replay`, which engine.mjs writes
+// under its own name; either name is read.
+const bundles = SIZES.map((n) => eng(`engine-board-${n}-bundle.json`) || eng(`engine-board-${n}-bundle.only-replay.json`));
+const ablated = SIZES.map((n) => eng(`engine-board-${n}-source-checkpoints.json`) || eng(`engine-board-${n}-source-checkpoints.only-replay.json`));
+const row = (label, f) => out(`| ${label} | ${SIZES.map((_, i) => f(i)).join(oneColumn ? '; ' : ' | ')} |`);
 row('log: events · JSON', (i) => { const b = (boards[i] || builds[i] || {}).board; return b ? `${b.events} · ${b.jsonMB} MB` : '—'; });
 row('content plane after replay (marks, words, artifacts)', (i) => {
   const s = boards[i] && boards[i].state;
