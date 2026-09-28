@@ -13,6 +13,13 @@
 // thing here and on the glass. What only the glass can say — the Pencil's
 // real hover height, the keyboard, a real palm — is QA-v1.md §A10, by hand.
 //
+// The on-screen keyboard is told to the page the way iPadOS tells it: the
+// layout viewport stays as it was and the VISUAL viewport shrinks. A desktop
+// engine has no such keyboard, so `window.visualViewport` is stood in for by
+// an init script before the page loads (`keyboardInit`) — the page's own
+// listeners hear its resize, and `viewportRect` reads it, exactly as they
+// would on the glass. Nothing else in the page is touched.
+//
 // The records:
 //   P1   the pen draws, and every point of its stroke carries its pressure
 //   P1b  the switch to the pen is said once, and the hand tile says so
@@ -21,8 +28,32 @@
 //   P3   a palm that lands while the pen draws is ignored — the stroke is the pen's
 //   P3b  a palm just after the pen lifts is ignored; one just before it lands has its pan undone
 //   P4   the pen's hover is a hover: the reading of the mark under it, and the magnet ghost
+//   P5   the pen holds a mark, the field opens, and a pill the pen taps is taken — a clean
+//   P6   the pen taps undo, and the clean form goes
+//   P7   the keyboard up: the field stays in the visible viewport, every pill in reach, one taken
+//   P8   the hand tile gives a finger its ink back — a palm still draws nothing, a field a
+//        finger opened does not take the focus — and four taps come round to the pen
+//   P9   the mouse is untouched: it draws, its points carry no pressure, its hover no ghost
+//   P10  the board saved, the page reloaded: every stroke back with its pressure, the
+//        preference kept, the switch not said again
 
 import { sleep, waitReady } from './keep.mjs';
+
+/** The iPad's keyboard, as the page hears of it: a visual viewport that shrinks. Runs before the page's own scripts. */
+function keyboardInit() {
+  const vv = new EventTarget();
+  const kb = { height: 0, offsetTop: 0 };
+  const props = [['width', () => innerWidth], ['height', () => innerHeight - kb.height], ['offsetLeft', () => 0], ['offsetTop', () => kb.offsetTop],
+    ['pageLeft', () => scrollX], ['pageTop', () => scrollY + kb.offsetTop], ['scale', () => 1]];
+  for (const [k, get] of props) Object.defineProperty(vv, k, { get, enumerable: true });
+  Object.defineProperty(window, 'visualViewport', { configurable: true, get: () => vv });
+  /** Raise the keyboard `height` px (0 puts it away), the visual viewport scrolled `offsetTop` px. */
+  window.__keyboard = (height, offsetTop) => {
+    kb.height = height; kb.offsetTop = offsetTop || 0;
+    vv.dispatchEvent(new Event('resize'));
+    vv.dispatchEvent(new Event('scroll'));
+  };
+}
 
 /** The page's own hand: a pen and fingers, synthesised as iPadOS delivers them. Installed after every load. */
 function installHand() {
@@ -110,6 +141,54 @@ function liveInkNear({ pt, r }) {
   return false;
 }
 
+/** Two frames and a moment: a layout change is re-placed on the next frame (01-view.js, relayoutChrome). */
+async function frames(page) {
+  await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+  await sleep(60);
+}
+
+/** Where the open field stands against the visible viewport — the keyboard's space, not the window's. */
+function fieldGeometry() {
+  const el = document.getElementById('summon');
+  const vv = window.visualViewport;
+  const v = { top: vv.offsetTop, bottom: vv.offsetTop + vv.height, left: vv.offsetLeft, right: vv.offsetLeft + vv.width };
+  const box = (r) => ({ top: r.top, bottom: r.bottom, left: r.left, right: r.right });
+  const inside = (r) => r.top >= v.top - 0.5 && r.bottom <= v.bottom + 0.5 && r.left >= v.left - 0.5 && r.right <= v.right + 0.5;
+  const r = el.getBoundingClientRect();
+  const input = el.querySelector('input.filter');
+  const list = el.querySelector('.list');
+  return {
+    open: el.classList.contains('field') && el.style.display !== 'none',
+    v, field: box(r), inView: inside(r),
+    inputInView: !!input && inside(input.getBoundingClientRect()),
+    held: !!list && list.classList.contains('held'),
+    listH: list ? list.clientHeight : 0, listScroll: list ? list.scrollHeight : 0,
+    pills: el.querySelectorAll('.list .pill').length,
+  };
+}
+
+/** Every pill of the open field's list, scrolled to — the list alone, never the page — and hit where it then stands. */
+function pillsInReach() {
+  const list = document.querySelector('#summon .list');
+  const vv = window.visualViewport;
+  const out = [];
+  for (const pill of list ? list.querySelectorAll('.pill') : []) {
+    const lr = list.getBoundingClientRect();
+    let pr = pill.getBoundingClientRect();
+    if (pr.top < lr.top) list.scrollTop -= lr.top - pr.top;
+    else if (pr.bottom > lr.bottom) list.scrollTop += pr.bottom - lr.bottom;
+    pr = pill.getBoundingClientRect();
+    const hit = document.elementFromPoint(pr.left + pr.width / 2, pr.top + pr.height / 2);
+    out.push({
+      text: pill.textContent.trim(),
+      inView: pr.top >= vv.offsetTop - 0.5 && pr.bottom <= vv.offsetTop + vv.height + 0.5,
+      hit: !!hit && (hit === pill || pill.contains(hit)),
+    });
+  }
+  if (list) list.scrollTop = 0;
+  return out;
+}
+
 // The pen's box, drawn where the panel, the bar and the minimap leave the board clear.
 const BOX = { x: 560, y: 200, w: 200, h: 130 };
 function boxPath(b, k) {
@@ -128,6 +207,7 @@ export async function runPencil(browser, servers, { freshContext, screenshot }) 
   const check = (name, ok, detail) => steps.push({ name, ok: !!ok, detail });
   const measured = {};
   const guards = await freshContext(browser, { origins: [servers.staticOrigin], label: 'pencil' });
+  await guards.context.addInitScript(keyboardInit);
   const page = await guards.context.newPage();
   // An iPad's screen in landscape, not a desktop's: the panel docks where it would there.
   await page.setViewportSize({ width: 1180, height: 820 });
@@ -283,6 +363,200 @@ export async function runPencil(browser, servers, { freshContext, screenshot }) 
         Math.abs(after.view.zoom - 1.5) < 1e-3 && after.events === before.events && after.nulls === 0,
         { before, after });
       await page.evaluate(() => window.__mm.setView(1, 0, 0));
+    });
+
+    // ---- P5. The pen holds a mark; the field opens; a pill the pen taps is taken ----
+    const cleanOf = (id) => page.evaluate((id) => { const mm = window.__mm, n = mm.session.getState().nodes.get(id), c = n && mm.MM.cleanOf(n); return c ? c.shape : null; }, id);
+    const holdWithPen = async (x, y) => {
+      await page.evaluate(({ x, y }) => window.__hand.penDown(x, y, 0.45), { x, y });
+      const opened = await page.waitForFunction(() => !!window.__mm.session.getState().summon, null, { timeout: 3000 }).then(() => true).catch(() => false);
+      await page.evaluate(({ x, y }) => window.__hand.penUp(x, y), { x, y });
+      return opened;
+    };
+    // A tap on empty ground lets go of the field: the pen's, a tap never a dot.
+    const penTapGround = () => page.evaluate(() => { const h = window.__hand; h.penDown(1040, 150, 0.3); h.penUp(1040, 150); });
+    await record('P5', async () => {
+      await sleep(40);
+      const before = await cleanOf(box.id);
+      const e0 = (await page.evaluate(boardNow)).strokes;
+      const opened = await holdWithPen(BOX.x + BOX.w / 2, BOX.y);
+      const held = await page.evaluate(() => { const s = window.__mm.session.getState(); return s.summon ? s.summon.enclosedIds.slice() : []; });
+      const pill = await page.evaluate(() => {
+        const b = [...document.querySelectorAll('#summon .pill.item')].find((x) => /Draw them clean/.test(x.textContent));
+        if (b) window.__hand.penTap(b);
+        return !!b;
+      });
+      await sleep(60);
+      const after = await cleanOf(box.id);
+      const e1 = (await page.evaluate(boardNow)).strokes;
+      check(`P5. the pen holds the box still and the field opens on it (${held.length} mark${held.length === 1 ? '' : 's'} held, no stroke drawn); the pill it taps, Draw them clean, is taken — the box carries its clean form (${after}), the ink under it`,
+        opened && held.includes(box.id) && e1 === e0 && pill && !before && after === 'rectangle', { opened, held, pill, before, after, strokes: [e0, e1] });
+    });
+
+    // ---- P6. The pen taps undo ----
+    await record('P6', async () => {
+      const before = await cleanOf(box.id);
+      const b0 = await page.evaluate(boardNow);
+      await page.evaluate(() => window.__hand.penTap(document.getElementById('undoBtn')));
+      await sleep(60);
+      const after = await cleanOf(box.id);
+      const b1 = await page.evaluate(boardNow);
+      check(`P6. the pen taps undo, and the clean form goes (${before} → ${after}); the ink stays (${b1.content} marks, as before)`,
+        before === 'rectangle' && after === null && b1.content === b0.content && b1.strokes === b0.strokes, { before, after, b0, b1 });
+    });
+
+    // ---- P7. The keyboard up: the field stays in the visible viewport, every pill in reach ----
+    await record('P7', async () => {
+      await penTapGround();
+      await sleep(40);
+      // A row of three boxes, drawn by the pen: held, it offers a reading and five pills — a tall field.
+      const row = [{ x: 820, y: 200, w: 70, h: 60 }, { x: 920, y: 204, w: 70, h: 60 }, { x: 1020, y: 198, w: 70, h: 60 }];
+      for (const b of row) await page.evaluate(({ pts, ps }) => window.__hand.penStroke(pts, ps), { pts: boxPath(b, 8), ps: pressures(33) });
+      await sleep(40);
+      const opened = await holdWithPen(955, 204);
+      // A finger taps the input: the keyboard's cue. Then the keyboard rises — an 11-inch iPad in
+      // landscape with the keyboard and its bar up leaves about 360 of its 820 px.
+      const focused = await page.evaluate(() => { const f = document.querySelector('#summon input.filter'); if (!f) return false; f.focus(); return document.activeElement === f; });
+      await page.evaluate(() => window.__keyboard(460));
+      await frames(page);
+      const at360 = await page.evaluate(fieldGeometry);
+      // A smaller iPad, or the keyboard's bar taller: 260 px left, less than the field is tall.
+      await page.evaluate(() => window.__keyboard(560));
+      await frames(page);
+      const at260 = await page.evaluate(fieldGeometry);
+      const reach = await page.evaluate(pillsInReach);
+      // The keyboard goes: the list is let go, the field where it was.
+      await page.evaluate(() => window.__keyboard(0));
+      await frames(page);
+      const away = await page.evaluate(fieldGeometry);
+      // It comes back, and a word is typed: two pills, which fit — the list is let go again.
+      await page.evaluate(() => window.__keyboard(560));
+      await frames(page);
+      await page.evaluate(() => { const f = document.querySelector('#summon input.filter'); f.value = 'pump'; f.dispatchEvent(new Event('input', { bubbles: true })); });
+      await frames(page);
+      const typed = await page.evaluate(fieldGeometry);
+      // The pill that labels the person's own ink with the word, taken by the pen.
+      const took = await page.evaluate(() => {
+        const pill = [...document.querySelectorAll('#summon .list .pill')].find((b) => /^Label it/.test(b.textContent.trim()));
+        if (!pill) return null;
+        const r = pill.getBoundingClientRect(), vv = window.visualViewport;
+        const inView = r.top >= vv.offsetTop - 0.5 && r.bottom <= vv.offsetTop + vv.height + 0.5;
+        window.__hand.penTap(pill);
+        return { text: pill.textContent.trim(), inView };
+      });
+      await sleep(80);
+      const ids = await page.evaluate(() => { const s = window.__mm.session.getState(); return s.contentIds.slice(-3); });
+      const labelled = await page.evaluate((ids) => window.__mm.session.getEvents().some((e) => e.type === 'label' && JSON.stringify(e).includes('pump') && ids.some((id) => JSON.stringify(e).includes('"' + id + '"'))), ids);
+      await page.evaluate(() => window.__keyboard(0));
+      await frames(page);
+      await penTapGround();
+      const allReach = reach.length >= 5 && reach.every((p) => p.inView && p.hit);
+      const span = (g) => Math.round(g.field.top) + '–' + Math.round(g.field.bottom);
+      check(`P7. the keyboard up, the field stays in the visible viewport — with 360 px left ${at360.inView ? 'inside' : 'OUTSIDE'} (${span(at360)}), with 260 ${at260.inView ? 'inside' : 'OUTSIDE'} (${span(at260)}; its ${at260.pills} pills ${at260.held ? 'scrolling in ' + at260.listH + ' of ' + at260.listScroll + ' px' : 'NOT HELD'}), its input in view each time — every pill in reach, scrolled to and hit where it stands (${reach.filter((p) => p.inView && p.hit).length} of ${reach.length}); the keyboard away, the list is ${away.held ? 'STILL HELD' : 'let go'}; back up with a word typed, the two pills fit (${typed.held ? 'STILL HELD' : 'let go'}) and ${took ? took.text : 'no Label it pill'}, taken by the pen, ${labelled ? 'labels the row' : 'labelled nothing'}`,
+        opened && focused && at360.inView && at360.inputInView && !at360.held && at260.inView && at260.inputInView && at260.held
+          && allReach && away.open && away.inView && !away.held && typed.open && typed.inView && !typed.held && took && took.inView && labelled,
+        { opened, focused, at360, at260, reach, away, typed, took, labelled });
+    });
+
+    // ---- P8. The hand tile gives a finger its ink back; four taps come round ----
+    await record('P8', async () => {
+      await penTapGround();
+      const face = () => page.evaluate(() => { window.__mm.syncTiles(); return (document.querySelector('#handBtn .v') || {}).textContent || ''; });
+      const faces = [];
+      await page.evaluate(() => window.__hand.penTap(document.getElementById('ccBtn')));
+      await page.evaluate(() => window.__hand.penTap(document.getElementById('handBtn')));
+      faces.push(await face());
+      await page.evaluate(() => window.__hand.penTap(document.getElementById('ccBtn'))); // the centre closes
+      await sleep(PAST_PALM_MS);
+      // A finger draws.
+      const f0 = await page.evaluate(boardNow);
+      await page.evaluate(() => window.__hand.touchDrag(11, { x: 600, y: 660 }, { x: 800, y: 660 }, 16));
+      await sleep(60);
+      const fline = await page.evaluate(lastStroke);
+      const f1 = await page.evaluate(boardNow);
+      // A palm while the pen draws still draws nothing: one stroke, the pen's.
+      await page.evaluate(() => {
+        const h = window.__hand;
+        h.penDown(600, 700, 0.4);
+        for (let i = 1; i <= 16; i++) { h.penMove(600 + i * 12.5, 700, 0.5); if (i === 4) h.touchDown(24, 820, 760, 64); if (i > 4) h.touchMove(24, 820 + i, 760, 64); }
+        h.penUp(800, 700); h.touchUp(24, 840, 760, 64);
+      });
+      await sleep(60);
+      const pline = await page.evaluate(lastStroke);
+      const f2 = await page.evaluate(boardNow);
+      // A finger holds its line: the field opens, and waits for the finger to tap its input.
+      await sleep(PAST_PALM_MS);
+      await page.evaluate(() => window.__hand.touchDown(12, 700, 660));
+      const opened = await page.waitForFunction(() => !!window.__mm.session.getState().summon, null, { timeout: 3000 }).then(() => true).catch(() => false);
+      await page.evaluate(() => window.__hand.touchUp(12, 700, 660));
+      await sleep(60);
+      const focus = await page.evaluate(() => { const f = document.querySelector('#summon input.filter'); return { input: !!f, focused: !!f && document.activeElement === f, by: window.__mm.hands().downType }; });
+      await page.evaluate(() => { const h = window.__hand; h.touchDown(13, 1040, 150); h.touchUp(13, 1040, 150); }); // a finger's tap on the ground lets go
+      const closed = await page.evaluate(() => !window.__mm.session.getState().summon);
+      // Three more taps come round to the pen.
+      await page.evaluate(() => window.__hand.penTap(document.getElementById('ccBtn')));
+      for (let i = 0; i < 3; i++) { await page.evaluate(() => window.__hand.penTap(document.getElementById('handBtn'))); faces.push(await face()); }
+      await page.evaluate(() => window.__hand.penTap(document.getElementById('ccBtn')));
+      const draws = await page.evaluate(() => window.__mm.draws());
+      check(`P8. the hand tile, tapped by the pen, says ${faces[0]} and a finger draws (a ${fline && fline.reads}, ${fline && fline.n} points, none with pressure); a palm while the pen draws still draws nothing (${f2.strokes - f1.strokes} stroke added, ${pline && pline.withP} of ${pline && pline.n} points the pen's); a field a finger opened ${focus.focused ? 'TOOK' : 'did not take'} the focus, and a finger's tap let it go; three more taps say ${faces.slice(1).join(', ')}`,
+        faces.join(' | ') === 'right · finger | left · finger | left · pen | right · pen' && draws === 'pen'
+          && f1.strokes === f0.strokes + 1 && fline && fline.reads === 'line' && fline.withP === 0 && fline.n === 17
+          && f2.strokes === f1.strokes + 1 && pline && pline.n === 17 && pline.withP === 17 && pline.x0 === 600 && pline.x1 === 800
+          && opened && focus.input && !focus.focused && focus.by === 'touch' && closed,
+        { faces, draws, f0, f1, f2, fline: fline && { reads: fline.reads, n: fline.n, withP: fline.withP }, pline: pline && { n: pline.n, withP: pline.withP, x0: pline.x0, x1: pline.x1 }, opened, focus, closed });
+    });
+
+    // ---- P9. The mouse is untouched ----
+    await record('P9', async () => {
+      await sleep(40);
+      const b0 = await page.evaluate(boardNow);
+      await page.mouse.move(600, 740);
+      await page.mouse.down();
+      for (let i = 1; i <= 20; i++) await page.mouse.move(600 + i * 10, 740);
+      await page.mouse.up();
+      await sleep(60);
+      const line = await page.evaluate(lastStroke);
+      const b1 = await page.evaluate(boardNow);
+      const corner = await page.evaluate((id) => {
+        const mm = window.__mm, s = mm.session.getState(), n = s.nodes.get(id);
+        const tr = mm.MM.magnetSites(n, s.nodes).filter((x) => x.kind === 'corner').sort((a, b) => (b.point.x - b.point.y) - (a.point.x - a.point.y))[0];
+        return mm.worldToScreen(tr.point.x, tr.point.y);
+      }, box.id);
+      await page.mouse.move(corner.x + 2, corner.y + 2);
+      await sleep(60);
+      const over = await page.evaluate(() => ({ reading: window.__mm.readingDrawn(), hook: window.__mm.penHover(), type: window.__mm.hands().downType }));
+      const ghost = await page.evaluate(liveInkNear, { pt: corner, r: 5 });
+      await page.mouse.move(1040, 150);
+      check(`P9. the mouse is untouched: it draws a ${line && line.reads} (${line && line.n} points, ${line && line.withP} with pressure), and its hover over the box's corner shows the reading ("${over.reading && over.reading.text}") and, as it never did, no magnet ghost (${ghost ? 'drawn' : 'none'})`,
+        b1.strokes === b0.strokes + 1 && line && line.reads === 'line' && line.n === 21 && line.withP === 0
+          && over.reading && over.reading.id === box.id && over.hook === null && !ghost,
+        { line: line && { reads: line.reads, n: line.n, withP: line.withP }, over, ghost });
+    });
+
+    // ---- P10. Saved, reloaded ----
+    await record('P10', async () => {
+      await page.evaluate(() => window.__mm.boardIdle());
+      const saved = await page.evaluate(() => {
+        const ev = window.__mm.session.getEvents();
+        return { n: ev.length, strokes: ev.filter((e) => e.type === 'stroke').map((e) => ({ n: e.points.length, p: e.points.map((q) => (typeof q.p === 'number' ? q.p : null)) })) };
+      });
+      await page.reload({ waitUntil: 'load' });
+      await waitReady(page);
+      await page.evaluate(installHand);
+      await sleep(100);
+      const back = await page.evaluate(() => {
+        const ev = window.__mm.session.getEvents();
+        return { n: ev.length, strokes: ev.filter((e) => e.type === 'stroke').map((e) => ({ n: e.points.length, p: e.points.map((q) => (typeof q.p === 'number' ? q.p : null)) })) };
+      });
+      // A pencil comes near again: nothing is said about it this time.
+      await page.evaluate(() => window.__hand.penHover(1040, 150));
+      await sleep(40);
+      const said = await page.evaluate(() => (document.getElementById('status').textContent || '').trim());
+      const face = await page.evaluate(() => { window.__mm.syncTiles(); return (document.querySelector('#handBtn .v') || {}).textContent || ''; });
+      const pens = back.strokes.filter((s) => s.p.every((p) => p !== null)).length;
+      check(`P10. saved and reloaded: all ${back.n} events back (${saved.n} saved), every stroke with the pressure it was drawn with (${pens} pen strokes); the hand tile still says ${face}, and a pencil near the glass again is not announced twice`,
+        back.n === saved.n && JSON.stringify(back.strokes) === JSON.stringify(saved.strokes) && pens >= 5 && face === 'right · pen' && !/it draws now/.test(said),
+        { saved: saved.n, back: back.n, pens, face, said });
     });
   } catch (err) {
     check(`the scenario itself fell over: ${String(err && err.message ? err.message : err).split('\n')[0]}`, false, { stack: String(err && err.stack) });

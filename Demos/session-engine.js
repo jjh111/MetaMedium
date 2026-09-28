@@ -5024,7 +5024,10 @@
    */
   function keepFieldOnScreen() {
     if (!summonEl.classList.contains('field')) return;
-    const r = summonEl.getBoundingClientRect(), v = viewportRect();
+    const v = viewportRect();
+    // The pills' list held to the room a keyboard leaves, or let go once they fit again (R6).
+    fitFieldHeight(v, usableViewport());
+    const r = summonEl.getBoundingClientRect();
     if (r.bottom <= v.bottom - 2 && r.right <= v.right - 2 && r.top >= v.top - 2 && r.left >= v.left - 2) return;
     placeField();
   }
