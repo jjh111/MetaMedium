@@ -161,7 +161,7 @@
   async function openLive(room, opts) {
     opts = opts || {};
     // The board on screen is left only once its store holds all of it (R1).
-    if (onBoardHere()) { const v = await readyToLeave(); if (v) throw new Error(v.words); }
+    if (onBoardHere()) { const v = await readyToLeave(); if (v && v.kind !== 'not-kept') throw new Error(v.words); }
     // From here this page's log is the room's: nothing drawn under the room's
     // name is written into the board this browser keeps (L1: a live tab keeps no local log).
     leaveBoard();
@@ -233,7 +233,13 @@
     // The board on screen, carried in as this participant's log (keepBoardIn), or nothing.
     const carry = opts.carry && opts.carry.length ? opts.carry.map((ev) => Object.assign({}, ev)) : null;
     // The board on screen is left only once its store holds all of it (R1) — unless it is being carried in.
-    if (!carry && onBoardHere()) { const v = await readyToLeave(); if (v) { say(v.words); return null; } }
+    // A tab that only showed a board another tab holds is not stopped: that tab keeps it, and what was
+    // drawn here was said all along not to be kept. A board that is not saved is: the line's own
+    // "open a folder" carries it in instead (keepBoardIn), and "export the log" keeps it as a file.
+    if (!carry && onBoardHere()) {
+      const v = await readyToLeave();
+      if (v && v.kind !== 'not-kept') { say(v.words + (v.kind === 'unsaved' ? ' — or "open a folder" in the line, which carries it in' : '')); return null; }
+    }
     // From here this page's log is the folder's or the room's: the board this
     // browser keeps stays as it was (where the hand left it too), and is not written again from this page.
     leaveBoard();
@@ -539,10 +545,18 @@
       append(rec, o) {
         return new Promise((resolve, reject) => {
           const tx = db.transaction(o.meta ? ['records', 'meta'] : ['records'], 'readwrite', { durability: 'strict' });
-          const rs = tx.objectStore('records');
-          if (o.compact) rs.delete(IDBKeyRange.bound([id, 0], [id, rec.seq], false, true));
-          rs.add({ board: id, seq: rec.seq, on: rec.on, base: rec.base, n: rec.n, text: rec.text });
-          if (o.meta) tx.objectStore('meta').put(Object.assign({}, o.meta, { board: id }));
+          try {
+            const rs = tx.objectStore('records');
+            if (o.compact) rs.delete(IDBKeyRange.bound([id, 0], [id, rec.seq], false, true));
+            rs.add({ board: id, seq: rec.seq, on: rec.on, base: rec.base, n: rec.n, text: rec.text });
+            if (o.meta) tx.objectStore('meta').put(Object.assign({}, o.meta, { board: id }));
+          } catch (err) {
+            // A request refused as it is made (a whole log's delete already issued): the transaction
+            // is abandoned, so the delete never lands without the log that replaces what it deletes.
+            try { tx.abort(); } catch (e) { /* already finished */ }
+            reject(err);
+            return;
+          }
           tx.oncomplete = () => resolve();
           tx.onabort = () => reject(tx.error || new DOMException('the browser abandoned the write', 'AbortError'));
           if (tx.commit) tx.commit();

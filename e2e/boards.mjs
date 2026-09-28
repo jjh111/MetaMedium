@@ -399,6 +399,43 @@ export async function boardsTest(browser, servers, ctx) {
     check('N15. a board out and back in: its log from the export pane, brought back from the boards pane\'s "from a file…" as a new board named for the file — every event equal',
       in15 && !!made15 && made15.name === 'canvas' && n15.log === want15,
       { in15, made: made15 && [made15.id, made15.name], same: n15.log === want15, lines: file.split('\n').filter(Boolean).length });
+
+    // ---- N16. a board that is not saved is never left without a word -----------------------
+    // The store refuses every record (IDBObjectStore.add throws a real QuotaExceededError in the
+    // page — both engines), while the list's own writes still land: the board on screen cannot be kept.
+    const here16 = (await boardsNow(page)).current;
+    const before16 = strokesIn((await storeOf(page, here16)).log);
+    await page.evaluate(() => window.__mm.setView(1, 0, 0)); // the board from a file opened fitted: world = screen again
+    await page.evaluate(() => {
+      window.__addBefore = IDBObjectStore.prototype.add;
+      IDBObjectStore.prototype.add = function () { throw new DOMException('The quota has been exceeded.', 'QuotaExceededError'); };
+    });
+    const drawn16 = await draw(page);
+    await until(page, () => /not saved/.test(document.getElementById('status').textContent), null, 5000);
+    await openBoardsPane(page);
+    await page.click('#boardsPanel button[data-open="default"]');
+    await until(page, () => /is not saved/.test((document.getElementById('boardsStatus') || {}).textContent || ''), null, 10000);
+    const refused16 = await page.evaluate(() => ({
+      said: document.getElementById('boardsStatus').textContent.replace(/\s+/g, ' ').trim(),
+      ways: [...document.querySelectorAll('#boardsStatus button[data-leave-way]')].map((b) => b.dataset.leaveWay),
+      current: window.__mm.boards().current,
+    }));
+    const onScreen16 = await strokesOnBoard(page);
+    // By now the leave has flushed: a whole log was tried (its delete issued, its add refused) — and
+    // the transaction abandoned, so what the store already held is all still there.
+    const during16 = strokesIn((await storeOf(page, here16)).log);
+    // Room again: the next change writes the whole log, and then the switch goes.
+    await page.evaluate(() => { IDBObjectStore.prototype.add = window.__addBefore; });
+    await sleep(1700);
+    await closeBoardsPane(page);
+    const drawn16b = await draw(page);
+    await until(page, () => !/not saved/.test(document.getElementById('status').textContent) && !window.__mm.board().inFlight, null, 10000);
+    await switchTo(page, 'default');
+    const kept16 = strokesIn((await storeOf(page, here16)).log);
+    check('N16. a board that is not saved is never left without a word: the switch is refused in the pane — the board stays on screen with its stroke, the ways out offered (export the log, leave it anyway), nothing the store held lost while writes fail — and once a save lands the switch goes, every stroke in the store',
+      /is not saved/.test(refused16.said) && refused16.ways.includes('export') && refused16.ways.includes('leave') && refused16.current === here16 &&
+        onScreen16.some((x) => sameSig(x, drawn16)) && during16 === before16 && kept16 === before16 + 2,
+      { refused: refused16, onScreen: onScreen16.length, stored: { before: before16, whileFailing: during16, after: kept16 }, second: !!drawn16b });
   } catch (err) {
     check('N. the boards scenario ran to its end', false, { error: String(err && err.stack ? err.stack : err) });
     await ctx.screenshot(page, 'boards');
