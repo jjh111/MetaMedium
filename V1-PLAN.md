@@ -2126,6 +2126,18 @@ selection still standing — now a dismissal by design — and lets go of the
 selection first; its assertion is unchanged. Not done: WebKit's run of P12
 (this machine has no WebKit build; CI's `webkit` job runs `pencil`).
 
+*W2 status, 28 Sep 2026: built on `claude/friendly-galileo-g1z8wo`* — `3124cb7`
+(red first: e2e 55–55d and the reader's case — a word and a line of writing
+held offered three options, Enter named the line "writing" and made an
+artifact of it), `f29da44` (the fix) and `17235d8` (e2e 49's golden for *line
+of writing* recorded again, by design; the other seven scopes unchanged).
+Held writing nobody has read is one option — its reading, with the model dot,
+taken by the read tool's act (`09-palette.js`), the line `↵ read it` (an
+item's `enter`, `09-field.js`); with no reader the line says what would read
+it and Enter keeps the ask (J5's), said in the field, no pane (55d). The
+records that took *Read the writing* on writing alone (e2e 30, 34, 35; models
+M5; seat J4.3) take the one option; their assertions are unchanged.
+
 ### Phase 7 — review and release
 **H1** — week 1's U7 (the `hand` gate scenario) plus `QA-v1.md`, a hand
 checklist for A1–A10 with the MCP hand in the room checking each step.

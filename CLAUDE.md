@@ -2088,6 +2088,14 @@ fingerprint carries it, so the model is asked to *read*, not to interpret.
   model `vlm` on `/api/v0/models`. Joined models marked *sees* read
   automatically; with none present, writing stays `text` and the inspector says
   what it would take.
+- **Writing reads when it is writing** (PLAN-USER-SURFACE W2; `conversionsFor`
+  in `09-palette.js`, an item's `enter` in `09-field.js`). Held marks that are
+  all writing, unread, are ONE option: their reading (*writing 0.75*, or
+  *writing 0.65* for a word alone), with the model dot, taken by the read
+  tool's own act — whichever reader is here, or the ask kept for one — and
+  the line says `↵ read it`. Enter used to name the group "writing". *Read the
+  writing* and *What is this?* leave the row and stay typeable; once the words
+  land they lead as below. *Read as writing* on other ink (F5) is unchanged.
 - **The word becomes the offer to name with.** A label with a transcript puts
   *Name it "Pricing"* at the top of the palette (Tier 0, since the reading is
   already held) — write a word beside a shape and it becomes that shape's name,
