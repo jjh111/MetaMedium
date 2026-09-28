@@ -6983,8 +6983,8 @@ function printTiled(doc, options = {}) {
       });
       for (let rr = 0; rr < rows; rr++) {
         for (let cc = 0; cc < cols; cc++) {
-          const here = rr === r && cc === c;
-          footerEls.push(`<rect data-cell="${label(rr, cc)}"${here ? ' data-here="1"' : ""} x="${pn(mapLeft + cc * cell)}" y="${pn(fy + P.pad + rr * cell)}" width="${pn(cell)}" height="${pn(cell)}"${here ? ' fill="currentColor"' : ""}/>`);
+          const here2 = rr === r && cc === c;
+          footerEls.push(`<rect data-cell="${label(rr, cc)}"${here2 ? ' data-here="1"' : ""} x="${pn(mapLeft + cc * cell)}" y="${pn(fy + P.pad + rr * cell)}" width="${pn(cell)}" height="${pn(cell)}"${here2 ? ' fill="currentColor"' : ""}/>`);
         }
       }
       footerEls.push(`<text x="${pn(pw - m)}" y="${pn(fy + P.pad + 0.8 * P.big)}" font-size="${pn(P.big)}" font-weight="600" text-anchor="end" fill="currentColor" stroke="none">${name}</text>`);
@@ -9615,13 +9615,13 @@ var MarkGrid = class {
     if (!xs) this.levels.set(level, xs = /* @__PURE__ */ new Map());
     let ys = xs.get(cx2);
     if (!ys) xs.set(cx2, ys = /* @__PURE__ */ new Map());
-    let here = ys.get(cy2);
+    let here2 = ys.get(cy2);
     const count3 = this.counts.get(level) ?? { marks: 0, cells: 0 };
-    if (!here) {
-      ys.set(cy2, here = /* @__PURE__ */ new Set());
+    if (!here2) {
+      ys.set(cy2, here2 = /* @__PURE__ */ new Set());
       count3.cells++;
     }
-    here.add(id);
+    here2.add(id);
     count3.marks++;
     this.counts.set(level, count3);
     this.filed.set(id, { level, cx: cx2, cy: cy2, bounds: { minX: bounds.minX, minY: bounds.minY, maxX: bounds.maxX, maxY: bounds.maxY } });
@@ -9632,11 +9632,11 @@ var MarkGrid = class {
     this.filed.delete(id);
     const xs = this.levels.get(f.level);
     const ys = xs.get(f.cx);
-    const here = ys.get(f.cy);
-    here.delete(id);
+    const here2 = ys.get(f.cy);
+    here2.delete(id);
     const count3 = this.counts.get(f.level);
     count3.marks--;
-    if (here.size === 0) {
+    if (here2.size === 0) {
       ys.delete(f.cy);
       count3.cells--;
       if (ys.size === 0) xs.delete(f.cx);
@@ -9685,7 +9685,7 @@ var MarkGrid = class {
       const cell = 2 ** level;
       const box = boxAt(cell);
       if (!finiteBounds(box)) {
-        for (const ys of xs.values()) for (const here of ys.values()) for (const id of here) fn(id, this.filed.get(id).bounds, box);
+        for (const ys of xs.values()) for (const here2 of ys.values()) for (const id of here2) fn(id, this.filed.get(id).bounds, box);
         continue;
       }
       const x0 = Math.floor(box.minX / cell) - 1, x1 = Math.floor(box.maxX / cell);
@@ -9695,9 +9695,9 @@ var MarkGrid = class {
       if (span > count3.cells) {
         for (const [cx2, ys] of xs) {
           if (cx2 < x0 || cx2 > x1) continue;
-          for (const [cy2, here] of ys) {
+          for (const [cy2, here2] of ys) {
             if (cy2 < y0 || cy2 > y1) continue;
-            for (const id of here) fn(id, this.filed.get(id).bounds, box);
+            for (const id of here2) fn(id, this.filed.get(id).bounds, box);
           }
         }
         continue;
@@ -9706,9 +9706,9 @@ var MarkGrid = class {
         const ys = xs.get(cx2);
         if (!ys) continue;
         for (let cy2 = y0; cy2 <= y1; cy2++) {
-          const here = ys.get(cy2);
-          if (!here) continue;
-          for (const id of here) fn(id, this.filed.get(id).bounds, box);
+          const here2 = ys.get(cy2);
+          if (!here2) continue;
+          for (const id of here2) fn(id, this.filed.get(id).bounds, box);
         }
       }
     }
@@ -13850,18 +13850,18 @@ var TIER1_LIBRARY = [
   { id: "relations", name: "relations", ability: "read", does: "what the canvas can see between marks \u2014 inside, near, crossing, aligned \u2014 every threshold a ratio of their size", source: "relate/relations.ts" },
   { id: "roles", name: "the diagram rung", ability: "read", does: "what a mark plays: container, node, edge, label, annotation", source: "diagram/roles.ts" },
   { id: "concepts", name: "concepts", ability: "read", does: "a row, a column, a frame, a flow, a grid, a label, a slider \u2014 matched plurally, ranked", source: "concepts/concept.ts" },
-  { id: "tidy", name: "tidy", ability: "arrange", does: "line marks up and space them evenly, or match their sizes; the ink untouched", source: "session/session.ts (tidy)" },
-  { id: "clean", name: "clean forms", ability: "clean", does: "a confident, unambiguous reading redrawn from the ink's own measurements", source: "session/clean.ts" },
-  { id: "structure", name: "structure", ability: "structure", does: "a page or a diagram from the drawing \u2014 the regions in place, no words", source: "tier1/library.ts, parse/" },
-  { id: "signature", name: "signatures", ability: "name", does: "a named group recognised again by its shapes and the links between them", source: "session/signature.ts" },
-  { id: "verbs", name: "words into verbs", ability: "verbs", does: "the common ways each verb is said, read with no model", source: "behave/words.ts" },
+  { id: "tidy", name: "tidy", ability: "arrange", does: "line marks up and space them evenly, or match their sizes; the ink untouched", source: "session/session.ts (tidy)", tool: "tidy" },
+  { id: "clean", name: "clean forms", ability: "clean", does: "a confident, unambiguous reading redrawn from the ink's own measurements", source: "session/clean.ts", tool: "clean" },
+  { id: "structure", name: "structure", ability: "structure", does: "a page or a diagram from the drawing \u2014 the regions in place, no words", source: "tier1/library.ts, parse/", tool: "structure" },
+  { id: "signature", name: "signatures", ability: "name", does: "a named group recognised again by its shapes and the links between them", source: "session/signature.ts", tool: "correct" },
+  { id: "verbs", name: "words into verbs", ability: "verbs", does: "the common ways each verb is said, read with no model", source: "behave/words.ts", tool: "verbs" },
   { id: "library", name: "the library", ability: "reuse", does: "a brief the library already answers reuses that program", source: "kinds/, Demos/surface/09-palette.js" },
   { id: "trace", name: "tracing", ability: "trace", does: "a picture of a sketch becomes ink", source: "image/trace.ts" },
   { id: "measure", name: "the maths", ability: "measure", does: "what follows from a reading, as numbers", source: "session/measure.ts" },
-  { id: "fit", name: "acting out", ability: "fit", does: "a dragged path fitted onto the verb basis, the residual named", source: "behave/fit.ts" },
-  { id: "frames", name: "wiring", ability: "wire", does: "artifacts wired by their ports, connections offered by type and ranked by name", source: "frames/frame.ts" },
+  { id: "fit", name: "acting out", ability: "fit", does: "a dragged path fitted onto the verb basis, the residual named", source: "behave/fit.ts", tool: "verbs" },
+  { id: "frames", name: "wiring", ability: "wire", does: "artifacts wired by their ports, connections offered by type and ranked by name", source: "frames/frame.ts", tool: "frames" },
   { id: "words", name: "words from letters", ability: "words", does: "printed letters gathered into one word", source: "session/words.ts" },
-  { id: "graph3d", name: "a graph in 3D", ability: "structure", does: "nodes as spheres and edges as bonds, turning in the frame, each sphere named for its mark", source: "tier1/library.ts (buildGraph3D)" }
+  { id: "graph3d", name: "a graph in 3D", ability: "structure", does: "nodes as spheres and edges as bonds, turning in the frame, each sphere named for its mark", source: "tier1/library.ts (buildGraph3D)", tool: "graph3d" }
 ];
 function describeTier1() {
   return TIER1_LIBRARY.map((m) => `${m.name} \u2014 ${m.does}`).join("\n");
@@ -15162,9 +15162,13 @@ function describeReading(reading2, options = {}) {
 // src/participants/agent.ts
 var MAX_READINGS = 4;
 var HERE = `THE CANVAS holds only these: ink (the human's marks, read as rectangle, circle, triangle, line, arrow, text or dot), names the human gives a group, PAGES (regions the drawing laid out, filled per region id), PROGRAMS (the body of a function of \`mm\`: width, height, ctx, THREE/scene/camera when 3D loaded, onFrame, onPointer, report), TEXT (plain words, editable), SVG markup, and short answers placed beside marks. Nothing else exists here \u2014 no files, servers, frameworks or libraries beyond three.js r128.`;
-var SYSTEM_PROMPT = `You are a participant on a shared drawing canvas, alongside a human and the canvas's own geometric recognizer.
+function here() {
+  const names = registeredTools().filter((t) => !t.asks).map((t) => t.name);
+  return names.length ? `${HERE} THE CANVAS'S OWN TOOLS, which need no model: ${names.join(", ")}.` : HERE;
+}
+var SYSTEM_PROMPT = () => `You are a participant on a shared drawing canvas, alongside a human and the canvas's own geometric recognizer.
 
-${HERE}
+${here()}
 
 You are given GROUNDED FACTS about marks that were drawn: measured geometry, spatial relations, and how other participants already read them. You are not given an image. Trust the measurements \u2014 they are exact.
 
@@ -15179,9 +15183,9 @@ Rules:
 
 Reply with ONLY a JSON array, no prose, no code fences:
 [{"label":"short-name","confidence":0.0-1.0,"reasoning":"one sentence citing the evidence"}]`;
-var ASK_PROMPT = `You are a participant on a shared drawing canvas, answering a question about specific marks the human has selected.
+var ASK_PROMPT = () => `You are a participant on a shared drawing canvas, answering a question about specific marks the human has selected.
 
-${HERE}
+${here()}
 
 You are given GROUNDED FACTS: measured geometry, spatial relations between marks, and how each participant (including the canvas's own recognizer) currently reads them. You are not given an image.
 
@@ -15193,9 +15197,9 @@ Rules:
 - If the readings disagree, say so and explain what separates them. The disagreement is usually the answer.
 - If the facts do not support an answer, say what is missing rather than guessing.
 - No preamble, no markdown, no bullet points. Just the answer.`;
-var MAKE_PROMPT = `You are a participant on a shared drawing canvas. The human drew a layout and asked you to build it.
+var MAKE_PROMPT = () => `You are a participant on a shared drawing canvas. The human drew a layout and asked you to build it.
 
-${HERE}
+${here()}
 
 THE LAYOUT IS ALREADY DECIDED. It was measured from their drawing and the canvas will assemble it. You are not writing the page structure and you must not try to: no wrappers, no positioning, no widths or heights, no flexbox. If you emit layout it will be discarded, and if you omit a region it will render empty.
 
@@ -15256,9 +15260,9 @@ var BEHAVE_PROMPT = `You are a participant on a shared drawing canvas. A human w
 A target is a NAME the human uses for something on the canvas; use the word they used, singular. Weights are 0\u20132, 1 is normal. Reply with JSON only:
 {"terms":[{"verb":"flee","target":"shark","weight":1,"params":{"only":"bigger"},"why":"'runs from big sharks'"}],"unread":["any clause you could not map"]}
 Every term's "why" quotes the words it came from. Do not invent a verb outside the list.`;
-var PROGRAM_PROMPT = `You are a participant on a shared drawing canvas. The human circled a drawing and typed a brief, and the canvas cannot answer it from what it holds \u2014 so you write a PROGRAM that renders it, right there, in the drawing's own frame.
+var PROGRAM_PROMPT = () => `You are a participant on a shared drawing canvas. The human circled a drawing and typed a brief, and the canvas cannot answer it from what it holds \u2014 so you write a PROGRAM that renders it, right there, in the drawing's own frame.
 
-${HERE}
+${here()}
 
 THE CONTRACT. Your code is the body of a function with one argument, \`mm\`:
   mm.width, mm.height     the frame in pixels \u2014 fill it; the drawing sits exactly here
@@ -15280,9 +15284,9 @@ Reply with ONLY a JSON object, no prose, no code fences:
 {"name":"torus","parts":["torus"],"code":"\u2026the function body, as one JSON string\u2026"}
 or
 {"reuse":"<library name>"}`;
-var DRAW_PROMPT = `You are a participant on a shared drawing canvas, alongside a human. You have been asked to ADD MARKS to the drawing.
+var DRAW_PROMPT = () => `You are a participant on a shared drawing canvas, alongside a human. You have been asked to ADD MARKS to the drawing.
 
-${HERE}
+${here()}
 
 You are given the marks already on the canvas as measured facts \u2014 positions, sizes, what each reads as and plays \u2014 in canvas units (y grows downward). You are not given an image.
 
@@ -15583,7 +15587,7 @@ ${describeReading(session.read(targets), { noun: "mark" })}` : "");
     const result2 = await send(
       config,
       [
-        { role: "system", content: SYSTEM_PROMPT },
+        { role: "system", content: SYSTEM_PROMPT() },
         { role: "user", content: `${context}
 
 ${question}` }
@@ -15620,7 +15624,7 @@ ${describeReading(session.read(targets), { noun: "mark" })}` : "");
     const result2 = await send(
       config,
       [
-        { role: "system", content: ASK_PROMPT },
+        { role: "system", content: ASK_PROMPT() },
         { role: "user", content: `${context}
 
 Question: ${q}` }
@@ -15697,7 +15701,7 @@ ${brief}`, ids: planned.ids, build: planned.build };
     const result2 = await send(
       config,
       [
-        { role: "system", content: revising ? REVISE_PROMPT : MAKE_PROMPT },
+        { role: "system", content: revising ? REVISE_PROMPT : MAKE_PROMPT() },
         { role: "user", content: lines.join("\n") }
       ],
       { signal: args.signal }
@@ -15810,7 +15814,7 @@ THE HUMAN POINTED AT: ${pointed.join(", ")}${(() => {
     const result2 = await send(
       config,
       [
-        { role: "system", content: DRAW_PROMPT },
+        { role: "system", content: DRAW_PROMPT() },
         { role: "user", content: `${context}${reading2}${focus}
 
 The human asks: ${prompt2}` }
@@ -15849,7 +15853,7 @@ The human asks: ${prompt2}` }
     const result2 = await send(
       config,
       [
-        { role: "system", content: PROGRAM_PROMPT },
+        { role: "system", content: PROGRAM_PROMPT() },
         { role: "user", content: `THE FRAME: ${Math.round(frame.w)}\xD7${Math.round(frame.h)} pixels.
 
 THE DRAWING inside it:
@@ -16218,7 +16222,8 @@ function route(ability, state, options = {}) {
     settledLocally,
     localAnswer: settledLocally ? `${top.concept} (${top.confidence.toFixed(2)}) \u2014 ${top.reasoning}` : void 0,
     candidates,
-    ...instant ? { instant } : {}
+    ...instant ? { instant } : {},
+    ...instant?.tool ? { tool: instant.tool } : {}
   };
 }
 function describeRoute(r) {

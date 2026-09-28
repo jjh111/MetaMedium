@@ -10,6 +10,8 @@ import { route, describeRoute, instantFor } from '../participants/router';
 import { ENGINE_PARTICIPANT, ENGINE_NAME, wordOf } from '../session/nodes';
 import { createAgentParticipant } from '../participants/agent';
 import { PRESETS } from '../llm/provider';
+import '../tools/builtin';
+import { getTool } from '../tools/registry';
 
 function fourBoxes() {
   const s = createSession();
@@ -33,6 +35,19 @@ describe('the tier 1 library', () => {
     }
     expect(new Set(TIER1_LIBRARY.map((m) => m.id)).size).toBe(TIER1_LIBRARY.length);
     expect(describeTier1().split('\n')).toHaveLength(TIER1_LIBRARY.length);
+  });
+
+  it('a module that acts in the field names its tool, and every tool it names is registered', () => {
+    const acting = TIER1_LIBRARY.filter((m) => m.tool);
+    expect(acting.map((m) => [m.id, m.tool])).toEqual([
+      ['tidy', 'tidy'], ['clean', 'clean'], ['structure', 'structure'], ['signature', 'correct'],
+      ['verbs', 'verbs'], ['fit', 'verbs'], ['frames', 'frames'], ['graph3d', 'graph3d'],
+    ]);
+    for (const m of acting) expect(getTool(m.tool!)?.id).toBe(m.tool);
+    // The router says which tool takes an ability's act, where one does.
+    expect(route('arrange', createSession().getState()).tool).toBe('tidy');
+    expect(route('build', createSession().getState()).tool).toBe('structure');
+    expect(route('answer', createSession().getState()).tool).toBeUndefined();
   });
 
   it('the router names the module that answers at once, and asks nobody for what tier 1 settles', () => {

@@ -21,8 +21,8 @@ import { fileURLToPath } from 'node:url';
 import * as MM from '../metamedium-core.node.mjs';
 
 const src = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '09-field.js'), 'utf8');
-const { readFieldCommand, verbFor, libraryMatch, typedWord } = new Function(
-  src + '\n  return { readFieldCommand, verbFor, libraryMatch, typedWord };'
+const { readFieldCommand, verbFor, libraryMatch, typedWord, theirMarks, madeThese } = new Function(
+  src + '\n  return { readFieldCommand, verbFor, libraryMatch, typedWord, theirMarks, madeThese };'
 )();
 
 /** A board with nothing on it but the four core verbs and one reading. */
@@ -361,4 +361,14 @@ test('verbFor and libraryMatch on their own', () => {
   assert.equal(libraryMatch('clock', []), null);
   assert.equal(libraryMatch('CLOCK', [{ id: '1', name: 'clock' }]).id, '1');
   assert.equal(libraryMatch('the ball', [{ id: '1', name: 'bouncing ball' }]), null, 'every word of the name must be there');
+});
+
+// The words for another hand's marks live in two places that cannot import each
+// other: this reader (it names nothing outside itself) and core's label tool (V1-PLAN
+// B1), whose Label pill says them in its reason. One phrasing, held here to one.
+test('core’s label tool says another hand’s marks exactly as the reader does', () => {
+  for (const others of [[], ['fern'], ['fern', 'fern'], ['fern', 'qwen3'], ['fern', 'qwen3', 'ann', 'ann']]) {
+    assert.equal(MM.theirMarks(others), theirMarks(others), JSON.stringify(others));
+    assert.equal(MM.madeThese(others), madeThese(others), JSON.stringify(others));
+  }
 });

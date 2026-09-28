@@ -1,5 +1,6 @@
 // ===== models =====
-// Provides: the model pane: probing local servers, joining by key, remembering the pick, offerModel;
+// Provides: the model pane: probing local servers, joining by key, remembering the pick, offerModel,
+//   and what the canvas does with no model (the tools registry's own, renderTools);
 //   the work-in-progress register (withWork); askModelsAbout/cancelReading — a model is asked only by a deliberate act.
 // Uses: core, ui, teach (togglePanel), render, palette (refreshPalette), input (say).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
@@ -155,6 +156,18 @@
     syncTiles();
     render(session.getState());
   }
+
+  // What the canvas does itself, with no model (V1-PLAN B1): the registered tools that
+  // ask none, each with what it does as its tooltip — so what a model ADDS is what is
+  // not on this line. Read from the registry, and again whenever it changes.
+  const mpTools = document.getElementById('mpTools');
+  function renderTools() {
+    if (!mpTools) return;
+    mpTools.innerHTML = MM.registeredTools().filter((t) => !t.asks)
+      .map((t) => '<span title="' + esc(t.describe()) + '">' + esc(t.name) + '</span>').join(' · ');
+  }
+  renderTools();
+  MM.onToolsChange(renderTools);
 
   function renderAgents() {
     mpList.innerHTML = agents.map((a, i) =>

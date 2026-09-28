@@ -11,6 +11,12 @@
 // answers instantly and what a model would add, and the router reads it to
 // know which abilities are settled here. A module that needs a network, a
 // worker or a frame does not belong in it.
+//
+// What a module lets the hand DO is a tool (V1-PLAN B1, `tools/`): one
+// contract, one registry, and the field's affordances are that registry's
+// offers — not this list. A module that acts in the field names its tool
+// (`tool`); the readers — relations, roles, concepts — act through the tools
+// that read them.
 
 import type { Session } from '../session/session';
 import { planFor, connectionsOf } from '../parse/plan';
@@ -29,24 +35,26 @@ export interface InstantModule {
   does: string;
   /** Where it lives, relative to src/. */
   source: string;
+  /** The registered tool that acts for it in the field, where one does (`tools/builtin.ts`). */
+  tool?: string;
 }
 
 export const TIER1_LIBRARY: readonly InstantModule[] = [
   { id: 'relations', name: 'relations', ability: 'read', does: 'what the canvas can see between marks — inside, near, crossing, aligned — every threshold a ratio of their size', source: 'relate/relations.ts' },
   { id: 'roles', name: 'the diagram rung', ability: 'read', does: 'what a mark plays: container, node, edge, label, annotation', source: 'diagram/roles.ts' },
   { id: 'concepts', name: 'concepts', ability: 'read', does: 'a row, a column, a frame, a flow, a grid, a label, a slider — matched plurally, ranked', source: 'concepts/concept.ts' },
-  { id: 'tidy', name: 'tidy', ability: 'arrange', does: 'line marks up and space them evenly, or match their sizes; the ink untouched', source: 'session/session.ts (tidy)' },
-  { id: 'clean', name: 'clean forms', ability: 'clean', does: 'a confident, unambiguous reading redrawn from the ink\'s own measurements', source: 'session/clean.ts' },
-  { id: 'structure', name: 'structure', ability: 'structure', does: 'a page or a diagram from the drawing — the regions in place, no words', source: 'tier1/library.ts, parse/' },
-  { id: 'signature', name: 'signatures', ability: 'name', does: 'a named group recognised again by its shapes and the links between them', source: 'session/signature.ts' },
-  { id: 'verbs', name: 'words into verbs', ability: 'verbs', does: 'the common ways each verb is said, read with no model', source: 'behave/words.ts' },
+  { id: 'tidy', name: 'tidy', ability: 'arrange', does: 'line marks up and space them evenly, or match their sizes; the ink untouched', source: 'session/session.ts (tidy)', tool: 'tidy' },
+  { id: 'clean', name: 'clean forms', ability: 'clean', does: 'a confident, unambiguous reading redrawn from the ink\'s own measurements', source: 'session/clean.ts', tool: 'clean' },
+  { id: 'structure', name: 'structure', ability: 'structure', does: 'a page or a diagram from the drawing — the regions in place, no words', source: 'tier1/library.ts, parse/', tool: 'structure' },
+  { id: 'signature', name: 'signatures', ability: 'name', does: 'a named group recognised again by its shapes and the links between them', source: 'session/signature.ts', tool: 'correct' },
+  { id: 'verbs', name: 'words into verbs', ability: 'verbs', does: 'the common ways each verb is said, read with no model', source: 'behave/words.ts', tool: 'verbs' },
   { id: 'library', name: 'the library', ability: 'reuse', does: 'a brief the library already answers reuses that program', source: 'kinds/, Demos/surface/09-palette.js' },
   { id: 'trace', name: 'tracing', ability: 'trace', does: 'a picture of a sketch becomes ink', source: 'image/trace.ts' },
   { id: 'measure', name: 'the maths', ability: 'measure', does: 'what follows from a reading, as numbers', source: 'session/measure.ts' },
-  { id: 'fit', name: 'acting out', ability: 'fit', does: 'a dragged path fitted onto the verb basis, the residual named', source: 'behave/fit.ts' },
-  { id: 'frames', name: 'wiring', ability: 'wire', does: 'artifacts wired by their ports, connections offered by type and ranked by name', source: 'frames/frame.ts' },
+  { id: 'fit', name: 'acting out', ability: 'fit', does: 'a dragged path fitted onto the verb basis, the residual named', source: 'behave/fit.ts', tool: 'verbs' },
+  { id: 'frames', name: 'wiring', ability: 'wire', does: 'artifacts wired by their ports, connections offered by type and ranked by name', source: 'frames/frame.ts', tool: 'frames' },
   { id: 'words', name: 'words from letters', ability: 'words', does: 'printed letters gathered into one word', source: 'session/words.ts' },
-  { id: 'graph3d', name: 'a graph in 3D', ability: 'structure', does: 'nodes as spheres and edges as bonds, turning in the frame, each sphere named for its mark', source: 'tier1/library.ts (buildGraph3D)' },
+  { id: 'graph3d', name: 'a graph in 3D', ability: 'structure', does: 'nodes as spheres and edges as bonds, turning in the frame, each sphere named for its mark', source: 'tier1/library.ts (buildGraph3D)', tool: 'graph3d' },
 ];
 
 /** The library, one module per line, for a pane or a brief. */

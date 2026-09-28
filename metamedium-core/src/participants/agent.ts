@@ -24,6 +24,9 @@ import type { Behaviour, Term, Verb } from '../behave/verbs';
 import { VERBS, TARGETED } from '../behave/verbs';
 import { parseBehaviour, describeBehaviour } from '../behave/words';
 import { boundsOf } from '../session/nodes';
+// The tools the canvas ships with, registered on import, so `here()` names them wherever a model is asked.
+import '../tools/builtin';
+import { registeredTools } from '../tools/registry';
 
 /** One candidate reading, as the model reports it. */
 export interface AgentReading {
@@ -52,9 +55,22 @@ export const MAX_READINGS = 4;
  */
 export const HERE = `THE CANVAS holds only these: ink (the human's marks, read as rectangle, circle, triangle, line, arrow, text or dot), names the human gives a group, PAGES (regions the drawing laid out, filled per region id), PROGRAMS (the body of a function of \`mm\`: width, height, ctx, THREE/scene/camera when 3D loaded, onFrame, onPointer, report), TEXT (plain words, editable), SVG markup, and short answers placed beside marks. Nothing else exists here — no files, servers, frameworks or libraries beyond three.js r128.`;
 
-const SYSTEM_PROMPT = `You are a participant on a shared drawing canvas, alongside a human and the canvas's own geometric recognizer.
+/**
+ * HERE, with the canvas's own tools named from the registry as it stands
+ * (V1-PLAN B1): what the canvas does itself, with no model — so a model is
+ * not asked, and does not offer, to line marks up or draw them clean. One
+ * sentence, names only (a model's own tools — reading, *What is this?* —
+ * are not listed: they are the model); `describeTools()` has a line each.
+ * Read when a prompt is made, so a tool registered later is named too.
+ */
+export function here(): string {
+  const names = registeredTools().filter((t) => !t.asks).map((t) => t.name);
+  return names.length ? `${HERE} THE CANVAS'S OWN TOOLS, which need no model: ${names.join(', ')}.` : HERE;
+}
 
-${HERE}
+const SYSTEM_PROMPT = (): string => `You are a participant on a shared drawing canvas, alongside a human and the canvas's own geometric recognizer.
+
+${here()}
 
 You are given GROUNDED FACTS about marks that were drawn: measured geometry, spatial relations, and how other participants already read them. You are not given an image. Trust the measurements — they are exact.
 
@@ -70,9 +86,9 @@ Rules:
 Reply with ONLY a JSON array, no prose, no code fences:
 [{"label":"short-name","confidence":0.0-1.0,"reasoning":"one sentence citing the evidence"}]`;
 
-const ASK_PROMPT = `You are a participant on a shared drawing canvas, answering a question about specific marks the human has selected.
+const ASK_PROMPT = (): string => `You are a participant on a shared drawing canvas, answering a question about specific marks the human has selected.
 
-${HERE}
+${here()}
 
 You are given GROUNDED FACTS: measured geometry, spatial relations between marks, and how each participant (including the canvas's own recognizer) currently reads them. You are not given an image.
 
@@ -85,9 +101,9 @@ Rules:
 - If the facts do not support an answer, say what is missing rather than guessing.
 - No preamble, no markdown, no bullet points. Just the answer.`;
 
-const MAKE_PROMPT = `You are a participant on a shared drawing canvas. The human drew a layout and asked you to build it.
+const MAKE_PROMPT = (): string => `You are a participant on a shared drawing canvas. The human drew a layout and asked you to build it.
 
-${HERE}
+${here()}
 
 THE LAYOUT IS ALREADY DECIDED. It was measured from their drawing and the canvas will assemble it. You are not writing the page structure and you must not try to: no wrappers, no positioning, no widths or heights, no flexbox. If you emit layout it will be discarded, and if you omit a region it will render empty.
 
@@ -162,9 +178,9 @@ A target is a NAME the human uses for something on the canvas; use the word they
 {"terms":[{"verb":"flee","target":"shark","weight":1,"params":{"only":"bigger"},"why":"'runs from big sharks'"}],"unread":["any clause you could not map"]}
 Every term's "why" quotes the words it came from. Do not invent a verb outside the list.`;
 
-const PROGRAM_PROMPT = `You are a participant on a shared drawing canvas. The human circled a drawing and typed a brief, and the canvas cannot answer it from what it holds — so you write a PROGRAM that renders it, right there, in the drawing's own frame.
+const PROGRAM_PROMPT = (): string => `You are a participant on a shared drawing canvas. The human circled a drawing and typed a brief, and the canvas cannot answer it from what it holds — so you write a PROGRAM that renders it, right there, in the drawing's own frame.
 
-${HERE}
+${here()}
 
 THE CONTRACT. Your code is the body of a function with one argument, \`mm\`:
   mm.width, mm.height     the frame in pixels — fill it; the drawing sits exactly here
@@ -187,9 +203,9 @@ Reply with ONLY a JSON object, no prose, no code fences:
 or
 {"reuse":"<library name>"}`;
 
-const DRAW_PROMPT = `You are a participant on a shared drawing canvas, alongside a human. You have been asked to ADD MARKS to the drawing.
+const DRAW_PROMPT = (): string => `You are a participant on a shared drawing canvas, alongside a human. You have been asked to ADD MARKS to the drawing.
 
-${HERE}
+${here()}
 
 You are given the marks already on the canvas as measured facts — positions, sizes, what each reads as and plays — in canvas units (y grows downward). You are not given an image.
 
@@ -773,7 +789,7 @@ export function createAgentParticipant(
     const result = await send(
       config,
       [
-        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'system', content: SYSTEM_PROMPT() },
         { role: 'user', content: `${context}\n\n${question}` },
       ],
       { signal }
@@ -816,7 +832,7 @@ export function createAgentParticipant(
     const result = await send(
       config,
       [
-        { role: 'system', content: ASK_PROMPT },
+        { role: 'system', content: ASK_PROMPT() },
         { role: 'user', content: `${context}\n\nQuestion: ${q}` },
       ],
       { signal }
@@ -916,7 +932,7 @@ export function createAgentParticipant(
     const result = await send(
       config,
       [
-        { role: 'system', content: revising ? REVISE_PROMPT : MAKE_PROMPT },
+        { role: 'system', content: revising ? REVISE_PROMPT : MAKE_PROMPT() },
         { role: 'user', content: lines.join('\n') },
       ],
       { signal: args.signal }
@@ -1048,7 +1064,7 @@ export function createAgentParticipant(
     const result = await send(
       config,
       [
-        { role: 'system', content: DRAW_PROMPT },
+        { role: 'system', content: DRAW_PROMPT() },
         { role: 'user', content: `${context}${reading}${focus}\n\nThe human asks: ${prompt}` },
       ],
       { signal: args.signal }
@@ -1093,7 +1109,7 @@ export function createAgentParticipant(
     const result = await send(
       config,
       [
-        { role: 'system', content: PROGRAM_PROMPT },
+        { role: 'system', content: PROGRAM_PROMPT() },
         { role: 'user', content:
           `THE FRAME: ${Math.round(frame.w)}×${Math.round(frame.h)} pixels.\n\nTHE DRAWING inside it:\n${drawing}\n\nTHE LIBRARY holds:\n${library || '  (nothing yet)'}\n\nThe human typed: ${prompt}` },
       ],

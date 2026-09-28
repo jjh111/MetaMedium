@@ -243,6 +243,9 @@ html, body {
 #modelPanel .mpItem .t { color: var(--dim); }
 #modelPanel .mpItem button { flex: 0 0 auto; padding: 1px 7px; font-size: 10px; }
 #modelPanel .mpSection + .mpSection { margin-top: 10px; padding-top: 9px; border-top: 1px solid var(--edge); }
+#modelPanel .mpOwn { margin-top: 10px; padding-top: 9px; border-top: 1px solid var(--edge); }
+#modelPanel .mpTools { font-size: 10.5px; line-height: 1.55; color: var(--dim); }
+#modelPanel .mpTools span { white-space: nowrap; }
 #modelPanel .mpHead { display: flex; justify-content: space-between; align-items: center; font-size: 10px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--dim); margin-bottom: 4px; }
 #modelPanel .mpHead button { flex: 0 0 auto; padding: 3px 9px; font-size: 10.5px; }
 #modelPanel .mpLocal .server { display: flex; gap: 7px; align-items: baseline; margin: 6px 0 3px; font-family: var(--mono); font-size: 10px; color: var(--dim); }

@@ -64,6 +64,12 @@ export interface Route {
    * library already holds). A surface says it before asking anyone.
    */
   instant?: InstantModule;
+  /**
+   * The registered tool that takes this ability's act on the canvas, when one
+   * does (V1-PLAN B1): arrange is tidy's, build stands the structure. A surface
+   * takes it through the tools registry, and the events carry its id.
+   */
+  tool?: string;
 }
 
 /** Which of the askable abilities the instant library settles on its own. */
@@ -133,6 +139,7 @@ export function route(ability: Ability, state: SessionState, options: RouteOptio
       : undefined,
     candidates,
     ...(instant ? { instant } : {}),
+    ...(instant?.tool ? { tool: instant.tool } : {}),
   };
 }
 
