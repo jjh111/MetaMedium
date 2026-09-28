@@ -1543,6 +1543,105 @@ above a mark's top-left, not inside a symbol; declared content leaves an
 open field standing; at most 60 nodes and 120 links, the rest said.
 **D4 UML class**, **D5 sequence and state**, **D6 ER and mind map** — one
 notation module and pack each, each with its golden Mermaid and its bench.
+*D4 status, 28 Sep 2026:* D4's core built on `w2-maths` (`27e5ac0` red —
+A2 as a core test, 38 failing — then `abc6605`, `b98889b`, `fd16b6f`,
+`d87a1f4`); the field's and the panel's display, the `mermaid` kind's render
+of a `classDiagram` and *Draw it* are the surface's, still to come.
+`notations/uml-class.ts`: a **class** is a box with one or two lines across
+it, side to side — its compartments — read in the box's OWN frame (the
+tightest box at any angle, each axis tried as the one its lines run along; a
+compartment line lies level in it, runs straight, reaches both sides within a
+hand's miss or overshoot and stands inside), never from the relation or role
+tables (the trap: they call a compartment line `inside` and a box holding
+boxes a frame); a compartment line is ruled — a line of writing across a
+class from side to side zigzags across its own line at every letter
+(`zigzagOf`), and is a member (only writing flatter than a hand's wobble,
+which the rung too reads as a line, is taken for a compartment line); a box
+holding a mark that is no writing is a sketch, three lines across a table, a
+box holding boxes a frame — none a class, each said.
+The name is the writing in the top compartment (or a word on the box); each
+line of writing below is a member — attributes above methods, a **method only
+when read words say so** (`METHOD_WORDS`: a name straight into its
+parentheses), never invented; unread, a member whose words are not known. A
+**plain box** is a class with only a name, read lower, and only where a
+compartment or a UML head says UML — boxes and lines are what every diagram
+has. **Relations** by `headsOf` at each end, past the head, a bind first:
+hollow triangle inheritance (`<|--`, at the parent), filled diamond
+composition (`*--`), hollow aggregation (`o--`), open arrow (or a filled
+triangle) association (`-->`), none a link (`--`); **a head read first as a
+circle degrades** — to the first head a class relation has, less surely, a
+plain link its other reading — and a mark that reads as no head is said
+(90 small shaky triangles: 80 inheritance, 9 a plain link saying so, 1 read
+first as a hollow diamond with the inheritance among its readings; none lost
+silently). **Multiplicities** are short writing near an end — a "1" as one
+stroke counts — credited to the line they stand beside. **Dashed lines are not
+read**: a dashed line is several strokes, and gathering them into one
+connector is a perception of its own that D5's sequence messages need too, so
+D4 reads solid lines and the reader draws `..>` and `..|>` solid and says so.
+Ports: each class's four sides, continuous (`along:uml-class`). Plural with
+the flowchart: A2 reads *a UML class diagram 0.91* above *a flowchart 0.62*;
+a compartment box beside flowchart symbols reads both ways, the flowchart
+first. `notations/uml-class-mermaid.ts`: the writer — `class id["name"]
+{ … }` (attributes, then methods; an attribute's parentheses written as
+entities, so Mermaid never takes one for a method — unread writing in a member
+is `#40;unread writing#41;`), relations from the marked end (`P <|-- C`,
+`W *-- P`, `W o-- P`, `F --> T`, a link in reading order), cardinalities
+quoted, a label after a colon, `direction LR` when the relations run across;
+D2's ids, quoting, placeholder and order. The reader — the writer's subset and
+a hand's forms (member statements, generics, dashed drawn solid, a namespace's
+contents; notes, styles, lollipops and annotations refused with their lines)
+— drawn by D3's layered layout: each class a box with two lines across it, its
+name a label on the box and each compartment's members a label on the line
+that opens it; each relation side to side (an arc around a class in the way),
+ends sharing a side spread along it and bound there (`along:uml-class`) or at
+the box's own edge middle; heads apart as confident shapes (a triangle, a
+square turned 45°, a hatch right after its outline) and a multiplicity a dash
+beside its own line carrying its words — every mark a confident shape, so the
+letter rules gather none; read back, what does not read as written is said.
+`uml-class@1` (`packs/shipped/uml-class.ts`) names the notation and restates
+none of `UML_CLASS_TABLE`; its affinities lift clean forms and lining up;
+its ports follow it on the pen. The bench (`uml-class.bench.test.ts`, 36 hands
+of each board): the six-class board and A2 read as class diagrams 36/36 and
+36/36, first among the readings both (the board 0.75–0.79); classes 216/216 +
+72/72, compartment lines, names and members all right; inheritance 72/72 +
+36/36, composition, aggregation and association 36/36 each; multiplicities
+108/108; classes turned −30° to 30° 78/78; a filled diamond hatched within the
+word window, gathered into a word by the letter rules, still a composition
+12/12 (read apart on a scratch board); the flowchart bench, a wireframe, the
+molecule and a line of writing 0 above the floor (highest 0.00). The round
+trip (`uml-class-mermaid.test.ts`): the goldens (`fixtures/uml-class.mermaid.ts`,
+by hand) and six texts come back exactly, every hand of the board exports its
+golden before and after its writing is read, 50 seeded random diagrams at 1×,
+0.25× and 4×, the board's hands exported and drawn back read the same;
+beyond the suite, 400 random diagrams of up to 8 classes at the three scales
+all come back, and 7 of 100 of up to 14 keep a misread (a multiplicity
+credited to a neighbouring line, or no way around), 5 of the 7 said in the
+notes. packBench: uml-class@1 has no definitions (the notation reads it), the
+corpus — now 3,912 drawings with the class boards — 0 false reads; basics@1
+96/96 and test-molecule@1 48/48 unchanged. A context on the 2,000-mark bench
+board: 1.70 → 2.28 ms mean (max 4.6 → 8.5); a whole 2,000-mark board read
+in 189 ms (the flowchart's 333). The flowchart, clean, command-mark and
+recognition benches unchanged. Core 1,388 in 96 files. Found, for their
+owners: **the letter rules gather a vertical relation with a multiplicity
+written beside it** within the word window — a line under 150 px reads as a
+letter — and the relation is lost 3 of 6 times (`session.ts`, `words.ts`; a
+flowchart's "yes" beside a vertical flow is the same case); **heads.ts gives a
+fill to the first closed mark at an end it lies within**, which on a relation
+long beside its class is the class's own box, so the diamond beside it reads
+hollow (the notation reads such a head apart; heads.ts's owner); a hatch
+crossing a wobbly outline three times is still a scratch that erases it (E3's
+finding). The surface's half must know: `notationsOf(state, scope)` gives a
+`UmlClassReading` (each class's `name`, `members` with kind and compartment,
+`compartments`, `turn`; each relation's `kind`, `readings`, ends with
+`marker` and `multiplicity`); `toMermaid` maps each Mermaid class id to the
+box (`ids`) and its box and lines (`marks`), `links[i]` to relation i;
+mermaid.js decodes the entities itself; `drawMermaid` inside
+`session.withTool`, as D3; a compartment line's label is its compartment's
+members and belongs below the line, a box's label its name, a dash's label a
+multiplicity; a bind at `along:uml-class` is found again only while the
+notation's ports are offered (the pack in use); and e2e 51's golden list of
+packs (`["basics@1","flowchart@1"]`) must add `uml-class@1` when the bundles
+are rebuilt.
 **D7 Routing** — orthogonal connectors between ports and *tidy the diagram*.
 **D8 The repair demo** — `CONTROL-POINTS-PLAN.md` P4; *needs John:* one
 photograph of a hand-drawn flowchart.

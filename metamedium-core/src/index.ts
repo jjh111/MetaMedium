@@ -478,6 +478,40 @@ export type {
   SymbolReading,
 } from './notations/notation';
 export { FLOWCHART, FLOWCHART_TABLE, readFlowchart, flowchartPortsOf } from './notations/flowchart';
+// The UML class notation (V1-PLAN §3, D4): a class is a box with one or two
+// lines across it — its compartments, read in the box's own frame, a turned
+// box included — the name in the top one, its members below (a method only
+// when read words say so); relations by the head at a line's end — a hollow
+// triangle inheritance, a filled diamond composition, a hollow one
+// aggregation, an open arrow association, none a link; multiplicities are
+// short writing near an end. Its content is UML_CLASS_TABLE, which the
+// uml-class@1 pack names; its classDiagram writer and reader are
+// uml-class-mermaid.ts, registered with D2's writers and D3's readers.
+export {
+  UML_CLASS,
+  UML_CLASS_TABLE,
+  readUmlClass,
+  umlClassPortsOf,
+  memberKind,
+  METHOD_WORDS,
+  COMPARTMENT_LEVEL,
+  COMPARTMENT_STRAIGHT,
+  COMPARTMENT_CROSSINGS,
+  zigzagOf,
+  COMPARTMENT_SHORT,
+  COMPARTMENT_SHORT_PX,
+  COMPARTMENT_PAST,
+  COMPARTMENT_PAST_PX,
+  COMPARTMENT_INSET,
+  COMPARTMENT_FLOOR,
+  MAX_COMPARTMENT_LINES,
+  PLAIN_CLASS,
+  BOX_FLOOR,
+  WRITING_SPAN,
+  LETTER_SHARE,
+  END_SHARE,
+} from './notations/uml-class';
+export type { UmlClassReading, UmlClassSymbol, UmlCompartment, UmlMember, UmlRelation, UmlRelationEnd, UmlMarker } from './notations/uml-class';
 export { stanceOf, cornersOf, tightBox } from './notations/shape';
 export type { QuadStance } from './notations/shape';
 // Mermaid out (V1-PLAN §3, D2) — a notation reading said as Mermaid text at
@@ -502,6 +536,12 @@ export type { MermaidText, MermaidOptions, MermaidLink, MermaidWriter, MermaidDi
 export { drawMermaid, readMermaid, registerMermaidReader, mermaidReaders, readFlowchartText, FLOWCHART_READER, MERMAID_TEXT_PX, MERMAID_MAX_NODES, MERMAID_MAX_LINKS } from './notations/mermaid-in';
 export type { DrawMermaidOptions, DrawnMermaid, DrawnLink, DrawnEnd, MermaidRead, MermaidNodeRead, MermaidLinkRead, MermaidRefusal, MermaidReader, MermaidFlow } from './notations/mermaid-in';
 export { layoutLayered, keepApart, LAYERED_PASSES, KEEP_DIRECTION } from './notations/layered';
+// The class diagram in Mermaid, both ways (D4): `classDiagram` written from a
+// reading — classes in reading order with their members (an attribute's
+// parentheses as entities, so Mermaid never takes one for a method),
+// relations from the marked end, multiplicities as quoted cardinalities — and
+// read back and drawn as ink the notation reads, so the round trip holds.
+export { writeUmlClass, readClassDiagramText, CLASS_DIAGRAM_READER, memberLine } from './notations/uml-class-mermaid';
 export type { LayeredNode, LayeredLink, LayeredOptions, LayeredLayout, LayeredBack, LayeredDirection } from './notations/layered';
 
 // Concepts — the meaning-mappings, as a library rather than as code paths.

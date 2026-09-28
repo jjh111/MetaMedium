@@ -40,6 +40,7 @@ import type { HeadKind } from '../diagram/heads';
 import type { Role } from '../diagram/roles';
 import { ROLES } from '../diagram/roles';
 import { FLOWCHART } from './flowchart';
+import { UML_CLASS } from './uml-class';
 
 /** A symbol a notation knows, and which of the six roles it plays. */
 export interface NotationSymbolDef {
@@ -287,12 +288,19 @@ export function notationsOf(state: SessionState, scopeIds?: readonly string[]): 
   return out.sort((a, b) => b.confidence - a.confidence);
 }
 
-/** A reading in one line, for a status line, a panel or a brief: "a flowchart 0.84 — three processes, one decision, five flows". */
+/**
+ * A reading in one line, for a status line, a panel or a brief: "a flowchart
+ * 0.84 — three processes, one decision, five flows". A name that opens with
+ * an acronym keeps it: "a UML class diagram 0.85 — two classes, one
+ * inheritance".
+ */
 export function describeNotation(r: NotationReading): string {
-  const name = r.name.toLowerCase();
-  return `${/^[aeio]/.test(name) ? 'an' : 'a'} ${name} ${r.confidence.toFixed(2)} — ${r.summary}`;
+  const acronym = /^[A-Z]{2,}\b/.test(r.name);
+  const name = acronym ? r.name : r.name.toLowerCase();
+  return `${!acronym && /^[aeio]/.test(name) ? 'an' : 'a'} ${name} ${r.confidence.toFixed(2)} — ${r.summary}`;
 }
 
 // The notations shipped with the engine read from the start. Reading is
 // derived and harmless; their ports wait to be offered.
 registerNotation(FLOWCHART);
+registerNotation(UML_CLASS);
