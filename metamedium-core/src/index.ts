@@ -396,6 +396,38 @@ export {
   HEAD_COMPACT,
 } from './diagram/heads';
 export type { HeadKind, HeadReading, ConnectorEnd, ConnectorHeads } from './diagram/heads';
+// Notations (V1-PLAN §3, D1) — what a drawing is in a notation's own terms,
+// read over the diagram rung: symbols by their shape and their corners' angle
+// (a decision is a box turned 45°, which the shape rung is blind to), each
+// playing one of the six roles and adding none; connectors read past their
+// heads; labels inside a symbol or beside a flow. Every notation reads,
+// plural and ranked; derived, never in the log. A notation's ports reach the
+// pen through E3's hook only when offered. The flowchart ships; its content
+// is FLOWCHART_TABLE, which moves into the flowchart@1 pack with B3.
+export {
+  registerNotation,
+  unregisterNotation,
+  registeredNotations,
+  notationById,
+  notationsOf,
+  offerPorts,
+  describeNotation,
+  NOTATION_FLOOR,
+} from './notations/notation';
+export type {
+  Notation,
+  NotationReading,
+  NotationSymbol,
+  NotationSymbolDef,
+  NotationConnector,
+  NotationConnectorDef,
+  NotationEnd,
+  NotationLabel,
+  SymbolReading,
+} from './notations/notation';
+export { FLOWCHART, FLOWCHART_TABLE, readFlowchart, flowchartPortsOf } from './notations/flowchart';
+export { stanceOf, cornersOf, tightBox } from './notations/shape';
+export type { QuadStance } from './notations/shape';
 
 // Concepts — the meaning-mappings, as a library rather than as code paths.
 export { matchConcepts, BUILTIN_CONCEPTS } from './concepts/concept';

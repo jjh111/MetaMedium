@@ -43,7 +43,7 @@ import type { Bounds, Point } from '../types';
 import type { SessionState } from '../session/session';
 import { DEFAULT_SESSION_CONFIG } from '../session/session';
 import type { MMNode } from '../session/nodes';
-import { boundsOf, fingerprintOf, getRep, isWord, labelOf, lettersOf, resemblances, strokePointsOf, transcriptOf } from '../session/nodes';
+import { boundsOf, fingerprintOf, getRep, isWord, labelOf, lettersOf, placed, resemblances, strokePointsOf, transcriptOf } from '../session/nodes';
 import type { NotationPort, NotationPorts } from '../session/ports';
 import { activeBindingsOf, magnetRadius } from '../session/magnets';
 import type { ConnectorHeads, HeadReading } from '../diagram/heads';
@@ -312,23 +312,65 @@ function mayBeSide(n: MMNode): boolean {
   return !!fp && !fp.isClosed && top !== 'type:arrow' && top !== 'type:text' && top !== 'type:dot';
 }
 
-/** Loose strokes reachable from this one by touching bounds, a few at most: where a figure it is a side of would be. */
-function strokesAround(node: MMNode, nodes: ReadonlyMap<string, MMNode>, max = 24): string[] {
+/** A stroke's two ends where they stand now — only those two placed, not the whole stroke. */
+function endsOf(n: MMNode): [Point, Point] | null {
+  const raw = (getRep(n, 'stroke')?.data as { points?: Point[] } | undefined)?.points;
+  if (!raw || raw.length < 2) return null;
+  const [a, b] = placed(n, [raw[0], raw[raw.length - 1]]);
+  return [a, b];
+}
+
+const sizeOf = (n: MMNode) => {
+  const b = boundsOf(n);
+  return b ? Math.max(b.maxX - b.minX, b.maxY - b.minY) : 0;
+};
+
+/** What a stroke's ends are tied to by a magnet, end by end — a short list, read once. */
+function tiesOf(n: MMNode): { end?: string; to: string }[] {
+  return n.edges.filter((e) => e.rel === 'bound-to').map((e) => ({ end: e.end, to: e.to }));
+}
+
+/**
+ * Whether each end of `a` meets an end of `b` — within the reach figures.ts
+ * allows, with room to spare — or is tied to `b` by a magnet. A bound end is
+ * released ON its site, so where the ends are is the test; the ties catch one
+ * that has moved since.
+ */
+function endsMeet(a: MMNode, ea: [Point, Point], ties: { end?: string; to: string }[], b: MMNode): { start: boolean; end: boolean } {
+  const eb = endsOf(b);
+  if (!eb) return { start: false, end: false };
+  const reach = 1.5 * magnetRadius(Math.min(sizeOf(a), sizeOf(b)), Math.max(scaleOf(a), scaleOf(b)));
+  const meets = (p: Point, end: 'start' | 'end') => eb.some((q) => Math.hypot(p.x - q.x, p.y - q.y) <= reach) || ties.some((t) => t.to === b.id && (!t.end || t.end === end));
+  return { start: meets(ea[0], 'start'), end: meets(ea[1], 'end') };
+}
+
+/**
+ * The strokes a figure this one is a side of would be made of: open strokes
+ * joined end to end with it, a few at most — or just itself, when one of its
+ * ends meets no other stroke's, because then it closes nothing.
+ */
+function sideCluster(node: MMNode, nodes: ReadonlyMap<string, MMNode>, max = 12): string[] {
   const out = [node.id];
   const seen = new Set(out);
+  let start = false, end = false;
   for (let i = 0; i < out.length && out.length < max; i++) {
-    const b = boundsOf(nodes.get(out[i])!);
-    if (!b) continue;
-    const reach = 2 * magnetRadius(Math.max(b.maxX - b.minX, b.maxY - b.minY), scaleOf(nodes.get(out[i])!));
+    const a = nodes.get(out[i])!;
+    const ea = endsOf(a);
+    if (!ea) continue;
+    const ties = tiesOf(a);
     for (const [id, n] of nodes) {
-      if (seen.has(id) || out.length >= max || !mayBeSide(n)) continue;
-      const nb = boundsOf(n);
-      if (!nb) continue;
-      const gap = Math.hypot(Math.max(0, nb.minX - b.maxX, b.minX - nb.maxX), Math.max(0, nb.minY - b.maxY, b.minY - nb.maxY));
-      if (gap > reach) continue;
+      if (seen.has(id) || out.length >= max) continue;
+      // The cheap test first — where its ends are — and what it reads as only for a stroke whose ends meet.
+      const m = endsMeet(a, ea, ties, n);
+      if ((!m.start && !m.end) || !mayBeSide(n)) continue;
+      if (i === 0) {
+        start ||= m.start;
+        end ||= m.end;
+      }
       seen.add(id);
       out.push(id);
     }
+    if (i === 0 && !(start && end)) return [node.id];
   }
   return out;
 }
@@ -347,7 +389,7 @@ function candidateOfMark(node: MMNode, nodes: ReadonlyMap<string, MMNode>): Cand
   if (!fp) return null;
   if (fp.isClosed) return strokeCandidate(node);
   if (!mayBeSide(node)) return null;
-  const around = strokesAround(node, nodes);
+  const around = sideCluster(node, nodes);
   if (around.length < 2) return null;
   for (const f of figuresAmong(nodes, around)) {
     if (!f.ids.includes(node.id)) continue;
@@ -394,6 +436,21 @@ function centreOf(b: Bounds): Point {
   return { x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2 };
 }
 
+/** How far a point stands from a box: 0 inside it. The cheap test in front of every hull and path distance. */
+function offBox(p: Point, b: Bounds): number {
+  return Math.hypot(Math.max(0, b.minX - p.x, p.x - b.maxX), Math.max(0, b.minY - p.y, p.y - b.maxY));
+}
+
+/** How far apart two boxes stand: 0 when they touch or overlap. */
+function boxGap(a: Bounds, b: Bounds): number {
+  return Math.hypot(Math.max(0, b.minX - a.maxX, a.minX - b.maxX), Math.max(0, b.minY - a.maxY, a.minY - b.maxY));
+}
+
+function boundsOfPoints(pts: readonly Point[]): Bounds {
+  const xs = pts.map((p) => p.x), ys = pts.map((p) => p.y);
+  return { minX: Math.min(...xs), maxX: Math.max(...xs), minY: Math.min(...ys), maxY: Math.max(...ys) };
+}
+
 /** The nine places on a box a label is measured from: its centre, corners and edge middles. */
 function boxPoints(b: Bounds): Point[] {
   const xs = [b.minX, (b.minX + b.maxX) / 2, b.maxX], ys = [b.minY, (b.minY + b.maxY) / 2, b.maxY];
@@ -413,7 +470,7 @@ export function readFlowchart(state: SessionState, scopeIds?: readonly string[])
   const artifacts = new Set(state.artifacts);
   const scope = (scopeIds ? [...new Set(scopeIds)] : state.contentIds.filter((id) => !artifacts.has(id))).filter((id) => {
     const n = nodes.get(id);
-    return !!n && !artifacts.has(id) && !getRep(n, 'erased');
+    return !!n && !artifacts.has(id) && !getRep(n, 'erased') && !getRep(n, 'gesture');
   });
   if (!scope.length) return null;
   const marks: Mark[] = scope.map((id) => ({ id, node: nodes.get(id)! }));
@@ -453,7 +510,10 @@ export function readFlowchart(state: SessionState, scopeIds?: readonly string[])
   //    container — flowchart symbols do not nest — and a small round mark
   //    inside a symbol is a letter of its label, not a start.
   const containers = new Set<string>();
-  const inside = (a: Candidate, b: Candidate) => b.outline.size < a.outline.size && outside(centreOf(b.outline.bounds), a.outline.hull) === 0;
+  const inside = (a: Candidate, b: Candidate) => {
+    const c = centreOf(b.outline.bounds);
+    return b.outline.size < a.outline.size && offBox(c, a.outline.bounds) === 0 && outside(c, a.outline.hull) === 0;
+  };
   for (const a of candidates) {
     if (!coreOf(a)) continue;
     for (const b of candidates) if (a !== b && inside(a, b) && topCore(b)) containers.add(a.id);
@@ -596,7 +656,10 @@ export function readFlowchart(state: SessionState, scopeIds?: readonly string[])
 
   // 5. Labels: writing inside a symbol, or beside a flow; else beside a symbol; else alone.
   const labels: NotationLabel[] = [];
-  const paths = new Map(connectors.map((k) => [k.id, strokePointsOf(nodes.get(k.id)!) ?? []]));
+  const paths = new Map(connectors.map((k) => {
+    const pts = strokePointsOf(nodes.get(k.id)!) ?? [];
+    return [k.id, { pts, box: pts.length ? boundsOfPoints(pts) : null }];
+  }));
   for (const m of marks) {
     if (!writing.has(m.id) || symbolOfMark.has(m.id)) continue;
     const b = boundsOf(m.node);
@@ -605,7 +668,7 @@ export function readFlowchart(state: SessionState, scopeIds?: readonly string[])
     const size = Math.max(b.maxX - b.minX, b.maxY - b.minY);
     const text = transcriptOf(m.node) ?? labelOf(m.node)?.text;
     const home = out
-      .filter((s) => s.bounds && outside(c, s.outline) === 0 && Math.max(s.bounds.maxX - s.bounds.minX, s.bounds.maxY - s.bounds.minY) > size)
+      .filter((s) => offBox(c, s.bounds) === 0 && outside(c, s.outline) === 0 && Math.max(s.bounds.maxX - s.bounds.minX, s.bounds.maxY - s.bounds.minY) > size)
       .sort((p, q) => (p.bounds.maxX - p.bounds.minX) * (p.bounds.maxY - p.bounds.minY) - (q.bounds.maxX - q.bounds.minX) * (q.bounds.maxY - q.bounds.minY))[0];
     const base = { id: m.id, role: FLOWCHART_TABLE.label.role as Role, ...(text ? { text } : {}) };
     if (home) {
@@ -617,7 +680,11 @@ export function readFlowchart(state: SessionState, scopeIds?: readonly string[])
     const reach = Math.max(2 * magnetRadius(size, scaleOf(m.node)), size);
     const pts = boxPoints(b);
     const flow = connectors
-      .map((k) => ({ k, d: Math.min(...pts.map((p) => distToPath(p, paths.get(k.id)!))) }))
+      .filter((k) => {
+        const box = paths.get(k.id)!.box;
+        return !!box && boxGap(b, box) <= reach;
+      })
+      .map((k) => ({ k, d: Math.min(...pts.map((p) => distToPath(p, paths.get(k.id)!.pts))) }))
       .filter((x) => x.d <= reach)
       .sort((p, q) => p.d - q.d)[0];
     if (flow) {
@@ -626,6 +693,7 @@ export function readFlowchart(state: SessionState, scopeIds?: readonly string[])
       continue;
     }
     const by = out
+      .filter((s) => boxGap(b, s.bounds) <= reach)
       .map((s) => ({ s, d: Math.min(...pts.map((p) => outside(p, s.outline))) }))
       .filter((x) => x.d <= reach)
       .sort((p, q) => p.d - q.d)[0];
@@ -764,8 +832,9 @@ function endOf(
   let best: { c: Candidate; d: number } | undefined;
   for (const c of symbols) {
     if (!isSymbol.has(c)) continue;
-    const d = outside(point, c.outline.hull);
     const reach = reachOfSymbol(c);
+    if (offBox(point, c.outline.bounds) > reach) continue;
+    const d = outside(point, c.outline.hull);
     if (d > reach) continue;
     if (!best || d < best.d || (d === best.d && c.outline.size < best.c.outline.size)) best = { c, d };
   }
