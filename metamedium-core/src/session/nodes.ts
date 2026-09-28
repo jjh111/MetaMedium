@@ -242,10 +242,7 @@ export function placed(node: MMNode, points: Point[]): Point[] {
   let out = points;
   if (to) {
     const from = getBounds(raw);
-    const fw = Math.max(1e-6, from.maxX - from.minX);
-    const fh = Math.max(1e-6, from.maxY - from.minY);
-    const sx = (to.maxX - to.minX) / fw;
-    const sy = (to.maxY - to.minY) / fh;
+    const { sx, sy } = frameScale(from, to);
     out = points.map((p) => ({ ...p, x: to.minX + (p.x - from.minX) * sx, y: to.minY + (p.y - from.minY) * sy }));
   }
   if (rotation) {
@@ -255,6 +252,73 @@ export function placed(node: MMNode, points: Point[]): Point[] {
     out = out.map((p) => ({ ...p, x: cx + (p.x - cx) * c - (p.y - cy) * s, y: cy + (p.x - cx) * s + (p.y - cy) * c }));
   }
   return out;
+}
+
+/**
+ * How a `transform` fits the ink's own box to where the mark stands, axis by
+ * axis. An axis the ink has NO extent on — a ruled line's height, a tap — is
+ * carried, never stretched: every point of such ink lies on the box's edge,
+ * so it lands where it always did, and a clean form a hand reshaped off that
+ * edge (V1-PLAN E1: a flat line's end dragged up) moves with the mark instead
+ * of being flattened back onto it. Every other axis is the fit it always was.
+ */
+function frameScale(from: Bounds, to: Bounds): { sx: number; sy: number } {
+  const fw = from.maxX - from.minX, fh = from.maxY - from.minY;
+  return {
+    sx: fw > 0 ? (to.maxX - to.minX) / Math.max(1e-6, fw) : 1,
+    sy: fh > 0 ? (to.maxY - to.minY) / Math.max(1e-6, fh) : 1,
+  };
+}
+
+/**
+ * The inverse of `placed`: points where they stand on the board, taken back
+ * into the mark's OWN space — the space its ink was drawn in, before any
+ * move, scale or turn. A reshape is kept there (V1-PLAN E1), so a move, a
+ * scale or a turn that lands before it or after it carries it as it carries
+ * the ink.
+ */
+export function unplaced(node: MMNode, points: Point[]): Point[] {
+  const raw = (getRep(node, 'stroke')?.data as { points: Point[] } | undefined)?.points ?? points;
+  const to = getRep(node, 'transform')?.data as Bounds | undefined;
+  const rotation = (getRep(node, 'rotation')?.data as number | undefined) ?? 0;
+  let out = points;
+  if (rotation) {
+    const frame = to ?? getBounds(raw);
+    const cx = (frame.minX + frame.maxX) / 2, cy = (frame.minY + frame.maxY) / 2;
+    const c = Math.cos(-rotation), s = Math.sin(-rotation);
+    out = out.map((p) => ({ ...p, x: cx + (p.x - cx) * c - (p.y - cy) * s, y: cy + (p.x - cx) * s + (p.y - cy) * c }));
+  }
+  if (to) {
+    const from = getBounds(raw);
+    const { sx, sy } = frameScale(from, to);
+    out = out.map((p) => ({ ...p, x: from.minX + (p.x - to.minX) / (sx || 1), y: from.minY + (p.y - to.minY) / (sy || 1) }));
+  }
+  return out;
+}
+
+/** The clean form a hand reshaped (V1-PLAN E1), as the rep holds it — or nothing. */
+function reshapedForm(node: MMNode): { points: Point[]; closed?: boolean } | undefined {
+  const clean = getRep(node, 'clean')?.data as { points?: Point[]; closed?: boolean; reshaped?: unknown } | undefined;
+  return clean && clean.reshaped && clean.points && clean.points.length > 0 && getRep(node, 'stroke') ? (clean as { points: Point[]; closed?: boolean }) : undefined;
+}
+
+/**
+ * The outline a mark stands as NOW, for everything that reads where a mark
+ * is — its relations, the scratch that would rub it out, a hit: the clean
+ * form a hand reshaped it to (V1-PLAN E1), where it stands; else its ink as
+ * placed. A reshaped form is the hand's own geometry, set by a handle, and
+ * the ink under it is where it was drawn. A clean form only SNAPPED is the
+ * ink's own measurements redrawn, and the ink still stands for it.
+ */
+export function standingPointsOf(node: MMNode): Point[] | undefined {
+  const clean = reshapedForm(node);
+  return clean ? placed(node, clean.points) : strokePointsOf(node);
+}
+
+/** Whether the outline a mark stands as closes on itself: the reshaped clean form's, else the ink's (unknown for a mark with no ink). */
+export function standsClosed(node: MMNode): boolean | undefined {
+  const clean = reshapedForm(node);
+  return clean ? !!clean.closed : fingerprintOf(node)?.isClosed;
 }
 
 export function wordOf(node: MMNode): string | undefined {
@@ -375,15 +439,32 @@ export function topInterpretation(node: MMNode): string | undefined {
 }
 
 export function boundsOf(node: MMNode): Bounds | undefined {
+  // One pass over the reps, each modality's first as `getRep` finds it: this
+  // is asked of every mark by every relation and every paint.
+  let stroke: Rep | undefined, rotation: Rep | undefined, transform: Rep | undefined, fp: Rep | undefined, clean: Rep | undefined, bounds: Rep | undefined;
+  for (const r of node.reps) {
+    switch (r.modality) {
+      case 'stroke': if (!stroke) stroke = r; break;
+      case 'rotation': if (!rotation) rotation = r; break;
+      case 'transform': if (!transform) transform = r; break;
+      case 'fingerprint': if (!fp) fp = r; break;
+      case 'clean': if (!clean) clean = r; break;
+      case 'bounds': if (!bounds) bounds = r; break;
+    }
+  }
+  // A mark a hand reshaped stands where its clean form is (V1-PLAN E1); its
+  // ink is where it was drawn, faint beneath.
+  if (stroke && clean && (clean.data as { reshaped?: unknown }).reshaped) {
+    const pts = (clean.data as { points?: Point[] }).points;
+    if (pts && pts.length) return getBounds(placed(node, pts));
+  }
   // A turned mark's box is the box of its turned points.
-  if (getRep(node, 'rotation') && getRep(node, 'stroke')) return getBounds(strokePointsOf(node)!);
+  if (rotation && stroke) return getBounds(strokePointsOf(node)!);
   // A transform is where the mark IS; the fingerprint records where it was
   // drawn. Anything asking for bounds wants the former.
-  const moved = getRep(node, 'transform')?.data as Bounds | undefined;
-  if (moved) return moved;
-  const fp = fingerprintOf(node);
-  if (fp) return fp.bounds;
-  return getRep(node, 'bounds')?.data as Bounds | undefined;
+  if (transform?.data) return transform.data as Bounds;
+  if (fp?.data) return (fp.data as Fingerprint).bounds;
+  return bounds?.data as Bounds | undefined;
 }
 
 /** The behaviour that drives a definition: the newest one a human gave (or gave again in their name). */

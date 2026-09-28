@@ -32,6 +32,7 @@
 
 import { createSession, DEFAULT_SESSION_CONFIG, type Session, type SessionEvent } from '../session/session';
 import { LOCAL_PARTICIPANT } from '../session/nodes';
+import { handlesOf } from '../session/handles';
 import { LiveStore, type LiveLine, type LiveTransport, type RelayNotice } from '../store/live';
 import { mergeLogs } from '../store/merge';
 import { LiveMerge, type MergeReport } from '../store/livemerge';
@@ -596,12 +597,23 @@ function act(s: Session, rand: () => number, at: number, kinds: string[], undo?:
       if (!content.length) return null;
       return s.label({ nodeId: pick(content), text: pick(['a', 'b', 'hub']), at }) ? 'label' : null;
     }
+    case 'reshape': {
+      // A handle dragged (V1-PLAN E1): one of a mark's own points, let go a little way off.
+      if (!content.length) return null;
+      const id = pick(content);
+      const n = st.nodes.get(id);
+      const hs = n ? handlesOf(n, st.nodes) : [];
+      if (!hs.length) return null;
+      const h = pick(hs);
+      const to = { x: h.point.x + (rand() - 0.5) * 80, y: h.point.y + (rand() - 0.5) * 80 };
+      return s.reshape({ id, handle: { kind: h.kind, index: h.index }, to, at }) ? 'reshape' : null;
+    }
   }
   return null;
 }
 
-const REMOTE_ACTS = ['draw', 'draw', 'draw', 'write', 'undo', 'undo', 'bless', 'answer', 'erase', 'move', 'label', 'tool'];
-const LOCAL_ACTS = ['draw', 'draw', 'write', 'undo', 'undo', 'bless', 'answer', 'erase', 'move', 'tool'];
+const REMOTE_ACTS = ['draw', 'draw', 'draw', 'write', 'undo', 'undo', 'bless', 'answer', 'erase', 'move', 'label', 'tool', 'reshape'];
+const LOCAL_ACTS = ['draw', 'draw', 'write', 'undo', 'undo', 'bless', 'answer', 'erase', 'move', 'tool', 'reshape'];
 
 /**
  * One room, from its seed. The readers under test join at a random moment,

@@ -21,7 +21,7 @@
 import type { Point } from '../types';
 import type { MMNode } from './nodes';
 import { boundsOf, fingerprintOf, getRep, placed, strokePointsOf } from './nodes';
-import { cleanPointsOf, idealize, snapReading } from './clean';
+import { cleanOf, cleanPointsOf, idealize, snapReading } from './clean';
 import { getBounds, tightestBox } from '../geometry';
 import type { LengthUnit } from '../maths/quantity';
 import type { BoardMaths, Conflict, SolvedValue } from '../maths/solve';
@@ -146,8 +146,9 @@ function inUnits(plain: Maths, id: string, board: BoardMaths): Maths {
 function measureInk(node: MMNode, nodes: ReadonlyMap<string, MMNode>): Maths | null {
   const fp = fingerprintOf(node);
   if (!fp) return null;
-  const reading = snapReading(node, nodes);
-  const shape = reading.shape;
+  // A held clean form says what shape it is — snapped from the ink's reading,
+  // or reshaped by a hand's handle, where the form is the hand's (V1-PLAN E1).
+  const shape = cleanOf(node)?.shape ?? snapReading(node, nodes).shape;
   const held = getRep(node, 'clean') ? cleanPointsOf(node) : undefined;
   const ideal = held ?? idealize(node, shape)?.points ?? strokePointsOf(node);
   if (!ideal || ideal.length < 2) return null;
@@ -207,9 +208,12 @@ function measureInk(node: MMNode, nodes: ReadonlyMap<string, MMNode>): Maths | n
     }
     case 'line':
     case 'arrow': {
+      // A held form's own ends — the tail its first point, the tip an arrow's
+      // second (tail, tip, wing, tip, wing) or a line's last — so a reshaped
+      // end is measured where the hand left it; else the ink's.
       const arrow = getRep(node, 'reading:arrow')?.data as { tip?: Point; tail?: Point } | undefined;
-      const from = shape === 'arrow' && arrow?.tail ? arrow.tail : fp.start;
-      const to = shape === 'arrow' && arrow?.tip ? arrow.tip : fp.end;
+      const from = held && held.length > 1 ? held[0] : shape === 'arrow' && arrow?.tail ? arrow.tail : fp.start;
+      const to = held && held.length > 1 ? (shape === 'arrow' ? held[1] : held[held.length - 1]) : shape === 'arrow' && arrow?.tip ? arrow.tip : fp.end;
       const len = Math.hypot(to.x - from.x, to.y - from.y);
       // Heading as a compass reads it: 0° is to the right, 90° is up (y grows down on a canvas).
       const heading = ((deg(Math.atan2(-(to.y - from.y), to.x - from.x)) % 360) + 360) % 360;

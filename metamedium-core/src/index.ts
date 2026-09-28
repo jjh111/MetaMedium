@@ -58,6 +58,9 @@ export {
   lettersOf,
   topInterpretation,
   boundsOf,
+  standingPointsOf,
+  standsClosed,
+  unplaced,
   BUILTIN_TYPES,
   LOCAL_PARTICIPANT,
   TIER0_PARTICIPANT,
@@ -75,6 +78,8 @@ export {
   snapReading,
   cleanOf,
   cleanPointsOf,
+  arcThrough,
+  arrowPoints,
   describeSnap,
   SNAP_CONFIDENCE,
   SNAP_MARGIN,
@@ -260,7 +265,7 @@ export type { Binding, BoundRep } from './session/magnets';
 // Handles (V1-PLAN E1, CONTROL-POINTS-PLAN P2) — the same sites made
 // draggable: one mark with a clean form shows its own, and dragging one writes
 // one `reshape` event that reshapes the clean form and never the ink.
-export { handlesOf, reshapePreview } from './session/handles';
+export { handlesOf, reshapePreview, reshapedClean, reshapeClean, cleanFormOf, MIN_EXTENT_PX } from './session/handles';
 export type { Handle, HandleKind, ReshapePreview } from './session/handles';
 
 // Words from letters — printed letters gathered into one held mark (words.ts).

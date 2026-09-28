@@ -20,7 +20,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { createSession, DEFAULT_SESSION_CONFIG, type Session } from './session';
 import { cleanOf, cleanPointsOf, snapReading } from './clean';
-import { boundsOf, getRep, resemblances, strokePointsOf } from './nodes';
+import { authorOf, boundsOf, getRep, resemblances, strokePointsOf } from './nodes';
 import { magnetSites, siteOf } from './magnets';
 import { measure } from './measure';
 import { handlesOf, reshapePreview } from './handles';
@@ -28,6 +28,7 @@ import { registerPorts, unregisterPorts } from './ports';
 import { mergeLogs } from '../store/merge';
 import { analyzeStroke } from '../recognition';
 import type { Point } from '../types';
+import { getBounds } from '../geometry';
 import {
   rectStroke,
   circleStroke,
@@ -433,7 +434,9 @@ describe('reshape — born reshaped, undo, replay, another hand, one act', () =>
       for (const id of [b, l]) {
         expect(JSON.stringify(cleanOf(nodeOf(board, id)))).toBe(JSON.stringify(cleanOf(nodeOf(ada, id))));
         expect(inkNow(board, id)).toBe(inkNow(ada, id));
-        expect(getRep(nodeOf(board, id), 'clean')!.source).toBe('participant:hand:ada~a1');
+        // In her name: the hand that drew the mark on this board, never the reader.
+        expect(getRep(nodeOf(board, id), 'clean')!.source).toBe(authorOf(nodeOf(board, id)));
+        expect(authorOf(nodeOf(board, id))).toMatch(/^participant:hand:ada/);
       }
       // The reader's undo takes back its own act, never hers.
       board.undo();
@@ -501,5 +504,59 @@ describe('reshape — what reads from where it stands', () => {
     expect(cleanOf(nodeOf(s, b))).toBeUndefined();
     s.reshape({ id: b, handle: { kind: 'corner', index: 2 }, to: { x: 360, y: 260 }, at: 2000 });
     expect(JSON.stringify(cleanPointsOf(pv.node))).toBe(JSON.stringify(cleanNow(s, b)));
+  });
+});
+
+describe("reshape — the selection's own handles still scale and turn it, and tidy places its form", () => {
+  const inkBox = (s: Session, id: string) => getBounds(strokePointsOf(nodeOf(s, id))!);
+  const boxNear = (b: { minX: number; minY: number; maxX: number; maxY: number }, q: [number, number, number, number]) => {
+    expect(Math.abs(b.minX - q[0])).toBeLessThan(1e-6);
+    expect(Math.abs(b.minY - q[1])).toBeLessThan(1e-6);
+    expect(Math.abs(b.maxX - q[2])).toBeLessThan(1e-6);
+    expect(Math.abs(b.maxY - q[3])).toBeLessThan(1e-6);
+  };
+
+  it('a reshaped box scaled about a corner scales its form with its ink, one fit for both', () => {
+    const s = createSession();
+    const b = box(s);
+    s.reshape({ id: b, handle: { kind: 'corner', index: 2 }, to: { x: 360, y: 260 }, at: 2000 });
+    s.scale({ ids: [b], about: { x: 100, y: 100 }, sx: 2, sy: 0.5, at: 3000 });
+    boxNear(boundsOf(nodeOf(s, b))!, [100, 100, 620, 180]);
+    boxNear(inkBox(s, b), [100, 100, 500, 160]);
+  });
+
+  it('a reshaped box turned about a pivot turns rigidly, its form with its ink', () => {
+    const s = createSession();
+    const b = box(s);
+    s.reshape({ id: b, handle: { kind: 'corner', index: 2 }, to: { x: 360, y: 260 }, at: 2000 });
+    s.rotate({ ids: [b], about: { x: 0, y: 0 }, radians: Math.PI / 2, at: 3000 });
+    const c = cleanNow(s, b)!;
+    expectAt(c[2], { x: -260, y: 360 });
+    expectAt(c[0], { x: -100, y: 100 });
+    expectAt(siteOf(nodeOf(s, b), s.getState().nodes, { kind: 'corner', index: 2 })!.point, { x: -260, y: 360 });
+  });
+
+  it('tidy places a reshaped box by where its form stands: lined up in a row, the form keeps its size and the ink is not stretched', () => {
+    const s = createSession();
+    const b = box(s);
+    const o = s.addStroke(rectStroke(600, 100, 200, 120), 6000, undefined, 1);
+    s.reshape({ id: b, handle: { kind: 'corner', index: 2 }, to: { x: 360, y: 260 }, at: 7000 });
+    s.tidy({ ids: [b, o], mode: 'align', axis: 'row', at: 8000 });
+    // The row's line is the mean of the centres (180 and 160): the form, 160 tall, from 90 to 250.
+    boxNear(boundsOf(nodeOf(s, b))!, [100, 90, 360, 250]);
+    boxNear(inkBox(s, b), [100, 90, 300, 210]);
+    boxNear(boundsOf(nodeOf(s, o))!, [600, 110, 800, 230]);
+  });
+
+  it('show the ink: the reshaped form is put away, and the mark stands on its ink again', () => {
+    const s = createSession();
+    const b = box(s);
+    const c = s.addStroke(circleStroke(420, 160, 30), 6000, undefined, 1);
+    s.reshape({ id: b, handle: { kind: 'middle', index: 1 }, to: { x: 500, y: 160 }, at: 7000 });
+    expect(s.read([b, c]).relations.some((r) => r.kind === 'contains' && r.from === b)).toBe(true);
+    s.snap({ ids: [b], mode: 'raw', at: 8000 });
+    expect(cleanOf(nodeOf(s, b))).toBeUndefined();
+    expect(boundsOf(nodeOf(s, b))).toEqual({ minX: 100, minY: 100, maxX: 300, maxY: 220 });
+    expect(s.read([b, c]).relations.some((r) => r.kind === 'contains' && r.from === b)).toBe(false);
   });
 });

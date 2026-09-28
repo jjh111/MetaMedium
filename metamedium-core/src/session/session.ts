@@ -49,6 +49,8 @@ import {
   lettersOf,
   authorOf,
   isPackDefinition,
+  standingPointsOf,
+  standsClosed,
   LOCAL_PARTICIPANT,
   TIER0_PARTICIPANT,
   type Locality,
@@ -73,6 +75,7 @@ import { type ConceptMatch, type ConceptScope, matchConcepts } from '../concepts
 import { type GenreReading, type RoleReading, type Wire, assignRoles, genreOf } from '../diagram/roles';
 import { BUILTIN_COMMAND_MARK, matchesCommandMark } from './commandmark';
 import { type SnapReading, idealize, snapReading, cleanOf } from './clean';
+import { reshapePreview, reshapedClean } from './handles';
 import { isLetterLike, joinsRun, wordConfidence } from './words';
 import { type StructuralSignature, type Examples, structuralSignature, matchDefinition, addExample, MATCH_FLOOR } from './signature';
 import type { Kind } from '../kinds/kinds';
@@ -1715,8 +1718,9 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       .filter((n): n is MMNode => !!n && !getRep(n, 'erased') && !!strokePointsOf(n))
       .map((n) => ({
         id: n.id,
-        points: strokePointsOf(n)!,
-        closed: fingerprintOf(n)?.isClosed ?? false,
+        // Where it stands: a reshaped form is scratched out where it is drawn (E1).
+        points: standingPointsOf(n)!,
+        closed: standsClosed(n) ?? false,
       }));
   }
 
@@ -1849,11 +1853,15 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     });
   }
 
+  /**
+   * A mark as the relations read it: where it stands — its reshaped clean
+   * form when a hand reshaped it (V1-PLAN E1), else its ink as placed.
+   */
   function markOf(id: string): Mark | null {
     const n = nodes.get(id);
     const b = n && boundsOf(n);
     if (!n || !b) return null;
-    return { id, bounds: b, points: strokePointsOf(n) ?? undefined, closed: fingerprintOf(n)?.isClosed };
+    return { id, bounds: b, points: standingPointsOf(n) ?? undefined, closed: standsClosed(n) };
   }
 
   /**
@@ -1958,9 +1966,9 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       if (id === excludeId) continue;
       const n = nodes.get(id)!;
       if (getRep(n, 'erased')) continue;
-      const pts = strokePointsOf(n);
+      const pts = standingPointsOf(n);
       if (!pts) continue;
-      if (scratchedOut(points, [{ id, points: pts, closed: fingerprintOf(n)?.isClosed ?? false }], config.eraseCrossings).length) hits.add(id);
+      if (scratchedOut(points, [{ id, points: pts, closed: standsClosed(n) ?? false }], config.eraseCrossings).length) hits.add(id);
     }
     if (hits.size === 0) return [];
     return scratchTargets(excludeId).filter((t) => hits.has(t.id)).map((t) => t.id);
@@ -2511,11 +2519,27 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
 
     for (const p of placed) {
       const node = nodes.get(p.id)!;
+      // A transform is the frame of a mark's INK. A mark a hand reshaped
+      // stands where its clean form is (E1), so the box tidy placed is where
+      // its FORM goes, and its ink's frame is taken there by the same fit.
+      const shown = cleanOf(node)?.reshaped ? boundsOf(node) : undefined;
+      const frame = shown && frameBounds(node);
+      const to = shown && frame ? refit(frame, shown, p.to) : p.to;
       node.reps = node.reps.filter((r) => r.modality !== 'transform');
-      node.reps.push({ modality: 'transform', data: p.to, source: 'engine' });
+      node.reps.push({ modality: 'transform', data: to, source: 'engine' });
       boundsMoved(p.id);
     }
     recomputeClusterCandidates();
+  }
+
+  /** `b` taken by the fit that takes `from` to `to`, axis by axis; an axis `from` has no extent on is carried. */
+  function refit(b: Bounds, from: Bounds, to: Bounds): Bounds {
+    const fw = from.maxX - from.minX, fh = from.maxY - from.minY;
+    const sx = fw > 0 ? (to.maxX - to.minX) / fw : 1, sy = fh > 0 ? (to.maxY - to.minY) / fh : 1;
+    return {
+      minX: to.minX + (b.minX - from.minX) * sx, maxX: to.minX + (b.maxX - from.minX) * sx,
+      minY: to.minY + (b.minY - from.minY) * sy, maxY: to.minY + (b.maxY - from.minY) * sy,
+    };
   }
 
   /** Every mark on the board: loose ones, and the members of artifacts. A box
@@ -2548,10 +2572,20 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
    */
   function applySnap(ev: Extract<SessionEvent, { type: 'snap' }>) {
     if (ev.mode === 'raw') {
+      let moved = false;
       for (const id of ev.ids) {
         const node = nodes.get(id);
-        if (node) node.reps = node.reps.filter((r) => r.modality !== 'clean');
+        if (!node) continue;
+        // A reshaped form stood somewhere its ink does not (E1): the mark
+        // stands on its ink again, and is filed there.
+        const reshaped = !!cleanOf(node)?.reshaped;
+        node.reps = node.reps.filter((r) => r.modality !== 'clean');
+        if (reshaped) {
+          boundsMoved(id);
+          moved = true;
+        }
       }
+      if (moved) recomputeClusterCandidates();
       return;
     }
     for (const c of candidatesAmong(ev.ids)) {
@@ -2598,6 +2632,28 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       data: { end: ev.end, nodeId: ev.nodeId, site: { ...site } },
       source: by,
     });
+  }
+
+  /**
+   * A handle let go (V1-PLAN E1; handles.ts): the mark's clean form — the
+   * one it holds, or the one it would be offered, which this same act holds —
+   * reshaped in the mark's own space. The ink is never touched; the rep is
+   * replaced, never changed in place, so undo drops it and the form before
+   * it (or none) stands again. The mark now stands where its form is, so it
+   * is filed there and its group read again, as a move is.
+   */
+  function applyReshape(ev: Extract<SessionEvent, { type: 'reshape' }>) {
+    const node = nodes.get(ev.id);
+    // A log is read, not trusted (DATA-1): a point that is not one reshapes nothing.
+    if (!node || !ev.handle || !ev.to || !Number.isFinite(ev.to.x) || !Number.isFinite(ev.to.y)) return;
+    const clean = reshapedClean(node, nodes, { kind: ev.handle.kind, index: ev.handle.index }, { x: ev.to.x, y: ev.to.y });
+    if (!clean) return;
+    const was = getRep(node, 'clean');
+    const confidence = was?.confidence ?? snapReading(node, nodes).weight;
+    node.reps = node.reps.filter((r) => r.modality !== 'clean');
+    node.reps.push({ modality: 'clean', data: clean, confidence, source: ev.participantId ?? LOCAL_PARTICIPANT });
+    boundsMoved(node.id);
+    recomputeClusterCandidates();
   }
 
   // ===== Words from letters (words.ts) =====
@@ -3410,6 +3466,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
         applyBind(ev);
         return null;
       case 'reshape':
+        applyReshape(ev);
         return null;
       case 'code':
         return applyCode(ev);
@@ -3692,7 +3749,24 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     tidy: (args) => void dispatch({ type: 'tidy', ...args }),
     snap: (args) => void dispatch({ type: 'snap', ...args }),
     bind: (args) => void dispatch({ type: 'bind', ...args }),
-    reshape: () => false,
+    reshape: (args) => {
+      // The same function the replay runs, so what the hand was shown is what
+      // is written: the handle let go at `to` on the board, kept in the
+      // mark's own space. Nothing to reshape, nothing written.
+      const node = args && nodes.get(args.id);
+      if (!node || !args.handle) return false;
+      const pv = reshapePreview(node, nodes, { kind: args.handle.kind, index: args.handle.index }, args.to);
+      if (!pv) return false;
+      dispatch({
+        type: 'reshape',
+        id: args.id,
+        handle: { kind: args.handle.kind, index: args.handle.index },
+        to: pv.to,
+        at: args.at,
+        ...(args.participantId !== undefined ? { participantId: args.participantId } : {}),
+      });
+      return true;
+    },
     snapCandidates: (ids) => candidatesAmong(ids ?? snappableIds()),
     attachCode: ({ expect, ...args }) => guarded({ type: 'code', ...args }, expect),
     codeVersion,

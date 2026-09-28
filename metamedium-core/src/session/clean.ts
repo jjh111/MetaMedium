@@ -296,6 +296,31 @@ function circumcircle(a: Point, b: Point, c: Point): { cx: number; cy: number; r
 }
 
 /**
+ * The circular arc from `a` to `c` through `mid`, as 41 points evenly spaced
+ * in angle — so its 21st is halfway along it — or null when the three are in
+ * a line. How an arc's clean form is drawn, from the ink (`idealize`) or from
+ * its handles (a reshape, handles.ts).
+ */
+export function arcThrough(a: Point, mid: Point, c: Point): { points: Point[]; r: number; sweep: number } | null {
+  const cc = circumcircle(a, mid, c);
+  if (!cc) return null;
+  const a0 = Math.atan2(a.y - cc.cy, a.x - cc.cx);
+  const a1 = Math.atan2(c.y - cc.cy, c.x - cc.cx);
+  const am = Math.atan2(mid.y - cc.cy, mid.x - cc.cx);
+  // Sweep from a0 to a1 through am.
+  const norm = (x: number) => ((x % TAU) + TAU) % TAU;
+  const viaCcw = norm(am - a0) < norm(a1 - a0);
+  const sweep = viaCcw ? norm(a1 - a0) : -norm(a0 - a1);
+  const n = 40;
+  const points: Point[] = [];
+  for (let i = 0; i <= n; i++) {
+    const t = a0 + (sweep * i) / n;
+    points.push({ x: cc.cx + cc.r * Math.cos(t), y: cc.cy + cc.r * Math.sin(t) });
+  }
+  return { points, r: cc.r, sweep };
+}
+
+/**
  * The clean form of a mark, as the shape it reads as.
  *
  * Works from the RAW stroke — where it was drawn, before any tidy moved it —
@@ -413,19 +438,14 @@ export function idealize(node: MMNode, shape: string): CleanShape | null {
       const tail = meta?.tail ?? fp.start, tip = meta?.tip ?? fp.end;
       const len = Math.hypot(tip.x - tail.x, tip.y - tail.y);
       if (len < 1e-6) return null;
-      const ux = (tip.x - tail.x) / len, uy = (tip.y - tail.y) / len;
       // The barb the hand drew, as long as it was — at most a fifth of the
       // shaft, because two wings drawn out and back are three barbs' worth of
       // the head the rung reads, and a longer one would not read back as an
       // arrow at all (the old 0.28 of the shaft never did under 143px).
       const barb = Math.min(len * 0.2, Math.max(6, meta?.barb ?? len * 0.2));
-      const wing = (s: number) => ({
-        x: tip.x - barb * (ux * Math.cos(0.5) - s * uy * Math.sin(0.5)),
-        y: tip.y - barb * (uy * Math.cos(0.5) + s * ux * Math.sin(0.5)),
-      });
       return {
         shape, closed: false,
-        points: [tail, tip, wing(1), tip, wing(-1)],
+        points: arrowPoints(tail, tip, barb),
         reasoning:
           meta?.barb !== undefined && barb < meta.barb - 0.5
             ? `a straight shaft from tail to tip, with an even barb ${Math.round(barb)}px long — a fifth of the shaft, where the hand drew ${Math.round(meta.barb)}`
@@ -440,23 +460,9 @@ export function idealize(node: MMNode, shape: string): CleanShape | null {
         const d = Math.abs(sideOf(a, c, p));
         if (d > best) { best = d; mid = p; }
       }
-      const cc = circumcircle(a, mid, c);
-      if (!cc) return { shape: 'line', closed: false, points: [a, c], reasoning: 'too flat to bow; drawn straight' };
-      const a0 = Math.atan2(a.y - cc.cy, a.x - cc.cx);
-      const a1 = Math.atan2(c.y - cc.cy, c.x - cc.cx);
-      const am = Math.atan2(mid.y - cc.cy, mid.x - cc.cx);
-      // Sweep from a0 to a1 through am.
-      let sweep = a1 - a0;
-      const norm = (x: number) => ((x % TAU) + TAU) % TAU;
-      const viaCcw = norm(am - a0) < norm(a1 - a0);
-      sweep = viaCcw ? norm(a1 - a0) : -norm(a0 - a1);
-      const n = 40;
-      const points: Point[] = [];
-      for (let i = 0; i <= n; i++) {
-        const t = a0 + (sweep * i) / n;
-        points.push({ x: cc.cx + cc.r * Math.cos(t), y: cc.cy + cc.r * Math.sin(t) });
-      }
-      return { shape, closed: false, points, reasoning: `a circular arc of radius ${Math.round(cc.r)} through its ends and its bulge` };
+      const arc = arcThrough(a, mid, c);
+      if (!arc) return { shape: 'line', closed: false, points: [a, c], reasoning: 'too flat to bow; drawn straight' };
+      return { shape, closed: false, points: arc.points, reasoning: `a circular arc of radius ${Math.round(arc.r)} through its ends and its bulge` };
     }
     case 'dot': {
       const cx = (b.minX + b.maxX) / 2, cy = (b.minY + b.maxY) / 2;
@@ -470,6 +476,23 @@ export function idealize(node: MMNode, shape: string): CleanShape | null {
     default:
       return null;
   }
+}
+
+/**
+ * An arrow's clean outline: the shaft from `tail` to `tip`, then out one wing,
+ * back to the tip and out the other — `barb` long each, half a radian off the
+ * shaft — as the rung reads a head drawn by hand. The shaft alone when there
+ * is none to put a head on.
+ */
+export function arrowPoints(tail: Point, tip: Point, barb: number): Point[] {
+  const len = Math.hypot(tip.x - tail.x, tip.y - tail.y);
+  if (len < 1e-6) return [tail, tip];
+  const ux = (tip.x - tail.x) / len, uy = (tip.y - tail.y) / len;
+  const wing = (s: number) => ({
+    x: tip.x - barb * (ux * Math.cos(0.5) - s * uy * Math.sin(0.5)),
+    y: tip.y - barb * (uy * Math.cos(0.5) + s * ux * Math.sin(0.5)),
+  });
+  return [tail, tip, wing(1), tip, wing(-1)];
 }
 
 /** The clean rep a snapped mark carries, if any. */

@@ -51,8 +51,8 @@
 
 import type { Point } from '../types';
 import type { MMNode } from './nodes';
-import { boundsOf, fingerprintOf, getRep, strokePointsOf } from './nodes';
-import { cleanPointsOf, idealize, snapReading } from './clean';
+import { boundsOf, fingerprintOf, getRep, placed, strokePointsOf } from './nodes';
+import { type CleanShape, cleanOf, idealize, snapReading } from './clean';
 import { getBounds } from '../geometry';
 import { alongSiteOf, portSites, reachOf } from './ports';
 
@@ -109,16 +109,25 @@ export function magnetRadius(sizePx: number, scale = 1): number {
 
 const mid = (a: Point, b: Point): Point => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
 
-/** The outline a mark's sites derive from: the held clean form, else the offered one, else the ink. */
-function formOf(node: MMNode, nodes: ReadonlyMap<string, MMNode>): { shape: string; points: Point[] } | null {
+/**
+ * The outline a mark's sites derive from, where the mark stands: the held
+ * clean form, else the offered one, else the ink. `held` is the clean form
+ * the mark carries, in its own space — a snapped one, or one a hand reshaped
+ * (V1-PLAN E1) — and every site of a held form is read off it, so the sites
+ * follow a reshape as the drawn form does. The offered form is placed as the
+ * ink is: a moved mark offers its sites where it stands, not where it was
+ * drawn.
+ */
+function formOf(node: MMNode, nodes: ReadonlyMap<string, MMNode>): { shape: string; points: Point[]; held: CleanShape | null } | null {
   const fp = fingerprintOf(node);
   const ink = strokePointsOf(node);
   if (!fp || !ink || ink.length < 2) return null;
+  const clean = cleanOf(node);
+  if (clean && clean.points.length >= 2) return { shape: clean.shape, points: placed(node, clean.points), held: clean };
   const reading = snapReading(node, nodes);
-  const held = getRep(node, 'clean') ? cleanPointsOf(node) : undefined;
-  const ideal = held ?? (reading.ok ? idealize(node, reading.shape)?.points : undefined);
-  if (ideal && ideal.length >= 2 && reading.shape) return { shape: reading.shape, points: ideal };
-  return { shape: 'ink', points: ink };
+  const ideal = reading.ok ? idealize(node, reading.shape)?.points : undefined;
+  if (ideal && ideal.length >= 2 && reading.shape) return { shape: reading.shape, points: placed(node, ideal), held: null };
+  return { shape: 'ink', points: ink, held: null };
 }
 
 /**
@@ -139,12 +148,22 @@ export function magnetSites(node: MMNode, nodes: ReadonlyMap<string, MMNode>): M
     out.push({ nodeId: node.id, shape: form.shape, kind, index, point, reasoning: why });
   };
 
+  // A held form's own middle: the box of its outline where it stands. An
+  // offered form's is the ink's box, as it always was.
+  const heldBox = form.held ? getBounds(form.points) : null;
+  const heldCentre = heldBox ? { x: (heldBox.minX + heldBox.maxX) / 2, y: (heldBox.minY + heldBox.maxY) / 2 } : null;
+
   switch (form.shape) {
     case 'line':
     case 'arrow': {
-      const arrow = getRep(node, 'reading:arrow')?.data as { tip?: Point; tail?: Point } | undefined;
-      const tail = form.shape === 'arrow' && arrow?.tail ? arrow.tail : form.points[0];
-      const tip = form.shape === 'arrow' && arrow?.tip ? arrow.tip : form.points[form.points.length - 1];
+      // A held form's ends are its own — the tail its first point, the tip
+      // its second for an arrow (tail, tip, wing, tip, wing), its last for a
+      // line — so they follow a reshape. An offered arrow's are its reading's,
+      // placed where the mark stands.
+      const arrow = form.held ? undefined : (getRep(node, 'reading:arrow')?.data as { tip?: Point; tail?: Point } | undefined);
+      const ends = arrow?.tail && arrow.tip && form.shape === 'arrow' ? placed(node, [arrow.tail, arrow.tip]) : null;
+      const tail = ends ? ends[0] : form.points[0];
+      const tip = ends ? ends[1] : form.held && form.shape === 'arrow' && form.points.length > 1 ? form.points[1] : form.points[form.points.length - 1];
       add('tail', tail, `the ${form.shape}'s tail — where it begins`);
       add('tip', tip, `the ${form.shape}'s tip — where it ends`);
       add('middle', mid(tail, tip), 'halfway along it');
@@ -158,17 +177,22 @@ export function magnetSites(node: MMNode, nodes: ReadonlyMap<string, MMNode>): M
       } else {
         boundsSites(add, b);
       }
-      add('centre', centre, 'the centre of the rectangle');
+      // A held box's centre is where its diagonals cross — turned, leaning or reshaped.
+      add('centre', form.held && v.length === 4 ? mid(v[0], v[2]) : centre, 'the centre of the rectangle');
       break;
     }
     case 'circle': {
-      add('centre', centre, 'the centre of the circle');
+      // A held circle's centre and cardinals are its own, taken where its
+      // form stands — so a reshaped radius moves them, and a turned oval's
+      // lie on it.
+      const own = form.held ? circleSites(node, form.held) : null;
+      add('centre', own ? own[0] : centre, 'the centre of the circle');
       const rx = w / 2, ry = h / 2;
       const cardinals: [string, Point][] = [
-        ['north', { x: centre.x, y: centre.y - ry }],
-        ['east', { x: centre.x + rx, y: centre.y }],
-        ['south', { x: centre.x, y: centre.y + ry }],
-        ['west', { x: centre.x - rx, y: centre.y }],
+        ['north', own ? own[1] : { x: centre.x, y: centre.y - ry }],
+        ['east', own ? own[2] : { x: centre.x + rx, y: centre.y }],
+        ['south', own ? own[3] : { x: centre.x, y: centre.y + ry }],
+        ['west', own ? own[4] : { x: centre.x - rx, y: centre.y }],
       ];
       for (const [name, p] of cardinals) add('cardinal', p, `the ${name} of the circle`);
       break;
@@ -186,11 +210,11 @@ export function magnetSites(node: MMNode, nodes: ReadonlyMap<string, MMNode>): M
     case 'arc': {
       add('tail', form.points[0], 'where the arc begins');
       add('tip', form.points[form.points.length - 1], 'where the arc ends');
-      add('centre', centre, 'the middle of the arc’s span');
+      add('centre', heldCentre ?? centre, 'the middle of the arc’s span');
       break;
     }
     case 'dot':
-      add('point', centre, 'the dot');
+      add('point', heldCentre ?? centre, 'the dot');
       break;
     default:
       // Invariant 5: no confident reading, no pretended shape — the ink's own box.
@@ -202,6 +226,18 @@ export function magnetSites(node: MMNode, nodes: ReadonlyMap<string, MMNode>): M
   // adds its ports after the mark's own sites — nothing at all when none is.
   out.push(...portSites(node, nodes, MAGNET_SCREEN_PX));
   return out;
+}
+
+/**
+ * A held circle's centre, then its north, east, south and west: read off its
+ * own form in its own space (an axis-aligned ellipse there, as `idealize` and
+ * a reshape draw it) and placed where the mark stands.
+ */
+function circleSites(node: MMNode, clean: CleanShape): Point[] {
+  const b = getBounds(clean.points);
+  const cx = (b.minX + b.maxX) / 2, cy = (b.minY + b.maxY) / 2;
+  const rx = (b.maxX - b.minX) / 2, ry = (b.maxY - b.minY) / 2;
+  return placed(node, [{ x: cx, y: cy }, { x: cx, y: cy - ry }, { x: cx + rx, y: cy }, { x: cx, y: cy + ry }, { x: cx - rx, y: cy }]);
 }
 
 /** Corners from the bounds alone — the fallback for unread ink. */
