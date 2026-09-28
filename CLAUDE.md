@@ -237,7 +237,7 @@ any structural change.
 
 | Path | What it is |
 |---|---|
-| `metamedium-core/` | **The canonical engine** (TypeScript, zero deps, tested): geometry, recognition (the shape rung), relations, the diagram rung (`src/diagram/`), notations over it (`src/notations/`: the flowchart), concepts, the no-modes session engine, the layout and graph parsers, maths (`src/maths/`: quantities, expressions, the sheet, dimensions, solving figure by figure, true size and tiled print), the participants — a model's prompts and parsing, the router, the bridge, and **the decision seat** (`src/participants/decide.ts`, tier 1½; under *Tiered LLM Interpretation*) — **the tools** (`src/tools/`: what the field affords, one contract and one registry; under *Tools*) and the LLM transport. New recognition/engine work lands HERE |
+| `metamedium-core/` | **The canonical engine** (TypeScript, zero deps, tested): geometry, recognition (the shape rung), relations, the diagram rung (`src/diagram/`), notations over it (`src/notations/`: the flowchart, and Mermaid out), concepts, the no-modes session engine, the layout and graph parsers, maths (`src/maths/`: quantities, expressions, the sheet, dimensions, solving figure by figure, true size and tiled print), the participants — a model's prompts and parsing, the router, the bridge, and **the decision seat** (`src/participants/decide.ts`, tier 1½; under *Tiered LLM Interpretation*) — **the tools** (`src/tools/`: what the field affords, one contract and one registry; under *Tools*) and the LLM transport. New recognition/engine work lands HERE |
 | `index.html` | **Interactive whitepaper v5** "MetaMedium: AI Beyond Chat" (live on GitHub Pages). Fully on the `brand/` system as of 3 Sept 2026 — its `:root` is `brand/tokens.css` under the names this page already used, so change a value THERE first |
 | `brand/` | **The visual system, one home**: `tokens.css` holds every MetaMedium colour, face, size and figure/diagram token; `styleguide.html` is the living specimen (light paper first, IBM Plex Mono throughout, teal keyword, colour as signal, §11 figures and diagrams, §12 long-form furniture). v1 draft — the whitepaper's **figures** have migrated, the page around them has not; `brand/README.md` carries the four laws, the convergence order, and what applying it to the whitepaper taught the system |
 | `doodle2-canvas.html` | **Flagship demo**: heuristic recognition, spatial graph, library, undo/redo, touch. No LLM. Single-file (~500KB) |
@@ -424,7 +424,9 @@ what a definition is called.
 > `metamedium-core/src/session/measure.ts` — `measure(node, nodes, board?)`, `describeMaths`.
 
 What follows from a reading, as numbers: a circle's centre, radius,
-circumference and area; a rectangle's sides, perimeter and area; a line's
+circumference and area; a rectangle's sides — at whatever angle it stands,
+never its upright bounds, width the side nearer level — perimeter and area,
+and a leaning box's lean (D2); a line's
 length and heading; an arrow's direction; a triangle's angles (acute / right /
 obtuse) and sides; an arc's radius and sweep. Measured from the clean form the
 mark carries or would be offered, so it is the maths of the *shape*, not of the
@@ -506,7 +508,12 @@ ink faint beneath it. **Ink is never replaced**; undo drops the rep. Three rules
   a flowchart's decision turned into a process. Square to the screen within
   the hand's wobble (`SQUARE_UP_DEG`) it is squared up to the bounds the ink
   fills, exactly as before, when those hold it tightly (`BOUNDS_SLACK`), and
-  at its own size when they would grow it. **A bend is not a line**: a line
+  at its own size when they would grow it. **And its lean** (D2): a box
+  whose sides lean past `LEAN_KEPT_DEG`, parallel in pairs
+  (`LEAN_PARALLEL_DEG`), is redrawn as the parallelogram it was drawn as —
+  each side fitted along the ink (`leaningBox`), the tightest such
+  parallelogram holding the ink — so a flowchart's data symbol stays data;
+  as its upright box it was a process. **A bend is not a line**: a line
   is offered only when its ink stands off the straight line through its ends
   no further than a hand's line bows — half of a two-stroke diamond,
   straightened, made the decision a triangle. **An arrow keeps its barb**,
@@ -516,7 +523,7 @@ ink faint beneath it. **Ink is never replaced**; undo drops the rep. Three rules
   since S1, turned boxes (every one drawn clean at its own angle), arcs of
   30°–300°, and **every clean form, drawn again as ink, reads as the shape it
   cleans**. The flowchart bench draws every board clean and reads it again:
-  every decision stays a decision.
+  every decision stays a decision, and every data symbol stays data.
 
 In the surface the offer is a dashed ghost under a qualifying mark **for a
 moment, not forever** (v10 F4): the mark just drawn, for a few seconds,
@@ -1078,6 +1085,27 @@ decision's vertices, a process's edge middles, a terminator's ends and sides
 them in use. The content (names, roles, ports, Mermaid) is `FLOWCHART_TABLE`,
 bound for the `flowchart@1` pack (B3); `flowchart.bench.test.ts` is the
 bench. Derived: nothing enters the log.
+
+**Mermaid out** (V1-PLAN §3, D2; `notations/mermaid.ts`). `toMermaid(reading)`
+says a notation reading as Mermaid text, at tier 1, by the writer its
+notation registered (`registerMermaidWriter`: the flowchart's ships, D4–D6
+add theirs; a notation with none gives null). The flowchart's is `flowchart
+TD`, or `LR` when the flows run across — measured between the centres of the
+symbols each flow joins, with the reason — each symbol in `FLOWCHART_TABLE`'s
+brackets, each flow `-->`, `---` or `<-->` with `|"…"|` for the writing
+beside it. Three rules hold it: **the ids are the marks' own, said safely**
+(`stroke:ada:7` → `stroke_ada_7`, a figure → `figure_6_7`; never a keyword,
+and ids that would say the same take a suffix hashed from their own id, so
+`qwen3:8b` and `qwen3-8b` never meet); **every label is quoted and escaped**
+(`mermaidString`; `unescapeMermaid` is its inverse) — unquoted, `"`, `|`,
+brackets or `(` break the parse, and Mermaid's own preprocessing reads `#…;`,
+`%%` and a backtick; **writing nobody has read is written "(unread
+writing)"**, never invented, its marks listed in `unread` and said in the
+notes. Nodes come in the drawing's reading order and links by the nodes they
+join — never the log's order — so the same drawing says the same text in any
+merge order; `fixtures/flowchart.mermaid.ts` holds the golden every hand of
+D1's bench must export. `ids`/`marks`/`links` map the text back to the marks
+for the surface that renders it (the `mermaid` kind, still to come).
 
 ### Spatial Graph — retired
 
