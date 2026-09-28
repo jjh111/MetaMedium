@@ -20807,6 +20807,11 @@ function anthropicContent(content) {
 }
 var DEFAULT_TIMEOUT_MS = 6e4;
 var LOCAL_TIMEOUT_MS = 3e5;
+var DEFAULT_MAX_TOKENS = 8192;
+var MIN_REPLY_TOKENS = 1024;
+var OPENROUTER_REASONING = { effort: "low" };
+var OPENROUTER_APP = { url: "https://jjh111.github.io/MetaMedium/", title: "MetaMedium" };
+var MODEL_LIST_TIMEOUT_MS = 15e3;
 function providerLabel(config) {
   return config.label ?? `llm:${config.model}`;
 }
@@ -20816,6 +20821,54 @@ function providerLocality(config) {
 function providerTier(config) {
   void config;
   return 2;
+}
+function hostOf(url) {
+  try {
+    return new URL(url).host;
+  } catch {
+    return url.replace(/^[a-z]+:\/\//i, "").split("/")[0];
+  }
+}
+function isOpenRouter(baseUrl) {
+  return /^openrouter\.ai$/i.test(hostOf(baseUrl));
+}
+var NAMED2 = [
+  [/^openrouter\.ai$/i, "OpenRouter"],
+  [/^api\.anthropic\.com$/i, "Anthropic"],
+  [/^api\.openai\.com$/i, "OpenAI"],
+  [/^(localhost|127\.0\.0\.1|\[::1\]):11434$/i, "Ollama"],
+  [/^(localhost|127\.0\.0\.1|\[::1\]):1234$/i, "LM Studio"]
+];
+function whereOf(baseUrl) {
+  const host = hostOf(baseUrl);
+  const named2 = NAMED2.find(([re]) => re.test(host));
+  return named2 ? { name: named2[1], on: "on " + named2[1] } : { name: host, on: "at " + host };
+}
+function modelWords(config) {
+  const title = (config.title || "").trim();
+  if (title) return title.replace(/^[^:]{1,40}:\s+/, "") || title;
+  const id = String(config.model || "").replace(/^~/, "");
+  const tail = id.includes("/") ? id.slice(id.lastIndexOf("/") + 1) : id;
+  return tail.replace(/:/g, " ").trim() || id;
+}
+function countWords(n2) {
+  return String(Math.round(n2)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+}
+function andList(items) {
+  return items.length <= 1 ? items.join("") : items.slice(0, -1).join(", ") + " and " + items[items.length - 1];
+}
+function orList(items) {
+  return items.length <= 1 ? items.join("") : items.slice(0, -1).join(", ") + " or " + items[items.length - 1];
+}
+function waitWords(ms) {
+  return ms < 1e3 ? `${ms} ms` : `${Math.round(ms / 100) / 10} s`;
+}
+function clip(text, n2 = 200) {
+  const t = text.replace(/\s+/g, " ").trim();
+  return t.length > n2 ? t.slice(0, n2 - 1) + "\u2026" : t;
+}
+function redact(text, key2) {
+  return key2 && key2.length >= 6 ? text.split(key2).join("(the key)") : text;
 }
 function withTimeout(ms, external) {
   const ctl = new AbortController();
@@ -20833,7 +20886,93 @@ function withTimeout(ms, external) {
     }
   };
 }
-async function post(url, headers, body, timeoutMs, external) {
+var GLOSS = {
+  400: ["the request was refused", "request"],
+  401: ["bad key", "key"],
+  402: ["no credit", "credit"],
+  403: ["not allowed", "refused"],
+  404: ["no such model, or no such endpoint", "model"],
+  408: ["the provider timed out", "timeout"],
+  413: ["the request is too large", "request"],
+  422: ["the request could not be read", "request"],
+  429: ["rate limited", "rate"],
+  500: ["the provider failed", "server"],
+  502: ["the model's provider failed or is down", "server"],
+  503: ["no provider is available right now", "server"],
+  504: ["the provider timed out", "timeout"],
+  524: ["the provider timed out", "timeout"],
+  529: ["the provider is overloaded", "server"]
+};
+function gloss(status) {
+  return GLOSS[status] ?? (status >= 500 ? ["the provider failed", "server"] : ["refused", "request"]);
+}
+function firstString(...candidates) {
+  for (const c of candidates) if (typeof c === "string" && c.length > 0) return c;
+  return void 0;
+}
+function firstNumber(...candidates) {
+  for (const c of candidates) if (typeof c === "number" && Number.isFinite(c) && c > 0) return c;
+  return void 0;
+}
+function upstream(meta) {
+  if (!meta || typeof meta !== "object") return void 0;
+  const m = meta;
+  let said3;
+  if (typeof m.raw === "string") {
+    try {
+      const r = JSON.parse(m.raw);
+      said3 = firstString(r?.error?.message, typeof r?.error === "string" ? r.error : void 0, r?.message) ?? m.raw;
+    } catch {
+      said3 = m.raw;
+    }
+  } else if (m.raw && typeof m.raw === "object") {
+    said3 = firstString(m.raw.error?.message, m.raw.message);
+  }
+  if (!said3) return void 0;
+  const who = firstString(m.provider_name);
+  return (who ? `${who}: ` : "") + `\u201C${clip(said3)}\u201D`;
+}
+function providerWords(text) {
+  let j = null;
+  try {
+    j = JSON.parse(text);
+  } catch {
+  }
+  if (j && typeof j === "object") {
+    const e = j.error;
+    const message = firstString(typeof e === "string" ? e : e?.message, j.message, typeof j.detail === "string" ? j.detail : j.detail?.message);
+    return { message, also: upstream(e?.metadata) };
+  }
+  const plain = text.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+  return { message: plain || void 0 };
+}
+function httpFailure(status, text, key2) {
+  const [g, reason] = gloss(status);
+  const { message, also } = providerWords(text);
+  const error = `HTTP ${status} \u2014 ${g}` + (message ? `: \u201C${clip(message)}\u201D` : "") + (also ? ` (${also})` : "");
+  return { ok: false, error: redact(error, key2), status, reason };
+}
+function inReplyFailure(e, key2) {
+  const x = e && typeof e === "object" ? e : { message: String(e) };
+  const code = typeof x.code === "number" ? x.code : Number(x.code) || void 0;
+  const [g, reason] = code ? gloss(code) : ["the provider failed", "server"];
+  const message = firstString(x.message);
+  const also = upstream(x.metadata);
+  const error = `the reply was an error${code ? `, code ${code}` : ""} \u2014 ${g}` + (message ? `: \u201C${clip(message)}\u201D` : "") + (also ? ` (${also})` : "");
+  return { ok: false, error: redact(error, key2), reason, ...code ? { status: code } : {} };
+}
+function thrownFailure(err, where, timeoutMs, external, signal) {
+  if (external?.aborted) return { ok: false, error: "cancelled", reason: "cancelled" };
+  if (signal.aborted) return { ok: false, error: `timed out \u2014 no answer from ${where} in ${waitWords(timeoutMs)}`, reason: "timeout" };
+  const msg = err instanceof Error ? err.message : String(err);
+  return {
+    ok: false,
+    error: `could not reach ${where} \u2014 offline, the server is not running, or it does not let this page ask (CORS); the browser does not say which (${msg})`,
+    reason: "network"
+  };
+}
+async function post(url, headers, body, timeoutMs, external, key2) {
+  const where = hostOf(url);
   const { signal, done } = withTimeout(timeoutMs, external);
   try {
     const res = await fetch(url, {
@@ -20842,15 +20981,15 @@ async function post(url, headers, body, timeoutMs, external) {
       body: JSON.stringify(body),
       signal
     });
-    if (!res.ok) {
-      const detail = await res.text().catch(() => "");
-      return { ok: false, error: `HTTP ${res.status}${detail ? `: ${detail.slice(0, 200)}` : ""}` };
+    const text = await res.text();
+    if (!res.ok) return httpFailure(res.status, text, key2);
+    try {
+      return { ok: true, json: JSON.parse(text) };
+    } catch {
+      return { ok: false, error: redact(`${where} answered, but not with JSON: \u201C${clip(text, 120)}\u201D`, key2), reason: "unreadable" };
     }
-    return { ok: true, json: await res.json() };
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    if (external?.aborted) return { ok: false, error: "cancelled" };
-    return { ok: false, error: signal.aborted ? `timed out after ${timeoutMs}ms` : msg };
+    return thrownFailure(err, where, timeoutMs, external, signal);
   } finally {
     done();
   }
@@ -20860,32 +20999,90 @@ function stripThink(text) {
   const open = stripped.search(/<think>/i);
   return (open === -1 ? stripped : stripped.slice(0, open)).trim();
 }
-function firstString(...candidates) {
-  for (const c of candidates) if (typeof c === "string" && c.length > 0) return c;
-  return void 0;
+function contentText(content) {
+  if (typeof content === "string") return content;
+  if (!Array.isArray(content)) return "";
+  return content.map((p) => p && typeof p === "object" && (p.type === "text" || p.type === "output_text") && typeof p.text === "string" ? p.text : "").join("");
+}
+function hasReasoning(m) {
+  if (firstString(m.reasoning, m.reasoning_content, m.thinking)) return true;
+  if (Array.isArray(m.reasoning_details) && m.reasoning_details.length > 0) return true;
+  if (Array.isArray(m.content) && m.content.some((p) => p && typeof p === "object" && (p.type === "thinking" || p.type === "reasoning"))) return true;
+  return false;
+}
+function readOpenAIReply(body, config) {
+  const b = body && typeof body === "object" ? body : {};
+  const who = modelWords(config);
+  if (b.error && !Array.isArray(b.choices)) return inReplyFailure(b.error, config.apiKey);
+  const choice2 = Array.isArray(b.choices) ? b.choices[0] : void 0;
+  if (!choice2 || typeof choice2 !== "object") return { ok: false, error: `${hostOf(config.baseUrl)} answered with no choices \u2014 nothing from ${who}`, reason: "unreadable" };
+  if (choice2.error) return inReplyFailure(choice2.error, config.apiKey);
+  const message = choice2.message && typeof choice2.message === "object" ? choice2.message : {};
+  const finish = firstString(choice2.finish_reason, choice2.native_finish_reason);
+  const content = contentText(message.content);
+  const answer = stripThink(content);
+  if (answer) {
+    return { ok: true, text: answer, model: firstString(b.model) ?? config.model, ...finish === "length" ? { truncated: true } : {} };
+  }
+  if (typeof message.refusal === "string" && message.refusal.trim()) {
+    return { ok: false, error: redact(`${who} declined: \u201C${clip(message.refusal)}\u201D`, config.apiKey), reason: "refused" };
+  }
+  if (finish === "content_filter") return { ok: false, error: `${who}'s answer was withheld by the provider's content filter`, reason: "refused" };
+  const thought = hasReasoning(message) || /<think>/i.test(content);
+  const tokens = typeof b.usage?.completion_tokens === "number" ? b.usage.completion_tokens : void 0;
+  if (thought && finish === "length") {
+    return {
+      ok: false,
+      error: `${who} spent its whole budget thinking \u2014 no answer came back (it stopped at the token limit${tokens ? `, ${countWords(tokens)} tokens` : ""})`,
+      reason: "thinking"
+    };
+  }
+  if (thought) return { ok: false, error: `${who} thought but gave no answer \u2014 only its reasoning came back`, reason: "thinking" };
+  if (finish === "length") return { ok: false, error: `${who} hit the token limit before it wrote anything`, reason: "length" };
+  return { ok: false, error: `${who} answered with nothing`, reason: "empty" };
+}
+function promptTokens(messages) {
+  let chars = 0;
+  let images = 0;
+  for (const m of messages) {
+    if (typeof m.content === "string") chars += m.content.length;
+    else for (const p of m.content) if (p.type === "text") chars += p.text.length;
+    else images++;
+  }
+  return Math.ceil(chars / 3.5) + images * 1e3;
+}
+function maxTokensFor(config, messages) {
+  let n2 = DEFAULT_MAX_TOKENS;
+  if (config.maxOutput && config.maxOutput > 0) n2 = Math.min(n2, config.maxOutput);
+  if (config.contextLength && config.contextLength > 0) {
+    const room = config.contextLength - promptTokens(messages) - 256;
+    n2 = Math.min(n2, Math.max(Math.min(MIN_REPLY_TOKENS, config.contextLength), room));
+  }
+  return Math.max(1, Math.floor(n2));
 }
 async function completeOpenAICompatible(config, messages, timeoutMs, external) {
   const headers = {};
   if (config.apiKey) headers.authorization = `Bearer ${config.apiKey}`;
-  const res = await post(
-    `${config.baseUrl.replace(/\/$/, "")}/chat/completions`,
-    headers,
-    { model: config.model, messages: messages.map((m) => ({ role: m.role, content: openAIContent(m.content) })), stream: false },
-    timeoutMs,
-    external
-  );
+  const body = {
+    model: config.model,
+    messages: messages.map((m) => ({ role: m.role, content: openAIContent(m.content) })),
+    stream: false,
+    max_tokens: maxTokensFor(config, messages)
+  };
+  if (isOpenRouter(config.baseUrl)) {
+    headers["HTTP-Referer"] = OPENROUTER_APP.url;
+    headers["X-Title"] = OPENROUTER_APP.title;
+    body.reasoning = { ...OPENROUTER_REASONING };
+  }
+  const res = await post(`${config.baseUrl.replace(/\/$/, "")}/chat/completions`, headers, body, timeoutMs, external, config.apiKey);
   if (!res.ok) return res;
-  const body = res.json;
-  const raw = firstString(body?.choices?.[0]?.message?.content);
-  if (raw === void 0) return { ok: false, error: "no completion text in response" };
-  const text = stripThink(raw);
-  return { ok: true, text, model: firstString(body.model) ?? config.model };
+  return readOpenAIReply(res.json, config);
 }
 async function completeAnthropic(config, messages, timeoutMs, external) {
-  if (!config.apiKey) return { ok: false, error: "anthropic requires an API key" };
+  if (!config.apiKey) return { ok: false, error: "anthropic requires an API key", reason: "key" };
   const system = messages.filter((m) => m.role === "system").map((m) => textOf3(m.content)).join("\n\n");
   const user = messages.filter((m) => m.role === "user");
-  if (user.length === 0) return { ok: false, error: "no user message" };
+  if (user.length === 0) return { ok: false, error: "no user message", reason: "request" };
   const res = await post(
     `${config.baseUrl.replace(/\/$/, "")}/messages`,
     {
@@ -20902,39 +21099,205 @@ async function completeAnthropic(config, messages, timeoutMs, external) {
       messages: user.map((m) => ({ role: "user", content: anthropicContent(m.content) }))
     },
     timeoutMs,
-    external
+    external,
+    config.apiKey
   );
   if (!res.ok) return res;
   const body = res.json;
+  if (body?.error && !Array.isArray(body.content)) return inReplyFailure(body.error, config.apiKey);
   if (body?.stop_reason === "refusal") {
-    return { ok: false, error: "model declined the request" };
+    return { ok: false, error: "model declined the request", reason: "refused" };
   }
   const text = body?.content?.find((b) => b?.type === "text")?.text;
-  if (typeof text !== "string") return { ok: false, error: "no text block in response" };
-  return { ok: true, text, model: firstString(body.model) ?? config.model };
+  if (typeof text !== "string" || !text.trim()) {
+    const who = modelWords(config);
+    const thought = !!body?.content?.some((b) => b?.type === "thinking" || b?.type === "redacted_thinking");
+    if (thought && body?.stop_reason === "max_tokens") return { ok: false, error: `${who} spent its whole budget thinking \u2014 no answer came back (it stopped at the token limit)`, reason: "thinking" };
+    return { ok: false, error: `${who} answered with no text`, reason: thought ? "thinking" : "empty" };
+  }
+  return { ok: true, text, model: firstString(body.model) ?? config.model, ...body.stop_reason === "max_tokens" ? { truncated: true } : {} };
 }
 async function complete(config, messages, opts = {}) {
   const timeoutMs = config.timeoutMs ?? (providerLocality(config) === "local" ? LOCAL_TIMEOUT_MS : DEFAULT_TIMEOUT_MS);
   try {
     return config.kind === "anthropic" ? await completeAnthropic(config, messages, timeoutMs, opts.signal) : await completeOpenAICompatible(config, messages, timeoutMs, opts.signal);
   } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+    return { ok: false, error: redact(err instanceof Error ? err.message : String(err), config.apiKey), reason: "unreadable" };
+  }
+}
+function stringsOf(v) {
+  return Array.isArray(v) ? v.filter((x) => typeof x === "string") : void 0;
+}
+function inputsOf(x) {
+  const listed = stringsOf(x.architecture?.input_modalities) ?? stringsOf(x.input_modalities) ?? stringsOf(x.modalities?.input);
+  if (listed && listed.length) return listed;
+  const modality = firstString(x.architecture?.modality);
+  if (modality && modality.includes("->")) return modality.split("->")[0].split("+").map((s) => s.trim()).filter(Boolean);
+  return void 0;
+}
+function visionOf(x) {
+  if (x.type === "vlm") return true;
+  if (x.type === "llm") return false;
+  if (Array.isArray(x.capabilities)) {
+    if (x.capabilities.includes("vision")) return true;
+    if (x.capabilities.includes("completion")) return false;
+    return void 0;
+  }
+  if (x.capabilities && typeof x.capabilities === "object" && typeof x.capabilities.vision === "boolean") return x.capabilities.vision;
+  return void 0;
+}
+function parseModelList(body) {
+  const b = body;
+  const rows = Array.isArray(body) ? body : Array.isArray(b?.data) ? b.data : Array.isArray(b?.models) ? b.models : [];
+  const models = [];
+  let describes = false;
+  for (const r of rows) {
+    if (!r || typeof r !== "object") continue;
+    const x = r;
+    const id = firstString(x.id, x.model, x.name);
+    if (!id) continue;
+    const m = { id };
+    const title = firstString(x.id ? x.name : void 0, x.display_name);
+    if (title && title !== id) m.title = title;
+    const inputs = inputsOf(x);
+    if (inputs) m.inputs = inputs;
+    const vision = inputs ? inputs.includes("image") : visionOf(x);
+    if (vision !== void 0) {
+      m.vision = vision;
+      describes = true;
+    }
+    const context = firstNumber(x.context_length, x.top_provider?.context_length, x.max_context_length, x.context_window, x.max_model_len, x.loaded_context_length);
+    if (context) m.contextLength = context;
+    const out = firstNumber(x.top_provider?.max_completion_tokens, x.max_completion_tokens, x.max_output_tokens);
+    if (out) m.maxOutput = out;
+    const parameters = stringsOf(x.supported_parameters);
+    if (parameters) {
+      m.parameters = parameters;
+      m.reasons = parameters.includes("reasoning") || parameters.includes("include_reasoning");
+    } else if (Array.isArray(x.capabilities) && x.capabilities.includes("thinking")) {
+      m.reasons = true;
+    }
+    models.push(m);
+  }
+  return { models, describes };
+}
+async function readModels(config, opts = {}) {
+  const url = `${config.baseUrl.replace(/\/$/, "")}/models`;
+  const where = hostOf(url);
+  const timeoutMs = opts.timeoutMs ?? MODEL_LIST_TIMEOUT_MS;
+  const headers = {};
+  if (config.apiKey && !isOpenRouter(config.baseUrl)) headers.authorization = `Bearer ${config.apiKey}`;
+  const { signal, done } = withTimeout(timeoutMs, opts.signal);
+  const failed = (f) => ({ ok: false, models: [], describes: false, error: f.error, ...f.reason ? { reason: f.reason } : {} });
+  try {
+    const res = await fetch(url, { headers, signal });
+    const text = await res.text();
+    if (!res.ok) return failed(httpFailure(res.status, text, config.apiKey));
+    let json;
+    try {
+      json = JSON.parse(text);
+    } catch {
+      return failed({ ok: false, error: `${where} answered, but not with a list of models`, reason: "unreadable" });
+    }
+    const { models, describes } = parseModelList(json);
+    return { ok: true, models, describes };
+  } catch (err) {
+    return failed(thrownFailure(err, where, timeoutMs, opts.signal, signal));
+  } finally {
+    done();
   }
 }
 async function listModels(config) {
-  const headers = {};
-  if (config.apiKey) headers.authorization = `Bearer ${config.apiKey}`;
-  try {
-    const { signal, done } = withTimeout(5e3);
-    const res = await fetch(`${config.baseUrl.replace(/\/$/, "")}/models`, { headers, signal });
-    done();
-    if (!res.ok) return { ok: false, models: [], error: `HTTP ${res.status}` };
-    const body = await res.json();
-    const models = (body?.data ?? []).map((m) => m?.id).filter((id) => typeof id === "string").sort();
-    return { ok: true, models };
-  } catch (err) {
-    return { ok: false, models: [], error: err instanceof Error ? err.message : String(err) };
+  const c = await readModels(config, { timeoutMs: 5e3 });
+  return c.ok ? { ok: true, models: c.models.map((m) => m.id).sort() } : { ok: false, models: [], error: c.error };
+}
+function idWords(id) {
+  return id.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+}
+function editDistance(a, b) {
+  const prev = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    let diag = prev[0];
+    prev[0] = i;
+    for (let j = 1; j <= b.length; j++) {
+      const up = prev[j];
+      prev[j] = Math.min(prev[j] + 1, prev[j - 1] + 1, diag + (a[i - 1] === b[j - 1] ? 0 : 1));
+      diag = up;
+    }
   }
+  return prev[b.length];
+}
+function nearestModelIds(id, ids, n2 = 3) {
+  const want = idWords(id);
+  if (!want.length) return [];
+  const flat = want.join("");
+  return ids.map((cand, order2) => {
+    const have = idWords(cand);
+    let held2 = 0;
+    for (const w2 of want) {
+      if (have.includes(w2)) held2 += 1;
+      else if (w2.length >= 3 && have.some((h2) => h2.length >= 3 && (h2.startsWith(w2) || w2.startsWith(h2) || editDistance(h2, w2) <= 1))) held2 += 0.75;
+    }
+    const extra = have.filter((h2) => !want.includes(h2)).length;
+    return { cand, order: order2, held: held2, extra, edits: editDistance(flat, have.join("")) };
+  }).filter((s) => s.held >= Math.max(1, want.length / 2)).sort((a, b) => b.held - a.held || a.extra - b.extra || a.edits - b.edits || a.order - b.order).slice(0, n2).map((s) => s.cand);
+}
+function guessVision(model) {
+  return /claude|gpt-4o|gpt-4\.1|gpt-5|gemini|qwen3\.5|qwen.*vl|vision|pixtral|llava|glm-[\d.]+v\b|[-_.]vl\b|vlm/i.test(model);
+}
+function modelFacts(id, catalog, where, remembered) {
+  const fallback = (why, title) => {
+    if (remembered && typeof remembered.vision === "boolean") {
+      const vision2 = remembered.vision;
+      return {
+        ok: true,
+        facts: {
+          vision: vision2,
+          from: "remembered",
+          said: `${why} \u2014 ${vision2 ? "it sees" : "it reads text only"}, as its provider said when it last joined`,
+          because: `as its provider said when it last joined; ${why}`,
+          ...title ?? remembered.title ? { title: title ?? remembered.title } : {}
+        }
+      };
+    }
+    const vision = guessVision(id);
+    return {
+      ok: true,
+      facts: {
+        vision,
+        from: "id",
+        said: `${why} \u2014 ${vision ? "it sees" : "it reads text only"}, guessed from its id`,
+        because: `guessed from its id; ${why}`,
+        ...title ? { title } : {}
+      }
+    };
+  };
+  if (!catalog.ok) return fallback(`${where.name}'s model list could not be read (${catalog.error ?? "no answer"})`);
+  const m = catalog.models.find((x) => x.id === id);
+  if (!m) {
+    const near = nearestModelIds(id, catalog.models.map((x) => x.id));
+    return {
+      ok: false,
+      near,
+      error: `no model called ${id} ${where.on}` + (near.length ? ` \u2014 did you mean ${orList(near)}?` : ` \u2014 it lists ${catalog.models.length} model${catalog.models.length === 1 ? "" : "s"}, none like it`)
+    };
+  }
+  if (m.vision === void 0) return fallback(`${where.name} lists ${id} but does not say what it takes`, m.title);
+  const words = modelWords({ model: m.id, title: m.title });
+  const sees = m.vision ? "it sees" : "it reads text only";
+  const context = m.contextLength ? `; ${countWords(m.contextLength)} tokens of context` : "";
+  const facts = {
+    vision: m.vision,
+    from: "provider",
+    said: m.inputs ? `${where.name} says ${words} takes ${andList(m.inputs)} \u2014 ${sees}${context}` : `${where.name} says ${words} ${m.vision ? "sees" : "reads text only"}${context}`,
+    because: m.inputs ? `${where.name} says it takes ${andList(m.inputs)}` : `${where.name} says ${m.vision ? "it sees" : "it reads text only"}`
+  };
+  if (m.title) facts.title = m.title;
+  if (m.inputs) facts.inputs = m.inputs;
+  if (m.contextLength) facts.contextLength = m.contextLength;
+  if (m.maxOutput) facts.maxOutput = m.maxOutput;
+  if (m.reasons !== void 0) facts.reasons = m.reasons;
+  return { ok: true, facts };
 }
 
 // src/parse/plan.ts
@@ -23900,6 +24263,7 @@ export {
   DEFAULT_FILE_LIMIT,
   DEFAULT_GESTURE_CONFIG,
   DEFAULT_MAX_FORCE,
+  DEFAULT_MAX_TOKENS,
   DEFAULT_MIN_LENGTH_PX,
   DEFAULT_RELATE_CONFIG,
   DEFAULT_SESSION_CONFIG,
@@ -23978,7 +24342,9 @@ export {
   MIN_CONFIDENCE,
   MIN_DASHES,
   MIN_EXTENT_PX,
+  MIN_REPLY_TOKENS,
   MODEL_DISCOUNT,
+  MODEL_LIST_TIMEOUT_MS,
   MarkGrid,
   MemoryStore,
   NAMING_IS,
@@ -23987,6 +24353,8 @@ export {
   NO_CONTEXT,
   NO_MATCH,
   ONE_BEND,
+  OPENROUTER_APP,
+  OPENROUTER_REASONING,
   OUTLINE_PATH,
   PACK_HEADS,
   PACK_ID,
@@ -24199,6 +24567,7 @@ export {
   getFingerprint,
   getRep,
   getTool,
+  guessVision,
   handLabel,
   handLike,
   handlesOf,
@@ -24225,6 +24594,7 @@ export {
   isGesture,
   isLassoLike,
   isLetterLike,
+  isOpenRouter,
   isPackDefinition,
   isParticipant,
   isRange,
@@ -24270,6 +24640,7 @@ export {
   matchDefinition,
   matchPrimitiveFromLibrary,
   matchesCommandMark,
+  maxTokensFor,
   mayCross,
   measure,
   memberKind,
@@ -24279,10 +24650,13 @@ export {
   mermaidReaders,
   mermaidString,
   mermaidWriters,
+  modelFacts,
+  modelWords,
   movesWhole,
   nameMarks,
   nearLimitOf,
   nearestMagnet,
+  nearestModelIds,
   nearnessOf,
   negateQuantity,
   nodeIdsIn,
@@ -24317,6 +24691,7 @@ export {
   parseGraph,
   parseLayout,
   parseLine,
+  parseModelList,
   parsePackRef,
   parseProgram,
   parseQuantity,
@@ -24345,6 +24720,7 @@ export {
   readFlowchart,
   readFlowchartText,
   readMermaid,
+  readModels,
   readNumber,
   readSequence,
   readSequenceText,
@@ -24451,6 +24827,7 @@ export {
   validatePack,
   validateRegions,
   wallBoxes,
+  whereOf,
   whoseInk,
   whyNotResolved,
   withParams,

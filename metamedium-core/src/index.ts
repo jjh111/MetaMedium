@@ -637,8 +637,8 @@ export type { Interpretation, InterpretationGroup, Disagreement } from './sessio
 export {
   complete, listModels, providerLabel, providerTier, providerLocality, stripThink, textOf, PRESETS, DEFAULT_TIMEOUT_MS, LOCAL_TIMEOUT_MS,
   // What a provider says a model can do, how a reply is budgeted, and a model's name in words (V1-PLAN J5).
-  readModels, parseModelList, modelFacts, nearestModelIds, guessVision, whereOf, modelWords, maxTokensFor,
-  DEFAULT_MAX_TOKENS, OPENROUTER_REASONING, OPENROUTER_APP, MODEL_LIST_TIMEOUT_MS,
+  readModels, parseModelList, modelFacts, nearestModelIds, guessVision, whereOf, isOpenRouter, modelWords, maxTokensFor,
+  DEFAULT_MAX_TOKENS, MIN_REPLY_TOKENS, OPENROUTER_REASONING, OPENROUTER_APP, MODEL_LIST_TIMEOUT_MS,
 } from './llm/provider';
 export type { ProviderConfig, ProviderKind, ChatMessage, ContentPart, CompletionResult, ModelList, Locality, FailureReason, ModelInfo, ModelCatalog, ModelFacts } from './llm/provider';
 
