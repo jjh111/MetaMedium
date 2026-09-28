@@ -48,6 +48,7 @@
       snapOffers = snapMode === 'off' ? new Map() : new Map(session.snapCandidates().map((c) => [c.id, c]));
       heldCandidates = heldEnclosed(s).filter((id) => snapOffers.has(id));
       offersKey = paintReference ? null : key;
+      warmMagnets();
     }
     // A held loop scopes the tile: what you circled, not everything.
     if (ccOpen()) syncTiles();
@@ -121,6 +122,17 @@
     sites.forEach((site, i) => { xs[i] = site.point.x; ys[i] = site.point.y; });
     magnetSitesAt = { key: key, sites: sites, xs: xs, ys: ys, byNode: byNode };
     return magnetSitesAt;
+  }
+  // …and read ahead: when the log has changed, the sites are read again while
+  // the page is idle, so the pen that comes down next finds them ready — the
+  // first reading of a big board's sites is tens of milliseconds, and a hand
+  // would feel it at pen-down.
+  let magnetsWarming = false;
+  function warmMagnets() {
+    if (magnetsWarming || magnetSitesAt.key === logKey()) return;
+    magnetsWarming = true;
+    const go = () => { magnetsWarming = false; if (!live) sitesNow(); };
+    if (window.requestIdleCallback) requestIdleCallback(go, { timeout: 2000 }); else setTimeout(go, 200);
   }
   /** The nearest site to a world point within the hand's radius, or null. */
   function magnetQuery(w) {

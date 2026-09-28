@@ -427,7 +427,7 @@ async function runBudgets(browser, servers, engineName) {
           measured.budgets2000 = Object.fromEntries(verdict.map((b) => [b.key, b.value === null ? null : +b.value.toFixed(1)]));
           for (const b of verdict) {
             check(`${name(b)}: ${fmt(b.value)} ${b.ok ? '≤' : '>'} ${fmt(b.max)}${b.said ? ' (' + b.said + ')' : ''}`, b.ok,
-              { value: b.value, max: b.max, calibrationMs: measured.calibrationMs, readings: r.draw.readings, drawn: r.draw.drawn });
+              { value: b.value, max: b.max, calibrationMs: measured.calibrationMs, releases: r.strokes.map((x) => Math.round(x.upToFrame)), handlers: r.strokes.map((x) => Math.round(x.up)), readings: r.draw.readings, drawn: r.draw.drawn });
           }
           // The reading drawn under each box is the box's: the release was read, not skipped.
           check('R4c. each box drawn on the 2,000-mark board has its reading drawn under it, the moment it is released (a box round marks is a loop that waits, and has none)',
