@@ -469,11 +469,26 @@ async function seatCases() {
     const wordNode = session.getState().nodes.get(word);
     check('the transcript lands on the word, attributed to the seat', got2.ok && MM.transcriptOf(wordNode) === 'hello', { got: got2, transcripts: MM.transcriptsOf(wordNode) });
 
+    // ---- A question, answered in prose, lands as the seat's own card ----
+    const asked = seat.ask('why are these one thing?', [boxA, boxB], Date.now());
+    const kq = seat.waiting()[0];
+    const pq = await pendingText((t) => kq && t.includes(kq.key));
+    await until(() => watchLines.length >= 3, 4000);
+    const notProse = await call('canvas_answer', { key: kq ? kq.key : '', reply: { answer: 'they touch' } });
+    await call('canvas_answer', { key: kq ? kq.key : '', reply: 'They are one size and sit on one band, a gap apart.' });
+    const gotQ = await settled(asked);
+    const card = gotQ.ok && session.getState().nodes.get(gotQ.explanationId);
+    const cardData = card && MM.explanationOf(card);
+    check('ask: is parked as a question and answered in prose — an object refused first — and lands as the seat\'s own card beside the boxes',
+      !!kq && /ask: why are these one thing\?/.test(pq) && /in prose/.test(textOf(notProse)) && gotQ.ok && !!cardData && cardData.text === 'They are one size and sit on one band, a gap apart.'
+        && card.edges.some((e) => e.rel === 'made-by' && e.to === seat.id) && !MM.isSeatTraffic(card, session.getState().nodes),
+      { pending: pq.slice(0, 200), notProse: textOf(notProse), got: gotQ });
+
     // ---- A refusal is said ----
     const third = seat.interpret([boxA, boxB], Date.now());
     const k3 = seat.waiting()[0];
     await pendingText((t) => k3 && t.includes(k3.key));
-    await until(() => watchLines.length >= 3, 4000);
+    await until(() => watchLines.length >= 4, 4000);
     const edgesBefore = session.getState().nodes.get(boxA).edges.length;
     const ref = await call('canvas_answer', { key: k3 ? k3.key : '', refuse: 'two boxes are not enough to say what they are' });
     const got3 = await settled(third);
@@ -486,7 +501,7 @@ async function seatCases() {
     const k4 = seat.waiting()[0];
     await pendingText((t) => k4 && t.includes(k4.key));
     // Heard by the watcher before it is withdrawn, so its line is not a race.
-    await until(() => watchLines.length >= 4, 4000);
+    await until(() => watchLines.length >= 5, 4000);
     const cancelled = !!k4 && seat.cancel(k4.key, 'stopped');
     const got4 = await settled(fourth, 3000);
     await wait(300);
@@ -495,7 +510,7 @@ async function seatCases() {
       { cancelled, got: got4, pending: p4.slice(0, 200) });
 
     await wait(400);
-    check('the watcher printed one line per brief parked — four — and nothing else', watchLines.length === 4 && watchLines.every((l) => /^brief \S+ · /.test(l)) && new Set(watchLines.map((l) => l.split(' ')[1])).size === 4, watchLines);
+    check('the watcher printed one line per brief parked — five — and nothing else', watchLines.length === 5 && watchLines.every((l) => /^brief \S+ · /.test(l)) && new Set(watchLines.map((l) => l.split(' ')[1])).size === 5, watchLines);
   } finally {
     seat.leave();
     store.close();

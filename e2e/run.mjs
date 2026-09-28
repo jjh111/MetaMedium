@@ -341,6 +341,8 @@ async function runSmoke(browser, servers) {
  * their own — each with the gate's guards — because a board kept by the
  * browser is only tested by closing the page that kept it and opening
  * another, and an app that opens offline only by taking its server away.
+ * The seat (J4; `seat.mjs`) is one of them too: it brings its own relay and
+ * the MCP hand that answers, and reloads its page.
  */
 const OWN_PAGES = { keep: runKeep, big: runBig, boards: runBoards, app: runApp, pencil: runPencil, seat: runSeat };
 const OWN_URL = { app: 'app/', seat: 'Demos/session-engine.html?live=claude&relay=…' };

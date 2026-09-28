@@ -253,7 +253,7 @@ suite and the gate green, `master` fast-forwarded and pushed.
 | **2. Editing** — ✅ done, 28 Sep | E1 handles · E2 bindings follow · E3 ports, heads and figures | a selected mark reshapes by its points; bound arrows follow; notations can declare ports |
 | **3. Diagrams** — core of D1–D4 and D5's sequence half built, 28 Sep; the surfaces next | D1 flowchart · S1 the shape rung holds a diamond, an L and a wide arc · W1 drawing never destroys what it connects · S2 an arrow read where its ink points · D2 Mermaid out · D3 Mermaid in · D4 UML class · D5 sequence and state · D6 ER and mind map · D7 routing · D8 the repair demo | A1–A3 pass in the gate |
 | **4. Maths** ∥ after B1 | M1 quantities and expressions · M2 the sheet · M3 figures and dimensions · M4 solving · M5 maths on the board · M6 the garment pack · M7 true size and print | A4 passes in the gate |
-| **5. Seats** ∥ | J1 decide on the canvas · J2 extraction, a spike · J3 numerals, an experiment | the seat is measured on fixtures; the spike and the experiment say yes or not yet, with numbers |
+| **5. Seats** ∥ | J1 decide on the canvas · J2 extraction, a spike · J3 numerals, an experiment · J4 Claude Code is the canvas's seat (28 Sep) | the seat is measured on fixtures; the spike and the experiment say yes or not yet, with numbers; What is this? and Read the writing reach the Claude Code session and come back |
 | **6. Ready for use** | R1 boards · R2 the log format · R3 no lost work · R4 performance · R5 first run · R6 pencil and WebKit · R7 deploy and release · R8 one platform · R9 the shard alongside | A8–A10 pass; budgets met |
 | **7. Review and release** | H1 the hand in the gate and QA-v1 · V1 the review of use · V2 its fixes · V3 the whitepaper's v1 figures · V4 v1.0.0 | §11 |
 
@@ -1826,6 +1826,40 @@ extraction waits for a better model or a fine-tune. Unported and worth a
 look: the export's classification head, a possible *local* answer to
 decide's Choice questions. `gliner-seat/README.md` has every number and the
 command that produced it.
+
+**J4 status, 28 Sep 2026: built on `w2-shard` — Claude Code is the canvas's
+seat** (`663c887`, red first: the gate's `seat` scenario and the smoke's seat
+cases, committed failing; then the core, the hand, the surface, and the
+commits carrying this line). John asked whether *Read the writing* and *What
+is this?* could come straight back to the Claude Code session over MCP instead
+of going out to an HTTP endpoint; the shard's G5 had answered it for 3D, and
+this is the canvas's answer, in core (`participants/seat.ts`).
+`createSeatParticipant` is an agent participant whose injected transport parks
+each question in the live room as a brief — an answer whose question is
+`brief`, carrying what was asked, the contract and the question, never a
+picture — and settles it with the reply whose question is the brief node's own
+id (L2a): the same prompts, the same parsers, the same propose channel; a
+refusal said, *claude would not: …*; a brief given up on (Esc, *withdraw*, ten
+minutes) taken back, undone while it is still this hand's last act, erased
+after. A hand that answers at the seat says so on every line of its own and
+beats while it waits (`LiveStore`: `seat`, `here()`), so the page knows Claude
+is in the room. The page (`24-seat.js`; one hook in `04-models.js`, `join`
+taking a made participant): the models pane leads with *Claude Code — in this
+room*, one tap, or a sentence saying what to do; the Live pane's *with Claude*
+is the room and the seat in one act and says *Claude is here and will read for
+you*; the seat is the reader while seated; the door moved under *advanced*.
+The hand (`Demos/mcp.mjs`): `canvas_pending` — the brief, its marks with their
+ids, the contract, and for a read the ink as a PNG — and `canvas_answer`,
+checked with the page's own parser before anything is sent;
+`Demos/seat-watch.mjs`, a silent reader, prints one line per brief parked, the
+line a session's Monitor wakes on. `node e2e/run.mjs seat`: 12 records
+(J4.0–J4.8), in the default run; the smoke 61 checks, *What is this?*, *Read
+the writing* and `ask:` among them; core 1668 tests. Found on the way: the
+old *with Claude* overwrote a relay typed in the Live pane with `:8020` — the
+first red run joined the room a relay of this machine carries there — so the
+scenario refuses and counts any request to `:8020` (J4.8). Owed: the shard's seat still keeps its own copy of the brief's rules
+(`shard-3d/src/room.ts`), and the reader's preference for the seat meets J5's
+reader choice in `06-handwriting.js` when the two lanes merge.
 
 ### Phase 6 — ready for use
 **R1 Boards.** A boards list in browser storage; `?board=`; the existing

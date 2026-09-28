@@ -3,7 +3,7 @@
 //   view, theme, hand, auto-read, folder, import, export, models, teach, live, reset, help, boards, packs);
 //   syncTiles() writes every tile's face from state; openPane/closePanes keep one pane open at a time.
 // Uses: core (prefs, themeMode, hand, draws), hand (handFace, nextHand), input (palmHere), snap (snapMode), folder (viewMode, folder; the boards adapter:
-//   boardOnScreenName, resetBoard), models (agents), teach (teachPanel), handwriting (autoRead), packs (packsFace); the page's
+//   boardOnScreenName, resetBoard), models (agents), teach (teachPanel), handwriting (autoRead), packs (packsFace), seat (withClaude); the page's
 //   version from its <meta name="metamedium-version"> (V1-PLAN R7), said at the head of the help pane.
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () { ... })();`. Shared state is the

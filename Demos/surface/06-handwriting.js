@@ -1,6 +1,6 @@
 // ===== handwriting =====
 // Provides: handwriting: inkImage, isWriting, isRead, readOne, readLine (a line of writing as one image), readWriting; the auto-read preference (off by default).
-// Uses: core (prefs), models (agents, withWork), render, input (say).
+// Uses: core (prefs), models (agents, withWork), render, input (say), seat (isSeatAgent: the seat reads while seated).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () Ellipsis)();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.

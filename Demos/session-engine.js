@@ -1881,7 +1881,7 @@
 
 // ===== handwriting =====
 // Provides: handwriting: inkImage, isWriting, isRead, readOne, readLine (a line of writing as one image), readWriting; the auto-read preference (off by default).
-// Uses: core (prefs), models (agents, withWork), render, input (say).
+// Uses: core (prefs), models (agents, withWork), render, input (say), seat (isSeatAgent: the seat reads while seated).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () Ellipsis)();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -7824,7 +7824,7 @@
 // Uses: core, board (createJournal, openPlan, troubleOf, troubleWords, journalEvents, journalFold,
 //   journalText), boards (the list's pure half), view (fitAll, afterViewChange, clampZoom), teach
 //   (savedMark, restoreMark), artifacts, render, input (say, flash), images (downloadText), controls
-//   (syncTiles), the boards pane (renderBoardsPane).
+//   (syncTiles), the boards pane (renderBoardsPane), the seat (seatRoomOpened: who is heard in a room).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () { ... })();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -9800,7 +9800,7 @@
 //   view, theme, hand, auto-read, folder, import, export, models, teach, live, reset, help, boards, packs);
 //   syncTiles() writes every tile's face from state; openPane/closePanes keep one pane open at a time.
 // Uses: core (prefs, themeMode, hand, draws), hand (handFace, nextHand), input (palmHere), snap (snapMode), folder (viewMode, folder; the boards adapter:
-//   boardOnScreenName, resetBoard), models (agents), teach (teachPanel), handwriting (autoRead), packs (packsFace); the page's
+//   boardOnScreenName, resetBoard), models (agents), teach (teachPanel), handwriting (autoRead), packs (packsFace), seat (withClaude); the page's
 //   version from its <meta name="metamedium-version"> (V1-PLAN R7), said at the head of the help pane.
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () { ... })();`. Shared state is the

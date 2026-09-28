@@ -463,6 +463,10 @@ async function answer(args) {
   if (wire.error) return { text: wire.error + ' — nothing was sent' };
   const refused = MM.refusalOf(wire.text);
   const c = CONTRACTS[held.ask];
+  // A question is answered in prose: an object would reach the page as its JSON, and be placed as the answer.
+  if (refused === null && held.ask === 'ask' && typeof args.reply !== 'string') {
+    return { text: 'a question is answered in prose — pass "reply" as a string; nothing was sent, and brief ' + key + ' still waits' };
+  }
   if (refused === null && c && !c.parse(wire.text)) {
     return { text: 'the page would read nothing from that: for “' + held.asked + '” it reads ' + c.shape + ' — nothing was sent, and brief ' + key + ' still waits' };
   }
