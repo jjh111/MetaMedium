@@ -873,6 +873,16 @@ smoke and the shard's (605 in 31 files, typecheck clean) pass; the gate 464
 passed and the one honest skip (canvas 268, keep 31, boards 19; shard 123 + 11
 + 12); WebKit smoke 4.
 
+**R4e a brief carries what it is about — status, 27 Sep 2026: met by R4b.**
+The budget (a model brief for five marks on the 2,000-mark board ≤ 4 KB) holds
+at 2 KB since R4b stored only the relations within reach — what a brief lists
+shrank with what is stored (`PERF.md`, the budgets' table). No separate
+scoping was needed; revisit only if a larger brief shows otherwise.
+
+**Phase 0b — status, 27 Sep 2026: done** (R3, R4b, R4c, R4d; R4e met by R4b;
+R1 and R7 landed with it). Gate on the merged tip `d75cc6f`: 520 records and
+the one honest skip across eight scenarios; core 1,091; shard 605; WebKit 4.
+
 ### Phase 1 — the backbone
 **B1 Tools.** *Owns* `metamedium-core/src/tools/` (the contract, the
 registry, adapters for today's tier-1 modules and concept conversions),
