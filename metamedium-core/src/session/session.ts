@@ -3066,12 +3066,13 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     const scale = strokeScaleOf(n);
     const touch = HAND_RESOLUTION_PX * scale;
     const nSize = sizeOfBounds(nb);
-    // The closed marks this connector stands inside: a line in one of them is the box's, not connected.
-    const holders = reach.query(nb).filter((id) => {
+    // The closed marks this connector stands inside, asked for once a line is met: a line in one of them is the box's, not connected.
+    let held: string[] | undefined;
+    const holders = () => (held ??= reach.query(nb).filter((id) => {
       const h = nodes.get(id)!;
       const hb = boundsOf(h);
       return id !== n.id && !!hb && boundsContain(hb, nb) && (artifacts.includes(id) || (standsClosed(h) ?? false)) && nonWriting(h);
-    });
+    }));
     const meets = { closed: false, open: [false, false] };
     ends.forEach((e, k) => {
       for (const id of reach.around(e.point, (cell) => magnetRadius(cell, scale))) {
@@ -3083,7 +3084,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
         const r = magnetRadius(closed ? sizeOfBounds(mb) : Math.min(nSize, sizeOfBounds(mb)), scale);
         if (distancePointToBounds(e.point, mb) > r) continue;
         if (closed && boundsContain(mb, nb)) continue;
-        if (!closed && holders.some((h) => boundsContain(boundsOf(nodes.get(h)!)!, mb))) continue;
+        if (!closed && holders().some((h) => boundsContain(boundsOf(nodes.get(h)!)!, mb))) continue;
         // Where it arrives: the nearest of the mark's ink and sites.
         let q: Point | null = null, d = Infinity;
         for (const [pts, c] of inkPathsOf(m)) {
@@ -3234,14 +3235,15 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     if (isWord(prev)) {
       const letters = lettersOf(prev);
       const last = nodes.get(letters[letters.length - 1])!;
-      if (oneDrawing(last, node)) {
+      const lastAt = (getRep(last, 'stroke')?.data as { at: number }).at;
+      // Drawn right after the word's last letter, this stroke may show that
+      // letter was never one: the other half of its figure, or its head.
+      if (at - lastAt <= WORD_WINDOW_MS && oneDrawing(last, node)) {
         releaseLetters(prev, [last.id], node.id);
         return false;
       }
-      if (connectorNotLetter(node, letters)) return false;
-      const lastAt = (getRep(last, 'stroke')?.data as { at: number }).at;
       const j = joinsRun({ bounds: boundsOf(prev)!, lastAt }, letter, scale);
-      if (!j.ok) return false;
+      if (!j.ok || connectorNotLetter(node, letters)) return false;
       letters.push(node.id);
       setWordReps(prev, letters);
       node.edges.push({ to: prev.id, rel: 'part-of', reasoning: j.reasoning });
@@ -3254,6 +3256,8 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     // Two confident shapes side by side are a drawing. A word needs a letter
     // the rung could not read as a shape — in this stroke or the one before.
     if (shapeAlone(node) && shapeAlone(prev)) return false;
+    const j = joinsRun({ bounds: first.bounds, lastAt: first.at }, letter, scale);
+    if (!j.ok) return false;
     // Nor is a stroke that is drawing a letter: halves of a figure, a head and
     // its connector — this stroke and the one before, or that one and the one
     // before it — and a connector (W1).
@@ -3261,8 +3265,6 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     const before = behind(1);
     if (before && oneDrawing(nodes.get(before)!, prev)) return false;
     if (connectorNotLetter(node, [prevId]) || connectorNotLetter(prev, [node.id])) return false;
-    const j = joinsRun({ bounds: first.bounds, lastAt: first.at }, letter, scale);
-    if (!j.ok) return false;
 
     // Gather back: the letters this hand wrote just before these two, while
     // each still sits on the run's line and came within the window of the
@@ -3274,11 +3276,11 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       if (!id) break;
       const cand = letterCandidate(id, scale);
       if (!cand) break;
+      const back = joinsRun({ bounds, lastAt: cand.at }, { bounds: cand.bounds, at: run[0].at }, cand.scale);
+      if (!back.ok) break;
       const earlier = behind(k + 1);
       if (earlier && oneDrawing(nodes.get(earlier)!, cand.node)) break;
       if (connectorNotLetter(cand.node, [...run.map((r) => r.node.id), node.id])) break;
-      const back = joinsRun({ bounds, lastAt: cand.at }, { bounds: cand.bounds, at: run[0].at }, cand.scale);
-      if (!back.ok) break;
       run.unshift(cand);
       bounds = { minX: Math.min(bounds.minX, cand.bounds.minX), minY: Math.min(bounds.minY, cand.bounds.minY), maxX: Math.max(bounds.maxX, cand.bounds.maxX), maxY: Math.max(bounds.maxY, cand.bounds.maxY) };
     }
