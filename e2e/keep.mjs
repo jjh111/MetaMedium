@@ -9,12 +9,14 @@
 //   now and then, and the page is closed ABRUPTLY at a random point — the
 //   renderer crashed (Chromium's `Page.crash`, no pagehide, nothing flushed)
 //   or the tab closed (`page.close`, pagehide and nothing else) — right after
-//   a stroke's release, halfway through a stroke, right after an undo, or a
-//   moment after the last act. The board is opened again in a new tab and
-//   must hold EVERY stroke whose release the page had taken, in order, and
-//   nothing undone. Several cycles, each killing at its own point, on one
-//   board that grows across them; the seed is printed, so a failure can be
-//   run again exactly (`E2E_KEEP_SEED`).
+//   a stroke's release, halfway through a stroke, right after an undo, a
+//   moment after the last act, right after a board switch or in the middle of
+//   one (R1: two boards, switched through the boards pane mid-session). The
+//   page is opened again in a new tab and BOTH boards must hold EVERY stroke
+//   whose release the page had taken, in order, and nothing undone. Several
+//   cycles, each killing at its own point, on boards that grow across them;
+//   the seed is printed, so a failure can be run again exactly
+//   (`E2E_KEEP_SEED`).
 //
 //   NEVER SILENT. A save that fails is said at once in the status line, in
 //   plain words, with the way out offered — export the log, open a folder —
@@ -33,7 +35,7 @@
 const DEFAULT_CYCLES = 10;
 
 /** mulberry32: a seeded stream, so a failing run can be run again exactly. */
-function rng(seed) {
+export function rng(seed) {
   let a = seed >>> 0;
   return () => {
     a = (a + 0x6d2b79f5) >>> 0;
@@ -42,14 +44,14 @@ function rng(seed) {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 }
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // The ground boxes are drawn on: clear of the panel (left), the bar (top),
 // the minimap (bottom right) and the status line — one box a cell, so no box
 // ever crosses another (a crossing could be read as a scratch and erase it).
-const GRID = { x0: 470, y0: 140, w: 100, h: 80, cols: 7, rows: 7 };
+export const GRID = { x0: 470, y0: 140, w: 100, h: 80, cols: 7, rows: 7 };
 
-function cellBox(i, rand) {
+export function cellBox(i, rand) {
   const col = i % GRID.cols, row = Math.floor(i / GRID.cols) % GRID.rows;
   const w = 36 + Math.round(rand() * 24), h = 26 + Math.round(rand() * 22);
   const x = GRID.x0 + col * GRID.w + 10 + Math.round(rand() * (GRID.w - 20 - w));
@@ -62,7 +64,7 @@ function cellBox(i, rand) {
  * short of closing. Six moves an edge — Chromium delivers one move a frame, so
  * a point costs the run a frame, and six an edge still reads as a box.
  */
-function boxPath(b) {
+export function boxPath(b) {
   const corners = [[b.x, b.y], [b.x + b.w, b.y], [b.x + b.w, b.y + b.h], [b.x, b.y + b.h], [b.x + 2, b.y + 4]];
   const pts = [{ x: b.x, y: b.y }];
   for (let c = 1; c < corners.length; c++) {
@@ -73,15 +75,15 @@ function boxPath(b) {
 }
 
 /** What a stroke is, for comparing: where it began and ended, and how many points. */
-const sig = (pts) => ({ x0: +pts[0].x.toFixed(2), y0: +pts[0].y.toFixed(2), x1: +pts[pts.length - 1].x.toFixed(2), y1: +pts[pts.length - 1].y.toFixed(2), n: pts.length });
-const sameSig = (a, b) => a.x0 === b.x0 && a.y0 === b.y0 && a.x1 === b.x1 && a.y1 === b.y1 && a.n === b.n;
+export const sig = (pts) => ({ x0: +pts[0].x.toFixed(2), y0: +pts[0].y.toFixed(2), x1: +pts[pts.length - 1].x.toFixed(2), y1: +pts[pts.length - 1].y.toFixed(2), n: pts.length });
+export const sameSig = (a, b) => a.x0 === b.x0 && a.y0 === b.y0 && a.x1 === b.x1 && a.y1 === b.y1 && a.n === b.n;
 
 /**
  * Draw a path with the real pointer; `stopAfter` lifts nothing and returns
  * halfway (a stroke cut off); `release: 'send'` sends the release and returns
  * without waiting for the page to take it (a kill that lands during it).
  */
-async function drawPath(page, pts, stopAfter, opts) {
+export async function drawPath(page, pts, stopAfter, opts) {
   await page.mouse.move(pts[0].x, pts[0].y);
   await page.mouse.down();
   const last = stopAfter === undefined ? pts.length : Math.min(stopAfter, pts.length);
@@ -92,27 +94,33 @@ async function drawPath(page, pts, stopAfter, opts) {
   return true;
 }
 
-/** The board is open once the page says so — or at once, on a page that keeps its board synchronously. */
-async function waitReady(page, timeout = 60000) {
+/**
+ * The board is open once the page says so — or at once, on a page that keeps its board
+ * synchronously — and, where the page keeps several (R1), once its list is read and no
+ * switch is under way. `pin: false` leaves the view where the board opened it.
+ */
+export async function waitReady(page, timeout = 60000, opts) {
   await page.waitForFunction(() => {
     const mm = window.__mm;
     if (!mm || !mm.session) return false;
-    return typeof mm.board !== 'function' || mm.board().ready;
+    if (typeof mm.board === 'function' && !mm.board().ready) return false;
+    if (typeof mm.boards === 'function') { const b = mm.boards(); if (!b.ready || b.switching) return false; }
+    return true;
   }, null, { timeout, polling: 50 });
   // World = screen, so the points the pointer drew are the points the log holds.
-  await page.evaluate(() => window.__mm.setView(1, 0, 0));
+  if (!opts || opts.pin !== false) await page.evaluate(() => window.__mm.setView(1, 0, 0));
 }
 
-async function strokesOnBoard(page) {
+export async function strokesOnBoard(page) {
   return page.evaluate(() => window.__mm.session.getEvents()
     .filter((e) => e.type === 'stroke')
     .map((e) => ({ x0: +e.points[0].x.toFixed(2), y0: +e.points[0].y.toFixed(2), x1: +e.points[e.points.length - 1].x.toFixed(2), y1: +e.points[e.points.length - 1].y.toFixed(2), n: e.points.length })));
 }
 
-const statusText = (page) => page.evaluate(() => document.getElementById('status').textContent || '');
+export const statusText = (page) => page.evaluate(() => document.getElementById('status').textContent || '');
 
 /** Close the page the abrupt way: a crashed renderer, or a closed tab with nothing waited for. */
-async function killPage(page, how, cdp) {
+export async function killPage(page, how, cdp) {
   if (how === 'crash') {
     const crashed = new Promise((r) => page.once('crash', r));
     cdp.send('Page.crash').catch(() => {}); // never resolves: the target is gone
@@ -123,10 +131,67 @@ async function killPage(page, how, cdp) {
   }
 }
 
+// ===== The boards pane, driven the way a hand drives it (V1-PLAN R1) =====
+// The control centre, then the boards tile; a board's name in the pane opens it.
+
+/** What the page says about its boards: the one on screen, the list, whether a switch is under way. */
+export const boardsNow = (page) => page.evaluate(() => (typeof window.__mm.boards === 'function' ? window.__mm.boards() : null));
+
+/** The boards pane, opened through the control centre and its tile. */
+export async function openBoardsPane(page) {
+  const open = await page.evaluate(() => { const p = document.getElementById('boardsPanel'); return !!p && !p.hasAttribute('hidden'); });
+  if (open) return;
+  await page.click('#ccBtn');
+  await page.click('#boardsBtn', { timeout: 5000 });
+  await page.waitForSelector('#boardsPanel:not([hidden])', { timeout: 5000 });
+}
+/** The pane closed by its own ×, so nothing of it stands over the ground the hand draws on. */
+export async function closeBoardsPane(page) {
+  const open = await page.evaluate(() => { const p = document.getElementById('boardsPanel'); return !!p && !p.hasAttribute('hidden'); });
+  if (open) await page.click('#boardsPanel .paneClose');
+}
+/** Wait until the page is on board `id`, its list read and no switch under way. */
+export async function waitOnBoard(page, id, timeout = 20000) {
+  await page.waitForFunction((want) => {
+    const mm = window.__mm;
+    if (!mm || typeof mm.boards !== 'function') return false;
+    const b = mm.boards();
+    return b.ready && !b.switching && b.current === want && mm.board().ready;
+  }, id, { timeout, polling: 50 });
+}
+/** Open a board by its name in the pane, wait until the page is on it, and pin the view again (world = screen). */
+export async function switchTo(page, id) {
+  await openBoardsPane(page);
+  await page.click(`#boardsPanel button[data-open="${id}"]`);
+  await waitOnBoard(page, id);
+  await closeBoardsPane(page);
+  await page.evaluate(() => window.__mm.setView(1, 0, 0));
+}
+/** A new board through the pane's own button; resolves to its id once the page is on it. */
+export async function newBoardVia(page) {
+  await openBoardsPane(page);
+  const before = ((await boardsNow(page)) || { list: [] }).list.map((e) => e.id);
+  await page.click('#boardsPanel button[data-board-new]');
+  const handle = await page.waitForFunction((b4) => {
+    const b = window.__mm.boards();
+    const e = b.list.find((x) => x.kind === 'board' && !b4.includes(x.id));
+    return e && b.ready && !b.switching && b.current === e.id && window.__mm.board().ready ? e.id : null;
+  }, before, { timeout: 20000, polling: 50 });
+  const id = await handle.jsonValue();
+  await closeBoardsPane(page);
+  await page.evaluate(() => window.__mm.setView(1, 0, 0));
+  return id;
+}
+
 /**
- * The kill test. One context (one browser's storage), one board growing
- * across cycles; each cycle opens the board in a new tab, checks every
- * stroke is there, draws, and is killed at its own random point.
+ * The kill test, across board switches (R3, and R1's "nothing lost"). One
+ * context (one browser's storage) keeping TWO boards: the first, and one made
+ * through the boards pane in the first cycle. Each cycle opens the page in a
+ * new tab — which opens the board opened last — checks that board, switches to
+ * the other through the pane and checks it too, then draws, switching between
+ * the two now and then, and is killed at its own random point: after a
+ * release, during one, mid-stroke, after an undo, a moment later — or right
+ * after a switch, or in the middle of one. Both boards must come back whole.
  */
 export async function killTest(browser, servers, ctx) {
   const { freshContext, engineName, steps } = ctx;
@@ -136,45 +201,60 @@ export async function killTest(browser, servers, ctx) {
   const rand = rng(seed);
   const guards = await freshContext(browser, { origins: [servers.staticOrigin], label: 'keep-kill' });
   const url = `${servers.staticOrigin}/Demos/session-engine.html?nosw=1`;
-  const expected = []; // the completed strokes, in log order
-  let optional = null;  // a stroke whose release the kill may have landed before, or after
+  const FIRST = 'default';
+  const expected = { [FIRST]: [] }; // board id → its completed strokes, in log order
+  let other = null;     // the second board, made through the pane in the first cycle
+  let optional = null;  // { board, sig }: a stroke whose release the kill may have landed before, or after
   let cell = 0;
-  const tally = { crash: 0, close: 0, phases: {} };
+  const tally = { crash: 0, close: 0, phases: {}, switches: 0 };
   let page = null;
+  const other_ = (id) => (id === FIRST ? other : FIRST);
+  // A board as it reopened, against what it must hold; a release a kill landed during is there whole and last, or not at all.
+  const settle = (id, got) => {
+    const eq = (want) => got.length === want.length && got.every((s, i) => sameSig(s, want[i]));
+    if (optional && optional.board === id && eq(expected[id].concat([optional.sig]))) { expected[id].push(optional.sig); tally.landedDuring = (tally.landedDuring || 0) + 1; optional = null; }
+    const whole = eq(expected[id]);
+    const out = { board: id, expected: expected[id].length, got: got.length, missing: expected[id].filter((s) => !got.some((o) => sameSig(o, s))).length, extra: got.filter((o) => !expected[id].some((s) => sameSig(o, s))).length, whole };
+    // What the next cycle builds on is the board as it reopened.
+    if (!whole) expected[id] = got.slice();
+    return out;
+  };
   try {
-    for (let c = 1; c <= cycles; c++) {
+    for (let c = 1; c <= cycles + 1; c++) {
       page = await guards.context.newPage();
       await page.goto(url, { waitUntil: 'load', timeout: 60000 });
       await waitReady(page);
-      const onOpen = await strokesOnBoard(page);
-      const eq = (want) => onOpen.length === want.length && onOpen.every((s, i) => sameSig(s, want[i]));
-      // A release the kill landed during: the stroke is either there, whole and last, or not there at all.
-      if (optional && eq(expected.concat([optional]))) { expected.push(optional); tally.landedDuring = (tally.landedDuring || 0) + 1; }
-      optional = null;
-      const whole = eq(expected);
       if (c > 1) {
-        check(`K${c - 1}. reopened after kill ${c - 1}: every completed stroke is on the board, in order, and nothing undone (${onOpen.length} of ${expected.length})`,
-          whole, { seed, cycle: c - 1, expected: expected.length, got: onOpen.length, missing: expected.filter((s) => !onOpen.some((o) => sameSig(o, s))).length, extra: onOpen.filter((o) => !expected.some((s) => sameSig(o, s))).length });
-        if (!whole) {
-          // What the next cycle builds on is the board as it reopened; keep going from there.
-          expected.splice(0, expected.length, ...onOpen);
-        }
+        const opened = (await boardsNow(page) || {}).current || FIRST;
+        const first = settle(opened, await strokesOnBoard(page));
+        let second = null;
+        if (other) { await switchTo(page, other_(opened)); tally.switches++; second = settle(other_(opened), await strokesOnBoard(page)); }
+        optional = null;
+        const both = [first].concat(second ? [second] : []);
+        check(`K${c - 1}. reopened after kill ${c - 1}: both boards whole — every completed stroke on each, in order, nothing undone (${both.map((b) => (b.board === FIRST ? 'first' : 'second') + ' ' + b.got + ' of ' + b.expected).join(', ')})`,
+          both.length === 2 && both.every((b) => b.whole), { seed, cycle: c - 1, opened, boards: both });
       }
+      if (c > cycles) break;
+      // The second board, made the way a hand makes one: the pane's own button.
+      if (!other) { other = await newBoardVia(page); if (other) expected[other] = []; tally.switches++; }
+      let cur = (await boardsNow(page) || {}).current || FIRST;
       // A crash is Chromium's; WebKit's pages are closed.
       const how = engineName === 'chromium' && rand() < 0.6 ? 'crash' : 'close';
       const cdp = how === 'crash' ? await guards.context.newCDPSession(page) : null;
-      const phases = ['after-release', 'after-release', 'mid-stroke', 'after-undo', 'a-moment-later'].concat(how === 'crash' ? ['during-release'] : []);
+      const phases = ['after-release', 'mid-stroke', 'after-undo', 'a-moment-later', 'after-switch', 'mid-switch'].concat(how === 'crash' ? ['during-release'] : []);
       const phase = phases[Math.floor(rand() * phases.length)];
       const n = 2 + Math.floor(rand() * 4);
+      // Half the cycles switch boards between two strokes, mid-session.
+      const switchAt = rand() < 0.5 ? 1 + Math.floor(rand() * (n - 1)) : -1;
       for (let s = 0; s < n; s++) {
-        const box = cellBox(cell++, rand);
-        const pts = boxPath(box);
+        if (s === switchAt && other) { cur = other_(cur); await switchTo(page, cur); tally.switches++; }
+        const pts = boxPath(cellBox(cell++, rand));
         await drawPath(page, pts);
-        expected.push(sig(pts));
+        expected[cur].push(sig(pts));
         // An undo now and then, mid-cycle: the log shrinks, and the store must follow.
         if (s < n - 1 && rand() < 0.25) {
           await page.click('#undoBtn');
-          expected.pop();
+          expected[cur].pop();
         }
       }
       if (phase === 'mid-stroke') {
@@ -182,7 +262,7 @@ export async function killTest(browser, servers, ctx) {
         await drawPath(page, pts, 3 + Math.floor(rand() * (pts.length - 6))); // down, some moves, no release
       } else if (phase === 'after-undo') {
         await page.click('#undoBtn');
-        expected.pop();
+        expected[cur].pop();
       } else if (phase === 'a-moment-later') {
         await sleep(Math.round(rand() * 400));
       } else if (phase === 'during-release') {
@@ -190,25 +270,26 @@ export async function killTest(browser, servers, ctx) {
         await drawPath(page, pts, undefined, { release: 'send' });
         // 0–25 ms behind the release: some kills land before the page takes it, some while or after.
         await sleep(Math.floor(rand() * 26));
-        optional = sig(pts);
+        optional = { board: cur, sig: sig(pts) };
+      } else if (phase === 'after-switch' && other) {
+        cur = other_(cur);
+        await switchTo(page, cur);
+        tally.switches++;
+      } else if (phase === 'mid-switch' && other) {
+        // The switch begun and the page killed 0–25 ms into it: the board being left was written as it changed.
+        await openBoardsPane(page);
+        page.click(`#boardsPanel button[data-open="${other_(cur)}"]`).catch(() => {});
+        await sleep(Math.floor(rand() * 26));
+        tally.switches++;
       }
       await killPage(page, how, cdp);
       tally[how]++;
       tally.phases[phase] = (tally.phases[phase] || 0) + 1;
       page = null;
     }
-    // The last kill, reopened.
-    page = await guards.context.newPage();
-    await page.goto(url, { waitUntil: 'load', timeout: 60000 });
-    await waitReady(page);
-    const final = await strokesOnBoard(page);
-    const eqFinal = (want) => final.length === want.length && final.every((s, i) => sameSig(s, want[i]));
-    if (optional && eqFinal(expected.concat([optional]))) { expected.push(optional); tally.landedDuring = (tally.landedDuring || 0) + 1; }
-    const whole = eqFinal(expected);
-    check(`K${cycles}. reopened after kill ${cycles}: every completed stroke is on the board, in order, and nothing undone (${final.length} of ${expected.length})`,
-      whole, { seed, cycle: cycles, expected: expected.length, got: final.length, missing: expected.filter((s) => !final.some((o) => sameSig(o, s))).length });
-    check(`K. ${cycles} kills (${tally.crash} crashed, ${tally.close} closed; ${Object.entries(tally.phases).map(([k, v]) => v + ' ' + k).join(', ')}${tally.phases['during-release'] ? '; ' + (tally.landedDuring || 0) + ' of the releases a kill landed during were taken first' : ''}), seed ${seed}`, true, { seed, tally });
-    await page.close().catch(() => {});
+    check(`K. ${cycles} kills across ${tally.switches} board switches (${tally.crash} crashed, ${tally.close} closed; ${Object.entries(tally.phases).map(([k, v]) => v + ' ' + k).join(', ')}${tally.phases['during-release'] ? '; ' + (tally.landedDuring || 0) + ' of the releases a kill landed during were taken first' : ''}), seed ${seed}`,
+      !!other && tally.switches >= cycles, { seed, tally, other });
+    if (page) await page.close().catch(() => {});
   } catch (err) {
     check(`K. the kill test ran to its end (seed ${seed})`, false, { error: String(err && err.stack ? err.stack : err) });
     if (page) await ctx.screenshot(page, 'keep-kill');

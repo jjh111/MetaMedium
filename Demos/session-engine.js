@@ -7181,17 +7181,314 @@
     };
   }
 
+// ===== boards (the list) =====
+// Provides: several named boards this browser keeps (V1-PLAN §9 R1) — the pure half: boardName (a
+//   name as typed), boardShelves (the boards, the trash, the recent places), listPlan (R3's board as
+//   the first entry), nextBoardName / newBoardEntry / copyName / copyEntry / renamed / trashed /
+//   restored (the entries), pickBoard (which board a page opens), nextAfter (where the page goes when
+//   the board on screen goes to the trash), emptyTrashPlan (what emptying the trash will take, said
+//   plainly), agoWords / sizeWords / kindWords / boardRows (what the pane shows), countMarks / statsOf
+//   / statsAfter (what a board holds, kept up as records land), placeEntry / placesPlan (folders,
+//   repositories and sites as recent places), leaveVerdict (whether the board on screen may be left),
+//   switchPlan (what opening an entry does), boardTitle / boardSearch (the page's title and address).
+// Uses: NOTHING. Like 17-board.js (R3's journal: ONE board's log) this fragment names no closure
+//   variable and touches no DOM, no storage and no session; 17-folder.js is the adapter (IndexedDB,
+//   the lock, the switch) and 22-boards.js the pane. Tested on its own in Node:
+//   node --test Demos/surface/17-boards.test.mjs
+// A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
+// in name order inside `(function () { ... })();`. Shared state is the
+// closure's; no imports, no exports, no build step beyond the concatenation.
+//
+// A BOARD IS ITS LOG. Each board is its own R3 journal, keyed by the board's id; its entry in the
+// list says what it is called, when it was made, opened, and put in the trash — and nothing of what
+// it holds. The NAME IS SHOWN, NEVER USED AS THE KEY: a rename changes one field of one entry, so it
+// can never orphan a journal, and two boards may share a name. The board R3 kept is the first entry,
+// under the key R3 kept it under ("default"), unchanged.
+//
+// NOTHING IS ONE TAP FROM LOST. Deleting moves a board to the trash, from which it comes back whole;
+// only emptying the trash deletes, it is its own act, and what it will take is said — by name, with
+// what each holds, "for good" — before it happens. A board open in another tab is never emptied.
+
+  const FIRST_BOARD = 'default';
+  const FIRST_BOARD_NAME = 'My board';
+  const BOARD_NAME_MAX = 80;
+  /** How many recent places (folders, repositories, sites) the list remembers. */
+  const RECENT_MAX = 12;
+  const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+  /** A name as typed: its runs of space collapsed, trimmed, not too long. Nothing is not a name (null). */
+  function boardName(raw) {
+    if (typeof raw !== 'string') return null;
+    const t = raw.replace(/\s+/g, ' ').trim();
+    return t ? t.slice(0, BOARD_NAME_MAX).trim() : null;
+  }
+  /** A board this browser keeps — as against a place (a folder, a repository, a site) it only remembers. */
+  function isKept(e) { return !!e && e.kind === 'board'; }
+
+  const idOrder = (a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+  const byMade = (a, b) => (a.created || 0) - (b.created || 0) || idOrder(a, b);
+  const byOpened = (a, b) => (b.opened || 0) - (a.opened || 0) || byMade(a, b);
+
+  /**
+   * The list, shelved: the boards in the order they were made (a list whose rows keep their
+   * places), the trash newest first, the recent places most recently opened first.
+   */
+  function boardShelves(entries) {
+    const all = (entries || []).filter(Boolean);
+    const kept = all.filter(isKept);
+    return {
+      boards: kept.filter((e) => !e.trashed).sort(byMade),
+      trash: kept.filter((e) => e.trashed).sort((a, b) => b.trashed - a.trashed || byMade(a, b)),
+      places: all.filter((e) => !isKept(e)).sort(byOpened),
+    };
+  }
+
+  /**
+   * The list as read, and what to write so it holds a board: a list with no board at all — the
+   * first read of a browser that kept one board under R3, or none — gets R3's board as its first
+   * entry, "My board", under R3's own key (its journal is not moved, renamed or rewritten). A list
+   * whose every board is in the trash is left alone: which board opens is pickBoard's to say.
+   * `meta` is R3's meta record for that key, when there is one (its `created` is kept).
+   */
+  function listPlan(entries, now, meta) {
+    entries = entries || [];
+    if (entries.some(isKept)) return { entries, put: [] };
+    const first = { id: FIRST_BOARD, kind: 'board', name: FIRST_BOARD_NAME, created: (meta && meta.created) || now, opened: 0, trashed: 0 };
+    return { entries: entries.concat([first]), put: [first] };
+  }
+
+  /** A name for a new board: "My board" when there is no other on the list, else "Board 2", "Board 3" … (a name in the trash is taken). */
+  function nextBoardName(entries) {
+    const kept = (entries || []).filter(isKept);
+    if (!kept.some((e) => !e.trashed)) return FIRST_BOARD_NAME;
+    const taken = new Set(kept.map((e) => e.name));
+    for (let n = 2; ; n++) if (!taken.has('Board ' + n)) return 'Board ' + n;
+  }
+  /** A new board's entry. `id` is minted by the adapter; `name`, as typed, or the next free one. */
+  function newBoardEntry(entries, id, now, name) {
+    return { id, kind: 'board', name: boardName(name) || nextBoardName(entries), created: now, opened: 0, trashed: 0 };
+  }
+  /** "Sketch copy", then "Sketch copy 2" … — room is left for the suffix, so a long name still gets one. */
+  function copyName(entries, name) {
+    const stem = (boardName(name) || FIRST_BOARD_NAME).slice(0, BOARD_NAME_MAX - 16).trim() + ' copy';
+    const taken = new Set((entries || []).filter(isKept).map((e) => e.name));
+    if (!taken.has(stem)) return stem;
+    for (let n = 2; ; n++) if (!taken.has(stem + ' ' + n)) return stem + ' ' + n;
+  }
+  /** A copy's entry: its own id — so its own journal — and where it came from. */
+  function copyEntry(entries, src, id, now) {
+    return { id, kind: 'board', name: copyName(entries, src && src.name), created: now, opened: 0, trashed: 0, from: src ? src.id : null };
+  }
+  /** The same entry — the same id, so the same journal — under a new name; null when there is nothing to change. */
+  function renamed(entry, raw) {
+    const name = boardName(raw);
+    if (!entry || !name || name === entry.name) return null;
+    return Object.assign({}, entry, { name });
+  }
+  function trashed(entry, now) { return Object.assign({}, entry, { trashed: now || 1 }); }
+  function restored(entry) { return Object.assign({}, entry, { trashed: 0 }); }
+
+  /**
+   * Which board a page opens: the one the address names — out of the trash, if it was there (it is
+   * being used) — else the one opened most recently (never opened: the first made), else a new one.
+   * An id this browser does not hold is `missing`, and said; a place is not a board.
+   */
+  function pickBoard(entries, requested) {
+    const kept = (entries || []).filter(isKept);
+    if (requested) {
+      const e = kept.find((x) => x.id === requested);
+      if (e) return { id: e.id, restore: !!e.trashed, missing: null, make: false };
+    }
+    const missing = requested || null;
+    const live = kept.filter((e) => !e.trashed).sort(byOpened);
+    if (!live.length) return { id: null, restore: false, missing, make: true };
+    return { id: live[0].id, restore: false, missing, make: false };
+  }
+  /** Where the page goes when the board on screen goes to the trash: the board opened most recently among the rest, or null (a new one). */
+  function nextAfter(entries, leavingId) {
+    const live = (entries || []).filter((e) => isKept(e) && !e.trashed && e.id !== leavingId).sort(byOpened);
+    return live.length ? live[0].id : null;
+  }
+
+  const listWords = (xs) => (xs.length <= 1 ? xs.join('') : xs.slice(0, -1).join(', ') + ' and ' + xs[xs.length - 1]);
+  /** What a board holds, in marks: "42 marks", "1 mark", "empty". */
+  function marksWords(stat) {
+    if (!stat) return 'size not known yet';
+    if (!stat.events && !stat.marks) return 'empty';
+    return stat.marks + ' mark' + (stat.marks === 1 ? '' : 's');
+  }
+  function bytesWords(chars) {
+    const c = chars || 0;
+    if (c < 1024) return 'under 1 KB';
+    if (c < 1024 * 1024) return Math.round(c / 1024) + ' KB';
+    return (c / (1024 * 1024)).toFixed(1) + ' MB';
+  }
+  /** Roughly how big a board is: its marks and what its records take in the browser's store. */
+  function sizeWords(stat) {
+    if (!stat) return 'size not known yet';
+    if (!stat.events && !stat.marks) return 'empty';
+    return marksWords(stat) + ' · ' + bytesWords(stat.chars);
+  }
+
+  /**
+   * What emptying the trash will take, said before it happens. `held` — the ids whose lock another
+   * tab holds: a board open there is never emptied out from under it, and the sentence says so.
+   * @returns {{ gone: Array, kept: Array, words: string }}
+   */
+  function emptyTrashPlan(entries, stats, held) {
+    const bin = boardShelves(entries).trash;
+    const heldSet = new Set(held || []);
+    const gone = bin.filter((e) => !heldSet.has(e.id));
+    const kept = bin.filter((e) => heldSet.has(e.id));
+    if (!bin.length) return { gone, kept, words: 'the trash is empty' };
+    const stat = (e) => (stats && stats[e.id]) || null;
+    let words = gone.length
+      ? gone.length + ' board' + (gone.length === 1 ? '' : 's') + ' will be deleted for good — ' +
+        listWords(gone.map((e) => '“' + e.name + '” (' + marksWords(stat(e)) + ')')) + '. This cannot be undone.'
+      : 'nothing in the trash can be deleted now.';
+    if (kept.length) {
+      const one = kept.length === 1;
+      words += ' ' + listWords(kept.map((e) => '“' + e.name + '”')) + (one ? ' is' : ' are') + ' open in another tab — ' +
+        (one ? 'it stays' : 'they stay') + ' in the trash until that tab lets ' + (one ? 'it' : 'them') + ' go.';
+    }
+    return { gone, kept, words };
+  }
+
+  /** When, in a few words: "just now", "4 min ago", "3 h ago", "yesterday", "4 days ago", "2 Aug", "2 Aug 2025". */
+  function agoWords(ms, now) {
+    if (!ms) return '';
+    const d = Math.max(0, now - ms);
+    if (d < 60000) return 'just now';
+    if (d < 3600000) return Math.floor(d / 60000) + ' min ago';
+    if (d < 86400000) return Math.floor(d / 3600000) + ' h ago';
+    if (d < 2 * 86400000) return 'yesterday';
+    if (d < 7 * 86400000) return Math.floor(d / 86400000) + ' days ago';
+    const t = new Date(ms);
+    return t.getDate() + ' ' + MONTHS[t.getMonth()] + (t.getFullYear() !== new Date(now).getFullYear() ? ' ' + t.getFullYear() : '');
+  }
+
+  /** The strokes in a log: a board's marks, drawn (an erase is a reading of the log, not a removal from it). */
+  function countMarks(events) {
+    let n = 0;
+    for (const ev of events || []) if (ev && ev.type === 'stroke') n++;
+    return n;
+  }
+  /** What a board holds: when it last changed, its events, its marks, and the characters its records take. */
+  function statsOf(events, chars, now) {
+    return { changed: now, events: (events || []).length, marks: countMarks(events), chars: chars || 0 };
+  }
+  /**
+   * The same, after a record lands (written in the record's own transaction by the adapter).
+   * `events` is the log the record brings the store to. A whole log compacts the store, so its
+   * characters are the store's; anything else adds its own (an undo's cut record included).
+   */
+  function statsAfter(stats, rec, events, now) {
+    const chars = rec.base === 0 ? rec.text.length : ((stats && stats.chars) || 0) + rec.text.length;
+    return { changed: now, events: rec.base + rec.n, marks: countMarks(events), chars };
+  }
+
+  /** What kind an entry is, as the list says it. */
+  function kindWords(kind) {
+    return { board: 'kept in this browser', folder: 'folder', git: 'repository', static: 'site', live: 'room' }[kind] || String(kind || '');
+  }
+  /**
+   * A place opened on the page — a folder, a repository, a site — as a recent entry. `spec` is how it
+   * is opened again: a repository's owner/repo[@branch][/dir], a site's base; never a token (a key
+   * never enters this list). A folder's handle, where the browser keeps one, the adapter adds.
+   */
+  function placeEntry(kind, spec, name, now) {
+    return { id: kind + ':' + spec, kind, name: name || spec, spec, opened: now };
+  }
+  /** Remembering a place: it goes (or moves) to the top; past RECENT_MAX the oldest are dropped. Boards never are. */
+  function placesPlan(entries, entry) {
+    const others = (entries || []).filter((e) => e && !isKept(e) && e.id !== entry.id).sort(byOpened);
+    return { put: entry, drop: others.slice(RECENT_MAX - 1).map((e) => e.id) };
+  }
+
+  /** The rows the pane shows, in the shelves' order: the board here marked, when and how big, places by kind, the trash with its date. */
+  function boardRows(entries, stats, now, currentId) {
+    const sh = boardShelves(entries);
+    const st = (id) => (stats && stats[id]) || null;
+    const when = (verb, ms) => (ms ? verb + ' ' + agoWords(ms, now) : '');
+    return {
+      boards: sh.boards.map((e) => ({ id: e.id, name: e.name, here: e.id === currentId, when: when('changed', st(e.id) && st(e.id).changed), size: sizeWords(st(e.id)) })),
+      places: sh.places.map((e) => ({ id: e.id, k: e.kind, kind: kindWords(e.kind), name: e.name, here: e.id === currentId, when: when('opened', e.opened) })),
+      trash: sh.trash.map((e) => ({ id: e.id, name: e.name, when: when('deleted', e.trashed), size: sizeWords(st(e.id)) })),
+    };
+  }
+
+  /**
+   * Whether the board on screen may be left (a switch, a folder opened over it). `s`: the journal's
+   * snapshot, and the board's name. null — the store holds all of it; 'busy' — a record is on its way
+   * (the adapter waits, then asks again); 'unsaved' / 'not-kept' — said, with the ways out: the log
+   * as a file, or leaving it anyway, which is the person's call and a second, deliberate tap.
+   */
+  function leaveVerdict(s) {
+    if (!s || s.state === 'off') return null;
+    const name = '“' + (s.name || 'this board') + '”';
+    const ways = ['export', 'leave'];
+    if (s.state === 'readonly' || (s.state === 'armed' && s.trouble)) {
+      if (s.state === 'readonly' && !s.dirty) return null; // nothing drawn here, nothing to keep
+      const tab = s.trouble && (s.trouble.kind === 'tab' || s.trouble.kind === 'elsewhere');
+      if (tab) return { kind: 'not-kept', words: name + ' is open in another tab, and what was drawn on it here was not kept — export the log to keep it, or leave it as that tab has it', ways };
+      return { kind: 'unsaved', words: name + ' is not saved' + (s.trouble && s.trouble.kind === 'full' ? ' (the browser\'s storage is full)' : '') + ' — export the log to keep it, or leave it and lose what was not saved', ways };
+    }
+    if (s.state === 'armed') return s.inFlight || s.dirty || s.needWhole ? { kind: 'busy' } : null;
+    return { kind: 'busy' }; // 'waiting': the store is still being opened
+  }
+
+  /**
+   * What opening an entry of the list does. 'here' — it is on screen; 'switch' — in place, the board
+   * on screen flushed first; 'navigate' — a folder, a repository or a room is on screen, and the board
+   * opens in a page of its own; 'place' — a folder, a repository or a site, opened the way its tile
+   * opens it; 'missing' — not on the list (emptied from the trash in another tab, say).
+   */
+  function switchPlan(o) {
+    const e = (o.entries || []).find((x) => x && x.id === o.target);
+    if (!e) return { go: 'missing', id: o.target };
+    if (!isKept(e)) return { go: 'place', id: e.id };
+    if (o.onBoard && o.current === e.id) return { go: 'here', id: e.id };
+    return { go: o.onBoard ? 'switch' : 'navigate', id: e.id, restore: !!e.trashed };
+  }
+
+  /** The page's title: the board's name first. */
+  function boardTitle(name) { return name ? name + ' — MetaMedium' : 'MetaMedium'; }
+  /**
+   * The page's address on board `id`: `board=` set (in the place it had, or last), everything else
+   * kept — except what would make the board not this board on a reload: `fresh` (a fresh start
+   * replaces the board at its first change), and a folder, a repository, a room or a figure.
+   */
+  function boardSearch(search, id) {
+    const drop = { fresh: 1, folder: 1, git: 1, live: 1, relay: 1, replay: 1, embed: 1 };
+    const out = [];
+    let said = false;
+    for (const p of String(search || '').replace(/^\?/, '').split('&')) {
+      if (!p) continue;
+      let k;
+      try { k = decodeURIComponent(p.split('=')[0]); } catch (err) { k = p.split('=')[0]; }
+      if (drop[k]) continue;
+      if (k === 'board') { if (!said) { out.push('board=' + encodeURIComponent(id)); said = true; } continue; }
+      out.push(p);
+    }
+    if (!said) out.push('board=' + encodeURIComponent(id));
+    return '?' + out.join('&');
+  }
+
 // ===== folder =====
 // Provides: the folder as the canvas — openFolder/openStatic/openStore (discovery into artifacts,
 //   per-participant logs merged), autosave (to the folder), the live budget (liveSet), the grid and
 //   focus views (setViewMode, focusOn), imageUrlFor, folderStatus; a live room (openLive: logs
-//   arriving live over a BroadcastChannel or a relay, merged as they land); and the board this
-//   browser keeps when there is no folder (V1-PLAN R3) — the adapter over 17-board.js's journal:
-//   IndexedDB (openBoard, persistBoard, flushBoard, forgetLocalLog), browser storage where there is
-//   no IndexedDB, the one import of browser storage's old copy, the lock one tab holds, and what the
-//   status line says when a save fails (boardWarning, keepBoardIn — the way out into a folder).
-// Uses: core, board (createJournal, openPlan, troubleOf, troubleWords, journalEvents, journalFold),
-//   view (fitAll, afterViewChange), artifacts, render, input (say, flash), images (downloadText).
+//   arriving live over a BroadcastChannel or a relay, merged as they land); and the boards this
+//   browser keeps when there is no folder (V1-PLAN R3, R1) — the adapter over 17-board.js's journal
+//   and 17-boards.js's list: IndexedDB (openBoard, persistBoard, flushBoard, forgetLocalLog; the list:
+//   switchBoard, newBoard, renameBoard, duplicateBoard, trashBoard, restoreBoard, planEmptyTrash,
+//   emptyTrash, boardFromFile, resetBoard, rememberPlace, openPlace), the view per board, browser
+//   storage where there is no IndexedDB, the one import of browser storage's old copy, the lock one
+//   tab holds per board, and what the status line says when a save fails (boardWarning, keepBoardIn).
+// Uses: core, board (createJournal, openPlan, troubleOf, troubleWords, journalEvents, journalFold,
+//   journalText), boards (the list's pure half), view (fitAll, afterViewChange, clampZoom), teach
+//   (savedMark, restoreMark), artifacts, render, input (say, flash), images (downloadText), controls
+//   (syncTiles), the boards pane (renderBoardsPane).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () { ... })();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -7263,7 +7560,7 @@
     let handle;
     try { handle = await window.showDirectoryPicker({ mode: 'readwrite' }); } catch (err) { return null; }
     const store = new MM.FolderStore(handle);
-    return opts && opts.carry ? keepBoardIn(store, 'folder', handle.name) : openStore(store, 'folder', handle.name);
+    return opts && opts.carry ? keepBoardIn(store, 'folder', handle.name, handle) : openStore(store, 'folder', handle.name, { handle });
   }
 
   /**
@@ -7339,6 +7636,8 @@
   const PAGE_SITTING = MM.sittingToken(8);
   async function openLive(room, opts) {
     opts = opts || {};
+    // The board on screen is left only once its store holds all of it (R1).
+    if (onBoardHere()) { const v = await readyToLeave(); if (v && v.kind !== 'not-kept') throw new Error(v.words); }
     // From here this page's log is the room's: nothing drawn under the room's
     // name is written into the board this browser keeps (L1: a live tab keeps no local log).
     leaveBoard();
@@ -7409,12 +7708,21 @@
    * pull — the board comes back and nothing is discovered twice.
    */
   async function openStore(store, how, name, opts) {
+    opts = opts || {};
     // The board on screen, carried in as this participant's log (keepBoardIn), or nothing.
-    const carry = opts && opts.carry && opts.carry.length ? opts.carry.map((ev) => Object.assign({}, ev)) : null;
-    folder.store = store; folder.how = how || 'store'; folder.name = name || ''; folder.error = ''; folder.saveTrouble = null;
+    const carry = opts.carry && opts.carry.length ? opts.carry.map((ev) => Object.assign({}, ev)) : null;
+    // The board on screen is left only once its store holds all of it (R1) — unless it is being carried in.
+    // A tab that only showed a board another tab holds is not stopped: that tab keeps it, and what was
+    // drawn here was said all along not to be kept. A board that is not saved is: the line's own
+    // "open a folder" carries it in instead (keepBoardIn), and "export the log" keeps it as a file.
+    if (!carry && onBoardHere()) {
+      const v = await readyToLeave();
+      if (v && v.kind !== 'not-kept') { say(v.words + (v.kind === 'unsaved' ? ' — or "open a folder" in the line, which carries it in' : '')); return null; }
+    }
     // From here this page's log is the folder's or the room's: the board this
-    // browser keeps stays as it was, and is not written again from this page.
+    // browser keeps stays as it was (where the hand left it too), and is not written again from this page.
     leaveBoard();
+    folder.store = store; folder.how = how || 'store'; folder.name = name || ''; folder.error = ''; folder.saveTrouble = null;
     // A folder is written under the device's own stable name, whatever a live
     // sitting in this page load was called.
     if (folder.how !== 'live') folder.me = deviceParticipant();
@@ -7457,6 +7765,9 @@
     await discover(entries);
     render(session.getState());
     fitAll();
+    // A folder, a repository or a site is a recent place in the boards list (never a room; never a key).
+    if (folder.how === 'folder' || folder.how === 'git' || folder.how === 'static') rememberPlace(folder.how, folder.name || folder.how, folder.name, opts.handle || null);
+    syncBoardFaces();
     const misnumbered = [...folder.misnumbered.values()];
     flash((carry ? 'the board is kept in ' + (folder.name || 'the folder') + ' now — ' + carry.length + ' event' + (carry.length === 1 ? '' : 's') + ' carried in, '
       : 'opened ' + (folder.name || 'a folder') + ': ') + entries.length + ' file' + (entries.length === 1 ? '' : 's') + (folder.truncated ? ' shown — the folder holds more' : '') +
@@ -7542,22 +7853,40 @@
     else flash('saved to ' + (folder.name || 'the folder') + ' again');
   }
 
-  // ===== The board this browser keeps (V1-PLAN R3) ===========================
-  // With no folder, the board is kept in this browser: in IndexedDB, as an
+  // ===== The boards this browser keeps (V1-PLAN R3, R1) ======================
+  // With no folder, a board is kept in this browser: in IndexedDB, as an
   // append-only journal (17-board.js) — a record per change, begun and
   // committed in the task that made the change, before the paint. It used to
   // be one string in browser storage, the whole log rewritten 900 ms after the
   // last change: saving stopped at about 1,500 marks, the error was swallowed,
   // and a tab that died inside those 900 ms took its strokes with it
-  // (PERF.md, hotspot 7). One board for now, under one name — naming boards
-  // is R1. A failure is never silent: the status line leads with it, with the
-  // way out, until a save succeeds (boardWarning).
+  // (PERF.md, hotspot 7). A failure is never silent: the status line leads
+  // with it, with the way out, until a save succeeds (boardWarning).
+  //
+  // SEVERAL BOARDS (R1; 17-boards.js decides, this acts). Each board is its
+  // own journal, keyed by the board's id — records under [id, seq], its meta
+  // under id — and the list (the `boards` store) holds one entry a board: its
+  // name, when it was made, opened and put in the trash. R3's one board is the
+  // first entry, "My board", under the key R3 kept it under ("default"),
+  // untouched. The name is shown, never the key. A board's meta also says what
+  // it holds (when it last changed, its events, marks and characters), written
+  // in the same transaction as each record, so the list is right after a kill.
+  // One tab writes a board (a Web Lock per board). Switching is in place: what
+  // the next board needs is read while the one on screen goes on being
+  // written; then the one on screen is flushed and waited on until the store
+  // holds all of it — or the switch is refused, said, with the way out — and
+  // only then, in one task with nothing awaited, is it left and the next
+  // loaded (switchBoard). From a folder, a repository or a room the board
+  // opens in a page of its own.
   const BOARD_DB = 'mm-boards';
-  const BOARD_KEY = 'default';
-  const BOARD_LOCK = 'mm-board:' + BOARD_KEY;
+  const BOARD_DB_VERSION = 2; // 1: R3's records and meta; 2: R1's list of boards
   const BOARD_RETRY_MS = 5000;
+  const BOARD_VIEW_KEY = 'view:';
+  const boardLockName = (id) => 'mm-board:' + id;
   const board = {
-    // Whose board this page is (boardMode).
+    // The board this page is on: its journal's key.
+    id: FIRST_BOARD,
+    // Whose board this page is (boardMode): 'restore' | 'fresh' | 'off'.
     mode: 'off',
     ready: false,
     backend: null,
@@ -7565,26 +7894,73 @@
     lock: 'none',       // 'held' | 'taken' (another tab holds the board) | 'none' (no Web Locks here)
     from: 'nothing',    // where the board came back from: 'store' | 'browser storage' | 'nothing'
     opened: null,       // what the store held when this page opened it: { arr, len, lastSeq }
+    meta: null,         // its meta record, as this page last wrote or read it
     restoring: false,
     dbClosed: false,
     retryTimer: 0,
     release: null,      // lets the lock go: a page that stops keeping the board frees it for another tab
-    freedEarly: false,  // the lock came before the board had opened: take it up once it has
+    waitCtl: null,      // stops waiting for a board another tab holds, when this page leaves it
+    lateGrant: null,    // the lock came before the board had opened: { id, release }, taken up once it has
+    gen: 0,             // bumped at every open: a read begun for a board since left is dropped
+    viewSaved: null,
+    resetArmed: 0,
+    saidAtOpen: false,  // the open said something of its own (an id not held, a board out of the trash)
     journal: null,
   };
-  /** This page no longer keeps the board (a folder or a room keeps its log): the journal stops, and another tab may take the board. */
+  // The list: every board and every recent place, and what each board holds.
+  const boards = {
+    ready: false,
+    how: 'none',        // 'indexeddb' | 'browser storage' (one board only) | 'none'
+    entries: new Map(), // id → entry (17-boards.js)
+    stats: new Map(),   // id → { changed, events, marks, chars }
+    switching: false,
+    busy: 0,
+    channel: null,
+    // Entries this page could not write yet (the store refused: full, say) — held, and written once a
+    // record lands again. The list never stands between a board and its journal.
+    held: [],
+  };
+  let boardDbPromise = null;
+  // Resolves once this page has read the list (openBoard, openBoardsList): a place opened at boot waits for it.
+  let boardsListed = null;
+
+  /** A journal bound to one board's store; what the board holds rides in each record's transaction. */
+  function journalFor(id, backend) {
+    const jn = createJournal({
+      append(rec, o) {
+        const stats = statsAfter(boards.stats.get(id), rec, session.getEvents(), Date.now());
+        const meta = Object.assign({}, board.id === id && board.meta ? board.meta : {}, o.meta || {}, stats, { board: id });
+        const p = backend.append(rec, { compact: o.compact, meta });
+        if (board.id === id) board.meta = meta;
+        boards.stats.set(id, stats);
+        if (typeof renderBoardsPane === 'function') renderBoardsPane(true);
+        return p;
+      },
+    }, {
+      now: () => Date.now(),
+      onTrouble: (t, was) => { if (board.journal === jn) boardTroubleChanged(t, was); },
+      onLanded: (x) => {
+        // The old copy in browser storage goes once the import has landed — not before.
+        if (x.meta && id === FIRST_BOARD && board.how === 'indexeddb') { try { localStorage.removeItem(LOCAL_LOG_KEY); } catch (err) { /* nothing */ } }
+        // The store takes writes again: what the list could not write, now.
+        if (boards.held.length) writeHeldEntries();
+      },
+    });
+    return jn;
+  }
+  board.journal = journalFor(FIRST_BOARD, { append: () => Promise.reject(new DOMException('the board is not open', 'InvalidStateError')) });
+
+  /** This page no longer keeps its board (a folder, a room, or another board keeps its log): the journal stops, and another tab may take it. */
   function leaveBoard() {
+    saveBoardView();
+    if (board.waitCtl) { try { board.waitCtl.abort(); } catch (err) { /* nothing */ } board.waitCtl = null; }
+    if (board.lateGrant) { board.lateGrant.release(); board.lateGrant = null; }
     board.journal.off();
     if (board.release) { board.release(); board.release = null; }
+    board.lock = 'none';
+    clearInterval(board.retryTimer);
+    board.retryTimer = 0;
   }
-  board.journal = createJournal({
-    append: (rec, o) => (board.backend ? board.backend.append(rec, o) : Promise.reject(new DOMException('the board is not open', 'InvalidStateError'))),
-  }, {
-    now: () => Date.now(),
-    onTrouble: boardTroubleChanged,
-    // The old copy in browser storage goes once the import has landed — not before.
-    onLanded: (x) => { if (x.meta && board.how === 'indexeddb') { try { localStorage.removeItem(LOCAL_LOG_KEY); } catch (err) { /* nothing */ } } },
-  });
 
   /**
    * Whose board this page is. 'restore' — the device's, brought back; 'fresh'
@@ -7598,22 +7974,33 @@
     if (params.has('live') || params.has('replay') || EMBED || params.has('folder') || params.has('git')) return 'off';
     return params.has('fresh') ? 'fresh' : 'restore';
   }
+  /** A board is on screen: not a folder, a repository or a room, and not a figure. */
+  function onBoardHere() { return !folder.store && board.mode !== 'off'; }
+  function boardEntryName(id) { const e = boards.entries.get(id); return (e && e.name) || (id === FIRST_BOARD ? FIRST_BOARD_NAME : id); }
+  /** What is on screen, by name: the board's, or the folder's, repository's, site's or room's. */
+  function boardOnScreenName() {
+    if (folder.store) return folder.name || (folder.how === 'live' ? 'room' : 'folder');
+    if (board.mode === 'off') return '';
+    return boardEntryName(board.id);
+  }
 
   function openBoardDB() {
     return new Promise((resolve, reject) => {
       let req;
-      try { req = indexedDB.open(BOARD_DB, 1); } catch (err) { reject(err); return; }
+      try { req = indexedDB.open(BOARD_DB, BOARD_DB_VERSION); } catch (err) { reject(err); return; }
       req.onupgradeneeded = () => {
         const db = req.result;
         if (!db.objectStoreNames.contains('records')) db.createObjectStore('records', { keyPath: ['board', 'seq'] });
         if (!db.objectStoreNames.contains('meta')) db.createObjectStore('meta', { keyPath: 'board' });
+        // R1: one entry a board (and one a recent place). R3's records and meta are left as they are.
+        if (!db.objectStoreNames.contains('boards')) db.createObjectStore('boards', { keyPath: 'id' });
       };
       req.onsuccess = () => {
         const db = req.result;
         // A newer page asking for a new version: it may; this page says it stopped saving.
-        db.onversionchange = () => { db.close(); board.dbClosed = true; board.journal.broken({ kind: 'refused', detail: 'a newer copy of the page took the board over' }); };
+        db.onversionchange = () => { db.close(); board.dbClosed = true; boardDbPromise = null; board.journal.broken({ kind: 'refused', detail: 'a newer copy of the page took the board over' }); };
         // Closed by the browser (site data cleared under it): the next try opens it again.
-        db.onclose = () => { board.dbClosed = true; };
+        db.onclose = () => { board.dbClosed = true; boardDbPromise = null; };
         resolve(db);
       };
       req.onerror = () => reject(req.error || new DOMException('the browser would not open its storage', 'UnknownError'));
@@ -7621,20 +8008,37 @@
       req.onblocked = () => { board.journal.broken({ kind: 'tab', detail: 'an older copy of the page' }); };
     });
   }
+  /** The one connection, opened once — and said, not waited on forever, when the store never answers. */
+  function boardDB() {
+    if (!boardDbPromise) {
+      boardDbPromise = Promise.race([openBoardDB(), new Promise((resolve, reject) => setTimeout(() => reject(new DOMException('the browser did not open its storage within 10 s', 'TimeoutError')), 10000))]);
+      boardDbPromise.catch(() => { boardDbPromise = null; });
+    }
+    return boardDbPromise;
+  }
 
-  /** IndexedDB as the journal's store: `records` keyed [board, seq], `meta` keyed by board. */
-  function idbBackend(db) {
-    const every = () => IDBKeyRange.bound([BOARD_KEY, 0], [BOARD_KEY, Infinity]);
+  /** IndexedDB as one board's store: `records` keyed [board, seq], `meta` keyed by board. */
+  function idbBackend(db, id) {
+    const every = () => IDBKeyRange.bound([id, 0], [id, Infinity]);
     return {
+      id,
       // Begun AND committed before it returns: once this task ends the record
       // is the browser's to keep, whatever becomes of the tab (the kill test).
       append(rec, o) {
         return new Promise((resolve, reject) => {
           const tx = db.transaction(o.meta ? ['records', 'meta'] : ['records'], 'readwrite', { durability: 'strict' });
-          const rs = tx.objectStore('records');
-          if (o.compact) rs.delete(IDBKeyRange.bound([BOARD_KEY, 0], [BOARD_KEY, rec.seq], false, true));
-          rs.add({ board: BOARD_KEY, seq: rec.seq, on: rec.on, base: rec.base, n: rec.n, text: rec.text });
-          if (o.meta) tx.objectStore('meta').put(Object.assign({ board: BOARD_KEY }, o.meta));
+          try {
+            const rs = tx.objectStore('records');
+            if (o.compact) rs.delete(IDBKeyRange.bound([id, 0], [id, rec.seq], false, true));
+            rs.add({ board: id, seq: rec.seq, on: rec.on, base: rec.base, n: rec.n, text: rec.text });
+            if (o.meta) tx.objectStore('meta').put(Object.assign({}, o.meta, { board: id }));
+          } catch (err) {
+            // A request refused as it is made (a whole log's delete already issued): the transaction
+            // is abandoned, so the delete never lands without the log that replaces what it deletes.
+            try { tx.abort(); } catch (e) { /* already finished */ }
+            reject(err);
+            return;
+          }
           tx.oncomplete = () => resolve();
           tx.onabort = () => reject(tx.error || new DOMException('the browser abandoned the write', 'AbortError'));
           if (tx.commit) tx.commit();
@@ -7644,17 +8048,27 @@
         return new Promise((resolve, reject) => {
           const tx = db.transaction(['records', 'meta'], 'readonly');
           const out = { meta: null, records: [] };
-          tx.objectStore('meta').get(BOARD_KEY).onsuccess = (e) => { out.meta = e.target.result || null; };
+          tx.objectStore('meta').get(id).onsuccess = (e) => { out.meta = e.target.result || null; };
           tx.objectStore('records').getAll(every()).onsuccess = (e) => { out.records = e.target.result || []; };
           tx.oncomplete = () => resolve(out);
           tx.onabort = () => reject(tx.error || new DOMException('the browser abandoned the read', 'AbortError'));
+        });
+      },
+      /** What the board holds, said again without a record (a board opened that R3 kept had none of it). */
+      putMeta(meta) {
+        return new Promise((resolve, reject) => {
+          const tx = db.transaction(['meta'], 'readwrite');
+          tx.objectStore('meta').put(Object.assign({}, meta, { board: id }));
+          tx.oncomplete = () => resolve();
+          tx.onabort = () => reject(tx.error);
+          if (tx.commit) tx.commit();
         });
       },
       clear() {
         return new Promise((resolve, reject) => {
           const tx = db.transaction(['records', 'meta'], 'readwrite');
           tx.objectStore('records').delete(every());
-          tx.objectStore('meta').delete(BOARD_KEY);
+          tx.objectStore('meta').delete(id);
           tx.oncomplete = () => resolve();
           tx.onabort = () => reject(tx.error);
           if (tx.commit) tx.commit();
@@ -7666,11 +8080,12 @@
   /**
    * Browser storage as the journal's store, where there is no IndexedDB: the
    * whole log under one key, as before R3 — and a failure there is said like
-   * any other.
+   * any other. One board only: there is nowhere to keep a list.
    */
   function legacyBackend(events) {
     let log = (events || []).slice();
     return {
+      id: FIRST_BOARD,
       append(rec) {
         try {
           const evs = journalEvents(rec.text).events;
@@ -7682,98 +8097,336 @@
         } catch (err) { return Promise.reject(err); }
       },
       read() { return Promise.resolve({ meta: null, records: [] }); },
+      putMeta() { return Promise.resolve(); },
       clear() { log = []; try { localStorage.removeItem(LOCAL_LOG_KEY); } catch (err) { /* nothing */ } return Promise.resolve(); },
     };
   }
 
   /**
-   * One tab writes the board. Two tabs appending to one journal would
-   * interleave two logs into a board neither showed, so the board is a Web
-   * Lock held for the page's life; a second tab shows the board and writes
-   * nothing, and says so. The lock of a tab that died is released by the
-   * browser, so the wait is short. 'held' | 'taken' | 'none' (no Web Locks
-   * here: this tab writes, as before).
+   * One tab writes a board. Two tabs appending to one journal would
+   * interleave two logs into a board neither showed, so each board is a Web
+   * Lock, held while this page is on it; a second tab shows the board and
+   * writes nothing, and says so. The lock of a tab that died is released by
+   * the browser, so the wait is short. Resolves { state: 'held' | 'taken' |
+   * 'none' (no Web Locks here: this tab writes, as before), release }.
    */
-  function takeBoardLock(waitMs) {
-    if (!(navigator.locks && navigator.locks.request)) return Promise.resolve('none');
+  function takeBoardLock(id, waitMs) {
+    if (!(navigator.locks && navigator.locks.request)) return Promise.resolve({ state: 'none', release: null });
     return new Promise((resolve) => {
       let settled = false;
       const ctl = typeof AbortController === 'function' ? new AbortController() : null;
-      // Held for the page's life — or until it stops keeping the board (leaveBoard).
-      const forever = () => new Promise((r) => { board.release = r; });
-      const timer = setTimeout(() => { if (settled) return; settled = true; if (ctl) ctl.abort(); resolve('taken'); }, waitMs);
-      const none = () => { if (!settled) { settled = true; clearTimeout(timer); resolve('none'); } };
+      const timer = setTimeout(() => { if (settled) return; settled = true; if (ctl) ctl.abort(); resolve({ state: 'taken', release: null }); }, waitMs);
+      const none = () => { if (!settled) { settled = true; clearTimeout(timer); resolve({ state: 'none', release: null }); } };
       try {
-        navigator.locks.request(BOARD_LOCK, ctl ? { signal: ctl.signal } : {}, () => {
-          const held = forever(); // first, so a page that no longer keeps the board can let it go at once
-          if (settled) { boardFreed(); return held; }
-          settled = true; clearTimeout(timer); resolve('held');
+        navigator.locks.request(boardLockName(id), ctl ? { signal: ctl.signal } : {}, () => {
+          let release;
+          const held = new Promise((r) => { release = r; }); // first, so a page that no longer keeps the board can let it go at once
+          if (settled) { lateGrant(id, release); return held; }
+          settled = true; clearTimeout(timer); resolve({ state: 'held', release });
           return held;
         }).catch(none);
       } catch (err) { none(); } // a page the lock manager will not serve (an opaque origin): this tab writes, as before
     });
   }
-  /** Wait for the other tab to let the board go. */
-  function waitForBoard() {
-    if (!(navigator.locks && navigator.locks.request)) return;
-    try { navigator.locks.request(BOARD_LOCK, () => { const held = new Promise((r) => { board.release = r; }); boardFreed(); return held; }).catch(() => { /* nothing */ }); } catch (err) { /* nothing */ }
+  /** The lock came just as this page stopped waiting for it: taken up as a board let go — once this page is on that board. */
+  function lateGrant(id, release) {
+    if (board.id === id && board.ready && board.opened && onBoardHere() && board.journal.state === 'readonly' && board.lock !== 'held') { boardFreed(id, release); return; }
+    if (board.lateGrant && board.lateGrant.release !== release) board.lateGrant.release();
+    board.lateGrant = { id, release };
   }
-  /** The other tab let go: this one writes from here — if nothing was written since it opened. */
-  async function boardFreed() {
-    if (board.lock === 'held') return;
-    if (folder.store || board.journal.state === 'off') { if (board.release) { board.release(); board.release = null; } return; }
-    if (!board.backend || !board.opened) { board.freedEarly = true; return; } // opening still: taken up at its end
+  /** Wait for the tab holding board `id` to let it go; stopped when this page leaves the board. */
+  function waitForBoard(id) {
+    if (!(navigator.locks && navigator.locks.request)) return;
+    const ctl = typeof AbortController === 'function' ? new AbortController() : null;
+    board.waitCtl = ctl;
+    try {
+      navigator.locks.request(boardLockName(id), ctl ? { signal: ctl.signal } : {}, () => {
+        let release;
+        const held = new Promise((r) => { release = r; });
+        boardFreed(id, release);
+        return held;
+      }).catch(() => { /* stopped waiting */ });
+    } catch (err) { /* nothing */ }
+  }
+  /** The other tab let go of board `id`: this one writes it from here — if nothing was written since it opened. */
+  async function boardFreed(id, release) {
+    if (board.id !== id || !onBoardHere() || board.journal.state === 'off' || board.lock === 'held') { if (release) release(); return; }
+    if (!board.backend || !board.opened || !board.ready) {
+      if (board.lateGrant && board.lateGrant.release !== release) board.lateGrant.release();
+      board.lateGrant = { id, release };
+      return;
+    }
+    const gen = board.gen;
     board.lock = 'held';
+    board.release = release;
+    board.waitCtl = null;
     let got;
     try { got = await board.backend.read(); } catch (err) { board.journal.broken(troubleOf(err, 'read')); return; }
+    if (gen !== board.gen) return; // this page has left the board since: leaveBoard let the lock go
     const fold = journalFold(got.records);
     if (fold.lastSeq !== board.opened.lastSeq) { board.journal.readonly({ kind: 'elsewhere', detail: '' }); return; }
+    board.meta = got.meta;
     board.journal.arm({ seq: fold.lastSeq, chain: fold.chain, sinceFull: fold.sinceFull, arr: board.opened.arr, len: board.opened.len, whole: fold.skipped.length > 0 || fold.bad > 0 || !got.meta, meta: got.meta ? null : { v: 1, created: Date.now(), imported: 0 } });
     persistBoard();
     flash('saving here now — the other tab let the board go');
   }
 
+  // ----- The list ------------------------------------------------------------
+  /** Every entry and every board's meta, in one read. */
+  function readBoardsList(db) {
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(['boards', 'meta'], 'readonly');
+      const out = { entries: [], metas: [] };
+      tx.objectStore('boards').getAll().onsuccess = (e) => { out.entries = e.target.result || []; };
+      tx.objectStore('meta').getAll().onsuccess = (e) => { out.metas = e.target.result || []; };
+      tx.oncomplete = () => resolve(out);
+      tx.onabort = () => reject(tx.error || new DOMException('the browser abandoned the read', 'AbortError'));
+    });
+  }
+  /** What a meta record says the board holds, if it says (R3's said nothing of it). */
+  function statsOfMeta(m) {
+    return m && typeof m.events === 'number' ? { changed: m.changed || 0, events: m.events, marks: m.marks || 0, chars: m.chars || 0 } : null;
+  }
+  /** The list as the store holds it, taken into this page (the board on screen keeps what this page knows of it). */
+  function takeBoardsList(got) {
+    boards.entries = new Map(got.entries.map((e) => [e.id, e]));
+    for (const h of boards.held) boards.entries.set(h.id, h); // not written yet: still this page's
+    const mine = onBoardHere() ? boards.stats.get(board.id) : null;
+    boards.stats = new Map();
+    for (const m of got.metas) { const s = statsOfMeta(m); if (s) boards.stats.set(m.board, s); }
+    if (mine) boards.stats.set(board.id, mine);
+  }
+  /** Read the list again (another tab changed it), and say what changed here. */
+  function rereadBoards() {
+    if (boards.how !== 'indexeddb') return Promise.resolve();
+    return boardDB().then(readBoardsList).then((got) => { takeBoardsList(got); syncBoardFaces(); }, () => { /* the list stays as this page last knew it */ });
+  }
+  /** A readwrite transaction over the list; `fn(tx)` issues the writes. Resolves with what `fn` returned, once committed. */
+  function boardsTx(stores, fn) {
+    boards.busy++;
+    return boardDB().then((db) => new Promise((resolve, reject) => {
+      let tx, out;
+      try { tx = db.transaction(stores, 'readwrite'); out = fn(tx); } catch (err) { try { if (tx) tx.abort(); } catch (e) { /* nothing */ } reject(err); return; }
+      tx.oncomplete = () => resolve(out);
+      tx.onabort = () => reject(tx.error || new DOMException('the browser abandoned the write', 'AbortError'));
+    })).finally(() => { boards.busy--; });
+  }
+  /** Change entries as the store holds them — read and written in one transaction, since another tab may have changed them. */
+  function updateBoardEntries(ids, change) {
+    return boardsTx(['boards'], (tx) => {
+      const st = tx.objectStore('boards');
+      const done = [];
+      for (const id of ids) {
+        st.get(id).onsuccess = (e) => {
+          // An entry the store refused earlier is changed where it is held, and written with the change.
+          const cur = e.target.result || boards.held.find((h) => h.id === id);
+          const next = cur && change(cur);
+          if (next) { st.put(next); done.push(next); }
+        };
+      }
+      return done;
+    }).then((done) => {
+      for (const e of done) { boards.entries.set(e.id, e); boards.held = boards.held.filter((h) => h.id !== e.id); }
+      if (done.length) boardsChanged();
+      return done;
+    });
+  }
+  /** A new board, with a log or empty: its entry, its first record and its meta in one transaction. */
+  function writeNewBoard(entry, events, view) {
+    const now = Date.now();
+    const evs = events || [];
+    const text = journalText(evs);
+    const stats = statsOf(evs, text.length, now);
+    return boardsTx(['boards', 'records', 'meta'], (tx) => {
+      tx.objectStore('boards').put(entry);
+      if (evs.length) tx.objectStore('records').add({ board: entry.id, seq: 1, on: 1, base: 0, n: evs.length, text });
+      tx.objectStore('meta').put(Object.assign({ board: entry.id, v: 1, created: now, imported: 0 }, stats));
+    }).then(() => {
+      boards.entries.set(entry.id, entry);
+      boards.stats.set(entry.id, stats);
+      if (view) prefs.set(BOARD_VIEW_KEY + entry.id, view);
+      boardsChanged();
+      return entry;
+    });
+  }
+  /** Entries the store refused, held until it takes writes again. */
+  function holdEntries(list) {
+    for (const e of list) { boards.entries.set(e.id, e); boards.held = boards.held.filter((h) => h.id !== e.id).concat([e]); }
+  }
+  function writeHeldEntries() {
+    const list = boards.held;
+    boards.held = [];
+    return boardsTx(['boards'], (tx) => { for (const e of list) tx.objectStore('boards').put(e); })
+      .then(() => boardsChanged(), () => { boards.held = list.concat(boards.held); });
+  }
+  /** An id for a new board: never a name, never reused. */
+  function mintBoardId() {
+    let r = '';
+    try { const a = new Uint32Array(2); crypto.getRandomValues(a); r = a[0].toString(36) + a[1].toString(36); } catch (err) { r = Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2); }
+    return 'b-' + Date.now().toString(36) + '-' + r.slice(0, 8);
+  }
+  /** The list changed here: this page's faces, the pane, and every other tab of this browser. */
+  function boardsChanged() {
+    syncBoardFaces();
+    try { if (boards.channel) boards.channel.postMessage({ type: 'boards', at: Date.now() }); } catch (err) { /* nothing */ }
+  }
+  try {
+    if (typeof BroadcastChannel === 'function') {
+      boards.channel = new BroadcastChannel('mm-boards');
+      boards.channel.onmessage = () => { rereadBoards(); };
+    }
+  } catch (err) { boards.channel = null; }
+
+  /** The title, the boards tile and the pane, from what is on screen. Figures keep theirs. */
+  function syncBoardFaces() {
+    if (!EMBED && !params.has('replay')) {
+      const name = boardOnScreenName();
+      if (name) document.title = boardTitle(name);
+    }
+    if (typeof syncTiles === 'function') syncTiles();
+    if (typeof renderBoardsPane === 'function') renderBoardsPane();
+  }
+
+  /** A place opened on the page is remembered in the list: a folder (with its handle, where the browser keeps one), a repository, a site. */
+  async function rememberPlace(how, spec, name, handle) {
+    const kind = how === 'git' ? 'git' : how === 'static' ? 'static' : how === 'folder' ? 'folder' : null;
+    if (!kind || !spec) return;
+    if (boardsListed) await boardsListed.catch(() => {});
+    if (boards.how !== 'indexeddb') return;
+    const entry = placeEntry(kind, spec, name, Date.now());
+    const plan = placesPlan([...boards.entries.values()], entry);
+    const write = (withHandle) => boardsTx(['boards'], (tx) => {
+      const st = tx.objectStore('boards');
+      st.put(withHandle && handle ? Object.assign({}, entry, { handle }) : entry);
+      for (const id of plan.drop) st.delete(id);
+    });
+    // A handle the browser cannot keep is left out: the folder is then opened again by its picker.
+    return write(true).catch(() => write(false)).then(() => {
+      boards.entries.set(entry.id, handle ? Object.assign({}, entry, { handle }) : entry);
+      for (const id of plan.drop) boards.entries.delete(id);
+      boardsChanged();
+    }, () => { /* remembering a place is a convenience; the place itself is open */ });
+  }
+  /** A recent place, opened again the way its tile opens it. */
+  async function openPlace(id) {
+    const e = boards.entries.get(id);
+    if (!e) return null;
+    if (e.kind === 'static') return openStatic(e.spec);
+    if (e.kind === 'git') return openGit(e.spec);
+    if (e.kind === 'folder') {
+      if (e.handle && e.handle.requestPermission) {
+        try {
+          const ok = (await e.handle.queryPermission({ mode: 'readwrite' })) === 'granted' || (await e.handle.requestPermission({ mode: 'readwrite' })) === 'granted';
+          if (ok) return openStore(new MM.FolderStore(e.handle), 'folder', e.handle.name, { handle: e.handle });
+        } catch (err) { /* the picker, then */ }
+      }
+      return openFolder();
+    }
+    return null;
+  }
+
+  // ----- The view, per board --------------------------------------------------
+  // Where the hand left a board — its zoom and pan — is this device's, not the
+  // board's (a board is its log, nothing else): a preference per board id,
+  // saved on the way out of a board or a page, and a moment after the view moves.
+  function saveBoardView() {
+    if (!onBoardHere() || !board.ready) return;
+    const v = { zoom: view.zoom, panX: view.panX, panY: view.panY };
+    const was = board.viewSaved;
+    if (was && was.zoom === v.zoom && was.panX === v.panX && was.panY === v.panY) return;
+    board.viewSaved = v;
+    prefs.set(BOARD_VIEW_KEY + board.id, v);
+  }
+  /** A board opens where it was left; one never looked at here opens fitted. */
+  function restoreBoardView(id) {
+    const v = prefs.get(BOARD_VIEW_KEY + id, null);
+    if (v && isFinite(v.zoom) && v.zoom > 0 && isFinite(v.panX) && isFinite(v.panY)) {
+      view.zoom = clampZoom(v.zoom); view.panX = v.panX; view.panY = v.panY;
+      afterViewChange();
+      board.viewSaved = { zoom: view.zoom, panX: view.panX, panY: view.panY };
+    } else {
+      // Fitted, and not yet anywhere the device keeps: the next save writes it, moved or not,
+      // so a board left where it opened comes back there — not fitted again to what it holds by then.
+      fitAll();
+      board.viewSaved = null;
+    }
+  }
+  let boardViewTimer = 0;
+  const boardViewSoon = () => { clearTimeout(boardViewTimer); boardViewTimer = setTimeout(saveBoardView, 800); };
+  addEventListener('pointerup', boardViewSoon, true);
+  addEventListener('wheel', boardViewSoon, { capture: true, passive: true });
+  addEventListener('keyup', boardViewSoon, true);
+
+  // ----- Opening a board ------------------------------------------------------
   /**
-   * Open the board this browser keeps: the store, the lock, the records, the
-   * one import of browser storage's old copy (openPlan decides; this acts).
-   * Resolves true when a board came back onto the page.
+   * Open the board this page is on at boot: the store, the list (R3's board as
+   * its first entry), which board (?board=, else the one opened last), its
+   * lock, its records — and the one import of browser storage's old copy
+   * (openPlan decides; this acts). Resolves true when a board came back onto the page.
    */
-  async function openBoard(mode) {
+  function openBoard(mode) {
     board.mode = mode;
+    const opening = openBoardSafely(mode);
+    boardsListed = opening.then(() => undefined);
+    return opening;
+  }
+  async function openBoardSafely(mode) {
     try { return await openBoardNow(mode); } catch (err) {
       // Whatever went wrong, it is said: a page that silently stopped saving is the one thing this may not do.
       board.journal.broken(troubleOf(err, 'open'));
       board.ready = true;
+      boards.ready = true;
+      syncBoardFaces();
       return false;
     }
   }
   async function openBoardNow(mode) {
-    let legacy = null;
-    try { legacy = localStorage.getItem(LOCAL_LOG_KEY); } catch (err) { legacy = null; }
-    let got = null, fallback = null, unreadable = null;
-    try {
-      // A store that never answers is a store that does not work: said, not waited on forever.
-      const db = await Promise.race([openBoardDB(), new Promise((resolve, reject) => setTimeout(() => reject(new DOMException('the browser did not open its storage within 10 s', 'TimeoutError')), 10000))]);
-      board.backend = idbBackend(db);
-      board.how = 'indexeddb';
-    } catch (err) {
+    let db = null, fallback = null;
+    try { db = await boardDB(); board.how = 'indexeddb'; } catch (err) {
       if (err && err.name === 'TimeoutError') throw err;
       fallback = err;
     }
-    if (!fallback) {
-      board.lock = await takeBoardLock(1500);
-      try { got = await board.backend.read(); } catch (err) { unreadable = err; }
+    if (fallback) return openFallbackBoard(mode);
+    boards.how = 'indexeddb';
+    // The list: read it; a list with no board gets R3's as its first entry.
+    const got = await readBoardsList(db);
+    const metaFirst = got.metas.find((m) => m.board === FIRST_BOARD) || null;
+    const plan = listPlan(got.entries, Date.now(), metaFirst);
+    takeBoardsList({ entries: plan.entries, metas: got.metas });
+    // The list never stands between a board and its journal: an entry the store refuses (full) is held.
+    if (plan.put.length) await boardsTx(['boards'], (tx) => { for (const e of plan.put) tx.objectStore('boards').put(e); }).catch(() => holdEntries(plan.put));
+    // Which board this page opens.
+    const asked = params.get('board');
+    const pick = pickBoard(plan.entries, asked);
+    let id = pick.id;
+    if (pick.make) {
+      const entry = newBoardEntry(plan.entries, mintBoardId(), Date.now());
+      await writeNewBoard(entry, null, null).catch(() => holdEntries([entry]));
+      id = entry.id;
     }
-    if (unreadable) {
-      // Never write over what could not be read.
-      board.journal.broken(troubleOf(unreadable, 'read'));
-      board.ready = true;
-      return false;
-    }
-    const owner = board.lock !== 'taken';
-    const plan = openPlan({ meta: got && got.meta, records: got ? got.records : [], legacy, owner, fallback: !!fallback, now: Date.now() });
-    if (fallback) { board.backend = legacyBackend(plan.events); board.how = 'browser storage'; }
-    // What a quick hand drew while the store was opening stays, after what comes back.
+    if (pick.restore) await updateBoardEntries([id], (e) => (e.trashed ? restored(e) : null)).catch(() => { const e = boards.entries.get(id); if (e) holdEntries([restored(e)]); });
+    boards.ready = true;
+    const prep = await prepareBoard(id);
+    await boardOpening(prep.approx);
+    const back = applyBoard(prep, { mode, early: true });
+    afterBoardOpened(id, { boot: true, address: mode === 'restore' });
+    if (pick.missing) say('there is no board “' + pick.missing + '” in this browser — opened “' + boardEntryName(id) + '”');
+    else if (pick.restore) say('“' + boardEntryName(id) + '” was in the trash — it is back on the list');
+    board.saidAtOpen = !!(pick.missing || pick.restore);
+    return back;
+  }
+  /** No IndexedDB: browser storage is the store, as before R3 — one board, and nowhere to keep a list. */
+  async function openFallbackBoard(mode) {
+    let legacy = null;
+    try { legacy = localStorage.getItem(LOCAL_LOG_KEY); } catch (err) { legacy = null; }
+    boards.how = 'browser storage';
+    boards.entries = new Map([[FIRST_BOARD, listPlan([], Date.now(), null).put[0]]]);
+    boards.ready = true;
+    const plan = openPlan({ meta: null, records: [], legacy, owner: true, fallback: true, now: Date.now() });
+    board.id = FIRST_BOARD;
+    board.backend = legacyBackend(plan.events);
+    board.how = 'browser storage';
+    board.journal = journalFor(FIRST_BOARD, board.backend);
     const early = session.getEvents().slice();
     let arr = null;
     if (mode === 'restore' && plan.events.length) {
@@ -7783,22 +8436,119 @@
       try { session.load(plan.events.concat(early)); } finally { board.restoring = false; }
       arr = session.getEvents();
     }
+    board.opened = { arr: arr || [], len: arr ? plan.events.length : 0, lastSeq: 0 };
+    const a = Object.assign({}, plan.arm);
+    if (mode !== 'fresh' && arr) { a.arr = arr; a.len = plan.events.length; }
+    board.journal.arm(a);
+    board.ready = true;
+    persistBoard();
+    afterBoardOpened(FIRST_BOARD, { boot: true, address: false });
+    return !!arr;
+  }
+  /** Everything opening board `id` needs, read before anything on screen changes: its lock, its records. */
+  async function prepareBoard(id) {
+    const db = await boardDB();
+    const backend = idbBackend(db, id);
+    const lock = await takeBoardLock(id, 1500);
+    let got = null, unreadable = null;
+    try { got = await backend.read(); } catch (err) { unreadable = err; }
+    let approx = 0;
+    if (got) for (const r of got.records) approx += r.n || 0;
+    return { id, backend, lock, got, unreadable, approx };
+  }
+  /**
+   * Put a prepared board on the page — in one task, with nothing awaited, so
+   * no stroke lands between the board left and the board loaded. `early`
+   * (boot only): what a quick hand drew while the store was opening stays,
+   * after what comes back. Returns whether a board came back onto the page.
+   */
+  function applyBoard(prep, o) {
+    const id = prep.id;
+    board.gen++;
+    board.id = id;
+    board.backend = prep.backend;
+    board.lock = prep.lock.state;
+    board.release = prep.lock.release;
+    board.meta = prep.got ? prep.got.meta : null;
+    board.viewSaved = null;
+    board.journal = journalFor(id, prep.backend);
+    if (prep.unreadable) {
+      // Never write over what could not be read — and never show the board left as if it were this one.
+      if (!o.early) { board.restoring = true; try { session.load([]); } finally { board.restoring = false; } }
+      board.journal.broken(troubleOf(prep.unreadable, 'read'));
+      board.opened = { arr: [], len: 0, lastSeq: 0 };
+      board.ready = true;
+      return false;
+    }
+    let legacy = null;
+    if (id === FIRST_BOARD) { try { legacy = localStorage.getItem(LOCAL_LOG_KEY); } catch (err) { legacy = null; } }
+    const owner = prep.lock.state !== 'taken';
+    const plan = openPlan({ meta: prep.got.meta, records: prep.got.records, legacy, owner, fallback: false, now: Date.now() });
+    // What a quick hand drew while the store was opening stays, after what comes back (boot).
+    const early = o.early ? session.getEvents().slice() : [];
+    let arr = null;
+    if (o.mode === 'restore' && (plan.events.length || !o.early)) {
+      board.from = plan.from;
+      board.restoring = true;
+      try { session.load(plan.events.concat(early)); } finally { board.restoring = false; }
+      arr = session.getEvents();
+    } else if (!o.early) {
+      board.restoring = true;
+      try { session.load([]); } finally { board.restoring = false; }
+    }
     board.opened = { arr: arr || [], len: arr ? plan.events.length : 0, lastSeq: plan.lastSeq };
+    // What the board holds, when its meta does not say (R3 kept none of it): from its records, as of its last event.
+    if (!statsOfMeta(prep.got.meta)) {
+      let chars = 0;
+      for (const r of prep.got.records) chars += (r.text || '').length;
+      let last = 0;
+      for (const ev of plan.events) if (ev && typeof ev.at === 'number' && ev.at > last) last = ev.at;
+      const st = statsOf(plan.events, chars, last || (prep.got.meta && prep.got.meta.created) || 0);
+      boards.stats.set(id, st);
+      if (owner && prep.got.meta && plan.from === 'store') {
+        board.meta = Object.assign({}, prep.got.meta, st, { board: id });
+        prep.backend.putMeta(board.meta).catch(() => { /* the next record says it */ });
+      }
+    } else boards.stats.set(id, statsOfMeta(prep.got.meta));
     if (plan.arm) {
       const a = Object.assign({}, plan.arm);
       // A fresh board replaces what is kept at its first change, never before it.
-      if (mode === 'fresh') a.whole = false;
+      if (o.mode === 'fresh') a.whole = false;
       else if (arr && !a.whole) { a.arr = arr; a.len = plan.events.length; }
       board.journal.arm(a);
     } else {
       board.journal.readonly({ kind: 'tab', detail: '' });
-      if (board.freedEarly) boardFreed(); else waitForBoard();
+      if (!(board.lateGrant && board.lateGrant.id === id)) waitForBoard(id);
     }
     board.ready = true;
+    // The other tab let go while this one was opening: taken up now that the board is open.
+    if (!plan.arm && board.lateGrant && board.lateGrant.id === id) { const g = board.lateGrant; board.lateGrant = null; boardFreed(id, g.release); }
     if (plan.damaged && plan.arm) say('the board kept in this browser had ' + (plan.damaged.skipped + plan.damaged.bad) + ' unreadable piece' + (plan.damaged.skipped + plan.damaged.bad === 1 ? '' : 's') + ' — what could be read is back, and is written whole again');
     // What the store has not heard: the import, what was drawn while it opened.
     persistBoard();
     return !!arr;
+  }
+  /**
+   * After a board is on the page: its view (unless a hand has moved it since
+   * the page opened, or it is a fresh start the page draws on at once), the
+   * title, the tile, the address, the device's mark, and "opened" in its entry.
+   */
+  function afterBoardOpened(id, o) {
+    const untouched = view.zoom === 1 && view.panX === 0 && view.panY === 0;
+    if (board.mode !== 'fresh' && (!o.boot || untouched)) restoreBoardView(id);
+    if (o.address && !EMBED) {
+      try { history.replaceState(history.state, '', location.pathname + boardSearch(location.search, id) + location.hash); } catch (err) { /* an address this page may not change */ }
+    }
+    if (!o.boot) markAfterOpen();
+    syncBoardFaces();
+    if (boards.how === 'indexeddb') updateBoardEntries([id], (e) => Object.assign({}, e, { opened: Date.now() })).catch(() => { /* when it was opened is a convenience */ });
+  }
+  /** The device's taught mark, on the board just opened — taught again only where the board's own log says otherwise. */
+  function markAfterOpen() {
+    const saved = savedMark();
+    if (!saved || !saved.mark) return;
+    const now = session.getState().commandMark || null;
+    if (JSON.stringify(now) !== JSON.stringify(saved.mark)) restoreMark();
   }
   /** A big board: say so, and let the line paint before the replay holds the thread. */
   function boardOpening(n) {
@@ -7811,6 +8561,212 @@
       setTimeout(go, 120);
     });
   }
+  /** The list, on a page that keeps no board (a folder, a repository or a room named in the address): read, for the pane and the places. */
+  function openBoardsList() {
+    boardsListed = boardDB().then((db) => readBoardsList(db)).then((got) => {
+      boards.how = 'indexeddb';
+      takeBoardsList(got);
+    }, () => { boards.how = 'none'; }).then(() => { boards.ready = true; board.ready = true; syncBoardFaces(); });
+    return boardsListed;
+  }
+
+  // ----- Leaving, switching ---------------------------------------------------
+  /**
+   * Flush the board on screen and wait until its store holds all of it.
+   * null when it may be left; else the verdict (17-boards.js: 'unsaved',
+   * 'not-kept', said with the ways out). `force`: the person said leave it.
+   */
+  async function readyToLeave(force) {
+    for (let i = 0; i < 100; i++) {
+      board.journal.flush(session.getEvents());
+      await board.journal.idle();
+      const v = leaveVerdict(Object.assign(board.journal.snapshot(), { name: boardEntryName(board.id) }));
+      if (!v) return null;
+      if (v.kind !== 'busy') return force ? null : v;
+      await new Promise((r) => setTimeout(r, 30));
+    }
+    return force ? null : { kind: 'busy', words: '“' + boardEntryName(board.id) + '” is still being written — try again in a moment', ways: [] };
+  }
+  /**
+   * Open board `id` (or a place) from the list. In place when a board is on
+   * screen: what the next needs is read first, the one on screen flushed and
+   * waited on, then — in one task — left, and the next loaded. Resolves true
+   * when the page is on it (or leaving for it), false when refused.
+   * `o.force`: leave a board that is not saved (the person's second tap);
+   * `o.said(verdict)`: where a refusal is said (the pane), else the status line.
+   */
+  async function switchBoard(id, o) {
+    o = o || {};
+    if (boards.switching) return false;
+    const plan = switchPlan({ entries: [...boards.entries.values()], current: board.id, onBoard: onBoardHere(), target: id });
+    const refuse = (v) => { if (o.said) o.said(v); else say(v.words); return false; };
+    if (plan.go === 'here') return true;
+    if (plan.go === 'missing') return refuse({ kind: 'missing', words: 'that board is not in this browser any more', ways: [] });
+    boards.switching = true;
+    syncBoardFaces();
+    try {
+      if (plan.go === 'place') { await openPlace(id); return true; }
+      if (plan.restore) await updateBoardEntries([id], (e) => (e.trashed ? restored(e) : null));
+      if (plan.go === 'navigate') {
+        // A folder, a repository or a room is on screen: what it has not sent goes first, then the board opens in a page of its own.
+        if (folder.store && folder.how !== 'static') await saveNow();
+        if (folder.saveTrouble && !o.force) return refuse({ kind: 'unsaved', words: troubleWords(folder.saveTrouble).lead, ways: ['export', 'leave'] });
+        location.assign(location.pathname + boardSearch(location.search, id) + location.hash);
+        return true;
+      }
+      const prep = await prepareBoard(id);
+      await boardOpening(prep.approx);
+      const v = await readyToLeave(o.force);
+      if (v) { if (prep.lock.release) prep.lock.release(); return refuse(v); }
+      // From here to the load, nothing is awaited: no stroke can land in between.
+      leaveBoard();
+      applyBoard(prep, { mode: 'restore', early: false });
+      afterBoardOpened(id, { boot: false, address: true });
+      return true;
+    } catch (err) {
+      return refuse({ kind: 'refused', words: 'could not open that board — ' + ((err && err.message) || err), ways: [] });
+    } finally {
+      boards.switching = false;
+      syncBoardFaces();
+    }
+  }
+  /** A new board, opened. Refused, and nothing made, while the board on screen may not be left. */
+  async function newBoard(o) {
+    o = o || {};
+    if (boards.how !== 'indexeddb') { const v = { kind: 'one', words: 'this browser keeps one board here — open a folder to keep more', ways: [] }; if (o.said) o.said(v); else say(v.words); return false; }
+    if (onBoardHere()) { const v = await readyToLeave(o.force); if (v) { if (o.said) o.said(v); else say(v.words); return false; } }
+    const entry = newBoardEntry([...boards.entries.values()], mintBoardId(), Date.now(), o.name);
+    await writeNewBoard(entry, o.events || null, null);
+    const ok = await switchBoard(entry.id, o);
+    return ok ? entry : false;
+  }
+  async function renameBoard(id, raw) {
+    const done = await updateBoardEntries([id], (e) => renamed(e, raw));
+    return done[0] || null;
+  }
+  /** A copy under its own id, beside the original: the board on screen as it stands, any other as its store holds it. */
+  async function duplicateBoard(id) {
+    const src = boards.entries.get(id);
+    if (!src || !isKept(src) || boards.how !== 'indexeddb') return null;
+    let events;
+    if (id === board.id && onBoardHere()) events = session.getEvents().map((ev) => Object.assign({}, ev));
+    else { const db = await boardDB(); events = journalFold((await idbBackend(db, id).read()).records).events; }
+    const entry = copyEntry([...boards.entries.values()], src, mintBoardId(), Date.now());
+    return writeNewBoard(entry, events, prefs.get(BOARD_VIEW_KEY + id, null));
+  }
+  /** Delete: to the trash, from which it comes back whole. The board on screen: the page goes to another first. */
+  async function trashBoard(id, o) {
+    o = o || {};
+    const e = boards.entries.get(id);
+    if (!e || !isKept(e) || e.trashed) return false;
+    if (onBoardHere() && id === board.id) {
+      const next = nextAfter([...boards.entries.values()], id);
+      const ok = next ? await switchBoard(next, o) : await newBoard(o);
+      if (!ok) return false;
+    }
+    await updateBoardEntries([id], (cur) => (cur.trashed ? null : trashed(cur, Date.now())));
+    return true;
+  }
+  async function restoreBoard(id) {
+    const done = await updateBoardEntries([id], (e) => (e.trashed ? restored(e) : null));
+    return done[0] || null;
+  }
+  /** The boards whose lock a tab holds — a board open there is never emptied out from under it. */
+  async function boardsHeldElsewhere() {
+    if (!(navigator.locks && navigator.locks.query)) return [];
+    try {
+      const q = await navigator.locks.query();
+      return (q.held || []).map((l) => l.name || '').filter((n) => n.startsWith('mm-board:')).map((n) => n.slice('mm-board:'.length)).filter((b) => b !== board.id || !onBoardHere());
+    } catch (err) { return []; }
+  }
+  /** What emptying the trash will take, said before it happens (17-boards.js). */
+  async function planEmptyTrash() {
+    await rereadBoards();
+    const stats = {};
+    for (const [k, v] of boards.stats) stats[k] = v;
+    return emptyTrashPlan([...boards.entries.values()], stats, await boardsHeldElsewhere());
+  }
+  /** Take a board's lock only if no tab holds it; resolves its release, or null. */
+  function boardLockIfFree(id) {
+    if (!(navigator.locks && navigator.locks.request)) return Promise.resolve(() => {});
+    return new Promise((resolve) => {
+      try {
+        navigator.locks.request(boardLockName(id), { ifAvailable: true }, (lock) => {
+          if (!lock) { resolve(null); return undefined; }
+          return new Promise((release) => resolve(release));
+        }).catch(() => resolve(null));
+      } catch (err) { resolve(null); }
+    });
+  }
+  /**
+   * Empty the trash — the second, deliberate tap: every board the plan said,
+   * each only while no tab holds it (its lock is taken here for the delete),
+   * its entry, meta and every record in one transaction. Nothing else.
+   */
+  async function emptyTrash(plan) {
+    const got = [];
+    for (const e of plan.gone) {
+      const cur = boards.entries.get(e.id);
+      if (!cur || !cur.trashed) continue; // restored since the sentence: kept
+      const release = await boardLockIfFree(e.id);
+      if (release) got.push({ id: e.id, release });
+    }
+    try {
+      if (got.length) {
+        await boardsTx(['boards', 'records', 'meta'], (tx) => {
+          for (const g of got) {
+            tx.objectStore('records').delete(IDBKeyRange.bound([g.id, 0], [g.id, Infinity]));
+            tx.objectStore('meta').delete(g.id);
+            tx.objectStore('boards').delete(g.id);
+          }
+        });
+        for (const g of got) { boards.entries.delete(g.id); boards.stats.delete(g.id); prefs.del(BOARD_VIEW_KEY + g.id); }
+      }
+    } finally { for (const g of got) g.release(); }
+    boardsChanged();
+    return { gone: got.map((g) => g.id), kept: plan.gone.map((e) => e.id).filter((x) => !got.some((g) => g.id === x)).concat(plan.kept.map((e) => e.id)) };
+  }
+  /** A log file as a new board: one event per line (as *export* writes it), or a JSON array. */
+  async function boardFromFile(file, o) {
+    const text = await file.text();
+    let events = null;
+    const t = text.trim();
+    if (t.startsWith('[')) { try { const a = JSON.parse(t); if (Array.isArray(a)) events = a; } catch (err) { events = null; } }
+    else { const d = journalEvents(text); events = d.bad ? null : d.events; }
+    if (!events || !events.length || !events.every((ev) => ev && typeof ev.type === 'string')) {
+      const v = { kind: 'file', words: '“' + file.name + '” is not a board’s log — one event per line, as export writes it', ways: [] };
+      if (o && o.said) o.said(v); else say(v.words);
+      return false;
+    }
+    return newBoard(Object.assign({}, o, { name: String(file.name || '').replace(/\.[^.]*$/, '') || null, events }));
+  }
+  /**
+   * Reset: a fresh board, never one tap from losing this one. The board on
+   * screen goes to the trash (it comes back whole from there) and a fresh one
+   * opens under the same name. With no IndexedDB there is nowhere for a
+   * second board: the first tap says so, and a second within five seconds
+   * empties the one board there is.
+   */
+  async function resetBoard() {
+    if (boards.how !== 'indexeddb') {
+      if (Date.now() - board.resetArmed > 5000) { board.resetArmed = Date.now(); say('this browser keeps one board here and has no trash — export the log to keep it; Reset again within 5 s empties it'); return false; }
+      board.resetArmed = 0;
+      await forgetLocalLog();
+      location.reload();
+      return true;
+    }
+    if (!onBoardHere()) return newBoard();
+    const cur = boards.entries.get(board.id);
+    if (!session.getEvents().length) { flash('this board is already empty'); return false; }
+    const v = await readyToLeave();
+    if (v) { say(v.words); return false; }
+    const entry = newBoardEntry([...boards.entries.values()], mintBoardId(), Date.now(), cur ? cur.name : null);
+    await writeNewBoard(entry, null, null);
+    if (!(await switchBoard(entry.id))) return false;
+    if (cur) await updateBoardEntries([cur.id], (e) => (e.trashed ? null : trashed(e, Date.now())));
+    say('a fresh board — what “' + (cur ? cur.name : 'the board') + '” held is in the trash; boards ▸ restore it');
+    return true;
+  }
 
   /**
    * The session's FIRST listener, ahead of the paint — a release on a big
@@ -7822,8 +8778,9 @@
     if (folder.store) { if (board.journal.state !== 'off') leaveBoard(); return; }
     board.journal.sync(session.getEvents());
   }
-  /** On the way out — the tab hidden, the page going — anything not yet written goes now. */
+  /** On the way out — the tab hidden, the page going — anything not yet written goes now, and where the hand left the board. */
   function flushBoard() {
+    saveBoardView();
     if (folder.store) { if (folder.how !== 'static') saveNow(); return; }
     board.journal.flush(session.getEvents());
   }
@@ -7838,7 +8795,8 @@
       board.retryTimer = setInterval(() => {
         if (board.dbClosed && board.how === 'indexeddb') {
           board.dbClosed = false;
-          openBoardDB().then((db) => { board.backend = idbBackend(db); }, () => { board.dbClosed = true; });
+          const id = board.id, jn = board.journal;
+          boardDB().then((db) => { if (board.id === id && board.journal === jn) board.backend = idbBackend(db, id); }, () => { board.dbClosed = true; });
           return;
         }
         board.journal.flush(session.getEvents());
@@ -7856,8 +8814,8 @@
   }
 
   /** The way out of a failing save: this board, carried into a store that keeps it from now on. */
-  function keepBoardIn(store, how, name) {
-    return openStore(store, how, name, { carry: session.getEvents().filter((ev) => !ev.by) });
+  function keepBoardIn(store, how, name, handle) {
+    return openStore(store, how, name, { carry: session.getEvents().filter((ev) => !ev.by), handle: handle || null });
   }
   /** The other way out: the whole log, as a file to keep. */
   function exportLogNow() {
@@ -7872,16 +8830,39 @@
     else if (b.dataset.way === 'folder') openFolder({ carry: true });
   });
 
-  /** Reset: the board this browser keeps is emptied; resolves when it is. */
+  /** Empty the board on screen's store (the e2e starts from nothing with it); resolves when it is. The list keeps its entry. */
   function forgetLocalLog() {
     board.journal.reset();
     try { localStorage.removeItem(LOCAL_LOG_KEY); } catch (err) { /* nothing */ }
+    boards.stats.set(board.id, statsOf([], 0, Date.now()));
+    board.meta = null;
     return board.backend ? board.backend.clear().catch(() => {}) : Promise.resolve();
   }
 
   /** For tests: the board's own state, and what its store holds. */
   function boardState() {
-    return Object.assign({ ready: board.ready, mode: board.mode, how: board.how, lock: board.lock, from: board.from, warning: boardWarning() }, board.journal.snapshot());
+    return Object.assign({ id: board.id, ready: board.ready, mode: board.mode, how: board.how, lock: board.lock, from: board.from, warning: boardWarning() }, board.journal.snapshot());
+  }
+  /** For tests: the list as this page holds it. */
+  function boardsState() {
+    return {
+      ready: boards.ready, how: boards.how, switching: boards.switching, busy: boards.busy > 0,
+      current: onBoardHere() ? board.id : null, name: boardOnScreenName(),
+      list: [...boards.entries.values()].map((e) => { const x = Object.assign({}, e, { stats: boards.stats.get(e.id) || null }); delete x.handle; return x; }),
+    };
+  }
+  /** For tests: one board as the store holds it — its entry, its meta, how many records, its log. */
+  function boardsStore(id) {
+    return boardDB().then((db) => new Promise((resolve, reject) => {
+      const tx = db.transaction(['boards', 'records', 'meta'], 'readonly');
+      const out = { entry: null, meta: null, records: 0, log: [] };
+      let recs = [];
+      tx.objectStore('boards').get(id).onsuccess = (e) => { out.entry = e.target.result || null; if (out.entry) delete out.entry.handle; };
+      tx.objectStore('meta').get(id).onsuccess = (e) => { out.meta = e.target.result || null; };
+      tx.objectStore('records').getAll(IDBKeyRange.bound([id, 0], [id, Infinity])).onsuccess = (e) => { recs = e.target.result || []; };
+      tx.oncomplete = () => { out.records = recs.length; out.log = journalFold(recs).events; resolve(out); };
+      tx.onabort = () => reject(tx.error);
+    }));
   }
 
   function folderStatus() {
@@ -8453,10 +9434,10 @@
 
 // ===== controls =====
 // Provides: the control centre — one button in the bar, a grid of tiles in fixed slots (zoom, snap,
-//   view, theme, hand, auto-read, folder, import, export, models, teach, reset, help); syncTiles()
-//   writes every tile's face from state; openPane/closePanes keep one pane open at a time.
-// Uses: core (prefs, themeMode, hand), snap (snapMode), folder (viewMode, folder), models (agents),
-//   teach (teachPanel), handwriting (autoRead).
+//   view, theme, hand, auto-read, folder, import, export, models, teach, live, reset, help, boards);
+//   syncTiles() writes every tile's face from state; openPane/closePanes keep one pane open at a time.
+// Uses: core (prefs, themeMode, hand), snap (snapMode), folder (viewMode, folder; the boards adapter:
+//   boardOnScreenName, resetBoard), models (agents), teach (teachPanel), handwriting (autoRead).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () { ... })();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -8474,6 +9455,7 @@
     autoRead: document.getElementById('autoReadBtn'), folder: document.getElementById('folderBtn'), imp: document.getElementById('importBtn'),
     exp: document.getElementById('exportBtn'), models: document.getElementById('modelBtn'), teach: document.getElementById('teachBtn'),
     reset: document.getElementById('resetBtn'), help: document.getElementById('helpBtn'), live: document.getElementById('liveBtn'),
+    boards: document.getElementById('boardsBtn'),
   };
 
   function ccOpen() { return !ccEl.hasAttribute('hidden'); }
@@ -8505,12 +9487,18 @@
     ui.tile(tiles.exp, 'export', '…', { why: 'the board as SVG or PNG, or the session as its log' });
     ui.tile(tiles.models, 'models', agents.length ? agents.map((a) => a.config.model).join(', ') : 'none', { on: agents.length > 0, why: 'a model joins as a participant; it is asked only when you ask' });
     ui.tile(tiles.teach, 'mark', s.commandMark ? s.commandMark.name : 'check ✓', { on: !!s.commandMark, why: 'the mark that turns a circled group into a selection; teach your own' });
-    ui.tile(tiles.reset, 'reset', 'fresh board', { why: 'a fresh board; the one in browser storage is forgotten too' });
+    ui.tile(tiles.reset, 'reset', 'fresh board', { why: 'a fresh board under the same name — what this one holds goes to the trash, from which it comes back whole' });
     ui.tile(tiles.help, 'help', '?', { why: 'the hand QA plan, which doubles as the manual' });
     ui.tile(tiles.live, 'live', folder.how === 'live' ? folder.name : 'room…', { on: folder.how === 'live', why: 'a room other hands can join: between tabs on this machine, or across machines through a relay' });
+    // Its face is the name of what is on screen (V1-PLAN R1); the pane is 22-boards.js.
+    ui.tile(tiles.boards, 'boards', boardOnScreenName() || '…', { why: 'the boards this browser keeps — new, open, rename, duplicate, delete, and the trash — and the folders, repositories and sites opened lately' });
   }
 
   tiles.theme.onclick = () => setThemeMode(THEME_MODES[(THEME_MODES.indexOf(themeMode) + 1) % THEME_MODES.length]);
+  // Reset is a fresh board, never one tap from losing this one (V1-PLAN R1): what the board on screen
+  // holds goes to the trash, whole. This supersedes the handler 07-input.js set earlier in the build,
+  // which emptied the board in the browser and reloaded — one tap from losing it.
+  if (tiles.reset) tiles.reset.onclick = () => { closeCC(); resetBoard(); };
   tiles.hand.onclick = () => setHand(hand === 'right' ? 'left' : 'right');
   tiles.autoRead.onclick = () => setAutoRead(!autoRead);
   // A live room: a name, and a relay when the other hand is on another machine.
@@ -8678,6 +9666,273 @@
     minimapEl.addEventListener('pointercancel', miniEnd);
   }
 
+// ===== boards (the pane) =====
+// Provides: the boards pane under the bar (V1-PLAN §9 R1) — the boards this browser keeps, each with
+//   when it last changed and roughly how big it is, the board on screen marked; New board, a board
+//   from a log file, open, rename, duplicate, delete (to the trash), restore, and emptying the trash
+//   said plainly before it happens; the folders, repositories and sites opened lately, by kind.
+//   renderBoardsPane (the adapter calls it when the list changes).
+// Uses: ui (pane, chip), controls (tiles.boards, togglePanel/closePanel), boards list (boardRows,
+//   sizeWords, isKept), folder (the boards adapter: boards, board, onBoardHere, switchBoard, newBoard,
+//   renameBoard, duplicateBoard, trashBoard, restoreBoard, planEmptyTrash, emptyTrash, boardFromFile,
+//   rereadBoards, boardEntryName, exportLogNow), input (flash).
+// A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
+// in name order inside `(function () { ... })();`. Shared state is the
+// closure's; no imports, no exports, no build step beyond the concatenation.
+//
+// One pane among the others (one open at a time, under the bar), opened by the control centre's
+// boards tile, whose face is the name of what is on screen. Every sentence the pane has stays in
+// the pane — a refusal to leave a board that is not saved, what a delete did, what emptying the
+// trash will take — as the model pane's does; the status line keeps its one sentence.
+
+  const boardsPanel = document.getElementById('boardsPanel');
+  const bdList = boardsPanel ? boardsPanel.querySelector('.bdList') : null;
+  const bdStatus = document.getElementById('boardsStatus');
+  const bdFile = document.getElementById('boardsFile');
+  // What the pane holds between paints: the board whose name is being typed, the trash's sentence
+  // while it stands, the pane's own line (and the act a "leave it anyway" would take again).
+  const bd = { renaming: null, confirm: null, said: null };
+
+  if (boardsPanel) ui.pane(boardsPanel, 'boards', () => closePanel(boardsPanel, tiles.boards));
+  if (tiles.boards) {
+    tiles.boards.onclick = () => {
+      togglePanel(boardsPanel, tiles.boards);
+      if (boardsPanel.hasAttribute('hidden')) return;
+      bd.renaming = null; bd.confirm = null; bd.said = null;
+      paintBoardsPane();
+      // Another tab may have changed the list, and what its boards hold, since this page read it.
+      rereadBoards();
+    };
+  }
+
+  /** The list changed (a record landed, another tab spoke): the pane again, if it stands — never under a name being typed. */
+  function renderBoardsPane() {
+    if (!boardsPanel || boardsPanel.hasAttribute('hidden') || bd.renaming) return;
+    paintBoardsPane();
+  }
+
+  function bdEl(tag, cls, text) {
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text !== undefined && text !== null) e.textContent = text;
+    return e;
+  }
+  /** Children with a space between each, so the pane reads as words to a screen reader and to anything that reads its text. */
+  function bdJoin(parent, parts) {
+    parts.filter(Boolean).forEach((p, i) => { if (i) parent.appendChild(document.createTextNode(' ')); parent.appendChild(p); });
+    return parent;
+  }
+  function bdButton(label, cls, data, why) {
+    const b = bdEl('button', cls, label);
+    b.type = 'button';
+    for (const k of Object.keys(data || {})) b.dataset[k] = data[k];
+    if (why) b.title = why;
+    return b;
+  }
+
+  function boardRowEl(r) {
+    const row = bdEl('div', 'bdItem' + (r.here ? ' here' : ''));
+    row.dataset.id = r.id;
+    if (r.here) row.dataset.here = '';
+    let name;
+    if (bd.renaming === r.id) {
+      name = bdEl('input', 'bdNameInput');
+      name.value = r.name;
+      name.maxLength = 80;
+      name.dataset.nameInput = r.id;
+      name.setAttribute('aria-label', 'the board’s name');
+      name.spellcheck = false;
+    } else name = bdButton(r.name, 'bdName', { open: r.id }, r.here ? 'the board on screen' : 'open this board');
+    bdJoin(row.appendChild(bdEl('div', 'bdTop')), [name, r.here ? ui.chip('here', { cls: 'bdHere', why: 'the board on screen' }) : null]);
+    row.appendChild(document.createTextNode(' '));
+    row.appendChild(bdEl('div', 'bdMeta', [r.when, r.size].filter(Boolean).join(' · ')));
+    row.appendChild(document.createTextNode(' '));
+    bdJoin(row.appendChild(bdEl('div', 'bdActs')), [
+      bdButton('rename', '', { rename: r.id }, 'a new name — the board keeps its id, so nothing it holds moves'),
+      bdButton('duplicate', '', { dup: r.id }, 'a copy beside it, under its own id'),
+      bdButton('delete', '', { trash: r.id }, 'to the trash — it comes back whole from there until the trash is emptied'),
+    ]);
+    return row;
+  }
+  function placeRowEl(r) {
+    const row = bdEl('div', 'bdItem bdPlace');
+    row.dataset.id = r.id;
+    row.dataset.kind = r.k;
+    bdJoin(row.appendChild(bdEl('div', 'bdTop')), [
+      bdButton(r.name, 'bdName', { open: r.id }, 'open it again, the way its tile does'),
+      ui.chip(r.kind, { cls: 'bdKind', why: 'what kind of place it is' }),
+    ]);
+    if (r.when) { row.appendChild(document.createTextNode(' ')); row.appendChild(bdEl('div', 'bdMeta', r.when)); }
+    return row;
+  }
+  function trashRowEl(r) {
+    const row = bdEl('div', 'bdItem bdGone');
+    row.dataset.id = r.id;
+    row.dataset.trashed = '';
+    row.appendChild(bdEl('div', 'bdTop')).appendChild(bdEl('span', 'bdName', r.name));
+    row.appendChild(document.createTextNode(' '));
+    row.appendChild(bdEl('div', 'bdMeta', [r.when, r.size].filter(Boolean).join(' · ')));
+    row.appendChild(document.createTextNode(' '));
+    row.appendChild(bdEl('div', 'bdActs')).appendChild(bdButton('restore', '', { restore: r.id }, 'back onto the list, whole'));
+    return row;
+  }
+
+  function paintBoardsPane() {
+    if (!bdList) return;
+    const stats = {};
+    for (const [k, v] of boards.stats) stats[k] = v;
+    const rows = boardRows([...boards.entries.values()], stats, Date.now(), onBoardHere() ? board.id : null);
+    const frag = document.createDocumentFragment();
+    const many = boards.how === 'indexeddb';
+    const head = bdJoin(bdEl('div', 'bdHead'), [
+      bdButton('New board', 'bdNew', { boardNew: '' }, 'a new, empty board — the one on screen stays as it is'),
+      bdButton('from a file…', 'bdFrom', { boardFile: '' }, 'a board from a log file — one event per line, as export writes it'),
+    ]);
+    if (!many) head.querySelectorAll('button').forEach((b) => { b.disabled = true; });
+    frag.appendChild(head);
+    if (!boards.ready) frag.appendChild(bdEl('p', 'hint', 'reading the boards this browser keeps…'));
+    else if (boards.how === 'browser storage') frag.appendChild(bdEl('p', 'hint', 'this browser keeps one board here (it has no IndexedDB) — open a folder to keep more'));
+    else if (boards.how !== 'indexeddb') frag.appendChild(bdEl('p', 'hint', 'this browser will not let the page keep boards (a private window, or site data blocked)'));
+    const list = frag.appendChild(bdEl('div', 'bdBoards'));
+    for (const r of rows.boards) list.appendChild(boardRowEl(r));
+    if (rows.places.length) {
+      const pl = frag.appendChild(bdEl('div', 'bdPlaces'));
+      pl.appendChild(bdEl('div', 'bdLabel', 'recent places'));
+      for (const r of rows.places) pl.appendChild(placeRowEl(r));
+    }
+    if (rows.trash.length || bd.confirm) {
+      const tr = frag.appendChild(bdEl('div', 'bdTrash'));
+      tr.appendChild(bdEl('div', 'bdLabel', 'trash · ' + rows.trash.length));
+      for (const r of rows.trash) tr.appendChild(trashRowEl(r));
+      const c = bd.confirm;
+      if (c) {
+        // Said before it happens; the second tap is its own act.
+        const box = tr.appendChild(bdEl('div', 'bdConfirm'));
+        box.appendChild(bdEl('p', '', c.words));
+        const btns = [];
+        if (c.gone.length) btns.push(bdButton(c.gone.length === 1 ? 'Delete it for good' : 'Delete them for good', 'bdDanger', { emptyConfirm: '' }, 'cannot be undone'));
+        btns.push(bdButton(c.gone.length ? 'Keep them' : 'Close', '', { emptyCancel: '' }));
+        bdJoin(box.appendChild(bdEl('div', 'bdConfirmRow')), btns);
+      }
+      // With nothing it could take yet (a board open elsewhere), asking again is the next move.
+      if (rows.trash.length && (!c || !c.gone.length)) tr.appendChild(bdButton('Empty the trash…', 'bdEmpty', { emptyTrash: '' }, 'says what it will delete, and asks again'));
+    }
+    bdList.replaceChildren(frag);
+    paintBoardsSaid();
+  }
+
+  /** The pane's own line: what just happened, or why not — with the ways out as buttons in it. */
+  function paneSay(v, retry) {
+    bd.said = v ? (typeof v === 'string' ? { words: v, ways: [] } : { words: v.words, ways: v.ways || [] }) : null;
+    if (bd.said) bd.said.retry = retry || null;
+    paintBoardsSaid();
+  }
+  function paintBoardsSaid() {
+    if (!bdStatus) return;
+    bdStatus.replaceChildren();
+    if (!bd.said) return;
+    const parts = [document.createTextNode(bd.said.words)];
+    for (const w of bd.said.ways) {
+      if (w === 'export') parts.push(bdButton('export the log', 'bdWay', { leaveWay: 'export' }, 'the whole board on screen, as a file to keep'));
+      else if (w === 'leave' && bd.said.retry) parts.push(bdButton('leave it anyway', 'bdWay', { leaveWay: 'leave' }, 'what was not saved is lost'));
+    }
+    bdJoin(bdStatus, parts);
+  }
+
+  async function openFromPane(id, force) {
+    paneSay(null);
+    const kept = isKept(boards.entries.get(id));
+    const ok = await switchBoard(id, { force: !!force, said: (v) => paneSay(v, () => openFromPane(id, true)) });
+    if (!ok) return;
+    closePanel(boardsPanel, tiles.boards);
+    if (kept && onBoardHere() && board.id === id) flash('“' + boardEntryName(id) + '” — ' + sizeWords(boards.stats.get(id)));
+  }
+  async function newFromPane(force) {
+    paneSay(null);
+    const made = await newBoard({ force: !!force, said: (v) => paneSay(v, () => newFromPane(true)) });
+    if (made) { closePanel(boardsPanel, tiles.boards); flash('“' + made.name + '” — a new board; the one before stays in boards'); }
+  }
+  async function trashFromPane(id, force) {
+    paneSay(null);
+    const name = boardEntryName(id);
+    const ok = await trashBoard(id, { force: !!force, said: (v) => paneSay(v, () => trashFromPane(id, true)) });
+    if (ok) paneSay('“' + name + '” is in the trash — restore it below; it stays whole there until the trash is emptied');
+  }
+
+  if (boardsPanel) {
+    boardsPanel.addEventListener('click', async (e) => {
+      const b = e.target.closest && e.target.closest('button');
+      if (!b || !boardsPanel.contains(b) || b.classList.contains('paneClose') || b.disabled) return;
+      const d = b.dataset;
+      try {
+        if (d.open !== undefined) await openFromPane(d.open);
+        else if (d.boardNew !== undefined) await newFromPane();
+        else if (d.boardFile !== undefined) { bdFile.value = ''; bdFile.click(); }
+        else if (d.rename !== undefined) {
+          bd.renaming = d.rename; bd.confirm = null;
+          paintBoardsPane();
+          const input = bdList.querySelector('input[data-name-input]');
+          if (input) { input.focus(); input.select(); }
+        } else if (d.dup !== undefined) {
+          paneSay(null);
+          const made = await duplicateBoard(d.dup);
+          if (made) paneSay('“' + made.name + '” — a copy of “' + boardEntryName(made.from) + '”, beside it; the original is as it was');
+        } else if (d.trash !== undefined) await trashFromPane(d.trash);
+        else if (d.restore !== undefined) {
+          const back = await restoreBoard(d.restore);
+          if (back) paneSay('“' + back.name + '” is back on the list, whole');
+        } else if (d.emptyTrash !== undefined) {
+          paneSay(null);
+          bd.confirm = await planEmptyTrash();
+          paintBoardsPane();
+        } else if (d.emptyCancel !== undefined) { bd.confirm = null; paintBoardsPane(); }
+        else if (d.emptyConfirm !== undefined && bd.confirm) {
+          const plan = bd.confirm;
+          bd.confirm = null;
+          const r = await emptyTrash(plan);
+          paintBoardsPane();
+          paneSay(r.gone.length
+            ? r.gone.length + ' board' + (r.gone.length === 1 ? '' : 's') + ' deleted for good' + (r.kept.length ? ' — ' + r.kept.length + ' kept: open in another tab' : '')
+            : 'nothing was deleted — what is in the trash is open in another tab');
+        } else if (d.leaveWay === 'export') exportLogNow();
+        else if (d.leaveWay === 'leave' && bd.said && bd.said.retry) { const again = bd.said.retry; paneSay(null); await again(); }
+      } catch (err) {
+        paneSay('that did not work — ' + ((err && err.message) || err));
+      }
+    });
+    // Typing a name: Enter keeps it, Esc drops it, leaving the field keeps it. Keys stay in the field
+    // (⌘Z in a name is not an undo on the board).
+    bdList.addEventListener('keydown', (e) => {
+      const input = e.target.closest && e.target.closest('input[data-name-input]');
+      if (!input) return;
+      e.stopPropagation();
+      if (e.key === 'Enter') { e.preventDefault(); commitRename(input); }
+      else if (e.key === 'Escape') { e.preventDefault(); bd.renaming = null; paintBoardsPane(); }
+    });
+    bdList.addEventListener('focusout', (e) => {
+      const input = e.target.closest && e.target.closest('input[data-name-input]');
+      if (input) commitRename(input);
+    });
+  }
+  async function commitRename(input) {
+    const id = input.dataset.nameInput;
+    if (bd.renaming !== id) return;
+    bd.renaming = null;
+    const done = await renameBoard(id, input.value).catch(() => null);
+    paintBoardsPane();
+    if (done) paneSay('“' + done.name + '” — the same board under a new name; what it holds did not move');
+  }
+  if (bdFile) {
+    bdFile.addEventListener('change', async () => {
+      const f = bdFile.files && bdFile.files[0];
+      if (!f) return;
+      paneSay(null);
+      const made = await boardFromFile(f, { said: (v) => paneSay(v) }).catch((err) => { paneSay('could not read “' + f.name + '” — ' + ((err && err.message) || err)); return false; });
+      bdFile.value = '';
+      if (made) { closePanel(boardsPanel, tiles.boards); flash('“' + made.name + '” — ' + sizeWords(boards.stats.get(made.id)) + ', from ' + f.name); }
+    });
+  }
+
 // ===== boot =====
 // Provides: the debug handle (window.__mm, what the e2e drives), subscription, restore, first render.
 // Uses: everything.
@@ -8746,6 +10001,9 @@
     saveNow: saveNow,
     // The board this browser keeps (V1-PLAN R3), for tests: its state, what its store holds, and the way out into a folder.
     board: boardState, boardRecords: () => (board.backend ? board.backend.read() : Promise.resolve(null)), keepBoardIn: keepBoardIn,
+    // The boards this browser keeps (V1-PLAN R1), for tests: the list as this page holds it, one board as its store holds it, and the acts.
+    boards: boardsState, boardsStore: boardsStore, switchBoard: switchBoard, newBoard: newBoard, renameBoard: renameBoard,
+    duplicateBoard: duplicateBoard, trashBoard: trashBoard, restoreBoard: restoreBoard, planEmptyTrash: planEmptyTrash, emptyTrash: emptyTrash,
     boardLog: () => (board.backend ? board.backend.read().then((got) => journalFold(got.records).events) : Promise.resolve(null)),
     boardIdle: () => board.journal.idle(),
     setViewMode: setViewMode, viewMode: () => viewMode, focusOn: focusOn,
@@ -8774,16 +10032,21 @@
   if (mode === 'off') board.journal.off();
   if (!replayUrl) {
     // Last time's board comes back from the browser (IndexedDB — a moment,
-    // not at once); a folder, a repository or a room named in the URL is the
-    // canvas instead, and this page keeps no board of its own.
+    // not at once): the one the address names (?board=), else the one opened
+    // last; a folder, a repository or a room named in the URL is the canvas
+    // instead, and this page keeps no board of its own — it reads the list,
+    // for the boards pane and the places it remembers.
     const settle = (restored) => {
-      restoreMark();
+      // The device's mark, taught again only where the board's log says otherwise (so opening a board is not a change to it).
+      markAfterOpen();
       rejoinRemembered();
-      if (restored) flash('your last board is back — Reset starts a fresh one');
+      const others = [...boards.entries.values()].filter((e) => isKept(e) && !e.trashed && e.id !== board.id).length;
+      if (restored && !board.saidAtOpen) flash('“' + boardOnScreenName() + '” is back' + (others ? ' — ' + others + ' more in boards' : ''));
     };
     if (mode === 'restore') openBoard(mode).then(settle, () => settle(false));
     else {
       if (mode === 'fresh') openBoard(mode);
+      else if (!EMBED) openBoardsList();
       settle(false);
     }
     if (params.get('folder')) openStatic(params.get('folder'));

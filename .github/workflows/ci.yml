@@ -56,6 +56,10 @@ jobs:
       # browser keeps is written through, driven by a store held in memory.
       - name: The board's journal, on its own
         run: node --test ../Demos/surface/17-board.test.mjs
+      # And its sibling (V1-PLAN R1): the list of boards — names, the trash,
+      # which board a page opens and whether the one on screen may be left.
+      - name: The boards list, on its own
+        run: node --test ../Demos/surface/17-boards.test.mjs
 
   shard:
     name: shard-3d — typecheck, test, build

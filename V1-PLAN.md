@@ -1029,6 +1029,37 @@ Synthetic boards of 500, 2,000 and 5,000 marks; budgets for open, replay,
 drawing and reading as tests that record their numbers. *Trap:* relations
 over every pair are quadratic; measure before indexing.
 
+*R1 status, 27 Sep 2026: built on `w2-shard`, on R3* — `6ff6779` (red first:
+no tile, no list, the kill test unable to make a second board) … `0ab77b7`
+and the commits carrying this line. Each board is its own R3 journal keyed by
+its id; IndexedDB version 2 adds the list (`boards`: a name and when it was
+made, opened and put in the trash — nothing of what it holds), and a board's
+meta says what it holds (changed, events, marks, characters) in each record's
+own transaction. `Demos/surface/17-boards.js` is the pure half (17 tests in
+Node, in CI), `17-folder.js` the adapter, `22-boards.js` the pane, opened by a
+*boards* tile in a fixed slot after *help* whose face is the name on screen.
+`node e2e/run.mjs boards` (19 records, in the gate, Chromium and WebKit): R3's
+board comes back byte for byte as the first entry, "My board" (N1); the name
+is never the key — a rename orphans nothing and two boards share a name (N5);
+delete is to the trash, restore brings a board back whole, emptying the trash
+is its own act said first by name and size, and never takes a board another
+tab holds (N7–N10); Reset is a fresh board under the same name with the old
+one in the trash — it was one tap from losing the board (N14); `?board=`, the
+title, the view per board, a board left unmoved coming back unmoved (N4, N12, N12b); folders and sites as recent places of
+their kind (N13); a board out as a log and back in (N15, A8's export and
+import); a board that is not saved is never left without a word (N16, which
+found that a whole log's delete could commit without its add — the store held
+0 of 9 strokes while writes failed; now 9 of 9). Switching is in place and
+flushes the board left. The kill test now keeps two boards and switches
+between them through the pane mid-session, killing right after a switch and
+in the middle of one: both boards whole in every run — 80 kills over 8 seeds
+on Chromium (53 crashed, 27 closed; 154 switches, 12 kills mid-switch) and 30
+on WebKit over 4 (closed; 64 switches, 5 mid-switch). Not done: reopening a
+folder or a repository from the list is not in the gate (the picker and
+GitHub's API; a site is); a new tab opens the board opened last even when
+another tab holds it (read-only, and said); `07-input.js` still sets the old
+Reset handler, superseded by `20-controls.js` — the main lane owns that file.
+
 *R3 status, 27 Sep 2026: built on `w2-shard`, pulled forward by R4a* —
 `13bd6f1` (red first: every stroke of every cycle lost, the failures silent)
 …`5695f79` and the commit carrying this line. With no folder the board is kept
