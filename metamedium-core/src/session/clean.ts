@@ -18,8 +18,11 @@
 //      goes. A box drawn turned stays turned: its clean form is the tightest
 //      box at any angle, so a diamond is redrawn as a diamond, not as the
 //      upright box around it — which turned a flowchart's decision into a
-//      process (S1). An arrow keeps the barb the hand drew, and a stroke that
-//      BENDS is not offered as the straight line through its ends.
+//      process (S1). A box drawn LEANING stays leaning: its clean form is the
+//      parallelogram its corners make, so a flowchart's data symbol is not
+//      redrawn as the upright box around it either (D2). An arrow keeps the
+//      barb the hand drew, and a stroke that BENDS is not offered as the
+//      straight line through its ends.
 //
 // Writing has no clean form. Handwriting redrawn as a box is a lie about what
 // was written, so `text` is never idealized and stays ink.
@@ -29,6 +32,7 @@ import type { MMNode } from './nodes';
 import { fingerprintOf, getRep, wordOf, placed } from './nodes';
 import { bowOf, tightestBox } from '../geometry';
 import { ARC_BULGE_PX, ARC_SWEEP } from '../recognition';
+import { between, cornersOf, hullOf, offLevel, offSquare } from '../notations/shape';
 
 import { interpretationsOf } from './interpretations';
 
@@ -40,6 +44,8 @@ export interface CleanShape {
   closed: boolean;
   /** How the form was derived, in the terms it was measured in. */
   reasoning: string;
+  /** A box drawn leaning, kept so: how far its sides lean off square, in degrees. Absent for a square-cornered box. */
+  lean?: number;
 }
 
 /** The top Tier 0 reading must reach this to be offered for snapping. */
@@ -66,6 +72,120 @@ export const SQUARE_UP_DEG = 5;
  * bounds 176×87 — so it is squared up at its own size instead.
  */
 export const BOUNDS_SLACK = 0.05;
+
+/**
+ * A box whose sides lean off square by more than this keeps its lean: its
+ * clean form is the parallelogram it was drawn as, not the box around it. A
+ * hand's box leans by its wobble alone — 1,548 of them (the corpus's boxes,
+ * turned or not, the flowchart bench's processes and its boxes tilted to
+ * 12°) within 4.4°, each side fitted along its middle run of ink and the
+ * sides averaged in opposite pairs — where a flowchart's data symbol leans
+ * 22°–27° and a hand's box leaning 12° measures 9.2° at the least. The
+ * flowchart reads no lean under 8° as data (LEAN, notations/flowchart.ts),
+ * so a lean under this is wobble to the notation and to the clean form alike.
+ */
+export const LEAN_KEPT_DEG = 8;
+/**
+ * …and only when its opposite sides lie parallel within this, pair by pair —
+ * a parallelogram, not a trapezoid. A hand's parallelograms measure within
+ * 11.1°. A trapezoid with one side plumb and the other leaning θ differs by θ
+ * and leans only θ/2 on average, so it cannot pass LEAN_KEPT_DEG until θ
+ * passes 16°, and this refuses it first.
+ */
+export const LEAN_PARALLEL_DEG = 15;
+
+const sub = (a: Point, b: Point): Point => ({ x: a.x - b.x, y: a.y - b.y });
+const turned = (v: Point, t: number): Point => ({ x: v.x * Math.cos(t) - v.y * Math.sin(t), y: v.x * Math.sin(t) + v.y * Math.cos(t) });
+
+/**
+ * Which way the ink runs along one side of a quadrilateral, from `p` toward
+ * `q`, as long as the side: a line fitted (principal axis) to the ink in the
+ * side's middle run, away from the corners, within a fifth of its length of
+ * the chord. A hand rounds its corners, and more at an acute corner than an
+ * obtuse one, so the chord between two corner points leans with the
+ * rounding — on a data symbol's short slanted side by as much as 5°. The
+ * chord itself when the run holds too little ink to fit.
+ */
+function inkAlong(raw: readonly Point[], p: Point, q: Point): Point {
+  const d = sub(q, p);
+  const len = Math.hypot(d.x, d.y);
+  if (len < 1e-9) return d;
+  const u = { x: d.x / len, y: d.y / len };
+  const run = raw.filter((r) => {
+    const t = ((r.x - p.x) * u.x + (r.y - p.y) * u.y) / len;
+    return t >= 0.2 && t <= 0.8 && Math.abs((r.x - p.x) * -u.y + (r.y - p.y) * u.x) <= 0.2 * len;
+  });
+  if (run.length < 3) return d;
+  const mx = run.reduce((k, r) => k + r.x, 0) / run.length, my = run.reduce((k, r) => k + r.y, 0) / run.length;
+  let sxx = 0, sxy = 0, syy = 0;
+  for (const r of run) {
+    sxx += (r.x - mx) ** 2;
+    sxy += (r.x - mx) * (r.y - my);
+    syy += (r.y - my) ** 2;
+  }
+  const angle = 0.5 * Math.atan2(2 * sxy, sxx - syy);
+  const sign = Math.cos(angle) * u.x + Math.sin(angle) * u.y < 0 ? -1 : 1;
+  return { x: sign * Math.cos(angle) * len, y: sign * Math.sin(angle) * len };
+}
+
+/**
+ * A box drawn leaning, as the parallelogram it was drawn as: the four
+ * corners on the ink's hull (notations/shape.ts) say where its sides are,
+ * each side's direction is fitted to the ink along it (`inkAlong`), opposite
+ * sides are averaged, and the parallelogram with those sides is the tightest
+ * that holds the ink — the size the ink is, as a box's tightest box is. A
+ * pair of sides within SQUARE_UP_DEG of level or plumb is laid exactly so,
+ * the lean kept. Its corners come from the top-left of the side nearer
+ * level, clockwise on screen, as a box's do. Null for a box that does not
+ * lean past LEAN_KEPT_DEG, or whose sides are not parallel pairs.
+ */
+function leaningBox(raw: readonly Point[]): { points: Point[]; lean: number; base: number; height: number } | null {
+  const hull = hullOf(raw);
+  const { quad } = cornersOf(hull);
+  if (quad.length !== 4) return null;
+  const s = quad.map((p, i) => inkAlong(raw, p, quad[(i + 1) % 4]));
+  if (between(s[0], s[2]) > LEAN_PARALLEL_DEG || between(s[1], s[3]) > LEAN_PARALLEL_DEG) return null;
+  let a = { x: (s[0].x - s[2].x) / 2, y: (s[0].y - s[2].y) / 2 };
+  let b = { x: (s[1].x - s[3].x) / 2, y: (s[1].y - s[3].y) / 2 };
+  const lean = 90 - between(a, b);
+  if (!(lean > LEAN_KEPT_DEG)) return null;
+  // Squared up within the hand's wobble: the pair nearer level or plumb is laid exactly so.
+  const ref = offSquare(a) <= offSquare(b) ? a : b;
+  if (offSquare(ref) <= SQUARE_UP_DEG) {
+    const angle = Math.atan2(ref.y, ref.x);
+    const t = Math.round(angle / (Math.PI / 2)) * (Math.PI / 2) - angle;
+    a = turned(a, t);
+    b = turned(b, t);
+  }
+  // Across each pair of sides, the ink's extent: the parallelogram with these sides that holds it.
+  const la = Math.hypot(a.x, a.y), lb = Math.hypot(b.x, b.y);
+  if (la < 1e-9 || lb < 1e-9) return null;
+  const na = { x: -a.y / la, y: a.x / la }, nb = { x: -b.y / lb, y: b.x / lb };
+  let loA = Infinity, hiA = -Infinity, loB = Infinity, hiB = -Infinity;
+  for (const p of hull) {
+    const pa = p.x * na.x + p.y * na.y, pb = p.x * nb.x + p.y * nb.y;
+    loA = Math.min(loA, pa); hiA = Math.max(hiA, pa);
+    loB = Math.min(loB, pb); hiB = Math.max(hiB, pb);
+  }
+  const det = na.x * nb.y - na.y * nb.x;
+  if (Math.abs(det) < 1e-9 || hiA - loA < 1e-9 || hiB - loB < 1e-9) return null;
+  // Each corner is where a side along a (p·na = u) meets a side along b (p·nb = v).
+  const corners = [loA, hiA].flatMap((u) => [loB, hiB].map((v) => ({ u, v, p: { x: (u * nb.y - na.y * v) / det, y: (na.x * v - u * nb.x) / det } })));
+  // The sides nearer level are the top and the bottom; the top is the higher of them on screen.
+  const across: 'u' | 'v' = offLevel(a) <= offLevel(b) ? 'u' : 'v';
+  const along: 'u' | 'v' = across === 'u' ? 'v' : 'u';
+  const meanY = (k: number) => corners.filter((c) => c[across] === k).reduce((y, c) => y + c.p.y, 0) / 2;
+  const [first, second] = across === 'u' ? [loA, hiA] : [loB, hiB];
+  const topSide = meanY(first) <= meanY(second) ? first : second;
+  const [tl, tr] = corners.filter((c) => c[across] === topSide).sort((p, q) => p.p.x - q.p.x);
+  const br = corners.find((c) => c[across] !== topSide && c[along] === tr[along])!;
+  const bl = corners.find((c) => c[across] !== topSide && c[along] === tl[along])!;
+  const points = [tl.p, tr.p, br.p, bl.p];
+  const top = sub(points[1], points[0]), side = sub(points[3], points[0]);
+  const base = Math.hypot(top.x, top.y);
+  const area = Math.abs(top.x * side.y - top.y * side.x);
+  return { points, lean: 90 - between(top, side), base, height: base > 0 ? area / base : 0 };
+}
 
 /**
  * How far a line's ink may stand off the straight line through its ends and
@@ -186,6 +306,19 @@ export function idealize(node: MMNode, shape: string): CleanShape | null {
 
   switch (shape) {
     case 'rectangle': {
+      // A box drawn leaning keeps its lean: a flowchart's data symbol is a
+      // parallelogram, and the rung reads it as a rectangle, whose tightest
+      // box is upright — redrawn so, it was a process (D2).
+      const leaning = leaningBox(raw);
+      if (leaning) {
+        return {
+          shape,
+          closed: true,
+          points: leaning.points,
+          lean: leaning.lean,
+          reasoning: `its four corners: a box ${Math.round(leaning.base)}×${Math.round(leaning.height)} leaning ${Math.round(leaning.lean)}° as drawn — its sides parallel and not square, and kept so`,
+        };
+      }
       // The tightest box at any angle — the one extent measures against. Near
       // square to the screen it is the hand's wobble, squared up; turned
       // further, the turn was drawn and is kept, so a diamond stays one.
