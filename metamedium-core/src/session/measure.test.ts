@@ -100,6 +100,15 @@ describe('measure — a box by its sides, at whatever angle it stands', () => {
     }
   });
 
+  it('a long bar two degrees off level measures its own thickness — the size its clean form is drawn — not its bounds', () => {
+    // Its bounds are 400×34; squared up at its own size (clean.ts, BOUNDS_SLACK) it is 400×20, and so is its maths.
+    const m = built(inkOf(boxCorners(300, 300, 400, 20, 2), true));
+    expect(m!.shape).toBe('rectangle');
+    expect(get(m, 'width')).toBe(400);
+    expect(get(m, 'height')).toBe(20);
+    expect(m!.measures.some((x) => x.key === 'lean')).toBe(false);
+  });
+
   it('a box that leans — a flowchart’s data symbol — measures its base, its height and its lean', () => {
     // 180 wide, 64 high, its top 28 to the right of its bottom: the sides lean 24°.
     const m = built(inkOf(parallelogramCorners(300, 300, 180, 64, 28), true));
