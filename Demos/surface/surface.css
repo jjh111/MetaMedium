@@ -257,9 +257,9 @@ html, body {
 #modelPanel #mpList:not(:empty) { margin-top: 9px; padding-top: 8px; border-top: 1px solid var(--edge); }
 /* A joined model (V1-PLAN J5): its name in words, what it is and can do, try it, leave — and its last call, kept until the next. */
 #modelPanel .mpItem { color: var(--agent); font-size: 10.5px; padding: 3px 0; }
-#modelPanel .mpItemHead { display: flex; align-items: baseline; gap: 8px; }
-#modelPanel .mpItemHead .n { flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-#modelPanel .mpItemHead .t { color: var(--dim); flex: 1 1 auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#modelPanel .mpItemHead { display: flex; align-items: baseline; gap: 6px; }
+#modelPanel .mpItemHead .n { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#modelPanel .mpItem .t { color: var(--dim); font-size: 10px; margin-top: 1px; }
 #modelPanel .mpItem button { flex: 0 0 auto; padding: 1px 7px; font-size: 10px; }
 #modelPanel .mpCall { font: 10px var(--mono); color: var(--dim); margin-top: 2px; overflow-wrap: anywhere; }
 #modelPanel .mpCall.bad { color: var(--gold); }

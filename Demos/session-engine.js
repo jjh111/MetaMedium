@@ -1429,9 +1429,9 @@
       const line = busy ? 'asking now' + (c ? ' · last: ' + callLine(c) : '') : callLine(c);
       return '<div class="mpItem">' +
         '<div class="mpItemHead"><span class="n" title="' + esc(a.name) + '">' + esc(modelWords(a)) + '</span>' +
-        '<span class="t"' + (f ? ' title="' + esc(f.said) + '"' : '') + '>' + esc(tags.join(' · ')) + '</span>' +
         (isModel(a) ? '<button class="ghost" data-try="' + i + '" title="one tiny prompt: is it there, and does it answer?">try it</button>' : '') +
         '<button class="ghost" data-leave="' + i + '">leave</button></div>' +
+        '<div class="t"' + (f ? ' title="' + esc(f.said) + '"' : '') + '>' + esc(tags.join(' · ')) + '</div>' +
         (line ? '<div class="mpCall ' + (busy ? 'busy' : c.ok ? 'ok' : 'bad') + '">' + esc(line) + '</div>' : '') +
         '</div>';
     }).join('');
