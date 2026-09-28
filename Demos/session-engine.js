@@ -8798,7 +8798,8 @@
 //   view, theme, hand, auto-read, folder, import, export, models, teach, live, reset, help, boards);
 //   syncTiles() writes every tile's face from state; openPane/closePanes keep one pane open at a time.
 // Uses: core (prefs, themeMode, hand), snap (snapMode), folder (viewMode, folder; the boards adapter:
-//   boardOnScreenName, resetBoard), models (agents), teach (teachPanel), handwriting (autoRead).
+//   boardOnScreenName, resetBoard), models (agents), teach (teachPanel), handwriting (autoRead); the page's
+//   version from its <meta name="metamedium-version"> (V1-PLAN R7), said at the head of the help pane.
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () { ... })();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -8885,6 +8886,14 @@
   // Help is the hand QA plan, which doubles as the manual, read into a pane.
   const helpPanel = document.getElementById('helpPanel');
   ui.pane(helpPanel, 'help', () => closePanel(helpPanel, tiles.help));
+  // It leads with the version this page is (V1-PLAN R7): the repository's VERSION, stamped into the
+  // page by scripts/build-app.mjs, so the line holds offline and in the standalone file alike.
+  const pageVersion = ((document.querySelector('meta[name="metamedium-version"]') || {}).content || '').trim();
+  const helpVersion = document.getElementById('helpVersion');
+  if (helpVersion) {
+    helpVersion.textContent = !pageVersion ? 'MetaMedium — this page carries no version'
+      : pageVersion === '0.0.0' ? 'MetaMedium 0.0.0 — no release has been cut yet' : 'MetaMedium ' + pageVersion;
+  }
   let helpLoaded = false;
   tiles.help.onclick = () => {
     togglePanel(helpPanel, tiles.help);
