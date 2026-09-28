@@ -1829,8 +1829,8 @@ command that produced it.
 
 **J5 status, 28 Sep 2026: built on `w2` — a hosted model is asked, and says
 why when it cannot be** (`cb26c51`, red first: 34 of 42 transport tests and
-14 of 16 e2e records; `cb1a4c4` core; `abfe4c7`, `b1968a5` surface; and the
-commit carrying this line). What was wrong for John's GLM Flash on
+14 of 16 e2e records; `cb1a4c4` core; `abfe4c7`, `b1968a5`, `6f8a327`
+surface; `5892a70` and the commit carrying this line, docs). What was wrong for John's GLM Flash on
 OpenRouter: whether a model sees was guessed from its id and "glm" was not in
 the guess, so *Read the writing* never asked it and opened the models pane
 instead — which looked exactly like "it won't send"; a reasoning model that
