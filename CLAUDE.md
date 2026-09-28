@@ -242,7 +242,7 @@ any structural change.
 
 | Path | What it is |
 |---|---|
-| `metamedium-core/` | **The canonical engine** (TypeScript, zero deps, tested): geometry, recognition (the shape rung), relations, the diagram rung (`src/diagram/`), notations over it (`src/notations/`: the flowchart, the UML class diagram, Mermaid out and in, and a layered layout), concepts, the no-modes session engine, the layout and graph parsers, maths (`src/maths/`: quantities, expressions, the sheet, dimensions, solving figure by figure, true size and tiled print), the participants — a model's prompts and parsing, the router, the bridge, and **the decision seat** (`src/participants/decide.ts`, tier 1½; under *Tiered LLM Interpretation*) — **the tools** (`src/tools/`: what the field affords, one contract and one registry; under *Tools*), **the context** (`src/context/`; under *Context*), **the library packs** (`src/packs/`: the format, the validator, the shipped packs by `id@version`, `use`/`unuse`, the bench; under *Library packs*) and the LLM transport. New recognition/engine work lands HERE |
+| `metamedium-core/` | **The canonical engine** (TypeScript, zero deps, tested): geometry, recognition (the shape rung), relations, the diagram rung (`src/diagram/`), notations over it (`src/notations/`: the flowchart, the UML class diagram, the sequence diagram and the dashed lines it reads, Mermaid out and in, and a layered layout), concepts, the no-modes session engine, the layout and graph parsers, maths (`src/maths/`: quantities, expressions, the sheet, dimensions, solving figure by figure, true size and tiled print), the participants — a model's prompts and parsing, the router, the bridge, and **the decision seat** (`src/participants/decide.ts`, tier 1½; under *Tiered LLM Interpretation*) — **the tools** (`src/tools/`: what the field affords, one contract and one registry; under *Tools*), **the context** (`src/context/`; under *Context*), **the library packs** (`src/packs/`: the format, the validator, the shipped packs by `id@version`, `use`/`unuse`, the bench; under *Library packs*) and the LLM transport. New recognition/engine work lands HERE |
 | `index.html` | **Interactive whitepaper v5** "MetaMedium: AI Beyond Chat" (live on GitHub Pages). Fully on the `brand/` system as of 3 Sept 2026 — its `:root` is `brand/tokens.css` under the names this page already used, so change a value THERE first |
 | `brand/` | **The visual system, one home**: `tokens.css` holds every MetaMedium colour, face, size and figure/diagram token; `styleguide.html` is the living specimen (light paper first, IBM Plex Mono throughout, teal keyword, colour as signal, §11 figures and diagrams, §12 long-form furniture). v1 draft — the whitepaper's **figures** have migrated, the page around them has not; `brand/README.md` carries the four laws, the convergence order, and what applying it to the whitepaper taught the system |
 | `doodle2-canvas.html` | **Flagship demo**: heuristic recognition, spatial graph, library, undo/redo, touch. No LLM. Single-file (~500KB) |
@@ -871,8 +871,10 @@ molecule, drawn three ways — bonds short of the circles, to their edges, three
 in a row), **`flowchart@1`** (names the notation and restates none of it:
 `FLOWCHART_TABLE` stays the single home of the flowchart's symbols, which
 D2's writer reads; its affinities), **`uml-class@1`** (names the class
-notation, restating none of `UML_CLASS_TABLE`; its affinities) and
-**`test-molecule@1`** (tests only — a `test-` pack is never listed).
+notation, restating none of `UML_CLASS_TABLE`; its affinities),
+**`sequence@1`** (names the sequence notation, restating none of
+`SEQUENCE_TABLE`; its affinities) and **`test-molecule@1`** (tests only — a
+`test-` pack is never listed).
 
 **A board uses a pack by an event**: `use { pack: 'basics@1' }` and `unuse`,
 through `session.use` / `unuse`; `SessionState.packs` in the order used. They
@@ -1341,7 +1343,8 @@ a UML head says UML. Relations by `headsOf` past their heads, a bind first:
 hollow triangle inheritance, filled diamond composition, hollow aggregation,
 open arrow association, none a link; a head read first as a circle degrades,
 said; short writing near an end is its multiplicity, credited to the line it
-stands beside. Dashed lines are not read yet (a perception D5 needs too).
+stands beside. It reads solid lines only: a dependency's dashes are read
+as a dashed line by `notations/dashes.ts` (D5) but not yet by this notation.
 Each class's four sides are continuous ports (`along:uml-class`). Mermaid:
 `class id["name"] { … }`, an attribute's parentheses as entities so Mermaid
 never takes it for a method, relations from the marked end, cardinalities
@@ -1350,6 +1353,36 @@ shape (a class a box with two lines, its name and members labels on the box
 and lines, a multiplicity a dash) so the letter rules gather none, the round
 trip the test (`uml-class-mermaid.test.ts`). `uml-class.test.ts` is A2;
 `uml-class.bench.test.ts` the rates; `uml-class.read.test.ts` the rules.
+
+**The sequence diagram** (V1-PLAN §3, D5; `notations/sequence.ts`,
+`notations/sequence-mermaid.ts`, `notations/dashes.ts`, the `sequence@1`
+pack). A participant is a box — or a stick figure, read as an actor: a
+circle, a body down from under it and at least one more short line — at the
+top of its lifeline, a long line near plumb (one stroke, or dashed; pieces
+one under the next are one lifeline), its top under the box's bottom middle.
+**Read from the geometry, never the relation or role tables** (the trap: the
+relation table has the lifeline touch its box and be an edge from it): a
+line with a head, one landing on another box, or one with a head drawn at
+its top is no lifeline. A message is a roughly level connector whose ends,
+past their heads, land on two lifelines — only its ends say where it goes,
+whatever it crosses: solid with a head a call (`->>`), dashed a return
+(`-->>`), no head `->`/`-->`; a loop both of whose ends land on one lifeline
+is a self-message, its barb measured where it comes back. Messages are
+ordered by height, each labelled by the writing just above it (writing
+includes a stroke that zigzags across its own line). **Dashed lines are
+derived** (`dashedLines`): short straight strokes in a row, both ends of
+each in the row's corridor, a gap from the next — and a mark a letter's size
+may touch a dash only at the row's ends and stand in no gap, so printed
+capitals, whose bars join their stems, never read as one; a word's letters
+are strokes like any other. Each lifeline is a continuous port
+(`along:sequence`). Mermaid: participants left to right as `participant`/
+`actor <id> as <name>`, messages down the page, words as raw text with
+Mermaid's entities; a reader for `sequenceDiagram` draws boxes or stick
+figures over straight lifelines, calls as arrows bound along them, returns
+as dashes with a triangle apart — the round trip the test
+(`sequence-mermaid.test.ts`). `sequence.test.ts` is A3;
+`sequence.bench.test.ts` the rates; `sequence.read.test.ts` the rules;
+`dashes.test.ts` the dash bench.
 
 ### Spatial Graph — retired
 
