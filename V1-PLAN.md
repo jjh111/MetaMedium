@@ -1270,6 +1270,74 @@ app 14, pencil 15, budgets 7 — open 504 ms, release 35 ms on 2,000 marks, the
 500-mark paint equivalence differing in 0 — shard 123 + 11 + 12); WebKit
 smoke 4 and pencil 15.
 
+**E2 Bindings follow — status, 28 Sep 2026: done on `w2`** — `2c73eff` (red:
+22 of 25 core tests in `session/follow.test.ts` and e2e 53/53a against the
+contract with nothing behind it), `b9167c0` (core), `f6ba5bc` (a manipulation
+and the hand's decisions as pure functions), `221db7b` (the surface),
+`c2c8735` (the budget), `e1cfa88` (the trap's tests), and the docs. **The
+derived form** is a `'follow'` rep: an affine map in the connector's OWN
+space, applied before the hand's transform and turn (`placed`, nodes.ts) —
+a `'transform'` is a frame and a turn about its centre and cannot say *turn
+about this end and stretch* — computed in the apply path (`followed`,
+`session/follow.ts`) after every move, scale, turn, tidy, reshape, snap,
+proposal and bind, down the chain of connectors bound to connectors, and
+never logged. One bound end pivots and stretches the connector about its free
+end; two are carried by the one similarity that takes both; both on one moved
+mark translate it; both on one site take the mean step — never a collapse.
+Composed onto where the connector stands, an erased target moves nothing and
+a binding let go leaves it where it stood; a bind carries its end onto its
+site at once, so a move merged before the bind or after it gives the same
+board. A follower is filed where it stands and its wire read again, so a
+moved box's arrow still points at it. **The director's decision, as built:**
+a connector's own tail or tip dragged by its handle binds where the pen's
+magnet holds it (the old claim for that end replaced) and lets go anywhere
+else — a new event, `unbind`, keyed by the end as BIND-1 removes — and moved
+whole (a move, scale or turn of it, or its middle handle) it lets go of the
+ends no longer within the magnet's reach of their sites; the door writes the
+unbinds, the reshape or move and any bind in one act. No case proved it
+wrong; two refinements: a nudge the magnet still holds lets go of nothing
+(the follow puts the end back), and a free end dragged onto a magnet binds
+too. **Ports follow:** the flowchart reads a lone symbol's ports from the
+clean form it holds, and a bound port is found by the notations the engine
+knows (`knowPorts`, `boundSiteOf`), offered on the pen or not — state stays a
+pure function of the log. **The surface** draws what follows a drag before
+the hand lets go, by the functions the replay runs (the preview is the act),
+and a connector's end handle feels the magnets with the pen's ring; e2e
+53–53d. **Budget:** a move carrying ten bound arrows costs 1.02 / 1.50 ms on
+the 2,000-mark board (0.09 ms with none; 1.20 / 1.90 ms at 5,000), held to a
+stroke's budget in `bench/budgets.test.mjs`, whose R4b budgets still hold.
+**Equivalence** against `deab00d`: every held log and the 500-mark board read
+the same; the scripted log reads differently in its one bound connector
+alone — a line tied to a box tidied, scaled and turned before the bind — from
+the bind on: where it stands, its sites and heads, its wire, the board's and
+its cluster's reading (now a flow), that cluster's signature, the briefs.
+**Found:** a two-wing arrowhead whose tip lands on an outline crosses it three
+times and rubs the box out, so an arrow drawn to a box stops short and the
+bind carries its tip on; the rung's arrow tip, which a clean arrow and its tip
+handle are built from, can sit a wing's length short of the ink's (the follow
+reads the ink's tip, the pen's first reach farthest along the shaft); a head
+drawn apart is bound to nothing and does not follow (Mermaid in's arcs and
+`<-->` starts); `relate`'s touching is overlapping boxes, so a tip landing on
+an edge touches by a float's last bit, and the tests measure the gap instead.
+**Not changed:** a follower's stored relation edges (as for any moved mark);
+a notation's ports that change with their context are found again at the next
+trigger. **For D7:** the follow is a similarity of the whole connector, so an
+orthogonal route must be derived again from its bound ports, never carried —
+`boundSiteOf` says where each stands, `followed` is the seam to replace for a
+routed connector, and `unbind` and the doors' rules apply to its ends.
+**For D3's surface:** an imported diagram's connectors follow with no work
+(their tips are ink on the ports, so nothing moves at import), its port
+bindings resolve without the pack in use, and its heads drawn apart stay
+behind. Whole suite before the last commit: core 1,348 in 94 files
+(follow 30), typecheck clean, both bundles equal to a fresh build; relay,
+field, build, board and release tests 107; surface and app in sync; the
+canvas MCP smoke and the shard's (606 in 31 files, typecheck clean) pass; the
+gate 558 passed and the one honest skip (canvas 325, keep 31, boards 20, app
+14, pencil 15, budgets 7 — open 504 ms, release 34 ms on 2,000 marks, the
+500-mark paint equivalence differing in 0 — shard 123 + 11 + 12); WebKit
+smoke 4 and pencil 15; `bench/budgets.test.mjs` three of three; the room
+oracle at 200 seeds.
+
 ### Phase 3 — diagrams
 **D1 Flowchart** — `src/notations/flowchart.ts`, the `flowchart@1` pack,
 the notation reading in the field and the panel, the ports. *Red first:* a

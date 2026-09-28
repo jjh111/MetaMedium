@@ -570,6 +570,7 @@ the 5,000 column is the headroom to aim for.
 | A hello in a room of six: bytes delivered | 34 MB | 163 MB | **each log once, to the newcomer (≈ 6.6 MB)** | ≈ 16 MB | unchanged (R4d) | unchanged (R4d's) | **each log once: 6.51 MB to the newcomer**, one copy of each — with a hand that left or vanished too; 32.6 MB on a broadcast wire |
 | Autosave: main-thread work per change, and does it hold | 7 ms, holds | 30 ms, refused | **≤ 8 ms, and never refused in silence** | same | unchanged (R3) | unchanged (R3's) | — (not R4d's) |
 | A model's brief for five marks | 16 KB | 113 KB | **≤ 4 KB, whatever the board's size** | same | 2 KB; 2 KB — what it lists shrank with what is stored (R4e's still) | unchanged (R4e's) | — (not R4d's) |
+| A move that carries ten bound arrows, engine: median / p95 (V1-PLAN E2) | — (nothing followed) | — | **≤ 4 / 16 ms**, a stroke's: a move is one act | ≤ 4 / 16 ms | — | — | — (E2's: **1.02 / 1.50 ms**; 1.20 / 1.90 ms at 5,000 — the same box with none 0.09 ms) |
 
 The "after R4b" engine rows are `node --test metamedium-core/bench/budgets.test.mjs`
 (27 Sep 2026, load 2–4; the 2,000 board's own result file,
@@ -577,6 +578,16 @@ The "after R4b" engine rows are `node --test metamedium-core/bench/budgets.test.
 `dist/bench/budgets-history.jsonl` every run), which holds the 2,000 budgets
 as assertions and asks the 5,000 board only to replay; the read, the room and
 the brief are `engine.mjs board`, as in the engine's table.
+
+The E2 row (28 Sep 2026, load 0.5–0.7) is `node --test
+metamedium-core/bench/budgets.test.mjs`, which holds it as an assertion on
+the 2,000 board: a box beside the generated board with ten lines around it,
+each end tied to one of its sites, moved twenty times by one `move` each, and
+every line following it in the apply path (each end checked on its site
+afterwards), beside the same box with nothing tied to it (0.09 ms). About a
+tenth of a millisecond an arrow: each is read again where its site stands,
+filed where it stands, and its wire read again. With basics@1 and flowchart@1
+in use, 0.99 / 1.52 ms.
 
 The "after R4c" surface rows are the gate's `budgets` scenario (`node e2e/run.mjs
 budgets`, 27 Sep 2026, load 1.6–3.7, eight runs: open 487–502 ms, a move
@@ -715,6 +726,16 @@ node --expose-gc metamedium-core/bench/engine.mjs hello --size=2000             
 node --test metamedium-core/bench/budgets.test.mjs                                  # R4b's budgets still hold: 264 ms, 0.16 / 0.34 ms, 16.8 MB at 2,000; 713 ms, 57.5 MB at 5,000
 node metamedium-core/bench/equivalence.mjs --ref=0bca5ca                             # the engine before R4d against src/: nothing reads differently
 MM_ROOM_SEEDS=500 npx vitest run src/store/room.oracle.test.ts                       # (in metamedium-core) the oracle, 500 seeded rooms: ~45 s
+```
+
+After E2 — a move that carries ten bound arrows (V1-PLAN E2), and what reads
+differently now that a connector follows what it is bound to:
+
+```
+node --expose-gc metamedium-core/bench/budgets.mjs --size=2000                       # its line: a move carrying 10 bound arrows, beside the same box with none
+node --test metamedium-core/bench/budgets.test.mjs                                  # held to a stroke's budget: 1.02 / 1.50 ms at 2,000; R4b's still hold (256 ms, 0.15 / 0.21 ms, 16.9 MB)
+node metamedium-core/bench/equivalence.mjs --ref=deab00d                             # the engine before E2 against src/: only the scripted log's one bound connector reads differently
+MM_ROOM_SEEDS=200 npx vitest run src/store/room.oracle.test.ts                       # (in metamedium-core) the oracle with binds and follows: ~18 s
 ```
 
 Results land in `metamedium-core/dist/bench/` and `e2e/results/perf/`, both
