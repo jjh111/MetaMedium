@@ -510,14 +510,14 @@ meta says what it holds (changed, events, marks, characters) in each record's
 own transaction. `Demos/surface/17-boards.js` is the pure half (17 tests in
 Node, in CI), `17-folder.js` the adapter, `22-boards.js` the pane, opened by a
 *boards* tile in a fixed slot after *help* whose face is the name on screen.
-`node e2e/run.mjs boards` (18 records, in the gate, Chromium and WebKit): R3's
+`node e2e/run.mjs boards` (19 records, in the gate, Chromium and WebKit): R3's
 board comes back byte for byte as the first entry, "My board" (N1); the name
 is never the key — a rename orphans nothing and two boards share a name (N5);
 delete is to the trash, restore brings a board back whole, emptying the trash
 is its own act said first by name and size, and never takes a board another
 tab holds (N7–N10); Reset is a fresh board under the same name with the old
 one in the trash — it was one tap from losing the board (N14); `?board=`, the
-title, the view per board (N4, N12); folders and sites as recent places of
+title, the view per board, a board left unmoved coming back unmoved (N4, N12, N12b); folders and sites as recent places of
 their kind (N13); a board out as a log and back in (N15, A8's export and
 import); a board that is not saved is never left without a word (N16, which
 found that a whole log's delete could commit without its add — the store held

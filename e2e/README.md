@@ -112,7 +112,8 @@ switch completes; **N4** reload, `?board=`, an id not held said; **N5** rename
 **N7** delete to the trash; **N8** restore; **N9** emptying the trash said
 plainly first, then done — entry, meta and every record gone, nothing else;
 **N10** a board open in another tab kept in the trash; **N11** one tab writes a
-board, per board; **N12** the view per board; **N13** folders and sites as
+board, per board; **N12** the view per board (and **N12b**: a board that opened
+fitted and was never moved comes back there, not refitted); **N13** folders and sites as
 recent places of their kind; **N14** Reset no longer one tap from losing a
 board; **N15** a board out as a log file from the export pane and back in from
 the boards pane; **N16** a board that is not saved (every record refused: the
