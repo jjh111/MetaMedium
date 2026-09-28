@@ -440,15 +440,18 @@ export async function equivalence(page, { strokes = 3 } = {}) {
     await page.mouse.up();
     await page.waitForTimeout(50);
     note('after stroke ' + (i + 1), await page.evaluate(() => window.__mm.paintCheck()));
+    // Every mark's role again, a stroke after the last table: most are carried
+    // forward from it, read over the same neighbourhood, and must still be the
+    // whole-board read's.
+    await roles('after stroke ' + (i + 1));
     found.strokes++;
   }
-  await roles('with the boxes drawn');
   for (let i = 0; i < strokes; i++) {
     await page.evaluate(() => window.__mm.session.undo());
     note('after undo ' + (i + 1), await page.evaluate(() => window.__mm.paintCheck()));
+    await roles('after undo ' + (i + 1));
     found.undos++;
   }
-  await roles('with the boxes undone');
   await page.evaluate(() => window.__mm.fitAll());
   note('the whole board, fitted', await page.evaluate(() => window.__mm.paintCheck()));
   return found;

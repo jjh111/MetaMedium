@@ -147,7 +147,13 @@
     const key = logKey();
     // Built from the session's own state, which is the log's, whatever state
     // a caller holds: a cache kept by the log must be made from that log.
-    if (!paintIndex || paintIndex.key !== key) paintIndex = buildIndex(session.getState(), key);
+    if (!paintIndex || paintIndex.key !== key) {
+      const before = paintIndex;
+      paintIndex = buildIndex(session.getState(), key);
+      // The last log's roles, and what each was read over, for roleOf to carry
+      // forward — one log back, never a chain.
+      if (before) { before.prev = null; paintIndex.prev = before; }
+    }
     return paintIndex;
   }
   function buildIndex(s, key) {
@@ -200,7 +206,7 @@
     return {
       key, s, scope, at, reach, stray, wiredBy, paint, boxes, topOf, contentAt, unboxed,
       artifactsInOrder: s.contentIds.filter((id) => artifactSet.has(id)),
-      roles: new Map(), genre: null, readChips: null, labelled: null, candidates: null,
+      roles: new Map(), roleSig: new Map(), prev: null, genre: null, readChips: null, labelled: null, candidates: null,
     };
   }
 
@@ -245,14 +251,35 @@
     return pos.map((i) => ix.scope[i]);
   }
 
-  /** The role the whole board gives a mark, read over its neighbourhood; undefined for what the rungs do not read. */
+  /**
+   * What a mark's role was read from: each mark of its neighbourhood, in the
+   * board's order, and that mark's own content — the node, its reps and its
+   * edges, which change only by being pushed to or replaced (and a rep or an
+   * edge is never changed in place, R4b), so their identities and lengths say
+   * whether anything a role is read from has changed.
+   */
+  const nodeSig = (n) => (n ? serialOf(n) + '.' + serialOf(n.reps) + '.' + n.reps.length + '.' + serialOf(n.edges) + '.' + n.edges.length : '-');
+
+  /**
+   * The role the whole board gives a mark, read over its neighbourhood;
+   * undefined for what the rungs do not read. A role the last log read over
+   * exactly the same neighbourhood — the same marks, in the same order, each
+   * the same — is carried forward rather than read again: that is what keeps
+   * the board's genre, every mark's role, a few milliseconds after a stroke
+   * rather than a read of every neighbourhood on the board.
+   */
   function roleOf(s, id) {
     const ix = boardIndex();
     if (!ix.at.has(id)) return undefined;
     if (ix.roles.has(id)) return ix.roles.get(id);
+    const ids = neighbourhoodOf(ix, ix.s, id);
+    let sig = '';
+    for (const x of ids) sig += x + ':' + nodeSig(ix.s.nodes.get(x)) + '|';
     let role;
-    for (const r of session.read(neighbourhoodOf(ix, s, id)).roles) if (r.id === id) role = r;
+    if (ix.prev && ix.prev.roleSig.get(id) === sig) role = ix.prev.roles.get(id);
+    else for (const r of session.read(ids).roles) if (r.id === id) role = r;
     ix.roles.set(id, role);
+    ix.roleSig.set(id, sig);
     return role;
   }
 
