@@ -515,13 +515,15 @@
       : Object.assign({}, MM.PRESETS[pick.provider] || { kind: pick.kind, baseUrl: pick.baseUrl }, { model: pick.model });
     // What the provider said when it last joined stands until its list says otherwise (J5).
     const remembered = typeof pick.vision === 'boolean' ? { vision: pick.vision, title: pick.title } : undefined;
-    if (key) { config.apiKey = key; joinHosted(config, null, remembered); return; }
+    // A pick that does not rejoin says why where the hand is looking, not only in a pane that is closed at boot.
+    const rejoin = () => joinHosted(config, null, remembered).then((a) => { if (!a && mpStatus.textContent) say('the remembered model did not rejoin — ' + mpStatus.textContent); });
+    if (key) { config.apiKey = key; rejoin(); return; }
     if (pick.provider !== 'custom') {
       mpProvider.value = pick.provider; syncProviderFields(); mpModel.value = pick.model;
       mpStatus.textContent = 'Remembered ' + pick.model + ' — enter its key to rejoin.';
     } else {
       mpProvider.value = 'custom'; syncProviderFields(); mpEndpoint.value = pick.baseUrl; mpModel.value = pick.model;
-      joinHosted(config, null, remembered);
+      rejoin();
     }
   }
 
