@@ -1934,10 +1934,10 @@ var MetaMediumCore = (() => {
     if (!fp) return null;
     const reading2 = snapReading(node, nodes);
     const shape = reading2.shape;
-    const held = getRep(node, "clean") ? cleanPointsOf(node) : void 0;
-    const ideal = held ?? idealize(node, shape)?.points ?? strokePointsOf(node);
+    const held2 = getRep(node, "clean") ? cleanPointsOf(node) : void 0;
+    const ideal = held2 ?? idealize(node, shape)?.points ?? strokePointsOf(node);
     if (!ideal || ideal.length < 2) return null;
-    const b = held ? getBounds(held) : boundsOf(node) ?? getBounds(ideal);
+    const b = held2 ? getBounds(held2) : boundsOf(node) ?? getBounds(ideal);
     const w2 = b.maxX - b.minX, h2 = b.maxY - b.minY;
     const centre = { x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2 };
     const m = [];
@@ -4082,8 +4082,8 @@ var MetaMediumCore = (() => {
     const ink = strokePointsOf(node);
     if (!fp || !ink || ink.length < 2) return null;
     const reading2 = snapReading(node, nodes);
-    const held = getRep(node, "clean") ? cleanPointsOf(node) : void 0;
-    const ideal = held ?? (reading2.ok ? idealize(node, reading2.shape)?.points : void 0);
+    const held2 = getRep(node, "clean") ? cleanPointsOf(node) : void 0;
+    const ideal = held2 ?? (reading2.ok ? idealize(node, reading2.shape)?.points : void 0);
     if (ideal && ideal.length >= 2 && reading2.shape) return { shape: reading2.shape, points: ideal };
     return { shape: "ink", points: ink };
   }
@@ -4629,8 +4629,8 @@ var MetaMediumCore = (() => {
     if (!fp || transcriptOf(node) || getRep(node, "word-run")) return null;
     const snap = snapReading(node, nodes);
     const shape = snap.shape;
-    const held = getRep(node, "clean") ? cleanPointsOf(node) : void 0;
-    const ideal = held ?? (() => {
+    const held2 = getRep(node, "clean") ? cleanPointsOf(node) : void 0;
+    const ideal = held2 ?? (() => {
       const i = idealize(node, shape);
       return i ? placed(node, i.points) : void 0;
     })();
@@ -7576,8 +7576,8 @@ ${p.svg}</section>`),
     for (const t of tagged) {
       const k = authorKey(t.ev);
       if (k === null) continue;
-      const held = winner.get(k);
-      if (!held || opts.me !== void 0 && t.name === opts.me && held.name !== opts.me) winner.set(k, t);
+      const held2 = winner.get(k);
+      if (!held2 || opts.me !== void 0 && t.name === opts.me && held2.name !== opts.me) winner.set(k, t);
     }
     const out = [];
     for (const t of tagged) {
@@ -8030,9 +8030,9 @@ ${p.svg}</section>`),
       if (line.full) {
         const last = this.applied.get(line.participant);
         if (last !== void 0 && at < last) return;
-        const held = this.logs[line.participant];
+        const held2 = this.logs[line.participant];
         if (!sid) {
-          const i = held && held.length ? divergence(held, events) : -1;
+          const i = held2 && held2.length ? divergence(held2, events) : -1;
           if (i >= 0) {
             this.collide(line.participant, `two hands are both called "${line.participant}" \u2014 their logs disagree from event ${i + 1}; what is held is kept, so rename one`);
             return;
@@ -8081,8 +8081,8 @@ ${p.svg}</section>`),
     for (let i = 0; i < sent.length; i++) if (eventKey(sent[i]) !== eventKey(now[i])) return false;
     return true;
   }
-  function divergence(held, incoming) {
-    const a = held.map((e) => JSON.stringify(e));
+  function divergence(held2, incoming) {
+    const a = held2.map((e) => JSON.stringify(e));
     const b = incoming.map((e) => JSON.stringify(e));
     const i = unaccounted(a, b);
     if (i < 0) return -1;
@@ -10196,16 +10196,16 @@ ${lines.join("\n")}
     const shapeConf = s.shapeConfidence[id] ?? 0.5;
     const wire = s.wires[id];
     const ends = wire ? wire.ends.filter((e) => inScope(s, e) && e !== id) : [];
-    const held = isClosed(s, id) ? contents(s, id) : [];
-    if (held.length > 0) {
-      const strength = held.reduce((a, r) => a + r.strength, 0) / held.length;
+    const held2 = isClosed(s, id) ? contents(s, id) : [];
+    if (held2.length > 0) {
+      const strength = held2.reduce((a, r) => a + r.strength, 0) / held2.length;
       return {
         id,
         role: "container",
         rule: 1,
         confidence: Math.min(0.95, 0.5 + strength * 0.45),
-        reasoning: `a ${shape} wholly enclosing ${held.length} mark${held.length === 1 ? "" : "s"}`,
-        targets: held.map((r) => r.to)
+        reasoning: `a ${shape} wholly enclosing ${held2.length} mark${held2.length === 1 ? "" : "s"}`,
+        targets: held2.map((r) => r.to)
       };
     }
     if (isWriting(s, id)) {
@@ -11352,7 +11352,7 @@ ${lines.join("\n")}
       const fresh = [];
       for (const id of unsettled) {
         if (!linked.has(id) || componentOf.has(id)) continue;
-        fresh.push(gather(id));
+        fresh.push(gather2(id));
       }
       unsettled.clear();
       for (const c of fresh) {
@@ -11364,7 +11364,7 @@ ${lines.join("\n")}
         assemble(c);
       }
     }
-    function gather(start) {
+    function gather2(start) {
       const seen = /* @__PURE__ */ new Set([start]);
       const stack = [start];
       let first = start;
@@ -12671,7 +12671,7 @@ ${lines.join("\n")}
     }
     function dispatch(given) {
       staleResult = null;
-      const raw = actingTool !== null && given.tool === void 0 ? { ...given, tool: actingTool } : given;
+      const raw = actingTool !== null && given.tool === void 0 ? { ...given, tool: actingTool.tool, ...actingTool.offer !== void 0 ? { offer: actingTool.offer } : {} } : given;
       const ev = myLog === void 0 || raw.seq !== void 0 ? raw : { ...raw, origin: myLog, seq: (highWater.get(myLog) ?? 0) + 1 };
       if (ev.origin && typeof ev.seq === "number") sawNumber(ev.origin, ev.seq);
       events.push(ev);
@@ -12800,9 +12800,9 @@ ${lines.join("\n")}
       dismiss: (summonId, at) => void dispatch({ type: "dismiss", summonId, at }),
       erase: (nodeId, at) => void dispatch({ type: "erase", nodeId, at }),
       undo,
-      withTool: (toolId, fn) => {
+      withTool: (toolId, fn, offerKey) => {
         const before = actingTool;
-        actingTool = toolId;
+        actingTool = offerKey === void 0 ? { tool: toolId } : { tool: toolId, offer: offerKey };
         try {
           return fn();
         } finally {
@@ -14463,20 +14463,31 @@ if (mm.THREE && mm.scene) {
       listeners.delete(listener);
     };
   }
-  function offersFor(scope, ctx = NO_CONTEXT) {
+  function held(offer, tool) {
+    let o = offer.tool === tool.id ? offer : { ...offer, tool: tool.id };
+    if (o.lead && o.asks) {
+      const { lead: _lead, ...rest } = o;
+      o = rest;
+    }
+    return o;
+  }
+  function gather(tools, each) {
     const out = [];
-    for (const tool of registry3.values()) {
-      for (const offer of tool.offers(scope, ctx)) out.push(offer.tool === tool.id ? offer : { ...offer, tool: tool.id });
+    const keys = /* @__PURE__ */ new Set();
+    for (const tool of tools) {
+      for (const offer of each(tool)) {
+        if (keys.has(offer.key)) continue;
+        keys.add(offer.key);
+        out.push(held(offer, tool));
+      }
     }
     return out;
   }
+  function offersFor(scope, ctx = NO_CONTEXT) {
+    return gather(registry3.values(), (tool) => tool.offers(scope, ctx));
+  }
   function completionsFor(scope, ctx = NO_CONTEXT) {
-    const out = [];
-    for (const tool of registry3.values()) {
-      if (!tool.completes) continue;
-      for (const offer of tool.completes(scope, ctx)) out.push(offer.tool === tool.id ? offer : { ...offer, tool: tool.id });
-    }
-    return out;
+    return gather(registry3.values(), (tool) => tool.completes ? tool.completes(scope, ctx) : []);
   }
   function toolsFor(scope, ctx = NO_CONTEXT) {
     return registeredTools().filter((tool) => tool.offers(scope, ctx).length > 0);
@@ -14492,7 +14503,7 @@ if (mm.THREE && mm.scene) {
   function takeOffer(offer, scope, session, at) {
     const tool = registry3.get(offer.tool);
     if (!tool) throw new Error(`no tool "${offer.tool}" is registered to take "${offer.key}"`);
-    return session.withTool(tool.id, () => tool.take(offer, scope, session, at)) || {};
+    return session.withTool(tool.id, () => tool.take(offer, scope, session, at), offer.key) || {};
   }
   function describeTools(filter = () => true) {
     return registeredTools().filter(filter).map((tool) => `${tool.name} \u2014 ${tool.describe()}`).join("\n");
@@ -14717,7 +14728,7 @@ if (mm.THREE && mm.scene) {
   // src/tools/name.ts
   var NAMING_IS = "naming makes one thing of them, a definition the library keeps and the next drawing like it is offered as; it writes no word on the ink";
   function nameMarks(session, summonId, name, at) {
-    return session.withTool(NAME2.id, () => session.bless({ summonId, name, at }));
+    return session.withTool(NAME2.id, () => session.bless({ summonId, name, at }), "name-word");
   }
   var NAME2 = {
     id: "name",
@@ -14792,18 +14803,18 @@ if (mm.THREE && mm.scene) {
   function labelInk(session, args) {
     const text = String(args.word || "").trim();
     const s = session.getState();
-    const held = (args.ids || []).filter((id) => {
+    const held2 = (args.ids || []).filter((id) => {
       const n2 = s.nodes.get(id);
       return !!n2 && !getRep(n2, "erased");
     });
-    if (!text || !held.length) return { done: [], saying: [], refused: [] };
+    if (!text || !held2.length) return { done: [], saying: [], refused: [] };
     return session.withTool(LABEL.id, () => {
       const mine = (id) => session.isMine(id);
-      const saying = held.filter((id) => {
+      const saying = held2.filter((id) => {
         const l = mine(id) && labelOf(s.nodes.get(id));
         return !!l && l.text === text;
       });
-      const asks = held.filter((id) => !saying.includes(id));
+      const asks = held2.filter((id) => !saying.includes(id));
       if (asks.some(mine)) {
         if (args.summonId && s.summon && s.summon.id === args.summonId) session.dismiss(args.summonId, args.at);
         if (session.getState().selection.length) session.deselect(args.at);
@@ -14820,7 +14831,7 @@ if (mm.THREE && mm.scene) {
         refused.push({ id, reason: st && st.what === "label" ? st.reason : "refused", detail: st && st.what === "label" ? st.detail : "", maker });
       }
       return { done, saying, refused };
-    });
+    }, args.offer ?? "label-word");
   }
   var isWritingOrRead = (n2, nodes) => isWritingMark(n2, nodes) || isWord(n2) || !!transcriptOf(n2);
   var LABEL = {
@@ -14862,7 +14873,7 @@ if (mm.THREE && mm.scene) {
     },
     take(offer, scope, session, at) {
       const { word, targets } = offer.data;
-      return { detail: labelInk(session, { summonId: scope.summon.id, ids: targets, word, at, nameOf: scope.host.nameOf }) };
+      return { detail: labelInk(session, { summonId: scope.summon.id, ids: targets, word, at, nameOf: scope.host.nameOf, offer: offer.key }) };
     }
   };
 

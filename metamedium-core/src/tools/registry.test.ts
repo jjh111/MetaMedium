@@ -48,4 +48,29 @@ describe('the tool registry', () => {
     expect(getTool('test:count-boxes')).toBeUndefined();
     expect(offersFor(toolScope(boxes)).some((o) => o.tool === 'test:count-boxes')).toBe(false);
   });
+
+  it('an offer that asks a model never leads, and a key is offered once — the first tool to offer it keeps it', () => {
+    const boxes = held((s) => [s.addStroke(rectStroke(100, 100, 120, 80), 1000)]);
+    const LEADS: Tool = {
+      id: 'test:leads',
+      name: 'leads',
+      describe: () => 'a test',
+      offers: () => [
+        { key: 'test:ask', label: 'Ask it', reason: 'asks a model', base: 2, tool: 'test:leads', asks: 'model', lead: true },
+        { key: 'test:same', label: 'First', reason: 'mine', base: 0.3, tool: 'test:leads', lead: true },
+      ],
+      take: () => ({}),
+    };
+    const SAME: Tool = { ...LEADS, id: 'test:same', offers: () => [{ key: 'test:same', label: 'Second', reason: 'theirs', base: 0.3, tool: 'test:same' }] };
+    const offs = [registerTool(LEADS), registerTool(SAME)];
+    try {
+      const offers = offersFor(toolScope(boxes));
+      const ask = offers.find((o) => o.key === 'test:ask')!;
+      expect(ask.asks).toBe('model');
+      expect(ask.lead).toBeUndefined();
+      expect(offers.filter((o) => o.key === 'test:same').map((o) => [o.label, o.tool, o.lead])).toEqual([['First', 'test:leads', true]]);
+    } finally {
+      offs.forEach((off) => off());
+    }
+  });
 });

@@ -2992,9 +2992,9 @@ window.__scenario = async function(){
     await wait(30);
     const evs49 = mm.session.getEvents();
     const answered = evs49[evs49.length - 1];
-    step('49b. a tool registered in one line is offered in the open field for a scope it applies to, the four core slots unmoved, and what taking it writes carries its id',
-      !before && offered && slots49 === 'name,copy,paste,erase' && answered.type === 'answer' && answered.tool === 'test:count-boxes' && answered.text === '3 boxes',
-      { before, offered, slots: slots49, last: { type: answered.type, tool: answered.tool, text: answered.text } });
+    step('49b. a tool registered in one line is offered in the open field for a scope it applies to, the four core slots unmoved, and what taking it writes carries its id and the offer\'s key',
+      !before && offered && slots49 === 'name,copy,paste,erase' && answered.type === 'answer' && answered.tool === 'test:count-boxes' && answered.offer === 'test:count-boxes' && answered.text === '3 boxes',
+      { before, offered, slots: slots49, last: { type: answered.type, tool: answered.tool, offer: answered.offer, text: answered.text } });
     mm.session.summonMarks([ring49], Date.now()); await wait(60);
     const onCircle = !!pillOf();
     mm.session.summonMarks(boxes49, Date.now()); await wait(60);

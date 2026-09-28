@@ -40,6 +40,16 @@ describe('what a tool writes carries its id', () => {
     expect(s.getEvents().slice(0, before).every((e) => e.tool === undefined)).toBe(true);
   });
 
+  it('an act that took an offer says which: the offer\'s key beside the tool', () => {
+    const { s, ids } = threeBoxes();
+    s.withTool('tidy', () => s.tidy({ ids, mode: 'align', axis: 'row', at: 2000 }), 'row:tidy-row');
+    s.withTool('tidy', () => s.tidy({ ids, mode: 'equalize', at: 2100 }));
+    const [a, b] = s.getEvents().slice(-2);
+    expect(a).toMatchObject({ tool: 'tidy', offer: 'row:tidy-row' });
+    expect(b.tool).toBe('tidy');
+    expect('offer' in b).toBe(false);
+  });
+
   it('nested, the innermost tool is stamped; a throw puts the one before back', () => {
     const { s, ids } = threeBoxes();
     const n = s.getEvents().length;
@@ -68,7 +78,7 @@ describe('what a tool writes carries its id', () => {
     s.withTool('name', () => s.bless({ summonId: sum, name: 'boxes', at: 2300 }));
     const stamped = s.getEvents();
     expect(stamped.filter((e) => e.tool).length).toBe(3);
-    const bare: SessionEvent[] = stamped.map(({ tool: _tool, ...e }) => e as SessionEvent);
+    const bare: SessionEvent[] = stamped.map(({ tool: _tool, offer: _offer, ...e }) => e as SessionEvent);
     const a = createSession(); a.load(stamped);
     const b = createSession(); b.load(bare);
     expect(shape(a)).toBe(shape(s));
@@ -99,7 +109,7 @@ describe('what a tool writes carries its id', () => {
       const taken = takeOffer(offer, scope, s, 2000);
       expect(taken).toEqual({ detail: 'equalized' });
       const last = s.getEvents()[s.getEvents().length - 1];
-      expect(last).toMatchObject({ type: 'tidy', mode: 'equalize', tool: 'test:equalize' });
+      expect(last).toMatchObject({ type: 'tidy', mode: 'equalize', tool: 'test:equalize', offer: 'test:equalize' });
     } finally {
       off();
     }

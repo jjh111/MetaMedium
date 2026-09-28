@@ -14,9 +14,9 @@ import type { Tool } from './tool';
 /** What naming is, said wherever it stands beside labelling — and in the readings that take a word as a name. */
 export const NAMING_IS = 'naming makes one thing of them, a definition the library keeps and the next drawing like it is offered as; it writes no word on the ink';
 
-/** Bless a summon's marks under a name, as this tool's act. Returns the artifact, or null. */
+/** Bless a summon's marks under a name, as this tool's act (the typed word's offer, `name-word`). Returns the artifact, or null. */
 export function nameMarks(session: Session, summonId: string, name: string, at: number): string | null {
-  return session.withTool(NAME.id, () => session.bless({ summonId, name, at }));
+  return session.withTool(NAME.id, () => session.bless({ summonId, name, at }), 'name-word');
 }
 
 export const NAME: Tool = {

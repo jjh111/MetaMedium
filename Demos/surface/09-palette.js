@@ -226,7 +226,7 @@
       const taken = MM.takeOffer(o, scope, session, Date.now());
       if (taken.host && HOST_ACTS[taken.host]) HOST_ACTS[taken.host](o, scope, taken);
       if (acts.after) acts.after(o, scope, taken);
-    });
+    }, o.key);
   }
 
   // A tool registered or unregistered changes what the field offers with no

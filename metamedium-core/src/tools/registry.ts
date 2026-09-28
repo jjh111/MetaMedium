@@ -74,16 +74,41 @@ export function onToolsChange(listener: () => void): () => void {
 }
 
 /**
- * Everything the tools offer for a scope, in registry order, each tool's
- * offers in its own order. Unranked: `rankOffers` orders them. Every offer is
- * the tool's own — one naming another tool is taken as the tool that made it.
+ * An offer as the field may hold it: its tool's own, whatever it named; and
+ * never leading if it asks anyone — Enter with nothing typed takes the
+ * leading item, and a model or a seat is asked only by a deliberate act.
  */
-export function offersFor(scope: ToolScope, ctx: Context = NO_CONTEXT): Offer[] {
+function held(offer: Offer, tool: Tool): Offer {
+  let o = offer.tool === tool.id ? offer : { ...offer, tool: tool.id };
+  if (o.lead && o.asks) {
+    const { lead: _lead, ...rest } = o;
+    o = rest;
+  }
+  return o;
+}
+
+/** Offers in order, each key once: a later offer under a key already offered is not the field's to hold twice. */
+function gather(tools: Iterable<Tool>, each: (tool: Tool) => Offer[]): Offer[] {
   const out: Offer[] = [];
-  for (const tool of registry.values()) {
-    for (const offer of tool.offers(scope, ctx)) out.push(offer.tool === tool.id ? offer : { ...offer, tool: tool.id });
+  const keys = new Set<string>();
+  for (const tool of tools) {
+    for (const offer of each(tool)) {
+      if (keys.has(offer.key)) continue;
+      keys.add(offer.key);
+      out.push(held(offer, tool));
+    }
   }
   return out;
+}
+
+/**
+ * Everything the tools offer for a scope, in registry order, each tool's
+ * offers in its own order. Unranked: `rankOffers` orders them. Every offer is
+ * the tool's own — one naming another tool is taken as the tool that made
+ * it — and every key is offered once (the first tool to offer it keeps it).
+ */
+export function offersFor(scope: ToolScope, ctx: Context = NO_CONTEXT): Offer[] {
+  return gather(registry.values(), (tool) => tool.offers(scope, ctx));
 }
 
 /**
@@ -91,12 +116,7 @@ export function offersFor(scope: ToolScope, ctx: Context = NO_CONTEXT): Offer[] 
  * registry order — each placed in the field by its `place`, not ranked.
  */
 export function completionsFor(scope: ToolScope, ctx: Context = NO_CONTEXT): Offer[] {
-  const out: Offer[] = [];
-  for (const tool of registry.values()) {
-    if (!tool.completes) continue;
-    for (const offer of tool.completes(scope, ctx)) out.push(offer.tool === tool.id ? offer : { ...offer, tool: tool.id });
-  }
-  return out;
+  return gather(registry.values(), (tool) => (tool.completes ? tool.completes(scope, ctx) : []));
 }
 
 /** The tools that offer something for a scope, in registry order. */
@@ -116,14 +136,15 @@ export function readingsFor(scope: ToolScope): (ToolReading & { tool: string })[
 
 /**
  * Take an offer, through the one door that stamps: every event the tool
- * writes carries its id. What is left for the host — an act only the host
- * can perform — comes back in `host`, and a host that performs it inside
- * `session.withTool(offer.tool, …)` stamps what that writes too.
+ * writes carries its id and the offer's key. What is left for the host — an
+ * act only the host can perform — comes back in `host`, and a host that
+ * performs it inside `session.withTool(offer.tool, …, offer.key)` stamps
+ * what that writes too.
  */
 export function takeOffer(offer: Offer, scope: ToolScope, session: Session, at: number): Taken {
   const tool = registry.get(offer.tool);
   if (!tool) throw new Error(`no tool "${offer.tool}" is registered to take "${offer.key}"`);
-  return session.withTool(tool.id, () => tool.take(offer, scope, session, at)) || {};
+  return session.withTool(tool.id, () => tool.take(offer, scope, session, at), offer.key) || {};
 }
 
 /** Every tool, one line each: its name and what it does — for `HERE`, the models pane and a brief. */

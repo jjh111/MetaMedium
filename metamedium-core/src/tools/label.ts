@@ -97,7 +97,7 @@ export interface LabelRefusal { id: string; reason: string; detail: string; make
  */
 export function labelInk(
   session: Session,
-  args: { summonId?: string | null; ids: readonly string[]; word: string; at: number; nameOf?: (participantId: string) => string }
+  args: { summonId?: string | null; ids: readonly string[]; word: string; at: number; nameOf?: (participantId: string) => string; offer?: string }
 ): { done: string[]; saying: string[]; refused: LabelRefusal[] } {
   const text = String(args.word || '').trim();
   const s = session.getState();
@@ -120,7 +120,7 @@ export function labelInk(
       refused.push({ id, reason: st && st.what === 'label' ? st.reason : 'refused', detail: st && st.what === 'label' ? st.detail : '', maker });
     }
     return { done, saying, refused };
-  });
+  }, args.offer ?? 'label-word');
 }
 
 const isWritingOrRead = (n: MMNode, nodes: ReadonlyMap<string, MMNode>) => isWritingMark(n, nodes) || isWord(n) || !!transcriptOf(n);
@@ -161,6 +161,6 @@ export const LABEL: Tool = {
   },
   take(offer, scope, session, at) {
     const { word, targets } = offer.data as { word: string; targets: string[] };
-    return { detail: labelInk(session, { summonId: scope.summon.id, ids: targets, word, at, nameOf: scope.host.nameOf }) };
+    return { detail: labelInk(session, { summonId: scope.summon.id, ids: targets, word, at, nameOf: scope.host.nameOf, offer: offer.key }) };
   },
 };

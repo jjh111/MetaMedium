@@ -403,11 +403,12 @@ type SessionEventUnion =
  * always had (see `nextId`).
  *
  * `tool` is the tool whose offer wrote the event, when one did (V1-PLAN B1,
- * `tools/`): stamped by the writing session while `withTool` holds, so the log
- * says which tool did what and context (B2) can read what was just taken
- * where. Like `by`, it is provenance, never state: replay ignores it.
+ * `tools/`), and `offer` that offer's key: stamped by the writing session
+ * while `withTool` holds, so the log says which tool did what and context
+ * (B2) can read what was just taken where. Like `by`, they are provenance,
+ * never state: replay ignores them.
  */
-export type SessionEvent = SessionEventUnion & { by?: string; origin?: string; seq?: number; tool?: string };
+export type SessionEvent = SessionEventUnion & { by?: string; origin?: string; seq?: number; tool?: string; offer?: string };
 
 /**
  * An attributed, inferred REP offered by a participant — what a model read
@@ -672,12 +673,13 @@ export interface Session {
    */
   load(events: readonly SessionEvent[]): void;
   /**
-   * Take a tool's act: every event `fn` writes carries `tool: toolId`
-   * (V1-PLAN B1), so the log says which tool did what. Nothing else changes —
-   * replay reads no `tool`, and an event that already carries one keeps it.
-   * Nested, the innermost tool is the one stamped; `fn`'s result is returned.
+   * Take a tool's act: every event `fn` writes carries `tool: toolId`, and
+   * `offer: offerKey` when the act took one of its offers (V1-PLAN B1), so
+   * the log says which tool did what. Nothing else changes — replay reads
+   * neither, and an event that already carries a tool keeps its own. Nested,
+   * the innermost is the one stamped; `fn`'s result is returned.
    */
-  withTool<T>(toolId: string, fn: () => T): T;
+  withTool<T>(toolId: string, fn: () => T, offerKey?: string): T;
 }
 
 export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): Session {
@@ -701,9 +703,10 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
   // Runtime notices, not log facts: neither is derived from the events, so
   // neither is checkpointed and neither survives into another session's log.
   let staleResult: StaleResult | null = null;
-  // The tool whose act is being taken (`withTool`): runtime, never derived
-  // from the log; what it stamps on the events it writes is the log's.
-  let actingTool: string | null = null;
+  // The tool whose act is being taken (`withTool`), and the offer it took:
+  // runtime, never derived from the log; what they stamp on the events
+  // written meanwhile is the log's.
+  let actingTool: { tool: string; offer?: string } | null = null;
   let generation = 0;
   let lastAt = 0;
   let counter = 0;
@@ -3009,7 +3012,9 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
   function dispatch(given: SessionEvent): string | null {
     staleResult = null;
     // The tool taking its act is stamped here too, beside authorship (B1).
-    const raw: SessionEvent = actingTool !== null && given.tool === undefined ? { ...given, tool: actingTool } : given;
+    const raw: SessionEvent = actingTool !== null && given.tool === undefined
+      ? { ...given, tool: actingTool.tool, ...(actingTool.offer !== undefined ? { offer: actingTool.offer } : {}) }
+      : given;
     // Authorship is stamped HERE, because this is the only place an event is
     // made; an event that already carries it was written elsewhere and keeps
     // what it was written with. The number is one past the sitting's
@@ -3165,9 +3170,9 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     dismiss: (summonId, at) => void dispatch({ type: 'dismiss', summonId, at }),
     erase: (nodeId, at) => void dispatch({ type: 'erase', nodeId, at }),
     undo,
-    withTool: <T>(toolId: string, fn: () => T): T => {
+    withTool: <T>(toolId: string, fn: () => T, offerKey?: string): T => {
       const before = actingTool;
-      actingTool = toolId;
+      actingTool = offerKey === undefined ? { tool: toolId } : { tool: toolId, offer: offerKey };
       try {
         return fn();
       } finally {
