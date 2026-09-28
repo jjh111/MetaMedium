@@ -449,6 +449,19 @@ export type { QuadStance } from './notations/shape';
 // Mermaid's own numbering) to its connector.
 export { toMermaid, registerMermaidWriter, mermaidWriters, mermaidIds, mermaidString, unescapeMermaid, UNREAD_WRITING } from './notations/mermaid';
 export type { MermaidText, MermaidOptions, MermaidLink, MermaidWriter, MermaidDirection } from './notations/mermaid';
+// Mermaid in (V1-PLAN §3, D3) — a Mermaid text drawn as ink the engine reads
+// as a hand's: a reader per diagram keyword (the flowchart's reads
+// `flowchart` and `graph`; D4–D6 add theirs), what it cannot read refused
+// with its line and never thrown; a deterministic layered layout that keeps
+// the text's order as its reading order; each symbol a clean form the
+// notation reads, each link port to port and bound at both ends, each word a
+// label on its own ink — so `toMermaid` of the reading says the text again.
+// Tier 1; the events are strokes, binds and labels. Wrap the call in
+// `session.withTool` to make it one act.
+export { drawMermaid, readMermaid, registerMermaidReader, mermaidReaders, readFlowchartText, FLOWCHART_READER, MERMAID_TEXT_PX, MERMAID_MAX_NODES, MERMAID_MAX_LINKS } from './notations/mermaid-in';
+export type { DrawMermaidOptions, DrawnMermaid, DrawnLink, DrawnEnd, MermaidRead, MermaidNodeRead, MermaidLinkRead, MermaidRefusal, MermaidReader, MermaidFlow } from './notations/mermaid-in';
+export { layoutLayered, keepApart, LAYERED_PASSES, KEEP_DIRECTION } from './notations/layered';
+export type { LayeredNode, LayeredLink, LayeredOptions, LayeredLayout, LayeredBack, LayeredDirection } from './notations/layered';
 
 // Concepts — the meaning-mappings, as a library rather than as code paths.
 export { matchConcepts, BUILTIN_CONCEPTS } from './concepts/concept';
