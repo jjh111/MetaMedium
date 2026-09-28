@@ -10,6 +10,7 @@
 //     node e2e/run.mjs keep                   # no lost work: the kill test, the forced failures
 //     node e2e/run.mjs boards                 # several named boards: the list, the trash, the switch
 //     node e2e/run.mjs big                    # a 2,000-mark board saved and opened again (minutes)
+//     node e2e/run.mjs app                    # one app address: /app/ installs, opens offline, is versioned per release
 //
 // It starts its own servers on ports the OS hands out, opens a FRESH browser
 // context per scenario (no profile, no cache, no board carried over from the
@@ -29,6 +30,7 @@ import { startStatic, startVite } from './servers.mjs';
 import { isModelRequest, allowedError, ALLOWED_PAGE_ERRORS } from './guards.mjs';
 import { runKeep, runBig } from './keep.mjs';
 import { runBoards } from './boards.mjs';
+import { runApp } from './app.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, '..');
@@ -328,14 +330,16 @@ async function runSmoke(browser, servers) {
 
 /**
  * No lost work (V1-PLAN R3; `keep.mjs`): the kill test and the forced
- * failures; and several named boards (R1; `boards.mjs`). Unlike the others
- * they open several contexts or pages of their own — each with the gate's
- * guards — because a board kept by the browser is only tested by closing the
- * page that kept it and opening another.
+ * failures; several named boards (R1; `boards.mjs`); and one app address
+ * (R7; `app.mjs`). Unlike the others they open several contexts or pages of
+ * their own — each with the gate's guards — because a board kept by the
+ * browser is only tested by closing the page that kept it and opening
+ * another, and an app that opens offline only by taking its server away.
  */
-const OWN_PAGES = { keep: runKeep, big: runBig, boards: runBoards };
+const OWN_PAGES = { keep: runKeep, big: runBig, boards: runBoards, app: runApp };
+const OWN_URL = { app: 'app/' };
 async function runKeepScenario(browser, servers, engineName, which = 'keep') {
-  const out = { name: which, url: `${servers.staticOrigin}/Demos/session-engine.html?nosw=1` };
+  const out = { name: which, url: `${servers.staticOrigin}/${OWN_URL[which] || 'Demos/session-engine.html?nosw=1'}` };
   let guards = [];
   try {
     const r = await OWN_PAGES[which](browser, servers, { freshContext, engineName, screenshot });
@@ -389,8 +393,8 @@ async function main() {
   // `smoke` is opt-in: it is the short WebKit interaction, not part of the gate's
   // own four, and naming it in the default list would run it twice on Chromium.
   // `big` is opt-in too: a 2,000-mark board saved and opened again, minutes of replay.
-  const all = ['canvas', 'keep', 'boards', 'shard', 'demo', 'demo2', 'smoke', 'big'];
-  const byDefault = ['canvas', 'keep', 'boards', 'shard', 'demo', 'demo2'];
+  const all = ['canvas', 'keep', 'boards', 'app', 'shard', 'demo', 'demo2', 'smoke', 'big'];
+  const byDefault = ['canvas', 'keep', 'boards', 'app', 'shard', 'demo', 'demo2'];
   const picked = wanted.length ? all.filter((n) => wanted.includes(n)) : byDefault;
   if (!picked.length) {
     console.error(`nothing to run — pick from: ${all.join(', ')}`);
@@ -400,7 +404,7 @@ async function main() {
   rmSync(RESULTS, { recursive: true, force: true });
   mkdirSync(RESULTS, { recursive: true });
 
-  const needCanvas = picked.includes('canvas') || picked.includes('smoke') || picked.includes('keep') || picked.includes('boards') || picked.includes('big');
+  const needCanvas = picked.includes('canvas') || picked.includes('smoke') || picked.includes('keep') || picked.includes('boards') || picked.includes('big') || picked.includes('app');
   const needShard = picked.includes('shard') || picked.includes('demo') || picked.includes('demo2');
 
   const started = Date.now();
