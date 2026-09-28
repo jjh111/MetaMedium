@@ -24,6 +24,7 @@ import { createSession, DEFAULT_SESSION_CONFIG, type Session, type SessionEvent 
 import { LOCAL_PARTICIPANT } from '../session/nodes';
 import { LiveStore, type LiveLine, type LiveTransport, type RelayNotice } from '../store/live';
 import { mergeLogs } from '../store/merge';
+import { LiveMerge, type MergeReport } from '../store/livemerge';
 import { rng, rectStroke, circleStroke, lineStroke } from './strokes';
 import type { Point } from '../types';
 
@@ -133,6 +134,40 @@ export class Wire {
   }
 }
 
+/**
+ * The room's time, for everything in it that waits: a store's `later` runs
+ * when the room's clock passes it, in the order it fell due — so a room with
+ * copies waiting to be handed on is as deterministic as one without.
+ */
+export class Clock {
+  private queue: { due: number; n: number; fn: () => void; live: boolean }[] = [];
+  private n = 0;
+  constructor(public now: number) {}
+
+  later = (fn: () => void, ms: number): (() => void) => {
+    const t = { due: this.now + ms, n: this.n++, fn, live: true };
+    this.queue.push(t);
+    return () => { t.live = false; };
+  };
+
+  /** Move the clock on to `to`, running what falls due on the way. How many ran. */
+  advance(to: number): number {
+    let ran = 0;
+    for (;;) {
+      let next: (typeof this.queue)[number] | null = null;
+      for (const t of this.queue) if (t.live && t.due <= to && (!next || t.due < next.due || (t.due === next.due && t.n < next.n))) next = t;
+      if (!next) break;
+      next.live = false;
+      this.now = Math.max(this.now, next.due);
+      next.fn();
+      ran++;
+    }
+    this.queue = this.queue.filter((t) => t.live);
+    this.now = Math.max(this.now, to);
+    return ran;
+  }
+}
+
 /** A session's own events: what it wrote, never what it merged in (those carry `by`). */
 export const unstamped = (s: Session): SessionEvent[] => s.getEvents().filter((e) => !e.by);
 
@@ -181,13 +216,13 @@ export class RemoteHand {
   skew: number;
   private joins = 0;
 
-  constructor(private wire: Wire, public name: string, skew: number, readonly sitting: string, opts: { unnamedFirst?: boolean } = {}) {
+  constructor(private wire: Wire, public name: string, skew: number, readonly sitting: string, private clock: Clock, opts: { unnamedFirst?: boolean } = {}) {
     this.skew = skew;
     // A newcomer may have drawn before it had a log name (a shard tab before
     // it joined): its first marks carry no authorship and mint by counter.
     this.session = opts.unnamedFirst ? createSession() : createSession({ ...DEFAULT_SESSION_CONFIG, logName: name });
     this.member = `${name}#${this.joins}`;
-    this.store = new LiveStore(this.wire.transport(this.member), name, 'r', { sitting });
+    this.store = new LiveStore(this.wire.transport(this.member), name, 'r', { sitting, later: this.clock.later });
   }
 
   mine(): SessionEvent[] {
@@ -231,7 +266,7 @@ export class RemoteHand {
     this.joins++;
     this.name = name;
     this.member = `${name}#${this.joins}`;
-    this.store = new LiveStore(this.wire.transport(this.member), name, 'r', { sitting: this.sitting });
+    this.store = new LiveStore(this.wire.transport(this.member), name, 'r', { sitting: this.sitting, later: this.clock.later });
     await this.enter();
   }
 }
@@ -246,14 +281,19 @@ export interface LocalHand {
   readonly sent: LiveLine[];
   /** The path's own memory. */
   x: Record<string, unknown>;
+  /** How many times the session has told its subscribers it changed. */
+  notified: number;
 }
 
 /** What a surface does in a room: join it, merge when its store says a line landed, and say what its log is. */
 export interface RoomPath {
   readonly label: string;
   join(h: LocalHand): Promise<void>;
-  merge(h: LocalHand): Promise<void>;
+  /** What the surface does when its store says something happened. Whether it merged. */
+  merge(h: LocalHand): Promise<boolean>;
   mine(h: LocalHand): SessionEvent[];
+  /** What the path did since it was last asked, one word a merge — for the counts. */
+  did?(h: LocalHand): string[];
 }
 
 /**
@@ -283,8 +323,72 @@ export const fullReplayPath: RoomPath = {
     h.x.myPrevious = mine;
     h.x.loadedCount = merged.length;
     h.store.notices();
+    return true;
   },
   mine: (h) => myLogNow(h),
+};
+
+/**
+ * The reference for R4d's path: the whole log merged and replayed from zero,
+ * exactly as before — but only when a log the store holds changed, which is
+ * when R4d's path merges too. So the two differ in how they merge, never in
+ * when, and a local act between lines (a mark drawn, an undo) meets the same
+ * board in both.
+ */
+export const fullReplayOnChangePath: RoomPath = {
+  label: 'the whole log merged and replayed when a log changed (the reference)',
+  async join(h) {
+    await fullReplayPath.join(h);
+    h.x.revision = h.store.revision();
+  },
+  async merge(h) {
+    const rev = h.store.revision();
+    if (rev === h.x.revision) {
+      h.store.notices();
+      return false;
+    }
+    h.x.revision = rev;
+    return fullReplayPath.merge(h);
+  },
+  mine: (h) => myLogNow(h),
+};
+
+/**
+ * The surface since R4d (Demos/surface/17-folder.js): `openLive` as before —
+ * the room's logs merged and loaded once, the board replaced — then a
+ * `LiveMerge` holds the merge between lines. On every notify the store says
+ * whether a log changed (`revision`); only then is the merge brought up to
+ * the logs as held (`heldLogs`), which hands the session what changed. This
+ * hand's log is the session's own unstamped events in the order they were
+ * written (`LiveStore.ownLog`).
+ */
+export const liveMergePath: RoomPath = {
+  label: 'the merge kept standing, a line applied (R4d)',
+  async join(h) {
+    h.session.setLogName(h.me);
+    await h.store.publish(unstamped(h.session));
+    const logs = await h.store.readLogs();
+    h.session.load(mergeLogs(logs, { me: h.me }));
+    const merge = new LiveMerge(h.session, h.me);
+    merge.sync(h.store.heldLogs());
+    h.x.merge = merge;
+    h.x.revision = h.store.revision();
+    h.x.reports = [] as MergeReport[];
+    h.store.hello();
+  },
+  async merge(h) {
+    const rev = h.store.revision();
+    h.store.notices();
+    if (rev === h.x.revision) return false;
+    h.x.revision = rev;
+    (h.x.reports as MergeReport[]).push((h.x.merge as LiveMerge).sync(h.store.heldLogs()));
+    return true;
+  },
+  mine: (h) => h.store.ownLog(h.session.getEvents()),
+  did(h) {
+    const rs = (h.x.reports as MergeReport[]).splice(0);
+    return rs.map((r) => `the merge: ${r.rebuilt ? 'read again whole, then ' : ''}${r.how === 'cut' ? (r.from === 0 ? 'replayed from zero' : 'replayed from a checkpoint') : r.how === 'append' ? 'appended' : 'nothing to hand over'}`);
+  },
 };
 
 /** `myLogNow` as the surface had it: my previous events still loaded, found by their JSON, then what came after. */
@@ -399,6 +503,7 @@ export async function runRoom(o: RoomOptions): Promise<RoomReport> {
   const failures: string[] = [];
   const wire = new Wire();
   let now = T0;
+  const clock = new Clock(now);
   let nameIx = 0;
   const nextName = () => `${NAMES[nameIx++ % NAMES.length]}${nameIx > NAMES.length ? nameIx : ''}~${(o.seed % 97).toString(36)}${nameIx}`;
   const skew = () => Math.round((rand() - 0.5) * 6000);
@@ -407,7 +512,7 @@ export async function runRoom(o: RoomOptions): Promise<RoomReport> {
   const remotes: RemoteHand[] = [];
   const nRemote = 2 + Math.floor(rand() * 2);
   for (let i = 0; i < nRemote; i++) {
-    const h = new RemoteHand(wire, nextName(), skew(), `sit-${o.seed}-${i}`);
+    const h = new RemoteHand(wire, nextName(), skew(), `sit-${o.seed}-${i}`, clock);
     remotes.push(h);
     await h.enter();
   }
@@ -424,6 +529,7 @@ export async function runRoom(o: RoomOptions): Promise<RoomReport> {
   const opening = 4 + Math.floor(rand() * 6);
   for (let i = 0; i < opening; i++) {
     now += 200 + Math.floor(rand() * 1500);
+    count('a wait run out', clock.advance(now));
     const h = alive()[Math.floor(rand() * alive().length)];
     if (act(await h.ready(), rand, now + h.skew, ['draw', 'draw', 'write'])) await h.publish();
     for (const r of alive()) for (const from of wire.waiting(r.member)) await remoteHears(r, from);
@@ -433,11 +539,18 @@ export async function runRoom(o: RoomOptions): Promise<RoomReport> {
   const me = `${NAMES[(o.seed + 3) % NAMES.length]}me~t${o.seed % 7}`;
   const sitting = `sit-${o.seed}-me`;
   const paths: RoomPath[] = o.reference ? [o.reference, o.under] : [o.under];
+  const checkpointEvery = 3 + Math.floor(rand() * 12);
   const locals: LocalHand[] = paths.map((p, i) => {
     const sent: LiveLine[] = [];
     // Only the first reader's lines go onto the wire; the second's are kept to compare.
     const transport = wire.transport('reader', (line) => sent.push(line), i === 0);
-    return { label: p.label, session: createSession(), store: new LiveStore(transport, me, 'r', { sitting }), me, sent, x: {} };
+    // The path under test snapshots every few events, so a line that cuts
+    // back goes to a checkpoint, never to zero, and a checkpoint gone back
+    // to is held to the oracle too — which snapshots at its default, or never.
+    const session = i === paths.length - 1 ? createSession({ ...DEFAULT_SESSION_CONFIG, checkpointEvery }) : createSession();
+    const h: LocalHand = { label: p.label, session, store: new LiveStore(transport, me, 'r', { sitting, later: clock.later }), me, sent, x: {}, notified: 0 };
+    session.subscribe(() => { h.notified++; });
+    return h;
   });
   const myAt = () => now; // this reader's clock is the room's
   // A few marks on the board before it joins, drawn before it had a log name
@@ -445,6 +558,7 @@ export async function runRoom(o: RoomOptions): Promise<RoomReport> {
   const before = Math.floor(rand() * 3);
   for (let i = 0; i < before; i++) {
     now += 150;
+    clock.advance(now);
     const seedAt = Math.floor(rand() * 1e9);
     for (const h of locals) act(h.session, rng(seedAt), myAt(), ['draw']);
   }
@@ -486,18 +600,36 @@ export async function runRoom(o: RoomOptions): Promise<RoomReport> {
   };
 
   const readersMerge = async (where: string) => {
-    for (let i = 0; i < locals.length; i++) await paths[i].merge(locals[i]);
-    await check(where);
+    const under = locals.length - 1;
+    const h = locals[under];
+    const was = { evs: h.session.getEvents(), n: h.session.getEvents().length, notified: h.notified };
+    const merged: boolean[] = [];
+    for (let i = 0; i < locals.length; i++) merged.push(await paths[i].merge(locals[i]));
+    for (const w of paths[under].did?.(h) ?? []) count(w);
+    if (merged.some((m) => m !== merged[under])) {
+      failures.push(`seed ${o.seed}, ${where}: the readers disagree on whether a log changed`);
+      return;
+    }
+    if (merged[under]) {
+      await check(where);
+      return;
+    }
+    // No log changed: no work, the board not so much as told.
+    count('a line that changed no log: no work');
+    if (h.session.getEvents() !== was.evs || h.session.getEvents().length !== was.n || h.notified !== was.notified) {
+      failures.push(`seed ${o.seed}, ${where}: ${h.label} did work for a line that changed no log`);
+    }
   };
   const readersPublish = async () => {
     for (let i = 0; i < locals.length; i++) await locals[i].store.publish(paths[i].mine(locals[i]));
   };
-  await readersMerge('after joining');
+  await check('after joining');
 
   // ----- the room at work -----
   const steps = o.steps ?? 40 + Math.floor(rand() * 30);
   for (let step = 0; step < steps && !failures.length; step++) {
     now += 50 + Math.floor(rand() * 1500);
+    count('a wait run out', clock.advance(now));
     const r = rand();
     const where = `step ${step}`;
     if (r < 0.3) {
@@ -553,7 +685,7 @@ export async function runRoom(o: RoomOptions): Promise<RoomReport> {
       count('a hand left');
     } else if (r < 0.975) {
       // A newcomer arrives — sometimes with marks drawn before it had a log name.
-      const h = new RemoteHand(wire, nextName(), skew(), `sit-${o.seed}-n${step}`, { unnamedFirst: rand() < 0.5 });
+      const h = new RemoteHand(wire, nextName(), skew(), `sit-${o.seed}-n${step}`, clock, { unnamedFirst: rand() < 0.5 });
       if (rand() < 0.7) for (let k = 0; k < 1 + Math.floor(rand() * 2); k++) act(h.session, rand, now + h.skew - 3000 + k * 100, ['draw', 'write']);
       remotes.push(h);
       await h.enter();
@@ -571,7 +703,9 @@ export async function runRoom(o: RoomOptions): Promise<RoomReport> {
     }
   }
 
-  // ----- everything still on the wire, delivered -----
+  // ----- everything still on the wire, delivered — and every wait run out -----
+  now += 60_000;
+  count('a wait run out', clock.advance(now));
   for (let guard = 0; guard < 10000 && wire.pending() && !failures.length; guard++) {
     for (const h of alive()) for (const from of wire.waiting(h.member)) await remoteHears(h, from);
     const from = wire.waiting('reader');

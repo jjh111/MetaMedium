@@ -78,9 +78,38 @@ function myLogNow(r) {
   return kept.concat(evs.slice(r.loadedCount));
 }
 
-const PATHS = { before };
+/**
+ * The surface since R4d: the room merged and loaded once as it opens, then a
+ * `LiveMerge` holds the merge between lines. On a notify the store says
+ * whether a log changed (`revision`); only then is the merge brought up to the
+ * logs as held (`heldLogs`), and the session is handed what changed — applied
+ * when it falls after everything held, replayed from the nearest checkpoint
+ * when it falls before. The save publishes `ownLog`: no event serialised.
+ */
+const live = {
+  label: 'the merge kept standing, a line applied (R4d)',
+  join(r) {
+    const logs = Object.fromEntries(Object.entries(r.store.heldLogs()).map(([k, v]) => [k, v.slice()]));
+    r.session.load(core.mergeLogs(logs, { me: r.me }));
+    r.merge = new core.LiveMerge(r.session, r.me);
+    r.merge.sync(r.store.heldLogs());
+    r.revision = r.store.revision();
+  },
+  async line(r) {
+    const rev = r.store.revision();
+    r.store.notices();
+    if (rev === r.revision) return;
+    r.revision = rev;
+    r.report = r.merge.sync(r.store.heldLogs());
+  },
+  async save(r) {
+    await r.store.publish(r.store.ownLog(r.session.getEvents()));
+  },
+};
+
+const PATHS = { before, live };
 /** What the surface runs now. */
-const SURFACE = 'before';
+const SURFACE = 'live';
 const pathName = a.path || SURFACE;
 const P = PATHS[pathName];
 if (!P) throw new Error(`unknown path "${pathName}" — ${Object.keys(PATHS).join(', ')}`);

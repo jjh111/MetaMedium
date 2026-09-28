@@ -470,6 +470,14 @@ export interface SessionConfig {
    * throw it.
    */
   logName?: string;
+  /**
+   * How many events apart the reducer's state is snapshotted, so an undo or a
+   * room's merge that cuts back replays from the nearest snapshot rather than
+   * from zero. 200 when unset. No reading depends on it — state is a pure
+   * function of the log however often it is snapshotted — which is what the
+   * room's oracle checks by setting it small.
+   */
+  checkpointEvery?: number;
 }
 
 export const DEFAULT_SESSION_CONFIG: SessionConfig = {
@@ -666,6 +674,40 @@ export interface Session {
    * draw afterwards to continue the recorded session with your own marks.
    */
   load(events: readonly SessionEvent[]): void;
+  /**
+   * Keep the first `keep` events of the log and put `tail` after them: what a
+   * live room's merge hands the session when only the end of the merged log
+   * changed (V1-PLAN §9 R4d, `store/livemerge.ts`).
+   *
+   * When nothing is cut — `keep` is the log's length — the tail is APPLIED,
+   * event by event, exactly as `dispatch` applies one: no replay. When
+   * something is, the state goes back to the nearest checkpoint at or before
+   * `keep` and replays from there, never from zero. Either way the log and the
+   * state are what `load` of the whole log would give — state is a pure
+   * function of the log — and subscribers hear it once.
+   *
+   * Unlike `load`, the board is not replaced, so `generation` stands and a
+   * model still thinking about a mark answers about it: an id minted from an
+   * event's authorship names that event's mark however the log is ordered.
+   * Except when the stretch replayed holds an event with no authorship, whose
+   * ids come off the replay's counter and may now name other marks — then it
+   * is bumped, as a load bumps it.
+   *
+   * The events are taken as they are, not copied: the caller hands them over
+   * and does not change them. Nothing is stamped — they were written elsewhere;
+   * their numbers only raise the high-water marks, as a load's do.
+   */
+  rebase(keep: number, tail: readonly SessionEvent[]): RebaseReport;
+}
+
+/** What `rebase` did. */
+export interface RebaseReport {
+  /** Whether anything already applied was cut; false is an append. */
+  cut: boolean;
+  /** Where the state was rebuilt from: the checkpoint gone back to when something was cut, else the old end of the log. */
+  from: number;
+  /** Events applied, from `from` to the new end. */
+  applied: number;
 }
 
 export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): Session {
@@ -735,6 +777,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
   // in place (a summon's suggestions), so they are cloned outright. Restoring
   // copies again, so a snapshot stays as it was however often it is used.
   const CHECKPOINT_EVERY = 200;
+  const checkpointEvery = config.checkpointEvery !== undefined && config.checkpointEvery >= 1 ? Math.floor(config.checkpointEvery) : CHECKPOINT_EVERY;
   let checkpoints: { length: number; snap: Snapshot }[] = [];
 
   interface Snapshot {
@@ -768,7 +811,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     rebuildDerived();
   }
   function maybeCheckpoint(length: number) {
-    if (length > 0 && length % CHECKPOINT_EVERY === 0 && !checkpoints.some((c) => c.length === length)) {
+    if (length > 0 && length % checkpointEvery === 0 && !checkpoints.some((c) => c.length === length)) {
       checkpoints.push({ length, snap: snapshot() });
     }
   }
@@ -3027,6 +3070,44 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     return dispatch(ev);
   }
 
+  function rebase(keepAt: number, tail: readonly SessionEvent[]): RebaseReport {
+    const keep = Math.max(0, Math.min(Math.floor(Number(keepAt) || 0), events.length));
+    if (keep === events.length && !tail.length) return { cut: false, from: keep, applied: 0 };
+    staleResult = null;
+    // As a load notes them: the next number this sitting writes is past them.
+    for (const ev of tail) if (ev.origin && typeof ev.seq === 'number') sawNumber(ev.origin, ev.seq);
+    let report: RebaseReport;
+    if (keep === events.length) {
+      // Nothing cut: each event applied as `dispatch` applies one.
+      const from = events.length;
+      for (const ev of tail) {
+        events.push(ev);
+        applyEvent(ev);
+        maybeCheckpoint(events.length);
+      }
+      report = { cut: false, from, applied: tail.length };
+    } else {
+      // Something cut: back to the nearest checkpoint that holds none of it.
+      // A checkpoint past `keep` was taken with events the new log does not
+      // have there, so it is dropped before the replay can use it.
+      checkpoints = checkpoints.filter((c) => c.length <= keep);
+      if (tail.some((ev) => mintKeyOf(ev) === null)) generation++;
+      events = events.slice(0, keep).concat(tail);
+      const from = checkpoints.length ? checkpoints[checkpoints.length - 1].length : 0;
+      replay();
+      report = { cut: true, from, applied: events.length - from };
+    }
+    // A host that never said what its log is called: the name this log
+    // remembers, as a load reads it (the last of my own events' names).
+    if (!logNameSaid) {
+      let remembered: string | undefined;
+      for (const ev of events) if (!ev.by && ev.origin) remembered = ev.origin;
+      if (remembered !== undefined) myLog = remembered;
+    }
+    notify();
+    return report;
+  }
+
   function undo() {
     // Drop the most recent meaningful input and rebuild. Ticks are not
     // user actions, so they're skipped over (but kept in the log).
@@ -3178,6 +3259,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       replay();
       notify();
     },
+    rebase,
     getState,
     subscribe,
     getEvents: () => events,

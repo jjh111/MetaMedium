@@ -265,8 +265,10 @@ export { isLetterLike, joinsRun, wordConfidence, LETTER_MAX_HEIGHT_PX, WORD_GAP_
 export { mergeLogs, describeAuthorshipCollision } from './store/merge';
 export type { MergeOptions, AuthorshipCollision } from './store/merge';
 // Live logs — multiplayer as a transport over the per-participant logs (v9 S6).
-export { LiveStore, LocalHub } from './store/live';
+export { LiveStore, LocalHub, ownLog, SEND_WAIT_MS, COVER_WAIT_MS, COVER_STAGGER_MS } from './store/live';
 export type { LiveLine, LiveTransport, LiveStoreOptions, Presence, RelayNotice } from './store/live';
+export { LiveMerge } from './store/livemerge';
+export type { MergeReport } from './store/livemerge';
 // How a hand is named in a room: one sitting, one log (DIRECTOR-PLAN-W2 L1).
 export { sittingName, sittingToken, handLabel } from './session/hands';
 
@@ -465,6 +467,7 @@ export type {
   ClusterCandidate,
   ProposedEdge,
   ProposedRep,
+  RebaseReport,
 } from './session/session';
 
 // Interpretations — the NON-COLLAPSING read path (ARCHITECTURE-v7 §4.1).

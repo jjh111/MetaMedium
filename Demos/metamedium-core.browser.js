@@ -30,6 +30,8 @@ var MetaMediumCore = (() => {
     BUILTIN_TYPES: () => BUILTIN_TYPES,
     COMMAND_MARK_SAMPLES: () => COMMAND_MARK_SAMPLES,
     COORD_PLACES: () => COORD_PLACES,
+    COVER_STAGGER_MS: () => COVER_STAGGER_MS,
+    COVER_WAIT_MS: () => COVER_WAIT_MS,
     DEFAULT_CORNER_OPTIONS: () => DEFAULT_CORNER_OPTIONS,
     DEFAULT_ERASE_CROSSINGS: () => DEFAULT_ERASE_CROSSINGS,
     DEFAULT_FILE_LIMIT: () => DEFAULT_FILE_LIMIT,
@@ -69,6 +71,7 @@ var MetaMediumCore = (() => {
     LOCAL_TIMEOUT_MS: () => LOCAL_TIMEOUT_MS,
     LOG_DIR: () => LOG_DIR,
     LOG_EXT: () => LOG_EXT,
+    LiveMerge: () => LiveMerge,
     LiveStore: () => LiveStore,
     LocalHub: () => LocalHub,
     MAGNET_SCREEN_PX: () => MAGNET_SCREEN_PX,
@@ -93,6 +96,7 @@ var MetaMediumCore = (() => {
     RIGHT_ANGLE_TOLERANCE: () => RIGHT_ANGLE_TOLERANCE,
     ROLES: () => ROLES,
     ReadOnlyError: () => ReadOnlyError,
+    SEND_WAIT_MS: () => SEND_WAIT_MS,
     SETTLED_CONFIDENCE: () => SETTLED_CONFIDENCE,
     SKIP_DIRS: () => SKIP_DIRS,
     SLIVER: () => SLIVER,
@@ -300,6 +304,7 @@ var MetaMediumCore = (() => {
     offerPorts: () => offerPorts,
     otsu: () => otsu,
     outlineOf: () => outlineOf,
+    ownLog: () => ownLog,
     paramsOf: () => paramsOf,
     parseBehaviour: () => parseBehaviour,
     parseBehaviourReply: () => parseBehaviourReply,
@@ -1163,16 +1168,16 @@ var MetaMediumCore = (() => {
   var BARB_OF_SHAFT = [0.3, 0.45];
   var BARB_FLICK_PX = [16, 32];
   function barbOf(path, tipIdx, head, tail, scale) {
-    const order = head === "end" ? path.slice(tipIdx) : path.slice(0, tipIdx + 1).reverse();
-    const corner = order[0];
+    const order2 = head === "end" ? path.slice(tipIdx) : path.slice(0, tipIdx + 1).reverse();
+    const corner = order2[0];
     const L = Math.hypot(corner.x - tail.x, corner.y - tail.y) || 1;
     const ux = (corner.x - tail.x) / L, uy = (corner.y - tail.y) / L;
     const along = (p) => (p.x - tail.x) * ux + (p.y - tail.y) * uy;
-    const far = Math.max(...order.map(along));
-    const k = Math.max(0, order.findIndex((p) => along(p) >= far - HAND_RESOLUTION_PX * scale));
-    const tip = order[k];
+    const far = Math.max(...order2.map(along));
+    const k = Math.max(0, order2.findIndex((p) => along(p) >= far - HAND_RESOLUTION_PX * scale));
+    const tip = order2[k];
     let reach = 0;
-    for (let i = k; i < order.length; i++) reach = Math.max(reach, Math.hypot(order[i].x - tip.x, order[i].y - tip.y));
+    for (let i = k; i < order2.length; i++) reach = Math.max(reach, Math.hypot(order2[i].x - tip.x, order2[i].y - tip.y));
     const shaft = Math.hypot(tip.x - tail.x, tip.y - tail.y) || 1;
     return { reach, shaft, ratio: reach / shaft };
   }
@@ -2079,8 +2084,8 @@ var MetaMediumCore = (() => {
     return sign + String(whole) + (glyph ?? ` ${f}`);
   }
   function formatQuantity(q, opts = {}) {
-    const written = q.precision && q.precision < 1 ? Math.round(1 / q.precision) : 0;
-    const den = opts.fractions ?? (FRACTION_DENOMINATORS.includes(written) && Math.abs(1 / q.precision - written) < 1e-9 ? written : 0);
+    const written2 = q.precision && q.precision < 1 ? Math.round(1 / q.precision) : 0;
+    const den = opts.fractions ?? (FRACTION_DENOMINATORS.includes(written2) && Math.abs(1 / q.precision - written2) < 1e-9 ? written2 : 0);
     const n2 = (v) => (den ? asFraction(v, den) : null) ?? formatNumber(v, opts.digits ?? 2);
     let body;
     if (!isRange(q)) body = n2(q.lo);
@@ -2318,50 +2323,50 @@ var MetaMediumCore = (() => {
     const p = [a.lo / y.lo, a.lo / y.hi, a.hi / y.lo, a.hi / y.hi];
     return { quantity: computed(Math.min(...p), Math.max(...p), unit3, a.dim - y.dim, approx), notes };
   }
-  function compareQuantities(computedQ, written) {
-    const w2 = formatQuantity(written);
-    if (!computedQ) return { status: "unknown", written, computed: null, reason: `nothing to check ${w2} against` };
+  function compareQuantities(computedQ, written2) {
+    const w2 = formatQuantity(written2);
+    if (!computedQ) return { status: "unknown", written: written2, computed: null, reason: `nothing to check ${w2} against` };
     let c = computedQ;
     let note;
-    if (written.unit && c.unit && written.unit !== c.unit && written.dim === c.dim) {
-      const conv = convertQuantity(c, written.unit);
+    if (written2.unit && c.unit && written2.unit !== c.unit && written2.dim === c.dim) {
+      const conv = convertQuantity(c, written2.unit);
       c = conv.quantity;
       note = conv.note;
     }
-    const shown = isBare(written) && c.unit ? { ...written, unit: c.unit, dim: c.dim } : written;
+    const shown = isBare(written2) && c.unit ? { ...written2, unit: c.unit, dim: c.dim } : written2;
     const ws = formatQuantity(shown);
     const cs = formatQuantity(c);
-    const base = { written, computed: computedQ, ...note ? { note } : {} };
-    if (written.unit && c.unit && written.dim !== c.dim) {
-      return { ...base, status: "off", reason: `written ${ws} is ${dimName(written)}, computed ${cs} is ${dimName(c)}` };
+    const base = { written: written2, computed: computedQ, ...note ? { note } : {} };
+    if (written2.unit && c.unit && written2.dim !== c.dim) {
+      return { ...base, status: "off", reason: `written ${ws} is ${dimName(written2)}, computed ${cs} is ${dimName(c)}` };
     }
-    const t = tolFor(c.lo, c.hi, written.lo, written.hi);
-    const wRange = isRange(written), cRange = isRange(c);
+    const t = tolFor(c.lo, c.hi, written2.lo, written2.hi);
+    const wRange = isRange(written2), cRange = isRange(c);
     const off = (d) => ({
       ...base,
       status: "off",
       difference: d,
-      reason: `written ${ws}, computed ${cs}: ${formatNumber(Math.abs(d))}${unitSuffix(c.unit ?? written.unit, c.unit ? c.dim : written.dim)} ${d > 0 ? "more" : "less"} than computed`
+      reason: `written ${ws}, computed ${cs}: ${formatNumber(Math.abs(d))}${unitSuffix(c.unit ?? written2.unit, c.unit ? c.dim : written2.dim)} ${d > 0 ? "more" : "less"} than computed`
     });
     if (!wRange && !cRange) {
-      const d = written.lo - c.lo;
+      const d = written2.lo - c.lo;
       if (Math.abs(d) <= t) return { ...base, status: "ok", difference: 0, reason: `\u2713 ${cs}` };
-      const p = written.precision ?? 0;
-      const slack = written.approx ? Math.max(p, 1) : p / 2;
+      const p = written2.precision ?? 0;
+      const slack = written2.approx ? Math.max(p, 1) : p / 2;
       if (p > 0 && Math.abs(d) <= slack + t) return { ...base, status: "rounded", difference: d, reason: `\u2248 ${cs}, written ${ws}` };
       return off(d);
     }
     if (!wRange && cRange) {
-      if (holds(c, written.lo)) return { ...base, status: "within", difference: 0, reason: `${ws} chosen from ${cs}` };
-      return off(written.lo < c.lo ? written.lo - c.lo : written.lo - c.hi);
+      if (holds(c, written2.lo)) return { ...base, status: "within", difference: 0, reason: `${ws} chosen from ${cs}` };
+      return off(written2.lo < c.lo ? written2.lo - c.lo : written2.lo - c.hi);
     }
     if (wRange && !cRange) {
-      if (holds(written, c.lo)) return { ...base, status: "within", difference: 0, reason: `${cs} is within the written ${ws}` };
-      return off(c.lo < written.lo ? written.lo - c.lo : written.hi - c.lo);
+      if (holds(written2, c.lo)) return { ...base, status: "within", difference: 0, reason: `${cs} is within the written ${ws}` };
+      return off(c.lo < written2.lo ? written2.lo - c.lo : written2.hi - c.lo);
     }
-    if (Math.abs(written.lo - c.lo) <= t && Math.abs(written.hi - c.hi) <= t) return { ...base, status: "ok", difference: 0, reason: `\u2713 ${cs}` };
-    if (written.lo <= c.hi + t && c.lo <= written.hi + t) return { ...base, status: "within", difference: 0, reason: `${ws} overlaps ${cs}` };
-    return off(written.lo > c.hi ? written.lo - c.hi : written.hi - c.lo);
+    if (Math.abs(written2.lo - c.lo) <= t && Math.abs(written2.hi - c.hi) <= t) return { ...base, status: "ok", difference: 0, reason: `\u2713 ${cs}` };
+    if (written2.lo <= c.hi + t && c.lo <= written2.hi + t) return { ...base, status: "within", difference: 0, reason: `${ws} overlaps ${cs}` };
+    return off(written2.lo > c.hi ? written2.lo - c.hi : written2.hi - c.lo);
   }
 
   // src/maths/expr.ts
@@ -2827,7 +2832,7 @@ var MetaMediumCore = (() => {
       const byPrecedence = parseTokens(ptoks, false);
       const leftToRight = parseTokens(ptoks, true);
       const departures = dashChoices.filter((c) => !c.plain).length;
-      const push = (expr, order, orderReason) => {
+      const push = (expr, order2, orderReason) => {
         if (out.some((r) => sameExpr(r.expr, expr))) return;
         const formula = formatExpr(expr);
         const clauses = [...dashReasons, ...orderReason ? [orderReason] : []];
@@ -2835,8 +2840,8 @@ var MetaMediumCore = (() => {
           expr,
           formula,
           reason: clauses.length ? clauses.join("; ") : `one reading: ${formula}`,
-          departures: departures + (order && !order.plain ? 1 : 0),
-          choices: [...dashChoices, ...order ? [order] : []]
+          departures: departures + (order2 && !order2.plain ? 1 : 0),
+          choices: [...dashChoices, ...order2 ? [order2] : []]
         });
       };
       if (byPrecedence && leftToRight && !sameExpr(byPrecedence, leftToRight)) {
@@ -3685,14 +3690,14 @@ var MetaMediumCore = (() => {
         case "worked":
           return { ...base, kind: "worked", step: d.step, reason: `the worked line of ${who(d.step)}` };
         case "label": {
-          const written = withUnit(d.written);
-          const check2 = checkReadings(d.step, readingsOf2(d.step), written);
-          return { ...base, kind: "label", step: d.step, written, check: check2, reason: check2.reason };
+          const written2 = withUnit(d.written);
+          const check2 = checkReadings(d.step, readingsOf2(d.step), written2);
+          return { ...base, kind: "label", step: d.step, written: written2, check: check2, reason: check2.reason };
         }
         case "value": {
-          const written = withUnit(d.written);
-          const matches = stepKeys.filter((k) => !cycles.has(k)).map((k) => checkReadings(k, readingsOf2(k), written)).filter((c) => c.status === "ok" || c.status === "rounded" || c.status === "within" || c.status === "spans");
-          return { ...base, kind: "value", written, matches, reason: matches.length ? matches.map((m) => m.reason).join("; ") : `${fmt(written)} agrees with no step here` };
+          const written2 = withUnit(d.written);
+          const matches = stepKeys.filter((k) => !cycles.has(k)).map((k) => checkReadings(k, readingsOf2(k), written2)).filter((c) => c.status === "ok" || c.status === "rounded" || c.status === "within" || c.status === "spans");
+          return { ...base, kind: "value", written: written2, matches, reason: matches.length ? matches.map((m) => m.reason).join("; ") : `${fmt(written2)} agrees with no step here` };
         }
         default:
           return { ...base, kind: "note", reason: d.note ?? `cannot read \u201C${d.parse.body}\u201D` };
@@ -3777,10 +3782,10 @@ var MetaMediumCore = (() => {
     }
     return steps.filter((s) => found.has(s.key)).map((s) => s.key);
   }
-  function checkWritten(sheet, key2, written) {
+  function checkWritten(sheet, key2, written2) {
     const e = sheetEntry(sheet, key2);
     if (!e || e.kind !== "step") return null;
-    const q = typeof written === "string" ? parseQuantity(written)?.quantity : written;
+    const q = typeof written2 === "string" ? parseQuantity(written2)?.quantity : written2;
     if (!q) return null;
     return checkReadings(e.key, e.readings, isBare(q) && sheet.unit ? { ...q, unit: sheet.unit, dim: 1 } : q);
   }
@@ -5291,10 +5296,10 @@ var MetaMediumCore = (() => {
       }
       const count3 = /* @__PURE__ */ new Map();
       for (const f of members) for (const l of raw.get(f.id) ?? []) if (!l.declared && l.value.unit && l.value.dim >= 1) count3.set(l.value.unit, (count3.get(l.value.unit) ?? 0) + 1);
-      let written = null;
-      for (const [u, n2] of count3) if (!written || n2 > count3.get(written)) written = u;
-      const unit3 = written ?? fallback;
-      const unitReason = written ? `${UNIT_NAMES2[written]}, written on ${count3.get(written)} of its labels` : unit3 ? `${UNIT_NAMES2[unit3]}, the unit the page speaks` : "no unit written, so its numbers stay bare";
+      let written2 = null;
+      for (const [u, n2] of count3) if (!written2 || n2 > count3.get(written2)) written2 = u;
+      const unit3 = written2 ?? fallback;
+      const unitReason = written2 ? `${UNIT_NAMES2[written2]}, written on ${count3.get(written2)} of its labels` : unit3 ? `${UNIT_NAMES2[unit3]}, the unit the page speaks` : "no unit written, so its numbers stay bare";
       const given2 = [];
       for (const f of members) {
         const ls = (raw.get(f.id) ?? []).map((l) => {
@@ -5981,8 +5986,8 @@ var MetaMediumCore = (() => {
   }
   function solveFigure(figure, labels, options = {}) {
     const notes = [];
-    const written = labels.find((l) => !l.declared && l.value.unit && l.value.dim >= 1)?.value.unit ?? null;
-    const unit3 = options.unit !== void 0 && options.unit !== null ? options.unit : written;
+    const written2 = labels.find((l) => !l.declared && l.value.unit && l.value.dim >= 1)?.value.unit ?? null;
+    const unit3 = options.unit !== void 0 && options.unit !== null ? options.unit : written2;
     const { facts, partChecks, partLabels } = factsOf(figure, labels, unit3, notes);
     const f = figure;
     let models = [];
@@ -6150,14 +6155,14 @@ var MetaMediumCore = (() => {
     for (const side of f.sides) {
       if (!side.parts?.length) continue;
       const whole = c.model.vals.get(f.kind === "rectangle" ? rectanglePairs(f).width.includes(side.key) ? "width" : "height" : side.key);
-      const written = side.parts.map((p) => parts.get(p.key));
+      const written2 = side.parts.map((p) => parts.get(p.key));
       side.parts.forEach((p, i) => {
-        const w2 = written[i];
+        const w2 = written2[i];
         if (w2) out.push({ key: p.key, label: p.label, value: w2.q, from: "labelled", text: formatQuantity(w2.q), reason: `${p.label} ${formatQuantity(w2.q)}, as labelled` });
       });
-      const open = side.parts.filter((_, i) => !written[i]);
+      const open = side.parts.filter((_, i) => !written2[i]);
       if (!whole || open.length !== 1) continue;
-      const known = written.filter((w2) => !!w2);
+      const known = written2.filter((w2) => !!w2);
       const lo = whole.iv.lo - known.reduce((a, w2) => a + w2.q.hi, 0);
       const hi = whole.iv.hi - known.reduce((a, w2) => a + w2.q.lo, 0);
       if (!(hi > TOL)) continue;
@@ -6867,7 +6872,7 @@ var MetaMediumCore = (() => {
       if (k < 3) v.push(add(v[k], mul(d, wide.includes(k) ? W : H)));
       d = turn(d, s);
     }
-    const written = (pair) => {
+    const written2 = (pair) => {
       for (const l of c.labels ?? []) {
         const m = /^side(\d)$/.exec(l.key);
         if (!l.declared && m && pair.includes(Number(m[1]))) return Number(m[1]);
@@ -6879,8 +6884,8 @@ var MetaMediumCore = (() => {
       return o.x === normal.x && o.y === normal.y;
     }) ?? pair[0];
     const tall = [0, 1, 2, 3].filter((k) => !wide.includes(k));
-    const wAt = written(wide) >= 0 ? written(wide) : facing(wide, { x: 0, y: -1 });
-    const hAt = written(tall) >= 0 ? written(tall) : facing(tall, { x: -1, y: 0 });
+    const wAt = written2(wide) >= 0 ? written2(wide) : facing(wide, { x: 0, y: -1 });
+    const hAt = written2(tall) >= 0 ? written2(tall) : facing(tall, { x: -1, y: 0 });
     return polygonShape(c, v, s, (k) => {
       const key2 = wide.includes(k) ? "width" : "height";
       return { key: key2, label: c.vals.get(key2).label, show: k === wAt || k === hAt };
@@ -6891,8 +6896,8 @@ var MetaMediumCore = (() => {
     if (!labelled) return null;
     const text = valueText(labelled, c.precision, c.unit);
     if (labelled.key === "diameter") return `\u2300 ${text}`;
-    const written = c.labels?.find((l) => l.key === labelled.key && l.name)?.name ?? c.reading.keeps.map((k) => readNumber(k)?.name).find((x) => !!x);
-    return `${written ?? (labelled.key === "area" ? "area" : "C")} ${text}`;
+    const written2 = c.labels?.find((l) => l.key === labelled.key && l.name)?.name ?? c.reading.keeps.map((k) => readNumber(k)?.name).find((x) => !!x);
+    return `${written2 ?? (labelled.key === "area" ? "area" : "C")} ${text}`;
   }
   function circleShape(c) {
     const F = c.F;
@@ -7572,7 +7577,7 @@ ${p.svg}</section>`),
     return "{" + keys.map((k) => JSON.stringify(k) + ":" + canonical(o[k])).join(",") + "}";
   }
   function atOf(ev) {
-    return "at" in ev && typeof ev.at === "number" ? ev.at : 0;
+    return "at" in ev && typeof ev.at === "number" && !Number.isNaN(ev.at) ? ev.at : 0;
   }
 
   // src/session/hands.ts
@@ -7725,6 +7730,13 @@ ${p.svg}</section>`),
 
   // src/store/live.ts
   var SEND_WAIT_MS = 1e4;
+  var COVER_WAIT_MS = 1500;
+  var COVER_STAGGER_MS = 200;
+  var timer = (fn, ms) => {
+    const t = setTimeout(fn, ms);
+    t.unref?.();
+    return () => clearTimeout(t);
+  };
   var LiveStore = class {
     constructor(transport, me, room = "room", opts = {}) {
       this.transport = transport;
@@ -7745,8 +7757,20 @@ ${p.svg}</section>`),
        * logs held here (the merge's collision, L1b): one sentence per name.
        */
       this.misnumbered = /* @__PURE__ */ new Map();
-      /** Whether the logs held here changed since they were last read for `misnumbered`. */
-      this.logsChanged = false;
+      /** Every held event under its authorship — the log, its place there — to find two different events numbered alike as they land. */
+      this.numbered = /* @__PURE__ */ new Map();
+      /** Moves whenever a log another hand wrote changes here. */
+      this.rev = 0;
+      /** Lines heard, counted, to say what was heard since a hello. */
+      this.heard = 0;
+      /** When each log was last heard from its writer, and last handed on by another hand, in lines heard. */
+      this.fromWriter = /* @__PURE__ */ new Map();
+      this.fromCopy = /* @__PURE__ */ new Map();
+      /** Writers that said goodbye and have not been heard since. */
+      this.gone = /* @__PURE__ */ new Set();
+      /** Copies waiting to be handed on, should their writers not answer. */
+      this.waiting = /* @__PURE__ */ new Set();
+      this.closed = false;
       /** The relay's word that this room is older than its buffer. */
       this.truncated = null;
       /** Whether this store has put MY log on the wire yet, in any form. */
@@ -7756,6 +7780,7 @@ ${p.svg}</section>`),
       this.tail = null;
       this.listeners = [];
       this.sitting = opts.sitting || sittingToken(8);
+      this.later = opts.later || timer;
       this.logs[me] = [];
       this.off = transport.onMessage((line) => this.receive(line));
     }
@@ -7776,8 +7801,11 @@ ${p.svg}</section>`),
     async appendLog(participant, events) {
       if (!events.length) return;
       const log = this.logs[participant] ??= [];
-      log.push(...events);
-      this.logsChanged = true;
+      for (const ev of events) {
+        this.number(participant, log.length, ev);
+        log.push(ev);
+      }
+      if (participant !== this.me) this.rev++;
       if (participant === this.me) this.published = true;
       await this.post({ participant, events: events.slice(), at: this.stamp(), sid: this.sitting });
     }
@@ -7794,20 +7822,58 @@ ${p.svg}</section>`),
     async publish(events) {
       const sent = this.logs[this.me];
       if (this.published && extendsLog(sent, events)) {
+        for (let i = 0; i < sent.length; i++) {
+          if (sent[i] !== events[i]) {
+            this.logs[this.me] = events.slice(0, sent.length);
+            break;
+          }
+        }
         if (events.length > sent.length) await this.appendLog(this.me, events.slice(sent.length));
         return;
       }
       this.published = true;
+      this.unnumber(this.me);
       this.logs[this.me] = events.slice();
-      this.logsChanged = true;
+      this.logs[this.me].forEach((ev, i) => this.number(this.me, i, ev));
       await this.post({ participant: this.me, events: events.slice(), at: this.stamp(), full: true, sid: this.sitting });
+    }
+    /**
+     * My log as it stands, from the session's events: what was sent, less what
+     * the session no longer holds (an undo, a reset), then what it holds of its
+     * own that was never sent, in the order it holds them. The order it was
+     * WRITTEN in, never the merge's: a mark stamped a moment earlier by the clock
+     * than one before it would otherwise reshuffle the log, and the next send be
+     * the whole of it instead of its tail. Found by identity and authorship — an
+     * event is its authorship (L1b) — and by what it says only for an event
+     * written before there was any, whose object a load has since copied.
+     */
+    ownLog(events) {
+      return ownLog(this.logs[this.me], events);
     }
     async readLogs() {
       const out = {};
       for (const [k, v] of Object.entries(this.logs)) out[k] = v.slice();
       return out;
     }
-    /** Ask the room for its logs; every peer answers with every log it holds, in full. */
+    /**
+     * The logs as held, not copied — for a reader that merges a line at a time
+     * (`LiveMerge`). An array here is only ever appended to or replaced whole,
+     * never changed in place, so the same array longer is an append of its
+     * tail. Read them; never change them.
+     */
+    heldLogs() {
+      return this.logs;
+    }
+    /**
+     * Moves whenever a log another hand wrote changes here — an append that
+     * added an event, a whole log that is not the one held. A line with no
+     * events (a hello, a goodbye, the relay's word) and a whole log equal to the
+     * one held leave it where it was, and a reader that merges on it does no work.
+     */
+    revision() {
+      return this.rev;
+    }
+    /** Ask the room for its logs: every hand answers with its own, and with a copy of any whose writer cannot answer. */
     hello() {
       void this.post({ participant: this.me, events: [], at: this.stamp(), hello: true, sid: this.sitting });
     }
@@ -7837,19 +7903,11 @@ ${p.svg}</section>`),
      * here — one sentence per name. The same event heard in two logs is one
      * event, and the merge folds it without a word; two events under one
      * authorship are two writers under one name, and the merge keeps the first
-     * (L1b). Read when asked, from the logs as they stand, and remembered once
-     * said, like a name collision.
+     * (L1b). Found as each event lands, against the others held under its
+     * authorship — never by merging the room again — and remembered once said,
+     * like a name collision.
      */
     misnumberings() {
-      if (this.logsChanged) {
-        this.logsChanged = false;
-        mergeLogs(this.logs, {
-          me: this.me,
-          onCollision: (c) => {
-            if (!this.misnumbered.has(c.origin)) this.misnumbered.set(c.origin, describeAuthorshipCollision(c));
-          }
-        });
-      }
       return [...this.misnumbered.values()];
     }
     /**
@@ -7873,7 +7931,17 @@ ${p.svg}</section>`),
         this.listeners = this.listeners.filter((l) => l !== cb);
       };
     }
+    /**
+     * Leave the room: a goodbye first, so the hands that hold this hand's log
+     * know it is no longer here to answer for it, and hand a copy on to the next
+     * newcomer themselves. Then nothing more is heard or sent.
+     */
     close() {
+      if (this.closed) return;
+      this.closed = true;
+      for (const cancel of this.waiting) cancel();
+      this.waiting.clear();
+      void this.post({ participant: this.me, events: [], at: this.stamp(), bye: true, sid: this.sitting });
       if (this.off) this.off();
       this.off = null;
       if (this.transport.close) this.transport.close();
@@ -7899,15 +7967,15 @@ ${p.svg}</section>`),
         }
         if (!r || typeof r.then !== "function") return void 0;
         return new Promise((done) => {
-          const timer = setTimeout(done, SEND_WAIT_MS);
-          timer.unref?.();
+          const timer2 = setTimeout(done, SEND_WAIT_MS);
+          timer2.unref?.();
           r.then(
             () => {
-              clearTimeout(timer);
+              clearTimeout(timer2);
               done();
             },
             () => {
-              clearTimeout(timer);
+              clearTimeout(timer2);
               done();
             }
           );
@@ -7928,21 +7996,50 @@ ${p.svg}</section>`),
       return t;
     }
     /**
-     * Answer a hello: my own log, and every other log held — each still marked
-     * with the sitting that wrote it and the newest line of it applied here — so
-     * a hand that has left is caught up by the hands that stayed.
+     * Answer a hello — each log once (V1-PLAN §9 R4d). My own log, at once:
+     * every hand answers for its own. A copy of another hand's log only when
+     * that hand cannot answer for itself: at once when it said goodbye, else
+     * after `COVER_WAIT_MS`, when it has stayed silent — and only if no copy has
+     * gone from another hand by then. The hands that hold a copy go in the order
+     * of their names, `COVER_STAGGER_MS` apart, so the first one's copy is heard
+     * by the rest and they send none. The asker's own log is never handed back.
+     * `ownOnly`: a hello from a second hand under my own name, which only needs
+     * to hear that I am here.
      */
-    answer() {
+    answer(asker, ownOnly = false) {
       void this.post({ participant: this.me, events: this.logs[this.me].slice(), at: this.stamp(), full: true, sid: this.sitting });
-      for (const [name, events] of Object.entries(this.logs)) {
-        if (name === this.me) continue;
-        const at = this.applied.get(name);
-        if (at === void 0) continue;
-        const line = { participant: name, events: events.slice(), at, full: true, via: this.me };
-        const sid = this.sittings.get(name);
-        if (sid) line.sid = sid;
-        void this.post(line);
+      if (ownOnly) return;
+      const asked = this.heard;
+      const copies = Object.keys(this.logs).filter((n2) => n2 !== this.me && n2 !== asker && this.applied.has(n2));
+      if (!copies.length) return;
+      const hands = [...new Set(Object.keys(this.logs).concat(this.me))].filter((n2) => n2 === this.me || !this.gone.has(n2) && n2 !== asker).sort();
+      const place2 = hands.indexOf(this.me) * COVER_STAGGER_MS;
+      this.cover(copies.filter((n2) => this.gone.has(n2)), asked, place2);
+      this.cover(copies.filter((n2) => !this.gone.has(n2)), asked, COVER_WAIT_MS + place2);
+    }
+    /** Hand on each of `names` after `ms`, unless its writer or another hand has answered for it since the hello. */
+    cover(names, asked, ms) {
+      if (!names.length) return;
+      const go = () => {
+        for (const name of names) {
+          if ((this.fromWriter.get(name) ?? -1) > asked || (this.fromCopy.get(name) ?? -1) > asked) continue;
+          const at = this.applied.get(name);
+          if (at === void 0) continue;
+          const line = { participant: name, events: this.logs[name].slice(), at, full: true, via: this.me };
+          const sid = this.sittings.get(name);
+          if (sid) line.sid = sid;
+          void this.post(line);
+        }
+      };
+      if (ms <= 0) {
+        go();
+        return;
       }
+      const cancel = this.later(() => {
+        this.waiting.delete(cancel);
+        if (!this.closed) go();
+      }, ms);
+      this.waiting.add(cancel);
     }
     collide(name, sentence) {
       if (this.collided.has(name)) return;
@@ -7950,7 +8047,7 @@ ${p.svg}</section>`),
       this.notify(name, []);
     }
     receive(raw) {
-      if (!raw || typeof raw !== "object") return;
+      if (this.closed || !raw || typeof raw !== "object") return;
       if (raw.relay === "truncated") {
         const n2 = raw;
         this.truncated = { relay: "truncated", room: n2.room, dropped: Math.max(0, Number(n2.dropped) || 0), kept: n2.kept };
@@ -7965,21 +8062,35 @@ ${p.svg}</section>`),
       if (line.participant === this.me) {
         if (!sid || sid === this.sitting) return;
         this.collide(this.me, `two hands are both called "${this.me}" \u2014 this one, and another writing under its name; neither is taken for the other, so reload one to give it a new name`);
-        if (line.hello) this.answer();
+        if (line.hello) this.answer(line.participant, true);
         return;
       }
+      this.heard++;
       if (from !== this.me) this.seen.set(from, Date.now());
       if (sid) {
         const known = this.sittings.get(line.participant);
         if (known === void 0) this.sittings.set(line.participant, sid);
         else if (known !== sid) {
           this.collide(line.participant, `two hands are both called "${line.participant}" \u2014 the one heard first is kept and the other's lines are refused; reload one to give it a new name`);
-          if (line.hello) this.answer();
+          if (line.hello) this.answer("");
           return;
         }
       }
+      if (line.bye) {
+        if (!line.via) {
+          this.gone.add(line.participant);
+          this.seen.delete(line.participant);
+        }
+        this.notify(line.participant, []);
+        return;
+      }
+      if (line.via) this.fromCopy.set(line.participant, this.heard);
+      else {
+        this.fromWriter.set(line.participant, this.heard);
+        this.gone.delete(line.participant);
+      }
       if (line.hello) {
-        this.answer();
+        this.answer(line.participant);
         this.notify(line.participant, []);
         return;
       }
@@ -7996,25 +8107,89 @@ ${p.svg}</section>`),
             return;
           }
         }
-        this.logs[line.participant] = events.slice();
-        this.logsChanged = true;
-        this.carried.set(line.participant, new Set(events.map(authorKey2).filter((k) => k !== null)));
+        const was = held ? prefixOf(held, events) : -1;
+        if (held && was === held.length) {
+          if (events.length > held.length) {
+            const keys = this.carried.get(line.participant) ?? /* @__PURE__ */ new Set();
+            this.carried.set(line.participant, keys);
+            for (let i = held.length; i < events.length; i++) {
+              const k = authorKey2(events[i]);
+              if (k !== null) keys.add(k);
+              this.number(line.participant, held.length, events[i]);
+              held.push(events[i]);
+            }
+            this.rev++;
+          }
+        } else {
+          this.unnumber(line.participant);
+          this.logs[line.participant] = events.slice();
+          this.logs[line.participant].forEach((ev, i) => this.number(line.participant, i, ev));
+          this.carried.set(line.participant, new Set(events.map(authorKey2).filter((k) => k !== null)));
+          if (held || events.length) this.rev++;
+        }
       } else {
         const log = this.logs[line.participant] ??= [];
         let keys = this.carried.get(line.participant);
         if (!keys) this.carried.set(line.participant, keys = /* @__PURE__ */ new Set());
+        let added = 0;
         for (const ev of events) {
           const k = authorKey2(ev);
           if (k !== null) {
             if (keys.has(k)) continue;
             keys.add(k);
           }
+          this.number(line.participant, log.length, ev);
           log.push(ev);
-          this.logsChanged = true;
+          added++;
         }
+        if (added) this.rev++;
       }
       this.applied.set(line.participant, Math.max(this.applied.get(line.participant) ?? 0, at));
       this.notify(line.participant, events);
+    }
+    /**
+     * Hold an event under its authorship, and say it when a DIFFERENT event is
+     * already held under the same one: two writers under one name (L1b). Which
+     * is kept is the merge's rule — the reader's own log first, else the first
+     * in the merge's order — so the sentence is the one the merge would say.
+     */
+    number(name, i, ev) {
+      const k = authorKey(ev);
+      if (k === null) return;
+      const mine = { name, i, ev };
+      const list = this.numbered.get(k);
+      if (!list) {
+        this.numbered.set(k, [mine]);
+        return;
+      }
+      const origin = ev.origin;
+      for (const other of list) {
+        if (this.misnumbered.has(origin)) break;
+        if (sameEvent(other.ev, ev)) continue;
+        const [kept, dropped] = this.keeps(other, mine) ? [other, mine] : [mine, other];
+        this.misnumbered.set(origin, describeAuthorshipCollision({ origin, seq: ev.seq, kept: kept.name, dropped: dropped.name }));
+      }
+      list.push(mine);
+    }
+    /** A log's events, no longer held under their authorship: it is about to be replaced. */
+    unnumber(name) {
+      for (const ev of this.logs[name] ?? []) {
+        const k = authorKey(ev);
+        if (k === null) continue;
+        const list = this.numbered.get(k);
+        if (!list) continue;
+        const rest = list.filter((x) => x.name !== name);
+        if (rest.length) this.numbered.set(k, rest);
+        else this.numbered.delete(k);
+      }
+    }
+    /** Whether the merge keeps `a` over `b`, two copies of one authorship: the reader's own, else the first in the merge's order. */
+    keeps(a, b) {
+      if (a.name === this.me !== (b.name === this.me)) return a.name === this.me;
+      const ta = atOf(a.ev), tb = atOf(b.ev);
+      if (ta !== tb) return ta < tb;
+      if (a.name !== b.name) return a.name < b.name;
+      return a.i < b.i;
     }
     notify(participant, events) {
       for (const l of this.listeners) l(participant, events);
@@ -8034,10 +8209,52 @@ ${p.svg}</section>`),
     }
     return s;
   }
+  function ownLog(sent, events) {
+    const own = events.filter((e) => !e.by);
+    const objects = new Set(own);
+    const byKey = /* @__PURE__ */ new Map();
+    let words = null;
+    for (const e of own) {
+      const k = authorKey2(e);
+      if (k !== null) byKey.set(k, e);
+    }
+    const taken = /* @__PURE__ */ new Set();
+    const out = [];
+    for (const e of sent) {
+      let now;
+      if (objects.has(e)) now = e;
+      else {
+        const k = authorKey2(e);
+        if (k !== null) now = byKey.get(k);
+        else {
+          if (!words) {
+            words = /* @__PURE__ */ new Map();
+            for (const x of own) if (authorKey2(x) === null) words.set(eventKey(x), x);
+          }
+          now = words.get(eventKey(e));
+        }
+      }
+      if (now && !taken.has(now)) {
+        taken.add(now);
+        out.push(now);
+      }
+    }
+    for (const e of own) if (!taken.has(e)) out.push(e);
+    return out;
+  }
+  function sameAt(a, b) {
+    return a === b || a.type === b.type && eventKey(a) === eventKey(b);
+  }
   function extendsLog(sent, now) {
     if (now.length < sent.length) return false;
-    for (let i = 0; i < sent.length; i++) if (eventKey(sent[i]) !== eventKey(now[i])) return false;
+    for (let i = 0; i < sent.length; i++) if (!sameAt(sent[i], now[i])) return false;
     return true;
+  }
+  function prefixOf(held, incoming) {
+    const n2 = Math.min(held.length, incoming.length);
+    let i = 0;
+    while (i < n2 && sameAt(held[i], incoming[i])) i++;
+    return i;
   }
   function divergence(held, incoming) {
     const a = held.map((e) => JSON.stringify(e));
@@ -8078,6 +8295,253 @@ ${p.svg}</section>`),
         }
       };
       return transport;
+    }
+  };
+
+  // src/store/livemerge.ts
+  var order = (a, b) => {
+    if (a.at !== b.at) return a.at - b.at;
+    if (a.name !== b.name) return a.name < b.name ? -1 : 1;
+    return a.i - b.i;
+  };
+  function lowerBound(list, e) {
+    let lo = 0, hi = list.length;
+    while (lo < hi) {
+      const mid6 = lo + hi >> 1;
+      if (order(list[mid6], e) < 0) lo = mid6 + 1;
+      else hi = mid6;
+    }
+    return lo;
+  }
+  var written = /* @__PURE__ */ new WeakMap();
+  function jsonOf(ev) {
+    let s = written.get(ev);
+    if (s === void 0) {
+      s = JSON.stringify(ev);
+      written.set(ev, s);
+    }
+    return s;
+  }
+  function sameEventAs(a, b) {
+    if (a === b) return true;
+    const ka = authorKey(a), kb = authorKey(b);
+    if (ka !== null || kb !== null) return ka === kb && a.type === b.type && atOf(a) === atOf(b);
+    const { by: _a, ...ra } = a;
+    const { by: _b, ...rb } = b;
+    void _a;
+    void _b;
+    return (a.by === void 0 ? jsonOf(a) : JSON.stringify(ra)) === (b.by === void 0 ? jsonOf(b) : JSON.stringify(rb));
+  }
+  var LiveMerge = class {
+    constructor(session, me) {
+      this.session = session;
+      this.me = me;
+      /** The merge: every standing entry, in order. The session's log is exactly their `ev`s. */
+      this.list = [];
+      /** Every other log, as last seen. */
+      this.logs = /* @__PURE__ */ new Map();
+      /** This reader's own events, in the order it wrote them. */
+      this.mine = [];
+      /** Every entry of each authorship, standing or not. */
+      this.copies = /* @__PURE__ */ new Map();
+      /** The session's log as the last sync left it, and how long it was. */
+      this.held = null;
+      this.heldLength = 0;
+      /** The earliest entry that stood up or fell since the sync began: nothing before it moved. */
+      this.lowest = null;
+    }
+    /** How many events the merge holds. */
+    get length() {
+      return this.list.length;
+    }
+    /**
+     * Bring the session to the merge of `logs` and its own events. `logs` may
+     * hold this reader's log too (a store keeps what it sent); it is never read —
+     * this reader's log is the session's own events, sent or not.
+     */
+    sync(logs) {
+      const evs = this.session.getEvents();
+      this.lowest = null;
+      if (this.held === null || evs !== this.held || evs.length < this.heldLength || !this.adoptMine(evs)) {
+        return this.rebuild(logs, evs);
+      }
+      for (const name of Object.keys(logs)) if (name !== this.me) this.syncLog(name, logs[name]);
+      for (const name of [...this.logs.keys()]) if (!(name in logs)) this.dropLog(name);
+      let d = this.lowest ? lowerBound(this.list, this.lowest) : this.list.length;
+      while (d < this.list.length && d < evs.length && this.list[d].ev === evs[d]) d++;
+      return this.handOver(d, evs, false);
+    }
+    /** The session drew: its new events are mine, and join the merge where their time puts them. False when one is not mine to adopt. */
+    adoptMine(evs) {
+      for (let j = this.heldLength; j < evs.length; j++) if (evs[j].by !== void 0) return false;
+      for (let j = this.heldLength; j < evs.length; j++) this.add(this.entry(evs[j], evs[j], this.me, this.mine.length, this.mine));
+      return true;
+    }
+    entry(src, ev, name, i, into) {
+      const e = { ev, src, name, i, at: atOf(src), key: authorKey(src), standing: false };
+      into.push(e);
+      return e;
+    }
+    /** Another log's event, stamped as `mergeLogs` stamps it. */
+    theirs(name, src, i, into) {
+      return this.entry(src, { ...src, by: name }, name, i, into);
+    }
+    /** Another hand's log as the store holds it now: an append of its tail, or a replacement matched by authorship until the two part. */
+    syncLog(name, arr) {
+      const held = this.logs.get(name);
+      if (!held) {
+        const entries2 = [];
+        for (let i = 0; i < arr.length; i++) this.add(this.theirs(name, arr[i], i, entries2));
+        this.logs.set(name, { ref: arr, entries: entries2 });
+        return;
+      }
+      const { entries } = held;
+      if (held.ref === arr && arr.length >= entries.length) {
+        for (let i = entries.length; i < arr.length; i++) this.add(this.theirs(name, arr[i], i, entries));
+        return;
+      }
+      let p = 0;
+      const n2 = Math.min(entries.length, arr.length);
+      while (p < n2 && sameEventAs(entries[p].src, arr[p])) {
+        entries[p].src = arr[p];
+        p++;
+      }
+      for (let j = entries.length - 1; j >= p; j--) this.remove(entries[j]);
+      entries.length = p;
+      for (let i = p; i < arr.length; i++) this.add(this.theirs(name, arr[i], i, entries));
+      held.ref = arr;
+    }
+    dropLog(name) {
+      const held = this.logs.get(name);
+      if (!held) return;
+      for (let j = held.entries.length - 1; j >= 0; j--) this.remove(held.entries[j]);
+      this.logs.delete(name);
+    }
+    add(e) {
+      if (e.key === null) {
+        this.stand(e);
+        return;
+      }
+      const cs = this.copies.get(e.key);
+      if (!cs) {
+        this.copies.set(e.key, [e]);
+        this.stand(e);
+        return;
+      }
+      cs.push(e);
+      this.settle(cs);
+    }
+    remove(e) {
+      if (e.key === null) {
+        if (e.standing) this.fall(e);
+        return;
+      }
+      const cs = this.copies.get(e.key);
+      if (e.standing) this.fall(e);
+      if (!cs) return;
+      const k = cs.indexOf(e);
+      if (k >= 0) cs.splice(k, 1);
+      if (!cs.length) this.copies.delete(e.key);
+      else this.settle(cs);
+    }
+    /** Of the copies of one authorship, the reader's own stands; else the first in the merge's order (`mergeLogs`' fold). */
+    settle(cs) {
+      let win = null;
+      for (const c of cs) {
+        const mineC = c.name === this.me;
+        if (!win) {
+          win = c;
+          continue;
+        }
+        const mineW = win.name === this.me;
+        if (mineC !== mineW) {
+          if (mineC) win = c;
+          continue;
+        }
+        if (order(c, win) < 0) win = c;
+      }
+      for (const c of cs) if (c !== win && c.standing) this.fall(c);
+      if (win && !win.standing) this.stand(win);
+    }
+    stand(e) {
+      const at = lowerBound(this.list, e);
+      this.list.splice(at, 0, e);
+      e.standing = true;
+      if (!this.lowest || order(e, this.lowest) < 0) this.lowest = e;
+    }
+    fall(e) {
+      let at = lowerBound(this.list, e);
+      while (at < this.list.length && this.list[at] !== e) at++;
+      if (at < this.list.length) this.list.splice(at, 1);
+      e.standing = false;
+      if (!this.lowest || order(e, this.lowest) < 0) this.lowest = e;
+    }
+    /**
+     * Read the merge again whole: every other log from the store, and this
+     * reader's own events from the session — then find where the session's log
+     * and the merge part, and hand over the rest from there.
+     */
+    rebuild(logs, evs) {
+      this.list = [];
+      this.logs = /* @__PURE__ */ new Map();
+      this.mine = [];
+      this.copies = /* @__PURE__ */ new Map();
+      const all = [];
+      for (const ev of evs) if (ev.by === void 0) all.push(this.entry(ev, ev, this.me, this.mine.length, this.mine));
+      for (const name of Object.keys(logs)) {
+        if (name === this.me) continue;
+        const arr = logs[name];
+        const entries = [];
+        for (let i = 0; i < arr.length; i++) all.push(this.theirs(name, arr[i], i, entries));
+        this.logs.set(name, { ref: arr, entries });
+      }
+      all.sort(order);
+      for (const e of all) {
+        if (e.key === null) continue;
+        const cs = this.copies.get(e.key);
+        if (cs) cs.push(e);
+        else this.copies.set(e.key, [e]);
+      }
+      const winners = /* @__PURE__ */ new Set();
+      for (const cs of this.copies.values()) {
+        let win = cs[0];
+        if (win.name !== this.me) {
+          for (const c of cs) if (c.name === this.me) {
+            win = c;
+            break;
+          }
+        }
+        winners.add(win);
+      }
+      for (const e of all) {
+        if (e.key !== null && !winners.has(e)) continue;
+        e.standing = true;
+        this.list.push(e);
+      }
+      let d = 0;
+      while (d < this.list.length && d < evs.length) {
+        const e = this.list[d];
+        if (e.ev !== evs[d]) {
+          if (e.name === this.me || evs[d].by !== e.name || !sameEventAs(e.src, evs[d])) break;
+          e.ev = evs[d];
+        }
+        d++;
+      }
+      return this.handOver(d, evs, true);
+    }
+    /** Hand the session the merge from `d` on, and remember what it then holds. */
+    handOver(d, evs, rebuilt) {
+      let report;
+      if (d === this.list.length && d === evs.length) {
+        report = { how: "none", kept: d, applied: 0, from: d, rebuilt };
+      } else {
+        const r = this.session.rebase(d, this.list.slice(d).map((e) => e.ev));
+        report = { how: r.cut ? "cut" : "append", kept: d, applied: r.applied, from: r.from, rebuilt };
+      }
+      this.held = this.session.getEvents();
+      this.heldLength = this.held.length;
+      this.lowest = null;
+      return report;
     }
   };
 
@@ -10477,11 +10941,11 @@ ${lines.join("\n")}
         const far = Math.max(...pts.map(reachOut));
         const near = magnetRadius(0, scale) / 2;
         const headAtEnd = meta.head !== "start";
-        const order = headAtEnd ? pts.map((_, i) => i) : pts.map((_, i) => pts.length - 1 - i);
-        let at = order.findIndex((i) => reachOut(pts[i]) >= far - near);
-        if (at < 0) at = order.length - 1;
-        while (at + 1 < order.length && reachOut(pts[order[at + 1]]) >= reachOut(pts[order[at]])) at++;
-        const k = order[at];
+        const order2 = headAtEnd ? pts.map((_, i) => i) : pts.map((_, i) => pts.length - 1 - i);
+        let at = order2.findIndex((i) => reachOut(pts[i]) >= far - near);
+        if (at < 0) at = order2.length - 1;
+        while (at + 1 < order2.length && reachOut(pts[order2[at + 1]]) >= reachOut(pts[order2[at]])) at++;
+        const k = order2[at];
         const tip = pts[k];
         const barb = headAtEnd ? pts.slice(k) : pts.slice(0, k + 1).reverse();
         const u = unit2(sub3(tip, tail));
@@ -11052,6 +11516,7 @@ ${lines.join("\n")}
     };
     const listeners = /* @__PURE__ */ new Set();
     const CHECKPOINT_EVERY = 200;
+    const checkpointEvery = config.checkpointEvery !== void 0 && config.checkpointEvery >= 1 ? Math.floor(config.checkpointEvery) : CHECKPOINT_EVERY;
     let checkpoints = [];
     const nodeCopy = (n2) => ({ ...n2, reps: n2.reps.slice(), edges: n2.edges.slice() });
     function snapshot() {
@@ -11089,11 +11554,11 @@ ${lines.join("\n")}
       rebuildDerived();
     }
     function maybeCheckpoint(length) {
-      if (length > 0 && length % CHECKPOINT_EVERY === 0 && !checkpoints.some((c) => c.length === length)) {
+      if (length > 0 && length % checkpointEvery === 0 && !checkpoints.some((c) => c.length === length)) {
         checkpoints.push({ length, snap: snapshot() });
       }
     }
-    let order = /* @__PURE__ */ new Map();
+    let order2 = /* @__PURE__ */ new Map();
     let nextOrder = 0;
     let inContent = /* @__PURE__ */ new Set();
     const reach = new MarkGrid();
@@ -11107,9 +11572,9 @@ ${lines.join("\n")}
     let holding = /* @__PURE__ */ new Set();
     let holdingInOrder = [];
     let holdingMoved = false;
-    const byOrder = (p, q) => order.get(p) - order.get(q);
+    const byOrder = (p, q) => order2.get(p) - order2.get(q);
     function rebuildDerived() {
-      order = /* @__PURE__ */ new Map();
+      order2 = /* @__PURE__ */ new Map();
       nextOrder = 0;
       inContent = /* @__PURE__ */ new Set();
       reach.clear();
@@ -11125,7 +11590,7 @@ ${lines.join("\n")}
       holdingMoved = false;
       for (const id of contentIds) {
         inContent.add(id);
-        order.set(id, ++nextOrder);
+        order2.set(id, ++nextOrder);
       }
       for (const id of contentIds) fileContent(id);
       for (const [id, n2] of nodes) {
@@ -11198,7 +11663,7 @@ ${lines.join("\n")}
       refreshDefinitions();
       settle();
       if (holdingMoved) {
-        holdingInOrder = [...holding].sort((p, q) => order.get(p.first) - order.get(q.first));
+        holdingInOrder = [...holding].sort((p, q) => order2.get(p.first) - order2.get(q.first));
         holdingMoved = false;
       }
       clusterCandidates = holdingInOrder.map((c) => c.candidate);
@@ -11206,7 +11671,7 @@ ${lines.join("\n")}
     function contentPush(id) {
       contentIds.push(id);
       inContent.add(id);
-      order.set(id, ++nextOrder);
+      order2.set(id, ++nextOrder);
       fileContent(id);
     }
     function removeFromContent(id) {
@@ -11214,18 +11679,18 @@ ${lines.join("\n")}
       if (idx < 0) return;
       contentIds.splice(idx, 1);
       inContent.delete(id);
-      order.delete(id);
+      order2.delete(id);
       unfileContent(id);
     }
     function contentReplace(prev, next) {
       const idx = contentIds.indexOf(prev);
-      const place2 = order.get(prev);
+      const place2 = order2.get(prev);
       contentIds.splice(idx, 1, next);
       inContent.delete(prev);
-      order.delete(prev);
+      order2.delete(prev);
       unfileContent(prev);
       inContent.add(next);
-      order.set(next, place2);
+      order2.set(next, place2);
       fileContent(next);
     }
     function contentSpread(prev, ids) {
@@ -11234,9 +11699,9 @@ ${lines.join("\n")}
       contentIds.splice(idx, 1, ...ids);
       inContent.delete(prev);
       unfileContent(prev);
-      order = /* @__PURE__ */ new Map();
+      order2 = /* @__PURE__ */ new Map();
       nextOrder = 0;
-      for (const c of contentIds) order.set(c, ++nextOrder);
+      for (const c of contentIds) order2.set(c, ++nextOrder);
       for (const c of ids) {
         inContent.add(c);
         fileContent(c);
@@ -11325,7 +11790,7 @@ ${lines.join("\n")}
       let first = start;
       while (stack.length) {
         const id = stack.pop();
-        if (order.get(id) < order.get(first)) first = id;
+        if (order2.get(id) < order2.get(first)) first = id;
         for (const o of linked.get(id)) {
           if (seen.has(o)) continue;
           seen.add(o);
@@ -11466,7 +11931,7 @@ ${lines.join("\n")}
           const within = Math.max(floor, size * config.wireEndpointRatio);
           const d = distancePointToBounds(p, bounds);
           if (!(d < within)) continue;
-          const place2 = order.get(id);
+          const place2 = order2.get(id);
           if (!best || d < best.d || d === best.d && place2 < bestPlace) {
             best = { id, d };
             bestPlace = place2;
@@ -12643,6 +13108,36 @@ ${lines.join("\n")}
       }
       return dispatch(ev);
     }
+    function rebase(keepAt, tail) {
+      const keep = Math.max(0, Math.min(Math.floor(Number(keepAt) || 0), events.length));
+      if (keep === events.length && !tail.length) return { cut: false, from: keep, applied: 0 };
+      staleResult = null;
+      for (const ev of tail) if (ev.origin && typeof ev.seq === "number") sawNumber(ev.origin, ev.seq);
+      let report;
+      if (keep === events.length) {
+        const from = events.length;
+        for (const ev of tail) {
+          events.push(ev);
+          applyEvent(ev);
+          maybeCheckpoint(events.length);
+        }
+        report = { cut: false, from, applied: tail.length };
+      } else {
+        checkpoints = checkpoints.filter((c) => c.length <= keep);
+        if (tail.some((ev) => mintKeyOf(ev) === null)) generation++;
+        events = events.slice(0, keep).concat(tail);
+        const from = checkpoints.length ? checkpoints[checkpoints.length - 1].length : 0;
+        replay();
+        report = { cut: true, from, applied: events.length - from };
+      }
+      if (!logNameSaid) {
+        let remembered;
+        for (const ev of events) if (!ev.by && ev.origin) remembered = ev.origin;
+        if (remembered !== void 0) myLog = remembered;
+      }
+      notify();
+      return report;
+    }
     function undo() {
       for (let i = events.length - 1; i >= 0; i--) {
         if (events[i].type !== "tick") {
@@ -12770,6 +13265,7 @@ ${lines.join("\n")}
         replay();
         notify();
       },
+      rebase,
       getState,
       subscribe,
       getEvents: () => events,
@@ -13468,11 +13964,11 @@ ${lines.join("\n")}
       counts.label ? `${count2(counts.label)} label${counts.label === 1 ? "" : "s"}` : "",
       unplaced.length ? `${count2(unplaced.length)} mark${unplaced.length === 1 ? "" : "s"} it places nowhere` : ""
     ].filter(Boolean).join(", ");
-    const order = new Map(scope.map((id, i) => [id, i]));
-    const firstOf = (ids) => Math.min(...ids.map((id) => order.get(id) ?? Infinity));
+    const order2 = new Map(scope.map((id, i) => [id, i]));
+    const firstOf = (ids) => Math.min(...ids.map((id) => order2.get(id) ?? Infinity));
     out.sort((p, q) => firstOf([p.id, ...p.ids]) - firstOf([q.id, ...q.ids]));
-    labels.sort((p, q) => (order.get(p.id) ?? 0) - (order.get(q.id) ?? 0));
-    connectors.sort((p, q) => (order.get(p.id) ?? 0) - (order.get(q.id) ?? 0));
+    labels.sort((p, q) => (order2.get(p.id) ?? 0) - (order2.get(q.id) ?? 0));
+    connectors.sort((p, q) => (order2.get(p.id) ?? 0) - (order2.get(q.id) ?? 0));
     return {
       notation: "flowchart",
       name: FLOWCHART_TABLE.name,
@@ -15316,8 +15812,8 @@ The canvas already read: ${describeBehaviour({ terms: local.terms })}. Read the 
         at: Date.now()
       };
       return new Promise((resolve) => {
-        const timer = setTimeout(() => settle({ ok: false, error: `no answer within ${timeoutMs}ms` }), timeoutMs);
-        waiting = { request, resolve, timer };
+        const timer2 = setTimeout(() => settle({ ok: false, error: `no answer within ${timeoutMs}ms` }), timeoutMs);
+        waiting = { request, resolve, timer: timer2 };
         if (opts.signal) {
           if (opts.signal.aborted) settle({ ok: false, error: "cancelled" });
           else opts.signal.addEventListener("abort", () => settle({ ok: false, error: "cancelled" }), { once: true });
@@ -15389,13 +15885,13 @@ The canvas already read: ${describeBehaviour({ terms: local.terms })}. Read the 
         why: `yes ${p2(answer.yes)} \u2014 ${p2(d)} from an even chance`
       };
     }
-    const order = ranked(answer);
-    if (order.length === 0) return { flat: true, why: "no distribution came back" };
-    if (order.length === 1) return { flat: false, why: `only one outcome: ${order[0].of} ${p2(order[0].p)}` };
-    const lead = order[0].p - order[1].p;
+    const order2 = ranked(answer);
+    if (order2.length === 0) return { flat: true, why: "no distribution came back" };
+    if (order2.length === 1) return { flat: false, why: `only one outcome: ${order2[0].of} ${p2(order2[0].p)}` };
+    const lead = order2[0].p - order2[1].p;
     return {
       flat: lead < margin,
-      why: `${order[0].of} ${p2(order[0].p)} leads ${order[1].of} ${p2(order[1].p)} by ${p2(lead)}`
+      why: `${order2[0].of} ${p2(order2[0].p)} leads ${order2[1].of} ${p2(order2[1].p)} by ${p2(lead)}`
     };
   }
   function reasonOf(question, answer) {
@@ -15539,8 +16035,8 @@ The canvas already read: ${describeBehaviour({ terms: local.terms })}. Read the 
         }
         const ids = q.candidates.map((c) => c.id);
         const dist6 = "pick" in entry && ids.includes(entry.pick) ? spread(ids, entry.pick, entry.p) : even(ids);
-        const order = [...dist6].sort((a, b) => b.p - a.p);
-        const lead = order.length > 1 && order[0].p - order[1].p < FLAT_MARGIN ? null : order[0]?.of ?? null;
+        const order2 = [...dist6].sort((a, b) => b.p - a.p);
+        const lead = order2.length > 1 && order2[0].p - order2[1].p < FLAT_MARGIN ? null : order2[0]?.of ?? null;
         answers.push({
           kind: "choice",
           questionId: q.id,
