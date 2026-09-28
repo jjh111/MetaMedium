@@ -407,6 +407,12 @@ export async function equivalence(page, { strokes = 3 } = {}) {
     if (found.first.length < 5) found.first.push({ where, diffs: c.diffs.slice(0, 3) });
   };
   await roles('as opened');
+  // Every loose mark held: its group, found through the index, against the clusters of the whole plane.
+  {
+    const h = await page.evaluate(() => window.__mm.heldCheck());
+    found.held = { marks: h.marks, differing: h.differing };
+    note('every mark held', { ok: h.ok, diffs: h.differ });
+  }
   // Every mark, pointed at: its reading drawn under it, its ladder in the panel.
   const batch = 40;
   for (let i = 0; i < marks.length; i += batch) {

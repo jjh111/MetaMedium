@@ -1904,8 +1904,47 @@
   }
   function pressMove(e) { if (press && Math.hypot(e.clientX - press.x, e.clientY - press.y) > HOLD_SLOP) pressEnd(); }
   function pressEnd() { if (press) { clearTimeout(press.timer); press = null; } }
-  /** Hold a mark with everything it hangs together with: the cluster over the relations the canvas sees. */
-  function holdAround(id) {
+  /**
+   * The marks a held mark hangs together with: the cluster `MM.clusters` finds
+   * for it over the relations of every loose mark — read over the marks joined
+   * to it through reach alone (R4c). Every link a cluster follows (near,
+   * touching, crossing, contains) is an engaging relation, and those hold only
+   * between marks within reach of each other (R4b), so the marks the index
+   * walks to from the held one are its cluster; `MM.clusters` over them, in
+   * the board's order, orders them as the whole plane would. It used to relate
+   * every loose mark to every other: 183 ms on 2,000 marks, for one press.
+   */
+  function heldGroupOf(s, id) {
+    const markOf = (cid) => {
+      const n = s.nodes.get(cid);
+      const b = n && MM.boundsOf(n);
+      if (!b) return null;
+      const fp = MM.fingerprintOf(n);
+      return { id: cid, bounds: b, points: MM.strokePointsOf(n) || undefined, closed: !!(fp && fp.isClosed) };
+    };
+    const ix = boardIndex();
+    const arts = new Set(s.artifacts);
+    const loose = (x) => ix.contentAt.has(x) && !arts.has(x);
+    let pool;
+    if (ix.stray.some(loose)) pool = s.contentIds.filter(loose); // a box with no finite edge may meet anything: the whole plane, as before
+    else {
+      const seen = new Set([id]), queue = [id];
+      while (queue.length) {
+        const x = queue.pop();
+        const b = ix.reach.boundsOf(x);
+        if (!b) continue;
+        const r = MM.reachAround(b);
+        for (const y of ix.reach.query({ minX: b.minX - r, minY: b.minY - r, maxX: b.maxX + r, maxY: b.maxY + r })) {
+          if (!seen.has(y) && loose(y) && MM.withinReach(b, ix.reach.boundsOf(y))) { seen.add(y); queue.push(y); }
+        }
+      }
+      pool = s.contentIds.filter((cid) => seen.has(cid) && loose(cid));
+    }
+    const marks = pool.map(markOf).filter(Boolean);
+    return MM.clusters(marks, MM.relate(marks)).find((g) => g.includes(id)) || [id];
+  }
+  /** Every loose mark's held group against the clusters of the whole plane, as holding it used to find them. For tests. */
+  function heldCheck() {
     const s = session.getState();
     const marks = s.contentIds.filter((cid) => !s.artifacts.includes(cid)).map((cid) => {
       const n = s.nodes.get(cid);
@@ -1914,7 +1953,18 @@
       const fp = MM.fingerprintOf(n);
       return { id: cid, bounds: b, points: MM.strokePointsOf(n) || undefined, closed: !!(fp && fp.isClosed) };
     }).filter(Boolean);
-    const group = MM.clusters(marks, MM.relate(marks)).find((g) => g.includes(id)) || [id];
+    const whole = MM.clusters(marks, MM.relate(marks));
+    const differ = [];
+    for (const m of marks) {
+      const mine = heldGroupOf(s, m.id), theirs = whole.find((g) => g.includes(m.id)) || [m.id];
+      if (JSON.stringify(mine) !== JSON.stringify(theirs)) differ.push({ id: m.id, mine: mine, whole: theirs });
+    }
+    return { ok: !differ.length, marks: marks.length, differing: differ.length, differ: differ.slice(0, 3) };
+  }
+  /** Hold a mark with everything it hangs together with: the cluster over the relations the canvas sees. */
+  function holdAround(id) {
+    const s = session.getState();
+    const group = heldGroupOf(s, id);
     lastTap = null;
     session.summonMarks(group, Date.now());
     render(session.getState());
@@ -2291,7 +2341,7 @@
   /** The last mark on the board whose box, with a little slack, holds the point — found among the few the paint's index says could. */
   function nodeAt(x, y) {
     const slack = wpx(8);
-    const ix = boardIndex(state);
+    const ix = boardIndex();
     let best = null, bestAt = -1;
     const consider = (id) => {
       const at = ix.contentAt.get(id);
@@ -2391,9 +2441,11 @@
    * - `roles` and `genre` fill in as the paint asks.
    */
   let paintIndex = null;
-  function boardIndex(s) {
+  function boardIndex() {
     const key = logKey();
-    if (!paintIndex || paintIndex.key !== key) paintIndex = buildIndex(s, key);
+    // Built from the session's own state, which is the log's, whatever state
+    // a caller holds: a cache kept by the log must be made from that log.
+    if (!paintIndex || paintIndex.key !== key) paintIndex = buildIndex(session.getState(), key);
     return paintIndex;
   }
   function buildIndex(s, key) {
@@ -2444,7 +2496,7 @@
       if (b && MM.finiteBounds(b)) paint.set(id, b); else unboxed.push(id);
     });
     return {
-      key, scope, at, reach, stray, wiredBy, paint, boxes, topOf, contentAt, unboxed,
+      key, s, scope, at, reach, stray, wiredBy, paint, boxes, topOf, contentAt, unboxed,
       artifactsInOrder: s.contentIds.filter((id) => artifactSet.has(id)),
       roles: new Map(), genre: null, readChips: null, labelled: null, candidates: null,
     };
@@ -2493,7 +2545,7 @@
 
   /** The role the whole board gives a mark, read over its neighbourhood; undefined for what the rungs do not read. */
   function roleOf(s, id) {
-    const ix = boardIndex(s);
+    const ix = boardIndex();
     if (!ix.at.has(id)) return undefined;
     if (ix.roles.has(id)) return ix.roles.get(id);
     let role;
@@ -2504,7 +2556,7 @@
 
   /** The board's genre: every mark's role, each read over its neighbourhood. Asked only by a live artifact's panel. */
   function boardGenre(s) {
-    const ix = boardIndex(s);
+    const ix = boardIndex();
     if (!ix.genre) {
       if (!ix.scope.length) ix.genre = { genre: 'empty', reasoning: 'nothing drawn yet' };
       else {
@@ -2585,7 +2637,7 @@
    * artifact it is part of — as `inkOf` would choose. For tests.
    */
   function inkWouldBe(id) {
-    const s = state, ix = boardIndex(s);
+    const s = state, ix = boardIndex();
     const top = ix.contentAt.has(id) ? id : ix.topOf.get(id);
     const n = s.nodes.get(id), t = top && s.nodes.get(top);
     if (!n || !t || !MM.strokePointsOf(n)) return null;
@@ -2752,14 +2804,15 @@
   }
 
   /** The box each cluster candidate's marks fill, for this log. */
-  function candidateBoxes(s, ix) {
-    if (!ix.candidates) ix.candidates = s.clusterCandidates.map((c) => union(c.nodeIds.map((id) => MM.boundsOf(s.nodes.get(id)))));
+  function candidateBoxes(ix) {
+    if (!ix.candidates) ix.candidates = ix.s.clusterCandidates.map((c) => union(c.nodeIds.map((id) => MM.boundsOf(ix.s.nodes.get(id)))));
     return ix.candidates;
   }
 
   /** What each model read a group as, for this log: the marks that hold a reading of the second tier, and what the chip says. */
   function readChipsOf(s, ix) {
     if (ix && ix.readChips) return ix.readChips;
+    if (ix) s = ix.s;
     const out = [];
     for (const id of s.contentIds) {
       const n = s.nodes.get(id);
@@ -2824,7 +2877,7 @@
     // The reference paint (paintCheck) reads the whole board and draws all of
     // it, as every paint did before R4c; a hand's paint reads what the log
     // keeps and draws what is on screen.
-    const ix = paintReference ? null : boardIndex(s);
+    const ix = paintReference ? null : boardIndex();
 
     const dpr = window.devicePixelRatio || 1;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -2841,8 +2894,8 @@
     // own box — a stroke's width and its halo, a chip, a few words beside it.
     const vb = ix ? screenWorld(Math.max(wpx(48), inkW * 2)) : null;
 
-    const cands = ix ? candidateBoxes(s, ix) : null;
-    s.clusterCandidates.forEach((c, ci) => {
+    const cands = ix ? candidateBoxes(ix) : null;
+    (ix ? ix.s : s).clusterCandidates.forEach((c, ci) => {
       const b0 = cands ? cands[ci] : union(c.nodeIds.map((id) => MM.boundsOf(s.nodes.get(id))));
       const cp = bodyPlacement(c.nodeIds[0]);
       const b = cp ? { minX: b0.minX + cp.dx, maxX: b0.maxX + cp.dx, minY: b0.minY + cp.dy, maxY: b0.maxY + cp.dy } : b0;
@@ -3100,6 +3153,7 @@
   /** The marks that carry a label, and the content mark each is drawn under, in the board's order — for this log. */
   function labelledOf(s, ix) {
     if (ix && ix.labelled) return ix.labelled;
+    if (ix) s = ix.s;
     const out = [];
     const seen = new Set();
     const visit = (id, placedBy) => {
@@ -3320,7 +3374,7 @@
     // The marks near the window, in the board's order: the paint's index finds them, the test below is the same.
     let ids = s.contentIds;
     if (!paintReference) {
-      const ix = boardIndex(s);
+      const ix = boardIndex();
       const near = new Set(ix.paint.query({ minX: win.x - thin, minY: win.y - thin, maxX: win.x + win.w + thin, maxY: win.y + win.h + thin }));
       for (const id of ix.unboxed) near.add(id);
       ids = [...near].filter((id) => ix.contentAt.has(id)).sort((a, b) => ix.contentAt.get(a) - ix.contentAt.get(b));
@@ -3505,7 +3559,7 @@
   function rolesCheck() {
     const s = session.getState();
     const whole = wholeBoardRungs(s);
-    const ix = boardIndex(s);
+    const ix = boardIndex();
     const differ = [];
     for (const id of ix.at.keys()) {
       const mine = roleOf(s, id), theirs = whole.roles.get(id);
@@ -8598,7 +8652,7 @@
     // A hand's word on its own ink, for tests: where the last paint drew each label, and a mark's ink colour.
     labelsDrawn: () => labelsDrawn.map((l) => Object.assign({}, l)),
     // What the last paint drew under the inspected mark, and the check that a hand's paint draws and says what the whole-board read would (R4c).
-    readingDrawn: () => (readingDrawn ? Object.assign({}, readingDrawn) : null), paintCheck: paintCheck, rolesCheck: rolesCheck,
+    readingDrawn: () => (readingDrawn ? Object.assign({}, readingDrawn) : null), paintCheck: paintCheck, rolesCheck: rolesCheck, heldCheck: heldCheck,
     // Point at a mark the way a hover does, for tests: it is inspected, its reading drawn under it and its ladder in the panel.
     inspect: (id) => { hoverId = id || null; render(state); },
     colourOf: (id) => { const n = session.getState().nodes.get(id); return n ? colourOf(n) : null; },

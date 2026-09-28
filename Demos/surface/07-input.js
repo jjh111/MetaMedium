@@ -80,8 +80,47 @@
   }
   function pressMove(e) { if (press && Math.hypot(e.clientX - press.x, e.clientY - press.y) > HOLD_SLOP) pressEnd(); }
   function pressEnd() { if (press) { clearTimeout(press.timer); press = null; } }
-  /** Hold a mark with everything it hangs together with: the cluster over the relations the canvas sees. */
-  function holdAround(id) {
+  /**
+   * The marks a held mark hangs together with: the cluster `MM.clusters` finds
+   * for it over the relations of every loose mark — read over the marks joined
+   * to it through reach alone (R4c). Every link a cluster follows (near,
+   * touching, crossing, contains) is an engaging relation, and those hold only
+   * between marks within reach of each other (R4b), so the marks the index
+   * walks to from the held one are its cluster; `MM.clusters` over them, in
+   * the board's order, orders them as the whole plane would. It used to relate
+   * every loose mark to every other: 183 ms on 2,000 marks, for one press.
+   */
+  function heldGroupOf(s, id) {
+    const markOf = (cid) => {
+      const n = s.nodes.get(cid);
+      const b = n && MM.boundsOf(n);
+      if (!b) return null;
+      const fp = MM.fingerprintOf(n);
+      return { id: cid, bounds: b, points: MM.strokePointsOf(n) || undefined, closed: !!(fp && fp.isClosed) };
+    };
+    const ix = boardIndex();
+    const arts = new Set(s.artifacts);
+    const loose = (x) => ix.contentAt.has(x) && !arts.has(x);
+    let pool;
+    if (ix.stray.some(loose)) pool = s.contentIds.filter(loose); // a box with no finite edge may meet anything: the whole plane, as before
+    else {
+      const seen = new Set([id]), queue = [id];
+      while (queue.length) {
+        const x = queue.pop();
+        const b = ix.reach.boundsOf(x);
+        if (!b) continue;
+        const r = MM.reachAround(b);
+        for (const y of ix.reach.query({ minX: b.minX - r, minY: b.minY - r, maxX: b.maxX + r, maxY: b.maxY + r })) {
+          if (!seen.has(y) && loose(y) && MM.withinReach(b, ix.reach.boundsOf(y))) { seen.add(y); queue.push(y); }
+        }
+      }
+      pool = s.contentIds.filter((cid) => seen.has(cid) && loose(cid));
+    }
+    const marks = pool.map(markOf).filter(Boolean);
+    return MM.clusters(marks, MM.relate(marks)).find((g) => g.includes(id)) || [id];
+  }
+  /** Every loose mark's held group against the clusters of the whole plane, as holding it used to find them. For tests. */
+  function heldCheck() {
     const s = session.getState();
     const marks = s.contentIds.filter((cid) => !s.artifacts.includes(cid)).map((cid) => {
       const n = s.nodes.get(cid);
@@ -90,7 +129,18 @@
       const fp = MM.fingerprintOf(n);
       return { id: cid, bounds: b, points: MM.strokePointsOf(n) || undefined, closed: !!(fp && fp.isClosed) };
     }).filter(Boolean);
-    const group = MM.clusters(marks, MM.relate(marks)).find((g) => g.includes(id)) || [id];
+    const whole = MM.clusters(marks, MM.relate(marks));
+    const differ = [];
+    for (const m of marks) {
+      const mine = heldGroupOf(s, m.id), theirs = whole.find((g) => g.includes(m.id)) || [m.id];
+      if (JSON.stringify(mine) !== JSON.stringify(theirs)) differ.push({ id: m.id, mine: mine, whole: theirs });
+    }
+    return { ok: !differ.length, marks: marks.length, differing: differ.length, differ: differ.slice(0, 3) };
+  }
+  /** Hold a mark with everything it hangs together with: the cluster over the relations the canvas sees. */
+  function holdAround(id) {
+    const s = session.getState();
+    const group = heldGroupOf(s, id);
     lastTap = null;
     session.summonMarks(group, Date.now());
     render(session.getState());
