@@ -368,6 +368,62 @@ export async function blockedTest(browser, servers, ctx) {
 }
 
 /**
+ * Flush on the way out. Writes go as they happen, so what can be pending is a
+ * write waiting for its retry: storage refused it, then made room, and the next
+ * try is not due yet. Leaving the page then — the tab closed (pagehide), or
+ * hidden and then killed (visibilitychange, and a crash that says nothing) —
+ * must write it on the way out. Chromium: the refusal is the quota's.
+ */
+export async function flushTest(browser, servers, ctx) {
+  const { freshContext, steps } = ctx;
+  const check = (name, ok, detail) => steps.push({ name, ok: !!ok, detail });
+  const url = `${servers.staticOrigin}/Demos/session-engine.html?nosw=1`;
+  const all = [];
+  for (const how of ['pagehide', 'visibilitychange']) {
+    const guards = await freshContext(browser, { origins: [servers.staticOrigin], label: 'keep-flush-' + how });
+    all.push(guards);
+    let page = await guards.context.newPage();
+    try {
+      const cdp = await guards.context.newCDPSession(page);
+      await page.goto(`${servers.staticOrigin}/404.html`, { waitUntil: 'load' });
+      await cdp.send('Storage.overrideQuotaForOrigin', { origin: servers.staticOrigin, quotaSize: 1 });
+      await page.goto(url, { waitUntil: 'load' });
+      await waitReady(page);
+      const rand = rng(how.length);
+      const drawn = [];
+      for (let i = 0; i < 2; i++) { const pts = boxPath(cellBox(i, rand)); await drawPath(page, pts); drawn.push(sig(pts)); }
+      await page.evaluate(() => window.__mm.boardIdle());
+      const failing = await page.evaluate(() => window.__mm.board());
+      await cdp.send('Storage.overrideQuotaForOrigin', { origin: servers.staticOrigin });
+      const issued = failing.issued;
+      if (how === 'pagehide') {
+        await page.close({ runBeforeUnload: false });
+      } else {
+        // Hidden — as when the person switches away — and then the tab dies without another word.
+        await page.evaluate(() => {
+          Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' });
+          document.dispatchEvent(new Event('visibilitychange'));
+        });
+        const crashed = new Promise((r) => page.once('crash', r));
+        cdp.send('Page.crash').catch(() => {});
+        await Promise.race([crashed, sleep(5000)]);
+      }
+      page = await guards.context.newPage();
+      await page.goto(url, { waitUntil: 'load' });
+      await waitReady(page);
+      const back = await strokesOnBoard(page);
+      check(`F${how === 'pagehide' ? 1 : 2}. a write waiting for its retry goes on the way out (${how}${how === 'pagehide' ? ', the tab closed' : ', then the renderer crashed'}) — ${back.length} of ${drawn.length} strokes back`,
+        failing.trouble && failing.trouble.kind === 'full' && failing.needWhole && back.length === drawn.length && drawn.every((d, i) => sameSig(back[i], d)),
+        { trouble: failing.trouble, needWhole: failing.needWhole, issuedBefore: issued, back: back.length });
+      await page.close().catch(() => {});
+    } catch (err) {
+      check(`F. the flush test (${how}) ran to its end`, false, { error: String(err && err.stack ? err.stack : err) });
+    }
+  }
+  return all;
+}
+
+/**
  * A board as the surface's autosave wrote it before R3: one string under
  * `mm-log`. Made in the page by the engine the page runs — strokes, a loop
  * taken up with the check and named, so the log carries more than strokes.
@@ -534,7 +590,17 @@ export async function tabsTest(browser, servers, ctx) {
     await c.reload({ waitUntil: 'load' });
     await waitReady(c);
     check('T3b. reloaded, it holds the board as the other tab left it', (await strokes(c)) === 3 && (await c.evaluate(() => window.__mm.board().state)) === 'armed');
+    // The tab holding the board opens a folder: its log is the folder's now, and it lets the board go.
+    const d = await open();
+    await c.evaluate(async () => { const mm = window.__mm; await mm.openStore(new mm.MM.MemoryStore(), 'folder', 'elsewhere'); });
+    let dState = null;
+    for (let i = 0; i < 40; i++) { dState = await d.evaluate(() => window.__mm.board()); if (dState.state === 'armed') break; await sleep(100); }
+    await draw(d);
+    await d.evaluate(() => window.__mm.boardIdle());
+    check('T4. a tab that opens a folder lets the board go, and the tab waiting for it takes it up',
+      dState.state === 'armed' && dState.lock === 'held' && (await stored(d)) === 4, { state: dState.state, lock: dState.lock });
     await c.close();
+    await d.close();
   } catch (err) {
     check('T. the two-tab test ran to its end', false, { error: String(err && err.stack ? err.stack : err) });
   }
@@ -682,6 +748,8 @@ export async function runKeep(browser, servers, ctx) {
   all.push(await timed('kill s', () => killTest(browser, servers, inner)));
   if (ctx.engineName === 'chromium') all.push(await timed('full s', () => quotaTest(browser, servers, inner)));
   else steps.push({ name: 'Q. storage full — skipped: the quota is forced through the DevTools protocol, which is Chromium\'s', ok: true });
+  if (ctx.engineName === 'chromium') all.push(...(await timed('flush s', () => flushTest(browser, servers, inner))));
+  else steps.push({ name: 'F. flush on the way out — skipped: a write waiting for its retry needs the quota, forced through the DevTools protocol, which is Chromium\'s', ok: true });
   all.push(await timed('blocked s', () => blockedTest(browser, servers, inner)));
   all.push(...(await timed('import s', () => importTest(browser, servers, inner))));
   all.push(await timed('tabs s', () => tabsTest(browser, servers, inner)));

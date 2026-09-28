@@ -6665,7 +6665,7 @@
     opts = opts || {};
     // From here this page's log is the room's: nothing drawn under the room's
     // name is written into the board this browser keeps (L1: a live tab keeps no local log).
-    board.journal.off();
+    leaveBoard();
     if (folder.store && folder.store.close) folder.store.close();
     folder.noticed = new Set();
     // A hand in a room is one SITTING: a second tab of the same person is a
@@ -6735,7 +6735,7 @@
     folder.store = store; folder.how = how || 'store'; folder.name = name || ''; folder.error = ''; folder.saveTrouble = null;
     // From here this page's log is the folder's or the room's: the board this
     // browser keeps stays as it was, and is not written again from this page.
-    board.journal.off();
+    leaveBoard();
     // A folder is written under the device's own stable name, whatever a live
     // sitting in this page load was called.
     if (folder.how !== 'live') folder.me = deviceParticipant();
@@ -6886,8 +6886,15 @@
     restoring: false,
     dbClosed: false,
     retryTimer: 0,
+    release: null,      // lets the lock go: a page that stops keeping the board frees it for another tab
+    freedEarly: false,  // the lock came before the board had opened: take it up once it has
     journal: null,
   };
+  /** This page no longer keeps the board (a folder or a room keeps its log): the journal stops, and another tab may take the board. */
+  function leaveBoard() {
+    board.journal.off();
+    if (board.release) { board.release(); board.release = null; }
+  }
   board.journal = createJournal({
     append: (rec, o) => (board.backend ? board.backend.append(rec, o) : Promise.reject(new DOMException('the board is not open', 'InvalidStateError'))),
   }, {
@@ -7010,14 +7017,16 @@
     return new Promise((resolve) => {
       let settled = false;
       const ctl = typeof AbortController === 'function' ? new AbortController() : null;
-      const forever = () => new Promise(() => {});
+      // Held for the page's life — or until it stops keeping the board (leaveBoard).
+      const forever = () => new Promise((r) => { board.release = r; });
       const timer = setTimeout(() => { if (settled) return; settled = true; if (ctl) ctl.abort(); resolve('taken'); }, waitMs);
       const none = () => { if (!settled) { settled = true; clearTimeout(timer); resolve('none'); } };
       try {
         navigator.locks.request(BOARD_LOCK, ctl ? { signal: ctl.signal } : {}, () => {
-          if (settled) { boardFreed(); return forever(); }
+          const held = forever(); // first, so a page that no longer keeps the board can let it go at once
+          if (settled) { boardFreed(); return held; }
           settled = true; clearTimeout(timer); resolve('held');
-          return forever();
+          return held;
         }).catch(none);
       } catch (err) { none(); } // a page the lock manager will not serve (an opaque origin): this tab writes, as before
     });
@@ -7025,11 +7034,13 @@
   /** Wait for the other tab to let the board go. */
   function waitForBoard() {
     if (!(navigator.locks && navigator.locks.request)) return;
-    try { navigator.locks.request(BOARD_LOCK, () => { boardFreed(); return new Promise(() => {}); }).catch(() => { /* nothing */ }); } catch (err) { /* nothing */ }
+    try { navigator.locks.request(BOARD_LOCK, () => { const held = new Promise((r) => { board.release = r; }); boardFreed(); return held; }).catch(() => { /* nothing */ }); } catch (err) { /* nothing */ }
   }
   /** The other tab let go: this one writes from here — if nothing was written since it opened. */
   async function boardFreed() {
-    if (board.lock === 'held' || !board.backend || !board.opened || folder.store) return;
+    if (board.lock === 'held') return;
+    if (folder.store || board.journal.state === 'off') { if (board.release) { board.release(); board.release = null; } return; }
+    if (!board.backend || !board.opened) { board.freedEarly = true; return; } // opening still: taken up at its end
     board.lock = 'held';
     let got;
     try { got = await board.backend.read(); } catch (err) { board.journal.broken(troubleOf(err, 'read')); return; }
@@ -7099,7 +7110,7 @@
       board.journal.arm(a);
     } else {
       board.journal.readonly({ kind: 'tab', detail: '' });
-      waitForBoard();
+      if (board.freedEarly) boardFreed(); else waitForBoard();
     }
     board.ready = true;
     if (plan.damaged) say('the board kept in this browser had ' + (plan.damaged.skipped + plan.damaged.bad) + ' unreadable piece' + (plan.damaged.skipped + plan.damaged.bad === 1 ? '' : 's') + ' — what could be read is back, and is written whole again');
@@ -7126,7 +7137,7 @@
    */
   function persistBoard() {
     if (board.restoring) return; // the log being loaded is what the store holds
-    if (folder.store) { if (board.journal.state !== 'off') board.journal.off(); return; }
+    if (folder.store) { if (board.journal.state !== 'off') leaveBoard(); return; }
     board.journal.sync(session.getEvents());
   }
   /** On the way out — the tab hidden, the page going — anything not yet written goes now. */
