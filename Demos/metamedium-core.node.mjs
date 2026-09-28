@@ -14634,7 +14634,7 @@ function buildGraph3D(session, artifactId) {
 }
 
 // src/tools/tool.ts
-var NO_CONTEXT = Object.freeze({ scopeIds: [], notations: [], concepts: [], recent: [] });
+var NO_CONTEXT = Object.freeze({ scopeIds: [], notations: [], concepts: [], recent: [], kind: null, key: null });
 
 // src/tools/registry.ts
 var registry3 = /* @__PURE__ */ new Map();
@@ -15659,6 +15659,62 @@ registerTool(WHAT);
 registerTool(DUPLICATE);
 registerTool(KEEP);
 registerTool(STRUCTURE);
+
+// src/context/context.ts
+var CONTEXT_FADE = 2.5;
+var RECENT_MS = 12e4;
+var NEIGHBOURHOOD_MAX = 80;
+var RECENT_EVENTS_MAX = 400;
+function nearnessOf(_a, _b) {
+  return 0;
+}
+function pointNearnessOf(_p, _b) {
+  return 0;
+}
+var conceptNoun = (name) => "a " + name;
+function isEmptyContext(ctx) {
+  return !ctx || !ctx.notations.length && !ctx.concepts.length && !ctx.recent.length;
+}
+function contextAt(board, at, opts = {}) {
+  const scopeIds = Array.isArray(at) ? [...at] : [];
+  const events = board.getEvents();
+  return { scopeIds, notations: [], concepts: [], recent: [], kind: null, key: null, at: opts.now ?? (events.length ? events[events.length - 1].at : 0) };
+}
+function describeContext(_ctx) {
+  return [];
+}
+
+// src/context/rank.ts
+var CONTEXT_LIFT_MAX = 1.25;
+var RECENT_SAME_TOOL = 0.5;
+var STEADY_MARGIN = 0.1;
+var STEADY_MS = 12e4;
+var AFFINITY = {};
+function liftTargets(_kind) {
+  return [];
+}
+function standsOn(_item) {
+  return /* @__PURE__ */ new Set();
+}
+function liftOf(_item, _ctx = NO_CONTEXT) {
+  return { factor: 1, because: [] };
+}
+function canLift(_items) {
+  return false;
+}
+function rank(items, _ctx = NO_CONTEXT, opts = {}) {
+  const uses = opts.uses ?? {};
+  return items.map((item) => {
+    const likelihood = likelihoodOf(item, uses);
+    return { ...item, likelihood, lift: 1, score: likelihood, because: [] };
+  }).sort((a, b) => b.score - a.score);
+}
+function steadyTop(ranked2, _held, _opts = {}) {
+  return ranked2.slice();
+}
+function topOf(ranked2, eligible = () => true) {
+  return ranked2.find((x) => eligible(x));
+}
 
 // src/participants/serialize.ts
 function n(v, round) {
@@ -16906,6 +16962,7 @@ function describeRoute(r) {
   return `${r.ability}: ${r.candidates.map((c) => `${c.name} (tier ${c.tier}${c.locality ? ", " + c.locality : ""})`).join(", ")}`;
 }
 export {
+  AFFINITY,
   ALONG_STEPS,
   BARB_CLOSED,
   BARB_ROUND,
@@ -16914,6 +16971,8 @@ export {
   BUILTIN_TOOLS,
   BUILTIN_TYPES,
   COMMAND_MARK_SAMPLES,
+  CONTEXT_FADE,
+  CONTEXT_LIFT_MAX,
   COORD_PLACES,
   COVER_STAGGER_MS,
   COVER_WAIT_MS,
@@ -16974,6 +17033,7 @@ export {
   MarkGrid,
   MemoryStore,
   NAMING_IS,
+  NEIGHBOURHOOD_MAX,
   NOTATION_FLOOR,
   NO_CONTEXT,
   NO_MATCH,
@@ -16982,6 +17042,9 @@ export {
   PAPERS,
   PHRASES,
   PRESETS,
+  RECENT_EVENTS_MAX,
+  RECENT_MS,
+  RECENT_SAME_TOOL,
   RIGHT_ANGLE_TOLERANCE,
   ROLES,
   ReadOnlyError,
@@ -16993,6 +17056,8 @@ export {
   SNAP_CONFIDENCE,
   SNAP_MARGIN,
   SPECIFIC_GROUNDS,
+  STEADY_MARGIN,
+  STEADY_MS,
   STRAIGHT_RUN,
   STRAIGHT_TURN,
   SYMMETRIC_LINKS,
@@ -17045,6 +17110,7 @@ export {
   byTier,
   calculateDistance,
   calculateStraightness,
+  canLift,
   canonicalCheckSamples,
   checkOvershoot,
   checkWritten,
@@ -17059,9 +17125,11 @@ export {
   compareSignatures,
   complete,
   completionsFor,
+  conceptNoun,
   connectionsFor,
   connectionsOf,
   connectorHeads,
+  contextAt,
   controlOf,
   convertQuantity,
   convexHull,
@@ -17086,6 +17154,7 @@ export {
   describeAuthorshipCollision,
   describeBehaviour,
   describeBinding,
+  describeContext,
   describeDimensions,
   describeExpr,
   describeFigure,
@@ -17159,6 +17228,7 @@ export {
   isBare,
   isCanvasFile,
   isCheckLike,
+  isEmptyContext,
   isExplanation,
   isFlat,
   isFrame,
@@ -17181,6 +17251,8 @@ export {
   learnCommandMark,
   lettersOf,
   levelOf2 as levelOf,
+  liftOf,
+  liftTargets,
   likelihoodOf,
   listModels,
   localityOf,
@@ -17202,6 +17274,7 @@ export {
   nameMarks,
   nearLimitOf,
   nearestMagnet,
+  nearnessOf,
   negateQuantity,
   nodeIdsIn,
   normName,
@@ -17236,6 +17309,7 @@ export {
   participantOfLog,
   placed,
   planFor,
+  pointNearnessOf,
   polygonFigure,
   prepare,
   printTiled,
@@ -17244,6 +17318,7 @@ export {
   providerTier,
   quantity,
   rangeOf,
+  rank,
   rankOffers,
   ranked,
   reachAround,
@@ -17298,6 +17373,8 @@ export {
   sourcesOf,
   stanceOf,
   standStructure,
+  standsOn,
+  steadyTop,
   steer,
   step,
   stripThink,
@@ -17316,6 +17393,7 @@ export {
   toolsFor,
   toolsVersion,
   topInterpretation,
+  topOf,
   trace,
   tracePaths,
   transcriptOf,

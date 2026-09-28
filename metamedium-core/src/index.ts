@@ -534,6 +534,41 @@ export { isWritingMark, definitionOf, definitionsIn, artifactsIn, writingLine } 
 export type { WritingLine } from './tools/board';
 export { bestWiring, frameTemplatesFor } from './tools/frames';
 
+// Context (V1-PLAN §2.2, B2) — what stands beside the hand: the notations and
+// concepts read over what a scope sits beside, weighted by nearness relative to
+// the marks' own size, and what this hand just took there, read from the log.
+// `rank` is B1's order with the context applied — a lift, never a filter, each
+// with its reason — and `steadyTop` holds the top offer in one context until
+// another beats it by a margin. Far from any context the order is B1's exactly.
+export {
+  contextAt,
+  nearnessOf,
+  pointNearnessOf,
+  isEmptyContext,
+  describeContext,
+  conceptNoun,
+  CONTEXT_FADE,
+  RECENT_MS,
+  NEIGHBOURHOOD_MAX,
+  RECENT_EVENTS_MAX,
+} from './context/context';
+export type { ContextSource, ContextOptions, ContextNotation, ContextConcept, ContextAct, ReadContext } from './context/context';
+export {
+  rank,
+  liftOf,
+  liftTargets,
+  standsOn,
+  canLift,
+  steadyTop,
+  topOf,
+  AFFINITY,
+  CONTEXT_LIFT_MAX,
+  RECENT_SAME_TOOL,
+  STEADY_MARGIN,
+  STEADY_MS,
+} from './context/rank';
+export type { RankItem, Ranked, RankOptions, HeldTop, SteadyOptions } from './context/rank';
+
 // Agent participants — a model joins through the same channel a human uses.
 export { HERE, createAgentParticipant, parseReadings, parseCode, parseFill, parseTranscripts, parseBehaviourReply, parseProgram, readingsToEdges, MAX_READINGS } from './participants/agent';
 export type { BehaveResult, ProgramResult } from './participants/agent';

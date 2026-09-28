@@ -3032,6 +3032,86 @@ window.__scenario = async function(){
     mm.session.load([]); mm.setView(1, 0, 0);
   }
 
+  // ---- 50. The steady top beside a flowchart (V1-PLAN §2.2, B2) ----
+  // A flowchart — three processes and a decision joined by arrows — and three
+  // boxes drawn one after another beside it, each time the boxes drawn so far
+  // held, the way a hand works along: one box, then two, then three. With
+  // nothing beside them the top offer flips — one box is only drawn clean, two
+  // in a row are lined up first. Beside a flowchart it holds, and says why.
+  // Then an offer a little ahead of it arrives (a tool registered in one line,
+  // as 49b does): within the margin the top holds; past it, the new one leads.
+  // A board away, two boxes rank as they did before context, lifted by nothing.
+  {
+    mm.session.load([]); mm.setView(1, 0, 0); mm.resetUses();
+    const lastId50 = () => { const st = mm.session.getState(); return st.contentIds[st.contentIds.length - 1]; };
+    const diamond50 = (cx, cy, w, h) => {
+      const v = [{ x: cx, y: cy - h / 2 }, { x: cx + w / 2, y: cy }, { x: cx, y: cy + h / 2 }, { x: cx - w / 2, y: cy }];
+      const mid = { x: (v[0].x + v[1].x) / 2, y: (v[0].y + v[1].y) / 2 };
+      const path = [mid, v[1], v[2], v[3], v[0], mid];
+      let p = [];
+      for (let i = 0; i < path.length - 1; i++) p = p.concat(t.line(path[i], path[i + 1], 26).slice(i ? 1 : 0));
+      return p;
+    };
+    // A shaft down, and one wing drawn back at the tip.
+    const arrowDown50 = (x, y0, y1) => t.line({ x: x, y: y0 }, { x: x, y: y1 }, 40).concat(t.line({ x: x, y: y1 }, { x: x - 14, y: y1 - 20 }, 16).slice(1));
+    t.stroke(t.rect(200, 100, 160, 70));
+    t.stroke(arrowDown50(280, 174, 236));
+    t.stroke(t.rect(200, 240, 160, 70));
+    t.stroke(arrowDown50(280, 314, 382));
+    t.stroke(diamond50(280, 440, 180, 110));
+    t.stroke(arrowDown50(280, 499, 566));
+    t.stroke(t.rect(200, 570, 160, 70));
+    const flowRead50 = MM.notationsOf(mm.session.getState()).map(MM.describeNotation);
+    const topPill50 = () => document.querySelector('#summon .row.afford .pill');
+    const letGo50 = async () => { const sum = mm.session.getState().summon; if (sum) mm.session.dismiss(sum.id, Date.now()); await wait(30); };
+    const drawn50 = [], tops50 = [], titles50 = [];
+    for (const x of [440, 580, 720]) {
+      t.stroke(t.rect(x, 250, 120, 60)); drawn50.push(lastId50());
+      mm.session.summonMarks(drawn50.slice(), Date.now()); await wait(60);
+      const pill = topPill50();
+      tops50.push(pill ? pill.dataset.key : null); titles50.push(pill ? pill.title : '');
+      if (x !== 720) await letGo50();
+    }
+    step('50. three boxes drawn one after another beside a flowchart keep the same top offer, and it says why',
+      /^a flowchart /.test(flowRead50[0] || '') && tops50.length === 3 && tops50.every((k) => k === 'snap') &&
+        titles50.every((ti) => /first because it sits beside a flowchart: three processes, one decision/.test(ti)),
+      { flowRead: flowRead50, tops: tops50, title: titles50[1] });
+
+    // An offer a little ahead of the held top, then well ahead: the margin decides.
+    const near50 = (base) => ({
+      id: 'test:near-top', name: 'a near rival', describe: () => 'offers one thing, a little likelier than the top',
+      offers: (scope) => (scope.marks.length === 3 ? [{ key: 'test:near-top', label: 'A near rival', reason: 'a tool from one file', base: base, tool: 'test:near-top' }] : []),
+      take: () => ({}),
+    });
+    let off50 = MM.registerTool(near50(1.12)); // ahead of the held top by less than a tenth
+    await wait(30);
+    const held50 = topPill50() ? topPill50().dataset.key : null;
+    const heldWhy50 = topPill50() ? topPill50().title : '';
+    const rivalShown50 = !!document.querySelector('#summon .pill[data-key="test:near-top"]');
+    off50();
+    off50 = MM.registerTool(near50(1.3)); // ahead by more than the margin
+    await wait(30);
+    const beaten50 = topPill50() ? topPill50().dataset.key : null;
+    off50();
+    await wait(30);
+    step('50b. an offer a little ahead does not take the held top — within the margin it holds, and says so; past the margin the new one leads',
+      held50 === 'snap' && rivalShown50 && /first because it led here a moment ago/.test(heldWhy50) && beaten50 === 'test:near-top',
+      { held: held50, heldWhy: heldWhy50, rivalShown: rivalShown50, beaten: beaten50 });
+    await letGo50();
+
+    // A board away from the flowchart: the same two boxes, ranked as before context.
+    t.stroke(t.rect(1100, 700, 120, 60)); const far1 = lastId50();
+    t.stroke(t.rect(1240, 700, 120, 60)); const far2 = lastId50();
+    mm.session.summonMarks([far1, far2], Date.now()); await wait(60);
+    const farTop50 = topPill50();
+    const farTitles50 = [...document.querySelectorAll('#summon .pill.item')].map((b) => b.title);
+    step('50c. a board away the order is B1’s — two boxes in a row are lined up first — and nothing says it was lifted',
+      !!farTop50 && farTop50.dataset.key === 'row:tidy-row' && farTitles50.every((ti) => !/because/.test(ti)),
+      { top: farTop50 ? farTop50.dataset.key : null, titles: farTitles50 });
+    await letGo50();
+    mm.session.load([]); mm.setView(1, 0, 0);
+  }
+
   return R;
 };
 

@@ -22,6 +22,7 @@ var MetaMediumCore = (() => {
   // src/index.ts
   var index_exports = {};
   __export(index_exports, {
+    AFFINITY: () => AFFINITY,
     ALONG_STEPS: () => ALONG_STEPS,
     BARB_CLOSED: () => BARB_CLOSED,
     BARB_ROUND: () => BARB_ROUND,
@@ -30,6 +31,8 @@ var MetaMediumCore = (() => {
     BUILTIN_TOOLS: () => BUILTIN_TOOLS,
     BUILTIN_TYPES: () => BUILTIN_TYPES,
     COMMAND_MARK_SAMPLES: () => COMMAND_MARK_SAMPLES,
+    CONTEXT_FADE: () => CONTEXT_FADE,
+    CONTEXT_LIFT_MAX: () => CONTEXT_LIFT_MAX,
     COORD_PLACES: () => COORD_PLACES,
     COVER_STAGGER_MS: () => COVER_STAGGER_MS,
     COVER_WAIT_MS: () => COVER_WAIT_MS,
@@ -90,6 +93,7 @@ var MetaMediumCore = (() => {
     MarkGrid: () => MarkGrid,
     MemoryStore: () => MemoryStore,
     NAMING_IS: () => NAMING_IS,
+    NEIGHBOURHOOD_MAX: () => NEIGHBOURHOOD_MAX,
     NOTATION_FLOOR: () => NOTATION_FLOOR,
     NO_CONTEXT: () => NO_CONTEXT,
     NO_MATCH: () => NO_MATCH,
@@ -98,6 +102,9 @@ var MetaMediumCore = (() => {
     PAPERS: () => PAPERS,
     PHRASES: () => PHRASES,
     PRESETS: () => PRESETS,
+    RECENT_EVENTS_MAX: () => RECENT_EVENTS_MAX,
+    RECENT_MS: () => RECENT_MS,
+    RECENT_SAME_TOOL: () => RECENT_SAME_TOOL,
     RIGHT_ANGLE_TOLERANCE: () => RIGHT_ANGLE_TOLERANCE,
     ROLES: () => ROLES,
     ReadOnlyError: () => ReadOnlyError,
@@ -109,6 +116,8 @@ var MetaMediumCore = (() => {
     SNAP_CONFIDENCE: () => SNAP_CONFIDENCE,
     SNAP_MARGIN: () => SNAP_MARGIN,
     SPECIFIC_GROUNDS: () => SPECIFIC_GROUNDS,
+    STEADY_MARGIN: () => STEADY_MARGIN,
+    STEADY_MS: () => STEADY_MS,
     STRAIGHT_RUN: () => STRAIGHT_RUN,
     STRAIGHT_TURN: () => STRAIGHT_TURN,
     SYMMETRIC_LINKS: () => SYMMETRIC_LINKS,
@@ -161,6 +170,7 @@ var MetaMediumCore = (() => {
     byTier: () => byTier,
     calculateDistance: () => calculateDistance,
     calculateStraightness: () => calculateStraightness,
+    canLift: () => canLift,
     canonicalCheckSamples: () => canonicalCheckSamples,
     checkOvershoot: () => checkOvershoot,
     checkWritten: () => checkWritten,
@@ -175,9 +185,11 @@ var MetaMediumCore = (() => {
     compareSignatures: () => compareSignatures,
     complete: () => complete,
     completionsFor: () => completionsFor,
+    conceptNoun: () => conceptNoun,
     connectionsFor: () => connectionsFor,
     connectionsOf: () => connectionsOf,
     connectorHeads: () => connectorHeads,
+    contextAt: () => contextAt,
     controlOf: () => controlOf,
     convertQuantity: () => convertQuantity,
     convexHull: () => convexHull,
@@ -202,6 +214,7 @@ var MetaMediumCore = (() => {
     describeAuthorshipCollision: () => describeAuthorshipCollision,
     describeBehaviour: () => describeBehaviour,
     describeBinding: () => describeBinding,
+    describeContext: () => describeContext,
     describeDimensions: () => describeDimensions,
     describeExpr: () => describeExpr,
     describeFigure: () => describeFigure,
@@ -275,6 +288,7 @@ var MetaMediumCore = (() => {
     isBare: () => isBare,
     isCanvasFile: () => isCanvasFile,
     isCheckLike: () => isCheckLike,
+    isEmptyContext: () => isEmptyContext,
     isExplanation: () => isExplanation,
     isFlat: () => isFlat,
     isFrame: () => isFrame,
@@ -297,6 +311,8 @@ var MetaMediumCore = (() => {
     learnCommandMark: () => learnCommandMark,
     lettersOf: () => lettersOf,
     levelOf: () => levelOf2,
+    liftOf: () => liftOf,
+    liftTargets: () => liftTargets,
     likelihoodOf: () => likelihoodOf,
     listModels: () => listModels,
     localityOf: () => localityOf,
@@ -318,6 +334,7 @@ var MetaMediumCore = (() => {
     nameMarks: () => nameMarks,
     nearLimitOf: () => nearLimitOf,
     nearestMagnet: () => nearestMagnet,
+    nearnessOf: () => nearnessOf,
     negateQuantity: () => negateQuantity,
     nodeIdsIn: () => nodeIdsIn,
     normName: () => normName,
@@ -352,6 +369,7 @@ var MetaMediumCore = (() => {
     participantOfLog: () => participantOfLog,
     placed: () => placed,
     planFor: () => planFor,
+    pointNearnessOf: () => pointNearnessOf,
     polygonFigure: () => polygonFigure,
     prepare: () => prepare,
     printTiled: () => printTiled,
@@ -360,6 +378,7 @@ var MetaMediumCore = (() => {
     providerTier: () => providerTier,
     quantity: () => quantity,
     rangeOf: () => rangeOf,
+    rank: () => rank,
     rankOffers: () => rankOffers,
     ranked: () => ranked,
     reachAround: () => reachAround,
@@ -414,6 +433,8 @@ var MetaMediumCore = (() => {
     sourcesOf: () => sourcesOf,
     stanceOf: () => stanceOf,
     standStructure: () => standStructure,
+    standsOn: () => standsOn,
+    steadyTop: () => steadyTop,
     steer: () => steer,
     step: () => step,
     stripThink: () => stripThink,
@@ -432,6 +453,7 @@ var MetaMediumCore = (() => {
     toolsFor: () => toolsFor,
     toolsVersion: () => toolsVersion,
     topInterpretation: () => topInterpretation,
+    topOf: () => topOf,
     trace: () => trace,
     tracePaths: () => tracePaths,
     transcriptOf: () => transcriptOf,
@@ -15088,7 +15110,7 @@ if (mm.THREE && mm.scene) {
   }
 
   // src/tools/tool.ts
-  var NO_CONTEXT = Object.freeze({ scopeIds: [], notations: [], concepts: [], recent: [] });
+  var NO_CONTEXT = Object.freeze({ scopeIds: [], notations: [], concepts: [], recent: [], kind: null, key: null });
 
   // src/tools/registry.ts
   var registry3 = /* @__PURE__ */ new Map();
@@ -16113,6 +16135,62 @@ if (mm.THREE && mm.scene) {
   registerTool(DUPLICATE);
   registerTool(KEEP);
   registerTool(STRUCTURE);
+
+  // src/context/context.ts
+  var CONTEXT_FADE = 2.5;
+  var RECENT_MS = 12e4;
+  var NEIGHBOURHOOD_MAX = 80;
+  var RECENT_EVENTS_MAX = 400;
+  function nearnessOf(_a, _b) {
+    return 0;
+  }
+  function pointNearnessOf(_p, _b) {
+    return 0;
+  }
+  var conceptNoun = (name) => "a " + name;
+  function isEmptyContext(ctx) {
+    return !ctx || !ctx.notations.length && !ctx.concepts.length && !ctx.recent.length;
+  }
+  function contextAt(board, at, opts = {}) {
+    const scopeIds = Array.isArray(at) ? [...at] : [];
+    const events = board.getEvents();
+    return { scopeIds, notations: [], concepts: [], recent: [], kind: null, key: null, at: opts.now ?? (events.length ? events[events.length - 1].at : 0) };
+  }
+  function describeContext(_ctx) {
+    return [];
+  }
+
+  // src/context/rank.ts
+  var CONTEXT_LIFT_MAX = 1.25;
+  var RECENT_SAME_TOOL = 0.5;
+  var STEADY_MARGIN = 0.1;
+  var STEADY_MS = 12e4;
+  var AFFINITY = {};
+  function liftTargets(_kind) {
+    return [];
+  }
+  function standsOn(_item) {
+    return /* @__PURE__ */ new Set();
+  }
+  function liftOf(_item, _ctx = NO_CONTEXT) {
+    return { factor: 1, because: [] };
+  }
+  function canLift(_items) {
+    return false;
+  }
+  function rank(items, _ctx = NO_CONTEXT, opts = {}) {
+    const uses = opts.uses ?? {};
+    return items.map((item) => {
+      const likelihood = likelihoodOf(item, uses);
+      return { ...item, likelihood, lift: 1, score: likelihood, because: [] };
+    }).sort((a, b) => b.score - a.score);
+  }
+  function steadyTop(ranked2, _held, _opts = {}) {
+    return ranked2.slice();
+  }
+  function topOf(ranked2, eligible = () => true) {
+    return ranked2.find((x) => eligible(x));
+  }
 
   // src/participants/serialize.ts
   function n(v, round) {
