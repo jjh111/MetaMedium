@@ -3545,6 +3545,56 @@ window.__scenario = async function(){
     mm.session.load([]); mm.setView(1, 0, 0);
   }
 
+  // ---- 55. Writing reads when it is writing (PLAN-USER-SURFACE W2; audit row 4) ----
+  {
+    const visible55 = () => [...document.querySelectorAll('#summon .row.certain .pill.item, #summon .row.afford .pill.item')].map((b) => ({ key: b.dataset.key, label: (b.querySelector('span') || b).textContent.trim(), dot: !!b.querySelector('.dot') }));
+    const last55 = () => { const st = mm.session.getState(); return st.contentIds[st.contentIds.length - 1]; };
+    const said55 = (ids) => { const st = mm.session.getState(); return ids.map((id) => MM.transcriptOf(st.nodes.get(id))).filter(Boolean); };
+    // A written word, held: the one option is to read it, and Enter does.
+    mm.session.load([]); mm.setView(1, 0, 0);
+    t.stroke(t.word(200, 300, 90, 28, 6)); const word55 = last55();
+    mm.session.summonMarks([word55], Date.now()); await wait(80);
+    const pills55 = visible55(), line55 = t.readingLine();
+    const calls55 = window.__calls.length;
+    window.__readReply = [{ text: 'hello', confidence: 0.9 }];
+    t.typeEnter(''); await wait(400);
+    step('55. a written word held: the field offers one option, reading it, and the line says ↵ read it — Enter reads it',
+      pills55.length === 1 && pills55[0].dot && !pills55.some((p) => /Read the writing|What is this/.test(p.label)) && /^↵ read it/.test(line55)
+        && window.__calls.length === calls55 + 1 && said55([word55]).join(' ') === 'hello',
+      { pills: pills55, line: line55, calls: window.__calls.length - calls55, said: said55([word55]) });
+    // A written line, held: the same, and the line is read in one call.
+    mm.session.load([]); mm.setView(1, 0, 0);
+    const words55 = [];
+    for (const [x, y, w, h, humps] of [[200, 300, 90, 28, 6], [320, 302, 110, 26, 7], [460, 300, 80, 28, 5]]) { t.stroke(t.word(x, y, w, h, humps)); words55.push(last55()); }
+    mm.session.summonMarks(words55, Date.now()); await wait(80);
+    const pills55b = visible55(), line55b = t.readingLine();
+    const calls55b = window.__calls.length;
+    window.__readReply = [{ text: 'hello wide world', confidence: 0.9 }];
+    t.typeEnter(''); await wait(400);
+    step('55b. a written line held: one option, the writing reading, with its dot; the line says ↵ read it, and Enter reads the line in one call — never names it "writing"',
+      pills55b.length === 1 && pills55b[0].dot && /^writing 0\.\d\d$/.test(pills55b[0].label) && /^↵ read it/.test(line55b)
+        && window.__calls.length === calls55b + 1 && said55(words55).join(' ') === 'hello wide world' && !mm.session.getState().artifacts.length,
+      { pills: pills55b, line: line55b, calls: window.__calls.length - calls55b, said: said55(words55), artifacts: mm.session.getState().artifacts.length });
+    const chips55c = t.chips();
+    step('55c. when the words land they lead as before: the line as a name, Make it text, Label it', chips55c.some((c) => /^“hello wide world” 0\.90/.test(c)) && chips55c.some((c) => /Make it text/.test(c)) && chips55c.some((c) => /^Label it/.test(c)), chips55c);
+    // With no model that can see: the line says what would read it, in the field, and Enter keeps the ask.
+    mm.session.load([]); mm.setView(1, 0, 0);
+    t.stroke(t.word(200, 300, 90, 28, 6)); const word55d = last55();
+    const agents55 = mm.agents.splice(0, mm.agents.length);
+    mm.session.summonMarks([word55d], Date.now()); await wait(80);
+    const line55d = t.readingLine(), calls55d = window.__calls.length;
+    t.typeEnter(''); await wait(200);
+    const kept55 = typeof mm.keptAsk === 'function' ? mm.keptAsk() : null;
+    const need55 = ((document.querySelector('#summon .need') || {}).textContent || '').trim();
+    const pane55 = !document.getElementById('modelPanel').hasAttribute('hidden');
+    step('55d. with no model that can see, the line says what would read it, Enter keeps the ask, said in the field — no pane, no call',
+      /^↵ read it — needs a model that can see/.test(line55d) && !!kept55 && /can see/.test(need55) && !pane55 && window.__calls.length === calls55d,
+      { line: line55d, kept: kept55 && kept55.what, need: need55, pane: pane55, calls: window.__calls.length - calls55d });
+    mm.agents.push(...agents55);
+    window.__readReply = null;
+    mm.session.load([]); mm.setView(1, 0, 0);
+  }
+
   return R;
 };
 

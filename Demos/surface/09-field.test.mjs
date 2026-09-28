@@ -372,3 +372,19 @@ test('core’s label tool says another hand’s marks exactly as the reader does
     assert.equal(MM.madeThese(others), madeThese(others), JSON.stringify(others));
   }
 });
+
+// ---- W2: writing reads when it is writing (PLAN-USER-SURFACE §4) ----
+
+test('a reading that says what Enter does when it leads says that, with the model dot — writing is read, not named', () => {
+  const items = [{ key: 'concept:writing', certain: true, label: 'writing 0.75', enter: 'read it', asks: true, why: '3 marks of writing on one line — read it' }].concat(ITEMS.slice(1));
+  const r = readFieldCommand(ctx({ items }));
+  assert.equal(r.line, '↵ read it');
+  assert.equal(r.model, true);
+  assert.deepEqual(r.command, { do: 'take', key: 'concept:writing', index: 0 });
+});
+
+test('…and a reading that names says so, with no dot', () => {
+  const r = readFieldCommand(ctx());
+  assert.equal(r.line, '↵ molecule 0.92 — take it as another molecule');
+  assert.ok(!r.model);
+});
