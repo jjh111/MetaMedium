@@ -1,0 +1,196 @@
+{
+  "_about": "Replies to POST /chat/completions in the shapes providers send them (V1-PLAN J5): OpenRouter carrying GLM (content beside the model's reasoning), a plain OpenAI reply, content as parts (Mistral's Magistral puts its thinking in a part of its own), a reasoning model that spent its whole budget thinking (OpenRouter spells it `reasoning`; Z.AI's own API, vLLM, DeepSeek and LM Studio spell it `reasoning_content`), an answer cut off at the token limit, and the error bodies OpenRouter sends for a bad key, no credit, no such model, a rate limit, and a provider's failure passed on inside a 200. Reconstructed from the providers' API references — no real call was made to write this file. The core tests (llm/provider.test.ts) and the e2e stub server (e2e/servers.mjs) both read it.",
+  "openrouter-glm": {
+    "status": 200,
+    "body": {
+      "id": "gen-1790600000-Xk2PqR8sT1uV3wY5zA7b",
+      "provider": "Z.AI",
+      "model": "z-ai/glm-5.3-flash",
+      "object": "chat.completion",
+      "created": 1790600000,
+      "choices": [
+        {
+          "logprobs": null,
+          "finish_reason": "stop",
+          "native_finish_reason": "stop",
+          "index": 0,
+          "message": {
+            "role": "assistant",
+            "content": "[{\"text\":\"hello\",\"confidence\":0.93},{\"text\":\"hallo\",\"confidence\":0.21}]",
+            "refusal": null,
+            "reasoning": "The image shows one handwritten word, dark on white. Five letters: h, e, l, l, o — though the second could be an a. I will answer as a JSON array { text, confidence }.",
+            "reasoning_details": [
+              { "type": "reasoning.text", "text": "The image shows one handwritten word, dark on white. Five letters: h, e, l, l, o — though the second could be an a. I will answer as a JSON array { text, confidence }.", "format": "unknown", "index": 0 }
+            ]
+          }
+        }
+      ],
+      "usage": {
+        "prompt_tokens": 1164,
+        "completion_tokens": 97,
+        "total_tokens": 1261,
+        "prompt_tokens_details": { "cached_tokens": 0 },
+        "completion_tokens_details": { "reasoning_tokens": 62 }
+      }
+    }
+  },
+  "openai-plain": {
+    "status": 200,
+    "body": {
+      "id": "chatcmpl-AbC123dEf456GhI789jKl0",
+      "object": "chat.completion",
+      "created": 1790600000,
+      "model": "gpt-4o-mini-2024-07-18",
+      "choices": [
+        {
+          "index": 0,
+          "message": { "role": "assistant", "content": "ok", "refusal": null, "annotations": [] },
+          "logprobs": null,
+          "finish_reason": "stop"
+        }
+      ],
+      "usage": {
+        "prompt_tokens": 31,
+        "completion_tokens": 1,
+        "total_tokens": 32,
+        "prompt_tokens_details": { "cached_tokens": 0, "audio_tokens": 0 },
+        "completion_tokens_details": { "reasoning_tokens": 0, "audio_tokens": 0, "accepted_prediction_tokens": 0, "rejected_prediction_tokens": 0 }
+      },
+      "service_tier": "default",
+      "system_fingerprint": "fp_0aa8d3e20b"
+    }
+  },
+  "content-parts": {
+    "status": 200,
+    "body": {
+      "id": "d1e2f3a4b5c6",
+      "object": "chat.completion",
+      "created": 1790600000,
+      "model": "magistral-small-2509",
+      "choices": [
+        {
+          "index": 0,
+          "finish_reason": "stop",
+          "message": {
+            "role": "assistant",
+            "tool_calls": null,
+            "content": [
+              { "type": "thinking", "thinking": [{ "type": "text", "text": "Three circles joined by two lines. Readings { could be a molecule, or a chain." }] },
+              { "type": "text", "text": "[{\"label\":\"molecule\",\"confidence\":0.8," },
+              { "type": "text", "text": "\"reasoning\":\"three circles joined by two lines\"}]" }
+            ]
+          }
+        }
+      ],
+      "usage": { "prompt_tokens": 842, "total_tokens": 1010, "completion_tokens": 168 }
+    }
+  },
+  "reasoning-only": {
+    "status": 200,
+    "body": {
+      "id": "gen-1790600001-Qm4RsT6uV8wX0yZ2aB4c",
+      "provider": "Z.AI",
+      "model": "z-ai/glm-5.3-flash",
+      "object": "chat.completion",
+      "created": 1790600001,
+      "choices": [
+        {
+          "logprobs": null,
+          "finish_reason": "length",
+          "native_finish_reason": "length",
+          "index": 0,
+          "message": {
+            "role": "assistant",
+            "content": "",
+            "refusal": null,
+            "reasoning": "Let me look at the strokes one at a time. The first could be an h, or a b whose bowl did not close. Then again the stroke rises at the end, so perhaps a k. Let me reconsider { the whole word before deciding. If the first letter is an h then the word could be hello, or hells, or hollow — and the proportions…"
+          }
+        }
+      ],
+      "usage": {
+        "prompt_tokens": 1164,
+        "completion_tokens": 8192,
+        "total_tokens": 9356,
+        "completion_tokens_details": { "reasoning_tokens": 8192 }
+      }
+    }
+  },
+  "reasoning-content": {
+    "status": 200,
+    "body": {
+      "id": "chatcmpl-20260928-glm47",
+      "object": "chat.completion",
+      "created": 1790600002,
+      "model": "glm-4.7-flash",
+      "choices": [
+        {
+          "index": 0,
+          "finish_reason": "length",
+          "message": {
+            "role": "assistant",
+            "content": null,
+            "reasoning_content": "The marks are three circles and two lines. Are they atoms and bonds { or a chain of beads? Before I answer I should weigh the spacing…"
+          }
+        }
+      ],
+      "usage": { "prompt_tokens": 842, "completion_tokens": 4096, "total_tokens": 4938, "completion_tokens_details": { "reasoning_tokens": 4096 } }
+    }
+  },
+  "length-with-content": {
+    "status": 200,
+    "body": {
+      "id": "gen-1790600003-Ld8FgH0jK2lM4nP6qR8s",
+      "provider": "Z.AI",
+      "model": "z-ai/glm-4.7-flash",
+      "object": "chat.completion",
+      "created": 1790600003,
+      "choices": [
+        {
+          "logprobs": null,
+          "finish_reason": "length",
+          "native_finish_reason": "length",
+          "index": 0,
+          "message": { "role": "assistant", "content": "[{\"label\":\"molecule\",\"confidence\":0.8,\"reasoning\":\"three circ", "refusal": null, "reasoning": null }
+        }
+      ],
+      "usage": { "prompt_tokens": 842, "completion_tokens": 24, "total_tokens": 866 }
+    }
+  },
+  "error-401": {
+    "status": 401,
+    "body": { "error": { "message": "User not found.", "code": 401 } }
+  },
+  "error-401-no-key": {
+    "status": 401,
+    "body": { "error": { "message": "No auth credentials found", "code": 401 } }
+  },
+  "error-402": {
+    "status": 402,
+    "body": { "error": { "message": "Insufficient credits. Add more using https://openrouter.ai/settings/credits", "code": 402 } }
+  },
+  "error-404": {
+    "status": 404,
+    "body": { "error": { "message": "No endpoints found for z-ai/glm-flash.", "code": 404 } }
+  },
+  "error-429": {
+    "status": 429,
+    "body": {
+      "error": {
+        "message": "Rate limit exceeded: free-models-per-min.",
+        "code": 429,
+        "metadata": { "headers": { "X-RateLimit-Limit": "20", "X-RateLimit-Remaining": "0", "X-RateLimit-Reset": "1790600060000" } }
+      }
+    }
+  },
+  "error-in-200": {
+    "status": 200,
+    "body": {
+      "error": {
+        "message": "Provider returned error",
+        "code": 502,
+        "metadata": { "raw": "{\"error\":{\"message\":\"model overloaded, try again shortly\"}}", "provider_name": "Z.AI" }
+      },
+      "user_id": "user_2aBcDeFgHiJkLmNoPqRsTuV"
+    }
+  }
+}

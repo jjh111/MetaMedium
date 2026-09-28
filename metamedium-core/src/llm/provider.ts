@@ -28,6 +28,12 @@ export interface ProviderConfig {
    * the server reports; a model without it is simply never asked to read.
    */
   vision?: boolean;
+  /** What the provider calls the model, when it said — OpenRouter's `name`, "Z.AI: GLM 5.3 Flash". For sentences; the id stays the id. */
+  title?: string;
+  /** How many tokens the model reads at once, prompt and reply together, when the provider said. */
+  contextLength?: number;
+  /** The most tokens the provider lets the model write in one reply, when it said. */
+  maxOutput?: number;
 }
 
 /** Ready-made configs for the providers v7 targets. `model` still required. */
@@ -78,10 +84,116 @@ function anthropicContent(content: string | ContentPart[]): unknown {
   });
 }
 
+/**
+ * Why a call failed, as a word a surface can act on: the key, the credit, the
+ * model's id, a rate limit, the provider, the network, the clock, the caller,
+ * a model that only thought, a reply with nothing in it.
+ */
+export type FailureReason =
+  | 'key' | 'credit' | 'model' | 'rate' | 'refused' | 'request' | 'server'
+  | 'network' | 'timeout' | 'cancelled' | 'thinking' | 'length' | 'empty' | 'unreadable';
+
 /** Success or failure, never a throw — the caller is inside a drawing app. */
 export type CompletionResult =
-  | { ok: true; text: string; model: string }
-  | { ok: false; error: string };
+  | { ok: true; text: string; model: string; truncated?: boolean }
+  | { ok: false; error: string; status?: number; reason?: FailureReason };
+
+/** A reply's budget when the provider has said nothing of the model's limits (J5). */
+export const DEFAULT_MAX_TOKENS = 8192;
+/** What OpenRouter is told of reasoning on every call (J5). */
+export const OPENROUTER_REASONING = { effort: 'low' } as const;
+/** Who is asking, in OpenRouter's two optional headers (J5). */
+export const OPENROUTER_APP = { url: 'https://jjh111.github.io/MetaMedium/', title: 'MetaMedium' } as const;
+/** How long a provider's list of models is waited for (J5). */
+export const MODEL_LIST_TIMEOUT_MS = 15_000;
+
+/** A model's name as a sentence says it (J5). Not yet: J5 red. */
+export function modelWords(config: { model: string; title?: string }): string {
+  return config.model;
+}
+
+/** The reply's budget for this call (J5). Not yet: J5 red. */
+export function maxTokensFor(config: ProviderConfig, messages: ChatMessage[]): number {
+  void config; void messages;
+  return 0;
+}
+
+/** Where a provider is, in words (J5). Not yet: J5 red. */
+export function whereOf(baseUrl: string): { name: string; on: string } {
+  return { name: baseUrl, on: 'at ' + baseUrl };
+}
+
+/** What a provider's list says of one model (J5). */
+export interface ModelInfo {
+  id: string;
+  title?: string;
+  inputs?: string[];
+  vision?: boolean;
+  contextLength?: number;
+  maxOutput?: number;
+  parameters?: string[];
+  reasons?: boolean;
+}
+
+/** A provider's list of models, read — or why it could not be (J5). */
+export interface ModelCatalog {
+  ok: boolean;
+  models: ModelInfo[];
+  describes: boolean;
+  error?: string;
+  reason?: FailureReason;
+}
+
+/** What joining a model is told of it (J5). */
+export interface ModelFacts {
+  vision: boolean;
+  from: 'provider' | 'remembered' | 'id';
+  said: string;
+  because: string;
+  title?: string;
+  inputs?: string[];
+  contextLength?: number;
+  maxOutput?: number;
+  reasons?: boolean;
+}
+
+/** Parse a provider's list of models (J5). Not yet: J5 red. */
+export function parseModelList(body: unknown): { models: ModelInfo[]; describes: boolean } {
+  void body;
+  return { models: [], describes: false };
+}
+
+/** Read a provider's list of models (J5). Not yet: J5 red. */
+export async function readModels(
+  config: Pick<ProviderConfig, 'baseUrl' | 'apiKey'>,
+  opts: { timeoutMs?: number; signal?: AbortSignal } = {}
+): Promise<ModelCatalog> {
+  void config; void opts;
+  return { ok: false, models: [], describes: false, error: 'not yet (J5 red)' };
+}
+
+/** The ids nearest one that is not listed (J5). Not yet: J5 red. */
+export function nearestModelIds(id: string, ids: string[], n = 3): string[] {
+  void id; void ids; void n;
+  return [];
+}
+
+/** Whether a model sees, guessed from its id — the fallback (J5). Not yet: J5 red. */
+export function guessVision(model: string): boolean {
+  void model;
+  return false;
+}
+
+/** The facts a join is given (J5). Not yet: J5 red. */
+export function modelFacts(
+  id: string,
+  catalog: ModelCatalog,
+  where: { name: string; on: string },
+  remembered?: { vision?: boolean; title?: string }
+): { ok: true; facts: ModelFacts } | { ok: false; error: string; near: string[] } {
+  void id; void catalog; void where; void remembered;
+  return { ok: false, error: 'not yet (J5 red)', near: [] };
+}
 
 export const DEFAULT_TIMEOUT_MS = 60_000;
 

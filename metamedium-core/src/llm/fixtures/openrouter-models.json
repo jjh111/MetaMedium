@@ -1,0 +1,173 @@
+{
+  "_about": "An excerpt of OpenRouter's public GET https://openrouter.ai/api/v1/models, in its shape (V1-PLAN J5). The fields and their types are OpenRouter's; which models take which inputs is what the director read there on 28 Sep 2026 (z-ai/glm-5.3-flash and its alias ~z-ai/glm-flash-latest take text, image and video and support reasoning; z-ai/glm-4.7-flash is text only); the numbers, prices and descriptions are illustrative. No real call was made to write this file, and the core tests and the e2e stub server (e2e/servers.mjs) both read it, so the shape is said in one place.",
+  "data": [
+    {
+      "id": "z-ai/glm-5.3-flash",
+      "canonical_slug": "z-ai/glm-5.3-flash-20260901",
+      "hugging_face_id": "",
+      "name": "Z.AI: GLM 5.3 Flash",
+      "created": 1788825600,
+      "description": "A fast multimodal model from Z.AI that reads text, images and video, with optional reasoning.",
+      "context_length": 202752,
+      "architecture": {
+        "modality": "text+image+video->text",
+        "input_modalities": ["text", "image", "video"],
+        "output_modalities": ["text"],
+        "tokenizer": "Other",
+        "instruct_type": null
+      },
+      "pricing": { "prompt": "0.0000001", "completion": "0.0000004", "request": "0", "image": "0", "web_search": "0", "internal_reasoning": "0" },
+      "top_provider": { "context_length": 202752, "max_completion_tokens": 131072, "is_moderated": false },
+      "per_request_limits": null,
+      "supported_parameters": ["include_reasoning", "max_tokens", "reasoning", "response_format", "seed", "stop", "structured_outputs", "temperature", "tool_choice", "tools", "top_p"],
+      "default_parameters": { "temperature": null, "top_p": null, "frequency_penalty": null }
+    },
+    {
+      "id": "~z-ai/glm-flash-latest",
+      "canonical_slug": "z-ai/glm-5.3-flash-20260901",
+      "hugging_face_id": "",
+      "name": "Z.AI: GLM Flash (latest)",
+      "created": 1788825600,
+      "description": "Always the newest GLM Flash — today GLM 5.3 Flash.",
+      "context_length": 202752,
+      "architecture": {
+        "modality": "text+image+video->text",
+        "input_modalities": ["text", "image", "video"],
+        "output_modalities": ["text"],
+        "tokenizer": "Other",
+        "instruct_type": null
+      },
+      "pricing": { "prompt": "0.0000001", "completion": "0.0000004", "request": "0", "image": "0", "web_search": "0", "internal_reasoning": "0" },
+      "top_provider": { "context_length": 202752, "max_completion_tokens": 131072, "is_moderated": false },
+      "per_request_limits": null,
+      "supported_parameters": ["include_reasoning", "max_tokens", "reasoning", "response_format", "seed", "stop", "structured_outputs", "temperature", "tool_choice", "tools", "top_p"],
+      "default_parameters": { "temperature": null, "top_p": null, "frequency_penalty": null }
+    },
+    {
+      "id": "z-ai/glm-4.7-flash",
+      "canonical_slug": "z-ai/glm-4.7-flash-20260115",
+      "hugging_face_id": "zai-org/GLM-4.7-Flash",
+      "name": "Z.AI: GLM 4.7 Flash",
+      "created": 1768435200,
+      "description": "A small, fast text model from Z.AI with optional reasoning.",
+      "context_length": 202752,
+      "architecture": {
+        "modality": "text->text",
+        "input_modalities": ["text"],
+        "output_modalities": ["text"],
+        "tokenizer": "Other",
+        "instruct_type": null
+      },
+      "pricing": { "prompt": "0.00000007", "completion": "0.0000004", "request": "0", "image": "0", "web_search": "0", "internal_reasoning": "0" },
+      "top_provider": { "context_length": 202752, "max_completion_tokens": 65536, "is_moderated": false },
+      "per_request_limits": null,
+      "supported_parameters": ["include_reasoning", "max_tokens", "reasoning", "response_format", "seed", "stop", "temperature", "tool_choice", "tools", "top_p"],
+      "default_parameters": { "temperature": null, "top_p": null, "frequency_penalty": null }
+    },
+    {
+      "id": "z-ai/glm-4.5v",
+      "canonical_slug": "z-ai/glm-4.5v",
+      "hugging_face_id": "zai-org/GLM-4.5V",
+      "name": "Z.AI: GLM 4.5V",
+      "created": 1754870400,
+      "description": "A vision-language model from Z.AI.",
+      "context_length": 65536,
+      "architecture": {
+        "modality": "text+image->text",
+        "input_modalities": ["text", "image"],
+        "output_modalities": ["text"],
+        "tokenizer": "Other",
+        "instruct_type": null
+      },
+      "pricing": { "prompt": "0.0000005", "completion": "0.0000018", "request": "0", "image": "0", "web_search": "0", "internal_reasoning": "0" },
+      "top_provider": { "context_length": 65536, "max_completion_tokens": 16384, "is_moderated": false },
+      "per_request_limits": null,
+      "supported_parameters": ["include_reasoning", "max_tokens", "reasoning", "seed", "stop", "temperature", "top_p"],
+      "default_parameters": {}
+    },
+    {
+      "id": "z-ai/glm-4.5",
+      "canonical_slug": "z-ai/glm-4.5",
+      "hugging_face_id": "zai-org/GLM-4.5",
+      "name": "Z.AI: GLM 4.5",
+      "created": 1753488000,
+      "description": "Z.AI's flagship text model of mid 2025.",
+      "context_length": 131072,
+      "architecture": {
+        "modality": "text->text",
+        "input_modalities": ["text"],
+        "output_modalities": ["text"],
+        "tokenizer": "Other",
+        "instruct_type": null
+      },
+      "pricing": { "prompt": "0.0000006", "completion": "0.0000022", "request": "0", "image": "0", "web_search": "0", "internal_reasoning": "0" },
+      "top_provider": { "context_length": 131072, "max_completion_tokens": 98304, "is_moderated": false },
+      "per_request_limits": null,
+      "supported_parameters": ["include_reasoning", "max_tokens", "reasoning", "response_format", "seed", "stop", "temperature", "tool_choice", "tools", "top_p"],
+      "default_parameters": {}
+    },
+    {
+      "id": "anthropic/claude-opus-5",
+      "canonical_slug": "anthropic/claude-opus-5",
+      "hugging_face_id": "",
+      "name": "Anthropic: Claude Opus 5",
+      "created": 1780000000,
+      "description": "Anthropic's most capable model.",
+      "context_length": 200000,
+      "architecture": {
+        "modality": "text+image+file->text",
+        "input_modalities": ["text", "image", "file"],
+        "output_modalities": ["text"],
+        "tokenizer": "Claude",
+        "instruct_type": null
+      },
+      "pricing": { "prompt": "0.000005", "completion": "0.000025", "request": "0", "image": "0", "web_search": "0", "internal_reasoning": "0" },
+      "top_provider": { "context_length": 200000, "max_completion_tokens": 64000, "is_moderated": true },
+      "per_request_limits": null,
+      "supported_parameters": ["include_reasoning", "max_tokens", "reasoning", "stop", "temperature", "tool_choice", "tools", "top_p"],
+      "default_parameters": {}
+    },
+    {
+      "id": "qwen/qwen3-8b",
+      "canonical_slug": "qwen/qwen3-8b-04-28",
+      "hugging_face_id": "Qwen/Qwen3-8B",
+      "name": "Qwen: Qwen3 8B",
+      "created": 1745798400,
+      "description": "A small dense Qwen3 model with a thinking mode.",
+      "context_length": 40960,
+      "architecture": {
+        "modality": "text->text",
+        "input_modalities": ["text"],
+        "output_modalities": ["text"],
+        "tokenizer": "Qwen3",
+        "instruct_type": "qwen3"
+      },
+      "pricing": { "prompt": "0.000000035", "completion": "0.000000138", "request": "0", "image": "0", "web_search": "0", "internal_reasoning": "0" },
+      "top_provider": { "context_length": 40960, "max_completion_tokens": 20000, "is_moderated": false },
+      "per_request_limits": null,
+      "supported_parameters": ["include_reasoning", "max_tokens", "reasoning", "response_format", "seed", "stop", "temperature", "top_p"],
+      "default_parameters": {}
+    },
+    {
+      "id": "openai/gpt-4o-mini",
+      "canonical_slug": "openai/gpt-4o-mini",
+      "hugging_face_id": null,
+      "name": "OpenAI: GPT-4o-mini",
+      "created": 1721260800,
+      "description": "OpenAI's small multimodal model.",
+      "context_length": 128000,
+      "architecture": {
+        "modality": "text+image->text",
+        "input_modalities": ["text", "image", "file"],
+        "output_modalities": ["text"],
+        "tokenizer": "GPT",
+        "instruct_type": null
+      },
+      "pricing": { "prompt": "0.00000015", "completion": "0.0000006", "request": "0", "image": "0.000217", "web_search": "0", "internal_reasoning": "0" },
+      "top_provider": { "context_length": 128000, "max_completion_tokens": 16384, "is_moderated": true },
+      "per_request_limits": null,
+      "supported_parameters": ["max_tokens", "response_format", "seed", "stop", "structured_outputs", "temperature", "tool_choice", "tools", "top_p"],
+      "default_parameters": {}
+    }
+  ]
+}

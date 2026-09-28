@@ -10,6 +10,8 @@
       "WebWorker"
     ],
     "strict": true,
+    // The recorded replies and model lists the transport's tests read (llm/fixtures/*.json).
+    "resolveJsonModule": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
