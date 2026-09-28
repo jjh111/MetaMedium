@@ -1,9 +1,14 @@
 // ===== folder =====
 // Provides: the folder as the canvas — openFolder/openStatic/openStore (discovery into artifacts,
-//   per-participant logs merged), autosave (to the folder, else browser storage), the live budget
-//   (liveSet), the grid and focus views (setViewMode, focusOn), imageUrlFor, folderStatus;
-//   a live room (openLive: logs arriving live over a BroadcastChannel or a relay, merged as they land).
-// Uses: core, view (fitAll, afterViewChange), artifacts, render.
+//   per-participant logs merged), autosave (to the folder), the live budget (liveSet), the grid and
+//   focus views (setViewMode, focusOn), imageUrlFor, folderStatus; a live room (openLive: logs
+//   arriving live over a BroadcastChannel or a relay, merged as they land); and the board this
+//   browser keeps when there is no folder (V1-PLAN R3) — the adapter over 17-board.js's journal:
+//   IndexedDB (openBoard, persistBoard, flushBoard, forgetLocalLog), browser storage where there is
+//   no IndexedDB, the one import of browser storage's old copy, the lock one tab holds, and what the
+//   status line says when a save fails (boardWarning, keepBoardIn — the way out into a folder).
+// Uses: core, board (createJournal, openPlan, troubleOf, troubleWords, journalEvents, journalFold),
+//   view (fitAll, afterViewChange), artifacts, render, input (say, flash), images (downloadText).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () { ... })();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -65,12 +70,17 @@
     return folder.urls.get(path) || null;
   }
 
-  async function openFolder() {
+  /**
+   * `carry`: the way out of a save that fails (the status line's *open a folder*) — the board
+   * on screen goes into the folder as this participant's log, instead of the folder's board
+   * replacing it (keepBoardIn).
+   */
+  async function openFolder(opts) {
     if (!window.showDirectoryPicker) { flash('this browser cannot open a folder — Chrome and Edge can'); return null; }
     let handle;
     try { handle = await window.showDirectoryPicker({ mode: 'readwrite' }); } catch (err) { return null; }
     const store = new MM.FolderStore(handle);
-    return openStore(store, 'folder', handle.name);
+    return opts && opts.carry ? keepBoardIn(store, 'folder', handle.name) : openStore(store, 'folder', handle.name);
   }
 
   /**
@@ -146,6 +156,9 @@
   const PAGE_SITTING = MM.sittingToken(8);
   async function openLive(room, opts) {
     opts = opts || {};
+    // From here this page's log is the room's: nothing drawn under the room's
+    // name is written into the board this browser keeps (L1: a live tab keeps no local log).
+    leaveBoard();
     if (folder.store && folder.store.close) folder.store.close();
     folder.noticed = new Set();
     // A hand in a room is one SITTING: a second tab of the same person is a
@@ -212,13 +225,22 @@
    * new. Opening the same store again is what a second machine does after a
    * pull — the board comes back and nothing is discovered twice.
    */
-  async function openStore(store, how, name) {
-    folder.store = store; folder.how = how || 'store'; folder.name = name || ''; folder.error = '';
+  async function openStore(store, how, name, opts) {
+    // The board on screen, carried in as this participant's log (keepBoardIn), or nothing.
+    const carry = opts && opts.carry && opts.carry.length ? opts.carry.map((ev) => Object.assign({}, ev)) : null;
+    folder.store = store; folder.how = how || 'store'; folder.name = name || ''; folder.error = ''; folder.saveTrouble = null;
+    // From here this page's log is the folder's or the room's: the board this
+    // browser keeps stays as it was, and is not written again from this page.
+    leaveBoard();
     // A folder is written under the device's own stable name, whatever a live
     // sitting in this page load was called.
     if (folder.how !== 'live') folder.me = deviceParticipant();
     let logs = {};
     try { logs = await store.readLogs(); } catch (err) { folder.error = 'could not read the logs: ' + (err.message || err); }
+    if (carry) {
+      const mine = folder.how === 'live' ? folder.me : MM.participantOfLog(MM.logPathFor(folder.me));
+      logs = Object.assign({}, logs, { [mine]: (logs[mine] || []).concat(carry) });
+    }
     // One event, applied once (L1b): the merge folds an event found in two
     // logs, and keeps the first of two DIFFERENT events under one number. A
     // live room says the second through its store's notices; a folder says it
@@ -253,7 +275,8 @@
     render(session.getState());
     fitAll();
     const misnumbered = [...folder.misnumbered.values()];
-    flash('opened ' + (folder.name || 'a folder') + ': ' + entries.length + ' file' + (entries.length === 1 ? '' : 's') + (folder.truncated ? ' shown — the folder holds more' : '') +
+    flash((carry ? 'the board is kept in ' + (folder.name || 'the folder') + ' now — ' + carry.length + ' event' + (carry.length === 1 ? '' : 's') + ' carried in, '
+      : 'opened ' + (folder.name || 'a folder') + ': ') + entries.length + ' file' + (entries.length === 1 ? '' : 's') + (folder.truncated ? ' shown — the folder holds more' : '') +
       (misnumbered.length ? ' · ' + misnumbered.join(' · ') : ''));
     return folder;
   }
@@ -284,8 +307,8 @@
 
   // ===== Autosave: the log is saved as it grows ==============================
   // To the folder when there is one — this participant's own file, rewritten
-  // whole (nobody else writes it) — else to browser storage, so a reload
-  // replays and a crash loses nothing.
+  // whole (nobody else writes it); to the room when this page is in one; and
+  // with neither, to the board this browser keeps (below), a record a change.
   function myLogNow() {
     const evs = session.getEvents();
     folder.loadedCount = Math.min(folder.loadedCount, evs.length);
@@ -295,18 +318,12 @@
   }
 
   function scheduleSave() {
+    if (!folder.store) return; // the board this browser keeps is written as it changes (persistBoard)
     clearTimeout(folder.saveTimer);
-    folder.saveTimer = setTimeout(saveNow, folder.store ? 300 : 900);
-  }
-
-  /** A cheap key for "has the log changed": its length and its last event's time. */
-  function logKey(evs) {
-    const last = evs[evs.length - 1];
-    return evs.length + ':' + (last ? (last.at || 0) + ':' + last.type : '');
+    folder.saveTimer = setTimeout(saveNow, 300);
   }
 
   async function saveNow() {
-    const evs = session.getEvents();
     if (folder.store && folder.how === 'live') {
       // A live room takes my log as it stands (`publish`): the new tail when
       // it only grew, the whole of it when it did not — an undo, a reset — so
@@ -322,37 +339,366 @@
       const text = MM.encodeLog(mine);
       if (text === folder.lastSave) return;
       folder.saving = true;
-      try { await folder.store.write(MM.logPathFor(folder.me), text); folder.lastSave = text; folder.error = ''; }
-      catch (err) { folder.error = 'could not save: ' + (err.message || err); }
+      try { await folder.store.write(MM.logPathFor(folder.me), text); folder.lastSave = text; folder.error = ''; setFolderTrouble(null); }
+      catch (err) { folder.error = 'could not save: ' + (err.message || err); setFolderTrouble(troubleOf(err, 'folder')); }
       folder.saving = false;
     } else if (!folder.store) {
-      // Browser storage holds the whole log; writing it is the one cost here,
-      // so it is written only when the log actually changed.
-      const key = logKey(evs);
-      if (key === folder.lastSave) return;
-      folder.lastSave = key;
-      try { localStorage.setItem(LOCAL_LOG_KEY, JSON.stringify(evs)); } catch (err) { /* storage full or private */ }
+      // The board this browser keeps: anything not yet written goes now, and
+      // this resolves when every record issued has landed (or failed, and said so).
+      board.journal.flush(session.getEvents());
+      await board.journal.idle();
     }
   }
 
-  /** What browser storage held from last time, when there is no folder. */
-  function restoreLocalLog() {
-    // A tab opened on a room is that room's: its log is one sitting, and the
-    // board this device held before is not carried in by every reload — each
-    // reload is a new name, so it would stand in the room once per reload.
-    // The live tile still brings the board you are on into a room.
-    if (params.has('replay') || params.has('fresh') || params.has('live')) return false;
-    try {
-      const raw = localStorage.getItem(LOCAL_LOG_KEY);
-      if (!raw) return false;
-      const evs = JSON.parse(raw);
-      if (!Array.isArray(evs) || !evs.length) return false;
-      session.load(evs);
-      return true;
-    } catch (err) { return false; }
+  /** A folder's write failed, or works again: said at once, and until it works (boardWarning). */
+  function setFolderTrouble(t) {
+    const was = folder.saveTrouble || null;
+    folder.saveTrouble = t;
+    if (!!was === !!t) return;
+    if (t) render(session.getState());
+    else flash('saved to ' + (folder.name || 'the folder') + ' again');
   }
+
+  // ===== The board this browser keeps (V1-PLAN R3) ===========================
+  // With no folder, the board is kept in this browser: in IndexedDB, as an
+  // append-only journal (17-board.js) — a record per change, begun and
+  // committed in the task that made the change, before the paint. It used to
+  // be one string in browser storage, the whole log rewritten 900 ms after the
+  // last change: saving stopped at about 1,500 marks, the error was swallowed,
+  // and a tab that died inside those 900 ms took its strokes with it
+  // (PERF.md, hotspot 7). One board for now, under one name — naming boards
+  // is R1. A failure is never silent: the status line leads with it, with the
+  // way out, until a save succeeds (boardWarning).
+  const BOARD_DB = 'mm-boards';
+  const BOARD_KEY = 'default';
+  const BOARD_LOCK = 'mm-board:' + BOARD_KEY;
+  const BOARD_RETRY_MS = 5000;
+  const board = {
+    // Whose board this page is (boardMode).
+    mode: 'off',
+    ready: false,
+    backend: null,
+    how: 'none',        // 'indexeddb' | 'browser storage' (no IndexedDB here) | 'none'
+    lock: 'none',       // 'held' | 'taken' (another tab holds the board) | 'none' (no Web Locks here)
+    from: 'nothing',    // where the board came back from: 'store' | 'browser storage' | 'nothing'
+    opened: null,       // what the store held when this page opened it: { arr, len, lastSeq }
+    restoring: false,
+    dbClosed: false,
+    retryTimer: 0,
+    release: null,      // lets the lock go: a page that stops keeping the board frees it for another tab
+    freedEarly: false,  // the lock came before the board had opened: take it up once it has
+    journal: null,
+  };
+  /** This page no longer keeps the board (a folder or a room keeps its log): the journal stops, and another tab may take the board. */
+  function leaveBoard() {
+    board.journal.off();
+    if (board.release) { board.release(); board.release = null; }
+  }
+  board.journal = createJournal({
+    append: (rec, o) => (board.backend ? board.backend.append(rec, o) : Promise.reject(new DOMException('the board is not open', 'InvalidStateError'))),
+  }, {
+    now: () => Date.now(),
+    onTrouble: boardTroubleChanged,
+    // The old copy in browser storage goes once the import has landed — not before.
+    onLanded: (x) => { if (x.meta && board.how === 'indexeddb') { try { localStorage.removeItem(LOCAL_LOG_KEY); } catch (err) { /* nothing */ } } },
+  });
+
+  /**
+   * Whose board this page is. 'restore' — the device's, brought back; 'fresh'
+   * — the device's, started empty (?fresh=1: what it holds is replaced at the
+   * first change, as before); 'off' — not the device's: a live room keeps no
+   * log of its own (DIRECTOR-PLAN-W2 L1), a replay and an embed are figures
+   * (the whitepaper embeds both, and a figure must never write over the
+   * reader's board), and a folder or a repository named in the URL is its own.
+   */
+  function boardMode() {
+    if (params.has('live') || params.has('replay') || EMBED || params.has('folder') || params.has('git')) return 'off';
+    return params.has('fresh') ? 'fresh' : 'restore';
+  }
+
+  function openBoardDB() {
+    return new Promise((resolve, reject) => {
+      let req;
+      try { req = indexedDB.open(BOARD_DB, 1); } catch (err) { reject(err); return; }
+      req.onupgradeneeded = () => {
+        const db = req.result;
+        if (!db.objectStoreNames.contains('records')) db.createObjectStore('records', { keyPath: ['board', 'seq'] });
+        if (!db.objectStoreNames.contains('meta')) db.createObjectStore('meta', { keyPath: 'board' });
+      };
+      req.onsuccess = () => {
+        const db = req.result;
+        // A newer page asking for a new version: it may; this page says it stopped saving.
+        db.onversionchange = () => { db.close(); board.dbClosed = true; board.journal.broken({ kind: 'refused', detail: 'a newer copy of the page took the board over' }); };
+        // Closed by the browser (site data cleared under it): the next try opens it again.
+        db.onclose = () => { board.dbClosed = true; };
+        resolve(db);
+      };
+      req.onerror = () => reject(req.error || new DOMException('the browser would not open its storage', 'UnknownError'));
+      // An older copy of the page holds the store open at an older version and will not let go.
+      req.onblocked = () => { board.journal.broken({ kind: 'tab', detail: 'an older copy of the page' }); };
+    });
+  }
+
+  /** IndexedDB as the journal's store: `records` keyed [board, seq], `meta` keyed by board. */
+  function idbBackend(db) {
+    const every = () => IDBKeyRange.bound([BOARD_KEY, 0], [BOARD_KEY, Infinity]);
+    return {
+      // Begun AND committed before it returns: once this task ends the record
+      // is the browser's to keep, whatever becomes of the tab (the kill test).
+      append(rec, o) {
+        return new Promise((resolve, reject) => {
+          const tx = db.transaction(o.meta ? ['records', 'meta'] : ['records'], 'readwrite', { durability: 'strict' });
+          const rs = tx.objectStore('records');
+          if (o.compact) rs.delete(IDBKeyRange.bound([BOARD_KEY, 0], [BOARD_KEY, rec.seq], false, true));
+          rs.add({ board: BOARD_KEY, seq: rec.seq, on: rec.on, base: rec.base, n: rec.n, text: rec.text });
+          if (o.meta) tx.objectStore('meta').put(Object.assign({ board: BOARD_KEY }, o.meta));
+          tx.oncomplete = () => resolve();
+          tx.onabort = () => reject(tx.error || new DOMException('the browser abandoned the write', 'AbortError'));
+          if (tx.commit) tx.commit();
+        });
+      },
+      read() {
+        return new Promise((resolve, reject) => {
+          const tx = db.transaction(['records', 'meta'], 'readonly');
+          const out = { meta: null, records: [] };
+          tx.objectStore('meta').get(BOARD_KEY).onsuccess = (e) => { out.meta = e.target.result || null; };
+          tx.objectStore('records').getAll(every()).onsuccess = (e) => { out.records = e.target.result || []; };
+          tx.oncomplete = () => resolve(out);
+          tx.onabort = () => reject(tx.error || new DOMException('the browser abandoned the read', 'AbortError'));
+        });
+      },
+      clear() {
+        return new Promise((resolve, reject) => {
+          const tx = db.transaction(['records', 'meta'], 'readwrite');
+          tx.objectStore('records').delete(every());
+          tx.objectStore('meta').delete(BOARD_KEY);
+          tx.oncomplete = () => resolve();
+          tx.onabort = () => reject(tx.error);
+          if (tx.commit) tx.commit();
+        });
+      },
+    };
+  }
+
+  /**
+   * Browser storage as the journal's store, where there is no IndexedDB: the
+   * whole log under one key, as before R3 — and a failure there is said like
+   * any other.
+   */
+  function legacyBackend(events) {
+    let log = (events || []).slice();
+    return {
+      append(rec) {
+        try {
+          const evs = journalEvents(rec.text).events;
+          if (rec.base === 0) log = evs;
+          else if (rec.base <= log.length) { log.length = rec.base; for (const ev of evs) log.push(ev); }
+          else throw new DOMException('a record came before the one it follows', 'DataError');
+          localStorage.setItem(LOCAL_LOG_KEY, JSON.stringify(log));
+          return Promise.resolve();
+        } catch (err) { return Promise.reject(err); }
+      },
+      read() { return Promise.resolve({ meta: null, records: [] }); },
+      clear() { log = []; try { localStorage.removeItem(LOCAL_LOG_KEY); } catch (err) { /* nothing */ } return Promise.resolve(); },
+    };
+  }
+
+  /**
+   * One tab writes the board. Two tabs appending to one journal would
+   * interleave two logs into a board neither showed, so the board is a Web
+   * Lock held for the page's life; a second tab shows the board and writes
+   * nothing, and says so. The lock of a tab that died is released by the
+   * browser, so the wait is short. 'held' | 'taken' | 'none' (no Web Locks
+   * here: this tab writes, as before).
+   */
+  function takeBoardLock(waitMs) {
+    if (!(navigator.locks && navigator.locks.request)) return Promise.resolve('none');
+    return new Promise((resolve) => {
+      let settled = false;
+      const ctl = typeof AbortController === 'function' ? new AbortController() : null;
+      // Held for the page's life — or until it stops keeping the board (leaveBoard).
+      const forever = () => new Promise((r) => { board.release = r; });
+      const timer = setTimeout(() => { if (settled) return; settled = true; if (ctl) ctl.abort(); resolve('taken'); }, waitMs);
+      const none = () => { if (!settled) { settled = true; clearTimeout(timer); resolve('none'); } };
+      try {
+        navigator.locks.request(BOARD_LOCK, ctl ? { signal: ctl.signal } : {}, () => {
+          const held = forever(); // first, so a page that no longer keeps the board can let it go at once
+          if (settled) { boardFreed(); return held; }
+          settled = true; clearTimeout(timer); resolve('held');
+          return held;
+        }).catch(none);
+      } catch (err) { none(); } // a page the lock manager will not serve (an opaque origin): this tab writes, as before
+    });
+  }
+  /** Wait for the other tab to let the board go. */
+  function waitForBoard() {
+    if (!(navigator.locks && navigator.locks.request)) return;
+    try { navigator.locks.request(BOARD_LOCK, () => { const held = new Promise((r) => { board.release = r; }); boardFreed(); return held; }).catch(() => { /* nothing */ }); } catch (err) { /* nothing */ }
+  }
+  /** The other tab let go: this one writes from here — if nothing was written since it opened. */
+  async function boardFreed() {
+    if (board.lock === 'held') return;
+    if (folder.store || board.journal.state === 'off') { if (board.release) { board.release(); board.release = null; } return; }
+    if (!board.backend || !board.opened) { board.freedEarly = true; return; } // opening still: taken up at its end
+    board.lock = 'held';
+    let got;
+    try { got = await board.backend.read(); } catch (err) { board.journal.broken(troubleOf(err, 'read')); return; }
+    const fold = journalFold(got.records);
+    if (fold.lastSeq !== board.opened.lastSeq) { board.journal.readonly({ kind: 'elsewhere', detail: '' }); return; }
+    board.journal.arm({ seq: fold.lastSeq, chain: fold.chain, sinceFull: fold.sinceFull, arr: board.opened.arr, len: board.opened.len, whole: fold.skipped.length > 0 || fold.bad > 0 || !got.meta, meta: got.meta ? null : { v: 1, created: Date.now(), imported: 0 } });
+    persistBoard();
+    flash('saving here now — the other tab let the board go');
+  }
+
+  /**
+   * Open the board this browser keeps: the store, the lock, the records, the
+   * one import of browser storage's old copy (openPlan decides; this acts).
+   * Resolves true when a board came back onto the page.
+   */
+  async function openBoard(mode) {
+    board.mode = mode;
+    try { return await openBoardNow(mode); } catch (err) {
+      // Whatever went wrong, it is said: a page that silently stopped saving is the one thing this may not do.
+      board.journal.broken(troubleOf(err, 'open'));
+      board.ready = true;
+      return false;
+    }
+  }
+  async function openBoardNow(mode) {
+    let legacy = null;
+    try { legacy = localStorage.getItem(LOCAL_LOG_KEY); } catch (err) { legacy = null; }
+    let got = null, fallback = null, unreadable = null;
+    try {
+      // A store that never answers is a store that does not work: said, not waited on forever.
+      const db = await Promise.race([openBoardDB(), new Promise((resolve, reject) => setTimeout(() => reject(new DOMException('the browser did not open its storage within 10 s', 'TimeoutError')), 10000))]);
+      board.backend = idbBackend(db);
+      board.how = 'indexeddb';
+    } catch (err) {
+      if (err && err.name === 'TimeoutError') throw err;
+      fallback = err;
+    }
+    if (!fallback) {
+      board.lock = await takeBoardLock(1500);
+      try { got = await board.backend.read(); } catch (err) { unreadable = err; }
+    }
+    if (unreadable) {
+      // Never write over what could not be read.
+      board.journal.broken(troubleOf(unreadable, 'read'));
+      board.ready = true;
+      return false;
+    }
+    const owner = board.lock !== 'taken';
+    const plan = openPlan({ meta: got && got.meta, records: got ? got.records : [], legacy, owner, fallback: !!fallback, now: Date.now() });
+    if (fallback) { board.backend = legacyBackend(plan.events); board.how = 'browser storage'; }
+    // What a quick hand drew while the store was opening stays, after what comes back.
+    const early = session.getEvents().slice();
+    let arr = null;
+    if (mode === 'restore' && plan.events.length) {
+      board.from = plan.from;
+      await boardOpening(plan.events.length);
+      board.restoring = true;
+      try { session.load(plan.events.concat(early)); } finally { board.restoring = false; }
+      arr = session.getEvents();
+    }
+    board.opened = { arr: arr || [], len: arr ? plan.events.length : 0, lastSeq: plan.lastSeq };
+    if (plan.arm) {
+      const a = Object.assign({}, plan.arm);
+      // A fresh board replaces what is kept at its first change, never before it.
+      if (mode === 'fresh') a.whole = false;
+      else if (arr && !a.whole) { a.arr = arr; a.len = plan.events.length; }
+      board.journal.arm(a);
+    } else {
+      board.journal.readonly({ kind: 'tab', detail: '' });
+      if (board.freedEarly) boardFreed(); else waitForBoard();
+    }
+    board.ready = true;
+    if (plan.damaged && plan.arm) say('the board kept in this browser had ' + (plan.damaged.skipped + plan.damaged.bad) + ' unreadable piece' + (plan.damaged.skipped + plan.damaged.bad === 1 ? '' : 's') + ' — what could be read is back, and is written whole again');
+    // What the store has not heard: the import, what was drawn while it opened.
+    persistBoard();
+    return !!arr;
+  }
+  /** A big board: say so, and let the line paint before the replay holds the thread. */
+  function boardOpening(n) {
+    if (n < 400) return Promise.resolve();
+    say('opening the board kept in this browser — ' + n + ' events…', 600000);
+    return new Promise((resolve) => {
+      let done = false;
+      const go = () => { if (!done) { done = true; resolve(); } };
+      requestAnimationFrame(() => setTimeout(go, 0));
+      setTimeout(go, 120);
+    });
+  }
+
+  /**
+   * The session's FIRST listener, ahead of the paint — a release on a big
+   * board paints for seconds, and the record must not wait behind it: every
+   * change reaches the store in the task that made it.
+   */
+  function persistBoard() {
+    if (board.restoring) return; // the log being loaded is what the store holds
+    if (folder.store) { if (board.journal.state !== 'off') leaveBoard(); return; }
+    board.journal.sync(session.getEvents());
+  }
+  /** On the way out — the tab hidden, the page going — anything not yet written goes now. */
+  function flushBoard() {
+    if (folder.store) { if (folder.how !== 'static') saveNow(); return; }
+    board.journal.flush(session.getEvents());
+  }
+  addEventListener('pagehide', flushBoard);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flushBoard(); });
+
+  /** A save failed, or works again: the line says it at once; a failing store is tried again on a timer too. */
+  function boardTroubleChanged(t, was) {
+    clearInterval(board.retryTimer);
+    board.retryTimer = 0;
+    if (t && board.journal.state === 'armed') {
+      board.retryTimer = setInterval(() => {
+        if (board.dbClosed && board.how === 'indexeddb') {
+          board.dbClosed = false;
+          openBoardDB().then((db) => { board.backend = idbBackend(db); }, () => { board.dbClosed = true; });
+          return;
+        }
+        board.journal.flush(session.getEvents());
+      }, BOARD_RETRY_MS);
+    }
+    render(session.getState());
+    if (!t && was && board.journal.state === 'armed') flash('saved — the board is kept in this browser again');
+  }
+
+  /** What the status line leads with while the board is not being kept: the sentence and its ways out. */
+  function boardWarning() {
+    if (folder.store) return folder.saveTrouble ? troubleWords(folder.saveTrouble) : null;
+    if (board.mode === 'off') return null;
+    return troubleWords(board.journal.trouble);
+  }
+
+  /** The way out of a failing save: this board, carried into a store that keeps it from now on. */
+  function keepBoardIn(store, how, name) {
+    return openStore(store, how, name, { carry: session.getEvents().filter((ev) => !ev.by) });
+  }
+  /** The other way out: the whole log, as a file to keep. */
+  function exportLogNow() {
+    const evs = session.getEvents();
+    downloadText('canvas.jsonl', MM.encodeLog(evs), 'application/json');
+    flash('canvas.jsonl — the whole board, ' + evs.length + ' events, to keep');
+  }
+  statusEl.addEventListener('click', (e) => {
+    const b = e.target.closest && e.target.closest('button[data-way]');
+    if (!b) return;
+    if (b.dataset.way === 'export') exportLogNow();
+    else if (b.dataset.way === 'folder') openFolder({ carry: true });
+  });
+
+  /** Reset: the board this browser keeps is emptied; resolves when it is. */
   function forgetLocalLog() {
+    board.journal.reset();
     try { localStorage.removeItem(LOCAL_LOG_KEY); } catch (err) { /* nothing */ }
+    return board.backend ? board.backend.clear().catch(() => {}) : Promise.resolve();
+  }
+
+  /** For tests: the board's own state, and what its store holds. */
+  function boardState() {
+    return Object.assign({ ready: board.ready, mode: board.mode, how: board.how, lock: board.lock, from: board.from, warning: boardWarning() }, board.journal.snapshot());
   }
 
   function folderStatus() {
@@ -373,7 +719,8 @@
     const misnumbered = [...folder.misnumbered.values()];
     return (folder.how === 'static' ? 'site' : folder.how === 'git' ? 'repo' : 'folder') + (folder.name ? ' ' + folder.name : '') + ' · ' + n + ' file' + (n === 1 ? '' : 's') +
       (folder.truncated ? '+' : '') + (misnumbered.length ? ' · ' + misnumbered.join(' · ') : '') +
-      (folder.error ? ' · ' + folder.error : folder.store.capabilities().write ? (folder.saving ? ' · saving' : ' · saved') : ' · read-only');
+      // A write the folder refused leads the line instead (boardWarning), so it is not said twice.
+      (folder.saveTrouble ? '' : folder.error ? ' · ' + folder.error : folder.store.capabilities().write ? (folder.saving ? ' · saving' : ' · saved') : ' · read-only');
   }
 
   // ===== The live budget =======================================================

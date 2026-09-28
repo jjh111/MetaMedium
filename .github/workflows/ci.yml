@@ -52,6 +52,10 @@ jobs:
       # above. Like the field's test, it finds what it imports relative to itself.
       - name: The relay, on its own
         run: node --test ../Demos/relay.test.mjs
+      # The same kind of fragment (V1-PLAN R3): the journal the board this
+      # browser keeps is written through, driven by a store held in memory.
+      - name: The board's journal, on its own
+        run: node --test ../Demos/surface/17-board.test.mjs
 
   shard:
     name: shard-3d — typecheck, test, build

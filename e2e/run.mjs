@@ -7,6 +7,8 @@
 //     node e2e/run.mjs canvas                 # just the canvas scenario
 //     node e2e/run.mjs shard demo demo2       # just the shard's three
 //     node e2e/run.mjs --browser webkit smoke # the WebKit smoke
+//     node e2e/run.mjs keep                   # no lost work: the kill test, the forced failures
+//     node e2e/run.mjs big                    # a 2,000-mark board saved and opened again (minutes)
 //
 // It starts its own servers on ports the OS hands out, opens a FRESH browser
 // context per scenario (no profile, no cache, no board carried over from the
@@ -24,6 +26,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { startStatic, startVite } from './servers.mjs';
 import { isModelRequest, allowedError, ALLOWED_PAGE_ERRORS } from './guards.mjs';
+import { runKeep, runBig } from './keep.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, '..');
@@ -321,6 +324,38 @@ async function runSmoke(browser, servers) {
   return out;
 }
 
+/**
+ * No lost work (V1-PLAN R3; `keep.mjs`): the kill test and the forced
+ * failures. Unlike the others it opens several contexts of its own — each
+ * with the gate's guards — because a board kept by the browser is only tested
+ * by closing the page that kept it and opening another.
+ */
+async function runKeepScenario(browser, servers, engineName, which = 'keep') {
+  const out = { name: which, url: `${servers.staticOrigin}/Demos/session-engine.html?nosw=1` };
+  let guards = [];
+  try {
+    const r = await (which === 'big' ? runBig : runKeep)(browser, servers, { freshContext, engineName, screenshot });
+    out.steps = r.steps;
+    out.measured = r.measured;
+    guards = r.guards;
+  } catch (err) {
+    out.harnessError = String(err && err.stack ? err.stack : err);
+    out.steps = out.steps || [];
+  }
+  out.reportedOk = out.steps.length > 0 && out.steps.every((s) => s.ok);
+  Object.assign(out, tally(out.steps));
+  const merged = { pageErrors: [], modelAttempts: [] };
+  for (const g of guards) { merged.pageErrors.push(...g.pageErrors); merged.modelAttempts.push(...g.modelAttempts); }
+  const sorted = sortErrors(merged.pageErrors);
+  out.expectedErrors = sorted.expected;
+  out.unexpectedErrors = sorted.unexpected;
+  out.modelAttempts = merged.modelAttempts;
+  out.problems = verdict(out, merged);
+  out.ok = out.problems.length === 0;
+  for (const g of guards) await g.context.close().catch(() => {});
+  return out;
+}
+
 async function screenshot(page, name) {
   try {
     mkdirSync(RESULTS, { recursive: true });
@@ -349,8 +384,9 @@ async function main() {
   const wanted = argv.filter((a) => !a.startsWith('-'));
   // `smoke` is opt-in: it is the short WebKit interaction, not part of the gate's
   // own four, and naming it in the default list would run it twice on Chromium.
-  const all = ['canvas', 'shard', 'demo', 'demo2', 'smoke'];
-  const byDefault = ['canvas', 'shard', 'demo', 'demo2'];
+  // `big` is opt-in too: a 2,000-mark board saved and opened again, minutes of replay.
+  const all = ['canvas', 'keep', 'shard', 'demo', 'demo2', 'smoke', 'big'];
+  const byDefault = ['canvas', 'keep', 'shard', 'demo', 'demo2'];
   const picked = wanted.length ? all.filter((n) => wanted.includes(n)) : byDefault;
   if (!picked.length) {
     console.error(`nothing to run — pick from: ${all.join(', ')}`);
@@ -360,7 +396,7 @@ async function main() {
   rmSync(RESULTS, { recursive: true, force: true });
   mkdirSync(RESULTS, { recursive: true });
 
-  const needCanvas = picked.includes('canvas') || picked.includes('smoke');
+  const needCanvas = picked.includes('canvas') || picked.includes('smoke') || picked.includes('keep') || picked.includes('big');
   const needShard = picked.includes('shard') || picked.includes('demo') || picked.includes('demo2');
 
   const started = Date.now();
@@ -398,7 +434,9 @@ async function main() {
         ? await runCanvas(browser, servers)
         : name === 'smoke'
           ? await runSmoke(browser, servers)
-          : await runShard(browser, servers, name);
+          : name === 'keep' || name === 'big'
+            ? await runKeepScenario(browser, servers, engineName, name)
+            : await runShard(browser, servers, name);
       r.browser = engineName;
       r.durationMs = Date.now() - at;
       scenarios.push(r);

@@ -387,9 +387,33 @@
     // A fresh message takes the line; the one hint a waiting loop needs, and
     // a model at work, stay beside it. The standing state is kept on the
     // element for anything that needs to read it while a message shows.
-    statusEl.textContent = fresh ? flashText + (ws ? '  ·  ⋯ ' + ws : '') + (hint ? '  ·  ' + hint : '') : standing;
-    statusEl.dataset.standing = standing;
+    // A save that fails LEADS the line, fresh message or not, with its way
+    // out, until a save succeeds (V1-PLAN R3: never silent).
+    const warn = boardWarning();
+    paintStatus(warn, fresh ? flashText + (ws ? '  ·  ⋯ ' + ws : '') + (hint ? '  ·  ' + hint : '') : standing);
+    statusEl.dataset.standing = (warn ? warn.lead + '  ·  ' : '') + standing;
     statusEl.classList.toggle('said', !!fresh);
+    statusEl.classList.toggle('warn', !!warn);
+  }
+
+  /**
+   * The status line's text, and — while the board is not being kept — the
+   * sentence that says so and its ways out as buttons in the line: *export
+   * the log*, and *open a folder* where the browser can. Touched only when
+   * what it says changes.
+   */
+  let statusSaid = '';
+  function paintStatus(warn, text) {
+    const canFolder = !!window.showDirectoryPicker;
+    const ways = warn ? warn.ways.filter((w) => w !== 'folder' || canFolder) : [];
+    const key = (warn ? warn.lead + '|' + ways.join(',') : '') + '\u0000' + text;
+    if (key === statusSaid) return;
+    statusSaid = key;
+    if (!warn) { statusEl.textContent = text; return; }
+    const label = { export: 'export the log', folder: 'open a folder' };
+    statusEl.innerHTML = '<span class="lead">' + esc(warn.lead) + '</span>' +
+      (ways.length ? ': ' + ways.map((w) => '<button type="button" data-way="' + w + '">' + label[w] + '</button>').join(', or ') : '') +
+      (text ? '<span class="rest">  ·  ' + esc(text) + '</span>' : '');
   }
 
   /** A model at work: a breathing dot and its words, above the marks it is working on. */

@@ -353,6 +353,10 @@ body.panelHidden #inspector { display: none; }
   pointer-events: none; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .status.said { color: var(--ink); }
+/* A save that fails leads the line until one succeeds, with its ways out as buttons in the sentence. */
+.status.warn .lead { color: var(--ink); }
+.status button { pointer-events: auto; font: inherit; color: var(--gold); background: none; border: 0; padding: 0; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+.status button:hover { color: var(--ink); }
 .scrimBottom {
   position: absolute; left: 0; right: 0; bottom: 0; height: 54px; z-index: 4; pointer-events: none;
   background: linear-gradient(to top, rgba(var(--scrim), 0.94) 40%, rgba(var(--scrim), 0));

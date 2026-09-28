@@ -396,8 +396,9 @@
     else if (act === 'behave-drop') session.behave({ nodeId: id, behaviour: { terms: [{ verb: 'wander', weight: 1 }, { verb: 'hold', weight: 0.35 }], source: 'hand' }, participantId: MM.LOCAL_PARTICIPANT, at: Date.now() });
     else session.snap({ ids: [id], mode: 'raw', at: Date.now() });
   });
-  // Reset is a fresh board: what browser storage held goes too, or the reload would bring it back.
-  document.getElementById('resetBtn').onclick = () => { forgetLocalLog(); location.reload(); };
+  // Reset is a fresh board: what the browser kept goes too, or the reload would
+  // bring it back — and the reload waits until it has gone.
+  document.getElementById('resetBtn').onclick = () => { forgetLocalLog().then(() => location.reload()); };
 
   // The status line says ONE thing: the last thing that happened, for a
   // while, then the standing state. `say` is for outcomes worth reading

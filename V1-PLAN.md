@@ -968,6 +968,33 @@ Synthetic boards of 500, 2,000 and 5,000 marks; budgets for open, replay,
 drawing and reading as tests that record their numbers. *Trap:* relations
 over every pair are quadratic; measure before indexing.
 
+*R3 status, 27 Sep 2026: built on `w2-shard`, pulled forward by R4a* —
+`13bd6f1` (red first: every stroke of every cycle lost, the failures silent)
+…`5695f79` and the commit carrying this line. With no folder the board is kept
+in IndexedDB as an append-only journal (`Demos/surface/17-board.js`, pure, 13
+tests in Node; `17-folder.js` the adapter): a record a change, begun and
+committed in the task that made it by the session's first listener, ahead of
+the paint; the whole log only when the log is replaced (a first open, a load),
+every thousand records, and after a failure. The kill test (`node e2e/run.mjs
+keep`, in the gate) crashes or closes the page at random points — after a
+release, during one, mid-stroke, after an undo — and in every run every
+completed stroke came back: 108 kills on Chromium over nine seeds (53 crashed,
+55 closed) and 58 on WebKit over four (closed: WebKit has no crash to send),
+besides a fresh random seed in every gate run. A save that fails leads the
+status line in plain words, with *export the log* and *open a folder* (which
+carries the board in) as buttons, until one succeeds — forced for real by a
+full quota (Chromium) and by a store that refuses (both engines); the flush on
+`pagehide` and `visibilitychange` is tested by taking it out (both checks
+fail). Browser storage's old board is imported once, byte for byte, and its key
+goes only when that has landed. One tab writes a board (a Web Lock). A live
+room, a replay and an embed never read or write the device's board — a change:
+the whitepaper's embedded figures used to overwrite a reader's board. A
+2,000-mark board (2,079 events, 6.9 M characters, past the ~5 M browser storage
+refused) is kept in one record, a stroke on it is one record of 876 characters,
+and it reopens with every event (`node e2e/run.mjs big`, opt-in: 100 s to load,
+101 s to reopen — the replay, R4's). Not done: a private window that keeps the
+board only for its own life is not detected, and says nothing.
+
 *R4a status, 27 Sep 2026: measured on `w2-shard`, nothing changed* —
 `c456ac1`…`06b3ea8` and the commit carrying this line; `PERF.md` has every
 number with its command, the hotspots ranked with file:line, and budgets for
