@@ -502,8 +502,8 @@ drawing and reading as tests that record their numbers. *Trap:* relations
 over every pair are quadratic; measure before indexing.
 
 *R1 status, 27 Sep 2026: built on `w2-shard`, on R3* — `6ff6779` (red first:
-no tile, no list, the kill test unable to make a second board) … `a8f638d`
-and the commit carrying this line. Each board is its own R3 journal keyed by
+no tile, no list, the kill test unable to make a second board) … `0ab77b7`
+and the commits carrying this line. Each board is its own R3 journal keyed by
 its id; IndexedDB version 2 adds the list (`boards`: a name and when it was
 made, opened and put in the trash — nothing of what it holds), and a board's
 meta says what it holds (changed, events, marks, characters) in each record's
