@@ -74,6 +74,16 @@
   const penLifts = (e) => { if (e.pointerType !== 'pen') return; pen.down.delete(e.pointerId); heardPen(e); };
   addEventListener('pointerup', penLifts, true);
   addEventListener('pointercancel', penLifts, true);
+  // A page hidden with a hand on the glass may never hear it lift: a pen left "down", or a
+  // palm left in the map, would make every touch after it a palm. What only watches — the
+  // pens, the palms, a pan, a pinch — is forgotten; a finger's stroke is left as a mouse's is.
+  const forgetHands = () => {
+    pen.down.clear();
+    pinch = null;
+    for (const [id, t] of touches) if (t.role !== 'draw') touches.delete(id);
+  };
+  addEventListener('blur', forgetHands);
+  document.addEventListener('visibilitychange', () => { if (document.hidden) forgetHands(); });
 
   /**
    * A pen comes down: every finger down is a palm from now on. A finger's stroke is dropped,
