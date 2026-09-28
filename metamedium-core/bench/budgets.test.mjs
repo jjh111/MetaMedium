@@ -1,7 +1,8 @@
 // PERF.md's engine budgets as tests (V1-PLAN.md §9 R4b): a board of 2,000
 // marks, generated from its seed, must replay in half a second, take one
 // more stroke in 4 ms (16 ms at the 95th percentile), and hold no more than
-// 150 MB; the 5,000-mark board must replay at all. Every run records its
+// 150 MB; a move of a box that carries ten bound arrows is held to a
+// stroke's budget (V1-PLAN E2); the 5,000-mark board must replay at all. Every run records its
 // numbers (`dist/bench/budgets-<size>-source.json`, and a line each in
 // `dist/bench/budgets-history.jsonl`) and prints them, pass or fail.
 //
@@ -34,6 +35,10 @@ export const BUDGETS = {
   strokeMedianMs: 4,
   strokeP95Ms: 16,
   heldMB: 150,
+  // A move is one act, as a stroke is: a box moved with ten arrows bound to it
+  // is held to a stroke's budget (V1-PLAN E2).
+  followMoveMedianMs: 4,
+  followMoveP95Ms: 16,
 };
 
 /** Run `budgets.mjs` for one size; resolve with its numbers, or say why there are none. */
@@ -73,6 +78,7 @@ function record(size, run, packs = []) {
           replayWarmMs: +n.replay.warm.median.toFixed(1),
           strokeMedianMs: +n.stroke.median.toFixed(2),
           strokeP95Ms: +n.stroke.p95.toFixed(2),
+          ...(n.follow ? { followMoveMedianMs: +n.follow.move.median.toFixed(2), followMoveP95Ms: +n.follow.move.p95.toFixed(2), controlMoveMedianMs: +n.follow.control.median.toFixed(2) } : {}),
           heldMB: n.memory.heldMB,
           maxRssMB: n.memory.maxRssMB,
           edges: n.memory.edges,
@@ -87,19 +93,22 @@ function record(size, run, packs = []) {
 const TWO_K_LIMIT_MS = 15 * 60 * 1000;
 const FIVE_K_LIMIT_MS = 5 * 60 * 1000;
 
-test('2,000 marks: replay ≤ 0.5 s, one more stroke ≤ 4 ms median and ≤ 16 ms p95, ≤ 150 MB held', { timeout: TWO_K_LIMIT_MS + 60_000 }, async (t) => {
+test('2,000 marks: replay ≤ 0.5 s, one more stroke ≤ 4 ms median and ≤ 16 ms p95, ≤ 150 MB held; a move carrying ten bound arrows ≤ 4 / 16 ms', { timeout: TWO_K_LIMIT_MS + 60_000 }, async (t) => {
   const run = await measure(2000, { limitMs: TWO_K_LIMIT_MS });
   const line = record(2000, run);
   t.diagnostic(JSON.stringify(line));
   assert.ok(run.numbers, `the 2,000-mark board did not finish in ${ms(run.wallMs)} (${run.signal ?? 'exit ' + run.code})`);
   const n = run.numbers;
-  const said = `replay ${ms(n.replay.warm.median)} (cold ${ms(n.replay.coldMs)}) · one more stroke ${ms(n.stroke.median)} / p95 ${ms(n.stroke.p95)} · held ${n.memory.heldMB} MB · ${n.memory.edges.toLocaleString('en-GB')} edges`;
+  const said = `replay ${ms(n.replay.warm.median)} (cold ${ms(n.replay.coldMs)}) · one more stroke ${ms(n.stroke.median)} / p95 ${ms(n.stroke.p95)} · held ${n.memory.heldMB} MB · ${n.memory.edges.toLocaleString('en-GB')} edges · a move carrying ${n.follow.arrows} bound arrows ${ms(n.follow.move.median)} / p95 ${ms(n.follow.move.p95)} (with none ${ms(n.follow.control.median)})`;
   t.diagnostic(said);
   const over = [];
   if (!(n.replay.warm.median <= BUDGETS.replayMs)) over.push(`replay ${ms(n.replay.warm.median)} > ${BUDGETS.replayMs} ms`);
   if (!(n.stroke.median <= BUDGETS.strokeMedianMs)) over.push(`stroke median ${ms(n.stroke.median)} > ${BUDGETS.strokeMedianMs} ms`);
   if (!(n.stroke.p95 <= BUDGETS.strokeP95Ms)) over.push(`stroke p95 ${ms(n.stroke.p95)} > ${BUDGETS.strokeP95Ms} ms`);
   if (!(n.memory.heldMB <= BUDGETS.heldMB)) over.push(`held ${n.memory.heldMB} MB > ${BUDGETS.heldMB} MB`);
+  if (!(n.follow.move.median <= BUDGETS.followMoveMedianMs)) over.push(`a move carrying ten arrows, median ${ms(n.follow.move.median)} > ${BUDGETS.followMoveMedianMs} ms`);
+  if (!(n.follow.move.p95 <= BUDGETS.followMoveP95Ms)) over.push(`a move carrying ten arrows, p95 ${ms(n.follow.move.p95)} > ${BUDGETS.followMoveP95Ms} ms`);
+  if (n.follow.off) over.push(`${n.follow.off} of the ten arrows' ends not on their sites after the moves`);
   assert.deepEqual(over, [], `over budget on the 2,000-mark board: ${said}`);
 });
 
