@@ -255,9 +255,17 @@ html, body {
 #modelPanel button[hidden] { display: none; }
 #modelPanel #mpStatus { margin: 9px 0 0; }
 #modelPanel #mpList:not(:empty) { margin-top: 9px; padding-top: 8px; border-top: 1px solid var(--edge); }
-#modelPanel .mpItem { display: flex; justify-content: space-between; gap: 8px; color: var(--agent); font-size: 10.5px; padding: 2px 0; }
-#modelPanel .mpItem .t { color: var(--dim); }
+/* A joined model (V1-PLAN J5): its name in words, what it is and can do, try it, leave — and its last call, kept until the next. */
+#modelPanel .mpItem { color: var(--agent); font-size: 10.5px; padding: 3px 0; }
+#modelPanel .mpItemHead { display: flex; align-items: baseline; gap: 8px; }
+#modelPanel .mpItemHead .n { flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#modelPanel .mpItemHead .t { color: var(--dim); flex: 1 1 auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #modelPanel .mpItem button { flex: 0 0 auto; padding: 1px 7px; font-size: 10px; }
+#modelPanel .mpCall { font: 10px var(--mono); color: var(--dim); margin-top: 2px; overflow-wrap: anywhere; }
+#modelPanel .mpCall.bad { color: var(--gold); }
+#modelPanel .mpCall.busy { font-style: italic; }
+#modelPanel .mpLocal .model.suggested .why { color: var(--agent); }
+#modelPanel .mpLocal .mpAll { display: block; margin: 4px 0 2px 8px; padding: 1px 7px; font-size: 10px; }
 #modelPanel .mpSection + .mpSection { margin-top: 10px; padding-top: 9px; border-top: 1px solid var(--edge); }
 #modelPanel .mpOwn { margin-top: 10px; padding-top: 9px; border-top: 1px solid var(--edge); }
 #modelPanel .mpTools { font-size: 10.5px; line-height: 1.55; color: var(--dim); }
@@ -357,6 +365,10 @@ body.panelHidden #inspector { display: none; }
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 #summon .reading.quiet { color: var(--dim); }
+/* An ask kept for a model (V1-PLAN J5): what it needs, said where it was asked, and the one way the models pane opens for it. */
+#summon .need { font: 10.5px var(--mono); color: var(--dim); padding: 0 5px 4px; display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; }
+#summon .need[hidden] { display: none; }
+#summon .need button.choose { font: 10.5px var(--mono); color: var(--gold); background: transparent; border: 1px solid var(--rule); border-radius: 4px; padding: 0 6px; cursor: pointer; }
 #summon .fieldBody { display: flex; align-items: flex-start; gap: 10px; margin-top: 7px; }
 #summon.left .fieldBody { flex-direction: row-reverse; }
 #summon .row { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }

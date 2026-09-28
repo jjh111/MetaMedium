@@ -608,7 +608,8 @@
       if (!n || n.reps.some((r) => r.modality === 'erased')) continue;
       const reads = MM.interpretationsOf(n, s.nodes).filter((r) => r.tier === 2 && !r.blessed).sort((a, b) => b.weight - a.weight);
       if (!reads.length) continue;
-      out.push({ id: id, text: reads.slice(0, 2).map((r) => r.label + ' ' + r.weight.toFixed(2)).join('  ·  ') + '  ·  ' + reads[0].sourceName });
+      // In words, by a name in words (V1-PLAN J5): "state transformation 0.82  ·  GLM 5.3 Flash", never a slug or "llm:".
+      out.push({ id: id, text: reads.slice(0, 2).map((r) => readingWords(r.label) + ' ' + r.weight.toFixed(2)).join('  ·  ') + '  ·  ' + modelWords(reads[0].sourceName) });
     }
     if (ix) ix.readChips = out;
     return out;
@@ -855,7 +856,7 @@
     if (fs) parts.push(fs);
     // A pack this board names that this build cannot give it is said, never hidden (V1-PLAN B3).
     if (s.packNotices.length) parts.push(s.packNotices.map((n) => n.reason === 'unknown' ? n.pack + ' is not in this build' : '“' + n.pack + '” is no pack').join(', ') + ' — its definitions are not matched here');
-    if (agents.length) parts.push(agents.map((a) => a.config.model).join(', '));
+    if (agents.length) parts.push(agents.map((a) => modelWords(a) + (a.config && a.config.kind !== 'mcp' ? ' · ' + MM.providerLocality(a.config) : '')).join(', '));
     if (ws) parts.push('⋯ ' + ws);
     if (hint) parts.push(hint);
     // The standing line is a ladder (SURFACE-v10-PLAN D5): the next move, in a

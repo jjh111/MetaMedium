@@ -157,11 +157,13 @@
           heard.push(r);
         }
       }
+      // In words, by a name in words (J5): "state transformation 0.82 · GLM 5.3 Flash" — taking it names the thing by its label.
       heard.sort((a, b) => b.weight - a.weight).slice(0, 3).forEach((r) => {
+        const who = modelWords(r.sourceName);
         proposed.push(readingItem({
-          key: 'proposed:' + r.label, grounds: { on: 'proposed', confidence: r.weight, why: 'read this way by ' + r.sourceName },
-          label: r.label + ' ' + r.weight.toFixed(2) + ' · ' + r.sourceName, name: r.label,
-          why: r.sourceName + (r.reasoning ? ' — ' + r.reasoning.slice(0, 80) : '') + ' — take it as the name',
+          key: 'proposed:' + r.label, grounds: { on: 'proposed', confidence: r.weight, why: 'read this way by ' + who },
+          label: readingWords(r.label) + ' ' + r.weight.toFixed(2) + ' · ' + who, name: r.label,
+          why: who + (r.reasoning ? ' — ' + r.reasoning.slice(0, 80) : '') + ' — take it as the name',
           run: () => session.bless({ summonId: sum.id, name: r.label, at: Date.now() }),
         }));
       });
@@ -182,7 +184,14 @@
     // An act as particular to these marks as a reading (Fold “…” into the text)
     // stands with the readings, where it always stood: after the line it takes.
     const lead = offers.filter((i) => i.certain);
-    return known.concat(lined, lead, worded, proposed, conceived, offers.filter((i) => !i.certain));
+    const items = known.concat(lined, lead, worded, proposed, conceived, offers.filter((i) => !i.certain));
+    // A pill that asks a model none here can answer says what it needs, inline, while it is pointed at (J5).
+    for (const it of items) {
+      if (it.asks !== 'model' || it.line) continue;
+      const need = needFor(it.tool);
+      if (need) it.line = '↵ ' + it.label + ' — ' + need + ': it is kept, and runs when one joins';
+    }
+    return items;
   }
 
   // ===== Taking an offer: the tool writes, the surface does the rest =========
@@ -198,14 +207,16 @@
     flip: (o) => { const id = o.data.id; if (flipped.has(id)) flipped.delete(id); else flipped.add(id); render(session.getState()); refreshPalette(); },
     read: (o) => {
       const d = o.data, s = session.getState();
+      // No model that can see: which joined ones cannot and why, said once, the read kept for one that can (J5) — no pane.
+      if (!readers().length) { keepRead(d); return; }
       let any = false;
       if (d.line.length) any = readLine(d.line, true) || any;
       d.single.forEach((id) => { any = readOne(s.nodes.get(id), true) || any; });
-      if (!any) offerModel('Reading writing needs a model that can see — one marked “sees”.');
+      if (!any) say('nothing there to read — the marks held have no ink an image can be made of');
     },
     what: (o) => askModelsAbout(o.data.ids.slice()),
     duplicate: (o, scope) => duplicateMarks(scope.summon, o.data.ids),
-    'behave-model': (o) => { const d = o.data; agents.forEach((a) => withWork('behave:' + a.id + ':' + d.nodeId, [d.nodeId], a.name + ' · reading the words', a.behave({ nodeId: d.nodeId, words: d.words, at: Date.now() })).then(() => render(session.getState()))); },
+    'behave-model': (o) => { const d = o.data; agents.forEach((a) => withWork('behave:' + a.id + ':' + d.nodeId, [d.nodeId], modelWords(a) + ' · reading the words', a.behave({ nodeId: d.nodeId, words: d.words, at: Date.now() })).then(() => render(session.getState()))); },
   };
   /** What the surface does around a tool's act: before it (the field rebuilt from what it leaves), and after (what to say). */
   const TOOL_ACTS = {
@@ -485,10 +496,23 @@
     }
     if (cmd.do === 'behave') {
       session.behave({ nodeId: cmd.definitionId, behaviour: cmd.behaviour, participantId: MM.LOCAL_PARTICIPANT, at: at });
-      if (cmd.ask) agents.forEach((a) => withWork('behave:' + a.id + ':' + cmd.definitionId, [cmd.definitionId], a.name + ' · reading the words', a.behave({ nodeId: cmd.definitionId, words: cmd.words, at: Date.now() })).then(() => render(session.getState())));
+      if (cmd.ask) agents.forEach((a) => withWork('behave:' + a.id + ':' + cmd.definitionId, [cmd.definitionId], modelWords(a) + ' · reading the words', a.behave({ nodeId: cmd.definitionId, words: cmd.words, at: Date.now() })).then(() => render(session.getState())));
       return;
     }
-    if (cmd.do === 'need-model') { offerModel(cmd.what[0].toUpperCase() + cmd.what.slice(1) + ' needs a model.'); return; }
+    // With no model here, what was typed is kept, said once, and run when one joins — never the pane popped over the field (J5).
+    if (cmd.do === 'need-model') {
+      const f = fieldInput(), text = f ? f.value : '', sumId = sum.id;
+      const what = cmd.what[0].toUpperCase() + cmd.what.slice(1);
+      keepAsk({ what: what, needs: 'model', need: 'needs a model', ids: sum.enclosedIds.slice(),
+        sentence: what + ' needs a model — kept: it runs when one joins · choose one under models',
+        run: () => {
+          const st = session.getState();
+          if (!st.summon || st.summon.id !== sumId) { say('the field that asked for ' + cmd.what + ' has closed — ask again'); return; }
+          const r = readField(text);
+          if (r.run) r.run();
+        } });
+      return;
+    }
   }
 
   /**
@@ -648,6 +672,11 @@
     const reading = document.createElement('div');
     reading.className = 'reading';
     top.appendChild(reading);
+    // An ask kept for a model says what it needs here, where it was asked, with the way to choose one (J5).
+    const need = document.createElement('div');
+    need.className = 'need';
+    need.hidden = true;
+    top.appendChild(need);
     summonEl.appendChild(top);
     // The body, as the sketch has it: the round buttons at the left, the
     // pills stacked to their right — what this is, then what it affords.
@@ -800,7 +829,22 @@
     const hidden = shown.filter((x) => !x.certain).length - shownAfford;
     if (hidden > 0) { const more = document.createElement('span'); more.className = 'more'; more.textContent = '+' + hidden + ' more — type to find'; affordRow.appendChild(more); }
     standingLine();
+    paintNeed(s);
     keepFieldOnScreen();
+  }
+
+  /**
+   * The ask this field kept for a model, said where it was asked (J5, the pure-user walkthrough):
+   * what it needs, and "choose one" — the one way the models pane opens for it. Nothing when none waits.
+   */
+  function paintNeed(s) {
+    const el = summonEl.querySelector('.need');
+    if (!el) return;
+    const k = keptFor(s.summon);
+    el.hidden = !k;
+    if (!k) { el.innerHTML = ''; return; }
+    el.innerHTML = '<span>' + esc(k.what + ' ' + k.need) + ' — kept, it runs when one joins</span> <button type="button" class="choose">choose one</button>';
+    el.querySelector('.choose').onclick = () => offerModel(k.sentence);
   }
 
   /**
@@ -1023,14 +1067,15 @@
     const aboutIds = session.getState().nodes.get(artifactId) ? [artifactId] : sum.enclosedIds;
     agents.forEach((agent) => {
       const key = 'build:' + agent.id + ':' + artifactId;
-      withWork(key, aboutIds, agent.name + (revising ? ' · changing “' : ' · building “') + brief.slice(0, 32) + (brief.length > 32 ? '…' : '') + '”',
+      withWork(key, aboutIds, modelWords(agent) + (revising ? ' · changing “' : ' · building “') + brief.slice(0, 32) + (brief.length > 32 ? '…' : '') + '”',
         agent.generate({ prompt: brief, artifactId: artifactId, at: Date.now(), addressed: addressed, signal: workSignal(key) }))
         .then((res) => {
+          noteOutcome(agent, res.ok, res.ok ? (res.revised ? 'changed ' : 'built ') + (res.revised ? (res.changed || res.filled) : res.filled).join(', ') : res.error);
           if (res.ok) {
             const short = res.unfilled && res.unfilled.length ? ' — left ' + res.unfilled.join(', ') + ' empty' : '';
-            say(agent.name + ' ' + (res.revised ? 'changed' : 'built') + ' ' + (res.revised ? (res.changed || res.filled) : res.filled).join(', ') + short);
+            say(modelWords(agent) + ' ' + (res.revised ? 'changed' : 'built') + ' ' + (res.revised ? (res.changed || res.filled) : res.filled).join(', ') + short);
           } else {
-            say(agent.name + ' could not build (' + res.error + ') — the drawing is untouched');
+            say(modelWords(agent) + ' could not build (' + res.error + ') — the drawing is untouched');
             // A model that answered unusably is a thing you need to SEE to fix.
             if (res.raw) window.__mm.lastRaw = res.raw;
           }
@@ -1049,21 +1094,22 @@
     const library = libraryEntries(session.getState()).map((e) => ({ id: e.id, name: e.name }));
     agents.forEach((agent) => {
       const key = 'program:' + agent.id + ':' + artifactId;
-      withWork(key, [artifactId], agent.name + ' · writing “' + brief.slice(0, 32) + (brief.length > 32 ? '…' : '') + '”',
+      withWork(key, [artifactId], modelWords(agent) + ' · writing “' + brief.slice(0, 32) + (brief.length > 32 ? '…' : '') + '”',
         agent.program({ prompt: brief, artifactId: artifactId, library: library, at: Date.now(), signal: workSignal(key) }))
         .then((res) => {
+          noteOutcome(agent, res.ok, res.ok ? (res.reuse ? 'pointed at ' + res.reuse + ' in the library' : 'wrote ' + (res.name || 'a program')) : res.error);
           if (res.ok && res.reuse) {
             const entry = libraryEntries(session.getState()).find((e) => e.name.toLowerCase() === res.reuse.toLowerCase());
-            if (entry) { reuseEntry(artifactId, entry); say(agent.name + ' pointed at ' + entry.name + ' in the library — reused'); }
-            else say(agent.name + ' pointed at “' + res.reuse + '”, which the library does not hold');
+            if (entry) { reuseEntry(artifactId, entry); say(modelWords(agent) + ' pointed at ' + entry.name + ' in the library — reused'); }
+            else say(modelWords(agent) + ' pointed at “' + res.reuse + '”, which the library does not hold');
           } else if (res.ok) {
             // The human asked for it: it runs on arrival. A program that
             // arrived any other way waits for play (I9).
             session.clock({ nodeId: artifactId, op: 'play', at: Date.now() });
-            say(agent.name + ' wrote ' + (res.name || 'a program') + (res.parts && res.parts.length ? ' — parts: ' + res.parts.join(', ') : ''));
+            say(modelWords(agent) + ' wrote ' + (res.name || 'a program') + (res.parts && res.parts.length ? ' — parts: ' + res.parts.join(', ') : ''));
           } else {
             const dropped = dropFailedBless(artifactId);
-            say(agent.name + ' could not write it (' + res.error + ')' + (dropped ? ' — nothing was made; the drawing is as it was' : ' — the drawing is untouched'));
+            say(modelWords(agent) + ' could not write it (' + res.error + ')' + (dropped ? ' — nothing was made; the drawing is as it was' : ' — the drawing is untouched'));
             if (res.raw) window.__mm.lastRaw = res.raw;
           }
           render(session.getState());
@@ -1077,9 +1123,10 @@
     session.dismiss(sum.id, Date.now());
     cancelReading();
     agents.forEach((agent) => {
-      withWork('draw:' + agent.id, ids, agent.name + ' · drawing', agent.draw({ prompt: q, nodeIds: ids, at: Date.now() })).then((res) => {
-        if (res.ok) say(agent.name + ' drew ' + res.ids.length + ' mark' + (res.ids.length === 1 ? '' : 's') + ': ' + res.shapes.map((x) => x.shape).join(', '));
-        else { say(agent.name + ' drew nothing (' + res.error + ')'); if (res.raw) window.__mm.lastRaw = res.raw; }
+      withWork('draw:' + agent.id, ids, modelWords(agent) + ' · drawing', agent.draw({ prompt: q, nodeIds: ids, at: Date.now() })).then((res) => {
+        noteOutcome(agent, res.ok, res.ok ? 'drew ' + res.ids.length + ' mark' + (res.ids.length === 1 ? '' : 's') : res.error);
+        if (res.ok) say(modelWords(agent) + ' drew ' + res.ids.length + ' mark' + (res.ids.length === 1 ? '' : 's') + ': ' + res.shapes.map((x) => x.shape).join(', '));
+        else { say(modelWords(agent) + ' drew nothing (' + res.error + ')'); if (res.raw) window.__mm.lastRaw = res.raw; }
         render(session.getState());
       });
     });
@@ -1090,8 +1137,9 @@
     const ids = sum.enclosedIds.slice();
     cancelReading();
     agents.forEach((agent) => {
-      withWork('ask:' + agent.id, ids, agent.name + ' · answering', agent.ask(q, ids, Date.now())).then((res) => {
-        if (!res.ok) say(agent.name + ' could not answer (' + res.error + ')');
+      withWork('ask:' + agent.id, ids, modelWords(agent) + ' · answering', agent.ask(q, ids, Date.now())).then((res) => {
+        noteOutcome(agent, res.ok, res.ok ? 'answered beside the marks' : res.error);
+        if (!res.ok) say(modelWords(agent) + ' could not answer (' + res.error + ')');
         render(session.getState());
       });
     });

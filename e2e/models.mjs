@@ -102,20 +102,26 @@ function installDraw() {
   window.__draw = { stroke, line, circle, word };
 }
 
-/** The molecule (three circles, two lines) and a word well below it; their ids. */
-function drawBoard() {
-  const d = window.__draw, mm = window.__mm;
-  d.stroke(d.circle(300, 300, 40)); d.stroke(d.circle(500, 300, 40)); d.stroke(d.circle(400, 460, 40));
-  d.stroke(d.line({ x: 340, y: 300 }, { x: 460, y: 300 }, 30)); d.stroke(d.line({ x: 328, y: 328 }, { x: 372, y: 432 }, 30));
+/**
+ * The molecule (three circles, two lines) and a word well below it, clear of the panel on the left
+ * (at 1440 × 900 the inspector covers the canvas up to x ≈ 330, and a real pointer lands on it); their ids.
+ */
+const MOLECULE_AT = { x: 700, y: 300 };
+function drawBoard(o) {
+  const d = window.__draw, mm = window.__mm, x = o.x, y = o.y;
+  d.stroke(d.circle(x, y, 40)); d.stroke(d.circle(x + 200, y, 40)); d.stroke(d.circle(x + 100, y + 160, 40));
+  d.stroke(d.line({ x: x + 40, y: y }, { x: x + 160, y: y }, 30)); d.stroke(d.line({ x: x + 28, y: y + 28 }, { x: x + 72, y: y + 132 }, 30));
   const s = mm.session.getState();
   const molecule = s.contentIds.slice(-5);
-  d.stroke(d.word(300, 660, 220, 44, 7));
+  d.stroke(d.word(x, y + 360, 220, 44, 7));
   const s2 = mm.session.getState();
   return { molecule, word: s2.contentIds[s2.contentIds.length - 1] };
 }
 
 /** Press and hold at a point with the real pointer, until the field opens; true when it did. */
 async function holdAt(page, x, y) {
+  const under = await page.evaluate(([px, py]) => { const e = document.elementFromPoint(px, py); return e ? e.id : null; }, [x, y]);
+  if (under !== 'canvas') throw new Error(`the pointer at ${x}, ${y} would land on #${under}, not the canvas`);
   await page.mouse.move(x, y);
   await page.mouse.down();
   const opened = await page.waitForFunction(() => !!window.__mm.session.getState().summon, null, { timeout: 6000 }).then(() => true).catch(() => false);
@@ -124,10 +130,18 @@ async function holdAt(page, x, y) {
   return opened;
 }
 
-/** A tap on empty ground: the field lets go. */
+/**
+ * Let go of whatever is held: a tap on empty ground (above the minimap, clear of the marks) takes
+ * the field down, and another the selection it leaves — or Esc in the field, if the ground is covered.
+ */
 async function letGo(page) {
-  await page.mouse.click(1100, 780);
-  await sleep(80);
+  const holding = () => page.evaluate(() => { const s = window.__mm.session.getState(); return !!s.summon || s.selection.length > 0; });
+  for (let i = 0; i < 3 && await holding(); i++) {
+    const under = await page.evaluate(() => { const e = document.elementFromPoint(1150, 180); return e ? e.id : null; });
+    if (under === 'canvas') await page.mouse.click(1150, 180);
+    else await page.evaluate(() => { const f = document.querySelector('#summon input.filter'); if (f) f.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); });
+    await sleep(120);
+  }
 }
 
 /** Take a pill of the open field by its words, with the real pointer. */
@@ -282,7 +296,7 @@ export async function runModels(browser, servers, { freshContext, screenshot }) 
   const page = await guards.context.newPage();
   const url = `${servers.staticOrigin}/app/`;
   const host = stub.origin.replace(/^https?:\/\//, '');
-  const chats = (since = 0) => stub.calls().slice(since).filter((c) => c.path === '/v1/chat/completions');
+  const chats = (since = 0) => stub.calls().filter((c) => c.path === '/v1/chat/completions').slice(since);
   let board = null;
   try {
     // ---- M0. The gate's guard, unchanged ----
@@ -327,13 +341,13 @@ export async function runModels(browser, servers, { freshContext, screenshot }) 
       await closeModels(page);
     });
 
-    board = await page.evaluate(drawBoard);
+    board = await page.evaluate(drawBoard, MOLECULE_AT);
     await sleep(200);
 
     // ---- M2. What is this? with no model: kept, said, no pane ----
     await record('M2', async () => {
       const calls = stub.calls().length;
-      const held = await holdAt(page, 300, 300);
+      const held = await holdAt(page, MOLECULE_AT.x, MOLECULE_AT.y);
       const took = held && await takePill(page, 'What is this?');
       await sleep(200);
       const after = await page.evaluate(() => ({
@@ -461,7 +475,7 @@ export async function runModels(browser, servers, { freshContext, screenshot }) 
       await closeModels(page);
       await letGo(page);
       const calls = chats().length;
-      const held = await holdAt(page, 300, 300);
+      const held = await holdAt(page, MOLECULE_AT.x, MOLECULE_AT.y);
       const took = held && await takePill(page, 'What is this?');
       const asked = await stubbed(chats, calls, 2);
       await sleep(300);
@@ -469,7 +483,7 @@ export async function runModels(browser, servers, { freshContext, screenshot }) 
       const rows = [await rowOf(page, 'GLM 4.7 Flash'), await rowOf(page, 'GLM 5.3 Flash')];
       check(`M10. What is this?, taken again, asks every joined model once — ${asked.map((a) => a.model).join(', ')} — and each row says what it read: ${rows.map((r) => r && r.call).join(' / ')}`,
         held && took && asked.length === 2 && new Set(asked.map((a) => a.model)).size === 2 && asked.every((a) => a.job === 'what') && rows.every((r) => r && /^ok · \d+(\.\d)? s · reads it as state transformation$/.test(r.call)),
-        { asked, rows });
+        { held, took, asked, rows });
       await letGo(page);
     });
 

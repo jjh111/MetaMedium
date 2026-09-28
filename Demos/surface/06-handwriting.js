@@ -1,6 +1,7 @@
 // ===== handwriting =====
-// Provides: handwriting: inkImage, isWriting, isRead, readOne, readLine (a line of writing as one image), readWriting; the auto-read preference (off by default).
-// Uses: core (prefs), models (agents, withWork), render, input (say).
+// Provides: handwriting: inkImage, isWriting, isRead, readOne, readLine (a line of writing as one image), readWriting; the auto-read preference (off by default);
+//   (V1-PLAN J5) whyNoReader — which joined models cannot read writing, and why — and keepRead, a read kept for a model that can see.
+// Uses: core (prefs), models (agents, withWork, factsOf, keepAsk, noteOutcome, modelWords), render, input (say).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () Ellipsis)();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -82,10 +83,12 @@
     const image = inkImage(node);
     if (!image) return false;
     who.forEach((agent) => {
-      withWork('write:' + agent.id + ':' + node.id, [node.id], agent.name + ' · reading the writing', agent.read({ nodeId: node.id, image: image, at: Date.now() })).then((res) => {
+      withWork('write:' + agent.id + ':' + node.id, [node.id], modelWords(agent) + ' · reading the writing', agent.read({ nodeId: node.id, image: image, at: Date.now() })).then((res) => {
+        // The row keeps what the read came to; the status line says it once (J5).
+        noteOutcome(agent, res.ok, res.ok ? 'read “' + res.transcripts[0].text + '”' : res.error);
         say(res.ok
-          ? agent.name + ' read “' + res.transcripts[0].text + '”' + (res.transcripts.length > 1 ? ' (or ' + res.transcripts.slice(1).map((t) => '“' + t.text + '”').join(', ') + ')' : '')
-          : agent.name + ' could not read it (' + res.error + ')');
+          ? modelWords(agent) + ' read “' + res.transcripts[0].text + '”' + (res.transcripts.length > 1 ? ' (or ' + res.transcripts.slice(1).map((t) => '“' + t.text + '”').join(', ') + ')' : '')
+          : modelWords(agent) + ' could not read it — ' + res.error);
         if (!res.ok && res.raw) window.__mm.lastRaw = res.raw;
         render(session.getState());
         refreshPalette();
@@ -113,7 +116,8 @@
     if (!image) return false;
     const first = nodes[0];
     who.forEach((agent) => {
-      withWork('write:' + agent.id + ':' + first.id, ids, agent.name + ' · reading the line', agent.read({ nodeId: first.id, image: image, at: Date.now(), hold: false })).then((res) => {
+      withWork('write:' + agent.id + ':' + first.id, ids, modelWords(agent) + ' · reading the line', agent.read({ nodeId: first.id, image: image, at: Date.now(), hold: false })).then((res) => {
+        noteOutcome(agent, res.ok, res.ok ? 'read “' + res.transcripts[0].text + '”' : res.error);
         if (res.ok) {
           const top = res.transcripts[0];
           const words = top.text.trim().split(/\s+/);
@@ -124,9 +128,9 @@
             session.propose({ participantId: agent.id, nodeId: first.id, edges: [], reps: res.transcripts.map((t) => ({ modality: 'transcript', data: { text: t.text }, confidence: t.confidence })), at: at });
             nodes.slice(1).forEach((n) => readWith.set(n.id, first.id));
           }
-          say(agent.name + ' read “' + top.text + '”' + (res.transcripts.length > 1 ? ' (or ' + res.transcripts.slice(1).map((t) => '“' + t.text + '”').join(', ') + ')' : ''));
+          say(modelWords(agent) + ' read “' + top.text + '”' + (res.transcripts.length > 1 ? ' (or ' + res.transcripts.slice(1).map((t) => '“' + t.text + '”').join(', ') + ')' : ''));
         } else {
-          say(agent.name + ' could not read it (' + res.error + ')');
+          say(modelWords(agent) + ' could not read it — ' + res.error);
           if (res.raw) window.__mm.lastRaw = res.raw;
         }
         render(session.getState());
@@ -145,4 +149,34 @@
       if (!node || s.pendingLassoId === id || MM.transcriptOf(node) || !(MM.strokePointsOf(node) || MM.isWord(node))) continue;
       if (isWriting(node)) readOne(node, false);
     }
+  }
+
+  // ===== Writing with no model that can see (V1-PLAN J5) =====================
+  // *Read the writing* used to open the models pane and nothing else, which
+  // looked exactly like "it won't send": the model joined could not see, and
+  // nothing said so. Now it says which joined models cannot, and why — what
+  // each one's provider said it takes, or that its id was all there was — and
+  // the read is kept: the moment a model that can see joins, it runs.
+  /** Why no joined model reads writing: each one, and what its provider said it takes (or why that is a guess). */
+  function whyNoReader() {
+    const models = agents.filter((a) => a.config && (a.config.kind === 'openai-compatible' || a.config.kind === 'anthropic'));
+    const others = agents.filter((a) => !models.includes(a));
+    if (!agents.length) return 'Read the writing needs a model that can see — none is joined';
+    const said = models.map((a) => { const f = factsOf.get(a.id); return modelWords(a) + ' reads text only' + (f && f.because ? ' (' + f.because + ')' : ''); })
+      .concat(others.map((a) => modelWords(a) + ' is not asked to read writing'));
+    return 'Read the writing needs a model that can see — ' + said.join('; ');
+  }
+  /** Keep a read of these marks for a model that can see (a line as one image, the rest one by one); said once, run when one joins. */
+  function keepRead(d) {
+    const line = (d.line || []).slice(), single = (d.single || []).slice();
+    return keepAsk({
+      what: 'Read the writing', needs: 'sees', need: 'needs a model that can see', ids: line.concat(single),
+      sentence: whyNoReader() + ' — kept: it runs when one that sees joins',
+      run: (live) => {
+        const s = session.getState();
+        const l = line.filter((id) => live.includes(id));
+        if (l.length) readLine(l, true);
+        single.filter((id) => live.includes(id)).forEach((id) => readOne(s.nodes.get(id), true));
+      },
+    });
   }

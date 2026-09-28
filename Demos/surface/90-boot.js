@@ -13,6 +13,9 @@
     fitAll: fitAll, regionsUnderInk: regionsUnderInk,
     snapMode: () => snapMode, setSnapMode: setSnapMode, snapOffers: () => snapOffers,
     inkImage: inkImage, readOne: readOne, readWriting: readWriting, askModelsAbout: askModelsAbout,
+    // A hosted model asked, and why when it cannot be (V1-PLAN J5), for tests: the ask kept for a model, and each model's last call.
+    keptAsk: () => (keptAsk ? { what: keptAsk.what, needs: keptAsk.needs } : null),
+    lastCalls: () => agents.map((a) => ({ id: a.id, model: a.config.model, line: callLine(lastCall.get(a.id)) })),
     // Device preferences and the chrome, for tests: the theme, the hand, auto-read, the field's reader, the clip.
     themeMode: () => themeMode, setThemeMode: setThemeMode, hand: () => hand, setHand: setHand,
     // Pen, finger and palm (V1-PLAN R6), for tests: what draws, the magnet a hovering pen feels, and the hands down.

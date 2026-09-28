@@ -618,7 +618,8 @@
     const id = b.getAttribute('data-id');
     const act = b.getAttribute('data-act');
     if (act === 'snap') snapAll([id]);
-    else if (act === 'read') { const n = state.nodes.get(id); if (n && !readOne(n, true)) offerModel('Reading writing needs a model that can see.'); }
+    // No model that can see: kept for one, and said — never the pane popped (V1-PLAN J5).
+    else if (act === 'read') { const n = state.nodes.get(id); if (n && !readers().length) keepRead({ line: [], single: [id] }); else if (n && !readOne(n, true)) say('nothing there to read'); }
     else if (act === 'split') session.splitWord(id, Date.now());
     else if (act === 'clock-play') session.clock({ nodeId: id, op: 'play', at: Date.now() });
     else if (act === 'clock-pause') session.clock({ nodeId: id, op: 'pause', at: Date.now() });

@@ -613,9 +613,10 @@ window.__scenario = async function(){
     await wait(400); // the stubbed model answers the reading
     t.typeIn('');
     const chips = t.chips();
-    const proposed = chips.find(c => /^page-layout 0\.78 · /.test(c));
-    step('17. what the model read the group as joins the certainty row, with its number, attributed', !!proposed && window.__calls.length === calls17 + 1, chips);
-    const btn = [...document.querySelectorAll('#summon .item')].find(b => /^page-layout 0\.78/.test(b.textContent));
+    // In words, not a slug, by the model's name with no "llm:" (V1-PLAN J5); taking it names the group by the label.
+    const proposed = chips.find(c => /^page layout 0\.78 · e2e-stub$/.test(c));
+    step('17. what the model read the group as joins the certainty row, with its number, attributed — in words', !!proposed && window.__calls.length === calls17 + 1, chips);
+    const btn = [...document.querySelectorAll('#summon .item')].find(b => /^page layout 0\.78/.test(b.textContent));
     if (btn) btn.click();
     const named = mm.session.getState().artifacts.map(id => MM.wordOf(mm.session.getState().nodes.get(id)));
     step('17a. blessing it holds the entry — the model proposed, the human decided', named.includes('page-layout'), named);

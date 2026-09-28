@@ -1,7 +1,10 @@
 // ===== models =====
 // Provides: the model pane: probing local servers, joining by key, remembering the pick, offerModel,
 //   and what the canvas does with no model (the tools registry's own, renderTools);
-//   the work-in-progress register (withWork); askModelsAbout/cancelReading — a model is asked only by a deliberate act.
+//   the work-in-progress register (withWork); askModelsAbout/cancelReading — a model is asked only by a deliberate act;
+//   (V1-PLAN J5) what a provider says a model can do (factsOf), each model's last call and try it (noteOutcome),
+//   an ask kept until a model that can answer it is here (keepAsk, keptFor, needFor), one local model suggested a job,
+//   and a model's name and a reading in words (modelWords, readingWords).
 // Uses: core, ui, teach (togglePanel), render, palette (refreshPalette), input (say).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () Ellipsis)();`. Shared state is the
@@ -44,6 +47,170 @@
     del(k) { try { localStorage.removeItem(k); } catch (err) { /* nothing */ } },
   };
 
+  // ===== What a provider says a model can do, and each model's last call (V1-PLAN J5) =====
+  // John joined GLM Flash from OpenRouter and could not get the canvas to send
+  // it anything: whether a model could see was guessed from its id, and "glm"
+  // was not in the guess, so *Read the writing* never asked it — it opened this
+  // pane instead, which looked exactly like "it won't send". Now a join asks
+  // the provider's own list (read once a page, lazily, never waited on past
+  // LIST_WAIT_MS — a list that lands later still corrects the join), and each
+  // model's row keeps its last call — ok, how long, what it came to — or the
+  // failure in full, until the next.
+  const LIST_WAIT_MS = 3000;
+  const catalogs = new Map(); // baseUrl → Promise<ModelCatalog>, read once a page; a failure is not kept
+  const factsOf = new Map();  // agent id → ModelFacts: what its provider said it can do, or why that is a guess
+  const lastCall = new Map(); // agent id → { ok, ms, at, reply, error, truncated, what } — kept until the next
+  const asking = new Map();   // agent id → calls in flight
+  const sendOf = new Map();   // agent id → the transport that keeps its last call
+
+  /** A model's name as the board says it: no `llm:`, what its provider calls it, else its id with colons as spaces — "qwen3.5 9b". */
+  function modelWords(who) {
+    if (!who) return '';
+    if (typeof who === 'string') {
+      const a = agents.find((x) => x.name === who || x.id === who);
+      if (a) return modelWords(a);
+      return /^llm:/.test(who) ? MM.modelWords({ model: who.slice(4) }) : who;
+    }
+    const c = who.config || {};
+    return c.kind === 'openai-compatible' || c.kind === 'anthropic' ? MM.modelWords(c) : (who.name || '');
+  }
+  /** A reading in words, not a slug: "state-transformation" → "state transformation". Display only — the held reading keeps its label. */
+  function readingWords(label) { return String(label || '').replace(/[-_]+/g, ' ').replace(/\s+/g, ' ').trim(); }
+  /** A reply, short enough for a row. */
+  function clipWords(text, n) { const t = String(text || '').replace(/\s+/g, ' ').trim(); return t.length > (n || 60) ? t.slice(0, (n || 60) - 1) + '…' : t; }
+  const isModel = (a) => !!a && !!a.config && (a.config.kind === 'openai-compatible' || a.config.kind === 'anthropic');
+
+  /** The provider's list, read once a page and kept; a list that could not be read is asked again next time. */
+  function catalogOf(config) {
+    const key = config.baseUrl.replace(/\/+$/, '');
+    let p = catalogs.get(key);
+    if (!p) {
+      p = MM.readModels(config).then((c) => { if (!c.ok) catalogs.delete(key); return c; });
+      catalogs.set(key, p);
+    }
+    return p;
+  }
+
+  /**
+   * What a join is told of a model: what its provider's list says, if the list answers within
+   * LIST_WAIT_MS; else what it said when the model last joined, else its id's guess — and the list,
+   * still coming, corrects the join when it lands (`later`). Anthropic is not asked: its list wants
+   * the key and says nothing of images, and every Claude model takes them.
+   */
+  async function factsFor(config, remembered) {
+    const where = MM.whereOf(config.baseUrl);
+    if (config.kind === 'anthropic') {
+      const vision = MM.guessVision(config.model);
+      return { first: { ok: true, facts: { vision: vision, from: 'id', said: 'Anthropic is not asked — every Claude model takes images', because: 'Anthropic is not asked; every Claude model takes images' } }, later: null, where: where };
+    }
+    const list = catalogOf(config);
+    let timer = 0;
+    const late = new Promise((r) => { timer = setTimeout(() => r(null), LIST_WAIT_MS); });
+    const catalog = await Promise.race([list, late]);
+    clearTimeout(timer);
+    if (catalog) return { first: MM.modelFacts(config.model, catalog, where, remembered), later: null, where: where };
+    const waiting = { ok: false, models: [], describes: false, error: 'it did not answer in ' + LIST_WAIT_MS / 1000 + ' s' };
+    return { first: MM.modelFacts(config.model, waiting, where, remembered), later: list, where: where };
+  }
+
+  /** What the facts say, on the config the transport reads: whether it sees, what it is called, what it may read and write. */
+  function applyFacts(config, facts) {
+    config.vision = !!facts.vision;
+    if (facts.title) config.title = facts.title;
+    if (facts.contextLength) config.contextLength = facts.contextLength;
+    if (facts.maxOutput) config.maxOutput = facts.maxOutput;
+  }
+
+  /** The remembered pick keeps what the provider said, so a list that cannot be read at the next visit still knows. */
+  function rememberFacts(config) {
+    const pick = store.get(PICK_KEY);
+    if (pick && pick.baseUrl === config.baseUrl && pick.model === config.model) store.set(PICK_KEY, Object.assign(pick, { vision: !!config.vision }, config.title ? { title: config.title } : {}));
+  }
+
+  /** The transport a joined model is asked through: core's, with each call kept for its row. */
+  function recording(holder) {
+    return (config, messages, opts) => {
+      const t0 = performance.now();
+      if (holder.agent) { asking.set(holder.agent.id, (asking.get(holder.agent.id) || 0) + 1); renderAgents(); }
+      return MM.complete(config, messages, opts).then((res) => {
+        if (holder.agent) noteCall(holder.agent, res, performance.now() - t0);
+        return res;
+      });
+    };
+  }
+  function sendFor(agent) {
+    if (!sendOf.has(agent.id)) sendOf.set(agent.id, recording({ agent: agent }));
+    return sendOf.get(agent.id);
+  }
+  /** A call ended: kept for the row, whatever it came to — except a cancel, which is no outcome. */
+  function noteCall(agent, res, ms) {
+    asking.set(agent.id, Math.max(0, (asking.get(agent.id) || 1) - 1));
+    if (!(res && !res.ok && res.error === 'cancelled')) {
+      lastCall.set(agent.id, { ok: !!res.ok, ms: ms, at: Date.now(), reply: res.ok ? res.text : null, error: res.ok ? null : res.error, truncated: !!(res.ok && res.truncated), what: null });
+    }
+    renderAgents();
+  }
+  /** What the call came to in the canvas's terms — read “hello”, reads it as molecule — or why its answer was no use. */
+  function noteOutcome(agent, ok, what) {
+    if (!agent || (!ok && what === 'cancelled')) return;
+    const c = lastCall.get(agent.id) || { ok: ok, ms: null, at: Date.now(), reply: null, error: null, truncated: false, what: null };
+    const next = Object.assign({}, c);
+    if (ok) { next.ok = true; next.what = what; }
+    else if (c.ok !== false) { next.ok = false; next.error = what + (c.truncated ? ' — the answer was cut off at the token limit' : ''); next.what = null; }
+    lastCall.set(agent.id, next);
+    renderAgents();
+  }
+  /** A row's last call, in a line: "ok · 1.8 s · read “hello”", or "failed · 0.4 s · HTTP 401 — bad key: …". */
+  function callLine(c) {
+    if (!c) return '';
+    const secs = c.ms == null ? '' : ' · ' + (c.ms / 1000).toFixed(1) + ' s';
+    if (c.ok) return 'ok' + secs + ' · ' + (c.what || 'replied “' + clipWords(c.reply) + '”') + (c.truncated && !c.what ? ' · cut off at the token limit' : '');
+    return 'failed' + secs + ' · ' + c.error;
+  }
+  /** Tokens, short: 202752 → "203k". */
+  const tokensShort = (n) => (n >= 1000 ? Math.round(n / 1000) + 'k' : String(n));
+
+  // ===== An ask kept until a model that can answer it is here (J5, the pure-user walkthrough) =====
+  // Asking never opens this pane as a side effect. An ask that needs a model —
+  // What is this?, Read the writing, a brief — with none here that can answer
+  // it is KEPT: the status line says so once, the field says what it needs
+  // with a way to choose one, and the moment a model that can answer it joins,
+  // it runs. The pane opens only when the hand asks for it ("choose one").
+  let keptAsk = null; // { what, needs: 'model'|'sees', need, sentence, ids, summonId, generation, run(ids) }
+  /** What a tool's ask needs that no joined model gives — "needs a model that can see" — or null. */
+  function needFor(tool) {
+    if (tool === 'read') return agents.some((a) => a.config && a.config.vision) ? null : 'needs a model that can see';
+    return agents.length ? null : 'needs a model';
+  }
+  function keepAsk(ask) {
+    const s = session.getState();
+    keptAsk = Object.assign({ at: Date.now(), generation: s.generation, summonId: s.summon ? s.summon.id : null }, ask);
+    say(ask.sentence);
+    mpStatus.textContent = ask.sentence;
+    refreshPalette();
+    return false;
+  }
+  /** The ask kept for this field, if one waits there. */
+  function keptFor(summon) { return keptAsk && summon && keptAsk.summonId === summon.id ? keptAsk : null; }
+  /** A model joined (or learned it can see): the kept ask runs if it can answer it. */
+  function runKeptAsk(agent) {
+    if (!keptAsk || !agent) return false;
+    if (keptAsk.needs === 'sees' ? !(agent.config && agent.config.vision) : !agents.includes(agent)) return false;
+    const ask = keptAsk;
+    keptAsk = null;
+    const s = session.getState();
+    const ids = (ask.ids || []).filter((id) => s.nodes.has(id));
+    if (s.generation !== ask.generation || (ask.ids && ask.ids.length && !ids.length)) {
+      say('the ask kept for a model was about marks no longer here — nothing asked');
+      refreshPalette();
+      return false;
+    }
+    say('asking ' + modelWords(agent) + ' what you asked before a model was here: ' + ask.what);
+    ask.run(ids);
+    refreshPalette();
+    return true;
+  }
+
   function syncProviderFields() {
     const p = mpProvider.value;
     mpEndpoint.hidden = p !== 'custom' && p !== 'mcp';
@@ -60,14 +227,21 @@
     // Each server says what its models can do; the pane only relays it. A
     // model that can SEE is the one that gets asked to read handwriting —
     // Ollama lists `vision` among capabilities, LM Studio types the model `vlm`.
+    // How big a model is, in billions of parameters, for suggesting one a job (J5): what the
+    // server says ("9.7B", "137M"), else what its name says ("qwen3:8b"); unknown is Infinity.
+    const billions = (said, name) => {
+      const m = /^(\d+(?:\.\d+)?)\s*([BM])/i.exec(String(said || '')) || /(\d+(?:\.\d+)?)\s*(b)\b/i.exec(String(name || ''));
+      return m ? parseFloat(m[1]) / (m[2].toUpperCase() === 'M' ? 1000 : 1) : Infinity;
+    };
     const probes = [
       { source: 'Ollama', preset: 'ollama', list: ['http://localhost:11434/api/tags'],
         pick: (d) => (d.models || []).map((m) => ({ name: m.name,
           chat: !(m.capabilities && m.capabilities.length && !m.capabilities.includes('completion')) && !/embed/i.test(m.name),
-          vision: !!(m.capabilities && m.capabilities.includes('vision')) })) },
+          vision: !!(m.capabilities && m.capabilities.includes('vision')),
+          size: billions(m.details && m.details.parameter_size, m.name) })) },
       { source: 'LM Studio', preset: 'lmStudio', list: ['http://localhost:1234/api/v0/models', 'http://localhost:1234/v1/models'],
         pick: (d) => (d.data || []).map((m) => ({ name: m.id, chat: !/embed/i.test(m.id) && m.type !== 'embeddings',
-          vision: m.type === 'vlm' })) },
+          vision: m.type === 'vlm', size: billions(null, m.id) })) },
     ];
     const settled = await Promise.allSettled(probes.map(async (pr) => {
       let all = null, err = null;
@@ -85,6 +259,7 @@
         host: MM.PRESETS[pr.preset].baseUrl.replace(/^https?:\/\//, '').replace(/\/v1$/, ''),
         models: all.filter((m) => m.chat).map((m) => m.name).sort(),
         vision: all.filter((m) => m.chat && m.vision).map((m) => m.name),
+        sizes: Object.fromEntries(all.map((m) => [m.name, m.size])),
         skipped: all.filter((m) => !m.chat).map((m) => m.name),
       };
     }));
@@ -95,62 +270,152 @@
 
   const isJoined = (baseUrl, model) => agents.some((a) => a.config.baseUrl === baseUrl && a.config.model === model);
 
+  // One model a job (J5, the pure-user walkthrough): with a long list on this
+  // machine the pane suggests the smallest model that sees, for reading
+  // writing (a word is a small job, and a 27B model takes minutes at it), and
+  // a mid-size one for What is this? — and keeps the rest behind "all N
+  // models". A flat list of thirteen asked the hand to know them all.
+  let showAllLocal = false;
+  const SUGGEST_FROM = 4; // fewer models than this are simply listed
+  const MID_SIZE_B = 8;   // What is this?: the model nearest this many billions — enough to read a brief, quick enough on a laptop
+  function suggestLocal(servers) {
+    const all = [];
+    for (const sv of servers) for (const name of sv.models) all.push({ sv: sv, name: name, sees: sv.vision.includes(name), size: (sv.sizes && sv.sizes[name]) || Infinity });
+    if (all.length < SUGGEST_FROM) return null;
+    const seers = all.filter((m) => m.sees).sort((a, b) => a.size - b.size || a.name.localeCompare(b.name));
+    const near = (m) => Math.abs(Math.log(m.size / MID_SIZE_B));
+    const sized = all.filter((m) => Number.isFinite(m.size)).sort((a, b) => near(a) - near(b) || a.name.localeCompare(b.name));
+    return { read: seers[0] || null, what: sized[0] || all[Math.floor(all.length / 2)] };
+  }
+  function modelButton(sv, m, job) {
+    const on = isJoined(sv.baseUrl, m);
+    const why = (job ? job + ' · ' : '') + (on ? 'joined' : 'local' + (sv.vision.includes(m) ? ' · sees' : '') + ' · tap to join');
+    return '<button class="model' + (job ? ' suggested' : '') + (on ? ' on' : '') + '" data-base="' + esc(sv.baseUrl) + '" data-model="' + esc(m) + '">' +
+      '<span>' + esc(m) + '</span><span class="why">' + esc(why) + '</span></button>';
+  }
+
   function renderLocal() {
     if (!localServers.length) {
       mpLocal.innerHTML = '<div class="note">nothing answered on :11434 or :1234</div>';
       return;
     }
     let html = '';
-    for (const sv of localServers) {
-      html += '<div class="server"><b>' + esc(sv.source) + '</b><span>' + esc(sv.host) + '</span></div>';
-      for (const m of sv.models) {
-        const on = isJoined(sv.baseUrl, m);
-        html += '<button class="model' + (on ? ' on' : '') + '" data-base="' + esc(sv.baseUrl) + '" data-model="' + esc(m) + '">' +
-          '<span>' + esc(m) + '</span><span class="why">' + (on ? 'joined' : 'local' + (sv.vision.includes(m) ? ' · sees' : '') + ' · tap to join') + '</span></button>';
-      }
-      if (!sv.models.length && sv.skipped.length) {
-        html += '<div class="note">only embedding models here — they cannot chat</div>';
-      } else if (sv.skipped.length) {
-        html += '<div class="note">' + sv.skipped.length + ' embedding model' + (sv.skipped.length === 1 ? '' : 's') + ' hidden</div>';
+    const sug = suggestLocal(localServers);
+    if (sug) {
+      const count = localServers.reduce((n, sv) => n + sv.models.length, 0);
+      const jobs = new Map();
+      const add = (m, job) => { if (!m) return; const k = m.sv.baseUrl + ' ' + m.name; if (jobs.has(k)) jobs.get(k).jobs.push(job); else jobs.set(k, { m: m, jobs: [job] }); };
+      add(sug.read, 'reads writing');
+      add(sug.what, 'what is this?');
+      html += '<div class="server"><b>suggested</b><span>one model a job</span></div>';
+      for (const j of jobs.values()) html += modelButton(j.m.sv, j.m.name, j.jobs.join(' · '));
+      html += '<button class="ghost mpAll" type="button">' + (showAllLocal ? 'fewer ▴' : 'all ' + count + ' models ▾') + '</button>';
+    }
+    if (!sug || showAllLocal) {
+      for (const sv of localServers) {
+        html += '<div class="server"><b>' + esc(sv.source) + '</b><span>' + esc(sv.host) + '</span></div>';
+        for (const m of sv.models) html += modelButton(sv, m, null);
+        if (!sv.models.length && sv.skipped.length) {
+          html += '<div class="note">only embedding models here — they cannot chat</div>';
+        } else if (sv.skipped.length) {
+          html += '<div class="note">' + sv.skipped.length + ' embedding model' + (sv.skipped.length === 1 ? '' : 's') + ' hidden</div>';
+        }
       }
     }
     mpLocal.innerHTML = html;
     mpLocal.querySelectorAll('.model').forEach((btn) => {
       btn.onclick = () => {
         const sv = localServers.find((x) => x.baseUrl === btn.dataset.base);
-        join(Object.assign({}, MM.PRESETS[sv.preset], { model: btn.dataset.model, vision: sv.vision.includes(btn.dataset.model) }), { provider: sv.preset });
+        const name = btn.dataset.model, sees = sv.vision.includes(name);
+        const because = sv.source + (sees ? ' lists vision among what it takes' : ' lists no vision for it');
+        join(Object.assign({}, MM.PRESETS[sv.preset], { model: name, vision: sees }), { provider: sv.preset }, { vision: sees, from: 'provider', said: because, because: because });
       };
     });
+    const all = mpLocal.querySelector('.mpAll');
+    if (all) all.onclick = () => { showAllLocal = !showAllLocal; renderLocal(); };
   }
 
   // --- Joining, and remembering ---
-  function join(config, pick) {
+  // `facts`: what its provider said it can do, or why that is a guess (J5) — the row's tooltip, and the
+  // reason a model that reads text only gives when writing is to be read.
+  function join(config, pick, facts) {
     if (isJoined(config.baseUrl, config.model)) {
-      mpStatus.textContent = config.model + ' is already here.';
+      mpStatus.textContent = MM.modelWords(config) + ' is already here.';
       return null;
     }
     // Several models may run at once — that is the point. Every model is
-    // tier 2; local or hosted is a cost the router pays attention to.
-    const agent = MM.createAgentParticipant(session, config, Date.now());
+    // tier 2; local or hosted is a cost the router pays attention to. Each is
+    // asked through a transport that keeps its last call for its row (J5).
+    const holder = {};
+    const send = recording(holder);
+    const agent = MM.createAgentParticipant(session, config, Date.now(), { transport: send });
+    holder.agent = agent;
+    sendOf.set(agent.id, send);
+    if (facts) factsOf.set(agent.id, facts);
     agents.push(agent);
-    if (pick) store.set(PICK_KEY, Object.assign({ baseUrl: config.baseUrl, model: config.model, kind: config.kind }, pick));
-    mpStatus.textContent = agent.name + ' joined (' + MM.providerLocality(config) + (config.vision ? ', sees' : '') + ').';
+    // The pick remembers what the provider said (whether it sees, what it is called) — never the key, which is its own entry.
+    if (pick) store.set(PICK_KEY, Object.assign({ baseUrl: config.baseUrl, model: config.model, kind: config.kind, vision: !!config.vision }, config.title ? { title: config.title } : {}, pick));
+    mpStatus.textContent = modelWords(agent) + ' joined (' + MM.providerLocality(config) + (config.vision ? ', sees' : '') + ').';
     renderAgents();
     renderLocal();
     syncTiles();
     render(session.getState());
-    // Nothing is read on join: a model is asked when you ask (§6.3). Auto-read is the one exception, and it is a tile.
+    // Nothing is read on join: a model is asked when you ask (§6.3). Auto-read is the one exception, and it is a tile —
+    // and an ask the hand made before any model was here, kept for one that can answer it (J5).
     if (autoRead) readWriting(session.getState());
+    runKeptAsk(agent);
     return agent;
+  }
+
+  /**
+   * Join a hosted model, or one at a custom endpoint, the way its provider says it can be (J5): its
+   * list is asked what the model is — refused, with the nearest ids, when the list holds no such id;
+   * joined with whether it sees and what it reads when it does; joined on its id's guess, said to be,
+   * when the list does not answer within LIST_WAIT_MS, and corrected when it lands.
+   */
+  const joining = new Set();
+  async function joinHosted(config, pick, remembered) {
+    const k = config.baseUrl + ' ' + config.model;
+    if (isJoined(config.baseUrl, config.model)) { mpStatus.textContent = MM.modelWords(config) + ' is already here.'; return null; }
+    if (joining.has(k)) return null;
+    joining.add(k);
+    try {
+      const where = MM.whereOf(config.baseUrl);
+      mpStatus.textContent = 'asking ' + where.name + ' what ' + config.model + ' can do…';
+      const got = await factsFor(config, remembered);
+      if (!got.first.ok) { mpStatus.textContent = got.first.error; return null; }
+      applyFacts(config, got.first.facts);
+      const agent = join(config, pick, got.first.facts);
+      if (!agent) return null;
+      rememberFacts(config);
+      mpStatus.textContent = modelWords(agent) + ' joined — ' + got.first.facts.said + '.';
+      if (got.later) got.later.then((catalog) => refineFacts(agent, catalog, got.where));
+      return agent;
+    } finally {
+      joining.delete(k);
+    }
+  }
+  /** The provider's list landed after the join: what it says now stands — or, where it holds no such id, the row says so. */
+  function refineFacts(agent, catalog, where) {
+    if (!agents.includes(agent) || !catalog || !catalog.ok) return;
+    const f = MM.modelFacts(agent.config.model, catalog, where);
+    if (!f.ok) { noteOutcome(agent, false, f.error); mpStatus.textContent = f.error; return; }
+    applyFacts(agent.config, f.facts);
+    factsOf.set(agent.id, f.facts);
+    rememberFacts(agent.config);
+    renderAgents();
+    syncTiles();
+    runKeptAsk(agent);
   }
 
   function leave(agent) {
     const i = agents.indexOf(agent);
     if (i >= 0) agents.splice(i, 1);
+    factsOf.delete(agent.id); lastCall.delete(agent.id); asking.delete(agent.id); sendOf.delete(agent.id);
     // The session keeps the join in its history; it simply stops being asked.
     const pick = store.get(PICK_KEY);
     if (pick && pick.baseUrl === agent.config.baseUrl && pick.model === agent.config.model) { store.del(PICK_KEY); store.del(KEY_KEY); }
-    mpStatus.textContent = agent.name + ' left.';
+    mpStatus.textContent = modelWords(agent) + ' left.';
     renderAgents();
     renderLocal();
     syncTiles();
@@ -169,13 +434,38 @@
   renderTools();
   MM.onToolsChange(renderTools);
 
+  // Each joined model, in words (J5): what it is, where, whether it sees and how much it reads — the tooltip says
+  // what its provider said, or why that is a guess — its last call, kept until the next, and *try it*.
   function renderAgents() {
-    mpList.innerHTML = agents.map((a, i) =>
-      '<div class="mpItem"><span>' + esc(a.name) + '</span>' +
-      '<span class="t">' + MM.providerLocality(a.config) + (a.config.vision ? ' · sees' : '') + '</span>' +
-      '<button class="ghost" data-leave="' + i + '">leave</button></div>'
-    ).join('');
+    mpList.innerHTML = agents.map((a, i) => {
+      const f = factsOf.get(a.id);
+      const tags = [a.config.kind === 'mcp' ? 'mcp' : MM.providerLocality(a.config)];
+      if (isModel(a)) tags.push(a.config.vision ? 'sees' : 'text only');
+      if (a.config.contextLength) tags.push(tokensShort(a.config.contextLength));
+      const c = lastCall.get(a.id), busy = (asking.get(a.id) || 0) > 0;
+      const line = busy ? 'asking now' + (c ? ' · last: ' + callLine(c) : '') : callLine(c);
+      return '<div class="mpItem">' +
+        '<div class="mpItemHead"><span class="n" title="' + esc(a.name) + '">' + esc(modelWords(a)) + '</span>' +
+        '<span class="t"' + (f ? ' title="' + esc(f.said) + '"' : '') + '>' + esc(tags.join(' · ')) + '</span>' +
+        (isModel(a) ? '<button class="ghost" data-try="' + i + '" title="one tiny prompt: is it there, and does it answer?">try it</button>' : '') +
+        '<button class="ghost" data-leave="' + i + '">leave</button></div>' +
+        (line ? '<div class="mpCall ' + (busy ? 'busy' : c.ok ? 'ok' : 'bad') + '">' + esc(line) + '</div>' : '') +
+        '</div>';
+    }).join('');
     mpList.querySelectorAll('[data-leave]').forEach((b) => { b.onclick = () => leave(agents[Number(b.dataset.leave)]); });
+    mpList.querySelectorAll('[data-try]').forEach((b) => { b.onclick = () => tryModel(agents[Number(b.dataset.try)]); });
+  }
+
+  // *Try it* (J5): one tiny prompt, a deliberate act, and the reply — or the failure, in full — in the row.
+  const TRY_MESSAGES = [
+    { role: 'system', content: 'This is a connection check from a drawing canvas. Reply with the single word ok and nothing else.' },
+    { role: 'user', content: 'Are you there?' },
+  ];
+  async function tryModel(agent) {
+    if (!agent || !isModel(agent)) return;
+    const res = await sendFor(agent)(agent.config, TRY_MESSAGES, {});
+    if (res.ok) noteOutcome(agent, true, 'replied “' + clipWords(res.text) + '”');
+    mpStatus.textContent = modelWords(agent) + (res.ok ? ' answered.' : ' did not answer — ' + res.error);
   }
 
   document.getElementById('mpAdd').onclick = () => {
@@ -184,8 +474,6 @@
     const model = (mpModel.value || DEFAULT_MODEL[p] || '').trim();
     const key = mpKey.value.trim();
     if (!model) { mpStatus.textContent = 'Which model? Type its id.'; return; }
-    // Hosted servers do not say what a model can do; the id is the only clue.
-    const vision = /claude|gpt-4o|gpt-5|gemini|qwen3\.5|qwen.*vl|vision|pixtral|llava/i.test(model);
     let config;
     if (p === 'custom') {
       const base = mpEndpoint.value.trim().replace(/\/+$/, '');
@@ -196,35 +484,44 @@
       config = Object.assign({}, MM.PRESETS[p], { model: model });
     }
     if (key) config.apiKey = key;
-    const agent = join(config, { provider: p, endpoint: p === 'custom' ? config.baseUrl : undefined });
-    if (!agent) return;
-    // The key is remembered only when asked, and only on this device.
-    if (key && mpRememberKey.checked) store.set(KEY_KEY, key); else store.del(KEY_KEY);
-    mpKey.value = '';
+    // What it can do is the provider's to say (J5): its list, read once a page; the id's guess only when the list cannot be read.
+    joinHosted(config, { provider: p, endpoint: p === 'custom' ? config.baseUrl : undefined }).then((agent) => {
+      if (!agent) return;
+      // The key is remembered only when asked, and only on this device.
+      if (key && mpRememberKey.checked) store.set(KEY_KEY, key); else store.del(KEY_KEY);
+      mpKey.value = '';
+    });
   };
 
   // --- Coming back: the remembered pick rejoins if it can ---
   async function rejoinRemembered() {
     const pick = store.get(PICK_KEY);
     if (!pick) return;
-    if (MM.providerTier({ baseUrl: pick.baseUrl }) === 1) {
+    // A local server's model is asked for again where it runs. (This asked `providerTier(…) === 1`,
+    // which has been 2 for every model since 6 Sep — so a remembered Ollama pick asked for a key.)
+    if (pick.provider === 'ollama' || pick.provider === 'lmStudio') {
       const servers = await probeLocal();
       const sv = servers.find((x) => x.baseUrl === pick.baseUrl);
-      if (sv && sv.models.includes(pick.model)) join(Object.assign({}, MM.PRESETS[sv.preset], { model: pick.model, vision: sv.vision.includes(pick.model) }), null);
-      else mpStatus.textContent = 'Remembered ' + pick.model + ', but ' + pick.baseUrl + ' is not offering it right now.';
+      if (sv && sv.models.includes(pick.model)) {
+        const sees = sv.vision.includes(pick.model);
+        const because = sv.source + (sees ? ' lists vision among what it takes' : ' lists no vision for it');
+        join(Object.assign({}, MM.PRESETS[sv.preset], { model: pick.model, vision: sees }), null, { vision: sees, from: 'provider', said: because, because: because });
+      } else mpStatus.textContent = 'Remembered ' + pick.model + ', but ' + pick.baseUrl + ' is not offering it right now.';
       return;
     }
     const key = store.get(KEY_KEY);
     const config = pick.provider === 'custom'
       ? { kind: 'openai-compatible', baseUrl: pick.baseUrl, model: pick.model }
       : Object.assign({}, MM.PRESETS[pick.provider] || { kind: pick.kind, baseUrl: pick.baseUrl }, { model: pick.model });
-    if (key) { config.apiKey = key; join(config, null); return; }
+    // What the provider said when it last joined stands until its list says otherwise (J5).
+    const remembered = typeof pick.vision === 'boolean' ? { vision: pick.vision, title: pick.title } : undefined;
+    if (key) { config.apiKey = key; joinHosted(config, null, remembered); return; }
     if (pick.provider !== 'custom') {
       mpProvider.value = pick.provider; syncProviderFields(); mpModel.value = pick.model;
       mpStatus.textContent = 'Remembered ' + pick.model + ' — enter its key to rejoin.';
     } else {
       mpProvider.value = 'custom'; syncProviderFields(); mpEndpoint.value = pick.baseUrl; mpModel.value = pick.model;
-      join(config, null);
+      joinHosted(config, null, remembered);
     }
   }
 
@@ -446,19 +743,26 @@
   const readGroups = new Map();
   function askModelsAbout(ids) {
     if (!ids || !ids.length) { say('nothing to read'); return false; }
-    if (agents.length === 0) { offerModel('Reading a group needs a model.'); return false; }
+    // No model here: the ask is kept, said once, and runs when one joins — never the pane popped over the field (J5).
+    if (agents.length === 0) {
+      return keepAsk({ what: 'What is this?', needs: 'model', need: 'needs a model', ids: ids.slice(), run: (live) => askModelsAbout(live),
+        sentence: 'What is this? needs a model — kept: it runs when one joins · choose one under models' });
+    }
     cancelReading();
     readGroups.set(ids[0], ids.slice());
     const ctl = new AbortController();
     reading = ctl;
     let left = agents.length;
     agents.forEach((agent) => {
-      withWork('read:' + agent.id + ':' + ids.join('+'), ids, agent.name + ' · reading the group', agent.interpret(ids, Date.now(), ctl.signal)).then((res) => {
+      withWork('read:' + agent.id + ':' + ids.join('+'), ids, modelWords(agent) + ' · reading the group', agent.interpret(ids, Date.now(), ctl.signal)).then((res) => {
         if (ctl.signal.aborted) return;
         if (--left === 0 && reading === ctl) reading = null;
+        // The row keeps what it came to; the status line says it once — a reading in words, a failure in full (J5).
+        const words = res.ok ? res.readings.map((r) => readingWords(r.label)).join(', ') : '';
+        noteOutcome(agent, res.ok, res.ok ? 'reads it as ' + words : res.error);
         say(res.ok
-          ? agent.name + ' reads it as ' + res.readings.map((r) => r.label).join(', ')
-          : agent.name + ' unavailable (' + res.error + ')');
+          ? modelWords(agent) + ' reads it as ' + words
+          : modelWords(agent) + ' could not read it — ' + res.error);
         render(session.getState());
         refreshPalette();
       });
