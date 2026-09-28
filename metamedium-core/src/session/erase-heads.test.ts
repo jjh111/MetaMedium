@@ -313,3 +313,41 @@ describe('a real scratch still erases — back and forth across a mark, two to f
     expect(erased(s, d.box)).toBe(true);
   });
 });
+
+// ===== An open mark too (found by the sequence-diagram unit) =====
+
+describe('an open mark too: a message whose tip crosses a lifeline leaves the lifeline standing', () => {
+  const lifeline = (s: Session, seed: number) => s.addStroke(handLine({ x: 500, y: 100 }, { x: 502, y: 700 }, { seed, jitter: 1 }), 1000);
+
+  it('a message drawn to a lifeline from either side, at three sizes, its tip on it or past it with the barb back across — the lifeline stands and the message is ink', () => {
+    const lost: string[] = [];
+    for (const from of [-1, 1]) {
+      for (const [len, headLen] of [[120, 12], [200, 18], [360, 30]]) {
+        for (const past of [0, 3, 6]) {
+          for (const head of ['one wing', 'two wings', 'a chevron apart'] as Head[]) {
+            for (const seed of [1, 2, 3]) {
+              const s = createSession();
+              const line = lifeline(s, seed);
+              const y = 250 + seed * 60;
+              const dir = { x: -from, y: 0 };
+              const tip = { x: 501 + dir.x * past, y };
+              const ids = arrowStrokes(tip, dir, len, headLen, head, seed, 1).map((pts, k) => s.addStroke(pts, 5000 + k * 600));
+              const took = ids.filter((id) => gesture(s, id));
+              if (erased(s, line) || took.length) lost.push(`${from < 0 ? 'from the left' : 'from the right'} ${len} past ${past} ${head} seed ${seed}${took.length ? ` — ${took.map((id) => gesture(s, id)?.role).join(', ')}` : ''}`);
+            }
+          }
+        }
+      }
+    }
+    expect(lost, `lost ${lost.length}:\n  ${lost.slice(0, 8).join('\n  ')}`).toEqual([]);
+  });
+
+  it('the control: a scratch across a lifeline still rubs it out', () => {
+    for (const seed of [1, 2, 3]) {
+      const s = createSession();
+      const line = lifeline(s, seed);
+      s.addStroke(handScratch(501, 400, 60, 50, 3, { step: 6, jitter: 1, seed }), 5000);
+      expect(erased(s, line)).toBe(true);
+    }
+  });
+});

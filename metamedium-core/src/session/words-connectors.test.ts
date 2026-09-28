@@ -277,3 +277,64 @@ describe('the control: what a real hand prints still gathers into its words', ()
     expect(getRep(s.getState().nodes.get(ids[0])!, 'gesture')).toBeUndefined();
   });
 });
+
+// ===== A head drawn apart (found by the sequence-diagram unit) =====
+
+describe('a head drawn apart is part of its connector, never a letter', () => {
+  it('a self-message loop on a lifeline, and its head drawn right after it — a chevron, or a small closed triangle — are neither of them letters', () => {
+    const wrong: string[] = [];
+    for (const head of ['chevron', 'triangle'] as const) {
+      for (const seed of [1, 2, 3]) {
+        const s = createSession();
+        s.addStroke(handLine({ x: 500, y: 100 }, { x: 501, y: 700 }, { seed, jitter: 1 }), 1000);
+        // Out from the lifeline, down, and back to it: a loop 44 wide and 34 tall.
+        const loop = s.addStroke([
+          ...handLine({ x: 503, y: 300 }, { x: 538, y: 300 }, { seed, jitter: 0.8 }),
+          ...handLine({ x: 538, y: 300 }, { x: 546, y: 308 }, { seed: seed + 1, jitter: 0.4 }).slice(1),
+          ...handLine({ x: 546, y: 308 }, { x: 546, y: 326 }, { seed: seed + 2, jitter: 0.6 }).slice(1),
+          ...handLine({ x: 546, y: 326 }, { x: 538, y: 334 }, { seed: seed + 3, jitter: 0.4 }).slice(1),
+          ...handLine({ x: 538, y: 334 }, { x: 503, y: 334 }, { seed: seed + 4, jitter: 0.8 }).slice(1),
+        ], 5000);
+        // Its head at (503, 334), pointing left, into the lifeline.
+        const pts = head === 'chevron'
+          ? [...handLine({ x: 513, y: 327 }, { x: 503, y: 334 }, { seed: seed + 5, jitter: 0.4 }), ...handLine({ x: 503, y: 334 }, { x: 513, y: 341 }, { seed: seed + 6, jitter: 0.4 }).slice(1)]
+          : [...handLine({ x: 503, y: 334 }, { x: 515, y: 327 }, { seed: seed + 5, jitter: 0.3 }), ...handLine({ x: 515, y: 327 }, { x: 515, y: 341 }, { seed: seed + 6, jitter: 0.3 }).slice(1), ...handLine({ x: 515, y: 341 }, { x: 503, y: 334 }, { seed: seed + 7, jitter: 0.3 }).slice(1)];
+        const h = s.addStroke(pts, 5400);
+        if (inAWord(s, loop) || inAWord(s, h)) wrong.push(`${head} seed ${seed}: ${JSON.stringify(wordsOf(s).map((w) => w.map((id) => (id === loop ? 'loop' : id === h ? 'head' : id))))}`);
+      }
+    }
+    expect(wrong).toEqual([]);
+  });
+
+  it("a dashed line's last dash and the chevron that ends it are neither of them letters, and no dash is gathered back", () => {
+    const wrong: string[] = [];
+    for (const seed of [1, 2, 3]) {
+      const s = createSession();
+      const dashes: string[] = [];
+      let t = 5000;
+      for (let x = 100; x < 290; x += 26) {
+        dashes.push(s.addStroke(handLine({ x, y: 400 + (seed % 2) }, { x: x + 16, y: 400 }, { seed: seed + x, jitter: 0.5 }), t));
+        t += 150;
+      }
+      const tipX = 100 + 26 * (dashes.length - 1) + 16;
+      const chevron = s.addStroke([...handLine({ x: tipX - 12, y: 393 }, { x: tipX, y: 400 }, { seed: seed + 5, jitter: 0.4 }), ...handLine({ x: tipX, y: 400 }, { x: tipX - 12, y: 407 }, { seed: seed + 6, jitter: 0.4 }).slice(1)], t + 150);
+      const gathered = [...dashes, chevron].filter((id) => inAWord(s, id));
+      if (gathered.length) wrong.push(`seed ${seed}: ${gathered.length} of its ${dashes.length} dashes and chevron gathered into a word`);
+    }
+    expect(wrong).toEqual([]);
+  });
+
+  it('the control: a word printed with stems, bowls and dots — "hid", "slid", "sold", "held" — still gathers whole', () => {
+    const wrong: string[] = [];
+    for (const text of ['hid', 'slid', 'sold', 'held']) {
+      for (const seed of [1, 2, 3]) {
+        const s = createSession();
+        const p = handPrint(text, 100, 300, { xHeight: 34, seed });
+        const { ids } = write(s, p.strokes, 1000);
+        const ws = wordsOf(s);
+        if (ws.length !== 1 || !sameSet(ws[0], ids)) wrong.push(`"${text}" seed ${seed}: ${JSON.stringify(ws.map((w) => w.length))} of ${ids.length}`);
+      }
+    }
+    expect(wrong).toEqual([]);
+  });
+});
