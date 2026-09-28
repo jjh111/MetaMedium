@@ -1,6 +1,6 @@
 // ===== inspector =====
 // Provides: the panel: a mark, an artifact, a word, the selection.
-// Uses: core, render (readRungs), snap, handwriting, models.
+// Uses: core, render (readRungs, logKey, paintReference), snap, handwriting, models.
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () { ... })();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -61,6 +61,17 @@
   /** The kind of an artifact's newest code rep, html by default. */
   function codeKindOf(node) { const r = node && codeRepOf(node); return (r && r.data.kind) || 'html'; }
 
+  // The panel is written only when what it says changed (R4c): a pan or a
+  // hover repaints the board, and rebuilding the panel's DOM with the same
+  // words on every frame was work for nothing — and closed whatever a hand
+  // had opened in it. Every write to the panel goes through here.
+  let panelSaid = null;
+  function showPanel(html) {
+    if (html === panelSaid) return;
+    panelSaid = html;
+    inspectorEl.innerHTML = html;
+  }
+
   function renderInspector(s, id) {
     if (s.summon) return renderSummonScope(s);
 
@@ -73,17 +84,17 @@
       // It is not a tour and not a mode: it is the empty state of one row, and
       // the first mark drawn replaces it with that mark's reading.
       if (!s.contentIds.length && !s.artifacts.length) {
-        inspectorEl.innerHTML = '<div class="eyebrow">nothing drawn yet</div>' +
+        showPanel('<div class="eyebrow">nothing drawn yet</div>' +
           '<ol class="firstLoop">' +
           '<li><b>draw a few marks</b> — a box, a circle, a line</li>' +
           '<li><b>press and hold one</b> — it is held with what it sits with</li>' +
           '<li><b>choose what it becomes</b> — tap a pill, or type in the field</li>' +
           '</ol>' +
-          '<div class="why">the canvas reads every mark as you draw it; a model is asked only when you ask one</div>';
+          '<div class="why">the canvas reads every mark as you draw it; a model is asked only when you ask one</div>');
         return;
       }
-      inspectorEl.innerHTML = '<div class="eyebrow">mark</div>' +
-        '<div class="empty">nothing here yet</div>';
+      showPanel('<div class="eyebrow">mark</div>' +
+        '<div class="empty">nothing here yet</div>');
       return;
     }
 
@@ -342,7 +353,7 @@
         '<div class="row"><span class="k">size</span><span class="v">' + Math.round(fp.size) + 'px</span></div>';
     }
 
-    inspectorEl.innerHTML = html;
+    showPanel(html);
   }
 
   /**
@@ -376,9 +387,14 @@
     return { here: 'shapes' + (shapes.length ? ', ' + [...new Set(shapes)].join(', ') : ''), next: 'draw them clean · a name · a brief is a program' };
   }
 
+  // What the selection reads as, kept while the log stands (R4c): a pan with
+  // the field open used to read every held mark again on every frame.
+  let scopeRead = { key: null, reading: null };
   function renderSummonScope(s) {
     const sum = s.summon;
-    const reading = session.read(sum.enclosedIds);
+    const key = logKey() + '|' + sum.enclosedIds.join(',');
+    if (paintReference || scopeRead.key !== key) scopeRead = { key: paintReference ? null : key, reading: session.read(sum.enclosedIds) };
+    const reading = scopeRead.reading;
     let html = '<div class="eyebrow">selection</div>';
 
     html += '<div class="row"><span class="k">holds</span><span class="v">' +
@@ -448,7 +464,7 @@
       if (strongest) html += '<div class="why">' + esc(strongest.kind + ': ' + strongest.reasoning) + '</div>';
     }
 
-    inspectorEl.innerHTML = html;
+    showPanel(html);
   }
 
   // Debug handle. This is a reference surface for the engine, so reading the

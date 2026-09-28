@@ -25,9 +25,13 @@
     working: () => [...working.keys()],
     // A hand's word on its own ink, for tests: where the last paint drew each label, and a mark's ink colour.
     labelsDrawn: () => labelsDrawn.map((l) => Object.assign({}, l)),
+    // What the last paint drew under the inspected mark, and the check that a hand's paint draws and says what the whole-board read would (R4c).
+    readingDrawn: () => (readingDrawn ? Object.assign({}, readingDrawn) : null), paintCheck: paintCheck, rolesCheck: rolesCheck, heldCheck: heldCheck, paints: () => paints,
+    // Point at a mark the way a hover does, for tests: it is inspected, its reading drawn under it and its ladder in the panel.
+    inspect: (id) => { hoverId = id || null; render(state); },
     colourOf: (id) => { const n = session.getState().nodes.get(id); return n ? colourOf(n) : null; },
     // The colour the last paint stroked a mark's ink in — inside an artifact too, where each mark keeps its drawer's (L2f).
-    inkDrawn: (id) => inkDrawn.get(id) || null,
+    inkDrawn: (id) => inkDrawn.get(id) || inkWouldBe(id) || null,
     // The explanation plane, for tests: where the last paint put each answer card.
     answerCards: () => cardRects.map((c) => ({ id: c.id, about: c.about.slice(), what: c.what, who: c.who, ago: c.ago, x: c.x, y: c.y, w: c.w, h: c.h })),
     // Text folds back from ink, for tests: the words of a text where they stand.

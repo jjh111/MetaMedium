@@ -15,6 +15,22 @@ the budgets' table and the three hotspots it fixed (2, 4 and 5). Every number
 a hand feels in a browser is still the surface's, which R4c takes next: the
 whole-board read below is unchanged, 7.9 s at 2,000.*
 
+*After R4c (27 Sep 2026, `79971d0`–`317f514` on `w2`): the surface holds
+them too. On the 2,000-mark board it opens in 0.49 s (was 7.9 s after R4b,
+100 s before it), draws a stroke's reading 16 ms after the release (40 ms
+at p95, the first release after a pan; was 7.5 s), takes a pointer move in
+0.2 ms (was 6.6 ms after R4b, 39 ms before it) and pans in one frame at
+zoom 1 and two at fit-all (was 117 ms) — every budget of the 2,000 board
+met. The 5,000 board opens in 1.09 s (it crashed after 13 minutes) and
+meets them too but one: zoomed out to the whole of it, a pan is 50 ms a
+frame, 67 at p95. What changed is in the "after R4c" columns of the
+surface's tables and the budgets' table, and hotspots 1 and 6: a stroke is
+read for its neighbourhood, never the board; everything a paint derives from
+the log is kept while that log stands; painting is culled to the screen; a
+pointer move paints the pen and nothing else; a pan paints once a frame. The
+equivalence check (`paintCheck`, the gate's `budgets` scenario) holds a hand's
+paint to the whole-board read, drawing and saying.*
+
 *After R4d (27 Sep 2026, on `w2-shard`): a room merges a line, not the
 board. On the 2,000-mark board a line another hand sends costs 1.65 ms
 median and 2.03 ms p95 (was 312 / 317 ms on R4b's engine, 173 s before
@@ -216,51 +232,62 @@ Command: `node --expose-gc metamedium-core/bench/engine.mjs hello --size=2000` (
 
 ### Surface — chromium 153.0.8010.12 (1440x900 @1x, headless)
 
-| | 500 | 2,000 |
-|---|---|---|
-| **open, restored from browser storage** (navigation → board drawn) | 2.21 s (longest task 2.17 s) | did not open: browser storage refused the log (QuotaExceededError) |
-| **open as a folder** (`?folder=`) | 2.32 s (longest task 2.21 s) | 100.4 s (longest task 100.1 s) |
-| renderer heap after open (used of limit) | 98 of 3586 MB | 853 of 3586 MB |
-| one paint alone: fit-all / zoom 1 | 3.40 ms / 2.30 ms | 32.0 ms / 36.3 ms |
-| **pan at fit-all**: handler · frame (median / p95) | 3.30 ms / 3.70 ms · 33.3 ms / 33.4 ms | 38.4 ms / 41.2 ms · 117 ms / 133 ms |
-| **pan at zoom 1**: handler · frame | 2.70 ms / 3.60 ms · 16.7 ms / 16.7 ms | 39.5 ms / 42.9 ms · 49.9 ms / 50.1 ms |
-| **drawing**: pointer-move handler · frame | 3.30 ms / 3.70 ms · 16.7 ms / 16.8 ms | 38.8 ms / 41.2 ms · 16.8 ms / 33.4 ms |
-| **release → reading drawn** (median / p95, n 5) | 147 ms / 148 ms | 7.59 s / 7.65 s |
-| the release handler alone | 143 ms / 144 ms | 7.59 s / 7.65 s |
-| what the strokes read as | rectangle 0.91, rectangle 0.91, rectangle 0.91, rectangle 0.91, rectangle 0.91 | rectangle 0.91, rectangle 0.91, rectangle 0.91, rectangle 0.91, rectangle 0.91 |
-| autosave: stringify · into browser storage | 6.20 ms · 1.30 ms | 29.9 ms · refused (QuotaExceededError) |
+| | 500 | 2,000 | **after R4c**: 500; 2,000 |
+|---|---|---|---|
+| **open, restored from browser storage** (navigation → board drawn) | 2.21 s (longest task 2.17 s) | did not open: browser storage refused the log (QuotaExceededError) | 150 ms (longest task 87 ms); did not open — storage refuses it |
+| **open as a folder** (`?folder=`) | 2.32 s (longest task 2.21 s) | 100.4 s (longest task 100.1 s) | 187 ms (longest task 94 ms); **485 ms** (longest task 315 ms) |
+| renderer heap after open (used of limit) | 98 of 3586 MB | 853 of 3586 MB | 14 of 3586 MB; 38 of 3586 MB |
+| one paint alone: fit-all / zoom 1 | 3.40 ms / 2.30 ms | 32.0 ms / 36.3 ms | 1.30 / 0.20 ms; 4.00 / 1.40 ms |
+| **pan at fit-all**: handler · frame (median / p95) | 3.30 ms / 3.70 ms · 33.3 ms / 33.4 ms | 38.4 ms / 41.2 ms · 117 ms / 133 ms | 0.00 / 0.10 ms · 16.7 / 16.8 ms; 0.00 / 0.10 ms · **33.3 / 33.4 ms** |
+| **pan at zoom 1**: handler · frame | 2.70 ms / 3.60 ms · 16.7 ms / 16.7 ms | 39.5 ms / 42.9 ms · 49.9 ms / 50.1 ms | 0.00 / 0.10 ms · 16.7 / 16.7 ms; 0.00 / 0.10 ms · **16.7 / 16.8 ms** |
+| **drawing**: pointer-move handler · frame | 3.30 ms / 3.70 ms · 16.7 ms / 16.8 ms | 38.8 ms / 41.2 ms · 16.8 ms / 33.4 ms | 0.10 / 0.20 ms · 16.7 / 16.8 ms; **0.10 / 0.20 ms** · 16.7 / 16.7 ms |
+| **release → reading drawn** (median / p95, n 5) | 147 ms / 148 ms | 7.59 s / 7.65 s | 16.9 / 39.7 ms; **15.5 / 40.0 ms** |
+| the release handler alone | 143 ms / 144 ms | 7.59 s / 7.65 s | 3.90 / 12.6 ms; 8.20 / 14.9 ms |
+| what the strokes read as | rectangle 0.91, rectangle 0.91, rectangle 0.91, rectangle 0.91, rectangle 0.91 | rectangle 0.91, rectangle 0.91, rectangle 0.91, rectangle 0.91, rectangle 0.91 | the same, each with its reading drawn under it: rectangle · node |
+| autosave: stringify · into browser storage | 6.20 ms · 1.30 ms | 29.9 ms · refused (QuotaExceededError) | 5.90 ms · 3.50 ms; 27.9 ms · refused |
 
 Command: `node e2e/perf.mjs --browser=chromium --sizes=500,2000`
 
+The **after R4c** column: `317f514` on `w2`, 27 Sep 2026, load 4–6, the same command. A pan's handler is now nothing because it paints nothing: the wheel moves the view and the paint happens once, in the next frame, so the frame interval is the whole cost. The release's p95 is its first stroke, the first release after the pans: 22 ms of it is the browser's own work in the frame after it (`WebFrameWidgetImpl::BeginMainFrame`, nothing inside it instrumented, no script), once — the next four land in 15–16 ms. It appeared when the surface stopped writing the mark chip into the page on every paint (`03-teach.js`), which is right to stop; with that write put back, the first release is 17 ms too.
+
 ### Surface — chromium 153.0.8010.12 (1440x900 @1x, headless)
 
-| | 5,000 |
-|---|---|
-| **open, restored from browser storage** (navigation → board drawn) | did not open: browser storage refused the log (QuotaExceededError) |
-| **open as a folder** (`?folder=`) | did not open: the tab crashed (2026-09-27T23:16:04.449Z) after 786.5 s |
+| | 5,000 | **after R4c** |
+|---|---|---|
+| **open, restored from browser storage** (navigation → board drawn) | did not open: browser storage refused the log (QuotaExceededError) | not asked — storage refuses it |
+| **open as a folder** (`?folder=`) | did not open: the tab crashed (2026-09-27T23:16:04.449Z) after 786.5 s | **1.09 s** (longest task 756 ms) |
+| renderer heap after open (used of limit) | — | 104 of 3586 MB |
+| one paint alone: fit-all / zoom 1 | — | 8.40 / 0.90 ms |
+| **pan at fit-all**: handler · frame (median / p95) | — | 0.00 / 0.10 ms · 50.0 / 66.7 ms |
+| **pan at zoom 1**: handler · frame | — | 0.00 / 0.10 ms · 16.7 / 16.7 ms |
+| **drawing**: pointer-move handler · frame | — | 0.30 / 0.40 ms · 16.7 / 16.8 ms |
+| **release → reading drawn** (median / p95, n 5) | — | 20.4 / 48.9 ms |
+| the release handler alone | — | 17.4 / 23.9 ms |
+| what the strokes read as | — | rectangle 0.91, five times |
+| autosave: stringify · into browser storage | — | 75.4 ms · refused |
 
 Browser storage takes at most **5.00 M characters** under one key (found by halving); these boards' logs run 3.3 K characters a mark, so autosave into browser storage stops saving at about **1,549 marks** — and says nothing (17-folder.js:328 swallows the error).
 
-Command: `node e2e/perf.mjs --browser=chromium --sizes=5000`
+Command: `node e2e/perf.mjs --browser=chromium --sizes=5000`; after R4c `node e2e/perf.mjs --sizes=5000 --paths=folder --cap-min=10`.
 
 ### Surface — webkit 26.6 (1440x900 @1x, headless)
 
-| | 500 | 2,000 |
-|---|---|---|
-| **open, restored from browser storage** (navigation → board drawn) | 2.55 s | did not open: browser storage refused the log (QuotaExceededError) |
-| **open as a folder** (`?folder=`) | 2.13 s | 76.5 s |
-| one paint alone: fit-all / zoom 1 | 7.00 ms / 8.00 ms | 59.0 ms / 56.0 ms |
-| **pan at fit-all**: handler · frame (median / p95) | 8.00 ms / 9.00 ms · 17.0 ms / 17.0 ms | 64.0 ms / 76.0 ms · 66.0 ms / 79.0 ms |
-| **pan at zoom 1**: handler · frame | 7.00 ms / 9.00 ms · 17.0 ms / 18.0 ms | 64.0 ms / 80.0 ms · 66.0 ms / 82.0 ms |
-| **drawing**: pointer-move handler · frame | 7.00 ms / 9.00 ms · 17.0 ms / 27.0 ms | 63.0 ms / 78.0 ms · 66.0 ms / 85.0 ms |
-| **release → reading drawn** (median / p95, n 5) | 91.0 ms / 103 ms | 5.95 s / 6.24 s |
-| the release handler alone | 90.0 ms / 101 ms | 5.95 s / 6.24 s |
-| what the strokes read as | rectangle 0.92, rectangle 0.92, rectangle 0.92, rectangle 0.92, rectangle 0.92 | rectangle 0.92, rectangle 0.92, rectangle 0.92, rectangle 0.92, rectangle 0.92 |
-| autosave: stringify · into browser storage | 3.00 ms · 0.00 ms | 10.0 ms · refused (QuotaExceededError) |
+| | 500 | 2,000 | **after R4c**: 500; 2,000 |
+|---|---|---|---|
+| **open, restored from browser storage** (navigation → board drawn) | 2.55 s | did not open: browser storage refused the log (QuotaExceededError) | 170 ms; did not open — storage |
+| **open as a folder** (`?folder=`) | 2.13 s | 76.5 s | 201 ms; **511 ms** |
+| one paint alone: fit-all / zoom 1 | 7.00 ms / 8.00 ms | 59.0 ms / 56.0 ms | 3 / 1 ms; 8 / 2 ms |
+| **pan at fit-all**: handler · frame (median / p95) | 8.00 ms / 9.00 ms · 17.0 ms / 17.0 ms | 64.0 ms / 76.0 ms · 66.0 ms / 79.0 ms | 0 / 0 ms · 17 / 18 ms; 0 / 0 ms · 17 / 19 ms |
+| **pan at zoom 1**: handler · frame | 7.00 ms / 9.00 ms · 17.0 ms / 18.0 ms | 64.0 ms / 80.0 ms · 66.0 ms / 82.0 ms | 0 / 0 ms · 17 / 18 ms; 0 / 1 ms · 17 / 18 ms |
+| **drawing**: pointer-move handler · frame | 7.00 ms / 9.00 ms · 17.0 ms / 27.0 ms | 63.0 ms / 78.0 ms · 66.0 ms / 85.0 ms | 0 / 0 ms · 16 / 19 ms; 0 / 1 ms · 17 / 21 ms |
+| **release → reading drawn** (median / p95, n 5) | 91.0 ms / 103 ms | 5.95 s / 6.24 s | 13 / 15 ms; **14 / 16 ms** |
+| the release handler alone | 90.0 ms / 101 ms | 5.95 s / 6.24 s | 5 / 8 ms; 12 / 12 ms |
+| what the strokes read as | rectangle 0.92, rectangle 0.92, rectangle 0.92, rectangle 0.92, rectangle 0.92 | rectangle 0.92, rectangle 0.92, rectangle 0.92, rectangle 0.92, rectangle 0.92 | the same |
+| autosave: stringify · into browser storage | 3.00 ms · 0.00 ms | 10.0 ms · refused (QuotaExceededError) | 6 ms · 0 ms; 14 ms · refused |
 
 Browser storage takes at most **5.00 M characters** under one key (found by halving); these boards' logs run 3.2 K characters a mark, so autosave into browser storage stops saving at about **1,576 marks** — and says nothing (17-folder.js:328 swallows the error).
 
-Command: `node e2e/perf.mjs --browser=webkit --sizes=500,2000`
+Command: `node e2e/perf.mjs --browser=webkit --sizes=500,2000`. WebKit's clock is whole milliseconds, so a frame of one vsync reads 17 or 18 ms there — past the one-frame allowance of `budgets.mjs` (17.7 ms), which is Chromium's; only the Chromium runs are judged by it.
 
 ---
 
@@ -291,6 +318,21 @@ of every release at 2,000.**
   `contents` alone, and 0.8% in `relate`. In Chromium, 7.13 s of the
   7.24 s release handler is this read (`e2e/results/perf/stroke-2000.cpuprofile`).
   Release → reading drawn: 147 ms at 500, **7.59 s** at 2,000.
+- **After R4c — fixed.** A paint asks one mark's role (the reading under
+  it, the panel's ladder), and `roleOf` (`08-render.js`) reads it over that
+  mark's neighbourhood: the marks within its reach (`MM.MarkGrid` and
+  `MM.withinReach`, R4b's), the ends of its wires and the connectors wired to
+  it, in the whole board's order. The table reads nothing else — its rows ask
+  only the engaging relations and the wires — so that is the role the whole
+  board gives it; `rolesCheck` compares every mark both ways (the 500 board
+  as opened and after every stroke and undo, 344 marks; the 2,000 board's
+  1,403; none differ). A mark's neighbourhood is 0.02 ms. The board's genre,
+  which only a live artifact's panel asks, is every mark's role read that way,
+  and a role read over the same neighbourhood as the last log's — the same
+  marks in the same order, each with the same reps and edges by identity and
+  length — is carried forward: 39 ms at 2,000 the first time, 9–10 ms after
+  each stroke. Release → reading drawn: 15.5 ms median at 2,000 (40 ms p95,
+  the first release after a pan), 20 ms at 5,000.
 
 **2. Every event re-relates the whole board once one definition exists —
 the replay is cubic, and it is most of the engine's per-stroke cost.**
@@ -444,6 +486,35 @@ and a 31 GB process by 4,250 marks of the 5,000 board.**
     `render` is 68% of samples. Inside it, as shares of all samples,
     `snapCandidates` is 19%, `interpretationsOf` 11%, `renderLabels` 11%
     and the loop itself 21%. Native painting is another 31%.
+- **After R4c — fixed.**
+  - *A pointer move while drawing paints the pen and nothing else*: the
+    stroke in progress and the magnet in reach are drawn on a canvas of their
+    own over the board's (`drawLive`), and the board is not painted (e2e 48e
+    counts it: thirty moves, no paint). The magnet sites are one flat list per
+    log, read ahead while the page is idle. 0.2 ms at 2,000, 0.4 at 5,000.
+  - *A wheel, a pinch, a pan or a drag on the minimap moves the view at once
+    and paints once a frame* (`viewChanged`, e2e 48e: ten wheel events, one
+    paint, in the next frame).
+  - *Painting is culled to the screen*: the paint's index files each content
+    mark by what it draws — its box, its clean form's and its parts' — and a
+    paint draws the marks whose box meets the screen (and, wherever they are,
+    what the hand is on or holds and what a drag or a tank has moved), an
+    artifact's members one by one, its chrome where its name reaches, and
+    chips, labels and cards that reach the screen — every chip, label and card
+    still measured and placed, and the minimap still every mark. At zoom 1 on
+    the 500 board a paint strokes 5% of the ink the whole-board read strokes.
+  - *Everything a paint derives from the log is kept while that log stands*:
+    the offers, the model's reading chips, the labels, the candidates' boxes,
+    the minimap's reading, the selection's reading — no longer read again on
+    every paint. The panel is rewritten only when what it says changed.
+  - *Below a pixel, a stroke's crowded points are thinned* (`THIN_PX`, one
+    screen pixel): at fit-all a stroke of seventy points spans a few pixels,
+    and stroking every one, twice with its halo, was most of the frame.
+  - A paint alone at 2,000: 4.0 ms at fit-all, 1.4 ms at zoom 1. Panning:
+    one frame at zoom 1, two at fit-all (33.4 ms p95) — headless Chromium
+    still rasterises the whole board's ink on the CPU there, and without the
+    ink the frame is one (the probe: every stroke skipped). At 5,000, fit-all
+    is 50 ms (67 at p95), over the ≤ 50 ms aimed for.
 
 **7. Autosave rewrites the whole log into browser storage, and fails
 silently at about 1,500 marks.**
@@ -462,6 +533,11 @@ silently at about 1,500 marks.**
 Also O(n²), but not ranked, because it is one act rather than every stroke:
 press-and-hold relates the whole content plane (`07-input.js:93`; `relate`
 takes 183 ms at 2,000) and then summons, which runs hotspot 2 again.
+*After R4c:* the index walks from the held mark to the marks within reach
+of it, and of those — every link a cluster follows is an engaging relation
+— and `MM.clusters` over that component, in the board's order, orders it
+as the whole plane would (`heldGroupOf`; `heldCheck` compares every loose
+mark's group: 332 on the 500 board, 1,367 on the 2,000, none differ).
 
 ---
 
@@ -479,21 +555,21 @@ except the matches, and those need only the cluster the new mark joined.
 v1 ships when the budgets hold on the 2,000-mark board (`V1-PLAN.md` §11.3);
 the 5,000 column is the headroom to aim for.
 
-| Measure | 500 today | 2,000 today | **Budget, 2,000** | **Budget, 5,000** | **After R4b**: 2,000; 5,000 | **After R4d**: 2,000 |
-|---|---|---|---|---|---|---|
-| Open: navigation → board drawn (Chromium) | 2.2 s | 100 s, and only as a folder: storage refuses it | **≤ 1.5 s** | ≤ 3 s | not measured (R4c and R3 own the open) | — (not R4d's) |
-| Replay, `load` (Node, warm median) | 2.58 s | 167 s | **≤ 0.5 s** | ≤ 1.5 s | **244 ms**; 648 ms | 264 ms; 713 ms — a checkpoint keeps the index now (the last four of them) |
-| Memory held after replay (Node) | 25 MB | 1,058 MB | **≤ 150 MB** | ≤ 400 MB, so a tab opens it | **12.4 MB**; 45.5 MB | 16.8 MB; 57.5 MB — those four copies of the index |
-| One more stroke, engine: median / p95 | 18 / 27 ms | 256 / 749 ms | **≤ 4 / 16 ms** | ≤ 4 / 16 ms | **0.15 / 0.23 ms**; 0.31 / 0.39 ms | 0.16 / 0.34 ms |
-| Release → reading drawn, p95 | 148 ms | 7.65 s | **≤ 100 ms** | ≤ 100 ms | the surface's (R4c) | — (not R4d's) |
-| A pointer move while drawing: handler, p95 | 3.7 ms | 41 ms | **≤ 4 ms** | ≤ 6 ms | the surface's (R4c) | — (not R4d's) |
-| Pan at zoom 1: frame, p95 | 16.7 ms | 50 ms | **≤ 16.7 ms** | ≤ 16.7 ms | the surface's (R4c) | — (not R4d's) |
-| Pan at fit-all: frame, p95 | 33 ms | 133 ms | **≤ 33 ms** | ≤ 50 ms | the surface's (R4c) | — (not R4d's) |
-| The whole-board read on the stroke path | 139 ms | 8.07 s | **off the stroke path, or ≤ 16 ms** | same | unchanged, 7.94 s; 105 s (R4c) | — (not R4d's) |
-| A live room: main-thread work per incoming line | 2.6 s | 173 s | **≤ 16 ms, and no full replay** | ≤ 16 ms | 63 ms of merge work, then a 0.27 s replay (R4d's) | **1.65 / 2.03 ms, no replay**; crossing a mark just drawn 4.2 / 5.0 ms; 30 and 150 events back 39 and 64 ms, from a checkpoint; a line with no events, no work |
-| A hello in a room of six: bytes delivered | 34 MB | 163 MB | **each log once, to the newcomer (≈ 6.6 MB)** | ≈ 16 MB | unchanged (R4d) | **each log once: 6.51 MB to the newcomer**, one copy of each — with a hand that left or vanished too; 32.6 MB on a broadcast wire |
-| Autosave: main-thread work per change, and does it hold | 7 ms, holds | 30 ms, refused | **≤ 8 ms, and never refused in silence** | same | unchanged (R3) | — (not R4d's) |
-| A model's brief for five marks | 16 KB | 113 KB | **≤ 4 KB, whatever the board's size** | same | 2 KB; 2 KB — what it lists shrank with what is stored (R4e's still) | — (not R4d's) |
+| Measure | 500 today | 2,000 today | **Budget, 2,000** | **Budget, 5,000** | **After R4b**: 2,000; 5,000 | **After R4c**: 2,000; 5,000 | **After R4d**: 2,000 |
+|---|---|---|---|---|---|---|---|
+| Open: navigation → board drawn (Chromium) | 2.2 s | 100 s, and only as a folder: storage refuses it | **≤ 1.5 s** | ≤ 3 s | not measured (R4c and R3 own the open) | **485 ms**; 1.09 s | — (not R4d's) |
+| Replay, `load` (Node, warm median) | 2.58 s | 167 s | **≤ 0.5 s** | ≤ 1.5 s | **244 ms**; 648 ms | R4b's | 264 ms; 713 ms — a checkpoint keeps the index now (the last four of them) |
+| Memory held after replay (Node) | 25 MB | 1,058 MB | **≤ 150 MB** | ≤ 400 MB, so a tab opens it | **12.4 MB**; 45.5 MB | R4b's (the renderer's heap: 38 MB; 104 MB) | 16.8 MB; 57.5 MB — those four copies of the index |
+| One more stroke, engine: median / p95 | 18 / 27 ms | 256 / 749 ms | **≤ 4 / 16 ms** | ≤ 4 / 16 ms | **0.15 / 0.23 ms**; 0.31 / 0.39 ms | R4b's | 0.16 / 0.34 ms |
+| Release → reading drawn, p95 | 148 ms | 7.65 s | **≤ 100 ms** | ≤ 100 ms | the surface's (R4c) | **40 ms** (15.5 median); 49 ms (20 median) | — (not R4d's) |
+| A pointer move while drawing: handler, p95 | 3.7 ms | 41 ms | **≤ 4 ms** | ≤ 6 ms | the surface's (R4c) | **0.2 ms**; 0.4 ms | — (not R4d's) |
+| Pan at zoom 1: frame, p95 | 16.7 ms | 50 ms | **≤ 16.7 ms** | ≤ 16.7 ms | the surface's (R4c) | **16.8 ms** (one frame); 16.7 ms | — (not R4d's) |
+| Pan at fit-all: frame, p95 | 33 ms | 133 ms | **≤ 33 ms** | ≤ 50 ms | the surface's (R4c) | **33.4 ms** (two frames); 66.7 ms (50 median) — over | — (not R4d's) |
+| The whole-board read on the stroke path | 139 ms | 8.07 s | **off the stroke path, or ≤ 16 ms** | same | unchanged, 7.94 s; 105 s (R4c) | **off it**: one mark's neighbourhood, 0.02 ms; the genre 9–10 ms after a stroke | — (not R4d's) |
+| A live room: main-thread work per incoming line | 2.6 s | 173 s | **≤ 16 ms, and no full replay** | ≤ 16 ms | 63 ms of merge work, then a 0.27 s replay (R4d's) | unchanged (R4d's) | **1.65 / 2.03 ms, no replay**; crossing a mark just drawn 4.2 / 5.0 ms; 30 and 150 events back 39 and 64 ms, from a checkpoint; a line with no events, no work |
+| A hello in a room of six: bytes delivered | 34 MB | 163 MB | **each log once, to the newcomer (≈ 6.6 MB)** | ≈ 16 MB | unchanged (R4d) | unchanged (R4d's) | **each log once: 6.51 MB to the newcomer**, one copy of each — with a hand that left or vanished too; 32.6 MB on a broadcast wire |
+| Autosave: main-thread work per change, and does it hold | 7 ms, holds | 30 ms, refused | **≤ 8 ms, and never refused in silence** | same | unchanged (R3) | unchanged (R3's) | — (not R4d's) |
+| A model's brief for five marks | 16 KB | 113 KB | **≤ 4 KB, whatever the board's size** | same | 2 KB; 2 KB — what it lists shrank with what is stored (R4e's still) | unchanged (R4e's) | — (not R4d's) |
 
 The "after R4b" engine rows are `node --test metamedium-core/bench/budgets.test.mjs`
 (27 Sep 2026, load 2–4; the 2,000 board's own result file,
@@ -502,11 +578,27 @@ The "after R4b" engine rows are `node --test metamedium-core/bench/budgets.test.
 as assertions and asks the 5,000 board only to replay; the read, the room and
 the brief are `engine.mjs board`, as in the engine's table.
 
+The "after R4c" surface rows are the gate's `budgets` scenario (`node e2e/run.mjs
+budgets`, 27 Sep 2026, load 1.6–3.7, eight runs: open 487–502 ms, a move
+0.2–0.3 ms, the pans 16.7–16.8 and 33.4 ms every time, and the release's p95
+15.5–40 ms — 40 when the first stroke comes after the pans, see the surface's
+table) and `e2e/perf.mjs` for the 5,000 board. The gate records each budget as a step with its number; it
+skips them by name when the machine is too loaded to measure (a one-minute load
+past three quarters of the cores) or runs its calibration 1.4× slower than the
+machine they were set on (`budgets.mjs`, 41 ms here) — once, at load 9.1, it
+did. A frame budget is met when the interval is that many 60 Hz frames within a
+millisecond: `requestAnimationFrame` stamps frames on the vsync, and one reads
+16.6–16.8 ms.
+
 Two notes on the table:
 
 - The pan budget at fit-all asks for simplified ink at low zoom. Headless
   Chromium spends most of that frame painting on the CPU, so R4b should
-  confirm it in a real window before paying for it.
+  confirm it in a real window before paying for it. *R4c thinned only what no
+  one can see* (points under a screen pixel apart): two frames at 2,000. Thinned
+  to two pixels the median frame is one there, at a visible cost on small
+  curves, which was not taken; a cached raster of the ink for a zoom that stands
+  is the next step if a real window needs it.
 - The replay budget and the open budget are not the same machine: Chromium
   replayed the 2,000 board in 100 s where Node took 167 s.
 
@@ -596,6 +688,22 @@ node metamedium-core/bench/report.mjs --column="after R4b"                      
 node metamedium-core/bench/equivalence.mjs                                           # old engine (9977158) against src/: what reads differently
 node --max-old-space-size=24576 metamedium-core/bench/equivalence.mjs --size=2000 --prefix-step=100000 --undos=2 --extend=10   # the same on the 2,000 board: ~15 min, the old engine holding GBs
 ```
+
+After R4c — the surface's column, its budgets in the gate, and the check that
+a hand's paint draws and says what the whole-board read would:
+
+```
+node e2e/run.mjs budgets                          # the 500 board painted both ways; the 2,000 budgets as steps (~30 s)
+node e2e/run.mjs canvas                           # the R4c records and section 48 among the rest
+node e2e/perf.mjs --sizes=500,2000                # Chromium: the column, and each budget said within or over
+node e2e/perf.mjs --sizes=5000 --paths=folder --cap-min=10
+node e2e/perf.mjs --browser=webkit --sizes=500,2000
+node metamedium-core/bench/report.mjs             # the surface tables, from those runs
+```
+
+In a page: `__mm.paintCheck()` (both paints, compared), `__mm.rolesCheck()`
+(every mark's role, both ways, and the genre), `__mm.heldCheck()` (every loose
+mark's held group against the whole plane's clusters).
 
 After R4d — a room's line, and a newcomer's hello:
 

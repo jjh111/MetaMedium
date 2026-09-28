@@ -160,6 +160,17 @@ window.__scenario = async function(){
   const R = { steps: [], pass: true }; window.__Rlive = R;
   const codeRepOfNode = (n) => { for (let i = n.reps.length - 1; i >= 0; i--) if (n.reps[i].modality === 'code') return n.reps[i]; return null; };
   const step = (name, ok, detail) => { R.steps.push({name, ok: !!ok, detail}); if(!ok) R.pass=false; return ok; };
+  // R4c: what a hand's paint draws and says is what the whole-board read would
+  // draw and say — every mark's ink, the reading under the mark, the chips,
+  // the labels, the cards, the status line and the panel (`paintCheck`,
+  // 08-render.js: the board painted both ways and compared).
+  // And every mark's role, read over its neighbourhood, is the whole-board
+  // read's, and so is the board's genre (`rolesCheck`), where the surface has it.
+  const sameAsWhole = (label) => {
+    const c = typeof mm.paintCheck === 'function' ? mm.paintCheck() : { ok: false, diffs: ['no paintCheck on this surface'], ops: 0, of: 0 };
+    const r = typeof mm.rolesCheck === 'function' ? mm.rolesCheck() : { ok: true, marks: null };
+    return step('R4c. ' + label + ' — what is drawn and said equals the whole-board read', c.ok && r.ok, c.ok && r.ok ? { drawn: c.ops, of: c.of, marks: c.marks, roles: r.marks } : { paint: c.diffs.slice(0, 4), roles: r.differ, genre: r.genreSame });
+  };
   // A wait that survives a hidden tab: timers there fire once a minute, but a
   // message hop is a task and is not throttled, so the clock is read across hops.
   const wait = (ms) => new Promise((resolve) => {
@@ -216,6 +227,7 @@ window.__scenario = async function(){
     step('2b. the three boxes read clean and are offered as rectangles', offers.size === 3 && [...offers.values()].every(o => o.shape === 'rectangle'),
       {offers: [...offers.values()].map(o => o.shape + ' ' + o.weight.toFixed(2)), rail: document.getElementById('snapBtn').textContent, hidden: document.getElementById('snapBtn').hidden});
   }
+  sameAsWhole('three boxes, zoomed out, their offers standing');
 
   // ---- 3. Lasso the whole set at low zoom ----
   const c = mm.worldToScreen(490, 340);
@@ -273,6 +285,7 @@ window.__scenario = async function(){
       !!build && /WHAT EACH REGION PLAYS:/.test(build.user) && /HOW THEY SIT:/.test(build.user) && /r1: node/.test(build.user) && !/\bn\d+\b/.test(build.user),
       build ? build.user.split('\n').filter(l => /PLAYS|SIT|r1/.test(l)).slice(0, 6) : 'no build call');
   }
+  sameAsWhole('a live page over the boxes that drew it');
 
   // ---- 7. The rendered page matches the drawing ----
   // Not "did the model position things correctly" — it is not asked to. The
@@ -407,6 +420,7 @@ window.__scenario = async function(){
     !!flowCode && /<svg class="mm-edges"/.test(flowCode) && /marker-end/.test(flowCode) &&
     /position:absolute/.test(flowCode) && !/flex-direction/.test(flowCode),
     { live: mm.session.getState().live.length, hasSvg: !!flowCode && /<svg/.test(flowCode) });
+  sameAsWhole('a flowchart built beside the page, at fit-all');
 
   // ---- 13. Handwriting (v7 Stage E): write a word next to a shape; it becomes that shape's name ----
   {
@@ -621,6 +635,7 @@ window.__scenario = async function(){
       step('17b2. a tap on the match chip opens the field on the group, the match leading, and the marks selected', !!stChip.summon && stChip.summon.scopeSource === 'pointed' && stChip.summon.enclosedIds.length === 3 && /^page-layout [01]\.\d\d$/.test(chipsT[0] || '') && stChip.selection.length === 3, { source: stChip.summon && stChip.summon.scopeSource, chips: chipsT, at: chipAt });
       if (stChip.summon) mm.session.undo();
       step('17b3. undoing the tap leaves the group as it was, still matched', !mm.session.getState().summon && mm.session.getState().clusterCandidates.some(c => c.matches.some(m => m.name === 'page-layout')));
+      sameAsWhole('a match chip beside the look-alike, after an undo');
     }
     // The correction: circle the look-alike, refuse the match, and it stays refused.
     const cU = W(4280, 2400);
@@ -669,6 +684,7 @@ window.__scenario = async function(){
     mm.session.undo();
     const stU = mm.session.getState();
     step('18d. undo brings the selection back, in place', stU.selection.length === 3 && Math.abs(MM.boundsOf(stU.nodes.get(boxes[0])).minX - after.minX) < 1e-6);
+    sameAsWhole('a selection moved, let go and brought back by undo');
     mm.session.deselect(Date.now());
     // The verbs a selection was missing: duplicate and erase, through the palette.
     const c2 = W(5420, 2240);
@@ -1318,6 +1334,7 @@ window.__scenario = async function(){
     step('28c2. a line that lands after this hand sent does not double this hand\'s marks', st28c2.contentIds.length === 4 && mine28.length === 1, { content: st28c2.contentIds.length, mine: mine28.length });
     mm.session.undo();
     step('28d. undo takes back this hand\'s mark and leaves hers', mm.session.getState().contentIds.length === 3);
+    sameAsWhole('a room: another hand\'s marks in her colour, after this hand\'s undo');
     // Ids that hold (DIRECTOR-PLAN-W2 L1): the undo is SENT, so she no longer
     // holds the mark under a number this hand will never use again.
     await mm.saveNow(); await wait(150);
@@ -1573,6 +1590,7 @@ window.__scenario = async function(){
     await wait(50);
     const chip33 = mm.chips().find(c => c.ids.length === 3);
     step('33c. the model\'s reading of the group is a chip beside it, and it stays when the field is gone', !!chip33 && !mm.session.getState().summon && mm.readGroups.size >= 1, { chips: mm.chips().map(c => c.ids.length), summon: !!mm.session.getState().summon });
+    sameAsWhole('a model\'s reading, a chip beside the group it read');
     // A tap on the chip opens the field on the group again.
     if (chip33) { const at = mm.worldToScreen(chip33.x + chip33.w / 2, chip33.y + chip33.h / 2); t.stroke([{ x: at.x, y: at.y }]); }
     const s33b = mm.session.getState();
@@ -1738,6 +1756,7 @@ window.__scenario = async function(){
     await wait(60);
     const farCard = mm.answerCards().find((c) => c.about[0] === far);
     step('36e. a card whose marks are off screen stays with them', !!farCard && farCard.x > 2400 && pairs().length === 0, farCard && { x: Math.round(farCard.x), y: Math.round(farCard.y) });
+    sameAsWhole('seven cards, one with its marks off screen');
     mm.setView(1, 0, 0);
     mm.session.load([]);
   }
@@ -1793,6 +1812,7 @@ window.__scenario = async function(){
     mm.session.summonMarks([lab], Date.now());
     await wait(120);
     step('37f. pointed at, the figure wears its name again', mm.chromeDrawn().includes(lab), mm.chromeDrawn());
+    sameAsWhole('figures, one wearing its name while held');
     const su = mm.session.getState().summon;
     if (su) mm.session.dismiss(su.id, Date.now());
     mm.session.load([]);
@@ -2423,6 +2443,7 @@ window.__scenario = async function(){
     step('43b. each mark inside it keeps the colour of the hand that DREW it: this hand\'s box in its own ink, her circle in hers',
       !!ink43(box43) && ink43(box43) === mm.colourOf(box43) && ink43(kite43) === mm.handColour('fern') && ink43(box43) !== ink43(kite43),
       { box: ink43(box43), boxOwn: mm.colourOf(box43), circle: ink43(kite43), hue: mm.handColour('fern') });
+    sameAsWhole('a thing of two hands\' marks, each in its drawer\'s colour, and her label');
     // Held, it is not this hand's to label: the field says so before Enter, and Enter writes nothing.
     const c43 = S(475, 300);
     t.stroke(t.circle(c43.x, c43.y, 230)); t.takeLoop(c43.x, c43.y, 230); await wait(60);
@@ -2808,7 +2829,141 @@ window.__scenario = async function(){
         && (MM.labelOf(drawnNode47) || {}).text === 'cap' && MM.labelOf(drawnNode47).source === handIdOf47(next47)
         && !!drawnLab47 && drawnLab47.text === 'cap' && drawnLab47.who === person47,
       { drawn: drawn47, worded: worded47, stale: nextSession47.getState().staleResult, label: drawnNode47 ? MM.labelOf(drawnNode47) || null : null, drawnLabel: drawnLab47 || null });
+    sameAsWhole('a person across sittings, their words on the board');
     prevStore47.close(); fernStore47.close(); nextStore47.close();
+    if (mm.folder().store && mm.folder().store.close) mm.folder().store.close();
+    mm.session.load([]); mm.setView(1, 0, 0);
+  }
+
+  // ---- 48. What a paint reads is the log's (V1-PLAN R4c) ----
+  // The surface keeps what it derives from the log — what each mark plays, the
+  // offers, the chips — and keeps it only while the log it came from stands.
+  // So the reading under a mark, a mark's panel, a match chip and an answer
+  // card must change the moment the log does: a stroke, an undo, a line from
+  // another hand. Each is also painted the whole-board way and compared.
+  {
+    mm.session.load([]); mm.setView(1, 0, 0); await wait(30);
+    const until48 = async (pred) => { for (let i = 0; i < 40 && !pred(); i++) await wait(50); };
+    const lastId = () => { const st = mm.session.getState(); return st.contentIds[st.contentIds.length - 1]; };
+    const readingNow = () => { const r = mm.readingDrawn(); return r ? r.id + ' ' + r.text : null; };
+    const panel = () => document.getElementById('inspector').textContent;
+    const hoverAt = (x, y) => document.getElementById('canvas').dispatchEvent(new PointerEvent('pointermove', { pointerId: 1, isPrimary: true, bubbles: true, clientX: x, clientY: y, button: 0, buttons: 0 }));
+    const leave = () => document.getElementById('canvas').dispatchEvent(new PointerEvent('pointerleave', { pointerId: 1, bubbles: true }));
+    // A box alone plays a node, standing on its own.
+    t.stroke(t.rect(300, 260, 160, 100));
+    const boxA = lastId();
+    const alone = readingNow();
+    // A second box, and an arrow from the first to the second: the arrow is an edge.
+    t.stroke(t.rect(700, 260, 160, 100));
+    t.stroke(t.line({ x: 468, y: 310 }, { x: 692, y: 310 }, 40).concat(t.line({ x: 692, y: 310 }, { x: 666, y: 293 }, 20).slice(1)));
+    const arrow48 = lastId();
+    step('48. the reading under a mark is the mark just made: a box alone plays a node, then an arrow between two boxes plays an edge',
+      alone === boxA + ' rectangle · node' && readingNow() === arrow48 + ' arrow · edge',
+      { alone, arrow: readingNow() });
+    sameAsWhole('two boxes and an arrow between them');
+    // The first box, pointed at: the panel says a connector is attached to it.
+    hoverAt(380, 310); await wait(30);
+    const wired = panel();
+    // The arrow goes (its binds first — the pen landed it on the boxes' sites); the box it joined is not the mark undone.
+    for (let i = 0; i < 4 && mm.session.getState().contentIds.includes(arrow48); i++) mm.session.undo();
+    await wait(30);
+    const unwired = panel();
+    step('48a. undo reaches a neighbour: the box the arrow joined says a connector is attached, and after the arrow is undone, that it stands on its own',
+      /rectangle with 1 connector attached/.test(wired) && /rectangle standing on its own/.test(unwired) && readingNow() === boxA + ' rectangle · node',
+      { wired: (wired.match(/a rectangle[^.]*?(attached|own)/) || [])[0], unwired: (unwired.match(/a rectangle[^.]*?(attached|own)/) || [])[0], reading: readingNow() });
+    sameAsWhole('the arrow undone, the box it joined pointed at');
+    // A move changes no id, and still changes what a mark plays: a circle drawn
+    // inside the box makes the box a container; dragged out, the box is a node again.
+    t.stroke(t.circle(380, 310, 24));
+    const ring48 = lastId();
+    hoverAt(310, 262); await wait(30);
+    const holding = readingNow();
+    mm.session.move({ ids: [ring48], dx: 0, dy: 420, at: Date.now() }); await wait(30);
+    const empty = readingNow();
+    step('48a2. a move reaches a neighbour: a circle inside the box makes it a container, and dragged out of it, the box plays a node again — no mark added or taken away',
+      holding === boxA + ' rectangle · container' && empty === boxA + ' rectangle · node', { holding, empty });
+    sameAsWhole('the circle moved out of the box');
+    leave(); await wait(20);
+    // A definition, then another like it: a chip with its match beside the second.
+    const dumbbell = (x, y) => {
+      t.stroke(t.circle(x, y, 40)); const a = lastId();
+      t.stroke(t.circle(x + 200, y, 40)); const b = lastId();
+      t.stroke(t.line({ x: x + 44, y: y }, { x: x + 156, y: y }, 30)); const l = lastId();
+      return [a, b, l];
+    };
+    const first48 = dumbbell(300, 560);
+    const sid48 = mm.session.summonMarks(first48, Date.now());
+    mm.session.bless({ summonId: sid48, name: 'dumbbell', at: Date.now() });
+    const second48 = dumbbell(700, 560);
+    const chipOn = () => mm.chips().some((c) => c.ids.length === 3 && second48.every((id) => c.ids.includes(id)));
+    const matched = chipOn();
+    sameAsWhole('a definition, and a match chip beside the next one like it');
+    // The second dumbbell's bar goes (its binds first): two circles are not a dumbbell.
+    for (let i = 0; i < 4 && mm.session.getState().contentIds.includes(second48[2]); i++) mm.session.undo();
+    await wait(30);
+    const gone = !mm.chips().some((c) => second48.slice(0, 2).every((id) => c.ids.includes(id)));
+    sameAsWhole('the bar undone, no chip');
+    t.stroke(t.line({ x: 744, y: 560 }, { x: 856, y: 560 }, 30)); second48[2] = lastId();
+    const back = chipOn();
+    step('48b. a match chip stands beside the second dumbbell, goes the moment its bar is undone, and comes back when the bar is drawn again',
+      matched && gone && back, { matched, gone, back, chips: mm.chips().map((c) => c.ids.length) });
+    // An answer about a mark: a card beside it, gone with the undo, back with the answer.
+    const answer48 = () => mm.session.answer({ participantId: MM.LOCAL_PARTICIPANT, question: 'why', text: 'two circles held apart by a bar', aboutIds: [second48[0]], at: Date.now() });
+    answer48();
+    const card1 = mm.answerCards().some((c) => c.about[0] === second48[0]);
+    mm.session.undo(); await wait(30);
+    const card0 = !mm.answerCards().some((c) => c.about[0] === second48[0]);
+    answer48();
+    const card2 = mm.answerCards().some((c) => c.about[0] === second48[0]);
+    step('48c. an answer card stands beside the mark it is about, goes with the undo, and comes back with the answer',
+      card1 && card0 && card2, { card1, card0, card2, cards: mm.answerCards().length });
+    sameAsWhole('a card beside the dumbbell it is about');
+    // A pointer move while drawing paints the pen, not the board; a wheel moves the view at once and paints once a frame.
+    {
+      const c48 = document.getElementById('canvas');
+      const pe = (type, x, y) => c48.dispatchEvent(new PointerEvent(type, { pointerId: 1, isPrimary: true, bubbles: true, clientX: x, clientY: y, button: 0, buttons: type === 'pointerup' ? 0 : 1 }));
+      const p0 = mm.paints();
+      pe('pointerdown', 1000, 700);
+      for (let i = 1; i <= 30; i++) pe('pointermove', 1000 + i * 4, 700 + (i % 5));
+      const moved = mm.paints() - p0;
+      pe('pointerup', 1120, 700);
+      const released = mm.paints() - p0;
+      const line48 = lastId();
+      for (let i = 0; i < 4 && mm.session.getState().contentIds.includes(line48); i++) mm.session.undo();
+      await wait(30);
+      const panX0 = mm.view.panX, w0 = mm.paints();
+      for (let i = 0; i < 10; i++) c48.dispatchEvent(new WheelEvent('wheel', { deltaX: 5, deltaY: 0, deltaMode: 0, clientX: 700, clientY: 400, bubbles: true, cancelable: true }));
+      const wheeled = mm.paints() - w0, viewMoved = panX0 - mm.view.panX;
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+      const framed = mm.paints() - w0;
+      mm.setView(1, 0, 0);
+      step('48e. thirty pointer moves while drawing paint the pen and not the board; the release paints it; ten wheel events move the view at once and paint it in the next frame, once',
+        moved === 0 && released >= 1 && wheeled === 0 && Math.abs(viewMoved - 50) < 1e-6 && framed === 1,
+        { moved, released, wheeled, viewMoved, framed });
+    }
+    // Another hand's line: in a room, fern draws a box and an arrow from this hand's box to hers.
+    mm.session.load([]); mm.setView(1, 0, 0); await wait(30);
+    const hub48 = new MM.LocalHub();
+    const fernStore48 = new MM.LiveStore(hub48.connect(), 'fern~f8', 'r4c48');
+    await mm.openLive('r4c48', { transport: hub48.connect() });
+    t.stroke(t.rect(300, 260, 160, 100));
+    const mine48 = lastId();
+    await mm.saveNow(); await wait(100);
+    hoverAt(380, 310); await wait(30);
+    const before48 = panel();
+    const fern48 = MM.createSession(Object.assign({}, MM.DEFAULT_SESSION_CONFIG, { logName: 'fern~f8' }));
+    fern48.addStroke(t.rect(700, 260, 160, 100).map((p) => ({ x: p.x, y: p.y })), Date.now() + 1000, undefined, 1);
+    fern48.addStroke(t.line({ x: 460, y: 310 }, { x: 700, y: 310 }, 40).concat(t.line({ x: 700, y: 310 }, { x: 674, y: 293 }, 20).slice(1)).map((p) => ({ x: p.x, y: p.y })), Date.now() + 2000, undefined, 1);
+    await fernStore48.appendLog('fern~f8', fern48.getEvents().slice());
+    await until48(() => mm.session.getState().contentIds.length === 3);
+    await wait(60);
+    const after48 = panel();
+    step('48d. a line from another hand reaches this board\'s paint at once: her arrow lands on this hand\'s box, and the box, pointed at, says a connector is attached',
+      mm.session.getState().contentIds.length === 3 && /rectangle standing on its own/.test(before48) && /rectangle with 1 connector attached/.test(after48) && mm.readingDrawn() && mm.readingDrawn().id === mine48,
+      { content: mm.session.getState().contentIds.length, before: (before48.match(/a rectangle[^.]*?(attached|own)/) || [])[0], after: (after48.match(/a rectangle[^.]*?(attached|own)/) || [])[0] });
+    sameAsWhole('a room, another hand\'s arrow on this hand\'s box');
+    leave(); await wait(20);
+    fernStore48.close();
     if (mm.folder().store && mm.folder().store.close) mm.folder().store.close();
     mm.session.load([]); mm.setView(1, 0, 0);
   }

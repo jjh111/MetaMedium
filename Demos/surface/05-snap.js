@@ -36,10 +36,20 @@
   }
   let heldCandidates = []; // offers among what the held loop encloses
 
+  // What is offered is the log's (R4c): the offers and what a waiting loop
+  // holds of them are read again when the log changes or the mode does, not
+  // on every paint — a pan or a hover used to ask every mark on the board.
+  // The reference paint (paintCheck) asks them afresh, as every paint did.
+  let offersKey = null;
   function refreshOffers() {
-    const s = session.getState();
-    snapOffers = snapMode === 'off' ? new Map() : new Map(session.snapCandidates().map((c) => [c.id, c]));
-    heldCandidates = heldEnclosed(s).filter((id) => snapOffers.has(id));
+    const key = logKey() + '|' + snapMode;
+    if (paintReference || key !== offersKey) {
+      const s = session.getState();
+      snapOffers = snapMode === 'off' ? new Map() : new Map(session.snapCandidates().map((c) => [c.id, c]));
+      heldCandidates = heldEnclosed(s).filter((id) => snapOffers.has(id));
+      offersKey = paintReference ? null : key;
+      warmMagnets();
+    }
     // A held loop scopes the tile: what you circled, not everything.
     if (ccOpen()) syncTiles();
   }
@@ -84,23 +94,54 @@
   // site and logs the bind, and leaving the reach dissolves it (invariant 4).
   let magnetHold = null;   // the hit the live stroke's end is in reach of, if any
   let magnetStart = null;  // the hit the live stroke began on, if any
-  const magnetCache = new WeakMap(); // node → sites (nodes are rebuilt on replay)
-  function sitesForMagnet(node, nodes) {
-    let sites = magnetCache.get(node);
-    if (!sites) { sites = MM.magnetSites(node, nodes); magnetCache.set(node, sites); }
-    return sites;
+  /**
+   * Every site on the board, for one log (R4c): read when the pen first asks
+   * after the log changed, then each move is a pass over a flat list of
+   * points. A node keeps the sites it had when its own reps and edges are the
+   * ones they were (a mark's sites are read off its own clean form, reading
+   * and ink) — unless a notation offers ports, whose readings can look past
+   * the mark, and then every mark is read again. The cache used to be keyed
+   * by the node object, which a move or a snap changes in place.
+   */
+  let magnetSitesAt = { key: null, sites: [], xs: new Float64Array(0), ys: new Float64Array(0), byNode: new Map() };
+  function sitesNow() {
+    const key = logKey();
+    if (magnetSitesAt.key === key) return magnetSitesAt;
+    const s = session.getState();
+    const own = !MM.registeredPorts().length;
+    const before = magnetSitesAt.byNode, byNode = new Map(), sites = [];
+    for (const [id, n] of s.nodes) {
+      if (!MM.strokePointsOf(n)) continue;
+      const was = own && before.get(id);
+      const kept = was && was.node === n && was.reps === n.reps && was.nReps === n.reps.length && was.edges === n.edges && was.nEdges === n.edges.length;
+      const mine = kept ? was.sites : MM.magnetSites(n, s.nodes);
+      byNode.set(id, { node: n, reps: n.reps, nReps: n.reps.length, edges: n.edges, nEdges: n.edges.length, sites: mine });
+      for (const site of mine) sites.push(site);
+    }
+    const xs = new Float64Array(sites.length), ys = new Float64Array(sites.length);
+    sites.forEach((site, i) => { xs[i] = site.point.x; ys[i] = site.point.y; });
+    magnetSitesAt = { key: key, sites: sites, xs: xs, ys: ys, byNode: byNode };
+    return magnetSitesAt;
+  }
+  // …and read ahead: when the log has changed, the sites are read again while
+  // the page is idle, so the pen that comes down next finds them ready — the
+  // first reading of a big board's sites is tens of milliseconds, and a hand
+  // would feel it at pen-down.
+  let magnetsWarming = false;
+  function warmMagnets() {
+    if (magnetsWarming || magnetSitesAt.key === logKey()) return;
+    magnetsWarming = true;
+    const go = () => { magnetsWarming = false; if (!live) sitesNow(); };
+    if (window.requestIdleCallback) requestIdleCallback(go, { timeout: 2000 }); else setTimeout(go, 200);
   }
   /** The nearest site to a world point within the hand's radius, or null. */
   function magnetQuery(w) {
-    const s = session.getState();
+    const at = sitesNow();
     const radius = MM.MAGNET_SCREEN_PX / view.zoom; // about the hand, not the world (invariant 3)
-    let best = null;
-    for (const [id, n] of s.nodes) {
-      if (!MM.strokePointsOf(n)) continue;
-      for (const site of sitesForMagnet(n, s.nodes)) {
-        const distance = Math.hypot(site.point.x - w.x, site.point.y - w.y);
-        if (distance <= radius && (!best || distance < best.distance)) best = { site, distance };
-      }
+    let best = -1, bestD = 0;
+    for (let i = 0; i < at.sites.length; i++) {
+      const distance = Math.hypot(at.xs[i] - w.x, at.ys[i] - w.y);
+      if (distance <= radius && (best < 0 || distance < bestD)) { best = i; bestD = distance; }
     }
-    return best;
+    return best < 0 ? null : { site: at.sites[best], distance: bestD };
   }

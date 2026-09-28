@@ -14,7 +14,7 @@ exits nonzero if anything in it failed.
 
 ```bash
 cd e2e && npm ci && npx playwright install chromium   # once
-node run.mjs            # from anywhere: the default seven (canvas, keep, boards, app, shard, demo, demo2)
+node run.mjs            # from anywhere: the default eight (canvas, keep, boards, app, budgets, shard, demo, demo2)
 cd e2e && npm run e2e   # the same thing
 
 npx playwright install webkit                   # once, for the smoke
@@ -37,11 +37,13 @@ guessing. Pick scenarios by name to run one: `node e2e/run.mjs canvas`,
 | `boards` | several named boards — `boards.mjs`, written here, the boards pane driven with the real pointer | `Demos/session-engine.html?nosw=1`, in one context, with a second and third tab |
 | `big` | a 2,000-mark board saved and opened again (opt-in, minutes) | the same page, with the board from `metamedium-core/bench/board.mjs` |
 | `app` | one app address — `app.mjs`, written here: `/app/` installs, opens with the server gone, and is versioned per release | `app/` over the static server, then a server of its own it can take away, then a copy of the site it releases again |
+| `budgets` | the surface's budgets and the equivalence check — `budgets.mjs`, written here, not a page harness | `Demos/session-engine.html?folder=…`, the bench's boards served from memory, a context each |
 
 `--browser chromium` (the default) or `--browser webkit` picks the engine, and
 the run's `e2e.json` records which as `browser` / `browserVersion`. `smoke` is
-**opt-in**: a bare `node run.mjs` still runs the seven Chromium scenarios and
-nothing else, so the default gate needs no second engine installed.
+**opt-in**: a bare `node run.mjs` runs the eight Chromium scenarios (`canvas`,
+`keep`, `boards`, `app`, `budgets`, `shard`, `demo`, `demo2`) and nothing else,
+so the default gate needs no second engine installed.
 
 ### The WebKit smoke, and what it is not
 
@@ -59,7 +61,7 @@ over two hundred records and its own stub model; running it on a second engine w
 be a second full gate wearing the word "smoke", and a gate that costs two
 minutes is one whoever waits on it turns off.
 
-A full run of the four is about 135 s headless (27 Sep 2026, on a shared
+A full run of the six is about 200 s headless (27 Sep 2026, on a shared
 machine). `E2E_HEADED=1` watches it;
 `E2E_RESULTS=<dir>` moves the output; `E2E_TIMEOUT_MS` raises the per-scenario
 ceiling.
@@ -103,6 +105,31 @@ itself — several contexts, each with the gate's own guards.
 (6.6 M characters of log — past the ~5 M browser storage refused), draws one more
 stroke with the real pointer, reloads, and checks every event is back. Each open
 replays the board, which at that size is R4's problem: a run takes minutes.
+
+### The surface's budgets: `budgets`
+
+`PERF.md`'s budgets are the 2,000-mark board's, and v1 ships when they hold
+(V1-PLAN R4c, §11.3). `budgets` opens boards from the engine benchmark's
+generator (`metamedium-core/bench/board.mjs`, the same seed, served from
+memory as a published folder) and does two things.
+
+- **The equivalence check**, on the 500-mark board: every mark pointed at in
+  turn at zoom 1, three boxes drawn with the real pointer and undone, every
+  loose mark held — and after each, the board painted twice (`paintCheck` in
+  `08-render.js`: once as a hand's paint does, once as the whole-board read
+  would, uncached and unculled), what each drew and said compared, and every
+  mark's role and held group compared with the whole board's (`rolesCheck`,
+  `heldCheck`). It is not a speed, so it runs on any machine and any engine.
+- **The budgets**, on the 2,000-mark board in Chromium: open, release →
+  reading drawn, a pointer move, a pan at working zoom and zoomed out to the
+  whole board, each a step with its number against its budget. A machine
+  too loaded to measure (a one-minute load past three quarters of the cores)
+  or slower than the one the budgets were set on (a fixed calibration run in
+  the page, 1.4× its time there) says so in each step's name and skips it:
+  never a silent pass, never a failure that is the machine's.
+
+The same measuring is `perf.mjs`'s, beside the gate, for any board size and
+WebKit; it prints each budget within or over. About 30 s.
 
 ### Several boards: `boards`
 

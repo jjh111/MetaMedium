@@ -11,6 +11,7 @@
 //     node e2e/run.mjs boards                 # several named boards: the list, the trash, the switch
 //     node e2e/run.mjs big                    # a 2,000-mark board saved and opened again (minutes)
 //     node e2e/run.mjs app                    # one app address: /app/ installs, opens offline, is versioned per release
+//     node e2e/run.mjs budgets                # the surface's budgets on 2,000 marks; the 500-mark board painted both ways
 //
 // It starts its own servers on ports the OS hands out, opens a FRESH browser
 // context per scenario (no profile, no cache, no board carried over from the
@@ -29,6 +30,7 @@ import { fileURLToPath } from 'node:url';
 import { startStatic, startVite } from './servers.mjs';
 import { isModelRequest, allowedError, ALLOWED_PAGE_ERRORS } from './guards.mjs';
 import { runKeep, runBig } from './keep.mjs';
+import { boardOf, serveBoard, openBoard, interact, equivalence, judge, fmt, calibrateInPage, tooLoaded, CALIBRATION_MS } from './budgets.mjs';
 import { runBoards } from './boards.mjs';
 import { runApp } from './app.mjs';
 
@@ -364,6 +366,105 @@ async function runKeepScenario(browser, servers, engineName, which = 'keep') {
   return out;
 }
 
+/**
+ * The surface's budgets and the equivalence check (V1-PLAN.md §9 R4c;
+ * `budgets.mjs`). First the 500-mark board of the bench, painted both ways
+ * mark by mark and after boxes drawn and undone: what a hand's paint draws
+ * and says must be what the whole-board read draws and says. That is not a
+ * speed, so it always runs. Then the 2,000-mark board opened as a folder,
+ * panned and drawn on, each budget a step with its number. A machine too
+ * loaded to measure, or much slower than the one the budgets were set on
+ * (the calibration, budgets.mjs), says so in each budget's name and skips it
+ * — never a silent pass.
+ */
+async function runBudgets(browser, servers, engineName) {
+  const out = { name: 'budgets', url: `${servers.staticOrigin}/Demos/session-engine.html?folder=…` };
+  const steps = [];
+  const check = (name, ok, detail) => steps.push({ name, ok: !!ok, detail });
+  const guardsList = [];
+  const measured = {};
+  let page = null;
+  try {
+    const { loadCore, summarize } = await import('../metamedium-core/bench/lib.mjs');
+    const { generateBoard } = await import('../metamedium-core/bench/board.mjs');
+    const { core } = await loadCore('bundle');
+
+    // 1. The 500-mark board, painted both ways.
+    {
+      const board = boardOf(core, generateBoard, 500);
+      const guards = await freshContext(browser, { origins: [servers.staticOrigin], label: 'budgets-500' });
+      guardsList.push(guards);
+      await serveBoard(guards.context, servers.staticOrigin, board);
+      const opened = await openBoard(guards.context, servers.staticOrigin, { capMs: 5 * 60000 });
+      page = opened.page;
+      if (!page) check('R4c. the 500-mark board opens', false, opened.out);
+      else {
+        const eq = await equivalence(page, { strokes: 3 });
+        const share = eq.ink.of ? Math.round((100 * eq.ink.drawn) / eq.ink.of) : 100;
+        measured.equivalence500 = { paints: eq.checks, marks: eq.marks, differed: eq.differed, inkDrawnPct: share };
+        check(`R4c. the 500-mark board: ${eq.marks} marks pointed at one by one at zoom 1, ${eq.strokes} boxes drawn and undone, every mark held — what is drawn and said equals the whole-board read (${eq.checks} paints and tables compared; the pointed-at paints stroked ${share}% of the ink the whole-board read stroked, the minimap every mark)`,
+          eq.differed === 0 && eq.checks >= eq.marks && eq.minimap.drawn === eq.minimap.of && eq.ink.drawn < eq.ink.of,
+          eq.differed ? eq.first : { paints: eq.checks, ink: eq.ink, minimap: eq.minimap, held: eq.held });
+      }
+      page = null;
+      await guards.context.close();
+    }
+
+    // 2. The budgets, on the 2,000-mark board.
+    const name = (b) => `R4c budget, 2,000 marks — ${b.label}`;
+    const skipAll = (why) => { for (const b of judge({})) check(`${name(b)} — skipped: ${why}`, true, { why }); };
+    if (engineName !== 'chromium') skipAll('the budgets were set in Chromium');
+    else if (tooLoaded(NaN)) skipAll(tooLoaded(NaN));
+    else {
+      const board = boardOf(core, generateBoard, 2000);
+      const guards = await freshContext(browser, { origins: [servers.staticOrigin], label: 'budgets-2000' });
+      guardsList.push(guards);
+      await serveBoard(guards.context, servers.staticOrigin, board);
+      const opened = await openBoard(guards.context, servers.staticOrigin, { capMs: 5 * 60000 });
+      page = opened.page;
+      if (!page) {
+        check(`${name(judge({})[0])}: the board did not open — ${opened.out.why}`, false, opened.out);
+      } else {
+        const calibration = await page.evaluate(calibrateInPage);
+        measured.calibrationMs = +calibration.toFixed(1);
+        const why = tooLoaded(calibration);
+        if (why) skipAll(why);
+        else {
+          const r = await interact(page, { summarize, strokes: 5, size: 2000 });
+          const verdict = judge({ open: opened.out, draw: r.draw, panWork: r.panWork, panFit: r.panFit });
+          measured.budgets2000 = Object.fromEntries(verdict.map((b) => [b.key, b.value === null ? null : +b.value.toFixed(1)]));
+          for (const b of verdict) {
+            check(`${name(b)}: ${fmt(b.value)} ${b.ok ? '≤' : '>'} ${fmt(b.max)}${b.said ? ' (' + b.said + ')' : ''}`, b.ok,
+              { value: b.value, max: b.max, calibrationMs: measured.calibrationMs, releases: r.strokes.map((x) => Math.round(x.upToFrame)), handlers: r.strokes.map((x) => Math.round(x.up)), readings: r.draw.readings, drawn: r.draw.drawn });
+          }
+          // The reading drawn under each box is the box's: the release was read, not skipped.
+          check('R4c. each box drawn on the 2,000-mark board has its reading drawn under it, the moment it is released (a box round marks is a loop that waits, and has none)',
+            r.draw.drawn.length === 5 && r.draw.drawn.every((d, i) => r.draw.waits[i] ? d === null : typeof d === 'string' && /^rectangle/.test(d)), { drawn: r.draw.drawn, waits: r.draw.waits });
+        }
+      }
+      page = null;
+      await guards.context.close();
+    }
+  } catch (err) {
+    out.harnessError = String(err && err.stack ? err.stack : err);
+    if (page) await screenshot(page, 'budgets');
+  }
+  out.steps = steps;
+  out.measured = measured;
+  out.reportedOk = steps.length > 0 && steps.every((s) => s.ok);
+  Object.assign(out, tally(steps));
+  const merged = { pageErrors: [], modelAttempts: [] };
+  for (const g of guardsList) { merged.pageErrors.push(...g.pageErrors); merged.modelAttempts.push(...g.modelAttempts); }
+  const sorted = sortErrors(merged.pageErrors);
+  out.expectedErrors = sorted.expected;
+  out.unexpectedErrors = sorted.unexpected;
+  out.modelAttempts = merged.modelAttempts;
+  out.problems = verdict(out, merged);
+  out.ok = out.problems.length === 0;
+  for (const g of guardsList) await g.context.close().catch(() => {});
+  return out;
+}
+
 async function screenshot(page, name) {
   try {
     mkdirSync(RESULTS, { recursive: true });
@@ -393,8 +494,8 @@ async function main() {
   // `smoke` is opt-in: it is the short WebKit interaction, not part of the gate's
   // own four, and naming it in the default list would run it twice on Chromium.
   // `big` is opt-in too: a 2,000-mark board saved and opened again, minutes of replay.
-  const all = ['canvas', 'keep', 'boards', 'app', 'shard', 'demo', 'demo2', 'smoke', 'big'];
-  const byDefault = ['canvas', 'keep', 'boards', 'app', 'shard', 'demo', 'demo2'];
+  const all = ['canvas', 'keep', 'boards', 'app', 'budgets', 'shard', 'demo', 'demo2', 'smoke', 'big'];
+  const byDefault = ['canvas', 'keep', 'boards', 'app', 'budgets', 'shard', 'demo', 'demo2'];
   const picked = wanted.length ? all.filter((n) => wanted.includes(n)) : byDefault;
   if (!picked.length) {
     console.error(`nothing to run — pick from: ${all.join(', ')}`);
@@ -404,7 +505,7 @@ async function main() {
   rmSync(RESULTS, { recursive: true, force: true });
   mkdirSync(RESULTS, { recursive: true });
 
-  const needCanvas = picked.includes('canvas') || picked.includes('smoke') || picked.includes('keep') || picked.includes('boards') || picked.includes('big') || picked.includes('app');
+  const needCanvas = picked.includes('canvas') || picked.includes('smoke') || picked.includes('keep') || picked.includes('boards') || picked.includes('big') || picked.includes('app') || picked.includes('budgets');
   const needShard = picked.includes('shard') || picked.includes('demo') || picked.includes('demo2');
 
   const started = Date.now();
@@ -444,7 +545,9 @@ async function main() {
           ? await runSmoke(browser, servers)
           : OWN_PAGES[name]
             ? await runKeepScenario(browser, servers, engineName, name)
-            : await runShard(browser, servers, name);
+            : name === 'budgets'
+              ? await runBudgets(browser, servers, engineName)
+              : await runShard(browser, servers, name);
       r.browser = engineName;
       r.durationMs = Date.now() - at;
       scenarios.push(r);

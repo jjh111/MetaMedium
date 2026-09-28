@@ -207,9 +207,13 @@
   // teach event puts the check back in the rail. A chip that disagrees with the
   // grammar is worse than no chip.
   let shownMark = undefined, shownGlyph = undefined;
+  // The check's glyph, made once: the canonical samples are made afresh on
+  // every call, so asking for them in every paint made every paint redraw the
+  // chip and rewrite its name — a change to the page on every frame of a pan.
+  let checkGlyph = null;
   function syncMarkChip(s) {
     const name = s.commandMark ? s.commandMark.name : 'check';
-    const glyph = s.commandMark && taughtGlyph ? taughtGlyph : MM.canonicalCheckSamples()[0];
+    const glyph = s.commandMark && taughtGlyph ? taughtGlyph : (checkGlyph || (checkGlyph = MM.canonicalCheckSamples()[0]));
     if (shownMark === name && shownGlyph === glyph) return;
     shownMark = name; shownGlyph = glyph;
     drawMarkChip(glyph, name);

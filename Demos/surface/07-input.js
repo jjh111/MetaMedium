@@ -31,7 +31,7 @@
       if (touches.size === 2) {
         // Two fingers: this is a pinch, not a stroke. Drop the live ink — it
         // was the first finger landing, not a mark.
-        live = null; pressEnd(); magnetStart = null; magnetHold = null;
+        live = null; pressEnd(); magnetStart = null; magnetHold = null; drawLive();
         const [a, b] = [...touches.values()];
         pinch = { dist: Math.hypot(a.x - b.x, a.y - b.y), mid: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, zoom: view.zoom };
         return;
@@ -80,8 +80,47 @@
   }
   function pressMove(e) { if (press && Math.hypot(e.clientX - press.x, e.clientY - press.y) > HOLD_SLOP) pressEnd(); }
   function pressEnd() { if (press) { clearTimeout(press.timer); press = null; } }
-  /** Hold a mark with everything it hangs together with: the cluster over the relations the canvas sees. */
-  function holdAround(id) {
+  /**
+   * The marks a held mark hangs together with: the cluster `MM.clusters` finds
+   * for it over the relations of every loose mark — read over the marks joined
+   * to it through reach alone (R4c). Every link a cluster follows (near,
+   * touching, crossing, contains) is an engaging relation, and those hold only
+   * between marks within reach of each other (R4b), so the marks the index
+   * walks to from the held one are its cluster; `MM.clusters` over them, in
+   * the board's order, orders them as the whole plane would. It used to relate
+   * every loose mark to every other: 183 ms on 2,000 marks, for one press.
+   */
+  function heldGroupOf(s, id) {
+    const markOf = (cid) => {
+      const n = s.nodes.get(cid);
+      const b = n && MM.boundsOf(n);
+      if (!b) return null;
+      const fp = MM.fingerprintOf(n);
+      return { id: cid, bounds: b, points: MM.strokePointsOf(n) || undefined, closed: !!(fp && fp.isClosed) };
+    };
+    const ix = boardIndex();
+    const arts = new Set(s.artifacts);
+    const loose = (x) => ix.contentAt.has(x) && !arts.has(x);
+    let pool;
+    if (ix.stray.some(loose)) pool = s.contentIds.filter(loose); // a box with no finite edge may meet anything: the whole plane, as before
+    else {
+      const seen = new Set([id]), queue = [id];
+      while (queue.length) {
+        const x = queue.pop();
+        const b = ix.reach.boundsOf(x);
+        if (!b) continue;
+        const r = MM.reachAround(b);
+        for (const y of ix.reach.query({ minX: b.minX - r, minY: b.minY - r, maxX: b.maxX + r, maxY: b.maxY + r })) {
+          if (!seen.has(y) && loose(y) && MM.withinReach(b, ix.reach.boundsOf(y))) { seen.add(y); queue.push(y); }
+        }
+      }
+      pool = s.contentIds.filter((cid) => seen.has(cid) && loose(cid));
+    }
+    const marks = pool.map(markOf).filter(Boolean);
+    return MM.clusters(marks, MM.relate(marks)).find((g) => g.includes(id)) || [id];
+  }
+  /** Every loose mark's held group against the clusters of the whole plane, as holding it used to find them. For tests. */
+  function heldCheck() {
     const s = session.getState();
     const marks = s.contentIds.filter((cid) => !s.artifacts.includes(cid)).map((cid) => {
       const n = s.nodes.get(cid);
@@ -90,7 +129,18 @@
       const fp = MM.fingerprintOf(n);
       return { id: cid, bounds: b, points: MM.strokePointsOf(n) || undefined, closed: !!(fp && fp.isClosed) };
     }).filter(Boolean);
-    const group = MM.clusters(marks, MM.relate(marks)).find((g) => g.includes(id)) || [id];
+    const whole = MM.clusters(marks, MM.relate(marks));
+    const differ = [];
+    for (const m of marks) {
+      const mine = heldGroupOf(s, m.id), theirs = whole.find((g) => g.includes(m.id)) || [m.id];
+      if (JSON.stringify(mine) !== JSON.stringify(theirs)) differ.push({ id: m.id, mine: mine, whole: theirs });
+    }
+    return { ok: !differ.length, marks: marks.length, differing: differ.length, differ: differ.slice(0, 3) };
+  }
+  /** Hold a mark with everything it hangs together with: the cluster over the relations the canvas sees. */
+  function holdAround(id) {
+    const s = session.getState();
+    const group = heldGroupOf(s, id);
     lastTap = null;
     session.summonMarks(group, Date.now());
     render(session.getState());
@@ -113,11 +163,11 @@
         const dist = Math.hypot(a.x - b.x, a.y - b.y);
         const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
         const target = clampZoom(pinch.zoom * (dist / Math.max(1, pinch.dist)));
-        zoomAround(pinch.mid.x, pinch.mid.y, target / view.zoom);
+        zoomBy(pinch.mid.x, pinch.mid.y, target / view.zoom);
         view.panX += mid.x - pinch.mid.x;
         view.panY += mid.y - pinch.mid.y;
         pinch.mid = mid;
-        afterViewChange();
+        viewChanged();
         return;
       }
     }
@@ -130,7 +180,7 @@
       view.panX += e.clientX - panning.x;
       view.panY += e.clientY - panning.y;
       panning = { x: e.clientX, y: e.clientY };
-      afterViewChange();
+      viewChanged(); // one paint a frame, however many moves the frame holds
       return;
     }
     if (!live) {
@@ -143,7 +193,7 @@
     }
     live.push(screenToWorld(e.clientX, e.clientY));
     magnetHold = magnetQuery(live[live.length - 1]); // the offer follows the pen; out of reach, it lets go
-    render(state); // live ink
+    drawLive(); // the pen and its magnet, on their own layer; the board is as it was (R4c)
   });
 
   const endTouch = (e) => {
@@ -153,7 +203,7 @@
     return touches.size > 0; // a finger is still down: nothing to commit yet
   };
   canvas.addEventListener('pointercancel', (e) => {
-    endTouch(e); live = null; pressEnd(); magnetStart = null; magnetHold = null;
+    endTouch(e); live = null; pressEnd(); magnetStart = null; magnetHold = null; drawLive();
     if (forward) { postPointer(forward, 'cancel', e, screenToWorld(e.clientX, e.clientY)); forward = null; }
   });
 
@@ -304,11 +354,15 @@
   function scratchNearMiss(s, node, points) {
     const fp = MM.fingerprintOf(node);
     if (!fp || fp.isClosed || fp.corners < 2 || !points || points.length < 6) return null;
+    const sb = MM.getBounds(points);
     for (const id of s.contentIds) {
       if (id === node.id || s.artifacts.includes(id)) continue;
       const t = s.nodes.get(id);
       const pts = t && MM.strokePointsOf(t);
       if (!pts) continue;
+      // A stroke crosses only an outline whose box its own box meets: the rest are passed over unread (R4c).
+      const tb = MM.getBounds(pts);
+      if (tb.maxX < sb.minX || tb.minX > sb.maxX || tb.maxY < sb.minY || tb.minY > sb.maxY) continue;
       const tf = MM.fingerprintOf(t);
       const outline = MM.outlineOf({ points: pts, closed: !!(tf && tf.isClosed) });
       if (outline && MM.countCrossings(points, outline, 3) === 2) return id;
