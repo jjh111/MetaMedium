@@ -67,8 +67,7 @@
 
   tiles.theme.onclick = () => setThemeMode(THEME_MODES[(THEME_MODES.indexOf(themeMode) + 1) % THEME_MODES.length]);
   // Reset is a fresh board, never one tap from losing this one (V1-PLAN R1): what the board on screen
-  // holds goes to the trash, whole. This supersedes the handler 07-input.js set earlier in the build,
-  // which emptied the board in the browser and reloaded — one tap from losing it.
+  // holds goes to the trash, whole.
   if (tiles.reset) tiles.reset.onclick = () => { closeCC(); resetBoard(); };
   // Until a pen is seen it flips the side, as it always did; after, one word of its face a tap (07-hand.js, nextHand).
   tiles.hand.onclick = () => { const n = nextHand(hand, draws); if (n.draws !== draws) setDraws(n.draws); setHand(n.side); };
