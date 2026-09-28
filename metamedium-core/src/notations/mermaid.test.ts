@@ -287,6 +287,17 @@ describe('each symbol in its shape, each flow in its line', () => {
     expect(m.text.split('\n').slice(1, 5).map((l) => l.trim().split(/[[{(]/)[0])).toEqual(['stroke_1', 'stroke_2', 'stroke_3', 'stroke_4']);
   });
 
+  it('nodes in reading order: a row drawn at slightly different heights is one row, a small start dot is in the row it stands in', () => {
+    // A row: a small dot, then a tall box to its left whose middle sits lower than the dot's box reaches.
+    const dot = { ...sym('stroke:1', 'start', [400, 100]), bounds: { minX: 390, maxX: 410, minY: 90, maxY: 110 } };
+    const tall = { ...sym('stroke:2', 'process', [150, 118]), bounds: { minX: 70, maxX: 230, minY: 78, maxY: 158 } };
+    const below = sym('stroke:3', 'process', [300, 300]);
+    const r = reading([below, dot, tall], [flow('stroke:4', 'stroke:1', 'stroke:3'), flow('stroke:5', 'stroke:2', 'stroke:3')]);
+    const order = toMermaid(r)!.text.split('\n').slice(1, 4).map((l) => l.trim().split(/[[{(]/)[0]);
+    expect(order).toEqual(['stroke_2', 'stroke_1', 'stroke_3']);
+    expect(toMermaid(shuffled(r))!.text).toBe(toMermaid(r)!.text);
+  });
+
   it('the direction can be asked for, and the reason says it was', () => {
     const s = createSession();
     drawFlowchart(s, FLOWCHART_VARIANTS[0]);

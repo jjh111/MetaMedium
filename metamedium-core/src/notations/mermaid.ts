@@ -160,11 +160,12 @@ const centre = (b: Bounds): Point => ({ x: (b.minX + b.maxX) / 2, y: (b.minY + b
 /**
  * Things in the drawing's reading order: rows down the page, each row left to
  * right — or, `across`, columns left to right, each column top to bottom. A
- * row is everything whose middle lies within the extent of the row's first
- * member, so a line of boxes a hand drew at slightly different heights is one
- * row, and a staircase is not. Ties, and things with no bounds (last), go by
- * `keyOf` in natural order. Depends on where things are, never on the order
- * they are given in.
+ * thing joins a row when its middle lies within the extent of the row's first
+ * member, or that member's middle within its own — so a line of boxes a hand
+ * drew at slightly different heights is one row, a small dot beside a tall box
+ * is in its row, and a staircase, measured against its first step only, is
+ * not. Ties, and things with no bounds (last), go by `keyOf` in natural order.
+ * Depends on where things are, never on the order they are given in.
  */
 export function inReadingOrder<T>(items: readonly T[], boundsOf: (t: T) => Bounds | undefined, keyOf: (t: T) => string, across = false): T[] {
   const main = (b: Bounds) => (across ? centre(b).x : centre(b).y);
@@ -180,11 +181,9 @@ export function inReadingOrder<T>(items: readonly T[], boundsOf: (t: T) => Bound
     out.push(...band.map((x) => x.t));
     band = [];
   };
+  const within = (v: number, [lo, hi]: number[]) => v >= lo && v <= hi;
   for (const x of placed) {
-    if (band.length) {
-      const [lo, hi] = extent(band[0].b);
-      if (main(x.b) < lo || main(x.b) > hi) close();
-    }
+    if (band.length && !within(main(x.b), extent(band[0].b)) && !within(main(band[0].b), extent(x.b))) close();
     band.push(x);
   }
   close();
