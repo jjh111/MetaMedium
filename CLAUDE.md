@@ -1976,10 +1976,15 @@ buttons in view — measured from the list's own scroll height, so a list
 scrolled keeps its place — and let go on the next keystroke or layout change
 once the pills fit. When the field fits, nothing is set.
 
-**Read as writing** (v10 F5): the field offers to read any ink as one image
-— not only what the shape rung called `text` — because the rung called
-John's *h* an arc and his *o* a triangle, and the offer to read them was
-missing. **The minimap** (v10 F7, `21-minimap.js`): the whole board in the
+**Read as writing** (v10 F5): the field offers to read ink as one image —
+not only what the shape rung called `text` — because the rung called John's
+*h* an arc and his *o* a triangle, and the offer to read them was missing.
+**Only when some of the held ink the rung could not place for sure**
+(PLAN-USER-SURFACE U1d, `tools/read.ts`: the clean form's own rule,
+`snapReading` — confident and unambiguous — or a word); offered on a box, a
+line and a circle it was noise. Likewise *Show it in 3D* is offered only for
+what it builds, every node a circle and every edge a line or an arc
+(`tools/graph3d.ts`). **The minimap** (v10 F7, `21-minimap.js`): the whole board in the
 bottom-right corner with the viewport drawn on it, hidden while the board is
 empty; a tap or a drag there pans.
 
@@ -2115,7 +2120,7 @@ fingerprint carries it, so the model is asked to *read*, not to interpret.
   tool's own act — whichever reader is here, or the ask kept for one — and
   the line says `↵ read it`. Enter used to name the group "writing". *Read the
   writing* and *What is this?* leave the row and stay typeable; once the words
-  land they lead as below. *Read as writing* on other ink (F5) is unchanged.
+  land they lead as below. *Read as writing* on other ink (F5) is U1d's, below.
 - **The word becomes the offer to name with.** A label with a transcript puts
   *Name it "Pricing"* at the top of the palette (Tier 0, since the reading is
   already held) — write a word beside a shape and it becomes that shape's name,

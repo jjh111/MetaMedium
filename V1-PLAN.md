@@ -2173,6 +2173,18 @@ one; a pill in the list is at most the list's width, its label cut with an
 ellipsis. The stub answers *What is this?* with `window.__whatReply` when a
 test sets it.
 
+*U1d status, 28 Sep 2026: built on `claude/friendly-galileo-g1z8wo`* — the red
+commit (three core cases: a box, a line and a circle, and a molecule, offered
+*Read as writing*; a graph with one atom drawn as a box offered *Show it in
+3D*), the fix, and the goldens recorded again in a commit of their own
+(`read-any` leaves the boxes' and the molecules' offers in `builtin.test.ts`,
+`context.test.ts` and e2e 49, and nothing else changes). `tools/read.ts`
+offers *Read as writing* only when some held ink fails `snapReading` (or is a
+word) — F5's *h* still gets it (e2e 33b, re-pinned: it pinned three
+confident circles, which U1d withdraws; 33b2 pins them not offered);
+`tools/graph3d.ts` only when every node is a circle and every edge a line or
+an arc.
+
 ### Phase 7 — review and release
 **H1** — week 1's U7 (the `hand` gate scenario) plus `QA-v1.md`, a hand
 checklist for A1–A10 with the MCP hand in the room checking each step.
