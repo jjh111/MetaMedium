@@ -16,7 +16,8 @@ import { describe, it, expect } from 'vitest';
 import type { Bounds, Point } from '../types';
 import { createSession } from '../session/session';
 import type { Session } from '../session/session';
-import { triangleStroke, rectStroke, circleStroke, lineStroke, arcStroke } from '../test/strokes';
+import { triangleStroke, rectStroke, circleStroke, lineStroke, arcStroke, inkOf } from '../test/strokes';
+import { parallelogramCorners, handShape } from '../notations/fixtures/hand';
 import { dimensionsOf, figureOfMark, polygonFigure, readNumber, attachedNumberIds } from './dimension';
 import type { BoardDimensions, Figure } from './dimension';
 import { sheetLines } from './gather';
@@ -92,6 +93,33 @@ describe('figureOfMark — one closed stroke fills the figure', () => {
     const s = createSession();
     const id = text(s, '24', box(100, 100), 1000);
     expect(figureOfMark(s.getState().nodes.get(id)!, s.getState().nodes)).toBeNull();
+  });
+
+  it('a box drawn leaning — a data symbol — is a parallelogram, so a quadrilateral, never a rectangle (D2 found)', () => {
+    // The shape rung reads a parallelogram as a rectangle; its clean form keeps
+    // the lean (clean.ts, D2). A rectangle's rules assume right corners, which
+    // this one does not have: 180 wide, 64 high, its sides leaning 24°.
+    const s = createSession();
+    const ruled = s.addStroke(inkOf(parallelogramCorners(300, 300, 180, 64, 28), true), 1000);
+    const hand = s.addStroke(handShape(parallelogramCorners(700, 300, 180, 64, 28), { seed: 3, jitter: 2 }), 5000);
+    const upright = s.addStroke(rectStroke(1000, 268, 180, 64), 9000);
+    const st = s.getState();
+    for (const id of [ruled, hand]) {
+      const f = figureOfMark(st.nodes.get(id)!, st.nodes)!;
+      expect(f.kind, id).toBe('quadrilateral');
+      expect(f.vertices).toHaveLength(4);
+      expect(f.sides.map((x) => x.key)).toEqual(['side0', 'side1', 'side2', 'side3']);
+      expect(f.reason, id).toMatch(/lean/);
+      // Two corners acute and two obtuse, as the ink stands.
+      expect(Math.min(...f.angles!), id).toBeLessThan(75);
+      expect(Math.max(...f.angles!), id).toBeGreaterThan(105);
+    }
+    // Held clean, it is the same parallelogram.
+    s.snap({ ids: [ruled], at: 12000 });
+    const held = s.getState();
+    expect(figureOfMark(held.nodes.get(ruled)!, held.nodes)!.kind).toBe('quadrilateral');
+    // A box drawn upright is still a rectangle.
+    expect(figureOfMark(held.nodes.get(upright)!, held.nodes)!.kind).toBe('rectangle');
   });
 });
 

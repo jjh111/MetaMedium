@@ -17,7 +17,8 @@ import { describe, it, expect } from 'vitest';
 import type { Bounds, Point } from '../types';
 import { createSession } from '../session/session';
 import type { Session } from '../session/session';
-import { triangleStroke, rectStroke, circleStroke, lineStroke, arcStroke } from '../test/strokes';
+import { triangleStroke, rectStroke, circleStroke, lineStroke, arcStroke, inkOf } from '../test/strokes';
+import { parallelogramCorners } from '../notations/fixtures/hand';
 import { RIGHT_ANGLE_TOLERANCE } from '../session/measure';
 import { polygonFigure } from './dimension';
 import type { Figure, FigureLabel } from './dimension';
@@ -165,6 +166,23 @@ describe('a rectangle, a circle, an arc', () => {
     expect(texts.diagonal).toEqual(['31.62″', '√(30² + 10²)']);
     expect(texts.area).toEqual(['300 in²', '30 × 10']);
     expect(texts.perimeter).toEqual(['80″', '2 × (30 + 10)']);
+  });
+
+  it('a box drawn leaning is a parallelogram: each labelled side holds, and no rectangle’s diagonal or area is made of them', () => {
+    // 300 wide, 100 high, its top 60 to the right of its bottom: the sides lean 31°.
+    // Solved as a rectangle, 30 and 10 made a diagonal of √(30² + 10²) and an
+    // area of 300 — neither true of a parallelogram (D2 found).
+    const s = createSession();
+    const r = s.addStroke(inkOf(parallelogramCorners(250, 150, 300, 100, 60), true), 1000);
+    text(s, '30', box(280, 80), 20000);
+    text(s, '10', box(75, 150), 21000);
+    const sol = solutionOf(solveBoard(s.getState(), { unit: 'in' }), r);
+    expect(sol.figure.kind).toBe('quadrilateral');
+    expect(sol.conflicts).toEqual([]);
+    const values = sol.readings[0].values;
+    expect(values.map((v) => v.text).sort()).toEqual(['10″', '30″']);
+    expect(values.every((v) => v.from === 'labelled')).toBe(true);
+    expect(values.some((v) => v.key === 'diagonal' || v.key === 'area' || v.key === 'width' || v.key === 'height')).toBe(false);
   });
 
   it('a circle labelled with its circumference gives its radius — a circle skirt’s radius is its waist over 2π', () => {
