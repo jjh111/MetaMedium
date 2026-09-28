@@ -549,7 +549,9 @@ function drawSequenceRead(session: Session, read: MermaidRead, opts: DrawMermaid
     y += l.self ? ROW * U + LOOP_H * U : ROW * U;
     return at;
   });
-  const bottom = y - ROW * U + TAIL * U + (links.length ? 0 : ROW * U);
+  // Long enough under every head that the lifeline is one: past twice the tallest head's height (a stick figure is tall).
+  const tallest = Math.max(...nodes.map((x) => (x.symbol === 'actor' ? actorH : BOX_H * U)));
+  const bottom = Math.max(y - ROW * U + TAIL * U + (links.length ? 0 : ROW * U), lowest + 2.5 * tallest);
   const lifelines = nodes.map((x, i) => {
     const from = { x: xs[i], y: foot[i] + (x.symbol === 'actor' ? 0.3 * U : 0) };
     const id = session.addStroke(strokeFor({ shape: 'line', from: hand(from), to: hand({ x: xs[i], y: bottom }) })!.map(world), next(), pid, scale, { content: true });

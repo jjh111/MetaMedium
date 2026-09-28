@@ -810,9 +810,9 @@ export function readSequence(state: SessionState, scopeIds?: readonly string[], 
   }) => {
     const headA = !!o.a.head, headB = !!o.b.head;
     const direction: NotationConnector['direction'] = headA && headB ? 'both' : headA || headB ? 'forward' : 'none';
-    // `to` is where the head is; with none, the end it was drawn toward.
+    // `to` is where the head is; with none, or one at each end, the end it was drawn toward.
     let [from, to, fi, ti, fd, td, fb, tb] = [o.a, o.b, o.ia, o.ib, o.da, o.db, o.bound[0], o.bound[1]];
-    if ((headA && !headB) || (!headA && !headB && o.firstDrawn === o.b.end)) [from, to, fi, ti, fd, td, fb, tb] = [o.b, o.a, o.ib, o.ia, o.db, o.da, o.bound[1], o.bound[0]];
+    if ((headA && !headB) || (headA === headB && o.firstDrawn === o.b.end)) [from, to, fi, ti, fd, td, fb, tb] = [o.b, o.a, o.ib, o.ia, o.db, o.da, o.bound[1], o.bound[0]];
     const kind: MessageKind = o.self ? 'self' : o.line === 'dashed' ? 'return' : 'call';
     const arrows = SEQUENCE_TABLE.connectors[kind].mermaid;
     const arrow = o.self && o.line === 'dashed' ? (direction === 'none' ? '-->' : '-->>') : direction === 'both' ? arrows.both : direction === 'forward' ? arrows.head : arrows.none;
