@@ -66,7 +66,7 @@ import type { MMNode } from '../session/nodes';
 import { boundsOf, fingerprintOf, getRep, isWord, labelOf, lettersOf, resemblances, strokePointsOf, transcriptOf } from '../session/nodes';
 import type { NotationPort, NotationPorts } from '../session/ports';
 import { activeBindingsOf, magnetRadius } from '../session/magnets';
-import type { ConnectorEnd, HeadReading } from '../diagram/heads';
+import type { ConnectorEnd, ConnectorHeads, HeadReading } from '../diagram/heads';
 import { headsOf } from '../diagram/heads';
 import { figuresAmong } from '../diagram/figures';
 import type { Role } from '../diagram/roles';
@@ -497,6 +497,32 @@ function readEnd(e: ConnectorEnd, landOn?: (id: string) => boolean): ReadEnd {
 }
 
 /**
+ * heads.ts's reading of a connector's two ends, asked on a scratch board
+ * where the connector and every small stroke near its ends stand each on its
+ * own — so a head the letter rules gathered into a word (with the connector,
+ * or with the writing beside it) is read as the head it is; heads.ts takes a
+ * word for writing. The ids in each head are the board's own.
+ */
+function headsApart(conn: Stroke, others: readonly Stroke[]): ConnectorHeads | null {
+  const a = conn.ink[0], b = conn.ink[conn.ink.length - 1];
+  const length = dist(a, b);
+  const scratch = createSession();
+  let t = 1;
+  const id = scratch.addStroke(conn.ink.map((p) => ({ x: p.x, y: p.y })), t, undefined, conn.scale, { content: true });
+  const back = new Map<string, string>([[id, conn.id]]);
+  for (const o of others) {
+    if (o.id === conn.id || o.size > 0.5 * length) continue;
+    const reach = magnetRadius(o.size, o.scale) * 1.5;
+    if (offBox(a, o.bounds) > reach && offBox(b, o.bounds) > reach) continue;
+    back.set(scratch.addStroke(o.ink.map((p) => ({ x: p.x, y: p.y })), (t += 10_000), undefined, o.scale, { content: true }), o.id);
+  }
+  const h = headsOf(scratch.getState(), id);
+  if (!h) return null;
+  const map = (e: ConnectorEnd): ConnectorEnd => ({ ...e, heads: e.heads.filter((x) => x.ids.every((k) => back.has(k))).map((x) => ({ ...x, ids: [...new Set(x.ids.map((k) => back.get(k)!))], tip: { ...x.tip } })) });
+  return { id: conn.id, shape: h.shape, start: map(h.start), end: map(h.end) };
+}
+
+/**
  * A self-message's heads, one at each end of the loop. The leg that arrives
  * — from where the loop is well out to where it meets the lifeline — carries
  * its head at the lifeline: its own barb, when past the point nearest the
@@ -546,8 +572,8 @@ function loopHeads(loop: Stroke, lineX: (y: number) => number, side: number, oth
     const back = new Map<string, string>([[id, loop.id]]);
     for (const o of near) back.set(scratch.addStroke(o.ink.map((p) => ({ x: p.x, y: p.y })), (t += 10_000), undefined, o.scale, { content: true }), o.id);
     const h = headsOf(scratch.getState(), id);
-    const head = (h?.end.heads ?? []).filter((x) => pointing(x) && x.ids.every((q) => back.has(q)) && !x.ids.includes(id)).map((x) => ({ ...x, ids: x.ids.map((q) => back.get(q)!), tip: { ...x.tip } }))[0];
-    return head ? { end: which, point: { ...head.tip }, head, reason: head.reason.replace(/at its end/g, `at the loop’s ${which}`) } : plain;
+    const head = (h?.end.heads ?? []).filter((x) => pointing(x) && x.ids.every((q) => back.has(q)) && !x.ids.includes(id)).map((x) => ({ ...x, ids: x.ids.map((q) => back.get(q)!), tip: { ...x.tip }, reason: x.reason.replace(/at its end/g, `at the loop’s ${which}`) }))[0];
+    return head ? { end: which, point: { ...head.tip }, head, reason: head.reason } : plain;
   };
   return { start: legOf('start'), end: legOf('end') };
 }
@@ -852,10 +878,27 @@ export function readSequence(state: SessionState, scopeIds?: readonly string[], 
     for (const x of [...o.ids, ...headIds]) taken.add(x);
   };
 
+  // What may be a message: a loose stroke, or a word's main stroke when the rest of the word is small beside it — a
+  // loop and the head drawn right after it are one word to the letter rules; a word of writing is not that.
+  const wordsNear: Mark[] = [...marks.values()].filter((m) => isWord(m.node));
+  const letterOf = new Map<string, Stroke[]>();
+  for (const w of wordsNear) {
+    const ls = lettersOf(w.node).map((id) => strokes.get(id)).filter((x): x is Stroke => !!x);
+    for (const l of ls) if (ls.length >= 2 && ls.every((o) => o === l || o.size <= 0.5 * l.size)) letterOf.set(l.id, ls);
+  }
+  const mayBe = [...loose, ...[...strokes.values()].filter((x) => letterOf.has(x.id))];
+  /** A connector's ends: heads.ts on the board — or apart, when it or a word near it was gathered by the letter rules. */
+  const endsOf = (x: Stroke): ConnectorHeads | null => {
+    const a = x.ink[0], b = x.ink[x.ink.length - 1];
+    const reach = magnetRadius(0, x.scale) * 2;
+    const wordy = x.mark !== x.id || wordsNear.some((w) => offBox(a, w.bounds) <= reach || offBox(b, w.bounds) <= reach);
+    return wordy ? headsApart(x, [...strokes.values()].filter((o) => !taken.has(o.id))) : headsOf(state, x.id);
+  };
+
   // 4a. Solid messages: open strokes the rung reads as a line, an arrow or an arc, roughly level, each end on a lifeline.
   const nearAny = (p: Point, reach: number) => landing(p, reach) !== null;
   const solidDone = new Set<string>();
-  for (const s of loose) {
+  for (const s of mayBe) {
     if (taken.has(s.id) || inLine.has(s.id) || used.has(s.id) || closedOf(s) || writes(s)) continue;
     const a0 = s.ink[0], b0 = s.ink[s.ink.length - 1];
     const length = dist(a0, b0);
@@ -865,7 +908,7 @@ export function readSequence(state: SessionState, scopeIds?: readonly string[], 
     if (!nearAny(a0, reach + 0.5 * length) || !nearAny(b0, reach + 0.5 * length)) continue;
     const level = 1 - ramp(offLevel(sub(b0, a0)), MESSAGE_LEVEL[0], MESSAGE_LEVEL[1]);
     if (level <= 0) continue;
-    const h = headsOf(state, s.id);
+    const h = endsOf(s);
     if (!h) continue;
     const onLifeline = (id: string) => lifelineStrokes.has(id);
     const [a, b] = [readEnd(h.start, onLifeline), readEnd(h.end, onLifeline)];
@@ -900,7 +943,7 @@ export function readSequence(state: SessionState, scopeIds?: readonly string[], 
   }
 
   // 4c. Self-messages: a loop both of whose ends land on one lifeline, bulging to one side.
-  for (const s of loose) {
+  for (const s of mayBe) {
     if (taken.has(s.id) || inLine.has(s.id) || used.has(s.id) || solidDone.has(s.id) || closedOf(s)) continue;
     const a0 = s.ink[0], b0 = s.ink[s.ink.length - 1];
     const reach = reachFor(s.size, s.scale);
