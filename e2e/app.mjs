@@ -43,9 +43,9 @@ const root = resolve(here, '..');
 /** The repository's version, the one line the release script keeps. */
 const versionIn = (dir) => readFileSync(join(dir, 'VERSION'), 'utf8').trim();
 /** What the app's worker must hold after one visit, relative to the site's root. */
-const APP_SHELL = ['app/', 'app/manifest.webmanifest', 'Demos/session-engine.js', 'Demos/surface/surface.css', 'Demos/metamedium-core.browser.js', 'QA-v8.md'];
+const APP_SHELL = ['app/', 'app/manifest.webmanifest', 'Demos/session-engine.js', 'Demos/surface/surface.css', 'Demos/metamedium-core.browser.js', 'HELP.md'];
 /** What a copy of the site needs for the app to open and for its build to run (the release, in part C). */
-const SITE = ['VERSION', 'QA-v8.md', 'app', 'Demos/session-engine.html', 'Demos/session-engine.js', 'Demos/metamedium-core.browser.js', 'Demos/surface/surface.css', 'Demos/sw.js', 'Demos/manifest.webmanifest'];
+const SITE = ['VERSION', 'HELP.md', 'app', 'Demos/session-engine.html', 'Demos/session-engine.js', 'Demos/metamedium-core.browser.js', 'Demos/surface/surface.css', 'Demos/sw.js', 'Demos/manifest.webmanifest'];
 
 /** Every response of the site's own origin that failed while the page was open (the host's favicon is not the site's). */
 function watchFailures(page, origin) {
@@ -343,7 +343,7 @@ async function releaseTest(browser, ctx, { stamp }) {
     const workers = ['Demos/sw.js', 'app/sw.js'].map((p) => [p, readFileSync(join(dir, p), 'utf8')]);
     writeFileSync(join(dir, 'VERSION'), next + '\n');
     for (const f of make(dir)) if (f.changed) writeFileSync(join(dir, f.path), f.text);
-    writeFileSync(join(dir, 'QA-v8.md'), readFileSync(join(dir, 'QA-v8.md'), 'utf8') + '\n' + marker + '\n');
+    writeFileSync(join(dir, 'HELP.md'), readFileSync(join(dir, 'HELP.md'), 'utf8') + '\n' + marker + '\n');
     if (!stamp) for (const [p, text] of workers) writeFileSync(join(dir, p), text);
 
     // Its first network fetch: one reload, online.

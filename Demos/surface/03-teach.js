@@ -165,16 +165,19 @@
     return true;
   }
 
+  // What a mark is for, said before anything is asked of the hand (PLAN-USER-SURFACE U1g; it used to
+  // say only "Draw your mark five times"). The chip in the bar says the same (the page's markChip).
+  const MARK_SAYS = 'A mark is a gesture: circle some marks, then draw your mark across them to see what they can become.';
   // What the pane says depends on whether a mark is already held.
   function showPadState() {
     const held = !!session.getState().commandMark;
     teachForget.hidden = !held;
     if (held) {
-      teachHint.innerHTML = '<b>Your mark.</b> Draw here to teach a new one; <b>Forget</b> goes back to ✓.';
+      teachHint.innerHTML = MARK_SAYS + ' <b>Your mark</b> is held. Draw here to teach a new one; <b>Forget</b> goes back to ✓.';
       teachStatus.className = '';
       teachStatus.textContent = samples.length ? 'Held on this device — the five it learned from.' : 'Held on this device.';
     } else {
-      teachHint.innerHTML = 'Draw your mark <b>five times</b>.';
+      teachHint.innerHTML = MARK_SAYS + ' The built-in mark is a check ✓ — teach your own by drawing it <b>five times</b>.';
       evaluateSamples();
     }
   }

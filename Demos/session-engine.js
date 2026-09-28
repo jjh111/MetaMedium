@@ -906,16 +906,19 @@
     return true;
   }
 
+  // What a mark is for, said before anything is asked of the hand (PLAN-USER-SURFACE U1g; it used to
+  // say only "Draw your mark five times"). The chip in the bar says the same (the page's markChip).
+  const MARK_SAYS = 'A mark is a gesture: circle some marks, then draw your mark across them to see what they can become.';
   // What the pane says depends on whether a mark is already held.
   function showPadState() {
     const held = !!session.getState().commandMark;
     teachForget.hidden = !held;
     if (held) {
-      teachHint.innerHTML = '<b>Your mark.</b> Draw here to teach a new one; <b>Forget</b> goes back to ✓.';
+      teachHint.innerHTML = MARK_SAYS + ' <b>Your mark</b> is held. Draw here to teach a new one; <b>Forget</b> goes back to ✓.';
       teachStatus.className = '';
       teachStatus.textContent = samples.length ? 'Held on this device — the five it learned from.' : 'Held on this device.';
     } else {
-      teachHint.innerHTML = 'Draw your mark <b>five times</b>.';
+      teachHint.innerHTML = MARK_SAYS + ' The built-in mark is a check ✓ — teach your own by drawing it <b>five times</b>.';
       evaluateSamples();
     }
   }
@@ -10488,7 +10491,7 @@
     ui.tile(tiles.models, 'models', agents.length ? agents.map((a) => modelWords(a)).join(', ') : 'none', { on: agents.length > 0, why: 'a model joins as a participant; it is asked only when you ask' });
     ui.tile(tiles.teach, 'mark', s.commandMark ? s.commandMark.name : 'check ✓', { on: !!s.commandMark, why: 'the mark that turns a circled group into a selection; teach your own' });
     ui.tile(tiles.reset, 'reset', 'fresh board', { why: 'a fresh board under the same name — what this one holds goes to the trash, from which it comes back whole' });
-    ui.tile(tiles.help, 'help', '?', { why: 'the hand QA plan, which doubles as the manual' });
+    ui.tile(tiles.help, 'help', '?', { why: 'how to use the canvas, on one page: draw, hold, choose — and models, boards, rooms, your mark, the shortcuts' });
     ui.tile(tiles.live, 'live', folder.how === 'live' ? folder.name : 'room…', { on: folder.how === 'live', why: 'a room other hands can join: between tabs on this machine, or across machines through a relay' });
     // Its face is the name of what is on screen (V1-PLAN R1); the pane is 22-boards.js.
     ui.tile(tiles.boards, 'boards', boardOnScreenName() || '…', { why: 'the boards this browser keeps — new, open, rename, duplicate, delete, and the trash — and the folders, repositories and sites opened lately' });
@@ -10520,7 +10523,9 @@
       .catch((err) => { document.getElementById('liveStatus').textContent = 'could not join: ' + (err.message || err); });
   };
 
-  // Help is the hand QA plan, which doubles as the manual, read into a pane.
+  // Help is HELP.md, one page for a person — draw, hold, choose — read into a pane (PLAN-USER-SURFACE U1g).
+  // It used to be the hand QA plan (QA-v8.md), a developer's test plan dated 6 Sep with server
+  // commands; that stays in the repository, and HELP.md names it at its foot.
   const helpPanel = document.getElementById('helpPanel');
   ui.pane(helpPanel, 'help', () => closePanel(helpPanel, tiles.help));
   // It leads with the version this page is (V1-PLAN R7): the repository's VERSION, stamped into the
@@ -10537,10 +10542,10 @@
     if (helpPanel.hasAttribute('hidden') || helpLoaded) return;
     const body = helpPanel.querySelector('.helpBody');
     body.textContent = 'loading…';
-    fetch('../QA-v8.md', { cache: 'no-cache' }).then((r) => (r.ok ? r.text() : Promise.reject(new Error('HTTP ' + r.status)))).then((md) => { body.innerHTML = markdownToHtml(md); helpLoaded = true; })
-      .catch((err) => { body.innerHTML = '<p>could not load QA-v8.md (' + esc(err.message || err) + ') — it is in the repository root.</p>'; });
+    fetch('../HELP.md', { cache: 'no-cache' }).then((r) => (r.ok ? r.text() : Promise.reject(new Error('HTTP ' + r.status)))).then((md) => { body.innerHTML = markdownToHtml(md); helpLoaded = true; })
+      .catch((err) => { body.innerHTML = '<p>could not load HELP.md (' + esc(err.message || err) + ') — it is in the repository root.</p>'; });
   };
-  /** Enough markdown for the QA plan: headings, lists, bold, code, links. */
+  /** Enough markdown for the help: headings, lists, bold, code, links. */
   function markdownToHtml(md) {
     const inline = (t) => esc(t)
       .replace(/`([^`]+)`/g, '<code>$1</code>')

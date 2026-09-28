@@ -32,7 +32,7 @@ const SHELL = [
   '../Demos/metamedium-core.browser.js',
 ];
 // The help pane's text: kept for offline when it answers, never the reason a shell is not kept.
-const EXTRA = ['../QA-v8.md'];
+const EXTRA = ['../HELP.md'];
 
 // `reload`: the release's own files, never a copy the browser's HTTP cache still holds.
 const fresh = (u) => new Request(u, { cache: 'reload' });

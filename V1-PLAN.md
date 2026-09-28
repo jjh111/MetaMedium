@@ -2206,6 +2206,20 @@ with the board and far from Help; it scrolls when the window is short. e2e
 51 pinned the packs tile as the grid's last; it now pins it among the
 Helpers, as the plan says to, deliberately.
 
+*U1g status, 28 Sep 2026: built on `claude/friendly-galileo-g1z8wo`* — the red
+commit (e2e 61–61b: the help pane was *QA for v8 and v9*, branch `next-phases`,
+with server commands; *your mark* said only *Draw your mark five times*) and
+the commit carrying this line. `HELP.md` at the root is one page for a person
+— the loop, the field's four round buttons, handling marks, what a model adds
+and how to ask one (Claude in the room first), boards, live rooms, your mark,
+undo, the shortcuts — read by the help tile and kept offline by both service
+workers (`Demos/sw.js`'s `EXTRA`; the gate's `app` scenario and the release
+test ask for `HELP.md` now); `QA-v8.md` stays, named at its foot. *Your mark*
+says what a mark is for in its pane (`03-teach.js`, `MARK_SAYS`) and on the
+chip. R5's first run is still its own unit. The harness's fetch stub lets a
+request with no body through to the page's origin, so the help loads in the
+canvas scenario.
+
 ### Phase 7 — review and release
 **H1** — week 1's U7 (the `hand` gate scenario) plus `QA-v1.md`, a hand
 checklist for A1–A10 with the MCP hand in the room checking each step.

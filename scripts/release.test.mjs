@@ -150,7 +150,7 @@ test('a key-shaped string is found and never said back; the files a release ship
 // ===== the script, on a small repository ============================================
 
 /** The files a release reads or writes, copied from this repository. */
-const FILES = ['.gitignore', 'CHANGELOG.md', 'VERSION', 'QA-v8.md', 'app', 'Demos/session-engine.html', 'Demos/sw.js', 'Demos/manifest.webmanifest',
+const FILES = ['.gitignore', 'CHANGELOG.md', 'VERSION', 'HELP.md', 'app', 'Demos/session-engine.html', 'Demos/sw.js', 'Demos/manifest.webmanifest',
   'Demos/session-engine.js', 'Demos/metamedium-core.browser.js', 'Demos/surface/surface.css'];
 
 /** A small repository holding those files at `version`, released as such (tagged, pushed to a remote of its own). */
