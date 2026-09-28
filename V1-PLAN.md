@@ -250,7 +250,7 @@ suite and the gate green, `master` fast-forwarded and pushed.
 | **0. Make week 1 whole** | L1 ids that hold · L2a the shard pairs by id · L2b labels on the board · L2c the shard asks · L2d duplicate Enter, fitAll, the cache measured · L3 CI, bundles, docs | every unit week 1 claimed is whole, CI runs what exists (WebKit included), docs say what the code does |
 | **1. The backbone** | B1 tools · B2 context · B3 packs | a tool is one file; the field ranks by context with reasons; a pack is used by an event and benched |
 | **2. Editing** | E1 handles · E2 bindings follow · E3 ports, heads and figures | a selected mark reshapes by its points; bound arrows follow; notations can declare ports |
-| **3. Diagrams** | D1 flowchart · D2 Mermaid out · D3 Mermaid in · D4 UML class · D5 sequence and state · D6 ER and mind map · D7 routing · D8 the repair demo | A1–A3 pass in the gate |
+| **3. Diagrams** | D1 flowchart · S1 the shape rung holds a diamond, an L and a wide arc · D2 Mermaid out · D3 Mermaid in · D4 UML class · D5 sequence and state · D6 ER and mind map · D7 routing · D8 the repair demo | A1–A3 pass in the gate |
 | **4. Maths** ∥ after B1 | M1 quantities and expressions · M2 the sheet · M3 figures and dimensions · M4 solving · M5 maths on the board · M6 the garment pack · M7 true size and print | A4 passes in the gate |
 | **5. Seats** ∥ | J1 decide on the canvas · J2 extraction, a spike · J3 numerals, an experiment | the seat is measured on fixtures; the spike and the experiment say yes or not yet, with numbers |
 | **6. Ready for use** | R1 boards · R2 the log format · R3 no lost work · R4 performance · R5 first run · R6 pencil and WebKit · R7 deploy and release · R8 one platform · R9 the shard alongside | A8–A10 pass; budgets met |
@@ -387,7 +387,42 @@ A box drawn as two L-shaped strokes is two *arrow 0.59* readings, so
 `figuresOf`, which skips arrows, never sees it (ruled in four, it reads). A
 square diamond, which the rung reads as *rectangle 0.82*, is offered *Draw it
 clean* as its upright bounding box (`clean.ts`) — a decision redrawn as a
-process.
+process. (Both fixed by S1, below.)
+**S1 The shape rung holds a diamond, an L and a wide arc** — a correctness
+unit, found by D1 and the maths lane, before diagrams reach the surface:
+*Draw them clean* redrew a diamond as its upright box, an L read as an
+arrow (so a box drawn as two Ls was two arrows and no figure), and a wide
+arc read as a line. *Owns* `recognition.ts`, `geometry.ts`,
+`session/clean.ts`, their tests and benches. *Red first:* boxes turned
+0°–45° drawn clean at their angle, Ls with no arrow reading, arcs by sweep,
+a flowchart drawn clean and read again. *Trap:* the barb's length, not its
+angle (raising the angle loses real arrows); the arc measured on the
+denoised path, or a slow wobbly line becomes one.
+*Status, 27 Sep 2026:* built on `w2-maths`. A rectangle's clean form is its
+tightest box at any angle (`tightestBox`), squared up only within the
+hand's wobble; an arrow's barb must be short against its shaft or a flick in
+the hand's space, and says its ratio; a stroke that bows evenly — swept,
+shown past a straight line's bow on screen, spread, round — reads as an arc
+and the line gives way (`bowOf`); a line that bends is not offered clean;
+an arrow's clean form keeps its barb and reads back as an arrow. Benches:
+the recognition corpus unchanged (1674, 99.9%, every row); arcs 30°–300°
+1295/1296 read as arcs, every steady one (0 of 864 under 180° before); no
+L of the red test carries an arrow reading (they were 0.53–0.60), and of
+1008 swept arrows every one with a barb under 0.4 of its shaft or 16px
+still reads first; the clean bench's corpus rows unchanged, turned boxes
+864/864 at their own angle (864 off before), arcs offered 1293/1296 (288,
+with 709 offered as lines), every clean form reading back as its shape;
+figures: a box drawn as two Ls is one rectangle; the flowchart bench drawn
+clean keeps every decision — 72/72 on the boards (43 before), 48/48 in one
+stroke (32) and 48/48 in two (12) — core 967. Found, for their owners: a
+data symbol drawn clean reads as a process (36/36) — the rung reads a
+parallelogram as a rectangle and its tightest box is upright, so that offer
+needs the hull's corners (D1) or a rung that sees a lean; `measure.ts`
+gives a turned box's width and height from its bounds, not its sides (the
+maths lane); `inferWire` (`session.ts`) wires only a top *line* or *arrow*,
+so a curved connector that now reads as an arc gets no wire (the main
+lane); and John's own arrows are not in the repo — the barb rule was
+checked on synthetic hands and D1's arrows, and wants his strokes (R1).
 **D2 Mermaid out** — the exporter tool,
 the `mermaid` kind in `kinds/kinds.ts` and its renderer in the `run`
 sandbox, the export pane. *Red first:* the fixture's Mermaid equals a golden

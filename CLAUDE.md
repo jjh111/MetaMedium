@@ -271,22 +271,42 @@ is the strongest single discriminator.** Rectangle ~1.0, circle ~0.79, triangle
 ~0.5. Corner count is fragile (miss one corner and a box becomes a triangle);
 extent holds regardless. This is what fixed "rectangles read as triangles".
 **The box is the tightest one at any angle** (rotating calipers over the
-hull), not the axis-aligned bounds: against those, a box tilted ten degrees
+hull, `tightestBox`), not the axis-aligned bounds: against those, a box tilted ten degrees
 filled ~80% and lost its snap offer, and at fifteen read half as a triangle.
-A hand rarely draws square to the screen.
+A hand rarely draws square to the screen. The same box is a rectangle's clean
+form (below), so a diamond — a square turned 45° — is read and redrawn as one.
+
+**An arc is known by its bow, not its straightness** (S1, `bowOf` in
+geometry.ts, `evenBowOf` in recognition.ts). Straightness — chord over path
+— is nearly blind to a bow: a 90° arc still scores 0.90 and a 30° one 0.99,
+so every arc under a half circle read as a line (a 140° arc was *line 0.63*).
+The bulge off the chord is not: it means a sweep (4·atan(2·bulge/chord)). A
+stroke **bows evenly** when it sweeps like an arc, its bulge is past what a
+hand's straight line bows **on screen** (a fixed-pixel rule about the hand,
+so it takes the scale), each half bows off its own chord as an arc's halves
+do (a bend's straight arms do not), it stays near the circle through its
+ends and bulge (a hook, a J, an S do not), and it turns no corners. That
+evidence lifts the arc and **the line gives way exactly as far**; measured
+on the denoised path, so a slow, wobbly straight line stays a line. The
+constants are `ARC_SWEEP`, `ARC_BULGE_PX`, `ARC_EVEN`, `ARC_RESIDUAL`.
 
 **The shape rung is closed: eight entries.** `line`, `arc`, `triangle`,
 `rectangle`, `circle`, and — because the rung above cannot do without them —
 `arrow` (a straight shaft with a barb that **draws back on it** — a wing
 turning past ninety degrees and at least a sixteenth of the stroke long;
 the hook a pen leaves at liftoff is neither, and used to make every tall
-*l* an arrow 0.6 — v10 F2),
+*l* an arrow 0.6 — v10 F2 — and a barb **short against its shaft**, its
+reach from the tip over the shaft's length, or a flick in the hand's space
+whatever the shaft: an L is two arms, and each L of a box drawn in two
+strokes used to be *arrow 0.59*. Its length, never its angle, is the
+discriminator — S1, `BARB_OF_SHAFT`, `BARB_FLICK_PX` — and the reading says
+it: *the barb 0.13 of the shaft*),
 `text` (writing, *without reading it*: open, turns many times, low and wide,
 mostly-empty box — enough to make a mark a `label`), and `dot`. **Below the
 hand's resolution (`HAND_RESOLUTION_PX`) only `dot` is offered**: a 5px blob has
 no measurable geometry, and reporting "circle 0.85" for it would be sensor noise
 dressed as evidence. A detector may return `meta` beyond its label — an arrow's
-tip and tail — which the session keeps as a `reading:<type>` rep so the rungs
+tip, tail and barb — which the session keeps as a `reading:<type>` rep so the rungs
 above can read direction as a fact.
 
 **Size-relative closure** (key innovation): a stroke closes if the start–end
@@ -418,12 +438,26 @@ ink faint beneath it. **Ink is never replaced**; undo drops the rep. Three rules
   silently settle an argument the engine deliberately holds open. Only the
   engine's own reading counts — a model calling a box "a card" is a claim about
   meaning, not geometry.
-- **Built from the ink's own measurements**, never a template: bounds, the
-  three sharpest corners, the arrow's tip and tail, the arc's bulge. A slight
+- **Built from the ink's own measurements**, never a template: the three
+  sharpest corners, the arrow's tip, tail and barb, the arc's bulge. A slight
   oval stays an oval. `text` has no clean form — handwriting redrawn as a box
   is a lie about what was written.
+- **A box keeps its angle** (S1): its clean form is its tightest box at any
+  angle, so a diamond is redrawn as a diamond — as its upright bounds it was
+  a flowchart's decision turned into a process. Square to the screen within
+  the hand's wobble (`SQUARE_UP_DEG`) it is squared up to the bounds the ink
+  fills, exactly as before, when those hold it tightly (`BOUNDS_SLACK`), and
+  at its own size when they would grow it. **A bend is not a line**: a line
+  is offered only when its ink stands off the straight line through its ends
+  no further than a hand's line bows — half of a two-stroke diamond,
+  straightened, made the decision a triangle. **An arrow keeps its barb**,
+  at most a fifth of its shaft, so its clean form reads back as an arrow.
 - **Zero wrong snaps over the whole corpus** is pinned in `clean.bench.test.ts`,
-  alongside ≥95% offered for every drawable shape and 0% for writing.
+  alongside ≥95% offered for every drawable shape and 0% for writing — and,
+  since S1, turned boxes (every one drawn clean at its own angle), arcs of
+  30°–300°, and **every clean form, drawn again as ink, reads as the shape it
+  cleans**. The flowchart bench draws every board clean and reads it again:
+  every decision stays a decision.
 
 In the surface the offer is a dashed ghost under a qualifying mark **for a
 moment, not forever** (v10 F4): the mark just drawn, for a few seconds,
@@ -797,8 +831,8 @@ roles each symbol plays; it adds none (registering one that names a seventh
 throws). `notationsOf(state, scope?)` asks every registered notation, plural
 and ranked, and `describeNotation` says *a flowchart 0.78 — three processes,
 two decisions, …, eight flows*. Symbols are read by their **corners**,
-because the shape rung is blind to rotation by design and a rectangle's clean
-form is its upright bounds: the four corners on the ink's hull and the share
+because the shape rung is blind to rotation by design (a rectangle's clean
+form keeps its angle since S1, but the rung's reading carries none): the four corners on the ink's hull and the share
 they hold, how upright its sides, how turned its diagonals (a decision's
 stand one plumb and one level), how its sides lean (data) — so a box drawn a
 little tilted stays a process. A diamond in two strokes is `figuresAmong`'s;
