@@ -183,7 +183,7 @@ any structural change.
 
 | Path | What it is |
 |---|---|
-| `metamedium-core/` | **The canonical engine** (TypeScript, zero deps, tested): geometry, recognition (the shape rung), relations, the diagram rung (`src/diagram/`), concepts, the no-modes session engine, the layout and graph parsers, maths on a page (`src/maths/`: quantities, expressions, the sheet), and the LLM transport. New recognition/engine work lands HERE |
+| `metamedium-core/` | **The canonical engine** (TypeScript, zero deps, tested): geometry, recognition (the shape rung), relations, the diagram rung (`src/diagram/`), notations over it (`src/notations/`: the flowchart), concepts, the no-modes session engine, the layout and graph parsers, maths on a page (`src/maths/`: quantities, expressions, the sheet), and the LLM transport. New recognition/engine work lands HERE |
 | `index.html` | **Interactive whitepaper v5** "MetaMedium: AI Beyond Chat" (live on GitHub Pages). Fully on the `brand/` system as of 3 Sept 2026 — its `:root` is `brand/tokens.css` under the names this page already used, so change a value THERE first |
 | `brand/` | **The visual system, one home**: `tokens.css` holds every MetaMedium colour, face, size and figure/diagram token; `styleguide.html` is the living specimen (light paper first, IBM Plex Mono throughout, teal keyword, colour as signal, §11 figures and diagrams, §12 long-form furniture). v1 draft — the whitepaper's **figures** have migrated, the page around them has not; `brand/README.md` carries the four laws, the convergence order, and what applying it to the whitepaper taught the system |
 | `doodle2-canvas.html` | **Flagship demo**: heuristic recognition, spatial graph, library, undo/redo, touch. No LLM. Single-file (~500KB) |
@@ -788,6 +788,29 @@ the drawn ink, cut at the tip so the head sits where the arrow pointed).
 `edge`s — and gets its direction for free. `session.read(ids)` returns the
 relations, roles, genre and concepts together; the inspector's **ladder**
 (ink → shape → plays → code) is that reading, per mark.
+
+**Notations read over the roles** (V1-PLAN §3, D1; `notations/notation.ts`,
+`notations/flowchart.ts`, `notations/shape.ts`). A notation says what a
+scope's marks are in its own terms — the flowchart's process, decision,
+terminator, data, start and end, its flows and labels — and which of the six
+roles each symbol plays; it adds none (registering one that names a seventh
+throws). `notationsOf(state, scope?)` asks every registered notation, plural
+and ranked, and `describeNotation` says *a flowchart 0.78 — three processes,
+two decisions, …, eight flows*. Symbols are read by their **corners**,
+because the shape rung is blind to rotation by design and a rectangle's clean
+form is its upright bounds: the four corners on the ink's hull and the share
+they hold, how upright its sides, how turned its diagonals (a decision's
+stand one plumb and one level), how its sides lean (data) — so a box drawn a
+little tilted stays a process. A diamond in two strokes is `figuresAmong`'s;
+one drawn as left and right halves quickly, which the letter rules gather
+into a word, is read from the word's own strokes. A flow's ends are read
+**past its heads** (`headsOf`'s `tip`), a magnet's bind first, and a small
+start dot that `headsOf` reads as a circle head is the start. Ports — a
+decision's vertices, a process's edge middles, a terminator's ends and sides
+— reach the pen through E3's hook only once `offerPorts('flowchart')` puts
+them in use. The content (names, roles, ports, Mermaid) is `FLOWCHART_TABLE`,
+bound for the `flowchart@1` pack (B3); `flowchart.bench.test.ts` is the
+bench. Derived: nothing enters the log.
 
 ### Spatial Graph — retired
 

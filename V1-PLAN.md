@@ -356,7 +356,39 @@ session's inferred wire lands on a head, not the node beyond its `tip`.
 the notation reading in the field and the panel, the ports. *Red first:* a
 hand-drawn flowchart fixture (jittered, several strokes per symbol) reads as
 a flowchart; a wireframe fixture does not. *Trap:* rotation — the diamond is
-known only by its clean form's angle. **D2 Mermaid out** — the exporter tool,
+known only by its clean form's angle.
+*Status, 27 Sep 2026:* D1's core built on `w2-maths`; the surface's display
+(the field's *what this is* row, the panel's *becomes* row), the
+`flowchart@1` pack (B3) and a board's `use` offering the ports are still to
+come. `notations/notation.ts` — a notation's symbols and connectors each play
+one of the six roles and add none; `notationsOf(state, scope?)` asks every
+registered notation, plural and ranked, leaving out one that throws or names
+a seventh role; a reading gives each symbol with its readings and ports, each
+flow with its direction and its ends read past its heads, each label, and
+every mark's role; `offerPorts` puts a notation's ports through E3's hook,
+never by default. `notations/shape.ts` reads an outline by its corners (the
+four on its hull and the share they hold, how upright, how turned, how it
+leans). `notations/flowchart.ts`: process, decision (one stroke; two; two a
+word gathered), terminator, data, start and end; flows directed by their
+heads, a magnet's bind first; labels inside a symbol or beside a flow; the
+content is `FLOWCHART_TABLE`, each symbol's Mermaid included, bound for the
+pack. The bench: 36/36 hand-drawn flowcharts read (0.76–0.80), 288/288
+symbols, 288/288 flows, 216/216 labels; boxes tilted to 12° 72/72
+processes; diamonds 48/48 in one stroke and 48/48 in two; the wireframe, the
+molecule and a line of writing 0/8 each above the floor (0.5) — 51 tests,
+core 943. The trap's answer: a rectangle's clean form is its upright bounds
+and carries no angle, so the diamond is read from the corners on the ink's
+own hull. Found, for their owners: a diamond drawn as left and right halves
+inside the word window is still gathered as a word, because `absorbIntoWord`
+(`session.ts`) hands `words.ts` bounds only and bounds cannot tell `< >` from
+`( )` — the fix needs the strokes' ends in `session.ts`; the notation reads
+the word's two strokes as the figure they make, so D1 does not wait on it.
+A box drawn as two L-shaped strokes is two *arrow 0.59* readings, so
+`figuresOf`, which skips arrows, never sees it (ruled in four, it reads). A
+square diamond, which the rung reads as *rectangle 0.82*, is offered *Draw it
+clean* as its upright bounding box (`clean.ts`) — a decision redrawn as a
+process.
+**D2 Mermaid out** — the exporter tool,
 the `mermaid` kind in `kinds/kinds.ts` and its renderer in the `run`
 sandbox, the export pane. *Red first:* the fixture's Mermaid equals a golden
 text; the render is asserted when the library loads and skipped by name when
