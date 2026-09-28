@@ -8,7 +8,7 @@ import type { Session } from '../session/session';
 import { ROLES } from '../diagram/roles';
 import { headsOf } from '../diagram/heads';
 import { notationsOf, notationById, registeredNotations, describeNotation } from './notation';
-import { readUmlClass, umlClassPortsOf, memberKind, UML_CLASS, UML_CLASS_TABLE } from './uml-class';
+import { readUmlClass, umlClassPortsOf, memberKind, zigzagOf, UML_CLASS, UML_CLASS_TABLE, COMPARTMENT_CROSSINGS } from './uml-class';
 import type { UmlClassReading } from './uml-class';
 import { toMermaid } from './mermaid';
 import './uml-class-mermaid';
@@ -129,6 +129,22 @@ describe('the trap: compartments are read in the box’s own frame, never from t
     const tb = createSession();
     classAt(tb, { at: 0 }, 300, 200, { lines: [35, 70, 110] });
     expect(readUmlClass(tb.getState())).toBeNull();
+  });
+
+  it('a line of writing across a class from side to side is a member, never a compartment line — writing zigzags, a ruled line does not', () => {
+    for (const seed of [1, 2, 3, 4, 5, 6]) {
+      const s = createSession();
+      const t = { at: 0 };
+      const k = classAt(s, t, 300, 200, { lines: [40], writing: false, seed });
+      // As wide as the class, a member written edge to edge: the rung may read it as a line.
+      const long = s.addStroke(handText(203, 200, 194, 20, { seed: seed * 3, humps: 10, jitter: 1 }), (t.at += 4000));
+      const c = readUmlClass(s.getState())!.symbols[0];
+      expect(c.lines, `seed ${seed}`).toEqual(k.lines);
+      expect(c.members.map((m) => m.ids), `seed ${seed}`).toEqual([[long]]);
+    }
+    // A ruled line, however shaky, crosses its own line hardly at all; a line of writing at every letter.
+    for (const jitter of [1, 2, 3, 4]) expect(zigzagOf(handLine({ x: 0, y: 0 }, { x: 200, y: 3 }, { seed: 7, jitter }), 1)).toBeLessThanOrEqual(COMPARTMENT_CROSSINGS[0]);
+    for (const h of [16, 20, 28]) expect(zigzagOf(handText(0, 0, 200, h, { seed: 9, humps: 10, jitter: 1 }), 1)).toBeGreaterThan(COMPARTMENT_CROSSINGS[1]);
   });
 
   it('a turned class reads in its own frame, and says how far it is turned', () => {

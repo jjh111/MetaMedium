@@ -1421,8 +1421,12 @@ tightest box at any angle, each axis tried as the one its lines run along; a
 compartment line lies level in it, runs straight, reaches both sides within a
 hand's miss or overshoot and stands inside), never from the relation or role
 tables (the trap: they call a compartment line `inside` and a box holding
-boxes a frame); a box holding a mark that is no writing is a sketch, three
-lines across a table, a box holding boxes a frame — none a class, each said.
+boxes a frame); a compartment line is ruled — a line of writing across a
+class from side to side zigzags across its own line at every letter
+(`zigzagOf`), and is a member (only writing flatter than a hand's wobble,
+which the rung too reads as a line, is taken for a compartment line); a box
+holding a mark that is no writing is a sketch, three lines across a table, a
+box holding boxes a frame — none a class, each said.
 The name is the writing in the top compartment (or a word on the box); each
 line of writing below is a member — attributes above methods, a **method only
 when read words say so** (`METHOD_WORDS`: a name straight into its
@@ -1485,7 +1489,7 @@ corpus — now 3,912 drawings with the class boards — 0 false reads; basics@1
 96/96 and test-molecule@1 48/48 unchanged. A context on the 2,000-mark bench
 board: 1.70 → 2.28 ms mean (max 4.6 → 8.5); a whole 2,000-mark board read
 in 189 ms (the flowchart's 333). The flowchart, clean, command-mark and
-recognition benches unchanged. Core 1,387 in 96 files. Found, for their
+recognition benches unchanged. Core 1,388 in 96 files. Found, for their
 owners: **the letter rules gather a vertical relation with a multiplicity
 written beside it** within the word window — a line under 150 px reads as a
 letter — and the relation is lost 3 of 6 times (`session.ts`, `words.ts`; a

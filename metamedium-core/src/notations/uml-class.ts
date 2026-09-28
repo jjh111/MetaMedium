@@ -127,6 +127,14 @@ const PRECEDENCE: UmlMarker[] = ['inheritance', 'composition', 'aggregation', 'a
 export const COMPARTMENT_LEVEL = [7, 16] as const;
 /** …bows off its own chord by at most this share of its length (a hand's ruled line bows about 2%). */
 export const COMPARTMENT_STRAIGHT = [0.06, 0.14] as const;
+/**
+ * …and runs as a ruled line runs: it crosses its own chord, beyond a hand's
+ * wobble, at most this many times — full to the first, gone by the second. A
+ * line of writing zigzags across it at every letter, so a long flat word is
+ * never a compartment line (the fingerprint's straightness, measured on a
+ * denoised path, smooths those humps away: a flat word reads 0.91).
+ */
+export const COMPARTMENT_CROSSINGS = [4, 8] as const;
 /** …stops short of a side by at most this share of the class's width — or these pixels on screen, whichever is more — gone by the second. */
 export const COMPARTMENT_SHORT = [0.05, 0.12] as const;
 export const COMPARTMENT_SHORT_PX = [6, 12] as const;
@@ -317,6 +325,8 @@ interface CompartmentLine {
 /** Whether a stroke is a compartment line of a box in this frame — a line across it, level, straight, side to side, inside. */
 function compartmentLineOf(id: string, pts: readonly Point[], f: Frame, scale: number): CompartmentLine | null {
   if (pts.length < 2) return null;
+  const ruled = 1 - ramp(zigzagOf(pts, scale), COMPARTMENT_CROSSINGS[0], COMPARTMENT_CROSSINGS[1]);
+  if (ruled <= 0) return null;
   const loc = pts.map((p) => inFrame(f, p));
   let umin = Infinity, umax = -Infinity, vsum = 0;
   let lo = loc[0], hi = loc[0];
@@ -344,7 +354,7 @@ function compartmentLineOf(id: string, pts: readonly Point[], f: Frame, scale: n
   // Inside: clear of the top and bottom edges.
   const vm = vsum / loc.length;
   const inside = Math.abs(vm) <= f.h / 2 - COMPARTMENT_INSET * f.h ? 1 : 0;
-  const score = level * straight * reach * inside;
+  const score = ruled * level * straight * reach * inside;
   if (score <= 0) return null;
   const said = (gap: number, side: string) => (gap >= 0 ? `${Math.round(gap / scale)} px short of the ${side} side` : `${Math.round(-gap / scale)} px past the ${side} side`);
   // Where it crosses the frame's sides: its chord, run out to them.
@@ -357,6 +367,40 @@ function compartmentLineOf(id: string, pts: readonly Point[], f: Frame, scale: n
     vLeft,
     vRight,
   };
+}
+
+/**
+ * How often a stroke crosses the line fitted through its ink, beyond a hand's
+ * wobble (1.5 px on screen, or 1.2% of its length): a ruled line hardly at
+ * all, a line of writing at every letter. A line of writing flatter than a
+ * hand's wobble is a line to this, as it is to the shape rung.
+ */
+export function zigzagOf(pts: readonly Point[], scale: number): number {
+  if (pts.length < 3) return 0;
+  const n0 = pts.length;
+  const c = { x: pts.reduce((k, p) => k + p.x, 0) / n0, y: pts.reduce((k, p) => k + p.y, 0) / n0 };
+  let sxx = 0, syy = 0, sxy = 0;
+  for (const p of pts) {
+    sxx += (p.x - c.x) ** 2;
+    syy += (p.y - c.y) ** 2;
+    sxy += (p.x - c.x) * (p.y - c.y);
+  }
+  const angle = 0.5 * Math.atan2(2 * sxy, sxx - syy);
+  const u = { x: Math.cos(angle), y: Math.sin(angle) };
+  const n = { x: -u.y, y: u.x };
+  const along = pts.map((p) => (p.x - c.x) * u.x + (p.y - c.y) * u.y);
+  const L = Math.max(...along) - Math.min(...along);
+  if (L < 1e-9) return 0;
+  const band = Math.max(1.5 * scale, 0.012 * L);
+  let side = 0, crossings = 0;
+  for (const p of pts) {
+    const off = (p.x - c.x) * n.x + (p.y - c.y) * n.y;
+    const now = off > band ? 1 : off < -band ? -1 : 0;
+    if (!now) continue;
+    if (side && now !== side) crossings++;
+    side = now;
+  }
+  return crossings;
 }
 
 /** The line's place across the frame at `u`. */
@@ -707,9 +751,14 @@ export function readUmlClass(state: SessionState, scopeIds?: readonly string[]):
     const corners = [m.bounds.minX, m.bounds.maxX].flatMap((x) => [m.bounds.minY, m.bounds.maxY].map((y) => inFrame(f, { x, y })));
     const spanU = Math.max(...corners.map((q) => q.u)) - Math.min(...corners.map((q) => q.u));
     const spanV = Math.max(...corners.map((q) => q.v)) - Math.min(...corners.map((q) => q.v));
-    const closed = !!fingerprintOf(m.node)?.isClosed && !isWord(m.node);
-    const letter = !closed || sizeOfBounds(m.bounds) <= LETTER_SHARE * Math.min(f.w, f.h);
-    if (isWriting(m.node) || (letter && spanU <= WRITING_SPAN * f.w && spanV <= WRITING_SPAN * f.h)) inside.get(c)!.writing.push(m);
+    const fp = fingerprintOf(m.node);
+    const closed = !!fp?.isClosed && !isWord(m.node);
+    // Writing: what reads as writing; a letter's size of closed ink (an o); open ink that stays within the class — or, wider,
+    // zigzags as writing does rather than running ruled across it. A ruled line across that is no compartment line, a
+    // box, a shape: a mark of its own, and the box a sketch.
+    const spans = spanU > WRITING_SPAN * f.w || spanV > WRITING_SPAN * f.h;
+    const writes = isWriting(m.node) || (closed ? sizeOfBounds(m.bounds) <= LETTER_SHARE * Math.min(f.w, f.h) : !spans || !fp || zigzagOf(strokePointsOf(m.node) ?? [], m.scale) > COMPARTMENT_CROSSINGS[0]);
+    if (writes) inside.get(c)!.writing.push(m);
     else inside.get(c)!.foreign.push(m);
   }
 
