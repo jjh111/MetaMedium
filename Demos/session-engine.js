@@ -6845,6 +6845,9 @@
 
   const folder = {
     store: null, how: 'none', name: '',
+    // A live room's merge, kept standing between lines (MM.LiveMerge), and the
+    // store's revision it last merged — a line that moves no revision is no work.
+    merge: null, mergedRevision: -1,
     me: deviceParticipant(),
     myPrevious: [], loadedCount: 0, entries: [], truncated: false,
     urls: new Map(), saveTimer: 0, lastSave: '', saving: false, error: '',
@@ -6927,7 +6930,11 @@
   // another log arriving live. Between tabs on one machine the transport is a
   // BroadcastChannel; between machines it is a relay that forwards lines
   // (Demos/relay.mjs, Server-Sent Events in, POST out). The merge runs as each
-  // line lands, and the other hand's ink draws in its colour.
+  // line lands, and the other hand's ink draws in its colour. A room merges a
+  // LINE, not the board (V1-PLAN R4d): the merge is kept standing between lines
+  // (`MM.LiveMerge`), a line's events are applied where they fall — no replay
+  // when they come after everything held, a replay from the nearest checkpoint
+  // when one comes before — and a line that changes no log does no work.
   function broadcastTransport(room) {
     const ch = new BroadcastChannel('mm-live:' + room);
     return {
@@ -7008,6 +7015,11 @@
     // here, it was taken for the room's, and the room's first merge dropped it:
     // the board judged this hand by the built-in check from then on (L2h).
     await openStore(store, 'live', room);
+    // The room is on the board, loaded whole — joining replaces the board. From
+    // here the merge stands between lines, and each line is merged into it.
+    folder.merge = new MM.LiveMerge(session, me);
+    folder.mergedRevision = -1;
+    await mergeLive();
     store.hello();
     return folder;
   }
@@ -7017,27 +7029,32 @@
   }
   /** A hand's name as shown: the person's, without the sitting's suffix (core's one rule). */
   function handLabel(name) { return MM.handLabel(name); }
-  /** Every log the room has, merged and loaded; my own events stay mine. */
+  /**
+   * A line landed: merge it — only when a log another hand wrote changed.
+   * A hello, a goodbye, the relay's word, a whole log already held change no
+   * log and do no work here; what the room says about itself is still said.
+   * The merge is every log the room holds and this hand's own events — sent
+   * or not, never the room's copy of them, or a line landing between a send
+   * and this merge would count my sent marks twice — and `LiveMerge` hands the
+   * session only what changed (`MM.LiveMerge`, `session.rebase`).
+   */
   async function mergeLive() {
-    if (!folder.store || folder.how !== 'live') return;
-    const logs = await folder.store.readLogs();
-    // My log is what this session holds of mine — sent or not — never the
-    // room's copy of it: a line that lands between a send and this merge
-    // would otherwise count my sent events twice, and every mark of mine
-    // would stand doubled.
-    const mine = myLogNow();
-    const merged = MM.mergeLogs(Object.assign({}, logs, { [folder.me]: mine }), { me: folder.me });
-    session.load(merged);
-    folder.myPrevious = mine;
-    folder.loadedCount = merged.length;
+    if (!folder.store || folder.how !== 'live' || !folder.merge) return;
+    let changed = false;
+    const rev = folder.store.revision();
+    if (rev !== folder.mergedRevision) {
+      folder.mergedRevision = rev;
+      changed = folder.merge.sync(folder.store.heldLogs()).how !== 'none';
+    }
     // What the room says about itself is said here once, the moment it is
     // heard, and then stands in the status line (folderStatus).
     for (const n of folder.store.notices ? folder.store.notices() : []) {
       if (folder.noticed.has(n)) continue;
       folder.noticed.add(n);
       say(n);
+      changed = true;
     }
-    if (typeof syncTiles === 'function') syncTiles();
+    if (changed && typeof syncTiles === 'function') syncTiles();
   }
 
   /**
@@ -7061,6 +7078,8 @@
     // browser keeps stays as it was (where the hand left it too), and is not written again from this page.
     leaveBoard();
     folder.store = store; folder.how = how || 'store'; folder.name = name || ''; folder.error = ''; folder.saveTrouble = null;
+    // A room's merge stands for that room only; `openLive` makes the next one.
+    folder.merge = null;
     // A folder is written under the device's own stable name, whatever a live
     // sitting in this page load was called.
     if (folder.how !== 'live') folder.me = deviceParticipant();
@@ -7141,6 +7160,10 @@
   // To the folder when there is one — this participant's own file, rewritten
   // whole (nobody else writes it); to the room when this page is in one; and
   // with neither, to the board this browser keeps (below), a record a change.
+  // A folder's merge stamps no `by`, so which loaded events are this hand's is
+  // read off what its file held (`myLogNow`); a room's are the session's own
+  // unstamped events, in the order written (`store.ownLog`) — no event
+  // serialised on the way (R4d).
   function myLogNow() {
     const evs = session.getEvents();
     folder.loadedCount = Math.min(folder.loadedCount, evs.length);
@@ -7161,7 +7184,7 @@
       // it only grew, the whole of it when it did not — an undo, a reset — so
       // every hand in the room holds what this one holds (DIRECTOR-PLAN-W2 L1).
       folder.saving = true;
-      try { await folder.store.publish(myLogNow()); folder.error = ''; }
+      try { await folder.store.publish(folder.store.ownLog(session.getEvents())); folder.error = ''; }
       catch (err) { folder.error = 'could not send: ' + (err.message || err); }
       folder.saving = false;
       return;
