@@ -1051,6 +1051,49 @@ readings with reasons — a lift never removes. *Trap:* a context that sticks
 after the hand has left is a mode; the lift decays with distance, relative
 to the marks' size.
 
+**B2 Context — status, 28 Sep 2026: done on `w2`** — `20e11e9` (red: 17
+Node tests in `src/context/` and e2e 50–50c, against the contract with every
+context empty — 15 tests and 50, 50b failing, the two invariants and 50c
+passing), `06a04ee` (core), `1b78c59` (the surface), and the docs.
+`contextAt(board, ids | point)` reads what a scope sits **beside**, never its
+own marks: every mark within the fade (full inside `near`'s own limit, gone
+at 2.5 times it — scale-free), each walked by within-reach links into the
+thing it hangs together with, each thing read on its own (`notationsOf`
+above the floor, `session.read`'s concepts) and weighted confidence ×
+nearness, and this hand's stamped acts beside it, fading over two minutes;
+`kind` is the strongest notation, else concept, and `key` adds its
+neighbourhood's first mark. `rank(items, ctx, { uses, usesHere })` is
+`rankOffers` × a lift of at most a quarter again, with `because[]`; what the
+hand named, wrote or a model read here is never lifted and nothing lifted
+passes it; `AFFINITY` says what a notation beside the hand makes likelier
+(a flowchart: clean forms, flows). `steadyTop` holds the top affordance in
+one context until another beats it by a tenth. The surface keeps the context
+by the log, counts use per kind (`mm-palette-uses-here`), holds the tops per
+context key and board generation (runtime, two minutes), shows both rows in
+the ranked order, ends a lifted pill's tooltip *first because it sits beside
+a flowchart: three processes, one decision, three flows*, adds *beside* and
+*first* to the selection's panel, and draws the reading under a mark through
+the same `rank`. e2e 50: three boxes drawn one after another beside a
+flowchart keep *Draw them clean* first — with no context the top flipped to
+*Line up across* at the second; 50a the panel; 50b a rival a little ahead
+does not take the top, one past the margin does; 50c a board away, B1's
+order. A context costs 1–2 ms (9 at most) on the 2,000-mark bench board.
+*Found:* the field's top row was sorted by its number while Enter took the
+first reading in ranked order, so the two could disagree — a model's
+reading at 0.95 shown before a match at 0.62, which is what Enter took;
+both rows are in the ranked order now, as e2e 49's golden already was. *Not changed:* nothing drawn under a mark can
+be lifted yet (a name and the words are the hand's own; a shape is no
+concept), so a stroke reads no neighbourhood (`canLift`); `AFFINITY` is a
+table in core until packs carry it; a blessed artifact beside the scope is
+read as itself, not as its members. Whole suite before the last commit:
+core 1,131 in 85 files, typecheck clean, both bundles equal to a fresh
+build; relay, field, build and board tests 107; surface and app in sync; the
+canvas MCP smoke and the shard's (606 in 31 files, typecheck clean) pass;
+the gate 538 passed and the one honest skip (canvas 307, keep 31, boards 19,
+app 14, pencil 14, budgets 7 — release p95 38 ms on 2,000 marks, the
+500-mark paint equivalence differing in 0 — shard 123 + 11 + 12); WebKit
+smoke 4 and pencil 14.
+
 **B3 Packs.** *Owns* `metamedium-core/src/packs/` (format, validation in the
 DATA-1 manner, the shipped registry, the `use`/`unuse` events),
 `metamedium-core/packs/*.json`, a pack bench helper, a library pane in the

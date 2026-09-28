@@ -52,7 +52,9 @@ a pill — and both bundles equal a fresh build (L3). Beside them: the maths cor
 extraction spike's *not yet* (`gliner-seat/`) and the performance baseline
 (`PERF.md`). **Phase 1, the backbone, has begun: B1** — every affordance
 the field shows is an offer from a registered tool, one file and one
-registration line each (`src/tools/`; *Tools*, below). **Phase 0b, a board
+registration line each (`src/tools/`; *Tools*, below) — **and B2**: what
+stands beside the hand lifts what it makes likelier, says why, and the top
+offer holds steady in one context (`src/context/`; *Context*, below). **Phase 0b, a board
 that holds, came first, ahead of the backbone**, because `PERF.md` measured that 500 marks are usable once open,
 2,000 take 100 s to open and freeze the page for 7.6 s on every stroke,
 5,000 do not open, and autosave stops saving, in silence, at 1,100–1,600
@@ -584,8 +586,9 @@ reading line while the pointer rests on one); then, stacked to their right,
 **what this is** — readings with their numbers (*molecule 0.92*, *“Pricing”
 0.92*, *page-layout 0.78 · GLM*, *row 0.81*), and tapping one takes it as
 the name; and **what it affords** — Draw them clean, Line up, Frame these,
-Play A, Not a molecule …, ranked by the reading and by use, the rest a
-keystroke away: each an offer from a registered tool (see *Tools*, below). A word typed, or writing read, is offered two ways side by
+Play A, Not a molecule …, ranked by the reading, by use and by what stands
+beside them, the rest a keystroke away: each an offer from a registered tool
+(see *Tools* and *Context*, below). A word typed, or writing read, is offered two ways side by
 side — *Name it* and *Label it* (see *A label*, below). A pill carries a
 label; its reason is the tooltip; a pill that asks a model carries a dot.
 Copy holds the
@@ -739,6 +742,85 @@ pane lists them as what the canvas does with no model. **A new tool is one
 file and one registration line**: e2e 49b registers one while the field is
 open and it is offered at once; e2e 49 is the golden record of the field's
 offers for three scopes, captured before tools and unchanged since.
+
+### Context: what stands beside the hand lifts, and the top holds (V1-PLAN §2.2, B2)
+
+> `metamedium-core/src/context/` — `context.ts` (`contextAt`, `nearnessOf`,
+> `describeContext`), `rank.ts` (`rank`, `liftOf`, `steadyTop`, `canLift`,
+> `AFFINITY`); the surface's side in `Demos/surface/09-palette.js`
+> (`contextFor`, `rankItems`, `steadyTops`, the per-context use counts),
+> `08-render.js` (`readingUnder`) and `10-inspector.js` (*beside*, *first*).
+
+John asked for it directly: *keep the suggested top offer in that context
+when near — conceptual adjacency can bias the top suggestion.* Two boxes
+held beside a flowchart lead with *Draw them clean*; the same two beside a
+row lead with *Line up across*; a board away from both, the order is B1's.
+
+**`contextAt(board, ids | point)`** reads what a scope sits **beside**, never
+its own marks (those already set every item's base, so a scope with nothing
+beside it reads an empty context — which is why e2e 49's golden is
+untouched). Every mark within the fade of the scope is found through a
+`MarkGrid` of the content plane, and each is walked outwards by
+within-reach links (`withinReach`, the links the session clusters by; the
+scope left out; `NEIGHBOURHOOD_MAX` marks, nearest first) into **the thing it
+hangs together with** — a box beside a flowchart is within reach of one
+process at most, and the flowchart is what that process hangs with. Each
+neighbourhood is read on its own: `notationsOf` above `NOTATION_FLOOR`
+(*it sits beside a flowchart: three processes, one decision, three flows*)
+and `session.read`'s concepts (*it sits beside a row: 3 comparable marks
+sitting side by side*), each weighted confidence × **nearness** — 1 inside
+`near`'s own limit (a ratio of the smaller mark), fading to 0 at
+`CONTEXT_FADE` times it, so the same board at any scale reads the same.
+`recent` is this hand's stamped acts (B1's `tool`, `offer`, `act`) whose
+marks lie beside the scope or in a neighbourhood it touches, fading over
+`RECENT_MS`; an act on the scope itself is not beside it, and another hand's
+is not this hand's. `kind` is the strongest notation, else concept; `key`
+adds its neighbourhood's first mark. `now` is the log's own latest time, so
+a context is a pure function of the log. About 1–2 ms on the 2,000-mark
+bench board.
+
+**The five rules, and where each lives:**
+
+1. **A lift, never a filter** (`rank.ts`). `rank(items, ctx, { uses,
+   usesHere })` is `rankOffers` × a lift of at most a quarter again
+   (`CONTEXT_LIFT_MAX`); nothing is removed. An item lifts when it stands
+   on an entry's own name — `grounds.on` (a conversion's concept), a
+   `concept:` reading, a `notation:` tool — or on the entry's `AFFINITY`
+   (content, not code: a flowchart makes clean forms and flows likelier;
+   packs will carry their own); an offer just taken beside the hand lifts,
+   its tool's other offers half as much. **What the hand named, wrote or a
+   model read here is never lifted, and no lift carries a generic item past
+   it.** With no context, `rank` is `rankOffers` key for key.
+2. **Every lift says why** (`because[]`, strongest first): the pill's
+   tooltip ends *first because it sits beside a flowchart: three processes,
+   one decision, three flows* (or *raised because …*), and the selection's
+   panel adds **beside** (`describeContext`) and **first** (the top offer
+   and its because). Far from any context neither appears.
+3. **The steady top** (`steadyTop`; the memory in `09-palette.js`). Within
+   one context the top affordance changes only when another beats it by
+   `STEADY_MARGIN` (a tenth), and the held one says *it led here a moment
+   ago*. The memory is runtime, never the log: per context key and board
+   generation, lapsing after `STEADY_MS`. It never holds a generic item
+   over a specific one. e2e 50–50c: three boxes drawn one after another
+   beside a flowchart keep *Draw them clean* first (with no context the top
+   flipped to *Line up across* at the second); a rival a little ahead does
+   not take it, one past the margin does.
+4. **Use is learned per context**: the device's counts (`mm-palette-uses`)
+   gain `mm-palette-uses-here`, by kind (`notation:flowchart`,
+   `concept:row`); `rank` takes this kind's count for an item first, the
+   global as the fallback. Core keeps no counts.
+5. **Derived only.** Context writes nothing; the surface keeps it by
+   `logKey()` (R4c), so an undo can leave no stale lift.
+
+**One `rank` for everything that orders readings**: the field's two rows
+(both now in the ranked order, so the first reading shown is the one Enter
+takes — the top row used to be re-sorted by its number) and the reading
+drawn under a new mark (`readingUnder`: its name, its words, the shape
+rung's readings, ranked). `canLift` says whether any context could lift any
+of a list; nothing under a mark can today, so a stroke reads no
+neighbourhood — the day a pack's reading of a mark can be lifted, the
+context is read for it. The seats (J1) are to be asked their candidates in
+the same order.
 
 ### Magnets and bindings: the pen feels where a mark offers attachment
 
