@@ -230,13 +230,16 @@ any structural change.
 | `metadoodle1.html` | Fork of flagship + tiered LLM recognition (WebLLM in-browser, LM Studio local API) + voice. Single-file (~600KB) |
 | `Web App Skeleton/` | React + Vite + TypeScript + Zustand rebuild; Claude API interpreter skeleton in `src/llm/`; recognition/spatial/matching in `src/core/` |
 | `Demos/surface/` | **The reference surface's source**: `surface.css` and twenty-seven script fragments (`00-core`, `00-ui` … `20-controls`, `21-minimap`, `22-boards`, then `90-boot`, which must stay last), one concern each, concatenated in name order into one closure by `Demos/build-surface.mjs` → the committed `Demos/session-engine.js` (CI checks it has not drifted). Because they are one closure, the build and its `--check` refuse a name declared at the top of two fragments — the last would silently replace the first everywhere, which broke rendering once — reading the fragments as one strict block, so they must also compile as strict code (`Demos/build-surface.test.mjs`, in CI's `core` job). Fragments share the closure's variables — no imports; each fragment's header says what it provides and uses. Edit a fragment, run the build, commit both. **`09-field.js` is the exception that proves the rule** (SEAM-1): it names nothing outside itself, so the field's query is a pure function of a record and is unit-tested in Node with no browser — `node --test Demos/surface/09-field.test.mjs`, in CI's `core` job. **`17-board.js` is the second** (V1-PLAN R3): the journal the board this browser keeps is written through, driven in Node by a store held in memory — `node --test Demos/surface/17-board.test.mjs`, in CI's `core` job too. **`17-boards.js` is the third** (R1): the list of boards — names, the trash, which board a page opens, whether the one on screen may be left — `node --test Demos/surface/17-boards.test.mjs`, also in CI. A fragment's `.test.mjs` is not concatenated into the build |
-| `Demos/` | **`session-engine.html` is the MVP surface** (it links `surface/surface.css` and loads `session-engine.js`) — infinite canvas, the taught command mark, living artifacts in a DOM overlay, ink-over-artifact addressing, "why" inspector, model participants, canvas answers. Uses the committed `metamedium-core.browser.js` bundle. **`session-engine.e2e.js`** drives the whole loop through the real UI with a stubbed model (browser console; not part of `npm test`). `build-standalone.mjs` inlines the bundle into a single shareable file. **`mcp.mjs`** is the MCP hand (Claude Code's way onto the board; `.mcp.json` at the root registers it), over `relay.mjs` and `live-node.mjs`, with `ink-png.mjs` for the ink as a picture and `mcp-smoke.mjs` as its stdio test; `metamedium-core.node.mjs` is the committed Node bundle it runs (`npm run build:node`, drift-checked in CI like the browser bundle). **`relay.test.mjs`** is the relay's own test (`node --test Demos/relay.test.mjs`, in CI's `core` job): the catch-up as a pure function, and, over a real relay on a free port, the truncation line and three hands with one departed. `Demos/programs/` holds `run` programs written for the canvas (`metamedium-explained.run.js`: the loop told as a program, ending on a real measurement of the viewer's own stroke). Plus fish, composition diagrams, no-modes graph, etc. |
+| `Demos/` | **`session-engine.html` is the MVP surface** (it links `surface/surface.css` and loads `session-engine.js`) — infinite canvas, the taught command mark, living artifacts in a DOM overlay, ink-over-artifact addressing, "why" inspector, model participants, canvas answers. Uses the committed `metamedium-core.browser.js` bundle. **`session-engine.e2e.js`** drives the whole loop through the real UI with a stubbed model (browser console; not part of `npm test`). `build-standalone.mjs` inlines the bundle into a single shareable file (and exports the same build as `standalone(dir)`, which the release script attaches to a release). **`sw.js` is the service worker for both addresses** — this one and `/app/` — copied to `app/sw.js` by `scripts/build-app.mjs`, which stamps `VERSION` into it and into the page's `<meta name="metamedium-version">` (*One app address*, below). **`mcp.mjs`** is the MCP hand (Claude Code's way onto the board; `.mcp.json` at the root registers it), over `relay.mjs` and `live-node.mjs`, with `ink-png.mjs` for the ink as a picture and `mcp-smoke.mjs` as its stdio test; `metamedium-core.node.mjs` is the committed Node bundle it runs (`npm run build:node`, drift-checked in CI like the browser bundle). **`relay.test.mjs`** is the relay's own test (`node --test Demos/relay.test.mjs`, in CI's `core` job): the catch-up as a pure function, and, over a real relay on a free port, the truncation line and three hands with one departed. `Demos/programs/` holds `run` programs written for the canvas (`metamedium-explained.run.js`: the loop told as a program, ending on a real measurement of the viewer's own stroke). Plus fish, composition diagrams, no-modes graph, etc. |
+| `app/` | **The app — v1's one address, `https://jjh111.github.io/MetaMedium/app/`** (V1-PLAN R7). Made, never edited: `index.html` is `Demos/session-engine.html` with each file it asks for asked for from `/app/` (`../Demos/…`), `sw.js` is `Demos/sw.js` byte for byte, `manifest.webmanifest` is the old address's starting and scoped at `./` — all three written by `node scripts/build-app.mjs` and drift-checked in CI (`--check`). Installable there, and it opens with no network after one visit. `Demos/session-engine.html` stays where it was and works as it always has |
+| `VERSION`, `CHANGELOG.md` | **The version, one line** (`MAJOR.MINOR.PATCH`, an optional pre-release; `0.0.0` until the first release) — stamped into the page and both service workers' cache names by `scripts/build-app.mjs`, said at the head of the help pane. **The changelog**, newest first, one section a release, written only by `scripts/release.mjs` |
+| `scripts/` | **The app's build and the release** (V1-PLAN R7): `build-app.mjs` (stamps `VERSION`, makes `app/`; `--check` in CI) and `release.mjs` (`node scripts/release.mjs <version> [--dry-run] [--since <ref>]`: refuses a dirty tree and a version not greater than the last, writes the changelog's section by unit, bumps and stamps, builds the standalone file into `dist/release/`, commits, tags `v<version>` annotated — and never pushes). `build-app.test.mjs` and `release.test.mjs` are theirs (`node --test`, in CI's `core` job) |
 | `skills/` | Claude Code skills: `metamedium-code` (code patterns), `metamedium-design` (design principles) |
 | `Assets/` | Figures and design rationale (recognition strategy, point-primitive proposal), and the social card. `make-card.mjs` regenerates that card from index.html's own hero — synthetic pointer input, so the picture shows the engine really reading a mark; `node Assets/make-card.mjs`. Change the picture and you must change the FILENAME and the four og:/twitter: tags in `index.html` and `404.html`, because scrapers cache by URL. **`Assets/whitepaper-figures/`** is the whitepaper's seven graphic plates: `build.py` holds their content and geometry and emits the static blocks `index.html` carries between `whitepaper-plate:KEY` markers (`--check` says they are in sync), `figures.css` and `figures.js` style and enhance them with no build, and `e2e/whitepaper-figures.mjs` audits the real page; its README is the workflow |
 | `archive/` | Retired versions and superseded plans, incl. whitepaper v4 (root `MetaMedium_Whitepaper_v4.html` is a redirect stub — keep it) and PRDs v3.2/v4 |
-| `e2e/` | **The browser gate** (`DIRECTOR-REVIEW-2026-09-15.md`, QA-1): `node e2e/run.mjs` starts its own servers on free ports (a static one over the repo root, vite over `shard-3d`), opens a **fresh browser context per scenario**, loads the harnesses that already exist — `Demos/session-engine.e2e.js` (`__setup` + `__scenario`) and `shard-3d/e2e.js` (`__scenario`, `__demo`, `__demo2`) — and awaits the result object each one returns. It does not reimplement them. **Six scenarios** on Chromium by default (`canvas`, `keep`, `boards`, `shard`, `demo`, `demo2`): 464 passing records and the one honest skip as of 27 Sep 2026 (canvas 268, keep 31, boards 19, shard 123 + 11 + 12), in about 190 s. **`smoke`** is opt-in and runs on WebKit (`node e2e/run.mjs --browser webkit smoke`, CI's `webkit` job): the board loads, ink drawn with real pointer input is read back, press-and-hold opens the field and one pill is taken — four checks in `run.mjs` itself, a WebKit smoke and not an iPhone test. Pass, fail and **skip** are counted separately (a record whose name says it skipped is a skip); a failed assertion, a harness exception, an attempted request to a real model, or a page error not on the named allowlist in `guards.mjs` each exit nonzero, with structured JSON and a screenshot in `e2e/results/`. Beside the gate, on its static server and never run by it or by CI: `e2e/perf.mjs` (the surface's half of `PERF.md`, numbers only) and `e2e/whitepaper-figures.mjs` (the plates' audit, Chromium and WebKit). **`keep`** (`e2e/keep.mjs`, V1-PLAN R3) loads no harness: the kill test (the page crashed or closed at random points, reopened, every completed stroke there), a save forced to fail (storage full for real, a store the browser will not let the page use), the one import of browser storage's old board, two tabs, and the pages that must not write — in the default run, and on WebKit where it can (`--browser webkit keep`); since R1 the kill test keeps two boards and switches between them through the boards pane mid-session, killing right after a switch and in the middle of one too, and checks both. **`boards`** (`e2e/boards.mjs`, R1, in the default run) drives the boards pane with the real pointer: R3's board as the first entry, new, switch, reload and `?board=`, rename, duplicate, delete, restore, emptying the trash said first, a board open in another tab, one tab per board, the view per board, recent places, Reset, a board out as a file and back, and a board that is not saved never left without a word. **`big`** (opt-in, minutes) saves and reopens a 2,000-mark board. `e2e/README.md` has the rest |
+| `e2e/` | **The browser gate** (`DIRECTOR-REVIEW-2026-09-15.md`, QA-1): `node e2e/run.mjs` starts its own servers on free ports (a static one over the repo root, vite over `shard-3d`), opens a **fresh browser context per scenario**, loads the harnesses that already exist — `Demos/session-engine.e2e.js` (`__setup` + `__scenario`) and `shard-3d/e2e.js` (`__scenario`, `__demo`, `__demo2`) — and awaits the result object each one returns. It does not reimplement them. **Six scenarios** on Chromium by default (`canvas`, `keep`, `boards`, `shard`, `demo`, `demo2`): 464 passing records and the one honest skip as of 27 Sep 2026 (canvas 268, keep 31, boards 19, shard 123 + 11 + 12), in about 190 s. **`smoke`** is opt-in and runs on WebKit (`node e2e/run.mjs --browser webkit smoke`, CI's `webkit` job): the board loads, ink drawn with real pointer input is read back, press-and-hold opens the field and one pill is taken — four checks in `run.mjs` itself, a WebKit smoke and not an iPhone test. Pass, fail and **skip** are counted separately (a record whose name says it skipped is a skip); a failed assertion, a harness exception, an attempted request to a real model, or a page error not on the named allowlist in `guards.mjs` each exit nonzero, with structured JSON and a screenshot in `e2e/results/`. Beside the gate, on its static server and never run by it or by CI: `e2e/perf.mjs` (the surface's half of `PERF.md`, numbers only) and `e2e/whitepaper-figures.mjs` (the plates' audit, Chromium and WebKit). **`keep`** (`e2e/keep.mjs`, V1-PLAN R3) loads no harness: the kill test (the page crashed or closed at random points, reopened, every completed stroke there), a save forced to fail (storage full for real, a store the browser will not let the page use), the one import of browser storage's old board, two tabs, and the pages that must not write — in the default run, and on WebKit where it can (`--browser webkit keep`); since R1 the kill test keeps two boards and switches between them through the boards pane mid-session, killing right after a switch and in the middle of one too, and checks both. **`boards`** (`e2e/boards.mjs`, R1, in the default run) drives the boards pane with the real pointer: R3's board as the first entry, new, switch, reload and `?board=`, rename, duplicate, delete, restore, emptying the trash said first, a board open in another tab, one tab per board, the view per board, recent places, Reset, a board out as a file and back, and a board that is not saved never left without a word. **`app`** (`e2e/app.mjs`, R7, in the default run; 14 records on Chromium and WebKit, about 10 s) opens `/app/` on the gate's static server: every file it asks for answers, the manifest starts and is scoped there (and Chromium finds it installable), the worker's scope covers the page and the page is *controlled* by it, a box drawn comes back on a reload the worker served and with the server gone, the help pane says `VERSION`, a request carrying a key is never kept, the old address and every address the whitepaper, `404.html` and the README link still answer — and a release renames the cache, beside a control that shows the stale shell a cache that kept its name serves. **`big`** (opt-in, minutes) saves and reopens a 2,000-mark board. `e2e/README.md` has the rest |
 | `PERF.md`, `metamedium-core/bench/`, `e2e/perf.mjs` | **The performance baseline** (V1-PLAN §9 R4a, 27 Sep 2026): `bench/board.mjs` draws deterministic boards of 500, 2,000 and 5,000 marks from a seed (the generator is kept, never the boards); `bench/engine.mjs` times replay, memory, relations, the whole-board read, one more stroke, a live room's incoming line and a newcomer's hello; `e2e/perf.mjs`, beside the gate and on its servers and model guard, times the surface — open, pan, draw, release → reading drawn — in Chromium and WebKit; `bench/profile.mjs` reads a CPU profile back to `src/…:line` and the surface's fragments; `bench/report.mjs` prints `PERF.md`'s tables from the results. `PERF.md` has the answer (500 marks usable, 2,000 not, 5,000 does not open), every number with its command, the hotspots ranked with file:line, and budgets for R4b — and, after R4b, the engine's numbers beside them. **R4b added** `bench/budgets.test.mjs` (`node --test`: the engine's budgets on the generated 2,000-mark board — replay ≤ 0.5 s, a stroke ≤ 4 / 16 ms, ≤ 150 MB — and the 5,000 board replays; each size in a process of its own, every run's numbers recorded in `dist/bench`) and `bench/equivalence.mjs` (every held log, a scripted log of the rarer acts and the 500-mark board replayed by the old engine — a committed bundle at `--ref` — and by `src/`, every reading and id compared, and what differs said). **R4d added** `bench/room.test.mjs` (`node --test`: a live room's budgets on the 2,000-mark board — a line ≤ 16 ms at p95 with no full replay, one crossing a mark just drawn too, a line that lands earlier from a checkpoint, a line with no events no work, a newcomer's hello one copy of each log in rooms of three and six with a hand gone — measured by `bench/room.mjs`, whose `--path=before` is the surface before R4d). Not in `npm test` (`vitest.config.mjs` keeps `bench/` out) or the gate |
-| `.github/workflows/ci.yml` | CI, on every push/PR: typecheck + test + build for `metamedium-core` — with the drift check for both committed bundles, the MCP hand's smoke, the surface's drift check and its build's test, the field reader's, the relay's and the board journal's Node tests — `shard-3d` (with its MCP hand's smoke) and `Web App Skeleton` (with lint); the **browser gate** (`e2e/run.mjs` on Chromium); and the **WebKit smoke** in a job of its own. Both browser jobs upload `e2e/results` when they fail |
+| `.github/workflows/ci.yml` | CI, on every push/PR: typecheck + test + build for `metamedium-core` — with the drift check for both committed bundles, the MCP hand's smoke, the surface's drift check and its build's test, the field reader's, the relay's and the board journal's Node tests, the app's drift check (`scripts/build-app.mjs --check`) and the app build's and release script's Node tests — `shard-3d` (with its MCP hand's smoke) and `Web App Skeleton` (with lint); the **browser gate** (`e2e/run.mjs` on Chromium); and the **WebKit smoke** in a job of its own. Both browser jobs upload `e2e/results` when they fail |
 
 ### Experiments (subordinate tier — see `EXPERIMENTS.md`)
 
@@ -1420,9 +1423,10 @@ back. Grid and
 focus are lenses over the same log. **A repository is a folder too**
 (`store/git.ts`, `?git=owner/repo`): the tree in one request, files by
 path, this participant's log committed as one file; reads need no token,
-writes need one the user pasted. **The page is installable**: a manifest
-and a service worker cache the shell for offline; every request is
-network-first with the cache as the fallback. **Loops do not depend on paint**: a tab
+writes need one the user pasted. **The page is installable**, at the app's
+address and at its old one: a manifest and a service worker cache the shell
+for offline; every request is network-first with the cache as the fallback
+(*One app address, versioned*, below). **Loops do not depend on paint**: a tab
 the browser stops painting gets no animation frames, so the tank and the
 worker take a timer's tick when no frame comes (`nextFrame` in
 `01-view.js`) — time is state, not a movie.
@@ -1510,6 +1514,75 @@ killed right after a switch and in the middle of one; both whole). The list
 never stands between a board and its journal: an entry the store refuses (full)
 is held and written once a record lands. With no IndexedDB there is one board
 and the pane says so.
+
+### One app address, versioned (V1-PLAN R7)
+
+> `app/` (made, never edited), `Demos/sw.js`, `scripts/build-app.mjs`,
+> `scripts/release.mjs`, `VERSION`, `CHANGELOG.md`; the gate's `app`
+> scenario, `e2e/app.mjs`.
+
+**The app is `/app/` on the Pages site — `https://jjh111.github.io/MetaMedium/app/`
+— a page, not a redirect.** `app/index.html` is `Demos/session-engine.html`
+with each file it asks for asked for from `/app/` (`../Demos/…`), so the
+surface is one set of files at two addresses and the query is the page's own
+(`?board=`, `?live=`, `?fresh=`, `?folder=` …; Pages sends `/app?…` to
+`/app/?…` with its query, and so does the gate's static server). A redirect
+could not install there: the offline shell must be served by a worker whose
+scope covers the page, and a worker's scope is its own folder at most. **The
+old address stays**: `Demos/session-engine.html` is the same page with its
+own manifest and worker, and the whitepaper's links and embeds are untouched
+— the `app` scenario asks every address the whitepaper, `404.html` and the
+README link into the site, and both addresses open the same boards (one
+origin, one IndexedDB).
+
+**One worker, two addresses.** `Demos/sw.js` is the source and `app/sw.js`
+its copy; where a copy stands decides its shell (the page, its manifest, the
+surface's script and style, the engine bundle; the help's text when it
+answers, never the reason a shell is not kept) and its caches
+(`mm-app-<version>`, `mm-shell-<version>`). Network-first, the cache the
+fallback, as before — and five rules, each one a failure a test can show:
+**the scope is tested, not the registration** (a worker registered at a
+narrower scope than its page registers without a word and controls nothing,
+while Chromium still calls the page installable — so the gate asks that the
+page be *controlled*, and a mutation that narrows the scope fails it);
+**the cache is named for the release** (a release changes the worker's
+bytes, so the browser installs the new one at its first network fetch; it
+keeps the new shell whole, then drops the old release's cache — with a fixed
+name, a file the page does not fetch on every load, the help's text, came
+back offline from the release before beside the new page, which the gate
+keeps as a control); **only its own caches** (caches belong to the origin,
+which both addresses share with every project on the `github.io` host — the
+old worker deleted every cache but its own — and a miss is answered from
+this worker's cache only, never another release's copy of the same file);
+**a page is kept once, whatever its query**, so an address never visited
+online opens offline; and **a key never enters a cache** — a request
+carrying `Authorization`, and a relay's stream that never ends, are the
+network's alone. The shell is installed with `cache: 'reload'`, never the
+HTTP cache's older copy (Pages sends `max-age=600`).
+
+**The version** is `VERSION` at the root: one line, semver without build
+metadata, `0.0.0` until the first release. `node scripts/build-app.mjs`
+stamps it into the page's `<meta name="metamedium-version">` — which the
+help pane leads with, offline and in the standalone file alike — and into
+the worker's `const VERSION`, and makes `app/` again; CI's `--check` names
+the file when either has drifted from `VERSION` and `Demos/`. Pages
+publishes `master` as it stands, so between releases the app runs master's
+code under the last release's number.
+
+**A release** is one command, cut by the director on John's instruction
+(*Working with the Codebase*): it refuses a dirty tree and a version not
+greater than the last — `VERSION`'s or any `v<version>` tag's (`v1.0-day1`
+is not one) — writes `CHANGELOG.md` a section from the commit subjects since
+the previous release tag, merges left out, **grouped by the unit each names**
+(the first unit before the subject's colon, else the first anywhere; "V1
+plan" names the plan), bumps and stamps, builds the standalone file into
+`dist/release/` (ignored) and refuses anything key-shaped in it or in the
+section without saying the thing back, commits `Release <version>`, and
+makes the annotated tag `v<version>` with the section as its message
+(`--cleanup=whitespace`: by default git strips every `###` line from a tag).
+**It never pushes**; it prints the pushes, to the fetch URL — the push URL is
+a lock the week-1 automation left, on purpose. `--dry-run` prints all of it
+and writes nothing, exiting 1 where the real run would refuse.
 
 ### Live logs: multiplayer as a transport (v9 S6)
 
@@ -2011,11 +2084,36 @@ test and the smokes run the Node one) — CI fails if either committed copy
 drifts from source. After surface changes, run
 `node Demos/build-surface.mjs` and commit `Demos/session-engine.js` with the
 fragments — CI checks that too, and the build refuses a name declared at the
-top of two fragments.
+top of two fragments. After editing `Demos/session-engine.html`,
+`Demos/sw.js` or `Demos/manifest.webmanifest`, run `node scripts/build-app.mjs`
+and commit `app/` with them — CI checks that the app is their build and
+`VERSION`'s.
 
 `src/session/session.scenario.test.ts` is the executable spec for the
 no-modes flow (lasso → check → summon → bless → artifact). Change it knowingly
 or not at all. Design rationale: `ARCHITECTURE-v6-SESSION-ENGINE.md`.
+
+### The app, the version and a release (V1-PLAN R7)
+
+```bash
+node scripts/build-app.mjs                 # stamp VERSION, make app/ from Demos/ (after editing the page, sw.js or the manifest)
+node scripts/build-app.mjs --check         # CI's: app/ and the stamps are the build of VERSION and Demos/
+node scripts/release.mjs 0.1.0 --dry-run   # the whole release printed; nothing written
+node scripts/release.mjs 0.1.0             # one commit, one annotated tag, dist/release/metamedium-0.1.0.html — never a push
+node --test scripts/build-app.test.mjs scripts/release.test.mjs
+node e2e/run.mjs app                       # /app/ in a browser: installable, offline, versioned (also --browser webkit)
+```
+
+Cut a release on `master`, with the suite and the gate green; the script
+refuses a dirty tree and a version not greater than the last. The first
+release has no previous tag, so its section is the whole history unless
+`--since <ref>` says where to start. Then, on John's instruction, what the
+script prints: push the branch and the tag to
+`https://github.com/jjh111/MetaMedium.git` (the fetch URL; `origin`'s push URL
+is deliberately a lock), and
+`gh release create v<version> dist/release/metamedium-<version>.html --title "MetaMedium <version>" --notes-from-tag`.
+Pages serves the app at `/app/` with the new version in its help pane; a
+browser that had the last release takes the new shell at its first visit.
 
 ### Standalone HTML demos
 
@@ -2128,7 +2226,8 @@ which only works because every diagram is authored 1000 units wide.
 
 - Fingerprinting system and geometric utilities (expanded, not replaced)
 - The `context` array (kept for compatibility as `components`/`basedOn` grow)
-- Published URLs — retire old demos to `archive/` with redirects, never break links
+- Published URLs — retire old demos to `archive/` with redirects, never break links (the gate's `app`
+  scenario asks every address the whitepaper, `404.html` and the README link into the site)
 - The whitepaper's claim-to-demo honesty: only link demos that actually show what the text claims
 
 ## Common Pitfalls

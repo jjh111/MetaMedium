@@ -1107,6 +1107,52 @@ changelog and the standalone file. **R8 One platform.** The monoliths and
 index, a README that is a front page. **R9 The shard alongside.** A built
 shard published beside the canvas and opened from it into the same room.
 
+*R7 status, 27 Sep 2026: built on `w2-shard`, on R4d* — `0cc9805` (red
+first: the gate's `app` scenario and the release script's tests, failing: no
+`app/`, no `VERSION`, no script) … and the commits carrying this line. **The
+app's address is `/app/`, a page and not a redirect** (§12's default):
+`scripts/build-app.mjs` makes `app/index.html` from
+`Demos/session-engine.html` with each file it asks for asked for from `/app/`,
+`app/sw.js` a copy of `Demos/sw.js`, `app/manifest.webmanifest` the old
+address's starting and scoped at `./`; nothing in `app/` is edited, and CI's
+`--check` names what drifted. A redirect could not install there — the shell
+must come from a worker whose scope covers the page, and a worker's scope is
+its own folder at most. The old address is untouched and opens the same
+boards. **One worker, two addresses**: where a copy stands decides its shell
+and its caches; network-first as before, installed past the HTTP cache,
+**its cache named for the release**, dropping only its own old caches (the
+old worker deleted every cache on the origin — both addresses', and every
+project's on the `github.io` host), answering a miss from its own cache only,
+keeping a page once whatever its query, and never keeping a request that
+carries a key. **`VERSION`** (0.0.0: no release yet) is stamped into the
+page's meta, which the help pane leads with, and into the workers' cache
+names. **`scripts/release.mjs <version>`** refuses a dirty tree and a version
+not greater than `VERSION` or any `v<version>` tag (`v1.0-day1` is not one),
+writes `CHANGELOG.md` a section by unit, bumps and stamps, builds the
+standalone file into `dist/release/`, refuses anything key-shaped, commits,
+tags annotated — and never pushes; `--dry-run` writes nothing. `node e2e/run.mjs
+app` (in the gate's default run): 14 records on Chromium and on WebKit — every
+file answering, installable (Chromium's own check), the page *controlled*
+(narrow the scope and A3, A5, B1 fail while Chromium still calls it
+installable), a box kept across a reload the worker served and with the
+server gone, the version in the help pane, no key kept, the old address and
+all 27 published links answering, and a release's first network fetch
+dropping the old shell — beside a control where the cache kept its name and
+the old help came back offline beside the new page. `node --test
+scripts/build-app.test.mjs scripts/release.test.mjs` (17, in CI): semver's
+order, the day-one tag, the unit rule on the real history, a release cut on a
+small repository (one commit, one annotated tag, nothing pushed), its
+refusals, and a dry run on a scratch clone of this repository that changes
+nothing — also in a shallow, detached, tagless checkout like CI's. Not done:
+**nothing is published** — the first release is the director's, on John's
+instruction; its section is the whole history (today 442 commits: 191 under 66
+units, 251 naming none) unless `--since` starts it later. Pages publishes `master` as it stands, so
+between releases the app runs master's code under the last release's number.
+The app's icon is the old address's SVG (Chromium installs with it; no
+`apple-touch-icon` for an iPad's home screen yet — R6's). The WebKit run of
+`app` is not in CI's `webkit` job, which runs the smoke on Linux; it passes
+here on macOS.
+
 ### Phase 7 — review and release
 **H1** — week 1's U7 (the `hand` gate scenario) plus `QA-v1.md`, a hand
 checklist for A1–A10 with the MCP hand in the room checking each step.
