@@ -6,6 +6,7 @@
 
 import type { Bounds, Fingerprint, Point } from '../types';
 import { getBounds } from '../geometry';
+import { type Affine, IDENTITY, applyAffine, compose, invert, isAffine } from './affine';
 
 /**
  * A kind of knowing, not a place (CLAUDE.md, the tiers redressed 6 Sep 2026):
@@ -229,21 +230,28 @@ export function strokePointsOf(node: MMNode): Point[] | undefined {
 }
 
 /**
- * Where a mark's points stand now: the raw points, fitted to the `transform`
- * frame if there is one, then turned by the `rotation` rep about that frame's
- * centre. Both are reps beside the ink; undo drops them and the ink is as it
- * was. Used for the stroke and for the clean form alike, so they never
- * disagree.
+ * Where a mark's points stand now: the raw points, carried first by the map
+ * its bindings have carried it by when it follows them (`'follow'`, V1-PLAN
+ * E2 — derived, never logged), then fitted to the `transform` frame if there
+ * is one, then turned by the `rotation` rep about that frame's centre. All
+ * three are reps beside the ink; undo drops them and the ink is as it was.
+ * Used for the stroke and for the clean form alike, so they never disagree.
+ *
+ * The follow comes FIRST, in the mark's own space: what the hand does to the
+ * mark afterwards — a move, a scale, a turn — is done to the mark as it
+ * stands, on the board, exactly as it is done to any other.
  */
 export function placed(node: MMNode, points: Point[]): Point[] {
   const raw = (getRep(node, 'stroke')?.data as { points: Point[] } | undefined)?.points ?? points;
   const to = getRep(node, 'transform')?.data as Bounds | undefined;
   const rotation = (getRep(node, 'rotation')?.data as number | undefined) ?? 0;
+  const follow = followMapOf(node);
   let out = points;
+  if (follow) out = out.map((p) => applyAffine(follow, p));
   if (to) {
     const from = getBounds(raw);
     const { sx, sy } = frameScale(from, to);
-    out = points.map((p) => ({ ...p, x: to.minX + (p.x - from.minX) * sx, y: to.minY + (p.y - from.minY) * sy }));
+    out = out.map((p) => ({ ...p, x: to.minX + (p.x - from.minX) * sx, y: to.minY + (p.y - from.minY) * sy }));
   }
   if (rotation) {
     const frame = to ?? getBounds(raw);
@@ -293,7 +301,48 @@ export function unplaced(node: MMNode, points: Point[]): Point[] {
     const { sx, sy } = frameScale(from, to);
     out = out.map((p) => ({ ...p, x: from.minX + (p.x - to.minX) / (sx || 1), y: from.minY + (p.y - to.minY) / (sy || 1) }));
   }
+  const follow = followMapOf(node);
+  const back = follow && invert(follow);
+  if (back) out = out.map((p) => applyAffine(back, p));
   return out;
+}
+
+/**
+ * The map a mark's bindings have carried it by (V1-PLAN E2), in its own space
+ * — the `'follow'` rep the engine holds for a connector that follows the
+ * sites its ends are bound to — or null for a mark that follows nothing. A
+ * log is read, not trusted: a map that is not six finite numbers that can be
+ * undone carries nothing.
+ */
+export function followMapOf(node: MMNode): Affine | null {
+  const m = (getRep(node, 'follow')?.data as { map?: unknown } | undefined)?.map;
+  return isAffine(m) ? m : null;
+}
+
+/**
+ * The hand's own placement of a mark as one map: its `transform`'s fit, then
+ * its `rotation` — what `placed` does after the follow. The follow is carried
+ * through it (session/follow.ts), so a map made on the board is held in the
+ * mark's own space, where the hand's later moves leave it be.
+ */
+export function placementOf(node: MMNode): Affine {
+  const raw = (getRep(node, 'stroke')?.data as { points?: Point[] } | undefined)?.points;
+  if (!raw || !raw.length) return IDENTITY;
+  const to = getRep(node, 'transform')?.data as Bounds | undefined;
+  const rotation = (getRep(node, 'rotation')?.data as number | undefined) ?? 0;
+  let m = IDENTITY;
+  if (to) {
+    const from = getBounds(raw);
+    const { sx, sy } = frameScale(from, to);
+    m = { a: sx, b: 0, c: 0, d: sy, e: to.minX - from.minX * sx, f: to.minY - from.minY * sy };
+  }
+  if (rotation) {
+    const frame = to ?? getBounds(raw);
+    const cx = (frame.minX + frame.maxX) / 2, cy = (frame.minY + frame.maxY) / 2;
+    const c = Math.cos(rotation), s = Math.sin(rotation);
+    m = compose({ a: c, b: s, c: -s, d: c, e: cx - c * cx + s * cy, f: cy - s * cx - c * cy }, m);
+  }
+  return m;
 }
 
 /** The clean form a hand reshaped (V1-PLAN E1), as the rep holds it — or nothing. */
@@ -441,7 +490,7 @@ export function topInterpretation(node: MMNode): string | undefined {
 export function boundsOf(node: MMNode): Bounds | undefined {
   // One pass over the reps, each modality's first as `getRep` finds it: this
   // is asked of every mark by every relation and every paint.
-  let stroke: Rep | undefined, rotation: Rep | undefined, transform: Rep | undefined, fp: Rep | undefined, clean: Rep | undefined, bounds: Rep | undefined;
+  let stroke: Rep | undefined, rotation: Rep | undefined, transform: Rep | undefined, fp: Rep | undefined, clean: Rep | undefined, bounds: Rep | undefined, follow: Rep | undefined;
   for (const r of node.reps) {
     switch (r.modality) {
       case 'stroke': if (!stroke) stroke = r; break;
@@ -450,6 +499,7 @@ export function boundsOf(node: MMNode): Bounds | undefined {
       case 'fingerprint': if (!fp) fp = r; break;
       case 'clean': if (!clean) clean = r; break;
       case 'bounds': if (!bounds) bounds = r; break;
+      case 'follow': if (!follow) follow = r; break;
     }
   }
   // A mark a hand reshaped stands where its clean form is (V1-PLAN E1); its
@@ -458,8 +508,9 @@ export function boundsOf(node: MMNode): Bounds | undefined {
     const pts = (clean.data as { points?: Point[] }).points;
     if (pts && pts.length) return getBounds(placed(node, pts));
   }
-  // A turned mark's box is the box of its turned points.
-  if (rotation && stroke) return getBounds(strokePointsOf(node)!);
+  // A turned mark's box is the box of its turned points; a mark its bindings
+  // carried (V1-PLAN E2), the box of its points where they carried it.
+  if ((rotation || (follow && followMapOf(node))) && stroke) return getBounds(strokePointsOf(node)!);
   // A transform is where the mark IS; the fingerprint records where it was
   // drawn. Anything asking for bounds wants the former.
   if (transform?.data) return transform.data as Bounds;

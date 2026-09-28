@@ -35,7 +35,7 @@
 import type { Bounds, Point } from '../types';
 import type { SessionState } from '../session/session';
 import type { NotationPort, NotationPorts } from '../session/ports';
-import { registerPorts } from '../session/ports';
+import { knowPorts, registerPorts } from '../session/ports';
 import type { HeadKind } from '../diagram/heads';
 import type { Role } from '../diagram/roles';
 import { ROLES } from '../diagram/roles';
@@ -187,6 +187,8 @@ export const NOTATION_FLOOR = 0.5;
 
 const registry = new Map<string, Notation>();
 const offered = new Map<string, () => void>();
+/** The way to forget each registered notation's ports as known (session/ports.ts `knowPorts`). */
+const knownPorts = new Map<string, () => void>();
 
 function sixRoles(n: Notation): void {
   const bad = [...n.symbols, ...n.connectors].filter((d) => !ROLES.includes(d.role));
@@ -205,6 +207,12 @@ function sixRoles(n: Notation): void {
 export function registerNotation(n: Notation): () => void {
   sixRoles(n);
   registry.set(n.id, n);
+  // Its ports are known to the engine from here on, offered on the pen or not:
+  // a binding already made to one is found again wherever the mark stands
+  // (V1-PLAN E2). Offering them to the pen is the page's (`offerPorts`).
+  knownPorts.get(n.id)?.();
+  knownPorts.delete(n.id);
+  if (n.ports) knownPorts.set(n.id, knowPorts(n.ports));
   if (offered.has(n.id)) offerPorts(n.id);
   return () => {
     if (registry.get(n.id) === n) unregisterNotation(n.id);
@@ -214,6 +222,8 @@ export function registerNotation(n: Notation): () => void {
 /** Stop a notation reading, and take back its ports if they were offered. False when it was not registered. */
 export function unregisterNotation(id: string): boolean {
   offered.get(id)?.();
+  knownPorts.get(id)?.();
+  knownPorts.delete(id);
   return registry.delete(id);
 }
 

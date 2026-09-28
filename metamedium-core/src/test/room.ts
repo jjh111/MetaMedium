@@ -613,7 +613,8 @@ function act(s: Session, rand: () => number, at: number, kinds: string[], undo?:
     case 'move':
       if (!content.length) return null;
       s.move({ ids: [pick(content)], dx: (rand() - 0.5) * 80, dy: (rand() - 0.5) * 80, at });
-      return 'move';
+      // A connector moved whole lets go of the sites it walked off, in the same act (E2).
+      return s.lastAct().some((e) => e.type === 'unbind') ? 'move, letting go of a site' : 'move';
     case 'label': {
       if (!content.length) return null;
       return s.label({ nodeId: pick(content), text: pick(['a', 'b', 'hub']), at }) ? 'label' : null;
@@ -627,7 +628,9 @@ function act(s: Session, rand: () => number, at: number, kinds: string[], undo?:
       if (!hs.length) return null;
       const h = pick(hs);
       const to = { x: h.point.x + (rand() - 0.5) * 80, y: h.point.y + (rand() - 0.5) * 80 };
-      return s.reshape({ id, handle: { kind: h.kind, index: h.index }, to, at }) ? 'reshape' : null;
+      if (!s.reshape({ id, handle: { kind: h.kind, index: h.index }, to, at })) return null;
+      // A connector's own bound end dragged off its site lets go of it, in the same act (E2).
+      return s.lastAct().some((e) => e.type === 'unbind') ? 'reshape, letting go of a site' : 'reshape';
     }
     case 'bind':
     case 'follow': {
@@ -638,7 +641,8 @@ function act(s: Session, rand: () => number, at: number, kinds: string[], undo?:
       s.bind({ strokeId: tie.connector, nodeId: tie.target, site: tie.site, end: tie.end, at });
       if (kind === 'bind') return 'bind';
       s.move({ ids: [tie.target], dx: (rand() - 0.5) * 160, dy: (rand() - 0.5) * 160, at: at + 10 });
-      return 'follow';
+      const line = s.getState().nodes.get(tie.connector);
+      return line && getRep(line, 'follow') ? 'follow' : 'follow, with nothing carried';
     }
   }
   return null;

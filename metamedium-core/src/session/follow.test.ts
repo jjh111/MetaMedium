@@ -19,7 +19,7 @@
 
 import { describe, it, expect, afterEach } from 'vitest';
 import { createSession, DEFAULT_SESSION_CONFIG, type Session, type SessionEvent } from './session';
-import { getRep, strokePointsOf } from './nodes';
+import { getRep, standingPointsOf, strokePointsOf } from './nodes';
 import { activeBindingsOf, bindingsOf, magnetSites } from './magnets';
 import { handlesOf } from './handles';
 import { connectorEnds } from './follow';
@@ -219,11 +219,14 @@ describe('an arrow: its tip follows the box, and it still points at it', () => {
     const n = nodeOf(s, ar);
     expect(n.edges.find((e) => e.rel === 'points-to')?.to).toBe(b);
     expect(n.edges.find((e) => e.rel === 'points-from')?.to).toBe(a);
-    // Read where it stands: the arrow touches the box it points at.
+    // Read where it stands: its ink touches the box it points at, and it plays the edge from A to B.
+    const outline = standingPointsOf(nodeOf(s, b))!;
+    const gap = Math.min(...inkNow(s, ar).map((p) => Math.min(...outline.slice(1).map((q, i) => offSegment(p, outline[i], q)))));
+    expect(gap).toBeLessThan(1e-6);
     const r = s.read([a, b, ar]);
-    const meets = r.relations.filter((x) => ((x.from === ar && x.to === b) || (x.from === b && x.to === ar)) && (x.kind === 'touching' || x.kind === 'crossing'));
-    expect(meets.length, JSON.stringify(r.relations.filter((x) => x.from === ar || x.to === ar).map((x) => `${x.from} ${x.kind} ${x.to}`))).toBeGreaterThan(0);
-    expect(r.roles.find((x) => x.id === ar)?.role).toBe('edge');
+    const role = r.roles.find((x) => x.id === ar)!;
+    expect(role.role).toBe('edge');
+    expect(role.direction).toEqual({ from: a, to: b });
     // Still an arrow: a similarity keeps its shape.
     expect(n.edges.find((e) => e.rel === 'resembles')?.to).toBe('type:arrow');
   });

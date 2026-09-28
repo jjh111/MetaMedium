@@ -362,6 +362,20 @@ function connectorOf(node: MMNode, nodes: ReadonlyMap<string, MMNode>): Connecto
   };
 }
 
+/**
+ * A connector's two ends where its INK stands, by the end of the stroke each
+ * is: an arrow's tail and its tip — the ink the pen first reached farthest
+ * along the shaft, where the rung's own tip can sit a wing's length short —
+ * a line's or an arc's first and last points; and which of them is the tail.
+ * Null for anything the rung does not read as a line, an arrow or an arc.
+ * What a connector's bound ends are, as ink (V1-PLAN E2, session/follow.ts).
+ */
+export function inkEndsOf(node: MMNode, nodes: ReadonlyMap<string, MMNode>): { start: Point; end: Point; tail: 'start' | 'end' } | null {
+  const c = connectorOf(node, nodes);
+  if (!c) return null;
+  return { start: c.ends[0].point, end: c.ends[1].point, tail: c.shape === 'arrow' && c.ends[0].barb ? 'end' : 'start' };
+}
+
 // ===== Reading a head =====
 
 interface Candidate {

@@ -100,6 +100,28 @@ export function registeredPorts(): string[] {
   return [...registry.keys()];
 }
 
+// ===== Known notations: a binding found again whether or not the pen is offered =====
+//
+// What the pen FEELS is the page's to choose — a board puts a notation's ports
+// in reach by using its pack (`followPacks`) — and the registry above is
+// that. But a binding already in the log is a claim about the board, and
+// where its site stands now must be read the same on every board that holds
+// the log, whatever each page happens to offer (V1-PLAN E2: a connector bound
+// to a decision's vertex follows the decision). So every notation the engine
+// knows says so here, once, when it is registered (notations/notation.ts),
+// and a bound port is found by it. A notation only offered, never known — a
+// test's — is found while it is offered.
+
+const known = new Map<string, NotationPorts>();
+
+/** Let the engine know a notation's ports, offered on the pen or not. Returns the way to forget them. */
+export function knowPorts(notation: NotationPorts): () => void {
+  known.set(notation.notation, notation);
+  return () => {
+    if (known.get(notation.notation) === notation) known.delete(notation.notation);
+  };
+}
+
 // ===== Where along a port =====
 
 /** A place along a continuous port is said in thousandths of its length. */
@@ -282,8 +304,7 @@ export function reachOf(at: Point, site: MagnetSite): MagnetHit {
  * bind carries — where that port is NOW. Null when the notation is not
  * registered, no longer reads the mark, or has no such port.
  */
-export function alongSiteOf(node: MMNode, nodes: ReadonlyMap<string, MMNode>, notation: string, index: number): MagnetSite | null {
-  const provider = registry.get(notation);
+export function alongSiteOf(node: MMNode, nodes: ReadonlyMap<string, MMNode>, notation: string, index: number, provider: NotationPorts | undefined = registry.get(notation)): MagnetSite | null {
   if (!provider || !Number.isInteger(index) || index < 0) return null;
   const read = readingOf(provider, node, nodes);
   if (!read) return null;
@@ -294,6 +315,31 @@ export function alongSiteOf(node: MMNode, nodes: ReadonlyMap<string, MMNode>, no
     const span = continuousSpan(port);
     if (!span) continue;
     if (k++ === ordinal) return alongSite(node.id, read.symbol, notation, port, span, ordinal, t);
+  }
+  return null;
+}
+
+/**
+ * A notation's port a BINDING names — `port:<notation>` by its place among
+ * the notation's point ports on the mark, `along:<notation>` by which port and
+ * how far along — found again where it stands now, by the notation the engine
+ * knows, else by one the pen is offered. Null when neither reads the mark so,
+ * or it has no such port (V1-PLAN E2; `boundSiteOf` in magnets.ts).
+ */
+export function portSiteOf(node: MMNode, nodes: ReadonlyMap<string, MMNode>, kind: string, index: number): MagnetSite | null {
+  const along = kind.startsWith('along:');
+  if (!along && !kind.startsWith('port:')) return null;
+  const notation = kind.slice(along ? 'along:'.length : 'port:'.length);
+  const provider = known.get(notation) ?? registry.get(notation);
+  if (!provider || !Number.isInteger(index) || index < 0) return null;
+  if (along) return alongSiteOf(node, nodes, notation, index, provider);
+  const read = readingOf(provider, node, nodes);
+  if (!read) return null;
+  let k = 0;
+  for (const port of read.ports) {
+    if (!port || typeof port.name !== 'string' || !isPointPort(port)) continue;
+    if (k++ !== index) continue;
+    return { nodeId: node.id, shape: read.symbol, kind: `port:${notation}`, index, point: { x: port.at!.x, y: port.at!.y }, reasoning: said(port, notation), notation, port: port.name };
   }
   return null;
 }

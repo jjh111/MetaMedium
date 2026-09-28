@@ -51,6 +51,7 @@ import {
   isPackDefinition,
   standingPointsOf,
   standsClosed,
+  followMapOf,
   LOCAL_PARTICIPANT,
   TIER0_PARTICIPANT,
   type Locality,
@@ -76,6 +77,8 @@ import { type GenreReading, type RoleReading, type Wire, assignRoles, genreOf } 
 import { BUILTIN_COMMAND_MARK, matchesCommandMark } from './commandmark';
 import { type SnapReading, idealize, snapReading, cleanOf } from './clean';
 import { reshapePreview, reshapedClean } from './handles';
+import { bindingsOf, boundSiteOf } from './magnets';
+import { connectorEnds, endOfHandle, followed, followThrough, movesWhole, sitsOn } from './follow';
 import { isLetterLike, joinsRun, wordConfidence } from './words';
 import { type StructuralSignature, type Examples, structuralSignature, matchDefinition, addExample, MATCH_FLOOR } from './signature';
 import type { Kind } from '../kinds/kinds';
@@ -395,6 +398,20 @@ type SessionEventUnion =
     }
   | {
       /**
+       * Let go of one end's binding (V1-PLAN E2): the claim for that end is
+       * withdrawn — its `bound-to` edge and its `'bound'` rep, keyed by the
+       * end as BIND-1 keys removal — and the connector stays where it stands.
+       * What a hand's act writes when it drags a bound end off its site, or
+       * moves a connector whole off the sites it sat on, in the same act.
+       */
+      type: 'unbind';
+      strokeId: string;
+      end: 'start' | 'end';
+      at: number;
+      participantId?: string;
+    }
+  | {
+      /**
        * A handle dragged (V1-PLAN E1, CONTROL-POINTS-PLAN P2): one of the
        * mark's own points, `handle` — `{ kind, index }` as `handlesOf` names
        * it — let go at `to`, in the mark's OWN space (the space its ink was
@@ -681,16 +698,42 @@ export interface Session {
    * not a command that can fail.
    */
   snap(args: { ids: string[]; mode?: 'clean' | 'raw'; at: number }): void;
-  /** Tie a stroke's endpoint to a magnet site on another mark (CONTROL-POINTS-PLAN P1). */
+  /**
+   * Tie a stroke's endpoint to a magnet site on another mark (CONTROL-POINTS-PLAN
+   * P1). From then on the end follows the site wherever the mark stands
+   * (V1-PLAN E2) — derived at replay, never logged: the bind carries the end
+   * onto the site at once.
+   */
   bind(args: { strokeId: string; nodeId: string; site: { kind: string; index: number }; end: 'start' | 'end'; at: number; participantId?: string }): void;
+  /**
+   * Let go of one end's binding (V1-PLAN E2): one `unbind` event, and the
+   * connector stays where it stands. Nothing is written when that end is
+   * bound to nothing.
+   */
+  unbind(args: { strokeId: string; end: 'start' | 'end'; at: number; participantId?: string }): void;
   /**
    * Drag one of a mark's handles (V1-PLAN E1): `handle` as `handlesOf` names
    * it, let go at `to` on the board. One `reshape` event — one act — and the
    * mark's clean form is reshaped, born reshaped when it held none; the ink
    * is never touched. False, and nothing written, when the mark has no clean
    * form to reshape or the handle is not one of its own.
+   *
+   * A connector's own end dragged (V1-PLAN E2, the director's decision): let
+   * go where a magnet holds it — `bind`, the site the caller found in the
+   * pen's reach there — it binds there, the old claim for that end replaced;
+   * let go anywhere else, that end's binding is released. Moved whole by a
+   * handle that moves it whole (its middle), it lets go of the ends that no
+   * longer sit on their sites. Either way the `unbind` and `bind` events are
+   * written in the same act as the reshape, so one undo takes them all back.
    */
-  reshape(args: { id: string; handle: { kind: string; index: number }; to: Point; at: number; participantId?: string }): boolean;
+  reshape(args: {
+    id: string;
+    handle: { kind: string; index: number };
+    to: Point;
+    at: number;
+    participantId?: string;
+    bind?: { nodeId: string; site: { kind: string; index: number } } | null;
+  }): boolean;
   /**
    * Which marks read cleanly enough to be redrawn, and as what. Defaults to
    * every loose mark on the board. Marks already snapped are not offered again.
@@ -728,7 +771,14 @@ export interface Session {
   /** Select marks outright (a grid view, a tap on a card). Ids not in the content plane are ignored. */
   select(ids: string[], at: number): void;
   deselect(at: number): void;
-  /** Move, scale or rotate marks — a hand dragging a selection. Artifacts move their members. */
+  /**
+   * Move, scale or rotate marks — a hand dragging a selection. Artifacts move
+   * their members. A connector bound to a moved mark follows it (V1-PLAN E2).
+   * A connector moved whole lets go of the bound ends that no longer sit on
+   * their sites — an `unbind` each, written before the move in the same act —
+   * and keeps the ones on a mark moved with it, or still within the magnet's
+   * reach of their sites.
+   */
   move(args: { ids: string[]; dx: number; dy: number; at: number }): void;
   scale(args: { ids: string[]; about: Point; sx: number; sy: number; at: number }): void;
   rotate(args: { ids: string[]; about: Point; radians: number; at: number }): void;
@@ -965,6 +1015,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     componentOf: Map<string, Component>; matchable: Set<Component>; unsettled: Set<string>;
     definitionsSeen: Map<string, DefinitionKey>; definitionsChanged: boolean;
     holding: Set<Component>; holdingInOrder: Component[]; holdingMoved: boolean;
+    boundBy: Map<string, Set<string>>;
   }
 
   /**
@@ -996,12 +1047,15 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       inkCopy = new MarkGrid();
       inkCopy.copyFrom(d.ink);
     }
+    const boundByCopy = new Map<string, Set<string>>();
+    for (const [id, set] of d.boundBy) boundByCopy.set(id, new Set(set));
     return {
       order: new Map(d.order), nextOrder: d.nextOrder, inContent: new Set(d.inContent),
       reach: reachCopy, ink: inkCopy, linked: linkedCopy,
       componentOf: componentOfCopy, matchable: new Set([...d.matchable].map(cp)), unsettled: new Set(d.unsettled),
       definitionsSeen: new Map(d.definitionsSeen), definitionsChanged: d.definitionsChanged,
       holding: new Set([...d.holding].map(cp)), holdingInOrder: d.holdingInOrder.map(cp), holdingMoved: d.holdingMoved,
+      boundBy: boundByCopy,
     };
   }
 
@@ -1019,7 +1073,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       packs: packs.slice(), library: library.slice(), packNotices: packNotices.slice(),
       derived: copyDerived({
         order, nextOrder, inContent, reach, ink, linked, componentOf, matchable, unsettled,
-        definitionsSeen, definitionsChanged, holding, holdingInOrder, holdingMoved,
+        definitionsSeen, definitionsChanged, holding, holdingInOrder, holdingMoved, boundBy,
       }),
     };
   }
@@ -1042,6 +1096,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     componentOf = d.componentOf; matchable = d.matchable; unsettled = d.unsettled;
     definitionsSeen = d.definitionsSeen; definitionsChanged = d.definitionsChanged;
     holding = d.holding; holdingInOrder = d.holdingInOrder; holdingMoved = d.holdingMoved;
+    boundBy = d.boundBy;
   }
 
   /** How many of the latest checkpoints keep the index. */
@@ -1092,13 +1147,16 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
   //   - `ink`: every stroke at its current bounds, for the scratch test;
   //   - the components of `linked`, each holding the candidate reading
   //     `recomputeClusterCandidates` would give it, found again only where a
-  //     mark was added, taken away or moved.
+  //     mark was added, taken away or moved;
+  //   - `boundBy`: each mark, and the connectors whose ends are bound to it
+  //     (active or not) — who follows a mark when it moves (V1-PLAN E2).
   let order = new Map<string, number>();
   let nextOrder = 0;
   let inContent = new Set<string>();
   const reach = new MarkGrid();
   const ink = new MarkGrid();
   let linked = new Map<string, Set<string>>();
+  let boundBy = new Map<string, Set<string>>();
 
   /** A cluster of the content plane: marks joined by relations that engage. */
   interface Component {
@@ -1149,11 +1207,28 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       order.set(id, ++nextOrder);
     }
     for (const id of contentIds) fileContent(id);
+    boundBy = new Map();
     for (const [id, n] of nodes) {
+      for (const e of n.edges) if (e.rel === 'bound-to') followerOf(e.to, id);
       if (!getRep(n, 'stroke') || getRep(n, 'erased')) continue;
       const b = boundsOf(n);
       if (b) ink.set(id, b);
     }
+  }
+
+  /** `connector` has an end bound to `target`: it follows it (V1-PLAN E2). */
+  function followerOf(target: string, connector: string) {
+    const set = boundBy.get(target);
+    if (set) set.add(connector);
+    else boundBy.set(target, new Set([connector]));
+  }
+
+  /** `connector` has no end bound to `target` any more. */
+  function noFollowerOf(target: string, connector: string) {
+    const set = boundBy.get(target);
+    if (!set) return;
+    set.delete(connector);
+    if (!set.size) boundBy.delete(target);
   }
 
   function reset() {
@@ -1637,16 +1712,17 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
    * land near two different content nodes is held as a candidate connection.
    * The line IS the relation node (relations are nodes — core schema).
    */
-  function inferWire(node: MMNode, points: Point[], scale: number) {
+  function inferWire(node: MMNode, points: Point[], scale: number, given?: [Point, Point]) {
     const top = resemblances(node)[0];
     if (!top) return;
     const kind = top.to.replace(/^type:/, '');
     if (kind !== 'line' && kind !== 'arrow') return;
 
     // An arrow's ends are its tip and tail, not the stroke's first and last
-    // points — the last point is the end of a wing.
+    // points — the last point is the end of a wing. A connector that follows
+    // its bindings is read again from its ends where it stands (`rewire`).
     const arrow = getRep(node, 'reading:arrow')?.data as { tip: Point; tail: Point } | undefined;
-    const ends = kind === 'arrow' && arrow ? [arrow.tail, arrow.tip] : [points[0], points[points.length - 1]];
+    const ends = given ?? (kind === 'arrow' && arrow ? [arrow.tail, arrow.tip] : [points[0], points[points.length - 1]]);
 
     // The nearest content mark an end lands on, within that mark's own reach
     // (a fraction of its size, with a hand's floor under it); the earliest on
@@ -2370,6 +2446,9 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       });
     }
     for (const r of ev.reps ?? []) {
+      // Where a connector's bindings carried it is the engine's to derive
+      // (V1-PLAN E2), never a reading a participant offers.
+      if (r.modality === 'follow') continue;
       node.reps.push({
         modality: r.modality,
         data: r.reasoning === undefined ? r.data : { ...(r.data as object), reasoning: r.reasoning },
@@ -2386,6 +2465,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     boundsMoved(node.id);
     unsettle(node.id);
     definitionsChanged = true;
+    followFrom([node.id]);
     recomputeClusterCandidates();
   }
 
@@ -2520,15 +2600,17 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     for (const p of placed) {
       const node = nodes.get(p.id)!;
       // A transform is the frame of a mark's INK. A mark a hand reshaped
-      // stands where its clean form is (E1), so the box tidy placed is where
-      // its FORM goes, and its ink's frame is taken there by the same fit.
-      const shown = cleanOf(node)?.reshaped ? boundsOf(node) : undefined;
+      // stands where its clean form is (E1), and one its bindings carried
+      // where they carried it (E2), so the box tidy placed is where it STANDS
+      // goes, and its ink's frame is taken there by the same fit.
+      const shown = cleanOf(node)?.reshaped || followMapOf(node) ? boundsOf(node) : undefined;
       const frame = shown && frameBounds(node);
       const to = shown && frame ? refit(frame, shown, p.to) : p.to;
       node.reps = node.reps.filter((r) => r.modality !== 'transform');
       node.reps.push({ modality: 'transform', data: to, source: 'engine' });
       boundsMoved(p.id);
     }
+    followFrom(placed.map((p) => p.id));
     recomputeClusterCandidates();
   }
 
@@ -2573,27 +2655,35 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
   function applySnap(ev: Extract<SessionEvent, { type: 'snap' }>) {
     if (ev.mode === 'raw') {
       let moved = false;
+      const put: string[] = [];
       for (const id of ev.ids) {
         const node = nodes.get(id);
         if (!node) continue;
         // A reshaped form stood somewhere its ink does not (E1): the mark
         // stands on its ink again, and is filed there.
         const reshaped = !!cleanOf(node)?.reshaped;
+        if (getRep(node, 'clean')) put.push(id);
         node.reps = node.reps.filter((r) => r.modality !== 'clean');
         if (reshaped) {
           boundsMoved(id);
           moved = true;
         }
       }
+      // Its sites are read off its ink again, and a connector's ends: what follows them follows (E2).
+      if (followFrom(put)) moved = true;
       if (moved) recomputeClusterCandidates();
       return;
     }
+    const drawn: string[] = [];
     for (const c of candidatesAmong(ev.ids)) {
       const node = nodes.get(c.id)!;
       const clean = idealize(node, c.shape);
       if (!clean) continue;
       node.reps.push({ modality: 'clean', data: clean, confidence: c.weight, source: ev.participantId ?? 'engine' });
+      drawn.push(c.id);
     }
+    // A held form's sites are its own, and a connector drawn clean stands as its form (E2).
+    if (followFrom(drawn)) recomputeClusterCandidates();
   }
 
   /**
@@ -2616,6 +2706,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     // The site is COPIED, not held: the log is the source, and a derived
     // graph that aliases an event's object could write back into it.
     const site = { kind: ev.site.kind, index: ev.site.index };
+    const was = stroke.edges.find((e) => e.rel === 'bound-to' && e.end === ev.end)?.to;
     stroke.edges = stroke.edges.filter((e) => !(e.rel === 'bound-to' && e.end === ev.end));
     stroke.edges.push({
       to: ev.nodeId,
@@ -2632,6 +2723,83 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       data: { end: ev.end, nodeId: ev.nodeId, site: { ...site } },
       source: by,
     });
+    if (was && was !== ev.nodeId && !stroke.edges.some((e) => e.rel === 'bound-to' && e.to === was)) noFollowerOf(was, stroke.id);
+    followerOf(ev.nodeId, stroke.id);
+    // The end is carried onto its site at once (V1-PLAN E2), so the board is
+    // the same whether the site's mark moved before this bind or after it.
+    if (followFrom([stroke.id])) recomputeClusterCandidates();
+  }
+
+  /**
+   * One end's binding let go (V1-PLAN E2): its `bound-to` edge and its
+   * `'bound'` rep, keyed by the end as BIND-1 keys removal. The connector
+   * keeps the map its bindings carried it by, so it stays where it stands.
+   */
+  function applyUnbind(ev: Extract<SessionEvent, { type: 'unbind' }>) {
+    const stroke = nodes.get(ev.strokeId);
+    if (!stroke) return;
+    const was = stroke.edges.find((e) => e.rel === 'bound-to' && e.end === ev.end)?.to;
+    if (!was) return;
+    stroke.edges = stroke.edges.filter((e) => !(e.rel === 'bound-to' && e.end === ev.end));
+    stroke.reps = stroke.reps.filter((r) => !(r.modality === 'bound' && (r.data as { end?: string }).end === ev.end));
+    if (!stroke.edges.some((e) => e.rel === 'bound-to' && e.to === was)) noFollowerOf(was, stroke.id);
+  }
+
+  // ===== Bindings follow (V1-PLAN E2; follow.ts) =====
+
+  /**
+   * Read one connector again and carry its bound ends onto their sites where
+   * they stand now: its `'follow'` rep replaced (never changed in place), the
+   * mark filed where it stands, its wire read again. True when it stands
+   * somewhere else now.
+   */
+  function refollow(id: string): boolean {
+    const node = nodes.get(id);
+    if (!node) return false;
+    const rep = followed(node, nodes);
+    if (!rep) return false;
+    node.reps = node.reps.filter((r) => r.modality !== 'follow');
+    node.reps.push(rep);
+    boundsMoved(id);
+    rewire(node);
+    return true;
+  }
+
+  /**
+   * Everything that follows these marks, carried: the connectors bound to
+   * them, those of them that are bound themselves, and on down the chain.
+   * Nothing at all on a board with no binding. True when anything moved.
+   */
+  function followFrom(changed: readonly string[]): boolean {
+    if (!boundBy.size || !changed.length) return false;
+    const isBound = (id: string) => !!nodes.get(id)?.edges.some((e) => e.rel === 'bound-to');
+    return followThrough(changed, (id) => boundBy.get(id) ?? [], isBound, refollow) > 0;
+  }
+
+  /**
+   * The wire a connector that followed is read as, found again where it
+   * stands (V1-PLAN E2): its `connects`, `points-from` and `points-to` — and
+   * the `connected-by` on the marks at its old ends — taken off, and inferred
+   * again from its ends as they stand now, by the rule a stroke's wire is
+   * inferred by when it is drawn. So a moved box's arrow still points at it.
+   */
+  function rewire(node: MMNode) {
+    const old = node.edges.filter((e) => e.rel === 'connects').map((e) => e.to);
+    if (!old.length && !inContent.has(node.id)) return;
+    if (old.length) {
+      node.edges = node.edges.filter((e) => e.rel !== 'connects' && e.rel !== 'points-from' && e.rel !== 'points-to');
+      for (const t of new Set(old)) {
+        const tn = nodes.get(t);
+        if (!tn) continue;
+        tn.edges = tn.edges.filter((e) => !(e.rel === 'connected-by' && e.to === node.id));
+        unsettle(t);
+      }
+    }
+    const ends = connectorEnds(node, nodes);
+    if (!ends) return;
+    const scale = (getRep(node, 'stroke')?.data as { scale?: number } | undefined)?.scale;
+    const [tail, tip] = ends.tail === 'start' ? [ends.start, ends.end] : [ends.end, ends.start];
+    inferWire(node, [], scale && scale > 0 ? scale : 1, [tail, tip]);
   }
 
   /**
@@ -2655,6 +2823,8 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     node.reps = node.reps.filter((r) => r.modality !== 'clean');
     node.reps.push({ modality: 'clean', data: clean, confidence, source: ev.participantId ?? LOCAL_PARTICIPANT });
     boundsMoved(node.id);
+    // What is bound to its sites follows them, and it follows its own (V1-PLAN E2).
+    followFrom([node.id]);
     recomputeClusterCandidates();
   }
 
@@ -2864,18 +3034,23 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
   }
 
   function applyMove(ev: Extract<SessionEvent, { type: 'move' }>) {
+    const moved: string[] = [];
     for (const n of manipulable(ev.ids)) {
       const b = frameBounds(n);
       if (!b) continue;
       setTransform(n, { minX: b.minX + ev.dx, maxX: b.maxX + ev.dx, minY: b.minY + ev.dy, maxY: b.maxY + ev.dy });
       boundsMoved(n.id);
       refreshWordBounds(n);
+      moved.push(n.id);
     }
+    // What is bound to what moved follows it (V1-PLAN E2).
+    followFrom(moved);
     recomputeClusterCandidates();
   }
 
   function applyScale(ev: Extract<SessionEvent, { type: 'scale' }>) {
     const sx = ev.sx > 1e-3 ? ev.sx : 1e-3, sy = ev.sy > 1e-3 ? ev.sy : 1e-3;
+    const moved: string[] = [];
     for (const n of manipulable(ev.ids)) {
       const b = frameBounds(n);
       if (!b) continue;
@@ -2885,12 +3060,15 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       });
       boundsMoved(n.id);
       refreshWordBounds(n);
+      moved.push(n.id);
     }
+    followFrom(moved);
     recomputeClusterCandidates();
   }
 
   function applyRotate(ev: Extract<SessionEvent, { type: 'rotate' }>) {
     const c = Math.cos(ev.radians), s = Math.sin(ev.radians);
+    const moved: string[] = [];
     for (const n of manipulable(ev.ids)) {
       const b = frameBounds(n);
       if (!b) continue;
@@ -2904,7 +3082,9 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       n.reps.push({ modality: 'rotation', data: prev + ev.radians, source: 'user' });
       boundsMoved(n.id);
       refreshWordBounds(n);
+      moved.push(n.id);
     }
+    followFrom(moved);
     recomputeClusterCandidates();
   }
 
@@ -3467,6 +3647,9 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       case 'bind':
         applyBind(ev);
         return null;
+      case 'unbind':
+        applyUnbind(ev);
+        return null;
       case 'reshape':
         applyReshape(ev);
         return null;
@@ -3678,6 +3861,61 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     notify();
   }
 
+  // ===== The hand on a connector itself (V1-PLAN E2, the director's decision) =====
+
+  /** Write inside one act (L2j): what `fn` dispatches carries one act number — the act already open, when one is. */
+  function inOneAct<T>(fn: () => T): T {
+    const outermost = openAct === null;
+    if (outermost) openAct = { n: null };
+    try {
+      return fn();
+    } finally {
+      if (outermost) openAct = null;
+    }
+  }
+
+  /**
+   * The bound ends a hand's move, scale or turn of these marks walks off
+   * their sites: for each connector it moves, each binding to a mark not
+   * moved with it whose end, carried by `map`, would stand beyond the
+   * magnet's reach of its site (`sitsOn`). A claim the hand walked away from
+   * is let go; one on a mark moved with it, or one the magnet still holds, is
+   * kept — and the follow puts that end back on its site.
+   */
+  function releasesFor(ids: readonly string[], map: (p: Point) => Point): { strokeId: string; end: 'start' | 'end' }[] {
+    if (!boundBy.size) return [];
+    const moved = manipulable([...ids]);
+    const together = new Set(moved.map((n) => n.id));
+    const out: { strokeId: string; end: 'start' | 'end' }[] = [];
+    for (const n of moved) {
+      const bs = bindingsOf(n).filter((b) => b.end === 'start' || b.end === 'end');
+      if (!bs.length) continue;
+      const ends = connectorEnds(n, nodes);
+      for (const b of bs) {
+        if (together.has(b.nodeId)) continue;
+        const target = nodes.get(b.nodeId);
+        const site = target && boundSiteOf(target, nodes, b.site);
+        const at = ends ? (b.end === 'start' ? ends.start : ends.end) : null;
+        if (target && site && at && sitsOn(map(at), site.point, target, n)) continue;
+        out.push({ strokeId: n.id, end: b.end as 'start' | 'end' });
+      }
+    }
+    return out;
+  }
+
+  /** A move, a scale or a turn, and the bound ends it walks off their sites let go first — one act. */
+  function manipulate(ev: Extract<SessionEvent, { type: 'move' | 'scale' | 'rotate' }>, map: (p: Point) => Point) {
+    const releases = releasesFor(ev.ids, map);
+    if (!releases.length) {
+      dispatch(ev);
+      return;
+    }
+    inOneAct(() => {
+      for (const r of releases) dispatch({ type: 'unbind', strokeId: r.strokeId, end: r.end, at: ev.at });
+      dispatch(ev);
+    });
+  }
+
   function getState(): SessionState {
     // The board's gestures are its reader's own: the board's own hand. Every
     // other hand's are held and replayed, and shown to nobody here (L2h).
@@ -3751,22 +3989,55 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     tidy: (args) => void dispatch({ type: 'tidy', ...args }),
     snap: (args) => void dispatch({ type: 'snap', ...args }),
     bind: (args) => void dispatch({ type: 'bind', ...args }),
+    unbind: (args) => {
+      // A claim there is to let go of, or nothing written.
+      const stroke = args && nodes.get(args.strokeId);
+      if (!stroke || !stroke.edges.some((e) => e.rel === 'bound-to' && e.end === args.end)) return;
+      dispatch({ type: 'unbind', strokeId: args.strokeId, end: args.end, at: args.at, ...(args.participantId !== undefined ? { participantId: args.participantId } : {}) });
+    },
     reshape: (args) => {
       // The same function the replay runs, so what the hand was shown is what
       // is written: the handle let go at `to` on the board, kept in the
       // mark's own space. Nothing to reshape, nothing written.
       const node = args && nodes.get(args.id);
       if (!node || !args.handle || isPendingLasso(args.id)) return false;
-      const pv = reshapePreview(node, nodes, { kind: args.handle.kind, index: args.handle.index }, args.to);
+      const handle = { kind: args.handle.kind, index: args.handle.index };
+      const pv = reshapePreview(node, nodes, handle, args.to);
       if (!pv) return false;
-      dispatch({
-        type: 'reshape',
-        id: args.id,
-        handle: { kind: args.handle.kind, index: args.handle.index },
-        to: pv.to,
-        at: args.at,
-        ...(args.participantId !== undefined ? { participantId: args.participantId } : {}),
-      });
+      const pid = args.participantId !== undefined ? { participantId: args.participantId } : {};
+      // What the hand does to a connector's own bindings (V1-PLAN E2, the
+      // director's decision), decided here and written in the same act.
+      const bs = bindingsOf(node).filter((b) => b.end === 'start' || b.end === 'end');
+      const releases: ('start' | 'end')[] = [];
+      let tie: { end: 'start' | 'end'; nodeId: string; site: { kind: string; index: number } } | null = null;
+      const end = endOfHandle(node, nodes, handle.kind);
+      if (end) {
+        // Its own end dragged: let go where a magnet holds it, it binds there
+        // (the old claim for that end replaced); anywhere else, it lets go.
+        const want = args.bind;
+        const hold = want && typeof want.nodeId === 'string' && want.nodeId !== node.id && nodes.has(want.nodeId) && want.site && typeof want.site.kind === 'string' && Number.isInteger(want.site.index) ? want : null;
+        const current = bs.find((b) => b.end === end);
+        const same = !!hold && !!current && current.nodeId === hold.nodeId && current.site.kind === hold.site.kind && current.site.index === hold.site.index;
+        if (current && !same) releases.push(end);
+        if (hold && !same) tie = { end, nodeId: hold.nodeId, site: { kind: hold.site.kind, index: hold.site.index } };
+      } else if (bs.length && movesWhole(pv.clean.shape, handle.kind)) {
+        // Moved whole by a handle: the ends that no longer sit on their sites let go.
+        const ends = connectorEnds(pv.node, nodes);
+        for (const b of bs) {
+          const target = nodes.get(b.nodeId);
+          const site = target && boundSiteOf(target, nodes, b.site);
+          const at = ends ? (b.end === 'start' ? ends.start : ends.end) : null;
+          if (target && site && at && sitsOn(at, site.point, target, node)) continue;
+          releases.push(b.end as 'start' | 'end');
+        }
+      }
+      const write = () => {
+        for (const e of releases) dispatch({ type: 'unbind', strokeId: node.id, end: e, at: args.at, ...pid });
+        dispatch({ type: 'reshape', id: args.id, handle, to: pv.to, at: args.at, ...pid });
+        if (tie) dispatch({ type: 'bind', strokeId: node.id, nodeId: tie.nodeId, site: tie.site, end: tie.end, at: args.at, ...pid });
+      };
+      if (releases.length || tie) inOneAct(write);
+      else write();
       return true;
     },
     snapCandidates: (ids) => candidatesAmong(ids ?? snappableIds()),
@@ -3816,9 +4087,15 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     splitWord: (nodeId, at) => void dispatch({ type: 'split', nodeId, at }),
     select: (ids, at) => void dispatch({ type: 'select', ids, at }),
     deselect: (at) => void dispatch({ type: 'deselect', at }),
-    move: (args) => void dispatch({ type: 'move', ...args }),
-    scale: (args) => void dispatch({ type: 'scale', ...args }),
-    rotate: (args) => void dispatch({ type: 'rotate', ...args }),
+    move: (args) => manipulate({ type: 'move', ...args }, (p) => ({ x: p.x + args.dx, y: p.y + args.dy })),
+    scale: (args) => {
+      const sx = args.sx > 1e-3 ? args.sx : 1e-3, sy = args.sy > 1e-3 ? args.sy : 1e-3, o = args.about;
+      manipulate({ type: 'scale', ...args }, (p) => ({ x: o.x + (p.x - o.x) * sx, y: o.y + (p.y - o.y) * sy }));
+    },
+    rotate: (args) => {
+      const c = Math.cos(args.radians), s = Math.sin(args.radians), o = args.about;
+      manipulate({ type: 'rotate', ...args }, (p) => ({ x: o.x + (p.x - o.x) * c - (p.y - o.y) * s, y: o.y + (p.x - o.x) * s + (p.y - o.y) * c }));
+    },
     bless: (args) => dispatch({ type: 'bless', ...args }),
     dismiss: (summonId, at) => void dispatch({ type: 'dismiss', summonId, at }),
     erase: (nodeId, at) => void dispatch({ type: 'erase', nodeId, at }),

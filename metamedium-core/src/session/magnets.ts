@@ -54,7 +54,7 @@ import type { MMNode } from './nodes';
 import { boundsOf, fingerprintOf, getRep, placed, strokePointsOf } from './nodes';
 import { type CleanShape, cleanOf, idealize, snapReading } from './clean';
 import { getBounds } from '../geometry';
-import { alongSiteOf, portSites, reachOf } from './ports';
+import { alongSiteOf, portSiteOf, portSites, reachOf } from './ports';
 
 export type MagnetKind =
   | 'tip'
@@ -135,8 +135,21 @@ function formOf(node: MMNode, nodes: ReadonlyMap<string, MMNode>): { shape: stri
  * with nothing to measure (below the hand's resolution).
  */
 export function magnetSites(node: MMNode, nodes: ReadonlyMap<string, MMNode>): MagnetSite[] {
+  const out = ownSitesOf(node, nodes);
+  // The hook (ports.ts): whatever a registered notation reads this mark as
+  // adds its ports after the mark's own sites — nothing at all when none is.
+  out.push(...portSites(node, nodes, MAGNET_SCREEN_PX));
+  return out;
+}
+
+/**
+ * The sites a mark offers of its own — its corners, middles, centre, ends —
+ * without a notation's ports: what a binding to one of them is found again
+ * by wherever the mark stands, whether or not the pen is offered any ports.
+ */
+export function ownSitesOf(node: MMNode, nodes: ReadonlyMap<string, MMNode>): MagnetSite[] {
   const form = formOf(node, nodes);
-  if (!form) return portSites(node, nodes, MAGNET_SCREEN_PX);
+  if (!form) return [];
   const b = boundsOf(node) ?? getBounds(form.points);
   const w = b.maxX - b.minX, h = b.maxY - b.minY;
   const centre = { x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2 };
@@ -222,9 +235,6 @@ export function magnetSites(node: MMNode, nodes: ReadonlyMap<string, MMNode>): M
       add('centre', centre, 'the centre of the mark’s bounds');
       break;
   }
-  // The hook (ports.ts): whatever a registered notation reads this mark as
-  // adds its ports after the mark's own sites — nothing at all when none is.
-  out.push(...portSites(node, nodes, MAGNET_SCREEN_PX));
   return out;
 }
 
@@ -316,6 +326,21 @@ export function magnetsNear(
 export function siteOf(node: MMNode, nodes: ReadonlyMap<string, MMNode>, site: { kind: string; index: number }): MagnetSite | null {
   if (site.kind.startsWith('along:')) return alongSiteOf(node, nodes, site.kind.slice('along:'.length), site.index);
   return magnetSites(node, nodes).find((s) => s.kind === site.kind && s.index === site.index) ?? null;
+}
+
+/**
+ * Where a BINDING's site stands now (V1-PLAN E2): the mark's own site, or the
+ * port of a notation the engine knows — read whether or not the pen is
+ * offered that notation's ports, because a claim already in the log is read
+ * as the board stands, and what the pen is offered is the page's, not the
+ * log's. This is what a connector that follows its bindings is carried to,
+ * so it answers the same on every board that holds the same log. Null when
+ * the mark no longer offers it; the binding stays in the graph as history.
+ */
+export function boundSiteOf(node: MMNode, nodes: ReadonlyMap<string, MMNode>, site: { kind: string; index: number }): MagnetSite | null {
+  if (!site || typeof site.kind !== 'string' || !Number.isInteger(site.index)) return null;
+  if (site.kind.startsWith('port:') || site.kind.startsWith('along:')) return portSiteOf(node, nodes, site.kind, site.index);
+  return ownSitesOf(node, nodes).find((s) => s.kind === site.kind && s.index === site.index) ?? null;
 }
 
 /** One line, for a status line or a brief: "corner of the rectangle at (100, 100)". */

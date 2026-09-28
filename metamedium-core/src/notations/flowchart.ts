@@ -47,6 +47,7 @@ import type { MMNode } from '../session/nodes';
 import { boundsOf, fingerprintOf, getRep, isWord, labelOf, lettersOf, placed, resemblances, strokePointsOf, transcriptOf } from '../session/nodes';
 import type { NotationPort, NotationPorts } from '../session/ports';
 import { activeBindingsOf, magnetRadius } from '../session/magnets';
+import { cleanOf, cleanPointsOf } from '../session/clean';
 import type { ConnectorHeads, HeadReading } from '../diagram/heads';
 import { headsOf } from '../diagram/heads';
 import type { InkFigure } from '../diagram/figures';
@@ -223,6 +224,20 @@ function portsFor(symbol: SymbolName, o: Outline): NotationPort[] {
   }
   // A start or end takes a flow where the circle itself offers one: its centre and cardinals (magnets.ts).
   return [];
+}
+
+/**
+ * The outline a symbol's ports are read from: the clean form a lone stroke
+ * holds — drawn clean, or reshaped by a hand (E1) — where it stands, because
+ * the form is where the mark stands and a binding at one of its ports must
+ * follow it there (V1-PLAN E2); else the ink's, as the symbol was read. What
+ * the symbol IS is always read from the ink.
+ */
+function portOutline(c: Candidate, nodes: ReadonlyMap<string, MMNode>): Outline {
+  if (c.ids.length !== 1) return c.outline;
+  const n = nodes.get(c.ids[0]);
+  const form = n && cleanOf(n) ? cleanPointsOf(n) : undefined;
+  return (form && form.length >= 3 ? outlineOf(form) : null) ?? c.outline;
 }
 
 // ===== Candidates: what could be a symbol =====
@@ -415,7 +430,7 @@ export function flowchartPortsOf(node: MMNode, nodes: ReadonlyMap<string, MMNode
     const c = candidateOfMark(node, nodes);
     const top = c && readingsOf(c)[0];
     if (!c || !top || top.confidence < PORTS_FLOOR) return null;
-    return { symbol: top.symbol, ports: portsFor(top.symbol as SymbolName, c.outline) };
+    return { symbol: top.symbol, ports: portsFor(top.symbol as SymbolName, portOutline(c, nodes)) };
   } finally {
     reading--;
   }
@@ -661,7 +676,7 @@ export function readFlowchart(state: SessionState, scopeIds?: readonly string[])
       readings: rs,
       outline: c.outline.hull.map((p) => ({ x: p.x, y: p.y })),
       bounds: { ...c.outline.bounds },
-      ports: portsFor(top.symbol as SymbolName, c.outline),
+      ports: portsFor(top.symbol as SymbolName, portOutline(c, nodes)),
       labels: [],
       ...(words ? { text: words } : {}),
     };

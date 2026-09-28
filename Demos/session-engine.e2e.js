@@ -3425,14 +3425,24 @@ window.__scenario = async function(){
       return !!e && at53(e.end, site53(b53, tipSites53[i].kind, tipSites53[i].index)) && at53(e.start, tails53[i]);
     });
     const read53 = mm.session.read([a53, b53].concat(arrows53));
+    // How far a stroke's ink, where it stands, comes to a mark's outline, where it stands.
+    const gap53 = (id, other) => {
+      const ink = MM.strokePointsOf(nodes53().get(id)), outline = MM.standingPointsOf(nodes53().get(other));
+      let best = Infinity;
+      for (const p of ink) for (let i = 1; i < outline.length; i++) {
+        const a = outline[i - 1], b = outline[i], dx = b.x - a.x, dy = b.y - a.y, l2 = dx * dx + dy * dy;
+        const u = l2 > 0 ? Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / l2)) : 0;
+        best = Math.min(best, Math.hypot(p.x - (a.x + u * dx), p.y - (a.y + u * dy)));
+      }
+      return best;
+    };
     const points53 = arrows53.map((id) => {
       const n = nodes53().get(id);
       const to = (n.edges.find((e) => e.rel === 'points-to') || {}).to;
-      const meets = read53.relations.some((r) => ((r.from === id && r.to === b53) || (r.from === b53 && r.to === id)) && (r.kind === 'touching' || r.kind === 'crossing'));
-      const role = (read53.roles.find((r) => r.id === id) || {}).role;
-      return to === b53 && meets && role === 'edge';
+      const role = read53.roles.find((r) => r.id === id) || {};
+      return to === b53 && gap53(id, b53) < 0.5 && role.role === 'edge' && !!role.direction && role.direction.to === b53;
     });
-    step('53. two arrows tied to box B follow it when the pointer drags it: each tip stands on its site where B now stands, each tail where it was on A, and each still reads as pointing at B, an edge that touches it — the drag is one move event, the following derived',
+    step('53. two arrows tied to box B follow it when the pointer drags it: each tip stands on its site where B now stands, each tail where it was on A, and each still reads as pointing at B — an edge to B, its ink touching the outline of B — the drag is one move event, the following derived',
       standing53 && tied53.every((x) => x === 'end→B start→A') && JSON.stringify(evs53) === '["move"]' && followed53.every(Boolean) && points53.every(Boolean),
       { standing: standing53, tied: tied53, events: evs53, followed: followed53, pointsAtB: points53, tips: arrows53.map((id) => round53(ends53(id) && ends53(id).end)), sites: tipSites53.map((x) => round53(site53(b53, x.kind, x.index))) });
     mm.session.undo(); await wait(30);
