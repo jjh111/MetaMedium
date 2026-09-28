@@ -4289,6 +4289,72 @@ function outlineOf(target) {
     { x: b.minX, y: b.minY }
   ];
 }
+function crossingAt(p1, p22, p3, p4) {
+  const d = (p22.x - p1.x) * (p4.y - p3.y) - (p22.y - p1.y) * (p4.x - p3.x);
+  if (Math.abs(d) < 1e-10) return null;
+  const t = ((p3.x - p1.x) * (p4.y - p3.y) - (p3.y - p1.y) * (p4.x - p3.x)) / d;
+  const u = ((p3.x - p1.x) * (p22.y - p1.y) - (p3.y - p1.y) * (p22.x - p1.x)) / d;
+  return t >= 0 && t <= 1 && u >= 0 && u <= 1 ? t : null;
+}
+function crossingPoints(stroke, outline, max = Infinity) {
+  const out = [];
+  for (let i = 1; i < stroke.length; i++) {
+    const a = stroke[i - 1], b = stroke[i];
+    for (let j = 1; j < outline.length; j++) {
+      const t = crossingAt(a, b, outline[j - 1], outline[j]);
+      if (t === null) continue;
+      out.push({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t });
+      if (out.length >= max) return out;
+    }
+  }
+  return out;
+}
+function distanceToPath(p, path, closed = false) {
+  if (path.length === 0) return Infinity;
+  if (path.length === 1) return Math.hypot(p.x - path[0].x, p.y - path[0].y);
+  let best = Infinity;
+  const n2 = closed ? path.length + 1 : path.length;
+  for (let i = 1; i < n2; i++) {
+    const a = path[i - 1], b = path[i % path.length];
+    const abx = b.x - a.x, aby = b.y - a.y;
+    const l2 = abx * abx + aby * aby;
+    const t = l2 > 0 ? Math.max(0, Math.min(1, ((p.x - a.x) * abx + (p.y - a.y) * aby) / l2)) : 0;
+    const d = Math.hypot(p.x - (a.x + abx * t), p.y - (a.y + aby * t));
+    if (d < best) best = d;
+  }
+  return best;
+}
+function headOf(points, arrow, near) {
+  if (!arrow.tip || !arrow.tail || points.length < 3) return null;
+  const { tip: rough, tail } = arrow;
+  const L = Math.hypot(rough.x - tail.x, rough.y - tail.y);
+  if (!(L > 0)) return null;
+  const ux = (rough.x - tail.x) / L, uy = (rough.y - tail.y) / L;
+  const along = (p) => (p.x - tail.x) * ux + (p.y - tail.y) * uy;
+  const order2 = arrow.head === "start" ? points.map((_, i) => points.length - 1 - i) : points.map((_, i) => i);
+  let far = -Infinity;
+  for (const p of points) far = Math.max(far, along(p));
+  let k = order2.findIndex((i) => along(points[i]) >= far - near);
+  if (k < 0) return null;
+  while (k + 1 < order2.length && along(points[order2[k + 1]]) >= along(points[order2[k]])) k++;
+  const tip = points[order2[k]];
+  let reach = 0;
+  for (let j = k; j < order2.length; j++) {
+    const q = points[order2[j]];
+    reach = Math.max(reach, Math.hypot(q.x - tip.x, q.y - tip.y));
+  }
+  const shaft = Math.hypot(tip.x - tail.x, tip.y - tail.y);
+  if (!(reach > 0) || reach >= shaft) return null;
+  return { at: { x: tip.x, y: tip.y }, radius: reach, why: `its head \u2014 the barb within ${Math.round(reach)} of its tip` };
+}
+function crossesOnlyWhereTheyMeet(stroke, outline, meetings) {
+  if (meetings.length === 0) return false;
+  const slack = (m) => m.radius + 1e-9 * (1 + Math.abs(m.at.x) + Math.abs(m.at.y));
+  for (const c of crossingPoints(stroke, outline)) {
+    if (!meetings.some((m) => Math.hypot(c.x - m.at.x, c.y - m.at.y) <= slack(m))) return false;
+  }
+  return true;
+}
 function countCrossings(stroke, outline, max = DEFAULT_ERASE_CROSSINGS) {
   let n2 = 0;
   for (let i = 1; i < stroke.length; i++) {
@@ -4315,7 +4381,7 @@ function mayCross(a, b) {
   const pad = 1e-9 * (1 + Math.max(Math.abs(a.minX), Math.abs(a.maxX), Math.abs(a.minY), Math.abs(a.maxY), Math.abs(b.minX), Math.abs(b.maxX), Math.abs(b.minY), Math.abs(b.maxY)));
   return !(a.maxX + pad < b.minX || b.maxX + pad < a.minX || a.maxY + pad < b.minY || b.maxY + pad < a.minY);
 }
-function scratchedOut(points, targets, minCrossings = DEFAULT_ERASE_CROSSINGS) {
+function scratchedOut(points, targets, minCrossings = DEFAULT_ERASE_CROSSINGS, meetingsOf) {
   if (points.length < 3) return [];
   const span = spanOf2(points);
   const hit = [];
@@ -4323,7 +4389,9 @@ function scratchedOut(points, targets, minCrossings = DEFAULT_ERASE_CROSSINGS) {
     const outline = outlineOf(t);
     if (!outline) continue;
     if (!mayCross(span, spanOf2(outline))) continue;
-    if (countCrossings(points, outline, minCrossings) >= minCrossings) hit.push(t.id);
+    if (countCrossings(points, outline, minCrossings) < minCrossings) continue;
+    if (meetingsOf && crossesOnlyWhereTheyMeet(points, outline, meetingsOf(t.id))) continue;
+    hit.push(t.id);
   }
   return hit;
 }
@@ -13320,9 +13388,17 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
     }
     return null;
   }
-  function scratchHits(points, span, excludeId) {
+  function scratchHits(points, span, excludeId, scale, analyzed) {
     if (points.length < 3) return [];
     const pad = 1e-6 * (1 + Math.max(Math.abs(span.minX), Math.abs(span.maxX), Math.abs(span.minY), Math.abs(span.maxY)));
+    let head;
+    const meetings = (id) => {
+      if (head === void 0) {
+        const arrow = analyzed().results.find((r) => r.type === "arrow");
+        head = arrow?.meta ? headOf(points, arrow.meta, HAND_RESOLUTION_PX * scale) : null;
+      }
+      return meetingsOf(points, scale, head, id);
+    };
     const hits = /* @__PURE__ */ new Set();
     for (const id of ink.query({ minX: span.minX - pad, minY: span.minY - pad, maxX: span.maxX + pad, maxY: span.maxY + pad })) {
       if (id === excludeId) continue;
@@ -13330,10 +13406,37 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
       if (getRep(n2, "erased")) continue;
       const pts = standingPointsOf(n2);
       if (!pts) continue;
-      if (scratchedOut(points, [{ id, points: pts, closed: standsClosed(n2) ?? false }], config.eraseCrossings).length) hits.add(id);
+      if (scratchedOut(points, [{ id, points: pts, closed: standsClosed(n2) ?? false }], config.eraseCrossings, meetings).length) hits.add(id);
     }
     if (hits.size === 0) return [];
     return scratchTargets(excludeId).filter((t) => hits.has(t.id)).map((t) => t.id);
+  }
+  function meetingsOf(points, scale, head, targetId) {
+    const out = head ? [head] : [];
+    const n2 = nodes.get(targetId);
+    const outline = n2 && standingPointsOf(n2);
+    const b = n2 && boundsOf(n2);
+    if (!n2 || !outline || outline.length < 2 || !b) return out;
+    const size = Math.max(b.maxX - b.minX, b.maxY - b.minY);
+    const closed = standsClosed(n2) ?? false;
+    const touch = HAND_RESOLUTION_PX * scale;
+    const magnet = magnetRadius(size, scale);
+    const sites = size >= 4 * magnet ? ownSitesOf(n2, nodes) : [];
+    for (const e of [points[0], points[points.length - 1]]) {
+      if (sites.some((site) => Math.hypot(site.point.x - e.x, site.point.y - e.y) <= magnet)) {
+        out.push({ at: e, radius: magnet, why: "its end on a site the magnet binds" });
+      } else if (size >= 4 * touch && distanceToPath(e, outline, closed) <= touch) {
+        out.push({ at: e, radius: touch, why: "its end on the mark's ink" });
+      }
+    }
+    if (!closed && size >= 4 * touch) {
+      const own = connectorEnds(n2, nodes);
+      const ends = [outline[0], outline[outline.length - 1], ...own ? [own.start, own.end] : []];
+      for (const f of ends) {
+        if (distanceToPath(f, points) <= touch) out.push({ at: f, radius: touch, why: "the mark's own end, drawn over" });
+      }
+    }
+    return out;
   }
   function enclosesAny(b, excludeId) {
     for (const id of reach.query(b)) {
@@ -13422,7 +13525,9 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
         return node.id;
       }
     }
-    const scratched = fp.isClosed || !byHand ? [] : scratchHits(points, fp.bounds, node.id);
+    let analysis;
+    const analyzed = () => analysis ??= analyzeStroke(points, scale);
+    const scratched = fp.isClosed || !byHand ? [] : scratchHits(points, fp.bounds, node.id, scale, analyzed);
     if (scratched.length > 0) {
       node.reps.push({
         modality: "gesture",
@@ -13439,8 +13544,8 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
       g.selection = [];
     }
     contentPush(node.id);
-    const analysis = analyzeStroke(points, scale);
-    for (const r of analysis.results) {
+    const { results } = analyzed();
+    for (const r of results) {
       node.edges.push({
         to: typeNodeId(r.type),
         rel: "resembles",
@@ -13451,7 +13556,7 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
         // grounded "why", carried with the claim
       });
     }
-    for (const r of analysis.results) {
+    for (const r of results) {
       if (r.meta) node.reps.push({ modality: `reading:${r.type}`, data: r.meta, source: TIER0_PARTICIPANT });
     }
     if (absorbIntoWord(node, fp, at, scale, hand)) {
@@ -16082,8 +16187,8 @@ function readUmlClass(state, scopeIds) {
   }
   const kept = classes.filter((c) => !demoted.has(c));
   if (demoted.size) for (const c of demoted) for (const id of c.box) classOfMark.delete(id);
-  const headOf = /* @__PURE__ */ new Set();
-  for (const [id, h2] of heads) for (const e of [h2.start, h2.end]) for (const x of e.heads[0]?.ids ?? []) if (x !== id && heads.has(x)) headOf.add(x);
+  const headOf2 = /* @__PURE__ */ new Set();
+  for (const [id, h2] of heads) for (const e of [h2.start, h2.end]) for (const x of e.heads[0]?.ids ?? []) if (x !== id && heads.has(x)) headOf2.add(x);
   const relations = [];
   const pointers = [];
   const edgeMarks = /* @__PURE__ */ new Map();
@@ -16143,7 +16248,7 @@ function readUmlClass(state, scopeIds) {
     };
   };
   for (const [id, h2] of heads) {
-    if (headOf.has(id)) continue;
+    if (headOf2.has(id)) continue;
     const node = nodes.get(id);
     const pts = strokePointsOf(node);
     const length = Math.max(1e-6, Math.hypot(pts[pts.length - 1].x - pts[0].x, pts[pts.length - 1].y - pts[0].y));
@@ -16207,7 +16312,7 @@ function readUmlClass(state, scopeIds) {
   const joined = relations.filter((r) => inSet.has(byId.get(r.from)) && inSet.has(byId.get(r.to)));
   const leftOut = relations.filter((r) => !joined.includes(r));
   const labels = [];
-  const taken = /* @__PURE__ */ new Set([...relations.flatMap((r) => r.ids), ...pointers, ...edgeMarks.keys(), ...usedWords, ...headOf]);
+  const taken = /* @__PURE__ */ new Set([...relations.flatMap((r) => r.ids), ...pointers, ...edgeMarks.keys(), ...usedWords, ...headOf2]);
   const outsideWriting = [...marks.values()].filter((m) => {
     if (insideOf2.has(m.id) || boxMarks.has(m.id) || lineIds.has(m.id) || inFigure.has(m.id) || taken.has(m.id)) return false;
     if (isWriting4(m.node)) return true;

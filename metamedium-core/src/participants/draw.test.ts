@@ -7,7 +7,7 @@ import { parseShapes, strokeFor } from '../session/synthesize';
 import { getRep, boundsOf } from '../session/nodes';
 import { interpretationsOf } from '../session/interpretations';
 import { PRESETS } from '../llm/provider';
-import { rectStroke } from '../test/strokes';
+import { rectStroke, scratchStroke } from '../test/strokes';
 
 const realFetch = globalThis.fetch;
 afterEach(() => { globalThis.fetch = realFetch; vi.restoreAllMocks(); });
@@ -125,10 +125,28 @@ describe('a model\'s drawn marks are declared content, never gestures', () => {
     }
   });
 
-  it('the same strokes, undeclared, ARE gestures — the rule is about what was declared, not who drew', () => {
+  it('the same strokes, undeclared, ARE gestures where a hand\'s would be — the rule is about what was declared, not who drew', () => {
+    // The loop around the box, from a hand, is a lasso that waits.
     const s = createSession();
-    const box = s.addStroke(rectStroke(300, 100, 200, 120), 1000);
-    s.addStroke(strokeFor({ shape: 'arrow', from: { x: 100, y: 160 }, to: { x: 330, y: 160 } })!, 1100);
-    expect(s.getState().contentIds).not.toContain(box);
+    s.addStroke(rectStroke(300, 100, 200, 120), 1000);
+    const loop = s.addStroke(strokeFor({ shape: 'circle', x: 250, y: 50, w: 300, h: 220 })!, 1100);
+    expect(s.getState().pendingLassoId).toBe(loop);
+    // A hand's scratch across the box rubs it out; declared, the same ink is a drawing.
+    const scratch = scratchStroke(280, 120, 240, 80, 3);
+    const s2 = createSession();
+    const box2 = s2.addStroke(rectStroke(300, 100, 200, 120), 1000);
+    s2.addStroke(scratch, 1100);
+    expect(s2.getState().contentIds).not.toContain(box2);
+    const s3 = createSession();
+    const box3 = s3.addStroke(rectStroke(300, 100, 200, 120), 1000);
+    s3.addStroke(scratch, 1100, undefined, 1, { content: true });
+    expect(s3.getState().contentIds).toContain(box3);
+    // The model's arrow, drawn by a hand, is no scratch either: its barb crosses the
+    // box's edge three times where the arrow arrives at it — its head, not a pass
+    // across it (V1-PLAN §9 W1; this test used it as a scratch before).
+    const s4 = createSession();
+    const box4 = s4.addStroke(rectStroke(300, 100, 200, 120), 1000);
+    s4.addStroke(strokeFor({ shape: 'arrow', from: { x: 100, y: 160 }, to: { x: 330, y: 160 } })!, 1100);
+    expect(s4.getState().contentIds).toContain(box4);
   });
 });

@@ -17,7 +17,7 @@
 //     its own, found by authorship, never another hand's (V1-PLAN L2j).
 
 import type { Bounds, Point } from '../types';
-import type { Fingerprint } from '../types';
+import type { Fingerprint, StrokeAnalysis } from '../types';
 import {
   getFingerprint,
   getBounds,
@@ -26,7 +26,7 @@ import {
   boundingBoxDistance,
   boundsContain,
 } from '../geometry';
-import { analyzeStroke } from '../recognition';
+import { HAND_RESOLUTION_PX, analyzeStroke } from '../recognition';
 import {
   type MMNode,
   type Edge,
@@ -68,7 +68,8 @@ import { type CommandMark } from './commandmark';
 import { type MarkMiss, whyNotResolved } from './gesture';
 import { type Expectation, type StaleResult, describeStale } from './stale';
 import { handLabel } from './hands';
-import { DEFAULT_ERASE_CROSSINGS, scratchedOut } from './erase';
+import { DEFAULT_ERASE_CROSSINGS, type Meeting, distanceToPath, headOf, scratchedOut } from './erase';
+import { magnetRadius, ownSitesOf } from './magnets';
 import { type Region, regionsOf, regionsOverlapping } from './regions';
 import { type Mark, type Relation, ENGAGING_KINDS, clusters, reachAround, relate, withinReach } from '../relate/relations';
 import { MarkGrid } from '../relate/grid';
@@ -2039,11 +2040,20 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
    * (and to keep only real targets: a letter of a word inside an artifact is
    * ink but no target). Ordinary ink crosses nothing, and never walks.
    */
-  function scratchHits(points: Point[], span: Bounds, excludeId: string): string[] {
+  function scratchHits(points: Point[], span: Bounds, excludeId: string, scale: number, analyzed: () => StrokeAnalysis): string[] {
     if (points.length < 3) return [];
     // A billionth is scratchedOut's own margin; this is wider, so the index's
     // boxes (a moved mark's frame, not its placed points) never shave a crossing.
     const pad = 1e-6 * (1 + Math.max(Math.abs(span.minX), Math.abs(span.maxX), Math.abs(span.minY), Math.abs(span.maxY)));
+    // The stroke's own head, read only once something was crossed enough (erase.ts, W1).
+    let head: Meeting | null | undefined;
+    const meetings = (id: string): Meeting[] => {
+      if (head === undefined) {
+        const arrow = analyzed().results.find((r) => r.type === 'arrow');
+        head = arrow?.meta ? headOf(points, arrow.meta as { head?: string; tip?: Point; tail?: Point }, HAND_RESOLUTION_PX * scale) : null;
+      }
+      return meetingsOf(points, scale, head, id);
+    };
     const hits = new Set<string>();
     for (const id of ink.query({ minX: span.minX - pad, minY: span.minY - pad, maxX: span.maxX + pad, maxY: span.maxY + pad })) {
       if (id === excludeId) continue;
@@ -2051,10 +2061,51 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       if (getRep(n, 'erased')) continue;
       const pts = standingPointsOf(n);
       if (!pts) continue;
-      if (scratchedOut(points, [{ id, points: pts, closed: standsClosed(n) ?? false }], config.eraseCrossings).length) hits.add(id);
+      if (scratchedOut(points, [{ id, points: pts, closed: standsClosed(n) ?? false }], config.eraseCrossings, meetings).length) hits.add(id);
     }
     if (hits.size === 0) return [];
     return scratchTargets(excludeId).filter((t) => hits.has(t.id)).map((t) => t.id);
+  }
+
+  /**
+   * Where the stroke just drawn meets a mark it crossed enough to rub out
+   * (erase.ts, V1-PLAN §9 W1): its own head, when the rung reads a barb at one
+   * of its ends; an end of it that lands on the mark — on a site of the mark
+   * where the pen's magnet would bind it, within the magnet's reach relative
+   * to the mark (a bind always follows its stroke in the log, so this is the
+   * bind about to be made), or on the mark's ink within the hand's resolution;
+   * and an end of the mark, when it is an open stroke, that this stroke is
+   * drawn over (a wing or a chevron drawn apart, over its shaft's tip). A
+   * meeting about an end is a place ON the mark, so a mark no bigger than four
+   * of them offers none: a dot or a letter scratched over is scratched out
+   * whole, as before.
+   */
+  function meetingsOf(points: Point[], scale: number, head: Meeting | null, targetId: string): Meeting[] {
+    const out: Meeting[] = head ? [head] : [];
+    const n = nodes.get(targetId);
+    const outline = n && standingPointsOf(n);
+    const b = n && boundsOf(n);
+    if (!n || !outline || outline.length < 2 || !b) return out;
+    const size = Math.max(b.maxX - b.minX, b.maxY - b.minY);
+    const closed = standsClosed(n) ?? false;
+    const touch = HAND_RESOLUTION_PX * scale;
+    const magnet = magnetRadius(size, scale);
+    const sites = size >= 4 * magnet ? ownSitesOf(n, nodes) : [];
+    for (const e of [points[0], points[points.length - 1]]) {
+      if (sites.some((site) => Math.hypot(site.point.x - e.x, site.point.y - e.y) <= magnet)) {
+        out.push({ at: e, radius: magnet, why: 'its end on a site the magnet binds' });
+      } else if (size >= 4 * touch && distanceToPath(e, outline, closed) <= touch) {
+        out.push({ at: e, radius: touch, why: "its end on the mark's ink" });
+      }
+    }
+    if (!closed && size >= 4 * touch) {
+      const own = connectorEnds(n, nodes);
+      const ends = [outline[0], outline[outline.length - 1], ...(own ? [own.start, own.end] : [])];
+      for (const f of ends) {
+        if (distanceToPath(f, points) <= touch) out.push({ at: f, radius: touch, why: "the mark's own end, drawn over" });
+      }
+    }
+    return out;
   }
 
   /** Whether a closed stroke's box holds any other mark on the content plane — what makes it a loop that may wait. */
@@ -2187,9 +2238,14 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     //     does most of the discriminating everywhere else in the engine, and
     //     without this rule a loop that grazes a shape's edge tangentially can
     //     count six crossings and rub out what the user meant to select.
+    //     And crossings made where the stroke MEETS a mark — its head arriving,
+    //     an end landing on it — are not a scratch (erase.ts, W1), so the
+    //     shape rung is asked, once, when something was crossed enough.
+    let analysis: StrokeAnalysis | undefined;
+    const analyzed = () => (analysis ??= analyzeStroke(points, scale));
     const scratched = fp.isClosed || !byHand
       ? []
-      : scratchHits(points, fp.bounds, node.id);
+      : scratchHits(points, fp.bounds, node.id, scale, analyzed);
     if (scratched.length > 0) {
       node.reps.push({
         modality: 'gesture',
@@ -2210,8 +2266,8 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     contentPush(node.id);
 
     // Multi-parse: every qualifying recognition becomes a held 'resembles' edge.
-    const analysis = analyzeStroke(points, scale);
-    for (const r of analysis.results) {
+    const { results } = analyzed();
+    for (const r of results) {
       node.edges.push({
         to: typeNodeId(r.type),
         rel: 'resembles',
@@ -2223,7 +2279,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
 
     // What a detector measured beyond its label — an arrow's tip and tail —
     // is kept on the node so the rungs above can read it as fact.
-    for (const r of analysis.results) {
+    for (const r of results) {
       if (r.meta) node.reps.push({ modality: `reading:${r.type}`, data: r.meta, source: TIER0_PARTICIPANT });
     }
 
