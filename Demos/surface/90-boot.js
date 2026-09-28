@@ -63,7 +63,7 @@
       return session.getState().summon ? { ranked: paletteItems.map(of), shown: visibleItems(q || '').map(of) } : null;
     },
     // What stands beside the open field's marks (V1-PLAN §2.2, B2), and the tops the contexts hold, for tests.
-    fieldContext: () => (session.getState().summon ? paletteContext : null),
+    paletteContext: () => (session.getState().summon ? paletteContext : null),
     steadyTops: () => [...steadyTops].map(([k, v]) => ({ context: k, key: v.key, at: v.at })),
     usesHere: () => JSON.parse(JSON.stringify(usesHere)),
     // The worker runtime, for tests: what is loaded, where each body is, what broke.

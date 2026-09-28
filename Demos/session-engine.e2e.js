@@ -3078,7 +3078,7 @@ window.__scenario = async function(){
       { flowRead: flowRead50, tops: tops50, title: titles50[1] });
     // The panel says it too: what stands beside the selection, and what that put first.
     const panel50 = document.getElementById('inspector').textContent;
-    const ctx50 = mm.fieldContext ? mm.fieldContext() : null;
+    const ctx50 = mm.paletteContext ? mm.paletteContext() : null;
     step('50a. the panel says what stands beside the selection and what it put first, and why',
       /beside\s*a flowchart 0\.\d\d — three processes, one decision, three flows/.test(panel50) &&
         /first\s*Draw them clean\s*because it sits beside a flowchart: three processes, one decision/.test(panel50) &&
