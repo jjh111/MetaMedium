@@ -817,6 +817,62 @@ board tests 58; surface in sync; the canvas MCP smoke and the shard's (605 in
 31 files, typecheck clean) pass; the gate 475 passed and the one honest skip
 (canvas 291, keep 31, budgets 7, shard 123 + 11 + 12); WebKit smoke 4.
 
+**R4d a room merges a line, not the board — status, 27 Sep 2026: done on
+`w2-shard`** (on R4b's engine, merged in as `0bca5ca`) — `f3d3357` (red: the
+room's budgets as tests, and the oracle passing against the full replay),
+`0b8bee2` (core), `6e99380` (the canvas), `46f67fd` (the MCP hand),
+`a1158bc` (checkpoints) and the commit carrying this line. `LiveMerge`
+(`store/livemerge.ts`) keeps the merge standing between lines — `mergeLogs`'
+order and fold, the reader's own copy standing — and hands the session only
+what changed through the new `Session.rebase`: applied with no replay when a
+line's events fall after everything held, replayed from the nearest
+checkpoint when one falls before. The store says when to merge (`revision`,
+read through `heldLogs`): a hello, a goodbye, the relay's word and a whole log
+already held change no log and do no work. A room's log is `ownLog`, in the
+order written, with no event serialised. A hello is answered once per log:
+each hand for its own, a copy only for a writer that said goodbye (`close()`
+sends `bye`) or stayed silent 1.5 s, by the first holder. A merge leaves a
+checkpoint where it ended, and the last four checkpoints keep the index, so
+the commonest early line — one crossing a mark this hand just drew — goes back
+a few events. On the 2,000-mark board (`node --test
+metamedium-core/bench/room.test.mjs`, all four pass): **a line 1.65 ms median,
+2.03 ms p95, no replay** (was 312 / 317 ms on R4b's engine, 173 s before it);
+crossing a mark just drawn 4.2 / 5.0 ms; lines with no events, no work; the
+save a line schedules 0.26 ms (was 62.9); **a newcomer's hello one copy of each
+log** in rooms of three and six, with a hand that left or vanished — 6.51 MB to
+it in a room of six (was 32.56 MB, five copies) — and it holds exactly the
+room's logs. At 500: 0.94 / 1.10 ms (was 71.9 / 74.8). The oracle
+(`src/store/room.oracle.test.ts`, 16 seeded rooms in `npm test`) holds the path
+to `mergeLogs` and a replay from zero after every merge, and to a reference
+merging the whole log when one changed; 500 rooms (`MM_ROOM_SEEDS=500`, 45 s)
+pass with 8,857 checks, 10,250 lines that changed no log, 4,426 replays from a
+checkpoint (the path under test snapshots every 3–14 events), 1,974 appends,
+1,437 cuts before the first checkpoint, 410 merges read again whole, 443 undos
+here and 784 by other hands, 504 leavers, 921 goodbyes, 464 newcomers (236
+with marks drawn before they had a log name), 417 renames and 390 clocks that
+jumped. What it found: the path published its own log in the merge's order —
+a whole log where the reference sent an append, 6 rooms of 500 — so `ownLog`
+reads it in the order written. e2e 28l (a line after everything is applied:
+the same log, one event longer, `generation` unchanged) and 28m (a hello, the
+relay's word, a whole log already held leave the board and the paint
+untouched). R4b's budgets hold — 2,000 marks replay in 264 ms, a stroke 0.16 /
+0.34 ms, 16.8 MB held (was 12.4: the kept index); 5,000 in 713 ms, 57.5 MB (was
+45.5) — and `bench/equivalence.mjs --ref=0bca5ca` finds nothing that reads
+differently. *Found, not changed:* a line 30 or 150 events back — a clock
+seconds behind other hands' lines — replays from the regular checkpoints, 39
+and 64 ms at 2,000; undo in a room takes the last event on the board, which
+may be another hand's (it comes back at the next line that changes a log —
+before, at the next line of any kind); undo past ticks keeps a checkpoint
+taken after the undone event (latent: nothing dispatches ticks); answering a
+hello costs the answering hand the serialisation of its own log on the wire
+(40 ms at 2,000 through the test hub); the shard (`shard-3d/src/room.ts`)
+still merges its room whole on every notify. Whole suite before the last
+commit: core 1,063 in 77 files, typecheck clean, both bundles equal to a fresh
+build; relay, field, build and board tests 75; surface in sync; the canvas MCP
+smoke and the shard's (605 in 31 files, typecheck clean) pass; the gate 464
+passed and the one honest skip (canvas 268, keep 31, boards 19; shard 123 + 11
++ 12); WebKit smoke 4.
+
 ### Phase 1 — the backbone
 **B1 Tools.** *Owns* `metamedium-core/src/tools/` (the contract, the
 registry, adapters for today's tier-1 modules and concept conversions),
@@ -1159,6 +1215,53 @@ changelog and the standalone file. **R8 One platform.** The monoliths and
 `Web App Skeleton/` archived behind their addresses (and out of CI), a docs
 index, a README that is a front page. **R9 The shard alongside.** A built
 shard published beside the canvas and opened from it into the same room.
+
+*R7 status, 27 Sep 2026: built on `w2-shard`, on R4d* — `0cc9805` (red
+first: the gate's `app` scenario and the release script's tests, failing: no
+`app/`, no `VERSION`, no script) … and the commits carrying this line. **The
+app's address is `/app/`, a page and not a redirect** (§12's default):
+`scripts/build-app.mjs` makes `app/index.html` from
+`Demos/session-engine.html` with each file it asks for asked for from `/app/`,
+`app/sw.js` a copy of `Demos/sw.js`, `app/manifest.webmanifest` the old
+address's starting and scoped at `./`; nothing in `app/` is edited, and CI's
+`--check` names what drifted. A redirect could not install there — the shell
+must come from a worker whose scope covers the page, and a worker's scope is
+its own folder at most. The old address is untouched and opens the same
+boards. **One worker, two addresses**: where a copy stands decides its shell
+and its caches; network-first as before, installed past the HTTP cache,
+**its cache named for the release**, dropping only its own old caches (the
+old worker deleted every cache on the origin — both addresses', and every
+project's on the `github.io` host), answering a miss from its own cache only,
+keeping a page once whatever its query, and never keeping a request that
+carries a key. **`VERSION`** (0.0.0: no release yet) is stamped into the
+page's meta, which the help pane leads with, and into the workers' cache
+names. **`scripts/release.mjs <version>`** refuses a dirty tree and a version
+not greater than `VERSION` or any `v<version>` tag (`v1.0-day1` is not one),
+writes `CHANGELOG.md` a section by unit, bumps and stamps, builds the
+standalone file into `dist/release/`, refuses anything key-shaped, commits,
+tags annotated — and never pushes; `--dry-run` writes nothing. `node e2e/run.mjs
+app` (in the gate's default run): 14 records on Chromium and on WebKit — every
+file answering, installable (Chromium's own check), the page *controlled*
+(narrow the scope and A3, A5, B1 fail while Chromium still calls it
+installable), a box kept across a reload the worker served and with the
+server gone, the version in the help pane, no key kept, the old address and
+all 30 published addresses answering (every link and social-card image
+the whitepaper, `404.html` and the README give, and the v4 stub), and a release's first network fetch
+dropping the old shell — beside a control where the cache kept its name and
+the old help came back offline beside the new page. `node --test
+scripts/build-app.test.mjs scripts/release.test.mjs` (17, in CI): semver's
+order, the day-one tag, the unit rule on the real history, a release cut on a
+small repository (one commit, one annotated tag, nothing pushed), its
+refusals, and a dry run on a scratch clone of this repository that changes
+nothing — also in a shallow, detached, tagless checkout like CI's. Not done:
+**nothing is published** — the first release is the director's, on John's
+instruction; its section is the whole history (today 442 commits: 191 under 66
+units, 251 naming none) unless `--since` starts it later. Pages publishes `master` as it stands, so
+between releases the app runs master's code under the last release's number.
+The app's icon is the old address's SVG (Chromium installs with it; no
+`apple-touch-icon` for an iPad's home screen yet — R6's). The WebKit run of
+`app` is not in CI's `webkit` job, which runs the smoke on Linux; it passes
+here on macOS.
 
 ### Phase 7 — review and release
 **H1** — week 1's U7 (the `hand` gate scenario) plus `QA-v1.md`, a hand

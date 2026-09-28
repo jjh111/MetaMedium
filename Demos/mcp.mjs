@@ -80,12 +80,21 @@ const label = (name) => MM.handLabel(name);
 
 // My log is the session's unstamped events — sent or not — never the room's
 // copy of it: a line that lands between a send and the next merge would
-// otherwise count my sent events twice.
-const myLog = () => session.getEvents().filter((e) => !e.by);
+// otherwise count my sent events twice. In the order they were written
+// (`ownLog`), so a send is the new tail, not the whole log again.
+const myLog = () => store.ownLog(session.getEvents());
+// A room merges a line, not the board (V1-PLAN R4d), here as in a tab: the
+// merge stands between lines (`LiveMerge`), is brought up to the logs only
+// when one another hand wrote changed (`revision`), and hands the session
+// what changed — applied after everything held, or replayed from the nearest
+// checkpoint when it falls before.
+const merger = new MM.LiveMerge(session, ME);
+let merged = -1;
 async function merge() {
-  const logs = await store.readLogs();
-  const merged = MM.mergeLogs(Object.assign({}, logs, { [ME]: myLog() }), { me: ME });
-  session.load(merged);
+  const rev = store.revision();
+  if (rev === merged) return;
+  merged = rev;
+  merger.sync(store.heldLogs());
 }
 let mergePending = false;
 const noticed = new Set();

@@ -476,6 +476,14 @@ export interface SessionConfig {
    * throw it.
    */
   logName?: string;
+  /**
+   * How many events apart the reducer's state is snapshotted, so an undo or a
+   * room's merge that cuts back replays from the nearest snapshot rather than
+   * from zero. 200 when unset. No reading depends on it — state is a pure
+   * function of the log however often it is snapshotted — which is what the
+   * room's oracle checks by setting it small.
+   */
+  checkpointEvery?: number;
 }
 
 export const DEFAULT_SESSION_CONFIG: SessionConfig = {
@@ -680,6 +688,40 @@ export interface Session {
    * the innermost is the one stamped; `fn`'s result is returned.
    */
   withTool<T>(toolId: string, fn: () => T, offerKey?: string): T;
+  /**
+   * Keep the first `keep` events of the log and put `tail` after them: what a
+   * live room's merge hands the session when only the end of the merged log
+   * changed (V1-PLAN §9 R4d, `store/livemerge.ts`).
+   *
+   * When nothing is cut — `keep` is the log's length — the tail is APPLIED,
+   * event by event, exactly as `dispatch` applies one: no replay. When
+   * something is, the state goes back to the nearest checkpoint at or before
+   * `keep` and replays from there, never from zero. Either way the log and the
+   * state are what `load` of the whole log would give — state is a pure
+   * function of the log — and subscribers hear it once.
+   *
+   * Unlike `load`, the board is not replaced, so `generation` stands and a
+   * model still thinking about a mark answers about it: an id minted from an
+   * event's authorship names that event's mark however the log is ordered.
+   * Except when the stretch replayed holds an event with no authorship, whose
+   * ids come off the replay's counter and may now name other marks — then it
+   * is bumped, as a load bumps it.
+   *
+   * The events are taken as they are, not copied: the caller hands them over
+   * and does not change them. Nothing is stamped — they were written elsewhere;
+   * their numbers only raise the high-water marks, as a load's do.
+   */
+  rebase(keep: number, tail: readonly SessionEvent[]): RebaseReport;
+}
+
+/** What `rebase` did. */
+export interface RebaseReport {
+  /** Whether anything already applied was cut; false is an append. */
+  cut: boolean;
+  /** Where the state was rebuilt from: the checkpoint gone back to when something was cut, else the old end of the log. */
+  from: number;
+  /** Events applied, from `from` to the new end. */
+  applied: number;
 }
 
 export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): Session {
@@ -752,7 +794,19 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
   // 2,000 marks (PERF.md, hotspot 4). The gestures are small and are mutated
   // in place (a summon's suggestions), so they are cloned outright. Restoring
   // copies again, so a snapshot stays as it was however often it is used.
+  //
+  // It keeps the index too (V1-PLAN §9 R4d) — where the marks are, which are
+  // within reach of which, the components and what they match, as they stood
+  // — because rebuilding all of that from the nodes, then scoring every
+  // component again, cost a 2,000-mark board 10 ms on every restore, and a
+  // room's line that lands a little before the end restores one. The index is
+  // derived and decides no reading, so kept or rebuilt it reads the same; kept,
+  // a replay from a checkpoint finds again only what the replayed events touch.
+  // Only the last few checkpoints keep it — those are the ones a line or an
+  // undo goes back to — and an older one rebuilds it as a restore always did,
+  // so a 5,000-mark board does not hold two dozen copies of its index.
   const CHECKPOINT_EVERY = 200;
+  const checkpointEvery = config.checkpointEvery !== undefined && config.checkpointEvery >= 1 ? Math.floor(config.checkpointEvery) : CHECKPOINT_EVERY;
   let checkpoints: { length: number; snap: Snapshot }[] = [];
 
   interface Snapshot {
@@ -760,6 +814,55 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     clusterCandidates: ClusterCandidate[]; participants: string[]; explanations: string[];
     live: string[]; gestures: Map<string, Gestures>; markHands: Map<string, string>;
     lastAt: number; counter: number; clocks: Record<string, Clock>;
+    /** The index as it stood — kept by the last few checkpoints only. */
+    derived?: Derived;
+  }
+
+  /** The index a snapshot keeps: everything `rebuildDerived` would otherwise find again. */
+  interface Derived {
+    order: Map<string, number>; nextOrder: number; inContent: Set<string>;
+    reach: MarkGrid; ink: MarkGrid; linked: Map<string, Set<string>>;
+    componentOf: Map<string, Component>; matchable: Set<Component>; unsettled: Set<string>;
+    definitionsSeen: Map<string, DefinitionKey>; definitionsChanged: boolean;
+    holding: Set<Component>; holdingInOrder: Component[]; holdingMoved: boolean;
+  }
+
+  /**
+   * A copy of the index that shares nothing either side changes. A component
+   * is changed in place only in its scores and its candidate and whether it is
+   * retired, so each is copied with its own scores; its members and its
+   * signature are never changed and are shared, as the filed boxes are.
+   * `grids`: false leaves the two indexes to the caller, which copies them
+   * into the session's own.
+   */
+  function copyDerived(d: Derived, grids = true): Derived {
+    const copies = new Map<Component, Component>();
+    const cp = (c: Component): Component => {
+      let x = copies.get(c);
+      if (!x) {
+        x = { ...c, scores: new Map(c.scores) };
+        copies.set(c, x);
+      }
+      return x;
+    };
+    const linkedCopy = new Map<string, Set<string>>();
+    for (const [id, set] of d.linked) linkedCopy.set(id, new Set(set));
+    const componentOfCopy = new Map<string, Component>();
+    for (const [id, c] of d.componentOf) componentOfCopy.set(id, cp(c));
+    let reachCopy = d.reach, inkCopy = d.ink;
+    if (grids) {
+      reachCopy = new MarkGrid();
+      reachCopy.copyFrom(d.reach);
+      inkCopy = new MarkGrid();
+      inkCopy.copyFrom(d.ink);
+    }
+    return {
+      order: new Map(d.order), nextOrder: d.nextOrder, inContent: new Set(d.inContent),
+      reach: reachCopy, ink: inkCopy, linked: linkedCopy,
+      componentOf: componentOfCopy, matchable: new Set([...d.matchable].map(cp)), unsettled: new Set(d.unsettled),
+      definitionsSeen: new Map(d.definitionsSeen), definitionsChanged: d.definitionsChanged,
+      holding: new Set([...d.holding].map(cp)), holdingInOrder: d.holdingInOrder.map(cp), holdingMoved: d.holdingMoved,
+    };
   }
 
   /** A node of its own, holding the same reps and edges: they are never changed in place. */
@@ -773,6 +876,10 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       clusterCandidates: clusterCandidates.slice(), participants: participants.slice(),
       explanations: explanations.slice(), live: live.slice(), gestures: structuredClone(gestures),
       markHands: new Map(markHands), lastAt, counter, clocks: { ...clocks },
+      derived: copyDerived({
+        order, nextOrder, inContent, reach, ink, linked, componentOf, matchable, unsettled,
+        definitionsSeen, definitionsChanged, holding, holdingInOrder, holdingMoved,
+      }),
     };
   }
   function restore(s: Snapshot) {
@@ -783,11 +890,45 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     explanations = s.explanations.slice(); live = s.live.slice(); gestures = structuredClone(s.gestures);
     markHands = new Map(s.markHands);
     lastAt = s.lastAt; counter = s.counter; clocks = { ...(s.clocks ?? {}) };
-    rebuildDerived();
+    if (!s.derived) {
+      rebuildDerived();
+      return;
+    }
+    const d = copyDerived(s.derived, false);
+    order = d.order; nextOrder = d.nextOrder; inContent = d.inContent;
+    reach.copyFrom(s.derived.reach); ink.copyFrom(s.derived.ink); linked = d.linked;
+    componentOf = d.componentOf; matchable = d.matchable; unsettled = d.unsettled;
+    definitionsSeen = d.definitionsSeen; definitionsChanged = d.definitionsChanged;
+    holding = d.holding; holdingInOrder = d.holdingInOrder; holdingMoved = d.holdingMoved;
+  }
+
+  /** How many of the latest checkpoints keep the index. */
+  const DERIVED_KEPT = 4;
+  function keepCheckpoint(c: { length: number; snap: Snapshot }) {
+    checkpoints.push(c);
+    for (let i = checkpoints.length - 1 - DERIVED_KEPT; i >= 0 && checkpoints[i].snap.derived; i--) delete checkpoints[i].snap.derived;
   }
   function maybeCheckpoint(length: number) {
-    if (length > 0 && length % CHECKPOINT_EVERY === 0 && !checkpoints.some((c) => c.length === length)) {
-      checkpoints.push({ length, snap: snapshot() });
+    if (length > 0 && length % checkpointEvery === 0 && !checkpoints.some((c) => c.length === length)) {
+      keepCheckpoint({ length, snap: snapshot() });
+    }
+  }
+
+  // A room's line most often lands a LITTLE before the end of the log — this
+  // hand drew a moment later, by the clocks, than the line it now meets — so
+  // `rebase` leaves a checkpoint where it ended, and the next line that cuts
+  // back a little goes back to that one rather than to the last of the
+  // regular ones, up to `checkpointEvery` events further. Only the last few
+  // of these are kept; a regular one is never dropped for them.
+  const END_CHECKPOINTS = 3;
+  function checkpointAtEnd() {
+    const length = events.length;
+    if (length === 0 || checkpoints.some((c) => c.length === length)) return;
+    keepCheckpoint({ length, snap: snapshot() });
+    let kept = 0;
+    for (let i = checkpoints.length - 1; i >= 0; i--) {
+      if (checkpoints[i].length % checkpointEvery === 0) continue;
+      if (++kept > END_CHECKPOINTS) checkpoints.splice(i, 1);
     }
   }
 
@@ -3049,6 +3190,45 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     return dispatch(ev);
   }
 
+  function rebase(keepAt: number, tail: readonly SessionEvent[]): RebaseReport {
+    const keep = Math.max(0, Math.min(Math.floor(Number(keepAt) || 0), events.length));
+    if (keep === events.length && !tail.length) return { cut: false, from: keep, applied: 0 };
+    staleResult = null;
+    // As a load notes them: the next number this sitting writes is past them.
+    for (const ev of tail) if (ev.origin && typeof ev.seq === 'number') sawNumber(ev.origin, ev.seq);
+    let report: RebaseReport;
+    if (keep === events.length) {
+      // Nothing cut: each event applied as `dispatch` applies one.
+      const from = events.length;
+      for (const ev of tail) {
+        events.push(ev);
+        applyEvent(ev);
+        maybeCheckpoint(events.length);
+      }
+      report = { cut: false, from, applied: tail.length };
+    } else {
+      // Something cut: back to the nearest checkpoint that holds none of it.
+      // A checkpoint past `keep` was taken with events the new log does not
+      // have there, so it is dropped before the replay can use it.
+      checkpoints = checkpoints.filter((c) => c.length <= keep);
+      if (tail.some((ev) => mintKeyOf(ev) === null)) generation++;
+      events = events.slice(0, keep).concat(tail);
+      const from = checkpoints.length ? checkpoints[checkpoints.length - 1].length : 0;
+      replay();
+      report = { cut: true, from, applied: events.length - from };
+    }
+    checkpointAtEnd();
+    // A host that never said what its log is called: the name this log
+    // remembers, as a load reads it (the last of my own events' names).
+    if (!logNameSaid) {
+      let remembered: string | undefined;
+      for (const ev of events) if (!ev.by && ev.origin) remembered = ev.origin;
+      if (remembered !== undefined) myLog = remembered;
+    }
+    notify();
+    return report;
+  }
+
   function undo() {
     // Drop the most recent meaningful input and rebuild. Ticks are not
     // user actions, so they're skipped over (but kept in the log).
@@ -3209,6 +3389,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       replay();
       notify();
     },
+    rebase,
     getState,
     subscribe,
     getEvents: () => events,

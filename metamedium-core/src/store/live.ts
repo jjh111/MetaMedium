@@ -9,10 +9,20 @@
 //
 // The transport is the only thing that varies: a BroadcastChannel between
 // tabs on one machine, a relay that forwards lines between machines, or the
-// in-memory hub the tests use. A newcomer says hello and every peer answers
-// with every log it holds — its own, and every other hand's it has heard —
-// so history is caught up the way a pull would, even for a hand that has
-// since left the room.
+// in-memory hub the tests use. A newcomer says hello and is answered with
+// each log ONCE (V1-PLAN §9 R4d): every hand answers for its own, and a copy
+// of a log is handed on only when its writer cannot answer for itself — it
+// said goodbye as it left, or it stayed silent when asked — by the first of
+// the hands that hold one, the others hearing it go. So history is caught up
+// the way a pull would, even for a hand that has since left the room, without
+// every hand sending every log it holds to every other.
+//
+// A reader merges only when a log it holds changed (`revision`), and reads the
+// logs as they are held (`heldLogs`) — an array is only ever appended to or
+// replaced whole, so an append can be told from a replacement by identity
+// alone, and `LiveMerge` (livemerge.ts) takes a line without reading the rest.
+// A whole log equal to the one held changes nothing, and one that only
+// extends it is taken as an append.
 //
 // Ids that hold (DIRECTOR-PLAN-W2 L1). A hand's log is ONE SITTING — a tab's
 // page load, a process — under a name of its own (`sittingName`, in
@@ -25,7 +35,7 @@
 import type { SessionEvent } from '../session/session';
 import { sittingToken } from '../session/hands';
 import { type Store, type Entry, type Capabilities, ReadOnlyError } from './seam';
-import { mergeLogs, describeAuthorshipCollision } from './merge';
+import { describeAuthorshipCollision, authorKey as eventAuthorship, sameEvent, atOf } from './merge';
 
 /** One line on the wire: a participant's events, or a hello, or a whole log in answer to one. */
 export interface LiveLine {
@@ -62,6 +72,12 @@ export interface LiveLine {
    * the absent writer's.
    */
   via?: string;
+  /**
+   * The writer is leaving (its store closed). Its log stays held everywhere;
+   * it is only no longer here to answer a hello for it, so the hands that
+   * hold a copy do.
+   */
+  bye?: boolean;
 }
 
 /**
@@ -96,10 +112,33 @@ export interface LiveStoreOptions {
    * one, or its own earlier lines, replayed by a relay, read as a second hand.
    */
   sitting?: string;
+  /**
+   * How the store waits: run `fn` after `ms`, and return how to cancel it.
+   * A timer by default; a test passes its own clock.
+   */
+  later?: (fn: () => void, ms: number) => () => void;
 }
 
 /** How long a line that has not yet gone holds back the next one. */
 export const SEND_WAIT_MS = 10_000;
+
+/**
+ * How long a hand that holds a copy of another hand's log waits, after a
+ * hello, for that hand to answer for itself before handing the copy on. A
+ * writer that said goodbye is not waited for.
+ */
+export const COVER_WAIT_MS = 1500;
+/**
+ * How much longer each further hand that holds a copy waits: the first, by
+ * name, goes first, and the rest hear its copy go and send none.
+ */
+export const COVER_STAGGER_MS = 200;
+
+const timer = (fn: () => void, ms: number): (() => void) => {
+  const t = setTimeout(fn, ms);
+  (t as unknown as { unref?: () => void }).unref?.();
+  return () => clearTimeout(t);
+};
 
 export interface Presence {
   participant: string;
@@ -125,8 +164,21 @@ export class LiveStore implements Store {
    * logs held here (the merge's collision, L1b): one sentence per name.
    */
   private misnumbered = new Map<string, string>();
-  /** Whether the logs held here changed since they were last read for `misnumbered`. */
-  private logsChanged = false;
+  /** Every held event under its authorship — the log, its place there — to find two different events numbered alike as they land. */
+  private numbered = new Map<string, { name: string; i: number; ev: SessionEvent }[]>();
+  /** Moves whenever a log another hand wrote changes here. */
+  private rev = 0;
+  /** Lines heard, counted, to say what was heard since a hello. */
+  private heard = 0;
+  /** When each log was last heard from its writer, and last handed on by another hand, in lines heard. */
+  private fromWriter = new Map<string, number>();
+  private fromCopy = new Map<string, number>();
+  /** Writers that said goodbye and have not been heard since. */
+  private gone = new Set<string>();
+  /** Copies waiting to be handed on, should their writers not answer. */
+  private waiting = new Set<() => void>();
+  private closed = false;
+  private readonly later: (fn: () => void, ms: number) => () => void;
   /** The relay's word that this room is older than its buffer. */
   private truncated: RelayNotice | null = null;
   /** Whether this store has put MY log on the wire yet, in any form. */
@@ -139,6 +191,7 @@ export class LiveStore implements Store {
 
   constructor(private transport: LiveTransport, readonly me: string, readonly room: string = 'room', opts: LiveStoreOptions = {}) {
     this.sitting = opts.sitting || sittingToken(8);
+    this.later = opts.later || timer;
     this.logs[me] = [];
     this.off = transport.onMessage((line) => this.receive(line));
   }
@@ -155,8 +208,11 @@ export class LiveStore implements Store {
   async appendLog(participant: string, events: readonly SessionEvent[]): Promise<void> {
     if (!events.length) return;
     const log = (this.logs[participant] ??= []);
-    log.push(...events);
-    this.logsChanged = true;
+    for (const ev of events) {
+      this.number(participant, log.length, ev);
+      log.push(ev);
+    }
+    if (participant !== this.me) this.rev++;
     if (participant === this.me) this.published = true;
     await this.post({ participant, events: events.slice(), at: this.stamp(), sid: this.sitting });
   }
@@ -174,13 +230,36 @@ export class LiveStore implements Store {
   async publish(events: readonly SessionEvent[]): Promise<void> {
     const sent = this.logs[this.me];
     if (this.published && extendsLog(sent, events)) {
+      // Held as the session holds them from here — a load copies every event —
+      // so the next look finds them by identity alone.
+      for (let i = 0; i < sent.length; i++) {
+        if (sent[i] !== events[i]) {
+          this.logs[this.me] = events.slice(0, sent.length);
+          break;
+        }
+      }
       if (events.length > sent.length) await this.appendLog(this.me, events.slice(sent.length));
       return;
     }
     this.published = true;
+    this.unnumber(this.me);
     this.logs[this.me] = events.slice();
-    this.logsChanged = true;
+    this.logs[this.me].forEach((ev, i) => this.number(this.me, i, ev));
     await this.post({ participant: this.me, events: events.slice(), at: this.stamp(), full: true, sid: this.sitting });
+  }
+
+  /**
+   * My log as it stands, from the session's events: what was sent, less what
+   * the session no longer holds (an undo, a reset), then what it holds of its
+   * own that was never sent, in the order it holds them. The order it was
+   * WRITTEN in, never the merge's: a mark stamped a moment earlier by the clock
+   * than one before it would otherwise reshuffle the log, and the next send be
+   * the whole of it instead of its tail. Found by identity and authorship — an
+   * event is its authorship (L1b) — and by what it says only for an event
+   * written before there was any, whose object a load has since copied.
+   */
+  ownLog(events: readonly SessionEvent[]): SessionEvent[] {
+    return ownLog(this.logs[this.me], events);
   }
 
   async readLogs(): Promise<Record<string, SessionEvent[]>> {
@@ -189,7 +268,27 @@ export class LiveStore implements Store {
     return out;
   }
 
-  /** Ask the room for its logs; every peer answers with every log it holds, in full. */
+  /**
+   * The logs as held, not copied — for a reader that merges a line at a time
+   * (`LiveMerge`). An array here is only ever appended to or replaced whole,
+   * never changed in place, so the same array longer is an append of its
+   * tail. Read them; never change them.
+   */
+  heldLogs(): Readonly<Record<string, readonly SessionEvent[]>> {
+    return this.logs;
+  }
+
+  /**
+   * Moves whenever a log another hand wrote changes here — an append that
+   * added an event, a whole log that is not the one held. A line with no
+   * events (a hello, a goodbye, the relay's word) and a whole log equal to the
+   * one held leave it where it was, and a reader that merges on it does no work.
+   */
+  revision(): number {
+    return this.rev;
+  }
+
+  /** Ask the room for its logs: every hand answers with its own, and with a copy of any whose writer cannot answer. */
   hello(): void {
     void this.post({ participant: this.me, events: [], at: this.stamp(), hello: true, sid: this.sitting });
   }
@@ -223,19 +322,11 @@ export class LiveStore implements Store {
    * here — one sentence per name. The same event heard in two logs is one
    * event, and the merge folds it without a word; two events under one
    * authorship are two writers under one name, and the merge keeps the first
-   * (L1b). Read when asked, from the logs as they stand, and remembered once
-   * said, like a name collision.
+   * (L1b). Found as each event lands, against the others held under its
+   * authorship — never by merging the room again — and remembered once said,
+   * like a name collision.
    */
   misnumberings(): string[] {
-    if (this.logsChanged) {
-      this.logsChanged = false;
-      mergeLogs(this.logs, {
-        me: this.me,
-        onCollision: (c) => {
-          if (!this.misnumbered.has(c.origin)) this.misnumbered.set(c.origin, describeAuthorshipCollision(c));
-        },
-      });
-    }
     return [...this.misnumbered.values()];
   }
 
@@ -260,7 +351,17 @@ export class LiveStore implements Store {
     return () => { this.listeners = this.listeners.filter((l) => l !== cb); };
   }
 
+  /**
+   * Leave the room: a goodbye first, so the hands that hold this hand's log
+   * know it is no longer here to answer for it, and hand a copy on to the next
+   * newcomer themselves. Then nothing more is heard or sent.
+   */
   close(): void {
+    if (this.closed) return;
+    this.closed = true;
+    for (const cancel of this.waiting) cancel();
+    this.waiting.clear();
+    void this.post({ participant: this.me, events: [], at: this.stamp(), bye: true, sid: this.sitting });
     if (this.off) this.off();
     this.off = null;
     if (this.transport.close) this.transport.close();
@@ -308,21 +409,54 @@ export class LiveStore implements Store {
   }
 
   /**
-   * Answer a hello: my own log, and every other log held — each still marked
-   * with the sitting that wrote it and the newest line of it applied here — so
-   * a hand that has left is caught up by the hands that stayed.
+   * Answer a hello — each log once (V1-PLAN §9 R4d). My own log, at once:
+   * every hand answers for its own. A copy of another hand's log only when
+   * that hand cannot answer for itself: at once when it said goodbye, else
+   * after `COVER_WAIT_MS`, when it has stayed silent — and only if no copy has
+   * gone from another hand by then. The hands that hold a copy go in the order
+   * of their names, `COVER_STAGGER_MS` apart, so the first one's copy is heard
+   * by the rest and they send none. The asker's own log is never handed back.
+   * `ownOnly`: a hello from a second hand under my own name, which only needs
+   * to hear that I am here.
    */
-  private answer(): void {
+  private answer(asker: string, ownOnly = false): void {
     void this.post({ participant: this.me, events: this.logs[this.me].slice(), at: this.stamp(), full: true, sid: this.sitting });
-    for (const [name, events] of Object.entries(this.logs)) {
-      if (name === this.me) continue;
-      const at = this.applied.get(name);
-      if (at === undefined) continue;
-      const line: LiveLine = { participant: name, events: events.slice(), at, full: true, via: this.me };
-      const sid = this.sittings.get(name);
-      if (sid) line.sid = sid;
-      void this.post(line);
+    if (ownOnly) return;
+    const asked = this.heard;
+    const copies = Object.keys(this.logs).filter((n) => n !== this.me && n !== asker && this.applied.has(n));
+    if (!copies.length) return;
+    // Who could hand a copy on: the hands whose logs are held here and have
+    // not said goodbye, and this one. Every holder counts the same hands, so
+    // each has its own place in the order.
+    const hands = [...new Set(Object.keys(this.logs).concat(this.me))].filter((n) => n === this.me || (!this.gone.has(n) && n !== asker)).sort();
+    const place = hands.indexOf(this.me) * COVER_STAGGER_MS;
+    this.cover(copies.filter((n) => this.gone.has(n)), asked, place);
+    this.cover(copies.filter((n) => !this.gone.has(n)), asked, COVER_WAIT_MS + place);
+  }
+
+  /** Hand on each of `names` after `ms`, unless its writer or another hand has answered for it since the hello. */
+  private cover(names: string[], asked: number, ms: number): void {
+    if (!names.length) return;
+    const go = () => {
+      for (const name of names) {
+        if ((this.fromWriter.get(name) ?? -1) > asked || (this.fromCopy.get(name) ?? -1) > asked) continue;
+        const at = this.applied.get(name);
+        if (at === undefined) continue;
+        const line: LiveLine = { participant: name, events: this.logs[name].slice(), at, full: true, via: this.me };
+        const sid = this.sittings.get(name);
+        if (sid) line.sid = sid;
+        void this.post(line);
+      }
+    };
+    if (ms <= 0) {
+      go();
+      return;
     }
+    const cancel = this.later(() => {
+      this.waiting.delete(cancel);
+      if (!this.closed) go();
+    }, ms);
+    this.waiting.add(cancel);
   }
 
   private collide(name: string, sentence: string): void {
@@ -332,7 +466,7 @@ export class LiveStore implements Store {
   }
 
   private receive(raw: LiveLine | RelayNotice | null | undefined): void {
-    if (!raw || typeof raw !== 'object') return;
+    if (this.closed || !raw || typeof raw !== 'object') return;
     if ((raw as RelayNotice).relay === 'truncated') {
       const n = raw as RelayNotice;
       this.truncated = { relay: 'truncated', room: n.room, dropped: Math.max(0, Number(n.dropped) || 0), kept: n.kept };
@@ -359,9 +493,10 @@ export class LiveStore implements Store {
       this.collide(this.me, `two hands are both called "${this.me}" — this one, and another writing under its name; neither is taken for the other, so reload one to give it a new name`);
       // Answered all the same: my own log, from my sitting, is how the other
       // hand learns it shares a name with me.
-      if (line.hello) this.answer();
+      if (line.hello) this.answer(line.participant, true);
       return;
     }
+    this.heard++;
     if (from !== this.me) this.seen.set(from, Date.now());
     if (sid) {
       const known = this.sittings.get(line.participant);
@@ -370,13 +505,29 @@ export class LiveStore implements Store {
         // Keep what was heard first — refusing is the only answer that cannot
         // lose work — and say so.
         this.collide(line.participant, `two hands are both called "${line.participant}" — the one heard first is kept and the other's lines are refused; reload one to give it a new name`);
-        if (line.hello) this.answer();
+        if (line.hello) this.answer('');
         return;
       }
     }
+    if (line.bye) {
+      // A hand leaving. Its log stays held; it is only no longer here to
+      // answer for it — and no longer here.
+      if (!line.via) {
+        this.gone.add(line.participant);
+        this.seen.delete(line.participant);
+      }
+      this.notify(line.participant, []);
+      return;
+    }
+    // Who answered for this log, and when: its writer, or a copy another hand handed on.
+    if (line.via) this.fromCopy.set(line.participant, this.heard);
+    else {
+      this.fromWriter.set(line.participant, this.heard);
+      this.gone.delete(line.participant);
+    }
     if (line.hello) {
-      // Answer with every log held, so the newcomer has what a pull would give.
-      this.answer();
+      // Answered with each log once, so the newcomer has what a pull would give.
+      this.answer(line.participant);
       this.notify(line.participant, []);
       return;
     }
@@ -402,10 +553,31 @@ export class LiveStore implements Store {
         }
       }
       // From its own sitting a log may be anything: its writer undid, reset or
-      // rewrote it, and what it sends is what it holds.
-      this.logs[line.participant] = events.slice();
-      this.logsChanged = true;
-      this.carried.set(line.participant, new Set(events.map(authorKey).filter((k): k is string => k !== null)));
+      // rewrote it, and what it sends is what it holds. What it holds is most
+      // often what is held here already — every answer to a hello is a whole
+      // log — and then nothing changes; a whole log that only runs on past
+      // what is held is taken as the append it amounts to.
+      const was = held ? prefixOf(held, events) : -1;
+      if (held && was === held.length) {
+        if (events.length > held.length) {
+          const keys = this.carried.get(line.participant) ?? new Set<string>();
+          this.carried.set(line.participant, keys);
+          for (let i = held.length; i < events.length; i++) {
+            const k = authorKey(events[i]);
+            if (k !== null) keys.add(k);
+            this.number(line.participant, held.length, events[i]);
+            held.push(events[i]);
+          }
+          this.rev++;
+        }
+      } else {
+        this.unnumber(line.participant);
+        this.logs[line.participant] = events.slice();
+        this.logs[line.participant].forEach((ev, i) => this.number(line.participant, i, ev));
+        this.carried.set(line.participant, new Set(events.map(authorKey).filter((k): k is string => k !== null)));
+        // A newcomer's empty log, where none was held, changes no board.
+        if (held || events.length) this.rev++;
+      }
     } else {
       // An event already held — one a newcomer was handed in a peer's copy
       // before the writer's own line reached it — is held once. Only an event
@@ -414,18 +586,68 @@ export class LiveStore implements Store {
       const log = (this.logs[line.participant] ??= []);
       let keys = this.carried.get(line.participant);
       if (!keys) this.carried.set(line.participant, (keys = new Set()));
+      let added = 0;
       for (const ev of events) {
         const k = authorKey(ev);
         if (k !== null) {
           if (keys.has(k)) continue;
           keys.add(k);
         }
+        this.number(line.participant, log.length, ev);
         log.push(ev);
-        this.logsChanged = true;
+        added++;
       }
+      if (added) this.rev++;
     }
     this.applied.set(line.participant, Math.max(this.applied.get(line.participant) ?? 0, at));
     this.notify(line.participant, events);
+  }
+
+  /**
+   * Hold an event under its authorship, and say it when a DIFFERENT event is
+   * already held under the same one: two writers under one name (L1b). Which
+   * is kept is the merge's rule — the reader's own log first, else the first
+   * in the merge's order — so the sentence is the one the merge would say.
+   */
+  private number(name: string, i: number, ev: SessionEvent): void {
+    const k = eventAuthorship(ev);
+    if (k === null) return;
+    const mine = { name, i, ev };
+    const list = this.numbered.get(k);
+    if (!list) {
+      this.numbered.set(k, [mine]);
+      return;
+    }
+    const origin = ev.origin as string;
+    for (const other of list) {
+      if (this.misnumbered.has(origin)) break;
+      if (sameEvent(other.ev, ev)) continue;
+      const [kept, dropped] = this.keeps(other, mine) ? [other, mine] : [mine, other];
+      this.misnumbered.set(origin, describeAuthorshipCollision({ origin, seq: ev.seq as number, kept: kept.name, dropped: dropped.name }));
+    }
+    list.push(mine);
+  }
+
+  /** A log's events, no longer held under their authorship: it is about to be replaced. */
+  private unnumber(name: string): void {
+    for (const ev of this.logs[name] ?? []) {
+      const k = eventAuthorship(ev);
+      if (k === null) continue;
+      const list = this.numbered.get(k);
+      if (!list) continue;
+      const rest = list.filter((x) => x.name !== name);
+      if (rest.length) this.numbered.set(k, rest);
+      else this.numbered.delete(k);
+    }
+  }
+
+  /** Whether the merge keeps `a` over `b`, two copies of one authorship: the reader's own, else the first in the merge's order. */
+  private keeps(a: { name: string; i: number; ev: SessionEvent }, b: { name: string; i: number; ev: SessionEvent }): boolean {
+    if ((a.name === this.me) !== (b.name === this.me)) return a.name === this.me;
+    const ta = atOf(a.ev), tb = atOf(b.ev);
+    if (ta !== tb) return ta < tb;
+    if (a.name !== b.name) return a.name < b.name;
+    return a.i < b.i;
   }
 
   private notify(participant: string, events: SessionEvent[]): void {
@@ -457,11 +679,59 @@ function eventKey(ev: SessionEvent): string {
   return s;
 }
 
+/** A hand's log as it stands: see `LiveStore.ownLog`. */
+export function ownLog(sent: readonly SessionEvent[], events: readonly SessionEvent[]): SessionEvent[] {
+  const own = events.filter((e) => !e.by);
+  const objects = new Set<SessionEvent>(own);
+  const byKey = new Map<string, SessionEvent>();
+  let words: Map<string, SessionEvent> | null = null;
+  for (const e of own) {
+    const k = authorKey(e);
+    if (k !== null) byKey.set(k, e);
+  }
+  const taken = new Set<SessionEvent>();
+  const out: SessionEvent[] = [];
+  for (const e of sent) {
+    let now: SessionEvent | undefined;
+    if (objects.has(e)) now = e;
+    else {
+      const k = authorKey(e);
+      if (k !== null) now = byKey.get(k);
+      else {
+        if (!words) {
+          words = new Map();
+          for (const x of own) if (authorKey(x) === null) words.set(eventKey(x), x);
+        }
+        now = words.get(eventKey(e));
+      }
+    }
+    if (now && !taken.has(now)) {
+      taken.add(now);
+      out.push(now);
+    }
+  }
+  for (const e of own) if (!taken.has(e)) out.push(e);
+  return out;
+}
+
+/** Whether two events in the same place of one log are one event: the same object, or the same authorship (or, with none, the same words). */
+function sameAt(a: SessionEvent, b: SessionEvent): boolean {
+  return a === b || (a.type === b.type && eventKey(a) === eventKey(b));
+}
+
 /** Whether `now` is `sent` with events added after it and nothing before them changed. */
 function extendsLog(sent: readonly SessionEvent[], now: readonly SessionEvent[]): boolean {
   if (now.length < sent.length) return false;
-  for (let i = 0; i < sent.length; i++) if (eventKey(sent[i]) !== eventKey(now[i])) return false;
+  for (let i = 0; i < sent.length; i++) if (!sameAt(sent[i], now[i])) return false;
   return true;
+}
+
+/** How many of `held`'s events `incoming` begins with. `held.length` when it begins with all of them. */
+function prefixOf(held: readonly SessionEvent[], incoming: readonly SessionEvent[]): number {
+  const n = Math.min(held.length, incoming.length);
+  let i = 0;
+  while (i < n && sameAt(held[i], incoming[i])) i++;
+  return i;
 }
 
 /**

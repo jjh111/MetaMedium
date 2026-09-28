@@ -1390,6 +1390,31 @@ window.__scenario = async function(){
       /two different events are both "dora~d1" number 1 — the one in dora~d1's log is kept and the one in eve~e1's is left out/.test(standing28())
         && st28k.contentIds.filter(id => id === doraBox).length === 1 && st28k.contentIds.length === before28j + 1,
       { standing: standing28(), content: st28k.contentIds.length, was: before28j });
+    // A room merges a line, not the board (V1-PLAN R4d). Dora draws again,
+    // later than anything on this board: her line is APPLIED — the board's log
+    // is the same log, one event longer, and nothing asked of it before stays
+    // unanswerable — rather than the whole room merged and replayed from zero.
+    const told28 = { n: 0 };
+    const off28 = mm.session.subscribe(() => { told28.n++; });
+    const log28l = mm.session.getEvents(), len28l = log28l.length, gen28l = mm.session.getState().generation;
+    const dora2 = dora.addStroke(t.rect(900, 320, 120, 80).map(p => ({ x: p.x, y: p.y })), Date.now() + 60000);
+    deliver28({ participant: 'dora~d1', events: dora.getEvents().slice(-1), at: 8000, sid: 'sitting-d' });
+    for (let i = 0; i < 30 && !mm.session.getState().contentIds.includes(dora2); i++) await wait(50);
+    step('28l. a line that lands after everything on the board is applied, not the board replayed: the same log one event longer, the board not replaced',
+      mm.session.getState().contentIds.includes(dora2) && mm.session.getEvents() === log28l && mm.session.getEvents().length === len28l + 1 && mm.session.getState().generation === gen28l,
+      { landed: mm.session.getState().contentIds.includes(dora2), sameLog: mm.session.getEvents() === log28l, events: mm.session.getEvents().length, was: len28l, generation: mm.session.getState().generation, gen: gen28l });
+    // Lines that change no log do no work: a newcomer's hello, the relay's
+    // word, a whole log this board already holds. The board is not merged,
+    // not replayed, and its subscribers — the paint among them — are not told.
+    const told28m = told28.n;
+    deliver28({ participant: 'zed~z1', events: [], at: 9000, hello: true, sid: 'sitting-z' });
+    deliver28({ relay: 'truncated', room: 'elsewhere', dropped: 13, kept: 5000 });
+    deliver28({ participant: 'dora~d1', events: dora.getEvents().slice(), at: 9500, full: true, sid: 'sitting-d' });
+    await wait(150);
+    step('28m. a hello, the relay\'s word and a whole log already held do no work — the board untouched, the paint not asked',
+      told28.n === told28m && mm.session.getEvents() === log28l && mm.session.getEvents().length === len28l + 1 && /13 earlier lines are gone/.test(standing28()),
+      { told: told28.n - told28m, sameLog: mm.session.getEvents() === log28l, standing: standing28() });
+    off28();
     if (mm.folder().store && mm.folder().store.close) mm.folder().store.close();
     mm.session.load([]);
   }

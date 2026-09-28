@@ -14,7 +14,7 @@ exits nonzero if anything in it failed.
 
 ```bash
 cd e2e && npm ci && npx playwright install chromium   # once
-node run.mjs            # from anywhere: the default seven (canvas, keep, boards, budgets, shard, demo, demo2)
+node run.mjs            # from anywhere: the default eight (canvas, keep, boards, app, budgets, shard, demo, demo2)
 cd e2e && npm run e2e   # the same thing
 
 npx playwright install webkit                   # once, for the smoke
@@ -36,13 +36,14 @@ guessing. Pick scenarios by name to run one: `node e2e/run.mjs canvas`,
 | `keep` | no lost work — `keep.mjs`, written here, not a page harness | `Demos/session-engine.html?nosw=1`, in several contexts of its own |
 | `boards` | several named boards — `boards.mjs`, written here, the boards pane driven with the real pointer | `Demos/session-engine.html?nosw=1`, in one context, with a second and third tab |
 | `big` | a 2,000-mark board saved and opened again (opt-in, minutes) | the same page, with the board from `metamedium-core/bench/board.mjs` |
+| `app` | one app address — `app.mjs`, written here: `/app/` installs, opens with the server gone, and is versioned per release | `app/` over the static server, then a server of its own it can take away, then a copy of the site it releases again |
 | `budgets` | the surface's budgets and the equivalence check — `budgets.mjs`, written here, not a page harness | `Demos/session-engine.html?folder=…`, the bench's boards served from memory, a context each |
 
 `--browser chromium` (the default) or `--browser webkit` picks the engine, and
 the run's `e2e.json` records which as `browser` / `browserVersion`. `smoke` is
-**opt-in**: a bare `node run.mjs` runs the seven Chromium scenarios (`canvas`,
-`keep`, `boards`, `budgets`, `shard`, `demo`, `demo2`) and nothing else, so the
-default gate needs no second engine installed.
+**opt-in**: a bare `node run.mjs` runs the eight Chromium scenarios (`canvas`,
+`keep`, `boards`, `app`, `budgets`, `shard`, `demo`, `demo2`) and nothing else,
+so the default gate needs no second engine installed.
 
 ### The WebKit smoke, and what it is not
 
@@ -152,6 +153,46 @@ page's `IDBObjectStore.add` throws a real `QuotaExceededError`, both engines) is
 never left without a word — the switch refused in the pane with its ways out,
 nothing the store held lost while writes fail, and the switch going once a save
 lands. About 15 s, on Chromium and WebKit.
+
+### One app address: `app`
+
+`app.mjs` (V1-PLAN R7) is the app at `/app/` — made from the old address by
+`scripts/build-app.mjs` — asked what a person installing it would find, with
+the real pointer where it draws. Fourteen records, about ten seconds, the same
+on Chromium and WebKit (`--browser webkit app`):
+
+- **On the gate's own static server** (A1–A11): every file `/app/` asks for
+  answers and its stylesheet applies; the manifest it links starts and is
+  scoped at `/app/`, and Chromium's own installability check (the DevTools
+  protocol's `Page.getInstallabilityErrors`) finds nothing in the way; the
+  worker's scope is `/app/` **and the page is controlled by it** — a worker
+  registered at a narrower scope registers without a word and controls
+  nothing, while Chromium still calls the page installable, so the scope is
+  what is tested (narrow it, and A3, A5 and B1 fail); a box drawn is kept,
+  and comes back on a reload the worker served; `?fresh=1` and `?board=` are
+  read there, and `/app?board=` lands on `/app/?board=` (the static server
+  sends a folder asked for without its slash to it, query and all, as Pages
+  does); the help pane says `VERSION`; a same-origin request carrying
+  `Authorization` — or asking for an event stream — is never kept, while the
+  same request without one is; the old address opens as it did, with its own
+  worker at `/Demos/`, on the same board; that worker keeps to its own caches;
+  and every address the whitepaper, `404.html` and the README give into the
+  site still answers — each link, the social card's image, the root, a
+  replay's recording with the page that plays it, and the v4 whitepaper's
+  redirect stub.
+- **With the server gone** (B1): a server of its own over the repository,
+  one visit, a box drawn, the server stopped — connection refused — and
+  `/app/` reloads from its worker's cache with the box on the board, and an
+  address it never saw online opens too. Not Playwright's offline switch: in
+  WebKit that fails a request before the worker can answer it.
+- **A release** (C1, C2): a copy of the site, visited once; then the next
+  version made over the copy as the release script makes it (`VERSION`
+  bumped, `scripts/build-app.mjs` run) with the help's text changed; one
+  online reload; the server gone. The page, its version line and its help
+  are the new release's, and the old release's cache is gone. **C2 is the
+  control**: the same release with the worker put back as it was, so its
+  cache keeps its name — and offline the new page comes back beside the
+  **old** help, the stale shell a cache named for the release prevents.
 
 ## What it refuses to do
 

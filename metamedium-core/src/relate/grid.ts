@@ -120,6 +120,27 @@ export class MarkGrid {
     this.filed.clear();
   }
 
+  /**
+   * Become a copy of `other`: the same marks filed the same way, sharing
+   * nothing either will change — a filed box is never changed in place, so
+   * those are shared. For a checkpoint, which keeps the index as it stood.
+   */
+  copyFrom(other: MarkGrid): void {
+    this.levels = new Map();
+    for (const [level, xs] of other.levels) {
+      const xs2 = new Map<number, Map<number, Set<string>>>();
+      for (const [cx, ys] of xs) {
+        const ys2 = new Map<number, Set<string>>();
+        for (const [cy, here] of ys) ys2.set(cy, new Set(here));
+        xs2.set(cx, ys2);
+      }
+      this.levels.set(level, xs2);
+    }
+    this.counts = new Map();
+    for (const [level, c] of other.counts) this.counts.set(level, { marks: c.marks, cells: c.cells });
+    this.filed = new Map(other.filed);
+  }
+
   /** Every mark whose box meets `box` (edges touching count), in no particular order. */
   query(box: Bounds): string[] {
     const out: string[] = [];

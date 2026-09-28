@@ -36,3 +36,7 @@ e2e/results/
 # A trailing slash matches directories only; a symlinked node_modules slipped
 # past it once (diagrams-visible-states), so ignore the name however it is made.
 node_modules
+
+# A release's standalone file (scripts/release.mjs): attached to the GitHub
+# release, never committed.
+/dist/

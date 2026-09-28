@@ -16,6 +16,7 @@ const TYPES = {
   '.mjs': 'text/javascript; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
   '.json': 'application/json; charset=utf-8',
+  '.webmanifest': 'application/manifest+json; charset=utf-8',
   '.svg': 'image/svg+xml',
   '.png': 'image/png',
   '.jpg': 'image/jpeg',
@@ -46,6 +47,14 @@ export async function startStatic(root) {
       pathname = decodeURIComponent(new URL(req.url, 'http://127.0.0.1').pathname);
     } catch {
       res.writeHead(400).end('bad path');
+      return;
+    }
+    // A folder asked for without its slash is sent to it, query and all, as GitHub Pages
+    // sends /MetaMedium/app?board=… to /MetaMedium/app/?board=… (V1-PLAN R7).
+    const folderAt = join(base, normalize(pathname).replace(/^(\.\.[/\\])+/, ''));
+    if (!pathname.endsWith('/') && folderAt.startsWith(base) && existsSync(folderAt) && statSync(folderAt).isDirectory()) {
+      const u = new URL(req.url, 'http://127.0.0.1');
+      res.writeHead(301, { location: u.pathname + '/' + u.search, 'cache-control': 'no-store' }).end();
       return;
     }
     if (pathname.endsWith('/')) pathname += 'index.html';

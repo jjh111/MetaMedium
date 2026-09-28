@@ -130,7 +130,7 @@ function foldAuthorship(tagged: readonly Tagged[], opts: MergeOptions): Tagged[]
  * identity to fold by. The same well-formedness the session mints ids by: a
  * name and a whole, non-negative number.
  */
-function authorKey(ev: SessionEvent): string | null {
+export function authorKey(ev: SessionEvent): string | null {
   if (typeof ev.origin !== 'string' || !ev.origin) return null;
   if (typeof ev.seq !== 'number' || !Number.isSafeInteger(ev.seq) || ev.seq < 0) return null;
   return `${ev.origin}#${ev.seq}`;
@@ -142,7 +142,7 @@ function authorKey(ev: SessionEvent): string | null {
  * are compared in a fixed order, so two copies that took different routes
  * (a relay, a file, a peer's answer to a hello) still compare as written.
  */
-function sameEvent(a: SessionEvent, b: SessionEvent): boolean {
+export function sameEvent(a: SessionEvent, b: SessionEvent): boolean {
   if (a === b) return true;
   return canonical(a, true) === canonical(b, true);
 }
@@ -156,6 +156,13 @@ function canonical(v: unknown, top = false): string {
   return '{' + keys.map((k) => JSON.stringify(k) + ':' + canonical(o[k])).join(',') + '}';
 }
 
-function atOf(ev: SessionEvent): number {
-  return 'at' in ev && typeof ev.at === 'number' ? ev.at : 0;
+/**
+ * When an event happened, for the merge's order: its `at`, or 0 when it has
+ * none — or one that is not a number, NaN included, which would make the order
+ * no order at all (a comparison with NaN is neither less nor more), and the
+ * same logs could merge two ways. The incremental merge (`livemerge.ts`)
+ * orders by this too, so the two agree on every log, well formed or not.
+ */
+export function atOf(ev: SessionEvent): number {
+  return 'at' in ev && typeof ev.at === 'number' && !Number.isNaN(ev.at) ? ev.at : 0;
 }

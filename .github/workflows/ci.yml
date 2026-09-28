@@ -60,6 +60,18 @@ jobs:
       # which board a page opens and whether the one on screen may be left.
       - name: The boards list, on its own
         run: node --test ../Demos/surface/17-boards.test.mjs
+      # The app at /app/ (V1-PLAN R7): its page, its worker and its manifest
+      # are made from the old address's, and VERSION is stamped into the page
+      # and into both workers' caches — what is committed must be that build.
+      - name: The app and its version, in sync
+        run: node ../scripts/build-app.mjs --check
+      # …and the build and the release script on their own: versions in
+      # semver's order, the changelog by unit, a real release cut on a small
+      # repository made for it (a commit and an annotated tag, nothing pushed),
+      # what it refuses, and a dry run on a scratch clone of this checkout.
+      # Git runs there with a configuration of its own and a test identity.
+      - name: The app's build and the release script, on their own
+        run: node --test ../scripts/build-app.test.mjs ../scripts/release.test.mjs
 
   shard:
     name: shard-3d — typecheck, test, build

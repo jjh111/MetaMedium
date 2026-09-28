@@ -31,6 +31,15 @@ pointer move paints the pen and nothing else; a pan paints once a frame. The
 equivalence check (`paintCheck`, the gate's `budgets` scenario) holds a hand's
 paint to the whole-board read, drawing and saying.*
 
+*After R4d (27 Sep 2026, on `w2-shard`): a room merges a line, not the
+board. On the 2,000-mark board a line another hand sends costs 1.65 ms
+median and 2.03 ms p95 (was 312 / 317 ms on R4b's engine, 173 s before
+it), applied with no replay; one that crosses a mark this hand drew a moment
+before goes back to the checkpoint the last line left, 4.2 / 5.0 ms; a line
+with no events does no work; and a newcomer's hello brings each log once —
+6.5 MB to it in a room of six, not 32.6 MB. The "after R4d" columns of the
+two room tables, and of the budgets' table, say the rest (hotspot 3).*
+
 ---
 
 ## The answer
@@ -185,32 +194,41 @@ Command: `node --expose-gc --max-old-space-size=65536 metamedium-core/bench/engi
 
 ### A live room — one incoming line at one hand, in a room of three
 
-| step (what `mergeLive` runs, 17-folder.js) | 500-mark board | 2,000-mark board |
-|---|---|---|
-| `receive` the line (LiveStore) | 0.01 ms / 0.01 ms | 0.01 ms / 0.11 ms |
-| `readLogs()` | 0.01 ms / 0.08 ms | 0.01 ms / 0.09 ms |
-| `myLogNow()` — every loaded event stringified | 13.2 ms / 13.6 ms | 64.1 ms / 65.2 ms |
-| `mergeLogs` | 0.28 ms / 0.89 ms | 0.99 ms / 4.85 ms |
-| `notices()` — a second `mergeLogs` | 0.24 ms / 0.70 ms | 1.03 ms / 4.59 ms |
-| **merge work without `notices()`** | 13.6 ms / 13.9 ms | 65.4 ms / 69.0 ms |
-| **merge work with `notices()`** | 13.9 ms / 14.2 ms | 67.3 ms / 70.1 ms |
-| **then `session.load(merged)` — a full replay, every line** | 2.56 s | 172.6 s |
-| *after R4b*: the merge work with `notices()` · then the replay | 13.7 ms / 14.1 ms · 84.7 ms | 63.7 ms / 64.9 ms · 271 ms |
+| step (what `mergeLive` runs, 17-folder.js) | 500-mark board | 2,000-mark board | **after R4d**: 500 | **after R4d**: 2,000 |
+|---|---|---|---|---|
+| `receive` the line (LiveStore) | 0.01 ms / 0.01 ms | 0.01 ms / 0.11 ms | 0.01 ms | 0.01 ms |
+| `readLogs()` | 0.01 ms / 0.08 ms | 0.01 ms / 0.09 ms | gone — `heldLogs()`, the arrays as held | gone |
+| `myLogNow()` — every loaded event stringified | 13.2 ms / 13.6 ms | 64.1 ms / 65.2 ms | gone — a room's log is `ownLog`, read on the save | gone |
+| `mergeLogs` | 0.28 ms / 0.89 ms | 0.99 ms / 4.85 ms | gone — `LiveMerge.sync` finds where the line's events fall | gone |
+| `notices()` — a second `mergeLogs` | 0.24 ms / 0.70 ms | 1.03 ms / 4.59 ms | a read: misnumbering is found as each event lands | a read |
+| **merge work without `notices()`** | 13.6 ms / 13.9 ms | 65.4 ms / 69.0 ms | | |
+| **merge work with `notices()`** | 13.9 ms / 14.2 ms | 67.3 ms / 70.1 ms | | |
+| **then `session.load(merged)` — a full replay, every line** | 2.56 s | 172.6 s | none — `session.rebase` applies the line | none |
+| *after R4b*: the merge work with `notices()` · then the replay | 13.7 ms / 14.1 ms · 84.7 ms | 63.7 ms / 64.9 ms · 271 ms | | |
+| **the line, all of it** — receive, merge, apply, what the room says | 2.6 s (R4b: 71.9 ms / 74.8 ms) | 173 s (R4b: 312 ms / 317 ms) | **0.94 ms / 1.10 ms** | **1.65 ms / 2.03 ms** |
+| a line crossing a mark this hand just drew (two hands at once) | the same full replay (R4b: 74.4 ms / 75.5 ms) | the same | 1.27 ms / 1.40 ms, from the checkpoint the last line left | 4.23 ms / 4.96 ms, the same |
+| a line 3 · 30 · 150 events back (a clock seconds behind) | the same full replay (R4b: 75–77 ms) | the same (R4b: 312–314 ms) | 1.9 · 25.9 · 25.0 ms, from the nearest checkpoint | 6.6 · 38.9 · 63.8 ms, from the nearest checkpoint |
+| a line with no events — a hello, the relay's word, a whole log already held | a full replay (R4b: 83 · 74 ms) | a full replay (R4b: 422 · 309 · 311 ms) | no work | no work |
+| the save a line schedules (300 ms later: `publish` of this hand's log) | 13.7 ms (`myLogNow`, R4b) | 62.9 ms (`myLogNow`, R4b) | 0.09 ms | 0.26 ms |
 
 Command: `node --expose-gc metamedium-core/bench/engine.mjs room --size=N` (median / p95 over 12 lines). After R4b the line still replays the whole board — only the replay is cheap now; taking it off the line is R4d's.
 
+After R4d: `node --expose-gc metamedium-core/bench/room.mjs --size=N` (N 500, 2000; median / p95 over 16 lines in order and 8 crossing; `--path=before` runs the surface before R4d for the same board, the 312 / 317 ms above), held to the budgets by `node --test metamedium-core/bench/room.test.mjs`. What the line costs now is the checkpoint it leaves where it ended (about 1 ms of the 1.65) — the one a line crossing a mark just drawn goes back to. A line 30 or 150 events back replays from the last regular checkpoint, every 200 events: those are over the 16 ms at 2,000.
+
 ### A newcomer's hello — the 2,000-mark board held by the hands already there
 
-| | room of 3 | room of 6 |
-|---|---|---|
-| lines sent in answer | 6 | 30 |
-| bytes sent in answer | 12.14 MB | 32.56 MB |
-| bytes delivered (every line reaches every other hand) | 24.28 MB | 162.81 MB |
-| lines each hand already there hears | 5 | 26 |
-| times each is notified (in the surface: a full re-merge and replay each) | 4 (1 carry events) | 16 (10 carry events) |
-| times the newcomer is notified | 3 | 15 |
+| | room of 3 | room of 6 | **after R4d**: room of 3 | **after R4d**: room of 6 |
+|---|---|---|---|---|
+| lines sent in answer | 6 | 30 | 2 | 5 |
+| bytes sent in answer | 12.14 MB | 32.56 MB | 6.07 MB — the board, once | 6.51 MB — the board, once |
+| bytes delivered (every line reaches every other hand) | 24.28 MB | 162.81 MB | 12.14 MB | 32.56 MB |
+| bytes the newcomer takes, and the most copies of one log | 12.14 MB, 2 copies | 32.56 MB, 5 copies | 6.07 MB, 1 copy | 6.51 MB, 1 copy |
+| … with a hand that left (said goodbye) · one that vanished (said nothing) | — | 26.05 MB, 4 copies · the same | — | 6.51 MB, 1 copy · the same, after a 1.5 s wait |
+| lines each hand already there hears | 5 | 26 | 3 | 6 |
+| times each is notified (in the surface before R4d: a full re-merge and replay each) | 4 (1 carry events) | 16 (10 carry events) | 3 (0 change a log) | 6 (0 change a log) |
+| times the newcomer is notified | 3 | 15 | 2 | 5 |
 
-Command: `node --expose-gc metamedium-core/bench/engine.mjs hello --size=2000` (LocalHub; the board split between the hands already there; the newcomer publishes its empty log and says hello, as `openLive` does).
+Command: `node --expose-gc metamedium-core/bench/engine.mjs hello --size=2000` (LocalHub; the board split between the hands already there; the newcomer publishes its empty log and says hello, as `openLive` does). After R4d the same command, and `node --expose-gc metamedium-core/bench/room.mjs --size=2000` for the copies a newcomer takes — with a hand that left and one that vanished — and whether it ends holding exactly the room's logs (it does, in all four). "Delivered" is what a broadcast wire carries: every line reaches every hand, and each log now goes on it once.
 
 ### Surface — chromium 153.0.8010.12 (1440x900 @1x, headless)
 
@@ -372,6 +390,20 @@ line at 2,000.**
   delivered. Each hand already there is notified 16 times. The surface
   turns each into a full replay, because over a BroadcastChannel or a relay
   every line is a task of its own.
+- **After R4d — fixed.** The merge stands between lines
+  (`store/livemerge.ts`): a line's events find their places in it and the
+  session is handed only what changed (`Session.rebase`) — applied, with no
+  replay, when they fall after everything held (1.65 ms a line at 2,000);
+  replayed from the nearest checkpoint when one falls before. A merge leaves
+  a checkpoint where it ended, and a checkpoint keeps the index as it stood,
+  so a line crossing a mark this hand just drew costs 4.2 ms, not the 10 ms a
+  restore spent rebuilding the index before one event was replayed. The store
+  says whether a line changed a log (`revision`): a hello, a goodbye, the
+  relay's word and a whole log already held change none and cost the reader
+  nothing. A room's log is read in the order it was written, by identity and
+  authorship (`ownLog`) — no event serialised. A hello is answered once per
+  log: each hand for its own; a copy only for a writer that said goodbye or
+  stayed silent, by the first of the hands holding one.
 
 **4. Relations with no distance limit are stored on every mark, and a
 checkpoint clones them every 200 events — 1.06 GB held at 2,000 marks,
@@ -523,21 +555,21 @@ except the matches, and those need only the cluster the new mark joined.
 v1 ships when the budgets hold on the 2,000-mark board (`V1-PLAN.md` §11.3);
 the 5,000 column is the headroom to aim for.
 
-| Measure | 500 today | 2,000 today | **Budget, 2,000** | **Budget, 5,000** | **After R4b**: 2,000; 5,000 | **After R4c**: 2,000; 5,000 |
-|---|---|---|---|---|---|---|
-| Open: navigation → board drawn (Chromium) | 2.2 s | 100 s, and only as a folder: storage refuses it | **≤ 1.5 s** | ≤ 3 s | not measured (R4c and R3 own the open) | **485 ms**; 1.09 s |
-| Replay, `load` (Node, warm median) | 2.58 s | 167 s | **≤ 0.5 s** | ≤ 1.5 s | **244 ms**; 648 ms | R4b's |
-| Memory held after replay (Node) | 25 MB | 1,058 MB | **≤ 150 MB** | ≤ 400 MB, so a tab opens it | **12.4 MB**; 45.5 MB | R4b's (the renderer's heap: 38 MB; 104 MB) |
-| One more stroke, engine: median / p95 | 18 / 27 ms | 256 / 749 ms | **≤ 4 / 16 ms** | ≤ 4 / 16 ms | **0.15 / 0.23 ms**; 0.31 / 0.39 ms | R4b's |
-| Release → reading drawn, p95 | 148 ms | 7.65 s | **≤ 100 ms** | ≤ 100 ms | the surface's (R4c) | **40 ms** (15.5 median); 49 ms (20 median) |
-| A pointer move while drawing: handler, p95 | 3.7 ms | 41 ms | **≤ 4 ms** | ≤ 6 ms | the surface's (R4c) | **0.2 ms**; 0.4 ms |
-| Pan at zoom 1: frame, p95 | 16.7 ms | 50 ms | **≤ 16.7 ms** | ≤ 16.7 ms | the surface's (R4c) | **16.8 ms** (one frame); 16.7 ms |
-| Pan at fit-all: frame, p95 | 33 ms | 133 ms | **≤ 33 ms** | ≤ 50 ms | the surface's (R4c) | **33.4 ms** (two frames); 66.7 ms (50 median) — over |
-| The whole-board read on the stroke path | 139 ms | 8.07 s | **off the stroke path, or ≤ 16 ms** | same | unchanged, 7.94 s; 105 s (R4c) | **off it**: one mark's neighbourhood, 0.02 ms; the genre 9–10 ms after a stroke |
-| A live room: main-thread work per incoming line | 2.6 s | 173 s | **≤ 16 ms, and no full replay** | ≤ 16 ms | 63 ms of merge work, then a 0.27 s replay (R4d's) | unchanged (R4d's) |
-| A hello in a room of six: bytes delivered | 34 MB | 163 MB | **each log once, to the newcomer (≈ 6.6 MB)** | ≈ 16 MB | unchanged (R4d) | unchanged (R4d's) |
-| Autosave: main-thread work per change, and does it hold | 7 ms, holds | 30 ms, refused | **≤ 8 ms, and never refused in silence** | same | unchanged (R3) | unchanged (R3's) |
-| A model's brief for five marks | 16 KB | 113 KB | **≤ 4 KB, whatever the board's size** | same | 2 KB; 2 KB — what it lists shrank with what is stored (R4e's still) | unchanged (R4e's) |
+| Measure | 500 today | 2,000 today | **Budget, 2,000** | **Budget, 5,000** | **After R4b**: 2,000; 5,000 | **After R4c**: 2,000; 5,000 | **After R4d**: 2,000 |
+|---|---|---|---|---|---|---|---|
+| Open: navigation → board drawn (Chromium) | 2.2 s | 100 s, and only as a folder: storage refuses it | **≤ 1.5 s** | ≤ 3 s | not measured (R4c and R3 own the open) | **485 ms**; 1.09 s | — (not R4d's) |
+| Replay, `load` (Node, warm median) | 2.58 s | 167 s | **≤ 0.5 s** | ≤ 1.5 s | **244 ms**; 648 ms | R4b's | 264 ms; 713 ms — a checkpoint keeps the index now (the last four of them) |
+| Memory held after replay (Node) | 25 MB | 1,058 MB | **≤ 150 MB** | ≤ 400 MB, so a tab opens it | **12.4 MB**; 45.5 MB | R4b's (the renderer's heap: 38 MB; 104 MB) | 16.8 MB; 57.5 MB — those four copies of the index |
+| One more stroke, engine: median / p95 | 18 / 27 ms | 256 / 749 ms | **≤ 4 / 16 ms** | ≤ 4 / 16 ms | **0.15 / 0.23 ms**; 0.31 / 0.39 ms | R4b's | 0.16 / 0.34 ms |
+| Release → reading drawn, p95 | 148 ms | 7.65 s | **≤ 100 ms** | ≤ 100 ms | the surface's (R4c) | **40 ms** (15.5 median); 49 ms (20 median) | — (not R4d's) |
+| A pointer move while drawing: handler, p95 | 3.7 ms | 41 ms | **≤ 4 ms** | ≤ 6 ms | the surface's (R4c) | **0.2 ms**; 0.4 ms | — (not R4d's) |
+| Pan at zoom 1: frame, p95 | 16.7 ms | 50 ms | **≤ 16.7 ms** | ≤ 16.7 ms | the surface's (R4c) | **16.8 ms** (one frame); 16.7 ms | — (not R4d's) |
+| Pan at fit-all: frame, p95 | 33 ms | 133 ms | **≤ 33 ms** | ≤ 50 ms | the surface's (R4c) | **33.4 ms** (two frames); 66.7 ms (50 median) — over | — (not R4d's) |
+| The whole-board read on the stroke path | 139 ms | 8.07 s | **off the stroke path, or ≤ 16 ms** | same | unchanged, 7.94 s; 105 s (R4c) | **off it**: one mark's neighbourhood, 0.02 ms; the genre 9–10 ms after a stroke | — (not R4d's) |
+| A live room: main-thread work per incoming line | 2.6 s | 173 s | **≤ 16 ms, and no full replay** | ≤ 16 ms | 63 ms of merge work, then a 0.27 s replay (R4d's) | unchanged (R4d's) | **1.65 / 2.03 ms, no replay**; crossing a mark just drawn 4.2 / 5.0 ms; 30 and 150 events back 39 and 64 ms, from a checkpoint; a line with no events, no work |
+| A hello in a room of six: bytes delivered | 34 MB | 163 MB | **each log once, to the newcomer (≈ 6.6 MB)** | ≈ 16 MB | unchanged (R4d) | unchanged (R4d's) | **each log once: 6.51 MB to the newcomer**, one copy of each — with a hand that left or vanished too; 32.6 MB on a broadcast wire |
+| Autosave: main-thread work per change, and does it hold | 7 ms, holds | 30 ms, refused | **≤ 8 ms, and never refused in silence** | same | unchanged (R3) | unchanged (R3's) | — (not R4d's) |
+| A model's brief for five marks | 16 KB | 113 KB | **≤ 4 KB, whatever the board's size** | same | 2 KB; 2 KB — what it lists shrank with what is stored (R4e's still) | unchanged (R4e's) | — (not R4d's) |
 
 The "after R4b" engine rows are `node --test metamedium-core/bench/budgets.test.mjs`
 (27 Sep 2026, load 2–4; the 2,000 board's own result file,
@@ -672,6 +704,18 @@ node metamedium-core/bench/report.mjs             # the surface tables, from tho
 In a page: `__mm.paintCheck()` (both paints, compared), `__mm.rolesCheck()`
 (every mark's role, both ways, and the genre), `__mm.heldCheck()` (every loose
 mark's held group against the whole plane's clusters).
+
+After R4d — a room's line, and a newcomer's hello:
+
+```
+node --test metamedium-core/bench/room.test.mjs                                     # the room's budgets on the 2,000 board: a line, a crossing line, lines with no events, the hello
+node --expose-gc metamedium-core/bench/room.mjs --size=N                             # N 500, 2000: the surface's path now
+node --expose-gc metamedium-core/bench/room.mjs --size=2000 --path=before            # the surface before R4d, on the same board
+node --expose-gc metamedium-core/bench/engine.mjs hello --size=2000                  # the hello's lines, bytes and notifies
+node --test metamedium-core/bench/budgets.test.mjs                                  # R4b's budgets still hold: 264 ms, 0.16 / 0.34 ms, 16.8 MB at 2,000; 713 ms, 57.5 MB at 5,000
+node metamedium-core/bench/equivalence.mjs --ref=0bca5ca                             # the engine before R4d against src/: nothing reads differently
+MM_ROOM_SEEDS=500 npx vitest run src/store/room.oracle.test.ts                       # (in metamedium-core) the oracle, 500 seeded rooms: ~45 s
+```
 
 Results land in `metamedium-core/dist/bench/` and `e2e/results/perf/`, both
 ignored. Nothing here is in `npm test` or the gate.
