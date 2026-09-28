@@ -205,14 +205,23 @@ describe('LiveMerge', () => {
     expect(s2.session.getEvents().every((e) => !e.by)).toBe(true);
   });
 
-  it('the session\'s log changed under it — an undo took another hand\'s mark — is read again whole, and the mark comes back', () => {
+  it('the session\'s log changed under it — this hand undid its mark, ada\'s standing after it — is read again whole, with nothing to hand over', () => {
+    // Before L2j the undo here took ada's last mark — the last event on the
+    // board — and this sync put it back. Undo is per hand: it takes this
+    // hand's own mark from the middle of the board and leaves ada's.
     const r = reader();
     r.logs['ada~1'] = drew('ada~1', 3, 1000);
     r.merge.sync(r.logs);
-    r.session.undo(); // the last event on the board is ada's
-    expect(r.session.getEvents()).toHaveLength(2);
-    const rep = r.merge.sync(r.logs);
-    expect(rep).toMatchObject({ rebuilt: true, how: 'append', kept: 2, applied: 1 });
+    r.session.addStroke(circleStroke(600, 400, 40, 24), 1500, undefined, 1); // between ada's first and second
+    r.merge.sync(r.logs);
+    r.same();
+    r.session.undo();
+    expect(r.session.getEvents().map((e) => e.by)).toEqual(['ada~1', 'ada~1', 'ada~1']);
+    expect(r.merge.sync(r.logs)).toMatchObject({ rebuilt: true, how: 'none', kept: 3, applied: 0 });
+    r.same();
+    // And the next line is taken as a line always is.
+    r.logs['ada~1'] = drew('ada~1', 4, 1000);
+    expect(r.merge.sync(r.logs)).toMatchObject({ rebuilt: false, how: 'append', applied: 1 });
     r.same();
   });
 

@@ -13,7 +13,8 @@
 //     events never dissolve, take up or open them (V1-PLAN L2h).
 //   - Ink is never destroyed: gesture/member/erased strokes keep their nodes.
 //   - The engine is event-sourced: every input is logged, state is a pure
-//     function of the log, and undo = drop the last input and replay.
+//     function of the log, and undo = drop this hand's last act and replay —
+//     its own, found by authorship, never another hand's (V1-PLAN L2j).
 
 import type { Bounds, Point } from '../types';
 import type { Fingerprint } from '../types';
@@ -407,8 +408,15 @@ type SessionEventUnion =
  * while `withTool` holds, so the log says which tool did what and context
  * (B2) can read what was just taken where. Like `by`, they are provenance,
  * never state: replay ignores them.
+ *
+ * `act` says which ACT of its log the event belongs to, when it is one of
+ * several written at once (V1-PLAN L2j): every event a tool writes inside one
+ * outermost `withTool` carries the same number, so undo takes them back in one
+ * step. The number is its log's to compare, never another's — one past the
+ * highest this sitting has seen, so no two acts of one log share it. An event
+ * with none is an act of its own. Provenance too: replay ignores it.
  */
-export type SessionEvent = SessionEventUnion & { by?: string; origin?: string; seq?: number; tool?: string; offer?: string };
+export type SessionEvent = SessionEventUnion & { by?: string; origin?: string; seq?: number; tool?: string; offer?: string; act?: number };
 
 /**
  * An attributed, inferred REP offered by a participant — what a model read
@@ -649,8 +657,29 @@ export interface Session {
   dismiss(summonId: string, at: number): void;
   /** Remove a node from the content plane. Members degrade their artifact. Ink is kept. */
   erase(nodeId: string, at: number): void;
-  /** Drop the last input event and replay the log. */
+  /**
+   * Take back this hand's last ACT and replay (V1-PLAN L2j): what `lastAct`
+   * names, dropped from the log wherever the merge put it; every other
+   * hand's event stays where it stands. An act is one dispatched event, or
+   * everything a tool wrote inside one outermost `withTool`. Ticks are never
+   * taken back. Nothing of this hand's on the board: nothing happens.
+   */
   undo(): void;
+  /**
+   * The act `undo` would take back now: this hand's last, its events in the
+   * order they stand in the log; empty when there is none.
+   *
+   * This hand's events are its own log's — the ones no merge stamped `by`,
+   * whoever they name (a model's reading in this hand's log is this hand's
+   * act, as `handOf` reads it) — and the last is the one it wrote last, never
+   * the last the merge put on the board: under the name this sitting writes,
+   * the highest number (`seq` only rises in a sitting, and a merge that
+   * interleaves logs by time changes no number); with none, under the name of
+   * the last named event of its own in the log, the highest number there; and
+   * with no names at all, the last of its own in the log — a board of one
+   * hand, exactly as before.
+   */
+  lastAct(): readonly SessionEvent[];
   getState(): SessionState;
   subscribe(listener: (state: SessionState) => void): () => void;
   /** Full input log — state is a pure function of this. */
@@ -686,6 +715,13 @@ export interface Session {
    * the log says which tool did what. Nothing else changes — replay reads
    * neither, and an event that already carries a tool keeps its own. Nested,
    * the innermost is the one stamped; `fn`'s result is returned.
+   *
+   * It is one ACT (V1-PLAN L2j): what the outermost call writes carries one
+   * `act` number, and one undo takes it all back — a tool's own events and a
+   * host's inside the same stamp alike. The field a tool closes first (a
+   * `dismiss` or `deselect` before anything else, L2e's order) is not part of
+   * it: those are written as events of their own, so undo takes back what the
+   * tool made and leaves the field closed, as it did before acts.
    */
   withTool<T>(toolId: string, fn: () => T, offerKey?: string): T;
   /**
@@ -749,6 +785,17 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
   // runtime, never derived from the log; what they stamp on the events
   // written meanwhile is the log's.
   let actingTool: { tool: string; offer?: string } | null = null;
+  // The act the outermost `withTool` is writing (V1-PLAN L2j): its number,
+  // taken at its first event that is not the field closing, or null until
+  // then. Runtime, like the tool; the number it stamps is the log's.
+  let openAct: { n: number | null } | null = null;
+  // The highest act number this sitting has seen or issued. Like the
+  // high-water mark below it only rises — a load, a merge, an undo never
+  // lower it — so no two acts of one log are given one number.
+  let actHigh = 0;
+  const sawAct = (n: unknown) => {
+    if (typeof n === 'number' && Number.isSafeInteger(n) && n > actHigh) actHigh = n;
+  };
   let generation = 0;
   let lastAt = 0;
   let counter = 0;
@@ -3153,9 +3200,23 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
   function dispatch(given: SessionEvent): string | null {
     staleResult = null;
     // The tool taking its act is stamped here too, beside authorship (B1).
-    const raw: SessionEvent = actingTool !== null && given.tool === undefined
+    const stamped: SessionEvent = actingTool !== null && given.tool === undefined
       ? { ...given, tool: actingTool.tool, ...(actingTool.offer !== undefined ? { offer: actingTool.offer } : {}) }
       : given;
+    // And the act it belongs to (L2j): inside a tool's act, the act's number —
+    // taken at its first event, one past the highest this sitting has seen —
+    // except the field the tool closes before it writes anything else, which
+    // is an event of its own, as L2e ordered it. An event that already says
+    // its act was written elsewhere and keeps it.
+    let raw = stamped;
+    if (openAct !== null && stamped.act === undefined) {
+      const closing = openAct.n === null && (stamped.type === 'dismiss' || stamped.type === 'deselect');
+      if (!closing) {
+        if (openAct.n === null) openAct.n = ++actHigh;
+        raw = { ...stamped, act: openAct.n };
+      }
+    }
+    sawAct(raw.act);
     // Authorship is stamped HERE, because this is the only place an event is
     // made; an event that already carries it was written elsewhere and keeps
     // what it was written with. The number is one past the sitting's
@@ -3195,7 +3256,10 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     if (keep === events.length && !tail.length) return { cut: false, from: keep, applied: 0 };
     staleResult = null;
     // As a load notes them: the next number this sitting writes is past them.
-    for (const ev of tail) if (ev.origin && typeof ev.seq === 'number') sawNumber(ev.origin, ev.seq);
+    for (const ev of tail) {
+      if (ev.origin && typeof ev.seq === 'number') sawNumber(ev.origin, ev.seq);
+      sawAct(ev.act);
+    }
     let report: RebaseReport;
     if (keep === events.length) {
       // Nothing cut: each event applied as `dispatch` applies one.
@@ -3229,17 +3293,83 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     return report;
   }
 
-  function undo() {
-    // Drop the most recent meaningful input and rebuild. Ticks are not
-    // user actions, so they're skipped over (but kept in the log).
-    for (let i = events.length - 1; i >= 0; i--) {
-      if (events[i].type !== 'tick') {
-        events = [...events.slice(0, i), ...events.slice(i + 1)];
-        replay();
-        notify();
-        return;
+  // ===== Undo is per hand (V1-PLAN L2j) =====
+  //
+  // A room's board is every hand's log merged by time, so the last event on
+  // it is whoever acted last by the clocks — and undo dropped it, another
+  // hand's as readily as this one's, sent nothing (this hand's log had not
+  // changed), and the mark came back at the next line. Undo takes back this
+  // hand's own last act: found among the events of its own log — the ones no
+  // merge stamped `by` — by the order it wrote them, never by where they
+  // stand. Ticks are not acts and stay, as they always did.
+
+  /** Whether an event is this hand's to take back: its own log's (no `by`), and not a tick. */
+  const ownAct = (ev: SessionEvent) => ev.by === undefined && ev.type !== 'tick';
+
+  /** Where this hand's event with the highest number under `name` stands, or -1. */
+  function highestUnder(name: string): number {
+    let at = -1;
+    let best = -1;
+    for (let i = 0; i < events.length; i++) {
+      const ev = events[i];
+      if (!ownAct(ev) || ev.origin !== name || mintKeyOf(ev) === null) continue;
+      if (at < 0 || ev.seq! > best) {
+        at = i;
+        best = ev.seq!;
       }
     }
+    return at;
+  }
+
+  /** Where this hand's last act stands in the log: its events' places, in order; empty when it has none. */
+  function lastActAt(): number[] {
+    // What this sitting writes: the highest number under its log's name.
+    let last = myLog !== undefined ? highestUnder(myLog) : -1;
+    if (last < 0) {
+      // None: what it wrote before, under another name — the name of the last
+      // of its own named events in the log — the highest number there; and
+      // with no names at all, the last of its own events in the log: a board
+      // of one hand, taken back exactly as before.
+      let named: string | undefined;
+      for (let i = events.length - 1; i >= 0 && named === undefined; i--) {
+        if (ownAct(events[i]) && mintKeyOf(events[i]) !== null) named = events[i].origin;
+      }
+      if (named !== undefined) last = highestUnder(named);
+      else for (let i = events.length - 1; i >= 0 && last < 0; i--) if (ownAct(events[i])) last = i;
+    }
+    if (last < 0) return [];
+    const top = events[last];
+    if (typeof top.act !== 'number') return [last];
+    // One of several written at once: all of that act — its log's own events
+    // under the same name and number.
+    const at: number[] = [];
+    for (let i = 0; i < events.length; i++) {
+      const ev = events[i];
+      if (ownAct(ev) && ev.act === top.act && ev.origin === top.origin) at.push(i);
+    }
+    return at;
+  }
+
+  function undo() {
+    const take = lastActAt();
+    if (!take.length) return;
+    const first = take[0];
+    const dropped = new Set(take);
+    // What stands after the act is replayed again. An event there with no
+    // authorship mints its ids off the replay's counter, and they may now name
+    // other marks — the board is replaced for what was asked about it, as a
+    // load or a merge's cut replaces it (ticks mint nothing).
+    for (let i = first + 1; i < events.length; i++) {
+      if (dropped.has(i) || events[i].type === 'tick' || mintKeyOf(events[i]) !== null) continue;
+      generation++;
+      break;
+    }
+    events = events.filter((_, i) => !dropped.has(i));
+    // Every checkpoint past the first event taken back was taken with it in
+    // the log; the replay starts from the nearest one before it.
+    checkpoints = checkpoints.filter((c) => c.length <= first);
+    replay();
+    notify();
   }
 
   function getState(): SessionState {
@@ -3350,13 +3480,18 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     dismiss: (summonId, at) => void dispatch({ type: 'dismiss', summonId, at }),
     erase: (nodeId, at) => void dispatch({ type: 'erase', nodeId, at }),
     undo,
+    lastAct: () => lastActAt().map((i) => events[i]),
     withTool: <T>(toolId: string, fn: () => T, offerKey?: string): T => {
       const before = actingTool;
+      // The outermost call is the act (L2j); a nested one writes into it.
+      const outermost = openAct === null;
+      if (outermost) openAct = { n: null };
       actingTool = offerKey === undefined ? { tool: toolId } : { tool: toolId, offer: offerKey };
       try {
         return fn();
       } finally {
         actingTool = before;
+        if (outermost) openAct = null;
       }
     },
     load: (log) => {
@@ -3385,6 +3520,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       // no longer carries (an undo never sent, a reset) stays issued (D1).
       for (const ev of events) {
         if (ev.origin && typeof ev.seq === 'number') sawNumber(ev.origin, ev.seq);
+        sawAct(ev.act);
       }
       replay();
       notify();

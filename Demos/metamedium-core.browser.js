@@ -11570,6 +11570,11 @@ ${lines.join("\n")}
     let markHands = /* @__PURE__ */ new Map();
     let staleResult = null;
     let actingTool = null;
+    let openAct = null;
+    let actHigh = 0;
+    const sawAct = (n2) => {
+      if (typeof n2 === "number" && Number.isSafeInteger(n2) && n2 > actHigh) actHigh = n2;
+    };
     let generation = 0;
     let lastAt = 0;
     let counter2 = 0;
@@ -13244,7 +13249,16 @@ ${lines.join("\n")}
     }
     function dispatch(given) {
       staleResult = null;
-      const raw = actingTool !== null && given.tool === void 0 ? { ...given, tool: actingTool.tool, ...actingTool.offer !== void 0 ? { offer: actingTool.offer } : {} } : given;
+      const stamped = actingTool !== null && given.tool === void 0 ? { ...given, tool: actingTool.tool, ...actingTool.offer !== void 0 ? { offer: actingTool.offer } : {} } : given;
+      let raw = stamped;
+      if (openAct !== null && stamped.act === void 0) {
+        const closing = openAct.n === null && (stamped.type === "dismiss" || stamped.type === "deselect");
+        if (!closing) {
+          if (openAct.n === null) openAct.n = ++actHigh;
+          raw = { ...stamped, act: openAct.n };
+        }
+      }
+      sawAct(raw.act);
       const ev = myLog === void 0 || raw.seq !== void 0 ? raw : { ...raw, origin: myLog, seq: (highWater.get(myLog) ?? 0) + 1 };
       if (ev.origin && typeof ev.seq === "number") sawNumber(ev.origin, ev.seq);
       events.push(ev);
@@ -13266,7 +13280,10 @@ ${lines.join("\n")}
       const keep = Math.max(0, Math.min(Math.floor(Number(keepAt) || 0), events.length));
       if (keep === events.length && !tail.length) return { cut: false, from: keep, applied: 0 };
       staleResult = null;
-      for (const ev of tail) if (ev.origin && typeof ev.seq === "number") sawNumber(ev.origin, ev.seq);
+      for (const ev of tail) {
+        if (ev.origin && typeof ev.seq === "number") sawNumber(ev.origin, ev.seq);
+        sawAct(ev.act);
+      }
       let report;
       if (keep === events.length) {
         const from = events.length;
@@ -13293,15 +13310,54 @@ ${lines.join("\n")}
       notify();
       return report;
     }
-    function undo() {
-      for (let i = events.length - 1; i >= 0; i--) {
-        if (events[i].type !== "tick") {
-          events = [...events.slice(0, i), ...events.slice(i + 1)];
-          replay();
-          notify();
-          return;
+    const ownAct = (ev) => ev.by === void 0 && ev.type !== "tick";
+    function highestUnder(name) {
+      let at = -1;
+      let best = -1;
+      for (let i = 0; i < events.length; i++) {
+        const ev = events[i];
+        if (!ownAct(ev) || ev.origin !== name || mintKeyOf(ev) === null) continue;
+        if (at < 0 || ev.seq > best) {
+          at = i;
+          best = ev.seq;
         }
       }
+      return at;
+    }
+    function lastActAt() {
+      let last = myLog !== void 0 ? highestUnder(myLog) : -1;
+      if (last < 0) {
+        let named2;
+        for (let i = events.length - 1; i >= 0 && named2 === void 0; i--) {
+          if (ownAct(events[i]) && mintKeyOf(events[i]) !== null) named2 = events[i].origin;
+        }
+        if (named2 !== void 0) last = highestUnder(named2);
+        else for (let i = events.length - 1; i >= 0 && last < 0; i--) if (ownAct(events[i])) last = i;
+      }
+      if (last < 0) return [];
+      const top = events[last];
+      if (typeof top.act !== "number") return [last];
+      const at = [];
+      for (let i = 0; i < events.length; i++) {
+        const ev = events[i];
+        if (ownAct(ev) && ev.act === top.act && ev.origin === top.origin) at.push(i);
+      }
+      return at;
+    }
+    function undo() {
+      const take = lastActAt();
+      if (!take.length) return;
+      const first = take[0];
+      const dropped = new Set(take);
+      for (let i = first + 1; i < events.length; i++) {
+        if (dropped.has(i) || events[i].type === "tick" || mintKeyOf(events[i]) !== null) continue;
+        generation++;
+        break;
+      }
+      events = events.filter((_, i) => !dropped.has(i));
+      checkpoints = checkpoints.filter((c) => c.length <= first);
+      replay();
+      notify();
     }
     function getState() {
       const reader = gestures.get(LOCAL_PARTICIPANT) ?? blankGestures(LOCAL_PARTICIPANT);
@@ -13404,13 +13460,17 @@ ${lines.join("\n")}
       dismiss: (summonId, at) => void dispatch({ type: "dismiss", summonId, at }),
       erase: (nodeId, at) => void dispatch({ type: "erase", nodeId, at }),
       undo,
+      lastAct: () => lastActAt().map((i) => events[i]),
       withTool: (toolId, fn, offerKey) => {
         const before = actingTool;
+        const outermost = openAct === null;
+        if (outermost) openAct = { n: null };
         actingTool = offerKey === void 0 ? { tool: toolId } : { tool: toolId, offer: offerKey };
         try {
           return fn();
         } finally {
           actingTool = before;
+          if (outermost) openAct = null;
         }
       },
       load: (log) => {
@@ -13425,6 +13485,7 @@ ${lines.join("\n")}
         }
         for (const ev of events) {
           if (ev.origin && typeof ev.seq === "number") sawNumber(ev.origin, ev.seq);
+          sawAct(ev.act);
         }
         replay();
         notify();

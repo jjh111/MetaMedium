@@ -861,7 +861,11 @@ export async function runRoom(o: RoomOptions): Promise<RoomReport> {
     } else if (r < 0.975) {
       // A newcomer arrives — sometimes with marks drawn before it had a log name.
       const h = new RemoteHand(wire, nextName(), skew(), `sit-${o.seed}-n${step}`, clock, { unnamedFirst: rand() < 0.5 });
-      if (rand() < 0.7) for (let k = 0; k < 1 + Math.floor(rand() * 2); k++) h.writing.note(h.session, act(h.session, rand, now + h.skew - 3000 + k * 100, ['draw', 'write']));
+      // Its clock runs on between them, a second apart: a mark with no
+      // authorship has no number, so where it stands among its hand's writing
+      // is the log's order (L2j) — the order written, while the clock that
+      // stamped them ran forward.
+      if (rand() < 0.7) for (let k = 0; k < 1 + Math.floor(rand() * 2); k++) h.writing.note(h.session, act(h.session, rand, now + h.skew - 3000 + k * 1000, ['draw', 'write']));
       remotes.push(h);
       await h.enter();
       count(h.session.getEvents().some((e) => !e.origin) ? 'a newcomer with unnamed marks' : 'a newcomer');
