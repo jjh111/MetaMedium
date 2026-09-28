@@ -3369,6 +3369,80 @@ window.__scenario = async function(){
     mm.session.load([]); mm.setView(1, 0, 0);
   }
 
+  // ---- 53. Bindings follow (V1-PLAN E2; CONTROL-POINTS-PLAN P3) ----
+  // Two arrows drawn from box A to box B — each begun on one of A's sites, so
+  // the pen ties its tail there, and its tip tied to one of B's sites. B
+  // dragged by the pointer carries both: each tip stands on its site where B
+  // now stands, each tail where it was, and each still reads as pointing at
+  // B. The move is the one event — the following is derived — and one undo
+  // takes the move back, and the arrows with it.
+  {
+    mm.session.load([]); mm.setView(1, 0, 0); await wait(30);
+    const last53 = () => { const st = mm.session.getState(); return st.contentIds[st.contentIds.length - 1]; };
+    const c53 = document.getElementById('canvas');
+    const pe53 = (type, x, y) => c53.dispatchEvent(new PointerEvent(type, { pointerId: 1, isPrimary: true, bubbles: true, clientX: x, clientY: y, button: 0, buttons: type === 'pointerup' ? 0 : 1 }));
+    const drag53 = (from, to, n) => { n = n || 8; pe53('pointerdown', from.x, from.y); for (let i = 1; i <= n; i++) pe53('pointermove', from.x + ((to.x - from.x) * i) / n, from.y + ((to.y - from.y) * i) / n); pe53('pointerup', to.x, to.y); };
+    const at53 = (p, q) => !!p && !!q && Math.hypot(p.x - q.x, p.y - q.y) < 0.5;
+    const round53 = (p) => (p ? [Math.round(p.x), Math.round(p.y)] : null);
+    const nodes53 = () => mm.session.getState().nodes;
+    const site53 = (id, kind, index) => MM.magnetSites(nodes53().get(id), nodes53()).find((x) => x.kind === kind && x.index === index).point;
+    const ends53 = (id) => (typeof MM.connectorEnds === 'function' ? MM.connectorEnds(nodes53().get(id), nodes53()) : null);
+    // A single-stroke arrow as a hand draws one: the shaft, out one wing, back to the tip, out the other.
+    const arrow53 = (from, to) => {
+      const len = Math.hypot(to.x - from.x, to.y - from.y), ux = (to.x - from.x) / len, uy = (to.y - from.y) / len;
+      const wing = (side) => ({ x: to.x - 22 * (ux * Math.cos(0.5) - side * uy * Math.sin(0.5)), y: to.y - 22 * (uy * Math.cos(0.5) + side * ux * Math.sin(0.5)) });
+      return t.line(from, to, 60).concat(t.line(to, wing(1), 10).slice(1), t.line(wing(1), to, 10).slice(1), t.line(to, wing(-1), 10).slice(1));
+    };
+    t.stroke(t.rect(160, 240, 180, 120)); await wait(40);
+    const a53 = last53();
+    t.stroke(t.rect(640, 180, 200, 280)); await wait(40);
+    const b53 = last53();
+    const tails53 = [site53(a53, 'middle', 1), site53(a53, 'corner', 1)];
+    const tipSites53 = [{ kind: 'middle', index: 3 }, { kind: 'corner', index: 0 }];
+    const arrows53 = [];
+    // Each tip three pixels short of its site, outside B: a two-wing head whose tip lands ON
+    // an outline visits it three times, and three crossings would rub B out. Tied, the tip is
+    // carried onto its site.
+    const short53 = (from, to) => { const l = Math.hypot(to.x - from.x, to.y - from.y); return { x: to.x - (3 * (to.x - from.x)) / l, y: to.y - (3 * (to.y - from.y)) / l }; };
+    for (let i = 0; i < 2; i++) {
+      t.stroke(arrow53(tails53[i], short53(tails53[i], site53(b53, tipSites53[i].kind, tipSites53[i].index)))); await wait(40);
+      const id = last53();
+      arrows53.push(id);
+      mm.session.bind({ strokeId: id, nodeId: b53, site: tipSites53[i], end: 'end', at: Date.now() });
+    }
+    const tied53 = arrows53.map((id) => mm.session.getEvents().filter((e) => e.type === 'bind' && e.strokeId === id).map((e) => e.end + '→' + (e.nodeId === a53 ? 'A' : e.nodeId === b53 ? 'B' : e.nodeId)).sort().join(' '));
+    const standing53 = [a53, b53].concat(arrows53).every((id) => mm.session.getState().contentIds.includes(id));
+    const before53 = arrows53.map((id) => JSON.stringify(MM.strokePointsOf(nodes53().get(id))));
+    // B selected, and dragged by a press inside it, away from its handles.
+    mm.session.select([b53], Date.now()); await wait(30);
+    const n53 = mm.session.getEvents().length;
+    const inside53 = mm.worldToScreen(700, 264);
+    drag53(inside53, { x: inside53.x + 120, y: inside53.y + 90 });
+    await wait(40);
+    const evs53 = mm.session.getEvents().slice(n53).map((e) => e.type);
+    const followed53 = arrows53.map((id, i) => {
+      const e = ends53(id);
+      return !!e && at53(e.end, site53(b53, tipSites53[i].kind, tipSites53[i].index)) && at53(e.start, tails53[i]);
+    });
+    const read53 = mm.session.read([a53, b53].concat(arrows53));
+    const points53 = arrows53.map((id) => {
+      const n = nodes53().get(id);
+      const to = (n.edges.find((e) => e.rel === 'points-to') || {}).to;
+      const meets = read53.relations.some((r) => ((r.from === id && r.to === b53) || (r.from === b53 && r.to === id)) && (r.kind === 'touching' || r.kind === 'crossing'));
+      const role = (read53.roles.find((r) => r.id === id) || {}).role;
+      return to === b53 && meets && role === 'edge';
+    });
+    step('53. two arrows tied to box B follow it when the pointer drags it: each tip stands on its site where B now stands, each tail where it was on A, and each still reads as pointing at B, an edge that touches it — the drag is one move event, the following derived',
+      standing53 && tied53.every((x) => x === 'end→B start→A') && JSON.stringify(evs53) === '["move"]' && followed53.every(Boolean) && points53.every(Boolean),
+      { standing: standing53, tied: tied53, events: evs53, followed: followed53, pointsAtB: points53, tips: arrows53.map((id) => round53(ends53(id) && ends53(id).end)), sites: tipSites53.map((x) => round53(site53(b53, x.kind, x.index))) });
+    mm.session.undo(); await wait(30);
+    const back53 = arrows53.map((id, i) => JSON.stringify(MM.strokePointsOf(nodes53().get(id))) === before53[i]);
+    step('53a. one undo takes the move back, and both arrows with it: each exactly where it stood before the drag, its tip on B\'s site where B stands again',
+      mm.session.getEvents().length === n53 && back53.every(Boolean) && arrows53.every((id, i) => { const e = ends53(id); return !!e && at53(e.end, site53(b53, tipSites53[i].kind, tipSites53[i].index)); }),
+      { events: mm.session.getEvents().length - n53, back: back53 });
+    mm.session.load([]); mm.setView(1, 0, 0);
+  }
+
   return R;
 };
 

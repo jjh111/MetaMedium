@@ -5,8 +5,10 @@
 // the board it arrives at must be the one `mergeLogs` + a replay from zero
 // would give — for EVERY order the lines could arrive in. Three hand-written
 // cases cannot say that, so this room generates them: hands that draw, write,
-// undo, name things, answer, erase and move, whose clocks disagree by
-// seconds; hands that leave, arrive late, and come back under another name;
+// undo, name things, answer, erase, move and reshape, tie a line's end to
+// another mark's site and move that mark so the line follows it (V1-PLAN E2),
+// whose clocks disagree by seconds; hands that leave, arrive late, and come
+// back under another name;
 // a newcomer whose first marks were drawn before it had a log name; and a wire
 // that delivers each sender's lines in the order they were sent, the senders
 // interleaved as the seed decides, now and then handing a hand a stretch of
@@ -31,8 +33,9 @@
 // of it.
 
 import { createSession, DEFAULT_SESSION_CONFIG, type Session, type SessionEvent } from '../session/session';
-import { LOCAL_PARTICIPANT } from '../session/nodes';
+import { LOCAL_PARTICIPANT, getRep, resemblances } from '../session/nodes';
 import { handlesOf } from '../session/handles';
+import { magnetSites } from '../session/magnets';
 import { LiveStore, type LiveLine, type LiveTransport, type RelayNotice } from '../store/live';
 import { mergeLogs } from '../store/merge';
 import { LiveMerge, type MergeReport } from '../store/livemerge';
@@ -201,13 +204,31 @@ export class Writing {
   readonly acts: string[][] = [];
   private known = new Set<string>();
 
-  /** Note what the session wrote since the last look: one act per event, or one for a tool's whole act. */
+  /**
+   * Note what the session wrote since the last look: one act per event, or
+   * one for everything written as one act — a tool's whole act, or a door
+   * that writes several events at once (a connector moved whole lets go of
+   * the sites it no longer sits on, E2) — which the events say by sharing
+   * an `act` number (L2j).
+   */
   note(s: Session, kind: string | null): void {
-    const fresh = unstamped(s).filter((e) => e.type !== 'tick').map(idOf).filter((k) => !this.known.has(k));
+    const fresh = unstamped(s).filter((e) => e.type !== 'tick' && !this.known.has(idOf(e)));
     if (!fresh.length) return;
-    for (const k of fresh) this.known.add(k);
-    if (kind === 'tool') this.acts.push(fresh);
-    else for (const k of fresh) this.acts.push([k]);
+    for (const e of fresh) this.known.add(idOf(e));
+    if (kind === 'tool') {
+      this.acts.push(fresh.map(idOf));
+      return;
+    }
+    let open: { act: number; keys: string[] } | null = null;
+    for (const e of fresh) {
+      if (typeof e.act === 'number' && open && open.act === e.act) {
+        open.keys.push(idOf(e));
+        continue;
+      }
+      const keys = [idOf(e)];
+      this.acts.push(keys);
+      open = typeof e.act === 'number' ? { act: e.act, keys } : null;
+    }
   }
 
   /** Every event, in the order written. */
@@ -608,12 +629,42 @@ function act(s: Session, rand: () => number, at: number, kinds: string[], undo?:
       const to = { x: h.point.x + (rand() - 0.5) * 80, y: h.point.y + (rand() - 0.5) * 80 };
       return s.reshape({ id, handle: { kind: h.kind, index: h.index }, to, at }) ? 'reshape' : null;
     }
+    case 'bind':
+    case 'follow': {
+      // A connector's end tied to a site on another mark (P1) — and, for a
+      // follow, that mark moved at once, so the connector follows it (E2).
+      const tie = bindable(s, rand);
+      if (!tie) return null;
+      s.bind({ strokeId: tie.connector, nodeId: tie.target, site: tie.site, end: tie.end, at });
+      if (kind === 'bind') return 'bind';
+      s.move({ ids: [tie.target], dx: (rand() - 0.5) * 160, dy: (rand() - 0.5) * 160, at: at + 10 });
+      return 'follow';
+    }
   }
   return null;
 }
 
-const REMOTE_ACTS = ['draw', 'draw', 'draw', 'write', 'undo', 'undo', 'bless', 'answer', 'erase', 'move', 'label', 'tool', 'reshape'];
-const LOCAL_ACTS = ['draw', 'draw', 'write', 'undo', 'undo', 'bless', 'answer', 'erase', 'move', 'tool', 'reshape'];
+/** A line on the board, another mark, one of that mark's own sites and an end: a bind to make, or null when there is none. */
+function bindable(s: Session, rand: () => number): { connector: string; target: string; site: { kind: string; index: number }; end: 'start' | 'end' } | null {
+  const st = s.getState();
+  const pick = <T>(xs: readonly T[]): T => xs[Math.floor(rand() * xs.length)];
+  const lines = st.contentIds.filter((id) => {
+    const n = st.nodes.get(id);
+    return !!n && getRep(n, 'stroke') && resemblances(n)[0]?.to === 'type:line';
+  });
+  if (!lines.length) return null;
+  const connector = pick(lines);
+  const others = st.contentIds.filter((id) => id !== connector && !!st.nodes.get(id) && !!getRep(st.nodes.get(id)!, 'stroke'));
+  if (!others.length) return null;
+  const target = pick(others);
+  const sites = magnetSites(st.nodes.get(target)!, st.nodes).filter((x) => !x.notation);
+  if (!sites.length) return null;
+  const site = pick(sites);
+  return { connector, target, site: { kind: site.kind, index: site.index }, end: rand() < 0.5 ? 'start' : 'end' };
+}
+
+const REMOTE_ACTS = ['draw', 'draw', 'draw', 'write', 'undo', 'undo', 'bless', 'answer', 'erase', 'move', 'label', 'tool', 'reshape', 'bind', 'follow'];
+const LOCAL_ACTS = ['draw', 'draw', 'write', 'undo', 'undo', 'bless', 'answer', 'erase', 'move', 'tool', 'reshape', 'bind', 'follow'];
 
 /**
  * One room, from its seed. The readers under test join at a random moment,

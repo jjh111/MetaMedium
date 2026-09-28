@@ -267,6 +267,10 @@ export type { Binding, BoundRep } from './session/magnets';
 // one `reshape` event that reshapes the clean form and never the ink.
 export { handlesOf, reshapePreview, reshapedClean, reshapeClean, cleanFormOf, MIN_EXTENT_PX } from './session/handles';
 export type { Handle, HandleKind, ReshapePreview } from './session/handles';
+// Bindings follow (V1-PLAN E2, CONTROL-POINTS-PLAN P3): a connector's ends,
+// and where they stand.
+export { connectorEnds } from './session/follow';
+export type { ConnectorEnds } from './session/follow';
 
 // Words from letters — printed letters gathered into one held mark (words.ts).
 export { isLetterLike, joinsRun, wordConfidence, LETTER_MAX_HEIGHT_PX, WORD_GAP_RATIO, WORD_WINDOW_MS } from './session/words';

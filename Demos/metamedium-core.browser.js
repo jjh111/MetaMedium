@@ -208,6 +208,7 @@ var MetaMediumCore = (() => {
     conceptNoun: () => conceptNoun,
     connectionsFor: () => connectionsFor,
     connectionsOf: () => connectionsOf,
+    connectorEnds: () => connectorEnds,
     connectorHeads: () => connectorHeads,
     contextAt: () => contextAt,
     controlOf: () => controlOf,
@@ -8207,6 +8208,14 @@ ${p.svg}</section>`),
       }
     }
     return null;
+  }
+
+  // src/session/follow.ts
+  function connectorEnds(node, _nodes) {
+    void _nodes;
+    const pts = strokePointsOf(node);
+    if (!pts || pts.length < 2) return null;
+    return { start: pts[0], end: pts[pts.length - 1], tail: "start" };
   }
 
   // src/session/words.ts

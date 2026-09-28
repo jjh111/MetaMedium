@@ -7668,6 +7668,14 @@ function reshapeClean(clean, handle, to, floor = 0) {
   return null;
 }
 
+// src/session/follow.ts
+function connectorEnds(node, _nodes) {
+  void _nodes;
+  const pts = strokePointsOf(node);
+  if (!pts || pts.length < 2) return null;
+  return { start: pts[0], end: pts[pts.length - 1], tail: "start" };
+}
+
 // src/session/words.ts
 var LETTER_MAX_HEIGHT_PX = 150;
 var LETTER_MAX_WIDTH_PX = 150;
@@ -19999,6 +20007,7 @@ export {
   conceptNoun,
   connectionsFor,
   connectionsOf,
+  connectorEnds,
   connectorHeads,
   contextAt,
   controlOf,
