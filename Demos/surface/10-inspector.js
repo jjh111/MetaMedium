@@ -1,7 +1,8 @@
 // ===== inspector =====
 // Provides: the panel: a mark, an artifact, a word, the selection.
 // Uses: core, render (readRungs, logKey, paintReference), snap, handwriting, models,
-//   palette (contextFor, paletteItems, afforded — what stands beside a selection, and what it put first).
+//   palette (contextFor, paletteItems, afforded — what stands beside a selection, and what it put first),
+//   packs (packSaid — a definition from a library pack says its pack).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () { ... })();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -132,7 +133,9 @@
           ex.accepted.length + ' is, ' + ex.rejected.length + ' is not</span></div>';
       }
       const inst = node.edges.find((e) => e.rel === 'instance-of');
-      if (inst) html += '<div class="row"><span class="k">same as</span><span class="v">' + esc(inst.to) + '</span></div>';
+      // A library pack's definition is said by name and pack (V1-PLAN B3): this thing is its own now, the pack's its provenance.
+      const packDef = inst && s.nodes.get(inst.to) && MM.packDefinitionOf(s.nodes.get(inst.to));
+      if (inst) html += '<div class="row"><span class="k">same as</span><span class="v">' + esc(packDef ? packDef.definition + ', from ' + packSaid(packDef.pack) : inst.to) + '</span></div>';
     }
 
     // The code plane. Every attempt is kept and attributed; the newest is what
@@ -377,7 +380,7 @@
       return { here: 'a definition' + (MM.wordOf(a) ? ' “' + MM.wordOf(a) + '”' : ''), next: 'another like it is matched · a brief builds on it · its tank plays' };
     }
     const match = sum.suggestions.find((x) => x.kind === 'match');
-    if (match) return { here: 'a definition, ' + match.label + ' ' + (match.score || 1).toFixed(2), next: (libraryEntries(s).some((e) => e.id === match.artifactId) ? 'its program on this drawing' : 'take the name') + ' · a brief builds from it' };
+    if (match) return { here: 'a definition, ' + match.label + ' ' + (match.score || 1).toFixed(2) + (match.pack ? ', from ' + packSaid(match.pack) : ''), next: (libraryEntries(s).some((e) => e.id === match.artifactId) ? 'its program on this drawing' : 'take the name') + ' · a brief builds from it' };
     const genre = reading.genre && reading.genre.genre;
     const concept = reading.concepts[0];
     if (genre === 'graph' || genre === 'mixed') return { here: 'a structure, a graph' + (concept ? ' (' + concept.concept + ')' : ''), next: 'Show it in 3D · a brief builds the diagram, then a model writes the words' };

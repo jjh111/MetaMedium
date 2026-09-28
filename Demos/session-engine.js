@@ -2635,6 +2635,7 @@
 //   a hand's label on its own mark (labelsDrawn), match chips,
 //   the working dot, the explanation plane and its layout, the status line (one sentence).
 // Uses: core, view, artifacts, snap, models, palette (contextFor), inspector, teach (syncMarkChip), folder (folderStatus, liveSet),
+//   packs (packShort — a match chip says its pack; a pack this build lacks is said in the standing line),
 //   input (live, magnetHold, penHover — the pen's layer draws the stroke in progress and a hovering pencil's magnet).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () Ellipsis)();`. Shared state is the
@@ -3312,7 +3313,8 @@
       // A match is a chip beside the group, with its number (D8); a tap on it
       // opens the field with the match leading. Plural, like every reading:
       // two definitions with the same shapes are both named.
-      const said = c.matches.slice(0, 2).map((m) => m.name + ' ' + m.score.toFixed(2)).join('  ·  ');
+      // A library pack's definition says its pack (V1-PLAN B3): molecule 0.93 · basics.
+      const said = c.matches.slice(0, 2).map((m) => m.name + ' ' + m.score.toFixed(2) + (m.pack ? ' · ' + packShort(m.pack) : '')).join('  ·  ');
       const at = chipRect(said, b.minX - pad, b.minY - pad - wpx(8));
       const whole = { minX: b.minX - pad, minY: at.y, maxX: Math.max(b.minX - pad + at.w, b.maxX + pad), maxY: b.maxY + pad };
       if (!vb || cp || boxMeets(whole, vb)) {
@@ -3325,7 +3327,7 @@
         if (paintOps) recordOp({ kind: 'match', id: c.nodeIds.join(','), text: said, box: boxOfRect(whole.minX, whole.minY, whole.maxX - whole.minX, whole.maxY - whole.minY), moved: !!cp });
       }
       // Measured wherever it is, so a tap and a test find it whether it was drawn or not.
-      chipHits.push({ ids: c.nodeIds.slice(), x: at.x, y: at.y, w: at.w, h: at.h });
+      chipHits.push({ ids: c.nodeIds.slice(), x: at.x, y: at.y, w: at.w, h: at.h, text: said });
     });
     // What a model read a group as stays beside it (v10 F6): a chip with the
     // number and the reader, whether or not the field is still open, and a
@@ -3344,7 +3346,7 @@
         chipText(rc.text, b.minX - pad, b.maxY + pad + wpx(17));
         if (paintOps) recordOp({ kind: 'read', id: id, text: rc.text, box: boxOfRect(at.x, at.y, at.w, at.h), moved: false });
       }
-      chipHits.push({ ids: group.length ? group : [id], x: at.x, y: at.y, w: at.w, h: at.h });
+      chipHits.push({ ids: group.length ? group : [id], x: at.x, y: at.y, w: at.w, h: at.h, text: rc.text });
     }
 
     const inspectedId = hoverId || lastContentId(s);
@@ -3462,6 +3464,8 @@
     }
     const fs = folderStatus();
     if (fs) parts.push(fs);
+    // A pack this board names that this build cannot give it is said, never hidden (V1-PLAN B3).
+    if (s.packNotices.length) parts.push(s.packNotices.map((n) => n.reason === 'unknown' ? n.pack + ' is not in this build' : '“' + n.pack + '” is no pack').join(', ') + ' — its definitions are not matched here');
     if (agents.length) parts.push(agents.map((a) => a.config.model).join(', '));
     if (ws) parts.push('⋯ ' + ws);
     if (hint) parts.push(hint);
@@ -4337,7 +4341,7 @@
 // Uses: core (hand, lastPen), ui, field (readFieldCommand, verbFor, libraryMatch, typedWord — pure,
 //   09-field.js), view (usableViewport, viewportRect), models (agents, withWork, cancelReading,
 //   askModelsAbout, offerModel), snap (snapMode), render (nameOfParticipant, logKey, paintReference),
-//   artifacts (flipped), frames,
+//   artifacts (flipped), frames, packs (packShort, packSaid — how a match says its pack),
 //   clocks (definitionOf), handwriting (isWriting, isRead, readLine, readOne), images (svgOf), text
 //   (wordToText, lineToText, foldIntoText, textNear, beginTextEdit), input (say, flash, downType — which
 //   hand opened the field), hand (handOfPointer).
@@ -4422,10 +4426,12 @@
     // --- What this IS: readings with their numbers. Tapping one takes it as the name. ---
     for (const sug of sum.suggestions) {
       if (sug.kind !== 'match') continue;
+      // A library pack's definition says its pack (V1-PLAN §2.3, B3): known because this board uses it, not because you named it.
+      const from = sug.pack ? packSaid(sug.pack) : null;
       known.push(readingItem({
-        key: 'sug:' + sug.id, grounds: { on: 'known', confidence: sug.score || 1, why: 'you named this shape before' },
-        label: sug.label + ' ' + (sug.score || 1).toFixed(2), name: sug.label,
-        why: (sug.reasoning || 'like the one you named') + ' — take it as another ' + sug.label,
+        key: 'sug:' + sug.id, grounds: { on: 'known', confidence: sug.score || 1, why: from ? 'from ' + from + ', which this board uses' : 'you named this shape before' },
+        label: sug.label + ' ' + (sug.score || 1).toFixed(2) + (sug.pack ? ' · ' + packShort(sug.pack) : ''), name: sug.label,
+        why: (sug.reasoning || 'like the one you named') + (from ? ' — from ' + from : '') + ' — take it as another ' + sug.label,
         run: () => {
           const made = session.bless({ summonId: sum.id, suggestionId: sug.id, at: Date.now() });
           // A definition that holds a program hands it to its instance: a
@@ -5421,7 +5427,8 @@
 // ===== inspector =====
 // Provides: the panel: a mark, an artifact, a word, the selection.
 // Uses: core, render (readRungs, logKey, paintReference), snap, handwriting, models,
-//   palette (contextFor, paletteItems, afforded — what stands beside a selection, and what it put first).
+//   palette (contextFor, paletteItems, afforded — what stands beside a selection, and what it put first),
+//   packs (packSaid — a definition from a library pack says its pack).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () { ... })();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -5552,7 +5559,9 @@
           ex.accepted.length + ' is, ' + ex.rejected.length + ' is not</span></div>';
       }
       const inst = node.edges.find((e) => e.rel === 'instance-of');
-      if (inst) html += '<div class="row"><span class="k">same as</span><span class="v">' + esc(inst.to) + '</span></div>';
+      // A library pack's definition is said by name and pack (V1-PLAN B3): this thing is its own now, the pack's its provenance.
+      const packDef = inst && s.nodes.get(inst.to) && MM.packDefinitionOf(s.nodes.get(inst.to));
+      if (inst) html += '<div class="row"><span class="k">same as</span><span class="v">' + esc(packDef ? packDef.definition + ', from ' + packSaid(packDef.pack) : inst.to) + '</span></div>';
     }
 
     // The code plane. Every attempt is kept and attributed; the newest is what
@@ -5797,7 +5806,7 @@
       return { here: 'a definition' + (MM.wordOf(a) ? ' “' + MM.wordOf(a) + '”' : ''), next: 'another like it is matched · a brief builds on it · its tank plays' };
     }
     const match = sum.suggestions.find((x) => x.kind === 'match');
-    if (match) return { here: 'a definition, ' + match.label + ' ' + (match.score || 1).toFixed(2), next: (libraryEntries(s).some((e) => e.id === match.artifactId) ? 'its program on this drawing' : 'take the name') + ' · a brief builds from it' };
+    if (match) return { here: 'a definition, ' + match.label + ' ' + (match.score || 1).toFixed(2) + (match.pack ? ', from ' + packSaid(match.pack) : ''), next: (libraryEntries(s).some((e) => e.id === match.artifactId) ? 'its program on this drawing' : 'take the name') + ' · a brief builds from it' };
     const genre = reading.genre && reading.genre.genre;
     const concept = reading.concepts[0];
     if (genre === 'graph' || genre === 'mixed') return { here: 'a structure, a graph' + (concept ? ' (' + concept.concept + ')' : ''), next: 'Show it in 3D · a brief builds the diagram, then a model writes the words' };
@@ -9596,10 +9605,10 @@
 
 // ===== controls =====
 // Provides: the control centre — one button in the bar, a grid of tiles in fixed slots (zoom, snap,
-//   view, theme, hand, auto-read, folder, import, export, models, teach, live, reset, help, boards);
+//   view, theme, hand, auto-read, folder, import, export, models, teach, live, reset, help, boards, packs);
 //   syncTiles() writes every tile's face from state; openPane/closePanes keep one pane open at a time.
 // Uses: core (prefs, themeMode, hand, draws), hand (handFace, nextHand), input (palmHere), snap (snapMode), folder (viewMode, folder; the boards adapter:
-//   boardOnScreenName, resetBoard), models (agents), teach (teachPanel), handwriting (autoRead); the page's
+//   boardOnScreenName, resetBoard), models (agents), teach (teachPanel), handwriting (autoRead), packs (packsFace); the page's
 //   version from its <meta name="metamedium-version"> (V1-PLAN R7), said at the head of the help pane.
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () { ... })();`. Shared state is the
@@ -9618,7 +9627,7 @@
     autoRead: document.getElementById('autoReadBtn'), folder: document.getElementById('folderBtn'), imp: document.getElementById('importBtn'),
     exp: document.getElementById('exportBtn'), models: document.getElementById('modelBtn'), teach: document.getElementById('teachBtn'),
     reset: document.getElementById('resetBtn'), help: document.getElementById('helpBtn'), live: document.getElementById('liveBtn'),
-    boards: document.getElementById('boardsBtn'),
+    boards: document.getElementById('boardsBtn'), packs: document.getElementById('packsBtn'),
   };
 
   function ccOpen() { return !ccEl.hasAttribute('hidden'); }
@@ -9659,6 +9668,8 @@
     ui.tile(tiles.live, 'live', folder.how === 'live' ? folder.name : 'room…', { on: folder.how === 'live', why: 'a room other hands can join: between tabs on this machine, or across machines through a relay' });
     // Its face is the name of what is on screen (V1-PLAN R1); the pane is 22-boards.js.
     ui.tile(tiles.boards, 'boards', boardOnScreenName() || '…', { why: 'the boards this browser keeps — new, open, rename, duplicate, delete, and the trash — and the folders, repositories and sites opened lately' });
+    // The library packs this board uses (V1-PLAN §2.3, B3), last in the grid; the pane is 23-packs.js.
+    ui.tile(tiles.packs, 'packs', packsFace(s), { on: s.packs.length > 0, why: 'the library packs this board uses — premade definitions and notations, matched as if you had taught them; using one is an event in the board’s log, and undo takes it back' });
   }
 
   tiles.theme.onclick = () => setThemeMode(THEME_MODES[(THEME_MODES.indexOf(themeMode) + 1) % THEME_MODES.length]);
@@ -10110,8 +10121,150 @@
     });
   }
 
+// ===== packs (the pane) =====
+// Provides: the library packs pane under the bar (V1-PLAN §2.3, §9 B3) — every pack this build ships
+//   (never a test pack), each with what it adds, whether this board uses it, and *use* / *stop using*;
+//   the packs this board names that this build lacks, said, with *stop using*. packsFace (the tile's
+//   face), packShort and packSaid (how a match says its pack), renderPacksPane, packsHeard (the session's
+//   listener, subscribed by the boot, which also has the pen follow the board's packs — MM.followPacks).
+// Uses: ui (pane, chip), controls (tiles.packs, togglePanel/closePanel, syncTiles, ccOpen), input (say), palette (refreshPalette).
+// A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
+// in name order inside `(function () { ... })();`. Shared state is the
+// closure's; no imports, no exports, no build step beyond the concatenation.
+//
+// Using a pack is an EVENT in the board's log (`session.use`), never a device preference: a board
+// replays with the same library everywhere, undo takes a use back, a room carries it. So the pane is
+// only a door onto the log — it keeps nothing of its own, and reads what it shows from the state.
+
+  const packsPanel = document.getElementById('packsPanel');
+  const pkList = packsPanel ? packsPanel.querySelector('.pkList') : null;
+  const pkStatus = document.getElementById('packsStatus');
+
+  /** A pack as a match says it, short: `basics@1` → `basics`. */
+  function packShort(ref) { return String(ref || '').split('@')[0]; }
+  /** A pack as a tooltip says it: `the Basics pack (basics@1)`. */
+  function packSaid(ref) {
+    const p = MM.shippedPack(ref);
+    return 'the ' + (p ? p.name : packShort(ref)) + ' pack (' + ref + ')';
+  }
+  /** The tile's face: the packs this board uses, short — or none; a name this build lacks shows as a question. */
+  function packsFace(s) {
+    const names = (s.packs || []).map(packShort).concat((s.packNotices || []).map((n) => n.pack + '?'));
+    return names.length ? names.join(', ') : 'none';
+  }
+
+  /** What a pack adds, in a line: its definitions by name, its notation's symbols, its connectors. */
+  function packHolds(p) {
+    const parts = [];
+    if (p.definitions.length) parts.push(p.definitions.map((d) => d.name).join(', '));
+    if (p.notation) {
+      const n = MM.notationById(p.notation);
+      parts.push('the ' + (n ? n.name.toLowerCase() : p.notation) + ' notation' + (n ? ': ' + n.symbols.map((x) => x.name).concat(n.connectors.map((x) => x.name + 's')).join(', ') : ''));
+    }
+    if (p.connectors && p.connectors.length) parts.push(p.connectors.map((c) => c.name).join(', '));
+    return parts.join(' · ');
+  }
+
+  if (packsPanel) ui.pane(packsPanel, 'packs', () => closePanel(packsPanel, tiles.packs));
+  if (tiles.packs) {
+    tiles.packs.onclick = () => {
+      togglePanel(packsPanel, tiles.packs);
+      if (!packsPanel.hasAttribute('hidden')) { pkSay(null); renderPacksPane(); }
+    };
+  }
+
+  function pkEl(tag, cls, text) {
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text !== undefined && text !== null) e.textContent = text;
+    return e;
+  }
+
+  /** The pane again, when it stands: after a use, an undo, another hand's line, a board loaded in place. */
+  function renderPacksPane() {
+    if (!pkList || !packsPanel || packsPanel.hasAttribute('hidden')) return;
+    const s = session.getState();
+    const frag = document.createDocumentFragment();
+    for (const p of MM.listedPacks()) {
+      const ref = MM.packRef(p);
+      const used = s.packs.includes(ref);
+      const row = frag.appendChild(pkEl('div', 'pkItem' + (used ? ' used' : '')));
+      row.dataset.pack = ref;
+      const top = row.appendChild(pkEl('div', 'pkTop'));
+      top.appendChild(pkEl('span', 'pkName', p.name));
+      top.appendChild(document.createTextNode(' '));
+      top.appendChild(ui.chip(ref, { cls: 'pkRef', why: 'its name and version — content under one name never changes' }));
+      if (used) { top.appendChild(document.createTextNode(' ')); top.appendChild(ui.chip('in use', { cls: 'pkUsed', why: 'this board uses it: its log says so' })); }
+      row.appendChild(pkEl('div', 'pkWhat', p.describes));
+      const holds = packHolds(p);
+      if (holds) row.appendChild(pkEl('div', 'pkHolds', holds));
+      const b = row.appendChild(pkEl('button', '', used ? 'stop using' : 'use'));
+      b.type = 'button';
+      b.dataset[used ? 'unuse' : 'use'] = ref;
+      b.title = used ? 'its definitions leave this board’s matching — an event in its log; undo brings them back'
+        : 'this board uses it from now on — an event in its log: what it ships is matched here, attributed to it';
+    }
+    // What this board names that this build does not ship: said, never hidden, and it can be let go.
+    for (const n of s.packNotices || []) {
+      const row = frag.appendChild(pkEl('div', 'pkItem pkLost'));
+      row.dataset.pack = n.pack;
+      const top = row.appendChild(pkEl('div', 'pkTop'));
+      top.appendChild(pkEl('span', 'pkName', n.pack));
+      top.appendChild(document.createTextNode(' '));
+      top.appendChild(ui.chip(n.reason === 'unknown' ? 'not in this build' : 'no pack’s name', { cls: 'pkRef', why: n.detail }));
+      row.appendChild(pkEl('div', 'pkWhat', n.detail));
+      const b = row.appendChild(pkEl('button', '', 'stop using'));
+      b.type = 'button';
+      b.dataset.unuse = n.pack;
+      b.title = 'the board stops naming it — an event in its log';
+    }
+    pkList.replaceChildren(frag);
+  }
+
+  /** The pane's own line. */
+  function pkSay(words) { if (pkStatus) pkStatus.textContent = words || ''; }
+
+  if (packsPanel) {
+    packsPanel.addEventListener('click', (e) => {
+      const b = e.target.closest && e.target.closest('button');
+      if (!b || !packsPanel.contains(b) || b.classList.contains('paneClose') || b.disabled) return;
+      const d = b.dataset;
+      if (d.use !== undefined) {
+        const refused = session.use(d.use, Date.now());
+        if (refused) { pkSay(refused.detail); return; }
+        const p = MM.shippedPack(d.use);
+        const what = p && p.definitions.length ? p.definitions.map((x) => x.name).join(', ') + ' matched here' : p && p.notation ? 'its notation’s ports on the pen' : 'in use';
+        pkSay('this board uses ' + d.use + ' — ' + what + '; undo takes it back');
+        say('using ' + packSaid(d.use) + ' — ' + what);
+      } else if (d.unuse !== undefined) {
+        session.unuse(d.unuse, Date.now());
+        pkSay('this board no longer uses ' + d.unuse + '; undo brings it back');
+        say('stopped using ' + d.unuse);
+      }
+      syncTiles();
+      renderPacksPane();
+    });
+  }
+
+  /**
+   * The pane and the tile follow the board — a use undone, another hand's line, a board loaded in
+   * place. A listener of the session's, subscribed by the boot after the journal and the paint (the
+   * journal hears every change first, V1-PLAN R3).
+   */
+  let pkHeard = '';
+  function packsHeard(s) {
+    const now = s.packs.join(',') + '|' + s.packNotices.map((n) => n.pack).join(',');
+    if (now === pkHeard) return;
+    pkHeard = now;
+    if (packsPanel && !packsPanel.hasAttribute('hidden')) renderPacksPane();
+    if (ccOpen()) syncTiles();
+    // A field open while the packs change offers what the board now knows its marks as (core re-reads the summon's matches).
+    refreshPalette();
+  }
+
 // ===== boot =====
-// Provides: the debug handle (window.__mm, what the e2e drives), subscription, restore, first render.
+// Provides: the debug handle (window.__mm, what the e2e drives), subscription (the journal first, the paint,
+//   the packs pane and the pen's ports), restore, first render.
 // Uses: everything.
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () { ... })();`. Shared state is the
@@ -10223,6 +10376,10 @@
   // must be the browser's before then (V1-PLAN R3, the kill test).
   session.subscribe(persistBoard);
   session.subscribe(render);
+  // The library packs the board uses (V1-PLAN §2.3, B3): the pane and the tile follow its log, and so
+  // does the pen — a pack naming a notation offers its ports while in use, and takes them back after.
+  session.subscribe(packsHeard);
+  MM.followPacks(session);
   const replayUrl = params.get('replay');
   const mode = boardMode();
   if (mode === 'off') board.journal.off();

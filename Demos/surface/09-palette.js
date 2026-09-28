@@ -14,7 +14,7 @@
 // Uses: core (hand, lastPen), ui, field (readFieldCommand, verbFor, libraryMatch, typedWord — pure,
 //   09-field.js), view (usableViewport, viewportRect), models (agents, withWork, cancelReading,
 //   askModelsAbout, offerModel), snap (snapMode), render (nameOfParticipant, logKey, paintReference),
-//   artifacts (flipped), frames,
+//   artifacts (flipped), frames, packs (packShort, packSaid — how a match says its pack),
 //   clocks (definitionOf), handwriting (isWriting, isRead, readLine, readOne), images (svgOf), text
 //   (wordToText, lineToText, foldIntoText, textNear, beginTextEdit), input (say, flash, downType — which
 //   hand opened the field), hand (handOfPointer).
@@ -99,10 +99,12 @@
     // --- What this IS: readings with their numbers. Tapping one takes it as the name. ---
     for (const sug of sum.suggestions) {
       if (sug.kind !== 'match') continue;
+      // A library pack's definition says its pack (V1-PLAN §2.3, B3): known because this board uses it, not because you named it.
+      const from = sug.pack ? packSaid(sug.pack) : null;
       known.push(readingItem({
-        key: 'sug:' + sug.id, grounds: { on: 'known', confidence: sug.score || 1, why: 'you named this shape before' },
-        label: sug.label + ' ' + (sug.score || 1).toFixed(2), name: sug.label,
-        why: (sug.reasoning || 'like the one you named') + ' — take it as another ' + sug.label,
+        key: 'sug:' + sug.id, grounds: { on: 'known', confidence: sug.score || 1, why: from ? 'from ' + from + ', which this board uses' : 'you named this shape before' },
+        label: sug.label + ' ' + (sug.score || 1).toFixed(2) + (sug.pack ? ' · ' + packShort(sug.pack) : ''), name: sug.label,
+        why: (sug.reasoning || 'like the one you named') + (from ? ' — from ' + from : '') + ' — take it as another ' + sug.label,
         run: () => {
           const made = session.bless({ summonId: sum.id, suggestionId: sug.id, at: Date.now() });
           // A definition that holds a program hands it to its instance: a

@@ -4,6 +4,7 @@
 //   a hand's label on its own mark (labelsDrawn), match chips,
 //   the working dot, the explanation plane and its layout, the status line (one sentence).
 // Uses: core, view, artifacts, snap, models, palette (contextFor), inspector, teach (syncMarkChip), folder (folderStatus, liveSet),
+//   packs (packShort — a match chip says its pack; a pack this build lacks is said in the standing line),
 //   input (live, magnetHold, penHover — the pen's layer draws the stroke in progress and a hovering pencil's magnet).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () Ellipsis)();`. Shared state is the
@@ -681,7 +682,8 @@
       // A match is a chip beside the group, with its number (D8); a tap on it
       // opens the field with the match leading. Plural, like every reading:
       // two definitions with the same shapes are both named.
-      const said = c.matches.slice(0, 2).map((m) => m.name + ' ' + m.score.toFixed(2)).join('  ·  ');
+      // A library pack's definition says its pack (V1-PLAN B3): molecule 0.93 · basics.
+      const said = c.matches.slice(0, 2).map((m) => m.name + ' ' + m.score.toFixed(2) + (m.pack ? ' · ' + packShort(m.pack) : '')).join('  ·  ');
       const at = chipRect(said, b.minX - pad, b.minY - pad - wpx(8));
       const whole = { minX: b.minX - pad, minY: at.y, maxX: Math.max(b.minX - pad + at.w, b.maxX + pad), maxY: b.maxY + pad };
       if (!vb || cp || boxMeets(whole, vb)) {
@@ -694,7 +696,7 @@
         if (paintOps) recordOp({ kind: 'match', id: c.nodeIds.join(','), text: said, box: boxOfRect(whole.minX, whole.minY, whole.maxX - whole.minX, whole.maxY - whole.minY), moved: !!cp });
       }
       // Measured wherever it is, so a tap and a test find it whether it was drawn or not.
-      chipHits.push({ ids: c.nodeIds.slice(), x: at.x, y: at.y, w: at.w, h: at.h });
+      chipHits.push({ ids: c.nodeIds.slice(), x: at.x, y: at.y, w: at.w, h: at.h, text: said });
     });
     // What a model read a group as stays beside it (v10 F6): a chip with the
     // number and the reader, whether or not the field is still open, and a
@@ -713,7 +715,7 @@
         chipText(rc.text, b.minX - pad, b.maxY + pad + wpx(17));
         if (paintOps) recordOp({ kind: 'read', id: id, text: rc.text, box: boxOfRect(at.x, at.y, at.w, at.h), moved: false });
       }
-      chipHits.push({ ids: group.length ? group : [id], x: at.x, y: at.y, w: at.w, h: at.h });
+      chipHits.push({ ids: group.length ? group : [id], x: at.x, y: at.y, w: at.w, h: at.h, text: rc.text });
     }
 
     const inspectedId = hoverId || lastContentId(s);
@@ -831,6 +833,8 @@
     }
     const fs = folderStatus();
     if (fs) parts.push(fs);
+    // A pack this board names that this build cannot give it is said, never hidden (V1-PLAN B3).
+    if (s.packNotices.length) parts.push(s.packNotices.map((n) => n.reason === 'unknown' ? n.pack + ' is not in this build' : '“' + n.pack + '” is no pack').join(', ') + ' — its definitions are not matched here');
     if (agents.length) parts.push(agents.map((a) => a.config.model).join(', '));
     if (ws) parts.push('⋯ ' + ws);
     if (hint) parts.push(hint);

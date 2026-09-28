@@ -1,5 +1,6 @@
 // ===== boot =====
-// Provides: the debug handle (window.__mm, what the e2e drives), subscription, restore, first render.
+// Provides: the debug handle (window.__mm, what the e2e drives), subscription (the journal first, the paint,
+//   the packs pane and the pen's ports), restore, first render.
 // Uses: everything.
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () { ... })();`. Shared state is the
@@ -111,6 +112,10 @@
   // must be the browser's before then (V1-PLAN R3, the kill test).
   session.subscribe(persistBoard);
   session.subscribe(render);
+  // The library packs the board uses (V1-PLAN §2.3, B3): the pane and the tile follow its log, and so
+  // does the pen — a pack naming a notation offers its ports while in use, and takes them back after.
+  session.subscribe(packsHeard);
+  MM.followPacks(session);
   const replayUrl = params.get('replay');
   const mode = boardMode();
   if (mode === 'off') board.journal.off();

@@ -235,6 +235,19 @@ html, body {
 #boardsPanel .bdEmpty { margin-top: 7px; width: 100%; }
 #boardsPanel #boardsStatus:not(:empty) { margin: 9px 0 0; }
 
+/* The library packs pane (V1-PLAN §2.3, B3): what this build ships, what the board uses, and use / stop using. */
+#packsPanel { width: min(320px, calc(100vw - 24px)); box-sizing: border-box; max-height: calc(100vh - 80px); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+#packsPanel .pkItem { padding: 6px 7px; border: 1px solid transparent; border-radius: 6px; }
+#packsPanel .pkItem + .pkItem { margin-top: 2px; }
+#packsPanel .pkItem.used { border-color: var(--rule); background: rgba(var(--gold-rgb), 0.07); }
+#packsPanel .pkTop { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; min-width: 0; }
+#packsPanel .pkName { font: 12px var(--ui); color: var(--ink); }
+#packsPanel .pkLost .pkName { color: var(--dim); }
+#packsPanel .pkWhat { font-size: 10.5px; line-height: 1.45; color: var(--dim); margin-top: 3px; }
+#packsPanel .pkHolds { font-family: var(--mono); font-size: 10px; color: var(--ink); margin-top: 3px; }
+#packsPanel .pkItem button { margin-top: 5px; padding: 2px 8px; font-size: 10.5px; }
+#packsPanel #packsStatus:not(:empty) { margin: 9px 0 0; }
+
 /* The model pane. */
 #modelPanel .mpRow { display: flex; gap: 7px; margin-top: 11px; }
 #modelPanel .mpRow button { flex: 1; }
