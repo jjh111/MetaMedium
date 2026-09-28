@@ -131,12 +131,20 @@ describe('the arrow’s own barb', () => {
 
   it('a barb filled with a hatch is a filled triangle', () => {
     const s = createSession();
-    const pts = handArrow({ x: 100, y: 200 }, { x: 400, y: 200 }, { wings: 2, seed: 1 });
+    const tip = { x: 400, y: 200 }, w1 = { x: 376, y: 186 }, w2 = { x: 376, y: 214 };
+    // Out one wing, back to the tip, out the other — the way a hand draws a two-wing barb.
+    const pts = [
+      ...lineStroke({ x: 100, y: 200 }, tip, 80),
+      ...lineStroke(tip, w1, 12).slice(1),
+      ...lineStroke(w1, tip, 12).slice(1),
+      ...lineStroke(tip, w2, 12).slice(1),
+    ];
     const id = s.addStroke(pts, 1000);
-    const barb = pts.filter((p) => p.x > 360);
-    const w1 = barb.reduce((a, p) => (p.y < a.y ? p : a)), w2 = barb.reduce((a, p) => (p.y > a.y ? p : a));
-    const fill = s.addStroke(hatch([{ x: 400, y: 200 }, w1, w2], 7, 0.3, { y: 200, half: 1.5 }), 5000);
-    expect(s.getState().contentIds).toContain(id); // the fill is not a scratch across the arrow
+    expect(top(s, id)).toMatchObject({ kind: 'arrow', filled: false });
+    // A fill kept inside the wings: one that crosses them three times is a
+    // scratch, and would rub the arrow out (erase.ts). It crosses the shaft once.
+    const fill = s.addStroke(hatch([tip, w1, w2], 7, 0.3, { y: 200, half: 1.5 }), 5000);
+    expect(s.getState().contentIds).toContain(id);
     const head = top(s, id)!;
     expect(head).toMatchObject({ kind: 'triangle', filled: true });
     expect(head.ids).toEqual(expect.arrayContaining([id, fill]));

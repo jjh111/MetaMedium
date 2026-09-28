@@ -375,6 +375,27 @@ export type { Relation, RelationKind, Mark, RelateConfig } from './relate/relati
 // (KEYFRAMES.md §3), and the genre that decides how a drawing compiles.
 export { assignRoles, genreOf, describeRoles, ROLES } from './diagram/roles';
 export type { Role, RoleReading, RoleScope, Wire, Genre, GenreReading } from './diagram/roles';
+// Connector heads (V1-PLAN E3): what sits at each end of a line, an arrow or
+// an arc — the arrow's own barb, a small triangle, diamond or circle touching
+// the end, a separate chevron — hollow or filled, filled measured as ink
+// coverage relative to the head's own area. Writing at an end is a label, not
+// a head. Plural, with reasons; derived, never in the log.
+export {
+  headsOf,
+  connectorHeads,
+  describeHeads,
+  HEAD_MAX_SHARE,
+  HEAD_AXIS_SHARE,
+  FILL_CORE,
+  FILL_REACH,
+  FILLED_AT,
+  FILL_UNSURE,
+  BARB_ROUND,
+  BARB_CLOSED,
+  OUTLINE_PATH,
+  HEAD_COMPACT,
+} from './diagram/heads';
+export type { HeadKind, HeadReading, ConnectorEnd, ConnectorHeads } from './diagram/heads';
 
 // Concepts — the meaning-mappings, as a library rather than as code paths.
 export { matchConcepts, BUILTIN_CONCEPTS } from './concepts/concept';
