@@ -401,8 +401,13 @@ type SessionEventUnion =
  * An event carrying neither was written before this rule, or by a session
  * that was never told what its log is called; it keeps the numbering it
  * always had (see `nextId`).
+ *
+ * `tool` is the tool whose offer wrote the event, when one did (V1-PLAN B1,
+ * `tools/`): stamped by the writing session while `withTool` holds, so the log
+ * says which tool did what and context (B2) can read what was just taken
+ * where. Like `by`, it is provenance, never state: replay ignores it.
  */
-export type SessionEvent = SessionEventUnion & { by?: string; origin?: string; seq?: number };
+export type SessionEvent = SessionEventUnion & { by?: string; origin?: string; seq?: number; tool?: string };
 
 /**
  * An attributed, inferred REP offered by a participant — what a model read
@@ -666,6 +671,13 @@ export interface Session {
    * draw afterwards to continue the recorded session with your own marks.
    */
   load(events: readonly SessionEvent[]): void;
+  /**
+   * Take a tool's act: every event `fn` writes carries `tool: toolId`
+   * (V1-PLAN B1), so the log says which tool did what. Nothing else changes —
+   * replay reads no `tool`, and an event that already carries one keeps it.
+   * Nested, the innermost tool is the one stamped; `fn`'s result is returned.
+   */
+  withTool<T>(toolId: string, fn: () => T): T;
 }
 
 export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): Session {
@@ -689,6 +701,9 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
   // Runtime notices, not log facts: neither is derived from the events, so
   // neither is checkpointed and neither survives into another session's log.
   let staleResult: StaleResult | null = null;
+  // The tool whose act is being taken (`withTool`): runtime, never derived
+  // from the log; what it stamps on the events it writes is the log's.
+  let actingTool: string | null = null;
   let generation = 0;
   let lastAt = 0;
   let counter = 0;
@@ -2991,8 +3006,10 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
 
   // ===== Public API =====
 
-  function dispatch(raw: SessionEvent): string | null {
+  function dispatch(given: SessionEvent): string | null {
     staleResult = null;
+    // The tool taking its act is stamped here too, beside authorship (B1).
+    const raw: SessionEvent = actingTool !== null && given.tool === undefined ? { ...given, tool: actingTool } : given;
     // Authorship is stamped HERE, because this is the only place an event is
     // made; an event that already carries it was written elsewhere and keeps
     // what it was written with. The number is one past the sitting's
@@ -3148,6 +3165,15 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     dismiss: (summonId, at) => void dispatch({ type: 'dismiss', summonId, at }),
     erase: (nodeId, at) => void dispatch({ type: 'erase', nodeId, at }),
     undo,
+    withTool: <T>(toolId: string, fn: () => T): T => {
+      const before = actingTool;
+      actingTool = toolId;
+      try {
+        return fn();
+      } finally {
+        actingTool = before;
+      }
+    },
     load: (log) => {
       // The whole board is replaced — including `load([])`, which is how a
       // surface resets. Anything asked for against the old board is now about
