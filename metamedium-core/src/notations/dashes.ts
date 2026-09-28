@@ -21,7 +21,9 @@
 //     each beside the next ALONG it, a gap between them no longer than
 //     DASH_GAP of their length, or a hand's slight overlap. Letters stand side
 //     by side, not end to end, so a row of them is no dashed line, and neither
-//     is a column; strokes slanting across the line leave its corridor.
+//     is a column; strokes slanting across the line leave its corridor, and
+//     none runs more across the line than along it (DASH_ALONG) — that is a
+//     dash of a row crossing this one.
 //   - **Nothing small touches a dash but at the row's own ends, and nothing
 //     small stands in a gap.** This is what keeps writing out. Printed
 //     letters are straight strokes too — the top bars of an F and two Es
@@ -85,6 +87,8 @@ export const DASH_PATH = 1.35;
 /** Both ends of each dash lie within this share of the row's median dash of the line through them all — or 3 px on screen, whichever is more. */
 export const DASH_OFF = 0.3;
 export const DASH_OFF_PX = 3;
+/** …and each runs along the line, not across it: within this many degrees of it. A short dash's direction is noise, but one standing across a row is a dash of a row crossing it. */
+export const DASH_ALONG = 45;
 /** The gap from one dash to the next is at most this share of their mean length — or 10 px on screen, whichever is more. */
 export const DASH_GAP = 1.5;
 export const DASH_GAP_PX = 10;
@@ -269,6 +273,7 @@ function gapBetween(p: Dash, q: Dash): number | null {
   const sc = Math.max(p.scale, q.scale);
   const off = Math.max(DASH_OFF * Math.max(p.len, q.len), DASH_OFF_PX * sc);
   for (const e of [p.a, p.b, q.a, q.b]) if (Math.abs(cross(u, sub(e, p.c))) > off) return null;
+  for (const d of [p, q]) if (Math.abs(dot(d.u, u)) < Math.cos(DASH_ALONG / DEG)) return null;
   const pa = dot(sub(p.a, p.c), u), pb = dot(sub(p.b, p.c), u);
   const qa = dot(sub(q.a, p.c), u), qb = dot(sub(q.b, p.c), u);
   const gap = Math.min(qa, qb) - Math.max(pa, pb);
@@ -349,7 +354,7 @@ function kept(run: Dash[]): Dash[][] {
     // The worst dash off its line, by how far past its allowance; none past it keeps the row.
     let worst = -1, by = 1;
     f.placed.forEach((p, k) => {
-      const over = Math.max(p.off / f.off, p.d.len / (DASH_SPREAD[1] * f.dash), (DASH_SPREAD[0] * f.dash) / Math.max(1e-9, p.d.len));
+      const over = Math.max(p.off / f.off, p.angle / DASH_ALONG, p.d.len / (DASH_SPREAD[1] * f.dash), (DASH_SPREAD[0] * f.dash) / Math.max(1e-9, p.d.len));
       if (over > by) {
         by = over;
         worst = k;

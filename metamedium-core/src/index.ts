@@ -473,6 +473,35 @@ export {
   END_SHARE,
 } from './notations/uml-class';
 export type { UmlClassReading, UmlClassSymbol, UmlCompartment, UmlMember, UmlRelation, UmlRelationEnd, UmlMarker } from './notations/uml-class';
+// The sequence notation (V1-PLAN §3, D5): participants — a box, or a stick
+// figure (a circle over a body and a few short lines), at the top of its
+// lifeline, one long line or dashed — read from the geometry, never the
+// relation table; messages are roughly level connectors whose ends, past
+// their heads, land on two lifelines (a call solid, a return dashed; a loop
+// out and back is a self-message), in order down the page, each labelled by
+// the writing just above it. Its content is SEQUENCE_TABLE, which the
+// sequence@1 pack names; each lifeline is a continuous port.
+export {
+  SEQUENCE,
+  SEQUENCE_TABLE,
+  readSequence,
+  sequencePortsOf,
+  LIFELINE_PLUMB,
+  LIFELINE_PX,
+  LIFELINE_OF_BOX,
+  LIFELINE_MIDDLE,
+  LIFELINE_BELOW,
+  LIFELINE_GAP,
+  LIFELINE_GAP_PX,
+  MESSAGE_LEVEL,
+  LAND_SHARE,
+  LOOP_PX,
+  LOOP_SPAN_PX,
+  LABEL_ABOVE,
+  LABEL_DIP,
+  WRITING_ZIGZAG,
+} from './notations/sequence';
+export type { SequenceReading, SequenceParticipant, SequenceMessage, MessageKind } from './notations/sequence';
 export { stanceOf, cornersOf, tightBox } from './notations/shape';
 // Dashed lines (V1-PLAN §3, D5) — short straight strokes in a row read as one
 // line, derived like figures: each dash's ends in the row's corridor, each a
@@ -480,7 +509,7 @@ export { stanceOf, cornersOf, tightBox } from './notations/shape';
 // row's ends nor standing in a gap — so printed capitals, whose bars join
 // their stems, never read as one. `dashedHeads` asks heads.ts what sits at
 // each end, on a scratch board where the row is one stroke.
-export { dashedLines, dashedHeads, DASH_PX, DASH_BOW, DASH_PATH, DASH_OFF, DASH_OFF_PX, DASH_GAP, DASH_GAP_PX, DASH_OVERLAP, DASH_SPREAD, MIN_DASHES, SMALL_MARK, DASH_TOUCH, DASH_TOUCH_PX, CROSSING_DEG, HEAD_OF } from './notations/dashes';
+export { dashedLines, dashedHeads, DASH_PX, DASH_BOW, DASH_PATH, DASH_OFF, DASH_OFF_PX, DASH_ALONG, DASH_GAP, DASH_GAP_PX, DASH_OVERLAP, DASH_SPREAD, MIN_DASHES, SMALL_MARK, DASH_TOUCH, DASH_TOUCH_PX, CROSSING_DEG, HEAD_OF } from './notations/dashes';
 export type { DashedLine } from './notations/dashes';
 export type { QuadStance } from './notations/shape';
 // Mermaid out (V1-PLAN §3, D2) — a notation reading said as Mermaid text at
@@ -511,6 +540,12 @@ export { layoutLayered, keepApart, LAYERED_PASSES, KEEP_DIRECTION } from './nota
 // relations from the marked end, multiplicities as quoted cardinalities — and
 // read back and drawn as ink the notation reads, so the round trip holds.
 export { writeUmlClass, readClassDiagramText, CLASS_DIAGRAM_READER, memberLine } from './notations/uml-class-mermaid';
+// The sequence diagram in Mermaid, both ways (D5): `sequenceDiagram` written
+// from a reading — participants left to right, messages down the page, each
+// arrow as its line and head say, words as raw text with Mermaid's entities —
+// and read back and drawn as ink the notation reads, so the round trip holds.
+export { writeSequence, readSequenceText, SEQUENCE_READER, sequenceText, BLANK_WORDS } from './notations/sequence-mermaid';
+export type { SequenceDiagramRead, SequenceNodeRead, SequenceLinkRead, DrawnSequenceLink } from './notations/sequence-mermaid';
 export type { LayeredNode, LayeredLink, LayeredOptions, LayeredLayout, LayeredBack, LayeredDirection } from './notations/layered';
 
 // Concepts — the meaning-mappings, as a library rather than as code paths.
