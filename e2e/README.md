@@ -82,6 +82,10 @@ itself — several contexts, each with the gate's own guards.
   private window, blocked site data). The status line must say it at once, keep
   saying it, offer the ways out, and let it go when a save succeeds; both ways
   out are taken.
+- **Flush on the way out** (F, Chromium). A write waiting for its retry —
+  refused, then room made, the next try not yet due — must go when the page
+  does: the tab closed (pagehide), or hidden and then crashed
+  (visibilitychange). Take the two listeners out and both checks fail.
 - **The import** (I), **two tabs** (T), and **pages that must not write** (L: a
   live room, an embed, a replay).
 

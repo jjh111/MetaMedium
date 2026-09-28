@@ -1212,8 +1212,9 @@ browser storage (`mm-log`), rewritten 900 ms after the last change — stopped
 saving at about 1,500 marks and swallowed the error (PERF.md); that board is
 **imported once, unchanged**, the first time the store opens, and the key is
 removed only when the write has landed. **One tab writes a board** (a Web Lock
-for the page's life): a second tab shows it and writes nothing, and when the
-first lets go it takes over — unless the board was written since it opened.
+for the page's life, or until it opens a folder or a room): a second tab shows
+it and writes nothing, and when the first lets go it takes over — unless the
+board was written since it opened.
 **A save that fails is never silent**: the status line LEADS with it, whatever
 else it says, until a save succeeds — *not saved — the browser's storage for
 this page is full* (or: this browser will not let the page keep anything, a

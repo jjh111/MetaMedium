@@ -606,7 +606,7 @@
       if (board.freedEarly) boardFreed(); else waitForBoard();
     }
     board.ready = true;
-    if (plan.damaged) say('the board kept in this browser had ' + (plan.damaged.skipped + plan.damaged.bad) + ' unreadable piece' + (plan.damaged.skipped + plan.damaged.bad === 1 ? '' : 's') + ' — what could be read is back, and is written whole again');
+    if (plan.damaged && plan.arm) say('the board kept in this browser had ' + (plan.damaged.skipped + plan.damaged.bad) + ' unreadable piece' + (plan.damaged.skipped + plan.damaged.bad === 1 ? '' : 's') + ' — what could be read is back, and is written whole again');
     // What the store has not heard: the import, what was drawn while it opened.
     persistBoard();
     return !!arr;
