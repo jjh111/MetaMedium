@@ -658,6 +658,28 @@ describe('a person is the same person across sittings (V1-PLAN L2i)', () => {
     expect(b2.getState().staleResult!.detail).toContain('made by fern');
   });
 
+  it('what stays per sitting: a word is one sitting\'s run — his letters from two tabs, interleaved on one band, never gather into one', () => {
+    // Two tabs of one person write independently, as two hands do (L2g): his N
+    // in one tab, his A right beside it in the other, his V back in the first.
+    const a1 = hand('john~a1'), b2 = hand('john~b2');
+    const [n] = N(100, 100), [a, bar] = A(126, 100), [v] = V(154, 100);
+    const first = [a1.addStroke(n, 1000)];
+    const second = [b2.addStroke(a, 1400), b2.addStroke(bar, 1800)];
+    first.push(a1.addStroke(v, 2200));
+    const tab = (id: string) => (first.includes(id) ? 'a1' : second.includes(id) ? 'b2' : id);
+    for (const me of ['john~a1', 'john~b2', 'fern~x1']) {
+      const board = hand(me);
+      board.load(mergeLogs({ 'john~a1': own(a1), 'john~b2': own(b2) }, { me }));
+      const s = board.getState();
+      for (const w of s.contentIds.map((id) => s.nodes.get(id)!).filter(isWord)) {
+        expect([...new Set(lettersOf(w).map(tab))]).toHaveLength(1);
+      }
+      // Every letter still stands, in a word of its own tab's or alone.
+      const standing = s.contentIds.flatMap((id) => { const x = s.nodes.get(id)!; return isWord(x) ? lettersOf(x) : [id]; });
+      expect(standing.sort()).toEqual([...first, ...second].sort());
+    }
+  });
+
   it('what stays per sitting: two logs, two participants, and each its own numbering — the rule merges no one', () => {
     const a1 = hand('john~a1');
     const x = a1.addStroke(box(0, 0, 100, 60), 1000, undefined, 1, { content: true });
