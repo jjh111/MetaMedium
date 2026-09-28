@@ -375,6 +375,114 @@ for (const [path, log] of heldLogs()) {
   r.done();
 }
 
+// ===== A log of the acts the generated boards never make ===================
+//
+// The bench board draws, blesses, moves, snaps, proposes, answers and writes
+// text. This log, made through the OLD engine's own API, does the rest: a
+// loop taken by the check and by a tap, a group kept as a drawing, words
+// split and rubbed out, a correction each way, tidying, scaling, turning, a
+// file and a traced picture imported, a frame, a label, a binding, a taught
+// mark, clocks and a behaviour — each beside marks a definition can match.
+
+const pts = {
+  line: (a, b, n = 40) => Array.from({ length: n + 1 }, (_, i) => ({ x: a.x + ((b.x - a.x) * i) / n, y: a.y + ((b.y - a.y) * i) / n })),
+  circle: (cx, cy, r, n = 90) => Array.from({ length: n + 1 }, (_, i) => ({ x: cx + r * Math.cos((i / n) * 2 * Math.PI), y: cy + r * Math.sin((i / n) * 2 * Math.PI) })),
+  rect(x, y, w, h, k = 24) {
+    const c = [{ x: x + w / 2, y }, { x: x + w, y }, { x: x + w, y: y + h }, { x, y: y + h }, { x, y }, { x: x + w / 2, y }];
+    return c.slice(1).flatMap((q, i) => pts.line(c[i], q, k).slice(i ? 1 : 0));
+  },
+  check: (x, y) => [...pts.line({ x, y }, { x: x + 25, y: y + 35 }, 30), ...pts.line({ x: x + 25, y: y + 35 }, { x: x + 70, y: y - 15 }, 30).slice(1)],
+  scratch(x, y, w, h, passes = 3) {
+    const out = [];
+    for (let i = 0; i < passes; i++) {
+      const yi = y + (h * i) / (passes - 1);
+      const from = { x: i % 2 ? x + w : x, y: yi }, to = { x: i % 2 ? x : x + w, y: yi };
+      out.push(...pts.line(from, to, 10).slice(i ? 1 : 0));
+    }
+    return out;
+  },
+  N: (x, y, h = 30) => [[...pts.line({ x, y: y + h }, { x, y }, 14), ...pts.line({ x, y }, { x: x + 18, y: y + h }, 14).slice(1), ...pts.line({ x: x + 18, y: y + h }, { x: x + 18, y }, 14).slice(1)]],
+  V: (x, y, h = 30) => [[...pts.line({ x, y }, { x: x + 10, y: y + h }, 14), ...pts.line({ x: x + 10, y: y + h }, { x: x + 20, y }, 14).slice(1)]],
+};
+
+function scriptedLog(core) {
+  const s = core.createSession({ ...core.DEFAULT_SESSION_CONFIG, logName: 'script' });
+  let t = 1000;
+  const at = (dt = 700) => (t += dt);
+  const molecule = (x, y) => [
+    s.addStroke(pts.circle(x, y, 30), at()), s.addStroke(pts.circle(x + 100, y, 30), at()),
+    s.addStroke(pts.line({ x: x + 32, y }, { x: x + 68, y }), at()),
+  ];
+  const word = (x, y) => { for (const p of [...pts.N(x, y), ...pts.V(x + 26, y)]) s.addStroke(p, at(350)); };
+  // A definition, taken by a loop and the check.
+  const m1 = molecule(200, 200);
+  s.addStroke(pts.circle(250, 200, 110), at());
+  s.addStroke(pts.check(320, 180), at(400));
+  if (!s.getState().summon) throw new Error(`the scripted check did not take the loop up: ${JSON.stringify(s.getState().markMiss)}`);
+  const def = s.bless({ summonId: s.getState().summon.id, name: 'molecule', at: at() });
+  // A loop taken by a tap, then kept as a drawing.
+  const m2 = molecule(700, 200);
+  s.addStroke(pts.circle(750, 200, 110), at());
+  const kept = s.summonHeld(at());
+  const keep = s.getState().summon.suggestions.find((x) => x.kind === 'keep-as-drawing');
+  s.bless({ summonId: kept, suggestionId: keep.id, at: at() });
+  // Groups the definition matches; a correction each way.
+  const m3 = molecule(200, 600);
+  const m4 = molecule(700, 600);
+  s.correct({ ids: m3, definitionId: def, verdict: 'is-not', at: at() });
+  s.correct({ ids: m4, definitionId: def, verdict: 'is', at: at() });
+  s.correct({ ids: m3, definitionId: def, verdict: 'is', at: at() });
+  // Words: one split, one rubbed out a letter at a time.
+  word(1200, 200);
+  const w1 = s.getState().contentIds.find((id) => core.isWord(s.getState().nodes.get(id)));
+  s.splitWord(w1, at());
+  word(1200, 400);
+  const w2 = s.getState().contentIds.find((id) => core.isWord(s.getState().nodes.get(id)));
+  s.erase(core.lettersOf(s.getState().nodes.get(w2))[0], at());
+  // Boxes in a rough row: tidied, equalised, scaled, turned, moved.
+  const row = [s.addStroke(pts.rect(100, 1000, 120, 70), at()), s.addStroke(pts.rect(260, 1012, 90, 80), at()), s.addStroke(pts.rect(400, 995, 140, 60), at())];
+  s.tidy({ ids: row, mode: 'align', at: at() });
+  s.tidy({ ids: row, mode: 'equalize', at: at() });
+  s.scale({ ids: [row[0]], about: { x: 100, y: 1000 }, sx: 1.4, sy: 0.8, at: at() });
+  s.rotate({ ids: [row[1]], about: { x: 300, y: 1040 }, radians: 0.3, at: at() });
+  s.move({ ids: [row[2]], dx: 40, dy: -30, at: at() });
+  s.select(row, at());
+  s.deselect(at());
+  // A second definition of boxes, a file and a traced picture, and a frame of them.
+  const boxes = [s.addStroke(pts.rect(1200, 1000, 160, 100), at()), s.addStroke(pts.rect(1220, 1020, 60, 40), at())];
+  const framed = s.bless({ summonId: s.summonMarks(boxes, at()), name: 'framed', at: at() });
+  const file = s.import({ kind: 'md', path: 'notes/readme.md', name: 'readme', bounds: { minX: 1600, minY: 1000, maxX: 1900, maxY: 1200 }, code: '# notes', at: at() });
+  s.import({ kind: 'png', path: 'sketch.png', bounds: { minX: 2000, minY: 1000, maxX: 2300, maxY: 1200 }, strokes: [pts.rect(2010, 1010, 100, 80), pts.line({ x: 2120, y: 1050 }, { x: 2280, y: 1050 })], at: at() });
+  s.frame({ ids: [framed, file], name: 'pair', connections: [], at: at() });
+  // A molecule moved as a definition's instance, with its members moved too.
+  const m5 = molecule(200, 1400);
+  s.bless({ summonId: s.summonMarks(m5, at()), suggestionId: undefined, name: 'molecule 2', at: at() });
+  const inst = s.getState().artifacts[s.getState().artifacts.length - 1];
+  s.move({ ids: [inst], dx: 300, dy: 50, at: at() });
+  // A label, a binding, a proposal, code taken as text, an answer, a snap.
+  s.label({ nodeId: row[0], text: 'inlet', at: at() });
+  const arrow = s.addStroke(pts.line({ x: 225, y: 1035 }, { x: 255, y: 1040 }), at());
+  s.bind({ strokeId: arrow, nodeId: row[1], site: { kind: 'corner', index: 0 }, end: 'end', at: at() });
+  const model = s.join('agent', 'llm:script', at(), 2, 'local');
+  s.propose({ participantId: model, nodeId: m4[0], edges: [{ to: 'type:bubble', rel: 'resembles', weight: 0.95, reasoning: 'scripted' }], at: at() });
+  s.attachCode({ participantId: model, nodeId: framed, code: 'framed', kind: 'text', at: at() });
+  s.answer({ participantId: model, question: 'what?', text: 'two molecules', aboutIds: m3, at: at() });
+  s.snap({ ids: row, at: at() });
+  // A taught mark, clocks and a behaviour on the definition.
+  s.teachCommandMark(null, at());
+  s.clock({ nodeId: def, op: 'play', at: at() });
+  s.clock({ nodeId: def, op: 'pause', reason: 'scripted', at: at() });
+  s.behave({ nodeId: def, behaviour: { terms: [{ verb: 'wander', weight: 1 }] }, at: at() });
+  // A member rubbed out degrades its artifact; a scratch across two groups.
+  s.erase(boxes[1], at());
+  const b = core.boundsOf(s.getState().nodes.get(m2[0]));
+  // Three passes, so it ends across from where it began: an open stroke (four
+  // would end beside its start, and a closed stroke is a loop, never a scratch).
+  s.addStroke(pts.scratch(b.minX - 10, (b.minY + b.maxY) / 2 - 12, b.maxX - b.minX + 20, 24, 3), at());
+  molecule(1500, 600);
+  return s.getEvents().slice();
+}
+
 // ===== The bench board =====================================================
 
 function applyViaApi(s, ev) {
@@ -392,6 +500,38 @@ function applyViaApi(s, ev) {
     case 'snap': return s.snap({ ids: ev.ids, mode: ev.mode, at: ev.at });
     default: throw new Error(`cannot draw a "${ev.type}" event`);
   }
+}
+
+{
+  const log = scriptedLog(engines.old);
+  const r = reporter(`a scripted log of the acts the boards never make (${log.length} events: ${[...new Set(log.map((e) => e.type))].join(', ')})`);
+  for (const [variant, open] of Object.entries(VARIANTS)) compareBoards(variant, open(engines.old, log), open(engines.new, log), r);
+  {
+    // What the board ends as — so a pass is not a comparison of two empty boards.
+    const st = VARIANTS.bare(engines.new, log).getState();
+    const erased = [...st.nodes.values()].filter((n) => n.reps.some((x) => x.modality === 'erased')).length;
+    const broken = st.artifacts.length + [...st.nodes.values()].filter((n) => n.reps.some((x) => x.modality === 'status' && x.data === 'broken')).length;
+    r.line(`it ends with ${st.contentIds.length} marks on the plane, ${st.artifacts.length} artifacts standing (${broken} ever made), ${st.clusterCandidates.length} groups matched, ${erased} marks rubbed out`);
+  }
+  const diffs = [];
+  for (let k = 1; k < log.length; k++) {
+    const so = VARIANTS.bare(engines.old, log.slice(0, k)), sn = VARIANTS.bare(engines.new, log.slice(0, k));
+    if (glance(so) !== glance(sn)) diffs.push({ key: `prefix ${k} (${log[k - 1].type})`, old: glance(so), new: glance(sn) });
+    else compareBoards(`prefix ${k}`, so, sn, { differ: (sec, d) => diffs.push(...d.map((x) => ({ ...x, key: `prefix ${k} ${sec} ${x.key}` }))), note() {} });
+  }
+  if (diffs.length) r.differ('prefixes', diffs);
+  else r.line(`every prefix of the log (${log.length - 1}), read in full, stands the same`);
+  // And undone from the end, one event at a time, against a replay from zero.
+  const u = { old: VARIANTS.bare(engines.old, log), new: VARIANTS.bare(engines.new, log) };
+  const undone = [];
+  for (let i = 0; i < 12; i++) {
+    u.old.undo();
+    u.new.undo();
+    if (glance(u.old) !== glance(u.new)) undone.push({ key: `undo ${i + 1}`, old: glance(u.old), new: glance(u.new) });
+  }
+  if (undone.length) r.differ('undo', undone);
+  else r.line('twelve undos from the end stand the same');
+  r.done();
 }
 
 if (SIZE > 0) {
