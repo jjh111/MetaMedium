@@ -12,12 +12,15 @@ screenshot later.*
 
 1. In the terminal at the repo, Claude runs the hand: `node Demos/mcp.mjs`
    (it starts the relay on :8020 when none answers). Or, in a Claude Code
-   session with the repo's `.mcp.json` approved, the seven `metamedium`
+   session with the repo's `.mcp.json` approved, the eight `metamedium`
    tools are simply there.
 2. John opens **Chrome** at `http://localhost:8010/Demos/session-engine.html`,
    presses the *live* tile, then **with Claude**. The status line says
    *live claude · you are hand · with claude* within a moment. Give the hand
-   a name in the pane first if you like — it is what Claude sees.
+   a name in the pane first if you like — it is what Claude sees. The tile's
+   room does not survive a reload; for §6's reload row, open the room by its
+   address instead — `…/session-engine.html?live=claude&relay=http://127.0.0.1:8020`
+   — which a reload keeps.
 3. Claude: `canvas_look` says *with hand* (or the name). The board is what
    John's tab holds. **Claude never plays a program and never blesses**;
    everything it does is held and attributed, in its own colour.
@@ -73,12 +76,26 @@ screenshot later.*
 
 ## 6. Two hands
 
+Every mark has one id on every board — its log's name and its number there
+— and a tab's log is one sitting, a page load (`SURFACE-v10-PLAN.md` T8;
+`V1-PLAN.md` L1). A word goes only on the ink its maker drew (L2b, L2e), a
+thing is its blesser's and a word its writer's (L2f, L2g), and each hand's
+loop, field and selection are its own (L2h). A reload is a new sitting and
+the same person: the marks drawn before it are still his to label (L2i).
+
 | John | Should see | Claude does |
 |---|---|---|
 | Draw a box | — | `canvas_draw` a circle beside it with a *why*: John sees the circle land in Claude's colour with the card beside it, and *with claude* in the status |
+| — | — | `canvas_look`: John's box is `stroke:<his name>~…:N`, the id his own tab gave it. `canvas_say` a sentence about that id: the card lands beside **his box**, never on another mark |
 | Write a word | — | `canvas_see` the word, `canvas_transcribe` it: John sees the transcript pill on the word without any model joined |
 | Circle both hands' marks, take the loop, *What is this?* | the readings row, if a model is joined | `canvas_propose` a reading with a confidence: it joins the row as *… · claude* |
-| Undo once | only John's last mark goes; Claude's stay | `canvas_look` still lists Claude's marks |
+| Undo once | only John's last mark goes; Claude's stay | `canvas_look` no longer lists the undone mark — the undo reached the room — and still lists Claude's. The next mark John draws has a new number, never the undone one's |
+| — | *sun* above Claude's circle, in Claude's colour, scaling with the board as it zooms | `canvas_label` its own circle *sun*; then `canvas_label` John's box: refused, the reply naming whose ink it is, and nothing lands on the box |
+| Circle his box and Claude's circle, take the loop, type `label: inlet` | the line under the field says *↵ label it “inlet” — on yours, not the mark claude made*; Enter puts *inlet* on his box alone, and the status says why Claude's circle was left | `canvas_look`: the box `labelled “inlet”`, by him; the circle with no label |
+| Circle two of his marks and take the loop; leave the field open | while it stands, Claude's line lands and **the field stays open on his two marks**; he types `name: pair` and Enter, and the thing is made, holding his two marks and nothing of Claude's | while John's field is open, `canvas_draw` a line near it. Then `canvas_look`: an artifact *pair*, by him, on this board too; its count line never says *the field is open* — John's field is his |
+| Draw a loop around a mark, and before his check… | …Claude's stroke lands; his check still takes **his** loop up and the field opens on his mark | `canvas_draw` a line between John's loop and his check |
+| Reload the tab (opened by its address, above) | the board comes back from the room: his marks in his colour, *you are* his name | `canvas_look` lists his earlier marks, by him, under their old ids; the next mark he draws carries a new sitting in its id, a number the room has never held |
+| After the reload, hold a mark drawn **before** it, type `label: inlet` | the line says *↵ label it “inlet”* before Enter, and Enter puts *inlet* on it: a reload is a new sitting and the same person, so the marks drawn before it are still his to label (L2i). Then hold it with Claude's circle and type `label: outlet`: *↵ label it “outlet” — on yours, not the mark claude made* | `canvas_look`: his mark `labelled “outlet”`, still *by <his name>* — the earlier sitting's — and the circle without it; then `canvas_label` his mark: refused, whose it is said — Claude is another person |
 
 ## 7. The minimap and the frame
 
@@ -92,4 +109,7 @@ screenshot later.*
 A letter that does not gather at his size. A summon that opens while he
 is writing. A ghost that stays. A *Play* on a text. A brief that leaves a
 named artifact behind. A reading that lands and shows nowhere. Claude's
-mark arriving under John's name, or doubled.
+mark arriving under John's name, or doubled. A sentence of Claude's beside
+a mark it was not about. An undone mark still in Claude's look. A word of
+Claude's on John's ink. John's field closed, or his loop taken, by
+Claude's stroke.

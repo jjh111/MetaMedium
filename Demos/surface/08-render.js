@@ -111,9 +111,13 @@
     ctx.stroke();
   }
 
+  /** The colour each mark's ink was stroked in by the last paint, by node id. For tests. */
+  const inkDrawn = new Map();
+
   function inkOf(node, style) {
     const points = MM.strokePointsOf(node);
     if (points) {
+      inkDrawn.set(node.id, style.color);
       const clean = MM.cleanPointsOf(node);
       if (clean) {
         // Snapped: the clean form in front, the hand's ink faint beneath it.
@@ -150,7 +154,11 @@
     for (const e of node.edges) { // artifact: draw its members (transparent within)
       if (e.rel !== 'has-part') continue;
       const m = state.nodes.get(e.to);
-      if (m && !m.reps.some((r) => r.modality === 'erased')) inkOf(m, style);
+      // Each mark in the colour of the hand that DREW it, not of the one that made the
+      // whole: an artifact is made by whoever blessed it, and a hand may bless a group
+      // several hands drew (V1-PLAN L2f). A colour the style imposes — a live page's
+      // gold, the outline of what was built — holds for every mark in it.
+      if (m && !m.reps.some((r) => r.modality === 'erased')) inkOf(m, style.byMaker ? Object.assign({}, style, { color: colourOf(m) }) : style);
     }
   }
 
@@ -192,6 +200,7 @@
     state = s;
     chipHits = [];
     chromeDrawn = [];
+    inkDrawn.clear();
     pruneRuntime(s);
     // No model is asked from here: a paint is not a request (§6.3).
     syncStage(s);
@@ -269,6 +278,7 @@
       inkOf(node, {
         color: isLive ? `rgba(${C.goldRGB},0.85)` : color,
         width: id === inspectedId ? inkW * 1.3 : inkW,
+        byMaker: !isLive,
       });
       if (pl) ctx.restore();
       if (held) ctx.restore();

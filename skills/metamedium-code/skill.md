@@ -572,18 +572,20 @@ overshoot term is scaled by the hand's `scale`, and that `extent` carries the
 most weight wherever a closed shape is being told from another.
 
 ```typescript
-function detectLine(fp: Fingerprint, points: Point[], scale = 1): RecognitionResult | null {
+function detectLine(fp: Fingerprint, points: Point[], scale = 1, even = evenBowOf(fp, points, scale)): RecognitionResult | null {
   if (fp.isClosed || checkOvershoot(points, 50 * scale)) return null;
 
   const straight = ramp(fp.straightness, 0.55, 0.95);
   const corners = fit(fp.corners, 0, 3);
-  const confidence = straight * 0.7 + corners * 0.3;
+  // A line gives way exactly as far as an even bow is shown to be meant (S1).
+  const confidence = (straight * 0.7 + corners * 0.3) * (1 - even.evidence);
+  const bows = even.bow && even.evidence >= 0.05 ? `, but it bows evenly like an arc of ${Math.round(even.bow.sweep)}°` : '';
 
   return result(
     'line',
     'Line',
     confidence,
-    `open, straightness ${fp.straightness.toFixed(2)}, ${fp.corners} corner(s)`
+    `open, straightness ${fp.straightness.toFixed(2)}, ${fp.corners} corner(s)${bows}`
   );
 }
 
@@ -613,12 +615,12 @@ pattern and live in `src/recognition.ts`:
 
 | Detector | Gate | What it weighs |
 |---|---|---|
-| `detectArc` | open | curvature (inverse straightness), few corners |
+| `detectArc` | open | curvature: inverse straightness, or an **even bow** (`evenBowOf` over geometry's `bowOf`: a sweep past a hand's line, a bulge shown on screen, both halves bowing, near its circle, no corners) — how a 30°–150° arc is told from a line |
 | `detectTriangle` | closed, sane aspect | extent near a half box, three corners, mean turn near 120° |
 | `detectRectangle` | closed, very generous aspect (a header bar is a rectangle) | extent near a full box, four corners, mean turn near 90° |
 | `detectDot` | — | size *on screen* (`fp.size / scale`) |
 | `detectText` | open, at least a few turns | many corners, sparse box, curvy, wide. Writing *without reading it*: enough to make a mark a `label` |
-| `detectArrow` | open, 1–4 corners, none in the middle | a straight shaft, a sharp barb inside one end, a short head. Returns `meta: { head, tip, tail }` |
+| `detectArrow` | open, 1–4 corners, none in the middle | a straight shaft, a sharp barb inside one end, a short head — gated by the barb being **short against its shaft** (or a flick in the hand's space), so an L is two arms, not an arrow. Returns `meta: { head, tip, tail, barb }` |
 
 ### Main Analysis Function
 
@@ -632,9 +634,10 @@ export function analyzeStroke(points: Point[], scale = 1): StrokeAnalysis {
     return { fingerprint, results: dot ? [dot] : [] };
   }
 
+  const even = evenBowOf(fingerprint, points, scale); // read once, for the line and the arc
   const results = [
-    detectLine(fingerprint, points, scale),
-    detectArc(fingerprint, points, scale),
+    detectLine(fingerprint, points, scale, even),
+    detectArc(fingerprint, points, scale, even),
     detectTriangle(fingerprint),
     detectRectangle(fingerprint),
     detectCircle(fingerprint, points, scale),
@@ -650,9 +653,11 @@ export function analyzeStroke(points: Point[], scale = 1): StrokeAnalysis {
 }
 ```
 
-**Key Insight**: a diamond is legitimately *triangle* and *rectangle* at once.
+**Key Insight**: a pentagon is legitimately *rectangle* and *circle* at once.
 Return every qualifying reading, ranked; the caller decides. Nothing wins by
-silencing the others.
+silencing the others. (A diamond is not the example any more: extent is
+measured against the tightest box at any angle, so a square turned 45° is a
+rectangle — and its clean form keeps the turn.)
 
 ---
 
@@ -703,6 +708,10 @@ export function snapReading(node: MMNode, nodes: ReadonlyMap<string, MMNode>): S
       reasoning: `${shape} ${top.weight.toFixed(2)} and ${second.label} ${second.weight.toFixed(2)} are too close to call`,
     };
   }
+  // A bend is not a line (S1): past a hand's line bow off its chord, never straightened.
+  if (shape === 'line' && lineBendsTooFar(node).bends) {
+    return { shape, weight: top.weight, ok: false, reasoning: `${shape} ${top.weight.toFixed(2)}, but it bends …` };
+  }
   return {
     shape,
     weight: top.weight,
@@ -714,13 +723,15 @@ export function snapReading(node: MMNode, nodes: ReadonlyMap<string, MMNode>): S
 }
 ```
 
-**Confident AND unambiguous.** A diamond that is triangle 0.61 / rectangle
-0.58 is never redrawn as either: that would silently settle an argument the
+**Confident AND unambiguous.** A pentagon that is rectangle 0.44 / circle
+0.43 is never redrawn as either: that would silently settle an argument the
 engine deliberately holds open. `idealize(node, shape)` then builds the clean
-form **from the ink's own measurements** — bounds, the three sharpest corners,
-the arrow's tip and tail, the arc's bulge through its chord — never from a
-template. Zero wrong snaps over the whole corpus is pinned in
-`clean.bench.test.ts`.
+form **from the ink's own measurements** — a box's tightest box at any angle
+(squared up to its bounds only within the hand's wobble, so a diamond stays a
+diamond), the three sharpest corners, the arrow's tip, tail and barb, the
+arc's bulge through its chord — never from a template. Zero wrong snaps over
+the whole corpus is pinned in `clean.bench.test.ts`, and so is this: every
+clean form, drawn again as ink, reads as the shape it cleans.
 
 ---
 

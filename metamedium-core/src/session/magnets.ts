@@ -12,6 +12,11 @@
 // reading still offers its bounds' corners and centre, from its own ink:
 // an offer, never a lie about shape.
 //
+// A notation that reads a mark as one of its symbols adds that symbol's ports
+// after the mark's own sites — points, and places along a segment or an
+// outline — through the hook in ports.ts (V1-PLAN E3). With none registered,
+// every query here answers exactly as it did before the hook.
+//
 // ===== The binding contract (BIND-1, 16 Sep 2026) =====
 //
 // A bind is a claim about ONE END of a stroke. The contract, decided here so
@@ -49,19 +54,44 @@ import type { MMNode } from './nodes';
 import { boundsOf, fingerprintOf, getRep, strokePointsOf } from './nodes';
 import { cleanPointsOf, idealize, snapReading } from './clean';
 import { getBounds } from '../geometry';
+import { alongSiteOf, portSites, reachOf } from './ports';
 
-export type MagnetKind = 'tip' | 'tail' | 'corner' | 'middle' | 'centre' | 'cardinal' | 'point';
+export type MagnetKind =
+  | 'tip'
+  | 'tail'
+  | 'corner'
+  | 'middle'
+  | 'centre'
+  | 'cardinal'
+  | 'point'
+  /** A notation's point port (ports.ts): a decision's vertex. */
+  | `port:${string}`
+  /** A place along a notation's continuous port (ports.ts): a lifeline, a state's border. */
+  | `along:${string}`;
 
 export interface MagnetSite {
   nodeId: string;
   /** The reading the sites were derived from: 'rectangle', 'circle', … or 'ink' for the bounds fallback. */
   shape: string;
   kind: MagnetKind;
-  /** 0-based among same-kind sites of this mark, in a stable order (corners: TL, TR, BR, BL; cardinals: N, E, S, W). */
+  /**
+   * 0-based among same-kind sites of this mark, in a stable order (corners:
+   * TL, TR, BR, BL; cardinals: N, E, S, W). For a place along a port, which
+   * port and how far along it (`alongIndex` in ports.ts).
+   */
   index: number;
   point: Point;
   /** Why this site is here, in the terms it was measured in. */
   reasoning: string;
+  // ----- Only on a notation's port (ports.ts) -----
+  /** The notation that offers it: 'flowchart'. */
+  notation?: string;
+  /** The port's own name in that notation: 'vertex', 'lifeline', 'border'. */
+  port?: string;
+  /** A place along a continuous port: the polyline the port runs along (a closed outline repeats its first point last)… */
+  span?: Point[];
+  /** …and how far along it, as a share of its length, in thousandths. */
+  t?: number;
 }
 
 /** The attraction radius's screen part: about the HAND, not the world (plan invariant 3). */
@@ -97,7 +127,7 @@ function formOf(node: MMNode, nodes: ReadonlyMap<string, MMNode>): { shape: stri
  */
 export function magnetSites(node: MMNode, nodes: ReadonlyMap<string, MMNode>): MagnetSite[] {
   const form = formOf(node, nodes);
-  if (!form) return [];
+  if (!form) return portSites(node, nodes, MAGNET_SCREEN_PX);
   const b = boundsOf(node) ?? getBounds(form.points);
   const w = b.maxX - b.minX, h = b.maxY - b.minY;
   const centre = { x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2 };
@@ -168,6 +198,9 @@ export function magnetSites(node: MMNode, nodes: ReadonlyMap<string, MMNode>): M
       add('centre', centre, 'the centre of the mark’s bounds');
       break;
   }
+  // The hook (ports.ts): whatever a registered notation reads this mark as
+  // adds its ports after the mark's own sites — nothing at all when none is.
+  out.push(...portSites(node, nodes, MAGNET_SCREEN_PX));
   return out;
 }
 
@@ -193,10 +226,16 @@ export interface MagnetHit {
  */
 export function nearestMagnet(at: Point, sites: MagnetSite[], radius: number): MagnetHit | null {
   let best: MagnetHit | null = null;
+  const spans = new Set<Point[]>();
   for (const site of sites) {
-    const distance = Math.hypot(site.point.x - at.x, site.point.y - at.y);
-    if (distance > radius) continue;
-    if (!best || distance < best.distance) best = { site, distance };
+    // A continuous port is measured once, at the nearest place on it.
+    if (site.span) {
+      if (spans.has(site.span)) continue;
+      spans.add(site.span);
+    }
+    const hit = reachOf(at, site);
+    if (hit.distance > radius) continue;
+    if (!best || hit.distance < best.distance) best = hit;
   }
   return best;
 }
@@ -217,13 +256,30 @@ export function magnetsNear(
     if (exclude?.has(id)) continue;
     const node = nodes.get(id);
     if (!node) continue;
+    const spans = new Set<Point[]>();
     for (const site of magnetSites(node, nodes)) {
-      const distance = Math.hypot(site.point.x - at.x, site.point.y - at.y);
-      if (distance <= radius) hits.push({ site, distance });
+      // One hit per continuous port: the nearest place on it.
+      if (site.span) {
+        if (spans.has(site.span)) continue;
+        spans.add(site.span);
+      }
+      const hit = reachOf(at, site);
+      if (hit.distance <= radius) hits.push(hit);
     }
   }
   hits.sort((a, b) => a.distance - b.distance);
   return hits;
+}
+
+/**
+ * A site found again from what a bind carries — `{ kind, index }` — where it
+ * stands NOW: the mark's own sites re-derived, or a notation's port read
+ * again. Null when the mark no longer offers it (a notation no longer in use,
+ * a shape read differently now); the binding itself stays in the graph.
+ */
+export function siteOf(node: MMNode, nodes: ReadonlyMap<string, MMNode>, site: { kind: string; index: number }): MagnetSite | null {
+  if (site.kind.startsWith('along:')) return alongSiteOf(node, nodes, site.kind.slice('along:'.length), site.index);
+  return magnetSites(node, nodes).find((s) => s.kind === site.kind && s.index === site.index) ?? null;
 }
 
 /** One line, for a status line or a brief: "corner of the rectangle at (100, 100)". */

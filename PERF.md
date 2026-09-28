@@ -6,6 +6,15 @@ they stand at `ff330a9` — nothing in them was changed to measure them. What
 this unit makes is numbers, the commands that made them, the hotspots ranked
 with their evidence, and budgets R4b can hold itself to. It fixes nothing.*
 
+*After R4b (27 Sep 2026, `08a1aef` on `w2`): the engine holds all three
+boards. The 2,000-mark board replays in 0.24 s (was 167 s), takes one more
+stroke in 0.15 ms (was 256 ms) and holds 12.4 MB (was 1,058 MB); the 5,000
+board replays in 0.65 s and holds 45.5 MB. Why lines 1 and 3 below no longer
+hold, and what still does, is in the "after R4b" column of the engine's table,
+the budgets' table and the three hotspots it fixed (2, 4 and 5). Every number
+a hand feels in a browser is still the surface's, which R4c takes next: the
+whole-board read below is unchanged, 7.9 s at 2,000.*
+
 ---
 
 ## The answer
@@ -107,51 +116,56 @@ Printed from the result files by `node metamedium-core/bench/report.mjs` — a n
 
 ### Engine (Node) — replay, memory, relations, the whole-board read, one more stroke
 
-| | 500 | 2,000 | 5,000 |
-|---|---|---|---|
-| log: events · JSON | 530 · 1.53 MB | 2079 · 6.56 MB | 5208 · 16.13 MB |
-| content plane after replay (marks, words, artifacts) | 336 (4 artifacts) | 1377 (10 artifacts) | 2859 (after 4250 strokes) |
-| **replay (`load`), cold** | 2.64 s | 169.7 s | — |
-| replay, warm (median of n) | 2.58 s (n 5) | 166.9 s (n 2) | — |
-| replay, committed bundle (cold · warm) | 2.61 s · 2.57 s | 174.3 s | — |
-| drawn event by event (`build`) | 2.65 s | — | stopped at 4,250 marks after 55 min |
-| **memory held after replay** | 24.7 MB | 1058.1 MB | — |
-| …of which checkpoints (held with them off) | 8.8 MB held, replay 2.55 s | 108.5 MB held, replay 157.7 s | — |
-| edges stored in the graph | 65,336 | 909,566 | — |
-| max RSS of the process | 261 MB | 3039 MB | — |
-| `relate` over the content plane (pairs → relations) | 6.09 ms (56,280 → 64,734) | 183 ms (947,376 → 939,380) | 1.20 s (5,656,566 → 5,375,998) † |
-| …the relation list it builds, held | 7.5 MB (336 marks) | 109.7 MB (1,377 marks) | 619.1 MB (3,364 marks) |
-| `session.read` of the whole board (the surface's readRungs) | 139 ms (344 marks) | 8.07 s (1403 marks) | 106.1 s (3423 marks) † |
-| **one more stroke: median / p95** | 17.5 ms / 26.9 ms (n 60) | 256 ms / 749 ms (n 40) | 2.62 s / 4.04 s (the build's last 250 strokes, to 4,250 marks) |
-| …the shape rung alone for those strokes | 0.07 ms / 0.26 ms | 0.03 ms / 0.10 ms | — |
-| `getState()` (handed to subscribers on every event) | 0.02 ms / 0.03 ms | 0.10 ms / 0.21 ms | — |
-| a model's brief (`describeSession`): five marks · the whole board | 16 KB · 1.7 MB | 113 KB · 23.6 MB | — |
+| | 500 | 2,000 | 5,000 | **after R4b**: 500; 2,000; 5,000 |
+|---|---|---|---|---|
+| log: events · JSON | 530 · 1.53 MB | 2079 · 6.56 MB | 5208 · 16.13 MB | 530 · 1.53 MB; 2079 · 6.56 MB; 5208 · 16.13 MB |
+| content plane after replay (marks, words, artifacts) | 336 (4 artifacts) | 1377 (10 artifacts) | 2859 (after 4250 strokes) | 336 (4 artifacts); 1377 (10 artifacts); 3364 (26 artifacts) |
+| **replay (`load`), cold** | 2.64 s | 169.7 s | — | 76.2 ms; 273 ms; 706 ms |
+| replay, warm (median of n) | 2.58 s (n 5) | 166.9 s (n 2) | — | 56.6 ms (n 5); 241 ms (n 2); 650 ms (n 2) |
+| replay, committed bundle (cold · warm) | 2.61 s · 2.57 s | 174.3 s | — | 76.2 ms · 60.3 ms; 282 ms · 247 ms; — |
+| drawn event by event (`build`) | 2.65 s | — | stopped at 4,250 marks after 55 min | 80.9 ms; 356 ms; 1.20 s |
+| **memory held after replay** | 24.7 MB | 1058.1 MB | — | 2.3 MB; 12.4 MB; 45.5 MB |
+| …of which checkpoints (held with them off) | 8.8 MB held, replay 2.55 s | 108.5 MB held, replay 157.7 s | — | 2.1 MB held, replay 76.2 ms; 8.5 MB held, replay 270 ms; 20.7 MB held, replay 689 ms |
+| edges stored in the graph | 65,336 | 909,566 | — | 4,398; 18,146; 43,826 |
+| max RSS of the process | 261 MB | 3039 MB | — | 103 MB; 139 MB; 227 MB |
+| `relate` over the content plane (pairs → relations) | 6.09 ms (56,280 → 64,734) | 183 ms (947,376 → 939,380) | 1.20 s (5,656,566 → 5,375,998) † | 20.2 ms (56,280 → 64,734); 159 ms (947,376 → 939,380); 1.08 s (5,656,566 → 5,375,998) |
+| …the relation list it builds, held | 7.5 MB (336 marks) | 109.7 MB (1,377 marks) | 619.1 MB (3,364 marks) | 7.5 MB (336 marks); 114.4 MB (1,377 marks); 631.6 MB (3,364 marks) |
+| `session.read` of the whole board (the surface's readRungs) | 139 ms (344 marks) | 8.07 s (1403 marks) | 106.1 s (3423 marks) † | 142 ms (344 marks); 7.94 s (1403 marks); 105.0 s (3423 marks) |
+| **one more stroke: median / p95** | 17.5 ms / 26.9 ms (n 60) | 256 ms / 749 ms (n 40) | 2.62 s / 4.04 s (the build's last 250 strokes, to 4,250 marks) | 0.11 ms / 0.27 ms (n 60); 0.16 ms / 0.37 ms (n 40); 0.38 ms / 1.02 ms (n 20) |
+| …the shape rung alone for those strokes | 0.07 ms / 0.26 ms | 0.03 ms / 0.10 ms | — | 0.02 ms / 0.06 ms; 0.03 ms / 0.05 ms; 0.04 ms / 0.11 ms |
+| `getState()` (handed to subscribers on every event) | 0.02 ms / 0.03 ms | 0.10 ms / 0.21 ms | — | 0.03 ms / 0.04 ms; 0.08 ms / 0.09 ms; 0.21 ms / 0.24 ms |
+| a model's brief (`describeSession`): five marks · the whole board | 16 KB · 1.7 MB | 113 KB · 23.6 MB | — | 2 KB · 0.1 MB; 2 KB · 0.6 MB; 2 KB · 1.5 MB |
 
 Commands: `node --expose-gc metamedium-core/bench/engine.mjs board --size=N --repeat=K` (500: K=5; 2,000: K=2); 5,000: `node --expose-gc --max-old-space-size=65536 metamedium-core/bench/engine.mjs build --size=5000 --strokes=20`; bundle: add `--core=bundle`; checkpoints off: add `--ablate=checkpoints --only=replay`; the relation list and † (the content plane gathered from the diagrams the board was drawn in, so no replay — the same 336 and 1,377 marks and the same relations the replayed boards hold, and a read within 4% of the session's own): `node --expose-gc metamedium-core/bench/engine.mjs relate --size=N --read`.
 
+The **after R4b** column: `08a1aef` on `w2`, 27 Sep 2026, load 2–4 — the same commands, with the 5,000 board now run by `board --size=5000 --repeat=2 --strokes=20` (a heap of 8 GB for the whole-board read, which still builds 5.4 million relations) and drawn by `build --size=5000 --every=250`; checkpoints off with `--ablate=checkpoints --only=replay` at every size, the relation list with `relate --size=N`; printed by `node metamedium-core/bench/report.mjs --column="after R4b"`. What changed is the replay, what is held and stored, the stroke and the brief. `relate` is the same function — the engine no longer runs it over the whole plane on every event (`recomputeClusterCandidates` did), which is also why it measures colder at 500 — and `session.read` of the whole board is unchanged: the surface still runs it on every release (R4c).
+
 ### One stroke's cost as the board grows (the 5000-mark board drawn event by event)
 
-| strokes drawn | content marks | median | p95 | max | elapsed |
-|---|---|---|---|---|---|
-| 250 | 160 | 0.70 ms | 4.56 ms | 14.2 ms | 0.4 s |
-| 500 | 330 | 7.44 ms | 18.5 ms | 46.7 ms | 2.6 s |
-| 750 | 496 | 19.1 ms | 40.4 ms | 90.9 ms | 8.2 s |
-| 1000 | 673 | 42.9 ms | 75.4 ms | 261 ms | 20.2 s |
-| 1250 | 849 | 68.7 ms | 130 ms | 358 ms | 40.2 s |
-| 1500 | 1014 | 101 ms | 237 ms | 650 ms | 69.9 s |
-| 1750 | 1171 | 151 ms | 220 ms | 1.11 s | 112.9 s |
-| 2000 | 1347 | 209 ms | 288 ms | 1.08 s | 170.2 s |
-| 2250 | 1510 | 288 ms | 401 ms | 1.79 s | 250.5 s |
-| 2500 | 1675 | 406 ms | 578 ms | 2.04 s | 362.5 s |
-| 2750 | 1843 | 542 ms | 781 ms | 2.41 s | 512.8 s |
-| 3000 | 2018 | 723 ms | 964 ms | 2.78 s | 713.3 s |
-| 3250 | 2192 | 960 ms | 1.41 s | 3.88 s | 973.1 s |
-| 3500 | 2333 | 1.29 s | 1.85 s | 4.36 s | 1326.7 s |
-| 3750 | 2519 | 1.70 s | 2.58 s | 7.29 s | 1789.7 s |
-| 4000 | 2692 | 2.71 s | 5.18 s | 9.14 s | 2537.7 s |
-| 4250 | 2859 | 2.62 s | 4.04 s | 11.8 s | 3274.3 s |
+| strokes drawn | content marks | median | p95 | max | elapsed | **after R4b**: median / p95 · elapsed |
+|---|---|---|---|---|---|---|
+| 250 | 160 | 0.70 ms | 4.56 ms | 14.2 ms | 0.4 s | 0.14 ms / 0.47 ms · 0 s |
+| 500 | 330 | 7.44 ms | 18.5 ms | 46.7 ms | 2.6 s | 0.12 ms / 0.23 ms · 0.1 s |
+| 750 | 496 | 19.1 ms | 40.4 ms | 90.9 ms | 8.2 s | 0.13 ms / 0.27 ms · 0.1 s |
+| 1000 | 673 | 42.9 ms | 75.4 ms | 261 ms | 20.2 s | 0.13 ms / 0.32 ms · 0.2 s |
+| 1250 | 849 | 68.7 ms | 130 ms | 358 ms | 40.2 s | 0.15 ms / 0.32 ms · 0.2 s |
+| 1500 | 1014 | 101 ms | 237 ms | 650 ms | 69.9 s | 0.15 ms / 0.32 ms · 0.2 s |
+| 1750 | 1171 | 151 ms | 220 ms | 1.11 s | 112.9 s | 0.15 ms / 0.29 ms · 0.3 s |
+| 2000 | 1347 | 209 ms | 288 ms | 1.08 s | 170.2 s | 0.16 ms / 0.28 ms · 0.3 s |
+| 2250 | 1510 | 288 ms | 401 ms | 1.79 s | 250.5 s | 0.16 ms / 0.30 ms · 0.4 s |
+| 2500 | 1675 | 406 ms | 578 ms | 2.04 s | 362.5 s | 0.17 ms / 0.25 ms · 0.4 s |
+| 2750 | 1843 | 542 ms | 781 ms | 2.41 s | 512.8 s | 0.20 ms / 0.36 ms · 0.5 s |
+| 3000 | 2018 | 723 ms | 964 ms | 2.78 s | 713.3 s | 0.21 ms / 0.38 ms · 0.6 s |
+| 3250 | 2192 | 960 ms | 1.41 s | 3.88 s | 973.1 s | 0.23 ms / 0.42 ms · 0.6 s |
+| 3500 | 2333 | 1.29 s | 1.85 s | 4.36 s | 1326.7 s | 0.24 ms / 0.41 ms · 0.7 s |
+| 3750 | 2519 | 1.70 s | 2.58 s | 7.29 s | 1789.7 s | 0.26 ms / 0.71 ms · 0.8 s |
+| 4000 | 2692 | 2.71 s | 5.18 s | 9.14 s | 2537.7 s | 0.25 ms / 0.38 ms · 0.9 s |
+| 4250 | 2859 | 2.62 s | 4.04 s | 11.8 s | 3274.3 s | 0.25 ms / 0.46 ms · 0.9 s |
+| 4500 | 3031 | — | — | — | — | 0.28 ms / 0.45 ms · 1 s |
+| 4750 | 3205 | — | — | — | — | 0.31 ms / 0.59 ms · 1.1 s |
+| 5000 | 3364 | — | — | — | — | 0.30 ms / 0.52 ms · 1.2 s |
 
-Command: `node --expose-gc --max-old-space-size=65536 metamedium-core/bench/engine.mjs build --size=5000 --every=250`. Each row is the 250 strokes ending at that count; a stroke is one `addStroke`, with every event before it applied.
+Command: `node --expose-gc --max-old-space-size=65536 metamedium-core/bench/engine.mjs build --size=5000 --every=250`. Each row is the 250 strokes ending at that count; a stroke is one `addStroke`, with every event before it applied. After R4b (`node --expose-gc metamedium-core/bench/engine.mjs build --size=5000 --every=250 --strokes=20`, default heap) the whole board is drawn in 1.20 s, holding 45.7 MB, and the log it writes is the log it was given.
 
 ### A live room — one incoming line at one hand, in a room of three
 
@@ -165,8 +179,9 @@ Command: `node --expose-gc --max-old-space-size=65536 metamedium-core/bench/engi
 | **merge work without `notices()`** | 13.6 ms / 13.9 ms | 65.4 ms / 69.0 ms |
 | **merge work with `notices()`** | 13.9 ms / 14.2 ms | 67.3 ms / 70.1 ms |
 | **then `session.load(merged)` — a full replay, every line** | 2.56 s | 172.6 s |
+| *after R4b*: the merge work with `notices()` · then the replay | 13.7 ms / 14.1 ms · 84.7 ms | 63.7 ms / 64.9 ms · 271 ms |
 
-Command: `node --expose-gc metamedium-core/bench/engine.mjs room --size=N` (median / p95 over 12 lines).
+Command: `node --expose-gc metamedium-core/bench/engine.mjs room --size=N` (median / p95 over 12 lines). After R4b the line still replays the whole board — only the replay is cheap now; taking it off the line is R4d's.
 
 ### A newcomer's hello — the 2,000-mark board held by the hands already there
 
@@ -284,6 +299,12 @@ the replay is cubic, and it is most of the engine's per-stroke cost.**
 - **Scale.** The replay goes 2.6 s → 170 s for 4× the marks (×65). The
   stroke's own cost, as the 5,000-mark board is drawn, climbs from 0.7 ms
   (the first 250 strokes) to 209 ms at 2,000 and 2.6 s at 4,250.
+- **After R4b — fixed.** The components of the within-reach links are kept
+  with their candidates (`session.ts`, `settle`): a mark added, taken away or
+  moved finds only its own component again, and a changed definition is
+  scored against every component. The 5,000 board is drawn event by event
+  in 1.2 s, a stroke costing 0.14 ms in its first 250 and 0.30 ms in its
+  last (the curve's "after R4b" column).
 
 **3. A live room replays the whole board on every line — about 3 minutes a
 line at 2,000.**
@@ -296,6 +317,9 @@ line at 2,000.**
   (`17-folder.js:283`).
 - **Evidence, one line at 2,000.** Merge work of 65 ms (64 ms of it
   `myLogNow`), then a 173 s replay.
+- **After R4b** the replay a line ends in is the board's replay: 0.27 s at
+  2,000 (85 ms at 500), after 63 ms of merge work (`engine.mjs room`). The
+  merge work and the replay per line are still there (R4d's).
 - **`notices()`.** It does double the merge, as W2's follow-up says: it runs
   `mergeLogs` again (`src/store/live.ts:229–240`, 0.99 → 2.0 ms). That is
   true, but it is 1.5% of the merge work and under a thousandth of a
@@ -343,6 +367,15 @@ and a 31 GB process by 4,250 marks of the 5,000 board.**
     process).
 - **Where it hurts.** Not time: the clone is 1.9% of the 2,000 replay.
   Memory: a Chromium tab may hold 3,586 MB of JavaScript heap.
+- **After R4b — fixed.** A pair within reach stores every relation `relate`
+  finds (`withinReach`, the test `relate` makes for `near`); a pair out of
+  reach stores none, and a scope computes those on demand (`session.read`).
+  Stored edges at 2,000: 909,566 → 18,146. A checkpoint copies each node and
+  its two arrays and shares the reps and edges, which nothing changes in
+  place: 12.4 MB held at 2,000 (8.5 MB with checkpoints off), 45.5 MB at
+  5,000. The brief lists what is stored, so it lost exactly the relations
+  between marks out of reach: five marks at 2,000 are 2 KB, the whole board
+  0.6 MB (R4e still owns what a brief should carry).
 
 **5. The scratch test tests every mark on the board — 11% of the replay.**
 
@@ -352,6 +385,10 @@ and a 31 GB process by 4,250 marks of the 5,000 board.**
   (`scratchTargets`, `session.ts:935`). No bounding box is tested first;
   `relate` has one (`relations.ts:150`).
 - **Evidence.** 11.2% of the replay at 2,000, and 7.7% of a stroke.
+- **After R4b — fixed.** An index of the ink gives the strokes whose boxes
+  meet the scratch's, and only those are counted; the targets are walked,
+  for their order, only when something was crossed. `scratchedOut` itself
+  passes over a target whose box stands clear of the stroke's (`mayCross`).
 
 **6. The surface paints everything, at once, on every input event —
 39 ms a pointer move and 50 ms a pan frame at 2,000.**
@@ -410,21 +447,28 @@ except the matches, and those need only the cluster the new mark joined.
 v1 ships when the budgets hold on the 2,000-mark board (`V1-PLAN.md` §11.3);
 the 5,000 column is the headroom to aim for.
 
-| Measure | 500 today | 2,000 today | **Budget, 2,000** | **Budget, 5,000** |
-|---|---|---|---|---|
-| Open: navigation → board drawn (Chromium) | 2.2 s | 100 s, and only as a folder: storage refuses it | **≤ 1.5 s** | ≤ 3 s |
-| Replay, `load` (Node, warm median) | 2.58 s | 167 s | **≤ 0.5 s** | ≤ 1.5 s |
-| Memory held after replay (Node) | 25 MB | 1,058 MB | **≤ 150 MB** | ≤ 400 MB, so a tab opens it |
-| One more stroke, engine: median / p95 | 18 / 27 ms | 256 / 749 ms | **≤ 4 / 16 ms** | ≤ 4 / 16 ms |
-| Release → reading drawn, p95 | 148 ms | 7.65 s | **≤ 100 ms** | ≤ 100 ms |
-| A pointer move while drawing: handler, p95 | 3.7 ms | 41 ms | **≤ 4 ms** | ≤ 6 ms |
-| Pan at zoom 1: frame, p95 | 16.7 ms | 50 ms | **≤ 16.7 ms** | ≤ 16.7 ms |
-| Pan at fit-all: frame, p95 | 33 ms | 133 ms | **≤ 33 ms** | ≤ 50 ms |
-| The whole-board read on the stroke path | 139 ms | 8.07 s | **off the stroke path, or ≤ 16 ms** | same |
-| A live room: main-thread work per incoming line | 2.6 s | 173 s | **≤ 16 ms, and no full replay** | ≤ 16 ms |
-| A hello in a room of six: bytes delivered | 34 MB | 163 MB | **each log once, to the newcomer (≈ 6.6 MB)** | ≈ 16 MB |
-| Autosave: main-thread work per change, and does it hold | 7 ms, holds | 30 ms, refused | **≤ 8 ms, and never refused in silence** | same |
-| A model's brief for five marks | 16 KB | 113 KB | **≤ 4 KB, whatever the board's size** | same |
+| Measure | 500 today | 2,000 today | **Budget, 2,000** | **Budget, 5,000** | **After R4b**: 2,000; 5,000 |
+|---|---|---|---|---|---|
+| Open: navigation → board drawn (Chromium) | 2.2 s | 100 s, and only as a folder: storage refuses it | **≤ 1.5 s** | ≤ 3 s | not measured (R4c and R3 own the open) |
+| Replay, `load` (Node, warm median) | 2.58 s | 167 s | **≤ 0.5 s** | ≤ 1.5 s | **244 ms**; 648 ms |
+| Memory held after replay (Node) | 25 MB | 1,058 MB | **≤ 150 MB** | ≤ 400 MB, so a tab opens it | **12.4 MB**; 45.5 MB |
+| One more stroke, engine: median / p95 | 18 / 27 ms | 256 / 749 ms | **≤ 4 / 16 ms** | ≤ 4 / 16 ms | **0.15 / 0.23 ms**; 0.31 / 0.39 ms |
+| Release → reading drawn, p95 | 148 ms | 7.65 s | **≤ 100 ms** | ≤ 100 ms | the surface's (R4c) |
+| A pointer move while drawing: handler, p95 | 3.7 ms | 41 ms | **≤ 4 ms** | ≤ 6 ms | the surface's (R4c) |
+| Pan at zoom 1: frame, p95 | 16.7 ms | 50 ms | **≤ 16.7 ms** | ≤ 16.7 ms | the surface's (R4c) |
+| Pan at fit-all: frame, p95 | 33 ms | 133 ms | **≤ 33 ms** | ≤ 50 ms | the surface's (R4c) |
+| The whole-board read on the stroke path | 139 ms | 8.07 s | **off the stroke path, or ≤ 16 ms** | same | unchanged, 7.94 s; 105 s (R4c) |
+| A live room: main-thread work per incoming line | 2.6 s | 173 s | **≤ 16 ms, and no full replay** | ≤ 16 ms | 63 ms of merge work, then a 0.27 s replay (R4d's) |
+| A hello in a room of six: bytes delivered | 34 MB | 163 MB | **each log once, to the newcomer (≈ 6.6 MB)** | ≈ 16 MB | unchanged (R4d) |
+| Autosave: main-thread work per change, and does it hold | 7 ms, holds | 30 ms, refused | **≤ 8 ms, and never refused in silence** | same | unchanged (R3) |
+| A model's brief for five marks | 16 KB | 113 KB | **≤ 4 KB, whatever the board's size** | same | 2 KB; 2 KB — what it lists shrank with what is stored (R4e's still) |
+
+The "after R4b" engine rows are `node --test metamedium-core/bench/budgets.test.mjs`
+(27 Sep 2026, load 2–4; the 2,000 board's own result file,
+`dist/bench/budgets-2000-source.json`, and a line in
+`dist/bench/budgets-history.jsonl` every run), which holds the 2,000 budgets
+as assertions and asks the 5,000 board only to replay; the read, the room and
+the brief are `engine.mjs board`, as in the engine's table.
 
 Two notes on the table:
 
@@ -474,7 +518,8 @@ Two notes on the table:
     against the replayed boards: `relate` at 1.2 s and 619 MB, and the read
     at 106 s.
   - *Not replayed.* The 5,000 board was never replayed with `load` in one
-    piece.
+    piece. After R4b it is, in 0.65 s, holding 45.5 MB (the engine's
+    "after R4b" column).
 
 ---
 
@@ -499,6 +544,25 @@ node e2e/perf.mjs --sizes=500,2000                                              
 node e2e/perf.mjs --sizes=5000 --cap-min=25                                          # Chromium, 5,000: it crashes
 node e2e/perf.mjs --browser=webkit --sizes=500,2000
 node metamedium-core/bench/report.mjs                                                # the tables above
+```
+
+After R4b — the engine's column, the budgets as tests, and what reads
+differently between the engine the baseline measured and this one:
+
+```
+node --test metamedium-core/bench/budgets.test.mjs                                  # the 2,000 budgets, and the 5,000 board replays
+node --expose-gc metamedium-core/bench/engine.mjs board --size=500 --repeat=5
+node --expose-gc metamedium-core/bench/engine.mjs board --size=2000 --repeat=2
+node --expose-gc --max-old-space-size=8192 metamedium-core/bench/engine.mjs board --size=5000 --repeat=2 --strokes=20
+node --expose-gc metamedium-core/bench/engine.mjs board --size=N --repeat=K --only=replay --core=bundle      # N 500, 2000
+node --expose-gc metamedium-core/bench/engine.mjs board --size=N --repeat=0 --only=replay --ablate=checkpoints # N 500, 2000, 5000
+node --expose-gc metamedium-core/bench/engine.mjs build --size=5000 --every=250 --strokes=20                 # the curve
+node --expose-gc metamedium-core/bench/engine.mjs build --size=N --every=1000 --strokes=20                   # N 500, 2000
+node --expose-gc metamedium-core/bench/engine.mjs relate --size=N                                            # N 500, 2000, 5000
+node --expose-gc metamedium-core/bench/engine.mjs room --size=N                                              # N 500, 2000
+node metamedium-core/bench/report.mjs --column="after R4b"                           # the engine's column, from those runs
+node metamedium-core/bench/equivalence.mjs                                           # old engine (9977158) against src/: what reads differently
+node --max-old-space-size=24576 metamedium-core/bench/equivalence.mjs --size=2000 --prefix-step=100000 --undos=2 --extend=10   # the same on the 2,000 board: ~15 min, the old engine holding GBs
 ```
 
 Results land in `metamedium-core/dist/bench/` and `e2e/results/perf/`, both

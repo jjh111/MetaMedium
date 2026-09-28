@@ -2312,9 +2312,13 @@
     ctx.stroke();
   }
 
+  /** The colour each mark's ink was stroked in by the last paint, by node id. For tests. */
+  const inkDrawn = new Map();
+
   function inkOf(node, style) {
     const points = MM.strokePointsOf(node);
     if (points) {
+      inkDrawn.set(node.id, style.color);
       const clean = MM.cleanPointsOf(node);
       if (clean) {
         // Snapped: the clean form in front, the hand's ink faint beneath it.
@@ -2351,7 +2355,11 @@
     for (const e of node.edges) { // artifact: draw its members (transparent within)
       if (e.rel !== 'has-part') continue;
       const m = state.nodes.get(e.to);
-      if (m && !m.reps.some((r) => r.modality === 'erased')) inkOf(m, style);
+      // Each mark in the colour of the hand that DREW it, not of the one that made the
+      // whole: an artifact is made by whoever blessed it, and a hand may bless a group
+      // several hands drew (V1-PLAN L2f). A colour the style imposes — a live page's
+      // gold, the outline of what was built — holds for every mark in it.
+      if (m && !m.reps.some((r) => r.modality === 'erased')) inkOf(m, style.byMaker ? Object.assign({}, style, { color: colourOf(m) }) : style);
     }
   }
 
@@ -2393,6 +2401,7 @@
     state = s;
     chipHits = [];
     chromeDrawn = [];
+    inkDrawn.clear();
     pruneRuntime(s);
     // No model is asked from here: a paint is not a request (§6.3).
     syncStage(s);
@@ -2470,6 +2479,7 @@
       inkOf(node, {
         color: isLive ? `rgba(${C.goldRGB},0.85)` : color,
         width: id === inspectedId ? inkW * 1.3 : inkW,
+        byMaker: !isLive,
       });
       if (pl) ctx.restore();
       if (held) ctx.restore();
@@ -3822,15 +3832,19 @@
   const NAMING_IS = 'naming makes one thing of them, a definition the library keeps and the next drawing like it is offered as; it writes no word on the ink';
   const LABELLING_IS = 'it makes nothing: no definition, no name the library learns, no file; undo takes it off';
 
-  /** The held marks' ink, for the reader and the tooltips: how many the person made, and who made each of the rest. */
+  /**
+   * The held marks' ink, for the reader and the tooltips: how many the person made, and who
+   * made each of the rest. "Is this mine?" is core's question (`session.isMine`), the one the
+   * label door asks — the person's, in this sitting or another, so the marks drawn before a
+   * reload are still theirs (V1-PLAN L2i). Who made the rest is said as it is shown.
+   */
   function whoseInk(s, ids) {
     const out = { mine: 0, others: [] };
     for (const id of ids) {
       const n = s.nodes.get(id);
       if (!n) continue;
-      const pid = authorOf(n);
-      if (pid === MM.LOCAL_PARTICIPANT) out.mine++;
-      else out.others.push(nameOfParticipant(pid));
+      if (session.isMine(id)) out.mine++;
+      else out.others.push(nameOfParticipant(authorOf(n)));
     }
     return out;
   }
@@ -3871,11 +3885,12 @@
   }
 
   /**
-   * A word on the person's own ink (V1-PLAN L2e): one `label` event per mark they made,
-   * each through the session's door, which refuses another hand's mark and says whose it
-   * is. Every mark is accounted for in the status line — labelled, already saying the
-   * word, or refused with the reason — never silently skipped. Nothing is made: no bless,
-   * no artifact, no file. When a word is written the field closes FIRST, so the labels
+   * A word on the person's own ink (V1-PLAN L2e): one `label` event per mark they made —
+   * in this sitting or before a reload (L2i, `session.isMine`) — each through the
+   * session's door, which refuses another person's mark and says whose it is. Every mark
+   * is accounted for in the status line — labelled, already saying the word, or refused
+   * with the reason — never silently skipped. Nothing is made: no bless, no artifact, no
+   * file. When a word is written the field closes FIRST, so the labels
    * are the last events in the log and undo takes them off, not the close; a mark that
    * already says the word writes nothing, so a second Enter or tap is not a second event.
    */
@@ -3884,7 +3899,7 @@
     const s = session.getState();
     const held = (ids || []).filter((id) => s.nodes.get(id) && !MM.getRep(s.nodes.get(id), 'erased'));
     if (!text || !held.length) return { done: [], saying: [], refused: [] };
-    const mine = (id) => authorOf(s.nodes.get(id)) === MM.LOCAL_PARTICIPANT;
+    const mine = (id) => session.isMine(id);
     const saying = held.filter((id) => { const l = mine(id) && MM.labelOf(s.nodes.get(id)); return !!l && l.text === text; });
     const asks = held.filter((id) => !saying.includes(id));
     if (asks.some(mine)) {
@@ -4647,9 +4662,8 @@
     const isArtifact = s.artifacts.includes(id);
     const isLive = s.live.includes(id);
     const isWordNode = MM.isWord(node);
-    const author = MM.strokePointsOf(node)
-      ? authorOf(node)
-      : ((node.reps.find((r) => r.modality === 'word') || {}).source || MM.LOCAL_PARTICIPANT);
+    // Who made it: a mark's drawer, an artifact's blesser — never who drew its marks (V1-PLAN L2f).
+    const author = authorOf(node);
     const authorName = nameOfParticipant(author);
     let html = '<div class="eyebrow">' +
       (isLive ? (codeKindOf(node) === 'html' ? 'living page' : 'living ' + codeKindOf(node)) : isArtifact ? 'artifact' : isWordNode ? 'word' : 'mark') + '</div>';
@@ -6989,8 +7003,11 @@
     // this sitting replaces what the room holds of it instead of doubling it.
     await store.publish(session.getEvents().filter((e) => !e.by));
     store.subscribe(() => { if (liveMergePending) return; liveMergePending = true; Promise.resolve().then(() => { liveMergePending = false; return mergeLive(); }); });
+    // `openStore` counted what it loaded BEFORE the device re-taught its mark,
+    // so that teach is this hand's and goes out with its log. Counted again
+    // here, it was taken for the room's, and the room's first merge dropped it:
+    // the board judged this hand by the built-in check from then on (L2h).
     await openStore(store, 'live', room);
-    folder.loadedCount = session.getEvents().length;
     store.hello();
     return folder;
   }
@@ -7075,8 +7092,11 @@
     // participant's — including the mark this device re-teaches at open.
     folder.loadedCount = session.getEvents().length;
     folder.lastSave = '';
-    // The device's mark is re-taught only when no log already teaches one.
-    if (!merged.some((ev) => ev.type === 'teach')) restoreMark();
+    // The device's mark is re-taught only when this hand's own log already
+    // teaches none. A mark is the hand's that taught it (L2h): another hand's
+    // teach — stamped `by` — says nothing about this one's, and waiting on it
+    // left this hand judged by the other's mark.
+    if (!merged.some((ev) => ev.type === 'teach' && !ev.by)) restoreMark();
     let entries = [];
     try { entries = await store.list(); } catch (err) { folder.error = 'could not list the folder: ' + (err.message || err); }
     folder.entries = entries; folder.truncated = !!store.truncated;
@@ -9257,6 +9277,8 @@
     // A hand's word on its own ink, for tests: where the last paint drew each label, and a mark's ink colour.
     labelsDrawn: () => labelsDrawn.map((l) => Object.assign({}, l)),
     colourOf: (id) => { const n = session.getState().nodes.get(id); return n ? colourOf(n) : null; },
+    // The colour the last paint stroked a mark's ink in — inside an artifact too, where each mark keeps its drawer's (L2f).
+    inkDrawn: (id) => inkDrawn.get(id) || null,
     // The explanation plane, for tests: where the last paint put each answer card.
     answerCards: () => cardRects.map((c) => ({ id: c.id, about: c.about.slice(), what: c.what, who: c.who, ago: c.ago, x: c.x, y: c.y, w: c.w, h: c.h })),
     // Text folds back from ink, for tests: the words of a text where they stand.

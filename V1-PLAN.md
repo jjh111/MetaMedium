@@ -247,10 +247,11 @@ suite and the gate green, `master` fast-forwarded and pushed.
 
 | Phase | Units | Done when |
 |---|---|---|
-| **0. Make week 1 whole** | L1 ids that hold · L1b one event, applied once · L2a the shard pairs by id · L2b labels on the board · L2c the shard asks · L2d duplicate Enter, fitAll, the cache measured · L2e a person labels their own ink · L3 CI, bundles, docs | every unit week 1 claimed is whole, CI runs what exists (WebKit included), docs say what the code does |
+| **0. Make week 1 whole** — ✅ done on `w2`, 27 Sep (on `master` when John lands it, L4) | L1 ids that hold · L1b one event, applied once · L2a the shard pairs by id · L2b labels on the board · L2c the shard asks · L2d duplicate Enter, fitAll, the cache measured · L2e a person labels their own ink · L2f an artifact is made by whoever blessed it · L2g a word is made by whoever wrote its letters · L2h gestures are per hand · L3 CI, bundles, docs · and L3's finding, L2i a person is the same person across sittings (27 Sep) | every unit week 1 claimed is whole, CI runs what exists (WebKit included), docs say what the code does |
+| **0b. A board that holds** (pulled forward by `PERF.md`, 27 Sep) | R3 no lost work · R4b the engine holds 2,000 marks · R4c the surface draws only what changed · R4d a room merges a line, not the board · R4e a brief carries what it is about | nothing is ever lost silently; a 2,000-mark board opens in under 1.5 s, answers a stroke in 16 ms at p95 and draws its reading within 100 ms; a room line costs under 16 ms; the budgets are tests |
 | **1. The backbone** | B1 tools · B2 context · B3 packs | a tool is one file; the field ranks by context with reasons; a pack is used by an event and benched |
 | **2. Editing** | E1 handles · E2 bindings follow · E3 ports, heads and figures | a selected mark reshapes by its points; bound arrows follow; notations can declare ports |
-| **3. Diagrams** | D1 flowchart · D2 Mermaid out · D3 Mermaid in · D4 UML class · D5 sequence and state · D6 ER and mind map · D7 routing · D8 the repair demo | A1–A3 pass in the gate |
+| **3. Diagrams** | D1 flowchart · S1 the shape rung holds a diamond, an L and a wide arc · D2 Mermaid out · D3 Mermaid in · D4 UML class · D5 sequence and state · D6 ER and mind map · D7 routing · D8 the repair demo | A1–A3 pass in the gate |
 | **4. Maths** ∥ after B1 | M1 quantities and expressions · M2 the sheet · M3 figures and dimensions · M4 solving · M5 maths on the board · M6 the garment pack · M7 true size and print | A4 passes in the gate |
 | **5. Seats** ∥ | J1 decide on the canvas · J2 extraction, a spike · J3 numerals, an experiment | the seat is measured on fixtures; the spike and the experiment say yes or not yet, with numbers |
 | **6. Ready for use** | R1 boards · R2 the log format · R3 no lost work · R4 performance · R5 first run · R6 pencil and WebKit · R7 deploy and release · R8 one platform · R9 the shard alongside | A8–A10 pass; budgets met |
@@ -365,6 +366,178 @@ sync; the canvas MCP smoke and the shard's (573 in 30 files, typecheck
 clean) all pass; the gate 384 passed and the one honest skip (canvas 244;
 shard 120 + 11 + 9); WebKit smoke 3.
 
+**L2f an artifact is made by whoever blessed it.** Found by L2e: a bless
+writes no `made-by` edge, so every board reads an artifact as its own
+reader's — in a room the maker's label on her own artifact is dropped when
+another hand's board replays her log, and another hand may label it at its
+own door. An artifact blessed by a hand is made by that hand on every board
+that replays the log, the attribution a stroke gets: its labels follow the
+label rule everywhere, the surface says whose it is, and a single-hand board
+and every held log replay as before. *Red first:* two hands — A blesses a
+group and labels it, B's board replays A's log, B tries to label it — and
+the replay-unchanged check for every held log. *Trap:* the maker is who
+blessed it, not who drew its marks.
+
+**L2f status, 27 Sep 2026: done on `w2`** — `c004c8e` (red), `34358ac`
+(red, revised before the fix), `6da3554`, `de471c0`, `2358bfb` (CLAUDE.md).
+`applyBless` writes `made-by` for whoever blessed: the participant the bless
+names, "local" in another hand's log meaning that hand. So the maker's word
+on her artifact survives every replay, attributed to her, and another hand's
+is refused at the door (`not-your-ink`, with her name) and dropped on replay.
+Not who drew its marks: a hand may bless a group two hands drew — the thing
+is the blesser's and each mark stays its drawer's, drawn inside it in its
+drawer's colour (`inkOf`'s `byMaker`; it had been drawn in the artifact's).
+A bless is a person's act: the shard blesses its hulls in the engine's name
+inside its hand's act, and those are the hand's, the engine keeping its name
+on the word — the first red asked for the engine's, which would have moved
+the shard's two boards by an edge each and let no person label a hull, and
+was revised before the fix. The edge is written only for a maker other than
+the board's own hand, so every held log (`Demos/recordings/*.json`,
+`shard-3d/fixtures/*.mm.log`) replays against the `ff330a9` bundle node for
+node — the same ids, nodes, state and next id — bare, named, merged as the
+reader's own and merged with no reader: 24 of 24; merged as another hand's,
+the four logs with a bless differ only by the new edge to that hand on their
+six artifacts. `held.test.ts` reads every held log in core. The panel's *by*
+row reads `authorOf` for every node; the MCP hand's look says *by tab* and
+`canvas_label` on the tab's artifact is refused (the smoke, two checks); e2e
+43–43c. *Found, not changed:* a word gathered from another hand's letters is
+still made by the reader (`made-by` the local participant in the word's
+gathering), so her label on her own word is dropped on another board and
+that board may label it; its letters now draw in her colour. Whole suite at
+the last commit: core 797 in 62 files, typecheck clean, both bundles equal
+to a fresh build; relay and field 40; surface in sync; the canvas MCP smoke
+and the shard's (605 in 31 files, typecheck clean) all pass; the gate 394
+passed and the one honest skip (canvas 248; shard 123 + 11 + 12); WebKit
+smoke 3.
+
+**L2g a word is made by whoever wrote its letters.** Found by L2f: the
+gathering writes every word `made-by` the local participant, whoever wrote
+its letters, so on another hand's board her word reads as the reader's —
+her label on it is dropped there, and that board may label it — while its
+letters draw in her colour. A word is made by the hand that wrote its
+letters on every board: a hand's label on its own word survives every
+replay, another hand's is refused at the door, the letters of two hands
+never gather into one word, and every held log replays as before. *Red
+first:* two hands — A writes a word and labels it, B's board replays A's
+log, B tries to label it — and A's and B's letters interleaved on one band.
+*Trap:* a merge interleaves two hands' events by time, so gathering must
+never see another hand's letter as the next letter of this word.
+
+**L2g status, 27 Sep 2026: done on `w2`** — `9ae7ba9` (red), `a313935`
+(red: the smoke and the gate), `d6d1a37`, `14f28ad` (CLAUDE.md).
+`absorbIntoWord` reads the run over the marks the new stroke's maker made
+and writes the word `made-by` that maker — the attribution each letter
+already carries, "local" in another hand's log meaning that hand. So her
+label on her word survives every replay, attributed to her, and another
+hand's is refused at the door (`not-your-ink`, with her name) and dropped on
+replay, his own board's included; the label rule needed no change. The trap
+was live, not only possible: in the merge's time order the mark before her
+next letter may be his, and taken for her run's last letter it joined her
+word (e2e 44c: this hand's I printed beside fern's word made it five
+letters) or broke it (44: her word split in two where the merge set this
+hand's I between her letters; two hands printing at once on two lines
+gathered no word at all). Read over her own marks, her letters gather into
+her word whoever drew in between, and the letters of two hands — or of a
+hand and a model — never gather into one. A board's own words name its own
+hand as they always did: every held log (none holds a word) replays against
+the `c1aa0ec` bundle node for node — the same ids, nodes, state and next id
+— bare, named, merged as the reader's own, merged with no reader and merged
+as another hand's: 30 of 30; so does single-hand writing, six logs with and
+without a log name in the four ways a reader opens its own log: 48 of 48,
+56 word nodes. `held.test.ts` is unchanged. The MCP hand's look says *by
+tab* on the tab's word and `canvas_label` on it is refused (the smoke, two
+checks); e2e 44–44c (the panel says *by fern*, her label drawn in her hue,
+held it is not this hand's to label, a letter printed beside her word never
+joins it); no surface change — every door reads `authorOf`. *Found, not
+changed:* the session's gesture state — a loop that waits, a summon, a
+selection — is one for the board, not one per hand, so the trap has a
+sibling there. Another hand's stroke that the merge sets between a hand's
+summon and its bless dissolves the summon on replay and the bless is lost on
+every board, the blesser's own included once the room's logs merge (a probe:
+her artifact stands on her live board, and on none of three replays); set
+between a loop and its check, the loop is not taken up and the check reads
+backwards, holding the loop's own ink as a member. Whole suite at the last
+commit: core 804 in 62 files, typecheck clean, both bundles equal to a fresh
+build; relay and field 40; surface in sync; the canvas MCP smoke and the
+shard's (605 in 31 files, typecheck clean) all pass; the gate 398 passed and
+the one honest skip (canvas 252; shard 123 + 11 + 12); WebKit smoke 3.
+
+**L2h gestures are per hand.** Found by L2g, with a probe: the gesture
+state — a loop waiting to be taken up, a summon, the selection, the command
+mark's look-back over recent marks — is shared by the whole board, while a
+merged log interleaves hands' events by time. Another hand's stroke between
+a hand's summon and its bless dissolves the summon on replay, and the bless
+is lost on every board, the blesser's own included once the room's logs
+merge; between a loop and its check, the loop is not taken up and the check
+gathers recent marks, holding the loop's own ink. Two hands in one room (A7)
+cannot work until each hand's gesture state is its own, keyed by the hand
+exactly as authorship is keyed: a hand's summon survives any other hand's
+events and its bless applies to it, on every board and replay, in both merge
+orders; its loop is taken up by its own check; the look-back counts its own
+marks; the selection and the field on a board are the reader's own; a
+single-hand board is exactly as before. *Red first:* two-hand core tests in
+both merge orders, and gate records that drive two tabs in one room through
+a summon with the other drawing in between. *Trap:* a gesture keyed by a
+participant id that differs between boards (the local participant on one,
+`participant:hand:<name>` on another) splits one hand's gesture in two; key
+by the attribution `authorOf` uses, and test from both boards.
+
+**L2h status, 27 Sep 2026: done on `w2`** — `e9ec56d` (red), `b2a5568`
+(red: the gate), `1f377ec`, `345be9f` (the canvas's half), and CLAUDE.md
+with this entry. Each hand's gestures — its waiting loop, its summon, its
+selection, why its last stroke missed, the mark it taught, and the look-back
+— are held under `handOf`, the rule L2f's maker already was: a person's act
+is theirs ("local" in another hand's log reads as that hand), and a model's
+or the engine's is the act of the hand whose log holds it. So one hand keys
+alike from its own board and from every other: the shard's bless in the
+engine's name takes up its hand's summon, and a model's loop waits for its
+hand (the trap's test, from three boards). Her summon survives his strokes
+and her bless makes her thing on her board, his and a third's, in both merge
+orders (his stroke at the moment of her check falls before it or after it as
+the names break the tie); her loop is taken up by her check whatever he drew
+between; her look-back gathers her own marks, never his box drawn beside her
+row in the same breath; his loop, summon, selection and dismissal never
+touch hers; what is erased leaves every hand's gestures. The board's
+`summon`, `selection`, `pendingLassoId`, `markMiss`, `commandMark` and
+`recentIds` are its reader's own. **A taught mark is its hand's**, and two
+faults in `17-folder.js` kept a hand from its own in a room, found by the
+gate: the device's mark was re-taught only when no log taught one, so a room
+whose other hand taught hers left this hand judged by hers; and `openLive`
+counted the loaded events again after the re-teach, so the room's first
+merge took the teach for the room's and dropped it — from the first line
+another hand sent, the board judged this hand by the built-in check. Now it
+is re-taught unless this hand's own log teaches one, and it stays this
+hand's; either fix alone leaves e2e 46 red. A single-hand board is exactly
+as before: `session.scenario.test.ts` and `held.test.ts` unchanged and
+green; every held log replays against the `a4bccfa` bundle node for node —
+the same ids, nodes, state and next id — bare, named, merged as the
+reader's own, merged with no reader and merged as another hand's (the
+reader's own gesture fields set apart there: the reader drew nothing): 30 of
+30, and at every one of their 515 prefixes; nine single-hand gesture logs
+(the canonical loop, the look-back over an artifact, pointed summons with a
+correction and a dismissal, a double-tap and keep-as-drawing, a taught caret
+forgotten, scratches and erases against gestures, a model's gestures, the
+engine's bless and imports, a word taken up) are written live as the same
+events by either bundle, 18 of 18 with and without a log name, and replay
+the same in all five ways: 90 of 90, and 940 of 940 prefixes. e2e 45–45e
+(fern draws while this hand's field stands open and it stays open; the name
+given in the field makes the thing here, on fern's board and on a third
+reader's replay; fern's own loop and check never open this hand's field;
+fern's stroke between this hand's loop and its check leaves the loop waiting
+for this hand) and 46–46a (the device's caret is this hand's in a room whose
+other hand taught her own check, and takes its loop up while her check takes
+hers). *Found, not changed:* two hands may now hold the same marks at once,
+and when both bless, each thing takes them — a mark part of two things, the
+same on every board; which should win is a decision. A folder opened with
+no reader stamps no `by`, so every log in it is the reader's own: one hand's
+gestures there, as its authorship already was. The MCP hand's look says what
+its own gestures are, so it no longer reports the tab's open field as the
+room's. Whole suite at the last commit: core 860 in 65 files, typecheck
+clean, both bundles equal to a fresh build; relay and field 40; surface in
+sync; the canvas MCP smoke and the shard's (605 in 31 files, typecheck clean)
+all pass; the gate 406 passed and the one honest skip (canvas 260; shard 123
++ 11 + 12); WebKit smoke 3.
+
 *L2a status, 26 Sep 2026: done on `w2-shard`* — `0540c1c` (red), `092f747`.
 Taken from `auto/w1-U1d` (6893f53), which takes both prefixes off the write
 path and keeps a reader; `auto/w1-U1d-r0920105222` still wrote `answer:<id>`
@@ -393,6 +566,195 @@ any gate board is 6 entries, 336 KB (the mug). The cache clears whenever a
 solid rebuilds, so no bound. The losing attempt branches (`auto/w1-U1d-r0920105222`,
 `auto/w1-U3-r0920120035`) are left for the director to delete: this lane
 creates and deletes no branch.
+
+**L3 CI, bundles, docs — status, 27 Sep 2026: done on `w2`** — `bf4b533`
+(CI; its message carries the red-first `rg`, which printed nothing),
+`426f547` (the smoke's pill), `8b2493b` (red), `5487395` (the guard),
+`51194de` (CLAUDE.md), `7bdb2f2` (the other docs), and the commit carrying
+this line. CI's core job runs `Demos/relay.test.mjs` beside the field
+reader's test and `Demos/build-surface.test.mjs` beside `--check`; a
+`webkit` job installs WebKit (`npx playwright install --with-deps webkit`
+in `e2e/`) and runs `node e2e/run.mjs --browser webkit smoke`, uploading
+`e2e-webkit-results` when it fails. The YAML parses (Python's
+`yaml.safe_load`); Actions were not run here. The smoke takes one pill:
+*Draw them clean*, clicked on the held line, which then carries its clean
+form — four checks, shown able to fail with the click sent elsewhere.
+`node Demos/build-surface.mjs`, and its `--check`, refuse a name declared
+at the top of two fragments: the fragments read as one strict block are
+the engine's own early error, and the fragments that declare it are named
+(a scratch copy with a second `renderLabels`: exit 1, `08-render.js,
+21-minimap.js`). Both bundles already equalled a fresh build and still do.
+The docs: CLAUDE.md's headline (phase 0 done, 0b next with `PERF.md`'s
+numbers), documents, map, tier 1½ and working notes, the paragraphs the
+units wrote checked against the code and true as they stand, the finding
+below added to the sitting's; ROADMAP.md's
+entry; T8 done in `SURFACE-v10-PLAN.md` with its commits; QA-v10's two
+hands; the core README's map (it named `spatial`, long gone), both bundles
+and the sitting; `e2e/README.md`. *Found, not changed:* a sitting is its
+own participant, so after a reload a person may not label what they drew
+before it — core refuses (`not-your-ink`) and the field says *no label —
+john made this mark* (shown with the Node bundle: john's second sitting
+labelling his first sitting's box). Whether a sitting inherits its person's
+marks is a decision. Whole suite at the last commit: core 889 in 67 files,
+typecheck clean, both bundles equal to a fresh build; relay and field 40,
+the build's test 4; surface in sync; the canvas MCP smoke and the shard's
+(605 in 31 files, typecheck clean) all pass; the gate 406 passed and the one
+honest skip (canvas 260; shard 123 + 11 + 12); WebKit smoke 4.
+
+**L2i a person is the same person across sittings** (L3's finding, a
+phase-0 follow-up). Since L1 a live hand's log is one sitting — a new
+suffix per page load or process (`sittingName`) — shown under the person's
+name and colour (`handLabel`); but the rules that ask "is this mine?"
+compare the exact log name, so after a reload a person may not label what
+they drew before it: core refuses `not-your-ink` and the field says *no
+label — john made this mark*. Those rules compare the person — the log name
+without its sitting's suffix — so every sitting of one person may label that
+person's marks, and the field counts them as the person's own; another
+person's are refused, with the reason. What stays per sitting: log names,
+ids and numbering (L1), and gesture state (L2h). Folder and browser-storage
+boards keep one stable name and are unchanged, and so are `held.test.ts`
+and `session.scenario.test.ts`. The trust model is said plainly in
+CLAUDE.md: a name is self-asserted — there are no accounts — so one name is
+one person on the trust the name and the colour already carry; it is not
+authentication. *Red first:* marks written by `john~a1`, a label by
+`john~b2` accepted, one by `fern~x1` refused, the field's line across two
+sittings; and a gate record — draw in a room, reload, label a mark drawn
+before the reload. *Invariant:* state is a pure function of the log.
+*Trap:* changing the attribution (whose colour, whose name on a card)
+instead of the rule; or merging sittings into one participant — the logs
+stay separate, or numbering could collide.
+
+**L2i status, 27 Sep 2026: done on `w2`** — `4f9c113` (red), `22b0c9b`,
+`564a058` (the canvas's half), `039f353` (the MCP hand), `7987ef0` (a
+guard), and the commit carrying this line. The label rule, at the door
+(`staleFor`) and on replay (`applyLabel`), asks `samePerson(maker, writer)`:
+the same hand, or two sittings of one person, the person being `handLabel`
+of the log's name. This board's own hand is the person its log is written
+under (`logName`) — the same fact every other board reads off that log's
+name when it merges it, so every board agrees; another hand is shown by its
+person already; a model or the engine is no person and only ever itself; a
+board never told its log's name compares hands exactly, as before.
+`Session.isMine(id, participant?)` asks the same question for the field:
+`whoseInk` and `labelMarks` (`09-palette.js`) asked `authorOf ===
+LOCAL_PARTICIPANT` — the sitting — and now ask core, so the line before
+Enter and the door never disagree (a test checks them mark by mark).
+Attribution is unchanged: the panel, the card and `canvas_look` still say
+a mark drawn before the reload is the earlier sitting's, *by john*, in
+john's hue. Pinned: after a reload john labels what he drew before it, and
+the word stands on every board — the earlier tab's (still open), the later
+one's, fern's, in both merge orders; the earlier tab labels what the later
+one drew; a thing he blessed and a word he wrote in one sitting are his in
+the next; fern, and johnny — whose name only begins like his — are refused
+at the door with whose it is, and a label in fern's log is dropped on every
+replay; the field's line says *on each of your 3 marks* across two sittings
+and names only fern's. Still per sitting, and said so in the tests: two
+logs, two participants, each its own numbering; his field in one tab
+survives his strokes in the other, his loop waits for its own tab's check,
+the look-back is the tab's own; his letters from two tabs never gather into
+one word (the gesture and word guards shown failing with another sitting of
+the person keyed as the same hand, the change then taken out).
+e2e 47–47e (the harness cannot reload its own page, so the sitting before
+the reload is a hand of this person's name under another suffix — what a
+reload leaves in the room): the box drawn before comes back the earlier
+sitting's; the line says `↵ label it “inlet”` where it said *no label —
+hand made this mark*; Enter writes one label event of this sitting's; the
+word stands on the earlier sitting's board, fern's and a third reader's;
+held with fern's circle it goes on the box and not on hers; and a box this
+tab drew is labelled by the person's next sitting, the word landing here.
+The canvas MCP smoke restarts the hand, which labels the circle it drew
+before the restart and is still refused the tab's box (its two new checks
+red on the old bundle). Every held log replays against the `e1f5349` bundle
+node for node — the same state and next id — bare, named, merged as the
+reader's own, merged with no reader and merged as another hand's: 30 of 30
+(none holds a label). *Found, not changed:* a hand that never gave a name
+is *hand*, so two unnamed people are one person to the rules — as they are
+already one name and one colour on the board. `7987ef0`'s message says
+core 900; it is 899. Whole suite at the last commit: core 899 in 67 files,
+typecheck clean, both bundles equal to a fresh build; relay and field 41,
+the build's test 4; surface in sync; the canvas MCP smoke and the shard's
+(605 in 31 files, typecheck clean) all pass; the gate 412 passed and the one
+honest skip (canvas 266; shard 123 + 11 + 12); WebKit smoke 4.
+
+### Phase 0b — a board that holds (pulled forward, 27 September)
+The performance baseline (`PERF.md`, R4a) measured what daily use would meet
+and found the medium does not hold a working board: **500 marks are usable
+once open; 2,000 take 100 s to open and freeze the page 7.6 s on every
+stroke; 5,000 do not open; and autosave stops saving, in silence, near
+1,100–1,600 marks.** A page of handwritten formulas passes 500 marks — every
+letter is a stroke. So this phase comes before the backbone: tools, context,
+notations and the maths on the board all read the board on every stroke, and
+would inherit the cost. The budgets are `PERF.md`'s, enforced as tests.
+
+**R3 no lost work** — as in phase 6 below, run first: never silent, an
+append-only store per board in IndexedDB, flush on the way out, the kill test.
+**R4b the engine holds 2,000 marks** — relations stored only within reach
+(distance-limited, relative to the marks' size; `same-size` across the whole
+board is 88% of what is held), computed for the new mark's neighbourhood
+through a spatial index instead of the whole board on every stroke
+(`recomputeClusterCandidates`, `session.ts`), checkpoints that do not clone
+every relation, and the scratch test's bounding-box check (`erase.ts`);
+replay of every held log node for node, and the budgets as tests on the
+generated boards (`metamedium-core/bench/`). **R4c the surface draws only what
+changed** — the reading of roles for the marks a stroke touched, not the whole
+board (`readRungs` in `08-render.js`, `assignRoles` in `diagram/roles.ts`),
+culling to the viewport, and a pointer move that repaints the stroke in
+progress, not everything. **R4d a room merges a line, not the board** — an
+arriving line appended without a full replay (`17-folder.js`), hellos not
+answered with every log by every hand, and the re-serialisation of every event
+per line gone. **R4e a brief carries what it is about** — `describeSession`
+lists the relations near the scope, not every stored one (113 KB for five
+marks at 2,000).
+
+**R4b the engine holds 2,000 marks — status, 27 Sep 2026: done on `w2`** —
+`d16fdab` (red: the budgets as tests, the equivalence harness), `08a1aef`,
+`1fbd868` (PERF.md's "after R4b" column), `8f45ac2` (the harness's scripted
+log), `bd843b7` (the grid and the reach test exported, for R4c). A content
+mark is filed in `relate/grid.ts`, a hierarchical grid whose cells are sized
+from the marks (each at the smallest power of two its own size fits in), and
+linked to the marks within its reach: `withinReach` is exactly "`relate` finds
+an engaging relation" (pinned on 4,000 pairs at four scales), and
+`reachAround` — `nearRatio` of the mark's own size — grows the box the index
+is asked about. A pair within reach stores every relation `relate` finds, in
+the old order; a pair out of reach stores none, and a scope computes those on
+demand (`session.read`). The components of the links are kept with their
+candidates and found again only where a mark joined, left or moved; a changed
+definition is scored against every component; checkpoints share the reps and
+edges nothing changes in place; the scratch test asks an index of the ink, and
+`scratchedOut` passes over a target whose box stands clear (`mayCross`). On
+the generated boards (`node --test metamedium-core/bench/budgets.test.mjs`):
+**2,000 marks replay in 0.24 s (was 159.5 s), take one more stroke in 0.15 ms
+median and 0.23 ms p95 (was 237 / 535 ms) and hold 12.4 MB (was 1,059 MB;
+stored edges 909,566 → 18,146); 5,000 marks replay in 0.65 s (killed at 300 s
+before), 0.31 / 0.39 ms a stroke, 45.5 MB** — inside PERF.md's 5,000 budgets
+too. `bench/equivalence.mjs` (the `9977158` bundle against `src/`) finds
+nothing that reads differently in any held log — bare, as the reader's own, as
+another hand's, at every prefix — in a scripted log of the acts the boards
+never make (tidy, scale, turn, import, frame, correct, split, label, bind, a
+loop kept as a drawing, clocks; every prefix, twelve undos), or on the
+500-mark board loaded, drawn event by event and compared after all 530 events,
+by prefixes, undone six times from a checkpoint (equal to a replay from zero),
+and drawn on: ids, reps, the state, clusters and candidates, shapes, words,
+reads, matches, signatures, regions, magnets, snap offers, heads, figures and
+the maths are identical — and so they are on the 2,000-mark board
+(`--size=2000`, the old engine given a 24 GB heap), loaded, drawn event by
+event and compared after all 2,079 events, undone from a checkpoint and drawn
+on. What changed is the stored edges, less exactly the relations between marks
+out of reach (500 board: 65,336 → 4,398; 2,000: 909,566 → 18,146, 800,948 of
+the dropped same-size), and the brief's lines that listed them — five marks'
+brief at 2,000 is 2 KB, not 113 KB, so R4e's number is met as a side effect
+and its scoping is still its own. `session.scenario.test.ts` untouched,
+`held.test.ts` green.
+*Found, not changed:* the whole-board read the surface runs per stroke is
+still 7.9 s at 2,000 (R4c's); a room's line is 63 ms of merge work and a 0.27
+s replay (R4d's); moving an artifact moves its members but not its own bounds,
+so the plane reads the artifact where it was blessed — as it always did, and
+kept, because changing it changes a reading. `vitest.config.mjs` keeps
+`bench/` out of `npm test`, which had collected `budgets.test.mjs` since the
+red commit. Whole suite before the last commit: core 967 in 72 files,
+typecheck clean, both bundles equal to a fresh build; relay, field and build
+tests 45; surface in sync; the canvas MCP smoke and the shard's (605 in 31
+files, typecheck clean) pass; the gate 412 passed and the one honest skip
+(canvas 266; shard 123 + 11 + 12); WebKit smoke 4.
 
 ### Phase 1 — the backbone
 **B1 Tools.** *Owns* `metamedium-core/src/tools/` (the contract, the
@@ -441,13 +803,98 @@ line's end, lines meeting read as one figure. *Red first:* synthetic
 connectors with each head kind; a two-stroke diamond and a three-line
 triangle read as one figure each. *Trap:* *filled* is ink coverage, and a
 fast hatch leaves gaps; measure coverage relative to the head's own area.
+*Status, 27 Sep 2026:* E3 built in core on `w2-maths` —
+`session/ports.ts` (a notation registers and its point and continuous ports
+come back through `magnetSites`, `nearestMagnet` and `magnetsNear`; a place
+along a port is `along:<notation>` with its share of the port in the index,
+found again by `siteOf`; with none registered every query equals a golden
+captured before the hook), `diagram/heads.ts` (the arrow's own barb, a small
+triangle, diamond or circle on the axis, a separate chevron, a fill; filled as
+coverage of the head's own inside — 804 of 810 hand-drawn heads right, the
+misses a shaky, heavily rounded triangle read as a circle 0.37; writing at an
+end is a label) and `diagram/figures.ts` (ruled strokes whose ends meet, bound
+or touching, as a triangle, a quadrilateral, a diamond said as one turned
+about 45°, a rectangle when its corners read right; sides keep their marks;
+`solveBoard(state, { figures: figuresOf(state) })` gives the three-line
+triangle 25.30″ with the single stroke's conflict and other reading) — 48
+tests, core 892. Left for D1: a diamond drawn as left and right halves inside
+the word window is gathered as a word (`session.ts`) and so is no figure; a
+fill that crosses a head's outline three times is a scratch and erases it; the
+session's inferred wire lands on a head, not the node beyond its `tip`.
 
 ### Phase 3 — diagrams
 **D1 Flowchart** — `src/notations/flowchart.ts`, the `flowchart@1` pack,
 the notation reading in the field and the panel, the ports. *Red first:* a
 hand-drawn flowchart fixture (jittered, several strokes per symbol) reads as
 a flowchart; a wireframe fixture does not. *Trap:* rotation — the diamond is
-known only by its clean form's angle. **D2 Mermaid out** — the exporter tool,
+known only by its clean form's angle.
+*Status, 27 Sep 2026:* D1's core built on `w2-maths`; the surface's display
+(the field's *what this is* row, the panel's *becomes* row), the
+`flowchart@1` pack (B3) and a board's `use` offering the ports are still to
+come. `notations/notation.ts` — a notation's symbols and connectors each play
+one of the six roles and add none; `notationsOf(state, scope?)` asks every
+registered notation, plural and ranked, leaving out one that throws or names
+a seventh role; a reading gives each symbol with its readings and ports, each
+flow with its direction and its ends read past its heads, each label, and
+every mark's role; `offerPorts` puts a notation's ports through E3's hook,
+never by default. `notations/shape.ts` reads an outline by its corners (the
+four on its hull and the share they hold, how upright, how turned, how it
+leans). `notations/flowchart.ts`: process, decision (one stroke; two; two a
+word gathered), terminator, data, start and end; flows directed by their
+heads, a magnet's bind first; labels inside a symbol or beside a flow; the
+content is `FLOWCHART_TABLE`, each symbol's Mermaid included, bound for the
+pack. The bench: 36/36 hand-drawn flowcharts read (0.76–0.80), 288/288
+symbols, 288/288 flows, 216/216 labels; boxes tilted to 12° 72/72
+processes; diamonds 48/48 in one stroke and 48/48 in two; the wireframe, the
+molecule and a line of writing 0/8 each above the floor (0.5) — 51 tests,
+core 943. The trap's answer: a rectangle's clean form is its upright bounds
+and carries no angle, so the diamond is read from the corners on the ink's
+own hull. Found, for their owners: a diamond drawn as left and right halves
+inside the word window is still gathered as a word, because `absorbIntoWord`
+(`session.ts`) hands `words.ts` bounds only and bounds cannot tell `< >` from
+`( )` — the fix needs the strokes' ends in `session.ts`; the notation reads
+the word's two strokes as the figure they make, so D1 does not wait on it.
+A box drawn as two L-shaped strokes is two *arrow 0.59* readings, so
+`figuresOf`, which skips arrows, never sees it (ruled in four, it reads). A
+square diamond, which the rung reads as *rectangle 0.82*, is offered *Draw it
+clean* as its upright bounding box (`clean.ts`) — a decision redrawn as a
+process. (Both fixed by S1, below.)
+**S1 The shape rung holds a diamond, an L and a wide arc** — a correctness
+unit, found by D1 and the maths lane, before diagrams reach the surface:
+*Draw them clean* redrew a diamond as its upright box, an L read as an
+arrow (so a box drawn as two Ls was two arrows and no figure), and a wide
+arc read as a line. *Owns* `recognition.ts`, `geometry.ts`,
+`session/clean.ts`, their tests and benches. *Red first:* boxes turned
+0°–45° drawn clean at their angle, Ls with no arrow reading, arcs by sweep,
+a flowchart drawn clean and read again. *Trap:* the barb's length, not its
+angle (raising the angle loses real arrows); the arc measured on the
+denoised path, or a slow wobbly line becomes one.
+*Status, 27 Sep 2026:* built on `w2-maths`. A rectangle's clean form is its
+tightest box at any angle (`tightestBox`), squared up only within the
+hand's wobble; an arrow's barb must be short against its shaft or a flick in
+the hand's space, and says its ratio; a stroke that bows evenly — swept,
+shown past a straight line's bow on screen, spread, round — reads as an arc
+and the line gives way (`bowOf`); a line that bends is not offered clean;
+an arrow's clean form keeps its barb and reads back as an arrow. Benches:
+the recognition corpus unchanged (1674, 99.9%, every row); arcs 30°–300°
+1295/1296 read as arcs, every steady one (0 of 864 under 180° before); no
+L of the red test carries an arrow reading (they were 0.53–0.60), and of
+1008 swept arrows every one with a barb under 0.4 of its shaft or 16px
+still reads first; the clean bench's corpus rows unchanged, turned boxes
+864/864 at their own angle (864 off before), arcs offered 1293/1296 (288,
+with 709 offered as lines), every clean form reading back as its shape;
+figures: a box drawn as two Ls is one rectangle; the flowchart bench drawn
+clean keeps every decision — 72/72 on the boards (43 before), 48/48 in one
+stroke (32) and 48/48 in two (12) — core 967. Found, for their owners: a
+data symbol drawn clean reads as a process (36/36) — the rung reads a
+parallelogram as a rectangle and its tightest box is upright, so that offer
+needs the hull's corners (D1) or a rung that sees a lean; `measure.ts`
+gives a turned box's width and height from its bounds, not its sides (the
+maths lane); `inferWire` (`session.ts`) wires only a top *line* or *arrow*,
+so a curved connector that now reads as an arc gets no wire (the main
+lane); and John's own arrows are not in the repo — the barb rule was
+checked on synthetic hands and D1's arrows, and wants his strokes (R1).
+**D2 Mermaid out** — the exporter tool,
 the `mermaid` kind in `kinds/kinds.ts` and its renderer in the `run`
 sandbox, the export pane. *Red first:* the fixture's Mermaid equals a golden
 text; the render is asserted when the library loads and skipped by name when
@@ -470,6 +917,26 @@ marks. *Trap:* a printer scales; the tile carries a measured test square.
 M2 (the sheet, `sheetLines`) built in `metamedium-core/src/maths/` on
 `w2-maths` — 94 tests; changing the bust re-derives exactly A, 1, 2 and 5
 (`MATHS-PLAN.md` §4).
+*Status, 27 Sep 2026:* M3a (dimensions — a number beside a mark offered as
+one of its measures, ranked with its reason and runner-up; a piece label
+inside a closed mark; a square declaring a corner right; the underline;
+each drawing's unit and scale) and M4 (solving, figure by figure in closed
+form — the triangle says 25.30″ with `√(24² + 8²)`, its conflict and the
+other reading; `measure.ts` in units, unchanged for a mark with no labels;
+a step's value on an edge checked against its step) built in
+`metamedium-core/src/maths/` on `w2-maths` — 139 maths tests, core 815
+(`MATHS-PLAN.md` §4). M3's figures of several strokes are E3's, which fill
+the same figure through `polygonFigure`.
+*Status, 27 Sep 2026:* M7 (core) built on `w2-maths` — `maths/truesize.ts`
+draws solved figures at true size as a new SVG (the root in paper units,
+the viewBox in the drawing's; each figure from the solver's first reading,
+never from the ink; labels as written, a derived length a place finer; the
+title says when labels conflict, and what was left out), and
+`maths/print.ts` tiles it onto Letter or A4 at 100% with overlap, ⊕
+alignment marks both neighbours print, grid labels, a map, a measured test
+square (1 in, or 2 cm) on every page and one HTML that prints a page per
+sheet; the 22″ × 56″ piece is 28 Letter pages; 29 tests, core 844
+(`MATHS-PLAN.md` §4). The offers and the export pane are M5's.
 
 ### Phase 5 — seats
 J1–J3 as `DIRECTOR-PLAN-W2.md` §3, with §6's addition.
@@ -641,3 +1108,10 @@ the backbone, R1–R3, or A1 and A4.
 5. One photograph of a hand-drawn flowchart for D8.
 6. The decision seat stays in core as a participant at tier 1½ [yes, as
    landed; maths is its second user].
+7. When two hands both bless the same marks, which artifact holds them
+   [today both do; proposed: the first bless in merge order holds them and
+   the second is refused at the door with its reason, the STATE-1 way].
+8. Who makes a hull the shard blesses in the engine's name [the hand whose
+   log holds it, so a person can label it — as landed in L2f].
+9. The precision a derived length is written to [one place finer than the
+   labels it came from: 24 and 8 give 25.3 — as landed in M7].

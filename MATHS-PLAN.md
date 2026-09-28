@@ -171,6 +171,99 @@ text artifacts and read writing, changing nothing. Fixtures `apron.sample`,
 else, and undo restores them. Not yet: `measure.ts` in units, the HERE
 clause, and the `maths` tool, which waits for B1's registry.
 
+**Status, 27 Sep 2026: M3a and M4 built** (branch `w2-maths`; red `084f8de`,
+`a165ba1`, `e2d4fc4`, `4b8181d`, `7f2c812`, `9d572dc`; built `b41a302`,
+`3b66234`, `b350704`, `496f677`, `374860a`, `2050132`). `dimension.ts` —
+the **figure** the solver works on (corners, sides with the marks that drew
+each, the ink's angles, an outline), filled by one closed stroke from its
+clean form (`figureOfMark`) and by `polygonFigure`, the adapter E3's lines
+meeting will fill. A number — a one-line text artifact or a phrase of read
+writing, parsed by M1 (`readNumber`: bare, with a unit, a range, named as
+*r*, *⌀*, a girth such as *waist*, *area* or *rise*, a step's value
+*1. 15″*, an angle *40°*) — is offered as a side, a part of a side, a
+circle's radius or diameter or an arc's chord, ranked by its distance to
+that side's middle relative to the side's length and by how squarely it
+sits across (a closed figure's side is seen only from outside it), with the
+reason and the runner-up; a bare number beside a circle is radius and
+diameter tied, and says so. Inside a closed mark it is a piece label. A
+small square in a corner — an L or a closed square, measured in the
+corner's own frame, an arc across it refused — declares the corner right
+and is not a figure. The underline: a short line under a number that
+reaches no other mark is the number's; one whose ends reach marks spans
+something, and the number is its length. Other marks' ends, crossings and
+corners divide a side into parts. Drawings are clustered by `relations.ts`;
+each takes a unit (the one its labels write, else the page's) and a scale
+— the median units per canvas unit, one label per number — that says *to
+scale within N%* (`TO_SCALE_WITHIN`), *not to scale; the labels rule*, or
+*one label sets the scale*. `writing.ts` reads the board's words once for
+the sheet and the dimensions, and `sheetLines` leaves every number on a
+mark out of the page. `solve.ts` — one figure at a time, in closed form: a
+triangle from three facts (SSS, SAS, ASA, AAS, SSA with both triangles), a
+rectangle from two of width, height, diagonal, area and perimeter, a circle
+from any one of four, an arc from two of chord, rise, radius and length,
+lines and quadrilaterals side by side, parts summing to their whole and a
+missing part derived, ranges evaluated at the corners of their inputs.
+Readings are the sets of labels that hold together, ranked by labels kept,
+conflicts, assumptions, the size of the disagreement and last the ink's
+proportions. A declared square is never dropped; a corner the ink measures
+right is offered only as *if the corner at C is right*, citing
+`RIGHT_ANGLE_TOLERANCE`, now one exported constant in `measure.ts`; what
+the labels leave open is offered at the drawing's scale as the ink's.
+`solveBoard` reads the page once — the unit bare labels take — and checks
+every step's value on an edge against its step with `checkWritten`.
+`measure(node, nodes, board)` adds the unit, the values with their
+formulas, the conflicts, the other readings, the checks, the ink's offers,
+the scale and notes for a mark that carries labels, and returns a mark that
+carries none exactly as before; `describeMaths` says them ahead of the px
+measures. The triangle, verbatim: *legs of 24 and 8 make the long side
+25.30″* (`√(24² + 8²)`); *labelled 24; legs of 24 and 8 make it 25.30, 1.30
+longer (5%)*; *or 24 on the long side and a leg of 8 make the other leg
+22.63″*; *the three labels hold together only if the corner at C is
+80.41°, not the right angle its square declares*. 139 maths tests in six
+files (dimension 21, solve 24), measure 10; core 815 in 63 files (767 in
+61). Found on the way: the shape rung reads a shallow arc (140°) as a line
+0.63, so only arcs it reads as arcs are figures. Not yet: braces and double
+arrows as spans; figures of several strokes (E3's, through
+`polygonFigure`); an oval; the decision seat for a flat attachment (J1); the
+surface (M5).
+
+**Status, 27 Sep 2026: M7 (core) built — true size and print** (branch
+`w2-maths`; red `cb00056`; built `b805358`, `f4a9bcf`). `truesize.ts` —
+`trueSize(board)` draws solved figures at their real size as a **new SVG
+document built from the numbers, never from the ink**: the root is paper
+(`width="24.5in"`, or cm or mm) and the viewBox is in the drawing's unit,
+so 24″ prints as twenty-four inches. Each figure is drawn from the solver's
+first reading — a triangle from its three sides, a rectangle from its width
+and height, a circle from its radius, an arc from its chord and rise, a line
+from its length — squared to the page on the side the ink draws nearest
+level or plumb, its corners going round the way the ink's do, which is all
+the ink supplies. Labels are set as written; a derived length a place finer
+than the finest label on its figure (24 and 8 make *25.3″*, eighths make
+sixteenths), so it agrees with a ruler and claims no more than was written;
+coordinates are written to a fixed resolution finer than a printer's dot
+(`COORD_PLACES`), so the same figures give the same bytes. Labels that
+conflict are drawn from the first reading, the title says so (*drawn from
+the first of 2 readings: its labels conflict*) and the side carries *25.3″
+(labelled 24)*; a figure its labels do not fix — a quadrilateral's sides
+alone, a rectangle with one side, a range, a bare number — is left out and
+listed. Figures stand apart in a row, because they were solved apart; a
+scale bar closes the page. `print.ts` — `printTiled(doc, { paper,
+orientation })` tiles the pieces with their labels onto Letter or A4: each
+page an SVG the sheet's size, the drawing placed by one transform and
+clipped; neighbours share ½ in (1 cm for a metric drawing), with a dashed
+line and a ⊕ labelled *A1|A2* printed identically on both; a grid label, a
+map, and a **test square of exactly 1 in (2 cm for a metric drawing) with
+the sentence to measure it before cutting** on every page; and one HTML
+document that prints them one per sheet at 100%. The 22″ × 56″ piece on
+Letter: ½ in margins and a 1.3 in footer leave 7.5 × 8.7 in a page,
+advancing 7 × 8.2, so 22.5 × 56.8 in of piece and labels take 4 across and
+7 down — 28 pages; headless Chromium printed the HTML as 28 PDF pages of
+612 × 792 pt with the square exactly 1 in. 29 tests (truesize 18, print 11);
+maths 168 in 8 files; core 844 in 65 (815 in 63). Not yet: the surface
+(M5's *draw it to scale* and the export pane); several figures assembled
+into one piece, which would mean solving them together; grain lines, notches
+and seam allowance (M6); leaving out a page with nothing on it.
+
 ## 5. The middle layer — seats that judge
 
 TypeSafe's own guidance for Jev is the pattern this engine already follows:

@@ -92,7 +92,13 @@ export function localityOf(node: MMNode): Locality | null {
   return l === 'local' || l === 'hosted' ? l : null;
 }
 
-/** Who made a node: the `made-by` edge's target, else the local human. */
+/**
+ * Who made a node: the `made-by` edge's target, else the local human. A mark
+ * is made by the hand that drew it; an artifact by whoever BLESSED it, not by
+ * whoever drew its marks (V1-PLAN L2f) — a person, so a bless in the engine's
+ * name is the hand's whose log holds it. A bless writes the edge only for a
+ * maker other than this board's own hand, so no edge here means that hand.
+ */
 export function authorOf(node: MMNode): string {
   const e = node.edges.find((x) => x.rel === 'made-by');
   return e ? e.to : LOCAL_PARTICIPANT;
@@ -305,7 +311,11 @@ export function transcriptOf(node: MMNode): string | undefined {
  */
 export interface Label {
   text: string;
-  /** Who wrote it — always the participant that made the mark. */
+  /**
+   * Who wrote it: the participant that made the mark, or another sitting of
+   * the same person — a reload is a new participant and the same person
+   * (V1-PLAN L2i, `Session.isMine`).
+   */
   source?: string;
   at: number;
 }

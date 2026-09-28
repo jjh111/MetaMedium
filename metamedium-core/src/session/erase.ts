@@ -76,9 +76,37 @@ export interface ScratchTarget {
   closed?: boolean;
 }
 
+/** The box a run of points spans. */
+function spanOf(points: Point[]): Bounds {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const p of points) {
+    if (p.x < minX) minX = p.x;
+    if (p.x > maxX) maxX = p.x;
+    if (p.y < minY) minY = p.y;
+    if (p.y > maxY) maxY = p.y;
+  }
+  return { minX, minY, maxX, maxY };
+}
+
+/**
+ * Whether two boxes could hold a crossing. Two segments can only cross where
+ * both are, so strokes whose boxes stand apart cross nothing — and a box is
+ * one pass over the points where counting crossings is a pass over every pair
+ * of segments. The boxes are compared with a margin of a billionth of their
+ * coordinates, so a crossing the segment test would find at the very edge of
+ * a box (where rounding lives) is never ruled out by this one.
+ */
+export function mayCross(a: Bounds, b: Bounds): boolean {
+  const pad = 1e-9 * (1 + Math.max(Math.abs(a.minX), Math.abs(a.maxX), Math.abs(a.minY), Math.abs(a.maxY), Math.abs(b.minX), Math.abs(b.maxX), Math.abs(b.minY), Math.abs(b.maxY)));
+  // Written so a box that is not a number meets everything: never ruled out here.
+  return !(a.maxX + pad < b.minX || b.maxX + pad < a.minX || a.maxY + pad < b.minY || b.maxY + pad < a.minY);
+}
+
 /**
  * Which of `targets` this stroke scratched out. Empty means it is ordinary ink —
  * which is the common case, and why this is safe to run on every stroke.
+ * A target whose outline's box stands clear of the stroke's is passed over
+ * before a single crossing is counted (`mayCross`): it has none to count.
  */
 export function scratchedOut(
   points: Point[],
@@ -86,10 +114,12 @@ export function scratchedOut(
   minCrossings = DEFAULT_ERASE_CROSSINGS
 ): string[] {
   if (points.length < 3) return [];
+  const span = spanOf(points);
   const hit: string[] = [];
   for (const t of targets) {
     const outline = outlineOf(t);
     if (!outline) continue;
+    if (!mayCross(span, spanOf(outline))) continue;
     if (countCrossings(points, outline, minCrossings) >= minCrossings) hit.push(t.id);
   }
   return hit;

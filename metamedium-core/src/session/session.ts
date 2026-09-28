@@ -8,6 +8,9 @@
 //     the NEXT event resolves it (deferred commitment with retroactivity).
 //   - A check summons; it does not confirm. Blessing is a separate act.
 //   - Drawing past an active summon dissolves it (ignoring is a valid answer).
+//   - Gestures are per hand: a loop that waits, a summon, a selection, the
+//     look-back and a taught mark are each hand's own, so another hand's
+//     events never dissolve, take up or open them (V1-PLAN L2h).
 //   - Ink is never destroyed: gesture/member/erased strokes keep their nodes.
 //   - The engine is event-sourced: every input is logged, state is a pure
 //     function of the log, and undo = drop the last input and replay.
@@ -20,11 +23,13 @@ import {
   distancePointToBounds,
   boundsOverlap,
   boundingBoxDistance,
+  boundsContain,
 } from '../geometry';
 import { analyzeStroke } from '../recognition';
 import {
   type MMNode,
   type Edge,
+  type Rep,
   type ParticipantKind,
   type Capability,
   createBootstrapNodes,
@@ -60,7 +65,8 @@ import { type Expectation, type StaleResult, describeStale } from './stale';
 import { handLabel } from './hands';
 import { DEFAULT_ERASE_CROSSINGS, scratchedOut } from './erase';
 import { type Region, regionsOf, regionsOverlapping } from './regions';
-import { type Mark, type Relation, clusters, relate } from '../relate/relations';
+import { type Mark, type Relation, ENGAGING_KINDS, clusters, reachAround, relate, withinReach } from '../relate/relations';
+import { MarkGrid } from '../relate/grid';
 import { type ConceptMatch, type ConceptScope, matchConcepts } from '../concepts/concept';
 import { type GenreReading, type RoleReading, type Wire, assignRoles, genreOf } from '../diagram/roles';
 import { BUILTIN_COMMAND_MARK, matchesCommandMark } from './commandmark';
@@ -126,13 +132,20 @@ export interface ClusterCandidate {
   matches: { artifactId: string; name: string; score: number; reasoning?: string }[];
 }
 
+/**
+ * The gesture state of the board's own hand — its reader. `pendingLassoId`,
+ * `summon`, `selection`, `markMiss`, `commandMark` and `recentIds` below are
+ * all this hand's; every other hand in a room holds its own, which the board
+ * keeps and replays but never shows as the reader's (V1-PLAN L2h).
+ */
 export interface SessionState {
   /** Live view of the node graph (not a snapshot) — read, don't mutate. */
   nodes: ReadonlyMap<string, MMNode>;
   /** Nodes on the content plane (strokes not yet in artifacts, plus artifacts). */
   contentIds: string[];
-  /** Stroke currently held as gesture-candidate (also still content). */
+  /** This hand's stroke currently held as gesture-candidate (also still content). */
   pendingLassoId: string | null;
+  /** This hand's summon: the field opens on it. Another hand's never does. */
   summon: Summon | null;
   clusterCandidates: ClusterCandidate[];
   artifacts: string[];
@@ -144,11 +157,15 @@ export interface SessionState {
    * lasso, a cluster, or a signature.
    */
   explanations: string[];
-  /** The mark the user taught this session, or null while the built-in check stands. */
+  /**
+   * The mark this hand taught, or null while the built-in check stands. Each
+   * hand's own: a mark another hand taught judges only that hand's strokes.
+   */
   commandMark: CommandMark | null;
   /**
-   * Why the last stroke drawn against a waiting lasso did not summon. Cleared
-   * by the next stroke. A gesture that fails silently cannot be learned.
+   * Why this hand's last stroke drawn against its waiting lasso did not
+   * summon. Cleared by its next stroke. A gesture that fails silently cannot
+   * be learned.
    */
   markMiss: MarkMiss | null;
   /**
@@ -176,18 +193,36 @@ export interface SessionState {
    */
   clocks: Record<string, Clock>;
   /**
-   * The marks a held loop became once it was taken up (by the mark or the
-   * chip), or that were selected outright. Transient: a hand's next content
-   * stroke clears it; undoing a `deselect` brings it back in place. It is
-   * state the human just made and can see — the one place a stroke's
+   * The marks this hand's held loop became once it was taken up (by the mark
+   * or the chip), or that it selected outright. Transient: the hand's next
+   * content stroke clears it; undoing a `deselect` brings it back in place. It
+   * is state the human just made and can see — the one place a stroke's
    * meaning may depend on state (a tap dismisses it and is never a dot).
    */
   selection: string[];
   /**
-   * Content drawn inside the recent window, oldest first — "what you were just
-   * doing". The command mark reads back over this.
+   * Content this hand drew inside the recent window, oldest first — "what you
+   * were just doing". The command mark reads back over this, and over nobody
+   * else's: another hand drawing beside you just now is not you.
    */
   recentIds: string[];
+}
+
+/**
+ * One hand's gestures (V1-PLAN L2h). A merged log interleaves the hands'
+ * events by time, so state shared by the board let another hand's stroke
+ * dissolve a summon on replay — and the bless after it made nothing, on every
+ * board — or leave a loop untaken between it and its check. Each hand holds
+ * its own, under the key its acts carry (`handOf`).
+ */
+interface Gestures {
+  /** This hand's stroke held as a gesture-candidate: a loop waiting for this hand's mark. */
+  pendingLasso: { id: string; at: number } | null;
+  summon: Summon | null;
+  selection: string[];
+  markMiss: MarkMiss | null;
+  /** The mark this hand taught, or null for the built-in check. */
+  commandMark: CommandMark | null;
 }
 
 // Every event is attributed: participantId defaults to the local human.
@@ -419,9 +454,12 @@ export interface SessionConfig {
    * reused only when its whole history was loaded first. It is stamped on every event
    * this session authors, and the ids those events mint are derived from it,
    * so a host that shares a room must pass the same name it writes its log
-   * file under (`mergeLogs`' `me`). It is never read back at replay time: an
-   * event carries the name it was written under, so opening a board in a new
-   * tab — a new name, every time — renumbers nothing.
+   * file under (`mergeLogs`' `me`). It never numbers anything at replay time:
+   * an event carries the name it was written under, so opening a board in a
+   * new tab — a new name, every time — renumbers nothing. It is read at replay
+   * for one thing only: which person this board's own hand is, so a sitting
+   * may label what the same person drew in another (V1-PLAN L2i) — the name
+   * every other board reads off this log when it merges it.
    *
    * **Left unset, ids are minted the old way**, off a counter over the replay.
    * That is not a hedge, it is the honest answer: a writer with no name cannot
@@ -478,6 +516,15 @@ export interface Session {
    * An empty `text` takes this hand's label off again.
    */
   label(args: { nodeId: string; text: string; participantId?: string; at: number }): string | null;
+  /**
+   * Whether a mark is the participant's own ink — `participantId` defaults to
+   * this board's own hand. The question the label rule asks, at the door and on
+   * replay, and the one the field asks before Enter: the hand that made it, or
+   * another sitting of the same person, since a reload must not make someone a
+   * stranger to their own ink (V1-PLAN L2i). Whose it IS is unchanged —
+   * `authorOf` still names the sitting that made it. Pure; no event.
+   */
+  isMine(nodeId: string, participantId?: string): boolean;
   /**
    * Install (or clear) the mark that resolves a lasso. An event, not a setting:
    * teaching is part of the session's history and replays with it.
@@ -626,16 +673,19 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
   let nodes = new Map<string, MMNode>();
   let contentIds: string[] = [];
   let artifacts: string[] = [];
-  let pendingLasso: { id: string; at: number } | null = null;
-  let summon: Summon | null = null;
   let clusterCandidates: ClusterCandidate[] = [];
   let participants: string[] = [];
   let explanations: string[] = [];
   let live: string[] = [];
   let clocks: Record<string, Clock> = {};
-  let selection: string[] = [];
-  let commandMark: CommandMark | null = config.gesture.commandMark ?? null;
-  let markMiss: MarkMiss | null = null;
+  // Every hand's gestures, keyed by the hand whose acts they are (`handOf`):
+  // the board's own under LOCAL_PARTICIPANT, another's under
+  // `participant:hand:<name>` — so every board keys one hand alike (L2h).
+  let gestures = new Map<string, Gestures>();
+  // The hand whose act made each mark on the content plane — the hand of the
+  // event, not only the participant it names: a model's mark is its hand's.
+  // What the command mark's look-back is limited to.
+  let markHands = new Map<string, string>();
   // Runtime notices, not log facts: neither is derived from the events, so
   // neither is checkpointed and neither survives into another session's log.
   let staleResult: StaleResult | null = null;
@@ -670,30 +720,52 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
   // State is a pure function of the log, and undo is "drop an event and
   // replay". A log of ten thousand events must not replay from zero on every
   // undo, so every CHECKPOINT_EVERY events the reducer's state is snapshotted
-  // (structured clone — Maps included) and a replay starts from the nearest
-  // snapshot at or before where it needs to get to. Snapshots are derived,
-  // never logged, and are discarded past any point the log is cut back to.
+  // and a replay starts from the nearest snapshot at or before where it needs
+  // to get to. Snapshots are derived, never logged, and are discarded past any
+  // point the log is cut back to.
+  //
+  // A snapshot copies what changes and SHARES what never does. The reducer
+  // changes a node only by replacing its reps or edges array, or pushing onto
+  // one; a rep, an edge, and the data a rep carries (a stroke's points, a
+  // fingerprint) are never altered once made. So a snapshot holds its own copy
+  // of every node and of its two arrays, and the same rep and edge objects the
+  // live graph holds — a structured clone copied every point of every stroke
+  // and every stored relation into every checkpoint, and held 950 MB of them at
+  // 2,000 marks (PERF.md, hotspot 4). The gestures are small and are mutated
+  // in place (a summon's suggestions), so they are cloned outright. Restoring
+  // copies again, so a snapshot stays as it was however often it is used.
   const CHECKPOINT_EVERY = 200;
-  let checkpoints: { length: number; snap: unknown }[] = [];
+  let checkpoints: { length: number; snap: Snapshot }[] = [];
 
-  function snapshot(): unknown {
-    return structuredClone({
-      nodes, contentIds, artifacts, pendingLasso, summon, clusterCandidates,
-      participants, explanations, live, selection, commandMark, markMiss, lastAt, counter, clocks,
-    });
+  interface Snapshot {
+    nodes: Map<string, MMNode>; contentIds: string[]; artifacts: string[];
+    clusterCandidates: ClusterCandidate[]; participants: string[]; explanations: string[];
+    live: string[]; gestures: Map<string, Gestures>; markHands: Map<string, string>;
+    lastAt: number; counter: number; clocks: Record<string, Clock>;
   }
-  function restore(snap: unknown) {
-    const s = structuredClone(snap) as {
-      nodes: Map<string, MMNode>; contentIds: string[]; artifacts: string[];
-      pendingLasso: { id: string; at: number } | null; summon: Summon | null;
-      clusterCandidates: ClusterCandidate[]; participants: string[]; explanations: string[];
-      live: string[]; selection: string[]; commandMark: CommandMark | null; markMiss: MarkMiss | null;
-      lastAt: number; counter: number; clocks: Record<string, Clock>;
+
+  /** A node of its own, holding the same reps and edges: they are never changed in place. */
+  const nodeCopy = (n: MMNode): MMNode => ({ ...n, reps: n.reps.slice(), edges: n.edges.slice() });
+
+  function snapshot(): Snapshot {
+    const copied = new Map<string, MMNode>();
+    for (const [id, n] of nodes) copied.set(id, nodeCopy(n));
+    return {
+      nodes: copied, contentIds: contentIds.slice(), artifacts: artifacts.slice(),
+      clusterCandidates: clusterCandidates.slice(), participants: participants.slice(),
+      explanations: explanations.slice(), live: live.slice(), gestures: structuredClone(gestures),
+      markHands: new Map(markHands), lastAt, counter, clocks: { ...clocks },
     };
-    nodes = s.nodes; contentIds = s.contentIds; artifacts = s.artifacts; pendingLasso = s.pendingLasso;
-    summon = s.summon; clusterCandidates = s.clusterCandidates; participants = s.participants;
-    explanations = s.explanations; live = s.live; selection = s.selection; commandMark = s.commandMark;
-    markMiss = s.markMiss; lastAt = s.lastAt; counter = s.counter; clocks = s.clocks ?? {};
+  }
+  function restore(s: Snapshot) {
+    nodes = new Map();
+    for (const [id, n] of s.nodes) nodes.set(id, nodeCopy(n));
+    contentIds = s.contentIds.slice(); artifacts = s.artifacts.slice();
+    clusterCandidates = s.clusterCandidates.slice(); participants = s.participants.slice();
+    explanations = s.explanations.slice(); live = s.live.slice(); gestures = structuredClone(s.gestures);
+    markHands = new Map(s.markHands);
+    lastAt = s.lastAt; counter = s.counter; clocks = { ...(s.clocks ?? {}) };
+    rebuildDerived();
   }
   function maybeCheckpoint(length: number) {
     if (length > 0 && length % CHECKPOINT_EVERY === 0 && !checkpoints.some((c) => c.length === length)) {
@@ -701,23 +773,103 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     }
   }
 
+  // ===== What the board holds, found without walking it (V1-PLAN §9 R4b) =====
+  //
+  // Derived from the node graph, never logged and never checkpointed: rebuilt
+  // whenever the graph is replaced whole (reset, restore) and kept current by
+  // the few places that change what is on the content plane or where a mark
+  // stands. None of it decides what a reading says. Each piece finds the marks
+  // a reading would have found by walking the whole board, and the reading
+  // still makes its own exact test of them:
+  //
+  //   - `order`: each content id's place along `contentIds`, as a number that
+  //     only increases along it, so a handful of ids can be put in the board's
+  //     order without walking the board;
+  //   - `reach`: the content plane at its marks' current bounds (grid.ts);
+  //   - `linked`: which content marks are within reach of which now — the
+  //     engaging relations `clusters` groups by (`withinReach`, relations.ts);
+  //   - `ink`: every stroke at its current bounds, for the scratch test;
+  //   - the components of `linked`, each holding the candidate reading
+  //     `recomputeClusterCandidates` would give it, found again only where a
+  //     mark was added, taken away or moved.
+  let order = new Map<string, number>();
+  let nextOrder = 0;
+  let inContent = new Set<string>();
+  const reach = new MarkGrid();
+  const ink = new MarkGrid();
+  let linked = new Map<string, Set<string>>();
+
+  /** A cluster of the content plane: marks joined by relations that engage. */
+  interface Component {
+    /** The member earliest on the content plane — where `clusters` begins its walk. */
+    first: string;
+    /** Every member, in the order `clusters` walks them. */
+    members: string[];
+    /** The members that are not artifacts, when there are two or more: what a candidate names. */
+    strokeIds: string[] | null;
+    signature: StructuralSignature | null;
+    /** How it scores against each definition it matches (not vetoed, at or above the floor). */
+    scores: Map<string, { score: number; reasoning: string }>;
+    candidate: ClusterCandidate | null;
+    retired: boolean;
+  }
+  let componentOf = new Map<string, Component>();
+  /** Live components with two or more strokes — the ones a definition can match. */
+  let matchable = new Set<Component>();
+  /** Content marks whose component must be found again. */
+  let unsettled = new Set<string>();
+  /** What each definition was when the components were last scored against it. */
+  interface DefinitionKey { signature: Rep | undefined; examples: Rep | undefined; text: boolean }
+  let definitionsSeen = new Map<string, DefinitionKey>();
+  let definitionsChanged = true;
+  let holding = new Set<Component>();
+  let holdingInOrder: Component[] = [];
+  let holdingMoved = false;
+
+  const byOrder = (p: string, q: string) => order.get(p)! - order.get(q)!;
+
+  function rebuildDerived() {
+    order = new Map();
+    nextOrder = 0;
+    inContent = new Set();
+    reach.clear();
+    ink.clear();
+    linked = new Map();
+    componentOf = new Map();
+    matchable = new Set();
+    unsettled = new Set();
+    definitionsSeen = new Map();
+    definitionsChanged = true;
+    holding = new Set();
+    holdingInOrder = [];
+    holdingMoved = false;
+    for (const id of contentIds) {
+      inContent.add(id);
+      order.set(id, ++nextOrder);
+    }
+    for (const id of contentIds) fileContent(id);
+    for (const [id, n] of nodes) {
+      if (!getRep(n, 'stroke') || getRep(n, 'erased')) continue;
+      const b = boundsOf(n);
+      if (b) ink.set(id, b);
+    }
+  }
+
   function reset() {
     nodes = new Map();
     contentIds = [];
     artifacts = [];
-    pendingLasso = null;
-    summon = null;
     clusterCandidates = [];
     participants = [LOCAL_PARTICIPANT, TIER0_PARTICIPANT];
     explanations = [];
     live = [];
     clocks = {};
-    selection = [];
-    commandMark = config.gesture.commandMark ?? null;
-    markMiss = null;
+    gestures = new Map();
+    markHands = new Map();
     lastAt = 0;
     counter = 0;
     for (const n of createBootstrapNodes(0)) nodes.set(n.id, n);
+    rebuildDerived();
   }
   reset();
 
@@ -820,20 +972,283 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     return out.sort((p, q) => q.score - p.score);
   }
 
+  /**
+   * The groups of the content plane that match a definition, best first, in
+   * the board's order — what `clusters(marks, relate(marks))` and `matchesFor`
+   * over every group gave, when they were run over the whole board on every
+   * event (PERF.md, hotspot 2). The components are kept (`settle`), and only
+   * the ones a mark joined, left or moved within are found again; a changed
+   * definition is scored against every component, and nothing else is.
+   */
   function recomputeClusterCandidates() {
-    clusterCandidates = [];
-    if (artifacts.length === 0 || contentIds.length === 0) return;
-
-    const marks = contentIds.map(markOf).filter((m): m is Mark => !!m);
-    const groups = clusters(marks, relate(marks));
-
-    for (const ids of groups) {
-      // Don't offer an artifact as a match for itself.
-      const strokeIds = ids.filter((id) => !artifacts.includes(id));
-      if (strokeIds.length < 2) continue;
-      const matches = matchesFor(strokeIds);
-      if (matches.length > 0) clusterCandidates.push({ nodeIds: strokeIds, matches });
+    if (artifacts.length === 0 || contentIds.length === 0) {
+      clusterCandidates = [];
+      return;
     }
+    refreshDefinitions();
+    settle();
+    if (holdingMoved) {
+      holdingInOrder = [...holding].sort((p, q) => order.get(p.first)! - order.get(q.first)!);
+      holdingMoved = false;
+    }
+    clusterCandidates = holdingInOrder.map((c) => c.candidate!);
+  }
+
+  // ===== The content plane, kept filed (R4b) =====
+  //
+  // Every change to what is on the content plane goes through these, so the
+  // index, the links and the components are never out of step with it.
+
+  function contentPush(id: string) {
+    contentIds.push(id);
+    inContent.add(id);
+    order.set(id, ++nextOrder);
+    fileContent(id);
+  }
+
+  function removeFromContent(id: string) {
+    const idx = contentIds.indexOf(id);
+    if (idx < 0) return;
+    contentIds.splice(idx, 1);
+    inContent.delete(id);
+    order.delete(id);
+    unfileContent(id);
+  }
+
+  /** `next` takes `prev`'s place on the content plane — a word where its first letter stood. */
+  function contentReplace(prev: string, next: string) {
+    const idx = contentIds.indexOf(prev);
+    const place = order.get(prev)!;
+    contentIds.splice(idx, 1, next);
+    inContent.delete(prev);
+    order.delete(prev);
+    unfileContent(prev);
+    inContent.add(next);
+    order.set(next, place);
+    fileContent(next);
+  }
+
+  /** `ids` take `prev`'s place — a dissolved word's letters, back where it stood. */
+  function contentSpread(prev: string, ids: string[]) {
+    const idx = contentIds.indexOf(prev);
+    if (idx < 0) return;
+    contentIds.splice(idx, 1, ...ids);
+    inContent.delete(prev);
+    unfileContent(prev);
+    // Places between two neighbours: number the plane again, in its order.
+    order = new Map();
+    nextOrder = 0;
+    for (const c of contentIds) order.set(c, ++nextOrder);
+    for (const c of ids) {
+      inContent.add(c);
+      fileContent(c);
+    }
+  }
+
+  /**
+   * File a content mark at its current bounds and link it to every mark
+   * within its reach: the index is asked for the marks whose boxes meet this
+   * one's grown by its reach (`reachAround`), and each is kept only when
+   * `withinReach` says so — the test `relate` makes for `near`.
+   */
+  function fileContent(id: string) {
+    const n = nodes.get(id);
+    const b = n && boundsOf(n);
+    if (!b) return;
+    reach.set(id, b);
+    if (!reach.has(id)) return; // a box that is not finite is within reach of nothing
+    const mine = new Set<string>();
+    const r = reachAround(b);
+    for (const o of reach.query({ minX: b.minX - r, minY: b.minY - r, maxX: b.maxX + r, maxY: b.maxY + r })) {
+      if (o === id || !withinReach(b, reach.boundsOf(o)!)) continue;
+      mine.add(o);
+      linked.get(o)!.add(id);
+      unsettle(o);
+    }
+    linked.set(id, mine);
+    unsettle(id);
+  }
+
+  function unfileContent(id: string) {
+    const mine = linked.get(id);
+    if (mine) {
+      for (const o of mine) {
+        linked.get(o)?.delete(id);
+        unsettle(o);
+      }
+    }
+    const c = componentOf.get(id);
+    if (c) retire(c);
+    linked.delete(id);
+    componentOf.delete(id);
+    unsettled.delete(id);
+    reach.delete(id);
+  }
+
+  /** A mark stands somewhere else now (a transform, a turn, a word's letters): file it again. */
+  function boundsMoved(id: string) {
+    const n = nodes.get(id);
+    if (!n) return;
+    if (inContent.has(id)) {
+      unfileContent(id);
+      fileContent(id);
+    }
+    if (ink.has(id)) {
+      const b = boundsOf(n);
+      if (b) ink.set(id, b);
+      else ink.delete(id);
+    }
+  }
+
+  /** This mark's component must be found again — and so must every mark that was in it. */
+  function unsettle(id: string) {
+    const c = componentOf.get(id);
+    if (c) retire(c);
+    if (linked.has(id)) unsettled.add(id);
+  }
+
+  function retire(c: Component) {
+    if (c.retired) return;
+    c.retired = true;
+    matchable.delete(c);
+    if (holding.delete(c)) holdingMoved = true;
+    for (const m of c.members) {
+      if (componentOf.get(m) === c) componentOf.delete(m);
+      if (linked.has(m)) unsettled.add(m);
+    }
+  }
+
+  // ===== Components, and what they match =====
+
+  /** Find the components of every unsettled mark, and read each against the definitions. */
+  function settle() {
+    if (unsettled.size === 0) return;
+    const fresh: Component[] = [];
+    for (const id of unsettled) {
+      if (!linked.has(id) || componentOf.has(id)) continue;
+      fresh.push(gather(id));
+    }
+    unsettled.clear();
+    for (const c of fresh) {
+      if (c.strokeIds) {
+        matchable.add(c);
+        c.signature = signatureOf(c.strokeIds);
+        for (const aid of artifacts) scoreAgainst(c, aid);
+      }
+      assemble(c);
+    }
+  }
+
+  /** The component `start` is in: its members, the one `clusters` starts from, and the order it walks them in. */
+  function gather(start: string): Component {
+    const seen = new Set<string>([start]);
+    const stack = [start];
+    let first = start;
+    while (stack.length) {
+      const id = stack.pop()!;
+      if (order.get(id)! < order.get(first)!) first = id;
+      for (const o of linked.get(id)!) {
+        if (seen.has(o)) continue;
+        seen.add(o);
+        stack.push(o);
+      }
+    }
+    const members = walkFrom(first);
+    // Don't offer an artifact as a match for itself.
+    const strokeIds = members.filter((id) => !artifacts.includes(id));
+    const c: Component = {
+      first,
+      members,
+      strokeIds: strokeIds.length >= 2 ? strokeIds : null,
+      signature: null,
+      scores: new Map(),
+      candidate: null,
+      retired: false,
+    };
+    for (const m of members) componentOf.set(m, c);
+    return c;
+  }
+
+  /**
+   * The order `clusters` walks a component in: depth first from its earliest
+   * mark, each mark's links taken in the board's order and the last one taken
+   * first — which is how `clusters` meets them, since `relate` lists pairs in
+   * the board's order.
+   */
+  function walkFrom(first: string): string[] {
+    const out: string[] = [];
+    const seen = new Set<string>();
+    const stack = [first];
+    while (stack.length) {
+      const id = stack.pop()!;
+      if (seen.has(id)) continue;
+      seen.add(id);
+      out.push(id);
+      for (const o of [...linked.get(id)!].sort(byOrder)) if (!seen.has(o)) stack.push(o);
+    }
+    return out;
+  }
+
+  /** What `matchesFor` reads of a definition: its signature, its examples, and whether it is writing taken as text. */
+  function definitionKeyOf(aid: string): DefinitionKey {
+    const a = nodes.get(aid)!;
+    const code = [...a.reps].reverse().find((r) => r.modality === 'code')?.data as { kind?: string } | undefined;
+    return { signature: getRep(a, 'signature'), examples: getRep(a, 'examples'), text: code?.kind === 'text' };
+  }
+
+  /** `matchesFor`'s test, for one component against one definition. */
+  function scoreAgainst(c: Component, aid: string) {
+    c.scores.delete(aid);
+    const k = definitionsSeen.get(aid) ?? definitionKeyOf(aid);
+    // Writing taken as text is a transcription, not vocabulary (v10 F8).
+    if (k.text) return;
+    const aSig = k.signature?.data as StructuralSignature | undefined;
+    if (!aSig) return;
+    const m = matchDefinition(c.signature!, aSig, k.examples?.data as Examples | undefined);
+    if (m.vetoed || m.score < MATCH_FLOOR) return;
+    c.scores.set(aid, { score: m.score, reasoning: m.reasoning });
+  }
+
+  /** A definition made, changed, corrected or gone: score every component against what changed. */
+  function refreshDefinitions() {
+    if (!definitionsChanged) return;
+    definitionsChanged = false;
+    const now = new Map<string, DefinitionKey>();
+    for (const aid of artifacts) now.set(aid, definitionKeyOf(aid));
+    const changed: string[] = [];
+    for (const [aid, k] of now) {
+      const was = definitionsSeen.get(aid);
+      if (!was || was.signature !== k.signature || was.examples !== k.examples || was.text !== k.text) changed.push(aid);
+    }
+    const gone = [...definitionsSeen.keys()].filter((aid) => !now.has(aid));
+    definitionsSeen = now;
+    if (changed.length === 0 && gone.length === 0) return;
+    for (const c of matchable) {
+      for (const aid of gone) c.scores.delete(aid);
+      for (const aid of changed) scoreAgainst(c, aid);
+      assemble(c);
+    }
+  }
+
+  /** A component's candidate: `matchesFor`'s list, in its order, when there is one. */
+  function assemble(c: Component) {
+    let candidate: ClusterCandidate | null = null;
+    if (c.strokeIds && c.scores.size) {
+      const matches: ClusterCandidate['matches'] = [];
+      for (const aid of artifacts) {
+        const s = c.scores.get(aid);
+        if (s) matches.push({ artifactId: aid, name: wordOf(nodes.get(aid)!) ?? aid, score: s.score, reasoning: s.reasoning });
+      }
+      matches.sort((p, q) => q.score - p.score);
+      if (matches.length) candidate = { nodeIds: c.strokeIds, matches };
+    }
+    c.candidate = candidate;
+    if (candidate) {
+      if (!holding.has(c)) {
+        holding.add(c);
+        holdingMoved = true;
+      }
+    } else if (holding.delete(c)) holdingMoved = true;
   }
 
   function makeSuggestions(enclosedIds: string[]): Suggestion[] {
@@ -855,24 +1270,34 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
   }
 
   /**
-   * Record what Tier 0 can see between the new mark and everything else, as
-   * held (unblessed) edges on both ends. This is the SAME relate() the palette
-   * and the diagram rung read from — one relation system, one set of
-   * thresholds, all of them ratios of the marks' own sizes.
+   * Record what Tier 0 can see between the new mark and the marks within its
+   * reach, as held (unblessed) edges on both ends. This is the SAME relate()
+   * the palette and the diagram rung read from — one relation system, one set
+   * of thresholds, all of them ratios of the marks' own sizes.
+   *
+   * What is stored is what is read (V1-PLAN §9 R4b). A pair within reach —
+   * one engaging the other: contains, inside, crossing, touching, near — keeps
+   * every relation `relate` finds between them, how they sit included. A pair
+   * out of reach keeps none: what holds between two marks at any distance —
+   * above, left-of, same-row, same-column, same-size — is computed for the
+   * scope that asks, by `session.read` and the concepts over it, and stored it
+   * was 88% of a 2,000-mark board and read by nothing but the brief.
    */
   function addSpatialEdges(node: MMNode) {
-    // Relations are pairwise, so the new mark is related to each other mark
-    // one pair at a time: linear in the board, and the same relations as
-    // relating everything and keeping this mark's. (It used to relate the
-    // whole board per stroke — quadratic per stroke, cubic over a session —
-    // which is what made undo on a few hundred marks take seconds.)
+    // Relations are pairwise, so the new mark is related to each mark within
+    // its reach one pair at a time, in the board's order: the same relations,
+    // in the same order, as relating it to every mark and keeping the pairs
+    // that engage. The index found them (`fileContent`, when the mark joined
+    // the plane); walking the whole board for them made every stroke linear
+    // in the board and every replay quadratic.
     const me = markOf(node.id);
     if (!me) return;
-    for (const id of contentIds) {
-      if (id === node.id) continue;
+    for (const id of [...(linked.get(node.id) ?? [])].sort(byOrder)) {
       const other = markOf(id);
       if (!other) continue;
-      for (const r of relate([me, other])) {
+      const found = relate([me, other]);
+      if (!found.some((r) => ENGAGING_KINDS.has(r.kind))) continue;
+      for (const r of found) {
         nodes.get(r.from)?.edges.push({
           to: r.to,
           rel: r.kind,
@@ -900,13 +1325,27 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     const arrow = getRep(node, 'reading:arrow')?.data as { tip: Point; tail: Point } | undefined;
     const ends = kind === 'arrow' && arrow ? [arrow.tail, arrow.tip] : [points[0], points[points.length - 1]];
 
+    // The nearest content mark an end lands on, within that mark's own reach
+    // (a fraction of its size, with a hand's floor under it); the earliest on
+    // the board wins a tie. The index is asked level by level, each level
+    // with the reach its biggest mark could have, so no mark that could count
+    // is left unasked and the board is not walked for the rest.
+    const floor = 10 * scale;
     const nearest = (p: Point) => {
       let best: { id: string; d: number } | null = null;
-      for (const c of contentBoundsList(node.id)) {
-        const size = Math.max(c.bounds.maxX - c.bounds.minX, c.bounds.maxY - c.bounds.minY);
-        const reach = Math.max(10 * scale, size * config.wireEndpointRatio);
-        const d = distancePointToBounds(p, c.bounds);
-        if (d < reach && (!best || d < best.d)) best = { id: c.id, d };
+      let bestPlace = Infinity;
+      for (const id of reach.around(p, (cell) => Math.max(floor, cell * config.wireEndpointRatio))) {
+        if (id === node.id) continue;
+        const bounds = boundsOf(nodes.get(id)!)!;
+        const size = Math.max(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY);
+        const within = Math.max(floor, size * config.wireEndpointRatio);
+        const d = distancePointToBounds(p, bounds);
+        if (!(d < within)) continue;
+        const place = order.get(id)!;
+        if (!best || d < best.d || (d === best.d && place < bestPlace)) {
+          best = { id, d };
+          bestPlace = place;
+        }
       }
       return best;
     };
@@ -914,6 +1353,9 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     const a = nearest(ends[0]);
     const b = nearest(ends[1]);
     if (!a || !b || a.id === b.id) return;
+    // Its ends' marks carry a new edge; their components are read again.
+    unsettle(a.id);
+    unsettle(b.id);
 
     const weight = top.weight;
     const why = `its ${kind === 'arrow' ? 'tail' : 'start'} lands on ${a.id} and its ${kind === 'arrow' ? 'tip' : 'end'} on ${b.id}`;
@@ -958,6 +1400,88 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       }));
   }
 
+  // ===== Whose gesture (V1-PLAN L2h) =====
+
+  /**
+   * Whose act an event is: the key a hand's gestures are held under, and the
+   * maker of what it blesses (L2f). A person's act is theirs — the board's own
+   * hand, another hand (`participant:hand:<name>`, which "local" in its log
+   * already reads as, `applyEvent`), or a person who joined. Anyone else — a
+   * model, the engine — acts inside the act of the hand whose log holds the
+   * event, because every tier proposes and none commits: the shard's bless in
+   * the engine's name takes up its hand's summon, and a model's loop waits
+   * for its hand. So one hand's gesture keys alike on every board, however
+   * each board names that hand.
+   */
+  function handOf(ev: SessionEvent): string {
+    const named = (ev as { participantId?: string }).participantId ?? LOCAL_PARTICIPANT;
+    if (isHuman(named)) return named;
+    return ev.by ? handId(ev.by) : LOCAL_PARTICIPANT;
+  }
+
+  // ===== Whose ink (V1-PLAN L2i) =====
+  //
+  // A live hand's log is one SITTING (`sittingName` in hands.ts): a reload is a
+  // new log, a new participant and a new numbering, and all three stay per
+  // sitting — as do gestures (`handOf`), because two tabs of one person draw
+  // independently. But the rules that ask "is this mine?" ask it of the PERSON,
+  // or a reload would make someone a stranger to their own ink.
+
+  /**
+   * The person a participant is: the name its log is written under without the
+   * sitting's suffix (`handLabel`) — the name every board already shows it by —
+   * or null for a participant that is no person (a model, the engine), which is
+   * only ever itself.
+   *
+   * This board's own hand is the person its log is written under (`logName`):
+   * the one fact about the reader this rule reads, and the same fact every
+   * other board reads off that log's name when it merges it (`by`). Another
+   * hand is shown by its person already (`handParticipant`). A board never told
+   * what its log is called is no sitting of anyone, and its rules compare hands
+   * exactly, as they always did.
+   *
+   * A name is self-asserted — there are no accounts — so one name is one
+   * person, on the same trust the name and the colour already carry. It is not
+   * authentication.
+   */
+  function personOf(pid: string): string | null {
+    if (pid === LOCAL_PARTICIPANT) return myLog === undefined ? null : handLabel(myLog);
+    if (!isHuman(pid)) return null;
+    const name = getRep(nodes.get(pid)!, 'word')?.data;
+    return typeof name === 'string' && name !== '' ? name : null;
+  }
+
+  /**
+   * Whether `writer` may call `maker`'s ink its own: the same hand, or two
+   * sittings of one person. The label rule's question, at the door and on
+   * replay, and the field's (`isMine`).
+   */
+  function samePerson(maker: string, writer: string): boolean {
+    if (maker === writer) return true;
+    const person = personOf(maker);
+    return person !== null && person === personOf(writer);
+  }
+
+  function blankGestures(hand: string): Gestures {
+    // The configured mark is the session's own hand's; another hand's is
+    // whatever its own log taught.
+    const commandMark = hand === LOCAL_PARTICIPANT ? (config.gesture.commandMark ?? null) : null;
+    return { pendingLasso: null, summon: null, selection: [], markMiss: null, commandMark };
+  }
+
+  /** A hand's gestures, made on first use. */
+  function gesturesOf(hand: string): Gestures {
+    let g = gestures.get(hand);
+    if (!g) gestures.set(hand, (g = blankGestures(hand)));
+    return g;
+  }
+
+  /** Whether a mark is a loop some hand still holds as a gesture-candidate. */
+  function isPendingLasso(id: string): boolean {
+    for (const g of gestures.values()) if (g.pendingLasso?.id === id) return true;
+    return false;
+  }
+
   function buildSummon(
     ids: string[],
     source: ScopeSource,
@@ -965,7 +1489,8 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     gestureIds: string[],
     scopeBounds: Bounds,
     excludeId: string,
-    at: number
+    at: number,
+    g: Gestures
   ): Summon {
     const artifactId = liveArtifactUnder(scopeBounds, excludeId);
     const onArtifact = artifactId
@@ -976,7 +1501,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       : undefined;
     // Taking a loop up IS selecting what it held: the summon and the
     // selection are one act, so the palette and the handles agree.
-    selection = ids.slice();
+    g.selection = ids.slice();
     return {
       id: nextId('summon'),
       enclosedIds: ids,
@@ -989,9 +1514,15 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     };
   }
 
-  /** Content drawn inside the recent window — what the human was just doing. */
-  function recentWithin(at: number): string[] {
+  /**
+   * Content this hand drew inside the recent window — what it was just doing.
+   * Another hand drawing beside it just now is not it (L2h): a merge sets the
+   * hands' marks side by side in time, and the look-back swept a stranger's
+   * box into a hand's group.
+   */
+  function recentWithin(at: number, hand: string): string[] {
     return contentIds.filter((id) => {
+      if ((markHands.get(id) ?? LOCAL_PARTICIPANT) !== hand) return false;
       const n = nodes.get(id);
       if (!n || getRep(n, 'erased')) return false;
       return at - n.createdAt <= config.recentWindowMs;
@@ -1017,7 +1548,8 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
   function scopeFromMark(
     points: Point[],
     fp: Fingerprint,
-    at: number
+    at: number,
+    hand: string
   ): { ids: string[]; source: ScopeSource; reasoning: string } | null {
     const candidates = contentIds
       .map(markOf)
@@ -1055,8 +1587,9 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     const scopeSize = Math.max(union.maxX - union.minX, union.maxY - union.minY);
     if (fp.size > scopeSize) return null;
 
-    // Grow the selection through things drawn in the same breath.
-    const recent = new Set(recentWithin(at));
+    // Grow the selection through things this hand drew in the same breath —
+    // what it crossed may be anyone's, what comes along with it is its own.
+    const recent = new Set(recentWithin(at, hand));
     const pool = candidates.filter((m) => recent.has(m.id) || engaged.some((e) => e.id === m.id));
     const groups = clusters(pool, relate(pool));
     const ids = new Set(engaged.map((m) => m.id));
@@ -1085,9 +1618,42 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     return null;
   }
 
-  function removeFromContent(id: string) {
-    const idx = contentIds.indexOf(id);
-    if (idx >= 0) contentIds.splice(idx, 1);
+  /**
+   * The strokes a scratch across `span` could rub out, in the order the old
+   * walk of every target meets them — the same answer as `scratchedOut` over
+   * `scratchTargets`, found without walking the board (PERF.md, hotspot 5).
+   * Only strokes whose boxes meet the scratch's can be crossed, so the ink
+   * index is asked for those and each is counted as it would have been; when
+   * something was crossed enough, the targets are walked once for their order
+   * (and to keep only real targets: a letter of a word inside an artifact is
+   * ink but no target). Ordinary ink crosses nothing, and never walks.
+   */
+  function scratchHits(points: Point[], span: Bounds, excludeId: string): string[] {
+    if (points.length < 3) return [];
+    // A billionth is scratchedOut's own margin; this is wider, so the index's
+    // boxes (a moved mark's frame, not its placed points) never shave a crossing.
+    const pad = 1e-6 * (1 + Math.max(Math.abs(span.minX), Math.abs(span.maxX), Math.abs(span.minY), Math.abs(span.maxY)));
+    const hits = new Set<string>();
+    for (const id of ink.query({ minX: span.minX - pad, minY: span.minY - pad, maxX: span.maxX + pad, maxY: span.maxY + pad })) {
+      if (id === excludeId) continue;
+      const n = nodes.get(id)!;
+      if (getRep(n, 'erased')) continue;
+      const pts = strokePointsOf(n);
+      if (!pts) continue;
+      if (scratchedOut(points, [{ id, points: pts, closed: fingerprintOf(n)?.isClosed ?? false }], config.eraseCrossings).length) hits.add(id);
+    }
+    if (hits.size === 0) return [];
+    return scratchTargets(excludeId).filter((t) => hits.has(t.id)).map((t) => t.id);
+  }
+
+  /** Whether a closed stroke's box holds any other mark on the content plane — what makes it a loop that may wait. */
+  function enclosesAny(b: Bounds, excludeId: string): boolean {
+    for (const id of reach.query(b)) {
+      if (id === excludeId) continue;
+      const inner = boundsOf(nodes.get(id)!);
+      if (inner && boundsContain(b, inner)) return true;
+    }
+    return false;
   }
 
   // ===== Event application (the reducer — all mutation lives here) =====
@@ -1108,6 +1674,13 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       createdAt: at,
     };
     nodes.set(node.id, node);
+    ink.set(node.id, fp.bounds);
+    // Whose gesture this stroke can be: its hand's, never the board's. Every
+    // gesture read below is that hand's — its waiting loop, its mark, what it
+    // just drew, its summon — and nothing another hand holds is touched.
+    const hand = handOf(ev);
+    const g = gesturesOf(hand);
+    markHands.set(node.id, hand);
 
     // Declared content is never a gesture. Lassoing, commanding and scratching
     // out are commitments, and a stroke whose author said "this is a drawing"
@@ -1117,59 +1690,60 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     // does. `agent.draw()` always declares it.
     const byHand = !ev.content;
 
-    // --- Gesture resolution first: does this stroke complete a pending lasso? ---
-    if (pendingLasso && byHand) {
-      const lassoNode = nodes.get(pendingLasso.id)!;
+    // --- Gesture resolution first: does this stroke complete its hand's pending lasso? ---
+    if (g.pendingLasso && byHand) {
+      const lassoNode = nodes.get(g.pendingLasso.id)!;
       const lassoFp = fingerprintOf(lassoNode)!;
       const lassoPoints = strokePointsOf(lassoNode) ?? [];
       // No scale correction is needed here any more: every term in the gesture
       // rule is a ratio of the lasso's own size, so it is zoom-free by
       // construction rather than by compensation.
-      const gestureConfig = { ...config.gesture, commandMark };
+      const gestureConfig = { ...config.gesture, commandMark: g.commandMark };
       const strokePair = { check: points, lasso: lassoPoints };
-      if (resolvesLasso(fp, at, lassoFp, pendingLasso.at, gestureConfig, strokePair)) {
+      if (resolvesLasso(fp, at, lassoFp, g.pendingLasso.at, gestureConfig, strokePair)) {
         // Retroactivity: the lasso was a gesture all along. Both strokes get
         // gesture reps and leave the content plane; their ink and prior
         // candidate edges remain (provenance, principle 9).
         node.reps.push({
           modality: 'gesture',
-          data: { role: commandMark ? 'command' : 'check' },
-          source: commandMark ? `command-mark:${commandMark.name}` : 'heuristic',
+          data: { role: g.commandMark ? 'command' : 'check' },
+          source: g.commandMark ? `command-mark:${g.commandMark.name}` : 'heuristic',
         });
         lassoNode.reps.push({ modality: 'gesture', data: { role: 'lasso' }, source: 'heuristic' });
         removeFromContent(lassoNode.id);
 
         const enclosedIds = enclosedBy(lassoFp.bounds, contentBoundsList());
-        summon = buildSummon(
+        g.summon = buildSummon(
           enclosedIds,
           'lasso',
           `you circled ${enclosedIds.length} mark${enclosedIds.length === 1 ? '' : 's'}`,
           [lassoNode.id, node.id],
           lassoFp.bounds,
           lassoNode.id,
-          at
+          at,
+          g
         );
-        pendingLasso = null;
-        markMiss = null;
+        g.pendingLasso = null;
+        g.markMiss = null;
         recomputeClusterCandidates();
         return node.id;
       }
       // It did not resolve the lasso. Fall through — it may still be the mark,
       // acting on what was drawn just now — and remember why, if it is not.
-      markMiss = whyNotResolved(fp, at, lassoFp, pendingLasso.at, gestureConfig, strokePair);
+      g.markMiss = whyNotResolved(fp, at, lassoFp, g.pendingLasso.at, gestureConfig, strokePair);
     } else {
-      markMiss = null;
+      g.markMiss = null;
     }
 
     // --- The mark, with nothing circled first. It reads BACKWARDS: what did
-    //     this stroke cross, and what did you draw alongside it just now? ---
-    if (byHand && matchesCommandMark(fp, commandMark ?? BUILTIN_COMMAND_MARK).match) {
-      const scope = scopeFromMark(points, fp, at);
+    //     this stroke cross, and what did this hand draw alongside it just now? ---
+    if (byHand && matchesCommandMark(fp, g.commandMark ?? BUILTIN_COMMAND_MARK).match) {
+      const scope = scopeFromMark(points, fp, at, hand);
       if (scope) {
         node.reps.push({
           modality: 'gesture',
-          data: { role: commandMark ? 'command' : 'check', scope: scope.source },
-          source: commandMark ? `command-mark:${commandMark.name}` : 'heuristic',
+          data: { role: g.commandMark ? 'command' : 'check', scope: scope.source },
+          source: g.commandMark ? `command-mark:${g.commandMark.name}` : 'heuristic',
         });
         const union = getBounds(
           scope.ids.flatMap((id) => {
@@ -1180,9 +1754,9 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
             ];
           })
         );
-        summon = buildSummon(scope.ids, scope.source, scope.reasoning, [node.id], union, node.id, at);
-        pendingLasso = null;
-        markMiss = null;
+        g.summon = buildSummon(scope.ids, scope.source, scope.reasoning, [node.id], union, node.id, at, g);
+        g.pendingLasso = null;
+        g.markMiss = null;
         recomputeClusterCandidates();
         return node.id;
       }
@@ -1204,24 +1778,25 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     //     count six crossings and rub out what the user meant to select.
     const scratched = fp.isClosed || !byHand
       ? []
-      : scratchedOut(points, scratchTargets(node.id), config.eraseCrossings);
+      : scratchHits(points, fp.bounds, node.id);
     if (scratched.length > 0) {
       node.reps.push({
         modality: 'gesture',
         data: { role: 'scratch', erased: scratched },
         source: 'heuristic',
       });
-      pendingLasso = null;
-      summon = null;
+      g.pendingLasso = null;
+      g.summon = null;
       for (const id of scratched) eraseNode(id, at);
       return node.id;
     }
 
-    // --- Not a gesture: this is content. Drawing past a summon dissolves it —
-    //     when it is the human drawing; a model adding a mark while the human
-    //     is still choosing takes nothing away from them. ---
-    if (byHand) { summon = null; selection = []; }
-    contentIds.push(node.id);
+    // --- Not a gesture: this is content. A hand drawing past its own summon
+    //     dissolves it — when it is the hand drawing; a model adding a mark
+    //     while the human is still choosing takes nothing away from them, and
+    //     another hand drawing meanwhile takes nothing from either. ---
+    if (byHand) { g.summon = null; g.selection = []; }
+    contentPush(node.id);
 
     // Multi-parse: every qualifying recognition becomes a held 'resembles' edge.
     const analysis = analyzeStroke(points, scale);
@@ -1244,7 +1819,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     // Printed letters gather into a word. If this stroke joined one, the WORD
     // now stands in the content plane and this stroke is one of its parts;
     // relations belong to the word and are read live, so none are stored here.
-    if (absorbIntoWord(node, fp, at, scale)) {
+    if (absorbIntoWord(node, fp, at, scale, hand)) {
       recomputeClusterCandidates();
       return node.id;
     }
@@ -1253,22 +1828,30 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     inferWire(node, points, scale);
 
     // Held ambiguity: a closed stroke enclosing content is BOTH a content
-    // candidate (edges above) and the new pending lasso. The next event decides.
+    // candidate (edges above) and its hand's new pending lasso. That hand's
+    // next stroke decides; another hand's decides nothing about it.
     //
     // A closed stroke drawn ON a live artifact is also lasso-like even when it
     // encloses no whole mark — it encloses a REGION of the running thing, which
     // is the whole point of being able to draw on top of it.
-    const enclosed = enclosedBy(fp.bounds, contentBoundsList(node.id));
+    // Only a closed stroke can be a loop, and a loop needs one mark inside it:
+    // the index is asked for the marks its box meets, not the board.
+    const enclosed = fp.isClosed && enclosesAny(fp.bounds, node.id) ? 1 : 0;
     const onLive = liveArtifactUnder(fp.bounds, node.id);
-    pendingLasso =
-      byHand && (isLassoLike(fp, enclosed.length) || (fp.isClosed && onLive)) ? { id: node.id, at } : null;
+    g.pendingLasso =
+      byHand && (isLassoLike(fp, enclosed) || (fp.isClosed && onLive)) ? { id: node.id, at } : null;
 
     recomputeClusterCandidates();
     return node.id;
   }
 
   function applyBless(ev: Extract<SessionEvent, { type: 'bless' }>): string | null {
-    if (!summon || summon.id !== ev.summonId) return null;
+    // A bless takes up its OWN hand's summon — whatever other hands did since,
+    // and on every board (L2h). The maker of what it makes is that hand (L2f).
+    const hand = handOf(ev);
+    const own = gestures.get(hand);
+    const summon = own?.summon;
+    if (!own || !summon || summon.id !== ev.summonId) return null;
 
     const chosen = ev.suggestionId
       ? summon.suggestions.find((s) => s.id === ev.suggestionId)
@@ -1279,9 +1862,9 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       for (const gid of summon.gestureIds) {
         const g = nodes.get(gid)!;
         g.reps = g.reps.filter((r) => r.modality !== 'gesture');
-        contentIds.push(gid);
+        contentPush(gid);
       }
-      summon = null;
+      own.summon = null;
       recomputeClusterCandidates();
       return null;
     }
@@ -1298,14 +1881,35 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       ])
     );
 
+    // An artifact is made by whoever BLESSED it (V1-PLAN L2f) — the same
+    // attribution a stroke gets: "local" in another hand's log means that hand
+    // (`applyEvent`). Not whoever drew its marks: a hand may bless a group
+    // several hands drew, and each mark stays its drawer's. With no maker
+    // written, every board read an artifact as its own reader's, so the label
+    // rule (`applyLabel`, `staleFor`) took the maker's word for a stranger's on
+    // every other board and let a stranger's through.
+    //
+    // A bless is a person's act — every tier proposes, none commits — so one
+    // in the ENGINE's name (the shard stands a hull at tier 1, inside its
+    // hand's act) is the act of the hand whose log holds it; the engine keeps
+    // its name on the word, which is its word for what it made. The edge is
+    // written only for a maker other than this board's own hand, which
+    // `authorOf` reads from no edge at all: a board's own blesses — every held
+    // log — replay node for node. That rule is `handOf`'s, and the hand it
+    // names is the one whose summon this bless took up.
+    const named = ev.participantId ?? LOCAL_PARTICIPANT;
+    const maker = hand;
+    // Another hand's participant, made on first sight, when the edge names it.
+    if (ev.by && maker === handId(ev.by)) handParticipant(ev.by);
     const artifact: MMNode = {
       id: nextId('artifact'),
       reps: [
-        { modality: 'word', data: name, source: ev.participantId ?? LOCAL_PARTICIPANT },
+        { modality: 'word', data: name, source: named },
         { modality: 'bounds', data: unionBounds },
         { modality: 'signature', data: signatureOf(memberIds), source: TIER0_PARTICIPANT },
       ],
       edges: [
+        ...(maker !== LOCAL_PARTICIPANT ? [{ to: maker, rel: 'made-by' }] : []),
         ...memberIds.map((id) => ({ to: id, rel: 'has-part', blessed: true })),
         ...summon.gestureIds.map((id) => ({ to: id, rel: 'blessed-by' })),
         ...(chosen?.artifactId
@@ -1316,6 +1920,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       createdAt: ev.at,
     };
     nodes.set(artifact.id, artifact);
+    markHands.set(artifact.id, hand);
 
     // Members join the artifact: opaque from outside, transparent within.
     // Their nodes (ink, candidates) persist; they just leave the content plane.
@@ -1324,13 +1929,14 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       removeFromContent(id);
     }
 
-    contentIds.push(artifact.id);
+    contentPush(artifact.id);
     artifacts.push(artifact.id);
+    definitionsChanged = true;
     // Blessing ends the selection rather than moving it onto the artifact: the
     // hand's next act on a page is usually ink over it, and a selected page
     // would catch that pointer as a drag. A page is selected by circling it.
-    selection = [];
-    summon = null;
+    own.selection = [];
+    own.summon = null;
     recomputeClusterCandidates();
     return artifact.id;
   }
@@ -1347,17 +1953,18 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     // Ink is never destroyed: the node stays in the graph, marked erased.
     node.reps.push({ modality: 'erased', data: { at }, source: 'user' });
     removeFromContent(node.id);
-    selection = selection.filter((id) => id !== node.id);
+    ink.delete(node.id);
+    definitionsChanged = true;
 
     const li = live.indexOf(node.id);
     if (li >= 0) live.splice(li, 1);
 
-    if (pendingLasso?.id === node.id) pendingLasso = null;
-    if (
-      summon &&
-      (summon.enclosedIds.includes(node.id) || summon.gestureIds.includes(node.id))
-    ) {
-      summon = null;
+    // A mark that is gone is gone from every hand's gestures — whoever erased
+    // it: a loop cannot wait, nor a summon hold, what is no longer there.
+    for (const g of gestures.values()) {
+      g.selection = g.selection.filter((id) => id !== node.id);
+      if (g.pendingLasso?.id === node.id) g.pendingLasso = null;
+      if (g.summon && (g.summon.enclosedIds.includes(node.id) || g.summon.gestureIds.includes(node.id))) g.summon = null;
     }
 
     const degrade = (artifactId: string) => {
@@ -1379,8 +1986,8 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       for (const e of artifact.edges) {
         if (e.rel !== 'has-part') continue;
         const member = nodes.get(e.to);
-        if (member && !getRep(member, 'erased') && !contentIds.includes(e.to)) {
-          contentIds.push(e.to);
+        if (member && !getRep(member, 'erased') && !inContent.has(e.to)) {
+          contentPush(e.to);
         }
       }
     };
@@ -1438,6 +2045,15 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
         source: ev.participantId,
       });
     }
+    // A proposal may change what the node reads as, what it links to, or —
+    // a rep is any rep — where it stands: file it again and read its group again.
+    if (getRep(node, 'stroke') && !ink.has(node.id)) {
+      const b = boundsOf(node);
+      if (b) ink.set(node.id, b);
+    }
+    boundsMoved(node.id);
+    unsettle(node.id);
+    definitionsChanged = true;
     recomputeClusterCandidates();
   }
 
@@ -1447,14 +2063,15 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
    * The authorship rule is checked HERE as well as at the door, for the same
    * reason `applyCode` re-checks `erased`: a merged log can carry another
    * hand's label event, and state must be a pure function of the log however
-   * the logs were put together. A label whose writer did not make the mark is
-   * dropped on replay exactly as it is refused at the door.
+   * the logs were put together. A label whose writer is not the person who
+   * made the mark — in this sitting or another (L2i) — is dropped on replay
+   * exactly as it is refused at the door.
    */
   function applyLabel(ev: Extract<SessionEvent, { type: 'label' }>): string | null {
     const node = nodes.get(ev.nodeId);
     if (!node || getRep(node, 'erased')) return null;
     const pid = ev.participantId ?? LOCAL_PARTICIPANT;
-    if (authorOf(node) !== pid) return null;
+    if (!samePerson(authorOf(node), pid)) return null;
     node.reps.push({ modality: 'label', data: { text: ev.text, at: ev.at }, source: pid });
     return node.id;
   }
@@ -1572,6 +2189,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       const node = nodes.get(p.id)!;
       node.reps = node.reps.filter((r) => r.modality !== 'transform');
       node.reps.push({ modality: 'transform', data: p.to, source: 'engine' });
+      boundsMoved(p.id);
     }
     recomputeClusterCandidates();
   }
@@ -1581,7 +2199,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
   function snappableIds(): string[] {
     // A held lasso is a circle until the next mark says otherwise; offering to
     // draw it clean would be offering to redraw a gesture.
-    const out = contentIds.filter((id) => !artifacts.includes(id) && id !== pendingLasso?.id);
+    const out = contentIds.filter((id) => !artifacts.includes(id) && !isPendingLasso(id));
     for (const aid of artifacts) {
       const a = nodes.get(aid);
       if (a) for (const e of a.edges) if (e.rel === 'has-part') out.push(e.to);
@@ -1680,6 +2298,8 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       via: TIER0_PARTICIPANT,
       reasoning: `${letterIds.length} small strokes in a row on one line — printed letters`,
     });
+    boundsMoved(word.id);
+    unsettle(word.id);
   }
 
   /**
@@ -1717,7 +2337,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
   /** A content stroke that could be a letter of a word being written: small, not a gesture, not a held loop, not a shape. */
   function letterCandidate(id: string, scale: number): { node: MMNode; bounds: Bounds; at: number; scale: number } | null {
     const n = nodes.get(id);
-    if (!n || isWord(n) || getRep(n, 'gesture') || pendingLasso?.id === id) return null;
+    if (!n || isWord(n) || getRep(n, 'gesture') || isPendingLasso(id)) return null;
     const fp = fingerprintOf(n);
     const st = getRep(n, 'stroke')?.data as { at: number; scale?: number } | undefined;
     if (!fp || !st) return null;
@@ -1726,10 +2346,32 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     return { node: n, bounds: fp.bounds, at: st.at, scale: sc };
   }
 
-  /** The stroke just made: does it continue a word, or start one with the strokes before it? */
-  function absorbIntoWord(node: MMNode, fp: Fingerprint, at: number, scale: number): boolean {
+  /**
+   * The stroke just made: does it continue a word, or start one with the strokes before it?
+   *
+   * A word is ONE hand's run (V1-PLAN L2g), so the run is read over the marks
+   * this stroke's maker made, never the board's last mark whoever made it: a
+   * merge interleaves the hands' events by time, and the mark just before her
+   * next letter may be his — taken for the last letter of her run, it joined
+   * her word or broke it in two. The word is made by the hand that wrote its
+   * letters, on every board (the gathering wrote the local participant whoever
+   * wrote them, so her word read as the reader's everywhere else, and the
+   * label rule took her word on it for a stranger's). A board's own words name
+   * its own hand as they always did, so every held log replays node for node.
+   */
+  function absorbIntoWord(node: MMNode, fp: Fingerprint, at: number, scale: number, hand: string): boolean {
     if (!isLetterLike(fp.bounds, scale) || neverLetter(node)) return false;
-    const prevId = contentIds.filter((id) => id !== node.id).pop();
+    const maker = authorOf(node);
+    // This hand's marks on the plane, newest first, walked back only as far as
+    // the run reaches — a word is written in the last few marks, and taking
+    // every mark on the board to find them was a walk of the board per letter.
+    const mine = (function* () {
+      for (let i = contentIds.length - 1; i >= 0; i--) {
+        const id = contentIds[i];
+        if (id !== node.id && authorOf(nodes.get(id)!) === maker) yield id;
+      }
+    })();
+    const prevId = mine.next().value;
     if (!prevId) return false;
     const prev = nodes.get(prevId)!;
     const letter = { bounds: fp.bounds, at };
@@ -1754,13 +2396,12 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     const j = joinsRun({ bounds: first.bounds, lastAt: first.at }, letter, scale);
     if (!j.ok) return false;
 
-    // Gather back: the letters written just before these two, while each
-    // still sits on the run's line and came within the window of the next.
+    // Gather back: the letters this hand wrote just before these two, while
+    // each still sits on the run's line and came within the window of the next.
     const run = [first];
     let bounds = first.bounds;
-    const ordered = contentIds.filter((id) => id !== node.id);
-    for (let i = ordered.indexOf(prevId) - 1; i >= 0; i--) {
-      const cand = letterCandidate(ordered[i], scale);
+    for (let step = mine.next(); !step.done; step = mine.next()) {
+      const cand = letterCandidate(step.value, scale);
       if (!cand) break;
       const back = joinsRun({ bounds, lastAt: cand.at }, { bounds: cand.bounds, at: run[0].at }, cand.scale);
       if (!back.ok) break;
@@ -1770,17 +2411,19 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     const letterIds = run.map((r) => r.node.id).concat(node.id);
 
     // The word takes their place in the content plane, where the first
-    // letter stood, so reading order is where the writing began.
-    const word: MMNode = { id: nextId('word'), reps: [], edges: [{ to: LOCAL_PARTICIPANT, rel: 'made-by' }], capability: 0, createdAt: at };
+    // letter stood, so reading order is where the writing began. It is made
+    // by the hand that wrote them.
+    const word: MMNode = { id: nextId('word'), reps: [], edges: [{ to: maker, rel: 'made-by' }], capability: 0, createdAt: at };
     nodes.set(word.id, word);
+    markHands.set(word.id, hand);
     setWordReps(word, letterIds);
     for (const id of letterIds) {
       nodes.get(id)!.edges.push({ to: word.id, rel: 'part-of', reasoning: j.reasoning });
     }
-    const idx = contentIds.indexOf(letterIds[0]);
-    contentIds.splice(idx, 1, word.id);
+    contentReplace(letterIds[0], word.id);
     for (const id of letterIds.slice(1)) removeFromContent(id);
-    if (pendingLasso?.id === node.id) pendingLasso = null;
+    const own = gestures.get(hand);
+    if (own && own.pendingLasso?.id === node.id) own.pendingLasso = null;
     return true;
   }
 
@@ -1794,8 +2437,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       return;
     }
     // Dissolve: the surviving letters go back where the word stood.
-    const idx = contentIds.indexOf(wordId);
-    if (idx >= 0) contentIds.splice(idx, 1, ...letters);
+    contentSpread(wordId, letters);
     for (const id of letters) {
       const n = nodes.get(id)!;
       n.edges = n.edges.filter((e) => !(e.rel === 'part-of' && e.to === wordId));
@@ -1806,8 +2448,9 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
 
   // ===== Selection and direct manipulation =====
 
+  /** A hand selects outright: its own selection, never another's (L2h). */
   function applySelect(ev: Extract<SessionEvent, { type: 'select' }>) {
-    selection = ev.ids.filter((id) => contentIds.includes(id));
+    gesturesOf(handOf(ev)).selection = ev.ids.filter((id) => inContent.has(id));
   }
 
   /** The strokes a manipulation actually moves: a stroke itself, or an artifact's or word's members, recursively. */
@@ -1843,6 +2486,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       const b = frameBounds(n);
       if (!b) continue;
       setTransform(n, { minX: b.minX + ev.dx, maxX: b.maxX + ev.dx, minY: b.minY + ev.dy, maxY: b.maxY + ev.dy });
+      boundsMoved(n.id);
       refreshWordBounds(n);
     }
     recomputeClusterCandidates();
@@ -1857,6 +2501,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
         minX: ev.about.x + (b.minX - ev.about.x) * sx, maxX: ev.about.x + (b.maxX - ev.about.x) * sx,
         minY: ev.about.y + (b.minY - ev.about.y) * sy, maxY: ev.about.y + (b.maxY - ev.about.y) * sy,
       });
+      boundsMoved(n.id);
       refreshWordBounds(n);
     }
     recomputeClusterCandidates();
@@ -1875,6 +2520,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       const prev = (getRep(n, 'rotation')?.data as number | undefined) ?? 0;
       n.reps = n.reps.filter((r) => r.modality !== 'rotation');
       n.reps.push({ modality: 'rotation', data: prev + ev.radians, source: 'user' });
+      boundsMoved(n.id);
       refreshWordBounds(n);
     }
     recomputeClusterCandidates();
@@ -1907,10 +2553,12 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       data: addExample(prev, sig, ev.verdict),
       source: ev.participantId ?? LOCAL_PARTICIPANT,
     });
+    definitionsChanged = true;
     recomputeClusterCandidates();
-    // A summon open on these very marks reads its matches again, so the offer
-    // the human just refused is gone from the palette rather than waiting for
-    // the next mark.
+    // The corrector's own summon, open on these very marks, reads its matches
+    // again, so the offer the human just refused is gone from the palette
+    // rather than waiting for the next mark. Another hand's field is its own.
+    const summon = gestures.get(handOf(ev))?.summon;
     if (summon && sameSet(summon.enclosedIds, ids)) {
       summon.suggestions = summon.suggestions.filter((g) => g.kind !== 'match');
       summon.suggestions.unshift(...makeSuggestions(ids).filter((g) => g.kind === 'match'));
@@ -1963,6 +2611,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     };
     nodes.set(frame.id, frame);
     artifacts.push(frame.id);
+    definitionsChanged = true;
     return frame.id;
   }
 
@@ -1981,7 +2630,8 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       let at = ev.at;
       for (const pts of ev.strokes) {
         if (!pts || pts.length < 2) continue;
-        const id = applyStroke({ type: 'stroke', points: pts, at, participantId: pid, scale: 1, content: true });
+        // `by` carried along, so each stroke is its hand's as the import is.
+        const id = applyStroke({ type: 'stroke', points: pts, at, participantId: pid, scale: 1, content: true, ...(ev.by ? { by: ev.by } : {}) });
         if (id && !first) first = id;
         at += 1;
       }
@@ -2002,17 +2652,20 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       createdAt: ev.at,
     };
     nodes.set(node.id, node);
+    markHands.set(node.id, handOf(ev));
     artifacts.push(node.id);
-    contentIds.push(node.id);
+    contentPush(node.id);
+    definitionsChanged = true;
     if (ev.kind !== 'png' && ev.kind !== 'jpg') live.push(node.id);
     recomputeClusterCandidates();
     return node.id;
   }
 
+  /** A person: the local hand, another hand, or a human who joined. Not the engine, not a model — and not an id this board has never seen. */
   function isHuman(participantId: string): boolean {
     if (participantId === LOCAL_PARTICIPANT) return true;
     const p = nodes.get(participantId);
-    const kind = (getRep(p!, 'participant')?.data as { kind?: string } | undefined)?.kind;
+    const kind = p ? (getRep(p, 'participant')?.data as { kind?: string } | undefined)?.kind : undefined;
     return kind === 'human';
   }
 
@@ -2038,45 +2691,51 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
   }
 
   function applySummon(ev: Extract<SessionEvent, { type: 'summon' }>): string | null {
+    // The summoning hand's own: its pointed marks, or the loop IT holds (L2h).
+    const g = gesturesOf(handOf(ev));
     if (ev.ids) {
       // Pointed at: the marks named, no loop involved. A tap on a match chip.
-      const ids = ev.ids.filter((id) => contentIds.includes(id));
+      const ids = ev.ids.filter((id) => inContent.has(id));
       const boxes = ids.map((id) => boundsOf(nodes.get(id)!)).filter((b): b is Bounds => !!b);
       if (!ids.length || !boxes.length) return null;
       const union = boxes.reduce((a, b) => ({
         minX: Math.min(a.minX, b.minX), minY: Math.min(a.minY, b.minY),
         maxX: Math.max(a.maxX, b.maxX), maxY: Math.max(a.maxY, b.maxY),
       }));
-      summon = buildSummon(ids, 'pointed', `you pointed at ${ids.length} mark${ids.length === 1 ? '' : 's'}`, [], union, '', ev.at);
-      markMiss = null;
+      const summon = buildSummon(ids, 'pointed', `you pointed at ${ids.length} mark${ids.length === 1 ? '' : 's'}`, [], union, '', ev.at, g);
+      g.summon = summon;
+      g.markMiss = null;
       recomputeClusterCandidates();
       return summon.id;
     }
-    if (!pendingLasso) return null;
-    const lassoNode = nodes.get(pendingLasso.id);
+    if (!g.pendingLasso) return null;
+    const lassoNode = nodes.get(g.pendingLasso.id);
     const lassoFp = lassoNode && fingerprintOf(lassoNode);
     if (!lassoNode || !lassoFp) return null;
     // Same retroactivity as the mark: the loop was a gesture all along.
     lassoNode.reps.push({ modality: 'gesture', data: { role: 'lasso' }, source: 'heuristic' });
     removeFromContent(lassoNode.id);
     const enclosedIds = enclosedBy(lassoFp.bounds, contentBoundsList());
-    summon = buildSummon(
+    const summon = buildSummon(
       enclosedIds,
       'lasso',
       `you circled ${enclosedIds.length} mark${enclosedIds.length === 1 ? '' : 's'} and asked`,
       [lassoNode.id],
       lassoFp.bounds,
       lassoNode.id,
-      ev.at
+      ev.at,
+      g
     );
-    pendingLasso = null;
-    markMiss = null;
+    g.summon = summon;
+    g.pendingLasso = null;
+    g.markMiss = null;
     recomputeClusterCandidates();
     return summon.id;
   }
 
+  /** A hand's mark is the one IT taught: another hand's teaching judges only that hand's strokes (L2h). */
   function applyTeach(ev: Extract<SessionEvent, { type: 'teach' }>) {
-    commandMark = ev.mark;
+    gesturesOf(handOf(ev)).commandMark = ev.mark;
   }
 
   /** How many versions of code a node carries. A revision is pinned to one of these. */
@@ -2141,15 +2800,15 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       const n = nodes.get(id);
       return refuse(!n ? 'missing' : 'erased', id);
     }
-    // A label is a word on your OWN ink. Naming a mark another hand made is
-    // blessing it, and a bless is the human's act — so the hand that made the
-    // mark is the only one that may label it, and the refusal says whose it is
-    // (the notes, §B).
+    // A label is a word on your OWN ink. Naming a mark another person made is
+    // blessing it, and a bless is the human's act — so the person who made the
+    // mark is the only one who may label it, from this sitting or another
+    // (L2i), and the refusal says whose it is (the notes, §B).
     if (ev.type === 'label') {
       const node = nodes.get(targets[0]);
       const maker = node ? authorOf(node) : LOCAL_PARTICIPANT;
       const mine = ev.participantId ?? LOCAL_PARTICIPANT;
-      if (node && maker !== mine) {
+      if (node && !samePerson(maker, mine)) {
         const makerNode = nodes.get(maker);
         const makerName = makerNode ? getRep(makerNode, 'word')?.data : undefined;
         return refuse('not-your-ink', targets[0], typeof makerName === 'string' ? makerName : maker);
@@ -2190,12 +2849,19 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       source: ev.participantId,
     });
     if (!live.includes(node.id)) live.push(node.id);
+    // Writing taken as text stops being a definition (matchesFor).
+    definitionsChanged = true;
     return node.id;
+  }
+
+  /** The id of the participant another log's events belong to: stable, from the log's name. */
+  function handId(name: string): string {
+    return 'participant:hand:' + name.replace(/[^A-Za-z0-9._-]+/g, '_');
   }
 
   /** The participant another log's events belong to, made on first sight; a stable id from the log's name. */
   function handParticipant(name: string): string {
-    const id = 'participant:hand:' + name.replace(/[^A-Za-z0-9._-]+/g, '_');
+    const id = handId(name);
     if (!nodes.has(id)) {
       // A hand in a room is one SITTING — a tab's page load, a process —
       // named `person~suffix` (`sittingName`); the person's name is what is
@@ -2272,7 +2938,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
         applySelect(ev);
         return null;
       case 'deselect':
-        selection = [];
+        gesturesOf(handOf(ev)).selection = [];
         return null;
       case 'move':
         applyMove(ev);
@@ -2294,9 +2960,12 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
         return null;
       case 'code':
         return applyCode(ev);
-      case 'dismiss':
-        if (summon?.id === ev.summonId) summon = null;
+      case 'dismiss': {
+        // A hand dismisses its own field; another hand's is not its to close.
+        const g = gestures.get(handOf(ev));
+        if (g && g.summon?.id === ev.summonId) g.summon = null;
         return null;
+      }
       case 'erase':
         applyErase(ev);
         return null;
@@ -2372,23 +3041,28 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
   }
 
   function getState(): SessionState {
+    // The board's gestures are its reader's own: the board's own hand. Every
+    // other hand's are held and replayed, and shown to nobody here (L2h).
+    const reader = gestures.get(LOCAL_PARTICIPANT) ?? blankGestures(LOCAL_PARTICIPANT);
     return {
       nodes,
       contentIds: [...contentIds],
-      pendingLassoId: pendingLasso?.id ?? null,
-      summon: summon ? { ...summon, enclosedIds: [...summon.enclosedIds] } : null,
-      clusterCandidates: clusterCandidates.map((c) => ({ ...c })),
+      pendingLassoId: reader.pendingLasso?.id ?? null,
+      summon: reader.summon ? { ...reader.summon, enclosedIds: [...reader.summon.enclosedIds] } : null,
+      // A group's candidate is kept while the group stands, so what is handed
+      // out is a copy all the way down to its lists.
+      clusterCandidates: clusterCandidates.map((c) => ({ ...c, nodeIds: c.nodeIds.slice(), matches: c.matches.slice() })),
       artifacts: [...artifacts],
       participants: [...participants],
       explanations: [...explanations],
-      commandMark,
-      markMiss,
+      commandMark: reader.commandMark,
+      markMiss: reader.markMiss,
       staleResult,
       generation,
-      recentIds: recentWithin(lastAt),
+      recentIds: recentWithin(lastAt, LOCAL_PARTICIPANT),
       live: [...live],
       clocks: { ...clocks },
-      selection: [...selection],
+      selection: [...reader.selection],
     };
   }
 
@@ -2406,6 +3080,10 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     propose: ({ expect, ...args }) => void guarded({ type: 'propose', ...args }, expect),
     answer: ({ expect, ...args }) => guarded({ type: 'answer', ...args }, expect),
     label: (args) => guarded({ type: 'label', ...args }),
+    isMine: (nodeId, participantId) => {
+      const node = nodes.get(nodeId);
+      return !!node && samePerson(authorOf(node), participantId ?? LOCAL_PARTICIPANT);
+    },
     teachCommandMark: (mark, at) => void dispatch({ type: 'teach', mark, at }),
     correct: (args) => void dispatch({ type: 'correct', ...args }),
     clock: (args) => void dispatch({ type: 'clock', ...args }),

@@ -90,9 +90,8 @@
     const isArtifact = s.artifacts.includes(id);
     const isLive = s.live.includes(id);
     const isWordNode = MM.isWord(node);
-    const author = MM.strokePointsOf(node)
-      ? authorOf(node)
-      : ((node.reps.find((r) => r.modality === 'word') || {}).source || MM.LOCAL_PARTICIPANT);
+    // Who made it: a mark's drawer, an artifact's blesser — never who drew its marks (V1-PLAN L2f).
+    const author = authorOf(node);
     const authorName = nameOfParticipant(author);
     let html = '<div class="eyebrow">' +
       (isLive ? (codeKindOf(node) === 'html' ? 'living page' : 'living ' + codeKindOf(node)) : isArtifact ? 'artifact' : isWordNode ? 'word' : 'mark') + '</div>';

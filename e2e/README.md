@@ -31,7 +31,8 @@ guessing. Pick scenarios by name to run one: `node e2e/run.mjs canvas`,
 | `canvas` | `__setup(); __scenario()` | `Demos/session-engine.html?fresh=1&nosw=1` over a static server on the repo root |
 | `shard` | `__scenario()` | `shard-3d/` over vite |
 | `demo` | `__demo()` | `shard-3d/` over vite, in its own context |
-| `smoke` | three checks written in `run.mjs` itself | `Demos/session-engine.html?fresh=1&nosw=1`, usually with `--browser webkit` |
+| `demo2` | `__demo2()` | `shard-3d/` over vite, in its own context |
+| `smoke` | four checks written in `run.mjs` itself | `Demos/session-engine.html?fresh=1&nosw=1`, usually with `--browser webkit` |
 | `keep` | no lost work — `keep.mjs`, written here, not a page harness | `Demos/session-engine.html?nosw=1`, in several contexts of its own |
 | `boards` | several named boards — `boards.mjs`, written here, the boards pane driven with the real pointer | `Demos/session-engine.html?nosw=1`, in one context, with a second and third tab |
 | `big` | a 2,000-mark board saved and opened again (opt-in, minutes) | the same page, with the board from `metamedium-core/bench/board.mjs` |
@@ -46,16 +47,19 @@ nothing else, so the default gate needs no second engine installed.
 **It is a WebKit smoke, not an iPhone test.** It is desktop WebKit, headless, at
 1440×900 — the engine Safari is built on, not a phone, not a touch screen, and
 not a viewport pretending to be either. What it checks is the short list the
-review asked for: the board loads, a hand draws ink with real pointer input, the
-engine reads that ink back (a line, with a weight), and press-and-hold opens the
-field. It takes about two seconds.
+review asked for, and the pill week 1's plan added: the board loads, a hand
+draws ink with real pointer input, the engine reads that ink back (a line, with
+a weight), press-and-hold opens the field, and one pill in it is taken with a
+click — *Draw them clean*, the held line's one pill that asks no model — after
+which the line carries its clean form. It takes about two seconds.
 
 It deliberately does **not** load `Demos/session-engine.e2e.js`. That harness is
-two hundred records and its own stub model; running it on a second engine would
+over two hundred records and its own stub model; running it on a second engine would
 be a second full gate wearing the word "smoke", and a gate that costs two
 minutes is one whoever waits on it turns off.
 
-A full run is about 70 s headless. `E2E_HEADED=1` watches it;
+A full run of the four is about 135 s headless (27 Sep 2026, on a shared
+machine). `E2E_HEADED=1` watches it;
 `E2E_RESULTS=<dir>` moves the output; `E2E_TIMEOUT_MS` raises the per-scenario
 ceiling.
 
@@ -159,14 +163,24 @@ asserts the surface survives. Anything else is a failure.
 every record and its detail, and `<scenario>-failure.png` when one fails. CI
 uploads the directory as an artifact when the job is red.
 
+## Beside the gate
+
+Two more runners live here, on the gate's static server (`servers.mjs`), and
+neither is the gate — `node e2e/run.mjs` never starts them and CI does not run
+them. `perf.mjs` times the surface on generated boards, behind the gate's model
+guard, and asserts nothing; its numbers are `PERF.md`'s. `whitepaper-figures.mjs`
+audits the whitepaper's graphic plates in Chromium and WebKit at several widths
+and in both themes (`Assets/whitepaper-figures/README.md`).
+
 ## What is not here yet
 
 The four large scenarios are still Chromium only — WebKit gets the smoke above
 and nothing more, which is the honest version of the review's ask and is all it
-claims to be. **The CI job is still owed**: `.github/workflows/ci.yml` needs
-`npx playwright install --with-deps webkit` and a step running
-`node e2e/run.mjs --browser webkit smoke`; until it does, the smoke is something
-a human runs. Real-model evaluation stays a separate opt-in lane; nothing here is
+claims to be. CI runs the smoke in a job of its own (`webkit` in
+`.github/workflows/ci.yml`: `npx playwright install --with-deps webkit`, then
+`node e2e/run.mjs --browser webkit smoke`, with `e2e/results` uploaded as
+`e2e-webkit-results` when it fails); a WebKit scenario of the canvas's core
+records is V1-PLAN's R6. Real-model evaluation stays a separate opt-in lane; nothing here is
 evidence about model quality. The two large scenarios are still one case each;
 splitting them is meant to be incremental and must not discard the full-loop
 acceptance run.

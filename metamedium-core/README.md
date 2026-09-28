@@ -14,11 +14,14 @@ npm install           # dev deps only (typescript, vitest, esbuild)
 npm test              # full suite incl. the canonical-loop scenario
 npm run build         # ESM + .d.ts → dist/
 npm run build:browser # IIFE bundle (window.MetaMediumCore) → dist/
+npm run build:node    # ESM bundle for Node → dist/
 ```
 
-A copy of the browser bundle is committed at `Demos/metamedium-core.browser.js`
-for the GitHub Pages demo (`Demos/session-engine.html`). After engine changes,
-rebuild and re-copy it — CI fails if it drifts from source.
+Both bundles are committed: `Demos/metamedium-core.browser.js` for the GitHub
+Pages demo (`Demos/session-engine.html`), and `Demos/metamedium-core.node.mjs`
+for what runs in Node — the MCP hands, the relay's test, the smokes. After
+engine changes, rebuild both and re-copy them — CI fails if either drifts from
+source.
 
 ## Wiring a surface (canvas, playground iframe, React app)
 
@@ -77,6 +80,16 @@ session.setLogName('john~a1b2');
 session.load(mergeLogs(logs, { me: 'john~a1b2' }));
 ```
 
+**A log name is reused only when its whole history was loaded first**
+(`src/session/hands.ts`), because the number an event mints comes from its
+log. A folder's log is its file, loaded before anything is minted, so a folder
+keeps one name. A live hand has no history to load, so its log is **one
+sitting** — a page load, a process: `sittingName('john')` mints `john~a1b2`
+once per sitting, and `handLabel` gives back the name a person sees — the
+person the rules that ask "is this mine?" compare (`Session.isMine`), so a
+reload is a new log and never a stranger to its own ink. Within a sitting the
+session's high-water mark only rises, whatever `load()` sees.
+
 Say nothing and ids fall back to a counter over the replay, which is what
 every log written before this rule carries and what every event of such a log
 keeps: a held log opens as itself and is never renumbered. But two hands in
@@ -91,12 +104,18 @@ both halves, the fix and the defect it closes.
 | Module | What it holds |
 |---|---|
 | `geometry` | fingerprinting, closure, corners, hull, bounds ops (ported from Web App Skeleton, behavior-identical) |
-| `recognition` | Tier-0 heuristic shape experts with grounded `reasoning` strings |
-| `spatial` | `buildSpatialGraph` (touching/intersecting/contains), `spatialCluster` |
-| `session/nodes` | the node model: open `reps` list + `edges` + `capability` tier — everything is a node |
-| `session/gesture` | lasso/check predicates; temporal **+** contextual resolution |
-| `session/nodes` (participants) | participants are nodes: local human + tier-0 heuristics bootstrap; `join` adds humans/agents |
-| `session/session` | the engine: events in, `SessionState` out; event-sourced — `undo()` = drop last input + replay; `erase()` with artifact degradation; wire (`connects`) inference |
+| `recognition` | the shape rung: Tier-0 detectors over a fingerprint, each with a grounded `reasoning` string |
+| `relate/` | the relations the canvas can see between marks, every threshold a ratio of the marks' own size |
+| `diagram/` | the diagram rung: what a mark plays (`roles.ts`), and a drawing's genre |
+| `concepts/` | the meaning-mappings (row, column, frame, flow, grid, writing, …) and the conversions each affords |
+| `session/` | the engine: events in, `SessionState` out (`session.ts`), the node model (`nodes.ts`), gestures and the command mark, erasing, clean forms, the maths of a mark, magnets, signatures, words from letters, sittings (`hands.ts`), late results refused (`stale.ts`) |
+| `parse/` | the drawing as code: a layout by XY-cut (`layout.ts`), a graph (`graph.ts`), one plan for both (`plan.ts`), the scaffold |
+| `tier1/` | the instant library: everything that answers with no model and no wait |
+| `participants/` | a model's prompts and parsing (`agent.ts`), what it is told (`serialize.ts`), the router, the bridge, and the decision seat, tier 1.5 (`decide.ts`) |
+| `llm/` | the one transport for the OpenAI-compatible servers, and Anthropic's |
+| `store/` | the storage seam and its backends (a static site, a folder, a git repository), live rooms (`live.ts`), the merge (`merge.ts`) |
+| `kinds/`, `frames/`, `behave/`, `image/` | artifact kinds and what ink over each addresses; frames wired by reference; the verb basis and its fit; pictures traced into ink |
+| `maths/` | quantities, expressions, the sheet, dimensions, solving figure by figure, true size and tiled print |
 
 ### Plugging in an LLM tier (or any agent)
 

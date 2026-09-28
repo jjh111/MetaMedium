@@ -8,6 +8,22 @@
 
 ## The Vision, Restated
 
+> **Week 1 and phase 0, 27 September 2026 (branch `w2`, local).** The plan
+> is `V1-PLAN.md` now — the whole platform, ready for true use — and its
+> §9 carries every unit's dated status line. Week 1's automated run
+> (`DIRECTOR-PLAN-W1.md`, 20 Sep) reached `master` with its gaps named;
+> week 2 (`DIRECTOR-PLAN-W2.md`) made it whole as **phase 0**: ids that
+> hold (one sitting per page load, an undo sent to every peer, one event
+> applied once), the shard pairing by id and asking how deep, a hand's word
+> on its own ink from the MCP hand and from the field, an artifact made by
+> whoever blessed it and a word by whoever wrote its letters, gestures per
+> hand, one Enter one act, and CI running the relay's test and a WebKit
+> smoke. Beside it: the maths core, the extraction spike's *not yet*, and
+> the performance baseline (`PERF.md`), which pulled **phase 0b, a board
+> that holds**, ahead of everything else — 2,000 marks take 100 s to open
+> and freeze the page on every stroke. Core 889 tests in 67 files; the
+> gate 406 and one honest skip.
+>
 > **v10 accounting, 14 September 2026 (branch `next-phases`, local).** The
 > canvas reaches out (`SURFACE-v10-PLAN.md`): **an MCP hand** —
 > `Demos/mcp.mjs`, a participant in a live room with seven tools (look, see

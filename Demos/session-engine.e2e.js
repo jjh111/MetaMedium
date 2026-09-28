@@ -2361,5 +2361,432 @@ window.__scenario = async function(){
     mm.session.load([]); mm.setView(1, 0, 0);
   }
 
+  // ---- 43. An artifact is made by whoever blessed it (V1-PLAN L2f) ----
+  // A bless wrote no maker, so every board read an artifact as its reader's own:
+  // fern's word on the thing she made was dropped here, the marks inside it were
+  // drawn in this hand's ink, and this hand could label it. The maker of an
+  // artifact is who BLESSED it — and not who drew its marks: fern takes her
+  // circle up together with this hand's box, and each mark keeps its drawer's colour.
+  {
+    mm.session.load([]); mm.setView(1, 0, 0);
+    const S = (x, y) => mm.worldToScreen(x, y);
+    const b0 = S(300, 250), b1 = S(460, 350);
+    t.stroke(t.rect(b0.x, b0.y, b1.x - b0.x, b1.y - b0.y));
+    const box43 = mm.session.getState().contentIds[0];
+    const mine43 = mm.session.getEvents().filter((e) => !e.by);
+    // Fern, holding this hand's log, draws a circle beside the box, takes the two up as one thing, and puts a word on it.
+    const fern = MM.createSession(Object.assign({}, MM.DEFAULT_SESSION_CONFIG, { logName: 'fern~f1' }));
+    fern.load(MM.mergeLogs({ 'me~m1': mine43, 'fern~f1': [] }, { me: 'fern~f1' }));
+    const at43 = Date.now();
+    const kite43 = fern.addStroke(t.circle(600, 300, 50).map((p) => ({ x: p.x, y: p.y })), at43, undefined, 1, { content: true });
+    const pair43 = fern.bless({ summonId: fern.summonMarks([box43, kite43], at43 + 1), name: 'pair', at: at43 + 2 });
+    const worded43 = fern.label({ nodeId: pair43, text: 'kite and box', at: at43 + 3 });
+    mm.session.load(MM.mergeLogs({ 'fern~f1': fern.getEvents().filter((e) => !e.by), 'me~m1': mine43 }, { me: 'me~m1' })); await wait(30);
+    const s43 = mm.session.getState();
+    const node43 = s43.nodes.get(pair43);
+    const panel43 = document.getElementById('inspector').textContent;
+    step('43. fern blesses her circle with this hand\'s box: on this board the thing is hers, and the panel says so',
+      !!pair43 && s43.artifacts.includes(pair43) && !!node43 && MM.authorOf(node43) === 'participant:hand:fern_f1'
+        && MM.authorOf(s43.nodes.get(box43)) === MM.LOCAL_PARTICIPANT && MM.authorOf(s43.nodes.get(kite43)) === 'participant:hand:fern_f1'
+        && /by\s*fern/.test(panel43),
+      { artifact: pair43, maker: node43 && MM.authorOf(node43), box: MM.authorOf(s43.nodes.get(box43)), panel: panel43.slice(0, 200) });
+    const lab43 = (typeof mm.labelsDrawn === 'function' ? mm.labelsDrawn() : []).find((l) => l.id === pair43);
+    step('43a. her word on the thing she made survives this board\'s replay, drawn in her colour and attributed to her',
+      worded43 === pair43 && !!lab43 && lab43.text === 'kite and box' && lab43.colour === mm.handColour('fern') && lab43.who === 'fern',
+      { worded: worded43, label: lab43, hue: mm.handColour('fern') });
+    const ink43 = (id) => (typeof mm.inkDrawn === 'function' ? mm.inkDrawn(id) : null);
+    step('43b. each mark inside it keeps the colour of the hand that DREW it: this hand\'s box in its own ink, her circle in hers',
+      !!ink43(box43) && ink43(box43) === mm.colourOf(box43) && ink43(kite43) === mm.handColour('fern') && ink43(box43) !== ink43(kite43),
+      { box: ink43(box43), boxOwn: mm.colourOf(box43), circle: ink43(kite43), hue: mm.handColour('fern') });
+    // Held, it is not this hand's to label: the field says so before Enter, and Enter writes nothing.
+    const c43 = S(475, 300);
+    t.stroke(t.circle(c43.x, c43.y, 230)); t.takeLoop(c43.x, c43.y, 230); await wait(60);
+    const held43 = mm.session.getState().summon;
+    t.typeIn('label: mine');
+    const line43 = t.readingLine();
+    const evs43 = mm.session.getEvents().length;
+    t.typeEnter('label: mine'); await wait(60);
+    const status43 = document.getElementById('status').textContent;
+    step('43c. held, fern\'s thing is not this hand\'s to label — though it drew one of its marks: the line says so before Enter, and Enter writes nothing',
+      !!held43 && held43.enclosedIds.length === 1 && held43.enclosedIds[0] === pair43 && line43 === '↵ no label — fern made this mark; a label goes on your own ink'
+        && !mm.session.getEvents().slice(evs43).some((e) => e.type === 'label') && (MM.labelOf(mm.session.getState().nodes.get(pair43)) || {}).text === 'kite and box'
+        && /no label on the mark fern made/.test(status43),
+      { held: held43 && held43.enclosedIds, line: line43, status: status43, events: mm.session.getEvents().slice(evs43).map((e) => e.type) });
+    mm.session.load([]); mm.setView(1, 0, 0);
+  }
+
+  // ---- 44. A word is made by whoever wrote its letters (V1-PLAN L2g) ----
+  // Printed letters gather into a word, and the gathering wrote every word made
+  // by this board's own hand: fern's word read as this hand's here, her label on
+  // it was dropped, and this hand could label it. And gathering never asked whose
+  // a letter was: a mark of this hand's that the merge set between two of her
+  // letters broke her run, and a letter printed beside her word joined it. A word
+  // is one hand's run.
+  {
+    mm.session.load([]); mm.setView(1, 0, 0);
+    const S = (x, y) => mm.worldToScreen(x, y);
+    const seg44 = (a, b) => t.line(a, b, 14);
+    // N, A in two strokes, and V, as a hand prints them: 30 units tall, in the board's units.
+    const nav44 = (x, y) => [
+      seg44({ x, y: y + 30 }, { x, y }).concat(seg44({ x, y }, { x: x + 18, y: y + 30 }).slice(1), seg44({ x: x + 18, y: y + 30 }, { x: x + 18, y }).slice(1)),
+      seg44({ x: x + 26, y: y + 30 }, { x: x + 36, y }).concat(seg44({ x: x + 36, y }, { x: x + 46, y: y + 30 }).slice(1)),
+      seg44({ x: x + 30, y: y + 18 }, { x: x + 42, y: y + 18 }),
+      seg44({ x: x + 54, y }, { x: x + 64, y: y + 30 }).concat(seg44({ x: x + 64, y: y + 30 }, { x: x + 74, y }).slice(1)),
+    ];
+    const wordHolding44 = (s, letter) => s.contentIds.find((id) => MM.isWord(s.nodes.get(id)) && MM.lettersOf(s.nodes.get(id)).includes(letter));
+    // This hand prints an I on the line, well to the right of where fern's word will stand.
+    const i0 = S(500, 300), i1 = S(500, 330);
+    t.stroke(t.line(i0, i1, 14));
+    const mine44 = mm.session.getEvents().filter((e) => !e.by);
+    const myI44 = mm.session.getState().contentIds[0];
+    const myAt44 = mine44[mine44.length - 1].at;
+    // Fern prints N A V on her own board — her A's crossbar a moment AFTER this hand's I,
+    // so the merge sets this hand's mark between two of her letters — and puts a word on hers.
+    const fern44 = MM.createSession(Object.assign({}, MM.DEFAULT_SESSION_CONFIG, { logName: 'fern~f1' }));
+    const hers44 = nav44(300, 300).map((pts, i) => fern44.addStroke(pts, myAt44 + [-800, -400, 400, 800][i], undefined, 1));
+    const word44 = wordHolding44(fern44.getState(), hers44[0]);
+    const worded44 = word44 && fern44.label({ nodeId: word44, text: 'nav', at: myAt44 + 1200 });
+    mm.session.load(MM.mergeLogs({ 'fern~f1': fern44.getEvents().filter((e) => !e.by), 'me~m1': mine44 }, { me: 'me~m1' })); await wait(30);
+    // The panel reports on the mark the pointer rests on: rest it on her word.
+    const w44 = S(337, 315);
+    document.getElementById('canvas').dispatchEvent(new PointerEvent('pointermove', { pointerId: 1, isPrimary: true, bubbles: true, clientX: w44.x, clientY: w44.y, buttons: 0 }));
+    await wait(30);
+    const s44 = mm.session.getState();
+    const node44 = word44 && s44.nodes.get(word44);
+    const panel44 = document.getElementById('inspector').textContent;
+    step('44. fern\'s word stands whole on this board — her four letters, though the merge set this hand\'s I between two of them — and it is hers, as the panel says; the I is this hand\'s, alone',
+      !!node44 && MM.isWord(node44) && JSON.stringify(MM.lettersOf(node44)) === JSON.stringify(hers44)
+        && MM.authorOf(node44) === 'participant:hand:fern_f1' && /word/.test(panel44) && /by\s*fern/.test(panel44)
+        && s44.contentIds.includes(myI44) && MM.authorOf(s44.nodes.get(myI44)) === MM.LOCAL_PARTICIPANT,
+      { word: word44, letters: node44 && MM.lettersOf(node44), hers: hers44, maker: node44 && MM.authorOf(node44), content: s44.contentIds, panel: panel44.slice(0, 200) });
+    const lab44 = (typeof mm.labelsDrawn === 'function' ? mm.labelsDrawn() : []).find((l) => l.id === word44);
+    step('44a. her label on her word survives this board\'s replay, drawn in her colour and attributed to her',
+      !!word44 && worded44 === word44 && !!lab44 && lab44.text === 'nav' && lab44.colour === mm.handColour('fern') && lab44.who === 'fern',
+      { worded: worded44, label: lab44, hue: mm.handColour('fern') });
+    // Held, her word is not this hand's to label: the line says so before Enter, and Enter writes nothing.
+    t.stroke(t.circle(w44.x, w44.y, 90)); t.takeLoop(w44.x, w44.y, 90); await wait(60);
+    const held44 = mm.session.getState().summon;
+    t.typeIn('label: mine');
+    const line44 = t.readingLine();
+    const evs44 = mm.session.getEvents().length;
+    t.typeEnter('label: mine'); await wait(60);
+    const status44 = document.getElementById('status').textContent;
+    step('44b. held, fern\'s word is not this hand\'s to label: the line says so before Enter, and Enter writes nothing',
+      !!held44 && held44.enclosedIds.length === 1 && held44.enclosedIds[0] === word44 && line44 === '↵ no label — fern made this mark; a label goes on your own ink'
+        && !mm.session.getEvents().slice(evs44).some((e) => e.type === 'label') && (MM.labelOf(mm.session.getState().nodes.get(word44)) || {}).text === 'nav'
+        && /no label on the mark fern made/.test(status44),
+      { held: held44 && held44.enclosedIds, line: line44, status: status44, events: mm.session.getEvents().slice(evs44).map((e) => e.type) });
+    // Live: fern has just printed a word, and this hand prints a letter beside it — on her
+    // line, a letter's gap from her V, within the moment a word is written. It stays this hand's.
+    const fern44c = MM.createSession(Object.assign({}, MM.DEFAULT_SESSION_CONFIG, { logName: 'fern~f2' }));
+    const now44 = Date.now();
+    const hers44c = nav44(300, 500).map((pts, i) => fern44c.addStroke(pts, now44 - 1600 + 400 * i, undefined, 1));
+    const word44c = wordHolding44(fern44c.getState(), hers44c[0]);
+    mm.session.load(MM.mergeLogs({ 'fern~f2': fern44c.getEvents().filter((e) => !e.by), 'me~m1': [] }, { me: 'me~m1' })); await wait(30);
+    const j0 = S(382, 500), j1 = S(382, 530);
+    t.stroke(t.line(j0, j1, 14)); await wait(30);
+    const s44c = mm.session.getState();
+    const myJ44 = [...s44c.nodes.values()].find((n) => !!MM.strokePointsOf(n) && MM.authorOf(n) === MM.LOCAL_PARTICIPANT);
+    const herWord44c = word44c && s44c.nodes.get(word44c);
+    step('44c. a letter this hand prints beside her word — on her line, a letter\'s gap from it, just after she wrote it — never joins it: a word is one hand\'s run',
+      !!herWord44c && JSON.stringify(MM.lettersOf(herWord44c)) === JSON.stringify(hers44c) && MM.authorOf(herWord44c) === 'participant:hand:fern_f2'
+        && !!myJ44 && s44c.contentIds.includes(myJ44.id) && !wordHolding44(s44c, myJ44.id),
+      { word: word44c, letters: herWord44c && MM.lettersOf(herWord44c), hers: hers44c, mine: myJ44 && myJ44.id, content: s44c.contentIds });
+    document.getElementById('canvas').dispatchEvent(new PointerEvent('pointerleave', { pointerId: 1, isPrimary: true, bubbles: true }));
+    mm.session.load([]); mm.setView(1, 0, 0);
+  }
+
+  // ---- 45. Gestures are per hand (V1-PLAN L2h) ----
+  // The gesture state — a loop that waits, a summon, the selection — was one for
+  // the whole board, while a room's logs interleave by time. So a stroke fern
+  // drew while this hand's field stood open dissolved the field at the next
+  // merge, and the name given in it made nothing, on any board; her loop and her
+  // check opened this hand's field on her marks; and her stroke between this
+  // hand's loop and its check left the loop untaken, so the check read backwards
+  // and held the loop's own ink. Two tabs in one room: this one, driven through
+  // its own surface, and fern's, a hand with its own board on the same hub.
+  {
+    // This hand takes its loops up with the built-in check here; a mark held on
+    // the device (record 12 leaves one) is record 46's business.
+    if (mm.savedMark()) mm.forgetMark();
+    mm.session.load([]); mm.setView(1, 0, 0);
+    const S = (x, y) => mm.worldToScreen(x, y);
+    const hub45 = new MM.LocalHub();
+    const fernStore45 = new MM.LiveStore(hub45.connect(), 'fern~f1', 'pair45');
+    const fern45 = MM.createSession(Object.assign({}, MM.DEFAULT_SESSION_CONFIG, { logName: 'fern~f1' }));
+    await mm.openLive('pair45', { transport: hub45.connect() });
+    const me45 = mm.folder().me;
+    const myHand45 = 'participant:hand:' + me45.replace(/[^A-Za-z0-9._-]+/g, '_');
+    // fern acts on her own board and sends what she wrote; this board merges it as it lands.
+    const fernActs45 = async (fn) => { const n = fern45.getEvents().length; const out = fn(); await fernStore45.appendLog('fern~f1', fern45.getEvents().slice(n)); return out; };
+    const until45 = async (pred) => { for (let i = 0; i < 40 && !pred(); i++) await wait(50); };
+    const fieldShown45 = () => { const el = document.getElementById('summon'); return !!el && el.style.display !== 'none'; };
+    // This hand draws two boxes, circles them and takes the loop up: the field opens on the two.
+    const p0 = S(200, 200), p1 = S(340, 290), q0 = S(400, 200), q1 = S(540, 290), c45 = S(370, 245);
+    t.stroke(t.rect(p0.x, p0.y, p1.x - p0.x, p1.y - p0.y));
+    t.stroke(t.rect(q0.x, q0.y, q1.x - q0.x, q1.y - q0.y));
+    const boxes45 = mm.session.getState().contentIds.slice();
+    t.stroke(t.circle(c45.x, c45.y, 240)); t.takeLoop(c45.x, c45.y, 240); await wait(60);
+    const sum45 = mm.session.getState().summon;
+    // fern draws a box well away while the field stands open, and her line lands here.
+    await wait(30);
+    const fernBox45 = await fernActs45(() => fern45.addStroke(t.rect(1100, 700, 120, 80), Date.now(), undefined, 1));
+    await until45(() => mm.session.getState().contentIds.includes(fernBox45));
+    await wait(60);
+    const st45 = mm.session.getState();
+    step('45. fern draws while this hand\'s field stands open on its two boxes: her box lands on this board, and the field stays open on the same two',
+      !!sum45 && JSON.stringify([...sum45.enclosedIds].sort()) === JSON.stringify([...boxes45].sort()) && st45.contentIds.includes(fernBox45)
+        && !!st45.summon && st45.summon.id === sum45.id && JSON.stringify([...st45.summon.enclosedIds].sort()) === JSON.stringify([...boxes45].sort()) && fieldShown45(),
+      { summon: sum45 && sum45.id, boxes: boxes45, now: st45.summon && { id: st45.summon.id, enclosed: st45.summon.enclosedIds }, fern: fernBox45, content: st45.contentIds, shown: fieldShown45() });
+    // This hand names what it circled, in the field.
+    await wait(30);
+    t.typeEnter('name: pair'); await wait(80);
+    const st45a = mm.session.getState();
+    const pair45 = st45a.artifacts.find((id) => MM.wordOf(st45a.nodes.get(id)) === 'pair');
+    const partsOf45 = (s, id) => { const n = id && s.nodes.get(id); return n ? n.edges.filter((e) => e.rel === 'has-part').map((e) => e.to).sort() : []; };
+    step('45a. the name given in the field makes the thing on this board, holding this hand\'s two boxes; fern\'s box stays loose, and hers',
+      !!pair45 && JSON.stringify(partsOf45(st45a, pair45)) === JSON.stringify([...boxes45].sort()) && MM.authorOf(st45a.nodes.get(pair45)) === MM.LOCAL_PARTICIPANT
+        && st45a.contentIds.includes(fernBox45) && MM.authorOf(st45a.nodes.get(fernBox45)) === 'participant:hand:fern_f1' && !st45a.summon && !fieldShown45(),
+      { artifact: pair45 || null, artifacts: st45a.artifacts, parts: partsOf45(st45a, pair45), content: st45a.contentIds, summon: st45a.summon && st45a.summon.id });
+    // What this hand wrote reaches fern; her board is her log and the room's, merged.
+    await mm.saveNow(); await wait(120);
+    const fernBoard45 = () => {
+      const s = MM.createSession(Object.assign({}, MM.DEFAULT_SESSION_CONFIG, { logName: 'fern~f1' }));
+      return fernStore45.readLogs().then((logs) => { s.load(MM.mergeLogs(Object.assign({}, logs, { 'fern~f1': fern45.getEvents().filter((e) => !e.by) }), { me: 'fern~f1' })); return s.getState(); });
+    };
+    const fb45 = await fernBoard45();
+    step('45b. on fern\'s board the thing stands too — this hand\'s, holding this hand\'s two boxes — and no field of hers was ever opened by it',
+      !!pair45 && fb45.artifacts.includes(pair45) && JSON.stringify(partsOf45(fb45, pair45)) === JSON.stringify([...boxes45].sort())
+        && MM.authorOf(fb45.nodes.get(pair45)) === myHand45 && fb45.summon === null && fb45.selection.length === 0,
+      { artifacts: fb45.artifacts, parts: partsOf45(fb45, pair45), maker: pair45 && fb45.nodes.get(pair45) ? MM.authorOf(fb45.nodes.get(pair45)) : null, summon: fb45.summon && fb45.summon.id });
+    // A third reader who was never in the room, the logs handed over in both orders.
+    const logs45 = await fernStore45.readLogs();
+    const mine45 = logs45[me45] || [], hers45 = fern45.getEvents().filter((e) => !e.by);
+    const third45 = [[me45, mine45, 'fern~f1', hers45], ['fern~f1', hers45, me45, mine45]].map(([k1, v1, k2, v2]) => {
+      const s = MM.createSession(Object.assign({}, MM.DEFAULT_SESSION_CONFIG, { logName: 'cleo~c1' }));
+      s.load(MM.mergeLogs({ [k1]: v1, [k2]: v2 }, { me: 'cleo~c1' }));
+      return s.getState();
+    });
+    step('45c. and on a third reader\'s replay, the two logs handed over in either order, the thing stands holding this hand\'s two boxes',
+      !!pair45 && third45.every((s) => s.artifacts.includes(pair45) && JSON.stringify(partsOf45(s, pair45)) === JSON.stringify([...boxes45].sort()) && MM.authorOf(s.nodes.get(pair45)) === myHand45 && s.contentIds.includes(fernBox45)),
+      { mine: mine45.length, hers: hers45.length, third: third45.map((s) => ({ artifacts: s.artifacts, parts: partsOf45(s, pair45) })) });
+    // fern circles her box and takes her loop up on her own board: her field is hers.
+    await wait(30);
+    await fernActs45(() => fern45.addStroke(t.circle(1160, 740, 110), Date.now(), undefined, 1));
+    await wait(30);
+    await fernActs45(() => fern45.addStroke(t.check(1235, 730, 1), Date.now(), undefined, 1));
+    const fernSummon45 = fern45.getState().summon;
+    await until45(() => mm.session.getEvents().filter((e) => e.by === 'fern~f1').length >= 3);
+    await wait(60);
+    const st45d = mm.session.getState();
+    step('45d. fern takes her own loop up and her field opens on her box, on her board — never this hand\'s: nothing opens here, and nothing here is selected or waiting',
+      !!fernSummon45 && fernSummon45.enclosedIds.length === 1 && fernSummon45.enclosedIds[0] === fernBox45
+        && st45d.summon === null && st45d.selection.length === 0 && st45d.pendingLassoId === null && !fieldShown45(),
+      { hers: fernSummon45 && fernSummon45.enclosedIds, here: st45d.summon && st45d.summon.enclosedIds, selection: st45d.selection, pending: st45d.pendingLassoId, shown: fieldShown45() });
+    // This hand circles a new box; fern draws between its loop and its check; the check takes the loop up.
+    const r0 = S(200, 450), r1 = S(340, 540), c45e = S(270, 495);
+    t.stroke(t.rect(r0.x, r0.y, r1.x - r0.x, r1.y - r0.y));
+    const box45e = mm.session.getState().contentIds[mm.session.getState().contentIds.length - 1];
+    t.stroke(t.circle(c45e.x, c45e.y, 150));
+    const loop45e = mm.session.getState().pendingLassoId;
+    await wait(30);
+    const fernLine45 = await fernActs45(() => fern45.addStroke(t.line({ x: 1100, y: 950 }, { x: 1300, y: 950 }, 30), Date.now(), undefined, 1));
+    await until45(() => mm.session.getState().contentIds.includes(fernLine45));
+    await wait(40);
+    const waiting45e = mm.session.getState().pendingLassoId;
+    t.takeLoop(c45e.x, c45e.y, 150); await wait(60);
+    const st45e = mm.session.getState();
+    step('45e. a stroke of fern\'s lands between this hand\'s loop and its check: the loop still waits for this hand, the check takes it up, and the field holds what the loop held — not the loop\'s own ink',
+      !!loop45e && waiting45e === loop45e && !!st45e.summon && st45e.summon.scopeSource === 'lasso'
+        && JSON.stringify(st45e.summon.enclosedIds) === JSON.stringify([box45e]) && !st45e.summon.enclosedIds.includes(loop45e) && fieldShown45(),
+      { loop: loop45e, waiting: waiting45e, summon: st45e.summon && { source: st45e.summon.scopeSource, enclosed: st45e.summon.enclosedIds }, box: box45e });
+    if (st45e.summon) mm.session.dismiss(st45e.summon.id, Date.now());
+    fernStore45.close();
+    if (mm.folder().store && mm.folder().store.close) mm.folder().store.close();
+    mm.session.load([]); mm.setView(1, 0, 0);
+  }
+
+  // ---- 46. A hand's own mark in a room (V1-PLAN L2h) ----
+  // The mark that takes a loop up is the hand's that taught it. The mark held on
+  // this device is re-taught as a room opens — but only when no log taught one,
+  // so a room where fern's log teaches her own mark taught this hand nothing and
+  // judged it by hers; and when it was re-taught, the room's first merge counted
+  // that teach as the room's and dropped it from this hand's log.
+  {
+    mm.session.load([]); mm.setView(1, 0, 0);
+    const S = (x, y) => mm.worldToScreen(x, y);
+    const until46 = async (pred) => { for (let i = 0; i < 40 && !pred(); i++) await wait(50); };
+    const fieldShown46 = () => { const el = document.getElementById('summon'); return !!el && el.style.display !== 'none'; };
+    // This device holds the caret, taught on the pad.
+    window.__teach();
+    mm.session.load([]);
+    const held46 = mm.savedMark();
+    // fern taught a check of her own on her board, and drew a box.
+    const fern46 = MM.createSession(Object.assign({}, MM.DEFAULT_SESSION_CONFIG, { logName: 'fern~f2' }));
+    fern46.teachCommandMark(MM.learnCommandMark(MM.canonicalCheckSamples(), 'fern\'s check'), Date.now() - 3000);
+    const fernBox46 = fern46.addStroke(t.rect(1100, 450, 120, 80), Date.now() - 2000, undefined, 1);
+    const hub46 = new MM.LocalHub();
+    const fernStore46 = new MM.LiveStore(hub46.connect(), 'fern~f2', 'mark46');
+    await fernStore46.appendLog('fern~f2', fern46.getEvents().slice());
+    // The room replays what it holds as a hand connects, the way a relay replays its buffer.
+    const conn46 = hub46.connect();
+    const transport46 = {
+      send: (line) => conn46.send(line),
+      onMessage: (cb) => { const off = conn46.onMessage(cb); cb({ participant: 'fern~f2', events: fern46.getEvents().slice(), at: Date.now(), full: true, sid: fernStore46.sitting }); return off; },
+    };
+    await mm.openLive('mark46', { transport: transport46 });
+    // Wait for the room's answer to this hand's hello — the first merge after opening.
+    await wait(150);
+    const st46 = mm.session.getState();
+    step('46. the mark this device holds is this hand\'s in a room whose other hand taught her own: re-taught as the room opened, and still its mark once the room\'s logs have merged',
+      !!held46 && st46.contentIds.includes(fernBox46) && !!st46.commandMark && st46.commandMark.name === held46.mark.name && document.getElementById('markName').textContent === held46.mark.name,
+      { held: held46 && held46.mark.name, mark: st46.commandMark && st46.commandMark.name, chip: document.getElementById('markName').textContent, teaches: mm.session.getEvents().filter((e) => e.type === 'teach').map((e) => ({ by: e.by || 'me', mark: e.mark && e.mark.name })) });
+    // This hand circles a box and takes the loop up with its caret; fern takes hers up with her check.
+    const b0 = S(300, 450), b1 = S(440, 540), c46 = S(370, 495);
+    t.stroke(t.rect(b0.x, b0.y, b1.x - b0.x, b1.y - b0.y));
+    const box46 = mm.session.getState().contentIds[mm.session.getState().contentIds.length - 1];
+    t.stroke(t.circle(c46.x, c46.y, 150));
+    const loop46 = mm.session.getState().pendingLassoId;
+    t.stroke(t.caret(c46.x + 150 - 30, c46.y - 20)); await wait(60);
+    const sum46 = mm.session.getState().summon;
+    await wait(30);
+    const n46 = fern46.getEvents().length;
+    const fernLoop46 = fern46.addStroke(t.circle(1160, 490, 110), Date.now(), undefined, 1);
+    const fernCheck46 = fern46.addStroke(t.check(1235, 480, 1), Date.now() + 1, undefined, 1);
+    await fernStore46.appendLog('fern~f2', fern46.getEvents().slice(n46));
+    await until46(() => mm.session.getState().contentIds.includes(fernBox46) && mm.session.getEvents().some((e) => e.by === 'fern~f2' && e.seq === fern46.getEvents()[fern46.getEvents().length - 1].seq));
+    await wait(60);
+    const st46a = mm.session.getState();
+    const role46 = (id) => { const n = st46a.nodes.get(id); const g = n && n.reps.find((r) => r.modality === 'gesture'); return g ? g.data.role : null; };
+    step('46a. its caret takes its loop up and the field opens on its box — and stays open when fern takes her loop up with her own check, which is read as hers, on this board',
+      !!loop46 && !!sum46 && sum46.scopeSource === 'lasso' && JSON.stringify(sum46.enclosedIds) === JSON.stringify([box46])
+        && !!st46a.summon && st46a.summon.id === sum46.id && fieldShown46() && !!st46a.commandMark && st46a.commandMark.name === held46.mark.name
+        && role46(fernLoop46) === 'lasso' && role46(fernCheck46) === 'command' && !st46a.contentIds.includes(fernLoop46),
+      { loop: loop46, summon: sum46 && { source: sum46.scopeSource, enclosed: sum46.enclosedIds }, now: st46a.summon && st46a.summon.id, mark: st46a.commandMark && st46a.commandMark.name, hers: { loop: role46(fernLoop46), check: role46(fernCheck46) }, miss: st46a.markMiss });
+    if (st46a.summon) mm.session.dismiss(st46a.summon.id, Date.now());
+    fernStore46.close();
+    if (mm.folder().store && mm.folder().store.close) mm.folder().store.close();
+    mm.forgetMark();
+    mm.session.load([]); mm.setView(1, 0, 0);
+  }
+
+  // ---- 47. A person is the same person across sittings (V1-PLAN L2i) ----
+  // A live tab's log is one sitting — this page load — shown under the person's
+  // name and colour. But the rule that asks "is this mine?" compared the exact
+  // log name, so after a reload the person was a stranger to their own ink: the
+  // field said *no label — <name> made this mark*, and core refused the word.
+  // The harness cannot reload its own page, so the sitting before the reload is
+  // a hand of this person's name under another suffix — what a reload leaves in
+  // the room — and this tab is the sitting after it; then the other way round,
+  // this tab draws and its next sitting labels. fern shares the room.
+  {
+    mm.session.load([]); mm.setView(1, 0, 0);
+    const S = (x, y) => mm.worldToScreen(x, y);
+    const until47 = async (pred) => { for (let i = 0; i < 40 && !pred(); i++) await wait(50); };
+    const handIdOf47 = (name) => 'participant:hand:' + name.replace(/[^A-Za-z0-9._-]+/g, '_');
+    const named47 = (name) => MM.createSession(Object.assign({}, MM.DEFAULT_SESSION_CONFIG, { logName: name }));
+    const hub47 = new MM.LocalHub();
+    await mm.openLive('reload47', { transport: hub47.connect() });
+    const me47 = mm.folder().me;
+    const person47 = MM.handLabel(me47);
+    // The sitting before the reload: this person, another suffix (five letters, so
+    // never this page load's four). It drew a box in the room; fern drew a circle.
+    // Both are in the room before either sends, so each hears the other.
+    const prev47 = MM.sittingName(person47, 'prev1');
+    const prevSession47 = named47(prev47);
+    const prevStore47 = new MM.LiveStore(hub47.connect(), prev47, 'reload47');
+    const fern47 = named47('fern~f7');
+    const fernStore47 = new MM.LiveStore(hub47.connect(), 'fern~f7', 'reload47');
+    const box47 = prevSession47.addStroke(t.rect(200, 200, 160, 100).map((p) => ({ x: p.x, y: p.y })), Date.now() - 60000, undefined, 1);
+    await prevStore47.appendLog(prev47, prevSession47.getEvents().slice());
+    const kite47 = fern47.addStroke(t.circle(560, 250, 50).map((p) => ({ x: p.x, y: p.y })), Date.now() - 50000, undefined, 1);
+    await fernStore47.appendLog('fern~f7', fern47.getEvents().slice());
+    await until47(() => mm.session.getState().contentIds.includes(box47) && mm.session.getState().contentIds.includes(kite47));
+    await wait(60);
+    const st47 = mm.session.getState();
+    const prevHand47 = st47.nodes.get(handIdOf47(prev47));
+    step('47. after a reload the room brings back the box this person drew before it: the earlier sitting\'s mark, shown under this person\'s name',
+      person47 !== '' && prev47 !== me47 && st47.contentIds.includes(box47) && MM.authorOf(st47.nodes.get(box47)) === handIdOf47(prev47)
+        && !!prevHand47 && MM.wordOf(prevHand47) === person47,
+      { me: me47, person: person47, prev: prev47, maker: st47.nodes.get(box47) ? MM.authorOf(st47.nodes.get(box47)) : null, content: st47.contentIds });
+    // Held alone: the word goes on it — no longer *no label — <name> made this mark*.
+    const b47 = S(280, 250);
+    t.stroke(t.circle(b47.x, b47.y, 130)); t.takeLoop(b47.x, b47.y, 130); await wait(60);
+    const held47 = mm.session.getState().summon;
+    t.typeIn('label: inlet');
+    const line47 = t.readingLine();
+    const quiet47 = !!document.querySelector('#summon .reading.quiet');
+    const evs47 = mm.session.getEvents().length;
+    t.typeEnter('label: inlet'); await wait(60);
+    const s47 = mm.session.getState();
+    const lab47 = mm.session.getEvents().slice(evs47).filter((e) => e.type === 'label');
+    const status47 = document.getElementById('status').textContent;
+    step('47a. held after the reload, the box drawn before it is this person\'s to label: the line says the word goes on it, before Enter',
+      !!held47 && held47.enclosedIds.length === 1 && held47.enclosedIds[0] === box47 && line47 === '↵ label it “inlet”' && !quiet47,
+      { held: held47 && held47.enclosedIds, line: line47, quiet: quiet47 });
+    step('47b. Enter puts the word on it — one label event, this sitting\'s — and the box is still the earlier sitting\'s mark: the rule changed, not whose it is',
+      lab47.length === 1 && lab47[0].nodeId === box47 && !lab47[0].by && (MM.labelOf(s47.nodes.get(box47)) || {}).text === 'inlet'
+        && MM.labelOf(s47.nodes.get(box47)).source === MM.LOCAL_PARTICIPANT && MM.authorOf(s47.nodes.get(box47)) === handIdOf47(prev47)
+        && /labelled it “inlet”/.test(status47),
+      { labels: lab47, label: MM.labelOf(s47.nodes.get(box47)) || null, maker: MM.authorOf(s47.nodes.get(box47)), status: status47, stale: s47.staleResult });
+    // The word reaches the room: every board holds it on the box.
+    await mm.saveNow(); await wait(150);
+    const room47 = await fernStore47.readLogs();
+    const boardOf47 = (me, own) => {
+      const s = named47(me);
+      s.load(MM.mergeLogs(Object.assign({}, room47, own ? { [me]: own } : {}), { me }));
+      return s.getState();
+    };
+    const boards47 = [
+      ['the earlier sitting\'s', boardOf47(prev47, prevSession47.getEvents().filter((e) => !e.by))],
+      ['fern\'s', boardOf47('fern~f7', fern47.getEvents().filter((e) => !e.by))],
+      ['a third reader\'s', boardOf47('cleo~c7', null)],
+    ];
+    step('47c. the word reaches the room: on the earlier sitting\'s board — a tab still open — on fern\'s and on a third reader\'s, it stands on the box',
+      boards47.every(([, s]) => (MM.labelOf(s.nodes.get(box47)) || {}).text === 'inlet' && MM.labelOf(s.nodes.get(box47)).source === handIdOf47(me47)),
+      { boards: boards47.map(([who, s]) => ({ who, label: s.nodes.get(box47) ? MM.labelOf(s.nodes.get(box47)) || null : 'no box' })), room: Object.keys(room47) });
+    // Held with fern's circle: another person is refused as before, said before Enter and after it.
+    const c47 = S(420, 250);
+    t.stroke(t.circle(c47.x, c47.y, 250)); t.takeLoop(c47.x, c47.y, 250); await wait(60);
+    const heldBoth47 = mm.session.getState().summon;
+    t.typeIn('label: outlet');
+    const lineBoth47 = t.readingLine();
+    const evsBoth47 = mm.session.getEvents().length;
+    t.typeEnter('label: outlet'); await wait(60);
+    const sBoth47 = mm.session.getState();
+    const labBoth47 = mm.session.getEvents().slice(evsBoth47).filter((e) => e.type === 'label');
+    const statusBoth47 = document.getElementById('status').textContent;
+    step('47d. held with fern\'s circle, the word goes on this person\'s box and not on hers — another person is refused as before, said before Enter and after it',
+      !!heldBoth47 && heldBoth47.enclosedIds.length === 2 && [box47, kite47].every((id) => heldBoth47.enclosedIds.includes(id))
+        && lineBoth47 === '↵ label it “outlet” — on yours, not the mark fern made'
+        && labBoth47.length === 1 && labBoth47[0].nodeId === box47 && (MM.labelOf(sBoth47.nodes.get(box47)) || {}).text === 'outlet' && !MM.labelOf(sBoth47.nodes.get(kite47))
+        && /labelled it “outlet”/.test(statusBoth47) && /not on the mark fern made/.test(statusBoth47),
+      { held: heldBoth47 && heldBoth47.enclosedIds, line: lineBoth47, labels: labBoth47.map((e) => e.nodeId), status: statusBoth47 });
+    // And the other way round: this tab draws in the room, and its next sitting — as
+    // after the next reload — puts a word on what it drew; the word lands here.
+    const d0 = S(800, 200), d1 = S(920, 280);
+    t.stroke(t.rect(d0.x, d0.y, d1.x - d0.x, d1.y - d0.y));
+    const drawn47 = mm.session.getState().contentIds[mm.session.getState().contentIds.length - 1];
+    await mm.saveNow(); await wait(150);
+    const next47 = MM.sittingName(person47, 'next1');
+    const nextSession47 = named47(next47);
+    nextSession47.load(MM.mergeLogs(Object.assign({}, await fernStore47.readLogs(), { [next47]: [] }), { me: next47 }));
+    const worded47 = nextSession47.label({ nodeId: drawn47, text: 'cap', at: Date.now() });
+    const nextStore47 = new MM.LiveStore(hub47.connect(), next47, 'reload47');
+    await nextStore47.appendLog(next47, nextSession47.getEvents().filter((e) => !e.by));
+    await until47(() => !!MM.labelOf(mm.session.getState().nodes.get(drawn47)));
+    await wait(60);
+    const drawnNode47 = mm.session.getState().nodes.get(drawn47);
+    const drawnLab47 = (typeof mm.labelsDrawn === 'function' ? mm.labelsDrawn() : []).find((l) => l.id === drawn47);
+    step('47e. and the other way round: a box this tab drew in the room is its person\'s next sitting\'s to label — the word lands here, beside it, this tab\'s mark still',
+      !!drawn47 && worded47 === drawn47 && !!drawnNode47 && MM.authorOf(drawnNode47) === MM.LOCAL_PARTICIPANT
+        && (MM.labelOf(drawnNode47) || {}).text === 'cap' && MM.labelOf(drawnNode47).source === handIdOf47(next47)
+        && !!drawnLab47 && drawnLab47.text === 'cap' && drawnLab47.who === person47,
+      { drawn: drawn47, worded: worded47, stale: nextSession47.getState().staleResult, label: drawnNode47 ? MM.labelOf(drawnNode47) || null : null, drawnLabel: drawnLab47 || null });
+    prevStore47.close(); fernStore47.close(); nextStore47.close();
+    if (mm.folder().store && mm.folder().store.close) mm.folder().store.close();
+    mm.session.load([]); mm.setView(1, 0, 0);
+  }
+
   return R;
 };

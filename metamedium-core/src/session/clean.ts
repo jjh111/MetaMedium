@@ -15,7 +15,11 @@
 //   3. **The clean form is built from the ink's own measurements** — bounds,
 //      corners, tip and tail — never from a template placed by hand. A circle
 //      that was drawn as a slight oval stays a slight oval; only the wobble
-//      goes.
+//      goes. A box drawn turned stays turned: its clean form is the tightest
+//      box at any angle, so a diamond is redrawn as a diamond, not as the
+//      upright box around it — which turned a flowchart's decision into a
+//      process (S1). An arrow keeps the barb the hand drew, and a stroke that
+//      BENDS is not offered as the straight line through its ends.
 //
 // Writing has no clean form. Handwriting redrawn as a box is a lie about what
 // was written, so `text` is never idealized and stays ink.
@@ -23,6 +27,8 @@
 import type { Bounds, Point } from '../types';
 import type { MMNode } from './nodes';
 import { fingerprintOf, getRep, wordOf, placed } from './nodes';
+import { bowOf, tightestBox } from '../geometry';
+import { ARC_BULGE_PX, ARC_SWEEP } from '../recognition';
 
 import { interpretationsOf } from './interpretations';
 
@@ -43,6 +49,40 @@ export const SNAP_MARGIN = 0.12;
 
 /** Shapes that have a clean form at all. */
 export const SNAPPABLE = new Set(['rectangle', 'circle', 'triangle', 'line', 'arrow', 'arc', 'dot']);
+
+/**
+ * A box within this many degrees of square to the screen is squared up; past
+ * it the turn was drawn and is kept. The corpus's boxes drawn square measure
+ * within 3.2° of it, the rounded ones the most (their tightest box at any
+ * angle, measured).
+ */
+export const SQUARE_UP_DEG = 5;
+/**
+ * Squared up, a box is the bounds its ink fills — when those bounds hold it
+ * as tightly as its own box, give or take this share of its area. The
+ * corpus's boxes drawn square fill their bounds within 2.5% of that. A box
+ * turned only a little, or a long bar a degree off level, fills its bounds
+ * loosely: squared up to them it would grow — a 170×70 box turned 6° has
+ * bounds 176×87 — so it is squared up at its own size instead.
+ */
+export const BOUNDS_SLACK = 0.05;
+
+/**
+ * How far a line's ink may stand off the straight line through its ends and
+ * still be drawn clean as that line: no further than a hand's straight line
+ * bows — under the bulge an arc must show to be one (ARC_BULGE_PX, in the
+ * hand's space), or under the bulge of the shallowest arc (ARC_SWEEP) on a
+ * long line. Past it the stroke BENDS: half of a diamond drawn in two
+ * strokes, redrawn straight, turned the diamond into a triangle (S1).
+ */
+function lineBendsTooFar(node: MMNode): { bends: boolean; off: number } {
+  const stroke = getRep(node, 'stroke')?.data as { points?: Point[]; scale?: number } | undefined;
+  const bow = stroke?.points ? bowOf(stroke.points) : null;
+  if (!bow) return { bends: false, off: 0 };
+  const scale = stroke?.scale ?? 1;
+  const allowed = Math.max(ARC_BULGE_PX[1] * scale, (bow.chord * Math.tan((ARC_SWEEP[0] * Math.PI) / 180 / 4)) / 2);
+  return { bends: bow.sagitta > allowed, off: bow.sagitta / scale };
+}
 
 export interface SnapReading {
   shape: string;
@@ -79,6 +119,17 @@ export function snapReading(node: MMNode, nodes: ReadonlyMap<string, MMNode>): S
       ok: false,
       reasoning: `${shape} ${top.weight.toFixed(2)} and ${second.label} ${second.weight.toFixed(2)} are too close to call`,
     };
+  }
+  if (shape === 'line') {
+    const bend = lineBendsTooFar(node);
+    if (bend.bends) {
+      return {
+        shape,
+        weight: top.weight,
+        ok: false,
+        reasoning: `${shape} ${top.weight.toFixed(2)}, but it bends ${Math.round(bend.off)}px off the straight line through its ends — more than a hand's straight line bows`,
+      };
+    }
   }
   return {
     shape,
@@ -135,6 +186,45 @@ export function idealize(node: MMNode, shape: string): CleanShape | null {
 
   switch (shape) {
     case 'rectangle': {
+      // The tightest box at any angle — the one extent measures against. Near
+      // square to the screen it is the hand's wobble, squared up; turned
+      // further, the turn was drawn and is kept, so a diamond stays one.
+      const box = tightestBox(raw);
+      if (box && Math.abs(box.angle) > SQUARE_UP_DEG) {
+        const { centre: c, axis: u, width: bw, height: bh } = box;
+        const corner = (su: number, sv: number): Point => ({
+          x: c.x + (u.x * su * bw) / 2 - (u.y * sv * bh) / 2,
+          y: c.y + (u.y * su * bw) / 2 + (u.x * sv * bh) / 2,
+        });
+        // Its diagonals square to the screen too: a square turned 45°.
+        const tilt = (Math.atan2(bh, bw) * 180) / Math.PI;
+        const offSquare = (deg: number) => {
+          const d = ((deg % 90) + 90) % 90;
+          return Math.min(d, 90 - d);
+        };
+        const diamond = Math.max(offSquare(box.angle + tilt), offSquare(box.angle - tilt)) <= SQUARE_UP_DEG;
+        return {
+          shape,
+          closed: true,
+          // Its own top-left, top-right, bottom-right and bottom-left, as an upright box's.
+          points: [corner(-1, -1), corner(1, -1), corner(1, 1), corner(-1, 1)],
+          reasoning:
+            `the tightest box the ink fills, ${Math.round(bw)}×${Math.round(bh)}, turned ${Math.round(Math.abs(box.angle))}° as drawn` +
+            (diamond ? ' — a diamond: a square turned 45°, its diagonals level and plumb' : ''),
+        };
+      }
+      if (box && w * h > box.area * (1 + BOUNDS_SLACK)) {
+        const { centre: c, width: bw, height: bh } = box;
+        return {
+          shape,
+          closed: true,
+          points: [
+            { x: c.x - bw / 2, y: c.y - bh / 2 }, { x: c.x + bw / 2, y: c.y - bh / 2 },
+            { x: c.x + bw / 2, y: c.y + bh / 2 }, { x: c.x - bw / 2, y: c.y + bh / 2 },
+          ],
+          reasoning: `its own box, ${Math.round(bw)}×${Math.round(bh)}, squared up from ${Math.round(Math.abs(box.angle))}° — the bounds it fills are looser`,
+        };
+      }
       return {
         shape,
         closed: true,
@@ -180,12 +270,16 @@ export function idealize(node: MMNode, shape: string): CleanShape | null {
       return { shape, closed: false, points: [fp.start, fp.end], reasoning: 'its two ends, joined straight' };
     }
     case 'arrow': {
-      const meta = getRep(node, 'reading:arrow')?.data as { tip?: Point; tail?: Point } | undefined;
+      const meta = getRep(node, 'reading:arrow')?.data as { tip?: Point; tail?: Point; barb?: number } | undefined;
       const tail = meta?.tail ?? fp.start, tip = meta?.tip ?? fp.end;
       const len = Math.hypot(tip.x - tail.x, tip.y - tail.y);
       if (len < 1e-6) return null;
       const ux = (tip.x - tail.x) / len, uy = (tip.y - tail.y) / len;
-      const barb = Math.max(6, Math.min(len * 0.28, 40));
+      // The barb the hand drew, as long as it was — at most a fifth of the
+      // shaft, because two wings drawn out and back are three barbs' worth of
+      // the head the rung reads, and a longer one would not read back as an
+      // arrow at all (the old 0.28 of the shaft never did under 143px).
+      const barb = Math.min(len * 0.2, Math.max(6, meta?.barb ?? len * 0.2));
       const wing = (s: number) => ({
         x: tip.x - barb * (ux * Math.cos(0.5) - s * uy * Math.sin(0.5)),
         y: tip.y - barb * (uy * Math.cos(0.5) + s * ux * Math.sin(0.5)),
@@ -193,7 +287,10 @@ export function idealize(node: MMNode, shape: string): CleanShape | null {
       return {
         shape, closed: false,
         points: [tail, tip, wing(1), tip, wing(-1)],
-        reasoning: 'a straight shaft from tail to tip, with an even barb',
+        reasoning:
+          meta?.barb !== undefined && barb < meta.barb - 0.5
+            ? `a straight shaft from tail to tip, with an even barb ${Math.round(barb)}px long — a fifth of the shaft, where the hand drew ${Math.round(meta.barb)}`
+            : `a straight shaft from tail to tip, with an even barb ${Math.round(barb)}px long${meta?.barb !== undefined ? ', as drawn' : ''}`,
       };
     }
     case 'arc': {

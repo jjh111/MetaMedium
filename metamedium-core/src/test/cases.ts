@@ -5,10 +5,60 @@
 // you cannot debug against.
 
 import { analyzeStroke } from '../recognition';
-import { handRect, handTriangle, handCircle, handLine, handArrow, handText, handDot, type HandOptions } from './strokes';
+import { handRect, handTriangle, handCircle, handLine, handArrow, handText, handDot, handArc, handBox, type HandOptions } from './strokes';
 import type { Point } from '../types';
 
 export interface Case { label: string; expect: string; points: Point[]; }
+
+/** The hand's variants without a start point: drawn fast to slowly, a ruler to a shaky hand, a clean digitizer to a finger. */
+function handVariants(): { name: string; opts: HandOptions }[] {
+  const out: { name: string; opts: HandOptions }[] = [];
+  for (const density of [0.12, 0.35, 1.0, 2.5]) {
+    for (const jitter of [0, 2.5, 5]) {
+      for (const sensorNoise of [0, 1, 2]) {
+        out.push({ name: `dens${density} jit${jitter} noise${sensorNoise}`, opts: { density, jitter, sensorNoise, seed: out.length + 1 } });
+      }
+    }
+  }
+  return out;
+}
+
+/** The sweeps an arc is drawn at, shallowest to nearly closed. */
+export const ARC_SWEEPS = [30, 45, 60, 90, 120, 140, 180, 240, 300] as const;
+
+/**
+ * Arcs of every sweep from 30° to 300°, every way a hand draws them, turned
+ * four ways. Hand-sized: a chord of 240 up to a half circle — a shallow curve
+ * is drawn long, or its bow is no bigger than the wobble of a straight line —
+ * and a radius of 100 past it.
+ */
+export function buildArcCases(): (Case & { sweep: number })[] {
+  const cases: (Case & { sweep: number })[] = [];
+  for (const sweep of ARC_SWEEPS) {
+    const r = sweep <= 180 ? 120 / Math.sin((sweep * Math.PI) / 360) : 100;
+    for (const v of handVariants()) {
+      for (const turn of [0, 70, 160, 250]) {
+        cases.push({ label: `arc ${sweep}° turned ${turn} ${v.name}`, expect: 'arc', sweep, points: handArc(0, 0, r, turn - 90 - sweep / 2, sweep, v.opts) });
+      }
+    }
+  }
+  return cases;
+}
+
+/** Boxes turned off square — 10°, 20°, 30° and a diamond's 45° — a square and a rectangle, every way a hand draws them. */
+export function buildTurnedCases(): (Case & { turn: number })[] {
+  const cases: (Case & { turn: number })[] = [];
+  for (const startAt of [0, 0.12, 0.5]) {
+    for (const v of handVariants()) {
+      for (const turn of [10, 20, 30, 45]) {
+        const opts = { ...v.opts, startAt, seed: (v.opts.seed ?? 1) * 7 + turn };
+        cases.push({ label: `square turned ${turn} start${startAt} ${v.name}`, expect: 'rectangle', turn, points: handBox(0, 0, 170, 170, turn, opts) });
+        cases.push({ label: `rect turned ${turn} start${startAt} ${v.name}`, expect: 'rectangle', turn, points: handBox(0, 0, 200, 140, turn, opts) });
+      }
+    }
+  }
+  return cases;
+}
 
 /** The sweep: every shape drawn every way a hand might draw it. */
 export function buildCases(): Case[] {

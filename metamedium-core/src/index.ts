@@ -87,8 +87,11 @@ export type { CleanShape, SnapReading } from './session/clean';
 export { strokeFor, parseShapes, MAX_DRAWN } from './session/synthesize';
 export type { DrawnShape } from './session/synthesize';
 
-// The maths of a mark — what follows from a reading, measured from the ink.
-export { measure, describeMaths } from './session/measure';
+// The maths of a mark — what follows from a reading, measured from the ink;
+// in the drawing's units when numbers are written on it (M4: pass the board's
+// maths, `solveBoard(state)`). A measured corner is right within
+// RIGHT_ANGLE_TOLERANCE — a reading of the ink, never a fact.
+export { measure, describeMaths, angleClass, RIGHT_ANGLE_TOLERANCE } from './session/measure';
 export type { Maths, Measure } from './session/measure';
 
 // Maths on a page — quantities as the hand writes them (a value or a range, a
@@ -167,11 +170,91 @@ export type {
   StepCheckStatus,
 } from './maths/sheet';
 export { sheetLines } from './maths/gather';
-export type { GatheredLine } from './maths/gather';
+export type { GatheredLine, SheetLinesOptions } from './maths/gather';
+// Dimensions (M3a): a number beside a mark offered as one of its measures —
+// ranked by its distance to a side's middle relative to the side's length and
+// by its alignment, with the reason and the runner-up; a number inside a
+// closed mark is a piece label; a square in a corner declares it right; an
+// underline belongs to its number; each drawing gets a unit and a scale, and
+// says how consistently its labels agree with the ink. `sheetLines` leaves
+// the numbers on marks out of the page.
+export {
+  dimensionsOf,
+  figureOfMark,
+  polygonFigure,
+  readNumber,
+  numbersOf,
+  attachNumber,
+  attachedNumberIds,
+  insideFigure,
+  inkMeasure,
+  describeDimensions,
+  TO_SCALE_WITHIN,
+} from './maths/dimension';
+export type {
+  Figure,
+  FigureKind,
+  FigureSide,
+  FigurePart,
+  MeasureName,
+  NumberReading,
+  BoardNumber,
+  Attachment,
+  AttachmentCandidate,
+  AttachmentKind,
+  FigureLabel,
+  RightAngleMark,
+  Underline,
+  Drawing,
+  DrawingScale,
+  DimensionOptions,
+  BoardDimensions,
+} from './maths/dimension';
+// Solving (M4): figure by figure, in closed form — a triangle from three
+// facts, a rectangle from two, a circle from one, an arc from two, a line,
+// parts along one edge summing to their whole. Every derived value carries
+// its formula; an over-determined figure keeps every consistent reading and
+// says what cannot hold and by how much; a declared square rules, a measured
+// right angle is only a reading; what the labels leave open is the ink's.
+export { solveFigure, solveBoard, describeSolution } from './maths/solve';
+// Figures of several strokes (V1-PLAN E3): ruled strokes whose ends meet — a
+// magnet tied them, or they touch within the hand's reach — read as one
+// figure: a triangle, a quadrilateral (a diamond, turned about 45°; a
+// rectangle, its corners right), a polygon. Each side keeps the marks it was
+// drawn with, and each figure is the maths lane's own, so
+// `solveBoard(state, { figures: figuresOf(state) })` solves it. Derived.
+export { figuresOf, figuresAmong, describeFigure, STRAIGHT_TURN, STRAIGHT_RUN, ONE_BEND, DIAMOND_SLACK, SLIVER, MAX_FIGURE_STROKES } from './diagram/figures';
+export type { InkFigure, FigureShape, FigureCorner } from './diagram/figures';
+export type {
+  SolvedFrom,
+  SolvedValue,
+  Conflict as MathsConflict,
+  SolveReading,
+  Solution,
+  SolveOptions,
+  FigureMaths,
+  BoardMaths,
+  SolveBoardOptions,
+} from './maths/solve';
+// True size and print (M7): solved figures drawn at their real size as a new
+// SVG document — by the solver's first reading, never by the ink, the root in
+// paper units and the viewBox in the drawing's — and that document tiled onto
+// Letter or A4 at 100%, with overlap, alignment marks, grid labels, a map and a
+// measured test square on every page. Pure and deterministic.
+export { trueSize, COORD_PLACES } from './maths/truesize';
+export type { TrueSize, TrueSizeOptions, TrueSizeFigure, TrueSizeSide, TrueSizeOmission, SolvedFigures } from './maths/truesize';
+export { printTiled, PAPERS } from './maths/print';
+export type { Paper, Orientation, PaperSize, PrintOptions, PrintPage, PrintJob } from './maths/print';
 
 // Magnets — the places a mark offers attachment, derived from its clean form.
-export { magnetSites, nearestMagnet, magnetsNear, magnetRadius, describeMagnet, MAGNET_SCREEN_PX, MAGNET_SIZE_FRACTION } from './session/magnets';
+export { magnetSites, nearestMagnet, magnetsNear, magnetRadius, describeMagnet, siteOf, MAGNET_SCREEN_PX, MAGNET_SIZE_FRACTION } from './session/magnets';
 export type { MagnetSite, MagnetKind, MagnetHit } from './session/magnets';
+// Ports by notation (V1-PLAN E3) — the one hook beside magnetSites: a notation
+// that reads a mark as its symbol offers that symbol's ports, points and places
+// along a segment or an outline, through the same queries the pen asks. None
+// registered, nothing changes.
+export { registerPorts, unregisterPorts, registeredPorts, alongIndex, alongOf, ALONG_STEPS } from './session/ports';
+export type { NotationPort, NotationPorts } from './session/ports';
 export { bindingsOf, boundRepsOf, activeBindingsOf, boundToMark, describeBinding } from './session/magnets';
 export type { Binding, BoundRep } from './session/magnets';
 
@@ -264,6 +347,7 @@ export {
   countCrossings,
   outlineOf,
   scratchedOut,
+  mayCross,
   DEFAULT_ERASE_CROSSINGS,
 } from './session/erase';
 export type { ScratchTarget } from './session/erase';
@@ -284,14 +368,75 @@ export {
   clusters,
   describeRelations,
   DEFAULT_RELATE_CONFIG,
+  ENGAGING_KINDS,
+  withinReach,
+  nearLimitOf,
+  reachAround,
 } from './relate/relations';
 export type { Relation, RelationKind, Mark, RelateConfig } from './relate/relations';
+// Where marks are (V1-PLAN §9 R4b): a grid whose cells are sized from the
+// marks, asked which boxes meet a box — what the session finds the marks
+// within a mark's reach with, and what a surface can cull to the viewport by.
+export { MarkGrid, finiteBounds } from './relate/grid';
 
 // The diagram rung — what a mark PLAYS: container, node, edge, label,
 // annotation, unclassified. A closed vocabulary, placed by a table
 // (KEYFRAMES.md §3), and the genre that decides how a drawing compiles.
 export { assignRoles, genreOf, describeRoles, ROLES } from './diagram/roles';
 export type { Role, RoleReading, RoleScope, Wire, Genre, GenreReading } from './diagram/roles';
+// Connector heads (V1-PLAN E3): what sits at each end of a line, an arrow or
+// an arc — the arrow's own barb, a small triangle, diamond or circle touching
+// the end, a separate chevron — hollow or filled, filled measured as ink
+// coverage relative to the head's own area. Writing at an end is a label, not
+// a head. Plural, with reasons; derived, never in the log.
+export {
+  headsOf,
+  connectorHeads,
+  describeHeads,
+  HEAD_MAX_SHARE,
+  HEAD_AXIS_SHARE,
+  FILL_CORE,
+  FILL_REACH,
+  FILLED_AT,
+  FILL_UNSURE,
+  BARB_ROUND,
+  BARB_CLOSED,
+  OUTLINE_PATH,
+  HEAD_COMPACT,
+} from './diagram/heads';
+export type { HeadKind, HeadReading, ConnectorEnd, ConnectorHeads } from './diagram/heads';
+// Notations (V1-PLAN §3, D1) — what a drawing is in a notation's own terms,
+// read over the diagram rung: symbols by their shape and their corners' angle
+// (a decision is a box turned 45°, which the shape rung is blind to), each
+// playing one of the six roles and adding none; connectors read past their
+// heads; labels inside a symbol or beside a flow. Every notation reads,
+// plural and ranked; derived, never in the log. A notation's ports reach the
+// pen through E3's hook only when offered. The flowchart ships; its content
+// is FLOWCHART_TABLE, which moves into the flowchart@1 pack with B3.
+export {
+  registerNotation,
+  unregisterNotation,
+  registeredNotations,
+  notationById,
+  notationsOf,
+  offerPorts,
+  describeNotation,
+  NOTATION_FLOOR,
+} from './notations/notation';
+export type {
+  Notation,
+  NotationReading,
+  NotationSymbol,
+  NotationSymbolDef,
+  NotationConnector,
+  NotationConnectorDef,
+  NotationEnd,
+  NotationLabel,
+  SymbolReading,
+} from './notations/notation';
+export { FLOWCHART, FLOWCHART_TABLE, readFlowchart, flowchartPortsOf } from './notations/flowchart';
+export { stanceOf, cornersOf, tightBox } from './notations/shape';
+export type { QuadStance } from './notations/shape';
 
 // Concepts — the meaning-mappings, as a library rather than as code paths.
 export { matchConcepts, BUILTIN_CONCEPTS } from './concepts/concept';

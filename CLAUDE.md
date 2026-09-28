@@ -24,15 +24,38 @@ automatically → ask "why?" and get grounded reasoning.
 `ARCHITECTURE-v7-PARTICIPANTS-AND-TIERS.md` is the active engine plan; MVP.md
 absorbs and raises its Stage D.
 
-**26 Sep 2026: week 1's automated run landed on `master`, with its gaps.**
-It carries ids per hand (with two reproduced defects), the relay's
-catch-up, the label event in core, the decision seat and a WebKit smoke;
-the rest sits on attempt branches. `DIRECTOR-PLAN-W2.md` §0 says exactly
-what, and its L1–L3 finish it before anything new. **`V1-PLAN.md` is the
-plan now**: the whole platform as layers (tools, context, library packs,
-seats), diagrams with Mermaid out and in, handles and bindings that
-follow, maths as a tool, and what "ready for true use" takes — ten
-acceptance scenarios, a ladder of units, and when v1.0.0 ships. The
+**27 Sep 2026: phase 0 of `V1-PLAN.md` is done on `w2` — week 1 is whole**
+(each unit's dated status line is in the plan's §9). **Ids hold** (L1): a
+live hand's log is one sitting, a page load or an MCP process
+(`sittingName`, `session/hands.ts`), whose high-water mark only rises
+(`session.ts`), so no number is issued twice under one name — not after an
+undo, which now reaches every peer (`LiveStore.publish` sends the whole log
+when it did not only grow), nor after a peer's line or a reload; one event
+is applied once however many logs carry it (L1b, `store/merge.ts`). The
+shard pairs a brief and its answer by the brief's node id
+(L2a, `shard-3d/src/room.ts`) and asks how deep a hull seen from one
+standpoint is (L2c, `shard-3d/src/depth.ts`). A hand puts a word on its own
+ink and never on another's — the MCP hand's `canvas_label` (`Demos/mcp.mjs`),
+a person's `label:` in the field (`09-field.js`; L2b, L2e); an artifact is
+made by whoever blessed it and a word by whoever wrote its letters, on every
+board (`applyBless`, `absorbIntoWord`; L2f, L2g); a hand's gestures are its
+own (`handOf`; L2h), and a person is the same person across sittings — a
+reload is a new hand, and the rules still ask the person "is this mine?"
+(`Session.isMine`; L2i, the phase's follow-up); one Enter is one act
+(`09-palette.js`) and `fitAll` fits the content (`01-view.js`; L2d). CI runs what exists
+(`.github/workflows/ci.yml`) — the relay's test, the surface build's guard
+against a function declared in two fragments, and a WebKit smoke that takes
+a pill — and both bundles equal a fresh build (L3). Beside them: the maths core (`src/maths/`), the
+extraction spike's *not yet* (`gliner-seat/`) and the performance baseline
+(`PERF.md`). **Phase 0b, a board that holds, is next, ahead of the
+backbone**, because `PERF.md` measured that 500 marks are usable once open,
+2,000 take 100 s to open and freeze the page for 7.6 s on every stroke,
+5,000 do not open, and autosave stops saving, in silence, at 1,100–1,600
+marks.
+**`V1-PLAN.md` is the plan**: the whole platform as layers (tools, context,
+library packs, seats), diagrams with Mermaid out and in, handles and
+bindings that follow, maths as a tool, and what "ready for true use" takes
+— ten acceptance scenarios, a ladder of units, and when v1.0.0 ships. The
 headline below is the 17 Sep state it builds on.
 
 Headline (17 Sep 2026, everything on `master`; `DIRECTOR-VIEW-2026-09-17.md`
@@ -81,7 +104,7 @@ circle them, cross with a command mark *you taught the system*, prompt them into
 a living page that renders in the canvas with your ink still outlining its
 divs — then draw on that page and the ink addresses the regions underneath it.
 Scratch anything out to erase. `Demos/session-engine.html` is the surface;
-`Demos/session-engine.e2e.js` drives 208 records through the real UI (207 checks and one honest skip, 25d; headless with the shard's two scenarios via `node e2e/run.mjs` from `e2e/`, which CI runs): page, flowchart, handwriting (read only when asked; a line read as one), the model drawing, the user-side loop, selection and the field, corrections, the worker, the tank, words into verbs and acting out, frames and the drawn slider, the folder, pictures, text, the moment, a live room (and ids that hold in it: an undo sent, one sitting per page load, a doubled name and a truncated room said), a playing frame that takes the pointer, hold by long-press, the graph in 3D, and the foundations (letters at any size, a mark that crosses, readings that stay, the minimap), and the explanation plane's layout. A run takes about 100 s; run it **in its own tab on its own origin** (`http://127.0.0.1:8010/…?fresh=1&nosw=1` — `__setup` refuses any other URL: it replaces `fetch` with a stub, joins a stub model named `e2e-stub`, and wipes the origin's saved board), start it with `__setup(); __scenario().then(r => window.__R = r)` and read `__R` when it lands.
+`Demos/session-engine.e2e.js` drives 267 records through the real UI (266 checks and one honest skip, 25d, on 27 Sep; headless with the shard's three scenarios via `node e2e/run.mjs`, which CI runs): page, flowchart, handwriting (read only when asked; a line read as one), the model drawing, the user-side loop, selection and the field, corrections, the worker, the tank, words into verbs and acting out, frames and the drawn slider, the folder, pictures, text, the moment, a live room (and ids that hold in it: an undo sent, one sitting per page load, a doubled name and a truncated room said), a playing frame that takes the pointer, hold by long-press, the graph in 3D, and the foundations (letters at any size, a mark that crosses, readings that stay, the minimap), the explanation plane's layout, one Enter one act and what `fitAll` fits, labels (a hand's and a person's, on their own ink only), who made what, gestures per hand in a room, and a person the same across a reload. A run takes about 100 s; run it **in its own tab on its own origin** (`http://127.0.0.1:8010/…?fresh=1&nosw=1` — `__setup` refuses any other URL: it replaces `fetch` with a stub, joins a stub model named `e2e-stub`, and wipes the origin's saved board), start it with `__setup(); __scenario().then(r => window.__R = r)` and read `__R` when it lands.
 v7 Stage E (handwriting) shipped 1 Sep 2026: a word written beside a shape is read by a
 model that can see and offered as that shape's name. Whitepaper v5.1 stays parked until the
 conversation benchmark passes end to end.
@@ -127,6 +150,17 @@ Architecture documents (chronological; **read MVP.md, then v7, then v6**):
   a dependency, with five places it would fit in order of value; next steps
   — ids per hand (T8) first, then a review of use, a label primitive, the
   shard asking, the seat experiment, the paper's next figures
+- `DIRECTOR-PLAN-W1.md` — **week 1's pre-flight, 20 Sep 2026**: units
+  U1a–U8 (ids per hand, the relay's catch-up, the shard's pairing, a label,
+  the shard asking, the decision seat, housekeeping, the next figures, the
+  hand in the gate, a closing view), each with the command a machine runs to
+  check it, the invariant it is most likely to bend and the trap; its checks
+  are the ones week 2's L2 units were held to
+- `DIAGRAM-REVISION-PLAN.md` — **the whitepaper plates' visible states, 17
+  Sep 2026**: the handoff asking for every state of the seven plates at once
+  on a desktop and one state in focus on a phone; built in
+  `Assets/whitepaper-figures/` (`a449540`, on `master` since 26 Sep) though
+  its header still says *proposed*
 - `DIRECTOR-PLAN-W2.md` — **week 2, 26 Sep 2026**: what week 1's automated
   run left on `auto/w1` (not on `master`: U1a–U1c, U4 and half of U2 and U5
   integrated, the rest on attempt branches, the bundles drifted, two id
@@ -154,6 +188,12 @@ Architecture documents (chronological; **read MVP.md, then v7, then v6**):
   what daily use needs (boards, a versioned log, no lost work, budgets,
   first run, pencil, deploy); the ladder in eight phases, the units, how the
   agents run, and the release criteria
+- `PERF.md` — **the performance baseline, 27 Sep 2026** (V1-PLAN R4a):
+  the engine and the surface measured on generated boards of 500, 2,000 and
+  5,000 marks, every number with its command, the hotspots ranked with
+  file:line, and the budgets phase 0b holds itself to — with R4b's "after"
+  column: the engine holds all three boards (2,000 replay in 0.24 s, a
+  stroke in 0.15 ms, 12 MB), the surface is still as measured
 - `SHARD-3D-PUSH-2.md` — **geometry from the drawing, G0–G5 all landed
   16 Sep 2026**: what John's first real use showed (a footprint and elevations
   from free views stood nothing, and a brief with nothing to fill was refused
@@ -183,20 +223,20 @@ any structural change.
 
 | Path | What it is |
 |---|---|
-| `metamedium-core/` | **The canonical engine** (TypeScript, zero deps, tested): geometry, recognition (the shape rung), relations, the diagram rung (`src/diagram/`), concepts, the no-modes session engine, the layout and graph parsers, maths on a page (`src/maths/`: quantities, expressions, the sheet), and the LLM transport. New recognition/engine work lands HERE |
+| `metamedium-core/` | **The canonical engine** (TypeScript, zero deps, tested): geometry, recognition (the shape rung), relations, the diagram rung (`src/diagram/`), notations over it (`src/notations/`: the flowchart), concepts, the no-modes session engine, the layout and graph parsers, maths (`src/maths/`: quantities, expressions, the sheet, dimensions, solving figure by figure, true size and tiled print), the participants — a model's prompts and parsing, the router, the bridge, and **the decision seat** (`src/participants/decide.ts`, tier 1½; under *Tiered LLM Interpretation*) — and the LLM transport. New recognition/engine work lands HERE |
 | `index.html` | **Interactive whitepaper v5** "MetaMedium: AI Beyond Chat" (live on GitHub Pages). Fully on the `brand/` system as of 3 Sept 2026 — its `:root` is `brand/tokens.css` under the names this page already used, so change a value THERE first |
 | `brand/` | **The visual system, one home**: `tokens.css` holds every MetaMedium colour, face, size and figure/diagram token; `styleguide.html` is the living specimen (light paper first, IBM Plex Mono throughout, teal keyword, colour as signal, §11 figures and diagrams, §12 long-form furniture). v1 draft — the whitepaper's **figures** have migrated, the page around them has not; `brand/README.md` carries the four laws, the convergence order, and what applying it to the whitepaper taught the system |
 | `doodle2-canvas.html` | **Flagship demo**: heuristic recognition, spatial graph, library, undo/redo, touch. No LLM. Single-file (~500KB) |
 | `metadoodle1.html` | Fork of flagship + tiered LLM recognition (WebLLM in-browser, LM Studio local API) + voice. Single-file (~600KB) |
 | `Web App Skeleton/` | React + Vite + TypeScript + Zustand rebuild; Claude API interpreter skeleton in `src/llm/`; recognition/spatial/matching in `src/core/` |
-| `Demos/surface/` | **The reference surface's source**: `surface.css` and twenty-seven script fragments (`00-core`, `00-ui` … `20-controls`, `21-minimap`, `22-boards`, then `90-boot`, which must stay last), one concern each, concatenated in name order into one closure by `Demos/build-surface.mjs` → the committed `Demos/session-engine.js` (CI checks it has not drifted). Fragments share the closure's variables — no imports; each fragment's header says what it provides and uses. Edit a fragment, run the build, commit both. **`09-field.js` is the exception that proves the rule** (SEAM-1): it names nothing outside itself, so the field's query is a pure function of a record and is unit-tested in Node with no browser — `node --test Demos/surface/09-field.test.mjs`, in CI's `core` job. **`17-board.js` is the second** (V1-PLAN R3): the journal the board this browser keeps is written through, driven in Node by a store held in memory — `node --test Demos/surface/17-board.test.mjs`, in CI's `core` job too. **`17-boards.js` is the third** (R1): the list of boards — names, the trash, which board a page opens, whether the one on screen may be left — `node --test Demos/surface/17-boards.test.mjs`, also in CI. A fragment's `.test.mjs` is not concatenated into the build |
-| `Demos/` | **`session-engine.html` is the MVP surface** (it links `surface/surface.css` and loads `session-engine.js`) — infinite canvas, the taught command mark, living artifacts in a DOM overlay, ink-over-artifact addressing, "why" inspector, model participants, canvas answers. Uses the committed `metamedium-core.browser.js` bundle. **`session-engine.e2e.js`** drives the whole loop through the real UI with a stubbed model (browser console; not part of `npm test`). `build-standalone.mjs` inlines the bundle into a single shareable file. **`mcp.mjs`** is the MCP hand (Claude Code's way onto the board; `.mcp.json` at the root registers it), over `relay.mjs` and `live-node.mjs`, with `ink-png.mjs` for the ink as a picture and `mcp-smoke.mjs` as its stdio test; `metamedium-core.node.mjs` is the committed Node bundle it runs (`npm run build:node`, drift-checked in CI like the browser bundle). `programs/` holds `run` programs written for the canvas (`metamedium-explained.run.js`: the loop told as a program, ending on a real measurement of the viewer's own stroke). Plus fish, composition diagrams, no-modes graph, etc. |
+| `Demos/surface/` | **The reference surface's source**: `surface.css` and twenty-seven script fragments (`00-core`, `00-ui` … `20-controls`, `21-minimap`, `22-boards`, then `90-boot`, which must stay last), one concern each, concatenated in name order into one closure by `Demos/build-surface.mjs` → the committed `Demos/session-engine.js` (CI checks it has not drifted). Because they are one closure, the build and its `--check` refuse a name declared at the top of two fragments — the last would silently replace the first everywhere, which broke rendering once — reading the fragments as one strict block, so they must also compile as strict code (`Demos/build-surface.test.mjs`, in CI's `core` job). Fragments share the closure's variables — no imports; each fragment's header says what it provides and uses. Edit a fragment, run the build, commit both. **`09-field.js` is the exception that proves the rule** (SEAM-1): it names nothing outside itself, so the field's query is a pure function of a record and is unit-tested in Node with no browser — `node --test Demos/surface/09-field.test.mjs`, in CI's `core` job. **`17-board.js` is the second** (V1-PLAN R3): the journal the board this browser keeps is written through, driven in Node by a store held in memory — `node --test Demos/surface/17-board.test.mjs`, in CI's `core` job too. **`17-boards.js` is the third** (R1): the list of boards — names, the trash, which board a page opens, whether the one on screen may be left — `node --test Demos/surface/17-boards.test.mjs`, also in CI. A fragment's `.test.mjs` is not concatenated into the build |
+| `Demos/` | **`session-engine.html` is the MVP surface** (it links `surface/surface.css` and loads `session-engine.js`) — infinite canvas, the taught command mark, living artifacts in a DOM overlay, ink-over-artifact addressing, "why" inspector, model participants, canvas answers. Uses the committed `metamedium-core.browser.js` bundle. **`session-engine.e2e.js`** drives the whole loop through the real UI with a stubbed model (browser console; not part of `npm test`). `build-standalone.mjs` inlines the bundle into a single shareable file. **`mcp.mjs`** is the MCP hand (Claude Code's way onto the board; `.mcp.json` at the root registers it), over `relay.mjs` and `live-node.mjs`, with `ink-png.mjs` for the ink as a picture and `mcp-smoke.mjs` as its stdio test; `metamedium-core.node.mjs` is the committed Node bundle it runs (`npm run build:node`, drift-checked in CI like the browser bundle). **`relay.test.mjs`** is the relay's own test (`node --test Demos/relay.test.mjs`, in CI's `core` job): the catch-up as a pure function, and, over a real relay on a free port, the truncation line and three hands with one departed. `Demos/programs/` holds `run` programs written for the canvas (`metamedium-explained.run.js`: the loop told as a program, ending on a real measurement of the viewer's own stroke). Plus fish, composition diagrams, no-modes graph, etc. |
 | `skills/` | Claude Code skills: `metamedium-code` (code patterns), `metamedium-design` (design principles) |
-| `Assets/` | Figures and design rationale (recognition strategy, point-primitive proposal), and the social card. `make-card.mjs` regenerates that card from index.html's own hero — synthetic pointer input, so the picture shows the engine really reading a mark; `node Assets/make-card.mjs`. Change the picture and you must change the FILENAME and the four og:/twitter: tags in `index.html` and `404.html`, because scrapers cache by URL |
+| `Assets/` | Figures and design rationale (recognition strategy, point-primitive proposal), and the social card. `make-card.mjs` regenerates that card from index.html's own hero — synthetic pointer input, so the picture shows the engine really reading a mark; `node Assets/make-card.mjs`. Change the picture and you must change the FILENAME and the four og:/twitter: tags in `index.html` and `404.html`, because scrapers cache by URL. **`Assets/whitepaper-figures/`** is the whitepaper's seven graphic plates: `build.py` holds their content and geometry and emits the static blocks `index.html` carries between `whitepaper-plate:KEY` markers (`--check` says they are in sync), `figures.css` and `figures.js` style and enhance them with no build, and `e2e/whitepaper-figures.mjs` audits the real page; its README is the workflow |
 | `archive/` | Retired versions and superseded plans, incl. whitepaper v4 (root `MetaMedium_Whitepaper_v4.html` is a redirect stub — keep it) and PRDs v3.2/v4 |
-| `e2e/` | **The browser gate** (`DIRECTOR-REVIEW-2026-09-15.md`, QA-1): `node e2e/run.mjs` starts its own servers on free ports (a static one over the repo root, vite over `shard-3d`), opens a **fresh Chromium context per scenario**, loads the harnesses that already exist — `Demos/session-engine.e2e.js` (`__setup` + `__scenario`) and `shard-3d/e2e.js` (`__scenario`, `__demo`, `__demo2`) — and awaits the result object each one returns. It does not reimplement them. **Four scenarios** (`canvas`, `shard`, `demo`, `demo2`), 342 records and one honest skip as of 16 Sep 2026, in about 110 s. Pass, fail and **skip** are counted separately (a record whose name says it skipped is a skip); a failed assertion, a harness exception, an attempted request to a real model, or a page error not on the named allowlist in `guards.mjs` each exit nonzero, with structured JSON and a screenshot in `e2e/results/`. Chromium only so far — a WebKit smoke is still owed. **`keep`** (`e2e/keep.mjs`, V1-PLAN R3) is a scenario of its own that loads no harness: the kill test (the page crashed or closed at random points, reopened, every completed stroke there), a save forced to fail (storage full for real, a store the browser will not let the page use), the one import of browser storage's old board, two tabs, and the pages that must not write — in the default run, and on WebKit too (`--browser webkit keep`, where it can); since R1 the kill test keeps two boards and switches between them through the boards pane mid-session, killing right after a switch and in the middle of one too, and checks both. **`boards`** (`e2e/boards.mjs`, R1, in the default run) drives the boards pane with the real pointer: R3's board as the first entry, new, switch, reload and `?board=`, rename, duplicate, delete, restore, emptying the trash said first, a board open in another tab, one tab per board, the view per board, recent places, Reset, a board out as a file and back, and a board that is not saved never left without a word. **`big`** (opt-in, minutes) saves and reopens a 2,000-mark board. `e2e/README.md` has the rest |
-| `PERF.md`, `metamedium-core/bench/`, `e2e/perf.mjs` | **The performance baseline** (V1-PLAN §9 R4a, 27 Sep 2026): `bench/board.mjs` draws deterministic boards of 500, 2,000 and 5,000 marks from a seed (the generator is kept, never the boards); `bench/engine.mjs` times replay, memory, relations, the whole-board read, one more stroke, a live room's incoming line and a newcomer's hello; `e2e/perf.mjs`, beside the gate and on its servers and model guard, times the surface — open, pan, draw, release → reading drawn — in Chromium and WebKit; `bench/profile.mjs` reads a CPU profile back to `src/…:line` and the surface's fragments; `bench/report.mjs` prints `PERF.md`'s tables from the results. `PERF.md` has the answer (500 marks usable, 2,000 not, 5,000 does not open), every number with its command, the hotspots ranked with file:line, and budgets for R4b. Not in `npm test` or the gate |
-| `.github/workflows/ci.yml` | CI: typecheck + test + build for `metamedium-core` (incl. a bundle-drift check), `shard-3d` and `Web App Skeleton`, plus the **browser gate** (`e2e/run.mjs`, results uploaded on failure), on every push/PR |
+| `e2e/` | **The browser gate** (`DIRECTOR-REVIEW-2026-09-15.md`, QA-1): `node e2e/run.mjs` starts its own servers on free ports (a static one over the repo root, vite over `shard-3d`), opens a **fresh browser context per scenario**, loads the harnesses that already exist — `Demos/session-engine.e2e.js` (`__setup` + `__scenario`) and `shard-3d/e2e.js` (`__scenario`, `__demo`, `__demo2`) — and awaits the result object each one returns. It does not reimplement them. **Six scenarios** on Chromium by default (`canvas`, `keep`, `boards`, `shard`, `demo`, `demo2`): before R1 and the merge, 443 passing records and the one honest skip (27 Sep 2026: canvas 266, keep 31, shard 123 + 11 + 12), in about 170 s. **`smoke`** is opt-in and runs on WebKit (`node e2e/run.mjs --browser webkit smoke`, CI's `webkit` job): the board loads, ink drawn with real pointer input is read back, press-and-hold opens the field and one pill is taken — four checks in `run.mjs` itself, a WebKit smoke and not an iPhone test. Pass, fail and **skip** are counted separately (a record whose name says it skipped is a skip); a failed assertion, a harness exception, an attempted request to a real model, or a page error not on the named allowlist in `guards.mjs` each exit nonzero, with structured JSON and a screenshot in `e2e/results/`. Beside the gate, on its static server and never run by it or by CI: `e2e/perf.mjs` (the surface's half of `PERF.md`, numbers only) and `e2e/whitepaper-figures.mjs` (the plates' audit, Chromium and WebKit). **`keep`** (`e2e/keep.mjs`, V1-PLAN R3) loads no harness: the kill test (the page crashed or closed at random points, reopened, every completed stroke there), a save forced to fail (storage full for real, a store the browser will not let the page use), the one import of browser storage's old board, two tabs, and the pages that must not write — in the default run, and on WebKit where it can (`--browser webkit keep`); since R1 the kill test keeps two boards and switches between them through the boards pane mid-session, killing right after a switch and in the middle of one too, and checks both. **`boards`** (`e2e/boards.mjs`, R1, in the default run) drives the boards pane with the real pointer: R3's board as the first entry, new, switch, reload and `?board=`, rename, duplicate, delete, restore, emptying the trash said first, a board open in another tab, one tab per board, the view per board, recent places, Reset, a board out as a file and back, and a board that is not saved never left without a word. **`big`** (opt-in, minutes) saves and reopens a 2,000-mark board. `e2e/README.md` has the rest |
+| `PERF.md`, `metamedium-core/bench/`, `e2e/perf.mjs` | **The performance baseline** (V1-PLAN §9 R4a, 27 Sep 2026): `bench/board.mjs` draws deterministic boards of 500, 2,000 and 5,000 marks from a seed (the generator is kept, never the boards); `bench/engine.mjs` times replay, memory, relations, the whole-board read, one more stroke, a live room's incoming line and a newcomer's hello; `e2e/perf.mjs`, beside the gate and on its servers and model guard, times the surface — open, pan, draw, release → reading drawn — in Chromium and WebKit; `bench/profile.mjs` reads a CPU profile back to `src/…:line` and the surface's fragments; `bench/report.mjs` prints `PERF.md`'s tables from the results. `PERF.md` has the answer (500 marks usable, 2,000 not, 5,000 does not open), every number with its command, the hotspots ranked with file:line, and budgets for R4b — and, after R4b, the engine's numbers beside them. **R4b added** `bench/budgets.test.mjs` (`node --test`: the engine's budgets on the generated 2,000-mark board — replay ≤ 0.5 s, a stroke ≤ 4 / 16 ms, ≤ 150 MB — and the 5,000 board replays; each size in a process of its own, every run's numbers recorded in `dist/bench`) and `bench/equivalence.mjs` (every held log, a scripted log of the rarer acts and the 500-mark board replayed by the old engine — a committed bundle at `--ref` — and by `src/`, every reading and id compared, and what differs said). Not in `npm test` (`vitest.config.mjs` keeps `bench/` out) or the gate |
+| `.github/workflows/ci.yml` | CI, on every push/PR: typecheck + test + build for `metamedium-core` — with the drift check for both committed bundles, the MCP hand's smoke, the surface's drift check and its build's test, the field reader's, the relay's and the board journal's Node tests — `shard-3d` (with its MCP hand's smoke) and `Web App Skeleton` (with lint); the **browser gate** (`e2e/run.mjs` on Chromium); and the **WebKit smoke** in a job of its own. Both browser jobs upload `e2e/results` when they fail |
 
 ### Experiments (subordinate tier — see `EXPERIMENTS.md`)
 
@@ -212,7 +252,7 @@ not the product. Each entry's rationale and what it feeds back lives in
 | `test-llm.html` | Standalone LLM harness |
 | `manim-explainer/` | ~50s explainer video. Source + stills tracked; renders and `media/` cache gitignored (regenerate from the scripts) |
 | `playground.html` | Personal sandbox on the personal-site design language |
-| `shard-3d/` | **Live · the plan's MVP line (P0–P6) + the compass + the review's four shard packages + push 2 (G0–G5)** — a bounded MetaMedium for making things in space: ink on a plane read by the shape rung in that plane's own units, a form rung, solids as **op trees in the log** (the tree is the source, the mesh is derived), the diff as the brief, definitions and placements. **Push 2 is geometry from the drawing** (`SHARD-3D-PUSH-2.md`): the board goes out and comes back as its own core-format log; every free stroke is a **silhouette claim**, so a footprint plus ⊓ drawn from wherever the hand stood stands a **hull** at tier 1, in the volume its claims define; the hull is cut into **parts** with ids and a sentence each; the brief a small model can answer is 1048 characters and its reply names parts by id and never writes geometry; and `shard-3d/mcp.mjs` is the shard's own MCP hand **and the model seat** — Claude Code answers the parked brief and the shard applies it as it would a model's (`.mcp.json`, `metamedium-3d`). **`shard-3d/README.md` is the single source** for how it works, what it does not do, what core would need, and the fixtures; don't restate it here. `npm install && npm run dev` in `shard-3d/` (vite on :5174); `?demo=castle` runs the whole loop on John's own drawing at boot and `?fixture=<name>` loads a board from `shard-3d/fixtures/`; `npm test` is vitest on the pure rungs (555); the engine is imported from source, so there is no bundle to drift |
+| `shard-3d/` | **Live · the plan's MVP line (P0–P6) + the compass + the review's four shard packages + push 2 (G0–G5)** — a bounded MetaMedium for making things in space: ink on a plane read by the shape rung in that plane's own units, a form rung, solids as **op trees in the log** (the tree is the source, the mesh is derived), the diff as the brief, definitions and placements. **Push 2 is geometry from the drawing** (`SHARD-3D-PUSH-2.md`): the board goes out and comes back as its own core-format log; every free stroke is a **silhouette claim**, so a footprint plus ⊓ drawn from wherever the hand stood stands a **hull** at tier 1, in the volume its claims define; the hull is cut into **parts** with ids and a sentence each; the brief a small model can answer is 1048 characters and its reply names parts by id and never writes geometry; and `shard-3d/mcp.mjs` is the shard's own MCP hand **and the model seat** — Claude Code answers the parked brief and the shard applies it as it would a model's (`.mcp.json`, `metamedium-3d`). **`shard-3d/README.md` is the single source** for how it works, what it does not do, what core would need, and the fixtures; don't restate it here. `npm install && npm run dev` in `shard-3d/` (vite on :5174); `?demo=castle` runs the whole loop on John's own drawing at boot and `?fixture=<name>` loads a board from `shard-3d/fixtures/`; `npm test` is vitest on the pure rungs (605 in 31 files on 27 Sep); the engine is imported from source, so there is no bundle to drift |
 | `gliner-seat/` | **Parked with its answer, *not yet* (J2, 26 Sep 2026)** — can GLiNER2 be the middle layer's `extract` seat? It runs where MetaMedium runs: the one-graph ONNX export of `fastino/gliner2-multi-v1` (Apache-2.0) with a JS port of the library's processor, token-identical to the Python original; a line of a pattern page in 24 ms in a Chromium page on WebGPU, 55 ms in WebKit, 23 ms in a Node process. But it misses the names a seat would add (measurement names 7/11 at best, part names 6/9, operators 8/26), and a page pays 614 MB and ~2.2 GB of memory. `transport.mjs` is the seat's seam, shaped like `DecideTransport`, with a fake; `node --test gliner-seat/*.test.mjs` needs no model. `gliner-seat/README.md` has the numbers, the commands and what a later unit would need. Weights, venv and caches are never committed (`node fetch.mjs`). **Not in CI** |
 
 **Known duplication:** recognition logic still exists independently in
@@ -273,22 +313,42 @@ is the strongest single discriminator.** Rectangle ~1.0, circle ~0.79, triangle
 ~0.5. Corner count is fragile (miss one corner and a box becomes a triangle);
 extent holds regardless. This is what fixed "rectangles read as triangles".
 **The box is the tightest one at any angle** (rotating calipers over the
-hull), not the axis-aligned bounds: against those, a box tilted ten degrees
+hull, `tightestBox`), not the axis-aligned bounds: against those, a box tilted ten degrees
 filled ~80% and lost its snap offer, and at fifteen read half as a triangle.
-A hand rarely draws square to the screen.
+A hand rarely draws square to the screen. The same box is a rectangle's clean
+form (below), so a diamond — a square turned 45° — is read and redrawn as one.
+
+**An arc is known by its bow, not its straightness** (S1, `bowOf` in
+geometry.ts, `evenBowOf` in recognition.ts). Straightness — chord over path
+— is nearly blind to a bow: a 90° arc still scores 0.90 and a 30° one 0.99,
+so every arc under a half circle read as a line (a 140° arc was *line 0.63*).
+The bulge off the chord is not: it means a sweep (4·atan(2·bulge/chord)). A
+stroke **bows evenly** when it sweeps like an arc, its bulge is past what a
+hand's straight line bows **on screen** (a fixed-pixel rule about the hand,
+so it takes the scale), each half bows off its own chord as an arc's halves
+do (a bend's straight arms do not), it stays near the circle through its
+ends and bulge (a hook, a J, an S do not), and it turns no corners. That
+evidence lifts the arc and **the line gives way exactly as far**; measured
+on the denoised path, so a slow, wobbly straight line stays a line. The
+constants are `ARC_SWEEP`, `ARC_BULGE_PX`, `ARC_EVEN`, `ARC_RESIDUAL`.
 
 **The shape rung is closed: eight entries.** `line`, `arc`, `triangle`,
 `rectangle`, `circle`, and — because the rung above cannot do without them —
 `arrow` (a straight shaft with a barb that **draws back on it** — a wing
 turning past ninety degrees and at least a sixteenth of the stroke long;
 the hook a pen leaves at liftoff is neither, and used to make every tall
-*l* an arrow 0.6 — v10 F2),
+*l* an arrow 0.6 — v10 F2 — and a barb **short against its shaft**, its
+reach from the tip over the shaft's length, or a flick in the hand's space
+whatever the shaft: an L is two arms, and each L of a box drawn in two
+strokes used to be *arrow 0.59*. Its length, never its angle, is the
+discriminator — S1, `BARB_OF_SHAFT`, `BARB_FLICK_PX` — and the reading says
+it: *the barb 0.13 of the shaft*),
 `text` (writing, *without reading it*: open, turns many times, low and wide,
 mostly-empty box — enough to make a mark a `label`), and `dot`. **Below the
 hand's resolution (`HAND_RESOLUTION_PX`) only `dot` is offered**: a 5px blob has
 no measurable geometry, and reporting "circle 0.85" for it would be sensor noise
 dressed as evidence. A detector may return `meta` beyond its label — an arrow's
-tip and tail — which the session keeps as a `reading:<type>` rep so the rungs
+tip, tail and barb — which the session keeps as a `reading:<type>` rep so the rungs
 above can read direction as a fact.
 
 **Size-relative closure** (key innovation): a stroke closes if the start–end
@@ -344,7 +404,7 @@ what a definition is called.
 
 ### The maths of a mark
 
-> `metamedium-core/src/session/measure.ts` — `measure(node, nodes)`, `describeMaths`.
+> `metamedium-core/src/session/measure.ts` — `measure(node, nodes, board?)`, `describeMaths`.
 
 What follows from a reading, as numbers: a circle's centre, radius,
 circumference and area; a rectangle's sides, perimeter and area; a line's
@@ -371,6 +431,39 @@ measurement re-derives exactly what depends on it (`diffSheets`), and
 `gather.ts` collects the lines from text artifacts and read writing without
 touching the session. Tier 1: no model computes a number.
 
+**Dimensions and solving** (M3a, M4). `maths/dimension.ts` offers a number
+beside a mark as one of its measures, ranked by its distance to a side's
+middle *relative to the side's length* and by how squarely it sits across,
+with the reason and the runner-up; a number inside a closed mark is a piece
+label, a small square in a corner declares it right, a short line under a
+number that reaches nothing is its underline, and `sheetLines` leaves every
+number on a mark out of the page (`maths/writing.ts` reads the board's words
+once for both). The **figure** the solver works on — corners, sides and the
+marks that drew them — is filled by one closed stroke (`figureOfMark`) and,
+for lines meeting, by `polygonFigure`. Each drawing gets a unit (its labels',
+else the page's) and a scale that says how consistently its labels agree
+with the ink (`TO_SCALE_WITHIN`). `maths/solve.ts` works **one figure at a
+time, in closed form** — triangle, rectangle, circle, arc, parts summing to
+their whole — every derived value with its formula, and **an
+over-determined figure keeps every consistent reading and says what cannot
+hold and by how much** (*labelled 24; legs of 24 and 8 make it 25.30, 1.30
+longer (5%)*). A declared square is never dropped; a corner the ink measures
+right is only a reading (`RIGHT_ANGLE_TOLERANCE` in `measure.ts`); what the
+labels leave open is offered at the scale as the ink's. `solveBoard(state)`
+does the board (and checks a step's value on an edge with `checkWritten`);
+`measure(node, nodes, board)` speaks the drawing's unit for a mark with
+labels and is unchanged for one without.
+
+**True size and print** (M7). `maths/truesize.ts` draws solved figures at
+their real size as **a new SVG built from the numbers, never from the ink**
+— the root in paper units (`width="24.5in"`), the viewBox in the drawing's
+unit, each figure from the solver's first reading squared to the page,
+labels as written and a derived length a place finer than they were
+written — and `maths/print.ts` tiles it onto Letter or A4 at 100%, with
+overlap and ⊕ marks both neighbours print, grid labels, a map, and **a
+measured test square (1 in, or 2 cm) on every page**, because a printer
+scales without saying so.
+
 ### Clean forms: a confident reading, redrawn
 
 > `metamedium-core/src/session/clean.ts` — `snapReading`, `idealize`,
@@ -387,12 +480,26 @@ ink faint beneath it. **Ink is never replaced**; undo drops the rep. Three rules
   silently settle an argument the engine deliberately holds open. Only the
   engine's own reading counts — a model calling a box "a card" is a claim about
   meaning, not geometry.
-- **Built from the ink's own measurements**, never a template: bounds, the
-  three sharpest corners, the arrow's tip and tail, the arc's bulge. A slight
+- **Built from the ink's own measurements**, never a template: the three
+  sharpest corners, the arrow's tip, tail and barb, the arc's bulge. A slight
   oval stays an oval. `text` has no clean form — handwriting redrawn as a box
   is a lie about what was written.
+- **A box keeps its angle** (S1): its clean form is its tightest box at any
+  angle, so a diamond is redrawn as a diamond — as its upright bounds it was
+  a flowchart's decision turned into a process. Square to the screen within
+  the hand's wobble (`SQUARE_UP_DEG`) it is squared up to the bounds the ink
+  fills, exactly as before, when those hold it tightly (`BOUNDS_SLACK`), and
+  at its own size when they would grow it. **A bend is not a line**: a line
+  is offered only when its ink stands off the straight line through its ends
+  no further than a hand's line bows — half of a two-stroke diamond,
+  straightened, made the decision a triangle. **An arrow keeps its barb**,
+  at most a fifth of its shaft, so its clean form reads back as an arrow.
 - **Zero wrong snaps over the whole corpus** is pinned in `clean.bench.test.ts`,
-  alongside ≥95% offered for every drawable shape and 0% for writing.
+  alongside ≥95% offered for every drawable shape and 0% for writing — and,
+  since S1, turned boxes (every one drawn clean at its own angle), arcs of
+  30°–300°, and **every clean form, drawn again as ink, reads as the shape it
+  cleans**. The flowchart bench draws every board clean and reads it again:
+  every decision stays a decision.
 
 In the surface the offer is a dashed ghost under a qualifying mark **for a
 moment, not forever** (v10 F4): the mark just drawn, for a few seconds,
@@ -421,7 +528,13 @@ are asymmetric (~1:1.6), unlike anything in the canvas's vocabulary; and it is
 **A taught mark is held on the device** (`localStorage`, with the five samples
 it learned from) and re-taught into the session at boot as a `teach` event, so
 it replays like any other. Opening the pane with a mark held shows those five
-samples and offers *Forget*; teaching a new one means *Clear* first.
+samples and offers *Forget*; teaching a new one means *Clear* first. **A mark
+is its hand's** (V1-PLAN L2h): a `teach` sets the mark of the hand that
+taught it, and judges only that hand's strokes. Opening a board re-teaches
+the device's mark unless this hand's own log (the events with no `by`)
+already teaches one — another hand's teach says nothing about it — and the
+re-taught mark is this hand's, sent with its log (`openStore` in
+`17-folder.js`; a room's first merge used to drop it, e2e 46).
 
 - Features are **scale-free** (ratios, counts, and positions within the stroke's
   own box), so a mark works at any size and any zoom. Three are oriented.
@@ -527,6 +640,31 @@ floors** (`MAX_WIDEN`): five samples that disagree learned a band so wide
 the mark fired on ordinary writing; the teach pane warns below a
 consistency of 0.5.
 
+**Gestures are per hand** (V1-PLAN L2h; `handOf` and `Gestures` in
+`session.ts`, `session/gesture-hands.test.ts`, e2e 45–46). A loop that
+waits, a summon, the selection, why the last stroke missed, the taught
+mark and the look-back are each **one hand's**, held under the key its
+acts carry — `handOf`, the attribution a bless's maker gets: a person's
+act is theirs ("local" in another hand's log already reads as that hand),
+and a model's or the engine's is the act of the hand whose log holds it,
+so the shard's bless in the engine's name takes up its hand's summon and
+a model's loop waits for its hand. Every board keys one hand alike. So a
+hand's own next stroke dissolves its summon, and another hand's never
+does; its loop waits for its own check or double-tap whatever another
+hand draws meanwhile; the look-back grows the scope through its own
+recent marks only (what the mark *crosses* may be anyone's); another
+hand's loop, summon, selection or dismissal never opens, closes or
+changes the reader's. A mark that is erased leaves every hand's gestures,
+whoever erased it. The board's `summon`, `selection`, `pendingLassoId`,
+`markMiss`, `commandMark` and `recentIds` are its reader's own. **A hand is
+a sitting, not a person** (L2i): two tabs of one person draw independently,
+so his stroke in one never dissolves his field in the other, and a loop
+waiting in one waits for that tab's own check — though either may label
+what the other drew (*Live logs*). Two hands
+may now hold the same marks at once, and when both bless, each thing
+takes them — a mark can be part of two (the same on every board; which
+should win is not yet decided).
+
 **Erasing is relational, not gestural** (`src/session/erase.ts`): count
 crossings between the stroke and the target's own outline; three erases it. No
 speed, density, or size constant to tune, zoom-invariant, and it degrades
@@ -563,6 +701,29 @@ the edge and rep stay, `active: false`; `activeBindingsOf` never returns a
 tombstoned target, and undo of the erase makes it an anchor again, because
 state is a pure function of the log. P1-era logs replay into this
 representation unchanged. P3, bindings that follow, builds on it.
+
+**Ports by notation, heads, and figures of several strokes** (V1-PLAN E3;
+`session/ports.ts`, `diagram/heads.ts`, `diagram/figures.ts`). A notation that
+reads a mark as one of its symbols registers (`registerPorts`) and offers that
+symbol's ports — a point, or a segment or outline where the nearest point is
+the port — after the mark's own sites, through the same `magnetSites` /
+`nearestMagnet` / `magnetsNear` the pen asks, so the surface feels them
+unchanged. A place along a port binds as `along:<notation>`, its index its
+share of the port, and `siteOf` finds any bound site again where it stands
+now; with no notation registered every query equals a golden captured before
+the hook (`src/test/magnets.golden.ts`). `headsOf` reads what sits at each end
+of a line, an arrow or an arc — the arrow's own barb, a small triangle, diamond
+or circle touching the end on its axis, a separate chevron, a fill — hollow or
+filled, filled measured as ink coverage of the head's own inside, so a fast
+hatch and a head three times the size read alike; writing at an end is a
+label, not a head. `figuresOf` reads ruled strokes whose ends meet — tied by a
+magnet, or touching within the magnet radius — as one figure: a triangle, a
+quadrilateral (a diamond, said as one turned about 45°; a rectangle when its
+corners read right), a polygon. Each side keeps the marks it was drawn with,
+and each figure is the maths lane's own (`polygonFigure`), so
+`solveBoard(state, { figures: figuresOf(state) })` solves a triangle ruled in
+three strokes as it solves one drawn in one. All three are derived: nothing
+enters the log.
 
 ### Parsing: the drawing as a layout
 
@@ -711,6 +872,36 @@ makes it render as real DOM in the canvas. The rules:
   from a large box is not near it.
 - **Relations carry strength**, so a crisp row can be told from a rough one.
 
+**What is stored is what is read; the rest is computed for a scope** (R4b,
+27 Sep 2026). The five **engaging** relations — `contains`, `inside`,
+`crossing`, `touching`, `near` (`ENGAGING_KINDS`) — hold only between marks
+**within reach** of each other (`withinReach`: their boxes meet, or the gap is
+under `near`'s own limit, a ratio of the smaller mark); the other seven hold at
+any distance. So a new mark is related, as held edges, only to the marks
+within its reach, and for each such pair **every** relation `relate` finds is
+stored, how they sit included — the same edges in the same order as before. A
+pair out of reach stores nothing: above, left-of, same-row, same-column and
+same-size between marks a board apart (88% of a 2,000-mark board's edges, read
+by nothing but the brief) are computed **on demand for the scope that asks** —
+`session.read(ids)` relates its scope, and concepts, roles, notations, figures
+and the field read that. A signature reads only the engaging edges, which are
+all still stored. The marks within reach are found through a spatial index,
+`relate/grid.ts` (`MarkGrid`, exported, so a surface culls by the same
+index): a hierarchical grid whose cells are **sized from the marks** — each mark filed at the smallest power of two its own size
+fits in — asked for the boxes that meet a mark's box grown by `reachAround`;
+the index decides what is looked at, never what is true. The session keeps
+the content plane filed, and the **components** of the within-reach links with
+their cluster candidates: a mark added, taken away or moved finds only its own
+component again, a changed definition is scored against every component, and
+the list is rebuilt exactly where `recomputeClusterCandidates` ran before.
+Checkpoints share the rep and edge objects the live graph holds (none is ever
+changed in place). `metamedium-core/bench/equivalence.mjs` replays every held
+log, a scripted log of the acts the boards never make and the 500-mark board
+with the old and the new engine and says what reads differently (nothing; the stored out-of-reach relations and the brief's
+lines listing them are what changed), and `bench/budgets.test.mjs` holds
+PERF.md's engine budgets on the generated 2,000-mark board (`node --test`,
+this machine's, not CI).
+
 **Concepts** are the meaning-mappings, kept as a library rather than as code
 paths: `row`, `column`, `frame`, `flow`, `grid`, `labelled`. Each is a name, a
 predicate over relations, and a list of `conversions` it affords. They match
@@ -755,11 +946,35 @@ the drawn ink, cut at the tip so the head sits where the arrow pointed).
 relations, roles, genre and concepts together; the inspector's **ladder**
 (ink → shape → plays → code) is that reading, per mark.
 
+**Notations read over the roles** (V1-PLAN §3, D1; `notations/notation.ts`,
+`notations/flowchart.ts`, `notations/shape.ts`). A notation says what a
+scope's marks are in its own terms — the flowchart's process, decision,
+terminator, data, start and end, its flows and labels — and which of the six
+roles each symbol plays; it adds none (registering one that names a seventh
+throws). `notationsOf(state, scope?)` asks every registered notation, plural
+and ranked, and `describeNotation` says *a flowchart 0.78 — three processes,
+two decisions, …, eight flows*. Symbols are read by their **corners**,
+because the shape rung is blind to rotation by design (a rectangle's clean
+form keeps its angle since S1, but the rung's reading carries none): the four corners on the ink's hull and the share
+they hold, how upright its sides, how turned its diagonals (a decision's
+stand one plumb and one level), how its sides lean (data) — so a box drawn a
+little tilted stays a process. A diamond in two strokes is `figuresAmong`'s;
+one drawn as left and right halves quickly, which the letter rules gather
+into a word, is read from the word's own strokes. A flow's ends are read
+**past its heads** (`headsOf`'s `tip`), a magnet's bind first, and a small
+start dot that `headsOf` reads as a circle head is the start. Ports — a
+decision's vertices, a process's edge middles, a terminator's ends and sides
+— reach the pen through E3's hook only once `offerPorts('flowchart')` puts
+them in use. The content (names, roles, ports, Mermaid) is `FLOWCHART_TABLE`,
+bound for the `flowchart@1` pack (B3); `flowchart.bench.test.ts` is the
+bench. Derived: nothing enters the log.
+
 ### Spatial Graph — retired
 
 The old spatial graph (`spatial.ts`, with its fixed 50px "touching") is gone.
-`src/relate/relations.ts` is the one relation system: the session records its
-measured, scale-free relations on the node graph, clusters over them, and infers
+`src/relate/relations.ts` is the one relation system: the session records the
+measured, scale-free relations of marks within reach of each other on the node
+graph (found through `relate/grid.ts`), clusters over them, and infers
 wires (`connects`, plus `points-from`/`points-to` for arrows) with a tolerance
 relative to the target's own size. Legacy copies still exist for reference in
 `Web App Skeleton/src/core/spatial.ts` and `doodle2-canvas.html`.
@@ -800,6 +1015,21 @@ relative to the target's own size. Legacy copies still exist for reference in
   own and by a hand pressed inside; the field's *Show it in 3D*, and a
   definition that holds one is rebuilt for the next drawing, never copied
   — `GRAPH3D_MARK`) — **built**
+- **Tier 1½:** the decision seat (`participants/decide.ts`; `1.5` in
+  `Capability`, `session/nodes.ts`, so every ordering over tiers keeps
+  working) — **built in core, on no surface yet**. Typed questions in — a
+  *choice* among candidates the engine already holds, `no-match` always
+  among them; a *score* on levels the engine named; the probability of *yes*
+  for one statement — and a typed value with its whole distribution out,
+  held as one attributed row beside the engine's readings, never evicting
+  them, with the question and the distribution as its reason. A flat answer
+  is not held (`isFlat`). A batch is asked over one snapshot: what it says
+  about a board since replaced, or a mark since erased, is refused the
+  STATE-1 way, never written into the log. It sits
+  **behind an injectable transport** (`DecideTransport`;
+  `createStubDecideTransport` in its tests) — a seat, never a dependency:
+  nothing in `decide.ts` names a vendor or opens a socket, and with nobody in
+  the seat the engine answers from tiers 0 and 1
 - **Tier 2:** a model — local via Ollama (`localhost:11434/v1`) or LM Studio
   (`localhost:1234/v1`), hosted via OpenRouter or Anthropic with your own key
   — **built**. `providerLocality()` says which; the router asks local first
@@ -1106,13 +1336,18 @@ fingerprint carries it, so the model is asked to *read*, not to interpret.
   written, and the word gathers back the letter-like strokes written just
   before it. **Letters are letters by their run, not by an absolute size**
   (v10 F1): the cap (`LETTER_MAX_HEIGHT_PX`, 150) is a ceiling, and a
-  letter may stand up to `LETTER_HEIGHT_RATIO` (3.2) x-heights over its
+  letter may stand up to `LETTER_HEIGHT_RATIO` x-heights over its
   neighbours — the old cap of 44 px threw out every ascender a real hand
   makes (John's h, l and d were 72–88 px tall), so *hello* was five
   shapes and *world* gathered only its x-height letters. Found the hard way: at hand size, three bubbles and two lines
   drawn quickly are exactly a run of small strokes on one line, and the
   earlier rule folded the whole canonical loop into one word — after which
-  the lasso and the mark had nothing to act on.
+  the lasso and the mark had nothing to act on. **A word is one hand's
+  run** (V1-PLAN L2g, `absorbIntoWord`): the run is read over the marks
+  the new stroke's maker made, never the board's last mark whoever made
+  it, so the letters of two hands — or of a hand and a model — never
+  gather into one word, and the word is made by the hand that wrote its
+  letters, on every board (under *Live logs*).
 - `propose()` carries `reps` as well as edges, so a transcript is held through
   the same channel as every other reading and undo drops it.
 - **Writing gathers by nearness into a line** (v10 D3; the `writing`
@@ -1322,6 +1557,33 @@ carries a dropped event, and `load([])` never lower it. A tab opened on
 reload would carry it in again under a new name; the *live* tile brings
 the board you are on.
 
+**A person is the same person across sittings** (V1-PLAN L2i; `personOf`,
+`samePerson` and `Session.isMine` in `session.ts`, `session/label.test.ts`,
+e2e 47). A sitting is still a participant of its own
+(`participant:hand:<log name>`), so what a person drew before a reload is
+the earlier sitting's, as the panel and the card say. But **the rules that
+ask "is this mine?" compare the person** — the log name without its
+sitting's suffix (`handLabel`) — so every sitting of one person may label
+that person's marks, on every board: the reloaded tab labels what it drew
+before the reload, the earlier tab (still open) what the later one drew, a
+restarted MCP hand its own circle. Another person's marks are refused as
+before, with the reason. Before this, the rule compared the exact log name,
+and after a reload core told john *that mark was made by john*. This
+board's own hand is the person its log is written under (`logName`) — the
+same fact every other board reads off that log's name when it merges it —
+so every board agrees; a board never told its log's name is no sitting of
+anyone and compares hands exactly, as it always did. A model or the engine
+is no person and only ever itself. **What stays per sitting:** log names,
+ids and numbering (L1 — never reuse a number), gestures (L2h — two tabs of
+one person are two hands drawing independently) and a word's run of
+letters (L2g); the logs are never merged into one participant, or
+numbering could collide. **The trust
+model, plainly:** a name is self-asserted — there are no accounts — so
+treating one person's name as one person is the same trust the name and
+the colour already carry. It is not authentication: anyone who types
+*john* is john to the rules, as they already are in name and colour, and
+two hands that never gave a name are both *hand*.
+
 **A hand sends its log as it stands** (`LiveStore.publish`): the new tail
 as an append when the log only grew, the whole of it as a `full` when it
 did not — an undo, a reset — so **an undo reaches every peer**. A store's
@@ -1377,6 +1639,55 @@ hand, or what a shard tab drew before it joined a room (the shard names its
 log as it joins, `shard-3d/src/room.ts`) — keeps counter ids
 (`participant:N`), which a merge can renumber; nothing translates them.
 
+**An artifact is made by whoever blessed it** (V1-PLAN L2f; `applyBless`
+and `authorOf` in core, `session/label.test.ts` and `held.test.ts`, e2e 43).
+A bless used to write no maker, so every board read an artifact as its own
+reader's: the maker's label on her artifact was dropped on every other
+hand's replay, and any other hand could label it at its own door. Now a
+`bless` gets the attribution a stroke gets — "local" in another hand's log
+means that hand — so the label rule holds for things as it does for ink, on
+every board; the MCP hand's look says *by tab*; the panel's *by* row reads
+`authorOf` for every node. **Not who drew its marks**: a hand may bless a
+group several hands drew — the thing is the blesser's, and each mark stays
+its drawer's, drawn inside it in its drawer's colour (`inkOf`'s `byMaker`;
+a live page's gold is the one colour laid over all of them). **A bless is a
+person's act**: one in the engine's name — the shard stands a hull at tier
+1 inside its hand's act — is the hand's whose log holds it, and the engine
+keeps its name on the word. The `made-by` edge is written only for a maker
+other than the board's own hand, which `authorOf` reads from no edge at
+all, so a board's own blesses — every held log — replay node for node.
+
+**A word is made by whoever wrote its letters** (V1-PLAN L2g;
+`absorbIntoWord` in core, `session/label.test.ts`, e2e 44). The gathering
+wrote every word `made-by` the local participant, whoever wrote its
+letters, so on another hand's board her word read as the reader's: her
+label on it was dropped on every replay but her own, and that board could
+label it — while its letters were hers. Now a word names the maker its
+letters already carry, so the label rule holds for words as for ink, and
+the MCP hand's look says *by tab*. **A word is one hand's run**: the merge
+interleaves the hands' events by time, so the mark just before her next
+letter on the board may be his — taken for the last letter of her run, it
+joined her word (his letter printed beside hers) or broke it in two (his
+mark set between two of hers). The run is read over the marks the new
+stroke's maker made, so her letters gather into her word whoever drew in
+between, and the letters of two hands — or of a hand and a model — never
+gather into one. A board's own words name its own hand as they always did,
+so every held log replays node for node.
+
+**Gestures are per hand** (V1-PLAN L2h; under *Gestures*, e2e 45–46). The
+gesture state was one for the board while the merge interleaves the hands'
+events by time: another hand's stroke landing between a hand's summon and
+its bless dissolved the summon at the next merge, and the bless made
+nothing on any board — the blesser's own included, once her live board
+merged the room; set between a loop and its check, the loop was left
+untaken and the check read backwards, holding the loop's own ink; and one
+hand's loop and check opened every other board's field. Now each hand's
+gestures are keyed as authorship is, so the same hand keys alike from its
+own board (the local participant) and from every other
+(`participant:hand:<name>`). **A folder opened with no reader** stamps no
+`by`, so every log in it is the reader's own there — one hand's gestures,
+as its authorship already was.
+
 ### The MCP hand: Claude Code on the board (v10 T2)
 
 > `Demos/mcp.mjs` (the server), `Demos/live-node.mjs` (the relay as a
@@ -1404,9 +1715,10 @@ written by hand, so the repo takes no dependency; it imports the committed
 Node bundle `Demos/metamedium-core.node.mjs`. In the canvas: the *live*
 tile → *with Claude*, or `?live=claude&relay=http://127.0.0.1:8020`. Its
 ink arrives as its own log, stamped `by` on arrival, in its own colour. It
-is one sitting, named per process (`sittingName`), and `canvas_look` leads
-with what the room says about itself — a name two hands share, a history
-older than the relay remembers (`LiveStore.notices`).
+is one sitting, named per process (`sittingName`) — a restart is a new hand
+and the same person, so it may label what it drew before (L2i, the smoke) —
+and `canvas_look` leads with what the room says about itself — a name two
+hands share, a history older than the relay remembers (`LiveStore.notices`).
 **In a session without the tools loaded** (the `.mcp.json` was added after
 the session began), the hand still works from the shell: run `mcp.mjs` with
 its stdin fed by `tail -f` on a command file and its stdout to an output
@@ -1475,17 +1787,24 @@ awaited and the seat silently never took while the room joined fine.
 
 ### A label: a hand's word on its own ink (V1-PLAN L2b, L2e)
 
-> `session.label` / `labelOf` / `labelsOf` in core (`session/label.test.ts`);
-> `renderLabels` in `Demos/surface/08-render.js`; `canvas_label` in
-> `Demos/mcp.mjs`; the person's door — `readLabel` and `typedWord` in
-> `Demos/surface/09-field.js`, `labelMarks` and `labelItem` in `09-palette.js`
-> (e2e 42).
+> `session.label` / `session.isMine` / `labelOf` / `labelsOf` in core
+> (`session/label.test.ts`); `renderLabels` in `Demos/surface/08-render.js`;
+> `canvas_label` in `Demos/mcp.mjs`; the person's door — `readLabel` and
+> `typedWord` in `Demos/surface/09-field.js`, `labelMarks`, `labelItem` and
+> `whoseInk` in `09-palette.js` (e2e 42, 47).
 
 **Whoever made a mark may put a word on it; nobody else may.** Naming a mark
 someone else made is blessing it, the human's act; labelling your own ink is
 not (the notes, §B). A `label` event holds the word as a rep on the mark,
-attributed; it replays and undoes; an empty word takes it off; another hand's
-label on my mark is refused at the door (`not-your-ink`) and dropped on replay.
+attributed; it replays and undoes; an empty word takes it off; another
+person's label on my mark is refused at the door (`not-your-ink`) and dropped
+on replay. A mark's maker is the hand that drew it; an artifact's is whoever
+blessed it, and a word's the hand that wrote its letters, on every board (L2f
+and L2g, under *Live logs*). **"Whoever" is the person, not the sitting**
+(L2i): a reload is a new hand and the same person, so the marks drawn before
+it are still the person's to label — `session.isMine(id)` is the door's
+question, and the field asks it too, so the line before Enter and the door
+never disagree.
 **It is not a bless and not a file** (§D): no `word` rep, no artifact, no
 library entry, no card in the grid, never a name the matcher learns.
 
@@ -1643,13 +1962,16 @@ npm test         # full suite incl. the canonical-loop scenario (keep green)
 npm run typecheck
 npm run build    # ESM + d.ts → dist/
 npm run build:browser  # IIFE bundle; a copy is committed at Demos/metamedium-core.browser.js
+npm run build:node     # ESM bundle for Node; a copy is committed at Demos/metamedium-core.node.mjs
 ```
 
-After engine changes, rebuild the browser bundle and re-copy it to `Demos/`
-(`Demos/session-engine.html` is the live reference surface) — CI fails if the
-committed copy drifts from source. After surface changes, run
+After engine changes, rebuild both bundles and re-copy them to `Demos/`
+(`Demos/session-engine.html` runs the browser one; the MCP hand, the relay's
+test and the smokes run the Node one) — CI fails if either committed copy
+drifts from source. After surface changes, run
 `node Demos/build-surface.mjs` and commit `Demos/session-engine.js` with the
-fragments — CI checks that too.
+fragments — CI checks that too, and the build refuses a name declared at the
+top of two fragments.
 
 `src/session/session.scenario.test.ts` is the executable spec for the
 no-modes flow (lasso → check → summon → bless → artifact). Change it knowingly
