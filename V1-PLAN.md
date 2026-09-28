@@ -2138,6 +2138,17 @@ it and Enter keeps the ask (J5's), said in the field, no pane (55d). The
 records that took *Read the writing* on writing alone (e2e 30, 34, 35; models
 M5; seat J4.3) take the one option; their assertions are unchanged.
 
+*U1a status, 28 Sep 2026: built on `claude/friendly-galileo-g1z8wo`* — the red
+commit (e2e 56–56c: after a stroke the panel said `id stroke:…`, `tier 0 ·
+shape`; after a hold, the roles by id; no details) and the commit carrying this
+line. `10-inspector.js` leads with `markSummary` — *is* and *becomes* in plain
+words, and the act at hand — and puts the inspector behind *details*
+(`inspectDetails`), closed and remembered per device; the tank's and a
+script's clock stay above it, being acts. The bar's toggle says *panel ▾*.
+Found on the way: a short panel no longer docked as a wall, so `fitAll` put a
+mark under it (e2e 41e) — `chromeRects` (`01-view.js`) now measures the panel
+at the height it may grow to.
+
 ### Phase 7 — review and release
 **H1** — week 1's U7 (the `hand` gate scenario) plus `QA-v1.md`, a hand
 checklist for A1–A10 with the MCP hand in the room checking each step.

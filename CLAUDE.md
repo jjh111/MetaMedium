@@ -1869,10 +1869,17 @@ and the dark set on `[data-theme="dark"]`, the page stamps one of the two
 (*system* follows the OS until the tile says otherwise), and the canvas reads
 its colours from the same tokens (`readColours`), so ink and chrome never
 disagree. The panel that reports on the last or hovered mark tucks under the
-bar, scrolls, and collapses as a whole (*details ▾*, remembered per device;
-closed by default on narrow screens). Its labels are plain — *mark*,
-*reading*, *read as*, *maths*, *measured*, *selection*, *roles*,
-*relations*. **On an empty board it shows the loop instead of "nothing here
+bar, scrolls, and collapses as a whole (*panel ▾*, remembered per device;
+closed by default on narrow screens). **It speaks to the person first**
+(PLAN-USER-SURFACE U1a; `markSummary` in `10-inspector.js`): what the mark,
+the thing or the selection *is* and what it *becomes*, in two or three plain
+lines — no id, no tier, no coordinate — with the act at hand (*draw it
+clean*, *read it*, a clock's *play*). The inspector — ids, tiers, the
+ladder, *read as*, relations, *maths*, *measured*, roles — is behind
+**details**, closed by default and remembered on this device
+(`mm-inspect`). Its room is its own however little it says: the free ground
+measures the panel at the height it may grow to (`chromeRects` in
+`01-view.js`), or a short panel floated and the fit put marks under it. **On an empty board it shows the loop instead of "nothing here
 yet"** (UI-2): *draw a few marks → press and hold one → choose what it
 becomes*, three lines in the panel's own plain voice, replaced by the first
 mark's reading the moment one is drawn — the actionable start used to live

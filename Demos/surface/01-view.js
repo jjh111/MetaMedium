@@ -141,7 +141,19 @@
       const cs = getComputedStyle(el);
       if (cs.display === 'none' || cs.visibility === 'hidden') continue;
       const r = el.getBoundingClientRect();
-      if (r.width > 0 && r.height > 0) out.push({ id: id, left: r.left, top: r.top, right: r.right, bottom: r.bottom });
+      if (!(r.width > 0 && r.height > 0)) continue;
+      let top = r.top, bottom = r.bottom;
+      // The panel's room is its own however little it says now (U1a): measured at the height it
+      // may grow to, so a short panel docks as the wall it becomes the next moment, and the board
+      // never fits marks under it. A column grows down; a band along the bottom grows up.
+      if (id === 'inspector') {
+        const mh = parseFloat(cs.maxHeight);
+        if (mh > 0) {
+          const band = r.width > (window.innerWidth || r.width) * 0.6;
+          if (band) top = Math.min(top, r.bottom - mh); else bottom = Math.max(bottom, r.top + mh);
+        }
+      }
+      out.push({ id: id, left: r.left, top: top, right: r.right, bottom: bottom });
     }
     return out;
   }

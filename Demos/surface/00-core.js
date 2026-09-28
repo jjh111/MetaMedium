@@ -101,7 +101,8 @@
   let panelOpen = (() => { try { const v = localStorage.getItem(PANEL_KEY); return v === null ? innerWidth > 820 : v === 'open'; } catch (err) { return true; } })();
   function syncPanel() {
     document.body.classList.toggle('panelHidden', !panelOpen);
-    panelToggle.textContent = panelOpen ? 'details ▾' : 'details ▸';
+    // The bar's toggle shows or hides the whole panel; "details" is the inspector inside it (U1a).
+    panelToggle.textContent = panelOpen ? 'panel ▾' : 'panel ▸';
     panelToggle.setAttribute('aria-expanded', String(panelOpen));
   }
   panelToggle.onclick = () => { panelOpen = !panelOpen; try { localStorage.setItem(PANEL_KEY, panelOpen ? 'open' : 'closed'); } catch (err) { /* private mode */ } syncPanel(); };

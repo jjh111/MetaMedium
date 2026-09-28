@@ -1,5 +1,7 @@
 // ===== inspector =====
-// Provides: the panel: a mark, an artifact, a word, the selection.
+// Provides: the panel: a mark, an artifact, a word, the selection — what it is and what it can become
+//   in plain words first, and the inspector (ids, tiers, relations, measures) behind details, closed by
+//   default and remembered on this device (PLAN-USER-SURFACE U1a: markSummary, inspectDetails).
 // Uses: core, render (readRungs, logKey, paintReference), snap, handwriting, models,
 //   palette (contextFor, paletteItems, afforded — what stands beside a selection, and what it put first),
 //   packs (packSaid — a definition from a library pack says its pack).
@@ -106,8 +108,13 @@
     // Who made it: a mark's drawer, an artifact's blesser — never who drew its marks (V1-PLAN L2f).
     const author = authorOf(node);
     const authorName = nameOfParticipant(author);
-    let html = '<div class="eyebrow">' +
+    const eyebrow = '<div class="eyebrow">' +
       (isLive ? (codeKindOf(node) === 'html' ? 'living page' : 'living ' + codeKindOf(node)) : isArtifact ? 'artifact' : isWordNode ? 'word' : 'mark') + '</div>';
+    // What the person reads first (U1a): what it is and what it can become, in a few plain
+    // lines. Everything the engine holds about it — ids, tiers, relations, measures — is
+    // below, behind details.
+    let top = markSummary(s, node, id, { isArtifact: isArtifact, isLive: isLive, isWordNode: isWordNode, author: author, authorName: authorName });
+    let html = '';
 
     html += '<div class="row"><span class="k">id</span><span class="v">' + esc(id) + '</span></div>';
     html += '<div class="row"><span class="k">by</span><span class="v ' +
@@ -166,9 +173,9 @@
         html += '<div class="acts">' + (kind === 'text' ? '<button class="mini" data-act="edit-text" data-id="' + esc(id) + '">edit the words</button>' : '') +
           '<button class="mini" data-act="export-code" data-id="' + esc(id) + '">save as .' + esc(kind === 'text' ? 'txt' : kind) + '</button></div>';
       }
-      // The clock: nothing runs until a hand plays it, and a stop says why.
+      // The clock: nothing runs until a hand plays it, and a stop says why. An act, so it stands above details.
       if (kind === 'js') {
-        html += clockRows(s, id);
+        top += clockRows(s, id);
       }
     }
     // A frame: what it holds and how it is wired, each connection with its reason and what it carries now.
@@ -195,11 +202,12 @@
     // A definition without code has a clock too: play, and its instances move
     // by the built-in behaviour until words or a hand give it another.
     if (isArtifact && !codes.length && !MM.isFrame(node)) {
-      html += '<div class="sep"></div><div class="eyebrow">tank</div>';
+      // The tank is played and told how to behave by hand: it stands above details.
+      top += '<div class="sep"></div><div class="eyebrow">tank</div>';
       const inst = tankCount(s, id);
-      html += '<div class="row"><span class="k">bodies</span><span class="v">' + inst.total + (inst.held ? ' (' + inst.held + ' held, unblessed)' : '') + '</span></div>';
-      html += clockRows(s, id);
-      html += behaviourRows(s, node, id);
+      top += '<div class="row"><span class="k">bodies</span><span class="v">' + inst.total + (inst.held ? ' (' + inst.held + ' held, unblessed)' : '') + '</span></div>';
+      top += clockRows(s, id);
+      top += behaviourRows(s, node, id);
     }
 
     // THE LADDER. Every rung a mark has climbed, with why at each one — ink,
@@ -357,7 +365,67 @@
         '<div class="row"><span class="k">size</span><span class="v">' + Math.round(fp.size) + 'px</span></div>';
     }
 
-    showPanel(html);
+    showPanel(eyebrow + top + inspectDetails(html));
+  }
+
+  // ===== The panel for the person, the inspector behind details (PLAN-USER-SURFACE U1a) =====
+  // The panel opened itself after the first stroke as an inspector: an id, a tier, the
+  // relations by id, coordinates. Those are the engine's view, and stay one tap away —
+  // behind details, closed by default and remembered on this device.
+  const INSPECT_KEY = 'mm-inspect';
+  let inspectOpen = store.get(INSPECT_KEY) === 'open';
+  function inspectDetails(body) {
+    return body ? '<details class="inspect"' + (inspectOpen ? ' open' : '') + '><summary>details</summary>' + body + '</details>' : '';
+  }
+  inspectorEl.addEventListener('toggle', (e) => {
+    const d = e.target;
+    if (!d || !d.classList || !d.classList.contains('inspect')) return;
+    inspectOpen = d.open;
+    store.set(INSPECT_KEY, inspectOpen ? 'open' : 'closed');
+  }, true);
+
+  /** "a circle", "an arrow", "a box": a shape the rung read, with its article. */
+  function aShape(label) {
+    const words = { text: 'writing', rectangle: 'box' };
+    const w = words[label] || label;
+    return w === 'writing' ? w : (/^[aeiou]/.test(w) ? 'an ' : 'a ') + w;
+  }
+
+  /** Two or three plain lines: what this is, and what it can become — the words the person reads first. */
+  function markSummary(s, node, id, o) {
+    const row = (k, v) => '<div class="row"><span class="k">' + esc(k) + '</span><span class="v">' + esc(v) + '</span></div>';
+    let out = '';
+    if (o.isArtifact) {
+      const members = node.edges.filter((e) => e.rel === 'has-part').length;
+      const name = MM.wordOf(node);
+      const rep = codeRepOf(node);
+      const kind = rep ? (rep.data.kind || 'html') : null;
+      const what = !rep ? 'a thing you named' : kind === 'html' ? 'a page' : kind === 'run' ? 'a program' : kind === 'text' ? 'text' : kind === 'png' || kind === 'jpg' ? 'a picture' : 'a ' + kind + ' file';
+      out += row('is', (name ? '“' + name + '”, ' : '') + what + (members ? ' made of ' + members + ' mark' + (members === 1 ? '' : 's') : '') + (o.author !== MM.LOCAL_PARTICIPANT ? ', by ' + o.authorName : ''));
+      out += row('becomes', !rep ? 'another drawing like it is offered as one · a brief builds on it · its tank plays' : 'draw over it to change a part · a brief is a new version');
+      return out;
+    }
+    const shapeRead = MM.interpretationsOf(node, s.nodes).filter((r) => r.tier === 0 && r.basis !== 'label')[0];
+    const writing = o.isWordNode || (!!shapeRead && shapeRead.label === 'text');
+    const said = MM.transcriptsOf(node)[0];
+    let is = writing ? (said ? 'writing that says “' + said.text + '”' : 'writing, not read yet')
+      : shapeRead ? (shapeRead.weight >= 0.7 ? aShape(shapeRead.label) : shapeRead.weight >= 0.5 ? 'probably ' + aShape(shapeRead.label) : 'not clear yet — maybe ' + aShape(shapeRead.label)) : 'a mark';
+    const lab = MM.labelOf(node);
+    if (lab) is += ', labelled “' + lab.text + '”';
+    if (o.author !== MM.LOCAL_PARTICIPANT) is += ', drawn by ' + o.authorName;
+    out += row('is', is);
+    const clean = MM.cleanOf(node), offer = snapOffers.get(id);
+    const next = [];
+    if (writing) next.push(said ? 'text' : 'read', 'a name', 'a label');
+    else {
+      if (!clean && offer) next.push('a clean ' + aShape(offer.shape).replace(/^an? /, ''));
+      next.push('a name', 'part of a page or a diagram');
+    }
+    out += row('becomes', next.join(' · ') + ' — press and hold it to choose');
+    if (clean) out += '<button class="mini" data-act="raw" data-id="' + esc(id) + '">show the ink</button>';
+    else if (offer && !writing) out += '<button class="mini" data-act="snap" data-id="' + esc(id) + '">draw it clean</button>';
+    if (writing && !said && seeing().length) out += '<button class="mini" data-act="read" data-id="' + esc(id) + '">read it</button>';
+    return out;
   }
 
   /**
@@ -399,9 +467,11 @@
     const key = logKey() + '|' + sum.enclosedIds.join(',');
     if (paintReference || scopeRead.key !== key) scopeRead = { key: paintReference ? null : key, reading: session.read(sum.enclosedIds) };
     const reading = scopeRead.reading;
-    let html = '<div class="eyebrow">selection</div>';
+    // What the person reads first (U1a): what is held, what it becomes, and what stands beside it.
+    let top = '<div class="eyebrow">selection</div>';
+    let html = '';
 
-    html += '<div class="row"><span class="k">holds</span><span class="v">' +
+    top += '<div class="row"><span class="k">holds</span><span class="v">' +
       sum.enclosedIds.length + ' mark' + (sum.enclosedIds.length === 1 ? '' : 's') + '</span></div>';
     html += '<div class="row"><span class="k">scope</span><span class="v">' + esc(sum.scopeSource) + '</span></div>';
     html += '<div class="why">' + esc(sum.scopeReasoning) + '</div>';
@@ -412,17 +482,17 @@
     }
     // Where this stands on the map of becoming, and the rung after it (SURFACE-v10-PLAN §4).
     const rung = becomesOf(s, sum, reading);
-    if (rung) html += '<div class="row"><span class="k">becomes</span><span class="v">' + esc(rung.here + ' → ' + rung.next) + '</span></div>';
+    if (rung) top += '<div class="row"><span class="k">becomes</span><span class="v">' + esc(rung.here + ' → ' + rung.next) + '</span></div>';
     // What stands beside it, and what that put first (V1-PLAN §2.2). Said only
     // when something does: far from any context the panel is as it was.
     const beside = contextFor(sum.enclosedIds);
     if (!MM.isEmptyContext(beside)) {
       MM.describeContext(beside).slice(0, 3).forEach((line, i) => {
-        html += '<div class="row"><span class="k">' + (i ? '' : 'beside') + '</span><span class="v">' + esc(line) + '</span></div>';
+        top += '<div class="row"><span class="k">' + (i ? '' : 'beside') + '</span><span class="v">' + esc(line) + '</span></div>';
       });
       const lead = paletteItems.find(afforded);
       if (lead && lead.because && lead.because.length) {
-        html += '<div class="row"><span class="k">first</span><span class="v">' + esc(lead.label) + '</span></div>' +
+        top += '<div class="row"><span class="k">first</span><span class="v">' + esc(lead.label) + '</span></div>' +
           '<div class="why">' + esc('because ' + lead.because.join('; ')) + '</div>';
       }
     }
@@ -481,7 +551,7 @@
       if (strongest) html += '<div class="why">' + esc(strongest.kind + ': ' + strongest.reasoning) + '</div>';
     }
 
-    showPanel(html);
+    showPanel(top + inspectDetails(html));
   }
 
   // Debug handle. This is a reference surface for the engine, so reading the

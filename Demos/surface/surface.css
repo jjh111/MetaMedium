@@ -347,6 +347,9 @@ body.panelHidden #inspector { display: none; }
 #inspector .slider input[type=range] { grid-column: 1 / 2; width: 100%; accent-color: var(--gold); }
 #inspector .slider .v { grid-column: 2; grid-row: 1 / 3; font-family: var(--mono); font-size: 10px; color: var(--dim); }
 #inspector .slider .why { grid-column: 1 / 3; }
+/* The inspector behind details (U1a): the engine's view, one tap from the person's. */
+#inspector details.inspect { margin-top: 8px; border-top: 1px solid var(--rule); padding-top: 4px; }
+#inspector details.inspect > summary { cursor: pointer; font-size: 10px; color: var(--dim); letter-spacing: 0.06em; text-transform: uppercase; margin: 4px 0; }
 #inspector details.src summary { cursor: pointer; font-size: 10px; color: var(--dim); letter-spacing: 0.06em; text-transform: uppercase; margin: 6px 0 2px; }
 #inspector details.src pre { font-family: var(--mono); font-size: 10px; white-space: pre-wrap; margin: 0 0 6px; color: var(--ink); opacity: 0.85; }
 

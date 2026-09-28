@@ -3619,7 +3619,7 @@ window.__scenario = async function(){
     const afterStroke56 = said56();
     const inspect56 = document.querySelector('#inspector details.inspect');
     step('56. after a stroke the panel says what the mark is and what it can become, in the user\'s words — no id, no tier, no coordinate; the inspector is behind details, closed',
-      clean56(system56(afterStroke56)) && /becomes|could become|can become/.test(afterStroke56) && !!inspect56 && !inspect56.open && /\bid\b/.test(inspect56.textContent),
+      clean56(system56(afterStroke56)) && /becomes|could become|can become/.test(afterStroke56) && !!inspect56 && !inspect56.open && [...inspect56.querySelectorAll('.k')].some((k) => k.textContent === 'id'),
       { said: afterStroke56.slice(0, 300), system: system56(afterStroke56), details: !!inspect56, open: inspect56 && inspect56.open });
     const on56 = mm.worldToScreen(260, 200);
     const c56 = document.getElementById('canvas');
