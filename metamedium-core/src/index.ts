@@ -474,6 +474,14 @@ export {
 } from './notations/uml-class';
 export type { UmlClassReading, UmlClassSymbol, UmlCompartment, UmlMember, UmlRelation, UmlRelationEnd, UmlMarker } from './notations/uml-class';
 export { stanceOf, cornersOf, tightBox } from './notations/shape';
+// Dashed lines (V1-PLAN §3, D5) — short straight strokes in a row read as one
+// line, derived like figures: each dash's ends in the row's corridor, each a
+// gap from the next, and nothing a letter's size touching a dash but at the
+// row's ends nor standing in a gap — so printed capitals, whose bars join
+// their stems, never read as one. `dashedHeads` asks heads.ts what sits at
+// each end, on a scratch board where the row is one stroke.
+export { dashedLines, dashedHeads, DASH_PX, DASH_BOW, DASH_PATH, DASH_OFF, DASH_OFF_PX, DASH_GAP, DASH_GAP_PX, DASH_OVERLAP, DASH_SPREAD, MIN_DASHES, SMALL_MARK, DASH_TOUCH, DASH_TOUCH_PX, CROSSING_DEG, HEAD_OF } from './notations/dashes';
+export type { DashedLine } from './notations/dashes';
 export type { QuadStance } from './notations/shape';
 // Mermaid out (V1-PLAN §3, D2) — a notation reading said as Mermaid text at
 // tier 1, by the writer its notation registered (the flowchart's ships; D4–D6

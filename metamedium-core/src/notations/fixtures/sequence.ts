@@ -139,9 +139,10 @@ export function handPath(vertices: readonly Point[], o: { jitter?: number; seed?
 }
 
 /**
- * A dashed line from `a` to `b`, as a hand dashes one: strokes `dash` long
- * and `gap` apart, each a little longer or shorter than the last. Each is its
- * own stroke; the last stops where the line does.
+ * A dashed line from `a` to `b`, as a hand dashes one: strokes about `dash`
+ * long and `gap` apart — each a little longer or shorter than the last, the
+ * row spaced to end where the line does — every one its own quick flick,
+ * which wobbles no more than its length lets it.
  */
 export function dashesAlong(a: Point, b: Point, o: { dash?: number; gap?: number; seed?: number; jitter?: number } = {}): Point[][] {
   const dash = o.dash ?? 13, gap = o.gap ?? 9, seed = o.seed ?? 1;
@@ -149,19 +150,21 @@ export function dashesAlong(a: Point, b: Point, o: { dash?: number; gap?: number
   const L = Math.hypot(b.x - a.x, b.y - a.y);
   const u = { x: (b.x - a.x) / L, y: (b.y - a.y) / L };
   const n = { x: -u.y, y: u.x };
+  const count = Math.max(1, Math.round((L + gap) / (dash + gap)));
+  const lens = Array.from({ length: count }, () => dash * (0.8 + 0.4 * r()));
+  const gaps = Array.from({ length: count - 1 }, () => gap * (0.75 + 0.5 * r()));
+  const k = L / (lens.reduce((x, y) => x + y, 0) + gaps.reduce((x, y) => x + y, 0));
   const out: Point[][] = [];
-  let at = 0, k = 0;
-  while (at < L - 4) {
-    let len = dash * (0.8 + 0.4 * r());
-    // The last dash runs to the end rather than leaving a fleck there.
-    if (at + len + 0.8 * gap + 0.6 * dash > L) len = L - at;
-    const off0 = (r() - 0.5) * 1.6, off1 = (r() - 0.5) * 1.6;
+  const jitter = Math.min(o.jitter ?? 0.8, 0.08 * dash);
+  let at = 0;
+  lens.forEach((len0, i) => {
+    const len = len0 * k;
+    const off0 = (r() - 0.5) * 0.12 * dash, off1 = (r() - 0.5) * 0.12 * dash;
     const p = { x: a.x + u.x * at + n.x * off0, y: a.y + u.y * at + n.y * off0 };
     const q = { x: a.x + u.x * (at + len) + n.x * off1, y: a.y + u.y * (at + len) + n.y * off1 };
-    out.push(handLine(p, q, { seed: seed * 50 + k, jitter: o.jitter ?? 0.8, density: 0.6 }));
-    at += len + gap * (0.8 + 0.4 * r());
-    k++;
-  }
+    out.push(handLine(p, q, { seed: seed * 50 + i, jitter, density: 0.6 }));
+    at += len + (gaps[i] ?? 0) * k;
+  });
   return out;
 }
 
