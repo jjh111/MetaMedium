@@ -608,7 +608,9 @@ function readEnd(conn: Connector, e: EndGeom, state: SessionState): ConnectorEnd
     ? readings[0].reason
     : writing
       ? `writing sits at its ${e.end} — a label, not a head`
-      : `a plain ${e.end}: nothing sits there`;
+      : near.length
+        ? `a mark touches its ${e.end} but reads as no head`
+        : `a plain ${e.end}: nothing sits there`;
   return { end: e.end, point: { x: e.point.x, y: e.point.y }, heads: readings, reason };
 }
 

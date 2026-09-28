@@ -176,21 +176,35 @@ function project(span: Span, at: Point): number {
 
 // ===== Sites =====
 
-/** What each registered notation reads this mark as, with its ports — a notation that throws is left out. */
-function readings(node: MMNode, nodes: ReadonlyMap<string, MMNode>): { notation: string; symbol: string; ports: NotationPort[] }[] {
-  const out: { notation: string; symbol: string; ports: NotationPort[] }[] = [];
+interface Read {
+  notation: string;
+  symbol: string;
+  ports: NotationPort[];
+}
+
+/** What one notation reads this mark as, with its ports — or null, which a notation that throws also gets. */
+function readingOf(provider: NotationPorts, node: MMNode, nodes: ReadonlyMap<string, MMNode>): Read | null {
+  let read: { symbol: string; ports: NotationPort[] } | null;
+  try {
+    read = provider.portsOf(node, nodes);
+  } catch {
+    return null;
+  }
+  if (!read || !Array.isArray(read.ports)) return null;
+  return { notation: provider.notation, symbol: typeof read.symbol === 'string' ? read.symbol : provider.notation, ports: read.ports };
+}
+
+/** What every registered notation reads this mark as, in the order they registered. */
+function readings(node: MMNode, nodes: ReadonlyMap<string, MMNode>): Read[] {
+  const out: Read[] = [];
   for (const provider of registry.values()) {
-    let read: { symbol: string; ports: NotationPort[] } | null;
-    try {
-      read = provider.portsOf(node, nodes);
-    } catch {
-      continue;
-    }
-    if (!read || !Array.isArray(read.ports)) continue;
-    out.push({ notation: provider.notation, symbol: typeof read.symbol === 'string' ? read.symbol : provider.notation, ports: read.ports });
+    const read = readingOf(provider, node, nodes);
+    if (read) out.push(read);
   }
   return out;
 }
+
+const said = (port: NotationPort, notation: string) => `${typeof port.reasoning === 'string' ? port.reasoning : port.name} (${notation})`;
 
 const isPointPort = (p: NotationPort) => finite(p.at) && p.along === undefined;
 const continuousSpan = (p: NotationPort) => (p.at === undefined ? spanOf(p.along ?? [], !!p.closed) : null);
@@ -203,7 +217,7 @@ function alongSite(nodeId: string, symbol: string, notation: string, port: Notat
     kind: `along:${notation}`,
     index: alongIndex(ordinal, tq),
     point: pointAt(span, tq),
-    reasoning: `${port.reasoning} (${notation})`,
+    reasoning: said(port, notation),
     notation,
     port: port.name,
     span: span.points,
@@ -231,7 +245,7 @@ export function portSites(node: MMNode, nodes: ReadonlyMap<string, MMNode>, spac
           kind: `port:${notation}`,
           index: points++,
           point: { x: port.at!.x, y: port.at!.y },
-          reasoning: `${port.reasoning} (${notation})`,
+          reasoning: said(port, notation),
           notation,
           port: port.name,
         });
@@ -269,8 +283,9 @@ export function reachOf(at: Point, site: MagnetSite): MagnetHit {
  * registered, no longer reads the mark, or has no such port.
  */
 export function alongSiteOf(node: MMNode, nodes: ReadonlyMap<string, MMNode>, notation: string, index: number): MagnetSite | null {
-  if (!registry.has(notation) || !Number.isInteger(index) || index < 0) return null;
-  const read = readings(node, nodes).find((r) => r.notation === notation);
+  const provider = registry.get(notation);
+  if (!provider || !Number.isInteger(index) || index < 0) return null;
+  const read = readingOf(provider, node, nodes);
   if (!read) return null;
   const { ordinal, t } = alongOf(index);
   let k = 0;
