@@ -191,6 +191,13 @@ export interface Tool {
   /** What it affords here, each with a base likelihood and a reason. Pure: it writes nothing. */
   offers(scope: ToolScope, ctx: Context): Offer[];
   /**
+   * What the TYPED text completes to here — `scope.text` and `scope.word` —
+   * each with a `place` in the field rather than a rank: *Name it “inlet”*,
+   * *Label it “inlet”*, words a definition can be told. Asked on every
+   * keystroke, so it reads only what the typing changes. Pure.
+   */
+  completes?(scope: ToolScope, ctx: Context): Offer[];
+  /**
    * Take one of its offers: write events through `session` (the registry's
    * `takeOffer` stamps them with this tool's id), or name the act the host
    * performs. Undoable, as every event is.

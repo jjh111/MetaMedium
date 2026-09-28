@@ -62,6 +62,12 @@ export interface Conversion {
     | { kind: 'control' };
   /** One line saying what will happen. */
   hint?: string;
+  /**
+   * The tool that offers and performs it in the field (V1-PLAN B1,
+   * `tools/`). A conversion no tool performs — naming, a seeded brief — is
+   * the field's own: its reading's pill names, and the field takes a brief.
+   */
+  tool?: string;
 }
 
 export interface ConceptMatch {
@@ -106,6 +112,7 @@ const tidy = (axis: 'row' | 'column'): Conversion => ({
   tier: 1,
   effect: { kind: 'tidy', axis },
   hint: 'align and space them evenly',
+  tool: 'tidy',
 });
 
 const EQUALIZE: Conversion = {
@@ -114,6 +121,7 @@ const EQUALIZE: Conversion = {
   tier: 1,
   effect: { kind: 'equalize' },
   hint: 'make them the same size as the largest',
+  tool: 'tidy',
 };
 
 // ===== Helpers over the relation graph =====
@@ -231,7 +239,7 @@ export const BUILTIN_CONCEPTS: Concept[] = [
     name: 'slider',
     describes: 'a knob on a track',
     conversions: [
-      { id: 'control', label: 'Make it a slider', tier: 1, effect: { kind: 'control' }, hint: 'its value is where the knob sits; drag the knob to set it' },
+      { id: 'control', label: 'Make it a slider', tier: 1, effect: { kind: 'control' }, hint: 'its value is where the knob sits; drag the knob to set it', tool: 'control' },
       NAME,
     ],
     match(scope) {

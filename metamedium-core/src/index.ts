@@ -494,6 +494,43 @@ export type { InstantModule, InstantAbility, StructureResult, Graph3DResult } fr
 export { planFor, connectionsOf } from './parse/plan';
 export type { Plan } from './parse/plan';
 
+// Tools (V1-PLAN §2.1, B1) — one contract for what the canvas can do with a
+// scope: what it reads, what it offers (each with a base likelihood and a
+// reason), what taking an offer writes (stamped with the tool's id). The
+// field's affordances are `offersFor(scope)` ranked by `rankOffers`; what is
+// typed completes through `completionsFor`. A new tool is one file and one
+// registration line; importing core registers the built-ins, in the order
+// the field always offered them.
+export {
+  registerTool,
+  unregisterTool,
+  getTool,
+  registeredTools,
+  toolsVersion,
+  onToolsChange,
+  offersFor,
+  completionsFor,
+  toolsFor,
+  readingsFor,
+  takeOffer,
+  describeTools,
+  defaultHost,
+  toolScope,
+} from './tools/registry';
+export { baseOn, likelihoodOf, rankOffers, isSpecific, useLift, MODEL_DISCOUNT, USE_LIFT_MAX, USE_LIFT_RATE, SPECIFIC_GROUNDS } from './tools/rank';
+export type { Rankable, Uses } from './tools/rank';
+export { NO_CONTEXT } from './tools/tool';
+export type { Tool, Offer, Grounds, ToolScope, ToolHost, ToolReading, Taken, Context, ScopeReading, SessionReader } from './tools/tool';
+export { BUILTIN_TOOLS } from './tools/builtin';
+export { NAMING_IS, nameMarks } from './tools/name';
+export { LABELLING_IS, labelInk, theirMarks, madeThese, makersOf, whoseInk } from './tools/label';
+export type { LabelRefusal } from './tools/label';
+export { standStructure } from './tools/structure';
+export { shapesSummary } from './tools/clean';
+export { isWritingMark, definitionOf, definitionsIn, artifactsIn, writingLine } from './tools/board';
+export type { WritingLine } from './tools/board';
+export { bestWiring, frameTemplatesFor } from './tools/frames';
+
 // Agent participants — a model joins through the same channel a human uses.
 export { HERE, createAgentParticipant, parseReadings, parseCode, parseFill, parseTranscripts, parseBehaviourReply, parseProgram, readingsToEdges, MAX_READINGS } from './participants/agent';
 export type { BehaveResult, ProgramResult } from './participants/agent';
