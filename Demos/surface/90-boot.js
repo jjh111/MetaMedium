@@ -14,6 +14,10 @@
     inkImage: inkImage, readOne: readOne, readWriting: readWriting, askModelsAbout: askModelsAbout,
     // Device preferences and the chrome, for tests: the theme, the hand, auto-read, the field's reader, the clip.
     themeMode: () => themeMode, setThemeMode: setThemeMode, hand: () => hand, setHand: setHand,
+    // Pen, finger and palm (V1-PLAN R6), for tests: what draws, the magnet a hovering pen feels, and the hands down.
+    draws: () => draws, setDraws: setDraws, palmMs: PALM_MS,
+    penHover: () => (penHover ? { kind: penHover.site.kind, index: penHover.site.index, nodeId: penHover.site.nodeId, point: { x: penHover.site.point.x, y: penHover.site.point.y } } : null),
+    hands: () => ({ pens: pen.down.size, fingers: [...touches.values()].map((t) => ({ id: t.id, role: t.role, moved: t.moved })), owner: owner ? Object.assign({}, owner) : null, downType: downType }),
     autoRead: () => autoRead, setAutoRead: setAutoRead, readField: (q) => readField(q), clip: () => clip,
     copyMarks: copyMarks, pasteClip: pasteClip, openCC: openCC, closeCC: closeCC, syncTiles: syncTiles,
     replay: () => rp, rpGoTo: (i) => rpGoTo(i), theme: THEME,

@@ -78,6 +78,15 @@
   // The hand: the field fans to the right of the pen tip, or to the left.
   let hand = prefs.get('hand', 'right') === 'left' ? 'left' : 'right';
   function setHand(h) { hand = h === 'left' ? 'left' : 'right'; prefs.set('hand', hand); if (typeof syncTiles === 'function') syncTiles(); }
+  // …and what draws, once a pen has been seen on this device (V1-PLAN R6; the rules are 07-hand.js):
+  // 'pen' — the pen draws and a finger pans — or 'finger', which gives a finger its ink back. Null
+  // until then, and a finger draws, as it always did. The hand tile shows it and changes it.
+  let draws = ((d) => (d === 'pen' || d === 'finger' ? d : null))(prefs.get('draws', null));
+  function setDraws(d) {
+    draws = d === 'pen' || d === 'finger' ? d : null;
+    if (draws) prefs.set('draws', draws); else prefs.del('draws');
+    if (typeof syncTiles === 'function') syncTiles();
+  }
 
   const session = MM.createSession();
 

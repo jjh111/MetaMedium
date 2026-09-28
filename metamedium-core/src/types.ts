@@ -5,6 +5,12 @@ export interface Point {
   x: number;
   y: number;
   t?: number; // timestamp, when the surface provides it
+  /**
+   * A pen's pressure at this point, 0–1, when the surface records it — a pencil's
+   * stroke carries it on every point (V1-PLAN R6). Kept in the log as the hand
+   * gave it; nothing in the engine reads it: every reading is geometry.
+   */
+  p?: number;
 }
 
 export interface Bounds {

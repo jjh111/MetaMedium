@@ -2,7 +2,8 @@
 // Provides: queries over state, the rungs cache, render(), ink, the reading under the inspected mark,
 //   a hand's label on its own mark (labelsDrawn), match chips,
 //   the working dot, the explanation plane and its layout, the status line (one sentence).
-// Uses: core, view, artifacts, snap, models, palette, inspector, teach (syncMarkChip), folder (folderStatus, liveSet).
+// Uses: core, view, artifacts, snap, models, palette, inspector, teach (syncMarkChip), folder (folderStatus, liveSet),
+//   input (live, magnetHold, penHover — the pen's layer draws the stroke in progress and a hovering pencil's magnet).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () Ellipsis)();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -471,7 +472,9 @@
   // the board: a paint of everything on every move, on a big board, was the
   // ink lagging the pen. The layer takes no pointer; the board's canvas under
   // it takes every one, as before. Every paint of the board repaints it too,
-  // so a pan or a zoom mid-stroke keeps the pen where the hand is.
+  // so a pan or a zoom mid-stroke keeps the pen where the hand is. A pencil
+  // hovering over the glass, touching nothing, has its magnet drawn here too
+  // (V1-PLAN R6): the site a stroke begun there would start on.
   const liveCanvas = document.createElement('canvas');
   liveCanvas.id = 'liveInk';
   liveCanvas.setAttribute('aria-hidden', 'true');
@@ -490,9 +493,12 @@
     }
     liveCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
     if (liveShown) liveCtx.clearRect(0, 0, innerWidth, innerHeight);
-    liveShown = !!live;
-    if (!live) return;
+    liveShown = !!live || !!penHover;
+    if (!liveShown) return;
     liveCtx.setTransform(dpr * view.zoom, 0, 0, dpr * view.zoom, dpr * view.panX, dpr * view.panY);
+    // A pencil hovering over the glass: the magnet it is in reach of, where a stroke begun
+    // there would start (V1-PLAN R6) — the same ring, drawn before the pen comes down.
+    if (!live) { magnetRing(penHover); return; }
     liveCtx.lineCap = 'round';
     liveCtx.lineJoin = 'round';
     liveCtx.beginPath();
@@ -502,24 +508,26 @@
     liveCtx.stroke();
     // The hold, while the pen is in a site's reach: a ring and the site's
     // name, in the participant colour — an offer, never a trap (P1).
-    if (magnetHold) {
-      const p = magnetHold.site.point;
-      liveCtx.beginPath();
-      liveCtx.arc(p.x, p.y, wpx(8), 0, Math.PI * 2);
-      liveCtx.strokeStyle = C.agent;
-      liveCtx.lineWidth = wpx(1.5);
-      liveCtx.stroke();
-      liveCtx.beginPath();
-      liveCtx.arc(p.x, p.y, wpx(2.2), 0, Math.PI * 2);
-      liveCtx.fillStyle = C.agent;
-      liveCtx.fill();
-      liveCtx.font = wpx(11).toFixed(2) + "px 'Space Grotesk', system-ui, sans-serif";
-      liveCtx.lineWidth = wpx(3);
-      liveCtx.strokeStyle = C.haloText;
-      liveCtx.strokeText(magnetHold.site.kind, p.x + wpx(13), p.y - wpx(9));
-      liveCtx.fillStyle = C.agent;
-      liveCtx.fillText(magnetHold.site.kind, p.x + wpx(13), p.y - wpx(9));
-    }
+    if (magnetHold) magnetRing(magnetHold);
+  }
+  /** A magnet the pen is in reach of: a ring, a dot, and the site's name — in world space, on the pen's layer. */
+  function magnetRing(hit) {
+    const p = hit.site.point;
+    liveCtx.beginPath();
+    liveCtx.arc(p.x, p.y, wpx(8), 0, Math.PI * 2);
+    liveCtx.strokeStyle = C.agent;
+    liveCtx.lineWidth = wpx(1.5);
+    liveCtx.stroke();
+    liveCtx.beginPath();
+    liveCtx.arc(p.x, p.y, wpx(2.2), 0, Math.PI * 2);
+    liveCtx.fillStyle = C.agent;
+    liveCtx.fill();
+    liveCtx.font = wpx(11).toFixed(2) + "px 'Space Grotesk', system-ui, sans-serif";
+    liveCtx.lineWidth = wpx(3);
+    liveCtx.strokeStyle = C.haloText;
+    liveCtx.strokeText(hit.site.kind, p.x + wpx(13), p.y - wpx(9));
+    liveCtx.fillStyle = C.agent;
+    liveCtx.fillText(hit.site.kind, p.x + wpx(13), p.y - wpx(9));
   }
 
   /** The canvas in world units, grown by `m` world units on every side. */

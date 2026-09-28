@@ -12,7 +12,8 @@
 //   09-field.js), view (usableViewport, viewportRect), models (agents, withWork, cancelReading,
 //   askModelsAbout, offerModel), snap (snapMode), render (nameOfParticipant), artifacts (flipped), frames,
 //   clocks (definitionOf), handwriting (isWriting, isRead, readLine, readOne), images (svgOf), text
-//   (wordToText, lineToText, foldIntoText, textNear, beginTextEdit), input (say, flash).
+//   (wordToText, lineToText, foldIntoText, textNear, beginTextEdit), input (say, flash, downType — which
+//   hand opened the field), hand (handOfPointer).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () { ... })();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -281,7 +282,8 @@
     const strokes = [];
     const walk = (node) => {
       const pts = MM.strokePointsOf(node);
-      if (pts) { const clean = MM.cleanPointsOf(node); strokes.push({ points: (clean || pts).map((p) => ({ x: p.x, y: p.y })) }); return; }
+      // A pen's pressure goes with its ink (V1-PLAN R6); a clean form has none to carry.
+      if (pts) { const clean = MM.cleanPointsOf(node); strokes.push({ points: (clean || pts).map((p) => (typeof p.p === 'number' ? { x: p.x, y: p.y, p: p.p } : { x: p.x, y: p.y })) }); return; }
       for (const e of node.edges) if (e.rel === 'has-part') { const p = s.nodes.get(e.to); if (p && !p.reps.some((r) => r.modality === 'erased')) walk(p); }
     };
     ids.forEach((id) => { const n = s.nodes.get(id); if (n) walk(n); });
@@ -300,7 +302,7 @@
     const dx = at.x - clip.bounds.minX, dy = at.y - clip.bounds.minY;
     let t = Date.now();
     const made = [];
-    for (const st of clip.strokes) made.push(session.addStroke(st.points.map((p) => ({ x: p.x + dx, y: p.y + dy })), t++, undefined, 1 / view.zoom, { content: true }));
+    for (const st of clip.strokes) made.push(session.addStroke(st.points.map((p) => (typeof p.p === 'number' ? { x: p.x + dx, y: p.y + dy, p: p.p } : { x: p.x + dx, y: p.y + dy })), t++, undefined, 1 / view.zoom, { content: true }));
     if (made.length && select !== false) session.select(made, t);
     flash('pasted ' + made.length + ' stroke' + (made.length === 1 ? '' : 's'));
     return made;
@@ -514,13 +516,40 @@
     return r.width > 0 && r.height > 0 ? r : null;
   }
 
-  /** Place the field where it stands now. Touches left/top/width and NOTHING else. */
+  const FIELD_LIST_MIN = 64; // the pills' list is never held shorter than about two rows
+
+  /**
+   * The pills scroll rather than fall under a keyboard (V1-PLAN R6). When the
+   * field is taller than the room the visible viewport leaves it — an on-screen
+   * keyboard takes half an iPad's height and the layout viewport does not
+   * change, only the visual one — its list of pills is held to what fits and
+   * scrolls, and the input, its reading line and the four core buttons stay in
+   * view. The room is the box `fieldBox` will place the field in. Measured from
+   * the list's own scroll height, so a list already scrolled keeps its place;
+   * when the field fits, nothing is set and the stylesheet's rule stands.
+   */
+  function fitFieldHeight(v, u) {
+    const list = summonEl.querySelector('.list');
+    if (!list) return;
+    const room = Math.max(u.height - FIELD_M * 2, v.height - FIELD_TOP - FIELD_M);
+    const natural = summonEl.offsetHeight - list.offsetHeight + list.scrollHeight;
+    if (natural <= room) {
+      if (list.classList.contains('held')) { list.classList.remove('held'); list.style.maxHeight = ''; }
+      return;
+    }
+    const cap = Math.max(FIELD_LIST_MIN, Math.floor(list.scrollHeight - (natural - room))) + 'px';
+    if (list.style.maxHeight !== cap) list.style.maxHeight = cap;
+    list.classList.add('held');
+  }
+
+  /** Place the field where it stands now. Touches left/top/width, and the list's height when it must scroll — NOTHING else. */
   function placeField() {
     const v = viewportRect(), u = usableViewport();
     // Width first: the height below is whatever the content comes to at that
     // width, measured rather than assumed.
     const first = fieldBox(fieldAnchor, { viewport: v, usable: u, height: 0, hand: hand, panel: panelRect() });
     summonEl.style.width = first.w + 'px';
+    fitFieldHeight(v, u);
     const box = fieldBox(fieldAnchor, { viewport: v, usable: u, height: summonEl.offsetHeight, hand: hand, panel: panelRect() });
     summonEl.style.left = box.x + 'px';
     summonEl.style.top = box.y + 'px';
@@ -586,8 +615,11 @@
     paintField('');
     // A keyboard that pops up on every selection covers the pills on a phone;
     // a finger taps the input when it wants to type. A pointer gets the focus.
+    // Which hand opened it is read from its pointerType, never the user agent
+    // (V1-PLAN R6): a field a finger opened waits for the finger, whatever the
+    // screen says of itself; a pen's waits where the screen is a touch screen.
     const coarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
-    if (!coarse) setTimeout(() => filter.focus(), 0);
+    if (!coarse && handOfPointer(downType) !== 'finger') setTimeout(() => filter.focus(), 0);
   }
 
   /** Recompute the offers for the open summon and repaint, keeping what was typed. */

@@ -80,6 +80,15 @@
   // The hand: the field fans to the right of the pen tip, or to the left.
   let hand = prefs.get('hand', 'right') === 'left' ? 'left' : 'right';
   function setHand(h) { hand = h === 'left' ? 'left' : 'right'; prefs.set('hand', hand); if (typeof syncTiles === 'function') syncTiles(); }
+  // …and what draws, once a pen has been seen on this device (V1-PLAN R6; the rules are 07-hand.js):
+  // 'pen' — the pen draws and a finger pans — or 'finger', which gives a finger its ink back. Null
+  // until then, and a finger draws, as it always did. The hand tile shows it and changes it.
+  let draws = ((d) => (d === 'pen' || d === 'finger' ? d : null))(prefs.get('draws', null));
+  function setDraws(d) {
+    draws = d === 'pen' || d === 'finger' ? d : null;
+    if (draws) prefs.set('draws', draws); else prefs.del('draws');
+    if (typeof syncTiles === 'function') syncTiles();
+  }
 
   const session = MM.createSession();
 
@@ -177,7 +186,7 @@
 // ===== view =====
 // Provides: view {zoom, panX, panY}, screenToWorld/worldToScreen/wpx, zoomBy, zoomAround, fitAll, afterViewChange, viewChanged (one paint a frame), the wheel/pinch/keyboard zoom, resize,
 //   and the space actually visible: usableRect (pure), viewportRect, usableViewport, relayoutChrome.
-// Uses: core; input (panning/pinch state); palette (replaceOpenField).
+// Uses: core; input (panning/pinch state, the touches down); palette (replaceOpenField).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () Ellipsis)();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -416,11 +425,15 @@
     viewChanged();
   }, { passive: false });
 
-  // Safari: pinch is a gesture event, not a wheel.
+  // Safari: pinch is a gesture event, not a wheel. On a trackpad, that is all
+  // there is; on an iPad's glass the same pinch also arrives as two touch
+  // pointers, which pinch and pan (07-input), so the gesture is left to them —
+  // two hands zooming one view about two different points was a jitter.
   let gestureStartZoom = 1;
   canvas.addEventListener('gesturestart', (e) => { e.preventDefault(); gestureStartZoom = view.zoom; });
   canvas.addEventListener('gesturechange', (e) => {
     e.preventDefault();
+    if (touches.size) return;
     const target = clampZoom(gestureStartZoom * e.scale);
     if (zoomBy(e.clientX, e.clientY, target / view.zoom)) viewChanged();
   });
@@ -715,7 +728,7 @@
 
 // ===== teach =====
 // Provides: teaching the command mark: the pad, samples, the held mark on this device, the rail chip; togglePanel/closePanel.
-// Uses: core, view (render).
+// Uses: core, view (render), input (capture, palmHere).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () Ellipsis)();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -767,8 +780,14 @@
     teachDots.forEach((d, i) => d.classList.toggle('on', i < samples.length));
   }
 
+  // The pad follows one pointer: a palm on the glass while the pen teaches is neither a stroke
+  // of its own nor the end of the pen's (V1-PLAN R6). A mouse is one pointer, as before.
+  let padPointer = null;
   pad.addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'touch' && palmHere()) return;
+    if (padStroke && e.pointerId !== padPointer) return;
     capture(pad, e);
+    padPointer = e.pointerId;
     if (samplesHeld || samples.length >= MM.COMMAND_MARK_SAMPLES) {
       samples = []; samplesHeld = false; teachUse.disabled = true;
       teachStatus.className = ''; teachStatus.textContent = '';
@@ -777,7 +796,7 @@
     padStroke = [{ x: e.clientX - r.left, y: e.clientY - r.top }];
   });
   pad.addEventListener('pointermove', (e) => {
-    if (!padStroke) return;
+    if (!padStroke || e.pointerId !== padPointer) return;
     const r = pad.getBoundingClientRect();
     padStroke.push({ x: e.clientX - r.left, y: e.clientY - r.top });
     drawPad();
@@ -790,14 +809,15 @@
     drawPad();
     evaluateSamples();
   }
-  pad.addEventListener('pointerup', endPadStroke);
-  pad.addEventListener('pointercancel', endPadStroke);
-  // A release that lands anywhere else — capture not taken, the pen lifted
-  // off the pad — still ends the stroke. Otherwise the pad keeps drawing
-  // wherever the pointer goes next, which is the "held pointer" that broke
-  // the first use of the pad.
-  addEventListener('pointerup', () => { if (padStroke) endPadStroke(); }, true);
-  addEventListener('pointercancel', () => { if (padStroke) endPadStroke(); }, true);
+  // The stroke's own release ends it, wherever it lands — capture not taken,
+  // the pen lifted off the pad. Otherwise the pad keeps drawing wherever the
+  // pointer goes next, which is the "held pointer" that broke the first use of
+  // the pad. Another pointer's release (a palm lifting) is not the stroke's.
+  const padRelease = (e) => { if (padStroke && e.pointerId === padPointer) endPadStroke(); };
+  pad.addEventListener('pointerup', padRelease);
+  pad.addEventListener('pointercancel', padRelease);
+  addEventListener('pointerup', padRelease, true);
+  addEventListener('pointercancel', padRelease, true);
 
   function evaluateSamples() {
     const need = MM.COMMAND_MARK_SAMPLES - samples.length;
@@ -1846,9 +1866,115 @@
     }
   }
 
+// ===== hand (the rules) =====
+// Provides: the hand's rules for pen, finger and palm, pure (V1-PLAN R6) — handOfPointer (which
+//   hand a pointer is, by its pointerType), fingerRole (what a finger that lands on the board
+//   does), palmNow (whether a touch now is a palm), whenPenLands (what the fingers already down
+//   become when a pen comes down, and which pan is put back), handFace and nextHand (the hand
+//   tile's face and its cycle), and the two numbers they stand on (PALM_MS, PAN_SLOP_PX).
+// Uses: NOTHING. Like 09-field.js, this fragment names no closure variable, touches no DOM and
+//   asks the session nothing; 07-input.js is the adapter that gathers a record, asks, and acts.
+//   So it loads on its own in Node, which is how it is tested:
+//     node --test Demos/surface/07-hand.test.mjs
+// A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
+// in name order inside `(function () { ... })();`. Shared state is the
+// closure's; no imports, no exports, no build step beyond the concatenation.
+//
+// THE RULES (CLAUDE.md, "Pen, finger and palm")
+//   - Decide by pointerType, never by the user agent: iPadOS reports a pencil as `pen` and a
+//     finger as `touch`; a desktop test synthesises both, and a mouse is anything else — a
+//     `mouse`, or the empty type a synthesised event carries — and is never touched by these.
+//   - Before any pen has been seen on this device, today's rule stands: one finger draws, two
+//     pinch and pan.
+//   - Once a pen has been seen (said once, and held as a preference the hand tile shows), the
+//     pen draws and a finger pans; two fingers pinch. The tile can give the finger its ink back.
+//   - A palm: a touch that lands while a pen is on the glass, or within PALM_MS of the pen's
+//     last event anywhere on the page — down, moving, hovering, lifted — does nothing for its
+//     whole life, whichever the preference. And a pen coming down makes every finger already
+//     down a palm; one that landed within PALM_MS before it was the palm arriving first, so the
+//     pan it made is put back.
+
+  /** A touch within this long of the pen's last event is a palm. Long enough for a heel that comes down as the pencil lifts between words; short enough that a finger meant to pan, once the pencil is put down, is a finger. */
+  const PALM_MS = 500;
+  /** A finger that pans must first move this far, in screen pixels; short of it, it is a tap. */
+  const PAN_SLOP_PX = 6;
+
+  /** Which hand a pointer is: 'pen', 'finger', or 'mouse' — the last is anything that is not the first two. */
+  function handOfPointer(pointerType) {
+    return pointerType === 'pen' ? 'pen' : pointerType === 'touch' ? 'finger' : 'mouse';
+  }
+
+  /**
+   * Is a touch now a palm?
+   * @param {{penDown:boolean, sincePen:number}} h  a pen on the glass; ms since the pen's last event (Infinity if never)
+   */
+  function palmNow(h) {
+    return !!h.penDown || h.sincePen < PALM_MS;
+  }
+
+  /**
+   * What a finger that lands on the board does.
+   * @param {{draws:('pen'|'finger'|null), penDown:boolean, sincePen:number, fingers:number}} h
+   *   draws — the preference: null until a pen has been seen on this device;
+   *   penDown, sincePen — as palmNow;
+   *   fingers — the fingers already down that are drawing, panning or pinching (not palms, not resting).
+   * @returns {{role:('palm'|'extra'|'pinch'|'pan'|'draw'), why:string}}
+   *   palm — nothing, for its whole life; extra — a third finger, nothing; pinch — with the
+   *   finger already down, the view zooms and pans; pan — one finger moves the view (short of
+   *   PAN_SLOP_PX it is a tap); draw — today's rule, the ink path.
+   */
+  function fingerRole(h) {
+    if (h.penDown) return { role: 'palm', why: 'a pen is on the glass' };
+    if (h.sincePen < PALM_MS) return { role: 'palm', why: 'the pen was here ' + Math.max(0, Math.round(h.sincePen)) + ' ms ago' };
+    if (h.fingers >= 2) return { role: 'extra', why: 'two fingers are already down' };
+    if (h.fingers === 1) return { role: 'pinch', why: 'a second finger: the two pinch and pan' };
+    if (h.draws === 'pen') return { role: 'pan', why: 'the pen draws; a finger moves the view' };
+    return { role: 'draw', why: h.draws === 'finger' ? 'a finger draws, by the hand tile' : 'no pen seen here yet: a finger draws' };
+  }
+
+  /**
+   * A pen comes down: every finger down is a palm from now on, and the one that landed a moment
+   * before the pen — the heel arriving first — has what it moved put back.
+   * @param {Array<{id:*, role:string, at:number, moved:boolean}>} fingers  the fingers down, in the order they landed
+   * @param {number} now  when the pen came down, on the same clock as `at`
+   * @returns {{palms:Array<*>, putBack:(*|null)}}  the ids that become palms, and whose view to restore (the earliest such finger's), or null
+   */
+  function whenPenLands(fingers, now) {
+    const palms = [];
+    let putBack = null, at = Infinity;
+    for (const f of fingers) {
+      if (f.role === 'palm') continue;
+      palms.push(f.id);
+      if (now - f.at < PALM_MS && f.moved && (f.role === 'pan' || f.role === 'pinch') && f.at < at) { putBack = f.id; at = f.at; }
+    }
+    return { palms: palms, putBack: putBack };
+  }
+
+  /** The hand tile's face: the side the field opens on, and — once a pen has been seen — what draws. */
+  function handFace(side, draws) {
+    return draws ? side + ' · ' + draws : side;
+  }
+
+  /**
+   * The hand tile's next state. Until a pen has been seen it flips the side, as it always did.
+   * After, one word of the face changes a tap — right · pen, right · finger, left · finger,
+   * left · pen — so the pen and the finger are one tap apart from where most hands start.
+   */
+  function nextHand(side, draws) {
+    if (!draws) return { side: side === 'left' ? 'right' : 'left', draws: null };
+    const ring = [['right', 'pen'], ['right', 'finger'], ['left', 'finger'], ['left', 'pen']];
+    const i = ring.findIndex((r) => r[0] === side && r[1] === draws);
+    const next = ring[(i + 1) % ring.length];
+    return { side: next[0], draws: next[1] };
+  }
+
 // ===== input =====
-// Provides: pointer input (draw, pan, pinch), keys (undo, copy, paste, erase, zoom), say()/flash() for the status line.
-// Uses: core, view, snap (autoSweep), render, palette (copyMarks, pasteClip), handwriting (autoRead), artifacts (pointerFrameAt), kinds (postPointer).
+// Provides: pointer input (draw, pan, pinch) for the mouse, the pen and the finger — the palm ignored,
+//   the pen's pressure on every point it draws, its hover a hover (V1-PLAN R6) — keys (undo, copy,
+//   paste, erase, zoom), say()/flash() for the status line.
+// Uses: core (draws, setDraws), hand (the rules: fingerRole, palmNow, whenPenLands, PAN_SLOP_PX), view,
+//   snap (autoSweep, magnetQuery), render (drawLive), palette (copyMarks, pasteClip), handwriting
+//   (autoRead), artifacts (pointerFrameAt), kinds (postPointer).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () Ellipsis)();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -1861,6 +1987,13 @@
   let spaceHeld = false;
   // A hand inside a playing program: the frame has it until the hand lifts (SURFACE-v10-PLAN D2).
   let forward = null;
+  // Whose hand the board is following (V1-PLAN R6): the pointer whose press began what is under
+  // way — a stroke, a drag, a knob, a demonstration, a frame's pointer, a pan. Another pointer's
+  // moves and release are not its own: a palm on the glass while the pen drew used to put its
+  // points into the pen's stroke, and its release ended the stroke. A mouse is one pointer, so
+  // nothing a mouse does is changed by this.
+  let owner = null;   // { id, type } from the press that began it; null while nothing is under way
+  let downType = '';  // the pointerType of the last press on the board — the field asks it whether to take the focus
 
   // Pointer capture is a nicety — it keeps a stroke alive when the pointer
   // leaves the element. It is NOT allowed to be the reason a stroke fails to
@@ -1869,29 +2002,182 @@
     try { el.setPointerCapture(e.pointerId); } catch (err) { /* not capturable */ }
   }
 
-  const touches = new Map(); // pointerId → {x, y}, for two-finger pinch
-  let pinch = null;          // { dist, mid, zoom } at the moment the second finger landed
+  // ===== Pen, finger and palm (V1-PLAN R6; the rules are 07-hand.js) =======
+  // By pointerType, never by the user agent: iPadOS reports a pencil as `pen` and a
+  // finger as `touch`, and a desktop test synthesises both. Before a pen has been seen
+  // on this device a finger draws, as it always did; after, the pen draws and a finger
+  // pans, and a touch while the pen is down or a moment after it is a palm — nothing.
+  const touches = new Map(); // pointerId → a finger: { id, x, y, x0, y0, at, role, moved, view }
+  let pinch = null;          // { ids, dist, mid, zoom }: the two fingers pinching, as they were when the second landed
+  const pen = { down: new Set(), at: -Infinity }; // the pens on the glass, and when a pen was last heard anywhere on the page
+  let penHover = null;       // the magnet a hovering pen is in reach of — where a stroke begun there would start (drawLive draws it)
+  const handClock = () => performance.now();
+
+  /** A point of the hand's, in world coordinates, with a pen's pressure on it: the log keeps it; the engine reads x and y only. */
+  function pointOf(e) {
+    const w = screenToWorld(e.clientX, e.clientY);
+    if (e.pointerType === 'pen') w.p = Math.round(Math.max(0, Math.min(1, e.pressure || 0)) * 1000) / 1000;
+    return w;
+  }
+  /** Is a touch landing now a palm? */
+  function palmHere() { return palmNow({ penDown: pen.down.size > 0, sincePen: handClock() - pen.at }); }
+  /** The fingers down that draw, pan or pinch — not the palms, and not one left resting after a pinch. */
+  function activeFingers() {
+    let n = 0;
+    for (const t of touches.values()) if (t.role === 'draw' || t.role === 'pan' || t.role === 'pinch') n++;
+    return n;
+  }
+
+  // The pen, wherever it is on the page, heard before anything it lands on: the palm on the
+  // board is known for one while the pen writes in the field or taps a pill.
+  function heardPen(e) {
+    if (e.pointerType !== 'pen') return;
+    pen.at = handClock();
+    if (draws) return;
+    // The switch, said once: the first pen this device has seen. It is held as a preference
+    // the hand tile shows, and the tile gives a finger its ink back.
+    setDraws('pen');
+    say('a pen — it draws now; a finger pans and pinches, and a palm on the glass is ignored · the hand tile switches it');
+  }
+  addEventListener('pointerdown', (e) => { if (e.pointerType !== 'pen') return; pen.down.add(e.pointerId); heardPen(e); penLands(e); }, true);
+  addEventListener('pointermove', heardPen, true);
+  const penLifts = (e) => { if (e.pointerType !== 'pen') return; pen.down.delete(e.pointerId); heardPen(e); };
+  addEventListener('pointerup', penLifts, true);
+  addEventListener('pointercancel', penLifts, true);
+
+  /**
+   * A pen comes down: every finger down is a palm from now on. A finger's stroke is dropped,
+   * a pinch stops, and a pan that a heel began a moment before the pen is put back.
+   */
+  function penLands(e) {
+    if (!touches.size) return;
+    const r = whenPenLands([...touches.values()], handClock());
+    if (!r.palms.length) return;
+    if (owner && r.palms.includes(owner.id)) letGo(e);
+    for (const id of r.palms) { const t = touches.get(id); if (t) t.role = 'palm'; }
+    pinch = null;
+    const back = r.putBack === null ? null : touches.get(r.putBack);
+    if (back && (view.zoom !== back.view.zoom || view.panX !== back.view.panX || view.panY !== back.view.panY)) {
+      view.zoom = back.view.zoom; view.panX = back.view.panX; view.panY = back.view.panY;
+      viewChanged();
+    }
+  }
+
+  /**
+   * What a finger had under way ends where it stands: its stroke is dropped — it was a palm,
+   * or the first finger of a pinch landing, not a mark — and a drag, a knob, a demonstration
+   * or a program's pointer is let go as it is.
+   */
+  function letGo(e) {
+    live = null; held = false; pressEnd(); magnetStart = null; magnetHold = null;
+    if (drag) endDrag();
+    knobEnd(); demoEnd();
+    if (forward) { postPointer(forward, 'cancel', e, screenToWorld(e.clientX, e.clientY)); forward = null; }
+    if (panning) { panning = null; canvas.style.cursor = 'crosshair'; }
+    owner = null;
+    drawLive();
+  }
+
+  /** A finger lands. True when that is all it does now — a palm, a third finger, a pinch, a pan; false when it draws, down the path below, as a finger always did. */
+  function fingerDown(e) {
+    const r = fingerRole({ draws: draws, penDown: pen.down.size > 0, sincePen: handClock() - pen.at, fingers: activeFingers() });
+    const t = { id: e.pointerId, x: e.clientX, y: e.clientY, x0: e.clientX, y0: e.clientY, at: handClock(), role: r.role, moved: false, view: { zoom: view.zoom, panX: view.panX, panY: view.panY } };
+    const first = r.role === 'pinch' ? [...touches.values()].find((o) => o.role === 'draw' || o.role === 'pan') : null;
+    touches.set(e.pointerId, t);
+    if (r.role === 'draw') return false;
+    if (r.role === 'pinch' && first) {
+      // Two fingers: a pinch, not a stroke. The first finger's ink goes — it was the first
+      // finger landing, not a mark — and whatever it held is let go where it stands.
+      if (owner && owner.id === first.id) letGo(e);
+      first.role = 'pinch';
+      pinch = { ids: [first.id, t.id], dist: Math.hypot(first.x - t.x, first.y - t.y), mid: { x: (first.x + t.x) / 2, y: (first.y + t.y) / 2 }, zoom: view.zoom };
+    }
+    return true;
+  }
+
+  /** A finger moves. True when the move was the finger's own — a pinch, a pan, a palm's nothing; false when it draws. */
+  function fingerMove(e) {
+    const t = touches.get(e.pointerId);
+    const px = t.x, py = t.y;
+    t.x = e.clientX; t.y = e.clientY;
+    if (t.role === 'draw') return false;
+    if (t.role === 'pinch') {
+      const a = pinch && pinch.ids.includes(t.id) ? touches.get(pinch.ids[0]) : null;
+      const b = a ? touches.get(pinch.ids[1]) : null;
+      if (a && b) {
+        const dist = Math.hypot(a.x - b.x, a.y - b.y);
+        const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+        const target = clampZoom(pinch.zoom * (dist / Math.max(1, pinch.dist)));
+        zoomBy(pinch.mid.x, pinch.mid.y, target / view.zoom);
+        view.panX += mid.x - pinch.mid.x;
+        view.panY += mid.y - pinch.mid.y;
+        pinch.mid = mid;
+        a.moved = true; b.moved = true;
+        viewChanged();
+      }
+      return true;
+    }
+    if (t.role === 'pan') {
+      let fx = px, fy = py;
+      if (!t.moved) {
+        // Short of the slop it is still a tap; past it, the board follows the finger from where it landed.
+        if (Math.hypot(t.x - t.x0, t.y - t.y0) <= PAN_SLOP_PX) return true;
+        t.moved = true; fx = t.x0; fy = t.y0;
+      }
+      view.panX += t.x - fx;
+      view.panY += t.y - fy;
+      viewChanged(); // one paint a frame, however many moves the frame holds
+      return true;
+    }
+    return true; // a palm, a third finger, a finger resting after a pinch: nothing
+  }
+
+  /** A finger lifts. True when that is all it does — a pan's end, a pinch's, a palm's; a pan that never moved is a tap. False when it drew. */
+  function fingerUp(e, cancelled) {
+    const t = touches.get(e.pointerId);
+    if (!t) return false;
+    touches.delete(e.pointerId);
+    if (pinch && pinch.ids.includes(t.id)) {
+      pinch = null;
+      for (const o of touches.values()) if (o.role === 'pinch') o.role = 'rest'; // the finger still down rests until it lifts
+      return true;
+    }
+    if (t.role === 'draw') return false;
+    if (t.role === 'pan' && !t.moved && !cancelled) { lastPen = { x: e.clientX, y: e.clientY }; tapAt(e); }
+    return true;
+  }
+
+  /** A hovering pen feels the magnets: the site in reach is drawn on the pen's layer — where a stroke begun here would start. */
+  function penHoverAt(w) {
+    const hit = magnetQuery(w);
+    const a = hit && hit.site, b = penHover && penHover.site;
+    const same = a && b ? a.nodeId === b.nodeId && a.kind === b.kind && a.index === b.index : !a && !b;
+    penHover = hit;
+    if (!same) drawLive();
+  }
+  function penHoverOff() { if (penHover) { penHover = null; drawLive(); } }
+
+  // A moving pencil is ink, never Scribble's handwriting-to-text or a scroll: its touchmove's
+  // default is refused. Only a stylus's, and only while it moves — a finger, a tap and a
+  // double-tap keep theirs. (iPadOS; a desktop engine sends no touches for a mouse.)
+  canvas.addEventListener('touchmove', (e) => {
+    for (const t of e.changedTouches || []) if (t.touchType === 'stylus') { e.preventDefault(); return; }
+  }, { passive: false });
 
   canvas.addEventListener('pointerdown', (e) => {
     capture(canvas, e);
-    if (e.pointerType === 'touch') {
-      touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
-      if (touches.size === 2) {
-        // Two fingers: this is a pinch, not a stroke. Drop the live ink — it
-        // was the first finger landing, not a mark.
-        live = null; pressEnd(); magnetStart = null; magnetHold = null; drawLive();
-        const [a, b] = [...touches.values()];
-        pinch = { dist: Math.hypot(a.x - b.x, a.y - b.y), mid: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, zoom: view.zoom };
-        return;
-      }
-    }
+    downType = e.pointerType || '';
+    // A finger: a palm, a pinch or a pan is all it does; one that draws goes down the path below.
+    if (e.pointerType === 'touch' && fingerDown(e)) return;
+    owner = { id: e.pointerId, type: e.pointerType || '' };
+    if (e.pointerType === 'pen') penHoverOff(); // the stroke's own magnet takes over from the hover's
     if (e.button === 1 || e.altKey || spaceHeld) {
       panning = { x: e.clientX, y: e.clientY };
       canvas.style.cursor = 'grabbing';
       return;
     }
     // A hand landing on the selection takes hold of it rather than drawing.
-    const w0 = screenToWorld(e.clientX, e.clientY);
+    const w0 = pointOf(e);
     // A hand on a control's knob slides it: no selection needed, one move when it lets go.
     if (knobBegin(w0)) return;
     const hit = state.selection.length ? handleAt(w0) : null;
@@ -1923,7 +2209,7 @@
   let held = false; // the release after a hold is not a tap
   function pressBegin(e, w) {
     const id = nodeAt(w.x, w.y);
-    if (!id || state.summon || state.selection.length || touches.size > 1) return;
+    if (!id || state.summon || state.selection.length || activeFingers() > 1) return;
     press = { id: id, x: e.clientX, y: e.clientY, timer: setTimeout(() => { const p = press; press = null; if (!p || !live) return; live = null; held = true; holdAround(p.id); }, HOLD_MS) };
   }
   function pressMove(e) { if (press && Math.hypot(e.clientX - press.x, e.clientY - press.y) > HOLD_SLOP) pressEnd(); }
@@ -2004,21 +2290,10 @@
   }
 
   canvas.addEventListener('pointermove', (e) => {
-    if (e.pointerType === 'touch' && touches.has(e.pointerId)) {
-      touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
-      if (pinch && touches.size === 2) {
-        const [a, b] = [...touches.values()];
-        const dist = Math.hypot(a.x - b.x, a.y - b.y);
-        const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
-        const target = clampZoom(pinch.zoom * (dist / Math.max(1, pinch.dist)));
-        zoomBy(pinch.mid.x, pinch.mid.y, target / view.zoom);
-        view.panX += mid.x - pinch.mid.x;
-        view.panY += mid.y - pinch.mid.y;
-        pinch.mid = mid;
-        viewChanged();
-        return;
-      }
-    }
+    // A finger's pinch, pan or palm is its own; one that draws goes on below.
+    if (e.pointerType === 'touch' && touches.has(e.pointerId) && fingerMove(e)) return;
+    // Another pointer's move is not the one under way's: a palm, a mouse nudged while the pen draws.
+    if (owner && e.pointerId !== owner.id) return;
     if (forward) { postPointer(forward, 'move', e, screenToWorld(e.clientX, e.clientY)); return; }
     pressMove(e);
     if (knobMove(screenToWorld(e.clientX, e.clientY))) return;
@@ -2037,26 +2312,37 @@
       if (!spaceHeld) canvas.style.cursor = pointerFrameAt(w) && !insideWaitingLoop(w) ? 'default' : 'crosshair';
       const over = nodeAt(w.x, w.y);
       if (over !== hoverId) { hoverId = over; render(state); }
+      // A pencil near the glass, touching nothing, is a hover: the reading of the mark under it,
+      // as a mouse's gives — and it feels the magnets, the site in reach being where a stroke
+      // begun here would start. A mouse's hover draws no ghost, as it never did.
+      if (e.pointerType === 'pen') penHoverAt(w); else penHoverOff();
       return;
     }
-    live.push(screenToWorld(e.clientX, e.clientY));
+    live.push(pointOf(e));
     magnetHold = magnetQuery(live[live.length - 1]); // the offer follows the pen; out of reach, it lets go
     drawLive(); // the pen and its magnet, on their own layer; the board is as it was (R4c)
   });
 
-  const endTouch = (e) => {
-    if (e.pointerType !== 'touch') return false;
-    touches.delete(e.pointerId);
-    if (touches.size < 2) pinch = null;
-    return touches.size > 0; // a finger is still down: nothing to commit yet
-  };
   canvas.addEventListener('pointercancel', (e) => {
-    endTouch(e); live = null; pressEnd(); magnetStart = null; magnetHold = null; drawLive();
+    // A finger's cancel ends what it was doing and taps nothing; one that drew goes on below.
+    if (e.pointerType === 'touch' && touches.has(e.pointerId) && fingerUp(e, true)) return;
+    // Another pointer's cancel is not the one under way's.
+    if (owner && e.pointerId !== owner.id) return;
+    owner = null;
+    live = null; pressEnd(); magnetStart = null; magnetHold = null; drawLive();
     if (forward) { postPointer(forward, 'cancel', e, screenToWorld(e.clientX, e.clientY)); forward = null; }
   });
 
   canvas.addEventListener('pointerup', (e) => {
-    if (endTouch(e)) { live = null; return; }
+    // A finger's pinch, pan (or tap) and palm end here; one that drew goes on below.
+    if (e.pointerType === 'touch' && touches.has(e.pointerId) && fingerUp(e, false)) return;
+    // Another pointer's release is not the one under way's: a palm lifting while the pen draws.
+    if (owner && e.pointerId !== owner.id) return;
+    // A release the board began nothing for — a press on the chrome let go over the board, a
+    // pinch's last finger — ends nothing here. It used to commit a stroke with no points,
+    // which threw after the event was already in the log (V1-PLAN R6, e2e P2b and P3).
+    if (!owner) return;
+    owner = null;
     if (panning) { panning = null; canvas.style.cursor = 'crosshair'; return; }
     if (forward) { postPointer(forward, 'up', e, screenToWorld(e.clientX, e.clientY)); forward = null; return; }
     pressEnd();
@@ -2067,40 +2353,12 @@
     lastPen = { x: e.clientX, y: e.clientY };
     const points = live;
     live = null;
+    if (!points) return;
     // The dead state: a tap while something is dismissable is the dismissal,
     // and never a dot. Only a tap on empty ground with nothing to dismiss
     // could be a dot — and a bare tap is not one either; a dot is drawn.
-    const tiny = points && points.length < 3;
-    if (tiny) { magnetStart = null; magnetHold = null;
-      const s0 = session.getState();
-      const now = Date.now();
-      // A double-tap inside a waiting loop takes it up — the way in that
-      // needs no mark at all, for a hand that finds the check hard to draw
-      // apart from an arrow. The first tap is nothing; the second, close in
-      // time and place, is the summon.
-      // A tap on the chip beside a matching group opens the field on it, with the match leading.
-      {
-        const chip = chipAt(screenToWorld(e.clientX, e.clientY));
-        if (chip && !s0.summon) { lastTap = null; session.summonMarks(chip.ids, now); render(session.getState()); return; }
-      }
-      if (s0.pendingLassoId && !s0.summon) {
-        const w = screenToWorld(e.clientX, e.clientY);
-        const loop = s0.nodes.get(s0.pendingLassoId);
-        const b = loop && MM.boundsOf(loop);
-        const inside = b && w.x >= b.minX && w.x <= b.maxX && w.y >= b.minY && w.y <= b.maxY;
-        const again = lastTap && now - lastTap.t < DOUBLE_TAP_MS && Math.hypot(e.clientX - lastTap.x, e.clientY - lastTap.y) < 24;
-        lastTap = { x: e.clientX, y: e.clientY, t: now };
-        if (inside && again) { lastTap = null; session.summonHeld(now); render(session.getState()); return; }
-        if (inside) { render(session.getState()); return; }
-      }
-      lastTap = { x: e.clientX, y: e.clientY, t: now };
-      // One tap on the ground lets go of everything — the field and the
-      // selection — so the next stroke draws rather than moves (v10 F9).
-      if (s0.summon) session.dismiss(s0.summon.id, now);
-      if (s0.selection.length) session.deselect(now);
-      render(session.getState());
-      return;
-    }
+    const tiny = points.length < 3;
+    if (tiny) { magnetStart = null; magnetHold = null; tapAt(e); return; }
     lastTap = null;
 
     // A stroke released inside a hold lands its endpoint exactly on the site;
@@ -2127,8 +2385,9 @@
       // the word (found by e2e 16 and 33).
       const letterLike = MM.isLetterLike(MM.getBounds(points), 1 / view.zoom);
       if (connector && !isMark && !letterLike) {
-        if (magnetStart) points[0] = { x: magnetStart.site.point.x, y: magnetStart.site.point.y };
-        if (magnetHold) points[points.length - 1] = { x: magnetHold.site.point.x, y: magnetHold.site.point.y };
+        // Only the place moves: a pen's pressure stays on the point it was pressed at.
+        if (magnetStart) points[0] = Object.assign({}, points[0], { x: magnetStart.site.point.x, y: magnetStart.site.point.y });
+        if (magnetHold) points[points.length - 1] = Object.assign({}, points[points.length - 1], { x: magnetHold.site.point.x, y: magnetHold.site.point.y });
       } else {
         magnetStart = null;
         magnetHold = null;
@@ -2198,6 +2457,41 @@
   let lastTap = null; // the last tap on empty ground, for the double-tap
   const DOUBLE_TAP_MS = 400;
 
+  /**
+   * A tap: the dead state. A tap while something is dismissable is the dismissal, and never
+   * a dot — the pen's or the mouse's stroke too short to be one, or a finger's that never
+   * moved while the pen is what draws.
+   */
+  function tapAt(e) {
+    const s0 = session.getState();
+    const now = Date.now();
+    // A double-tap inside a waiting loop takes it up — the way in that
+    // needs no mark at all, for a hand that finds the check hard to draw
+    // apart from an arrow. The first tap is nothing; the second, close in
+    // time and place, is the summon.
+    // A tap on the chip beside a matching group opens the field on it, with the match leading.
+    {
+      const chip = chipAt(screenToWorld(e.clientX, e.clientY));
+      if (chip && !s0.summon) { lastTap = null; session.summonMarks(chip.ids, now); render(session.getState()); return; }
+    }
+    if (s0.pendingLassoId && !s0.summon) {
+      const w = screenToWorld(e.clientX, e.clientY);
+      const loop = s0.nodes.get(s0.pendingLassoId);
+      const b = loop && MM.boundsOf(loop);
+      const inside = b && w.x >= b.minX && w.x <= b.maxX && w.y >= b.minY && w.y <= b.maxY;
+      const again = lastTap && now - lastTap.t < DOUBLE_TAP_MS && Math.hypot(e.clientX - lastTap.x, e.clientY - lastTap.y) < 24;
+      lastTap = { x: e.clientX, y: e.clientY, t: now };
+      if (inside && again) { lastTap = null; session.summonHeld(now); render(session.getState()); return; }
+      if (inside) { render(session.getState()); return; }
+    }
+    lastTap = { x: e.clientX, y: e.clientY, t: now };
+    // One tap on the ground lets go of everything — the field and the
+    // selection — so the next stroke draws rather than moves (v10 F9).
+    if (s0.summon) session.dismiss(s0.summon.id, now);
+    if (s0.selection.length) session.deselect(now);
+    render(session.getState());
+  }
+
   /** The mark a stroke crossed exactly twice while turning back on itself, if any. */
   function scratchNearMiss(s, node, points) {
     const fp = MM.fingerprintOf(node);
@@ -2218,18 +2512,24 @@
     return null;
   }
 
-  canvas.addEventListener('pointerleave', () => { hoverId = null; render(state); });
-  // A release the canvas never sees — capture refused, a dialog, a second
-  // pointer — must still end whatever the hand was doing, or the next move
-  // keeps drawing with no button down.
+  // A pencil lifted out of reach of the glass leaves, and its magnet with it.
+  canvas.addEventListener('pointerleave', (e) => { if (e.pointerType === 'pen') penHoverOff(); hoverId = null; render(state); });
+  // A release the canvas never sees — capture refused, a dialog — must still
+  // end whatever the hand was doing, or the next move keeps drawing with no
+  // button down. The hand's OWN release: a palm lifted off the panel while the
+  // pen draws is not the pen letting go (V1-PLAN R6).
   addEventListener('pointerup', (e) => {
     if (e.target === canvas) return;
+    if (touches.has(e.pointerId)) fingerUp(e, true); // a finger let go off the board: forgotten, and it taps nothing
+    if (owner && e.pointerId !== owner.id) return;
+    owner = null;
     if (forward) { postPointer(forward, 'up', e, screenToWorld(e.clientX, e.clientY)); forward = null; return; }
     if (knobEnd() || demoEnd()) return;
     if (drag) { endDrag(); return; }
     if (panning) { panning = null; canvas.style.cursor = 'crosshair'; return; }
     if (live) { live = null; render(state); }
   }, true);
+  addEventListener('pointercancel', (e) => { if (e.target !== canvas && touches.has(e.pointerId)) fingerUp(e, true); }, true);
 
   addEventListener('keydown', (e) => {
     if (e.code === 'Space' && !spaceHeld && e.target === document.body) {
@@ -2324,7 +2624,8 @@
 // Provides: queries over state, the rungs cache, render(), ink, the reading under the inspected mark,
 //   a hand's label on its own mark (labelsDrawn), match chips,
 //   the working dot, the explanation plane and its layout, the status line (one sentence).
-// Uses: core, view, artifacts, snap, models, palette, inspector, teach (syncMarkChip), folder (folderStatus, liveSet).
+// Uses: core, view, artifacts, snap, models, palette, inspector, teach (syncMarkChip), folder (folderStatus, liveSet),
+//   input (live, magnetHold, penHover — the pen's layer draws the stroke in progress and a hovering pencil's magnet).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () Ellipsis)();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -2793,7 +3094,9 @@
   // the board: a paint of everything on every move, on a big board, was the
   // ink lagging the pen. The layer takes no pointer; the board's canvas under
   // it takes every one, as before. Every paint of the board repaints it too,
-  // so a pan or a zoom mid-stroke keeps the pen where the hand is.
+  // so a pan or a zoom mid-stroke keeps the pen where the hand is. A pencil
+  // hovering over the glass, touching nothing, has its magnet drawn here too
+  // (V1-PLAN R6): the site a stroke begun there would start on.
   const liveCanvas = document.createElement('canvas');
   liveCanvas.id = 'liveInk';
   liveCanvas.setAttribute('aria-hidden', 'true');
@@ -2812,9 +3115,12 @@
     }
     liveCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
     if (liveShown) liveCtx.clearRect(0, 0, innerWidth, innerHeight);
-    liveShown = !!live;
-    if (!live) return;
+    liveShown = !!live || !!penHover;
+    if (!liveShown) return;
     liveCtx.setTransform(dpr * view.zoom, 0, 0, dpr * view.zoom, dpr * view.panX, dpr * view.panY);
+    // A pencil hovering over the glass: the magnet it is in reach of, where a stroke begun
+    // there would start (V1-PLAN R6) — the same ring, drawn before the pen comes down.
+    if (!live) { magnetRing(penHover); return; }
     liveCtx.lineCap = 'round';
     liveCtx.lineJoin = 'round';
     liveCtx.beginPath();
@@ -2824,24 +3130,26 @@
     liveCtx.stroke();
     // The hold, while the pen is in a site's reach: a ring and the site's
     // name, in the participant colour — an offer, never a trap (P1).
-    if (magnetHold) {
-      const p = magnetHold.site.point;
-      liveCtx.beginPath();
-      liveCtx.arc(p.x, p.y, wpx(8), 0, Math.PI * 2);
-      liveCtx.strokeStyle = C.agent;
-      liveCtx.lineWidth = wpx(1.5);
-      liveCtx.stroke();
-      liveCtx.beginPath();
-      liveCtx.arc(p.x, p.y, wpx(2.2), 0, Math.PI * 2);
-      liveCtx.fillStyle = C.agent;
-      liveCtx.fill();
-      liveCtx.font = wpx(11).toFixed(2) + "px 'Space Grotesk', system-ui, sans-serif";
-      liveCtx.lineWidth = wpx(3);
-      liveCtx.strokeStyle = C.haloText;
-      liveCtx.strokeText(magnetHold.site.kind, p.x + wpx(13), p.y - wpx(9));
-      liveCtx.fillStyle = C.agent;
-      liveCtx.fillText(magnetHold.site.kind, p.x + wpx(13), p.y - wpx(9));
-    }
+    if (magnetHold) magnetRing(magnetHold);
+  }
+  /** A magnet the pen is in reach of: a ring, a dot, and the site's name — in world space, on the pen's layer. */
+  function magnetRing(hit) {
+    const p = hit.site.point;
+    liveCtx.beginPath();
+    liveCtx.arc(p.x, p.y, wpx(8), 0, Math.PI * 2);
+    liveCtx.strokeStyle = C.agent;
+    liveCtx.lineWidth = wpx(1.5);
+    liveCtx.stroke();
+    liveCtx.beginPath();
+    liveCtx.arc(p.x, p.y, wpx(2.2), 0, Math.PI * 2);
+    liveCtx.fillStyle = C.agent;
+    liveCtx.fill();
+    liveCtx.font = wpx(11).toFixed(2) + "px 'Space Grotesk', system-ui, sans-serif";
+    liveCtx.lineWidth = wpx(3);
+    liveCtx.strokeStyle = C.haloText;
+    liveCtx.strokeText(hit.site.kind, p.x + wpx(13), p.y - wpx(9));
+    liveCtx.fillStyle = C.agent;
+    liveCtx.fillText(hit.site.kind, p.x + wpx(13), p.y - wpx(9));
   }
 
   /** The canvas in world units, grown by `m` world units on every side. */
@@ -3986,7 +4294,8 @@
 //   09-field.js), view (usableViewport, viewportRect), models (agents, withWork, cancelReading,
 //   askModelsAbout, offerModel), snap (snapMode), render (nameOfParticipant), artifacts (flipped), frames,
 //   clocks (definitionOf), handwriting (isWriting, isRead, readLine, readOne), images (svgOf), text
-//   (wordToText, lineToText, foldIntoText, textNear, beginTextEdit), input (say, flash).
+//   (wordToText, lineToText, foldIntoText, textNear, beginTextEdit), input (say, flash, downType — which
+//   hand opened the field), hand (handOfPointer).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () { ... })();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -4255,7 +4564,8 @@
     const strokes = [];
     const walk = (node) => {
       const pts = MM.strokePointsOf(node);
-      if (pts) { const clean = MM.cleanPointsOf(node); strokes.push({ points: (clean || pts).map((p) => ({ x: p.x, y: p.y })) }); return; }
+      // A pen's pressure goes with its ink (V1-PLAN R6); a clean form has none to carry.
+      if (pts) { const clean = MM.cleanPointsOf(node); strokes.push({ points: (clean || pts).map((p) => (typeof p.p === 'number' ? { x: p.x, y: p.y, p: p.p } : { x: p.x, y: p.y })) }); return; }
       for (const e of node.edges) if (e.rel === 'has-part') { const p = s.nodes.get(e.to); if (p && !p.reps.some((r) => r.modality === 'erased')) walk(p); }
     };
     ids.forEach((id) => { const n = s.nodes.get(id); if (n) walk(n); });
@@ -4274,7 +4584,7 @@
     const dx = at.x - clip.bounds.minX, dy = at.y - clip.bounds.minY;
     let t = Date.now();
     const made = [];
-    for (const st of clip.strokes) made.push(session.addStroke(st.points.map((p) => ({ x: p.x + dx, y: p.y + dy })), t++, undefined, 1 / view.zoom, { content: true }));
+    for (const st of clip.strokes) made.push(session.addStroke(st.points.map((p) => (typeof p.p === 'number' ? { x: p.x + dx, y: p.y + dy, p: p.p } : { x: p.x + dx, y: p.y + dy })), t++, undefined, 1 / view.zoom, { content: true }));
     if (made.length && select !== false) session.select(made, t);
     flash('pasted ' + made.length + ' stroke' + (made.length === 1 ? '' : 's'));
     return made;
@@ -4488,13 +4798,40 @@
     return r.width > 0 && r.height > 0 ? r : null;
   }
 
-  /** Place the field where it stands now. Touches left/top/width and NOTHING else. */
+  const FIELD_LIST_MIN = 64; // the pills' list is never held shorter than about two rows
+
+  /**
+   * The pills scroll rather than fall under a keyboard (V1-PLAN R6). When the
+   * field is taller than the room the visible viewport leaves it — an on-screen
+   * keyboard takes half an iPad's height and the layout viewport does not
+   * change, only the visual one — its list of pills is held to what fits and
+   * scrolls, and the input, its reading line and the four core buttons stay in
+   * view. The room is the box `fieldBox` will place the field in. Measured from
+   * the list's own scroll height, so a list already scrolled keeps its place;
+   * when the field fits, nothing is set and the stylesheet's rule stands.
+   */
+  function fitFieldHeight(v, u) {
+    const list = summonEl.querySelector('.list');
+    if (!list) return;
+    const room = Math.max(u.height - FIELD_M * 2, v.height - FIELD_TOP - FIELD_M);
+    const natural = summonEl.offsetHeight - list.offsetHeight + list.scrollHeight;
+    if (natural <= room) {
+      if (list.classList.contains('held')) { list.classList.remove('held'); list.style.maxHeight = ''; }
+      return;
+    }
+    const cap = Math.max(FIELD_LIST_MIN, Math.floor(list.scrollHeight - (natural - room))) + 'px';
+    if (list.style.maxHeight !== cap) list.style.maxHeight = cap;
+    list.classList.add('held');
+  }
+
+  /** Place the field where it stands now. Touches left/top/width, and the list's height when it must scroll — NOTHING else. */
   function placeField() {
     const v = viewportRect(), u = usableViewport();
     // Width first: the height below is whatever the content comes to at that
     // width, measured rather than assumed.
     const first = fieldBox(fieldAnchor, { viewport: v, usable: u, height: 0, hand: hand, panel: panelRect() });
     summonEl.style.width = first.w + 'px';
+    fitFieldHeight(v, u);
     const box = fieldBox(fieldAnchor, { viewport: v, usable: u, height: summonEl.offsetHeight, hand: hand, panel: panelRect() });
     summonEl.style.left = box.x + 'px';
     summonEl.style.top = box.y + 'px';
@@ -4560,8 +4897,11 @@
     paintField('');
     // A keyboard that pops up on every selection covers the pills on a phone;
     // a finger taps the input when it wants to type. A pointer gets the focus.
+    // Which hand opened it is read from its pointerType, never the user agent
+    // (V1-PLAN R6): a field a finger opened waits for the finger, whatever the
+    // screen says of itself; a pen's waits where the screen is a touch screen.
     const coarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
-    if (!coarse) setTimeout(() => filter.focus(), 0);
+    if (!coarse && handOfPointer(downType) !== 'finger') setTimeout(() => filter.focus(), 0);
   }
 
   /** Recompute the offers for the open summon and repaint, keeping what was typed. */
@@ -9130,7 +9470,7 @@
 // Provides: the control centre — one button in the bar, a grid of tiles in fixed slots (zoom, snap,
 //   view, theme, hand, auto-read, folder, import, export, models, teach, live, reset, help, boards);
 //   syncTiles() writes every tile's face from state; openPane/closePanes keep one pane open at a time.
-// Uses: core (prefs, themeMode, hand), snap (snapMode), folder (viewMode, folder; the boards adapter:
+// Uses: core (prefs, themeMode, hand, draws), hand (handFace, nextHand), input (palmHere), snap (snapMode), folder (viewMode, folder; the boards adapter:
 //   boardOnScreenName, resetBoard), models (agents), teach (teachPanel), handwriting (autoRead); the page's
 //   version from its <meta name="metamedium-version"> (V1-PLAN R7), said at the head of the help pane.
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
@@ -9161,6 +9501,7 @@
   addEventListener('pointerdown', (e) => {
     if (!ccOpen()) return;
     if (ccEl.contains(e.target) || ccBtn.contains(e.target)) return;
+    if (e.pointerType === 'touch' && palmHere()) return; // a palm on the glass is not a tap outside (V1-PLAN R6)
     closeCC();
   }, true);
 
@@ -9175,7 +9516,10 @@
     if (tiles.snapNow) { tiles.snapNow.hidden = n === 0; ui.tile(tiles.snapNow, heldCandidates.length ? 'snap circled' : 'snap now', n ? String(n) : '', { why: 'redraw every confidently read shape clean; the ink stays underneath' }); }
     ui.tile(tiles.view, 'view', viewMode === 'canvas' ? 'canvas' : viewMode, { on: viewMode !== 'canvas', why: 'canvas, or every artifact as a card' });
     ui.tile(tiles.theme, 'theme', themeMode, { why: 'system follows the OS; light and dark are the same tokens inverted' });
-    ui.tile(tiles.hand, 'hand', hand, { why: 'which side of the pen tip the field opens on' });
+    // The hand: which side of the pen tip the field opens on — and, once a pen has been seen here, what draws (V1-PLAN R6).
+    ui.tile(tiles.hand, 'hand', handFace(hand, draws), draws
+      ? { on: draws === 'pen', why: 'which side of the pen tip the field opens on, and what draws: the pen — a finger pans and pinches, and a palm on the glass is ignored — or a finger too. A tap changes one word' }
+      : { why: 'which side of the pen tip the field opens on' });
     ui.tile(tiles.autoRead, 'auto-read', autoRead ? 'on' : 'off', { on: autoRead, why: 'read handwriting with a model as it is written; off asks only when you say read' });
     ui.tile(tiles.folder, folder.store ? (folder.how === 'git' ? 'repo' : folder.how === 'static' ? 'site' : 'folder') : 'folder', folder.store ? (folder.name || 'open') : 'open…', { on: !!folder.store, why: 'a folder is the canvas: its files are artifacts, your ink is saved beside them' });
     ui.tile(tiles.imp, 'import', '…', { why: 'a picture is traced into ink; a file of a known kind becomes an artifact. Drop or paste works too' });
@@ -9194,7 +9538,8 @@
   // holds goes to the trash, whole. This supersedes the handler 07-input.js set earlier in the build,
   // which emptied the board in the browser and reloaded — one tap from losing it.
   if (tiles.reset) tiles.reset.onclick = () => { closeCC(); resetBoard(); };
-  tiles.hand.onclick = () => setHand(hand === 'right' ? 'left' : 'right');
+  // Until a pen is seen it flips the side, as it always did; after, one word of its face a tap (07-hand.js, nextHand).
+  tiles.hand.onclick = () => { const n = nextHand(hand, draws); if (n.draws !== draws) setDraws(n.draws); setHand(n.side); };
   tiles.autoRead.onclick = () => setAutoRead(!autoRead);
   // A live room: a name, and a relay when the other hand is on another machine.
   const livePanel = document.getElementById('livePanel');
@@ -9276,7 +9621,7 @@
 
 // ===== minimap =====
 // Provides: renderMinimap — the whole board in a corner with the viewport on it; a tap or a drag there pans (SURFACE-v10-PLAN F7).
-// Uses: core (C), view (view, afterViewChange, union), render.
+// Uses: core (C), view (view, afterViewChange, union), render, input (palmHere).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () Ellipsis)();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -9357,6 +9702,8 @@
   if (minimapEl) {
     minimapEl.addEventListener('pointerdown', (e) => {
       if (!mini) return;
+      // A heel resting in the corner while the pen writes is a palm, not a jump across the board (V1-PLAN R6).
+      if (e.pointerType === 'touch' && palmHere()) { e.preventDefault(); return; }
       miniDrag = true;
       try { minimapEl.setPointerCapture(e.pointerId); } catch (err) { /* not capturable */ }
       miniPanTo(miniToWorld(e));
@@ -9652,6 +9999,10 @@
     inkImage: inkImage, readOne: readOne, readWriting: readWriting, askModelsAbout: askModelsAbout,
     // Device preferences and the chrome, for tests: the theme, the hand, auto-read, the field's reader, the clip.
     themeMode: () => themeMode, setThemeMode: setThemeMode, hand: () => hand, setHand: setHand,
+    // Pen, finger and palm (V1-PLAN R6), for tests: what draws, the magnet a hovering pen feels, and the hands down.
+    draws: () => draws, setDraws: setDraws, palmMs: PALM_MS,
+    penHover: () => (penHover ? { kind: penHover.site.kind, index: penHover.site.index, nodeId: penHover.site.nodeId, point: { x: penHover.site.point.x, y: penHover.site.point.y } } : null),
+    hands: () => ({ pens: pen.down.size, fingers: [...touches.values()].map((t) => ({ id: t.id, role: t.role, moved: t.moved })), owner: owner ? Object.assign({}, owner) : null, downType: downType }),
     autoRead: () => autoRead, setAutoRead: setAutoRead, readField: (q) => readField(q), clip: () => clip,
     copyMarks: copyMarks, pasteClip: pasteClip, openCC: openCC, closeCC: closeCC, syncTiles: syncTiles,
     replay: () => rp, rpGoTo: (i) => rpGoTo(i), theme: THEME,

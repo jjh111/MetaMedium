@@ -1,6 +1,6 @@
 // ===== minimap =====
 // Provides: renderMinimap — the whole board in a corner with the viewport on it; a tap or a drag there pans (SURFACE-v10-PLAN F7).
-// Uses: core (C), view (view, afterViewChange, union), render.
+// Uses: core (C), view (view, afterViewChange, union), render, input (palmHere).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () Ellipsis)();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -81,6 +81,8 @@
   if (minimapEl) {
     minimapEl.addEventListener('pointerdown', (e) => {
       if (!mini) return;
+      // A heel resting in the corner while the pen writes is a palm, not a jump across the board (V1-PLAN R6).
+      if (e.pointerType === 'touch' && palmHere()) { e.preventDefault(); return; }
       miniDrag = true;
       try { minimapEl.setPointerCapture(e.pointerId); } catch (err) { /* not capturable */ }
       miniPanTo(miniToWorld(e));
