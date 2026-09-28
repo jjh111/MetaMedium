@@ -92,7 +92,10 @@ window.__setup = function(){
   // The stub answers the FILL contract: per-region content, no layout. It
   // derives the region ids from the prompt it was handed rather than hardcoding
   // them, so a broken layout description fails the run instead of passing.
+  // A request with no body is no model call — the help pane's file (U1g): the page's own origin answers it.
+  if (!window.__realFetch) window.__realFetch = window.fetch;
   window.fetch = async function(url, init){
+    if (!init || !init.body) return window.__realFetch(url, init);
     const body=JSON.parse(init.body);
     const sys=body.messages.find(m=>m.role==='system').content;
     const usr=body.messages.find(m=>m.role==='user').content;
@@ -3792,6 +3795,33 @@ window.__scenario = async function(){
     step('60. the control centre is three labelled groups — Board, View, Helpers — every tile in one, keeping its id, and Reset away from Help',
       JSON.stringify(groups60) === JSON.stringify(want60) && groupOf60('resetBtn') !== groupOf60('helpBtn'),
       { groups: groups60 });
+    mm.closeCC();
+  }
+
+  // ---- 61. Help teaches the loop; your mark says what it is (PLAN-USER-SURFACE U1g; audit rows 13–14) ----
+  {
+    mm.openCC(); await wait(20);
+    const helpPanel61 = document.getElementById('helpPanel');
+    if (helpPanel61.hasAttribute('hidden')) document.getElementById('helpBtn').click();
+    const body61 = () => ((helpPanel61.querySelector('.helpBody') || {}).textContent || '');
+    for (let i = 0; i < 40 && (!body61() || body61() === 'loading…'); i++) await wait(50);
+    const help61 = body61();
+    const has61 = (re) => re.test(help61);
+    step('61. help is one page for a person: draw, hold, choose; the four round buttons; what a model adds and how to ask one, Claude too; boards; live rooms; your mark; undo; the shortcuts — and no developer test plan',
+      has61(/press and hold/i) && has61(/Name/) && has61(/Copy/) && has61(/Paste/) && has61(/Erase/) && has61(/model/i) && has61(/Claude/) && has61(/board/i) && has61(/live/i) && has61(/your mark/i) && has61(/undo/i) && has61(/shortcut/i)
+        && !has61(/QA for v8|Branch:|http\.server|next-phases/),
+      help61.slice(0, 240));
+    if (!helpPanel61.hasAttribute('hidden')) document.getElementById('helpBtn').click();
+    // Your mark: the pane and the chip say what a mark does, before asking for five.
+    const teach61 = document.getElementById('teachPanel');
+    if (teach61.hasAttribute('hidden')) document.getElementById('teachBtn').click();
+    await wait(20);
+    const hint61 = (document.getElementById('teachHint').textContent || '').trim();
+    const chip61 = document.getElementById('markChip').title || '';
+    step('61b. your mark says what a mark does — circle some marks, then draw it across them to see what they can become; the built-in is a check, and yours is taught by drawing it five times — in the pane and on the chip',
+      /circle some marks/i.test(hint61) && /what they can become/i.test(hint61) && /check/i.test(hint61) && /five times/i.test(hint61) && /circle some marks/i.test(chip61),
+      { hint: hint61, chip: chip61 });
+    if (!teach61.hasAttribute('hidden')) document.getElementById('teachBtn').click();
     mm.closeCC();
   }
 
