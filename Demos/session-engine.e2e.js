@@ -3827,6 +3827,22 @@ window.__scenario = async function(){
     mm.closeCC();
   }
 
+  // ---- 56d. The panel's becomes names only what the field offers (U1d, found walking the audit again, U2) ----
+  {
+    mm.session.load([]); mm.setView(1, 0, 0);
+    const ids56d = [];
+    const last56d = () => { const st = mm.session.getState(); return st.contentIds[st.contentIds.length - 1]; };
+    t.stroke(t.rect(420, 200, 160, 100)); ids56d.push(last56d());
+    t.stroke(t.circle(760, 250, 50)); ids56d.push(last56d());
+    t.stroke(t.line({ x: 580, y: 250 }, { x: 711, y: 250 }, 14)); ids56d.push(last56d());
+    mm.session.summonMarks(ids56d, Date.now()); await wait(60);
+    const offered56d = [...document.querySelectorAll('#summon .pill.item')].some((b) => /Show it in 3D/.test(b.textContent));
+    const becomes56d = [...document.querySelectorAll('#inspector .row')].map((r) => r.textContent).find((x) => /^becomes/.test(x)) || '';
+    step('56d. a box tied to a circle by a line: the panel\'s becomes says Show it in 3D only when the field offers it',
+      /Show it in 3D/.test(becomes56d) === offered56d, { offered: offered56d, becomes: becomes56d });
+    mm.session.load([]); mm.setView(1, 0, 0);
+  }
+
   return R;
 };
 
