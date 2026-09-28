@@ -10267,6 +10267,17 @@ ${pad}</${tag}>`;
       if (isHuman(named2)) return named2;
       return ev.by ? handId(ev.by) : LOCAL_PARTICIPANT;
     }
+    function personOf(pid) {
+      if (pid === LOCAL_PARTICIPANT) return myLog === void 0 ? null : handLabel(myLog);
+      if (!isHuman(pid)) return null;
+      const name = getRep(nodes.get(pid), "word")?.data;
+      return typeof name === "string" && name !== "" ? name : null;
+    }
+    function samePerson(maker, writer) {
+      if (maker === writer) return true;
+      const person = personOf(maker);
+      return person !== null && person === personOf(writer);
+    }
     function blankGestures(hand) {
       const commandMark = hand === LOCAL_PARTICIPANT ? config.gesture.commandMark ?? null : null;
       return { pendingLasso: null, summon: null, selection: [], markMiss: null, commandMark };
@@ -10621,7 +10632,7 @@ ${pad}</${tag}>`;
       const node = nodes.get(ev.nodeId);
       if (!node || getRep(node, "erased")) return null;
       const pid = ev.participantId ?? LOCAL_PARTICIPANT;
-      if (authorOf(node) !== pid) return null;
+      if (!samePerson(authorOf(node), pid)) return null;
       node.reps.push({ modality: "label", data: { text: ev.text, at: ev.at }, source: pid });
       return node.id;
     }
@@ -11180,7 +11191,7 @@ ${pad}</${tag}>`;
         const node = nodes.get(targets[0]);
         const maker = node ? authorOf(node) : LOCAL_PARTICIPANT;
         const mine = ev.participantId ?? LOCAL_PARTICIPANT;
-        if (node && maker !== mine) {
+        if (node && !samePerson(maker, mine)) {
           const makerNode = nodes.get(maker);
           const makerName = makerNode ? getRep(makerNode, "word")?.data : void 0;
           return refuse("not-your-ink", targets[0], typeof makerName === "string" ? makerName : maker);
@@ -11385,6 +11396,10 @@ ${pad}</${tag}>`;
       propose: ({ expect, ...args }) => void guarded({ type: "propose", ...args }, expect),
       answer: ({ expect, ...args }) => guarded({ type: "answer", ...args }, expect),
       label: (args) => guarded({ type: "label", ...args }),
+      isMine: (nodeId, participantId) => {
+        const node = nodes.get(nodeId);
+        return !!node && samePerson(authorOf(node), participantId ?? LOCAL_PARTICIPANT);
+      },
       teachCommandMark: (mark, at) => void dispatch({ type: "teach", mark, at }),
       correct: (args) => void dispatch({ type: "correct", ...args }),
       clock: (args) => void dispatch({ type: "clock", ...args }),

@@ -20,7 +20,13 @@
 //
 // The person is unchanged across sittings: what is shown — the name on a card,
 // the colour a hand's ink is drawn in — is derived from the name WITHOUT its
-// suffix (`handLabel`), so a reload is a new log and the same hand.
+// suffix (`handLabel`), so a reload is a new log and the same hand. So are the
+// rules that ask "is this mine?" (V1-PLAN L2i, `Session.isMine`): every
+// sitting of one person may label that person's marks. What stays per
+// sitting is the log, its participant and its numbering, and its gestures —
+// two tabs of one person are two hands drawing independently. A name is
+// self-asserted, so one name is one person on the trust the name and the
+// colour already carry; it is not authentication.
 
 const ALPHABET = 'abcdefghijklmnopqrstuvwxyz0123456789';
 

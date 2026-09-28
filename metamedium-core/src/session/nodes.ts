@@ -311,7 +311,11 @@ export function transcriptOf(node: MMNode): string | undefined {
  */
 export interface Label {
   text: string;
-  /** Who wrote it — always the participant that made the mark. */
+  /**
+   * Who wrote it: the participant that made the mark, or another sitting of
+   * the same person — a reload is a new participant and the same person
+   * (V1-PLAN L2i, `Session.isMine`).
+   */
   source?: string;
   at: number;
 }

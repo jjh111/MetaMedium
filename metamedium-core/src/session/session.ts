@@ -451,9 +451,12 @@ export interface SessionConfig {
    * reused only when its whole history was loaded first. It is stamped on every event
    * this session authors, and the ids those events mint are derived from it,
    * so a host that shares a room must pass the same name it writes its log
-   * file under (`mergeLogs`' `me`). It is never read back at replay time: an
-   * event carries the name it was written under, so opening a board in a new
-   * tab — a new name, every time — renumbers nothing.
+   * file under (`mergeLogs`' `me`). It never numbers anything at replay time:
+   * an event carries the name it was written under, so opening a board in a
+   * new tab — a new name, every time — renumbers nothing. It is read at replay
+   * for one thing only: which person this board's own hand is, so a sitting
+   * may label what the same person drew in another (V1-PLAN L2i) — the name
+   * every other board reads off this log when it merges it.
    *
    * **Left unset, ids are minted the old way**, off a counter over the replay.
    * That is not a hedge, it is the honest answer: a writer with no name cannot
@@ -510,6 +513,15 @@ export interface Session {
    * An empty `text` takes this hand's label off again.
    */
   label(args: { nodeId: string; text: string; participantId?: string; at: number }): string | null;
+  /**
+   * Whether a mark is the participant's own ink — `participantId` defaults to
+   * this board's own hand. The question the label rule asks, at the door and on
+   * replay, and the one the field asks before Enter: the hand that made it, or
+   * another sitting of the same person, since a reload must not make someone a
+   * stranger to their own ink (V1-PLAN L2i). Whose it IS is unchanged —
+   * `authorOf` still names the sitting that made it. Pure; no event.
+   */
+  isMine(nodeId: string, participantId?: string): boolean;
   /**
    * Install (or clear) the mark that resolves a lasso. An event, not a setting:
    * teaching is part of the session's history and replays with it.
@@ -1006,6 +1018,49 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     const named = (ev as { participantId?: string }).participantId ?? LOCAL_PARTICIPANT;
     if (isHuman(named)) return named;
     return ev.by ? handId(ev.by) : LOCAL_PARTICIPANT;
+  }
+
+  // ===== Whose ink (V1-PLAN L2i) =====
+  //
+  // A live hand's log is one SITTING (`sittingName` in hands.ts): a reload is a
+  // new log, a new participant and a new numbering, and all three stay per
+  // sitting — as do gestures (`handOf`), because two tabs of one person draw
+  // independently. But the rules that ask "is this mine?" ask it of the PERSON,
+  // or a reload would make someone a stranger to their own ink.
+
+  /**
+   * The person a participant is: the name its log is written under without the
+   * sitting's suffix (`handLabel`) — the name every board already shows it by —
+   * or null for a participant that is no person (a model, the engine), which is
+   * only ever itself.
+   *
+   * This board's own hand is the person its log is written under (`logName`):
+   * the one fact about the reader this rule reads, and the same fact every
+   * other board reads off that log's name when it merges it (`by`). Another
+   * hand is shown by its person already (`handParticipant`). A board never told
+   * what its log is called is no sitting of anyone, and its rules compare hands
+   * exactly, as they always did.
+   *
+   * A name is self-asserted — there are no accounts — so one name is one
+   * person, on the same trust the name and the colour already carry. It is not
+   * authentication.
+   */
+  function personOf(pid: string): string | null {
+    if (pid === LOCAL_PARTICIPANT) return myLog === undefined ? null : handLabel(myLog);
+    if (!isHuman(pid)) return null;
+    const name = getRep(nodes.get(pid)!, 'word')?.data;
+    return typeof name === 'string' && name !== '' ? name : null;
+  }
+
+  /**
+   * Whether `writer` may call `maker`'s ink its own: the same hand, or two
+   * sittings of one person. The label rule's question, at the door and on
+   * replay, and the field's (`isMine`).
+   */
+  function samePerson(maker: string, writer: string): boolean {
+    if (maker === writer) return true;
+    const person = personOf(maker);
+    return person !== null && person === personOf(writer);
   }
 
   function blankGestures(hand: string): Gestures {
@@ -1561,14 +1616,15 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
    * The authorship rule is checked HERE as well as at the door, for the same
    * reason `applyCode` re-checks `erased`: a merged log can carry another
    * hand's label event, and state must be a pure function of the log however
-   * the logs were put together. A label whose writer did not make the mark is
-   * dropped on replay exactly as it is refused at the door.
+   * the logs were put together. A label whose writer is not the person who
+   * made the mark — in this sitting or another (L2i) — is dropped on replay
+   * exactly as it is refused at the door.
    */
   function applyLabel(ev: Extract<SessionEvent, { type: 'label' }>): string | null {
     const node = nodes.get(ev.nodeId);
     if (!node || getRep(node, 'erased')) return null;
     const pid = ev.participantId ?? LOCAL_PARTICIPANT;
-    if (authorOf(node) !== pid) return null;
+    if (!samePerson(authorOf(node), pid)) return null;
     node.reps.push({ modality: 'label', data: { text: ev.text, at: ev.at }, source: pid });
     return node.id;
   }
@@ -2282,15 +2338,15 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       const n = nodes.get(id);
       return refuse(!n ? 'missing' : 'erased', id);
     }
-    // A label is a word on your OWN ink. Naming a mark another hand made is
-    // blessing it, and a bless is the human's act — so the hand that made the
-    // mark is the only one that may label it, and the refusal says whose it is
-    // (the notes, §B).
+    // A label is a word on your OWN ink. Naming a mark another person made is
+    // blessing it, and a bless is the human's act — so the person who made the
+    // mark is the only one who may label it, from this sitting or another
+    // (L2i), and the refusal says whose it is (the notes, §B).
     if (ev.type === 'label') {
       const node = nodes.get(targets[0]);
       const maker = node ? authorOf(node) : LOCAL_PARTICIPANT;
       const mine = ev.participantId ?? LOCAL_PARTICIPANT;
-      if (node && maker !== mine) {
+      if (node && !samePerson(maker, mine)) {
         const makerNode = nodes.get(maker);
         const makerName = makerNode ? getRep(makerNode, 'word')?.data : undefined;
         return refuse('not-your-ink', targets[0], typeof makerName === 'string' ? makerName : maker);
@@ -2558,6 +2614,10 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     propose: ({ expect, ...args }) => void guarded({ type: 'propose', ...args }, expect),
     answer: ({ expect, ...args }) => guarded({ type: 'answer', ...args }, expect),
     label: (args) => guarded({ type: 'label', ...args }),
+    isMine: (nodeId, participantId) => {
+      const node = nodes.get(nodeId);
+      return !!node && samePerson(authorOf(node), participantId ?? LOCAL_PARTICIPANT);
+    },
     teachCommandMark: (mark, at) => void dispatch({ type: 'teach', mark, at }),
     correct: (args) => void dispatch({ type: 'correct', ...args }),
     clock: (args) => void dispatch({ type: 'clock', ...args }),

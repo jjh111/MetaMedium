@@ -679,6 +679,29 @@ describe('a person is the same person across sittings (V1-PLAN L2i)', () => {
     expect(wordOf(s.nodes.get(handIdOf('john~b2'))!)).toBe('john');
   });
 
+  it('the field\'s question — is this mine? — is the door\'s: every sitting of the person, and nobody else', () => {
+    const a1 = hand('john~a1'), fern = hand('fern~x1');
+    const before = a1.addStroke(box(0, 0, 100, 60), 1000, undefined, 1, { content: true });
+    const hers = fern.addStroke(box(300, 0, 100, 60), 1100, undefined, 1, { content: true });
+    const b2 = hand('john~b2');
+    b2.load(mergeLogs({ 'john~a1': own(a1), 'fern~x1': own(fern), 'john~b2': [] }, { me: 'john~b2' }));
+    const after = b2.addStroke(box(600, 0, 100, 60), 2000, undefined, 1, { content: true });
+    const model = b2.join('agent', 'llm:drawer', 2100, 2);
+    const its = b2.addStroke(box(900, 0, 100, 60), 2200, model, 1, { content: true });
+    // This board's own hand: both of john's sittings' marks, not fern's, not a model's.
+    expect([before, after, hers, its].map((id) => b2.isMine(id))).toEqual([true, true, false, false]);
+    // Asked for another participant: fern's is hers alone, and the model's is its own.
+    expect([before, after, hers, its].map((id) => b2.isMine(id, handIdOf('fern~x1')))).toEqual([false, false, true, false]);
+    expect([before, after, hers, its].map((id) => b2.isMine(id, model))).toEqual([false, false, false, true]);
+    expect(b2.isMine('stroke:nope')).toBe(false);
+    // And the door agrees, mark by mark.
+    for (const id of [before, after, hers, its]) {
+      const probe = hand('john~b2');
+      probe.load(b2.getEvents().slice());
+      expect(probe.label({ nodeId: id, text: 'x', at: 3000 }) === id).toBe(b2.isMine(id));
+    }
+  });
+
   it('a board never told what its log is called compares hands exactly, as it always did', () => {
     // An unnamed board is no sitting of anyone: nothing of another log's is its own.
     const a1 = hand('john~a1');
