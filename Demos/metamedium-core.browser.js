@@ -22,7 +22,6 @@ var MetaMediumCore = (() => {
   // src/index.ts
   var index_exports = {};
   __export(index_exports, {
-    AFFINITY: () => AFFINITY,
     ALONG_STEPS: () => ALONG_STEPS,
     BARB_CLOSED: () => BARB_CLOSED,
     BARB_ROUND: () => BARB_ROUND,
@@ -64,6 +63,7 @@ var MetaMediumCore = (() => {
     GRAPH3D_MARK: () => GRAPH3D_MARK,
     GitStore: () => GitStore,
     HAND_RESOLUTION_PX: () => HAND_RESOLUTION_PX,
+    HAND_TREMOR: () => HAND_TREMOR,
     HEAD_AXIS_SHARE: () => HEAD_AXIS_SHARE,
     HEAD_COMPACT: () => HEAD_COMPACT,
     HEAD_MAX_SHARE: () => HEAD_MAX_SHARE,
@@ -82,6 +82,7 @@ var MetaMediumCore = (() => {
     MAGNET_SCREEN_PX: () => MAGNET_SCREEN_PX,
     MAGNET_SIZE_FRACTION: () => MAGNET_SIZE_FRACTION,
     MANIFEST_PATH: () => MANIFEST_PATH,
+    MARK_GAP_MS: () => MARK_GAP_MS,
     MATCH_FLOOR: () => MATCH_FLOOR,
     MAX_DRAWN: () => MAX_DRAWN,
     MAX_FIGURE_STROKES: () => MAX_FIGURE_STROKES,
@@ -99,6 +100,9 @@ var MetaMediumCore = (() => {
     NO_MATCH: () => NO_MATCH,
     ONE_BEND: () => ONE_BEND,
     OUTLINE_PATH: () => OUTLINE_PATH,
+    PACK_HEADS: () => PACK_HEADS,
+    PACK_ID: () => PACK_ID,
+    PACK_LIMITS: () => PACK_LIMITS,
     PAPERS: () => PAPERS,
     PHRASES: () => PHRASES,
     PRESETS: () => PRESETS,
@@ -126,6 +130,7 @@ var MetaMediumCore = (() => {
     TIER0_PARTICIPANT: () => TIER0_PARTICIPANT,
     TIER1_LIBRARY: () => TIER1_LIBRARY,
     TO_SCALE_WITHIN: () => TO_SCALE_WITHIN,
+    TREMOR_OF_SIZE: () => TREMOR_OF_SIZE,
     UNREAD_WRITING: () => UNREAD_WRITING,
     USE_LIFT_MAX: () => USE_LIFT_MAX,
     USE_LIFT_RATE: () => USE_LIFT_RATE,
@@ -136,6 +141,7 @@ var MetaMediumCore = (() => {
     activeBindingsOf: () => activeBindingsOf,
     addExample: () => addExample,
     addressablesOf: () => addressablesOf,
+    affinityOf: () => affinityOf,
     alongIndex: () => alongIndex,
     alongOf: () => alongOf,
     alongSegment: () => alongSegment,
@@ -207,6 +213,7 @@ var MetaMediumCore = (() => {
     createStubDecideTransport: () => createStubDecideTransport,
     decodeLog: () => decodeLog,
     defaultHost: () => defaultHost,
+    definitionId: () => definitionId,
     definitionOf: () => definitionOf,
     definitionsIn: () => definitionsIn,
     denoise: () => denoise,
@@ -226,6 +233,8 @@ var MetaMediumCore = (() => {
     describeMagnet: () => describeMagnet,
     describeMaths: () => describeMaths,
     describeNotation: () => describeNotation,
+    describePackNotice: () => describePackNotice,
+    describePackRefusal: () => describePackRefusal,
     describeReading: () => describeReading,
     describeRegions: () => describeRegions,
     describeRelations: () => describeRelations,
@@ -243,6 +252,9 @@ var MetaMediumCore = (() => {
     diffSheets: () => diffSheets,
     dimensionsOf: () => dimensionsOf,
     disagreement: () => disagreement,
+    drawingSeed: () => drawingSeed,
+    drawingStrokes: () => drawingStrokes,
+    drawingsOf: () => drawingsOf,
     elementsOf: () => elementsOf,
     enclosedBy: () => enclosedBy,
     encodeLog: () => encodeLog,
@@ -259,6 +271,7 @@ var MetaMediumCore = (() => {
     finiteBounds: () => finiteBounds,
     fit: () => fit2,
     flowchartPortsOf: () => flowchartPortsOf,
+    followPacks: () => followPacks,
     force: () => force,
     formatExpr: () => formatExpr,
     formatNumber: () => formatNumber,
@@ -274,6 +287,7 @@ var MetaMediumCore = (() => {
     getRep: () => getRep,
     getTool: () => getTool,
     handLabel: () => handLabel,
+    handLike: () => handLike,
     has: () => has,
     hasMultipleSources: () => hasMultipleSources,
     headingsOf: () => headingsOf,
@@ -296,10 +310,12 @@ var MetaMediumCore = (() => {
     isGesture: () => isGesture,
     isLassoLike: () => isLassoLike,
     isLetterLike: () => isLetterLike,
+    isPackDefinition: () => isPackDefinition,
     isParticipant: () => isParticipant,
     isRange: () => isRange,
     isSpecific: () => isSpecific,
     isStrokeClosed: () => isStrokeClosed,
+    isTestPack: () => isTestPack,
     isWord: () => isWord,
     isWritingMark: () => isWritingMark,
     joinsRun: () => joinsRun,
@@ -312,10 +328,13 @@ var MetaMediumCore = (() => {
     learnCommandMark: () => learnCommandMark,
     lettersOf: () => lettersOf,
     levelOf: () => levelOf2,
+    libraryDefinitions: () => libraryDefinitions,
+    libraryId: () => libraryId,
     liftOf: () => liftOf,
     liftTargets: () => liftTargets,
     likelihoodOf: () => likelihoodOf,
     listModels: () => listModels,
+    listedPacks: () => listedPacks,
     localityOf: () => localityOf,
     logPathFor: () => logPathFor,
     luminance: () => luminance,
@@ -344,6 +363,7 @@ var MetaMediumCore = (() => {
     normName: () => normName,
     normalizeStroke: () => normalizeStroke,
     notationById: () => notationById,
+    notationsInUse: () => notationsInUse,
     notationsOf: () => notationsOf,
     noul: () => noul,
     numbersOf: () => numbersOf,
@@ -353,6 +373,10 @@ var MetaMediumCore = (() => {
     otsu: () => otsu,
     outlineOf: () => outlineOf,
     ownLog: () => ownLog,
+    packDefinitionOf: () => packDefinitionOf,
+    packOfId: () => packOfId,
+    packRef: () => packRef,
+    packRefusals: () => packRefusals,
     paramsOf: () => paramsOf,
     parseBehaviour: () => parseBehaviour,
     parseBehaviourReply: () => parseBehaviourReply,
@@ -365,6 +389,7 @@ var MetaMediumCore = (() => {
     parseGraph: () => parseGraph,
     parseLayout: () => parseLayout,
     parseLine: () => parseLine,
+    parsePackRef: () => parsePackRef,
     parseProgram: () => parseProgram,
     parseQuantity: () => parseQuantity,
     parseReadings: () => parseReadings,
@@ -386,6 +411,7 @@ var MetaMediumCore = (() => {
     rankOffers: () => rankOffers,
     ranked: () => ranked,
     reachAround: () => reachAround,
+    readDrawing: () => readDrawing,
     readFlowchart: () => readFlowchart,
     readNumber: () => readNumber,
     readSheet: () => readSheet,
@@ -416,6 +442,7 @@ var MetaMediumCore = (() => {
     scopeOf: () => scopeOf,
     score: () => score,
     scratchedOut: () => scratchedOut,
+    seedOf: () => seedOf,
     seeded: () => seeded,
     segmentsIntersect: () => segmentsIntersect,
     shapeExtent: () => shapeExtent,
@@ -423,6 +450,8 @@ var MetaMediumCore = (() => {
     sheetEntry: () => sheetEntry,
     sheetLines: () => sheetLines,
     sheetValue: () => sheetValue,
+    shippedPack: () => shippedPack,
+    shippedPacks: () => shippedPacks,
     simplifyStroke: () => simplifyStroke,
     singular: () => singular,
     siteOf: () => siteOf,
@@ -471,6 +500,7 @@ var MetaMediumCore = (() => {
     unregisterPorts: () => unregisterPorts,
     unregisterTool: () => unregisterTool,
     useLift: () => useLift,
+    validatePack: () => validatePack,
     validateRegions: () => validateRegions,
     wallBoxes: () => wallBoxes,
     whoseInk: () => whoseInk,
@@ -1478,6 +1508,12 @@ var MetaMediumCore = (() => {
   function behavioursOf(node) {
     return node.reps.filter((r) => r.modality === "behaviour").reverse();
   }
+  function packDefinitionOf(node) {
+    return getRep(node, "pack-definition")?.data;
+  }
+  function isPackDefinition(node) {
+    return getRep(node, "pack-definition") !== void 0;
+  }
   function isFrame(node) {
     return getRep(node, "frame") !== void 0;
   }
@@ -1779,14 +1815,14 @@ var MetaMediumCore = (() => {
     const len = Math.hypot(d.x, d.y);
     if (len < 1e-9) return d;
     const u = { x: d.x / len, y: d.y / len };
-    const run = raw.filter((r) => {
+    const run2 = raw.filter((r) => {
       const t = ((r.x - p.x) * u.x + (r.y - p.y) * u.y) / len;
       return t >= 0.2 && t <= 0.8 && Math.abs((r.x - p.x) * -u.y + (r.y - p.y) * u.x) <= 0.2 * len;
     });
-    if (run.length < 3) return d;
-    const mx = run.reduce((k, r) => k + r.x, 0) / run.length, my = run.reduce((k, r) => k + r.y, 0) / run.length;
+    if (run2.length < 3) return d;
+    const mx = run2.reduce((k, r) => k + r.x, 0) / run2.length, my = run2.reduce((k, r) => k + r.y, 0) / run2.length;
     let sxx = 0, sxy = 0, syy = 0;
-    for (const r of run) {
+    for (const r of run2) {
       sxx += (r.x - mx) ** 2;
       sxy += (r.x - mx) * (r.y - my);
       syy += (r.y - my) ** 2;
@@ -3644,50 +3680,50 @@ var MetaMediumCore = (() => {
       sortRuns(runs);
     }
     const plural = first.readings.length > 1;
-    return runs.map((run) => {
-      const ev = evaluateExpr(run.cur, scope, { label: run.label, bindings: run.acc.bindings });
+    return runs.map((run2) => {
+      const ev = evaluateExpr(run2.cur, scope, { label: run2.label, bindings: run2.acc.bindings });
       const unknown = (u) => scope.describeUnknown?.(u) ?? `${u} is not defined`;
-      const notes = [...run.notes];
+      const notes = [...run2.notes];
       for (const n2 of ev.notes) if (!notes.includes(n2)) notes.push(n2);
       for (const u of ev.unknowns) if (!notes.some((n2) => n2.includes(u))) notes.push(unknown(u));
-      const formula = formatExpr(run.cur);
+      const formula = formatExpr(run2.cur);
       const clauses = [];
-      if (plural) clauses.push(run.reading.reason);
+      if (plural) clauses.push(run2.reading.reason);
       if (labels.length) {
         const taken = ev.resolved.filter((r) => r.from === "scope" && r.value);
         const alt = taken.filter((r) => r.alternative);
-        if (run.label) {
-          clauses.push(`${run.label} on ${joinNames(alt.map((r) => r.subject))} (${alt.map((r) => `${r.subject} ${formatQuantity(r.value)}`).join(", ")})`);
+        if (run2.label) {
+          clauses.push(`${run2.label} on ${joinNames(alt.map((r) => r.subject))} (${alt.map((r) => `${r.subject} ${formatQuantity(r.value)}`).join(", ")})`);
         } else {
           const plainLabel = taken.find((r) => r.label)?.label ?? "as written";
           clauses.push(`${plainLabel} (${taken.map((r) => `${r.subject} ${formatQuantity(r.value)}`).join(", ")})`);
         }
       }
-      if (run.restated) {
-        const fixed = run.acc.bound.map((b) => b.reason);
-        const across = run.restatedTexts.some((t) => t.startsWith("the worked line"));
-        clauses.push(`${run.restatedTexts.join(" and ")} ${across ? "has this form" : "restates it with the numbers put in"}${fixed.length ? `, with ${fixed.join(" and ")}` : ""}`);
+      if (run2.restated) {
+        const fixed = run2.acc.bound.map((b) => b.reason);
+        const across = run2.restatedTexts.some((t) => t.startsWith("the worked line"));
+        clauses.push(`${run2.restatedTexts.join(" and ")} ${across ? "has this form" : "restates it with the numbers put in"}${fixed.length ? `, with ${fixed.join(" and ")}` : ""}`);
       }
-      if (run.skipped.length) {
-        clauses.push(`the worked line ${run.skipped.map((t) => `\u201C${t}\u201D`).join(" and ")} does not have this form${run.seeded.length ? `; it puts ${run.seeded.map((b) => `${b.subject} as ${formatQuantity(b.value)}`).join(" and ")}` : ""}`);
+      if (run2.skipped.length) {
+        clauses.push(`the worked line ${run2.skipped.map((t) => `\u201C${t}\u201D`).join(" and ")} does not have this form${run2.seeded.length ? `; it puts ${run2.seeded.map((b) => `${b.subject} as ${formatQuantity(b.value)}`).join(" and ")}` : ""}`);
       }
-      const offs = run.acc.checks.filter((c) => c.status === "off");
+      const offs = run2.acc.checks.filter((c) => c.status === "off");
       clauses.push(ev.value ? `${formula} = ${formatQuantity(ev.value)}` : `${formula}: no value`);
-      if (run.acc.checks.length) {
+      if (run2.acc.checks.length) {
         clauses.push(
-          offs.length ? offs.map((c) => c.reason).join("; ") : run.acc.checks.some((c) => c.status === "unknown") ? "nothing to check some of the written numbers against" : "every written number checks"
+          offs.length ? offs.map((c) => c.reason).join("; ") : run2.acc.checks.some((c) => c.status === "unknown") ? "nothing to check some of the written numbers against" : "every written number checks"
         );
       }
       for (const n2 of notes) if (!clauses.includes(n2)) clauses.push(n2);
       return {
-        expr: run.cur,
+        expr: run2.cur,
         formula,
         value: ev.value,
         worked: ev.value && ev.worked !== formatQuantity(ev.value) ? `${ev.worked} = ${formatQuantity(ev.value)}` : ev.worked,
-        checks: run.acc.checks,
-        bindings: [...run.seeded, ...run.acc.bound],
-        restated: run.restated,
-        ...run.label ? { label: run.label } : {},
+        checks: run2.acc.checks,
+        bindings: [...run2.seeded, ...run2.acc.bound],
+        restated: run2.restated,
+        ...run2.label ? { label: run2.label } : {},
         uses: ev.uses,
         unknowns: ev.unknowns,
         notes,
@@ -3928,7 +3964,7 @@ var MetaMediumCore = (() => {
           return { value: v, key: key2, ...v ? {} : { reason: `step ${n2} has no value` } };
         }
       });
-      const run = (key2) => {
+      const run2 = (key2) => {
         if (readings2.has(key2)) return;
         const d = stepByKey.get(key2);
         const loop = cycles.get(key2);
@@ -3938,12 +3974,12 @@ var MetaMediumCore = (() => {
           values.set(key2, null);
           return;
         }
-        for (const dep of deps.get(key2) ?? []) run(dep);
+        for (const dep of deps.get(key2) ?? []) run2(dep);
         const r = evaluateChain(d.chain, scopeFor(alternatives2.get(key2)));
         readings2.set(key2, r);
         values.set(key2, r[0]?.value ?? null);
       };
-      stepKeys.forEach(run);
+      stepKeys.forEach(run2);
       return { values, readings: readings2, scopeFor };
     };
     const plain = evaluate(/* @__PURE__ */ new Map());
@@ -4280,20 +4316,20 @@ var MetaMediumCore = (() => {
     return bestT;
   }
   function readingOf(provider, node, nodes) {
-    let read;
+    let read2;
     try {
-      read = provider.portsOf(node, nodes);
+      read2 = provider.portsOf(node, nodes);
     } catch {
       return null;
     }
-    if (!read || !Array.isArray(read.ports)) return null;
-    return { notation: provider.notation, symbol: typeof read.symbol === "string" ? read.symbol : provider.notation, ports: read.ports };
+    if (!read2 || !Array.isArray(read2.ports)) return null;
+    return { notation: provider.notation, symbol: typeof read2.symbol === "string" ? read2.symbol : provider.notation, ports: read2.ports };
   }
   function readings(node, nodes) {
     const out = [];
     for (const provider of registry.values()) {
-      const read = readingOf(provider, node, nodes);
-      if (read) out.push(read);
+      const read2 = readingOf(provider, node, nodes);
+      if (read2) out.push(read2);
     }
     return out;
   }
@@ -4357,15 +4393,15 @@ var MetaMediumCore = (() => {
   function alongSiteOf(node, nodes, notation, index) {
     const provider = registry.get(notation);
     if (!provider || !Number.isInteger(index) || index < 0) return null;
-    const read = readingOf(provider, node, nodes);
-    if (!read) return null;
+    const read2 = readingOf(provider, node, nodes);
+    if (!read2) return null;
     const { ordinal, t } = alongOf(index);
     let k = 0;
-    for (const port of read.ports) {
+    for (const port of read2.ports) {
       if (!port || typeof port.name !== "string" || isPointPort(port)) continue;
       const span = continuousSpan(port);
       if (!span) continue;
-      if (k++ === ordinal) return alongSite(node.id, read.symbol, notation, port, span, ordinal, t);
+      if (k++ === ordinal) return alongSite(node.id, read2.symbol, notation, port, span, ordinal, t);
     }
     return null;
   }
@@ -7831,9 +7867,9 @@ ${p.svg}</section>`),
     if (h2 < 10 && w2 > DASH_MAX_WIDTH_PX) return false;
     return true;
   }
-  function joinsRun(run, letter, scale) {
-    if (letter.at - run.lastAt > WORD_WINDOW_MS) return { ok: false, reasoning: "drawn too long after the last letter" };
-    const rb = run.bounds, lb = letter.bounds;
+  function joinsRun(run2, letter, scale) {
+    if (letter.at - run2.lastAt > WORD_WINDOW_MS) return { ok: false, reasoning: "drawn too long after the last letter" };
+    const rb = run2.bounds, lb = letter.bounds;
     const runH = Math.max(1, rb.maxY - rb.minY), letH = Math.max(1, lb.maxY - lb.minY);
     const band = Math.min(rb.maxY, lb.maxY) - Math.max(rb.minY, lb.minY);
     const withinX = lb.minX >= rb.minX - runH * 0.3 && lb.maxX <= rb.maxX + runH * 0.3;
@@ -11357,8 +11393,8 @@ ${lines.join("\n")}
       const turned2 = 1 - ramp3(off, 10, 25);
       if (turned2 > 0) found.push({ kind: "diamond", score: four * turned2, why: `its four corners hold ${pct2(fits.four)} of it, a diagonal within ${Math.max(1, Math.round(off))}\xB0 of the line` });
     }
-    const circle = ramp3(round, 0.8, 0.92) * (1 - ramp3(fits.four, 0.72, 0.8));
-    if (circle > 0) found.push({ kind: "circle", score: circle, why: `round \u2014 ${pct2(round)} of a circle's area for its perimeter` });
+    const circle2 = ramp3(round, 0.8, 0.92) * (1 - ramp3(fits.four, 0.72, 0.8));
+    if (circle2 > 0) found.push({ kind: "circle", score: circle2, why: `round \u2014 ${pct2(round)} of a circle's area for its perimeter` });
     return found;
   }
   var filledShare = (cover) => Math.max(0, Math.min(1, 0.5 + (cover - FILLED_AT) / (2 * FILL_UNSURE)));
@@ -11844,6 +11880,497 @@ ${lines.join("\n")}
     return out.sort((a, b) => b.confidence - a.confidence);
   }
 
+  // src/packs/pack.ts
+  var PACK_HEADS = ["arrow", "triangle", "diamond", "circle", "none"];
+  var PACK_ID = /^[a-z][a-z0-9-]{0,39}$/;
+  var REF = /^([a-z][a-z0-9-]{0,39})@([1-9][0-9]{0,5})$/;
+  function packRef(pack) {
+    return `${pack.id}@${pack.version}`;
+  }
+  function parsePackRef(ref) {
+    if (typeof ref !== "string") return null;
+    const m = REF.exec(ref);
+    return m ? { id: m[1], version: Number(m[2]) } : null;
+  }
+  function isTestPack(pack) {
+    return pack.id.startsWith("test-");
+  }
+  var libraryId = (ref) => `library:${ref}`;
+  var definitionId = (ref, name) => `library:${ref}:${name}`;
+  function packOfId(id) {
+    if (!id.startsWith("library:")) return null;
+    const rest = id.slice("library:".length);
+    const m = /^([a-z][a-z0-9-]{0,39}@[1-9][0-9]{0,5})(?::|$)/.exec(rest);
+    return m ? m[1] : null;
+  }
+  function describePackNotice(pack, reason) {
+    if (reason === "malformed") {
+      return `this board names a pack as \u201C${pack.slice(0, 60)}\u201D, which is no pack's name (id@version) \u2014 nothing was used, and the board is otherwise whole`;
+    }
+    return `this board uses ${pack}, which this build does not have \u2014 its definitions are not matched here, and the board is otherwise whole`;
+  }
+  function describePackRefusal(pack, reason) {
+    if (reason === "malformed") return `\u201C${pack.slice(0, 60)}\u201D is no pack's name \u2014 a pack is named id@version, as basics@1; nothing was used`;
+    return `${pack} is not a pack this build ships; nothing was used`;
+  }
+
+  // src/packs/validate.ts
+  var PACK_LIMITS = {
+    definitions: 64,
+    /** Drawings of one definition, of each kind. */
+    samples: 16,
+    /** Marks in one drawing: a composition's limit. */
+    marks: 50,
+    /** Points in one recorded stroke: a stroke's limit. */
+    points: 500,
+    connectors: 32,
+    affinities: 32,
+    /** What one affinity lifts. */
+    targets: 16,
+    /** Formats one entry is said in. */
+    exports: 8,
+    nameChars: 60,
+    textChars: 400,
+    /** How far from the origin a drawing may reach, in canvas units. */
+    coordinate: 1e6,
+    version: 999999
+  };
+  var Fault = class {
+    constructor(at, reason) {
+      this.at = at;
+      this.reason = reason;
+    }
+  };
+  var bad = (at, reason) => {
+    throw new Fault(at, reason);
+  };
+  var isRecord = (v) => !!v && typeof v === "object" && !Array.isArray(v);
+  var kindOf2 = (v) => v === void 0 ? "missing" : v === null ? "null" : Array.isArray(v) ? "a list" : typeof v;
+  function wantRecord(v, at, what) {
+    if (!isRecord(v)) bad(at, `${what} is ${kindOf2(v)}, not an object`);
+    return v;
+  }
+  function wantList(v, at, what, max, min = 0) {
+    if (!Array.isArray(v)) bad(at, `${what} is ${kindOf2(v)}, not a list`);
+    const xs = v;
+    if (xs.length > max) bad(at, `${what} holds ${xs.length}, past the ${max} a pack may carry`);
+    if (xs.length < min) bad(at, `${what} holds ${xs.length}, and needs at least ${min}`);
+    return xs;
+  }
+  function wantText(v, at, what, max = PACK_LIMITS.textChars) {
+    if (typeof v !== "string") bad(at, `${what} is ${kindOf2(v)}, not text`);
+    const s = v.trim();
+    if (!s) bad(at, `${what} is empty`);
+    if (s.length > max) bad(at, `${what} is ${s.length} characters long, past the ${max} it may be`);
+    return s;
+  }
+  function wantNumber(v, at, what) {
+    if (typeof v !== "number") bad(at, `${what} is ${kindOf2(v)}, not a number`);
+    if (!Number.isFinite(v)) bad(at, `${what} is ${String(v)} \u2014 a measurement has to be a finite number`);
+    if (Math.abs(v) > PACK_LIMITS.coordinate) bad(at, `${what} is ${v}, further than ${PACK_LIMITS.coordinate} from the origin`);
+    return v;
+  }
+  function wantPoint(v, at, what) {
+    const r = wantRecord(v, at, what);
+    return { x: wantNumber(r.x, `${at}.x`, `${what}'s x`), y: wantNumber(r.y, `${at}.y`, `${what}'s y`) };
+  }
+  function wantRole(v, at) {
+    if (!ROLES.includes(v)) bad(at, `the role \u201C${String(v)}\u201D is not one of the six \u2014 ${ROLES.join(", ")} \u2014 and a pack adds none`);
+    return v;
+  }
+  function wantExport(v, at) {
+    const r = wantRecord(v, at, "what it is said as elsewhere");
+    const keys = Object.keys(r);
+    if (keys.length > PACK_LIMITS.exports) bad(at, `it is said in ${keys.length} formats, past the ${PACK_LIMITS.exports} an entry may name`);
+    const out = {};
+    for (const k of keys) {
+      if (!/^[a-z][a-z0-9-]{0,23}$/.test(k)) bad(`${at}.${k}`, `\u201C${k}\u201D is no format's name`);
+      out[k] = wantText(r[k], `${at}.${k}`, `how it is said in ${k}`);
+    }
+    return out;
+  }
+  var BOX_SHAPES = /* @__PURE__ */ new Set(["rectangle", "circle", "triangle"]);
+  var SEGMENT_SHAPES = /* @__PURE__ */ new Set(["line", "arrow"]);
+  function wantShape(v, at) {
+    const r = wantRecord(v, at, "a mark");
+    const shape = r.shape;
+    if (typeof shape === "string" && BOX_SHAPES.has(shape)) {
+      const w2 = wantNumber(r.w, `${at}.w`, "its width");
+      const h2 = wantNumber(r.h, `${at}.h`, "its height");
+      if (!(w2 > 1) || !(h2 > 1)) bad(at, `a ${shape} ${w2} by ${h2} has no size to draw`);
+      return { shape, x: wantNumber(r.x, `${at}.x`, "its x"), y: wantNumber(r.y, `${at}.y`, "its y"), w: w2, h: h2 };
+    }
+    if (typeof shape === "string" && SEGMENT_SHAPES.has(shape)) {
+      const from = wantPoint(r.from, `${at}.from`, "where it starts");
+      const to = wantPoint(r.to, `${at}.to`, "where it ends");
+      if (!(Math.hypot(to.x - from.x, to.y - from.y) > 1)) bad(at, `a ${shape} that starts where it ends has no length to draw`);
+      return { shape, from, to };
+    }
+    return bad(`${at}.shape`, `\u201C${String(shape)}\u201D is not a shape the rung reads \u2014 rectangle, circle, triangle, line or arrow`);
+  }
+  function wantStroke(v, at) {
+    const pts = wantList(v, at, "a recorded stroke", PACK_LIMITS.points, 2);
+    return pts.map((p, i) => wantPoint(p, `${at}[${i}]`, `point ${i}`));
+  }
+  function wantDefinition(v, at) {
+    const r = wantRecord(v, at, "a definition");
+    const name = wantText(r.name, `${at}.name`, "its name", PACK_LIMITS.nameChars);
+    const out = { name };
+    if (r.describes !== void 0) out.describes = wantText(r.describes, `${at}.describes`, "what it looks like");
+    if (r.samples !== void 0) {
+      out.samples = wantList(r.samples, `${at}.samples`, "its samples", PACK_LIMITS.samples).map(
+        (s, i) => wantList(s, `${at}.samples[${i}]`, `sample ${i}`, PACK_LIMITS.marks, 1).map((m, k) => wantShape(m, `${at}.samples[${i}][${k}]`))
+      );
+    }
+    if (r.strokes !== void 0) {
+      out.strokes = wantList(r.strokes, `${at}.strokes`, "its recorded drawings", PACK_LIMITS.samples).map(
+        (s, i) => wantList(s, `${at}.strokes[${i}]`, `recorded drawing ${i}`, PACK_LIMITS.marks, 1).map((k, j) => wantStroke(k, `${at}.strokes[${i}][${j}]`))
+      );
+    }
+    if (!(out.samples?.length || out.strokes?.length)) bad(at, `\u201C${name}\u201D has no drawing to be matched by \u2014 a definition needs a sample or a recorded drawing`);
+    if (r.role !== void 0) out.role = wantRole(r.role, `${at}.role`);
+    if (r.ports !== void 0) out.ports = wantText(r.ports, `${at}.ports`, "where it takes a connector");
+    if (r.export !== void 0) out.export = wantExport(r.export, `${at}.export`);
+    return out;
+  }
+  function wantConnector(v, at) {
+    const r = wantRecord(v, at, "a connector");
+    const out = { name: wantText(r.name, `${at}.name`, "its name", PACK_LIMITS.nameChars) };
+    if (r.describes !== void 0) out.describes = wantText(r.describes, `${at}.describes`, "what it looks like");
+    if (r.head !== void 0) {
+      if (!PACK_HEADS.includes(r.head)) bad(`${at}.head`, `\u201C${String(r.head)}\u201D is not a head \u2014 ${PACK_HEADS.join(", ")}`);
+      out.head = r.head;
+    }
+    if (r.filled !== void 0) {
+      if (typeof r.filled !== "boolean") bad(`${at}.filled`, `whether its head is filled is ${kindOf2(r.filled)}, not yes or no`);
+      out.filled = r.filled;
+    }
+    if (r.role !== void 0) out.role = wantRole(r.role, `${at}.role`);
+    if (r.export !== void 0) out.export = wantExport(r.export, `${at}.export`);
+    return out;
+  }
+  var AFFINITY_KIND = /^(notation|concept):[a-z][a-z0-9-]{0,39}$/;
+  var AFFINITY_TARGET = /^(on|tool|key):\S{1,80}$/;
+  function wantAffinity(kind, v, at) {
+    if (!AFFINITY_KIND.test(kind)) bad(at, `\u201C${kind}\u201D is not a context's entry \u2014 a notation:<id> or a concept:<name>`);
+    const xs = wantList(v, at, `what ${kind} lifts`, PACK_LIMITS.targets, 1);
+    return xs.map((t, i) => {
+      if (typeof t !== "string" || !AFFINITY_TARGET.test(t)) bad(`${at}[${i}]`, `\u201C${String(t)}\u201D lifts nothing a context names \u2014 on:<grounds>, tool:<id> or key:<offer>`);
+      return t;
+    });
+  }
+  function deepFreeze(v) {
+    if (v && typeof v === "object") {
+      for (const x of Object.values(v)) deepFreeze(x);
+      Object.freeze(v);
+    }
+    return v;
+  }
+  function validatePack(value) {
+    let head;
+    let raw;
+    try {
+      raw = wantRecord(value, "", "the pack");
+      const id = wantText(raw.id, "id", "its id", 40);
+      if (!PACK_ID.test(id)) bad("id", `\u201C${id}\u201D is not a pack's id \u2014 lower case, a letter first, then letters, digits and dashes`);
+      const version2 = raw.version;
+      if (typeof version2 !== "number" || !Number.isSafeInteger(version2) || version2 < 1 || version2 > PACK_LIMITS.version) {
+        bad("version", `the version is ${String(version2)} \u2014 a pack's version is a whole number from 1`);
+      }
+      head = { id, version: version2, name: wantText(raw.name, "name", "its name", PACK_LIMITS.nameChars), describes: wantText(raw.describes, "describes", "what it adds") };
+      if (raw.notation !== void 0) {
+        const n2 = wantText(raw.notation, "notation", "the notation it carries", 40);
+        if (!PACK_ID.test(n2)) bad("notation", `\u201C${n2}\u201D is not a notation's id`);
+        head.notation = n2;
+      }
+      wantList(raw.definitions, "definitions", "its definitions", PACK_LIMITS.definitions);
+      if (raw.connectors !== void 0) wantList(raw.connectors, "connectors", "its connectors", PACK_LIMITS.connectors);
+      if (raw.affinities !== void 0) {
+        const keys = Object.keys(wantRecord(raw.affinities, "affinities", "its affinities"));
+        if (keys.length > PACK_LIMITS.affinities) bad("affinities", `it names ${keys.length} affinities, past the ${PACK_LIMITS.affinities} a pack may carry`);
+      }
+    } catch (err) {
+      if (err instanceof Fault) return { ok: false, at: err.at, reason: err.reason };
+      throw err;
+    }
+    const refused = [];
+    const entry = (read2) => {
+      try {
+        return read2();
+      } catch (err) {
+        if (err instanceof Fault) {
+          refused.push({ at: err.at, reason: err.reason });
+          return null;
+        }
+        throw err;
+      }
+    };
+    const definitions = [];
+    raw.definitions.forEach((d, i) => {
+      const at = `definitions[${i}]`;
+      const got = entry(() => wantDefinition(d, at));
+      if (!got) return;
+      if (definitions.some((x) => x.name === got.name)) {
+        refused.push({ at: `${at}.name`, reason: `\u201C${got.name}\u201D is already a definition of this pack \u2014 a name means one thing in it` });
+        return;
+      }
+      definitions.push(got);
+    });
+    const pack = { ...head, definitions };
+    if (raw.connectors !== void 0) {
+      const connectors = [];
+      raw.connectors.forEach((c, i) => {
+        const at = `connectors[${i}]`;
+        const got = entry(() => wantConnector(c, at));
+        if (!got) return;
+        if (connectors.some((x) => x.name === got.name)) {
+          refused.push({ at: `${at}.name`, reason: `\u201C${got.name}\u201D is already a connector of this pack` });
+          return;
+        }
+        connectors.push(got);
+      });
+      pack.connectors = connectors;
+    }
+    if (raw.affinities !== void 0) {
+      const affinities = {};
+      for (const [kind, v] of Object.entries(raw.affinities)) {
+        const at = `affinities.${kind}`;
+        const got = entry(() => wantAffinity(kind, v, at));
+        if (got) affinities[kind] = [...new Set(got)];
+      }
+      pack.affinities = affinities;
+    }
+    return { ok: true, pack: deepFreeze(pack), refused };
+  }
+
+  // src/packs/shipped/basics.ts
+  var circle = (cx2, cy2, r = 40) => ({ shape: "circle", x: cx2 - r, y: cy2 - r, w: 2 * r, h: 2 * r });
+  var bond = (x1, y1, x2, y2) => ({ shape: "line", from: { x: x1, y: y1 }, to: { x: x2, y: y2 } });
+  var BASICS = {
+    id: "basics",
+    version: 1,
+    name: "Basics",
+    describes: "the canonical loop\u2019s vocabulary, already taught: a bubble, and a molecule of three bubbles joined by two bonds",
+    definitions: [
+      {
+        name: "bubble",
+        describes: "a circle on its own",
+        role: "node",
+        samples: [[circle(0, 0)]],
+        ports: "anywhere on its rim"
+      },
+      {
+        name: "molecule",
+        describes: "three circles joined by two bonds",
+        samples: [
+          // The bonds stopping a little short of the circles, as the canonical loop draws them.
+          [circle(200, 200), circle(380, 200), circle(290, 340), bond(245, 200, 335, 200), bond(220, 245, 270, 320)],
+          // The bonds drawn to the circles' edges.
+          [circle(300, 300), circle(500, 300), circle(400, 460), bond(340, 300, 460, 300), bond(328, 328, 372, 432)],
+          // Three in a row.
+          [circle(100, 300), circle(260, 300), circle(420, 300), bond(140, 300, 220, 300), bond(300, 300, 380, 300)]
+        ]
+      }
+    ],
+    connectors: [{ name: "bond", describes: "a line joining two bubbles", head: "none", role: "edge" }]
+  };
+
+  // src/packs/shipped/flowchart.ts
+  var FLOWCHART_PACK = {
+    id: "flowchart",
+    version: 1,
+    name: "Flowchart",
+    describes: "the flowchart notation in use: its ports on the pen, and clean forms and flows likelier beside a flowchart",
+    notation: "flowchart",
+    definitions: [],
+    affinities: { "notation:flowchart": ["on:flow", "on:clean"] }
+  };
+
+  // src/packs/shipped/test-molecule.ts
+  var ring = (cx2, cy2, r, n2 = 48) => Array.from({ length: n2 + 1 }, (_, i) => ({ x: cx2 + r * Math.cos(i / n2 * Math.PI * 2), y: cy2 + r * Math.sin(i / n2 * Math.PI * 2) }));
+  var run = (x1, y1, x2, y2, n2 = 24) => Array.from({ length: n2 }, (_, i) => ({ x: x1 + (x2 - x1) * i / (n2 - 1), y: y1 + (y2 - y1) * i / (n2 - 1) }));
+  var TEST_MOLECULE = {
+    id: "test-molecule",
+    version: 1,
+    name: "Test molecule",
+    describes: "for tests only: the canonical loop\u2019s molecule, known before it is taught",
+    definitions: [
+      {
+        name: "molecule",
+        describes: "three circles joined by two lines, as the canonical loop draws them",
+        samples: [
+          [
+            { shape: "circle", x: 160, y: 160, w: 80, h: 80 },
+            { shape: "circle", x: 340, y: 160, w: 80, h: 80 },
+            { shape: "circle", x: 250, y: 300, w: 80, h: 80 },
+            { shape: "line", from: { x: 245, y: 200 }, to: { x: 335, y: 200 } },
+            { shape: "line", from: { x: 220, y: 245 }, to: { x: 270, y: 320 } }
+          ]
+        ],
+        strokes: [[ring(200, 200, 40), ring(380, 200, 40), ring(290, 340, 40), run(245, 200, 335, 200), run(220, 245, 270, 320)]],
+        export: { mermaid: "(({label}))" }
+      }
+    ],
+    connectors: [{ name: "bond", describes: "a line between two circles", head: "none", role: "edge", export: { mermaid: "---" } }],
+    affinities: { "concept:row": ["key:snap"] }
+  };
+
+  // src/packs/registry.ts
+  var shipped = /* @__PURE__ */ new Map();
+  var refusals = [];
+  function ship(content) {
+    const check2 = validatePack(content);
+    if (!check2.ok) {
+      refusals.push({ pack: String(content?.id ?? "?"), at: check2.at, reason: check2.reason });
+      return;
+    }
+    const ref = packRef(check2.pack);
+    if (shipped.has(ref)) {
+      refusals.push({ pack: ref, at: "", reason: `${ref} is shipped twice \u2014 content under one name never changes` });
+      return;
+    }
+    for (const r of check2.refused) refusals.push({ pack: ref, ...r });
+    shipped.set(ref, check2.pack);
+  }
+  ship(BASICS);
+  ship(FLOWCHART_PACK);
+  ship(TEST_MOLECULE);
+  var shippedPack = (ref) => shipped.get(ref);
+  function shippedPacks() {
+    return [...shipped.values()];
+  }
+  function listedPacks() {
+    return shippedPacks().filter((p) => !isTestPack(p));
+  }
+  function packRefusals() {
+    return refusals.map((r) => ({ ...r }));
+  }
+  function affinityOf(refs, source = shippedPack) {
+    const out = {};
+    for (const ref of refs) {
+      const pack = source(ref);
+      for (const [kind, targets] of Object.entries(pack?.affinities ?? {})) {
+        const into = out[kind] ??= [];
+        for (const t of targets) if (!into.includes(t)) into.push(t);
+      }
+    }
+    return out;
+  }
+
+  // src/packs/synthesize.ts
+  var HAND_TREMOR = 2;
+  var TREMOR_OF_SIZE = 0.02;
+  function mulberry32(seed) {
+    let a = seed >>> 0;
+    return () => {
+      a = a + 1831565813 >>> 0;
+      let t = Math.imul(a ^ a >>> 15, 1 | a);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+  }
+  function seedOf(text) {
+    let h2 = 2166136261;
+    for (let i = 0; i < text.length; i++) {
+      h2 ^= text.charCodeAt(i);
+      h2 = Math.imul(h2, 16777619) >>> 0;
+    }
+    return h2 >>> 0;
+  }
+  var hundredth = (v) => Math.round(v * 100) / 100;
+  function handLike(points, seed, amplitude = HAND_TREMOR) {
+    if (points.length < 2) return points.map((p) => ({ x: hundredth(p.x), y: hundredth(p.y) }));
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const p of points) {
+      if (p.x < minX) minX = p.x;
+      if (p.y < minY) minY = p.y;
+      if (p.x > maxX) maxX = p.x;
+      if (p.y > maxY) maxY = p.y;
+    }
+    const a = Math.min(amplitude, TREMOR_OF_SIZE * Math.max(maxX - minX, maxY - minY));
+    const r = mulberry32(seed);
+    const waves = [1.7, 3.3, 6.1].map((freq) => ({ freq, px: r() * Math.PI * 2, py: r() * Math.PI * 2, weight: 1 / freq }));
+    const norm2 = waves.reduce((s, w2) => s + w2.weight, 0);
+    const last = points.length - 1;
+    return points.map((p, i) => {
+      const t = i / last;
+      let dx = 0, dy = 0;
+      for (const w2 of waves) {
+        dx += Math.sin(t * Math.PI * 2 * w2.freq + w2.px) * w2.weight;
+        dy += Math.cos(t * Math.PI * 2 * w2.freq + w2.py) * w2.weight;
+      }
+      return { x: hundredth(p.x + dx / norm2 * a), y: hundredth(p.y + dy / norm2 * a) };
+    });
+  }
+  function drawingsOf(def) {
+    return [
+      ...(def.samples ?? []).map((_, index) => ({ kind: "sample", index })),
+      ...(def.strokes ?? []).map((_, index) => ({ kind: "recorded", index }))
+    ];
+  }
+  var AS_DRAWN = { k: 1, dx: 0, dy: 0 };
+  function placeShape(s, p) {
+    const at = (q) => ({ x: q.x * p.k + p.dx, y: q.y * p.k + p.dy });
+    if (s.shape === "line" || s.shape === "arrow") return { shape: s.shape, from: at(s.from), to: at(s.to) };
+    const b = s;
+    const o = at({ x: b.x, y: b.y });
+    return { shape: b.shape, x: o.x, y: o.y, w: b.w * p.k, h: b.h * p.k };
+  }
+  function drawingStrokes(def, drawing, seed, place2 = AS_DRAWN) {
+    if (drawing.kind === "recorded") {
+      return (def.strokes?.[drawing.index] ?? []).map((s) => s.map((q) => ({ x: q.x * place2.k + place2.dx, y: q.y * place2.k + place2.dy })));
+    }
+    const out = [];
+    (def.samples?.[drawing.index] ?? []).forEach((shape, k) => {
+      const clean = strokeFor(placeShape(shape, place2));
+      if (clean) out.push(handLike(clean, (seed ^ Math.imul(k + 1, 2654435761)) >>> 0));
+    });
+    return out;
+  }
+
+  // src/packs/definitions.ts
+  var MARK_GAP_MS = 5e3;
+  function readDrawing(strokes, makeBoard) {
+    const board = makeBoard();
+    const ids = [];
+    strokes.forEach((pts, i) => ids.push(board.addStroke(pts.slice(), (i + 1) * MARK_GAP_MS, void 0, 1, { content: true })));
+    const state = board.getState();
+    const signature2 = structuralSignature(ids, state.nodes, (id) => topInterpretation(state.nodes.get(id)) ?? "art");
+    return { ids, signature: signature2, board };
+  }
+  var drawingSeed = (ref, name, drawing) => seedOf(`${ref}:${name}:${drawing.kind}:${drawing.index}`);
+  var read = /* @__PURE__ */ new WeakMap();
+  function libraryDefinitions(pack, makeBoard) {
+    const had = read.get(pack);
+    if (had) return had;
+    const ref = packRef(pack);
+    const out = [];
+    for (const def of pack.definitions) {
+      const sigs = drawingsOf(def).map((d) => readDrawing(drawingStrokes(def, d, drawingSeed(ref, def.name, d)), makeBoard).signature);
+      if (!sigs.length) continue;
+      const [signature2, ...rest] = sigs;
+      const accepted = [];
+      for (const s of rest) {
+        if (compareSignatures(s, signature2).score >= SAME) continue;
+        if (accepted.some((a) => compareSignatures(a, s).score >= SAME)) continue;
+        accepted.push(s);
+      }
+      out.push({
+        id: definitionId(ref, def.name),
+        pack: ref,
+        name: def.name,
+        signature: signature2,
+        accepted,
+        ...def.describes !== void 0 ? { describes: def.describes } : {},
+        ...def.role !== void 0 ? { role: def.role } : {},
+        ...def.ports !== void 0 ? { ports: def.ports } : {},
+        ...def.export !== void 0 ? { export: { ...def.export } } : {}
+      });
+    }
+    read.set(pack, out);
+    return out;
+  }
+
   // src/session/session.ts
   var DEFAULT_SESSION_CONFIG = {
     gesture: DEFAULT_GESTURE_CONFIG,
@@ -11861,6 +12388,10 @@ ${lines.join("\n")}
     let explanations = [];
     let live = [];
     let clocks = {};
+    let packs = [];
+    let library = [];
+    let packNotices = [];
+    const packSource = config.packs ?? shippedPack;
     let gestures = /* @__PURE__ */ new Map();
     let markHands = /* @__PURE__ */ new Map();
     let staleResult = null;
@@ -11938,6 +12469,9 @@ ${lines.join("\n")}
         lastAt,
         counter: counter2,
         clocks: { ...clocks },
+        packs: packs.slice(),
+        library: library.slice(),
+        packNotices: packNotices.slice(),
         derived: copyDerived({
           order: order2,
           nextOrder,
@@ -11970,6 +12504,9 @@ ${lines.join("\n")}
       lastAt = s.lastAt;
       counter2 = s.counter;
       clocks = { ...s.clocks ?? {} };
+      packs = s.packs.slice();
+      library = s.library.slice();
+      packNotices = s.packNotices.slice();
       if (!s.derived) {
         rebuildDerived();
         return;
@@ -12061,6 +12598,9 @@ ${lines.join("\n")}
       explanations = [];
       live = [];
       clocks = {};
+      packs = [];
+      library = [];
+      packNotices = [];
       gestures = /* @__PURE__ */ new Map();
       markHands = /* @__PURE__ */ new Map();
       lastAt = 0;
@@ -12092,10 +12632,14 @@ ${lines.join("\n")}
     function signatureOf(ids) {
       return structuralSignature(ids, nodes, (id) => topInterpretation(nodes.get(id)) ?? "art");
     }
+    function definitionIds() {
+      return library.length ? artifacts.concat(library) : artifacts;
+    }
+    const byScoreOwnFirst = (p, q) => q.score - p.score || (p.pack ? 1 : 0) - (q.pack ? 1 : 0);
     function matchesFor(ids) {
       const sig2 = signatureOf(ids);
       const out = [];
-      for (const aid of artifacts) {
+      for (const aid of definitionIds()) {
         const a = nodes.get(aid);
         const code = [...a.reps].reverse().find((r) => r.modality === "code")?.data;
         if (code?.kind === "text") continue;
@@ -12104,12 +12648,13 @@ ${lines.join("\n")}
         const examples = getRep(a, "examples")?.data;
         const m = matchDefinition(sig2, aSig, examples);
         if (m.vetoed || m.score < MATCH_FLOOR) continue;
-        out.push({ artifactId: aid, name: wordOf(a) ?? aid, score: m.score, reasoning: m.reasoning });
+        const pack = packOfId(aid);
+        out.push({ artifactId: aid, name: wordOf(a) ?? aid, score: m.score, reasoning: m.reasoning, ...pack ? { pack } : {} });
       }
-      return out.sort((p, q) => q.score - p.score);
+      return out.sort(byScoreOwnFirst);
     }
     function recomputeClusterCandidates() {
-      if (artifacts.length === 0 || contentIds.length === 0) {
+      if (artifacts.length === 0 && library.length === 0 || contentIds.length === 0) {
         clusterCandidates = [];
         return;
       }
@@ -12228,11 +12773,12 @@ ${lines.join("\n")}
         fresh.push(gather2(id));
       }
       unsettled.clear();
+      const defs = definitionIds();
       for (const c of fresh) {
         if (c.strokeIds) {
           matchable.add(c);
           c.signature = signatureOf(c.strokeIds);
-          for (const aid of artifacts) scoreAgainst(c, aid);
+          for (const aid of defs) scoreAgainst(c, aid);
         }
         assemble(c);
       }
@@ -12296,7 +12842,7 @@ ${lines.join("\n")}
       if (!definitionsChanged) return;
       definitionsChanged = false;
       const now = /* @__PURE__ */ new Map();
-      for (const aid of artifacts) now.set(aid, definitionKeyOf(aid));
+      for (const aid of definitionIds()) now.set(aid, definitionKeyOf(aid));
       const changed2 = [];
       for (const [aid, k] of now) {
         const was = definitionsSeen.get(aid);
@@ -12315,11 +12861,13 @@ ${lines.join("\n")}
       let candidate = null;
       if (c.strokeIds && c.scores.size) {
         const matches = [];
-        for (const aid of artifacts) {
+        for (const aid of definitionIds()) {
           const s = c.scores.get(aid);
-          if (s) matches.push({ artifactId: aid, name: wordOf(nodes.get(aid)) ?? aid, score: s.score, reasoning: s.reasoning });
+          if (!s) continue;
+          const pack = packOfId(aid);
+          matches.push({ artifactId: aid, name: wordOf(nodes.get(aid)) ?? aid, score: s.score, reasoning: s.reasoning, ...pack ? { pack } : {} });
         }
-        matches.sort((p, q) => q.score - p.score);
+        matches.sort(byScoreOwnFirst);
         if (matches.length) candidate = { nodeIds: c.strokeIds, matches };
       }
       c.candidate = candidate;
@@ -12339,7 +12887,8 @@ ${lines.join("\n")}
           label: m.name,
           artifactId: m.artifactId,
           score: m.score,
-          reasoning: m.reasoning
+          reasoning: m.reasoning,
+          ...m.pack ? { pack: m.pack } : {}
         });
       }
       suggestions.push({ id: nextId("sug"), kind: "prompt", label: "Make\u2026" });
@@ -12742,7 +13291,7 @@ ${lines.join("\n")}
     }
     function eraseNode(nodeId, at) {
       const node = nodes.get(nodeId);
-      if (!node || node.id.startsWith("type:")) return;
+      if (!node || node.id.startsWith("type:") || isLibraryNode(node.id)) return;
       if (getRep(node, "erased")) return;
       node.reps.push({ modality: "erased", data: { at }, source: "user" });
       removeFromContent(node.id);
@@ -12796,6 +13345,7 @@ ${lines.join("\n")}
     function applyPropose(ev) {
       const node = nodes.get(ev.nodeId);
       if (!node || !participants.includes(ev.participantId)) return;
+      if (isLibraryNode(node.id)) return;
       if (getRep(node, "erased")) return;
       for (const e of ev.edges) {
         node.edges.push({
@@ -13045,17 +13595,17 @@ ${lines.join("\n")}
       if (shapeAlone(node) && shapeAlone(prev)) return false;
       const j = joinsRun({ bounds: first.bounds, lastAt: first.at }, letter, scale);
       if (!j.ok) return false;
-      const run = [first];
+      const run2 = [first];
       let bounds = first.bounds;
       for (let step2 = mine.next(); !step2.done; step2 = mine.next()) {
         const cand = letterCandidate(step2.value, scale);
         if (!cand) break;
-        const back = joinsRun({ bounds, lastAt: cand.at }, { bounds: cand.bounds, at: run[0].at }, cand.scale);
+        const back = joinsRun({ bounds, lastAt: cand.at }, { bounds: cand.bounds, at: run2[0].at }, cand.scale);
         if (!back.ok) break;
-        run.unshift(cand);
+        run2.unshift(cand);
         bounds = { minX: Math.min(bounds.minX, cand.bounds.minX), minY: Math.min(bounds.minY, cand.bounds.minY), maxX: Math.max(bounds.maxX, cand.bounds.maxX), maxY: Math.max(bounds.maxY, cand.bounds.maxY) };
       }
-      const letterIds = run.map((r) => r.node.id).concat(node.id);
+      const letterIds = run2.map((r) => r.node.id).concat(node.id);
       const word = { id: nextId("word"), reps: [], edges: [{ to: maker, rel: "made-by" }], capability: 0, createdAt: at };
       nodes.set(word.id, word);
       markHands.set(word.id, hand);
@@ -13169,7 +13719,7 @@ ${lines.join("\n")}
     }
     function applyCorrect(ev) {
       const def = nodes.get(ev.definitionId);
-      if (!def || !artifacts.includes(ev.definitionId)) return;
+      if (!def || !(artifacts.includes(ev.definitionId) || isPackDefinition(def))) return;
       const ids = ev.ids.filter((id) => nodes.has(id));
       if (ids.length === 0) return;
       const sig2 = signatureOf(ids);
@@ -13337,6 +13887,78 @@ ${lines.join("\n")}
     function applyTeach(ev) {
       gesturesOf(handOf(ev)).commandMark = ev.mark;
     }
+    function isLibraryNode(id) {
+      return id.startsWith("library:");
+    }
+    function noticePack(pack, reason, at) {
+      if (packNotices.some((n2) => n2.pack === pack)) return;
+      packNotices = packNotices.concat({ pack, reason, detail: describePackNotice(pack, reason), at });
+    }
+    function packNodeOf(pack, ref, at) {
+      return {
+        id: libraryId(ref),
+        reps: [
+          { modality: "pack", data: { pack: ref, id: pack.id, version: pack.version, name: pack.name, describes: pack.describes, ...pack.notation ? { notation: pack.notation } : {} }, source: "library" },
+          { modality: "word", data: pack.name, source: "library" }
+        ],
+        edges: [],
+        capability: 1,
+        createdAt: at
+      };
+    }
+    function definitionNodeOf(def, at) {
+      const by = libraryId(def.pack);
+      return {
+        id: def.id,
+        reps: [
+          { modality: "word", data: def.name, source: by },
+          { modality: "signature", data: def.signature, source: by },
+          ...def.accepted.length ? [{ modality: "examples", data: { accepted: def.accepted.slice(), rejected: [] }, source: by }] : [],
+          {
+            modality: "pack-definition",
+            data: {
+              pack: def.pack,
+              definition: def.name,
+              ...def.describes !== void 0 ? { describes: def.describes } : {},
+              ...def.role !== void 0 ? { role: def.role } : {},
+              ...def.ports !== void 0 ? { ports: def.ports } : {},
+              ...def.export !== void 0 ? { export: { ...def.export } } : {}
+            },
+            source: by
+          }
+        ],
+        edges: [{ to: by, rel: "made-by" }],
+        capability: 1,
+        createdAt: at
+      };
+    }
+    function applyUse(ev) {
+      const ref = typeof ev.pack === "string" ? ev.pack : String(ev.pack);
+      if (!parsePackRef(ref)) return noticePack(ref, "malformed", ev.at);
+      if (packs.includes(ref)) return;
+      const pack = packSource(ref);
+      if (!pack || packRef(pack) !== ref) return noticePack(ref, "unknown", ev.at);
+      packs.push(ref);
+      const pid = libraryId(ref);
+      if (!nodes.has(pid)) nodes.set(pid, packNodeOf(pack, ref, ev.at));
+      for (const def of libraryDefinitions(pack, () => createSession())) {
+        if (!nodes.has(def.id)) nodes.set(def.id, definitionNodeOf(def, ev.at));
+        library.push(def.id);
+      }
+      definitionsChanged = true;
+      recomputeClusterCandidates();
+    }
+    function applyUnuse(ev) {
+      const ref = typeof ev.pack === "string" ? ev.pack : String(ev.pack);
+      if (packNotices.some((n2) => n2.pack === ref)) packNotices = packNotices.filter((n2) => n2.pack !== ref);
+      const at = packs.indexOf(ref);
+      if (at < 0) return;
+      packs.splice(at, 1);
+      const prefix = libraryId(ref) + ":";
+      library = library.filter((id) => !id.startsWith(prefix));
+      definitionsChanged = true;
+      recomputeClusterCandidates();
+    }
     function codeVersion(nodeId) {
       const node = nodes.get(nodeId);
       return node ? node.reps.filter((r) => r.modality === "code").length : 0;
@@ -13412,6 +14034,7 @@ ${lines.join("\n")}
     function applyCode(ev) {
       const node = nodes.get(ev.nodeId);
       if (!node || !participants.includes(ev.participantId)) return null;
+      if (isLibraryNode(node.id)) return null;
       if (getRep(node, "erased")) return null;
       node.reps.push({
         modality: "code",
@@ -13472,6 +14095,12 @@ ${lines.join("\n")}
           return applyLabel(ev);
         case "teach":
           applyTeach(ev);
+          return null;
+        case "use":
+          applyUse(ev);
+          return null;
+        case "unuse":
+          applyUnuse(ev);
           return null;
         case "correct":
           applyCorrect(ev);
@@ -13674,7 +14303,9 @@ ${lines.join("\n")}
         recentIds: recentWithin(lastAt, LOCAL_PARTICIPANT),
         live: [...live],
         clocks: { ...clocks },
-        selection: [...reader.selection]
+        selection: [...reader.selection],
+        packs: [...packs],
+        packNotices: packNotices.map((n2) => ({ ...n2 }))
       };
     }
     function subscribe(listener) {
@@ -13694,6 +14325,21 @@ ${lines.join("\n")}
         return !!node && samePerson(authorOf(node), participantId ?? LOCAL_PARTICIPANT);
       },
       teachCommandMark: (mark, at) => void dispatch({ type: "teach", mark, at }),
+      use: (pack, at, participantId) => {
+        const ref = typeof pack === "string" ? pack.trim() : String(pack);
+        const refuse = (reason) => ({ pack: ref, reason, detail: describePackRefusal(ref, reason), at });
+        if (!parsePackRef(ref)) return refuse("malformed");
+        const content = packSource(ref);
+        if (!content || packRef(content) !== ref) return refuse("unknown");
+        if (packs.includes(ref)) return null;
+        dispatch({ type: "use", pack: ref, at, ...participantId !== void 0 ? { participantId } : {} });
+        return null;
+      },
+      unuse: (pack, at, participantId) => {
+        const ref = typeof pack === "string" ? pack.trim() : String(pack);
+        if (!packs.includes(ref) && !packNotices.some((n2) => n2.pack === ref)) return;
+        dispatch({ type: "unuse", pack: ref, at, ...participantId !== void 0 ? { participantId } : {} });
+      },
       correct: (args) => void dispatch({ type: "correct", ...args }),
       clock: (args) => void dispatch({ type: "clock", ...args }),
       behave: (args) => void dispatch({ type: "behave", ...args }),
@@ -14428,10 +15074,10 @@ ${lines.join("\n")}
   var registry2 = /* @__PURE__ */ new Map();
   var offered = /* @__PURE__ */ new Map();
   function sixRoles(n2) {
-    const bad = [...n2.symbols, ...n2.connectors].filter((d) => !ROLES.includes(d.role));
-    if (bad.length) {
+    const bad2 = [...n2.symbols, ...n2.connectors].filter((d) => !ROLES.includes(d.role));
+    if (bad2.length) {
       throw new Error(
-        `a notation says which of the six roles its symbols play and adds none \u2014 ${bad.map((d) => `${d.name} plays "${d.role}"`).join(", ")}, not one of ${ROLES.join(", ")}`
+        `a notation says which of the six roles its symbols play and adds none \u2014 ${bad2.map((d) => `${d.name} plays "${d.role}"`).join(", ")}, not one of ${ROLES.join(", ")}`
       );
     }
   }
@@ -15630,8 +16276,8 @@ if (mm.THREE && mm.scene) {
       }));
     },
     take(offer, scope, session, at) {
-      const { definitionId } = offer.data;
-      session.correct({ ids: scope.summon.enclosedIds.slice(), definitionId, verdict: "is-not", at });
+      const { definitionId: definitionId2 } = offer.data;
+      session.correct({ ids: scope.summon.enclosedIds.slice(), definitionId: definitionId2, verdict: "is-not", at });
     }
   };
 
@@ -15649,7 +16295,9 @@ if (mm.THREE && mm.scene) {
   function definitionOf(board, artifactId) {
     const node = board.nodes.get(artifactId);
     const inst = node?.edges.find((e) => e.rel === "instance-of");
-    return inst ? inst.to : artifactId;
+    if (!inst) return artifactId;
+    const def = board.nodes.get(inst.to);
+    return def && isPackDefinition(def) ? artifactId : inst.to;
   }
   function definitionsIn(board, ids) {
     return [...new Set(artifactsIn(board, ids).map((id) => definitionOf(board, id)))];
@@ -15672,13 +16320,13 @@ if (mm.THREE && mm.scene) {
       const n2 = scope.state.nodes.get(id);
       return n2 ? transcriptsOf(n2)[0] : void 0;
     });
-    const read = ids.length >= 2 && said2.every((t) => !!t && !!t.text);
+    const read2 = ids.length >= 2 && said2.every((t) => !!t && !!t.text);
     return {
       ids,
       said: said2,
-      read,
-      text: read ? said2.map((t) => t.text).join(" ") : "",
-      confidence: read ? Math.min(...said2.map((t) => t.confidence)) : 0
+      read: read2,
+      text: read2 ? said2.map((t) => t.text).join(" ") : "",
+      confidence: read2 ? Math.min(...said2.map((t) => t.confidence)) : 0
     };
   }
   function unionOf(boxes) {
@@ -16518,8 +17166,8 @@ if (mm.THREE && mm.scene) {
   };
   var conceptNoun = (name) => CONCEPT_NOUN[name] ?? article2(name) + " " + name;
   var shortReason = (reasoning) => reasoning.split(/ \(| — /)[0].trim();
-  function emptyContext(scopeIds, at) {
-    return { scopeIds, notations: [], concepts: [], recent: [], kind: null, key: null, at };
+  function emptyContext(scopeIds, at, affinity) {
+    return { scopeIds, notations: [], concepts: [], recent: [], kind: null, key: null, at, affinity };
   }
   function isEmptyContext(ctx) {
     return !ctx || !ctx.notations.length && !ctx.concepts.length && !ctx.recent.length;
@@ -16528,6 +17176,7 @@ if (mm.THREE && mm.scene) {
     const state = board.getState();
     const events = board.getEvents();
     const now = opts.now ?? lastAtOf(events);
+    const affinity = affinityOf(state.packs ?? [], opts.packs ?? shippedPack);
     const point2 = isPoint(at) ? at : null;
     const scopeIds = point2 ? [] : [...new Set(at)].filter((id) => state.nodes.has(id));
     const scope = new Set(scopeIds);
@@ -16536,7 +17185,7 @@ if (mm.THREE && mm.scene) {
       const b = boundsOf(state.nodes.get(id));
       if (b && finiteBounds(b)) boxes.push(b);
     }
-    if (!point2 && !boxes.length) return emptyContext(scopeIds, now);
+    if (!point2 && !boxes.length) return emptyContext(scopeIds, now, affinity);
     const nearScope = (b) => {
       if (point2) return pointNearnessOf(point2, b);
       let best = 0;
@@ -16603,13 +17252,13 @@ if (mm.THREE && mm.scene) {
     const notations = /* @__PURE__ */ new Map();
     const concepts = /* @__PURE__ */ new Map();
     for (const hood of hoods) {
-      let read = [];
+      let read2 = [];
       try {
-        read = notationsOf(state, hood.ids);
+        read2 = notationsOf(state, hood.ids);
       } catch {
-        read = [];
+        read2 = [];
       }
-      for (const r of read) {
+      for (const r of read2) {
         if (!(r.confidence >= NOTATION_FLOOR)) continue;
         const weight = r.confidence * hood.nearness;
         const had = notations.get(r.notation);
@@ -16653,7 +17302,8 @@ if (mm.THREE && mm.scene) {
       recent,
       kind: lead ? lead.kind : null,
       key: lead ? lead.kind + "@" + lead.anchor : null,
-      at: now
+      at: now,
+      affinity
     };
   }
   function targetsOf(ev, state) {
@@ -16727,14 +17377,11 @@ if (mm.THREE && mm.scene) {
   var RECENT_SAME_TOOL = 0.5;
   var STEADY_MARGIN = 0.1;
   var STEADY_MS = 12e4;
-  var AFFINITY = {
-    "notation:flowchart": ["on:flow", "on:clean"]
-  };
-  function liftTargets(kind) {
+  function liftTargets(kind, affinity) {
     const at = kind.indexOf(":");
     const type = kind.slice(0, at), name = kind.slice(at + 1);
     const own = type === "notation" ? ["on:" + name, "tool:notation:" + name] : ["on:" + name];
-    return own.concat(AFFINITY[kind] ?? []);
+    return own.concat(affinity?.[kind] ?? []);
   }
   function standsOn(item) {
     const out = /* @__PURE__ */ new Set();
@@ -16750,7 +17397,7 @@ if (mm.THREE && mm.scene) {
     if (!ctx || isSpecific(item)) return { factor: 1, because: [] };
     const on = standsOn(item);
     const hits = [];
-    const lifts = (kind) => liftTargets(kind).some((t) => on.has(t));
+    const lifts = (kind) => liftTargets(kind, ctx.affinity).some((t) => on.has(t));
     for (const n2 of ctx.notations) if (n2.weight > 0 && lifts("notation:" + n2.id)) hits.push({ w: n2.weight, why: n2.reason });
     for (const c of ctx.concepts) if (c.weight > 0 && lifts("concept:" + c.name)) hits.push({ w: c.weight, why: c.reason ?? "it sits beside a " + c.name });
     for (const r of ctx.recent) {
@@ -16769,7 +17416,7 @@ if (mm.THREE && mm.scene) {
     const targets = /* @__PURE__ */ new Set();
     for (const c of BUILTIN_CONCEPTS) for (const t of liftTargets("concept:" + c.name)) targets.add(t);
     for (const n2 of registeredNotations()) for (const t of liftTargets("notation:" + n2)) targets.add(t);
-    for (const kind of Object.keys(AFFINITY)) for (const t of liftTargets(kind)) targets.add(t);
+    for (const p of shippedPacks()) for (const [kind, lifted] of Object.entries(p.affinities ?? {})) for (const t of liftTargets(kind, { [kind]: lifted })) targets.add(t);
     return items.some((item) => {
       if (isSpecific(item)) return false;
       if (item.tool) return true;
@@ -16808,6 +17455,35 @@ if (mm.THREE && mm.scene) {
   }
   function topOf(ranked2, eligible = () => true) {
     return ranked2.find((x) => eligible(x));
+  }
+
+  // src/packs/follow.ts
+  function notationsInUse(state, source = shippedPack) {
+    const out = [];
+    for (const ref of state.packs ?? []) {
+      const n2 = source(ref)?.notation;
+      if (n2 && !out.includes(n2)) out.push(n2);
+    }
+    return out;
+  }
+  function followPacks(board, source = shippedPack) {
+    const offered2 = /* @__PURE__ */ new Map();
+    const sync = (state) => {
+      const want = notationsInUse(state, source);
+      for (const [n2, off] of offered2) {
+        if (want.includes(n2)) continue;
+        off();
+        offered2.delete(n2);
+      }
+      for (const n2 of want) if (!offered2.has(n2)) offered2.set(n2, offerPorts(n2));
+    };
+    sync(board.getState());
+    const stop = board.subscribe(sync);
+    return () => {
+      stop();
+      for (const off of offered2.values()) off();
+      offered2.clear();
+    };
   }
 
   // src/participants/serialize.ts
@@ -17582,7 +18258,7 @@ ${brief}`, ids: planned.ids, build: planned.build };
         raw: result2.text
       };
     }
-    async function read(args) {
+    async function read2(args) {
       if (!config.vision) return { ok: false, transcripts: [], error: `${name} cannot see images` };
       const state = session.getState();
       const generation = state.generation;
@@ -17731,7 +18407,7 @@ The canvas already read: ${describeBehaviour({ terms: local.terms })}. Read the 
       session.behave({ nodeId: args.nodeId, behaviour, participantId: id, at: args.at });
       return { ok: true, behaviour, via: "model", unread: reply.unread, raw: result2.text };
     }
-    return { id, name, config, interpret, ask, generate, read, draw, behave, program };
+    return { id, name, config, interpret, ask, generate, read: read2, draw, behave, program };
   }
 
   // src/participants/bridge.ts

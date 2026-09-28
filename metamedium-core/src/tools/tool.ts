@@ -106,6 +106,14 @@ export interface Context {
   kind?: string | null;
   /** The kind and the neighbourhood it was read over: what the steady top is held under. Null far from any context. */
   key?: string | null;
+  /**
+   * What the library packs this board uses say an entry beside the hand makes
+   * likelier (V1-PLAN §2.3, B3): keyed by the entry (`notation:flowchart`),
+   * each the grounds, tools and offers it lifts (`on:clean`). Content, carried
+   * by the packs: with none in use, nothing is lifted but what stands on an
+   * entry's own name.
+   */
+  affinity?: Readonly<Record<string, readonly string[]>>;
 }
 
 export const NO_CONTEXT: Context = Object.freeze({ scopeIds: [], notations: [], concepts: [], recent: [], kind: null, key: null }) as Context;

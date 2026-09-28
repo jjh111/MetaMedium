@@ -6,11 +6,14 @@ import { describe, it, expect } from 'vitest';
 import type { Context } from '../tools/tool';
 import { NO_CONTEXT } from '../tools/tool';
 import { baseOn, rankOffers, type Uses } from '../tools/rank';
-import { AFFINITY, CONTEXT_LIFT_MAX, canLift, liftOf, liftTargets, rank, standsOn, steadyTop, topOf, type RankItem, type Ranked } from './rank';
+import { CONTEXT_LIFT_MAX, canLift, liftOf, liftTargets, rank, standsOn, steadyTop, topOf, type RankItem, type Ranked } from './rank';
+import { affinityOf } from '../packs/registry';
 
 const conv = (key: string, on: string, confidence: number, tool: string): RankItem => ({ key, base: baseOn({ on, confidence }), tool, grounds: { on, confidence } });
 const ctxOf = (c: Partial<Context>): Context => ({ ...NO_CONTEXT, ...c });
-const FLOW = ctxOf({ notations: [{ id: 'flowchart', weight: 0.8, reason: 'it sits beside a flowchart: three processes, one decision' }], kind: 'notation:flowchart', key: 'notation:flowchart@stroke:1' });
+/** What the flowchart@1 pack says a flowchart beside the hand makes likelier — the board beside it uses the pack (B3). */
+const FLOWCHART_AFFINITY = affinityOf(['flowchart@1']);
+const FLOW = ctxOf({ notations: [{ id: 'flowchart', weight: 0.8, reason: 'it sits beside a flowchart: three processes, one decision' }], kind: 'notation:flowchart', key: 'notation:flowchart@stroke:1', affinity: FLOWCHART_AFFINITY });
 const ROW = ctxOf({ concepts: [{ name: 'row', weight: 0.8, reason: 'it sits beside a row: 3 comparable marks sitting side by side' }], kind: 'concept:row', key: 'concept:row@stroke:9' });
 
 const items: RankItem[] = [
@@ -25,8 +28,9 @@ describe('rank — the field’s order, with what stands beside the hand', () =>
   it('what an item stands on: its grounds, the concept a reading names, its tool, its key', () => {
     expect([...standsOn(items[0])].sort()).toEqual(['key:row:tidy-row', 'on:row', 'tool:tidy']);
     expect([...standsOn({ key: 'concept:flow', base: 0.9, grounds: { on: 'concept', confidence: 0.9 } })].sort()).toEqual(['key:concept:flow', 'on:concept', 'on:flow']);
-    // A notation lifts what stands on its own name and its tool, and its affinity; a concept, what stands on its name.
-    expect(liftTargets('notation:flowchart')).toEqual(['on:flowchart', 'tool:notation:flowchart', ...AFFINITY['notation:flowchart']]);
+    // A notation lifts what stands on its own name and its tool, and what the packs in use say it makes likelier; a concept, what stands on its name.
+    expect(liftTargets('notation:flowchart')).toEqual(['on:flowchart', 'tool:notation:flowchart']);
+    expect(liftTargets('notation:flowchart', FLOWCHART_AFFINITY)).toEqual(['on:flowchart', 'tool:notation:flowchart', 'on:flow', 'on:clean']);
     expect(liftTargets('concept:row')).toEqual(['on:row']);
   });
 
@@ -41,11 +45,23 @@ describe('rank — the field’s order, with what stands beside the hand', () =>
     expect(byFlow.map((x) => x.key)).toEqual(['snap', 'row:tidy-row', 'row:equalize', 'read-any', 'what']);
     expect(byFlow[0].because).toEqual(['it sits beside a flowchart: three processes, one decision']);
     // However strong the context, a quarter again at most.
-    const loud = ctxOf({ notations: [{ id: 'flowchart', weight: 7, reason: 'loud' }] });
+    const loud = ctxOf({ notations: [{ id: 'flowchart', weight: 7, reason: 'loud' }], affinity: FLOWCHART_AFFINITY });
     expect(liftOf(items[2], loud).factor).toBe(CONTEXT_LIFT_MAX);
     // Two reasons for one item: the strongest sets the factor, both are said, strongest first.
-    const both = ctxOf({ notations: FLOW.notations, recent: [{ tool: 'clean', offer: 'snap', at: 1, weight: 0.5 }] });
+    const both = ctxOf({ notations: FLOW.notations, recent: [{ tool: 'clean', offer: 'snap', at: 1, weight: 0.5 }], affinity: FLOWCHART_AFFINITY });
     expect(liftOf(items[2], both)).toEqual({ factor: 1 + (CONTEXT_LIFT_MAX - 1) * 0.8, because: ['it sits beside a flowchart: three processes, one decision', 'you just took it beside these'] });
+  });
+
+  it('the affinity is the pack’s (B3): beside a flowchart on a board that uses no pack, only what stands on its own name is lifted', () => {
+    // The same flowchart beside the hand, no pack in use: nothing here stands on the flowchart's own name, so nothing moves.
+    const bare = ctxOf({ notations: FLOW.notations, kind: FLOW.kind, key: FLOW.key });
+    expect(rank(items, bare).map((x) => x.key)).toEqual(rankOffers(items).map((x) => x.key));
+    expect(rank(items, bare).every((x) => x.lift === 1 && x.because.length === 0)).toBe(true);
+    // An offer of the notation's own tool is lifted by its name, pack or none — recognition is never gated on a declaration.
+    const own: RankItem = { key: 'notation:flowchart:mermaid', base: 0.6, tool: 'notation:flowchart' };
+    expect(liftOf(own, bare).factor).toBeGreaterThan(1);
+    // With the pack, drawing them clean leads.
+    expect(rank(items, FLOW)[0].key).toBe('snap');
   });
 
   it('with no context it is rankOffers, key for key and number for number — use included', () => {

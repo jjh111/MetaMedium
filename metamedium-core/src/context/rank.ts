@@ -31,9 +31,12 @@
 // An item stands on what its grounds say (`grounds.on` — a concept's name for
 // a conversion, `clean` for the clean forms), on the concept a reading names
 // (`concept:row`), and on its tool. A context entry lifts what stands on its
-// own name, and on its `AFFINITY` — what that notation or concept beside the
-// hand makes likelier. That table is content, not code: packs (B3) will carry
-// their own.
+// own name, and on its AFFINITY — what that notation or concept beside the
+// hand makes likelier. The affinities are content, not code: the library packs
+// a board uses carry them (V1-PLAN §2.3, B3; `flowchart@1` says a flowchart
+// makes clean forms and flows likelier), and the context read from that board
+// hands them in (`ctx.affinity`). A board with no pack lifts only what stands
+// on an entry's own name.
 
 import type { Context, Grounds } from '../tools/tool';
 import { NO_CONTEXT } from '../tools/tool';
@@ -42,6 +45,7 @@ import { isSpecific, likelihoodOf } from '../tools/rank';
 import { getTool } from '../tools/registry';
 import { BUILTIN_CONCEPTS } from '../concepts/concept';
 import { registeredNotations } from '../notations/notation';
+import { shippedPacks } from '../packs/registry';
 
 /** The most a context lifts an item: a quarter again, as learned use does. */
 export const CONTEXT_LIFT_MAX = 1.25;
@@ -53,21 +57,16 @@ export const STEADY_MARGIN = 0.1;
 export const STEADY_MS = 120_000;
 
 /**
- * What a notation or concept beside the hand makes likelier, besides what
- * stands on its own name: the grounds (`on:…`), tools (`tool:…`) and keys
- * (`key:…`) it lifts. A flowchart is drawn clean and its marks join as flows
- * (V1-PLAN A1: *it reads as a flowchart; clean it*).
+ * Everything an entry of a context lifts: what stands on its own name, and
+ * what the packs in use say it makes likelier besides (`affinity`, keyed by the
+ * entry: the grounds `on:…`, tools `tool:…` and offers `key:…` it lifts — a
+ * flowchart is drawn clean and its marks join as flows, V1-PLAN A1).
  */
-export const AFFINITY: Readonly<Record<string, readonly string[]>> = {
-  'notation:flowchart': ['on:flow', 'on:clean'],
-};
-
-/** Everything an entry of a context lifts: what stands on its own name, and its affinity. */
-export function liftTargets(kind: string): string[] {
+export function liftTargets(kind: string, affinity?: Readonly<Record<string, readonly string[]>>): string[] {
   const at = kind.indexOf(':');
   const type = kind.slice(0, at), name = kind.slice(at + 1);
   const own = type === 'notation' ? ['on:' + name, 'tool:notation:' + name] : ['on:' + name];
-  return own.concat(AFFINITY[kind] ?? []);
+  return own.concat(affinity?.[kind] ?? []);
 }
 
 /** An item as `rank` reads it: B1's rankable, and the tool that offers it, where one does. */
@@ -113,7 +112,7 @@ export function liftOf(item: RankItem, ctx: Context = NO_CONTEXT): { factor: num
   if (!ctx || isSpecific(item)) return { factor: 1, because: [] };
   const on = standsOn(item);
   const hits: { w: number; why: string }[] = [];
-  const lifts = (kind: string) => liftTargets(kind).some((t) => on.has(t));
+  const lifts = (kind: string) => liftTargets(kind, ctx.affinity).some((t) => on.has(t));
   for (const n of ctx.notations) if (n.weight > 0 && lifts('notation:' + n.id)) hits.push({ w: n.weight, why: n.reason });
   for (const c of ctx.concepts) if (c.weight > 0 && lifts('concept:' + c.name)) hits.push({ w: c.weight, why: c.reason ?? 'it sits beside a ' + c.name });
   for (const r of ctx.recent) {
@@ -139,7 +138,8 @@ export function canLift(items: readonly RankItem[]): boolean {
   const targets = new Set<string>();
   for (const c of BUILTIN_CONCEPTS) for (const t of liftTargets('concept:' + c.name)) targets.add(t);
   for (const n of registeredNotations()) for (const t of liftTargets('notation:' + n)) targets.add(t);
-  for (const kind of Object.keys(AFFINITY)) for (const t of liftTargets(kind)) targets.add(t);
+  // What any shipped pack says a context makes likelier: whichever a board uses, it is among these.
+  for (const p of shippedPacks()) for (const [kind, lifted] of Object.entries(p.affinities ?? {})) for (const t of liftTargets(kind, { [kind]: lifted })) targets.add(t);
   return items.some((item) => {
     if (isSpecific(item)) return false;
     if (item.tool) return true; // an act taken beside the hand lifts its tool's offers

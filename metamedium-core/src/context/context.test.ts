@@ -60,9 +60,11 @@ const threeBoxes = (s: Session, ox = 0) => [[200, 200], [360, 204], [520, 200]].
 
 describe('context — what stands beside the hand lifts what it makes likelier, and says why (V1-PLAN §2.2)', () => {
   it('the same scope ranks differently beside a flowchart and beside a row, each lift with its reason', () => {
-    // Beside a flowchart: the bench's hand-drawn one, with the pair to the right of its first process.
+    // Beside a flowchart: the bench's hand-drawn one, with the pair to the right of its first process,
+    // on a board that uses the flowchart pack — whose affinities say what a flowchart makes likelier (B3).
     const sf = createSession();
     drawFlowchart(sf, FLOWCHART_VARIANTS[0]);
+    expect(sf.use('flowchart@1', (clock += 100))).toBeNull();
     const inFlow = pair(sf, 560, 320);
     hold(sf, inFlow);
     const offersF = offersNow(sf);
@@ -92,6 +94,15 @@ describe('context — what stands beside the hand lifts what it makes likelier, 
     expect(byF[0]).toMatchObject({ key: 'snap', label: 'Draw them clean' });
     expect(byF[0].lift).toBeGreaterThan(1);
     expect(byF[0].because[0]).toMatch(/^it sits beside a flowchart: three processes, two decisions/);
+    // The same flowchart on a board that uses no pack is still READ — recognition is never gated on a
+    // declaration — and lifts nothing here: what it makes likelier is the pack's to say.
+    const bare = createSession();
+    drawFlowchart(bare, FLOWCHART_VARIANTS[0]);
+    const inBare = pair(bare, 560, 320);
+    hold(bare, inBare);
+    const ctxBare = contextAt(bare, inBare);
+    expect(ctxBare.notations.map((n) => n.id)).toEqual(['flowchart']);
+    expect(keys(rank(offersNow(bare), ctxBare))).toEqual(keys(rankOffers(offersNow(bare))));
     // Beside the row, lining them up leads, and matching sizes with it: they stand on a row.
     const byR = rank(offersR, ctxR);
     expect(keys(byR).slice(0, 3)).toEqual(['row:tidy-row', 'row:equalize', 'snap']);
@@ -189,9 +200,10 @@ describe('context — what stands beside the hand lifts what it makes likelier, 
     // On the board: boxes drawn one after another beside a flowchart, each time
     // the marks drawn so far held — one box, then two, then three. With no
     // context the top flips (one box is only drawn clean; two in a row are
-    // lined up first). In the flowchart's context it holds.
+    // lined up first). In the flowchart's context — the board using its pack — it holds.
     const s = createSession();
     drawFlowchart(s, FLOWCHART_VARIANTS[0]);
+    s.use('flowchart@1', (clock += 100));
     const tops: string[] = [], plain: string[] = [], contexts: (string | null)[] = [];
     const memory = new Map<string, HeldTop>();
     const drawn: string[] = [];

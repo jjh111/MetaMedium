@@ -55,6 +55,7 @@ import { boundingBoxDistance, boundsOverlap } from '../geometry';
 import { NOTATION_FLOOR, notationsOf } from '../notations/notation';
 import { getTool } from '../tools/registry';
 import type { Context, ScopeReading } from '../tools/tool';
+import { type PackSource, affinityOf, shippedPack } from '../packs/registry';
 
 export type { Context } from '../tools/tool';
 export { NO_CONTEXT } from '../tools/tool';
@@ -78,6 +79,8 @@ export interface ContextSource {
 export interface ContextOptions {
   /** When the context is read, for how recent the acts beside it are. The log's latest `at` when not said. */
   now?: number;
+  /** Where the board's packs come from, for their affinities: the shipped packs when not said (a bench hands in its own). */
+  packs?: PackSource;
 }
 
 /** A notation read beside the scope. */
@@ -186,8 +189,8 @@ interface Neighbourhood {
   nearness: number;
 }
 
-function emptyContext(scopeIds: string[], at: number): ReadContext {
-  return { scopeIds, notations: [], concepts: [], recent: [], kind: null, key: null, at };
+function emptyContext(scopeIds: string[], at: number, affinity: Record<string, string[]>): ReadContext {
+  return { scopeIds, notations: [], concepts: [], recent: [], kind: null, key: null, at, affinity };
 }
 
 /** Far from any context: nothing beside the scope lifts anything. */
@@ -205,6 +208,8 @@ export function contextAt(board: ContextSource, at: readonly string[] | Point, o
   const state = board.getState();
   const events = board.getEvents();
   const now = opts.now ?? lastAtOf(events);
+  // What the packs this board uses say an entry beside the hand makes likelier (B3).
+  const affinity = affinityOf(state.packs ?? [], opts.packs ?? shippedPack);
   const point = isPoint(at) ? at : null;
   const scopeIds = point ? [] : [...new Set(at as readonly string[])].filter((id) => state.nodes.has(id));
   const scope = new Set(scopeIds);
@@ -213,7 +218,7 @@ export function contextAt(board: ContextSource, at: readonly string[] | Point, o
     const b = boundsOf(state.nodes.get(id)!);
     if (b && finiteBounds(b)) boxes.push(b);
   }
-  if (!point && !boxes.length) return emptyContext(scopeIds, now);
+  if (!point && !boxes.length) return emptyContext(scopeIds, now, affinity);
 
   const nearScope = (b: Bounds): number => {
     if (point) return pointNearnessOf(point, b);
@@ -334,6 +339,7 @@ export function contextAt(board: ContextSource, at: readonly string[] | Point, o
     kind: lead ? lead.kind : null,
     key: lead ? lead.kind + '@' + lead.anchor : null,
     at: now,
+    affinity,
   };
 }
 

@@ -400,6 +400,33 @@ export function behavioursOf(node: MMNode): Rep[] {
   return node.reps.filter((r) => r.modality === 'behaviour').reverse();
 }
 
+/**
+ * What a library pack's definition carries on the board that uses the pack
+ * (V1-PLAN §2.3, B3): the pack it came from (`basics@1`), its name there, and
+ * what the pack says of it. Such a node is attributed to the pack
+ * (`library:basics@1`, its `made-by`), matched and corrected as a taught
+ * definition is, and never on the board: not content, not an artifact, not a
+ * file.
+ */
+export interface PackDefinitionRep {
+  pack: string;
+  definition: string;
+  describes?: string;
+  role?: string;
+  ports?: string;
+  export?: Record<string, string>;
+}
+
+/** The pack a node is a definition of, and what it says of it — or undefined for every other node. */
+export function packDefinitionOf(node: MMNode): PackDefinitionRep | undefined {
+  return getRep(node, 'pack-definition')?.data as PackDefinitionRep | undefined;
+}
+
+/** A library pack's definition: held while its pack is in use, never on the board (B3). */
+export function isPackDefinition(node: MMNode): boolean {
+  return getRep(node, 'pack-definition') !== undefined;
+}
+
 /** A frame: an artifact that refers to other artifacts and wires them. */
 export function isFrame(node: MMNode): boolean {
   return getRep(node, 'frame') !== undefined;
