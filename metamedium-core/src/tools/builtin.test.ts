@@ -73,13 +73,13 @@ describe('the built-in tools', () => {
     expect(lines).toContain('tidy — line marks up and space them evenly, or match their sizes; the ink untouched');
   });
 
-  it('a row of three boxes: draw them clean, line up, match sizes; read as writing and what is this ask a model', () => {
+  it('a row of three boxes: draw them clean, line up, match sizes; what is this asks a model — nothing offers to read boxes as writing (U1d)', () => {
     const s = createSession();
     const row = [[200, 200], [360, 204], [520, 200]].map(([x, y]) => draw(s, rect(x, y, 120, 80)));
     hold(s, row);
     const offers = ranked(s);
-    expect(keys(offers)).toEqual(['snap', 'row:tidy-row', 'row:equalize', 'read-any', 'what', 'duplicate', 'keep']);
-    expect(pills(offers)).toEqual([['Draw them clean', false], ['Line up across', false], ['Match sizes', false], ['Read as writing', true], ['What is this?', true]]);
+    expect(keys(offers)).toEqual(['snap', 'row:tidy-row', 'row:equalize', 'what', 'duplicate', 'keep']);
+    expect(pills(offers)).toEqual([['Draw them clean', false], ['Line up across', false], ['Match sizes', false], ['What is this?', true]]);
     // A concept's conversion stands on the concept's reading, and says it.
     const tidy = offers.find((o) => o.key === 'row:tidy-row')!;
     expect(tidy).toMatchObject({ tool: 'tidy', reason: 'align and space them evenly', grounds: { on: 'row' } });
@@ -92,13 +92,13 @@ describe('the built-in tools', () => {
     const s = createSession();
     const first = molecule(s, 0);
     hold(s, first);
-    expect(keys(ranked(s))).toEqual(['snap', '3d', 'read-any', 'what', 'duplicate', 'keep']);
+    expect(keys(ranked(s))).toEqual(['snap', '3d', 'what', 'duplicate', 'keep']);
     expect(ranked(s).find((o) => o.key === '3d')!.reason).toMatch(/^3 spheres and 2 bonds in the frame, turning/);
     s.bless({ summonId: s.getState().summon!.id, name: 'molecule', at: (clock += 100) });
     const second = molecule(s, 560);
     hold(s, second);
     const sug = s.getState().summon!.suggestions.find((x) => x.kind === 'match')!;
-    expect(keys(ranked(s))).toEqual(['snap', 'not:' + sug.id, '3d', 'read-any', 'what', 'duplicate', 'keep']);
+    expect(keys(ranked(s))).toEqual(['snap', 'not:' + sug.id, '3d', 'what', 'duplicate', 'keep']);
     expect(ranked(s).find((o) => o.key === 'not:' + sug.id)!.label).toBe('Not a molecule');
   });
 

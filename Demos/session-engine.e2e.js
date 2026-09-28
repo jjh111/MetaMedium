@@ -1578,14 +1578,25 @@ window.__scenario = async function(){
     // F3: a stroke shaped like the mark beside the word, crossing nothing, summons nothing.
     t.stroke(t.check(420, 330, 1));
     step('33a. a mark-shaped stroke that crosses nothing summons nothing', !mm.session.getState().summon, { summon: !!mm.session.getState().summon, source: mm.session.getState().summon && mm.session.getState().summon.scopeSource });
-    // F5: bubbles the rung reads as circles still offer to be read as writing, on request.
+    // F5, as U1d scopes it (PLAN-USER-SURFACE): ink the rung could not place for sure — a hand's h,
+    // which it calls an arc — still offers to be read as writing, on request; bubbles it reads
+    // confidently as circles no longer do (offered on every shape it was noise, audit row 5).
+    mm.session.load([]);
+    mm.agents.length = 0; mm.agents.push(MM.createAgentParticipant(mm.session, Object.assign({}, MM.PRESETS.ollama, { model: 'e2e-stub', vision: true }), Date.now()));
+    const h33 = (x, y) => t.line({ x, y }, { x, y: y + 60 }, 20).concat(t.line({ x, y: y + 60 }, { x, y: y + 32 }, 10).slice(1),
+      Array.from({ length: 14 }, (_, i) => { const a = Math.PI + (i / 13) * Math.PI; return { x: x + 11 + 11 * Math.cos(a), y: y + 34 + 9 * Math.sin(a) }; }).slice(1),
+      t.line({ x: x + 22, y: y + 34 }, { x: x + 22, y: y + 60 }, 10).slice(1));
+    t.stroke(h33(300, 270)); t.stroke(t.rect(360, 260, 60, 70));
+    t.stroke(t.circle(360, 300, 120)); t.takeLoop(360, 300, 120); await wait(60);
+    t.typeIn('read');
+    step('33b. typing read on ink the rung could not place for sure — an h it calls an arc — offers Read as writing, marked as asking a model', t.chips().some(c => /Read as writing/.test(c)) && !!([...document.querySelectorAll('#summon .item')].find(b => /Read as writing/.test(b.textContent)) || {}).querySelector('.dot'), t.chips());
+    t.typeIn('');
+    { const sm = mm.session.getState().summon; if (sm) mm.session.dismiss(sm.id, Date.now()); if (mm.session.getState().selection.length) mm.session.deselect(Date.now()); }
     mm.session.load([]);
     mm.agents.length = 0; mm.agents.push(MM.createAgentParticipant(mm.session, Object.assign({}, MM.PRESETS.ollama, { model: 'e2e-stub', vision: true }), Date.now()));
     t.stroke(t.circle(300, 300, 30)); t.stroke(t.circle(380, 300, 30)); t.stroke(t.circle(460, 300, 30));
     t.stroke(t.circle(380, 300, 120)); t.takeLoop(380, 300, 120); await wait(60);
-    t.typeIn('read');
-    step('33b. typing read on marks the rung did not call writing offers Read as writing, marked as asking a model', t.chips().some(c => /Read as writing/.test(c)) && !!([...document.querySelectorAll('#summon .item')].find(b => /Read as writing/.test(b.textContent)) || {}).querySelector('.dot'), t.chips());
-    t.typeIn('');
+    step('33b2. bubbles the rung reads confidently as circles are not offered to be read as writing', !t.chips().some(c => /Read as writing/.test(c)), t.chips());
     // F6: what a model reads the group as stays beside it after the field is gone.
     const whatPill = [...document.querySelectorAll('#summon .item')].find(b => /What is this/.test(b.textContent));
     const calls33 = window.__calls.length;
@@ -3835,6 +3846,9 @@ window.__fieldGolden = async function () {
 
 // Today's field, captured on 27 Sep 2026 before B1 (the surface at 365865e + the test handles):
 // what each fixture's field shows, and must still show once its offers come from tools.
+// Recorded again 28 Sep 2026 by design (PLAN-USER-SURFACE U1d): Read as writing ("read-any")
+// leaves the row of boxes and both molecules — shapes the rung reads for sure are not offered as
+// writing — and nothing else in any scope changed.
 window.__FIELD_GOLDEN = {
   "row of three boxes": {
     core: ["name", "copy", "paste", "erase"],
@@ -3846,11 +3860,10 @@ window.__FIELD_GOLDEN = {
       {"key": "snap", "label": "Draw them clean", "title": "3 rectangles · ink kept — each reads confidently as one shape", "dot": false},
       {"key": "row:tidy-row", "label": "Line up across", "title": "align and space them evenly — 3 comparable marks sitting side by side (overlap 0.95, similarity 1.00) — already well lined up", "dot": false},
       {"key": "row:equalize", "label": "Match sizes", "title": "make them the same size as the largest — 3 comparable marks sitting side by side (overlap 0.95, similarity 1.00) — already well lined up", "dot": false},
-      {"key": "read-any", "label": "Read as writing", "title": "the ink as one image, to a model that can see — for writing the shape rung did not spot", "dot": true},
       {"key": "what", "label": "What is this?", "title": "every joined model reads the group; its readings join the row above", "dot": true},
     ],
     more: "",
-    ranked: ["snap", "concept:row", "row:tidy-row", "row:equalize", "read-any", "what", "duplicate", "keep"],
+    ranked: ["snap", "concept:row", "row:tidy-row", "row:equalize", "what", "duplicate", "keep"],
   },
   "row of three boxes, \"row\" typed": {
     core: ["name", "copy", "paste", "erase"],
@@ -3863,7 +3876,7 @@ window.__FIELD_GOLDEN = {
       {"key": "row:equalize", "label": "Match sizes", "title": "make them the same size as the largest — 3 comparable marks sitting side by side (overlap 0.95, similarity 1.00) — already well lined up", "dot": false},
     ],
     more: "",
-    ranked: ["snap", "concept:row", "row:tidy-row", "row:equalize", "read-any", "what", "duplicate", "keep"],
+    ranked: ["snap", "concept:row", "row:tidy-row", "row:equalize", "what", "duplicate", "keep"],
   },
   "row of three boxes, \"nav\" typed": {
     core: ["name", "copy", "paste", "erase"],
@@ -3874,7 +3887,7 @@ window.__FIELD_GOLDEN = {
       {"key": "label-word", "label": "Label it “nav”", "title": "“nav” on each of the 3 marks you made, in your ink at the board's scale — it makes nothing: no definition, no name the library learns, no file; undo takes it off", "dot": false},
     ],
     more: "",
-    ranked: ["snap", "concept:row", "row:tidy-row", "row:equalize", "read-any", "what", "duplicate", "keep"],
+    ranked: ["snap", "concept:row", "row:tidy-row", "row:equalize", "what", "duplicate", "keep"],
   },
   "molecule": {
     core: ["name", "copy", "paste", "erase"],
@@ -3885,11 +3898,10 @@ window.__FIELD_GOLDEN = {
     afford: [
       {"key": "snap", "label": "Draw them clean", "title": "3 circles, 2 lines · ink kept — each reads confidently as one shape", "dot": false},
       {"key": "3d", "label": "Show it in 3D", "title": "3 spheres and 2 bonds in the frame, turning — press inside to turn it; ink over a sphere lands on its mark → then: What is this? asks which molecule", "dot": false},
-      {"key": "read-any", "label": "Read as writing", "title": "the ink as one image, to a model that can see — for writing the shape rung did not spot", "dot": true},
       {"key": "what", "label": "What is this?", "title": "every joined model reads the group; its readings join the row above", "dot": true},
     ],
     more: "",
-    ranked: ["snap", "concept:flow", "3d", "read-any", "what", "duplicate", "keep"],
+    ranked: ["snap", "concept:flow", "3d", "what", "duplicate", "keep"],
   },
   "molecule, the second one drawn": {
     core: ["name", "copy", "paste", "erase"],
@@ -3902,11 +3914,10 @@ window.__FIELD_GOLDEN = {
       {"key": "snap", "label": "Draw them clean", "title": "3 circles, 2 lines · ink kept — each reads confidently as one shape", "dot": false},
       {"key": "not:<match-1>", "label": "Not a molecule", "title": "remembered — a group like this is not offered as one again", "dot": false},
       {"key": "3d", "label": "Show it in 3D", "title": "3 spheres and 2 bonds in the frame, turning — press inside to turn it; ink over a sphere lands on its mark → then: What is this? asks which molecule", "dot": false},
-      {"key": "read-any", "label": "Read as writing", "title": "the ink as one image, to a model that can see — for writing the shape rung did not spot", "dot": true},
       {"key": "what", "label": "What is this?", "title": "every joined model reads the group; its readings join the row above", "dot": true},
     ],
     more: "",
-    ranked: ["sug:<match-1>", "snap", "concept:flow", "not:<match-1>", "3d", "read-any", "what", "duplicate", "keep"],
+    ranked: ["sug:<match-1>", "snap", "concept:flow", "not:<match-1>", "3d", "what", "duplicate", "keep"],
   },
   // Recorded again 28 Sep 2026 by design (PLAN-USER-SURFACE W2): writing nobody has read is one
   // option — its reading, which reads it (the dot, ↵ read it) — and Read the writing and What is

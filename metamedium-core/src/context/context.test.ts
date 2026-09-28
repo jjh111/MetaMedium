@@ -87,7 +87,7 @@ describe('context — what stands beside the hand lifts what it makes likelier, 
 
     // The same scope: the same offers, in the same order, before any context.
     expect(keys(offersF)).toEqual(keys(offersR));
-    expect(keys(rankOffers(offersF))).toEqual(['row:tidy-row', 'row:equalize', 'snap', 'read-any', 'what', 'duplicate', 'keep']);
+    expect(keys(rankOffers(offersF))).toEqual(['row:tidy-row', 'row:equalize', 'snap', 'what', 'duplicate', 'keep']);
 
     // Beside the flowchart, drawing them clean leads — the flowchart is drawn clean (A1).
     const byF = rank(offersF, ctxF);
@@ -140,7 +140,7 @@ describe('context — what stands beside the hand lifts what it makes likelier, 
     const s1 = createSession();
     const row = threeBoxes(s1);
     hold(s1, row);
-    same(s1, row, ['snap', 'row:tidy-row', 'row:equalize', 'read-any', 'what', 'duplicate', 'keep']);
+    same(s1, row, ['snap', 'row:tidy-row', 'row:equalize', 'what', 'duplicate', 'keep']);
 
     // A molecule; named, and the second one drawn.
     const s2 = createSession();
@@ -151,12 +151,12 @@ describe('context — what stands beside the hand lifts what it makes likelier, 
     ];
     const first = mol(0);
     hold(s2, first);
-    same(s2, first, ['snap', '3d', 'read-any', 'what', 'duplicate', 'keep']);
+    same(s2, first, ['snap', '3d', 'what', 'duplicate', 'keep']);
     s2.bless({ summonId: s2.getState().summon!.id, name: 'molecule', at: (clock += 100) });
     const second = mol(560);
     hold(s2, second);
     const sug = s2.getState().summon!.suggestions.find((x) => x.kind === 'match')!;
-    same(s2, second, ['snap', 'not:' + sug.id, '3d', 'read-any', 'what', 'duplicate', 'keep']);
+    same(s2, second, ['snap', 'not:' + sug.id, '3d', 'what', 'duplicate', 'keep']);
 
     // A line of writing, unread and read.
     const s3 = createSession();
@@ -172,7 +172,7 @@ describe('context — what stands beside the hand lifts what it makes likelier, 
     drawFlowchart(s4, FLOWCHART_VARIANTS[0]);
     const far = pair(s4, 5000, 320);
     hold(s4, far);
-    same(s4, far, ['row:tidy-row', 'row:equalize', 'snap', 'read-any', 'what', 'duplicate', 'keep']);
+    same(s4, far, ['row:tidy-row', 'row:equalize', 'snap', 'what', 'duplicate', 'keep']);
   });
 
   it('small score changes never flip the top offer within one context', () => {
