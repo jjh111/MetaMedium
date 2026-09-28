@@ -21,7 +21,10 @@
 //   - ?board=<id> opens a board, the title carries its name, the view comes
 //     back per board; folders, repositories and sites are recent entries of
 //     their kind; switching flushes the board being left; one tab writes a
-//     board (R3's rule, per board).
+//     board (R3's rule, per board);
+//   - and a library pack the board uses is kept with it: the `use` and the
+//     `unuse` are its log's, so its journal carries them through a reload
+//     (V1-PLAN §2.3, B3).
 //
 // The kill test across switches is keep.mjs's (`node e2e/run.mjs keep`).
 
@@ -451,6 +454,32 @@ export async function boardsTest(browser, servers, ctx) {
       /is not saved/.test(refused16.said) && refused16.ways.includes('export') && refused16.ways.includes('leave') && refused16.current === here16 &&
         onScreen16.some((x) => sameSig(x, drawn16)) && during16 === before16 && kept16 === before16 + 2,
       { refused: refused16, onScreen: onScreen16.length, stored: { before: before16, whileFailing: during16, after: kept16 }, second: !!drawn16b });
+
+    // --- N17. A library pack is part of the board's log (V1-PLAN §2.3, B3): used from the packs pane with
+    //     the pointer, the use event is written with the board in its journal — reloaded, the board uses it;
+    //     stopped and reloaded, it does not, and the unuse is in the journal too. ---
+    const packsTap17 = async (act) => {
+      const open = await page.evaluate(() => { const p = document.getElementById('packsPanel'); return !!p && !p.hasAttribute('hidden'); });
+      if (!open) { await page.click('#ccBtn'); await page.click('#packsBtn', { timeout: 5000 }); await page.waitForSelector('#packsPanel:not([hidden])', { timeout: 5000 }); }
+      await page.click(`#packsPanel .pkItem[data-pack="basics@1"] button[data-${act}]`, { timeout: 5000 });
+      await page.click('#packsPanel .paneClose');
+      await page.evaluate(() => window.__mm.boardIdle());
+    };
+    const here17 = await page.evaluate(() => window.__mm.boards().current);
+    await packsTap17('use');
+    const used17 = (await storeOf(page, here17)).log || [];
+    await page.reload();
+    await waitReady(page);
+    const reopened17 = await page.evaluate(() => ({ board: window.__mm.boards().current, packs: window.__mm.session.getState().packs, notices: window.__mm.session.getState().packNotices.length }));
+    await packsTap17('unuse');
+    const unused17 = (await storeOf(page, here17)).log || [];
+    await page.reload();
+    await waitReady(page);
+    const again17 = await page.evaluate(() => ({ board: window.__mm.boards().current, packs: window.__mm.session.getState().packs }));
+    check('N17. a pack used from the packs pane is kept with the board: its use event is in the journal, and the board reopened after a reload uses it; stopped, the unuse is kept too, and reopened it uses none',
+      used17.some((e) => e.type === 'use' && e.pack === 'basics@1') && reopened17.board === here17 && JSON.stringify(reopened17.packs) === '["basics@1"]' && reopened17.notices === 0 &&
+        unused17.some((e) => e.type === 'unuse' && e.pack === 'basics@1') && again17.board === here17 && again17.packs.length === 0,
+      { board: here17, journal: { use: used17.filter((e) => e.type === 'use').length, unuse: unused17.filter((e) => e.type === 'unuse').length }, reopened: reopened17, again: again17 });
   } catch (err) {
     check('N. the boards scenario ran to its end', false, { error: String(err && err.stack ? err.stack : err) });
     await ctx.screenshot(page, 'boards');

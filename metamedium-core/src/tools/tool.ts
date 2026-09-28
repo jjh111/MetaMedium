@@ -83,19 +83,40 @@ export interface ToolScope {
 }
 
 /**
- * Where the hand is working (V1-PLAN §2.2) — B2 fills this: which notations
- * and concepts are active near the hand, and what was just taken there, read
- * from the log. A lift, never a filter. Until B2, every scope is read with
- * `NO_CONTEXT`, and the order is exactly the field's order before tools.
+ * Where the hand is working (V1-PLAN §2.2, B2; `context/`): which notations
+ * and concepts stand beside the scope, weighted by how near they are relative
+ * to the marks' own size, and what this hand just took there, read from the
+ * log. A lift, never a filter — `rank` (context/rank.ts) multiplies a score by
+ * a bounded factor and says why. `contextAt` reads one; far from any context
+ * every list is empty, and the order is exactly the field's order before tools.
  */
 export interface Context {
   scopeIds: string[];
+  /** Notations read beside the scope, above the floor: 'flowchart' 0.8 — "it sits beside a flowchart: three processes, one decision". */
   notations: { id: string; weight: number; reason: string }[];
-  concepts: { name: string; weight: number }[];
-  recent: { tool: string; offer: string; at: number }[];
+  /** Concepts read beside the scope: 'row' 0.8 — "it sits beside a row: 3 comparable marks sitting side by side". */
+  concepts: { name: string; weight: number; reason?: string }[];
+  /** What this hand just took beside the scope, read from the log: the tool, the offer's key, when, and how much it still counts. */
+  recent: { tool: string; offer: string; at: number; weight?: number; reason?: string }[];
+  /**
+   * The context's kind — its strongest notation, else its strongest concept
+   * ('notation:flowchart', 'concept:row') — or null far from any. A device's
+   * learned use is counted per kind.
+   */
+  kind?: string | null;
+  /** The kind and the neighbourhood it was read over: what the steady top is held under. Null far from any context. */
+  key?: string | null;
+  /**
+   * What the library packs this board uses say an entry beside the hand makes
+   * likelier (V1-PLAN §2.3, B3): keyed by the entry (`notation:flowchart`),
+   * each the grounds, tools and offers it lifts (`on:clean`). Content, carried
+   * by the packs: with none in use, nothing is lifted but what stands on an
+   * entry's own name.
+   */
+  affinity?: Readonly<Record<string, readonly string[]>>;
 }
 
-export const NO_CONTEXT: Context = Object.freeze({ scopeIds: [], notations: [], concepts: [], recent: [] }) as Context;
+export const NO_CONTEXT: Context = Object.freeze({ scopeIds: [], notations: [], concepts: [], recent: [], kind: null, key: null }) as Context;
 
 /**
  * What an offer stands on: the reading of these marks it is offered under,

@@ -156,7 +156,10 @@ the boards pane; **N16** a board that is not saved (every record refused: the
 page's `IDBObjectStore.add` throws a real `QuotaExceededError`, both engines) is
 never left without a word — the switch refused in the pane with its ways out,
 nothing the store held lost while writes fail, and the switch going once a save
-lands. About 15 s, on Chromium and WebKit.
+lands; **N17** a library pack used from the packs pane with the pointer is kept
+with the board — its `use` in the journal, the board reopened after a reload
+using it — and so is its `unuse` (V1-PLAN B3). About 18 s, on Chromium and
+WebKit.
 
 ### One app address: `app`
 

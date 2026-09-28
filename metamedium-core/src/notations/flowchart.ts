@@ -37,7 +37,8 @@
 //
 // The whole reading is derived, like a concept's: nothing enters the log. Its
 // content — the names, roles, ports and Mermaid of each symbol — is the typed
-// table below, which moves into the flowchart@1 pack when B3 lands.
+// table below, its single home: the flowchart@1 pack (packs/shipped/flowchart.ts)
+// names this notation and restates none of it (V1-PLAN §2.3, B3).
 
 import type { Bounds, Point } from '../types';
 import type { SessionState } from '../session/session';
@@ -61,8 +62,9 @@ import { areaOf, cornersOf, distToPath, hullOf, mid, outside, ramp, stanceOf, ti
 /**
  * The flowchart's content: each symbol's name, the role it plays, where it
  * takes a connector, and how it is said in Mermaid (D2 writes with these).
- * Content, not code — it moves into the `flowchart@1` pack when B3 lands
- * (V1-PLAN §2.3); what stays in this file is what a signature cannot see.
+ * Content, not code, and this is its single home: the `flowchart@1` pack names
+ * the notation and restates none of it (V1-PLAN §2.3, B3); the rest of this
+ * file is what a signature cannot see.
  */
 export const FLOWCHART_TABLE = {
   pack: 'flowchart@1',

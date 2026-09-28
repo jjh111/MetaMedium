@@ -49,6 +49,7 @@
   <button id="resetBtn"></button>
   <button id="helpBtn"></button>
   <button id="boardsBtn" aria-pressed="false"></button>
+  <button id="packsBtn" aria-pressed="false"></button>
   <input id="importInput" type="file" accept="image/*,.svg,.html,.htm,.js,.mjs,.json,.md,.txt" multiple capture="environment" hidden>
 </div>
 
@@ -107,6 +108,11 @@
   <div class="bdList"></div>
   <div id="boardsStatus" class="hint" aria-live="polite"></div>
   <input id="boardsFile" type="file" accept=".jsonl,.ndjson,.json,.txt,application/json" hidden>
+</div>
+<div id="packsPanel" hidden>
+  <p class="hint">A board says which packs it uses. Using one is an event in its log — undo takes it back — and what it ships is matched here as if you had taught it.</p>
+  <div class="pkList"></div>
+  <div id="packsStatus" class="hint" aria-live="polite"></div>
 </div>
 <div id="livePanel" hidden>
   <input id="liveRoom" placeholder="room" autocomplete="off" spellcheck="false" />

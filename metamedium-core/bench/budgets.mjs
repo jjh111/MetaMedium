@@ -5,7 +5,12 @@
 //
 //     node --expose-gc metamedium-core/bench/budgets.mjs --size=2000
 //     node --expose-gc metamedium-core/bench/budgets.mjs --size=5000 --strokes=20
+//     node --expose-gc metamedium-core/bench/budgets.mjs --size=2000 --packs=basics@1,flowchart@1
 //
+// `--packs` puts a `use` event for each named library pack at the head of the
+// board's log (V1-PLAN §9 B3), so every group on it is matched against the
+// packs' definitions too, the whole replay and every stroke after it: what
+// matching costs with packs in use.
 // What is measured is what PERF.md measured, the same way (`engine.mjs
 // board`): the board is generated from its seed first and is in no number;
 // the cold `load` is the first in the process; warm loads follow on fresh
@@ -27,6 +32,7 @@ const seed = Number(a.seed || 1);
 const which = a.core || 'source';
 const repeat = Number(a.repeat ?? 3);
 const nStrokes = Number(a.strokes || (size >= 5000 ? 20 : 40));
+const packs = typeof a.packs === 'string' && a.packs ? a.packs.split(',').map((x) => x.trim()).filter(Boolean) : [];
 const say = (s) => process.stderr.write(s + '\n');
 const now = () => performance.now();
 
@@ -45,14 +51,19 @@ const out = {
   corePath: path.replace(/^.*\/(MetaMedium[^/]*)\//, ''),
   size,
   seed,
+  packs,
 };
-const resultName = `budgets-${size}-${which}.json`;
+const resultName = `budgets-${size}-${which}${packs.length ? '-packs' : ''}.json`;
 say(`budgets ${size} · core ${which} · heap limit ${out.heapLimitMB} MB · load ${out.loadavg.join(' ')}`);
 
 const tg = now();
-const { events, stats } = generateBoard(core, { marks: size, seed });
-out.board = { marks: stats.marks, events: stats.events, jsonMB: +(stats.bytes / 1048576).toFixed(2), generatedMs: Math.round(now() - tg) };
-say(`  ${stats.marks} marks, ${stats.events} events, ${out.board.jsonMB} MB of JSON (generated in ${out.board.generatedMs} ms, not measured)`);
+const generated = generateBoard(core, { marks: size, seed });
+const { stats } = generated;
+// The packs, used before the first mark: a board that says it uses them from the start.
+const first = generated.events.reduce((m, e) => Math.min(m, typeof e.at === 'number' ? e.at : m), Infinity);
+const events = packs.map((pack, i) => ({ type: 'use', pack, at: first - packs.length + i })).concat(generated.events);
+out.board = { marks: stats.marks, events: events.length, jsonMB: +(stats.bytes / 1048576).toFixed(2), generatedMs: Math.round(now() - tg) };
+say(`  ${stats.marks} marks, ${events.length} events, ${out.board.jsonMB} MB of JSON (generated in ${out.board.generatedMs} ms, not measured)${packs.length ? ' · packs in use: ' + packs.join(', ') : ''}`);
 
 // --- the cold load, with nothing else alive ---
 const base = heapUsed();
@@ -71,7 +82,15 @@ out.memory = {
   nodes: st.nodes.size,
   edges,
 };
-out.state = { content: st.contentIds.length, artifacts: st.artifacts.length, clusterCandidates: st.clusterCandidates.length };
+out.state = {
+  content: st.contentIds.length, artifacts: st.artifacts.length, clusterCandidates: st.clusterCandidates.length,
+  packs: st.packs, packNotices: st.packNotices.length,
+  byPack: st.clusterCandidates.filter((c) => c.matches.some((m) => m.pack)).length,
+};
+if (packs.length && st.packs.length !== packs.length) {
+  say(`budgets.mjs: the board uses ${st.packs.join(', ') || 'no pack'}, not ${packs.join(', ')} — ${st.packNotices.map((n) => n.detail).join('; ')}`);
+  process.exit(2);
+}
 say(`  cold load ${ms(coldMs)} · held ${mb(heldBytes)} · ${st.nodes.size} nodes, ${edges.toLocaleString('en-GB')} edges`);
 writeResult(resultName, out);
 

@@ -166,6 +166,9 @@ function look(args) {
   // one name are not both on this board, and a room older than the relay
   // remembers may be missing its beginning.
   for (const n of store.notices()) lines.push('room says: ' + n);
+  // The library packs the board uses (V1-PLAN §2.3, B3): what it matches groups by besides what was taught here.
+  if (s.packs.length) lines.push('uses ' + s.packs.join(', ') + ' — what they ship is matched here as if taught, attributed to them');
+  for (const n of s.packNotices) lines.push('board says: ' + n.detail);
   const marks = s.contentIds.filter((id) => !s.artifacts.includes(id));
   lines.push(marks.length + ' mark' + (marks.length === 1 ? '' : 's') + ' · ' + s.artifacts.length + ' artifact' + (s.artifacts.length === 1 ? '' : 's') + ' · ' + s.live.length + ' live' +
     (s.selection.length ? ' · ' + s.selection.length + ' selected' : '') + (s.summon ? ' · the field is open on ' + s.summon.enclosedIds.length : '') + (s.pendingLassoId ? ' · a loop waits' : ''));

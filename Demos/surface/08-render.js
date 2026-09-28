@@ -1,8 +1,10 @@
 // ===== render =====
-// Provides: queries over state, the rungs cache, render(), ink, the reading under the inspected mark,
+// Provides: queries over state, the rungs cache, render(), ink, the reading under the inspected mark
+//   (readingUnder: its readings ranked by MM.rank, as the field ranks — V1-PLAN §2.2),
 //   a hand's label on its own mark (labelsDrawn), match chips,
 //   the working dot, the explanation plane and its layout, the status line (one sentence).
-// Uses: core, view, artifacts, snap, models, palette, inspector, teach (syncMarkChip), folder (folderStatus, liveSet),
+// Uses: core, view, artifacts, snap, models, palette (contextFor), inspector, teach (syncMarkChip), folder (folderStatus, liveSet),
+//   packs (packShort — a match chip says its pack; a pack this build lacks is said in the standing line),
 //   input (live, magnetHold, penHover — the pen's layer draws the stroke in progress and a hovering pencil's magnet).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () Ellipsis)();`. Shared state is the
@@ -296,6 +298,40 @@
       }
     }
     return ix.genre;
+  }
+
+  // ===== The reading under a mark, ranked as the field ranks (V1-PLAN §2.2) ==
+  // What a mark IS, as items with a base and grounds — the name it was given,
+  // the words it says, what the shape rung measured — ordered by the same
+  // `MM.rank` the field's rows are, in the context where the mark stands, so
+  // the reading under a mark and the field never disagree about what leads.
+  // Nothing ranked here can be lifted by what stands beside it today
+  // (`MM.canLift`: a name and the words are the hand's own, a shape is no
+  // concept), so a stroke reads no neighbourhood; the day something can — a
+  // pack's reading of a mark (B3) — the context is read for it, kept by the log.
+  const KNOWN_READING = { on: 'known', confidence: 1 };
+  function readingsOfMark(s, node) {
+    const items = [];
+    const word = MM.wordOf(node);
+    if (word) items.push({ key: 'word', label: word, base: MM.baseOn(KNOWN_READING), grounds: KNOWN_READING });
+    const said = MM.transcriptsOf(node)[0];
+    if (said) { const g = { on: 'written', confidence: said.confidence }; items.push({ key: 'said', label: '“' + said.text + '”', base: MM.baseOn(g), grounds: g }); }
+    // The shape rung's readings, in the order it holds them (blessed first,
+    // then by weight): a later one never stands above an earlier one. A label
+    // is its maker's word, not what the rung measured (L2b); a name is above.
+    let cap = Infinity;
+    for (const r of MM.interpretationsOf(node, s.nodes)) {
+      if (r.tier !== 0 || r.basis !== 'resemblance') continue;
+      const g = { on: 'shape', confidence: r.weight };
+      cap = Math.min(cap, MM.baseOn(g));
+      items.push({ key: 'shape:' + r.label, label: r.label, base: cap, grounds: g });
+    }
+    return items;
+  }
+  function readingUnder(s, node, id) {
+    const items = readingsOfMark(s, node);
+    if (!items.length) return MM.topInterpretation(node);
+    return MM.rank(items, MM.canLift(items) ? contextFor([id]) : MM.NO_CONTEXT)[0].label;
   }
 
   // The whole-board read: every mark's role, related over the whole board at
@@ -646,7 +682,8 @@
       // A match is a chip beside the group, with its number (D8); a tap on it
       // opens the field with the match leading. Plural, like every reading:
       // two definitions with the same shapes are both named.
-      const said = c.matches.slice(0, 2).map((m) => m.name + ' ' + m.score.toFixed(2)).join('  ·  ');
+      // A library pack's definition says its pack (V1-PLAN B3): molecule 0.93 · basics.
+      const said = c.matches.slice(0, 2).map((m) => m.name + ' ' + m.score.toFixed(2) + (m.pack ? ' · ' + packShort(m.pack) : '')).join('  ·  ');
       const at = chipRect(said, b.minX - pad, b.minY - pad - wpx(8));
       const whole = { minX: b.minX - pad, minY: at.y, maxX: Math.max(b.minX - pad + at.w, b.maxX + pad), maxY: b.maxY + pad };
       if (!vb || cp || boxMeets(whole, vb)) {
@@ -659,7 +696,7 @@
         if (paintOps) recordOp({ kind: 'match', id: c.nodeIds.join(','), text: said, box: boxOfRect(whole.minX, whole.minY, whole.maxX - whole.minX, whole.maxY - whole.minY), moved: !!cp });
       }
       // Measured wherever it is, so a tap and a test find it whether it was drawn or not.
-      chipHits.push({ ids: c.nodeIds.slice(), x: at.x, y: at.y, w: at.w, h: at.h });
+      chipHits.push({ ids: c.nodeIds.slice(), x: at.x, y: at.y, w: at.w, h: at.h, text: said });
     });
     // What a model read a group as stays beside it (v10 F6): a chip with the
     // number and the reader, whether or not the field is still open, and a
@@ -678,7 +715,7 @@
         chipText(rc.text, b.minX - pad, b.maxY + pad + wpx(17));
         if (paintOps) recordOp({ kind: 'read', id: id, text: rc.text, box: boxOfRect(at.x, at.y, at.w, at.h), moved: false });
       }
-      chipHits.push({ ids: group.length ? group : [id], x: at.x, y: at.y, w: at.w, h: at.h });
+      chipHits.push({ ids: group.length ? group : [id], x: at.x, y: at.y, w: at.w, h: at.h, text: rc.text });
     }
 
     const inspectedId = hoverId || lastContentId(s);
@@ -741,10 +778,7 @@
         // The reading of the mark the hand just made (or is over), and only
         // that one: what it is, and what it plays. Under every mark it was a
         // board of fragments; the panel has the rest.
-        const said = MM.transcriptOf(node);
-        // A label is its maker's word, not what the shape rung measured (L2b).
-        const shape = MM.interpretationsOf(node, s.nodes).filter((r) => r.tier === 0 && r.basis !== 'label')[0];
-        const top = MM.wordOf(node) || (said ? '“' + said + '”' : shape ? shape.label : MM.topInterpretation(node));
+        const top = readingUnder(s, node, id);
         const role = readRungs(s).roles.get(id);
         const played = role && role.role !== 'unclassified' && role.role !== top ? ' · ' + role.role : '';
         if (top) {
@@ -799,6 +833,8 @@
     }
     const fs = folderStatus();
     if (fs) parts.push(fs);
+    // A pack this board names that this build cannot give it is said, never hidden (V1-PLAN B3).
+    if (s.packNotices.length) parts.push(s.packNotices.map((n) => n.reason === 'unknown' ? n.pack + ' is not in this build' : '“' + n.pack + '” is no pack').join(', ') + ' — its definitions are not matched here');
     if (agents.length) parts.push(agents.map((a) => a.config.model).join(', '));
     if (ws) parts.push('⋯ ' + ws);
     if (hint) parts.push(hint);

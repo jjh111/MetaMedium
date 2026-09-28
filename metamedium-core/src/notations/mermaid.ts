@@ -12,7 +12,8 @@
 //     writer gives null, never a guess.
 //   - **The content is the notation's table.** Each symbol's brackets, each
 //     connector's line, the header and its default direction come from
-//     FLOWCHART_TABLE (flowchart.ts), bound for the flowchart@1 pack; what
+//     FLOWCHART_TABLE (flowchart.ts), their single home, which the
+//     flowchart@1 pack names and never restates (B3); what
 //     stays code is what a table cannot say — the order, the ids, the quoting.
 //   - **Ids are the marks' own, said safely.** `stroke:ada:7` is
 //     `stroke_ada_7`; a symbol drawn with several strokes is its figure,

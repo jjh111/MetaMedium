@@ -81,7 +81,7 @@ window.__setup = function(){
   window.__autoReadBefore = window.__mm.autoRead();
   window.__mm.setAutoRead(false);
   // Learned palette use is device state; a run starts from none and puts it back.
-  try { window.__usesBefore = localStorage.getItem('mm-palette-uses'); } catch (e) {}
+  try { window.__usesBefore = localStorage.getItem('mm-palette-uses'); window.__usesHereBefore = localStorage.getItem('mm-palette-uses-here'); } catch (e) {}
   window.__mm.resetUses();
   const strokeOn = window.__t.strokeOn, line = window.__t.line;
 
@@ -1292,7 +1292,7 @@ window.__scenario = async function(){
   while (mm.session.getEvents().length) mm.session.undo();
   if (window.__snapModeBefore) mm.setSnapMode(window.__snapModeBefore);
   mm.setAutoRead(!!window.__autoReadBefore);
-  try { if (window.__usesBefore) localStorage.setItem('mm-palette-uses', window.__usesBefore); } catch (e) {}
+  try { if (window.__usesBefore) localStorage.setItem('mm-palette-uses', window.__usesBefore); if (window.__usesHereBefore) localStorage.setItem('mm-palette-uses-here', window.__usesHereBefore); } catch (e) {}
   step('12. the rail follows the grammar — undoing the teach restores the check',
     mm.session.getState().commandMark === null &&
     document.getElementById('markName').textContent === 'check',
@@ -3029,6 +3029,229 @@ window.__scenario = async function(){
     const gone = !pillOf();
     step('49c. a scope it does not apply to is offered nothing from it; unregistered, it is gone from the open field',
       !onCircle && again && gone, { onCircle, again, gone });
+    mm.session.load([]); mm.setView(1, 0, 0);
+  }
+
+  // ---- 50. The steady top beside a flowchart (V1-PLAN §2.2, B2) ----
+  // A flowchart — three processes and a decision joined by arrows — and three
+  // boxes drawn one after another beside it, each time the boxes drawn so far
+  // held, the way a hand works along: one box, then two, then three. With
+  // nothing beside them the top offer flips — one box is only drawn clean, two
+  // in a row are lined up first. Beside a flowchart it holds, and says why.
+  // What a flowchart beside the hand makes likelier is its pack's to say (B3):
+  // the board uses flowchart@1, from the moment the flowchart is drawn.
+  // Then an offer a little ahead of it arrives (a tool registered in one line,
+  // as 49b does): within the margin the top holds; past it, the new one leads.
+  // A board away, two boxes rank as they did before context, lifted by nothing.
+  {
+    mm.session.load([]); mm.setView(1, 0, 0); mm.resetUses();
+    const lastId50 = () => { const st = mm.session.getState(); return st.contentIds[st.contentIds.length - 1]; };
+    const diamond50 = (cx, cy, w, h) => {
+      const v = [{ x: cx, y: cy - h / 2 }, { x: cx + w / 2, y: cy }, { x: cx, y: cy + h / 2 }, { x: cx - w / 2, y: cy }];
+      const mid = { x: (v[0].x + v[1].x) / 2, y: (v[0].y + v[1].y) / 2 };
+      const path = [mid, v[1], v[2], v[3], v[0], mid];
+      let p = [];
+      for (let i = 0; i < path.length - 1; i++) p = p.concat(t.line(path[i], path[i + 1], 26).slice(i ? 1 : 0));
+      return p;
+    };
+    // A shaft down, and one wing drawn back at the tip.
+    const arrowDown50 = (x, y0, y1) => t.line({ x: x, y: y0 }, { x: x, y: y1 }, 40).concat(t.line({ x: x, y: y1 }, { x: x - 14, y: y1 - 20 }, 16).slice(1));
+    t.stroke(t.rect(200, 100, 160, 70));
+    t.stroke(arrowDown50(280, 174, 236));
+    t.stroke(t.rect(200, 240, 160, 70));
+    t.stroke(arrowDown50(280, 314, 382));
+    t.stroke(diamond50(280, 440, 180, 110));
+    t.stroke(arrowDown50(280, 499, 566));
+    t.stroke(t.rect(200, 570, 160, 70));
+    mm.session.use('flowchart@1', Date.now());
+    const flowRead50 = MM.notationsOf(mm.session.getState()).map(MM.describeNotation);
+    const topPill50 = () => document.querySelector('#summon .row.afford .pill');
+    const letGo50 = async () => { const sum = mm.session.getState().summon; if (sum) mm.session.dismiss(sum.id, Date.now()); await wait(30); };
+    const drawn50 = [], tops50 = [], titles50 = [];
+    for (const x of [440, 580, 720]) {
+      t.stroke(t.rect(x, 250, 120, 60)); drawn50.push(lastId50());
+      mm.session.summonMarks(drawn50.slice(), Date.now()); await wait(60);
+      const pill = topPill50();
+      tops50.push(pill ? pill.dataset.key : null); titles50.push(pill ? pill.title : '');
+      if (x !== 720) await letGo50();
+    }
+    step('50. three boxes drawn one after another beside a flowchart keep the same top offer, and it says why',
+      /^a flowchart /.test(flowRead50[0] || '') && tops50.length === 3 && tops50.every((k) => k === 'snap') &&
+        titles50.every((ti) => /first because it sits beside a flowchart: three processes, one decision/.test(ti)),
+      { flowRead: flowRead50, tops: tops50, title: titles50[1] });
+    // The panel says it too: what stands beside the selection, and what that put first.
+    const panel50 = document.getElementById('inspector').textContent;
+    const ctx50 = mm.paletteContext ? mm.paletteContext() : null;
+    step('50a. the panel says what stands beside the selection and what it put first, and why',
+      /beside\s*a flowchart 0\.\d\d — three processes, one decision, three flows/.test(panel50) &&
+        /first\s*Draw them clean\s*because it sits beside a flowchart: three processes, one decision/.test(panel50) &&
+        !!ctx50 && /^notation:flowchart@/.test(ctx50.key || ''),
+      { panel: (panel50.match(/beside[\s\S]{0,220}/) || [''])[0], key: ctx50 && ctx50.key });
+
+    // An offer a little ahead of the held top, then well ahead: the margin decides.
+    const near50 = (base) => ({
+      id: 'test:near-top', name: 'a near rival', describe: () => 'offers one thing, a little likelier than the top',
+      offers: (scope) => (scope.marks.length === 3 ? [{ key: 'test:near-top', label: 'A near rival', reason: 'a tool from one file', base: base, tool: 'test:near-top' }] : []),
+      take: () => ({}),
+    });
+    let off50 = MM.registerTool(near50(1.12)); // ahead of the held top by less than a tenth
+    await wait(30);
+    const held50 = topPill50() ? topPill50().dataset.key : null;
+    const heldWhy50 = topPill50() ? topPill50().title : '';
+    const rivalShown50 = !!document.querySelector('#summon .pill[data-key="test:near-top"]');
+    off50();
+    off50 = MM.registerTool(near50(1.3)); // ahead by more than the margin
+    await wait(30);
+    const beaten50 = topPill50() ? topPill50().dataset.key : null;
+    off50();
+    await wait(30);
+    step('50b. an offer a little ahead does not take the held top — within the margin it holds, and says so; past the margin the new one leads',
+      held50 === 'snap' && rivalShown50 && /first because it led here a moment ago/.test(heldWhy50) && beaten50 === 'test:near-top',
+      { held: held50, heldWhy: heldWhy50, rivalShown: rivalShown50, beaten: beaten50 });
+    await letGo50();
+
+    // A board away from the flowchart: the same two boxes, ranked as before context.
+    t.stroke(t.rect(1100, 700, 120, 60)); const far1 = lastId50();
+    t.stroke(t.rect(1240, 700, 120, 60)); const far2 = lastId50();
+    mm.session.summonMarks([far1, far2], Date.now()); await wait(60);
+    const farTop50 = topPill50();
+    const farTitles50 = [...document.querySelectorAll('#summon .pill.item')].map((b) => b.title);
+    step('50c. a board away the order is B1’s — two boxes in a row are lined up first — and nothing says it was lifted',
+      !!farTop50 && farTop50.dataset.key === 'row:tidy-row' && farTitles50.every((ti) => !/because/.test(ti)),
+      { top: farTop50 ? farTop50.dataset.key : null, titles: farTitles50 });
+    await letGo50();
+    mm.session.load([]); mm.setView(1, 0, 0);
+  }
+
+  // ---- 51. A library pack, used by an event (V1-PLAN §2.3, B3) ----
+  // Premade content arrives the way the command mark does — shipped pre-taught
+  // — and stands on a board only because the board says so: one `use` event
+  // in its log. The packs pane is the control centre's last tile; basics@1
+  // used from it, the canonical molecule drawn with nothing taught is named by
+  // the field and by a chip beside it, each saying its pack; the journal and
+  // the exported log carry the event. Stop using it: gone. Undo: back. Then a
+  // board that uses no pack offers what e2e 49's golden holds, a board naming
+  // a pack this build lacks loads and says so, and flowchart@1 in use puts
+  // the flowchart's ports on the pen.
+  {
+    mm.session.load([]); mm.setView(1, 0, 0); mm.resetUses();
+    const lastId51 = () => { const st = mm.session.getState(); return st.contentIds[st.contentIds.length - 1]; };
+    const molecule51 = (ox) => {
+      const ids = [];
+      for (const [x, y] of [[300, 300], [500, 300], [400, 460]]) { t.stroke(t.circle(ox + x, y, 40)); ids.push(lastId51()); }
+      t.stroke(t.line({ x: ox + 340, y: 300 }, { x: ox + 460, y: 300 }, 30)); ids.push(lastId51());
+      t.stroke(t.line({ x: ox + 328, y: 328 }, { x: ox + 372, y: 432 }, 30)); ids.push(lastId51());
+      return ids;
+    };
+    const pane51 = document.getElementById('packsPanel');
+    const face51 = () => (document.querySelector('#packsBtn .v') || {}).textContent || '';
+    const openPacks51 = async () => { mm.openCC(); await wait(20); if (pane51.hasAttribute('hidden')) document.getElementById('packsBtn').click(); await wait(30); };
+    const closePacks51 = async () => { const x = pane51.querySelector('.paneClose'); if (x && !pane51.hasAttribute('hidden')) x.click(); mm.closeCC(); await wait(20); };
+    const tap51 = async (ref, act) => { const b = pane51.querySelector('.pkItem[data-pack="' + ref + '"] button[data-' + act + ']'); if (b) b.click(); await wait(40); return !!b; };
+    const chipOf51 = (ids) => mm.chips().find((c) => c.ids.length === ids.length && ids.every((id) => c.ids.includes(id)));
+    const letGo51 = async () => { const sum = mm.session.getState().summon; if (sum) mm.session.dismiss(sum.id, Date.now()); await wait(30); };
+
+    // The tile, last in the grid; its pane; use.
+    mm.openCC(); await wait(20);
+    const grid51 = [...document.getElementById('cc').children].filter((el) => el.matches('button, .tile')).map((el) => el.id).filter(Boolean);
+    await openPacks51();
+    const listed51 = [...pane51.querySelectorAll('.pkItem')].map((r) => r.dataset.pack);
+    const tapped51 = await tap51('basics@1', 'use');
+    const uses51 = mm.session.getEvents().filter((e) => e.type === 'use');
+    const marked51 = !!pane51.querySelector('.pkItem.used[data-pack="basics@1"]');
+    const faceIn51 = face51();
+    step('51. the packs tile is the last in the control centre; its pane lists what this build ships and never a test pack; use writes one use event, and the board uses basics@1 — the tile and the pane say so',
+      grid51[grid51.length - 1] === 'packsBtn' && JSON.stringify(listed51) === '["basics@1","flowchart@1"]' && tapped51 && uses51.length === 1 && uses51[0].pack === 'basics@1' &&
+        JSON.stringify(mm.session.getState().packs) === '["basics@1"]' && faceIn51 === 'basics' && marked51,
+      { lastTiles: grid51.slice(-3), listed: listed51, uses: uses51.map((e) => e.pack), face: faceIn51, marked: marked51 });
+    await closePacks51();
+
+    // The canonical molecule, nothing taught: named beside the group and in the field, its pack said.
+    const mol51 = molecule51(0); await wait(60);
+    const chip51 = chipOf51(mol51);
+    mm.session.summonMarks(mol51, Date.now()); await wait(60);
+    const top51 = document.querySelector('#summon .row.certain .pill');
+    const topText51 = top51 ? top51.querySelector('span').textContent : '';
+    const ranked51 = (mm.fieldItems('') || { ranked: [] }).ranked;
+    step('51a. the canonical molecule drawn with nothing taught is named — the chip beside it and the field’s first reading say “molecule … · basics”, the tooltip the pack it came from — and nothing is made, no model asked',
+      !!chip51 && /^molecule \d\.\d\d · basics$/.test(chip51.text) && /^molecule \d\.\d\d · basics$/.test(topText51) && !!top51 && /from the Basics pack \(basics@1\)/.test(top51.title) &&
+        ranked51.length > 0 && ranked51[0].key.startsWith('sug:') && mm.session.getState().artifacts.length === 0,
+      { chip: chip51 && chip51.text, top: topText51, title: top51 && top51.title, first: ranked51[0] && ranked51[0].key, artifacts: mm.session.getState().artifacts.length });
+    await letGo51();
+
+    // The log carries it: the exported log — the export pane's canvas.jsonl, one event a line — read back on a
+    // board of its own. (The journal this browser keeps carries it through a reload: the boards scenario's N17.)
+    const replayed51 = (evs) => {
+      const s = MM.createSession();
+      s.load(evs);
+      const st = s.getState();
+      return { packs: st.packs, names: st.clusterCandidates.map((c) => c.matches[0] ? c.matches[0].name + '·' + c.matches[0].pack : null) };
+    };
+    const file51 = MM.decodeLog(MM.encodeLog(mm.session.getEvents()));
+    const fromFile51 = replayed51(file51.events);
+    const fromJson51 = replayed51(JSON.parse(mm.exportLog()));
+    step('51b. the exported log carries the use event: read back on a board of its own, it uses basics@1 and names the molecule',
+      file51.skipped === 0 && file51.events.some((e) => e.type === 'use' && e.pack === 'basics@1') && JSON.stringify(fromFile51.packs) === '["basics@1"]' &&
+        JSON.stringify(fromFile51.names) === '["molecule·basics@1"]' && JSON.stringify(fromJson51) === JSON.stringify(fromFile51),
+      { file: fromFile51, json: fromJson51 });
+
+    // Stop using it: gone. Undo: back.
+    await openPacks51();
+    await tap51('basics@1', 'unuse');
+    const lastEv51 = mm.session.getEvents().slice(-1)[0];
+    const stopped51 = { packs: mm.session.getState().packs.slice(), chip: !!chipOf51(mol51), matches: mm.session.matchesOf(mol51).length, face: face51() };
+    await closePacks51();
+    mm.session.undo(); await wait(60);
+    const backChip51 = chipOf51(mol51);
+    const back51 = { packs: mm.session.getState().packs.slice(), chip: backChip51 ? backChip51.text : null, matches: mm.session.matchesOf(mol51).map((m) => m.name + '·' + m.pack) };
+    step('51c. stop using it: one unuse event, and the molecule is matched by nothing — no chip, the tile says none; undo takes the unuse back, and the chip and the match return',
+      lastEv51.type === 'unuse' && lastEv51.pack === 'basics@1' && stopped51.packs.length === 0 && !stopped51.chip && stopped51.matches === 0 && stopped51.face === 'none' &&
+        JSON.stringify(back51.packs) === '["basics@1"]' && /^molecule \d\.\d\d · basics$/.test(back51.chip || '') && JSON.stringify(back51.matches) === '["molecule·basics@1"]',
+      { last: lastEv51 && lastEv51.type, stopped: stopped51, back: back51 });
+
+    // A board that uses no pack, straight after one that did: the field offers what it did before packs.
+    const golden51 = await window.__fieldGolden();
+    const differs51 = Object.keys(window.__FIELD_GOLDEN).filter((name) => JSON.stringify(golden51[name]) !== JSON.stringify(window.__FIELD_GOLDEN[name]));
+    step('51d. on boards that use no pack — straight after one that did — the field offers exactly what e2e 49’s golden holds: the same pills, keys, reasons and order',
+      differs51.length === 0, { differs: differs51 });
+
+    // A board naming a pack this build lacks: it loads, and says so — in the standing line, on the tile and in the pane — and can let it go.
+    mm.session.load([]); mm.setView(1, 0, 0);
+    t.stroke(t.rect(300, 300, 160, 90));
+    const drawn51 = mm.session.getEvents().slice();
+    mm.session.load([{ type: 'use', pack: 'garment@9', at: drawn51[0].at - 1 }].concat(drawn51)); await wait(60);
+    const st51 = mm.session.getState();
+    const standing51 = document.getElementById('status').dataset.standing || '';
+    await openPacks51();
+    const lost51 = pane51.querySelector('.pkItem.pkLost[data-pack="garment@9"]');
+    const lostFace51 = face51();
+    await tap51('garment@9', 'unuse');
+    const cleared51 = mm.session.getState().packNotices.length === 0 && mm.session.getEvents().slice(-1)[0].type === 'unuse';
+    await closePacks51();
+    step('51e. a board that names a pack this build lacks still loads — its mark there — and says so in the standing line, on the tile and in the pane; stop using it and the notice goes',
+      st51.contentIds.length === 1 && st51.packs.length === 0 && st51.packNotices.length === 1 && st51.packNotices[0].pack === 'garment@9' && /garment@9 is not in this build/.test(standing51) &&
+        !!lost51 && /not in this build/.test(lost51.textContent) && lostFace51 === 'garment@9?' && cleared51,
+      { content: st51.contentIds.length, notices: st51.packNotices.map((n) => n.pack), standing: standing51, face: lostFace51, cleared: cleared51 });
+
+    // flowchart@1 in use: the flowchart's ports on the pen — a decision offers its vertices — and taken back when it is not.
+    mm.session.load([]); mm.setView(1, 0, 0);
+    const v51 = [{ x: 500, y: 240 }, { x: 590, y: 300 }, { x: 500, y: 360 }, { x: 410, y: 300 }];
+    const mid51 = { x: (v51[0].x + v51[1].x) / 2, y: (v51[0].y + v51[1].y) / 2 };
+    const path51 = [mid51, v51[1], v51[2], v51[3], v51[0], mid51];
+    let dia51 = [];
+    for (let i = 0; i < path51.length - 1; i++) dia51 = dia51.concat(t.line(path51[i], path51[i + 1], 26).slice(i ? 1 : 0));
+    t.stroke(dia51); const decision51 = lastId51();
+    const portsAt51 = () => { const s = mm.session.getState(); return MM.magnetSites(s.nodes.get(decision51), s.nodes).filter((x) => x.kind === 'port:flowchart').length; };
+    const before51 = { registered: MM.registeredPorts().slice(), ports: portsAt51() };
+    await openPacks51();
+    await tap51('flowchart@1', 'use');
+    const inUse51 = { registered: MM.registeredPorts().slice(), ports: portsAt51() };
+    await tap51('flowchart@1', 'unuse');
+    const after51 = { registered: MM.registeredPorts().slice(), ports: portsAt51() };
+    await closePacks51();
+    step('51f. flowchart@1 in use puts the flowchart’s ports on the pen — the decision offers its four vertices; stopped, they are taken back',
+      before51.registered.length === 0 && before51.ports === 0 && JSON.stringify(inUse51.registered) === '["flowchart"]' && inUse51.ports === 4 && after51.registered.length === 0 && after51.ports === 0,
+      { before: before51, inUse: inUse51, after: after51 });
     mm.session.load([]); mm.setView(1, 0, 0);
   }
 

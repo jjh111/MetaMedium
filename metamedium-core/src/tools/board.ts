@@ -3,7 +3,7 @@
 // found in it. Pure reads over the board; nothing here writes.
 
 import type { MMNode, Rep, Transcript } from '../session/nodes';
-import { getRep, isWord, transcriptsOf } from '../session/nodes';
+import { getRep, isPackDefinition, isWord, transcriptsOf } from '../session/nodes';
 import { interpretationsOf } from '../session/interpretations';
 import type { SessionState } from '../session/session';
 import type { ToolScope } from './tool';
@@ -24,11 +24,19 @@ export function artifactsIn(board: Pick<SessionState, 'artifacts'>, ids: readonl
   return [...new Set(ids.filter((id) => artifacts.has(id)))];
 }
 
-/** The definition an artifact belongs to: what it is an instance of, else itself. */
+/**
+ * The definition an artifact belongs to: what it is an instance of, else
+ * itself. An instance of a library pack's definition is its own (B3): the
+ * pack's definition is never on the board — it has no clock, no tank and no
+ * behaviour — so the first molecule taken from a pack is this board's own
+ * molecule, and the pack's stays its provenance (`instance-of`).
+ */
 export function definitionOf(board: Pick<SessionState, 'nodes'>, artifactId: string): string {
   const node = board.nodes.get(artifactId);
   const inst = node?.edges.find((e) => e.rel === 'instance-of');
-  return inst ? inst.to : artifactId;
+  if (!inst) return artifactId;
+  const def = board.nodes.get(inst.to);
+  return def && isPackDefinition(def) ? artifactId : inst.to;
 }
 
 /** The definitions the scope's artifacts belong to, each once, in the order they are held. */

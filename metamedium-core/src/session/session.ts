@@ -48,6 +48,7 @@ import {
   isWord,
   lettersOf,
   authorOf,
+  isPackDefinition,
   LOCAL_PARTICIPANT,
   TIER0_PARTICIPANT,
   type Locality,
@@ -77,6 +78,10 @@ import { type StructuralSignature, type Examples, structuralSignature, matchDefi
 import type { Kind } from '../kinds/kinds';
 import type { Behaviour } from '../behave/verbs';
 import type { Connection } from '../frames/frame';
+import type { Pack, PackNotice } from '../packs/pack';
+import { describePackNotice, describePackRefusal, libraryId, packOfId, packRef, parsePackRef } from '../packs/pack';
+import { type PackSource, shippedPack } from '../packs/registry';
+import { type LibraryDefinition, libraryDefinitions } from '../packs/definitions';
 
 // ===== Public state shape =====
 
@@ -88,6 +93,8 @@ export interface Suggestion {
   score?: number;
   /** Why it matched, in the terms the signature was measured in. */
   reasoning?: string;
+  /** For a match against a library pack's definition: the pack (`basics@1`) — the definition is the pack's, not a thing on this board (B3). */
+  pack?: string;
 }
 
 /** How the command mark decided what it was about. */
@@ -129,8 +136,13 @@ export interface Clock {
 
 export interface ClusterCandidate {
   nodeIds: string[];
-  /** Every definition above the floor, best first — plural, like every reading. */
-  matches: { artifactId: string; name: string; score: number; reasoning?: string }[];
+  /**
+   * Every definition above the floor, best first — plural, like every
+   * reading; on a tie, this board's own before a library pack's. `pack` says
+   * when the definition is a pack's (`basics@1`): the id is then the pack's
+   * definition, never an artifact on the board (B3).
+   */
+  matches: { artifactId: string; name: string; score: number; reasoning?: string; pack?: string }[];
 }
 
 /**
@@ -207,6 +219,20 @@ export interface SessionState {
    * else's: another hand drawing beside you just now is not you.
    */
   recentIds: string[];
+  /**
+   * The library packs this board uses, by `id@version`, in the order its
+   * `use` events named them (V1-PLAN §2.3, B3). A pack's definitions are
+   * matched on this board only because its log says it uses them: `use` and
+   * `unuse` are events, so a board replays with the same library everywhere.
+   */
+  packs: string[];
+  /**
+   * Packs this board says it uses that this build cannot give it — a name it
+   * does not ship, or no pack's name at all — each with its sentence. Standing
+   * while the log says so (an `unuse` clears one), never thrown: the board
+   * loads without them and the surface says it (B3).
+   */
+  packNotices: PackNotice[];
 }
 
 /**
@@ -292,6 +318,16 @@ type SessionEventUnion =
    */
   | { type: 'label'; nodeId: string; text: string; participantId?: string; at: number }
   | { type: 'teach'; mark: CommandMark | null; at: number }
+  /**
+   * The board uses a library pack (V1-PLAN §2.3, B3): its definitions are
+   * matched here from this event on, attributed to the pack; its notation's
+   * ports may reach the pen and its affinities lift what stands beside the
+   * hand. `pack` is `id@version`. A board-wide fact: whichever hand said it,
+   * every hand's board uses it once the logs are merged.
+   */
+  | { type: 'use'; pack: string; at: number; participantId?: string }
+  /** The board stops using a pack: its definitions leave the matching (what corrections taught them is kept for a later use). */
+  | { type: 'unuse'; pack: string; at: number; participantId?: string }
   /**
    * A behaviour for a definition, held as a rep. From a human it is blessed
    * by the act; from a model or the engine's own fit it is held, attributed,
@@ -492,6 +528,14 @@ export interface SessionConfig {
    * room's oracle checks by setting it small.
    */
   checkpointEvery?: number;
+  /**
+   * Where the packs a board uses come from: a pack's name to its content
+   * (`packs/registry.ts`). The packs this build ships when unset — which is
+   * every surface; a bench hands in the pack it measures. Content under one
+   * name never changes, so the same log replays to the same board with any
+   * source that has the packs it names.
+   */
+  packs?: PackSource;
 }
 
 export const DEFAULT_SESSION_CONFIG: SessionConfig = {
@@ -562,8 +606,22 @@ export interface Session {
   clock(args: { nodeId: string; op: 'play' | 'pause' | 'reset' | 'seed'; seed?: number; reason?: string; at: number; participantId?: string }): void;
   /** Say that a group is, or is not, a definition; the correction is remembered on the definition. */
   correct(args: { ids: string[]; definitionId: string; verdict: 'is' | 'is-not'; at: number; participantId?: string }): void;
-  /** Which definitions a group matches now, best first, with reasoning. Pure; no event. */
-  matchesOf(ids: string[]): { artifactId: string; name: string; score: number; reasoning: string }[];
+  /**
+   * Which definitions a group matches now, best first, with reasoning — this
+   * board's own and those of the library packs it uses, a pack's marked with
+   * `pack`, and on a tie this board's own first. Pure; no event.
+   */
+  matchesOf(ids: string[]): { artifactId: string; name: string; score: number; reasoning: string; pack?: string }[];
+  /**
+   * Use a library pack on this board, by `id@version` (V1-PLAN §2.3, B3): one
+   * `use` event, and the pack's definitions are matched from it on. Returns
+   * null when the board uses the pack now — already, or from this call — or
+   * the notice saying why it cannot: no pack's name, or one this build does
+   * not ship. A refusal writes nothing into the log.
+   */
+  use(pack: string, at: number, participantId?: string): PackNotice | null;
+  /** Stop using a pack — one it uses, or one it names that this build lacks: one `unuse` event. Nothing, when the board does not name it. */
+  unuse(pack: string, at: number, participantId?: string): void;
   /**
    * Attach generated code to an artifact — the 'code' rep that makes it live.
    * Several participants may each attach code to the same artifact; every
@@ -770,6 +828,13 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
   let explanations: string[] = [];
   let live: string[] = [];
   let clocks: Record<string, Clock> = {};
+  // The library packs this board uses (B3): their names in the order the log
+  // used them, the definitions they add to the matching (pack by pack, each
+  // pack's in its own order), and the names it uses that this build lacks.
+  let packs: string[] = [];
+  let library: string[] = [];
+  let packNotices: PackNotice[] = [];
+  const packSource: PackSource = config.packs ?? shippedPack;
   // Every hand's gestures, keyed by the hand whose acts they are (`handOf`):
   // the board's own under LOCAL_PARTICIPANT, another's under
   // `participant:hand:<name>` — so every board keys one hand alike (L2h).
@@ -861,6 +926,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     clusterCandidates: ClusterCandidate[]; participants: string[]; explanations: string[];
     live: string[]; gestures: Map<string, Gestures>; markHands: Map<string, string>;
     lastAt: number; counter: number; clocks: Record<string, Clock>;
+    packs: string[]; library: string[]; packNotices: PackNotice[];
     /** The index as it stood — kept by the last few checkpoints only. */
     derived?: Derived;
   }
@@ -923,6 +989,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       clusterCandidates: clusterCandidates.slice(), participants: participants.slice(),
       explanations: explanations.slice(), live: live.slice(), gestures: structuredClone(gestures),
       markHands: new Map(markHands), lastAt, counter, clocks: { ...clocks },
+      packs: packs.slice(), library: library.slice(), packNotices: packNotices.slice(),
       derived: copyDerived({
         order, nextOrder, inContent, reach, ink, linked, componentOf, matchable, unsettled,
         definitionsSeen, definitionsChanged, holding, holdingInOrder, holdingMoved,
@@ -937,6 +1004,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     explanations = s.explanations.slice(); live = s.live.slice(); gestures = structuredClone(s.gestures);
     markHands = new Map(s.markHands);
     lastAt = s.lastAt; counter = s.counter; clocks = { ...(s.clocks ?? {}) };
+    packs = s.packs.slice(); library = s.library.slice(); packNotices = s.packNotices.slice();
     if (!s.derived) {
       rebuildDerived();
       return;
@@ -1070,6 +1138,9 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     explanations = [];
     live = [];
     clocks = {};
+    packs = [];
+    library = [];
+    packNotices = [];
     gestures = new Map();
     markHands = new Map();
     lastAt = 0;
@@ -1154,15 +1225,29 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
   }
 
   /**
+   * Every definition a group could be matched against, in the order a tie
+   * keeps: this board's own — its artifacts — then the definitions of the
+   * library packs it uses (B3), pack by pack.
+   */
+  function definitionIds(): string[] {
+    return library.length ? artifacts.concat(library) : artifacts;
+  }
+
+  /** Best first; on a tie, this board's own definition before a library pack's (V1-PLAN §2.3). */
+  const byScoreOwnFirst = (p: { score: number; pack?: string }, q: { score: number; pack?: string }) =>
+    q.score - p.score || (p.pack ? 1 : 0) - (q.pack ? 1 : 0);
+
+  /**
    * Every definition a group matches, best first: its signature against each
-   * artifact's own, and against what corrections have taught that artifact.
+   * artifact's own, and against what corrections have taught that artifact —
+   * and against each library pack's definition in use, the same way (B3).
    * Plural on purpose — two definitions with the same shapes are both offered,
    * with the reasoning that ranks them, and the human decides.
    */
   function matchesFor(ids: readonly string[]) {
     const sig = signatureOf(ids);
-    const out: { artifactId: string; name: string; score: number; reasoning: string }[] = [];
-    for (const aid of artifacts) {
+    const out: { artifactId: string; name: string; score: number; reasoning: string; pack?: string }[] = [];
+    for (const aid of definitionIds()) {
       const a = nodes.get(aid)!;
       // Writing taken as text is a transcription, not vocabulary: a group of
       // words is never offered as "another hello world" (v10 F8).
@@ -1173,9 +1258,10 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       const examples = getRep(a, 'examples')?.data as Examples | undefined;
       const m = matchDefinition(sig, aSig, examples);
       if (m.vetoed || m.score < MATCH_FLOOR) continue;
-      out.push({ artifactId: aid, name: wordOf(a) ?? aid, score: m.score, reasoning: m.reasoning });
+      const pack = packOfId(aid);
+      out.push({ artifactId: aid, name: wordOf(a) ?? aid, score: m.score, reasoning: m.reasoning, ...(pack ? { pack } : {}) });
     }
-    return out.sort((p, q) => q.score - p.score);
+    return out.sort(byScoreOwnFirst);
   }
 
   /**
@@ -1187,7 +1273,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
    * definition is scored against every component, and nothing else is.
    */
   function recomputeClusterCandidates() {
-    if (artifacts.length === 0 || contentIds.length === 0) {
+    if ((artifacts.length === 0 && library.length === 0) || contentIds.length === 0) {
       clusterCandidates = [];
       return;
     }
@@ -1335,11 +1421,12 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       fresh.push(gather(id));
     }
     unsettled.clear();
+    const defs = definitionIds();
     for (const c of fresh) {
       if (c.strokeIds) {
         matchable.add(c);
         c.signature = signatureOf(c.strokeIds);
-        for (const aid of artifacts) scoreAgainst(c, aid);
+        for (const aid of defs) scoreAgainst(c, aid);
       }
       assemble(c);
     }
@@ -1420,7 +1507,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     if (!definitionsChanged) return;
     definitionsChanged = false;
     const now = new Map<string, DefinitionKey>();
-    for (const aid of artifacts) now.set(aid, definitionKeyOf(aid));
+    for (const aid of definitionIds()) now.set(aid, definitionKeyOf(aid));
     const changed: string[] = [];
     for (const [aid, k] of now) {
       const was = definitionsSeen.get(aid);
@@ -1441,11 +1528,13 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     let candidate: ClusterCandidate | null = null;
     if (c.strokeIds && c.scores.size) {
       const matches: ClusterCandidate['matches'] = [];
-      for (const aid of artifacts) {
+      for (const aid of definitionIds()) {
         const s = c.scores.get(aid);
-        if (s) matches.push({ artifactId: aid, name: wordOf(nodes.get(aid)!) ?? aid, score: s.score, reasoning: s.reasoning });
+        if (!s) continue;
+        const pack = packOfId(aid);
+        matches.push({ artifactId: aid, name: wordOf(nodes.get(aid)!) ?? aid, score: s.score, reasoning: s.reasoning, ...(pack ? { pack } : {}) });
       }
-      matches.sort((p, q) => q.score - p.score);
+      matches.sort(byScoreOwnFirst);
       if (matches.length) candidate = { nodeIds: c.strokeIds, matches };
     }
     c.candidate = candidate;
@@ -1467,6 +1556,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
         artifactId: m.artifactId,
         score: m.score,
         reasoning: m.reasoning,
+        ...(m.pack ? { pack: m.pack } : {}),
       });
     }
     suggestions.push({ id: nextId('sug'), kind: 'prompt', label: 'Make…' });
@@ -2153,7 +2243,9 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
 
   function eraseNode(nodeId: string, at: number) {
     const node = nodes.get(nodeId);
-    if (!node || node.id.startsWith('type:')) return;
+    // A type node is popular, not sacred, but not ink; a library pack's node is
+    // the pack's content, never on the board — `unuse` is how it leaves (B3).
+    if (!node || node.id.startsWith('type:') || isLibraryNode(node.id)) return;
     if (getRep(node, 'erased')) return;
 
     // Ink is never destroyed: the node stays in the graph, marked erased.
@@ -2229,6 +2321,8 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
   function applyPropose(ev: Extract<SessionEvent, { type: 'propose' }>) {
     const node = nodes.get(ev.nodeId);
     if (!node || !participants.includes(ev.participantId)) return;
+    // A library pack's content is read, not read INTO: a reading is about marks.
+    if (isLibraryNode(node.id)) return;
     // A reading of ink that is no longer there is about a board that no longer
     // exists (STATE-1). Checked here too, for a log that arrives out of order.
     if (getRep(node, 'erased')) return;
@@ -2745,10 +2839,15 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     shrinkWord(ev.nodeId, null);
   }
 
-  /** A correction lands on the definition as examples, and the candidates are read again. */
+  /**
+   * A correction lands on the definition as examples, and the candidates are
+   * read again. A library pack's definition is corrected as a taught one is
+   * (B3): *Not a molecule* on this board is remembered on this board, and
+   * kept through an `unuse` for the pack's next use.
+   */
   function applyCorrect(ev: Extract<SessionEvent, { type: 'correct' }>) {
     const def = nodes.get(ev.definitionId);
-    if (!def || !artifacts.includes(ev.definitionId)) return;
+    if (!def || !(artifacts.includes(ev.definitionId) || isPackDefinition(def))) return;
     const ids = ev.ids.filter((id) => nodes.has(id));
     if (ids.length === 0) return;
     const sig = signatureOf(ids);
@@ -2944,6 +3043,120 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     gesturesOf(handOf(ev)).commandMark = ev.mark;
   }
 
+  // ===== Library packs (V1-PLAN §2.3, B3) =====
+  //
+  // A board uses a pack by an event, and only by an event: `use` puts the
+  // pack's definitions into the matching, `unuse` takes them out, and replay,
+  // undo and a room's merge carry both as they carry a stroke. A definition is
+  // a node — attributed to the pack (`library:basics@1`), carrying the
+  // signature its drawings read as and the accepted examples the rest of them
+  // did — so it is matched, ranked and corrected by the very code a taught one
+  // is. It is never on the board: not on the content plane, not an artifact,
+  // not live, never erased, never read into. Its node outlasts an `unuse`, so
+  // what a correction taught it holds for the pack's next use.
+
+  /** Whether a node is a library pack's — the pack's own node or one of its definitions. */
+  function isLibraryNode(id: string): boolean {
+    return id.startsWith('library:');
+  }
+
+  /** A notice for a name the board uses that this build cannot give it, once per name, standing. */
+  function noticePack(pack: string, reason: PackNotice['reason'], at: number) {
+    if (packNotices.some((n) => n.pack === pack)) return;
+    packNotices = packNotices.concat({ pack, reason, detail: describePackNotice(pack, reason), at });
+  }
+
+  /** The pack's own node: what its definitions are made by, and what the panel calls it. */
+  function packNodeOf(pack: Pack, ref: string, at: number): MMNode {
+    return {
+      id: libraryId(ref),
+      reps: [
+        { modality: 'pack', data: { pack: ref, id: pack.id, version: pack.version, name: pack.name, describes: pack.describes, ...(pack.notation ? { notation: pack.notation } : {}) }, source: 'library' },
+        { modality: 'word', data: pack.name, source: 'library' },
+      ],
+      edges: [],
+      capability: 1,
+      createdAt: at,
+    };
+  }
+
+  /** A pack's definition as a node: its name, its signature, the other drawings as accepted examples, and the pack as its maker. */
+  function definitionNodeOf(def: LibraryDefinition, at: number): MMNode {
+    const by = libraryId(def.pack);
+    return {
+      id: def.id,
+      reps: [
+        { modality: 'word', data: def.name, source: by },
+        { modality: 'signature', data: def.signature, source: by },
+        ...(def.accepted.length ? [{ modality: 'examples', data: { accepted: def.accepted.slice(), rejected: [] } as Examples, source: by }] : []),
+        {
+          modality: 'pack-definition',
+          data: {
+            pack: def.pack, definition: def.name,
+            ...(def.describes !== undefined ? { describes: def.describes } : {}),
+            ...(def.role !== undefined ? { role: def.role } : {}),
+            ...(def.ports !== undefined ? { ports: def.ports } : {}),
+            ...(def.export !== undefined ? { export: { ...def.export } } : {}),
+          },
+          source: by,
+        },
+      ],
+      edges: [{ to: by, rel: 'made-by' }],
+      capability: 1,
+      createdAt: at,
+    };
+  }
+
+  function applyUse(ev: Extract<SessionEvent, { type: 'use' }>) {
+    // Read, not trusted (DATA-1): whatever stands where a pack's name should.
+    const ref = typeof ev.pack === 'string' ? ev.pack : String(ev.pack);
+    if (!parsePackRef(ref)) return noticePack(ref, 'malformed', ev.at);
+    if (packs.includes(ref)) return;
+    const pack = packSource(ref);
+    if (!pack || packRef(pack) !== ref) return noticePack(ref, 'unknown', ev.at);
+    packs.push(ref);
+    const pid = libraryId(ref);
+    if (!nodes.has(pid)) nodes.set(pid, packNodeOf(pack, ref, ev.at));
+    // What the pack's drawings read as — read once per pack, on a scratch
+    // board of its own (packs/definitions.ts), never on this one.
+    for (const def of libraryDefinitions(pack, () => createSession())) {
+      if (!nodes.has(def.id)) nodes.set(def.id, definitionNodeOf(def, ev.at));
+      library.push(def.id);
+    }
+    definitionsChanged = true;
+    recomputeClusterCandidates();
+    rereadSummonMatches();
+  }
+
+  /**
+   * Every hand's open summon reads its matches again, as a correction's does
+   * for its corrector (`applyCorrect`): the definitions this board matches by
+   * changed for every hand, so a field open on some marks offers what the
+   * board now knows them as — the pack's molecule the moment it is used, and
+   * not a moment after it is stopped.
+   */
+  function rereadSummonMatches() {
+    for (const g of gestures.values()) {
+      if (!g.summon) continue;
+      g.summon.suggestions = g.summon.suggestions.filter((x) => x.kind !== 'match');
+      g.summon.suggestions.unshift(...makeSuggestions(g.summon.enclosedIds).filter((x) => x.kind === 'match'));
+    }
+  }
+
+  function applyUnuse(ev: Extract<SessionEvent, { type: 'unuse' }>) {
+    const ref = typeof ev.pack === 'string' ? ev.pack : String(ev.pack);
+    // A name this build could not give the board stops being said.
+    if (packNotices.some((n) => n.pack === ref)) packNotices = packNotices.filter((n) => n.pack !== ref);
+    const at = packs.indexOf(ref);
+    if (at < 0) return;
+    packs.splice(at, 1);
+    const prefix = libraryId(ref) + ':';
+    library = library.filter((id) => !id.startsWith(prefix));
+    definitionsChanged = true;
+    recomputeClusterCandidates();
+    rereadSummonMatches();
+  }
+
   /** How many versions of code a node carries. A revision is pinned to one of these. */
   function codeVersion(nodeId: string): number {
     const node = nodes.get(nodeId);
@@ -3032,6 +3245,8 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
   function applyCode(ev: Extract<SessionEvent, { type: 'code' }>): string | null {
     const node = nodes.get(ev.nodeId);
     if (!node || !participants.includes(ev.participantId)) return null;
+    // A library pack's content never becomes a thing on the board (B3).
+    if (isLibraryNode(node.id)) return null;
     // Also checked here, not only at the door: a merged or loaded log can put
     // an erase BEFORE a code event (another hand's log arriving out of order),
     // and state must be a pure function of the log either way.
@@ -3121,6 +3336,12 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
         return applyLabel(ev);
       case 'teach':
         applyTeach(ev);
+        return null;
+      case 'use':
+        applyUse(ev);
+        return null;
+      case 'unuse':
+        applyUnuse(ev);
         return null;
       case 'correct':
         applyCorrect(ev);
@@ -3395,6 +3616,8 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       live: [...live],
       clocks: { ...clocks },
       selection: [...reader.selection],
+      packs: [...packs],
+      packNotices: packNotices.map((n) => ({ ...n })),
     };
   }
 
@@ -3417,6 +3640,23 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       return !!node && samePerson(authorOf(node), participantId ?? LOCAL_PARTICIPANT);
     },
     teachCommandMark: (mark, at) => void dispatch({ type: 'teach', mark, at }),
+    use: (pack, at, participantId) => {
+      // Refused at the door, never written: a name that is no pack's, or one
+      // this build does not ship — the log names only packs it could use.
+      const ref = typeof pack === 'string' ? pack.trim() : String(pack);
+      const refuse = (reason: PackNotice['reason']): PackNotice => ({ pack: ref, reason, detail: describePackRefusal(ref, reason), at });
+      if (!parsePackRef(ref)) return refuse('malformed');
+      const content = packSource(ref);
+      if (!content || packRef(content) !== ref) return refuse('unknown');
+      if (packs.includes(ref)) return null;
+      dispatch({ type: 'use', pack: ref, at, ...(participantId !== undefined ? { participantId } : {}) });
+      return null;
+    },
+    unuse: (pack, at, participantId) => {
+      const ref = typeof pack === 'string' ? pack.trim() : String(pack);
+      if (!packs.includes(ref) && !packNotices.some((n) => n.pack === ref)) return;
+      dispatch({ type: 'unuse', pack: ref, at, ...(participantId !== undefined ? { participantId } : {}) });
+    },
     correct: (args) => void dispatch({ type: 'correct', ...args }),
     clock: (args) => void dispatch({ type: 'clock', ...args }),
     behave: (args) => void dispatch({ type: 'behave', ...args }),

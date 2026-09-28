@@ -287,7 +287,8 @@ export type { DirHandleLike, FileHandleLike, FileLike, WritableLike } from './st
 export { structuralSignature, compareSignatures, matchDefinition, addExample, describeStructure, MATCH_FLOOR, DIRECTED_LINKS, SYMMETRIC_LINKS } from './session/signature';
 export type { StructuralSignature, Examples, SignatureMatch } from './session/signature';
 export type { Clock } from './session/session';
-export { blessedBehaviourOf, behavioursOf, isFrame, frameOfNode } from './session/nodes';
+export { blessedBehaviourOf, behavioursOf, isFrame, frameOfNode, packDefinitionOf, isPackDefinition } from './session/nodes';
+export type { PackDefinitionRep } from './session/nodes';
 
 // Frames: artifacts wired together by reference; the drawn slider (WP-10).
 export { sliderOf, controlOf, alongSegment, paramsOf, withParams, interfacesOf, connectionsFor, resolveFrame, describeFrame, exportFrame, slotsIn } from './frames/frame';
@@ -413,8 +414,9 @@ export type { HeadKind, HeadReading, ConnectorEnd, ConnectorHeads } from './diag
 // playing one of the six roles and adding none; connectors read past their
 // heads; labels inside a symbol or beside a flow. Every notation reads,
 // plural and ranked; derived, never in the log. A notation's ports reach the
-// pen through E3's hook only when offered. The flowchart ships; its content
-// is FLOWCHART_TABLE, which moves into the flowchart@1 pack with B3.
+// pen through E3's hook only when offered — while a board uses the notation's
+// pack (B3, `followPacks`). The flowchart ships; its content is
+// FLOWCHART_TABLE, its single home, which the flowchart@1 pack names.
 export {
   registerNotation,
   unregisterNotation,
@@ -556,6 +558,66 @@ export { shapesSummary } from './tools/clean';
 export { isWritingMark, definitionOf, definitionsIn, artifactsIn, writingLine } from './tools/board';
 export type { WritingLine } from './tools/board';
 export { bestWiring, frameTemplatesFor } from './tools/frames';
+
+// Context (V1-PLAN §2.2, B2) — what stands beside the hand: the notations and
+// concepts read over what a scope sits beside, weighted by nearness relative to
+// the marks' own size, and what this hand just took there, read from the log.
+// `rank` is B1's order with the context applied — a lift, never a filter, each
+// with its reason — and `steadyTop` holds the top offer in one context until
+// another beats it by a margin. Far from any context the order is B1's exactly.
+export {
+  contextAt,
+  nearnessOf,
+  pointNearnessOf,
+  isEmptyContext,
+  describeContext,
+  conceptNoun,
+  CONTEXT_FADE,
+  RECENT_MS,
+  NEIGHBOURHOOD_MAX,
+  RECENT_EVENTS_MAX,
+} from './context/context';
+export type { ContextSource, ContextOptions, ContextNotation, ContextConcept, ContextAct, ReadContext } from './context/context';
+export {
+  rank,
+  liftOf,
+  liftTargets,
+  standsOn,
+  canLift,
+  steadyTop,
+  topOf,
+  CONTEXT_LIFT_MAX,
+  RECENT_SAME_TOOL,
+  STEADY_MARGIN,
+  STEADY_MS,
+} from './context/rank';
+export type { RankItem, Ranked, RankOptions, HeldTop, SteadyOptions } from './context/rank';
+
+// Library packs (V1-PLAN §2.3, B3) — premade content shipped pre-taught, the
+// way the command mark is: a board uses a pack by one `use` event in its log
+// (`session.use`, `unuse`), and from it on the pack's definitions are matched
+// exactly as taught ones — structural signatures read from its own drawings,
+// drawn through `strokeFor` with seeded jitter — attributed to the pack
+// (`library:<id>@<version>`), below this board's own on a tie, correctable,
+// never on the board. A pack naming a notation puts its ports on the pen while
+// in use (`followPacks`); its affinities lift what stands beside the hand
+// (`ctx.affinity`). Content is code-bundled and immutable per `id@version`,
+// read through `validatePack` (DATA-1); `packBench` measures a pack against
+// its own drawings and a corpus of others.
+export { packRef, parsePackRef, isTestPack, libraryId, definitionId, packOfId, describePackNotice, describePackRefusal, PACK_HEADS, PACK_ID } from './packs/pack';
+export type { Pack, PackDefinition, PackConnector, PackHead, PackNotice } from './packs/pack';
+export { validatePack, PACK_LIMITS } from './packs/validate';
+export type { PackCheck, PackFault } from './packs/validate';
+export { shippedPack, shippedPacks, listedPacks, packRefusals, affinityOf } from './packs/registry';
+export type { PackSource } from './packs/registry';
+export { libraryDefinitions, readDrawing, drawingSeed, MARK_GAP_MS } from './packs/definitions';
+export type { LibraryDefinition, ScratchBoard } from './packs/definitions';
+export { handLike, seedOf, drawingsOf, drawingStrokes, HAND_TREMOR, TREMOR_OF_SIZE } from './packs/synthesize';
+export type { Placement } from './packs/synthesize';
+export { followPacks, notationsInUse } from './packs/follow';
+export type { PackBoard } from './packs/follow';
+export { packBench, benchCorpus, BENCH_SEEDS, BENCH_PLACES } from './packs/bench';
+export type { BenchDrawing, BenchCorpus, BenchMiss, BenchRead, PackBenchOptions, PackBenchResult } from './packs/bench';
 
 // Agent participants — a model joins through the same channel a human uses.
 export { HERE, createAgentParticipant, parseReadings, parseCode, parseFill, parseTranscripts, parseBehaviourReply, parseProgram, readingsToEdges, MAX_READINGS } from './participants/agent';
