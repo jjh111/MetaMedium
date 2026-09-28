@@ -127,8 +127,8 @@ function detectLine(fp: Fingerprint, points: Point[], scale = 1, even = evenBowO
 function detectArc(fp: Fingerprint, points: Point[], scale = 1, even = evenBowOf(fp, points, scale)): RecognitionResult | null {
   if (fp.isClosed || checkOvershoot(points, 50 * scale)) return null;
 
-  // Curved enough that straightness says so (past about 150°), or bowing
-  // evenly, which says so at any sweep from 30°.
+  // Curved enough that straightness alone says so — past about a half
+  // circle — or bowing evenly, which says so from 30°.
   const bent = 1 - ramp(fp.straightness, 0.25, 0.8);
   const curved = Math.max(bent, even.evidence);
   const smooth = fit(fp.corners, 0, 2.5);
@@ -285,10 +285,11 @@ function detectArrow(fp: Fingerprint, points: Point[], scale = 1): RecognitionRe
     const shortHead = 1 - ramp(headLen, 0.3, 0.45);
     const tipIdx = Math.round(first * 99);
     const tail = head === 'end' ? path[0] : path[99];
-    // A barb is SHORT AGAINST ITS SHAFT; an L is two arms. The barb's reach
-    // from the tip over the shaft's length, which a second arm as long as a
-    // box's side never has — and which says nothing about the barb's angle,
-    // because John's real barbs do not all draw back far (S1).
+    // A barb is SHORT AGAINST ITS SHAFT; an L is two arms (S1). The barb's
+    // reach from the tip over the shaft's length, which a second arm as long
+    // as a box's side never has. Its length, not its angle: an L's corner is
+    // square, but raising the angle a barb must turn to keep it out would
+    // lose the arrows real hands draw.
     const barb = barbOf(path, tipIdx, head, tail, scale);
     // Short against the shaft, or short in the hand's space: a barb is a
     // flick of the pen, and on a short arrow the flick is most of the shaft.

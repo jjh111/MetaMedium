@@ -287,7 +287,10 @@ export function idealize(node: MMNode, shape: string): CleanShape | null {
       return {
         shape, closed: false,
         points: [tail, tip, wing(1), tip, wing(-1)],
-        reasoning: `a straight shaft from tail to tip, with an even barb ${Math.round(barb)}px long, as drawn`,
+        reasoning:
+          meta?.barb !== undefined && barb < meta.barb - 0.5
+            ? `a straight shaft from tail to tip, with an even barb ${Math.round(barb)}px long — a fifth of the shaft, where the hand drew ${Math.round(meta.barb)}`
+            : `a straight shaft from tail to tip, with an even barb ${Math.round(barb)}px long${meta?.barb !== undefined ? ', as drawn' : ''}`,
       };
     }
     case 'arc': {
