@@ -186,9 +186,9 @@ describe('flows', () => {
     const s = createSession();
     const a = s.addStroke(handShape(boxCorners(200, 100, 160, 70), { seed: 24 }), 1000);
     const x = s.addStroke(handShape(boxCorners(200, 305, 160, 70), { seed: 25 }), 5000);
-    // The line stops thirty short of x; a small hollow triangle carries it the rest of the way.
-    const f = s.addStroke(lineStroke({ x: 200, y: 139 }, { x: 200, y: 240 }), 9000);
-    const head = s.addStroke(triangleStroke({ x: 189, y: 240 }, { x: 211, y: 240 }, { x: 200, y: 263 }, 16), 13000);
+    // The line stops thirty short of x; a small hollow triangle, drawn first, carries it the rest of the way.
+    const head = s.addStroke(triangleStroke({ x: 189, y: 240 }, { x: 211, y: 240 }, { x: 200, y: 263 }, 16), 9000);
+    const f = s.addStroke(lineStroke({ x: 200, y: 139 }, { x: 200, y: 240 }), 13000);
     const st = s.getState();
     // The session's own wire stops at the head (E3's note)…
     expect(st.nodes.get(f)!.edges.filter((e) => e.rel === 'connects').map((e) => e.to)).toContain(head);
@@ -328,6 +328,23 @@ describe('ports, through E3’s hook', () => {
     const ids = [s.addStroke(top, 1000), s.addStroke(bottom, 2000)];
     const ports = ids.flatMap((id) => portsOn(s, id));
     expect(ports.map((x) => x.port)).toEqual(['top', 'right', 'bottom', 'left']);
+  });
+
+  it('offered, the hook never asks itself without end: halves bound to each other’s ports still read as one decision', () => {
+    offerPorts('flowchart');
+    const s = createSession();
+    const [top, bottom] = diamondTopBottom(diamondCorners(200, 330, 160, 100), { seed: 57, jitter: 1 });
+    const a = s.addStroke(top, 1000);
+    const b = s.addStroke(bottom, 2000);
+    // The bottom half's ends tied to the decision's left and right vertices, which the top half offers.
+    const offeredBy = [a, b].find((id) => portsOn(s, id).length)!;
+    const vertex = (name: string) => portsOn(s, offeredBy).find((x) => x.port === name)!;
+    s.bind({ strokeId: b, nodeId: offeredBy, site: { kind: 'port:flowchart', index: vertex('left').index }, end: 'start', at: 2001 });
+    s.bind({ strokeId: b, nodeId: offeredBy, site: { kind: 'port:flowchart', index: vertex('right').index }, end: 'end', at: 2002 });
+    const p = s.addStroke(handShape(boxCorners(200, 120, 160, 70), { seed: 58 }), 6000);
+    s.addStroke(arrow({ x: 200, y: 159 }, { x: 200, y: 276 }, 59), 10000);
+    expect(symbolOf(read(s), [a, b]).symbol).toBe('decision');
+    expect(symbolOf(read(s), [p]).symbol).toBe('process');
   });
 
   it('a flow released on a decision’s vertex binds there, and the reading says so', () => {
