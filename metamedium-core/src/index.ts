@@ -414,8 +414,9 @@ export type { HeadKind, HeadReading, ConnectorEnd, ConnectorHeads } from './diag
 // playing one of the six roles and adding none; connectors read past their
 // heads; labels inside a symbol or beside a flow. Every notation reads,
 // plural and ranked; derived, never in the log. A notation's ports reach the
-// pen through E3's hook only when offered. The flowchart ships; its content
-// is FLOWCHART_TABLE, which moves into the flowchart@1 pack with B3.
+// pen through E3's hook only when offered — while a board uses the notation's
+// pack (B3, `followPacks`). The flowchart ships; its content is
+// FLOWCHART_TABLE, its single home, which the flowchart@1 pack names.
 export {
   registerNotation,
   unregisterNotation,

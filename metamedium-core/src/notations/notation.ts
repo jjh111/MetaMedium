@@ -20,15 +20,17 @@
 //   - **Its ports reach the pen through E3's hook** (`session/ports.ts`) — but
 //     only when a board puts the notation in use (`offerPorts`), because what
 //     the pen feels on every board is not a notation's to change by being
-//     known. Today the surface or a test offers them; when packs land (B3) a
-//     board's `use { pack }` event will.
+//     known. A board puts it in use by using its pack (B3): while the board's
+//     log says it uses a pack naming the notation, `followPacks`
+//     (packs/follow.ts) offers its ports, and takes them back when it does not.
 //
 // Some things a notation must know are content, not code: its symbols' names,
 // which role each plays, the Mermaid each is said as. They live in a typed
-// table beside the notation (FLOWCHART_TABLE in flowchart.ts), marked to move
-// into the notation's pack when B3 lands. What stays code is what a signature
-// cannot see — a diamond is a box turned 45°, and the shape rung is blind to
-// rotation by design.
+// table beside the notation (FLOWCHART_TABLE in flowchart.ts), their single
+// home; the notation's pack (`flowchart@1`, packs/shipped/) names the notation
+// and restates none of it. What stays code is what a signature cannot see — a
+// diamond is a box turned 45°, and the shape rung is blind to rotation by
+// design.
 
 import type { Bounds, Point } from '../types';
 import type { SessionState } from '../session/session';
