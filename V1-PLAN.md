@@ -756,6 +756,67 @@ tests 45; surface in sync; the canvas MCP smoke and the shard's (605 in 31
 files, typecheck clean) pass; the gate 412 passed and the one honest skip
 (canvas 266; shard 123 + 11 + 12); WebKit smoke 4.
 
+**R4c the surface draws only what changed — status, 27 Sep 2026: done on
+`w2`** — `a24677f` (red: PERF.md's budgets measured by `e2e/perf.mjs` and a
+gate scenario, `budgets`, failing on the 2,000-mark board — open 8.04 s,
+release 7.51 s, a pointer move 7.5 ms, a pan at fit-all 117 ms — and the
+equivalence check passing against the whole-board read it was), `79971d0`,
+`f11ecec`, `7e1a4b5`, `c6d0dc1`, `30c879d`, `317f514`, and the docs. After a
+stroke the surface reads the marks the stroke touched and their
+neighbourhood: the reading under a mark and the panel ask one mark's role,
+and `roleOf` (`08-render.js`) reads it over the marks within its reach
+(`MM.MarkGrid`, `MM.withinReach`), the ends of its wires and the connectors
+wired to it, in the whole board's order — the role table reads only engaging
+relations and wires, so that is the whole board's role for it; the board's
+genre (a live artifact's panel) is every role read that way, one read over an
+unchanged neighbourhood carried from the last log. Everything a paint derives
+from the log is kept while that log stands, keyed by the log itself (which
+array, its length, the event that ends it): the paint's index, roles, offers,
+reading chips, labels, candidate boxes, the minimap's and the selection's
+readings, the magnet sites (read ahead while idle). Painting is culled to the
+screen — ink by what each mark draws, an artifact's members one by one, its
+chrome where its name reaches, chips, labels and cards that reach the screen,
+each still measured and placed — with the minimap still the whole board; what
+the hand is on or holds and what a drag or a tank moved is always drawn;
+points under a screen pixel apart are thinned. A pointer move paints the pen
+on a layer of its own and not the board; a wheel, pinch, pan or minimap drag
+paints once a frame. On the 2,000-mark board (the gate, Chromium, load
+1.6–3.7): **open 0.49 s, release → reading drawn 15.5 ms median and 40 ms p95
+(the first release after a pan; the rest 15–16), a pointer move 0.2 ms, a pan
+frame 16.7 ms at zoom 1 and 33.4 ms (two frames) at fit-all — every budget**;
+5,000 marks open in 1.09 s (a crashed tab before), 20 / 49 ms a release, 0.4
+ms a move, 16.7 ms a pan at zoom 1, and 50 / 67 ms at fit-all, over the 50
+aimed for. The equivalence check — `paintCheck` paints both ways and compares
+what each drew (every mark's ink, ghost, chip, reading, name, label, card,
+the minimap) and said (the status line, the panel); `rolesCheck` every mark's
+role and the genre; `heldCheck` every held group — finds nothing that differs:
+the 500-mark board with all 336 marks pointed at at zoom 1, three boxes drawn
+and undone and the role table after each (351 paints and tables; a hand's
+paint strokes 5% of the ink, the minimap every mark), the 2,000 board's role
+table (1,403 marks) and held groups (1,367), and the gate's own boards
+through eighteen records (eleven through the scenario, seven in section 48,
+each a paint and a role table) — and section 48 pins the reading under a mark, a
+neighbour's panel after an undo and after a move, a match chip, an answer card
+and another hand's arrow changing the moment the log does, and a pointer move
+that paints no board and ten wheel events that paint it once. *Found and
+fixed:* the whole-board read was kept on the set of ids, so a move that changed
+a role left the old one standing (48a2 fails on the red commit's surface: the
+box stayed a container after its circle left it); the magnet sites were kept
+on the node object, which a move or a snap changes in place; the mark chip was
+redrawn and its name rewritten into the page on every paint; press-and-hold
+related every loose mark (183 ms at 2,000) — now the component the index walks
+to, the same group. *Found, not changed:* with that per-paint write gone, the
+first release after a pan waits 22 ms on the browser's own frame work
+(`BeginMainFrame`, no script; put the write back and it is 17 ms); at fit-all
+headless Chromium rasterises every stroke on the CPU, and two-pixel thinning
+would make 2,000 one frame at a visible cost, not taken; a room's line still
+reloads the whole log, so every cache is read again after it (R4d's).
+Whole suite before the last commit: core 1,042 in 75 files, typecheck clean,
+both bundles equal to a fresh build (core untouched); relay, field, build and
+board tests 58; surface in sync; the canvas MCP smoke and the shard's (605 in
+31 files, typecheck clean) pass; the gate 475 passed and the one honest skip
+(canvas 291, keep 31, budgets 7, shard 123 + 11 + 12); WebKit smoke 4.
+
 ### Phase 1 — the backbone
 **B1 Tools.** *Owns* `metamedium-core/src/tools/` (the contract, the
 registry, adapters for today's tier-1 modules and concept conversions),
