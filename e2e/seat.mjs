@@ -164,7 +164,13 @@ async function closeModels(page) {
 /** Nothing held and nothing open: the field dismissed by a tap on empty ground, a selection let go. */
 async function letGo(page) {
   if (await page.evaluate(() => !!window.__mm.session.getState().summon)) {
-    await page.mouse.click(1100, 760);
+    // A tap on empty ground: a point clear of the open field itself and of every mark.
+    const at = await page.evaluate(() => {
+      const f = document.getElementById('summon').getBoundingClientRect();
+      const inside = (p) => p.x >= f.left - 20 && p.x <= f.right + 20 && p.y >= f.top - 20 && p.y <= f.bottom + 20;
+      return [{ x: 1120, y: 160 }, { x: 420, y: 780 }, { x: 1120, y: 700 }, { x: 420, y: 160 }].find((p) => !inside(p));
+    });
+    await page.mouse.click(at.x, at.y);
     await sleep(60);
   }
   await page.evaluate(() => { if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur(); });
@@ -184,7 +190,16 @@ async function holdOn(page, pt) {
 async function takePill(page, label) {
   const pill = page.locator('#summon .pill.item', { hasText: label });
   if (await pill.count() !== 1) return false;
-  await pill.click({ timeout: 5000 });
+  try {
+    await pill.click({ timeout: 5000 });
+  } catch (err) {
+    const where = await page.evaluate(() => {
+      const el = document.getElementById('summon');
+      const r = (e) => { const b = e.getBoundingClientRect(); return [Math.round(b.left), Math.round(b.top), Math.round(b.width), Math.round(b.height)]; };
+      return { summon: r(el), style: el.getAttribute('style'), cls: el.className, state: !!window.__mm.session.getState().summon, pills: [...el.querySelectorAll('.pill.item')].map((p) => [p.textContent.trim().slice(0, 24), r(p), getComputedStyle(p).visibility]) };
+    });
+    throw new Error('the pill "' + label + '" could not be taken: ' + JSON.stringify(where));
+  }
   return true;
 }
 const waitFor = (page, fn, arg, ms = 8000) => page.waitForFunction(fn, arg, { timeout: ms, polling: 50 }).then(() => true, () => false);

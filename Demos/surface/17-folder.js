@@ -191,6 +191,8 @@
     session.setLogName(me);
     const transport = opts.transport || (opts.relay ? relayTransport(opts.relay, room) : broadcastTransport(room));
     const store = new MM.LiveStore(transport, me, room, { sitting: PAGE_SITTING });
+    // Which relay carries the room: the seat parks its questions only through one on this machine (V1-PLAN J4).
+    folder.relay = opts.relay || '';
     // What this hand already drew is its opening log in the room — sent whole,
     // as a store's first send always is, so joining the same room again in
     // this sitting replaces what the room holds of it instead of doubling it.
@@ -206,6 +208,8 @@
     folder.merge = new MM.LiveMerge(session, me);
     folder.mergedRevision = -1;
     await mergeLive();
+    // Who is heard here, for the seat: Claude's hand, offered in the models pane (24-seat.js).
+    seatRoomOpened(store);
     store.hello();
     return folder;
   }

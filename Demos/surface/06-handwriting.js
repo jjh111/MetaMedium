@@ -22,6 +22,9 @@
    */
   function readers() {
     const sees = seeing();
+    // The seat taken is a deliberate act that says *ask me* (V1-PLAN J4): Claude reads.
+    const seat = sees.find(isSeatAgent);
+    if (seat) return [seat];
     if (sees.length <= 1) return sees;
     const size = (a) => { const m = /(\d+(?:\.\d+)?)\s*b\b/i.exec(a.config.model || ''); return m ? parseFloat(m[1]) : Infinity; };
     return [sees.slice().sort((a, b) => size(a) - size(b))[0]];
@@ -113,7 +116,7 @@
     if (!image) return false;
     const first = nodes[0];
     who.forEach((agent) => {
-      withWork('write:' + agent.id + ':' + first.id, ids, agent.name + ' · reading the line', agent.read({ nodeId: first.id, image: image, at: Date.now(), hold: false })).then((res) => {
+      withWork('write:' + agent.id + ':' + first.id, ids, agent.name + ' · reading the line', agent.read({ nodeId: first.id, about: nodes.map((n) => n.id), image: image, at: Date.now(), hold: false })).then((res) => {
         if (res.ok) {
           const top = res.transcripts[0];
           const words = top.text.trim().split(/\s+/);

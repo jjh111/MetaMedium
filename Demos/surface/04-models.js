@@ -124,14 +124,15 @@
   }
 
   // --- Joining, and remembering ---
-  function join(config, pick) {
+  function join(config, pick, made) {
     if (isJoined(config.baseUrl, config.model)) {
       mpStatus.textContent = config.model + ' is already here.';
       return null;
     }
     // Several models may run at once — that is the point. Every model is
-    // tier 2; local or hosted is a cost the router pays attention to.
-    const agent = MM.createAgentParticipant(session, config, Date.now());
+    // tier 2; local or hosted is a cost the router pays attention to. `made`:
+    // a participant made elsewhere — the seat (24-seat.js) — joins the same way.
+    const agent = made || MM.createAgentParticipant(session, config, Date.now());
     agents.push(agent);
     if (pick) store.set(PICK_KEY, Object.assign({ baseUrl: config.baseUrl, model: config.model, kind: config.kind }, pick));
     mpStatus.textContent = agent.name + ' joined (' + MM.providerLocality(config) + (config.vision ? ', sees' : '') + ').';
