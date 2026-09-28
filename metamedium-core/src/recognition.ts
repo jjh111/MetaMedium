@@ -5,7 +5,8 @@
 // by silencing the others (ARCHITECTURE-v6 principle 2).
 
 import type { Point, Fingerprint, RecognitionResult, StrokeAnalysis } from './types';
-import { getFingerprint, checkOvershoot, calculateStraightness, resampleByArcLength } from './geometry';
+import type { Bow } from './geometry';
+import { getFingerprint, checkOvershoot, calculateStraightness, resampleByArcLength, bowOf } from './geometry';
 
 // ===== Evidence =====
 //
@@ -71,34 +72,73 @@ function result(
  */
 export const HAND_RESOLUTION_PX = 8;
 
-function detectLine(fp: Fingerprint, points: Point[], scale = 1): RecognitionResult | null {
+// ===== An even bow: what tells an arc from a line (S1) =====
+//
+// Straightness — chord over path — is nearly blind to a bow: a 90° arc still
+// scores 0.90 and a 30° one 0.99, so every arc under a half circle read as a
+// line (a 140° arc was line 0.63). The bulge is not blind to it
+// (`bowOf`, geometry.ts). A stroke bows EVENLY, like an arc, when four things
+// hold, each measured and each scale-free or about the hand:
+
+/** It sweeps like an arc: nothing below the first, full from the second, degrees. A hand's straight line bows like an arc of up to 21° (the corpus's lines, measured). */
+export const ARC_SWEEP = [15, 30] as const;
+/**
+ * The bulge is SHOWN, in the hand's space: a straight line bows up to about
+ * the first on screen (the corpus's shakiest hand bows its lines 11 px, on
+ * the denoised path), so a bulge counts from there and fully past the second.
+ */
+export const ARC_BULGE_PX = [10, 18] as const;
+/** It is spread along the stroke: each half bows off its own chord about a quarter as much as the whole (an arc's do); a bend's straight arms under a tenth (measured: 0.09 at most). */
+export const ARC_EVEN = [0.07, 0.12] as const;
+/** It follows a circle: the path's RMS distance from the circle through its ends and bulge, as a share of the bulge (a hand's arc under 0.3; a hook, a J or an S well past 0.5). */
+export const ARC_RESIDUAL = [0.3, 0.5] as const;
+
+/** How surely an open stroke bows evenly, like an arc — 0 to 1 — and the bow it measured. A stroke that turns corners is not bowing (that is writing, or a bend). */
+function evenBowOf(fp: Fingerprint, points: Point[], scale: number): { evidence: number; bow: Bow | null } {
+  if (fp.isClosed) return { evidence: 0, bow: null };
+  const bow = bowOf(points);
+  if (!bow) return { evidence: 0, bow };
+  const evidence =
+    ramp(bow.sweep, ARC_SWEEP[0], ARC_SWEEP[1]) *
+    ramp(bow.sagitta / scale, ARC_BULGE_PX[0], ARC_BULGE_PX[1]) *
+    ramp(bow.even, ARC_EVEN[0], ARC_EVEN[1]) *
+    (1 - ramp(bow.residual, ARC_RESIDUAL[0], ARC_RESIDUAL[1])) *
+    fit(fp.corners, 0, 2.5);
+  return { evidence, bow };
+}
+
+function detectLine(fp: Fingerprint, points: Point[], scale = 1, even = evenBowOf(fp, points, scale)): RecognitionResult | null {
   if (fp.isClosed || checkOvershoot(points, 50 * scale)) return null;
 
   const straight = ramp(fp.straightness, 0.55, 0.95);
   const corners = fit(fp.corners, 0, 3);
-  const confidence = straight * 0.7 + corners * 0.3;
+  // A line gives way exactly as far as an even bow is shown to be meant.
+  const confidence = (straight * 0.7 + corners * 0.3) * (1 - even.evidence);
+  const bows = even.bow && even.evidence >= 0.05 ? `, but it bows evenly like an arc of ${Math.round(even.bow.sweep)}°` : '';
 
   return result(
     'line',
     'Line',
     confidence,
-    `open, straightness ${fp.straightness.toFixed(2)}, ${fp.corners} corner(s)`
+    `open, straightness ${fp.straightness.toFixed(2)}, ${fp.corners} corner(s)${bows}`
   );
 }
 
-function detectArc(fp: Fingerprint, points: Point[], scale = 1): RecognitionResult | null {
+function detectArc(fp: Fingerprint, points: Point[], scale = 1, even = evenBowOf(fp, points, scale)): RecognitionResult | null {
   if (fp.isClosed || checkOvershoot(points, 50 * scale)) return null;
 
-  const curved = 1 - ramp(fp.straightness, 0.25, 0.8);
+  // Curved enough that straightness says so (past about 150°), or bowing
+  // evenly, which says so at any sweep from 30°.
+  const bent = 1 - ramp(fp.straightness, 0.25, 0.8);
+  const curved = Math.max(bent, even.evidence);
   const smooth = fit(fp.corners, 0, 2.5);
   const confidence = curved * 0.6 + smooth * 0.4;
+  const b = even.bow;
+  const how = b && even.evidence > 0
+    ? `bows evenly like an arc of ${Math.round(b.sweep)}° (its bulge ${Math.round(b.sagitta / scale)}px on screen, each half bowing ${b.even.toFixed(2)} of it)`
+    : `curved (straightness ${fp.straightness.toFixed(2)})`;
 
-  return result(
-    'arc',
-    'Arc',
-    confidence,
-    `open, curved (straightness ${fp.straightness.toFixed(2)}), ${fp.corners} corner(s)`
-  );
+  return result('arc', 'Arc', confidence, `open, ${how}, ${fp.corners} corner(s)`);
 }
 
 function detectTriangle(fp: Fingerprint): RecognitionResult | null {
@@ -244,13 +284,21 @@ function detectArrow(fp: Fingerprint, points: Point[], scale = 1): RecognitionRe
     if (headLen < 0.06) return null;
     const shortHead = 1 - ramp(headLen, 0.3, 0.45);
     const tipIdx = Math.round(first * 99);
+    const tail = head === 'end' ? path[0] : path[99];
+    // A barb is SHORT AGAINST ITS SHAFT; an L is two arms. The barb's reach
+    // from the tip over the shaft's length, which a second arm as long as a
+    // box's side never has — and which says nothing about the barb's angle,
+    // because John's real barbs do not all draw back far (S1).
+    const barb = barbOf(path, tipIdx, head, tail, scale);
+    const shortBarb = 1 - ramp(barb.ratio, BARB_OF_SHAFT[0], BARB_OF_SHAFT[1]);
     return {
-      fit: shaftOk * 0.5 + barbOk * 0.35 + shortHead * 0.15,
+      fit: (shaftOk * 0.5 + barbOk * 0.35 + shortHead * 0.15) * shortBarb,
       head,
       tip: path[tipIdx],
-      tail: head === 'end' ? path[0] : path[99],
+      tail,
       straight,
       sharpest,
+      barb,
     };
   };
   const best = [tryHead('end', atEnd), tryHead('start', atStart)]
@@ -262,9 +310,41 @@ function detectArrow(fp: Fingerprint, points: Point[], scale = 1): RecognitionRe
     'arrow',
     'Arrow',
     best.fit,
-    `a straight shaft (${best.straight.toFixed(2)}) with a ${Math.round((best.sharpest * 180) / Math.PI)}° barb at the ${best.head}`,
-    { head: best.head, tip: best.tip, tail: best.tail }
+    `a straight shaft (${best.straight.toFixed(2)}) with a ${Math.round((best.sharpest * 180) / Math.PI)}° barb at the ${best.head}, ` +
+      `the barb ${best.barb.ratio.toFixed(2)} of the shaft`,
+    { head: best.head, tip: best.tip, tail: best.tail, barb: best.barb.reach }
   );
+}
+
+/**
+ * A barb is at most about this share of its shaft: full credit to the first,
+ * none from the second. A hand's barb is a sixth to a fifth of its shaft (the
+ * corpus 0.13–0.16, D1's shortest flow 0.22); an L's second arm, even on a
+ * box two and a half times as wide as it is tall, is two fifths of its first.
+ */
+export const BARB_OF_SHAFT = [0.3, 0.45] as const;
+
+/**
+ * The barb at one end of a stroke: how far it reaches from the tip, against
+ * how long the shaft is. The tip is where the ink first comes within the
+ * hand's resolution of its farthest along the shaft, coming from the tail —
+ * the corner the rung measured can sit a wing's length short of it, where a
+ * two-wing barb comes back between its wings (heads.ts reads the tip the same
+ * way), and an arm drawn square off the shaft never gets farther along it.
+ */
+function barbOf(path: Point[], tipIdx: number, head: 'end' | 'start', tail: Point, scale: number): { reach: number; shaft: number; ratio: number } {
+  const order = head === 'end' ? path.slice(tipIdx) : path.slice(0, tipIdx + 1).reverse();
+  const corner = order[0];
+  const L = Math.hypot(corner.x - tail.x, corner.y - tail.y) || 1;
+  const ux = (corner.x - tail.x) / L, uy = (corner.y - tail.y) / L;
+  const along = (p: Point) => (p.x - tail.x) * ux + (p.y - tail.y) * uy;
+  const far = Math.max(...order.map(along));
+  const k = Math.max(0, order.findIndex((p) => along(p) >= far - HAND_RESOLUTION_PX * scale));
+  const tip = order[k];
+  let reach = 0;
+  for (let i = k; i < order.length; i++) reach = Math.max(reach, Math.hypot(order[i].x - tip.x, order[i].y - tip.y));
+  const shaft = Math.hypot(tip.x - tail.x, tip.y - tail.y) || 1;
+  return { reach, shaft, ratio: reach / shaft };
 }
 
 export function analyzeStroke(points: Point[], scale = 1): StrokeAnalysis {
@@ -276,9 +356,10 @@ export function analyzeStroke(points: Point[], scale = 1): StrokeAnalysis {
     return { fingerprint, results: dot ? [dot] : [] };
   }
 
+  const even = evenBowOf(fingerprint, points, scale);
   const results = [
-    detectLine(fingerprint, points, scale),
-    detectArc(fingerprint, points, scale),
+    detectLine(fingerprint, points, scale, even),
+    detectArc(fingerprint, points, scale, even),
     detectTriangle(fingerprint),
     detectRectangle(fingerprint),
     detectCircle(fingerprint, points, scale),

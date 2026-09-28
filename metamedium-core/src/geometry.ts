@@ -541,29 +541,143 @@ export function shapeExtent(points: Point[]): number {
   // Against the TIGHTEST box at any angle, not the axis-aligned one. A box
   // drawn by hand is rarely square to the screen, and against its axis-aligned
   // bounds a rectangle tilted ten degrees fills only ~80% — enough to drop it
-  // below the snap floor and, at fifteen, to read half as a triangle. The
-  // minimum-area enclosing box has an edge collinear with a hull edge
-  // (rotating calipers), so trying each hull edge's direction is exact. A
+  // below the snap floor and, at fifteen, to read half as a triangle. A
   // rectangle scores ~1 at any tilt; a circle stays at π/4; a triangle at ½.
+  const box = tightestBox(points);
+  if (!box) return 0;
+  return Math.min(1, area / box.area);
+}
+
+/** The tightest box at any angle around a set of points. */
+export interface TightBox {
+  centre: Point;
+  /** Which way the box's first side runs: a unit vector at `angle`. */
+  axis: Point;
+  /** The first side's angle, in degrees, folded into (-45°, 45°] — a box is the same box a quarter turn on. */
+  angle: number;
+  /** How far the box runs along `axis`, and across it. */
+  width: number;
+  height: number;
+  area: number;
+}
+
+/**
+ * The minimum-area box enclosing the points, at whatever angle it stands.
+ *
+ * The minimum-area enclosing box has an edge collinear with an edge of the
+ * convex hull (rotating calipers), so trying each hull edge's direction is
+ * exact. `shapeExtent` measures a stroke against it, and a rectangle's clean
+ * form is it (session/clean.ts) — so a box drawn turned is read, and drawn
+ * clean, at its own angle, and a square turned 45° stays a diamond.
+ */
+export function tightestBox(points: Point[]): TightBox | null {
   const hull = convexHull(points);
-  if (hull.length < 3) return 0;
-  let best = Infinity;
-  for (let i = 0; i < hull.length; i++) {
-    const a = hull[i], b = hull[(i + 1) % hull.length];
-    const len = Math.hypot(b.x - a.x, b.y - a.y);
-    if (len < 1e-9) continue;
-    const ux = (b.x - a.x) / len, uy = (b.y - a.y) / len;
+  if (!hull || hull.length < 3) return null;
+  const span = (ux: number, uy: number) => {
     let minU = Infinity, maxU = -Infinity, minV = Infinity, maxV = -Infinity;
     for (const p of hull) {
       const u = p.x * ux + p.y * uy, v = -p.x * uy + p.y * ux;
       if (u < minU) minU = u; if (u > maxU) maxU = u;
       if (v < minV) minV = v; if (v > maxV) maxV = v;
     }
-    const boxArea = (maxU - minU) * (maxV - minV);
-    if (boxArea > 0 && boxArea < best) best = boxArea;
+    return { minU, maxU, minV, maxV, area: (maxU - minU) * (maxV - minV) };
+  };
+  let best = Infinity, bestAngle = 0;
+  for (let i = 0; i < hull.length; i++) {
+    const a = hull[i], b = hull[(i + 1) % hull.length];
+    const len = Math.hypot(b.x - a.x, b.y - a.y);
+    if (len < 1e-9) continue;
+    const area = span((b.x - a.x) / len, (b.y - a.y) / len).area;
+    if (area > 0 && area < best) {
+      best = area;
+      bestAngle = Math.atan2(b.y - a.y, b.x - a.x);
+    }
   }
-  if (!Number.isFinite(best) || best <= 0) return 0;
-  return Math.min(1, area / best);
+  if (!Number.isFinite(best) || best <= 0) return null;
+  // Fold to the quarter turn nearest level, then measure the box in that frame.
+  let angle = (bestAngle * 180) / Math.PI;
+  while (angle > 45) angle -= 90;
+  while (angle <= -45) angle += 90;
+  const t = (angle * Math.PI) / 180;
+  const axis = { x: Math.cos(t), y: Math.sin(t) };
+  const s = span(axis.x, axis.y);
+  const cu = (s.minU + s.maxU) / 2, cv = (s.minV + s.maxV) / 2;
+  return {
+    centre: { x: cu * axis.x - cv * axis.y, y: cu * axis.y + cv * axis.x },
+    axis,
+    angle,
+    width: s.maxU - s.minU,
+    height: s.maxV - s.minV,
+    area: best,
+  };
+}
+
+/**
+ * How an open stroke bows off the chord between its ends — the measures that
+ * tell an arc from a line, and from a bend.
+ *
+ * Straightness (chord over path) is nearly blind to a bow: a 90° arc still
+ * scores 0.90 and a 30° one 0.99, which is why a wide arc read as a line. The
+ * bulge is not blind to it: an arc of sweep θ stands off its chord by
+ * tan(θ/4)/2 of the chord. Measured on the DENOISED path, resampled by arc
+ * length, so a slow stroke's sensor noise is not taken for a bow.
+ */
+export interface Bow {
+  /** From the first point to the last, in the stroke's own units. */
+  chord: number;
+  /** How far the path stands off that chord, at most — the bulge. */
+  sagitta: number;
+  /** The sweep of the circular arc through the ends and the bulge, degrees: 4·atan(2·sagitta/chord). */
+  sweep: number;
+  /**
+   * How the bow is spread along the stroke: split at the bulge, each half
+   * bows off its own chord, on average, this share of the whole. An arc's
+   * halves bow about a quarter as much as it does; a bend's straight arms
+   * hardly at all.
+   */
+  even: number;
+  /** The path's root-mean-square distance from the circle through its ends and bulge, as a share of the bulge: small for an arc, large for a hook, a J or an S. */
+  residual: number;
+}
+
+const BOW_SAMPLES = 64;
+
+export function bowOf(points: Point[]): Bow | null {
+  if (points.length < 5) return null;
+  const path = resampleByArcLength(denoise(points), BOW_SAMPLES);
+  const a = path[0], b = path[path.length - 1];
+  const chord = calculateDistance(a, b);
+  if (chord < 1e-9) return null;
+  const off = (p: Point, u: Point, v: Point) => {
+    const L = calculateDistance(u, v);
+    return L > 1e-9 ? Math.abs((v.x - u.x) * (p.y - u.y) - (v.y - u.y) * (p.x - u.x)) / L : calculateDistance(p, u);
+  };
+  let m = 0, sagitta = 0;
+  path.forEach((p, i) => {
+    const d = off(p, a, b);
+    if (d > sagitta) { sagitta = d; m = i; }
+  });
+  if (sagitta <= 0 || m < 2 || m > path.length - 3) return null;
+  const halfBow = (lo: number, hi: number) => {
+    let h = 0;
+    for (let i = lo; i <= hi; i++) h = Math.max(h, off(path[i], path[lo], path[hi]));
+    return h;
+  };
+  const even = (halfBow(0, m) + halfBow(m, path.length - 1)) / 2 / sagitta;
+  // The circle through the ends and the bulge.
+  const c = path[m];
+  const det = 2 * (a.x * (c.y - b.y) + c.x * (b.y - a.y) + b.x * (a.y - c.y));
+  let residual = Infinity;
+  if (Math.abs(det) > 1e-9) {
+    const a2 = a.x * a.x + a.y * a.y, c2 = c.x * c.x + c.y * c.y, b2 = b.x * b.x + b.y * b.y;
+    const cx = (a2 * (c.y - b.y) + c2 * (b.y - a.y) + b2 * (a.y - c.y)) / det;
+    const cy = (a2 * (b.x - c.x) + c2 * (a.x - b.x) + b2 * (c.x - a.x)) / det;
+    const r = Math.hypot(a.x - cx, a.y - cy);
+    let sq = 0;
+    for (const p of path) sq += (Math.hypot(p.x - cx, p.y - cy) - r) ** 2;
+    residual = Math.sqrt(sq / path.length) / sagitta;
+  }
+  return { chord, sagitta, sweep: (4 * Math.atan((2 * sagitta) / chord) * 180) / Math.PI, even, residual };
 }
 
 export function analyzeCornerAngles(angles: number[]): {
