@@ -393,13 +393,20 @@ export async function equivalence(page, { strokes = 3 } = {}) {
     const s = window.__mm.session.getState(), MM = window.__mm.MM;
     return s.contentIds.map((id) => { const b = MM.boundsOf(s.nodes.get(id)); return b ? { id, x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2 } : null; }).filter(Boolean);
   });
-  const found = { checks: 0, differed: 0, first: [], marks: marks.length, strokes: 0, undos: 0 };
+  const found = { checks: 0, differed: 0, first: [], marks: marks.length, strokes: 0, undos: 0, roles: [] };
+  // Every mark's role, read over its neighbourhood, against the whole-board read, and the genre.
+  const roles = async (where) => {
+    const r = await page.evaluate(() => window.__mm.rolesCheck());
+    found.roles.push({ where, marks: r.marks, ok: r.ok });
+    note('the role table, ' + where, { ok: r.ok, diffs: r.differ.concat(r.genreSame ? [] : [{ what: 'genre', genre: r.genre }]) });
+  };
   const note = (where, c) => {
     found.checks++;
     if (c.ok) return;
     found.differed++;
     if (found.first.length < 5) found.first.push({ where, diffs: c.diffs.slice(0, 3) });
   };
+  await roles('as opened');
   // Every mark, pointed at: its reading drawn under it, its ladder in the panel.
   const batch = 40;
   for (let i = 0; i < marks.length; i += batch) {
@@ -426,11 +433,13 @@ export async function equivalence(page, { strokes = 3 } = {}) {
     note('after stroke ' + (i + 1), await page.evaluate(() => window.__mm.paintCheck()));
     found.strokes++;
   }
+  await roles('with the boxes drawn');
   for (let i = 0; i < strokes; i++) {
     await page.evaluate(() => window.__mm.session.undo());
     note('after undo ' + (i + 1), await page.evaluate(() => window.__mm.paintCheck()));
     found.undos++;
   }
+  await roles('with the boxes undone');
   await page.evaluate(() => window.__mm.fitAll());
   note('the whole board, fitted', await page.evaluate(() => window.__mm.paintCheck()));
   return found;

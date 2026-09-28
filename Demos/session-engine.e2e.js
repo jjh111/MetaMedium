@@ -164,9 +164,12 @@ window.__scenario = async function(){
   // draw and say — every mark's ink, the reading under the mark, the chips,
   // the labels, the cards, the status line and the panel (`paintCheck`,
   // 08-render.js: the board painted both ways and compared).
+  // And every mark's role, read over its neighbourhood, is the whole-board
+  // read's, and so is the board's genre (`rolesCheck`), where the surface has it.
   const sameAsWhole = (label) => {
     const c = typeof mm.paintCheck === 'function' ? mm.paintCheck() : { ok: false, diffs: ['no paintCheck on this surface'], ops: 0, of: 0 };
-    return step('R4c. ' + label + ' — what is drawn and said equals the whole-board read', c.ok, c.ok ? { drawn: c.ops, of: c.of, marks: c.marks } : c.diffs.slice(0, 4));
+    const r = typeof mm.rolesCheck === 'function' ? mm.rolesCheck() : { ok: true, marks: null };
+    return step('R4c. ' + label + ' — what is drawn and said equals the whole-board read', c.ok && r.ok, c.ok && r.ok ? { drawn: c.ops, of: c.of, marks: c.marks, roles: r.marks } : { paint: c.diffs.slice(0, 4), roles: r.differ, genre: r.genreSame });
   };
   // A wait that survives a hidden tab: timers there fire once a minute, but a
   // message hop is a task and is not throttled, so the clock is read across hops.
@@ -2844,6 +2847,17 @@ window.__scenario = async function(){
       /rectangle with 1 connector attached/.test(wired) && /rectangle standing on its own/.test(unwired) && readingNow() === boxA + ' rectangle · node',
       { wired: (wired.match(/a rectangle[^.]*?(attached|own)/) || [])[0], unwired: (unwired.match(/a rectangle[^.]*?(attached|own)/) || [])[0], reading: readingNow() });
     sameAsWhole('the arrow undone, the box it joined pointed at');
+    // A move changes no id, and still changes what a mark plays: a circle drawn
+    // inside the box makes the box a container; dragged out, the box is a node again.
+    t.stroke(t.circle(380, 310, 24));
+    const ring48 = lastId();
+    hoverAt(310, 262); await wait(30);
+    const holding = readingNow();
+    mm.session.move({ ids: [ring48], dx: 0, dy: 420, at: Date.now() }); await wait(30);
+    const empty = readingNow();
+    step('48a2. a move reaches a neighbour: a circle inside the box makes it a container, and dragged out of it, the box plays a node again — no mark added or taken away',
+      holding === boxA + ' rectangle · container' && empty === boxA + ' rectangle · node', { holding, empty });
+    sameAsWhole('the circle moved out of the box');
     leave(); await wait(20);
     // A definition, then another like it: a chip with its match beside the second.
     const dumbbell = (x, y) => {

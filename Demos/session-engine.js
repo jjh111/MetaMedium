@@ -2517,7 +2517,11 @@
   }
 
   // The whole-board read: every mark's role, related over the whole board at
-  // once — O(n·R), 7.9 s on 2,000 marks. What the reference paint reads.
+  // once — O(n·R), 7.9 s on 2,000 marks. What the reference paint reads. It
+  // was kept on the set of ids alone, so a move that changed a role — a
+  // circle dragged out of the box that held it — left the old role standing
+  // until a mark was added or taken away; it is kept by the log now, like
+  // everything else a paint reads.
   let rungs = { key: null, roles: new Map(), genre: null, reading: null };
   function wholeBoardRungs(s) {
     const ids = s.contentIds.filter((id) => !s.artifacts.includes(id));
@@ -2526,7 +2530,7 @@
     for (const aid of s.artifacts) {
       for (const e of s.nodes.get(aid).edges) if (e.rel === 'has-part') ids.push(e.to);
     }
-    const key = ids.join('|');
+    const key = logKey() + '|' + ids.join('|');
     if (rungs.key === key) return rungs;
     const reading = ids.length
       ? session.read(ids)
@@ -3491,6 +3495,25 @@
     ctx.arcTo(x, y + h, x, y, r);
     ctx.arcTo(x, y, x + w, y, r);
     ctx.closePath();
+  }
+
+  /**
+   * Every mark's role as a hand's paint reads it (over its neighbourhood)
+   * against the whole-board read, and the board's genre both ways: the table
+   * the reading under a mark and the panel say from. For tests.
+   */
+  function rolesCheck() {
+    const s = session.getState();
+    const whole = wholeBoardRungs(s);
+    const ix = boardIndex(s);
+    const differ = [];
+    for (const id of ix.at.keys()) {
+      const mine = roleOf(s, id), theirs = whole.roles.get(id);
+      if (JSON.stringify(mine) !== JSON.stringify(theirs)) differ.push({ id: id, neighbourhood: mine || null, whole: theirs || null });
+    }
+    const genre = boardGenre(s);
+    const genreSame = JSON.stringify(genre) === JSON.stringify(whole.genre);
+    return { ok: !differ.length && genreSame, marks: ix.at.size, differ: differ.slice(0, 5), differing: differ.length, genre: genre.genre, genreSame: genreSame };
   }
 
   // ===== The equivalence check (R4c) ========================================
@@ -8575,7 +8598,7 @@
     // A hand's word on its own ink, for tests: where the last paint drew each label, and a mark's ink colour.
     labelsDrawn: () => labelsDrawn.map((l) => Object.assign({}, l)),
     // What the last paint drew under the inspected mark, and the check that a hand's paint draws and says what the whole-board read would (R4c).
-    readingDrawn: () => (readingDrawn ? Object.assign({}, readingDrawn) : null), paintCheck: paintCheck,
+    readingDrawn: () => (readingDrawn ? Object.assign({}, readingDrawn) : null), paintCheck: paintCheck, rolesCheck: rolesCheck,
     // Point at a mark the way a hover does, for tests: it is inspected, its reading drawn under it and its ladder in the panel.
     inspect: (id) => { hoverId = id || null; render(state); },
     colourOf: (id) => { const n = session.getState().nodes.get(id); return n ? colourOf(n) : null; },
