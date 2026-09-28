@@ -3688,12 +3688,28 @@ function countCrossings(stroke, outline, max = DEFAULT_ERASE_CROSSINGS) {
   }
   return n2;
 }
+function spanOf2(points) {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const p of points) {
+    if (p.x < minX) minX = p.x;
+    if (p.x > maxX) maxX = p.x;
+    if (p.y < minY) minY = p.y;
+    if (p.y > maxY) maxY = p.y;
+  }
+  return { minX, minY, maxX, maxY };
+}
+function mayCross(a, b) {
+  const pad = 1e-9 * (1 + Math.max(Math.abs(a.minX), Math.abs(a.maxX), Math.abs(a.minY), Math.abs(a.maxY), Math.abs(b.minX), Math.abs(b.maxX), Math.abs(b.minY), Math.abs(b.maxY)));
+  return !(a.maxX + pad < b.minX || b.maxX + pad < a.minX || a.maxY + pad < b.minY || b.maxY + pad < a.minY);
+}
 function scratchedOut(points, targets, minCrossings = DEFAULT_ERASE_CROSSINGS) {
   if (points.length < 3) return [];
+  const span = spanOf2(points);
   const hit = [];
   for (const t of targets) {
     const outline = outlineOf(t);
     if (!outline) continue;
+    if (!mayCross(span, spanOf2(outline))) continue;
     if (countCrossings(points, outline, minCrossings) >= minCrossings) hit.push(t.id);
   }
   return hit;
@@ -3711,6 +3727,18 @@ var h = (b) => b.maxY - b.minY;
 var cx = (b) => (b.minX + b.maxX) / 2;
 var cy = (b) => (b.minY + b.maxY) / 2;
 var sizeOf = (b) => Math.max(w(b), h(b));
+var ENGAGING_KINDS = /* @__PURE__ */ new Set(["contains", "inside", "crossing", "touching", "near"]);
+function nearLimitOf(a, b, config = DEFAULT_RELATE_CONFIG) {
+  return config.nearRatio * Math.max(1, Math.min(sizeOf(a), sizeOf(b)));
+}
+function withinReach(a, b, config = DEFAULT_RELATE_CONFIG) {
+  if (!finite2(a) || !finite2(b)) return false;
+  return boundsOverlap(a, b) || boundingBoxDistance(a, b) < nearLimitOf(a, b, config);
+}
+function reachAround(b, config = DEFAULT_RELATE_CONFIG) {
+  return config.nearRatio * Math.max(1, sizeOf(b));
+}
+var finite2 = (b) => Number.isFinite(b.minX) && Number.isFinite(b.minY) && Number.isFinite(b.maxX) && Number.isFinite(b.maxY);
 function overlapFraction(aMin, aMax, bMin, bMax) {
   const shorter = Math.min(aMax - aMin, bMax - bMin);
   if (shorter <= 0) return 0;
@@ -3766,7 +3794,7 @@ function relate(marks, config = DEFAULT_RELATE_CONFIG) {
         add2("touching", a.id, b.id, 0.5 + depth2 * 0.5, "their areas overlap");
         add2("touching", b.id, a.id, 0.5 + depth2 * 0.5, "their areas overlap");
       }
-      const nearLimit = config.nearRatio * ref;
+      const nearLimit = nearLimitOf(ab, bb, config);
       if (gap < nearLimit) {
         const strength = 1 - gap / nearLimit;
         const pct3 = Math.round(gap / ref * 100);
@@ -10693,6 +10721,151 @@ function buildGraphScaffold(graph, content, theme = {}) {
   ].join("\n");
 }
 
+// src/relate/grid.ts
+var MIN_LEVEL = -40;
+function finiteBounds(b) {
+  return Number.isFinite(b.minX) && Number.isFinite(b.minY) && Number.isFinite(b.maxX) && Number.isFinite(b.maxY);
+}
+function levelOf(b) {
+  const size = Math.max(b.maxX - b.minX, b.maxY - b.minY);
+  if (!(size > 0)) return MIN_LEVEL;
+  let level = Math.max(MIN_LEVEL, Math.ceil(Math.log2(size)));
+  while (2 ** level < size) level++;
+  return level;
+}
+var MarkGrid = class {
+  constructor() {
+    /** level → cx → cy → the ids filed there. */
+    this.levels = /* @__PURE__ */ new Map();
+    /** How many marks each level holds, and how many cells, so a query skips empty levels. */
+    this.counts = /* @__PURE__ */ new Map();
+    this.filed = /* @__PURE__ */ new Map();
+  }
+  get size() {
+    return this.filed.size;
+  }
+  has(id) {
+    return this.filed.has(id);
+  }
+  /** The box a mark is filed under, as it was given. */
+  boundsOf(id) {
+    return this.filed.get(id)?.bounds;
+  }
+  ids() {
+    return this.filed.keys();
+  }
+  /** File a mark (or move it, when it is already filed). A box that is not finite is not filed. */
+  set(id, bounds) {
+    this.delete(id);
+    if (!finiteBounds(bounds)) return;
+    const level = levelOf(bounds);
+    const cell = 2 ** level;
+    const cx2 = Math.floor(bounds.minX / cell);
+    const cy2 = Math.floor(bounds.minY / cell);
+    let xs = this.levels.get(level);
+    if (!xs) this.levels.set(level, xs = /* @__PURE__ */ new Map());
+    let ys = xs.get(cx2);
+    if (!ys) xs.set(cx2, ys = /* @__PURE__ */ new Map());
+    let here = ys.get(cy2);
+    const count2 = this.counts.get(level) ?? { marks: 0, cells: 0 };
+    if (!here) {
+      ys.set(cy2, here = /* @__PURE__ */ new Set());
+      count2.cells++;
+    }
+    here.add(id);
+    count2.marks++;
+    this.counts.set(level, count2);
+    this.filed.set(id, { level, cx: cx2, cy: cy2, bounds: { minX: bounds.minX, minY: bounds.minY, maxX: bounds.maxX, maxY: bounds.maxY } });
+  }
+  delete(id) {
+    const f = this.filed.get(id);
+    if (!f) return false;
+    this.filed.delete(id);
+    const xs = this.levels.get(f.level);
+    const ys = xs.get(f.cx);
+    const here = ys.get(f.cy);
+    here.delete(id);
+    const count2 = this.counts.get(f.level);
+    count2.marks--;
+    if (here.size === 0) {
+      ys.delete(f.cy);
+      count2.cells--;
+      if (ys.size === 0) xs.delete(f.cx);
+    }
+    if (count2.marks === 0) {
+      this.counts.delete(f.level);
+      this.levels.delete(f.level);
+    }
+    return true;
+  }
+  clear() {
+    this.levels.clear();
+    this.counts.clear();
+    this.filed.clear();
+  }
+  /** Every mark whose box meets `box` (edges touching count), in no particular order. */
+  query(box) {
+    const out = [];
+    this.visit(() => box, (id, b) => {
+      if (b.maxX >= box.minX && b.minX <= box.maxX && b.maxY >= box.minY && b.minY <= box.maxY) out.push(id);
+    });
+    return out;
+  }
+  /**
+   * Marks near a point, where how near depends on how big the mark is:
+   * `radiusFor(cell)` is the farthest a mark of at most `cell` across can be
+   * and still count. Every mark whose box comes within its level's radius of
+   * the point is returned — a superset, for the caller's exact test.
+   */
+  around(p, radiusFor) {
+    const out = [];
+    this.visit(
+      (cell) => {
+        const r = radiusFor(cell);
+        return { minX: p.x - r, minY: p.y - r, maxX: p.x + r, maxY: p.y + r };
+      },
+      (id, b, box) => {
+        if (b.maxX >= box.minX && b.minX <= box.maxX && b.maxY >= box.minY && b.minY <= box.maxY) out.push(id);
+      }
+    );
+    return out;
+  }
+  /** Walk the cells a box (per level) could reach, handing each filed mark to `fn`. */
+  visit(boxAt, fn) {
+    for (const [level, xs] of this.levels) {
+      const cell = 2 ** level;
+      const box = boxAt(cell);
+      if (!finiteBounds(box)) {
+        for (const ys of xs.values()) for (const here of ys.values()) for (const id of here) fn(id, this.filed.get(id).bounds, box);
+        continue;
+      }
+      const x0 = Math.floor(box.minX / cell) - 1, x1 = Math.floor(box.maxX / cell);
+      const y0 = Math.floor(box.minY / cell) - 1, y1 = Math.floor(box.maxY / cell);
+      const span = (x1 - x0 + 1) * (y1 - y0 + 1);
+      const count2 = this.counts.get(level);
+      if (span > count2.cells) {
+        for (const [cx2, ys] of xs) {
+          if (cx2 < x0 || cx2 > x1) continue;
+          for (const [cy2, here] of ys) {
+            if (cy2 < y0 || cy2 > y1) continue;
+            for (const id of here) fn(id, this.filed.get(id).bounds, box);
+          }
+        }
+        continue;
+      }
+      for (let cx2 = x0; cx2 <= x1; cx2++) {
+        const ys = xs.get(cx2);
+        if (!ys) continue;
+        for (let cy2 = y0; cy2 <= y1; cy2++) {
+          const here = ys.get(cy2);
+          if (!here) continue;
+          for (const id of here) fn(id, this.filed.get(id).bounds, box);
+        }
+      }
+    }
+  }
+};
+
 // src/session/session.ts
 var DEFAULT_SESSION_CONFIG = {
   gesture: DEFAULT_GESTURE_CONFIG,
@@ -10725,40 +10898,85 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
   const listeners = /* @__PURE__ */ new Set();
   const CHECKPOINT_EVERY = 200;
   let checkpoints = [];
+  const nodeCopy = (n2) => ({ ...n2, reps: n2.reps.slice(), edges: n2.edges.slice() });
   function snapshot() {
-    return structuredClone({
-      nodes,
-      contentIds,
-      artifacts,
-      clusterCandidates,
-      participants,
-      explanations,
-      live,
-      gestures,
-      markHands,
+    const copied = /* @__PURE__ */ new Map();
+    for (const [id, n2] of nodes) copied.set(id, nodeCopy(n2));
+    return {
+      nodes: copied,
+      contentIds: contentIds.slice(),
+      artifacts: artifacts.slice(),
+      clusterCandidates: clusterCandidates.slice(),
+      participants: participants.slice(),
+      explanations: explanations.slice(),
+      live: live.slice(),
+      gestures: structuredClone(gestures),
+      markHands: new Map(markHands),
       lastAt,
       counter: counter2,
-      clocks
-    });
+      clocks: { ...clocks }
+    };
   }
-  function restore(snap) {
-    const s = structuredClone(snap);
-    nodes = s.nodes;
-    contentIds = s.contentIds;
-    artifacts = s.artifacts;
-    clusterCandidates = s.clusterCandidates;
-    participants = s.participants;
-    explanations = s.explanations;
-    live = s.live;
-    gestures = s.gestures;
-    markHands = s.markHands;
+  function restore(s) {
+    nodes = /* @__PURE__ */ new Map();
+    for (const [id, n2] of s.nodes) nodes.set(id, nodeCopy(n2));
+    contentIds = s.contentIds.slice();
+    artifacts = s.artifacts.slice();
+    clusterCandidates = s.clusterCandidates.slice();
+    participants = s.participants.slice();
+    explanations = s.explanations.slice();
+    live = s.live.slice();
+    gestures = structuredClone(s.gestures);
+    markHands = new Map(s.markHands);
     lastAt = s.lastAt;
     counter2 = s.counter;
-    clocks = s.clocks ?? {};
+    clocks = { ...s.clocks ?? {} };
+    rebuildDerived();
   }
   function maybeCheckpoint(length) {
     if (length > 0 && length % CHECKPOINT_EVERY === 0 && !checkpoints.some((c) => c.length === length)) {
       checkpoints.push({ length, snap: snapshot() });
+    }
+  }
+  let order = /* @__PURE__ */ new Map();
+  let nextOrder = 0;
+  let inContent = /* @__PURE__ */ new Set();
+  const reach = new MarkGrid();
+  const ink = new MarkGrid();
+  let linked = /* @__PURE__ */ new Map();
+  let componentOf = /* @__PURE__ */ new Map();
+  let matchable = /* @__PURE__ */ new Set();
+  let unsettled = /* @__PURE__ */ new Set();
+  let definitionsSeen = /* @__PURE__ */ new Map();
+  let definitionsChanged = true;
+  let holding = /* @__PURE__ */ new Set();
+  let holdingInOrder = [];
+  let holdingMoved = false;
+  const byOrder = (p, q) => order.get(p) - order.get(q);
+  function rebuildDerived() {
+    order = /* @__PURE__ */ new Map();
+    nextOrder = 0;
+    inContent = /* @__PURE__ */ new Set();
+    reach.clear();
+    ink.clear();
+    linked = /* @__PURE__ */ new Map();
+    componentOf = /* @__PURE__ */ new Map();
+    matchable = /* @__PURE__ */ new Set();
+    unsettled = /* @__PURE__ */ new Set();
+    definitionsSeen = /* @__PURE__ */ new Map();
+    definitionsChanged = true;
+    holding = /* @__PURE__ */ new Set();
+    holdingInOrder = [];
+    holdingMoved = false;
+    for (const id of contentIds) {
+      inContent.add(id);
+      order.set(id, ++nextOrder);
+    }
+    for (const id of contentIds) fileContent(id);
+    for (const [id, n2] of nodes) {
+      if (!getRep(n2, "stroke") || getRep(n2, "erased")) continue;
+      const b = boundsOf(n2);
+      if (b) ink.set(id, b);
     }
   }
   function reset() {
@@ -10775,6 +10993,7 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
     lastAt = 0;
     counter2 = 0;
     for (const n2 of createBootstrapNodes(0)) nodes.set(n2.id, n2);
+    rebuildDerived();
   }
   reset();
   let mint = null;
@@ -10817,16 +11036,226 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
     return out.sort((p, q) => q.score - p.score);
   }
   function recomputeClusterCandidates() {
-    clusterCandidates = [];
-    if (artifacts.length === 0 || contentIds.length === 0) return;
-    const marks = contentIds.map(markOf).filter((m) => !!m);
-    const groups = clusters(marks, relate(marks));
-    for (const ids of groups) {
-      const strokeIds = ids.filter((id) => !artifacts.includes(id));
-      if (strokeIds.length < 2) continue;
-      const matches = matchesFor(strokeIds);
-      if (matches.length > 0) clusterCandidates.push({ nodeIds: strokeIds, matches });
+    if (artifacts.length === 0 || contentIds.length === 0) {
+      clusterCandidates = [];
+      return;
     }
+    refreshDefinitions();
+    settle();
+    if (holdingMoved) {
+      holdingInOrder = [...holding].sort((p, q) => order.get(p.first) - order.get(q.first));
+      holdingMoved = false;
+    }
+    clusterCandidates = holdingInOrder.map((c) => c.candidate);
+  }
+  function contentPush(id) {
+    contentIds.push(id);
+    inContent.add(id);
+    order.set(id, ++nextOrder);
+    fileContent(id);
+  }
+  function removeFromContent(id) {
+    const idx = contentIds.indexOf(id);
+    if (idx < 0) return;
+    contentIds.splice(idx, 1);
+    inContent.delete(id);
+    order.delete(id);
+    unfileContent(id);
+  }
+  function contentReplace(prev, next) {
+    const idx = contentIds.indexOf(prev);
+    const place2 = order.get(prev);
+    contentIds.splice(idx, 1, next);
+    inContent.delete(prev);
+    order.delete(prev);
+    unfileContent(prev);
+    inContent.add(next);
+    order.set(next, place2);
+    fileContent(next);
+  }
+  function contentSpread(prev, ids) {
+    const idx = contentIds.indexOf(prev);
+    if (idx < 0) return;
+    contentIds.splice(idx, 1, ...ids);
+    inContent.delete(prev);
+    unfileContent(prev);
+    order = /* @__PURE__ */ new Map();
+    nextOrder = 0;
+    for (const c of contentIds) order.set(c, ++nextOrder);
+    for (const c of ids) {
+      inContent.add(c);
+      fileContent(c);
+    }
+  }
+  function fileContent(id) {
+    const n2 = nodes.get(id);
+    const b = n2 && boundsOf(n2);
+    if (!b) return;
+    reach.set(id, b);
+    if (!reach.has(id)) return;
+    const mine = /* @__PURE__ */ new Set();
+    const r = reachAround(b);
+    for (const o of reach.query({ minX: b.minX - r, minY: b.minY - r, maxX: b.maxX + r, maxY: b.maxY + r })) {
+      if (o === id || !withinReach(b, reach.boundsOf(o))) continue;
+      mine.add(o);
+      linked.get(o).add(id);
+      unsettle(o);
+    }
+    linked.set(id, mine);
+    unsettle(id);
+  }
+  function unfileContent(id) {
+    const mine = linked.get(id);
+    if (mine) {
+      for (const o of mine) {
+        linked.get(o)?.delete(id);
+        unsettle(o);
+      }
+    }
+    const c = componentOf.get(id);
+    if (c) retire(c);
+    linked.delete(id);
+    componentOf.delete(id);
+    unsettled.delete(id);
+    reach.delete(id);
+  }
+  function boundsMoved(id) {
+    const n2 = nodes.get(id);
+    if (!n2) return;
+    if (inContent.has(id)) {
+      unfileContent(id);
+      fileContent(id);
+    }
+    if (ink.has(id)) {
+      const b = boundsOf(n2);
+      if (b) ink.set(id, b);
+      else ink.delete(id);
+    }
+  }
+  function unsettle(id) {
+    const c = componentOf.get(id);
+    if (c) retire(c);
+    if (linked.has(id)) unsettled.add(id);
+  }
+  function retire(c) {
+    if (c.retired) return;
+    c.retired = true;
+    matchable.delete(c);
+    if (holding.delete(c)) holdingMoved = true;
+    for (const m of c.members) {
+      if (componentOf.get(m) === c) componentOf.delete(m);
+      if (linked.has(m)) unsettled.add(m);
+    }
+  }
+  function settle() {
+    if (unsettled.size === 0) return;
+    const fresh = [];
+    for (const id of unsettled) {
+      if (!linked.has(id) || componentOf.has(id)) continue;
+      fresh.push(gather(id));
+    }
+    unsettled.clear();
+    for (const c of fresh) {
+      if (c.strokeIds) {
+        matchable.add(c);
+        c.signature = signatureOf(c.strokeIds);
+        for (const aid of artifacts) scoreAgainst(c, aid);
+      }
+      assemble(c);
+    }
+  }
+  function gather(start) {
+    const seen = /* @__PURE__ */ new Set([start]);
+    const stack = [start];
+    let first = start;
+    while (stack.length) {
+      const id = stack.pop();
+      if (order.get(id) < order.get(first)) first = id;
+      for (const o of linked.get(id)) {
+        if (seen.has(o)) continue;
+        seen.add(o);
+        stack.push(o);
+      }
+    }
+    const members = walkFrom(first);
+    const strokeIds = members.filter((id) => !artifacts.includes(id));
+    const c = {
+      first,
+      members,
+      strokeIds: strokeIds.length >= 2 ? strokeIds : null,
+      signature: null,
+      scores: /* @__PURE__ */ new Map(),
+      candidate: null,
+      retired: false
+    };
+    for (const m of members) componentOf.set(m, c);
+    return c;
+  }
+  function walkFrom(first) {
+    const out = [];
+    const seen = /* @__PURE__ */ new Set();
+    const stack = [first];
+    while (stack.length) {
+      const id = stack.pop();
+      if (seen.has(id)) continue;
+      seen.add(id);
+      out.push(id);
+      for (const o of [...linked.get(id)].sort(byOrder)) if (!seen.has(o)) stack.push(o);
+    }
+    return out;
+  }
+  function definitionKeyOf(aid) {
+    const a = nodes.get(aid);
+    const code = [...a.reps].reverse().find((r) => r.modality === "code")?.data;
+    return { signature: getRep(a, "signature"), examples: getRep(a, "examples"), text: code?.kind === "text" };
+  }
+  function scoreAgainst(c, aid) {
+    c.scores.delete(aid);
+    const k = definitionsSeen.get(aid) ?? definitionKeyOf(aid);
+    if (k.text) return;
+    const aSig = k.signature?.data;
+    if (!aSig) return;
+    const m = matchDefinition(c.signature, aSig, k.examples?.data);
+    if (m.vetoed || m.score < MATCH_FLOOR) return;
+    c.scores.set(aid, { score: m.score, reasoning: m.reasoning });
+  }
+  function refreshDefinitions() {
+    if (!definitionsChanged) return;
+    definitionsChanged = false;
+    const now = /* @__PURE__ */ new Map();
+    for (const aid of artifacts) now.set(aid, definitionKeyOf(aid));
+    const changed = [];
+    for (const [aid, k] of now) {
+      const was = definitionsSeen.get(aid);
+      if (!was || was.signature !== k.signature || was.examples !== k.examples || was.text !== k.text) changed.push(aid);
+    }
+    const gone = [...definitionsSeen.keys()].filter((aid) => !now.has(aid));
+    definitionsSeen = now;
+    if (changed.length === 0 && gone.length === 0) return;
+    for (const c of matchable) {
+      for (const aid of gone) c.scores.delete(aid);
+      for (const aid of changed) scoreAgainst(c, aid);
+      assemble(c);
+    }
+  }
+  function assemble(c) {
+    let candidate = null;
+    if (c.strokeIds && c.scores.size) {
+      const matches = [];
+      for (const aid of artifacts) {
+        const s = c.scores.get(aid);
+        if (s) matches.push({ artifactId: aid, name: wordOf(nodes.get(aid)) ?? aid, score: s.score, reasoning: s.reasoning });
+      }
+      matches.sort((p, q) => q.score - p.score);
+      if (matches.length) candidate = { nodeIds: c.strokeIds, matches };
+    }
+    c.candidate = candidate;
+    if (candidate) {
+      if (!holding.has(c)) {
+        holding.add(c);
+        holdingMoved = true;
+      }
+    } else if (holding.delete(c)) holdingMoved = true;
   }
   function makeSuggestions(enclosedIds) {
     const suggestions = [];
@@ -10848,11 +11277,12 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
   function addSpatialEdges(node) {
     const me = markOf(node.id);
     if (!me) return;
-    for (const id of contentIds) {
-      if (id === node.id) continue;
+    for (const id of [...linked.get(node.id) ?? []].sort(byOrder)) {
       const other = markOf(id);
       if (!other) continue;
-      for (const r of relate([me, other])) {
+      const found = relate([me, other]);
+      if (!found.some((r) => ENGAGING_KINDS.has(r.kind))) continue;
+      for (const r of found) {
         nodes.get(r.from)?.edges.push({
           to: r.to,
           rel: r.kind,
@@ -10870,19 +11300,30 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
     if (kind !== "line" && kind !== "arrow") return;
     const arrow = getRep(node, "reading:arrow")?.data;
     const ends = kind === "arrow" && arrow ? [arrow.tail, arrow.tip] : [points[0], points[points.length - 1]];
+    const floor = 10 * scale;
     const nearest2 = (p) => {
       let best = null;
-      for (const c of contentBoundsList(node.id)) {
-        const size = Math.max(c.bounds.maxX - c.bounds.minX, c.bounds.maxY - c.bounds.minY);
-        const reach = Math.max(10 * scale, size * config.wireEndpointRatio);
-        const d = distancePointToBounds(p, c.bounds);
-        if (d < reach && (!best || d < best.d)) best = { id: c.id, d };
+      let bestPlace = Infinity;
+      for (const id of reach.around(p, (cell) => Math.max(floor, cell * config.wireEndpointRatio))) {
+        if (id === node.id) continue;
+        const bounds = boundsOf(nodes.get(id));
+        const size = Math.max(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY);
+        const within = Math.max(floor, size * config.wireEndpointRatio);
+        const d = distancePointToBounds(p, bounds);
+        if (!(d < within)) continue;
+        const place2 = order.get(id);
+        if (!best || d < best.d || d === best.d && place2 < bestPlace) {
+          best = { id, d };
+          bestPlace = place2;
+        }
       }
       return best;
     };
     const a = nearest2(ends[0]);
     const b = nearest2(ends[1]);
     if (!a || !b || a.id === b.id) return;
+    unsettle(a.id);
+    unsettle(b.id);
     const weight = top.weight;
     const why = `its ${kind === "arrow" ? "tail" : "start"} lands on ${a.id} and its ${kind === "arrow" ? "tip" : "end"} on ${b.id}`;
     node.edges.push({ to: a.id, rel: "connects", weight, reasoning: why });
@@ -11018,9 +11459,28 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
     }
     return null;
   }
-  function removeFromContent(id) {
-    const idx = contentIds.indexOf(id);
-    if (idx >= 0) contentIds.splice(idx, 1);
+  function scratchHits(points, span, excludeId) {
+    if (points.length < 3) return [];
+    const pad = 1e-6 * (1 + Math.max(Math.abs(span.minX), Math.abs(span.maxX), Math.abs(span.minY), Math.abs(span.maxY)));
+    const hits = /* @__PURE__ */ new Set();
+    for (const id of ink.query({ minX: span.minX - pad, minY: span.minY - pad, maxX: span.maxX + pad, maxY: span.maxY + pad })) {
+      if (id === excludeId) continue;
+      const n2 = nodes.get(id);
+      if (getRep(n2, "erased")) continue;
+      const pts = strokePointsOf(n2);
+      if (!pts) continue;
+      if (scratchedOut(points, [{ id, points: pts, closed: fingerprintOf(n2)?.isClosed ?? false }], config.eraseCrossings).length) hits.add(id);
+    }
+    if (hits.size === 0) return [];
+    return scratchTargets(excludeId).filter((t) => hits.has(t.id)).map((t) => t.id);
+  }
+  function enclosesAny(b, excludeId) {
+    for (const id of reach.query(b)) {
+      if (id === excludeId) continue;
+      const inner = boundsOf(nodes.get(id));
+      if (inner && boundsContain(b, inner)) return true;
+    }
+    return false;
   }
   function applyStroke(ev) {
     const { points, at } = ev;
@@ -11038,6 +11498,7 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
       createdAt: at
     };
     nodes.set(node.id, node);
+    ink.set(node.id, fp.bounds);
     const hand = handOf(ev);
     const g = gesturesOf(hand);
     markHands.set(node.id, hand);
@@ -11100,7 +11561,7 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
         return node.id;
       }
     }
-    const scratched = fp.isClosed || !byHand ? [] : scratchedOut(points, scratchTargets(node.id), config.eraseCrossings);
+    const scratched = fp.isClosed || !byHand ? [] : scratchHits(points, fp.bounds, node.id);
     if (scratched.length > 0) {
       node.reps.push({
         modality: "gesture",
@@ -11116,7 +11577,7 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
       g.summon = null;
       g.selection = [];
     }
-    contentIds.push(node.id);
+    contentPush(node.id);
     const analysis = analyzeStroke(points, scale);
     for (const r of analysis.results) {
       node.edges.push({
@@ -11138,9 +11599,9 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
     }
     addSpatialEdges(node);
     inferWire(node, points, scale);
-    const enclosed = enclosedBy(fp.bounds, contentBoundsList(node.id));
+    const enclosed = fp.isClosed && enclosesAny(fp.bounds, node.id) ? 1 : 0;
     const onLive = liveArtifactUnder(fp.bounds, node.id);
-    g.pendingLasso = byHand && (isLassoLike(fp, enclosed.length) || fp.isClosed && onLive) ? { id: node.id, at } : null;
+    g.pendingLasso = byHand && (isLassoLike(fp, enclosed) || fp.isClosed && onLive) ? { id: node.id, at } : null;
     recomputeClusterCandidates();
     return node.id;
   }
@@ -11154,7 +11615,7 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
       for (const gid of summon.gestureIds) {
         const g = nodes.get(gid);
         g.reps = g.reps.filter((r) => r.modality !== "gesture");
-        contentIds.push(gid);
+        contentPush(gid);
       }
       own.summon = null;
       recomputeClusterCandidates();
@@ -11195,8 +11656,9 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
       nodes.get(id).edges.push({ to: artifact.id, rel: "part-of", blessed: true });
       removeFromContent(id);
     }
-    contentIds.push(artifact.id);
+    contentPush(artifact.id);
     artifacts.push(artifact.id);
+    definitionsChanged = true;
     own.selection = [];
     own.summon = null;
     recomputeClusterCandidates();
@@ -11211,6 +11673,8 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
     if (getRep(node, "erased")) return;
     node.reps.push({ modality: "erased", data: { at }, source: "user" });
     removeFromContent(node.id);
+    ink.delete(node.id);
+    definitionsChanged = true;
     const li = live.indexOf(node.id);
     if (li >= 0) live.splice(li, 1);
     for (const g of gestures.values()) {
@@ -11230,8 +11694,8 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
       for (const e of artifact.edges) {
         if (e.rel !== "has-part") continue;
         const member = nodes.get(e.to);
-        if (member && !getRep(member, "erased") && !contentIds.includes(e.to)) {
-          contentIds.push(e.to);
+        if (member && !getRep(member, "erased") && !inContent.has(e.to)) {
+          contentPush(e.to);
         }
       }
     };
@@ -11277,6 +11741,13 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
         source: ev.participantId
       });
     }
+    if (getRep(node, "stroke") && !ink.has(node.id)) {
+      const b = boundsOf(node);
+      if (b) ink.set(node.id, b);
+    }
+    boundsMoved(node.id);
+    unsettle(node.id);
+    definitionsChanged = true;
     recomputeClusterCandidates();
   }
   function applyLabel(ev) {
@@ -11364,6 +11835,7 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
       const node = nodes.get(p.id);
       node.reps = node.reps.filter((r) => r.modality !== "transform");
       node.reps.push({ modality: "transform", data: p.to, source: "engine" });
+      boundsMoved(p.id);
     }
     recomputeClusterCandidates();
   }
@@ -11444,6 +11916,8 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
       via: TIER0_PARTICIPANT,
       reasoning: `${letterIds.length} small strokes in a row on one line \u2014 printed letters`
     });
+    boundsMoved(word.id);
+    unsettle(word.id);
   }
   const SHAPE_NOT_LETTER = 0.72;
   function topShape2(n2) {
@@ -11472,8 +11946,13 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
   function absorbIntoWord(node, fp, at, scale, hand) {
     if (!isLetterLike(fp.bounds, scale) || neverLetter(node)) return false;
     const maker = authorOf(node);
-    const ordered2 = contentIds.filter((id) => id !== node.id && authorOf(nodes.get(id)) === maker);
-    const prevId = ordered2[ordered2.length - 1];
+    const mine = (function* () {
+      for (let i = contentIds.length - 1; i >= 0; i--) {
+        const id = contentIds[i];
+        if (id !== node.id && authorOf(nodes.get(id)) === maker) yield id;
+      }
+    })();
+    const prevId = mine.next().value;
     if (!prevId) return false;
     const prev = nodes.get(prevId);
     const letter = { bounds: fp.bounds, at };
@@ -11495,8 +11974,8 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
     if (!j.ok) return false;
     const run = [first];
     let bounds = first.bounds;
-    for (let i = ordered2.length - 2; i >= 0; i--) {
-      const cand = letterCandidate(ordered2[i], scale);
+    for (let step2 = mine.next(); !step2.done; step2 = mine.next()) {
+      const cand = letterCandidate(step2.value, scale);
       if (!cand) break;
       const back = joinsRun({ bounds, lastAt: cand.at }, { bounds: cand.bounds, at: run[0].at }, cand.scale);
       if (!back.ok) break;
@@ -11511,8 +11990,7 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
     for (const id of letterIds) {
       nodes.get(id).edges.push({ to: word.id, rel: "part-of", reasoning: j.reasoning });
     }
-    const idx = contentIds.indexOf(letterIds[0]);
-    contentIds.splice(idx, 1, word.id);
+    contentReplace(letterIds[0], word.id);
     for (const id of letterIds.slice(1)) removeFromContent(id);
     const own = gestures.get(hand);
     if (own && own.pendingLasso?.id === node.id) own.pendingLasso = null;
@@ -11526,8 +12004,7 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
       setWordReps(word, letters);
       return;
     }
-    const idx = contentIds.indexOf(wordId);
-    if (idx >= 0) contentIds.splice(idx, 1, ...letters);
+    contentSpread(wordId, letters);
     for (const id of letters) {
       const n2 = nodes.get(id);
       n2.edges = n2.edges.filter((e) => !(e.rel === "part-of" && e.to === wordId));
@@ -11536,7 +12013,7 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
     word.edges = word.edges.filter((e) => e.rel !== "has-part");
   }
   function applySelect(ev) {
-    gesturesOf(handOf(ev)).selection = ev.ids.filter((id) => contentIds.includes(id));
+    gesturesOf(handOf(ev)).selection = ev.ids.filter((id) => inContent.has(id));
   }
   function manipulable(ids) {
     const out = [];
@@ -11569,6 +12046,7 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
       const b = frameBounds(n2);
       if (!b) continue;
       setTransform(n2, { minX: b.minX + ev.dx, maxX: b.maxX + ev.dx, minY: b.minY + ev.dy, maxY: b.maxY + ev.dy });
+      boundsMoved(n2.id);
       refreshWordBounds(n2);
     }
     recomputeClusterCandidates();
@@ -11584,6 +12062,7 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
         minY: ev.about.y + (b.minY - ev.about.y) * sy,
         maxY: ev.about.y + (b.maxY - ev.about.y) * sy
       });
+      boundsMoved(n2.id);
       refreshWordBounds(n2);
     }
     recomputeClusterCandidates();
@@ -11600,6 +12079,7 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
       const prev = getRep(n2, "rotation")?.data ?? 0;
       n2.reps = n2.reps.filter((r) => r.modality !== "rotation");
       n2.reps.push({ modality: "rotation", data: prev + ev.radians, source: "user" });
+      boundsMoved(n2.id);
       refreshWordBounds(n2);
     }
     recomputeClusterCandidates();
@@ -11627,6 +12107,7 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
       data: addExample(prev, sig2, ev.verdict),
       source: ev.participantId ?? LOCAL_PARTICIPANT
     });
+    definitionsChanged = true;
     recomputeClusterCandidates();
     const summon = gestures.get(handOf(ev))?.summon;
     if (summon && sameSet(summon.enclosedIds, ids)) {
@@ -11675,6 +12156,7 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
     };
     nodes.set(frame.id, frame);
     artifacts.push(frame.id);
+    definitionsChanged = true;
     return frame.id;
   }
   function applyImport(ev) {
@@ -11708,7 +12190,8 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
     nodes.set(node.id, node);
     markHands.set(node.id, handOf(ev));
     artifacts.push(node.id);
-    contentIds.push(node.id);
+    contentPush(node.id);
+    definitionsChanged = true;
     if (ev.kind !== "png" && ev.kind !== "jpg") live.push(node.id);
     recomputeClusterCandidates();
     return node.id;
@@ -11740,7 +12223,7 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
   function applySummon(ev) {
     const g = gesturesOf(handOf(ev));
     if (ev.ids) {
-      const ids = ev.ids.filter((id) => contentIds.includes(id));
+      const ids = ev.ids.filter((id) => inContent.has(id));
       const boxes = ids.map((id) => boundsOf(nodes.get(id))).filter((b) => !!b);
       if (!ids.length || !boxes.length) return null;
       const union = boxes.reduce((a, b) => ({
@@ -11872,6 +12355,7 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
       source: ev.participantId
     });
     if (!live.includes(node.id)) live.push(node.id);
+    definitionsChanged = true;
     return node.id;
   }
   function handId(name) {
@@ -12021,7 +12505,9 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
       contentIds: [...contentIds],
       pendingLassoId: reader.pendingLasso?.id ?? null,
       summon: reader.summon ? { ...reader.summon, enclosedIds: [...reader.summon.enclosedIds] } : null,
-      clusterCandidates: clusterCandidates.map((c) => ({ ...c })),
+      // A group's candidate is kept while the group stands, so what is handed
+      // out is a copy all the way down to its lists.
+      clusterCandidates: clusterCandidates.map((c) => ({ ...c, nodeIds: c.nodeIds.slice(), matches: c.matches.slice() })),
       artifacts: [...artifacts],
       participants: [...participants],
       explanations: [...explanations],
@@ -13510,7 +13996,7 @@ function reasonOf(question, answer) {
   const offered = question.candidates.map((c) => c.id).join(", ");
   return `asked \u201C${question.ask}\u201D (choice among ${offered}) \u2014 ${dist5}; confidence ${p2(answer.confidence)}`;
 }
-function levelOf(answer) {
+function levelOf2(answer) {
   const i = Math.max(0, Math.min(answer.levels.length - 1, Math.round(answer.expectation)));
   return answer.levels[i] ?? "";
 }
@@ -13949,7 +14435,7 @@ export {
   leadOf,
   learnCommandMark,
   lettersOf,
-  levelOf,
+  levelOf2 as levelOf,
   listModels,
   localityOf,
   logPathFor,

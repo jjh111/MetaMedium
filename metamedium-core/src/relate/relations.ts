@@ -84,6 +84,48 @@ const cx = (b: Bounds) => (b.minX + b.maxX) / 2;
 const cy = (b: Bounds) => (b.minY + b.maxY) / 2;
 const sizeOf = (b: Bounds) => Math.max(w(b), h(b));
 
+/**
+ * The relations that ENGAGE two marks — one holds of the other, touches it, or
+ * sits within its reach — as against the ones that only say how two marks sit
+ * (direction, alignment, size), which hold at any distance.
+ */
+export const ENGAGING_KINDS: ReadonlySet<RelationKind> = new Set<RelationKind>(['contains', 'inside', 'crossing', 'touching', 'near']);
+
+/**
+ * How near two marks must come to be `near`: `nearRatio` of the SMALLER one's
+ * size. The one number `relate` judges nearness by, and so the one number
+ * "within reach" means everywhere else.
+ */
+export function nearLimitOf(a: Bounds, b: Bounds, config: RelateConfig = DEFAULT_RELATE_CONFIG): number {
+  return config.nearRatio * Math.max(1, Math.min(sizeOf(a), sizeOf(b)));
+}
+
+/**
+ * Whether two marks are within reach of each other: whether `relate` finds an
+ * ENGAGING relation between them. Their boxes meet (so one contains the
+ * other, or they touch, or their strokes may cross), or the gap between them
+ * is under `nearLimitOf`. Every other relation — above, left-of, same-row,
+ * same-size — holds at any distance, and is what a scope asks for on demand
+ * rather than what the board stores (V1-PLAN §9 R4b). Boxes that are not
+ * finite are within reach of nothing.
+ */
+export function withinReach(a: Bounds, b: Bounds, config: RelateConfig = DEFAULT_RELATE_CONFIG): boolean {
+  if (!finite(a) || !finite(b)) return false;
+  return boundsOverlap(a, b) || boundingBoxDistance(a, b) < nearLimitOf(a, b, config);
+}
+
+/**
+ * The farthest another mark can lie from this one and still be within its
+ * reach — `nearRatio` of this mark's own size, since the smaller of two is
+ * never larger than either. A box grown by this on every side meets every
+ * mark within reach: the query a spatial index is asked.
+ */
+export function reachAround(b: Bounds, config: RelateConfig = DEFAULT_RELATE_CONFIG): number {
+  return config.nearRatio * Math.max(1, sizeOf(b));
+}
+
+const finite = (b: Bounds) => Number.isFinite(b.minX) && Number.isFinite(b.minY) && Number.isFinite(b.maxX) && Number.isFinite(b.maxY);
+
 /** Overlap of two 1-D ranges, as a fraction of the shorter one. */
 function overlapFraction(aMin: number, aMax: number, bMin: number, bMax: number): number {
   const shorter = Math.min(aMax - aMin, bMax - bMin);
@@ -106,9 +148,11 @@ function crossings(a: Point[], b: Point[], max = 4): number {
 /**
  * Every relation that holds between every pair of marks.
  *
- * Pairwise and O(n²), which is right for a drawing: the interesting relations
- * are local, and a board large enough for that to hurt wants a spatial index
- * rather than a cheaper rule.
+ * Pairwise and O(n²), which is right for a scope — a selection, a cluster, a
+ * definition's members: the interesting relations are local. The session does
+ * not hand it the whole board: it relates a new mark to the marks within its
+ * reach through a spatial index (`grid.ts`), stores what engages, and leaves
+ * the rest for a scope to ask for (V1-PLAN §9 R4b).
  */
 export function relate(marks: Mark[], config: RelateConfig = DEFAULT_RELATE_CONFIG): Relation[] {
   const out: Relation[] = [];
@@ -159,7 +203,7 @@ export function relate(marks: Mark[], config: RelateConfig = DEFAULT_RELATE_CONF
         add('touching', a.id, b.id, 0.5 + depth * 0.5, 'their areas overlap');
         add('touching', b.id, a.id, 0.5 + depth * 0.5, 'their areas overlap');
       }
-      const nearLimit = config.nearRatio * ref;
+      const nearLimit = nearLimitOf(ab, bb, config);
       if (gap < nearLimit) {
         const strength = 1 - gap / nearLimit;
         const pct = Math.round((gap / ref) * 100);
