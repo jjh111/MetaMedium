@@ -8,6 +8,7 @@
 //     node e2e/run.mjs shard demo demo2       # just the shard's three
 //     node e2e/run.mjs --browser webkit smoke # the WebKit smoke
 //     node e2e/run.mjs keep                   # no lost work: the kill test, the forced failures
+//     node e2e/run.mjs boards                 # several named boards: the list, the trash, the switch
 //     node e2e/run.mjs big                    # a 2,000-mark board saved and opened again (minutes)
 //
 // It starts its own servers on ports the OS hands out, opens a FRESH browser
@@ -27,6 +28,7 @@ import { fileURLToPath } from 'node:url';
 import { startStatic, startVite } from './servers.mjs';
 import { isModelRequest, allowedError, ALLOWED_PAGE_ERRORS } from './guards.mjs';
 import { runKeep, runBig } from './keep.mjs';
+import { runBoards } from './boards.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, '..');
@@ -298,15 +300,17 @@ async function runSmoke(browser, servers) {
 
 /**
  * No lost work (V1-PLAN R3; `keep.mjs`): the kill test and the forced
- * failures. Unlike the others it opens several contexts of its own — each
- * with the gate's guards — because a board kept by the browser is only tested
- * by closing the page that kept it and opening another.
+ * failures; and several named boards (R1; `boards.mjs`). Unlike the others
+ * they open several contexts or pages of their own — each with the gate's
+ * guards — because a board kept by the browser is only tested by closing the
+ * page that kept it and opening another.
  */
+const OWN_PAGES = { keep: runKeep, big: runBig, boards: runBoards };
 async function runKeepScenario(browser, servers, engineName, which = 'keep') {
   const out = { name: which, url: `${servers.staticOrigin}/Demos/session-engine.html?nosw=1` };
   let guards = [];
   try {
-    const r = await (which === 'big' ? runBig : runKeep)(browser, servers, { freshContext, engineName, screenshot });
+    const r = await OWN_PAGES[which](browser, servers, { freshContext, engineName, screenshot });
     out.steps = r.steps;
     out.measured = r.measured;
     guards = r.guards;
@@ -357,8 +361,8 @@ async function main() {
   // `smoke` is opt-in: it is the short WebKit interaction, not part of the gate's
   // own four, and naming it in the default list would run it twice on Chromium.
   // `big` is opt-in too: a 2,000-mark board saved and opened again, minutes of replay.
-  const all = ['canvas', 'keep', 'shard', 'demo', 'demo2', 'smoke', 'big'];
-  const byDefault = ['canvas', 'keep', 'shard', 'demo', 'demo2'];
+  const all = ['canvas', 'keep', 'boards', 'shard', 'demo', 'demo2', 'smoke', 'big'];
+  const byDefault = ['canvas', 'keep', 'boards', 'shard', 'demo', 'demo2'];
   const picked = wanted.length ? all.filter((n) => wanted.includes(n)) : byDefault;
   if (!picked.length) {
     console.error(`nothing to run — pick from: ${all.join(', ')}`);
@@ -368,7 +372,7 @@ async function main() {
   rmSync(RESULTS, { recursive: true, force: true });
   mkdirSync(RESULTS, { recursive: true });
 
-  const needCanvas = picked.includes('canvas') || picked.includes('smoke') || picked.includes('keep') || picked.includes('big');
+  const needCanvas = picked.includes('canvas') || picked.includes('smoke') || picked.includes('keep') || picked.includes('boards') || picked.includes('big');
   const needShard = picked.includes('shard') || picked.includes('demo') || picked.includes('demo2');
 
   const started = Date.now();
@@ -406,7 +410,7 @@ async function main() {
         ? await runCanvas(browser, servers)
         : name === 'smoke'
           ? await runSmoke(browser, servers)
-          : name === 'keep' || name === 'big'
+          : OWN_PAGES[name]
             ? await runKeepScenario(browser, servers, engineName, name)
             : await runShard(browser, servers, name);
       r.browser = engineName;
