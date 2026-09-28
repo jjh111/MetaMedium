@@ -13,6 +13,7 @@
 //     node e2e/run.mjs app                    # one app address: /app/ installs, opens offline, is versioned per release
 //     node e2e/run.mjs budgets                # the surface's budgets on 2,000 marks; the 500-mark board painted both ways
 //     node e2e/run.mjs pencil                 # pencil and tablet: pen, finger, palm, hover, the keyboard (also --browser webkit)
+//     node e2e/run.mjs seat                   # the canvas's seat: Claude Code over MCP as a model the field asks (a relay and the hand of its own)
 //
 // It starts its own servers on ports the OS hands out, opens a FRESH browser
 // context per scenario (no profile, no cache, no board carried over from the
@@ -35,6 +36,7 @@ import { boardOf, serveBoard, openBoard, interact, equivalence, judge, fmt, cali
 import { runBoards } from './boards.mjs';
 import { runApp } from './app.mjs';
 import { runPencil } from './pencil.mjs';
+import { runSeat } from './seat.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, '..');
@@ -340,8 +342,8 @@ async function runSmoke(browser, servers) {
  * browser is only tested by closing the page that kept it and opening
  * another, and an app that opens offline only by taking its server away.
  */
-const OWN_PAGES = { keep: runKeep, big: runBig, boards: runBoards, app: runApp, pencil: runPencil };
-const OWN_URL = { app: 'app/' };
+const OWN_PAGES = { keep: runKeep, big: runBig, boards: runBoards, app: runApp, pencil: runPencil, seat: runSeat };
+const OWN_URL = { app: 'app/', seat: 'Demos/session-engine.html?live=claude&relay=…' };
 async function runKeepScenario(browser, servers, engineName, which = 'keep') {
   const out = { name: which, url: `${servers.staticOrigin}/${OWN_URL[which] || 'Demos/session-engine.html?nosw=1'}` };
   let guards = [];
@@ -497,8 +499,8 @@ async function main() {
   // own scenarios, and naming it in the default list would run it twice on Chromium.
   // `pencil` is in the default list (Chromium) and CI's `webkit` job runs it again on WebKit.
   // `big` is opt-in too: a 2,000-mark board saved and opened again, minutes of replay.
-  const all = ['canvas', 'keep', 'boards', 'app', 'pencil', 'budgets', 'shard', 'demo', 'demo2', 'smoke', 'big'];
-  const byDefault = ['canvas', 'keep', 'boards', 'app', 'pencil', 'budgets', 'shard', 'demo', 'demo2'];
+  const all = ['canvas', 'keep', 'boards', 'app', 'pencil', 'seat', 'budgets', 'shard', 'demo', 'demo2', 'smoke', 'big'];
+  const byDefault = ['canvas', 'keep', 'boards', 'app', 'pencil', 'seat', 'budgets', 'shard', 'demo', 'demo2'];
   const picked = wanted.length ? all.filter((n) => wanted.includes(n)) : byDefault;
   if (!picked.length) {
     console.error(`nothing to run — pick from: ${all.join(', ')}`);
@@ -508,7 +510,7 @@ async function main() {
   rmSync(RESULTS, { recursive: true, force: true });
   mkdirSync(RESULTS, { recursive: true });
 
-  const needCanvas = picked.includes('canvas') || picked.includes('smoke') || picked.includes('keep') || picked.includes('boards') || picked.includes('big') || picked.includes('app') || picked.includes('pencil') || picked.includes('budgets');
+  const needCanvas = picked.includes('canvas') || picked.includes('smoke') || picked.includes('keep') || picked.includes('boards') || picked.includes('big') || picked.includes('app') || picked.includes('pencil') || picked.includes('seat') || picked.includes('budgets');
   const needShard = picked.includes('shard') || picked.includes('demo') || picked.includes('demo2');
 
   const started = Date.now();
