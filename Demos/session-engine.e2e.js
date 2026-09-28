@@ -3775,6 +3775,25 @@ window.__scenario = async function(){
     mm.session.load([]); mm.setView(1, 0, 0);
   }
 
+  // ---- 60. The control centre, grouped (PLAN-USER-SURFACE U1f; audit row 12) ----
+  {
+    mm.openCC(); await wait(30);
+    const groups60 = [...document.querySelectorAll('#cc .ccGroup')].map((g) => ({
+      head: ((g.querySelector('.ccHead') || {}).textContent || '').trim(),
+      tiles: [...g.querySelectorAll('.ccTiles > button, .ccTiles > .tile')].map((el) => el.id).filter(Boolean),
+    }));
+    const want60 = [
+      { head: 'Board', tiles: ['boardsBtn', 'folderBtn', 'importBtn', 'exportBtn', 'resetBtn'] },
+      { head: 'View', tiles: ['zoomTile', 'gridBtn', 'themeBtn', 'handBtn', 'snapMode', 'snapBtn'] },
+      { head: 'Helpers', tiles: ['modelBtn', 'liveBtn', 'autoReadBtn', 'packsBtn', 'teachBtn', 'helpBtn'] },
+    ];
+    const groupOf60 = (id) => groups60.findIndex((g) => g.tiles.includes(id));
+    step('60. the control centre is three labelled groups — Board, View, Helpers — every tile in one, keeping its id, and Reset away from Help',
+      JSON.stringify(groups60) === JSON.stringify(want60) && groupOf60('resetBtn') !== groupOf60('helpBtn'),
+      { groups: groups60 });
+    mm.closeCC();
+  }
+
   return R;
 };
 
