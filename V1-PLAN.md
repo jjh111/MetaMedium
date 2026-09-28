@@ -1827,6 +1827,51 @@ look: the export's classification head, a possible *local* answer to
 decide's Choice questions. `gliner-seat/README.md` has every number and the
 command that produced it.
 
+**J5 status, 28 Sep 2026: built on `w2` — a hosted model is asked, and says
+why when it cannot be** (`cb26c51`, red first: 34 of 42 transport tests and
+14 of 16 e2e records; `cb1a4c4` core; `abfe4c7`, `b1968a5` surface; and the
+commit carrying this line). What was wrong for John's GLM Flash on
+OpenRouter: whether a model sees was guessed from its id and "glm" was not in
+the guess, so *Read the writing* never asked it and opened the models pane
+instead — which looked exactly like "it won't send"; a reasoning model that
+spent its budget thinking came back with empty `content`, read as *no
+completion text*, and no budget was sent; and every failure was one sentence
+in the status line, gone in seconds. **Core** (`llm/provider.ts`): a reply is
+read the way the provider sends it — content as a string or as parts, a
+model's `reasoning` or `reasoning_content` never taken for its answer, and
+with none the failure says why (*GLM 5.3 Flash spent its whole budget
+thinking — no answer came back*); a failure carries its HTTP status, a reason
+and the provider's own words (*HTTP 401 — bad key: “User not found.”*), a
+network or CORS failure said as one, the key never repeated; every call sends
+`max_tokens` 8,192 under what the provider said the model may write and
+read, and a call to OpenRouter `reasoning: { effort: 'low' }` and its
+`HTTP-Referer` and `X-Title`; `readModels` and `modelFacts` read what a
+provider's list says a model can do, refuse an id it does not hold with the
+nearest ids, and fall back to what it said last time, then to the id's guess,
+saying which. **Surface** (`04-models.js`): a join asks the list (once a page,
+waited on at most 3 s, correcting the join when it lands late); each model's
+row keeps its last call until the next and has *try it*; *Read the writing*
+with no model that sees says which cannot and why. Folded in from the pure-
+user walkthrough (John: "it opens the model panel whenever sending to llm"):
+asking never opens the pane — an ask with no model that can answer it is
+kept, said once and in the field with *choose one*, and runs when one joins;
+a model is named in words with no `llm:` and a reading is words, not a slug,
+on the board; with a long local list one model is suggested a job. The
+gate's `models` scenario (19 records, about 6 s) runs the real transport
+against a stub provider on 127.0.0.1 answering in OpenRouter's recorded
+shapes: the guard still stops a real model host, a wrong id refused, the
+kept *What is this?* and *Read the writing* run on join, a 401 and a
+reasoning-only reply said in the row, try it, a reload rejoining with the
+vision flag right, and the key nowhere but where *remember* put it. Core
+1,688 in 105 files (the transport's 42). **Not done:** OpenRouter itself is
+never called by a test — the guard forbids it — so its CORS for the two
+headers and its handling of the reasoning setting are John's first real
+join to confirm (a CORS failure there would now be said as one, and the
+headers are one block in `completeOpenAICompatible`); the field's reading
+line and tooltips still name a model `llm:…` (e2e 49's golden holds them); a
+kept ask waits until it runs or another replaces it, with no expiry; the
+shard's model seats (`shard-3d/src/models.ts`) keep their own join.
+
 ### Phase 6 — ready for use
 **R1 Boards.** A boards list in browser storage; `?board=`; the existing
 single board becomes the first entry, unchanged. *Red first:* three boards

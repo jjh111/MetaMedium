@@ -45,6 +45,18 @@ it* from Mermaid, maths offers — then S2, state and ER, first run, a review
 of use, and v1.0.0 (`V1-PLAN.md` §8–§9, every unit with its dated status
 line).
 
+**28 Sep 2026, J5 (phase 5, seats): a hosted model is asked, and says why
+when it cannot be.** John joined GLM Flash from OpenRouter and the canvas
+sent it nothing: whether a model sees was guessed from its id (no "glm" in
+the guess), a reasoning model's answer outside `content` read as none, and
+every failure was one fleeting sentence. Now a join asks the provider's own
+list what a model can do; a reply is read the way the provider sends it,
+with every call budgeted; a failure is said in full, with the provider's
+words; each model's row keeps its last call and has *try it*; and an ask
+that needs a model none here can answer is kept and runs when one joins —
+asking never opens the models pane (*Tiered LLM Interpretation*, below;
+`node e2e/run.mjs models`, against a stub provider).
+
 **27 Sep 2026: phase 0 of `V1-PLAN.md` is done on `w2` — week 1 is whole**
 (each unit's dated status line is in the plan's §9). **Ids hold** (L1): a
 live hand's log is one sitting, a page load or an MCP process
@@ -284,7 +296,7 @@ any structural change.
 | `skills/` | Claude Code skills: `metamedium-code` (code patterns), `metamedium-design` (design principles) |
 | `Assets/` | Figures and design rationale (recognition strategy, point-primitive proposal), and the social card. `make-card.mjs` regenerates that card from index.html's own hero — synthetic pointer input, so the picture shows the engine really reading a mark; `node Assets/make-card.mjs`. Change the picture and you must change the FILENAME and the four og:/twitter: tags in `index.html` and `404.html`, because scrapers cache by URL. **`Assets/whitepaper-figures/`** is the whitepaper's seven graphic plates: `build.py` holds their content and geometry and emits the static blocks `index.html` carries between `whitepaper-plate:KEY` markers (`--check` says they are in sync), `figures.css` and `figures.js` style and enhance them with no build, and `e2e/whitepaper-figures.mjs` audits the real page; its README is the workflow |
 | `archive/` | Retired versions and superseded plans, incl. whitepaper v4 (root `MetaMedium_Whitepaper_v4.html` is a redirect stub — keep it) and PRDs v3.2/v4 |
-| `e2e/` | **The browser gate** (`DIRECTOR-REVIEW-2026-09-15.md`, QA-1): `node e2e/run.mjs` starts its own servers on free ports (a static one over the repo root, vite over `shard-3d`), opens a **fresh browser context per scenario**, loads the harnesses that already exist — `Demos/session-engine.e2e.js` (`__setup` + `__scenario`) and `shard-3d/e2e.js` (`__scenario`, `__demo`, `__demo2`) — and awaits the result object each one returns. It does not reimplement them. **Nine scenarios** on Chromium by default (`canvas`, `keep`, `boards`, `app`, `pencil`, `budgets`, `shard`, `demo`, `demo2`): 558 passing records and the one honest skip as of 28 Sep 2026 (canvas 325, keep 31, boards 20, app 14, pencil 15, budgets 7, shard 123 + 11 + 12), in about 240 s. **`budgets`** (`e2e/budgets.mjs`, V1-PLAN R4c) paints the bench's 500-mark board both ways, every mark pointed at, boxes drawn and undone, and every mark held (`paintCheck`, `rolesCheck`, `heldCheck`: a hand's paint must draw and say what the whole-board read would), then measures PERF.md's budgets on the 2,000-mark board — open, release → reading drawn, a pointer move, a pan at zoom 1 and at fit-all — each a step with its number, **skipped by name** on a machine too loaded to measure or slower than the one they were set on (a calibration in the page). Beside them, **`smoke`** is opt-in and runs on WebKit (`node e2e/run.mjs --browser webkit smoke`): the board loads, ink drawn with real pointer input is read back, press-and-hold opens the field and one pill is taken — four checks in `run.mjs` itself, a WebKit smoke and not an iPhone test. CI's `webkit` job runs it with `pencil` and `keep` (`--browser webkit smoke pencil keep`, `npm run webkit` in `e2e/`, about 30 s). **`pencil`** (`e2e/pencil.mjs`, V1-PLAN R6, in the default run and on WebKit; 15 records, about 12 s) is the canvas by pen and finger at an iPad's size: a pen and fingers synthesised in the page as iPadOS delivers them (`pointerType` `pen` with a pressure and a tilt, `touch`), and the on-screen keyboard as iPadOS tells the page (a stand-in `visualViewport`, installed before the page's scripts, that shrinks) — the pen draws with its pressure on every point, the switch said once, a finger pans, two pinch and leave nothing in the log, a palm during, just after and just before the pen is nothing, the pencil's hover shows the reading and the magnet, the field by the pen's hold and a pill, a clean, an undo, the field above the keyboard with every pill scrolled to and hit, the hand tile round, the mouse untouched, a save and a reload, and a handle of the one selected mark dragged by the pen while a finger laid on another pans (E1); `QA-v1.md` §A10 is what only an iPad can say. Pass, fail and **skip** are counted separately (a record whose name says it skipped is a skip); a failed assertion, a harness exception, an attempted request to a real model, or a page error not on the named allowlist in `guards.mjs` each exit nonzero, with structured JSON and a screenshot in `e2e/results/`. Beside the gate, on its static server and never run by it or by CI: `e2e/perf.mjs` (the surface's half of `PERF.md`, numbers, each budget said within or over — measured with the gate's own `budgets.mjs`) and `e2e/whitepaper-figures.mjs` (the plates' audit, Chromium and WebKit). **`keep`** (`e2e/keep.mjs`, V1-PLAN R3) loads no harness: the kill test (the page crashed or closed at random points, reopened, every completed stroke there), a save forced to fail, the one import of browser storage's old board, two tabs, and the pages that must not write — in the default run, and on WebKit where it can (`--browser webkit keep`, in CI's `webkit` job since R6: 22 records and 3 skipped by name — the quota is Chromium's to force); **`big`** (opt-in, minutes) saves and reopens a 2,000-mark board. Since R1 the kill test keeps two boards and switches between them through the boards pane mid-session, killing right after a switch and in the middle of one. **`boards`** (`e2e/boards.mjs`, R1, in the default run) drives the boards pane with the real pointer: the old board as the first entry, new, switch, reload and `?board=`, rename, duplicate, delete, restore, emptying the trash said first, a board open in another tab, one tab per board, the view per board, recent places, Reset, a board out as a file and back, a board that is not saved never left without a word, and a library pack kept with its board through a reload (B3). **`app`** (`e2e/app.mjs`, R7, in the default run; 14 records on Chromium and WebKit, about 10 s) opens `/app/` on the gate's static server: every file it asks for answers, the manifest starts and is scoped there (and Chromium finds it installable), the worker's scope covers the page and the page is *controlled* by it, a box drawn comes back on a reload the worker served and with the server gone, the help pane says `VERSION`, a request carrying a key is never kept, the old address and every address the whitepaper, `404.html` and the README link still answer — and a release renames the cache, beside a control that shows the stale shell a cache that kept its name serves. `e2e/README.md` has the rest |
+| `e2e/` | **The browser gate** (`DIRECTOR-REVIEW-2026-09-15.md`, QA-1): `node e2e/run.mjs` starts its own servers on free ports (a static one over the repo root, vite over `shard-3d`), opens a **fresh browser context per scenario**, loads the harnesses that already exist — `Demos/session-engine.e2e.js` (`__setup` + `__scenario`) and `shard-3d/e2e.js` (`__scenario`, `__demo`, `__demo2`) — and awaits the result object each one returns. It does not reimplement them. **Ten scenarios** on Chromium by default (`canvas`, `keep`, `boards`, `app`, `pencil`, `models`, `budgets`, `shard`, `demo`, `demo2`): 577 passing records and the one honest skip as of 28 Sep 2026 (canvas 325, keep 31, boards 20, app 14, pencil 15, models 19, budgets 7, shard 123 + 11 + 12), in about 240 s. **`models`** (`e2e/models.mjs`, V1-PLAN J5, in the default run; 19 records, about 6 s, and it passes on WebKit too) runs the real transport through the models pane and the field against `startModelStub` (`e2e/servers.mjs`) — an OpenAI-compatible endpoint on 127.0.0.1 answering `/v1/models` and `/v1/chat/completions` in OpenRouter's recorded shapes (`metamedium-core/src/llm/fixtures/`, the core tests' too): the guard still stops a real model host, one local model suggested a job (Ollama's list a stand-in in the page, nothing on the machine probed), *What is this?* with no model kept and run on join, a wrong id refused with the nearest ids, text only and *sees* from the list, *Read the writing* saying which model cannot and why and running when one that sees joins, a 401 and a reasoning-only reply said in the row, *try it*, a reload rejoining with the vision flag right, and the key nowhere but where *remember* put it. **`budgets`** (`e2e/budgets.mjs`, V1-PLAN R4c) paints the bench's 500-mark board both ways, every mark pointed at, boxes drawn and undone, and every mark held (`paintCheck`, `rolesCheck`, `heldCheck`: a hand's paint must draw and say what the whole-board read would), then measures PERF.md's budgets on the 2,000-mark board — open, release → reading drawn, a pointer move, a pan at zoom 1 and at fit-all — each a step with its number, **skipped by name** on a machine too loaded to measure or slower than the one they were set on (a calibration in the page). Beside them, **`smoke`** is opt-in and runs on WebKit (`node e2e/run.mjs --browser webkit smoke`): the board loads, ink drawn with real pointer input is read back, press-and-hold opens the field and one pill is taken — four checks in `run.mjs` itself, a WebKit smoke and not an iPhone test. CI's `webkit` job runs it with `pencil` and `keep` (`--browser webkit smoke pencil keep`, `npm run webkit` in `e2e/`, about 30 s). **`pencil`** (`e2e/pencil.mjs`, V1-PLAN R6, in the default run and on WebKit; 15 records, about 12 s) is the canvas by pen and finger at an iPad's size: a pen and fingers synthesised in the page as iPadOS delivers them (`pointerType` `pen` with a pressure and a tilt, `touch`), and the on-screen keyboard as iPadOS tells the page (a stand-in `visualViewport`, installed before the page's scripts, that shrinks) — the pen draws with its pressure on every point, the switch said once, a finger pans, two pinch and leave nothing in the log, a palm during, just after and just before the pen is nothing, the pencil's hover shows the reading and the magnet, the field by the pen's hold and a pill, a clean, an undo, the field above the keyboard with every pill scrolled to and hit, the hand tile round, the mouse untouched, a save and a reload, and a handle of the one selected mark dragged by the pen while a finger laid on another pans (E1); `QA-v1.md` §A10 is what only an iPad can say. Pass, fail and **skip** are counted separately (a record whose name says it skipped is a skip); a failed assertion, a harness exception, an attempted request to a real model, or a page error not on the named allowlist in `guards.mjs` each exit nonzero, with structured JSON and a screenshot in `e2e/results/`. Beside the gate, on its static server and never run by it or by CI: `e2e/perf.mjs` (the surface's half of `PERF.md`, numbers, each budget said within or over — measured with the gate's own `budgets.mjs`) and `e2e/whitepaper-figures.mjs` (the plates' audit, Chromium and WebKit). **`keep`** (`e2e/keep.mjs`, V1-PLAN R3) loads no harness: the kill test (the page crashed or closed at random points, reopened, every completed stroke there), a save forced to fail, the one import of browser storage's old board, two tabs, and the pages that must not write — in the default run, and on WebKit where it can (`--browser webkit keep`, in CI's `webkit` job since R6: 22 records and 3 skipped by name — the quota is Chromium's to force); **`big`** (opt-in, minutes) saves and reopens a 2,000-mark board. Since R1 the kill test keeps two boards and switches between them through the boards pane mid-session, killing right after a switch and in the middle of one. **`boards`** (`e2e/boards.mjs`, R1, in the default run) drives the boards pane with the real pointer: the old board as the first entry, new, switch, reload and `?board=`, rename, duplicate, delete, restore, emptying the trash said first, a board open in another tab, one tab per board, the view per board, recent places, Reset, a board out as a file and back, a board that is not saved never left without a word, and a library pack kept with its board through a reload (B3). **`app`** (`e2e/app.mjs`, R7, in the default run; 14 records on Chromium and WebKit, about 10 s) opens `/app/` on the gate's static server: every file it asks for answers, the manifest starts and is scoped there (and Chromium finds it installable), the worker's scope covers the page and the page is *controlled* by it, a box drawn comes back on a reload the worker served and with the server gone, the help pane says `VERSION`, a request carrying a key is never kept, the old address and every address the whitepaper, `404.html` and the README link still answer — and a release renames the cache, beside a control that shows the stale shell a cache that kept its name serves. `e2e/README.md` has the rest |
 | `PERF.md`, `metamedium-core/bench/`, `e2e/perf.mjs` | **The performance baseline** (V1-PLAN §9 R4a, 27 Sep 2026): `bench/board.mjs` draws deterministic boards of 500, 2,000 and 5,000 marks from a seed (the generator is kept, never the boards); `bench/engine.mjs` times replay, memory, relations, the whole-board read, one more stroke, a live room's incoming line and a newcomer's hello; `e2e/perf.mjs`, beside the gate and on its servers and model guard, times the surface — open, pan, draw, release → reading drawn — in Chromium and WebKit; `bench/profile.mjs` reads a CPU profile back to `src/…:line` and the surface's fragments; `bench/report.mjs` prints `PERF.md`'s tables from the results. `PERF.md` has the answer (500 marks usable, 2,000 not, 5,000 does not open), every number with its command, the hotspots ranked with file:line, and budgets for R4b — and, after R4b, the engine's numbers beside them. **R4b added** `bench/budgets.test.mjs` (`node --test`: the engine's budgets on the generated 2,000-mark board — replay ≤ 0.5 s, a stroke ≤ 4 / 16 ms, ≤ 150 MB — and the 5,000 board replays; each size in a process of its own, every run's numbers recorded in `dist/bench`) and `bench/equivalence.mjs` (every held log, a scripted log of the rarer acts and the 500-mark board replayed by the old engine — a committed bundle at `--ref` — and by `src/`, every reading and id compared, and what differs said). Not in `npm test` (`vitest.config.mjs` keeps `bench/` out) or the gate. **R4c added** the surface's column, and its budgets to the gate: `e2e/budgets.mjs` (what `perf.mjs` and the gate's `budgets` scenario both measure with) **R4d added** `bench/room.test.mjs` (`node --test`: a live room's budgets on the 2,000-mark board — a line ≤ 16 ms at p95 with no full replay, one crossing a mark just drawn too, a line that lands earlier from a checkpoint, a line with no events no work, a newcomer's hello one copy of each log in rooms of three and six with a hand gone — measured by `bench/room.mjs`, whose `--path=before` is the surface before R4d). |
 | `.github/workflows/ci.yml` | CI, on every push/PR: typecheck + test + build for `metamedium-core` — with the drift check for both committed bundles, the MCP hand's smoke, the surface's drift check and its build's test, the field reader's, the hand's rules', the relay's, the board journal's and the board list's Node tests, the app's drift check (`scripts/build-app.mjs --check`) and the app build's and release script's Node tests — `shard-3d` (with its MCP hand's smoke) and `Web App Skeleton` (with lint); the **browser gate** (`e2e/run.mjs` on Chromium); and **WebKit** — the smoke, `pencil` and `keep` (`--browser webkit smoke pencil keep`) — in a job of its own. Both browser jobs upload `e2e/results` when they fail |
 
@@ -1771,6 +1783,51 @@ differ only by base URL and key. Anthropic needs its own client.
   relatives think inside `<think>…</think>`, and a brace in there is exactly what
   the tolerant JSON readers downstream would latch onto.
 
+**A hosted model is asked, and says why when it cannot be** (V1-PLAN J5,
+`llm/provider.ts`, its recorded shapes in `llm/fixtures/`, shared with the
+e2e stub). What John's GLM Flash on OpenRouter taught:
+
+- **A reply is read the way the provider sends it.** The answer is
+  `content` only — a string, or the text parts of a list (a thinking part
+  is left out) — with `<think>` dropped. A reasoning model's `reasoning`
+  (OpenRouter), `reasoning_content` (Z.AI's own API, vLLM, DeepSeek, LM
+  Studio) or reasoning details are never read as its answer; with no answer
+  the failure says exactly why — *GLM 5.3 Flash spent its whole budget
+  thinking — no answer came back (it stopped at the token limit, 8,192
+  tokens)*, it thought and stopped, it hit the limit before writing, a
+  filter withheld it, it declined, it said nothing. An answer cut off at the
+  limit is kept and marked `truncated`; an error OpenRouter puts inside a
+  200 is a failure, with the upstream provider's own words.
+- **A failure is said in full**: `HTTP 401 — bad key: “User not found.”`,
+  `402 — no credit`, `404 — no such model, or no such endpoint`, `429 — rate
+  limited`, each with the provider's message, and `status` and a `reason`
+  beside the sentence for a surface to act on. A network or CORS failure is
+  said as one — the browser does not say which; a timeout says the host and
+  the wait; a key a provider echoes back is never repeated; `'cancelled'`
+  stays the one word callers test for.
+- **Every call is budgeted**: `max_tokens` 8,192 (`DEFAULT_MAX_TOKENS`),
+  under what the provider said the model may write and read
+  (`maxTokensFor`). Unsent, the budget was the provider's default, and a
+  model that thinks first could spend a small one thinking. **A call to
+  OpenRouter adds `reasoning: { effort: 'low' }`** (`OPENROUTER_REASONING`):
+  every ask the canvas makes is a reading or a fill whose structure the
+  engine decided, so deep thinking buys little and costs a wait; low, not
+  off, because some models cannot turn it off; OpenRouter maps an effort
+  onto whatever the model takes and leaves a model that does not reason
+  alone. It also gets OpenRouter's optional `HTTP-Referer` and `X-Title`
+  (`OPENROUTER_APP`); no other endpoint is sent either, since its CORS may
+  not allow a header it does not know.
+- **A provider's list says what a model can do** (`readModels`,
+  `parseModelList`, `modelFacts`): OpenRouter's rows (inputs, context,
+  output limit, parameters — read without the key, the list is public), LM
+  Studio's `vlm`/`llm`, a capabilities list, a plain OpenAI list that names
+  ids only (`describes: false`). A join is given what the list says — an id
+  it does not hold is refused with the nearest ids (`nearestModelIds`) — and,
+  when it cannot be read, what it said when the model last joined, else the
+  id's guess (`guessVision`), and the sentence says which. `listModels` is
+  its ids, sorted, as before. `whereOf` and `modelWords` say where and who in
+  words (*on OpenRouter*, *GLM 5.3 Flash*, *qwen3.5 9b*).
+
 **The surface's chrome** (`Demos/session-engine.html`, v9 S1): **one bar**
 — the wordmark and the panel toggle on the left, the mark chip, undo and the
 **control centre** on the right — and nothing in it explains the system
@@ -1902,7 +1959,18 @@ a model. The *auto-read* tile restores reading handwriting as it is written,
 off by default. Found the hard way: every stroke the shape rung could not
 place read as `text` and was handed to every model that can see, and every
 check asked every model to interpret the group before a word was typed — a
-doodle session was a stream of calls nobody made.
+doodle session was a stream of calls nobody made. **An ask with no model
+here that can answer it is kept, not dropped, and never opens the pane**
+(J5, `keepAsk` in `04-models.js`): *What is this?*, *Read the writing* or a
+typed brief with no model (or none that sees) is said once in the status
+line and in the field where it was asked — *Read the writing needs a model
+that can see — kept, it runs when one joins* and **choose one**, the one way
+the models pane opens for it — and the moment a model that can answer it
+joins, it runs. The ask was the deliberate act; the join is the second.
+*Read the writing* says which joined models cannot, and why (*GLM 4.7 Flash
+reads text only (OpenRouter says it takes text)*, `whyNoReader`). A pill
+that asks a model none here can answer says so on the reading line while it
+is pointed at.
 
 **Every making prompt says what can be made here** (v10 F13, `HERE` in
 `participants/agent.ts`): one paragraph on the interpret, ask, make,
@@ -1925,12 +1993,17 @@ nothing since — the bless is still its last act (`session.lastAct`, L2j),
 whatever another hand drew — that bless is undone and the status says so. **Typed text at a loop is a brief unless it names a verb**: the reading
 line says which before Enter is pressed; "website about dolphins" goes to
 the model as the prompt. With no model joined, the reading line says so and
-Enter opens the pane.
+Enter keeps the brief for a model (J5): it runs when one joins.
 
 **Keys never leave the device.** A hosted provider's key lives in
 `agents[].config` in memory and, only when *remember* is ticked, in
 `localStorage`; the `join` event in the log carries a kind and a name and
 nothing else, so the log, the folder, autosave and export are clean of it.
+The remembered pick keeps what the provider said (whether it sees, what it is
+called), never the key; OpenRouter's public list of models is read without
+it; and a key a provider echoes in an error is never repeated (J5). The gate's
+`models` scenario looks for the key in the log, the board's journal, every
+cache, the DOM and the address, and finds it only where *remember* put it.
 
 **The model pane** (`Demos/session-engine.html`) follows what the personal
 site's search bar learned (`johnhanacek/scripts/search-core.js`): it probes
@@ -1940,8 +2013,26 @@ embedding-only models and says so** (an Ollama holding only `nomic-embed-text`
 used to show nothing and explain nothing), and **remembers the pick as a
 preference** — honoured when that server still offers that model, quietly
 ignored otherwise. Hosted providers and a custom OpenAI-compatible endpoint
-join by key; the key is remembered only when asked. A brief typed with no
-model present opens this pane: the escalation, made visible.
+join by key; the key is remembered only when asked. **A join asks the
+provider what the model can do** (J5, `joinHosted`): its list, read once a
+page and waited on at most three seconds — a list that lands later still
+corrects the join — refuses an id it does not hold (*no model called
+z-ai/glm-flash on OpenRouter — did you mean ~z-ai/glm-flash-latest,
+z-ai/glm-5.3-flash or z-ai/glm-4.7-flash?*) and says whether the model sees
+and how much it reads; the id's guess stands only when the list cannot be
+read, and says so. A remembered pick rejoins after a reload the same way
+(and a remembered Ollama or LM Studio pick is asked for where it runs, as it
+was before the 6 Sep tier redress made it ask for a key). **Each joined
+model's row** says its name in words, where it runs, *sees* or *text only*,
+its context (the tooltip: what its provider said, or why that is a guess),
+**its last call, kept until the next** — *ok · 1.8 s · read “hello”*, or the
+failure in full — recorded by the transport every call goes through, and
+**try it**, one tiny prompt. With a long list on this machine the pane
+**suggests one model a job** — the smallest that sees for reading writing,
+the one nearest 8B for *What is this?* — and the rest wait behind *all N
+models*. On the board a model is named in words, with no `llm:` (chips,
+working dots, the status line, the tile), and a reading is words, not a
+slug (*state transformation*; taking it still names by the label).
 Model participants are surface-side (`agents[]`); the session keeps every
 `join` in its history, so leaving only stops a model being asked.
 
