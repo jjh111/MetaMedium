@@ -37,6 +37,7 @@
       if (!b) continue;
       const x = ox + b.minX * scale, y = oy + b.minY * scale;
       const bw = Math.max(1.5, (b.maxX - b.minX) * scale), bh = Math.max(1.5, (b.maxY - b.minY) * scale);
+      if (paintOps) recordOp({ kind: 'mini', id: id, box: boxOfRect(x, y, bw, bh), moved: true });
       if (s.artifacts.includes(id)) { g.strokeStyle = 'rgba(' + C.goldRGB + ',0.8)'; g.lineWidth = 1; g.strokeRect(x + 0.5, y + 0.5, bw, bh); }
       else { g.fillStyle = s.explanations.includes(id) ? 'rgba(' + C.goldRGB + ',0.35)' : C.inkFaint; g.fillRect(x, y, bw, bh); }
     }

@@ -2270,6 +2270,33 @@
     return s.contentIds.length ? s.contentIds[s.contentIds.length - 1] : null;
   }
 
+  // ===== What a paint drew and said, for the equivalence check (R4c) ========
+  // Off unless a test asks. `paintCheck` paints the board twice — once as the
+  // surface paints it, once as the whole-board read would — records what each
+  // drew (every mark's ink, a ghost, a chip, the reading under a mark, an
+  // artifact's name, a label, a card, the minimap) and what each said (the
+  // status line, the panel), and compares: what a hand's paint drew must be
+  // what the whole-board read draws, and everything the whole-board read
+  // draws on screen must be drawn. Nothing here runs in a hand's paint.
+  let paintOps = null;        // while recording: what this paint drew, one op a thing
+  let paintReference = false; // while painting as the whole-board read would
+  let paintMoved = false;     // the ink being drawn is where a drag or a tank has taken it
+  let paintNow = 0;           // a clock held still for the two paints a check compares
+  const nowMs = () => paintNow || Date.now();
+  /** The reading under the inspected mark, as the last paint drew it: { id, text }, or null. */
+  let readingDrawn = null;
+  const round2 = (v) => Math.round(v * 100) / 100;
+  function boxOfPoints(points) {
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const p of points) {
+      if (p.x < minX) minX = p.x; if (p.x > maxX) maxX = p.x;
+      if (p.y < minY) minY = p.y; if (p.y > maxY) maxY = p.y;
+    }
+    return { minX: round2(minX), minY: round2(minY), maxX: round2(maxX), maxY: round2(maxY) };
+  }
+  const boxOfRect = (x, y, w, h) => ({ minX: round2(x), minY: round2(y), maxX: round2(x + w), maxY: round2(y + h) });
+  function recordOp(op) { if (paintOps) paintOps.push(op); }
+
   // ===== The rungs, read once per frame ====================================
   // Shape → role → genre for everything on the board, from session.read().
   // Labels under marks, the inspector's ladder and the palette all read from
@@ -2320,6 +2347,7 @@
     if (points) {
       inkDrawn.set(node.id, style.color);
       const clean = MM.cleanPointsOf(node);
+      if (paintOps) recordOp({ kind: 'ink', id: node.id, colour: style.color, width: round2(style.width), box: boxOfPoints(points), clean: clean ? boxOfPoints(clean) : null, moved: paintMoved, gesture: !!style.gesture });
       if (clean) {
         // Snapped: the clean form in front, the hand's ink faint beneath it.
         // What was drawn is still there — that is the whole promise.
@@ -2340,7 +2368,9 @@
         const ideal = idealOf(node, offer.shape);
         if (ideal) {
           // The ghost follows the ink: same placement (transform, rotation).
-          path(MM.placed(node, ideal.points), ideal.closed);
+          const ghost = MM.placed(node, ideal.points);
+          if (paintOps) recordOp({ kind: 'ghost', id: node.id, box: boxOfPoints(ghost), moved: paintMoved });
+          path(ghost, ideal.closed);
           ctx.setLineDash([wpx(3), wpx(4)]);
           ctx.strokeStyle = `rgba(${C.goldRGB},0.7)`;
           ctx.lineWidth = wpx(1.2);
@@ -2370,7 +2400,7 @@
     if (hoverId === id || s.selection.includes(id)) return true;
     if (s.summon && s.summon.enclosedIds.includes(id)) return true;
     if (heldCandidates.includes(id)) return true;
-    return id === lastContentId(s) && Date.now() - lastDrawAt < GHOST_MS;
+    return id === lastContentId(s) && nowMs() - lastDrawAt < GHOST_MS;
   }
 
   let chipHits = []; // the match chips drawn this frame, in world coordinates: { ids, x, y, w, h }
@@ -2401,6 +2431,7 @@
     state = s;
     chipHits = [];
     chromeDrawn = [];
+    readingDrawn = null;
     inkDrawn.clear();
     pruneRuntime(s);
     // No model is asked from here: a paint is not a request (§6.3).
@@ -2432,8 +2463,10 @@
       // A match is a chip beside the group, with its number (D8); a tap on it
       // opens the field with the match leading. Plural, like every reading:
       // two definitions with the same shapes are both named.
-      const hit = chipText(c.matches.slice(0, 2).map((m) => m.name + ' ' + m.score.toFixed(2)).join('  ·  '), b.minX - pad, b.minY - pad - wpx(8));
+      const said = c.matches.slice(0, 2).map((m) => m.name + ' ' + m.score.toFixed(2)).join('  ·  ');
+      const hit = chipText(said, b.minX - pad, b.minY - pad - wpx(8));
       chipHits.push({ ids: c.nodeIds.slice(), x: hit.x, y: hit.y, w: hit.w, h: hit.h });
+      if (paintOps) recordOp({ kind: 'match', id: c.nodeIds.join(','), text: said, box: boxOfRect(b.minX - pad, hit.y, Math.max(hit.w, b.maxX - b.minX + pad * 2), b.maxY + pad - hit.y), moved: !!cp });
     }
     // What a model read a group as stays beside it (v10 F6): a chip with the
     // number and the reader, whether or not the field is still open, and a
@@ -2452,6 +2485,7 @@
       const text = reads.slice(0, 2).map((r) => r.label + ' ' + r.weight.toFixed(2)).join('  ·  ') + '  ·  ' + reads[0].sourceName;
       const hit = chipText(text, b.minX - pad, b.maxY + pad + wpx(17));
       chipHits.push({ ids: group.length ? group : [id], x: hit.x, y: hit.y, w: hit.w, h: hit.h });
+      if (paintOps) recordOp({ kind: 'read', id: id, text: text, box: boxOfRect(hit.x, hit.y, hit.w, hit.h), moved: false });
     }
 
     const inspectedId = hoverId || lastContentId(s);
@@ -2476,11 +2510,13 @@
       // the DRAWING moves, translated and turned, never a sprite in its place.
       const pl = bodyPlacement(id);
       if (pl) { ctx.save(); ctx.translate(pl.cx + pl.dx, pl.cy + pl.dy); ctx.rotate(pl.angle); ctx.translate(-pl.cx, -pl.cy); }
+      paintMoved = !!(held || pl);
       inkOf(node, {
         color: isLive ? `rgba(${C.goldRGB},0.85)` : color,
         width: id === inspectedId ? inkW * 1.3 : inkW,
         byMaker: !isLive,
       });
+      paintMoved = false;
       if (pl) ctx.restore();
       if (held) ctx.restore();
 
@@ -2497,8 +2533,10 @@
         const quiet = isFigureArtifact(node) && id !== inspectedId && !s.selection.includes(id);
         if (!quiet) {
           chromeDrawn.push(id);
+          const name = (MM.wordOf(node) || '') + (isLive ? '  ·  live' : '');
+          if (paintOps) recordOp({ kind: 'chrome', id: id, text: name, box: boxOfRect(b.minX, b.minY, b.maxX - b.minX, b.maxY - b.minY), moved: !!pl });
           brackets(b, isLive ? C.gold : `rgba(${C.goldRGB},0.7)`);
-          text((MM.wordOf(node) || '') + (isLive ? '  ·  live' : ''), b.minX, b.minY - wpx(10), C.gold);
+          text(name, b.minX, b.minY - wpx(10), C.gold);
         }
       } else if (b && !pending && id === inspectedId && !s.selection.length) {
         // The reading of the mark the hand just made (or is over), and only
@@ -2510,7 +2548,11 @@
         const top = MM.wordOf(node) || (said ? '“' + said + '”' : shape ? shape.label : MM.topInterpretation(node));
         const role = readRungs(s).roles.get(id);
         const played = role && role.role !== 'unclassified' && role.role !== top ? ' · ' + role.role : '';
-        if (top) text(top + played, b.minX, b.maxY + wpx(15), `rgba(${C.labelRGB},0.85)`);
+        if (top) {
+          readingDrawn = { id: id, text: top + played };
+          if (paintOps) recordOp({ kind: 'reading', id: id, text: top + played, box: boxOfRect(b.minX, b.maxY, 0, wpx(15)), moved: !!pl });
+          text(top + played, b.minX, b.maxY + wpx(15), `rgba(${C.labelRGB},0.85)`);
+        }
       }
     }
 
@@ -2565,7 +2607,7 @@
 
     // The status line: what just happened, else the standing state, in a few
     // words — and a model at work is always in it, whichever it shows.
-    const fresh = flashText && Date.now() - flashAt < flashFor;
+    const fresh = flashText && nowMs() - flashAt < flashFor;
     const ws = workingSummary();
     const hint = s.pendingLassoId ? 'cross the loop with ' + (s.commandMark ? 'your mark' : '✓') + ' to select what it holds' : '';
     const strokes = s.contentIds.length - s.artifacts.length;
@@ -2702,6 +2744,7 @@
     if (whoShown) text('· ' + who, x + w + size * 0.4, y, `rgba(${C.labelRGB},0.85)`);
     if (held) ctx.restore();
     labelsDrawn.push({ id: node.id, text: lab.text, x: x, y: y, w: w, size: size, px: size * view.zoom, colour: colour, who: who, whoShown: whoShown });
+    if (paintOps) recordOp({ kind: 'label', id: node.id, text: lab.text, box: boxOfRect(x, y - size, w, size * 1.45), moved: !!(held || pl) });
   }
 
   function text(str, x, y, color) {
@@ -2833,7 +2876,7 @@
    * labels that belong in the drawing.
    */
   function agoOf(at) {
-    const ms = Date.now() - (at || 0);
+    const ms = nowMs() - (at || 0);
     if (!(ms > 0) || ms < 45000) return 'just now';
     const m = Math.round(ms / 60000);
     if (m < 60) return m + 'm ago';
@@ -2961,6 +3004,11 @@
       card.rect = placeCard(card, placed, obstacles, vw, gap);
       placed.push(card.rect);
       cardRects.push({ id: card.id, about: card.about.slice(), what: card.what, who: card.who, ago: card.ago, x: card.rect.x, y: card.rect.y, w: card.rect.w, h: card.rect.h });
+      if (paintOps) {
+        const r = card.rect, sub = card.subject;
+        recordOp({ kind: 'card', id: card.id, text: card.who + ' · ' + card.what + ' · ' + card.ago + ' · ' + card.lines.join(' '),
+          box: boxOfRect(Math.min(r.x, sub.minX), Math.min(r.y, sub.minY), Math.max(r.x + r.w, sub.maxX) - Math.min(r.x, sub.minX), Math.max(r.y + r.h, sub.maxY) - Math.min(r.y, sub.minY)), moved: false });
+      }
     }
 
     for (const card of cards) {
@@ -3038,6 +3086,64 @@
     ctx.arcTo(x, y + h, x, y, r);
     ctx.arcTo(x, y, x + w, y, r);
     ctx.closePath();
+  }
+
+  // ===== The equivalence check (R4c) ========================================
+  /**
+   * Paint the board as a hand's paint does, then as the whole-board read
+   * would, and say where the two differ: everything the first drew, the second
+   * drew the same; everything the second drew on screen, the first drew; and
+   * both said the same thing — the reading under the mark, the status line,
+   * the panel, the chips, the labels, the cards, the minimap, the offers.
+   * A test's tool: it paints three times, with the clock held still, and
+   * leaves the board as a hand's paint left it. `ops` is how many things a
+   * hand's paint drew, `of` how many the whole-board read drew.
+   */
+  function paintCheck() {
+    const s = session.getState();
+    const take = (reference) => {
+      paintOps = [];
+      paintReference = reference;
+      try { render(s); } finally { paintReference = false; }
+      const ops = paintOps;
+      paintOps = null;
+      return {
+        ops: ops,
+        reading: readingDrawn,
+        // A model at work says how long it has worked; that is the clock, not the board.
+        status: statusEl.textContent.replace(/\d+s\b/g, '#s'),
+        standing: (statusEl.dataset.standing || '').replace(/\d+s\b/g, '#s'),
+        // A running tank's clock is said in the panel; that too is the clock.
+        panel: inspectorEl.innerHTML.replace(/t = [\d.]+s/g, 't = #s'),
+        chips: chipHits.map((c) => ({ ids: c.ids.slice(), x: round2(c.x), y: round2(c.y), w: round2(c.w), h: round2(c.h) })),
+        labels: labelsDrawn.map((l) => ({ id: l.id, text: l.text, x: round2(l.x), y: round2(l.y), w: round2(l.w), colour: l.colour, who: l.who, whoShown: l.whoShown })),
+        cards: cardRects.map((c) => ({ id: c.id, what: c.what, who: c.who, ago: c.ago, x: round2(c.x), y: round2(c.y), w: round2(c.w), h: round2(c.h) })),
+        chrome: chromeDrawn.slice(),
+        mini: typeof mini !== 'undefined' && mini ? { scale: mini.scale, ox: round2(mini.ox), oy: round2(mini.oy) } : null,
+        offers: [...snapOffers.keys()],
+        held: heldCandidates.slice(),
+      };
+    };
+    let got, want;
+    paintNow = Date.now();
+    try { got = take(false); want = take(true); } finally { paintNow = 0; render(s); }
+    const diffs = [];
+    const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+    for (const k of ['reading', 'status', 'standing', 'panel', 'chips', 'labels', 'cards', 'chrome', 'mini', 'offers', 'held']) {
+      if (!same(got[k], want[k])) diffs.push({ what: 'said differently: ' + k, got: got[k], want: want[k] });
+    }
+    // On screen: the canvas in world units, and a margin for what a stroke's
+    // width, its halo and a chip's words carry past the box they were given.
+    const a = screenToWorld(0, 0), b = screenToWorld(innerWidth, innerHeight), m = wpx(120);
+    const vp = { minX: a.x - m, minY: a.y - m, maxX: b.x + m, maxY: b.y + m };
+    const onScreen = (op) => op.moved || !op.box ||
+      (op.box.maxX >= vp.minX && op.box.minX <= vp.maxX && op.box.maxY >= vp.minY && op.box.minY <= vp.maxY) ||
+      (op.clean && op.clean.maxX >= vp.minX && op.clean.minX <= vp.maxX && op.clean.maxY >= vp.minY && op.clean.minY <= vp.maxY);
+    const key = (op) => JSON.stringify(op);
+    const wantKeys = new Set(want.ops.map(key)), gotKeys = new Set(got.ops.map(key));
+    for (const op of got.ops) if (!wantKeys.has(key(op))) diffs.push({ what: 'drawn, and the whole-board read draws it otherwise or not at all', op: op });
+    for (const op of want.ops) if (!gotKeys.has(key(op)) && onScreen(op)) diffs.push({ what: 'on screen, and not drawn', op: op });
+    return { ok: diffs.length === 0, diffs: diffs, ops: got.ops.length, of: want.ops.length, marks: s.contentIds.length };
   }
 
 // ===== field (the reader) =====
@@ -7960,6 +8066,7 @@
       if (!b) continue;
       const x = ox + b.minX * scale, y = oy + b.minY * scale;
       const bw = Math.max(1.5, (b.maxX - b.minX) * scale), bh = Math.max(1.5, (b.maxY - b.minY) * scale);
+      if (paintOps) recordOp({ kind: 'mini', id: id, box: boxOfRect(x, y, bw, bh), moved: true });
       if (s.artifacts.includes(id)) { g.strokeStyle = 'rgba(' + C.goldRGB + ',0.8)'; g.lineWidth = 1; g.strokeRect(x + 0.5, y + 0.5, bw, bh); }
       else { g.fillStyle = s.explanations.includes(id) ? 'rgba(' + C.goldRGB + ',0.35)' : C.inkFaint; g.fillRect(x, y, bw, bh); }
     }
@@ -8021,6 +8128,10 @@
     working: () => [...working.keys()],
     // A hand's word on its own ink, for tests: where the last paint drew each label, and a mark's ink colour.
     labelsDrawn: () => labelsDrawn.map((l) => Object.assign({}, l)),
+    // What the last paint drew under the inspected mark, and the check that a hand's paint draws and says what the whole-board read would (R4c).
+    readingDrawn: () => (readingDrawn ? Object.assign({}, readingDrawn) : null), paintCheck: paintCheck,
+    // Point at a mark the way a hover does, for tests: it is inspected, its reading drawn under it and its ladder in the panel.
+    inspect: (id) => { hoverId = id || null; render(state); },
     colourOf: (id) => { const n = session.getState().nodes.get(id); return n ? colourOf(n) : null; },
     // The colour the last paint stroked a mark's ink in — inside an artifact too, where each mark keeps its drawer's (L2f).
     inkDrawn: (id) => inkDrawn.get(id) || null,
