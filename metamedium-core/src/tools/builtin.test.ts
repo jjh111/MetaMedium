@@ -209,3 +209,65 @@ describe('taking a built-in offer writes events carrying the tool', () => {
     expect(s.getEvents()[s.getEvents().length - 1]).toMatchObject({ type: 'code', kind: 'html', tool: 'structure' });
   });
 });
+
+// PLAN-USER-SURFACE U1d (audit row 5): an offer with no relation to what is held is noise that
+// hides the ones that matter. Read as writing stays for ink the shape rung could not place for
+// sure — the point of v10 F5, John's h read as an arc — and Show it in 3D for what its tool
+// builds: circles joined by lines.
+describe('offers relevant or absent', () => {
+  // A hand's h, in one stroke: down the stem, back up half way, over the shoulder and down.
+  const h = (x: number, y: number): Point[] => [
+    ...line({ x, y }, { x, y: y + 60 }, 20),
+    ...line({ x, y: y + 60 }, { x, y: y + 32 }, 10).slice(1),
+    ...Array.from({ length: 14 }, (_, i) => { const a = Math.PI + (i / 13) * Math.PI; return { x: x + 11 + 11 * Math.cos(a), y: y + 34 + 9 * Math.sin(a) }; }).slice(1),
+    ...line({ x: x + 22, y: y + 34 }, { x: x + 22, y: y + 60 }, 10).slice(1),
+  ];
+
+  it('a box, a line and a circle: nothing offers to read them as writing, nor to stand them in 3D — a box is no sphere', () => {
+    const s = createSession();
+    const ids = [draw(s, rect(200, 200, 120, 80)), draw(s, line({ x: 320, y: 240 }, { x: 420, y: 240 }, 30)), draw(s, circle(460, 240, 40))];
+    hold(s, ids);
+    const k = keys(ranked(s));
+    expect(k).not.toContain('read-any');
+    expect(k).not.toContain('3d');
+    expect(k).toContain('what');
+  });
+
+  it('two boxes joined by a line are a graph, but no molecule: no 3D', () => {
+    const s = createSession();
+    const ids = [draw(s, rect(200, 200, 120, 80)), draw(s, line({ x: 322, y: 240 }, { x: 478, y: 240 }, 30)), draw(s, rect(480, 200, 120, 80))];
+    hold(s, ids);
+    expect(keys(ranked(s))).not.toContain('3d');
+    // …nor with an arrow between them, a flowchart's flow.
+    const t = createSession();
+    const arrow = [...line({ x: 322, y: 240 }, { x: 476, y: 240 }, 30), ...line({ x: 476, y: 240 }, { x: 460, y: 228 }, 8).slice(1)];
+    hold(t, [draw(t, rect(200, 200, 120, 80)), draw(t, arrow), draw(t, rect(480, 200, 120, 80))]);
+    expect(keys(ranked(t))).not.toContain('3d');
+  });
+
+  it('a graph whose nodes are not all circles — one atom drawn as a box — is not stood in 3D', () => {
+    const s = createSession();
+    const ids = [draw(s, circle(300, 300, 40)), draw(s, circle(500, 300, 40)), draw(s, rect(360, 420, 80, 80)),
+      draw(s, line({ x: 340, y: 300 }, { x: 460, y: 300 }, 30)), draw(s, line({ x: 328, y: 328 }, { x: 372, y: 422 }, 30))];
+    hold(s, ids);
+    const scope = toolScope(s, { host: HOST });
+    expect(scope.reading.genre.genre).toBe('graph');
+    expect(keys(ranked(s))).not.toContain('3d');
+  });
+
+  it('a molecule stands in 3D, and is not offered as writing', () => {
+    const s = createSession();
+    hold(s, molecule(s, 0));
+    const k = keys(ranked(s));
+    expect(k).toContain('3d');
+    expect(k).not.toContain('read-any');
+  });
+
+  it('ink the rung could not place for sure is still offered to read as writing (v10 F5)', () => {
+    const s = createSession();
+    const id = draw(s, h(300, 300));
+    hold(s, [id, draw(s, rect(360, 290, 60, 70))]);
+    const k = keys(ranked(s));
+    expect(k).toContain('read-any');
+  });
+});
