@@ -368,4 +368,57 @@ describe('live logs', () => {
     await expect(store.read('a.md')).rejects.toThrow(/no files/);
     await expect(store.write('a.md', '#')).rejects.toThrow(/read-only/);
   });
+
+  // V1-PLAN J4: a page offers Claude Code as the model it can ask while a hand
+  // that answers briefs at the seat is heard in the room.
+  describe('a hand that answers at the seat says so', () => {
+    it('on every line of its own — a hello, an append, a whole log, a beat, a goodbye — and presence says it', async () => {
+      const w = wire();
+      const hand = new LiveStore(w.transport as any, 'claude~c1', 'claude', { seat: true });
+      hand.hello();
+      await hand.appendLog('claude~c1', eventsOf((s) => s.addStroke(rectStroke(100, 100, 200, 120), 1000)));
+      hand.here();
+      await hand.publish([]);
+      hand.close();
+      const own = w.sent.filter((l) => l.participant === 'claude~c1');
+      expect(own.length).toBe(5);
+      expect(own.every((l) => l.seat === true)).toBe(true);
+
+      const hub = new LocalHub();
+      const page = new LiveStore(hub.connect(), 'john~j1', 'claude');
+      const claude = new LiveStore(hub.connect(), 'claude~c1', 'claude', { seat: true });
+      const other = new LiveStore(hub.connect(), 'fern~f1', 'claude');
+      claude.hello();
+      other.hello();
+      await tick(); await tick();
+      const seen = Object.fromEntries(page.presence().map((p) => [p.participant, !!p.seat]));
+      expect(seen).toEqual({ 'claude~c1': true, 'fern~f1': false });
+      // A goodbye takes it out of the room, seat and all.
+      claude.close();
+      await tick();
+      expect(page.presence().map((p) => p.participant)).toEqual(['fern~f1']);
+    });
+
+    it('a copy handed on says nothing of its writer: presence is the sender\'s', async () => {
+      const w = wire();
+      const page = new LiveStore(w.transport as any, 'john~j1', 'claude');
+      w.deliver({ participant: 'claude~c1', events: [], at: 1000, full: true, via: 'fern~f1', seat: true });
+      expect(page.presence().map((p) => [p.participant, !!p.seat])).toEqual([['fern~f1', false]]);
+    });
+
+    it('a beat moves no revision and changes no log — a quiet hand is still heard', async () => {
+      const hub = new LocalHub();
+      const page = new LiveStore(hub.connect(), 'john~j1', 'claude');
+      const claude = new LiveStore(hub.connect(), 'claude~c1', 'claude', { seat: true });
+      await claude.appendLog('claude~c1', eventsOf((s) => s.addStroke(rectStroke(100, 100, 200, 120), 1000)));
+      await tick();
+      const rev = page.revision();
+      const held = (await page.readLogs())['claude~c1'].length;
+      claude.here();
+      await tick();
+      expect(page.revision()).toBe(rev);
+      expect((await page.readLogs())['claude~c1'].length).toBe(held);
+      expect(page.presence().find((p) => p.participant === 'claude~c1')?.seat).toBe(true);
+    });
+  });
 });

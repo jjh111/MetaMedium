@@ -755,6 +755,28 @@ export type { Transport, AgentOptions } from './participants/agent';
 export { createBridgeParticipant } from './participants/bridge';
 export type { BridgeParticipant, BridgeRequest, BridgeOptions } from './participants/bridge';
 
+// The seat (V1-PLAN J4): Claude Code, over MCP, as a model — every question
+// parked in the room as a brief, answered by the hand, paired by the brief's
+// own node id.
+export {
+  createSeatParticipant,
+  seatBriefs,
+  pendingBriefs,
+  isSeatTraffic,
+  refusalOf,
+  seatReplyText,
+  briefText,
+  readBriefText,
+  askedLine,
+  askOf,
+  SEAT_QUESTION,
+  SEAT_NAME,
+  SEAT_WAIT_MS,
+  SEAT_RULE,
+  SEAT_PICTURE,
+} from './participants/seat';
+export type { SeatParticipant, SeatOptions, SeatBrief, SeatReply, SeatAsk, SeatChange, ParkedSeatBrief } from './participants/seat';
+
 // The decision seat (tier 1.5) — typed questions in, a typed value out, behind
 // an injected transport. No vendor, no network: a seat, not a dependency.
 export {

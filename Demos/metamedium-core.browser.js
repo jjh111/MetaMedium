@@ -168,6 +168,11 @@ var MetaMediumCore = (() => {
     RIGHT_ANGLE_TOLERANCE: () => RIGHT_ANGLE_TOLERANCE,
     ROLES: () => ROLES,
     ReadOnlyError: () => ReadOnlyError,
+    SEAT_NAME: () => SEAT_NAME,
+    SEAT_PICTURE: () => SEAT_PICTURE,
+    SEAT_QUESTION: () => SEAT_QUESTION,
+    SEAT_RULE: () => SEAT_RULE,
+    SEAT_WAIT_MS: () => SEAT_WAIT_MS,
     SEND_WAIT_MS: () => SEND_WAIT_MS,
     SEQUENCE: () => SEQUENCE,
     SEQUENCE_READER: () => SEQUENCE_READER,
@@ -218,6 +223,8 @@ var MetaMediumCore = (() => {
     arithmetic: () => arithmetic,
     arrowPoints: () => arrowPoints,
     artifactsIn: () => artifactsIn,
+    askOf: () => askOf,
+    askedLine: () => askedLine,
     assignRoles: () => assignRoles,
     attachNumber: () => attachNumber,
     attachedNumberIds: () => attachedNumberIds,
@@ -239,6 +246,7 @@ var MetaMediumCore = (() => {
     boundsContain: () => boundsContain,
     boundsOf: () => boundsOf,
     boundsOverlap: () => boundsOverlap,
+    briefText: () => briefText,
     buildGraph3D: () => buildGraph3D,
     buildGraphScaffold: () => buildGraphScaffold,
     buildScaffold: () => buildScaffold,
@@ -281,6 +289,7 @@ var MetaMediumCore = (() => {
     createDecideParticipant: () => createDecideParticipant,
     createExplanationNode: () => createExplanationNode,
     createParticipantNode: () => createParticipantNode,
+    createSeatParticipant: () => createSeatParticipant,
     createSession: () => createSession,
     createStubDecideTransport: () => createStubDecideTransport,
     dashedHeads: () => dashedHeads,
@@ -395,6 +404,7 @@ var MetaMediumCore = (() => {
     isPackDefinition: () => isPackDefinition,
     isParticipant: () => isParticipant,
     isRange: () => isRange,
+    isSeatTraffic: () => isSeatTraffic,
     isSpecific: () => isSpecific,
     isStrokeClosed: () => isStrokeClosed,
     isTestPack: () => isTestPack,
@@ -491,6 +501,7 @@ var MetaMediumCore = (() => {
     parseShapes: () => parseShapes,
     parseTranscripts: () => parseTranscripts,
     participantOfLog: () => participantOfLog,
+    pendingBriefs: () => pendingBriefs,
     placed: () => placed,
     placementOf: () => placementOf,
     planFor: () => planFor,
@@ -507,6 +518,7 @@ var MetaMediumCore = (() => {
     rankOffers: () => rankOffers,
     ranked: () => ranked,
     reachAround: () => reachAround,
+    readBriefText: () => readBriefText,
     readClassDiagramText: () => readClassDiagramText,
     readDrawing: () => readDrawing,
     readFlowchart: () => readFlowchart,
@@ -520,6 +532,7 @@ var MetaMediumCore = (() => {
     readingsFor: () => readingsFor,
     readingsToEdges: () => readingsToEdges,
     reasonOf: () => reasonOf,
+    refusalOf: () => refusalOf,
     regionAt: () => regionAt,
     regionIdsIn: () => regionIdsIn,
     regionsOf: () => regionsOf,
@@ -550,6 +563,8 @@ var MetaMediumCore = (() => {
     scopeOf: () => scopeOf,
     score: () => score,
     scratchedOut: () => scratchedOut,
+    seatBriefs: () => seatBriefs,
+    seatReplyText: () => seatReplyText,
     seedOf: () => seedOf,
     seeded: () => seeded,
     segmentsIntersect: () => segmentsIntersect,
@@ -9525,6 +9540,8 @@ ${p.svg}</section>`),
       this.fromCopy = /* @__PURE__ */ new Map();
       /** Writers that said goodbye and have not been heard since. */
       this.gone = /* @__PURE__ */ new Set();
+      /** Hands heard saying they answer briefs parked at the seat (`LiveLine.seat`). */
+      this.seats = /* @__PURE__ */ new Set();
       /** Copies waiting to be handed on, should their writers not answer. */
       this.waiting = /* @__PURE__ */ new Set();
       this.closed = false;
@@ -9538,6 +9555,7 @@ ${p.svg}</section>`),
       this.listeners = [];
       this.sitting = opts.sitting || sittingToken(8);
       this.later = opts.later || timer;
+      this.seat = !!opts.seat;
       this.logs[me] = [];
       this.off = transport.onMessage((line) => this.receive(line));
     }
@@ -9634,9 +9652,19 @@ ${p.svg}</section>`),
     hello() {
       void this.post({ participant: this.me, events: [], at: this.stamp(), hello: true, sid: this.sitting });
     }
-    /** Every hand heard from, and when. */
+    /**
+     * Say this hand is here, and nothing else: a line with no events, which
+     * changes no log and moves no revision anywhere, so no hand merges or
+     * repaints for it. A hand that keeps quiet for long spells — the MCP hand,
+     * waiting for a brief — sends one now and then, so that "heard in the last
+     * minute" stays true for as long as it is in the room.
+     */
+    here() {
+      void this.post({ participant: this.me, events: [], at: this.stamp(), sid: this.sitting });
+    }
+    /** Every hand heard from, and when — and whether it answers briefs parked at the seat. */
     presence() {
-      return [...this.seen.entries()].map(([participant, at]) => ({ participant, at })).sort((a, b) => b.at - a.at);
+      return [...this.seen.entries()].map(([participant, at]) => this.seats.has(participant) ? { participant, at, seat: true } : { participant, at }).sort((a, b) => b.at - a.at);
     }
     /**
      * Names heard from two hands at once — two sittings writing under one name,
@@ -9715,6 +9743,7 @@ ${p.svg}</section>`),
      * A line that fails is gone — the next whole log carries what it held.
      */
     post(line) {
+      if (this.seat && line.participant === this.me && !line.via) line.seat = true;
       const go = () => {
         let r;
         try {
@@ -9824,6 +9853,7 @@ ${p.svg}</section>`),
       }
       this.heard++;
       if (from !== this.me) this.seen.set(from, Date.now());
+      if (!line.via && line.seat === true) this.seats.add(line.participant);
       if (sid) {
         const known2 = this.sittings.get(line.participant);
         if (known2 === void 0) this.sittings.set(line.participant, sid);
@@ -9837,6 +9867,7 @@ ${p.svg}</section>`),
         if (!line.via) {
           this.gone.add(line.participant);
           this.seen.delete(line.participant);
+          this.seats.delete(line.participant);
         }
         this.notify(line.participant, []);
         return;
@@ -24226,6 +24257,292 @@ The canvas already read: ${describeBehaviour({ terms: local.terms })}. Read the 
       subscribe(listener) {
         listeners2.add(listener);
         return () => listeners2.delete(listener);
+      }
+    };
+  }
+
+  // src/participants/seat.ts
+  var SEAT_QUESTION = "brief";
+  var SEAT_NAME = "Claude Code (MCP hand)";
+  var SEAT_WAIT_MS = 6e5;
+  var SEAT_RULE = "\n\n----\n\n";
+  var SEAT_PICTURE = "[the ink of the marks this brief is about, as one picture \u2014 the hand that answers renders it from the board]";
+  var ASKED = {
+    what: "what is this",
+    read: "read the writing",
+    ask: "ask",
+    build: "build",
+    program: "program",
+    draw: "draw",
+    behave: "behave"
+  };
+  function askedLine(ask, words) {
+    const w2 = String(words ?? "").replace(/\s+/g, " ").trim();
+    if (ask === "what" || ask === "read" || !w2) return ASKED[ask];
+    return `${ASKED[ask]}: ${w2}`;
+  }
+  function askOf(asked) {
+    const a = String(asked ?? "").trim();
+    if (a === ASKED.what) return "what";
+    if (a === ASKED.read) return "read";
+    const m = /^(ask|build|program|draw|behave)(?::|$)/.exec(a);
+    return m ? m[1] : null;
+  }
+  function briefText(p) {
+    return `${p.asked}${SEAT_RULE}${p.system}${SEAT_RULE}${p.user}`;
+  }
+  function readBriefText(text) {
+    const parts = String(text ?? "").split(SEAT_RULE);
+    if (parts.length >= 3 && !parts[0].includes("\n")) return { asked: parts[0], contract: parts[1], brief: parts.slice(2).join(SEAT_RULE) };
+    if (parts.length >= 2) return { asked: "", contract: parts[0], brief: parts.slice(1).join(SEAT_RULE) };
+    return { asked: "", contract: "", brief: parts[0] };
+  }
+  function refusalOf(text) {
+    const t = String(text ?? "").trim();
+    if (!t.startsWith("{")) return null;
+    try {
+      const parsed = JSON.parse(t);
+      return typeof parsed.refuse === "string" && parsed.refuse.trim() ? parsed.refuse.trim() : null;
+    } catch {
+      return null;
+    }
+  }
+  function seatReplyText(p) {
+    const refuse = p.refuse === void 0 || p.refuse === null ? "" : String(p.refuse).trim();
+    if (refuse) return { text: JSON.stringify({ refuse }) };
+    if (typeof p.reply === "string") return p.reply.trim() ? { text: p.reply } : { error: "an empty reply" };
+    if (p.reply !== void 0 && p.reply !== null && typeof p.reply === "object") return { text: JSON.stringify(p.reply) };
+    return { error: 'an answer is "reply" (what the contract asks for) or "refuse" (one clause saying why)' };
+  }
+  function makerOf(node, nodes) {
+    const e = node.edges.find((x) => x.rel === "made-by");
+    if (!e) return { from: "", who: "someone" };
+    if (e.to === LOCAL_PARTICIPANT) return { from: e.to, who: "me" };
+    const p = nodes.get(e.to);
+    const word = p ? wordOf(p) : void 0;
+    return { from: e.to, who: handLabel(word || e.to.replace(/^participant:hand:/, "")) || "someone" };
+  }
+  function seatBriefs(state) {
+    const briefs = [];
+    const replies = /* @__PURE__ */ new Map();
+    for (const id of state.explanations) {
+      const node = state.nodes.get(id);
+      if (!node) continue;
+      const data = explanationOf(node);
+      if (!data) continue;
+      const erased = !!getRep(node, "erased");
+      const question = String(data.question ?? "");
+      const text = String(data.text ?? "");
+      const maker = makerOf(node, state.nodes);
+      if (question === SEAT_QUESTION) {
+        const read2 = readBriefText(text);
+        briefs.push({
+          key: id,
+          asked: read2.asked,
+          ask: askOf(read2.asked),
+          contract: read2.contract,
+          brief: read2.brief,
+          about: aboutIdsOf(node),
+          from: maker.from,
+          who: maker.who,
+          at: node.createdAt,
+          withdrawn: erased,
+          reply: null
+        });
+        continue;
+      }
+      if (erased || replies.has(question)) continue;
+      replies.set(question, { id, text, from: maker.from, who: maker.who, at: node.createdAt, refused: refusalOf(text) });
+    }
+    for (const b of briefs) b.reply = replies.get(b.key) ?? null;
+    return briefs;
+  }
+  function pendingBriefs(state) {
+    return seatBriefs(state).filter((b) => !b.withdrawn && !b.reply);
+  }
+  function isSeatTraffic(node, nodes) {
+    const data = explanationOf(node);
+    if (!data) return false;
+    const question = String(data.question ?? "");
+    if (question === SEAT_QUESTION) return true;
+    const asked = nodes.get(question);
+    if (asked) {
+      const d = explanationOf(asked);
+      return !!d && d.question === SEAT_QUESTION;
+    }
+    return question.startsWith("explanation:");
+  }
+  function forTheHand(content) {
+    return typeof content === "string" ? content : content.map((p) => p.type === "text" ? p.text : SEAT_PICTURE).join("\n");
+  }
+  function createSeatParticipant(session, at = 0, options = {}) {
+    const name = options.name ?? SEAT_NAME;
+    const timeoutMs = options.timeoutMs ?? SEAT_WAIT_MS;
+    const parker = options.participantId ?? LOCAL_PARTICIPANT;
+    const now = options.now ?? (() => Date.now());
+    const config = {
+      kind: "openai-compatible",
+      // The relay IS where the question goes, so it is the seat's base URL — and
+      // a relay on this machine reads as local, which is true.
+      baseUrl: options.baseUrl ?? "http://127.0.0.1:8020",
+      model: name,
+      label: name,
+      vision: true
+    };
+    const waiting = /* @__PURE__ */ new Map();
+    let asking = null;
+    let left = false;
+    let off = null;
+    const changed2 = (kind, w2, detail) => {
+      const brief = { key: w2.key, asked: w2.asked, ask: w2.ask, about: w2.about.slice(), at: w2.at };
+      options.onChange?.(detail === void 0 ? { kind, brief, signalled: w2.signalled } : { kind, brief, signalled: w2.signalled, detail });
+    };
+    const done = (w2) => {
+      if (waiting.get(w2.key) !== w2) return false;
+      waiting.delete(w2.key);
+      w2.cancelTimer();
+      w2.offSignal();
+      if (left && !waiting.size && off) {
+        off();
+        off = null;
+      }
+      return true;
+    };
+    const takeBack = (w2) => {
+      const node = session.getState().nodes.get(w2.key);
+      if (!node || getRep(node, "erased")) return;
+      const act = session.lastAct();
+      const last = act.length === 1 ? act[0] : null;
+      if (last && last.type === "answer" && last.question === SEAT_QUESTION && last.at === w2.at && last.text === w2.text) session.undo();
+      else session.erase(w2.key, now());
+    };
+    const giveUp = (w2, kind, why) => {
+      if (!done(w2)) return;
+      takeBack(w2);
+      changed2(kind, w2, why);
+      w2.resolve({ ok: false, error: why });
+    };
+    const check2 = () => {
+      if (!waiting.size) return;
+      const s = session.getState();
+      let briefs = null;
+      for (const w2 of [...waiting.values()]) {
+        const node = s.nodes.get(w2.key);
+        if (!node) {
+          if (!done(w2)) continue;
+          const why = "the brief is no longer on the board \u2014 taken back, or the board was left \u2014 before a hand answered it";
+          changed2("gone", w2, why);
+          w2.resolve({ ok: false, error: why });
+          continue;
+        }
+        if (getRep(node, "erased")) {
+          if (!done(w2)) continue;
+          const why = "the brief was withdrawn before a hand answered it";
+          changed2("withdrawn", w2, why);
+          w2.resolve({ ok: false, error: why });
+          continue;
+        }
+        briefs ??= new Map(seatBriefs(s).map((b) => [b.key, b]));
+        const reply = briefs.get(w2.key)?.reply;
+        if (!reply || !done(w2)) continue;
+        if (reply.refused !== null) {
+          const why = `${reply.who} would not: ${reply.refused}`;
+          changed2("refused", w2, why);
+          w2.resolve({ ok: false, error: why });
+        } else {
+          changed2("answered", w2);
+          w2.resolve({ ok: true, text: reply.text, model: name });
+        }
+      }
+    };
+    off = session.subscribe(check2);
+    const transport = (_config, messages, opts) => {
+      const call = asking;
+      asking = null;
+      if (!call) return Promise.resolve({ ok: false, error: `${name} was asked by a call that did not say what it is about` });
+      const refused = options.canPark?.() ?? null;
+      if (refused) return Promise.resolve({ ok: false, error: refused });
+      if (opts.signal?.aborted) return Promise.resolve({ ok: false, error: "stopped" });
+      const asked = askedLine(call.ask, call.words);
+      const text = briefText({
+        asked,
+        system: textOf3(messages.find((m) => m.role === "system")?.content ?? ""),
+        user: forTheHand(messages.find((m) => m.role === "user")?.content ?? "")
+      });
+      const t = now();
+      const key2 = session.answer({ participantId: parker, question: SEAT_QUESTION, text, aboutIds: call.about, at: t });
+      if (!key2) return Promise.resolve({ ok: false, error: "nothing the brief was about is on the board \u2014 nothing was parked" });
+      const node = session.getState().nodes.get(key2);
+      return new Promise((resolve) => {
+        const w2 = {
+          key: key2,
+          asked,
+          ask: call.ask,
+          about: node ? aboutIdsOf(node) : call.about.slice(),
+          at: t,
+          text,
+          signalled: !!opts.signal,
+          resolve,
+          cancelTimer: () => {
+          },
+          offSignal: () => {
+          }
+        };
+        waiting.set(key2, w2);
+        const timer2 = setTimeout(
+          () => giveUp(w2, "timeout", `no hand in the room answered in ${Math.round(timeoutMs / 1e3)} s \u2014 the brief was withdrawn`),
+          timeoutMs
+        );
+        timer2.unref?.();
+        w2.cancelTimer = () => clearTimeout(timer2);
+        if (opts.signal) {
+          const stop = () => giveUp(w2, "stopped", "stopped");
+          opts.signal.addEventListener("abort", stop, { once: true });
+          w2.offSignal = () => opts.signal.removeEventListener("abort", stop);
+        }
+        changed2("parked", w2);
+      });
+    };
+    const agent = createAgentParticipant(session, config, at, { transport, name, tier: 2, locality: providerLocality(config) });
+    function via(call, run2) {
+      asking = call;
+      try {
+        return run2();
+      } finally {
+        asking = null;
+      }
+    }
+    const alive = (ids) => {
+      const s = session.getState();
+      return ids.filter((id) => s.nodes.has(id));
+    };
+    const everything = () => {
+      const s = session.getState();
+      return s.contentIds.filter((id) => !s.artifacts.includes(id));
+    };
+    return {
+      ...agent,
+      interpret: (nodeIds, t, signal) => via({ ask: "what", about: alive(nodeIds) }, () => agent.interpret(nodeIds, t, signal)),
+      ask: (question, nodeIds, t, signal) => via({ ask: "ask", about: alive(nodeIds), words: question }, () => agent.ask(question, nodeIds, t, signal)),
+      // A line read as one image names every mark in the picture (`about`); one mark names itself.
+      read: (args) => via({ ask: "read", about: alive(args.about && args.about.length ? args.about : [args.nodeId]) }, () => agent.read(args)),
+      generate: (args) => via({ ask: "build", about: alive([args.artifactId]), words: args.prompt }, () => agent.generate(args)),
+      program: (args) => via({ ask: "program", about: alive([args.artifactId]), words: args.prompt }, () => agent.program(args)),
+      draw: (args) => via({ ask: "draw", about: alive(args.nodeIds && args.nodeIds.length ? args.nodeIds : everything()), words: args.prompt }, () => agent.draw(args)),
+      behave: (args) => via({ ask: "behave", about: alive([args.nodeId]), words: args.words }, () => agent.behave(args)),
+      waiting: () => [...waiting.values()].sort((a, b) => a.at - b.at).map((w2) => ({ key: w2.key, asked: w2.asked, ask: w2.ask, about: w2.about.slice(), at: w2.at })),
+      cancel: (key2, why) => {
+        const w2 = waiting.get(key2);
+        if (!w2) return false;
+        giveUp(w2, "withdrawn", why ?? "withdrawn");
+        return true;
+      },
+      leave: () => {
+        left = true;
+        if (!waiting.size && off) {
+          off();
+          off = null;
+        }
       }
     };
   }

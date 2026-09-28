@@ -78,6 +78,13 @@ export interface LiveLine {
    * hold a copy do.
    */
   bye?: boolean;
+  /**
+   * The writer answers briefs parked at the seat (V1-PLAN J4): a Claude Code
+   * hand, which a page offers as the model it can ask while it is heard. Said
+   * on every line such a hand writes about itself; a copy handed on (`via`)
+   * never carries it, because presence is the sender's.
+   */
+  seat?: boolean;
 }
 
 /**
@@ -117,6 +124,8 @@ export interface LiveStoreOptions {
    * A timer by default; a test passes its own clock.
    */
   later?: (fn: () => void, ms: number) => () => void;
+  /** This hand answers briefs parked at the seat: every line it writes about itself says so (`LiveLine.seat`). */
+  seat?: boolean;
 }
 
 /** How long a line that has not yet gone holds back the next one. */
@@ -144,6 +153,8 @@ export interface Presence {
   participant: string;
   /** When their last event landed here (their clock, or ours for a hello). */
   at: number;
+  /** It answers briefs parked at the seat (`LiveLine.seat`): a Claude Code hand. */
+  seat?: boolean;
 }
 
 export class LiveStore implements Store {
@@ -175,6 +186,10 @@ export class LiveStore implements Store {
   private fromCopy = new Map<string, number>();
   /** Writers that said goodbye and have not been heard since. */
   private gone = new Set<string>();
+  /** Hands heard saying they answer briefs parked at the seat (`LiveLine.seat`). */
+  private seats = new Set<string>();
+  /** Whether this hand is one (`LiveStoreOptions.seat`). */
+  private readonly seat: boolean;
   /** Copies waiting to be handed on, should their writers not answer. */
   private waiting = new Set<() => void>();
   private closed = false;
@@ -192,6 +207,7 @@ export class LiveStore implements Store {
   constructor(private transport: LiveTransport, readonly me: string, readonly room: string = 'room', opts: LiveStoreOptions = {}) {
     this.sitting = opts.sitting || sittingToken(8);
     this.later = opts.later || timer;
+    this.seat = !!opts.seat;
     this.logs[me] = [];
     this.off = transport.onMessage((line) => this.receive(line));
   }
@@ -293,9 +309,22 @@ export class LiveStore implements Store {
     void this.post({ participant: this.me, events: [], at: this.stamp(), hello: true, sid: this.sitting });
   }
 
-  /** Every hand heard from, and when. */
+  /**
+   * Say this hand is here, and nothing else: a line with no events, which
+   * changes no log and moves no revision anywhere, so no hand merges or
+   * repaints for it. A hand that keeps quiet for long spells — the MCP hand,
+   * waiting for a brief — sends one now and then, so that "heard in the last
+   * minute" stays true for as long as it is in the room.
+   */
+  here(): void {
+    void this.post({ participant: this.me, events: [], at: this.stamp(), sid: this.sitting });
+  }
+
+  /** Every hand heard from, and when — and whether it answers briefs parked at the seat. */
   presence(): Presence[] {
-    return [...this.seen.entries()].map(([participant, at]) => ({ participant, at })).sort((a, b) => b.at - a.at);
+    return [...this.seen.entries()]
+      .map(([participant, at]) => (this.seats.has(participant) ? { participant, at, seat: true } : { participant, at }))
+      .sort((a, b) => b.at - a.at);
   }
 
   /**
@@ -380,6 +409,8 @@ export class LiveStore implements Store {
    * A line that fails is gone — the next whole log carries what it held.
    */
   private post(line: LiveLine): Promise<void> {
+    // A seat's hand says so on every line of its own — never on a copy it hands on.
+    if (this.seat && line.participant === this.me && !line.via) line.seat = true;
     const go = (): Promise<void> | undefined => {
       let r: unknown;
       try { r = this.transport.send(line); } catch { return undefined; }
@@ -498,6 +529,8 @@ export class LiveStore implements Store {
     }
     this.heard++;
     if (from !== this.me) this.seen.set(from, Date.now());
+    // A hand that answers briefs at the seat, said by itself — a copy handed on says nothing of its writer.
+    if (!line.via && line.seat === true) this.seats.add(line.participant);
     if (sid) {
       const known = this.sittings.get(line.participant);
       if (known === undefined) this.sittings.set(line.participant, sid);
@@ -515,6 +548,7 @@ export class LiveStore implements Store {
       if (!line.via) {
         this.gone.add(line.participant);
         this.seen.delete(line.participant);
+        this.seats.delete(line.participant);
       }
       this.notify(line.participant, []);
       return;
