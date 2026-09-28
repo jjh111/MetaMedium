@@ -37,6 +37,8 @@
 //   P9   the mouse is untouched: it draws, its points carry no pressure, its hover no ghost
 //   P10  the board saved, the page reloaded: every stroke back with its pressure, the
 //        preference kept, the switch not said again
+//   P11  the pen drags a handle of the one selected mark (V1-PLAN E1): one reshape, no
+//        stroke and no summon; a finger on a handle, with a pen present, pans and takes none
 
 import { sleep, waitReady } from './keep.mjs';
 
@@ -560,6 +562,54 @@ export async function runPencil(browser, servers, { freshContext, screenshot }) 
       check(`P10. saved and reloaded: all ${back.n} events back (${saved.n} saved), every stroke with the pressure it was drawn with (${pens} pen strokes); the hand tile still says ${face}, and a pencil near the glass again is not announced twice`,
         back.n === saved.n && JSON.stringify(back.strokes) === JSON.stringify(saved.strokes) && pens >= 5 && face === 'right · pen' && !/it draws now/.test(said),
         { saved: saved.n, back: back.n, pens, face, said });
+    });
+
+    // ---- P11. The pen drags a handle; a finger never does ----
+    await record('P11', async () => {
+      await page.evaluate(() => { window.__mm.session.load([]); window.__mm.setView(1, 0, 0); });
+      await sleep(PAST_PALM_MS);
+      const HB = { x: 500, y: 260, w: 240, h: 160 };
+      const pts = boxPath(HB, 8);
+      await page.evaluate(({ pts, ps }) => window.__hand.penStroke(pts, ps), { pts, ps: pressures(pts.length) });
+      await sleep(60);
+      // Held alone: its own points are drawn on the selection.
+      const held = await page.evaluate(() => {
+        const mm = window.__mm, s = mm.session.getState();
+        const id = s.contentIds[s.contentIds.length - 1];
+        mm.session.select([id], Date.now());
+        const n = mm.session.getState().nodes.get(id);
+        const hs = mm.MM.handlesOf(n, mm.session.getState().nodes);
+        const at = (k, i) => { const h = hs.find((x) => x.kind === k && x.index === i); return h ? mm.worldToScreen(h.point.x, h.point.y) : null; };
+        return { id, corner2: at('corner', 2), corner0: at('corner', 0), drawn: mm.handlesDrawn().length, ink: JSON.stringify(mm.MM.strokePointsOf(n)) };
+      });
+      await sleep(PAST_PALM_MS);
+      const before = await page.evaluate(boardNow);
+      await page.evaluate(({ from }) => {
+        const h = window.__hand;
+        h.penDown(from.x, from.y, 0.5);
+        for (let i = 1; i <= 8; i++) h.penMove(from.x + (50 * i) / 8, from.y + (40 * i) / 8, 0.5);
+        h.penUp(from.x + 50, from.y + 40);
+      }, { from: held.corner2 });
+      await sleep(80);
+      const after = await page.evaluate(boardNow);
+      const pen = await page.evaluate(({ id, n }) => {
+        const mm = window.__mm, node = mm.session.getState().nodes.get(id);
+        const clean = mm.MM.cleanPointsOf(node);
+        return { events: mm.session.getEvents().slice(n).map((e) => e.type), corner2: clean ? mm.worldToScreen(clean[2].x, clean[2].y) : null, ink: JSON.stringify(mm.MM.strokePointsOf(node)), selection: mm.session.getState().selection.length };
+      }, { id: held.id, n: before.events });
+      const landed = !!pen.corner2 && Math.hypot(pen.corner2.x - (held.corner2.x + 50), pen.corner2.y - (held.corner2.y + 40)) < 0.5;
+      // A finger, with the pen present and past the palm's window, laid on the box's other corner: it pans.
+      await sleep(PAST_PALM_MS);
+      const f0 = await page.evaluate(boardNow);
+      await page.evaluate(({ from }) => window.__hand.touchDrag(11, from, { x: from.x - 60, y: from.y - 30 }, 10), { from: held.corner0 });
+      await sleep(80);
+      const f1 = await page.evaluate(boardNow);
+      const dx = +(f1.view.panX - f0.view.panX).toFixed(2), dy = +(f1.view.panY - f0.view.panY).toFixed(2);
+      check(`P11. the pen takes a handle: the box held alone shows its ${held.drawn} points, and the pen dragging its corner writes ${pen.events.join(', ') || 'nothing'} — the clean corner where the pen let go, the ink as drawn, no stroke, no summon; a finger laid on the other corner pans the view ${dx}, ${dy} and writes ${f1.events - f0.events} events`,
+        held.drawn === 9 && JSON.stringify(pen.events) === '["reshape"]' && landed && pen.ink === held.ink && after.strokes === before.strokes && !after.summon && pen.selection === 1
+          && dx === -60 && dy === -30 && f1.events === f0.events,
+        { held: { drawn: held.drawn }, pen, before: before.events, after: after.events, finger: { dx, dy, events: f1.events - f0.events } });
+      await page.evaluate(() => window.__mm.setView(1, 0, 0));
     });
   } catch (err) {
     check(`the scenario itself fell over: ${String(err && err.message ? err.message : err).split('\n')[0]}`, false, { stack: String(err && err.stack) });

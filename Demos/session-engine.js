@@ -1451,9 +1451,10 @@
 
 // ===== selection =====
 // Provides: the selection as a thing on the canvas — a soft outline with
-//   handles around what a loop became; hit tests (handleAt); the drag preview
-//   the input applies while a hand moves, scales or rotates; renderSelection.
-// Uses: core (state, session), view (wpx, worldToScreen), render (union), input (drag).
+//   handles around what a loop became, and the one selected mark's own points
+//   (V1-PLAN E1); hit tests (handleAt); the drag preview the input applies
+//   while a hand moves, scales, rotates or reshapes; renderSelection.
+// Uses: core (state, session), view (wpx, worldToScreen), render (union, logKey), input (drag, flash).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () { ... })();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -1463,7 +1464,62 @@
   // a corner to scale, the knob above to turn. None of it is a mode — the
   // next stroke elsewhere dissolves it, a tap dismisses it (and is never a
   // dot), and undoing the dismissal brings it back where it was.
-  let drag = null; // { ids, mode: 'move'|'scale'|'rotate', start, last, about, moved }
+  let drag = null; // { ids, mode: 'move'|'scale'|'rotate'|'reshape', start, last, about, moved } — a reshape's also { id, handle, grab, to, pv }
+
+  // ===== Handles: the one mark's own points (V1-PLAN E1; CONTROL-POINTS-PLAN P2) =====
+  // One mark selected alone, with a clean form — held, or the one it would be
+  // offered — shows its handles: its own sites (core's `handlesOf`, the same
+  // the magnets offer; an arc's ends and bulge), small rings on the selection.
+  // Dragging one previews the reshape — the form as it will be, the ink faint
+  // beneath — and, let go, writes one `reshape`: one act, one undo. A mark
+  // with no clean form shows none.
+  //
+  // WHICH GESTURE OWNS WHICH ZONE. Every handle — the selection's four scale
+  // corners and its knob, and the mark's own points — owns the ground nearer
+  // to it than to any other handle, within a handle's reach; on an exact tie
+  // the selection's own wins. The rest of the outline is the move zone. So a
+  // box's corner, which carries both — its own corner on the ink, the scale
+  // corner on the outline a little way out from it — is split by nearness:
+  // pressed on the box's corner it reshapes, on the outline's corner it
+  // scales. A mark too small on screen for its handles to leave room to move
+  // it (HANDLES_MIN_PX) shows none until the board is zoomed in.
+  const HANDLES_MIN_PX = 48;
+  let handlesDrawn = []; // the last paint's handles, for tests: { kind, index, x, y, reasoning } in world units
+  let handlesAt = { key: null, list: [] };
+
+  /** The handles the selection offers now: the one selected mark's own points, when it has them and stands big enough on screen. */
+  function markHandles(s) {
+    s = s || state;
+    if (s.selection.length !== 1) return [];
+    const key = logKey() + '|' + s.selection[0] + '|' + view.zoom;
+    if (s === state && handlesAt.key === key) return handlesAt.list;
+    const n = s.nodes.get(s.selection[0]);
+    const b = n && MM.boundsOf(n);
+    const list = b && Math.max(b.maxX - b.minX, b.maxY - b.minY) * view.zoom >= HANDLES_MIN_PX ? MM.handlesOf(n, s.nodes) : [];
+    if (s === state) handlesAt = { key: key, list: list };
+    return list;
+  }
+  /** Moves the clean form whole rather than a point of it: drawn with a dot in its ring. */
+  const movesWhole = (h) => h.kind === 'centre' || h.kind === 'point' || (h.kind === 'middle' && h.shape !== 'rectangle');
+  function drawHandle(h, active) {
+    ctx.beginPath();
+    ctx.arc(h.point.x, h.point.y, wpx(active ? 5.5 : 4.5), 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(${C.panelRGB},0.95)`;
+    ctx.fill();
+    ctx.lineWidth = wpx(1.5);
+    ctx.strokeStyle = C.gold;
+    ctx.stroke();
+    if (movesWhole(h)) {
+      ctx.beginPath();
+      ctx.arc(h.point.x, h.point.y, wpx(1.6), 0, Math.PI * 2);
+      ctx.fillStyle = C.gold;
+      ctx.fill();
+    }
+  }
+  /** The mark a reshape drag is showing as it will be, or null: the render draws that one's clean form. */
+  function reshapeShownFor(id) {
+    return drag && drag.mode === 'reshape' && drag.moved && drag.id === id && drag.pv ? drag.pv.node : null;
+  }
 
   function selectionBounds(s) {
     const ids = (s || state).selection.filter((id) => (s || state).nodes.get(id) && MM.boundsOf((s || state).nodes.get(id)));
@@ -1471,9 +1527,10 @@
     return union(ids.map((id) => MM.boundsOf((s || state).nodes.get(id))));
   }
 
-  /** The drag's current transform, as a preview the renderer applies before the log has it. */
+  /** The drag's current transform, as a preview the renderer applies before the log has it. A reshape moves no mark as a whole: its preview is the form. */
   function dragPreview() {
     if (!drag || !drag.moved) return null;
+    if (drag.mode === 'reshape') return { ids: [], kind: 'reshape', id: drag.id, handle: drag.handle, to: drag.to, node: drag.pv ? drag.pv.node : null };
     const dx = drag.last.x - drag.start.x, dy = drag.last.y - drag.start.y;
     if (drag.mode === 'move') return { ids: drag.ids, kind: 'move', dx, dy };
     if (drag.mode === 'scale') {
@@ -1505,22 +1562,36 @@
     };
   }
 
-  /** What is under a world point, as far as the selection is concerned. */
+  /**
+   * What is under a world point, as far as the selection is concerned: the
+   * nearest handle in reach — the selection's scale corners and knob first, so
+   * they win a tie, then the one mark's own points — else the move zone.
+   */
   function handleAt(w) {
     const b = selectionBounds();
     if (!b) return null;
     const h = handles(b), r = HANDLE() * 1.6;
-    for (const k of Object.keys(h.corners)) {
-      const c = h.corners[k];
-      if (Math.hypot(w.x - c.x, w.y - c.y) <= r) return { kind: 'scale', corner: k, at: c, bounds: b };
-    }
-    if (Math.hypot(w.x - h.knob.x, w.y - h.knob.y) <= r) return { kind: 'rotate', bounds: b };
+    let best = null, bestD = Infinity;
+    const offer = (hit, p) => {
+      const d = Math.hypot(w.x - p.x, w.y - p.y);
+      if (d <= r && d < bestD) { best = hit; bestD = d; }
+    };
+    for (const k of Object.keys(h.corners)) offer({ kind: 'scale', corner: k, at: h.corners[k], bounds: b }, h.corners[k]);
+    offer({ kind: 'rotate', bounds: b }, h.knob);
+    for (const mh of markHandles()) offer({ kind: 'reshape', id: mh.nodeId, handle: { kind: mh.kind, index: mh.index }, at: mh.point, bounds: b }, mh.point);
+    if (best) return best;
     const o = h.outline;
     if (w.x >= o.minX && w.x <= o.maxX && w.y >= o.minY && w.y <= o.maxY) return { kind: 'move', bounds: b };
     return null;
   }
 
   function beginDrag(hit, w) {
+    if (hit.kind === 'reshape') {
+      // The handle follows the hand from where it was taken, not from where the pen landed on it.
+      drag = { ids: [], mode: 'reshape', id: hit.id, handle: hit.handle, grab: hit.at, to: hit.at, pv: null, start: w, last: w, moved: false, bounds: hit.bounds };
+      canvas.style.cursor = 'grabbing';
+      return;
+    }
     const b = hit.bounds;
     const centre = { x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2 };
     const opposite = hit.kind === 'scale'
@@ -1534,6 +1605,12 @@
     if (!drag) return;
     drag.last = w;
     if (!drag.moved && Math.hypot(w.x - drag.start.x, w.y - drag.start.y) > wpx(3)) drag.moved = true;
+    if (drag.mode === 'reshape' && drag.moved) {
+      // The form as it will be: the very function the reshape runs, on the board's own state.
+      drag.to = { x: drag.grab.x + (w.x - drag.start.x), y: drag.grab.y + (w.y - drag.start.y) };
+      const n = state.nodes.get(drag.id);
+      drag.pv = n ? MM.reshapePreview(n, state.nodes, drag.handle, drag.to) : null;
+    }
     render(state);
   }
 
@@ -1546,17 +1623,29 @@
     canvas.style.cursor = 'crosshair';
     if (!pv) { render(state); return; }
     const at = Date.now();
+    if (pv.kind === 'reshape') {
+      // One reshape: the form where the hand let go, the ink as it was. A mark
+      // not yet drawn clean is drawn clean by the same act — said, once.
+      const n = state.nodes.get(pv.id);
+      const born = !!n && !MM.cleanOf(n);
+      if (!session.reshape({ id: pv.id, handle: pv.handle, to: pv.to, at })) { render(state); return; }
+      if (born) flash('drawn clean and reshaped — the ink stays beneath; undo takes both back');
+      return;
+    }
     if (pv.kind === 'move') session.move({ ids, dx: pv.dx, dy: pv.dy, at });
     else if (pv.kind === 'scale') session.scale({ ids, about: pv.about, sx: pv.sx, sy: pv.sy, at });
     else session.rotate({ ids, about: pv.about, radians: pv.radians, at });
   }
 
   function renderSelection(s) {
-    const b0 = selectionBounds(s);
+    const pv = dragPreview();
+    // While a handle is dragged the outline follows the form as it will be.
+    const reshaping = !!pv && pv.kind === 'reshape' && !!pv.node;
+    const b0 = reshaping ? MM.boundsOf(pv.node) : selectionBounds(s);
+    handlesDrawn = [];
     if (!b0) return;
     ctx.save();
-    const pv = dragPreview();
-    if (pv) applyPreview(pv);
+    if (pv && pv.kind !== 'reshape') applyPreview(pv);
     const h = handles(b0), o = h.outline;
     ctx.setLineDash([wpx(5), wpx(5)]);
     ctx.strokeStyle = `rgba(${C.goldRGB},0.75)`;
@@ -1569,6 +1658,12 @@
     for (const k of Object.keys(h.corners)) { const c = h.corners[k]; ctx.fillRect(c.x - hs / 2, c.y - hs / 2, hs, hs); }
     ctx.beginPath(); ctx.moveTo(h.knob.x, o.minY); ctx.lineTo(h.knob.x, h.knob.y); ctx.strokeStyle = `rgba(${C.goldRGB},0.6)`; ctx.lineWidth = wpx(1); ctx.stroke();
     ctx.beginPath(); ctx.arc(h.knob.x, h.knob.y, hs * 0.7, 0, Math.PI * 2); ctx.fill();
+    // The one mark's own points, where they are — or will be, while one is dragged.
+    const own = reshaping ? MM.handlesOf(pv.node, s.nodes) : markHandles(s);
+    for (const mh of own) {
+      drawHandle(mh, reshaping && pv.handle.kind === mh.kind && pv.handle.index === mh.index);
+      handlesDrawn.push({ kind: mh.kind, index: mh.index, x: mh.point.x, y: mh.point.y, reasoning: mh.reasoning });
+    }
     ctx.restore();
   }
 
@@ -2235,12 +2330,12 @@
    * every loose mark to every other: 183 ms on 2,000 marks, for one press.
    */
   function heldGroupOf(s, id) {
+    // A mark as the relations read it — where it stands: a reshaped form where the hand set it (E1).
     const markOf = (cid) => {
       const n = s.nodes.get(cid);
       const b = n && MM.boundsOf(n);
       if (!b) return null;
-      const fp = MM.fingerprintOf(n);
-      return { id: cid, bounds: b, points: MM.strokePointsOf(n) || undefined, closed: !!(fp && fp.isClosed) };
+      return { id: cid, bounds: b, points: MM.standingPointsOf(n) || undefined, closed: !!MM.standsClosed(n) };
     };
     const ix = boardIndex();
     const arts = new Set(s.artifacts);
@@ -2270,8 +2365,7 @@
       const n = s.nodes.get(cid);
       const b = n && MM.boundsOf(n);
       if (!b) return null;
-      const fp = MM.fingerprintOf(n);
-      return { id: cid, bounds: b, points: MM.strokePointsOf(n) || undefined, closed: !!(fp && fp.isClosed) };
+      return { id: cid, bounds: b, points: MM.standingPointsOf(n) || undefined, closed: !!MM.standsClosed(n) };
     }).filter(Boolean);
     const whole = MM.clusters(marks, MM.relate(marks));
     const differ = [];
@@ -2318,8 +2412,12 @@
     }
     if (!live) {
       const w = screenToWorld(e.clientX, e.clientY);
-      // Over a playing frame the cursor says the frame is live to the hand.
-      if (!spaceHeld) canvas.style.cursor = pointerFrameAt(w) && !insideWaitingLoop(w) ? 'default' : 'crosshair';
+      // Over a playing frame the cursor says the frame is live to the hand; over one of the
+      // selected mark's own points, that it can be taken hold of (E1).
+      if (!spaceHeld) {
+        const onHandle = state.selection.length === 1 ? handleAt(w) : null;
+        canvas.style.cursor = onHandle && onHandle.kind === 'reshape' ? 'grab' : pointerFrameAt(w) && !insideWaitingLoop(w) ? 'default' : 'crosshair';
+      }
       const over = nodeAt(w.x, w.y);
       if (over !== hoverId) { hoverId = over; render(state); }
       // A pencil near the glass, touching nothing, is a hover: the reading of the mark under it,
@@ -2512,13 +2610,13 @@
     for (const id of s.contentIds) {
       if (id === node.id || s.artifacts.includes(id)) continue;
       const t = s.nodes.get(id);
-      const pts = t && MM.strokePointsOf(t);
+      // Where it stands, as the scratch reads it: a reshaped form where the hand set it (E1).
+      const pts = t && MM.standingPointsOf(t);
       if (!pts) continue;
       // A stroke crosses only an outline whose box its own box meets: the rest are passed over unread (R4c).
       const tb = MM.getBounds(pts);
       if (tb.maxX < sb.minX || tb.minX > sb.maxX || tb.maxY < sb.minY || tb.minY > sb.maxY) continue;
-      const tf = MM.fingerprintOf(t);
-      const outline = MM.outlineOf({ points: pts, closed: !!(tf && tf.isClosed) });
+      const outline = MM.outlineOf({ points: pts, closed: !!MM.standsClosed(t) });
       if (outline && MM.countCrossings(points, outline, 3) === 2) return id;
     }
     return null;
@@ -2668,7 +2766,8 @@
   /** The next move, for the standing line: one rung of the ladder, by what stands. */
   function nextMove(s, strokes) {
     if (s.summon) return 'type in the field, or tap a pill · a tap on the ground lets go';
-    if (s.selection.length) return 'drag inside to move, a corner to scale, the knob to turn · Esc lets go';
+    // One mark with its own points showing (E1): a ring reshapes its clean form.
+    if (s.selection.length) return 'drag inside to move, a corner to scale, the knob to turn' + (markHandles(s).length ? ', a ring to reshape' : '') + ' · Esc lets go';
     if (s.pendingLassoId) return 'or double-tap inside the loop';
     if (!strokes && !s.artifacts.length) return 'draw anything · double-click empty ground to type';
     return 'press and hold a mark to hold it · or circle marks and double-tap inside';
@@ -3046,8 +3145,12 @@
     const points = MM.strokePointsOf(node);
     if (points) {
       inkDrawn.set(node.id, style.color);
-      const clean = MM.cleanPointsOf(node);
-      if (paintOps) recordOp({ kind: 'ink', id: node.id, colour: style.color, width: round2(style.width), box: boxOfPoints(points), clean: clean ? boxOfPoints(clean) : null, moved: paintMoved, gesture: !!style.gesture });
+      // A handle being dragged (V1-PLAN E1): the form shown is the one the
+      // mark will hold when the hand lets go — born clean, if it was ink.
+      const reshaping = reshapeShownFor(node.id);
+      const shown = reshaping || node;
+      const clean = MM.cleanPointsOf(shown);
+      if (paintOps) recordOp({ kind: 'ink', id: node.id, colour: style.color, width: round2(style.width), box: boxOfPoints(points), clean: clean ? boxOfPoints(clean) : null, moved: paintMoved || !!reshaping, gesture: !!style.gesture });
       if (clean) {
         // Snapped: the clean form in front, the hand's ink faint beneath it.
         // What was drawn is still there — that is the whole promise.
@@ -3055,7 +3158,7 @@
         ctx.strokeStyle = C.inkFaint;
         ctx.lineWidth = Math.max(1, style.width * 0.7);
         ctx.stroke();
-        inkStroke(clean, MM.cleanOf(node).closed, style);
+        inkStroke(clean, MM.cleanOf(shown).closed, style);
         return;
       }
       inkStroke(points, false, style);
@@ -10294,6 +10397,8 @@
     working: () => [...working.keys()],
     // A hand's word on its own ink, for tests: where the last paint drew each label, and a mark's ink colour.
     labelsDrawn: () => labelsDrawn.map((l) => Object.assign({}, l)),
+    // The one selected mark's own points (V1-PLAN E1), for tests: where the last paint drew each handle, in world units.
+    handlesDrawn: () => handlesDrawn.map((h) => Object.assign({}, h)),
     // What the last paint drew under the inspected mark, and the check that a hand's paint draws and says what the whole-board read would (R4c).
     readingDrawn: () => (readingDrawn ? Object.assign({}, readingDrawn) : null), paintCheck: paintCheck, rolesCheck: rolesCheck, heldCheck: heldCheck, paints: () => paints,
     // Point at a mark the way a hover does, for tests: it is inspected, its reading drawn under it and its ladder in the panel.

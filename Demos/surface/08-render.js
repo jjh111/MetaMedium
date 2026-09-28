@@ -37,7 +37,8 @@
   /** The next move, for the standing line: one rung of the ladder, by what stands. */
   function nextMove(s, strokes) {
     if (s.summon) return 'type in the field, or tap a pill · a tap on the ground lets go';
-    if (s.selection.length) return 'drag inside to move, a corner to scale, the knob to turn · Esc lets go';
+    // One mark with its own points showing (E1): a ring reshapes its clean form.
+    if (s.selection.length) return 'drag inside to move, a corner to scale, the knob to turn' + (markHandles(s).length ? ', a ring to reshape' : '') + ' · Esc lets go';
     if (s.pendingLassoId) return 'or double-tap inside the loop';
     if (!strokes && !s.artifacts.length) return 'draw anything · double-click empty ground to type';
     return 'press and hold a mark to hold it · or circle marks and double-tap inside';
@@ -415,8 +416,12 @@
     const points = MM.strokePointsOf(node);
     if (points) {
       inkDrawn.set(node.id, style.color);
-      const clean = MM.cleanPointsOf(node);
-      if (paintOps) recordOp({ kind: 'ink', id: node.id, colour: style.color, width: round2(style.width), box: boxOfPoints(points), clean: clean ? boxOfPoints(clean) : null, moved: paintMoved, gesture: !!style.gesture });
+      // A handle being dragged (V1-PLAN E1): the form shown is the one the
+      // mark will hold when the hand lets go — born clean, if it was ink.
+      const reshaping = reshapeShownFor(node.id);
+      const shown = reshaping || node;
+      const clean = MM.cleanPointsOf(shown);
+      if (paintOps) recordOp({ kind: 'ink', id: node.id, colour: style.color, width: round2(style.width), box: boxOfPoints(points), clean: clean ? boxOfPoints(clean) : null, moved: paintMoved || !!reshaping, gesture: !!style.gesture });
       if (clean) {
         // Snapped: the clean form in front, the hand's ink faint beneath it.
         // What was drawn is still there — that is the whole promise.
@@ -424,7 +429,7 @@
         ctx.strokeStyle = C.inkFaint;
         ctx.lineWidth = Math.max(1, style.width * 0.7);
         ctx.stroke();
-        inkStroke(clean, MM.cleanOf(node).closed, style);
+        inkStroke(clean, MM.cleanOf(shown).closed, style);
         return;
       }
       inkStroke(points, false, style);

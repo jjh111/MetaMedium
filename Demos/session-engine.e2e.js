@@ -3287,6 +3287,85 @@ window.__scenario = async function(){
         !!clean52 && at52(clean52[2], { x: corner52.x + 60, y: corner52.y + 40 }) && at52(clean52[0], across52) &&
         JSON.stringify(MM.strokePointsOf(node52())) === ink52 && !mm.session.getState().summon && mm.session.getState().selection.length === 1,
       { handles: drawn52.map((h) => h.kind + h.index), events: evs52.map((e) => e.type), clean: round52(clean52), corner: round52([corner52]), inkSame: JSON.stringify(MM.strokePointsOf(node52())) === ink52, summon: !!mm.session.getState().summon });
+
+    // The pen feels the new corner: a line released near where the corner now stands binds to it there.
+    const moved52 = site52('corner', 2);
+    t.stroke(t.line({ x: 900, y: 620 }, { x: moved52.x + 3, y: moved52.y + 3 }, 40));
+    const line52 = last52();
+    const bind52 = mm.session.getEvents().filter((e) => e.type === 'bind' && e.strokeId === line52);
+    const end52 = MM.strokePointsOf(mm.session.getState().nodes.get(line52)).slice(-1)[0];
+    step('52a. the magnets follow the reshape: a line released near where the dragged corner now stands binds to that corner, there — not where the ink\'s corner is',
+      at52(moved52, { x: corner52.x + 60, y: corner52.y + 40 }) && bind52.length === 1 && bind52[0].nodeId === box52 && bind52[0].site.kind === 'corner' && bind52[0].site.index === 2 && at52(end52, moved52),
+      { corner: round52([moved52]), binds: bind52.map((e) => e.site.kind + e.site.index + '→' + e.nodeId), end: round52([end52]) });
+    for (let i = 0; i < 4 && mm.session.getState().contentIds.includes(line52); i++) mm.session.undo();
+    await wait(30);
+
+    // One undo takes the reshape back whole: born reshaped, the box is ink again, as drawn.
+    const before52b = mm.session.getEvents().length;
+    mm.session.undo(); await wait(30);
+    step('52b. one undo takes the reshape back whole — the box was born reshaped, so it is ink again, unsnapped, exactly as drawn',
+      mm.session.getEvents().length === before52b - 1 && !MM.cleanOf(node52()) && JSON.stringify(MM.strokePointsOf(node52())) === ink52 && at52(site52('corner', 2), corner52),
+      { clean: !!MM.cleanOf(node52()), corner: round52([site52('corner', 2)]) });
+
+    // The zone rule, both sides of the overlap: a box's corner carries two handles — its own, on
+    // the ink, and the selection's scale corner on the outline a little way out. Each owns the
+    // ground nearer to it: pressed nearer the box's corner it reshapes, nearer the outline's it scales.
+    mm.session.select([box52], Date.now()); await wait(30);
+    const sb52 = MM.boundsOf(node52());
+    const pad52 = 10 / mm.view.zoom;
+    const outlineCorner52 = { x: sb52.maxX + pad52, y: sb52.maxY + pad52 };
+    const nearBox52 = mm.worldToScreen(corner52.x + 3, corner52.y + 3), nearOutline52 = mm.worldToScreen(outlineCorner52.x - 3, outlineCorner52.y - 3);
+    const n52c = mm.session.getEvents().length;
+    drag52(nearBox52, { x: nearBox52.x + 30, y: nearBox52.y + 20 });
+    await wait(30);
+    const byBox52 = mm.session.getEvents().slice(n52c).map((e) => e.type);
+    mm.session.undo(); await wait(30);
+    mm.session.select([box52], Date.now()); await wait(30);
+    const n52d = mm.session.getEvents().length;
+    drag52(nearOutline52, { x: nearOutline52.x + 30, y: nearOutline52.y + 20 });
+    await wait(30);
+    const byOutline52 = mm.session.getEvents().slice(n52d).map((e) => e.type);
+    mm.session.undo(); await wait(30);
+    step('52c. where a box\'s corner carries both handles, each owns the ground nearer to it: 3 px off the box\'s corner the drag reshapes; 3 px off the outline\'s corner it scales',
+      JSON.stringify(byBox52) === '["reshape"]' && JSON.stringify(byOutline52) === '["scale"]',
+      { byBox: byBox52, byOutline: byOutline52 });
+
+    // The selection's own handles keep working: the knob turns, the move zone moves — and the form rides with the ink.
+    mm.session.select([box52], Date.now()); await wait(30);
+    mm.session.reshape({ id: box52, handle: { kind: 'corner', index: 2 }, to: { x: corner52.x + 60, y: corner52.y + 40 }, at: Date.now() }); await wait(30);
+    mm.session.select([box52], Date.now()); await wait(30);
+    const sb52e = MM.boundsOf(node52());
+    const knob52 = mm.worldToScreen((sb52e.minX + sb52e.maxX) / 2, sb52e.minY - pad52 - 26 / mm.view.zoom);
+    const n52e = mm.session.getEvents().length;
+    drag52(knob52, { x: knob52.x + 80, y: knob52.y + 30 });
+    await wait(30);
+    const byKnob52 = mm.session.getEvents().slice(n52e).map((e) => e.type);
+    mm.session.undo(); await wait(30);
+    mm.session.select([box52], Date.now()); await wait(30);
+    const inside52 = mm.worldToScreen(sb52e.minX + (sb52e.maxX - sb52e.minX) * 0.3, sb52e.minY + (sb52e.maxY - sb52e.minY) * 0.3);
+    const clean52f = MM.cleanPointsOf(node52()), ink52f = MM.strokePointsOf(node52());
+    const n52f = mm.session.getEvents().length;
+    drag52(inside52, { x: inside52.x + 50, y: inside52.y - 20 });
+    await wait(30);
+    const byInside52 = mm.session.getEvents().slice(n52f).map((e) => e.type);
+    const clean52g = MM.cleanPointsOf(node52()), ink52g = MM.strokePointsOf(node52());
+    const rode52 = at52(clean52g[2], { x: clean52f[2].x + 50, y: clean52f[2].y - 20 }) && at52(ink52g[0], { x: ink52f[0].x + 50, y: ink52f[0].y - 20 });
+    step('52d. the selection\'s own handles keep working on a reshaped box: its knob turns it (one rotate), and a press inside, away from the handles, moves it (one move) — the clean form riding with the ink',
+      JSON.stringify(byKnob52) === '["rotate"]' && JSON.stringify(byInside52) === '["move"]' && rode52,
+      { byKnob: byKnob52, byInside: byInside52, rode: rode52 });
+
+    // Nothing is pretended: writing has no clean form and shows no handles; nor do two marks held together.
+    t.stroke(t.word(300, 560, 180, 40));
+    const writing52 = last52();
+    mm.session.select([writing52], Date.now()); await wait(30);
+    const onWriting52 = mm.handlesDrawn().length;
+    mm.session.select([writing52, box52], Date.now()); await wait(30);
+    const onTwo52 = mm.handlesDrawn().length;
+    mm.session.select([box52], Date.now()); await wait(30);
+    const onBox52 = mm.handlesDrawn().length;
+    step('52e. nothing is pretended: writing selected alone shows no handles — it has no clean form — and two marks selected together show none; the box alone shows its nine',
+      onWriting52 === 0 && onTwo52 === 0 && onBox52 === 9 && !MM.snapReading(mm.session.getState().nodes.get(writing52), mm.session.getState().nodes).ok,
+      { writing: onWriting52, two: onTwo52, box: onBox52 });
     mm.session.load([]); mm.setView(1, 0, 0);
   }
 

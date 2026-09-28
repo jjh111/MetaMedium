@@ -265,12 +265,12 @@
    * every loose mark to every other: 183 ms on 2,000 marks, for one press.
    */
   function heldGroupOf(s, id) {
+    // A mark as the relations read it — where it stands: a reshaped form where the hand set it (E1).
     const markOf = (cid) => {
       const n = s.nodes.get(cid);
       const b = n && MM.boundsOf(n);
       if (!b) return null;
-      const fp = MM.fingerprintOf(n);
-      return { id: cid, bounds: b, points: MM.strokePointsOf(n) || undefined, closed: !!(fp && fp.isClosed) };
+      return { id: cid, bounds: b, points: MM.standingPointsOf(n) || undefined, closed: !!MM.standsClosed(n) };
     };
     const ix = boardIndex();
     const arts = new Set(s.artifacts);
@@ -300,8 +300,7 @@
       const n = s.nodes.get(cid);
       const b = n && MM.boundsOf(n);
       if (!b) return null;
-      const fp = MM.fingerprintOf(n);
-      return { id: cid, bounds: b, points: MM.strokePointsOf(n) || undefined, closed: !!(fp && fp.isClosed) };
+      return { id: cid, bounds: b, points: MM.standingPointsOf(n) || undefined, closed: !!MM.standsClosed(n) };
     }).filter(Boolean);
     const whole = MM.clusters(marks, MM.relate(marks));
     const differ = [];
@@ -348,8 +347,12 @@
     }
     if (!live) {
       const w = screenToWorld(e.clientX, e.clientY);
-      // Over a playing frame the cursor says the frame is live to the hand.
-      if (!spaceHeld) canvas.style.cursor = pointerFrameAt(w) && !insideWaitingLoop(w) ? 'default' : 'crosshair';
+      // Over a playing frame the cursor says the frame is live to the hand; over one of the
+      // selected mark's own points, that it can be taken hold of (E1).
+      if (!spaceHeld) {
+        const onHandle = state.selection.length === 1 ? handleAt(w) : null;
+        canvas.style.cursor = onHandle && onHandle.kind === 'reshape' ? 'grab' : pointerFrameAt(w) && !insideWaitingLoop(w) ? 'default' : 'crosshair';
+      }
       const over = nodeAt(w.x, w.y);
       if (over !== hoverId) { hoverId = over; render(state); }
       // A pencil near the glass, touching nothing, is a hover: the reading of the mark under it,
@@ -542,13 +545,13 @@
     for (const id of s.contentIds) {
       if (id === node.id || s.artifacts.includes(id)) continue;
       const t = s.nodes.get(id);
-      const pts = t && MM.strokePointsOf(t);
+      // Where it stands, as the scratch reads it: a reshaped form where the hand set it (E1).
+      const pts = t && MM.standingPointsOf(t);
       if (!pts) continue;
       // A stroke crosses only an outline whose box its own box meets: the rest are passed over unread (R4c).
       const tb = MM.getBounds(pts);
       if (tb.maxX < sb.minX || tb.minX > sb.maxX || tb.maxY < sb.minY || tb.minY > sb.maxY) continue;
-      const tf = MM.fingerprintOf(t);
-      const outline = MM.outlineOf({ points: pts, closed: !!(tf && tf.isClosed) });
+      const outline = MM.outlineOf({ points: pts, closed: !!MM.standsClosed(t) });
       if (outline && MM.countCrossings(points, outline, 3) === 2) return id;
     }
     return null;

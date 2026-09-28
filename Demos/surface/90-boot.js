@@ -30,6 +30,8 @@
     working: () => [...working.keys()],
     // A hand's word on its own ink, for tests: where the last paint drew each label, and a mark's ink colour.
     labelsDrawn: () => labelsDrawn.map((l) => Object.assign({}, l)),
+    // The one selected mark's own points (V1-PLAN E1), for tests: where the last paint drew each handle, in world units.
+    handlesDrawn: () => handlesDrawn.map((h) => Object.assign({}, h)),
     // What the last paint drew under the inspected mark, and the check that a hand's paint draws and says what the whole-board read would (R4c).
     readingDrawn: () => (readingDrawn ? Object.assign({}, readingDrawn) : null), paintCheck: paintCheck, rolesCheck: rolesCheck, heldCheck: heldCheck, paints: () => paints,
     // Point at a mark the way a hover does, for tests: it is inspected, its reading drawn under it and its ladder in the panel.
