@@ -1220,8 +1220,8 @@ hand put on its own ink (`label`) is its symbol's or flow's text. The
 golden (`fixtures/flowchart.mermaid.ts`, by hand): all 36 of D1's hands
 export one text before the writing is read and one after; the same text
 after a replay, with the reading's lists shuffled, and for two hands merged
-by any reader, in either key order or end to end either way. Mermaid 20
-tests, core 1144. The surface's half must know: ink over the rendered
+by any reader, in either key order or end to end either way. Mermaid 21
+tests, core 1145. The surface's half must know: ink over the rendered
 diagram maps back through `ids` (the symbol's id — a figure's is
 `figure:a+b`, not a node) and `marks` (its real strokes); `links[i]` is
 Mermaid's link `i`; `unread` is what *Read the writing* would read first;
