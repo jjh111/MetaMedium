@@ -3737,6 +3737,44 @@ window.__scenario = async function(){
     mm.session.load([]); mm.setView(1, 0, 0);
   }
 
+  // ---- 59. Enter does the likely act (PLAN-USER-SURFACE U1e; audit row 4) ----
+  {
+    const fresh59 = () => { mm.session.load([]); mm.setView(1, 0, 0); mm.agents.length = 0; mm.agents.push(MM.createAgentParticipant(mm.session, Object.assign({}, MM.PRESETS.ollama, { model: 'e2e-stub', vision: true }), Date.now())); };
+    const last59 = () => { const st = mm.session.getState(); return st.contentIds[st.contentIds.length - 1]; };
+    const cleanCount59 = (ids) => ids.filter((id) => MM.cleanOf(mm.session.getState().nodes.get(id))).length;
+    // A row of three boxes: Enter draws them clean — the act ranked first — and names nothing.
+    fresh59();
+    const row59 = [];
+    for (const [x, y] of [[200, 200], [360, 204], [520, 200]]) { t.stroke(t.rect(x, y, 120, 80)); row59.push(last59()); }
+    mm.session.summonMarks(row59, Date.now()); await wait(60);
+    const lineRow59 = t.readingLine(), arts59 = mm.session.getState().artifacts.length;
+    t.typeEnter(''); await wait(60);
+    step('59. a row of boxes held: the line says ↵ Draw them clean, and Enter draws them clean — it takes no reading as a name',
+      lineRow59 === '↵ Draw them clean' && cleanCount59(row59) === 3 && mm.session.getState().artifacts.length === arts59,
+      { line: lineRow59, clean: cleanCount59(row59), artifacts: mm.session.getState().artifacts.length - arts59 });
+    // A molecule: the same — never "flow" as its name.
+    fresh59();
+    const mol59 = [];
+    for (const [x, y] of [[300, 300], [500, 300], [400, 460]]) { t.stroke(t.circle(x, y, 40)); mol59.push(last59()); }
+    t.stroke(t.line({ x: 340, y: 300 }, { x: 460, y: 300 }, 30)); mol59.push(last59());
+    t.stroke(t.line({ x: 328, y: 328 }, { x: 372, y: 432 }, 30)); mol59.push(last59());
+    mm.session.summonMarks(mol59, Date.now()); await wait(60);
+    const lineMol59 = t.readingLine();
+    t.typeEnter(''); await wait(60);
+    step('59b. a molecule held: ↵ Draw them clean, and Enter does it — "flow" is a reading, taken as a name only by tapping it or typing name:',
+      lineMol59 === '↵ Draw them clean' && cleanCount59(mol59) === 5 && !mm.session.getState().artifacts.length,
+      { line: lineMol59, clean: cleanCount59(mol59), artifacts: mm.session.getState().artifacts.length });
+    // name: still names, and a tap on the reading still takes it.
+    { const sm = mm.session.getState().summon; if (sm) mm.session.dismiss(sm.id, Date.now()); if (mm.session.getState().selection.length) mm.session.deselect(Date.now()); }
+    mm.session.summonMarks(mol59, Date.now()); await wait(60);
+    const flow59 = [...document.querySelectorAll('#summon .row.certain .pill')].find((b) => /^flow /.test(b.textContent.trim()));
+    if (flow59) flow59.click();
+    await wait(40);
+    const named59 = mm.session.getState().artifacts.map((id) => MM.wordOf(mm.session.getState().nodes.get(id)));
+    step('59c. a reading tapped is still taken as the name', !!flow59 && named59.includes('flow'), { tapped: !!flow59, named: named59 });
+    mm.session.load([]); mm.setView(1, 0, 0);
+  }
+
   return R;
 };
 

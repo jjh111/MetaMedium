@@ -28,8 +28,9 @@ const { readFieldCommand, verbFor, libraryMatch, typedWord, theirMarks, madeThes
 /** A board with nothing on it but the four core verbs and one reading. */
 const ITEMS = [
   { key: 'sug:1', certain: true, label: 'molecule 0.92', why: 'like the one you named — take it as another molecule' },
-  { key: 'snap', label: 'Draw them clean', verbs: ['clean', 'snap', 'draw clean'], why: '3 shapes · ink kept' },
-  { key: 'what', label: 'What is this?', verbs: ['what', 'what is this', '?'], why: 'every joined model reads the group' },
+  // An act Enter may take with nothing typed (U1e): an offer the row shows. Readings and the core are not.
+  { key: 'snap', act: true, label: 'Draw them clean', verbs: ['clean', 'snap', 'draw clean'], why: '3 shapes · ink kept' },
+  { key: 'what', act: true, asks: 'model', label: 'What is this?', verbs: ['what', 'what is this', '?'], why: 'every joined model reads the group' },
   { key: 'name', label: 'Name…', verbs: [], why: 'Name — hold it as a thing you can use again' },
   { key: 'copy', label: 'Copy', verbs: ['copy', 'cp'], why: 'Copy — hold the ink to paste' },
   { key: 'paste', label: 'Paste', verbs: ['paste'], disabled: true, why: 'Paste — nothing copied yet' },
@@ -51,18 +52,36 @@ test('with no summon there is nothing to read', () => {
   assert.equal(r.line, '');
 });
 
-test('nothing typed: Enter takes the leading reading', () => {
+test('nothing typed: Enter takes the likely act — the first offer in the ranked order — never a reading as a name (U1e)', () => {
   const r = readFieldCommand(ctx());
   assert.equal(r.kind, 'default');
-  assert.deepEqual(r.command, { do: 'take', key: 'sug:1', index: 0 });
-  assert.match(r.line, /^↵ molecule 0\.92 — take it as another molecule$/);
+  assert.deepEqual(r.command, { do: 'take', key: 'snap', index: 1 });
+  assert.equal(r.line, '↵ Draw them clean');
+  assert.ok(!r.model);
 });
 
-test('nothing typed and nothing read: the line stays quiet', () => {
-  const r = readFieldCommand(ctx({ items: ITEMS.filter((i) => !i.certain) }));
+test('…the act that leads is the one taken, whatever it is: one that asks a model carries the dot', () => {
+  const items = [ITEMS[0], ITEMS[2], ITEMS[1]].concat(ITEMS.slice(3));
+  const r = readFieldCommand(ctx({ items }));
+  assert.deepEqual(r.command, { do: 'take', key: 'what', index: 1 });
+  assert.equal(r.line, '↵ What is this?');
+  assert.equal(r.model, true);
+});
+
+test('nothing typed and only readings: Enter names nothing, and the line says a reading is taken by tapping it', () => {
+  const r = readFieldCommand(ctx({ items: ITEMS.filter((i) => !i.act) }));
   assert.equal(r.kind, 'empty');
   assert.equal(r.quiet, true);
   assert.equal(r.command, null);
+  assert.match(r.line, /tap a reading/);
+});
+
+test('nothing typed and nothing read or offered: the line stays quiet', () => {
+  const r = readFieldCommand(ctx({ items: ITEMS.filter((i) => !i.certain && !i.act) }));
+  assert.equal(r.kind, 'empty');
+  assert.equal(r.quiet, true);
+  assert.equal(r.command, null);
+  assert.equal(r.line, '');
 });
 
 test('a verb by its label', () => {
@@ -376,15 +395,15 @@ test('core’s label tool says another hand’s marks exactly as the reader does
 // ---- W2: writing reads when it is writing (PLAN-USER-SURFACE §4) ----
 
 test('a reading that says what Enter does when it leads says that, with the model dot — writing is read, not named', () => {
-  const items = [{ key: 'concept:writing', certain: true, label: 'writing 0.75', enter: 'read it', asks: true, why: '3 marks of writing on one line — read it' }].concat(ITEMS.slice(1));
+  const items = [{ key: 'concept:writing', certain: true, act: true, label: 'writing 0.75', enter: 'read it', asks: true, why: '3 marks of writing on one line — read it' }].concat(ITEMS.slice(1));
   const r = readFieldCommand(ctx({ items }));
   assert.equal(r.line, '↵ read it');
   assert.equal(r.model, true);
   assert.deepEqual(r.command, { do: 'take', key: 'concept:writing', index: 0 });
 });
 
-test('…and a reading that names says so, with no dot', () => {
+test('…and a reading that names is never Enter\'s, even leading (U1e)', () => {
   const r = readFieldCommand(ctx());
-  assert.equal(r.line, '↵ molecule 0.92 — take it as another molecule');
-  assert.ok(!r.model);
+  assert.notEqual(r.command && r.command.key, 'sug:1');
+  assert.doesNotMatch(r.line, /take it as/);
 });
