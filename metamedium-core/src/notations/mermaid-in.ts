@@ -922,10 +922,10 @@ interface RouteTaken {
 const APART_DEG = 45;
 
 /** An arc's sweeps, the flattest first, each with the shortest chord on screen it is drawn on: there the shape rung reads it as an arc at 0.92. */
-const ARC_SWEEPS: [number, number][] = [[90, 100], [120, 60], [150, 60]];
+export const ARC_SWEEPS: [number, number][] = [[90, 100], [120, 60], [150, 60]];
 
 /** The points of an arc from P to Q bulging to `side` (+1: left of P→Q as the screen shows it), sweeping `sweep` degrees — `n` segments. */
-function arcThrough(P: Point, Q: Point, sweep: number, side: 1 | -1, n: number): Point[] {
+export function arcThrough(P: Point, Q: Point, sweep: number, side: 1 | -1, n: number): Point[] {
   const c = Math.hypot(Q.x - P.x, Q.y - P.y);
   const u = { x: (Q.x - P.x) / c, y: (Q.y - P.y) / c };
   const out = { x: u.y * side, y: -u.x * side };

@@ -151,6 +151,8 @@ export const LETTER_SHARE = 0.3;
 export const LETTER_PX = 40;
 /** Writing stands at a relation's end within this share of its length from the end; further along, beside its middle. */
 export const END_SHARE = 0.35;
+/** A mark is inside a class when this share of its ink is — not where its box's middle falls. */
+export const INK_INSIDE = 0.6;
 /** A per-mark reading below this offers no ports: the pen should not feel a guess. */
 export const PORTS_FLOOR = 0.4;
 
@@ -500,6 +502,25 @@ function boxGap(a: Bounds, b: Bounds): number {
   return Math.hypot(Math.max(0, b.minX - a.maxX, a.minX - b.maxX), Math.max(0, b.minY - a.maxY, a.minY - b.maxY));
 }
 
+/** A path's stretch near one of its ends: its first or last END_SHARE of points. */
+function nearEnd(path: readonly Point[], end: 'start' | 'end'): Point[] {
+  const k = Math.max(2, Math.ceil(path.length * END_SHARE));
+  return end === 'start' ? path.slice(0, k) : path.slice(-k);
+}
+
+/** The share of a mark's ink inside a box's hull, with a hand's slack at its edge — sampled, for a long stroke. */
+function inkInside(pts: readonly Point[], m: Mark, box: Box): number {
+  if (!pts.length) return 1;
+  const step = Math.max(1, Math.floor(pts.length / 48));
+  const slack = magnetRadius(box.size, m.scale) * 0.5;
+  let n = 0, in_ = 0;
+  for (let i = 0; i < pts.length; i += step) {
+    n++;
+    if (outside(pts[i], box.hull) <= slack) in_++;
+  }
+  return in_ / n;
+}
+
 /** Pieces of writing grouped into the lines they stand on, top to bottom, each left to right — in a class's own frame. */
 function linesOfWriting(pieces: readonly Mark[], f: Frame): Mark[][] {
   const at = pieces.map((m) => {
@@ -573,26 +594,32 @@ function markerOf(heads: readonly HeadReading[]): { marker?: UmlMarker; head?: H
 }
 
 /**
- * A head the letter rules gathered into a word: a filled diamond drawn as an
- * outline and a quick hatch is one word, and heads.ts reads a word as
- * writing. Read apart — the connector and the word's letters alone on a
- * scratch board, far enough apart in time that no word gathers — it is the
- * head it was drawn as. Null when the word closes no outline, or reads as no
- * head even so.
+ * A head read apart: the connector and the marks of its head alone on a
+ * scratch board, far enough apart in time that the letter rules gather none
+ * of them. Two things need it. A filled diamond drawn as an outline and a
+ * quick hatch is one word to the letter rules, and heads.ts reads a word as
+ * writing. And heads.ts gives a fill to the first closed mark at an end it
+ * lies within — which, on a relation long beside its class, is the class's
+ * own box — so the head beside it reads hollow. Apart, each is the head it
+ * was drawn as. Null when nothing reads as a head there.
  */
-function headOfWord(state: SessionState, conn: MMNode, end: 'start' | 'end', word: MMNode): HeadReading | null {
-  const letters = lettersOf(word).map((id) => state.nodes.get(id)).filter((n): n is MMNode => !!n && !getRep(n, 'erased') && !!strokePointsOf(n));
-  if (letters.length < 2 || !letters.some((n) => fingerprintOf(n)?.isClosed)) return null;
+function headApart(conn: MMNode, end: 'start' | 'end', parts: readonly MMNode[]): HeadReading | null {
   const pts = strokePointsOf(conn);
-  if (!pts) return null;
+  if (!pts || !parts.length) return null;
   const scratch = createSession();
   let t = 1;
   const cid = scratch.addStroke(pts.map((p) => ({ x: p.x, y: p.y })), t, undefined, scaleOf(conn), { content: true });
-  for (const n of letters) scratch.addStroke(strokePointsOf(n)!.map((p) => ({ x: p.x, y: p.y })), (t += 10_000), undefined, scaleOf(n), { content: true });
-  const h = headsOf(scratch.getState(), cid);
-  const top = h?.[end].heads[0];
-  if (!top || top.ids.includes(cid)) return null;
-  return { ...top, ids: [word.id], reason: `${top.reason} — its strokes, which the letter rules gathered into a word, read apart` };
+  for (const n of parts) scratch.addStroke(strokePointsOf(n)!.map((p) => ({ x: p.x, y: p.y })), (t += 10_000), undefined, scaleOf(n), { content: true });
+  const top = headsOf(scratch.getState(), cid)?.[end].heads[0];
+  return top && !top.ids.includes(cid) ? top : null;
+}
+
+/** A word at a connector's end whose letters close an outline: its head, read apart — null when it is only writing. */
+function headOfWord(state: SessionState, conn: MMNode, end: 'start' | 'end', word: MMNode): HeadReading | null {
+  const letters = lettersOf(word).map((id) => state.nodes.get(id)).filter((n): n is MMNode => !!n && !getRep(n, 'erased') && !!strokePointsOf(n));
+  if (letters.length < 2 || !letters.some((n) => fingerprintOf(n)?.isClosed)) return null;
+  const top = headApart(conn, end, letters);
+  return top ? { ...top, ids: [word.id], reason: `${top.reason} — its strokes, which the letter rules gathered into a word, read apart` } : null;
 }
 
 /**
@@ -674,7 +701,9 @@ export function readUmlClass(state: SessionState, scopeIds?: readonly string[]):
   const byArea = [...boxes].sort((a, b) => areaOf(a.shape.hull) - areaOf(b.shape.hull));
   for (const m of marks.values()) {
     if (boxMarks.has(m.id) || lineIds.has(m.id) || inFigure.has(m.id)) continue;
-    const c = byArea.find((k) => offBox(m.centre, k.shape.bounds) === 0 && outside(m.centre, k.shape.hull) === 0);
+    // Inside is where its ink is, not where its box's middle falls: a line bowing around a class has its middle in it.
+    const inkOf = () => (isWord(m.node) ? lettersOf(m.node).flatMap((id) => (nodes.get(id) && strokePointsOf(nodes.get(id)!)) ?? []) : (strokePointsOf(m.node) ?? []));
+    const c = byArea.find((k) => offBox(m.centre, k.shape.bounds) === 0 && outside(m.centre, k.shape.hull) === 0 && inkInside(inkOf(), m, k.shape) >= INK_INSIDE);
     if (!c) continue;
     insideOf.set(m.id, c);
     const f = c.frame;
@@ -713,7 +742,7 @@ export function readUmlClass(state: SessionState, scopeIds?: readonly string[]):
     if (h) heads.set(id, h);
   }
   // A small plain box that a connector reads as its head — a diamond is a box turned 45° — is that head, not a
-  // class: so is what fills it, which stood inside it as if it were writing.
+  // class; what stands inside it is its fill, not a name.
   const demoted = new Set<Candidate>();
   for (const [id, h] of heads) {
     for (const e of [h.start, h.end]) {
@@ -721,7 +750,7 @@ export function readUmlClass(state: SessionState, scopeIds?: readonly string[]):
       if (!top) continue;
       for (const x of top.ids) {
         const c = classOfMark.get(x);
-        if (c && x !== id && !c.lines.length && inside.get(c)!.writing.every((m) => top.ids.includes(m.id))) demoted.add(c);
+        if (c && x !== id && !c.lines.length) demoted.add(c);
       }
     }
   }
@@ -750,6 +779,17 @@ export function readUmlClass(state: SessionState, scopeIds?: readonly string[]):
       if (h) {
         heads = [h];
         usedWords.add(w!.id);
+      }
+    }
+    // A hollow head with marks inside it: its fill, which heads.ts may have given to a class's box beside it. Read apart.
+    if (heads[0] && !heads[0].filled && heads[0].kind !== 'arrow') {
+      const outline = heads[0].ids.find((x) => x !== id && marks.has(x));
+      const ob = outline ? marks.get(outline)!.bounds : undefined;
+      const grow = ob ? 0.2 * sizeOfBounds(ob) : 0;
+      const fills = ob ? [...marks.values()].filter((m) => m.id !== outline && m.id !== id && !classOfMark.has(m.id) && !isWord(m.node) && !!strokePointsOf(m.node) && m.bounds.minX >= ob.minX - grow && m.bounds.maxX <= ob.maxX + grow && m.bounds.minY >= ob.minY - grow && m.bounds.maxY <= ob.maxY + grow) : [];
+      if (fills.length) {
+        const h = headApart(nodes.get(id)!, e.end, [marks.get(outline!)!.node, ...fills.map((m) => m.node)]);
+        if (h && h.filled && h.kind === heads[0].kind) heads = [{ ...h, ids: [outline!, ...fills.map((m) => m.id)], reason: `${h.reason} — read apart from the class beside it, which heads.ts gave its fill` }, ...heads];
       }
     }
     const head = heads[0];
@@ -878,8 +918,9 @@ export function readUmlClass(state: SessionState, scopeIds?: readonly string[]):
       const reachEnd = Math.max(2.5 * magnetRadius(size, m.scale), 1.6 * size);
       for (const [end, E, F] of [['from', P, Q], ['to', Q, P]] as const) {
         const t = dot(sub(m.centre, E), sub(F, E)) / (len * len);
-        if (t > END_SHARE || t < -0.4) continue;
-        const d = offBox(E, m.bounds);
+        if (t > END_SHARE || t < -0.4 || offBox(E, m.bounds) > reachEnd) continue;
+        // Beside ITS line: where several ends share a side, writing belongs to the line it stands nearest, near that end.
+        const d = Math.max(0, distToPath(m.centre, nearEnd(paths.get(r.id)!, r.ends[end].end)) - size / 2);
         if (d <= reachEnd && (!best || d / reachEnd < best.d / best.reach)) best = { r, end, d, reach: reachEnd };
       }
       const t = dot(sub(m.centre, P), sub(Q, P)) / (len * len);

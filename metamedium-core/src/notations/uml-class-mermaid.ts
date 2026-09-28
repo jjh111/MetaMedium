@@ -59,7 +59,7 @@ import type { NotationReading } from './notation';
 import type { MermaidDirection, MermaidLink, MermaidOptions, MermaidText } from './mermaid';
 import { inReadingOrder, mermaidIds, mermaidString, naturalCompare, registerMermaidWriter, unescapeMermaid, UNREAD_WRITING } from './mermaid';
 import type { DrawMermaidOptions, DrawnEnd, DrawnMermaid, MermaidFlow, MermaidLinkRead, MermaidNodeRead, MermaidRead, MermaidReader, MermaidRefusal } from './mermaid-in';
-import { MERMAID_MAX_LINKS, MERMAID_MAX_NODES, MERMAID_TEXT_PX, registerMermaidReader } from './mermaid-in';
+import { ARC_SWEEPS, arcThrough, MERMAID_MAX_LINKS, MERMAID_MAX_NODES, MERMAID_TEXT_PX, registerMermaidReader } from './mermaid-in';
 import { layoutLayered } from './layered';
 import type { UmlClassReading, UmlClassSymbol, UmlMarker, UmlMember, UmlRelation } from './uml-class';
 import { readUmlClass, UML_CLASS_TABLE } from './uml-class';
@@ -568,8 +568,8 @@ const CLASS_MAX = 24;
 const PAD = 0.8;
 const EMPTY = 1.4;
 /** The gap between ranks and between neighbours in a rank, in text sizes: room for a head and a multiplicity at each end. */
-const RANK_GAP = 7;
-const NODE_GAP = 6;
+const RANK_GAP = 8;
+const NODE_GAP = 7;
 /** A head drawn at a relation's end is this long, in text sizes. */
 const HEAD = 1.7;
 /** Ink is laid every this many screen pixels along an outline. */
@@ -581,15 +581,16 @@ const ARROW_PROPORTION_PX = 800;
  * “1” is — carrying its words as a label: a confident line, which the letter
  * rules never gather with the lines and heads around it (a scribble beside a
  * line is gathered with it, the line taken for an “l”). This tall, in text
- * sizes, and this far off its relation's line beside the head.
+ * sizes, and this far off its relation's line, just past its head.
  */
 const DASH = 0.9;
-const DASH_OFF = 0.8;
+const DASH_OFF = 0.6;
 
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 const add = (a: Point, b: Point): Point => ({ x: a.x + b.x, y: a.y + b.y });
 const scaled = (a: Point, k: number): Point => ({ x: a.x * k, y: a.y * k });
+const sub2 = (a: Point, b: Point): Point => ({ x: a.x - b.x, y: a.y - b.y });
 const unit = (v: Point): Point => {
   const l = Math.hypot(v.x, v.y) || 1;
   return { x: v.x / l, y: v.y / l };
@@ -672,6 +673,19 @@ const sideMiddle = (b: Bounds, side: Side): Point => {
   return { x: (p.x + q.x) / 2, y: (p.y + q.y) / 2 };
 };
 
+/** Distance from a point to an open polyline. */
+function distToPolyline(p: Point, path: readonly Point[]): number {
+  let best = Infinity;
+  for (let i = 1; i < path.length; i++) {
+    const a = path[i - 1], b = path[i];
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const l2 = dx * dx + dy * dy;
+    const t = l2 > 0 ? Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / l2)) : 0;
+    best = Math.min(best, Math.hypot(p.x - (a.x + dx * t), p.y - (a.y + dy * t)));
+  }
+  return path.length === 1 ? Math.hypot(p.x - path[0].x, p.y - path[0].y) : best;
+}
+
 /** Whether one score comes before another: the first place they differ decides. */
 function lexLess(a: readonly number[], b: readonly number[]): boolean {
   for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return a[i] < b[i];
@@ -719,6 +733,8 @@ export interface DrawnClassLink {
   ids: string[];
   /** The relation as the text wrote it: '<|--', '*--', '-->' … */
   written: string;
+  /** Straight, or an arc bowing around a class in the way. */
+  route: 'straight' | 'arc';
   label?: string;
   start: DrawnEnd;
   end: DrawnEnd;
@@ -800,7 +816,13 @@ function drawClassDiagramRead(session: Session, read: MermaidRead, opts: DrawMer
   const margin = 0.5 * U * scale;
   const grown = (b: Bounds): Bounds => ({ minX: b.minX - margin, minY: b.minY - margin, maxX: b.maxX + margin, maxY: b.maxY + margin });
   const sidesOfLink = new Map<ClassLinkRead, [Side, Side]>();
+  /** A relation no straight way reaches clear of the other classes bows around them: its sweep and the side it bows to. */
+  const bowOf = new Map<ClassLinkRead, { sweep: number; side: 1 | -1 }>();
   const crossing: string[] = [];
+  const crossesOf = (pts: readonly Point[], others: readonly Standing[]) => others.filter((o) => pts.some((p, i) => i > 0 && meetsBox(pts[i - 1], p, grown(o.box)))).length;
+  /** Leaving `from` along `d`, and arriving at `to` along `e`: each outward from its class, never back across it or along its side. */
+  const leavesBoth = (sa: Side, d: Point, sb: Side, e: Point) =>
+    d.x * outward[sa].x + d.y * outward[sa].y > 0.2 * Math.hypot(d.x, d.y) && e.x * outward[sb].x + e.y * outward[sb].y > 0.2 * Math.hypot(e.x, e.y);
   for (const l of links) {
     const a = standing.get(l.left)!, b = standing.get(l.right)!;
     const others = [...standing.values()].filter((o) => o !== a && o !== b);
@@ -820,15 +842,39 @@ function drawClassDiagramRead(session: Session, read: MermaidRead, opts: DrawMer
       for (const sb of SIDES) {
         const P = sideMiddle(a.box, sa), Q = sideMiddle(b.box, sb);
         const v = { x: Q.x - P.x, y: Q.y - P.y };
-        // It leaves each class outward, never back across it or along its side.
-        const leaves = v.x * outward[sa].x + v.y * outward[sa].y > 0.2 * Math.hypot(v.x, v.y) && -(v.x * outward[sb].x + v.y * outward[sb].y) > 0.2 * Math.hypot(v.x, v.y);
-        const crosses = others.filter((o) => meetsBox(P, Q, grown(o.box))).length;
-        const score = [leaves ? 0 : 1, crosses, pref(sa, sb), Math.hypot(v.x, v.y)];
+        const leaves = leavesBoth(sa, v, sb, { x: -v.x, y: -v.y });
+        const score = [leaves ? 0 : 1, crossesOf([P, Q], others), pref(sa, sb), Math.hypot(v.x, v.y)];
         if (!best || lexLess(score, best.score)) best = { score, sides: [sa, sb] };
       }
     }
-    sidesOfLink.set(l, best!.sides);
-    if (best!.score[1]) crossing.push(`${l.left} — ${l.right}`);
+    // No straight way clear of every class: bow around them, the flattest arc the shape rung reads as one (D3's sweeps).
+    let bow: { score: number[]; sides: [Side, Side]; sweep: number; side: 1 | -1 } | null = null;
+    if (best!.score[0] || best!.score[1]) {
+      for (const sa of SIDES) {
+        for (const sb of SIDES) {
+          const P = sideMiddle(a.box, sa), Q = sideMiddle(b.box, sb);
+          const chord = Math.hypot(Q.x - P.x, Q.y - P.y) / scale;
+          ARC_SWEEPS.forEach(([sweep, least], k) => {
+            if (chord < least) return;
+            for (const side of [1, -1] as const) {
+              const pts = arcThrough(P, Q, sweep, side, 24);
+              if (!leavesBoth(sa, sub2(pts[1], P), sb, sub2(pts[23], Q))) continue;
+              const score = [crossesOf(pts, others), k, pref(sa, sb), chord];
+              if (!bow || lexLess(score, bow.score)) bow = { score, sides: [sa, sb], sweep, side };
+            }
+          });
+        }
+      }
+    }
+    const b0 = bow as { score: number[]; sides: [Side, Side]; sweep: number; side: 1 | -1 } | null;
+    if (b0 && (best!.score[0] || b0.score[0] < best!.score[1])) {
+      sidesOfLink.set(l, b0.sides);
+      bowOf.set(l, { sweep: b0.sweep, side: b0.side });
+      if (b0.score[0]) crossing.push(`${l.left} — ${l.right}`);
+    } else {
+      sidesOfLink.set(l, best!.sides);
+      if (best!.score[1]) crossing.push(`${l.left} — ${l.right}`);
+    }
   }
 
   // Ends sharing a side stand apart along it, in the order of what each reaches, so no two heads meet.
@@ -875,7 +921,7 @@ function drawClassDiagramRead(session: Session, read: MermaidRead, opts: DrawMer
   const drawnLinks: DrawnClassLink[] = [];
   const hand = (p: Point) => scaled(p, 1 / scale);
   const world = (p: Point) => scaled(p, scale);
-  const dashes: { at: Point; toward: Point; marked: boolean; said: string }[] = [];
+  const dashes: { at: Point; toward: Point; side: Side; marked: boolean; said: string }[] = [];
   const apart: { link: DrawnClassLink; kind: 'triangle' | 'diamond'; filled: boolean; at: Point; from: Point }[] = [];
   const len = HEAD * U;
   for (const l of links) {
@@ -883,40 +929,68 @@ function drawClassDiagramRead(session: Session, read: MermaidRead, opts: DrawMer
     const P = start.point, Q = end.point;
     const { left, right } = l.markers;
     // An association is the line's own barb; with one at each end, the second is a filled triangle drawn apart (read so).
-    const arrowAt: 'left' | 'right' | null = right === 'association' ? 'right' : left === 'association' ? 'left' : null;
+    const bow = bowOf.get(l);
+    // On a straight line an association is the line's own barb; on an arc, and at the second end of a line with one at
+    // each end, it is a filled triangle drawn apart (read so).
+    const arrowAt: 'left' | 'right' | null = bow ? null : right === 'association' ? 'right' : left === 'association' ? 'left' : null;
     // A long arrow keeps its barb in proportion (D3's finding: strokeFor caps a barb, and past about 1,200 px it stops reading).
     const k = Math.max(1, Math.hypot(Q.x - P.x, Q.y - P.y) / scale / ARROW_PROPORTION_PX);
     const small = (p: Point) => scaled(p, 1 / (scale * k));
-    const shaft = arrowAt === 'right'
-      ? strokeFor({ shape: 'arrow', from: small(P), to: small(Q) })!.map((p) => scaled(p, k))
-      : arrowAt === 'left'
-        ? strokeFor({ shape: 'arrow', from: small(Q), to: small(P) })!.map((p) => scaled(p, k)).reverse()
-        : strokeFor({ shape: 'line', from: hand(P), to: hand(Q) })!;
+    const chord = Math.hypot(Q.x - P.x, Q.y - P.y) / scale;
+    const arc = bow ? arcThrough(hand(P), hand(Q), bow.sweep, bow.side, Math.max(16, Math.min(300, Math.round((chord * (bow.sweep * Math.PI / 180)) / (2 * Math.sin((bow.sweep * Math.PI) / 360)) / INK_STEP)))) : null;
+    const shaft = arc
+      ? arc
+      : arrowAt === 'right'
+        ? strokeFor({ shape: 'arrow', from: small(P), to: small(Q) })!.map((p) => scaled(p, k))
+        : arrowAt === 'left'
+          ? strokeFor({ shape: 'arrow', from: small(Q), to: small(P) })!.map((p) => scaled(p, k)).reverse()
+          : strokeFor({ shape: 'line', from: hand(P), to: hand(Q) })!;
     const id = session.addStroke(shaft.map(world), next(), pid, scale, { content: true });
+    // Where each end leaves along: the line itself, or the arc's last stretch.
+    const leaving = arc ? [world(arc[Math.min(3, arc.length - 1)]), world(arc[Math.max(0, arc.length - 4)])] : [Q, P];
     drawnMarks.push(id);
     session.bind({ strokeId: id, nodeId: start.nodeId, site: start.site, end: 'start', at: next(), participantId: pid });
     session.bind({ strokeId: id, nodeId: end.nodeId, site: end.site, end: 'end', at: next(), participantId: pid });
     const words = l.label?.trim();
     if (words) session.label({ nodeId: id, text: words, participantId: pid, at: next() });
     const drawn = `${left ? T.connectors[left].mermaid.left : ''}${T.mermaid.line}${right ? T.connectors[right].mermaid.right : ''}`;
-    const link: DrawnClassLink = { index: l.index, from: l.left, to: l.right, id, ids: [id], written: drawn, ...(words ? { label: words } : {}), start, end };
+    const link: DrawnClassLink = { index: l.index, from: l.left, to: l.right, id, ids: [id], written: drawn, route: arc ? 'arc' : 'straight', ...(words ? { label: words } : {}), start, end };
     drawnLinks.push(link);
-    for (const [marker, at, from, card] of [[left, P, Q, l.cardinality.left], [right, Q, P, l.cardinality.right]] as const) {
-      if (card?.trim()) dashes.push({ at, toward: from, marked: !!marker, said: card.trim() });
+    for (const [marker, at, from, card, side] of [[left, P, leaving[0], l.cardinality.left, start.port], [right, Q, leaving[1], l.cardinality.right, end.port]] as const) {
+      if (card?.trim()) dashes.push({ at, toward: from, side: side as Side, marked: !!marker, said: card.trim() });
       if (!marker || (marker === 'association' && ((arrowAt === 'right' && at === Q) || (arrowAt === 'left' && at === P)))) continue;
       const kind = marker === 'inheritance' || marker === 'association' ? 'triangle' : 'diamond';
       apart.push({ link, kind, filled: marker === 'composition' || marker === 'association', at, from });
     }
     if (words === UNREAD_WRITING || l.cardinality.left === UNREAD_WRITING || l.cardinality.right === UNREAD_WRITING) placeholder.push(`${l.left} — ${l.right}`);
   }
-  // Each multiplicity: a dash beside its end, off the line and clear of the head, labelled with its words.
+  // Each multiplicity: a dash beside its end, off the line and clear of the head, labelled with its words — on the side of
+  // its line that keeps it outside its class and furthest from every other line leaving near it.
+  const leavingNear = drawnLinks.flatMap((k) => {
+    const pts = (st().nodes.get(k.id) && (getRep(st().nodes.get(k.id)!, 'stroke')?.data as { points?: Point[] } | undefined)?.points) ?? [];
+    const m = Math.max(2, Math.ceil(pts.length * 0.4));
+    return [{ id: k.id, pts: pts.slice(0, m) }, { id: k.id, pts: pts.slice(-m) }];
+  });
+  const offLines = (p: Point, except: Point) =>
+    Math.min(Infinity, ...leavingNear.filter((x) => x.pts.length && !x.pts.some((q) => q.x === except.x && q.y === except.y)).map((x) => distToPolyline(p, x.pts)));
   for (const d of dashes) {
     const u = unit({ x: d.toward.x - d.at.x, y: d.toward.y - d.at.y });
-    // Beside the line: above one that runs across, right of one that runs down.
-    const n = Math.abs(u.x) > Math.abs(u.y) ? (u.x > 0 ? { x: u.y, y: -u.x } : { x: -u.y, y: u.x }) : u.y > 0 ? { x: u.y, y: -u.x } : { x: -u.y, y: u.x };
+    const o = outward[d.side];
     const h = DASH * U;
-    const halfAlong = Math.abs(u.y) * (h / 2), halfAcross = Math.abs(n.y) * (h / 2);
-    const c = add(hand(d.at), add(scaled(u, 0.5 * U + halfAlong), scaled(n, (d.marked ? 0.55 * len : 0) + DASH_OFF * U + halfAcross)));
+    // Just past its head along its own line, close beside it — where the lines leaving one side have fanned apart.
+    const place = (n: Point) => {
+      const halfAlong = Math.abs(u.y) * (h / 2), halfAcross = Math.abs(n.y) * (h / 2);
+      return add(hand(d.at), add(scaled(u, (d.marked ? len : 0) + 0.3 * U + halfAlong), scaled(n, DASH_OFF * U + halfAcross)));
+    };
+    const perp = { x: -u.y, y: u.x };
+    const options = [perp, { x: -perp.x, y: -perp.y }]
+      .map((n) => ({ n, c: place(n) }))
+      .filter((x) => (x.c.x - hand(d.at).x) * o.x + (x.c.y - hand(d.at).y) * o.y > 0.3 * U);
+    const pick = (options.length ? options : [{ n: perp, c: place(perp) }])
+      .map((x) => ({ ...x, room: offLines(world(x.c), d.at) }))
+      // The most room from the other lines; on a tie, above a line that runs across, right of one that runs down.
+      .sort((p, q) => q.room - p.room || (Math.abs(u.x) > Math.abs(u.y) ? p.n.y - q.n.y : q.n.x - p.n.x))[0];
+    const c = pick.c;
     const mark = session.addStroke(strokeFor({ shape: 'line', from: { x: c.x, y: c.y - h / 2 }, to: { x: c.x, y: c.y + h / 2 } })!.map(world), next(), pid, scale, { content: true });
     session.label({ nodeId: mark, text: d.said, participantId: pid, at: next() });
     drawnMarks.push(mark);
@@ -946,7 +1020,7 @@ function drawClassDiagramRead(session: Session, read: MermaidRead, opts: DrawMer
     return !got || (!both && got.kind !== kind) || !([got.from, got.to].includes(ids[d.from]) && [got.from, got.to].includes(ids[d.to]));
   });
   if (misread.length) notes.push(`read back, ${misread.length === 1 ? 'a relation does' : `${count(misread.length)} relations do`} not read as written: ${some(misread.map((d) => `${d.from} ${d.written} ${d.to}`))}`);
-  if (crossing.length) notes.push(`a straight relation cannot always go around: ${some(crossing)} ${crossing.length === 1 ? 'crosses' : 'cross'} a class on the way — read back, a class a line crosses may not read as one`);
+  if (crossing.length) notes.push(`no way around the classes between: ${some(crossing)} ${crossing.length === 1 ? 'crosses' : 'cross'} a class on the way — read back, a class a line crosses may not read as one`);
   for (const b of layout.back) {
     if (!b.cycle) continue;
     const l = links[b.index];
@@ -960,7 +1034,7 @@ function drawClassDiagramRead(session: Session, read: MermaidRead, opts: DrawMer
     notation: r.notation,
     direction: r.direction,
     ids,
-    links: drawnLinks.map((d) => ({ ...d, drawn: d.written.includes('<') && d.written.includes('>') ? '<-->' : d.written === '--' ? '---' : '-->', route: 'straight' as const })) as DrawnMermaid['links'],
+    links: drawnLinks.map((d) => ({ ...d, drawn: d.written.includes('<') && d.written.includes('>') ? '<-->' : d.written === '--' ? '---' : '-->' })) as DrawnMermaid['links'],
     notes,
     refused,
     bounds: { minX: origin.x + lb.minX, minY: origin.y + lb.minY, maxX: origin.x + lb.maxX, maxY: origin.y + lb.maxY },

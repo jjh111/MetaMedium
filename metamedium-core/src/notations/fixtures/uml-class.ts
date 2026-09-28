@@ -134,7 +134,8 @@ export function hatchIn(tip: Point, dir: Point, len: number, o: { seed: number }
   for (let i = 0; i <= n; i++) {
     const a = 0.12 + (0.76 * i) / n;
     const along = { x: tip.x - u.x * len * a, y: tip.y - u.y * len * a };
-    const w = len * 0.32 * (1 - Math.abs(a - 0.5) * 2) * 0.8;
+    // Inside its outline, as a careful hand fills it: a hatch crossing a wobbly outline three times is a scratch, and erases it (session.ts).
+    const w = len * 0.32 * (1 - Math.abs(a - 0.5) * 2) * 0.6;
     const side = i % 2 ? 1 : -1;
     pts.push({ x: along.x + v.x * w * side + (r() - 0.5), y: along.y + v.y * w * side + (r() - 0.5) });
   }
@@ -231,8 +232,10 @@ export const DIAGRAM_WORDS = {
   Circle: { name: 'Circle', members: ['-r: double', '+area() double'] },
   Square: { name: 'Square', members: ['-side: double'] },
   Point: { name: 'Point', members: [] as string[] },
-  multiplicities: { one: '1', many: '*', layer: '0..1' },
 };
+
+/** …and its multiplicities, in the order `drawClassDiagram` lists them: "1" and "*" on the composition, "0..1" on the aggregation. */
+export const DIAGRAM_MULTIPLICITIES = ['1', '*', '0..1'];
 
 /** Draw the bench's class diagram on a session. Returns what it should read as. */
 export function drawClassDiagram(s: Session, v: ClassVariant, t0 = 1000): ClassExpected {
