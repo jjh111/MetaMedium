@@ -861,8 +861,13 @@
     if (v && isFinite(v.zoom) && v.zoom > 0 && isFinite(v.panX) && isFinite(v.panY)) {
       view.zoom = clampZoom(v.zoom); view.panX = v.panX; view.panY = v.panY;
       afterViewChange();
-    } else fitAll();
-    board.viewSaved = { zoom: view.zoom, panX: view.panX, panY: view.panY };
+      board.viewSaved = { zoom: view.zoom, panX: view.panX, panY: view.panY };
+    } else {
+      // Fitted, and not yet anywhere the device keeps: the next save writes it, moved or not,
+      // so a board left where it opened comes back there — not fitted again to what it holds by then.
+      fitAll();
+      board.viewSaved = null;
+    }
   }
   let boardViewTimer = 0;
   const boardViewSoon = () => { clearTimeout(boardViewTimer); boardViewTimer = setTimeout(saveBoardView, 800); };

@@ -347,6 +347,21 @@ export async function boardsTest(browser, servers, ctx) {
       { afterSwitch: v12a, afterReload: v12b, other: v12c, minimap: mini.shown });
     await closeBoardsPane(page);
     await page.evaluate(() => window.__mm.setView(1, 0, 0));
+    // A board that opened fitted and was never moved comes back where it was left — not fitted again
+    // to what it holds by then (a box drawn far off would pull a refit away from where the hand was).
+    const b12 = await newBoardVia(page);
+    const left12 = await viewNow(page);
+    await drawPath(page, boxPath({ x: 1000, y: 600, w: 70, h: 44 }));
+    await switchTo(page, b2);
+    await openBoardsPane(page);
+    await page.click(`#boardsPanel button[data-open="${b12}"]`);
+    await waitOnBoard(page, b12);
+    const back12 = await viewNow(page);
+    check('N12b. a board that opened fitted and was never moved comes back where it was left, not fitted again to what it holds by then',
+      !!b12 && back12.zoom === left12.zoom && back12.panX === left12.panX && back12.panY === left12.panY,
+      { left: left12, back: back12 });
+    await closeBoardsPane(page);
+    await switchTo(page, b2);
 
     // ---- N13. places: folders, repositories and sites are recent entries of their kind -------
     const g13 = strokesIn((await storeOf(page, b2)).log);
