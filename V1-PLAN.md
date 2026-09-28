@@ -756,6 +756,62 @@ tests 45; surface in sync; the canvas MCP smoke and the shard's (605 in 31
 files, typecheck clean) pass; the gate 412 passed and the one honest skip
 (canvas 266; shard 123 + 11 + 12); WebKit smoke 4.
 
+**R4d a room merges a line, not the board — status, 27 Sep 2026: done on
+`w2-shard`** (on R4b's engine, merged in as `0bca5ca`) — `f3d3357` (red: the
+room's budgets as tests, and the oracle passing against the full replay),
+`0b8bee2` (core), `6e99380` (the canvas), `46f67fd` (the MCP hand),
+`a1158bc` (checkpoints) and the commit carrying this line. `LiveMerge`
+(`store/livemerge.ts`) keeps the merge standing between lines — `mergeLogs`'
+order and fold, the reader's own copy standing — and hands the session only
+what changed through the new `Session.rebase`: applied with no replay when a
+line's events fall after everything held, replayed from the nearest
+checkpoint when one falls before. The store says when to merge (`revision`,
+read through `heldLogs`): a hello, a goodbye, the relay's word and a whole log
+already held change no log and do no work. A room's log is `ownLog`, in the
+order written, with no event serialised. A hello is answered once per log:
+each hand for its own, a copy only for a writer that said goodbye (`close()`
+sends `bye`) or stayed silent 1.5 s, by the first holder. A merge leaves a
+checkpoint where it ended, and the last four checkpoints keep the index, so
+the commonest early line — one crossing a mark this hand just drew — goes back
+a few events. On the 2,000-mark board (`node --test
+metamedium-core/bench/room.test.mjs`, all four pass): **a line 1.65 ms median,
+2.03 ms p95, no replay** (was 312 / 317 ms on R4b's engine, 173 s before it);
+crossing a mark just drawn 4.2 / 5.0 ms; lines with no events, no work; the
+save a line schedules 0.26 ms (was 62.9); **a newcomer's hello one copy of each
+log** in rooms of three and six, with a hand that left or vanished — 6.51 MB to
+it in a room of six (was 32.56 MB, five copies) — and it holds exactly the
+room's logs. At 500: 0.94 / 1.10 ms (was 71.9 / 74.8). The oracle
+(`src/store/room.oracle.test.ts`, 16 seeded rooms in `npm test`) holds the path
+to `mergeLogs` and a replay from zero after every merge, and to a reference
+merging the whole log when one changed; 500 rooms (`MM_ROOM_SEEDS=500`, 45 s)
+pass with 8,857 checks, 10,250 lines that changed no log, 4,426 replays from a
+checkpoint (the path under test snapshots every 3–14 events), 1,974 appends,
+1,437 cuts before the first checkpoint, 410 merges read again whole, 443 undos
+here and 784 by other hands, 504 leavers, 921 goodbyes, 464 newcomers (236
+with marks drawn before they had a log name), 417 renames and 390 clocks that
+jumped. What it found: the path published its own log in the merge's order —
+a whole log where the reference sent an append, 6 rooms of 500 — so `ownLog`
+reads it in the order written. e2e 28l (a line after everything is applied:
+the same log, one event longer, `generation` unchanged) and 28m (a hello, the
+relay's word, a whole log already held leave the board and the paint
+untouched). R4b's budgets hold — 2,000 marks replay in 264 ms, a stroke 0.16 /
+0.34 ms, 16.8 MB held (was 12.4: the kept index); 5,000 in 713 ms, 57.5 MB (was
+45.5) — and `bench/equivalence.mjs --ref=0bca5ca` finds nothing that reads
+differently. *Found, not changed:* a line 30 or 150 events back — a clock
+seconds behind other hands' lines — replays from the regular checkpoints, 39
+and 64 ms at 2,000; undo in a room takes the last event on the board, which
+may be another hand's (it comes back at the next line that changes a log —
+before, at the next line of any kind); undo past ticks keeps a checkpoint
+taken after the undone event (latent: nothing dispatches ticks); answering a
+hello costs the answering hand the serialisation of its own log on the wire
+(40 ms at 2,000 through the test hub); the shard (`shard-3d/src/room.ts`)
+still merges its room whole on every notify. Whole suite before the last
+commit: core 1,063 in 77 files, typecheck clean, both bundles equal to a fresh
+build; relay, field, build and board tests 75; surface in sync; the canvas MCP
+smoke and the shard's (605 in 31 files, typecheck clean) pass; the gate 464
+passed and the one honest skip (canvas 268, keep 31, boards 19; shard 123 + 11
++ 12); WebKit smoke 4.
+
 ### Phase 1 — the backbone
 **B1 Tools.** *Owns* `metamedium-core/src/tools/` (the contract, the
 registry, adapters for today's tier-1 modules and concept conversions),

@@ -418,11 +418,18 @@ async function hello() {
     const hub = new core.LocalHub();
     const tallies = present.map(() => newTally());
     const stores = present.map((h, i) => new core.LiveStore(metered(hub, tallies[i]), h, 'r4a', { sitting: `sit-${i}` }));
-    stores.forEach((st, i) => st.subscribe((_, evs) => { tallies[i].notified++; if (evs.length) tallies[i].notifiedWithEvents++; }));
+    stores.forEach((st, i) => st.subscribe((_, evs) => {
+      tallies[i].notified++;
+      if (evs.length) tallies[i].notifiedWithEvents++;
+      // Since R4d a surface merges only on a notify whose line changed a log (the store's revision moved).
+      const rev = typeof st.revision === 'function' ? st.revision() : null;
+      if (rev === null || rev !== tallies[i].lastRevision) tallies[i].changedALog = (tallies[i].changedALog || 0) + 1;
+      tallies[i].lastRevision = rev;
+    }));
     for (let i = 0; i < present.length; i++) await stores[i].publish(logs[present[i]]);
     await settle();
     // Count from here: the newcomer's arrival only.
-    for (const t of tallies) Object.assign(t, newTally());
+    for (let i = 0; i < tallies.length; i++) Object.assign(tallies[i], newTally(), { changedALog: 0, lastRevision: typeof stores[i].revision === 'function' ? stores[i].revision() : null });
     const nt = newTally();
     const newcomer = new core.LiveStore(metered(hub, nt), 'newcomer~r4a', 'r4a', { sitting: 'sit-new' });
     newcomer.subscribe((_, evs) => { nt.notified++; if (evs.length) nt.notifiedWithEvents++; });
@@ -435,6 +442,7 @@ async function hello() {
     const deliveredBytes = answered.bytes * (k - 1); // every line reaches every other member
     const peerNotified = tallies.map((t) => t.notified);
     const peerNotifiedWithEvents = tallies.map((t) => t.notifiedWithEvents);
+    const peerChangedALog = tallies.map((t) => t.changedALog || 0);
     const newcomerLogs = await newcomer.readLogs();
     out.rooms[k] = {
       hands: k,
@@ -452,11 +460,12 @@ async function hello() {
       // BroadcastChannel or a relay each line is its own task, so each is one.
       peerNotified: peerNotified,
       peerNotifiedWithEvents,
+      peerChangedALog,
       newcomerNotified: nt.notified,
       wallMs: wall,
     };
     const r = out.rooms[k];
-    say(`  room of ${k}: the hello is answered with ${r.answerLines} lines, ${r.answerMB} MB sent, ${r.deliveredMB} MB delivered; each peer hears ${Math.max(...r.peerLinesReceived)} lines and is notified ${Math.max(...peerNotified)} times (${Math.max(...peerNotifiedWithEvents)} with events) — in the surface each notify is a full re-merge and replay; the newcomer is notified ${nt.notified} times`);
+    say(`  room of ${k}: the hello is answered with ${r.answerLines} lines, ${r.answerMB} MB sent, ${r.deliveredMB} MB delivered; each peer hears ${Math.max(...r.peerLinesReceived)} lines and is notified ${Math.max(...peerNotified)} times (${Math.max(...peerNotifiedWithEvents)} with events, ${Math.max(...peerChangedALog)} that changed a log) — before R4d the surface re-merged and replayed the board on every notify, since only on one that changed a log; the newcomer is notified ${nt.notified} times`);
   }
   const file = writeResult(`engine-hello-${size}-${which}.json`, out);
   say(`  → ${file}`);

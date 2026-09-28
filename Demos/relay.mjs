@@ -19,7 +19,8 @@
 // MM_RELAY_MAX_LINES, else 5000 lines per room. Past it the oldest lines go,
 // and a hand that connects after is told the room is older than the relay
 // remembers — every hand's store says so (store/live.ts, `truncation`), and
-// the hands still in the room answer its hello with every log they hold.
+// the hands still in the room answer its hello: each with its own log, and
+// one of them with a copy of any log whose writer has gone (V1-PLAN R4d).
 
 import { createServer } from 'node:http';
 import { pathToFileURL } from 'node:url';
