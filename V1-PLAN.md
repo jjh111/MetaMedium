@@ -1206,6 +1206,70 @@ the word window is gathered as a word (`session.ts`) and so is no figure; a
 fill that crosses a head's outline three times is a scratch and erases it; the
 session's inferred wire lands on a head, not the node beyond its `tip`.
 
+**E1 Handles — status, 28 Sep 2026: done on `w2`** — `f6e7c3a` (red: 26 of 27
+core tests in `session/handles.test.ts` against the contract with nothing
+behind it, and e2e 52, which found a press on a box's corner in the move zone
+moving the ink), `2fe798c` (core), `207e1ca` (the surface), `7eb87f3` and
+`6f72a2e` (red, then green: a loop that waits is never reshaped, at the door
+or on replay, as snapping never offers it), and the docs.
+`session/handles.ts`: `handlesOf` — the magnets' own sites of the clean form
+held or offered, never a notation's port, and for an arc its ends and its
+bulge; none without a clean form. The event is `reshape { id, handle, to, at
+}`, `handle` `{ kind, index }`, `to` in the mark's own space (`unplaced`,
+nodes.ts), so a move merged either side of it carries it and the reducer
+places nothing; the door, the preview and the replay run one function
+(`reshapePreview` → `reshapedClean`), one event is one act, the `'clean'` rep
+is replaced (with `reshaped`) and the ink never touched, and a mark not yet
+snapped is born reshaped. Per shape: a box keeps its frame, turned or leaning
+(a corner taken in the frame of the sides meeting at the corner across, which
+stays; an edge middle moves its side across only; the centre moves the form
+whole; past the side across it flips, each corner keeping its number); a
+circle's cardinal sets its radius, its centre moves it; a line's end moves
+that end; an arrow's too, the head kept at the tip, its barb between a
+fortieth and a fifth of the shaft so the form reads back as an arrow; a
+triangle's corner moves freely; an arc's end turns and scales it about the
+other end (its sweep kept), its bulge bends it through the chord's
+perpendicular; a dot moves; nothing under `MIN_EXTENT_PX` of the hand.
+**Readings:** the clean form is authoritative for where the mark stands —
+`boundsOf` and `standingPointsOf` return it, and the relations, the index,
+the scratch, tidy and every hit read them, as do its sites and its maths —
+and the shape rung's readings are not recomputed, because they measure the
+ink and the ink is as drawn: a box dragged into a thin bar is still a
+rectangle, and its maths says 400×6. **The zone rule** (`05-selection.js`):
+each handle — the selection's scale corners and knob, the mark's own points —
+owns the ground nearer to it than to any other, within a handle's reach, the
+selection's winning an exact tie; the rest of the outline is the move zone.
+The surface draws rings (a dot in those that move the form whole), none under
+48 px on screen, the form previewed in front with the ink faint beneath, the
+standing line adding *a ring to reshape*; a pen reaches a handle by the
+mouse's path, and a finger that pans while a pen is present never reaches
+one. e2e 52–52e (a box's nine points and its corner dragged; the magnets
+following; one undo; both sides of the corner's overlap; the knob and the
+move zone on a reshaped box; none on writing or two marks) and pencil P11.
+Core 1,226 in 91 files (handles 32; the room oracle now draws reshapes — 200
+seeded rooms, 281 reshapes, every board the full merge). *Found:* a moved or
+tidied mark offered its magnet sites where it was drawn (and a held circle's
+cardinals sat on its ink's box, not its clean circle); `placed` fitted an
+axis the ink has no extent on by a factor of nothing, so a flat line moved
+and its end dragged up collapsed — both fixed; `bench/equivalence.mjs`
+against `b353adc` reads every held log the same but for exactly those sites
+(a moved line and a tidied row in the scripted log; 17 snapped circles'
+cardinals on the 500-mark board, under a pixel). *Not changed:* a notation's
+symbols, ports, heads and figures still read the ink, a reading (E2 and
+D-units: `standingPointsOf` is where a mark stands); a reshape has no owner
+rule, as a move has none. *For E2:* a `reshape` changes only the `'clean'`
+rep, and `siteOf` of a binding's `{ kind, index }` answers where the site
+stands after it; a connector's own bound end dragged by its handle moves its
+form and leaves its `bound-to` claim as it stood — whether that lets the end
+go, or binds it where it lands, is E2's. Whole suite before the last commit:
+core 1,226 in 91 files, typecheck clean, both bundles equal to a fresh build;
+relay, field, build, board and release tests 107; surface and app in sync;
+the canvas MCP smoke and the shard's (606 in 31 files, typecheck clean) pass;
+the gate 553 passed and the one honest skip (canvas 320, keep 31, boards 20,
+app 14, pencil 15, budgets 7 — open 504 ms, release 35 ms on 2,000 marks, the
+500-mark paint equivalence differing in 0 — shard 123 + 11 + 12); WebKit
+smoke 4 and pencil 15.
+
 ### Phase 3 — diagrams
 **D1 Flowchart** — `src/notations/flowchart.ts`, the `flowchart@1` pack,
 the notation reading in the field and the panel, the ports. *Red first:* a

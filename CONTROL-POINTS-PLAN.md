@@ -79,7 +79,7 @@ line 0.9, and pulling its foot unwrites the word, e2e 16/33).
 
 **← the MVP line: everything above it is the felt feature.**
 
-### P2 — handles
+### P2 — handles · **landed 28 Sep 2026 (V1-PLAN E1, on `w2`)**
 
 A selected mark with a clean form shows its handles (the same sites, kind
 permitting: corners, middles, tip, tail, centre). Dragging one dispatches
@@ -89,6 +89,32 @@ the drag, in `07-input` / `05-selection`.
 
 **Done when:** a traced rectangle's corner drags to true it against the
 raster parked beside it, and undo restores both.
+
+**Landed as:** `session/handles.ts` — `handlesOf` (the magnets' own sites
+of the clean form held or offered, never a notation's port, and an arc's
+bulge in place of its span's middle), the geometry per shape, and
+`reshapePreview` / `reshapedClean`, the one function the door, the preview
+and the replay run. The event is `reshape { id, handle, to, at }`, `handle`
+`{ kind, index }` and `to` in the mark's own space, so a move merged either
+side of it carries it; one event, one act; a mark not yet snapped is born
+reshaped; the rep is replaced and undo drops it. A reshaped form is where
+the mark stands (`boundsOf`, `standingPointsOf`), so its sites, maths and
+relations follow it; the shape rung's readings of the ink are not
+recomputed. The surface's handles and zone rule are in `05-selection`, the
+preview in `08-render`; `07-input`'s mouse, pen and finger reach a handle by
+the path they reach the selection; CLAUDE.md *Handles* has the rest. **The done-when, honestly:** checked on drawn boxes, turned, leaning
+and born reshaped, by mouse and by a synthesised pen (e2e 52–52e, pencil
+P11); a traced rectangle is ink like any other and takes the same act, but
+the photograph it would be traced from is still P4's (D8, John's).
+**Found on the way:** a moved or tidied mark offered its magnet sites where
+it was DRAWN, and `placed` flattened any form off an axis the ink has no
+extent on (a ruled line's end dragged up, then moved) — both fixed.
+**For P3:** a `reshape` changes only the `'clean'` rep, and `siteOf` of a
+binding's `{ kind, index }` answers where that site stands after it (a
+corner keeps its number through a flip); ports are still read from the ink.
+A connector's OWN bound end can be dragged too: its form moves and its
+`bound-to` claim stands as it was — whether a hand's drag lets the end go,
+or binds it where it lands as the pen does, is P3's to decide.
 
 ### P3 — bindings follow
 

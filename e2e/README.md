@@ -213,7 +213,7 @@ events mean here what they mean on the glass. The on-screen keyboard is told
 to the page as iPadOS tells it: the layout viewport stays and the **visual**
 viewport shrinks — `window.visualViewport` stood in for by an init script
 before the page's own scripts run, whose `resize` the page's listeners hear.
-The mouse is Playwright's real pointer. Fourteen records, about ten seconds,
+The mouse is Playwright's real pointer. Fifteen records, about twelve seconds,
 the same on Chromium (in the default run) and WebKit (CI's `webkit` job):
 **P1** the pen draws and every point of its stroke carries its pressure;
 **P1b** the switch to the pen said once, the hand tile saying `right · pen`;
@@ -232,7 +232,9 @@ tile gives a finger its ink back, a palm still draws nothing, a field a finger
 opened does not take the focus, four taps come round; **P9** the mouse
 untouched — it draws, with no pressure, and its hover draws no ghost; **P10**
 saved and reloaded, every stroke back with its pressure, the preference kept
-and the pen not announced again. What only the glass can say — a real
+and the pen not announced again; **P11** the pen drags a handle of the one
+selected box — one reshape, no stroke, no summon, the ink as drawn — and a
+finger laid on another of its handles pans (V1-PLAN E1). What only the glass can say — a real
 Pencil's hover height, a real palm, the real keyboard, Scribble — is
 `QA-v1.md` §A10, by hand on an iPad.
 
