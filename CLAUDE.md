@@ -191,7 +191,9 @@ Architecture documents (chronological; **read MVP.md, then v7, then v6**):
 - `PERF.md` — **the performance baseline, 27 Sep 2026** (V1-PLAN R4a):
   the engine and the surface measured on generated boards of 500, 2,000 and
   5,000 marks, every number with its command, the hotspots ranked with
-  file:line, and the budgets phase 0b holds itself to
+  file:line, and the budgets phase 0b holds itself to — with R4b's "after"
+  column: the engine holds all three boards (2,000 replay in 0.24 s, a
+  stroke in 0.15 ms, 12 MB), the surface is still as measured
 - `SHARD-3D-PUSH-2.md` — **geometry from the drawing, G0–G5 all landed
   16 Sep 2026**: what John's first real use showed (a footprint and elevations
   from free views stood nothing, and a brief with nothing to fill was refused
@@ -233,7 +235,7 @@ any structural change.
 | `Assets/` | Figures and design rationale (recognition strategy, point-primitive proposal), and the social card. `make-card.mjs` regenerates that card from index.html's own hero — synthetic pointer input, so the picture shows the engine really reading a mark; `node Assets/make-card.mjs`. Change the picture and you must change the FILENAME and the four og:/twitter: tags in `index.html` and `404.html`, because scrapers cache by URL. **`Assets/whitepaper-figures/`** is the whitepaper's seven graphic plates: `build.py` holds their content and geometry and emits the static blocks `index.html` carries between `whitepaper-plate:KEY` markers (`--check` says they are in sync), `figures.css` and `figures.js` style and enhance them with no build, and `e2e/whitepaper-figures.mjs` audits the real page; its README is the workflow |
 | `archive/` | Retired versions and superseded plans, incl. whitepaper v4 (root `MetaMedium_Whitepaper_v4.html` is a redirect stub — keep it) and PRDs v3.2/v4 |
 | `e2e/` | **The browser gate** (`DIRECTOR-REVIEW-2026-09-15.md`, QA-1): `node e2e/run.mjs` starts its own servers on free ports (a static one over the repo root, vite over `shard-3d`), opens a **fresh browser context per scenario**, loads the harnesses that already exist — `Demos/session-engine.e2e.js` (`__setup` + `__scenario`) and `shard-3d/e2e.js` (`__scenario`, `__demo`, `__demo2`) — and awaits the result object each one returns. It does not reimplement them. **Four scenarios** on Chromium (`canvas`, `shard`, `demo`, `demo2`): 406 passing records and the one honest skip as of 27 Sep 2026 (canvas 260, shard 123 + 11 + 12), in about 135 s. A fifth, **`smoke`**, is opt-in and runs on WebKit (`node e2e/run.mjs --browser webkit smoke`, CI's `webkit` job): the board loads, ink drawn with real pointer input is read back, press-and-hold opens the field and one pill is taken — four checks in `run.mjs` itself, a WebKit smoke and not an iPhone test. Pass, fail and **skip** are counted separately (a record whose name says it skipped is a skip); a failed assertion, a harness exception, an attempted request to a real model, or a page error not on the named allowlist in `guards.mjs` each exit nonzero, with structured JSON and a screenshot in `e2e/results/`. Beside the gate, on its static server and never run by it or by CI: `e2e/perf.mjs` (the surface's half of `PERF.md`, numbers only) and `e2e/whitepaper-figures.mjs` (the plates' audit, Chromium and WebKit). `e2e/README.md` has the rest |
-| `PERF.md`, `metamedium-core/bench/`, `e2e/perf.mjs` | **The performance baseline** (V1-PLAN §9 R4a, 27 Sep 2026): `bench/board.mjs` draws deterministic boards of 500, 2,000 and 5,000 marks from a seed (the generator is kept, never the boards); `bench/engine.mjs` times replay, memory, relations, the whole-board read, one more stroke, a live room's incoming line and a newcomer's hello; `e2e/perf.mjs`, beside the gate and on its servers and model guard, times the surface — open, pan, draw, release → reading drawn — in Chromium and WebKit; `bench/profile.mjs` reads a CPU profile back to `src/…:line` and the surface's fragments; `bench/report.mjs` prints `PERF.md`'s tables from the results. `PERF.md` has the answer (500 marks usable, 2,000 not, 5,000 does not open), every number with its command, the hotspots ranked with file:line, and budgets for R4b. Not in `npm test` or the gate |
+| `PERF.md`, `metamedium-core/bench/`, `e2e/perf.mjs` | **The performance baseline** (V1-PLAN §9 R4a, 27 Sep 2026): `bench/board.mjs` draws deterministic boards of 500, 2,000 and 5,000 marks from a seed (the generator is kept, never the boards); `bench/engine.mjs` times replay, memory, relations, the whole-board read, one more stroke, a live room's incoming line and a newcomer's hello; `e2e/perf.mjs`, beside the gate and on its servers and model guard, times the surface — open, pan, draw, release → reading drawn — in Chromium and WebKit; `bench/profile.mjs` reads a CPU profile back to `src/…:line` and the surface's fragments; `bench/report.mjs` prints `PERF.md`'s tables from the results. `PERF.md` has the answer (500 marks usable, 2,000 not, 5,000 does not open), every number with its command, the hotspots ranked with file:line, and budgets for R4b — and, after R4b, the engine's numbers beside them. **R4b added** `bench/budgets.test.mjs` (`node --test`: the engine's budgets on the generated 2,000-mark board — replay ≤ 0.5 s, a stroke ≤ 4 / 16 ms, ≤ 150 MB — and the 5,000 board replays; each size in a process of its own, every run's numbers recorded in `dist/bench`) and `bench/equivalence.mjs` (every held log, a scripted log of the rarer acts and the 500-mark board replayed by the old engine — a committed bundle at `--ref` — and by `src/`, every reading and id compared, and what differs said). Not in `npm test` (`vitest.config.mjs` keeps `bench/` out) or the gate |
 | `.github/workflows/ci.yml` | CI, on every push/PR: typecheck + test + build for `metamedium-core` — with the drift check for both committed bundles, the MCP hand's smoke, the surface's drift check and its build's test, and the field reader's and the relay's Node tests — `shard-3d` (with its MCP hand's smoke) and `Web App Skeleton` (with lint); the **browser gate** (`e2e/run.mjs` on Chromium); and the **WebKit smoke** in a job of its own. Both browser jobs upload `e2e/results` when they fail |
 
 ### Experiments (subordinate tier — see `EXPERIMENTS.md`)
@@ -836,6 +838,36 @@ makes it render as real DOM in the canvas. The rules:
   from a large box is not near it.
 - **Relations carry strength**, so a crisp row can be told from a rough one.
 
+**What is stored is what is read; the rest is computed for a scope** (R4b,
+27 Sep 2026). The five **engaging** relations — `contains`, `inside`,
+`crossing`, `touching`, `near` (`ENGAGING_KINDS`) — hold only between marks
+**within reach** of each other (`withinReach`: their boxes meet, or the gap is
+under `near`'s own limit, a ratio of the smaller mark); the other seven hold at
+any distance. So a new mark is related, as held edges, only to the marks
+within its reach, and for each such pair **every** relation `relate` finds is
+stored, how they sit included — the same edges in the same order as before. A
+pair out of reach stores nothing: above, left-of, same-row, same-column and
+same-size between marks a board apart (88% of a 2,000-mark board's edges, read
+by nothing but the brief) are computed **on demand for the scope that asks** —
+`session.read(ids)` relates its scope, and concepts, roles, notations, figures
+and the field read that. A signature reads only the engaging edges, which are
+all still stored. The marks within reach are found through a spatial index,
+`relate/grid.ts` (`MarkGrid`, exported, so a surface culls by the same
+index): a hierarchical grid whose cells are **sized from the marks** — each mark filed at the smallest power of two its own size
+fits in — asked for the boxes that meet a mark's box grown by `reachAround`;
+the index decides what is looked at, never what is true. The session keeps
+the content plane filed, and the **components** of the within-reach links with
+their cluster candidates: a mark added, taken away or moved finds only its own
+component again, a changed definition is scored against every component, and
+the list is rebuilt exactly where `recomputeClusterCandidates` ran before.
+Checkpoints share the rep and edge objects the live graph holds (none is ever
+changed in place). `metamedium-core/bench/equivalence.mjs` replays every held
+log, a scripted log of the acts the boards never make and the 500-mark board
+with the old and the new engine and says what reads differently (nothing; the stored out-of-reach relations and the brief's
+lines listing them are what changed), and `bench/budgets.test.mjs` holds
+PERF.md's engine budgets on the generated 2,000-mark board (`node --test`,
+this machine's, not CI).
+
 **Concepts** are the meaning-mappings, kept as a library rather than as code
 paths: `row`, `column`, `frame`, `flow`, `grid`, `labelled`. Each is a name, a
 predicate over relations, and a list of `conversions` it affords. They match
@@ -883,8 +915,9 @@ relations, roles, genre and concepts together; the inspector's **ladder**
 ### Spatial Graph — retired
 
 The old spatial graph (`spatial.ts`, with its fixed 50px "touching") is gone.
-`src/relate/relations.ts` is the one relation system: the session records its
-measured, scale-free relations on the node graph, clusters over them, and infers
+`src/relate/relations.ts` is the one relation system: the session records the
+measured, scale-free relations of marks within reach of each other on the node
+graph (found through `relate/grid.ts`), clusters over them, and infers
 wires (`connects`, plus `points-from`/`points-to` for arrows) with a tolerance
 relative to the target's own size. Legacy copies still exist for reference in
 `Web App Skeleton/src/core/spatial.ts` and `doodle2-canvas.html`.

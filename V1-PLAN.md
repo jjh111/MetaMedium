@@ -705,6 +705,57 @@ per line gone. **R4e a brief carries what it is about** — `describeSession`
 lists the relations near the scope, not every stored one (113 KB for five
 marks at 2,000).
 
+**R4b the engine holds 2,000 marks — status, 27 Sep 2026: done on `w2`** —
+`d16fdab` (red: the budgets as tests, the equivalence harness), `08a1aef`,
+`1fbd868` (PERF.md's "after R4b" column), `8f45ac2` (the harness's scripted
+log), `bd843b7` (the grid and the reach test exported, for R4c). A content
+mark is filed in `relate/grid.ts`, a hierarchical grid whose cells are sized
+from the marks (each at the smallest power of two its own size fits in), and
+linked to the marks within its reach: `withinReach` is exactly "`relate` finds
+an engaging relation" (pinned on 4,000 pairs at four scales), and
+`reachAround` — `nearRatio` of the mark's own size — grows the box the index
+is asked about. A pair within reach stores every relation `relate` finds, in
+the old order; a pair out of reach stores none, and a scope computes those on
+demand (`session.read`). The components of the links are kept with their
+candidates and found again only where a mark joined, left or moved; a changed
+definition is scored against every component; checkpoints share the reps and
+edges nothing changes in place; the scratch test asks an index of the ink, and
+`scratchedOut` passes over a target whose box stands clear (`mayCross`). On
+the generated boards (`node --test metamedium-core/bench/budgets.test.mjs`):
+**2,000 marks replay in 0.24 s (was 159.5 s), take one more stroke in 0.15 ms
+median and 0.23 ms p95 (was 237 / 535 ms) and hold 12.4 MB (was 1,059 MB;
+stored edges 909,566 → 18,146); 5,000 marks replay in 0.65 s (killed at 300 s
+before), 0.31 / 0.39 ms a stroke, 45.5 MB** — inside PERF.md's 5,000 budgets
+too. `bench/equivalence.mjs` (the `9977158` bundle against `src/`) finds
+nothing that reads differently in any held log — bare, as the reader's own, as
+another hand's, at every prefix — in a scripted log of the acts the boards
+never make (tidy, scale, turn, import, frame, correct, split, label, bind, a
+loop kept as a drawing, clocks; every prefix, twelve undos), or on the
+500-mark board loaded, drawn event by event and compared after all 530 events,
+by prefixes, undone six times from a checkpoint (equal to a replay from zero),
+and drawn on: ids, reps, the state, clusters and candidates, shapes, words,
+reads, matches, signatures, regions, magnets, snap offers, heads, figures and
+the maths are identical — and so they are on the 2,000-mark board
+(`--size=2000`, the old engine given a 24 GB heap), loaded, drawn event by
+event and compared after all 2,079 events, undone from a checkpoint and drawn
+on. What changed is the stored edges, less exactly the relations between marks
+out of reach (500 board: 65,336 → 4,398; 2,000: 909,566 → 18,146, 800,948 of
+the dropped same-size), and the brief's lines that listed them — five marks'
+brief at 2,000 is 2 KB, not 113 KB, so R4e's number is met as a side effect
+and its scoping is still its own. `session.scenario.test.ts` untouched,
+`held.test.ts` green.
+*Found, not changed:* the whole-board read the surface runs per stroke is
+still 7.9 s at 2,000 (R4c's); a room's line is 63 ms of merge work and a 0.27
+s replay (R4d's); moving an artifact moves its members but not its own bounds,
+so the plane reads the artifact where it was blessed — as it always did, and
+kept, because changing it changes a reading. `vitest.config.mjs` keeps
+`bench/` out of `npm test`, which had collected `budgets.test.mjs` since the
+red commit. Whole suite before the last commit: core 967 in 72 files,
+typecheck clean, both bundles equal to a fresh build; relay, field and build
+tests 45; surface in sync; the canvas MCP smoke and the shard's (605 in 31
+files, typecheck clean) pass; the gate 412 passed and the one honest skip
+(canvas 266; shard 123 + 11 + 12); WebKit smoke 4.
+
 ### Phase 1 — the backbone
 **B1 Tools.** *Owns* `metamedium-core/src/tools/` (the contract, the
 registry, adapters for today's tier-1 modules and concept conversions),

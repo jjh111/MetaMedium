@@ -562,6 +562,7 @@ node --expose-gc metamedium-core/bench/engine.mjs relate --size=N               
 node --expose-gc metamedium-core/bench/engine.mjs room --size=N                                              # N 500, 2000
 node metamedium-core/bench/report.mjs --column="after R4b"                           # the engine's column, from those runs
 node metamedium-core/bench/equivalence.mjs                                           # old engine (9977158) against src/: what reads differently
+node --max-old-space-size=24576 metamedium-core/bench/equivalence.mjs --size=2000 --prefix-step=100000 --undos=2 --extend=10   # the same on the 2,000 board: ~15 min, the old engine holding GBs
 ```
 
 Results land in `metamedium-core/dist/bench/` and `e2e/results/perf/`, both
