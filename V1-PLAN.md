@@ -1207,11 +1207,69 @@ maths lane); `inferWire` (`session.ts`) wires only a top *line* or *arrow*,
 so a curved connector that now reads as an arc gets no wire (the main
 lane); and John's own arrows are not in the repo — the barb rule was
 checked on synthetic hands and D1's arrows, and wants his strokes (R1).
+*Status of two of those, 28 Sep 2026 (fixed in D2's lane, `w2-maths`):*
+**the data symbol after clean** — a box drawn leaning keeps its lean
+(`clean.ts`, `leaningBox`): the four corners on the ink's hull (D1's
+`shape.ts`) place its sides, each side's direction is fitted to the ink
+along its middle run (a hand rounds an acute corner more, so the chord
+leaned with the rounding, up to 5.5°; fitted, 3.1°), and past
+`LEAN_KEPT_DEG` with its sides parallel in pairs within
+`LEAN_PARALLEL_DEG` (which refuses a trapezoid) its clean form is the
+tightest parallelogram with those sides that holds the ink, top and bottom
+laid level within the hand's wobble. 1,548 hand boxes lean 4.4° at most by
+this measure, data symbols 22°–27°. The flowchart bench after *Draw them
+clean*: data 36/36 (0 before), every other row unchanged; the clean bench's
+rows unchanged, and a new row of 108 boxes drawn leaning 12°–24° either way
+offered 107/108, wrong 0, read back wrong 0, off its lean 0 (107 before).
+**A turned box's sides** — `measure.ts` measures a rectangle from the four
+corners of its clean form where the mark stands (held, else offered, else
+the tightest box around the ink): width the side nearer level, height
+across to the opposite side, and a `lean` for a leaning box. Unchanged for
+every box whose clean form is its bounds (the corpus's 540 of 540, the
+flowchart's upright processes); changed for the 864 turned boxes (e.g.
+216×167 → 200×140), processes tilted 6° and 10°, a box within 5° whose
+bounds are looser than its own box by more than `BOUNDS_SLACK` (a 400×20
+bar 2° off level measured 400×33, now 400×21 — as its clean form is drawn),
+and a leaning box (its base, not its bounds). Found, for its owner:
+`maths/dimension.ts` makes any rectangle-read mark a figure of kind
+`rectangle`, whose rules assume right corners; a clean form that carries a
+`lean` is a parallelogram and wants `quadrilateral` there (the maths lane).
 **D2 Mermaid out** — the exporter tool,
 the `mermaid` kind in `kinds/kinds.ts` and its renderer in the `run`
 sandbox, the export pane. *Red first:* the fixture's Mermaid equals a golden
 text; the render is asserted when the library loads and skipped by name when
-it cannot. **D3 Mermaid in** — the parser, the layered layout, drawing
+it cannot.
+*Status, 28 Sep 2026:* D2's core built on `w2-maths`; the tool, the
+`mermaid` kind, its render in the `run` sandbox and the export pane are
+still to come. `notations/mermaid.ts`: `toMermaid(reading, opts)` finds
+the writer its notation registered (`registerMermaidWriter` — D4–D6 add
+theirs; none gives null) and returns `{ text, notation, diagram, direction,
+ids, marks, links, unread, notes }`, at tier 1, nothing in the log. The
+flowchart's: `flowchart TD`, or `LR` when the flows run across — measured
+between the centres of the symbols each flow joins, the reason said, or
+asked for; each symbol in `FLOWCHART_TABLE`'s brackets, each flow `-->`,
+`---` or `<-->`, writing beside it as `|"…"|`; nodes in the drawing's
+reading order and links by the nodes they join — never the log's order.
+Ids are the marks' own said safely (`stroke:ada:7` → `stroke_ada_7`, a
+figure → `figure_6_7`): a letter first, no keyword Mermaid's lexer reads
+first, and ids that would say the same each take a suffix hashed from their
+own id, so a name is a function of the set. Every label quoted and escaped
+(`"`, `#`, `%`, backtick, `<`, `>`, `&` as Mermaid's entities, a break as
+`<br>`, `:` too on a line its preprocessing would take for `style` or
+`classDef`; `unescapeMermaid` is the exact inverse). Writing nobody has
+read is written "(unread writing)", its marks in `unread`, and said in
+`notes` beside the symbols with no writing and marks left out; a word a
+hand put on its own ink (`label`) is its symbol's or flow's text. The
+golden (`fixtures/flowchart.mermaid.ts`, by hand): all 36 of D1's hands
+export one text before the writing is read and one after; the same text
+after a replay, with the reading's lists shuffled, and for two hands merged
+by any reader, in either key order or end to end either way. Mermaid 21
+tests, core 1145. The surface's half must know: ink over the rendered
+diagram maps back through `ids` (the symbol's id — a figure's is
+`figure:a+b`, not a node) and `marks` (its real strokes); `links[i]` is
+Mermaid's link `i`; `unread` is what *Read the writing* would read first;
+pass `readWith` for words read with their line; the text ends in a newline.
+**D3 Mermaid in** — the parser, the layered layout, drawing
 through `strokeFor` with bindings. *Red first:* export of import is the
 original text, normalised; import of export reads as the same notation.
 **D4 UML class**, **D5 sequence and state**, **D6 ER and mind map** — one

@@ -126,6 +126,7 @@ var MetaMediumCore = (() => {
     TIER0_PARTICIPANT: () => TIER0_PARTICIPANT,
     TIER1_LIBRARY: () => TIER1_LIBRARY,
     TO_SCALE_WITHIN: () => TO_SCALE_WITHIN,
+    UNREAD_WRITING: () => UNREAD_WRITING,
     USE_LIFT_MAX: () => USE_LIFT_MAX,
     USE_LIFT_RATE: () => USE_LIFT_RATE,
     VERBS: () => VERBS,
@@ -152,7 +153,7 @@ var MetaMediumCore = (() => {
     behaviourSource: () => behaviourSource,
     behavioursOf: () => behavioursOf,
     bestWiring: () => bestWiring,
-    between: () => between,
+    between: () => between2,
     binarize: () => binarize,
     bindingsOf: () => bindingsOf,
     blessedBehaviourOf: () => blessedBehaviourOf,
@@ -331,6 +332,9 @@ var MetaMediumCore = (() => {
     mayCross: () => mayCross,
     measure: () => measure,
     mergeLogs: () => mergeLogs,
+    mermaidIds: () => mermaidIds,
+    mermaidString: () => mermaidString,
+    mermaidWriters: () => mermaidWriters,
     nameMarks: () => nameMarks,
     nearLimitOf: () => nearLimitOf,
     nearestMagnet: () => nearestMagnet,
@@ -392,6 +396,7 @@ var MetaMediumCore = (() => {
     regionIdsIn: () => regionIdsIn,
     regionsOf: () => regionsOf,
     regionsOverlapping: () => regionsOverlapping,
+    registerMermaidWriter: () => registerMermaidWriter,
     registerNotation: () => registerNotation,
     registerPorts: () => registerPorts,
     registerTool: () => registerTool,
@@ -448,6 +453,7 @@ var MetaMediumCore = (() => {
     thin: () => thin,
     tightBox: () => tightBox,
     toBytes: () => toBytes,
+    toMermaid: () => toMermaid,
     toText: () => toText,
     toolScope: () => toolScope,
     toolsFor: () => toolsFor,
@@ -460,6 +466,7 @@ var MetaMediumCore = (() => {
     transcriptsOf: () => transcriptsOf,
     trueSize: () => trueSize,
     typeNodeId: () => typeNodeId,
+    unescapeMermaid: () => unescapeMermaid,
     unregisterNotation: () => unregisterNotation,
     unregisterPorts: () => unregisterPorts,
     unregisterTool: () => unregisterTool,
@@ -695,10 +702,10 @@ var MetaMediumCore = (() => {
     const total = cum[cum.length - 1];
     if (total === 0) return path.slice(0, n2);
     const out = [];
-    const count3 = closed ? n2 : n2 - 1;
+    const count4 = closed ? n2 : n2 - 1;
     let j = 0;
     for (let i = 0; i < (closed ? n2 : n2); i++) {
-      const target = i / count3 * total;
+      const target = i / count4 * total;
       while (j < cum.length - 2 && cum[j + 1] < target) j++;
       const span = cum[j + 1] - cum[j];
       const t = span > 0 ? (target - cum[j]) / span : 0;
@@ -1478,6 +1485,173 @@ var MetaMediumCore = (() => {
     return getRep(node, "frame")?.data;
   }
 
+  // src/notations/shape.ts
+  var sub = (a, b) => ({ x: a.x - b.x, y: a.y - b.y });
+  var cross = (a, b) => a.x * b.y - a.y * b.x;
+  var dot = (a, b) => a.x * b.x + a.y * b.y;
+  var dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+  var mid = (a, b) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+  var DEG2 = 180 / Math.PI;
+  var ramp2 = (v, lo, hi) => Math.max(0, Math.min(1, (v - lo) / (hi - lo)));
+  function hullOf(points) {
+    const pts = [...points].filter((p) => Number.isFinite(p.x) && Number.isFinite(p.y)).sort((a, b) => a.x - b.x || a.y - b.y);
+    if (pts.length < 3) return pts.map((p) => ({ x: p.x, y: p.y }));
+    const lower = [], upper = [];
+    for (const p of pts) {
+      while (lower.length >= 2 && cross(sub(lower[lower.length - 1], lower[lower.length - 2]), sub(p, lower[lower.length - 2])) <= 0) lower.pop();
+      lower.push(p);
+    }
+    for (let i = pts.length - 1; i >= 0; i--) {
+      const p = pts[i];
+      while (upper.length >= 2 && cross(sub(upper[upper.length - 1], upper[upper.length - 2]), sub(p, upper[upper.length - 2])) <= 0) upper.pop();
+      upper.push(p);
+    }
+    return lower.slice(0, -1).concat(upper.slice(0, -1)).map((p) => ({ x: p.x, y: p.y }));
+  }
+  function areaOf(v) {
+    let s = 0;
+    for (let i = 0; i < v.length; i++) s += cross(v[i], v[(i + 1) % v.length]);
+    return Math.abs(s) / 2;
+  }
+  function insideConvex(p, v) {
+    if (v.length < 3) return false;
+    let sign = 0;
+    for (let i = 0; i < v.length; i++) {
+      const c = cross(sub(v[(i + 1) % v.length], v[i]), sub(p, v[i]));
+      if (Math.abs(c) < 1e-9) continue;
+      if (sign === 0) sign = Math.sign(c);
+      else if (Math.sign(c) !== sign) return false;
+    }
+    return true;
+  }
+  function distToSegment(p, a, b) {
+    const ab = sub(b, a);
+    const l2 = dot(ab, ab);
+    const t = l2 > 0 ? Math.max(0, Math.min(1, dot(sub(p, a), ab) / l2)) : 0;
+    return Math.hypot(p.x - (a.x + ab.x * t), p.y - (a.y + ab.y * t));
+  }
+  function distToRing(p, v) {
+    if (v.length === 1) return dist(p, v[0]);
+    let best = Infinity;
+    for (let i = 0; i < v.length; i++) best = Math.min(best, distToSegment(p, v[i], v[(i + 1) % v.length]));
+    return best;
+  }
+  function distToPath(p, path) {
+    if (path.length === 1) return dist(p, path[0]);
+    let best = Infinity;
+    for (let i = 1; i < path.length; i++) best = Math.min(best, distToSegment(p, path[i - 1], path[i]));
+    return best;
+  }
+  function outside(p, hull2) {
+    if (hull2.length >= 3 && insideConvex(p, hull2)) return 0;
+    return distToRing(p, hull2);
+  }
+  function reduceHull(hull2, max = 16) {
+    const v = hull2.slice();
+    while (v.length > max) {
+      let k = 0, least = Infinity;
+      for (let i = 0; i < v.length; i++) {
+        const a = v[(i - 1 + v.length) % v.length], b = v[i], c = v[(i + 1) % v.length];
+        const cost = Math.abs(cross(sub(b, a), sub(c, a))) / 2;
+        if (cost < least) {
+          least = cost;
+          k = i;
+        }
+      }
+      v.splice(k, 1);
+    }
+    return v;
+  }
+  function cornersOf(hull2) {
+    const A = areaOf(hull2);
+    if (hull2.length < 4 || A <= 0) return { share: 0, three: hull2.length === 3 && A > 0 ? 1 : 0, quad: [] };
+    const v = reduceHull(hull2);
+    const n2 = v.length;
+    let best = 0, tri = 0, quad = [];
+    for (let i = 0; i < n2; i++)
+      for (let j = i + 1; j < n2; j++)
+        for (let k = j + 1; k < n2; k++) {
+          tri = Math.max(tri, areaOf([v[i], v[j], v[k]]));
+          for (let l = k + 1; l < n2; l++) {
+            const q = [v[i], v[j], v[k], v[l]];
+            const a = areaOf(q);
+            if (a > best) {
+              best = a;
+              quad = q;
+            }
+          }
+        }
+    return { share: best / A, three: tri / A, quad: quad.map((p) => ({ x: p.x, y: p.y })) };
+  }
+  function tightBox(hull2) {
+    if (hull2.length < 3) return null;
+    let best = null;
+    for (let i = 0; i < hull2.length; i++) {
+      const a = hull2[i], b = hull2[(i + 1) % hull2.length];
+      const len = dist(a, b);
+      if (len < 1e-9) continue;
+      const u = { x: (b.x - a.x) / len, y: (b.y - a.y) / len };
+      let minU = Infinity, maxU = -Infinity, minV = Infinity, maxV = -Infinity;
+      for (const p of hull2) {
+        const pu = p.x * u.x + p.y * u.y, pv = -p.x * u.y + p.y * u.x;
+        minU = Math.min(minU, pu);
+        maxU = Math.max(maxU, pu);
+        minV = Math.min(minV, pv);
+        maxV = Math.max(maxV, pv);
+      }
+      const w2 = maxU - minU, h2 = maxV - minV, area3 = w2 * h2;
+      if (area3 <= 0 || best && area3 >= best.area) continue;
+      const cu = (minU + maxU) / 2, cv = (minV + maxV) / 2;
+      const centre2 = { x: cu * u.x - cv * u.y, y: cu * u.y + cv * u.x };
+      const axis = w2 >= h2 ? u : { x: -u.y, y: u.x };
+      best = { centre: centre2, axis, long: Math.max(w2, h2), short: Math.min(w2, h2), area: area3 };
+    }
+    return best;
+  }
+  function roundFrom(quad, first) {
+    let v = quad.map((p) => ({ x: p.x, y: p.y }));
+    let s = 0;
+    for (let i = 0; i < v.length; i++) s += cross(v[i], v[(i + 1) % v.length]);
+    if (s < 0) v = v.reverse();
+    let k = 0;
+    v.forEach((p, i) => {
+      const q = v[k];
+      const better = first === "top" ? p.y < q.y - 1e-9 || Math.abs(p.y - q.y) <= 1e-9 && p.x < q.x : p.x + p.y < q.x + q.y - 1e-9 || Math.abs(p.x + p.y - (q.x + q.y)) <= 1e-9 && p.y < q.y;
+      if (better) k = i;
+    });
+    return v.map((_, i) => v[(i + k) % v.length]);
+  }
+  var offLevel = (v) => Math.atan2(Math.abs(v.y), Math.abs(v.x)) * DEG2;
+  var offPlumb = (v) => 90 - offLevel(v);
+  var offSquare = (v) => Math.min(offLevel(v), offPlumb(v));
+  function between(a, b) {
+    const la = Math.hypot(a.x, a.y), lb = Math.hypot(b.x, b.y);
+    if (la < 1e-9 || lb < 1e-9) return 90;
+    return Math.acos(Math.min(1, Math.abs(dot(a, b)) / (la * lb))) * DEG2;
+  }
+  function anglesOf(v) {
+    const n2 = v.length;
+    return v.map((p, i) => {
+      const a = sub(v[(i - 1 + n2) % n2], p), b = sub(v[(i + 1) % n2], p);
+      const la = Math.hypot(a.x, a.y), lb = Math.hypot(b.x, b.y);
+      if (la < 1e-9 || lb < 1e-9) return 180;
+      return Math.acos(Math.max(-1, Math.min(1, dot(a, b) / (la * lb)))) * DEG2;
+    });
+  }
+  function stanceOf(quad) {
+    const box = roundFrom(quad, "top-left");
+    const diamond = roundFrom(quad, "top");
+    const sides = box.map((p, i) => sub(box[(i + 1) % 4], p));
+    const upright = Math.max(...sides.map(offSquare));
+    const square = Math.max(...anglesOf(box).map((a) => Math.abs(a - 90)));
+    const d1 = sub(diamond[2], diamond[0]), d2 = sub(diamond[3], diamond[1]);
+    const turned2 = Math.max(offPlumb(d1), offLevel(d2));
+    const level = Math.max(offLevel(sides[0]), offLevel(sides[2]));
+    const parallel = between(sides[1], sides[3]);
+    const lean = (offPlumb(sides[1]) + offPlumb(sides[3])) / 2;
+    return { box, diamond, upright, square, turned: turned2, level, parallel, lean };
+  }
+
   // src/session/interpretations.ts
   function participantName(id, nodes) {
     const p = nodes.get(id);
@@ -1548,7 +1722,7 @@ var MetaMediumCore = (() => {
       if (g) g.push(i);
       else groups.set(i.tier, [i]);
     }
-    return [...groups.entries()].sort((a, b) => a[0] - b[0]).map(([key2, list]) => ({ key: key2, label: `tier ${key2}`, interpretations: list }));
+    return [...groups.entries()].sort((a, b) => a[0] - b[0]).map(([key2, list2]) => ({ key: key2, label: `tier ${key2}`, interpretations: list2 }));
   }
   function bySource(interpretations) {
     const groups = /* @__PURE__ */ new Map();
@@ -1558,10 +1732,10 @@ var MetaMediumCore = (() => {
       if (g) g.push(i);
       else groups.set(key2, [i]);
     }
-    return [...groups.entries()].map(([key2, list]) => ({
+    return [...groups.entries()].map(([key2, list2]) => ({
       key: key2,
-      label: list[0].sourceName,
-      interpretations: list
+      label: list2[0].sourceName,
+      interpretations: list2
     }));
   }
   function disagreement(interpretations) {
@@ -1596,6 +1770,76 @@ var MetaMediumCore = (() => {
   var SNAPPABLE = /* @__PURE__ */ new Set(["rectangle", "circle", "triangle", "line", "arrow", "arc", "dot"]);
   var SQUARE_UP_DEG = 5;
   var BOUNDS_SLACK = 0.05;
+  var LEAN_KEPT_DEG = 8;
+  var LEAN_PARALLEL_DEG = 15;
+  var sub2 = (a, b) => ({ x: a.x - b.x, y: a.y - b.y });
+  var turned = (v, t) => ({ x: v.x * Math.cos(t) - v.y * Math.sin(t), y: v.x * Math.sin(t) + v.y * Math.cos(t) });
+  function inkAlong(raw, p, q) {
+    const d = sub2(q, p);
+    const len = Math.hypot(d.x, d.y);
+    if (len < 1e-9) return d;
+    const u = { x: d.x / len, y: d.y / len };
+    const run = raw.filter((r) => {
+      const t = ((r.x - p.x) * u.x + (r.y - p.y) * u.y) / len;
+      return t >= 0.2 && t <= 0.8 && Math.abs((r.x - p.x) * -u.y + (r.y - p.y) * u.x) <= 0.2 * len;
+    });
+    if (run.length < 3) return d;
+    const mx = run.reduce((k, r) => k + r.x, 0) / run.length, my = run.reduce((k, r) => k + r.y, 0) / run.length;
+    let sxx = 0, sxy = 0, syy = 0;
+    for (const r of run) {
+      sxx += (r.x - mx) ** 2;
+      sxy += (r.x - mx) * (r.y - my);
+      syy += (r.y - my) ** 2;
+    }
+    const angle = 0.5 * Math.atan2(2 * sxy, sxx - syy);
+    const sign = Math.cos(angle) * u.x + Math.sin(angle) * u.y < 0 ? -1 : 1;
+    return { x: sign * Math.cos(angle) * len, y: sign * Math.sin(angle) * len };
+  }
+  function leaningBox(raw) {
+    const hull2 = hullOf(raw);
+    const { quad } = cornersOf(hull2);
+    if (quad.length !== 4) return null;
+    const s = quad.map((p, i) => inkAlong(raw, p, quad[(i + 1) % 4]));
+    if (between(s[0], s[2]) > LEAN_PARALLEL_DEG || between(s[1], s[3]) > LEAN_PARALLEL_DEG) return null;
+    let a = { x: (s[0].x - s[2].x) / 2, y: (s[0].y - s[2].y) / 2 };
+    let b = { x: (s[1].x - s[3].x) / 2, y: (s[1].y - s[3].y) / 2 };
+    const lean = 90 - between(a, b);
+    if (!(lean > LEAN_KEPT_DEG)) return null;
+    const ref = offSquare(a) <= offSquare(b) ? a : b;
+    if (offSquare(ref) <= SQUARE_UP_DEG) {
+      const angle = Math.atan2(ref.y, ref.x);
+      const t = Math.round(angle / (Math.PI / 2)) * (Math.PI / 2) - angle;
+      a = turned(a, t);
+      b = turned(b, t);
+    }
+    const la = Math.hypot(a.x, a.y), lb = Math.hypot(b.x, b.y);
+    if (la < 1e-9 || lb < 1e-9) return null;
+    const na = { x: -a.y / la, y: a.x / la }, nb = { x: -b.y / lb, y: b.x / lb };
+    let loA = Infinity, hiA = -Infinity, loB = Infinity, hiB = -Infinity;
+    for (const p of hull2) {
+      const pa = p.x * na.x + p.y * na.y, pb = p.x * nb.x + p.y * nb.y;
+      loA = Math.min(loA, pa);
+      hiA = Math.max(hiA, pa);
+      loB = Math.min(loB, pb);
+      hiB = Math.max(hiB, pb);
+    }
+    const det = na.x * nb.y - na.y * nb.x;
+    if (Math.abs(det) < 1e-9 || hiA - loA < 1e-9 || hiB - loB < 1e-9) return null;
+    const corners = [loA, hiA].flatMap((u) => [loB, hiB].map((v) => ({ u, v, p: { x: (u * nb.y - na.y * v) / det, y: (na.x * v - u * nb.x) / det } })));
+    const across = offLevel(a) <= offLevel(b) ? "u" : "v";
+    const along = across === "u" ? "v" : "u";
+    const meanY = (k) => corners.filter((c) => c[across] === k).reduce((y, c) => y + c.p.y, 0) / 2;
+    const [first, second] = across === "u" ? [loA, hiA] : [loB, hiB];
+    const topSide = meanY(first) <= meanY(second) ? first : second;
+    const [tl, tr] = corners.filter((c) => c[across] === topSide).sort((p, q) => p.p.x - q.p.x);
+    const br = corners.find((c) => c[across] !== topSide && c[along] === tr[along]);
+    const bl = corners.find((c) => c[across] !== topSide && c[along] === tl[along]);
+    const points = [tl.p, tr.p, br.p, bl.p];
+    const top = sub2(points[1], points[0]), side = sub2(points[3], points[0]);
+    const base = Math.hypot(top.x, top.y);
+    const area3 = Math.abs(top.x * side.y - top.y * side.x);
+    return { points, lean: 90 - between(top, side), base, height: base > 0 ? area3 / base : 0 };
+  }
   function lineBendsTooFar(node) {
     const stroke = getRep(node, "stroke")?.data;
     const bow = stroke?.points ? bowOf(stroke.points) : null;
@@ -1672,6 +1916,16 @@ var MetaMediumCore = (() => {
     const w2 = b.maxX - b.minX, h2 = b.maxY - b.minY;
     switch (shape) {
       case "rectangle": {
+        const leaning = leaningBox(raw);
+        if (leaning) {
+          return {
+            shape,
+            closed: true,
+            points: leaning.points,
+            lean: leaning.lean,
+            reasoning: `its four corners: a box ${Math.round(leaning.base)}\xD7${Math.round(leaning.height)} leaning ${Math.round(leaning.lean)}\xB0 as drawn \u2014 its sides parallel and not square, and kept so`
+          };
+        }
         const box = tightestBox(raw);
         if (box && Math.abs(box.angle) > SQUARE_UP_DEG) {
           const { centre: c, axis: u, width: bw, height: bh } = box;
@@ -1923,6 +2177,17 @@ var MetaMediumCore = (() => {
   var deg = (rad) => rad * 180 / Math.PI;
   var r0 = (v) => Math.round(v);
   var r1 = (v) => Math.round(v * 10) / 10;
+  function boxCorners(node, held2) {
+    if (held2?.length === 4) return held2;
+    const offered2 = idealize(node, "rectangle");
+    if (offered2?.points.length === 4) return placed(node, offered2.points);
+    const ink = strokePointsOf(node);
+    const box = ink && tightestBox(ink);
+    if (!box) return null;
+    const { centre: c, axis: u, width: w2, height: h2 } = box;
+    const at = (su, sv) => ({ x: c.x + (u.x * su * w2 - u.y * sv * h2) / 2, y: c.y + (u.y * su * w2 + u.x * sv * h2) / 2 });
+    return [at(-1, -1), at(1, -1), at(1, 1), at(-1, 1)];
+  }
   function angleAt(prev, v, next) {
     const a = Math.atan2(prev.y - v.y, prev.x - v.x);
     const b = Math.atan2(next.y - v.y, next.x - v.x);
@@ -1966,14 +2231,14 @@ var MetaMediumCore = (() => {
     if (!ideal || ideal.length < 2) return null;
     const b = held2 ? getBounds(held2) : boundsOf(node) ?? getBounds(ideal);
     const w2 = b.maxX - b.minX, h2 = b.maxY - b.minY;
-    const centre = { x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2 };
+    const centre2 = { x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2 };
     const m = [];
     switch (shape) {
       case "circle": {
         const round = Math.min(w2, h2) / Math.max(1e-6, w2, h2) > 0.85;
         const r = (w2 + h2) / 4;
-        m.push({ key: "centre", label: "centre", value: r0(centre.x), unit: "", at: centre });
-        m.push({ key: "centreY", label: "centre y", value: r0(centre.y), unit: "" });
+        m.push({ key: "centre", label: "centre", value: r0(centre2.x), unit: "", at: centre2 });
+        m.push({ key: "centreY", label: "centre y", value: r0(centre2.y), unit: "" });
         if (round) {
           m.push({ key: "radius", label: "radius", value: r0(r), unit: "px" });
           m.push({ key: "circumference", label: "circumference", value: r0(2 * Math.PI * r), unit: "px" });
@@ -1986,11 +2251,19 @@ var MetaMediumCore = (() => {
         return { shape, measures: m };
       }
       case "rectangle": {
-        m.push({ key: "width", label: "width", value: r0(w2), unit: "px" });
-        m.push({ key: "height", label: "height", value: r0(h2), unit: "px" });
-        m.push({ key: "perimeter", label: "perimeter", value: r0(2 * (w2 + h2)), unit: "px" });
-        m.push({ key: "area", label: "area", value: r0(w2 * h2), unit: "px\xB2" });
-        m.push({ key: "aspect", label: "aspect", value: r1(w2 / Math.max(1e-6, h2)), unit: "" });
+        const v = boxCorners(node, held2);
+        if (!v) return null;
+        const top = { x: v[1].x - v[0].x, y: v[1].y - v[0].y }, left = { x: v[3].x - v[0].x, y: v[3].y - v[0].y };
+        const width = Math.hypot(top.x, top.y), side = Math.hypot(left.x, left.y);
+        const area3 = Math.abs(top.x * left.y - top.y * left.x);
+        const height = area3 / Math.max(1e-6, width);
+        const lean = width > 0 && side > 0 ? 90 - deg(Math.acos(Math.min(1, Math.abs(top.x * left.x + top.y * left.y) / (width * side)))) : 0;
+        m.push({ key: "width", label: "width", value: r0(width), unit: "px" });
+        m.push({ key: "height", label: "height", value: r0(height), unit: "px" });
+        m.push({ key: "perimeter", label: "perimeter", value: r0(2 * (width + side)), unit: "px" });
+        m.push({ key: "area", label: "area", value: r0(area3), unit: "px\xB2" });
+        m.push({ key: "aspect", label: "aspect", value: r1(width / Math.max(1e-6, height)), unit: "" });
+        if (r0(lean) >= 1) m.push({ key: "lean", label: "lean", value: r0(lean), unit: "\xB0" });
         return { shape, measures: m };
       }
       case "triangle": {
@@ -2037,8 +2310,8 @@ var MetaMediumCore = (() => {
         return { shape, measures: m };
       }
       case "dot": {
-        m.push({ key: "centre", label: "at", value: r0(centre.x), unit: "", at: centre });
-        m.push({ key: "centreY", label: "at y", value: r0(centre.y), unit: "" });
+        m.push({ key: "centre", label: "at", value: r0(centre2.x), unit: "", at: centre2 });
+        m.push({ key: "centreY", label: "at y", value: r0(centre2.y), unit: "" });
         return { shape, measures: m };
       }
       default:
@@ -2703,8 +2976,8 @@ var MetaMediumCore = (() => {
     return null;
   }
   var leafText = (e) => e.k === "num" ? formatQuantity(e.q) : e.k === "name" ? e.name : e.k === "ref" ? e.text : "";
-  function fmtExpr(e, sub5) {
-    const own = sub5?.(e);
+  function fmtExpr(e, sub6) {
+    const own = sub6?.(e);
     if (own !== void 0) return own;
     switch (e.k) {
       case "num":
@@ -2712,13 +2985,13 @@ var MetaMediumCore = (() => {
       case "ref":
         return leafText(e);
       case "carry":
-        return fmtExpr(e.a, sub5);
+        return fmtExpr(e.a, sub6);
       case "neg": {
-        const inner = fmtExpr(e.a, sub5);
+        const inner = fmtExpr(e.a, sub6);
         return "\u2212" + (opOf(e.a) ? `(${inner})` : inner);
       }
       case "op": {
-        const la = fmtExpr(e.a, sub5), lb = fmtExpr(e.b, sub5);
+        const la = fmtExpr(e.a, sub6), lb = fmtExpr(e.b, sub6);
         const oa = opOf(e.a), ob = opOf(e.b);
         return `${oa && oa !== e.op ? `(${la})` : la} ${GLYPH[e.op]} ${ob ? `(${lb})` : lb}`;
       }
@@ -4103,7 +4376,7 @@ var MetaMediumCore = (() => {
   function magnetRadius(sizePx, scale = 1) {
     return Math.max(MAGNET_SCREEN_PX * scale, sizePx * MAGNET_SIZE_FRACTION);
   }
-  var mid = (a, b) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+  var mid2 = (a, b) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
   function formOf(node, nodes) {
     const fp = fingerprintOf(node);
     const ink = strokePointsOf(node);
@@ -4119,7 +4392,7 @@ var MetaMediumCore = (() => {
     if (!form) return portSites(node, nodes, MAGNET_SCREEN_PX);
     const b = boundsOf(node) ?? getBounds(form.points);
     const w2 = b.maxX - b.minX, h2 = b.maxY - b.minY;
-    const centre = { x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2 };
+    const centre2 = { x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2 };
     const out = [];
     const counts = {};
     const add2 = (kind, point2, why) => {
@@ -4135,28 +4408,28 @@ var MetaMediumCore = (() => {
         const tip = form.shape === "arrow" && arrow?.tip ? arrow.tip : form.points[form.points.length - 1];
         add2("tail", tail, `the ${form.shape}'s tail \u2014 where it begins`);
         add2("tip", tip, `the ${form.shape}'s tip \u2014 where it ends`);
-        add2("middle", mid(tail, tip), "halfway along it");
+        add2("middle", mid2(tail, tip), "halfway along it");
         break;
       }
       case "rectangle": {
         const v = form.points.slice(0, 4);
         if (v.length === 4) {
           v.forEach((p) => add2("corner", p, "a corner of the rectangle"));
-          for (let i = 0; i < 4; i++) add2("middle", mid(v[i], v[(i + 1) % 4]), "the middle of an edge");
+          for (let i = 0; i < 4; i++) add2("middle", mid2(v[i], v[(i + 1) % 4]), "the middle of an edge");
         } else {
           boundsSites(add2, b);
         }
-        add2("centre", centre, "the centre of the rectangle");
+        add2("centre", centre2, "the centre of the rectangle");
         break;
       }
       case "circle": {
-        add2("centre", centre, "the centre of the circle");
+        add2("centre", centre2, "the centre of the circle");
         const rx = w2 / 2, ry = h2 / 2;
         const cardinals = [
-          ["north", { x: centre.x, y: centre.y - ry }],
-          ["east", { x: centre.x + rx, y: centre.y }],
-          ["south", { x: centre.x, y: centre.y + ry }],
-          ["west", { x: centre.x - rx, y: centre.y }]
+          ["north", { x: centre2.x, y: centre2.y - ry }],
+          ["east", { x: centre2.x + rx, y: centre2.y }],
+          ["south", { x: centre2.x, y: centre2.y + ry }],
+          ["west", { x: centre2.x - rx, y: centre2.y }]
         ];
         for (const [name, p] of cardinals) add2("cardinal", p, `the ${name} of the circle`);
         break;
@@ -4174,15 +4447,15 @@ var MetaMediumCore = (() => {
       case "arc": {
         add2("tail", form.points[0], "where the arc begins");
         add2("tip", form.points[form.points.length - 1], "where the arc ends");
-        add2("centre", centre, "the middle of the arc\u2019s span");
+        add2("centre", centre2, "the middle of the arc\u2019s span");
         break;
       }
       case "dot":
-        add2("point", centre, "the dot");
+        add2("point", centre2, "the dot");
         break;
       default:
         boundsSites(add2, b);
-        add2("centre", centre, "the centre of the mark\u2019s bounds");
+        add2("centre", centre2, "the centre of the mark\u2019s bounds");
         break;
     }
     out.push(...portSites(node, nodes, MAGNET_SCREEN_PX));
@@ -4467,7 +4740,7 @@ var MetaMediumCore = (() => {
   function relationsOf(relations, id) {
     return relations.filter((r) => r.from === id);
   }
-  function between(relations, from, to) {
+  function between2(relations, from, to) {
     return relations.filter((r) => r.from === from && r.to === to);
   }
   function has(relations, kind, from, to) {
@@ -4590,8 +4863,8 @@ var MetaMediumCore = (() => {
   // src/maths/dimension.ts
   var LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
   var vName = (i) => LETTERS[i % 26] ?? `V${i}`;
-  var dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
-  var mid2 = (a, b) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+  var dist2 = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+  var mid3 = (a, b) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
   function angleAt2(prev, v, next) {
     const a = Math.atan2(prev.y - v.y, prev.x - v.x);
     const b = Math.atan2(next.y - v.y, next.x - v.x);
@@ -4626,7 +4899,7 @@ var MetaMediumCore = (() => {
         label: `side ${vName(i)}${vName((i + 1) % n2)}`,
         from: p,
         to: q,
-        length: dist(p, q),
+        length: dist2(p, q),
         ids: opts.sideIds?.[i] ? [...opts.sideIds[i]] : all.slice()
       };
     });
@@ -4704,7 +4977,7 @@ var MetaMediumCore = (() => {
           kind: "line",
           ids: [id],
           vertices: [from, to],
-          sides: [{ key: "length", label: "the length", from, to, length: dist(from, to), ids: [id] }],
+          sides: [{ key: "length", label: "the length", from, to, length: dist2(from, to), ids: [id] }],
           closed: false,
           outline: [from, to],
           reason: why
@@ -4712,7 +4985,7 @@ var MetaMediumCore = (() => {
       }
       case "arc": {
         const a = ideal[0], c = ideal[ideal.length - 1];
-        const chord = dist(a, c);
+        const chord = dist2(a, c);
         if (chord < 1e-6) return null;
         let bulge = ideal[Math.floor(ideal.length / 2)], rise = -1;
         for (const p of ideal) {
@@ -4724,11 +4997,11 @@ var MetaMediumCore = (() => {
         }
         if (rise <= 1e-6) return null;
         const r = chord * chord / (8 * rise) + rise / 2;
-        const m = mid2(a, c);
+        const m = mid3(a, c);
         const toBulge = { x: (bulge.x - m.x) / rise, y: (bulge.y - m.y) / rise };
-        const centre = { x: bulge.x - toBulge.x * r, y: bulge.y - toBulge.y * r };
+        const centre2 = { x: bulge.x - toBulge.x * r, y: bulge.y - toBulge.y * r };
         let arcLength = 0;
-        for (let i = 1; i < ideal.length; i++) arcLength += dist(ideal[i], ideal[i - 1]);
+        for (let i = 1; i < ideal.length; i++) arcLength += dist2(ideal[i], ideal[i - 1]);
         const foot = { x: m.x, y: m.y };
         return {
           id,
@@ -4739,7 +5012,7 @@ var MetaMediumCore = (() => {
             { key: "chord", label: "the chord", from: a, to: c, length: chord, ids: [id] },
             { key: "rise", label: "the rise", from: foot, to: bulge, length: rise, ids: [id] }
           ],
-          centre,
+          centre: centre2,
           radius: r,
           rise,
           arcLength,
@@ -4857,10 +5130,10 @@ var MetaMediumCore = (() => {
     }
     return out;
   }
-  function distToSegment(p, a, b) {
+  function distToSegment2(p, a, b) {
     const dx = b.x - a.x, dy = b.y - a.y;
     const l2 = dx * dx + dy * dy;
-    if (l2 < 1e-12) return dist(p, a);
+    if (l2 < 1e-12) return dist2(p, a);
     const t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / l2));
     return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
   }
@@ -4874,8 +5147,8 @@ var MetaMediumCore = (() => {
   }
   function distToOutline(p, outline) {
     let best = Infinity;
-    for (let i = 1; i < outline.length; i++) best = Math.min(best, distToSegment(p, outline[i - 1], outline[i]));
-    return outline.length === 1 ? dist(p, outline[0]) : best;
+    for (let i = 1; i < outline.length; i++) best = Math.min(best, distToSegment2(p, outline[i - 1], outline[i]));
+    return outline.length === 1 ? dist2(p, outline[0]) : best;
   }
   function insidePolygon(p, v) {
     let inside = false;
@@ -4886,7 +5159,7 @@ var MetaMediumCore = (() => {
   }
   function insideFigure(f, p) {
     if (!f.closed) return false;
-    if (f.kind === "circle" && f.centre && f.radius) return dist(p, f.centre) < f.radius;
+    if (f.kind === "circle" && f.centre && f.radius) return dist2(p, f.centre) < f.radius;
     return insidePolygon(p, f.vertices);
   }
   function areaOfFigure(f) {
@@ -4899,7 +5172,7 @@ var MetaMediumCore = (() => {
   function squareInCorner(f, k, pts) {
     const n2 = f.vertices.length;
     const v = f.vertices[k], next = f.vertices[(k + 1) % n2], prev = f.vertices[(k - 1 + n2) % n2];
-    const l1 = dist(v, next), l2 = dist(v, prev);
+    const l1 = dist2(v, next), l2 = dist2(v, prev);
     if (l1 < 1e-6 || l2 < 1e-6 || pts.length < 3) return false;
     const u1 = { x: (next.x - v.x) / l1, y: (next.y - v.y) / l1 };
     const u2 = { x: (prev.x - v.x) / l2, y: (prev.y - v.y) / l2 };
@@ -4956,7 +5229,7 @@ var MetaMediumCore = (() => {
       for (const g of others) {
         if (g === f || g.ids.some((id) => f.ids.includes(id))) continue;
         const points = g.kind === "line" ? g.vertices : g.kind === "circle" || g.kind === "arc" ? [] : g.vertices;
-        for (const p of points) if (distToSegment(p, side.from, side.to) <= tol) ts.push(along(p));
+        for (const p of points) if (distToSegment2(p, side.from, side.to) <= tol) ts.push(along(p));
         if (g.kind === "line") {
           const t = crossAt(side.from, side.to, g.vertices[0], g.vertices[1]);
           if (t !== null) ts.push(t);
@@ -4971,7 +5244,7 @@ var MetaMediumCore = (() => {
       const parts = [];
       for (let i = 0; i < stops.length - 1; i++) {
         const a = at(stops[i]), b = at(stops[i + 1]);
-        parts.push({ key: `${side.key}.part${i}`, label: `part ${i + 1} of ${stops.length - 1} along ${side.label}`, from: a, to: b, length: dist(a, b) });
+        parts.push({ key: `${side.key}.part${i}`, label: `part ${i + 1} of ${stops.length - 1} along ${side.label}`, from: a, to: b, length: dist2(a, b) });
       }
       return { ...side, parts };
     });
@@ -4988,8 +5261,8 @@ var MetaMediumCore = (() => {
     const L = seg2.length;
     if (L < 1e-6) return null;
     const p = num2.centre;
-    const m = mid2(seg2.from, seg2.to);
-    const d = dist(p, m);
+    const m = mid3(seg2.from, seg2.to);
+    const d = dist2(p, m);
     const u = { x: (seg2.to.x - seg2.from.x) / L, y: (seg2.to.y - seg2.from.y) / L };
     const across = (p.x - m.x) * -u.y + (p.y - m.y) * u.x;
     const offset = d / L;
@@ -5008,7 +5281,7 @@ var MetaMediumCore = (() => {
   }
   function rimCandidates(num2, f) {
     if (!f.centre || !f.radius) return [];
-    const offset = Math.abs(dist(num2.centre, f.centre) - f.radius) / f.radius;
+    const offset = Math.abs(dist2(num2.centre, f.centre) - f.radius) / f.radius;
     const confidence = 1 / (1 + 4 * offset * offset);
     const base = `${pct(offset)} of the radius from the circle's rim`;
     return ["radius", "diameter"].map((key2) => ({
@@ -5065,9 +5338,9 @@ var MetaMediumCore = (() => {
         const n2 = f.vertices.length;
         f.vertices.forEach((v, k) => {
           const next = f.vertices[(k + 1) % n2], prev = f.vertices[(k - 1 + n2) % n2];
-          const shorter = Math.min(dist(v, next), dist(v, prev));
+          const shorter = Math.min(dist2(v, next), dist2(v, prev));
           if (shorter < 1e-6) return;
-          const offset = dist(p, v) / shorter;
+          const offset = dist2(p, v) / shorter;
           const within = insideFigure(f, p);
           const confidence = 1 / (1 + 4 * offset * offset) * (within ? 1 : 0.5);
           out.push({
@@ -5188,7 +5461,7 @@ var MetaMediumCore = (() => {
       case "perimeter":
         return f.kind === "circle" ? f.radius ? 2 * Math.PI * f.radius : null : f.closed ? sum : null;
       case "diagonal":
-        return f.kind === "rectangle" || f.kind === "quadrilateral" ? dist(f.vertices[0], f.vertices[2]) : null;
+        return f.kind === "rectangle" || f.kind === "quadrilateral" ? dist2(f.vertices[0], f.vertices[2]) : null;
       case "arc":
         return f.arcLength ?? null;
       default:
@@ -5358,12 +5631,12 @@ var MetaMediumCore = (() => {
         for (const f of members) if (raw.has(f.id)) labels.set(f.id, raw.get(f.id));
         continue;
       }
-      const count3 = /* @__PURE__ */ new Map();
-      for (const f of members) for (const l of raw.get(f.id) ?? []) if (!l.declared && l.value.unit && l.value.dim >= 1) count3.set(l.value.unit, (count3.get(l.value.unit) ?? 0) + 1);
+      const count4 = /* @__PURE__ */ new Map();
+      for (const f of members) for (const l of raw.get(f.id) ?? []) if (!l.declared && l.value.unit && l.value.dim >= 1) count4.set(l.value.unit, (count4.get(l.value.unit) ?? 0) + 1);
       let written2 = null;
-      for (const [u, n2] of count3) if (!written2 || n2 > count3.get(written2)) written2 = u;
+      for (const [u, n2] of count4) if (!written2 || n2 > count4.get(written2)) written2 = u;
       const unit3 = written2 ?? fallback;
-      const unitReason = written2 ? `${UNIT_NAMES2[written2]}, written on ${count3.get(written2)} of its labels` : unit3 ? `${UNIT_NAMES2[unit3]}, the unit the page speaks` : "no unit written, so its numbers stay bare";
+      const unitReason = written2 ? `${UNIT_NAMES2[written2]}, written on ${count4.get(written2)} of its labels` : unit3 ? `${UNIT_NAMES2[unit3]}, the unit the page speaks` : "no unit written, so its numbers stay bare";
       const given2 = [];
       for (const f of members) {
         const ls = (raw.get(f.id) ?? []).map((l) => {
@@ -5428,7 +5701,7 @@ var MetaMediumCore = (() => {
 
   // src/maths/solve.ts
   var TOL = 1e-9;
-  var DEG2 = Math.PI / 180;
+  var DEG3 = Math.PI / 180;
   function fmtV(v) {
     const r = Math.round(v * 100) / 100;
     if (Math.abs(v - r) <= TOL * Math.max(1, Math.abs(v))) return formatNumber(v, 2);
@@ -5461,13 +5734,13 @@ var MetaMediumCore = (() => {
   var shared = (s, t) => (s + 1) % 3 === t ? t : (t + 1) % 3 === s ? s : -1;
   var V = "ABC";
   function lawOfCosines(a, b, C) {
-    const c2 = a * a + b * b - 2 * a * b * Math.cos(C * DEG2);
+    const c2 = a * a + b * b - 2 * a * b * Math.cos(C * DEG3);
     return c2 > TOL ? Math.sqrt(c2) : null;
   }
   function angleFrom(a, b, opposite) {
     const c = (a * a + b * b - opposite * opposite) / (2 * a * b);
     if (c < -1 - 1e-12 || c > 1 + 1e-12) return null;
-    return Math.acos(Math.max(-1, Math.min(1, c))) / DEG2;
+    return Math.acos(Math.max(-1, Math.min(1, c))) / DEG3;
   }
   function validTri(t) {
     if (t.sides.some((s) => !(s > TOL)) || t.angles.some((a) => !(a > TOL) || a >= 180 - TOL)) return null;
@@ -5505,9 +5778,9 @@ var MetaMediumCore = (() => {
       const o = oppSide(v);
       const n2 = o === s ? t : s;
       const on = sides.get(o), nn = sides.get(n2);
-      const sinY = nn * Math.sin(X * DEG2) / on;
+      const sinY = nn * Math.sin(X * DEG3) / on;
       if (sinY > 1 + 1e-12) return [];
-      const y0 = Math.asin(Math.min(1, sinY)) / DEG2;
+      const y0 = Math.asin(Math.min(1, sinY)) / DEG3;
       const out = [];
       for (const Y of y0 > 90 - 1e-9 && y0 < 90 + 1e-9 ? [y0] : [y0, 180 - y0]) {
         const Z = 180 - X - Y;
@@ -5522,7 +5795,7 @@ var MetaMediumCore = (() => {
         const side = [0, 0, 0];
         side[o] = on;
         side[n2] = nn;
-        side[third] = on * Math.sin(Z * DEG2) / Math.sin(X * DEG2);
+        side[third] = on * Math.sin(Z * DEG3) / Math.sin(X * DEG3);
         const tri = validTri({ sides: side, angles: ang });
         if (tri) out.push(tri);
       }
@@ -5537,7 +5810,7 @@ var MetaMediumCore = (() => {
       const s0 = S[0];
       const known = sides.get(s0);
       const across = ang[oppVertex(s0)];
-      const side = [0, 1, 2].map((k) => k === s0 ? known : known * Math.sin(ang[oppVertex(k)] * DEG2) / Math.sin(across * DEG2));
+      const side = [0, 1, 2].map((k) => k === s0 ? known : known * Math.sin(ang[oppVertex(k)] * DEG3) / Math.sin(across * DEG3));
       const tri = validTri({ sides: side, angles: ang });
       return tri ? [tri] : [];
     }
@@ -5695,7 +5968,7 @@ var MetaMediumCore = (() => {
       const y = known.get(`angle${k}`);
       vals.set(`angle${k}`, y ? { iv: y.iv, from: y.assumed ? "assumed" : y.fixed ? "declared" : "labelled", fact: y } : { iv: angles[k], from: "derived", formula: formulas.get(`angle${k}`) });
     }
-    const area3 = over([sides[0], sides[1], angles[shared(0, 1)]], ([p, q, C]) => 0.5 * p * q * Math.sin(C * DEG2));
+    const area3 = over([sides[0], sides[1], angles[shared(0, 1)]], ([p, q, C]) => 0.5 * p * q * Math.sin(C * DEG3));
     if (area3) vals.set("area", { iv: area3, from: "derived", formula: formulas.get("area") });
     vals.set("perimeter", { iv: { lo: sides[0].lo + sides[1].lo + sides[2].lo, hi: sides[0].hi + sides[1].hi + sides[2].hi }, from: "derived", formula: formulas.get("perimeter") });
     const assumed = basis.find((x) => x.assumed)?.assumed;
@@ -5817,7 +6090,7 @@ var MetaMediumCore = (() => {
     const build = (basis, c, h2, r, forms, makes) => {
       const major = h2.lo > r.lo + TOL;
       const sweep = over([c, r], ([cc, rr]) => {
-        const s = 2 * Math.asin(Math.min(1, cc / (2 * rr))) / DEG2;
+        const s = 2 * Math.asin(Math.min(1, cc / (2 * rr))) / DEG3;
         return major ? 360 - s : s;
       });
       const vals = /* @__PURE__ */ new Map();
@@ -5833,7 +6106,7 @@ var MetaMediumCore = (() => {
       const cs = basis.find((x) => x.key === "chord") ? numText(basis.find((x) => x.key === "chord")) : fmtIv(c);
       if (sweep) {
         put("sweep", sweep, `${major ? "360\xB0 \u2212 " : ""}2 \xD7 asin(${cs} \xF7 (2 \xD7 ${rs}))`);
-        put("arc", over([r, sweep], ([rr, sw]) => rr * sw * DEG2), `\u03C0 \xD7 ${rs} \xD7 ${fmtIv(sweep)}\xB0 \xF7 180\xB0`);
+        put("arc", over([r, sweep], ([rr, sw]) => rr * sw * DEG3), `\u03C0 \xD7 ${rs} \xD7 ${fmtIv(sweep)}\xB0 \xF7 180\xB0`);
       }
       const word = (x) => `${/^[aeiou]/i.test(x.key) ? "an" : "a"} ${x.key === "arc" ? "arc length" : x.key} of ${x.shown}`;
       out.push({ basis, vals, how: basis.map(word).join(" and "), makes });
@@ -6183,7 +6456,7 @@ var MetaMediumCore = (() => {
   function inkSweep(f) {
     if (f.kind !== "arc" || !f.radius) return null;
     const chord = f.sides.find((s2) => s2.key === "chord")?.length ?? 0;
-    const s = 2 * Math.asin(Math.min(1, chord / (2 * f.radius))) / DEG2;
+    const s = 2 * Math.asin(Math.min(1, chord / (2 * f.radius))) / DEG3;
     return (f.rise ?? 0) > f.radius ? 360 - s : s;
   }
   function keysOf(f) {
@@ -6309,12 +6582,12 @@ var MetaMediumCore = (() => {
   var ONE_BEND = 0.2;
   var MAX_FIGURE_STROKES = 8;
   var MAX_CYCLES = 2e3;
-  var DEG3 = Math.PI / 180;
-  var sub = (a, b) => ({ x: a.x - b.x, y: a.y - b.y });
-  var dot = (a, b) => a.x * b.x + a.y * b.y;
-  var cross = (a, b) => a.x * b.y - a.y * b.x;
-  var dist2 = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
-  var mid3 = (a, b) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+  var DEG4 = Math.PI / 180;
+  var sub3 = (a, b) => ({ x: a.x - b.x, y: a.y - b.y });
+  var dot2 = (a, b) => a.x * b.x + a.y * b.y;
+  var cross2 = (a, b) => a.x * b.y - a.y * b.x;
+  var dist3 = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+  var mid4 = (a, b) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
   function fitLine(points) {
     if (points.length < 2) return null;
     const n2 = points.length;
@@ -6327,25 +6600,25 @@ var MetaMediumCore = (() => {
     }
     const angle = 0.5 * Math.atan2(2 * sxy, sxx - syy);
     let dir = { x: Math.cos(angle), y: Math.sin(angle) };
-    if (dot(sub(points[n2 - 1], points[0]), dir) < 0) dir = { x: -dir.x, y: -dir.y };
+    if (dot2(sub3(points[n2 - 1], points[0]), dir) < 0) dir = { x: -dir.x, y: -dir.y };
     return { point: c, dir };
   }
   var onLine = (l, p) => {
-    const t = dot(sub(p, l.point), l.dir);
+    const t = dot2(sub3(p, l.point), l.dir);
     return { x: l.point.x + l.dir.x * t, y: l.point.y + l.dir.y * t };
   };
   function meet(a, b) {
-    const d = cross(a.dir, b.dir);
+    const d = cross2(a.dir, b.dir);
     if (Math.abs(d) < 1e-9) return null;
-    const t = cross(sub(b.point, a.point), b.dir) / d;
+    const t = cross2(sub3(b.point, a.point), b.dir) / d;
     return { x: a.point.x + a.dir.x * t, y: a.point.y + a.dir.y * t };
   }
   function offChord(path, a, b) {
     const p = path[a], q = path[b];
-    const L = dist2(p, q);
+    const L = dist3(p, q);
     let at = a, off = 0;
     for (let i = a + 1; i < b; i++) {
-      const d = L > 1e-9 ? Math.abs(cross(sub(q, p), sub(path[i], p))) / L : dist2(path[i], p);
+      const d = L > 1e-9 ? Math.abs(cross2(sub3(q, p), sub3(path[i], p))) / L : dist3(path[i], p);
       if (d > off) {
         off = d;
         at = i;
@@ -6395,7 +6668,7 @@ var MetaMediumCore = (() => {
     for (let k = 1; k < runs.length; k++) {
       const at = path[spans[k][0]];
       const m = meet(runs[k - 1], runs[k]);
-      bends.push(m && dist2(m, at) <= magnetRadius(size, scale) ? m : onLine(runs[k], at));
+      bends.push(m && dist3(m, at) <= magnetRadius(size, scale) ? m : onLine(runs[k], at));
     }
     return {
       id: node.id,
@@ -6413,8 +6686,8 @@ var MetaMediumCore = (() => {
     if (site.kind === "tip") return "end";
     const s = siteOf(node, nodes, site);
     if (!s) return null;
-    if (dist2(s.point, r.start) <= reach) return "start";
-    if (dist2(s.point, r.end) <= reach) return "end";
+    if (dist3(s.point, r.start) <= reach) return "start";
+    if (dist3(s.point, r.end) <= reach) return "end";
     return null;
   }
   function figuresOf(state) {
@@ -6456,10 +6729,10 @@ var MetaMediumCore = (() => {
         if (ea.stroke === eb.stroke) continue;
         const bound = boundPairs.has(pairKey(a, b));
         const reach = reachOf2(ea, eb);
-        const apart = dist2(ea.point, eb.point);
+        const apart = dist3(ea.point, eb.point);
         if (!bound && apart > reach) continue;
         const corner = meet(ea.out, eb.out);
-        const point2 = corner && dist2(corner, ea.point) <= 2 * reach && dist2(corner, eb.point) <= 2 * reach ? corner : mid3(ea.point, eb.point);
+        const point2 = corner && dist3(corner, ea.point) <= 2 * reach && dist3(corner, eb.point) <= 2 * reach ? corner : mid4(ea.point, eb.point);
         meetings.set(pairKey(a, b), { a, b, point: point2, bound, gap: bound ? 0 : apart / reach });
       }
     }
@@ -6495,7 +6768,7 @@ var MetaMediumCore = (() => {
   }
   function runMiddles(r) {
     const stops = [r.start, ...r.bends, r.end];
-    return stops.slice(1).map((p, i) => mid3(stops[i], p));
+    return stops.slice(1).map((p, i) => mid4(stops[i], p));
   }
   function simpleCycles(edges) {
     const out = [];
@@ -6532,12 +6805,12 @@ var MetaMediumCore = (() => {
   }
   function shoelace(v) {
     let s = 0;
-    for (let i = 0; i < v.length; i++) s += cross(v[i], v[(i + 1) % v.length]);
+    for (let i = 0; i < v.length; i++) s += cross2(v[i], v[(i + 1) % v.length]);
     return s / 2;
   }
   function segmentsCross(a, b, c, d) {
-    const d1 = cross(sub(b, a), sub(c, a)), d2 = cross(sub(b, a), sub(d, a));
-    const d3 = cross(sub(d, c), sub(a, c)), d4 = cross(sub(d, c), sub(b, c));
+    const d1 = cross2(sub3(b, a), sub3(c, a)), d2 = cross2(sub3(b, a), sub3(d, a));
+    const d3 = cross2(sub3(d, c), sub3(a, c)), d4 = cross2(sub3(d, c), sub3(b, c));
     return d1 * d2 < 0 && d3 * d4 < 0;
   }
   function selfCrossing(v) {
@@ -6557,22 +6830,22 @@ var MetaMediumCore = (() => {
     }
     return inside;
   }
-  function distToSegment2(p, a, b) {
-    const ab = sub(b, a);
-    const l2 = dot(ab, ab);
-    const t = l2 > 0 ? Math.max(0, Math.min(1, dot(sub(p, a), ab) / l2)) : 0;
-    return dist2(p, { x: a.x + ab.x * t, y: a.y + ab.y * t });
+  function distToSegment3(p, a, b) {
+    const ab = sub3(b, a);
+    const l2 = dot2(ab, ab);
+    const t = l2 > 0 ? Math.max(0, Math.min(1, dot2(sub3(p, a), ab) / l2)) : 0;
+    return dist3(p, { x: a.x + ab.x * t, y: a.y + ab.y * t });
   }
   function strictlyInside(f, p, r) {
     if (!insidePolygon2(p, f.vertices)) return false;
     const reach = magnetRadius(r.size, r.scale);
-    return f.sides.every((s) => distToSegment2(p, s.from, s.to) > reach);
+    return f.sides.every((s) => distToSegment3(p, s.from, s.to) > reach);
   }
   function interiorAngles(v) {
     const n2 = v.length;
     return v.map((p, k) => {
-      const a = sub(p, v[(k - 1 + n2) % n2]), b = sub(v[(k + 1) % n2], p);
-      const turn2 = Math.atan2(cross(a, b), dot(a, b)) / DEG3;
+      const a = sub3(p, v[(k - 1 + n2) % n2]), b = sub3(v[(k + 1) % n2], p);
+      const turn2 = Math.atan2(cross2(a, b), dot2(a, b)) / DEG4;
       return 180 - turn2;
     });
   }
@@ -6612,9 +6885,9 @@ var MetaMediumCore = (() => {
       changed2 = false;
       const n3 = corners.length;
       for (let k = 0; k < n3; k++) {
-        const a = sub(corners[k].point, corners[(k - 1 + n3) % n3].point), b = sub(corners[(k + 1) % n3].point, corners[k].point);
+        const a = sub3(corners[k].point, corners[(k - 1 + n3) % n3].point), b = sub3(corners[(k + 1) % n3].point, corners[k].point);
         const la = Math.hypot(a.x, a.y), lb = Math.hypot(b.x, b.y);
-        const turn2 = la > 1e-9 && lb > 1e-9 ? Math.abs(Math.atan2(cross(a, b), dot(a, b))) / DEG3 : 0;
+        const turn2 = la > 1e-9 && lb > 1e-9 ? Math.abs(Math.atan2(cross2(a, b), dot2(a, b))) / DEG4 : 0;
         if (turn2 >= STRAIGHT_TURN) continue;
         const before = (k - 1 + n3) % n3;
         const merged = [.../* @__PURE__ */ new Set([...sides[before], ...sides[k]])];
@@ -6629,7 +6902,7 @@ var MetaMediumCore = (() => {
     if (n2 < 3) return null;
     let v = corners.map((c) => c.point);
     const area3 = shoelace(v);
-    const perimeter2 = v.reduce((s, p, i) => s + dist2(p, v[(i + 1) % n2]), 0);
+    const perimeter2 = v.reduce((s, p, i) => s + dist3(p, v[(i + 1) % n2]), 0);
     if (perimeter2 <= 0 || 4 * Math.PI * Math.abs(area3) / (perimeter2 * perimeter2) < SLIVER) return null;
     if (selfCrossing(v)) return null;
     if (area3 < 0) {
@@ -6653,7 +6926,7 @@ var MetaMediumCore = (() => {
       kind = "triangle";
       says = "a triangle";
     } else if (n2 === 4) {
-      const slope = (p, q) => Math.atan2(Math.abs(q.y - p.y), Math.abs(q.x - p.x)) / DEG3;
+      const slope = (p, q) => Math.atan2(Math.abs(q.y - p.y), Math.abs(q.x - p.x)) / DEG4;
       const d1 = slope(v[0], v[2]), d2 = slope(v[1], v[3]);
       const levelPlumb = d1 <= DIAMOND_SLACK && d2 >= 90 - DIAMOND_SLACK || d2 <= DIAMOND_SLACK && d1 >= 90 - DIAMOND_SLACK;
       const convex = angles.every((a) => a < 180);
@@ -6810,13 +7083,13 @@ var MetaMediumCore = (() => {
     return ps.length ? Math.min(...ps) : 1;
   }
   var add = (a, b) => ({ x: a.x + b.x, y: a.y + b.y });
-  var sub2 = (a, b) => ({ x: a.x - b.x, y: a.y - b.y });
+  var sub4 = (a, b) => ({ x: a.x - b.x, y: a.y - b.y });
   var mul = (a, k) => ({ x: a.x * k, y: a.y * k });
-  var mid4 = (a, b) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+  var mid5 = (a, b) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
   var norm = (a) => Math.hypot(a.x, a.y);
   var unit = (a) => mul(a, 1 / (norm(a) || 1));
-  var cross2 = (a, b) => a.x * b.y - a.y * b.x;
-  var DEG4 = 180 / Math.PI;
+  var cross3 = (a, b) => a.x * b.y - a.y * b.x;
+  var DEG5 = 180 / Math.PI;
   var AXES = [{ x: 1, y: 0 }, { x: 0, y: 1 }, { x: -1, y: 0 }, { x: 0, y: -1 }];
   function nearestAxis(from, to) {
     const t = Math.atan2(to.y - from.y, to.x - from.x);
@@ -6827,7 +7100,7 @@ var MetaMediumCore = (() => {
   var outward = (d, s) => s > 0 ? { x: d.y, y: -d.x } : { x: -d.y, y: d.x };
   function signedArea(v) {
     let a = 0;
-    for (let i = 0; i < v.length; i++) a += cross2(v[i], v[(i + 1) % v.length]);
+    for (let i = 0; i < v.length; i++) a += cross3(v[i], v[(i + 1) % v.length]);
     return a / 2;
   }
   function readable(deg3) {
@@ -6864,9 +7137,9 @@ var MetaMediumCore = (() => {
   }
   function alongSide(c, text, from, to, n2, tier, key2) {
     const F = c.F;
-    const d = sub2(to, from);
+    const d = sub4(to, from);
     const off = F.labelGap + 0.6 * F.label + (tier - 1) * (1.2 * F.label + F.labelGap);
-    return { text, at: add(mid4(from, to), mul(n2, off)), angle: readable(Math.atan2(d.y, d.x) * DEG4), size: F.label, anchor: "middle", key: key2 };
+    return { text, at: add(mid5(from, to), mul(n2, off)), angle: readable(Math.atan2(d.y, d.x) * DEG5), size: F.label, anchor: "middle", key: key2 };
   }
   function polygonShape(c, v, s, side) {
     const marks = [];
@@ -6877,9 +7150,9 @@ var MetaMediumCore = (() => {
       const a = v[k], b = v[(k + 1) % n2];
       const info = side(k);
       const value = c.vals.get(info.key);
-      const L = norm(sub2(b, a));
+      const L = norm(sub4(b, a));
       sides.push({ key: `side${k}`, label: info.label, from: a, to: b, length: L, text: sideTextOf(c, info.key), source: value.from });
-      const d = unit(sub2(b, a));
+      const d = unit(sub4(b, a));
       const out = outward(d, s);
       const parts = c.fig.sides[k]?.parts ?? [];
       const pv = parts.map((p) => c.vals.get(p.key));
@@ -6916,7 +7189,7 @@ var MetaMediumCore = (() => {
     for (let k = 0; k < 3; k++) {
       const a = c.vals.get(`angle${k}`)?.value;
       if (!a || Math.abs(a.lo - 90) > 1e-6 || Math.abs(a.hi - 90) > 1e-6) continue;
-      const at = v[k], e1 = unit(sub2(v[(k + 1) % 3], at)), e2 = unit(sub2(v[(k + 2) % 3], at));
+      const at = v[k], e1 = unit(sub4(v[(k + 1) % 3], at)), e2 = unit(sub4(v[(k + 2) % 3], at));
       const q = Math.min(c.F.corner, 0.25 * Math.min(L[k], L[(k + 2) % 3]));
       shape.marks.push({ points: [add(at, mul(e1, q)), add(at, add(mul(e1, q), mul(e2, q))), add(at, mul(e2, q))] });
     }
@@ -6927,7 +7200,7 @@ var MetaMediumCore = (() => {
     const ink = c.fig.vertices.slice(0, 4);
     const s = Math.sign(signedArea(ink)) || 1;
     const wide = widthPair(c.fig);
-    const d0 = sub2(ink[1], ink[0]);
+    const d0 = sub4(ink[1], ink[0]);
     let d = wide.includes(0) ? { x: d0.x >= 0 ? 1 : -1, y: 0 } : { x: 0, y: d0.y >= 0 ? 1 : -1 };
     const v = [{ x: 0, y: 0 }];
     const dirs = [];
@@ -6989,13 +7262,13 @@ var MetaMediumCore = (() => {
     const [a, e, bulge] = c.fig.vertices;
     const u = AXES[nearestAxis(a, e).axis];
     const w2 = turn(u, 1);
-    const sb = Math.sign(cross2(sub2(e, a), sub2(bulge, a))) || 1;
+    const sb = Math.sign(cross3(sub4(e, a), sub4(bulge, a))) || 1;
     const A = { x: 0, y: 0 }, C = mul(u, chord), M = mul(u, chord / 2);
     const B = add(M, mul(w2, sb * h2));
     const O = add(M, mul(w2, sb * (h2 - r)));
     const large = h2 > r ? 1 : 0;
-    const sweep = cross2(sub2(A, O), sub2(B, O)) > 0 ? 1 : 0;
-    const span = 2 * Math.atan2(cross2(sub2(A, O), sub2(B, O)), (A.x - O.x) * (B.x - O.x) + (A.y - O.y) * (B.y - O.y));
+    const sweep = cross3(sub4(A, O), sub4(B, O)) > 0 ? 1 : 0;
+    const span = 2 * Math.atan2(cross3(sub4(A, O), sub4(B, O)), (A.x - O.x) * (B.x - O.x) + (A.y - O.y) * (B.y - O.y));
     const a0 = Math.atan2(A.y - O.y, A.x - O.x);
     const samples = [];
     for (let i = 0; i <= 64; i++) samples.push(add(O, mul({ x: Math.cos(a0 + span * i / 64), y: Math.sin(a0 + span * i / 64) }, r)));
@@ -7005,8 +7278,8 @@ var MetaMediumCore = (() => {
       { key: "rise", label: riseV.label, from: M, to: B, length: h2, text: sideTextOf(c, "rise"), source: riseV.from }
     ];
     const riseText = `rise ${drawnText(c, "rise")}`;
-    const along = readable(Math.atan2(u.y, u.x) * DEG4);
-    const t = { x: Math.round(Math.cos(along / DEG4)), y: Math.round(Math.sin(along / DEG4)) };
+    const along = readable(Math.atan2(u.y, u.x) * DEG5);
+    const t = { x: Math.round(Math.cos(along / DEG5)), y: Math.round(Math.sin(along / DEG5)) };
     const texts = [
       alongSide(c, drawnText(c, "chord"), A, C, mul(w2, -sb), 1, "chord"),
       { text: riseText, at: add(add(M, mul(w2, sb * h2 / 2)), mul(t, F.labelGap + textWidth(riseText, F.label) / 2)), angle: along, size: F.label, anchor: "middle", key: "rise" }
@@ -7068,8 +7341,8 @@ var MetaMediumCore = (() => {
     return null;
   }
   function entriesOf(solved) {
-    const list = "dimensions" in solved ? solved.figures : solved;
-    return list.map((x) => "solution" in x ? { figure: x.figure, solution: x.solution, labels: x.labels } : { figure: x.figure, solution: x, labels: null });
+    const list2 = "dimensions" in solved ? solved.figures : solved;
+    return list2.map((x) => "solution" in x ? { figure: x.figure, solution: x.solution, labels: x.labels } : { figure: x.figure, solution: x, labels: null });
   }
   function inkBounds(f) {
     const pts = f.outline.length ? f.outline : f.vertices;
@@ -7080,7 +7353,7 @@ var MetaMediumCore = (() => {
     const w2 = textWidth(t.text, t.size), h2 = 1.2 * t.size;
     const x0 = t.anchor === "middle" ? -w2 / 2 : 0;
     const corners = [{ x: x0, y: -h2 / 2 }, { x: x0 + w2, y: -h2 / 2 }, { x: x0 + w2, y: h2 / 2 }, { x: x0, y: h2 / 2 }];
-    const a = t.angle / DEG4, ca = Math.cos(a), sa = Math.sin(a);
+    const a = t.angle / DEG5, ca = Math.cos(a), sa = Math.sin(a);
     return unionBounds(corners.map((p) => {
       const q = { x: t.at.x + p.x * ca - p.y * sa, y: t.at.y + p.x * sa + p.y * ca };
       return { minX: q.x, maxX: q.x, minY: q.y, maxY: q.y };
@@ -7144,15 +7417,15 @@ var MetaMediumCore = (() => {
   }
   function trueSize(solved, options = {}) {
     const entries = entriesOf(solved).map((e) => ({ e, b: inkBounds(e.figure) })).sort((p, q2) => p.b.minX - q2.b.minX || p.b.minY - q2.b.minY || (p.e.figure.id < q2.e.figure.id ? -1 : p.e.figure.id > q2.e.figure.id ? 1 : 0)).map((x2) => x2.e);
-    const count3 = /* @__PURE__ */ new Map();
-    for (const e of entries) count3.set(e.figure.kind, (count3.get(e.figure.kind) ?? 0) + 1);
+    const count4 = /* @__PURE__ */ new Map();
+    for (const e of entries) count4.set(e.figure.kind, (count4.get(e.figure.kind) ?? 0) + 1);
     const seen = /* @__PURE__ */ new Map();
     const nameOf3 = /* @__PURE__ */ new Map();
     for (const e of entries) {
       const k = e.figure.kind;
       const i = (seen.get(k) ?? 0) + 1;
       seen.set(k, i);
-      nameOf3.set(e.figure.id, options.names?.[e.figure.id] ?? ((count3.get(k) ?? 0) > 1 ? `${k} ${i}` : k));
+      nameOf3.set(e.figure.id, options.names?.[e.figure.id] ?? ((count4.get(k) ?? 0) > 1 ? `${k} ${i}` : k));
     }
     const drawable = [];
     const omitted = [];
@@ -7384,8 +7657,8 @@ ${barParts.join("\n")}
       const why = `the margins and a ${amount(od, U)} overlap leave no room on ${P.name} ${orientation}`;
       return empty(`nothing to print: ${why}`, why);
     }
-    const count3 = (len, tile) => len <= tile + 1e-9 ? 1 : Math.ceil((len - od) / (tile - od) - 1e-9);
-    const cols = count3(rw, Wd), rows = count3(rh, Hd);
+    const count4 = (len, tile) => len <= tile + 1e-9 ? 1 : Math.ceil((len - od) / (tile - od) - 1e-9);
+    const cols = count4(rw, Wd), rows = count4(rh, Hd);
     const n2 = rows * cols;
     const x0 = (c) => region.minX + c * (Wd - od);
     const y0 = (r) => region.minY + r * (Hd - od);
@@ -8221,28 +8494,28 @@ ${p.svg}</section>`),
       const k = authorKey(ev);
       if (k === null) return;
       const mine = { name, i, ev };
-      const list = this.numbered.get(k);
-      if (!list) {
+      const list2 = this.numbered.get(k);
+      if (!list2) {
         this.numbered.set(k, [mine]);
         return;
       }
       const origin = ev.origin;
-      for (const other of list) {
+      for (const other of list2) {
         if (this.misnumbered.has(origin)) break;
         if (sameEvent(other.ev, ev)) continue;
         const [kept, dropped] = this.keeps(other, mine) ? [other, mine] : [mine, other];
         this.misnumbered.set(origin, describeAuthorshipCollision({ origin, seq: ev.seq, kept: kept.name, dropped: dropped.name }));
       }
-      list.push(mine);
+      list2.push(mine);
     }
     /** A log's events, no longer held under their authorship: it is about to be replaced. */
     unnumber(name) {
       for (const ev of this.logs[name] ?? []) {
         const k = authorKey(ev);
         if (k === null) continue;
-        const list = this.numbered.get(k);
-        if (!list) continue;
-        const rest = list.filter((x) => x.name !== name);
+        const list2 = this.numbered.get(k);
+        if (!list2) continue;
+        const rest = list2.filter((x) => x.name !== name);
         if (rest.length) this.numbered.set(k, rest);
         else this.numbered.delete(k);
       }
@@ -8368,11 +8641,11 @@ ${p.svg}</section>`),
     if (a.name !== b.name) return a.name < b.name ? -1 : 1;
     return a.i - b.i;
   };
-  function lowerBound(list, e) {
-    let lo = 0, hi = list.length;
+  function lowerBound(list2, e) {
+    let lo = 0, hi = list2.length;
     while (lo < hi) {
       const mid6 = lo + hi >> 1;
-      if (order(list[mid6], e) < 0) lo = mid6 + 1;
+      if (order(list2[mid6], e) < 0) lo = mid6 + 1;
       else hi = mid6;
     }
     return lo;
@@ -9493,7 +9766,7 @@ ${p.svg}</section>`),
   var DEFAULT_SPEED = 120;
   var DEFAULT_MAX_FORCE = 240;
   var sizeOf2 = (b) => Math.max(1, Math.sqrt(Math.max(1, b.w) * Math.max(1, b.h)));
-  var dist3 = (a, b) => Math.hypot(b.x - a.x, b.y - a.y);
+  var dist4 = (a, b) => Math.hypot(b.x - a.x, b.y - a.y);
   var num = (t, k, d) => typeof t.params?.[k] === "number" ? t.params[k] : d;
   function nearest(world, name, only) {
     if (!name) return null;
@@ -9504,13 +9777,13 @@ ${p.svg}</section>`),
       const s = sizeOf2(o);
       if (only === "bigger" && s < mine * 1.25) continue;
       if (only === "smaller" && s > mine / 1.25) continue;
-      const d = dist3(world.me, o);
+      const d = dist4(world.me, o);
       if (!best || d < best.d) best = { body: o, d };
     }
     return best;
   }
   function toward(world, to, speed, weight) {
-    const d = dist3(world.me, to);
+    const d = dist4(world.me, to);
     if (d < 1e-6) return { fx: 0, fy: 0 };
     const dx = (to.x - world.me.x) / d * speed, dy = (to.y - world.me.y) / d * speed;
     return { fx: (dx - world.me.vx) * weight, fy: (dy - world.me.vy) * weight };
@@ -9553,7 +9826,7 @@ ${p.svg}</section>`),
       }
       case "school": {
         const range = num(term, "range", sizeOf2(me) * 5);
-        const peers = (term.target ? world.named(term.target) : world.others).filter((o) => o.id !== me.id && dist3(me, o) <= range);
+        const peers = (term.target ? world.named(term.target) : world.others).filter((o) => o.id !== me.id && dist4(me, o) <= range);
         if (!peers.length) return none(`no ${term.target ?? "peers"} within ${Math.round(range)}px to school with`);
         let cx2 = 0, cy2 = 0, ax = 0, ay = 0, sx = 0, sy = 0;
         const tooClose = sizeOf2(me) * 1.4;
@@ -9562,7 +9835,7 @@ ${p.svg}</section>`),
           cy2 += o.y;
           ax += o.vx;
           ay += o.vy;
-          const d = dist3(me, o);
+          const d = dist4(me, o);
           if (d < tooClose && d > 1e-6) {
             sx += (me.x - o.x) / d * (1 - d / tooClose);
             sy += (me.y - o.y) / d * (1 - d / tooClose);
@@ -9580,7 +9853,7 @@ ${p.svg}</section>`),
       case "hold": {
         const o = me.origin ?? { x: me.x, y: me.y };
         const radius = num(term, "radius", sizeOf2(me) * 3);
-        const d = dist3(me, o);
+        const d = dist4(me, o);
         if (d <= radius) return none(`holding within ${Math.round(radius)}px of where it began`);
         const f = toward(world, o, speed, w2 * Math.min(1, (d - radius) / radius + 0.3));
         return { ...f, reasoning: `${Math.round(d - radius)}px past its ${Math.round(radius)}px hold \u2014 returning` };
@@ -9656,10 +9929,10 @@ ${p.svg}</section>`),
         const t1 = away + Math.PI / 2, t2 = away - Math.PI / 2;
         const slide = Math.abs(angleDiff(t1, heading)) <= Math.abs(angleDiff(t2, heading)) ? t1 : t2;
         const target = slide + angleDiff(away, slide) * 0.3;
-        const turned = heading + angleDiff(target, heading) * 0.35;
+        const turned2 = heading + angleDiff(target, heading) * 0.35;
         const sp = Math.max(speed, 1e-6);
-        vx = Math.cos(turned) * sp;
-        vy = Math.sin(turned) * sp;
+        vx = Math.cos(turned2) * sp;
+        vy = Math.sin(turned2) * sp;
         reasoning = "sliding along a wall ahead";
       }
       const m = half + 2;
@@ -10551,14 +10824,14 @@ ${lines.join("\n")}
       let ys = xs.get(cx2);
       if (!ys) xs.set(cx2, ys = /* @__PURE__ */ new Map());
       let here2 = ys.get(cy2);
-      const count3 = this.counts.get(level) ?? { marks: 0, cells: 0 };
+      const count4 = this.counts.get(level) ?? { marks: 0, cells: 0 };
       if (!here2) {
         ys.set(cy2, here2 = /* @__PURE__ */ new Set());
-        count3.cells++;
+        count4.cells++;
       }
       here2.add(id);
-      count3.marks++;
-      this.counts.set(level, count3);
+      count4.marks++;
+      this.counts.set(level, count4);
       this.filed.set(id, { level, cx: cx2, cy: cy2, bounds: { minX: bounds.minX, minY: bounds.minY, maxX: bounds.maxX, maxY: bounds.maxY } });
     }
     delete(id) {
@@ -10569,14 +10842,14 @@ ${lines.join("\n")}
       const ys = xs.get(f.cx);
       const here2 = ys.get(f.cy);
       here2.delete(id);
-      const count3 = this.counts.get(f.level);
-      count3.marks--;
+      const count4 = this.counts.get(f.level);
+      count4.marks--;
       if (here2.size === 0) {
         ys.delete(f.cy);
-        count3.cells--;
+        count4.cells--;
         if (ys.size === 0) xs.delete(f.cx);
       }
-      if (count3.marks === 0) {
+      if (count4.marks === 0) {
         this.counts.delete(f.level);
         this.levels.delete(f.level);
       }
@@ -10646,8 +10919,8 @@ ${lines.join("\n")}
         const x0 = Math.floor(box.minX / cell) - 1, x1 = Math.floor(box.maxX / cell);
         const y0 = Math.floor(box.minY / cell) - 1, y1 = Math.floor(box.maxY / cell);
         const span = (x1 - x0 + 1) * (y1 - y0 + 1);
-        const count3 = this.counts.get(level);
-        if (span > count3.cells) {
+        const count4 = this.counts.get(level);
+        if (span > count4.cells) {
           for (const [cx2, ys] of xs) {
             if (cx2 < x0 || cx2 > x1) continue;
             for (const [cy2, here2] of ys) {
@@ -10855,47 +11128,47 @@ ${lines.join("\n")}
   var OUTLINE_PATH = 1.6;
   var HEAD_COMPACT = 2.2;
   var GRID = 40;
-  var DEG5 = Math.PI / 180;
-  var sub3 = (a, b) => ({ x: a.x - b.x, y: a.y - b.y });
-  var dot2 = (a, b) => a.x * b.x + a.y * b.y;
-  var cross3 = (a, b) => a.x * b.y - a.y * b.x;
-  var dist4 = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+  var DEG6 = Math.PI / 180;
+  var sub5 = (a, b) => ({ x: a.x - b.x, y: a.y - b.y });
+  var dot3 = (a, b) => a.x * b.x + a.y * b.y;
+  var cross4 = (a, b) => a.x * b.y - a.y * b.x;
+  var dist5 = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
   var unit2 = (v) => {
     const l = Math.hypot(v.x, v.y);
     return l > 1e-12 ? { x: v.x / l, y: v.y / l } : { x: 1, y: 0 };
   };
-  var ramp2 = (v, lo, hi) => Math.max(0, Math.min(1, (v - lo) / (hi - lo)));
+  var ramp3 = (v, lo, hi) => Math.max(0, Math.min(1, (v - lo) / (hi - lo)));
   var pct2 = (x) => `${Math.round(x * 100)}%`;
-  function hullOf(points) {
+  function hullOf2(points) {
     const pts = [...points].sort((a, b) => a.x - b.x || a.y - b.y);
     if (pts.length < 3) return pts.slice();
     const lower = [], upper = [];
     for (const p of pts) {
-      while (lower.length >= 2 && cross3(sub3(lower[lower.length - 1], lower[lower.length - 2]), sub3(p, lower[lower.length - 2])) <= 0) lower.pop();
+      while (lower.length >= 2 && cross4(sub5(lower[lower.length - 1], lower[lower.length - 2]), sub5(p, lower[lower.length - 2])) <= 0) lower.pop();
       lower.push(p);
     }
     for (let i = pts.length - 1; i >= 0; i--) {
       const p = pts[i];
-      while (upper.length >= 2 && cross3(sub3(upper[upper.length - 1], upper[upper.length - 2]), sub3(p, upper[upper.length - 2])) <= 0) upper.pop();
+      while (upper.length >= 2 && cross4(sub5(upper[upper.length - 1], upper[upper.length - 2]), sub5(p, upper[upper.length - 2])) <= 0) upper.pop();
       upper.push(p);
     }
     return lower.slice(0, -1).concat(upper.slice(0, -1));
   }
   function area(v) {
     let s = 0;
-    for (let i = 0; i < v.length; i++) s += cross3(v[i], v[(i + 1) % v.length]);
+    for (let i = 0; i < v.length; i++) s += cross4(v[i], v[(i + 1) % v.length]);
     return Math.abs(s) / 2;
   }
   function perimeter(v) {
     let s = 0;
-    for (let i = 0; i < v.length; i++) s += dist4(v[i], v[(i + 1) % v.length]);
+    for (let i = 0; i < v.length; i++) s += dist5(v[i], v[(i + 1) % v.length]);
     return s;
   }
   function centroidOf(v) {
     let a = 0, cx2 = 0, cy2 = 0;
     for (let i = 0; i < v.length; i++) {
       const p = v[i], q = v[(i + 1) % v.length];
-      const c = cross3(p, q);
+      const c = cross4(p, q);
       a += c;
       cx2 += (p.x + q.x) * c;
       cy2 += (p.y + q.y) * c;
@@ -10903,22 +11176,22 @@ ${lines.join("\n")}
     if (Math.abs(a) < 1e-9) return { x: v.reduce((s, p) => s + p.x, 0) / v.length, y: v.reduce((s, p) => s + p.y, 0) / v.length };
     return { x: cx2 / (3 * a), y: cy2 / (3 * a) };
   }
-  function distToSegment3(p, a, b) {
-    const ab = sub3(b, a);
-    const l2 = dot2(ab, ab);
-    const t = l2 > 0 ? Math.max(0, Math.min(1, dot2(sub3(p, a), ab) / l2)) : 0;
+  function distToSegment4(p, a, b) {
+    const ab = sub5(b, a);
+    const l2 = dot3(ab, ab);
+    const t = l2 > 0 ? Math.max(0, Math.min(1, dot3(sub5(p, a), ab) / l2)) : 0;
     return Math.hypot(p.x - (a.x + ab.x * t), p.y - (a.y + ab.y * t));
   }
-  function distToRing(p, v) {
+  function distToRing2(p, v) {
     let best = Infinity;
-    for (let i = 0; i < v.length; i++) best = Math.min(best, distToSegment3(p, v[i], v[(i + 1) % v.length]));
+    for (let i = 0; i < v.length; i++) best = Math.min(best, distToSegment4(p, v[i], v[(i + 1) % v.length]));
     return best;
   }
-  function insideConvex(p, v) {
+  function insideConvex2(p, v) {
     if (v.length < 3) return false;
     let sign = 0;
     for (let i = 0; i < v.length; i++) {
-      const c = cross3(sub3(v[(i + 1) % v.length], v[i]), sub3(p, v[i]));
+      const c = cross4(sub5(v[(i + 1) % v.length], v[i]), sub5(p, v[i]));
       if (Math.abs(c) < 1e-12) continue;
       if (sign === 0) sign = Math.sign(c);
       else if (Math.sign(c) !== sign) return false;
@@ -10928,18 +11201,18 @@ ${lines.join("\n")}
   function distToInk(p, ink) {
     let best = Infinity;
     for (const line of ink) {
-      if (line.length === 1) best = Math.min(best, dist4(p, line[0]));
-      for (let i = 1; i < line.length; i++) best = Math.min(best, distToSegment3(p, line[i - 1], line[i]));
+      if (line.length === 1) best = Math.min(best, dist5(p, line[0]));
+      for (let i = 1; i < line.length; i++) best = Math.min(best, distToSegment4(p, line[i - 1], line[i]));
     }
     return best;
   }
-  function reduceHull(hull2, max = 16) {
+  function reduceHull2(hull2, max = 16) {
     const v = hull2.slice();
     while (v.length > max) {
       let k = 0, least = Infinity;
       for (let i = 0; i < v.length; i++) {
         const a = v[(i - 1 + v.length) % v.length], b = v[i], c = v[(i + 1) % v.length];
-        const cost = Math.abs(cross3(sub3(b, a), sub3(c, a))) / 2;
+        const cost = Math.abs(cross4(sub5(b, a), sub5(c, a))) / 2;
         if (cost < least) {
           least = cost;
           k = i;
@@ -10950,7 +11223,7 @@ ${lines.join("\n")}
     return v;
   }
   function cornerFits(hull2) {
-    const v = reduceHull(hull2);
+    const v = reduceHull2(hull2);
     const A = area(hull2);
     let three = 0, four = 0, quad = [];
     const n2 = v.length;
@@ -10982,8 +11255,8 @@ ${lines.join("\n")}
     for (let y = minY + cell / 2; y < maxY; y += cell) {
       for (let x = minX + cell / 2; x < maxX; x += cell) {
         const p = { x, y };
-        if (!insideConvex(p, hull2)) continue;
-        const depth2 = Math.min(distToRing(p, hull2), outline.length ? distToInk(p, outline) : Infinity);
+        if (!insideConvex2(p, hull2)) continue;
+        const depth2 = Math.min(distToRing2(p, hull2), outline.length ? distToInk(p, outline) : Infinity);
         if (depth2 < FILL_CORE * inradius) continue;
         inside++;
         if (distToInk(p, fill) <= FILL_REACH * inradius) covered++;
@@ -10998,7 +11271,7 @@ ${lines.join("\n")}
     let n2 = 0, on = 0;
     for (let i = 0; i < hull2.length; i++) {
       const a = hull2[i], b = hull2[(i + 1) % hull2.length];
-      const L = dist4(a, b);
+      const L = dist5(a, b);
       for (let s = 0; s < L; s += step2) {
         const p = { x: a.x + (b.x - a.x) * s / L, y: a.y + (b.y - a.y) * s / L };
         n2++;
@@ -11020,8 +11293,8 @@ ${lines.join("\n")}
       const raw = getRep(node, "stroke")?.data?.points;
       if (meta?.tip && meta.tail && raw && raw.length === pts.length) {
         const [roughTip, tail] = placed(node, [meta.tip, meta.tail]);
-        const heading = unit2(sub3(roughTip, tail));
-        const reachOut = (p) => dot2(sub3(p, tail), heading);
+        const heading = unit2(sub5(roughTip, tail));
+        const reachOut = (p) => dot3(sub5(p, tail), heading);
         const far = Math.max(...pts.map(reachOut));
         const near = magnetRadius(0, scale) / 2;
         const headAtEnd = meta.head !== "start";
@@ -11032,19 +11305,19 @@ ${lines.join("\n")}
         const k = order2[at];
         const tip = pts[k];
         const barb = headAtEnd ? pts.slice(k) : pts.slice(0, k + 1).reverse();
-        const u = unit2(sub3(tip, tail));
+        const u = unit2(sub5(tip, tail));
         const tipEnd = { end: headAtEnd ? "end" : "start", point: tip, out: u, barb };
         const tailEnd = { end: headAtEnd ? "start" : "end", point: tail, out: { x: -u.x, y: -u.y } };
-        return { id: node.id, shape, length: dist4(tip, tail), scale, ends: headAtEnd ? [tailEnd, tipEnd] : [tipEnd, tailEnd] };
+        return { id: node.id, shape, length: dist5(tip, tail), scale, ends: headAtEnd ? [tailEnd, tipEnd] : [tipEnd, tailEnd] };
       }
     }
     const along = (t) => pts[Math.min(pts.length - 1, Math.max(0, Math.round(t * (pts.length - 1))))];
-    const outStart = shape === "arc" ? unit2(sub3(first, along(0.15))) : unit2(sub3(first, last));
-    const outEnd = shape === "arc" ? unit2(sub3(last, along(0.85))) : unit2(sub3(last, first));
+    const outStart = shape === "arc" ? unit2(sub5(first, along(0.15))) : unit2(sub5(first, last));
+    const outEnd = shape === "arc" ? unit2(sub5(last, along(0.85))) : unit2(sub5(last, first));
     return {
       id: node.id,
       shape,
-      length: Math.max(dist4(first, last), 1e-6),
+      length: Math.max(dist5(first, last), 1e-6),
       scale,
       ends: [
         { end: "start", point: first, out: outStart },
@@ -11060,7 +11333,7 @@ ${lines.join("\n")}
   function farAlong(hull2, from, out) {
     let best = hull2[0], bestT = -Infinity;
     for (const p of hull2) {
-      const t = dot2(sub3(p, from), out);
+      const t = dot3(sub5(p, from), out);
       if (t > bestT) {
         bestT = t;
         best = p;
@@ -11074,17 +11347,17 @@ ${lines.join("\n")}
     const fits = cornerFits(hull2);
     const round = 4 * Math.PI * A / (P * P);
     const found = [];
-    const three = ramp2(fits.three, 0.56, 0.72);
+    const three = ramp3(fits.three, 0.56, 0.72);
     if (three > 0) found.push({ kind: "triangle", score: three, why: `its three corners hold ${pct2(fits.three)} of it` });
-    const four = ramp2(fits.four, 0.7, 0.8) * (1 - three);
+    const four = ramp3(fits.four, 0.7, 0.8) * (1 - three);
     if (four > 0 && fits.quad.length === 4) {
       const q = fits.quad;
-      const axisOf = (a, b) => Math.abs(dot2(unit2(sub3(b, a)), out));
-      const off = Math.acos(Math.min(1, Math.max(axisOf(q[0], q[2]), axisOf(q[1], q[3])))) / DEG5;
-      const turned = 1 - ramp2(off, 10, 25);
-      if (turned > 0) found.push({ kind: "diamond", score: four * turned, why: `its four corners hold ${pct2(fits.four)} of it, a diagonal within ${Math.max(1, Math.round(off))}\xB0 of the line` });
+      const axisOf = (a, b) => Math.abs(dot3(unit2(sub5(b, a)), out));
+      const off = Math.acos(Math.min(1, Math.max(axisOf(q[0], q[2]), axisOf(q[1], q[3])))) / DEG6;
+      const turned2 = 1 - ramp3(off, 10, 25);
+      if (turned2 > 0) found.push({ kind: "diamond", score: four * turned2, why: `its four corners hold ${pct2(fits.four)} of it, a diagonal within ${Math.max(1, Math.round(off))}\xB0 of the line` });
     }
-    const circle = ramp2(round, 0.8, 0.92) * (1 - ramp2(fits.four, 0.72, 0.8));
+    const circle = ramp3(round, 0.8, 0.92) * (1 - ramp3(fits.four, 0.72, 0.8));
     if (circle > 0) found.push({ kind: "circle", score: circle, why: `round \u2014 ${pct2(round)} of a circle's area for its perimeter` });
     return found;
   }
@@ -11116,10 +11389,10 @@ ${lines.join("\n")}
   function fillsIn(hull2, cands, grow) {
     const c = centroidOf(hull2);
     const bigger = hull2.map((p) => {
-      const d = unit2(sub3(p, c));
+      const d = unit2(sub5(p, c));
       return { x: p.x + d.x * grow, y: p.y + d.y * grow };
     });
-    return cands.filter((m) => m.ink.length > 0 && m.ink.filter((p) => insideConvex(p, bigger)).length >= 0.8 * m.ink.length);
+    return cands.filter((m) => m.ink.length > 0 && m.ink.filter((p) => insideConvex2(p, bigger)).length >= 0.8 * m.ink.length);
   }
   function readEnd(conn, e, state) {
     const nodes = state.nodes;
@@ -11141,8 +11414,8 @@ ${lines.join("\n")}
     const used = /* @__PURE__ */ new Set();
     let writing = false;
     if (e.barb && e.barb.length >= 2) {
-      const hull2 = hullOf(e.barb);
-      const size = Math.max(...hull2.map((p) => dist4(p, e.point)));
+      const hull2 = hullOf2(e.barb);
+      const size = Math.max(...hull2.map((p) => dist5(p, e.point)));
       const tip = e.point;
       const round = hull2.length >= 3 ? 4 * Math.PI * area(hull2) / perimeter(hull2) ** 2 : 0;
       if (round >= BARB_ROUND && size > 0) {
@@ -11166,16 +11439,16 @@ ${lines.join("\n")}
       if (size > HEAD_MAX_SHARE * conn.length) continue;
       const reach = magnetRadius(size, conn.scale);
       const ink = o.ink.length ? o.ink : [{ x: b.minX, y: b.minY }, { x: b.maxX, y: b.minY }, { x: b.maxX, y: b.maxY }, { x: b.minX, y: b.maxY }];
-      const hull2 = hullOf(ink);
-      const d = hull2.length >= 3 && insideConvex(e.point, hull2) ? 0 : hull2.length >= 2 ? distToRing(e.point, hull2) : dist4(e.point, hull2[0]);
+      const hull2 = hullOf2(ink);
+      const d = hull2.length >= 3 && insideConvex2(e.point, hull2) ? 0 : hull2.length >= 2 ? distToRing2(e.point, hull2) : dist5(e.point, hull2[0]);
       if (d > reach) continue;
       if (isWriting2(o.node, nodes, o.ink, hull2)) {
         writing = true;
         continue;
       }
       const c = hull2.length >= 3 ? centroidOf(hull2) : hull2[0];
-      const across = Math.abs(cross3(e.out, sub3(c, e.point)));
-      const alongIt = dot2(e.out, sub3(c, e.point));
+      const across = Math.abs(cross4(e.out, sub5(c, e.point)));
+      const alongIt = dot3(e.out, sub5(c, e.point));
       if (across > HEAD_AXIS_SHARE * size || alongIt < -size) continue;
       near.push({ id: o.id, node: o.node, ink, hull: hull2, size, touch: 1 - 0.5 * (d / reach), axis: 1 - 0.5 * (across / (HEAD_AXIS_SHARE * size)) });
     }
@@ -11183,12 +11456,12 @@ ${lines.join("\n")}
       if (used.has(c.id)) continue;
       const fp = fingerprintOf(c.node);
       if (!fp?.isClosed) continue;
-      const pathLength2 = c.ink.reduce((s, p, i) => i ? s + dist4(p, c.ink[i - 1]) : 0, 0);
+      const pathLength2 = c.ink.reduce((s, p, i) => i ? s + dist5(p, c.ink[i - 1]) : 0, 0);
       const oneStroke = pathLength2 > OUTLINE_PATH * perimeter(c.hull);
       const fills = oneStroke ? [] : fillsIn(c.hull, others.filter((o) => o.id !== c.id && !used.has(o.id) && !isRead(o.node)), 0.1 * c.size);
       used.add(c.id);
       fills.forEach((f) => used.add(f.id));
-      const hull2 = hullOf([...c.ink, ...fills.flatMap((f) => f.ink)]);
+      const hull2 = hullOf2([...c.ink, ...fills.flatMap((f) => f.ink)]);
       const fill = oneStroke ? fillOf(hull2, [], [c.ink]) : fillOf(hull2, [c.ink], fills.map((f) => f.ink));
       const ids = [c.id, ...fills.map((f) => f.id)];
       const tip = farAlong(hull2, e.point, e.out);
@@ -11201,7 +11474,7 @@ ${lines.join("\n")}
       const v = chevronOf(c.ink, e, conn.scale);
       if (!v) continue;
       used.add(c.id);
-      const hull2 = hullOf(c.ink);
+      const hull2 = hullOf2(c.ink);
       const fills = fillsIn(hull2, others.filter((o) => !used.has(o.id) && !isRead(o.node)), 0.1 * c.size);
       fills.forEach((f) => used.add(f.id));
       const fill = fillOf(hull2, [c.ink], fills.map((f) => f.ink));
@@ -11232,10 +11505,10 @@ ${lines.join("\n")}
   var CHEVRON_STRAIGHT = 0.9;
   function chevronOf(ink, e, scale) {
     const a = ink[0], z = ink[ink.length - 1];
-    const L = dist4(a, z);
+    const L = dist5(a, z);
     let k = 0, off = -1;
     ink.forEach((p, i) => {
-      const d = L > 1e-9 ? Math.abs(cross3(sub3(z, a), sub3(p, a))) / L : dist4(p, a);
+      const d = L > 1e-9 ? Math.abs(cross4(sub5(z, a), sub5(p, a))) / L : dist5(p, a);
       if (d > off) {
         off = d;
         k = i;
@@ -11243,18 +11516,18 @@ ${lines.join("\n")}
     });
     if (k < 2 || k > ink.length - 3) return null;
     const apex = ink[k];
-    const size = Math.max(dist4(apex, a), dist4(apex, z));
-    if (dist4(apex, e.point) > magnetRadius(size, scale)) return null;
+    const size = Math.max(dist5(apex, a), dist5(apex, z));
+    if (dist5(apex, e.point) > magnetRadius(size, scale)) return null;
     const arm1 = ink.slice(0, k + 1), arm2 = ink.slice(k);
     if (calculateStraightness(arm1) < CHEVRON_STRAIGHT || calculateStraightness(arm2) < CHEVRON_STRAIGHT) return null;
-    const d1 = unit2(sub3(a, apex)), d2 = unit2(sub3(z, apex));
-    const back1 = -dot2(d1, e.out), back2 = -dot2(d2, e.out);
+    const d1 = unit2(sub5(a, apex)), d2 = unit2(sub5(z, apex));
+    const back1 = -dot3(d1, e.out), back2 = -dot3(d2, e.out);
     if (back1 < 0.2 || back2 < 0.2) return null;
-    if (Math.sign(cross3(e.out, d1)) === Math.sign(cross3(e.out, d2))) return null;
-    const s1 = Math.acos(Math.min(1, back1)) / DEG5, s2 = Math.acos(Math.min(1, back2)) / DEG5;
+    if (Math.sign(cross4(e.out, d1)) === Math.sign(cross4(e.out, d2))) return null;
+    const s1 = Math.acos(Math.min(1, back1)) / DEG6, s2 = Math.acos(Math.min(1, back2)) / DEG6;
     const even2 = 1 - Math.abs(s1 - s2) / Math.max(1, s1 + s2);
-    const lengths = Math.min(dist4(a, apex), dist4(z, apex)) / Math.max(1e-6, Math.max(dist4(a, apex), dist4(z, apex)));
-    return { score: Math.max(0.3, even2) * ramp2(lengths, 0.25, 0.6), why: `arms ${Math.round(s1)}\xB0 and ${Math.round(s2)}\xB0 off the line` };
+    const lengths = Math.min(dist5(a, apex), dist5(z, apex)) / Math.max(1e-6, Math.max(dist5(a, apex), dist5(z, apex)));
+    return { score: Math.max(0.3, even2) * ramp3(lengths, 0.25, 0.6), why: `arms ${Math.round(s1)}\xB0 and ${Math.round(s2)}\xB0 off the line` };
   }
   function compactFill(ink, hull2) {
     if (ink.length < 6 || hull2.length < 3) return false;
@@ -11330,11 +11603,11 @@ ${lines.join("\n")}
     return pairs ? total / pairs : 0;
   }
   function ordered(scope, axis) {
-    const centre = (id) => {
+    const centre2 = (id) => {
       const b = scope.marks.find((m) => m.id === id).bounds;
       return axis === "x" ? (b.minX + b.maxX) / 2 : (b.minY + b.maxY) / 2;
     };
-    return [...scope.ids].sort((a, b) => centre(a) - centre(b));
+    return [...scope.ids].sort((a, b) => centre2(a) - centre2(b));
   }
   function chainStrength(scope, kind, axis) {
     if (scope.ids.length < 2) return 0;
@@ -13524,173 +13797,6 @@ ${lines.join("\n")}
     };
   }
 
-  // src/notations/shape.ts
-  var sub4 = (a, b) => ({ x: a.x - b.x, y: a.y - b.y });
-  var cross4 = (a, b) => a.x * b.y - a.y * b.x;
-  var dot3 = (a, b) => a.x * b.x + a.y * b.y;
-  var dist5 = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
-  var mid5 = (a, b) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
-  var DEG6 = 180 / Math.PI;
-  var ramp3 = (v, lo, hi) => Math.max(0, Math.min(1, (v - lo) / (hi - lo)));
-  function hullOf2(points) {
-    const pts = [...points].filter((p) => Number.isFinite(p.x) && Number.isFinite(p.y)).sort((a, b) => a.x - b.x || a.y - b.y);
-    if (pts.length < 3) return pts.map((p) => ({ x: p.x, y: p.y }));
-    const lower = [], upper = [];
-    for (const p of pts) {
-      while (lower.length >= 2 && cross4(sub4(lower[lower.length - 1], lower[lower.length - 2]), sub4(p, lower[lower.length - 2])) <= 0) lower.pop();
-      lower.push(p);
-    }
-    for (let i = pts.length - 1; i >= 0; i--) {
-      const p = pts[i];
-      while (upper.length >= 2 && cross4(sub4(upper[upper.length - 1], upper[upper.length - 2]), sub4(p, upper[upper.length - 2])) <= 0) upper.pop();
-      upper.push(p);
-    }
-    return lower.slice(0, -1).concat(upper.slice(0, -1)).map((p) => ({ x: p.x, y: p.y }));
-  }
-  function areaOf(v) {
-    let s = 0;
-    for (let i = 0; i < v.length; i++) s += cross4(v[i], v[(i + 1) % v.length]);
-    return Math.abs(s) / 2;
-  }
-  function insideConvex2(p, v) {
-    if (v.length < 3) return false;
-    let sign = 0;
-    for (let i = 0; i < v.length; i++) {
-      const c = cross4(sub4(v[(i + 1) % v.length], v[i]), sub4(p, v[i]));
-      if (Math.abs(c) < 1e-9) continue;
-      if (sign === 0) sign = Math.sign(c);
-      else if (Math.sign(c) !== sign) return false;
-    }
-    return true;
-  }
-  function distToSegment4(p, a, b) {
-    const ab = sub4(b, a);
-    const l2 = dot3(ab, ab);
-    const t = l2 > 0 ? Math.max(0, Math.min(1, dot3(sub4(p, a), ab) / l2)) : 0;
-    return Math.hypot(p.x - (a.x + ab.x * t), p.y - (a.y + ab.y * t));
-  }
-  function distToRing2(p, v) {
-    if (v.length === 1) return dist5(p, v[0]);
-    let best = Infinity;
-    for (let i = 0; i < v.length; i++) best = Math.min(best, distToSegment4(p, v[i], v[(i + 1) % v.length]));
-    return best;
-  }
-  function distToPath(p, path) {
-    if (path.length === 1) return dist5(p, path[0]);
-    let best = Infinity;
-    for (let i = 1; i < path.length; i++) best = Math.min(best, distToSegment4(p, path[i - 1], path[i]));
-    return best;
-  }
-  function outside(p, hull2) {
-    if (hull2.length >= 3 && insideConvex2(p, hull2)) return 0;
-    return distToRing2(p, hull2);
-  }
-  function reduceHull2(hull2, max = 16) {
-    const v = hull2.slice();
-    while (v.length > max) {
-      let k = 0, least = Infinity;
-      for (let i = 0; i < v.length; i++) {
-        const a = v[(i - 1 + v.length) % v.length], b = v[i], c = v[(i + 1) % v.length];
-        const cost = Math.abs(cross4(sub4(b, a), sub4(c, a))) / 2;
-        if (cost < least) {
-          least = cost;
-          k = i;
-        }
-      }
-      v.splice(k, 1);
-    }
-    return v;
-  }
-  function cornersOf(hull2) {
-    const A = areaOf(hull2);
-    if (hull2.length < 4 || A <= 0) return { share: 0, three: hull2.length === 3 && A > 0 ? 1 : 0, quad: [] };
-    const v = reduceHull2(hull2);
-    const n2 = v.length;
-    let best = 0, tri = 0, quad = [];
-    for (let i = 0; i < n2; i++)
-      for (let j = i + 1; j < n2; j++)
-        for (let k = j + 1; k < n2; k++) {
-          tri = Math.max(tri, areaOf([v[i], v[j], v[k]]));
-          for (let l = k + 1; l < n2; l++) {
-            const q = [v[i], v[j], v[k], v[l]];
-            const a = areaOf(q);
-            if (a > best) {
-              best = a;
-              quad = q;
-            }
-          }
-        }
-    return { share: best / A, three: tri / A, quad: quad.map((p) => ({ x: p.x, y: p.y })) };
-  }
-  function tightBox(hull2) {
-    if (hull2.length < 3) return null;
-    let best = null;
-    for (let i = 0; i < hull2.length; i++) {
-      const a = hull2[i], b = hull2[(i + 1) % hull2.length];
-      const len = dist5(a, b);
-      if (len < 1e-9) continue;
-      const u = { x: (b.x - a.x) / len, y: (b.y - a.y) / len };
-      let minU = Infinity, maxU = -Infinity, minV = Infinity, maxV = -Infinity;
-      for (const p of hull2) {
-        const pu = p.x * u.x + p.y * u.y, pv = -p.x * u.y + p.y * u.x;
-        minU = Math.min(minU, pu);
-        maxU = Math.max(maxU, pu);
-        minV = Math.min(minV, pv);
-        maxV = Math.max(maxV, pv);
-      }
-      const w2 = maxU - minU, h2 = maxV - minV, area3 = w2 * h2;
-      if (area3 <= 0 || best && area3 >= best.area) continue;
-      const cu = (minU + maxU) / 2, cv = (minV + maxV) / 2;
-      const centre = { x: cu * u.x - cv * u.y, y: cu * u.y + cv * u.x };
-      const axis = w2 >= h2 ? u : { x: -u.y, y: u.x };
-      best = { centre, axis, long: Math.max(w2, h2), short: Math.min(w2, h2), area: area3 };
-    }
-    return best;
-  }
-  function roundFrom(quad, first) {
-    let v = quad.map((p) => ({ x: p.x, y: p.y }));
-    let s = 0;
-    for (let i = 0; i < v.length; i++) s += cross4(v[i], v[(i + 1) % v.length]);
-    if (s < 0) v = v.reverse();
-    let k = 0;
-    v.forEach((p, i) => {
-      const q = v[k];
-      const better = first === "top" ? p.y < q.y - 1e-9 || Math.abs(p.y - q.y) <= 1e-9 && p.x < q.x : p.x + p.y < q.x + q.y - 1e-9 || Math.abs(p.x + p.y - (q.x + q.y)) <= 1e-9 && p.y < q.y;
-      if (better) k = i;
-    });
-    return v.map((_, i) => v[(i + k) % v.length]);
-  }
-  var offLevel = (v) => Math.atan2(Math.abs(v.y), Math.abs(v.x)) * DEG6;
-  var offPlumb = (v) => 90 - offLevel(v);
-  var offSquare = (v) => Math.min(offLevel(v), offPlumb(v));
-  function between2(a, b) {
-    const la = Math.hypot(a.x, a.y), lb = Math.hypot(b.x, b.y);
-    if (la < 1e-9 || lb < 1e-9) return 90;
-    return Math.acos(Math.min(1, Math.abs(dot3(a, b)) / (la * lb))) * DEG6;
-  }
-  function anglesOf(v) {
-    const n2 = v.length;
-    return v.map((p, i) => {
-      const a = sub4(v[(i - 1 + n2) % n2], p), b = sub4(v[(i + 1) % n2], p);
-      const la = Math.hypot(a.x, a.y), lb = Math.hypot(b.x, b.y);
-      if (la < 1e-9 || lb < 1e-9) return 180;
-      return Math.acos(Math.max(-1, Math.min(1, dot3(a, b) / (la * lb)))) * DEG6;
-    });
-  }
-  function stanceOf(quad) {
-    const box = roundFrom(quad, "top-left");
-    const diamond = roundFrom(quad, "top");
-    const sides = box.map((p, i) => sub4(box[(i + 1) % 4], p));
-    const upright = Math.max(...sides.map(offSquare));
-    const square = Math.max(...anglesOf(box).map((a) => Math.abs(a - 90)));
-    const d1 = sub4(diamond[2], diamond[0]), d2 = sub4(diamond[3], diamond[1]);
-    const turned = Math.max(offPlumb(d1), offLevel(d2));
-    const level = Math.max(offLevel(sides[0]), offLevel(sides[2]));
-    const parallel = between2(sides[1], sides[3]);
-    const lean = (offPlumb(sides[1]) + offPlumb(sides[3])) / 2;
-    return { box, diamond, upright, square, turned, level, parallel, lean };
-  }
-
   // src/notations/flowchart.ts
   var FLOWCHART_TABLE = {
     pack: "flowchart@1",
@@ -13734,7 +13840,7 @@ ${lines.join("\n")}
   var pct3 = (x) => `${Math.round(x * 100)}%`;
   var scaleOf2 = (node) => getRep(node, "stroke")?.data?.scale ?? 1;
   function outlineOf2(points) {
-    const hull2 = hullOf2(points);
+    const hull2 = hullOf(points);
     if (hull2.length < 3) return null;
     const A = areaOf(hull2);
     if (A <= 0) return null;
@@ -13756,21 +13862,21 @@ ${lines.join("\n")}
   }
   function shapeScores(o) {
     const out = [];
-    const notThree = 1 - ramp3(o.three, THREE_CORNERED[0], THREE_CORNERED[1]);
-    const cornered = ramp3(o.four, CORNERED[0], CORNERED[1]) * notThree;
+    const notThree = 1 - ramp2(o.three, THREE_CORNERED[0], THREE_CORNERED[1]);
+    const cornered = ramp2(o.four, CORNERED[0], CORNERED[1]) * notThree;
     const st = o.stance;
     if (st) {
-      const process = cornered * (1 - ramp3(st.upright, UPRIGHT[0], UPRIGHT[1])) * (1 - ramp3(st.square, SQUARE[0], SQUARE[1]));
+      const process = cornered * (1 - ramp2(st.upright, UPRIGHT[0], UPRIGHT[1])) * (1 - ramp2(st.square, SQUARE[0], SQUARE[1]));
       if (process > 0) out.push({ symbol: "process", score: process, why: `an upright box \u2014 its sides within ${deg2(st.upright)} of level and plumb, its corners within ${deg2(st.square)} of square` });
-      const decision = ramp3(o.four, 0.72, 0.8) * notThree * (1 - ramp3(st.turned, TURNED[0], TURNED[1]));
+      const decision = ramp2(o.four, 0.72, 0.8) * notThree * (1 - ramp2(st.turned, TURNED[0], TURNED[1]));
       if (decision > 0) out.push({ symbol: "decision", score: decision, why: `a diamond \u2014 its corners at the top, right, bottom and left, a box turned about 45\xB0 (its diagonals within ${deg2(st.turned)} of plumb and level)` });
-      const data = cornered * (1 - ramp3(st.level, LEVEL[0], LEVEL[1])) * (1 - ramp3(st.parallel, PARALLEL[0], PARALLEL[1])) * ramp3(st.lean, LEAN[0], LEAN[1]) * ramp3(st.square, LEAN[0], LEAN[1]) * (1 - ramp3(st.lean, 55, 70));
+      const data = cornered * (1 - ramp2(st.level, LEVEL[0], LEVEL[1])) * (1 - ramp2(st.parallel, PARALLEL[0], PARALLEL[1])) * ramp2(st.lean, LEAN[0], LEAN[1]) * ramp2(st.square, LEAN[0], LEAN[1]) * (1 - ramp2(st.lean, 55, 70));
       if (data > 0) out.push({ symbol: "data", score: data, why: `a parallelogram \u2014 top and bottom within ${deg2(st.level)} of level, its sides leaning ${deg2(st.lean)} off plumb` });
     }
-    const rounded = 1 - ramp3(o.four, CORNERED[0], CORNERED[1]);
-    const terminator = rounded * ramp3(o.aspect, ELONGATED[0], ELONGATED[1]) * ramp3(o.extent, 0.72, 0.8);
+    const rounded = 1 - ramp2(o.four, CORNERED[0], CORNERED[1]);
+    const terminator = rounded * ramp2(o.aspect, ELONGATED[0], ELONGATED[1]) * ramp2(o.extent, 0.72, 0.8);
     if (terminator > 0) out.push({ symbol: "terminator", score: terminator, why: `an elongated round-ended form, ${o.aspect.toFixed(1)}:1 \u2014 no corners to hold it (its best four hold ${pct3(o.four)})` });
-    const round = (1 - ramp3(o.four, 0.76, 0.84)) * (1 - ramp3(o.aspect, ROUND[0], ROUND[1])) * ramp3(o.extent, 0.72, 0.78);
+    const round = (1 - ramp2(o.four, 0.76, 0.84)) * (1 - ramp2(o.aspect, ROUND[0], ROUND[1])) * ramp2(o.extent, 0.72, 0.78);
     if (round > 0) out.push({ symbol: "round", score: round, why: `a circle, ${o.aspect.toFixed(1)}:1, with no corners` });
     return out.sort((a, b) => b.score - a.score);
   }
@@ -13783,7 +13889,7 @@ ${lines.join("\n")}
     if ((symbol === "process" || symbol === "data") && st) {
       const b = st.box;
       const names = ["top", "right", "bottom", "left"];
-      return names.map((name, i) => ({ name, at: mid5(b[i], b[(i + 1) % 4]), reasoning: `the middle of the ${symbol === "data" ? "data symbol" : "process"}\u2019s ${name} edge` }));
+      return names.map((name, i) => ({ name, at: mid(b[i], b[(i + 1) % 4]), reasoning: `the middle of the ${symbol === "data" ? "data symbol" : "process"}\u2019s ${name} edge` }));
     }
     if (symbol === "terminator" && o.frame) {
       const { centre: c, axis: u, long, short } = o.frame;
@@ -13940,6 +14046,15 @@ ${lines.join("\n")}
   function centreOf3(b) {
     return { x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2 };
   }
+  function ownWords(nodes, ids) {
+    const words = [];
+    for (const id of [...new Set(ids)].sort()) {
+      const n2 = nodes.get(id);
+      const t = n2 && labelOf(n2)?.text.trim();
+      if (t && !words.includes(t)) words.push(t);
+    }
+    return words.length ? words.join(" ") : void 0;
+  }
   function offBox(p, b) {
     return Math.hypot(Math.max(0, b.minX - p.x, p.x - b.maxX), Math.max(0, b.minY - p.y, p.y - b.maxY));
   }
@@ -14014,7 +14129,7 @@ ${lines.join("\n")}
         c.marks.forEach((id) => writing.add(id));
         return false;
       }
-      return r.score * (1 - ramp3(c.outline.size / median2, SMALL[0], SMALL[1])) > 0.1;
+      return r.score * (1 - ramp2(c.outline.size / median2, SMALL[0], SMALL[1])) > 0.1;
     });
     const symbolOfMark = /* @__PURE__ */ new Map();
     for (const c of [...cores, ...rounds]) for (const id of [...c.ids, ...c.marks]) symbolOfMark.set(id, c);
@@ -14059,6 +14174,7 @@ ${lines.join("\n")}
       const pointing2 = direction === "forward" ? to.head : void 0;
       const quality = Math.min(from.quality, to.quality) * (pointing2 ? 0.75 + 0.25 * (pointing2.confidence / MAX) : direction === "both" ? 0.85 : 0.8);
       const reason2 = direction === "forward" ? `${an(h2.shape)} from ${from.symbol.id} to ${to.symbol.id}, its ${to.head.kind === "arrow" ? "arrowhead" : `${to.head.filled ? "filled" : "hollow"} ${to.head.kind}`} at ${to.symbol.id}` : direction === "both" ? `${an(h2.shape)} with a head at both ends, between ${from.symbol.id} and ${to.symbol.id}` : `${an(h2.shape)} with no head, from ${from.symbol.id} to ${to.symbol.id} in the order it was drawn`;
+      const words = ownWords(nodes, [id]);
       connectors.push({
         id,
         ids: [id, ...headIds],
@@ -14071,7 +14187,8 @@ ${lines.join("\n")}
         ends: { from: from.said, to: to.said },
         confidence: MAX * quality,
         reason: reason2,
-        labels: []
+        labels: [],
+        ...words ? { text: words } : {}
       });
     }
     const readings2 = /* @__PURE__ */ new Map();
@@ -14085,7 +14202,7 @@ ${lines.join("\n")}
       const plain = connectors.filter((k) => !k.directed && (k.from === c.id || k.to === c.id));
       if (!outs && !ins && !plain.length) continue;
       const r = c.shapes.find((s) => s.symbol === "round");
-      const small = 1 - ramp3(c.outline.size / median2, SMALL[0], SMALL[1]);
+      const small = 1 - ramp2(c.outline.size / median2, SMALL[0], SMALL[1]);
       let symbol, sure, why;
       if (outs && !ins) [symbol, sure, why] = ["start", 1, `${count2(outs)} flow${outs === 1 ? "" : "s"} leave${outs === 1 ? "s" : ""} it`];
       else if (ins && !outs) [symbol, sure, why] = ["end", 1, `${count2(ins)} flow${ins === 1 ? "" : "s"} arrive${ins === 1 ? "s" : ""} at it`];
@@ -14103,6 +14220,7 @@ ${lines.join("\n")}
     const out = placed2.map((c) => {
       const rs = readings2.get(c);
       const top = rs[0];
+      const words = ownWords(nodes, [c.id, ...c.ids]);
       return {
         id: c.id,
         ids: [...c.ids],
@@ -14114,7 +14232,8 @@ ${lines.join("\n")}
         outline: c.outline.hull.map((p) => ({ x: p.x, y: p.y })),
         bounds: { ...c.outline.bounds },
         ports: portsFor(top.symbol, c.outline),
-        labels: []
+        labels: [],
+        ...words ? { text: words } : {}
       };
     });
     const bySymbol = new Map(out.map((s) => [s.id, s]));
@@ -14138,7 +14257,7 @@ ${lines.join("\n")}
       const size = Math.max(b.maxX - b.minX, b.maxY - b.minY);
       const text = transcriptOf(m.node) ?? labelOf(m.node)?.text;
       const home = out.filter((s) => offBox(c, s.bounds) === 0 && outside(c, s.outline) === 0 && Math.max(s.bounds.maxX - s.bounds.minX, s.bounds.maxY - s.bounds.minY) > size).sort((p, q) => (p.bounds.maxX - p.bounds.minX) * (p.bounds.maxY - p.bounds.minY) - (q.bounds.maxX - q.bounds.minX) * (q.bounds.maxY - q.bounds.minY))[0];
-      const base = { id: m.id, role: FLOWCHART_TABLE.label.role, ...text ? { text } : {} };
+      const base = { id: m.id, role: FLOWCHART_TABLE.label.role, ...text ? { text } : {}, bounds: { ...b } };
       if (home) {
         labels.push({ ...base, of: home.id, where: "inside", confidence: MAX * 0.9, reason: `writing inside ${home.symbol} ${home.id}` });
         home.labels.push(m.id);
@@ -14374,6 +14493,235 @@ ${lines.join("\n")}
     return `${/^[aeio]/.test(name) ? "an" : "a"} ${name} ${r.confidence.toFixed(2)} \u2014 ${r.summary}`;
   }
   registerNotation(FLOWCHART);
+
+  // src/notations/mermaid.ts
+  var UNREAD_WRITING = "(unread writing)";
+  var BLANK = " ";
+  var writers = /* @__PURE__ */ new Map();
+  function registerMermaidWriter(notation, writer) {
+    writers.set(notation, writer);
+    return () => {
+      if (writers.get(notation) === writer) writers.delete(notation);
+    };
+  }
+  function mermaidWriters() {
+    return [...writers.keys()];
+  }
+  function toMermaid(reading2, opts = {}) {
+    const w2 = writers.get(reading2.notation);
+    return w2 ? w2(reading2, opts) : null;
+  }
+  var codeUnit = (a, b) => a < b ? -1 : a > b ? 1 : 0;
+  function naturalCompare(a, b) {
+    const ra = a.match(/\d+|\D+/g) ?? [], rb = b.match(/\d+|\D+/g) ?? [];
+    for (let i = 0; i < Math.min(ra.length, rb.length); i++) {
+      const x = ra[i], y = rb[i];
+      if (x === y) continue;
+      if (/^\d/.test(x) && /^\d/.test(y)) {
+        const nx = x.replace(/^0+(?=\d)/, ""), ny = y.replace(/^0+(?=\d)/, "");
+        if (nx.length !== ny.length) return nx.length - ny.length;
+        if (nx !== ny) return codeUnit(nx, ny);
+        continue;
+      }
+      return codeUnit(x, y);
+    }
+    return ra.length - rb.length || codeUnit(a, b);
+  }
+  var centre = (b) => ({ x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2 });
+  function inReadingOrder(items, boundsOf2, keyOf, across = false) {
+    const main = (b) => across ? centre(b).x : centre(b).y;
+    const cross5 = (b) => across ? centre(b).y : centre(b).x;
+    const extent = (b) => across ? [b.minX, b.maxX] : [b.minY, b.maxY];
+    const placed2 = items.filter((t) => !!boundsOf2(t)).map((t) => ({ t, b: boundsOf2(t), k: keyOf(t) }));
+    const loose = items.filter((t) => !boundsOf2(t)).sort((p, q) => naturalCompare(keyOf(p), keyOf(q)));
+    placed2.sort((p, q) => main(p.b) - main(q.b) || cross5(p.b) - cross5(q.b) || naturalCompare(p.k, q.k));
+    const out = [];
+    let band = [];
+    const close = () => {
+      band.sort((p, q) => cross5(p.b) - cross5(q.b) || naturalCompare(p.k, q.k));
+      out.push(...band.map((x) => x.t));
+      band = [];
+    };
+    const within = (v, [lo, hi]) => v >= lo && v <= hi;
+    for (const x of placed2) {
+      if (band.length && !within(main(x.b), extent(band[0].b)) && !within(main(band[0].b), extent(x.b))) close();
+      band.push(x);
+    }
+    close();
+    return [...out, ...loose];
+  }
+  var KEYWORD = /^(end|graph|flowchart|subgraph|style|classdef|class|click|linkstyle|default|direction|call|href|interpolate|acc)/i;
+  function spoken(id) {
+    let raw = id;
+    const compound = /^([A-Za-z]+):(.*\+.*)$/.exec(id);
+    if (compound) {
+      const members = compound[2].split("+").sort(naturalCompare);
+      const families = members.map((m) => /^([A-Za-z]+):./.exec(m)?.[1]);
+      const shared2 = families[0] && families.every((f) => f === families[0]) ? families[0] : null;
+      raw = [compound[1], ...members.map((m) => shared2 ? m.slice(shared2.length + 1) : m)].join("_");
+    }
+    const s = raw.replace(/[^A-Za-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+    return !s || /^[0-9]/.test(s) || KEYWORD.test(s) ? s ? `n_${s}` : "n" : s;
+  }
+  function hashOf(s) {
+    let h2 = 2166136261;
+    for (let i = 0; i < s.length; i++) {
+      h2 ^= s.charCodeAt(i);
+      h2 = Math.imul(h2, 16777619) >>> 0;
+    }
+    return h2.toString(36);
+  }
+  function mermaidIds(nodeIds) {
+    const unique = [...new Set(nodeIds)].sort(codeUnit);
+    const groups = /* @__PURE__ */ new Map();
+    for (const id of unique) {
+      const s = spoken(id);
+      (groups.get(s) ?? groups.set(s, []).get(s)).push(id);
+    }
+    const named2 = /* @__PURE__ */ new Map();
+    const taken = /* @__PURE__ */ new Set();
+    for (const [s, ids] of groups) {
+      if (ids.length !== 1) continue;
+      named2.set(ids[0], s);
+      taken.add(s);
+    }
+    for (const [s, ids] of [...groups].filter(([, ids2]) => ids2.length > 1).sort(([a], [b]) => codeUnit(a, b))) {
+      for (const id of ids) {
+        const base = `${s}_${hashOf(id)}`;
+        let name = base;
+        for (let k = 2; taken.has(name); k++) name = `${base}_${k}`;
+        named2.set(id, name);
+        taken.add(name);
+      }
+    }
+    return new Map(unique.map((id) => [id, named2.get(id)]));
+  }
+  var ENTITY = { "#": "#35;", '"': "#quot;", "%": "#37;", "`": "#96;", "<": "#lt;", ">": "#gt;", "&": "#amp;" };
+  var NAMED = { quot: '"', lt: "<", gt: ">", amp: "&" };
+  function mermaidString(text, opts = {}) {
+    const lines = String(text).replace(/\r\n?/g, "\n").split("\n").map(
+      (line) => [...line.replace(/\t/g, " ").replace(/[\u0000-\u0008\u000b-\u001f\u007f]/g, "")].map((ch) => ENTITY[ch] ?? (opts.colons && ch === ":" ? "#58;" : ch)).join("")
+    );
+    const body = lines.join("<br>");
+    return `"${body.length ? body : BLANK}"`;
+  }
+  function unescapeMermaid(quoted) {
+    const inner = quoted.length >= 2 && quoted.startsWith('"') && quoted.endsWith('"') ? quoted.slice(1, -1) : quoted;
+    return inner.split(/<br\s*\/?>/i).map(
+      (part) => part.replace(/#(\w+);/g, (whole, name) => {
+        if (/^\d+$/.test(name)) return String.fromCodePoint(Number(name));
+        return NAMED[name] ?? whole;
+      })
+    ).join("\n");
+  }
+  var PREPROCESSED = /style|classDef/;
+  var COUNT = ["no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve"];
+  var count3 = (n2) => COUNT[n2] ?? String(n2);
+  var list = (xs) => xs.length <= 1 ? xs.join("") : `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`;
+  var isFlowSymbol = (s) => Object.prototype.hasOwnProperty.call(FLOWCHART_TABLE.symbols, s);
+  function flowDirection(connectors, at, symbols) {
+    let down = 0, across = 0, downward = 0;
+    for (const c of connectors) {
+      const a = at(c.from), b = at(c.to);
+      const dx = Math.abs(b.x - a.x), dy = Math.abs(b.y - a.y);
+      down += dy;
+      across += dx;
+      if (dy >= dx) downward++;
+    }
+    const n2 = connectors.length;
+    if (!n2) {
+      const xs = symbols.map((s) => centre(s.bounds).x), ys = symbols.map((s) => centre(s.bounds).y);
+      const wide = xs.length ? Math.max(...xs) - Math.min(...xs) : 0, tall = ys.length ? Math.max(...ys) - Math.min(...ys) : 0;
+      return wide > tall ? { value: "LR", reason: `no flows to follow, and the symbols spread across \u2014 ${Math.round(wide)} across against ${Math.round(tall)} down` } : { value: "TD", reason: `no flows to follow, and the symbols spread down \u2014 ${Math.round(tall)} down against ${Math.round(wide)} across` };
+    }
+    return across > down ? { value: "LR", reason: `the flows run across \u2014 between the symbols they join, ${Math.round(across)} across against ${Math.round(down)} down; ${n2 - downward} of ${n2} flows more across than down` } : { value: "TD", reason: `the flows run down \u2014 between the symbols they join, ${Math.round(down)} down against ${Math.round(across)} across; ${downward} of ${n2} flows more down than across` };
+  }
+  function writeFlowchart(reading2, opts = {}) {
+    const T = FLOWCHART_TABLE;
+    const symbols = reading2.symbols.filter((s) => isFlowSymbol(s.symbol));
+    const idOf = mermaidIds(symbols.map((s) => s.id));
+    const byId = new Map(symbols.map((s) => [s.id, s]));
+    const connectors = reading2.connectors.filter((c) => byId.has(c.from) && byId.has(c.to) && c.from !== c.to);
+    const labels = new Map(reading2.labels.map((l) => [l.id, l]));
+    const direction = opts.direction ? { value: opts.direction, reason: `asked for ${opts.direction === "LR" ? "across (LR)" : "down (TD)"}` } : flowDirection(connectors, (id) => centre(byId.get(id).bounds), symbols);
+    const ordered2 = inReadingOrder(symbols, (s) => s.bounds, (s) => idOf.get(s.id), direction.value === "LR");
+    const place2 = new Map(ordered2.map((s, i) => [s.id, i]));
+    const unread = [];
+    const unreadIds = /* @__PURE__ */ new Set();
+    const wordsOf = (own, labelIds, owner, on, where) => {
+      const mine = [.../* @__PURE__ */ new Set([...labelIds, ...reading2.labels.filter((l) => l.of === owner).map((l) => l.id)])].map(
+        (id) => labels.get(id) ?? { id, of: owner, where: "beside", role: "label", confidence: 0, reason: "writing" }
+      );
+      const inOrder = (at) => inReadingOrder(mine.filter((l) => l.where === at), (l) => l.bounds, (l) => l.id);
+      const parts = own?.trim() ? [own.trim()] : [];
+      const missing = [];
+      for (const l of [...inOrder("inside"), ...inOrder("beside")]) {
+        const text = l.text?.trim();
+        if (text) parts.push(text);
+        else if (opts.readWith?.(l.id)) continue;
+        else {
+          missing.push(l.id);
+          if (parts[parts.length - 1] !== UNREAD_WRITING) parts.push(UNREAD_WRITING);
+        }
+      }
+      if (missing.length) {
+        unread.push({ on, where, ids: missing });
+        missing.forEach((id) => unreadIds.add(id));
+      }
+      return parts.length ? parts.join(" ") : null;
+    };
+    const lines = [`${T.mermaid.header} ${direction.value}`];
+    const ids = {};
+    const marks = {};
+    const blank = [];
+    for (const s of ordered2) {
+      const m = idOf.get(s.id);
+      const shape = T.symbols[s.symbol].mermaid;
+      const words = wordsOf(s.text, s.labels, s.id, "symbol", m);
+      if (words === null) blank.push(m);
+      const text = words ?? BLANK;
+      lines.push(`    ${m}${shape.open}${mermaidString(text, { colons: PREPROCESSED.test(m + text) })}${shape.close}`);
+      ids[m] = s.id;
+      marks[m] = [...new Set(s.ids.length ? s.ids : [s.id])].sort(naturalCompare);
+    }
+    const arrows = T.connectors.flow.mermaid;
+    const links = [];
+    const written2 = [...connectors].sort((p, q) => place2.get(p.from) - place2.get(q.from) || place2.get(p.to) - place2.get(q.to) || naturalCompare(p.id, q.id));
+    for (const c of written2) {
+      const a = idOf.get(c.from), b = idOf.get(c.to);
+      const arrow = c.direction === "forward" ? arrows.forward : c.direction === "both" ? arrows.both : arrows.none;
+      const words = wordsOf(c.text, c.labels, c.id, "flow", `${a} ${arrow} ${b}`);
+      const label = words === null ? "" : arrows.label.replace("%label%", mermaidString(words, { colons: PREPROCESSED.test(a + b + words) }));
+      lines.push(`    ${a} ${arrow}${label} ${b}`);
+      links.push({ index: links.length, id: c.id, ids: [c.id, ...[...new Set(c.ids)].filter((x) => x !== c.id).sort(naturalCompare)], from: a, to: b });
+    }
+    const notes = [];
+    if (unread.length) {
+      const n2 = unread.reduce((k, u) => k + u.ids.length, 0);
+      const onSymbols = unread.filter((u) => u.on === "symbol").map((u) => u.where);
+      const onFlows = unread.filter((u) => u.on === "flow").map((u) => u.where);
+      const where = [onSymbols.length ? `in ${list(onSymbols)}` : "", onFlows.length ? `on the flow${onFlows.length === 1 ? "" : "s"} ${list(onFlows)}` : ""].filter(Boolean).join("; ");
+      notes.push(`${n2 === 1 ? "one piece of writing has" : `${count3(n2)} pieces of writing have`} not been read, so ${n2 === 1 ? "its words are" : "their words are"} not known \u2014 written "${UNREAD_WRITING}": ${where}`);
+    }
+    if (blank.length) notes.push(`${blank.length === 1 ? "one symbol has" : `${count3(blank.length)} symbols have`} no writing in ${blank.length === 1 ? "it and is" : "them and are"} written blank: ${list(blank)}`);
+    const said2 = /* @__PURE__ */ new Set([...symbols.flatMap((s) => [s.id, ...s.ids]), ...connectors.flatMap((c) => c.ids), ...reading2.labels.filter((l) => l.of && (byId.has(l.of) || connectors.some((c) => c.id === l.of))).map((l) => l.id)]);
+    const alone = reading2.labels.filter((l) => !said2.has(l.id)).map((l) => l.id).sort(naturalCompare);
+    if (alone.length) notes.push(`writing that labels nothing in the chart is left out: ${list(alone)}`);
+    const left = Object.keys(reading2.roles).filter((id) => !said2.has(id) && !alone.includes(id)).sort(naturalCompare);
+    if (left.length) notes.push(`${left.length === 1 ? "one mark" : `${count3(left.length)} marks`} the chart has no place for ${left.length === 1 ? "is" : "are"} left out: ${list(left.map((id) => `${id} (${reading2.roles[id]})`))}`);
+    return {
+      text: lines.join("\n") + "\n",
+      notation: reading2.notation,
+      diagram: T.mermaid.header,
+      direction,
+      ids,
+      marks,
+      links,
+      unread: [...unreadIds].sort(naturalCompare),
+      notes
+    };
+  }
+  registerMermaidWriter(FLOWCHART_TABLE.notation, writeFlowchart);
 
   // src/parse/layout.ts
   var area2 = (r) => r.w * r.h;
@@ -15708,7 +16056,7 @@ if (mm.THREE && mm.scene) {
   function frameTemplatesFor(s, ids) {
     const members = artifactsIn(s, ids);
     if (!members.length) return [];
-    const kindsOf = (list) => list.map((id) => {
+    const kindsOf = (list2) => list2.map((id) => {
       const n2 = s.nodes.get(id);
       const r = n2 && codeRepOf(n2);
       return r && r.data.kind || (n2 && blessedBehaviourOf(n2) ? "behaviour" : "ink");
@@ -16538,7 +16886,7 @@ if (mm.THREE && mm.scene) {
       if (!top) continue;
       counts.set(top, (counts.get(top) ?? 0) + 1);
     }
-    return [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([label, count3]) => `${count3}\xD7${label}`).join(" + ");
+    return [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([label, count4]) => `${count4}\xD7${label}`).join(" + ");
   }
   function rect(r, round = true) {
     const v = (x) => round ? Math.round(x) : Number(x.toFixed(2));

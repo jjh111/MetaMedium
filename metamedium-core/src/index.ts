@@ -439,6 +439,16 @@ export type {
 export { FLOWCHART, FLOWCHART_TABLE, readFlowchart, flowchartPortsOf } from './notations/flowchart';
 export { stanceOf, cornersOf, tightBox } from './notations/shape';
 export type { QuadStance } from './notations/shape';
+// Mermaid out (V1-PLAN §3, D2) — a notation reading said as Mermaid text at
+// tier 1, by the writer its notation registered (the flowchart's ships; D4–D6
+// add theirs); null for a notation with none. Ids are the marks' own said
+// safely and never alike; every label quoted and escaped; writing nobody has
+// read written "(unread writing)" and named in `unread` and the notes; the
+// order the drawing's, so any merge order says the same text. `ids` and
+// `marks` map each Mermaid id back to the marks, `links` each link (in
+// Mermaid's own numbering) to its connector.
+export { toMermaid, registerMermaidWriter, mermaidWriters, mermaidIds, mermaidString, unescapeMermaid, UNREAD_WRITING } from './notations/mermaid';
+export type { MermaidText, MermaidOptions, MermaidLink, MermaidWriter, MermaidDirection } from './notations/mermaid';
 
 // Concepts — the meaning-mappings, as a library rather than as code paths.
 export { matchConcepts, BUILTIN_CONCEPTS } from './concepts/concept';

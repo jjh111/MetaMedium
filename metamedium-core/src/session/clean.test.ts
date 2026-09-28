@@ -3,7 +3,8 @@
 import { describe, it, expect } from 'vitest';
 import { createSession } from './session';
 import { boundsOf, getRep, strokePointsOf } from './nodes';
-import { cleanOf, cleanPointsOf, idealize, snapReading, SNAP_CONFIDENCE } from './clean';
+import { cleanOf, cleanPointsOf, idealize, snapReading, SNAP_CONFIDENCE, LEAN_KEPT_DEG } from './clean';
+import { handShape, parallelogramCorners } from '../notations/fixtures/hand';
 import { handRect, handCircle, handLine, handArrow, handTriangle, handText, handDot, circleStroke, rectStroke, handBox, boxVertices, handArc, inkOf } from '../test/strokes';
 import { getBounds } from '../geometry';
 import { analyzeStroke } from '../recognition';
@@ -316,5 +317,65 @@ describe('a clean form stays the drawing it cleans (S1)', () => {
     const r = snapReading(s.getState().nodes.get(id)!, s.getState().nodes);
     expect(r.shape).toBe('arc');
     expect(r.ok, r.reasoning).toBe(true);
+  });
+});
+
+describe('a leaning box is drawn clean at its own lean (D2)', () => {
+  const build = (pts: { x: number; y: number }[]) => {
+    const s = createSession();
+    const id = s.addStroke(pts, at());
+    return { s, id, node: s.getState().nodes.get(id)! };
+  };
+  /** How far a clean box's sides lean off square, the top to the right positive: its top-left over its bottom-left. */
+  const leanOf = (p: { x: number; y: number }[]) => (Math.atan2(p[0].x - p[3].x, p[3].y - p[0].y) * 180) / Math.PI;
+
+  it('a data symbol — a parallelogram the rung reads as a rectangle — is redrawn as the parallelogram, its top and bottom level', () => {
+    for (const px of [28, -28, 20]) {
+      const { s, id, node } = build(handShape(parallelogramCorners(300, 300, 180, 64, px), { seed: 7, jitter: 2 }));
+      const r = snapReading(node, s.getState().nodes);
+      expect(r.shape).toBe('rectangle');
+      expect(r.ok, r.reasoning).toBe(true);
+      s.snap({ ids: [id], at: at() });
+      const clean = cleanOf(s.getState().nodes.get(id)!)!;
+      expect(clean.shape).toBe('rectangle');
+      expect(clean.points).toHaveLength(4);
+      const drawn = (Math.atan2(px, 64) * 180) / Math.PI;
+      expect(Math.abs(leanOf(clean.points) - drawn), `leaning ${px}`).toBeLessThan(3.5);
+      expect(Math.abs(clean.lean! - Math.abs(drawn))).toBeLessThan(3.5);
+      // Squared up within the hand: its top and its bottom exactly level.
+      expect(clean.points[0].y).toBeCloseTo(clean.points[1].y, 6);
+      expect(clean.points[2].y).toBeCloseTo(clean.points[3].y, 6);
+      expect(clean.reasoning).toMatch(/leaning \d+° as drawn/);
+      // The size the ink is: it holds every point of the ink, and each of its
+      // sides touches it — the sharp corners the hand rounded are given back.
+      const ink = strokePointsOf(node)!;
+      const q = clean.points;
+      for (let i = 0; i < 4; i++) {
+        const p0 = q[i], p1 = q[(i + 1) % 4];
+        // Clockwise on screen, (−dy, dx) points inward.
+        const nx = -(p1.y - p0.y), ny = p1.x - p0.x, len = Math.hypot(nx, ny);
+        const inward = Math.min(...ink.map((r) => ((r.x - p0.x) * nx + (r.y - p0.y) * ny) / len));
+        expect(Math.abs(inward), `leaning ${px}, side ${i}`).toBeLessThan(1e-6);
+      }
+      // Drawn again as ink, it still reads as the rectangle it is the clean form of.
+      expect(analyzeStroke(inkOf(clean.points, true)).results[0]?.type).toBe('rectangle');
+    }
+  });
+
+  it('a box leaning less than the hand wobbles is squared up as before; a lean past it is kept', () => {
+    // 4px over 64 is 3.6°: a box. 20 over 64 is 17°: a lean.
+    const box = build(handShape(parallelogramCorners(300, 300, 180, 64, 4), { seed: 8, jitter: 1.5 })).node;
+    const c = idealize(box, 'rectangle')!;
+    expect(c.lean).toBeUndefined();
+    expect(Math.abs(leanOf(c.points))).toBeLessThan(1e-6);
+    const leaning = idealize(build(handShape(parallelogramCorners(300, 300, 180, 64, 20), { seed: 8, jitter: 1.5 })).node, 'rectangle')!;
+    expect(leaning.lean!).toBeGreaterThan(LEAN_KEPT_DEG);
+  });
+
+  it('a trapezoid is not a leaning box: one side plumb, the other slanting 30°, is squared up', () => {
+    const trapezoid = [{ x: 200, y: 260 }, { x: 380, y: 260 }, { x: 380 + 80 * Math.tan(Math.PI / 6), y: 340 }, { x: 200, y: 340 }];
+    const { node } = build(handShape(trapezoid, { seed: 9, jitter: 1 }));
+    const c = idealize(node, 'rectangle')!;
+    expect(c.lean).toBeUndefined();
   });
 });

@@ -20,9 +20,9 @@
 
 import type { Point } from '../types';
 import type { MMNode } from './nodes';
-import { boundsOf, fingerprintOf, getRep, strokePointsOf } from './nodes';
+import { boundsOf, fingerprintOf, getRep, placed, strokePointsOf } from './nodes';
 import { cleanPointsOf, idealize, snapReading } from './clean';
-import { getBounds } from '../geometry';
+import { getBounds, tightestBox } from '../geometry';
 import type { LengthUnit } from '../maths/quantity';
 import type { BoardMaths, Conflict, SolvedValue } from '../maths/solve';
 
@@ -73,6 +73,24 @@ export const RIGHT_ANGLE_TOLERANCE = 4;
 const deg = (rad: number) => (rad * 180) / Math.PI;
 const r0 = (v: number) => Math.round(v);
 const r1 = (v: number) => Math.round(v * 10) / 10;
+
+/**
+ * A box's four corners where the mark stands now — its own top-left,
+ * top-right, bottom-right and bottom-left: the clean form it holds, else the
+ * one it would be offered (turned, leaning or upright, clean.ts), else the
+ * tightest box around its ink.
+ */
+function boxCorners(node: MMNode, held: Point[] | undefined): Point[] | null {
+  if (held?.length === 4) return held;
+  const offered = idealize(node, 'rectangle');
+  if (offered?.points.length === 4) return placed(node, offered.points);
+  const ink = strokePointsOf(node);
+  const box = ink && tightestBox(ink);
+  if (!box) return null;
+  const { centre: c, axis: u, width: w, height: h } = box;
+  const at = (su: number, sv: number): Point => ({ x: c.x + (u.x * su * w - u.y * sv * h) / 2, y: c.y + (u.y * su * w + u.x * sv * h) / 2 });
+  return [at(-1, -1), at(1, -1), at(1, 1), at(-1, 1)];
+}
 
 function angleAt(prev: Point, v: Point, next: Point): number {
   const a = Math.atan2(prev.y - v.y, prev.x - v.x);
@@ -156,11 +174,24 @@ function measureInk(node: MMNode, nodes: ReadonlyMap<string, MMNode>): Maths | n
       return { shape, measures: m };
     }
     case 'rectangle': {
-      m.push({ key: 'width', label: 'width', value: r0(w), unit: 'px' });
-      m.push({ key: 'height', label: 'height', value: r0(h), unit: 'px' });
-      m.push({ key: 'perimeter', label: 'perimeter', value: r0(2 * (w + h)), unit: 'px' });
-      m.push({ key: 'area', label: 'area', value: r0(w * h), unit: 'px²' });
-      m.push({ key: 'aspect', label: 'aspect', value: r1(w / Math.max(1e-6, h)), unit: '' });
+      // By its sides, at whatever angle it stands — not the upright box around
+      // it, which grows as the box turns (a 200×120 box turned 30° has bounds
+      // 233×204). Its width is its first side, the one nearer level; its
+      // height the distance across to the side opposite; a box drawn leaning
+      // (a data symbol) says its lean too.
+      const v = boxCorners(node, held);
+      if (!v) return null;
+      const top = { x: v[1].x - v[0].x, y: v[1].y - v[0].y }, left = { x: v[3].x - v[0].x, y: v[3].y - v[0].y };
+      const width = Math.hypot(top.x, top.y), side = Math.hypot(left.x, left.y);
+      const area = Math.abs(top.x * left.y - top.y * left.x);
+      const height = area / Math.max(1e-6, width);
+      const lean = width > 0 && side > 0 ? 90 - deg(Math.acos(Math.min(1, Math.abs(top.x * left.x + top.y * left.y) / (width * side)))) : 0;
+      m.push({ key: 'width', label: 'width', value: r0(width), unit: 'px' });
+      m.push({ key: 'height', label: 'height', value: r0(height), unit: 'px' });
+      m.push({ key: 'perimeter', label: 'perimeter', value: r0(2 * (width + side)), unit: 'px' });
+      m.push({ key: 'area', label: 'area', value: r0(area), unit: 'px²' });
+      m.push({ key: 'aspect', label: 'aspect', value: r1(width / Math.max(1e-6, height)), unit: '' });
+      if (r0(lean) >= 1) m.push({ key: 'lean', label: 'lean', value: r0(lean), unit: '°' });
       return { shape, measures: m };
     }
     case 'triangle': {
