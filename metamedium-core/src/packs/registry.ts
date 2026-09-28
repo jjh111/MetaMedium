@@ -17,6 +17,7 @@ import { validatePack } from './validate';
 import { BASICS } from './shipped/basics';
 import { FLOWCHART_PACK } from './shipped/flowchart';
 import { UML_CLASS_PACK } from './shipped/uml-class';
+import { SEQUENCE_PACK } from './shipped/sequence';
 import { TEST_MOLECULE } from './shipped/test-molecule';
 
 /** Where a board's packs come from: a name to its content, or undefined for a name this build does not have. */
@@ -43,6 +44,7 @@ function ship(content: unknown): void {
 ship(BASICS);
 ship(FLOWCHART_PACK);
 ship(UML_CLASS_PACK);
+ship(SEQUENCE_PACK);
 ship(TEST_MOLECULE);
 
 /** The content a pack's name stands for in this build, or undefined. */

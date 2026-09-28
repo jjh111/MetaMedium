@@ -4,7 +4,7 @@
 // recognition corpus's single marks (every shape every way a hand draws it,
 // boxes turned, arcs of every sweep), the flowchart bench's thirty-six
 // flowcharts, its wireframes and lines of writing, the class-diagram bench's
-// boards (D4), a row of boxes and a hub.
+// boards (D4), the sequence board every way it is drawn (D5), a row of boxes and a hub.
 // A canonical molecule in the corpus says what it is, and must be read as one.
 //
 // A false read is a match above the floor on a drawing that is neither
@@ -18,6 +18,7 @@ import { buildCases, buildTurnedCases, buildArcCases } from '../test/cases';
 import { handCircle, handLine, handRect } from '../test/strokes';
 import { FLOWCHART_VARIANTS, drawFlowchart, drawMolecule, drawWireframe, drawWriting } from '../notations/fixtures/flowchart';
 import { CLASS_VARIANTS, drawClassDiagram, drawClassPair } from '../notations/fixtures/uml-class';
+import { SEQUENCE_VARIANTS, drawSequence } from '../notations/fixtures/sequence';
 import { benchCorpus, packBench, type BenchDrawing, type PackBenchResult } from './bench';
 import { shippedPacks } from './registry';
 import { packRef } from './pack';
@@ -38,6 +39,8 @@ function corpus(): BenchDrawing[] {
     out.push({ label: `class diagram seed ${v.seed}`, strokes: strokesOf((s) => drawClassDiagram(s, v)) });
     out.push({ label: `A2 seed ${v.seed}`, strokes: strokesOf((s) => drawClassPair(s, v)) });
   });
+  // The sequence bench's board (D5): boxes over solid and dashed lifelines, and a stick figure; calls, a loop, a dashed return.
+  SEQUENCE_VARIANTS.filter((_, i) => i % 4 === 0).forEach((v) => out.push({ label: `A3 ${v.style} seed ${v.seed}`, strokes: strokesOf((s) => drawSequence(s, v)) }));
   for (const seed of [1, 2, 3, 4, 5, 6]) {
     out.push({ label: `wireframe ${seed}`, strokes: strokesOf((s) => drawWireframe(s, seed)) });
     out.push({ label: `writing ${seed}`, strokes: strokesOf((s) => drawWriting(s, seed)) });

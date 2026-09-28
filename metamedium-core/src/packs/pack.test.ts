@@ -370,6 +370,8 @@ describe('the pen: a pack naming a notation offers its ports while in use', () =
     expect(shippedPack('flowchart@1')!.definitions).toEqual([]);
     expect(shippedPack('uml-class@1')!.notation).toBe('uml-class');
     expect(shippedPack('uml-class@1')!.definitions).toEqual([]);
+    expect(shippedPack('sequence@1')!.notation).toBe('sequence');
+    expect(shippedPack('sequence@1')!.definitions).toEqual([]);
   });
 
   it('uml-class@1 in use puts each class’s four sides on the pen — a place along a side — and stopping takes them back (D4)', () => {
@@ -392,6 +394,36 @@ describe('the pen: a pack naming a notation offers its ports while in use', () =
     s.unuse('uml-class@1', next() + 12000);
     expect(registeredPorts()).toEqual([]);
     expect(sites()).toEqual([]);
+    stop();
+  });
+
+  it('sequence@1 in use puts each lifeline’s whole length on the pen — one stroke, or any dash of a dashed one — and stopping takes it back (D5)', () => {
+    const s = createSession();
+    const stop = followPacks(s);
+    // Two participants, each a box over its lifeline: one drawn as one line, one dashed; a call between them.
+    s.addStroke(handRect(100, 100, 140, 56, { seed: 3 }), next(4000));
+    s.addStroke(handRect(400, 100, 140, 56, { seed: 4 }), next(4000));
+    const solid = s.addStroke(lineStroke({ x: 170, y: 158 }, { x: 170, y: 520 }), next(4000));
+    const dashes: string[] = [];
+    for (let y = 158; y + 12 <= 520; y += 20) dashes.push(s.addStroke(lineStroke({ x: 470, y }, { x: 470, y: y + 12 }, 8), next(200)));
+    s.addStroke(lineStroke({ x: 172, y: 260 }, { x: 468, y: 260 }), next(4000));
+    const sites = (id: string) => magnetSites(s.getState().nodes.get(id)!, s.getState().nodes).filter((x) => x.kind === 'along:sequence');
+    expect(sites(solid)).toEqual([]);
+    s.use('sequence@1', next(4000));
+    expect(registeredPorts()).toEqual(['sequence']);
+    const along = sites(solid);
+    expect(along.length).toBeGreaterThan(10);
+    // From the lifeline's top to its bottom.
+    expect(Math.min(...along.map((x) => x.point.y))).toBeLessThan(160);
+    expect(Math.max(...along.map((x) => x.point.y))).toBeGreaterThan(515);
+    expect(along.every((x) => Math.abs(x.point.x - 170) < 2)).toBe(true);
+    // Any dash of the dashed lifeline offers the whole of it.
+    const fromDash = sites(dashes[7]);
+    expect(Math.min(...fromDash.map((x) => x.point.y))).toBeLessThan(160);
+    expect(Math.max(...fromDash.map((x) => x.point.y))).toBeGreaterThan(505);
+    s.unuse('sequence@1', next());
+    expect(registeredPorts()).toEqual([]);
+    expect(sites(solid)).toEqual([]);
     stop();
   });
 });

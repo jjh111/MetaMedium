@@ -1642,6 +1642,110 @@ multiplicity; a bind at `along:uml-class` is found again only while the
 notation's ports are offered (the pack in use); and e2e 51's golden list of
 packs (`["basics@1","flowchart@1"]`) must add `uml-class@1` when the bundles
 are rebuilt.
+*D5 status (the sequence half), 28 Sep 2026:* D5's sequence core built on
+`w2-maths` (`0aec805` red — A3 as a core test, 74 of 79 failing — then
+`5ad9d77`, `67509de`, `dd419b3`, `a22129b`, `7889203`, `aacbb58`,
+`3eec7ec`); the state diagram, the field's and the panel's display, the
+`mermaid` kind's render of a `sequenceDiagram` and *Draw it* are still to
+come. `notations/sequence.ts`: a **participant** is a box (one stroke the
+rung reads as a rectangle, square and upright within a hand's tilt, or ruled
+— figures.ts) or a **stick figure**, read as an actor — a circle, a body
+running down from under it and at least one more short line beside the body
+(arms or legs), all close under the head, its name the writing under it — at
+the top of its **lifeline**: a long line within 20° of plumb, one stroke or
+dashed, its top under the box's bottom middle, running down at least 1.5
+times the box's height; pieces one under the next in one column are one
+lifeline (a hand lifts the pen). Read from the geometry, never the relation
+or role tables (the trap: the relation table has the lifeline touch its box):
+a line with a head is no lifeline, nor one landing on another box or with a
+head drawn at its top — a flowchart's flow, a class diagram's relation. A
+**message** is a roughly level connector (within 25°) whose ends, past their
+heads (heads.ts, a magnet's bind first), land on two lifelines — only its
+ends say where it goes, whatever lifelines it crosses (A → C passing B is A →
+C): solid with a head a call (`->>`), dashed a return (`-->>`), no head `->`
+/ `-->` from the lifeline it was drawn from, a head at each end `<<->>` /
+`<<-->>`. A **self-message** is a loop both of whose ends land on one
+lifeline, bulging to one side; its head is its own barb (the pen folding
+back out where it arrives, measured — the rung reads a short leg with a
+two-wing barb as writing) or a head drawn apart. Messages are ordered by
+height; a message's **label** is the writing just above it (a loop's above
+or beside it) — writing includes a stroke that zigzags across its own line
+(uml-class's `zigzagOf`), which a flat scribble the rung calls a line does;
+a name is the writing in the box. Each lifeline is a continuous port
+(`along:sequence`). **Dashes, built**: `notations/dashes.ts` reads short
+straight strokes in a row as one dashed line — both ends of each in the
+row's corridor (a corridor in the hand's pixels, not an angle: an 8 px dash
+has no direction a hand meant), each running along the row, a gap from the
+next; writing is kept out because a mark a letter's size may touch a dash
+only at the row's ends and stand in no gap (a printed letter's bars join its
+stems, digits stand between minus signs), while long marks, the dashes of a
+row crossing steeply, and a head drawn at another line's end cross freely;
+the letters of a word are strokes like any other (a chevron drawn right
+after a dashed line's last dash is gathered with it into a word, and the
+dash is still a dash); `dashedHeads` asks heads.ts what sits at each end on
+a scratch board where the row is one stroke. Its bench: 504/504 dashed lines
+drawn by hand (7 headings, 4 spacings, 2 hands, 3 seeds, zoom 1, 0.5 and 2)
+read whole with their ends; printed capitals, 408 words (FEE, EFFETE,
+TEETH, serifed III, + + +, 1 - 2 - 3 - 4 …), 0; the flowchart and class
+benches, wireframes, molecules, writing, 0; the 2,000-mark bench board (38%
+printed capitals), 0 in 5 ms. `notations/sequence-mermaid.ts`: the writer
+(`participant`/`actor <id> as <name>` left to right, `<a><arrow><b>: <words>`
+down the page; words as raw text with `#`, `;` and markup as Mermaid's
+entities, a leading `wrap:` escaped, blank as `#32;`; D2's ids, placeholder
+and order) and a reader for its subset and a hand's forms (undeclared
+participants, the ten arrows — a cross and an async head drawn as a head
+and said — activations, notes, frames, numbering refused with their lines,
+their messages read), drawn as boxes or stick figures over straight
+lifelines, calls as arrows bound along the lifelines, returns as dashes with
+a closed triangle apart, loops with their barb; read back, what does not read
+as written is said. `sequence@1` (`packs/shipped/sequence.ts`) names the
+notation and restates none of `SEQUENCE_TABLE`; its affinities lift clean
+forms and lining up; in use, each lifeline's whole length is on the pen
+(any dash of a dashed one offers all of it). The bench
+(`sequence.bench.test.ts`, 36 hands: boxes over solid lifelines, over dashed
+ones, a stick figure; the page turned 0 or ±3°; the return's chevron
+gathered with its last dash or not): read 36/36, first 36/36 (0.78–0.85);
+participants 108/108, lifelines 108/108, names 108/108; calls 72/72,
+self-messages 36/36, returns 36/36; in order 144/144; labels 144/144; a
+message crossing one or two lifelines, solid and dashed, either way 72/72;
+the page turned −8° to 8° 18/18; a loop's head drawn apart 6/6; a lifeline
+in two goes read as one 12/12; the flowchart bench, the class bench, a
+wireframe, the molecule and a line of writing 0 above the floor (highest
+0.00). The round trip (`sequence-mermaid.test.ts`): the goldens
+(`fixtures/sequence.mermaid.ts`, by hand) and every hand of the board before
+and after its writing is read; every arrow, actors, escapes and a hand's text
+come back; 40 seeded random diagrams at 1× and 10 at 0.25× and 4×; twelve
+hands exported and drawn back read the same. packBench: `sequence@1` has no
+definitions; the corpus, now 3,921 drawings with the sequence boards, 0 false
+reads for every pack. A context on the 2,000-mark bench board, base and this
+side by side: mean 3.00 → 3.07 ms (p95 6.36 → 6.45); the whole board read
+for a sequence in 10 ms. The flowchart, class, clean, command-mark and
+recognition benches print unchanged. Core 1,536 in 101 files. Found, for
+their owners: **an arrow whose tip crosses a lifeline and whose barb comes
+back across it crosses it three times, and the session reads a scratch that
+erases the lifeline** (`session/erase.ts`; the fixture stops tips a few
+pixels short, and the reader's drawing is declared content) — a hazard of
+hand-drawn sequence diagrams; **heads.ts reads an arrow's own barb only when
+the arrow leads** — a 742 px message with a 14 px head reads *line 0.83,
+arrow 0.60* (at 900 px, line alone), and the notation takes the barb the
+rung holds (`HELD_ARROW`); **the letter rules gather a loop and the head
+drawn right after it, and a dashed line's last dash and its chevron, into a
+word** — read through (a message may be a word's main stroke when the rest
+of the word is small beside it; heads near a word are read on a scratch
+board). The surface's half must know: `notationsOf(state, scope)` gives a
+`SequenceReading` (each participant's `symbol`, `figure`, `lifeline`,
+`dashed`, `top`/`bottom`, `name`; each message's `kind`, `line`, `arrow`,
+`order`, `labels`); `toMermaid` maps each participant id to its box or its
+figure's head (`ids`) and its box and lifeline strokes (`marks`),
+`links[i]` to message i — a dashed one's id `dashes:…`, its `ids` the
+dashes and head; `drawMermaid` inside `session.withTool`, as D3; a
+participant's name is a label on its box (or the figure's head), a message's
+words a label on its stroke (a dashed one's first dash); a bind at
+`along:sequence` is found again only while the pack is in use; e2e 51's
+golden list of packs must add `sequence@1` (and `uml-class@1`) when the
+bundles are rebuilt; the bundles are not committed here. The state half can
+reuse the loop reading (a state's self-transition), `headsApart` and the
+held barb; its transitions are solid, so dashes are not needed there.
 **D7 Routing** — orthogonal connectors between ports and *tidy the diagram*.
 **D8 The repair demo** — `CONTROL-POINTS-PLAN.md` P4; *needs John:* one
 photograph of a hand-drawn flowchart.

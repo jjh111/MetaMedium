@@ -27,6 +27,7 @@ var MetaMediumCore = (() => {
     BARB_ROUND: () => BARB_ROUND,
     BENCH_PLACES: () => BENCH_PLACES,
     BENCH_SEEDS: () => BENCH_SEEDS,
+    BLANK_WORDS: () => BLANK_WORDS,
     BOX_FLOOR: () => BOX_FLOOR,
     BUILTIN_COMMAND_MARK: () => BUILTIN_COMMAND_MARK,
     BUILTIN_CONCEPTS: () => BUILTIN_CONCEPTS,
@@ -48,6 +49,19 @@ var MetaMediumCore = (() => {
     COORD_PLACES: () => COORD_PLACES,
     COVER_STAGGER_MS: () => COVER_STAGGER_MS,
     COVER_WAIT_MS: () => COVER_WAIT_MS,
+    CROSSING_DEG: () => CROSSING_DEG,
+    DASH_ALONG: () => DASH_ALONG,
+    DASH_BOW: () => DASH_BOW,
+    DASH_GAP: () => DASH_GAP,
+    DASH_GAP_PX: () => DASH_GAP_PX,
+    DASH_OFF: () => DASH_OFF,
+    DASH_OFF_PX: () => DASH_OFF_PX,
+    DASH_OVERLAP: () => DASH_OVERLAP,
+    DASH_PATH: () => DASH_PATH,
+    DASH_PX: () => DASH_PX,
+    DASH_SPREAD: () => DASH_SPREAD,
+    DASH_TOUCH: () => DASH_TOUCH,
+    DASH_TOUCH_PX: () => DASH_TOUCH_PX,
     DEFAULT_CORNER_OPTIONS: () => DEFAULT_CORNER_OPTIONS,
     DEFAULT_ERASE_CROSSINGS: () => DEFAULT_ERASE_CROSSINGS,
     DEFAULT_FILE_LIMIT: () => DEFAULT_FILE_LIMIT,
@@ -83,18 +97,32 @@ var MetaMediumCore = (() => {
     HEAD_AXIS_SHARE: () => HEAD_AXIS_SHARE,
     HEAD_COMPACT: () => HEAD_COMPACT,
     HEAD_MAX_SHARE: () => HEAD_MAX_SHARE,
+    HEAD_OF: () => HEAD_OF,
+    HELD_ARROW: () => HELD_ARROW,
     HERE: () => HERE,
     KEEP_DIRECTION: () => KEEP_DIRECTION,
     KINDS: () => KINDS,
     LABELLING_IS: () => LABELLING_IS,
+    LABEL_ABOVE: () => LABEL_ABOVE,
+    LABEL_DIP: () => LABEL_DIP,
+    LAND_SHARE: () => LAND_SHARE,
     LAYERED_PASSES: () => LAYERED_PASSES,
     LENGTH_UNITS: () => LENGTH_UNITS,
     LETTER_MAX_HEIGHT_PX: () => LETTER_MAX_HEIGHT_PX,
     LETTER_SHARE: () => LETTER_SHARE,
+    LIFELINE_BELOW: () => LIFELINE_BELOW,
+    LIFELINE_GAP: () => LIFELINE_GAP,
+    LIFELINE_GAP_PX: () => LIFELINE_GAP_PX,
+    LIFELINE_MIDDLE: () => LIFELINE_MIDDLE,
+    LIFELINE_OF_BOX: () => LIFELINE_OF_BOX,
+    LIFELINE_PLUMB: () => LIFELINE_PLUMB,
+    LIFELINE_PX: () => LIFELINE_PX,
     LOCAL_PARTICIPANT: () => LOCAL_PARTICIPANT,
     LOCAL_TIMEOUT_MS: () => LOCAL_TIMEOUT_MS,
     LOG_DIR: () => LOG_DIR,
     LOG_EXT: () => LOG_EXT,
+    LOOP_PX: () => LOOP_PX,
+    LOOP_SPAN_PX: () => LOOP_SPAN_PX,
     LiveMerge: () => LiveMerge,
     LiveStore: () => LiveStore,
     LocalHub: () => LocalHub,
@@ -111,9 +139,11 @@ var MetaMediumCore = (() => {
     MERMAID_MAX_LINKS: () => MERMAID_MAX_LINKS,
     MERMAID_MAX_NODES: () => MERMAID_MAX_NODES,
     MERMAID_TEXT_PX: () => MERMAID_TEXT_PX,
+    MESSAGE_LEVEL: () => MESSAGE_LEVEL,
     META_DIR: () => META_DIR,
     METHOD_WORDS: () => METHOD_WORDS,
     MIN_CONFIDENCE: () => MIN_CONFIDENCE,
+    MIN_DASHES: () => MIN_DASHES,
     MIN_EXTENT_PX: () => MIN_EXTENT_PX,
     MODEL_DISCOUNT: () => MODEL_DISCOUNT,
     MarkGrid: () => MarkGrid,
@@ -139,10 +169,14 @@ var MetaMediumCore = (() => {
     ROLES: () => ROLES,
     ReadOnlyError: () => ReadOnlyError,
     SEND_WAIT_MS: () => SEND_WAIT_MS,
+    SEQUENCE: () => SEQUENCE,
+    SEQUENCE_READER: () => SEQUENCE_READER,
+    SEQUENCE_TABLE: () => SEQUENCE_TABLE,
     SETTLED_CONFIDENCE: () => SETTLED_CONFIDENCE,
     SITS_EXACTLY: () => SITS_EXACTLY,
     SKIP_DIRS: () => SKIP_DIRS,
     SLIVER: () => SLIVER,
+    SMALL_MARK: () => SMALL_MARK,
     SNAPPABLE: () => SNAPPABLE,
     SNAP_CONFIDENCE: () => SNAP_CONFIDENCE,
     SNAP_MARGIN: () => SNAP_MARGIN,
@@ -167,6 +201,7 @@ var MetaMediumCore = (() => {
     WORD_GAP_RATIO: () => WORD_GAP_RATIO,
     WORD_WINDOW_MS: () => WORD_WINDOW_MS,
     WRITING_SPAN: () => WRITING_SPAN,
+    WRITING_ZIGZAG: () => WRITING_ZIGZAG,
     aboutIdsOf: () => aboutIdsOf,
     activeBindingsOf: () => activeBindingsOf,
     addExample: () => addExample,
@@ -248,6 +283,8 @@ var MetaMediumCore = (() => {
     createParticipantNode: () => createParticipantNode,
     createSession: () => createSession,
     createStubDecideTransport: () => createStubDecideTransport,
+    dashedHeads: () => dashedHeads,
+    dashedLines: () => dashedLines,
     decodeLog: () => decodeLog,
     defaultHost: () => defaultHost,
     definitionId: () => definitionId,
@@ -476,6 +513,8 @@ var MetaMediumCore = (() => {
     readFlowchartText: () => readFlowchartText,
     readMermaid: () => readMermaid,
     readNumber: () => readNumber,
+    readSequence: () => readSequence,
+    readSequenceText: () => readSequenceText,
     readSheet: () => readSheet,
     readUmlClass: () => readUmlClass,
     readingsFor: () => readingsFor,
@@ -514,6 +553,8 @@ var MetaMediumCore = (() => {
     seedOf: () => seedOf,
     seeded: () => seeded,
     segmentsIntersect: () => segmentsIntersect,
+    sequencePortsOf: () => sequencePortsOf,
+    sequenceText: () => sequenceText,
     shapeExtent: () => shapeExtent,
     shapesSummary: () => shapesSummary,
     sheetEntry: () => sheetEntry,
@@ -560,7 +601,7 @@ var MetaMediumCore = (() => {
     toolsFor: () => toolsFor,
     toolsVersion: () => toolsVersion,
     topInterpretation: () => topInterpretation,
-    topOf: () => topOf,
+    topOf: () => topOf2,
     trace: () => trace,
     tracePaths: () => tracePaths,
     transcriptOf: () => transcriptOf,
@@ -584,6 +625,7 @@ var MetaMediumCore = (() => {
     wordConfidence: () => wordConfidence,
     wordOf: () => wordOf,
     worldOf: () => worldOf,
+    writeSequence: () => writeSequence,
     writeUmlClass: () => writeUmlClass,
     writingLine: () => writingLine,
     zigzagOf: () => zigzagOf
@@ -808,10 +850,10 @@ var MetaMediumCore = (() => {
     const total = cum[cum.length - 1];
     if (total === 0) return path.slice(0, n2);
     const out = [];
-    const count7 = closed ? n2 : n2 - 1;
+    const count9 = closed ? n2 : n2 - 1;
     let j = 0;
     for (let i = 0; i < (closed ? n2 : n2); i++) {
-      const target = i / count7 * total;
+      const target = i / count9 * total;
       while (j < cum.length - 2 && cum[j + 1] < target) j++;
       const span = cum[j + 1] - cum[j];
       const t = span > 0 ? (target - cum[j]) / span : 0;
@@ -1123,9 +1165,9 @@ var MetaMediumCore = (() => {
       const start = pts[0];
       const end = pts[pts.length - 1];
       for (let i = 1; i < pts.length - 1; i++) {
-        const dist8 = perpendicularDistance(pts[i], start, end);
-        if (dist8 > maxDist) {
-          maxDist = dist8;
+        const dist10 = perpendicularDistance(pts[i], start, end);
+        if (dist10 > maxDist) {
+          maxDist = dist10;
           maxIndex = i;
         }
       }
@@ -1298,10 +1340,10 @@ var MetaMediumCore = (() => {
     if (fp.isClosed || checkOvershoot(points, 50 * scale)) return null;
     const corners = fp.cornerData ?? [];
     if (corners.length === 0 || corners.length > 4) return null;
-    const HEAD2 = 0.42;
-    const atEnd = corners.filter((c) => c.t >= 1 - HEAD2);
-    const atStart = corners.filter((c) => c.t <= HEAD2);
-    if (corners.some((c) => c.t > HEAD2 && c.t < 1 - HEAD2)) return null;
+    const HEAD3 = 0.42;
+    const atEnd = corners.filter((c) => c.t >= 1 - HEAD3);
+    const atStart = corners.filter((c) => c.t <= HEAD3);
+    if (corners.some((c) => c.t > HEAD3 && c.t < 1 - HEAD3)) return null;
     if (atEnd.length > 0 && atStart.length > 0) return null;
     const path = resampleByArcLength(points, 100);
     const tryHead = (head, cs) => {
@@ -1361,8 +1403,8 @@ var MetaMediumCore = (() => {
   function analyzeStroke(points, scale = 1) {
     const fingerprint = getFingerprint(points, scale);
     if (fingerprint.size / scale < HAND_RESOLUTION_PX) {
-      const dot5 = detectDot(fingerprint, scale);
-      return { fingerprint, results: dot5 ? [dot5] : [] };
+      const dot6 = detectDot(fingerprint, scale);
+      return { fingerprint, results: dot6 ? [dot6] : [] };
     }
     const even2 = evenBowOf(fingerprint, points, scale);
     const results = [
@@ -1970,7 +2012,7 @@ var MetaMediumCore = (() => {
       if (g) g.push(i);
       else groups.set(i.tier, [i]);
     }
-    return [...groups.entries()].sort((a, b) => a[0] - b[0]).map(([key2, list4]) => ({ key: key2, label: `tier ${key2}`, interpretations: list4 }));
+    return [...groups.entries()].sort((a, b) => a[0] - b[0]).map(([key2, list5]) => ({ key: key2, label: `tier ${key2}`, interpretations: list5 }));
   }
   function bySource(interpretations) {
     const groups = /* @__PURE__ */ new Map();
@@ -1980,10 +2022,10 @@ var MetaMediumCore = (() => {
       if (g) g.push(i);
       else groups.set(key2, [i]);
     }
-    return [...groups.entries()].map(([key2, list4]) => ({
+    return [...groups.entries()].map(([key2, list5]) => ({
       key: key2,
-      label: list4[0].sourceName,
-      interpretations: list4
+      label: list5[0].sourceName,
+      interpretations: list5
     }));
   }
   function disagreement(interpretations) {
@@ -2199,8 +2241,8 @@ var MetaMediumCore = (() => {
             y: c.y + u.y * su * bw / 2 + u.x * sv * bh / 2
           });
           const tilt = Math.atan2(bh, bw) * 180 / Math.PI;
-          const offSquare2 = (deg5) => {
-            const d = (deg5 % 90 + 90) % 90;
+          const offSquare2 = (deg6) => {
+            const d = (deg6 % 90 + 90) % 90;
             return Math.min(d, 90 - d);
           };
           const diamond = Math.max(offSquare2(box.angle + tilt), offSquare2(box.angle - tilt)) <= SQUARE_UP_DEG;
@@ -3232,8 +3274,8 @@ var MetaMediumCore = (() => {
     return null;
   }
   var leafText = (e) => e.k === "num" ? formatQuantity(e.q) : e.k === "name" ? e.name : e.k === "ref" ? e.text : "";
-  function fmtExpr(e, sub8) {
-    const own = sub8?.(e);
+  function fmtExpr(e, sub10) {
+    const own = sub10?.(e);
     if (own !== void 0) return own;
     switch (e.k) {
       case "num":
@@ -3241,13 +3283,13 @@ var MetaMediumCore = (() => {
       case "ref":
         return leafText(e);
       case "carry":
-        return fmtExpr(e.a, sub8);
+        return fmtExpr(e.a, sub10);
       case "neg": {
-        const inner = fmtExpr(e.a, sub8);
+        const inner = fmtExpr(e.a, sub10);
         return "\u2212" + (opOf(e.a) ? `(${inner})` : inner);
       }
       case "op": {
-        const la = fmtExpr(e.a, sub8), lb = fmtExpr(e.b, sub8);
+        const la = fmtExpr(e.a, sub10), lb = fmtExpr(e.b, sub10);
         const oa = opOf(e.a), ob = opOf(e.b);
         return `${oa && oa !== e.op ? `(${la})` : la} ${GLYPH[e.op]} ${ob ? `(${lb})` : lb}`;
       }
@@ -3797,8 +3839,8 @@ var MetaMediumCore = (() => {
     for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return a[i] - b[i];
     return 0;
   };
-  function runChain(reading3, rest, scope, label, skip = /* @__PURE__ */ new Set(), seed = []) {
-    let cur = reading3.expr;
+  function runChain(reading4, rest, scope, label, skip = /* @__PURE__ */ new Set(), seed = []) {
+    let cur = reading4.expr;
     const acc = newAcc();
     const seeded2 = [];
     for (const s of seed) {
@@ -3866,7 +3908,7 @@ var MetaMediumCore = (() => {
       }
       options.reduce((best, o) => cmpScore(o.score, best.score) < 0 ? o : best).apply();
     });
-    return { reading: reading3, label, cur, acc, restated, restatedSegs, restatedTexts, skipped, seeded: seeded2, notes };
+    return { reading: reading4, label, cur, acc, restated, restatedSegs, restatedTexts, skipped, seeded: seeded2, notes };
   }
   var joinNames = (xs) => xs.length <= 1 ? xs.join("") : `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`;
   var runKey = (r) => [r.acc.fails, -r.restated, -r.acc.passes, r.li, r.reading.departures, r.ri];
@@ -3880,10 +3922,10 @@ var MetaMediumCore = (() => {
     }
     const labels = alternativeLabels(first.readings.map((r) => r.expr), scope);
     let runs = [];
-    first.readings.forEach((reading3, ri) => {
+    first.readings.forEach((reading4, ri) => {
       [void 0, ...labels].forEach((label, li) => {
-        if (label && !takesLabel(reading3.expr, label, scope)) return;
-        runs.push({ ...runChain(reading3, rest, scope, label), ri, li });
+        if (label && !takesLabel(reading4.expr, label, scope)) return;
+        runs.push({ ...runChain(reading4, rest, scope, label), ri, li });
       });
     });
     sortRuns(runs);
@@ -4662,9 +4704,9 @@ var MetaMediumCore = (() => {
     if (!fp || !ink || ink.length < 2) return null;
     const clean = cleanOf(node);
     if (clean && clean.points.length >= 2) return { shape: clean.shape, points: placed(node, clean.points), held: clean };
-    const reading3 = snapReading(node, nodes);
-    const ideal = reading3.ok ? idealize(node, reading3.shape)?.points : void 0;
-    if (ideal && ideal.length >= 2 && reading3.shape) return { shape: reading3.shape, points: placed(node, ideal), held: null };
+    const reading4 = snapReading(node, nodes);
+    const ideal = reading4.ok ? idealize(node, reading4.shape)?.points : void 0;
+    if (ideal && ideal.length >= 2 && reading4.shape) return { shape: reading4.shape, points: placed(node, ideal), held: null };
     return { shape: "ink", points: ink, held: null };
   }
   function magnetSites(node, nodes) {
@@ -5067,9 +5109,9 @@ var MetaMediumCore = (() => {
         const nearLimit = nearLimitOf(ab, bb, config);
         if (gap < nearLimit) {
           const strength = 1 - gap / nearLimit;
-          const pct5 = Math.round(gap / ref * 100);
-          add5("near", a.id, b.id, strength, `${Math.round(gap)}px apart \u2014 ${pct5}% of the smaller mark`);
-          add5("near", b.id, a.id, strength, `${Math.round(gap)}px apart \u2014 ${pct5}% of the smaller mark`);
+          const pct6 = Math.round(gap / ref * 100);
+          add5("near", a.id, b.id, strength, `${Math.round(gap)}px apart \u2014 ${pct6}% of the smaller mark`);
+          add5("near", b.id, a.id, strength, `${Math.round(gap)}px apart \u2014 ${pct6}% of the smaller mark`);
         }
         const vOverlap = overlapFraction(ab.minY, ab.maxY, bb.minY, bb.maxY);
         const hOverlap = overlapFraction(ab.minX, ab.maxX, bb.minX, bb.maxX);
@@ -5486,16 +5528,16 @@ var MetaMediumCore = (() => {
     for (const t of texts) {
       const rows = t.code.split(/\r?\n/).map((r) => r.trim()).filter(Boolean);
       if (rows.length !== 1) continue;
-      const reading3 = readNumber(rows[0]);
-      if (reading3) out.push({ id: t.id, ids: [t.id], from: "text", text: rows[0], bounds: t.bounds, centre: centreOf(t.bounds), reading: reading3 });
+      const reading4 = readNumber(rows[0]);
+      if (reading4) out.push({ id: t.id, ids: [t.id], from: "text", text: rows[0], bounds: t.bounds, centre: centreOf(t.bounds), reading: reading4 });
     }
     for (const band of writingBands(pieces)) {
       for (const phrase of bandPhrases(band)) {
         const text = phrase.map((p) => p.text).join(" ").replace(/(\d)\s+(["″”'′])/g, "$1$2");
-        const reading3 = readNumber(text);
-        if (!reading3) continue;
+        const reading4 = readNumber(text);
+        if (!reading4) continue;
         const bounds = boundsOfAll(phrase.map((p) => p.bounds));
-        out.push({ id: phrase[0].id, ids: phrase.map((p) => p.id), from: "writing", text, bounds, centre: centreOf(bounds), reading: reading3 });
+        out.push({ id: phrase[0].id, ids: phrase.map((p) => p.id), from: "writing", text, bounds, centre: centreOf(bounds), reading: reading4 });
       }
     }
     return out;
@@ -5701,8 +5743,8 @@ var MetaMediumCore = (() => {
   function candidatesFor(num2, figures) {
     const p = num2.centre;
     const out = [];
-    const reading3 = num2.reading;
-    if (reading3.angle) {
+    const reading4 = num2.reading;
+    if (reading4.angle) {
       for (const f of figures) {
         if (f.kind === "circle" || f.kind === "arc" || f.kind === "line") continue;
         const n2 = f.vertices.length;
@@ -5726,9 +5768,9 @@ var MetaMediumCore = (() => {
       }
       return out.sort((a, b) => b.confidence - a.confidence);
     }
-    if (reading3.measure) {
+    if (reading4.measure) {
       for (const f of figures) {
-        for (const k of namedKeys(f, reading3.measure)) {
+        for (const k of namedKeys(f, reading4.measure)) {
           if (k.segment) {
             const c = segmentCandidate(num2, f, { key: k.key, label: k.label, from: k.segment.from, to: k.segment.to, length: k.segment.length }, "measure");
             if (c) out.push({ ...c, reason: `${c.reason}, as its name says` });
@@ -6001,12 +6043,12 @@ var MetaMediumCore = (() => {
         for (const f of members) if (raw.has(f.id)) labels.set(f.id, raw.get(f.id));
         continue;
       }
-      const count7 = /* @__PURE__ */ new Map();
-      for (const f of members) for (const l of raw.get(f.id) ?? []) if (!l.declared && l.value.unit && l.value.dim >= 1) count7.set(l.value.unit, (count7.get(l.value.unit) ?? 0) + 1);
+      const count9 = /* @__PURE__ */ new Map();
+      for (const f of members) for (const l of raw.get(f.id) ?? []) if (!l.declared && l.value.unit && l.value.dim >= 1) count9.set(l.value.unit, (count9.get(l.value.unit) ?? 0) + 1);
       let written2 = null;
-      for (const [u, n2] of count7) if (!written2 || n2 > count7.get(written2)) written2 = u;
+      for (const [u, n2] of count9) if (!written2 || n2 > count9.get(written2)) written2 = u;
       const unit4 = written2 ?? fallback;
-      const unitReason = written2 ? `${UNIT_NAMES2[written2]}, written on ${count7.get(written2)} of its labels` : unit4 ? `${UNIT_NAMES2[unit4]}, the unit the page speaks` : "no unit written, so its numbers stay bare";
+      const unitReason = written2 ? `${UNIT_NAMES2[written2]}, written on ${count9.get(written2)} of its labels` : unit4 ? `${UNIT_NAMES2[unit4]}, the unit the page speaks` : "no unit written, so its numbers stay bare";
       const given2 = [];
       for (const f of members) {
         const ls = (raw.get(f.id) ?? []).map((l) => {
@@ -6522,7 +6564,7 @@ var MetaMediumCore = (() => {
   }
   var dimOf = (key2) => /^angle\d$/.test(key2) || key2 === "sweep" ? 0 : key2 === "area" ? 2 : 1;
   function check(model, facts, unit4) {
-    const kept = [...model.basis];
+    const kept2 = [...model.basis];
     const conflicts = [];
     const used = new Set(model.basis.map((x) => x.group));
     const groups = /* @__PURE__ */ new Map();
@@ -6541,13 +6583,13 @@ var MetaMediumCore = (() => {
         }
         if (cmp.status === "off" && !miss) miss = { fact: x, derived: v.iv };
       }
-      if (hit) kept.push(hit);
+      if (hit) kept2.push(hit);
       else if (miss) {
         conflicts.push(miss);
         share += Math.abs(miss.derived.lo - miss.fact.iv.lo) / Math.max(TOL, Math.abs(miss.fact.iv.lo));
       }
     }
-    return { model, kept, conflicts, share, ink: 0 };
+    return { model, kept: kept2, conflicts, share, ink: 0 };
   }
   function inkDistance(f, model) {
     const pairs = [];
@@ -6558,8 +6600,8 @@ var MetaMediumCore = (() => {
     }
     if (pairs.length < 2) return 0;
     const ratios = pairs.map(([a, b]) => Math.log(a / b));
-    const mean4 = ratios.reduce((s, r) => s + r, 0) / ratios.length;
-    return ratios.reduce((s, r) => s + Math.abs(r - mean4), 0);
+    const mean5 = ratios.reduce((s, r) => s + r, 0) / ratios.length;
+    return ratios.reduce((s, r) => s + Math.abs(r - mean5), 0);
   }
   function inkKeyOf(f, key2) {
     if (f.kind === "rectangle" && (key2 === "width" || key2 === "height")) {
@@ -6671,9 +6713,9 @@ var MetaMediumCore = (() => {
     return `${approx ? "~" : ""}${fmtIv(iv)}${suffix}`;
   }
   var lengthWord = (key2, more) => dimOf(key2) === 1 ? more ? "longer" : "shorter" : more ? "larger" : "smaller";
-  function conflictOf(f, c, reading3, unit4, right2) {
+  function conflictOf(f, c, reading4, unit4, right2) {
     const x = c.fact;
-    const model = c.against ?? reading3;
+    const model = c.against ?? reading4;
     const d = c.derived.lo - x.iv.lo;
     const share = Math.abs(d) / Math.max(TOL, Math.abs(x.iv.lo));
     const verb = model.basis.length > 1 || /\band\b/.test(model.how) ? "make" : "makes";
@@ -6708,9 +6750,9 @@ var MetaMediumCore = (() => {
         }
         if (facts.some((x) => x.key.startsWith("side")) && f.angles) {
           const taken = new Set(angleFacts.map((x) => x.key));
-          f.angles.forEach((deg5, k) => {
-            if (models.length || taken.has(`angle${k}`) || angleClass(deg5) !== "right") return;
-            const assumed = `the corner at ${V[k]} measures ${Math.round(deg5)}\xB0, right within \xB1${RIGHT_ANGLE_TOLERANCE}\xB0 (measure.ts) \u2014 a reading, not a fact`;
+          f.angles.forEach((deg6, k) => {
+            if (models.length || taken.has(`angle${k}`) || angleClass(deg6) !== "right") return;
+            const assumed = `the corner at ${V[k]} measures ${Math.round(deg6)}\xB0, right within \xB1${RIGHT_ANGLE_TOLERANCE}\xB0 (measure.ts) \u2014 a reading, not a fact`;
             const hyp = { i: -1, key: `angle${k}`, iv: point(90), q: { lo: 90, hi: 90, unit: null, dim: 0, approx: false }, text: "90\xB0", shown: "90", group: `assumed:${k}`, fixed: true, assumed, ids: [] };
             models = triangleModels([...facts, hyp]);
           });
@@ -6776,10 +6818,10 @@ var MetaMediumCore = (() => {
     if (f.kind === "triangle" && f.angles) {
       const topReading = readings2[0];
       if (topReading && !topReading.assumes) {
-        f.angles.forEach((deg5, k) => {
-          if (angleClass(deg5) !== "right" || facts.some((x) => x.key === `angle${k}`)) return;
+        f.angles.forEach((deg6, k) => {
+          if (angleClass(deg6) !== "right" || facts.some((x) => x.key === `angle${k}`)) return;
           const v = topReading.values.find((x) => x.key === `angle${k}`);
-          if (v && Math.abs(v.value.lo - 90) >= RIGHT_ANGLE_TOLERANCE) notes.push(`the corner at ${V[k]} measures ${Math.round(deg5)}\xB0 in the ink; the labels make it ${v.text}`);
+          if (v && Math.abs(v.value.lo - 90) >= RIGHT_ANGLE_TOLERANCE) notes.push(`the corner at ${V[k]} measures ${Math.round(deg6)}\xB0 in the ink; the labels make it ${v.text}`);
         });
       }
       const declared = facts.filter((x) => x.fixed && !x.assumed);
@@ -6888,7 +6930,7 @@ var MetaMediumCore = (() => {
     }
     const vals = /* @__PURE__ */ new Map();
     const basis = [];
-    const kept = [];
+    const kept2 = [];
     const conflicts = [];
     let share = 0;
     for (const rs of bySide.values()) {
@@ -6896,12 +6938,12 @@ var MetaMediumCore = (() => {
       const best = rs[0];
       for (const [k, v] of best.model.vals) vals.set(k, v);
       basis.push(...best.model.basis);
-      kept.push(...best.kept);
+      kept2.push(...best.kept);
       conflicts.push(...best.conflicts.map((c) => ({ ...c, against: best.model })));
       share += best.share;
     }
     const how = basis.map((x) => x.parts ? x.text : `${x.shown}`).join(", ");
-    return [{ model: { basis, vals, how, makes: [] }, kept, conflicts, share, ink: 0 }];
+    return [{ model: { basis, vals, how, makes: [] }, kept: kept2, conflicts, share, ink: 0 }];
   }
   function solveBoard(state, options = {}) {
     const pages = [];
@@ -7446,8 +7488,8 @@ var MetaMediumCore = (() => {
     if (v.from === "labelled" && v.value.precision !== void 0 && v.value.unit === unit4) return formatQuantity(v.value);
     return derivedText(v.value, p, unit4);
   }
-  function figurePrecision(reading3) {
-    const labelled = reading3.values.filter((v) => v.from === "labelled");
+  function figurePrecision(reading4) {
+    const labelled = reading4.values.filter((v) => v.from === "labelled");
     const lengths = labelled.filter((v) => v.value.dim === 1);
     const ps = (lengths.length ? lengths : labelled).map((v) => precisionOf(v.value));
     return ps.length ? Math.min(...ps) : 1;
@@ -7473,8 +7515,8 @@ var MetaMediumCore = (() => {
     for (let i = 0; i < v.length; i++) a += cross3(v[i], v[(i + 1) % v.length]);
     return a / 2;
   }
-  function readable(deg5) {
-    return ((deg5 + 90) % 180 + 180) % 180 - 90;
+  function readable(deg6) {
+    return ((deg6 + 90) % 180 + 180) % 180 - 90;
   }
   function baseSide(v) {
     let best = 0;
@@ -7694,25 +7736,25 @@ var MetaMediumCore = (() => {
     return `its ${key2}`;
   }
   function whyNot(f, sol, labelled) {
-    const reading3 = sol.readings[0];
+    const reading4 = sol.readings[0];
     if (!labelled) return "no numbers on it";
     if (f.kind === "quadrilateral" || f.kind === "polygon") return "its sides alone do not fix its shape";
     if (!sol.unit) return "its numbers have no unit: write one on a label, or on the page";
-    if (!reading3) return "its labels do not fix it";
+    if (!reading4) return "its labels do not fix it";
     const keys = DRAWN_FROM[f.kind];
     if (!keys) return "nothing here draws a figure of this kind";
     for (const key2 of keys) {
-      const v = reading3.values.find((x) => x.key === key2);
+      const v = reading4.values.find((x) => x.key === key2);
       if (!v) return `nothing fixes ${measureWord(f, key2)}`;
-      const text = v.from === "labelled" && v.value.precision !== void 0 ? formatQuantity(v.value) : derivedText(v.value, figurePrecision(reading3), sol.unit);
+      const text = v.from === "labelled" && v.value.precision !== void 0 ? formatQuantity(v.value) : derivedText(v.value, figurePrecision(reading4), sol.unit);
       if (isRange(v.value)) return `${v.label} is ${text}, a range: choose one value to draw it`;
       if (!(v.value.lo > 0)) return `${v.label} is ${text}: no size to draw`;
     }
     return null;
   }
   function entriesOf(solved) {
-    const list4 = "dimensions" in solved ? solved.figures : solved;
-    return list4.map((x) => "solution" in x ? { figure: x.figure, solution: x.solution, labels: x.labels } : { figure: x.figure, solution: x, labels: null });
+    const list5 = "dimensions" in solved ? solved.figures : solved;
+    return list5.map((x) => "solution" in x ? { figure: x.figure, solution: x.solution, labels: x.labels } : { figure: x.figure, solution: x, labels: null });
   }
   function inkBounds(f) {
     const pts = f.outline.length ? f.outline : f.vertices;
@@ -7787,15 +7829,15 @@ var MetaMediumCore = (() => {
   }
   function trueSize(solved, options = {}) {
     const entries = entriesOf(solved).map((e) => ({ e, b: inkBounds(e.figure) })).sort((p, q2) => p.b.minX - q2.b.minX || p.b.minY - q2.b.minY || (p.e.figure.id < q2.e.figure.id ? -1 : p.e.figure.id > q2.e.figure.id ? 1 : 0)).map((x2) => x2.e);
-    const count7 = /* @__PURE__ */ new Map();
-    for (const e of entries) count7.set(e.figure.kind, (count7.get(e.figure.kind) ?? 0) + 1);
+    const count9 = /* @__PURE__ */ new Map();
+    for (const e of entries) count9.set(e.figure.kind, (count9.get(e.figure.kind) ?? 0) + 1);
     const seen = /* @__PURE__ */ new Map();
     const nameOf3 = /* @__PURE__ */ new Map();
     for (const e of entries) {
       const k = e.figure.kind;
       const i = (seen.get(k) ?? 0) + 1;
       seen.set(k, i);
-      nameOf3.set(e.figure.id, options.names?.[e.figure.id] ?? ((count7.get(k) ?? 0) > 1 ? `${k} ${i}` : k));
+      nameOf3.set(e.figure.id, options.names?.[e.figure.id] ?? ((count9.get(k) ?? 0) > 1 ? `${k} ${i}` : k));
     }
     const drawable = [];
     const omitted = [];
@@ -7818,19 +7860,19 @@ var MetaMediumCore = (() => {
     const w2 = { n: (v) => fmt2(v, places), F };
     const built = drawable.map((e) => {
       const sol = e.solution;
-      const reading3 = sol.readings[0];
+      const reading4 = sol.readings[0];
       const figUnit = sol.unit;
-      const precision = figurePrecision(reading3);
+      const precision = figurePrecision(reading4);
       const c = {
         fig: e.figure,
-        vals: new Map(reading3.values.map((v) => [v.key, v])),
+        vals: new Map(reading4.values.map((v) => [v.key, v])),
         f: unitFactor(figUnit, U),
         F,
         precision,
         unit: figUnit,
         conflicts: new Map(sol.conflicts.map((x2) => [x2.key, x2])),
         labels: e.labels,
-        reading: reading3
+        reading: reading4
       };
       const shape = e.figure.kind === "triangle" ? triangleShape(c) : e.figure.kind === "rectangle" ? rectangleShape(c) : e.figure.kind === "circle" ? circleShape(c) : e.figure.kind === "arc" ? arcShape(c) : lineShape(c);
       const name = nameOf3.get(e.figure.id);
@@ -7851,12 +7893,12 @@ var MetaMediumCore = (() => {
         notes2.push(drawnKeys.has(x2.key) ? `the ${name}: ${x2.label} is labelled ${x2.text}, which cannot hold; drawn ${made}, ${from}` : `the ${name}: ${x2.label} is labelled ${x2.text}, which cannot hold; the first of ${n2} readings makes it ${made}`);
       }
       if (!sol.conflicts.length && n2 > 1) notes2.push(`the ${name}: its labels read ${n2} ways; drawn from the first`);
-      for (const a of reading3.assumes ?? []) {
+      for (const a of reading4.assumes ?? []) {
         const m = /^the corner at ([A-Z]) measures (\d+)°/.exec(a);
         notes2.push(m ? `the ${name}: drawn as if the corner at ${m[1]} is right \u2014 the ink measures it ${m[2]}\xB0, a reading, not a fact` : `the ${name}: drawn on a reading \u2014 ${a}`);
       }
       if (figUnit !== U) notes2.push(`the ${name}: labelled in ${UNIT_WORDS2[figUnit]}, drawn in ${UNIT_WORDS2[U]}`);
-      return { e, shape, box, name, notes: notes2, precision, figUnit, reading: reading3 };
+      return { e, shape, box, name, notes: notes2, precision, figUnit, reading: reading4 };
     });
     const clauses = [];
     const one = built.length === 1;
@@ -8027,8 +8069,8 @@ ${barParts.join("\n")}
       const why = `the margins and a ${amount(od, U)} overlap leave no room on ${P.name} ${orientation}`;
       return empty(`nothing to print: ${why}`, why);
     }
-    const count7 = (len2, tile) => len2 <= tile + 1e-9 ? 1 : Math.ceil((len2 - od) / (tile - od) - 1e-9);
-    const cols = count7(rw, Wd), rows = count7(rh, Hd);
+    const count9 = (len2, tile) => len2 <= tile + 1e-9 ? 1 : Math.ceil((len2 - od) / (tile - od) - 1e-9);
+    const cols = count9(rw, Wd), rows = count9(rh, Hd);
     const n2 = rows * cols;
     const x0 = (c) => region.minX + c * (Wd - od);
     const y0 = (r) => region.minY + r * (Hd - od);
@@ -8207,10 +8249,10 @@ ${p.svg}</section>`),
     if (!getRep(node, "stroke") || getRep(node, "erased") || getRep(node, "gesture")) return null;
     const held2 = cleanOf(node);
     if (held2) return HANDLES[held2.shape] ? { clean: held2, held: true, confidence: getRep(node, "clean").confidence ?? 0 } : null;
-    const reading3 = snapReading(node, nodes);
-    if (!reading3.ok) return null;
-    const ideal = idealize(node, reading3.shape);
-    return ideal && HANDLES[ideal.shape] ? { clean: ideal, held: false, confidence: reading3.weight } : null;
+    const reading4 = snapReading(node, nodes);
+    if (!reading4.ok) return null;
+    const ideal = idealize(node, reading4.shape);
+    return ideal && HANDLES[ideal.shape] ? { clean: ideal, held: false, confidence: reading4.weight } : null;
   }
   function holding(node, clean, confidence) {
     return { ...node, reps: [...node.reps.filter((r) => r.modality !== "clean"), { modality: "clean", data: clean, confidence, source: "engine" }] };
@@ -9152,9 +9194,9 @@ ${p.svg}</section>`),
     for (const [id, n2] of nodes) {
       for (const e of n2.edges) {
         if (e.rel !== "bound-to" || typeof e.end !== "string" || !e.site) continue;
-        const list4 = out.get(e.to);
-        if (!list4) out.set(e.to, [id]);
-        else if (!list4.includes(id)) list4.push(id);
+        const list5 = out.get(e.to);
+        if (!list5) out.set(e.to, [id]);
+        else if (!list5.includes(id)) list5.push(id);
       }
     }
     return out;
@@ -9242,9 +9284,9 @@ ${p.svg}</section>`),
       if (a.name !== b.name) return a.name < b.name ? -1 : 1;
       return a.i - b.i;
     });
-    const kept = foldAuthorship(tagged, opts);
+    const kept2 = foldAuthorship(tagged, opts);
     const stamp = opts.me !== void 0;
-    return kept.map((t) => stamp && t.name !== opts.me ? { ...t.ev, by: t.name } : { ...t.ev });
+    return kept2.map((t) => stamp && t.name !== opts.me ? { ...t.ev, by: t.name } : { ...t.ev });
   }
   function describeAuthorshipCollision(c) {
     return `two different events are both "${c.origin}" number ${c.seq} \u2014 the one in ${c.kept}'s log is kept and the one in ${c.dropped}'s is left out; two hands have written under one name`;
@@ -9872,28 +9914,28 @@ ${p.svg}</section>`),
       const k = authorKey(ev);
       if (k === null) return;
       const mine = { name, i, ev };
-      const list4 = this.numbered.get(k);
-      if (!list4) {
+      const list5 = this.numbered.get(k);
+      if (!list5) {
         this.numbered.set(k, [mine]);
         return;
       }
       const origin = ev.origin;
-      for (const other of list4) {
+      for (const other of list5) {
         if (this.misnumbered.has(origin)) break;
         if (sameEvent(other.ev, ev)) continue;
-        const [kept, dropped] = this.keeps(other, mine) ? [other, mine] : [mine, other];
-        this.misnumbered.set(origin, describeAuthorshipCollision({ origin, seq: ev.seq, kept: kept.name, dropped: dropped.name }));
+        const [kept2, dropped] = this.keeps(other, mine) ? [other, mine] : [mine, other];
+        this.misnumbered.set(origin, describeAuthorshipCollision({ origin, seq: ev.seq, kept: kept2.name, dropped: dropped.name }));
       }
-      list4.push(mine);
+      list5.push(mine);
     }
     /** A log's events, no longer held under their authorship: it is about to be replaced. */
     unnumber(name) {
       for (const ev of this.logs[name] ?? []) {
         const k = authorKey(ev);
         if (k === null) continue;
-        const list4 = this.numbered.get(k);
-        if (!list4) continue;
-        const rest = list4.filter((x) => x.name !== name);
+        const list5 = this.numbered.get(k);
+        if (!list5) continue;
+        const rest = list5.filter((x) => x.name !== name);
         if (rest.length) this.numbered.set(k, rest);
         else this.numbered.delete(k);
       }
@@ -10019,11 +10061,11 @@ ${p.svg}</section>`),
     if (a.name !== b.name) return a.name < b.name ? -1 : 1;
     return a.i - b.i;
   };
-  function lowerBound(list4, e) {
-    let lo = 0, hi = list4.length;
+  function lowerBound(list5, e) {
+    let lo = 0, hi = list5.length;
     while (lo < hi) {
       const mid8 = lo + hi >> 1;
-      if (order(list4[mid8], e) < 0) lo = mid8 + 1;
+      if (order(list5[mid8], e) < 0) lo = mid8 + 1;
       else hi = mid8;
     }
     return lo;
@@ -11237,9 +11279,9 @@ ${p.svg}</section>`),
         return { ...f, reasoning: `${Math.round(d - radius)}px past its ${Math.round(radius)}px hold \u2014 returning` };
       }
       case "drift": {
-        const deg5 = num(term, "direction", -90);
-        const a = deg5 * Math.PI / 180;
-        return { fx: Math.cos(a) * speed * 0.6 * w2, fy: Math.sin(a) * speed * 0.6 * w2, reasoning: `drifting toward ${deg5}\xB0` };
+        const deg6 = num(term, "direction", -90);
+        const a = deg6 * Math.PI / 180;
+        return { fx: Math.cos(a) * speed * 0.6 * w2, fy: Math.sin(a) * speed * 0.6 * w2, reasoning: `drifting toward ${deg6}\xB0` };
       }
       case "avoid":
         return none("sliding along walls");
@@ -12202,14 +12244,14 @@ ${lines.join("\n")}
       let ys = xs.get(cx2);
       if (!ys) xs.set(cx2, ys = /* @__PURE__ */ new Map());
       let here2 = ys.get(cy2);
-      const count7 = this.counts.get(level) ?? { marks: 0, cells: 0 };
+      const count9 = this.counts.get(level) ?? { marks: 0, cells: 0 };
       if (!here2) {
         ys.set(cy2, here2 = /* @__PURE__ */ new Set());
-        count7.cells++;
+        count9.cells++;
       }
       here2.add(id);
-      count7.marks++;
-      this.counts.set(level, count7);
+      count9.marks++;
+      this.counts.set(level, count9);
       this.filed.set(id, { level, cx: cx2, cy: cy2, bounds: { minX: bounds.minX, minY: bounds.minY, maxX: bounds.maxX, maxY: bounds.maxY } });
     }
     delete(id) {
@@ -12220,14 +12262,14 @@ ${lines.join("\n")}
       const ys = xs.get(f.cx);
       const here2 = ys.get(f.cy);
       here2.delete(id);
-      const count7 = this.counts.get(f.level);
-      count7.marks--;
+      const count9 = this.counts.get(f.level);
+      count9.marks--;
       if (here2.size === 0) {
         ys.delete(f.cy);
-        count7.cells--;
+        count9.cells--;
         if (ys.size === 0) xs.delete(f.cx);
       }
-      if (count7.marks === 0) {
+      if (count9.marks === 0) {
         this.counts.delete(f.level);
         this.levels.delete(f.level);
       }
@@ -12297,8 +12339,8 @@ ${lines.join("\n")}
         const x0 = Math.floor(box.minX / cell) - 1, x1 = Math.floor(box.maxX / cell);
         const y0 = Math.floor(box.minY / cell) - 1, y1 = Math.floor(box.maxY / cell);
         const span = (x1 - x0 + 1) * (y1 - y0 + 1);
-        const count7 = this.counts.get(level);
-        if (span > count7.cells) {
+        const count9 = this.counts.get(level);
+        if (span > count9.cells) {
           for (const [cx2, ys] of xs) {
             if (cx2 < x0 || cx2 > x1) continue;
             for (const [cy2, here2] of ys) {
@@ -13098,6 +13140,17 @@ ${lines.join("\n")}
     affinities: { "notation:uml-class": ["on:clean", "tool:tidy"] }
   };
 
+  // src/packs/shipped/sequence.ts
+  var SEQUENCE_PACK = {
+    id: "sequence",
+    version: 1,
+    name: "Sequence diagram",
+    describes: "the sequence notation in use: its lifelines on the pen, and clean forms and lining up likelier beside a sequence diagram",
+    notation: "sequence",
+    definitions: [],
+    affinities: { "notation:sequence": ["on:clean", "tool:tidy"] }
+  };
+
   // src/packs/shipped/test-molecule.ts
   var ring = (cx2, cy2, r, n2 = 48) => Array.from({ length: n2 + 1 }, (_, i) => ({ x: cx2 + r * Math.cos(i / n2 * Math.PI * 2), y: cy2 + r * Math.sin(i / n2 * Math.PI * 2) }));
   var run = (x1, y1, x2, y2, n2 = 24) => Array.from({ length: n2 }, (_, i) => ({ x: x1 + (x2 - x1) * i / (n2 - 1), y: y1 + (y2 - y1) * i / (n2 - 1) }));
@@ -13147,6 +13200,7 @@ ${lines.join("\n")}
   ship(BASICS);
   ship(FLOWCHART_PACK);
   ship(UML_CLASS_PACK);
+  ship(SEQUENCE_PACK);
   ship(TEST_MOLECULE);
   var shippedPack = (ref) => shipped.get(ref);
   function shippedPacks() {
@@ -13465,10 +13519,10 @@ ${lines.join("\n")}
       const length = events.length;
       if (length === 0 || checkpoints.some((c) => c.length === length)) return;
       keepCheckpoint({ length, snap: snapshot() });
-      let kept = 0;
+      let kept2 = 0;
       for (let i = checkpoints.length - 1; i >= 0; i--) {
         if (checkpoints[i].length % checkpointEvery === 0) continue;
-        if (++kept > END_CHECKPOINTS) checkpoints.splice(i, 1);
+        if (++kept2 > END_CHECKPOINTS) checkpoints.splice(i, 1);
       }
     }
     let order2 = /* @__PURE__ */ new Map();
@@ -13997,7 +14051,7 @@ ${lines.join("\n")}
         return boundingBoxDistance(fp.bounds, m.bounds) < size * config.gesture.checkProximityRatio;
       });
       if (engaged.length === 0) return null;
-      const union2 = engaged.reduce(
+      const union3 = engaged.reduce(
         (acc, m) => ({
           minX: Math.min(acc.minX, m.bounds.minX),
           minY: Math.min(acc.minY, m.bounds.minY),
@@ -14006,7 +14060,7 @@ ${lines.join("\n")}
         }),
         engaged[0].bounds
       );
-      const scopeSize = Math.max(union2.maxX - union2.minX, union2.maxY - union2.minY);
+      const scopeSize = Math.max(union3.maxX - union3.minX, union3.maxY - union3.minY);
       if (fp.size > scopeSize) return null;
       const recent = new Set(recentWithin(at, hand));
       const pool = candidates.filter((m) => recent.has(m.id) || engaged.some((e) => e.id === m.id));
@@ -14151,7 +14205,7 @@ ${lines.join("\n")}
             data: { role: g.commandMark ? "command" : "check", scope: scope.source },
             source: g.commandMark ? `command-mark:${g.commandMark.name}` : "heuristic"
           });
-          const union2 = getBounds(
+          const union3 = getBounds(
             scope.ids.flatMap((id) => {
               const b = boundsOf(nodes.get(id));
               return [
@@ -14160,7 +14214,7 @@ ${lines.join("\n")}
               ];
             })
           );
-          g.summon = buildSummon(scope.ids, scope.source, scope.reasoning, [node.id], union2, node.id, at, g);
+          g.summon = buildSummon(scope.ids, scope.source, scope.reasoning, [node.id], union3, node.id, at, g);
           g.pendingLasso = null;
           g.markMiss = null;
           recomputeClusterCandidates();
@@ -14377,7 +14431,7 @@ ${lines.join("\n")}
       });
       if (about.length === 0) return null;
       const subject = about.map((id) => boundsOf(nodes.get(id))).filter((b) => !!b);
-      const union2 = subject.length ? getBounds(
+      const union3 = subject.length ? getBounds(
         subject.flatMap((b) => [
           { x: b.minX, y: b.minY },
           { x: b.maxX, y: b.maxY }
@@ -14386,10 +14440,10 @@ ${lines.join("\n")}
       const gap = 28;
       const width = 260;
       const bounds = {
-        minX: union2.maxX + gap,
-        minY: union2.minY,
-        maxX: union2.maxX + gap + width,
-        maxY: union2.minY + 120
+        minX: union3.maxX + gap,
+        minY: union3.minY,
+        maxX: union3.maxX + gap + width,
+        maxY: union3.minY + 120
       };
       const participant = nodes.get(ev.participantId);
       const node = createExplanationNode(
@@ -14432,12 +14486,12 @@ ${lines.join("\n")}
         const start = axis === "row" ? span.minX : span.minY;
         const end = axis === "row" ? span.maxX : span.maxY;
         const gap = ordered2.length > 1 ? (end - start - total) / (ordered2.length - 1) : 0;
-        const cross6 = ordered2.reduce((acc, t) => acc + (axis === "row" ? (t.bounds.minY + t.bounds.maxY) / 2 : (t.bounds.minX + t.bounds.maxX) / 2), 0) / ordered2.length;
+        const cross7 = ordered2.reduce((acc, t) => acc + (axis === "row" ? (t.bounds.minY + t.bounds.maxY) / 2 : (t.bounds.minX + t.bounds.maxX) / 2), 0) / ordered2.length;
         let cursor = start;
         placed2 = ordered2.map((t, i) => {
           const size = sizes[i];
           const half = (axis === "row" ? h2(t.bounds) : w2(t.bounds)) / 2;
-          const to = axis === "row" ? { minX: cursor, maxX: cursor + size, minY: cross6 - half, maxY: cross6 + half } : { minX: cross6 - half, maxX: cross6 + half, minY: cursor, maxY: cursor + size };
+          const to = axis === "row" ? { minX: cursor, maxX: cursor + size, minY: cross7 - half, maxY: cross7 + half } : { minX: cross7 - half, maxX: cross7 + half, minY: cursor, maxY: cursor + size };
           cursor += size + gap;
           return { id: t.id, to };
         });
@@ -14652,7 +14706,7 @@ ${lines.join("\n")}
       const sc = getRep(n2, "stroke")?.data?.scale;
       return sc && sc > 0 ? sc : 1;
     }
-    function sizeOfBounds2(b) {
+    function sizeOfBounds3(b) {
       return Math.max(b.maxX - b.minX, b.maxY - b.minY);
     }
     function inkPathsOf(n2) {
@@ -14697,8 +14751,9 @@ ${lines.join("\n")}
       if (!ends || !nb) return false;
       const scale = strokeScaleOf(n2);
       const touch = HAND_RESOLUTION_PX * scale;
-      const nSize = sizeOfBounds2(nb);
-      const holders = reach.query(nb).filter((id) => {
+      const nSize = sizeOfBounds3(nb);
+      let held2;
+      const holders = () => held2 ??= reach.query(nb).filter((id) => {
         const h2 = nodes.get(id);
         const hb = boundsOf(h2);
         return id !== n2.id && !!hb && boundsContain(hb, nb) && (artifacts.includes(id) || (standsClosed(h2) ?? false)) && nonWriting(h2);
@@ -14711,10 +14766,10 @@ ${lines.join("\n")}
           const mb = boundsOf(m);
           if (!mb || !nonWriting(m)) continue;
           const closed = artifacts.includes(id) || (standsClosed(m) ?? false);
-          const r = magnetRadius(closed ? sizeOfBounds2(mb) : Math.min(nSize, sizeOfBounds2(mb)), scale);
+          const r = magnetRadius(closed ? sizeOfBounds3(mb) : Math.min(nSize, sizeOfBounds3(mb)), scale);
           if (distancePointToBounds(e.point, mb) > r) continue;
           if (closed && boundsContain(mb, nb)) continue;
-          if (!closed && holders.some((h2) => boundsContain(boundsOf(nodes.get(h2)), mb))) continue;
+          if (!closed && holders().some((h2) => boundsContain(boundsOf(nodes.get(h2)), mb))) continue;
           let q = null, d = Infinity;
           for (const [pts, c] of inkPathsOf(m)) {
             for (let i = 1; i < pts.length + (c ? 1 : 0); i++) {
@@ -14756,7 +14811,7 @@ ${lines.join("\n")}
       const b = boundsOf(n2);
       if (xh === null || !b) return false;
       const ends = connectorEnds(n2, nodes);
-      const length = Math.max(ends ? Math.hypot(ends.end.x - ends.start.x, ends.end.y - ends.start.y) : 0, sizeOfBounds2(b));
+      const length = Math.max(ends ? Math.hypot(ends.end.x - ends.start.x, ends.end.y - ends.start.y) : 0, sizeOfBounds3(b));
       return longAgainst(length, xh);
     }
     function connectorNotLetter(n2, run2) {
@@ -14766,14 +14821,14 @@ ${lines.join("\n")}
       const pa = standingPointsOf(a), pb = standingPointsOf(b);
       const ba = boundsOf(a), bb = boundsOf(b);
       if (!pa || !pb || pa.length < 2 || pb.length < 2 || !ba || !bb) return false;
-      const limit = FIGURE_MEET_SHARE * Math.min(sizeOfBounds2(ba), sizeOfBounds2(bb));
+      const limit = FIGURE_MEET_SHARE * Math.min(sizeOfBounds3(ba), sizeOfBounds3(bb));
       if (!endsPairUp([pa[0], pa[pa.length - 1]], [pb[0], pb[pb.length - 1]], limit)) return false;
       return figuresAmong(nodes, [a.id, b.id]).some((f) => f.shape !== "polygon" && f.ids.includes(a.id) && f.ids.includes(b.id));
     }
     function oneDrawing(a, b) {
       if (getRep(a, "erased") || getRep(b, "erased")) return false;
-      const atOf2 = (n2) => getRep(n2, "stroke")?.data?.at ?? n2.createdAt;
-      const together = Math.abs(atOf2(b) - atOf2(a)) <= WORD_WINDOW_MS;
+      const atOf3 = (n2) => getRep(n2, "stroke")?.data?.at ?? n2.createdAt;
+      const together = Math.abs(atOf3(b) - atOf3(a)) <= WORD_WINDOW_MS;
       return together && (headApartAt(a, b, nodes) !== null || headApartAt(b, a, nodes) !== null) || closesFigure(a, b);
     }
     function releaseLetters(word, ids, before) {
@@ -14825,14 +14880,13 @@ ${lines.join("\n")}
       if (isWord(prev)) {
         const letters = lettersOf(prev);
         const last = nodes.get(letters[letters.length - 1]);
-        if (oneDrawing(last, node)) {
+        const lastAt2 = (getRep(last, "stroke")?.data).at;
+        if (at - lastAt2 <= WORD_WINDOW_MS && oneDrawing(last, node)) {
           releaseLetters(prev, [last.id], node.id);
           return false;
         }
-        if (connectorNotLetter(node, letters)) return false;
-        const lastAt2 = (getRep(last, "stroke")?.data).at;
         const j2 = joinsRun({ bounds: boundsOf(prev), lastAt: lastAt2 }, letter, scale);
-        if (!j2.ok) return false;
+        if (!j2.ok || connectorNotLetter(node, letters)) return false;
         letters.push(node.id);
         setWordReps(prev, letters);
         node.edges.push({ to: prev.id, rel: "part-of", reasoning: j2.reasoning });
@@ -14842,12 +14896,12 @@ ${lines.join("\n")}
       const first = letterCandidate(prevId, scale);
       if (!first) return false;
       if (shapeAlone(node) && shapeAlone(prev)) return false;
+      const j = joinsRun({ bounds: first.bounds, lastAt: first.at }, letter, scale);
+      if (!j.ok) return false;
       if (oneDrawing(prev, node)) return false;
       const before = behind(1);
       if (before && oneDrawing(nodes.get(before), prev)) return false;
       if (connectorNotLetter(node, [prevId]) || connectorNotLetter(prev, [node.id])) return false;
-      const j = joinsRun({ bounds: first.bounds, lastAt: first.at }, letter, scale);
-      if (!j.ok) return false;
       const run2 = [first];
       let bounds = first.bounds;
       for (let k = 1; ; k++) {
@@ -14855,11 +14909,11 @@ ${lines.join("\n")}
         if (!id) break;
         const cand = letterCandidate(id, scale);
         if (!cand) break;
+        const back = joinsRun({ bounds, lastAt: cand.at }, { bounds: cand.bounds, at: run2[0].at }, cand.scale);
+        if (!back.ok) break;
         const earlier = behind(k + 1);
         if (earlier && oneDrawing(nodes.get(earlier), cand.node)) break;
         if (connectorNotLetter(cand.node, [...run2.map((r) => r.node.id), node.id])) break;
-        const back = joinsRun({ bounds, lastAt: cand.at }, { bounds: cand.bounds, at: run2[0].at }, cand.scale);
-        if (!back.ok) break;
         run2.unshift(cand);
         bounds = { minX: Math.min(bounds.minX, cand.bounds.minX), minY: Math.min(bounds.minY, cand.bounds.minY), maxX: Math.max(bounds.maxX, cand.bounds.maxX), maxY: Math.max(bounds.maxY, cand.bounds.maxY) };
       }
@@ -14964,14 +15018,14 @@ ${lines.join("\n")}
       if (members.length < 1 || !ev.name.trim()) return null;
       const pid = ev.participantId ?? LOCAL_PARTICIPANT;
       const bs = members.map((id) => boundsOf(nodes.get(id))).filter((b) => !!b);
-      const union2 = bs.length ? getBounds(bs.flatMap((b) => [{ x: b.minX, y: b.minY }, { x: b.maxX, y: b.maxY }])) : null;
+      const union3 = bs.length ? getBounds(bs.flatMap((b) => [{ x: b.minX, y: b.minY }, { x: b.maxX, y: b.maxY }])) : null;
       const frame = {
         id: nextId("frame"),
         reps: [
           { modality: "word", data: ev.name.trim(), source: pid },
           { modality: "frame", data: { members, connections: ev.connections.filter((c) => members.includes(c.from.id) && members.includes(c.to.id)) }, source: pid },
           { modality: "signature", data: signatureOf(members), source: TIER0_PARTICIPANT },
-          ...union2 ? [{ modality: "bounds", data: union2, source: TIER0_PARTICIPANT }] : []
+          ...union3 ? [{ modality: "bounds", data: union3, source: TIER0_PARTICIPANT }] : []
         ],
         edges: [
           { to: pid, rel: "made-by" },
@@ -15052,13 +15106,13 @@ ${lines.join("\n")}
         const ids = ev.ids.filter((id) => inContent.has(id));
         const boxes = ids.map((id) => boundsOf(nodes.get(id))).filter((b) => !!b);
         if (!ids.length || !boxes.length) return null;
-        const union2 = boxes.reduce((a, b) => ({
+        const union3 = boxes.reduce((a, b) => ({
           minX: Math.min(a.minX, b.minX),
           minY: Math.min(a.minY, b.minY),
           maxX: Math.max(a.maxX, b.maxX),
           maxY: Math.max(a.maxY, b.maxY)
         }));
-        const summon2 = buildSummon(ids, "pointed", `you pointed at ${ids.length} mark${ids.length === 1 ? "" : "s"}`, [], union2, "", ev.at, g);
+        const summon2 = buildSummon(ids, "pointed", `you pointed at ${ids.length} mark${ids.length === 1 ? "" : "s"}`, [], union3, "", ev.at, g);
         g.summon = summon2;
         g.markMiss = null;
         recomputeClusterCandidates();
@@ -15827,11 +15881,11 @@ ${lines.join("\n")}
     const fp = fingerprintOf(node);
     if (!pts || !fp || pts.length < 3) return null;
     const top = resemblances(node)[0]?.to;
-    const dot5 = top === "type:dot";
-    if (!fp.isClosed && !dot5) return null;
+    const dot6 = top === "type:dot";
+    if (!fp.isClosed && !dot6) return null;
     const o = outlineOf2(pts);
     if (!o) return null;
-    const shapes = dot5 ? [{ symbol: "round", score: 0.7, why: "a dot" }] : shapeScores(o);
+    const shapes = dot6 ? [{ symbol: "round", score: 0.7, why: "a dot" }] : shapeScores(o);
     if (!shapes.length) return null;
     return { id: node.id, ids: [node.id], marks: [node.id], outline: o, scale: scaleOf2(node), shapes, lead: "", fit: 1 };
   }
@@ -16028,7 +16082,7 @@ ${lines.join("\n")}
     const cores = candidates.filter((c) => !containers.has(c.id) && topCore(c) && readingsOf(c).length);
     if (!cores.length) return null;
     const sizes = cores.map((c) => c.outline.size).sort((a, b) => a - b);
-    const median2 = sizes[Math.floor(sizes.length / 2)];
+    const median3 = sizes[Math.floor(sizes.length / 2)];
     const rounds = candidates.filter((c) => {
       if (containers.has(c.id) || topCore(c)) return false;
       const r = c.shapes.find((s) => s.symbol === "round");
@@ -16037,7 +16091,7 @@ ${lines.join("\n")}
         c.marks.forEach((id) => writing.add(id));
         return false;
       }
-      return r.score * (1 - ramp2(c.outline.size / median2, SMALL[0], SMALL[1])) > 0.1;
+      return r.score * (1 - ramp2(c.outline.size / median3, SMALL[0], SMALL[1])) > 0.1;
     });
     const symbolOfMark = /* @__PURE__ */ new Map();
     for (const c of [...cores, ...rounds]) for (const id of [...c.ids, ...c.marks]) symbolOfMark.set(id, c);
@@ -16052,7 +16106,7 @@ ${lines.join("\n")}
       for (const e of [h2.start, h2.end]) {
         const top = e.heads[0];
         const c = top && top.ids.map((id) => symbolOfMark.get(id)).find((x) => x && x.ids[0] !== h2.id);
-        if (c && cores.includes(c) && c.outline.size <= HEAD_SHARE * median2) demoted.add(c);
+        if (c && cores.includes(c) && c.outline.size <= HEAD_SHARE * median3) demoted.add(c);
       }
     }
     const symbols = [...cores, ...rounds].filter((c) => !demoted.has(c));
@@ -16079,8 +16133,8 @@ ${lines.join("\n")}
       } else if (pointsIn(a) && pointsIn(b)) direction = "both";
       const headIds = [...new Set(ends.flatMap((e) => e.head ? e.head.ids : []).filter((x) => x !== id))];
       headIds.forEach((x) => edgeMarks.set(x, id));
-      const pointing2 = direction === "forward" ? to.head : void 0;
-      const quality = Math.min(from.quality, to.quality) * (pointing2 ? 0.75 + 0.25 * (pointing2.confidence / MAX) : direction === "both" ? 0.85 : 0.8);
+      const pointing3 = direction === "forward" ? to.head : void 0;
+      const quality = Math.min(from.quality, to.quality) * (pointing3 ? 0.75 + 0.25 * (pointing3.confidence / MAX) : direction === "both" ? 0.85 : 0.8);
       const reason2 = direction === "forward" ? `${an(h2.shape)} from ${from.symbol.id} to ${to.symbol.id}, its ${to.head.kind === "arrow" ? "arrowhead" : `${to.head.filled ? "filled" : "hollow"} ${to.head.kind}`} at ${to.symbol.id}` : direction === "both" ? `${an(h2.shape)} with a head at both ends, between ${from.symbol.id} and ${to.symbol.id}` : `${an(h2.shape)} with no head, from ${from.symbol.id} to ${to.symbol.id} in the order it was drawn`;
       const words = ownWords(nodes, [id]);
       connectors.push({
@@ -16110,7 +16164,7 @@ ${lines.join("\n")}
       const plain = connectors.filter((k) => !k.directed && (k.from === c.id || k.to === c.id));
       if (!outs && !ins && !plain.length) continue;
       const r = c.shapes.find((s) => s.symbol === "round");
-      const small = 1 - ramp2(c.outline.size / median2, SMALL[0], SMALL[1]);
+      const small = 1 - ramp2(c.outline.size / median3, SMALL[0], SMALL[1]);
       let symbol, sure, why;
       if (outs && !ins) [symbol, sure, why] = ["start", 1, `${count2(outs)} flow${outs === 1 ? "" : "s"} leave${outs === 1 ? "s" : ""} it`];
       else if (ins && !outs) [symbol, sure, why] = ["end", 1, `${count2(ins)} flow${ins === 1 ? "" : "s"} arrive${ins === 1 ? "s" : ""} at it`];
@@ -16121,7 +16175,7 @@ ${lines.join("\n")}
         const above = centreOf3(c.outline.bounds).y <= centreOf3(o.outline.bounds).y;
         [symbol, sure, why] = [above ? "start" : "end", 0.7, `a line with no head joins it, and it sits ${above ? "above" : "below"} what it joins`];
       }
-      const size = `${Math.round(c.outline.size / median2 * 100)}% the size of the chart\u2019s other symbols`;
+      const size = `${Math.round(c.outline.size / median3 * 100)}% the size of the chart\u2019s other symbols`;
       readings2.set(c, [{ symbol, role: FLOWCHART_TABLE.symbols[symbol].role, confidence: MAX * r.score * small * sure, reason: `${r.why}, ${size} \u2014 ${why}` }]);
     }
     const placed2 = symbols.filter((c) => readings2.get(c)?.length);
@@ -16218,12 +16272,12 @@ ${lines.join("\n")}
     const joined = new Set(connectors.flatMap((k) => [k.from, k.to]));
     const connected = out.filter((s) => joined.has(s.id)).length / out.length;
     const coverage = scope.reduce((a, id) => a + (weight[id] ?? 0), 0) / scope.length;
-    const mean4 = (xs) => xs.reduce((a, x) => a + x, 0) / Math.max(1, xs.length);
-    const symbolSure = mean4(out.map((s) => s.confidence)) / MAX;
-    const flowSure = mean4(connectors.map((k) => k.confidence)) / MAX;
-    const pointing = connectors.filter((k) => k.directed).length / connectors.length;
+    const mean5 = (xs) => xs.reduce((a, x) => a + x, 0) / Math.max(1, xs.length);
+    const symbolSure = mean5(out.map((s) => s.confidence)) / MAX;
+    const flowSure = mean5(connectors.map((k) => k.confidence)) / MAX;
+    const pointing2 = connectors.filter((k) => k.directed).length / connectors.length;
     const distinct = out.some((s) => s.symbol !== "process") ? 1 : 0;
-    const confidence = MAX * Math.sqrt(connected * coverage) * Math.sqrt(symbolSure * flowSure) * (0.55 + 0.45 * pointing) * (0.8 + 0.2 * distinct);
+    const confidence = MAX * Math.sqrt(connected * coverage) * Math.sqrt(symbolSure * flowSure) * (0.55 + 0.45 * pointing2) * (0.8 + 0.2 * distinct);
     const counts = {};
     for (const name of SYMBOLS) counts[name] = out.filter((s) => s.symbol === name).length;
     counts.flow = connectors.length;
@@ -16344,9 +16398,9 @@ ${lines.join("\n")}
   function mermaidWriters() {
     return [...writers.keys()];
   }
-  function toMermaid(reading3, opts = {}) {
-    const w2 = writers.get(reading3.notation);
-    return w2 ? w2(reading3, opts) : null;
+  function toMermaid(reading4, opts = {}) {
+    const w2 = writers.get(reading4.notation);
+    return w2 ? w2(reading4, opts) : null;
   }
   var codeUnit = (a, b) => a < b ? -1 : a > b ? 1 : 0;
   function naturalCompare(a, b) {
@@ -16367,15 +16421,15 @@ ${lines.join("\n")}
   var centre = (b) => ({ x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2 });
   function inReadingOrder(items, boundsOf2, keyOf, across2 = false) {
     const main = (b) => across2 ? centre(b).x : centre(b).y;
-    const cross6 = (b) => across2 ? centre(b).y : centre(b).x;
+    const cross7 = (b) => across2 ? centre(b).y : centre(b).x;
     const extent = (b) => across2 ? [b.minX, b.maxX] : [b.minY, b.maxY];
     const placed2 = items.filter((t) => !!boundsOf2(t)).map((t) => ({ t, b: boundsOf2(t), k: keyOf(t) }));
     const loose = items.filter((t) => !boundsOf2(t)).sort((p, q) => naturalCompare(keyOf(p), keyOf(q)));
-    placed2.sort((p, q) => main(p.b) - main(q.b) || cross6(p.b) - cross6(q.b) || naturalCompare(p.k, q.k));
+    placed2.sort((p, q) => main(p.b) - main(q.b) || cross7(p.b) - cross7(q.b) || naturalCompare(p.k, q.k));
     const out = [];
     let band = [];
     const close = () => {
-      band.sort((p, q) => cross6(p.b) - cross6(q.b) || naturalCompare(p.k, q.k));
+      band.sort((p, q) => cross7(p.b) - cross7(q.b) || naturalCompare(p.k, q.k));
       out.push(...band.map((x) => x.t));
       band = [];
     };
@@ -16473,20 +16527,20 @@ ${lines.join("\n")}
     }
     return across2 > down ? { value: "LR", reason: `the flows run across \u2014 between the symbols they join, ${Math.round(across2)} across against ${Math.round(down)} down; ${n2 - downward} of ${n2} flows more across than down` } : { value: "TD", reason: `the flows run down \u2014 between the symbols they join, ${Math.round(down)} down against ${Math.round(across2)} across; ${downward} of ${n2} flows more down than across` };
   }
-  function writeFlowchart(reading3, opts = {}) {
-    const T2 = FLOWCHART_TABLE;
-    const symbols = reading3.symbols.filter((s) => isFlowSymbol(s.symbol));
+  function writeFlowchart(reading4, opts = {}) {
+    const T3 = FLOWCHART_TABLE;
+    const symbols = reading4.symbols.filter((s) => isFlowSymbol(s.symbol));
     const idOf = mermaidIds(symbols.map((s) => s.id));
     const byId = new Map(symbols.map((s) => [s.id, s]));
-    const connectors = reading3.connectors.filter((c) => byId.has(c.from) && byId.has(c.to) && c.from !== c.to);
-    const labels = new Map(reading3.labels.map((l) => [l.id, l]));
+    const connectors = reading4.connectors.filter((c) => byId.has(c.from) && byId.has(c.to) && c.from !== c.to);
+    const labels = new Map(reading4.labels.map((l) => [l.id, l]));
     const direction = opts.direction ? { value: opts.direction, reason: `asked for ${opts.direction === "LR" ? "across (LR)" : "down (TD)"}` } : flowDirection(connectors, (id) => centre(byId.get(id).bounds), symbols);
     const ordered2 = inReadingOrder(symbols, (s) => s.bounds, (s) => idOf.get(s.id), direction.value === "LR");
     const place2 = new Map(ordered2.map((s, i) => [s.id, i]));
     const unread = [];
     const unreadIds = /* @__PURE__ */ new Set();
     const wordsOf2 = (own, labelIds, owner, on, where) => {
-      const mine = [.../* @__PURE__ */ new Set([...labelIds, ...reading3.labels.filter((l) => l.of === owner).map((l) => l.id)])].map(
+      const mine = [.../* @__PURE__ */ new Set([...labelIds, ...reading4.labels.filter((l) => l.of === owner).map((l) => l.id)])].map(
         (id) => labels.get(id) ?? { id, of: owner, where: "beside", role: "label", confidence: 0, reason: "writing" }
       );
       const inOrder = (at) => inReadingOrder(mine.filter((l) => l.where === at), (l) => l.bounds, (l) => l.id);
@@ -16507,13 +16561,13 @@ ${lines.join("\n")}
       }
       return parts.length ? parts.join(" ") : null;
     };
-    const lines = [`${T2.mermaid.header} ${direction.value}`];
+    const lines = [`${T3.mermaid.header} ${direction.value}`];
     const ids = {};
     const marks = {};
     const blank = [];
     for (const s of ordered2) {
       const m = idOf.get(s.id);
-      const shape = T2.symbols[s.symbol].mermaid;
+      const shape = T3.symbols[s.symbol].mermaid;
       const words = wordsOf2(s.text, s.labels, s.id, "symbol", m);
       if (words === null) blank.push(m);
       const text = words ?? BLANK;
@@ -16521,7 +16575,7 @@ ${lines.join("\n")}
       ids[m] = s.id;
       marks[m] = [...new Set(s.ids.length ? s.ids : [s.id])].sort(naturalCompare);
     }
-    const arrows = T2.connectors.flow.mermaid;
+    const arrows = T3.connectors.flow.mermaid;
     const links = [];
     const written2 = [...connectors].sort((p, q) => place2.get(p.from) - place2.get(q.from) || place2.get(p.to) - place2.get(q.to) || naturalCompare(p.id, q.id));
     for (const c of written2) {
@@ -16541,15 +16595,15 @@ ${lines.join("\n")}
       notes.push(`${n2 === 1 ? "one piece of writing has" : `${count3(n2)} pieces of writing have`} not been read, so ${n2 === 1 ? "its words are" : "their words are"} not known \u2014 written "${UNREAD_WRITING}": ${where}`);
     }
     if (blank.length) notes.push(`${blank.length === 1 ? "one symbol has" : `${count3(blank.length)} symbols have`} no writing in ${blank.length === 1 ? "it and is" : "them and are"} written blank: ${list(blank)}`);
-    const said3 = /* @__PURE__ */ new Set([...symbols.flatMap((s) => [s.id, ...s.ids]), ...connectors.flatMap((c) => c.ids), ...reading3.labels.filter((l) => l.of && (byId.has(l.of) || connectors.some((c) => c.id === l.of))).map((l) => l.id)]);
-    const alone = reading3.labels.filter((l) => !said3.has(l.id)).map((l) => l.id).sort(naturalCompare);
+    const said3 = /* @__PURE__ */ new Set([...symbols.flatMap((s) => [s.id, ...s.ids]), ...connectors.flatMap((c) => c.ids), ...reading4.labels.filter((l) => l.of && (byId.has(l.of) || connectors.some((c) => c.id === l.of))).map((l) => l.id)]);
+    const alone = reading4.labels.filter((l) => !said3.has(l.id)).map((l) => l.id).sort(naturalCompare);
     if (alone.length) notes.push(`writing that labels nothing in the chart is left out: ${list(alone)}`);
-    const left = Object.keys(reading3.roles).filter((id) => !said3.has(id) && !alone.includes(id)).sort(naturalCompare);
-    if (left.length) notes.push(`${left.length === 1 ? "one mark" : `${count3(left.length)} marks`} the chart has no place for ${left.length === 1 ? "is" : "are"} left out: ${list(left.map((id) => `${id} (${reading3.roles[id]})`))}`);
+    const left = Object.keys(reading4.roles).filter((id) => !said3.has(id) && !alone.includes(id)).sort(naturalCompare);
+    if (left.length) notes.push(`${left.length === 1 ? "one mark" : `${count3(left.length)} marks`} the chart has no place for ${left.length === 1 ? "is" : "are"} left out: ${list(left.map((id) => `${id} (${reading4.roles[id]})`))}`);
     return {
       text: lines.join("\n") + "\n",
-      notation: reading3.notation,
-      diagram: T2.mermaid.header,
+      notation: reading4.notation,
+      diagram: T3.mermaid.header,
       direction,
       ids,
       marks,
@@ -17008,7 +17062,7 @@ ${lines.join("\n")}
         }
       }
     }
-    const kept = classes.filter((c) => !demoted.has(c));
+    const kept2 = classes.filter((c) => !demoted.has(c));
     if (demoted.size) for (const c of demoted) for (const id of c.box) classOfMark.delete(id);
     const headOf2 = /* @__PURE__ */ new Set();
     for (const [id, h2] of heads) for (const e of [h2.start, h2.end]) for (const x of e.heads[0]?.ids ?? []) if (x !== id && heads.has(x)) headOf2.add(x);
@@ -17054,7 +17108,7 @@ ${lines.join("\n")}
         return { class: c, headIds: [], quality: 1, said: { end: e.end, point: { ...e.point }, symbol: c.id, reason: `it ends on ${c.id}, which heads.ts reads as a head and this notation as a class` } };
       }
       let best;
-      for (const c of kept) {
+      for (const c of kept2) {
         const reach = reachOf2(c);
         if (offBox2(point2, c.shape.bounds) > reach) continue;
         const d = outside(point2, c.shape.hull);
@@ -17122,14 +17176,14 @@ ${lines.join("\n")}
         ...said3 ? { text: said3 } : {}
       });
     }
-    const parent = new Map(kept.map((c) => [c, c]));
+    const parent = new Map(kept2.map((c) => [c, c]));
     const find = (c) => parent.get(c) === c ? c : (parent.set(c, find(parent.get(c))), parent.get(c));
-    const byId = new Map(kept.map((c) => [c.id, c]));
+    const byId = new Map(kept2.map((c) => [c.id, c]));
     for (const r of relations) parent.set(find(byId.get(r.from)), find(byId.get(r.to)));
     const says = /* @__PURE__ */ new Set();
-    for (const c of kept) if (c.lines.length) says.add(find(c));
+    for (const c of kept2) if (c.lines.length) says.add(find(c));
     for (const r of relations) if (r.kind !== "association" && r.kind !== "link") says.add(find(byId.get(r.from)));
-    const inDiagram = kept.filter((c) => says.has(find(c)));
+    const inDiagram = kept2.filter((c) => says.has(find(c)));
     if (!inDiagram.length) return null;
     const inSet = new Set(inDiagram);
     const joined = relations.filter((r) => inSet.has(byId.get(r.from)) && inSet.has(byId.get(r.to)));
@@ -17298,10 +17352,10 @@ ${lines.join("\n")}
     for (const k of KINDS2) counts[k] = joined.filter((r) => r.kind === k).length;
     counts.multiplicity = joined.reduce((a, r) => a + (r.ends.from.multiplicity ? 1 : 0) + (r.ends.to.multiplicity ? 1 : 0), 0);
     counts.label = joined.filter((r) => onMiddle.has(r.id)).length;
-    const T2 = UML_CLASS_TABLE;
-    const parts = [`${count4(symbols.length)} ${symbols.length === 1 ? T2.symbols.class.one : T2.symbols.class.many}`];
-    for (const k of KINDS2) if (counts[k]) parts.push(`${count4(counts[k])} ${counts[k] === 1 ? T2.connectors[k].one : T2.connectors[k].many}`);
-    if (counts.multiplicity) parts.push(`${count4(counts.multiplicity)} ${counts.multiplicity === 1 ? T2.labels.multiplicity.one : T2.labels.multiplicity.many}`);
+    const T3 = UML_CLASS_TABLE;
+    const parts = [`${count4(symbols.length)} ${symbols.length === 1 ? T3.symbols.class.one : T3.symbols.class.many}`];
+    for (const k of KINDS2) if (counts[k]) parts.push(`${count4(counts[k])} ${counts[k] === 1 ? T3.connectors[k].one : T3.connectors[k].many}`);
+    if (counts.multiplicity) parts.push(`${count4(counts.multiplicity)} ${counts.multiplicity === 1 ? T3.labels.multiplicity.one : T3.labels.multiplicity.many}`);
     const summary = parts.join(", ");
     const plain = symbols.filter((s) => !s.lines.length).length;
     const reason = [
@@ -17319,7 +17373,7 @@ ${lines.join("\n")}
     joined.sort((p, q) => (order2.get(p.id) ?? 0) - (order2.get(q.id) ?? 0));
     return {
       notation: "uml-class",
-      name: T2.name,
+      name: T3.name,
       confidence,
       summary,
       reason: `${summary} \u2014 ${reason}`,
@@ -17339,6 +17393,1192 @@ ${lines.join("\n")}
     connectors: KINDS2.map((k) => ({ name: k, role: UML_CLASS_TABLE.connectors[k].role, describes: UML_CLASS_TABLE.connectors[k].describes })),
     read: (state, scopeIds) => readUmlClass(state, scopeIds),
     ports: { notation: "uml-class", portsOf: umlClassPortsOf }
+  };
+
+  // src/notations/dashes.ts
+  var DASH_PX = [5, 48];
+  var DASH_BOW = 0.2;
+  var DASH_PATH = 1.35;
+  var DASH_OFF = 0.3;
+  var DASH_OFF_PX = 3;
+  var DASH_ALONG = 45;
+  var DASH_GAP = 1.5;
+  var DASH_GAP_PX = 10;
+  var DASH_OVERLAP = 0.25;
+  var DASH_SPREAD = [0.3, 2.5];
+  var MIN_DASHES = 3;
+  var SMALL_MARK = 3;
+  var DASH_TOUCH = 0.2;
+  var DASH_TOUCH_PX = 2;
+  var CROSSING_DEG = 50;
+  var HEAD_OF = 4;
+  var MAX3 = MAX_TIER0_CONFIDENCE;
+  var DEG7 = 180 / Math.PI;
+  var sub8 = (a, b) => ({ x: a.x - b.x, y: a.y - b.y });
+  var dot5 = (a, b) => a.x * b.x + a.y * b.y;
+  var cross6 = (a, b) => a.x * b.y - a.y * b.x;
+  var dist8 = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+  var ramp4 = (v, lo, hi) => Math.max(0, Math.min(1, (v - lo) / (hi - lo)));
+  var median2 = (xs) => {
+    const s = [...xs].sort((a, b) => a - b);
+    return s.length ? s.length % 2 ? s[(s.length - 1) / 2] : (s[s.length / 2 - 1] + s[s.length / 2]) / 2 : 0;
+  };
+  var scaleOf4 = (node) => getRep(node, "stroke")?.data?.scale ?? 1;
+  var canonical2 = (u) => Math.abs(u.y) > Math.abs(u.x) ? u.y < 0 ? { x: -u.x, y: -u.y } : u : u.x < 0 ? { x: -u.x, y: -u.y } : u;
+  function distToSegment5(p, a, b) {
+    const ab = sub8(b, a);
+    const l2 = dot5(ab, ab);
+    const t = l2 > 0 ? Math.max(0, Math.min(1, dot5(sub8(p, a), ab) / l2)) : 0;
+    return Math.hypot(p.x - (a.x + ab.x * t), p.y - (a.y + ab.y * t));
+  }
+  function distToPolyline(p, path) {
+    if (path.length === 1) return dist8(p, path[0]);
+    let best = Infinity;
+    for (let i = 1; i < path.length; i++) best = Math.min(best, distToSegment5(p, path[i - 1], path[i]));
+    return best;
+  }
+  function dashOf(s, node) {
+    const pts = s.ink;
+    if (pts.length < 2) return null;
+    const fp = fingerprintOf(node);
+    if (!fp || fp.isClosed) return null;
+    const a = pts[0], b = pts[pts.length - 1];
+    const len2 = dist8(a, b);
+    const hand = len2 / s.scale;
+    if (hand < DASH_PX[0] || hand > DASH_PX[1]) return null;
+    let path = 0, bow = 0;
+    for (let i = 0; i < pts.length; i++) {
+      if (i) path += dist8(pts[i], pts[i - 1]);
+      bow = Math.max(bow, distToSegment5(pts[i], a, b));
+    }
+    if (path > DASH_PATH * len2 || bow > Math.max(DASH_BOW * len2, 2 * s.scale)) return null;
+    const u = canonical2({ x: (b.x - a.x) / len2, y: (b.y - a.y) / len2 });
+    return { id: s.id, mark: s.mark, a, b, c: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, u, len: len2, scale: s.scale, ink: pts, bounds: s.bounds };
+  }
+  function strokesOf(state, scopeIds) {
+    const artifacts = new Set(state.artifacts);
+    const ids = scopeIds ? [...new Set(scopeIds)] : state.contentIds.filter((id) => !artifacts.has(id));
+    const strokes = [];
+    const nodes = /* @__PURE__ */ new Map();
+    const add5 = (id, mark) => {
+      const n2 = state.nodes.get(id);
+      if (!n2 || getRep(n2, "erased") || getRep(n2, "gesture") || !getRep(n2, "stroke")) return;
+      const ink = strokePointsOf(n2);
+      const b = boundsOf(n2);
+      if (!ink || !ink.length || !b) return;
+      strokes.push({ id, mark, ink, bounds: b, size: Math.max(b.maxX - b.minX, b.maxY - b.minY), scale: scaleOf4(n2) });
+      nodes.set(id, n2);
+    };
+    for (const id of ids) {
+      const n2 = state.nodes.get(id);
+      if (!n2 || artifacts.has(id) || getRep(n2, "erased") || getRep(n2, "gesture")) continue;
+      if (isWord(n2)) for (const l of lettersOf(n2)) add5(l, id);
+      else add5(id, id);
+    }
+    return { strokes, nodes };
+  }
+  function fitOf(run2) {
+    const pts = run2.flatMap((d) => [d.a, d.b]);
+    const n2 = pts.length;
+    const centre3 = { x: pts.reduce((k, p) => k + p.x, 0) / n2, y: pts.reduce((k, p) => k + p.y, 0) / n2 };
+    let sxx = 0, syy = 0, sxy = 0;
+    for (const p of pts) {
+      sxx += (p.x - centre3.x) ** 2;
+      syy += (p.y - centre3.y) ** 2;
+      sxy += (p.x - centre3.x) * (p.y - centre3.y);
+    }
+    const t = 0.5 * Math.atan2(2 * sxy, sxx - syy);
+    const axis = canonical2({ x: Math.cos(t), y: Math.sin(t) });
+    const placed2 = run2.map((d) => {
+      const pa = dot5(sub8(d.a, centre3), axis), pb = dot5(sub8(d.b, centre3), axis);
+      const off = Math.max(Math.abs(cross6(axis, sub8(d.a, centre3))), Math.abs(cross6(axis, sub8(d.b, centre3))));
+      return { d, s0: Math.min(pa, pb), s1: Math.max(pa, pb), off, angle: Math.acos(Math.min(1, Math.abs(dot5(d.u, axis)))) * DEG7 };
+    }).sort((p, q) => p.s0 + p.s1 - (q.s0 + q.s1));
+    const dash = median2(run2.map((d) => d.len));
+    const sc = median2(run2.map((d) => d.scale));
+    return { centre: centre3, axis, placed: placed2, dash, off: Math.max(DASH_OFF * dash, DASH_OFF_PX * sc), touch: Math.max(DASH_TOUCH * dash, DASH_TOUCH_PX * sc) };
+  }
+  var gapLimits = (p, q) => {
+    const sc = Math.max(p.scale, q.scale);
+    return { most: Math.max(DASH_GAP * ((p.len + q.len) / 2), DASH_GAP_PX * sc), least: -DASH_OVERLAP * Math.min(p.len, q.len) };
+  };
+  function gapBetween(p, q) {
+    const d = sub8(q.c, p.c);
+    const l = Math.hypot(d.x, d.y);
+    if (l < 1e-9) return null;
+    const u = { x: d.x / l, y: d.y / l };
+    const sc = Math.max(p.scale, q.scale);
+    const off = Math.max(DASH_OFF * Math.max(p.len, q.len), DASH_OFF_PX * sc);
+    for (const e of [p.a, p.b, q.a, q.b]) if (Math.abs(cross6(u, sub8(e, p.c))) > off) return null;
+    for (const d2 of [p, q]) if (Math.abs(dot5(d2.u, u)) < Math.cos(DASH_ALONG / DEG7)) return null;
+    const pa = dot5(sub8(p.a, p.c), u), pb = dot5(sub8(p.b, p.c), u);
+    const qa = dot5(sub8(q.a, p.c), u), qb = dot5(sub8(q.b, p.c), u);
+    const gap = Math.min(qa, qb) - Math.max(pa, pb);
+    const { most, least } = gapLimits(p, q);
+    return gap > most || gap < least ? null : gap;
+  }
+  function rowsOf(dashes) {
+    if (dashes.length < MIN_DASHES) return [];
+    const reach = Math.max(...dashes.map((d) => d.len * (1 + DASH_GAP) + DASH_GAP_PX * d.scale));
+    const cell = Math.max(1e-6, reach);
+    const grid = /* @__PURE__ */ new Map();
+    const key2 = (x, y) => `${x},${y}`;
+    dashes.forEach((d, i) => {
+      const k = key2(Math.floor(d.c.x / cell), Math.floor(d.c.y / cell));
+      (grid.get(k) ?? grid.set(k, []).get(k)).push(i);
+    });
+    const keep = dashes.map((p, i) => {
+      const gx = Math.floor(p.c.x / cell), gy = Math.floor(p.c.y / cell);
+      const near = [];
+      for (let dx = -1; dx <= 1; dx++)
+        for (let dy = -1; dy <= 1; dy++)
+          for (const j of grid.get(key2(gx + dx, gy + dy)) ?? []) {
+            if (j === i) continue;
+            const gap = gapBetween(p, dashes[j]);
+            if (gap === null) continue;
+            const d = sub8(dashes[j].c, p.c);
+            const l = Math.hypot(d.x, d.y);
+            near.push({ j, gap, dir: { x: d.x / l, y: d.y / l } });
+          }
+      near.sort((a, b) => a.gap - b.gap || a.j - b.j);
+      const first = near[0];
+      if (!first) return [];
+      const second = near.find((n2) => dot5(n2.dir, first.dir) < -0.5);
+      return second ? [first.j, second.j] : [first.j];
+    });
+    const links = dashes.map(() => []);
+    keep.forEach((ks, i) => {
+      for (const j of ks) if (j > i && keep[j].includes(i)) links[i].push(j), links[j].push(i);
+    });
+    const seen = /* @__PURE__ */ new Set();
+    const rows = [];
+    const walk = (start) => {
+      const row = [];
+      let prev = -1, at = start;
+      while (at >= 0 && !seen.has(at)) {
+        seen.add(at);
+        row.push(at);
+        const next = links[at].find((j) => j !== prev && !seen.has(j));
+        prev = at;
+        at = next ?? -1;
+      }
+      if (row.length >= MIN_DASHES) rows.push(row.map((k) => dashes[k]));
+    };
+    dashes.forEach((_, i) => {
+      if (!seen.has(i) && links[i].length <= 1) walk(i);
+    });
+    dashes.forEach((_, i) => {
+      if (!seen.has(i)) walk(i);
+    });
+    return rows;
+  }
+  function kept(run2) {
+    const out = [];
+    const queue = [run2];
+    while (queue.length) {
+      const r = queue.pop();
+      if (r.length < MIN_DASHES) continue;
+      const f = fitOf(r);
+      let worst = -1, by = 1;
+      f.placed.forEach((p, k) => {
+        const over2 = Math.max(p.off / f.off, p.angle / DASH_ALONG, p.d.len / (DASH_SPREAD[1] * f.dash), DASH_SPREAD[0] * f.dash / Math.max(1e-9, p.d.len));
+        if (over2 > by) {
+          by = over2;
+          worst = k;
+        }
+      });
+      if (worst >= 0) {
+        queue.push(f.placed.slice(0, worst).map((p) => p.d), f.placed.slice(worst + 1).map((p) => p.d));
+        continue;
+      }
+      const cut = f.placed.findIndex((p, k) => {
+        if (!k) return false;
+        const q = f.placed[k - 1];
+        const { most, least } = gapLimits(q.d, p.d);
+        const gap = p.s0 - q.s1;
+        return gap > most || gap < least;
+      });
+      if (cut > 0) {
+        queue.push(f.placed.slice(0, cut).map((p) => p.d), f.placed.slice(cut).map((p) => p.d));
+        continue;
+      }
+      out.push(f.placed.map((p) => p.d));
+    }
+    return out;
+  }
+  function clear(run2, others, crossing, heads) {
+    const f = fitOf(run2);
+    const mine = new Set(run2.map((d) => d.id));
+    const lo = f.placed[0].s0, hi = f.placed[f.placed.length - 1].s1;
+    const ends = [
+      { x: f.centre.x + f.axis.x * lo, y: f.centre.y + f.axis.y * lo },
+      { x: f.centre.x + f.axis.x * hi, y: f.centre.y + f.axis.y * hi }
+    ];
+    const box = run2.reduce((b, d) => ({ minX: Math.min(b.minX, d.bounds.minX), minY: Math.min(b.minY, d.bounds.minY), maxX: Math.max(b.maxX, d.bounds.maxX), maxY: Math.max(b.maxY, d.bounds.maxY) }), { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity });
+    const grow = f.dash + f.touch;
+    const joined = /* @__PURE__ */ new Set();
+    const blocked = /* @__PURE__ */ new Set();
+    const why = [];
+    for (const m of others) {
+      if (mine.has(m.id) || m.size > SMALL_MARK * f.dash) continue;
+      const b = m.bounds;
+      if (b.minX > box.maxX + grow || b.maxX < box.minX - grow || b.minY > box.maxY + grow || b.maxY < box.minY - grow) continue;
+      if (crossing(m.id, f.axis) || heads(m, run2)) continue;
+      const atEnd = ends.some((e) => distToPolyline(e, m.ink) <= 2 * f.touch);
+      f.placed.forEach((p, k) => {
+        if (joined.has(k)) return;
+        const near = m.ink.some((q) => distToSegment5(q, p.d.a, p.d.b) <= f.touch) || distToPolyline(p.d.a, m.ink) <= f.touch || distToPolyline(p.d.b, m.ink) <= f.touch;
+        if (!near) return;
+        const outer = (k === 0 || k === f.placed.length - 1) && atEnd;
+        if (outer) return;
+        joined.add(k);
+        why.push(`${m.id} touches the dash ${p.d.id}`);
+      });
+      for (const q of m.ink) {
+        const s = dot5(sub8(q, f.centre), f.axis);
+        if (Math.abs(cross6(f.axis, sub8(q, f.centre))) > f.off) continue;
+        for (let k = 1; k < f.placed.length; k++) {
+          if (s > f.placed[k - 1].s1 && s < f.placed[k].s0 && !blocked.has(k)) {
+            blocked.add(k);
+            why.push(`${m.id} stands in the gap before ${f.placed[k].d.id}`);
+          }
+        }
+      }
+    }
+    if (!joined.size && !blocked.size) return { parts: [run2], why };
+    const parts = [];
+    let part = [];
+    f.placed.forEach((p, k) => {
+      if (blocked.has(k) || joined.has(k)) {
+        if (part.length) parts.push(part);
+        part = [];
+      }
+      if (!joined.has(k)) part.push(p.d);
+    });
+    if (part.length) parts.push(part);
+    return { parts: parts.filter((x) => x.length >= MIN_DASHES), why };
+  }
+  function lineOf(run2) {
+    const f = fitOf(run2);
+    const first = f.placed[0], last = f.placed[f.placed.length - 1];
+    const at = (s) => ({ x: f.centre.x + f.axis.x * s, y: f.centre.y + f.axis.y * s });
+    const from = at(first.s0), to = at(last.s1);
+    const gaps = f.placed.slice(1).map((p, k) => p.s0 - f.placed[k].s1);
+    const gap = median2(gaps);
+    const meanGap = gaps.reduce((a, g) => a + g, 0) / Math.max(1, gaps.length);
+    const spread2 = gaps.length > 1 ? Math.sqrt(gaps.reduce((a, g) => a + (g - meanGap) ** 2, 0) / gaps.length) / Math.max(1e-9, Math.abs(meanGap) + f.dash * 0.25) : 0;
+    const maxOff = Math.max(...f.placed.map((p) => p.off));
+    const maxAngle = Math.max(...f.placed.map((p) => p.angle));
+    const n2 = f.placed.length;
+    const sure = (0.55 + 0.45 * ramp4(n2, MIN_DASHES, 6)) * (1 - 0.5 * (maxOff / f.off)) * (1 - 0.3 * Math.min(1, spread2));
+    const ids = f.placed.map((p) => p.d.id);
+    const sc = median2(run2.map((d) => d.scale));
+    const px = (v) => `${Math.round(v / sc)} px`;
+    return {
+      id: `dashes:${[...ids].sort().join("+")}`,
+      ids,
+      marks: [...new Set(f.placed.map((p) => p.d.mark))],
+      from,
+      to,
+      axis: f.axis,
+      length: dist8(from, to),
+      dashes: n2,
+      dash: f.dash,
+      gap,
+      confidence: MAX3 * sure,
+      reason: `${n2} dashes in a row, each about ${px(f.dash)} long and ${px(gap)} apart, both ends of every one within ${px(maxOff)} of the line through them (${Math.max(1, Math.round(maxAngle))}\xB0 off it at the most)`
+    };
+  }
+  function dashedLines(state, scopeIds) {
+    const { strokes, nodes } = strokesOf(state, scopeIds);
+    const dashes = strokes.map((s) => dashOf(s, nodes.get(s.id))).filter((d) => !!d);
+    if (dashes.length < MIN_DASHES) return [];
+    const rows = rowsOf(dashes).flatMap(kept);
+    const rowOf2 = /* @__PURE__ */ new Map();
+    for (const r of rows) {
+      const axis = fitOf(r).axis;
+      for (const d of r) rowOf2.set(d.id, axis);
+    }
+    const crossing = (id, axis) => {
+      const other = rowOf2.get(id);
+      return !!other && Math.acos(Math.min(1, Math.abs(dot5(other, axis)))) * DEG7 >= CROSSING_DEG;
+    };
+    const ends = [];
+    for (const s of strokes) {
+      if (s.ink.length < 2 || fingerprintOf(nodes.get(s.id))?.isClosed) continue;
+      const host = /* @__PURE__ */ new Set([s.id]);
+      ends.push({ at: s.ink[0], host, size: s.size }, { at: s.ink[s.ink.length - 1], host, size: s.size });
+    }
+    for (const r of rows) {
+      const l = lineOf(r);
+      const host = new Set(l.ids);
+      for (const at of [l.from, l.to]) ends.push({ at, host, size: l.length });
+    }
+    const heads = (m, run2) => {
+      const reach = magnetRadius(m.size, m.scale);
+      return ends.some((e) => e.size >= HEAD_OF * m.size && !e.host.has(m.id) && !run2.some((d) => e.host.has(d.id)) && distToPolyline(e.at, m.ink) <= reach);
+    };
+    const out = [];
+    const queue = [...rows];
+    while (queue.length) {
+      const r = queue.pop();
+      const { parts } = clear(r, strokes, crossing, heads);
+      if (parts.length === 1 && parts[0].length === r.length) {
+        out.push(lineOf(r));
+        continue;
+      }
+      for (const p of parts) queue.push(...kept(p));
+    }
+    return out.sort((a, b) => a.from.y - b.from.y || a.from.x - b.from.x || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  }
+  function dashedHeads(state, line, scopeIds) {
+    const { strokes } = strokesOf(state, scopeIds);
+    const mine = new Set(line.ids);
+    const scale = median2(strokes.filter((s) => mine.has(s.id)).map((s) => s.scale)) || 1;
+    const scratch = createSession();
+    const past = Math.max(line.gap, 0);
+    const a = { x: line.from.x - line.axis.x * past, y: line.from.y - line.axis.y * past };
+    const b = { x: line.to.x + line.axis.x * past, y: line.to.y + line.axis.y * past };
+    const n2 = Math.max(12, Math.round((line.length + 2 * past) / (3 * scale)));
+    const pts = [];
+    for (let k = 0; k <= n2; k++) pts.push({ x: a.x + (b.x - a.x) * k / n2, y: a.y + (b.y - a.y) * k / n2 });
+    let t = 1;
+    const id = scratch.addStroke(pts, t, void 0, scale, { content: true });
+    const back = /* @__PURE__ */ new Map([[id, id]]);
+    const most = HEAD_MAX_SHARE * line.length;
+    for (const s of strokes) {
+      if (mine.has(s.id) || s.size > most) continue;
+      const reach = magnetRadius(s.size, s.scale) * 1.5;
+      const off = (e) => Math.hypot(Math.max(0, s.bounds.minX - e.x, e.x - s.bounds.maxX), Math.max(0, s.bounds.minY - e.y, e.y - s.bounds.maxY));
+      if (off(a) > reach && off(b) > reach) continue;
+      back.set(scratch.addStroke(s.ink.map((p) => ({ x: p.x, y: p.y })), t += 1e4, void 0, s.scale, { content: true }), s.id);
+    }
+    const h2 = headsOf(scratch.getState(), id);
+    const said3 = (e, end, at) => {
+      if (!e) return { end, point: { ...at }, heads: [], reason: `a plain ${end}: nothing sits there` };
+      const heads = e.heads.filter((x) => x.ids.every((k) => back.has(k))).map((x) => ({ ...x, ids: x.ids.filter((k) => k !== id).map((k) => back.get(k)), tip: { ...x.tip } }));
+      return { end, point: { ...e.point }, heads, reason: e.reason };
+    };
+    return { start: said3(h2?.start, "start", a), end: said3(h2?.end, "end", b) };
+  }
+
+  // src/notations/sequence.ts
+  var SEQUENCE_TABLE = {
+    pack: "sequence@1",
+    notation: "sequence",
+    name: "Sequence diagram",
+    describes: "participants, each at the top of its lifeline, and the messages between them in order down the page",
+    symbols: {
+      participant: {
+        role: "node",
+        describes: "a box at the top of a long vertical line \u2014 its lifeline, one stroke or dashed \u2014 the name written in the box",
+        ports: "anywhere along its lifeline",
+        one: "participant",
+        many: "participants",
+        mermaid: "participant"
+      },
+      actor: {
+        role: "node",
+        describes: "a small stick figure \u2014 a circle over a body and a few short lines \u2014 at the top of its lifeline, the name written under it",
+        ports: "anywhere along its lifeline",
+        one: "actor",
+        many: "actors",
+        mermaid: "actor"
+      }
+    },
+    connectors: {
+      call: { role: "edge", describes: "a solid, roughly level line from one lifeline to another, directed by its head", one: "call", many: "calls", mermaid: { head: "->>", none: "->", both: "<<->>" } },
+      return: { role: "edge", describes: "a dashed, roughly level line from one lifeline to another, directed by its head", one: "return", many: "returns", mermaid: { head: "-->>", none: "-->", both: "<<-->>" } },
+      self: { role: "edge", describes: "a loop out from a lifeline and back to it, its head where it comes back", one: "self-message", many: "self-messages", mermaid: { head: "->>", none: "->", both: "->>" } }
+    },
+    labels: {
+      name: { role: "label", describes: "the writing in a participant\u2019s box, or under an actor\u2019s figure" },
+      message: { role: "label", describes: "the writing just above a message \u2014 above a self-message\u2019s loop, or beside it" }
+    },
+    mermaid: { header: "sequenceDiagram" }
+  };
+  var KINDS3 = Object.keys(SEQUENCE_TABLE.connectors);
+  var LIFELINE_PLUMB = [10, 20];
+  var LIFELINE_PX = 60;
+  var LIFELINE_OF_BOX = 1.5;
+  var LIFELINE_MIDDLE = 0.3;
+  var LIFELINE_BELOW = 0.35;
+  var LIFELINE_GAP = 0.15;
+  var LIFELINE_GAP_PX = 40;
+  var BOX_UPRIGHT = [15, 30];
+  var BOX_FLOOR2 = 0.3;
+  var HEAD_PX = [10, 80];
+  var MESSAGE_LEVEL = [12, 25];
+  var LAND_SHARE = 0.06;
+  var LOOP_PX = 12;
+  var LOOP_SPAN_PX = 8;
+  var LABEL_ABOVE = 1.2;
+  var LABEL_DIP = 0.35;
+  var INK_INSIDE2 = 0.6;
+  var WRITING_ZIGZAG = 4;
+  var PORTS_FLOOR3 = 0.4;
+  var HELD_ARROW = 0.5;
+  var MAX4 = MAX_TIER0_CONFIDENCE;
+  var WORDS4 = ["no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve"];
+  var count5 = (n2) => WORDS4[n2] ?? String(n2);
+  var deg5 = (x) => `${Math.max(0, Math.round(x))}\xB0`;
+  var pct5 = (x) => `${Math.round(x * 100)}%`;
+  var DEG8 = 180 / Math.PI;
+  var scaleOf5 = (node) => getRep(node, "stroke")?.data?.scale ?? 1;
+  var atOf2 = (node) => getRep(node, "stroke")?.data?.at ?? node.createdAt;
+  var sub9 = (a, b) => ({ x: a.x - b.x, y: a.y - b.y });
+  var dist9 = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+  var centreOf5 = (b) => ({ x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2 });
+  var sizeOfBounds2 = (b) => Math.max(b.maxX - b.minX, b.maxY - b.minY);
+  var mean3 = (xs) => xs.reduce((a, x) => a + x, 0) / Math.max(1, xs.length);
+  var boundsOfPoints2 = (pts) => {
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const p of pts) {
+      minX = Math.min(minX, p.x);
+      minY = Math.min(minY, p.y);
+      maxX = Math.max(maxX, p.x);
+      maxY = Math.max(maxY, p.y);
+    }
+    return { minX, minY, maxX, maxY };
+  };
+  var union = (bs) => ({ minX: Math.min(...bs.map((b) => b.minX)), minY: Math.min(...bs.map((b) => b.minY)), maxX: Math.max(...bs.map((b) => b.maxX)), maxY: Math.max(...bs.map((b) => b.maxY)) });
+  var offBox3 = (p, b) => Math.hypot(Math.max(0, b.minX - p.x, p.x - b.maxX), Math.max(0, b.minY - p.y, p.y - b.maxY));
+  var offPlumb2 = (v) => Math.atan2(Math.abs(v.x), Math.abs(v.y)) * DEG8;
+  var offLevel2 = (v) => Math.atan2(Math.abs(v.y), Math.abs(v.x)) * DEG8;
+  function isWriting5(node) {
+    if (isWord(node) || transcriptOf(node)) return true;
+    return resemblances(node)[0]?.to === "type:text";
+  }
+  function writingLike(node, ink, scale) {
+    if (isWriting5(node)) return true;
+    if (!ink || fingerprintOf(node)?.isClosed) return false;
+    return zigzagOf(ink, scale) >= WRITING_ZIGZAG;
+  }
+  function wordsOfMark2(node) {
+    const t = (transcriptOf(node) ?? labelOf(node)?.text)?.trim();
+    return t ? t : void 0;
+  }
+  function ownWords3(nodes, ids) {
+    const words = [];
+    for (const id of [...new Set(ids)].sort()) {
+      const n2 = nodes.get(id);
+      const t = n2 && labelOf(n2)?.text.trim();
+      if (t && !words.includes(t)) words.push(t);
+    }
+    return words.length ? words.join(" ") : void 0;
+  }
+  var topOf = (node) => {
+    const e = resemblances(node)[0];
+    return e ? { type: e.to.replace(/^type:/, ""), weight: e.weight ?? 0 } : null;
+  };
+  var reads = (node, type, floor = 0) => resemblances(node).some((e) => e.to === `type:${type}` && (e.weight ?? 0) >= floor);
+  function boxOf2(points, figure) {
+    const hull2 = hullOf(points);
+    if (hull2.length < 3 || areaOf(hull2) <= 0) return null;
+    const { share, three, quad } = cornersOf(hull2);
+    if (quad.length !== 4) return null;
+    const st = stanceOf(quad);
+    const four = figure ? 1 : share;
+    const notThree = figure ? 1 : 1 - ramp2(three, THREE_CORNERED[0], THREE_CORNERED[1]);
+    const cornered = ramp2(four, CORNERED[0], CORNERED[1]) * notThree;
+    const square = 1 - ramp2(st.square, SQUARE[0], SQUARE[1]);
+    const upright = 1 - ramp2(st.upright, BOX_UPRIGHT[0], BOX_UPRIGHT[1]);
+    const bounds = boundsOfPoints2(hull2);
+    return {
+      hull: hull2,
+      bounds,
+      size: sizeOfBounds2(bounds),
+      w: bounds.maxX - bounds.minX,
+      h: bounds.maxY - bounds.minY,
+      score: cornered * square * upright,
+      why: `a box \u2014 its four corners hold ${pct5(four)} of it, within ${deg5(st.square)} of square and ${deg5(st.upright)} of upright`
+    };
+  }
+  function figureOf(head, open, used) {
+    const s = head.size;
+    const hand = s / head.scale;
+    if (hand < HEAD_PX[0] || hand > HEAD_PX[1]) return null;
+    const c = centreOf5(head.bounds);
+    const region = { minX: c.x - 2.2 * s, maxX: c.x + 2.2 * s, minY: head.bounds.minY + 0.3 * s, maxY: head.bounds.maxY + 3.5 * s };
+    const reach = Math.max(0.35 * s, 4 * head.scale);
+    const near = open.filter((o) => !used.has(o.id) && o.size <= 3 * s && o.bounds.minX >= region.minX && o.bounds.maxX <= region.maxX && o.bounds.minY >= region.minY && o.bounds.maxY <= region.maxY);
+    if (near.length < 2) return null;
+    const bottom2 = { x: c.x, y: head.bounds.maxY };
+    let body = null, bodyScore = 0;
+    for (const o of near) {
+      const a = o.ink[0], b = o.ink[o.ink.length - 1];
+      const [top, low] = a.y <= b.y ? [a, b] : [b, a];
+      const d = Math.min(dist9(top, bottom2), distToPath(top, head.ink));
+      if (d > reach || low.y - top.y < 0.6 * s) continue;
+      const plumb = 1 - ramp2(offPlumb2(sub9(low, top)), 20, 35);
+      const score3 = plumb * (1 - 0.5 * (d / reach));
+      if (score3 > bodyScore) body = o, bodyScore = score3;
+    }
+    if (!body) return null;
+    const limbs = [body];
+    let grew = true;
+    while (grew) {
+      grew = false;
+      for (const o of near) {
+        if (limbs.includes(o)) continue;
+        const touches = [head, ...limbs].some((l) => o.ink.some((p) => distToPath(p, l.ink) <= reach));
+        if (touches) {
+          limbs.push(o);
+          grew = true;
+        }
+      }
+    }
+    if (limbs.length < 2) return null;
+    const strokes = [head, ...limbs];
+    const bounds = union(strokes.map((x) => x.bounds));
+    const circle2 = (topOf(head.node)?.weight ?? 0) / MAX4;
+    const score2 = Math.min(1, circle2) * bodyScore * (limbs.length >= 3 ? 1 : 0.85);
+    return {
+      kind: "actor",
+      id: head.id,
+      strokes: strokes.map((x) => x.id),
+      marks: [...new Set(strokes.map((x) => x.mark))],
+      outline: hullOf(strokes.flatMap((x) => x.ink)),
+      bounds,
+      foot: { x: c.x, y: bounds.maxY },
+      across: Math.max(0.8 * s, 12 * head.scale),
+      below: Math.max(4 * s, 70 * head.scale),
+      height: bounds.maxY - bounds.minY,
+      scale: head.scale,
+      score: score2,
+      why: `a stick figure \u2014 a circle with a body running down from under it and ${count5(limbs.length - 1)} more short line${limbs.length === 2 ? "" : "s"} beside it`,
+      nameBelow: { minX: c.x - 2 * s, maxX: c.x + 2 * s, minY: bounds.maxY - 0.3 * s, maxY: bounds.maxY + Math.max(1.5 * s, 24 * head.scale) }
+    };
+  }
+  var xAt = (top, bottom2, y) => bottom2.y === top.y ? top.x : top.x + (bottom2.x - top.x) * (y - top.y) / (bottom2.y - top.y);
+  function solidPiece(s) {
+    const fp = fingerprintOf(s.node);
+    if (!fp || fp.isClosed || s.ink.length < 2) return null;
+    const top = topOf(s.node);
+    if (!top || top.type !== "line") return null;
+    const a = s.ink[0], b = s.ink[s.ink.length - 1];
+    const [hi, lo] = a.y <= b.y ? [a, b] : [b, a];
+    if ((lo.y - hi.y) / s.scale < LIFELINE_PX) return null;
+    const plumb = 1 - ramp2(offPlumb2(sub9(lo, hi)), LIFELINE_PLUMB[0], LIFELINE_PLUMB[1]);
+    if (plumb <= 0) return null;
+    return { id: s.id, strokes: [s.id], marks: [s.mark], top: hi, bottom: lo, dashed: false, scale: s.scale, sure: plumb * Math.min(1, top.weight / MAX4), why: `a line ${deg5(offPlumb2(sub9(lo, hi)))} off plumb` };
+  }
+  function dashedPiece(l, scale) {
+    const [hi, lo] = l.from.y <= l.to.y ? [l.from, l.to] : [l.to, l.from];
+    if ((lo.y - hi.y) / scale < LIFELINE_PX) return null;
+    const plumb = 1 - ramp2(offPlumb2(sub9(lo, hi)), LIFELINE_PLUMB[0], LIFELINE_PLUMB[1]);
+    if (plumb <= 0) return null;
+    const strokes = l.from.y <= l.to.y ? [...l.ids] : [...l.ids].reverse();
+    return { id: l.id, strokes, marks: [...l.marks], top: hi, bottom: lo, dashed: true, scale, sure: plumb * (l.confidence / MAX4), why: `${l.dashes} dashes ${deg5(offPlumb2(sub9(lo, hi)))} off plumb` };
+  }
+  var pointing = (h2) => h2.kind === "arrow" || h2.kind === "triangle";
+  function heldBarb(node) {
+    const meta = getRep(node, "reading:arrow")?.data;
+    const arrow = resemblances(node).find((e) => e.to === "type:arrow");
+    if (!meta?.tip || !arrow || (arrow.weight ?? 0) < HELD_ARROW) return null;
+    const [tip] = placed(node, [meta.tip]);
+    const end = meta.head === "start" ? "start" : "end";
+    const w2 = arrow.weight ?? 0;
+    const top = topOf(node);
+    return { end, head: { kind: "arrow", filled: false, confidence: w2, reason: `its own barb at its ${end}, held as the rung\u2019s reading arrow ${w2.toFixed(2)} below ${top ? `${top.type} ${top.weight.toFixed(2)}` : "another"}`, ids: [node.id], tip: { x: tip.x, y: tip.y } } };
+  }
+  function readEnd2(e, landOn) {
+    const heads = e.heads.filter((h2) => pointing(h2) && !(landOn && h2.ids.some(landOn)));
+    const head = heads[0];
+    return { end: e.end, point: head ? { ...head.tip } : { ...e.point }, ...head ? { head } : {}, reason: head ? head.reason : e.reason };
+  }
+  function headsApart(conn, others) {
+    const a = conn.ink[0], b = conn.ink[conn.ink.length - 1];
+    const length = dist9(a, b);
+    const scratch = createSession();
+    let t = 1;
+    const id = scratch.addStroke(conn.ink.map((p) => ({ x: p.x, y: p.y })), t, void 0, conn.scale, { content: true });
+    const back = /* @__PURE__ */ new Map([[id, conn.id]]);
+    for (const o of others) {
+      if (o.id === conn.id || o.size > 0.5 * length) continue;
+      const reach = magnetRadius(o.size, o.scale) * 1.5;
+      if (offBox3(a, o.bounds) > reach && offBox3(b, o.bounds) > reach) continue;
+      back.set(scratch.addStroke(o.ink.map((p) => ({ x: p.x, y: p.y })), t += 1e4, void 0, o.scale, { content: true }), o.id);
+    }
+    const h2 = headsOf(scratch.getState(), id);
+    if (!h2) return null;
+    const map = (e) => ({ ...e, heads: e.heads.filter((x) => x.ids.every((k) => back.has(k))).map((x) => ({ ...x, ids: [...new Set(x.ids.map((k) => back.get(k)))], tip: { ...x.tip } })) });
+    return { id: conn.id, shape: h2.shape, start: map(h2.start), end: map(h2.end) };
+  }
+  function loopHeads(loop, lineX, side, others) {
+    const pts = loop.ink;
+    const out = pts.map((p) => side * (p.x - lineX(p.y)));
+    const far = Math.max(...out);
+    const legOf = (which) => {
+      const idx = which === "end" ? pts.map((_, i) => i) : pts.map((_, i) => pts.length - 1 - i);
+      let f = 0;
+      idx.forEach((i, k2) => {
+        if (out[i] >= 0.7 * far) f = k2;
+      });
+      const tail = idx.slice(f);
+      const endPoint = pts[idx[idx.length - 1]];
+      const plain = { end: which, point: { ...endPoint }, reason: `a plain ${which}: nothing sits there` };
+      if (tail.length < 3) return plain;
+      let k = 0;
+      tail.forEach((i, j) => {
+        if (out[i] < out[tail[k]]) k = j;
+      });
+      const wing = Math.max(0, ...tail.slice(k).map((i) => out[i] - out[tail[k]]));
+      const came = out[tail[0]] - out[tail[k]];
+      const least = Math.max(4 * loop.scale, 0.06 * far);
+      if (k < tail.length - 1 && wing >= least && wing <= 0.6 * far && came >= 0.5 * far) {
+        const tip = pts[tail[k]];
+        const reason = `its own barb at the loop\u2019s ${which}: the pen reaches the lifeline and folds back out ${Math.round(wing / loop.scale)} px \u2014 an open arrow`;
+        return { end: which, point: { ...tip }, head: { kind: "arrow", filled: false, confidence: MAX4 * (0.75 + 0.25 * ramp2(wing / least, 1, 2)), reason, ids: [loop.id], tip: { ...tip } }, reason };
+      }
+      const near = others.filter((o) => o.id !== loop.id && o.size <= 0.5 * far && offBox3(endPoint, o.bounds) <= magnetRadius(o.size, o.scale) * 1.5);
+      if (!near.length) return plain;
+      const a = pts[tail[0]];
+      const n2 = Math.max(12, Math.round(dist9(a, endPoint) / (3 * loop.scale)));
+      const leg = [];
+      for (let j = 0; j <= n2; j++) leg.push({ x: a.x + (endPoint.x - a.x) * j / n2, y: a.y + (endPoint.y - a.y) * j / n2 });
+      const scratch = createSession();
+      let t = 1;
+      const id = scratch.addStroke(leg, t, void 0, loop.scale, { content: true });
+      const back = /* @__PURE__ */ new Map([[id, loop.id]]);
+      for (const o of near) back.set(scratch.addStroke(o.ink.map((p) => ({ x: p.x, y: p.y })), t += 1e4, void 0, o.scale, { content: true }), o.id);
+      const h2 = headsOf(scratch.getState(), id);
+      const head = (h2?.end.heads ?? []).filter((x) => pointing(x) && x.ids.every((q) => back.has(q)) && !x.ids.includes(id)).map((x) => ({ ...x, ids: x.ids.map((q) => back.get(q)), tip: { ...x.tip }, reason: x.reason.replace(/at its end/g, `at the loop\u2019s ${which}`) }))[0];
+      return head ? { end: which, point: { ...head.tip }, head, reason: head.reason } : plain;
+    };
+    return { start: legOf("start"), end: legOf("end") };
+  }
+  var reading3 = 0;
+  function sequencePortsOf(node, nodes) {
+    if (reading3 > 0) return null;
+    reading3++;
+    try {
+      if (getRep(node, "erased") || getRep(node, "gesture") || isWord(node) || !getRep(node, "stroke")) return null;
+      const b = boundsOf(node);
+      if (!b) return null;
+      const scale = scaleOf5(node);
+      const margin = 60 * scale;
+      const column = [];
+      for (const [id, n2] of nodes) {
+        if (getRep(n2, "erased") || getRep(n2, "gesture") || n2.edges.some((e) => e.rel === "part-of" && !e.blessed)) continue;
+        const nb = boundsOf(n2);
+        if (!nb || nb.maxX < b.minX - margin - 400 * scale || nb.minX > b.maxX + margin + 400 * scale) continue;
+        column.push(id);
+      }
+      const state = { nodes, contentIds: column, artifacts: [] };
+      const r = readSequence(state, column, { lifelinesOnly: true });
+      const p = r?.symbols.find((x) => x.lifeline.includes(node.id));
+      if (!p || p.confidence < PORTS_FLOOR3) return null;
+      return { symbol: "lifeline", ports: p.ports };
+    } finally {
+      reading3--;
+    }
+  }
+  function readSequence(state, scopeIds, opts = {}) {
+    const nodes = state.nodes;
+    const artifacts = new Set(state.artifacts);
+    const scope = (scopeIds ? [...new Set(scopeIds)] : state.contentIds.filter((id) => !artifacts.has(id))).filter((id) => {
+      const n2 = nodes.get(id);
+      return !!n2 && !artifacts.has(id) && !getRep(n2, "erased") && !getRep(n2, "gesture") && !!boundsOf(n2);
+    });
+    if (!scope.length) return null;
+    const marks = /* @__PURE__ */ new Map();
+    for (const id of scope) {
+      const node = nodes.get(id);
+      const b = boundsOf(node);
+      marks.set(id, { id, node, bounds: b, centre: centreOf5(b), scale: isWord(node) ? scaleOf5(nodes.get(lettersOf(node)[0]) ?? node) : scaleOf5(node) });
+    }
+    const strokes = /* @__PURE__ */ new Map();
+    const addStroke = (id, mark) => {
+      const n2 = nodes.get(id);
+      if (!n2 || getRep(n2, "erased") || getRep(n2, "gesture") || !getRep(n2, "stroke")) return;
+      const ink = strokePointsOf(n2);
+      const b = boundsOf(n2);
+      if (!ink || ink.length < 2 || !b) return;
+      strokes.set(id, { id, mark, node: n2, ink, bounds: b, size: sizeOfBounds2(b), scale: scaleOf5(n2) });
+    };
+    for (const m of marks.values()) {
+      if (isWord(m.node)) for (const l of lettersOf(m.node)) addStroke(l, m.id);
+      else addStroke(m.id, m.id);
+    }
+    const loose = [...strokes.values()].filter((s) => s.mark === s.id);
+    const closedOf = (s) => !!fingerprintOf(s.node)?.isClosed;
+    const writes = (s) => writingLike(s.node, s.ink, s.scale);
+    const least = opts.lifelinesOnly ? 1 : 2;
+    let pieces = [];
+    for (const s of loose) {
+      const p = solidPiece(s);
+      if (p) pieces.push(p);
+    }
+    const lines = dashedLines(state, scope);
+    const inLine = /* @__PURE__ */ new Map();
+    for (const l of lines) {
+      for (const id of l.ids) inLine.set(id, l);
+      const sc = mean3(l.ids.map((id) => strokes.get(id)?.scale ?? 1));
+      const p = dashedPiece(l, sc);
+      if (p) pieces.push(p);
+    }
+    if (pieces.length < least) return null;
+    const tops = pieces.map((p) => p.top);
+    const heads = [];
+    const used = /* @__PURE__ */ new Set();
+    const overTop = (b, across2, below, scale) => {
+      const cx2 = (b.minX + b.maxX) / 2, h2 = b.maxY - b.minY, reach = magnetRadius(0, scale);
+      return tops.some((t) => Math.abs(t.x - cx2) <= across2 + reach && t.y >= b.maxY - 0.5 * h2 - reach && t.y <= b.maxY + below + reach);
+    };
+    for (const s of loose) {
+      if (!closedOf(s) || isWriting5(s.node) || !reads(s.node, "rectangle")) continue;
+      const b = s.bounds, w2 = b.maxX - b.minX, h2 = b.maxY - b.minY;
+      if (!overTop(b, LIFELINE_MIDDLE * w2, Math.max(LIFELINE_BELOW * h2, magnetRadius(s.size, s.scale)), s.scale)) continue;
+      const box = boxOf2(s.ink, false);
+      if (!box || box.score < BOX_FLOOR2) continue;
+      heads.push(headOfBox(s.id, [s.id], [s.mark], box, s.scale, ""));
+    }
+    const openLoose = loose.filter((s) => !closedOf(s) && !writes(s));
+    for (const s of loose) {
+      if (!closedOf(s) || !reads(s.node, "circle", 0.4) || topOf(s.node)?.type !== "circle") continue;
+      if (!overTop(s.bounds, Math.max(0.8 * s.size, 12 * s.scale), 3.5 * s.size + Math.max(4 * s.size, 70 * s.scale), s.scale)) continue;
+      const fig = figureOf(s, openLoose, used);
+      if (!fig) continue;
+      heads.push(fig);
+      fig.strokes.forEach((id) => used.add(id));
+    }
+    const hangs = (t) => heads.some((h2) => Math.abs(t.x - h2.foot.x) <= h2.across && t.y >= h2.foot.y - 0.5 * h2.height && t.y <= h2.foot.y + h2.below);
+    const orphans = tops.filter((t) => !hangs(t));
+    if (orphans.length) {
+      const near = openLoose.filter((o) => !used.has(o.id) && orphans.some((t) => o.bounds.maxX >= t.x - 250 * o.scale && o.bounds.minX <= t.x + 250 * o.scale && o.bounds.maxY >= t.y - 250 * o.scale && o.bounds.minY <= t.y + 20 * o.scale));
+      for (const f of near.length >= 2 ? figuresAmong(nodes, near.map((o) => o.id)) : []) {
+        if (f.vertices.length !== 4) continue;
+        const box = boxOf2(f.vertices, true);
+        if (!box || box.score < BOX_FLOOR2) continue;
+        heads.push(headOfBox(f.id, [...f.ids], [...f.ids], { ...box, score: box.score * (f.confidence / MAX4) }, strokes.get(f.ids[0]).scale, `${count5(f.ids.length)} strokes whose ends meet: `));
+        f.ids.forEach((id) => used.add(id));
+      }
+    }
+    const holds2 = (a, b) => b.bounds !== a.bounds && sizeOfBounds2(b.bounds) < sizeOfBounds2(a.bounds) && offBox3(centreOf5(b.bounds), a.bounds) === 0 && outside(centreOf5(b.bounds), a.outline) === 0;
+    const frames = new Set(heads.filter((a) => heads.some((b) => a !== b && holds2(a, b))));
+    const candidates = heads.filter((h2) => !frames.has(h2));
+    if (candidates.length < least) return null;
+    const inHeads = new Set(candidates.flatMap((h2) => h2.strokes));
+    pieces = pieces.filter((p) => !p.strokes.some((id) => inHeads.has(id)));
+    const closedHulls = candidates.map((h2) => ({ h: h2, hull: h2.outline }));
+    const takenPieces = /* @__PURE__ */ new Set();
+    const participants = [];
+    const lifelineOf = (head) => {
+      let best = null;
+      for (const p of pieces) {
+        if (takenPieces.has(p)) continue;
+        const dx = Math.abs(p.top.x - head.foot.x);
+        const dy = p.top.y - head.foot.y;
+        if (dx > head.across || dy > head.below || p.top.y < head.foot.y - 0.5 * head.height) continue;
+        const score2 = p.sure * (1 - 0.5 * (dx / head.across)) * (1 - 0.3 * Math.max(0, dy / head.below));
+        if (!best || score2 > best.score) best = { p, score: score2 };
+      }
+      if (!best) return null;
+      const chain = [best.p];
+      let bottom2 = best.p.bottom;
+      for (; ; ) {
+        const length2 = bottom2.y - chain[0].top.y;
+        const gapMost = Math.max(LIFELINE_GAP * length2, LIFELINE_GAP_PX * head.scale);
+        const next = pieces.filter((q) => !takenPieces.has(q) && !chain.includes(q) && q.top.y >= bottom2.y - 0.2 * gapMost && q.top.y - bottom2.y <= gapMost && Math.abs(q.top.x - xAt(chain[0].top, bottom2, q.top.y)) <= Math.max(head.across * 0.5, 8 * head.scale)).sort((a, b) => a.top.y - b.top.y)[0];
+        if (!next) break;
+        chain.push(next);
+        bottom2 = next.bottom;
+      }
+      const top = chain[0].top;
+      const length = bottom2.y - top.y;
+      if (length < LIFELINE_OF_BOX * head.height) return null;
+      const reachBottom = magnetRadius(0, head.scale);
+      if (closedHulls.some(({ h: h2, hull: hull2 }) => h2 !== head && offBox3(bottom2, h2.bounds) <= reachBottom && outside(bottom2, hull2) <= reachBottom)) return null;
+      const gapBox = { minX: Math.min(top.x, head.foot.x) - head.across * 0.5, maxX: Math.max(top.x, head.foot.x) + head.across * 0.5, minY: head.foot.y - 2, maxY: top.y + 2 };
+      if (loose.some((s) => closedOf(s) && !head.strokes.includes(s.id) && s.size < 0.5 * sizeOfBounds2(head.bounds) && s.bounds.minY >= gapBox.minY - s.size && s.bounds.maxY <= gapBox.maxY + s.size && s.bounds.minX <= gapBox.maxX && s.bounds.maxX >= gapBox.minX && offBox3(top, s.bounds) <= magnetRadius(s.size, s.scale))) return null;
+      const sure2 = mean3(chain.map((p) => p.sure)) * ramp2(length / Math.max(1e-9, head.height), LIFELINE_OF_BOX, LIFELINE_OF_BOX * 2) ** 0.5;
+      const dashed = chain.some((p) => p.dashed);
+      return {
+        pieces: chain,
+        top,
+        bottom: bottom2,
+        length,
+        dashed,
+        sure: sure2,
+        why: `${chain.length === 1 ? chain[0].why : `${count5(chain.length)} pieces, one under the next (${chain.map((p) => p.why).join("; ")})`}, its top ${Math.round(Math.abs(top.x - head.foot.x) / head.scale)} px across from under the ${head.kind === "actor" ? "figure" : "box"}, ${Math.round(length / head.height)} times as long as it is tall`
+      };
+    };
+    for (const head of [...candidates].sort((a, b) => a.foot.x - b.foot.x || (a.id < b.id ? -1 : 1))) {
+      const line = lifelineOf(head);
+      if (!line) continue;
+      line.pieces.forEach((p) => takenPieces.add(p));
+      participants.push({ head, line, sure: head.score * line.sure, why: `${head.why}, over its lifeline \u2014 ${line.why}` });
+    }
+    if (participants.length < least) return null;
+    participants.sort((a, b) => a.line.top.x - b.line.top.x || (a.head.id < b.head.id ? -1 : 1));
+    const lifelineStrokes = /* @__PURE__ */ new Map();
+    participants.forEach((p, i) => {
+      for (const piece of p.line.pieces) for (const id of piece.strokes) lifelineStrokes.set(id, i);
+      for (const id of p.head.strokes) lifelineStrokes.set(id, i);
+    });
+    const portOf = (p) => ({ name: "lifeline", along: [{ ...p.line.top }, { ...p.line.bottom }], reasoning: `anywhere along the lifeline of ${p.head.id}` });
+    if (opts.lifelinesOnly) {
+      return {
+        notation: "sequence",
+        name: SEQUENCE_TABLE.name,
+        confidence: MAX4 * mean3(participants.map((p) => p.sure)),
+        summary: `${count5(participants.length)} lifelines`,
+        reason: participants.map((p) => p.why).join("; "),
+        symbols: participants.map((p) => participantSymbol(p, portOf(p), nodes, [], [], void 0)),
+        connectors: [],
+        labels: [],
+        roles: {},
+        unplaced: [],
+        counts: {}
+      };
+    }
+    const landing = (p, reach, bound) => {
+      if (bound !== void 0) {
+        const i = lifelineStrokes.get(bound);
+        if (i !== void 0) return { i, d: 0 };
+      }
+      let best = null;
+      participants.forEach((q, i) => {
+        const { top, bottom: bottom2 } = q.line;
+        if (p.y < top.y - reach || p.y > bottom2.y + reach) return;
+        const d = Math.abs(p.x - xAt(top, bottom2, Math.max(top.y, Math.min(bottom2.y, p.y))));
+        if (d <= reach && (!best || d < best.d)) best = { i, d };
+      });
+      return best;
+    };
+    const reachFor = (length, scale) => Math.max(magnetRadius(0, scale), LAND_SHARE * length);
+    const taken = /* @__PURE__ */ new Set([...lifelineStrokes.keys()]);
+    const messages = [];
+    const endSaid = (e, i, bound, d) => ({
+      end: e.end,
+      point: { ...e.point },
+      ...i !== void 0 ? { symbol: participants[i].head.id } : {},
+      ...e.head ? { head: { kind: e.head.kind, filled: e.head.filled, ids: [...e.head.ids], confidence: e.head.confidence } } : {},
+      ...bound ? { bound: true } : {},
+      reason: i === void 0 ? `${e.reason}, nothing within reach` : bound ? `bound by a magnet to the lifeline of ${participants[i].head.id}` : `${e.head ? `past its ${e.head.kind === "arrow" ? "arrowhead" : e.head.kind}, ` : ""}${Math.round(d)} from the lifeline of ${participants[i].head.id}`
+    });
+    const message = (o) => {
+      const headA = !!o.a.head, headB = !!o.b.head;
+      const direction = headA && headB ? "both" : headA || headB ? "forward" : "none";
+      let [from, to, fi, ti, fd, td, fb, tb] = [o.a, o.b, o.ia, o.ib, o.da, o.db, o.bound[0], o.bound[1]];
+      if (headA && !headB || headA === headB && o.firstDrawn === o.b.end) [from, to, fi, ti, fd, td, fb, tb] = [o.b, o.a, o.ib, o.ia, o.db, o.da, o.bound[1], o.bound[0]];
+      const kind = o.self ? "self" : o.line === "dashed" ? "return" : "call";
+      const arrows = SEQUENCE_TABLE.connectors[kind].mermaid;
+      const arrow = o.self && o.line === "dashed" ? direction === "none" ? "-->" : "-->>" : direction === "both" ? arrows.both : direction === "forward" ? arrows.head : arrows.none;
+      const quality = Math.min(1 - 0.4 * (fd / o.reach), 1 - 0.4 * (td / o.reach));
+      const pointed = to.head ? 0.75 + 0.25 * (to.head.confidence / MAX4) : 0.75;
+      const confidence2 = MAX4 * quality * pointed * o.sure;
+      const P = participants[fi].head.id, Q = participants[ti].head.id;
+      const reason2 = o.self ? `a loop out from the lifeline of ${P} and back to it${to.head ? `, ${to.head.reason}` : ", with no head where it comes back"}` : direction === "forward" ? `${o.shape} from the lifeline of ${P} to the lifeline of ${Q}, ${to.head.kind === "arrow" ? "its arrowhead" : `its ${to.head.filled ? "filled" : "hollow"} triangle`} at ${Q}` : direction === "both" ? `${o.shape} with a head at both ends, between the lifelines of ${P} and ${Q}` : `${o.shape} with no head, from the lifeline of ${P} to the lifeline of ${Q} in the order it was drawn`;
+      const headIds = [...new Set([...from.head?.ids ?? [], ...to.head?.ids ?? []].filter((x) => !o.ids.includes(x)))];
+      const said3 = ownWords3(nodes, o.ids);
+      const at = o.self ? Math.min(o.a.point.y, o.b.point.y) : (o.a.point.y + o.b.point.y) / 2;
+      messages.push({
+        id: o.id,
+        ids: [...o.ids, ...headIds],
+        kind,
+        role: SEQUENCE_TABLE.connectors[kind].role,
+        direction,
+        directed: direction !== "none",
+        from: P,
+        to: Q,
+        ends: { from: endSaid(from, fi, fb, fd), to: endSaid(to, ti, tb, td) },
+        confidence: confidence2,
+        reason: reason2,
+        labels: [],
+        ...said3 ? { text: said3 } : {},
+        line: o.line,
+        arrow,
+        at,
+        order: 0
+      });
+      for (const x of [...o.ids, ...headIds]) taken.add(x);
+    };
+    const wordsNear = [...marks.values()].filter((m) => isWord(m.node));
+    const letterOf = /* @__PURE__ */ new Map();
+    for (const w2 of wordsNear) {
+      const ls = lettersOf(w2.node).map((id) => strokes.get(id)).filter((x) => !!x);
+      for (const l of ls) if (ls.length >= 2 && ls.every((o) => o === l || o.size <= 0.5 * l.size)) letterOf.set(l.id, ls);
+    }
+    const mayBe = [...loose, ...[...strokes.values()].filter((x) => letterOf.has(x.id))];
+    const endsOf4 = (x) => {
+      const a = x.ink[0], b = x.ink[x.ink.length - 1];
+      const reach = magnetRadius(0, x.scale) * 2;
+      const wordy = x.mark !== x.id || wordsNear.some((w2) => offBox3(a, w2.bounds) <= reach || offBox3(b, w2.bounds) <= reach);
+      return wordy ? headsApart(x, [...strokes.values()].filter((o) => !taken.has(o.id))) : headsOf(state, x.id);
+    };
+    const nearAny = (p, reach) => landing(p, reach) !== null;
+    const solidDone = /* @__PURE__ */ new Set();
+    for (const s of mayBe) {
+      if (taken.has(s.id) || inLine.has(s.id) || used.has(s.id) || closedOf(s) || writes(s)) continue;
+      const a0 = s.ink[0], b0 = s.ink[s.ink.length - 1];
+      const length = dist9(a0, b0);
+      if (length / s.scale < LIFELINE_PX * 0.5) continue;
+      const reach = reachFor(length, s.scale);
+      if (!nearAny(a0, reach + 0.5 * length) || !nearAny(b0, reach + 0.5 * length)) continue;
+      const level = 1 - ramp2(offLevel2(sub9(b0, a0)), MESSAGE_LEVEL[0], MESSAGE_LEVEL[1]);
+      if (level <= 0) continue;
+      const h2 = endsOf4(s);
+      if (!h2) continue;
+      const onLifeline = (id) => lifelineStrokes.has(id);
+      const [a, b] = [readEnd2(h2.start, onLifeline), readEnd2(h2.end, onLifeline)];
+      const held2 = h2.shape !== "arrow" ? heldBarb(s.node) : null;
+      for (const x of [a, b]) if (held2 && held2.end === x.end && !x.head) Object.assign(x, { head: held2.head, point: { ...held2.head.tip }, reason: held2.head.reason });
+      const bindings = activeBindingsOf(s.node, nodes);
+      const bs = bindings.find((x) => x.end === "start"), be = bindings.find((x) => x.end === "end");
+      const la = landing(a.point, reach, bs?.nodeId), lb = landing(b.point, reach, be?.nodeId);
+      if (!la || !lb || la.i === lb.i) continue;
+      message({ id: s.id, ids: [s.id], line: "solid", a, b, ia: la.i, ib: lb.i, da: la.d, db: lb.d, bound: [!!bs && lifelineStrokes.has(bs.nodeId), !!be && lifelineStrokes.has(be.nodeId)], reach, sure: level, shape: `${/^[aeiou]/.test(h2.shape) ? "an" : "a"} ${h2.shape}`, self: false, firstDrawn: "start" });
+      solidDone.add(s.id);
+    }
+    for (const l of lines) {
+      if (l.ids.some((id) => taken.has(id))) continue;
+      if (offLevel2(l.axis) >= MESSAGE_LEVEL[1]) continue;
+      const sc = mean3(l.ids.map((id) => strokes.get(id)?.scale ?? 1));
+      const reach = reachFor(l.length, sc);
+      if (!nearAny(l.from, reach + l.gap + l.dash * 2) || !nearAny(l.to, reach + l.gap + l.dash * 2)) continue;
+      const onLifeline = (id) => lifelineStrokes.has(id);
+      const h2 = dashedHeads(state, l, scope);
+      const a = readEnd2(h2.start, onLifeline), b = readEnd2(h2.end, onLifeline);
+      if (!a.head) a.point = { ...l.from };
+      if (!b.head) b.point = { ...l.to };
+      const la = landing(a.point, reach), lb = landing(b.point, reach);
+      if (!la || !lb || la.i === lb.i) continue;
+      const first = [...l.ids].sort((p, q) => atOf2(strokes.get(p).node) - atOf2(strokes.get(q).node))[0];
+      const firstDrawn = l.ids.indexOf(first) < l.ids.length / 2 ? "start" : "end";
+      const level = 1 - ramp2(offLevel2(l.axis), MESSAGE_LEVEL[0], MESSAGE_LEVEL[1]);
+      message({ id: l.id, ids: [...l.ids], line: "dashed", a, b, ia: la.i, ib: lb.i, da: la.d, db: lb.d, bound: [false, false], reach, sure: level * (l.confidence / MAX4), shape: `a dashed line of ${l.dashes} dashes`, self: false, firstDrawn });
+    }
+    for (const s of mayBe) {
+      if (taken.has(s.id) || inLine.has(s.id) || used.has(s.id) || solidDone.has(s.id) || closedOf(s)) continue;
+      const a0 = s.ink[0], b0 = s.ink[s.ink.length - 1];
+      const reach = reachFor(s.size, s.scale);
+      const ca = landing(a0, reach + 0.35 * s.size), cb = landing(b0, reach + 0.35 * s.size);
+      if (!ca || !cb || ca.i !== cb.i) continue;
+      const q = participants[ca.i].line;
+      const lineX = (y) => xAt(q.top, q.bottom, y);
+      const span = Math.abs(b0.y - a0.y);
+      if (span / s.scale < LOOP_SPAN_PX || span > 0.5 * q.length) continue;
+      const outR = Math.max(...s.ink.map((p) => p.x - lineX(p.y))), outL = Math.max(...s.ink.map((p) => lineX(p.y) - p.x));
+      const side = outR >= outL ? 1 : -1;
+      const far = Math.max(outR, outL), back = Math.min(outR, outL);
+      if (far / s.scale < LOOP_PX || back > Math.max(reach, 0.15 * far)) continue;
+      const nextOver = Math.min(...participants.filter((_, i) => i !== ca.i).map((o) => side * (o.line.top.x - q.top.x)).filter((d) => d > 0), Infinity);
+      if (far >= 0.8 * nextOver) continue;
+      const others = [...strokes.values()].filter((o) => !taken.has(o.id) && o.id !== s.id);
+      const h2 = loopHeads(s, lineX, side, others);
+      const bindings = activeBindingsOf(s.node, nodes);
+      const bs = bindings.find((x) => x.end === "start"), be = bindings.find((x) => x.end === "end");
+      const la = landing(h2.start.point, reach, bs?.nodeId), lb = landing(h2.end.point, reach, be?.nodeId);
+      if (!la || !lb || la.i !== ca.i || lb.i !== ca.i) continue;
+      const bulge = ramp2(far / Math.max(1e-9, span), 0.3, 0.8);
+      message({ id: s.id, ids: [s.id], line: "solid", a: h2.start, b: h2.end, ia: la.i, ib: lb.i, da: la.d, db: lb.d, bound: [!!bs && lifelineStrokes.has(bs.nodeId), !!be && lifelineStrokes.has(be.nodeId)], reach, sure: 0.85 + 0.15 * bulge, shape: "a loop", self: true, firstDrawn: "start" });
+    }
+    if (!messages.some((m) => m.kind !== "self")) return null;
+    messages.sort((p, q) => p.at - q.at || participantX(p.from) - participantX(q.from) || (p.id < q.id ? -1 : 1));
+    messages.forEach((m, i) => m.order = i + 1);
+    function participantX(id) {
+      return participants.find((p) => p.head.id === id).line.top.x;
+    }
+    const labels = [];
+    const names = /* @__PURE__ */ new Map();
+    const usedMarks = /* @__PURE__ */ new Set();
+    for (const id of taken) {
+      const s = strokes.get(id);
+      if (s) usedMarks.add(s.mark);
+    }
+    const writing = [...marks.values()].filter((m) => !usedMarks.has(m.id) && (isWord(m.node) ? true : writingLike(m.node, strokes.get(m.id)?.ink, m.scale)));
+    const inkOfMark = (m) => isWord(m.node) ? lettersOf(m.node).flatMap((id) => strokes.get(id)?.ink ?? []) : strokes.get(m.id)?.ink ?? [];
+    const byMessage = /* @__PURE__ */ new Map();
+    for (const m of writing) {
+      const h2 = m.bounds.maxY - m.bounds.minY;
+      const reach = Math.max(magnetRadius(sizeOfBounds2(m.bounds), m.scale), LABEL_ABOVE * h2);
+      const home = participants.findIndex((p) => {
+        if (p.head.kind === "participant") {
+          const ink = inkOfMark(m);
+          if (offBox3(m.centre, p.head.bounds) > 0) return false;
+          const slack = magnetRadius(p.head.bounds.maxX - p.head.bounds.minX, m.scale) * 0.5;
+          return ink.filter((q) => outside(q, p.head.outline) <= slack).length >= INK_INSIDE2 * Math.max(1, ink.length);
+        }
+        const r = p.head.nameBelow;
+        return m.bounds.minY >= r.minY && m.bounds.minY <= r.maxY && m.centre.x >= r.minX && m.centre.x <= r.maxX;
+      });
+      if (home >= 0) {
+        (names.get(home) ?? names.set(home, []).get(home)).push(m);
+        continue;
+      }
+      let best = null;
+      for (const msg of messages) {
+        const P = msg.ends.from.point, Q = msg.ends.to.point;
+        let gap;
+        if (msg.kind === "self") {
+          const loop = union(msg.ids.map((id) => strokes.get(id)?.bounds).filter((b) => !!b));
+          const above = m.centre.x >= loop.minX - 0.2 * (loop.maxX - loop.minX) && m.centre.x <= loop.maxX + 2 * h2 ? loop.minY - m.bounds.maxY : Infinity;
+          const beside = m.bounds.maxY >= loop.minY && m.bounds.minY <= loop.maxY ? m.bounds.minX - loop.maxX : Infinity;
+          gap = Math.min(above >= -LABEL_DIP * h2 ? above : Infinity, beside >= -0.2 * (m.bounds.maxX - m.bounds.minX) ? beside : Infinity);
+        } else {
+          const lo = Math.min(P.x, Q.x), hi = Math.max(P.x, Q.x);
+          const slack = 0.05 * (hi - lo);
+          if (m.centre.x < lo - slack || m.centre.x > hi + slack) continue;
+          const y = P.x === Q.x ? (P.y + Q.y) / 2 : P.y + (Q.y - P.y) * (m.centre.x - P.x) / (Q.x - P.x);
+          gap = y - m.bounds.maxY;
+          if (gap < -LABEL_DIP * h2) continue;
+        }
+        if (gap > reach) continue;
+        if (!best || gap < best.gap) best = { msg, gap };
+      }
+      if (best) {
+        (byMessage.get(best.msg) ?? byMessage.set(best.msg, []).get(best.msg)).push({ m, gap: best.gap });
+        continue;
+      }
+      const text = wordsOfMark2(m.node);
+      labels.push({ id: m.id, where: "alone", role: "annotation", ...text ? { text } : {}, bounds: { ...m.bounds }, confidence: MAX4 * 0.5, reason: "writing beside nothing in the diagram \u2014 a note" });
+    }
+    const readingOrder = (ms) => [...ms].sort((p, q) => {
+      const a = p.bounds, b = q.bounds;
+      const sameRow = !(a.maxY < b.minY || b.maxY < a.minY);
+      return sameRow ? a.minX - b.minX || (p.id < q.id ? -1 : 1) : a.minY - b.minY;
+    });
+    for (const [msg, ms] of byMessage) {
+      for (const { m, gap } of ms) {
+        const text = wordsOfMark2(m.node);
+        const reach = Math.max(magnetRadius(sizeOfBounds2(m.bounds), m.scale), LABEL_ABOVE * (m.bounds.maxY - m.bounds.minY));
+        labels.push({ id: m.id, of: msg.id, where: "beside", role: "label", ...text ? { text } : {}, bounds: { ...m.bounds }, confidence: MAX4 * (1 - 0.5 * (Math.max(0, gap) / reach)), reason: `writing ${Math.round(Math.max(0, gap))} above ${msg.kind === "self" ? "the loop" : "the message"} ${msg.id} \u2014 its label` });
+      }
+      msg.labels = readingOrder(ms.map((x) => x.m)).map((m) => m.id);
+    }
+    const symbols = participants.map((p, i) => {
+      const ms = readingOrder(names.get(i) ?? []);
+      for (const m of ms) {
+        const text = wordsOfMark2(m.node);
+        labels.push({ id: m.id, of: p.head.id, where: "inside", role: "label", ...text ? { text } : {}, bounds: { ...m.bounds }, confidence: MAX4 * 0.9, reason: p.head.kind === "actor" ? `writing under ${p.head.id}\u2019s figure \u2014 its name` : `writing in ${p.head.id}\u2019s box \u2014 its name` });
+      }
+      return participantSymbol(p, portOf(p), nodes, ms.map((m) => m.id), ms.map((m) => wordsOfMark2(m.node)), ownWords3(nodes, p.head.strokes));
+    });
+    const roles = {};
+    const weight = {};
+    const give = (id, role, w2) => {
+      if (roles[id] || !marks.has(id)) return;
+      roles[id] = role;
+      weight[id] = w2;
+    };
+    const markOf = (id) => strokes.get(id)?.mark ?? id;
+    for (const s of symbols) for (const id of s.ids) give(markOf(id), "node", 1);
+    for (const m of messages) for (const id of m.ids) give(markOf(id), "edge", 1);
+    for (const l of labels) give(l.id, l.role, l.where === "alone" ? 0.5 : 1);
+    for (const f of frames) for (const id of f.strokes) give(markOf(id), "container", 0.5);
+    const unplaced2 = [];
+    for (const id of scope) {
+      if (roles[id]) continue;
+      give(id, "unclassified", 0);
+      unplaced2.push(id);
+    }
+    const sure = (xs) => mean3(xs) / MAX4;
+    const coverage = scope.reduce((a, id) => a + (weight[id] ?? 0), 0) / scope.length;
+    const joinedIds = new Set(messages.flatMap((m) => [m.from, m.to]));
+    const connected = symbols.filter((s) => joinedIds.has(s.id)).length / symbols.length;
+    const participantSure = sure(symbols.map((s) => s.confidence));
+    const messageSure = sure(messages.map((m) => m.confidence));
+    const headed = messages.filter((m) => m.directed).length / messages.length;
+    const confidence = MAX4 * Math.sqrt(coverage * connected) * Math.sqrt(participantSure * messageSure) * (0.6 + 0.4 * headed);
+    const counts = {};
+    for (const k of Object.keys(SEQUENCE_TABLE.symbols)) counts[k] = symbols.filter((s) => s.symbol === k).length;
+    for (const k of KINDS3) counts[k] = messages.filter((m) => m.kind === k).length;
+    counts.label = labels.filter((l) => l.where === "beside").length;
+    const T3 = SEQUENCE_TABLE;
+    const parts = [];
+    for (const k of ["actor", "participant"]) if (counts[k]) parts.push(`${count5(counts[k])} ${counts[k] === 1 ? T3.symbols[k].one : T3.symbols[k].many}`);
+    for (const k of KINDS3) if (counts[k]) parts.push(`${count5(counts[k])} ${counts[k] === 1 ? T3.connectors[k].one : T3.connectors[k].many}`);
+    const summary = parts.join(", ");
+    const reason = [
+      "every participant over its lifeline",
+      connected === 1 ? "every one joined" : `${count5(symbols.filter((s) => joinedIds.has(s.id)).length)} of ${count5(symbols.length)} joined`,
+      `${count5(messages.length)} message${messages.length === 1 ? "" : "s"} down the page${headed === 1 ? ", every one pointing" : ""}`,
+      counts.label ? `${count5(counts.label)} label${counts.label === 1 ? "" : "s"}` : "",
+      frames.size ? `${count5(frames.size)} box${frames.size === 1 ? "" : "es"} holding another \u2014 a frame, not a participant` : "",
+      unplaced2.length ? `${count5(unplaced2.length)} mark${unplaced2.length === 1 ? "" : "s"} it places nowhere` : ""
+    ].filter(Boolean).join(", ");
+    const order2 = new Map(scope.map((id, i) => [id, i]));
+    labels.sort((p, q) => (order2.get(p.id) ?? 0) - (order2.get(q.id) ?? 0));
+    return {
+      notation: "sequence",
+      name: T3.name,
+      confidence,
+      summary,
+      reason: `${summary} \u2014 ${reason}`,
+      symbols,
+      connectors: messages,
+      labels,
+      roles,
+      unplaced: unplaced2,
+      counts
+    };
+  }
+  function headOfBox(id, strokes, marks, box, scale, lead) {
+    const reach = magnetRadius(box.size, scale);
+    return {
+      kind: "participant",
+      id,
+      strokes,
+      marks,
+      outline: box.hull,
+      bounds: box.bounds,
+      foot: { x: (box.bounds.minX + box.bounds.maxX) / 2, y: box.bounds.maxY },
+      across: LIFELINE_MIDDLE * box.w,
+      below: Math.max(LIFELINE_BELOW * box.h, reach),
+      height: box.h,
+      scale,
+      score: box.score,
+      why: `${lead}${box.why}`,
+      box
+    };
+  }
+  function participantSymbol(p, port, nodes, nameIds, nameWords, own) {
+    const lifeline = p.line.pieces.flatMap((x) => x.strokes);
+    const parts = own ? [own] : [];
+    const unread = [];
+    nameIds.forEach((id, i) => {
+      const w2 = nameWords[i];
+      if (w2) parts.push(w2);
+      else {
+        unread.push(id);
+        if (parts[parts.length - 1] !== UNREAD_WRITING) parts.push(UNREAD_WRITING);
+      }
+    });
+    const text = parts.length && !(parts.length === 1 && parts[0] === UNREAD_WRITING && !own) ? parts.join(" ") : void 0;
+    void nodes;
+    const kind = p.head.kind;
+    const readings2 = [{ symbol: kind, role: SEQUENCE_TABLE.symbols[kind].role, confidence: MAX4 * p.sure, reason: p.why }];
+    return {
+      id: p.head.id,
+      ids: [...p.head.strokes, ...lifeline],
+      symbol: kind,
+      role: "node",
+      confidence: MAX4 * p.sure,
+      reason: p.why,
+      readings: readings2,
+      outline: p.head.outline.map((q) => ({ x: q.x, y: q.y })),
+      bounds: { ...p.head.bounds },
+      ports: [port],
+      labels: [...nameIds],
+      ...own ? { text: own } : {},
+      figure: [...p.head.strokes],
+      lifeline,
+      dashed: p.line.dashed,
+      top: { ...p.line.top },
+      bottom: { ...p.line.bottom },
+      name: { ...text !== void 0 ? { text } : {}, ids: [...nameIds], unread }
+    };
+  }
+  var SEQUENCE = {
+    id: "sequence",
+    name: SEQUENCE_TABLE.name,
+    describes: SEQUENCE_TABLE.describes,
+    symbols: Object.keys(SEQUENCE_TABLE.symbols).map((k) => ({ name: k, role: SEQUENCE_TABLE.symbols[k].role, describes: SEQUENCE_TABLE.symbols[k].describes, ports: SEQUENCE_TABLE.symbols[k].ports })),
+    connectors: KINDS3.map((k) => ({ name: k, role: SEQUENCE_TABLE.connectors[k].role, describes: SEQUENCE_TABLE.connectors[k].describes })),
+    read: (state, scopeIds) => readSequence(state, scopeIds),
+    ports: { notation: "sequence", portsOf: sequencePortsOf }
   };
 
   // src/notations/notation.ts
@@ -17419,6 +18659,7 @@ ${lines.join("\n")}
   }
   registerNotation(FLOWCHART);
   registerNotation(UML_CLASS);
+  registerNotation(SEQUENCE);
 
   // src/notations/layered.ts
   var LAYERED_PASSES = 4;
@@ -17466,22 +18707,22 @@ ${lines.join("\n")}
     for (let v = to; v !== -1; v = prev.get(v)) path.unshift(v);
     return path;
   }
-  var mean3 = (xs) => xs.reduce((a, x) => a + x, 0) / xs.length;
+  var mean4 = (xs) => xs.reduce((a, x) => a + x, 0) / xs.length;
   function layoutLayered(nodes, links, opts) {
-    const list4 = [];
+    const list5 = [];
     const index = /* @__PURE__ */ new Map();
     for (const v of nodes) {
       if (index.has(v.id)) continue;
-      index.set(v.id, list4.length);
-      list4.push(v);
+      index.set(v.id, list5.length);
+      list5.push(v);
     }
-    const n2 = list4.length;
+    const n2 = list5.length;
     const across2 = opts.direction === "LR" || opts.direction === "RL";
     const along = (v) => across2 ? v.w : v.h;
     const wide = (v) => across2 ? v.h : v.w;
-    const forward = list4.map(() => []);
-    const before = list4.map(() => []);
-    const neighbours = list4.map(() => []);
+    const forward = list5.map(() => []);
+    const before = list5.map(() => []);
+    const neighbours = list5.map(() => []);
     const pairs = [];
     const back = [];
     const loops = [];
@@ -17499,7 +18740,7 @@ ${lines.join("\n")}
       } else back.push({ index: k, cycle: null });
     });
     for (const f of forward) f.sort((x, y) => x - y);
-    const behind = list4.map(() => []);
+    const behind = list5.map(() => []);
     for (const [a, b] of pairs) if (a > b) behind[a].push(b);
     const ranksOf = (strict) => {
       const out = [];
@@ -17519,9 +18760,9 @@ ${lines.join("\n")}
     for (const b of back) {
       const l = links[b.index];
       const path = forwardPath(index.get(l.to), index.get(l.from), forward);
-      if (path) b.cycle = [...path, path[0]].map((i) => list4[i].id);
+      if (path) b.cycle = [...path, path[0]].map((i) => list5[i].id);
     }
-    const sep = (i, j) => (wide(list4[i]) + wide(list4[j])) / 2 + opts.nodeGap;
+    const sep = (i, j) => (wide(list5[i]) + wide(list5[j])) / 2 + opts.nodeGap;
     const c = new Array(n2).fill(0);
     for (const row of ranks) {
       const targets = row.map(() => 0);
@@ -17536,13 +18777,13 @@ ${lines.join("\n")}
         const row = ranks[r];
         const targets = row.map((i) => {
           const near = neighbours[i].filter((j) => down ? rank2[j] < r : rank2[j] > r);
-          return near.length ? mean3(near.map((j) => c[j])) : c[i];
+          return near.length ? mean4(near.map((j) => c[j])) : c[i];
         });
         const placed2 = keepApart(targets, row.map((i, k) => k ? sep(row[k - 1], i) : 0));
         row.forEach((i, k) => c[i] = placed2[k]);
       }
     }
-    const thick = ranks.map((row) => Math.max(0, ...row.map((i) => along(list4[i]))));
+    const thick = ranks.map((row) => Math.max(0, ...row.map((i) => along(list5[i]))));
     const base = [];
     thick.forEach((t, r) => base.push(r ? base[r - 1] + (thick[r - 1] + t) / 2 : t / 2));
     let sideways = 0, fixed = 0, spans = 0;
@@ -17554,15 +18795,15 @@ ${lines.join("\n")}
     const keep = opts.keepDirection ?? KEEP_DIRECTION;
     const unstretched = fixed + opts.rankGap * spans;
     let stretch = 1;
-    let kept = !pairs.length || unstretched > sideways;
+    let kept2 = !pairs.length || unstretched > sideways;
     if (keep > 0 && pairs.length && unstretched < keep * sideways) {
       if (spans > 0 && opts.rankGap > 0) {
         stretch = (keep * sideways - fixed) / (opts.rankGap * spans);
-        kept = true;
-      } else kept = unstretched > sideways;
+        kept2 = true;
+      } else kept2 = unstretched > sideways;
     }
     const m = base.map((b, r) => b + opts.rankGap * stretch * r);
-    const raw = list4.map((_, i) => {
+    const raw = list5.map((_, i) => {
       const a = m[rank2[i]], x = c[i];
       switch (opts.direction) {
         case "LR":
@@ -17576,7 +18817,7 @@ ${lines.join("\n")}
       }
     });
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    list4.forEach((v, i) => {
+    list5.forEach((v, i) => {
       minX = Math.min(minX, raw[i].x - v.w / 2);
       maxX = Math.max(maxX, raw[i].x + v.w / 2);
       minY = Math.min(minY, raw[i].y - v.h / 2);
@@ -17584,16 +18825,16 @@ ${lines.join("\n")}
     });
     if (!n2) minX = minY = maxX = maxY = 0;
     const at = /* @__PURE__ */ new Map();
-    list4.forEach((v, i) => at.set(v.id, { x: raw[i].x - minX, y: raw[i].y - minY }));
+    list5.forEach((v, i) => at.set(v.id, { x: raw[i].x - minX, y: raw[i].y - minY }));
     return {
       at,
-      rank: new Map(list4.map((v, i) => [v.id, rank2[i]])),
-      ranks: ranks.map((row) => row.map((i) => list4[i].id)),
+      rank: new Map(list5.map((v, i) => [v.id, rank2[i]])),
+      ranks: ranks.map((row) => row.map((i) => list5[i].id)),
       back,
       loops,
       unknown,
       stretch,
-      kept,
+      kept: kept2,
       bounds: { minX: 0, minY: 0, maxX: maxX - minX, maxY: maxY - minY }
     };
   }
@@ -17662,9 +18903,9 @@ ${lines.join("\n")}
     return reader.draw(session, read2, opts);
   }
   var COUNT2 = ["no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve"];
-  var count5 = (n2) => COUNT2[n2] ?? String(n2);
+  var count6 = (n2) => COUNT2[n2] ?? String(n2);
   var list2 = (xs) => xs.length <= 1 ? xs.join("") : `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`;
-  var some = (xs, max = 4) => xs.length > max ? `${xs.slice(0, max).join(", ")} and ${count5(xs.length - max)} more` : list2(xs);
+  var some = (xs, max = 4) => xs.length > max ? `${xs.slice(0, max).join(", ")} and ${count6(xs.length - max)} more` : list2(xs);
   var SHAPES = [
     ...Object.entries(FLOWCHART_TABLE.symbols).map(([symbol, d]) => ({ open: d.mermaid.open, close: d.mermaid.close, symbol })),
     { open: "(", close: ")", symbol: "process", otherwise: "a box with round edges" },
@@ -18005,7 +19246,7 @@ ${lines.join("\n")}
     const lines = text ? text.split("\n") : [];
     return { chars: Math.max(0, ...lines.map((l) => [...l].length)), lines: Math.max(1, lines.length) };
   }
-  function figureOf(symbol, text) {
+  function figureOf2(symbol, text) {
     const U = MERMAID_TEXT_PX;
     const { chars, lines } = wordsOf(text);
     const tw = chars * CHAR * U, th = lines * LINE * U;
@@ -18145,7 +19386,7 @@ ${lines.join("\n")}
     const lo = Math.max(0, Math.min(t(r), t(s))), hi = Math.min(L, Math.max(t(r), t(s)));
     return hi - lo > tol;
   }
-  function routeLink(a, b, others, dir, taken, margin, scale, reads) {
+  function routeLink(a, b, others, dir, taken, margin, scale, reads2) {
     const across2 = dir === "LR" || dir === "RL";
     const ahead = dir === "LR" ? "right" : dir === "RL" ? "left" : dir === "BT" ? "top" : "bottom";
     const behind = ahead === "right" ? "left" : ahead === "left" ? "right" : ahead === "bottom" ? "top" : "bottom";
@@ -18194,7 +19435,7 @@ ${lines.join("\n")}
     }
     lines.sort(byScore);
     const first = (cands) => {
-      for (const c of cands) if (c.route.clean && reads(c.route)) return c.route;
+      for (const c of cands) if (c.route.clean && reads2(c.route)) return c.route;
       return void 0;
     };
     const found = first(lines);
@@ -18239,7 +19480,7 @@ ${lines.join("\n")}
     };
     const chord = Math.hypot(Q.x - P.x, Q.y - P.y) / scale;
     const size = clamp(0.1 * chord, HEAD_MIN_PX, HEAD_MAX_PX);
-    const head = (at, pointing) => triangleHead(hand(at), pointing, size).map(toWorld);
+    const head = (at, pointing2) => triangleHead(hand(at), pointing2, size).map(toWorld);
     if (route2.kind === "arc") {
       const th = route2.sweep * Math.PI / 180;
       const n2 = clamp(Math.round(chord * th / (2 * Math.sin(th / 2)) / INK_STEP), 16, 300);
@@ -18305,27 +19546,27 @@ ${lines.join("\n")}
     let t = opts.at;
     const next = () => t++;
     const nodes = read2.nodes.slice(0, MERMAID_MAX_NODES);
-    const kept = new Set(nodes.map((n2) => n2.id));
+    const kept2 = new Set(nodes.map((n2) => n2.id));
     if (read2.nodes.length > nodes.length) {
-      const cut = read2.links.filter((l) => !kept.has(l.from) || !kept.has(l.to)).length;
+      const cut = read2.links.filter((l) => !kept2.has(l.from) || !kept2.has(l.to)).length;
       notes.push(`the text holds ${read2.nodes.length} nodes and the board draws ${MERMAID_MAX_NODES} at most: the first ${MERMAID_MAX_NODES} are drawn, and the ${read2.nodes.length - MERMAID_MAX_NODES} after them${cut ? ` and the ${cut} link${cut === 1 ? "" : "s"} that touch them are` : " are"} not`);
     }
-    const among = read2.links.filter((l) => kept.has(l.from) && kept.has(l.to));
+    const among = read2.links.filter((l) => kept2.has(l.from) && kept2.has(l.to));
     const links = among.slice(0, MERMAID_MAX_LINKS);
     if (among.length > links.length) notes.push(`the text holds ${among.length} links among the nodes drawn and the board draws ${MERMAID_MAX_LINKS} at most: the ${among.length - MERMAID_MAX_LINKS} after the first ${MERMAID_MAX_LINKS} are not drawn`);
     if (!nodes.length) {
       notes.push("nothing to draw: the text names no node");
       return { notation: read2.notation, direction: read2.direction, ids: {}, links: [], notes, refused, bounds: null, lastAt: t - 1 };
     }
-    const figures = new Map(nodes.map((n2) => [n2.id, figureOf(n2.symbol, n2.text)]));
+    const figures = new Map(nodes.map((n2) => [n2.id, figureOf2(n2.symbol, n2.text)]));
     const layout = layoutLayered(
       nodes.map((n2) => ({ id: n2.id, w: figures.get(n2.id).w * scale, h: figures.get(n2.id).h * scale })),
       links.map((l) => ({ from: l.from, to: l.to })),
       { direction: read2.direction, rankGap: RANK_GAP * U * scale, nodeGap: NODE_GAP * U * scale }
     );
     const origin = opts.origin ?? besideContent(session, CORE_MIN * U * scale);
-    const centreOf5 = (id) => add3(origin, layout.at.get(id));
-    const world = (id, p) => add3(centreOf5(id), { x: p.x * scale, y: p.y * scale });
+    const centreOf6 = (id) => add3(origin, layout.at.get(id));
+    const world = (id, p) => add3(centreOf6(id), { x: p.x * scale, y: p.y * scale });
     const made = /* @__PURE__ */ new Map();
     const first = (n2) => n2.symbol === "process" || n2.symbol === "decision" || n2.symbol === "data" ? 0 : 1;
     for (const n2 of [...nodes].sort((p, q) => first(p) - first(q))) {
@@ -18369,7 +19610,7 @@ ${lines.join("\n")}
       const xs = hull2.map((p) => p.x), ys = hull2.map((p) => p.y);
       for (const p of PORTS) ends.set(`${n2.id}:${p}`, endAt(n2.id, p));
       const ports = Object.fromEntries(PORTS.map((p) => [p, ends.get(`${n2.id}:${p}`).point]));
-      standing.set(n2.id, { id: n2.id, rank: layout.rank.get(n2.id), ink, centre: centreOf5(n2.id), hull: hull2, box: { minX: Math.min(...xs), maxX: Math.max(...xs), minY: Math.min(...ys), maxY: Math.max(...ys) }, ports });
+      standing.set(n2.id, { id: n2.id, rank: layout.rank.get(n2.id), ink, centre: centreOf6(n2.id), hull: hull2, box: { minX: Math.min(...xs), maxX: Math.max(...xs), minY: Math.min(...ys), maxY: Math.max(...ys) }, ports });
     }
     const drawnLinks = [];
     const crossing = [];
@@ -18416,7 +19657,7 @@ ${lines.join("\n")}
       const others = [...standing.values()].filter((o) => o.id !== a.id && o.id !== b2.id);
       const drawn = drawnOf(l);
       let budget = VERIFIED;
-      const reads = (r) => {
+      const reads2 = (r) => {
         const c = placedOf(l, r);
         const involved = placed2.filter((d) => c.ends.some((e) => d.marks.some((m) => mayRead(e, m))) || d.ends.some((e) => c.marks.some((m) => mayRead(e, m))));
         const nearSymbols = others.filter((o) => c.ends.some((e) => mayRead(e, symbolWeight.get(o.id))));
@@ -18429,7 +19670,7 @@ ${lines.join("\n")}
         const conns = [...involved, c].map((d) => ({ ink: d.ink, route: d.route, drawn: d.drawn, at: { start: true, end: true } }));
         return readsAsDrawn([...symbols.values()].map((o) => o.ink), conns, scale);
       };
-      const route2 = routeLink(a, b2, others, read2.direction, taken, 0.5 * U * scale, scale, reads);
+      const route2 = routeLink(a, b2, others, read2.direction, taken, 0.5 * U * scale, scale, reads2);
       if (route2.misread) notes.push(`no way between ${l.from} and ${l.to} reads as drawn beside the links already there: read back, the link ${l.from} \u2192 ${l.to} or one beside it may say otherwise`);
       routes.set(l, route2);
       placed2.push(placedOf(l, route2));
@@ -18506,9 +19747,9 @@ ${lines.join("\n")}
   // src/notations/uml-class-mermaid.ts
   var T = UML_CLASS_TABLE;
   var COUNT3 = ["no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve"];
-  var count6 = (n2) => COUNT3[n2] ?? String(n2);
+  var count7 = (n2) => COUNT3[n2] ?? String(n2);
   var list3 = (xs) => xs.length <= 1 ? xs.join("") : `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`;
-  var some2 = (xs, max = 4) => xs.length > max ? `${xs.slice(0, max).join(", ")} and ${count6(xs.length - max)} more` : list3(xs);
+  var some2 = (xs, max = 4) => xs.length > max ? `${xs.slice(0, max).join(", ")} and ${count7(xs.length - max)} more` : list3(xs);
   var centre2 = (b) => ({ x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2 });
   var ENTITY2 = {
     "#": "#35;",
@@ -18550,8 +19791,8 @@ ${lines.join("\n")}
     }
     return across2 > down ? { value: "LR", reason: `the relations run across \u2014 between the classes they join, ${Math.round(across2)} across against ${Math.round(down)} down; ${n2 - downward} of ${n2} more across than down` } : { value: "TD", reason: `the relations run down \u2014 between the classes they join, ${Math.round(down)} down against ${Math.round(across2)} across; ${downward} of ${n2} more down than across` };
   }
-  function writeUmlClass(reading3, opts = {}) {
-    const r = reading3;
+  function writeUmlClass(reading4, opts = {}) {
+    const r = reading4;
     const classes = r.symbols.filter((s) => s.symbol === "class");
     const idOf = mermaidIds(classes.map((s) => s.id));
     const byId = new Map(classes.map((s) => [s.id, s]));
@@ -18648,20 +19889,20 @@ ${lines.join("\n")}
     const pieces = [...unreadIds].length;
     if (unread.length) {
       const where = [...new Set(unread.map((u) => u.where))];
-      notes.push(`${pieces === 1 ? "one piece of writing has" : `${count6(pieces)} pieces of writing have`} not been read, so ${pieces === 1 ? "its words are" : "their words are"} not known \u2014 written "${UNREAD_WRITING}" (in a member, with its parentheses as entities: its words do not say it is a method, so Mermaid shows it among the attributes): ${some2(where)}`);
+      notes.push(`${pieces === 1 ? "one piece of writing has" : `${count7(pieces)} pieces of writing have`} not been read, so ${pieces === 1 ? "its words are" : "their words are"} not known \u2014 written "${UNREAD_WRITING}" (in a member, with its parentheses as entities: its words do not say it is a method, so Mermaid shows it among the attributes): ${some2(where)}`);
     }
-    if (blank.length) notes.push(`${blank.length === 1 ? "one class has" : `${count6(blank.length)} classes have`} no writing in ${blank.length === 1 ? "its" : "their"} top compartment and ${blank.length === 1 ? "is" : "are"} written with a blank name: ${list3(blank)}`);
-    if (misplaced.length) notes.push(`${misplaced.length === 1 ? "a member stands" : `${count6(misplaced.length)} members stand`} in the other compartment from what ${misplaced.length === 1 ? "its words say it is" : "their words say they are"}, and Mermaid puts ${misplaced.length === 1 ? "it" : "them"} where the words do: ${some2(misplaced)}`);
+    if (blank.length) notes.push(`${blank.length === 1 ? "one class has" : `${count7(blank.length)} classes have`} no writing in ${blank.length === 1 ? "its" : "their"} top compartment and ${blank.length === 1 ? "is" : "are"} written with a blank name: ${list3(blank)}`);
+    if (misplaced.length) notes.push(`${misplaced.length === 1 ? "a member stands" : `${count7(misplaced.length)} members stand`} in the other compartment from what ${misplaced.length === 1 ? "its words say it is" : "their words say they are"}, and Mermaid puts ${misplaced.length === 1 ? "it" : "them"} where the words do: ${some2(misplaced)}`);
     const lower = relations.filter((c) => c.readings.length > 1 && c.readings[1].confidence > 0.6 * c.confidence);
-    if (lower.length) notes.push(`${lower.length === 1 ? "a relation\u2019s head reads" : `${count6(lower.length)} relations\u2019 heads read`} more than one way, and ${lower.length === 1 ? "it is" : "they are"} written as the likelier: ${some2(lower.map((c) => `${idOf.get(c.from)} \u2014 ${idOf.get(c.to)} as ${c.kind}, or ${c.readings[1].kind}`))}`);
+    if (lower.length) notes.push(`${lower.length === 1 ? "a relation\u2019s head reads" : `${count7(lower.length)} relations\u2019 heads read`} more than one way, and ${lower.length === 1 ? "it is" : "they are"} written as the likelier: ${some2(lower.map((c) => `${idOf.get(c.from)} \u2014 ${idOf.get(c.to)} as ${c.kind}, or ${c.readings[1].kind}`))}`);
     const saidIds = /* @__PURE__ */ new Set([...classes.flatMap((s) => [s.id, ...s.ids, ...s.labels]), ...relations.flatMap((c) => [...c.ids, ...c.labels])]);
     const alone = r.labels.filter((l) => !saidIds.has(l.id)).map((l) => l.id).sort(naturalCompare);
     if (alone.length) notes.push(`writing that belongs to no class or relation is left out: ${list3(alone)}`);
     const left = Object.keys(r.roles).filter((id) => !saidIds.has(id) && !alone.includes(id)).sort(naturalCompare);
-    if (left.length) notes.push(`${left.length === 1 ? "one mark" : `${count6(left.length)} marks`} the diagram has no place for ${left.length === 1 ? "is" : "are"} left out: ${some2(left.map((id) => `${id} (${r.roles[id]})`), 8)}`);
+    if (left.length) notes.push(`${left.length === 1 ? "one mark" : `${count7(left.length)} marks`} the diagram has no place for ${left.length === 1 ? "is" : "are"} left out: ${some2(left.map((id) => `${id} (${r.roles[id]})`), 8)}`);
     return {
       text: lines.join("\n") + "\n",
-      notation: reading3.notation,
+      notation: reading4.notation,
       diagram: T.mermaid.header,
       direction,
       ids,
@@ -18920,7 +20161,7 @@ ${lines.join("\n")}
   var INK_STEP2 = 3;
   var ARROW_PROPORTION_PX2 = 800;
   var DASH = 0.9;
-  var DASH_OFF = 0.6;
+  var DASH_OFF2 = 0.6;
   var clamp2 = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
   var add4 = (a, b) => ({ x: a.x + b.x, y: a.y + b.y });
   var scaled = (a, k) => ({ x: a.x * k, y: a.y * k });
@@ -18978,7 +20219,7 @@ ${lines.join("\n")}
     const [p, q] = sideEnds(b, side);
     return { x: (p.x + q.x) / 2, y: (p.y + q.y) / 2 };
   };
-  function distToPolyline(p, path) {
+  function distToPolyline2(p, path) {
     let best = Infinity;
     for (let i = 1; i < path.length; i++) {
       const a = path[i - 1], b = path[i];
@@ -19031,9 +20272,9 @@ ${lines.join("\n")}
     let t = opts.at;
     const next = () => t++;
     const nodes = r.nodes.slice(0, MERMAID_MAX_NODES);
-    const kept = new Set(nodes.map((n2) => n2.id));
+    const kept2 = new Set(nodes.map((n2) => n2.id));
     if (r.nodes.length > nodes.length) notes.push(`the text holds ${r.nodes.length} classes and the board draws ${MERMAID_MAX_NODES} at most: the first ${MERMAID_MAX_NODES} are drawn`);
-    const among = r.links.filter((l) => kept.has(l.left) && kept.has(l.right));
+    const among = r.links.filter((l) => kept2.has(l.left) && kept2.has(l.right));
     const links = among.slice(0, MERMAID_MAX_LINKS);
     if (among.length > links.length) notes.push(`the text holds ${among.length} relations among the classes drawn and the board draws ${MERMAID_MAX_LINKS} at most`);
     if (!nodes.length) {
@@ -19151,21 +20392,21 @@ ${lines.join("\n")}
       const a = standing.get(l.left), b = standing.get(l.right);
       for (const [k, s, other, which] of [[a, sa, b, 0], [b, sb, a, 1]]) {
         const key2 = `${k.id}:${s}`;
-        const list4 = onSide.get(key2) ?? [];
-        list4.push({ l, which, toward: sideMiddle(other.box, which === 0 ? sb : sa) });
-        onSide.set(key2, list4);
+        const list5 = onSide.get(key2) ?? [];
+        list5.push({ l, which, toward: sideMiddle(other.box, which === 0 ? sb : sa) });
+        onSide.set(key2, list5);
       }
     }
     const endPoint = /* @__PURE__ */ new Map();
-    for (const [key2, list4] of onSide) {
+    for (const [key2, list5] of onSide) {
       const [cls, side] = key2.split(/:(?=[a-z]+$)/);
       const [p, q] = sideEnds(standing.get(cls).box, side);
       const d = { x: q.x - p.x, y: q.y - p.y };
       const along = (x) => ((x.x - p.x) * d.x + (x.y - p.y) * d.y) / (d.x * d.x + d.y * d.y);
-      list4.sort((m, n2) => along(m.toward) - along(n2.toward) || m.l.index - n2.l.index);
-      list4.forEach((e, i) => {
-        const share = (i + 1) / (list4.length + 1);
-        endPoint.set(`${e.l.index}:${e.which}`, { point: { x: p.x + d.x * share, y: p.y + d.y * share }, share, side, count: list4.length });
+      list5.sort((m, n2) => along(m.toward) - along(n2.toward) || m.l.index - n2.l.index);
+      list5.forEach((e, i) => {
+        const share = (i + 1) / (list5.length + 1);
+        endPoint.set(`${e.l.index}:${e.which}`, { point: { x: p.x + d.x * share, y: p.y + d.y * share }, share, side, count: list5.length });
       });
     }
     const st = () => session.getState();
@@ -19219,14 +20460,14 @@ ${lines.join("\n")}
       const m = Math.max(2, Math.ceil(pts.length * 0.4));
       return [{ id: k.id, pts: pts.slice(0, m) }, { id: k.id, pts: pts.slice(-m) }];
     });
-    const offLines = (p, except) => Math.min(Infinity, ...leavingNear.filter((x) => x.pts.length && !x.pts.some((q) => q.x === except.x && q.y === except.y)).map((x) => distToPolyline(p, x.pts)));
+    const offLines = (p, except) => Math.min(Infinity, ...leavingNear.filter((x) => x.pts.length && !x.pts.some((q) => q.x === except.x && q.y === except.y)).map((x) => distToPolyline2(p, x.pts)));
     for (const d of dashes) {
       const u = unit3({ x: d.toward.x - d.at.x, y: d.toward.y - d.at.y });
       const o = outward2[d.side];
       const h2 = DASH * U;
       const place2 = (n2) => {
         const halfAlong = Math.abs(u.y) * (h2 / 2), halfAcross = Math.abs(n2.y) * (h2 / 2);
-        return add4(hand(d.at), add4(scaled(u, (d.marked ? len2 : 0) + 0.3 * U + halfAlong), scaled(n2, DASH_OFF * U + halfAcross)));
+        return add4(hand(d.at), add4(scaled(u, (d.marked ? len2 : 0) + 0.3 * U + halfAlong), scaled(n2, DASH_OFF2 * U + halfAcross)));
       };
       const perp = { x: -u.y, y: u.x };
       const options = [perp, { x: -perp.x, y: -perp.y }].map((n2) => ({ n: n2, c: place2(n2) })).filter((x) => (x.c.x - hand(d.at).x) * o.x + (x.c.y - hand(d.at).y) * o.y > 0.3 * U);
@@ -19257,7 +20498,7 @@ ${lines.join("\n")}
       const both = want.markers.left && want.markers.right;
       return !got || !both && got.kind !== kind || !([got.from, got.to].includes(ids[d.from]) && [got.from, got.to].includes(ids[d.to]));
     });
-    if (misread.length) notes.push(`read back, ${misread.length === 1 ? "a relation does" : `${count6(misread.length)} relations do`} not read as written: ${some2(misread.map((d) => `${d.from} ${d.written} ${d.to}`))}`);
+    if (misread.length) notes.push(`read back, ${misread.length === 1 ? "a relation does" : `${count7(misread.length)} relations do`} not read as written: ${some2(misread.map((d) => `${d.from} ${d.written} ${d.to}`))}`);
     if (crossing.length) notes.push(`no way around the classes between: ${some2(crossing)} ${crossing.length === 1 ? "crosses" : "cross"} a class on the way \u2014 read back, a class a line crosses may not read as one`);
     for (const b of layout.back) {
       if (!b.cycle) continue;
@@ -19284,6 +20525,482 @@ ${lines.join("\n")}
     draw: drawClassDiagramRead
   };
   for (const keyword of ["classDiagram", "classDiagram-v2"]) registerMermaidReader(keyword, CLASS_DIAGRAM_READER);
+
+  // src/notations/sequence-mermaid.ts
+  var T2 = SEQUENCE_TABLE;
+  var COUNT4 = ["no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve"];
+  var count8 = (n2) => COUNT4[n2] ?? String(n2);
+  var list4 = (xs) => xs.length <= 1 ? xs.join("") : `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`;
+  var some3 = (xs, max = 4) => xs.length > max ? `${xs.slice(0, max).join(", ")} and ${count8(xs.length - max)} more` : list4(xs);
+  var ENTITY3 = { "#": "#35;", ";": "#59;", '"': "#quot;", "%": "#37;", "`": "#96;", "<": "#lt;", ">": "#gt;", "&": "#amp;" };
+  var BLANK_WORDS = "#32;";
+  function sequenceText(text) {
+    const lines = String(text).replace(/\r\n?/g, "\n").split("\n").map((line) => [...line.replace(/\t/g, " ").replace(/[\u0000-\u0008\u000b-\u001f\u007f]/g, "")].map((ch) => ENTITY3[ch] ?? ch).join(""));
+    let body = lines.join("<br>");
+    const wrap2 = /^(no)?wrap:/i.exec(body);
+    if (wrap2) body = body.slice(0, wrap2[0].length - 1) + "#58;" + body.slice(wrap2[0].length);
+    body = body.replace(/^ /, "#32;").replace(/ $/, "#32;");
+    return body.length ? body : BLANK_WORDS;
+  }
+  var withoutPlaceholder2 = (text) => text.split(UNREAD_WRITING).join(" ").replace(/\s+/g, " ").trim();
+  function writeSequence(reading4, opts = {}) {
+    const r = reading4;
+    const ps = [...r.symbols].sort((a, b) => a.top.x - b.top.x || naturalCompare(a.id, b.id));
+    const idOf = mermaidIds(ps.map((p) => p.id));
+    const byId = new Map(ps.map((p) => [p.id, p]));
+    const messages = [...r.connectors].filter((m) => byId.has(m.from) && byId.has(m.to)).sort((a, b) => a.order - b.order || naturalCompare(a.id, b.id));
+    const labelOf3 = new Map(r.labels.map((l) => [l.id, l]));
+    const readWith = (id) => !!opts.readWith?.(id);
+    const unread = [];
+    const unreadIds = /* @__PURE__ */ new Set();
+    const said3 = (text, pieces2, where) => {
+      const missing = pieces2.filter((id) => !readWith(id));
+      if (pieces2.length && !missing.length) return withoutPlaceholder2(text ?? "") || null;
+      if (missing.length) {
+        unread.push({ where, ids: missing });
+        missing.forEach((id) => unreadIds.add(id));
+      }
+      return text ?? (pieces2.length ? UNREAD_WRITING : null);
+    };
+    const lines = [T2.mermaid.header];
+    const ids = {};
+    const marks = {};
+    const blank = [];
+    for (const p of ps) {
+      const m = idOf.get(p.id);
+      const name = said3(p.name.text, p.name.unread, `the name of ${m}`);
+      if (name === null) blank.push(m);
+      lines.push(`    ${T2.symbols[p.symbol].mermaid} ${m} as ${name === null ? BLANK_WORDS : sequenceText(name)}`);
+      ids[m] = p.id;
+      marks[m] = [...new Set(p.ids.length ? p.ids : [p.id])].sort(naturalCompare);
+    }
+    const links = [];
+    const quiet = [];
+    for (const msg of messages) {
+      const a = idOf.get(msg.from), b = idOf.get(msg.to);
+      const parts = msg.text?.trim() ? [msg.text.trim()] : [];
+      const missing = [];
+      for (const id of msg.labels) {
+        const t = labelOf3.get(id)?.text?.trim();
+        if (t) parts.push(t);
+        else if (readWith(id)) continue;
+        else {
+          missing.push(id);
+          if (parts[parts.length - 1] !== UNREAD_WRITING) parts.push(UNREAD_WRITING);
+        }
+      }
+      if (missing.length) {
+        unread.push({ where: `the label of ${a}${msg.arrow}${b}`, ids: missing });
+        missing.forEach((id) => unreadIds.add(id));
+      }
+      if (!parts.length) quiet.push(`${a}${msg.arrow}${b}`);
+      lines.push(`    ${a}${msg.arrow}${b}: ${parts.length ? sequenceText(parts.join(" ")) : BLANK_WORDS}`);
+      links.push({ index: links.length, id: msg.id, ids: [msg.id, ...[...new Set(msg.ids)].filter((x) => x !== msg.id).sort(naturalCompare)], from: a, to: b });
+    }
+    const notes = [];
+    const pieces = unreadIds.size;
+    if (unread.length) notes.push(`${pieces === 1 ? "one piece of writing has" : `${count8(pieces)} pieces of writing have`} not been read, so ${pieces === 1 ? "its words are" : "their words are"} not known \u2014 written "${UNREAD_WRITING}": ${some3([...new Set(unread.map((u) => u.where))])}`);
+    if (blank.length) notes.push(`${blank.length === 1 ? "one participant has" : `${count8(blank.length)} participants have`} no writing for a name and ${blank.length === 1 ? "is" : "are"} written with a blank one: ${list4(blank)}`);
+    if (quiet.length) notes.push(`${quiet.length === 1 ? "one message has" : `${count8(quiet.length)} messages have`} no writing above ${quiet.length === 1 ? "it and is" : "them and are"} written with blank words: ${some3(quiet)}`);
+    const saidIds = /* @__PURE__ */ new Set([...ps.flatMap((p) => [p.id, ...p.ids, ...p.labels]), ...messages.flatMap((m) => [...m.ids, ...m.labels])]);
+    const alone = r.labels.filter((l) => !saidIds.has(l.id)).map((l) => l.id).sort(naturalCompare);
+    if (alone.length) notes.push(`writing beside nothing in the diagram is left out: ${some3(alone, 6)}`);
+    const left = Object.keys(r.roles).filter((id) => !saidIds.has(id) && !alone.includes(id) && r.roles[id] !== "edge" && r.roles[id] !== "node").sort(naturalCompare);
+    if (left.length) notes.push(`${left.length === 1 ? "one mark" : `${count8(left.length)} marks`} the diagram has no place for ${left.length === 1 ? "is" : "are"} left out: ${some3(left.map((id) => `${id} (${r.roles[id]})`), 8)}`);
+    return {
+      text: lines.join("\n") + "\n",
+      notation: reading4.notation,
+      diagram: T2.mermaid.header,
+      ids,
+      marks,
+      links,
+      unread: [...unreadIds].sort(naturalCompare),
+      notes
+    };
+  }
+  registerMermaidWriter(T2.notation, writeSequence);
+  var ARROWS = [
+    { token: "<<-->>", dashed: true, head: "both", draws: "<<-->>" },
+    { token: "<<->>", dashed: false, head: "both", draws: "<<->>" },
+    { token: "-->>", dashed: true, head: "forward", draws: "-->>" },
+    { token: "->>", dashed: false, head: "forward", draws: "->>" },
+    { token: "--x", dashed: true, head: "forward", draws: "-->>", said: "a cross (--x) is drawn as an arrowhead" },
+    { token: "-x", dashed: false, head: "forward", draws: "->>", said: "a cross (-x) is drawn as an arrowhead" },
+    { token: "--)", dashed: true, head: "forward", draws: "-->>", said: "an open async head (--)) is drawn as an arrowhead" },
+    { token: "-)", dashed: false, head: "forward", draws: "->>", said: "an open async head (-)) is drawn as an arrowhead" },
+    { token: "-->", dashed: true, head: "none", draws: "-->" },
+    { token: "->", dashed: false, head: "none", draws: "->" }
+  ];
+  var ACTOR = /^[^\s+\-<>=:,;]+/u;
+  var NOT_DRAWN2 = [
+    [/^note\b/i, "a note is not drawn yet"],
+    [/^(activate|deactivate)\b/, "an activation bar is not drawn yet"],
+    [/^autonumber\b/, "numbering is not drawn: the messages are in order down the page"],
+    [/^title\b/, "a title is not drawn yet"],
+    [/^destroy\b/, "a participant\u2019s end is not drawn yet"],
+    [/^(links?|properties|details)\b/, "a participant\u2019s menu is not drawn"],
+    [/^(accTitle|accDescr)\b/, "an accessible title or description, not read yet"],
+    [/^(style|classDef|class)\b/, "styling: the board draws in its hand\u2019s own colour"]
+  ];
+  var FRAMES = /^(loop|alt|else|opt|par|and|critical|option|break|rect|box)\b/;
+  function readSequenceText(text) {
+    const all = String(text ?? "").replace(/\r\n?/g, "\n").split("\n");
+    const notes = /* @__PURE__ */ new Set();
+    const refused = [];
+    const nodes = [];
+    const links = [];
+    const byId = /* @__PURE__ */ new Map();
+    let keyword = "";
+    let header = null;
+    let depth2 = 0;
+    const node = (id, line, symbol, alias) => {
+      let n2 = byId.get(id);
+      if (!n2) {
+        n2 = { id, line, symbol: symbol ?? "participant", shape: "", text: id, declared: !!symbol };
+        byId.set(id, n2);
+        nodes.push(n2);
+      } else if (symbol && !n2.declared) {
+        n2.symbol = symbol;
+        n2.declared = true;
+      }
+      if (alias !== void 0) n2.text = alias;
+      return n2;
+    };
+    const decoded2 = (raw) => unescapeMermaid(raw.trim()).replace(/[ \t]+/g, " ").trim();
+    for (let i = 0; i < all.length; i++) {
+      const n2 = i + 1;
+      let t = all[i].trim();
+      if (!t) continue;
+      if (t.startsWith("%%{")) {
+        refused.push({ line: n2, text: t, reason: "a directive configures mermaid.js\u2019s own rendering \u2014 nothing on the board takes it" });
+        continue;
+      }
+      if (t.startsWith("%%")) continue;
+      if (header === null) {
+        if (t === "---") {
+          const close = all.findIndex((l, k) => k > i && l.trim() === "---");
+          const last = close >= 0 ? close : all.length - 1;
+          refused.push({ line: n2, text: "---", reason: `front matter (lines ${n2}\u2013${last + 1}) configures mermaid.js \u2014 nothing on the board takes it` });
+          i = last;
+          continue;
+        }
+        const m = /^(sequenceDiagram)\b\s*(.*)$/.exec(t);
+        header = n2;
+        keyword = m ? m[1] : /^[A-Za-z][\w-]*/.exec(t)?.[0] ?? "";
+        if (!m) refused.push({ line: n2, text: t, reason: "a sequence diagram opens with \u201CsequenceDiagram\u201D" });
+        else if (m[2]) refused.push({ line: n2, text: m[2], reason: "nothing is read after the header on its own line" });
+        continue;
+      }
+      if (t.endsWith(";") && !/#\w+;$/.test(t)) t = t.slice(0, -1).trim();
+      if (t === "end") {
+        if (depth2 > 0) depth2--;
+        else refused.push({ line: n2, text: t, reason: "\u201Cend\u201D with no frame open" });
+        continue;
+      }
+      if (FRAMES.test(t)) {
+        const word = FRAMES.exec(t)[1];
+        if (!["else", "and", "option"].includes(word)) depth2++;
+        refused.push({ line: n2, text: t, reason: word === "box" ? "a box around participants is not drawn \u2014 the participants inside it are" : `a frame (${word}) is not drawn yet \u2014 the messages inside it are` });
+        continue;
+      }
+      const not = NOT_DRAWN2.find(([re]) => re.test(t));
+      if (not) {
+        refused.push({ line: n2, text: t, reason: not[1] });
+        continue;
+      }
+      const decl = /^(create\s+)?(participant|actor)\s+(.+)$/.exec(t);
+      if (decl) {
+        if (decl[1]) notes.add("a participant created partway down is drawn at the top with the rest");
+        let rest = decl[3].trim();
+        if (/@\{/.test(rest)) {
+          refused.push({ line: n2, text: t, reason: "a participant\u2019s shape (@{ \u2026 }) is not read \u2014 it is drawn as a box" });
+          rest = rest.replace(/@\{.*$/, "").trim();
+        }
+        const as = /^(\S+)\s+as\s+(.*)$/.exec(rest);
+        const id = (as ? as[1] : rest).trim();
+        if (!id || /\s/.test(id)) {
+          refused.push({ line: n2, text: t, reason: "a participant\u2019s id is one word" });
+          continue;
+        }
+        node(id, n2, decl[2], as ? decoded2(as[2]) : void 0);
+        continue;
+      }
+      const a = ACTOR.exec(t);
+      if (a) {
+        let k = a[0].length;
+        while (k < t.length && /\s/.test(t[k])) k++;
+        const arrow = ARROWS.find((x) => t.startsWith(x.token, k));
+        if (arrow) {
+          k += arrow.token.length;
+          while (k < t.length && /\s/.test(t[k])) k++;
+          if (t[k] === "+" || t[k] === "-") {
+            notes.add("an activation (+ or \u2212 before a participant) is not drawn");
+            k++;
+          }
+          const rest = t.slice(k);
+          const b = ACTOR.exec(rest);
+          if (!b) {
+            refused.push({ line: n2, text: t, reason: "a message that leads nowhere" });
+            continue;
+          }
+          const after = rest.slice(b[0].length).trim();
+          if (after && !after.startsWith(":")) {
+            refused.push({ line: n2, text: t, reason: `\u201C${after.slice(0, 16)}\u201D follows the message` });
+            continue;
+          }
+          let words = after ? after.slice(1) : "";
+          words = words.replace(/^(no)?wrap:/i, "");
+          const label = decoded2(words);
+          const from = node(a[0], n2), to = node(b[0], n2);
+          if (arrow.said) notes.add(arrow.said);
+          links.push({
+            index: links.length,
+            line: n2,
+            from: from.id,
+            to: to.id,
+            head: arrow.head,
+            written: arrow.token,
+            ...label ? { label } : {},
+            dashed: arrow.dashed,
+            arrow: arrow.draws,
+            self: from.id === to.id
+          });
+          continue;
+        }
+      }
+      refused.push({ line: n2, text: t, reason: "a statement the sequence diagram\u2019s reader cannot parse" });
+    }
+    if (header === null) refused.push({ line: 1, text: "", reason: "nothing to read: a sequence diagram opens with \u201CsequenceDiagram\u201D" });
+    const said3 = [...notes];
+    const dashedSelf = links.filter((l) => l.self && l.dashed);
+    if (dashedSelf.length) said3.push(`the board reads a self-message\u2019s loop drawn solid: ${dashedSelf.length === 1 ? "a dashed self-message is" : "dashed self-messages are"} drawn solid and read back as ${dashedSelf.length === 1 ? "a call" : "calls"} \u2014 ${some3(dashedSelf.map((l) => `${l.from}${l.written}${l.to}`))}`);
+    return { keyword, notation: keyword ? T2.notation : null, direction: "TD", nodes, links, notes: said3, refused: refused.sort((x, y) => x.line - y.line) };
+  }
+  var CHAR3 = 0.6;
+  var BOX_MIN = 7;
+  var BOX_MAX = 20;
+  var BOX_H2 = 3;
+  var HEAD_D = 1.8;
+  var BODY = 2.2;
+  var LIMB = 1.2;
+  var NAME_ROOM = 1.8;
+  var COLUMN_GAP2 = 4;
+  var WORDS_ROOM = 3;
+  var FIRST_ROW = 3;
+  var ROW = 3.4;
+  var LOOP_H = 1.8;
+  var LOOP_W = 3.2;
+  var BARB = 0.9;
+  var HEAD2 = 1.2;
+  var DASH2 = 1;
+  var GAP = 0.6;
+  var TAIL = 2.5;
+  var INK_STEP3 = 3;
+  var ARROW_PROPORTION_PX3 = 800;
+  var clamp3 = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  var scaled2 = (a, k) => ({ x: a.x * k, y: a.y * k });
+  function inkAlong3(points, step2, closed = false) {
+    const ring2 = closed ? [...points, points[0]] : [...points];
+    const out = [{ ...ring2[0] }];
+    for (let i = 1; i < ring2.length; i++) {
+      const a = ring2[i - 1], b = ring2[i];
+      const n2 = Math.max(1, Math.round(Math.hypot(b.x - a.x, b.y - a.y) / step2));
+      for (let k = 1; k <= n2; k++) out.push({ x: a.x + (b.x - a.x) * k / n2, y: a.y + (b.y - a.y) * k / n2 });
+    }
+    return out;
+  }
+  function triangleAt2(apex, dir, len2, step2) {
+    const l = Math.hypot(dir.x, dir.y) || 1;
+    const u = { x: dir.x / l, y: dir.y / l };
+    const base = { x: apex.x - u.x * len2, y: apex.y - u.y * len2 };
+    const v = { x: -u.y * len2 * 0.55, y: u.x * len2 * 0.55 };
+    return inkAlong3([apex, { x: base.x + v.x, y: base.y + v.y }, { x: base.x - v.x, y: base.y - v.y }], step2, true);
+  }
+  function besideContent3(session, margin) {
+    const st = session.getState();
+    let minY = Infinity, maxX = -Infinity;
+    for (const id of st.contentIds) {
+      const n2 = st.nodes.get(id);
+      const b = n2 ? n2.reps.find((r) => r.modality === "fingerprint")?.data?.bounds : void 0;
+      if (!b || n2.reps.some((r) => r.modality === "erased")) continue;
+      maxX = Math.max(maxX, b.maxX);
+      minY = Math.min(minY, b.minY);
+    }
+    return Number.isFinite(maxX) ? { x: maxX + margin, y: minY } : { x: 0, y: 0 };
+  }
+  function drawSequenceRead(session, read2, opts) {
+    const r = read2;
+    const scale = opts.scale && opts.scale > 0 ? opts.scale : 1;
+    const pid = opts.participantId;
+    const U = MERMAID_TEXT_PX * scale;
+    const notes = [...r.notes];
+    const refused = [...r.refused];
+    let t = opts.at;
+    const next = () => t++;
+    const world = (p) => scaled2(p, scale);
+    const hand = (p) => scaled2(p, 1 / scale);
+    const nodes = r.nodes.slice(0, MERMAID_MAX_NODES);
+    const kept2 = new Set(nodes.map((x) => x.id));
+    if (r.nodes.length > nodes.length) notes.push(`the text holds ${r.nodes.length} participants and the board draws ${MERMAID_MAX_NODES} at most: the first ${MERMAID_MAX_NODES} are drawn`);
+    const among = r.links.filter((l) => kept2.has(l.from) && kept2.has(l.to));
+    const links = among.slice(0, MERMAID_MAX_LINKS);
+    if (among.length > links.length) notes.push(`the text holds ${among.length} messages among the participants drawn and the board draws ${MERMAID_MAX_LINKS} at most`);
+    if (!nodes.length) {
+      notes.push("nothing to draw: the text names no participant");
+      return { notation: r.notation, ids: {}, links: [], notes, refused, bounds: null, lastAt: t - 1 };
+    }
+    const words = (s) => Math.max(...s.split("\n").map((x) => [...x].length), 0);
+    const widths = nodes.map((x) => (x.symbol === "actor" ? Math.max(HEAD_D * 2, words(x.text) * CHAR3 + 1) : clamp3(words(x.text) * CHAR3 + 3, BOX_MIN, BOX_MAX)) * U);
+    const col = new Map(nodes.map((x, i) => [x.id, i]));
+    const gaps = nodes.slice(1).map((_, i) => Math.max(COLUMN_GAP2 * U + (widths[i] + widths[i + 1]) / 2, 0));
+    for (const l of links) {
+      const i = col.get(l.from), j = col.get(l.to);
+      const need = (words(l.label ?? "") * CHAR3 + WORDS_ROOM) * U + (l.self ? (LOOP_W + 1) * U : 0);
+      if (l.self) {
+        if (i < gaps.length) gaps[i] = Math.max(gaps[i], need + widths[i + 1] / 2);
+        continue;
+      }
+      const [lo, hi] = i < j ? [i, j] : [j, i];
+      const have = gaps.slice(lo, hi).reduce((a, g) => a + g, 0);
+      if (have < need) for (let k = lo; k < hi; k++) gaps[k] += (need - have) / (hi - lo);
+    }
+    const origin = opts.origin ?? besideContent3(session, BOX_MIN * U);
+    const xs = [];
+    nodes.forEach((_, i) => xs.push(i ? xs[i - 1] + gaps[i - 1] : origin.x + widths[0] / 2));
+    const ids = {};
+    const foot = [];
+    const drawnMarks = [];
+    const top = origin.y;
+    const actorH = (HEAD_D + BODY + LIMB) * U;
+    const headTop = nodes.some((x) => x.symbol === "actor") ? top : top;
+    for (const [i, x] of nodes.entries()) {
+      if (x.symbol === "actor") {
+        const cx2 = xs[i], d = HEAD_D * U;
+        const head = session.addStroke(strokeFor({ shape: "circle", x: hand({ x: cx2 - d / 2, y: headTop }).x, y: hand({ x: 0, y: headTop }).y, w: d / scale, h: d / scale }).map(world), next(), pid, scale, { content: true });
+        const neck = headTop + d, hip = neck + BODY * U;
+        const line = (a, b) => session.addStroke(strokeFor({ shape: "line", from: hand(a), to: hand(b) }).map(world), next(), pid, scale, { content: true });
+        const body = line({ x: cx2, y: neck }, { x: cx2, y: hip });
+        const arms = line({ x: cx2 - LIMB * U, y: neck + 0.6 * U }, { x: cx2 + LIMB * U, y: neck + 0.6 * U });
+        const legs = session.addStroke(inkAlong3([{ x: cx2 - LIMB * U * 0.8, y: hip + LIMB * U }, { x: cx2, y: hip }, { x: cx2 + LIMB * U * 0.8, y: hip + LIMB * U }], INK_STEP3 * scale), next(), pid, scale, { content: true });
+        drawnMarks.push(head, body, arms, legs);
+        ids[x.id] = head;
+        if (x.text.trim()) session.label({ nodeId: head, text: x.text, participantId: pid, at: next() });
+        foot.push(headTop + actorH + NAME_ROOM * U);
+      } else {
+        const w2 = widths[i], h2 = BOX_H2 * U;
+        const box = session.addStroke(strokeFor({ shape: "rectangle", x: (xs[i] - w2 / 2) / scale, y: top / scale, w: w2 / scale, h: h2 / scale }).map(world), next(), pid, scale, { content: true });
+        drawnMarks.push(box);
+        ids[x.id] = box;
+        if (x.text.trim()) session.label({ nodeId: box, text: x.text, participantId: pid, at: next() });
+        foot.push(top + h2);
+      }
+    }
+    const lowest = Math.max(...foot);
+    let y = lowest + FIRST_ROW * U;
+    const rows = links.map((l) => {
+      const at = y;
+      y += l.self ? ROW * U + LOOP_H * U : ROW * U;
+      return at;
+    });
+    const tallest = Math.max(...nodes.map((x) => x.symbol === "actor" ? actorH : BOX_H2 * U));
+    const bottom2 = Math.max(y - ROW * U + TAIL * U + (links.length ? 0 : ROW * U), lowest + 2.5 * tallest);
+    const lifelines = nodes.map((x, i) => {
+      const from = { x: xs[i], y: foot[i] + (x.symbol === "actor" ? 0.3 * U : 0) };
+      const id = session.addStroke(strokeFor({ shape: "line", from: hand(from), to: hand({ x: xs[i], y: bottom2 }) }).map(world), next(), pid, scale, { content: true });
+      drawnMarks.push(id);
+      return { id, top: from, bottom: { x: xs[i], y: bottom2 } };
+    });
+    const along = (i, yy) => {
+      const l = lifelines[i];
+      const share = (yy - l.top.y) / Math.max(1e-9, l.bottom.y - l.top.y);
+      return { nodeId: l.id, site: { kind: `along:${T2.notation}`, index: alongIndex(0, share) }, of: "notation", port: "lifeline", point: { x: l.top.x, y: yy } };
+    };
+    const drawn = [];
+    const placeholder = [];
+    for (const [k, l] of links.entries()) {
+      const i = col.get(l.from), j = col.get(l.to);
+      const yy = rows[k];
+      const ends = { start: along(i, yy), end: along(j, l.self ? yy + LOOP_H * U : yy) };
+      const own = [];
+      let bound = false;
+      if (l.self) {
+        const side = i === nodes.length - 1 && nodes.length > 1 ? -1 : 1;
+        const x = xs[i], w2 = LOOP_W * U * side, h2 = LOOP_H * U;
+        const tip = { x, y: yy + h2 };
+        const b = BARB * U;
+        const wing = (s) => ({ x: x + side * b * Math.cos(Math.PI / 6), y: tip.y + s * b * Math.sin(Math.PI / 6) });
+        const path = l.head === "none" ? [{ x, y: yy }, { x: x + w2, y: yy }, { x: x + w2, y: yy + h2 }, tip] : [{ x, y: yy }, { x: x + w2, y: yy }, { x: x + w2, y: yy + h2 }, tip, wing(-1), tip, wing(1)];
+        const id = session.addStroke(inkAlong3(path, INK_STEP3 * scale), next(), pid, scale, { content: true });
+        own.push(id);
+        session.bind({ strokeId: id, nodeId: ends.start.nodeId, site: ends.start.site, end: "start", at: next(), participantId: pid });
+        session.bind({ strokeId: id, nodeId: ends.end.nodeId, site: ends.end.site, end: "end", at: next(), participantId: pid });
+        bound = true;
+      } else if (!l.dashed) {
+        const P = ends.start.point, Q = ends.end.point;
+        const len2 = Math.abs(Q.x - P.x) / scale;
+        const kk = Math.max(1, len2 / ARROW_PROPORTION_PX3);
+        const small = (p) => scaled2(p, 1 / (scale * kk));
+        const shaft = l.head === "none" ? strokeFor({ shape: "line", from: hand(P), to: hand(Q) }) : strokeFor({ shape: "arrow", from: small(P), to: small(Q) }).map((p) => scaled2(p, kk));
+        const id = session.addStroke(shaft.map(world), next(), pid, scale, { content: true });
+        own.push(id);
+        session.bind({ strokeId: id, nodeId: ends.start.nodeId, site: ends.start.site, end: "start", at: next(), participantId: pid });
+        session.bind({ strokeId: id, nodeId: ends.end.nodeId, site: ends.end.site, end: "end", at: next(), participantId: pid });
+        bound = true;
+        if (l.head === "both") {
+          const dir = { x: P.x - Q.x, y: 0 };
+          const tri = session.addStroke(triangleAt2(P, dir, HEAD2 * U, INK_STEP3 * scale / 1.5), next(), pid, scale, { content: true });
+          own.push(tri);
+        }
+      } else {
+        const P = ends.start.point, Q = ends.end.point;
+        const dir = Math.sign(Q.x - P.x) || 1;
+        const startGap = l.head === "both" ? HEAD2 * U : 0;
+        const endGap = l.head === "none" ? 0 : HEAD2 * U;
+        const x0 = P.x + dir * startGap, x1 = Q.x - dir * endGap;
+        const span = Math.abs(x1 - x0);
+        const n2 = Math.max(3, Math.round((span + GAP * U) / ((DASH2 + GAP) * U)));
+        const unit4 = (span + GAP * U) / n2;
+        const dash = unit4 - GAP * U;
+        for (let d = 0; d < n2; d++) {
+          const a = x0 + dir * d * unit4, b = a + dir * dash;
+          own.push(session.addStroke(strokeFor({ shape: "line", from: hand({ x: a, y: yy }), to: hand({ x: b, y: yy }) }).map(world), next(), pid, scale, { content: true }));
+        }
+        if (l.head !== "none") own.push(session.addStroke(triangleAt2(Q, { x: dir, y: 0 }, HEAD2 * U, INK_STEP3 * scale / 1.5), next(), pid, scale, { content: true }));
+        if (l.head === "both") own.push(session.addStroke(triangleAt2(P, { x: -dir, y: 0 }, HEAD2 * U, INK_STEP3 * scale / 1.5), next(), pid, scale, { content: true }));
+      }
+      const label = l.label?.trim();
+      if (label) session.label({ nodeId: own[0], text: label, participantId: pid, at: next() });
+      if (label === UNREAD_WRITING) placeholder.push(`${l.from}${l.written}${l.to}`);
+      drawnMarks.push(...own);
+      drawn.push({ index: l.index, from: l.from, to: l.to, id: own[0], ids: own, written: l.self && l.dashed ? l.head === "none" ? "->" : "->>" : l.arrow, route: l.self ? "loop" : "straight", ...label ? { label } : {}, start: ends.start, end: ends.end, bound });
+    }
+    for (const x of nodes) if (x.text === UNREAD_WRITING) placeholder.push(x.id);
+    const back = readSequence(session.getState(), drawnMarks);
+    const lost = nodes.filter((x) => !back?.symbols.some((p) => p.id === ids[x.id] && p.symbol === x.symbol)).map((x) => x.id);
+    if (lost.length) notes.push(`read back, ${some3(lost)} ${lost.length === 1 ? "does" : "do"} not read as ${lost.length === 1 ? "a participant" : "participants"} as written`);
+    const misread = drawn.filter((d, k) => {
+      const got = back?.connectors.find((c) => c.ids.includes(d.id));
+      return !got || got.order !== k + 1 || got.arrow !== d.written || got.from !== ids[d.from] || got.to !== ids[d.to];
+    });
+    if (misread.length) notes.push(`read back, ${misread.length === 1 ? "a message does" : `${count8(misread.length)} messages do`} not read as written: ${some3(misread.map((d) => `${d.from}${d.written}${d.to}`))}`);
+    if (placeholder.length) notes.push(`\u201C${UNREAD_WRITING}\u201D is what D2 writes for writing nobody has read: it is put on the ink as the words, since the words are not known \u2014 ${some3(placeholder)}`);
+    const minX = Math.min(...xs.map((x, i) => x - widths[i] / 2)), maxX = Math.max(...xs.map((x, i) => x + widths[i] / 2), ...drawn.filter((d) => d.route === "loop").map((d) => d.start.point.x + LOOP_W * U));
+    return {
+      notation: r.notation,
+      ids,
+      links: drawn.map((d) => ({ ...d, drawn: d.written.startsWith("<<") ? "<-->" : d.written.endsWith(">>") ? "-->" : "---" })),
+      notes,
+      refused,
+      bounds: { minX, minY: top, maxX, maxY: bottom2 },
+      lastAt: t - 1
+    };
+  }
+  var SEQUENCE_READER = {
+    notation: T2.notation,
+    read: readSequenceText,
+    draw: drawSequenceRead
+  };
+  registerMermaidReader("sequenceDiagram", SEQUENCE_READER);
 
   // src/parse/layout.ts
   var area2 = (r) => r.w * r.h;
@@ -19426,8 +21143,8 @@ ${lines.join("\n")}
       const share = depth2 > 0 ? "" : "";
       lines.push(`${pad}${label} ${size} \u2014 ${n2.reasoning}${share}`);
       if (n2.children.length && n2.flow !== "leaf") {
-        const pct5 = n2.fractions.map((f) => `${Math.round(f * 100)}%`).join(" / ");
-        if (pct5) lines.push(`${pad}  ${n2.flow} split ${pct5}, gap ${n2.gap}px`);
+        const pct6 = n2.fractions.map((f) => `${Math.round(f * 100)}%`).join(" / ");
+        if (pct6) lines.push(`${pad}  ${n2.flow} split ${pct6}, gap ${n2.gap}px`);
       }
       n2.children.forEach((c) => walk(c, depth2 + 1));
     };
@@ -19872,8 +21589,8 @@ ${pad}</${tag}>`;
     if (!frame) return { error: "artifact has no frame" };
     const regions = regionsOf(artifact, state.nodes);
     if (regions.length === 0) return { error: "nothing was drawn inside the artifact" };
-    const reading3 = session.read(regions.map((r) => r.nodeId));
-    const genre = reading3.genre.genre;
+    const reading4 = session.read(regions.map((r) => r.nodeId));
+    const genre = reading4.genre.genre;
     if (genre === "graph" || genre === "mixed") {
       const strokes = {};
       const arrows = {};
@@ -19885,11 +21602,11 @@ ${pad}</${tag}>`;
         const a = getRep(n2, "reading:arrow")?.data;
         if (a) arrows[r.nodeId] = a;
       }
-      const graph = parseGraph(regions, frame, reading3.roles, { strokes, arrows });
-      return { genre, regions, reading: reading3, ids: nodeIdsIn(graph), describe: describeGraph(graph), build: (c, t) => buildGraphScaffold(graph, c, t) };
+      const graph = parseGraph(regions, frame, reading4.roles, { strokes, arrows });
+      return { genre, regions, reading: reading4, ids: nodeIdsIn(graph), describe: describeGraph(graph), build: (c, t) => buildGraphScaffold(graph, c, t) };
     }
     const layout = parseLayout(regions, frame, connectionsOf(artifact, state, regions));
-    return { genre, regions, reading: reading3, ids: regionIdsIn(layout), describe: describeLayout(layout), build: (c, t) => buildScaffold(layout, c, t) };
+    return { genre, regions, reading: reading4, ids: regionIdsIn(layout), describe: describeLayout(layout), build: (c, t) => buildScaffold(layout, c, t) };
   }
 
   // src/tier1/library.ts
@@ -20578,10 +22295,10 @@ if (mm.THREE && mm.scene) {
     name: "a graph in 3D",
     describe: () => "nodes joined by edges stand as spheres and bonds, turning in the frame, each sphere named for its mark",
     offers(scope) {
-      const { reading: reading3 } = scope;
-      if (!(reading3.genre.genre === "graph" || reading3.genre.genre === "mixed")) return [];
+      const { reading: reading4 } = scope;
+      if (!(reading4.genre.genre === "graph" || reading4.genre.genre === "mixed")) return [];
       if (scope.marks.length < 2 || artifactsIn(scope.state, scope.summon.enclosedIds).length) return [];
-      const nodes = reading3.roles.filter((r) => r.role === "node").length, edges = reading3.roles.filter((r) => r.role === "edge").length;
+      const nodes = reading4.roles.filter((r) => r.role === "node").length, edges = reading4.roles.filter((r) => r.role === "edge").length;
       if (nodes < 2 || edges < 1) return [];
       return [{
         key: "3d",
@@ -20620,7 +22337,7 @@ if (mm.THREE && mm.scene) {
   function frameTemplatesFor(s, ids) {
     const members = artifactsIn(s, ids);
     if (!members.length) return [];
-    const kindsOf = (list4) => list4.map((id) => {
+    const kindsOf = (list5) => list5.map((id) => {
       const n2 = s.nodes.get(id);
       const r = n2 && codeRepOf(n2);
       return r && r.data.kind || (n2 && blessedBehaviourOf(n2) ? "behaviour" : "ink");
@@ -20643,7 +22360,7 @@ if (mm.THREE && mm.scene) {
     }
     return out;
   }
-  var FRAMES = {
+  var FRAMES2 = {
     id: "frames",
     name: "wiring",
     describe: () => "artifacts wired into a frame by their ports \u2014 connections offered by type and ranked by name \u2014 and a frame built once, offered again",
@@ -21029,7 +22746,7 @@ if (mm.THREE && mm.scene) {
   };
 
   // src/tools/builtin.ts
-  var BUILTIN_TOOLS = [CORRECT, TEXT, NAME2, LABEL, TIDY, CONTROL, CLEAN, GRAPH3D, FRAMES, TEXT_EDIT, VERBS3, CLOCKS, READ, WHAT, DUPLICATE, KEEP, STRUCTURE];
+  var BUILTIN_TOOLS = [CORRECT, TEXT, NAME2, LABEL, TIDY, CONTROL, CLEAN, GRAPH3D, FRAMES2, TEXT_EDIT, VERBS3, CLOCKS, READ, WHAT, DUPLICATE, KEEP, STRUCTURE];
   registerTool(CORRECT);
   registerTool(TEXT);
   registerTool(NAME2);
@@ -21038,7 +22755,7 @@ if (mm.THREE && mm.scene) {
   registerTool(CONTROL);
   registerTool(CLEAN);
   registerTool(GRAPH3D);
-  registerTool(FRAMES);
+  registerTool(FRAMES2);
   registerTool(TEXT_EDIT);
   registerTool(VERBS3);
   registerTool(CLOCKS);
@@ -21361,15 +23078,15 @@ if (mm.THREE && mm.scene) {
     const leadAt = out.findIndex((x) => eligible(x));
     const heldAt = out.findIndex((x) => x.key === h2.key && eligible(x));
     if (leadAt < 0 || heldAt <= leadAt) return out;
-    const lead = out[leadAt], kept = out[heldAt];
-    if (isSpecific(lead) && !isSpecific(kept)) return out;
+    const lead = out[leadAt], kept2 = out[heldAt];
+    if (isSpecific(lead) && !isSpecific(kept2)) return out;
     const margin = opts.margin ?? STEADY_MARGIN;
-    if (lead.score > kept.score * (1 + margin)) return out;
+    if (lead.score > kept2.score * (1 + margin)) return out;
     out.splice(heldAt, 1);
-    out.splice(leadAt, 0, { ...kept, steady: true, because: [`it led here a moment ago, and nothing here beats it by ${Math.round(margin * 100)}%`, ...kept.because] });
+    out.splice(leadAt, 0, { ...kept2, steady: true, because: [`it led here a moment ago, and nothing here beats it by ${Math.round(margin * 100)}%`, ...kept2.because] });
     return out;
   }
-  function topOf(ranked2, eligible = () => true) {
+  function topOf2(ranked2, eligible = () => true) {
     return ranked2.find((x) => eligible(x));
   }
 
@@ -21421,9 +23138,9 @@ if (mm.THREE && mm.scene) {
     const board = createSession({ ...DEFAULT_SESSION_CONFIG, packs: (r) => packs.get(r) });
     return { drawings, board, ids: layOut(board, drawings.map((d) => d.strokes)), packs };
   }
-  var union = (bs) => getBounds(bs.flatMap((b) => [{ x: b.minX, y: b.minY }, { x: b.maxX, y: b.maxY }]));
+  var union2 = (bs) => getBounds(bs.flatMap((b) => [{ x: b.minX, y: b.minY }, { x: b.maxX, y: b.maxY }]));
   function layOut(s, drawings) {
-    const boxes = drawings.map((d) => d.length ? union(d.map((st) => getBounds(st))) : { minX: 0, minY: 0, maxX: 0, maxY: 0 });
+    const boxes = drawings.map((d) => d.length ? union2(d.map((st) => getBounds(st))) : { minX: 0, minY: 0, maxX: 0, maxY: 0 });
     const size = Math.max(1, ...boxes.map((b) => Math.max(b.maxX - b.minX, b.maxY - b.minY)));
     const cell = size * 3;
     const across2 = Math.max(1, Math.ceil(Math.sqrt(drawings.length)));
@@ -21544,10 +23261,10 @@ if (mm.THREE && mm.scene) {
       );
     }
     if (opts.includeInterpretations) {
-      const reads = interpretationsOf(node, state.nodes);
-      if (reads.length > 0) {
+      const reads2 = interpretationsOf(node, state.nodes);
+      if (reads2.length > 0) {
         lines.push("  read as:");
-        for (const r of reads) {
+        for (const r of reads2) {
           lines.push(
             `    - "${r.label}" ${r.weight.toFixed(2)} by ${r.sourceName}${r.blessed ? " [blessed]" : ""}${r.reasoning ? ` \u2014 ${r.reasoning}` : ""}`
           );
@@ -21594,12 +23311,12 @@ if (mm.THREE && mm.scene) {
     for (const id of nodeIds) {
       const node = state.nodes.get(id);
       if (!node) continue;
-      const reads = interpretationsOf(node, state.nodes);
-      const top = reads[0]?.label;
+      const reads2 = interpretationsOf(node, state.nodes);
+      const top = reads2[0]?.label;
       if (!top) continue;
       counts.set(top, (counts.get(top) ?? 0) + 1);
     }
-    return [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([label, count7]) => `${count7}\xD7${label}`).join(" + ");
+    return [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([label, count9]) => `${count9}\xD7${label}`).join(" + ");
   }
   function rect(r, round = true) {
     const v = (x) => round ? Math.round(x) : Number(x.toFixed(2));
@@ -21655,24 +23372,24 @@ if (mm.THREE && mm.scene) {
         return `${me}: unclassified \u2014 ${r.reasoning}`;
     }
   }
-  function describeReading(reading3, options = {}) {
+  function describeReading(reading4, options = {}) {
     const name = options.idOf ?? ((id) => id);
     const noun = options.noun ?? "region";
     const lines = [];
-    lines.push(`GENRE: ${reading3.genre.genre} \u2014 ${reading3.genre.reasoning}`);
-    const roleLines = reading3.roles.map((r) => roleLine(r, name, noun, reading3.scope?.transcripts?.[r.id])).filter((x) => !!x);
+    lines.push(`GENRE: ${reading4.genre.genre} \u2014 ${reading4.genre.reasoning}`);
+    const roleLines = reading4.roles.map((r) => roleLine(r, name, noun, reading4.scope?.transcripts?.[r.id])).filter((x) => !!x);
     if (roleLines.length) {
       lines.push("", `WHAT EACH ${noun.toUpperCase()} PLAYS:`);
       for (const l of roleLines) lines.push(`  ${l}`);
     }
     const seen = /* @__PURE__ */ new Set();
     const sits = [];
-    for (const c of reading3.concepts) {
+    for (const c of reading4.concepts) {
       const members = [...new Set(Object.values(c.roles ?? {}).flat())].map(name).filter((x) => !!x);
       const who = members.length ? members.join(", ") : "these marks";
       sits.push(`${who} read as a ${c.concept} (${c.confidence.toFixed(2)}) \u2014 ${c.reasoning}`);
     }
-    for (const r of reading3.relations) {
+    for (const r of reading4.relations) {
       if (!ENGAGING_RELATIONS.includes(r.kind)) continue;
       const a = name(r.from), b = name(r.to);
       if (!a || !b) continue;
@@ -21686,7 +23403,7 @@ if (mm.THREE && mm.scene) {
       lines.push("", "HOW THEY SIT:");
       for (const l of sits) lines.push(`  ${l}`);
     }
-    const names = Object.entries(reading3.scope?.names ?? {}).map(([id, w2]) => [name(id), w2]).filter((x) => !!x[0]);
+    const names = Object.entries(reading4.scope?.names ?? {}).map(([id, w2]) => [name(id), w2]).filter((x) => !!x[0]);
     if (names.length) {
       lines.push("", "NAMES the human gave:");
       for (const [id, w2] of names) lines.push(`  ${id}: "${w2}"`);
@@ -22194,11 +23911,11 @@ Question: ${q}` }
       if (regions.length === 0) return { ok: false, error: "nothing was drawn inside the artifact" };
       const planned = planFor(session, args.artifactId);
       if ("error" in planned) return { ok: false, error: planned.error };
-      const reading3 = planned.reading;
+      const reading4 = planned.reading;
       const regionIdOf = new Map(regions.map((r) => [r.nodeId, r.id]));
       const idOf = (id2) => regionIdOf.get(id2);
       const inside = [];
-      for (const r of reading3.roles) {
+      for (const r of reading4.roles) {
         if (r.role !== "container" || r.targets.length < 2) continue;
         const me = idOf(r.id);
         if (!me) continue;
@@ -22208,7 +23925,7 @@ Question: ${q}` }
           inside.push(`  within ${me}: ${who} read as a ${c.concept} (${c.confidence.toFixed(2)}) \u2014 ${c.reasoning}`);
         }
       }
-      const brief = describeReading(reading3, { idOf }) + (inside.length ? `
+      const brief = describeReading(reading4, { idOf }) + (inside.length ? `
 
 WITHIN CONTAINERS:
 ${inside.join("\n")}` : "");
@@ -22334,7 +24051,7 @@ ${brief}`, ids: planned.ids, build: planned.build };
       const pointed = (args.nodeIds ?? []).filter((n2) => state.nodes.has(n2));
       const all = state.contentIds.filter((n2) => !state.artifacts.includes(n2));
       const context = describeSession(state, { nodeIds: all.length ? all : void 0 });
-      const reading3 = all.length > 1 ? `
+      const reading4 = all.length > 1 ? `
 
 ${describeReading(session.read(all), { noun: "mark" })}` : "";
       const focus = pointed.length ? `
@@ -22350,7 +24067,7 @@ THE HUMAN POINTED AT: ${pointed.join(", ")}${(() => {
         config,
         [
           { role: "system", content: DRAW_PROMPT() },
-          { role: "user", content: `${context}${reading3}${focus}
+          { role: "user", content: `${context}${reading4}${focus}
 
 The human asks: ${prompt2}` }
         ],
@@ -22560,14 +24277,14 @@ The canvas already read: ${describeBehaviour({ terms: local.terms })}. Read the 
     };
   }
   function reasonOf(question, answer) {
-    const dist8 = ranked(answer).map((d) => `${d.of} ${p2(d.p)}`).join(" \xB7 ");
-    if (answer.kind === "noul") return `asked \u201C${question.ask}\u201D \u2014 ${dist8}`;
+    const dist10 = ranked(answer).map((d) => `${d.of} ${p2(d.p)}`).join(" \xB7 ");
+    if (answer.kind === "noul") return `asked \u201C${question.ask}\u201D \u2014 ${dist10}`;
     if (answer.kind === "score") {
       const levels = answer.levels.join(" < ");
-      return `asked \u201C${question.ask}\u201D (score over ${levels}) \u2014 ${dist8}; expectation ${answer.expectation.toFixed(2)}, confidence ${p2(answer.confidence)}`;
+      return `asked \u201C${question.ask}\u201D (score over ${levels}) \u2014 ${dist10}; expectation ${answer.expectation.toFixed(2)}, confidence ${p2(answer.confidence)}`;
     }
     const offered2 = question.candidates.map((c) => c.id).join(", ");
-    return `asked \u201C${question.ask}\u201D (choice among ${offered2}) \u2014 ${dist8}; confidence ${p2(answer.confidence)}`;
+    return `asked \u201C${question.ask}\u201D (choice among ${offered2}) \u2014 ${dist10}; confidence ${p2(answer.confidence)}`;
   }
   function levelOf2(answer) {
     const i = Math.max(0, Math.min(answer.levels.length - 1, Math.round(answer.expectation)));
@@ -22672,7 +24389,7 @@ The canvas already read: ${describeBehaviour({ terms: local.terms })}. Read the 
     const each = rest.length ? Math.max(0, 1 - p) / rest.length : 0;
     return outcomes.map((of) => ({ of, p: of === lead ? p : each }));
   }
-  var expectationOf = (levels, dist8) => dist8.reduce((n2, d) => n2 + levels.indexOf(d.of) * d.p, 0);
+  var expectationOf = (levels, dist10) => dist10.reduce((n2, d) => n2 + levels.indexOf(d.of) * d.p, 0);
   function createStubDecideTransport(book, options = {}) {
     const unscripted = options.unscripted ?? "flat";
     return async (questions) => {
@@ -22687,26 +24404,26 @@ The canvas already read: ${describeBehaviour({ terms: local.terms })}. Read the 
           continue;
         }
         if (q.kind === "score") {
-          const dist9 = "level" in entry ? spread(q.levels, entry.level, entry.p) : even(q.levels);
+          const dist11 = "level" in entry ? spread(q.levels, entry.level, entry.p) : even(q.levels);
           answers.push({
             kind: "score",
             questionId: q.id,
             levels: q.levels,
-            distribution: dist9,
-            expectation: expectationOf(q.levels, dist9),
+            distribution: dist11,
+            expectation: expectationOf(q.levels, dist11),
             confidence: "confidence" in entry && entry.confidence !== void 0 ? entry.confidence : "level" in entry ? entry.p : 0
           });
           continue;
         }
         const ids = q.candidates.map((c) => c.id);
-        const dist8 = "pick" in entry && ids.includes(entry.pick) ? spread(ids, entry.pick, entry.p) : even(ids);
-        const order2 = [...dist8].sort((a, b) => b.p - a.p);
+        const dist10 = "pick" in entry && ids.includes(entry.pick) ? spread(ids, entry.pick, entry.p) : even(ids);
+        const order2 = [...dist10].sort((a, b) => b.p - a.p);
         const lead = order2.length > 1 && order2[0].p - order2[1].p < FLAT_MARGIN ? null : order2[0]?.of ?? null;
         answers.push({
           kind: "choice",
           questionId: q.id,
           pick: lead,
-          distribution: dist8,
+          distribution: dist10,
           confidence: "confidence" in entry && entry.confidence !== void 0 ? entry.confidence : "pick" in entry ? entry.p : 0
         });
       }
