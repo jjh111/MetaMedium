@@ -3642,6 +3642,38 @@ window.__scenario = async function(){
     mm.session.load([]); mm.setView(1, 0, 0);
   }
 
+  // ---- 57. The status line in words (PLAN-USER-SURFACE U1b; audit rows 1, 2, 9) ----
+  {
+    const status57 = () => (document.getElementById('status').textContent || '').trim();
+    const standing57 = () => document.getElementById('status').dataset.standing || '';
+    const system57 = (text) => /\bloose\b|stroke:|participant:|\(\s*-?\d+,\s*-?\d+\s*\)|\bllm:/.test(text);
+    mm.session.load([]); mm.setView(1, 0, 0);
+    t.stroke(t.rect(200, 200, 160, 100)); t.stroke(t.circle(600, 250, 50)); t.stroke(t.rect(800, 200, 100, 80)); await wait(1800); // past the flash
+    const st57 = standing57();
+    step('57. the standing line counts in words — "3 marks", never "3 loose" — and names no id or coordinate', /\b3 marks\b/.test(st57) && !system57(st57), st57);
+    // A line drawn from the box's side to the circle's: tied, said in words.
+    const box57 = mm.session.getState().contentIds[0], circle57 = mm.session.getState().contentIds[1];
+    const siteOf57 = (id, kind, index) => MM.magnetSites(mm.session.getState().nodes.get(id), mm.session.getState().nodes).find((x) => x.kind === kind && x.index === index);
+    const from57 = siteOf57(box57, 'middle', 1) || siteOf57(box57, 'edge', 1), to57 = MM.magnetSites(mm.session.getState().nodes.get(circle57), mm.session.getState().nodes).find((x) => x.point.x < 600);
+    let bound57 = '';
+    if (from57 && to57) {
+      const a = mm.worldToScreen(from57.point.x + 2, from57.point.y), b = mm.worldToScreen(to57.point.x - 3, to57.point.y + 2);
+      t.stroke(t.line(a, b, 30)); await wait(40); bound57 = status57();
+    }
+    const tied57 = MM.bindingsOf(mm.session.getState().nodes.get(mm.session.getState().contentIds[3]), mm.session.getState().nodes).length;
+    step('57b. a line tied to what it touches is said in words — "the line is tied to the circle" — with no coordinates', tied57 >= 1 && /tied to the (circle|box)/.test(bound57) && !system57(bound57), { tied: tied57, said: bound57, sites: [!!from57, !!to57] });
+    // Work in flight, summarised: one model at three things is one phrase, and Esc is said; the detail is on the marks.
+    const ids57 = mm.session.getState().contentIds.slice(0, 3);
+    const hook57 = typeof mm.beginWork === 'function';
+    if (hook57) ids57.forEach((id, i) => mm.beginWork('e2e57:' + i, [id], 'e2e-stub · reading the group'));
+    await wait(60);
+    const work57 = status57();
+    if (hook57) ids57.forEach((id, i) => mm.endWork('e2e57:' + i));
+    step('57c. three calls of one model in flight are one phrase in the status line — "e2e-stub is working on 3 things · Esc stops it" — not a run-on of every task',
+      hook57 && /e2e-stub is working on 3 things/.test(work57) && /Esc stops it/.test(work57) && (work57.match(/reading the group/g) || []).length === 0, { hook: hook57, said: work57 });
+    mm.session.load([]); mm.setView(1, 0, 0);
+  }
+
   return R;
 };
 
