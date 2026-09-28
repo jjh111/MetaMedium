@@ -63,7 +63,7 @@ import type { Bounds, Point } from '../types';
 import type { SessionState } from '../session/session';
 import { createSession } from '../session/session';
 import type { MMNode } from '../session/nodes';
-import { boundsOf, fingerprintOf, getRep, isWord, labelOf, lettersOf, resemblances, strokePointsOf, transcriptOf } from '../session/nodes';
+import { boundsOf, fingerprintOf, getRep, isWord, labelOf, lettersOf, placed, resemblances, strokePointsOf, transcriptOf } from '../session/nodes';
 import type { NotationPort, NotationPorts } from '../session/ports';
 import { activeBindingsOf, magnetRadius } from '../session/magnets';
 import type { ConnectorEnd, ConnectorHeads, HeadReading } from '../diagram/heads';
@@ -165,6 +165,8 @@ export const INK_INSIDE = 0.6;
 export const WRITING_ZIGZAG = 4;
 /** A per-mark reading below this offers no ports: the pen should not feel a guess. */
 export const PORTS_FLOOR = 0.4;
+/** An arrow reading the rung holds below its top one carries its barb from this weight. */
+export const HELD_ARROW = 0.5;
 
 const MAX = MAX_TIER0_CONFIDENCE;
 const WORDS = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve'];
@@ -487,6 +489,24 @@ interface ReadEnd {
   point: Point;
   head?: HeadReading;
   reason: string;
+}
+
+/**
+ * The arrow's own barb the rung holds as a reading below its top one: a long
+ * message with a small head reads *line 0.83, arrow 0.60* (the barb is a sliver
+ * of the stroke), and heads.ts reads a barb only when the arrow leads. The
+ * reading is held all the same — plural, never silenced — so the end it names
+ * carries that barb, as sure as the rung is of it.
+ */
+function heldBarb(node: MMNode): { end: 'start' | 'end'; head: HeadReading } | null {
+  const meta = getRep(node, 'reading:arrow')?.data as { head?: string; tip?: Point; tail?: Point } | undefined;
+  const arrow = resemblances(node).find((e) => e.to === 'type:arrow');
+  if (!meta?.tip || !arrow || (arrow.weight ?? 0) < HELD_ARROW) return null;
+  const [tip] = placed(node, [meta.tip]);
+  const end = meta.head === 'start' ? 'start' : 'end';
+  const w = arrow.weight ?? 0;
+  const top = topOf(node);
+  return { end, head: { kind: 'arrow', filled: false, confidence: w, reason: `its own barb at its ${end}, held as the rung’s reading arrow ${w.toFixed(2)} below ${top ? `${top.type} ${top.weight.toFixed(2)}` : 'another'}`, ids: [node.id], tip: { x: tip.x, y: tip.y } } };
 }
 
 function readEnd(e: ConnectorEnd, landOn?: (id: string) => boolean): ReadEnd {
@@ -912,6 +932,9 @@ export function readSequence(state: SessionState, scopeIds?: readonly string[], 
     if (!h) continue;
     const onLifeline = (id: string) => lifelineStrokes.has(id);
     const [a, b] = [readEnd(h.start, onLifeline), readEnd(h.end, onLifeline)];
+    // The arrow's barb the rung holds below a line's reading, where heads.ts saw none.
+    const held = h.shape !== 'arrow' ? heldBarb(s.node) : null;
+    for (const x of [a, b]) if (held && held.end === x.end && !x.head) Object.assign(x, { head: held.head, point: { ...held.head.tip }, reason: held.head.reason });
     const bindings = activeBindingsOf(s.node, nodes);
     const bs = bindings.find((x) => x.end === 'start'), be = bindings.find((x) => x.end === 'end');
     const la = landing(a.point, reach, bs?.nodeId), lb = landing(b.point, reach, be?.nodeId);

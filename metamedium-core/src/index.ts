@@ -500,6 +500,7 @@ export {
   LABEL_ABOVE,
   LABEL_DIP,
   WRITING_ZIGZAG,
+  HELD_ARROW,
 } from './notations/sequence';
 export type { SequenceReading, SequenceParticipant, SequenceMessage, MessageKind } from './notations/sequence';
 export { stanceOf, cornersOf, tightBox } from './notations/shape';
