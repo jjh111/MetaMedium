@@ -1,0 +1,14 @@
+{
+  "seq": {
+    "readings": ["a sequence diagram 0.55 — five participants, six calls"],
+    "mermaid": "sequenceDiagram\n    participant stroke_claude_6c71_7 as Hand\n    participant stroke_claude_6c71_8 as Surface\n    participant stroke_claude_6c71_9 as Session\n    participant stroke_claude_6c71_10 as Readers\n    participant stroke_claude_6c71_11 as Field\n    stroke_claude_6c71_7->>stroke_claude_6c71_8: a stroke — pen, finger or mouse\n    stroke_claude_6c71_8->>stroke_claude_6c71_9: addStroke: one event in this hand’s log\n    stroke_claude_6c71_9->>stroke_claude_6c71_10: read it: shape, relations, roles\n    stroke_claude_6c71_9->>stroke_claude_6c71_11: offers from the tools, ranked by context\n    stroke_claude_6c71_7->>stroke_claude_6c71_11: take it\n    stroke_claude_6c71_11->>stroke_claude_6c71_9: one act: events stamped with the tool\n"
+  },
+  "flow": {
+    "readings": ["a flowchart 0.91 — three processes, one decision, one terminator, one start, six flows"],
+    "mermaid": "flowchart TD\n    stroke_claude_6c71_68((\"start\"))\n    stroke_claude_6c71_70[\"Draw a mark\"]\n    stroke_claude_6c71_78{\"Does the engine read it?\"}\n    stroke_claude_6c71_76[\"Name it, or teach it\"]\n    stroke_claude_6c71_73[\"Take an offer\"]\n    stroke_claude_6c71_79([\"an artifact\"])\n    stroke_claude_6c71_68 --> stroke_claude_6c71_70\n    stroke_claude_6c71_70 --> stroke_claude_6c71_78\n    stroke_claude_6c71_78 -->|\"no\"| stroke_claude_6c71_76\n    stroke_claude_6c71_78 -->|\"yes\"| stroke_claude_6c71_73\n    stroke_claude_6c71_76 -->|\"try again\"| stroke_claude_6c71_70\n    stroke_claude_6c71_73 --> stroke_claude_6c71_79\n"
+  },
+  "uml": {
+    "readings": ["a UML class diagram 0.91 — two classes, one inheritance", "a flowchart 0.51 — two processes, one flow"],
+    "mermaid": "classDiagram\n    class stroke_claude_6c71_89[\"Notation\"] {\n        id#59; roles\n        read(scope)#59; ports()\n    }\n    class stroke_claude_6c71_92[\"Flowchart\"] {\n        table\n        toMermaid()\n    }\n    stroke_claude_6c71_89 <|-- stroke_claude_6c71_92\n"
+  }
+}
