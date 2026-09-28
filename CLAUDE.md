@@ -41,7 +41,10 @@ made by whoever blessed it and a word by whoever wrote its letters, on every
 board (`applyBless`, `absorbIntoWord`; L2f, L2g); a hand's gestures are its
 own (`handOf`; L2h), and a person is the same person across sittings — a
 reload is a new hand, and the rules still ask the person "is this mine?"
-(`Session.isMine`; L2i, the phase's follow-up); one Enter is one act
+(`Session.isMine`; L2i, the phase's follow-up); undo takes back this
+hand's own last act — one event, or a tool's whole act — never another
+hand's, whatever the merge put last (`Session.lastAct`; L2j, R4d's
+finding); one Enter is one act
 (`09-palette.js`) and `fitAll` fits the content (`01-view.js`; L2d). CI runs what exists
 (`.github/workflows/ci.yml`) — the relay's test, the surface build's guard
 against a function declared in two fragments, and a WebKit smoke that takes
@@ -261,7 +264,7 @@ not the product. Each entry's rationale and what it feeds back lives in
 | `test-llm.html` | Standalone LLM harness |
 | `manim-explainer/` | ~50s explainer video. Source + stills tracked; renders and `media/` cache gitignored (regenerate from the scripts) |
 | `playground.html` | Personal sandbox on the personal-site design language |
-| `shard-3d/` | **Live · the plan's MVP line (P0–P6) + the compass + the review's four shard packages + push 2 (G0–G5)** — a bounded MetaMedium for making things in space: ink on a plane read by the shape rung in that plane's own units, a form rung, solids as **op trees in the log** (the tree is the source, the mesh is derived), the diff as the brief, definitions and placements. **Push 2 is geometry from the drawing** (`SHARD-3D-PUSH-2.md`): the board goes out and comes back as its own core-format log; every free stroke is a **silhouette claim**, so a footprint plus ⊓ drawn from wherever the hand stood stands a **hull** at tier 1, in the volume its claims define; the hull is cut into **parts** with ids and a sentence each; the brief a small model can answer is 1048 characters and its reply names parts by id and never writes geometry; and `shard-3d/mcp.mjs` is the shard's own MCP hand **and the model seat** — Claude Code answers the parked brief and the shard applies it as it would a model's (`.mcp.json`, `metamedium-3d`). **`shard-3d/README.md` is the single source** for how it works, what it does not do, what core would need, and the fixtures; don't restate it here. `npm install && npm run dev` in `shard-3d/` (vite on :5174); `?demo=castle` runs the whole loop on John's own drawing at boot and `?fixture=<name>` loads a board from `shard-3d/fixtures/`; `npm test` is vitest on the pure rungs (605 in 31 files on 27 Sep); the engine is imported from source, so there is no bundle to drift |
+| `shard-3d/` | **Live · the plan's MVP line (P0–P6) + the compass + the review's four shard packages + push 2 (G0–G5)** — a bounded MetaMedium for making things in space: ink on a plane read by the shape rung in that plane's own units, a form rung, solids as **op trees in the log** (the tree is the source, the mesh is derived), the diff as the brief, definitions and placements. **Push 2 is geometry from the drawing** (`SHARD-3D-PUSH-2.md`): the board goes out and comes back as its own core-format log; every free stroke is a **silhouette claim**, so a footprint plus ⊓ drawn from wherever the hand stood stands a **hull** at tier 1, in the volume its claims define; the hull is cut into **parts** with ids and a sentence each; the brief a small model can answer is 1048 characters and its reply names parts by id and never writes geometry; and `shard-3d/mcp.mjs` is the shard's own MCP hand **and the model seat** — Claude Code answers the parked brief and the shard applies it as it would a model's (`.mcp.json`, `metamedium-3d`). **`shard-3d/README.md` is the single source** for how it works, what it does not do, what core would need, and the fixtures; don't restate it here. `npm install && npm run dev` in `shard-3d/` (vite on :5174); `?demo=castle` runs the whole loop on John's own drawing at boot and `?fixture=<name>` loads a board from `shard-3d/fixtures/`; `npm test` is vitest on the pure rungs (606 in 31 files on 27 Sep); the engine is imported from source, so there is no bundle to drift |
 | `gliner-seat/` | **Parked with its answer, *not yet* (J2, 26 Sep 2026)** — can GLiNER2 be the middle layer's `extract` seat? It runs where MetaMedium runs: the one-graph ONNX export of `fastino/gliner2-multi-v1` (Apache-2.0) with a JS port of the library's processor, token-identical to the Python original; a line of a pattern page in 24 ms in a Chromium page on WebGPU, 55 ms in WebKit, 23 ms in a Node process. But it misses the names a seat would add (measurement names 7/11 at best, part names 6/9, operators 8/26), and a page pays 614 MB and ~2.2 GB of memory. `transport.mjs` is the seat's seam, shaped like `DecideTransport`, with a fake; `node --test gliner-seat/*.test.mjs` needs no model. `gliner-seat/README.md` has the numbers, the commands and what a later unit would need. Weights, venv and caches are never committed (`node fetch.mjs`). **Not in CI** |
 
 **Known duplication:** recognition logic still exists independently in
@@ -717,7 +720,10 @@ or flipped, where texts stand. **Taking** an offer goes through
 replay ignores both, and context (B2) reads them as what the hand just took
 where. An act only a host can do — ask a model, open the editor, flip a
 text, hold a clip — comes back named (`Taken.host`) and the surface
-performs it inside the same stamp. `Demos/surface/09-palette.js` is the
+performs it inside the same stamp. **What the outermost `withTool` writes is
+one act** (L2j): its events carry one `act` number and one undo takes them
+all back, the field the tool closed first excepted (*Live logs*, *Undo is
+per hand*). `Demos/surface/09-palette.js` is the
 adapter: `conversionsFor` reads the readings and maps `offersFor` to pills,
 `takeOffer` performs (`HOST_ACTS`, `TOOL_ACTS`); nothing in it builds an
 affordance by hand. The registry changes offers with no event in the log,
@@ -1347,8 +1353,9 @@ it says *Esc stops it*, and **Esc with nothing held stops every call in
 flight** (`cancelWork`; builds and programs carry a signal from
 `workSignal`). **A brief that fails leaves nothing behind** (v10 F10,
 `dropFailedBless`): the loop is blessed before the model is asked so the
-code has somewhere to live, and when the model fails and nothing has
-happened since, that bless is undone and the status says so. **Typed text at a loop is a brief unless it names a verb**: the reading
+code has somewhere to live, and when the model fails and this hand has done
+nothing since — the bless is still its last act (`session.lastAct`, L2j),
+whatever another hand drew — that bless is undone and the status says so. **Typed text at a loop is a brief unless it names a verb**: the reading
 line says which before Enter is pressed; "website about dolphins" goes to
 the model as the prompt. With no model joined, the reading line says so and
 Enter opens the pane.
@@ -1806,6 +1813,40 @@ already held by its authorship is held once, and lines leave in the order
 they were written (an asynchronous transport's POST is waited for before
 the next).
 
+**Undo is per hand** (V1-PLAN L2j; `undo` / `lastAct` in `session.ts`,
+`session/undo-hands.test.ts`). The board is every log merged by time, so its
+last event is whoever acted last by the clocks, and undo used to drop it —
+another hand's as readily as this one's, nothing sent (this hand's log had
+not changed), the mark back at the next line. **Undo takes back this hand's
+own last act**, wherever the merge put it, and every other hand's event
+stays. This hand's events are its own log's — the ones no merge stamped
+`by`, whoever they name (a model's reading in its log is its act, as
+`handOf` reads it) — and the last is the one it WROTE last, never the last
+on the board: the highest `seq` under the name this sitting writes (a
+number only rises in a sitting, and a merge that interleaves by time changes
+none); with none, the highest under the name of its last named event in the
+log; with no names at all, the last of its own in the log — a board of one
+hand undoes exactly as it always did, one event at a time, ticks never taken
+back. A mark with no authorship has no number, so among those the log's
+order stands for the order written. **An act is one dispatched event, or
+everything written inside one outermost `withTool`**: those events carry
+`act`, one number per act, one past the highest this sitting has seen (it
+only rises; provenance like `tool`, which replay ignores), so a tool's act —
+two labels, a text and its code, the duplicates — is one undo. **The field a
+tool closes before it writes anything** (a `dismiss` or `deselect` first,
+L2e's order) is an event of its own, not the act: one undo takes a label's
+words off and the field stays closed (e2e 42b). The act is dropped where it
+stands, the replay goes back to the nearest checkpoint before its first event
+(none taken with it), and `generation` moves only when an event left after it
+mints ids off the counter. Nothing else is new: the log shrank, so `publish`
+sends it whole, and every other hand's `LiveMerge` cuts the act out. The
+shard reads its acts off its own events too (`undo` in `shard-3d/src/log.ts`),
+and a failed brief's bless is dropped when it is still this hand's last act
+(`dropFailedBless`). There is no redo. The room's oracle holds every undo —
+the reader's and every other hand's, tool acts among them — to a record of
+each hand's writing kept beside it (`Writing` in `src/test/room.ts`), and
+follows it to every board that holds the log.
+
 **Two hands under one name are said — to the room and to both of them.**
 Every line carries its store's sitting id (`sid`, never shown); a second
 sitting under a name already heard is a collision: what was heard first is
@@ -2042,8 +2083,9 @@ and `name:` mark one). Taking it is `labelMarks`: one `label` event per held
 mark the person made, each through the session's door, and every mark said in
 the status line — labelled, already saying the word, or refused with whose it
 is (*not on the mark fern made — a label goes on your own ink*) — never passed
-over in silence. The field closes **before** the word is written, so the
-labels are the last events and one undo takes one off; a mark already saying
+over in silence. The field closes **before** the word is written, as an
+event of its own, and the labels are one act (L2j): one undo takes every
+label it wrote off and the field stays closed; a mark already saying
 the word writes nothing, so a second Enter or a held pill is not a second
 event. Naming and labelling one word side by side read as one thing twice,
 so the difference is said in words the field already has — each pill's

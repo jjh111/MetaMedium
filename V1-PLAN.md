@@ -247,7 +247,7 @@ suite and the gate green, `master` fast-forwarded and pushed.
 
 | Phase | Units | Done when |
 |---|---|---|
-| **0. Make week 1 whole** — ✅ done on `w2`, 27 Sep (on `master` when John lands it, L4) | L1 ids that hold · L1b one event, applied once · L2a the shard pairs by id · L2b labels on the board · L2c the shard asks · L2d duplicate Enter, fitAll, the cache measured · L2e a person labels their own ink · L2f an artifact is made by whoever blessed it · L2g a word is made by whoever wrote its letters · L2h gestures are per hand · L3 CI, bundles, docs · and L3's finding, L2i a person is the same person across sittings (27 Sep) | every unit week 1 claimed is whole, CI runs what exists (WebKit included), docs say what the code does |
+| **0. Make week 1 whole** — ✅ done on `w2`, 27 Sep (on `master` when John lands it, L4) | L1 ids that hold · L1b one event, applied once · L2a the shard pairs by id · L2b labels on the board · L2c the shard asks · L2d duplicate Enter, fitAll, the cache measured · L2e a person labels their own ink · L2f an artifact is made by whoever blessed it · L2g a word is made by whoever wrote its letters · L2h gestures are per hand · L3 CI, bundles, docs · and L3's finding, L2i a person is the same person across sittings (27 Sep) · and R4d's, L2j undo is per hand (27 Sep) | every unit week 1 claimed is whole, CI runs what exists (WebKit included), docs say what the code does |
 | **0b. A board that holds** (pulled forward by `PERF.md`, 27 Sep) | R3 no lost work · R4b the engine holds 2,000 marks · R4c the surface draws only what changed · R4d a room merges a line, not the board · R4e a brief carries what it is about | nothing is ever lost silently; a 2,000-mark board opens in under 1.5 s, answers a stroke in 16 ms at p95 and draws its reading within 100 ms; a room line costs under 16 ms; the budgets are tests |
 | **1. The backbone** | B1 tools · B2 context · B3 packs | a tool is one file; the field ranks by context with reasons; a pack is used by an event and benched |
 | **2. Editing** | E1 handles · E2 bindings follow · E3 ports, heads and figures | a selected mark reshapes by its points; bound arrows follow; notations can declare ports |
@@ -674,6 +674,101 @@ typecheck clean, both bundles equal to a fresh build; relay and field 41,
 the build's test 4; surface in sync; the canvas MCP smoke and the shard's
 (605 in 31 files, typecheck clean) all pass; the gate 412 passed and the one
 honest skip (canvas 266; shard 123 + 11 + 12); WebKit smoke 4.
+
+**L2j undo is per hand** (R4d's finding, a phase-0 follow-up). In a room,
+undo removes whatever event is last on the BOARD — the merge's order, every
+hand's log interleaved by time — which is another hand's whenever that hand
+drew after this one by the clocks; nothing is sent, since this hand's log
+did not change, and the mark comes back at the next line that changes a log.
+Undo takes back the reader's own last ACT, never another hand's: the events
+this hand wrote at once, found among its own log's events by authorship and
+the order they were written, never by where the merge put them. In a room
+the log shrinks, so L1's `publish` sends it whole and every other hand's
+`LiveMerge` (R4d) cuts the act out: the other boards lose exactly that act.
+Say what an act is — one `dispatch`, or everything written inside one
+`withTool` — and test it; redo, if it exists, redoes this hand's act; a
+single-hand board undoes as it did, one event at a time, save that a tool's
+act of several events undoes as one, with what changed said;
+`session.scenario.test.ts` untouched and `held.test.ts` green; R4d's oracle
+extended with per-hand undos, green at its default seeds and at
+`MM_ROOM_SEEDS=500`. *Red first:* two hands — A draws, B draws after, A
+undoes: A's mark gone and B's standing on both boards, in both merge orders;
+a tool act of several events undone in one step. *Invariant:* state is a
+pure function of the log. *Trap:* "the last event in my log" is not "the
+last event on the board"; find this hand's events by authorship and sitting
+(`handOf`), never by position — and a room's own-log view (`ownLog`) must
+shrink in the order it was written.
+
+**L2j status, 27 Sep 2026: done on `w2`** — `34885ff` (red: two hands in
+four merge orders, a hand with nothing of its own, the order written, tool
+acts through `withTool`, the one door and a host's stamp, the label act, a
+log read back in, another hand's tool act; 9 of 12 red), `e046c90` (red: the
+oracle holds every undo to its hand's writing), `a534e33`, `063c3ac`,
+`700da7d` (the shard), `4434d44` (the surface), and the commit carrying this
+line. `session.undo()` takes back what `session.lastAct()` names: this
+hand's own last act. Its events are its own log's — the ones no merge
+stamped `by`, whoever they name (a model's reading in its log is its act, as
+`handOf` reads it) — and the last is the one it wrote last: the highest `seq`
+under the name this sitting writes (a number only rises in a sitting, and
+the merge changes none); with none, the highest under the name of its last
+named event; with no names at all, the last of its own in the log. **An act
+is one dispatched event, or everything written inside one outermost
+`withTool`**: those events carry `act`, one number per act, one past the
+highest this sitting has seen — like the high-water mark it only rises
+through an undo, a load and a load of nothing — provenance that replay
+ignores, like `tool`. **The field a tool closes before it writes anything
+else is not the act**: a `dismiss` or `deselect` first is an event of its
+own, as L2e ordered it so that undo takes back the words and not the close
+— one undo takes every label a label act wrote off and the field stays
+closed (e2e 42b unchanged); a close after the act has begun is part of it.
+The act is dropped where it stands; every checkpoint past its first event is
+dropped (which mends R4d's latent finding: undo past ticks kept a checkpoint
+taken with the undone event, and a filter by length alone keeps checkpoints
+taken with an act in the middle of a room's board); the replay starts at the
+nearest one before it; `generation` moves only when an event left standing
+after it mints ids off the counter. Nothing else was needed in a room: the
+log shrank, `publish` sends it whole, `LiveMerge` cuts. There is no redo.
+**What changed on a board of one hand:** a tool's act of several events —
+labels on three marks, *Make it text* (the bless, its code and the
+deselect), a duplicate's copies — is one undo where it was one per event;
+everything else undoes as before, one event at a time
+(`bench/equivalence.mjs --ref=a6a66e8`: nothing reads
+differently, twelve undos from the end of the scripted log and six on the
+500-mark board included), and ticks are still never taken back.
+`session.scenario.test.ts` untouched; `held.test.ts` unchanged and green.
+`livemerge.test.ts` pinned the defect (*an undo took another hand's mark …
+and the mark comes back*); it now undoes this hand's mark from the middle of
+the board, ada's standing, and the sync has nothing to hand over. **The
+shard** reads its act — the run sharing the top event's `at` (ACT-1) — off
+its own events, not the board's top, which in a room may be the other
+hand's (its room test: red before, the tab's stroke stood with its plane
+gone). **The surface's** `dropFailedBless` asks `lastAct()` (the bless is
+still this hand's last act) instead of the board's last event; 07-input's
+undo needs no change. The oracle keeps each hand's writing beside its
+session (`Writing`, `src/test/room.ts`), independently of the engine, holds
+every undo to it — exactly that hand's last act gone, nothing else moved,
+the reader's `ownLog` always its writing in the order written — and follows
+it to every board that holds the log; hands now also take tool acts. At
+`MM_ROOM_SEEDS=500` (50 s): 8,989 checks, 1,974 undos (724 here, 1,250 by
+other hands), 491 of them with another hand's event last on the board (what
+the old undo took), 142 tool acts undone whole, 2,999 followed to another
+board and gone there. *Found, not changed:* a mark with no authorship has
+no number, so among those the log's order stands for the order written —
+a hand that wrote before it had a name, its clock set back between two
+marks, has them taken back in the clock's order once a merge has put them
+there (the room's newcomers now draw their unnamed marks a second apart);
+and a hand that came back under another name in its sitting leaves a copy
+of what it wrote before under the old name, so undoing one of those events
+leaves that copy standing on every board, the old name's (43 in the 500
+rooms). *Not built:* a gate record — the e2e files are the pencil lane's
+this week; the core's two-hand tests drive `LiveStore` and `LiveMerge` as
+the canvas does, and the gate's own undos (28d–e, 42b, 48) pass unchanged.
+Whole suite before the last commit: core 1,114 in 83 files,
+typecheck clean, both bundles equal to a fresh build; relay, field, build,
+board and scripts tests 93; surface and app in sync; the canvas MCP smoke
+and the shard's (606 in 31 files, typecheck clean) pass; the gate 520 passed
+and the one honest skip (canvas 303, keep 31, boards 19, app 14, budgets 7;
+shard 123 + 11 + 12); WebKit smoke 4.
 
 ### Phase 0b — a board that holds (pulled forward, 27 September)
 The performance baseline (`PERF.md`, R4a) measured what daily use would meet
